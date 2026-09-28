@@ -1,0 +1,6 @@
+// Meridian Basin: a stormy inland basin, late in the day.
+(
+    biome: Temperate,
+    weather: Stormy,
+    time: Dusk,
+)

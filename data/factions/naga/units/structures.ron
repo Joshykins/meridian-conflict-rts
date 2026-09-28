@@ -1,0 +1,450 @@
+// The Naga's own structures: the tech 1 core every side fields (factories, mass, power,
+// storage, point defence, anti-air, radar, walls), built as Naga machines: dark armour
+// plates lapped over bronze machinery that works. They are not ARC's buildings in black:
+// each one bends the shared job toward how the Naga fight.
+//
+// - Excavator: cuts the ore with an excavation beam and needs no power, but costs more
+//   mass up front.
+// - Star Cage: a caged star that never explodes; Star Cages can be packed tight where ARC
+//   reactors cannot.
+// - Reliquary: one building holds mass and energy both.
+// - Picket: a short-ranged brawler, more damage than a Sentinel inside its reach.
+// - Canopy: bursting flak that hurts a whole flight, not one plane.
+// - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
+// - Palisade: slow to build, very hard to cut.
+//
+// Their factories turn out the Naga's own Artificer and, until the Naga have fighting units
+// of their own, the stand-in roster's (ARC) units of their tier, poured by nanite streams
+// from fabricator heads whose mounts are in `mc_sim::print_heads`. The land and air
+// factories upgrade in place to tech 3, like ARC's; the tech 3 land factory also makes the
+// battle scorpion. Models: `models::naga::*`,
+// authored at the sizes here, so every muzzle and pivot below is the model's own number.
+[
+    // ---- Factories ----------------------------------------------------------------------
+    (
+        key: "naga_t1_land_factory",
+        name: "Anvil",
+        role: "Land Factory",
+        tech: 1,
+        categories: ["Land", "Factory"],
+        health: 4600,
+        cost: (mass: 250, energy: 2000, time: 320),
+        radius: 46, height: 22, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 20, range: 0, builds: [
+            "naga_t1_engineer", "naga_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
+        ]),
+        upgrades_to: "naga_t2_land_factory",
+        mesh: "naga_brood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 2 adds an outboard machine bank along each wing and two fabricator heads off
+    // the press block.
+    (
+        key: "naga_t2_land_factory",
+        name: "Anvil II",
+        role: "Land Factory",
+        tech: 2,
+        categories: ["Land", "Factory"],
+        health: 9200,
+        cost: (mass: 1580, energy: 12100, time: 2030),
+        radius: 46, height: 22, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 80, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
+        ]),
+        upgrades_to: "naga_t3_land_factory",
+        mesh: "naga_brood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 3 lifts the fabrication ring on four pylons, high enough for the battle scorpion
+    // to be made under it, and hangs six heads from it; blade plates over the outboard
+    // banks, a flywheel drum behind the press.
+    (
+        key: "naga_t3_land_factory",
+        name: "Anvil III",
+        role: "Land Factory",
+        tech: 3,
+        categories: ["Land", "Factory"],
+        health: 18500,
+        cost: (mass: 4840, energy: 39100, time: 5550),
+        radius: 46, height: 35, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 200, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "naga_t3_scorpion",
+        ]),
+        mesh: "naga_brood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "naga_t1_air_factory",
+        name: "Skyforge",
+        role: "Air Factory",
+        tech: 1,
+        categories: ["Land", "Air", "Factory"],
+        health: 4400,
+        cost: (mass: 250, energy: 2000, time: 320),
+        radius: 46, height: 30, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 20, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
+        ]),
+        upgrades_to: "naga_t2_air_factory",
+        mesh: "naga_hatchery", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 2 adds a flywheel press on each house's outer end and two fabricator heads on
+    // masts off the flank houses.
+    (
+        key: "naga_t2_air_factory",
+        name: "Skyforge II",
+        role: "Air Factory",
+        tech: 2,
+        categories: ["Land", "Air", "Factory"],
+        health: 8800,
+        cost: (mass: 1580, energy: 12100, time: 2030),
+        radius: 46, height: 30, footprint: (8, 8),
+        vision: 200,
+        // No reclaim carrier: the Naga reclaim nothing.
+        builder: (power: 80, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+        ]),
+        upgrades_to: "naga_t3_air_factory",
+        mesh: "naga_hatchery", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // Tech 3 raises a crown over the race on masts off the towers' heads, two more heads
+    // hung from it, and a second course of blade plates down each tower's back.
+    (
+        key: "naga_t3_air_factory",
+        name: "Skyforge III",
+        role: "Air Factory",
+        tech: 3,
+        categories: ["Land", "Air", "Factory"],
+        health: 17600,
+        cost: (mass: 4840, energy: 39100, time: 5550),
+        radius: 46, height: 38, footprint: (8, 8),
+        vision: 200,
+        builder: (power: 200, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
+        ]),
+        mesh: "naga_hatchery", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "naga_t1_naval_factory",
+        name: "Slipway",
+        role: "Naval Factory",
+        tech: 1,
+        categories: ["Naval", "Factory"],
+        health: 4600,
+        cost: (mass: 270, energy: 2100, time: 330),
+        radius: 46, height: 20, footprint: (8, 8),
+        vision: 200, water_build: true,
+        // No salvage boat: the Naga reclaim nothing.
+        builder: (power: 20, range: 0, builds: [
+            "naga_t1_engineer", "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine",
+        ]),
+        mesh: "naga_tidebrood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    // ---- Economy ------------------------------------------------------------------------
+    // Works the same ore as a Core Mine, and as well at every tier, but it digs with a beam
+    // and lifts the ore on its own gravity pinch, drawing nothing from the grid: no energy
+    // upkeep, so a Naga economy never browns out its mass. It pays for that up front, and
+    // upgrades in place through the same four tiers (`models::naga::taproot`); the fourth,
+    // like the Deep Core, opens with tech 3 and only adds a fixed yield from its shaft.
+    (
+        key: "naga_t1_extractor",
+        name: "Excavator",
+        role: "Materials Mine",
+        tech: 1,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 1200,
+        cost: (mass: 230, energy: 800, time: 200),
+        radius: 12.8, height: 11, footprint: (3, 3),
+        vision: 300, water_build: true,
+        economy: (mass_storage: 250),
+        // The beam lifts the ore with no hammer: no blows to show or hear.
+        mine: (
+            reach: 1000,
+            ground: 0.010, per_hectare: 0.9, base: 1.1, hammer: false,
+        ),
+        upgrades_to: "naga_t2_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t2_extractor",
+        name: "Excavator II",
+        role: "Materials Mine",
+        tech: 2,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 9600,
+        cost: (mass: 1700, energy: 6000, time: 900),
+        radius: 12.8, height: 15, footprint: (3, 3),
+        vision: 360, water_build: true,
+        economy: (mass_storage: 750),
+        mine: (
+            reach: 1000,
+            ground: 0.039, per_hectare: 3.6, base: 4.5, hammer: false,
+        ),
+        upgrades_to: "naga_t3_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t3_extractor",
+        name: "Excavator III",
+        role: "Materials Mine",
+        tech: 3,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 25600,
+        cost: (mass: 6900, energy: 24000, time: 1500),
+        radius: 12.8, height: 19, footprint: (3, 3),
+        vision: 420, water_build: true,
+        economy: (mass_storage: 2000),
+        mine: (
+            reach: 1000,
+            ground: 0.117, per_hectare: 10.8, base: 13.5, hammer: false,
+        ),
+        upgrades_to: "naga_t4_extractor",
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    (
+        key: "naga_t4_extractor",
+        name: "Deep Excavator",
+        role: "Materials Mine",
+        tech: 4,
+        categories: ["Land", "Economy", "Extractor"],
+        health: 48000,
+        cost: (mass: 23000, energy: 80000, time: 2400),
+        radius: 12.8, height: 19, footprint: (3, 3),
+        vision: 480, water_build: true,
+        economy: (mass_storage: 4000),
+        mine: (
+            reach: 1000,
+            ground: 0.117, per_hectare: 10.8, base: 53.5, hammer: false,
+        ),
+        mesh: "naga_taproot", icon: Extractor,
+    ),
+    // A small star held in a gravity cage: it gives what a Reactor gives, but a breached
+    // cage lets the star fall in on itself and go out, so it dies without a blast and can
+    // be packed tight. Tougher, dearer.
+    (
+        key: "naga_t1_power",
+        name: "Star Cage",
+        role: "Power Generator",
+        tech: 1,
+        categories: ["Land", "Economy", "Power"],
+        health: 1100,
+        cost: (mass: 90, energy: 420, time: 140),
+        radius: 6.9, height: 7.5, footprint: (2, 2),
+        vision: 120,
+        economy: (energy_income: 20),
+        mesh: "naga_heart", icon: Power,
+    ),
+    // The tech 2 and 3 star cores: bigger stars in more cage, on lots of their own (like
+    // Reactor II and III, built new, not upgraded). The same trade as the Star Cage: tougher
+    // and dearer than the Reactor of their tier, and no blast when the cage is breached.
+    (
+        key: "naga_t2_power",
+        name: "Star Cage II",
+        role: "Power Generator",
+        tech: 2,
+        categories: ["Land", "Economy", "Power"],
+        health: 3200,
+        cost: (mass: 840, energy: 3900, time: 1570),
+        radius: 18.75, height: 18, footprint: (4, 4),
+        vision: 160,
+        economy: (energy_income: 250),
+        mesh: "naga_heart_2", icon: Power,
+    ),
+    (
+        key: "naga_t3_power",
+        name: "Star Cage III",
+        role: "Power Generator",
+        tech: 3,
+        categories: ["Land", "Economy", "Power"],
+        health: 14000,
+        cost: (mass: 3360, energy: 15600, time: 3360),
+        radius: 42.5, height: 35, footprint: (8, 8),
+        vision: 200,
+        economy: (energy_income: 1500),
+        mesh: "naga_heart_3", icon: Power,
+    ),
+    // A mass vault between two energy cells: less mass than a Vault, less energy than a
+    // Capacitor Bank, in one lot and one build.
+    (
+        key: "naga_storage",
+        name: "Reliquary",
+        role: "Storage",
+        tech: 1,
+        categories: ["Land", "Economy", "Storage"],
+        health: 1800,
+        cost: (mass: 180, energy: 1800, time: 320),
+        radius: 12.9, height: 8, footprint: (3, 3),
+        vision: 100,
+        economy: (mass_storage: 1000, energy_storage: 3000),
+        mesh: "naga_cyst", icon: Storage,
+    ),
+    // ---- Defence ------------------------------------------------------------------------
+    // A plasmeric repeater on a squat mount: shorter reach than a Sentinel, a third more
+    // damage inside it. It wants to be where the fight comes to, not where it can see.
+    (
+        key: "naga_t1_point_defense",
+        name: "Picket",
+        role: "Point Defense",
+        tech: 1,
+        categories: ["Land", "Defense", "DirectFire"],
+        health: 1500,
+        cost: (mass: 260, energy: 2000, time: 260),
+        radius: 5.5, height: 8, footprint: (1, 1),
+        vision: 240,
+        weapons: [(
+            name: "Plasmeric Repeater",
+            // Three slugs a shot (`rounds`): 75 every 0.9 s.
+            damage: 75, splash: 1, range: 220, reload: 0.9, speed: 700, trajectory: Direct,
+            turret_turn: 160, muzzle: (5.2, 0, 6.8), pivot: (0, 0, 6),
+            targets: ["Land", "Naval"], color: Orange, red: 1.0, rounds: 3,
+            plasma_grade: Some(Plasmeric),
+            flash: 1.4, impact: 1.2, tracer: 0.8,
+            sounds: (fire: "naga_barb", impact: "shell_light"),
+        )],
+        mesh: "naga_barb", icon: Defense,
+    ),
+    // The tech 2 point defence: a Pinched-plasmeric Cannon on an armoured keep. Its slugs
+    // are plasma squeezed dense by gravity, three to a burst, and they stop in what they
+    // hit: all their weight on the one hull, next to nothing splashed. Reach and weight as
+    // a Bastion's. Placeholder name. Model: `naga_pinch_cannon` (`models::naga::pinch_guns`).
+    (
+        key: "naga_t2_point_defense",
+        name: "Halberd",
+        role: "Heavy Point Defense",
+        tech: 2,
+        categories: ["Land", "Defense", "DirectFire"],
+        health: 7800,
+        cost: (mass: 1000, energy: 9000, time: 2000),
+        radius: 10.5, height: 11, footprint: (2, 2),
+        vision: 300,
+        weapons: [(
+            name: "Pinched-plasmeric Cannon",
+            damage: 240, splash: 1, range: 520, reload: 2.4, salvo: 3, salvo_delay: 0.1,
+            speed: 900, trajectory: Direct,
+            turret_turn: 90, muzzle: (11.6, 0, 8.4), pivot: (0, 0, 8.4),
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(Pinched),
+            flash: 1.1, impact: 1.4, shockwave: 0.5,
+            sounds: (fire: "naga_pinched_cannon", impact: "naga_pinched_hit", ground: "naga_pinched_hit"),
+        )],
+        mesh: "naga_pinch_cannon", icon: Defense,
+        sounds: (death: "blast_large"),
+    ),
+    // The tech 3 point defence: a Pinch-fusion Cannon. The plasma is squeezed until it
+    // fuses, and the gun fires the fusion out as a stream of bursts, five to a shot, each
+    // flaring white where it lands. The Citadel's weight a shot, spread over five hits:
+    // it breaks heavies as the Citadel does, and wastes less on light hulls. Placeholder
+    // name. Model: `naga_fusion_cannon` (`models::naga::pinch_guns`).
+    (
+        key: "naga_t3_point_defense",
+        name: "Sunspear",
+        role: "Pinch-fusion Point Defense",
+        tech: 3,
+        categories: ["Land", "Defense", "DirectFire"],
+        health: 20000,
+        cost: (mass: 2400, energy: 22000, time: 5400),
+        radius: 20, height: 17, footprint: (4, 4),
+        vision: 360,
+        weapons: [(
+            name: "Pinch-fusion Cannon",
+            damage: 760, splash: 4, range: 620, reload: 7.5, salvo: 5, salvo_delay: 0.1,
+            speed: 1100, trajectory: Direct,
+            turret_turn: 18, muzzle: (26, 0, 14.2), pivot: (0, 0, 14.2),
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion),
+            flash: 1.4, impact: 1.8, shockwave: 1.1,
+            sounds: (fire: "naga_fusion_cannon", impact: "naga_fusion_hit", ground: "naga_fusion_hit"),
+        )],
+        mesh: "naga_fusion_cannon", icon: Defense,
+        sounds: (death: "blast_large"),
+    ),
+    // Plasmeric flak that bursts among aircraft: less on one plane than a
+    // Sparrow's rotary, but every plane in the burst takes it.
+    (
+        key: "naga_t1_aa",
+        name: "Canopy",
+        role: "AA Flak",
+        tech: 1,
+        categories: ["Land", "Naval", "Defense", "AntiAir"],
+        health: 800,
+        cost: (mass: 140, energy: 1100, time: 400),
+        radius: 5.5, height: 8.5, footprint: (1, 1),
+        vision: 450, water_build: true,
+        weapons: [(
+            name: "Plasmeric Flak Cannon",
+            damage: 30, splash: 9, range: 300, reload: 0.5, speed: 650, trajectory: Direct,
+            turret_turn: 240, muzzle: (4.4, 0, 7.4), pivot: (0, 0, 6.2),
+            targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+            plasma_grade: Some(Plasmeric),
+            flash: 1.2, impact: 1.4, tracer: 0.7,
+            sounds: (fire: "naga_spit", impact: "naga_needle_burst"),
+        )],
+        mesh: "naga_spitter", icon: AntiAir,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "naga_wall",
+        name: "Palisade",
+        role: "Wall Section",
+        tech: 1,
+        categories: ["Land", "Wall", "Defense"],
+        health: 5200,
+        cost: (mass: 4, energy: 20, time: 30),
+        radius: 6, height: 5, footprint: (1, 1),
+        vision: 0,
+        mesh: "naga_thornwall", icon: Wall,
+    ),
+    // ---- Intel --------------------------------------------------------------------------
+    // A sensor mast crowned with turning rings held floating by gravity: its radar reaches
+    // less far than a Watchtower's at every tier, but its optics see twice as far. It
+    // upgrades in place like the Watchtower, a ring a tier (`models::naga::eye`).
+    (
+        key: "naga_t1_radar",
+        name: "Orrery",
+        role: "Radar System",
+        tech: 1,
+        categories: ["Land", "Intel"],
+        health: 300,
+        cost: (mass: 90, energy: 700, time: 90),
+        radius: 7, height: 24, footprint: (2, 2),
+        vision: 500, radar: 1600,
+        economy: (energy_upkeep: 40),
+        upgrades_to: "naga_t2_radar",
+        mesh: "naga_eye", icon: Intel,
+    ),
+    (
+        key: "naga_t2_radar",
+        name: "Orrery II",
+        role: "Radar System",
+        tech: 2,
+        categories: ["Land", "Intel"],
+        health: 900,
+        cost: (mass: 200, energy: 3600, time: 780),
+        radius: 7, height: 28, footprint: (2, 2),
+        vision: 600, radar: 3200,
+        economy: (energy_upkeep: 160),
+        upgrades_to: "naga_t3_radar",
+        mesh: "naga_eye", icon: Intel,
+    ),
+    (
+        key: "naga_t3_radar",
+        name: "Orrery III",
+        role: "Radar System",
+        tech: 3,
+        categories: ["Land", "Intel"],
+        health: 2600,
+        cost: (mass: 800, energy: 11000, time: 2400),
+        radius: 7, height: 32, footprint: (2, 2),
+        vision: 720, radar: 6400,
+        economy: (energy_upkeep: 400),
+        mesh: "naga_eye", icon: Intel,
+    ),
+]

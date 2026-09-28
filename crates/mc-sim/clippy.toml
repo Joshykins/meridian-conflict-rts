@@ -1,0 +1,26 @@
+# The determinism gate (docs/ARCHITECTURE.md "Determinism rules", CLAUDE.md section 3).
+# The lints that read this list are allowed workspace-wide and switched on in this
+# crate's lib.rs, so they cover the simulation and not its tests. Presentation code
+# that must use floats says so with an `expect` naming why.
+disallowed-types = [
+    { path = "f32", reason = "sim state is fixed point (Fx, Angle); floats round differently across platforms" },
+    { path = "f64", reason = "sim state is fixed point (Fx, Angle); floats round differently across platforms" },
+    { path = "std::collections::HashMap", reason = "iteration order is random; use BTreeMap or a sorted Vec" },
+    { path = "std::collections::HashSet", reason = "iteration order is random; use BTreeSet or a sorted Vec" },
+    { path = "std::time::Instant", reason = "wall-clock time differs between peers" },
+    { path = "std::time::SystemTime", reason = "wall-clock time differs between peers" },
+]
+disallowed-methods = [
+    { path = "mc_core::Fx::to_f32", reason = "floats may not reach sim state" },
+    { path = "mc_core::Fx::to_f64", reason = "floats may not reach sim state" },
+    { path = "mc_core::Fx::from_f32", reason = "floats may not reach sim state" },
+    { path = "mc_core::FxVec2::to_f32", reason = "floats may not reach sim state" },
+    { path = "mc_core::FxVec3::to_f32", reason = "floats may not reach sim state" },
+    { path = "mc_core::Angle::to_radians_f32", reason = "floats may not reach sim state" },
+    { path = "std::time::Instant::now", reason = "wall-clock time differs between peers" },
+    { path = "std::time::SystemTime::now", reason = "wall-clock time differs between peers" },
+    { path = "std::thread::current", reason = "thread identity differs between runs" },
+    { path = "std::thread::available_parallelism", reason = "results may not depend on the worker count" },
+    { path = "slice::sort_unstable_by_key", reason = "ties land in any order; use sort_by_key, or expect this with the reason the key is unique" },
+    { path = "slice::sort_unstable_by", reason = "ties land in any order; use sort_by, or expect this with the reason no two compare equal" },
+]

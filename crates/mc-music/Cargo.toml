@@ -1,0 +1,25 @@
+[package]
+name = "mc-music"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+# The music engine: song data, the synthesisers and effects, the sequencer and
+# the adaptive director. No device code: the game and mc-studio each feed it
+# to their own output. Kept free of the other mc crates so the studio builds
+# without the renderer or the simulation.
+
+[dependencies]
+serde = { workspace = true }
+ron = { workspace = true }
+# Only for the CLI's song <-> JSON conversion, so scripts can edit songs.
+serde_json = { workspace = true }
+# Decodes the recorded instruments (data/music/samples, Ogg Vorbis).
+symphonia = { workspace = true, features = ["ogg", "vorbis"] }
+
+[[bin]]
+name = "mc-music"
+path = "src/bin/mc-music.rs"
+
+[lints]
+workspace = true

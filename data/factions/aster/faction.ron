@@ -1,0 +1,13 @@
+(
+    key: "Aster",
+    name: "Asterian Reach Command",
+    abbreviation: "ARC",
+    description: "The standing military of the Asterian Reach. Angular light-metal plating over dark gunmetal frames, with near-white blue emitters that grow denser on more advanced hardware.",
+    commander: "aster_commander",
+    plating_color: (0.16, 0.185, 0.225),
+    accent_color: (0.072, 0.082, 0.1),
+    highlight_color: (0.55, 0.85, 1.0),
+    // Shield fields: pale gold. The shader draws hits and the projector shaft from a
+    // denser amber of it, flares from a paler one.
+    shield_color: (1.0, 0.84, 0.38),
+)

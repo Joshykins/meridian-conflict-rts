@@ -1,0 +1,19 @@
+[package]
+name = "mc-map"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+mc-core = { workspace = true }
+
+[dev-dependencies]
+# tests/threshold.rs reads the survival map's sidecar.
+mc-data = { workspace = true }
+
+[[bin]]
+name = "mc-bake"
+path = "src/bin/mc-bake.rs"
+
+[lints]
+workspace = true

@@ -1,0 +1,502 @@
+// The Behemoth (`aster_t5_titan`), the first tier 5: a hundred-metre ARC siege walker.
+// Nothing else in the game is this big, and nothing it does may sound like a smaller
+// unit's sound played louder.
+//
+// - The footfall is a two-stage gesture: the leg's hydraulics straining as the foot comes
+//   down, then the impact (a sub-bass thud, ground crunching, the leg's frame taking the
+//   load with one low structural clang, the armour rattling) and the ground rumbling for
+//   seconds after. `titan_step_far` is the same footfall across the map: the boom and the
+//   roll, nothing above the low mids. The walk loop has no footfalls in it.
+// - The Tempest is six battleship-calibre barrels turning in a drum, firing faster as it
+//   winds up (about 2 shots a second a third of the way in, 7 at full speed). The spin-up
+//   is a heavy motor and the drum's detents clacking faster into a ratchet; the whir loops
+//   at full speed; the spin-down coasts to a latch. Each shot is a big gun's report over
+//   in a seventh of a second, so seven a second stay shots; its casings burst where they
+//   land (`titan_casing_land`); the hit is an explosion, not plate.
+// - The AEB-3 bore: a six-second charge (three banks switched in, the growl and the bore's
+//   stack climbing, arcs gathering), a discharge that is a thunderclap with the electric
+//   bolt torn through it, and a strike that is nearly a warhead. `titan_bore_far` is the
+//   strike from across the map.
+// - Shoulder rockets: an ignition slam and a short fluttering roar, twelve in a ripple.
+// - Its death is a reactor at this scale: nuclear, blinding, nearly all bass, and the
+//   hull coming down after it.
+//
+// Nothing whistles, rings or rises as a swoosh: pitch only climbs in a machine (the
+// motors, the banks), and noise is the first instant of a bang or a low roll. Every Roll
+// has a pinned seed, so its swells stay where they were measured (see heavy_rail.ron).
+(
+    sounds: {
+        // ---- footfalls and the walk ---------------------------------------------------
+        // The foot coming down: the leg's rams taking the weight (a groan that sinks as
+        // the load comes on, a creak in the frame), then the impact a third of a second
+        // later, and the ground rolling for seconds under it.
+        "titan_step": (
+            length: 4.0, peak: 0.9, room: 0.8,
+            layers: [
+                // Stage one: the hydraulics straining as the foot is lowered.
+                Fm(from: 96, to: 74, glide: 0.34, ratio: 1.0, index: 1.6, fade: 0.5, attack: 0.28, decay: 0.08, gain: 0.9),
+                Fm(from: 48, to: 40, glide: 0.34, ratio: 0.5, index: 2.0, fade: 0.6, attack: 0.3, decay: 0.08, gain: 1.2),
+                Fm(at: 0.08, from: 232, to: 214, glide: 0.25, ratio: 1.41, index: 0.7, fade: 0.2, attack: 0.2, decay: 0.05, gain: 0.14, pan: 0.2),
+                // Stage two: the foot lands. Ground crunching, and the thud under it.
+                Burst(at: 0.32, low: 110, high: 900, attack: 0.0006, decay: 0.028, gain: 9),
+                Burst(at: 0.322, low: 28, high: 240, attack: 0.004, decay: 0.4, gain: 20),
+                Tone(at: 0.32, from: 96, to: 34, glide: 0.18, attack: 0.002, decay: 0.3, gain: 2.0),
+                Tone(at: 0.32, from: 52, to: 27, glide: 0.6, attack: 0.004, decay: 0.85, gain: 2.0),
+                Tone(at: 0.33, from: 36, to: 25, glide: 1.1, attack: 0.012, decay: 1.3, gain: 1.1),
+                // The leg's frame taking the load: one low struck-steel clang, dull, short.
+                Fm(at: 0.326, from: 122, to: 112, glide: 0.4, ratio: 1.41, index: 1.5, fade: 0.12, attack: 0.002, decay: 0.34, gain: 0.3),
+                Fm(at: 0.33, from: 74, to: 66, glide: 0.5, ratio: 2.76, index: 0.8, fade: 0.1, attack: 0.003, decay: 0.4, gain: 0.22, pan: -0.15),
+                Drive(1.6),
+                // The shock going out over the ground.
+                Sweep(at: 0.325, from: 420, to: 55, glide: 1.1, q: 0.5, attack: 0.012, decay: 0.55, gain: 0.8),
+                // Grit and armour rattling, then clods landing.
+                Roll(at: 0.34, from: 900, to: 360, glide: 1.0, attack: 0.03, decay: 0.35, gain: 0.22, swell: 13, depth: 0.8, pan: 0.2, seed: 5101),
+                Burst(at: 0.61, low: 90, high: 650, attack: 0.001, decay: 0.03, gain: 2.4, pan: -0.35),
+                Burst(at: 0.86, low: 80, high: 560, attack: 0.001, decay: 0.035, gain: 1.6, pan: 0.4),
+                Burst(at: 1.18, low: 70, high: 480, attack: 0.002, decay: 0.04, gain: 1.0, pan: -0.1),
+                // The ground rumbling on under it.
+                Roll(at: 0.33, from: 170, to: 55, glide: 2.2, attack: 0.06, decay: 0.8, gain: 0.8, swell: 1.6, depth: 0.5, seed: 5102),
+                Roll(at: 0.42, from: 95, to: 40, glide: 2.8, attack: 0.3, decay: 1.0, gain: 0.7, swell: 0.9, depth: 0.5, pan: -0.2, seed: 5103),
+            ],
+        ),
+        // The same footfall from far across the map: no strain, no grit, no clang. A low
+        // boom arriving soft-edged, and the ground rolling on after it.
+        "titan_step_far": (
+            length: 4.0, peak: 0.8, room: 0.9,
+            layers: [
+                Burst(low: 26, high: 170, attack: 0.012, decay: 0.45, gain: 16),
+                Tone(from: 66, to: 30, glide: 0.35, attack: 0.01, decay: 0.5, gain: 1.8),
+                Tone(from: 42, to: 25, glide: 1.0, attack: 0.02, decay: 1.1, gain: 1.6),
+                Drive(1.4),
+                Roll(at: 0.02, from: 140, to: 50, glide: 2.4, attack: 0.1, decay: 0.9, gain: 0.8, swell: 1.3, depth: 0.55, seed: 5111),
+                Roll(at: 0.2, from: 90, to: 38, glide: 3.0, attack: 0.4, decay: 1.1, gain: 0.7, swell: 0.7, depth: 0.55, pan: 0.2, seed: 5112),
+                // The ground answering once, further off.
+                Burst(at: 0.9, low: 24, high: 140, attack: 0.02, decay: 0.3, gain: 5, pan: -0.3),
+            ],
+        ),
+        // Walking: the drive's deep growl and the legs' rams straining twice a loop, one
+        // leg then the other, a pump labouring under them. No footfalls (`titan_step`).
+        // Every steady frequency is a whole number of cycles in the 4 s loop.
+        "titan_walk": (
+            length: 4.0, peak: 0.34, room: 0.0, looped: true,
+            layers: [
+                // The drive: a growl on 41 Hz and its harmonics, breathing with the stride.
+                Fm(from: 41, to: 41, glide: 1, ratio: 0.5, index: 1.3, fade: 1000, attack: 0.01, decay: 100000, gain: 0.3),
+                Drone(freq: 82, gain: 0.16, wobble: 0.5, depth: 0.45),
+                Drone(freq: 123, gain: 0.1, wobble: 0.5, depth: 0.5, pan: -0.1),
+                Drone(freq: 164, gain: 0.06, wobble: 0.5, depth: 0.55, pan: 0.1),
+                // The pump: a low chug under everything.
+                Drone(freq: 61.5, gain: 0.08, wobble: 6, depth: 0.5),
+                // Each leg's rams straining up to the lift and sinking as it swings.
+                Fm(at: 0.1, from: 62, to: 88, glide: 1.1, ratio: 1.0, index: 1.4, fade: 1.5, attack: 1.0, decay: 0.5, gain: 0.3, pan: -0.25),
+                Fm(at: 0.1, from: 124, to: 176, glide: 1.1, ratio: 1.41, index: 0.5, fade: 1.0, attack: 1.0, decay: 0.4, gain: 0.05, pan: -0.25),
+                Fm(at: 2.1, from: 60, to: 84, glide: 1.1, ratio: 1.0, index: 1.4, fade: 1.5, attack: 1.0, decay: 0.5, gain: 0.3, pan: 0.25),
+                Fm(at: 2.1, from: 120, to: 168, glide: 1.1, ratio: 1.41, index: 0.5, fade: 1.0, attack: 1.0, decay: 0.4, gain: 0.05, pan: 0.25),
+                // The valves letting go at the top of each lift: a dull clunk.
+                Burst(at: 1.15, low: 70, high: 500, attack: 0.001, decay: 0.03, gain: 1.4, pan: -0.25),
+                Burst(at: 3.15, low: 70, high: 500, attack: 0.001, decay: 0.03, gain: 1.4, pan: 0.25),
+                Drive(1.3),
+                // The machine's weight in the ground, low.
+                Rumble(freq: 90, q: 0.8, gain: 4.0, wobble: 0.5, depth: 0.5),
+            ],
+        ),
+
+        // ---- the Tempest rotary cannon --------------------------------------------------
+        // The barrels starting to turn (`spin`, as the spin-up begins; the gun opens fire a
+        // third of the way in and fires faster as it winds up). A clutch going in, then a
+        // heavy motor and the drum's weight climbing together, the drum's detents clacking
+        // slow and heavy and then faster and faster into a ratchet, handing over to the
+        // whir at full speed (`titan_gatling_whir`, which ends on the same notes).
+        "titan_gatling_spin": (
+            length: 3.6, peak: 0.55, room: 0.35,
+            layers: [
+                // The clutch going in.
+                Burst(low: 55, high: 600, attack: 0.0006, decay: 0.035, gain: 5.5),
+                Tone(from: 76, to: 38, glide: 0.1, attack: 0.002, decay: 0.2, gain: 0.6),
+                // The motor and the drum: a reedy growl and its octave climbing with the speed.
+                Fm(at: 0.02, from: 20, to: 64, glide: 2.45, ratio: 0.5, index: 1.6, fade: 6.0, attack: 2.4, decay: 0.3, gain: 0.85),
+                Fm(at: 0.04, from: 40, to: 128, glide: 2.45, ratio: 1.0, index: 1.2, fade: 4.0, attack: 2.35, decay: 0.28, gain: 0.35),
+                // The gear train, low in the mix.
+                Tone(at: 0.3, from: 150, to: 470, glide: 2.2, attack: 2.2, decay: 0.25, gain: 0.05, pan: -0.1),
+                Tone(at: 0.3, from: 152, to: 476, glide: 2.2, attack: 2.2, decay: 0.25, gain: 0.04, pan: 0.1),
+                // The detents: slow heavy clacks, then quicker, lighter and closer into a ratchet.
+                Burst(at: 0.25, low: 80, high: 750, attack: 0.0008, decay: 0.024, gain: 2.4, pan: 0.2),
+                Tone(at: 0.25, from: 115, to: 66, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.3, pan: 0.2),
+                Burst(at: 0.658, low: 83, high: 770, attack: 0.0008, decay: 0.023, gain: 2.5, pan: -0.2),
+                Tone(at: 0.658, from: 121, to: 70, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.3, pan: -0.2),
+                Burst(at: 0.939, low: 86, high: 791, attack: 0.0008, decay: 0.022, gain: 2.6, pan: 0.2),
+                Tone(at: 0.939, from: 127, to: 73, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.3, pan: 0.2),
+                Burst(at: 1.168, low: 90, high: 812, attack: 0.0008, decay: 0.021, gain: 2.7, pan: -0.2),
+                Tone(at: 1.168, from: 133, to: 77, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.3, pan: -0.2),
+                Burst(at: 1.366, low: 93, high: 833, attack: 0.0008, decay: 0.02, gain: 2.8, pan: 0.2),
+                Tone(at: 1.366, from: 139, to: 80, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.3, pan: 0.2),
+                Burst(at: 1.543, low: 96, high: 854, attack: 0.0008, decay: 0.019, gain: 2.9, pan: -0.2),
+                Burst(at: 1.704, low: 100, high: 875, attack: 0.0008, decay: 0.018, gain: 3.0, pan: 0.2),
+                Burst(at: 1.853, low: 103, high: 895, attack: 0.0008, decay: 0.017, gain: 3.1, pan: -0.2),
+                Burst(at: 1.993, low: 106, high: 916, attack: 0.0008, decay: 0.016, gain: 3.2, pan: 0.2),
+                Burst(at: 2.125, low: 110, high: 937, attack: 0.0008, decay: 0.015, gain: 3.3, pan: -0.2),
+                Burst(at: 2.25, low: 113, high: 958, attack: 0.0008, decay: 0.014, gain: 3.4, pan: 0.2),
+                Burst(at: 2.369, low: 116, high: 979, attack: 0.0008, decay: 0.013, gain: 3.5, pan: -0.2),
+                Burst(at: 2.483, low: 120, high: 1000, attack: 0.0008, decay: 0.012, gain: 3.6, pan: 0.2),
+                Drive(1.3),
+            ],
+        ),
+        // The barrels at full speed, round and round while the gun turns: the drum's growl
+        // on 64 Hz with its octave, pulsing nine times a second with the barrels passing,
+        // the gear train humming, and the detents' ratchet. Every steady frequency is a
+        // whole number of cycles in the 2 s loop, and the clacks fall on the fold.
+        "titan_gatling_whir": (
+            length: 2.0, peak: 0.34, room: 0.0, looped: true,
+            layers: [
+                Fm(from: 64, to: 64, glide: 1, ratio: 0.5, index: 1.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.35),
+                Drone(freq: 128, gain: 0.16, wobble: 9, depth: 0.45),
+                Drone(freq: 192, gain: 0.07, wobble: 9, depth: 0.5, pan: -0.1),
+                Drone(freq: 256, gain: 0.035, wobble: 4.5, depth: 0.5, pan: 0.1),
+                Drone(freq: 470, gain: 0.018, wobble: 1.5, depth: 0.4),
+                Drive(1.3),
+                Rumble(freq: 110, q: 0.8, gain: 3.0, wobble: 9, depth: 0.5),
+                Burst(at: 0.0, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 3.0, pan: 0.2, seed: 61),
+                Burst(at: 0.1111, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 62),
+                Burst(at: 0.2222, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: 0.2, seed: 63),
+                Burst(at: 0.3333, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 64),
+                Burst(at: 0.4444, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: 0.2, seed: 65),
+                Burst(at: 0.5556, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 66),
+                Burst(at: 0.6667, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 3.0, pan: 0.2, seed: 67),
+                Burst(at: 0.7778, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 68),
+                Burst(at: 0.8889, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: 0.2, seed: 69),
+                Burst(at: 1.0, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 70),
+                Burst(at: 1.1111, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: 0.2, seed: 71),
+                Burst(at: 1.2222, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 72),
+                Burst(at: 1.3333, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 3.0, pan: 0.2, seed: 73),
+                Burst(at: 1.4444, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 74),
+                Burst(at: 1.5556, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: 0.2, seed: 75),
+                Burst(at: 1.6667, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 76),
+                Burst(at: 1.7778, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: 0.2, seed: 77),
+                Burst(at: 1.8889, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 78),
+                Burst(at: 2.0, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 3.0, pan: 0.2, seed: 61),
+                Burst(at: 2.1111, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: -0.2, seed: 62),
+                Burst(at: 2.2222, low: 120, high: 1000, attack: 0.0008, decay: 0.01, gain: 2.1, pan: 0.2, seed: 63),
+            ],
+        ),
+        // The barrels coasting down when there is nothing left to shoot: the growl falling,
+        // the ratchet opening out into slower and slower clacks, then the drum latching.
+        "titan_gatling_spindown": (
+            length: 3.6, peak: 0.5, room: 0.35,
+            layers: [
+                Fm(from: 64, to: 18, glide: 2.9, ratio: 0.5, index: 1.4, fade: 4.0, attack: 0.02, decay: 1.2, gain: 0.85),
+                Fm(from: 128, to: 36, glide: 2.9, ratio: 1.0, index: 1.0, fade: 3.0, attack: 0.02, decay: 0.9, gain: 0.35),
+                Tone(from: 470, to: 140, glide: 2.4, attack: 0.02, decay: 0.6, gain: 0.045, pan: -0.1),
+                Tone(from: 476, to: 142, glide: 2.4, attack: 0.02, decay: 0.6, gain: 0.035, pan: 0.1),
+                Burst(at: 0.056, low: 120, high: 1000, attack: 0.0008, decay: 0.012, gain: 3.2, pan: 0.2),
+                Burst(at: 0.172, low: 116, high: 979, attack: 0.0008, decay: 0.013, gain: 3.08, pan: -0.2),
+                Burst(at: 0.292, low: 113, high: 958, attack: 0.0008, decay: 0.014, gain: 2.97, pan: 0.2),
+                Burst(at: 0.418, low: 110, high: 937, attack: 0.0008, decay: 0.015, gain: 2.85, pan: -0.2),
+                Burst(at: 0.551, low: 106, high: 916, attack: 0.0008, decay: 0.016, gain: 2.73, pan: 0.2),
+                Burst(at: 0.691, low: 103, high: 895, attack: 0.0008, decay: 0.017, gain: 2.62, pan: -0.2),
+                Burst(at: 0.84, low: 100, high: 875, attack: 0.0008, decay: 0.018, gain: 2.5, pan: 0.2),
+                Burst(at: 1.0, low: 96, high: 854, attack: 0.0008, decay: 0.019, gain: 2.38, pan: -0.2),
+                Burst(at: 1.174, low: 93, high: 833, attack: 0.0008, decay: 0.02, gain: 2.27, pan: 0.2),
+                Burst(at: 1.367, low: 90, high: 812, attack: 0.0008, decay: 0.021, gain: 2.15, pan: -0.2),
+                Tone(at: 1.367, from: 110, to: 63, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.25, pan: -0.2),
+                Burst(at: 1.586, low: 86, high: 791, attack: 0.0008, decay: 0.022, gain: 2.03, pan: 0.2),
+                Tone(at: 1.586, from: 106, to: 61, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.25, pan: 0.2),
+                Burst(at: 1.845, low: 83, high: 770, attack: 0.0008, decay: 0.023, gain: 1.92, pan: -0.2),
+                Tone(at: 1.845, from: 102, to: 59, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.25, pan: -0.2),
+                Burst(at: 2.184, low: 80, high: 750, attack: 0.0008, decay: 0.024, gain: 1.8, pan: 0.2),
+                Tone(at: 2.184, from: 98, to: 56, glide: 0.03, attack: 0.001, decay: 0.06, gain: 0.25, pan: 0.2),
+                // The drum stopping and latching: a heavy clunk and a short dull clank.
+                Burst(at: 2.72, low: 55, high: 650, attack: 0.0006, decay: 0.035, gain: 5.5),
+                Tone(at: 2.72, from: 88, to: 40, glide: 0.08, attack: 0.002, decay: 0.18, gain: 0.65),
+                Fm(at: 2.725, from: 190, to: 176, glide: 0.1, ratio: 1.41, index: 1.2, fade: 0.04, attack: 0.001, decay: 0.07, gain: 0.12),
+                Drive(1.3),
+            ],
+        ),
+        // One barrel firing: a battleship gun on a slow heavy beat, two-odd a second. A
+        // crack held low, a big-gun bark and a long boom with the thump under it, the report
+        // rolling away over the field, and the breech clanking round as the next barrel
+        // comes up. The roll just reaches the next shot, so a burst is a pounding, not a rattle.
+        "titan_gatling_fire": (
+            length: 3.0, peak: 0.9, room: 0.55,
+            layers: [
+                Burst(low: 350, high: 1600, attack: 0.0002, decay: 0.008, gain: 14),
+                Burst(low: 70, high: 480, attack: 0.0005, decay: 0.05, gain: 26),
+                Burst(at: 0.001, low: 26, high: 180, attack: 0.002, decay: 0.16, gain: 20),
+                Tone(from: 150, to: 40, glide: 0.07, attack: 0.0008, decay: 0.08, gain: 1.7),
+                Tone(from: 76, to: 26, glide: 0.2, attack: 0.0012, decay: 0.2, gain: 1.8),
+                Tone(from: 44, to: 22, glide: 0.4, attack: 0.003, decay: 0.34, gain: 1.2),
+                Drive(2.0),
+                // The report rolling off over the field.
+                Roll(at: 0.005, from: 240, to: 60, glide: 0.9, attack: 0.015, decay: 0.45, gain: 0.55, swell: 4.0, depth: 0.45, pan: 0.15, seed: 5221),
+                // The low end hanging on under it.
+                Roll(at: 0.01, from: 110, to: 38, glide: 1.4, attack: 0.04, decay: 0.55, gain: 0.5, swell: 2.0, depth: 0.4, seed: 5222),
+                // The breech: a dull clank as the spent barrel turns away.
+                Burst(at: 0.055, low: 250, high: 1300, attack: 0.0005, decay: 0.008, gain: 1.4, pan: -0.25),
+                Fm(at: 0.055, from: 240, to: 226, glide: 0.05, ratio: 1.41, index: 1.0, fade: 0.02, attack: 0.001, decay: 0.03, gain: 0.07, pan: -0.25),
+            ],
+        ),
+        // A spent casing coming down and bursting: a steel knock as it hits, the burst
+        // (a thump-crack, bass under it), and the case's pieces tumbling away, clanking
+        // dull and low, fewer and further.
+        "titan_casing_land": (
+            length: 1.8, peak: 0.7, room: 0.5,
+            layers: [
+                Fm(from: 172, to: 160, glide: 0.2, ratio: 1.41, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.12, gain: 0.3),
+                Burst(low: 200, high: 1300, attack: 0.0004, decay: 0.012, gain: 6),
+                Burst(at: 0.03, low: 300, high: 1700, attack: 0.0003, decay: 0.008, gain: 9),
+                Burst(at: 0.031, low: 45, high: 400, attack: 0.001, decay: 0.08, gain: 20),
+                Burst(at: 0.033, low: 30, high: 180, attack: 0.003, decay: 0.22, gain: 10),
+                Tone(at: 0.03, from: 130, to: 38, glide: 0.1, attack: 0.001, decay: 0.14, gain: 1.6),
+                Tone(at: 0.03, from: 66, to: 26, glide: 0.35, attack: 0.002, decay: 0.35, gain: 1.2),
+                Drive(1.6),
+                Sweep(at: 0.035, from: 480, to: 70, glide: 0.6, q: 0.6, attack: 0.01, decay: 0.25, gain: 0.45),
+                // Pieces tumbling: dull clanks, each lower and softer.
+                Burst(at: 0.21, low: 150, high: 900, attack: 0.0006, decay: 0.012, gain: 2.6, pan: 0.35),
+                Fm(at: 0.21, from: 214, to: 206, glide: 0.05, ratio: 1.41, index: 1.2, fade: 0.04, attack: 0.001, decay: 0.09, gain: 0.12, pan: 0.35),
+                Burst(at: 0.37, low: 140, high: 850, attack: 0.0006, decay: 0.012, gain: 1.9, pan: -0.3),
+                Fm(at: 0.37, from: 186, to: 180, glide: 0.05, ratio: 1.41, index: 1.2, fade: 0.04, attack: 0.001, decay: 0.08, gain: 0.09, pan: -0.3),
+                Burst(at: 0.49, low: 130, high: 800, attack: 0.0006, decay: 0.01, gain: 1.3, pan: 0.15),
+                Fm(at: 0.49, from: 198, to: 192, glide: 0.05, ratio: 1.41, index: 1.0, fade: 0.03, attack: 0.001, decay: 0.06, gain: 0.06, pan: 0.15),
+                Burst(at: 0.6, low: 120, high: 700, attack: 0.0006, decay: 0.01, gain: 0.8, pan: -0.1),
+            ],
+        ),
+        // The slug arriving: an explosion first, a dull steel knock in it, earth thrown up.
+        "titan_rail_hit": (
+            length: 2.4, peak: 0.84, room: 0.6,
+            layers: [
+                Burst(low: 250, high: 1600, attack: 0.0003, decay: 0.01, gain: 8),
+                Burst(at: 0.001, low: 50, high: 450, attack: 0.001, decay: 0.1, gain: 24),
+                Burst(at: 0.004, low: 28, high: 180, attack: 0.004, decay: 0.32, gain: 12),
+                Tone(from: 130, to: 32, glide: 0.14, attack: 0.001, decay: 0.18, gain: 1.8),
+                Tone(from: 68, to: 24, glide: 0.4, attack: 0.002, decay: 0.42, gain: 1.5),
+                Tone(from: 42, to: 22, glide: 0.8, attack: 0.008, decay: 0.7, gain: 0.8),
+                Fm(at: 0.005, from: 96, to: 78, glide: 0.2, ratio: 1.41, index: 1.6, fade: 0.04, attack: 0.001, decay: 0.12, gain: 0.3),
+                Drive(1.7),
+                Sweep(at: 0.005, from: 600, to: 80, glide: 0.8, q: 0.6, attack: 0.01, decay: 0.38, gain: 0.7),
+                Roll(at: 0.06, from: 1100, to: 450, glide: 1.0, attack: 0.04, decay: 0.4, gain: 0.2, swell: 9, depth: 0.6, pan: 0.2, seed: 5211),
+                Roll(at: 0.08, from: 160, to: 55, glide: 1.8, attack: 0.1, decay: 0.6, gain: 0.5, swell: 1.2, depth: 0.5, pan: -0.2, seed: 5212),
+                Burst(at: 0.55, low: 70, high: 480, attack: 0.001, decay: 0.04, gain: 2.4, pan: -0.4),
+                Burst(at: 0.88, low: 60, high: 420, attack: 0.002, decay: 0.05, gain: 1.5, pan: 0.45),
+            ],
+        ),
+
+        // ---- the AEB-3 Cataclysm Bore -------------------------------------------------
+        // Six seconds: three banks switched in one after another, each lifting the growl;
+        // the bore's own stack and a low whine climbing the whole way; the air round the
+        // arm ionising and the arcs jumping closer and harder; a sub swell at the top.
+        "titan_bore_charge": (
+            length: 6.6, peak: 0.55, room: 0.4,
+            layers: [
+                // The banks closing, heavier each time.
+                Burst(low: 60, high: 650, attack: 0.0006, decay: 0.03, gain: 4.5),
+                Tone(from: 66, to: 36, glide: 0.1, attack: 0.002, decay: 0.2, gain: 0.45),
+                Burst(at: 1.6, low: 55, high: 600, attack: 0.0006, decay: 0.035, gain: 5.5, seed: 21),
+                Tone(at: 1.6, from: 62, to: 34, glide: 0.1, attack: 0.002, decay: 0.25, gain: 0.55),
+                Burst(at: 3.2, low: 50, high: 560, attack: 0.0006, decay: 0.04, gain: 6.5, seed: 22),
+                Tone(at: 3.2, from: 58, to: 32, glide: 0.1, attack: 0.002, decay: 0.3, gain: 0.65),
+                // The transformer growl, the whole six seconds.
+                Fm(at: 0.03, from: 26, to: 58, glide: 5.9, ratio: 0.5, index: 2.4, fade: 12.0, attack: 5.9, decay: 0.12, gain: 1.0),
+                Fm(at: 0.05, from: 52, to: 116, glide: 5.9, ratio: 2.0, index: 1.2, fade: 8.0, attack: 5.9, decay: 0.1, gain: 0.4),
+                // The bore's own voice filling: the stack, climbing.
+                Stack(at: 0.2, from: 60, to: 210, glide: 5.8, attack: 5.75, decay: 0.08, gain: 0.35, detune: 1.008, width: 0.3,
+                      partials: [(1, 1.0), (2, 0.5), (3, 0.28), (4.2, 0.12)]),
+                // The banks' whine, low in the mix.
+                Tone(at: 1.0, from: 280, to: 900, glide: 5.0, attack: 5.0, decay: 0.08, gain: 0.05, pan: -0.1),
+                Tone(at: 1.0, from: 282, to: 907, glide: 5.0, attack: 5.0, decay: 0.08, gain: 0.04, pan: 0.1),
+                // The ground humming, and the sub swell in the last second.
+                Roll(at: 0.4, from: 70, to: 120, glide: 5.5, attack: 5.5, decay: 0.12, gain: 0.45, swell: 3, depth: 0.5, seed: 5301),
+                Tone(at: 4.8, from: 36, to: 50, glide: 1.2, attack: 1.2, decay: 0.12, gain: 0.6),
+                Drive(1.35),
+                // The air ionising: a crackle bed that swells and thickens.
+                Roll(at: 2.2, from: 700, to: 1800, glide: 3.8, attack: 3.8, decay: 0.1, gain: 0.18, swell: 14, depth: 0.85, pan: -0.3, seed: 5302),
+                Roll(at: 3.4, from: 850, to: 2000, glide: 2.6, attack: 2.6, decay: 0.1, gain: 0.16, swell: 19, depth: 0.85, pan: 0.35, seed: 5303),
+                // Single arcs jumping, closer together and harder as it fills.
+                Burst(at: 1.9, low: 300, high: 1700, attack: 0.0005, decay: 0.012, gain: 1.2, pan: 0.4),
+                Burst(at: 2.7, low: 300, high: 1700, attack: 0.0005, decay: 0.013, gain: 1.5, pan: -0.35),
+                Burst(at: 3.35, low: 290, high: 1800, attack: 0.0005, decay: 0.014, gain: 1.8, pan: 0.2),
+                Burst(at: 3.9, low: 280, high: 1800, attack: 0.0005, decay: 0.015, gain: 2.2, pan: -0.5),
+                Burst(at: 4.3, low: 270, high: 1900, attack: 0.0005, decay: 0.016, gain: 2.6, pan: 0.45),
+                Burst(at: 4.65, low: 260, high: 1900, attack: 0.0005, decay: 0.017, gain: 3.0, pan: -0.15),
+                Burst(at: 4.95, low: 250, high: 2000, attack: 0.0005, decay: 0.018, gain: 3.3, pan: 0.3),
+                Burst(at: 5.2, low: 240, high: 2000, attack: 0.0005, decay: 0.02, gain: 3.6, pan: -0.4),
+                Burst(at: 5.4, low: 230, high: 2000, attack: 0.0005, decay: 0.02, gain: 3.9, pan: 0.1),
+                Burst(at: 5.56, low: 220, high: 2100, attack: 0.0005, decay: 0.022, gain: 4.1, pan: 0.45),
+                Burst(at: 5.7, low: 220, high: 2100, attack: 0.0005, decay: 0.024, gain: 4.3, pan: -0.25),
+                Burst(at: 5.81, low: 210, high: 2100, attack: 0.0005, decay: 0.026, gain: 4.5, pan: 0.2),
+                Burst(at: 5.9, low: 200, high: 2100, attack: 0.0005, decay: 0.03, gain: 4.8, pan: -0.1),
+            ],
+        ),
+        // The discharge: the whole charge down the channel at once. A snap, the bolt
+        // tearing (the bore's buzzing stack, falling), a thunderclap with a chest-deep
+        // slam under it, then the thunder rolling off the country for seconds.
+        "titan_bore_fire": (
+            length: 7.5, peak: 0.9, room: 0.9,
+            layers: [
+                // The channel lighting.
+                Burst(low: 600, high: 2400, attack: 0.0002, decay: 0.005, gain: 12),
+                Burst(low: 150, high: 1100, attack: 0.0004, decay: 0.03, gain: 24),
+                // The bolt tearing through: the bore's voice, huge and falling.
+                Stack(from: 480, to: 80, glide: 0.28, attack: 0.001, decay: 0.34, gain: 1.4, detune: 1.012, width: 0.3,
+                      partials: [(1, 1.0), (1.5, 0.6), (2, 0.45), (3, 0.25), (4.1, 0.1)]),
+                Fm(from: 360, to: 70, glide: 0.3, ratio: 1.33, index: 2.6, fade: 0.14, attack: 0.001, decay: 0.34, gain: 0.7),
+                // The thunderclap: the slam and the heave under it.
+                Burst(at: 0.003, low: 30, high: 220, attack: 0.004, decay: 0.6, gain: 20),
+                Tone(from: 160, to: 40, glide: 0.1, attack: 0.001, decay: 0.24, gain: 2.0),
+                Tone(from: 80, to: 27, glide: 0.4, attack: 0.002, decay: 0.8, gain: 2.2),
+                Tone(from: 46, to: 22, glide: 1.2, attack: 0.008, decay: 1.4, gain: 1.3),
+                // The air itself tearing, held for most of a second.
+                Roll(at: 0.003, from: 400, to: 100, glide: 1.2, attack: 0.01, decay: 0.7, gain: 1.8, swell: 5, depth: 0.5, seed: 5311),
+                Drive(2.0),
+                // The thunder rolling away off both sides, and the long low roll behind it.
+                Roll(at: 0.06, from: 380, to: 120, glide: 2.0, attack: 0.05, decay: 1.3, gain: 0.5, swell: 2.2, depth: 0.5, pan: -0.45, seed: 5312),
+                Roll(at: 0.35, from: 320, to: 100, glide: 2.6, attack: 0.25, decay: 1.5, gain: 0.36, swell: 1.7, depth: 0.55, pan: 0.45, seed: 5313),
+                Roll(at: 0.2, from: 140, to: 50, glide: 5.0, attack: 0.5, decay: 1.9, gain: 0.5, swell: 0.6, depth: 0.5, seed: 5314),
+                // Returns off the hills, each further, lower and wider.
+                Burst(at: 0.6, low: 110, high: 800, attack: 0.001, decay: 0.03, gain: 5, pan: 0.45),
+                Tone(at: 0.6, from: 72, to: 30, glide: 0.35, attack: 0.004, decay: 0.5, gain: 0.4, pan: 0.45),
+                Burst(at: 1.45, low: 80, high: 560, attack: 0.002, decay: 0.06, gain: 3.2, pan: -0.5),
+                Tone(at: 1.45, from: 58, to: 27, glide: 0.5, attack: 0.008, decay: 0.7, gain: 0.3, pan: -0.5),
+                Burst(at: 2.6, low: 60, high: 400, attack: 0.004, decay: 0.12, gain: 2.0, pan: 0.25),
+                Tone(at: 2.6, from: 48, to: 25, glide: 0.7, attack: 0.02, decay: 0.9, gain: 0.2, pan: 0.25),
+                Drive(1.5),
+            ],
+        ),
+        // The strike: nearly a warhead. The discharge snapping and crackling over the
+        // mark, a slam and a sub-bass thump that take seconds to let go, the ground
+        // heaving twice as the front goes out and comes back, and the roll for seconds.
+        "titan_bore_strike": (
+            length: 9.0, peak: 0.9, room: 1.0,
+            layers: [
+                // The discharge landing.
+                Burst(low: 500, high: 2400, attack: 0.0002, decay: 0.006, gain: 10),
+                Burst(low: 120, high: 1000, attack: 0.0005, decay: 0.035, gain: 14),
+                Stack(from: 400, to: 70, glide: 0.22, attack: 0.001, decay: 0.3, gain: 1.1, detune: 1.012, width: 0.25,
+                      partials: [(1, 1.0), (1.5, 0.55), (2, 0.4), (3, 0.2)]),
+                // The detonation: everything at once, and low.
+                Burst(at: 0.002, low: 40, high: 420, attack: 0.002, decay: 0.3, gain: 18),
+                Burst(at: 0.004, low: 30, high: 200, attack: 0.008, decay: 0.9, gain: 14),
+                Tone(from: 140, to: 50, glide: 0.2, attack: 0.002, decay: 0.45, gain: 2.2),
+                Tone(from: 82, to: 34, glide: 0.7, attack: 0.004, decay: 1.2, gain: 2.6),
+                Tone(from: 50, to: 26, glide: 1.8, attack: 0.01, decay: 1.9, gain: 1.6),
+                Roll(from: 260, to: 85, glide: 2.0, attack: 0.02, decay: 1.6, gain: 2.2, swell: 3.0, depth: 0.5, seed: 5321),
+                // The ground heaving as the front passes, and again as it comes back.
+                Burst(at: 1.1, low: 32, high: 240, attack: 0.006, decay: 0.4, gain: 8, pan: -0.3),
+                Tone(at: 1.1, from: 88, to: 36, glide: 0.7, attack: 0.006, decay: 0.9, gain: 1.4, pan: -0.3),
+                Burst(at: 2.3, low: 30, high: 200, attack: 0.008, decay: 0.5, gain: 5.5, pan: 0.35),
+                Tone(at: 2.3, from: 74, to: 32, glide: 0.9, attack: 0.008, decay: 1.1, gain: 1.1, pan: 0.35),
+                Drive(1.8),
+                // The discharge's crackle over the mark, thinning out.
+                Burst(at: 0.09, low: 260, high: 1500, attack: 0.0005, decay: 0.012, gain: 3.2, pan: 0.4),
+                Burst(at: 0.17, low: 280, high: 1400, attack: 0.0005, decay: 0.01, gain: 2.8, pan: -0.35),
+                Burst(at: 0.24, low: 240, high: 1500, attack: 0.0005, decay: 0.014, gain: 3.0, pan: 0.1),
+                Burst(at: 0.36, low: 300, high: 1300, attack: 0.0005, decay: 0.01, gain: 2.4, pan: -0.5),
+                Burst(at: 0.51, low: 260, high: 1400, attack: 0.0005, decay: 0.012, gain: 2.0, pan: 0.45),
+                Burst(at: 0.72, low: 280, high: 1300, attack: 0.0005, decay: 0.01, gain: 1.6, pan: -0.2),
+                Burst(at: 0.98, low: 250, high: 1200, attack: 0.0005, decay: 0.012, gain: 1.2, pan: 0.3),
+                Burst(at: 1.35, low: 260, high: 1200, attack: 0.0005, decay: 0.01, gain: 0.8, pan: -0.4),
+                // The roll: thunder going away in every direction, low and long.
+                Roll(at: 0.1, from: 300, to: 100, glide: 3.0, attack: 0.25, decay: 1.8, gain: 1.0, swell: 1.2, depth: 0.7, seed: 5322),
+                Roll(at: 0.5, from: 180, to: 66, glide: 5.0, attack: 1.0, decay: 1.9, gain: 0.85, swell: 0.7, depth: 0.85, pan: -0.5, seed: 5323),
+                Roll(at: 0.7, from: 170, to: 62, glide: 5.5, attack: 1.2, decay: 2.0, gain: 0.85, swell: 0.6, depth: 0.85, pan: 0.5, seed: 5324),
+                Roll(at: 0.3, from: 95, to: 45, glide: 6.0, attack: 0.8, decay: 2.1, gain: 1.0, swell: 0.4, depth: 0.7, seed: 5325),
+                // What was hit burning: a low roar that sinks away.
+                Sweep(at: 1.5, from: 140, to: 70, glide: 4.0, q: 0.7, attack: 1.2, decay: 1.6, gain: 0.4),
+                Drive(1.4),
+            ],
+        ),
+        // The strike from across the map: a low boom with a soft edge and the roll.
+        "titan_bore_far": (
+            length: 9.0, peak: 0.85, room: 1.0,
+            layers: [
+                Burst(low: 26, high: 170, attack: 0.015, decay: 0.8, gain: 16),
+                Tone(from: 72, to: 30, glide: 0.6, attack: 0.012, decay: 0.9, gain: 2.0),
+                Tone(from: 46, to: 24, glide: 1.6, attack: 0.02, decay: 1.8, gain: 1.8),
+                Drive(1.5),
+                Roll(at: 0.05, from: 170, to: 60, glide: 4.0, attack: 0.2, decay: 1.8, gain: 0.9, swell: 1.0, depth: 0.7, seed: 5331),
+                Roll(at: 0.4, from: 110, to: 42, glide: 6.0, attack: 0.8, decay: 2.1, gain: 0.8, swell: 0.5, depth: 0.8, pan: -0.35, seed: 5332),
+                Roll(at: 0.6, from: 105, to: 40, glide: 6.0, attack: 1.0, decay: 2.1, gain: 0.7, swell: 0.45, depth: 0.8, pan: 0.35, seed: 5333),
+                Burst(at: 1.3, low: 24, high: 150, attack: 0.02, decay: 0.45, gain: 6, pan: -0.3),
+                Burst(at: 2.6, low: 22, high: 130, attack: 0.03, decay: 0.5, gain: 4, pan: 0.3),
+            ],
+        ),
+
+        // ---- the Hailstorm pods -------------------------------------------------------
+        // One rocket leaving its pod: the motor lighting with a slam, a shove of bass, and
+        // a short fluttering roar that falls away as it climbs out.
+        "titan_rockets": (
+            length: 1.5, peak: 0.5, room: 0.45,
+            layers: [
+                Burst(low: 100, high: 1000, attack: 0.0006, decay: 0.03, gain: 7),
+                Burst(at: 0.002, low: 40, high: 260, attack: 0.002, decay: 0.12, gain: 9),
+                Tone(from: 120, to: 44, glide: 0.1, attack: 0.002, decay: 0.14, gain: 0.9),
+                Fm(at: 0.005, from: 46, to: 38, glide: 0.5, ratio: 0.5, index: 1.6, fade: 0.4, attack: 0.02, decay: 0.4, gain: 0.45),
+                Drive(1.4),
+                Roll(at: 0.01, from: 700, to: 240, glide: 1.0, attack: 0.02, decay: 0.36, gain: 0.9, swell: 22, depth: 0.55, pan: 0.15, seed: 5401),
+                Roll(at: 0.01, from: 160, to: 80, glide: 1.0, attack: 0.03, decay: 0.4, gain: 0.6, swell: 8, depth: 0.4, seed: 5402),
+            ],
+        ),
+
+        // ---- death ----------------------------------------------------------------------
+        // The reactor going. A containment crack, a breath, then the detonation: all low,
+        // a slam and a sub thump that take seconds to let go, the ground heaving; the rail
+        // banks and rocket pods cooking off as dull deep thumps; the hull, a hundred metres
+        // of it, coming down with a second enormous crash; and the roll for a quarter of a
+        // minute. Nothing rises or rings.
+        "titan_death": (
+            length: 20.0, peak: 0.9, room: 1.0,
+            layers: [
+                // Containment goes.
+                Burst(low: 350, high: 2200, attack: 0.0003, decay: 0.014, gain: 8),
+                Tone(from: 200, to: 56, glide: 0.1, attack: 0.001, decay: 0.14, gain: 1.4),
+                // The detonation.
+                Burst(at: 0.4, low: 250, high: 2000, attack: 0.0003, decay: 0.018, gain: 10),
+                Burst(at: 0.4, low: 50, high: 500, attack: 0.001, decay: 0.3, gain: 18),
+                Burst(at: 0.402, low: 30, high: 220, attack: 0.006, decay: 1.0, gain: 16),
+                Tone(at: 0.4, from: 220, to: 54, glide: 0.12, attack: 0.001, decay: 0.25, gain: 2.0),
+                Tone(at: 0.4, from: 130, to: 36, glide: 0.45, attack: 0.002, decay: 0.9, gain: 2.4),
+                Tone(at: 0.4, from: 82, to: 32, glide: 0.9, attack: 0.003, decay: 1.5, gain: 2.6),
+                Tone(at: 0.4, from: 54, to: 28, glide: 1.6, attack: 0.008, decay: 2.2, gain: 2.0),
+                Tone(at: 0.42, from: 40, to: 24, glide: 2.4, attack: 0.03, decay: 2.8, gain: 1.2),
+                Roll(at: 0.4, from: 260, to: 85, glide: 2.5, attack: 0.02, decay: 2.0, gain: 2.2, swell: 3.0, depth: 0.5, seed: 5501),
+                // The rail banks and the pods going, deep and dull, off to the sides.
+                Burst(at: 0.95, low: 50, high: 450, attack: 0.001, decay: 0.08, gain: 7, pan: 0.4),
+                Tone(at: 0.95, from: 110, to: 38, glide: 0.2, attack: 0.002, decay: 0.35, gain: 1.0, pan: 0.4),
+                Burst(at: 1.32, low: 50, high: 420, attack: 0.001, decay: 0.08, gain: 6, pan: -0.45),
+                Tone(at: 1.32, from: 104, to: 36, glide: 0.2, attack: 0.002, decay: 0.35, gain: 0.9, pan: -0.45),
+                Burst(at: 1.6, low: 55, high: 450, attack: 0.001, decay: 0.07, gain: 4.5, pan: 0.2),
+                Tone(at: 1.6, from: 98, to: 36, glide: 0.2, attack: 0.002, decay: 0.3, gain: 0.7, pan: 0.2),
+                // The hull coming down: a second huge crash, the frame giving way in it.
+                Burst(at: 2.7, low: 90, high: 800, attack: 0.001, decay: 0.05, gain: 5, pan: -0.15),
+                Burst(at: 2.702, low: 28, high: 220, attack: 0.006, decay: 0.6, gain: 11, pan: -0.15),
+                Tone(at: 2.7, from: 96, to: 30, glide: 0.4, attack: 0.003, decay: 0.8, gain: 1.3, pan: -0.15),
+                Tone(at: 2.71, from: 48, to: 24, glide: 1.2, attack: 0.01, decay: 1.6, gain: 1.0, pan: -0.15),
+                Fm(at: 2.705, from: 88, to: 70, glide: 0.5, ratio: 1.41, index: 1.8, fade: 0.1, attack: 0.002, decay: 0.4, gain: 0.35, pan: -0.15),
+                // The ground heaving as the front goes out and comes back.
+                Burst(at: 4.2, low: 30, high: 220, attack: 0.008, decay: 0.5, gain: 6, pan: 0.35),
+                Tone(at: 4.2, from: 76, to: 32, glide: 0.9, attack: 0.008, decay: 1.2, gain: 1.2, pan: 0.35),
+                Drive(1.7),
+                // Debris raining down after the hull: low, scattered, thinning.
+                Burst(at: 3.1, low: 70, high: 520, attack: 0.001, decay: 0.04, gain: 2.6, pan: 0.4),
+                Burst(at: 3.45, low: 80, high: 560, attack: 0.001, decay: 0.035, gain: 2.0, pan: -0.5),
+                Burst(at: 3.9, low: 60, high: 460, attack: 0.002, decay: 0.05, gain: 1.8, pan: 0.1),
+                Burst(at: 4.6, low: 70, high: 500, attack: 0.001, decay: 0.04, gain: 1.2, pan: -0.3),
+                Burst(at: 5.5, low: 60, high: 420, attack: 0.002, decay: 0.05, gain: 0.8, pan: 0.45),
+                // The shock cracking overhead as it arrives, and further off.
+                Burst(at: 0.9, low: 80, high: 900, attack: 0.0006, decay: 0.05, gain: 1.6, pan: -0.4),
+                Burst(at: 2.0, low: 70, high: 800, attack: 0.0008, decay: 0.06, gain: 1.2, pan: 0.45),
+                Burst(at: 6.5, low: 60, high: 600, attack: 0.0015, decay: 0.08, gain: 0.6, pan: -0.2),
+                // The roll: thunder going away in every direction, low and long.
+                Sweep(at: 0.41, from: 420, to: 70, glide: 2.2, q: 0.5, attack: 0.02, decay: 1.6, gain: 1.4),
+                Roll(at: 0.5, from: 280, to: 100, glide: 4.0, attack: 0.3, decay: 3.0, gain: 0.7, swell: 1.2, depth: 0.75, seed: 5502),
+                Roll(at: 0.9, from: 180, to: 68, glide: 8.0, attack: 1.2, decay: 3.4, gain: 0.6, swell: 0.7, depth: 0.85, pan: -0.5, seed: 5503),
+                Roll(at: 1.1, from: 170, to: 64, glide: 9.0, attack: 1.5, decay: 3.4, gain: 0.6, swell: 0.6, depth: 0.85, pan: 0.5, seed: 5504),
+                Roll(at: 0.5, from: 95, to: 46, glide: 10.0, attack: 1.0, decay: 3.6, gain: 0.7, swell: 0.35, depth: 0.7, seed: 5505),
+                // Fire where it stood: a low roar that sinks away.
+                Sweep(at: 2.0, from: 160, to: 80, glide: 6.0, q: 0.7, attack: 1.5, decay: 2.8, gain: 0.45),
+                // Squeeze the whole of it once more, gently: felt, not just heard.
+                Drive(1.4),
+            ],
+        ),
+        // A Tempest shell landing: the slug's hit, smaller and lighter, as ten a second land.
+        "titan_shell_hit": (like: "titan_rail_hit", size: 0.75, peak: 0.55),
+    },
+)

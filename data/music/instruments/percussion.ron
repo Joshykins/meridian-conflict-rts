@@ -1,0 +1,5 @@
+Sampler((
+    set: "percussion",
+    velocity: 0.7,
+    voices: 24,
+))

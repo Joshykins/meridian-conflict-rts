@@ -1,0 +1,295 @@
+// The two capital rail cannons: the Resolute's spinal rail (`aster_t3_frigate`, fired
+// down out of the cloud layer) and the Zenith (`aster_t4_anti_ship`, a ground gun
+// firing up at warships). Nothing else in the game is this big, and they must never be
+// mistaken for the rail family (`aster_rail_cannon` and its `like`s).
+//
+// Each shot is three sounds:
+// - The charge (`charge_time` before the shot): capacitor banks filling. A transformer
+//   growl and a whine climbing together, the air around the rails starting to crackle
+//   and the crackle thickening, all of it at its loudest the instant the shot goes, then
+//   let go fast under the fire sound. The game pitches every shot by up to 5%, so the top
+//   is held a moment and the release overlaps the fire.
+//   The spinal's charge is a heavy stepped sequence instead: banks slamming in faster
+//   and faster, each discharge an arc crack with thunder rolling after it.
+// - The fire: the slug through the sound barrier many times over (one hard N-wave crack,
+//   front and back shock), the rails dumping (a heavy electrical slam, low and short, no
+//   buzz), then a thunder that rolls for seconds, swelling and sagging off the country.
+// - The strike: a kinetic slam, the target coming apart, debris falling after.
+//
+// The spinal rail is heard from the sky: a sharper crack, and the thunder crossing
+// overhead from side to side. The Zenith is heard from beside it: the ground heaving,
+// more weight under 60 Hz, and the report going up and away and coming back down
+// off the cloud. Both keep their body at 40 to 400 Hz; nothing whistles, rings or buzzes.
+//
+// Tuning notes: every Roll has a pinned `seed`. A Roll's random swells can outpeak the
+// crack, and the whole sound is scaled to its loudest sample, so an unlucky swell pushes
+// everything else down; the seeds keep the swells where they were measured (and adding
+// a layer no longer reshuffles the others). The fire sounds end with a second, gentle
+// Drive over the low thunder: that is what puts them well over the Leviathan's broadside
+// in loudness at the same 0.9 peak, without clipping.
+(
+    sounds: {
+        // ---- the Resolute's spinal rail cannon ------------------------------------
+        // A heavy sequence, not one smooth climb: the capacitor banks slam in one after
+        // another, closer together and heavier each time, each a notch higher. Every bank
+        // discharging across the rails lets an arc crack and the air booms after it, so
+        // the charge thunders, rolling louder under a rising growl and spool-up whine.
+        "spinal_rail_charge": (
+            length: 4.3, peak: 0.5, room: 0.4,
+            layers: [
+                // The first bank slams in: a deep contactor thunk and a sub thud.
+                Burst(low: 40, high: 500, attack: 0.0006, decay: 0.04, gain: 4),
+                Tone(from: 62, to: 34, glide: 0.25, attack: 0.002, decay: 0.35, gain: 0.7),
+                // Each bank after it: sooner, heavier, a notch higher.
+                Tone(at: 0.8, from: 70, to: 38, glide: 0.25, attack: 0.002, decay: 0.3, gain: 0.7),
+                Tone(at: 1.4, from: 78, to: 42, glide: 0.25, attack: 0.002, decay: 0.28, gain: 0.8),
+                Tone(at: 1.9, from: 86, to: 46, glide: 0.25, attack: 0.002, decay: 0.26, gain: 0.9),
+                Tone(at: 2.3, from: 94, to: 50, glide: 0.25, attack: 0.002, decay: 0.24, gain: 1.0),
+                Tone(at: 2.6, from: 102, to: 54, glide: 0.25, attack: 0.002, decay: 0.22, gain: 1.1),
+                Tone(at: 2.8, from: 110, to: 58, glide: 0.25, attack: 0.002, decay: 0.2, gain: 1.2),
+                Tone(at: 2.92, from: 118, to: 62, glide: 0.25, attack: 0.002, decay: 0.18, gain: 1.3),
+                // The transformer growl climbing with the charge.
+                Fm(at: 0.05, from: 30, to: 78, glide: 2.95, ratio: 0.5, index: 2.6, fade: 8.0, attack: 2.95, decay: 0.12, gain: 1.0),
+                Fm(at: 0.1, from: 60, to: 160, glide: 2.9, ratio: 2.0, index: 1.4, fade: 5.0, attack: 2.9, decay: 0.1, gain: 0.45),
+                // The banks spooling up: a low whine rising the whole way, beating.
+                Stack(at: 0.2, from: 140, to: 620, glide: 2.8, attack: 2.8, decay: 0.08, gain: 0.09, detune: 1.5, width: 0.4, partials: [(1.0, 1.0), (2.0, 0.35), (3.0, 0.15)]),
+                // The last instant: a sub swell under everything.
+                Tone(at: 2.2, from: 40, to: 54, glide: 0.8, attack: 0.8, decay: 0.12, gain: 0.6),
+                Drive(1.5),
+                // Electrical thunder: each bank's contactor, the arc it throws across the
+                // rails, and the air booming and rolling off after it, heavier each time.
+                Burst(at: 0.8, low: 40, high: 600, attack: 0.0006, decay: 0.035, gain: 3.5),
+                Burst(at: 0.82, low: 350, high: 1800, attack: 0.0004, decay: 0.016, gain: 1.6, pan: -0.3, seed: 341),
+                Roll(at: 0.83, from: 480, to: 70, glide: 0.5, attack: 0.012, decay: 0.55, gain: 0.4, swell: 11, depth: 0.8, pan: -0.3, seed: 391),
+                Burst(at: 1.4, low: 40, high: 600, attack: 0.0006, decay: 0.035, gain: 4.0),
+                Burst(at: 1.42, low: 350, high: 1800, attack: 0.0004, decay: 0.016, gain: 2.0, pan: 0.35, seed: 342),
+                Roll(at: 1.43, from: 480, to: 70, glide: 0.5, attack: 0.012, decay: 0.6, gain: 0.46, swell: 11, depth: 0.8, pan: 0.35, seed: 392),
+                Burst(at: 1.9, low: 40, high: 600, attack: 0.0006, decay: 0.035, gain: 4.5),
+                Burst(at: 1.92, low: 350, high: 1800, attack: 0.0004, decay: 0.016, gain: 2.4, pan: -0.45, seed: 343),
+                Roll(at: 1.93, from: 480, to: 70, glide: 0.5, attack: 0.012, decay: 0.65, gain: 0.52, swell: 11, depth: 0.8, pan: -0.45, seed: 393),
+                Burst(at: 2.3, low: 40, high: 600, attack: 0.0006, decay: 0.035, gain: 5.0),
+                Burst(at: 2.32, low: 350, high: 1800, attack: 0.0004, decay: 0.016, gain: 2.8, pan: 0.25, seed: 344),
+                Roll(at: 2.33, from: 480, to: 70, glide: 0.5, attack: 0.012, decay: 0.7, gain: 0.58, swell: 11, depth: 0.8, pan: 0.25, seed: 394),
+                Burst(at: 2.6, low: 40, high: 600, attack: 0.0006, decay: 0.035, gain: 5.5),
+                Burst(at: 2.62, low: 350, high: 1800, attack: 0.0004, decay: 0.016, gain: 3.3, pan: -0.2, seed: 345),
+                Roll(at: 2.63, from: 480, to: 70, glide: 0.5, attack: 0.012, decay: 0.7, gain: 0.64, swell: 11, depth: 0.8, pan: -0.2, seed: 395),
+                Burst(at: 2.8, low: 40, high: 600, attack: 0.0006, decay: 0.035, gain: 6.0),
+                Burst(at: 2.82, low: 350, high: 1800, attack: 0.0004, decay: 0.016, gain: 3.8, pan: 0.45, seed: 346),
+                Roll(at: 2.83, from: 480, to: 70, glide: 0.5, attack: 0.012, decay: 0.75, gain: 0.7, swell: 11, depth: 0.8, pan: 0.45, seed: 396),
+                Burst(at: 2.92, low: 40, high: 600, attack: 0.0006, decay: 0.035, gain: 6.5),
+                Burst(at: 2.94, low: 350, high: 1800, attack: 0.0004, decay: 0.016, gain: 4.4, pan: -0.1, seed: 347),
+                Roll(at: 2.95, from: 480, to: 70, glide: 0.5, attack: 0.012, decay: 0.8, gain: 0.76, swell: 11, depth: 0.8, pan: -0.1, seed: 397),
+                // Under it all, a thunder bed rolling and growing the whole way up.
+                Roll(at: 0.3, from: 120, to: 420, glide: 2.6, attack: 2.6, decay: 0.15, gain: 0.3, swell: 7, depth: 0.9, seed: 360),
+                // The air along the rails ionising: a crackle bed that swells and thickens.
+                Roll(at: 0.6, from: 700, to: 1900, glide: 2.4, attack: 2.4, decay: 0.1, gain: 0.13, swell: 14, depth: 0.85, pan: -0.3, seed: 331),
+                Roll(at: 1.2, from: 850, to: 2200, glide: 1.8, attack: 1.8, decay: 0.1, gain: 0.11, swell: 19, depth: 0.85, pan: 0.35, seed: 332),
+            ],
+        ),
+        // Heard from the ground with the ship overhead: the crack first and hardest, the
+        // rails' slam, then the thunder crossing the sky and rolling back off the hills.
+        "spinal_rail_fire": (
+            length: 8.5, peak: 0.9, room: 0.9,
+            layers: [
+                // The N-wave: the bow shock's crack and the tail shock close behind it.
+                Burst(low: 1200, high: 5500, attack: 0.0001, decay: 0.004, gain: 10),
+                Burst(low: 400, high: 2400, attack: 0.0002, decay: 0.014, gain: 30),
+                Burst(at: 0.016, low: 300, high: 2000, attack: 0.0002, decay: 0.016, gain: 22),
+                // The rails dumping: a low electrical slam, bright for an instant, then plain.
+                Fm(from: 96, to: 40, glide: 0.08, ratio: 0.5, index: 3.4, fade: 0.04, attack: 0.0005, decay: 0.16, gain: 1.0),
+                Fm(at: 0.002, from: 150, to: 118, glide: 0.1, ratio: 1.41, index: 1.8, fade: 0.04, attack: 0.001, decay: 0.12, gain: 0.35),
+                // The blast: bark and boom, and the concussion under them.
+                Burst(at: 0.002, low: 110, high: 800, attack: 0.0006, decay: 0.08, gain: 30),
+                Burst(at: 0.004, low: 36, high: 240, attack: 0.003, decay: 0.5, gain: 22),
+                Tone(from: 180, to: 48, glide: 0.08, attack: 0.0008, decay: 0.16, gain: 1.5),
+                Tone(from: 82, to: 30, glide: 0.3, attack: 0.002, decay: 0.6, gain: 1.8),
+                Tone(from: 46, to: 24, glide: 0.8, attack: 0.006, decay: 0.9, gain: 1.0),
+                // The air itself tearing under the slam, held for most of a second.
+                Roll(at: 0.003, from: 380, to: 110, glide: 1.2, attack: 0.01, decay: 0.8, gain: 2.0, swell: 3.5, depth: 0.45, seed: 301),
+                Drive(2.1),
+                // The air torn open down the slug's path, going away below.
+                Sweep(at: 0.004, from: 2200, to: 380, glide: 0.35, q: 0.7, attack: 0.002, decay: 0.2, gain: 0.5, pan: 0.15),
+                Sweep(at: 0.01, from: 420, to: 60, glide: 1.4, q: 0.5, attack: 0.03, decay: 0.8, gain: 0.8),
+                // The thunder crossing overhead, left to right, and the long roll behind it.
+                Roll(at: 0.05, from: 420, to: 130, glide: 2.0, attack: 0.05, decay: 1.6, gain: 0.54, swell: 2.2, depth: 0.5, pan: -0.5, seed: 602),
+                Roll(at: 0.35, from: 340, to: 110, glide: 2.6, attack: 0.25, decay: 1.8, gain: 0.36, swell: 1.7, depth: 0.55, seed: 303),
+                Roll(at: 0.7, from: 300, to: 90, glide: 3.4, attack: 0.4, decay: 2.2, gain: 0.252, swell: 1.3, depth: 0.55, pan: 0.55, seed: 304),
+                Roll(at: 0.2, from: 140, to: 55, glide: 6.0, attack: 0.6, decay: 2.8, gain: 0.5, swell: 0.6, depth: 0.5, seed: 305),
+                // Returns off the hills: three, each further, lower and wider.
+                Burst(at: 0.55, low: 120, high: 900, attack: 0.001, decay: 0.03, gain: 5, pan: 0.45),
+                Tone(at: 0.55, from: 76, to: 32, glide: 0.35, attack: 0.004, decay: 0.5, gain: 0.4, pan: 0.45),
+                Burst(at: 1.3, low: 80, high: 600, attack: 0.002, decay: 0.06, gain: 3.2, pan: -0.5),
+                Tone(at: 1.3, from: 60, to: 28, glide: 0.5, attack: 0.008, decay: 0.7, gain: 0.3, pan: -0.5),
+                Burst(at: 2.4, low: 60, high: 420, attack: 0.004, decay: 0.12, gain: 2.0, pan: 0.25),
+                Tone(at: 2.4, from: 50, to: 26, glide: 0.7, attack: 0.02, decay: 0.9, gain: 0.2, pan: 0.25),
+                // Squeeze the whole of it once more, gently: the shot is felt, not just heard.
+                Drive(1.5),
+            ],
+        ),
+        // The slug arriving: a kinetic slam deeper than any shell, the target breaking,
+        // and the pieces coming down around it.
+        "spinal_rail_impact": (
+            length: 6.0, peak: 0.9, room: 0.7,
+            layers: [
+                Burst(low: 300, high: 2200, attack: 0.0002, decay: 0.01, gain: 12),
+                Burst(at: 0.001, low: 60, high: 500, attack: 0.0008, decay: 0.12, gain: 26),
+                Burst(at: 0.004, low: 30, high: 200, attack: 0.004, decay: 0.45, gain: 14),
+                Tone(from: 140, to: 34, glide: 0.12, attack: 0.001, decay: 0.2, gain: 1.8),
+                Tone(from: 74, to: 22, glide: 0.4, attack: 0.002, decay: 0.55, gain: 1.6),
+                Tone(from: 44, to: 20, glide: 1.0, attack: 0.008, decay: 1.0, gain: 0.9),
+                // Plate and frame giving way: a dull struck-steel knock, never a ring.
+                Fm(at: 0.006, from: 105, to: 82, glide: 0.2, ratio: 1.41, index: 2.0, fade: 0.05, attack: 0.001, decay: 0.16, gain: 0.45),
+                Drive(1.8),
+                // The blast going out, and the debris thrown up.
+                Sweep(at: 0.005, from: 700, to: 90, glide: 1.0, q: 0.6, attack: 0.01, decay: 0.6, gain: 0.9),
+                Roll(at: 0.08, from: 1400, to: 500, glide: 1.6, attack: 0.05, decay: 0.9, gain: 0.35, swell: 9, depth: 0.6, pan: 0.2, seed: 321),
+                Roll(at: 0.1, from: 200, to: 70, glide: 3.0, attack: 0.15, decay: 1.5, gain: 0.6, swell: 1.2, depth: 0.55, pan: -0.2, seed: 322),
+                // Pieces landing: heavy, low, scattered, fewer and further.
+                Burst(at: 0.72, low: 70, high: 520, attack: 0.001, decay: 0.05, gain: 4.5, pan: -0.4),
+                Burst(at: 1.05, low: 90, high: 650, attack: 0.001, decay: 0.035, gain: 3.2, pan: 0.5),
+                Burst(at: 1.31, low: 60, high: 420, attack: 0.002, decay: 0.07, gain: 3.6, pan: 0.1),
+                Burst(at: 1.84, low: 80, high: 560, attack: 0.001, decay: 0.04, gain: 2.0, pan: -0.55),
+                Burst(at: 2.5, low: 70, high: 480, attack: 0.002, decay: 0.05, gain: 1.3, pan: 0.35),
+                Tone(at: 1.31, from: 60, to: 34, glide: 0.2, attack: 0.004, decay: 0.3, gain: 0.3, pan: 0.1),
+            ],
+        ),
+        // The slug into bare ground: the same slam with the earth thrown up and falling back.
+        "spinal_rail_ground": (
+            length: 6.0, peak: 0.88, room: 0.7,
+            layers: [
+                Burst(low: 200, high: 1600, attack: 0.0003, decay: 0.012, gain: 9),
+                Burst(at: 0.001, low: 40, high: 380, attack: 0.001, decay: 0.16, gain: 28),
+                Burst(at: 0.005, low: 26, high: 160, attack: 0.006, decay: 0.6, gain: 14),
+                Tone(from: 110, to: 28, glide: 0.18, attack: 0.001, decay: 0.28, gain: 1.9),
+                Tone(from: 58, to: 20, glide: 0.6, attack: 0.003, decay: 0.8, gain: 1.4),
+                Drive(1.55),
+                Sweep(at: 0.005, from: 520, to: 70, glide: 1.2, q: 0.6, attack: 0.02, decay: 0.7, gain: 0.9),
+                // Earth and rock showering back down: a rattle that thins, then a few clods.
+                Roll(at: 0.35, from: 900, to: 380, glide: 2.0, attack: 0.2, decay: 0.9, gain: 0.3, swell: 11, depth: 0.6, seed: 323),
+                Roll(at: 0.1, from: 160, to: 60, glide: 3.5, attack: 0.2, decay: 1.6, gain: 0.6, swell: 0.9, depth: 0.55, pan: 0.2, seed: 324),
+                Burst(at: 0.9, low: 60, high: 420, attack: 0.002, decay: 0.05, gain: 3.2, pan: 0.45),
+                Burst(at: 1.4, low: 55, high: 380, attack: 0.002, decay: 0.06, gain: 2.4, pan: -0.4),
+                Burst(at: 2.1, low: 50, high: 340, attack: 0.003, decay: 0.06, gain: 1.4, pan: 0.15),
+            ],
+        ),
+
+        // ---- the Zenith ----------------------------------------------------------
+        // Stepped: three banks switched in one after another, each step lifting the
+        // transformer's growl and the ground under it, the arcs gathering to the top.
+        "zenith_rail_charge": (
+            length: 3.3, peak: 0.52, room: 0.35,
+            layers: [
+                // Three contactor banks closing, heavier each time.
+                Burst(low: 60, high: 650, attack: 0.0006, decay: 0.03, gain: 4.5),
+                Tone(from: 64, to: 36, glide: 0.1, attack: 0.002, decay: 0.2, gain: 0.45),
+                Burst(at: 0.78, low: 55, high: 600, attack: 0.0006, decay: 0.035, gain: 5.5, seed: 11),
+                Tone(at: 0.78, from: 60, to: 34, glide: 0.1, attack: 0.002, decay: 0.25, gain: 0.55),
+                Burst(at: 1.52, low: 50, high: 560, attack: 0.0006, decay: 0.04, gain: 6.5, seed: 12),
+                Tone(at: 1.52, from: 56, to: 32, glide: 0.1, attack: 0.002, decay: 0.3, gain: 0.65),
+                // The growl, one stage per bank, each higher and climbing to the shot.
+                Fm(at: 0.03, from: 26, to: 34, glide: 0.8, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.7, decay: 0.3, gain: 0.32),
+                Fm(at: 0.8, from: 33, to: 44, glide: 0.8, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.7, decay: 0.3, gain: 0.48),
+                Fm(at: 1.54, from: 42, to: 62, glide: 0.96, ratio: 0.5, index: 2.4, fade: 4.0, attack: 0.96, decay: 0.12, gain: 0.9),
+                Fm(at: 1.54, from: 84, to: 128, glide: 0.96, ratio: 2.0, index: 1.2, fade: 3.0, attack: 0.96, decay: 0.1, gain: 0.4),
+                // The whine, lower than the ship's and only in the last stage.
+                Tone(at: 1.0, from: 300, to: 720, glide: 1.5, attack: 1.5, decay: 0.08, gain: 0.06, pan: -0.1),
+                Tone(at: 1.0, from: 302, to: 726, glide: 1.5, attack: 1.5, decay: 0.08, gain: 0.045, pan: 0.1),
+                // The ground humming with it.
+                Roll(at: 0.2, from: 70, to: 110, glide: 2.3, attack: 2.3, decay: 0.12, gain: 0.5, swell: 3, depth: 0.5, seed: 325),
+                Drive(1.35),
+                // Arcs jumping off the rails.
+                Roll(at: 1.5, from: 700, to: 1800, glide: 1.0, attack: 1.0, decay: 0.1, gain: 0.2, swell: 16, depth: 0.85, pan: 0.25, seed: 333),
+                Burst(at: 0.95, low: 260, high: 1600, attack: 0.0005, decay: 0.014, gain: 1.5, pan: -0.3),
+                Burst(at: 1.7, low: 260, high: 1700, attack: 0.0005, decay: 0.016, gain: 2.4, pan: 0.4),
+                Burst(at: 2.05, low: 240, high: 1800, attack: 0.0005, decay: 0.02, gain: 3.2, pan: -0.45),
+                Burst(at: 2.21, low: 220, high: 1800, attack: 0.0005, decay: 0.02, gain: 2.2, pan: 0.2),
+                Burst(at: 2.4, low: 200, high: 1900, attack: 0.0005, decay: 0.03, gain: 3.6, pan: -0.1),
+            ],
+        ),
+        // Heard from beside it: the ground heaving, a blast that punches the chest, the
+        // slug tearing up and away, and the thunder coming back down off the cloud.
+        "zenith_rail_fire": (
+            length: 9.0, peak: 0.9, room: 0.9,
+            layers: [
+                // The N-wave, lower and duller than the ship's: the gun is at your side.
+                Burst(low: 900, high: 4200, attack: 0.0001, decay: 0.004, gain: 7),
+                Burst(low: 300, high: 1800, attack: 0.0002, decay: 0.016, gain: 28),
+                Burst(at: 0.014, low: 220, high: 1500, attack: 0.0002, decay: 0.018, gain: 18),
+                // The rails dumping.
+                Fm(from: 84, to: 34, glide: 0.1, ratio: 0.5, index: 3.6, fade: 0.05, attack: 0.0005, decay: 0.2, gain: 1.1),
+                Fm(at: 0.002, from: 132, to: 100, glide: 0.12, ratio: 1.41, index: 1.8, fade: 0.05, attack: 0.001, decay: 0.14, gain: 0.35),
+                // The blast into the ground: a slam and a heave that takes a second to let go.
+                Burst(at: 0.002, low: 70, high: 600, attack: 0.0008, decay: 0.1, gain: 30),
+                Burst(at: 0.004, low: 26, high: 180, attack: 0.004, decay: 0.6, gain: 20),
+                Tone(from: 150, to: 40, glide: 0.1, attack: 0.001, decay: 0.18, gain: 1.4),
+                Tone(from: 66, to: 24, glide: 0.4, attack: 0.002, decay: 0.7, gain: 2.0),
+                Tone(from: 38, to: 21, glide: 1.2, attack: 0.008, decay: 1.4, gain: 1.3),
+                Roll(at: 0.003, from: 240, to: 80, glide: 1.2, attack: 0.01, decay: 0.8, gain: 2.0, swell: 3.0, depth: 0.45, seed: 311),
+                Drive(2.1),
+                // The slug going up and away.
+                Sweep(at: 0.006, from: 1800, to: 260, glide: 0.8, q: 0.8, attack: 0.004, decay: 0.4, gain: 0.45),
+                // The ground shaking, and grit coming down off the gun.
+                Roll(at: 0.01, from: 120, to: 45, glide: 4.0, attack: 0.05, decay: 2.2, gain: 1.3, swell: 1.4, depth: 0.45, seed: 312),
+                Roll(at: 0.25, from: 1000, to: 450, glide: 1.8, attack: 0.3, decay: 0.8, gain: 0.18, swell: 10, depth: 0.85, pan: -0.25, seed: 326),
+                // The report up into the sky, and its thunder coming back down off the
+                // cloud from everywhere at once, then rolling away.
+                Sweep(at: 0.01, from: 360, to: 55, glide: 1.6, q: 0.5, attack: 0.03, decay: 0.9, gain: 0.8),
+                Roll(at: 0.9, from: 300, to: 100, glide: 3.0, attack: 0.3, decay: 2.0, gain: 0.48, swell: 1.5, depth: 0.55, pan: -0.35, seed: 313),
+                Roll(at: 1.1, from: 280, to: 95, glide: 3.2, attack: 0.4, decay: 2.2, gain: 0.45, swell: 1.2, depth: 0.55, pan: 0.4, seed: 314),
+                Roll(at: 0.6, from: 130, to: 48, glide: 6.0, attack: 0.8, decay: 3.0, gain: 0.56, swell: 0.5, depth: 0.4, seed: 315),
+                Burst(at: 0.95, low: 70, high: 600, attack: 0.004, decay: 0.08, gain: 3.5, pan: -0.3),
+                Tone(at: 0.95, from: 62, to: 28, glide: 0.5, attack: 0.01, decay: 0.8, gain: 0.35, pan: -0.3),
+                Burst(at: 2.2, low: 50, high: 380, attack: 0.008, decay: 0.15, gain: 2.0, pan: 0.35),
+                Tone(at: 2.2, from: 48, to: 25, glide: 0.8, attack: 0.02, decay: 1.0, gain: 0.22, pan: 0.35),
+                Drive(1.5),
+            ],
+        ),
+        // The slug through a warship's hull, heard from far below: a deep steel slam,
+        // the frame tearing, and wreckage raining off it.
+        "zenith_rail_impact": (
+            length: 6.0, peak: 0.88, room: 0.8,
+            layers: [
+                Burst(low: 250, high: 1800, attack: 0.0003, decay: 0.012, gain: 10),
+                Burst(at: 0.001, low: 55, high: 420, attack: 0.001, decay: 0.14, gain: 26),
+                Tone(from: 120, to: 32, glide: 0.15, attack: 0.001, decay: 0.24, gain: 1.8),
+                Tone(from: 62, to: 22, glide: 0.5, attack: 0.003, decay: 0.7, gain: 1.4),
+                // The hull taking it: dull steel, heavy, no ring.
+                Fm(at: 0.004, from: 88, to: 64, glide: 0.3, ratio: 1.41, index: 2.4, fade: 0.06, attack: 0.001, decay: 0.22, gain: 0.6),
+                Fm(at: 0.01, from: 52, to: 40, glide: 0.4, ratio: 0.5, index: 1.6, fade: 0.1, attack: 0.002, decay: 0.4, gain: 0.5),
+                Drive(1.5),
+                // Plate tearing open along the hole, falling in pitch.
+                Sweep(at: 0.03, from: 1400, to: 300, glide: 0.7, q: 2.0, attack: 0.02, decay: 0.35, gain: 0.35, pan: 0.2),
+                Sweep(at: 0.01, from: 520, to: 70, glide: 1.2, q: 0.55, attack: 0.02, decay: 0.8, gain: 0.8),
+                Roll(at: 0.1, from: 180, to: 60, glide: 3.0, attack: 0.2, decay: 1.6, gain: 0.55, swell: 1.2, depth: 0.55, pan: -0.2, seed: 327),
+                // Wreckage falling off it: a scatter of dull metal knocks.
+                Burst(at: 0.8, low: 90, high: 700, attack: 0.001, decay: 0.03, gain: 3.2, pan: 0.4),
+                Burst(at: 1.25, low: 80, high: 600, attack: 0.001, decay: 0.035, gain: 2.4, pan: -0.45),
+                Burst(at: 1.9, low: 70, high: 520, attack: 0.002, decay: 0.045, gain: 1.6, pan: 0.2),
+            ],
+        ),
+
+        // ---- the Resolute's drives ------------------------------------------------
+        // A warship's reactor, heavier and darker than the Bastion's: a growl at 27.5 Hz
+        // beating slowly against its neighbour, the fifth over it, and a minor second
+        // high in the body that beats and never settles. It breathes slowly. The body
+        // (110 to 220 Hz) is there for small speakers.
+        "aster_frigate": (
+            length: 12, peak: 0.46, room: 0, looped: true,
+            layers: [
+                Fm(from: 27.5, to: 27.5, glide: 1, ratio: 0.5, index: 1.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.5),
+                Drone(freq: 27.5833, gain: 0.3, wobble: 0.08333, depth: 0.12, pan: 0.15),
+                Drone(freq: 41.25, gain: 0.26, wobble: 0.1667, depth: 0.15, pan: -0.15),
+                Drone(freq: 55, gain: 0.26, wobble: 0.08333, depth: 0.1),
+                Drone(freq: 82.5, gain: 0.16, wobble: 0.25, depth: 0.15, pan: 0.1),
+                Drone(freq: 110, gain: 0.13, wobble: 0.1667, depth: 0.2, pan: -0.1),
+                Drone(freq: 116.5833, gain: 0.07, wobble: 0.3333, depth: 0.5, pan: 0.2),
+                Drone(freq: 165, gain: 0.06, wobble: 0.25, depth: 0.3),
+                Drone(freq: 220, gain: 0.03, wobble: 0.4167, depth: 0.4, pan: -0.2),
+                Drive(1.25),
+                Rumble(freq: 90, q: 0.8, gain: 6.0, wobble: 0.1667, depth: 0.4),
+            ],
+        ),
+        // Its stern engines: the capital roar, heavier.
+        "aster_frigate_thrust": (like: "capital_thrust", size: 1.2),
+    },
+)

@@ -1,0 +1,821 @@
+//! 2D overlay batch: rectangles, lines, arcs, images and text in pixel coordinates.
+//! The game fills one of these per frame; the renderer draws it in one call.
+//!
+//! Everything textured samples one RGBA atlas that the overlay owns:
+//!
+//! * outline glyphs, packed from the top, rasterised on first use at exactly the
+//!   pixel size they are drawn at, so type stays crisp at any UI scale (`type_text`);
+//! * sprites: pictures the caller rasterises on first use at exactly the
+//!   pixel size they are drawn at, kept beside the glyphs (`sprite`: faction
+//!   crests, which must stay sharp at every size the way type does);
+//! * four 512 px image slots along the bottom (`set_image`, `image`), used for
+//!   things like map previews.
+//!
+//! Glass (`blur_rect`) samples none of it: it shows a blurred copy of the scene
+//! behind it, which the renderer makes only on frames that have some.
+//!
+//! The renderer uploads whatever rows changed since it last looked.
+
+use crate::textures::{self, FONT_ATLAS_H, FONT_ATLAS_W};
+use std::cell::Cell;
+use std::collections::HashMap;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct OverlayVertex {
+    pub pos: [f32; 2],
+    /// Atlas coordinates; negative x means a solid fill, below -1.5 glass.
+    pub uv: [f32; 2],
+    pub color: [f32; 4],
+}
+
+pub const MAX_OVERLAY_VERTICES: usize = 262_144;
+
+/// Image slots are squares of this many pixels along the bottom of the atlas.
+pub const IMAGE_SLOT: usize = 512;
+pub const IMAGE_SLOTS: usize = FONT_ATLAS_W / IMAGE_SLOT;
+const IMAGES_Y: usize = FONT_ATLAS_H - IMAGE_SLOT;
+const SOLID: [[f32; 2]; 4] = [[-1.0, 0.0]; 4];
+/// Glass; the second coordinate is the panel's opacity.
+const GLASS: [[f32; 2]; 4] = [[-2.0, 1.0]; 4];
+/// Width of the soft edge that anti-aliases strokes and discs.
+const FEATHER: f32 = 1.0;
+
+/// The UI typeface's weights (Barlow, SIL OFL; see `assets/fonts/Barlow-OFL.txt`):
+/// light semi-condensed for display, medium for running text, semibold
+/// semi-condensed for names, figures and buttons.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Face {
+    Light,
+    Medium,
+    Bold,
+}
+
+/// How a run of text is set: weight, size in pixels, extra space between letters.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Type {
+    pub face: Face,
+    pub px: f32,
+    pub tracking: f32,
+}
+
+impl Type {
+    pub const fn new(face: Face, px: f32, tracking: f32) -> Type {
+        Type { face, px, tracking }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Glyph {
+    /// Atlas rectangle in pixels.
+    at: [u16; 2],
+    size: [u16; 2],
+    /// Bitmap offset from the pen: left bearing, and bottom edge above the baseline.
+    offset: [f32; 2],
+    advance: f32,
+}
+
+struct Fonts {
+    faces: [fontdue::Font; 3],
+}
+
+/// The embedded TTF behind a face, for callers that draw with its outlines.
+pub fn face_bytes(face: Face) -> &'static [u8] {
+    match face {
+        Face::Light => include_bytes!("../assets/fonts/BarlowSemiCondensed-Light.ttf"),
+        Face::Medium => include_bytes!("../assets/fonts/Barlow-Medium.ttf"),
+        Face::Bold => include_bytes!("../assets/fonts/BarlowSemiCondensed-SemiBold.ttf"),
+    }
+}
+
+impl Fonts {
+    fn load() -> Fonts {
+        let face = |bytes: &[u8]| {
+            fontdue::Font::from_bytes(
+                bytes,
+                fontdue::FontSettings {
+                    scale: 40.0,
+                    ..Default::default()
+                },
+            )
+            .expect("the embedded font parses")
+        };
+        Fonts {
+            faces: [Face::Light, Face::Medium, Face::Bold].map(|f| face(face_bytes(f))),
+        }
+    }
+}
+
+pub struct Overlay {
+    pub vertices: Vec<OverlayVertex>,
+    /// Set when a frame wanted more than `MAX_OVERLAY_VERTICES`; shown by the profiler.
+    pub overflowed: bool,
+    /// Set by `blur_rect`: the renderer blurs the scene for this frame.
+    glass: bool,
+    /// RGBA8, `FONT_ATLAS_W` x `FONT_ATLAS_H`.
+    atlas: Vec<u8>,
+    /// Rows changed since the renderer last uploaded, as `start..end`.
+    dirty: Cell<(usize, usize)>,
+    /// Parsed on first use: headless tools that never set type do not pay for it.
+    fonts: Option<Fonts>,
+    glyphs: HashMap<(Face, u16, char), Glyph>,
+    /// Where each sprite (the caller's key, width, height) sits in the atlas.
+    sprites: HashMap<(u64, u16, u16), [u16; 2]>,
+    /// Shelf packer: next free position and the height of the current shelf.
+    shelf: (usize, usize, usize),
+}
+
+impl Default for Overlay {
+    fn default() -> Overlay {
+        Overlay {
+            vertices: Vec::new(),
+            overflowed: false,
+            glass: false,
+            atlas: textures::font_atlas(),
+            dirty: Cell::new((0, 0)),
+            fonts: None,
+            glyphs: HashMap::new(),
+            sprites: HashMap::new(),
+            shelf: (0, 0, 0),
+        }
+    }
+}
+
+fn with_alpha(c: [f32; 4], a: f32) -> [f32; 4] {
+    [c[0], c[1], c[2], c[3] * a]
+}
+
+impl Overlay {
+    pub fn clear(&mut self) {
+        self.vertices.clear();
+        self.overflowed = false;
+        self.glass = false;
+    }
+
+    /// Whether this frame has glass, so the renderer has to blur the scene.
+    pub fn has_glass(&self) -> bool {
+        self.glass && !self.vertices.is_empty()
+    }
+
+    // -- atlas ------------------------------------------------------------------
+
+    pub fn atlas(&self) -> &[u8] {
+        &self.atlas
+    }
+
+    /// Rows of the atlas changed since the last call, if any. The renderer calls
+    /// this once per frame and uploads them.
+    pub fn take_dirty_rows(&self) -> Option<std::ops::Range<usize>> {
+        let (start, end) = self.dirty.replace((0, 0));
+        (end > start).then_some(start..end)
+    }
+
+    fn mark_dirty(&self, start: usize, end: usize) {
+        let (s, e) = self.dirty.get();
+        self.dirty.set(if e > s {
+            (s.min(start), e.max(end))
+        } else {
+            (start, end)
+        });
+    }
+
+    /// Copies an RGBA8 (sRGB) image of at most `IMAGE_SLOT` pixels a side into a slot.
+    pub fn set_image(&mut self, slot: usize, width: usize, height: usize, rgba: &[u8]) {
+        assert!(
+            slot < IMAGE_SLOTS
+                && width <= IMAGE_SLOT
+                && height <= IMAGE_SLOT
+                && rgba.len() == width * height * 4
+        );
+        for y in 0..height {
+            let at = ((IMAGES_Y + y) * FONT_ATLAS_W + slot * IMAGE_SLOT) * 4;
+            self.atlas[at..at + width * 4]
+                .copy_from_slice(&rgba[y * width * 4..(y + 1) * width * 4]);
+        }
+        self.mark_dirty(IMAGES_Y, IMAGES_Y + height);
+    }
+
+    /// Draws the `src` rectangle (x, y, width, height in pixels) of an image slot.
+    pub fn image(
+        &mut self,
+        slot: usize,
+        src: [f32; 4],
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        tint: [f32; 4],
+    ) {
+        // Half a texel in, so linear filtering never reaches the neighbouring slot.
+        let (left, top) = (
+            (slot * IMAGE_SLOT) as f32 + src[0] + 0.5,
+            IMAGES_Y as f32 + src[1] + 0.5,
+        );
+        let (u0, v0) = (left / FONT_ATLAS_W as f32, top / FONT_ATLAS_H as f32);
+        let (u1, v1) = (
+            (left + src[2] - 1.0) / FONT_ATLAS_W as f32,
+            (top + src[3] - 1.0) / FONT_ATLAS_H as f32,
+        );
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
+            [tint; 4],
+        );
+    }
+
+    fn glyph(&mut self, face: Face, px: u16, ch: char) -> Glyph {
+        if let Some(g) = self.glyphs.get(&(face, px, ch)) {
+            return *g;
+        }
+        let fonts = self.fonts.get_or_insert_with(Fonts::load);
+        let (metrics, coverage) = fonts.faces[face as usize].rasterize(ch, px as f32);
+        let (w, h) = (metrics.width, metrics.height);
+        let (x, y) = self.place(w, h);
+        for row in 0..h {
+            for col in 0..w {
+                let at = ((y + row) * FONT_ATLAS_W + x + col) * 4;
+                self.atlas[at..at + 4].copy_from_slice(&[255, 255, 255, coverage[row * w + col]]);
+            }
+        }
+        self.mark_dirty(y, y + h.max(1));
+        let g = Glyph {
+            at: [x as u16, y as u16],
+            size: [w as u16, h as u16],
+            offset: [metrics.xmin as f32, metrics.ymin as f32],
+            advance: metrics.advance_width,
+        };
+        self.glyphs.insert((face, px, ch), g);
+        g
+    }
+
+    /// Room for a `w` x `h` picture above the image slots, one texel apart from
+    /// its neighbours so filtering never bleeds between them.
+    fn place(&mut self, w: usize, h: usize) -> (usize, usize) {
+        let (mut x, mut y, mut shelf_h) = self.shelf;
+        if x + w + 1 > FONT_ATLAS_W {
+            (x, y, shelf_h) = (0, y + shelf_h + 1, 0);
+        }
+        if y + h + 1 > IMAGES_Y {
+            // Out of room: start over. Quads already batched this frame keep their old
+            // coordinates, so one frame may show wrong glyphs; it takes thousands of
+            // distinct sizes to get here.
+            log::warn!("the glyph atlas filled up and was reset");
+            for texel in self.atlas[..IMAGES_Y * FONT_ATLAS_W * 4]
+                .as_chunks_mut::<4>()
+                .0
+            {
+                texel.copy_from_slice(&[255, 255, 255, 0]);
+            }
+            self.mark_dirty(0, IMAGES_Y);
+            self.glyphs.clear();
+            self.sprites.clear();
+            (x, y, shelf_h) = (0, 0, 0);
+        }
+        self.shelf = (x + w + 1, y, shelf_h.max(h));
+        (x, y)
+    }
+
+    /// Draws a picture `size` pixels across with its top-left corner at `at`,
+    /// multiplied by `tint`. The first time a `key` is drawn at that size,
+    /// `draw` makes its pixels (straight-alpha sRGB RGBA, row by row); they
+    /// stay in the atlas until it fills. Pictures taller than the glyph area
+    /// are not drawn.
+    pub fn sprite(
+        &mut self,
+        key: u64,
+        at: [f32; 2],
+        size: [usize; 2],
+        tint: [f32; 4],
+        draw: impl FnOnce() -> Vec<u8>,
+    ) {
+        let ([x, y], [w, h]) = (at, size);
+        if w == 0 || h == 0 || w >= FONT_ATLAS_W || h + 1 >= IMAGES_Y {
+            return;
+        }
+        let id = (key, w as u16, h as u16);
+        let at = match self.sprites.get(&id) {
+            Some(at) => *at,
+            None => {
+                let rgba = draw();
+                if rgba.len() != w * h * 4 {
+                    log::warn!("sprite {key:x}: {} bytes for {w}x{h}", rgba.len());
+                    return;
+                }
+                let (ax, ay) = self.place(w, h);
+                for row in 0..h {
+                    let at = ((ay + row) * FONT_ATLAS_W + ax) * 4;
+                    self.atlas[at..at + w * 4]
+                        .copy_from_slice(&rgba[row * w * 4..(row + 1) * w * 4]);
+                }
+                self.mark_dirty(ay, ay + h);
+                let at = [ax as u16, ay as u16];
+                self.sprites.insert(id, at);
+                at
+            }
+        };
+        let (u0, v0) = (
+            at[0] as f32 / FONT_ATLAS_W as f32,
+            at[1] as f32 / FONT_ATLAS_H as f32,
+        );
+        let (u1, v1) = (
+            u0 + w as f32 / FONT_ATLAS_W as f32,
+            v0 + h as f32 / FONT_ATLAS_H as f32,
+        );
+        let (x, y) = (x.round(), y.round());
+        let (r, b) = (x + w as f32, y + h as f32);
+        self.quad(
+            [[x, y], [r, y], [r, b], [x, b]],
+            [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
+            [tint; 4],
+        );
+    }
+
+    // -- primitives -------------------------------------------------------------
+
+    fn quad(&mut self, corners: [[f32; 2]; 4], uvs: [[f32; 2]; 4], colors: [[f32; 4]; 4]) {
+        if self.vertices.len() + 6 > MAX_OVERLAY_VERTICES {
+            self.overflowed = true;
+            return;
+        }
+        for i in [0, 1, 2, 0, 2, 3] {
+            self.vertices.push(OverlayVertex {
+                pos: corners[i],
+                uv: uvs[i],
+                color: colors[i],
+            });
+        }
+    }
+
+    pub fn rect(&mut self, x: f32, y: f32, w: f32, h: f32, color: [f32; 4]) {
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            SOLID,
+            [color; 4],
+        );
+    }
+
+    /// Frosted glass: the rendered scene behind the rectangle, strongly blurred
+    /// (a Gaussian of 16 px sigma) and mixed toward `tint.rgb` by `tint.a`, so
+    /// `[0.0, 0.0, 0.0, 0.55]` is dark glass. The panel is opaque: overlay drawn
+    /// before it is covered, not blurred, so put glass first and draw on top.
+    pub fn blur_rect(&mut self, x: f32, y: f32, w: f32, h: f32, tint: [f32; 4]) {
+        self.glass = true;
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            GLASS,
+            [tint; 4],
+        );
+    }
+
+    /// `blur_rect` for any convex quadrilateral, corners in order: pieces of a
+    /// panel with cut corners.
+    pub fn blur_quad(&mut self, corners: [[f32; 2]; 4], tint: [f32; 4]) {
+        self.blur_quad_faded(corners, tint, 1.0);
+    }
+
+    /// `blur_quad` that is only `opacity` there: a panel fading in or out.
+    pub fn blur_quad_faded(&mut self, corners: [[f32; 2]; 4], tint: [f32; 4], opacity: f32) {
+        self.glass = true;
+        self.quad(corners, [[-2.0, opacity.clamp(0.0, 1.0)]; 4], [tint; 4]);
+    }
+
+    /// A rectangle with a colour per corner: top-left, top-right, bottom-right, bottom-left.
+    pub fn gradient(&mut self, x: f32, y: f32, w: f32, h: f32, colors: [[f32; 4]; 4]) {
+        self.quad(
+            [[x, y], [x + w, y], [x + w, y + h], [x, y + h]],
+            SOLID,
+            colors,
+        );
+    }
+
+    /// Any convex quadrilateral, corners in order.
+    pub fn quad_fill(&mut self, corners: [[f32; 2]; 4], color: [f32; 4]) {
+        self.quad(corners, SOLID, [color; 4]);
+    }
+
+    /// `quad_fill` with a colour per corner, in the same order.
+    pub fn quad_shaded(&mut self, corners: [[f32; 2]; 4], colors: [[f32; 4]; 4]) {
+        self.quad(corners, SOLID, colors);
+    }
+
+    pub fn frame(&mut self, x: f32, y: f32, w: f32, h: f32, thickness: f32, color: [f32; 4]) {
+        self.rect(x, y, w, thickness, color);
+        self.rect(x, y + h - thickness, w, thickness, color);
+        self.rect(x, y + thickness, thickness, h - 2.0 * thickness, color);
+        self.rect(
+            x + w - thickness,
+            y + thickness,
+            thickness,
+            h - 2.0 * thickness,
+            color,
+        );
+    }
+
+    pub fn line(&mut self, a: [f32; 2], b: [f32; 2], thickness: f32, color: [f32; 4]) {
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let len = (dx * dx + dy * dy).sqrt();
+        if len < 1e-3 {
+            return;
+        }
+        let (nx, ny) = (-dy / len * thickness * 0.5, dx / len * thickness * 0.5);
+        self.quad(
+            [
+                [a[0] + nx, a[1] + ny],
+                [b[0] + nx, b[1] + ny],
+                [b[0] - nx, b[1] - ny],
+                [a[0] - nx, a[1] - ny],
+            ],
+            SOLID,
+            [color; 4],
+        );
+    }
+
+    /// An anti-aliased line: a solid core with a soft edge either side. For
+    /// anything that is not axis-aligned; `rect` is sharper for what is.
+    pub fn stroke(&mut self, a: [f32; 2], b: [f32; 2], thickness: f32, color: [f32; 4]) {
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let len = (dx * dx + dy * dy).sqrt();
+        if len < 1e-3 {
+            return;
+        }
+        let (nx, ny) = (-dy / len, dx / len);
+        // A hairline keeps its brightness by fading the core rather than vanishing.
+        let core = (thickness - FEATHER).max(0.0) * 0.5;
+        let color = with_alpha(color, (thickness / FEATHER).min(1.0));
+        let clear = with_alpha(color, 0.0);
+        let at = |p: [f32; 2], d: f32| [p[0] + nx * d, p[1] + ny * d];
+        let outer = core + FEATHER;
+        self.quad(
+            [at(a, -outer), at(b, -outer), at(b, -core), at(a, -core)],
+            SOLID,
+            [clear, clear, color, color],
+        );
+        if core > 0.0 {
+            self.quad(
+                [at(a, -core), at(b, -core), at(b, core), at(a, core)],
+                SOLID,
+                [color; 4],
+            );
+        }
+        self.quad(
+            [at(a, core), at(b, core), at(b, outer), at(a, outer)],
+            SOLID,
+            [color, color, clear, clear],
+        );
+    }
+
+    /// An anti-aliased circular arc from angle `from` to `to` (radians, clockwise
+    /// on screen from +X). A full turn draws a ring.
+    pub fn arc(
+        &mut self,
+        centre: [f32; 2],
+        radius: f32,
+        from: f32,
+        to: f32,
+        thickness: f32,
+        color: [f32; 4],
+    ) {
+        let sweep = to - from;
+        let segments = ((sweep.abs() * radius / 5.0).ceil() as usize).clamp(2, 256);
+        let core = (thickness - FEATHER).max(0.0) * 0.5;
+        let color = with_alpha(color, (thickness / FEATHER).min(1.0));
+        let clear = with_alpha(color, 0.0);
+        let radii = [
+            radius - core - FEATHER,
+            radius - core,
+            radius + core,
+            radius + core + FEATHER,
+        ];
+        let point = |angle: f32, r: f32| [centre[0] + angle.cos() * r, centre[1] + angle.sin() * r];
+        for i in 0..segments {
+            let (a0, a1) = (
+                from + sweep * i as f32 / segments as f32,
+                from + sweep * (i + 1) as f32 / segments as f32,
+            );
+            for (band, colors) in [
+                [clear, clear, color, color],
+                [color; 4],
+                [color, color, clear, clear],
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                if band == 1 && core <= 0.0 {
+                    continue;
+                }
+                let (inner, outer) = (radii[band].max(0.0), radii[band + 1].max(0.0));
+                self.quad(
+                    [
+                        point(a0, inner),
+                        point(a1, inner),
+                        point(a1, outer),
+                        point(a0, outer),
+                    ],
+                    SOLID,
+                    colors,
+                );
+            }
+        }
+    }
+
+    /// A filled, anti-aliased circle.
+    pub fn disc(&mut self, centre: [f32; 2], radius: f32, color: [f32; 4]) {
+        let segments = ((radius * 1.3).ceil() as usize).clamp(8, 96);
+        let clear = with_alpha(color, 0.0);
+        let inner = (radius - FEATHER * 0.5).max(0.0);
+        let point = |i: usize, r: f32| {
+            let a = i as f32 / segments as f32 * std::f32::consts::TAU;
+            [centre[0] + a.cos() * r, centre[1] + a.sin() * r]
+        };
+        for i in 0..segments {
+            self.quad(
+                [centre, point(i, inner), point(i + 1, inner), centre],
+                SOLID,
+                [color; 4],
+            );
+            self.quad(
+                [
+                    point(i, inner),
+                    point(i + 1, inner),
+                    point(i + 1, inner + FEATHER),
+                    point(i, inner + FEATHER),
+                ],
+                SOLID,
+                [color, color, clear, clear],
+            );
+        }
+    }
+
+    /// An anti-aliased line through `points`, joined with mitres so the corners
+    /// close without the overlap beads and notches of separate strokes; the
+    /// ends are cut square. `closed` joins the last point back to the first.
+    pub fn polyline(&mut self, points: &[[f32; 2]], thickness: f32, color: [f32; 4], closed: bool) {
+        let mut pts: Vec<[f32; 2]> = Vec::with_capacity(points.len() + 1);
+        for &p in points {
+            if pts
+                .last()
+                .is_none_or(|q: &[f32; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) > 1e-3)
+            {
+                pts.push(p);
+            }
+        }
+        let closed = closed && pts.len() > 2;
+        if closed
+            && (pts[0][0] - pts[pts.len() - 1][0]).hypot(pts[0][1] - pts[pts.len() - 1][1]) <= 1e-3
+        {
+            pts.pop();
+        }
+        let n = pts.len();
+        if n < 2 {
+            return;
+        }
+        let normal = |a: [f32; 2], b: [f32; 2]| {
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let len = dx.hypot(dy);
+            [-dy / len, dx / len]
+        };
+        // Each point's offset direction, scaled so the band keeps its width
+        // through the bend; a very sharp corner is capped rather than spiking.
+        let offsets: Vec<[f32; 2]> = (0..n)
+            .map(|i| {
+                let before = if i > 0 {
+                    Some(normal(pts[i - 1], pts[i]))
+                } else if closed {
+                    Some(normal(pts[n - 1], pts[0]))
+                } else {
+                    None
+                };
+                let after = if i + 1 < n {
+                    Some(normal(pts[i], pts[i + 1]))
+                } else if closed {
+                    Some(normal(pts[n - 1], pts[0]))
+                } else {
+                    None
+                };
+                match (before, after) {
+                    (Some(a), Some(b)) => {
+                        let (mx, my) = (a[0] + b[0], a[1] + b[1]);
+                        let len = mx.hypot(my);
+                        if len < 1e-3 {
+                            return b;
+                        }
+                        let m = [mx / len, my / len];
+                        let k = 1.0 / (m[0] * b[0] + m[1] * b[1]).max(0.25);
+                        [m[0] * k, m[1] * k]
+                    }
+                    (Some(a), None) => a,
+                    (None, Some(b)) => b,
+                    (None, None) => [0.0, 0.0],
+                }
+            })
+            .collect();
+        let core = (thickness - FEATHER).max(0.0) * 0.5;
+        let color = with_alpha(color, (thickness / FEATHER).min(1.0));
+        let clear = with_alpha(color, 0.0);
+        let outer = core + FEATHER;
+        let at = |i: usize, d: f32| [pts[i][0] + offsets[i][0] * d, pts[i][1] + offsets[i][1] * d];
+        let segments = if closed { n } else { n - 1 };
+        for i in 0..segments {
+            let j = (i + 1) % n;
+            self.quad(
+                [at(i, -outer), at(j, -outer), at(j, -core), at(i, -core)],
+                SOLID,
+                [clear, clear, color, color],
+            );
+            if core > 0.0 {
+                self.quad(
+                    [at(i, -core), at(j, -core), at(j, core), at(i, core)],
+                    SOLID,
+                    [color; 4],
+                );
+            }
+            self.quad(
+                [at(i, core), at(j, core), at(j, outer), at(i, outer)],
+                SOLID,
+                [color, color, clear, clear],
+            );
+        }
+    }
+
+    /// A band from `a` to `b` shaded across its width: each stop is
+    /// `(k, px, color)`, placed `k` half-widths plus `px` pixels off the
+    /// middle (negative is to the left going from `a` to `b`), the colour
+    /// blending smoothly between neighbouring stops. The half-width is `wa`
+    /// at `a` and `wb` at `b`. Stops run from left to right.
+    pub fn ribbon(
+        &mut self,
+        a: [f32; 2],
+        b: [f32; 2],
+        wa: f32,
+        wb: f32,
+        stops: &[(f32, f32, [f32; 4])],
+    ) {
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let len = dx.hypot(dy);
+        if len < 1e-3 {
+            return;
+        }
+        let (nx, ny) = (-dy / len, dx / len);
+        let at = |p: [f32; 2], w: f32, (k, px): (f32, f32)| {
+            let d = w * k + px;
+            [p[0] + nx * d, p[1] + ny * d]
+        };
+        for pair in stops.windows(2) {
+            let ((k0, p0, c0), (k1, p1, c1)) = (pair[0], pair[1]);
+            self.quad(
+                [
+                    at(a, wa, (k0, p0)),
+                    at(b, wb, (k0, p0)),
+                    at(b, wb, (k1, p1)),
+                    at(a, wa, (k1, p1)),
+                ],
+                SOLID,
+                [c0, c0, c1, c1],
+            );
+        }
+    }
+
+    /// A rounded end for a `ribbon`: half a disc of radius `w` round
+    /// `centre`, bulging toward `out`, shaded from its middle outward by
+    /// `stops` (`(k, px, color)`, `k` in radii plus `px` pixels, from the
+    /// middle out).
+    pub fn ribbon_cap(
+        &mut self,
+        centre: [f32; 2],
+        out: [f32; 2],
+        w: f32,
+        stops: &[(f32, f32, [f32; 4])],
+    ) {
+        let len = out[0].hypot(out[1]);
+        if len < 1e-6 || stops.len() < 2 {
+            return;
+        }
+        let base = out[1].atan2(out[0]) - std::f32::consts::FRAC_PI_2;
+        let reach = stops.last().map_or(w, |&(k, px, _)| w * k + px);
+        let segments = ((reach * 0.6).ceil() as usize).clamp(4, 48);
+        let point = |i: usize, (k, px): (f32, f32)| {
+            let a = base + i as f32 / segments as f32 * std::f32::consts::PI;
+            let r = (w * k + px).max(0.0);
+            [centre[0] + a.cos() * r, centre[1] + a.sin() * r]
+        };
+        for i in 0..segments {
+            for pair in stops.windows(2) {
+                let ((k0, p0, c0), (k1, p1, c1)) = (pair[0], pair[1]);
+                self.quad(
+                    [
+                        point(i, (k0, p0)),
+                        point(i + 1, (k0, p0)),
+                        point(i + 1, (k1, p1)),
+                        point(i, (k1, p1)),
+                    ],
+                    SOLID,
+                    [c0, c0, c1, c1],
+                );
+            }
+        }
+    }
+
+    // -- text -------------------------------------------------------------------
+
+    /// Sets a run of type with its baseline at `y`; returns the x position after it.
+    /// Glyphs land on whole pixels, so text is as sharp as the rasteriser made it.
+    pub fn type_text(&mut self, x: f32, y: f32, style: Type, color: [f32; 4], text: &str) -> f32 {
+        let px = style.px.round().clamp(4.0, 400.0) as u16;
+        let (mut pen, baseline) = (x, y.round());
+        for ch in text.chars() {
+            let g = self.glyph(style.face, px, ch);
+            if g.size[0] > 0 && g.size[1] > 0 {
+                let (w, h) = (g.size[0] as f32, g.size[1] as f32);
+                let (left, top) = ((pen + g.offset[0]).round(), baseline - g.offset[1] - h);
+                let (u0, v0) = (
+                    g.at[0] as f32 / FONT_ATLAS_W as f32,
+                    g.at[1] as f32 / FONT_ATLAS_H as f32,
+                );
+                let (u1, v1) = (u0 + w / FONT_ATLAS_W as f32, v0 + h / FONT_ATLAS_H as f32);
+                self.quad(
+                    [
+                        [left, top],
+                        [left + w, top],
+                        [left + w, top + h],
+                        [left, top + h],
+                    ],
+                    [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
+                    [color; 4],
+                );
+            }
+            pen += g.advance + style.tracking;
+        }
+        pen
+    }
+
+    /// Width of a run as `type_text` sets it, without the trailing letter space.
+    pub fn type_width(&mut self, style: Type, text: &str) -> f32 {
+        let px = style.px.round().clamp(4.0, 400.0) as u16;
+        let mut width = 0.0;
+        let mut count = 0;
+        for ch in text.chars() {
+            width += self.glyph(style.face, px, ch).advance;
+            count += 1;
+        }
+        width + style.tracking * (count as f32 - 1.0).max(0.0)
+    }
+
+    /// Height of a capital letter at this size: what UI text is centred on.
+    pub fn cap_height(&mut self, style: Type) -> f32 {
+        let px = style.px.round().clamp(4.0, 400.0) as u16;
+        let g = self.glyph(style.face, px, 'H');
+        g.size[1] as f32 + g.offset[1]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn glyphs_are_cached_and_mark_the_atlas_dirty() {
+        let mut o = Overlay::default();
+        assert!(o.take_dirty_rows().is_none());
+        let style = Type::new(Face::Medium, 18.0, 2.0);
+        let end = o.type_text(10.0, 40.0, style, [1.0; 4], "SKIRMISH");
+        assert!((end - 10.0 - o.type_width(style, "SKIRMISH") - style.tracking).abs() < 1e-3);
+        let rows = o.take_dirty_rows().expect("new glyphs were rasterised");
+        assert!(rows.end <= IMAGES_Y);
+        // Six distinct letters, eight quads; a second run adds no glyphs.
+        assert_eq!(o.glyphs.len(), 6);
+        assert_eq!(o.vertices.len(), 8 * 6);
+        o.type_text(10.0, 80.0, style, [1.0; 4], "SKIRMISH");
+        assert!(o.take_dirty_rows().is_none());
+        let cap = o.cap_height(style);
+        assert!((10.0..16.0).contains(&cap), "cap height {cap}");
+    }
+
+    #[test]
+    fn sprites_are_drawn_once_per_size() {
+        let mut o = Overlay::default();
+        let mut made = 0;
+        for _ in 0..2 {
+            o.sprite(7, [3.0, 4.0], [2, 3], [1.0; 4], || {
+                made += 1;
+                vec![200; 2 * 3 * 4]
+            });
+        }
+        assert_eq!(made, 1, "the second draw reuses the pixels");
+        assert_eq!(o.vertices.len(), 2 * 6);
+        let at = o.sprites[&(7, 2, 3)];
+        let i = (at[1] as usize * FONT_ATLAS_W + at[0] as usize) * 4;
+        assert_eq!(o.atlas()[i..i + 4], [200; 4]);
+        o.sprite(7, [3.0, 4.0], [4, 6], [1.0; 4], || vec![1; 4 * 6 * 4]);
+        assert_eq!(o.sprites.len(), 2, "another size is another picture");
+    }
+
+    #[test]
+    fn images_land_in_their_slot() {
+        let mut o = Overlay::default();
+        o.set_image(1, 2, 2, &[9u8; 16]);
+        assert_eq!(o.take_dirty_rows(), Some(IMAGES_Y..IMAGES_Y + 2));
+        let at = (IMAGES_Y * FONT_ATLAS_W + IMAGE_SLOT) * 4;
+        assert_eq!(o.atlas()[at..at + 8], [9u8; 8]);
+        assert_eq!(o.atlas()[at - 4..at], [255, 255, 255, 0]);
+    }
+}

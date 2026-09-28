@@ -1,0 +1,189 @@
+// Aster experimentals (tech 4): too big for any factory. Combat engineers raise them on a
+// lot of their own, as they would a structure (`footprint` on a mobile unit), and the
+// finished machine drives off it.
+[
+    (
+        // A super-heavy assault tank built round the AEB-2, the electric bore scaled up
+        // until it no longer aims well: the tracer strays, and the charge sears everything
+        // along its channel on the way down, leaving the ground molten behind it. Sponson
+        // compact AEB turrets for what gets close, a heavy flak gun on the rear deck, and a hull
+        // field over all of it.
+        key: "aster_t4_assault_tank",
+        name: "Fulgur",
+        role: "Super-Heavy Assault Tank",
+        tech: 4,
+        categories: ["Land", "DirectFire", "Experimental"],
+        health: 60000,
+        cost: (mass: 3400, energy: 34000, time: 20000),
+        radius: 31.35, height: 24.75,
+        footprint: (6, 6),
+        vision: 380,
+        shield: (kind: Hull, health: 18000, regen: 120),
+        economy: (energy_upkeep: 300),
+        hull_mounts: true,
+        motion: (layer: Land, size: 5, speed: 16, accel: 8, turn: 30),
+        weapons: [
+            (
+                name: "AEB-2 Electric Bore",
+                damage: 6000, splash: 22, range: 650, reload: 9.0, speed: 800, trajectory: Direct,
+                turret_turn: 24, muzzle: (36.3, 4.125, 20.295), pivot: (9.075, 4.125, 20.295), spread: 1.2,
+                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.24, impact: 0.85, shockwave: 4.5,
+                tracer: 0.3, trail: false, wake: 0, bolts: 0,
+                bore: (width: 7, damage: 2000, cool: 45),
+                sounds: (fire: "aster_bore_heavy", charge: "aster_bore_heavy_charge", charge_time: 2.2, impact: "aster_bore_heavy_strike", ground: "aster_bore_heavy_strike"),
+            ),
+            (
+                name: "AEB-1 Compact Bore",
+                damage: 520, splash: 5, range: 300, reload: 2.6, speed: 900, trajectory: Direct,
+                turret_turn: 90, muzzle: (25.575, 17.325, 12.87), pivot: (14.85, 17.325, 11.88), mount: true,
+                targets: ["Land", "Naval"], color: Blue, flash: 0.18, impact: 0.5, shockwave: 0.9,
+                tracer: 0.2, trail: false, wake: 0, bolts: 0, bore: (cool: 8),
+                sounds: (fire: "aster_bore_compact", impact: "aster_bore_compact_strike", ground: "aster_bore_compact_strike"),
+            ),
+            (
+                name: "AEB-1 Compact Bore",
+                damage: 520, splash: 5, range: 300, reload: 2.6, speed: 900, trajectory: Direct,
+                turret_turn: 90, muzzle: (25.575, -17.325, 12.87), pivot: (14.85, -17.325, 11.88), mount: true,
+                targets: ["Land", "Naval"], color: Blue, flash: 0.18, impact: 0.5, shockwave: 0.9,
+                tracer: 0.2, trail: false, wake: 0, bolts: 0, bore: (cool: 8),
+                sounds: (fire: "aster_bore_compact", impact: "aster_bore_compact_strike", ground: "aster_bore_compact_strike"),
+            ),
+            (
+                name: "Heavy Flak",
+                damage: 875, splash: 48, proximity: 15, range: 440, reload: 1.1, speed: 360, trajectory: Direct,
+                turret_turn: 240, muzzle: (-9.075, 0, 16.83), pivot: (-18.15, 0, 15.51), mount: true,
+                targets: ["Air"], color: Orange, flak: true, flash: 1.8, impact: 1.8,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
+            ),
+        ],
+        mesh: "assault_tank", icon: Tank,
+        sounds: (death: "blast_colossal", moving: "tracks_colossal"),
+    ),
+    (
+        // The first tier 5: a two-legged siege walker nearly five hundred metres tall, raised
+        // on a lot of its own like the Fulgur. It strides straight over structures and slopes
+        // rather than round them, and wades any sea on the maps with the water below its
+        // knees, its guns still firing over it. Every footfall is felt: what is under the
+        // foot is crushed. The right arm is a rotary cluster of six battleship barrels, the
+        // left an AEB-3, a bore so big its discharge takes the heart out of a base. Rocket
+        // pods and a twin flak turret ride each shoulder, and a hull field lies over its
+        // plates.
+        key: "aster_t5_titan",
+        name: "Behemoth",
+        role: "Siege Titan",
+        tech: 5,
+        categories: ["Land", "DirectFire", "Experimental"],
+        health: 5000000,
+        cost: (mass: 120000, energy: 1200000, time: 400000),
+        radius: 160, height: 480,
+        footprint: (32, 32),
+        vision: 2400, radar: 4200,
+        // A personal field over its plates.
+        shield: (kind: Hull, health: 600000, regen: 4000),
+        economy: (energy_upkeep: 4000),
+        motion: (layer: Land, size: 5, speed: 26, accel: 5, turn: 12, stride: true),
+        // One footfall each half stride (the model's 256 m stride at this size), planted
+        // ahead of the middle on alternate sides: anything short of an experimental under
+        // the sole is crushed.
+        stomp: (pace: 128, reach: 76.8, gauge: 88, radius: 56, damage: 20000),
+        weapons: [
+            (
+                // Shoulder pods: heavy unguided rockets rippled at the mark, lofted out of the
+                // pods on an arc (`rake`), scattering wide and bursting big. Its third
+                // weapon, and still more than most armies can take. Listed first: the pods
+                // ride the torso itself, so the torso's aim is theirs, and the arms after
+                // them each swing a little off it on their own (`sway`).
+                name: "Hailstorm Rocket Pods",
+                damage: 3000, splash: 70, range_min: 600, range: 3200, reload: 14.0, salvo: 24, salvo_delay: 0.1, speed: 320, trajectory: Ballistic, rake: 30, loft: 7,
+                turret_turn: 20, pivot: (0, 0, 392), muzzle: (2.6, 80, 461.6),
+                // Two rows of three in each pod's face, the pods raked 17 degrees nose-up; the
+                // salvo ripples down them in turn, twice round.
+                muzzles: [(2.6, 62.4, 461.6), (2.6, 80, 461.6), (2.6, 97.6, 461.6), (-2.6, 62.4, 478.4), (-2.6, 80, 478.4), (-2.6, 97.6, 478.4),
+                          (2.6, -62.4, 461.6), (2.6, -80, 461.6), (2.6, -97.6, 461.6), (-2.6, -62.4, 478.4), (-2.6, -80, 478.4), (-2.6, -97.6, 478.4)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, missile: true,
+                intercept: 400, spread: 7, trail: true, wake: 8, tracer: 4, impact: 4.5, shockwave: 2.5,
+                // A heavy rocket in each tube: 6 m across in the 9.6 m mouth, 43 m long in the 60 m pod.
+                caliber: 6,
+                sounds: (fire: "titan_rockets", impact: "shell_heavy"),
+            ),
+            (
+                // Right arm. Six heavy barrels turn in the cluster: a battleship's gun fired
+                // like a machine gun, conventional shells walking round the mark. Its arms fire
+                // from nearly 300 m up: what is close is under them, out of their reach
+                // (`range_min`), and left to its feet and its flak.
+                name: "Tempest Rotary Cannon",
+                // It opens fire a third of the way into its spin-up and fires faster as the
+                // barrels come up to speed (`spin_ramp`): a slow heavy beat, two shells a second at
+                // full spin (a whole number of ticks, so a barrel is always at the top), each one a battleship's broadside on its own.
+                // Each shell leaves the barrel at the top of the cluster as it comes round
+                // (`barrels`), so the muzzle is that barrel's, 19.6 m over the cluster's axis.
+                // It shoots flat from nearly 300 m up, so a shell laid a hair high skims over
+                // its mark and comes down hundreds of metres past it: the spread is kept
+                // tight (0.7 degrees lands most shells on a T4 at full range; 4 landed one
+                // in twenty), and the burst is wide, so the fall of shot still walks about.
+                damage: 5400, splash: 60, range_min: 900, range: 2600, reload: 0.5, speed: 1000, trajectory: Direct,
+                turret_turn: 20, pivot: (0, 0, 392), muzzle: (256, -144, 315.6), spread: 0.7, spin_up: 2.5, spin_ramp: 3.0,
+                barrels: 6, sway: 15,
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange,
+                flash: 4.5, impact: 4.2, shockwave: 2.6, tracer: 0.7,
+                // Each shot kicks its one spent casing out of the port in the gun's flank (`port`,
+                // the model's `titan::EJECT` at 4x; it turns and pitches with the gun), every
+                // one thrown the same way (out of that flank and up, `throw`) before it tumbles
+                // off on its own: it comes down like a falling girder, crushing what it lands
+                // on, lies there a while and sinks away. It is worth nothing.
+                sabot: (port: (40, -178.4, 300), throw: (0, -0.83, 0.56), kick: 18, damage: 1500, splash: 24, casing: "aster_t5_titan_sabot"),
+                sounds: (fire: "titan_gatling_fire", spin: "titan_gatling_spin", impact: "titan_shell_hit", ground: "titan_shell_hit", casing: "titan_casing_land"),
+            ),
+            (
+                // Left arm. An argon tracer too fast to see, then the whole charge down its
+                // channel: it sears a lane to the mark and bursts there, and the gun keeps
+                // pouring its charge down the channel into a lightning storm that spreads
+                // from the hit and vaporises a whole base over several seconds (`storm`):
+                // an electrical warhead.
+                name: "AEB-3 Cataclysm Bore",
+                damage: 40000, splash: 150, range_min: 1200, range: 3800, reload: 45.0, speed: 12000, trajectory: Direct,
+                turret_turn: 20, pivot: (0, 0, 392), muzzle: (280, 144, 296), spread: 0.8, sway: 15,
+                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 0.6, impact: 3.0, shockwave: 9.0,
+                tracer: 0, trail: false, wake: 0, bolts: 0,
+                bore: (width: 60, damage: 20000, cool: 150, storm: (radius: 440, seconds: 9, damage: 6000)),
+                sounds: (fire: "titan_bore_fire", charge: "titan_bore_charge", charge_time: 6.0, impact: "titan_bore_strike", ground: "titan_bore_strike", far: "titan_bore_far"),
+            ),
+            (
+                // A twin flak turret on each pauldron, beside the pods: conventional heavy flak,
+                // enough to see off a few gunships. It is not the air defence it could carry;
+                // against a real air wing it wants escorts.
+                name: "Heavy Twin Flak",
+                damage: 420, splash: 48, proximity: 16, range: 900, reload: 0.9, speed: 380, trajectory: Direct,
+                turret_turn: 160, mount: true, pivot: (-24, 132, 456), muzzle: (16, 132, 456),
+                muzzles: [(16, 128.6, 456), (16, 135.4, 456)],
+                targets: ["Air"], color: Orange, flak: true, casings: 3,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
+            ),
+            (
+                name: "Heavy Twin Flak",
+                damage: 420, splash: 48, proximity: 16, range: 900, reload: 0.9, speed: 380, trajectory: Direct,
+                turret_turn: 160, mount: true, pivot: (-24, -132, 456), muzzle: (16, -132, 456),
+                muzzles: [(16, -135.4, 456), (16, -128.6, 456)],
+                targets: ["Air"], color: Orange, flak: true, casings: 3,
+                sounds: (fire: "flak_gun", impact: "flak_burst"),
+            ),
+        ],
+        mesh: "titan", icon: Titan,
+        sounds: (death: "titan_death", moving: "titan_walk", step: "titan_step", step_far: "titan_step_far"),
+    ),
+    (
+        // The Tempest's spent casing, as it is drawn falling and lying where it fell
+        // (`sabot` on the gun). Nobody builds it, and it is worth nothing.
+        key: "aster_t5_titan_sabot",
+        name: "Spent Casing",
+        role: "Scrap",
+        tech: 5,
+        categories: ["Structure"],
+        footprint: (1, 1),
+        health: 1,
+        cost: (mass: 0, energy: 0, time: 1),
+        radius: 7.5, height: 6,
+        vision: 0,
+        mesh: "titan_sabot", icon: Bot,
+    ),
+]

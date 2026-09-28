@@ -1,0 +1,6 @@
+Sampler((
+    set: "piano",
+    soften: 0.6,
+    velocity: 0.7,
+    voices: 24,
+))

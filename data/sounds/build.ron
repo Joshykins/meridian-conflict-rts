@@ -1,0 +1,48 @@
+// Construction: the beam coming on, at work, and shutting off. The game asks
+// for these three by name; every builder of every faction shares them.
+//
+// The same shape as reclaim — a loop, a start, an end — but it is a projector
+// depositing, not a machine pulling. Higher, cleaner, no grind. Nothing
+// swooshes. What finishes has no sound of its own; the beam shutting off is
+// the end of it.
+(
+    sounds: {
+        "build_beam": (
+            length: 2.0, peak: 0.4, room: 0.18, looped: true,
+            layers: [
+                // The projector: a held fifth, brighter than reclaim's throb.
+                Drone(freq: 148, gain: 0.055, wobble: 4, depth: 0.28),
+                Drone(freq: 222, gain: 0.05, wobble: 5, depth: 0.4),
+                // The octave above, a slow working pulse, not a chopped grind.
+                Drone(freq: 296, gain: 0.04, wobble: 7, depth: 0.55),
+                Drone(freq: 74, gain: 0.035, wobble: 2, depth: 0.22),
+                Drive(1.15),
+                // The weld. Narrow and mid, or it is static.
+                Rumble(freq: 880, q: 2.8, gain: 1.8, wobble: 6, depth: 0.55),
+            ],
+        ),
+        // Coming on: a contactor closing, and the projector catching from just
+        // under where the loop holds it. The loop fades in beneath.
+        "build_start": (
+            length: 0.55, peak: 0.48, room: 0.22,
+            layers: [
+                Burst(low: 220, high: 1400, attack: 0.0005, decay: 0.01, gain: 8),
+                Tone(from: 90, to: 148, glide: 0.1, attack: 0.005, decay: 0.16, gain: 0.45),
+                Stack(from: 168, to: 222, glide: 0.12, attack: 0.01, decay: 0.16, gain: 0.75, detune: 1.005, width: 0.28, partials: [(1, 1), (1.5, 0.45), (2, 0.35)]),
+                Drive(1.18),
+            ],
+        ),
+        // Shutting off: the contactor opening, the projector running down out
+        // of the loop's notes, and a light latch as it settles.
+        "build_end": (
+            length: 0.7, peak: 0.44, room: 0.28,
+            layers: [
+                Burst(low: 200, high: 1100, attack: 0.0005, decay: 0.01, gain: 7),
+                Stack(from: 222, to: 140, glide: 0.28, attack: 0.004, decay: 0.18, gain: 0.9, detune: 1.005, width: 0.28, partials: [(1, 1), (1.5, 0.45), (2, 0.35)]),
+                Tone(from: 148, to: 72, glide: 0.28, attack: 0.004, decay: 0.2, gain: 0.2),
+                Tone(at: 0.22, from: 260, to: 120, glide: 0.04, attack: 0.002, decay: 0.05, gain: 0.28),
+                Drive(1.15),
+            ],
+        ),
+    },
+)

@@ -1,0 +1,17 @@
+Synth((
+    oscs: [
+        (wave: Triangle, gain: 0.6, unison: 5, detune: 12, width: 0.9),
+        (wave: Noise, gain: 0.045),
+        (wave: Sine, gain: 0.25, octave: 1, unison: 3, detune: 6, width: 0.6),
+    ],
+    filter: (mode: LowPass, cutoff: 1500.0, resonance: 0.2, env: 0.5, keytrack: 0.6, velocity: 0.0, drive: 0.0),
+    amp: (a: 1.2, d: 1.5, s: 0.85, r: 2.2),
+    mod_env: (a: 1.5, d: 2.0, s: 0.6, r: 2.0),
+    lfos: [
+        (shape: Triangle, to: Cutoff, rate: 0.17, amount: 0.35),
+        (shape: Sine, to: Amp, rate: 4.5, amount: 0.06, delay: 1.0),
+    ],
+    voices: 14,
+    velocity: 0.3,
+    gain: 1.1,
+))

@@ -1,0 +1,10 @@
+Synth((
+    oscs: [(wave: Fold, gain: 0.6, shape: 0.55), (wave: Fm, gain: 0.45, shape: 0.35, ratio: 0.5, octave: -1)],
+    filter: (mode: LowPass4, cutoff: 420.0, resonance: 0.45, env: 2.2, keytrack: 0.3, velocity: 1.0, drive: 0.5),
+    amp: (a: 0.004, d: 0.3, s: 0.7, r: 0.12),
+    mod_env: (a: 0.002, d: 0.22, s: 0.2, r: 0.12),
+    lfos: [(shape: Triangle, to: Cutoff, rate: 2.0, amount: 0.9, sync: true, retrigger: true)],
+    voices: 4,
+    velocity: 0.6,
+    gain: 1.0,
+))

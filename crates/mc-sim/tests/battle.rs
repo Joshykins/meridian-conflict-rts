@@ -1,0 +1,665 @@
+//! End-to-end simulation tests on a flat synthetic map: a battle, a build
+//! chain, snapshots, and above all determinism across thread counts.
+
+use mc_core::{Angle, Fx, FxVec2};
+use mc_data::Blueprints;
+use mc_jobs::Pool;
+use mc_map::Heightfield;
+use mc_sim::tables::{flag, Controller};
+use mc_sim::world::MapData;
+use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, World};
+use std::path::Path;
+use std::sync::Arc;
+
+const MAP_CELLS: u32 = 512; // 4 km
+
+fn blueprints() -> Arc<Blueprints> {
+    Arc::new(Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap())
+}
+
+/// A square ore field `2 * half` metres across.
+fn ore_square(x: i32, y: i32, half: i32) -> mc_map::OreRegion {
+    mc_map::OreRegion {
+        points: [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+            .into_iter()
+            .map(|(dx, dy)| FxVec2::from_ints(x + dx * half, y + dy * half))
+            .collect(),
+    }
+}
+
+fn flat_world(threads: usize, commanders: bool, ai: bool) -> World {
+    let terrain = Heightfield::flat(MAP_CELLS, MAP_CELLS, Fx::from_int(20));
+    let map = MapData {
+        name: "flat".into(),
+        content_id: 1,
+        ore: [
+            (800, 512),
+            (512, 800),
+            (250, 250),
+            (1536, 1536),
+            (2040, 2040),
+            (2568, 2568),
+            (3296, 3584),
+            (3584, 3296),
+            (3842, 3842),
+        ]
+        .into_iter()
+        .map(|(x, y)| ore_square(x, y, 50))
+        .collect(),
+        starts: vec![FxVec2::from_ints(512, 512), FxVec2::from_ints(3584, 3584)],
+        props: Vec::new(),
+    };
+    let controller = if ai {
+        Controller::Ai
+    } else {
+        Controller::Human
+    };
+    let config = MatchConfig {
+        seed: 42,
+        players: vec![
+            PlayerSetup {
+                name: "one".into(),
+                faction: "Aster".into(),
+                ai: Default::default(),
+                team: 0,
+                controller,
+                start: 0,
+            },
+            PlayerSetup {
+                name: "two".into(),
+                faction: "Aster".into(),
+                ai: Default::default(),
+                team: 1,
+                controller,
+                start: 1,
+            },
+        ],
+        cheats: true,
+        fog: true,
+        spawn_commanders: commanders,
+    };
+    World::with_terrain(
+        terrain,
+        map,
+        blueprints(),
+        Arc::new(Pool::new(threads)),
+        &config,
+    )
+    .unwrap()
+}
+
+fn cmd(player: u8, command: Command) -> PlayerCommand {
+    PlayerCommand { player, command }
+}
+
+/// Two armies spawn, march at each other and fight. Returns the hash of every tick.
+fn run_battle(threads: usize, ticks: u32) -> (Vec<u64>, World) {
+    let mut w = flat_world(threads, false, false);
+    let bp = w.blueprints.clone();
+    let tank = bp.id_of("aster_t1_tank").unwrap();
+    let arty = bp.id_of("aster_t1_artillery").unwrap();
+    let bot = bp.id_of("aster_t1_bot").unwrap();
+    let mut hashes = Vec::new();
+    let setup = vec![
+        cmd(
+            0,
+            Command::DebugSpawn {
+                owner: 0,
+                blueprint: tank,
+                pos: FxVec2::from_ints(1500, 2000),
+                heading: Angle::ZERO,
+                count: 60,
+                flags: 0,
+                build: 1000,
+            },
+        ),
+        cmd(
+            0,
+            Command::DebugSpawn {
+                owner: 0,
+                blueprint: arty,
+                pos: FxVec2::from_ints(1350, 2000),
+                heading: Angle::ZERO,
+                count: 16,
+                flags: 0,
+                build: 1000,
+            },
+        ),
+        cmd(
+            1,
+            Command::DebugSpawn {
+                owner: 1,
+                blueprint: tank,
+                pos: FxVec2::from_ints(2500, 2050),
+                heading: Angle::HALF_TURN,
+                count: 50,
+                flags: 0,
+                build: 1000,
+            },
+        ),
+        cmd(
+            1,
+            Command::DebugSpawn {
+                owner: 1,
+                blueprint: bot,
+                pos: FxVec2::from_ints(2650, 2050),
+                heading: Angle::HALF_TURN,
+                count: 40,
+                flags: 0,
+                build: 1000,
+            },
+        ),
+    ];
+    hashes.push(w.tick(&setup).unwrap());
+    let ids = |w: &World, owner: u8| -> Vec<_> {
+        let u = &w.state.units;
+        u.slots
+            .iter()
+            .filter(|&r| u.owner[r] == owner)
+            .map(|r| u.id(r))
+            .collect()
+    };
+    let orders = vec![
+        cmd(
+            0,
+            Command::AttackMove {
+                units: ids(&w, 0),
+                target: FxVec2::from_ints(2600, 2050),
+                queue: false,
+            },
+        ),
+        cmd(
+            1,
+            Command::AttackMove {
+                units: ids(&w, 1),
+                target: FxVec2::from_ints(1400, 2000),
+                queue: false,
+            },
+        ),
+    ];
+    hashes.push(w.tick(&orders).unwrap());
+    for _ in 2..ticks {
+        hashes.push(w.tick(&[]).unwrap());
+    }
+    (hashes, w)
+}
+
+#[test]
+fn battle_is_fought_and_leaves_wreckage() {
+    let (_, w) = run_battle(4, 900);
+    let s = &w.state;
+    let alive = |owner: u8| {
+        s.units
+            .slots
+            .iter()
+            .filter(|&r| s.units.owner[r] == owner)
+            .count()
+    };
+    let (a, b) = (alive(0), alive(1));
+    assert!(a + b < 166, "nobody died: {a} + {b}");
+    assert!(
+        s.wrecks.slots.live() > 10,
+        "wrecks: {}",
+        s.wrecks.slots.live()
+    );
+    assert!(!s.stains.is_empty(), "no scorch marks");
+    assert!(s.players[0].units_killed + s.players[1].units_killed > 10);
+    // Somebody should have won the field.
+    assert!(
+        a == 0 || b == 0 || a + b < 100,
+        "battle stalled at {a} vs {b}"
+    );
+}
+
+#[test]
+fn identical_hashes_at_any_thread_count() {
+    let (reference, _) = run_battle(0, 400);
+    for threads in [1, 3, 8] {
+        let (hashes, _) = run_battle(threads, 400);
+        let first_diff = reference.iter().zip(&hashes).position(|(a, b)| a != b);
+        assert_eq!(
+            first_diff, None,
+            "desync with {threads} threads at tick {first_diff:?}"
+        );
+    }
+}
+
+#[test]
+fn snapshot_restores_to_the_same_future() {
+    let (_, mut a) = run_battle(2, 150);
+    let blob = a.snapshot();
+    let mut b = flat_world(2, false, false);
+    b.restore(
+        Heightfield::flat(MAP_CELLS, MAP_CELLS, Fx::from_int(20)),
+        &blob,
+    )
+    .unwrap();
+    assert_eq!(a.hash(), b.hash());
+    for t in 0..200 {
+        assert_eq!(
+            a.tick(&[]).unwrap(),
+            b.tick(&[]).unwrap(),
+            "diverged {t} ticks after the snapshot"
+        );
+    }
+}
+
+#[test]
+fn commander_builds_a_base_and_a_factory_builds_tanks() {
+    let mut w = flat_world(2, true, false);
+    let bp = w.blueprints.clone();
+    let acu = w.state.players[0].commander;
+    let power = bp.id_of("aster_t1_power").unwrap();
+    let extractor = bp.id_of("aster_core_mine").unwrap();
+    let factory = bp.id_of("aster_t1_land_factory").unwrap();
+    let tank = bp.id_of("aster_t1_tank").unwrap();
+    let build = |blueprint, x, y, queue| {
+        cmd(
+            0,
+            Command::Build {
+                units: vec![acu],
+                blueprint,
+                pos: FxVec2::from_ints(x, y),
+                heading: Angle::ZERO,
+                queue,
+            },
+        )
+    };
+    w.tick(&[
+        build(power, 600, 440, false),
+        build(power, 650, 440, true),
+        build(extractor, 762, 510, true),
+        build(factory, 420, 640, true),
+    ])
+    .unwrap();
+
+    let find = |w: &World, blueprint| {
+        let u = &w.state.units;
+        u.slots
+            .iter()
+            .find(|&r| u.blueprint[r] == blueprint && u.owner[r] == 0 && u.is_active(r))
+    };
+    let mut factory_row = None;
+    for _ in 0..3000 {
+        w.tick(&[]).unwrap();
+        factory_row = find(&w, factory);
+        if factory_row.is_some() {
+            break;
+        }
+    }
+    let factory_row = factory_row.expect("factory finished within five minutes");
+    assert!(find(&w, power).is_some() && find(&w, extractor).is_some());
+    assert!(
+        w.state.players[0].mass_income > Fx::ONE,
+        "mine income: {:?}",
+        w.state.players[0].mass_income
+    );
+    // The ground under the factory is level now.
+    let p = w.state.units.pos[factory_row];
+    let z = w.terrain.height_at(p);
+    assert_eq!(w.terrain.height_at(p + FxVec2::from_ints(40, -40)), z);
+
+    let fid = w.state.units.id(factory_row);
+    w.tick(&[
+        cmd(
+            0,
+            Command::Produce {
+                factories: vec![fid],
+                blueprint: tank,
+                count: 2,
+            },
+        ),
+        cmd(
+            0,
+            Command::SetRally {
+                factories: vec![fid],
+                pos: FxVec2::from_ints(700, 900),
+            },
+        ),
+    ])
+    .unwrap();
+    let mut tanks = 0;
+    for _ in 0..3000 {
+        w.tick(&[]).unwrap();
+        let u = &w.state.units;
+        tanks = u
+            .slots
+            .iter()
+            .filter(|&r| {
+                u.blueprint[r] == tank && u.is_active(r) && u.flags[r] & flag::IN_FACTORY == 0
+            })
+            .count();
+        if tanks == 2 {
+            break;
+        }
+    }
+    assert_eq!(tanks, 2, "factory output");
+    // They drive to the rally point.
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+    }
+    let u = &w.state.units;
+    let near_rally = u
+        .slots
+        .iter()
+        .filter(|&r| {
+            u.blueprint[r] == tank
+                && u.pos[r].distance(FxVec2::from_ints(700, 900)) < Fx::from_int(60)
+        })
+        .count();
+    assert_eq!(near_rally, 2, "tanks at the rally point");
+}
+
+#[test]
+fn ai_players_fight_a_whole_match_deterministically() {
+    let run = |threads| {
+        let mut w = flat_world(threads, true, true);
+        let mut hashes = Vec::new();
+        for _ in 0..6000 {
+            hashes.push(w.tick(&[]).unwrap());
+        }
+        (hashes, w)
+    };
+    let (a, w) = run(0);
+    let (b, _) = run(6);
+    assert_eq!(a.iter().zip(&b).position(|(x, y)| x != y), None);
+    let s = &w.state;
+    let count = |owner: u8, cats: u32| {
+        s.units
+            .slots
+            .iter()
+            .filter(|&r| s.units.owner[r] == owner && w.bp(r).has(cats))
+            .count()
+    };
+    for p in 0..2u8 {
+        assert!(
+            count(p, mc_data::cat::FACTORY) >= 1,
+            "player {p} built no factory"
+        );
+        let land = s
+            .units
+            .slots
+            .iter()
+            .filter(|&r| {
+                s.units.owner[r] == p
+                    && w.bp(r).has(mc_data::cat::FACTORY)
+                    && !w.bp(r).has(mc_data::cat::AIR)
+            })
+            .count();
+        assert!(land >= 1, "player {p} built only air factories");
+        assert!(
+            count(p, mc_data::cat::EXTRACTOR) >= 1,
+            "player {p} built no extractors"
+        );
+        assert!(
+            s.players[p as usize].units_built > 15,
+            "player {p} built {} units",
+            s.players[p as usize].units_built
+        );
+    }
+}
+
+/// The AI spreads its yard and guards mass points instead of stacking
+/// everything on the start marker.
+#[test]
+fn ai_spreads_out_and_guards_mass() {
+    let mut w = flat_world(0, true, true);
+    // Eight minutes: short of mass since a stall slows everything alike, a side can put
+    // up its second factory before its first point defense.
+    for _ in 0..4800 {
+        w.tick(&[]).unwrap();
+    }
+    let s = &w.state;
+    for p in 0..2u8 {
+        let start = s.players[p as usize].start;
+        let mut factories = Vec::new();
+        let mut land_factories = 0usize;
+        let mut extractors = Vec::new();
+        let mut power = Vec::new();
+        let mut pd = Vec::new();
+        let mut xmin = Fx::from_int(99_999);
+        let mut xmax = Fx::from_int(-99_999);
+        let mut ymin = xmin;
+        let mut ymax = xmax;
+        for r in s.units.slots.iter() {
+            if s.units.owner[r] != p || !s.units.is_active(r) {
+                continue;
+            }
+            let bp = w.bp(r);
+            let pos = s.units.pos[r];
+            if bp.is_structure() && !bp.has(mc_data::cat::EXTRACTOR) {
+                xmin = xmin.min(pos.x);
+                xmax = xmax.max(pos.x);
+                ymin = ymin.min(pos.y);
+                ymax = ymax.max(pos.y);
+            }
+            if bp.has(mc_data::cat::FACTORY) {
+                factories.push(pos);
+                if !bp.has(mc_data::cat::AIR) {
+                    land_factories += 1;
+                }
+            } else if bp.has(mc_data::cat::EXTRACTOR) {
+                extractors.push(pos);
+            } else if bp.has(mc_data::cat::POWER) {
+                power.push(pos);
+            } else if bp.has(mc_data::cat::DEFENSE) && bp.has(mc_data::cat::DIRECT_FIRE) {
+                pd.push(pos);
+            }
+        }
+        assert!(!factories.is_empty(), "player {p} built no factory");
+        assert!(land_factories >= 1, "player {p} built only air factories");
+        assert!(
+            factories
+                .iter()
+                .any(|f| f.distance(start) < Fx::from_int(280)),
+            "player {p} planted its yard far from start"
+        );
+        assert!(
+            !extractors.is_empty(),
+            "player {p} built {} mines",
+            extractors.len()
+        );
+        assert!(!pd.is_empty(), "player {p} built no point defense");
+        let guarded = extractors
+            .iter()
+            .any(|m| pd.iter().any(|t| t.distance(*m) < Fx::from_int(240)));
+        assert!(
+            guarded,
+            "player {p} left every mine unguarded: mines {extractors:?} pd {pd:?}"
+        );
+        let farm_apart = power
+            .iter()
+            .any(|g| factories.iter().all(|f| g.distance(*f) > Fx::from_int(48)));
+        assert!(
+            farm_apart || power.is_empty(),
+            "player {p} stacked reactors on the factory yard"
+        );
+        let span = (xmax - xmin).max(ymax - ymin);
+        assert!(
+            span > Fx::from_int(180),
+            "player {p} kept its base in a {span:?} blob at {start:?}"
+        );
+    }
+}
+
+/// A player who cannot cover their spending still finishes what they build.
+/// With other work keeping the economy stalled, the last sliver of a build
+/// must not shrink with the stall until it rounds to nothing.
+#[test]
+fn a_stalled_economy_still_completes_builds() {
+    let mut w = flat_world(1, true, false);
+    let bp = w.blueprints.clone();
+    let acu = w.state.players[0].commander;
+    let power = bp.id_of("aster_t1_power").unwrap();
+    let factory = bp.id_of("aster_t1_land_factory").unwrap();
+    let engineer = bp.id_of("aster_t1_engineer").unwrap();
+    w.tick(&[cmd(
+        0,
+        Command::DebugSpawn {
+            owner: 0,
+            blueprint: engineer,
+            pos: FxVec2::from_ints(520, 600),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 1000,
+        },
+    )])
+    .unwrap();
+    let u = &w.state.units;
+    let mason = u
+        .slots
+        .iter()
+        .find(|&r| u.blueprint[r] == engineer)
+        .map(|r| u.id(r))
+        .unwrap();
+    let build = |unit, blueprint, x, y| {
+        cmd(
+            0,
+            Command::Build {
+                units: vec![unit],
+                blueprint,
+                pos: FxVec2::from_ints(x, y),
+                heading: Angle::ZERO,
+                queue: false,
+            },
+        )
+    };
+    // The factory outlasts the generator, so the stall never lets up.
+    w.tick(&[build(acu, power, 600, 440), build(mason, factory, 420, 640)])
+        .unwrap();
+
+    let mut done = false;
+    for _ in 0..3000 {
+        // Keep the bank empty so everything runs on income alone.
+        w.state.players[0].mass = Fx::ZERO;
+        w.tick(&[]).unwrap();
+        let u = &w.state.units;
+        if u.slots
+            .iter()
+            .any(|r| u.blueprint[r] == power && u.is_active(r))
+        {
+            done = true;
+            break;
+        }
+    }
+    let u = &w.state.units;
+    let site = u
+        .slots
+        .iter()
+        .find(|&r| u.blueprint[r] == power)
+        .expect("the generator was started");
+    assert!(
+        w.state.players[0].efficiency < Fx::ONE,
+        "the test never stalled the economy"
+    );
+    assert!(
+        done,
+        "generator stuck {:?} short of done",
+        bp.unit(power).build_time - u.build_progress[site]
+    );
+}
+
+#[test]
+fn planned_structures_keep_their_ground_and_can_be_dragged() {
+    use mc_sim::tables::OrderKind;
+    let mut w = flat_world(2, true, false);
+    let bp = w.blueprints.clone();
+    let acu = w.state.players[0].commander;
+    let power = bp.id_of("aster_t1_power").unwrap();
+    let factory = bp.id_of("aster_t1_land_factory").unwrap();
+    let build = |blueprint, x, y, queue| {
+        cmd(
+            0,
+            Command::Build {
+                units: vec![acu],
+                blueprint,
+                pos: FxVec2::from_ints(x, y),
+                heading: Angle::ZERO,
+                queue,
+            },
+        )
+    };
+    let queue = |w: &World| -> Vec<(OrderKind, FxVec2)> {
+        let row = w.state.units.row(acu).unwrap();
+        w.state
+            .orders
+            .iter(&w.state.units, row)
+            .map(|o| (o.kind, o.pos))
+            .collect()
+    };
+    // Far enough away that nothing is begun while the test runs. The third overlaps the
+    // second, the fourth is the second again: both are refused.
+    w.tick(&[
+        build(power, 1600, 1400, false),
+        build(factory, 1700, 1400, true),
+        build(power, 1710, 1410, true),
+        build(factory, 1700, 1400, true),
+    ])
+    .unwrap();
+    let planned = queue(&w);
+    assert_eq!(
+        planned.len(),
+        2,
+        "overlapping plans were accepted: {planned:?}"
+    );
+    let mut plans = Vec::new();
+    w.write_plans(0, &mut plans);
+    assert_eq!(plans.len(), 2);
+
+    // Dragged clear, the factory's old ground is free again; dragged onto the power plant, it stays.
+    let relocate = |kind, from, x, y| {
+        cmd(
+            0,
+            Command::RelocateOrder {
+                units: vec![acu],
+                kind,
+                from,
+                to: FxVec2::from_ints(x, y),
+            },
+        )
+    };
+    let site = planned[1].1;
+    w.tick(&[relocate(OrderKind::Build, site, 1900, 1500)])
+        .unwrap();
+    let moved = queue(&w)[1].1;
+    assert!(
+        moved != site && moved.distance(FxVec2::from_ints(1900, 1500)) < Fx::from_int(16),
+        "factory plan at {moved:?}"
+    );
+    w.tick(&[
+        relocate(OrderKind::Build, moved, 1605, 1405),
+        build(power, 1700, 1400, true),
+    ])
+    .unwrap();
+    let planned = queue(&w);
+    assert_eq!(planned.len(), 3);
+    assert_eq!(planned[1].1, moved, "a plan was dragged onto another");
+
+    // A waypoint follows the drag, and the commander with it.
+    let target = FxVec2::from_ints(700, 520);
+    w.tick(&[cmd(
+        0,
+        Command::Move {
+            units: vec![acu],
+            target,
+            queue: false,
+        },
+    )])
+    .unwrap();
+    w.tick(&[relocate(OrderKind::Move, target, 520, 700)])
+        .unwrap();
+    assert_eq!(
+        queue(&w),
+        vec![(OrderKind::Move, FxVec2::from_ints(520, 700))]
+    );
+    for _ in 0..900 {
+        w.tick(&[]).unwrap();
+    }
+    let row = w.state.units.row(acu).unwrap();
+    assert!(
+        w.state.units.pos[row].distance(FxVec2::from_ints(520, 700)) < Fx::from_int(12),
+        "commander at {:?}",
+        w.state.units.pos[row]
+    );
+}

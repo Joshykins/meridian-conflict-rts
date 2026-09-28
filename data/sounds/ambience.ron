@@ -1,0 +1,265 @@
+// The living world (ambience.rs): a bed of wind, leaves and surf that follows
+// the camera, and the birds, insects and frogs that call over it. All of it on
+// the weather volume, kept well under the battle.
+//
+// Nothing here may sound like a held tone or a loop. The beds are `Wind`
+// layers, noise whose level and band wander at random, several to a loop at
+// different rates, each loop a different odd length; ambience.rs swells and
+// drops them again with gusts of its own. The calls are gestures: pitch that
+// slides and warbles (`Chirp`), phrases of several notes, and ambience.rs
+// scatters them at random times, places and pitches, with the odd answer. The
+// night choruses are many voices (`Chorus`), each keeping its own time and
+// pitch and coming and going on its own.
+(
+    sounds: {
+        // -- beds ---------------------------------------------------------------
+        // Wind over open ground and grass: a soft swish that rises and falls.
+        "amb_wind_open": (
+            length: 29.0, peak: 0.4, room: 0.0, looped: true,
+            layers: [
+                Wind(freq: 300, q: 0.5, gain: 1.0, swell: 0.13, depth: 0.7, sway: 0.6),
+                Wind(freq: 850, q: 0.7, gain: 0.55, swell: 0.21, depth: 0.8, sway: 0.7, pan: -0.45),
+                Wind(freq: 1900, q: 0.9, gain: 0.25, swell: 0.37, depth: 0.9, sway: 0.5, pan: 0.45),
+            ],
+        ),
+        // Up high and far off: a darker, emptier roar with a band in it that
+        // moans up and down as the gusts come through.
+        "amb_wind_high": (
+            length: 31.0, peak: 0.4, room: 0.0, looped: true,
+            layers: [
+                Wind(freq: 180, q: 0.5, gain: 1.0, swell: 0.09, depth: 0.6, sway: 0.7),
+                Wind(freq: 520, q: 0.6, gain: 0.6, swell: 0.16, depth: 0.7, sway: 0.9, pan: 0.3),
+                Wind(freq: 1250, q: 4.0, gain: 0.35, swell: 0.11, depth: 0.9, sway: 0.35, pan: -0.3),
+            ],
+        ),
+        // Broadleaf trees: leaves fluttering in bursts, bright but soft on top.
+        "amb_leaves": (
+            length: 23.0, peak: 0.4, room: 0.15, looped: true,
+            layers: [
+                Wind(freq: 2400, q: 0.9, gain: 1.0, swell: 1.6, depth: 0.95, sway: 0.5, pan: -0.3),
+                Wind(freq: 3700, q: 1.3, gain: 0.45, swell: 2.7, depth: 1.0, sway: 0.35, pan: 0.35),
+                Wind(freq: 1500, q: 0.7, gain: 0.5, swell: 0.7, depth: 0.85, sway: 0.6),
+            ],
+        ),
+        // Conifers: an airy whoosh through needles, slower and smoother than leaves.
+        "amb_needles": (
+            length: 27.0, peak: 0.4, room: 0.15, looped: true,
+            layers: [
+                Wind(freq: 1000, q: 0.6, gain: 1.0, swell: 0.22, depth: 0.85, sway: 0.7),
+                Wind(freq: 2300, q: 0.8, gain: 0.7, swell: 0.33, depth: 0.85, sway: 0.6, pan: -0.4),
+                Wind(freq: 3900, q: 1.0, gain: 0.25, swell: 0.5, depth: 0.9, sway: 0.4, pan: 0.4),
+            ],
+        ),
+        // Waves on the shore: slow surges of wash with foam hissing over them.
+        "amb_surf": (
+            length: 37.0, peak: 0.4, room: 0.2, looped: true,
+            layers: [
+                Wind(freq: 420, q: 0.5, gain: 1.0, swell: 0.1, depth: 0.95, sway: 0.8),
+                Wind(freq: 1500, q: 0.6, gain: 0.5, swell: 0.1, depth: 1.0, sway: 0.7, pan: 0.3),
+                Wind(freq: 3200, q: 0.8, gain: 0.15, swell: 0.14, depth: 1.0, sway: 0.5, pan: -0.3),
+            ],
+        ),
+        // Open sea: a low, slow swell.
+        "amb_sea": (
+            length: 33.0, peak: 0.4, room: 0.0, looped: true,
+            layers: [
+                Wind(freq: 150, q: 0.5, gain: 1.0, swell: 0.07, depth: 0.75, sway: 0.6),
+                Wind(freq: 480, q: 0.6, gain: 0.5, swell: 0.09, depth: 0.7, sway: 0.7, pan: 0.4),
+                Wind(freq: 1100, q: 0.7, gain: 0.15, swell: 0.12, depth: 0.8, sway: 0.5, pan: -0.4),
+            ],
+        ),
+        // A temperate night: field crickets chirping in their hundreds, a few slower
+        // trillers under them, the odd katydid's buzz, and the air.
+        "amb_crickets": (
+            length: 19.0, peak: 0.4, room: 0.3, looped: true,
+            layers: [
+                Chorus(freq: 4500, voices: 12, spread: 0.05, pulse: 30, chirps: 2.3, duty: 0.28, gain: 0.3, width: 0.85, bend: 0.02),
+                Chorus(freq: 3700, voices: 5, spread: 0.04, pulse: 55, chirps: 0.35, duty: 0.6, gain: 0.22, width: 0.7),
+                Chorus(freq: 6400, voices: 4, spread: 0.08, pulse: 90, chirps: 0.9, duty: 0.3, gain: 0.1, width: 0.9, ratio: 0.5, index: 0.8),
+                Wind(freq: 2400, q: 1.0, gain: 0.03, swell: 0.2, depth: 0.6),
+            ],
+        ),
+        // A tropical night: dense, fast insects, a buzzing layer under them, and tree
+        // frogs calling across it.
+        "amb_night_tropical": (
+            length: 23.0, peak: 0.4, room: 0.35, looped: true,
+            layers: [
+                Chorus(freq: 5200, voices: 18, spread: 0.07, pulse: 48, chirps: 3.1, duty: 0.45, gain: 0.25, width: 0.9),
+                Chorus(freq: 3100, voices: 8, spread: 0.05, pulse: 70, chirps: 0.5, duty: 0.7, gain: 0.16, width: 0.8, ratio: 0.5, index: 0.6),
+                Chorus(freq: 1150, voices: 10, spread: 0.22, pulse: 9, chirps: 0.6, duty: 0.35, gain: 0.3, width: 0.9, bend: -0.15, ratio: 1, index: 1.2),
+                Wind(freq: 3000, q: 1.0, gain: 0.04, swell: 0.2, depth: 0.6),
+            ],
+        ),
+        // Wet lowland at night: a pond of croaking frogs, and peepers above them.
+        "amb_frogs": (
+            length: 21.0, peak: 0.4, room: 0.4, looped: true,
+            layers: [
+                Chorus(freq: 430, voices: 6, spread: 0.25, pulse: 16, chirps: 0.45, duty: 0.3, gain: 0.5, width: 0.8, bend: 0.08, ratio: 1, index: 2.2),
+                Chorus(freq: 2600, voices: 5, spread: 0.06, pulse: 0, chirps: 1.0, duty: 0.12, gain: 0.2, width: 0.9, bend: -0.12),
+            ],
+        ),
+
+        // -- water and wind, once ------------------------------------------------
+        // A wave: the water rising, the crash of the break, the foam running out
+        // and the hiss as it drains back.
+        "wave_break": (
+            length: 6.0, peak: 0.5, room: 0.4,
+            layers: [
+                Roll(from: 260, to: 700, glide: 0.9, attack: 0.7, decay: 0.8, gain: 0.8, swell: 3, depth: 0.4),
+                Sweep(at: 0.75, from: 2400, to: 900, glide: 1.8, q: 0.5, attack: 0.03, decay: 0.8, gain: 1.6, pan: 0.15),
+                Sweep(at: 0.8, from: 900, to: 300, glide: 1.5, q: 0.6, attack: 0.05, decay: 0.9, gain: 1.2, pan: -0.15),
+                Sweep(at: 2.0, from: 1400, to: 3000, glide: 1.6, q: 0.9, attack: 0.5, decay: 0.7, gain: 0.45),
+            ],
+        ),
+        // A small wave lapping at the edge: a slap, a slosh, a bubble, a trickle.
+        "wave_lap": (
+            length: 1.4, peak: 0.4, room: 0.3,
+            layers: [
+                Hiss(freq: 900, q: 1.2, attack: 0.005, decay: 0.04, gain: 0.6),
+                Sweep(from: 700, to: 350, glide: 0.25, q: 0.8, attack: 0.04, decay: 0.16, gain: 1.4),
+                Chirp(at: 0.05, from: 380, to: 900, glide: 0.02, attack: 0.002, decay: 0.02, gain: 0.12),
+                Chirp(at: 0.19, from: 520, to: 1300, glide: 0.015, attack: 0.002, decay: 0.015, gain: 0.07),
+                Sweep(at: 0.12, from: 1500, to: 2600, glide: 0.4, q: 1.0, attack: 0.05, decay: 0.2, gain: 0.4),
+            ],
+        ),
+        // A strong gust going through the trees: the rush climbs and falls away.
+        "leaves_gust": (
+            length: 4.5, peak: 0.45, room: 0.2,
+            layers: [
+                Roll(from: 400, to: 900, glide: 1.0, attack: 0.8, decay: 0.8, gain: 0.6, swell: 4, depth: 0.8),
+                Sweep(from: 1200, to: 3800, glide: 1.4, q: 0.7, attack: 0.9, decay: 0.7, gain: 1.0),
+                Sweep(at: 0.3, from: 3000, to: 5200, glide: 1.2, q: 1.1, attack: 0.8, decay: 0.55, gain: 0.5, pan: 0.3),
+            ],
+        ),
+
+        // -- birds of a temperate day -------------------------------------------
+        // A tit's phrase: three quick down-slurred notes and a bright rising one.
+        "bird_chirp": (
+            length: 0.8, peak: 0.4, room: 0.35,
+            layers: [
+                Chirp(from: 6200, to: 4000, glide: 0.09, attack: 0.004, decay: 0.035, gain: 0.8, ratio: 2, index: 0.3),
+                Chirp(at: 0.11, from: 6000, to: 3900, glide: 0.09, attack: 0.004, decay: 0.035, gain: 0.75, ratio: 2, index: 0.3),
+                Chirp(at: 0.22, from: 5800, to: 3700, glide: 0.1, attack: 0.004, decay: 0.035, gain: 0.7, ratio: 2, index: 0.3),
+                Chirp(at: 0.36, from: 3600, to: 5900, glide: 0.14, attack: 0.01, decay: 0.06, gain: 0.9, vibrato: 45, bend: 0.03),
+            ],
+        ),
+        // A wren's trill: a fast rattle of little notes sinking, and a flourish.
+        "bird_trill": (
+            length: 2.0, peak: 0.4, room: 0.35,
+            layers: [
+                Chirp(from: 4600, to: 3900, glide: 1.1, attack: 0.08, decay: 0.45, gain: 1.0, vibrato: 24, bend: 0.07, pulse: 24),
+                Chirp(at: 1.2, from: 3600, to: 5200, glide: 0.07, attack: 0.006, decay: 0.05, gain: 0.8),
+                Chirp(at: 1.3, from: 5000, to: 4100, glide: 0.06, attack: 0.006, decay: 0.05, gain: 0.6),
+            ],
+        ),
+        // A blackbird's song: lower, fluty notes that wander, one held and wavering.
+        "bird_warble": (
+            length: 1.7, peak: 0.4, room: 0.4,
+            layers: [
+                Chirp(from: 2400, to: 3000, glide: 0.15, attack: 0.01, decay: 0.07, gain: 0.8, ratio: 2, index: 0.4),
+                Chirp(at: 0.14, from: 3200, to: 2500, glide: 0.13, attack: 0.01, decay: 0.06, gain: 0.7, ratio: 2, index: 0.4),
+                Chirp(at: 0.27, from: 2800, to: 3400, glide: 0.1, attack: 0.01, decay: 0.07, gain: 0.8, vibrato: 30, bend: 0.02),
+                Chirp(at: 0.42, from: 3600, to: 3000, glide: 0.11, attack: 0.008, decay: 0.05, gain: 0.6),
+                Chirp(at: 0.55, from: 2500, to: 2200, glide: 0.35, attack: 0.02, decay: 0.13, gain: 1.0, vibrato: 12, bend: 0.02, ratio: 2, index: 0.3),
+                Chirp(at: 0.82, from: 3900, to: 4400, glide: 0.04, attack: 0.004, decay: 0.03, gain: 0.5),
+                Chirp(at: 0.9, from: 4400, to: 3700, glide: 0.05, attack: 0.004, decay: 0.04, gain: 0.55),
+            ],
+        ),
+        // A wood pigeon far off: soft, low, breathy coos in its five-note rhythm.
+        "bird_call_far": (
+            length: 2.8, peak: 0.3, room: 0.9,
+            layers: [
+                Chirp(from: 520, to: 590, glide: 0.25, attack: 0.05, decay: 0.14, gain: 0.6, vibrato: 4, bend: 0.01, ratio: 1, index: 0.25),
+                Chirp(at: 0.35, from: 580, to: 650, glide: 0.35, attack: 0.06, decay: 0.22, gain: 1.0, vibrato: 4, bend: 0.01, ratio: 1, index: 0.25),
+                Chirp(at: 0.85, from: 600, to: 510, glide: 0.25, attack: 0.04, decay: 0.14, gain: 0.7, ratio: 1, index: 0.25),
+                Chirp(at: 1.35, from: 540, to: 600, glide: 0.22, attack: 0.04, decay: 0.13, gain: 0.6, ratio: 1, index: 0.25),
+                Chirp(at: 1.7, from: 600, to: 520, glide: 0.3, attack: 0.04, decay: 0.18, gain: 0.6, ratio: 1, index: 0.25),
+            ],
+        ),
+        // A crow: two harsh caws, the second lower.
+        "crow_caw": (
+            length: 1.3, peak: 0.35, room: 0.8,
+            layers: [
+                Chirp(from: 820, to: 640, glide: 0.22, attack: 0.02, decay: 0.13, gain: 1.0, vibrato: 38, bend: 0.02, ratio: 1, index: 2.2),
+                Hiss(freq: 1500, q: 1.5, attack: 0.02, decay: 0.1, gain: 0.3),
+                Chirp(at: 0.42, from: 760, to: 590, glide: 0.24, attack: 0.02, decay: 0.14, gain: 0.85, vibrato: 36, bend: 0.02, ratio: 1, index: 2.4),
+                Hiss(at: 0.42, freq: 1400, q: 1.5, attack: 0.02, decay: 0.1, gain: 0.25),
+            ],
+        ),
+
+        // -- birds of a tropical day --------------------------------------------
+        // A parrot: a raspy squawk down and a shorter one back up.
+        "parrot_squawk": (
+            length: 1.0, peak: 0.4, room: 0.4,
+            layers: [
+                Chirp(from: 2100, to: 1500, glide: 0.18, attack: 0.01, decay: 0.11, gain: 1.0, vibrato: 55, bend: 0.04, ratio: 0.5, index: 2.8),
+                Chirp(from: 4200, to: 3000, glide: 0.18, attack: 0.01, decay: 0.09, gain: 0.35, ratio: 1, index: 1.0),
+                Chirp(at: 0.3, from: 1500, to: 1900, glide: 0.1, attack: 0.008, decay: 0.07, gain: 0.8, vibrato: 50, bend: 0.04, ratio: 0.5, index: 2.4),
+            ],
+        ),
+        // A liquid whistle up and down and a short answer: an oriole's kind.
+        "trop_whistle": (
+            length: 2.2, peak: 0.4, room: 0.45,
+            layers: [
+                Chirp(from: 1300, to: 2500, glide: 0.3, attack: 0.03, decay: 0.22, gain: 0.9, vibrato: 7, bend: 0.015),
+                Chirp(at: 0.45, from: 2600, to: 1800, glide: 0.35, attack: 0.02, decay: 0.26, gain: 1.0, vibrato: 6, bend: 0.02, ratio: 2, index: 0.2),
+                Chirp(at: 0.95, from: 1850, to: 2300, glide: 0.2, attack: 0.01, decay: 0.09, gain: 0.7),
+            ],
+        ),
+        // A bellbird: metallic strikes, bright at first and ringing down.
+        "trop_bell": (
+            length: 1.9, peak: 0.35, room: 0.6,
+            layers: [
+                Chirp(from: 2400, to: 2260, glide: 0.35, attack: 0.002, decay: 0.16, gain: 1.0, ratio: 3.5, index: 1.4),
+                Chirp(at: 0.5, from: 2400, to: 2260, glide: 0.35, attack: 0.002, decay: 0.16, gain: 0.8, ratio: 3.5, index: 1.3),
+                Chirp(at: 1.0, from: 2180, to: 2020, glide: 0.4, attack: 0.002, decay: 0.2, gain: 0.9, ratio: 3.5, index: 1.2),
+            ],
+        ),
+        // Fast chattering, sliding down, and a scolding tail.
+        "trop_chatter": (
+            length: 1.5, peak: 0.4, room: 0.4,
+            layers: [
+                Chirp(from: 3400, to: 2600, glide: 0.6, attack: 0.02, decay: 0.3, gain: 1.0, vibrato: 14, bend: 0.05, pulse: 14, ratio: 1, index: 0.9),
+                Chirp(at: 0.7, from: 2900, to: 2200, glide: 0.2, attack: 0.01, decay: 0.12, gain: 0.7, pulse: 20, ratio: 1, index: 1.1),
+            ],
+        ),
+        // A ground dove: low, soft coo-cooroo.
+        "trop_coo": (
+            length: 2.2, peak: 0.3, room: 0.7,
+            layers: [
+                Chirp(from: 400, to: 470, glide: 0.22, attack: 0.04, decay: 0.12, gain: 0.8, vibrato: 9, bend: 0.02, ratio: 1, index: 0.3),
+                Chirp(at: 0.4, from: 490, to: 420, glide: 0.4, attack: 0.04, decay: 0.2, gain: 1.0, vibrato: 9, bend: 0.035, ratio: 1, index: 0.3),
+                Chirp(at: 0.85, from: 460, to: 380, glide: 0.4, attack: 0.04, decay: 0.2, gain: 0.7, vibrato: 8, bend: 0.03, ratio: 1, index: 0.3),
+            ],
+        ),
+
+        // -- the night, once -----------------------------------------------------
+        // A tawny owl: a long hoo, a pause, then hu-hu and a long quavering hoooo.
+        "owl_hoot": (
+            length: 3.4, peak: 0.35, room: 1.0,
+            layers: [
+                Chirp(from: 475, to: 405, glide: 0.8, attack: 0.06, decay: 0.32, gain: 1.0, vibrato: 5, bend: 0.01, ratio: 1, index: 0.35),
+                Chirp(at: 1.3, from: 440, to: 430, glide: 0.05, attack: 0.02, decay: 0.07, gain: 0.6, ratio: 1, index: 0.3),
+                Chirp(at: 1.45, from: 450, to: 440, glide: 0.05, attack: 0.02, decay: 0.07, gain: 0.6, ratio: 1, index: 0.3),
+                Chirp(at: 1.62, from: 480, to: 415, glide: 1.2, attack: 0.05, decay: 0.45, gain: 0.9, vibrato: 11, bend: 0.035, ratio: 1, index: 0.35),
+            ],
+        ),
+        // A frog near by: a rough two-pulse ribbit.
+        "frog_croak": (
+            length: 0.6, peak: 0.35, room: 0.4,
+            layers: [
+                Chirp(from: 480, to: 620, glide: 0.06, attack: 0.005, decay: 0.05, gain: 1.0, pulse: 70, ratio: 1, index: 2.4),
+                Chirp(from: 240, to: 310, glide: 0.06, attack: 0.005, decay: 0.05, gain: 0.4, ratio: 0.5, index: 1.5),
+                Chirp(at: 0.1, from: 520, to: 700, glide: 0.07, attack: 0.005, decay: 0.07, gain: 0.9, pulse: 70, ratio: 1, index: 2.6),
+            ],
+        ),
+        // A tropical tree frog: ko-KEE.
+        "frog_knock": (
+            length: 0.55, peak: 0.35, room: 0.5,
+            layers: [
+                Chirp(from: 1000, to: 1050, glide: 0.03, attack: 0.003, decay: 0.03, gain: 0.8, ratio: 1, index: 0.8),
+                Chirp(at: 0.09, from: 1700, to: 2300, glide: 0.08, attack: 0.004, decay: 0.07, gain: 1.0, ratio: 1, index: 0.5),
+            ],
+        ),
+    },
+)

@@ -1,0 +1,108 @@
+// Aster strategic weapons: the nuclear silo, the interceptor array that answers it,
+// and the Culverin, a gun that reaches across the map. The silo and the array fire no
+// weapon in the usual sense. Each assembles its own rounds one at a time
+// out of the side's income (`strategic.missile`, paid like a build at `strategic.power`)
+// and keeps up to `strategic.stock` of them. The silo launches only when ordered, at a
+// point anywhere on the map (`docs/NUKES.md`); the array, built beside it at tech 4,
+// fires by itself at any enemy warhead coming down inside its `coverage`.
+[
+    (
+        // A hardened launch bunker round one deep tube: blast doors over the tube, the
+        // armoured warhead store under its portal crane along one side, coolant plant.
+        key: "aster_t4_nuke_silo",
+        name: "Sunfall",
+        role: "Strategic Missile Silo",
+        tech: 4,
+        categories: ["Land", "Strategic", "Experimental"],
+        health: 42000,
+        cost: (mass: 9000, energy: 90000, time: 36000),
+        radius: 42.5, height: 26, footprint: (8, 8),
+        vision: 300,
+        economy: (energy_upkeep: 40),
+        strategic: (
+            kind: Nuke,
+            // One warhead: about five minutes on the silo's own assembly line.
+            missile: (mass: 6000, energy: 120000, time: 18000),
+            power: 60,
+            stock: 2,
+            // Metres a second along its path once the boost is done (it comes in faster),
+            // and the highest the arc goes over a long shot (`nukes::WarheadPath`).
+            speed: 320,
+            apogee: 4200,
+            // Everything inside `core` takes `damage`; it falls to `edge` at `radius`.
+            // The front takes `front` seconds to run out to `radius`. About 130 kt (a megaton,
+            // tried 2026-09-25, was twice the reach and too big for the maps).
+            blast: (radius: 520, core: 200, damage: 80000, edge: 2500, front: 1.0),
+        ),
+        mesh: "nuke_silo", icon: Silo,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        // Four launch cells under one pair of doors, a tracking radar on a mast that
+        // finds warheads coming down, and the magazine that loads the cells.
+        key: "aster_t3_nuke_defense",
+        name: "Parhelion",
+        role: "Strategic Missile Defence",
+        tech: 4,
+        categories: ["Land", "Strategic", "Experimental"],
+        health: 16000,
+        cost: (mass: 3200, energy: 32000, time: 8000),
+        radius: 18.75, height: 20, footprint: (4, 4),
+        vision: 300, radar: 2400,
+        economy: (energy_upkeep: 25),
+        strategic: (
+            kind: Interceptor,
+            missile: (mass: 1500, energy: 30000, time: 4500),
+            power: 45,
+            stock: 4,
+            speed: 900,
+            apogee: 0,
+            // Warheads bound for somewhere within this many metres of it are shot at once
+            // they are coming down inside it too.
+            coverage: 2400,
+        ),
+        mesh: "nuke_defense", icon: AntiNuke,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        // A supergun on a turntable: one very long tube, braced against its own droop by a
+        // king-post and cables, out of a carriage sunk in a ring of concrete, a shell
+        // hoist and magazine behind it. It shells the nearest enemy its side can see or
+        // has on radar anywhere in reach, building, army or fleet, and lands within a
+        // few percent of the range, so a shell meant for a factory takes whatever stands
+        // round it, and a moving tank is long gone when it lands. A shield over the base
+        // is the answer to it.
+        key: "aster_t4_artillery",
+        name: "Culverin",
+        role: "Strategic Artillery",
+        tech: 4,
+        categories: ["Land", "Artillery", "Strategic", "Experimental"],
+        health: 30000,
+        cost: (mass: 10000, energy: 100000, time: 36000),
+        radius: 30, height: 27, footprint: (6, 6),
+        vision: 300,
+        economy: (energy_upkeep: 60),
+        weapons: [(
+            name: "Culverin Long Gun",
+            // 22 km: from a base on a 16 km map it reaches every other base on it. The
+            // shell's `speed` is over the ground, and `loft` is 15 s more in the air on
+            // top: it is fired high (55-75 degrees) and goes up through the clouds and over
+            // everything, 4.5 km up and 30 s on its way to a base 12 km off.
+            damage: 5200, splash: 45, range_min: 1500, range: 22000, reload: 9.0, speed: 800,
+            trajectory: Ballistic, loft: 15,
+            // One degree: about 200 m either way at 12 km, short or long as much as wide.
+            spread: 1.0,
+            turret_turn: 8, pivot: (0, 0, 18), muzzle: (74, 0, 18),
+            targets: ["Structure", "Land", "Naval"], keeps_aim: true,
+            // A Bombard may spread its shells over a whole base, 2 km about the point.
+            bombard: 2000,
+            // Its firing, its trail through the clouds and its landing are drawn as the
+            // events they are (renderer/great_gun_fx.rs); the landing is heard and felt
+            // across the map (`far`).
+            color: Orange, tracer: 1.2, great_gun: 1.0,
+            sounds: (fire: "culverin_fire", charge: "culverin_load", charge_time: 3.4, impact: "culverin_hit", ground: "culverin_hit", far: "culverin_far"),
+        )],
+        mesh: "culverin", icon: Artillery,
+        sounds: (death: "blast_large"),
+    ),
+]

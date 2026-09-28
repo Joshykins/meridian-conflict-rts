@@ -1,0 +1,13 @@
+Synth((
+    oscs: [
+        (wave: Saw, gain: 0.55, unison: 3, detune: 7, width: 0.6),
+        (wave: Fold, gain: 0.4, shape: 0.35, octave: -1),
+    ],
+    filter: (mode: LowPass4, cutoff: 260.0, resonance: 0.35, env: 0.0, keytrack: 0.2, velocity: 0.0, drive: 0.0),
+    amp: (a: 2.5, d: 2.0, s: 1.0, r: 3.0),
+    mod_env: (a: 3.0, d: 2.0, s: 0.7, r: 2.0),
+    lfos: [(shape: Sine, to: Cutoff, rate: 0.06, amount: 1.1), (shape: Triangle, to: Pan, rate: 0.09, amount: 0.35)],
+    voices: 6,
+    velocity: 0.2,
+    gain: 0.9,
+))

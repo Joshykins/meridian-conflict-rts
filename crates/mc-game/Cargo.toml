@@ -1,0 +1,53 @@
+[package]
+name = "mc-game"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "meridian"
+path = "src/main.rs"
+
+[dependencies]
+mc-core = { workspace = true }
+mc-data = { workspace = true }
+mc-sfx = { workspace = true }
+mc-jobs = { workspace = true }
+mc-map = { workspace = true }
+mc-net = { workspace = true }
+mc-music = { workspace = true }
+mc-sim = { workspace = true }
+mc-render = { workspace = true }
+winit = { workspace = true }
+glam = { workspace = true }
+png = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+bincode = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
+tiny-skia = { workspace = true }
+ttf-parser = { workspace = true }
+arboard = { workspace = true }
+
+# Sound needs a system audio API. Windows and macOS ship one; on Linux cpal
+# links ALSA, whose headers are not always installed, so it is opt-in there
+# (`--features alsa`) and the game runs silent without it.
+cpal = { workspace = true, optional = true }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+cpal = { workspace = true }
+
+[features]
+alsa = ["dep:cpal"]
+
+[build-dependencies]
+embed-resource = { workspace = true }
+
+[dev-dependencies]
+bytemuck = { workspace = true }
+# The lobby test plays host and guest through a real server.
+mc-server = { workspace = true }
+
+[lints]
+workspace = true

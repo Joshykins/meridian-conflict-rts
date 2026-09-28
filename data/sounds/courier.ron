@@ -1,0 +1,60 @@
+// The Courier (`aster_t1_lift_ship`): a light, fast spacecraft. Its hum is its own
+// `moving` sound; the rest are the parts `audio/capital.rs` looks up as
+// `aster_courier_<part>`. It is the Bastion's family made smaller: the capital
+// recipes an octave-ish up and shorter (`size` under 1), so it is heard as the same
+// kind of machine, lighter and quicker. Its stern bay has sliding plug doors, not a
+// ramp: the `ramp_*` sounds are the doors, timed to their 0.9 s travel.
+(
+    sounds: {
+        // Reactor hum: a low pair beating slowly, a harmonic body, and a thin turbine
+        // whine that wavers, so a hovering Courier reads as a small ship, not a mine.
+        "aster_courier": (
+            length: 6, peak: 0.3, room: 0, looped: true,
+            layers: [
+                Drone(freq: 55, gain: 0.45, wobble: 0.1667, depth: 0.06, pan: -0.15),
+                Drone(freq: 55.5, gain: 0.16, wobble: 0.1667, depth: 0.05, pan: 0.15),
+                Drone(freq: 110, gain: 0.24, wobble: 0.3333, depth: 0.08),
+                Drone(freq: 165, gain: 0.1, wobble: 0.5, depth: 0.08, pan: -0.1),
+                Drone(freq: 220, gain: 0.05, wobble: 0.3333, depth: 0.1, pan: 0.1),
+                Drone(freq: 610, gain: 0.018, wobble: 1.5, depth: 0.35),
+                Drive(1.15),
+            ],
+        ),
+        "aster_courier_thrust": (like: "capital_thrust", size: 0.5),
+        "aster_courier_lift_jets": (like: "capital_lift_jets", size: 0.55),
+        "aster_courier_spool": (like: "capital_spool", size: 0.6, length: 6.5),
+        "aster_courier_liftoff": (like: "capital_liftoff", size: 0.6, length: 5.5),
+        // It sets down on skids, not legs: a lighter thud and the drives winding down.
+        "aster_courier_touchdown": (like: "capital_touchdown", size: 0.6, length: 5.0),
+        // The plug doors opening: two latches let go, the doors hiss back off their
+        // seals and run sideways on a rising hydraulic note, and bump home in the shoulders.
+        "aster_courier_ramp_open": (
+            length: 2.2, peak: 0.34, room: 0.22,
+            layers: [
+                Burst(low: 120, high: 900, attack: 0.0006, decay: 0.014, gain: 4.5),
+                Burst(at: 0.06, low: 120, high: 900, attack: 0.0006, decay: 0.012, gain: 3.5, seed: 7),
+                Hiss(at: 0.08, freq: 2400, q: 1.4, attack: 0.02, decay: 0.25, gain: 0.07),
+                Fm(at: 0.1, from: 70, to: 120, glide: 0.8, ratio: 2.0, index: 1.5, fade: 0.8, attack: 0.12, decay: 0.45, gain: 0.4),
+                Sweep(at: 0.1, from: 180, to: 520, glide: 0.8, q: 1.1, attack: 0.15, decay: 0.4, gain: 3.0),
+                Burst(at: 0.95, low: 40, high: 320, attack: 0.001, decay: 0.05, gain: 5.0),
+                Tone(at: 0.95, from: 82, to: 44, glide: 0.18, attack: 0.002, decay: 0.3, gain: 0.55),
+                Drive(1.2),
+            ],
+        ),
+        // The doors closing: they run in on a falling note, meet in the middle with a
+        // heavy thunk, and the seals and locks drive home.
+        "aster_courier_ramp_close": (
+            length: 2.4, peak: 0.34, room: 0.22,
+            layers: [
+                Fm(from: 115, to: 72, glide: 0.85, ratio: 2.0, index: 1.5, fade: 0.8, attack: 0.1, decay: 0.45, gain: 0.4),
+                Sweep(from: 480, to: 170, glide: 0.85, q: 1.1, attack: 0.12, decay: 0.4, gain: 3.0),
+                Burst(at: 0.92, low: 35, high: 300, attack: 0.001, decay: 0.06, gain: 6.0),
+                Tone(at: 0.92, from: 76, to: 38, glide: 0.2, attack: 0.002, decay: 0.35, gain: 0.7),
+                Hiss(at: 0.98, freq: 1800, q: 1.3, attack: 0.01, decay: 0.2, gain: 0.06),
+                Burst(at: 1.15, low: 150, high: 1000, attack: 0.0005, decay: 0.012, gain: 3.5, seed: 21),
+                Burst(at: 1.22, low: 150, high: 1000, attack: 0.0005, decay: 0.012, gain: 3.0, seed: 22),
+                Drive(1.2),
+            ],
+        ),
+    },
+)

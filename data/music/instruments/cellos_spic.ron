@@ -1,0 +1,6 @@
+Sampler((
+    set: "cellos_spic",
+    soften: 0.8,
+    velocity: 0.7,
+    voices: 16,
+))

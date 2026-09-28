@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Fast checks on what is being committed, and only on that: it never builds and
+# never looks at the rest of the working tree, where other sessions may have
+# edits in flight. Installed for every worktree by
+#   git config core.hooksPath scripts/hooks
+# The full gate is scripts/check.sh.
+set -uo pipefail
+fail=0
+complain() { echo "pre-commit: $*" >&2; fail=1; }
+
+# Formatting of each staged Rust file, as staged.
+while IFS= read -r -d '' f; do
+    # (rustfmt --check on stdin prints the diff but always exits 0, so compare.)
+    staged=$(git show ":$f")
+    if [ "$staged" != "$(rustfmt --edition 2021 --emit stdout <<<"$staged" 2>/dev/null)" ]; then
+        complain "$f is not rustfmt-formatted (run: rustfmt --edition 2021 $f)"
+    fi
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.rs')
+
+# Lines being added.
+added=$(git diff --cached -U0 --diff-filter=ACMR -- '*.rs' | grep -E '^\+' | grep -vE '^\+\+\+ ')
+if grep -qE '#!?\[allow\(' <<<"$added"; then
+    complain 'a new #[allow(...)]: write #[expect(lint, reason = "...")] (or #[cfg(test)] for test-only items)'
+fi
+if grep -qE '\bdbg!\(' <<<"$added"; then
+    complain 'a dbg!() is being committed'
+fi
+
+# Files that never belong in the repository.
+while IFS= read -r -d '' f; do
+    case "$f" in
+        *.pyc|*/__pycache__/*|*.mcmap|*.mcreplay|target/*|*/target/*|artifacts/*)
+            complain "$f is a build or runtime artefact" ;;
+        *.png|*.jpg|*.jpeg|*.ppm)
+            [[ "$f" != */* ]] && complain "$f: screenshots do not go in the repository root (use artifacts/)" ;;
+    esac
+    size=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+    if [ "$size" -gt 5242880 ]; then
+        complain "$f is $((size / 1048576)) MB; large binaries do not go in git"
+    fi
+done < <(git diff --cached --name-only --diff-filter=A -z)
+
+exit $fail

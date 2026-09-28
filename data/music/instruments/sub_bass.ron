@@ -1,0 +1,11 @@
+Synth((
+    oscs: [(wave: Sine, gain: 0.9), (wave: Triangle, gain: 0.35, octave: 1)],
+    filter: (mode: LowPass4, cutoff: 420.0, resonance: 0.05, env: 0.0, keytrack: 0.0, velocity: 0.0, drive: 0.0),
+    amp: (a: 0.01, d: 0.4, s: 0.9, r: 0.35),
+    mod_env: (a: 0.01, d: 0.3, s: 0.5, r: 0.3),
+    glide: 0.03,
+    mono: true,
+    voices: 12,
+    velocity: 0.3,
+    gain: 1.0,
+))

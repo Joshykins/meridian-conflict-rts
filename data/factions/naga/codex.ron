@@ -1,0 +1,17 @@
+// What the race card says about the Regency: ARC's file on them. On-screen text,
+// so only what ARC knows; the truth is in docs/LORE.md.
+(
+    art: Some(Crown),
+    // No motto: ARC has never heard them say anything it could write down.
+    motto: "",
+    meaning: "The name is Command's translation of the title the envoys at Meridia gave: they spoke for the Regent. A regent governs in someone else's place. Whose, no one in Command can say.",
+    about: "They came out of the dark in 175 AC, and the first battle was a massacre. They burn worlds to glass, but not every world; which ones, and why, no one in Command can yet say. Black machines lit red from inside, plasma no ARC lab can explain, and shields that hold against almost everything Command fires at them.",
+    crest: [
+        ("Whose mark", "ARC's. No Regency banner has ever been seen; this is what Command's own artists drew for the threat boards."),
+        ("The blades", "A crown cut down to blades, swept like the plates on their machines. Command drew a crown because a regent serves one."),
+        ("The light", "It burns red in every Regency machine. Survivors of the Arrival say it looks at you before it fires."),
+        ("The broken rings", "A world's horizon, twice. Both are open at the top: what they leave behind is never whole."),
+    ],
+    field: "Their own army is still to come. For now a Regency commander leads ARC units.",
+    marks: [Badge],
+)

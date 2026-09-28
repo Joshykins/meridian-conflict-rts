@@ -1,0 +1,31 @@
+[package]
+name = "mc-render"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+mc-core = { workspace = true }
+mc-data = { workspace = true }
+mc-jobs = { workspace = true }
+mc-map = { workspace = true }
+mc-models = { workspace = true }
+mc-sim = { workspace = true }
+ash = { workspace = true }
+raw-window-handle = { workspace = true }
+ash-window = { workspace = true }
+fontdue = { workspace = true }
+bytemuck = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
+# Shaders rebuilt at run time for the shot server (shader_reload.rs).
+naga = { workspace = true }
+
+[build-dependencies]
+naga = { workspace = true }
+
+[dev-dependencies]
+ron = { workspace = true }
+
+[lints]
+workspace = true

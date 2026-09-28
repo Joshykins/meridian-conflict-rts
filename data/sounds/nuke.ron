@@ -1,0 +1,289 @@
+// Strategic missiles (docs/NUKES.md): a silo launching, an interceptor going up, a
+// warhead broken open high up, and the detonation itself. Everything here is big and
+// low; nothing whines or rings. A commander's reactor going up is the detonation smaller
+// (`commander_death` in battle.ron is its own recipe, trimmed of its high whine).
+(
+    sounds: {
+        // The warhead going off: the flash is silent, then the air arrives. A hard crack held
+        // down in the low mids, a slam, and under it a sub-bass thump that takes seconds to
+        // let go. The ground heaves three times as the front goes out and comes back, the shock
+        // cracks overhead now and then, and the thunder rolls: low noise swelling and sagging
+        // at random, from both sides, for half a minute, sinking and thinning as it goes. The
+        // body sits around 60 to 120 Hz so small speakers carry it; nothing rises or rings.
+        "nuke_detonation": (
+            length: 30.0, peak: 0.9, room: 1.0,
+            layers: [
+                Burst(low: 120, high: 1100, attack: 0.0005, decay: 0.03, gain: 7),
+                Burst(at: 0.002, low: 40, high: 420, attack: 0.002, decay: 0.35, gain: 16),
+                Burst(at: 0.004, low: 32, high: 200, attack: 0.008, decay: 1.0, gain: 14),
+                Tone(from: 130, to: 55, glide: 0.25, attack: 0.002, decay: 0.6, gain: 2.2),
+                Tone(from: 80, to: 36, glide: 0.8, attack: 0.004, decay: 1.4, gain: 2.6),
+                Tone(from: 52, to: 34, glide: 2.0, attack: 0.01, decay: 2.2, gain: 1.4),
+                // The air itself tearing, right under the thump.
+                Roll(from: 260, to: 85, glide: 2.5, attack: 0.02, decay: 2.5, gain: 2.4, swell: 3.0, depth: 0.5),
+                // The ground heaves as the front passes, and again as it comes back.
+                Burst(at: 1.4, low: 35, high: 260, attack: 0.006, decay: 0.5, gain: 9, pan: -0.3),
+                Tone(at: 1.4, from: 92, to: 40, glide: 0.8, attack: 0.006, decay: 1.1, gain: 1.6, pan: -0.3),
+                Burst(at: 2.9, low: 30, high: 220, attack: 0.008, decay: 0.6, gain: 6.5, pan: 0.35),
+                Tone(at: 2.9, from: 80, to: 38, glide: 1.0, attack: 0.008, decay: 1.4, gain: 1.3, pan: 0.35),
+                Burst(at: 4.8, low: 28, high: 180, attack: 0.01, decay: 0.7, gain: 4.0),
+                Tone(at: 4.8, from: 70, to: 36, glide: 1.4, attack: 0.01, decay: 1.8, gain: 1.0),
+                Drive(1.8),
+                // The shock cracking overhead as it arrives, and again further off.
+                Burst(at: 0.55, low: 90, high: 1000, attack: 0.0006, decay: 0.04, gain: 2.2, pan: -0.4),
+                Burst(at: 0.9, low: 80, high: 900, attack: 0.0006, decay: 0.05, gain: 1.6, pan: 0.3),
+                Burst(at: 1.42, low: 80, high: 900, attack: 0.0006, decay: 0.05, gain: 1.4, pan: -0.2),
+                Burst(at: 2.2, low: 70, high: 800, attack: 0.0008, decay: 0.06, gain: 1.2, pan: 0.5),
+                Burst(at: 3.5, low: 70, high: 750, attack: 0.001, decay: 0.07, gain: 0.9, pan: -0.3),
+                Burst(at: 5.7, low: 60, high: 650, attack: 0.001, decay: 0.08, gain: 0.7, pan: 0.35),
+                Burst(at: 8.3, low: 60, high: 600, attack: 0.0015, decay: 0.09, gain: 0.5, pan: -0.45),
+                Burst(at: 12.0, low: 50, high: 500, attack: 0.002, decay: 0.1, gain: 0.35, pan: 0.2),
+                // The roll: thunder going away in every direction, swelling at random as the
+                // front bounces off the country, getting lower and further as it goes.
+                Roll(at: 0.1, from: 320, to: 110, glide: 4.0, attack: 0.3, decay: 5.0, gain: 0.8, swell: 1.2, depth: 0.75),
+                Roll(at: 0.6, from: 190, to: 70, glide: 10.0, attack: 1.5, decay: 7.0, gain: 0.75, swell: 0.7, depth: 0.85, pan: -0.5),
+                Roll(at: 0.9, from: 180, to: 66, glide: 12.0, attack: 2.0, decay: 7.5, gain: 0.75, swell: 0.6, depth: 0.85, pan: 0.5),
+                // The ground shaking under it all, slowest of all.
+                Roll(at: 0.3, from: 95, to: 48, glide: 14.0, attack: 1.0, decay: 8.0, gain: 0.85, swell: 0.35, depth: 0.7),
+                Roll(at: 4.0, from: 130, to: 52, glide: 16.0, attack: 5.0, decay: 6.5, gain: 0.6, swell: 0.25, depth: 0.9),
+                // The fire over the country afterwards: a low roar that falls away.
+                Sweep(at: 2.5, from: 110, to: 65, glide: 9.0, q: 0.7, attack: 2.0, decay: 4.0, gain: 0.6),
+            ],
+        ),
+        // A warhead lighting in its silo and climbing out, in two stages. The gas generator
+        // kicks it up the tube with a deep whump and a rush of steam; then the motor lights
+        // with a hard slam, a sub-bass shove, and the roar: low, fluttering, torn by the
+        // crackle a big solid motor makes, swelling as it clears the tube and sinking away
+        // as it climbs. Nothing whines; the pitch only falls.
+        "nuke_launch": (
+            length: 16.0, peak: 0.95, room: 0.9,
+            layers: [
+                // Stage one: the tube's charge.
+                Burst(low: 40, high: 380, attack: 0.003, decay: 0.12, gain: 12),
+                Tone(from: 70, to: 34, glide: 0.35, attack: 0.004, decay: 0.5, gain: 2.2),
+                Sweep(at: 0.02, from: 900, to: 260, glide: 0.8, q: 0.6, attack: 0.05, decay: 0.45, gain: 1.1),
+                // Stage two: the motor lights.
+                Burst(at: 0.55, low: 90, high: 1200, attack: 0.0006, decay: 0.03, gain: 9),
+                Burst(at: 0.552, low: 32, high: 260, attack: 0.003, decay: 0.45, gain: 16),
+                Tone(at: 0.55, from: 96, to: 30, glide: 0.9, attack: 0.003, decay: 1.3, gain: 2.6),
+                Fm(at: 0.56, from: 31, to: 36, glide: 5.0, ratio: 0.5, index: 1.8, fade: 4.0, attack: 0.25, decay: 5.0, gain: 0.7),
+                Drive(1.6),
+                // The roar: a fluttering low bed, a body over it, and a harsher top that thins
+                // as it goes up and away.
+                Roll(at: 0.58, from: 150, to: 90, glide: 9.0, attack: 0.25, decay: 5.5, gain: 1.6, swell: 8.0, depth: 0.55),
+                Roll(at: 0.6, from: 80, to: 55, glide: 10.0, attack: 0.4, decay: 6.5, gain: 1.4, swell: 3.0, depth: 0.4),
+                Sweep(at: 0.6, from: 70, to: 52, glide: 8.0, q: 0.6, attack: 0.3, decay: 5.0, gain: 1.9),
+                Sweep(at: 0.62, from: 260, to: 120, glide: 9.0, q: 0.7, attack: 0.5, decay: 4.0, gain: 1.1, pan: -0.2),
+                Sweep(at: 0.64, from: 240, to: 110, glide: 9.0, q: 0.7, attack: 0.6, decay: 4.2, gain: 1.0, pan: 0.2),
+                // Its crackle, thick at first, thinning out.
+                Burst(at: 0.869, low: 235, high: 1217, attack: 0.0005, decay: 0.014, gain: 5.83, pan: 0.39),
+                Burst(at: 0.879, low: 292, high: 1295, attack: 0.0005, decay: 0.017, gain: 3.93, pan: 0.53),
+                Burst(at: 0.923, low: 310, high: 1072, attack: 0.0005, decay: 0.013, gain: 4.34, pan: -0.34),
+                Burst(at: 0.989, low: 293, high: 1032, attack: 0.0005, decay: 0.015, gain: 4.03, pan: 0.50),
+                Burst(at: 0.999, low: 347, high: 982, attack: 0.0005, decay: 0.008, gain: 4.03, pan: -0.27),
+                Burst(at: 1.017, low: 255, high: 1340, attack: 0.0005, decay: 0.016, gain: 3.67, pan: -0.10),
+                Burst(at: 1.059, low: 311, high: 1599, attack: 0.0005, decay: 0.017, gain: 5.59, pan: -0.42),
+                Burst(at: 1.074, low: 265, high: 1054, attack: 0.0005, decay: 0.009, gain: 3.52, pan: -0.02),
+                Burst(at: 1.181, low: 370, high: 1086, attack: 0.0005, decay: 0.009, gain: 2.83, pan: -0.10),
+                Burst(at: 1.339, low: 314, high: 1524, attack: 0.0005, decay: 0.013, gain: 5.39, pan: 0.23),
+                Burst(at: 1.341, low: 351, high: 1532, attack: 0.0005, decay: 0.014, gain: 4.80, pan: -0.05),
+                Burst(at: 1.374, low: 419, high: 1596, attack: 0.0005, decay: 0.016, gain: 3.83, pan: -0.12),
+                Burst(at: 1.494, low: 246, high: 1393, attack: 0.0005, decay: 0.014, gain: 2.87, pan: -0.52),
+                Burst(at: 1.532, low: 273, high: 1351, attack: 0.0005, decay: 0.008, gain: 3.61, pan: -0.54),
+                Burst(at: 1.539, low: 220, high: 1480, attack: 0.0005, decay: 0.008, gain: 2.96, pan: -0.16),
+                Burst(at: 1.707, low: 226, high: 972, attack: 0.0005, decay: 0.016, gain: 4.25, pan: -0.42),
+                Burst(at: 1.855, low: 284, high: 1255, attack: 0.0005, decay: 0.013, gain: 3.80, pan: -0.46),
+                Burst(at: 1.956, low: 344, high: 1377, attack: 0.0005, decay: 0.012, gain: 3.34, pan: -0.43),
+                Burst(at: 2.078, low: 411, high: 1250, attack: 0.0005, decay: 0.015, gain: 3.70, pan: 0.23),
+                Burst(at: 2.334, low: 352, high: 923, attack: 0.0005, decay: 0.008, gain: 4.71, pan: -0.17),
+                Burst(at: 2.344, low: 396, high: 1456, attack: 0.0005, decay: 0.017, gain: 4.24, pan: -0.24),
+                Burst(at: 2.404, low: 384, high: 993, attack: 0.0005, decay: 0.014, gain: 3.01, pan: -0.16),
+                Burst(at: 2.455, low: 262, high: 1264, attack: 0.0005, decay: 0.015, gain: 3.63, pan: 0.33),
+                Burst(at: 2.485, low: 304, high: 1551, attack: 0.0005, decay: 0.009, gain: 4.28, pan: 0.58),
+                Burst(at: 2.488, low: 269, high: 1145, attack: 0.0005, decay: 0.016, gain: 4.10, pan: -0.33),
+                Burst(at: 2.544, low: 352, high: 1404, attack: 0.0005, decay: 0.010, gain: 2.41, pan: -0.57),
+                Burst(at: 2.789, low: 291, high: 1383, attack: 0.0005, decay: 0.009, gain: 3.81, pan: 0.55),
+                Burst(at: 2.829, low: 334, high: 1257, attack: 0.0005, decay: 0.017, gain: 3.06, pan: -0.34),
+                Burst(at: 2.971, low: 278, high: 1381, attack: 0.0005, decay: 0.008, gain: 2.64, pan: 0.15),
+                Burst(at: 3.096, low: 376, high: 901, attack: 0.0005, decay: 0.012, gain: 3.55, pan: 0.36),
+                Burst(at: 3.133, low: 241, high: 1576, attack: 0.0005, decay: 0.007, gain: 2.96, pan: 0.25),
+                Burst(at: 3.151, low: 271, high: 1389, attack: 0.0005, decay: 0.017, gain: 3.05, pan: 0.16),
+                Burst(at: 3.187, low: 242, high: 1305, attack: 0.0005, decay: 0.012, gain: 3.69, pan: -0.50),
+                Burst(at: 3.301, low: 260, high: 1074, attack: 0.0005, decay: 0.018, gain: 2.13, pan: 0.11),
+                Burst(at: 3.319, low: 339, high: 1571, attack: 0.0005, decay: 0.008, gain: 3.78, pan: 0.58),
+                Burst(at: 3.423, low: 388, high: 1258, attack: 0.0005, decay: 0.008, gain: 3.15, pan: -0.57),
+                Burst(at: 3.510, low: 405, high: 1565, attack: 0.0005, decay: 0.007, gain: 3.50, pan: -0.43),
+                Burst(at: 3.618, low: 269, high: 1116, attack: 0.0005, decay: 0.006, gain: 2.38, pan: 0.00),
+                Burst(at: 3.722, low: 415, high: 1500, attack: 0.0005, decay: 0.010, gain: 2.98, pan: 0.40),
+                Burst(at: 3.785, low: 235, high: 1262, attack: 0.0005, decay: 0.017, gain: 3.17, pan: 0.38),
+                Burst(at: 3.854, low: 352, high: 1330, attack: 0.0005, decay: 0.016, gain: 3.54, pan: -0.44),
+                Burst(at: 4.002, low: 258, high: 1436, attack: 0.0005, decay: 0.012, gain: 3.43, pan: 0.33),
+                Burst(at: 4.010, low: 375, high: 904, attack: 0.0005, decay: 0.015, gain: 2.10, pan: -0.43),
+                Burst(at: 4.026, low: 378, high: 1023, attack: 0.0005, decay: 0.013, gain: 2.42, pan: 0.02),
+                Burst(at: 4.042, low: 362, high: 1394, attack: 0.0005, decay: 0.015, gain: 2.01, pan: 0.07),
+                Burst(at: 4.052, low: 283, high: 1095, attack: 0.0005, decay: 0.009, gain: 3.21, pan: 0.01),
+                Burst(at: 4.076, low: 363, high: 928, attack: 0.0005, decay: 0.015, gain: 3.45, pan: -0.07),
+                Burst(at: 4.127, low: 376, high: 1417, attack: 0.0005, decay: 0.013, gain: 2.14, pan: -0.27),
+                Burst(at: 4.320, low: 350, high: 1446, attack: 0.0005, decay: 0.016, gain: 2.59, pan: -0.30),
+                Burst(at: 4.388, low: 353, high: 1165, attack: 0.0005, decay: 0.017, gain: 3.21, pan: -0.36),
+                Burst(at: 4.458, low: 334, high: 1040, attack: 0.0005, decay: 0.011, gain: 2.33, pan: -0.22),
+                Burst(at: 4.535, low: 391, high: 1146, attack: 0.0005, decay: 0.011, gain: 2.00, pan: -0.24),
+                Burst(at: 4.559, low: 251, high: 1058, attack: 0.0005, decay: 0.017, gain: 2.69, pan: -0.16),
+                Burst(at: 4.630, low: 284, high: 1040, attack: 0.0005, decay: 0.018, gain: 1.97, pan: 0.54),
+                Burst(at: 4.717, low: 321, high: 1398, attack: 0.0005, decay: 0.008, gain: 2.64, pan: -0.33),
+                Burst(at: 4.739, low: 400, high: 1341, attack: 0.0005, decay: 0.018, gain: 2.21, pan: -0.09),
+                Burst(at: 4.917, low: 311, high: 1226, attack: 0.0005, decay: 0.007, gain: 2.07, pan: -0.19),
+                Burst(at: 5.079, low: 337, high: 1351, attack: 0.0005, decay: 0.014, gain: 2.01, pan: 0.02),
+                Burst(at: 5.123, low: 295, high: 1424, attack: 0.0005, decay: 0.018, gain: 1.60, pan: 0.50),
+                Burst(at: 5.297, low: 278, high: 1007, attack: 0.0005, decay: 0.007, gain: 1.75, pan: 0.49),
+                Burst(at: 5.424, low: 266, high: 1176, attack: 0.0005, decay: 0.015, gain: 2.43, pan: 0.42),
+                Burst(at: 5.487, low: 393, high: 1164, attack: 0.0005, decay: 0.011, gain: 2.02, pan: 0.02),
+                Burst(at: 5.564, low: 346, high: 1234, attack: 0.0005, decay: 0.007, gain: 1.36, pan: 0.23),
+                Burst(at: 5.672, low: 328, high: 974, attack: 0.0005, decay: 0.009, gain: 1.27, pan: -0.49),
+                Burst(at: 5.770, low: 286, high: 985, attack: 0.0005, decay: 0.013, gain: 1.48, pan: -0.28),
+                Burst(at: 5.772, low: 251, high: 1364, attack: 0.0005, decay: 0.006, gain: 2.42, pan: -0.10),
+                Burst(at: 6.176, low: 288, high: 1536, attack: 0.0005, decay: 0.008, gain: 1.64, pan: -0.31),
+                Burst(at: 6.194, low: 248, high: 1065, attack: 0.0005, decay: 0.009, gain: 1.26, pan: 0.52),
+                Burst(at: 6.361, low: 380, high: 1212, attack: 0.0005, decay: 0.012, gain: 1.22, pan: -0.07),
+                Burst(at: 6.384, low: 392, high: 1082, attack: 0.0005, decay: 0.009, gain: 1.80, pan: 0.59),
+                Burst(at: 6.583, low: 406, high: 1551, attack: 0.0005, decay: 0.008, gain: 1.65, pan: 0.58),
+                Burst(at: 6.666, low: 253, high: 914, attack: 0.0005, decay: 0.007, gain: 1.43, pan: -0.29),
+                Burst(at: 7.394, low: 261, high: 956, attack: 0.0005, decay: 0.007, gain: 1.35, pan: 0.44),
+                Burst(at: 7.468, low: 391, high: 1188, attack: 0.0005, decay: 0.013, gain: 1.23, pan: -0.55),
+                Burst(at: 7.533, low: 267, high: 1061, attack: 0.0005, decay: 0.009, gain: 0.72, pan: -0.16),
+                Burst(at: 7.606, low: 304, high: 1460, attack: 0.0005, decay: 0.010, gain: 0.73, pan: 0.46),
+                Burst(at: 7.885, low: 275, high: 1265, attack: 0.0005, decay: 0.008, gain: 0.90, pan: -0.50),
+                Burst(at: 8.512, low: 291, high: 1414, attack: 0.0005, decay: 0.014, gain: 0.75, pan: 0.33),
+                Burst(at: 8.775, low: 243, high: 1170, attack: 0.0005, decay: 0.016, gain: 0.65, pan: 0.10),
+                Burst(at: 8.814, low: 320, high: 923, attack: 0.0005, decay: 0.010, gain: 0.92, pan: -0.50),
+                Burst(at: 8.957, low: 355, high: 1058, attack: 0.0005, decay: 0.014, gain: 0.94, pan: 0.45),
+                Burst(at: 9.425, low: 319, high: 1233, attack: 0.0005, decay: 0.015, gain: 0.73, pan: -0.26),
+                Burst(at: 9.454, low: 378, high: 1558, attack: 0.0005, decay: 0.008, gain: 0.89, pan: 0.26),
+                Burst(at: 9.462, low: 351, high: 1542, attack: 0.0005, decay: 0.011, gain: 0.82, pan: 0.01),
+                Burst(at: 10.469, low: 354, high: 1416, attack: 0.0005, decay: 0.013, gain: 0.66, pan: -0.58),
+                Burst(at: 10.499, low: 395, high: 1498, attack: 0.0005, decay: 0.016, gain: 0.62, pan: 0.55),
+                Burst(at: 10.866, low: 384, high: 1135, attack: 0.0005, decay: 0.007, gain: 0.33, pan: 0.16),
+                Burst(at: 10.901, low: 246, high: 1285, attack: 0.0005, decay: 0.016, gain: 0.49, pan: 0.15),
+            ],
+        ),
+        // A warhead's flight, looped while it is up (game.rs `nuke_sounds`): the motor's
+        // low fluttering roar with its crackle while it burns; the game swaps to
+        // `warhead_fall` when it goes over and comes down.
+        "warhead_flight": (
+            length: 2.4, peak: 0.34, room: 0.2, looped: true,
+            layers: [
+                Fm(from: 33, to: 33, glide: 1, ratio: 0.5, index: 1.6, fade: 1000, attack: 0.01, decay: 100000, gain: 0.08),
+                Drive(1.3),
+                Rumble(freq: 70, q: 0.7, gain: 7.0, wobble: 2.9, depth: 0.45),
+                Rumble(freq: 150, q: 0.8, gain: 5.0, wobble: 8.3, depth: 0.6, pan: -0.15),
+                Rumble(freq: 160, q: 0.8, gain: 5.0, wobble: 7.1, depth: 0.6, pan: 0.15),
+                Rumble(freq: 420, q: 1.1, gain: 1.6, wobble: 11.0, depth: 0.75),
+                Burst(at: 0.008, low: 257, high: 1239, attack: 0.0005, decay: 0.009, gain: 3.14, pan: -0.23),
+                Burst(at: 0.152, low: 365, high: 1036, attack: 0.0005, decay: 0.006, gain: 1.91, pan: -0.28),
+                Burst(at: 0.171, low: 392, high: 1001, attack: 0.0005, decay: 0.014, gain: 3.02, pan: -0.25),
+                Burst(at: 0.178, low: 352, high: 1192, attack: 0.0005, decay: 0.012, gain: 2.64, pan: -0.46),
+                Burst(at: 0.472, low: 360, high: 1104, attack: 0.0005, decay: 0.010, gain: 1.95, pan: -0.03),
+                Burst(at: 0.580, low: 294, high: 1369, attack: 0.0005, decay: 0.007, gain: 2.71, pan: 0.59),
+                Burst(at: 0.611, low: 288, high: 1296, attack: 0.0005, decay: 0.009, gain: 3.50, pan: -0.35),
+                Burst(at: 0.880, low: 368, high: 992, attack: 0.0005, decay: 0.008, gain: 2.74, pan: 0.54),
+                Burst(at: 1.102, low: 253, high: 1517, attack: 0.0005, decay: 0.016, gain: 2.72, pan: 0.46),
+                Burst(at: 1.125, low: 400, high: 1273, attack: 0.0005, decay: 0.009, gain: 3.42, pan: -0.02),
+                Burst(at: 1.136, low: 226, high: 1062, attack: 0.0005, decay: 0.006, gain: 2.69, pan: -0.06),
+                Burst(at: 1.157, low: 297, high: 1044, attack: 0.0005, decay: 0.011, gain: 2.48, pan: -0.45),
+                Burst(at: 1.231, low: 304, high: 901, attack: 0.0005, decay: 0.010, gain: 2.41, pan: -0.12),
+                Burst(at: 1.419, low: 270, high: 912, attack: 0.0005, decay: 0.017, gain: 2.32, pan: -0.15),
+                Burst(at: 1.440, low: 320, high: 1299, attack: 0.0005, decay: 0.018, gain: 2.86, pan: -0.17),
+                Burst(at: 1.478, low: 329, high: 1181, attack: 0.0005, decay: 0.016, gain: 2.31, pan: -0.54),
+                Burst(at: 1.516, low: 389, high: 1192, attack: 0.0005, decay: 0.014, gain: 2.07, pan: 0.57),
+                Burst(at: 1.566, low: 331, high: 1423, attack: 0.0005, decay: 0.010, gain: 3.19, pan: 0.34),
+                Burst(at: 1.573, low: 329, high: 929, attack: 0.0005, decay: 0.016, gain: 2.94, pan: 0.50),
+                Burst(at: 1.677, low: 361, high: 1462, attack: 0.0005, decay: 0.008, gain: 1.95, pan: 0.52),
+                Burst(at: 1.695, low: 325, high: 1361, attack: 0.0005, decay: 0.013, gain: 2.05, pan: 0.44),
+                Burst(at: 1.702, low: 344, high: 950, attack: 0.0005, decay: 0.017, gain: 2.79, pan: -0.40),
+                Burst(at: 1.721, low: 326, high: 1251, attack: 0.0005, decay: 0.009, gain: 2.26, pan: 0.29),
+                Burst(at: 1.764, low: 387, high: 1166, attack: 0.0005, decay: 0.011, gain: 2.23, pan: -0.02),
+                Burst(at: 1.835, low: 391, high: 1303, attack: 0.0005, decay: 0.007, gain: 2.96, pan: -0.51),
+                Burst(at: 2.244, low: 348, high: 1409, attack: 0.0005, decay: 0.013, gain: 2.62, pan: -0.20),
+            ],
+        ),
+        // A warhead coming down: no motor, the air tearing round the re-entry body, a deep
+        // rushing that the game raises in level (never in pitch) as it nears the ground.
+        "warhead_fall": (
+            length: 2.4, peak: 0.3, room: 0.2, looped: true,
+            layers: [
+                Rumble(freq: 110, q: 0.6, gain: 6.0, wobble: 1.3, depth: 0.35),
+                Rumble(freq: 260, q: 0.7, gain: 3.2, wobble: 3.7, depth: 0.5, pan: -0.2),
+                Rumble(freq: 240, q: 0.7, gain: 3.2, wobble: 3.1, depth: 0.5, pan: 0.2),
+                Rumble(freq: 55, q: 0.8, gain: 5.0, wobble: 0.9, depth: 0.4),
+            ],
+        ),
+        // An interceptor out of its cell: a sharp crack and a hard, fast roar going up.
+        "interceptor_launch": (
+            length: 3.2, peak: 0.8, room: 0.7,
+            layers: [
+                Burst(low: 200, high: 1600, attack: 0.0004, decay: 0.012, gain: 6),
+                Tone(from: 150, to: 60, glide: 0.08, attack: 0.001, decay: 0.08, gain: 1.2),
+                Sweep(at: 0.01, from: 160, to: 240, glide: 1.2, q: 0.8, attack: 0.03, decay: 0.8, gain: 1.6),
+                Sweep(at: 0.02, from: 180, to: 520, glide: 0.9, q: 0.6, attack: 0.05, decay: 0.9, gain: 1.4),
+                Sweep(at: 0.3, from: 400, to: 160, glide: 1.6, q: 0.6, attack: 0.4, decay: 1.0, gain: 0.7),
+            ],
+        ),
+        // A warhead broken open high up: a hard crack far off and a boom rolling down.
+        "warhead_intercepted": (
+            length: 6.0, peak: 0.9, room: 1.0,
+            layers: [
+                Burst(low: 300, high: 1800, attack: 0.0004, decay: 0.015, gain: 9),
+                Burst(at: 0.003, low: 40, high: 400, attack: 0.002, decay: 0.3, gain: 11),
+                Tone(from: 160, to: 40, glide: 0.4, attack: 0.002, decay: 0.8, gain: 2.0),
+                Tone(from: 70, to: 24, glide: 1.4, attack: 0.004, decay: 2.0, gain: 1.8),
+                Drive(1.4),
+                Sweep(at: 0.1, from: 300, to: 70, glide: 2.5, q: 0.5, attack: 0.05, decay: 2.2, gain: 1.2),
+                Sweep(at: 1.0, from: 160, to: 50, glide: 3.5, q: 0.6, attack: 0.6, decay: 2.5, gain: 0.7, pan: 0.3),
+            ],
+        ),
+        // A silo's blast doors: bolts thrown, then the leaves grinding apart on their rails.
+        "silo_doors": (
+            length: 4.4, peak: 0.6, room: 0.8,
+            layers: [
+                Tone(from: 120, to: 55, glide: 0.05, attack: 0.002, decay: 0.05, gain: 1.0),
+                Burst(low: 200, high: 1000, attack: 0.0005, decay: 0.008, gain: 1.6, pan: -0.3),
+                Tone(at: 0.14, from: 110, to: 50, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.9),
+                Burst(at: 0.14, low: 200, high: 1000, attack: 0.0005, decay: 0.008, gain: 1.4, pan: 0.3),
+                Fm(at: 0.35, from: 58, to: 64, glide: 3.2, ratio: 0.5, index: 1.8, fade: 2.5, attack: 0.3, decay: 1.6, gain: 0.55),
+                Sweep(at: 0.3, from: 100, to: 125, glide: 3.4, q: 0.9, attack: 0.4, decay: 1.8, gain: 1.0),
+                Tone(at: 3.9, from: 90, to: 42, glide: 0.08, attack: 0.002, decay: 0.12, gain: 1.2),
+                Burst(at: 3.9, low: 160, high: 900, attack: 0.0006, decay: 0.012, gain: 1.8),
+            ],
+        ),
+        // Heard by every player alike, the launcher too, whenever a warhead goes up: grave, not
+        // a cartoon klaxon, and it says nothing of whose it is.
+        "nuke_alarm": (
+            length: 7.5, peak: 0.55, room: 0.9,
+            layers: [
+                // A deep blow first, felt more than heard.
+                Tone(from: 64, to: 29, glide: 1.4, attack: 0.012, decay: 1.5, gain: 1.5),
+                Roll(from: 140, to: 60, glide: 3.0, attack: 0.06, decay: 2.4, gain: 0.8, swell: 1.6, depth: 0.5),
+                // An air-raid siren: a slow wind up, a long cry, a slow wind down. Two rotors a
+                // semitone apart, so it beats and never sits on a clean note.
+                Stack(at: 0.3, from: 96, to: 349, glide: 2.4, attack: 1.4, decay: 2.8, gain: 0.5, detune: 1.004, width: 0.35, partials: [(1, 1), (2, 0.18), (3, 0.3), (5, 0.1)]),
+                Stack(at: 0.3, from: 92, to: 370, glide: 2.6, attack: 1.6, decay: 2.8, gain: 0.32, detune: 1.004, width: 0.35, partials: [(1, 1), (3, 0.3), (5, 0.08)]),
+                Stack(at: 2.9, from: 349, to: 110, glide: 3.8, attack: 0.5, decay: 2.2, gain: 0.46, detune: 1.004, width: 0.35, partials: [(1, 1), (2, 0.18), (3, 0.3), (5, 0.1)]),
+                Stack(at: 2.95, from: 370, to: 104, glide: 3.9, attack: 0.55, decay: 2.2, gain: 0.3, detune: 1.004, width: 0.35, partials: [(1, 1), (3, 0.3), (5, 0.08)]),
+                // A low drone under it all, a tritone apart.
+                Fm(at: 0.2, from: 55, to: 52, glide: 6.0, ratio: 0.5, index: 1.3, fade: 3.0, attack: 1.0, decay: 3.6, gain: 0.5),
+                Fm(at: 0.4, from: 78, to: 74, glide: 6.0, ratio: 0.5, index: 1.0, fade: 3.0, attack: 1.2, decay: 3.4, gain: 0.3),
+            ],
+        ),
+        // A warhead is ready in its silo: a low latch and a chord that settles.
+        "warhead_ready": (
+            length: 1.6, peak: 0.35, room: 0.6,
+            layers: [
+                Tone(from: 110, to: 55, glide: 0.06, attack: 0.002, decay: 0.06, gain: 0.8),
+                Burst(low: 180, high: 900, attack: 0.0005, decay: 0.006, gain: 1.0),
+                Fm(at: 0.12, from: 147, to: 147, glide: 1, ratio: 2, index: 1.2, fade: 0.3, attack: 0.01, decay: 0.5, gain: 0.4),
+                Fm(at: 0.2, from: 220, to: 220, glide: 1, ratio: 2, index: 1.0, fade: 0.3, attack: 0.01, decay: 0.45, gain: 0.3, pan: 0.2),
+                Fm(at: 0.28, from: 294, to: 277, glide: 0.4, ratio: 2, index: 0.9, fade: 0.3, attack: 0.01, decay: 0.4, gain: 0.25, pan: -0.2),
+            ],
+        ),
+    },
+)

@@ -1,0 +1,15 @@
+// Vermilion Gorge: three against three across a desert canyon. The west side's
+// bases hold the west rim, the east side's the east; a reservoir fallen to dead
+// pool fills the canyon's middle, its old shore a white ring on the red walls.
+// At the south a colossal gravity dam closes the narrows, the dry riverbed
+// below it the one way across there; the other is the ford over the river's
+// delta flats at the north. A clear, hot afternoon; skirmish set-up can
+// override the weather and the time of day.
+(
+    biome: Desert,
+    style: Teams,
+    weather: Clear,
+    tweaks: (rain: 0.0, wind: 8),
+    time: Afternoon,
+    climate: Desert,
+)

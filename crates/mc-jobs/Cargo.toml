@@ -1,0 +1,11 @@
+[package]
+name = "mc-jobs"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+mc-core = { workspace = true }
+
+[lints]
+workspace = true

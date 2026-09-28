@@ -1,0 +1,9 @@
+Synth((
+    oscs: [(wave: Fm, gain: 0.6, shape: 0.45, ratio: 2.01, retrigger: true), (wave: Pulse, gain: 0.3, shape: 0.15)],
+    filter: (mode: LowPass, cutoff: 1200.0, resonance: 0.4, env: 2.4, keytrack: 0.5, velocity: 1.0, drive: 0.0),
+    amp: (a: 0.001, d: 0.14, s: 0.0, r: 0.1),
+    mod_env: (a: 0.001, d: 0.09, s: 0.0, r: 0.08),
+    voices: 8,
+    velocity: 0.7,
+    gain: 0.9,
+))

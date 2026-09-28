@@ -1,0 +1,99 @@
+// The Threshold: the survival map. One road along a coast, between the
+// mountains and the sea, into a Precursor facility that fills the east half
+// of the map. Late in the day, fair: the low sun rakes the plateau and the
+// facility's light is the brightest thing on it.
+// Positions are metres, x east, y north, from the south-west corner. They
+// match crates/mc-map/src/bake/threshold.rs (its `threshold_block` test
+// prints the facility block); crates/mc-map/tests/threshold.rs holds them to
+// the baked terrain.
+(
+    biome: Coastal,
+    weather: Fair,
+    tweaks: (rain: 0.0, wind: 14),
+    time: Dusk,
+    survival: (
+        engine: (13404, 8304),
+        ray_height: 720,
+        engine_start: 3,
+        harbor: (12600, 5988),
+        bays: [
+            (at: (11544, 9586), facing: 180, emitter: (11656, 9586, 165), max_radius: Some(45)),
+            (at: (11544, 9332), facing: 180, emitter: (11656, 9332, 165), max_radius: Some(45)),
+            (at: (11544, 9076), facing: 180, emitter: (11656, 9076, 165), max_radius: Some(45)),
+            (at: (11544, 8822), facing: 180, emitter: (11656, 8822, 165), max_radius: Some(45)),
+            (at: (11544, 7786), facing: 180, emitter: (11656, 7786, 165), max_radius: Some(45)),
+            (at: (11544, 7532), facing: 180, emitter: (11656, 7532, 165), max_radius: Some(45)),
+            (at: (11544, 7276), facing: 180, emitter: (11656, 7276, 165), max_radius: Some(45)),
+            (at: (11544, 7022), facing: 180, emitter: (11656, 7022, 165), max_radius: Some(45)),
+            (at: (16320, 9069), facing: 180, emitter: (16545, 9069, 330), max_radius: Some(180)),
+            (at: (16320, 8559), facing: 180, emitter: (16545, 8559, 330), max_radius: Some(180)),
+            (at: (16320, 8049), facing: 180, emitter: (16545, 8049, 330), max_radius: Some(180)),
+            (at: (16320, 7539), facing: 180, emitter: (16545, 7539, 330), max_radius: Some(180)),
+            (at: (12704, 7374), facing: 180, emitter: (12704, 7544, 220), domain: Air, max_radius: Some(40)),
+            (at: (14104, 7374), facing: 180, emitter: (14104, 7544, 220), domain: Air, max_radius: Some(40)),
+            (at: (14104, 9234), facing: 180, emitter: (14104, 9064, 220), domain: Air, max_radius: Some(40)),
+            (at: (12704, 9234), facing: 180, emitter: (12704, 9064, 220), domain: Air, max_radius: Some(40)),
+            (at: (12490, 6138), facing: 270, emitter: (12490, 6218, 140), domain: Naval, max_radius: Some(38)),
+            (at: (12600, 6138), facing: 270, emitter: (12600, 6218, 140), domain: Naval, max_radius: Some(180)),
+            (at: (12710, 6138), facing: 270, emitter: (12710, 6218, 140), domain: Naval, max_radius: Some(38)),
+        ],
+        guards: [
+            // The battery along the Rampart's top, looking down the road.
+            (key: "aster_t2_point_defense", at: (10110, 9900), facing: 180),
+            (key: "aster_t2_point_defense", at: (10110, 9300), facing: 180),
+            (key: "aster_t2_point_defense", at: (10110, 8760), facing: 180),
+            (key: "aster_t2_point_defense", at: (10110, 7850), facing: 180),
+            (key: "aster_t2_point_defense", at: (10110, 7300), facing: 180),
+            (key: "aster_t2_point_defense", at: (10110, 6700), facing: 180),
+            (key: "aster_t3_sam", at: (10300, 8600), facing: 180),
+            (key: "aster_t3_sam", at: (10300, 8000), facing: 180),
+            (key: "aster_t2_artillery", at: (10260, 9550), facing: 180),
+            (key: "aster_t2_artillery", at: (10260, 8900), facing: 180),
+            (key: "aster_t2_artillery", at: (10260, 7700), facing: 180),
+            (key: "aster_t2_artillery", at: (10260, 7050), facing: 180),
+            // The sky over the Forges and the Heart.
+            (key: "aster_t2_aa", at: (10800, 8900), facing: 180),
+            (key: "aster_t2_aa", at: (10800, 7700), facing: 180),
+            (key: "aster_t2_aa", at: (12050, 9500), facing: 180),
+            (key: "aster_t2_aa", at: (12050, 7100), facing: 180),
+            (key: "aster_t2_aa", at: (13000, 8950), facing: 180),
+            (key: "aster_t2_aa", at: (13000, 7650), facing: 180),
+            (key: "aster_t3_sam", at: (12800, 9400), facing: 180),
+            (key: "aster_t3_sam", at: (12800, 7200), facing: 180),
+            (key: "aster_t3_sam", at: (14100, 8304), facing: 180),
+            (key: "aster_t2_shield", at: (11150, 9000), facing: 180),
+            (key: "aster_t2_shield", at: (11150, 7600), facing: 180),
+            // The Sea Gate's mouth.
+            (key: "aster_t2_point_defense", at: (12200, 6380), facing: 270),
+            (key: "aster_t2_point_defense", at: (13000, 6380), facing: 270),
+            (key: "aster_t2_aa", at: (12100, 6560), facing: 270),
+            (key: "aster_t2_aa", at: (12980, 6560), facing: 270),
+        ],
+        spawns: [
+            (name: "The Landing", start: 0, blurb: "Mid-country astride the road: the columns out of the pass and the fleet's landings both reach it."),
+            (name: "Shorefast", start: 1, blurb: "On the coast, a short march from the pass: the fleet finds it first."),
+            (name: "Highfold", start: 2, blurb: "Under the mountains, furthest back: more time to build, but the High Road's aircraft come straight at it."),
+        ],
+        fronts: [
+            (name: "The Threshold Road", domain: Land, path: [(10900, 8304), (10250, 8304), (9100, 8304), (8200, 8150), (7000, 8000), (5200, 7800), (3800, 7700)]),
+            (name: "The Drowned Road", domain: Naval, path: [(12600, 5700), (12600, 4600), (10500, 5000), (8500, 5700), (7000, 5400), (5200, 4600), (3000, 4500)]),
+            (name: "The High Road", domain: Air, path: [(13400, 9800), (9000, 11600), (5000, 11000), (2600, 9000)]),
+            (name: "Sea Wind", domain: Air, path: [(13000, 7000), (10000, 4600), (6000, 4300), (3200, 6200)]),
+        ],
+        node_sites: [
+            (name: "Gatewatch North", at: (10806, 9798), domain: Land, facing: Some(180)),
+            (name: "Gatewatch South", at: (10806, 6810), domain: Land, facing: Some(180)),
+            (name: "The Nave", at: (12306, 8304), domain: Land, facing: Some(180)),
+            (name: "Lantern Berth", at: (12426, 9978), domain: Land, facing: Some(180)),
+            (name: "Tidewall Berth", at: (12306, 6654), domain: Land, facing: Some(180)),
+            (name: "The Choir", at: (14406, 9738), domain: Land, facing: Some(180)),
+            (name: "Undercroft", at: (14406, 6858), domain: Land, facing: Some(180)),
+            (name: "The Reliquary", at: (15306, 8304), domain: Land, facing: Some(180)),
+            (name: "Far Berth North", at: (15906, 9858), domain: Land, facing: Some(180)),
+            (name: "Far Berth South", at: (15906, 6750), domain: Land, facing: Some(180)),
+            (name: "Drowned Cradle", at: (11406, 5206), domain: Naval, facing: Some(180)),
+            (name: "The Sounding", at: (13806, 5206), domain: Naval, facing: Some(0)),
+            (name: "Deep Berth", at: (12606, 3906), domain: Naval, facing: Some(270)),
+        ],
+    ),
+)

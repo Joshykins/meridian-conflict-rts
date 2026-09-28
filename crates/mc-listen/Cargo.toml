@@ -1,0 +1,25 @@
+[package]
+name = "mc-listen"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+# Ears for an AI that cannot hear: turns recordings (reference songs, humming)
+# into facts precise enough to write music from, and compares our renders
+# against a reference. Pure Rust decoding (symphonia) so it builds on Windows
+# and Linux without system libraries.
+
+[dependencies]
+mc-music = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
+serde_json = { workspace = true }
+rustfft = { workspace = true }
+symphonia = { workspace = true, features = ["mp3", "flac", "ogg", "vorbis", "wav", "pcm", "adpcm"] }
+
+[[bin]]
+name = "mc-listen"
+path = "src/bin/mc-listen.rs"
+
+[lints]
+workspace = true

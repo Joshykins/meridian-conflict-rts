@@ -1,0 +1,118 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+mc-core = { path = "crates/mc-core" }
+mc-jobs = { path = "crates/mc-jobs" }
+mc-map = { path = "crates/mc-map" }
+mc-path = { path = "crates/mc-path" }
+mc-sim = { path = "crates/mc-sim" }
+mc-data = { path = "crates/mc-data" }
+mc-net = { path = "crates/mc-net" }
+mc-server = { path = "crates/mc-server" }
+mc-models = { path = "crates/mc-models" }
+mc-render = { path = "crates/mc-render" }
+mc-music = { path = "crates/mc-music" }
+mc-sfx = { path = "crates/mc-sfx" }
+mc-listen = { path = "crates/mc-listen" }
+
+ash = "0.38"
+winit = "0.30"
+raw-window-handle = "0.6"
+ash-window = "0.13"
+fontdue = "0.9"
+# Faction crests: vector art rasterised for the interface (ui/emblem).
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
+ttf-parser = "0.25"
+cpal = "0.15"
+naga = { version = "30", features = ["wgsl-in", "spv-out"] }
+bytemuck = { version = "1", features = ["derive"] }
+glam = { version = "0.33", features = ["bytemuck"] }
+serde = { version = "1", features = ["derive"] }
+ron = "0.12"
+bincode = "1.3"
+png = "0.18"
+log = "0.4"
+env_logger = "0.11"
+serde_json = "1"
+rustfft = "6"
+symphonia = { version = "0.5.5", default-features = false }
+eframe = { version = "0.36", default-features = false }
+midir = "0.11"
+# The match id on the profiler panel goes to the clipboard (mc-game issues.rs).
+arboard = { version = "3.6", default-features = false }
+# Builds the program icon into meridian.exe (crates/mc-game/build.rs).
+embed-resource = "3"
+# Network identity: device keys, sign-in challenges, room codes (mc-net, mc-server).
+ed25519-dalek = "2"
+sha2 = "0.10"
+getrandom = "0.3"
+# LAN discovery: several games on one machine share the beacon port.
+socket2 = { version = "0.6", features = ["all"] }
+# meridian-server: stop cleanly on SIGINT and SIGTERM.
+ctrlc = { version = "3", features = ["termination"] }
+
+# Every crate opts in with `[lints] workspace = true`. The rules behind these are
+# in CLAUDE.md; scripts/check.sh turns every warning into an error.
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+# Only the crates that talk to the GPU, the OS or raw memory (mc-render, mc-jobs,
+# mc-music, mc-game) opt out, with a crate-level `expect`.
+unsafe_code = "deny"
+# Items are private or pub(crate) unless another crate uses them, so rustc's
+# dead-code analysis can see them.
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+# A suppression must be `#[expect(lint, reason = "...")]`: it says why, and it
+# warns once the code it excused is gone.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+# Every `unsafe` block says why it is sound here, and every `unsafe fn` its contract.
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"
+# Long argument lists are the house style for mesh builders and draw helpers.
+too_many_arguments = "allow"
+# The determinism gate: mc-sim and mc-path list what they ban in their clippy.toml and
+# switch these on in lib.rs, so the ban covers the simulation and not its tests.
+disallowed_types = "allow"
+disallowed_methods = "allow"
+
+# The sim is integer-only, but keep debug builds usable at full entity counts.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = 1
+
+# Headless screenshots and quick GPU checks (scripts/shot.sh): release speed,
+# but incremental and split into many codegen units, so an edit to one model
+# rebuilds in seconds instead of recompiling mc-render and mc-game whole.
+[profile.shot]
+inherits = "release"
+incremental = true
+codegen-units = 256
+debug = "line-tables-only"
+
+# The mc-models program a shot server asks for fresh meshes after a model edit
+# (scripts/shot.sh): code generation is nearly all of a model rebuild, and
+# unoptimised it takes ~4 s instead of 35-45 s; the meshes still build in well
+# under a second.
+[profile.models]
+inherits = "dev"
+
+[profile.models.package.mc-models]
+opt-level = 0

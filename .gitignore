@@ -1,0 +1,20 @@
+/target
+/maps/*.mcmap
+*.mcreplay
+/replays/
+/artifacts
+/crates/*/target
+
+# Music: the studio's live session/inbox churn, and reference tracks (other people's recordings)
+/data/music/.studio/session.ron
+/data/music/.studio/inbox/
+/data/music/.studio/*/working.ron
+/data/music/references/
+/.venv-listen/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# meridian-server run from the repository root (README)
+/meridian-data/

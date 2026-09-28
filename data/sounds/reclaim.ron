@@ -1,0 +1,49 @@
+// Reclaim: the beam coming on, at work, and shutting off. The game asks for
+// these three by name; every reclaimer of every faction shares them.
+//
+// The beam is not a weapon and should not sound like one: no crack, no report.
+// It is a machine pulling: a low throb with a grinding edge. Nothing swooshes
+// and nothing rises in a sweep: that was tried, and it sounded fake. What is
+// reclaimed to nothing has no sound of its own either; the beam shutting off
+// is the end of it.
+(
+    sounds: {
+        "reclaim_beam": (
+            length: 2.0, peak: 0.42, room: 0.15, looped: true,
+            layers: [
+                // The throb: a root and its fifth beating slowly, felt more than heard.
+                Drone(freq: 62, gain: 0.05, wobble: 3, depth: 0.35),
+                Drone(freq: 93, gain: 0.045, wobble: 4.5, depth: 0.5),
+                // The grind: the octave above, chopped fast enough to growl.
+                Drone(freq: 124, gain: 0.075, wobble: 13, depth: 0.85),
+                Drone(freq: 186, gain: 0.055, wobble: 17, depth: 0.9),
+                Drive(1.3),
+                // Material on the move. Narrow and low, or it is static.
+                Rumble(freq: 520, q: 2.2, gain: 3.2, wobble: 6.5, depth: 0.8),
+            ],
+        ),
+        // Coming on: a contactor closing, and the throb and the grind catching
+        // from just under where the loop holds them. The loop fades in beneath.
+        "reclaim_start": (
+            length: 0.55, peak: 0.5, room: 0.25,
+            layers: [
+                Burst(low: 180, high: 1100, attack: 0.0005, decay: 0.012, gain: 10),
+                Tone(from: 40, to: 62, glide: 0.1, attack: 0.004, decay: 0.16, gain: 0.5),
+                Stack(from: 96, to: 124, glide: 0.12, attack: 0.012, decay: 0.15, gain: 0.8, detune: 1.006, width: 0.3, partials: [(1, 1), (1.5, 0.6), (2, 0.5), (3, 0.25)]),
+                Drive(1.25),
+            ],
+        ),
+        // Shutting off: the contactor opening, the machine running down out of the
+        // loop's notes into nothing, and a dull thunk as it settles.
+        "reclaim_end": (
+            length: 0.7, peak: 0.46, room: 0.3,
+            layers: [
+                Burst(low: 180, high: 900, attack: 0.0005, decay: 0.01, gain: 8),
+                Stack(from: 124, to: 82, glide: 0.3, attack: 0.004, decay: 0.17, gain: 1.0, detune: 1.006, width: 0.3, partials: [(1, 1), (1.5, 0.6), (2, 0.5), (3, 0.25)]),
+                Tone(from: 62, to: 34, glide: 0.3, attack: 0.004, decay: 0.2, gain: 0.22),
+                Tone(at: 0.24, from: 150, to: 70, glide: 0.05, attack: 0.003, decay: 0.06, gain: 0.4),
+                Drive(1.2),
+            ],
+        ),
+    },
+)

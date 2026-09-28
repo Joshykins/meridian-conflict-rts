@@ -1,0 +1,18 @@
+[package]
+name = "mc-models"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+mc-core = { workspace = true }
+mc-data = { workspace = true }
+mc-map = { workspace = true }
+mc-sim = { workspace = true }
+bytemuck = { workspace = true }
+glam = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+
+[lints]
+workspace = true

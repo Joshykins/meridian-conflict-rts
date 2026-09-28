@@ -1,0 +1,7 @@
+// Experimentals (tech 4): their running gear and their deaths, larger than anything else.
+(
+    sounds: {
+        "tracks_colossal": (like: "tracks", size: 2.4, peak: 0.36),
+        "blast_colossal": (like: "blast", size: 2.4, peak: 0.95),
+    },
+)

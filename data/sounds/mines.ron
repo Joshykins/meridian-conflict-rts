@@ -1,0 +1,32 @@
+// Core mines. The game plays "mine_blow" each time a mine's hammer strikes its pit
+// floor, in step with the model (a mine's `step` sound, paced one blow at a time).
+// Every tier strikes with the same sound: the deep core is told apart by its
+// shockwave, not by a different voice.
+//
+// A heavy thing landing on rock, not on a plate: a thump with the rock giving
+// under it, pieces falling back, a rumble going down the pit, and then the winch
+// taking up the weight again for the next haul.
+(
+    sounds: {
+        "mine_blow": (
+            length: 1.9, peak: 0.6, room: 0.5,
+            layers: [
+                // The blow: rock cracking under the bit, and the body of it.
+                Burst(low: 180, high: 1100, attack: 0.001, decay: 0.022, gain: 9),
+                Burst(at: 0.002, low: 50, high: 300, attack: 0.003, decay: 0.12, gain: 10),
+                Tone(from: 96, to: 34, glide: 0.1, attack: 0.002, decay: 0.16, gain: 1.1),
+                Tone(from: 58, to: 26, glide: 0.2, attack: 0.004, decay: 0.3, gain: 0.9),
+                Drive(1.2),
+                // Broken rock falling back down the pit, off to either side.
+                Burst(at: 0.07, low: 110, high: 650, attack: 0.002, decay: 0.03, gain: 3.0, pan: 0.3),
+                Burst(at: 0.13, low: 90, high: 520, attack: 0.002, decay: 0.035, gain: 2.2, pan: -0.25),
+                Burst(at: 0.22, low: 80, high: 420, attack: 0.003, decay: 0.04, gain: 1.4, pan: 0.15),
+                // The rumble going down the shaft.
+                Sweep(at: 0.01, from: 320, to: 60, glide: 0.8, q: 0.5, attack: 0.03, decay: 0.4, gain: 0.35),
+                // The winch taking the weight again: a low growl that climbs as it pulls.
+                Fm(at: 0.55, from: 44, to: 66, glide: 0.9, ratio: 0.5, index: 1.4, fade: 0.5, attack: 0.12, decay: 0.45, gain: 0.22),
+                Fm(at: 0.55, from: 88, to: 132, glide: 0.9, ratio: 1.0, index: 0.8, fade: 0.4, attack: 0.12, decay: 0.35, gain: 0.07),
+            ],
+        ),
+    },
+)
