@@ -133,6 +133,9 @@ const BASE: Kit = Kit {
 };
 /// The variants are drawn this much bigger than the base Argus.
 const SCALE: f32 = 1.15;
+/// The variants' airframe sits this far up (authored metres) so the reclaim head and
+/// the sonar hanging under the belly stay above the model's origin.
+const LIFT: f32 = 1.2;
 const KIT_A: Kit = Kit {
     scale: SCALE,
     ray: Ray::Ball,
@@ -192,9 +195,9 @@ pub(super) fn build_c(b: &mut MeshBuilder) {
 }
 
 fn build_kit(b: &mut MeshBuilder, kit: &Kit) {
-    b.with(Affine3A::from_scale(Vec3::splat(kit.scale)), |b| {
-        body(b, kit)
-    });
+    let frame =
+        Affine3A::from_scale(Vec3::splat(kit.scale)) * Affine3A::from_translation(Vec3::Z * LIFT);
+    b.with(frame, |b| body(b, kit));
 }
 
 fn body(b: &mut MeshBuilder, kit: &Kit) {
@@ -676,7 +679,7 @@ fn sonar(b: &mut MeshBuilder, sonar: Sonar) {
         Sonar::Towed => {
             b.paint(PLATING_DARK);
             b.spheroid(v3(-5.4, 0.0, 0.8), v3(0.65, 0.32, 0.26), b.sides(8), 2);
-            let (reel, fish) = (v3(-5.95, 0.0, 0.7), v3(-10.3, 0.0, -0.85));
+            let (reel, fish) = (v3(-5.95, 0.0, 0.7), v3(-10.3, 0.0, -0.3));
             b.paint(METAL);
             b.beam(reel, fish, v2(0.05, 0.05), v2(0.05, 0.05));
             let tail = fish - Vec3::X * 1.4;
