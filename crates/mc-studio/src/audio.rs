@@ -73,6 +73,8 @@ pub enum RefCmd {
         serial: u64,
     },
     StopShots,
+    /// The level of everything the studio plays, 0..1 as a gain.
+    Volume(f32),
 }
 
 /// A game sound playing.
@@ -117,6 +119,9 @@ struct Worker {
     ref_rx: Receiver<RefCmd>,
     reference: RefPlayer,
     shots: Vec<Shot>,
+    /// The output level (`RefCmd::Volume`), and where the ramp to it has got.
+    volume: f32,
+    heard: f32,
     shared: Arc<Mutex<Published>>,
     buf: Vec<f32>,
 }
@@ -140,6 +145,8 @@ impl Worker {
                 ..Default::default()
             },
             shots: Vec::new(),
+            volume: 1.0,
+            heard: 1.0,
             shared,
             buf: Vec::new(),
         }
@@ -149,7 +156,7 @@ impl Worker {
     fn run(&mut self, frames: usize) {
         self.buf.resize(frames * 2, 0.0);
         let rate = self.stage.song().rate();
-        let (stage, user_loop, rx, ref_rx, buf, r, shots) = (
+        let (stage, user_loop, rx, ref_rx, buf, r, shots, volume) = (
             &mut self.stage,
             &mut self.user_loop,
             &self.rx,
@@ -157,6 +164,7 @@ impl Worker {
             &mut self.buf,
             &mut self.reference,
             &mut self.shots,
+            &mut self.volume,
         );
         // A panic in the engine must not kill the device thread (WASAPI then
         // panics again when the stream drops). Output silence for the block.
@@ -214,6 +222,7 @@ impl Worker {
                         pos: 0,
                     }),
                     RefCmd::StopShots => shots.clear(),
+                    RefCmd::Volume(v) => *volume = v.clamp(0.0, 1.0),
                 }
             }
             stage.render(buf);
@@ -223,7 +232,19 @@ impl Worker {
         if ok.is_err() {
             self.buf.fill(0.0);
         }
+        self.apply_volume(rate);
         self.publish();
+    }
+
+    /// Scales the block by the output level, gliding to a new level over about
+    /// 20 ms so a drag on the slider does not crackle.
+    fn apply_volume(&mut self, rate: f32) {
+        let step = 1.0 / (0.02 * rate);
+        for f in self.buf.as_chunks_mut::<2>().0 {
+            self.heard += (self.volume - self.heard).clamp(-step, step);
+            f[0] *= self.heard;
+            f[1] *= self.heard;
+        }
     }
 
     fn publish(&mut self) {

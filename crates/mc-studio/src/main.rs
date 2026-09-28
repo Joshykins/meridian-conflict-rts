@@ -42,6 +42,7 @@ mod sounds;
 mod swap;
 mod theme;
 mod transport;
+mod volume;
 mod widgets;
 mod workbench;
 

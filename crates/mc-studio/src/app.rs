@@ -268,6 +268,7 @@ pub struct Studio {
     pub player: crate::player::State,
     pub moments: crate::moments::Moments,
     pub sounds: crate::sounds::Sounds,
+    pub volume: crate::volume::Volume,
     cli: Cli,
     frame: u64,
     time: f64,
@@ -378,6 +379,7 @@ impl Studio {
             player: Default::default(),
             moments: Default::default(),
             sounds: Default::default(),
+            volume: crate::volume::Volume::load(),
         };
         st.select_first_clip();
         st.collab.attach(st.path.as_deref());
@@ -1243,6 +1245,8 @@ impl Studio {
     /// After every view had its say: validate, send, record, save, watch.
     fn after_frame(&mut self, ctx: &egui::Context, now: f64) {
         let ctx = ctx.clone();
+        let status_bar = self.screen == Screen::Song && self.advanced;
+        self.volume.show(&ctx, &self.audio, status_bar);
         self.validate();
         self.sync_engine();
         let gesture = ctx.input(|i| i.pointer.any_down()) || Self::text_focus(&ctx);
