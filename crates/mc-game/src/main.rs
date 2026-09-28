@@ -39,6 +39,7 @@ mod sim_thread;
 mod survival;
 mod titan_marks;
 mod ui;
+mod unit_shot;
 mod window_chrome;
 
 use mc_data::Blueprints;
@@ -123,6 +124,17 @@ straight into a match instead.
   --follow N             match screenshot: play N more ticks through the renderer first,
                          so smoke, dust, track marks and shells in flight are in the picture
   --alpha A              with --follow: how far into the last tick the kept frame is (0..1)
+  --unit-shot KEY        with --screenshot: that unit alone on the range, no HUD, from several
+                         angles in one run, three to a row (--size is one view; default 800x600)
+  --views LIST           with --unit-shot: the angles, default front34,front,left,rear34,back,top;
+                         each front34 | front | left | right | rear34 | back | top | low, or
+                         BEARING:ELEVATION in degrees (bearing from the nose, towards its left)
+  --look X,Y,Z           with --unit-shot: aim at this point in the unit's own frame (metres:
+                         x forward, y left, z up from the ground under its centre)
+  --zoom F               with --unit-shot: close in F times on the body or the --look point
+  --frames N             with --unit-shot: an animated PNG of N frames at 20 a second, the sim
+                         playing on (two frames a tick) from the first --views angle
+  --turn DEG             with --frames: the camera turns this many degrees about the unit
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
                          menu | skirmish | survival | settings
   --loading SECONDS      with --screenshot: the loading screen that long after it came up;
@@ -186,6 +198,18 @@ fn run() -> Result<(), String> {
     let (mut follow, mut alpha) = (0u32, 1.0f32);
     let mut bot: Option<net_bot::Bot> = None;
     let mut drop_at: Option<u32> = None;
+    let mut sized = false;
+    let mut unit_shot = unit_shot::Spec {
+        path: String::new(),
+        width: 800,
+        height: 600,
+        views: Vec::new(),
+        look: None,
+        zoom: 1.0,
+        frames: 0,
+        turn: 0.0,
+    };
+    let mut unit_shot_key: Option<String> = None;
 
     while let Some(arg) = args.next() {
         let mut value = |name: &str| {
@@ -206,6 +230,7 @@ fn run() -> Result<(), String> {
                 | "--replay"
                 | "--no-fog"
                 | "--range"
+                | "--unit-shot"
                 | "--observe"
                 | "--ai-difficulty"
                 | "--ai-doctrine"
@@ -242,6 +267,15 @@ fn run() -> Result<(), String> {
                 opts.ai.domain_weights.copy_from_slice(&weights);
             },
             "--unit" => opts.subject = value("--unit")?,
+            "--unit-shot" => unit_shot_key = Some(value("--unit-shot")?),
+            "--views" => unit_shot.views = unit_shot::parse_views(&value("--views")?)?,
+            "--look" => {
+                let v: Vec<f32> = value("--look")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+                unit_shot.look = Some(<[f32; 3]>::try_from(v).map_err(|_| "--look takes X,Y,Z")?);
+            }
+            "--zoom" => unit_shot.zoom = value("--zoom")?.parse::<f32>().ok().filter(|z| *z > 0.0).ok_or("--zoom takes a number above 0")?,
+            "--frames" => unit_shot.frames = value("--frames")?.parse().map_err(|_| "--frames takes a number")?,
+            "--turn" => unit_shot.turn = value("--turn")?.parse().map_err(|_| "--turn takes degrees")?,
             "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
             "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, destruct or lift")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,
@@ -279,6 +313,7 @@ fn run() -> Result<(), String> {
                 let v = value("--size")?;
                 let (w, h) = v.split_once('x').ok_or("--size takes WxH")?;
                 size = (w.parse().map_err(|_| "--size takes WxH")?, h.parse().map_err(|_| "--size takes WxH")?);
+                sized = true;
             }
             "--loading" => loading_at = Some(loading_times(&value("--loading")?).ok_or("--loading takes SECONDS or FROM:TO:FPS")?),
             "--opening" => opening = true,
@@ -315,6 +350,11 @@ fn run() -> Result<(), String> {
             }
             other => return Err(format!("unknown option {other}\n\n{USAGE}")),
         }
+    }
+
+    if let Some(key) = &unit_shot_key {
+        opts.scene = Scene::Range;
+        opts.subject = key.clone();
     }
 
     let reading = std::time::Instant::now();
@@ -420,6 +460,19 @@ fn run() -> Result<(), String> {
     if let Some(ticks) = bench {
         headless::run_sim(&opts, &map, &blueprints, &pool, ticks, true)?;
         return Ok(());
+    }
+    if unit_shot_key.is_some() {
+        let shot = shot
+            .take()
+            .ok_or("--unit-shot draws a screenshot: give it --screenshot FILE.png")?;
+        unit_shot.path = shot.path;
+        if sized {
+            (unit_shot.width, unit_shot.height) = size;
+        }
+        if unit_shot.views.is_empty() {
+            unit_shot.views = unit_shot::parse_views(unit_shot::SHEET)?;
+        }
+        return unit_shot::run(&opts, map, blueprints, pool, ticks, &unit_shot);
     }
     if let Some(mut shot) = shot {
         shot.camera = camera;

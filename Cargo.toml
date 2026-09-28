@@ -95,3 +95,12 @@ opt-level = 3
 
 [profile.release]
 debug = 1
+
+# Headless screenshots and quick GPU checks (scripts/shot.sh): release speed,
+# but incremental and split into many codegen units, so an edit to one model
+# rebuilds in seconds instead of recompiling mc-render and mc-game whole.
+[profile.shot]
+inherits = "release"
+incremental = true
+codegen-units = 256
+debug = "line-tables-only"
