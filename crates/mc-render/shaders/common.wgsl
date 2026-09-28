@@ -716,6 +716,17 @@ struct Shockwave {
 // A mark on the ground (the renderer's stains buffer): the sim's scorch marks,
 // wreck craters and molten ground, then the structures' lots (ground.wgsl draws
 // them; grass_gen.wgsl keeps grass off lots and chars it on scorches).
+// One clad 8 m cell of slope round a levelled lot (renderer/foundations.rs;
+// foundations.wgsl draws it, grass_gen.wgsl keeps grass off it).
+//!rust crate::renderer::foundations::FoundationCell
+struct FoundationCell {
+    origin: vec2<f32>,
+    // Render time its plating began to come up.
+    start: f32,
+    // Bit 0: the slope runs along y (else x). Bit 1: it rises toward the far side.
+    kind: u32,
+}
+
 //!rust mc_sim::mirror::StainInstance
 struct Stain {
     pos: vec2<f32>,

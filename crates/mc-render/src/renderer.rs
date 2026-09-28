@@ -1949,10 +1949,16 @@ impl Renderer {
         write_image(scene_set, 24, sky.floor_view(), read);
         write_image(scene_set, 27, sky.shade_view(), vk::ImageLayout::GENERAL);
         let gtao = gtao::Gtao::new(&gpu, &globals)?;
-        let grass =
-            grass::Grass::new(&gpu, layouts.scene_set, passes.scene, &stains, &track_marks)?;
         let foundations =
             foundations::Foundations::new(&gpu, &layouts, &passes, scene.map.clone())?;
+        let grass = grass::Grass::new(
+            &gpu,
+            layouts.scene_set,
+            passes.scene,
+            &stains,
+            &track_marks,
+            foundations.cells(),
+        )?;
         write_image(scene_set, 30, gtao.ao_view(), vk::ImageLayout::GENERAL);
         write_buffers(
             scene_set,
@@ -6375,6 +6381,7 @@ impl Renderer {
             scorch_count: self.stain_count,
             lot_count: self.pad_count,
             track_count: self.prints.gather_count(self.track_count),
+            clad_count: self.foundations.count(),
             time: input.time,
         };
         self.timers.draws(&device, cmd, "grass.grow");

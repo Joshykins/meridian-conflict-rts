@@ -44,7 +44,7 @@ struct GrassPush {
     dims: vec4<u32>,
     // The trample map's origin in whole metres now, and last frame.
     window: vec4<i32>,
-    // Track marks in the ring; 1 to forget the trample map; the frame.
+    // Track marks in the ring; 1 to forget the trample map; the frame; clad cells.
     extra: vec4<u32>,
     // Seconds since last frame, density scale, full-density pixels per cell,
     // pixels per cell below which the grass is gone (cells of GRASS_CELL_M).
@@ -64,6 +64,8 @@ struct GrassPush {
 @group(1) @binding(3) var<storage, read_write> presses: array<Press>;
 @group(1) @binding(4) var<storage, read> stains: array<Stain>;
 @group(1) @binding(5) var<storage, read> track_marks: array<TrackMark>;
+// The clad slopes round levelled lots (renderer/foundations.rs): no grass through the plating.
+@group(1) @binding(6) var<storage, read> clad: array<FoundationCell>;
 var<immediate> push: GrassPush;
 
 
@@ -190,6 +192,26 @@ fn cs_gather_stains(@builtin(global_invocation_id) id: vec3<u32>) {
         p.r = vec2<f32>(s.radius, 0.0);
         p.kind = PRESS_LOT;
     }
+    p.s = 0.0;
+    add_press(p);
+}
+
+@compute @workgroup_size(64)
+fn cs_gather_clad(@builtin(global_invocation_id) id: vec3<u32>) {
+    if id.x >= push.extra.w {
+        return;
+    }
+    let c = clad[id.x];
+    let centre = c.origin + vec2<f32>(4.0);
+    if globals.camera.w < c.start || !in_reach(centre, 6.0) {
+        return;
+    }
+    // A whole 8 m cell, kept bare like a lot.
+    var p: Press;
+    p.a = centre;
+    p.b = vec2<f32>(0.0);
+    p.r = vec2<f32>(4.0, 0.0);
+    p.kind = PRESS_LOT;
     p.s = 0.0;
     add_press(p);
 }

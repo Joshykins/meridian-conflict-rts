@@ -1,19 +1,17 @@
-//! Foundation walls: where a structure's lot was levelled into the ground, the
-//! drawn terrain steps down (or up) at a wall instead of a ramp. Cosmetic only;
-//! the sim still walks the ramp.
+//! Retaining walls: where a structure's lot was levelled into the ground, the
+//! slanted strip of terrain between the lot's level and the ground round it is
+//! clad in steel. Cosmetic only; the sim walks the same slope.
 //!
 //! The terrain is a heightfield of 8 m cells, so a levelled lot's edge samples
 //! are shared with the cells round it and those cells slope from the lot's level
 //! to the ground's. Each such cell (a cell whose corners belong to different
-//! edits, or to an edit and the map) gets a block drawn over it: its top is flat
-//! across the step at the higher side's height, so the ramp lies inside it, and
-//! its sides run down into the ground. Where the lot stands proud, the wall faces
-//! out; where it is cut into a slope, the wall holds the slope back and faces
-//! in. The top is kept per sample (`wall_top`), so neighbouring blocks meet
-//! without a seam and a lot's corners close.
+//! edits, or to an edit and the map) with a real step across it gets a steel
+//! plate laid on its slope, ribs running down the slope, and a cap rail along
+//! its high edge. foundations.wgsl lays them on `terrain_height`, so they follow
+//! the ground exactly, settling included.
 //!
-//! A new lot's walls rise out of the ground as it settles (terrain.rs
-//! `TileCache::settling`, `settle::SECONDS`); foundations.wgsl draws them.
+//! A new lot's plating comes up out of the ground as it settles (terrain.rs
+//! `TileCache::settling`, `settle::SECONDS`).
 
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::settle;
@@ -23,42 +21,37 @@ use mc_map::{FlattenRecord, MapFile, CELL_SIZE_M, TILE_CELLS, TILE_SAMPLES};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Wall cells drawn at most. A cosmetic cap: past it the newest steps show
-/// the plain ramp. A lot has a few dozen, so this is thousands of structures.
+/// Clad cells drawn at most. A cosmetic cap: past it the newest slopes stay
+/// bare. A lot has a few dozen, so this is thousands of structures.
 const MAX_CELLS: usize = 65_536;
-/// Vertices per cell: the top's two triangles, then four sides of two each.
-const CELL_VERTICES: u32 = 30;
-/// A step lower than this is left as the ramp: a wall would only z-fight the ground.
+/// Vertices per cell: the plate, three ribs of two segments (top and two sides),
+/// and the cap rail (top and two sides). foundations.wgsl `CELL_VERTICES`.
+const CELL_VERTICES: u32 = 6 + 3 * 2 * 18 + 18;
+/// A step lower than this is left bare: there is no face to hold back.
 const MIN_STEP_M: f32 = 0.5;
-/// The wall's coping stands this proud of the ground it meets.
-const LIP_M: f32 = 0.15;
 /// Map tiles whose heights are kept for the next lot (132 KB each).
 const GROUND_TILES_KEPT: usize = 24;
-/// How far the sides reach below the lowest ground they meet.
-const FOOTING_M: f32 = 1.5;
+/// `FoundationCell::kind`: the slope runs along y (else along x) ...
+const ALONG_Y: u32 = 1;
+/// ... and rises toward the cell's far side (else its near side).
+const HIGH_FAR: u32 = 2;
 
-/// One wall block (foundations.wgsl `FoundationCell`).
+/// One clad cell (foundations.wgsl `FoundationCell`).
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct FoundationCell {
     /// The cell's low corner, metres.
     pub(crate) origin: [f32; 2],
-    /// Where the sides end, metres.
-    pub(crate) bottom: f32,
-    /// Render time the wall began to rise.
+    /// Render time the plating began to come up.
     pub(crate) start: f32,
-    /// The top at the corners (x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1), metres.
-    pub(crate) top: [f32; 4],
-    /// Sides drawn: bit 0 -x, 1 +x, 2 -y, 3 +y. A side against another wall cell is not.
-    pub(crate) faces: u32,
-    _pad: [u32; 3],
+    /// Which way the slope runs: `ALONG_Y` | `HIGH_FAR`.
+    pub(crate) kind: u32,
 }
 
-/// A wall block before it is packed: what the heights call for, in metres.
+/// A clad cell before it is packed.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Wall {
-    top: [f32; 4],
-    bottom: f32,
+    kind: u32,
     start: f32,
 }
 
@@ -226,36 +219,18 @@ impl Foundations {
         }
         let info = self.map.info();
         let (min_z, step) = (info.min_z.to_f32(), info.z_step.to_f32());
-        let metres = |s: u16| min_z + s as f32 * step;
         for cy in y0..=y1 {
             for cx in x0..=x1 {
-                let corners = [(cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1)];
-                let owners = corners.map(|(x, y)| grid.at(x, y).0);
                 let key = (cx, cy);
-                if owners.iter().all(|&o| o == owners[0]) {
+                let Some(kind) = grid.slope_kind(cx, cy, |s| min_z + s as f32 * step) else {
                     self.dirty |= self.walls.remove(&key).is_some();
                     continue;
-                }
-                let tops = corners.map(|(x, y)| metres(grid.wall_top(x, y)));
-                let ground = corners.map(|(x, y)| metres(grid.at(x, y).1));
-                let rise = (0..4).map(|k| tops[k] - ground[k]).fold(0.0, f32::max);
-                if rise < MIN_STEP_M {
-                    self.dirty |= self.walls.remove(&key).is_some();
-                    continue;
-                }
-                let lowest = corners
-                    .map(|(x, y)| metres(grid.at(x, y).1.min(grid.original(x, y))))
-                    .into_iter()
-                    .fold(f32::MAX, f32::min);
-                let wall = Wall {
-                    top: tops.map(|t| t + LIP_M),
-                    bottom: lowest - FOOTING_M,
-                    start,
                 };
+                let wall = Wall { kind, start };
                 match self.walls.get(&key) {
-                    // A wall that stands as it did keeps standing: a neighbour's lot
-                    // does not make it rise again.
-                    Some(old) if old.top == wall.top && old.bottom == wall.bottom => {}
+                    // Plating that lies as it did stays put: a neighbour's lot does
+                    // not make it come up again.
+                    Some(old) if old.kind == kind => {}
                     _ => {
                         self.walls.insert(key, wall);
                         self.dirty = true;
@@ -268,7 +243,7 @@ impl Foundations {
     /// The map's heights over the samples `x0..=x1`, `y0..=y1`, before any edit.
     fn window(&mut self, x0: u32, y0: u32, x1: u32, y1: u32) -> Option<Window> {
         let (tiles_w, tiles_h) = self.map.size_tiles();
-        let mut original = Vec::with_capacity(((x1 - x0 + 1) * (y1 - y0 + 1)) as usize);
+        let mut height = Vec::with_capacity(((x1 - x0 + 1) * (y1 - y0 + 1)) as usize);
         for y in y0..=y1 {
             for x in x0..=x1 {
                 // A tile's last row and column are its neighbour's first.
@@ -293,7 +268,7 @@ impl Foundations {
                 }
                 let samples = &self.ground[&tile];
                 let (lx, ly) = (x - tile.0 * TILE_CELLS, y - tile.1 * TILE_CELLS);
-                original.push(samples[(ly * TILE_SAMPLES + lx) as usize]);
+                height.push(samples[(ly * TILE_SAMPLES + lx) as usize]);
             }
         }
         Some(Window {
@@ -301,45 +276,28 @@ impl Foundations {
             y0,
             w: x1 - x0 + 1,
             h: y1 - y0 + 1,
-            owner: vec![0; original.len()],
-            height: original.clone(),
-            original,
+            owner: vec![0; height.len()],
+            height,
         })
     }
 
-    /// Writes every wall to the GPU, with the sides against other walls left out.
+    /// Writes every clad cell to the GPU.
     fn upload(&mut self) {
         let cell = CELL_SIZE_M as f32;
         let mut keys: Vec<_> = self.walls.keys().copied().collect();
-        // Oldest ground first would be nicer, but any order draws the same; this
-        // one is stable, so the cap below drops the same cells every time.
+        // Any order draws the same; this one is stable, so the cap below drops the
+        // same cells every time.
         keys.sort_unstable();
         let packed: Vec<FoundationCell> = keys
             .iter()
-            // The cosmetic cap (`MAX_CELLS`): the ramp shows past it.
+            // The cosmetic cap (`MAX_CELLS`): past it slopes stay bare.
             .take(MAX_CELLS)
             .map(|&(x, y)| {
                 let wall = &self.walls[&(x, y)];
-                let near = [
-                    x.checked_sub(1).map(|x| (x, y)),
-                    Some((x + 1, y)),
-                    y.checked_sub(1).map(|y| (x, y)),
-                    Some((x, y + 1)),
-                ];
-                let faces = near.iter().enumerate().fold(0, |m, (bit, n)| {
-                    if n.is_some_and(|n| self.walls.contains_key(&n)) {
-                        m
-                    } else {
-                        m | 1 << bit
-                    }
-                });
                 FoundationCell {
                     origin: [x as f32 * cell, y as f32 * cell],
-                    bottom: wall.bottom,
                     start: wall.start,
-                    top: wall.top,
-                    faces,
-                    _pad: [0; 3],
+                    kind: wall.kind,
                 }
             })
             .collect();
@@ -347,7 +305,17 @@ impl Foundations {
         self.count = packed.len() as u32;
     }
 
-    /// Draws the walls in the current render pass: the scene, the depth pre-pass or
+    /// The clad cells, for the grass to keep off (grass.rs).
+    pub(super) fn cells(&self) -> &Buffer {
+        &self.cells
+    }
+
+    /// How many clad cells `cells` holds.
+    pub(super) fn count(&self) -> u32 {
+        self.count
+    }
+
+    /// Draws the plating in the current render pass: the scene, the depth pre-pass or
     /// a shadow cascade, by `pass_kind`. Leaves set 0 bound; set 1 is its own.
     pub(super) fn record(
         &self,
@@ -417,7 +385,6 @@ struct Window {
     h: u32,
     owner: Vec<u32>,
     height: Vec<u16>,
-    original: Vec<u16>,
 }
 
 impl Window {
@@ -430,10 +397,6 @@ impl Window {
     fn at(&self, x: u32, y: u32) -> (u32, u16) {
         let i = self.index(x, y).expect("sample inside the window");
         (self.owner[i], self.height[i])
-    }
-
-    fn original(&self, x: u32, y: u32) -> u16 {
-        self.original[self.index(x, y).expect("sample inside the window")]
     }
 
     fn apply(&mut self, e: &FlattenRecord, owner: u32) {
@@ -449,25 +412,35 @@ impl Window {
         }
     }
 
-    /// The wall's top at a sample: its own height, or the highest of its eight
-    /// neighbours that belong to another lot (or to the map), so the top is flat
-    /// across a step and covers the ramp under it.
-    fn wall_top(&self, x: u32, y: u32) -> u16 {
-        let (own, mut top) = self.at(x, y);
-        for dy in -1i32..=1 {
-            for dx in -1i32..=1 {
-                let (nx, ny) = (x as i32 + dx, y as i32 + dy);
-                if nx < 0 || ny < 0 {
-                    continue;
-                }
-                if let Some(i) = self.index(nx as u32, ny as u32) {
-                    if self.owner[i] != own {
-                        top = top.max(self.height[i]);
-                    }
-                }
-            }
+    /// Whether cell `(cx, cy)` is a levelled step to clad, and if so which way its
+    /// slope runs (`ALONG_Y`, `HIGH_FAR`): its corners belong to different lots (or a
+    /// lot and the map) and are at least `MIN_STEP_M` apart. `metres` converts a sample.
+    fn slope_kind(&self, cx: u32, cy: u32, metres: impl Fn(u16) -> f32) -> Option<u32> {
+        let corners = [(cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1)];
+        let owners = corners.map(|(x, y)| self.at(x, y).0);
+        if owners.iter().all(|&o| o == owners[0]) {
+            return None;
         }
-        top
+        let h = corners.map(|(x, y)| metres(self.at(x, y).1));
+        let (lo, hi) = h
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(lo, hi), &z| (lo.min(z), hi.max(z)));
+        if hi - lo < MIN_STEP_M {
+            return None;
+        }
+        let gx = (h[1] + h[3] - h[0] - h[2]) * 0.5;
+        let gy = (h[2] + h[3] - h[0] - h[1]) * 0.5;
+        Some(if gx.abs() >= gy.abs() {
+            if gx > 0.0 {
+                HIGH_FAR
+            } else {
+                0
+            }
+        } else if gy > 0.0 {
+            ALONG_Y | HIGH_FAR
+        } else {
+            ALONG_Y
+        })
     }
 }
 
@@ -486,7 +459,6 @@ mod tests {
             h: 6,
             owner: vec![0; n],
             height: vec![100; n],
-            original: vec![100; n],
         };
         let lot = FlattenRecord {
             min_x: 2,
@@ -499,25 +471,30 @@ mod tests {
         w
     }
 
-    #[test]
-    fn a_raised_lot_is_walled_at_its_level_out_to_the_ground() {
-        let w = window(140);
-        // The ring cell (1, 2): its lot corners and its outer corners all top out
-        // at the lot's level, so the ramp from 140 down to 100 is inside the block.
-        for (x, y) in [(1, 2), (2, 2), (1, 3), (2, 3)] {
-            assert_eq!(w.wall_top(x, y), 140, "{x},{y}");
-        }
-        // Past the ring the ground is its own.
-        assert_eq!(w.wall_top(0, 3), 100);
+    fn metres(s: u16) -> f32 {
+        s as f32 * 0.1
     }
 
     #[test]
-    fn a_sunk_lot_is_walled_at_the_ground_down_to_its_level() {
+    fn a_raised_lot_is_clad_on_the_slopes_round_it() {
+        let w = window(140);
+        // West of the lot the slope rises east, toward the lot: along x, high far.
+        assert_eq!(w.slope_kind(1, 2, metres), Some(HIGH_FAR));
+        // East of it the slope falls away east: along x, high near.
+        assert_eq!(w.slope_kind(4, 3, metres), Some(0));
+        // South of it the slope rises north.
+        assert_eq!(w.slope_kind(3, 1, metres), Some(ALONG_Y | HIGH_FAR));
+        // The lot itself and the ground past the ring are bare.
+        assert_eq!(w.slope_kind(2, 2, metres), None);
+        assert_eq!(w.slope_kind(0, 0, metres), None);
+    }
+
+    #[test]
+    fn a_sunk_lot_is_clad_rising_away_from_it_and_a_small_step_is_not() {
         let w = window(60);
-        // The lot's edge sample carries the ground's height, so the wall faces in.
-        assert_eq!(w.wall_top(2, 3), 100);
-        assert_eq!(w.wall_top(1, 3), 100);
-        // Inside the lot, past its edge, the floor is the lot's.
-        assert_eq!(w.wall_top(3, 3), 60);
+        assert_eq!(w.slope_kind(1, 2, metres), Some(0));
+        assert_eq!(w.slope_kind(3, 4, metres), Some(ALONG_Y | HIGH_FAR));
+        // 0.4 m (4 samples of 0.1 m) is under `MIN_STEP_M`.
+        assert_eq!(window(104).slope_kind(1, 2, metres), None);
     }
 }

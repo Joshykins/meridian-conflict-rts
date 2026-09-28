@@ -15,7 +15,8 @@
 //!
 //! Set 1 of every grass pipeline: 0 tufts, 1 draw commands (three
 //! DrawIndexedIndirect, then the press count), 2 the trample map, 3 the press
-//! list, 4 the renderer's stains (scorches, then lots), 5 its track marks.
+//! list, 4 the renderer's stains (scorches, then lots), 5 its track marks, 6 the
+//! clad slopes round levelled lots (foundations.rs).
 //! `MERIDIAN_GRASS=0` turns it off, `MERIDIAN_GRASS_DENSITY` scales it.
 
 use crate::gpu::{Buffer, Gpu, GpuError};
@@ -82,6 +83,8 @@ pub(super) struct GrassFrame {
     pub scorch_count: u32,
     pub lot_count: u32,
     pub track_count: u32,
+    /// Clad cells (foundations.rs `Foundations::count`).
+    pub clad_count: u32,
     /// Seconds, `FrameInput::time`.
     pub time: f32,
 }
@@ -99,6 +102,7 @@ pub(super) struct Grass {
     gather_props: vk::Pipeline,
     gather_stains: vk::Pipeline,
     gather_tracks: vk::Pipeline,
+    gather_clad: vk::Pipeline,
     trample_pass: vk::Pipeline,
     tufts_pass: vk::Pipeline,
     finish: vk::Pipeline,
@@ -142,13 +146,14 @@ impl Grass {
         scene_pass: vk::RenderPass,
         stains: &Buffer,
         track_marks: &Buffer,
+        clad: &Buffer,
     ) -> Result<Grass, GpuError> {
         let dev = &gpu.device;
         use vk::DescriptorType as T;
         let stages = vk::ShaderStageFlags::VERTEX
             | vk::ShaderStageFlags::FRAGMENT
             | vk::ShaderStageFlags::COMPUTE;
-        let bindings: Vec<_> = (0..6)
+        let bindings: Vec<_> = (0..7)
             .map(|b| {
                 vk::DescriptorSetLayoutBinding::default()
                     .binding(b)
@@ -157,7 +162,7 @@ impl Grass {
                     .stage_flags(stages)
             })
             .collect();
-        // SAFETY: the device is alive and the create info borrows `bindings` (six distinct
+        // SAFETY: the device is alive and the create info borrows `bindings` (seven distinct
         // binding numbers), which lives to the end of the call.
         let set_layout = unsafe {
             dev.create_descriptor_set_layout(
@@ -201,7 +206,7 @@ impl Grass {
         }?;
         let sizes = [vk::DescriptorPoolSize {
             ty: T::STORAGE_BUFFER,
-            descriptor_count: 6,
+            descriptor_count: 7,
         }];
         // SAFETY: the device is alive and `sizes` lives to the end of the call.
         let pool = unsafe {
@@ -213,7 +218,7 @@ impl Grass {
             )
         }?;
         let own = [set_layout];
-        // SAFETY: the pool was made just above for exactly this one set of six storage buffers,
+        // SAFETY: the pool was made just above for exactly this one set of seven storage buffers,
         // and `own` lives to the end of the call.
         let set = unsafe {
             dev.allocate_descriptor_sets(
@@ -237,7 +242,7 @@ impl Grass {
             vk::BufferUsageFlags::INDEX_BUFFER,
         )?;
         let infos: Vec<[vk::DescriptorBufferInfo; 1]> =
-            [&tufts, &args, &trample, &presses, stains, track_marks]
+            [&tufts, &args, &trample, &presses, stains, track_marks, clad]
                 .iter()
                 .map(|b| [b.info()])
                 .collect();
@@ -253,7 +258,7 @@ impl Grass {
             })
             .collect();
         // SAFETY: `set` is fresh and unused by any command buffer; each write names one of its
-        // six storage-buffer bindings and a live buffer, and `writes`/`infos` live to the end
+        // seven storage-buffer bindings and a live buffer, and `writes`/`infos` live to the end
         // of the call.
         unsafe { dev.update_descriptor_sets(&writes, &[]) };
 
@@ -292,6 +297,7 @@ impl Grass {
             gather_props: compute(c"cs_gather_props")?,
             gather_stains: compute(c"cs_gather_stains")?,
             gather_tracks: compute(c"cs_gather_tracks")?,
+            gather_clad: compute(c"cs_gather_clad")?,
             trample_pass: compute(c"cs_trample")?,
             tufts_pass: compute(c"cs_tufts")?,
             finish: compute(c"cs_finish")?,
@@ -360,7 +366,7 @@ impl Grass {
             grid: [lo.x, lo.y, CELL_M, near],
             dims: [cells, cells, f.scorch_count, f.lot_count],
             window: [origin[0], origin[1], before[0], before[1]],
-            extra: [f.track_count, forget as u32, self.frame, 0],
+            extra: [f.track_count, forget as u32, self.frame, f.clad_count],
             tune: [dt.clamp(0.0, 0.5), self.density, FULL_PX, MIN_PX],
             ring: [0.0, handoff, reach, 0.0],
         };
@@ -438,6 +444,7 @@ impl Grass {
                 1,
             );
             run(self.gather_tracks, f.track_count.div_ceil(64), 1);
+            run(self.gather_clad, f.clad_count.div_ceil(64), 1);
             barrier(rw, cs);
             run(self.trample_pass, WINDOW as u32 / 16, WINDOW as u32 / 16);
             barrier(rw, cs);
@@ -507,6 +514,7 @@ impl Grass {
                 self.gather_props,
                 self.gather_stains,
                 self.gather_tracks,
+                self.gather_clad,
                 self.trample_pass,
                 self.tufts_pass,
                 self.finish,
