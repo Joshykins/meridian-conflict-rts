@@ -95,13 +95,13 @@
         radius: 4.6, height: 3.4,
         vision: 400,
         motion: (layer: Land, size: 0, speed: 29, accel: 26, turn: 100),
-        // The head on its mast (the Gleaner model's variant A).
+        // The head on the A-frame over the truck bed (the Gleaner model's `PIVOT`).
         reclaimer: (power: 5, range: 550, charge: 0.8, mobile: true, heads: [
-            (pivot: (-1.3, 0, 5.6), emitter: (0.25, 0, 5.6), turn: 90, pitch: (-75, 80)),
+            (pivot: (-2.1, 0, 4.1), emitter: (0.23, 0, 4.1), turn: 90, pitch: (-70, 80)),
         ]),
         weapons: [],
-        mesh: "tank_light", icon: Salvage,
-        sounds: (death: "blast_small", moving: "tracks"),
+        mesh: "gleaner", icon: Salvage,
+        sounds: (death: "blast_small", moving: "wheels"),
     ),
     (
         key: "aster_t2_land_reclaimer",
@@ -115,7 +115,7 @@
         vision: 600,
         motion: (layer: Land, size: 1, speed: 27, accel: 22, turn: 90),
         // Three heads along the spine, each on a house of its own, sharing the unit's pull
-        // (the Thresher model's variant A).
+        // (the Thresher model's `PIVOTS`, `LASERS` for the mounts).
         reclaimer: (power: 30, range: 850, charge: 0.6, mobile: true, heads: [
             (pivot: (3.3, 0, 3.95), emitter: (4.77, 0, 3.95), turn: 120, pitch: (-45, 80)),
             (pivot: (-0.3, 0, 5.25), emitter: (1.25, 0, 5.25), turn: 120, pitch: (-60, 80)),
@@ -125,7 +125,7 @@
         anti_missile: 220, anti_missile_lasers: 2,
         anti_missile_mounts: [(-5.3, 1.75, 4.1), (-5.3, -1.75, 4.1)],
         weapons: [],
-        mesh: "tank_heavy", icon: Salvage,
+        mesh: "thresher", icon: Salvage,
         sounds: (death: "blast", moving: "wheels"),
     ),
     (
