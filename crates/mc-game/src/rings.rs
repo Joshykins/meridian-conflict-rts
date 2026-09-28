@@ -580,7 +580,7 @@ mod tests {
         );
         assert_eq!(
             of(&b, "aster_t2_missile"),
-            vec![(Reach::Missile, 0, 120.0, 850.0)]
+            vec![(Reach::Missile, 0, 120.0, 1400.0)]
         );
         // The Paladin's twin projectors are one ring; its shin tubes another.
         assert_eq!(

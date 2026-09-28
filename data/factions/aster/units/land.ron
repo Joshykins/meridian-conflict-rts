@@ -188,7 +188,7 @@
         motion: (layer: Land, size: 1, speed: 25, accel: 20, turn: 90),
         weapons: [(
             name: "Tactical Missile Rack",
-            damage: 174, splash: 16, range_min: 120, range: 850, reload: 8.0, salvo: 6, salvo_delay: 0.2, speed: 160, trajectory: Ballistic, loft: 3,
+            damage: 174, splash: 16, range_min: 120, range: 1400, reload: 8.0, salvo: 6, salvo_delay: 0.2, speed: 160, trajectory: Ballistic, loft: 3,
             turret_turn: 20, arc: 360, muzzle: (2.49, 0, 2.32), pivot: (-1.4, 0, 2.0),
             muzzles: [
                 (2.49, -1.12, 2.32), (2.49, 0, 2.32), (2.49, 1.12, 2.32),
