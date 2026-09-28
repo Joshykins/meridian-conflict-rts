@@ -84,6 +84,8 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("aster_t1_rotor_gunship", 4, 1200, 300),
     ("aster_t1_interceptor", 4, 1400, 250),
     ("aster_t2_torpedo_bomber", 2, 1800, 200),
+    // Salvage carriers: three reclaim heads each, clearing wrecks on the attack-move.
+    ("aster_t2_land_reclaimer", 2, 850, 450),
     // The Naga battle scorpion: a held beam that runs up (`spin`), claws whose charges
     // curve onto their marks (`curve.rs`).
     ("naga_t3_scorpion", 1, 1100, 700),
@@ -109,6 +111,8 @@ fn setup(w: &mut World) {
         for &(key, count, x, y) in ARMY {
             add(key, count, x, y);
         }
+        // Room for what the salvage carriers bring in.
+        add("aster_mass_storage", 1, 500, 150);
         match player {
             0 => {
                 add("aster_t5_titan", 1, 1000, 900);
@@ -194,7 +198,14 @@ fn play(w: &mut World, from: u32) -> Vec<u64> {
 fn reference() -> Vec<u64> {
     let mut w = world(0);
     setup(&mut w);
-    play(&mut w, 1)
+    let hashes = play(&mut w, 1);
+    // The salvage carriers' heads were at work in it, on the move.
+    let reclaimed = w.state.players.iter().map(|p| p.reclaimed_mass).max();
+    assert!(
+        reclaimed.is_some_and(|m| m > mc_core::Fx::ZERO),
+        "nothing was reclaimed in the match"
+    );
+    hashes
 }
 
 #[test]

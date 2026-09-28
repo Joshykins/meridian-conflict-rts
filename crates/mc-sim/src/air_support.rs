@@ -185,7 +185,8 @@ impl World {
                     self.state.units.air_aim[row] = wreck_at;
                     self.state.units.flags[row] |= flag::AIR_RUN;
                     if pos.distance(wreck_at) <= self.work_range(row) {
-                        self.drain_wreck(row, w);
+                        let power = self.tool_power(row);
+                        self.drain_wreck(row, w, power, 0);
                         self.state.units.flags[row] |= flag::RECLAIMING;
                     }
                 } else {
@@ -328,12 +329,14 @@ impl World {
         match kind {
             OrderKind::Reclaim => {
                 if let Some(w) = self.state.wrecks.slots.resolve(target) {
-                    self.drain_wreck(row, w);
+                    let power = self.tool_power(row);
+                    self.drain_wreck(row, w, power, 0);
                 }
             }
             OrderKind::ReclaimUnit => {
                 if let Some(t) = self.state.units.row(target) {
-                    self.drain_unit(row, t);
+                    let power = self.tool_power(row);
+                    self.drain_unit(row, t, power, 0);
                 }
             }
             _ => {}

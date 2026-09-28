@@ -1522,6 +1522,15 @@ impl World {
                 OrderKind::Board => self.run_board(row, &o)?,
                 OrderKind::Land | OrderKind::Unload => self.run_land(row, &o)?,
             }
+            // A salvage vehicle, boat or aircraft clears what it passes as it goes.
+            if matches!(
+                o.kind,
+                OrderKind::Move | OrderKind::AttackMove | OrderKind::Patrol | OrderKind::Guard
+            ) && self.bp(row).reclaimer.is_some_and(|r| r.mobile)
+                && self.state.units.slots.is_alive(row)
+            {
+                self.idle_reclaim(row)?;
+            }
         }
         Ok(())
     }
@@ -2429,10 +2438,13 @@ impl World {
     /// [`Self::face_work`] for work whose middle is at height `z`: the arm points up or down at it too.
     pub(crate) fn face_work_at(&mut self, row: usize, pos: FxVec2, z: Fx) -> bool {
         let bp = self.bp(row);
-        let (turn, pivot) = match (bp.builder.as_ref().and_then(|b| b.arm), bp.reclaimer) {
-            (Some(arm), _) => (arm.turn, arm.pivot),
-            (None, Some(r)) if r.aims() => (r.heads()[0].turn, None),
-            _ => return true,
+        let Some((turn, pivot)) = bp
+            .builder
+            .as_ref()
+            .and_then(|b| b.arm)
+            .map(|arm| (arm.turn, arm.pivot))
+        else {
+            return true;
         };
         let has_shoulder = bp
             .builder
@@ -2795,7 +2807,13 @@ impl World {
             }
             return Ok(());
         }
-        if self.reclaim_ready(row, pos) && self.drain_wreck(row, w) {
+        let done = if self.bp(row).reclaimer.is_some() {
+            self.heads_work(row, crate::reclaim_heads::HeadWork::Wreck(w))
+        } else {
+            let power = self.tool_power(row);
+            self.reclaim_ready(row, pos) && self.drain_wreck(row, w, power, 0)
+        };
+        if done {
             self.finish_order(row);
         }
         Ok(())

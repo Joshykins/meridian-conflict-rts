@@ -1565,6 +1565,23 @@ impl World {
                 frame.houses.push(hp);
                 frame.houses.len() - 1
             });
+            // Reclaim heads on pivots are houses too: head `i` in slot `i`, and they never kick.
+            let house = house.or_else(|| {
+                let heads = bp.reclaimer.as_ref().map(|r| r.heads()).unwrap_or(&[]);
+                heads.iter().any(|h| h.pivot.is_some()).then(|| {
+                    let mut hp = HousePose::default();
+                    for (i, pose) in hp.pose.iter_mut().enumerate().take(heads.len()) {
+                        *pose = [
+                            s.units.prev_weapon_yaw[row][i].to_radians_f32(),
+                            s.units.weapon_yaw[row][i].to_radians_f32(),
+                            pitch(s.units.prev_arm_pitch[row][2 + i]),
+                            pitch(s.units.arm_pitch[row][2 + i]),
+                        ];
+                    }
+                    frame.houses.push(hp);
+                    frame.houses.len() - 1
+                })
+            });
             let spin = bp
                 .weapons
                 .iter()

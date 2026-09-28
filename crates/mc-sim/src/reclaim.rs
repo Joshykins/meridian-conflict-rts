@@ -9,6 +9,7 @@
 pub use crate::mirror::BeamInstance;
 use crate::mirror::SimEvent;
 use crate::orders::CHASE_REPATH_DISTANCE;
+use crate::reclaim_heads::HeadWork;
 use crate::spatial::kind;
 use crate::tables::*;
 use crate::{SimError, World};
@@ -35,6 +36,8 @@ pub struct ReclaimWork {
     pub height: Fx,
     /// Mass riding from this drone back into its carrier's belly.
     pub relay: bool,
+    /// Which of a reclaimer's heads the beam leaves (`mc_data::Reclaimer::heads`).
+    pub head: u8,
 }
 
 /// `BeamInstance::kind` of a reclaim beam.
@@ -83,32 +86,26 @@ impl World {
                 continue;
             }
             let bp = self.bp(row);
-            let (emitter, facing) = match (bp.reclaimer, bp.builder.as_ref().and_then(|b| b.arm)) {
-                (Some(r), _) => (
-                    r.heads()[0].emitter,
-                    s.units.heading[row] + s.units.weapon_yaw[row][0],
-                ),
+            let mut from = match (bp.reclaimer, bp.builder.as_ref().and_then(|b| b.arm)) {
+                (Some(_), _) => self.head_emitter(row, work.head as usize),
                 // The build arm is pitched at its work: the beam leaves from where its tip has swung to.
-                (None, Some(arm)) => (
-                    crate::world::pose_build_arm(
+                (None, Some(arm)) => {
+                    let emitter = crate::world::pose_build_arm(
                         arm,
                         s.units.arm_pitch[row][0],
                         s.units.arm_pitch[row][1],
-                    ),
-                    s.units.heading[row] + s.units.weapon_yaw[row][0],
-                ),
-                (None, None) => (
-                    FxVec3::new(Fx::ZERO, Fx::ZERO, bp.height),
-                    s.units.heading[row],
-                ),
+                    );
+                    let facing = s.units.heading[row] + s.units.weapon_yaw[row][0];
+                    (s.units.pos[row]
+                        + bp.turret_point(
+                            FxVec2::new(emitter.x, emitter.y),
+                            s.units.heading[row],
+                            facing,
+                        ))
+                    .extend(s.units.z[row] + emitter.z)
+                }
+                (None, None) => s.units.pos[row].extend(s.units.z[row] + bp.height),
             };
-            let mut from = (s.units.pos[row]
-                + bp.turret_point(
-                    FxVec2::new(emitter.x, emitter.y),
-                    s.units.heading[row],
-                    facing,
-                ))
-            .extend(s.units.z[row] + emitter.z);
             let mut kind = BEAM_RECLAIM;
             let (mut to_prev, mut to, mut height) = (to_prev, to, work.height);
             // Bits travel from the grip into the emitter. A relay parks the emitter
@@ -136,18 +133,6 @@ impl World {
                 height: height.to_f32(),
             });
         }
-    }
-
-    /// Whether `row` stands ready to work: a reclaimer that deploys to work (the
-    /// Trawler's folding mast, `Motion::deploy_ticks`) must be planted first. While it
-    /// is not, it is marked at work so `run_deploy` plants it.
-    fn planted_to_work(&mut self, row: usize) -> bool {
-        let need = self.bp(row).motion.map_or(0, |m| m.deploy_ticks);
-        if need == 0 || self.bp(row).reclaimer.is_none() || self.state.units.deploy[row] >= need {
-            return true;
-        }
-        self.state.units.flags[row] |= flag::WORKING;
-        false
     }
 
     /// How far this unit's tools reach: a builder's, or else a reclaimer's.
@@ -178,8 +163,7 @@ impl World {
     /// One tick of pulling mass out of a wreck. True once there is none left.
     /// A wreck gives up no more than its owner-to-be has room to store: what does
     /// not fit stays in the wreck for later, never lost.
-    pub(crate) fn drain_wreck(&mut self, row: usize, w: usize) -> bool {
-        let power = self.bp(row).reclaims().map_or(Fx::ZERO, |(power, _)| power);
+    pub(crate) fn drain_wreck(&mut self, row: usize, w: usize, power: Fx, head: u8) -> bool {
         let player = &self.state.players[self.state.units.owner[row] as usize];
         let wrecks = &mut self.state.wrecks;
         // Free building (the test range) keeps no books: it never waits for room.
@@ -213,6 +197,7 @@ impl World {
             radius: bp.radius,
             height: bp.height,
             relay: false,
+            head,
         });
         if let Some(parent) = self
             .state
@@ -228,6 +213,7 @@ impl World {
                 radius: Fx::ONE,
                 height: Fx::ZERO,
                 relay: true,
+                head,
             });
         }
         self.credit(row, take);
@@ -235,8 +221,7 @@ impl World {
     }
 
     /// One tick of unbuilding a live unit. True once it has nothing left to give.
-    pub(crate) fn drain_unit(&mut self, row: usize, t: usize) -> bool {
-        let power = self.bp(row).reclaims().map_or(Fx::ZERO, |(power, _)| power);
+    pub(crate) fn drain_unit(&mut self, row: usize, t: usize, power: Fx, head: u8) -> bool {
         let tbp = self.bp(t);
         let (full, time, cost, radius, height) = (
             tbp.health,
@@ -277,6 +262,7 @@ impl World {
             radius,
             height,
             relay: false,
+            head,
         });
         self.credit(row, mass);
         gone
@@ -326,36 +312,35 @@ impl World {
             }
             return Ok(());
         }
-        if self.reclaim_ready(row, pos) && self.drain_unit(row, t) {
+        let done = if self.bp(row).reclaimer.is_some() {
+            self.heads_work(row, HeadWork::Unit(t))
+        } else {
+            let power = self.tool_power(row);
+            self.reclaim_ready(row, pos) && self.drain_unit(row, t, power, 0)
+        };
+        if done {
             self.finish_order(row);
         }
         Ok(())
     }
 
-    /// Whether this unit turns a turret or an arm onto its work (see [`Self::face_work`]).
-    pub(crate) fn aims_to_work(&self, row: usize) -> bool {
-        let bp = self.bp(row);
-        bp.builder.as_ref().is_some_and(|b| b.arm.is_some())
-            || bp.reclaimer.is_some_and(|r| r.aims())
+    /// What a builder or a drone pulls a second with its tools.
+    pub(crate) fn tool_power(&self, row: usize) -> Fx {
+        self.bp(row).reclaims().map_or(Fx::ZERO, |(power, _)| power)
     }
 
-    /// Turns onto `pos` and, for a reclaimer turret, waits out its charge.
-    /// True once the beam may come on. Losing the aim dumps the charge.
+    /// Whether this builder turns an arm onto its work (see [`Self::face_work`]).
+    fn aims_to_work(&self, row: usize) -> bool {
+        self.bp(row)
+            .builder
+            .as_ref()
+            .is_some_and(|b| b.arm.is_some())
+    }
+
+    /// Turns a builder's arm onto `pos`. True once the beam may come on. A reclaimer
+    /// aims its heads instead (`reclaim_heads.rs`).
     pub(crate) fn reclaim_ready(&mut self, row: usize, pos: FxVec2) -> bool {
-        if !self.face_work(row, pos) {
-            self.state.units.reclaim_charge[row] = 0;
-            return false;
-        }
-        if !self.planted_to_work(row) {
-            return false;
-        }
-        let need = self.bp(row).reclaimer.map_or(0, |r| r.charge_ticks);
-        let charged = self.state.units.reclaim_charge[row];
-        if charged < need {
-            self.state.units.reclaim_charge[row] = charged + 1;
-            return false;
-        }
-        true
+        self.face_work(row, pos)
     }
 
     /// What a reclaimer with no orders does by itself: it clears the wrecks within
@@ -378,6 +363,10 @@ impl World {
         let (pos, owner) = (units.pos[row], units.owner[row]);
         let player = &self.state.players[owner as usize];
         if player.mass >= player.mass_capacity {
+            return Ok(());
+        }
+        if bp.reclaimer.is_some() {
+            self.heads_clear_wrecks(row);
             return Ok(());
         }
         let wrecks = &self.state.wrecks;
@@ -412,7 +401,8 @@ impl World {
         };
         if let Some(e) = found {
             if self.reclaim_ready(row, e.pos) {
-                self.drain_wreck(row, e.row as usize);
+                let power = self.tool_power(row);
+                self.drain_wreck(row, e.row as usize, power, 0);
             }
         } else {
             self.state.units.reclaim_charge[row] = 0;

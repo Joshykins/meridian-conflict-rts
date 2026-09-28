@@ -52,6 +52,7 @@ pub mod placement;
 pub mod print_heads;
 mod ranks;
 pub mod reclaim;
+mod reclaim_heads;
 mod reform;
 pub mod repair;
 mod seabed;

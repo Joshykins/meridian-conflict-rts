@@ -164,6 +164,8 @@ pub struct Units {
     /// A factory's standing orders, as the commands they came in as: each unit it
     /// rolls out is given them (`standing.rs`). Empty for everything else.
     pub standing: Vec<Vec<crate::command::Command>>,
+    /// Ticks to each weapon's next shot. On a reclaimer, which has no weapons, the ticks
+    /// each head has charged on its target (`reclaim_heads.rs`).
     pub weapon_cooldown: Vec<[u16; MAX_WEAPONS]>,
     pub weapon_salvo_left: Vec<[u8; MAX_WEAPONS]>,
     /// Turret yaw relative to the hull.

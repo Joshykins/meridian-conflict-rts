@@ -990,14 +990,10 @@ impl World {
                 continue;
             }
             let shelling = self.ground_mark(row).is_some();
-            // A salvage boat plants at its work (`World::reclaim_ready`).
-            let salvaging =
-                self.bp(row).reclaimer.is_some() && self.state.units.has_flag(row, flag::WORKING);
             let units = &mut self.state.units;
             let wants_move =
                 units.flags[row] & flag::HAS_FIELD != 0 && units.flags[row] & flag::HOLD == 0;
             let has_target = shelling
-                || salvaging
                 || units.weapon_target[row]
                     .iter()
                     .any(|&t| units.row(t).is_some());
