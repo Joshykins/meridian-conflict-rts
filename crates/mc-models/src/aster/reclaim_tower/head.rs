@@ -101,7 +101,7 @@ fn yoke(b: &mut MeshBuilder, ring: f32, pz: f32, s: f32, style: Style) {
                     [-1.4 * s, ring + 0.9 * s],
                     [1.2 * s, ring + 0.9 * s],
                     [0.5 * s, pz - 1.8 * s],
-                    [-1.0 * s, pz - 1.8 * s],
+                    [-s, pz - 1.8 * s],
                 ],
                 outer - 0.02,
                 outer + 0.06,
