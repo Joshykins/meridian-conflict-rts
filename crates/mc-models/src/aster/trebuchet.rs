@@ -12,7 +12,6 @@ use glam::Vec3;
 use super::bolt_rifle::siege_howitzer;
 use super::parts::*;
 use crate::builder::{MeshBuilder, Section};
-use crate::gpu_consts::stake;
 use crate::material::*;
 use crate::{part, pattern, rig};
 
@@ -73,7 +72,7 @@ pub(super) fn artillery_heavy(b: &mut MeshBuilder, _tech: u8) {
     }
 
     carriage(b);
-    stakes(b);
+    ground_stakes(b);
     b.with_part(part::TURRET, |b| {
         b.with_limb(rig::ARM_GUN, |b| {
             b.with_recoil(|b| siege_howitzer(b, breech, muzzle, BORE_R));
@@ -187,67 +186,6 @@ fn carriage(b: &mut MeshBuilder) {
         vent(b, v3(-3.5, 0.0, DECK - 0.14), v2(1.9, 0.9), 5, GLOW);
         b.paint(GLOW);
         b.plate(v3(3.5, 0.0, DECK - 0.4), v2(0.08, 1.2), 0.04, 0.02);
-    }
-}
-
-/// The ground stakes, one on each corner (`gpu_consts::stake`): a launcher tube on a ball
-/// hinge at the fender's edge and the spike it fires, authored planted, the spike driven
-/// in past the ground. Packed, the shader draws the spike back up the tube (its tip still
-/// showing) and swings the tube in along the fender.
-fn stakes(b: &mut MeshBuilder) {
-    if b.coarse() {
-        return;
-    }
-    let fine = b.fine();
-    for x in [stake::FRONT_X, stake::REAR_X] {
-        let sx = x.signum();
-        b.mirror_y(|b| {
-            let hinge = v3(x, stake::Y, stake::Z);
-            let down = v3(sx * stake::OUT_X, stake::OUT_Y, -stake::DOWN).normalize();
-            let at = |t: f32| hinge + down * t;
-            // The hinge's bracket on the fender, and its knuckle.
-            b.paint(ACCENT);
-            b.beam(
-                v3(x, stake::Y - 0.8, stake::Z - 0.2),
-                v3(x, stake::Y - 0.05, stake::Z - 0.05),
-                v2(0.8, 0.4),
-                v2(0.7, 0.36),
-            );
-            b.paint(METAL);
-            b.cylinder_between(
-                hinge - Vec3::X * 0.45,
-                hinge + Vec3::X * 0.45,
-                0.34,
-                0.34,
-                6,
-            );
-            b.with_stake(false, |b| {
-                // The tube: a heavy launcher, its breech standing proud behind the hinge.
-                b.paint(PLATING).pattern(pattern::PLAIN);
-                b.cylinder_between(at(-0.95), at(1.6), 0.44, 0.4, 6);
-                b.paint(ACCENT);
-                b.cylinder_between(at(1.6), at(1.8), 0.48, 0.46, 6);
-                if fine {
-                    // A blue line down the tube's back, where the charge that fires it runs.
-                    let side = down.cross(Vec3::Z).normalize();
-                    let up = side.cross(down).normalize();
-                    b.paint(GLOW);
-                    b.beam(
-                        at(-0.7) + up * 0.44,
-                        at(1.4) + up * 0.41,
-                        v2(0.06, 0.04),
-                        v2(0.06, 0.04),
-                    );
-                }
-            });
-            b.with_stake(true, |b| {
-                b.paint(METAL);
-                b.cylinder_between(at(1.0), at(2.75), 0.2, 0.2, 6);
-                // A broad head that holds it in the ground.
-                b.paint(ACCENT);
-                b.cylinder_between(at(2.75), at(3.35), 0.34, 0.02, 6);
-            });
-        });
     }
 }
 

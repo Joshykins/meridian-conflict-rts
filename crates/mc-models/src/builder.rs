@@ -294,14 +294,6 @@ impl MeshBuilder {
         self.rig = previous;
     }
 
-    /// Runs `f` as plantable gear: folded up on the move, down when deployed.
-    pub fn with_deploy(&mut self, f: impl FnOnce(&mut Self)) {
-        let previous = self.rig;
-        self.rig |= rig::DEPLOY;
-        f(self);
-        self.rig = previous;
-    }
-
     /// Runs `f` as a ground stake planted when the unit deploys (`gpu_consts::stake`): its
     /// launcher tube, or with `spike` the spike it fires.
     pub fn with_stake(&mut self, spike: bool, f: impl FnOnce(&mut Self)) {

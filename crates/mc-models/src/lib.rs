@@ -262,8 +262,8 @@ pub mod rig {
     pub const FLOAT: u32 = 1 << 5;
     /// Factory build deck: up while a unit is printing, then lowers to release it.
     pub const LIFT: u32 = 1 << 6;
-    /// Siege gear planted when the unit deploys: the Arbalest's spades (folded up when
-    /// packed) and the Trebuchet's ground stakes (`STAKE`, `STAKE_SPIKE`).
+    /// Siege gear planted when the unit deploys: the Trebuchet's and the Arbalest's
+    /// ground stakes (`STAKE`, `STAKE_SPIKE`).
     pub const DEPLOY: u32 = 1 << 7;
     /// On `DEPLOY` verts: a ground stake's launcher tube, and the spike it fires
     /// (`gpu_consts::stake`).

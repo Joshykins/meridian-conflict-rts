@@ -1691,12 +1691,6 @@ fn vs_main(in: VsIn) -> VsOut {
             let posed = stake_pose(p, n, (in.rig & STAKE_RIG_SPIKE) != 0u, planted, s);
             p = posed[0];
             n = posed[1];
-        } else if planted < 0.999 && p.x < -5.25 * s {
-            // The Arbalest's spades lift against the tail about its rear hinge.
-            let hinge = vec3<f32>(-5.2 * s, 0.0, 1.22 * s);
-            let ang = (1.0 - planted) * 1.35;
-            p = rot_y(p - hinge, ang) + hinge;
-            n = rot_y(n, ang);
         }
     }
     if walks && in.part != PART_LOCOMOTION {

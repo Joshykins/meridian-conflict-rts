@@ -280,7 +280,7 @@
     ),
     (
         // A low tracked sniper built round one long gun: the Argon Electric Bore. It
-        // plants its spades, charges, and throws the whole charge down range at once as a
+        // fires its four ground stakes in, charges, and throws the whole charge down range at once as a
         // bolt of lightning that vaporises what it lands on (docs/STYLE.md "The electric bore"). Outranges every direct-fire gun, and
         // cannot defend itself up close.
         key: "aster_t3_sniper",
@@ -290,20 +290,21 @@
         categories: ["Land", "DirectFire"],
         health: 4200,
         cost: (mass: 560, energy: 5600, time: 3200),
-        radius: 8.2, height: 4.8,
+        radius: 8.2, height: 4.2,
         vision: 1420,
-        motion: (layer: Land, size: 1, speed: 33, accel: 26, turn: 90, deploy: 1.2),
+        // `deploy`: the four ground stakes fire one after another (gpu_consts::stake).
+        motion: (layer: Land, size: 1, speed: 33, accel: 26, turn: 90, deploy: 2.0),
         weapons: [(
             name: "Argon Electric Bore",
             damage: 1250, splash: 9, range: 1400, reload: 6.0, hitscan: true, trajectory: Direct,
-            turret_turn: 40, muzzle: (11.5, 0, 3.6), pivot: (3.0, 0, 3.6),
+            turret_turn: 40, muzzle: (10.3, 0, 3.3), pivot: (2.0, 0, 3.3),
             targets: ["Land", "Naval", "Structure"], color: Blue, flash: 0.22, impact: 0.65, shockwave: 1.4,
             trail: false, wake: 0, bolts: 0,
             bore: (cool: 10),
             sounds: (fire: "aster_bore", charge: "aster_bore_charge", charge_time: 1.4, impact: "aster_bore_strike", ground: "aster_bore_strike"),
         )],
         mesh: "bore_tank", icon: Tank,
-        sounds: (death: "blast_large", moving: "tracks_heavy"),
+        sounds: (death: "blast_large", moving: "tracks_heavy", stake: "aster_stake_drive"),
     ),
 
 (key: "aster_t1_mobile_aa", name: "Gnat", role: "Mobile AA Gun", tech: 1,

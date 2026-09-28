@@ -4,6 +4,7 @@
 use glam::{Vec2, Vec3};
 
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
+use crate::gpu_consts::stake;
 use crate::material::*;
 use crate::part;
 use crate::pattern;
@@ -1232,5 +1233,67 @@ pub(super) fn team_panel(b: &mut MeshBuilder, base_center: Vec3, size: Vec2) {
         b.plate(base_center, size, 0.07, 0.03);
     } else {
         b.decal(base_center + Vec3::Z * 0.07, size);
+    }
+}
+
+/// The ground stakes a siege unit plants, one on each corner (`gpu_consts::stake`, the
+/// Trebuchet and the Arbalest, both at a 1.88 m deck): a launcher tube on a ball
+/// hinge at the fender's edge and the spike it fires, authored planted, the spike driven
+/// in past the ground. Packed, the shader draws the spike back up the tube (its tip still
+/// showing) and swings the tube in along the fender.
+pub(super) fn ground_stakes(b: &mut MeshBuilder) {
+    if b.coarse() {
+        return;
+    }
+    let fine = b.fine();
+    for x in [stake::FRONT_X, stake::REAR_X] {
+        let sx = x.signum();
+        b.mirror_y(|b| {
+            let hinge = v3(x, stake::Y, stake::Z);
+            let down = v3(sx * stake::OUT_X, stake::OUT_Y, -stake::DOWN).normalize();
+            let at = |t: f32| hinge + down * t;
+            // The hinge's bracket on the fender, and its knuckle.
+            b.paint(ACCENT);
+            b.beam(
+                v3(x, stake::Y - 0.8, stake::Z - 0.2),
+                v3(x, stake::Y - 0.05, stake::Z - 0.05),
+                v2(0.8, 0.4),
+                v2(0.7, 0.36),
+            );
+            b.paint(METAL);
+            b.cylinder_between(
+                hinge - Vec3::X * 0.45,
+                hinge + Vec3::X * 0.45,
+                0.34,
+                0.34,
+                6,
+            );
+            b.with_stake(false, |b| {
+                // The tube: a heavy launcher, its breech standing proud behind the hinge.
+                b.paint(PLATING).pattern(pattern::PLAIN);
+                b.cylinder_between(at(-0.95), at(1.6), 0.44, 0.4, 6);
+                b.paint(ACCENT);
+                b.cylinder_between(at(1.6), at(1.8), 0.48, 0.46, 6);
+                if fine {
+                    // A blue line down the tube's back, where the charge that fires it runs.
+                    let side = down.cross(Vec3::Z).normalize();
+                    let up = side.cross(down).normalize();
+                    b.paint(GLOW);
+                    b.beam(
+                        at(-0.7) + up * 0.44,
+                        at(1.4) + up * 0.41,
+                        v2(0.06, 0.04),
+                        v2(0.06, 0.04),
+                    );
+                }
+            });
+            b.with_stake(true, |b| {
+                b.paint(METAL);
+                b.cylinder_between(at(1.0), at(2.75), 0.2, 0.2, 6);
+                // A broad head that holds it in the ground.
+                b.paint(ACCENT);
+                b.cylinder_between(at(2.75), at(3.35), 0.34, 0.02, 6);
+            });
+        });
     }
 }

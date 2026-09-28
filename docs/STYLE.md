@@ -316,7 +316,10 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 ## The electric bore
 
 The Argon Electric Bore (AEB) is Aster's lightning gun: the Arbalest (tech 3
-sniper) carries one, the Fulgur (tech 4) an AEB-2. The Raptor (tech 3 air
+sniper) carries one, the Fulgur (tech 4) an AEB-2. The Arbalest is drawn in the Fulgur's
+language: a slim faceted barrel with a dark core in swept strakes and a stepped
+crown, capacitor drums on the turret's back, blue only in thin seams, no lit rings.
+It fires its four ground stakes in to plant, as the Trebuchet does. The Raptor (tech 3 air
 superiority fighter) and the Paladin (tech 3 assault walker) carry the
 projectile form, the bolt rifle, and the Trebuchet (tech 3 mobile artillery)
 its siege form, the Arc Howitzer: a long charge that swells blue in the mouth,

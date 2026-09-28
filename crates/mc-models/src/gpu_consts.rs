@@ -180,7 +180,7 @@ shared! {
     /// (front left, rear right, front right, rear left) its tube swings down from lying
     /// along the fender and its spike fires out into the ground, the tube kicking back as
     /// it strikes; packing runs it all the other way. Lengths are at the authored 1.88 m
-    /// deck and scale with the turret pivot, as the Arbalest's spade hinge does.
+    /// deck and scale with the turret pivot. The Trebuchet and the Arbalest plant them.
     pub mod stake as "STAKE_" {
         /// Rig bits on `DEPLOY` verts: a stake's tube, and its spike. They borrow
         /// `UPGRADE_AT` bits, which only mean anything on refit pieces; a stake never is one.
