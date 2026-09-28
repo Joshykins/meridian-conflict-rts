@@ -87,8 +87,8 @@ model_stamps="/tmp/meridian-shot-models-$checkout"
 models="$repo/crates/mc-models/src"
 
 # Overlays (Overwolf, Steam, Epic) hook every Vulkan program on this machine as
-# implicit layers; a headless shot has no window for them and has been seen to
-# hang in one for minutes. Every shot runs with them switched off.
+# implicit layers. A headless shot has no window for them, so every shot runs
+# with them switched off and never depends on what they do.
 no_overlays=(DISABLE_VULKAN_OW_OVERLAY_LAYER DISABLE_VULKAN_OW_OBS_CAPTURE
     DISABLE_VK_LAYER_VALVE_steam_overlay_1 DISABLE_VK_LAYER_VALVE_steam_fossilize_1
     EOS_OVERLAY_DISABLE_VULKAN_WIN64)
