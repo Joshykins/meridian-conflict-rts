@@ -42,6 +42,8 @@ mod cine_input;
 mod music_notes;
 #[path = "game_survival.rs"]
 mod survival_notes;
+#[path = "game_work.rs"]
+pub(crate) mod work;
 pub use cine_input::CursorMode;
 
 const DRAG_THRESHOLD: f32 = 6.0;
@@ -4278,6 +4280,9 @@ impl Game {
                 marks.push(self.unit_mark(i, true));
             }
         }
+        if !self.hud.free.on {
+            work::bar_marks(&self.view, |o| !self.is_enemy(o), &mut marks);
+        }
 
         // Placement preview: one ghost under the pointer, or a line of them while dragging.
         let mut ghosts: Vec<UnitInstance> = Vec::new();
@@ -4512,6 +4517,7 @@ impl Game {
                 self.ground_under_cursor(renderer),
                 placing,
             );
+            work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             if self.pointer == Pointer::Attack {
                 if let Some(target) = self.unit_at(self.cursor) {
@@ -4717,7 +4723,7 @@ pub(crate) fn unit_bar_work(u: &UnitInstance, queues: &[UnitOrders]) -> f32 {
         matches!(
             o.kind,
             OrderKind::Build | OrderKind::Produce | OrderKind::Upgrade
-        )
+        ) || (o.kind == OrderKind::Assist && q.progress > 0.0)
     });
     if making {
         q.progress.clamp(0.0, 1.0)

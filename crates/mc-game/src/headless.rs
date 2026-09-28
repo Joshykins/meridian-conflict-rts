@@ -623,7 +623,7 @@ pub fn screenshot(
     // As the game asks: the whole side's queues, so every group's badge shows.
     world.write_orders(Some(0), &view.selection, Some(0), &mut view.status.queues);
     world.write_plans(0, &mut view.status.plans);
-    let marks: Vec<mc_render::Mark> = view
+    let mut marks: Vec<mc_render::Mark> = view
         .selection
         .iter()
         .filter_map(|id| view.index_of.get(id).copied())
@@ -637,6 +637,7 @@ pub fn screenshot(
             }
         })
         .collect();
+    crate::game::work::bar_marks(&view, |o| o == 0, &mut marks);
     let mut rings = crate::rings::Rings::new(&world.blueprints);
     let (mut ranges, mut ranges_drawn) = rings.collect(
         view.selection
@@ -793,6 +794,7 @@ pub fn screenshot(
         }
         let outlined = order_map.ghosts(&field, &mut ghosts);
         order_map.draw(&mut ui, &field, 1.0);
+        crate::game::work::draw_tags(&mut ui, &field, 1.0, |o| o == 0);
         let pointer = crate::orders::surface_under(&field, input.cursor);
         let site = place.and_then(|bp| {
             let (at, _) = crate::orders::site(&field, bp, pointer?, None)?;
