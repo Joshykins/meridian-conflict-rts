@@ -160,7 +160,7 @@ fn include_body_vertex(v: &MeshVertex) -> bool {
 
 /// The box round a baked hull plan's body (its A channel): centre x, y and
 /// half-extents x, y, metres in the model's frame. None for an empty plan.
-pub(crate) fn hull_plan_box(tex: &[u8], half_m: f32) -> Option<[f32; 4]> {
+pub fn hull_plan_box(tex: &[u8], half_m: f32) -> Option<[f32; 4]> {
     let n = PAD_FOOTPRINT_RES as usize;
     if tex.len() != n * n * 4 {
         return None;
