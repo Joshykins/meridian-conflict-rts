@@ -97,9 +97,9 @@ The unit the naval design language is nailed on:
   hull heeling into turns.
 - A salvo is an event: the ship heels away from the broadside, the muzzle blast stamps a
   pressure ring on the water and throws a spray sheet, and the recoil shoves the hull
-  sideways. The shells are plain heavy rounds: no charge-up, no lightning, no glow on the
-  barrels.
-- It looks like a warship, not a starship: plain gunmetal guns, no emitter strips. Its only
+  sideways.
+- It looks like a warship, not a starship: no emitter strips on the hull; the only blue on
+  it is the Arc Howitzers' plasma cells and radiator lines. Its only
   lights are a ship's own (red/green sidelights, a white masthead and stern light, warm deck
   floods, lit scuttles; `GLOW_NAV_RED`, `GLOW_NAV_GREEN`, `GLOW_LAMP`, `WINDOWS`) and the
   missile-defence lasers' red.
@@ -113,8 +113,9 @@ The unit the naval design language is nailed on:
   trained outboard (`facing`) and covering their own side; conventional orange shells.
 - Four point-defence lasers (`anti_missile`, `anti_missile_mounts`) burn down missiles; each
   shot comes from the emitter nearest the missile. They do nothing against torpedoes.
-- The main guns sound like a battleship (`leviathan_main` in data/sounds/naval.ron): a
-  concussion and a report rolling back off the horizon, no buzz and no falling whine.
+- Its main guns are nine Arc Howitzers, the Trebuchet's gun, three to a house: each charges
+  for a long beat, then lobs a round of blue plasma high that bursts in lightning where it
+  lands (`discharge`), a long streak behind it (`streak`). They sound like the Trebuchet's.
 - It outranges its own eyes.
 - Its gaps are the point.
 

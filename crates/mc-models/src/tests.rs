@@ -245,7 +245,7 @@ const BLUEPRINTS: &[Blueprint] = &[
         72.0,
         38.0,
         3,
-        &[[66.0, -2.8, 11.4], [66.0, 0.0, 11.4], [66.0, 2.8, 11.4]],
+        &[[66.0, -3.4, 11.4], [66.0, 0.0, 11.4], [66.0, 3.4, 11.4]],
     ),
     hull_unit("rail_trimaran", 84.0, 34.0, 3, &[[86.0, 0.0, 24.0]]),
     hull_unit(
@@ -667,8 +667,9 @@ fn solids_face_outward() {
 /// Factories and core mines are the largest models by far (96 and 84 m lots) and
 /// there are few of them.
 const FACTORY_TRIANGLES: usize = 6000;
-/// The Leviathan, the navy's hero: more than a factory's budget for its layered detail.
-const BATTLESHIP_TRIANGLES: usize = 10000;
+/// The Leviathan, the navy's hero: more than a factory's budget for its layered detail,
+/// and nine Arc Howitzers (the Trebuchet's gun, about 700 triangles each).
+const BATTLESHIP_TRIANGLES: usize = 15000;
 const CORE_MINE_TRIANGLES: usize = 9000;
 /// The tech 4 assault tank runs on four open track units (road wheels, toothed
 /// sprockets, return rollers seen through the side) and carries two bolt rifles and the
@@ -804,7 +805,7 @@ fn lods_reduce_and_respect_budgets() {
             // 115 m spacecraft: walk-through bay, two drive bells, lift jets, dorsal mast.
             9000
         } else if model.key == "battleship" {
-            // 142 m hero hull: layered sides, a stepped pagoda, three triple gunhouses.
+            // 142 m hero hull: layered sides, a stepped pagoda, three triple howitzer houses.
             BATTLESHIP_TRIANGLES
         } else if CAPITAL_SHIPS.contains(&model.key.as_str()) {
             FACTORY_TRIANGLES
@@ -2355,15 +2356,15 @@ fn battleship_houses_and_muzzles() {
     let muzzles: [(&str, &[[f32; 3]]); 8] = [
         (
             "fore",
-            &[[66.0, -2.8, 11.4], [66.0, 0.0, 11.4], [66.0, 2.8, 11.4]],
+            &[[66.0, -3.4, 11.4], [66.0, 0.0, 11.4], [66.0, 3.4, 11.4]],
         ),
         (
             "second",
-            &[[46.0, -2.8, 15.0], [46.0, 0.0, 15.0], [46.0, 2.8, 15.0]],
+            &[[46.0, -3.4, 15.0], [46.0, 0.0, 15.0], [46.0, 3.4, 15.0]],
         ),
         (
             "aft",
-            &[[-18.0, -2.8, 9.2], [-18.0, 0.0, 9.2], [-18.0, 2.8, 9.2]],
+            &[[-18.0, -3.4, 9.2], [-18.0, 0.0, 9.2], [-18.0, 3.4, 9.2]],
         ),
         ("aa", &[[-11.4, -0.4, 18.2], [-11.4, 0.4, 18.2]]),
         (

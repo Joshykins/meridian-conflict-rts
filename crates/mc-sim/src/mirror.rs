@@ -934,7 +934,8 @@ pub struct ProjectileInstance {
     /// thrusters (`wings_or_turn`).
     pub _pad: [f32; 2],
     /// Nose this tick, xyz. Zero: the body follows travel (`pos - prev_pos`).
-    /// Then a missile's body across in metres (`Weapon::caliber`); zero: from `size`.
+    /// Then a missile's body across in metres (`Weapon::caliber`); zero: from `size`. Any
+    /// other shot's tail-length multiplier instead (`Weapon::streak`, `aim_w`).
     pub aim: [f32; 4],
     /// Nose last tick. A cold body blends from this to `aim` across the frame.
     pub prev_aim: [f32; 4],
@@ -979,6 +980,16 @@ fn wings_or_turn(weapon: &mc_data::Weapon, age: u16) -> f32 {
         .saturating_sub(weapon.boost_ticks)
         .max(1);
     -((age - weapon.boost_ticks) as f32 / span as f32).clamp(0.01, 1.0)
+}
+
+/// A shot's `aim.w`: a missile's body across (`Weapon::caliber`), any other shot's
+/// tail-length multiplier (`Weapon::streak`).
+fn aim_w(weapon: &mc_data::Weapon) -> f32 {
+    if weapon.missile {
+        weapon.caliber
+    } else {
+        weapon.streak
+    }
 }
 
 fn nose_pad(cold: bool, aim: FxVec3, caliber: f32) -> [f32; 4] {
@@ -1923,8 +1934,8 @@ impl World {
                 wake,
                 plasma,
                 _pad: [hot, wings_or_turn(weapon, s.projectiles.age[i])],
-                aim: nose_pad(cold_body, s.projectiles.aim[i], weapon.caliber),
-                prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i], weapon.caliber),
+                aim: nose_pad(cold_body, s.projectiles.aim[i], aim_w(weapon)),
+                prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i], aim_w(weapon)),
             });
         }
         // Shots that landed this tick fly their last stretch, so a shell is seen
@@ -1937,7 +1948,7 @@ impl World {
             let ends = ((shot.after.to_f32() * 255.0) as u32).clamp(1, 255);
             let from = shot.from.to_f32();
             let caliber =
-                self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize].caliber;
+                aim_w(&self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize]);
             frame.projectiles.push(ProjectileInstance {
                 prev_pos: std::array::from_fn(|a| from[a] + shot.lead[a]),
                 color: color

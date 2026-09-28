@@ -1,6 +1,6 @@
 //! The Leviathan: the tech 3 battleship, the hero of the navy.
 //!
-//! A 142 m dreadnought with heavy conventional guns: a low, sleek, aggressive hull under a tall
+//! A 142 m dreadnought with nine Arc Howitzers: a low, sleek, aggressive hull under a tall
 //! pagoda. The hull sits low in the water with a sharply raked clipper bow and
 //! a ram-like cutwater fin at the forefoot, a hard chine knuckle along its
 //! flanks (a dark belt under it, the side tumbling in above it to a dark
@@ -9,7 +9,8 @@
 //! sponson wings stand out along the citadel and carry four twin secondary
 //! turrets, two a side, that rest trained outboard. Three flat, hard-edged
 //! triple gunhouses on low faceted bases (two forward, superfiring, one
-//! astern). Over the citadel, a tall, slender, stepped pagoda tower with a
+//! astern), each carrying three of the Trebuchet's Arc Howitzers
+//! (`bolt_rifle::siege_howitzer`). Over the citadel, a tall, slender, stepped pagoda tower with a
 //! raked face, the bridge glass high up under a dark brow, rangefinder arms and
 //! a tall mast; behind it a low raked stack block and a stepped aft
 //! superstructure carrying the light AA mount. Four missile-defence laser heads
@@ -18,10 +19,11 @@
 //! `pattern::PLAIN`, so the surface shader lays no lights into them. The only light on it is a
 //! ship's own (`lights`): red and green sidelights on the bridge wings, a white
 //! masthead light, a stern light, a few warm deck lamps and lit scuttles, plus the
-//! missile-defence lasers' red. Every gun is plain gunmetal and a real weapon.
+//! missile-defence lasers' red, and the howitzers' own blue plasma cells.
 //! The waterline is z = 0, the keel goes to -11.5.
 
 use super::*;
+use crate::aster::bolt_rifle::siege_howitzer;
 
 // ---- the hull --------------------------------------------------------------
 
@@ -59,15 +61,26 @@ const FORECASTLE_AFT: f32 = -27.5;
 const FORE_PIVOT: Vec3 = Vec3::new(44.0, 0.0, 11.0);
 const SECOND_PIVOT: Vec3 = Vec3::new(24.0, 0.0, 14.6);
 const AFT_PIVOT: Vec3 = Vec3::new(-40.0, 0.0, 8.8);
-/// Pivot to muzzle, along the bore.
-const BARREL: f32 = 22.0;
+/// The main batteries' Arc Howitzers: the three bores either side of a house's
+/// centreline (`spread` apart), breech and muzzle ahead of the pivot, and half the
+/// breech housing's height.
+struct Howitzers {
+    spread: f32,
+    breech: f32,
+    muzzle: f32,
+    r: f32,
+}
+const GUNS: Howitzers = Howitzers {
+    spread: 3.4,
+    breech: 0.5,
+    muzzle: 22.0,
+    r: 0.95,
+};
 /// Bores sit this far above the pivot.
 const BORE_RISE: f32 = 0.4;
 /// A house's floor sits this far under its pivot, its roof this far over its floor.
 const HOUSE_SINK: f32 = 1.3;
 const HOUSE_HEIGHT: f32 = 2.8;
-/// The three bores of a battery, either side of the house's centreline.
-const BORES: [f32; 3] = [-2.8, 0.0, 2.8];
 /// How far the barrels kick back on a salvo.
 const RECOIL: f32 = 2.0;
 const AA_PIVOT: Vec3 = Vec3::new(-14.0, 0.0, 18.0);
@@ -368,13 +381,9 @@ fn coarse(b: &mut MeshBuilder) {
     house(b, SECOND_PIVOT, 7.0);
     b.paint(METAL);
     for pivot in [FORE_PIVOT, SECOND_PIVOT] {
-        let (x0, x1, z) = (pivot.x + 4.0, pivot.x + BARREL, pivot.z + BORE_RISE);
-        b.face(&[
-            v3(x0, -3.3, z),
-            v3(x1, -3.1, z),
-            v3(x1, 3.1, z),
-            v3(x0, 3.3, z),
-        ]);
+        let (x0, x1, z) = (pivot.x + 4.0, pivot.x + GUNS.muzzle, pivot.z + BORE_RISE);
+        let (w0, w1) = (GUNS.spread + GUNS.r * 0.7, GUNS.spread + GUNS.r * 0.4);
+        b.face(&[v3(x0, -w0, z), v3(x1, -w1, z), v3(x1, w1, z), v3(x0, w0, z)]);
     }
 }
 
@@ -1042,29 +1051,10 @@ fn house_plan() -> Vec<[f32; 2]> {
     ]
 }
 
-/// A heavy naval gun: one long gunmetal tube tapering to the muzzle, a slight swell
-/// at the end, a dark bore, and a canvas blast bag where it leaves the gunhouse face.
-/// Nothing lit and nothing bolted on.
-fn naval_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) {
-    let d = (muzzle - breech).normalize();
-    let length = (muzzle - breech).length();
-    let at = |t: f32| breech + d * (length * t);
-    let sides = b.sides(10);
-    b.paint(METAL);
-    b.cylinder_between(breech, at(0.95), r * 1.15, r * 0.74, sides);
-    b.cylinder_between(at(0.95), muzzle, r * 0.84, r * 0.84, sides);
-    if !b.fine() {
-        return;
-    }
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.cylinder_between(at(0.14), at(0.24), r * 1.9, r * 1.3, sides);
-    b.cylinder_between(muzzle - d * 0.04, muzzle + d * 0.01, r * 0.5, r * 0.5, 8);
-}
-
 /// A triple gunhouse: flat, wide and hard-edged. A sharp wedge face, cheeks and
 /// face sloped in two facets with a crease between them, a flat roof with a dark slab
 /// and the rangefinder low across its back. The house yaws about the pivot; the
-/// barrels with their sleeves and the mantlet pitch and recoil inside it.
+/// howitzers and the mantlet pitch and recoil inside it.
 fn gunhouse(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
     b.with_house(weapon, pivot, RECOIL, |b| {
         let cx = pivot.x - 1.2;
@@ -1097,20 +1087,20 @@ fn gunhouse(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
             );
         });
         let bore_z = pivot.z + BORE_RISE;
-        let muzzle_x = pivot.x + BARREL;
         b.with_recoil(|b| {
-            for y in BORES {
-                naval_gun(
+            for y in [-GUNS.spread, 0.0, GUNS.spread] {
+                siege_howitzer(
                     b,
-                    v3(pivot.x + 1.5, y, bore_z),
-                    v3(muzzle_x, y, bore_z),
-                    0.5,
+                    v3(pivot.x + GUNS.breech, y, bore_z),
+                    v3(pivot.x + GUNS.muzzle, y, bore_z),
+                    GUNS.r,
                 );
             }
             b.paint(ACCENT).pattern(pattern::PLAIN);
+            let half = GUNS.spread + GUNS.r * 1.4;
             b.block(
-                v3(pivot.x + 2.6, -3.8, bore_z - 0.6),
-                v3(pivot.x + 4.0, 3.8, bore_z + 0.6),
+                v3(pivot.x + 2.6, -half, bore_z - 0.6),
+                v3(pivot.x + 4.0, half, bore_z + 0.6),
             );
         });
         // The rangefinder: a low hood across the back of the roof, its arms out past the cheeks.
@@ -1170,7 +1160,7 @@ fn secondary_plan() -> Vec<[f32; 2]> {
 }
 
 /// A twin secondary turret on its wing: a low faceted base, a small hard-edged house
-/// with a wedge face, two plain gunmetal guns. Authored facing the nose; it rests trained outboard.
+/// with a wedge face, two plain gunmetal GUNS. Authored facing the nose; it rests trained outboard.
 fn secondary(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
     let floor = pivot.z - SECONDARY_SINK;
     let top = WING[3];

@@ -100,6 +100,8 @@ pub struct Weapon {
     pub plasma: f32,
     /// Blue-white bolts thrown at the muzzle and the impact. Zero: none.
     pub bolts: u8,
+    /// Multiplies how long a plasma slug's tail is drawn (`RawWeapon::streak`). Zero: one.
+    pub streak: f32,
     /// Metres of a charged shell's last flight the lightning strikes down when it lands. Zero: none.
     pub discharge: f32,
     /// A capital rail gun: its shot is drawn and heard at this scale over an ordinary rail. Zero: none.

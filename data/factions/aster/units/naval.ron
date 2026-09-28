@@ -347,41 +347,42 @@
         // Engaged and stopped, it lays its beam to the mark, a little forward of square, so
         // every battery bears.
         motion: (layer: Naval, size: 5, speed: 15, accel: 4, turn: 18, broadside: 75),
-        // Three triple turrets, each a house of its own: two forward, one astern. Plain
-        // heavy guns firing ordinary armour-piercing shells, lobbed; four twin secondary
-        // turrets on the sponsons; four point-defence lasers.
+        // Three triple turrets, each a house of its own: two forward, one astern, each
+        // carrying three Arc Howitzers (the Trebuchet's gun): a long charge, then great
+        // rounds of blue plasma lobbed high that burst in lightning where they land. Four
+        // twin secondary turrets on the sponsons; four point-defence lasers.
         // They cannot bear through the citadel. No sonar, no torpedo defence, weak AA.
         // `volley`: the three batteries hold for one another and fire as one broadside,
         // every barrel on the same tick.
         weapons: [
             (
                 name: "Fore Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 240, trajectory: Ballistic, loft: 6,
                 turret_turn: 24, arc: 300, mount: true, pivot: (44.0, 0, 11.0), muzzle: (66.0, 0, 11.4),
-                muzzles: [(66.0, -2.8, 11.4), (66.0, 0, 11.4), (66.0, 2.8, 11.4)], spread: 3.5,
-                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 2.2, shockwave: 2.0,
-                tracer: 0.18, trail: true, wake: 0.7,
-                sounds: (fire: "leviathan_main", impact: "leviathan_shell", ground: "leviathan_shell"),
+                muzzles: [(66.0, -3.4, 11.4), (66.0, 0, 11.4), (66.0, 3.4, 11.4)], spread: 3.5,
+                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
+                tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 8, discharge: 45,
+                sounds: (fire: "aster_trebuchet_fire", charge: "aster_trebuchet_charge", charge_time: 2.4, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
             ),
             (
                 name: "Second Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 240, trajectory: Ballistic, loft: 6,
                 turret_turn: 24, arc: 300, mount: true, pivot: (24.0, 0, 14.6), muzzle: (46.0, 0, 15.0),
-                muzzles: [(46.0, -2.8, 15.0), (46.0, 0, 15.0), (46.0, 2.8, 15.0)], spread: 3.5,
-                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 2.2, shockwave: 2.0,
-                tracer: 0.18, trail: true, wake: 0.7,
-                sounds: (fire: "leviathan_main", impact: "leviathan_shell", ground: "leviathan_shell"),
+                muzzles: [(46.0, -3.4, 15.0), (46.0, 0, 15.0), (46.0, 3.4, 15.0)], spread: 3.5,
+                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
+                tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 8, discharge: 45,
+                sounds: (fire: "aster_trebuchet_fire", charge: "aster_trebuchet_charge", charge_time: 2.4, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
             ),
             // The aft turret: `rear`, so its muzzles are given as if it faced forward and it
             // rests turned round to the stern.
             (
                 name: "Aft Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 240, trajectory: Ballistic, loft: 6,
                 turret_turn: 24, arc: 300, rear: true, mount: true, pivot: (-40.0, 0, 8.8), muzzle: (18.0, 0, 9.2),
-                muzzles: [(18.0, -2.8, 9.2), (18.0, 0, 9.2), (18.0, 2.8, 9.2)], spread: 3.5,
-                targets: ["Land", "Naval", "Structure"], color: Orange, flash: 2.2, shockwave: 2.0,
-                tracer: 0.18, trail: true, wake: 0.7,
-                sounds: (fire: "leviathan_main", impact: "leviathan_shell", ground: "leviathan_shell"),
+                muzzles: [(18.0, -3.4, 9.2), (18.0, 0, 9.2), (18.0, 3.4, 9.2)], spread: 3.5,
+                targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
+                tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 8, discharge: 45,
+                sounds: (fire: "aster_trebuchet_fire", charge: "aster_trebuchet_charge", charge_time: 2.4, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
             ),
             (
                 name: "Light AA",

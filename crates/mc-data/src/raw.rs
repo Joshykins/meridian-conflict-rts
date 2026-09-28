@@ -723,6 +723,10 @@ pub struct RawWeapon {
     /// Blue-white bolts at the muzzle and the impact. Zero (the default) is none.
     #[serde(default)]
     pub bolts: u8,
+    /// Multiplies how long a plasma-sheathed slug's glowing tail is drawn behind it
+    /// (`plasma`). Cosmetic. Zero (the default) is one: the usual short tail.
+    #[serde(default)]
+    pub streak: f64,
     /// An electrically charged shell: where it lands, the charge strikes back up the
     /// last this-many metres of its flight as lightning and forks into the ground round
     /// the hit (the electric bore's look, on a lobbed shell). Cosmetic. Zero: none.
@@ -1265,6 +1269,7 @@ impl Unit {
                 plasma: w.plasma.clamp(0.0, 4.0) as f32,
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
+                streak: w.streak.clamp(0.0, 8.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
                 arc_charge: w.arc_charge.clamp(0.0, 40.0) as f32,
                 great_gun: w.great_gun.clamp(0.0, 4.0) as f32,

@@ -41,12 +41,7 @@ fn main() {
     .unwrap();
     let id = blueprints.id_of("aster_t3_battleship").unwrap();
     let weapon = &blueprints.unit(id).weapons[0];
-    // The Leviathan fires plain shells now; the effect is still drawn at its old reach.
-    let discharge = if weapon.discharge > 0.0 {
-        weapon.discharge
-    } else {
-        40.0
-    };
+    let discharge = weapon.discharge;
     let mut frame = RenderFrame {
         props_dead: vec![0; map.props().len().div_ceil(32)],
         ..Default::default()

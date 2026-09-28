@@ -19,6 +19,7 @@ struct Projectile {
     // Nose this tick and last tick. Zero: the body follows travel.
     // A cold launch pitches these onto the target while the body stays on the lob.
     // aim.w: a missile's body across in metres (`Weapon::caliber`); zero: from `size`.
+    // Any other shot's tail-length multiplier (`Weapon::streak`); zero: one.
     aim: vec4<f32>,
     prev_aim: vec4<f32>,
 }
@@ -249,8 +250,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         trace = length(stride) * 0.75;
         if p.extras.y > 0.0 {
             // Sheathed in plasma (`Weapon::plasma`): a bolt with a tail, the tail a
-            // dozen sheaths long at most, not a tick-long beam (`fs_sprite`).
-            trace = min(trace, p.extras.y * 12.0);
+            // dozen sheaths long at most, not a tick-long beam (`fs_sprite`). A
+            // `Weapon::streak` draws it that many times longer, past the tick.
+            let streak = max(p.aim.w, 1.0);
+            trace = min(trace * streak, p.extras.y * 12.0 * streak);
         }
     }
     if (p.color & RAIL) != 0u {
