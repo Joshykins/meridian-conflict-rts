@@ -4,6 +4,7 @@
 //! hundred), never with the number of entities.
 
 use crate::camera::Camera;
+use crate::gpu_consts::settle;
 use glam::{Vec2, Vec3, Vec4};
 use mc_jobs::{Pool, TaskHandle};
 use mc_map::{FlattenRecord, MapFile, OVERVIEW_STRIDE, TILE_CELLS, TILE_SAMPLES};
@@ -160,8 +161,16 @@ pub struct TileCache {
     index: Vec<u16>,
     layers: Vec<Option<Resident>>,
     loading: Vec<TileLoad>,
-    /// Every terrain edit so far, in order; replayed onto tiles as they stream in.
+    /// Every terrain edit so far, in order. The first `committed` are in the
+    /// tiles (replayed onto them as they stream in) and the overview; the rest
+    /// are still settling, eased in by the shaders from `settling`.
     edits: Vec<FlattenRecord>,
+    committed: usize,
+    /// When each edit arrived, seconds of render time.
+    arrived: Vec<f32>,
+    /// Whether the renderer has seen the sim's edit table yet. The edits already
+    /// there when it first does are the match as it stands, and do not settle.
+    synced: bool,
     /// CPU copy of the overview for cursor picking.
     pub overview: Vec<u16>,
     pub overview_dims: (u32, u32),
@@ -193,6 +202,9 @@ impl TileCache {
             layers: (0..TILE_LAYERS).map(|_| None).collect(),
             loading: Vec::new(),
             edits: Vec::new(),
+            committed: 0,
+            arrived: Vec::new(),
+            synced: false,
             frame: 0,
         }
     }
@@ -220,7 +232,7 @@ impl TileCache {
                 log::error!("failed to read map tile {tile:?}");
                 continue;
             };
-            for e in &self.edits {
+            for e in &self.edits[..self.committed] {
                 patch_tile(&mut samples, tile, e);
             }
             if let Some(layer) = self.take_layer() {
@@ -292,12 +304,22 @@ impl TileCache {
             .map(|(i, _)| i)
     }
 
-    /// Applies terrain edits the renderer has not seen yet. `all` is the sim's
+    /// Takes in terrain edits the renderer has not seen yet. `all` is the sim's
     /// whole edit table; a shorter table than before means a snapshot replaced it.
-    pub fn apply_edits(&mut self, all: &[FlattenRecord], uploads: &mut Vec<TerrainUpload>) {
-        if all.len() < self.edits.len() || all[..self.edits.len()] != self.edits[..] {
+    /// A new edit settles: the ground eases to its level over `settle::SECONDS`
+    /// (`settling`), and only then is it written into the tiles.
+    pub fn apply_edits(
+        &mut self,
+        all: &[FlattenRecord],
+        time: f32,
+        uploads: &mut Vec<TerrainUpload>,
+    ) {
+        let replaced = all.len() < self.edits.len() || all[..self.edits.len()] != self.edits[..];
+        if replaced {
             log::warn!("terrain edit history was replaced; reloading terrain");
             self.edits.clear();
+            self.arrived.clear();
+            self.committed = 0;
             self.overview = self.map.overview().to_vec();
             for l in &mut self.layers {
                 *l = None;
@@ -312,40 +334,92 @@ impl TileCache {
                 sample: 0,
             });
         }
-        for e in &all[self.edits.len()..] {
-            let ((sx0, sy0), (sx1, sy1)) = e.sample_rect();
-            // Overview samples are every fourth full-resolution sample.
-            let (ox0, oy0) = (sx0.div_ceil(OVERVIEW_STRIDE), sy0.div_ceil(OVERVIEW_STRIDE));
-            let (ox1, oy1) = (sx1 / OVERVIEW_STRIDE, sy1 / OVERVIEW_STRIDE);
-            if ox0 <= ox1 && oy0 <= oy1 {
-                for y in oy0..=oy1.min(self.overview_dims.1 - 1) {
-                    for x in ox0..=ox1.min(self.overview_dims.0 - 1) {
-                        self.overview[(y * self.overview_dims.0 + x) as usize] = e.sample;
-                    }
+        // A match joined or restored part way is shown as it stands.
+        let at_once = replaced || !self.synced;
+        self.synced = true;
+        self.edits.extend_from_slice(&all[self.edits.len()..]);
+        self.arrived.resize(self.edits.len(), time);
+        while self.committed < self.edits.len() {
+            let age = time - self.arrived[self.committed];
+            // Past the slots the oldest snap to their level (a cosmetic cap): a
+            // line of lots laid at once still settles, a few at a time.
+            let crowded = self.edits.len() - self.committed > settle::SLOTS as usize;
+            // A clock that went back (a replay seek) must not hold an edit forever.
+            if !(at_once || crowded || age >= settle::SECONDS || age < -1.0) {
+                break;
+            }
+            let e = self.edits[self.committed];
+            self.commit(&e, uploads);
+            self.committed += 1;
+        }
+    }
+
+    /// Writes one edit into the overview and the resident tiles.
+    fn commit(&mut self, e: &FlattenRecord, uploads: &mut Vec<TerrainUpload>) {
+        let ((sx0, sy0), (sx1, sy1)) = e.sample_rect();
+        // Overview samples are every fourth full-resolution sample.
+        let (ox0, oy0) = (sx0.div_ceil(OVERVIEW_STRIDE), sy0.div_ceil(OVERVIEW_STRIDE));
+        let (ox1, oy1) = (sx1 / OVERVIEW_STRIDE, sy1 / OVERVIEW_STRIDE);
+        if ox0 <= ox1 && oy0 <= oy1 {
+            for y in oy0..=oy1.min(self.overview_dims.1 - 1) {
+                for x in ox0..=ox1.min(self.overview_dims.0 - 1) {
+                    self.overview[(y * self.overview_dims.0 + x) as usize] = e.sample;
                 }
-                uploads.push(TerrainUpload::OverviewPatch {
-                    x: ox0,
-                    y: oy0,
-                    w: ox1 - ox0 + 1,
-                    h: oy1 - oy0 + 1,
+            }
+            uploads.push(TerrainUpload::OverviewPatch {
+                x: ox0,
+                y: oy0,
+                w: ox1 - ox0 + 1,
+                h: oy1 - oy0 + 1,
+                sample: e.sample,
+            });
+        }
+        for (layer, r) in self.layers.iter().enumerate() {
+            let Some(r) = r else { continue };
+            if let Some((x, y, w, h)) = tile_overlap(r.tile, e) {
+                uploads.push(TerrainUpload::TilePatch {
+                    layer: layer as u32,
+                    x,
+                    y,
+                    w,
+                    h,
                     sample: e.sample,
                 });
             }
-            for (layer, r) in self.layers.iter().enumerate() {
-                let Some(r) = r else { continue };
-                if let Some((x, y, w, h)) = tile_overlap(r.tile, e) {
-                    uploads.push(TerrainUpload::TilePatch {
-                        layer: layer as u32,
-                        x,
-                        y,
-                        w,
-                        h,
-                        sample: e.sample,
-                    });
-                }
-            }
         }
-        self.edits = all.to_vec();
+    }
+
+    /// The lots still settling, oldest first, for `Globals::settling`: per lot
+    /// the rect it levels in metres (min xy, max xy), then its level in metres
+    /// and how far the ground has eased to it (0..1). Returns how many there are.
+    pub fn settling(&self, time: f32, out: &mut [[f32; 4]]) -> u32 {
+        let info = self.map.info();
+        let (min_z, step) = (info.min_z.to_f32(), info.z_step.to_f32());
+        let cell = mc_map::CELL_SIZE_M as f32;
+        let mut n = 0;
+        for (e, &arrived) in self.edits[self.committed..]
+            .iter()
+            .zip(&self.arrived[self.committed..])
+        {
+            let Some(pair) = out.get_mut(n * 2..n * 2 + 2) else {
+                break;
+            };
+            let ((sx0, sy0), (sx1, sy1)) = e.sample_rect();
+            pair[0] = [
+                sx0 as f32 * cell,
+                sy0 as f32 * cell,
+                sx1 as f32 * cell,
+                sy1 as f32 * cell,
+            ];
+            pair[1] = [
+                min_z + e.sample as f32 * step,
+                settle_ease((time - arrived) / settle::SECONDS),
+                0.0,
+                0.0,
+            ];
+            n += 1;
+        }
+        n as u32
     }
 
     /// Terrain height from the overview, metres. Good enough for the cursor.
@@ -397,6 +471,13 @@ impl TileCache {
         }
         None
     }
+}
+
+/// How far a settling lot has come at `t` of the way through: slow to start,
+/// slower to finish, like earth being moved and then tamped.
+pub fn settle_ease(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 /// Part of `e` that falls inside `tile`, in tile-local sample coordinates.

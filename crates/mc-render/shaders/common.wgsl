@@ -80,6 +80,12 @@ struct Globals {
     // of radius), y scales the LOD thresholds for props, z the smallest a prop casts
     // a shadow at (pixels), w spare.
     detail: vec4<f32>,
+    // Lots settling into the ground (terrain.rs `TileCache::settling`), oldest first:
+    // the rect they level (min xy, max xy metres), then their level in metres and
+    // how far the ground has eased to it, 0..1. Read by `terrain_height`.
+    settling: array<vec4<f32>, SETTLE_SLOTS * 2u>,
+    // x how many of `settling`'s pairs are in use.
+    settle: vec4<f32>,
 }
 
 

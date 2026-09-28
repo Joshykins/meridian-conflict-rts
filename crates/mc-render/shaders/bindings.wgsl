@@ -78,7 +78,18 @@ fn terrain_height(xy: vec2<f32>) -> f32 {
         let uv = (cell / 4.0 + vec2<f32>(0.5)) / dims;
         h = textureSampleLevel(height_overview, clamp_sampler, uv, 0.0).r;
     }
-    return globals.height.x + h * globals.height.y;
+    var z = globals.height.x + h * globals.height.y;
+    // A new structure's lot eases to its level: the tiles keep the old ground
+    // until it is done (terrain.rs `TileCache::apply_edits`).
+    let settling = u32(globals.settle.x);
+    for (var i = 0u; i < settling; i++) {
+        let r = globals.settling[2u * i];
+        if all(p >= r.xy) && all(p <= r.zw) {
+            let s = globals.settling[2u * i + 1u];
+            z = mix(z, s.x, s.y);
+        }
+    }
+    return z;
 }
 
 fn terrain_normal(xy: vec2<f32>, step: f32) -> vec3<f32> {

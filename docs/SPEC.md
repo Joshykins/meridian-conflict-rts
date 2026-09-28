@@ -59,6 +59,7 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 - Maps are baked files, streamed as tiles.
 - Units and projectiles collide with the same terrain the player sees.
 - Placing a structure flattens the ground under it. Nothing else deforms terrain. Craters are stains on the ground, not holes.
+- The flattening is instant in the sim; the renderer eases the ground to its new level over a few seconds, and where the level meets the ground it draws a foundation wall (stone, cosmetic) instead of the ramp the heightfield has there. Units still walk the ramp.
 
 **Game**
 

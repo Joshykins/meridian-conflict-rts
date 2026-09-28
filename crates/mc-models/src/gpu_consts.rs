@@ -197,6 +197,18 @@ shared! {
         pub const FULL: u32 = 4;
     }
 
+    /// A structure's lot settling into the ground, and the foundation walls round
+    /// it (terrain.rs `TileCache`, renderer/foundations.rs, bindings.wgsl
+    /// `terrain_height`, foundations.wgsl).
+    pub mod settle as "SETTLE_" {
+        /// Lots eased toward their level at once (`Globals::settling`, two vec4 each).
+        /// More at a time and the oldest snap to their level.
+        pub const SLOTS: u32 = 24;
+        /// Seconds the ground takes to reach its new level, and a foundation wall
+        /// to rise out of it.
+        pub const SECONDS: f32 = 5.0;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.

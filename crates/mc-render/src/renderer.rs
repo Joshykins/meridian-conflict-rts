@@ -7,7 +7,7 @@
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
-use crate::gpu_consts::{cull_list, lod, pass, sprite_layer};
+use crate::gpu_consts::{cull_list, lod, pass, settle, sprite_layer};
 use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
@@ -42,6 +42,7 @@ mod cull_lists;
 mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
+pub(crate) mod foundations;
 pub(crate) mod grass;
 mod great_gun_fx;
 mod gtao;
@@ -281,6 +282,11 @@ pub(crate) struct Globals {
     pub(crate) climate: [f32; 4],
     /// Prop detail: common.wgsl `Globals::detail`.
     pub(crate) detail: [f32; 4],
+    /// Lots settling into the ground (terrain.rs `TileCache::settling`): rect, then
+    /// level and progress.
+    pub(crate) settling: [[f32; 4]; settle::SLOTS as usize * 2],
+    /// x how many of `settling` are in use.
+    pub(crate) settle: [f32; 4],
 }
 
 /// Lots the build grid shows as taken, at most.
@@ -752,6 +758,8 @@ pub struct Renderer {
     gtao: gtao::Gtao,
     /// Fields of grass round the eye (grass.rs).
     grass: grass::Grass,
+    /// Walls where a structure's lot was levelled into the ground.
+    foundations: foundations::Foundations,
     hull_set: vk::DescriptorSet,
     scene_fb: vk::Framebuffer,
     /// One view and framebuffer per cascade layer of `shadow`.
@@ -1943,6 +1951,8 @@ impl Renderer {
         let gtao = gtao::Gtao::new(&gpu, &globals)?;
         let grass =
             grass::Grass::new(&gpu, layouts.scene_set, passes.scene, &stains, &track_marks)?;
+        let foundations =
+            foundations::Foundations::new(&gpu, &layouts, &passes, scene.map.clone())?;
         write_image(scene_set, 30, gtao.ao_view(), vk::ImageLayout::GENERAL);
         write_buffers(
             scene_set,
@@ -2184,6 +2194,7 @@ impl Renderer {
             quality: SceneQuality::from_env(),
             gtao,
             grass,
+            foundations,
             hull_set,
             present_format,
             width,
@@ -6108,7 +6119,8 @@ impl Renderer {
             self.fog_enabled = !frame.fog.is_empty();
             self.precursor_activity = frame.precursor_activity;
             self.tile_cache
-                .apply_edits(&frame.terrain_edits, &mut self.upload_scratch);
+                .apply_edits(&frame.terrain_edits, input.time, &mut self.upload_scratch);
+            self.foundations.update(&frame.terrain_edits, input.time);
         }
         let ghosts = &input.ghosts[..input.ghosts.len().min(512)];
         self.dynamic.write(
@@ -6232,6 +6244,8 @@ impl Renderer {
             self.tree_blasts.upload(input.time, &camera.frustum());
         let (nukes, strategic, nuke_view) =
             self.nuke_frame(input.time, input.alpha.clamp(0.0, 1.0), camera, view_proj);
+        let mut settling = [[0.0; 4]; settle::SLOTS as usize * 2];
+        let settling_count = self.tile_cache.settling(input.time, &mut settling);
         let globals = Globals {
             view_proj: view_proj.to_cols_array_2d(),
             inv_view_proj: view_proj.inverse().to_cols_array_2d(),
@@ -6299,6 +6313,8 @@ impl Renderer {
                 self.quality.prop_detail[2],
                 0.0,
             ],
+            settling,
+            settle: [settling_count as f32, 0.0, 0.0, 0.0],
         };
         self.globals.write(0, bytemuck::bytes_of(&globals));
         self.last_time = input.time;
@@ -6528,6 +6544,8 @@ impl Renderer {
                     )
                 };
                 draw_terrain(self.pipelines.terrain_shadow, kind);
+                self.foundations
+                    .record(&self.gpu, cmd, self.layouts.scene, kind);
                 draw_entities(
                     self.pipelines.entity_shadow,
                     kind,
@@ -6581,6 +6599,8 @@ impl Renderer {
                     &[],
                 );
                 draw_terrain(self.pipelines.terrain_prepass, pass::MAIN);
+                self.foundations
+                    .record(&self.gpu, cmd, self.layouts.scene, pass::PREPASS);
                 draw_entities(
                     self.pipelines.entity_prepass,
                     pass::PREPASS,
@@ -6637,6 +6657,8 @@ impl Renderer {
             );
             self.timers.draws(&device, cmd, "scene.terrain");
             draw_terrain(self.pipelines.terrain, pass::MAIN);
+            self.foundations
+                .record(&self.gpu, cmd, self.layouts.scene, pass::MAIN);
             self.timers.end(&device, cmd);
 
             self.timers.draws(&device, cmd, "scene.decals");
@@ -7582,6 +7604,7 @@ impl Drop for Renderer {
         self.post.destroy(&self.gpu);
         self.gtao.destroy(&self.gpu);
         self.grass.destroy(&self.gpu);
+        self.foundations.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
         self.cull.destroy(&self.gpu);
