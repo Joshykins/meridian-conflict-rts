@@ -352,6 +352,9 @@ const NAVAL_HULLS: &[&str] = &[
     "frigate",
     "submarine",
     "salvage_boat",
+    "reclaim_boat~a",
+    "reclaim_boat~b",
+    "reclaim_boat~c",
     "destroyer",
     "aa_cruiser",
     "missile_ship",
@@ -737,6 +740,9 @@ fn lods_reduce_and_respect_budgets() {
             4200
         } else if model.key == "assault_tank" {
             ASSAULT_TANK_TRIANGLES
+        } else if model.key.starts_with("reclaim_tower") {
+            // A 4x4 installation, a tower up to 84 m with the plant round its foot.
+            super::aster::reclaim_tower::TRIANGLES
         } else if let Some(budget) = super::naga::triangles(&model.key) {
             budget
         } else if model.key == "light_transport" {
@@ -1943,6 +1949,9 @@ fn complete_air_roster_models_meet_lod_budgets() {
         "air_scout",
         "rotor_gunship",
         "support_air",
+        "support_air~a",
+        "support_air~b",
+        "support_air~c",
         "reclaim_carrier",
         "reclaim_drone",
         "gunship",

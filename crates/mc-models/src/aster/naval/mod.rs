@@ -25,6 +25,7 @@ mod battleship;
 mod carrier;
 mod destroyer;
 mod missile_ship;
+mod reclaim_boat;
 mod salvage_boat;
 mod shield_boat;
 mod submarine_hunter;
@@ -35,6 +36,15 @@ pub(crate) use trimaran::RAIL as NARWHAL_RAIL;
 
 pub(super) fn salvage_boat(b: &mut MeshBuilder, _tech: u8) {
     salvage_boat::build(b);
+}
+pub(super) fn reclaim_boat_a(b: &mut MeshBuilder, _tech: u8) {
+    reclaim_boat::build_a(b);
+}
+pub(super) fn reclaim_boat_b(b: &mut MeshBuilder, _tech: u8) {
+    reclaim_boat::build_b(b);
+}
+pub(super) fn reclaim_boat_c(b: &mut MeshBuilder, _tech: u8) {
+    reclaim_boat::build_c(b);
 }
 pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
     destroyer::build(b);

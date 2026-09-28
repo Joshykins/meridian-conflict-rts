@@ -23,6 +23,7 @@ mod naval;
 pub(crate) use naval::NARWHAL_RAIL;
 mod parts;
 mod reactor;
+pub(super) mod reclaim_tower;
 mod reclaimers;
 mod strategic;
 mod structures;
@@ -32,6 +33,13 @@ mod wall;
 pub(super) mod zenith;
 
 use super::library::ModelDef;
+
+/// The reclaim tower's authored (radius, height) per tier.
+const RECLAIM_TOWER: [(f32, f32); 3] = [
+    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT[0]),
+    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT[1]),
+    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT[2]),
+];
 
 pub(super) const MODELS: &[ModelDef] = &[
     // Command and construction.
@@ -64,6 +72,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("air_scout", 3.5, 1.7, air::scout_air),
     ModelDef::new("rotor_gunship", 5.5, 3.2, air::rotor_gunship),
     ModelDef::new("support_air", 8.0, 3.5, air::support),
+    ModelDef::new("support_air~a", 9.2, 4.0, air::support_a),
+    ModelDef::new("support_air~b", 9.2, 4.0, air::support_b),
+    ModelDef::new("support_air~c", 9.2, 4.0, air::support_c),
     ModelDef::new("reclaim_carrier", 10.0, 4.5, air::carrier),
     ModelDef::new("light_transport", 58.0, 38.0, air::light_transport),
     ModelDef::new("lift_ship", 160.0, 95.0, air::lift_ship),
@@ -95,6 +106,10 @@ pub(super) const MODELS: &[ModelDef] = &[
         naval::sonar,
     ),
     ModelDef::new("salvage_boat", 8.0, 6.0, naval::salvage_boat),
+    // The reclaim boat's open designs, until the user picks one (CLAUDE.md section 9).
+    ModelDef::new("reclaim_boat~a", 8.0, 6.0, naval::reclaim_boat_a),
+    ModelDef::new("reclaim_boat~b", 8.0, 6.0, naval::reclaim_boat_b),
+    ModelDef::new("reclaim_boat~c", 8.0, 6.0, naval::reclaim_boat_c),
     ModelDef::new("destroyer", 22.0, 12.0, naval::destroyer),
     ModelDef::new("aa_cruiser", 22.0, 14.0, naval::aa_cruiser),
     ModelDef::new("missile_ship", 20.0, 10.0, naval::missile_ship),
@@ -164,6 +179,11 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(11.0, 12.0), (11.0, 12.0), (11.0, 14.0)],
         structures::reclaimer,
     ),
+    // The reclaim tower (a 4x4 lot, `reclaim_tower`): design variants until the user picks
+    // (CLAUDE.md section 9). All three share the head rig (`reclaim_tower::PIVOT_Z`, `EMIT_X`).
+    ModelDef::tiered("reclaim_tower~a", RECLAIM_TOWER, reclaim_tower::derrick),
+    ModelDef::tiered("reclaim_tower~b", RECLAIM_TOWER, reclaim_tower::spire),
+    ModelDef::tiered("reclaim_tower~c", RECLAIM_TOWER, reclaim_tower::legs),
     ModelDef::tiered(
         "shield",
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],
