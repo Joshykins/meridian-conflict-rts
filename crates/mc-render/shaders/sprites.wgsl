@@ -30,7 +30,8 @@ struct Effect {
     start: f32,
     // x radius, y lifetime seconds, z kind (0 blue, 1 orange, 2 explosion, 3 construction amber,
     // 4 a reactor going up, 5 a blast sitting on the ground, 6 a missile-defense kill,
-    // 7 a napalm wave: the impact disc, held and rolled for the burn, 8 a red-tracer gun's flash),
+    // 7 a napalm wave: the impact disc, held and rolled for the burn, 8 a red-tracer gun's flash,
+    // EFFECT_MATERIALS a reclaim flare),
     // w shock ring strength or ground-burst colour
     params: vec4<f32>,
 }
@@ -81,6 +82,10 @@ fn weapon_color(kind: u32) -> vec3<f32> {
     if kind == 8u {
         // A red-tracer gun's flash (`Weapon::red`).
         return vec3<f32>(1.0, 0.035, 0.015);
+    }
+    if kind == EFFECT_MATERIALS {
+        // The last of a hull going up a reclaim beam: Materials red-orange.
+        return vec3<f32>(MASS_R, MASS_G, MASS_B);
     }
     if kind == 9u {
         // An ARC rail gun's flash and strike (renderer/rail_fx.rs): white-hot.

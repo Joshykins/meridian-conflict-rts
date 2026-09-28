@@ -36,6 +36,13 @@ const MIN_PIXELS: f32 = 2.5;
 
 const _: () = assert!(CLUSTERS == 13824, "lights.wgsl LIGHT_CLUSTERS");
 
+/// Materials as light (`gpu_consts::mass`, the HUD's red-orange): reclaim's colour.
+const MATERIALS: Vec3 = Vec3::new(
+    crate::gpu_consts::mass::R,
+    crate::gpu_consts::mass::G,
+    crate::gpu_consts::mass::B,
+);
+
 const KIND_POINT: u32 = 0;
 const KIND_SPOT: u32 = 1;
 const KIND_LINE: u32 = 2;
@@ -388,6 +395,7 @@ impl Lights {
             4 => (Vec3::new(1.0, 0.86, 0.7), 60.0, 3.2, Envelope::Blast),
             5 => (Vec3::new(1.0, 0.5, 0.2), 20.0, 3.0, Envelope::Blast),
             6 => (Vec3::new(1.0, 0.72, 0.42), 50.0, 5.0, Envelope::Flash),
+            crate::gpu_consts::effect::MATERIALS => (MATERIALS, 70.0, 7.0, Envelope::Flash),
             // A rail gun (renderer/rail_fx.rs): white-hot.
             9 => (Vec3::new(1.0, 0.95, 0.88), 90.0, 6.0, Envelope::Flash),
             _ => return,
@@ -516,10 +524,20 @@ impl Lights {
                 continue;
             }
             let grip = Vec3::from(b.to) + Vec3::Z * b.height * 0.55;
+            // Repair lights the ground in its teal; reclaim (and salvage riding home on
+            // a relay) in the Materials red-orange of its beam. Every kind used to take
+            // the teal, so a reclaim beam cast a green light.
+            let (color, strength) = if b.kind == mc_sim::repair::BEAM_REPAIR {
+                (Vec3::new(0.18, 0.82, 0.52), 30.0)
+            } else if b.kind == mc_sim::reclaim::BEAM_RELAY {
+                (MATERIALS, 10.0)
+            } else {
+                (MATERIALS, 26.0)
+            };
             self.glows.push(Glow {
                 from: Vec3::from(b.from),
                 to: grip,
-                color: Vec3::new(0.18, 0.82, 0.52) * 30.0,
+                color: color * strength,
                 range: 9.0,
                 line: true,
             });

@@ -2,7 +2,7 @@
 // Work beams. The sim lists who is at work each tick; everything seen here is
 // made from that on the GPU. Reclaim (kind 0): a cone that grips the target
 // and narrows into the emitter, torn-off bits streaming back up it, heating
-// from red through orange to white. Repair (kind 2): the inverse — mint-green
+// from red through the Materials red-orange to white. Repair (kind 2): the inverse — mint-green
 // patches leave the emitter and settle onto the hull. `BEAM_NANITE`, a Naga builder's
 // nanite stream, and `BEAM_NANITE_SITE`, the site it feeds: below. Premultiplied:
 // hot cores only add light; the coloured body also covers what is behind it, or
@@ -32,9 +32,11 @@ const SHAPE_RIBBON: f32 = 0.0;
 const SHAPE_GLOW: f32 = 1.0;
 const SHAPE_BIT: f32 = 2.0;
 
-const WHITE: vec3<f32> = vec3<f32>(1.0, 0.92, 0.78);
-const ORANGE: vec3<f32> = vec3<f32>(1.0, 0.42, 0.07);
-const RED: vec3<f32> = vec3<f32>(0.9, 0.07, 0.02);
+// Reclaim is Materials: the HUD's red-orange (`MASS_*`, gpu_consts.rs) for its body, a
+// hot core just short of white, a deeper red at its edge. Never the construction amber.
+const WHITE: vec3<f32> = vec3<f32>(1.0, 0.84, 0.74);
+const MATERIALS: vec3<f32> = vec3<f32>(MASS_R, MASS_G, MASS_B);
+const RED: vec3<f32> = vec3<f32>(0.85, 0.05, 0.02);
 const MINT: vec3<f32> = vec3<f32>(0.78, 1.0, 0.88);
 const TEAL: vec3<f32> = vec3<f32>(0.18, 0.82, 0.52);
 const DEEP: vec3<f32> = vec3<f32>(0.04, 0.38, 0.26);
@@ -240,7 +242,7 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
         return replicator_fragment(in, n);
     }
     if in.state.x < 0.5 {
-        // Reclaim: white core, orange about it, red to the edge.
+        // Reclaim: hot core, Materials red-orange about it, red to the edge.
         // Repair: mint core, teal body, deep green edge — mass going back in.
         let half_m = max(in.state.z, 0.05);
         let y = abs(in.uv.y) * half_m;
@@ -250,7 +252,7 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
         let body = exp(-y * y / (0.16 * half_m * half_m + 0.06)) * (0.45 + 0.8 * n) * pulse;
         let edge = pow(max(1.0 - abs(in.uv.y), 0.0), 1.5) * (0.35 + 0.65 * n);
         let color = select(
-            WHITE * core * 5.0 + ORANGE * body * 1.3 + RED * edge * 0.8,
+            WHITE * core * 5.0 + MATERIALS * body * 1.5 + RED * edge * 0.8,
             MINT * core * 4.4 + TEAL * body * 1.45 + DEEP * edge * 0.95,
             repair
         );
@@ -263,7 +265,7 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
         }
         let fall = pow(1.0 - d, 2.2);
         let hot = select(
-            mix(mix(RED, ORANGE, fall), WHITE, in.state.y * fall),
+            mix(mix(RED, MATERIALS, fall), WHITE, in.state.y * fall),
             mix(mix(DEEP, TEAL, fall), MINT, in.state.y * fall),
             repair
         );
@@ -279,7 +281,7 @@ fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
     }
     let heat = in.state.y;
     let color = select(
-        mix(mix(RED, ORANGE, smoothstep(0.0, 0.45, heat)), WHITE, smoothstep(0.55, 1.0, heat)),
+        mix(mix(RED, MATERIALS, smoothstep(0.0, 0.45, heat)), WHITE, smoothstep(0.55, 1.0, heat)),
         mix(mix(DEEP, TEAL, smoothstep(0.0, 0.4, heat)), MINT, smoothstep(0.5, 1.0, heat)),
         repair
     );

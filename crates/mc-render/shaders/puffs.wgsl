@@ -690,10 +690,12 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
         return vec4<f32>((brass + light) * alpha, alpha);
     }
     if kind == PUFF_RECLAIM {
-        // White-hot as it tears off, then orange, then a red that fades out.
+        // White-hot as it tears off, then the Materials red-orange (`MASS_*`), then a red
+        // that fades out: the colours of the reclaim beam it rides.
+        let materials = vec3<f32>(MASS_R, MASS_G, MASS_B);
         let heat = select(
-            mix(vec3<f32>(1.0, 0.92, 0.78), vec3<f32>(1.0, 0.42, 0.07), age / 0.35),
-            mix(vec3<f32>(1.0, 0.42, 0.07), vec3<f32>(0.9, 0.07, 0.02), (age - 0.35) / 0.65),
+            mix(vec3<f32>(1.0, 0.84, 0.74), materials, age / 0.35),
+            mix(materials, vec3<f32>(0.85, 0.05, 0.02), (age - 0.35) / 0.65),
             age > 0.35);
         let flicker = 0.75 + 0.25 * sin(age * 40.0 + in.state.z * 30.0);
         let glow = pow(max(1.0 - d, 0.0), 1.6) * (1.0 - age * age) * flicker;
