@@ -587,6 +587,12 @@ impl World {
     /// weapon's pivot. A gun house with a limited arc takes nothing outside it, unless
     /// it is on a ship: a ship turns its hull to bring its guns to bear.
     pub(crate) fn in_arc(&self, shooter: usize, target: usize, weapon: &Weapon) -> bool {
+        self.bears_on(shooter, self.state.units.pos[target], weapon)
+    }
+
+    /// Whether the point `at` lies inside the arc of `weapon` on `shooter` ([`Self::in_arc`]):
+    /// a unit or a point on the ground its orders name alike.
+    fn bears_on(&self, shooter: usize, at: FxVec2, weapon: &Weapon) -> bool {
         if weapon.half_arc >= 0x8000 || !weapon.mount {
             return true;
         }
@@ -604,7 +610,7 @@ impl World {
                 .pivot
                 .map_or(FxVec2::ZERO, |p| p.xy())
                 .rotate(heading);
-        let to = units.pos[target] - from;
+        let to = at - from;
         if to == FxVec2::ZERO {
             return true;
         }
@@ -694,6 +700,12 @@ impl World {
         } else {
             centre
         };
+        // A gun house takes a point on the ground only inside its arc, as it does a unit
+        // (`is_valid_target`): one on a capital ship's far flank would shoot through its
+        // own hull.
+        if !self.bears_on(row, pos, weapon) {
+            return None;
+        }
         Some(Mark {
             unit: None,
             pos,
@@ -1628,7 +1640,9 @@ impl World {
                 // `want` is off the weapon's facing; the turret's yaw is off the nose.
                 in_arc && yaw == want + base
             } else {
-                (units.heading[row] + yaw).delta_to(bearing).unsigned_abs() <= AIM_TOLERANCE
+                // Held at the end of its traverse, it is not on a mark just beyond it.
+                in_arc
+                    && (units.heading[row] + yaw).delta_to(bearing).unsigned_abs() <= AIM_TOLERANCE
             }
         };
 
@@ -1805,18 +1819,24 @@ impl World {
         };
         // Twin barrels of the same gun take turns. The later one waits half a
         // reload whenever the earlier one fires and it is ready, so they do
-        // not dump both shots on the same tick after sitting idle.
+        // not dump both shots on the same tick after sitting idle. Guns of one name
+        // that cover other arcs (a capital ship's turrets on the bow, the stern and
+        // each flank) are separate guns: held back, one on the far side of the hull
+        // would sit through a charge it can never fire.
         if units.weapon_salvo_left[row][w] == 0 {
             let stagger = weapon.reload_ticks / 2 + 1;
             if stagger > 1 {
-                let twin = weapon.name.clone();
                 let later: Vec<usize> = bp
                     .unit(units.blueprint[row])
                     .weapons
                     .iter()
                     .enumerate()
                     .skip(w + 1)
-                    .filter(|(_, other)| other.name == twin)
+                    .filter(|(_, other)| {
+                        other.name == weapon.name
+                            && other.facing == weapon.facing
+                            && other.half_arc == weapon.half_arc
+                    })
                     .map(|(i, _)| i)
                     .collect();
                 for i in later {

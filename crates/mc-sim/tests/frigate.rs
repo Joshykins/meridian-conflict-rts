@@ -112,7 +112,7 @@ fn the_spinal_rail_hits_land_units_far_past_the_turrets() {
     let mut w = world();
     let _ship = add(&mut w, FRIGATE, 0, 3000, 3000, 90);
     settle(&mut w);
-    // A super-heavy tank off the beam, 2.3 km out: well past the turrets' 800 m.
+    // A super-heavy tank off the beam, 2.3 km out: well past the turrets' 1600 m.
     let tank = add(&mut w, "aster_t4_assault_tank", 1, 5300, 3000, 180);
     let row = w.state.units.row(tank).unwrap();
     w.state.units.fire_state[row] = FireState::HoldFire;
@@ -611,5 +611,66 @@ fn it_lands_only_when_told_to_and_cannot_lay_the_spinal_on_the_ground() {
         height(&w, ship) > 100.0,
         "given a move, it only rose to {} m",
         height(&w, ship)
+    );
+}
+
+/// Which of the frigate's weapons charged, and which fired, over `secs` after it is
+/// ordered onto the ground at `spot`: bit `w` for weapon `w`.
+fn ground_fire(spot: (i32, i32), secs: u32) -> (u32, u32) {
+    let mut w = world();
+    let ship = add(&mut w, FRIGATE, 0, 3000, 3000, 0);
+    settle(&mut w);
+    let (mut charged, mut fired) = (0u32, 0u32);
+    let command = Command::AttackGround {
+        units: vec![ship],
+        pos: FxVec2::from_ints(spot.0, spot.1),
+        queue: false,
+    };
+    let mut commands = vec![PlayerCommand { player: 0, command }];
+    for _ in 0..seconds(secs) {
+        w.tick(&std::mem::take(&mut commands)).unwrap();
+        for e in &w.events {
+            match e {
+                SimEvent::WeaponCharging { weapon, .. } => charged |= 1 << weapon,
+                SimEvent::ShotFired { weapon, .. } => fired |= 1 << weapon,
+                _ => {}
+            }
+        }
+    }
+    (charged, fired)
+}
+
+#[test]
+fn a_flank_turret_leaves_ground_across_the_hull_alone() {
+    // Weapons 3 and 4: the port (+y) and starboard flank houses. A point off the port
+    // bow, close in under the ship where the hull stays level: the port house takes it,
+    // the starboard one would shoot through the hull, so it neither charges nor fires.
+    let (port, starboard) = (1 << 3, 1 << 4);
+    let (charged, fired) = ground_fire((3500, 3300), 20);
+    assert!(
+        fired & port != 0,
+        "the port house left a mark on its own side"
+    );
+    assert!(
+        (charged | fired) & starboard == 0,
+        "the starboard house charged or fired across the hull"
+    );
+    // And the other way about.
+    let (charged, fired) = ground_fire((3500, 2700), 20);
+    assert!(
+        fired & starboard != 0,
+        "the starboard house left a mark on its own side"
+    );
+    assert!(
+        (charged | fired) & port == 0,
+        "the port house charged or fired across the hull"
+    );
+    // A far mark the hull turns and dives onto lies dead ahead, just inside the keel line
+    // from either flank house: the chin turret has it, and neither fires across the nose.
+    let (charged, fired) = ground_fire((4200, 3200), 20);
+    assert!(fired & 1 << 1 != 0, "the chin turret left the mark ahead");
+    assert!(
+        (charged | fired) & (port | starboard) == 0,
+        "a flank house fired across the nose: charged {charged:b}, fired {fired:b}"
     );
 }
