@@ -30,6 +30,7 @@ mod gannet;
 mod kestrel;
 pub(crate) mod osprey;
 mod peregrine;
+mod petrel;
 mod raptor;
 mod shrike;
 
@@ -97,151 +98,9 @@ pub(crate) fn interceptor(b: &mut MeshBuilder, _tech: u8) {
     shrike::build(b);
 }
 
-/// Broad straight wing, enclosed nose, twin nacelles and an eight-bomb belly rack.
+/// The Petrel: swept-wing tech 1 bomber with nacelles through the wings and an open bay ([`petrel`]).
 pub(crate) fn bomber(b: &mut MeshBuilder, _tech: u8) {
-    if b.coarse() {
-        b.paint(PLATING);
-        b.frustum_open(
-            v3(-0.1, 0.0, 1.1),
-            v2(8.8, 1.9),
-            v2(5.6, 1.1),
-            1.2,
-            v2(-0.4, 0.0),
-        );
-        b.mirror_y(|b| {
-            b.face(&[
-                v3(1.45, 0.8, 1.34),
-                v3(0.95, 5.0, 1.34),
-                v3(-1.35, 5.0, 1.34),
-                v3(-1.65, 0.8, 1.34),
-            ]);
-            b.face(&[
-                v3(-4.5, 0.65, 1.25),
-                v3(-2.8, 0.65, 1.25),
-                v3(-4.5, 0.65, 2.55),
-            ]);
-        });
-        b.paint(TEAM);
-        b.face(&[
-            v3(-1.5, -0.4, 2.3),
-            v3(0.3, -0.4, 2.3),
-            v3(0.3, 0.4, 2.3),
-            v3(-1.5, 0.4, 2.3),
-        ]);
-        b.paint(METAL);
-        b.cuboid_open(v3(0.6, 0.0, 0.42), v3(2.3, 2.25, 0.1));
-        return;
-    }
-    let plan = [
-        [4.1, -0.42],
-        [4.1, 0.42],
-        [2.55, 0.88],
-        [-2.85, 1.0],
-        [-4.55, 0.5],
-        [-4.55, -0.5],
-        [-2.85, -1.0],
-        [2.55, -0.88],
-    ];
-    b.paint(PLATING_DARK);
-    b.loft_z(&plan, &[Section::new(0.32, 0.8), Section::new(1.0, 1.0)]);
-    b.paint(PLATING);
-    b.loft_z(
-        &plan,
-        &[
-            Section::new(1.0, 1.0),
-            Section::scaled(1.9, 0.86, 0.8),
-            Section::scaled(2.22, 0.61, 0.5).shifted(-0.15, 0.0),
-        ],
-    );
-    b.mirror_y(|b| {
-        wing(
-            b,
-            &[
-                [1.45, 0.8],
-                [1.25, 4.65],
-                [0.95, 5.0],
-                [-1.35, 5.0],
-                [-1.65, 0.8],
-            ],
-            1.1,
-            0.24,
-        );
-        wing(
-            b,
-            &[[-3.05, 0.5], [-3.25, 2.05], [-4.4, 2.05], [-4.4, 0.5]],
-            1.22,
-            0.14,
-        );
-        b.paint(PLATING);
-        b.extrude_y(
-            &[[-4.4, 1.25], [-2.8, 1.25], [-3.85, 2.55], [-4.5, 2.55]],
-            0.55,
-            0.73,
-        );
-        if b.fine() {
-            b.paint(PLATING_DARK);
-            b.extrude_z(
-                &[[-0.85, 2.9], [-0.7, 4.78], [-1.18, 4.78], [-1.38, 2.9]],
-                1.345,
-                1.38,
-            );
-            b.paint(TEAM);
-            b.extrude_z(
-                &[[0.8, 3.3], [0.8, 4.2], [0.3, 4.2], [0.3, 3.3]],
-                1.35,
-                1.39,
-            );
-            // Armoured nacelles: black intake forward, nozzle aft.
-            b.paint(PLATING_DARK);
-            b.cylinder_between(
-                v3(-2.3, 2.35, 0.95),
-                v3(1.3, 2.35, 0.95),
-                0.43,
-                0.36,
-                b.sides(8),
-            );
-            b.paint(PLATING);
-            b.beam(
-                v3(-1.85, 2.35, 1.23),
-                v3(1.12, 2.35, 1.23),
-                v2(0.66, 0.17),
-                v2(0.55, 0.17),
-            );
-            b.paint(ACCENT);
-            b.cylinder_between(v3(1.31, 2.35, 0.95), v3(1.33, 2.35, 0.95), 0.28, 0.28, 6);
-            b.paint(METAL);
-            b.cylinder_between(
-                v3(-2.25, 2.35, 0.95),
-                v3(-2.65, 2.35, 0.95),
-                0.34,
-                0.27,
-                b.sides(8),
-            );
-            b.paint(ACCENT);
-            b.cylinder_between(v3(-2.65, 2.35, 0.95), v3(-2.67, 2.35, 0.95), 0.22, 0.22, 6);
-        } else {
-            b.paint(PLATING_DARK);
-            b.cylinder_between(v3(-2.68, 2.35, 0.95), v3(1.3, 2.35, 0.95), 0.33, 0.36, 4);
-        }
-    });
-    team_panel(b, v3(-0.75, 0.0, 2.23), v2(1.85, 0.72));
-    b.paint(ACCENT);
-    b.cuboid_open(v3(0.6, 0.0, 0.52), v3(2.8, 2.5, 0.18));
-    if b.fine() {
-        for x in [1.4, -0.2] {
-            for y in [-1.05, -0.35, 0.35, 1.05] {
-                b.paint(METAL);
-                b.cylinder_between(v3(x - 0.3, y, 0.42), v3(x + 0.3, y, 0.42), 0.1, 0.1, 6);
-                if b.fine() {
-                    b.paint(PLATING_DARK);
-                    b.cuboid(v3(x - 0.23, y, 0.42), v3(0.15, 0.27, 0.035));
-                }
-            }
-        }
-    } else {
-        b.paint(METAL);
-        b.cuboid_open(v3(0.6, 0.0, 0.42), v3(2.3, 2.25, 0.1));
-    }
+    petrel::build(b);
 }
 
 // Shared detailing; each airframe below defines its own planform and equipment.
