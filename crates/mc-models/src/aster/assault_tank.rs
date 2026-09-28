@@ -351,11 +351,17 @@ fn engine_deck(b: &mut MeshBuilder) {
     if b.fine() {
         b.paint(PLATING).pattern(pattern::TEAM_BAND);
         b.plate(v3(-16.2, 0.0, ENGINE_DECK), v2(0.8, 6.0), 0.08, 0.03);
-        // Exhaust stacks at the tail corners, dark and hot inside.
+        // Exhaust stacks at the tail corners: a dark stack, a raised lip round its mouth
+        // and the fire breathing through a grille in it, the hot air shimmering over it.
         b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.cylinder_between(v3(-16.2, 5.2, 7.0), v3(-16.6, 5.6, 9.6), 0.55, 0.5, 8);
-            b.add_exhaust(v3(-16.6, 5.6, 9.6), v3(-0.4, 0.4, 2.6), 0.5);
+            b.chamfered_box(v3(-16.3, 5.4, 8.3), v3(1.2, 1.2, 2.6), 0.2);
+            b.paint(PLATING_DARK);
+            b.block(v3(-16.95, 4.75, 9.6), v3(-15.65, 6.05, 9.78));
+            b.paint(ACCENT).pattern(pattern::FURNACE);
+            b.plate(v3(-16.3, 5.4, 9.78), v2(0.95, 0.95), 0.04, 0.01);
+            b.pattern(pattern::PLAIN);
+            b.add_exhaust(v3(-16.3, 5.4, 9.82), v3(-0.3, 0.3, 2.6), 0.5);
         });
     }
     aa_gun(b);

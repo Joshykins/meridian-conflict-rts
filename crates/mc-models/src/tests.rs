@@ -669,8 +669,8 @@ const BATTLESHIP_TRIANGLES: usize = 10000;
 const CORE_MINE_TRIANGLES: usize = 9000;
 /// The tech 4 assault tank runs on four open track units (road wheels, toothed
 /// sprockets, return rollers seen through the side) and carries two bolt rifles and the
-/// capacitor-fed AEB-2.
-const ASSAULT_TANK_TRIANGLES: usize = 8800;
+/// capacitor-fed AEB-2, and grilled exhaust stacks.
+const ASSAULT_TANK_TRIANGLES: usize = 9000;
 
 /// Models already over the rules below when they were last checked (2026-09-28),
 /// held where they are so they cannot grow further: its coarse level's triangles,

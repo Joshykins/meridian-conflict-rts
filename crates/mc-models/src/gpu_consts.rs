@@ -358,7 +358,7 @@ shared! {
         /// Past this many metres from the eye a plume is not looked at.
         pub const REACH_M: f32 = 700.0;
         /// The most a plume shifts the scene, output pixels.
-        pub const MAX_PX: f32 = 2.5;
+        pub const MAX_PX: f32 = 4.0;
     }
 
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
