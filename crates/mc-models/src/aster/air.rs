@@ -323,6 +323,17 @@ pub(crate) fn rotor_gunship(b: &mut MeshBuilder, _: u8) {
 pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
     argus::build(b);
 }
+/// Argus design variants (`support_air~a/b/c`): the reclaim head, sonar, shield and
+/// laser layouts on offer, until one is picked.
+pub(crate) fn support_a(b: &mut MeshBuilder, _: u8) {
+    argus::build_a(b);
+}
+pub(crate) fn support_b(b: &mut MeshBuilder, _: u8) {
+    argus::build_b(b);
+}
+pub(crate) fn support_c(b: &mut MeshBuilder, _: u8) {
+    argus::build_c(b);
+}
 /// The Osprey: the tech 2 reclaim carrier, four ducted lift fans and a drone hold ([`osprey`]).
 pub(crate) fn carrier(b: &mut MeshBuilder, _: u8) {
     osprey::build(b);
