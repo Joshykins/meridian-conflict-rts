@@ -258,3 +258,16 @@ In addition:
   for picks by letter (e.g. "tank B, scout A"), not one unit per round.
 - Once a variant is chosen it becomes the mesh and the other `~` keys are
   deleted before the unit is committed (section 2: no parked code).
+
+## 10. Every finished request leaves a check task for the user
+
+- When a request is done (landed, or answered if it changed nothing in game),
+  add a task to josh-os with `mcp__josh-os__create_task`: focus **Meridian
+  RTS** (`trackId` `9307e1c1-9014-4c0b-a1b1-86deeb20e7f7`), `pile` `queue`,
+  `process` `claude-code meridian`.
+- The title says what to look at in game ("Check: Fulgur heat sinks aft of
+  the turret"). The description says what changed and the commit. The steps
+  say how to see it: the map or scene, the units to spawn, the keys to press,
+  the camera angle, what right and wrong look like.
+- One task per request, not per commit. A request that changed nothing you
+  can see in game (a doc, a refactor, a tool) gets no task.
