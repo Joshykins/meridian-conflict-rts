@@ -7,15 +7,36 @@ A rule marked **[gate]** is checked by `scripts/check.sh`, which runs rustfmt,
 clippy with warnings as errors, and the tests. A rule without the mark is
 followed by hand and in review.
 
-## 1. Work lands in commits, and many sessions share this tree
+## 1. Work lands in commits, and many sessions share `dev`
 
-Several Claude sessions usually work in this checkout at the same time, each on
-its own task. They share one working tree, one index and one `dev` branch, which
-keeps builds warm and the Windows GPU build pointed at one place. The rules
-below exist so that no session ever loses, commits or rewrites another
-session's work.
+Several Claude sessions usually work at the same time, each on its own task,
+and all of them land on one `dev` branch. The rules below exist so that no
+session ever loses, commits or rewrites another session's work, and so that no
+session waits on another's build.
 
-**Commit your own work, and only your own work.**
+**Work in a worktree of your own.**
+- A task that edits code or takes shots starts with
+  `scripts/worktree.sh start <topic>` and works in the directory it prints:
+  your own branch, your own build dirs (Windows and WSL) and your own shot
+  server. Another session's half-done edit never breaks your build, and your
+  shots never queue behind their builds. A new worktree's first builds are
+  cold (about 5 minutes for the Windows game build, more for the first
+  `scripts/check.sh`), so keep one worktree for the whole task rather than
+  making a new one per change; after that builds are incremental.
+- Commit there as you go; plain git is fine inside your own worktree, since no
+  one else's files are in it. Land small and often, every unit and every fix:
+  `scripts/worktree.sh land` rebases onto `dev`, runs `scripts/check.sh` and
+  fast-forwards `dev`. Keep working in the same worktree afterwards, and run
+  `scripts/worktree.sh finish` when the task is done.
+- The main checkout (the `meridian-conflict` directory, on `dev`) is where
+  landings happen, so keep it clean: `git merge --ff-only` refuses to update a
+  file someone is editing there. A small edit made directly in it (a doc, a
+  data value) follows the shared-tree rules below.
+- Before landing a broad change (a rename, a move, a lint sweep), tell the busy
+  sessions (`ListAgents`): their worktrees will conflict on rebase. Formatting-
+  only changes (rustfmt runs, renames) go in commits of their own.
+
+**In the shared main checkout, commit your own work and only your own work.**
 - Keep a list of every file you create, edit or delete, and commit when a piece
   of work is done and verified: `scripts/commit.sh -m "message" <your paths>`.
   It commits exactly those paths, retries while another session holds the git
@@ -58,28 +79,6 @@ session's work.
   session straight away.
 - A commit that is known to break the build or the tests does not stay on
   `dev`: fix it forward within the hour, and say so in the message.
-
-**Broad or long work goes in a worktree.**
-- A change that touches many files at once goes on a worktree and branch of
-  its own, with its own target dir:
-  - reformatting
-  - renames or moving modules
-  - lint sweeps
-  - a refactor that takes hours
-
-  Create it with `git worktree add ../mc-<topic> -b <topic> dev`, then link
-  the baked maps in with `ln -s $PWD/maps/*.mcmap ../mc-<topic>/maps/`.
-- To land it:
-  1. Rebase onto `dev` inside the worktree.
-  2. Run `scripts/check.sh` there.
-  3. Fast-forward `dev` from the shared tree: `git merge --ff-only <topic>`.
-
-  Git refuses the merge, and changes nothing, if a file it would update has
-  uncommitted edits in the shared tree. If that happens, ask the session that
-  owns those edits to commit them, then rebase again.
-- Say so to the busy sessions (`ListAgents`) before you land a broad change:
-  their open files change under them.
-- Formatting-only changes (rustfmt runs, renames) go in commits of their own.
 
 ## 2. No dead code, no parked code
 

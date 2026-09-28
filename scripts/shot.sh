@@ -283,7 +283,7 @@ t0=$(date +%s%N)
     if [[ -n $changed ]]; then
         touch "$built_stamp.next"
         log="$bin_dir/build-$$.log"
-        if ! powershell.exe -NoProfile -Command "\$env:CARGO_TARGET_DIR='$target_win'; Set-Location '$repo_win'; cargo build --profile shot -p mc-game *> '$(wslpath -w "$log")'; exit \$LASTEXITCODE"; then
+        if ! powershell.exe -NoProfile -Command "Set-Location '$repo_win'; cargo build --profile shot -p mc-game --target-dir '$target_win' *> '$(wslpath -w "$log")'; exit \$LASTEXITCODE"; then
             tr -d '\r' < "$log" | grep -v '^\s*Compiling' | tail -60 >&2
             rm -f "$log" "$built_stamp.next"
             echo "shot.sh: build failed" >&2

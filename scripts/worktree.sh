@@ -16,8 +16,8 @@
 #                                     worktree, its branch and its build dirs
 #
 # Land small and often (every unit, every fix): a branch that lives for hours
-# collects conflicts. Builds in a new worktree share compiled dependencies
-# through sccache when it is installed (scripts/check.sh and shot.sh use it).
+# collects conflicts. A new worktree's first builds are cold (about 5 minutes
+# for the Windows game build), so keep one worktree for a whole task.
 set -euo pipefail
 
 main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
