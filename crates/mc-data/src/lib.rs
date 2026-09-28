@@ -1044,6 +1044,19 @@ impl Blueprints {
                 }
             }
         }
+        // Reclaiming takes no energy, not even a tower's (the user's rule): a unit that
+        // reclaims, itself or with drones, draws upkeep only for a powered system it
+        // also carries (the Argus's radar, sonar and field).
+        for u in &units {
+            let salvage = u.reclaimer.is_some() || u.drone.is_some();
+            let powered = u.radar > Fx::ZERO || u.sonar > Fx::ZERO || u.shield.is_some();
+            if salvage && u.economy.energy_upkeep > Fx::ZERO && !powered {
+                return Err(DataError::Invalid(format!(
+                    "{}: reclaiming takes no energy, so it draws no upkeep",
+                    u.key
+                )));
+            }
+        }
         // A drone is rebuilt for time alone: its parent is often the side's first salvage,
         // built while every bit of mass is spoken for, so nothing it makes may wait on mass
         // or energy (`mc_sim::air_support`).

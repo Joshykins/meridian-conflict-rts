@@ -160,6 +160,15 @@ impl World {
         owner == theirs || (self.are_enemies(owner, theirs) && self.detects(owner, t))
     }
 
+    /// Whether `player` has nowhere to put salvage, so reclaimers leave wrecks alone. A
+    /// side that builds for free (the test range) never waits for room, as `drain_wreck`
+    /// never does for it: its full store once left every idle tower aimed and dark.
+    /// Energy never matters: reclaim takes none, even in a stall.
+    pub(crate) fn no_room_for_salvage(&self, player: u8) -> bool {
+        let p = &self.state.players[player as usize];
+        !p.free_build && p.mass >= p.mass_capacity
+    }
+
     /// One tick of pulling mass out of a wreck. True once there is none left.
     /// A wreck gives up no more than its owner-to-be has room to store: what does
     /// not fit stays in the wreck for later, never lost.
@@ -361,8 +370,7 @@ impl World {
             return Ok(());
         }
         let (pos, owner) = (units.pos[row], units.owner[row]);
-        let player = &self.state.players[owner as usize];
-        if player.mass >= player.mass_capacity {
+        if self.no_room_for_salvage(owner) {
             return Ok(());
         }
         if bp.reclaimer.is_some() {

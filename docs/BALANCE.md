@@ -115,6 +115,10 @@ replacing the mines.
   itself in well under a minute of beam time on a wreck field, so it is a real income next to the
   mines. Its reach is far past an engineer's walk. A reclaimer's `power` is the whole unit's,
   split across the heads working that tick.
+- Reclaiming takes no energy, not even a tower's: no reclaimer draws upkeep for it, and an
+  energy stall never stops or slows it (checked on load; the Argus's upkeep is for its radar,
+  sonar, lasers and field). Only a full mass store holds reclaim back, and never on a side
+  that builds for free (the test range).
 
   | Unit | Tier | Mass | Power | Reach | Payback (beam) |
   | --- | --- | --- | --- | --- | --- |

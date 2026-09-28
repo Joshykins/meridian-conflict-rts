@@ -86,8 +86,8 @@
  motion: (layer: Air, size: 0, speed: 92, accel: 40, turn: 64, altitude: 220, hover: false),
  weapons: [], mesh: "support_air", icon: Intel,
  sounds: (death: "blast_small", moving: "aster_jet"), radar: 2800, sonar: 900, anti_missile: 450, anti_missile_lasers: 2,
- // Radar, sonar, the lasers, the salvage ray and its own small field all run off the reactor.
- economy: (energy_upkeep: 120),
+ // Radar, sonar, the lasers and its own small field draw energy; the salvage ray takes none.
+ economy: (energy_upkeep: 100),
  shield: (kind: Hull, health: 1200, regen: 20),
  // The laser heads on the wingtip pods (`models/aster/air/argus.rs`).
  anti_missile_mounts: [(-2.53, 9.03, 2.39), (-2.53, -9.03, 2.39)],
@@ -111,7 +111,7 @@
   (kind: Point, at: (-3.5, -6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
   (kind: Point, at: (0, 0, 0.3), color: (1.0, 0.72, 0.12), intensity: 40, range: 12),
  ],
- sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 600, economy: (energy_upkeep: 12),
+ sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 600,
  // In the hold, two abreast and two deep, on cradles 0.7 m up (the model's `CRADLES`).
  // Opening the hold drops them 1.9 m, clear of the door leaves.
  drone_sockets: [(-1.5, 1.3, 0.7), (-1.5, -1.3, 0.7), (1.5, 1.3, 0.7), (1.5, -1.3, 0.7)], drone_drop: 1.9,

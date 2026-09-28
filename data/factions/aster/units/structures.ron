@@ -496,7 +496,6 @@
         cost: (mass: 120, energy: 900, time: 240),
         radius: 22.5, height: 42, footprint: (4, 4),
         vision: 400,
-        economy: (energy_upkeep: 6),
         reclaimer: (power: 6, range: 640, charge: 3.0, heads: [
             (pivot: (0, 0, 36.5), emitter: (11.0, 0, 36.5), turn: 14, pitch: (-55, 80)),
         ]),
@@ -514,7 +513,6 @@
         cost: (mass: 420, energy: 3200, time: 800),
         radius: 22.5, height: 60, footprint: (4, 4),
         vision: 600,
-        economy: (energy_upkeep: 30),
         reclaimer: (power: 40, range: 1100, charge: 2.4, heads: [
             (pivot: (0, 0, 53.5), emitter: (13.0, 0, 53.5), turn: 18, pitch: (-55, 80)),
         ]),
@@ -532,7 +530,6 @@
         cost: (mass: 1700, energy: 10200, time: 1600),
         radius: 22.5, height: 84, footprint: (4, 4),
         vision: 900,
-        economy: (energy_upkeep: 120),
         // Five times the tech 2 tower's pull, half as far again: it clears a battlefield.
         reclaimer: (power: 200, range: 1700, charge: 1.6, heads: [
             (pivot: (0, 0, 76.0), emitter: (15.5, 0, 76.0), turn: 24, pitch: (-55, 80)),

@@ -213,3 +213,80 @@ fn a_tower_head_pitches_down_at_a_wreck_below_it() {
         "the head looks down from 36 m at 50 m: {pitch}"
     );
 }
+
+/// Reclaiming takes no energy, even a tower's: in a stall, with nothing in the store and
+/// a factory going up that asks for more than comes in, the tower pulls a steep wreck at
+/// its foot and a far one at full power.
+#[test]
+fn a_tower_reclaims_near_and_far_wrecks_through_an_energy_stall() {
+    let mut w = world();
+    let tower = add(&mut w, "aster_t1_reclaimer", 900, 900);
+    assert_eq!(w.bp(tower).economy.energy_upkeep, Fx::ZERO);
+    add(&mut w, "aster_mass_storage", 300, 300);
+    let engineer = add(&mut w, "aster_t1_engineer", 400, 400);
+    let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let id = w.state.units.id(engineer);
+    tick(
+        &mut w,
+        &[PlayerCommand {
+            player: 0,
+            command: Command::Build {
+                units: vec![id],
+                blueprint: factory,
+                pos: FxVec2::from_ints(460, 460),
+                heading: Angle::ZERO,
+                queue: false,
+            },
+        }],
+    );
+    // 48 m off, from a head 36 m up: well below level. And one far across the reach.
+    let near = wreck(&mut w, 948, 900, 60);
+    let far = wreck(&mut w, 900, 1450, 60);
+    let mut stalled = 0;
+    for _ in 0..1200 {
+        w.state.players[0].energy = Fx::ZERO;
+        tick(&mut w, &[]);
+        let p = &w.state.players[0];
+        if p.energy_demand > p.energy_income {
+            stalled += 1;
+        }
+        if !w.state.wrecks.slots.is_alive(near) && !w.state.wrecks.slots.is_alive(far) {
+            break;
+        }
+    }
+    assert!(
+        stalled > 100,
+        "the side was stalled on energy ({stalled} ticks)"
+    );
+    assert!(
+        !w.state.wrecks.slots.is_alive(near),
+        "the steep near wreck was taken"
+    );
+    assert!(
+        !w.state.wrecks.slots.is_alive(far),
+        "the far wreck was taken"
+    );
+}
+
+/// A side that builds for free (the test range) never runs out of room: its full store
+/// once left every idle tower aimed at its wreck and dark.
+#[test]
+fn a_free_building_side_with_a_full_store_still_reclaims() {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    let tower = add(&mut w, "aster_t1_reclaimer", 900, 900);
+    let near = wreck(&mut w, 948, 900, 60);
+    let mut beam = false;
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+        w.state.players[0].mass = w.state.players[0].mass_capacity;
+        beam |= w
+            .state
+            .units
+            .has_flag(tower, mc_sim::tables::flag::RECLAIMING);
+        if !w.state.wrecks.slots.is_alive(near) {
+            break;
+        }
+    }
+    assert!(beam && !w.state.wrecks.slots.is_alive(near));
+}

@@ -96,8 +96,7 @@ impl World {
             let heading = self.state.units.heading[parent];
             let reach = self.bp(parent).drone_radius;
             let owner = self.state.units.owner[parent];
-            let full = self.state.players[owner as usize].mass
-                >= self.state.players[owner as usize].mass_capacity;
+            let full = self.no_room_for_salvage(owner);
             for (slot, row) in children.iter().copied().enumerate() {
                 let dock = self.drone_socket(parent, slot);
                 let pos = self.state.units.pos[row];
@@ -223,8 +222,7 @@ impl World {
         let center = self.state.units.pos[row];
         let reach = self.bp(row).drone_radius;
         let owner = self.state.units.owner[row];
-        let player = &self.state.players[owner as usize];
-        if player.mass >= player.mass_capacity {
+        if self.no_room_for_salvage(owner) {
             return false;
         }
         self.state.wrecks.slots.iter().any(|w| {
