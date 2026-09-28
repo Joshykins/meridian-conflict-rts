@@ -227,25 +227,16 @@
         economy: (energy_upkeep: 60),
         motion: (layer: Naval, size: 3, speed: 22, accel: 8, turn: 34),
         weapons: [
-            // Vertical-launch cells forward of the bridge: the motor lights in the cell, the
-            // missile leaves straight up and arcs over onto its mark at once.
+            // A Tempest-style array forward of the bridge: sixteen cells rippled off in one
+            // volley, each missile straight up and arcing over onto its mark.
             (
-                name: "Vertical-Launch SAM",
-                damage: 400, splash: 6, range: 750, reload: 2.0, speed: 420, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (6.0, -2.0, 6.4),
-                muzzles: [(6.0, -2.0, 6.4), (6.0, 2.0, 6.4), (4.0, -2.0, 6.4), (4.0, 2.0, 6.4)],
+                name: "Vertical Missile Array",
+                damage: 110, splash: 5, range: 650, reload: 4, speed: 380, trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (7.25, -2.25, 6.4),
+                muzzles: [(7.25, -2.25, 6.4), (7.25, -0.75, 6.4), (7.25, 0.75, 6.4), (7.25, 2.25, 6.4), (5.75, -2.25, 6.4), (5.75, -0.75, 6.4), (5.75, 0.75, 6.4), (5.75, 2.25, 6.4), (4.25, -2.25, 6.4), (4.25, -0.75, 6.4), (4.25, 0.75, 6.4), (4.25, 2.25, 6.4), (2.75, -2.25, 6.4), (2.75, -0.75, 6.4), (2.75, 0.75, 6.4), (2.75, 2.25, 6.4)],
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
-                intercept: 30, proximity: 8, trail: true,
+                intercept: 20, proximity: 7, salvo: 16, salvo_delay: 0.1, trail: true,
                 sounds: (fire: "missile_launch", impact: "shell_light"),
-            ),
-            // Twin flak on the deckhouse, in a house of its own.
-            (
-                name: "Twin Flak",
-                damage: 200, splash: 30, range: 480, reload: 0.8, speed: 330, trajectory: Direct,
-                turret_turn: 200, mount: true, pivot: (-4.0, 0, 9.6), muzzle: (-1.6, 0.4, 9.8),
-                muzzles: [(-1.6, -0.4, 9.8), (-1.6, 0.4, 9.8)],
-                targets: ["Air"], color: Orange, flak: true, proximity: 12, casings: 2.2,
-                sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
             // One gun forward, for what comes close.
             (

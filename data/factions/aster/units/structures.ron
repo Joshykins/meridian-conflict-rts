@@ -609,12 +609,15 @@
  turret_turn: 240, muzzle: (5.5, 0, 6), pivot: (0, 0, 6), targets: ["Air"], color: Orange, spin_up: 0.4, rounds: 8, tracer: 0.7, casings: 4.5,
  sounds: (fire: "aster_minigun", impact: "shell_light"), )], mesh: "aa_gun", icon: AntiAir, sounds: (death: "blast_large")),
 
-(key: "aster_t2_aa", name: "Tempest", role: "AA Missile Array", tech: 2, categories: ["Land", "Naval", "Defense", "AntiAir"],
+(key: "aster_t2_aa", name: "Tempest", role: "Flak Battery", tech: 2, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 5515, cost: (mass: 520, energy: 4680, time: 1560), radius: 10, height: 8, footprint: (2, 2),
  vision: 450, radar: 650, water_build: true,
- weapons: [(name: "Vertical Missile Array", damage: 74, range: 480, reload: 4, speed: 350, trajectory: Direct,
- turret_turn: 240, muzzle: (-3, -3, 6.75),
- muzzles: [(-3, -3, 6.75), (-3, -1, 6.75), (-3, 1, 6.75), (-3, 3, 6.75), (-1, -3, 6.75), (-1, -1, 6.75), (-1, 1, 6.75), (-1, 3, 6.75), (1, -3, 6.75), (1, -1, 6.75), (1, 1, 6.75), (1, 3, 6.75), (3, -3, 6.75), (3, -1, 6.75), (3, 1, 6.75), (3, 3, 6.75)], targets: ["Air"], color: Orange, sounds: (fire: "missile_launch", impact: "shell_light"), missile: true, intercept: 20, guided: true, vertical_launch: true, proximity: 7, salvo: 16, salvo_delay: 0.1, splash: 5, trail: true,)], mesh: "aa_array", icon: AntiAir, sounds: (death: "blast_large")),
+ // A heavy twin gun: both barrels fire at once and their shells scatter, so each shot
+ // lays two bursts a little apart across the flight.
+ weapons: [(name: "Heavy Twin Flak", damage: 230, range: 480, reload: 1.5, speed: 360, trajectory: Direct,
+ turret_turn: 160, muzzle: (9, -0.7, 5), pivot: (1.6, 0, 5), muzzles: [(9, -0.7, 5), (9, 0.7, 5)],
+ salvo: 2, salvo_batch: 2, spread: 2.5, targets: ["Air"], color: Orange, flak: true, proximity: 12, splash: 40,
+ flash: 1.6, impact: 1.5, sounds: (fire: "flak_gun", impact: "flak_burst"), )], mesh: "flak_battery", icon: AntiAir, sounds: (death: "blast_large")),
 (key: "aster_t3_sam", name: "Skyguard", role: "Long Range SAM", tech: 3, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 10800, cost: (mass: 1500, energy: 15000, time: 4500), radius: 12, height: 14, footprint: (2, 2),
  vision: 450, radar: 1500, water_build: true,

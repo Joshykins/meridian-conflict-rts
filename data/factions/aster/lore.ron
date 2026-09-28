@@ -9,7 +9,7 @@
             "Vulcan Machine Gun": "A rotary gun on the right forearm, kept through every refit.",
             "Breach Cannon": "A heavy shell gun bolted over the Vulcan when the fight comes close.",
             "Meridian Rail Cannon": "The breach cannon's mount rebuilt around a pair of rails.",
-            "AA Flak Cannon": "A four-tube flak drum on the shoulder, its shells timed to burst among aircraft.",
+            "AA Flak Cannon": "A twin flak gun on the shoulder. Both barrels fire at once and the shells drift apart, timed to burst among aircraft.",
             "Shoulder Howitzer": "A short tube on the shoulder that lobs shells past the front.",
         },
     ),
@@ -323,10 +323,9 @@
         },
     ),
     "aster_t2_aa_cruiser": (
-        lore: "A wide, flat hull built round a radar. Its laser burns missiles out of the air and its cells put missiles up to meet aircraft. Nothing on it touches a submarine.",
+        lore: "A wide, flat hull built round a radar. Its laser burns missiles out of the air and its sixteen cells put a whole ripple of missiles up to meet aircraft. Nothing on it touches a submarine.",
         weapons: {
-            "Vertical-Launch SAM": "Cells forward of the bridge. The missiles leave straight up and curve onto their marks.",
-            "Twin Flak": "Flak on the deckhouse for what gets through the missiles.",
+            "Vertical Missile Array": "Sixteen cells forward of the bridge, fired as one ripple. The missiles leave straight up and curve onto their marks.",
             "Deck Gun": "One gun forward, for what comes close.",
         },
     ),
@@ -409,9 +408,9 @@
         },
     ),
     "aster_t2_aa": (
-        lore: "A sixteen-missile vertical array sharing its warhead with the Squall's flak.",
+        lore: "A dug-in heavy flak gun, the Squall's big sister, laid by radar and a rangefinder.",
         weapons: {
-            "Vertical Missile Array": "Launches a full ripple to answer tech-two aircraft in one volley.",
+            "Heavy Twin Flak": "Two long barrels fired together; the shells drift apart and burst side by side across a flight.",
         },
     ),
     "aster_t3_sam": (

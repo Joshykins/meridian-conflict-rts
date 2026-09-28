@@ -80,7 +80,7 @@ sea after a battle pays for the battle.
 | Barracuda | 1 | Attack submarine | Torpedoes, sonar. |
 | Trawler | 1 | Salvage boat | A mobile salvage ray on a folding mast; deploys to work. |
 | Marlin | 2 | Destroyer | Long twin rail guns (1000 m, a small battleship), torpedo tubes, sonar, interceptor tubes, light AA. |
-| Manta | 2 | Air-defence cruiser | Vertical-launch SAMs, flak, radar, missile interception, one light gun. |
+| Manta | 2 | Air-defence cruiser | A Tempest-style 16-cell vertical missile array fired as one ripple, radar, missile interception, one light gun. |
 | Swordfish | 2 | Cruise-missile ship | Eight sea skimmers per salvo. No other weapon. |
 | Moray | 2 | Hunter-killer submarine | Six guided torpedo tubes, sonar; a deck gun that only works surfaced. |
 | Nautilus | 2 | Shield boat | A bubble over the fleet. Unarmed. |

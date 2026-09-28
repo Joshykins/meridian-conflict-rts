@@ -69,7 +69,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("strategic_bomber", 16.0, 4.5, air::strategic),
     ModelDef::new("assault_air", 12.0, 5.5, air::assault),
     ModelDef::new("aa_gun", 6.0, 7.0, aa::gun),
-    ModelDef::new("aa_array", 10.0, 8.0, aa::array),
+    ModelDef::new("flak_battery", 10.0, 8.0, aa::flak_battery),
     ModelDef::new("aa_sam", 12.0, 14.0, aa::sam),
     ModelDef::tiered(
         "mobile_aa",

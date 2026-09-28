@@ -29,7 +29,7 @@ Incendiary bombs spread across consecutive releases and inflict six seconds of b
 | Tier | Structure | Mobile AA |
 | --- | --- | --- |
 | 1 | Sparrow: single-barrel rapid AA gun | Gnat: tracked AA gun |
-| 2 | Tempest: 16-missile vertical volley | Squall: conventional flak |
+| 2 | Tempest: heavy twin flak, two scattered shells a shot | Squall: conventional flak |
 | 3 | Skyguard: slow, long-range high-damage SAM | |
 
 All three AA structures accept land and water, with floating bases at the water surface; occupancy and cliff restrictions still apply. Mobile AA remains land-based.
@@ -119,7 +119,7 @@ Tracking with T follows the aircraft's interpolated altitude.
 Exhaust is emitted at every zoom level and has reduced opacity. Particle type
 IDs use flat interpolation so contrails cannot become emissive plasma particles.
 AA missiles turn more firmly toward their intercept and leave white smoke.
-Flak (`flak: true`; the Squall, the Manta's and Atoll's Twin Flak, the Behemoth's Heavy Twin Flak, the Fulgur's Heavy Flak and the commander's AA Flak Cannon) is a slow shell (320-380 m/s) on two fuses. The proximity fuse sets it off beside a hull; the timed fuse bursts it where it was laid, the lead on the aircraft (`mc-sim/src/flak.rs`), so a near miss still catches the flight in its 30-48 m splash. In flight it is a small hot round with a thin smoke wake. The burst (renderer/flak_fx.rs) is a quick knot of burning gas (blast_fx `fireball`), the charge burning on for a moment inside a hard-edged black puff (puff kind 39, puffs.wgsl `flak_smoke`) that hangs on the wind for about five seconds, a sphere of hot shrapnel streaks (puff kind 37) flung out to the edge of the splash, and burning scraps falling away trailing thin smoke. The gun's report is a tongue of flame and a ring of powder smoke punched out round the muzzle. The Shatter and the Sunder (rail flak) were removed on 2026-09-27.
+Flak (`flak: true`; the Squall, the Tempest's Heavy Twin Flak, the Atoll's Twin Flak, the Behemoth's Heavy Twin Flak, the Fulgur's Heavy Flak and the commander's AA Flak Cannon) is a slow shell (320-380 m/s) on two fuses. The proximity fuse sets it off beside a hull; the timed fuse bursts it where it was laid, the lead on the aircraft (`mc-sim/src/flak.rs`), so a near miss still catches the flight in its 30-48 m splash. In flight it is a small hot round with a thin smoke wake. The burst (renderer/flak_fx.rs) is a quick knot of burning gas (blast_fx `fireball`), the charge burning on for a moment inside a hard-edged black puff (puff kind 39, puffs.wgsl `flak_smoke`) that hangs on the wind for about five seconds, a sphere of hot shrapnel streaks (puff kind 37) flung out to the edge of the splash, and burning scraps falling away trailing thin smoke. The gun's report is a tongue of flame and a ring of powder smoke punched out round the muzzle. The Tempest and the commander fire both barrels on the same tick (`salvo: 2, salvo_batch: 2`) with a few degrees of `spread`, so each shot lays two bursts apart across a flight. The Shatter and the Sunder (rail flak) were removed on 2026-09-27.
 
 Thunderhead has 4,700 hull health, wider wings, no rockets, and forward-only
 weapons. Its rotary cannon has four-degree spread, bright conventional tracers,

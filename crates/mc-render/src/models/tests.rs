@@ -189,10 +189,22 @@ const BLUEPRINTS: &[Blueprint] = &[
         14.0,
         2,
         &[
-            [6.0, -2.0, 6.4],
-            [6.0, 2.0, 6.4],
-            [4.0, -2.0, 6.4],
-            [4.0, 2.0, 6.4],
+            [7.25, -2.25, 6.4],
+            [7.25, -0.75, 6.4],
+            [7.25, 0.75, 6.4],
+            [7.25, 2.25, 6.4],
+            [5.75, -2.25, 6.4],
+            [5.75, -0.75, 6.4],
+            [5.75, 0.75, 6.4],
+            [5.75, 2.25, 6.4],
+            [4.25, -2.25, 6.4],
+            [4.25, -0.75, 6.4],
+            [4.25, 0.75, 6.4],
+            [4.25, 2.25, 6.4],
+            [2.75, -2.25, 6.4],
+            [2.75, -0.75, 6.4],
+            [2.75, 0.75, 6.4],
+            [2.75, 2.25, 6.4],
         ],
     ),
     hull_unit(
@@ -1941,7 +1953,7 @@ fn complete_air_roster_models_meet_lod_budgets() {
         "strategic_bomber",
         "assault_air",
         "aa_gun",
-        "aa_array",
+        "flak_battery",
         "aa_sam",
         "mobile_aa",
         "factory_air",
@@ -2014,30 +2026,6 @@ fn skyguard_lods_keep_the_fixed_silo() {
         full >= mid && mid >= coarse && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0,
         "aa_sam lod triangles {full}/{mid}/{coarse}"
     );
-}
-
-#[test]
-fn tempest_lods_keep_sixteen_fixed_cell_mouths() {
-    let model = build_model("aa_array").unwrap();
-    for (level, lod) in model.lods.iter().enumerate() {
-        let mouths: Vec<_> = lod
-            .indices
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .filter(|t| {
-                t.iter().all(|&i| {
-                    let v = &lod.vertices[i as usize];
-                    v.material == material::ACCENT && (v.pos[2] - 6.75).abs() < 0.01
-                })
-            })
-            .collect();
-        assert_eq!(mouths.len(), 32, "LOD{level} must show all 16 cell mouths");
-        assert!(
-            lod.vertices.iter().all(|v| v.part == part::HULL),
-            "fixed launch cells must not track turret yaw"
-        );
-    }
 }
 
 #[test]
@@ -2809,19 +2797,30 @@ fn marlin_and_manta_hulls() {
             "aa_cruiser",
             22.0,
             14.0,
-            &[(1, [-4.0, 0.0, 9.6]), (2, [14.5, 0.0, 5.4])],
+            &[(1, [14.5, 0.0, 5.4])],
             &[
                 (
                     "cells",
                     &[
-                        [6.0, -2.0, 6.4],
-                        [6.0, 2.0, 6.4],
-                        [4.0, -2.0, 6.4],
-                        [4.0, 2.0, 6.4],
+                        [7.25, -2.25, 6.4],
+                        [7.25, -0.75, 6.4],
+                        [7.25, 0.75, 6.4],
+                        [7.25, 2.25, 6.4],
+                        [5.75, -2.25, 6.4],
+                        [5.75, -0.75, 6.4],
+                        [5.75, 0.75, 6.4],
+                        [5.75, 2.25, 6.4],
+                        [4.25, -2.25, 6.4],
+                        [4.25, -0.75, 6.4],
+                        [4.25, 0.75, 6.4],
+                        [4.25, 2.25, 6.4],
+                        [2.75, -2.25, 6.4],
+                        [2.75, -0.75, 6.4],
+                        [2.75, 0.75, 6.4],
+                        [2.75, 2.25, 6.4],
                     ],
                     true,
                 ),
-                ("flak", &[[-1.6, -0.4, 9.8], [-1.6, 0.4, 9.8]], false),
                 ("deck gun", &[[19.5, 0.0, 5.4]], false),
             ],
         ),

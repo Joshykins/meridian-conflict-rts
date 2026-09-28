@@ -5,13 +5,13 @@
 //! face behind a lit blue seam, the search radar turning on top, and an
 //! interceptor laser head (red-banded, `pd_laser`) off its front face, a second
 //! on a post on the quarterdeck. Forward of the
-//! bridge a raised vertical-launch deck with four cell hatches (dark lids in
-//! blue-lit rims); the deck gun in its own house on the foredeck ahead of it;
-//! the twin flak in a house on the deckhouse roof, firing over a bridge kept low
-//! for it. Decoy launchers, low side exhausts and a working quarterdeck aft.
+//! bridge a raised launch deck with a Tempest-style array of sixteen cell hatches,
+//! four by four (dark lids in blue-lit rims), rippled off in one volley; the deck
+//! gun in its own house on the foredeck ahead of it. Decoy launchers, low side
+//! exhausts and a working quarterdeck aft.
 //!
-//! Houses: 1 twin flak at (-4, 0, 9.6); 2 deck gun at (14.5, 0, 5.4).
-//! Fixed: 0 vertical-launch cells at (6 / 4, ±2, 6.4), the hatches.
+//! Houses: 1 deck gun at (14.5, 0, 5.4).
+//! Fixed: 0 vertical-launch cells at (7.25..2.75, ±0.75 / ±2.25, 6.4), the hatches.
 use super::*;
 
 /// Stern first: a broad flat run, the chine well inside the flared knuckle.
@@ -26,18 +26,25 @@ const HULL: [Station; 8] = [
     station(21.8, 1.4, [1.8, 0.0], [2.6, 0.0], [3.9, 0.0]),
 ];
 
-/// The cell hatches (weapon 0's muzzles, as in the unit file).
-const CELLS: [[f32; 3]; 4] = [
-    [6.0, -2.0, 6.4],
-    [6.0, 2.0, 6.4],
-    [4.0, -2.0, 6.4],
-    [4.0, 2.0, 6.4],
-];
+/// The cell hatches (weapon 0's muzzles, as in the unit file): four rows of four,
+/// bow first, 1.5 m apart.
+const CELLS: [[f32; 3]; 16] = {
+    let mut cells = [[0.0; 3]; 16];
+    let mut i = 0;
+    while i < 16 {
+        cells[i] = [
+            7.25 - CELL_PITCH * (i / 4) as f32,
+            -2.25 + CELL_PITCH * (i % 4) as f32,
+            6.4,
+        ];
+        i += 1;
+    }
+    cells
+};
+/// Between neighbouring hatches, both ways.
+const CELL_PITCH: f32 = 1.5;
 /// The launch deck's top, under the hatches.
 const CELL_DECK: f32 = 6.3;
-/// The flak house's pivot, and where its barrels end (y ±0.4).
-const FLAK: Vec3 = Vec3::new(-4.0, 0.0, 9.6);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-1.6, 0.4, 9.8);
 /// The deck gun's pivot and muzzle.
 const GUN: Vec3 = Vec3::new(14.5, 0.0, 5.4);
 const GUN_MUZZLE: Vec3 = Vec3::new(19.5, 0.0, 5.4);
@@ -72,7 +79,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
     // The launch deck: a faceted raised block forward of the bridge, its hatches on top.
     let cells = chamfered_rect(v2(3.0, 3.5), 0.55);
     let cells_at = v3(5.0, 0.0, 0.0);
-    // Deckhouse: the long faceted block the bridge, the flak and the tower stand on.
+    // Deckhouse: the long faceted block the bridge and the tower stand on.
     let house = chamfered_rect(v2(7.5, 3.7), 1.1);
     let house_at = v3(-5.5, 0.0, 0.0);
     // Bridge: pointed, low, the screen all round.
@@ -109,14 +116,18 @@ pub(super) fn build(b: &mut MeshBuilder) {
             RADAR.z - TOWER_FOOT,
             v2(0.0, 0.0),
         );
-        team_panel(b, v3(5.0, 0.0, CELL_DECK), v2(2.6, 1.6));
+        team_panel(b, v3(-4.0, 0.0, TOWER_FOOT), v2(2.6, 1.6));
         b.paint(PLATING_DARK);
-        for [x, y, z] in CELLS {
+        // One dark strip down each row of four hatches: the grid reads within the
+        // coarse budget.
+        let h = CELL_PITCH * 0.36;
+        for [x, _, z] in CELLS.iter().step_by(4) {
+            let y = CELL_PITCH * 1.5 + h;
             b.face(&[
-                v3(x - 0.7, y - 0.7, z),
-                v3(x + 0.7, y - 0.7, z),
-                v3(x + 0.7, y + 0.7, z),
-                v3(x - 0.7, y + 0.7, z),
+                v3(x - h, -y, *z),
+                v3(x + h, -y, *z),
+                v3(x + h, y, *z),
+                v3(x - h, y, *z),
             ]);
         }
     } else {
@@ -135,18 +146,20 @@ pub(super) fn build(b: &mut MeshBuilder) {
         // The hatches: a lit rim showing round a dark lid.
         for [x, y, z] in CELLS {
             b.paint(ACCENT);
-            b.plate(v3(x, y, CELL_DECK), v2(1.7, 1.7), 0.05, 0.02);
-            b.paint(GLOW);
-            b.plate(v3(x, y, CELL_DECK + 0.05), v2(1.52, 1.52), 0.03, 0.01);
+            b.plate(v3(x, y, CELL_DECK), v2(1.32, 1.32), 0.05, 0.02);
+            if b.fine() {
+                b.paint(GLOW);
+                b.plate(v3(x, y, CELL_DECK + 0.05), v2(1.18, 1.18), 0.03, 0.01);
+            }
             b.paint(PLATING_DARK);
             b.plate(
                 v3(x, y, CELL_DECK + 0.08),
-                v2(1.36, 1.36),
+                v2(1.04, 1.04),
                 z - CELL_DECK - 0.08,
                 0.03,
             );
         }
-        team_panel(b, v3(5.0, 0.0, CELL_DECK), v2(2.6, 1.6));
+        team_panel(b, v3(-4.0, 0.0, TOWER_FOOT), v2(2.6, 1.6));
         b.at(house_at, |b| {
             b.paint(ACCENT);
             b.loft_z(&house, &[Section::new(2.55, 1.02), Section::new(3.1, 1.02)]);
@@ -280,59 +293,6 @@ pub(super) fn build(b: &mut MeshBuilder) {
         }
     });
 
-    // The flak tub on the deckhouse roof, its house turning on the collar.
-    if b.mid() {
-        b.paint(PLATING);
-        b.at(v3(FLAK.x, 0.0, 0.0), |b| {
-            b.loft_z(
-                &ngon(b.sides(8), 1.35),
-                &[
-                    Section::new(TOWER_FOOT - 0.05, 1.0),
-                    Section::new(8.85, 0.9),
-                ],
-            );
-        });
-        b.paint(ACCENT);
-        b.at(v3(FLAK.x, 0.0, 0.0), |b| {
-            b.loft_z(
-                &ngon(b.sides(8), 1.35),
-                &[Section::new(8.75, 0.94), Section::new(9.0, 0.94)],
-            );
-        });
-    }
-    b.with_house(1, FLAK, 0.3, |b| {
-        if b.coarse() {
-            return;
-        }
-        let (x, z) = (FLAK.x, FLAK_MUZZLE.z);
-        b.paint(METAL);
-        b.prism(v3(x, 0.0, 9.02), b.sides(8), 0.9, 0.85, 0.12);
-        b.paint(PLATING);
-        b.at(v3(x - 0.15, 0.0, 0.0), |b| {
-            b.loft_z(
-                &chamfered_rect(v2(0.85, 0.7), 0.28),
-                &[
-                    Section::new(9.14, 1.0),
-                    Section::new(9.7, 1.0),
-                    Section::scaled(10.0, 0.78, 0.8).shifted(-0.1, 0.0),
-                ],
-            );
-        });
-        b.with_recoil(|b| {
-            for y in [-FLAK_MUZZLE.y, FLAK_MUZZLE.y] {
-                gun_tube(b, v3(x + 0.5, y, z), v3(FLAK_MUZZLE.x, y, z), 0.07);
-            }
-        });
-        if b.fine() {
-            // Ammunition drums each side, the tracker on top with its lit window.
-            b.paint(ACCENT);
-            b.mirror_y(|b| b.block(v3(x - 0.75, 0.66, 9.2), v3(x + 0.25, 0.9, 9.75)));
-            b.block(v3(x - 0.2, -0.14, 9.95), v3(x + 0.25, 0.14, 10.17));
-            b.paint(GLOW);
-            b.block(v3(x + 0.25, -0.1, 10.0), v3(x + 0.28, 0.1, 10.13));
-        }
-    });
-
     // The deck gun forward of the cells: a dark ring, a faceted gunhouse, one long rifle.
     if !b.coarse() {
         b.paint(ACCENT);
@@ -344,7 +304,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
             0.22,
         );
     }
-    b.with_house(2, GUN, 0.6, |b| {
+    b.with_house(1, GUN, 0.6, |b| {
         if b.coarse() {
             return;
         }

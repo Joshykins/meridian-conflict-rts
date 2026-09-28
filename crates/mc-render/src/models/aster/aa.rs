@@ -1,5 +1,6 @@
 //! Amphibious emplacements and tracked AA share recognisable weapon assemblies.
 use super::parts::*;
+mod flak_battery;
 mod gnat;
 mod squall;
 use crate::models::builder::MeshBuilder;
@@ -95,53 +96,9 @@ pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
     b.prism(v3(0.0, 0.0, 1.0), b.sides(8), 1.5, 1.2, 4.3);
     mount(b, 6.0);
 }
-pub(super) fn array(b: &mut MeshBuilder, _: u8) {
-    if b.fine() {
-        platform(b, 9.5);
-    } else {
-        b.paint(PLATING_DARK);
-        if b.coarse() {
-            b.decal(v3(0.0, 0.0, 1.3), v2(16.15, 16.15));
-        } else {
-            b.cuboid_open(v3(0.0, 0.0, 0.7), v3(16.15, 16.15, 1.2));
-        }
-        if b.mid() {
-            b.mirror_y(|b| {
-                b.paint(PLATING);
-                b.cuboid_open(v3(0.0, 5.89, 1.1), v3(14.25, 3.325, 2.0));
-            });
-        }
-    }
-    b.paint(PLATING);
-    b.frustum(
-        v3(0.0, 0.0, 1.0),
-        v2(11.0, 11.0),
-        v2(9.0, 9.0),
-        4.7,
-        v2(0.0, 0.0),
-    );
-    if !b.fine() {
-        b.paint(METAL);
-        b.cuboid_open(v3(0.0, 0.0, 6.2), v3(7.6, 7.6, 1.0));
-    }
-    for x in [-3.0, -1.0, 1.0, 3.0] {
-        for y in [-3.0, -1.0, 1.0, 3.0] {
-            if b.fine() {
-                b.paint(METAL);
-                b.cuboid(v3(x, y, 6.2), v3(1.6, 1.6, 1.0));
-            }
-            b.paint(ACCENT);
-            // Flat mouths keep the 4x4 grid readable within the coarse budget.
-            let z = 6.75;
-            b.face(&[
-                v3(x - 0.55, y - 0.55, z),
-                v3(x + 0.55, y - 0.55, z),
-                v3(x + 0.55, y + 0.55, z),
-                v3(x - 0.55, y + 0.55, z),
-            ]);
-        }
-    }
-    team_panel(b, v3(-6.0, 0.0, 2.2), v2(1.5, 5.0));
+/// Tempest: the tech 2 flak battery.
+pub(super) fn flak_battery(b: &mut MeshBuilder, _: u8) {
+    flak_battery::build(b);
 }
 pub(super) fn sam(b: &mut MeshBuilder, _: u8) {
     if !b.fine() {

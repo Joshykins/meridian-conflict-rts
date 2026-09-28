@@ -11,10 +11,25 @@ use std::path::Path;
 use std::sync::Arc;
 
 fn world() -> World {
+    world_on(Heightfield::flat(256, 256, Fx::from_int(20)))
+}
+
+/// Open sea 30 m deep.
+fn sea() -> World {
+    world_on(Heightfield::from_samples(
+        256,
+        256,
+        vec![0; 257 * 257],
+        Fx::from_int(-30),
+        Fx::ONE,
+        Fx::ZERO,
+    ))
+}
+
+fn world_on(terrain: Heightfield) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
-    let terrain = Heightfield::flat(256, 256, Fx::from_int(20));
     let map = MapData {
         name: "range".into(),
         content_id: 1,
@@ -695,9 +710,9 @@ fn redesigned_factory_beams_leave_the_visible_assembly_heads() {
 }
 
 #[test]
-fn tempest_uses_all_fixed_tubes_and_curves_while_accelerating() {
-    let mut w = world();
-    let aa = add(&mut w, "aster_t2_aa", 0, 600, 900);
+fn manta_ripples_all_sixteen_cells_and_curves_while_accelerating() {
+    let mut w = sea();
+    let aa = add(&mut w, "aster_t2_aa_cruiser", 0, 600, 900);
     let target = add(&mut w, "aster_t2_reclaim_carrier", 1, 950, 1050);
     w.state.units.flags[target] |= flag::PASSIVE | flag::INVULNERABLE;
     w.state.units.heading[aa] = Angle::from_degrees(37);
@@ -741,16 +756,57 @@ fn tempest_uses_all_fixed_tubes_and_curves_while_accelerating() {
     assert_eq!(mouths.len(), 16);
     for (i, (x, y)) in mouths.iter().enumerate() {
         assert!(
-            (*x - (-3.0 + 2.0 * (i / 4) as f32)).abs() < 0.02,
+            (*x - (7.25 - 1.5 * (i / 4) as f32)).abs() < 0.02,
             "{mouths:?}"
         );
         assert!(
-            (*y - (-3.0 + 2.0 * (i % 4) as f32)).abs() < 0.02,
+            (*y - (-2.25 + 1.5 * (i % 4) as f32)).abs() < 0.02,
             "{mouths:?}"
         );
     }
     assert!(speeds[&1] < speeds[&5] && speeds[&5] < speeds[&11]);
     assert!((speeds[&11] - cruise).abs() < Fx::ratio(1, 100));
+}
+
+#[test]
+fn twin_flak_fires_both_barrels_at_once_and_the_shells_drift_apart() {
+    let mut w = world();
+    let aa = add(&mut w, "aster_t2_aa", 0, 600, 900);
+    let target = add(&mut w, "aster_t2_reclaim_carrier", 1, 900, 1000);
+    w.state.units.flags[target] |= flag::PASSIVE | flag::INVULNERABLE;
+    let bp = w.state.units.blueprint[aa];
+    assert!(w.blueprints.unit(bp).weapons[0].flak);
+    let mut volley = Vec::new();
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        volley = w
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                SimEvent::ShotFired {
+                    pos,
+                    blueprint,
+                    vel,
+                    ..
+                } if *blueprint == bp => Some((*pos, *vel)),
+                _ => None,
+            })
+            .collect();
+        if !volley.is_empty() {
+            break;
+        }
+    }
+    assert_eq!(volley.len(), 2, "both barrels fire on the same tick");
+    let [(p0, v0), (p1, v1)] = [volley[0], volley[1]];
+    assert!(
+        (p0 - p1).length() > Fx::ONE,
+        "one shell from each barrel: {p0:?} {p1:?}"
+    );
+    // The two leave a few degrees apart, so ten ticks out they are metres apart.
+    let (d0, d1) = (v0.normalize(), v1.normalize());
+    assert!(d0.dot(d1) < Fx::ratio(9999, 10000), "{v0:?} {v1:?}");
+    let spread = ((p0 + v0 * Fx::from_int(10)) - (p1 + v1 * Fx::from_int(10))).length();
+    assert!(spread > Fx::from_int(3), "{spread:?}");
 }
 
 #[test]
