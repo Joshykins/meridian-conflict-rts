@@ -84,7 +84,7 @@
                         remount: [(weapon: "Vulcan Machine Gun", muzzle: (6.24, -6.64, 14.96))],
                         weapons: [(
                             name: "Meridian Rail Cannon",
-                            damage: 950, splash: 12, range: 430, reload: 2.4, speed: 1200, rail: true, trajectory: Direct,
+                            damage: 950, splash: 12, range: 780, reload: 2.4, speed: 1200, rail: true, trajectory: Direct,
                             turret_turn: 110, muzzle: (12.48, -4.8, 15.52), pivot: (-0.48, -4.8, 15.68),
                             targets: ["Land", "Naval"], color: Orange, flash: 3.6, impact: 4.5, shockwave: 1.3,
                             // It charges before it fires, arcs crawling its rails as every rail
