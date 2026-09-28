@@ -119,16 +119,17 @@ fn push(defense: &str, attacker: &str, count: usize) -> Push {
 #[test]
 fn a_citadel_breaks_a_paladin_push_that_a_bastion_cannot() {
     let citadel = push(CITADEL, "aster_t3_assault_bot", 2);
-    let bastion = push("aster_t2_point_defense", "aster_t3_assault_bot", 1);
+    // At 780 m a Bastion holds off one Paladin; the same pair of them takes it.
+    let bastion = push("aster_t2_point_defense", "aster_t3_assault_bot", 2);
     assert!(
         citadel.stands && citadel.left == 0,
         "the Citadel fell to two Paladins ({} left, {} s)",
         citadel.left,
         citadel.seconds
     );
-    assert!(!bastion.stands, "a Bastion held a Paladin");
-    // Not a wall: three Paladins, about its own mass, take it.
-    assert!(!push(CITADEL, "aster_t3_assault_bot", 3).stands);
+    assert!(!bastion.stands, "a Bastion held two Paladins");
+    // Not a wall: at 1500 m it holds three Paladins (about its own mass), but four take it.
+    assert!(!push(CITADEL, "aster_t3_assault_bot", 4).stands);
 }
 
 /// Every slug kills a light tank outright and most of it is wasted, so a swarm does
