@@ -522,9 +522,9 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     let half_w = max(e.radius * 1.35 * px, 22.0);
     let show_build = mark.work >= 0.0;
     let show_shield = mark.shield >= 0.0;
-    let health_h = 8.0;
-    let shield_h = 4.5;
-    let build_h = 6.5;
+    let health_h = 10.0;
+    let shield_h = 6.0;
+    let build_h = 9.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
     let down = select(0.0, build_h + gap, show_build);
@@ -546,20 +546,23 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     return out;
 }
 
-fn bar_fill(uv: vec2<f32>, fill: f32, color: vec3<f32>) -> vec4<f32> {
+// `per_px`: how far uv.x moves per screen pixel; `h`: the row's height in pixels.
+// The frame is a pixel and a half on every side, however wide the hull.
+fn bar_fill(uv: vec2<f32>, fill: f32, color: vec3<f32>, per_px: f32, h: f32) -> vec4<f32> {
     let ax = abs(uv.x);
     let ay = abs(uv.y);
     if ax > 1.0 || ay > 1.0 {
         return vec4<f32>(0.0);
     }
-    // Heavy black frame so the line reads on snow, grass and rock.
-    if ax > 0.965 || ay > 0.70 {
-        return vec4<f32>(0.0, 0.0, 0.0, 0.95);
+    // A thin black frame so the line reads on snow, grass and rock.
+    if ax > 1.0 - 1.5 * per_px || ay > 1.0 - 3.0 / h {
+        return vec4<f32>(0.0, 0.0, 0.0, 0.9);
     }
+    // What is missing stays in the bar's own colour, dimmed, so the bar's length reads.
     if uv.x * 0.5 + 0.5 > fill {
-        return vec4<f32>(0.03, 0.03, 0.04, 0.9);
+        return vec4<f32>(color * 0.22 + vec3<f32>(0.03), 0.9);
     }
-    return vec4<f32>(color * 1.45, 1.0);
+    return vec4<f32>(color * 1.6, 1.0);
 }
 
 fn row_uv(uv_x: f32, y: f32, top: f32, h: f32) -> vec2<f32> {
@@ -571,9 +574,11 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     let health_color = mix(vec3<f32>(1.0, 0.12, 0.05), vec3<f32>(0.2, 1.0, 0.3), smoothstep(0.2, 0.7, in.health));
     let show_shield = in.shield >= 0.0;
     let show_build = in.build >= 0.0;
-    let health_h = 8.0;
-    let shield_h = 4.5;
-    let build_h = 6.5;
+    // Before any branch, so the derivative is taken over the whole quad.
+    let per_px = fwidth(in.uv.x);
+    let health_h = 10.0;
+    let shield_h = 6.0;
+    let build_h = 9.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
     let down = select(0.0, build_h + gap, show_build);
@@ -583,7 +588,7 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     var cursor = 0.0;
     if show_shield {
         if y < cursor + shield_h {
-            return bar_fill(row_uv(in.uv.x, y, cursor, shield_h), in.shield, globals.shield.rgb);
+            return bar_fill(row_uv(in.uv.x, y, cursor, shield_h), in.shield, globals.shield.rgb, per_px, shield_h);
         }
         cursor += shield_h;
         if y < cursor + gap {
@@ -592,7 +597,7 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
         cursor += gap;
     }
     if y < cursor + health_h {
-        return bar_fill(row_uv(in.uv.x, y, cursor, health_h), in.health, health_color);
+        return bar_fill(row_uv(in.uv.x, y, cursor, health_h), in.health, health_color, per_px, health_h);
     }
     cursor += health_h;
     if show_build {
@@ -601,7 +606,7 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
         }
         cursor += gap;
         if y < cursor + build_h {
-            return bar_fill(row_uv(in.uv.x, y, cursor, build_h), in.build, vec3<f32>(1.0, 0.62, 0.12));
+            return bar_fill(row_uv(in.uv.x, y, cursor, build_h), in.build, vec3<f32>(1.0, 0.62, 0.12), per_px, build_h);
         }
     }
     return vec4<f32>(0.0);

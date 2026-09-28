@@ -1,6 +1,7 @@
 //! What a unit makes and spends, drawn the same way wherever a unit is shown:
 //! a strip with a MASS half and an ENERGY half, each with what comes in, what
 //! goes out, and, only while the side is short, what it wanted and the share it got.
+//! The net leads on the left; gains are green and spending red.
 
 use super::{Scene, ENERGY, MASS};
 use crate::ui::{palette, rgb, style, type_scale, Rect, Ui};
@@ -88,6 +89,7 @@ fn rate(v: f32) -> String {
 }
 
 const BIG: crate::ui::Style = style(mc_render::Face::Bold, 18.0, 0.8);
+const SMALL: crate::ui::Style = style(mc_render::Face::Bold, 13.5, 0.4);
 
 /// Whether a unit takes part in the economy at all: it makes something, keeps
 /// something running, or builds. Those always show the strip, idle or not.
@@ -120,8 +122,8 @@ pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect, always: bool) -> bo
         ui.fill(Rect::new(x, r.y + 8.0, 3.0, 9.0), rgb(tone, 1.0));
         ui.text(x + 9.0, r.y + 13.0, type_scale::MICRO, rgb(tone, 1.0), name);
         if flow.is_empty() {
-            // Nothing in or out right now: a quiet zero in the same place the rates go.
-            ui.text_right(x + w, r.y + 30.0, BIG, rgb(palette::FAINT, 1.0), "0 /s");
+            // Nothing in or out right now: a quiet zero where the net goes.
+            ui.text(x, r.y + 30.0, BIG, rgb(palette::FAINT, 1.0), "0");
             continue;
         }
         // Short of what it wanted: the share it got and what it asked for, on the label's row.
@@ -139,40 +141,55 @@ pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect, always: bool) -> bo
                 rgb(palette::WARN, pulse),
             );
         }
-        // What comes in, and what goes out, as big signed rates.
-        let mut right = x + w;
+        // The net, big, on the left: green while it gains, red while it drains.
+        let net = flow.made - flow.used;
+        let (net_text, net_tone) = if net >= 0.005 {
+            (format!("+{}", rate(net)), super::HEALTHY)
+        } else if net <= -0.005 {
+            (format!("\u{2212}{}", rate(-net)), palette::BAD)
+        } else {
+            ("0".to_owned(), palette::DIM)
+        };
+        ui.text(x, r.y + 30.0, BIG, rgb(net_tone, 1.0), &net_text);
+        let net_end = x + ui.text_width(BIG, &net_text) + 12.0;
+        // What comes in and what goes out, smaller, on the right.
+        let mut parts: Vec<(String, u32)> = Vec::new();
+        if flow.made >= 0.005 {
+            parts.push((format!("+{}", rate(flow.made)), super::HEALTHY));
+        }
+        if flow.used >= 0.005 || flow.wanted >= 0.005 {
+            let tone = if share < 0.995 {
+                palette::WARN
+            } else {
+                palette::BAD
+            };
+            parts.push((format!("\u{2212}{}", rate(flow.used)), tone));
+        }
         let unit_w = ui.text_width(type_scale::MICRO, "/s");
+        let gap = 8.0;
+        let room = x + w - net_end - unit_w - 4.0;
+        let wide = parts
+            .iter()
+            .map(|(t, _)| ui.text_width(SMALL, t))
+            .sum::<f32>()
+            + gap * parts.len().saturating_sub(1) as f32;
+        let st = if wide <= room {
+            SMALL
+        } else {
+            type_scale::MICRO
+        };
         ui.text(
-            right - unit_w,
-            r.y + 31.0,
+            x + w - unit_w,
+            r.y + 30.0,
             type_scale::MICRO,
             rgb(palette::DIM, 1.0),
             "/s",
         );
-        right -= unit_w + 4.0;
-        if flow.used >= 0.005 || flow.wanted >= 0.005 {
-            let out = format!("\u{2212}{}", rate(flow.used));
-            let wd = ui.text_width(BIG, &out);
-            ui.text(
-                right - wd,
-                r.y + 30.0,
-                BIG,
-                rgb(
-                    if share < 0.995 {
-                        palette::WARN
-                    } else {
-                        palette::BAD
-                    },
-                    1.0,
-                ),
-                &out,
-            );
-            right -= wd + 10.0;
-        }
-        if flow.made >= 0.005 {
-            let inc = format!("+{}", rate(flow.made));
-            let wd = ui.text_width(BIG, &inc);
-            ui.text(right - wd, r.y + 30.0, BIG, rgb(tone, 1.0), &inc);
+        let mut right = x + w - unit_w - 4.0;
+        for (t, tone) in parts.iter().rev() {
+            let wd = ui.text_width(st, t);
+            ui.text(right - wd, r.y + 30.0, st, rgb(*tone, 1.0), t);
+            right -= wd + gap;
         }
     }
     true

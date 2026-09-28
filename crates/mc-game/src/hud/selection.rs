@@ -114,13 +114,45 @@ fn health_tone(share: f32) -> u32 {
     }
 }
 
+/// The missing share stays in the bar's own colour, dimmed, so its length reads.
 fn bar(ui: &mut Ui, r: Rect, share: f32, tone: u32) {
-    ui.fill(r, rgb(palette::LINE, 0.12));
+    ui.fill(r, rgb(tone, 0.18));
     ui.gradient_h(
         Rect::new(r.x, r.y, r.w * share.clamp(0.0, 1.0), r.h),
-        rgb(tone, 0.6),
+        rgb(tone, 0.85),
         rgb(tone, 1.0),
     );
+}
+
+const BUILDING: u32 = 0xFFA030;
+const PERCENT: crate::ui::Style = crate::ui::style(mc_render::Face::Bold, 26.0, 0.4);
+
+/// A structure going up leads its card with how far along it is: a big
+/// percentage and a thick bar. Returns the height used.
+fn construction(ui: &mut Ui, u: &UnitInstance, x: f32, y: f32, cw: f32) -> f32 {
+    let tone = if u.paused() { PAUSED } else { BUILDING };
+    let label = if u.paused() {
+        "Paused  \u{b7}  Under Construction"
+    } else {
+        "Under Construction"
+    };
+    ui.text_fit_left(
+        x,
+        y + 10.0,
+        cw - 80.0,
+        type_scale::MICRO,
+        rgb(tone, 1.0),
+        label,
+    );
+    ui.text_right(
+        x + cw,
+        y + 14.0,
+        PERCENT,
+        rgb(tone, 1.0),
+        &format!("{:.0}%", u.build.clamp(0.0, 1.0) * 100.0),
+    );
+    bar(ui, Rect::new(x, y + 22.0, cw, 8.0), u.build, tone);
+    40.0
 }
 
 pub const RANKS: [&str; 6] = [
@@ -663,6 +695,10 @@ fn status_page(
     let kills = u.kill_count();
     let hp = veterancy_health(bp.health, level).to_f32();
     let mut y = r.y;
+    let building = has_flag(u, flag::UNDER_CONSTRUCTION);
+    if building {
+        y += construction(ui, u, x, y, cw);
+    }
     ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Integrity");
     ui.text_right(
         x + cw,
@@ -673,11 +709,11 @@ fn status_page(
     );
     bar(
         ui,
-        Rect::new(x, y + 9.0, cw, 4.0),
+        Rect::new(x, y + 9.0, cw, 6.0),
         u.health,
         health_tone(u.health),
     );
-    y += 22.0;
+    y += 24.0;
 
     if let Some(sh) = s
         .view
@@ -697,11 +733,11 @@ fn status_page(
         );
         bar(
             ui,
-            Rect::new(x, y + 9.0, cw, 4.0),
+            Rect::new(x, y + 9.0, cw, 6.0),
             sh.health,
             super::style::AIR,
         );
-        y += 22.0;
+        y += 24.0;
     }
 
     // Veterancy, in its own yellow: chevrons for the rank, the rank's name, kills.
@@ -734,8 +770,9 @@ fn status_page(
 
     // What it is doing.
     let queue = s.queue_of(u);
-    let doing = if has_flag(u, flag::UNDER_CONSTRUCTION) {
-        Some(("Under Construction".to_owned(), Some(u.build)))
+    let doing = if building {
+        // Shown at the top of the card.
+        None
     } else if let Some(front) = queue.and_then(|q| q.orders.first()) {
         let progress = queue.map_or(0.0, |q| q.progress);
         let making = matches!(
@@ -763,7 +800,7 @@ fn status_page(
     };
     // Paused work says so first, in the construction amber: what waits, and where it stopped.
     let doing = match doing {
-        _ if !u.paused() => doing,
+        _ if !u.paused() || building => doing,
         Some((label, progress)) => Some((format!("Paused  \u{b7}  {label}"), progress)),
         None => Some(("Paused  \u{b7}  Z Resumes".to_owned(), None)),
     };
@@ -778,7 +815,7 @@ fn status_page(
                 rgb(tone, 1.0),
                 &format!("{:.0}%", p * 100.0),
             );
-            bar(ui, Rect::new(x, y + 9.0, cw, 3.0), p, tone);
+            bar(ui, Rect::new(x, y + 9.0, cw, 5.0), p, tone);
         }
         y += 20.0;
     }
