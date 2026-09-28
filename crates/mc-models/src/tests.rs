@@ -1641,10 +1641,10 @@ fn naval_yard_is_one_sided_on_piles() {
 #[test]
 fn fabricator_tips_are_the_print_heads() {
     for key in ["factory_land", "factory_air", "factory_naval"] {
-        let factory = mc_sim::print_heads::factory_heads(key).unwrap();
+        let factory = mc_core::print_heads::factory_heads(key).unwrap();
         let model = build_model_scaled(key, 46.0, 42.0, 3).unwrap();
         for head in factory.heads {
-            let tip = Vec3::from(mc_sim::print_heads::nozzle(head, factory.aim));
+            let tip = Vec3::from(mc_core::print_heads::nozzle(head, factory.aim));
             let near = model.lods[0]
                 .vertices
                 .iter()

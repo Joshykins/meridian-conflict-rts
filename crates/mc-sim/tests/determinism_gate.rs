@@ -27,7 +27,7 @@ const BANNED: &[&str] = &[
 
 /// The only modules exempt as a whole: they exist to turn sim state into what the
 /// renderer draws.
-const PRESENTATION_MODULES: &[&str] = &["mirror.rs", "print_heads.rs"];
+const PRESENTATION_MODULES: &[&str] = &["mirror.rs"];
 
 fn crates() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")

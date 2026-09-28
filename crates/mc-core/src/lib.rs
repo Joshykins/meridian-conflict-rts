@@ -6,6 +6,7 @@
 pub mod fx;
 pub mod hash;
 pub mod perf;
+pub mod print_heads;
 pub mod rng;
 pub mod trig;
 pub mod vec;

@@ -250,7 +250,7 @@ pub(super) fn check_at(
 }
 
 /// A factory's violet fabricator tips are where the sim pours its nanite streams from
-/// (`mc_sim::print_heads`), and it has one at every head.
+/// (`mc_core::print_heads`), and it has one at every head.
 #[cfg(test)]
 pub(super) fn check_heads(key: &str, radius: f32, height: f32) {
     check_heads_at(key, 1, radius, height);
@@ -260,14 +260,14 @@ pub(super) fn check_heads(key: &str, radius: f32, height: f32) {
 #[cfg(test)]
 pub(super) fn check_heads_at(key: &str, tech: u8, radius: f32, height: f32) {
     use super::material;
-    let factory = mc_sim::print_heads::factory_heads(key).expect(key);
+    let factory = mc_core::print_heads::factory_heads(key).expect(key);
     assert!(
         factory.heads.iter().any(|h| h.fitted(tech)),
         "{key}: no heads at tech {tech}"
     );
     let model = super::build_model_scaled(key, radius, height, tech).expect(key);
     for head in factory.heads.iter().filter(|h| h.fitted(tech)) {
-        let tip = glam::Vec3::from(mc_sim::print_heads::nozzle(head, factory.aim));
+        let tip = glam::Vec3::from(mc_core::print_heads::nozzle(head, factory.aim));
         let near = model.lods[0]
             .vertices
             .iter()

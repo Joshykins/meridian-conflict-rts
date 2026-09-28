@@ -13,7 +13,7 @@
 //!   edge where the ship leaves.
 //! - Across the slip a gantry on bronze trestles standing in a winch bay open across each
 //!   arm, two plated crabs riding its bridge, the fabricator heads hung under it aimed
-//!   at the work (their mounts are `mc_sim::print_heads`, where the nanite
+//!   at the work (their mounts are `mc_core::print_heads`, where the nanite
 //!   streams pour from). The violet runs hot while the dock builds.
 //! - At the slip's head a caisson block, a toothed turntable turning on its roof
 //!   (`part::SPINNER`) between press rams.

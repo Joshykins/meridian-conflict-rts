@@ -16,7 +16,7 @@
 use std::f32::consts::TAU;
 
 use glam::{Vec2, Vec3};
-use mc_sim::print_heads::{factory_heads, PrintHead, TUBE};
+use mc_core::print_heads::{factory_heads, PrintHead, TUBE};
 
 use crate::builder::MeshBuilder;
 use crate::material::*;
@@ -279,7 +279,7 @@ pub(super) fn red_slot(b: &mut MeshBuilder, at: Vec3, out: Vec3, along: Vec3, le
 /// A fabricator head, the Naga's construction emitter: a bronze trunnion at `mount`, a
 /// plated housing reaching toward `aim`, a bronze nozzle through a seam-dark collar and
 /// a violet lens whose tip is `TUBE * s` from the mount, where the sim pours the nanite
-/// stream from (`mc_sim::print_heads::nozzle`). Its violet runs hot while the building
+/// stream from (`mc_core::print_heads::nozzle`). Its violet runs hot while the building
 /// builds.
 pub(super) fn fabricator(b: &mut MeshBuilder, mount: Vec3, aim: Vec3, s: f32) {
     let d = (aim - mount).normalize();
@@ -312,7 +312,7 @@ pub(super) fn fabricator(b: &mut MeshBuilder, mount: Vec3, aim: Vec3, s: f32) {
     b.cylinder_between(along(3.0), tip, 0.34 * s, 0.12 * s, sides);
 }
 
-/// The fabricator heads of the factory drawn with `mesh` (`mc_sim::print_heads`): its
+/// The fabricator heads of the factory drawn with `mesh` (`mc_core::print_heads`): its
 /// mounts, their scale, and the point they aim at, so mesh and stream cannot drift apart.
 pub(super) fn print_heads(mesh: &str) -> impl Iterator<Item = (Vec3, f32, Vec3)> {
     heads_where(mesh, |_| true)

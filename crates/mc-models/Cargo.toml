@@ -6,13 +6,18 @@ publish.workspace = true
 
 [dependencies]
 mc-core = { workspace = true }
-mc-data = { workspace = true }
 mc-map = { workspace = true }
-mc-sim = { workspace = true }
 bytemuck = { workspace = true }
 glam = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
+
+# Only the tests check the models against blueprints and sim constants: the
+# model program a shot server asks for meshes builds without the sim
+# (scripts/shot.sh), in about a minute from cold instead of several.
+[dev-dependencies]
+mc-data = { workspace = true }
+mc-sim = { workspace = true }
 
 [lints]
 workspace = true

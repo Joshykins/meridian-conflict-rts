@@ -132,7 +132,8 @@ In addition:
     back into `State`) may use floats. Each such item says so with
     `#[expect(clippy::float_arithmetic, ..., reason = "presentation: <who reads
     it>")]`.
-  - Only `mirror.rs` and `print_heads.rs` are exempt as whole modules.
+  - Only `mirror.rs` is exempt as a whole module (the fabricator geometry
+    both sides share lives in `mc_core::print_heads`, outside the sim).
 - Sorting is total. A plain `sort_unstable()` is fine, because equal elements
   are identical. A `_by`/`_by_key` sort on a key that can tie must be stable
   (`sort_by_key`). If the key is unique, expect the lint and say why.

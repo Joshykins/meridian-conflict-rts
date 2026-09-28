@@ -1,13 +1,10 @@
 //! Where factories print from: the fabricator heads on each factory model, in
 //! model space (metres, x forward, y left, z up from the lot origin). The meshes
 //! (`mc-render`'s factory models) stand their fabricators on these mounts and the
-//! sim draws build beams from their tips, so the two cannot drift apart.
-#![expect(
-    clippy::float_arithmetic,
-    clippy::disallowed_types,
-    reason = "presentation: fabricator mount/tip positions the render mirror draws build beams from; \
-              nothing here is written into State"
-)]
+//! sim draws build beams from their tips, so the two cannot drift apart. Floats:
+//! presentation only (the render mirror draws build beams from these tips;
+//! nothing here is written into State). Here and not in mc-sim so the model
+//! program builds without the sim.
 
 /// One fabricator head: the trunnion it turns about, its size, the tier whose kit
 /// fits it (tech 2 heads go on in the upgrade to tech 2, and so on) and the last tier

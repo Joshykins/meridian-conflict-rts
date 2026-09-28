@@ -49,7 +49,7 @@ pub mod perf;
 
 mod bore;
 pub mod placement;
-pub mod print_heads;
+pub use mc_core::print_heads;
 mod ranks;
 pub mod reclaim;
 mod reclaim_heads;

@@ -14,7 +14,7 @@
 //! pieces.
 
 use glam::{Affine3A, Vec2, Vec3};
-use mc_sim::print_heads::{factory_heads, PrintHead, PAD_DECK, TUBE};
+use mc_core::print_heads::{factory_heads, PrintHead, PAD_DECK, TUBE};
 
 use super::parts::*;
 use super::structures::kit;

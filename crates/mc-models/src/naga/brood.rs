@@ -13,7 +13,7 @@
 //!   (`part::PUMP`), pipe runs, a lit seam. Its prow is a door post, its edge lit violet
 //!   where the unit leaves, red optics looking down the way.
 //! - Over the bay, a fixed plated race carried off the wings' gear bays, the fabricator
-//!   heads hung from it aimed at the work (their mounts are `mc_sim::print_heads`, where
+//!   heads hung from it aimed at the work (their mounts are `mc_core::print_heads`, where
 //!   the nanite streams pour from), and inside it a toothed bronze ring turning on four
 //!   carriages (`part::SPINNER`). The violet runs hot while the works builds.
 //! - Behind the bay the press block: two feed rollers under a plated hood facing the bay,

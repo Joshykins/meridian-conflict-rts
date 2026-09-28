@@ -42,12 +42,15 @@
 # at opt-level 0 in seconds; none of the three needs a build of the game). It
 # leaves by itself after 30 idle minutes.
 #
-# Every session shares one incremental build (the `shot` profile, in
-# %TEMP%\meridian-target-shot-<checkout>), and nothing is built when no source
-# file changed since the last build. The build runs under a lock and runs from
-# copies of the exe, so sessions never lock each other's binary. A worktree gets
-# its own target dir and server; copy the .mcmap it needs into its maps/
-# (symlinks do not resolve from Windows).
+# Each checkout has its own incremental build (the `shot` profile, in
+# %TEMP%\meridian-target-shot-<checkout>) and server, and nothing is built when
+# no source file changed since the last build. Every build is also kept by what
+# it was built from (%TEMP%\meridian-shot-exes\<engine hash>, the last dozen):
+# a new worktree whose engine sources (all but the model code and shaders) match
+# one takes it and builds nothing, and the model code and shaders reach its
+# server as edits do. The build runs under a lock and servers run from copies of
+# the exe, so sessions never lock each other's binary. A worktree without baked
+# maps gets the main checkout's, hard-linked.
 set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel)
@@ -76,15 +79,50 @@ shots_win="$win_temp/meridian-shots"
 server_dir="$win_temp/meridian-shot-server-$checkout"
 mkdir -p "$bin_dir" "$shots_win" "$server_dir" "$repo/artifacts/shots"
 repo_win=$(wslpath -w "$repo")
+# A worktree has no baked maps (they are not checked in): the main checkout's,
+# hard-linked, since the game reads them through \\wsl.localhost, which does not
+# follow symlinks.
+if ! compgen -G "$repo/maps/*.mcmap" > /dev/null; then
+    main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+    for m in "$main"/maps/*.mcmap; do
+        [[ -e $m ]] && { ln "$m" "$repo/maps/" 2>/dev/null || cp "$m" "$repo/maps/"; }
+    done
+fi
 built="$target_dir/shot/meridian.exe"
 lock="/tmp/meridian-shot-build-$checkout.lock"
 built_stamp="/tmp/meridian-shot-built-$checkout"
+# What the game in $target_dir was built from (tree_hash); `engine` only when
+# the whole build came from one state of the sources.
+built_engine="$target_dir/shot/engine"
+built_looks="$target_dir/shot/looks"
+# Games by the engine sources they were built from, for every checkout.
+exes="$win_temp/meridian-shot-exes"
 data_stamp="/tmp/meridian-shot-data-$checkout"
 shader_stamp="/tmp/meridian-shot-shaders-$checkout"
 shaders="$repo/crates/mc-render/shaders"
 # Per unit key: when that unit's meshes were last rebuilt for the server.
 model_stamps="/tmp/meridian-shot-models-$checkout"
 models="$repo/crates/mc-models/src"
+
+# A hash of the checkout's sources, by content: `engine` is everything a unit
+# shot needs built into the game (crates/ but the model code and shaders, which
+# reach a server without a build, and the textures the renderer embeds);
+# `shaders` and `models` are those two, and `looks` both hashes, in that order.
+tree_hash() {
+    local list
+    case $1 in
+        engine) list=$(git -C "$repo" ls-files -co --exclude-standard -- crates Cargo.toml Cargo.lock \
+                    rust-toolchain.toml data/textures/terrain data/textures/foliage \
+                    | grep -v -e '^crates/mc-render/shaders/' -e '^crates/mc-models/src/'
+                echo crates/mc-models/src/gpu_consts.rs) ;;
+        looks) echo "$(tree_hash shaders) $(tree_hash models)"; return ;;
+        shaders) list=$(git -C "$repo" ls-files -co --exclude-standard -- crates/mc-render/shaders) ;;
+        models) list=$(git -C "$repo" ls-files -co --exclude-standard -- crates/mc-models/src \
+                    | grep -v '/gpu_consts\.rs$') ;;
+    esac
+    list=$(sort -u <<< "$list" | while read -r f; do [[ -f $repo/$f ]] && echo "$f"; done)
+    paste -d' ' <(echo "$list") <(cd "$repo" && git hash-object --stdin-paths <<< "$list") | sha1sum | cut -c1-16
+}
 
 # Overlays (Overwolf, Steam, Epic) hook every Vulkan program on this machine as
 # implicit layers. A headless shot has no window for them, so every shot runs
@@ -269,6 +307,21 @@ t0=$(date +%s%N)
     if [[ $build == 1 ]]; then
         if [[ ! -f $built_stamp || ! -f $built ]]; then
             changed=yes
+            # A game another checkout built from these same engine sources will do
+            # (a fresh worktree off dev): its model code and shaders reach its
+            # server without a build. A run-mode shot draws what the exe has built
+            # in, so that needs the model code and shaders to match too.
+            key=$(tree_hash engine)
+            if [[ -f $exes/$key/meridian.exe ]] \
+                && { [[ $mode != run ]] || [[ $(cat "$exes/$key/looks") == "$(tree_hash looks)" ]]; }; then
+                mkdir -p "$(dirname "$built")"
+                cp -p "$exes/$key/meridian.exe" "$built"
+                cp "$exes/$key/looks" "$built_looks"
+                echo "$key" > "$built_engine"
+                touch "$exes/$key" "$built_stamp"
+                echo "shot.sh: game $key was built already; no build" >&2
+                changed=""
+            fi
         else
             # A unit shot's server recompiles edited shaders itself (--shaders) and
             # takes edited models from mc-models (--models); gpu_consts.rs is
@@ -278,10 +331,15 @@ t0=$(date +%s%N)
                 -not \( -path "$models/*" -not -name gpu_consts.rs \))
             changed=$(find "$repo/crates" "$repo/Cargo.toml" "$repo/Cargo.lock" -newer "$built_stamp" -type f \
                 -not -path '*/target/*' "${skip[@]}" -print -quit)
+            # A game taken from another checkout has its model code and shaders,
+            # which may be older than the stamp here and still differ.
+            [[ -z $changed && $mode == run && $(cat "$built_looks" 2>/dev/null) != "$(tree_hash looks)" ]] \
+                && changed=yes
         fi
     fi
     if [[ -n $changed ]]; then
         touch "$built_stamp.next"
+        key=$(tree_hash engine) looks=$(tree_hash looks)
         log="$bin_dir/build-$$.log"
         if ! powershell.exe -NoProfile -Command "Set-Location '$repo_win'; cargo build --profile shot -p mc-game --target-dir '$target_win' *> '$(wslpath -w "$log")'; exit \$LASTEXITCODE"; then
             tr -d '\r' < "$log" | grep -v '^\s*Compiling' | tail -60 >&2
@@ -292,6 +350,21 @@ t0=$(date +%s%N)
         tr -d '\r' < "$log" | grep -E '^(warning|error)' | sort -u | head -5 >&2 || true
         rm -f "$log"
         mv "$built_stamp.next" "$built_stamp"
+        echo "$looks" > "$built_looks"
+        # Kept for other checkouts by what it was built from, unless a source
+        # changed during the build. Never overwritten: a server may be running it.
+        rm -f "$built_engine"
+        if [[ $(tree_hash engine) == "$key" ]]; then
+            echo "$key" > "$built_engine"
+            if [[ ! -d $exes/$key ]]; then
+                mkdir -p "$exes/$key.$$"
+                cp -p "$built" "$exes/$key.$$/meridian.exe"
+                echo "$looks" > "$exes/$key.$$/looks"
+                mv -T "$exes/$key.$$" "$exes/$key" 2>/dev/null || rm -rf "$exes/$key.$$"
+            fi
+            # The last dozen games stay; one a server is running cannot be deleted.
+            ls -1dt "$exes"/*/ 2>/dev/null | tail -n +13 | xargs -r rm -rf 2>/dev/null || true
+        fi
     fi
     [[ -f $built ]] || { echo "shot.sh: no build yet at $built (drop --no-build)" >&2; exit 1; }
 ) 9>"$lock"
@@ -312,7 +385,16 @@ if [[ $mode != run ]]; then
         # program, and a new name each time would compile them all again (~15 s).
         # Under the build lock, so another session's link cannot be caught half
         # done; retried while Windows still holds the old server's file.
+        # A game kept by its engine sources runs from its own path in the store,
+        # which every checkout on those sources shares, so their servers share the
+        # driver's pipelines too.
         exe="$server_dir/meridian-server.exe"
+        engine=$(cat "$built_engine" 2>/dev/null || true)
+        if [[ -n $engine && -f $exes/$engine/meridian.exe \
+            && $(stat -c '%Y-%s' "$exes/$engine/meridian.exe") == "$exe_id" ]]; then
+            exe="$exes/$engine/meridian.exe"
+            touch "$exes/$engine"
+        fi
         old_id=$(cat "$server_dir/exe" 2>/dev/null || true)
         echo "$exe_id" > "$server_dir/exe"
         # A server from before servers retired themselves is told to quit, by
@@ -321,7 +403,7 @@ if [[ $mode != run ]]; then
             sleep 2
             server_alive && { ask --quit "$old_id" > /dev/null 2>&1 || true; }
         fi
-        (
+        [[ $exe != "$server_dir"/* ]] || (
             flock -w 600 9
             for _ in $(seq 300); do cp -p "$built" "$exe" 2>/dev/null && exit 0; sleep 0.2; done
             exit 1
@@ -331,8 +413,8 @@ if [[ $mode != run ]]; then
         # \\wsl.localhost repo to a drive, since cmd cannot start in a UNC directory.
         # Backgrounded too, so a launcher that lingers cannot hold anyone up.
         server_win=$(wslpath -w "$server_dir")
-        printf '@echo off\r\n%sset RUST_LOG=info,mc_render::renderer=debug,mc_render::warm=debug\r\npushd "%s"\r\n"%s" --shot-server "%s" 2> "%s\\server.log"\r\n' \
-            "$cmd_env" "$repo_win" "$(wslpath -w "$exe")" "$server_win" "$server_win" > "$server_dir/start.cmd"
+        printf '@echo off\r\n%s\r\nset RUST_LOG=info,mc_render::renderer=debug,mc_render::warm=debug\r\npushd "%s"\r\n"%s" --shot-server "%s" 2> "%s\\server.log"\r\n' \
+            "${cmd_env%$'\r'}" "$repo_win" "$(wslpath -w "$exe")" "$server_win" "$server_win" > "$server_dir/start.cmd"
         # The lock descriptors are closed for it: a launcher holding the server lock
         # would block every session's shots.
         powershell.exe -NoProfile -Command "Start-Process -WindowStyle Hidden -FilePath '$server_win\\start.cmd'" \
@@ -340,9 +422,15 @@ if [[ $mode != run ]]; then
         for _ in $(seq 100); do server_alive && break; sleep 0.1; done
         server_alive || { echo "shot.sh: the shot server did not start" >&2; tr -d '\r' < "$server_dir/server.log" | tail -20 >&2; exit 1; }
         touch "$data_stamp"
-        # The new server has the shaders and models its build compiled.
-        touch -r "$built_stamp" "$shader_stamp"
+        # The new server has the shaders and models its build compiled: those
+        # here, unless they changed since (or the game came from another checkout),
+        # when the first shot recompiles every shader and rebuilds its unit's meshes.
         rm -rf "$model_stamps"
+        mkdir -p "$model_stamps"
+        { read -r built_shaders built_models < "$built_looks"; } 2>/dev/null || true
+        touch -r "$built_stamp" "$shader_stamp" "$model_stamps/.base"
+        [[ ${built_shaders:-} == "$(tree_hash shaders)" ]] || touch -d @0 "$shader_stamp"
+        [[ ${built_models:-} == "$(tree_hash models)" ]] || touch -d @0 "$model_stamps/.base"
     fi
     flock -u 8
     reload=()
@@ -359,7 +447,8 @@ if [[ $mode != run ]]; then
     # the server's renderer asked for, and send them over.
     mkdir -p "$model_stamps"
     model_stamp="$model_stamps/$key"
-    [[ -f $model_stamp ]] || touch -r "$built_stamp" "$model_stamp"
+    [[ -f $model_stamp ]] || touch -r "$model_stamps/.base" "$model_stamp" 2>/dev/null \
+        || touch -r "$built_stamp" "$model_stamp"
     # (Variants build their own meshes: shoot_variants.)
     if [[ $mode == unit && -n $(find "$models" -newer "$model_stamp" -type f -name '*.rs' -print -quit) ]]; then
         touch "$model_stamp.next"

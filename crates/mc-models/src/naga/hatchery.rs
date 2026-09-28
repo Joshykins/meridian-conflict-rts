@@ -10,7 +10,7 @@
 //!   under it, a press ram working at its foot (`part::PUMP`).
 //! - Their heads carry a fixed plated race high over the pad, a toothed bronze lift ring
 //!   turning inside it (`part::SPINNER`), and hang the violet fabricator heads aimed at
-//!   the work (their mounts are `mc_sim::print_heads`, where the nanite streams pour
+//!   the work (their mounts are `mc_core::print_heads`, where the nanite streams pour
 //!   from). The violet runs hot while the frame builds.
 //! - The owner's colour is on each tower's head and footing.
 
