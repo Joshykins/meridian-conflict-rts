@@ -5,7 +5,7 @@
 //! The terrain is a heightfield of 8 m cells, so a levelled lot's edge samples
 //! are shared with the cells round it and those cells slope from the lot's level
 //! to the ground's. Each such cell (a cell whose corners belong to different
-//! edits, or to an edit and the map) with a real step across it gets a steel
+//! edits, or to an edit and the map) steeper than `MIN_SLOPE` gets a steel
 //! plate laid on its slope, ribs running down the slope, and a cap rail along
 //! its high edge. foundations.wgsl lays them on `terrain_height`, so they follow
 //! the ground exactly, settling included.
@@ -27,8 +27,11 @@ const MAX_CELLS: usize = 65_536;
 /// Vertices per cell: the plate, three ribs of two segments (top and two sides),
 /// and the cap rail (top and two sides). foundations.wgsl `CELL_VERTICES`.
 const CELL_VERTICES: u32 = 6 + 3 * 2 * 18 + 18;
-/// A step lower than this is left bare: there is no face to hold back.
-const MIN_STEP_M: f32 = 0.5;
+/// A levelled slope gentler than this (rise over run, as the sim's
+/// `Heightfield::cell_slope` measures it) is left bare ground: 0.36 is about 20
+/// degrees, a little under where land units stop climbing (mc-sim nav.rs
+/// `MAX_SLOPE`, 1 in 2).
+const MIN_SLOPE: f32 = 0.36;
 /// Map tiles whose heights are kept for the next lot (132 KB each).
 const GROUND_TILES_KEPT: usize = 24;
 /// `FoundationCell::kind`: the slope runs along y (else along x) ...
@@ -414,7 +417,8 @@ impl Window {
 
     /// Whether cell `(cx, cy)` is a levelled step to clad, and if so which way its
     /// slope runs (`ALONG_Y`, `HIGH_FAR`): its corners belong to different lots (or a
-    /// lot and the map) and are at least `MIN_STEP_M` apart. `metres` converts a sample.
+    /// lot and the map) and one of its triangles is steeper than `MIN_SLOPE`.
+    /// `metres` converts a sample.
     fn slope_kind(&self, cx: u32, cy: u32, metres: impl Fn(u16) -> f32) -> Option<u32> {
         let corners = [(cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1)];
         let owners = corners.map(|(x, y)| self.at(x, y).0);
@@ -422,10 +426,11 @@ impl Window {
             return None;
         }
         let h = corners.map(|(x, y)| metres(self.at(x, y).1));
-        let (lo, hi) = h
-            .iter()
-            .fold((f32::MAX, f32::MIN), |(lo, hi), &z| (lo.min(z), hi.max(z)));
-        if hi - lo < MIN_STEP_M {
+        // The cell's two triangles, split as the terrain's are (`cell_slope`).
+        let cell = CELL_SIZE_M as f32;
+        let lower = (h[1] - h[0]).hypot(h[3] - h[1]) / cell;
+        let upper = (h[3] - h[2]).hypot(h[2] - h[0]) / cell;
+        if lower.max(upper) < MIN_SLOPE {
             return None;
         }
         let gx = (h[1] + h[3] - h[0] - h[2]) * 0.5;
@@ -490,11 +495,17 @@ mod tests {
     }
 
     #[test]
-    fn a_sunk_lot_is_clad_rising_away_from_it_and_a_small_step_is_not() {
+    fn a_sunk_lot_is_clad_rising_away_from_it() {
         let w = window(60);
         assert_eq!(w.slope_kind(1, 2, metres), Some(0));
         assert_eq!(w.slope_kind(3, 4, metres), Some(ALONG_Y | HIGH_FAR));
-        // 0.4 m (4 samples of 0.1 m) is under `MIN_STEP_M`.
-        assert_eq!(window(104).slope_kind(1, 2, metres), None);
+    }
+
+    #[test]
+    fn only_a_slope_steeper_than_min_slope_is_clad() {
+        // Samples are 0.1 m: a 2 m step over the 8 m cell is 0.25, bare ground;
+        // 3.2 m is 0.4, clad.
+        assert_eq!(window(120).slope_kind(1, 2, metres), None);
+        assert_eq!(window(132).slope_kind(1, 2, metres), Some(HIGH_FAR));
     }
 }
