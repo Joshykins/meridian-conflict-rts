@@ -372,12 +372,12 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
         )
         .unwrap();
         let gun = spawn(&mut w, key, 0, 300, 512, 0);
-        // Past the Fulgur's bolt rifles (780 m), so only the bore fires.
+        // 500 m out: the Fulgur's bolt rifles reach it too and fire alongside.
         let mark = spawn(
             &mut w,
             "aster_t2_tank",
             1,
-            1150,
+            800,
             512,
             flag::PASSIVE | flag::INVULNERABLE,
         );
@@ -390,25 +390,55 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
             },
         }])
         .unwrap();
-        let mut discharged = false;
+        let mut channel = None;
         for _ in 0..300 {
             w.tick(&[]).unwrap();
-            if w.events
-                .iter()
-                .any(|e| matches!(e, SimEvent::BoreDischarge { weapon: 0, .. }))
-            {
-                discharged = true;
+            channel = w.events.iter().find_map(|e| match e {
+                SimEvent::BoreDischarge {
+                    from,
+                    to,
+                    weapon: 0,
+                    ..
+                } => Some((from.xy(), to.xy())),
+                _ => None,
+            });
+            if channel.is_some() {
                 break;
             }
         }
-        assert!(discharged, "{key} must discharge at the 850 m target");
+        let (from, to) =
+            channel.unwrap_or_else(|| panic!("{key} must discharge at the 500 m target"));
         assert!(
             w.state.units.pos[row(&w, gun)].distance(FxVec2::from_ints(300, 512)) < Fx::from_int(5),
             "{key} should reach the target without closing range"
         );
+        // The tracer strays by up to the gun's spread, and the charge follows the tracer,
+        // not the aim: every tree the channel it struck passes within the burn of must go.
+        // (The spread is drawn from the match's one random stream, so which way it strays
+        // turns on everything else that fired first.)
+        let (a, b) = (from.to_f32(), to.to_f32());
+        assert!(b[0] > 720.0, "{key}'s channel stops short at {b:?}");
+        let off_channel = |p: [f32; 2]| {
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let t =
+                (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
+            ((p[0] - a[0] - dx * t).powi(2) + (p[1] - a[1] - dy * t).powi(2)).sqrt()
+        };
+        let mut burned = 0;
         for prop in 0..on_path {
-            assert!(!w.is_prop_alive(prop), "{key} left a gap at tree {prop}");
+            let at = [350.0 + 3.0 * prop as f32, 512.0];
+            if off_channel(at) < 6.0 {
+                assert!(
+                    !w.is_prop_alive(prop),
+                    "{key} left a gap at tree {prop} ({at:?})"
+                );
+                burned += 1;
+            }
         }
+        assert!(
+            burned * 2 > on_path,
+            "{key}'s channel strayed off most of the line"
+        );
         assert!(w.is_prop_alive(on_path), "{key} burned an off-path tree");
     }
 }
