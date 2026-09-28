@@ -119,11 +119,26 @@ impl Server {
         }
         let read = |path: &str| std::fs::read(path).map_err(|e| format!("{path}: {e}"));
         let calls_file = value("--calls").ok_or("--models and --calls-for need --calls FILE");
-        if let Some(path) = value("--models") {
-            let calls =
-                remote::decode_request(&read(&calls_file.clone()?)?).map_err(|e| e.to_string())?;
-            let models = remote::decode_response(&read(&path)?).map_err(|e| e.to_string())?;
-            let n = remote::replace(&calls, models);
+        // Any number of `--models ANSWER --calls FILE` pairs, one per unit, so a
+        // batch of variants swaps in with one renderer rebuild.
+        let all = |flag: &str| -> Vec<String> {
+            args.windows(2)
+                .filter(|w| w[0] == flag)
+                .map(|w| w[1].clone())
+                .collect()
+        };
+        let answers = all("--models");
+        if !answers.is_empty() {
+            let calls = all("--calls");
+            if calls.len() != answers.len() {
+                return Err("each --models ANSWER needs its own --calls FILE".into());
+            }
+            let mut n = 0;
+            for (answer, calls) in answers.iter().zip(&calls) {
+                let calls = remote::decode_request(&read(calls)?).map_err(|e| e.to_string())?;
+                let models = remote::decode_response(&read(answer)?).map_err(|e| e.to_string())?;
+                n += remote::replace(&calls, models);
+            }
             self.studio = None;
             said += &format!("{n} rebuilt meshes swapped in\n");
         }

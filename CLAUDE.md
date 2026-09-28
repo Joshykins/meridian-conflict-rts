@@ -228,3 +228,25 @@ In addition:
   with the same compiler. Change the pin in a commit of its own.
 - New dependencies go in `[workspace.dependencies]` and are used with
   `workspace = true`. Crates never use `path = "../..."` dependencies.
+
+## 9. Building and showing models
+
+- Look at a unit with `scripts/shot.sh unit KEY`: a six-angle sheet from a warm
+  shot server, ~1-2 s. `--views front34,left`, `--look X,Y,Z --zoom N` for a
+  close-up, `--frames N --turn DEG` for a turntable; `scripts/shot.sh --help`.
+  Do not build into a `meridian-target-<topic>` dir of your own: `shot.sh`
+  shares one incremental build and skips the game build when it can.
+- The loop is fast when you stay on its fast paths: an edit under
+  `crates/mc-models/src` reaches a picture in ~15 s, a `.wgsl` edit in ~6 s
+  and a `data/` edit in ~5 s, none of them rebuilding the game. Only the unit
+  being shot gets fresh meshes; look at the unit you changed.
+- **New or reworked models are shown to the user as variants.** Write two or
+  three real alternatives for each open design question as extra catalogue
+  keys, `<mesh>~<name>` (`ModelDef::new("tank_light~slim", ...)`), and render
+  them together: `scripts/shot.sh variants KEY=base,MESH~a,MESH~b ...` with
+  every unit of the batch in one call. It writes one labelled sheet per unit
+  (a row per variant) to `artifacts/shots/`; ten units with three variants
+  each take about a minute. Send the sheets together, in one message, and ask
+  for picks by letter (e.g. "tank B, scout A"), not one unit per round.
+- Once a variant is chosen it becomes the mesh and the other `~` keys are
+  deleted before the unit is committed (section 2: no parked code).

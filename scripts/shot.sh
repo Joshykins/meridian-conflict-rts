@@ -6,6 +6,15 @@
 #                                      (meridian --unit-shot; see its --help)
 #   scripts/shot.sh run [flags]        any other headless shot (--range, --scene,
 #                                      --ui, ...); --screenshot is added for you
+#   scripts/shot.sh variants KEY MESH... [flags]
+#   scripts/shot.sh variants KEY=MESH,MESH KEY=MESH,MESH... [flags]
+#                                      design variants: one labelled sheet per
+#                                      unit, one row per mesh key (e.g.
+#                                      tank_light~slim; `base` is the unit's own
+#                                      mesh), default views front34,left,rear34.
+#                                      Many units at once cost one renderer
+#                                      rebuild per round of variants, not one
+#                                      per variant (10 units x 3 ~ 1 minute).
 #   scripts/shot.sh stop               stop this checkout's shot server
 #
 # Options before the subcommand:
@@ -17,6 +26,13 @@
 #   scripts/shot.sh unit aster_t1_tank --views front34 --look 1,0,2.5 --zoom 3
 #   scripts/shot.sh unit aster_t1_tank --scenario march --ticks 40 --frames 60 --turn 90
 #   scripts/shot.sh run --range --unit aster_commander --scenario work --ticks 120 --follow 5
+#   scripts/shot.sh variants aster_t1_tank base tank_light~slim tank_light~twin
+#   scripts/shot.sh variants aster_t1_tank=base,tank_light~slim aster_t1_scout=base,scout~b
+#
+# Design variants live in the model catalogue as extra keys, `<mesh>~<name>`,
+# built like any model (ModelDef::new("tank_light~slim", ...)). Each is drawn as
+# the unit, with the unit's own traits. Once one is chosen it becomes the mesh
+# and the others are deleted (CLAUDE.md: no parked code).
 #
 # Unit shots go to a shot server (meridian --shot-server) that keeps a warm
 # renderer between shots, so a shot costs its views (~1-3 s), not the ~10 s
@@ -42,7 +58,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -o) out_name="$2"; shift 2 ;;
         --no-build) build=0; shift ;;
-        -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,/^set -euo/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) break ;;
     esac
 done
@@ -104,6 +120,83 @@ ask() {
     [[ ${said%%$'\n'*} == ok ]]
 }
 
+# Design variants for one or more units. Round r swaps every unit's r-th variant
+# in at once (one renderer rebuild) and shoots each unit as one row; each unit's
+# rows then go into a labelled sheet of its own. 10 units x 3 variants is 3
+# rebuilds and 30 one-second shots, not 30 rebuilds.
+shoot_variants() {
+    (cd "$repo" && cargo build -q --profile models -p mc-models --bin mc-models) \
+        || { echo "shot.sh: mc-models did not build" >&2; exit 1; }
+    trap 'rm -f "$server_dir"/calls-$$-*.bin "$server_dir"/meshes-$$-*.bin' EXIT
+    local units=() lists=() spec k u r m rounds=0 first=("${reload[@]}")
+    for spec in "${specs[@]}"; do
+        units+=("${spec%%=*}")
+        lists+=("${spec#*=}")
+    done
+    for u in "${!units[@]}"; do
+        said=$(ask "${first[@]}" --calls-for "${units[$u]}" \
+            --calls "$(wslpath -w "$server_dir/calls-$$-$u.bin")") \
+            || { echo "$said" >&2; echo "shot.sh: no mesh calls for ${units[$u]}" >&2; exit 1; }
+        first=()
+        IFS=, read -ra m <<< "${lists[$u]}"
+        (( ${#m[@]} > rounds )) && rounds=${#m[@]}
+    done
+    for ((r = 0; r < rounds; r++)); do
+        local pairs=() shots=()
+        for u in "${!units[@]}"; do
+            IFS=, read -ra m <<< "${lists[$u]}"
+            [[ $r -lt ${#m[@]} ]] || continue
+            local calls="$server_dir/calls-$$-$u.bin" meshes="$server_dir/meshes-$$-$u-$r.bin" as=()
+            [[ ${m[$r]} == base ]] || as=(--as "${m[$r]}")
+            "$repo/target/models/mc-models" "$calls" "$meshes" "${as[@]}" \
+                || { echo "shot.sh: mc-models could not build ${m[$r]}" >&2; exit 1; }
+            pairs+=(--models "$(wslpath -w "$meshes")" --calls "$(wslpath -w "$calls")")
+            shots+=("$u")
+        done
+        for u in "${shots[@]}"; do
+            said=$(ask "${pairs[@]}" --unit-shot "${units[$u]}" "${view_args[@]}" \
+                --screenshot "$(wslpath -w "$shots_win")\\$stem-$u-row$r.png") \
+                || { echo "$said" >&2; echo "shot.sh: variant $r of ${units[$u]} failed" >&2; exit 1; }
+            pairs=()
+        done
+    done
+    t2=$(date +%s%N)
+    echo "build $(( (t1 - t0) / 1000000 )) ms, shots $(( (t2 - t1) / 1000000 )) ms"
+    for u in "${!units[@]}"; do
+        k="${units[$u]}"
+        # The server now holds a variant: the unit's next plain shot puts its own mesh back.
+        mkdir -p "$model_stamps"
+        touch -d @0 "$model_stamps/$k"
+        IFS=, read -ra m <<< "${lists[$u]}"
+        local rows=() sheet="$stem-$k.png"
+        for r in "${!m[@]}"; do rows+=("$shots_win/$stem-$u-row$r.png"); done
+        python3 - "$repo/artifacts/shots/$sheet" "$k" "${#rows[@]}" "${rows[@]}" "${m[@]}" <<'PY'
+import sys
+from PIL import Image, ImageDraw, ImageFont
+out, unit, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
+paths, names = sys.argv[4:4 + n], sys.argv[4 + n:]
+rows = [Image.open(p).convert("RGB") for p in paths]
+band = 44
+w = max(r.width for r in rows)
+sheet = Image.new("RGB", (w, sum(r.height + band for r in rows)), (18, 22, 28))
+draw = ImageDraw.Draw(sheet)
+try:
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26)
+except OSError:
+    font = ImageFont.load_default()
+y = 0
+for i, (row, name) in enumerate(zip(rows, names)):
+    draw.text((14, y + 8), f"{unit}   {chr(65 + i)}: {name}", fill=(120, 220, 255), font=font)
+    sheet.paste(row, (0, y + band))
+    y += row.height + band
+sheet.save(out)
+PY
+        rm -f "${rows[@]}"
+        echo "$repo/artifacts/shots/$sheet"
+    done
+    exit 0
+}
+
 stop_server() {
     if server_alive; then
         ask --quit > /dev/null || true
@@ -122,10 +215,28 @@ case "$mode" in
         key="$1"; shift
         game_args=(--unit-shot "$key" "$@")
         stem="${out_name:-$key}" ;;
+    variants)
+        # KEY=MESH,MESH... per unit, or the one-unit form KEY MESH MESH...
+        specs=()
+        if [[ ${1:-} == *=* ]]; then
+            while [[ $# -gt 0 && $1 != -* ]]; do specs+=("$1"); shift; done
+        else
+            [[ $# -gt 1 ]] || { echo "shot.sh variants needs a blueprint key and mesh keys" >&2; exit 2; }
+            key="$1"; shift
+            meshes=()
+            while [[ $# -gt 0 && $1 != -* ]]; do meshes+=("$1"); shift; done
+            specs=("$key=$(IFS=,; echo "${meshes[*]}")")
+        fi
+        [[ ${#specs[@]} -gt 0 ]] || { echo "shot.sh variants needs KEY=MESH,MESH..." >&2; exit 2; }
+        key="${specs[0]%%=*}"
+        [[ " $* " == *" --views "* ]] || set -- --views front34,left,rear34 "$@"
+        view_args=("$@")
+        game_args=(--unit-shot "$key" "$@")
+        stem="${out_name:-variants}" ;;
     run)
         game_args=("$@")
         stem="${out_name:-shot}" ;;
-    *) echo "shot.sh: unknown mode $mode (unit, run or stop)" >&2; exit 2 ;;
+    *) echo "shot.sh: unknown mode $mode (unit, variants, run or stop)" >&2; exit 2 ;;
 esac
 stem="${stem%.png}-$(date +%H%M%S)"
 
@@ -144,7 +255,7 @@ t0=$(date +%s%N)
             # takes edited models from mc-models (--models); gpu_consts.rs is
             # shared with the renderer and shaders, so it still needs a build.
             skip=()
-            [[ $mode == unit ]] && skip=(-not -path "$shaders/*"
+            [[ $mode != run ]] && skip=(-not -path "$shaders/*"
                 -not \( -path "$models/*" -not -name gpu_consts.rs \))
             changed=$(find "$repo/crates" "$repo/Cargo.toml" "$repo/Cargo.lock" -newer "$built_stamp" -type f \
                 -not -path '*/target/*' "${skip[@]}" -print -quit)
@@ -168,7 +279,7 @@ t0=$(date +%s%N)
 t1=$(date +%s%N)
 
 out_win="$(wslpath -w "$shots_win")\\$stem.png"
-if [[ $mode == unit ]]; then
+if [[ $mode != run ]]; then
     # The server runs a copy of the build it was started from; a new build replaces it.
     exe_id=$(stat -c '%Y-%s' "$built")
     # One session at a time checks and (re)starts the server; waiting requests
@@ -222,7 +333,8 @@ if [[ $mode == unit ]]; then
     mkdir -p "$model_stamps"
     model_stamp="$model_stamps/$key"
     [[ -f $model_stamp ]] || touch -r "$built_stamp" "$model_stamp"
-    if [[ -n $(find "$models" -newer "$model_stamp" -type f -name '*.rs' -print -quit) ]]; then
+    # (Variants build their own meshes: shoot_variants.)
+    if [[ $mode == unit && -n $(find "$models" -newer "$model_stamp" -type f -name '*.rs' -print -quit) ]]; then
         touch "$model_stamp.next"
         (cd "$repo" && cargo build -q --profile models -p mc-models --bin mc-models) \
             || { rm -f "$model_stamp.next"; echo "shot.sh: mc-models did not build" >&2; exit 1; }
@@ -234,7 +346,11 @@ if [[ $mode == unit ]]; then
         reload+=(--models "$(wslpath -w "$meshes")" --calls "$(wslpath -w "$calls")")
         mv "$model_stamp.next" "$model_stamp"
     fi
-    ask "${reload[@]}" "${game_args[@]}" --screenshot "$out_win"
+    if [[ $mode == unit ]]; then
+        ask "${reload[@]}" "${game_args[@]}" --screenshot "$out_win"
+    else
+        shoot_variants
+    fi
 else
     # A few fixed exe paths, one per run at a time: the GPU driver keeps compiled
     # pipelines per program path, so a slot reused shot after shot starts warm.
