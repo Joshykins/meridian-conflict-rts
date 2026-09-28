@@ -91,7 +91,7 @@ fn collar(b: &mut MeshBuilder, pivot: Vec3, base: f32, s: f32, head: Head) {
                     pivot.y + 0.62 * s,
                     pivot.y + 0.8 * s,
                 );
-                if !b.coarse() {
+                if b.fine() {
                     b.paint(METAL);
                     b.cylinder_between(
                         v3(pivot.x, pivot.y + 0.56 * s, pivot.z),
@@ -113,7 +113,7 @@ fn collar(b: &mut MeshBuilder, pivot: Vec3, base: f32, s: f32, head: Head) {
                 0.7 * s,
                 (pivot.z - base - 0.35 * s).max(0.1),
             );
-            if !b.coarse() {
+            if b.fine() {
                 mirror_about(b, pivot.y, |b| {
                     let pivot = v3(pivot.x, 0.0, pivot.z);
                     b.paint(ACCENT);
@@ -165,12 +165,12 @@ fn mouth(b: &mut MeshBuilder, at: Vec3, radius: f32) {
         at + Vec3::X * 0.02,
         radius * 0.55,
         radius * 0.55,
-        sides,
+        6,
     );
     if b.fine() {
-        // Four vanes across the mouth: it swallows, it does not fire.
+        // Vanes across the mouth: it swallows, it does not fire.
         b.paint(ACCENT);
-        for (y, z) in [(1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)] {
+        for (y, z) in [(1.0, 0.0), (-1.0, 0.0)] {
             let c = at + v3(0.12 * radius, y * 0.72 * radius, z * 0.72 * radius);
             let size = v3(
                 0.5 * radius,
@@ -185,7 +185,7 @@ fn mouth(b: &mut MeshBuilder, at: Vec3, radius: f32) {
 /// Boxy processor on side trunnions, a snout forward and a charge pack aft.
 fn cradle(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
     let tip = p + Vec3::X * 1.55 * s;
-    if b.coarse() {
+    if !b.fine() {
         b.paint(PLATING);
         b.cuboid(p + Vec3::X * 0.1 * s, v3(1.5 * s, 1.1 * s, 0.9 * s));
         b.paint(METAL);
@@ -244,15 +244,13 @@ fn cradle(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
     );
     if b.fine() {
         b.paint(ACCENT);
-        for x in [0.95, 1.15] {
-            b.cylinder_between(
-                p + Vec3::X * (x - 0.05) * s,
-                p + Vec3::X * (x + 0.05) * s,
-                0.37 * s,
-                0.37 * s,
-                8,
-            );
-        }
+        b.cylinder_between(
+            p + Vec3::X * 1.0 * s,
+            p + Vec3::X * 1.1 * s,
+            0.37 * s,
+            0.37 * s,
+            8,
+        );
         // Feed pipes from the pack along the flanks into the snout.
         b.paint(METAL);
         mirror_about(b, p.y, |b| {
@@ -274,7 +272,7 @@ fn cradle(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
 fn ball(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
     let r = 0.62 * s;
     let tip = p + Vec3::X * 1.25 * s;
-    if b.coarse() {
+    if !b.fine() {
         b.paint(PLATING);
         b.cuboid(p, Vec3::splat(1.15 * s));
         b.paint(INTAKE);
@@ -282,7 +280,7 @@ fn ball(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
         return tip;
     }
     b.paint(PLATING);
-    b.spheroid(p, Vec3::splat(r), b.sides(14), if b.fine() { 7 } else { 5 });
+    b.spheroid(p, Vec3::splat(r), 12, 5);
     // A dark band round the ball's equator, across the line of pitch.
     b.paint(ACCENT);
     b.cylinder_between(
@@ -290,7 +288,7 @@ fn ball(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
         p + Vec3::Y * 0.12 * s,
         r * 1.03,
         r * 1.03,
-        b.sides(14),
+        12,
     );
     // Bezel and nozzle.
     b.paint(ACCENT);
@@ -311,22 +309,14 @@ fn ball(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
     );
     mouth(b, tip, 0.34 * s);
     if b.fine() {
-        // Sensor eye above the nozzle, a team dot on the crown.
-        b.paint(GLASS);
-        b.cylinder_between(
-            p + v3(0.48 * s, 0.0, 0.36 * s),
-            p + v3(0.6 * s, 0.0, 0.4 * s),
-            0.09 * s,
-            0.09 * s,
-            6,
-        );
+        // A team dot on the crown.
         b.paint(TEAM);
         b.cylinder_between(
             p + v3(-0.08 * s, 0.0, 0.6 * s),
             p + v3(-0.1 * s, 0.0, 0.64 * s),
             0.18 * s,
             0.18 * s,
-            8,
+            6,
         );
     }
     tip
@@ -335,8 +325,20 @@ fn ball(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
 /// The tower's processor tube, short and lean on a trunnion near its back third.
 fn lance(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
     let tip = p + Vec3::X * 2.1 * s;
+    if !b.fine() {
+        b.paint(ACCENT);
+        b.beam(
+            p - Vec3::X * 0.8 * s,
+            tip,
+            v2(0.8 * s, 0.9 * s),
+            v2(0.45 * s, 0.45 * s),
+        );
+        b.paint(INTAKE);
+        b.cuboid(tip, v3(0.1, 0.3 * s, 0.3 * s));
+        return tip;
+    }
     reclaim_gun(b, p - Vec3::X * 0.8 * s, tip, 0.2 * s);
-    if !b.coarse() {
+    if b.fine() {
         b.paint(METAL);
         b.cylinder_between(
             p - Vec3::Y * 0.55 * s,
@@ -356,21 +358,24 @@ fn mirror_about(b: &mut MeshBuilder, y: f32, f: impl Fn(&mut MeshBuilder)) {
 
 // ---- running gear and hulls ------------------------------------------------
 
-/// A big off-road wheel on the +y side: a tyre with a chunky tread band, a dished hub.
-pub(super) fn road_wheel(b: &mut MeshBuilder, center: Vec3, radius: f32, width: f32) {
-    wheel(b, center, radius, width);
-    if b.fine() {
-        b.with_part(part::LOCOMOTION, |b| {
-            b.paint(ACCENT);
+/// An off-road tyre on the +y side, axis across the body: eight-sided like the other
+/// running gear's round parts at this size, a hub cap at full detail.
+fn tyre(b: &mut MeshBuilder, center: Vec3, radius: f32, width: f32) {
+    b.with_part(part::LOCOMOTION, |b| {
+        let half = Vec3::Y * (width * 0.5);
+        b.paint(TREAD);
+        b.cylinder_between(center - half, center + half, radius, radius, b.sides(8));
+        if b.fine() {
+            b.paint(PLATING);
             b.cylinder_between(
-                center + Vec3::Y * (width * 0.5 + 0.06),
-                center + Vec3::Y * (width * 0.5 + 0.16),
-                radius * 0.22,
-                radius * 0.16,
+                center + half,
+                center + half + Vec3::Y * 0.08,
+                radius * 0.55,
+                radius * 0.4,
                 6,
             );
-        });
-    }
+        }
+    });
 }
 
 /// A wheeled hull: `axles` (x of each) with wheels of `wheel_r` at `track` half-gauge,
@@ -394,7 +399,7 @@ pub(super) fn wheeled_hull(b: &mut MeshBuilder, h: &WheeledHull) -> Roof {
     let (scale, shift) = (v2(0.8, 0.8), -0.045 * length);
     b.mirror_y(|b| {
         for &x in h.axles {
-            road_wheel(b, v3(x, h.track, h.wheel_r), h.wheel_r, h.wheel_w);
+            tyre(b, v3(x, h.track, h.wheel_r), h.wheel_r, h.wheel_w);
         }
     });
     b.paint(ACCENT);
@@ -468,7 +473,7 @@ pub(super) fn hopper(b: &mut MeshBuilder, at: Vec3, size: glam::Vec2, depth: f32
     b.paint(ACCENT).pattern(pattern::MASS_FLOW);
     b.frustum(at, size * 0.86, size, depth, v2(0.0, 0.0));
     b.pattern(pattern::GENERIC);
-    if b.coarse() {
+    if !b.fine() {
         return;
     }
     b.paint(METAL);
@@ -482,7 +487,7 @@ pub(super) fn hopper(b: &mut MeshBuilder, at: Vec3, size: glam::Vec2, depth: f32
     if b.fine() {
         // Scrap heaped in the bin: tumbled plates.
         b.paint(PLATING_DARK);
-        for (i, (u, v)) in [(-0.2, -0.15), (0.18, 0.12), (0.0, 0.2), (0.25, -0.2)]
+        for (i, (u, v)) in [(-0.2, -0.15), (0.18, 0.12), (0.25, -0.2)]
             .into_iter()
             .enumerate()
         {
@@ -501,7 +506,7 @@ pub(super) fn chute(b: &mut MeshBuilder, top: Vec3, bottom: Vec3, width: f32) {
     b.paint(ACCENT).pattern(pattern::MASS_FLOW);
     b.beam(top, bottom, v2(width, width), v2(width, width));
     b.pattern(pattern::GENERIC);
-    if b.coarse() {
+    if !b.fine() {
         return;
     }
     b.paint(METAL);
@@ -528,7 +533,7 @@ pub(super) fn pylon(b: &mut MeshBuilder, at: Vec3, height: f32, r: f32) {
         r * 0.5,
         height * 0.82,
     );
-    if b.coarse() {
+    if !b.fine() {
         return;
     }
     b.paint(INTAKE);
@@ -550,4 +555,51 @@ pub(super) fn column(b: &mut MeshBuilder, at: Vec3, height: f32, r0: f32, r1: f3
             ],
         );
     });
+}
+
+// ---- coarse level ------------------------------------------------------------
+
+/// The coarse level of any land reclaimer, a few boxes: the running gear as one dark
+/// slab `gear` (x rear..front, half width, height), a white hull up to `deck`, and a
+/// block per head on its house so the heads still turn. `masts` pairs a head's pivot
+/// with the z its column rises from (none for a head sat on the hull).
+pub(super) fn coarse(
+    b: &mut MeshBuilder,
+    gear: (f32, f32, f32, f32),
+    deck: f32,
+    heads: &[(Vec3, f32)],
+) {
+    let (rear, front, half, height) = gear;
+    let length = front - rear;
+    let mid = (rear + front) * 0.5;
+    b.with_part(part::LOCOMOTION, |b| {
+        b.paint(TREAD);
+        b.cuboid_open(v3(mid, 0.0, height * 0.5), v3(length, half * 2.0, height));
+    });
+    b.paint(PLATING);
+    b.frustum_open(
+        v3(mid, 0.0, height),
+        v2(length * 0.96, half * 1.7),
+        v2(length * 0.78, half * 1.36),
+        deck - height,
+        v2(-0.04 * length, 0.0),
+    );
+    for (i, &(pivot, foot)) in heads.iter().enumerate() {
+        b.with_house(i, pivot, 0.0, |b| {
+            b.with_part(part::TURRET, |b| {
+                // One head's column fits the budget; three heads sit on their blocks.
+                if heads.len() == 1 {
+                    b.paint(ACCENT);
+                    b.cuboid_open(
+                        v3(pivot.x, pivot.y, (foot + pivot.z) * 0.5),
+                        v3(0.8, 0.8, pivot.z - foot),
+                    );
+                }
+                b.with_recoil(|b| {
+                    b.paint(PLATING);
+                    b.cuboid_open(pivot + Vec3::X * 0.4, v3(2.0, 1.0, 0.9));
+                });
+            });
+        });
+    }
 }

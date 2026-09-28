@@ -39,6 +39,9 @@ pub(in crate::aster) const HARVESTER_PIVOTS: [Vec3; 3] = [
 pub(in crate::aster) const HARVESTER_LASERS: [Vec3; 2] =
     [Vec3::new(0.2, 1.95, 4.2), Vec3::new(0.2, -1.95, 4.2)];
 
+/// The wheels' extent for the coarse level: rear, front, outer half width, height.
+const GEAR: (f32, f32, f32, f32) = (-6.1, 6.2, 3.1, 1.9);
+
 fn eight_wheels(b: &mut MeshBuilder) -> Roof {
     wheeled_hull(
         b,
@@ -71,7 +74,7 @@ fn nose(b: &mut MeshBuilder, deck: &Roof, front: f32) {
         b.paint(GLASS);
         b.cuboid(v3(front - 0.18, 1.7, 1.75), v3(0.04, 0.26, 0.2));
         b.paint(METAL);
-        b.block(v3(front - 0.2, 1.0, 1.05), v3(front + 0.15, 1.2, 1.3));
+        b.block(v3(front - 0.75, 1.0, 1.55), v3(front - 0.4, 1.2, 1.8));
     });
 }
 
@@ -81,7 +84,7 @@ fn engine(b: &mut MeshBuilder, deck: &Roof) {
         return;
     }
     b.mirror_y(|b| {
-        vent(b, deck.at(0.08, 0.55), v2(1.2, 0.7), 4, METAL);
+        vent(b, deck.at(0.08, 0.55), v2(1.2, 0.7), 3, METAL);
         b.paint(METAL);
         b.cylinder_between(
             v3(deck.rear + 0.2, deck.half_width - 0.2, deck.z),
@@ -95,6 +98,11 @@ fn engine(b: &mut MeshBuilder, deck: &Roof) {
 
 /// A: three heads on the spine, the middle one on a pedestal; lasers at the tail corners.
 pub(in crate::aster) fn thresher_a(b: &mut MeshBuilder, _tech: u8) {
+    if b.coarse() {
+        let [a, b1, c] = SPINE_PIVOTS;
+        coarse(b, GEAR, 2.75, &[(a, 2.75), (b1, 2.75), (c, 2.75)]);
+        return;
+    }
     let deck = eight_wheels(b);
     let [front, mid, rear] = SPINE_PIVOTS;
     // Pedestal: a white faceted block amidships, hoppers either side of it.
@@ -106,7 +114,7 @@ pub(in crate::aster) fn thresher_a(b: &mut MeshBuilder, _tech: u8) {
         mid.z - 0.62 - deck.z,
         v2(-0.1, 0.0),
     );
-    if !b.coarse() {
+    if b.fine() {
         b.paint(ACCENT);
         b.block(
             v3(mid.x - 1.2, -1.15, deck.z + 0.5),
@@ -136,6 +144,11 @@ pub(in crate::aster) fn thresher_a(b: &mut MeshBuilder, _tech: u8) {
 
 /// B: a mast head amidships and two ball heads in sponsons over the wheels.
 pub(in crate::aster) fn thresher_b(b: &mut MeshBuilder, _tech: u8) {
+    if b.coarse() {
+        let [a, b1, c] = FLANK_PIVOTS;
+        coarse(b, GEAR, 2.75, &[(a, 2.75), (b1, 2.75), (c, 2.75)]);
+        return;
+    }
     let deck = eight_wheels(b);
     let [top, left, right] = FLANK_PIVOTS;
     // Sponsons: dark tubs hung off the flanks between the wheel pairs.
@@ -149,7 +162,7 @@ pub(in crate::aster) fn thresher_b(b: &mut MeshBuilder, _tech: u8) {
         };
         b.paint(PLATING_DARK);
         b.block(v3(p.x - 1.0, y0, 2.2), v3(p.x + 1.0, y1, deck.z - 0.05));
-        if !b.coarse() {
+        if b.fine() {
             b.paint(ACCENT);
             b.block(v3(p.x - 0.9, y0, 1.95), v3(p.x + 0.9, y1 - 0.1 * side, 2.2));
         }
@@ -186,6 +199,11 @@ pub(in crate::aster) fn thresher_b(b: &mut MeshBuilder, _tech: u8) {
 
 /// C: six wheels, two lance heads on the front shoulders, a tower head aft.
 pub(in crate::aster) fn thresher_c(b: &mut MeshBuilder, _tech: u8) {
+    if b.coarse() {
+        let [a, b1, c] = HARVESTER_PIVOTS;
+        coarse(b, GEAR, 2.75, &[(a, 2.75), (b1, 2.75), (c, 2.75)]);
+        return;
+    }
     let deck = wheeled_hull(
         b,
         &WheeledHull {
@@ -214,7 +232,7 @@ pub(in crate::aster) fn thresher_c(b: &mut MeshBuilder, _tech: u8) {
     }
     reclaim_head(b, 1, left, left.z - 0.45, 0.85, Head::Lance);
     reclaim_head(b, 2, right, right.z - 0.45, 0.85, Head::Lance);
-    // Tower over the tail: a tapering octagonal drum, pylons at its feet.
+    // Tower over the tail: a tapering octagonal drum.
     let (foot, crown) = (deck.z - 0.05, tower.z - 0.66);
     b.paint(ACCENT);
     b.at(v3(tower.x, 0.0, 0.0), |b| {
@@ -227,7 +245,7 @@ pub(in crate::aster) fn thresher_c(b: &mut MeshBuilder, _tech: u8) {
             ],
         );
     });
-    if !b.coarse() {
+    if b.fine() {
         b.paint(PLATING);
         b.prism(v3(tower.x, 0.0, foot + 1.1), b.sides(8), 1.62, 1.55, 0.3);
         team_panel(b, v3(tower.x - 1.55, 0.0, foot), v2(0.25, 1.0));
@@ -240,7 +258,6 @@ pub(in crate::aster) fn thresher_c(b: &mut MeshBuilder, _tech: u8) {
         0.4,
     );
     reclaim_head(b, 0, tower, crown, 1.1, Head::Ball);
-    b.mirror_y(|b| pylon(b, v3(-5.0, 1.9, deck.z), 1.6, 0.17));
     hopper(b, v3(0.3, 0.0, deck.z), v2(2.4, 2.6), 0.55);
     for at in HARVESTER_LASERS {
         pd_laser(b, at, 0.42, Some(deck.z));

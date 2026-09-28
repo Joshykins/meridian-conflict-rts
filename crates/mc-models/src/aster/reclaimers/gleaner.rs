@@ -15,6 +15,9 @@ pub(in crate::aster) const TOWER_PIVOT: Vec3 = Vec3::new(-0.4, 0.0, 4.55);
 /// Variant C, "Crane": a lance head on an A-frame at the back of a wheeled carrier.
 pub(in crate::aster) const CRANE_PIVOT: Vec3 = Vec3::new(-2.1, 0.0, 5.3);
 
+/// The tracks' extent for the coarse level: rear, front, outer half width, height.
+const TRACKS: (f32, f32, f32, f32) = (-3.7, 3.8, 2.6, 1.2);
+
 fn tracks(b: &mut MeshBuilder) -> Roof {
     tracked_chassis(
         b,
@@ -51,6 +54,10 @@ fn tracked_deck(b: &mut MeshBuilder, deck: &Roof, hopper_u: f32) {
 
 /// A: tracked hull, a slim two-stage mast at the rear carrying a cradle head.
 pub(in crate::aster) fn gleaner_a(b: &mut MeshBuilder, _tech: u8) {
+    if b.coarse() {
+        coarse(b, TRACKS, 1.85, &[(MAST_PIVOT, 1.85)]);
+        return;
+    }
     let deck = tracks(b);
     let p = MAST_PIVOT;
     // Mast foot: a dark drum on the deck, bolted down.
@@ -78,7 +85,7 @@ pub(in crate::aster) fn gleaner_a(b: &mut MeshBuilder, _tech: u8) {
                 v3(p.x - 0.62, 0.0, base + 1.55),
                 0.3,
             );
-            if !b.coarse() {
+            if b.fine() {
                 b.paint(PLATING);
                 b.plate(v3(p.x - 0.72, 0.0, base + 1.6), v2(0.6, 0.9), 0.06, 0.02);
                 b.paint(METAL);
@@ -99,6 +106,10 @@ pub(in crate::aster) fn gleaner_a(b: &mut MeshBuilder, _tech: u8) {
 /// B: tracked hull, a squat faceted tower amidships with a ball head on it, and
 /// four collector pylons at the deck corners, as on the reclaim tower.
 pub(in crate::aster) fn gleaner_b(b: &mut MeshBuilder, _tech: u8) {
+    if b.coarse() {
+        coarse(b, TRACKS, 1.85, &[(TOWER_PIVOT, 1.85)]);
+        return;
+    }
     let deck = tracks(b);
     let p = TOWER_PIVOT;
     let (foot, top) = (deck.z - 0.1, p.z - 0.62);
@@ -113,7 +124,7 @@ pub(in crate::aster) fn gleaner_b(b: &mut MeshBuilder, _tech: u8) {
             ],
         );
     });
-    if !b.coarse() {
+    if b.fine() {
         // White plates on the tower's cardinal faces, team on the rear one.
         let apothem = 1.35 * (std::f32::consts::PI / 8.0).cos();
         for (i, yaw) in [0.0f32, 90.0, 180.0, 270.0].into_iter().enumerate() {
@@ -153,6 +164,10 @@ pub(in crate::aster) fn gleaner_b(b: &mut MeshBuilder, _tech: u8) {
 /// C: a six-wheeled carrier, cab forward, hoppers amidships, a lance head on an
 /// A-frame over the tail.
 pub(in crate::aster) fn gleaner_c(b: &mut MeshBuilder, _tech: u8) {
+    if b.coarse() {
+        coarse(b, (-3.8, 3.9, 2.35, 1.2), 1.75, &[(CRANE_PIVOT, 1.75)]);
+        return;
+    }
     let deck = wheeled_hull(
         b,
         &WheeledHull {
@@ -177,7 +192,7 @@ pub(in crate::aster) fn gleaner_c(b: &mut MeshBuilder, _tech: u8) {
         0.95,
         v2(-0.35, 0.0),
     );
-    if !b.coarse() {
+    if b.fine() {
         on_slope(b, [cab1, deck.z], [cab1 - 0.45, deck.z + 0.9], 0.5, |b| {
             b.paint(GLASS);
             b.plate(Vec3::ZERO, v2(0.6, 2.2), 0.05, 0.02);
