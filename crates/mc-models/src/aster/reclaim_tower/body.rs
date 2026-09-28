@@ -1,12 +1,7 @@
-//! The tower from the ground to the head house, in the two bodies open to the user
-//! (CLAUDE.md section 9):
-//! - Spire: an armoured octagonal foot, a tapering octagonal shaft braced by four
-//!   sculpted fins on its diagonals, dark inset panels with light slits, and the flow
-//!   channel glazed into its back.
-//! - Cage: a round armoured foot, a dark core ringed by a glazed flow band, held in a
-//!   cage of eight bowed ribs.
-//!
-//! Both carry an armoured crown (the head house) the head turns on.
+//! The tower from the ground to the head house: an armoured octagonal foot, a tapering
+//! octagonal shaft braced by four sculpted fins on its diagonals, dark inset panels with
+//! light slits, the flow channel glazed into its back, and the armoured crown (the head
+//! house) the head turns on.
 
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
@@ -25,41 +20,17 @@ const SPIRE_FOOT: f32 = 8.6;
 /// Half the spire's shaft at the foot, and how much it narrows by the crown.
 const SPIRE_SHAFT: f32 = 5.4;
 const SPIRE_TAPER: f32 = 0.84;
-/// The cage: its foot's radius at the ground, the core's, and the ribs' widest.
-const CAGE_FOOT: f32 = 8.4;
-const CAGE_CORE: f32 = 4.4;
-const CAGE_RIB: f32 = 6.5;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Body {
-    Spire,
-    Cage,
-}
-
-impl Body {
-    /// How far out from the axis the shaft's face is at height `z` (above the foot):
-    /// where works hung on the tower meet it.
-    pub(super) fn half(self, z: f32) -> f32 {
-        match self {
-            Body::Spire => spire_half(z),
-            Body::Cage => CAGE_RIB,
-        }
-    }
-}
-
-/// The spire's shaft half width at height `z`.
-fn spire_half(z: f32) -> f32 {
+/// How far out from the axis the shaft's face is at height `z` (above the foot): where
+/// works hung on the tower meet it.
+pub(super) fn spire_half(z: f32) -> f32 {
     let f = ((z - FOOT) / (CAP - FOOT)).clamp(0.0, 1.0);
     SPIRE_SHAFT * (1.0 - (1.0 - SPIRE_TAPER) * f)
 }
 
-/// The foot as one block, the shaft and crown as another, and the first tank.
-pub(super) fn coarse(b: &mut MeshBuilder, body: Body) {
+/// The foot as one block, the shaft and crown as another.
+pub(super) fn coarse(b: &mut MeshBuilder) {
     b.paint(PLATING);
-    let foot = match body {
-        Body::Spire => SPIRE_FOOT,
-        Body::Cage => CAGE_FOOT * 0.9,
-    };
+    let foot = SPIRE_FOOT;
     b.frustum_open(
         Vec3::ZERO,
         Vec2::splat(foot * 2.0),
@@ -76,12 +47,9 @@ pub(super) fn coarse(b: &mut MeshBuilder, body: Body) {
     );
 }
 
-pub(super) fn body(b: &mut MeshBuilder, body: Body) {
-    match body {
-        Body::Spire => spire(b),
-        Body::Cage => cage(b),
-    }
-    crown(b, body);
+pub(super) fn body(b: &mut MeshBuilder) {
+    spire(b);
+    crown(b);
 }
 
 /// Emits `f` on the faces of the tower at these quarter turns (0 = front, +x).
@@ -90,8 +58,6 @@ fn faces(b: &mut MeshBuilder, quarters: &[u8], f: impl Fn(&mut MeshBuilder)) {
         b.yawed(Vec3::ZERO, f32::from(q) * FRAC_PI_2, |b| f(b));
     }
 }
-
-// ---- Spire -----------------------------------------------------------------------
 
 fn spire(b: &mut MeshBuilder) {
     // The armoured foot: sloped faces stepping in to a shoulder.
@@ -217,7 +183,7 @@ fn spire(b: &mut MeshBuilder) {
     });
     // Four fins on the diagonals, from the foot's shoulder high up the shaft.
     for i in 0..4 {
-        b.yawed(Vec3::ZERO, FRAC_PI_4 + i as f32 * FRAC_PI_2, |b| fin(b));
+        b.yawed(Vec3::ZERO, FRAC_PI_4 + i as f32 * FRAC_PI_2, fin);
     }
     // A band round the shaft where the fins end.
     b.paint(ACCENT);
@@ -261,106 +227,12 @@ fn fin(b: &mut MeshBuilder) {
     }
 }
 
-// ---- Cage ------------------------------------------------------------------------
-
-fn cage(b: &mut MeshBuilder) {
-    let sides = b.sides(16);
-    // The round armoured foot, stepping in to a shoulder, a dark band round it.
-    b.paint(PLATING);
-    b.prism(Vec3::ZERO, sides, CAGE_FOOT, CAGE_FOOT * 0.93, 5.4);
-    b.prism(
-        v3(0.0, 0.0, 5.4),
-        sides,
-        CAGE_FOOT * 0.93,
-        CAGE_RIB,
-        FOOT - 5.4,
-    );
-    b.paint(PLATING_DARK);
-    b.prism(
-        v3(0.0, 0.0, 1.2),
-        sides,
-        CAGE_FOOT - 0.02,
-        CAGE_FOOT * 0.955,
-        3.2,
-    );
-    if b.mid() {
-        b.paint(GLOW);
-        b.prism(
-            v3(0.0, 0.0, 4.9),
-            sides,
-            CAGE_FOOT * 0.936,
-            CAGE_FOOT * 0.934,
-            0.18,
-        );
-    }
-    if b.fine() {
-        // Doors round the band, a lamp over each.
-        faces(b, &[0, 1, 2, 3], |b| {
-            b.paint(ACCENT);
-            b.block(
-                v3(CAGE_FOOT - 0.4, -1.2, 0.0),
-                v3(CAGE_FOOT + 0.05, 1.2, 3.4),
-            );
-            b.paint(GLOW_LAMP);
-            b.cuboid(v3(CAGE_FOOT - 0.05, 0.0, 3.8), v3(0.3, 0.8, 0.25));
-        });
-    }
-    // The dark core, and the glazed band the flow is seen falling through.
-    b.paint(PLATING_DARK);
-    b.prism(
-        v3(0.0, 0.0, FOOT),
-        sides,
-        CAGE_CORE,
-        CAGE_CORE * 0.9,
-        CAP - FOOT + 0.2,
-    );
-    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-    b.prism(
-        v3(0.0, 0.0, 11.5),
-        sides,
-        CAGE_CORE * 0.99 + 0.1,
-        CAGE_CORE * 0.93 + 0.1,
-        11.0,
-    );
-    // Rings the ribs are tied to.
-    b.paint(ACCENT);
-    for z in [11.0, 22.6] {
-        b.prism(v3(0.0, 0.0, z), sides, CAGE_RIB + 0.1, CAGE_RIB + 0.1, 0.6);
-    }
-    // Eight ribs bowing out from the shoulder and in to the crown.
-    let ribs = if b.fine() { 8 } else { 4 };
-    b.radial(ribs, |b| {
-        let (a, m, c) = (
-            v3(CAGE_RIB - 0.3, 0.0, FOOT - 0.4),
-            v3(CAGE_RIB + 0.4, 0.0, 16.8),
-            v3(CROWN - 1.0, 0.0, CAP),
-        );
-        b.paint(PLATING);
-        b.beam(a, m, Vec2::new(1.1, 1.0), Vec2::new(0.95, 1.0));
-        b.beam(m, c, Vec2::new(0.95, 1.0), Vec2::new(1.1, 1.0));
-        if b.fine() {
-            b.paint(PLATING_DARK);
-            b.cuboid(m + Vec3::X * 0.1, v3(1.1, 1.3, 1.6));
-        }
-    });
-    if b.fine() {
-        // A lamp on the upper ring over each quarter.
-        faces(b, &[0, 1, 2, 3], |b| {
-            b.paint(GLOW_LAMP);
-            b.cuboid(v3(CAGE_RIB + 0.2, 0.0, 23.35), v3(0.3, 0.6, 0.25));
-        });
-    }
-}
-
 // ---- Crown -----------------------------------------------------------------------
 
 /// The armoured crown the head turns on: flared out from the shaft, straight sides, a
 /// dark band round it with lamps, a slope in to its roof.
-fn crown(b: &mut MeshBuilder, body: Body) {
-    let under = match body {
-        Body::Spire => spire_half(CAP - 1.4),
-        Body::Cage => CROWN - 1.0,
-    } / CROWN;
+fn crown(b: &mut MeshBuilder) {
+    let under = spire_half(CAP - 1.4) / CROWN;
     b.paint(PLATING);
     b.with_bevel(0.15, |b| {
         b.loft_z(

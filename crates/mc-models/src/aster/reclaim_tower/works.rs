@@ -11,7 +11,7 @@ use glam::{Vec2, Vec3};
 
 use super::super::parts::*;
 use super::super::structures::kit;
-use super::body::{Body, CROWN};
+use super::body::{spire_half, CROWN};
 use super::{chute, CAP, FOOT, HOUSE};
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
@@ -54,7 +54,7 @@ pub(super) fn foundation(b: &mut MeshBuilder) {
 }
 
 /// The upgrades' works, each on its tier's kit.
-pub(super) fn tiers(b: &mut MeshBuilder, tech: u8, body: Body) {
+pub(super) fn tiers(b: &mut MeshBuilder, tech: u8) {
     kit(b, tech, 2, 0.3, |b| {
         tank(b, TANK[1]);
         chute(
@@ -66,12 +66,12 @@ pub(super) fn tiers(b: &mut MeshBuilder, tech: u8, body: Body) {
         refinery(b);
     });
     kit(b, tech, 2, 0.6, |b| {
-        pods(b, body);
-        collar(b, body);
+        pods(b);
+        collar(b);
     });
     kit(b, tech, 3, 0.35, |b| {
         capacitors(b);
-        foot_armour(b, body);
+        foot_armour(b);
     });
     kit(b, tech, 3, 0.7, |b| {
         // Twin conduits from the tanks up to the crown's back corners.
@@ -238,9 +238,9 @@ fn refinery(b: &mut MeshBuilder) {
 
 /// Tech 2: a processing pod hung on each flank of the shaft: an armoured capsule with a
 /// sloped belly, a dark inset, a glazed window on the flow, a feed pipe up to the crown.
-fn pods(b: &mut MeshBuilder, body: Body) {
+fn pods(b: &mut MeshBuilder) {
     let z = 14.0;
-    let face = body.half(z);
+    let face = spire_half(z);
     b.mirror_y(|b| {
         let c = v3(0.6, face + 1.6, z);
         b.paint(PLATING);
@@ -279,9 +279,9 @@ fn pods(b: &mut MeshBuilder, body: Body) {
 }
 
 /// Tech 2: a dark collar round the shaft above the pods, lamps at its corners.
-fn collar(b: &mut MeshBuilder, body: Body) {
+fn collar(b: &mut MeshBuilder) {
     let z = 19.2;
-    let half = body.half(z) + 0.8;
+    let half = spire_half(z) + 0.8;
     b.paint(PLATING_DARK);
     b.loft_z(
         &chamfered_rect(Vec2::splat(half), 2.0),
@@ -331,11 +331,8 @@ fn capacitors(b: &mut MeshBuilder) {
 }
 
 /// Tech 3: heavy plates over the foot's flanks.
-fn foot_armour(b: &mut MeshBuilder, body: Body) {
-    let r = match body {
-        Body::Spire => 8.7,
-        Body::Cage => 8.5,
-    };
+fn foot_armour(b: &mut MeshBuilder) {
+    let r = 8.7;
     for q in [1, 3] {
         b.yawed(Vec3::ZERO, q as f32 * std::f32::consts::FRAC_PI_2, |b| {
             b.paint(PLATING);

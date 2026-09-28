@@ -27,8 +27,6 @@ mod body;
 mod turret;
 mod works;
 
-pub(super) use body::Body;
-
 /// Collision radius at every tier: a 3x3 lot of 12 m cells.
 pub(super) const RADIUS: f32 = 16.9;
 /// Authored height, the same at every tier: upgrades build round the tower, not up it.
@@ -57,28 +55,18 @@ const FOOT: f32 = 7.5;
 #[cfg(test)]
 pub(crate) const TRIANGLES: usize = 7500;
 
-/// The tower in the spire body.
 pub(super) fn tower(b: &mut MeshBuilder, tech: u8) {
-    build(b, tech, Body::Spire);
-}
-
-/// The tower in the cage body.
-pub(super) fn tower_cage(b: &mut MeshBuilder, tech: u8) {
-    build(b, tech, Body::Cage);
-}
-
-fn build(b: &mut MeshBuilder, tech: u8, body: Body) {
     let tech = tech.clamp(1, 3);
     if b.coarse() {
-        body::coarse(b, body);
+        body::coarse(b);
         works::coarse(b);
         turret::turret(b, tech);
         return;
     }
-    body::body(b, body);
+    body::body(b);
     works::foundation(b);
     turret::turret(b, tech);
-    works::tiers(b, tech, body);
+    works::tiers(b, tech);
 }
 
 /// A glazed chute carrying reclaimed material from `from` down to `to`: dark
