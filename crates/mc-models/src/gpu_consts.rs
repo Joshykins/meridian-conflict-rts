@@ -281,6 +281,10 @@ shared! {
         pub const R: f32 = 1.0;
         pub const G: f32 = 0.147;
         pub const B: f32 = 0.0467;
+        /// `pattern::MASS_FLOW`: a chute with material falling down it while the unit reclaims.
+        pub const FLOW_PATTERN: u32 = 30;
+        /// How fast the clumps fall down a chute, metres a second.
+        pub const FLOW_SPEED: f32 = 7.0;
     }
 
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
