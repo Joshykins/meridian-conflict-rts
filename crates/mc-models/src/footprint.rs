@@ -683,9 +683,9 @@ mod tests {
     #[test]
     fn commander_feet_are_not_a_disc() {
         let (tex, half, h) = hull("commander", 10.4, 24.0, 1);
-        // Soles sit at y ≈ ±1.85. A radius disc would fill the gap between them.
-        assert!(hull_inside(&tex, half, h, [0.4, 1.85, 0.4]), "left sole");
-        assert!(hull_inside(&tex, half, h, [0.4, -1.85, 0.4]), "right sole");
+        // Soles sit at y ≈ ±2.6. A radius disc would fill the gap between them.
+        assert!(hull_inside(&tex, half, h, [0.4, 2.6, 0.4]), "left sole");
+        assert!(hull_inside(&tex, half, h, [0.4, -2.6, 0.4]), "right sole");
         assert!(
             !hull_inside(&tex, half, h, [0.0, 0.0, 0.4]),
             "the gap between the feet is not a contact disc"

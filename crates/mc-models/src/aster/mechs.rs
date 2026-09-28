@@ -4,7 +4,7 @@
 //! the waist ring (torso, arms, head) is the `TURRET`, twisting about the
 //! model's z axis so arm-mounted muzzles track the sim's muzzle offsets.
 
-use glam::{Vec2, Vec3};
+use glam::{Affine3A, Vec2, Vec3};
 
 use super::bolt_rifle::bolt_rifle;
 use super::parts::*;
@@ -181,110 +181,126 @@ const AUX_HEAD_STOWED: f32 = -1.88;
 /// is its tip run out.
 const LANCE_TIP: f32 = 6.7;
 
+/// A commander's leg, splayed: `knee` and `ankle` lie on one line out from the hip. The
+/// leg is built upright under the hip and rolled out about it whole, so every plate, hub
+/// and cap runs along the leg; only the foot stays square on the ground.
 fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
+    let roll = (ankle.y - hip.y).atan2(hip.z - ankle.z);
+    let upright = |p: Vec3| v3(p.x, hip.y, hip.z - (hip.z - p.z) / roll.cos());
+    let splay = Affine3A::from_translation(hip)
+        * Affine3A::from_rotation_x(roll)
+        * Affine3A::from_translation(-hip);
+    let (foot_at, knee, ankle) = (ankle, upright(knee), upright(ankle));
     b.with_part(part::LOCOMOTION, |b| {
         if b.coarse() {
             // From this far the legs are their white greaves and cuisses.
             b.paint(PLATING);
             b.frustum_open(
-                v3(ankle.x + 0.5, ankle.y, 0.0),
+                v3(foot_at.x + 0.5, foot_at.y, 0.0),
                 v2(3.2, 1.75),
                 v2(1.5, 1.6),
                 hip.z,
-                v2(hip.x - ankle.x - 0.5, hip.y - ankle.y),
+                v2(hip.x - foot_at.x - 0.5, hip.y - foot_at.y),
             );
             return;
         }
-        b.with_limb(rig::THIGH, |b| {
-            b.paint(ACCENT);
-            b.beam(hip, knee, v2(1.35, 1.5), v2(1.1, 1.2));
-            b.cylinder_between(hip - Vec3::Y * 0.82, hip + Vec3::Y * 0.82, 0.9, 0.9, 6);
-            // Cuisse: a white plate over the front and outside of the thigh.
-            b.paint(PLATING);
-            b.beam(
-                hip + v3(0.55, 0.15, -0.5),
-                knee + v3(0.5, 0.15, 0.8),
-                v2(1.6, 0.72),
-                v2(1.3, 0.6),
-            );
-            if b.fine() {
-                // A hydraulic ram down the back of the thigh.
-                b.paint(METAL);
-                b.cylinder_between(
-                    hip + v3(-0.72, 0.0, -0.4),
-                    knee + v3(-0.66, 0.0, 0.6),
-                    0.18,
-                    0.15,
-                    6,
-                );
-            }
-        });
-        b.with_limb(rig::SHIN, |b| {
-            b.paint(METAL);
-            b.cylinder_between(knee - Vec3::Y * 0.78, knee + Vec3::Y * 0.78, 0.76, 0.76, 6);
-            b.paint(ACCENT);
-            b.beam(knee, ankle, v2(1.05, 1.2), v2(0.9, 1.0));
-            // Greave, with a black knee cap standing proud between it and the cuisse.
-            b.paint(PLATING);
-            b.beam(
-                knee + v3(0.36, 0.0, -0.7),
-                ankle + v3(0.52, 0.0, 0.55),
-                v2(1.55, 1.1),
-                v2(1.2, 0.82),
-            );
-            b.paint(ACCENT);
-            b.frustum(
-                knee + v3(0.72, 0.0, -0.6),
-                v2(0.7, 1.35),
-                v2(0.42, 0.9),
-                1.35,
-                v2(0.13, 0.0),
-            );
-            if b.fine() {
-                // The knee's hub on its outside.
-                b.paint(ACCENT);
-                b.cylinder_between(knee + Vec3::Y * 0.78, knee + Vec3::Y * 0.94, 0.6, 0.5, 6);
-                b.paint(TEAM);
-                b.beam(
-                    knee + v3(0.24, 0.6, -1.3),
-                    ankle + v3(0.4, 0.56, 1.2),
-                    v2(0.62, 0.07),
-                    v2(0.5, 0.07),
-                );
-                // The calf ram.
-                b.paint(METAL);
-                b.cylinder_between(
-                    knee + v3(-0.7, 0.0, -0.5),
-                    ankle + v3(-0.56, 0.0, 0.5),
-                    0.2,
-                    0.15,
-                    6,
-                );
-                b.module("eng_3", 0.72, |b| {
-                    // Suite III: feed conduits down the greaves.
-                    b.paint(GLOW_AMBER);
-                    b.beam(
-                        knee + v3(0.92, 0.0, -1.1),
-                        ankle + v3(0.94, 0.0, 0.9),
-                        v2(0.28, 0.07),
-                        v2(0.22, 0.07),
-                    );
-                });
-            }
-        });
+        b.with(splay, |b| commander_leg_upright(b, hip, knee, ankle));
         b.with_limb(rig::FOOT, |b| {
-            b.paint(METAL);
-            b.cylinder_between(
-                ankle - Vec3::Y * 0.65,
-                ankle + Vec3::Y * 0.65,
-                0.58,
-                0.58,
-                6,
-            );
             // Square under the shin: the leg bends in its own plane, so a foot turned
             // out would twist against it at the ankle.
-            b.at(v3(ankle.x, ankle.y, 0.0), commander_foot);
+            b.at(v3(foot_at.x, foot_at.y, 0.0), commander_foot);
         });
+    });
+}
+
+/// [`commander_leg`] before it is rolled out: straight down from the hip.
+fn commander_leg_upright(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
+    b.with_limb(rig::THIGH, |b| {
+        b.paint(ACCENT);
+        b.beam(hip, knee, v2(1.35, 1.5), v2(1.1, 1.2));
+        b.cylinder_between(hip - Vec3::Y * 0.82, hip + Vec3::Y * 0.82, 0.9, 0.9, 6);
+        // Cuisse: a white plate over the front and outside of the thigh.
+        b.paint(PLATING);
+        b.beam(
+            hip + v3(0.55, 0.0, -0.5),
+            knee + v3(0.5, 0.0, 0.8),
+            v2(1.6, 0.72),
+            v2(1.5, 0.6),
+        );
+        if b.fine() {
+            // A hydraulic ram down the back of the thigh.
+            b.paint(METAL);
+            b.cylinder_between(
+                hip + v3(-0.72, 0.0, -0.4),
+                knee + v3(-0.66, 0.0, 0.6),
+                0.18,
+                0.15,
+                6,
+            );
+        }
+    });
+    b.with_limb(rig::SHIN, |b| {
+        b.paint(METAL);
+        b.cylinder_between(knee - Vec3::Y * 0.78, knee + Vec3::Y * 0.78, 0.76, 0.76, 6);
+        b.paint(ACCENT);
+        b.beam(knee, ankle, v2(1.05, 1.2), v2(0.9, 1.0));
+        // Greave, with a black knee cap standing proud between it and the cuisse.
+        b.paint(PLATING);
+        b.beam(
+            knee + v3(0.36, 0.0, -0.7),
+            ankle + v3(0.52, 0.0, 0.55),
+            v2(1.55, 1.1),
+            v2(1.6, 0.82),
+        );
+        b.paint(ACCENT);
+        b.frustum(
+            knee + v3(0.72, 0.0, -0.6),
+            v2(0.7, 1.35),
+            v2(0.42, 0.9),
+            1.35,
+            v2(0.13, 0.0),
+        );
+        if b.fine() {
+            // The knee's hub on its outside.
+            b.paint(ACCENT);
+            b.cylinder_between(knee + Vec3::Y * 0.78, knee + Vec3::Y * 0.94, 0.6, 0.5, 6);
+            b.paint(TEAM);
+            b.beam(
+                knee + v3(0.24, 0.6, -1.3),
+                ankle + v3(0.4, 0.56, 1.2),
+                v2(0.62, 0.07),
+                v2(0.5, 0.07),
+            );
+            // The calf ram.
+            b.paint(METAL);
+            b.cylinder_between(
+                knee + v3(-0.7, 0.0, -0.5),
+                ankle + v3(-0.56, 0.0, 0.5),
+                0.2,
+                0.15,
+                6,
+            );
+            b.module("eng_3", 0.72, |b| {
+                // Suite III: feed conduits down the greaves.
+                b.paint(GLOW_AMBER);
+                b.beam(
+                    knee + v3(0.92, 0.0, -1.1),
+                    ankle + v3(0.94, 0.0, 0.9),
+                    v2(0.28, 0.07),
+                    v2(0.22, 0.07),
+                );
+            });
+        }
+    });
+    b.with_limb(rig::FOOT, |b| {
+        b.paint(METAL);
+        b.cylinder_between(
+            ankle - Vec3::Y * 0.65,
+            ankle + Vec3::Y * 0.65,
+            0.58,
+            0.58,
+            6,
+        );
     });
 }
 
@@ -361,13 +377,15 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
     // a foot is down for over half the cycle, so one is always planted and the
     // body never leaves the ground. Its long stride needs more reach than the
     // straight legs have, so it settles onto bent knees as it gets going.
-    // The hips sit in close under the pelvis and the legs run a little out to the feet,
-    // near straight, as a person stands. Standing, it carries its weight on one leg and
+    // The hips sit in close under the pelvis and the legs run straight out to the feet,
+    // near straight, as a person stands with their feet apart. Standing, it carries its weight on one leg and
     // eases the other now and then (the shader's `idle_stance`).
-    let (hip, knee, ankle) = (
-        v3(-0.1, 1.15, 8.7),
-        v3(0.7, 1.45, 4.75),
-        v3(-0.3, 1.75, 1.3),
+    // The knee on the line from hip to ankle, so the leg runs straight out.
+    let (hip, ankle) = (v3(-0.1, 1.15, 8.7), v3(-0.3, 2.45, 1.3));
+    let knee = v3(
+        0.7,
+        hip.y + (ankle.y - hip.y) * (8.7 - 4.75) / (8.7 - 1.3),
+        4.75,
     );
     b.set_legs(hip, knee, ankle, 16.0, 0.55, 1.3);
     b.set_walk_crouch(1.3);
