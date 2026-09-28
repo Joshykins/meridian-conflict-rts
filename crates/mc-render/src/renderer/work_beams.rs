@@ -39,7 +39,11 @@ pub(super) struct GpuBeam {
     start: f32,
     /// Negative while the beam is on.
     end: f32,
-    pad: [f32; 2],
+    /// Its length when it came on, which sets how long a bit takes up it. Fixed for the
+    /// beam's life: the shader's bit phase is `time / trip`, so a trip that followed the
+    /// length as its unit moved would send every bit racing up and down the beam.
+    trip_len: f32,
+    pad: f32,
 }
 
 /// The beams on and the beams emptying out.
@@ -101,11 +105,13 @@ impl WorkBeams {
             *head += 1;
             let mut start = on_since;
             let mut from_prev = beam.from;
+            let mut trip_len = length_of(beam);
             if let Some(old) = was.remove(&key) {
                 let jump = Vec3::from(old.beam.to).distance(Vec3::from(beam.to_prev));
                 if jump <= JUMP + beam.radius {
                     start = old.start;
                     from_prev = old.beam.from;
+                    trip_len = old.trip_len;
                 } else {
                     shut_off(old, &mut self.ended);
                 }
@@ -125,7 +131,8 @@ impl WorkBeams {
                     seed: seed_of(key),
                     start,
                     end: -1.0,
-                    pad: [0.0; 2],
+                    trip_len,
+                    pad: 0.0,
                 },
             );
         }
@@ -168,6 +175,12 @@ impl Pose {
         );
         self.prev + turned
     }
+}
+
+/// Emitter to where the beam grips its target (beams.wgsl `vs_beam`: `grip`).
+fn length_of(beam: &mc_sim::reclaim::BeamInstance) -> f32 {
+    let grip = Vec3::from(beam.to) + Vec3::Z * beam.height * 0.55;
+    Vec3::from(beam.from).distance(grip)
 }
 
 /// A number in 0..1000 for this beam, the same every tick it is on.

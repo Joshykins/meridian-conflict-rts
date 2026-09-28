@@ -27,7 +27,10 @@ struct Beam {
     // Seconds, on the clock of globals.camera.w. `end` is negative while the beam is on.
     start: f32,
     end: f32,
-    pad: vec2<f32>,
+    // Its length when it came on: sets a bit's trip time, fixed so bits keep their pace
+    // while the beam stretches or shrinks under a moving unit.
+    trip_len: f32,
+    pad: f32,
 }
 
 @group(1) @binding(1) var<storage, read> beams: array<Beam>;
@@ -208,7 +211,9 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         return hidden();
     }
     let seed = f32(slot) * 7.31 + b.seed;
-    let trip = clamp(len / 42.0, 0.55, 3.2) * (0.8 + 0.5 * hash(seed + 1.0));
+    // From the length the beam came on at, not `len`: `turns` is time / trip, so a trip
+    // that changed as the unit moved would spin every bit's phase many times a second.
+    let trip = clamp(b.trip_len / 42.0, 0.55, 3.2) * (0.8 + 0.5 * hash(seed + 1.0));
     let turns = time / trip + hash(seed + 2.0);
     let phase = fract(turns);
     // A bit exists only if it left while the beam was on: reclaim fills from the
