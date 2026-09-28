@@ -668,7 +668,7 @@ fn weapons_keep_their_target_when_a_closer_enemy_appears() {
 #[test]
 fn an_attack_order_fires_at_full_range() {
     let mut w = world();
-    // Tank gun is 180 m. 90 % of that is 162 m. Park the dummy just inside
+    // Tank gun is 300 m. 90 % of that is 270 m. Park the dummy just inside
     // max range so a close-in walk would move, but a fire order must not.
     w.tick(&[
         spawn(&w, 0, "aster_t1_tank", 500, 0),
@@ -676,7 +676,7 @@ fn an_attack_order_fires_at_full_range() {
             &w,
             1,
             "aster_t1_tank",
-            670,
+            795,
             flag::PASSIVE | flag::INVULNERABLE,
         ),
     ])

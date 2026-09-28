@@ -90,7 +90,7 @@ fn guards_hold_their_spot_chase_what_comes_in_and_walk_back() {
         units: ids,
         pos: spot,
         target: mc_sim::Handle::NONE,
-        radius: Fx::from_int(300),
+        radius: Fx::from_int(500),
         queue: false,
     };
     give(&mut w, 0, c);
@@ -113,7 +113,7 @@ fn guards_hold_their_spot_chase_what_comes_in_and_walk_back() {
         );
     }
     // Inside the area, beyond gun range: chased.
-    w.state.units.pos[far] = FxVec2::from_ints(1150, 600);
+    w.state.units.pos[far] = FxVec2::from_ints(1350, 600);
     w.state.units.prev_pos[far] = w.state.units.pos[far];
     let far_id = id(&w, far);
     run(&mut w, 8);

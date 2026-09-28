@@ -566,17 +566,17 @@ mod tests {
             of(&b, "aster_t1_scout"),
             vec![
                 (Reach::Direct, 0, 0.0, 140.0),
-                (Reach::Radar, 0, 0.0, 800.0)
+                (Reach::Radar, 0, 0.0, 3000.0)
             ]
         );
         assert_eq!(
             of(&b, "aster_t1_tank"),
-            vec![(Reach::Direct, 0, 0.0, 180.0)]
+            vec![(Reach::Direct, 0, 0.0, 300.0)]
         );
         // A howitzer has a dead zone, a missile rack is its own kind.
         assert_eq!(
             of(&b, "aster_t1_artillery"),
-            vec![(Reach::Indirect, 0, 60.0, 320.0)]
+            vec![(Reach::Indirect, 0, 60.0, 440.0)]
         );
         assert_eq!(
             of(&b, "aster_t2_missile"),
@@ -601,15 +601,15 @@ mod tests {
         );
         assert_eq!(
             of(&b, "aster_t1_radar"),
-            vec![(Reach::Radar, 0, 0.0, 2000.0)]
+            vec![(Reach::Radar, 0, 0.0, 3000.0)]
         );
         assert_eq!(
             of(&b, "aster_t2_radar"),
-            vec![(Reach::Radar, 0, 0.0, 4000.0)]
+            vec![(Reach::Radar, 0, 0.0, 6000.0)]
         );
         assert_eq!(
             of(&b, "aster_t3_radar"),
-            vec![(Reach::Radar, 0, 0.0, 8000.0)]
+            vec![(Reach::Radar, 0, 0.0, 12000.0)]
         );
         assert_eq!(
             of(&b, "aster_t2_shield"),
@@ -653,7 +653,7 @@ mod tests {
         assert_eq!(
             got,
             vec![
-                (Reach::Direct, 0, 0.0, 180.0),
+                (Reach::Direct, 0, 0.0, 300.0),
                 (Reach::Direct, 1, 0.0, 140.0)
             ]
         );
@@ -804,7 +804,7 @@ mod tests {
         let (one, drawn) = rings.collect([&unit].into_iter(), 0.5, true, &|_| 0.0);
         assert_eq!((one.len(), drawn), (1, 1));
         assert_eq!(one[0].center, [15.0, 30.0]);
-        assert_eq!(Rings::key(&one), vec![(Reach::Direct, 0, 0.0, 180.0)]);
+        assert_eq!(Rings::key(&one), vec![(Reach::Direct, 0, 0.0, 300.0)]);
 
         let wreck = UnitInstance {
             owner_flags: KIND_WRECK,
@@ -859,7 +859,7 @@ mod tests {
         };
         let block: Vec<UnitInstance> = (0..15)
             .flat_map(|x| {
-                (0..15).map(move |y| at(1000.0 + x as f32 * 12.0, 1000.0 + y as f32 * 12.0))
+                (0..15).map(move |y| at(1000.0 + x as f32 * 20.0, 1000.0 + y as f32 * 20.0))
             })
             .collect();
         let (all, drawn) = rings.collect(block.iter(), 1.0, true, &|_| 0.0);
@@ -867,12 +867,12 @@ mod tests {
         assert!((4..120).contains(&drawn), "{drawn} of 225 drawn");
         // The corners are on the outline, and the block's middle is not.
         let is_drawn = |x: f32, y: f32| all[..drawn].iter().any(|r| r.center == [x, y]);
-        assert!(is_drawn(1000.0, 1000.0) && is_drawn(1168.0, 1168.0));
-        assert!(!is_drawn(1084.0, 1084.0));
+        assert!(is_drawn(1000.0, 1000.0) && is_drawn(1280.0, 1280.0));
+        assert!(!is_drawn(1140.0, 1140.0));
 
         // Spread out of each other's reach, every ring shows.
         let line: Vec<UnitInstance> = (0..40)
-            .map(|i| at(1000.0 + i as f32 * 400.0, 1000.0))
+            .map(|i| at(1000.0 + i as f32 * 700.0, 1000.0))
             .collect();
         assert_eq!(rings.collect(line.iter(), 1.0, true, &|_| 0.0).1, 40);
 
@@ -881,12 +881,12 @@ mod tests {
         let ghost = UnitInstance {
             owner_flags: KIND_GHOST,
             unit_id: u32::MAX,
-            ..at(1084.0, 1084.0)
+            ..at(1140.0, 1140.0)
         };
         let (with_ghost, _) =
             rings.collect([&ghost].into_iter().chain(block.iter()), 1.0, true, &|_| {
                 0.0
             });
-        assert_eq!(with_ghost[0].center, [1084.0, 1084.0]);
+        assert_eq!(with_ghost[0].center, [1140.0, 1140.0]);
     }
 }
