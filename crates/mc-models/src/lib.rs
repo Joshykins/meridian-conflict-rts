@@ -310,7 +310,16 @@ pub mod rig {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    bytemuck::Pod,
+    bytemuck::Zeroable,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct MeshVertex {
     /// Model space, metres: x forward, y left, z up, origin on the ground under the centre.
     pub pos: [f32; 3],
@@ -330,7 +339,7 @@ pub struct MeshVertex {
     pub surface: u32,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MeshLod {
     pub vertices: Vec<MeshVertex>,
     pub indices: Vec<u32>,
@@ -339,7 +348,7 @@ pub struct MeshLod {
 pub const LOD_COUNT: usize = 3;
 
 /// Where a tracked model touches the ground, in model space (metres).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Treads {
     /// Distance from the centre line to the middle of each track.
     pub half_gauge: f32,
@@ -351,7 +360,7 @@ pub struct Treads {
 
 /// A walker's legs, in model space (metres): the joints of the left (+y) leg
 /// standing at rest. The right leg is its mirror image, half a cycle behind.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Legs {
     pub hip: [f32; 3],
     pub knee: [f32; 3],
@@ -393,7 +402,7 @@ pub const CRAWL_SLOTS: usize = 1 + 3 * MAX_CRAWL_PAIRS + MAX_TAIL_JOINTS / 2 + 2
 /// A many-legged walker (the Naga commander): each left leg's joints at rest, the right
 /// one its mirror. A leg's bones swing in the vertical plane through its hip and foot, and
 /// that plane turns about the hip to follow the foot through its stride.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Crawl {
     pub pairs: usize,
     /// Per pair: hip, knee, ankle (the foot's tip on the ground), model space.
@@ -452,7 +461,7 @@ impl Crawl {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Model {
     pub key: String,
     /// Full detail, reduced, and a handful of boxes.
@@ -517,7 +526,7 @@ pub struct Model {
 /// the beam runs from its emitter down into the bore (the model's `Pit`, whose opening is
 /// where the drawn beam meets the ground), converging pinch beams join it at the mouth,
 /// and ore is drawn up the column to the collector. Model space, at the blueprint's size.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Excavation {
     /// Where the beam leaves the emitter.
     pub emitter: [f32; 3],
@@ -531,7 +540,7 @@ pub struct Excavation {
 
 /// A gun house turning on the hull by itself: where it turns (its pivot, model space), how
 /// far its `rig::RECOIL` verts kick back when it fires, and which weapon of the unit it is.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct House {
     pub pivot: [f32; 3],
     pub travel: f32,
@@ -542,7 +551,7 @@ pub struct House {
 /// inside and below the opening up in depth so the terrain does not hide it, drives the
 /// `part::RAM`, `STRING` and `FEED` pieces on the mine's beat, and on water raises the rig
 /// onto its `part::AFLOAT` stilts and leaves the `part::ASHORE` ground out.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Pit {
     /// Height of the opening, and its radius there.
     pub open: f32,
@@ -579,6 +588,7 @@ mod precursor_sky;
 #[cfg(test)]
 mod preview;
 mod props;
+pub mod remote;
 mod replicator;
 pub mod shell;
 #[cfg(test)]

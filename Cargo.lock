@@ -1945,12 +1945,14 @@ dependencies = [
 name = "mc-models"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "bytemuck",
  "glam",
  "mc-core",
  "mc-data",
  "mc-map",
  "mc-sim",
+ "serde",
 ]
 
 [[package]]
