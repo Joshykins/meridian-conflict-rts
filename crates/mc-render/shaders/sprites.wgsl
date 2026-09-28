@@ -242,6 +242,11 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if (p.color & 0x800u) != 0u {
         // An energy slug: a longer blue streak the wake hangs off.
         trace = length(stride) * 0.75;
+        if p.extras.y > 0.0 {
+            // Sheathed in plasma (`Weapon::plasma`): a bolt with a tail, the tail a
+            // dozen sheaths long at most, not a tick-long beam (`fs_sprite`).
+            trace = min(trace, p.extras.y * 12.0);
+        }
     }
     if (p.color & RAIL) != 0u {
         trace = length(stride) * 0.45;
@@ -448,6 +453,13 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         out.color *= 0.75 + 0.25 * sin(globals.camera.w * 37.0 + f32(instance));
         out.shape = vec2<f32>(-distance(head, tail), 2.0);
     } else {
+        if (p.color & 0x800u) != 0u && plasma_m > 0.0 {
+            // A plasma bolt's rounded head: u runs on past the head over the quad's
+            // cap, and `shape.y` says how far (`fs_sprite`).
+            let cap = 2.0 * end_px / max(len, 1.0);
+            out.uv.x = select(2.0 * t_tail - 1.0 - cap, 2.0 * t_head - 1.0 + cap, corner.x > 0.0);
+            out.shape.y = cap;
+        }
         let strategic = strategic_view(a.w);
         // Red rounds stay red from orbit: the colour is the gun's signature.
         out.color = mix(out.color, SHOT_YELLOW * 9.0, strategic * select(1.0, 0.0, p.extras.z > 1.5));
@@ -776,10 +788,16 @@ fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
         let along = 1.0 - max(-in.uv.x, 0.0) * 0.85;
         glow = across * across * along * along;
         if in.shape.x > 0.02 && in.shape.x < 0.5 {
-            // Plasma sheath: the hot streak stays the old width; the rest is soft blue.
-            let core_across = max(1.0 - abs(in.uv.y) / in.shape.x, 0.0);
-            glow = core_across * core_across * along * along;
-            let halo = pow(across, 1.45) * along * (1.0 - core_across * 0.55);
+            // A plasma bolt (`Weapon::plasma`): the head's hot core in its soft blue
+            // sheath, then a tail that narrows and dies away behind it. `t` runs 0 at
+            // the tail to 1 at the head.
+            let t = clamp(in.uv.x * 0.5 + 0.5, 0.0, 1.0);
+            // Past the head the bolt closes in a round cap.
+            let r = length(vec2<f32>(max(in.uv.x - 1.0, 0.0) / max(in.shape.y, 0.001), in.uv.y));
+            let core_across = max(1.0 - r / (in.shape.x * mix(0.3, 1.0, t)), 0.0);
+            glow = core_across * core_across * pow(t, 1.6);
+            let tail_across = max(1.0 - r / mix(0.2, 1.0, t * t), 0.0);
+            let halo = pow(tail_across, 1.45) * pow(t, 2.2) * (1.0 - core_across * 0.55);
             let plasma = vec3<f32>(0.1, 0.45, 1.4) * 9.0 * halo;
             return vec4<f32>(in.color * glow + plasma, 1.0);
         }

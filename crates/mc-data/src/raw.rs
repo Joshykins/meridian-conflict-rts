@@ -695,7 +695,8 @@ pub struct RawWeapon {
     #[serde(default)]
     pub wake: f64,
     /// Multiplies a blue plasma sheath around the traveling slug. 0 (the default)
-    /// is none; 1 is the size the damage implies.
+    /// is none; 1 is the size the damage implies. A sheathed energy slug is drawn as
+    /// a plasma bolt: a round head and a short tail, not a tick-long streak.
     #[serde(default)]
     pub plasma: f64,
     /// Blue-white bolts at the muzzle and the impact. Zero (the default) is none.

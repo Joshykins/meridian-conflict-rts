@@ -281,9 +281,6 @@ impl Renderer {
                 };
                 let end = if faint { -s * 1.4 } else { s * 2.4 };
                 self.push_puff(PUFF_ARC, at, vel, start, life, (s, end));
-                if p.plasma > 0.0 {
-                    self.emit_plasma_around(at, dir, vel, start, p.plasma);
-                }
             } else {
                 let life = 3.4 + self.scatter.unit() * 0.6;
                 self.push_puff(PUFF_TRAIL, at, vel, start, life, (0.36, 1.05));

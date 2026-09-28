@@ -4964,34 +4964,6 @@ impl Renderer {
         }
     }
 
-    /// Extra plasma around an energy slug: soft discs beside the wake, not instead of it.
-    fn emit_plasma_around(&mut self, at: Vec3, dir: Vec3, vel: Vec3, start: f32, plasma: f32) {
-        let mut perp = dir.cross(Vec3::Z);
-        if perp.length_squared() < 0.04 {
-            perp = dir.cross(Vec3::X);
-        }
-        let perp = perp.normalize_or_zero();
-        let up = dir.cross(perp).normalize_or_zero();
-        for k in 0..6 {
-            let a = (k as f32 + self.scatter.unit() * 0.18) * std::f32::consts::TAU / 6.0;
-            let r = plasma * (0.22 + self.scatter.unit() * 0.16);
-            let off = (perp * a.cos() + up * a.sin()) * r;
-            let life = 0.2 + self.scatter.unit() * 0.1;
-            let s = plasma * (0.28 + self.scatter.unit() * 0.1);
-            self.push_puff(PUFF_PLASMA, at + off, vel * 0.2, start, life, (s, s * 1.65));
-        }
-        let knot = plasma * 0.4;
-        let knot_life = 0.16 + self.scatter.unit() * 0.06;
-        self.push_puff(
-            PUFF_PLASMA,
-            at,
-            vel * 0.12,
-            start,
-            knot_life,
-            (knot, knot * 1.55),
-        );
-    }
-
     /// Crackle at the slug's head so the sheath reads around it, not only behind it.
     fn emit_plasma_head(&mut self, at: Vec3, dir: Vec3, start: f32, plasma: f32) {
         for _ in 0..4 {

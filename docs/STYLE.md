@@ -317,11 +317,13 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 The Argon Electric Bore (AEB) is Aster's lightning gun: the Arbalest (tech 3
 sniper) carries one, the Fulgur (tech 4) an AEB-2. The Raptor (tech 3 air
 superiority fighter) and the Paladin (tech 3 assault walker) carry the
-projectile form, the bolt rifle: no channel, a fast, dim blue bolt that bursts
-in a flash and forks of lightning thrown out every way round the hit
-(`discharge`, drawn as an air burst when the hit is off the ground). The bolt
-is only the messenger: it stays dimmer than its burst, and the burst's forks
-re-strike and its glow lingers for over a second.
+projectile form, the bolt rifle: no channel, a fast bolt of blue plasma (a
+round white-hot head in a soft blue sheath, a tail narrowing and dying away
+behind it, `plasma`) that bursts in a flash and forks of lightning thrown out
+every way round the hit (`discharge`, drawn as an air burst when the hit is
+off the ground). The bolt is the messenger, never a beam: it leaves only a
+faint thread, and the burst's forks re-strike and its glow lingers for over a
+second.
 
 - **A shot is two things.** First an argon tracer round, an ordinary blue slug
   seen from muzzle to target. When it lands, the charge is dumped down the
