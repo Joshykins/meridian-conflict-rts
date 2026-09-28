@@ -87,7 +87,8 @@ pub enum Scenario {
     Refit,
     /// The subject walks down the range.
     March,
-    /// A field of wrecks beside a reclaimer, for it (or its drones) to salvage.
+    /// A field of wrecks for a reclaimer (or its drones) to salvage: beside it, or most of the
+    /// way out for a long reach, with a mobile one passing by it.
     Salvage,
     /// The subject destroys itself.
     Destruct,
@@ -957,10 +958,26 @@ fn stage(
         }
         Scenario::Salvage => {
             // Wrecks of the medium tank a short way east, inside a carrier's drone reach
-            // and a builder's walk, for a reclaimer to get to work on.
+            // and a builder's walk, for a reclaimer to get to work on. A reclaimer with a
+            // long reach finds its field most of the way out, and one that moves drives
+            // (or flies) north past it with its beams on.
             if bp.reclaimer.is_none() && bp.drone.is_none() && bp.builder.is_none() {
                 return Err("This Unit Does Not Reclaim");
             }
+            let reach = bp.reclaimer.map_or(Fx::ZERO, |r| r.range);
+            let out = if reach > Fx::from_int(160) {
+                reach * Fx::ratio(3, 4)
+            } else {
+                Fx::from_int(48)
+            };
+            let pass = (reach > Fx::from_int(160) && bp.motion.is_some()).then(|| {
+                (
+                    subject,
+                    PendingOrder::Move {
+                        pos: pad + FxVec2::new(Fx::ZERO, reach),
+                    },
+                )
+            });
             let wreck = blueprints
                 .id_of(DEFAULT_SUBJECT)
                 .filter(|&id| {
@@ -971,10 +988,10 @@ fn stage(
             Ok((
                 vec![Command::DebugWrecks {
                     blueprint: wreck,
-                    pos: pad + FxVec2::from_ints(48, 0),
+                    pos: east(out, 0),
                     count: 6,
                 }],
-                None,
+                pass,
             ))
         }
     }
