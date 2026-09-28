@@ -99,7 +99,7 @@ fn gunships_orbit_and_keep_the_target_in_front() {
 fn carrier_stays_airborne_and_drones_divide_and_orbit_wrecks() {
     let mut w = world();
     add(&mut w, "aster_commander", 0, 150, 150);
-    let c = add(&mut w, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let c = add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
     w.state.players[0].mass = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
     w.state.players[0].mass_capacity = Fx::from_int(100000);
@@ -176,7 +176,7 @@ fn overlapping_aircraft_reserve_only_one_landing_site() {
 #[test]
 fn cruise_vertical_velocity_changes_gradually_and_is_hashed() {
     let mut w = world();
-    let a = add(&mut w, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let a = add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
     w.state.units.z[a] = Fx::from_int(180);
     let mut previous = Fx::ZERO;
     for _ in 0..100 {
@@ -440,7 +440,7 @@ fn fighters_dive_and_climb_to_their_targets_and_fire_below_cruise() {
     ] {
         let mut w = world();
         let a = add(&mut w, key, 0, 780, 900);
-        let t = add(&mut w, "aster_t2_reclaim_carrier", 1, 900, 900);
+        let t = add(&mut w, "aster_t1_reclaim_carrier", 1, 900, 900);
         w.state.units.flags[t] |= flag::PASSIVE | flag::INVULNERABLE;
         let motion = w
             .blueprints

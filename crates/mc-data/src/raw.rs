@@ -486,15 +486,36 @@ pub(crate) struct RawBuildArm {
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawReclaimer {
+    /// Mass a second the whole unit pulls, split across its working heads.
     pub power: f64,
     pub range: f64,
+    /// Seconds a head must stay on a target before its beam comes on.
+    #[serde(default)]
+    pub charge: f64,
+    /// Keeps reclaiming what it passes while it moves (`Reclaimer::mobile`).
+    #[serde(default)]
+    pub mobile: bool,
+    pub heads: Vec<RawReclaimHead>,
+}
+
+/// One reclaim head (`mc_data::ReclaimHead`), in the model's frame.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawReclaimHead {
+    pub emitter: (f64, f64, f64),
+    /// Its yaw axis and pitch trunnion. Absent: it turns about the unit's middle, level.
+    #[serde(default)]
+    pub pivot: Option<(f64, f64, f64)>,
     /// Degrees per second; zero leaves the head fixed.
     #[serde(default)]
     pub turn: f64,
-    /// Seconds the turret must stay on a target before the beam comes on.
-    #[serde(default)]
-    pub charge: f64,
-    pub emitter: (f64, f64, f64),
+    /// Degrees it pitches down and up, `(down, up)`: `(-85, 80)` looks almost straight down.
+    #[serde(default = "default_head_pitch")]
+    pub pitch: (f64, f64),
+}
+
+fn default_head_pitch() -> (f64, f64) {
+    (-85.0, 85.0)
 }
 
 /// A lift ship's hold and ramp, in the model's frame (x along the heading).
@@ -870,6 +891,54 @@ fn steps(deg: f64) -> f64 {
 
 fn ticks(seconds: f64) -> u32 {
     (seconds * TICKS_PER_SECOND as f64).round().max(0.0) as u32
+}
+
+/// A reclaimer and its heads, checked: 1 to `MAX_RECLAIM_HEADS` heads, and no weapons
+/// beside them, since head `i` takes weapon slot `i` (`mc_data::Reclaimer`).
+fn compile_reclaimer(key: &str, r: &RawReclaimer, weapons: usize) -> Result<Reclaimer, DataError> {
+    let heads = r.heads.len();
+    if !(1..=crate::MAX_RECLAIM_HEADS
+        .min(MAX_WEAPONS)
+        .min(crate::MAX_HOUSES))
+        .contains(&heads)
+        || weapons > 0
+    {
+        return Err(DataError::Invalid(format!(
+            "{key}: a reclaimer has 1 to {} heads and no weapons (the heads take the weapon slots)",
+            crate::MAX_RECLAIM_HEADS
+        )));
+    }
+    if r.power <= 0.0 || r.range <= 0.0 || r.charge < 0.0 {
+        return Err(DataError::Invalid(format!(
+            "{key}: a reclaimer needs power and range"
+        )));
+    }
+    let v = |p: (f64, f64, f64)| FxVec3::new(fx(p.0), fx(p.1), fx(p.2));
+    let mut out = Vec::with_capacity(heads);
+    for h in &r.heads {
+        let (down, up) = h.pitch;
+        if !(-90.0..=0.0).contains(&down) || !(0.0..=90.0).contains(&up) {
+            return Err(DataError::Invalid(format!(
+                "{key}: a reclaim head pitches (down, up) within (-90, 90)"
+            )));
+        }
+        out.push(crate::ReclaimHead {
+            emitter: v(h.emitter),
+            pivot: h.pivot.map(v),
+            turn: (steps(h.turn) / TICKS_PER_SECOND as f64)
+                .round()
+                .clamp(0.0, 32767.0) as u16,
+            pitch_min: Angle(steps(down).round() as i32 as u16),
+            pitch_max: Angle(steps(up).round().min(16383.0) as u16),
+        });
+    }
+    Ok(Reclaimer::new(
+        fx(r.power),
+        fx(r.range),
+        ticks(r.charge).clamp(0, 600) as u16,
+        r.mobile,
+        &out,
+    ))
 }
 
 fn mask(names: &[String], ctx: &str) -> Result<u32, DataError> {
@@ -1333,15 +1402,10 @@ impl Unit {
                 None => None,
             },
             builder,
-            reclaimer: self.reclaimer.as_ref().map(|r| Reclaimer {
-                power: fx(r.power),
-                range: fx(r.range),
-                turn: (steps(r.turn) / TICKS_PER_SECOND as f64)
-                    .round()
-                    .clamp(0.0, 32767.0) as u16,
-                charge_ticks: ticks(r.charge).clamp(0, 600) as u16,
-                emitter: FxVec3::new(fx(r.emitter.0), fx(r.emitter.1), fx(r.emitter.2)),
-            }),
+            reclaimer: match &self.reclaimer {
+                Some(r) => Some(compile_reclaimer(key, r, self.weapons.len())?),
+                None => None,
+            },
             transport: match &self.transport {
                 Some(t)
                     if t.capacity == 0

@@ -10,7 +10,7 @@
         radius: 46, height: 28, footprint: (8, 8), hull: (44.5, 31.5),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
+            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa", "aster_t1_land_reclaimer",
         ]),
         upgrades_to: "aster_t2_land_factory",
         mesh: "factory_land", icon: Factory,
@@ -27,7 +27,7 @@
         radius: 46, height: 34, footprint: (8, 8), hull: (44.5, 31.5),
         vision: 200,
         builder: (power: 80, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
+            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "aster_t1_land_reclaimer", "aster_t2_land_reclaimer",
         ]),
         upgrades_to: "aster_t3_land_factory",
         mesh: "factory_land", icon: Factory,
@@ -44,7 +44,7 @@
         radius: 46, height: 42, footprint: (8, 8), hull: (44.5, 31.5),
         vision: 200,
         builder: (power: 200, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_engineer", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
+            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_engineer", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "aster_t1_land_reclaimer", "aster_t2_land_reclaimer",
         ]),
         mesh: "factory_land", icon: Factory,
         sounds: (death: "blast_large"),
@@ -60,7 +60,7 @@
         radius: 46, height: 26, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
+            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t1_reclaim_carrier",
         ]),
         upgrades_to: "aster_t2_air_factory",
         mesh: "factory_air", icon: Factory,
@@ -77,7 +77,7 @@
         radius: 46, height: 34, footprint: (8, 8),
         vision: 200,
         builder: (power: 80, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t1_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
         ]),
         upgrades_to: "aster_t3_air_factory",
         mesh: "factory_air", icon: Factory,
@@ -94,7 +94,7 @@
         radius: 46, height: 42, footprint: (8, 8),
         vision: 200,
         builder: (power: 200, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t3_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
+            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t3_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t1_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
         ]),
         mesh: "factory_air", icon: Factory,
         sounds: (death: "blast_large"),
@@ -482,36 +482,61 @@
         vision: 0,
         mesh: "citadel_casing", icon: Bot,
     ),
+    // The Scavenger line: one reclaim tower that upgrades in place, T1 to T3. Cheap for
+    // what it pulls (a wreck field pays it back in well under a minute of beam), with a
+    // reach far past any engineer's, a slow head and a charge before each beam.
+    // Live units take an order. The head is a turret in a house of its own (weapon slot 0).
+    (
+        key: "aster_t1_reclaimer",
+        name: "Scavenger",
+        role: "Reclaim Tower",
+        tech: 1,
+        categories: ["Land", "Economy"],
+        health: 1200,
+        cost: (mass: 120, energy: 900, time: 240),
+        radius: 22.5, height: 42, footprint: (4, 4),
+        vision: 400,
+        economy: (energy_upkeep: 6),
+        reclaimer: (power: 6, range: 640, charge: 3.0, heads: [
+            (pivot: (0, 0, 38), emitter: (5.0, 0, 38), turn: 14, pitch: (-80, 30)),
+        ]),
+        upgrades_to: "aster_t2_reclaimer",
+        mesh: "reclaimer", icon: Salvage,
+        sounds: (death: "blast_large"),
+    ),
     (
         key: "aster_t2_reclaimer",
-        name: "Scavenger",
+        name: "Scavenger II",
         role: "Reclaim Tower",
         tech: 2,
         categories: ["Land", "Economy"],
-        health: 2200,
+        health: 3200,
         cost: (mass: 420, energy: 3200, time: 800),
-        radius: 8.25, height: 9, footprint: (2, 2),
-        vision: 400,
-        economy: (energy_upkeep: 40),
-        // Long reach, a slow turret, and a charge before the beam. Live units take an order.
-        reclaimer: (power: 40, range: 640, turn: 22, charge: 2.4, emitter: (12.0, 0, 6.45)),
+        radius: 22.5, height: 60, footprint: (4, 4),
+        vision: 600,
+        economy: (energy_upkeep: 30),
+        reclaimer: (power: 40, range: 1100, charge: 2.4, heads: [
+            (pivot: (0, 0, 55), emitter: (6.0, 0, 55), turn: 18, pitch: (-80, 30)),
+        ]),
         upgrades_to: "aster_t3_reclaimer",
         mesh: "reclaimer", icon: Salvage,
         sounds: (death: "blast_large"),
     ),
     (
         key: "aster_t3_reclaimer",
-        name: "Scavenger II",
+        name: "Scavenger III",
         role: "Reclaim Tower",
         tech: 3,
         categories: ["Land", "Economy"],
-        health: 8800,
+        health: 9600,
         cost: (mass: 1700, energy: 10200, time: 1600),
-        radius: 8.25, height: 10.5, footprint: (2, 2),
-        vision: 560,
-        economy: (energy_upkeep: 150),
-        // Five times the tech 2 tower's pull, over half as far again: it clears a battlefield.
-        reclaimer: (power: 200, range: 960, turn: 30, charge: 1.6, emitter: (12.0, 0, 6.45)),
+        radius: 22.5, height: 84, footprint: (4, 4),
+        vision: 900,
+        economy: (energy_upkeep: 120),
+        // Five times the tech 2 tower's pull, half as far again: it clears a battlefield.
+        reclaimer: (power: 200, range: 1700, charge: 1.6, heads: [
+            (pivot: (0, 0, 78), emitter: (7.0, 0, 78), turn: 24, pitch: (-80, 30)),
+        ]),
         mesh: "reclaimer", icon: Salvage,
         sounds: (death: "blast_large"),
     ),

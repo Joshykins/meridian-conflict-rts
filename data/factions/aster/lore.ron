@@ -46,6 +46,12 @@
             "Light Howitzer": "Built to displace and fire again before counter-battery answers.",
         },
     ),
+    "aster_t1_land_reclaimer": (
+        lore: "A salvage crawler with one reclaim head. It picks a battlefield clean as it drives across it.",
+    ),
+    "aster_t2_land_reclaimer": (
+        lore: "A wheeled salvage carrier with three heads and point-defence lasers, built to work the front before the wrecks stop smoking.",
+    ),
     "aster_t2_tank": (
         lore: "Reach's heavy tank, first proven breaking the Blackridge Line.",
         weapons: {
@@ -149,10 +155,10 @@
         },
     ),
     "aster_t2_support": (
-        lore: "A radar and anti-missile airframe, built after the losses at Twin Shoals.",
+        lore: "A radar, sonar and anti-missile airframe, built after the losses at Twin Shoals. A salvage ray under its nose strips the wrecks it flies over.",
     ),
-    "aster_t2_reclaim_carrier": (
-        lore: "A hull-shielded carrier that fields its own Salvage Drones, called the flock.",
+    "aster_t1_reclaim_carrier": (
+        lore: "A cheap fan-lift carrier that fields its own Salvage Drones, called the flock. Often the first thing a new base builds after its mines.",
     ),
     "aster_reclaim_drone": (
         lore: "A small, disposable reclaimer that lives and dies with its parent Osprey.",
@@ -282,8 +288,11 @@
     "aster_t2_missile_defense": (
         lore: "Two of the fleet's interceptor lasers lifted off a cruiser's deck and set on a pole, for the bases that learned what a Javelin battery does to a factory.",
     ),
+    "aster_t1_reclaimer": (
+        lore: "A salvage mast with one slow head. It charges its beam before each pull, and reaches further than any engineer can walk in a minute.",
+    ),
     "aster_t2_reclaimer": (
-        lore: "A reclaim tower with a slow turret, charging its beam before it fires.",
+        lore: "The Scavenger raised another storey, its head re-wound for a longer, harder pull.",
     ),
     "aster_t3_reclaimer": (
         lore: "A heavy reclaim tower whose beam strips a whole battlefield of what fell on it.",
@@ -311,7 +320,7 @@
         lore: "A moored spar buoy whose hydrophones hear hulls no radar can see.",
     ),
     "aster_t1_salvage_boat": (
-        lore: "A salvage ray to sea. It raises its mast, stops, and draws what sank back up, out where no engineer can follow.",
+        lore: "A salvage ray to sea. It draws what sank back up as it sails, out where no engineer can follow.",
     ),
     "aster_t2_destroyer": (
         lore: "The fleet's workhorse. It hears dived hulls, shoots down the torpedoes they fire with torpedoes of its own, and its rail gun reaches further inland than any shore battery.",

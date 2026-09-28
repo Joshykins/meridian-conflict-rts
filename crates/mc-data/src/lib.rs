@@ -316,20 +316,80 @@ pub struct BuildArm {
     pub rest: Angle,
 }
 
-/// Takes things apart at a distance without being a builder: a reclaimer
-/// tower. Left alone it clears the wrecks within `range`; it takes orders for the rest.
-/// The head is a turret: it turns at `turn` and charges `charge_ticks` before the beam.
+/// Most reclaim heads one unit carries (`Reclaimer::heads`).
+pub const MAX_RECLAIM_HEADS: usize = 4;
+
+/// Takes things apart at a distance without being a builder: a reclaim tower, a salvage
+/// vehicle, boat or aircraft, a carrier's drone. Left alone it clears the wrecks within
+/// `range`; it takes orders for the rest.
+///
+/// It works with one or more heads. Head `i` is posed as a gun in a house of its own
+/// (`Weapon::mount`) in weapon slot `i`: it turns by `weapon_yaw[i]` off the hull's
+/// heading about its `pivot`, and pitches by `arm_pitch[2 + i]` about the same point. A
+/// unit with a reclaimer carries no weapons, so the slots are the heads'.
 #[derive(Clone, Copy, Debug)]
 pub struct Reclaimer {
-    /// Build time units undone per second, and mass per second out of a wreck.
+    /// Build time units undone per second, and mass per second out of a wreck, for the
+    /// whole unit: this tick's share is split evenly across the heads that are working.
     pub power: Fx,
+    /// Horizontal reach from the unit's middle to the edge of its work: a wreck deep
+    /// under a boat or far below an aircraft is within reach once it is this near across the map.
     pub range: Fx,
-    /// Angle steps per tick the turret turns toward its work. Zero: it does not turn.
-    pub turn: u16,
-    /// Ticks it must stay on a target before the beam comes on. Zero: it fires as it aims.
+    /// Ticks a head must stay on a target before its beam comes on. Zero: it fires as it aims.
     pub charge_ticks: u16,
-    /// Where the reclaim beam leaves the model, like a weapon's `muzzle`.
+    /// It keeps clearing the wrecks within reach while it moves or patrols, without
+    /// stopping for them (a salvage vehicle, boat or aircraft). A tower never moves.
+    pub mobile: bool,
+    heads: [ReclaimHead; MAX_RECLAIM_HEADS],
+    head_count: u8,
+}
+
+/// One head of a [`Reclaimer`]: a turret of its own on the hull.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ReclaimHead {
+    /// Where the beam leaves the model with the head at rest (turned to the nose, level),
+    /// like a weapon's `muzzle`.
     pub emitter: FxVec3,
+    /// The head's pivot: its yaw axis and pitch trunnion, on the hull. `None`: it turns
+    /// about the unit's middle (`UnitBlueprint::turret_at`) and does not pitch.
+    pub pivot: Option<FxVec3>,
+    /// Angle steps per tick it turns (and pitches at half of) toward its work. Zero: fixed.
+    pub turn: u16,
+    /// How far it pitches down (negative) and up.
+    pub pitch_min: Angle,
+    pub pitch_max: Angle,
+}
+
+impl Reclaimer {
+    /// A reclaimer with `heads` (1 to [`MAX_RECLAIM_HEADS`]).
+    pub fn new(
+        power: Fx,
+        range: Fx,
+        charge_ticks: u16,
+        mobile: bool,
+        heads: &[ReclaimHead],
+    ) -> Self {
+        assert!((1..=MAX_RECLAIM_HEADS).contains(&heads.len()));
+        let mut all = [ReclaimHead::default(); MAX_RECLAIM_HEADS];
+        all[..heads.len()].copy_from_slice(heads);
+        Reclaimer {
+            power,
+            range,
+            charge_ticks,
+            mobile,
+            heads: all,
+            head_count: heads.len() as u8,
+        }
+    }
+
+    pub fn heads(&self) -> &[ReclaimHead] {
+        &self.heads[..self.head_count as usize]
+    }
+
+    /// Whether any head has to turn onto its work.
+    pub fn aims(&self) -> bool {
+        self.heads().iter().any(|h| h.turn > 0)
+    }
 }
 
 /// A lift ship: it sets down, lowers a ramp beneath its belly, and land units walk up it into
@@ -1171,7 +1231,21 @@ impl Blueprints {
                 Some(r) => {
                     h.write_i64(r.power.0);
                     h.write_i64(r.range.0);
-                    h.write_u64(r.turn as u64 | (r.charge_ticks as u64) << 16);
+                    h.write_u64(
+                        r.charge_ticks as u64
+                            | (r.mobile as u64) << 16
+                            | (r.heads().len() as u64) << 24,
+                    );
+                    for head in r.heads() {
+                        h.write_u64(
+                            head.turn as u64
+                                | (head.pitch_min.0 as u64) << 16
+                                | (head.pitch_max.0 as u64) << 32,
+                        );
+                        for v in head.pivot.map_or([Fx::MAX; 3], |p| [p.x, p.y, p.z]) {
+                            h.write_i64(v.0);
+                        }
+                    }
                 }
                 None => h.write_u64(u64::MAX),
             }

@@ -2431,7 +2431,7 @@ impl World {
         let bp = self.bp(row);
         let (turn, pivot) = match (bp.builder.as_ref().and_then(|b| b.arm), bp.reclaimer) {
             (Some(arm), _) => (arm.turn, arm.pivot),
-            (None, Some(r)) if r.turn > 0 => (r.turn, None),
+            (None, Some(r)) if r.aims() => (r.heads()[0].turn, None),
             _ => return true,
         };
         let has_shoulder = bp

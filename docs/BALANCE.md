@@ -111,7 +111,22 @@ replacing the mines.
   `raw.rs`; `wreck_fraction` in a unit file overrides it: the commander keeps 20%).
 - A wreck gives up only what its reclaimer's side has room to store; the rest waits in the wreck.
 - Reclaim power is build power (1 mass a second per point), so it rises with the engineer tiers.
-  Scavenger towers: 40 power over 640 m (tech 2), 200 over 960 m (tech 3, "Scavenger II").
+- Reclaim is cheap and quick to pay back at every tier: a unit whose job is reclaim pays for
+  itself in well under a minute of beam time on a wreck field, so it is a real income next to the
+  mines. Its reach is far past an engineer's walk. A reclaimer's `power` is the whole unit's,
+  split across the heads working that tick.
+
+  | Unit | Tier | Mass | Power | Reach | Payback (beam) |
+  | --- | --- | --- | --- | --- | --- |
+  | Scavenger (tower, upgrades in place) | 1 | 120 | 6 | 640 | 20 s |
+  | Scavenger II | 2 | 420 | 40 | 1,100 | 11 s |
+  | Scavenger III | 3 | 1,700 | 200 | 1,700 | 9 s |
+  | Gleaner (land, works while moving) | 1 | 60 | 5 | 550 | 12 s |
+  | Thresher (land, 3 heads, anti-missile) | 2 | 320 | 30 | 850 | 11 s |
+  | Trawler (boat, works while sailing) | 1 | 80 | 6 | 600 | 13 s |
+  | Osprey (4 free drones, power 5 each) | 1 | 140 | 20 | 600 | 7 s |
+  | Argus salvage ray (radar/sonar plane) | 2 | 500 | 12 | 1,200 | - |
+  | Commander drone port (2 drones) | 2 | 450 | 10 | 1,400 | 45 s |
 - Materials Vault tiers hold 1,500 / 6,000 / 24,000 for 150 / 400 / 1,000 mass: storage gets cheaper per
   unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 mass.
 - Economy structures (mines, vaults, Scavengers) upgrade only as far as the side's tech.

@@ -152,7 +152,7 @@ fn carrier_builds_four_free_drones_and_reclaims_only_inside_radius() {
     w.state.players[0].mass_capacity = Fx::from_int(20000);
     w.state.players[0].energy_capacity = Fx::from_int(200000);
     add(&mut w, "aster_commander", 0, 150, 150);
-    let carrier = add(&mut w, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let carrier = add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     let inside = w
         .state
@@ -171,7 +171,7 @@ fn carrier_builds_four_free_drones_and_reclaims_only_inside_radius() {
         .wrecks
         .spawn(
             tank,
-            FxVec2::from_ints(1500, 900),
+            FxVec2::from_ints(1700, 900),
             Fx::from_int(20),
             Angle::ZERO,
             Fx::from_int(300),
@@ -207,14 +207,14 @@ fn carrier_reclaim_order_sends_every_drone() {
     w.state.players[0].mass_capacity = Fx::from_int(20000);
     w.state.players[0].energy_capacity = Fx::from_int(200000);
     add(&mut w, "aster_commander", 0, 150, 150);
-    let carrier = add(&mut w, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let carrier = add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     let far = w
         .state
         .wrecks
         .spawn(
             tank,
-            FxVec2::from_ints(1500, 900),
+            FxVec2::from_ints(1700, 900),
             Fx::from_int(20),
             Angle::ZERO,
             Fx::from_int(300),
@@ -242,7 +242,7 @@ fn an_empty_economy_still_makes_drones() {
     let mut w = world();
     w.state.players[0].mass = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
-    let c = add(&mut w, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let c = add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
     for _ in 0..100 {
         w.tick(&[]).unwrap();
     }
@@ -252,7 +252,7 @@ fn an_empty_economy_still_makes_drones() {
 fn sam_launches_vertically_then_curves_to_a_moving_aircraft() {
     let mut w = world();
     let sam = add(&mut w, "aster_t3_sam", 0, 600, 900);
-    let target = add(&mut w, "aster_t2_reclaim_carrier", 1, 1050, 900);
+    let target = add(&mut w, "aster_t1_reclaim_carrier", 1, 1050, 900);
     let target_id = w.state.units.id(target);
     w.state.units.flags[target] |= flag::PASSIVE;
     w.state.players[1].mass = Fx::ZERO;
@@ -457,7 +457,7 @@ fn carrier_and_guard_snapshot_continue_deterministically() {
     a.state.players[0].mass = Fx::from_int(10000);
     a.state.players[0].energy = Fx::from_int(100000);
     add(&mut a, "aster_commander", 0, 150, 150);
-    let c = add(&mut a, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let c = add(&mut a, "aster_t1_reclaim_carrier", 0, 900, 900);
     let id = a.state.units.id(c);
     a.tick(&[cmd(Command::Guard {
         units: vec![id],
@@ -617,7 +617,7 @@ fn lost_drone_is_replaced_and_projectile_guidance_survives_snapshot() {
     let mut a = world();
     let mut b = world();
     a.state.players[0].free_build = true;
-    let carrier = add(&mut a, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let carrier = add(&mut a, "aster_t1_reclaim_carrier", 0, 900, 900);
     let parent = a.state.units.id(carrier);
     for _ in 0..230 {
         a.tick(&[]).unwrap();
@@ -713,7 +713,7 @@ fn redesigned_factory_beams_leave_the_visible_assembly_heads() {
 fn manta_ripples_all_sixteen_cells_and_curves_while_accelerating() {
     let mut w = sea();
     let aa = add(&mut w, "aster_t2_aa_cruiser", 0, 600, 900);
-    let target = add(&mut w, "aster_t2_reclaim_carrier", 1, 950, 1050);
+    let target = add(&mut w, "aster_t1_reclaim_carrier", 1, 950, 1050);
     w.state.units.flags[target] |= flag::PASSIVE | flag::INVULNERABLE;
     w.state.units.heading[aa] = Angle::from_degrees(37);
     let bp = w.state.units.blueprint[aa];
@@ -772,7 +772,7 @@ fn manta_ripples_all_sixteen_cells_and_curves_while_accelerating() {
 fn twin_flak_fires_both_barrels_at_once_and_the_shells_drift_apart() {
     let mut w = world();
     let aa = add(&mut w, "aster_t2_aa", 0, 600, 900);
-    let target = add(&mut w, "aster_t2_reclaim_carrier", 1, 900, 1000);
+    let target = add(&mut w, "aster_t1_reclaim_carrier", 1, 900, 1000);
     w.state.units.flags[target] |= flag::PASSIVE | flag::INVULNERABLE;
     let bp = w.state.units.blueprint[aa];
     assert!(w.blueprints.unit(bp).weapons[0].flak);
@@ -814,7 +814,7 @@ fn sam_cold_lobs_aims_and_holds_until_ignition() {
     use mc_sim::mirror::{RenderFrame, PROJECTILE_COLD, PROJECTILE_MISSILE};
     let mut w = world();
     let sam = add(&mut w, "aster_t3_sam", 0, 600, 900);
-    let target = add(&mut w, "aster_t2_reclaim_carrier", 1, 1200, 900);
+    let target = add(&mut w, "aster_t1_reclaim_carrier", 1, 1200, 900);
     w.state.units.flags[target] |= flag::PASSIVE | flag::INVULNERABLE;
     let bp = w.state.units.blueprint[sam];
     let cold = w.blueprints.unit(bp).weapons[0].cold_launch_ticks;

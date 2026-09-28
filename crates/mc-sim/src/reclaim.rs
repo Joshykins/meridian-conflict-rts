@@ -84,7 +84,10 @@ impl World {
             }
             let bp = self.bp(row);
             let (emitter, facing) = match (bp.reclaimer, bp.builder.as_ref().and_then(|b| b.arm)) {
-                (Some(r), _) => (r.emitter, s.units.heading[row] + s.units.weapon_yaw[row][0]),
+                (Some(r), _) => (
+                    r.heads()[0].emitter,
+                    s.units.heading[row] + s.units.weapon_yaw[row][0],
+                ),
                 // The build arm is pitched at its work: the beam leaves from where its tip has swung to.
                 (None, Some(arm)) => (
                     crate::world::pose_build_arm(
@@ -333,7 +336,7 @@ impl World {
     pub(crate) fn aims_to_work(&self, row: usize) -> bool {
         let bp = self.bp(row);
         bp.builder.as_ref().is_some_and(|b| b.arm.is_some())
-            || bp.reclaimer.is_some_and(|r| r.turn > 0)
+            || bp.reclaimer.is_some_and(|r| r.aims())
     }
 
     /// Turns onto `pos` and, for a reclaimer turret, waits out its charge.

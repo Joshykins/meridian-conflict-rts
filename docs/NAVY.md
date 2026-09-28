@@ -78,7 +78,7 @@ sea after a battle pays for the battle.
 | Skiff | 1 | Attack boat | Rotary gun. |
 | Pike | 1 | Frigate | Deck gun, AA mount, radar. |
 | Barracuda | 1 | Attack submarine | Torpedoes, sonar. |
-| Trawler | 1 | Salvage boat | A mobile salvage ray on a folding mast; deploys to work. |
+| Trawler | 1 | Salvage boat | A mobile reclaim head, 600 m reach; works what it passes while it sails. |
 | Marlin | 2 | Destroyer | Long twin rail guns (1000 m, a small battleship), torpedo tubes, sonar, interceptor tubes, light AA. |
 | Manta | 2 | Air-defence cruiser | A Tempest-style 16-cell vertical missile array fired as one ripple, radar, missile interception, one light gun. |
 | Swordfish | 2 | Cruise-missile ship | Eight sea skimmers per salvo. No other weapon. |

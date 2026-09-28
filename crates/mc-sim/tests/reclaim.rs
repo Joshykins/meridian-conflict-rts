@@ -247,7 +247,7 @@ fn a_reclaimer_tower_clears_wrecks_by_itself_but_only_takes_live_units_on_an_ord
         spawn(&w, 0, TOWER, 500, 0),
         spawn(&w, 1, TANK, 600, flag::PASSIVE),
         spawn(&w, 1, TANK, 640, flag::PASSIVE),
-        spawn(&w, 1, TANK, 1200, flag::PASSIVE),
+        spawn(&w, 1, TANK, 1750, flag::PASSIVE),
         spawn(&w, 0, "aster_wall", 560, 0),
     ];
     w.tick(&setup).unwrap();

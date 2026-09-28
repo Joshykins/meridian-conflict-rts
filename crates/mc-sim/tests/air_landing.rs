@@ -119,7 +119,7 @@ fn a_second_aircraft_on_a_taken_pad_lands_beside_it() {
 #[test]
 fn the_reclaim_carrier_still_stays_up_over_the_sea() {
     let mut w = coast();
-    let c = add(&mut w, "aster_t2_reclaim_carrier", 1400, 900);
+    let c = add(&mut w, "aster_t1_reclaim_carrier", 1400, 900);
     for _ in 0..600 {
         w.tick(&[]).unwrap();
     }

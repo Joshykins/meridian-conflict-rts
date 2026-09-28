@@ -144,13 +144,15 @@
         tech: 1,
         categories: ["Naval", "Engineer"],
         health: 600,
-        cost: (mass: 90, energy: 540, time: 300),
+        cost: (mass: 80, energy: 480, time: 300),
         radius: 8, height: 6,
-        vision: 260,
-        // A salvage ray to sea: the emitter head rides a mast folded down along the deck on
-        // passage and raised when the boat deploys to work.
-        motion: (layer: Naval, size: 1, speed: 30, accel: 14, turn: 70, deploy: 1.6),
-        reclaimer: (power: 12, range: 120, turn: 90, emitter: (-6.0, 0, 7.0)),
+        vision: 400,
+        motion: (layer: Naval, size: 1, speed: 30, accel: 14, turn: 70),
+        // A reclaim head on a house of its own amidships: it works what it passes while it
+        // sails, and looks almost straight down at wrecks on the seabed under it.
+        reclaimer: (power: 6, range: 600, charge: 0.8, mobile: true, heads: [
+            (pivot: (-1.0, 0, 5.3), emitter: (0.3, 0, 5.3), turn: 90, pitch: (-85, 80)),
+        ]),
         weapons: [],
         mesh: "salvage_boat", icon: SalvageBoat,
         sounds: (death: "blast_small", moving: "boat_engine"),

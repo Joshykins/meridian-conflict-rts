@@ -83,6 +83,53 @@
         mesh: "artillery_light", icon: Artillery,
         sounds: (moving: "tracks"),
     ),
+    // Salvage vehicles: mobile reclaim towers that work what they pass without stopping.
+    (
+        key: "aster_t1_land_reclaimer",
+        name: "Gleaner",
+        role: "Salvage Vehicle",
+        tech: 1,
+        categories: ["Land", "Engineer"],
+        health: 320,
+        cost: (mass: 60, energy: 360, time: 240),
+        radius: 4.6, height: 3.4,
+        vision: 400,
+        motion: (layer: Land, size: 0, speed: 29, accel: 26, turn: 100),
+        economy: (energy_upkeep: 3),
+        // Placeholder head on the light tank's turret ring until the model gives its own.
+        reclaimer: (power: 5, range: 550, charge: 0.8, mobile: true, heads: [
+            (pivot: (0, 0, 2.8), emitter: (2.0, 0, 2.8), turn: 90, pitch: (-60, 70)),
+        ]),
+        weapons: [],
+        mesh: "tank_light", icon: Salvage,
+        sounds: (death: "blast_small", moving: "tracks"),
+    ),
+    (
+        key: "aster_t2_land_reclaimer",
+        name: "Thresher",
+        role: "Salvage Carrier",
+        tech: 2,
+        categories: ["Land", "Engineer"],
+        health: 2200,
+        cost: (mass: 320, energy: 1920, time: 1300),
+        radius: 6.2, height: 4.4,
+        vision: 600,
+        motion: (layer: Land, size: 1, speed: 27, accel: 22, turn: 90),
+        economy: (energy_upkeep: 30),
+        // Three heads along the back, each on a house of its own, sharing the unit's pull.
+        // Placeholder positions until the model gives its own.
+        reclaimer: (power: 30, range: 850, charge: 0.6, mobile: true, heads: [
+            (pivot: (2.4, 0, 4.0), emitter: (4.2, 0, 4.0), turn: 120, pitch: (-60, 70)),
+            (pivot: (-0.6, 1.6, 4.0), emitter: (1.2, 1.6, 4.0), turn: 120, pitch: (-60, 70)),
+            (pivot: (-0.6, -1.6, 4.0), emitter: (1.2, -1.6, 4.0), turn: 120, pitch: (-60, 70)),
+        ]),
+        // Point-defence lasers over the salvage crew: they burn incoming missiles down.
+        anti_missile: 220, anti_missile_lasers: 2,
+        anti_missile_mounts: [(-3.0, 2.4, 4.2), (-3.0, -2.4, 4.2)],
+        weapons: [],
+        mesh: "tank_heavy", icon: Salvage,
+        sounds: (death: "blast", moving: "wheels"),
+    ),
     (
         key: "aster_t2_tank",
         name: "Bulwark",

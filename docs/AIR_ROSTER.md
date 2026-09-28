@@ -7,8 +7,8 @@ All units are available through the existing tiered factories and engineer/comma
 | 1 | Swift | Fast, fragile scout with radar; circles on guard |
 | 1 | Shrike | Fighter |
 | 1 | Wasp | Low-altitude helicopter, light machine gun and unguided rockets |
-| 2 | Argus | Radar and missile interception; guards a point or friendly unit |
-| 2 | Osprey | Hull-shielded reclaim carrier |
+| 1 | Osprey | Cheap reclaim carrier with four salvage drones |
+| 2 | Argus | Radar, sonar, missile interception and a 1,200 m salvage ray; guards a point or friendly unit |
 | 2 | Kestrel | Four-engine vector-thrust gunship with cannon and rockets |
 | 2 | Hellkite | Four-engine flying fortress; 24 scattered incendiaries and three independent AA guns |
 | 2 | Peregrine | Fast guided-missile interceptor |
@@ -20,9 +20,9 @@ All units are available through the existing tiered factories and engineer/comma
 
 Aircraft circle on the **Guard** order (Ctrl+G; see [The guard order](#the-guard-order)): press on a point or a friendly unit and drag out the area. They fly halfway between its centre and its edge, and follow the ally if one was picked. Shift queues a guard; Stop cancels it. If the ally is destroyed, the aircraft keep circling its last position. Move and attack commands replace a guard normally. (The separate Orbit order and its **O** key were merged into Guard on 2026-09-26.)
 
-Osprey automatically pays for and assembles up to four salvage drones. Each costs 12 mass and 288 energy and takes 4.8 seconds at full resources. Drones recover visible wreckage within **420 m of the carrier**, return when there is no work, and wait when mass storage is full. Losses are replaced. Drones depend on their parent carrier and are removed when it is destroyed. The selection shows the recovery radius.
+Osprey (tech 1, from the first air factory) assembles up to four salvage drones for free: a drone costs nothing and takes 3 seconds, whatever the economy. Drones recover visible wreckage within **600 m of the carrier**, return when there is no work, and wait when mass storage is full. Losses are replaced. Drones depend on their parent carrier and are removed when it is destroyed. The selection shows the recovery radius.
 
-Argus has 2,800 m radar and burns hostile missiles with a laser within 300 m while powered. A light rocket fails in one tick; heavier missiles take a longer burst, then the laser waits 0.3 seconds before the next. It cannot intercept shells or bombs. Guided AA missiles retain their own target handle; vertical launch stays upright for 0.6 seconds before curving into pursuit. Losing a target leaves a finite-lived unguided missile.
+Argus has 2,800 m radar, 900 m sonar, 1,200 m sight and a small hull shield, and burns hostile missiles with two lasers within 450 m while powered. A salvage ray under its nose clears wrecks up to 1,200 m across the ground from it while it flies (`reclaimer.mobile`). A light rocket fails in one tick; heavier missiles take a longer burst, then the laser waits 0.3 seconds before the next. It cannot intercept shells or bombs. Guided AA missiles retain their own target handle; vertical launch stays upright for 0.6 seconds before curving into pursuit. Losing a target leaves a finite-lived unguided missile.
 
 Incendiary bombs spread across consecutive releases and inflict six seconds of burning damage, with persistent flame and smoke. Flak and missile splash use altitude and weapon target masks, so an airburst cannot damage ground units underneath it. Dome and hull shields intercept impacts.
 
@@ -101,7 +101,7 @@ engines and no engine effects at all when hovering. Each now has a file of its o
   had been raising a hovercraft's ground dust around them in mid-air.
 - **Range**: `--scenario salvage` leaves six medium-tank wrecks 48 m east of the
   pad for any reclaimer (builder, tower or carrier), so the flock can be watched
-  going out: `--range --unit aster_t2_reclaim_carrier --scenario salvage --ticks
+  going out: `--range --unit aster_t1_reclaim_carrier --scenario salvage --ticks
   140 --follow 12 --alpha 0.5 --camera 0,0,110,200`. Hover shots need `--follow`
   of ten or so ticks for the short-lived engine puffs to settle;
   `MERIDIAN_HOUR=23` shows the nozzle lamps.

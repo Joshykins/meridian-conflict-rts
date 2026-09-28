@@ -562,10 +562,10 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
         },
     );
 
-    // The Trawler sails into reach, raises its mast, and only then works.
+    // The Trawler reaches it from where it floats, 250 m off, and looks down at the bed:
+    // no mast to raise, no stop to make.
     let trawler = spawn(&mut w, "aster_t1_salvage_boat", 0, 1250, 1000, 0);
-    let need = w.bp(row(&w, trawler)).motion.unwrap().deploy_ticks;
-    assert!(need > 0);
+    assert_eq!(w.bp(row(&w, trawler)).motion.unwrap().deploy_ticks, 0);
     order(
         &mut w,
         0,
@@ -587,11 +587,7 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
         if left < mass && started.is_none() {
             started = Some(t);
             assert!(
-                w.state.units.deploy[r] >= need,
-                "it worked with the mast down"
-            );
-            assert!(
-                w.state.units.pos[r].distance(FxVec2::from_ints(1000, 1000)) < Fx::from_int(150),
+                w.state.units.pos[r].distance(FxVec2::from_ints(1250, 1000)) < Fx::from_int(5),
                 "it reached from where it started"
             );
         }
@@ -604,32 +600,6 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
         !w.state.wrecks.slots.is_alive(at),
         "the wreck was not cleared"
     );
-
-    // Sent off, it lowers the mast before it gets under way.
-    let r = row(&w, trawler);
-    assert_eq!(w.state.units.deploy[r], need);
-    let from = w.state.units.pos[r];
-    order(
-        &mut w,
-        0,
-        Command::Move {
-            units: vec![trawler],
-            target: FxVec2::from_ints(1500, 1000),
-            queue: false,
-        },
-    );
-    for _ in 0..need as usize / 2 {
-        w.tick(&[]).unwrap();
-        assert_eq!(
-            w.state.units.pos[row(&w, trawler)],
-            from,
-            "it sailed with the mast up"
-        );
-    }
-    run(&mut w, 100);
-    let r = row(&w, trawler);
-    assert_eq!(w.state.units.deploy[r], 0);
-    assert!(w.state.units.pos[r].distance(from) > Fx::from_int(20));
 }
 
 #[test]

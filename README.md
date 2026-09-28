@@ -242,8 +242,9 @@ Playable: a land war with the Aster faction (commander, three engineer tiers, ni
 nineteen structures across three tech tiers), flow economy, construction and assisting, factories
 with queues and standing orders (move, attack-move, patrol, attack, assist, guard, ground fire: every unit
 made takes them, and a factory still going up takes both its queue and its orders), in-place upgrades, reclaim (wrecks, your own units, enemies; idle engineers
-clear the wrecks within their reach while there is room for the mass, and so does the tech 2 Scavenger
-tower over a much wider one, though its turret is slow to aim and has to charge before the beam comes on;
+clear the wrecks within their reach while there is room for the mass, and so does the Scavenger reclaim
+tower (tech 1 to 3) over a much wider one, though its head is slow to aim and has to charge before the beam comes on;
+salvage vehicles, the Trawler boat and the Argus clear what they pass while they move;
 nothing reclaims a live unit without an order, and a builder that carries weapons
 leaves wrecks alone while an enemy is near; a builder raises a reclaim field over a lot before it lays a
 structure down, and four waves running out from the middle vaporize the trees on it (3 s, for nothing), and walkers as big as a commander knock over the trees they walk through), persistent scorch marks,
