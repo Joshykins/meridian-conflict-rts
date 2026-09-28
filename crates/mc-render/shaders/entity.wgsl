@@ -202,6 +202,12 @@ struct Weld {
 // the hull forward: top run +x, front down, underside -x, rear up. Side
 // faces (the lozenge you see from the flank) split on height, so the
 // visible upper half matches the top run.
+// One track link's pitch in model units: 0.4 on a tank, growing with the body (`reach`,
+// its radius) to 1.0 on the biggest, so a giant's belt is heavy links, not a fine mesh.
+fn tread_pitch(reach: f32) -> f32 {
+    return 0.4 * clamp(reach / 6.0, 1.0, 2.5);
+}
+
 fn tread_along(p: vec3<f32>, n: vec3<f32>) -> f32 {
     let side = abs(n.y) > abs(n.x) && abs(n.y) > abs(n.z);
     if side {
@@ -1894,10 +1900,11 @@ fn vs_main(in: VsIn) -> VsOut {
     let belt = (model.icon & 0x20000u) == 0u && model.leg_hip.w <= 0.0;
     if in.material == MAT_TREAD && belt {
         // The links move by the ground the hull has covered (the sim's gait, metres), one
-        // link pitch (0.4 m) wrapped, so a stopped belt stays put and a nudge moves it a nudge.
+        // link pitch (`tread_pitch`) wrapped, so a stopped belt stays put and a nudge moves it a nudge.
+        let pitch = tread_pitch(max(select(model.bounds_radius, model.surface.x, model.surface.x > 0.0), 1.0));
         var rolled = 0.0;
         if terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
-            rolled = fract((e.gait.x - e.gait.y * (1.0 - globals.sun.w)) * 2.5) * 0.4;
+            rolled = fract((e.gait.x - e.gait.y * (1.0 - globals.sun.w)) / pitch) * pitch;
         }
         out.uv = vec2<f32>(tread_along(in.pos, in.normal) + rolled, in.uv.y);
     } else {
@@ -2384,6 +2391,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let eye = globals.camera.xyz;
     let v = normalize(eye - in.world);
     let dist = distance(eye, in.world);
+    // The face's normal in model space, from the surface itself (the tread tells a belt's
+    // flank from its running face by it). Out here, where derivatives are defined.
+    let face_n = cross(dpdx(in.local), dpdy(in.local));
 
     // Plating is textured from each face's own shape (surface.wgsl): outlines, fitted
     // plates and rivets, lights in the black, the patterns a model asks for, and burns
@@ -2578,18 +2588,60 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     var tread = 1.0;
     if in.material == MAT_TREAD && (in.model_class & 0x200u) == 0u {
-        // Track links: cleats around the belt. The top run crawls forward
-        // with the hull; the underside crawls back so it stays on the ground.
-        // A hover skirt uses the same rubber but is not a belt.
-        // The crawl is already in uv.x (vertex stage, from the ground covered); afloat the
-        // belt has nothing to drive on and stands still.
-        let link = fract(in.uv.x * 2.5);
+        // Track links round the belt. The top run crawls forward with the hull; the
+        // underside crawls back so it stays on the ground. A hover skirt uses the same
+        // rubber but is not a belt. The crawl is already in uv.x (vertex stage, from the
+        // ground covered); afloat the belt has nothing to drive on and stands still.
+        //
+        // Each link is a steel shoe: a worn grouser bar across it, rubber pads either
+        // side of a centre guide horn, end connectors at its edges, a dark hinge gap to
+        // the next. Seen from the flank it is the links' side plates and their pins.
         tread = 0.45;
-        let cleat = smoothstep(0.0, 0.12, link) * (1.0 - smoothstep(0.55, 0.67, link));
+        let pitch = tread_pitch(in.weld.z);
+        let along = in.uv.x / pitch;
+        let link = fract(along);
+        let shade = 0.85 + 0.3 * hash11(floor(along) + in.state.w * 97.0);
         let detail = clamp(1.0 - dist / 500.0, 0.0, 1.0);
-        m.albedo = mix(m.albedo, mix(vec3<f32>(0.012), vec3<f32>(0.075, 0.07, 0.065), cleat), detail);
-        m.metallic = 0.5 * cleat * detail;
-        m.roughness = mix(m.roughness, 0.55, cleat * detail);
+        let flank = dot(face_n, face_n) > 1e-12 && abs(normalize(face_n).y) > 0.7;
+        let gap = smoothstep(0.9, 0.93, link);
+        let steel = vec3<f32>(0.045, 0.044, 0.043);
+        let worn = vec3<f32>(0.2, 0.195, 0.185);
+        var albedo = steel * shade;
+        var metal = 0.35;
+        var rough = 0.7;
+        var recess = gap;
+        if flank {
+            // Side plates, a pin boss at each joint, a bevel catching light on the lead edge.
+            let lead = smoothstep(0.02, 0.07, link) * (1.0 - smoothstep(0.1, 0.16, link));
+            let pin = smoothstep(0.78, 0.8, link) * (1.0 - smoothstep(0.88, 0.9, link));
+            albedo = mix(albedo, worn * 0.7, lead * 0.6);
+            albedo = mix(albedo, worn, pin);
+            metal = mix(metal, 0.85, pin);
+            rough = mix(rough, 0.35, pin);
+        } else {
+            // Across the shoe, every 1.1 m or so: pad, horn, pad, and a connector at each end.
+            let q = abs(fract(in.local.y * 0.36 / pitch + 0.5) - 0.5);
+            let grouser = smoothstep(0.06, 0.09, link) * (1.0 - smoothstep(0.3, 0.33, link));
+            let pad_along = smoothstep(0.4, 0.43, link) * (1.0 - smoothstep(0.84, 0.87, link));
+            let horn = 1.0 - smoothstep(0.05, 0.07, q);
+            let pad = pad_along * smoothstep(0.1, 0.12, q) * (1.0 - smoothstep(0.42, 0.44, q));
+            let connector = smoothstep(0.46, 0.475, q) * (1.0 - gap);
+            albedo = mix(albedo, worn * shade, max(grouser, connector * 0.7));
+            metal = mix(metal, 0.85, max(grouser, connector));
+            rough = mix(rough, 0.3, grouser);
+            albedo = mix(albedo, vec3<f32>(0.016, 0.016, 0.018), pad);
+            rough = mix(rough, 0.95, pad);
+            metal = mix(metal, 0.0, pad);
+            albedo = mix(albedo, worn * 1.15, horn * pad_along);
+            metal = mix(metal, 0.9, horn * pad_along);
+            // Dirt packs the edges of the pads.
+            recess = max(recess, pad * (smoothstep(0.36, 0.43, q) + 1.0 - smoothstep(0.1, 0.17, q)) * 0.6);
+        }
+        albedo = mix(albedo, vec3<f32>(0.006), gap);
+        albedo = mix(albedo, vec3<f32>(0.075, 0.058, 0.04), recess * 0.55 * (1.0 - gap));
+        m.albedo = mix(m.albedo, albedo, detail);
+        m.metallic = mix(m.metallic, metal, detail);
+        m.roughness = mix(m.roughness, rough, detail);
     }
     // Construction emitters: ARC's amber, the Naga's violet.
     let builds = in.material == MAT_GLOW_AMBER || in.material == MAT_GLOW_VIOLET;

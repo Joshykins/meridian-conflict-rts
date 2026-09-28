@@ -62,12 +62,125 @@ fn running_gear(b: &mut MeshBuilder) {
             track(b, -18.6, 18.2, inner, outer, h);
             return;
         }
-        track(b, -18.6, -1.1, inner, outer, h);
-        track(b, 1.1, 18.2, inner, outer, h);
+        track_unit(b, -18.6, -1.1);
+        track_unit(b, 1.1, 18.2);
         // The drive between them: a dark final-drive housing.
         b.paint(ACCENT);
         b.block(v3(-1.3, inner + 0.3, 1.2), v3(1.3, outer - 0.6, 3.4));
     });
+}
+
+/// One open track unit on the +y side, from `x0` to `x1`: the belt round a sprocket at
+/// each end, road wheels along its lower run and return rollers under its upper run, all
+/// seen from the flank through the open side.
+fn track_unit(b: &mut MeshBuilder, x0: f32, x1: f32) {
+    let (inner, outer, h) = TRACK;
+    // Where the wheels begin: the belt's far half is solid behind them.
+    let face = outer - 1.0;
+    b.with_part(part::LOCOMOTION, |b| {
+        b.paint(TREAD);
+        let lozenge = [
+            [x0 + 0.5 * h, 0.0],
+            [x1 - 0.5 * h, 0.0],
+            [x1, 0.5 * h],
+            [x1 - 0.22 * h, h],
+            [x0 + 0.22 * h, h],
+            [x0, 0.5 * h],
+        ];
+        b.with_profile_bevel(0.09 * h, |b| b.extrude_y(&lozenge, inner, face));
+        // The near half: the lower and upper runs, and the belt round each end.
+        b.extrude_y(
+            &[
+                [x0 + 0.45 * h, 0.0],
+                [x1 - 0.45 * h, 0.0],
+                [x1 - 0.45 * h, 0.17 * h],
+                [x0 + 0.45 * h, 0.17 * h],
+            ],
+            face,
+            outer,
+        );
+        b.extrude_y(
+            &[
+                [x0 + 0.3 * h, 0.84 * h],
+                [x1 - 0.3 * h, 0.84 * h],
+                [x1 - 0.3 * h, h],
+                [x0 + 0.3 * h, h],
+            ],
+            face,
+            outer,
+        );
+        for (end, dir) in [(x1, 1.0), (x0, -1.0)] {
+            let back = end - dir * 0.55 * h;
+            let mut cap = vec![
+                [back, 0.0],
+                [end - dir * 0.5 * h, 0.0],
+                [end, 0.5 * h],
+                [end - dir * 0.22 * h, h],
+                [back, h],
+            ];
+            if dir < 0.0 {
+                cap.reverse();
+            }
+            b.with_profile_bevel(0.09 * h, |b| b.extrude_y(&cap, face, outer));
+            sprocket(b, v3(end - dir * 0.46 * h, outer, 0.5 * h), 0.36 * h);
+        }
+        // Road wheels on the lower run.
+        let (first, last) = (x0 + 0.95 * h, x1 - 0.95 * h);
+        let count = (((last - first) / (0.62 * h)).round() as usize + 1).max(2);
+        for i in 0..count {
+            let x = first + (last - first) * i as f32 / (count - 1) as f32;
+            road_wheel(b, v3(x, outer, 0.4 * h), 0.27 * h, outer - face);
+        }
+        if b.fine() {
+            // Return rollers under the upper run.
+            b.paint(METAL);
+            for f in [0.25, 0.5, 0.75] {
+                let x = x0 + (x1 - x0) * f;
+                b.cylinder_between(
+                    v3(x, face, 0.77 * h),
+                    v3(x, outer - 0.25, 0.77 * h),
+                    0.07 * h,
+                    0.07 * h,
+                    8,
+                );
+            }
+        }
+    });
+}
+
+/// A road wheel on the +y side, its outer face at `center.y`: a dark rim over a light
+/// disc, and a hub cap.
+fn road_wheel(b: &mut MeshBuilder, center: Vec3, r: f32, width: f32) {
+    let at = |y: f32| v3(center.x, center.y + y, center.z);
+    b.paint(ACCENT);
+    b.cylinder_between(at(-width + 0.05), at(-0.1), r, r, b.sides(12));
+    b.paint(METAL);
+    b.cylinder_between(at(-0.12), at(-0.02), r * 0.78, r * 0.72, b.sides(12));
+    if b.fine() {
+        b.paint(PLATING_DARK);
+        b.cylinder_between(at(-0.03), at(0.12), r * 0.32, r * 0.24, 8);
+    }
+}
+
+/// A toothed drive sprocket or idler on the +y side, its outer face at `center.y`.
+fn sprocket(b: &mut MeshBuilder, center: Vec3, r: f32) {
+    let at = |y: f32| v3(center.x, center.y + y, center.z);
+    b.paint(METAL);
+    b.cylinder_between(at(-0.1), at(0.1), r, r, b.sides(12));
+    b.paint(ACCENT);
+    b.cylinder_between(at(0.05), at(0.3), r * 0.42, r * 0.3, b.sides(8));
+    if b.fine() {
+        b.paint(METAL);
+        for k in 0..8 {
+            let a = k as f32 * std::f32::consts::TAU / 8.0;
+            let (c, s) = (a.cos(), a.sin());
+            b.with(
+                Affine3A::from_translation(at(0.0) + v3(c, 0.0, s) * r * 1.05)
+                    * Affine3A::from_rotation_y(-a),
+                |b| b.cuboid(Vec3::ZERO, v3(r * 0.2, 0.18, r * 0.16)),
+            );
+        }
+    }
 }
 
 fn hull(b: &mut MeshBuilder) {
@@ -133,7 +246,21 @@ fn hull(b: &mut MeshBuilder) {
         // Skirts over each track's upper run, hung off the frame band.
         b.paint(PLATING);
         for (x0, x1) in [(-15.8, -1.6), (1.6, 14.9)] {
-            b.block(v3(x0, outer + 0.05, 1.9), v3(x1, outer + 0.4, belt + 0.05));
+            // Three plates a run, hung over the upper run so the wheels show under them.
+            let step = (x1 - x0) / 3.0;
+            for k in 0..3 {
+                let a = x0 + step * k as f32 + 0.08;
+                b.paint(PLATING);
+                b.block(
+                    v3(a, outer + 0.05, 2.9),
+                    v3(a + step - 0.16, outer + 0.4, belt + 0.05),
+                );
+                b.paint(ACCENT);
+                b.block(
+                    v3(a + 0.1, outer + 0.38, 2.9),
+                    v3(a + step - 0.26, outer + 0.44, 3.05),
+                );
+            }
         }
         // Blue deck-edge strips: the earned emitters, more than any tier below.
         glow_strip(b, v3(-4.0, 9.6, OUTER_DECK), v2(8.0, 0.22), GLOW);
