@@ -177,15 +177,23 @@ const AUX_HEAD_STOWED: f32 = -1.88;
 /// is its tip run out.
 const LANCE_TIP: f32 = 6.7;
 
+/// How much thicker the commander's legs are than first drawn: every width, depth and
+/// sideways/fore-aft offset off a joint scales by it; heights along the leg do not.
+const LEG_GIRTH: f32 = 1.2;
+
 fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
+    let g = LEG_GIRTH;
+    // An offset off a joint, and a cross-section, thickened by the girth.
+    let o = |x: f32, y: f32, z: f32| v3(x * g, y * g, z);
+    let w = |x: f32, y: f32| v2(x * g, y * g);
     b.with_part(part::LOCOMOTION, |b| {
         if b.coarse() {
             // From this far the legs are their white greaves and cuisses.
             b.paint(PLATING);
             b.frustum_open(
                 v3(ankle.x + 0.5, ankle.y, 0.0),
-                v2(3.2, 1.75),
-                v2(1.4, 1.5),
+                w(3.2, 1.75),
+                w(1.4, 1.5),
                 hip.z,
                 v2(hip.x - ankle.x - 0.5, hip.y - ankle.y),
             );
@@ -193,29 +201,29 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
         }
         b.with_limb(rig::THIGH, |b| {
             b.paint(ACCENT);
-            b.beam(hip, knee, v2(1.2, 1.4), v2(1.0, 1.15));
+            b.beam(hip, knee, w(1.2, 1.4), w(1.0, 1.15));
             b.cylinder_between(
                 hip - Vec3::Y * 0.82,
                 hip + Vec3::Y * 0.82,
-                0.85,
-                0.85,
+                0.85 * g,
+                0.85 * g,
                 b.sides(8),
             );
             // Cuisse: a white plate over the front and outside of the thigh.
             b.paint(PLATING);
             b.beam(
-                hip + v3(0.52, 0.15, -0.5),
-                knee + v3(0.46, 0.15, 0.8),
-                v2(1.55, 0.72),
-                v2(1.25, 0.6),
+                hip + o(0.52, 0.15, -0.5),
+                knee + o(0.46, 0.15, 0.8),
+                w(1.55, 0.72),
+                w(1.25, 0.6),
             );
             if b.fine() {
                 b.paint(METAL);
                 b.cylinder_between(
-                    hip + v3(-0.7, 0.0, -0.4),
-                    knee + v3(-0.64, 0.0, 0.6),
-                    0.18,
-                    0.15,
+                    hip + o(-0.7, 0.0, -0.4),
+                    knee + o(-0.64, 0.0, 0.6),
+                    0.18 * g,
+                    0.15 * g,
                     6,
                 );
             }
@@ -225,52 +233,52 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
             b.cylinder_between(
                 knee - Vec3::Y * 0.75,
                 knee + Vec3::Y * 0.75,
-                0.72,
-                0.72,
+                0.72 * g,
+                0.72 * g,
                 b.sides(8),
             );
             b.paint(ACCENT);
-            b.beam(knee, ankle, v2(0.95, 1.1), v2(0.82, 0.92));
+            b.beam(knee, ankle, w(0.95, 1.1), w(0.82, 0.92));
             // Greave, with a black knee cap standing proud between it and the cuisse.
             b.paint(PLATING);
             b.beam(
-                knee + v3(0.34, 0.0, -0.7),
-                ankle + v3(0.5, 0.0, 0.55),
-                v2(1.5, 1.1),
-                v2(1.18, 0.82),
+                knee + o(0.34, 0.0, -0.7),
+                ankle + o(0.5, 0.0, 0.55),
+                w(1.5, 1.1),
+                w(1.18, 0.82),
             );
             b.paint(ACCENT);
             b.frustum(
-                knee + v3(0.7, 0.0, -0.6),
-                v2(0.68, 1.3),
-                v2(0.4, 0.88),
+                knee + o(0.7, 0.0, -0.6),
+                w(0.68, 1.3),
+                w(0.4, 0.88),
                 1.35,
-                v2(0.13, 0.0),
+                w(0.13, 0.0),
             );
             if b.fine() {
                 b.paint(TEAM);
                 b.beam(
-                    knee + v3(0.24, 0.6, -1.3),
-                    ankle + v3(0.4, 0.56, 1.2),
-                    v2(0.62, 0.07),
-                    v2(0.5, 0.07),
+                    knee + o(0.24, 0.6, -1.3),
+                    ankle + o(0.4, 0.56, 1.2),
+                    w(0.62, 0.07),
+                    w(0.5, 0.07),
                 );
                 b.paint(METAL);
                 b.cylinder_between(
-                    knee + v3(-0.68, 0.0, -0.5),
-                    ankle + v3(-0.54, 0.0, 0.5),
-                    0.16,
-                    0.13,
+                    knee + o(-0.68, 0.0, -0.5),
+                    ankle + o(-0.54, 0.0, 0.5),
+                    0.16 * g,
+                    0.13 * g,
                     6,
                 );
                 b.module("eng_3", 0.72, |b| {
                     // Suite III: feed conduits down the greaves.
                     b.paint(GLOW_AMBER);
                     b.beam(
-                        knee + v3(0.9, 0.0, -1.1),
-                        ankle + v3(0.92, 0.0, 0.9),
-                        v2(0.28, 0.07),
-                        v2(0.22, 0.07),
+                        knee + o(0.9, 0.0, -1.1),
+                        ankle + o(0.92, 0.0, 0.9),
+                        w(0.28, 0.07),
+                        w(0.22, 0.07),
                     );
                 });
             }
@@ -280,12 +288,13 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
             b.cylinder_between(
                 ankle - Vec3::Y * 0.65,
                 ankle + Vec3::Y * 0.65,
-                0.55,
-                0.55,
+                0.55 * g,
+                0.55 * g,
                 b.sides(8),
             );
             let (x0, x1, h) = (ankle.x - 1.2, ankle.x + 2.4, 1.05);
-            b.paint(TREAD);
+            // A shod sole of dark armour: a boot, not a track.
+            b.paint(ACCENT);
             b.extrude_y(
                 &[
                     [x0, 0.0],
@@ -295,15 +304,15 @@ fn commander_leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, ankle: Vec3) {
                     [x0 + 0.6, h],
                     [x0, 0.5 * h],
                 ],
-                ankle.y - 0.95,
-                ankle.y + 0.95,
+                ankle.y - 1.05,
+                ankle.y + 1.05,
             );
             if b.fine() {
                 b.paint(PLATING);
                 on_slope(b, [x1, 0.35 * h], [x1 - 1.1, h], 0.5, |b| {
-                    b.plate(v3(0.0, ankle.y, 0.0), v2(1.0, 1.6), 0.12, 0.05)
+                    b.plate(v3(0.0, ankle.y, 0.0), v2(1.0, 1.75), 0.12, 0.05)
                 });
-                b.plate(v3(ankle.x + 0.2, ankle.y, h), v2(1.4, 1.55), 0.1, 0.04);
+                b.plate(v3(ankle.x + 0.2, ankle.y, h), v2(1.4, 1.7), 0.1, 0.04);
             }
         });
     });
@@ -338,15 +347,14 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
     // a foot is down for over half the cycle, so one is always planted and the
     // body never leaves the ground. Its long stride needs more reach than the
     // straight legs have, so it settles onto bent knees as it gets going.
-    let (hip, knee, ankle) = (
-        v3(-0.1, 1.75, 8.7),
-        v3(0.9, 1.85, 4.75),
-        v3(-0.3, 1.85, 1.3),
-    );
+    // The hips sit in under the pelvis and the feet close under them, so the thighs
+    // meet the skirts rather than hanging off its corners; the knee stands forward of
+    // the hip-ankle line, a braced stance rather than a stiff upright one.
+    let (hip, knee, ankle) = (v3(-0.1, 1.4, 8.7), v3(1.45, 1.5, 4.9), v3(-0.35, 1.5, 1.3));
     b.set_legs(hip, knee, ankle, 16.0, 0.55, 1.3);
     b.set_walk_crouch(1.3);
-    // Sole as `commander_leg` draws it: 1.2 m behind the ankle, 2.4 m ahead, 1.9 m across.
-    b.set_foot(-1.2, 2.4, 1.9);
+    // Sole as `commander_leg` draws it: 1.2 m behind the ankle, 2.4 m ahead, 2.1 m across.
+    b.set_foot(-1.2, 2.4, 2.1);
     b.mirror_y(|b| commander_leg(b, hip, knee, ankle));
 
     let (gun_y, tool_y, arm_z) = (COMMANDER_MUZZLE.y, COMMANDER_EMITTER.y, COMMANDER_MUZZLE.z);

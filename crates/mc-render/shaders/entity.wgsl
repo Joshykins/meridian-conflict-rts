@@ -1816,7 +1816,10 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     out.world = world;
     out.normal = world_n;
-    if in.material == MAT_TREAD && (model.icon & 0x20000u) == 0u {
+    // A walker's rubber is its soles, not a belt: no links, nothing crawls (hover skirts
+    // likewise). `model_class` bit 9 carries the same test to the fragment stage.
+    let belt = (model.icon & 0x20000u) == 0u && model.leg_hip.w <= 0.0;
+    if in.material == MAT_TREAD && belt {
         // The links move by the ground the hull has covered (the sim's gait, metres), one
         // link pitch (0.4 m) wrapped, so a stopped belt stays put and a nudge moves it a nudge.
         var rolled = 0.0;
@@ -1831,9 +1834,10 @@ fn vs_main(in: VsIn) -> VsOut {
     out.owner_flags = e.owner_flags;
     out.state = vec4<f32>(e.build, select(e.health, 2.0, falling), in.pos.z / max(model.height, 0.1), hash11(f32(e.unit_id & 0xFFFFu)));
     out.local = in.pos;
-    // Tech in the low byte, then mobile (bit 8) and hover (bit 9) from the icon flags.
+    // Tech in the low byte, then mobile (bit 8) from the icon flags and bit 9 when its
+    // rubber is no belt (a hover skirt or a walker's soles).
     // Naval (icon bit 23) rides in bit 11.
-    out.model_class = ((model.icon >> 8u) & 0xFFu) | ((model.icon >> 8u) & 0x300u) | ((model.icon >> 12u) & 0x800u)
+    out.model_class = ((model.icon >> 8u) & 0xFFu) | ((model.icon >> 8u) & 0x100u) | select(0x200u, 0u, belt) | ((model.icon >> 12u) & 0x800u)
         | ((in.surface & 0xFFFFu) << 16u)
         | select(0u, 0x1000u, (model.icon & 0x1000000u) != 0u)
         // Bit 13: a capital ship (icon bit 26).
