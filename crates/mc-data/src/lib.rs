@@ -758,6 +758,16 @@ impl UnitBlueprint {
         self.reclaims().is_some() || self.drone.is_some()
     }
 
+    /// A salvage unit the factories make: mobile, unarmed, and it reclaims on its own
+    /// or with drones. Not an engineer (it builds nothing). The Argus (radar) has a job
+    /// of its own and is not one.
+    pub fn is_salvager(&self) -> bool {
+        self.is_mobile()
+            && self.weapons.is_empty()
+            && self.radar == Fx::ZERO
+            && (self.reclaimer.is_some_and(|r| r.mobile) || self.drone_carrier())
+    }
+
     /// A carrier: its drones are how it reclaims, so they work the wrecks it is told to
     /// and come home when it moves off. A unit that reclaims with its own tools (a
     /// commander's drone port) leaves its drones to salvage round it on their own.

@@ -32,15 +32,6 @@ pub(super) struct Field {
     pub(super) mass: Fx,
 }
 
-/// A salvage unit the factories make: mobile, unarmed, and it reclaims on its own
-/// or with drones. The Argus (radar) has a job of its own and is not one.
-pub(super) fn is_salvager(bp: &UnitBlueprint) -> bool {
-    bp.is_mobile()
-        && bp.weapons.is_empty()
-        && bp.radar == Fx::ZERO
-        && (bp.reclaimer.is_some_and(|r| r.mobile) || bp.drone_carrier())
-}
-
 impl World {
     /// The wreck fields near `start` that are safe to work, richest first.
     pub(super) fn wreck_fields(&self, start: FxVec2, intel: &Intel) -> Vec<Field> {
@@ -151,7 +142,7 @@ impl World {
             .copied()
             .filter(|b| {
                 let bp = self.blueprints.unit(*b);
-                is_salvager(bp) && !bp.has(cat::NAVAL)
+                bp.is_salvager() && !bp.has(cat::NAVAL)
             })
             .min_by_key(|b| (self.blueprints.unit(*b).cost_mass, b.0))
     }

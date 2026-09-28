@@ -142,7 +142,7 @@
         name: "Trawler",
         role: "Salvage Boat",
         tech: 1,
-        categories: ["Naval", "Engineer"],
+        categories: ["Naval"],
         health: 600,
         cost: (mass: 80, energy: 480, time: 300),
         radius: 8, height: 6,

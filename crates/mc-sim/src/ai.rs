@@ -142,7 +142,7 @@ struct Census {
     air_factories: usize,
     /// Reclaim towers standing: where, and how far each reaches.
     towers: Vec<(FxVec2, Fx)>,
-    /// Salvage units (`salvage::is_salvager`), and those with no orders.
+    /// Salvage units (`UnitBlueprint::is_salvager`), and those with no orders.
     salvagers: usize,
     salvagers_idle: Vec<usize>,
     storage: usize,
@@ -485,7 +485,7 @@ impl World {
                 c.storage += 1;
             } else if let Some(r) = bp.reclaimer.filter(|_| bp.is_structure()) {
                 c.towers.push((pos, r.range));
-            } else if salvage::is_salvager(bp) {
+            } else if bp.is_salvager() {
                 if units.drone_parent[row] == crate::Handle::NONE {
                     c.salvagers += 1;
                     if idle {
@@ -770,7 +770,7 @@ impl World {
                             || u.drone.is_some())
                         && !u.has(cat::COMMANDER)
                         && !u.has(cat::ENGINEER)
-                        && !salvage::is_salvager(u)
+                        && !u.is_salvager()
                 })
                 .collect();
             let blueprint = if (census.engineers + planned_engineers < want_engineers

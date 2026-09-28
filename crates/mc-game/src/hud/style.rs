@@ -167,7 +167,7 @@ impl Purpose {
         let has = |c: u32| bp.categories & c != 0;
         if structures && has(cat::MOBILE) {
             Purpose::Units
-        } else if has(cat::ENGINEER | cat::FACTORY) {
+        } else if has(cat::ENGINEER | cat::FACTORY) || bp.is_salvager() {
             Purpose::Builders
         } else if has(cat::EXTRACTOR | cat::POWER | cat::STORAGE | cat::ECONOMY) {
             Purpose::Economy

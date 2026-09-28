@@ -212,7 +212,7 @@ fn forces_of(world: &World, players: &mut [PlayerStatus]) {
             f.generators += bp.has(cat::POWER) as u32;
         } else if bp.has(cat::ENGINEER) {
             f.engineers += 1;
-        } else if !bp.has(cat::COMMANDER) {
+        } else if !bp.has(cat::COMMANDER) && !bp.is_salvager() {
             f.army += 1;
             f.army_value += bp.cost_mass.to_f32();
         }

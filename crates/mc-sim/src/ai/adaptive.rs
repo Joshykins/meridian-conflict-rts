@@ -216,6 +216,7 @@ impl World {
                             u.is_mobile()
                                 && u.weapons.is_empty()
                                 && !u.has(cat::ENGINEER)
+                                && !u.is_salvager()
                                 && !u.has(cat::SCOUT)
                         })
                         .map(|(_, n)| *n)
