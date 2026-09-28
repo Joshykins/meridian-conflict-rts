@@ -42,7 +42,7 @@ fn skyguard_muzzles_stand_in_the_cells_the_shader_numbers() {
 
 #[test]
 fn skyguard_hatches_and_rounds_sit_on_their_cells() {
-    for key in ["aa_sam", "aa_sam~revetment"] {
+    for key in ["aa_sam"] {
         let model = build_model(key).unwrap();
         for (level, lod) in model.lods.iter().enumerate() {
             assert!(

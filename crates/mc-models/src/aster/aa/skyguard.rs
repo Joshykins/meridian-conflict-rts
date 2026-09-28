@@ -2,9 +2,10 @@
 //! cells forward on the pad, each under a hatch hinged on its outer edge
 //! (`gpu_consts::cells`): the hatches swing up and out before a salvo, a missile
 //! stands in every loaded cell, and the missiles are boosted straight up out of them.
-//! Behind the block stands the fire-control deckhouse: a tapered eight-sided tower
-//! with a fixed array face on each diagonal facet, laid flat on its facet. Nothing
-//! yaws.
+//! The block is dug in behind sloped armoured berms on its flanks and front, with a
+//! ramp up to its deck from behind and magazines at the back corners. Behind it stands
+//! the fire-control deckhouse: a tapered eight-sided tower with a fixed array face on
+//! each diagonal facet, laid flat on its facet. Nothing yaws.
 use super::*;
 use crate::builder::{ngon, Section};
 use crate::gpu_consts::cells::{CENTRE, DECK, HALF, OFFSET};
@@ -29,28 +30,16 @@ const TOWER_SIDE_Y: f32 = 1.2;
 const TOWER_H: f32 = 7.6;
 const TOWER_TOP: f32 = 0.74;
 
-/// How the site round the block is built.
-#[derive(Clone, Copy, PartialEq)]
-pub(super) enum Base {
-    /// An open hardstand: plated pad, equipment skids, cable runs, deck rails.
-    Hardstand,
-    /// The block dug in behind sloped armoured berms, magazines at the back.
-    Revetment,
-}
-
-pub(super) fn build(b: &mut MeshBuilder, base: Base) {
+pub(super) fn build(b: &mut MeshBuilder) {
     if b.coarse() {
         coarse(b);
         return;
     }
-    pad(b, base);
+    pad(b);
     block(b);
     cells(b);
     deckhouse(b);
-    match base {
-        Base::Hardstand => hardstand(b),
-        Base::Revetment => revetment(b),
-    }
+    revetment(b);
 }
 
 /// Cell centres in the order the shader numbers them and the weapon's muzzles run
@@ -78,9 +67,8 @@ fn chamfered(hx: f32, hy: f32, cut: f32) -> Vec<[f32; 2]> {
     ]
 }
 
-/// The pad: an octagonal plated slab over a darker kerb, and on the hardstand
-/// hazard-striped blast plates round the block's foot.
-fn pad(b: &mut MeshBuilder, base: Base) {
+/// The pad: an octagonal plated slab over a darker kerb.
+fn pad(b: &mut MeshBuilder) {
     let plan = chamfered(PAD, PAD, 2.4);
     b.paint(PLATING_DARK);
     b.loft_z(
@@ -92,21 +80,6 @@ fn pad(b: &mut MeshBuilder, base: Base) {
         &plan,
         &[Section::new(FOOT - 0.25, 0.975), Section::new(FOOT, 0.955)],
     );
-    if base == Base::Revetment || !b.fine() {
-        return;
-    }
-    let (w, reach) = (0.9, BLOCK + 0.9);
-    b.paint(PLATING).pattern(pattern::HAZARD);
-    for s in [-1.0, 1.0] {
-        b.cuboid(
-            v3(CENTRE, s * (reach - w * 0.5), FOOT + 0.04),
-            v3(reach * 2.0, w, 0.08),
-        );
-        b.cuboid(
-            v3(CENTRE + s * (reach - w * 0.5), 0.0, FOOT + 0.04),
-            v3(w, reach * 2.0 - w * 2.0, 0.08),
-        );
-    }
 }
 
 /// The armoured block the cells are sunk in: a dark core whose inner faces are the
@@ -423,36 +396,6 @@ fn array_face(b: &mut MeshBuilder, dx: f32, dy: f32, base: f32, top: f32) {
     }
 }
 
-/// A: the open hardstand. Equipment skids along the flanks, cable runs from the
-/// deckhouse to the block, a reload davit beside the block and a ladder up its side.
-fn hardstand(b: &mut MeshBuilder) {
-    b.mirror_y(|b| skid(b, 4.8, 7.7));
-    if !b.fine() {
-        return;
-    }
-    conduits(b, 1.4);
-    davit(b, v3(CENTRE + BLOCK + 1.2, -BLOCK - 1.3, FOOT));
-    // A ladder up the block's side, to the deck.
-    b.paint(METAL);
-    let x = CENTRE - 0.9;
-    let y = BLOCK + 0.5;
-    let rail = v2(0.07, 0.07);
-    for s in [-0.3, 0.3] {
-        b.beam(v3(x + s, y, FOOT), v3(x + s, y, DECK + 0.9), rail, rail);
-    }
-    for k in 0..8 {
-        b.cuboid(v3(x, y, FOOT + 0.6 + k as f32 * 0.75), v3(0.6, 0.05, 0.05));
-    }
-    // Floodlight posts at the pad's front corners.
-    for py in [PAD - 2.0, -PAD + 2.0] {
-        let px = PAD - 2.0;
-        b.paint(METAL);
-        b.cylinder_between(v3(px, py, FOOT), v3(px, py, FOOT + 3.2), 0.1, 0.08, 6);
-        b.paint(PLATING_DARK);
-        b.cuboid(v3(px - 0.2, py, FOOT + 3.25), v3(0.5, 0.6, 0.3));
-    }
-}
-
 /// Covered cable troughs over the pad from the deckhouse to the block, `y` either side.
 fn conduits(b: &mut MeshBuilder, y: f32) {
     let (from, to) = (TOWER + TOWER_X + 0.3, CENTRE - BLOCK - 0.6);
@@ -465,100 +408,7 @@ fn conduits(b: &mut MeshBuilder, y: f32) {
     }
 }
 
-/// An equipment skid on the pad's flank at (`x`, `y`): a generator housing with its
-/// louvres and exhaust stack, a fuel tank on cradles beside it, all on a base frame.
-fn skid(b: &mut MeshBuilder, x: f32, y: f32) {
-    let out = y.signum();
-    b.paint(PLATING_DARK);
-    b.cuboid(v3(x, y, FOOT + 0.15), v3(7.6, 2.8, 0.3));
-    b.paint(PLATING);
-    b.chamfered_box(v3(x + 1.3, y, FOOT + 1.3), v3(4.4, 2.4, 2.0), 0.25);
-    b.paint(PLATING_DARK);
-    b.cylinder_between(
-        v3(x - 3.6, y, FOOT + 1.05),
-        v3(x - 1.2, y, FOOT + 1.05),
-        0.75,
-        0.75,
-        if b.fine() { 8 } else { 6 },
-    );
-    if !b.fine() {
-        return;
-    }
-    // Louvres on the outboard face, a roof hatch and the exhaust stack.
-    b.cuboid(v3(x + 1.3, y + out * 1.21, FOOT + 1.4), v3(3.2, 0.04, 1.1));
-    b.paint(METAL);
-    for k in 0..4 {
-        b.cuboid(
-            v3(x + 1.3, y + out * 1.25, FOOT + 1.0 + k as f32 * 0.26),
-            v3(3.0, 0.06, 0.07),
-        );
-    }
-    b.paint(PLATING).pattern(pattern::PLAIN);
-    b.cuboid(v3(x + 0.6, y, FOOT + 2.36), v3(1.4, 1.2, 0.12));
-    b.paint(METAL);
-    b.cylinder_between(
-        v3(x + 2.8, y - out * 0.6, FOOT + 2.3),
-        v3(x + 2.8, y - out * 0.6, FOOT + 3.5),
-        0.2,
-        0.2,
-        8,
-    );
-    b.paint(PLATING_DARK);
-    b.cylinder_between(
-        v3(x + 2.8, y - out * 0.6, FOOT + 3.5),
-        v3(x + 2.8, y - out * 0.6, FOOT + 3.7),
-        0.24,
-        0.24,
-        8,
-    );
-    // The tank's cradles and band, and a pipe to the housing.
-    for cx in [x - 3.2, x - 1.6] {
-        b.cuboid(v3(cx, y, FOOT + 0.5), v3(0.3, 1.6, 0.5));
-    }
-    b.paint(ACCENT);
-    b.cylinder_between(
-        v3(x - 2.5, y, FOOT + 1.05),
-        v3(x - 2.3, y, FOOT + 1.05),
-        0.78,
-        0.78,
-        8,
-    );
-    b.paint(METAL);
-    b.beam(
-        v3(x - 1.2, y - out * 0.4, FOOT + 1.4),
-        v3(x - 0.9, y - out * 0.4, FOOT + 1.4),
-        v2(0.12, 0.12),
-        v2(0.12, 0.12),
-    );
-}
-
-/// The reload davit at `at`: a post, a jib folded back along the block, and its hook.
-fn davit(b: &mut MeshBuilder, at: Vec3) {
-    let head = at + v3(0.0, 0.0, DECK + 1.6 - at.z);
-    b.paint(PLATING_DARK);
-    b.cuboid(at + v3(0.0, 0.0, 0.2), v3(1.0, 1.0, 0.4));
-    b.paint(PLATING);
-    b.prism(at + v3(0.0, 0.0, 0.4), 8, 0.35, 0.3, head.z - at.z - 0.7);
-    b.paint(ACCENT);
-    b.cuboid(head, v3(0.8, 0.8, 0.6));
-    b.paint(PLATING);
-    b.beam(
-        head + v3(0.0, 0.0, 0.2),
-        head + v3(-4.2, 0.0, 0.5),
-        v2(0.35, 0.45),
-        v2(0.25, 0.3),
-    );
-    b.paint(METAL);
-    b.beam(
-        head + v3(-4.0, 0.0, 0.3),
-        head + v3(-4.0, 0.0, -1.4),
-        v2(0.04, 0.04),
-        v2(0.04, 0.04),
-    );
-    b.cuboid(head + v3(-4.0, 0.0, -1.5), v3(0.25, 0.25, 0.2));
-}
-
-/// B: the block dug in. Sloped armoured berms stand round its flanks and front to two
+/// The block dug in. Sloped armoured berms stand round its flanks and front to two
 /// thirds of its height, a ramp runs up to its deck from behind, magazines stand at the
 /// back corners.
 fn revetment(b: &mut MeshBuilder) {

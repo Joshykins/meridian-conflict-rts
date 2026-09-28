@@ -101,12 +101,9 @@ pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
 pub(super) fn flak_battery(b: &mut MeshBuilder, _: u8) {
     flak_battery::build(b);
 }
-/// Skyguard: the tech 3 SAM site (`skyguard.rs`), and its base variants.
+/// Skyguard: the tech 3 SAM site (`skyguard.rs`).
 pub(super) fn sam(b: &mut MeshBuilder, _: u8) {
-    skyguard::build(b, skyguard::Base::Hardstand);
-}
-pub(super) fn sam_revetment(b: &mut MeshBuilder, _: u8) {
-    skyguard::build(b, skyguard::Base::Revetment);
+    skyguard::build(b);
 }
 /// Tracked AA by tier: the Gnat, then the Squall.
 pub(super) fn mobile(b: &mut MeshBuilder, tech: u8) {
