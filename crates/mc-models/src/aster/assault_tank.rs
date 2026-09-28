@@ -1,6 +1,6 @@
 //! Fulgur: a long, faceted super-heavy hull with a broad centred turret and its
-//! AEB-2 in an armoured shroud. A bolt rifle on each flank sponson, and a low twin
-//! flak mount on the engine deck that rests facing aft to cover the tank's back.
+//! AEB-2 set back between armoured cheeks. A bolt rifle on each flank sponson, and on
+//! the engine deck a rotary AA gun that rests facing aft, raised to the sky.
 
 use glam::{Affine3A, Vec3};
 
@@ -24,11 +24,13 @@ const SPONSON_BREECH: Vec3 = Vec3::new(10.3, 10.5, 8.5);
 const SPONSON_MUZZLE: Vec3 = Vec3::new(17.5, 10.5, 8.5);
 /// Top of the sponson a house stands on.
 const SPONSON_TOP: f32 = 7.05;
-/// Flak house pivot on the engine deck; its barrels as authored facing the nose (the
-/// house rests turned aft, `facing: 180`), and their spacing.
-const FLAK: Vec3 = Vec3::new(-13.5, 0.0, 8.8);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-6.6, 0.0, 9.45);
-const FLAK_GAP: f32 = 0.55;
+/// The AA gun's house on the engine deck: its pivot is the gun's trunnion. Its muzzle
+/// as authored facing the nose and level (the house rests turned aft, `facing: 180`).
+const AA: Vec3 = Vec3::new(-13.5, 0.0, 9.9);
+/// The Sparrow's rotary gun at this scale, its barrels this long in its own units.
+const AA_SCALE: f32 = 1.15;
+const AA_LENGTH: f32 = 5.5;
+const AA_MUZZLE: Vec3 = Vec3::new(AA.x + AA_LENGTH * AA_SCALE, 0.0, AA.z);
 const ENGINE_DECK: f32 = 8.8;
 
 const REAR: f32 = -19.0;
@@ -328,7 +330,7 @@ fn sponson(b: &mut MeshBuilder, weapon: usize, side: f32) {
     });
 }
 
-/// The raised engine deck aft, its louvres, and the flak house on it.
+/// The raised engine deck aft, its louvres, and the AA gun on it.
 fn engine_deck(b: &mut MeshBuilder) {
     if b.coarse() {
         return;
@@ -355,76 +357,49 @@ fn engine_deck(b: &mut MeshBuilder) {
             b.cylinder_between(v3(-16.2, 5.2, 7.0), v3(-16.6, 5.6, 9.6), 0.55, 0.5, 8);
         });
     }
-    flak(b);
+    aa_gun(b);
 }
 
-/// The twin heavy flak mount, built facing the nose; the house rests turned aft. Low,
-/// so the main gun passes over it: a faceted shield house, ammunition boxes on its
-/// flanks, and two long barrels in recoil sleeves out to slotted brakes.
-fn flak(b: &mut MeshBuilder) {
-    b.with_house(3, FLAK, 0.35, |b| {
+/// The rotary AA gun, the Sparrow's gatling scaled up, built facing the nose: a low
+/// faceted house with a trunnion cheek either side, and the gun on the trunnion. The
+/// house rests turned aft and the gun raised to the sky (the sim's idle pitch for a
+/// land AA gun), so only the house has to be low enough for the main gun to pass over.
+fn aa_gun(b: &mut MeshBuilder) {
+    b.with_house(3, AA, 0.2, |b| {
         b.paint(ACCENT);
         b.prism(
-            v3(FLAK.x, 0.0, ENGINE_DECK - 0.02),
+            v3(AA.x, 0.0, ENGINE_DECK - 0.02),
             b.sides(10),
             2.1,
             2.0,
             0.3,
         );
         b.paint(PLATING);
-        b.at(v3(FLAK.x + 0.2, 0.0, 0.0), |b| {
+        b.at(v3(AA.x - 0.3, 0.0, 0.0), |b| {
             b.loft_z(
-                &turret_plan(4.8, 4.0),
+                &turret_plan(4.2, 3.6),
                 &[
                     Section::new(ENGINE_DECK + 0.2, 1.0),
-                    Section::scaled(9.85, 0.76, 0.72).shifted(-0.3, 0.0),
+                    Section::scaled(9.4, 0.8, 0.76).shifted(-0.2, 0.0),
                 ],
             );
         });
+        b.mirror_y(|b| {
+            b.paint(PLATING_DARK);
+            b.block(v3(AA.x - 0.7, 0.8, 9.2), v3(AA.x + 0.6, 1.15, AA.z + 0.1));
+        });
         if b.fine() {
-            team_panel(b, v3(FLAK.x - 0.9, 0.0, 9.85), v2(1.2, 1.4));
-            b.mirror_y(|b| {
-                b.paint(PLATING_DARK);
-                b.block(
-                    v3(FLAK.x - 1.6, 1.85, ENGINE_DECK + 0.25),
-                    v3(FLAK.x + 0.8, 2.35, 9.6),
-                );
-                b.paint(ACCENT);
-                b.block(v3(FLAK.x - 1.3, 2.35, 9.1), v3(FLAK.x + 0.5, 2.4, 9.35));
-            });
+            team_panel(b, v3(AA.x - 1.6, 0.0, 9.4), v2(0.9, 1.4));
         }
         b.with_recoil(|b| {
-            for side in [-1.0, 1.0] {
-                let y = side * FLAK_GAP;
-                let z = FLAK_MUZZLE.z;
-                b.paint(ACCENT).pattern(pattern::PLAIN);
-                b.cuboid(v3(FLAK.x + 1.9, y, z), v3(1.0, 0.5, 0.6));
-                b.paint(PLATING).pattern(pattern::PLAIN);
-                b.cylinder_between(
-                    v3(FLAK.x + 2.3, y, z),
-                    v3(FLAK.x + 3.9, y, z),
-                    0.27,
-                    0.25,
-                    b.sides(8),
-                );
-                b.paint(METAL).pattern(pattern::PLAIN);
-                b.cylinder_between(
-                    v3(FLAK.x + 3.9, y, z),
-                    v3(FLAK_MUZZLE.x - 0.6, y, z),
-                    0.17,
-                    0.15,
-                    b.sides(8),
-                );
-                b.paint(PLATING_DARK).pattern(pattern::PLAIN);
-                b.cuboid(v3(FLAK_MUZZLE.x - 0.3, y, z), v3(0.6, 0.34, 0.34));
-                if b.fine() {
-                    b.paint(ACCENT);
-                    for k in 0..3 {
-                        let x = FLAK_MUZZLE.x - 0.52 + k as f32 * 0.17;
-                        b.block(v3(x, y - 0.18, z - 0.08), v3(x + 0.08, y + 0.18, z + 0.08));
-                    }
-                }
-            }
+            b.with(
+                Affine3A::from_translation(v3(AA.x, 0.0, AA.z))
+                    * Affine3A::from_scale(Vec3::splat(AA_SCALE)),
+                |b| super::aa::rotary(b, 0.0, AA_LENGTH),
+            );
+            // The front clamp's hub, the bore line's end.
+            b.paint(PLATING_DARK);
+            b.cylinder_between(v3(AA_MUZZLE.x - 0.12, 0.0, AA.z), AA_MUZZLE, 0.14, 0.14, 8);
         });
     });
 }

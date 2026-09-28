@@ -413,8 +413,22 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
     }
 }
 
+/// With nothing to shoot, the Fulgur's AA gun comes round to face aft and raises its
+/// barrels to the sky, as a land AA gun waits.
 #[test]
-fn fulgur_uses_independent_bolt_rifles_and_an_aft_flak_mount() {
+fn the_fulgurs_aa_gun_rests_aft_and_raised() {
+    let mut w = dry();
+    let fulgur = spawn(&mut w, "aster_t4_assault_tank", 0, 512, 512, 0);
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    let r = row(&w, fulgur);
+    assert_eq!(w.state.units.weapon_yaw[r][3], Angle::from_degrees(180));
+    assert_eq!(w.state.units.arm_pitch[r][2 + 3], Angle::from_degrees(60));
+}
+
+#[test]
+fn fulgur_uses_independent_bolt_rifles_and_an_aft_aa_gun() {
     let bp = blueprints();
     let tank = bp.unit(bp.id_of("aster_t4_assault_tank").unwrap());
     assert_eq!(tank.name, "Fulgur");
@@ -425,9 +439,9 @@ fn fulgur_uses_independent_bolt_rifles_and_an_aft_flak_mount() {
         assert!(w.bore.is_none() && w.mount && w.discharge > 0.0);
         assert_eq!(w.sounds.fire.as_deref(), Some("aster_bolt_rifle_heavy"));
     }
-    let flak = &tank.weapons[3];
-    assert!(flak.flak && flak.mount);
-    assert_eq!(flak.facing.0, 0x8000, "the flak rests facing aft");
+    let aa = &tank.weapons[3];
+    assert!(aa.mount && aa.spin_ticks > 0 && aa.target_mask == mc_data::cat::AIR);
+    assert_eq!(aa.facing.0, 0x8000, "the AA gun rests facing aft");
 }
 
 #[test]

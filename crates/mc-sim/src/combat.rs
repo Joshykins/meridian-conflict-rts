@@ -1203,8 +1203,10 @@ impl World {
                 || (w == 0 && bp.unit(units.blueprint[row]).visual.mesh != "assault_air")
             {
                 let slot = pitch_slot(weapon, w);
-                // A land AA gun waits pointed at the sky, not at the horizon.
-                let sky_gun = !weapon.mount
+                // A land AA gun waits pointed at the sky, not at the horizon: on its turret,
+                // or in a house of its own on the hull (the Fulgur's rotary gun), not on a
+                // shoulder.
+                let sky_gun = (!weapon.mount || naval)
                     && !weapon.missile
                     && weapon.pivot.is_some()
                     && weapon.target_mask & !cat::AIR == 0

@@ -355,8 +355,7 @@ a dark core in a light sleeve cut on a slant, a dark cowl over its back.
 - Sound (`data/sounds/bore.ron`): capacitors filling (two contactors, a climbing
   stack), a light crack for the tracer, then the strike: a snap, a buzzing stack
   falling fast, a deep thump and thunder rolling back twice. The AEB-2's are
-  the same sounds larger. The Fulgur's compact mounts use quieter, shorter
-  variants so the main discharge dominates the pair.
+  the same sounds larger.
 
 ## Experimentals
 
@@ -365,7 +364,8 @@ their own, like a structure (`footprint` on a mobile unit), and the finished
 machine drives off it. The Fulgur is the first: a super-heavy assault tank,
 four tracks, a hull field, the AEB-2 on the main turret and gun houses of its
 own on the hull (`hull_mounts`: a Paladin-pattern bolt rifle on each sponson and a
-low twin flak mount on the engine deck that rests facing aft, `facing: 180`). The
+rotary AA gun, the Sparrow's gatling, on the engine deck that rests facing aft,
+`facing: 180`, raised to the sky like every land AA gun at rest). The
 turret is broad and centred, with armoured cheeks rising either side of the gun.
 The AEB-2 sits well back between them: a faceted housing with twin capacitor pods
 on its back, a dark core carried in three swept strakes, a stepped ported crown.

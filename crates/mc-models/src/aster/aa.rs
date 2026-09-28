@@ -20,10 +20,10 @@ fn mount(b: &mut MeshBuilder, z: f32) {
         team_panel(b, v3(-0.5, 0.0, z + 1.02), v2(1.4, 1.3));
     });
 }
-/// The Sparrow's gun: a receiver on the trunnion, six barrels in clamps that spin
+/// The Sparrow's gun (and the Fulgur's): a receiver on the trunnion, six barrels in clamps that spin
 /// about the bore line, a drum feeding it from the left and the ejection port on
 /// the right, where the casings come out.
-fn rotary(b: &mut MeshBuilder, z: f32, end: f32) {
+pub(super) fn rotary(b: &mut MeshBuilder, z: f32, end: f32) {
     let axis = v3(0.0, 0.0, z);
     b.paint(ACCENT);
     b.cylinder_between(v3(0.3, 0.0, z), v3(1.45, 0.0, z), 0.56, 0.5, b.sides(10));

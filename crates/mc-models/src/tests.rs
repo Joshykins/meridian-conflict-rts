@@ -2975,7 +2975,7 @@ fn fulgur_houses_and_muzzles() {
     let want: [(u8, [f32; 3], [f32; 3]); 3] = [
         (1, [14.85, 17.325, 11.88], [28.875, 17.325, 14.025]),
         (2, [14.85, -17.325, 11.88], [28.875, -17.325, 14.025]),
-        (3, [-22.275, 0.0, 14.52], [-10.89, 0.9075, 15.5925]),
+        (3, [-22.275, 0.0, 16.335], [-11.83875, 0.0, 16.335]),
     ];
     assert_eq!(model.houses.len(), 3, "fulgur: three gun houses");
     for (weapon, pivot, muzzle) in want {
@@ -3022,11 +3022,14 @@ fn fulgur_houses_and_muzzles() {
         }
     }
     let mesh = &model.lods[0];
-    let flak_slot = model.houses.iter().position(|h| h.weapon == 3).unwrap() as u32;
-    let flak_top = mesh
+    // The AA gun rests raised to the sky; the house under it must clear the main barrel.
+    let aa_slot = model.houses.iter().position(|h| h.weapon == 3).unwrap() as u32;
+    let aa_top = mesh
         .vertices
         .iter()
-        .filter(|v| (v.rig & rig::LIMB_MASK) == rig::HOUSE_FIRST + flak_slot)
+        .filter(|v| {
+            (v.rig & rig::LIMB_MASK) == rig::HOUSE_FIRST + aa_slot && v.rig & rig::RECOIL == 0
+        })
         .map(|v| v.pos[2])
         .fold(f32::MIN, f32::max);
     // The main barrel: the turret's recoiling part out past the shroud.
@@ -3037,11 +3040,11 @@ fn fulgur_houses_and_muzzles() {
         .map(|v| v.pos[2])
         .fold(f32::MAX, f32::min);
     assert!(
-        flak_top < barrel_bottom,
-        "fulgur: the main barrel (bottom {barrel_bottom}) must pass over the flak house (top {flak_top})"
+        aa_top < barrel_bottom,
+        "fulgur: the main barrel (bottom {barrel_bottom}) must pass over the AA house (top {aa_top})"
     );
     let [full, mid, coarse] = [0, 1, 2].map(|lod| triangles(&model.lods[lod]));
-    println!("fulgur triangles {full}/{mid}/{coarse}, flak top {flak_top:.2}, barrel bottom {barrel_bottom:.2}");
+    println!("fulgur triangles {full}/{mid}/{coarse}, AA house top {aa_top:.2}, barrel bottom {barrel_bottom:.2}");
 }
 
 /// The Arbalest plants two spades behind the tail to fire, folded up by the shader about

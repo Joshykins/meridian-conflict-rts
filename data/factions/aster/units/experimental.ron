@@ -6,7 +6,7 @@
         // A super-heavy assault tank built round the AEB-2, the electric bore scaled up
         // until it no longer aims well: the tracer strays, and the charge sears everything
         // along its channel on the way down, leaving the ground molten behind it. A bolt
-        // rifle on each sponson for what gets close, a twin flak mount on the engine deck
+        // rifle on each sponson for what gets close, a rotary AA gun on the engine deck
         // that rests facing aft, and a hull field over all of it.
         key: "aster_t4_assault_tank",
         name: "Fulgur",
@@ -53,15 +53,15 @@
                 sounds: (fire: "aster_bolt_rifle_heavy", impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
             ),
             (
-                // Twin barrels fired together, their shells drifting apart. The house rests
-                // facing aft (`facing`), guarding the tank's back; its muzzles are given as
-                // it faces the nose.
-                name: "Heavy Twin Flak",
-                damage: 440, splash: 48, proximity: 15, range: 440, reload: 1.1, speed: 360, trajectory: Direct,
-                turret_turn: 240, facing: 180, muzzle: (-10.89, 0, 15.5925), pivot: (-22.275, 0, 14.52), mount: true,
-                muzzles: [(-10.89, -0.9075, 15.5925), (-10.89, 0.9075, 15.5925)], salvo: 2, salvo_batch: 2, spread: 2.5,
-                targets: ["Air"], color: Orange, flak: true, flash: 1.5, impact: 1.8,
-                sounds: (fire: "flak_gun", impact: "flak_burst"),
+                // The Sparrow's rotary gun, bigger, in a house of its own on the engine deck.
+                // It rests facing aft (`facing`) and raised to the sky, guarding the tank's
+                // back; its muzzle is given as it faces the nose, level. It spins up on a
+                // target, then each 0.1 s shot is seen and heard as eight rounds.
+                name: "Rotary AA Gun",
+                damage: 70, range: 440, reload: 0.1, speed: 900, trajectory: Direct,
+                turret_turn: 240, facing: 180, muzzle: (-11.83875, 0, 16.335), pivot: (-22.275, 0, 16.335), mount: true,
+                targets: ["Air"], color: Orange, spin_up: 0.6, rounds: 8, tracer: 0.8, casings: 5.5,
+                sounds: (fire: "aster_minigun", impact: "shell_light"),
             ),
         ],
         mesh: "assault_tank", icon: Tank,

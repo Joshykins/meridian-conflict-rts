@@ -94,7 +94,7 @@
         weapons: {
             "AEB-2 Electric Bore": "The bore scaled past good aim: it sears everything along the channel and leaves the ground molten.",
             "Bolt Rifle": "A bolt rifle on each flank sponson, aimed on its own, bursts lightning round whatever gets close.",
-            "Heavy Twin Flak": "A twin flak mount on the engine deck, turned aft to guard the tank's back; its shells burst in pairs across a flight.",
+            "Rotary AA Gun": "A rotary gun on the engine deck, turned aft and raised to the sky to guard the tank's back.",
         },
     ),
     "aster_t5_titan": (
