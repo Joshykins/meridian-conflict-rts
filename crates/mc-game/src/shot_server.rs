@@ -8,8 +8,12 @@
 //! second and leaves after `IDLE` without a request, or on a `--quit` request.
 //! `--reload` re-reads data/ and rebuilds the renderer, after a data edit;
 //! `--shaders` recompiles the WGSL in `crates/mc-render/shaders` and rebuilds the
-//! renderer with it, after a shader edit (`mc_render::shader_reload`), so neither
-//! needs a build of the game.
+//! renderer with it, after a shader edit (`mc_render::shader_reload`). After a
+//! model edit, `--calls-for KEY --calls FILE` writes the mesh calls the renderer
+//! made for that unit; `scripts/shot.sh` has a freshly built `mc-models` program
+//! answer them, and `--models ANSWER --calls FILE` swaps its meshes in
+//! (`mc_models::remote`).
+//! None of the three needs a build of the game.
 
 use crate::range::Scenario;
 use crate::setup::Options;
@@ -17,6 +21,7 @@ use crate::unit_shot::{self, Spec, Studio};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::MapFile;
+use mc_render::models::remote;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -35,10 +40,17 @@ pub(crate) fn serve(
     pool: Arc<Pool>,
 ) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let mut blueprints = load(data_dir)?;
-    // Rebuilds after a shader or data edit take what the last build computed.
+    // Rebuilds after a shader, data or model edit take what the last build computed.
     mc_render::keep::keep_between_builds();
-    let mut studio: Option<Studio> = None;
+    remote::keep_meshes();
+    let mut server = Server {
+        base: base.clone(),
+        map,
+        data_dir: data_dir.to_owned(),
+        pool,
+        blueprints: load(data_dir)?,
+        studio: None,
+    };
     let mut asked = Instant::now();
     // A beat of its own, so a long renderer build does not look like a dead server.
     let alive = dir.join("alive");
@@ -63,50 +75,111 @@ pub(crate) fn serve(
             answer(&req, Ok("quitting\n".into()));
             break;
         }
-        let said = (|| {
-            let mut said = String::new();
-            if args.iter().any(|a| a == "--reload") {
-                blueprints = load(data_dir)?;
-                studio = None;
-                said += "data/ re-read\n";
-            }
-            if args.iter().any(|a| a == "--shaders") {
-                let t = Instant::now();
-                let n = mc_render::shader_reload::reload_from(Path::new(SHADERS))
-                    .map_err(|e| e.to_string())?;
-                studio = None;
-                said += &format!(
-                    "{n} shaders rebuilt in {:.1} s\n",
-                    t.elapsed().as_secs_f32()
-                );
-            }
-            let (opts, ticks, spec) = parse(base, &args)?;
-            if blueprints.id_of(&opts.subject).is_none() {
-                return Err(format!("{:?} is not a unit", opts.subject));
-            }
-            let studio = match &mut studio {
-                Some(s) => s,
-                None => {
-                    let t = Instant::now();
-                    let s = Studio::new(
-                        map.clone(),
-                        blueprints.clone(),
-                        pool.clone(),
-                        spec.width,
-                        spec.height,
-                    )?;
-                    said += &format!("renderer built in {:.1} s\n", t.elapsed().as_secs_f32());
-                    studio.insert(s)
-                }
-            };
-            said += &studio.shoot(&opts, ticks, &spec)?;
-            Ok(said)
-        })();
-        answer(&req, said);
+        answer(&req, server.handle(&args));
     }
     // The beat stops with the process; the file goes first so nobody waits on it.
     std::fs::remove_file(&alive).ok();
     Ok(())
+}
+
+/// What the server holds between requests.
+struct Server {
+    base: Options,
+    map: Arc<MapFile>,
+    data_dir: PathBuf,
+    pool: Arc<Pool>,
+    blueprints: Arc<Blueprints>,
+    studio: Option<Studio>,
+}
+
+impl Server {
+    /// One request; says what it did.
+    fn handle(&mut self, args: &[String]) -> Result<String, String> {
+        let mut said = String::new();
+        let value = |flag: &str| {
+            args.iter()
+                .position(|a| a == flag)
+                .and_then(|i| args.get(i + 1))
+                .cloned()
+        };
+        if args.iter().any(|a| a == "--reload") {
+            self.blueprints = load(&self.data_dir)?;
+            self.studio = None;
+            said += "data/ re-read\n";
+        }
+        if args.iter().any(|a| a == "--shaders") {
+            let t = Instant::now();
+            let n = mc_render::shader_reload::reload_from(Path::new(SHADERS))
+                .map_err(|e| e.to_string())?;
+            self.studio = None;
+            said += &format!(
+                "{n} shaders rebuilt in {:.1} s\n",
+                t.elapsed().as_secs_f32()
+            );
+        }
+        let read = |path: &str| std::fs::read(path).map_err(|e| format!("{path}: {e}"));
+        let calls_file = value("--calls").ok_or("--models and --calls-for need --calls FILE");
+        if let Some(path) = value("--models") {
+            let calls =
+                remote::decode_request(&read(&calls_file.clone()?)?).map_err(|e| e.to_string())?;
+            let models = remote::decode_response(&read(&path)?).map_err(|e| e.to_string())?;
+            let n = remote::replace(&calls, models);
+            self.studio = None;
+            said += &format!("{n} rebuilt meshes swapped in\n");
+        }
+        if let Some(key) = value("--calls-for") {
+            return self
+                .write_calls(&key, Path::new(&calls_file?))
+                .map(|n| said + &format!("{n} mesh calls\n"));
+        }
+        let (opts, ticks, spec) = parse(&self.base, args)?;
+        if self.blueprints.id_of(&opts.subject).is_none() {
+            return Err(format!("{:?} is not a unit", opts.subject));
+        }
+        said += &self.studio(spec.width, spec.height)?;
+        let studio = self.studio.as_mut().ok_or("no renderer")?;
+        said += &studio.shoot(&opts, ticks, &spec)?;
+        Ok(said)
+    }
+
+    /// Builds the renderer if there is none; says how long it took.
+    fn studio(&mut self, width: u32, height: u32) -> Result<String, String> {
+        if self.studio.is_some() {
+            return Ok(String::new());
+        }
+        let t = Instant::now();
+        self.studio = Some(Studio::new(
+            self.map.clone(),
+            self.blueprints.clone(),
+            self.pool.clone(),
+            width,
+            height,
+        )?);
+        Ok(format!(
+            "renderer built in {:.1} s\n",
+            t.elapsed().as_secs_f32()
+        ))
+    }
+
+    /// Writes to `path` the mesh calls the renderer made for unit `key`'s model,
+    /// for `mc-models` to build again with edited model code.
+    fn write_calls(&mut self, key: &str, path: &Path) -> Result<usize, String> {
+        let id = self
+            .blueprints
+            .id_of(key)
+            .ok_or_else(|| format!("{key:?} is not a unit"))?;
+        // The renderer records its calls as it builds.
+        self.studio(800, 600)?;
+        let mesh = &self
+            .blueprints
+            .unit(self.blueprints.base_of(id))
+            .visual
+            .mesh;
+        let calls = remote::kept_calls(mesh);
+        let bytes = remote::encode_request(&calls).map_err(|e| e.to_string())?;
+        std::fs::write(path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(calls.len())
+    }
 }
 
 fn load(data_dir: &Path) -> Result<Arc<Blueprints>, String> {
@@ -150,6 +223,9 @@ fn parse(base: &Options, args: &[String]) -> Result<(Options, u32, Spec), String
         let mut value = |name: &str| it.next().cloned().ok_or(format!("{name} needs a value"));
         match arg.as_str() {
             "--reload" | "--shaders" => {}
+            "--models" | "--calls-for" | "--calls" => {
+                value(arg)?;
+            }
             "--unit-shot" => opts.subject = value(arg)?,
             "--screenshot" => spec.path = value(arg)?,
             "--ticks" => ticks = value(arg)?.parse().map_err(|_| "--ticks takes a number")?,

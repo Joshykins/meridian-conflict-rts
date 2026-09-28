@@ -21,8 +21,10 @@
 # Unit shots go to a shot server (meridian --shot-server) that keeps a warm
 # renderer between shots, so a shot costs its views (~1-3 s), not the ~10 s
 # start-up. It is restarted when the build changes, told to re-read data/ when
-# data/ changes and to recompile the shaders when a .wgsl changes (no cargo build
-# for either), and leaves by itself after 30 idle minutes.
+# data/ changes and to recompile the shaders when a .wgsl changes, and handed
+# freshly built meshes when a model file in crates/mc-models changes (built here
+# at opt-level 0 in seconds; none of the three needs a build of the game). It
+# leaves by itself after 30 idle minutes.
 #
 # Every session shares one incremental build (the `shot` profile, in
 # %TEMP%\meridian-target-shot-<checkout>), and nothing is built when no source
@@ -64,6 +66,9 @@ built_stamp="/tmp/meridian-shot-built-$checkout"
 data_stamp="/tmp/meridian-shot-data-$checkout"
 shader_stamp="/tmp/meridian-shot-shaders-$checkout"
 shaders="$repo/crates/mc-render/shaders"
+# Per unit key: when that unit's meshes were last rebuilt for the server.
+model_stamps="/tmp/meridian-shot-models-$checkout"
+models="$repo/crates/mc-models/src"
 
 server_alive() {
     local beat
@@ -135,9 +140,12 @@ t0=$(date +%s%N)
         if [[ ! -f $built_stamp || ! -f $built ]]; then
             changed=yes
         else
-            # A unit shot's server recompiles edited shaders itself (--shaders).
+            # A unit shot's server recompiles edited shaders itself (--shaders) and
+            # takes edited models from mc-models (--models); gpu_consts.rs is
+            # shared with the renderer and shaders, so it still needs a build.
             skip=()
-            [[ $mode == unit ]] && skip=(-not -path "$shaders/*")
+            [[ $mode == unit ]] && skip=(-not -path "$shaders/*"
+                -not \( -path "$models/*" -not -name gpu_consts.rs \))
             changed=$(find "$repo/crates" "$repo/Cargo.toml" "$repo/Cargo.lock" -newer "$built_stamp" -type f \
                 -not -path '*/target/*' "${skip[@]}" -print -quit)
         fi
@@ -194,8 +202,9 @@ if [[ $mode == unit ]]; then
         for _ in $(seq 100); do server_alive && break; sleep 0.1; done
         server_alive || { echo "shot.sh: the shot server did not start" >&2; tr -d '\r' < "$server_dir/server.log" | tail -20 >&2; exit 1; }
         touch "$data_stamp"
-        # The new server has the shaders its build compiled.
+        # The new server has the shaders and models its build compiled.
         touch -r "$built_stamp" "$shader_stamp"
+        rm -rf "$model_stamps"
     fi
     flock -u 8
     reload=()
@@ -206,6 +215,24 @@ if [[ $mode == unit ]]; then
     if [[ -n $(find "$shaders" -newer "$shader_stamp" -type f -print -quit) ]]; then
         reload+=(--shaders)
         touch "$shader_stamp"
+    fi
+    # A model edit since this unit's meshes were last made: build the small
+    # mc-models program here (unoptimised, seconds), have it rebuild the meshes
+    # the server's renderer asked for, and send them over.
+    mkdir -p "$model_stamps"
+    model_stamp="$model_stamps/$key"
+    [[ -f $model_stamp ]] || touch -r "$built_stamp" "$model_stamp"
+    if [[ -n $(find "$models" -newer "$model_stamp" -type f -name '*.rs' -print -quit) ]]; then
+        touch "$model_stamp.next"
+        (cd "$repo" && cargo build -q --profile models -p mc-models --bin mc-models) \
+            || { rm -f "$model_stamp.next"; echo "shot.sh: mc-models did not build" >&2; exit 1; }
+        calls="$server_dir/calls-$$.bin" meshes="$server_dir/meshes-$$.bin"
+        trap 'rm -f "$calls" "$meshes"' EXIT
+        ask --calls-for "$key" --calls "$(wslpath -w "$calls")" > /dev/null
+        "$repo/target/models/mc-models" "$calls" "$meshes" \
+            || { rm -f "$model_stamp.next"; echo "shot.sh: mc-models could not build the meshes" >&2; exit 1; }
+        reload+=(--models "$(wslpath -w "$meshes")" --calls "$(wslpath -w "$calls")")
+        mv "$model_stamp.next" "$model_stamp"
     fi
     ask "${reload[@]}" "${game_args[@]}" --screenshot "$out_win"
 else

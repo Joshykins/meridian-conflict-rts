@@ -105,3 +105,13 @@ inherits = "release"
 incremental = true
 codegen-units = 256
 debug = "line-tables-only"
+
+# The mc-models program a shot server asks for fresh meshes after a model edit
+# (scripts/shot.sh): code generation is nearly all of a model rebuild, and
+# unoptimised it takes ~4 s instead of 35-45 s; the meshes still build in well
+# under a second.
+[profile.models]
+inherits = "dev"
+
+[profile.models.package.mc-models]
+opt-level = 0

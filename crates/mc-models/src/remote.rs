@@ -9,6 +9,7 @@
 
 use bincode::Options;
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 
 use crate::{build_model, build_model_fitted, Model};
 
@@ -26,6 +27,76 @@ pub struct Call {
     /// A prop (tree, rock, Precursor piece): built at its authored size
     /// ([`build_model`]).
     pub prop: bool,
+}
+
+impl Call {
+    /// A prop at its authored size ([`build_model`]).
+    pub fn prop(key: &str) -> Call {
+        Call {
+            key: key.to_owned(),
+            radius: 0.0,
+            height: 0.0,
+            tech: 0,
+            modules: Vec::new(),
+            prop: true,
+        }
+    }
+}
+
+/// A shot server's meshes, once [`keep_meshes`] has run: every call its renderers
+/// made with the mesh it got. A renderer rebuilt after a shader or data edit takes
+/// them as they are, and [`replace`] swaps in meshes a rebuilt `mc-models` made
+/// after a model edit, since the server's own model code is the old one.
+static KEPT: Mutex<Option<Vec<(Call, Model)>>> = Mutex::new(None);
+
+fn kept_lock() -> std::sync::MutexGuard<'static, Option<Vec<(Call, Model)>>> {
+    KEPT.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// From now on every mesh built is kept, and built again only for a new call.
+pub fn keep_meshes() {
+    kept_lock().get_or_insert_with(Vec::new);
+}
+
+/// `make()`'s mesh for `call`, or the one kept for it.
+pub(crate) fn through(call: Call, make: impl FnOnce() -> Option<Model>) -> Option<Model> {
+    if let Some(kept) = kept_lock().as_ref() {
+        if let Some((_, model)) = kept.iter().find(|(c, _)| *c == call) {
+            return Some(model.clone());
+        }
+    } else {
+        return make();
+    }
+    let model = make()?;
+    if let Some(kept) = kept_lock().as_mut() {
+        kept.push((call, model.clone()));
+    }
+    Some(model)
+}
+
+/// The kept calls for mesh `key`: what to ask a rebuilt `mc-models` for.
+pub fn kept_calls(key: &str) -> Request {
+    kept_lock()
+        .iter()
+        .flatten()
+        .filter(|(c, _)| c.key == key)
+        .map(|(c, _)| c.clone())
+        .collect()
+}
+
+/// Uses `models` for `calls` (a response to them, in order) from now on; returns
+/// how many were swapped in.
+pub fn replace(calls: &[Call], models: Response) -> usize {
+    let mut swapped = 0;
+    if let Some(kept) = kept_lock().as_mut() {
+        for (call, model) in calls.iter().zip(models) {
+            let Some(model) = model else { continue };
+            kept.retain(|(c, _)| c != call);
+            kept.push((call.clone(), model));
+            swapped += 1;
+        }
+    }
+    swapped
 }
 
 /// What a shot server asks for.

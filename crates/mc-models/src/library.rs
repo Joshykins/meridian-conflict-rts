@@ -106,6 +106,10 @@ pub fn authored_size(key: &str) -> Option<(f32, f32)> {
 
 /// Builds `key` at its authored (tech 1 blueprint) size.
 pub fn build_model(key: &str) -> Option<Model> {
+    crate::remote::through(crate::remote::Call::prop(key), || build_model_made(key))
+}
+
+fn build_model_made(key: &str) -> Option<Model> {
     let (radius, height) = catalogue().find(|def| def.key == key)?.nominal[0];
     build_model_scaled(key, radius, height, 1)
 }
@@ -120,6 +124,26 @@ pub fn build_model_scaled(key: &str, radius: f32, height: f32, tech: u8) -> Opti
 /// [`build_model_scaled`] for a unit with refit modules: `modules` are their keys in
 /// look-bit order, and the model carries every module's pieces, tagged for the shader.
 pub fn build_model_fitted(
+    key: &str,
+    radius: f32,
+    height: f32,
+    tech: u8,
+    modules: &[&str],
+) -> Option<Model> {
+    let call = crate::remote::Call {
+        key: key.to_owned(),
+        radius,
+        height,
+        tech,
+        modules: modules.iter().map(|m| (*m).to_owned()).collect(),
+        prop: false,
+    };
+    crate::remote::through(call, || {
+        build_fitted_made(key, radius, height, tech, modules)
+    })
+}
+
+fn build_fitted_made(
     key: &str,
     radius: f32,
     height: f32,
