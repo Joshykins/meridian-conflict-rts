@@ -76,7 +76,9 @@ impl Renderer {
             1.0,
             Vec3::ZERO,
         );
-        self.fireball(core, r * 1.8, 10, 0.6 + r * 0.02, 1.0, time + 0.02);
+        // A little under full heat: burning twice as long, full heat held the
+        // white-yellow heart too long (white blow-out).
+        self.fireball(core, r * 1.8, 10, 1.05 + r * 0.04, 0.85, time + 0.02);
         for i in 0..4 {
             let off = Vec3::new(
                 self.scatter.signed(),
@@ -86,12 +88,12 @@ impl Renderer {
                 * 0.85;
             let delay = 0.1 + 0.11 * i as f32 + self.scatter.unit() * 0.06;
             let size = r * (0.6 + self.scatter.unit() * 0.35);
-            self.fireball(core + off, size, 3, 0.35, 0.75, time + delay);
+            self.fireball(core + off, size, 3, 0.6, 0.75, time + delay);
         }
         for _ in 0..40 {
             let vel =
                 self.scatter.upward(0.1) * (12.0 + self.scatter.unit() * 28.0) * (0.85 + r * 0.07);
-            let life = 0.55 + self.scatter.unit() * 1.2;
+            let life = 0.8 + self.scatter.unit() * 1.4;
             self.push_puff(PUFF_SPARK, core, vel, time, life, (0.22 + r * 0.04, 0.05));
         }
         for _ in 0..16 {
@@ -103,7 +105,7 @@ impl Renderer {
         for i in 0..18 {
             let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / 18.0;
             let out = Vec3::new(a.cos(), a.sin(), 0.06);
-            let life = 1.4 + self.scatter.unit() * 0.9;
+            let life = 2.2 + self.scatter.unit() * 1.2;
             self.push_puff(
                 PUFF_DUST,
                 at + out * r * 0.7 + Vec3::Z * 0.4,
@@ -120,7 +122,7 @@ impl Renderer {
                 + Vec3::Z * h * 0.4;
             let start = time + 0.6 + i as f32 * 0.24 + self.scatter.unit() * 0.1;
             let size = r * (0.3 + self.scatter.unit() * 0.2);
-            self.fireball(at + off, size, 2, 0.35, 0.45, start);
+            self.fireball(at + off, size, 2, 0.55, 0.45, start);
         }
         for i in 0..16 {
             let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.45
@@ -141,10 +143,10 @@ impl Renderer {
     pub(super) fn air_blast(&mut self, at: Vec3, r: f32, time: f32) {
         self.push_effect(at.to_array(), time, r * 2.6, 0.14, 1.0, 0.0);
         self.push_shockwave(at.to_array(), time, r * 5.0, 0.5, 0.65, 0.0, Vec3::ZERO);
-        self.fireball(at, r * 1.25, 7, 0.5, 1.0, time + 0.01);
+        self.fireball(at, r * 1.35, 8, 0.95, 0.9, time + 0.01);
         for _ in 0..24 {
             let vel = self.scatter.upward(0.1) * (12.0 + r * 2.0);
-            self.push_puff(PUFF_SPARK, at, vel, time, 0.9, (0.35, 0.05));
+            self.push_puff(PUFF_SPARK, at, vel, time, 1.2, (0.35, 0.05));
         }
         for _ in 0..8 {
             let vel = self.scatter.upward(0.2) * 15.0;
@@ -154,10 +156,12 @@ impl Renderer {
 
     /// The fire of a shell that bursts with `splash` metres of blast: a ball
     /// of burning gas over the crater, bigger and longer for a heavier shell.
+    /// It burns long enough to see it boil (0.6 s for a light shell, over a
+    /// second for a heavy one), then climbs off as soot.
     pub(super) fn shell_blast(&mut self, at: Vec3, splash: f32, impact: f32, start: f32) {
-        let r = (1.0 + splash * 0.22) * impact.clamp(0.6, 2.0);
-        let lumps = (3 + (splash * 0.1) as u32).min(8);
-        let burn = 0.28 + splash * 0.008;
+        let r = (1.5 + splash * 0.25) * impact.clamp(0.6, 2.0);
+        let lumps = (4 + (splash * 0.1) as u32).min(9);
+        let burn = (0.55 + splash * 0.02).min(1.4);
         self.fireball(at + Vec3::Z * r * 0.4, r, lumps, burn, 0.9, start);
     }
 }

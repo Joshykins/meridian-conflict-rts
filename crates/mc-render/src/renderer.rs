@@ -47,6 +47,7 @@ mod great_gun_fx;
 mod gtao;
 mod heavy_rail_fx;
 mod impact_craters;
+mod impact_fx;
 mod launch_fx;
 mod mine_fx;
 mod naga_mine_fx;
@@ -5956,229 +5957,21 @@ impl Renderer {
                     self.flak_burst(&burst, start);
                     return;
                 }
-                let shell = *color == mc_data::WeaponColor::Orange;
-                let tint = if shell && red > 0.5 {
-                    8.0
-                } else {
-                    *color as u32 as f32
-                };
-                // A rail slug strikes white-hot (`rail_fx`).
-                let tint = if (hitscan || slug) && shell {
-                    rail_fx::RAIL_FLASH
-                } else {
-                    tint
-                };
-                // A bursting shell's colour is its fireball (blast_fx.rs): the flash
-                // is only the blink before it.
-                let burning = shell && splash > 0.0 && !incendiary && !rail;
-                let core = if burning {
-                    (1.4 + splash * 0.14) * impact
-                } else {
-                    (1.6 + power * 0.28 + splash * 0.15) * impact
-                };
-                let snap = bolts > 0 || (shockwave > 0.0 && splash <= 0.0);
-                let (life, ring) = if burning {
-                    (0.2, 1.0)
-                } else if splash > 0.0 {
-                    ((0.38 + splash * 0.01) * impact.min(2.0), 1.0)
-                } else if snap {
-                    (0.2, 1.0)
-                } else {
-                    (0.22, 0.0)
-                };
-                // A modest ball of light above the crater — the wide blast sits on the ground.
-                self.push_effect(
-                    at.to_array(),
+                self.shell_impact(&impact_fx::ShellImpact {
+                    at,
                     start,
-                    core,
-                    if rail {
-                        0.55
-                    } else {
-                        (life * 0.7).max(if snap { 0.12 } else { 0.2 })
-                    },
-                    tint,
-                    // Above 1 only for the Bulwark: the flash shader reads the extra as a brighter, bluer core.
-                    if rail { 1.8 } else { ring },
-                );
-                if rail {
-                    // A second, slower blue bloom, then lobes and bolts around the core.
-                    self.push_effect(
-                        (at + Vec3::Z * 0.6).to_array(),
-                        start + 0.04,
-                        core * 0.62,
-                        0.85,
-                        *color as u32 as f32,
-                        1.8,
-                    );
-                    for _ in 0..7 {
-                        let dir = Vec3::new(
-                            self.scatter.signed(),
-                            self.scatter.signed(),
-                            self.scatter.unit() * 0.8,
-                        )
-                        .normalize_or_zero();
-                        let speed = 10.0 + self.scatter.unit() * 14.0;
-                        let life = 0.42 + self.scatter.unit() * 0.18;
-                        self.push_puff(
-                            PUFF_SHATTER_BLAST,
-                            at + dir * core * 0.18,
-                            dir * speed,
-                            start,
-                            life,
-                            (core * 0.16, core * 0.42),
-                        );
-                    }
-                    for _ in 0..8 {
-                        let vel = self.scatter.upward(0.2) * (18.0 + self.scatter.unit() * 26.0);
-                        let life = 0.28 + self.scatter.unit() * 0.22;
-                        self.push_puff(
-                            PUFF_BOLT,
-                            at + Vec3::Z * 0.3,
-                            vel,
-                            start,
-                            life,
-                            (0.45, 0.08),
-                        );
-                    }
-                }
-                if burning {
-                    let draped = (4.0 + splash * 0.5) * impact.min(2.4);
-                    self.push_effect(at.to_array(), start, draped, 0.18, 5.0, tint);
-                } else if splash > 0.0 {
-                    let draped = (8.0 + splash * 1.15) * impact.min(2.4);
-                    self.push_effect(
-                        at.to_array(),
-                        start,
-                        draped,
-                        (life * 0.7).max(0.22),
-                        5.0,
-                        tint,
-                    );
-                    if splash > 16.0 {
-                        // A second beat of fire, not another sheet of haze.
-                        self.push_effect(
-                            (at + Vec3::Z * 2.2).to_array(),
-                            start + 0.06,
-                            core * 1.15,
-                            0.28,
-                            2.0,
-                            0.55,
-                        );
-                    }
-                }
-                if shockwave > 0.0 {
-                    self.push_shockwave(
-                        at.to_array(),
-                        start,
-                        if splash > 0.0 {
-                            (18.0 + splash * 2.1) * shockwave
-                        } else {
-                            (16.0 + power * 2.6) * shockwave
-                        },
-                        if splash > 0.0 {
-                            (0.7 + splash * 0.018).min(2.0)
-                        } else {
-                            0.55
-                        },
-                        shockwave.min(1.0),
-                        *color as u32 as f32,
-                        Vec3::ZERO,
-                    );
-                }
-                if !shell && splash <= 0.0 {
-                    for _ in 0..bolts {
-                        let vel = self.scatter.upward(0.08) * (16.0 + self.scatter.unit() * 22.0);
-                        let life = 0.16 + self.scatter.unit() * 0.12;
-                        self.push_puff(
-                            PUFF_BOLT,
-                            at + Vec3::Z * 0.2,
-                            vel,
-                            start,
-                            life,
-                            (0.22, 0.05),
-                        );
-                    }
-                    return;
-                }
-                // Sparks off armour or a burst of earth off the ground, and the smoke that hangs after.
-                // A splash shot (energy or shell) still throws debris: the ground takes the hit.
-                let big = (splash * 0.12) as usize;
-                let (sparks, clods) = if *on_unit {
-                    (12 + big, 2 + big / 2)
-                } else {
-                    (5 + big, 8 + big)
-                };
-                let reach = 1.0 + splash * 0.12;
-                for _ in 0..sparks {
-                    let vel =
-                        self.scatter.upward(0.15) * (8.0 + self.scatter.unit() * 14.0) * reach;
-                    let life = 0.25 + self.scatter.unit() * 0.35 + splash * 0.008;
-                    self.push_puff(
-                        PUFF_SPARK,
-                        at + Vec3::Z * 0.2,
-                        vel,
-                        start,
-                        life,
-                        (0.2 + splash * 0.004, 0.05),
-                    );
-                }
-                for _ in 0..clods {
-                    let vel = self.scatter.upward(0.45) * (6.0 + self.scatter.unit() * 9.0) * reach;
-                    let life = 0.7 + self.scatter.unit() * 0.6 + splash * 0.012;
-                    self.push_puff(
-                        PUFF_CLOD,
-                        at + Vec3::Z * 0.2,
-                        vel,
-                        start,
-                        life,
-                        (0.12 + power * 0.025 + splash * 0.006, 0.08),
-                    );
-                }
-                // Napalm stays as the ground wave. A normal blast still throws a short flame.
-                if !(incendiary && splash > 0.0) {
-                    let smokes = 2 + (splash > 0.0) as usize * 2 + big / 3;
-                    for i in 0..smokes {
-                        let vel = self.scatter.upward(0.5)
-                            * (1.5 + self.scatter.unit() * 2.5 + splash * 0.12);
-                        let kind = if *on_unit || i % 2 == 0 {
-                            PUFF_SMOKE
-                        } else {
-                            PUFF_DUST
-                        };
-                        let life = 0.55 + self.scatter.unit() * 0.4 + splash * 0.008;
-                        self.push_puff(
-                            kind,
-                            at + Vec3::Z * 0.4,
-                            vel,
-                            start + 0.03,
-                            life,
-                            (
-                                0.55 + power * 0.05 + splash * 0.03,
-                                1.2 + power * 0.1 + splash * 0.08,
-                            ),
-                        );
-                    }
-                    if splash > 0.0 {
-                        if burning {
-                            self.shell_blast(at, splash, impact, start);
-                        } else {
-                            let fires = 2 + big / 3;
-                            for i in 0..fires {
-                                let vel = self.scatter.upward(0.35)
-                                    * (3.0 + self.scatter.unit() * 4.0 + splash * 0.05);
-                                let life = 0.4 + self.scatter.unit() * 0.25 + splash * 0.004;
-                                self.push_puff(
-                                    PUFF_FIRE,
-                                    at + Vec3::Z * 0.55,
-                                    vel,
-                                    start + i as f32 * 0.015,
-                                    life,
-                                    (0.7 + splash * 0.04, 1.6 + splash * 0.06),
-                                );
-                            }
-                        }
-                    }
-                }
+                    splash,
+                    impact,
+                    power,
+                    shockwave,
+                    bolts,
+                    color: *color,
+                    red,
+                    white_hot: hitscan || slug,
+                    rail,
+                    incendiary,
+                    on_unit: *on_unit,
+                });
             }
             SimEvent::ShieldBroken { pos, radius, .. } => {
                 let at = Vec3::from(pos.to_f32());
