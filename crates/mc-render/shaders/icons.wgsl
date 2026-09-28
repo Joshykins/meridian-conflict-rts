@@ -509,7 +509,7 @@ fn fs_ring(in: MarkOut) -> @location(0) vec4<f32> {
 }
 
 // Status bars sit on the ground at the unit's feet, as wide as the hull.
-// Shield on top, health, then construction. Pixel heights must match fs_bar.
+// Shield (always blue, whatever the faction's dome colour) on top, health, then construction. Pixel heights must match fs_bar.
 @vertex
 fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> MarkOut {
     let mark = marks[instance];
@@ -522,15 +522,15 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     let half_w = max(e.radius * 0.8 * px, 16.0);
     let show_build = mark.work >= 0.0;
     let show_shield = mark.shield >= 0.0;
-    let health_h = 9.0;
-    let shield_h = 5.0;
-    let build_h = 8.0;
+    let health_h = 6.0;
+    let shield_h = 4.0;
+    let build_h = 5.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
     let down = select(0.0, build_h + gap, show_build);
     let half_h = 0.5 * (health_h + up + down);
     // South of the footprint, so the stack sits on the ground in front of the hull.
-    let mid_y = -max(e.radius * 0.45 * px, 4.0) - half_h - 2.0;
+    let mid_y = -max(e.radius * 0.6 * px, 6.0) - half_h - 2.0;
     var out: MarkOut;
     // NDC spans two units across the viewport, so a pixel is 2 / size.
     var ndc = center.xy / center.w + (corner * vec2<f32>(half_w, half_h) + vec2<f32>(0.0, mid_y)) * 2.0 * globals.viewport.zw;
@@ -577,9 +577,9 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     let show_build = in.build >= 0.0;
     // Before any branch, so the derivative is taken over the whole quad.
     let per_px = fwidth(in.uv.x);
-    let health_h = 9.0;
-    let shield_h = 5.0;
-    let build_h = 8.0;
+    let health_h = 6.0;
+    let shield_h = 4.0;
+    let build_h = 5.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
     let down = select(0.0, build_h + gap, show_build);
@@ -589,7 +589,7 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     var cursor = 0.0;
     if show_shield {
         if y < cursor + shield_h {
-            return bar_fill(row_uv(in.uv.x, y, cursor, shield_h), in.shield, globals.shield.rgb, per_px, shield_h);
+            return bar_fill(row_uv(in.uv.x, y, cursor, shield_h), in.shield, vec3<f32>(0.08, 0.38, 1.0), per_px, shield_h);
         }
         cursor += shield_h;
         if y < cursor + gap {
