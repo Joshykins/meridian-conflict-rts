@@ -669,8 +669,8 @@ const BATTLESHIP_TRIANGLES: usize = 10000;
 const CORE_MINE_TRIANGLES: usize = 9000;
 /// The tech 4 assault tank runs on four open track units (road wheels, toothed
 /// sprockets, return rollers seen through the side) and carries two bolt rifles and the
-/// capacitor-fed AEB-2.
-const ASSAULT_TANK_TRIANGLES: usize = 9000;
+/// capacitor-fed AEB-2, and finned heat sinks.
+const ASSAULT_TANK_TRIANGLES: usize = 9200;
 
 /// Models already over the rules below when they were last checked (2026-09-28),
 /// held where they are so they cannot grow further: its coarse level's triangles,
@@ -2975,7 +2975,7 @@ fn fulgur_houses_and_muzzles() {
     let want: [(u8, [f32; 3], [f32; 3]); 3] = [
         (1, [14.85, 17.325, 11.88], [28.875, 17.325, 14.025]),
         (2, [14.85, -17.325, 11.88], [28.875, -17.325, 14.025]),
-        (3, [-22.275, 0.0, 15.7575], [-14.1075, 0.0, 15.7575]),
+        (3, [-24.75, 0.0, 15.7575], [-16.5825, 0.0, 15.7575]),
     ];
     assert_eq!(model.houses.len(), 3, "fulgur: three gun houses");
     for (weapon, pivot, muzzle) in want {

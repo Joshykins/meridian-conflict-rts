@@ -2,7 +2,7 @@
 //! AEB-2 set back between armoured cheeks. A bolt rifle on each flank sponson, and on
 //! the engine deck a rotary AA gun that rests facing aft, raised to the sky.
 
-use glam::{Affine3A, Vec3};
+use glam::{Affine3A, Vec2, Vec3};
 
 use super::bolt_rifle::{bolt_rifle, bore_face, hexagon, ring, seam, vents};
 use super::parts::*;
@@ -26,12 +26,14 @@ const SPONSON_MUZZLE: Vec3 = Vec3::new(17.5, 10.5, 8.5);
 const SPONSON_TOP: f32 = 7.05;
 /// The AA gun's house on the engine deck: its pivot is the gun's trunnion. Its muzzle
 /// as authored facing the nose and level (the house rests turned aft, `facing: 180`).
-const AA: Vec3 = Vec3::new(-13.5, 0.0, 9.55);
+const AA: Vec3 = Vec3::new(-15.0, 0.0, 9.55);
 /// The Sparrow's rotary gun at this scale, its barrels this long in its own units.
 const AA_SCALE: f32 = 0.9;
 const AA_LENGTH: f32 = 5.5;
 const AA_MUZZLE: Vec3 = Vec3::new(AA.x + AA_LENGTH * AA_SCALE, 0.0, AA.z);
 const ENGINE_DECK: f32 = 8.8;
+/// The engine deck's middle (x) and each heat sink's (y, mirrored).
+const ENGINE: Vec2 = Vec2::new(-15.0, 4.3);
 
 const REAR: f32 = -19.0;
 const FRONT: f32 = 19.5;
@@ -330,34 +332,91 @@ fn sponson(b: &mut MeshBuilder, weapon: usize, side: f32) {
     });
 }
 
-/// The raised engine deck aft, its two exhaust vents, and the AA gun on it.
+/// The raised engine deck aft, clear of the turret's sweep (its bustle reaches 11.2 m
+/// from the pivot), its two exhaust vents, and the AA gun between them.
 fn engine_deck(b: &mut MeshBuilder) {
     if b.coarse() {
         return;
     }
     b.paint(PLATING);
     b.frustum(
-        v3(-12.5, 0.0, 6.0),
-        v2(8.2, 13.4),
-        v2(7.4, 11.6),
+        v3(ENGINE.x, 0.0, 6.0),
+        v2(7.2, 13.4),
+        v2(6.6, 12.0),
         ENGINE_DECK - 6.0,
-        v2(0.2, 0.0),
+        v2(0.0, 0.0),
     );
-    b.mirror_y(|b| {
-        // The engine's two exhaust vents, either side of the turret: louvres with the fire
-        // breathing between the slats, and the hot air shimmering over them.
-        b.paint(ACCENT).pattern(pattern::FURNACE);
-        b.plate(v3(-11.0, 4.1, ENGINE_DECK), v2(4.4, 2.4), 0.12, 0.04);
-        b.pattern(pattern::PLAIN);
-        if b.fine() {
-            b.add_exhaust(v3(-11.0, 4.1, ENGINE_DECK + 0.15), v3(-0.3, 0.0, 2.6), 1.2);
-        }
-    });
+    b.mirror_y(|b| heat_sink(b, v3(ENGINE.x, ENGINE.y, ENGINE_DECK)));
     if b.fine() {
         b.paint(PLATING).pattern(pattern::TEAM_BAND);
-        b.plate(v3(-16.2, 0.0, ENGINE_DECK), v2(0.8, 6.0), 0.08, 0.03);
+        b.plate(
+            v3(ENGINE.x - 3.1, 0.0, ENGINE_DECK),
+            v2(0.4, 5.0),
+            0.08,
+            0.03,
+        );
     }
     aa_gun(b);
+}
+
+/// One of the engine's two exhaust vents, `at` the middle of its foot on the deck (the +y
+/// one; mirrored for the other): a raised faceted housing with its corners cut, the
+/// louvre sunk in a dark frame on its top with the fire breathing between the slats, and
+/// cooling fins down its outer flank. The hot air shimmers over it.
+fn heat_sink(b: &mut MeshBuilder, at: Vec3) {
+    let top = at.z + 0.5;
+    b.paint(PLATING).pattern(pattern::PLAIN);
+    b.at(v3(at.x, at.y, 0.0), |b| {
+        b.loft_z(
+            &[
+                [-2.3, -1.4],
+                [1.7, -1.4],
+                [2.3, -0.8],
+                [2.3, 0.9],
+                [1.8, 1.4],
+                [-2.0, 1.4],
+                [-2.3, 1.1],
+            ],
+            &[
+                Section::new(at.z - 0.05, 1.0),
+                Section::scaled(top, 0.95, 0.92),
+            ],
+        );
+    });
+    // The frame, standing proud of the louvre so it reads sunk.
+    b.paint(PLATING_DARK);
+    let (hx, hy, w, h) = (1.75, 0.95, 0.16, 0.14);
+    b.block(
+        v3(at.x - hx - w, at.y - hy - w, top),
+        v3(at.x + hx + w, at.y - hy, top + h),
+    );
+    b.block(
+        v3(at.x - hx - w, at.y + hy, top),
+        v3(at.x + hx + w, at.y + hy + w, top + h),
+    );
+    b.block(
+        v3(at.x - hx - w, at.y - hy, top),
+        v3(at.x - hx, at.y + hy, top + h),
+    );
+    b.block(
+        v3(at.x + hx, at.y - hy, top),
+        v3(at.x + hx + w, at.y + hy, top + h),
+    );
+    b.paint(ACCENT).pattern(pattern::FURNACE);
+    b.plate(v3(at.x, at.y, top), v2(hx * 2.0, hy * 2.0), 0.06, 0.02);
+    b.pattern(pattern::PLAIN);
+    if b.fine() {
+        // Cooling fins down the outer flank.
+        b.paint(PLATING_DARK);
+        for k in 0..7 {
+            let x = at.x - 1.65 + k as f32 * 0.5;
+            b.block(
+                v3(x, at.y + 1.3, at.z + 0.02),
+                v3(x + 0.12, at.y + 1.62, top - 0.1),
+            );
+        }
+        b.add_exhaust(v3(at.x, at.y, top + 0.1), v3(-0.3, 0.0, 2.6), 1.2);
+    }
 }
 
 /// The rotary AA gun, the Sparrow's gatling, built facing the nose: a collar on the deck,
