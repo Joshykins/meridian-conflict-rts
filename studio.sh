@@ -7,6 +7,7 @@
 #   ./studio.sh                        opens the studio on data/music
 #   ./studio.sh reach_command          opens data/music/reach_command.ron
 #   ./studio.sh path/to/song.ron
+#   ./studio.sh --sounds [name]        opens the game's sounds (at data/sounds' `name`)
 #   ./studio.sh --build-only
 #
 # Songs save as text into data/music; a running game (./play.sh) picks up a

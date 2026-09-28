@@ -18,7 +18,8 @@ code meets them and the rules every crate follows.
 | `mc-game`   | the `meridian` binary: window, input, camera, UI, tools and test scenes            | yes |
 | `mc-music`  | songs as data, recorded instruments and synths, sequencer and adaptive director; no device code | yes |
 | `mc-listen` | decodes recordings into facts to write music from (tempo, key, notes)              | yes |
-| `mc-studio` | the music workstation (egui) built on `mc-music`                                   | yes |
+| `mc-sfx`    | the sound synthesiser: library recipes and the interface set made into samples     | yes |
+| `mc-studio` | the music workstation (egui) built on `mc-music`; plays the game's sounds via `mc-sfx` | yes |
 
 Dependencies point downward only: `mc-sim` never sees the renderer or the network.
 
@@ -134,8 +135,8 @@ uploads the rows that changed. Blending is linear-light into an sRGB target, so 
 `ui::ink`, which bends opacity to what it looks like rather than what it multiplies by.
 
 Controls make their own sounds, so nothing interactive can be mute. Sound is synthesised at
-start-up on a background thread at the device's rate (`audio.rs`: a small mixer behind `cpal`);
-there are no audio files. The tests check that no sound clicks or is cut off.
+start-up on a background thread at the device's rate (`audio.rs`: a small mixer behind `cpal`,
+synthesis in `mc-sfx`, which mc-studio's Sounds screen shares); there are no audio files. The tests check that no sound clicks or is cut off.
 
 ## Match HUD (mc-game `hud/`)
 
@@ -240,7 +241,7 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
 - Battle sounds are data: `mc_data::sounds` loads the library (`data/sounds/*.ron`, each faction's `sounds.ron`),
   recipes of layers (`Tone`, `Stack`, `Fm`, `Burst`, `Hiss`, `Sweep`, `Rumble`, `Drone`, `Drive`) with `like`/`size` for
   variants, and checks at start-up that every name in a unit file's `sounds` blocks exists. None of it is in the
-  content hash. `audio::from_recipe` synthesises them; the interface set is still code. `Game::sound_table` turns
+  content hash. `mc_sfx::synth` synthesises them; the interface set is still code (`mc_sfx::interface`). `Game::sound_table` turns
   names into ids (again when F9 reloads the library), `Game::battle_sounds` places one-shots by the camera
   (`Audio::play_world`, loudest few per tick) and hears moving units as a few loops per movement sound
   (split across the view, slightly detuned, so a column is not one machine),

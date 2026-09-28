@@ -13,6 +13,9 @@ path = "src/main.rs"
 
 [dependencies]
 mc-music = { workspace = true }
+# The game's sounds, made by the game's own synthesiser, for the Sounds screen.
+mc-data = { workspace = true }
+mc-sfx = { workspace = true }
 # Decoding reference recordings and hearing humming as notes. On by default;
 # `--no-default-features` builds without it (WAV references only, no humming).
 mc-listen = { workspace = true, optional = true }

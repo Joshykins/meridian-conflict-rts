@@ -3,7 +3,7 @@
 //! mc-studio [song.ron] [--song path] [--screenshot out.png] [--view arrange|piano|drums|instrument|mixer|director]
 //!           [--size WxH] [--smoke] [--play] [--audition <log id>]
 //!           [--reference <audio file>] [--edit] [--notice] [--music dir]
-//!           [--part NAME] [--whole] [--moment NAME] [--audio file]
+//!           [--part NAME] [--whole] [--moment NAME] [--audio file] [--sounds [NAME]]
 //!
 //! `--screenshot` opens the window, waits for it to settle, writes a PNG and
 //! exits; `--smoke` plays for two seconds, prints what the engine did and exits.
@@ -38,6 +38,7 @@ mod player;
 mod reference;
 mod sketch;
 mod songops;
+mod sounds;
 mod swap;
 mod theme;
 mod transport;
@@ -75,6 +76,14 @@ fn parse_args() -> app::Cli {
             "--whole" => cli.whole = true,
             "--moment" => cli.moment = value(),
             "--audio" => cli.audio = value().map(PathBuf::from),
+            // The game's sounds, at NAME if one follows.
+            "--sounds" => {
+                let named = args.get(i + 1).filter(|v| !v.starts_with("--")).cloned();
+                if named.is_some() {
+                    i += 1;
+                }
+                cli.sounds = Some(named.unwrap_or_default());
+            }
             "--notice" => cli.notice = true,
             "--play" => cli.play = true,
             other if !other.starts_with("--") => cli.song = Some(PathBuf::from(other)),

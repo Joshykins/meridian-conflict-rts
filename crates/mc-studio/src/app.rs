@@ -86,6 +86,8 @@ pub enum Screen {
     Picker,
     Song,
     Audio,
+    /// Every sound the game makes (`sounds.rs`).
+    Sounds,
 }
 
 pub fn chain_mut(song: &mut Song, strip: Strip) -> Option<&mut Vec<mc_music::Effect>> {
@@ -202,6 +204,8 @@ pub struct Cli {
     pub moment: Option<String>,
     /// Open this recording in the player.
     pub audio: Option<PathBuf>,
+    /// Open the game's sounds, at this one when it is named ("" for the first).
+    pub sounds: Option<String>,
     /// Workbench: show the notice for the newest Claude revision.
     pub notice: bool,
 }
@@ -263,6 +267,7 @@ pub struct Studio {
     pub picker: crate::picker::State,
     pub player: crate::player::State,
     pub moments: crate::moments::Moments,
+    pub sounds: crate::sounds::Sounds,
     cli: Cli,
     frame: u64,
     time: f64,
@@ -372,6 +377,7 @@ impl Studio {
             picker: Default::default(),
             player: Default::default(),
             moments: Default::default(),
+            sounds: Default::default(),
         };
         st.select_first_clip();
         st.collab.attach(st.path.as_deref());
@@ -850,6 +856,8 @@ impl Studio {
         if pressed(Key::Space, Modifiers::NONE) {
             if self.screen == Screen::Audio {
                 crate::player::toggle_play(self);
+            } else if self.screen == Screen::Sounds {
+                crate::sounds::toggle_play(self);
             } else if self.screen == Screen::Picker {
             } else if self.advanced {
                 self.toggle_play();
@@ -965,6 +973,11 @@ impl Studio {
                 };
                 crate::player::enter(self, row);
             }
+            if let Some(name) = self.cli.sounds.clone() {
+                crate::sounds::enter(self);
+                self.sounds.selected = (!name.is_empty()).then_some(name);
+                self.sounds.scroll_to_selected = true;
+            }
         }
         if self.frame == 20 {
             if let Some(m) = self.cli.moment.clone() {
@@ -1005,7 +1018,7 @@ impl Studio {
             }
         }
         if let Some(out) = self.cli.screenshot.clone() {
-            let waiting = self.reference.is_loading() && now < 15.0;
+            let waiting = (self.reference.is_loading() || self.sounds.busy()) && now < 15.0;
             if !self.shot_sent && self.frame > 30 && now > 1.2 && !waiting {
                 self.shot_sent = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
@@ -1101,6 +1114,11 @@ impl Studio {
             }
             Screen::Audio => {
                 crate::player::show(ui, self);
+                self.after_frame(&ctx, now);
+                return;
+            }
+            Screen::Sounds => {
+                crate::sounds::show(ui, self);
                 self.after_frame(&ctx, now);
                 return;
             }
@@ -1259,6 +1277,8 @@ impl Studio {
         let moving = self.status.playing
             || self.side.moment.is_some()
             || self.side.ref_playing
+            || self.side.shot.is_some()
+            || self.sounds.busy()
             || self.wb.animating
             || self.ramp.is_some()
             || self.export.busy();

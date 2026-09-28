@@ -1,0 +1,15 @@
+[package]
+name = "mc-sfx"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+# The sound synthesiser: library recipes (mc-data) and the interface set made
+# into samples. Shared by the game and mc-studio, so the studio plays exactly
+# what the game will.
+
+[dependencies]
+mc-data = { workspace = true }
+
+[lints]
+workspace = true

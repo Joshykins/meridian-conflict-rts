@@ -258,6 +258,9 @@ struct RawSound {
     looped: Option<bool>,
     #[serde(default)]
     layers: Vec<Layer>,
+    /// The file it is written in (not read from it; see `Sound::file`).
+    #[serde(skip)]
+    file: String,
 }
 
 fn one() -> f32 {
@@ -299,6 +302,11 @@ pub struct Sound {
     /// Plays round and round while something goes on (movement), instead of once.
     pub looped: bool,
     pub layers: Vec<Layer>,
+    /// Where it is written: a general file's stem (`battle` for
+    /// `sounds/battle.ron`), or a faction's key for `factions/<key>/sounds.ron`.
+    pub file: String,
+    /// The sound it is made from and at what size, when it is written as `like` one.
+    pub like: Option<(String, f32)>,
 }
 
 /// Index of a sound in [`SoundLibrary::sounds`].
@@ -334,7 +342,14 @@ impl SoundLibrary {
         let mut defaults = Defaults::default();
         for file in files {
             let library: RawLibrary = crate::parse_file(&file)?;
-            for (name, sound) in library.sounds {
+            let stem = if file.ends_with("sounds.ron") {
+                file.parent().and_then(|d| d.file_name())
+            } else {
+                file.file_stem()
+            };
+            let stem = stem.map(|s| s.to_string_lossy().into_owned());
+            for (name, mut sound) in library.sounds {
+                sound.file.clone_from(stem.as_ref().unwrap_or(&name));
                 if raw.insert(name.clone(), sound).is_some() {
                     return Err(DataError::Invalid(format!(
                         "{}: the sound {name} is already defined in another file",
@@ -470,10 +485,14 @@ fn resolve(name: &str, raw: &BTreeMap<String, RawSound>, depth: usize) -> Result
                 room: 0.5,
                 looped: false,
                 layers: r.layers.clone(),
+                file: String::new(),
+                like: None,
             }
         }
     };
     sound.name = name.to_owned();
+    sound.file.clone_from(&r.file);
+    sound.like = r.like.clone().map(|base| (base, r.size));
     if r.like.is_some() {
         if r.size <= 0.05 {
             return Err(DataError::Invalid(format!(

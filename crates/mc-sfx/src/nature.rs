@@ -8,7 +8,7 @@
 //! many callers, none keeping another's time or pitch, each fading in and out
 //! on its own, so a loop of it has no beat to give its length away.
 
-use super::{pluck, Air, Buf, Noise};
+use crate::buf::{pluck, Air, Buf, Noise};
 use mc_data::sounds::Layer;
 use std::f32::consts::TAU;
 use std::f64::consts::TAU as TAU64;
@@ -56,7 +56,7 @@ impl Wander {
 /// Lays down one of this module's layers. `seed` is the layer's own when it names
 /// none, `looped` the loop's length in seconds (zero for a sound played once), to
 /// which a chorus tunes its rates so the loop joins without a seam.
-pub(super) fn layer(b: &mut Buf, layer: &Layer, seed: u32, looped: f32) {
+pub(crate) fn layer(b: &mut Buf, layer: &Layer, seed: u32, looped: f32) {
     match *layer {
         Layer::Wind {
             freq,
@@ -253,7 +253,7 @@ fn chorus(b: &mut Buf, c: Chorus, seed: u32, looped: f32) {
 
 #[cfg(test)]
 mod tests {
-    use super::super::from_recipe;
+    use crate::synth as from_recipe;
     use mc_data::SoundLibrary;
 
     /// The ambience's sounds (`data/sounds/ambience.ron`) are not held tones or

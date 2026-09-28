@@ -165,6 +165,7 @@ enum Pick {
     Song(PathBuf),
     Audio(Row),
     New,
+    Sounds,
 }
 
 pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
@@ -208,6 +209,14 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
                     ui.label(egui::RichText::new("Recordings to listen to and learn from.").size(14.0).color(FAINT));
                     ui.add_space(4.0);
                     list(ui, st, &audio, "Put audio in data/music/references to see it here.", &mut pick, true);
+                    ui.add_space(20.0);
+                    heading(ui, "Game sounds");
+                    ui.label(egui::RichText::new("Every sound the game makes: play them, take them apart, see what uses them.").size(14.0).color(FAINT));
+                    ui.add_space(4.0);
+                    let count = st.sounds.count(st.music_dir.as_ref(), now);
+                    if sounds_row(ui, count) {
+                        pick = Some(Pick::Sounds);
+                    }
                     ui.add_space(40.0);
                 });
             });
@@ -219,12 +228,45 @@ pub fn show(ui: &mut egui::Ui, st: &mut Studio) {
             st.go(Screen::Song);
         }
         Some(Pick::Audio(r)) => crate::player::enter(st, r),
+        Some(Pick::Sounds) => crate::sounds::enter(st),
         Some(Pick::New) => {
             st.new_song();
             st.go(Screen::Song);
         }
         None => {}
     }
+}
+
+/// The one row that opens the Sounds screen.
+fn sounds_row(ui: &mut egui::Ui, count: usize) -> bool {
+    let w = ui.available_width();
+    let (rect, resp) = ui.allocate_exact_size(vec2(w, 54.0), Sense::click());
+    let hover = ui
+        .ctx()
+        .animate_bool_with_time(resp.id, resp.hovered(), 0.12);
+    let p = ui.painter();
+    p.rect(
+        rect,
+        CornerRadius::same(8),
+        theme::mix(BG2, BG3, hover),
+        Stroke::new(1.0, theme::mix(theme::line(10), ACCENT, hover * 0.6)),
+        StrokeKind::Inside,
+    );
+    p.text(
+        pos2(rect.left() + 18.0 + hover * 4.0, rect.center().y),
+        Align2::LEFT_CENTER,
+        "All game sounds",
+        theme::font_semi(17.0),
+        TEXT,
+    );
+    p.text(
+        pos2(rect.right() - 18.0, rect.center().y),
+        Align2::RIGHT_CENTER,
+        format!("{count} sounds"),
+        theme::font_body(14.0),
+        FAINT,
+    );
+    resp.clicked()
 }
 
 fn heading(ui: &mut egui::Ui, text: &str) {

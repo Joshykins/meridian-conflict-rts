@@ -8,6 +8,10 @@
 //! the song, and a flip crossfades which of the two is heard, so both keep
 //! their place and the comparison is at the same moment.
 //!
+//! Game sounds play through it too, as shots: each one plays once (or round
+//! and round, for a loop) over whatever else is sounding, and several may
+//! overlap, as they do in the game.
+//!
 //! Without a device (no cpal on this build, or opening it failed) the engine
 //! runs on a plain thread at real-time pace into nothing, so the transport,
 //! playhead and meters still work and the studio can be tested headless.
@@ -30,6 +34,8 @@ pub struct Published {
     pub song_level: f32,
     /// The moment sounding, if any.
     pub moment: Option<String>,
+    /// The latest game sound played: its serial and playhead, in frames.
+    pub shot: Option<(u64, f64)>,
 }
 
 /// What the stage and the reference player are doing, besides the song.
@@ -39,6 +45,8 @@ pub struct Side {
     pub ref_playing: bool,
     pub song_level: f32,
     pub moment: Option<String>,
+    /// The latest game sound still playing: its serial and playhead, in frames.
+    pub shot: Option<(u64, f64)>,
 }
 
 /// Commands for the reference player and for moments.
@@ -57,6 +65,22 @@ pub enum RefCmd {
     Gain(f32),
     /// Loop between these frames.
     Span(Option<(usize, usize)>),
+    /// Play a game sound (frames at the output rate) over everything else,
+    /// round and round when `looped`, until `StopShots`. `serial` names it in `Side::shot`.
+    Shot {
+        frames: Arc<Vec<[f32; 2]>>,
+        looped: bool,
+        serial: u64,
+    },
+    StopShots,
+}
+
+/// A game sound playing.
+struct Shot {
+    frames: Arc<Vec<[f32; 2]>>,
+    looped: bool,
+    serial: u64,
+    pos: usize,
 }
 
 #[derive(Default)]
@@ -92,6 +116,7 @@ struct Worker {
     rx: Receiver<Command>,
     ref_rx: Receiver<RefCmd>,
     reference: RefPlayer,
+    shots: Vec<Shot>,
     shared: Arc<Mutex<Published>>,
     buf: Vec<f32>,
 }
@@ -114,6 +139,7 @@ impl Worker {
                 gain: 1.0,
                 ..Default::default()
             },
+            shots: Vec::new(),
             shared,
             buf: Vec::new(),
         }
@@ -123,13 +149,14 @@ impl Worker {
     fn run(&mut self, frames: usize) {
         self.buf.resize(frames * 2, 0.0);
         let rate = self.stage.song().rate();
-        let (stage, user_loop, rx, ref_rx, buf, r) = (
+        let (stage, user_loop, rx, ref_rx, buf, r, shots) = (
             &mut self.stage,
             &mut self.user_loop,
             &self.rx,
             &self.ref_rx,
             &mut self.buf,
             &mut self.reference,
+            &mut self.shots,
         );
         // A panic in the engine must not kill the device thread (WASAPI then
         // panics again when the stream drops). Output silence for the block.
@@ -176,10 +203,22 @@ impl Worker {
                     RefCmd::Audible(a) => r.audible = a,
                     RefCmd::Gain(g) => r.gain = g,
                     RefCmd::Span(s) => r.span = s,
+                    RefCmd::Shot {
+                        frames,
+                        looped,
+                        serial,
+                    } => shots.push(Shot {
+                        frames,
+                        looped,
+                        serial,
+                        pos: 0,
+                    }),
+                    RefCmd::StopShots => shots.clear(),
                 }
             }
             stage.render(buf);
             mix_reference(r, buf, rate);
+            mix_shots(shots, buf);
         }));
         if ok.is_err() {
             self.buf.fill(0.0);
@@ -197,6 +236,7 @@ impl Worker {
         p.moment = self.stage.moment_playing().map(String::from);
         p.ref_pos = self.reference.pos;
         p.ref_playing = self.reference.playing && self.reference.frames.is_some();
+        p.shot = self.shots.last().map(|s| (s.serial, s.pos as f64));
         let m = self.stage.song().meters();
         let out = &mut p.meters;
         if out.tracks.len() != m.tracks.len() || out.buses.len() != m.buses.len() {
@@ -224,6 +264,27 @@ impl Worker {
         drop(p);
         self.stage.song_mut().meters_mut().decay();
     }
+}
+
+/// Adds the game sounds playing into `buf` (interleaved stereo) and drops
+/// those that have finished.
+fn mix_shots(shots: &mut Vec<Shot>, buf: &mut [f32]) {
+    for s in shots.iter_mut() {
+        let len = s.frames.len();
+        for out in buf.as_chunks_mut::<2>().0 {
+            if s.pos >= len {
+                if !s.looped || len == 0 {
+                    break;
+                }
+                s.pos = 0;
+            }
+            let f = s.frames[s.pos];
+            out[0] += f[0];
+            out[1] += f[1];
+            s.pos += 1;
+        }
+    }
+    shots.retain(|s| s.looped || s.pos < s.frames.len());
 }
 
 /// Plays the reference into `buf` (interleaved stereo), crossfading with the
@@ -273,6 +334,7 @@ impl Audio {
             ref_playing: false,
             song_level: 1.0,
             moment: None,
+            shot: None,
         }));
         drop(blank);
         let stop = Arc::new(AtomicBool::new(false));
@@ -355,6 +417,7 @@ impl Audio {
             ref_playing: p.ref_playing,
             song_level: p.song_level,
             moment: p.moment.clone(),
+            shot: p.shot,
         }
     }
 }

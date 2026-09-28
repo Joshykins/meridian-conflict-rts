@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 mc-core = { workspace = true }
 mc-data = { workspace = true }
+mc-sfx = { workspace = true }
 mc-jobs = { workspace = true }
 mc-map = { workspace = true }
 mc-net = { workspace = true }

@@ -20,6 +20,7 @@ mc-server = { path = "crates/mc-server" }
 mc-models = { path = "crates/mc-models" }
 mc-render = { path = "crates/mc-render" }
 mc-music = { path = "crates/mc-music" }
+mc-sfx = { path = "crates/mc-sfx" }
 mc-listen = { path = "crates/mc-listen" }
 
 ash = "0.38"

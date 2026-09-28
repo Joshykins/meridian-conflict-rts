@@ -1905,6 +1905,7 @@ dependencies = [
  "mc-net",
  "mc-render",
  "mc-server",
+ "mc-sfx",
  "mc-sim",
  "png",
  "ron",
@@ -2017,6 +2018,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc-sfx"
+version = "0.1.0"
+dependencies = [
+ "mc-data",
+]
+
+[[package]]
 name = "mc-sim"
 version = "0.1.0"
 dependencies = [
@@ -2036,8 +2044,10 @@ version = "0.1.0"
 dependencies = [
  "cpal",
  "eframe",
+ "mc-data",
  "mc-listen",
  "mc-music",
+ "mc-sfx",
  "midir",
  "png",
  "ron",
