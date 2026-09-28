@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 mod blast_fx;
+mod bolt_rifle_fx;
 mod bore_fx;
 mod capital_fx;
 mod capture;
@@ -3143,6 +3144,7 @@ impl Renderer {
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
         self.excavation_tick(units, time, camera);
+        self.bolt_rifle_tick(units, time);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, &frame.houses, projectiles, time);
         self.great_gun_tick(projectiles, time);
@@ -3390,6 +3392,7 @@ impl Renderer {
         }
         self.capital_lights(time, alpha);
         self.heavy_rail_lights(time);
+        self.bolt_rifle_lights(time);
         let dark = self.sky.darkness();
         let (list, grid) = self.lights.build(time, alpha, camera, dark);
         let list_bytes: &[u8] = bytemuck::cast_slice(list);
@@ -5228,7 +5231,10 @@ impl Renderer {
                 self.effect_settings.shockwave_color = Some([0.24, 0.62, 1.0]);
             }
         }
-        if !self.heavy_rail_event(event, time) && !self.great_gun_event(event, time) {
+        if !self.heavy_rail_event(event, time)
+            && !self.great_gun_event(event, time)
+            && !self.bolt_rifle_event(event, time)
+        {
             self.effects_of_inner(event, time);
         }
         (self.effect_origin, self.effect_settings) = previous;

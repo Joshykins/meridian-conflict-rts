@@ -137,6 +137,21 @@ fn breech_open(prev: f32, now: f32, t: f32) -> f32 {
     return smoothstep(0.0, 0.05, s) * (1.0 - smoothstep(0.55, 0.85, s));
 }
 
+// How far a gun on the arm is kicked back, on the side `y` says: a twin gun on the other
+// side from the main one (`mirror::UNIT_TWIN_*`) kicks on its own shots (its `HousePose`
+// kick), every other arm gun with the main gun (`recoil`).
+fn arm_kick(e: Entity, t: f32, y: f32) -> f32 {
+    let twin = (e.status[1] >> ARM_TWIN_SHIFT) & ARM_TWIN_MASK;
+    let right = (e.status[1] & ARM_TWIN_RIGHT) != 0u;
+    if twin == 0u || (e.status[1] >> 8u) == 0u || (y < 0.0) != right {
+        return mix(e.prev_recoil, e.recoil, t);
+    }
+    let w = twin - 1u;
+    let kicks = houses[(e.status[1] >> 8u) - 1u].kick[w / 2u];
+    let k = select(kicks.xy, kicks.zw, (w & 1u) == 1u);
+    return mix(k.x, k.y, t);
+}
+
 // How far into a refit what it takes off has faded and gone.
 const LEAVE_BY: f32 = 0.15;
 const RIG_SPIN: u32 = 0x40000000u;
@@ -1274,7 +1289,7 @@ fn vs_main(in: VsIn) -> VsOut {
                 // The tube kicks back along its aim the instant it fires, then runs home.
                 // Stepping the slide ten times a second reads as jitter, same as the turret.
                 if (in.rig & RIG_RECOIL) != 0u && model.recoil.w > 0.0 {
-                    let kick = mix(e.prev_recoil, e.recoil, t);
+                    let kick = arm_kick(e, t, p.y);
                     p -= rot_xz(model.recoil.xyz, pitch) * (model.recoil.w * kick);
                 }
             }

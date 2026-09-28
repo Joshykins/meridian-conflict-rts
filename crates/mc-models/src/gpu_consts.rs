@@ -361,6 +361,15 @@ shared! {
         pub const MAX_PX: f32 = 4.0;
     }
 
+    /// A twin gun on a walker's arm that kicks on its own shots (`mc_sim::mirror::UNIT_TWIN_*`
+    /// in `UnitInstance::status[1]`; a test holds them equal): one more than its weapon, read
+    /// from the unit's `HousePose`, and whether it sits on the right (-y).
+    pub mod arm_twin as "ARM_TWIN_" {
+        pub const SHIFT: u32 = 2;
+        pub const MASK: u32 = 0x7;
+        pub const RIGHT: u32 = 0x20;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

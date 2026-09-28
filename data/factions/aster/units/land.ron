@@ -225,18 +225,18 @@
             (
                 name: "Bolt Rifle",
                 damage: 338, splash: 5, range: 780, reload: 1.4, speed: 400, trajectory: Direct,
-                turret_turn: 150, muzzle: (10.0, -7.2, 18.0),
+                turret_turn: 150, muzzle: (10.0, -7.2, 18.0), pivot: (-0.8, 0, 18.4),
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
-                tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16,
-                sounds: (fire: "aster_bolt_rifle_heavy", impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
+                tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16, arc_charge: 8.2,
+                sounds: (fire: "aster_bolt_rifle_heavy", charge: "aster_bolt_rifle_heavy_charge", charge_time: 0.6, impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
             ),
             (
                 name: "Bolt Rifle",
                 damage: 338, splash: 5, range: 780, reload: 1.4, speed: 400, trajectory: Direct,
-                turret_turn: 150, muzzle: (10.0, 7.2, 18.0),
+                turret_turn: 150, muzzle: (10.0, 7.2, 18.0), pivot: (-0.8, 0, 18.4),
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
-                tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16,
-                sounds: (fire: "aster_bolt_rifle_heavy", impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
+                tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16, arc_charge: 8.2,
+                sounds: (fire: "aster_bolt_rifle_heavy", charge: "aster_bolt_rifle_heavy_charge", charge_time: 0.6, impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
             ),
             (
                 // One tube on the outside of each shin, fired a pair at a time.

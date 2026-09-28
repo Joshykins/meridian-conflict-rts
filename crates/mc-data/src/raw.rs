@@ -728,6 +728,14 @@ pub struct RawWeapon {
     /// (the default): an ordinary rail.
     #[serde(default)]
     pub heavy_rail: f64,
+    /// A bolt rifle's firing sequence (the Paladin's): while the weapon charges
+    /// (`sounds.charge_time`), small arcs crawl along its radiator blades and jump to the
+    /// core, then knot round the muzzle collar; on the shot, forks of lightning snap out of
+    /// the muzzle and the housing vents ionised haze. The number is the gun's length in
+    /// metres, breech to `muzzle`; the housing, bladed core and collar are laid out in
+    /// shares of it (models `bolt_rifle`). Cosmetic. Zero (the default): none.
+    #[serde(default)]
+    pub arc_charge: f64,
     /// A great gun (the Culverin): its firing, its shell's climb through the clouds and
     /// its landing are drawn as the event they are, at this scale: a muzzle blast that
     /// flattens the ground round the gun, a trail seen from the strategic view, a hit of
@@ -1245,6 +1253,7 @@ impl Unit {
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
+                arc_charge: w.arc_charge.clamp(0.0, 40.0) as f32,
                 great_gun: w.great_gun.clamp(0.0, 4.0) as f32,
                 keeps_aim: w.keeps_aim,
                 bombard_radius: fx(w.bombard.clamp(crate::weapon::BOMBARD_RADIUS, 6000.0)),

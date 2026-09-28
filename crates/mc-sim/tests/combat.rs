@@ -56,6 +56,63 @@ fn spawn(w: &World, owner: u8, key: &str, x: i32, flags: u16) -> PlayerCommand {
     })
 }
 
+/// The Paladin's two shoulder guns share one arm pitch but kick on their own shots: the
+/// second rides the unit's `HousePose` (`mirror::UNIT_TWIN_*`), the first `recoil`.
+#[test]
+fn paladin_guns_kick_on_their_own_shots() {
+    use mc_sim::mirror::{
+        RenderFrame, UNIT_HOUSE_SHIFT, UNIT_TWIN_MASK, UNIT_TWIN_RIGHT, UNIT_TWIN_SHIFT,
+    };
+    let mut w = world();
+    let paladin = w.blueprints.id_of("aster_t3_assault_bot").unwrap();
+    w.tick(&[
+        spawn(&w, 0, "aster_t3_assault_bot", 500, 0),
+        spawn(
+            &w,
+            1,
+            "aster_t1_tank",
+            650,
+            flag::PASSIVE | flag::INVULNERABLE,
+        ),
+    ])
+    .unwrap();
+    let mut frame = RenderFrame::default();
+    let mut seen = [false; 2];
+    for _ in 0..120 {
+        w.tick(&[]).unwrap();
+        let fired: Vec<u8> = w
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                SimEvent::ShotFired {
+                    blueprint, weapon, ..
+                } if *blueprint == paladin => Some(*weapon),
+                _ => None,
+            })
+            .collect();
+        w.write_render_frame(None, &mut frame);
+        let u = frame
+            .units
+            .iter()
+            .find(|u| u.health > 0.0 && u.status[1] >> UNIT_HOUSE_SHIFT != 0)
+            .expect("the Paladin publishes its guns' kicks");
+        // Weapon 1, on the left, is the twin of weapon 0 on the right.
+        assert_eq!((u.status[1] >> UNIT_TWIN_SHIFT) & UNIT_TWIN_MASK, 2);
+        assert_eq!(u.status[1] & UNIT_TWIN_RIGHT, 0);
+        let house = &frame.houses[(u.status[1] >> UNIT_HOUSE_SHIFT) as usize - 1];
+        for weapon in fired {
+            let (main, twin) = (u.recoil, house.kick[3]);
+            match weapon {
+                0 => assert!(main == 1.0 && twin < 1.0, "{main} {twin}"),
+                1 => assert!(twin == 1.0 && main < 1.0, "{main} {twin}"),
+                _ => continue,
+            }
+            seen[weapon as usize] = true;
+        }
+    }
+    assert_eq!(seen, [true, true], "both guns fired");
+}
+
 #[test]
 fn paladin_projectors_take_turns() {
     let mut w = world();

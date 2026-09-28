@@ -64,9 +64,6 @@
         // so a pair of fighters trading bolts stays readable.
         "aster_bore_light": (like: "aster_bore", size: 0.7, peak: 0.16, room: 0.1),
         "aster_bore_light_strike": (like: "aster_bore_strike", size: 0.55, peak: 0.24, room: 0.15),
-        // The Paladin's bolt rifles: the Raptor's voice a size up, a walker's heavier gun.
-        "aster_bolt_rifle_heavy": (like: "aster_bore", size: 0.9, peak: 0.24, room: 0.14),
-        "aster_bolt_rifle_heavy_strike": (like: "aster_bore_strike", size: 0.75, peak: 0.34, room: 0.2),
         "aster_bore_heavy_charge": (like: "aster_bore_charge", size: 1.7, peak: 0.42),
         "aster_bore_heavy": (like: "aster_bore", size: 1.6, peak: 0.4),
         "aster_bore_heavy_strike": (like: "aster_bore_strike", size: 1.7, peak: 0.98),

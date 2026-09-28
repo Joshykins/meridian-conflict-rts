@@ -1147,6 +1147,35 @@ const _: () = assert!(std::mem::size_of::<HousePose>() == 192);
 
 /// `UnitInstance::status[1]`: bits 8.. hold the unit's index into `RenderFrame::houses` plus one.
 pub const UNIT_HOUSE_SHIFT: u32 = 8;
+/// `UnitInstance::status[1]` bits 2..5: one more than the weapon of a twin gun on the arm
+/// (`twin_arm_gun`), zero for none. Its tube kicks on its own shots, read from the unit's
+/// `HousePose`; the main gun's kick stays in `recoil`.
+pub const UNIT_TWIN_SHIFT: u32 = 2;
+pub const UNIT_TWIN_MASK: u32 = 0x7;
+/// `UnitInstance::status[1]`: the twin gun is on the right (-y) of the arm, the main gun left.
+pub const UNIT_TWIN_RIGHT: u32 = 1 << 5;
+
+/// A second gun on the first weapon's elbow on the other side of it from the arm's main
+/// gun (`main`), so each arm kicks on its own shots: its weapon and whether it is on the
+/// right (-y). The heaviest such gun; none for a gun on the centreline or past the weapons
+/// a `HousePose` holds.
+fn twin_arm_gun(weapons: &[mc_data::Weapon], main: usize) -> Option<(usize, bool)> {
+    let arm = weapons.first()?.pivot?;
+    let side = weapons.get(main)?.muzzle.y.signum();
+    if side == 0 {
+        return None;
+    }
+    (0..weapons
+        .len()
+        .min(mc_data::MAX_HOUSES)
+        .min(UNIT_TWIN_MASK as usize))
+        .filter(|&w| {
+            let g = &weapons[w];
+            w != main && g.pivot == Some(arm) && !g.mount && g.muzzle.y.signum() == -side
+        })
+        .max_by_key(|&w| (weapons[w].damage, std::cmp::Reverse(w)))
+        .map(|w| (w, side > 0))
+}
 
 impl World {
     /// How far unit `id` moved this tick, metres; nothing for one that is gone. A jump
@@ -1556,12 +1585,14 @@ impl World {
                     w.map(|w| w.reload_ticks).unwrap_or(0),
                 ),
             };
+            let twin = twin_arm_gun(&bp.weapons, main);
             let mounted = bp.weapons.iter().position(|w| w.mount);
             let (mount_kick, prev_mount_kick) = mounted.map_or((0.0, 0.0), |w| {
                 barrel_recoil_pair(s.units.weapon_cooldown[row][w], bp.weapons[w].reload_ticks)
             });
-            // Guns on houses of their own (`rig::HOUSE`): every weapon's pose, in a side list.
-            let house = mounted.map(|_| {
+            // Guns on houses of their own (`rig::HOUSE`), or a twin on the arm that kicks on
+            // its own shots: every weapon's pose, in a side list.
+            let house = mounted.or(twin.map(|t| t.0)).map(|_| {
                 let mut hp = HousePose::default();
                 for (w, weapon) in bp.weapons.iter().enumerate().take(mc_data::MAX_HOUSES) {
                     let slot = crate::combat::pitch_slot(weapon, w);
@@ -1741,7 +1772,11 @@ impl World {
                         } else {
                             0
                         },
-                    house.map_or(0, |i| (i as u32 + 1) << UNIT_HOUSE_SHIFT),
+                    house.map_or(0, |i| (i as u32 + 1) << UNIT_HOUSE_SHIFT)
+                        | twin.map_or(0, |(w, right)| {
+                            (w as u32 + 1) << UNIT_TWIN_SHIFT
+                                | if right { UNIT_TWIN_RIGHT } else { 0 }
+                        }),
                     deck_up(row)
                         .or_else(|| self.loaded_cells(row))
                         .unwrap_or_else(|| self.launcher_pad(row)),

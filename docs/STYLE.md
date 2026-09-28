@@ -127,7 +127,7 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
   draws hits, the projector shaft and contact from a denser blue of it and
   flares from a paler one. The Replication Engine's veil is the Precursors' cold blue.
 - **Weapon look is data.** Muzzle flash (`flash`), impact flash (`impact`, or `flash` if left out), shockwave,
-  tracer size, trail, how long the wake hangs (`wake`), plasma around a traveling slug (`plasma`), energy bolts (`bolts`) and a charged shell's lightning (`discharge`) are set on the weapon. Shockwaves
+  tracer size, trail, how long the wake hangs (`wake`), plasma around a traveling slug (`plasma`), energy bolts (`bolts`), a charged shell's lightning (`discharge`) and a bolt rifle's firing sequence (`arc_charge`) are set on the weapon. Shockwaves
   take the weapon's colour: blue for energy, dust for guns. The renderer scales a recipe from damage and colour;
   it does not special-case a unit.
 - **Every shot is seen from muzzle to target.** A shell is drawn over its whole
@@ -331,6 +331,20 @@ blue only thin seams. The Paladin's is a sculpted housing with a plasma cell on
 its outboard flank feeding a slim core barrel, swept radiator blades along the
 core and a stepped, ported muzzle collar. The Raptor's is the fighter's cut:
 a dark core in a light sleeve cut on a slant, a dark cowl over its back.
+The Paladin's shoulder carries the gun back into itself: its armour hoods forward
+over the gun's housing on a slant, the gun's plasma cell runs on as a long canister
+down its outboard flank and the gun's seams run back along it. The whole shoulder
+pitches on its axle to aim, and each barrel kicks back into its housing on its own shot.
+
+The Paladin's rifles fire in a sequence (`arc_charge`, the gun's length; the
+charge time is the weapon's `charge_time`; renderer/bolt_rifle_fx.rs): over the
+charge small arcs crawl along the radiator blades and jump between their edges
+and the core, starting by the housing and running forward, denser as it builds,
+and in its last part a crackling knot curls round the muzzle collar; on the shot
+a short blue-white flash, a few forked strokes snapping a few metres out of the
+muzzle, sparks, haze venting from the housing and the blade seams flaring and
+cooling. Only arcs and seams glow, never a lit knot at the muzzle. The Raptor's
+rifles fire plainly.
 
 - **A shot is two things.** First an argon tracer round, an ordinary blue slug
   seen from muzzle to target. When it lands, the charge is dumped down the

@@ -6,7 +6,7 @@
 
 use glam::{Affine3A, Vec2, Vec3};
 
-use super::bolt_rifle::bolt_rifle;
+use super::bolt_rifle::{bolt_rifle, rifle_shoulder};
 use super::parts::*;
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
@@ -1581,6 +1581,13 @@ fn commander_shoulders(b: &mut MeshBuilder) {
 
 // ---- Paladin: assault bot ----------------------------------------------------
 
+/// The shoulder axle each arm pitches about (its y is the arm's own, mirrored): the unit
+/// file's `pivot`, (-0.8, 0, 18.4) on the 24 m Paladin, over two.
+const PALADIN_SHOULDER: Vec3 = Vec3::new(-0.4, 0.0, 9.2);
+/// The left bolt rifle's breech and muzzle: the unit file's muzzles, (10, ±7.2, 18), over two.
+const PALADIN_BREECH: Vec3 = Vec3::new(0.9, 3.6, 9.0);
+const PALADIN_MUZZLE: Vec3 = Vec3::new(5.0, 3.6, 9.0);
+
 pub(super) fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
     let stance = Leg {
         joints: &[
@@ -1604,6 +1611,10 @@ pub(super) fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
     b.mirror_y(shin_tube);
 
     b.set_turret_pivot(v3(0.0, 0.0, 7.2));
+    // Each shoulder pitches about its axle to point its gun up or down at what it aims at,
+    // and each barrel kicks back on its own shots (`mirror::UNIT_TWIN_*`).
+    b.set_arm_pivot(PALADIN_SHOULDER);
+    b.set_recoil(PALADIN_BREECH, PALADIN_MUZZLE, 0.4);
     if b.coarse() {
         b.with_part(part::TURRET, |b| {
             b.paint(PLATING);
@@ -1617,12 +1628,14 @@ pub(super) fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
             team_panel(b, v3(-1.4, 0.0, 10.5), v2(1.4, 4.8));
             b.mirror_y(|b| {
                 // Arm and rail in one tapered bar out to the muzzle.
-                b.paint(PLATING).beam(
-                    v3(-2.6, 3.6, 9.0),
-                    v3(5.0, 3.6, 9.0),
-                    v2(1.9, 1.7),
-                    v2(0.5, 0.5),
-                );
+                b.with_limb(rig::ARM_GUN, |b| {
+                    b.paint(PLATING).beam(
+                        v3(-2.6, 3.6, 9.0),
+                        PALADIN_MUZZLE,
+                        v2(1.9, 1.7),
+                        v2(0.5, 0.5),
+                    )
+                });
             });
         });
         return;
@@ -1666,28 +1679,15 @@ pub(super) fn assault_bot(b: &mut MeshBuilder, _tech: u8) {
             team_panel(b, Vec3::ZERO, v2(1.5, 3.0))
         });
 
-        // Arms: a bolt rifle slung from each shoulder.
+        // Arms: a bolt rifle carried in each shoulder, the shoulder turning on its axle.
         b.mirror_y(|b| {
             b.paint(ACCENT);
-            b.cylinder_between(v3(-0.4, 2.3, 9.2), v3(-0.4, 3.0, 9.2), 0.8, 0.8, b.sides(8));
-            b.at(v3(0.0, 3.6, 0.0), |b| {
-                b.paint(PLATING);
-                b.extrude_y_chamfered(
-                    &[
-                        [-2.7, 8.1],
-                        [0.5, 8.1],
-                        [1.2, 8.5],
-                        [1.2, 9.5],
-                        [0.4, 9.95],
-                        [-2.7, 9.95],
-                    ],
-                    0.98,
-                    0.28,
-                );
+            let axle = PALADIN_SHOULDER.with_y(2.3);
+            b.cylinder_between(axle, axle.with_y(3.0), 0.8, 0.8, b.sides(8));
+            b.with_limb(rig::ARM_GUN, |b| {
+                rifle_shoulder(b, PALADIN_BREECH, 0.44);
+                bolt_rifle(b, PALADIN_BREECH, PALADIN_MUZZLE, 0.44);
             });
-            // The unit file's muzzles, (10, ±7.2, 18) on the 24 m Paladin, over two.
-            bolt_rifle(b, v3(0.9, 3.6, 9.0), v3(5.0, 3.6, 9.0), 0.44);
-            team_panel(b, v3(-1.9, 3.6, 9.95), v2(0.8, 1.2));
         });
 
         // Heat-sink fins on the back.

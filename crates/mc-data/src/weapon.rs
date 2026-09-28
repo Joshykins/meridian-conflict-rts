@@ -104,6 +104,9 @@ pub struct Weapon {
     pub discharge: f32,
     /// A capital rail gun: its shot is drawn and heard at this scale over an ordinary rail. Zero: none.
     pub heavy_rail: f32,
+    /// A bolt rifle's charge and firing sequence, drawn on a gun this many metres long
+    /// (`RawWeapon::arc_charge`). Zero: none.
+    pub arc_charge: f32,
     /// A great gun: its firing, trail and hit are drawn at this scale (`RawWeapon::great_gun`).
     /// Zero: none.
     pub great_gun: f32,

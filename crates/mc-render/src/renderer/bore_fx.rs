@@ -61,11 +61,20 @@ pub(super) struct BoreFx {
     /// This frame's molten stains, heat filled in.
     stains: Vec<StainInstance>,
     seed: u32,
+    /// Bolt rifles charging and firing (renderer/bolt_rifle_fx.rs), their arcs among these strokes.
+    pub(super) rifles: super::bolt_rifle_fx::BoltRifleFx,
 }
 
 impl BoreFx {
+    /// A new world: no molten ground, no lightning. The rifles' sequences are kept: this
+    /// runs every tick while a world is young, and they reset themselves when the clock
+    /// goes back.
     pub(super) fn clear(&mut self) {
-        *self = BoreFx::default();
+        let rifles = std::mem::take(&mut self.rifles);
+        *self = BoreFx {
+            rifles,
+            ..BoreFx::default()
+        };
     }
 
     fn push_molten(&mut self, m: Molten) {
@@ -529,8 +538,11 @@ impl Renderer {
     pub(super) fn write_bore_strokes(&mut self, time: f32) {
         self.bore_fx.strokes.retain(|s| time < s.start + s.life);
         let size = size_of::<ProjectileInstance>();
+        // Written once a tick and drawn over its frames: a stroke that strikes during the
+        // tick is written now (sprites.wgsl hides a fading beam until its start).
+        let ahead = time + self.tick_seconds;
         for s in &self.bore_fx.strokes {
-            if time < s.start {
+            if ahead < s.start {
                 continue;
             }
             let i = self.projectile_count as usize;

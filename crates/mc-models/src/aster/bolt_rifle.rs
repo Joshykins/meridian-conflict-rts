@@ -33,34 +33,40 @@ pub(super) fn bolt_rifle(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32
                 v2(r * 2.3, r * 2.3),
                 v2(r * 1.5, r * 1.4),
             );
-            b.beam(
-                v3(0.88 * length, 0.0, 0.0),
-                Vec3::X * length,
-                v2(r * 1.25, r * 1.2),
-                v2(r * 0.95, r * 0.9),
-            );
-            b.paint(PLATING_DARK);
-            b.beam(
-                v3(0.34 * length, 0.0, 0.0),
-                v3(0.88 * length, 0.0, 0.0),
-                v2(r * 0.84, r * 0.84),
-                v2(r * 0.84, r * 0.84),
-            );
-            b.paint(PLATING);
-            b.extrude_y(
-                &[
-                    [0.36 * length, r * 0.3],
-                    [0.84 * length, r * 0.3],
-                    [0.4 * length, r * 1.05],
-                ],
-                -r * 0.05,
-                r * 0.05,
-            );
+            b.with_recoil(|b| {
+                b.paint(PLATING);
+                b.beam(
+                    v3(0.88 * length, 0.0, 0.0),
+                    Vec3::X * length,
+                    v2(r * 1.25, r * 1.2),
+                    v2(r * 0.95, r * 0.9),
+                );
+                b.paint(PLATING_DARK);
+                b.beam(
+                    v3(0.3 * length, 0.0, 0.0),
+                    v3(0.88 * length, 0.0, 0.0),
+                    v2(r * 0.84, r * 0.84),
+                    v2(r * 0.84, r * 0.84),
+                );
+                b.paint(PLATING);
+                b.extrude_y(
+                    &[
+                        [0.36 * length, r * 0.3],
+                        [0.84 * length, r * 0.3],
+                        [0.4 * length, r * 1.05],
+                    ],
+                    -r * 0.05,
+                    r * 0.05,
+                );
+            });
             return;
         }
         housing(b, length, r);
-        finned_core(b, length, r, 0.9);
-        collar(b, length, r);
+        // The barrel runs back into the housing as it fires (`MeshBuilder::set_recoil`).
+        b.with_recoil(|b| {
+            finned_core(b, length, r, 0.9);
+            collar(b, length, r);
+        });
     });
 }
 
@@ -415,4 +421,100 @@ fn sleeve(b: &mut MeshBuilder, length: f32, r: f32) {
         r * 0.06,
     );
     b.mirror_y(|b| seam(b, 0.36 * length, 0.6 * length, r * 1.05, 0.0, r));
+}
+
+/// The Paladin's shoulder behind a bolt rifle whose breech is at `breech` (the gun's frame:
+/// x along the gun, its axis at y = z = 0, +y outboard). `r` is the gun's. Its armour
+/// reaches forward over the gun's housing as a hood, the gun's plasma cell grown long down
+/// its outboard flank and the gun's seams run back along it.
+pub(super) fn rifle_shoulder(b: &mut MeshBuilder, breech: Vec3, r: f32) {
+    b.at(breech, |b| {
+        cowl(b, r);
+        if b.fine() {
+            long_cell(b, r);
+            b.mirror_y(|b| seam(b, -3.0, -0.8, 0.96, 0.3, r));
+            vents(b, -2.7, 0.22, 6, -0.96, (-0.35, 0.05), r);
+        }
+    });
+}
+
+/// The shoulder block, its armour reaching forward over the gun's housing as a hood with
+/// its front cut back on a slant, a dark plate layered down its spine.
+fn cowl(b: &mut MeshBuilder, r: f32) {
+    b.paint(PLATING);
+    b.extrude_y_chamfered(
+        &[
+            [-3.6, -0.9],
+            [-0.4, -0.9],
+            [0.25, -0.5],
+            [0.25, r * 1.05],
+            [1.7, r * 1.15],
+            [1.35, 0.98],
+            [-0.5, 1.02],
+            [-3.6, 0.95],
+        ],
+        0.98,
+        0.26,
+    );
+    // The hood's underside, dark where it stands off the housing.
+    b.paint(ACCENT);
+    b.block(v3(0.3, -r * 0.9, r * 1.02), v3(1.5, r * 0.9, r * 1.1));
+    b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+    b.extrude_y(
+        &[
+            [-3.3, 0.96],
+            [-0.6, 1.0],
+            [1.1, r * 2.05],
+            [1.3, r * 2.2],
+            [-0.6, 1.1],
+            [-3.3, 1.06],
+        ],
+        -0.6,
+        0.6,
+    );
+    team_panel(b, v3(-2.5, 0.0, 1.06), v2(0.9, 0.5));
+}
+
+/// The gun's plasma cell grown into a long canister down the shoulder's outboard flank,
+/// capped, a blue line down its top, its feed running forward into the gun's own cell.
+fn long_cell(b: &mut MeshBuilder, r: f32) {
+    let (c0, c1, cr) = (-3.0, -0.5, 0.2);
+    let (cy, cz) = (1.1, -0.2);
+    let sides = b.sides(10);
+    b.paint(PLATING_DARK);
+    b.cylinder_between(v3(c0, cy, cz), v3(c1, cy, cz), cr, cr, sides);
+    b.paint(METAL);
+    for x in [c0 - 0.06, c1] {
+        b.cylinder_between(
+            v3(x, cy, cz),
+            v3(x + 0.06, cy, cz),
+            cr * 0.82,
+            cr * 0.82,
+            sides,
+        );
+    }
+    for x in [-2.2, -1.5] {
+        b.paint(ACCENT);
+        b.cylinder_between(
+            v3(x, cy, cz),
+            v3(x + 0.07, cy, cz),
+            cr * 1.08,
+            cr * 1.08,
+            sides,
+        );
+    }
+    b.paint(GLOW);
+    b.block(
+        v3(c0 + 0.1, cy - 0.035, cz + cr * 0.96),
+        v3(c1 - 0.1, cy + 0.035, cz + cr * 1.03),
+    );
+    // Into the gun's cell (`housing`), along the flank.
+    b.paint(METAL);
+    b.cylinder_between(
+        v3(c1 + 0.06, cy, cz),
+        v3(0.05, r * 1.3, -r * 0.3),
+        0.06,
+        0.06,
+        6,
+    );
 }
