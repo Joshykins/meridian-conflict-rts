@@ -173,7 +173,7 @@ pub fn engagement(
         Rect::new(r.x, r.y + 4.0, 2.0, r.h - 8.0),
         rgb(crate::hud::MASS, 0.8),
     );
-    let note = "No mass is handed out: every unit the engine sends leaves a wreck worth most of its cost - reclaim the field.";
+    let note = "No materials are handed out: every unit the engine sends leaves a wreck worth most of its cost - reclaim the field.";
     for (k, l) in ui
         .wrap(type_scale::MICRO, note, r.w - 24.0)
         .iter()
@@ -593,7 +593,7 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
             let budget = rules.budget(round);
             let parts: Vec<String> = attacking.iter().map(|d| format!("{} {}", d.label(), mass(budget * weight(*d) / wsum))).collect();
             format!(
-                "Round {round}  \u{b7}  T{}  \u{b7}  {} mass  \u{b7}  {}{}{}",
+                "Round {round}  \u{b7}  T{}  \u{b7}  {} materials  \u{b7}  {}{}{}",
                 rules.tier_at(round),
                 mass(budget),
                 parts.join("  "),
@@ -615,7 +615,7 @@ fn forecast(ui: &mut Ui, rules: &SurvivalRules, counts: [usize; 3], area: Rect) 
             let secs = rules.grace_secs as u32 + total as u32 * rules.interval_secs as u32;
             let heavies = (1..=total).filter(|r| rules.heavy_at(*r).is_some()).count();
             format!(
-                "{total} rounds  \u{b7}  ~{} min  \u{b7}  tops out at T{max_tier}  \u{b7}  {nodes} Shaper{}{}  \u{b7}  last wave {} mass",
+                "{total} rounds  \u{b7}  ~{} min  \u{b7}  tops out at T{max_tier}  \u{b7}  {nodes} Shaper{}{}  \u{b7}  last wave {} materials",
                 (secs + 30) / 60,
                 if nodes == 1 { "" } else { "s" },
                 match heavies {

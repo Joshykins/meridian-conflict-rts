@@ -880,7 +880,8 @@ pub fn cursor_hint(
                 | Targeting::Strike
                 | Targeting::Bombard => style::Family::Combat.tone(),
                 Targeting::Move | Targeting::Patrol => style::Family::Movement.tone(),
-                Targeting::Assist | Targeting::Reclaim => style::Family::Engineering.tone(),
+                Targeting::Assist => style::Family::Engineering.tone(),
+                Targeting::Reclaim => MASS,
                 Targeting::Guard => style::Family::Stance.tone(),
                 Targeting::Land | Targeting::Unload => style::Family::Transport.tone(),
                 Targeting::Nuke => silo::WARHEAD,

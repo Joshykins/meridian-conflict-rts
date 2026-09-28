@@ -1263,6 +1263,12 @@ pub fn orders(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r:
             family.label(),
         );
         for (i, o) in orders.iter().enumerate() {
+            // Reclaim is lit in the Materials red-orange it brings in, not the family's colour.
+            let tone = if o.action == HudAction::Target(Targeting::Reclaim) {
+                super::MASS
+            } else {
+                tone
+            };
             let tr = Rect::new(
                 cx,
                 r.y + 36.0 + i as f32 * (ORDER_H + ORDER_GAP),

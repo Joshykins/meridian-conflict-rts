@@ -68,7 +68,7 @@ impl Game {
             } => (
                 if *raised {
                     format!(
-                        "Shaper Destroyed at {}  \u{b7}  Wreck Worth {wreck} Mass",
+                        "Shaper Destroyed at {}  \u{b7}  Wreck Worth {wreck} Materials",
                         site(*s)
                     )
                 } else {

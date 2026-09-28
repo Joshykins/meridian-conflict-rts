@@ -641,7 +641,7 @@ fn economy_page(
         asked.push(RangeAction::FreeBuild(!free));
     }
     // A shortage: the store run dry and a quarter of the income coming in.
-    for (i, (label, n)) in [("Low Power", 1usize), ("Low Mass", 0)]
+    for (i, (label, n)) in [("Low Power", 1usize), ("Low Materials", 0)]
         .into_iter()
         .enumerate()
     {

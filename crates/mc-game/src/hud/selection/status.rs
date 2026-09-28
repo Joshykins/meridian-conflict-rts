@@ -235,15 +235,19 @@ fn record(ui: &mut Ui, s: &Scene, u: &UnitInstance, bp: &UnitBlueprint, x: f32, 
                 RANKS[level as usize + 1]
             );
         }
-        ui.text(at, y, type_scale::MICRO, rgb(VETERANCY, 0.85), &text);
+        at = ui.text(at, y, type_scale::MICRO, rgb(VETERANCY, 0.85), &text);
     }
     if reclaimed >= 0.5 {
+        // Right of the rank and kills, or on the line over them when they leave no room.
+        let text = format!("{} materials reclaimed", whole(reclaimed));
+        let w = ui.text_width(type_scale::MICRO, &text);
+        let row = if at + 12.0 > x + cw - w { y - 16.0 } else { y };
         ui.text_right(
             x + cw,
-            y,
+            row,
             type_scale::MICRO,
             rgb(crate::hud::MASS, 1.0),
-            &format!("{} materials reclaimed", whole(reclaimed)),
+            &text,
         );
     }
 }
