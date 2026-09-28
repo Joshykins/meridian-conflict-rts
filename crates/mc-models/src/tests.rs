@@ -314,8 +314,8 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("radar", 10.5, 42.0, 2, 2, &[]),
     structure("radar", 10.5, 49.0, 3, 2, &[]),
     structure("reclaim_tower", 16.9, 38.0, 1, 3, &[]),
-    structure("reclaim_tower", 16.9, 52.0, 2, 3, &[]),
-    structure("reclaim_tower", 16.9, 68.0, 3, 3, &[]),
+    structure("reclaim_tower", 16.9, 38.0, 2, 3, &[]),
+    structure("reclaim_tower", 16.9, 38.0, 3, 3, &[]),
     structure("shield", 13.9, 40.0, 2, 3, &[]),
     structure("shield", 13.9, 52.0, 3, 3, &[]),
     structure("wall", 6.0, 4.5, 1, 1, &[]),
@@ -796,7 +796,7 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "assault_tank" {
             ASSAULT_TANK_TRIANGLES
         } else if model.key.starts_with("reclaim_tower") {
-            // A 4x4 installation, a tower up to 84 m with the plant round its foot.
+            // A 3x3 installation, a 38 m tower with the plant round its foot.
             super::aster::reclaim_tower::TRIANGLES
         } else if let Some(budget) = super::naga::triangles(&model.key) {
             budget

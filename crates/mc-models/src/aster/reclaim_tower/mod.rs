@@ -1,61 +1,89 @@
 //! The ARC reclaim tower (`reclaim_tower`, tech 1 to 3 on one upgrade chain, a 3x3 lot):
 //! a fixed installation that pulls wreckage in from far off (640 / 1100 / 1700 m) with a
-//! slow reclaim head at the top of a lattice derrick ([`derrick`]), and sends what it
-//! takes down the tower to the plant and bunkers at its foot.
+//! slow reclaim head at the top of a plated tower ([`body`]), and sends what it takes
+//! down the tower to the plant and bunkers at its foot ([`works`]).
 //!
-//! The head is the Thresher's Cradle at tower scale ([`turret`]). Its rig:
+//! The head is the Thresher's Cradle at tower scale with a long barrel ([`turret`]). Its
+//! rig:
 //! - The head is gun house 0 ([`crate::builder::MeshBuilder::with_house`]): it turns about
 //!   the tower's axis by weapon 0's yaw, and the processor in it pitches about the
-//!   trunnion at [`PIVOT_Z`] (the house pivot), steeply both ways.
-//! - The reclaim beam leaves [`EMIT_X`] ahead of the trunnion along the intake's bore.
-//! - Tiers grow by height and by working machinery added round the foot and up the tower,
-//!   never by spikes or glow.
+//!   trunnion at [`PIVOT_Z`] (the house pivot).
+//! - The reclaim beam leaves [`EMIT_X`] ahead of the trunnion along the barrel's bore.
+//! - The tower is as tall at every tier. Like the core mine, each tier builds onto the
+//!   last: tech 2 hangs processing pods and a gallery on the tower and adds a separator
+//!   house and a second bunker at its foot; tech 3 buttresses it, adds a press house, a
+//!   capacitor bank and an outside chute. The barrel gains a cooling jacket at tech 2 and
+//!   a collector shroud at tech 3. Never spikes or glow for menace.
 //! - The chutes wear `pattern::MASS_FLOW`: dark glazing, and a stream of glowing
 //!   Materials red-orange falling down them while the tower reclaims.
 
 use glam::Vec3;
 
-use super::parts::*;
-use crate::builder::{ngon, MeshBuilder, Section};
+use crate::builder::MeshBuilder;
 use crate::material::*;
 use crate::pattern;
 
-mod derrick;
+mod body;
 mod turret;
+mod works;
+
+pub(super) use body::Body;
 
 /// Collision radius at every tier: a 3x3 lot of 12 m cells.
 pub(super) const RADIUS: f32 = 16.9;
-/// Authored height per tier (T1, T2, T3).
-pub(super) const HEIGHT: [f32; 3] = [38.0, 52.0, 68.0];
-/// The head's pivot height per tier: the yaw axis is the tower's (x = y = 0), and the
-/// processor pitches about a y axis through (0, 0, PIVOT_Z). The blueprint's head pivot.
-pub(crate) const PIVOT_Z: [f32; 3] = [34.2, 47.2, 62.0];
-/// How much bigger the head is drawn at each tier.
-const HEAD_SCALE: [f32; 3] = [1.0, 1.15, 1.35];
-/// Trunnion to intake mouth at head scale 1.
-const REACH: f32 = 7.0;
+/// Authored height, the same at every tier: upgrades build round the tower, not up it.
+pub(super) const HEIGHT: f32 = 38.0;
+/// The head's pivot height: the yaw axis is the tower's (x = y = 0), and the processor
+/// pitches about a y axis through (0, 0, PIVOT_Z). The blueprint's head pivot.
+pub(crate) const PIVOT_Z: f32 = 34.2;
+/// The head's scale: metres per unit of the Thresher's Cradle, which is authored with
+/// its processor box 1.5 units long.
+const K: f32 = 4.8;
+/// Trunnion to the barrel's mouth, in units of [`K`].
+const MUZZLE: f32 = 2.3;
 /// Where the reclaim beam leaves the head: this far ahead of the trunnion along the
-/// bore (+x at rest, level), `REACH * HEAD_SCALE`. The blueprint's emitter is
-/// (EMIT_X, 0, PIVOT_Z).
-pub(crate) const EMIT_X: [f32; 3] = [7.0, 8.05, 9.45];
-/// Full-detail triangle budget: a 3x3 installation up to 68 m tall (the Citadel's 4x4
-/// keep has 4200; a factory 6000).
+/// bore (+x at rest, level). The blueprint's emitter is (EMIT_X, 0, PIVOT_Z).
+pub(crate) const EMIT_X: f32 = MUZZLE * K;
+/// Top of the head house, which the head's turntable turns on.
+const RING_TOP: f32 = PIVOT_Z - 0.69 * K;
+/// How tall the plated head house under the slewing ring is.
+const HOUSE: f32 = 3.4;
+/// Top of the tower's shaft, where the head house sits.
+const CAP: f32 = RING_TOP - HOUSE;
+/// Top of the foundation podium the tower stands on.
+const PODIUM: f32 = 3.0;
+/// Full-detail triangle budget: a 3x3 installation 38 m tall (the Citadel's 4x4 keep
+/// has 4200; a factory 6000).
 #[cfg(test)]
 pub(crate) const TRIANGLES: usize = 6000;
 
-/// The tower: the derrick with the Cradle head on top.
+/// The tower in the keep body.
 pub(super) fn tower(b: &mut MeshBuilder, tech: u8) {
-    derrick::derrick(b, tech);
+    build(b, tech, Body::Keep);
 }
 
-/// Tier index 0..3 for `tech`.
-fn tier(tech: u8) -> usize {
-    usize::from(tech.clamp(1, 3) - 1)
+/// The tower in the braced body.
+pub(super) fn tower_braced(b: &mut MeshBuilder, tech: u8) {
+    build(b, tech, Body::Braced);
 }
 
-/// Top of the head house, which the head's turntable turns on.
-fn ring_top(tech: u8) -> f32 {
-    PIVOT_Z[tier(tech)] - 3.1 * HEAD_SCALE[tier(tech)]
+/// The tower in the stack body.
+pub(super) fn tower_stack(b: &mut MeshBuilder, tech: u8) {
+    build(b, tech, Body::Stack);
+}
+
+fn build(b: &mut MeshBuilder, tech: u8, body: Body) {
+    let tech = tech.clamp(1, 3);
+    if b.coarse() {
+        works::coarse(b);
+        body::coarse(b, body);
+        turret::turret(b, tech);
+        return;
+    }
+    works::foundation(b);
+    body::body(b, body);
+    turret::turret(b, tech);
+    works::tiers(b, tech, body);
 }
 
 /// A glazed chute carrying reclaimed material from `from` down to `to`: dark
@@ -79,114 +107,6 @@ fn chute(b: &mut MeshBuilder, from: Vec3, to: Vec3, radius: f32) {
     }
 }
 
-/// The lot: a low dark slab across the 4x4 cells with cut corners, a light kerb.
-fn lot_slab(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK);
-    b.loft_z(
-        &ngon(8, 17.8)
-            .iter()
-            .map(|p| rotate8(*p))
-            .collect::<Vec<_>>(),
-        &[Section::new(0.0, 1.0), Section::new(0.45, 0.985)],
-    );
-}
-
-/// An octagon point turned by half a side, so the flat sides face the axes and the
-/// cut corners the diagonals.
-fn rotate8(p: [f32; 2]) -> [f32; 2] {
-    let (s, c) = std::f32::consts::FRAC_PI_8.sin_cos();
-    [p[0] * c - p[1] * s, p[0] * s + p[1] * c]
-}
-
-/// A material bunker at `at` (ground centre): a squat dark bin with a light lid and a
-/// glazed hopper throat on top where a chute comes in, `size` across.
-fn bunker(b: &mut MeshBuilder, at: Vec3, size: f32, height: f32) {
-    b.paint(PLATING);
-    b.at(at, |b| {
-        if b.coarse() {
-            b.cuboid_open(Vec3::Z * (height * 0.5), Vec3::splat(size).with_z(height));
-            return;
-        }
-        b.loft_z(
-            &crate::builder::chamfered_rect(glam::Vec2::splat(size * 0.5), size * 0.14),
-            &[
-                Section::new(0.0, 1.0),
-                Section::new(height * 0.72, 1.0),
-                Section::new(height, 0.82),
-            ],
-        );
-        b.paint(ACCENT);
-        b.prism(
-            v3(0.0, 0.0, height * 0.35),
-            8,
-            size * 0.52,
-            size * 0.52,
-            0.5,
-        );
-        // The throat the stream drops into.
-        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-        b.prism(
-            v3(0.0, 0.0, height - 0.05),
-            b.sides(8),
-            size * 0.26,
-            size * 0.16,
-            1.4,
-        );
-        if b.fine() {
-            b.paint(METAL);
-            b.prism(v3(0.0, 0.0, height + 1.35), 8, size * 0.2, size * 0.2, 0.3);
-            // A hatch and a ladder cage down one side.
-            b.paint(ACCENT);
-            b.block(
-                v3(size * 0.5 - 0.05, -0.9, 0.3),
-                v3(size * 0.5 + 0.12, 0.9, 2.6),
-            );
-            b.paint(METAL);
-            b.block(
-                v3(-0.4, size * 0.5, 0.2),
-                v3(0.4, size * 0.5 + 0.35, height),
-            );
-        }
-    });
-}
-
-/// A conveyor gallery from `from` to `to` (both at deck height): a covered trough on
-/// two stilts, the stream seen along its glazed top.
-fn conveyor(b: &mut MeshBuilder, from: Vec3, to: Vec3) {
-    let width = 1.5;
-    b.paint(PLATING_DARK);
-    b.beam(
-        from,
-        to,
-        glam::Vec2::new(width, 1.1),
-        glam::Vec2::new(width, 1.1),
-    );
-    if b.fine() {
-        let up = Vec3::Z * 0.6;
-        b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-        b.beam(
-            from + up,
-            to + up,
-            glam::Vec2::new(width * 0.6, 0.3),
-            glam::Vec2::new(width * 0.6, 0.3),
-        );
-    }
-    if b.fine() {
-        b.paint(METAL);
-        for t in [0.3, 0.7] {
-            let p = from.lerp(to, t);
-            if p.z > 1.5 {
-                b.beam(
-                    p.with_z(0.4),
-                    p - Vec3::Z * 0.55,
-                    glam::Vec2::splat(0.45),
-                    glam::Vec2::splat(0.4),
-                );
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,54 +121,55 @@ mod tests {
         );
     }
 
-    /// The tower has one head house at the rig's pivot, a projector reaching the
-    /// emitter, and chutes, at every tier.
+    /// The tower has one head house at the rig's pivot, a barrel reaching the emitter,
+    /// and chutes, at every tier, and stays inside its lot and budget.
     #[test]
     fn head_fits_the_rig() {
         let mut over = Vec::new();
-        let key = "reclaim_tower";
-        for tech in 1..=3u8 {
-            let t = tier(tech);
-            let model = crate::library::find(key).expect("registered");
-            let (radius, height) = model.nominal[t];
-            let built = crate::build_model_scaled(key, radius, height, tech).unwrap();
-            assert_eq!(built.houses.len(), 1, "{key} t{tech}: one head house");
-            let pivot = Vec3::from(built.houses[0].pivot);
-            assert!(
-                (pivot - Vec3::new(0.0, 0.0, PIVOT_Z[t])).length() < 1e-3,
-                "{key} t{tech}: pivot {pivot}"
-            );
-            let fine = build_lod(key, 0, tech);
-            let mesh = fine.mesh();
-            let tip = mesh
-                .vertices
-                .iter()
-                .filter(|v| v.rig & crate::rig::RECOIL != 0)
-                .map(|v| v.pos[0])
-                .fold(f32::MIN, f32::max);
-            assert!(
-                (tip - EMIT_X[t]).abs() < 1.0,
-                "{key} t{tech}: projector ends at x {tip}, emitter at {}",
-                EMIT_X[t]
-            );
-            let flow = mesh
-                .vertices
-                .iter()
-                .filter(|v| (v.surface & 0xFF) == pattern::MASS_FLOW)
-                .count();
-            assert!(flow > 0, "{key} t{tech}: no chute");
-            for (lod, m) in built.lods.iter().enumerate() {
-                let low = m.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+        let keys = crate::library::all_model_keys();
+        for key in keys.into_iter().filter(|k| k.starts_with("reclaim_tower")) {
+            for tech in 1..=3u8 {
+                let t = usize::from(tech - 1);
+                let model = crate::library::find(key).expect("registered");
+                let (radius, height) = model.nominal[t];
+                let built = crate::build_model_scaled(key, radius, height, tech).unwrap();
+                assert_eq!(built.houses.len(), 1, "{key} t{tech}: one head house");
+                let pivot = Vec3::from(built.houses[0].pivot);
                 assert!(
-                    low >= -1e-3,
-                    "{key} t{tech} lod{lod}: below ground at z {low}"
+                    (pivot - Vec3::new(0.0, 0.0, PIVOT_Z)).length() < 1e-3,
+                    "{key} t{tech}: pivot {pivot}"
                 );
-            }
-            let tris = |lod: usize| built.lods[lod].indices.len() / 3;
-            let (full, mid, coarse) = (tris(0), tris(1), tris(2));
-            println!("{key} t{tech}: {full}/{mid}/{coarse} triangles");
-            if !(full <= TRIANGLES && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0) {
-                over.push(format!("{key} t{tech}: {full}/{mid}/{coarse}"));
+                let fine = build_lod(key, 0, tech);
+                let mesh = fine.mesh();
+                let tip = mesh
+                    .vertices
+                    .iter()
+                    .filter(|v| v.rig & crate::rig::RECOIL != 0)
+                    .map(|v| v.pos[0])
+                    .fold(f32::MIN, f32::max);
+                assert!(
+                    (tip - EMIT_X).abs() < 1.0,
+                    "{key} t{tech}: barrel ends at x {tip}, emitter at {EMIT_X}"
+                );
+                let flow = mesh
+                    .vertices
+                    .iter()
+                    .filter(|v| (v.surface & 0xFF) == pattern::MASS_FLOW)
+                    .count();
+                assert!(flow > 0, "{key} t{tech}: no chute");
+                for (lod, m) in built.lods.iter().enumerate() {
+                    let low = m.vertices.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+                    assert!(
+                        low >= -1e-3,
+                        "{key} t{tech} lod{lod}: below ground at z {low}"
+                    );
+                }
+                let tris = |lod: usize| built.lods[lod].indices.len() / 3;
+                let (full, mid, coarse) = (tris(0), tris(1), tris(2));
+                println!("{key} t{tech}: {full}/{mid}/{coarse} triangles");
+                if !(full <= TRIANGLES && coarse < 60 && mid as f32 <= full as f32 * 0.45 + 20.0) {
+                    over.push(format!("{key} t{tech}: {full}/{mid}/{coarse}"));
+                }
             }
         }
         assert!(over.is_empty(), "over the triangle budgets: {over:?}");

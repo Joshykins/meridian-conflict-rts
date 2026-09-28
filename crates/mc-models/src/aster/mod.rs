@@ -40,9 +40,9 @@ use super::library::ModelDef;
 
 /// The reclaim tower's authored (radius, height) per tier.
 const RECLAIM_TOWER: [(f32, f32); 3] = [
-    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT[0]),
-    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT[1]),
-    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT[2]),
+    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT),
+    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT),
+    (reclaim_tower::RADIUS, reclaim_tower::HEIGHT),
 ];
 
 pub(super) const MODELS: &[ModelDef] = &[
@@ -168,7 +168,18 @@ pub(super) const MODELS: &[ModelDef] = &[
         structures::radar,
     ),
     // The reclaim tower (a 3x3 lot), its head on the rig `reclaim_tower::PIVOT_Z`, `EMIT_X`.
+    // The tower's body is open to the user (CLAUDE.md section 9): keep, braced, stack.
     ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower),
+    ModelDef::tiered(
+        "reclaim_tower~braced",
+        RECLAIM_TOWER,
+        reclaim_tower::tower_braced,
+    ),
+    ModelDef::tiered(
+        "reclaim_tower~stack",
+        RECLAIM_TOWER,
+        reclaim_tower::tower_stack,
+    ),
     ModelDef::tiered(
         "shield",
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],
