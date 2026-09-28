@@ -364,7 +364,7 @@
         vision: 260,
         weapons: [(
             name: "Light Cannon",
-            damage: 50, range: 270, reload: 0.8, speed: 520, trajectory: Direct,
+            damage: 50, range: 405, reload: 0.8, speed: 520, trajectory: Direct,
             turret_turn: 140, muzzle: (7.5, 0, 5.55),
             targets: ["Land", "Naval"], color: Orange, flash: 1.8,
             sounds: (fire: "cannon_light", impact: "shell_light"),
@@ -383,7 +383,7 @@
         vision: 300,
         weapons: [(
             name: "Triple Cannon Battery",
-            damage: 226, range: 520, reload: 2.4, salvo: 3, salvo_delay: 0.2, speed: 640, trajectory: Direct,
+            damage: 226, range: 780, reload: 2.4, salvo: 3, salvo_delay: 0.2, speed: 640, trajectory: Direct,
             turret_turn: 90, muzzle: (9.9, 0, 7.5),
             muzzles: [
                 (9.9, -1.5, 7.5), (9.9, 0, 7.5), (9.9, 1.5, 7.5),
@@ -437,8 +437,8 @@
     (
         // One heavy rail cannon on a pitching cradle over a 4x4 keep: the Bastion hoses a
         // crowd, the Citadel breaks heavies. A Paladin takes three slugs; a light tank is
-        // killed by one with most of it wasted, so a swarm outpaces the reload. It outranges
-        // the Arbalest; the Trebuchet and the Leviathan outrange it. Tuned by
+        // killed by one with most of it wasted, so a swarm outpaces the reload. At 1500 m it
+        // outranges the Arbalest, the Trebuchet (1300) and the Leviathan (1400). Tuned by
         // `zz_probe_citadel_pushes` (mc-sim/tests/citadel.rs).
         // `pivot`/`muzzle` are the model's trunnion and barrel tip (models/aster/citadel.rs).
         key: "aster_t3_point_defense",
@@ -452,7 +452,7 @@
         vision: 360,
         weapons: [(
             name: "Citadel Rail Cannon",
-            damage: 3800, splash: 3, range: 750, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
+            damage: 3800, splash: 3, range: 1500, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
             // With nothing left to shoot the gun stays laid where it last fired.
             turret_turn: 18, pivot: (0, 0, 13), muzzle: (34, 0, 13), keeps_aim: true,
             targets: ["Land", "Naval"], color: Orange,
@@ -627,7 +627,7 @@
  vision: 450, water_build: true,
  // A rotary gun like the commander's: it spins up on a target, then each 0.2 s shot is
  // seen and heard as eight rounds, and throws out a casing for each on the right.
- weapons: [(name: "Rotary AA Gun", damage: 16, range: 280, reload: 0.2, speed: 800, trajectory: Direct,
+ weapons: [(name: "Rotary AA Gun", damage: 16, range: 420, reload: 0.2, speed: 800, trajectory: Direct,
  turret_turn: 240, muzzle: (5.5, 0, 6), pivot: (0, 0, 6), targets: ["Air"], color: Orange, spin_up: 0.4, rounds: 8, tracer: 0.7, casings: 4.5,
  sounds: (fire: "aster_minigun", impact: "shell_light"), )], mesh: "aa_gun", icon: AntiAir, sounds: (death: "blast_large")),
 
