@@ -519,20 +519,21 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
     let center = globals.view_proj * vec4<f32>(feet, 1.0);
     let dist = max(distance(center_w, globals.camera.xyz), 1.0);
     let px = globals.lod.x / dist;
-    let half_w = max(e.radius * 1.35 * px, 22.0);
+    let half_w = max(e.radius * 0.8 * px, 16.0);
     let show_build = mark.work >= 0.0;
     let show_shield = mark.shield >= 0.0;
-    let health_h = 10.0;
-    let shield_h = 6.0;
-    let build_h = 9.0;
+    let health_h = 9.0;
+    let shield_h = 5.0;
+    let build_h = 8.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
     let down = select(0.0, build_h + gap, show_build);
     let half_h = 0.5 * (health_h + up + down);
     // South of the footprint, so the stack sits on the ground in front of the hull.
-    let mid_y = -max(e.radius * 0.9 * px, 8.0) - half_h - 2.0;
+    let mid_y = -max(e.radius * 0.45 * px, 4.0) - half_h - 2.0;
     var out: MarkOut;
-    var ndc = center.xy / center.w + (corner * vec2<f32>(half_w, half_h) + vec2<f32>(0.0, mid_y)) * globals.viewport.zw;
+    // NDC spans two units across the viewport, so a pixel is 2 / size.
+    var ndc = center.xy / center.w + (corner * vec2<f32>(half_w, half_h) + vec2<f32>(0.0, mid_y)) * 2.0 * globals.viewport.zw;
     // Radar blips stay anonymous: a ring, no bars.
     if (e.owner_flags & STATE_UNIDENTIFIED) != 0u {
         ndc = vec2<f32>(4.0);
@@ -547,7 +548,7 @@ fn vs_bar(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32
 }
 
 // `per_px`: how far uv.x moves per screen pixel; `h`: the row's height in pixels.
-// The frame is a pixel and a half on every side, however wide the hull.
+// The frame is one pixel on every side, however wide the hull.
 fn bar_fill(uv: vec2<f32>, fill: f32, color: vec3<f32>, per_px: f32, h: f32) -> vec4<f32> {
     let ax = abs(uv.x);
     let ay = abs(uv.y);
@@ -555,14 +556,14 @@ fn bar_fill(uv: vec2<f32>, fill: f32, color: vec3<f32>, per_px: f32, h: f32) -> 
         return vec4<f32>(0.0);
     }
     // A thin black frame so the line reads on snow, grass and rock.
-    if ax > 1.0 - 1.5 * per_px || ay > 1.0 - 3.0 / h {
+    if ax > 1.0 - per_px || ay > 1.0 - 2.0 / h {
         return vec4<f32>(0.0, 0.0, 0.0, 0.9);
     }
     // What is missing stays in the bar's own colour, dimmed, so the bar's length reads.
     if uv.x * 0.5 + 0.5 > fill {
-        return vec4<f32>(color * 0.22 + vec3<f32>(0.03), 0.9);
+        return vec4<f32>(color * 0.12 + vec3<f32>(0.015), 0.96);
     }
-    return vec4<f32>(color * 1.6, 1.0);
+    return vec4<f32>(color * 1.2, 1.0);
 }
 
 fn row_uv(uv_x: f32, y: f32, top: f32, h: f32) -> vec2<f32> {
@@ -576,9 +577,9 @@ fn fs_bar(in: MarkOut) -> @location(0) vec4<f32> {
     let show_build = in.build >= 0.0;
     // Before any branch, so the derivative is taken over the whole quad.
     let per_px = fwidth(in.uv.x);
-    let health_h = 10.0;
-    let shield_h = 6.0;
-    let build_h = 9.0;
+    let health_h = 9.0;
+    let shield_h = 5.0;
+    let build_h = 8.0;
     let gap = 2.0;
     let up = select(0.0, shield_h + gap, show_shield);
     let down = select(0.0, build_h + gap, show_build);
