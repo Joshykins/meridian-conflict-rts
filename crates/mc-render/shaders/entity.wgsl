@@ -1544,7 +1544,9 @@ fn vs_main(in: VsIn) -> VsOut {
         let dr = model.capital[4];
         let cy = sign(p.y) * select(dr.z, dr.w, abs(p.y) > 0.5 * (dr.z + dr.w));
         let c = vec3<f32>(dr.x, cy, dr.y);
-        let phase = time * 0.65 * sign(p.y) + cy * 0.13;
+        // A single drive on the centre line (both |y| zero) turns one way as a whole.
+        let turn = select(sign(p.y), 1.0, dr.w == 0.0);
+        let phase = time * 0.65 * turn + cy * 0.13;
         p = rot_x(p - c, phase) + c;
         n = rot_x(n, phase);
     } else if (in.part == 5u || in.part == 6u) && model.vtol[0].w > 0.0 {

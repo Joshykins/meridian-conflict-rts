@@ -77,18 +77,18 @@ pub(crate) fn light_transport(b: &mut MeshBuilder, _tech: u8) {
     courier::build(b);
 }
 
-/// Vigil: the tech 1 sensor ship, a spacecraft built round one great radar ([`vigil`]).
-/// The `~` keys are design variants of its hull, shown side by side.
+/// Vigil: the tech 1 sensor ship, a small single-drive spacecraft with a hammerhead of
+/// sensors ([`vigil`]). The `~` keys are design variants of its hull, shown side by side.
 pub(crate) fn sensor_ship(b: &mut MeshBuilder, _tech: u8) {
-    vigil::build_hammer(b);
+    vigil::build_ray(b);
 }
 
-pub(crate) fn sensor_ship_boom(b: &mut MeshBuilder, _tech: u8) {
-    vigil::build_boom(b);
+pub(crate) fn sensor_ship_eyes(b: &mut MeshBuilder, _tech: u8) {
+    vigil::build_eyes(b);
 }
 
-pub(crate) fn sensor_ship_truss(b: &mut MeshBuilder, _tech: u8) {
-    vigil::build_truss(b);
+pub(crate) fn sensor_ship_crescent(b: &mut MeshBuilder, _tech: u8) {
+    vigil::build_crescent(b);
 }
 
 /// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.

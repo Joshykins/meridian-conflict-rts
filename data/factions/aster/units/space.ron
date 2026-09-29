@@ -3,10 +3,10 @@
 // of their own (`footprint` on a mobile unit) and the finished ship climbs off it.
 [
     (
-        // The Reach's eyes in the upper air: a light hull carrying one great search radar,
-        // a tech 2 tower's reach that goes where the army goes. Unarmed. It hangs at
-        // fighter height, inside the reach of tech 1 anti-air, and its radar draws power
-        // like a tower's: an energy stall (or a pause) blinds it.
+        // The Reach's eyes in the upper air: a small single-drive hull with a hammerhead of
+        // sensors across its bow, a tech 2 tower's reach that goes where the army goes.
+        // Unarmed. It hangs at fighter height, inside the reach of tech 1 anti-air, and its
+        // radar draws power like a tower's: an energy stall (or a pause) blinds it.
         key: "aster_t1_sensor_ship",
         name: "Vigil",
         role: "Sensor Ship",
@@ -14,7 +14,7 @@
         categories: ["Air", "Space", "Intel"],
         health: 700,
         cost: (mass: 280, energy: 4200, time: 1400),
-        radius: 56, height: 40, footprint: (10, 6), hull: (56, 26), vision: 1500, radar: 6000,
+        radius: 36, height: 22, footprint: (6, 5), hull: (36, 27), vision: 1500, radar: 6000,
         motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 200, hover: true),
         economy: (energy_upkeep: 100),
         weapons: [],
