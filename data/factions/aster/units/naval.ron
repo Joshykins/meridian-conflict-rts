@@ -225,8 +225,9 @@
         radius: 26.4, height: 16.8,
         vision: 1000, radar: 2800,
         // Two interceptor lasers, one off the tower's front and one on the quarterdeck,
-        // burn missiles inside this radius; each beam leaves the head nearer the missile.
-        anti_missile: 320,
+        // each burning a missile of its own inside this radius: wide enough to screen the
+        // ships sailing with it, not only itself. Each beam leaves its own head.
+        anti_missile: 600, anti_missile_lasers: 2,
         anti_missile_mounts: [(-8.64, 0, 15.12), (-21.96, 0, 6)],
         economy: (energy_upkeep: 60),
         motion: (layer: Naval, size: 3, speed: 28, accel: 10, turn: 34),
@@ -237,7 +238,7 @@
             // fliers in range (`split`), all on one when it is alone.
             (
                 name: "Vertical Missile Array",
-                damage: 110, splash: 5, range: 1600, reload: 4, speed: 380, trajectory: Direct,
+                damage: 110, splash: 5, range: 1850, reload: 4, speed: 380, trajectory: Direct,
                 turret_turn: 0, arc: 360, muzzle: (8.7, -2.7, 7.68),
                 muzzles: [(8.7, -2.7, 7.68), (8.7, -0.9, 7.68), (8.7, 0.9, 7.68), (8.7, 2.7, 7.68), (6.9, -2.7, 7.68), (6.9, -0.9, 7.68), (6.9, 0.9, 7.68), (6.9, 2.7, 7.68), (5.1, -2.7, 7.68), (5.1, -0.9, 7.68), (5.1, 0.9, 7.68), (5.1, 2.7, 7.68), (3.3, -2.7, 7.68), (3.3, -0.9, 7.68), (3.3, 0.9, 7.68), (3.3, 2.7, 7.68)],
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
