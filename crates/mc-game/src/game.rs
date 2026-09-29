@@ -3705,6 +3705,12 @@ impl Game {
                 self.hear(p)
             }),
         );
+        // Warp: charges, jumps, rifts, stuns and dampeners (audio/warp.rs).
+        loops.extend(
+            capital
+                .warp
+                .tick(&self.view.frame, &self.blueprints, audio, |p| self.hear(p)),
+        );
         self.capital_sounds = capital;
         // Giant rotary guns' barrels turning (audio/titan.rs).
         loops.extend(self.giant_sounds.loops());
