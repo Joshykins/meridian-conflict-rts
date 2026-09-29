@@ -106,6 +106,9 @@
             "Heavy Twin Flak": "A twin flak turret beside each pod. Enough for a few gunships; against a real air wing the Behemoth wants escorts.",
         },
     ),
+    "aster_t1_sensor_ship": (
+        lore: "A light hull built round one great search radar, so the Reach's picture of the field travels with its army. It carries no guns; its crews say the dome is the weapon.",
+    ),
     "aster_t3_frigate": (
         lore: "The Reach's first heavy warship of the upper air: an armoured hull laid round a single gun, with its own search radar.",
         weapons: {
