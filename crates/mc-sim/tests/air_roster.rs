@@ -70,11 +70,13 @@ fn roster_is_tier_gated_and_every_aircraft_has_a_factory() {
     for bp in &w.blueprints.units {
         if let Some(builder) = &bp.builder {
             for id in &builder.builds {
-                // Experimentals (tech 4) are raised by combat engineers (tech 3).
+                // Experimentals (tech 4) are raised by combat engineers (tech 3), and so
+                // is the tech 4 economy (the Deep Core), which opens with tech 3.
                 let built = w.blueprints.unit(*id);
-                let experimental = built.categories & mc_data::cat::EXPERIMENTAL != 0;
+                let raised_by_tech_3 =
+                    built.categories & (mc_data::cat::EXPERIMENTAL | mc_data::cat::ECONOMY) != 0;
                 assert!(
-                    built.tech <= bp.tech || (experimental && bp.tech == 3),
+                    built.tech <= bp.tech || (raised_by_tech_3 && bp.tech == 3),
                     "{} builds {}",
                     bp.key,
                     w.blueprints.unit(*id).key
