@@ -7,10 +7,11 @@
 //! shader (after the numbers the CPU shares with the shaders, generated from
 //! `gpu_consts.rs`), and `bindings.wgsl` with `lights.wgsl` in front of those
 //! containing the line `//!use bindings`; then `habitat`, `desert`, `surface`,
-//! `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order.
+//! `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
+//! and `emp` (an EMP stun's look on a model) last.
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 9] = [
+pub(crate) const PRELUDES: [&str; 10] = [
     "common",
     "bindings",
     "surface",
@@ -20,6 +21,7 @@ pub(crate) const PRELUDES: [&str; 9] = [
     "desert",
     "warp_hull",
     "warp_puffs",
+    "emp",
 ];
 
 /// The prelude files' text.
@@ -32,6 +34,7 @@ pub(crate) struct Preludes {
     desert: String,
     warp_hull: String,
     warp_puffs: String,
+    emp: String,
 }
 
 impl Preludes {
@@ -47,6 +50,7 @@ impl Preludes {
             desert: read("desert"),
             warp_hull: read("warp_hull"),
             warp_puffs: read("warp_puffs"),
+            emp: read("emp"),
         }
     }
 
@@ -81,6 +85,10 @@ impl Preludes {
         }
         if uses("warp_puffs") {
             prelude = format!("{prelude}\n{}", self.warp_puffs);
+        }
+        // An EMP stun's look on a model (needs common).
+        if uses("emp") {
+            prelude = format!("{prelude}\n{}", self.emp);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

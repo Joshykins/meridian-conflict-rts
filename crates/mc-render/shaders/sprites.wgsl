@@ -441,6 +441,13 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             let flicker = 0.8 + 0.2 * sin((globals.camera.w - p.extras.x) * 67.0);
             out.color = vec3<f32>(0.48, 0.72, 1.0) * 9.0 * envelope * flicker;
             out.shape = vec2<f32>(-distance(head, tail), 3.0);
+        } else if (p.color & 0xFu) == FADE_BEAM_TETHER {
+            // A warp dampener's tether (renderer/damper_fx.rs): crimson lightning, a
+            // white-pink core, crackling as it holds.
+            let envelope = 1.0 - smoothstep(0.4, 1.0, age);
+            let flicker = 0.7 + 0.3 * sin((globals.camera.w - p.extras.x) * 71.0 + f32(instance));
+            out.color = vec3<f32>(1.0, 0.04, 0.16) * 8.0 * envelope * flicker;
+            out.shape = vec2<f32>(-distance(head, tail), 3.0);
         } else if (p.color & 0xFu) == 6u {
             // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
             // cooling through orange to a dull red before it goes out.
@@ -501,7 +508,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let p = projectiles[instance];
     // Lightning segments have their own soft caps. The ordinary shot-head sprite
     // would put a bead at every kink, turning dark as the light faded.
-    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u)) {
+    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER)) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;

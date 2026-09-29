@@ -316,6 +316,19 @@ shared! {
         pub const WARP_ARC: u32 = 47;
         /// A mote of charged light carried on `vel` and stopped by the air.
         pub const WARP_MOTE: u32 = 48;
+        /// A warp dampener's field edge (renderer/damper_fx.rs): a faint upright curtain
+        /// standing on the ground along `vel` (its run), `size` metres tall, coloured
+        /// `appearance.xyz` at strength `appearance.w`, swelling in and out over its life.
+        pub const VEIL: u32 = 50;
+    }
+
+    /// Colours of a fading beam (`ProjectileInstance::color` low bits under
+    /// `PROJECTILE_FADE_BEAM`; sprites.wgsl). The older ones are still spelled out in the
+    /// shader; new ones are declared here.
+    pub mod fade_beam as "FADE_BEAM_" {
+        /// A warp dampener's tether (renderer/damper_fx.rs): crimson lightning with a
+        /// white-pink core, crackling.
+        pub const TETHER: u32 = 10;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word
