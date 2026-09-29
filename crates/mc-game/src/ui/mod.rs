@@ -31,6 +31,7 @@ pub mod survival;
 pub mod teams;
 #[cfg(test)]
 pub(crate) mod test_maps;
+mod text_input;
 
 use crate::audio::{Audio, Sfx};
 use glam::Vec2;
@@ -915,6 +916,29 @@ impl<'a> Ui<'a> {
         out
     }
 
+    /// Keeps the pointer inside `r` for a panel drawn later over the others:
+    /// nothing asks for the pointer there until `release(id)`, and a press there
+    /// clicks nothing drawn under it. The panel itself draws after the release.
+    pub fn hold(&mut self, id: Id, r: Rect) {
+        let over = self.interactive
+            && r.contains(self.cursor - self.shift)
+            && self.mem.hot.is_none()
+            && self.mem.popup.is_none();
+        if over {
+            self.mem.hot = Some(id);
+            if self.input.pressed {
+                self.mem.active = Some(id);
+            }
+        }
+    }
+
+    /// Lets the panel that `hold` kept the pointer for have it.
+    pub fn release(&mut self, id: Id) {
+        if self.mem.hot == Some(id) {
+            self.mem.hot = None;
+        }
+    }
+
     // -- controls -----------------------------------------------------------------
 
     pub fn button(
@@ -1295,116 +1319,6 @@ impl<'a> Ui<'a> {
         (step, body.clicked)
     }
 
-    /// A single-line text field. Returns true when the text changed.
-    pub fn text_field(&mut self, id: Id, r: Rect, text: &mut String, max: usize) -> bool {
-        let res = self.interact(id, r, true);
-        if res.clicked {
-            self.mem.editing = Some(id);
-            self.audio.play(Sfx::Select);
-        } else if self.input.pressed && !res.hovered && self.mem.editing == Some(id) {
-            self.mem.editing = None;
-        }
-        let editing = self.mem.editing == Some(id);
-        if res.clicked || !editing {
-            // A click places the caret back at the end.
-            if self.mem.selected == Some(id) {
-                self.mem.selected = None;
-            }
-        }
-        let changed = editing && self.edit_text(id, text, max);
-        let focus = self.ease(id ^ 5, if editing { 1.0 } else { 0.0 }, 16.0);
-        self.fill(r, ink(0.55 + 0.2 * focus));
-        let selected = editing && self.mem.selected == Some(id) && !text.is_empty();
-        if selected {
-            let w = self.text_width(type_scale::VALUE, text);
-            self.fill(
-                Rect::new(r.x + 10.0, r.mid_y() - 11.0, w + 4.0, 22.0),
-                rgb(palette::ACCENT, 0.35),
-            );
-        }
-        self.frame(
-            r,
-            rgb(
-                if editing {
-                    palette::ACCENT
-                } else {
-                    palette::LINE
-                },
-                0.2 + 0.3 * res.glow + 0.5 * focus,
-            ),
-        );
-        let end = self.text(
-            r.x + 12.0,
-            r.mid_y(),
-            type_scale::VALUE,
-            rgb(palette::TEXT, 1.0),
-            text,
-        );
-        if editing && !selected && (self.time * 1.6).fract() < 0.55 {
-            self.fill(
-                Rect::new(end + 2.0, r.mid_y() - 8.0, 2.0, 16.0),
-                rgb(palette::ACCENT, 1.0),
-            );
-        }
-        changed
-    }
-
-    /// Applies this frame's keys to the field that has the keyboard: typing,
-    /// Backspace, and Ctrl+A/C/X/V. Returns true when the text changed.
-    fn edit_text(&mut self, id: Id, text: &mut String, max: usize) -> bool {
-        let fits = |ch: char| ch.is_ascii_graphic() || ch == ' ';
-        let mut all = self.mem.selected == Some(id);
-        let mut changed = false;
-        if self.input.key(Key::SelectAll) {
-            all = true;
-        }
-        // With nothing selected, Copy takes the whole field: it is one line with
-        // the caret always at its end.
-        if (self.input.key(Key::Copy) || (all && self.input.key(Key::Cut))) && !text.is_empty() {
-            if let Err(e) = crate::clipboard::copy(text) {
-                log::warn!("could not copy to the clipboard: {e}");
-            }
-        }
-        let paste = if self.input.key(Key::Paste) {
-            crate::clipboard::paste()
-        } else {
-            None
-        };
-        // What replaces a selection: a cut, a delete, or anything typed or pasted.
-        let incoming = self
-            .input
-            .typed
-            .chars()
-            .chain(paste.iter().flat_map(|p| p.chars()));
-        let mut incoming = incoming.filter(|&ch| fits(ch)).peekable();
-        if all
-            && (incoming.peek().is_some()
-                || self.input.key(Key::Cut)
-                || self.input.key(Key::Backspace))
-        {
-            changed |= !text.is_empty();
-            text.clear();
-            all = false;
-        } else if self.input.key(Key::Backspace) && text.pop().is_some() {
-            changed = true;
-        }
-        for ch in incoming {
-            if text.chars().count() >= max {
-                break;
-            }
-            text.push(ch);
-            changed = true;
-        }
-        self.mem.selected = all.then_some(id);
-        if self.input.key(Key::Enter) || self.input.key(Key::Escape) {
-            self.mem.editing = None;
-        }
-        if changed {
-            self.audio.play(Sfx::Tick);
-        }
-        changed
-    }
-
     /// Background and label shared by the option rows.
     fn row(&mut self, r: Rect, label: &str, hint: &str, glow: f32) {
         self.gradient_h(
@@ -1430,113 +1344,5 @@ impl<'a> Ui<'a> {
                 hint,
             );
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// One frame of a field that already has the keyboard.
-    fn edit(mem: &mut Memory, input: Input, text: &mut String) {
-        let mut o = Overlay::default();
-        let audio = Audio::silent();
-        let field = id("field", 0);
-        mem.editing = Some(field);
-        mem.begin_frame();
-        let mut ui = Ui::new(
-            &mut o,
-            &input,
-            mem,
-            &audio,
-            Vec2::new(1920.0, 1080.0),
-            1.0,
-            0.0,
-            0.016,
-        );
-        ui.text_field(field, Rect::new(100.0, 100.0, 400.0, 40.0), text, 8);
-    }
-
-    fn keys(keys: &[Key]) -> Input {
-        Input {
-            keys: keys.to_vec(),
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn select_all_is_replaced_by_typing_and_cleared_by_backspace() {
-        let mut mem = Memory::default();
-        let mut text = String::new();
-        edit(
-            &mut mem,
-            Input {
-                typed: "abc".into(),
-                ..Default::default()
-            },
-            &mut text,
-        );
-        assert_eq!(text, "abc");
-        edit(&mut mem, keys(&[Key::SelectAll]), &mut text);
-        // Selecting changes nothing until something replaces it.
-        edit(&mut mem, Input::default(), &mut text);
-        assert_eq!(text, "abc");
-        edit(
-            &mut mem,
-            Input {
-                typed: "xy".into(),
-                ..Default::default()
-            },
-            &mut text,
-        );
-        assert_eq!(text, "xy");
-        // The selection went with the replace: this appends.
-        edit(
-            &mut mem,
-            Input {
-                typed: "z".into(),
-                ..Default::default()
-            },
-            &mut text,
-        );
-        assert_eq!(text, "xyz");
-        edit(&mut mem, keys(&[Key::SelectAll]), &mut text);
-        edit(&mut mem, keys(&[Key::Backspace]), &mut text);
-        assert_eq!(text, "");
-    }
-
-    #[test]
-    fn a_click_in_the_field_drops_the_selection() {
-        let mut mem = Memory::default();
-        let mut text = "abc".to_owned();
-        edit(&mut mem, keys(&[Key::SelectAll]), &mut text);
-        edit(
-            &mut mem,
-            Input {
-                cursor: Vec2::new(200.0, 120.0),
-                down: true,
-                pressed: true,
-                ..Default::default()
-            },
-            &mut text,
-        );
-        edit(
-            &mut mem,
-            Input {
-                cursor: Vec2::new(200.0, 120.0),
-                released: true,
-                ..Default::default()
-            },
-            &mut text,
-        );
-        edit(
-            &mut mem,
-            Input {
-                typed: "d".into(),
-                ..Default::default()
-            },
-            &mut text,
-        );
-        assert_eq!(text, "abcd");
     }
 }

@@ -9,8 +9,10 @@ use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use glam::Vec2;
 use std::fmt::Write;
 
-/// Longest note, in characters.
-const NOTE_MAX: usize = 120;
+/// Longest note, in characters: room for a paragraph.
+const NOTE_MAX: usize = 2000;
+/// The note field grows with what is typed, from this many lines to this many.
+const NOTE_LINES: (usize, usize) = (2, 7);
 /// How long the result of a click stays under the button, in seconds.
 const SAID_FOR: f32 = 6.0;
 
@@ -28,6 +30,9 @@ pub struct IssueMark {
     /// Where the screenshot of the frame just marked goes, and whether the
     /// renderer has been asked for it yet.
     shot: Option<(std::path::PathBuf, bool)>,
+    /// What this card and the profiler under it covered last frame: they draw
+    /// over the rest of the HUD, and keep the pointer there (`Hud::debug_column`).
+    pub column: Rect,
 }
 
 impl IssueMark {
@@ -42,6 +47,11 @@ impl IssueMark {
             marks,
             ..Default::default()
         }
+    }
+
+    /// A note as if typed, for headless shots (`MERIDIAN_ISSUE_NOTE`).
+    pub fn stage_note(&mut self, note: &str) {
+        self.note = note.chars().take(NOTE_MAX).collect();
     }
 
     pub fn typing(&self) -> bool {
@@ -86,13 +96,15 @@ impl IssueMark {
             .as_ref()
             .filter(|(_, _, at)| ui.time - at < SAID_FOR)
             .cloned();
+        let field_h = ui.text_area_height(w - 24.0, &self.note, NOTE_LINES.0, NOTE_LINES.1);
         let r = Rect::new(
             corner.x - w,
             corner.y,
             w,
-            148.0 + if said.is_some() { 18.0 } else { 0.0 },
+            118.0 + field_h + if said.is_some() { 18.0 } else { 0.0 },
         );
-        ui.fill(r, ink(0.7));
+        // Near opaque: it draws over the deck and its chips.
+        ui.fill(r, ink(0.97));
         ui.frame(r, rgb(palette::LINE, 0.12));
         ui.section(r.x + 12.0, r.y + 14.0, w - 24.0, "Report");
 
@@ -133,16 +145,16 @@ impl IssueMark {
             }
         }
 
-        let field = Rect::new(r.x + 12.0, y + 20.0, w - 24.0, 30.0);
+        let field = Rect::new(r.x + 12.0, y + 20.0, w - 24.0, field_h);
         let note_id = id("issue-note", 0);
         // Enter in the field marks, as the button does.
         let entered = ui.mem.editing == Some(note_id) && ui.input.key(Key::Enter);
-        ui.text_field(note_id, field, &mut self.note, NOTE_MAX);
+        ui.text_area(note_id, field, &mut self.note, NOTE_MAX);
         self.typing = ui.mem.editing == Some(note_id);
         if self.note.is_empty() && !self.typing {
             ui.text(
                 field.x + 12.0,
-                field.mid_y(),
+                field.y + 17.5,
                 type_scale::VALUE,
                 rgb(palette::FAINT, 1.0),
                 "What's wrong? (optional)",

@@ -684,6 +684,10 @@ pub fn screenshot(
         hud.browse_range_subject();
     }
     hud.details_open = shot.details;
+    // `MERIDIAN_ISSUE_NOTE=TEXT`: the report card's note, typed.
+    if let Ok(note) = std::env::var("MERIDIAN_ISSUE_NOTE") {
+        hud.issues.stage_note(&note);
+    }
     // `MERIDIAN_FREE_CAMERA=guide|pill`: the panels folded away (Ctrl+Alt), with
     // the key guide open or folded to its pill.
     if let Ok(v) = std::env::var("MERIDIAN_FREE_CAMERA") {

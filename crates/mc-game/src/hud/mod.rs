@@ -548,23 +548,19 @@ impl Hud {
         } else {
             right_top
         };
-        if !view.show_profiler {
+        let report_top = if !view.show_profiler {
             // Opened, it starts where it belongs; it glides only as the camera changes.
             ui.snap(id("report-top", 0), goal);
+            self.issues.column = Rect::default();
+            None
         } else {
-            let top = ui.ease(id("report-top", 0), goal, 9.0);
-            // The report card first: the profiler can run off the bottom.
-            let r = self.issues.draw(ui, s, Vec2::new(w - EDGE, top));
-            self.claim(ui, r);
-            if let Some(mark) = self.issues.take_fresh() {
-                self.replay_bar.marked(mark);
+            // Drawn last, over the deck and its chips, but first to the pointer.
+            ui.hold(id("debug-column", 0), self.issues.column);
+            if !self.free.on && self.issues.column.h > 0.0 {
+                right_top = self.issues.column.bottom() + GAP;
             }
-            let r = profiler::draw(ui, s, Vec2::new(w - EDGE, r.bottom() + GAP));
-            self.claim(ui, r);
-            if !self.free.on {
-                right_top = r.bottom() + GAP;
-            }
-        }
+            Some(ui.ease(id("report-top", 0), goal, 9.0))
+        };
         let fold = self.fold_begin(ui, free_camera::Part::Right);
 
         // The minimap sits under the top bar on the right, and folds away.
@@ -771,6 +767,9 @@ impl Hud {
             self.claim(ui, r);
         }
         self.fold_end(ui, fold);
+        if let Some(top) = report_top {
+            self.debug_column(ui, s, top);
+        }
 
         silo::alerts(self, s);
         titan::alerts(self, ui, s, dt);
@@ -789,6 +788,22 @@ impl Hud {
         }
         ui.popups();
         std::mem::take(&mut self.actions)
+    }
+
+    /// The report card, then the profiler under it (it can run off the bottom),
+    /// in the right column from `top`, over whatever else is there.
+    fn debug_column(&mut self, ui: &mut Ui, s: &Scene, top: f32) {
+        ui.release(id("debug-column", 0));
+        let right = ui.size.x - EDGE;
+        let card = self.issues.draw(ui, s, Vec2::new(right, top));
+        self.claim(ui, card);
+        if let Some(mark) = self.issues.take_fresh() {
+            self.replay_bar.marked(mark);
+        }
+        let prof = profiler::draw(ui, s, Vec2::new(right, card.bottom() + GAP));
+        self.claim(ui, prof);
+        let x = card.x.min(prof.x);
+        self.issues.column = Rect::new(x, card.y, right - x, prof.bottom() - card.y);
     }
 
     /// The control groups that hold something, over the selection panel.

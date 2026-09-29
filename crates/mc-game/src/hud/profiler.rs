@@ -66,7 +66,8 @@ pub fn draw(ui: &mut Ui, s: &Scene, corner: Vec2) -> Rect {
 
     let (w, row_h) = (300.0, 15.0);
     let r = Rect::new(corner.x - w, corner.y, w, rows.len() as f32 * row_h + 34.0);
-    ui.fill(r, ink(0.7));
+    // Near opaque: it draws over the deck and its chips.
+    ui.fill(r, ink(0.97));
     ui.frame(r, rgb(palette::LINE, 0.12));
     ui.section(r.x + 12.0, r.y + 14.0, w - 24.0, "Performance");
     let mut y = r.y + 34.0;

@@ -160,6 +160,8 @@ MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the 
 1 a warhead launch, ground a titan's strike, reclaim the Reclaim order, warp a warp jump
 (each ship's exit in formation and the energy card).
 
+MERIDIAN_ISSUE_NOTE=TEXT with --screenshot: the F1 report card's note, as if typed.
+
 MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
 (default: the package version with -dev).
 ";
