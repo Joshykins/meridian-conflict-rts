@@ -36,9 +36,7 @@ mod raptor;
 mod shrike;
 
 pub(crate) use argus::NOZZLES as ARGUS_NOZZLES;
-pub(crate) use osprey::{
-    CRADLES as OSPREY_CRADLES, DRONE_NOZZLES, HOLD_CEILING as OSPREY_HOLD_CEILING,
-};
+pub(crate) use osprey::DRONE_NOZZLES;
 
 /// Loft rings for a hard-chined hull. Each station is x, then (half width, height)
 /// pairs from the keel up to the spine; `from..=to` picks the pairs, mirrored across
@@ -326,9 +324,21 @@ pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
 pub(crate) fn carrier(b: &mut MeshBuilder, _: u8) {
     osprey::build(b);
 }
+pub(crate) fn carrier_b(b: &mut MeshBuilder, _: u8) {
+    osprey::build_b(b);
+}
+pub(crate) fn carrier_c(b: &mut MeshBuilder, _: u8) {
+    osprey::build_c(b);
+}
 /// The Salvage Drone the Osprey fields ([`osprey::drone`]).
 pub(crate) fn drone(b: &mut MeshBuilder, _: u8) {
     osprey::drone(b);
+}
+pub(crate) fn drone_b(b: &mut MeshBuilder, _: u8) {
+    osprey::drone_b(b);
+}
+pub(crate) fn drone_c(b: &mut MeshBuilder, _: u8) {
+    osprey::drone_c(b);
 }
 /// The Kestrel: the tech 2 vector-thrust heavy gunship ([`kestrel`]).
 pub(crate) fn gunship(b: &mut MeshBuilder, _: u8) {

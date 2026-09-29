@@ -531,7 +531,7 @@ fn meshes_are_valid() {
                 );
                 assert!(
                     v.material <= material::LAST
-                        && (v.part <= part::CRADLE
+                        && (v.part <= part::HOLD_DOOR
                             || (part::RAM..=part::SILO_ROUND).contains(&v.part)
                             || (part::WALL_FIRST..part::WALL_FIRST + part::WALL_COUNT)
                                 .contains(&v.part)
@@ -1826,8 +1826,13 @@ fn aircraft_have_swept_wings_nozzle_origins_and_bounded_lods() {
 }
 
 #[test]
-fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
-    for key in ["gunship", "reclaim_carrier"] {
+fn vtol_pods_carry_their_nozzles() {
+    for key in [
+        "gunship",
+        "reclaim_carrier",
+        "reclaim_carrier~b",
+        "reclaim_carrier~c",
+    ] {
         let model = build_model(key).unwrap();
         let vtol = model.vtol.expect("VTOL pods");
         // Each pod's nozzle, lying along the hull (the rest pose).
@@ -1882,45 +1887,72 @@ fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
             assert!(near < 0.15, "{key}: nozzle {p} is {near} m from its pod");
         }
     }
-    // The hold: doors and cradles at the levels that draw them, and a drone in a
-    // cradle clear of the hold's sides.
-    let model = build_model("reclaim_carrier").unwrap();
-    for (level, lod) in model.lods.iter().take(2).enumerate() {
-        assert!(
-            lod.vertices.iter().any(|v| v.part == part::HOLD_DOOR),
-            "LOD{level}: no hold doors"
-        );
-    }
-    assert!(
-        model.lods[0]
+}
+
+/// Each Osprey (and each of its variants) grips a docked drone's lugs with a jaw over
+/// each, and the drones slung under the wing clear the hull, the nacelles and each other.
+#[test]
+fn osprey_pylons_grip_the_drones_lugs_and_the_flock_clears_the_airframe() {
+    use super::aster::air::osprey::{DOCK_Z, DRONE_HALF_WIDTH, LUG_TOP, LUG_X, PYLONS};
+    for key in ["reclaim_drone", "reclaim_drone~b", "reclaim_drone~c"] {
+        let drone = build_model(key).unwrap();
+        let mesh = &drone.lods[0];
+        let wide = mesh
             .vertices
             .iter()
-            .any(|v| v.part == part::CRADLE),
-        "no cradles"
-    );
-    let (cradles, ceiling) = super::carrier_cradles();
-    let drone = build_model("reclaim_drone").unwrap();
-    let half_width = drone.lods[0]
-        .vertices
-        .iter()
-        .map(|v| v.pos[1].abs())
-        .fold(0.0, f32::max);
-    let top = drone.lods[0]
-        .vertices
-        .iter()
-        .map(|v| v.pos[2])
-        .fold(0.0, f32::max);
-    for c in cradles {
+            .map(|v| v.pos[1].abs())
+            .fold(0.0, f32::max);
+        let top = mesh.vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
+        assert!(wide <= DRONE_HALF_WIDTH, "{key}: {wide} m wide a side");
         assert!(
-            c[1].abs() + half_width < super::aster::air::osprey::HOLD_HALF_WIDTH,
-            "a docked drone touches the hold's side"
+            (top - LUG_TOP).abs() < 0.01,
+            "{key}: its lugs are its top, not {top}"
+        );
+        for lx in LUG_X {
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .any(|v| (v.pos[0] - lx).abs() < 0.1 && (v.pos[2] - LUG_TOP).abs() < 0.01),
+                "{key}: no lug at {lx}"
+            );
+        }
+    }
+    // Everything of the airframe below the grip, where a drone hangs.
+    for key in ["reclaim_carrier", "reclaim_carrier~b", "reclaim_carrier~c"] {
+        let model = build_model(key).unwrap();
+        let mesh = &model.lods[0];
+        for p in PYLONS {
+            for side in [1.0, -1.0] {
+                let y = p[1] * side;
+                for lx in LUG_X {
+                    assert!(
+                        mesh.vertices
+                            .iter()
+                            .any(|v| (v.pos[0] - p[0] - lx).abs() < 0.15
+                                && (v.pos[1] - y).abs() < 0.2
+                                && (v.pos[2] - (DOCK_Z + LUG_TOP)).abs() < 0.1),
+                        "{key}: no jaw over the lug at ({}, {y})",
+                        p[0] + lx
+                    );
+                }
+                // The space a docked drone fills is empty of the airframe.
+                let clash = mesh.vertices.iter().find(|v| {
+                    (v.pos[0] - p[0]).abs() < 1.2
+                        && (v.pos[1] - y).abs() < DRONE_HALF_WIDTH
+                        && v.pos[2] < DOCK_Z + LUG_TOP - 0.2
+                });
+                assert!(
+                    clash.is_none(),
+                    "{key}: {clash:?} is where a drone hangs at {y}"
+                );
+            }
+        }
+        assert!(
+            PYLONS[1][1] - PYLONS[0][1] > DRONE_HALF_WIDTH * 2.0
+                && PYLONS[0][1] > DRONE_HALF_WIDTH + 1.0,
+            "drones side by side overlap"
         );
     }
-    // Stowed 0.7 m up (`drone_socket`), a drone's top is under the ceiling.
-    assert!(
-        0.7 + top <= ceiling + 0.15,
-        "a docked drone {top} tall sticks through the ceiling at {ceiling}"
-    );
 }
 
 #[test]

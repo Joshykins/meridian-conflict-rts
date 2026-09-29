@@ -162,11 +162,10 @@ pub mod part {
     /// `rig::SPIN` fan or turbine in one turns about the pod's own axis.
     pub const VTOL_FRONT: u32 = 5;
     pub const VTOL_REAR: u32 = 6;
-    /// A carrier's hold doors: two leaves hinged at the hold's sides that swing
-    /// down and out as the hold opens (`UnitInstance::deploy`).
+    /// A transport's hold doors, opened by `UnitInstance::deploy` (the Courier's plug
+    /// doors slide into its shoulders).
     pub const HOLD_DOOR: u32 = 7;
-    /// A carrier's drone cradles: lowered out of the hold with the flock.
-    pub const CRADLE: u32 = 8;
+    // retired: 8 (the Osprey's drone cradles)
     /// A core mine's pile driver: authored resting on the pipe string, hauled up and
     /// dropped along z on the mine's beat (`UnitInstance::gait`) by `Pit::stroke`.
     pub const RAM: u32 = 9;
@@ -763,12 +762,6 @@ pub use library::{
     all_model_keys, build_model, build_model_fitted, build_model_scaled, prop_model_key,
 };
 pub use thumbnail::{material_color, thumbnail, thumbnail_of};
-
-/// Where the Osprey's four Salvage Drones sit in its hold (x, y in model space) and
-/// the hold's ceiling they hang from; the sim's `drone_socket` says the same.
-pub fn carrier_cradles() -> ([[f32; 2]; 4], f32) {
-    (aster::air::OSPREY_CRADLES, aster::air::OSPREY_HOLD_CEILING)
-}
 
 /// Lamp fittings on a capital ship's hull (model space, +X forward, +Y left, metres) for
 /// the renderer's lamps (`renderer/capital_fx.rs`): landing floods, nav lights, strobes,

@@ -1387,15 +1387,6 @@ fn vs_main(in: VsIn) -> VsOut {
         // Courier stern bay plug doors slide into its shoulders.
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
         p.y += sign(p.y) * open * 14.2;
-    } else if (model.icon & 0x400000u) != 0u && in.part == 7u {
-        // The Osprey's hold doors: two leaves hinged at the hold's sides, on its floor
-        // (`osprey::HOLD_HALF_WIDTH`, `HOLD_FLOOR` + 0.06), that swing down and out to let
-        // the flock drop.
-        let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
-        let hinge = vec3<f32>(0.0, sign(p.y) * 2.55, 0.56);
-        let ang = sign(p.y) * open * 1.45;
-        p = rot_x(p - hinge, ang) + hinge;
-        n = rot_x(n, ang);
     } else if model.capital[6].w != 0.0 && in.part == 16u {
         // A lift ship's belly ramp, authored lying on the ground; it swings up about
         // its hinge at the back of the hold floor to close (`CapitalRig::ramp`,
@@ -1454,9 +1445,6 @@ fn vs_main(in: VsIn) -> VsOut {
         let phase = time * 0.65 * sign(p.y) + cy * 0.13;
         p = rot_x(p - c, phase) + c;
         n = rot_x(n, phase);
-    } else if (model.icon & 0x400000u) != 0u && in.part == 8u {
-        // The cradles lower the drones out of the hold (`air_support::drone_socket`).
-        p.z -= mix(e.prev_deploy, e.deploy, t) * 1.9;
     } else if (in.part == 5u || in.part == 6u) && model.vtol[0].w > 0.0 {
         let front = in.part == 5u;
         let fans = model.vtol[0].w > 1.5;

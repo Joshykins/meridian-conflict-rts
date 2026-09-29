@@ -1164,7 +1164,7 @@ impl Renderer {
                 | (bp.motion.is_some_and(|m| m.hover) as u32) << 19
                 | ((bp.visual.mesh == "assault_air") as u32) << 20
                 | ((bp.visual.mesh == "rotor_gunship") as u32) << 21
-                | ((bp.visual.mesh == "reclaim_carrier") as u32) << 22
+                // retired: 1 << 22 (the Osprey's hold doors)
                 // A ship: rides the swell, not the ground (`entity.wgsl`).
                 | (bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval) as u32) << 23
                 // Transport flight pitch; Bastion also has ramp/gear parts (`entity.wgsl`).
