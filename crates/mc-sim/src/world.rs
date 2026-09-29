@@ -345,6 +345,8 @@ impl World {
                 mass_demand: Fx::ZERO,
                 energy_demand: Fx::ZERO,
                 efficiency: Fx::ONE,
+                mass_spent: Fx::ZERO,
+                energy_spent: Fx::ZERO,
                 upkeep_efficiency: Fx::ONE,
                 build_speed: Fx::ONE,
                 mine_power: Fx::ONE,

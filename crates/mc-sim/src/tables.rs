@@ -803,6 +803,12 @@ pub struct Player {
     pub energy_income: Fx,
     pub mass_demand: Fx,
     pub energy_demand: Fx,
+    /// What was really spent last tick, in units per second: the demand as far as the
+    /// stall let it be paid. A stall of one resource holds back the other's spending too.
+    #[serde(default)]
+    pub mass_spent: Fx,
+    #[serde(default)]
+    pub energy_spent: Fx,
     /// Share of requested spending that was met last tick, zero to one.
     pub efficiency: Fx,
     /// Share of upkeep's energy that was met last tick.

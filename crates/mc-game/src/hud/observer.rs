@@ -2,7 +2,7 @@
 //! through, how the armies weigh against each other, and every commander's
 //! economy and forces, with a short history of their income.
 
-use super::economy_panel::mines_short;
+use super::economy_panel::{mines_short, shown_spend};
 use super::{whole, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
 use crate::audio::Sfx;
 use crate::sim_thread::PlayerStatus;
@@ -503,10 +503,28 @@ impl Hud {
             for (have, net, tone) in [
                 (
                     p.mass,
-                    p.mass_income + p.reclaim_income - p.mass_demand,
+                    p.mass_income + p.reclaim_income
+                        - shown_spend(
+                            p.mass,
+                            p.mass_income + p.reclaim_income,
+                            p.mass_demand,
+                            p.mass_spent,
+                            false,
+                        ),
                     MASS,
                 ),
-                (p.energy, p.energy_income - p.energy_demand, ENERGY),
+                (
+                    p.energy,
+                    p.energy_income
+                        - shown_spend(
+                            p.energy,
+                            p.energy_income,
+                            p.energy_demand,
+                            p.energy_spent,
+                            false,
+                        ),
+                    ENERGY,
+                ),
             ] {
                 ui.fill(Rect::new(x, y - 4.0, 3.0, 8.0), rgb(tone, alive));
                 let end = ui.text(
@@ -544,14 +562,26 @@ impl Hud {
                 p.mass,
                 p.mass_capacity,
                 p.mass_income + p.reclaim_income,
-                p.mass_demand,
+                shown_spend(
+                    p.mass,
+                    p.mass_income + p.reclaim_income,
+                    p.mass_demand,
+                    p.mass_spent,
+                    false,
+                ),
                 MASS,
             ),
             (
                 p.energy,
                 p.energy_capacity,
                 p.energy_income,
-                p.energy_demand,
+                shown_spend(
+                    p.energy,
+                    p.energy_income,
+                    p.energy_demand,
+                    p.energy_spent,
+                    false,
+                ),
                 ENERGY,
             ),
         ]

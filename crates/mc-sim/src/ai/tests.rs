@@ -949,6 +949,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
         .unwrap();
     // Short of power: a power site is the first thing an idle builder helps with.
     w.state.players[0].energy_demand = Fx::from_int(100);
+    w.state.players[0].energy_spent = Fx::from_int(100);
     let builder = spawn(&mut w, "aster_t1_engineer", 0, 1700, 800);
     let mut census = w.survey_own(0);
     census.sites = vec![site];
@@ -1392,6 +1393,7 @@ fn a_lesser_builder_helps_raise_a_big_plant_and_starts_no_small_one() {
     let pl = &mut w.state.players[0];
     pl.energy_income = Fx::from_int(100);
     pl.energy_demand = Fx::from_int(300);
+    pl.energy_spent = Fx::from_int(300);
     pl.energy_capacity = Fx::from_int(5000);
     pl.energy = Fx::from_int(3000);
     let start = FxVec2::from_ints(300, 300);
@@ -1428,6 +1430,19 @@ fn a_lesser_builder_helps_raise_a_big_plant_and_starts_no_small_one() {
     assert!(
         !out.iter()
             .any(|c| matches!(c, Command::Build { blueprint, .. } if *blueprint == small)),
+        "{out:?}"
+    );
+    // A mass stall asks for more energy than comes in, but pays out only a share of it
+    // and the store fills: that is no call for power.
+    let pl = &mut w.state.players[0];
+    pl.energy_income = Fx::from_int(2000);
+    pl.energy_demand = Fx::from_int(3000);
+    pl.energy_spent = Fx::from_int(500);
+    let out = run(&w, vec![plant]);
+    assert!(
+        !out.iter().any(
+            |c| matches!(c, Command::Assist { target, .. } if *target == w.state.units.id(plant))
+        ),
         "{out:?}"
     );
 }

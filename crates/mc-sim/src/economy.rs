@@ -378,9 +378,11 @@ impl World {
                 spent[p] = (Fx::ZERO, Fx::ZERO);
                 upkeep[p] = Fx::ZERO;
             }
+            let energy_spent = upkeep[p] * e + spent[p].1;
             pl.mass = (pl.mass + income[p].0 - spent[p].0).clamp(Fx::ZERO, capacity[p].0);
-            pl.energy = (pl.energy + income[p].1 - upkeep[p] * e - spent[p].1)
-                .clamp(Fx::ZERO, capacity[p].1);
+            pl.energy = (pl.energy + income[p].1 - energy_spent).clamp(Fx::ZERO, capacity[p].1);
+            pl.mass_spent = spent[p].0 * DT;
+            pl.energy_spent = energy_spent * DT;
             pl.mass_income = income[p].0 * DT;
             pl.reclaim_income = (pl.reclaimed_mass - pl.reclaimed_counted) * DT;
             pl.reclaimed_counted = pl.reclaimed_mass;

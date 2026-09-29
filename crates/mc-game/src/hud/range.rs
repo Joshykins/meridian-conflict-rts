@@ -4,7 +4,7 @@
 //! scenarios, each side's economy, the sky, and the range itself.
 //! Like the rest of the HUD it only reports what was asked for.
 
-use super::economy_panel::mines_short;
+use super::economy_panel::{mines_short, shown_spend};
 use super::{has_flag, Hud, HudAction, Scene, EDGE, ENERGY, GAP, MASS};
 use crate::audio::Sfx;
 use crate::game::Mode;
@@ -527,13 +527,19 @@ fn economy_page(
         .into_iter()
         .enumerate()
     {
-        let (have, cap, income, demand, reclaim) = status.map_or((0.0, 0.0, 0.0, 0.0, 0.0), |p| {
+        let (have, cap, income, spend, reclaim) = status.map_or((0.0, 0.0, 0.0, 0.0, 0.0), |p| {
             if n == 0 {
                 (
                     p.mass,
                     p.mass_capacity,
                     p.mass_income + p.reclaim_income,
-                    p.mass_demand,
+                    shown_spend(
+                        p.mass,
+                        p.mass_income + p.reclaim_income,
+                        p.mass_demand,
+                        p.mass_spent,
+                        free,
+                    ),
                     p.reclaim_income,
                 )
             } else {
@@ -541,7 +547,13 @@ fn economy_page(
                     p.energy,
                     p.energy_capacity,
                     p.energy_income,
-                    p.energy_demand,
+                    shown_spend(
+                        p.energy,
+                        p.energy_income,
+                        p.energy_demand,
+                        p.energy_spent,
+                        free,
+                    ),
                     0.0,
                 )
             }
@@ -557,13 +569,13 @@ fn economy_page(
                 &format!("reclaim +{reclaim:.1}"),
             );
         }
-        let net = income - if free { 0.0 } else { demand };
+        let net = income - spend;
         ui.text_right(
             x + w,
             y + 6.0,
             type_scale::MICRO,
             rgb(palette::DIM, 1.0),
-            &format!("{have:.0} / {cap:.0}    +{income:.1}  \u{2212}{demand:.1}  =  {net:+.1}/s"),
+            &format!("{have:.0} / {cap:.0}    +{income:.1}  \u{2212}{spend:.1}  =  {net:+.1}/s"),
         );
         let bar = Rect::new(x, y + 16.0, w, 3.0);
         ui.fill(bar, rgb(palette::LINE, 0.12));

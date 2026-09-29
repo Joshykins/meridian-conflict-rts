@@ -21,8 +21,10 @@ impl World {
         out: &mut Vec<Command>,
     ) {
         let pl = &self.state.players[player as usize];
-        let energy_short =
-            pl.energy_demand > pl.energy_income || pl.energy < pl.energy_capacity / 5;
+        // Short when the store really drains, not when builders merely ask for more
+        // than comes in: in a mass stall they get only a share of their energy and the
+        // store fills while the demand reads high.
+        let energy_short = pl.energy_spent > pl.energy_income || pl.energy < pl.energy_capacity / 5;
         let mass_rich = pl.mass > pl.mass_capacity * Fx::ratio(7, 10);
         let mass_income = pl.mass_income;
         let energy_income = pl.energy_income;

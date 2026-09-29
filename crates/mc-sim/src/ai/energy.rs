@@ -14,7 +14,8 @@ const BUILDER_DRAW: Fx = Fx::from_int(2);
 impl World {
     /// Energy a second the side draws with every factory and builder at work,
     /// plus the upkeep of everything it has standing or going up and the draw
-    /// of the upgrades running, and never less than what it asks for right now.
+    /// of the upgrades running, and never less than what it really spends right now
+    /// (not what it asks for: in a mass stall that is far more than it is paid).
     pub(super) fn energy_need(&self, player: u8) -> Fx {
         let units = &self.state.units;
         let mut need = Fx::ZERO;
@@ -36,7 +37,7 @@ impl World {
                 builder.power * self.product_draw(bp)
             };
         }
-        need.max(self.state.players[player as usize].energy_demand)
+        need.max(self.state.players[player as usize].energy_spent)
     }
 
     /// Mass a second `player`'s finished factories would spend with every
