@@ -3176,7 +3176,7 @@ impl Renderer {
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
         self.excavation_tick(units, time, camera);
-        self.bolt_rifle_tick(units, time);
+        self.bolt_rifle_tick(units, &frame.houses, time);
         self.arc_howitzer_tick(units, &frame.houses, time);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, &frame.houses, projectiles, time);

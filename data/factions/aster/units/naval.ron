@@ -166,28 +166,29 @@
         categories: ["Naval", "DirectFire", "AntiAir"],
         health: 12000,
         cost: (mass: 920, energy: 6440, time: 3000),
-        radius: 22, height: 12,
+        radius: 26.4, height: 14.4,
         vision: 800, radar: 1500, sonar: 900,
         motion: (layer: Naval, size: 3, speed: 24, accel: 8, turn: 34),
         weapons: [
-            // The twin rail gun forward, in a house of its own. It cannot bear astern. The
-            // Marlin is a small battleship: it reaches far past the other T2 hulls (the
-            // Leviathan's batteries reach 1400), with heavy, slow, accurate hits.
+            // The bolt rifle forward, in a house of its own: the Paladin's gun a size down
+            // (7.4 m of it). It lobs a little (`loft`), so it reaches over a headland or a
+            // ridge ashore. It cannot bear astern. The Marlin is a small battleship: it
+            // reaches far past the other T2 hulls, with heavy, slow hits.
             (
-                name: "Twin Rail Gun",
-                damage: 380, splash: 6, range: 1350, reload: 3.6, salvo: 2, salvo_delay: 0.15, speed: 1400, rail: true, trajectory: Direct,
-                turret_turn: 50, arc: 300, mount: true, pivot: (12.0, 0, 5.2), muzzle: (20.5, 0.5, 5.2),
-                muzzles: [(20.5, -0.5, 5.2), (20.5, 0.5, 5.2)], spread: 0.4,
-                targets: ["Land", "Naval"], color: Orange, flash: 3.0, impact: 2.8, shockwave: 0.6,
-                tracer: 0.75,
-                sounds: (fire: "aster_rail_cannon", impact: "aster_rail_impact", ground: "shell_heavy"),
+                name: "Bolt Rifle",
+                damage: 380, splash: 5, range: 1350, reload: 1.8, speed: 450, trajectory: Ballistic, loft: 1,
+                turret_turn: 50, arc: 300, mount: true, pivot: (14.4, 0, 6.24), muzzle: (23.28, 0, 6.24), spread: 1,
+                targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
+                tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16, arc_charge: 7.44,
+                flat_fire: true,
+                sounds: (fire: "aster_bolt_rifle_heavy", charge: "aster_bolt_rifle_heavy_charge", charge_time: 0.6, impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
             ),
             // Four bow tubes under the waterline.
             (
                 name: "Torpedo Tubes",
                 damage: 300, splash: 3, range: 650, reload: 6, speed: 50, trajectory: Direct,
                 salvo: 2, salvo_delay: 0.6,
-                muzzle: (16.0, 0, -1.2), muzzles: [(16.0, -0.8, -1.2), (16.0, 0.8, -1.2), (16.0, -0.8, -2.0), (16.0, 0.8, -2.0)],
+                muzzle: (19.2, 0, -1.44), muzzles: [(19.2, -0.96, -1.44), (19.2, 0.96, -1.44), (19.2, -0.96, -2.4), (19.2, 0.96, -2.4)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 2.2, shockwave: 0.6,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
@@ -195,8 +196,8 @@
             (
                 name: "Point Defence Gun",
                 damage: 22, range: 660, reload: 0.25, speed: 900, trajectory: Direct,
-                turret_turn: 220, mount: true, pivot: (-9.0, 0, 9.0), muzzle: (-7.0, 0.3, 9.2),
-                muzzles: [(-7.0, -0.3, 9.2), (-7.0, 0.3, 9.2)],
+                turret_turn: 220, mount: true, pivot: (-10.8, 0, 10.8), muzzle: (-8.4, 0.36, 11.04),
+                muzzles: [(-8.4, -0.36, 11.04), (-8.4, 0.36, 11.04)],
                 targets: ["Air"], color: Orange, tracer: 0.7, casings: 2.0,
                 sounds: (fire: "autocannon", impact: "shell_light"),
             ),
@@ -205,7 +206,7 @@
             (
                 name: "Interceptor Tubes",
                 damage: 1, range: 260, reload: 1.5, speed: 80, trajectory: Direct,
-                muzzle: (-14.0, 0, -1.0), muzzles: [(-14.0, -1.4, -1.0), (-14.0, 1.4, -1.0)],
+                muzzle: (-16.8, 0, -1.2), muzzles: [(-16.8, -1.68, -1.2), (-16.8, 1.68, -1.2)],
                 targets: ["Naval"], color: Orange, torpedo: true, intercepts: true,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
@@ -221,12 +222,12 @@
         categories: ["Naval", "AntiAir", "Intel"],
         health: 8500,
         cost: (mass: 900, energy: 6300, time: 3000),
-        radius: 22, height: 14,
+        radius: 26.4, height: 16.8,
         vision: 1000, radar: 2800,
         // Two interceptor lasers, one off the tower's front and one on the quarterdeck,
         // burn missiles inside this radius; each beam leaves the head nearer the missile.
         anti_missile: 320,
-        anti_missile_mounts: [(-7.2, 0.0, 12.6), (-18.3, 0.0, 5.0)],
+        anti_missile_mounts: [(-8.64, 0, 15.12), (-21.96, 0, 6)],
         economy: (energy_upkeep: 60),
         motion: (layer: Naval, size: 3, speed: 22, accel: 8, turn: 34),
         weapons: [
@@ -235,8 +236,8 @@
             (
                 name: "Vertical Missile Array",
                 damage: 110, splash: 5, range: 800, reload: 4, speed: 380, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (7.25, -2.25, 6.4),
-                muzzles: [(7.25, -2.25, 6.4), (7.25, -0.75, 6.4), (7.25, 0.75, 6.4), (7.25, 2.25, 6.4), (5.75, -2.25, 6.4), (5.75, -0.75, 6.4), (5.75, 0.75, 6.4), (5.75, 2.25, 6.4), (4.25, -2.25, 6.4), (4.25, -0.75, 6.4), (4.25, 0.75, 6.4), (4.25, 2.25, 6.4), (2.75, -2.25, 6.4), (2.75, -0.75, 6.4), (2.75, 0.75, 6.4), (2.75, 2.25, 6.4)],
+                turret_turn: 0, arc: 360, muzzle: (8.7, -2.7, 7.68),
+                muzzles: [(8.7, -2.7, 7.68), (8.7, -0.9, 7.68), (8.7, 0.9, 7.68), (8.7, 2.7, 7.68), (6.9, -2.7, 7.68), (6.9, -0.9, 7.68), (6.9, 0.9, 7.68), (6.9, 2.7, 7.68), (5.1, -2.7, 7.68), (5.1, -0.9, 7.68), (5.1, 0.9, 7.68), (5.1, 2.7, 7.68), (3.3, -2.7, 7.68), (3.3, -0.9, 7.68), (3.3, 0.9, 7.68), (3.3, 2.7, 7.68)],
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
                 intercept: 20, proximity: 7, salvo: 16, salvo_delay: 0.1, trail: true,
                 sounds: (fire: "missile_launch", impact: "shell_light"),
@@ -245,7 +246,7 @@
             (
                 name: "Deck Gun",
                 damage: 90, splash: 3, range: 650, reload: 1.5, speed: 450, trajectory: Direct,
-                turret_turn: 60, arc: 300, mount: true, pivot: (14.5, 0, 5.4), muzzle: (19.5, 0, 5.4),
+                turret_turn: 60, arc: 300, mount: true, pivot: (17.4, 0, 6.48), muzzle: (23.4, 0, 6.48),
                 targets: ["Land", "Naval"], color: Orange, flash: 2.0, impact: 1.6, shockwave: 0.3,
                 sounds: (fire: "cannon_heavy", impact: "shell_on_armour", ground: "shell_heavy"),
             ),
@@ -358,7 +359,7 @@
         weapons: [
             (
                 name: "Fore Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 2000, splash: 32, range_min: 150, range: 2520, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
                 turret_turn: 24, arc: 300, mount: true, pivot: (44.0, 0, 11.0), muzzle: (66.0, 0, 11.4),
                 muzzles: [(66.0, -3.4, 11.4), (66.0, 0, 11.4), (66.0, 3.4, 11.4)], spread: 3.5,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
@@ -368,7 +369,7 @@
             ),
             (
                 name: "Second Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 2000, splash: 32, range_min: 150, range: 2520, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
                 turret_turn: 24, arc: 300, mount: true, pivot: (24.0, 0, 14.6), muzzle: (46.0, 0, 15.0),
                 muzzles: [(46.0, -3.4, 15.0), (46.0, 0, 15.0), (46.0, 3.4, 15.0)], spread: 3.5,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
@@ -380,7 +381,7 @@
             // rests turned round to the stern.
             (
                 name: "Aft Battery",
-                damage: 2000, splash: 32, range_min: 150, range: 1800, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
+                damage: 2000, splash: 32, range_min: 150, range: 2520, reload: 12, salvo: 3, salvo_delay: 0, volley: true, speed: 300, trajectory: Ballistic, loft: 2,
                 turret_turn: 24, arc: 300, rear: true, mount: true, pivot: (-40.0, 0, 8.8), muzzle: (18.0, 0, 9.2),
                 muzzles: [(18.0, -3.4, 9.2), (18.0, 0, 9.2), (18.0, 3.4, 9.2)], spread: 3.5,
                 targets: ["Land", "Naval", "Structure"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,

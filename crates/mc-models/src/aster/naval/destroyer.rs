@@ -1,16 +1,17 @@
 //! Marlin: tech 2 destroyer. A 44 m hull, the Pike's bigger, meaner successor:
 //! a long low hull with a raked stem over a tiled sonar bulb that carries the
-//! four torpedo tube doors, a faceted twin rail-gun house forward with the blue
-//! accelerator glow along its rails, a stealth-sloped deckhouse with the bridge
+//! four torpedo tube doors, a faceted gunhouse forward carrying a bolt rifle (the
+//! Paladin's gun, a size down: `bolt_rifle`), a stealth-sloped deckhouse with the bridge
 //! band and a pyramidal mast with the search radar turning on top, low side
 //! exhausts, a hangar aft with a point-defence gun house on its roof, and the
 //! interceptor tubes on the quarterdeck: two steep launch tubes that run down
 //! through the deck to their doors in the hull bottom under the stern.
 //!
-//! Houses: 0 twin rail gun at (12, 0, 5.2); 2 point-defence gun at (-9, 0, 9).
+//! Houses: 0 bolt rifle at (12, 0, 5.2); 2 point-defence gun at (-9, 0, 9).
 //! Fixed: 1 torpedo tubes (16, ±0.8, -1.2 / -2.0) in the bulb; 3 interceptor
 //! tubes (-14, ±1.4, -1.0) under the quarterdeck.
 use super::*;
+use crate::aster::bolt_rifle::bolt_rifle;
 
 /// Stern first: a long lean hull, a flat run aft, the forefoot rising into a
 /// raked stem over the bulb.
@@ -26,11 +27,14 @@ const HULL: [Station; 9] = [
     station(21.8, 2.2, [2.6, 0.0], [3.2, 0.0], [4.45, 0.0]),
 ];
 
-/// The rail-gun house's yaw axis and trunnion (`pivot` in the unit file); its two
-/// barrels run at y ±GUN_Y to GUN_MUZZLE_X.
+/// The gun house's yaw axis and trunnion (`pivot` in the unit file, times the drawn
+/// scale); the bolt rifle runs level from its breech to `GUN_MUZZLE` (`muzzle`).
 const GUN: Vec3 = Vec3::new(12.0, 0.0, 5.2);
-const GUN_Y: f32 = 0.5;
-const GUN_MUZZLE_X: f32 = 20.5;
+const GUN_BREECH_X: f32 = 13.2;
+const GUN_MUZZLE: Vec3 = Vec3::new(19.4, 0.0, 5.2);
+/// Half the rifle housing's height: the Paladin's proportions (`r` 0.44 on a 4.1 m gun),
+/// so its firing sequence (`arc_charge`, the gun's drawn length) lies on the blades.
+const GUN_R: f32 = 0.66;
 /// The point-defence house's pivot, and where its barrels end (y ±0.3).
 const PD: Vec3 = Vec3::new(-9.0, 0.0, 9.0);
 const PD_MUZZLE: Vec3 = Vec3::new(-7.0, 0.3, 9.2);
@@ -234,8 +238,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         }
     });
 
-    // The rail-gun house: a dark ring on the deck, a faceted gunhouse turning on it,
-    // the twin accelerators and their mantlet elevating together.
+    // The gun house: a dark ring on the deck and, turning on it, the bolt rifle.
     b.paint(ACCENT);
     if !b.coarse() {
         b.prism(
@@ -247,75 +250,19 @@ pub(super) fn build(b: &mut MeshBuilder) {
         );
     }
     b.with_house(0, GUN, 0.9, |b| {
-        let house_x = GUN.x - 0.4;
-        b.paint(PLATING);
         if b.coarse() {
+            b.paint(PLATING);
             b.frustum_open(
-                v3(house_x, 0.0, gun_deck),
+                v3(GUN.x - 0.4, 0.0, gun_deck),
                 v2(4.4, 3.2),
                 v2(2.6, 1.9),
                 6.0 - gun_deck,
                 v2(-0.3, 0.0),
             );
-            b.paint(METAL);
-            for y in [-GUN_Y, GUN_Y] {
-                b.face(&[
-                    v3(13.6, y - 0.15, GUN.z),
-                    v3(GUN_MUZZLE_X, y - 0.12, GUN.z),
-                    v3(GUN_MUZZLE_X, y + 0.12, GUN.z),
-                    v3(13.6, y + 0.15, GUN.z),
-                ]);
-            }
-            return;
+        } else {
+            gun_house(b, gun_deck);
         }
-        b.at(v3(house_x, 0.0, 0.0), |b| {
-            b.loft_z(
-                &turret_plan(4.6, 3.3),
-                &[
-                    Section::new(gun_deck + 0.21, 0.95),
-                    Section::new(gun_deck + 0.75, 1.0),
-                    Section::scaled(6.0, 0.62, 0.6).shifted(-0.3, 0.0),
-                ],
-            );
-        });
-        b.with_recoil(|b| {
-            for y in [-GUN_Y, GUN_Y] {
-                rail_gun(
-                    b,
-                    v3(12.9, y, GUN.z),
-                    v3(GUN_MUZZLE_X, y, GUN.z),
-                    v2(0.13, 0.36),
-                    0.16,
-                    Emitter::Blue,
-                );
-            }
-            // One mantlet over both breeches.
-            b.paint(ACCENT);
-            b.block(v3(13.45, -1.05, GUN.z - 0.55), v3(14.3, 1.05, GUN.z + 0.55));
-            if b.fine() {
-                // The accelerator glow along the outside of each rail pair.
-                b.paint(GLOW);
-                for y in [-GUN_Y - 0.29, GUN_Y + 0.29] {
-                    b.beam(
-                        v3(16.0, y, GUN.z),
-                        v3(GUN_MUZZLE_X - 0.5, y, GUN.z),
-                        v2(0.04, 0.12),
-                        v2(0.04, 0.09),
-                    );
-                }
-            }
-        });
-        if b.fine() {
-            // A hatch on the roof, a vent at the back, the ranging optic on the front slope.
-            b.paint(ACCENT);
-            b.plate(v3(house_x - 0.6, 0.55, 6.0), v2(0.6, 0.5), 0.05, 0.02);
-            b.block(v3(house_x - 2.3, -0.55, 4.5), v3(house_x - 2.18, 0.55, 5.1));
-            b.paint(GLASS);
-            b.block(
-                v3(house_x + 1.35, -0.16, 5.85),
-                v3(house_x + 1.5, 0.16, 5.95),
-            );
-        }
+        bolt_rifle(b, v3(GUN_BREECH_X, 0.0, GUN.z), GUN_MUZZLE, GUN_R);
     });
 
     // The point-defence tub over the hangar, its gun house turning on the collar.
@@ -544,4 +491,35 @@ pub(super) fn build(b: &mut MeshBuilder) {
     );
     b.paint(ACCENT);
     b.mirror_y(|b| b.block(v3(-21.0, 0.8, qz), v3(-20.2, 0.95, qz + 1.1)));
+}
+
+/// The faceted gunhouse, the rifle's housing coming out of its front face through a
+/// dark mantlet; a hatch, a vent and the ranging optic on it.
+fn gun_house(b: &mut MeshBuilder, gun_deck: f32) {
+    let house_x = GUN.x - 0.4;
+    b.paint(PLATING);
+    b.at(v3(house_x, 0.0, 0.0), |b| {
+        b.loft_z(
+            &turret_plan(4.6, 3.3),
+            &[
+                Section::new(gun_deck + 0.21, 0.95),
+                Section::new(gun_deck + 0.75, 1.0),
+                Section::scaled(6.0, 0.62, 0.6).shifted(-0.3, 0.0),
+            ],
+        );
+    });
+    b.paint(ACCENT);
+    b.block(
+        v3(GUN_BREECH_X - 0.5, -1.0, GUN.z - 0.85),
+        v3(GUN_BREECH_X + 0.05, 1.0, GUN.z + 0.75),
+    );
+    if b.fine() {
+        b.plate(v3(house_x - 0.6, 0.55, 6.0), v2(0.6, 0.5), 0.05, 0.02);
+        b.block(v3(house_x - 2.3, -0.55, 4.5), v3(house_x - 2.18, 0.55, 5.1));
+        b.paint(GLASS);
+        b.block(
+            v3(house_x + 0.9, -1.05, 5.75),
+            v3(house_x + 1.05, -0.75, 5.85),
+        );
+    }
 }

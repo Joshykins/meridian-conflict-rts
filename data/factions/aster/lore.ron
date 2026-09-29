@@ -323,9 +323,9 @@
         lore: "A reclaim tower put to sea on two hulls. It draws what sank back up as it sails, out where no engineer can follow.",
     ),
     "aster_t2_destroyer": (
-        lore: "The fleet's workhorse. It hears dived hulls, shoots down the torpedoes they fire with torpedoes of its own, and its rail gun reaches further inland than any shore battery.",
+        lore: "The fleet's workhorse. It hears dived hulls, shoots down the torpedoes they fire with torpedoes of its own, and its bolt rifle lobs further inland than any shore battery.",
         weapons: {
-            "Twin Rail Gun": "A twin rail gun in the forward house. It cannot bear astern; the ship turns to bring it round.",
+            "Bolt Rifle": "The Paladin's bolt rifle a size smaller, in the forward house. It fires on a slight arc to clear a headland or a ridge ashore, and it cannot bear astern; the ship turns to bring it round.",
             "Torpedo Tubes": "Four bow tubes. The destroyer charges what it hears.",
             "Point Defence Gun": "A fast gun on the hangar roof that keeps aircraft off the ship.",
             "Interceptor Tubes": "Short torpedoes off the quarterdeck that run at torpedoes coming in and burst them.",

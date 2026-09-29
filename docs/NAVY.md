@@ -61,7 +61,7 @@ arcs. One umbrella does not cover both.
 
 ## Long guns need eyes
 
-The Leviathan shoots to 1,400 m and sees 400. It needs a Manta, a Swift, a buoy or a forward
+The Leviathan's batteries shoot to 2,520 m and it sees 1,440. It needs a Manta, a Swift, a buoy or a forward
 unit spotting for it. Killing the spotters blinds it.
 
 ## The wreck economy
@@ -79,7 +79,7 @@ sea after a battle pays for the battle.
 | Pike | 1 | Frigate | Deck gun, AA mount, radar. |
 | Barracuda | 1 | Attack submarine | Torpedoes, sonar. |
 | Trawler | 1 | Salvage boat | A mobile reclaim head, 600 m reach; works what it passes while it sails. |
-| Marlin | 2 | Destroyer | Long twin rail guns (1000 m, a small battleship), torpedo tubes, sonar, interceptor tubes, light AA. |
+| Marlin | 2 | Destroyer | A bolt rifle (the Paladin's gun a size down) that lobs a little over terrain, 1350 m (a small battleship); torpedo tubes, sonar, interceptor tubes, light AA. |
 | Manta | 2 | Air-defence cruiser | A 16-cell vertical missile array fired as one ripple, radar, missile interception, one light gun. |
 | Swordfish | 2 | Cruise-missile ship | Eight sea skimmers per salvo. No other weapon. |
 | Moray | 2 | Hunter-killer submarine | Six guided torpedo tubes, sonar; a deck gun that only works surfaced. |

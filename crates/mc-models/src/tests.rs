@@ -178,35 +178,30 @@ const BLUEPRINTS: &[Blueprint] = &[
     // no `part::TURRET`, so `hull_unit`. Muzzles are weapon 0's, as authored on the model
     // (a `rear` weapon's muzzles are given to the sim mirrored; here they are as drawn).
     hull_unit("reclaim_boat", 8.0, 6.0, 1, &[]),
-    hull_unit(
-        "destroyer",
-        22.0,
-        12.0,
-        2,
-        &[[20.5, -0.5, 5.2], [20.5, 0.5, 5.2]],
-    ),
+    // The Marlin and the Manta are drawn 1.2 times their authored size.
+    hull_unit("destroyer", 26.4, 14.4, 2, &[[23.28, 0.0, 6.24]]),
     hull_unit(
         "aa_cruiser",
-        22.0,
-        14.0,
+        26.4,
+        16.8,
         2,
         &[
-            [7.25, -2.25, 6.4],
-            [7.25, -0.75, 6.4],
-            [7.25, 0.75, 6.4],
-            [7.25, 2.25, 6.4],
-            [5.75, -2.25, 6.4],
-            [5.75, -0.75, 6.4],
-            [5.75, 0.75, 6.4],
-            [5.75, 2.25, 6.4],
-            [4.25, -2.25, 6.4],
-            [4.25, -0.75, 6.4],
-            [4.25, 0.75, 6.4],
-            [4.25, 2.25, 6.4],
-            [2.75, -2.25, 6.4],
-            [2.75, -0.75, 6.4],
-            [2.75, 0.75, 6.4],
-            [2.75, 2.25, 6.4],
+            [8.7, -2.7, 7.68],
+            [8.7, -0.9, 7.68],
+            [8.7, 0.9, 7.68],
+            [8.7, 2.7, 7.68],
+            [6.9, -2.7, 7.68],
+            [6.9, -0.9, 7.68],
+            [6.9, 0.9, 7.68],
+            [6.9, 2.7, 7.68],
+            [5.1, -2.7, 7.68],
+            [5.1, -0.9, 7.68],
+            [5.1, 0.9, 7.68],
+            [5.1, 2.7, 7.68],
+            [3.3, -2.7, 7.68],
+            [3.3, -0.9, 7.68],
+            [3.3, 0.9, 7.68],
+            [3.3, 2.7, 7.68],
         ],
     ),
     hull_unit(
@@ -400,6 +395,11 @@ const PROP_KEYS: &[&str] = &[
     "building_wide",
 ];
 
+/// The mesh a design variant (`mesh~name`) is drawn for: its rules are that mesh's.
+fn base_key(key: &str) -> &str {
+    key.split('~').next().unwrap_or(key)
+}
+
 fn built(bp: &Blueprint) -> Model {
     build_model_scaled(bp.mesh, bp.radius, bp.height, bp.tech)
         .unwrap_or_else(|| panic!("{} builds", bp.mesh))
@@ -580,7 +580,7 @@ fn meshes_are_valid() {
                 {
                     // A capital ship's keel, or a big submarine's hull, runs deep.
                     -12.0
-                } else if NAVAL_HULLS.contains(&model.key.as_str()) {
+                } else if NAVAL_HULLS.contains(&base_key(&model.key)) {
                     // Hulls float: the keel is under the waterline.
                     -4.5
                 } else if model.key == "sonar" {
@@ -809,7 +809,8 @@ fn lods_reduce_and_respect_budgets() {
             BATTLESHIP_TRIANGLES
         } else if CAPITAL_SHIPS.contains(&model.key.as_str()) {
             FACTORY_TRIANGLES
-        } else if WARSHIPS.contains(&model.key.as_str()) {
+        } else if WARSHIPS.contains(&base_key(&model.key)) {
+            // A design variant (`mesh~name`) has its hull's budget.
             WARSHIP_TRIANGLES
         } else {
             2600
@@ -2759,7 +2760,8 @@ fn carrier_houses_and_muzzles() {
     println!("carrier triangles {full}/{mid}/{coarse}, top {top:.1}, reach {reach:.1}");
 }
 
-/// The Marlin and the Manta: every gun house at its data pivot, every weapon's
+/// The Marlin and the Manta: every gun house at its data pivot (both drawn 1.2 times
+/// the size they are authored at, so the points below are scaled), every weapon's
 /// muzzles reached at every LOD they are drawn at (fixed launchers and the light
 /// mounts drop out of the coarse level), lit blue with nothing orange, team colour
 /// seen from above at every level, and inside the budgets and the fit.
@@ -2774,7 +2776,7 @@ fn marlin_and_manta_hulls() {
             12.0,
             &[(0, [12.0, 0.0, 5.2]), (2, [-9.0, 0.0, 9.0])],
             &[
-                ("rail", &[[20.5, -0.5, 5.2], [20.5, 0.5, 5.2]], true),
+                ("bolt rifle", &[[19.4, 0.0, 5.2]], true),
                 (
                     "tubes",
                     &[
@@ -2828,6 +2830,12 @@ fn marlin_and_manta_hulls() {
     for (key, radius, height, houses, weapons) in ships {
         let bp = BLUEPRINTS.iter().find(|bp| bp.mesh == key).unwrap();
         let model = built(bp);
+        let scale = bp.radius / radius;
+        assert!(
+            (bp.height / height - scale).abs() < 1e-3,
+            "{key}: drawn out of proportion"
+        );
+        let (radius, height) = (bp.radius, bp.height);
         assert_eq!(model.houses.len(), houses.len(), "{key}: gun houses");
         for (weapon, pivot) in houses {
             let house = model
@@ -2836,7 +2844,7 @@ fn marlin_and_manta_hulls() {
                 .find(|h| h.weapon == *weapon)
                 .expect("house per weapon");
             assert!(
-                Vec3::from(house.pivot).distance(Vec3::from(*pivot)) < 1e-3,
+                Vec3::from(house.pivot).distance(Vec3::from(*pivot) * scale) < 1e-3,
                 "{key}: house {weapon} pivot {:?}",
                 house.pivot
             );
@@ -2847,7 +2855,7 @@ fn marlin_and_manta_hulls() {
                     continue;
                 }
                 for muzzle in *list {
-                    let p = Vec3::from(*muzzle);
+                    let p = Vec3::from(*muzzle) * scale;
                     let nearest = mesh
                         .indices
                         .chunks(3)
@@ -2884,7 +2892,7 @@ fn marlin_and_manta_hulls() {
                 .iter()
                 .map(|v| v.pos[2])
                 .fold(f32::MAX, f32::min);
-            assert!(floor >= -4.5, "{key} lod{lod}: keel at {floor}");
+            assert!(floor >= -4.5 * scale, "{key} lod{lod}: keel at {floor}");
             assert!(
                 !mesh.vertices.iter().any(|v| v.part == part::TURRET),
                 "{key} lod{lod}: turret part"

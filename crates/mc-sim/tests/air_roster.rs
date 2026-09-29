@@ -756,11 +756,11 @@ fn manta_ripples_all_sixteen_cells_and_curves_while_accelerating() {
     assert_eq!(mouths.len(), 16);
     for (i, (x, y)) in mouths.iter().enumerate() {
         assert!(
-            (*x - (7.25 - 1.5 * (i / 4) as f32)).abs() < 0.02,
+            (*x - (8.7 - 1.8 * (i / 4) as f32)).abs() < 0.02,
             "{mouths:?}"
         );
         assert!(
-            (*y - (-2.25 + 1.5 * (i % 4) as f32)).abs() < 0.02,
+            (*y - (-2.7 + 1.8 * (i % 4) as f32)).abs() < 0.02,
             "{mouths:?}"
         );
     }

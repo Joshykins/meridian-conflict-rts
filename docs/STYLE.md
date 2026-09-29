@@ -339,6 +339,8 @@ blue only thin seams. The Paladin's is a sculpted housing with a plasma cell on
 its outboard flank feeding a slim core barrel, swept radiator blades along the
 core and a stepped, ported muzzle collar. The Raptor's is the fighter's cut:
 a dark core in a light sleeve cut on a slant, a dark cowl over its back.
+The Marlin carries the Paladin's gun a size down in its forward gun house, on a
+slight lob so it reaches over a headland.
 The Paladin's shoulder carries the gun back into itself: its armour hoods forward
 over the gun's housing on a slant, the gun's plasma cell runs on as a long canister
 down its outboard flank and the gun's seams run back along it. The whole shoulder

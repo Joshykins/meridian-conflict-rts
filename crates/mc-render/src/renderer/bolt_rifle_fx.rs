@@ -12,14 +12,15 @@
 //!   it hits are the ordinary ones (`plasma`, `discharge`).
 //!
 //! The arcs are laid a tick at a time on the gun as it is drawn then: the hull's place
-//! and heading, the torso's yaw and the arm's pitch about the weapon's `pivot`. They are
+//! and heading, the torso's yaw and the arm's pitch about the weapon's `pivot`, or, for a
+//! gun on a house of its own (the Marlin's), the house's yaw and pitch about it. They are
 //! lightning strokes among the bore's (`BoreFx::lightning`).
 
 use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_BOLT, PUFF_SPARK};
 use glam::Vec3;
 use mc_data::{BlueprintId, Weapon};
-use mc_sim::mirror::{SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK};
+use mc_sim::mirror::{HousePose, SimEvent, UnitInstance, KIND_GHOST, KIND_WRECK, UNIT_HOUSE_SHIFT};
 use std::f32::consts::{PI, TAU};
 
 /// Guns charging or cooling at once that get the sequence. A deliberate cosmetic cap: a
@@ -66,6 +67,8 @@ struct Gun {
 pub(super) struct BoltRifleFx {
     guns: Vec<Gun>,
     last: f32,
+    /// This tick's gun-house poses (`RenderFrame::houses`), for rifles on houses.
+    houses: Vec<HousePose>,
 }
 
 /// Where a rifle is in the world: its muzzle, along the bore, and the gun's left and up.
@@ -195,20 +198,26 @@ impl Renderer {
         }
     }
 
-    /// Where `u`'s rifle `w` is drawn `f` of the way through the tick.
-    fn rifle_frame(&self, u: &UnitInstance, w: &Weapon, f: f32) -> Frame {
+    /// Where `u`'s rifle `weapon` (`w`) is drawn `f` of the way through the tick.
+    fn rifle_frame(&self, u: &UnitInstance, weapon: u8, w: &Weapon, f: f32) -> Frame {
         let pos = Vec3::from(u.prev_pos).lerp(Vec3::from(u.pos), f);
         let heading = lerp_angle(u.prev_heading, u.heading, f);
-        let yaw = if w.turret_turn > 0 {
-            lerp_angle(u.prev_turret_yaw, u.turret_yaw, f)
-        } else {
-            0.0
+        // A gun on a house of its own (a warship's) has its pose in the houses list.
+        let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
+            .checked_sub(1)
+            .and_then(|i| self.bore_fx.rifles.houses.get(i as usize))
+            .filter(|_| w.mount)
+            .and_then(|h| h.pose.get(weapon as usize));
+        let yaw = match house {
+            Some(p) => lerp_angle(p[0], p[1], f),
+            None if w.turret_turn > 0 => lerp_angle(u.prev_turret_yaw, u.turret_yaw, f),
+            None => 0.0,
         };
         // The arm pitches the gun about its pivot (the shoulder), both guns together.
-        let pitch = if w.pivot.is_some() {
-            u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f
-        } else {
-            0.0
+        let pitch = match house {
+            Some(p) => p[2] + (p[3] - p[2]) * f,
+            None if w.pivot.is_some() => u.arm_pitch[0] + (u.arm_pitch[1] - u.arm_pitch[0]) * f,
+            None => 0.0,
         };
         let muzzle = Vec3::from(w.muzzle.to_f32());
         let pivot = w.pivot.map_or(muzzle, |p| Vec3::from(p.to_f32()));
@@ -220,8 +229,16 @@ impl Renderer {
             let (s, c) = a.sin_cos();
             Vec3::new(v.x * c - v.z * s, v.y, v.x * s + v.z * c)
         };
-        let place = |local: Vec3| pos + rot_z(pivot + rot_xz(local - pivot, pitch), yaw + heading);
-        let turn = |v: Vec3| rot_z(rot_xz(v, pitch), yaw + heading);
+        // A house turns about its own pivot; a torso about the unit's middle.
+        let place = |local: Vec3| {
+            let on_hull = if house.is_some() {
+                pivot + rot_z(rot_xz(local - pivot, pitch), yaw)
+            } else {
+                rot_z(pivot + rot_xz(local - pivot, pitch), yaw)
+            };
+            pos + rot_z(on_hull, heading)
+        };
+        let turn = |v: Vec3| rot_z(rot_z(rot_xz(v, pitch), yaw), heading);
         Frame {
             muzzle: place(muzzle),
             dir: turn(Vec3::X),
@@ -233,8 +250,15 @@ impl Renderer {
 
     /// Once a tick, before the bore's strokes are written: the next tick of every rifle's
     /// charge and of its seams cooling, on the gun as it is then.
-    pub(super) fn bolt_rifle_tick(&mut self, units: &[UnitInstance], time: f32) {
+    pub(super) fn bolt_rifle_tick(
+        &mut self,
+        units: &[UnitInstance],
+        houses: &[HousePose],
+        time: f32,
+    ) {
         let fx = &mut self.bore_fx.rifles;
+        fx.houses.clear();
+        fx.houses.extend_from_slice(houses);
         if time + 1.0 < fx.last {
             // The clock went back (a restaged backdrop).
             fx.guns.clear();
@@ -269,7 +293,7 @@ impl Renderer {
             let steps = ((until - from) / 0.05).ceil().max(1.0) as usize;
             for k in 0..steps {
                 let when = from + (until - from) * k as f32 / steps as f32;
-                let gun = self.rifle_frame(u, w, ((when - time) / tick).clamp(0.0, 1.0));
+                let gun = self.rifle_frame(u, weapon, w, ((when - time) / tick).clamp(0.0, 1.0));
                 if (start..end).contains(&when) {
                     let f = (when - start) / (end - start).max(0.01);
                     self.rifle_charge_step(&gun, f, when);

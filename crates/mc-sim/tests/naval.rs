@@ -789,3 +789,46 @@ fn a_submarine_holds_its_torpedoes_with_land_in_the_way() {
         "the tubes say they have no line of fire"
     );
 }
+
+#[test]
+fn a_destroyer_lobs_its_bolt_rifle_over_an_island() {
+    // The ridge stands 14 m out of the sea between them; a gun that shoots flat is blind.
+    let mut w = sea_with(false, ridge(34));
+    let frigate = spawn(&mut w, "aster_t1_frigate", 1, 1350, 1000, flag::PASSIVE);
+    let marlin = spawn(&mut w, "aster_t2_destroyer", 0, 900, 1000, 0);
+    let health = w.state.units.health[row(&w, frigate)];
+    let mut hits = 0;
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            match e {
+                SimEvent::Impact { on_unit: true, .. } => hits += 1,
+                SimEvent::Impact {
+                    on_unit: false,
+                    pos,
+                    ..
+                } => {
+                    assert!(
+                        pos.x > Fx::from_int(1152),
+                        "a bolt came down on the island at {pos:?}"
+                    );
+                }
+                _ => {}
+            }
+        }
+        if w.state.units.row(frigate).is_none() {
+            break;
+        }
+    }
+    assert!(hits >= 2, "the bolts reach the frigate behind the island");
+    assert!(w
+        .state
+        .units
+        .row(frigate)
+        .is_none_or(|r| w.state.units.health[r] < health));
+    assert_eq!(
+        w.state.units.shot_blocked[row(&w, marlin)] & 1,
+        0,
+        "the lobbed gun needs no line of sight"
+    );
+}

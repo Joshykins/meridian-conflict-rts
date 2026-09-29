@@ -17,11 +17,10 @@ pub(super) fn v2(x: f32, y: f32) -> Vec2 {
     Vec2::new(x, y)
 }
 
-/// The weapon highlight colour: blue for Aster energy weapons, orange for
-/// conventional ones, and none at all for a plain gun: a dark bore, nothing lit.
+/// The weapon highlight colour: orange for conventional weapons, or none at all for a
+/// plain gun: a dark bore, nothing lit.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Emitter {
-    Blue,
     Orange,
     Unlit,
 }
@@ -29,7 +28,6 @@ pub(super) enum Emitter {
 impl Emitter {
     pub(super) fn material(self) -> u32 {
         match self {
-            Emitter::Blue => GLOW,
             Emitter::Orange => GLOW_ORANGE,
             Emitter::Unlit => ACCENT,
         }
