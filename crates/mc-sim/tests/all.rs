@@ -21,6 +21,7 @@ mod build_line;
 mod citadel;
 mod combat;
 mod commander;
+mod corvette;
 mod crowd;
 mod culverin;
 mod deck_up;
