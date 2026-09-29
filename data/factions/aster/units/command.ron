@@ -151,7 +151,7 @@
                         categories: ["Artillery"],
                         weapons: [(
                             name: "Shoulder Howitzer", mount: true,
-                            damage: 420, splash: 14, range_min: 120, range: 900, reload: 8.0, speed: 200, trajectory: Ballistic, loft: 3,
+                            damage: 420, splash: 14, range_min: 120, range: 1900, reload: 8.0, speed: 200, trajectory: Ballistic, loft: 3,
                             turret_turn: 60, muzzle: (7.84, -4.96, 23.28), pivot: (0, -4.96, 23.28), spread: 1.5,
                             targets: ["Structure", "Land", "Naval"], color: Orange, shockwave: 0.7,
                             sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),

@@ -404,9 +404,11 @@
         cost: (mass: 1900, energy: 13500, time: 1600),
         radius: 10.5, height: 9, footprint: (2, 2),
         vision: 260,
+        // Reaches a little past the Trebuchet's 1800 m, so a mobile siege gun has to come
+        // into its fire to shell it; the commander's Shoulder Howitzer matches it.
         weapons: [(
             name: "Heavy Howitzer",
-            damage: 1100, splash: 32, range_min: 250, range: 1500, reload: 16.0, speed: 220, trajectory: Ballistic, loft: 3,
+            damage: 1100, splash: 32, range_min: 250, range: 1900, reload: 16.0, speed: 220, trajectory: Ballistic, loft: 3,
             turret_turn: 12, muzzle: (10.2, 0, 8.7), pivot: (-0.3, 0, 5.85), spread: 1.0,
             targets: ["Structure", "Land", "Naval"], color: Orange, shockwave: 1.0,
             sounds: (fire: "howitzer", impact: "shell_heavy", ground: "shell_heavy"),

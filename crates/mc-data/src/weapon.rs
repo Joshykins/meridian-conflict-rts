@@ -256,6 +256,31 @@ mod tests {
         }
         assert!(guns >= 5, "flak guns: {guns}");
     }
+
+    /// The Onager sits just out of a Trebuchet's reach, and the commander's Shoulder
+    /// Howitzer matches the Onager.
+    #[test]
+    fn the_onager_outranges_the_trebuchet_and_the_commander_matches_it() {
+        let bp =
+            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let reach = |key: &str| bp.unit(bp.id_of(key).unwrap()).weapons[0].range_max;
+        let onager = reach("aster_t2_artillery");
+        let trebuchet = reach("aster_t3_artillery");
+        assert!(onager > trebuchet, "{onager:?} vs {trebuchet:?}");
+        assert!(
+            onager <= trebuchet * Fx::ratio(6, 5),
+            "only slightly further"
+        );
+        let shoulder: Vec<Fx> = bp
+            .units
+            .iter()
+            .flat_map(|u| &u.weapons)
+            .filter(|w| w.name == "Shoulder Howitzer")
+            .map(|w| w.range_max)
+            .collect();
+        assert!(!shoulder.is_empty());
+        assert!(shoulder.iter().all(|&r| r == onager), "{shoulder:?}");
+    }
 }
 
 /// An Arc Howitzer's tube (`RawWeapon::howitzer`): metres from breech to muzzle, and half
