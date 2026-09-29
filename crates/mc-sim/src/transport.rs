@@ -112,8 +112,12 @@ impl World {
     }
 
     /// Target categories of `row` as it is now: a lift ship on the ground can be hit
-    /// by what hits land units, not only by anti-air.
+    /// by what hits land units, not only by anti-air; a drone on (or going up on) its
+    /// carrier by nothing, the carrier being the mark.
     pub(crate) fn target_layers(&self, row: usize) -> u32 {
+        if self.drone_seated(row) {
+            return 0;
+        }
         let bp = self.bp(row);
         let layers = bp.target_categories();
         if bp.is_capital_ship() && self.set_down(row) {
