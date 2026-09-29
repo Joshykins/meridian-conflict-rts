@@ -162,7 +162,9 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
     // Great-bore strikes: enemy, ours, allied, like warheads in flight.
     let team = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
     let tick = view.frame.tick as i64;
-    let mut sides: [Vec<(f32, Vec2, bool, f32, &str)>; 3] = Default::default();
+    // (seconds left, centre, still charging, radius, the gun's name), per side.
+    type Strike<'a> = (f32, Vec2, bool, f32, &'a str);
+    let mut sides: [Vec<Strike>; 3] = Default::default();
     for st in titans.strikes.iter().filter(|st| marks::shown(view, st)) {
         let side = if !view.observing && team(st.owner) != team(view.local) {
             0
