@@ -1480,3 +1480,54 @@ fn an_engineer_goes_up_a_tier_once_the_side_has_it() {
     }
     assert!(w.engineer_to_upgrade(0).is_none());
 }
+
+#[test]
+fn a_builder_joins_the_same_building_going_up_rather_than_start_a_second() {
+    let mut w = world_of(512);
+    let a = spawn(&mut w, "aster_t1_engineer", 0, 320, 320);
+    let b = spawn(&mut w, "aster_t1_engineer", 0, 340, 320);
+    let sparrow = w.blueprints.id_of("aster_t1_aa").unwrap();
+    let spot = FxVec2::from_ints(400, 360);
+    let census = w.survey_own(0);
+    let intel = Intel::default();
+    // One ordered this think: the second builder choosing a Sparrow goes to the same lot.
+    let ordered = [(sparrow, spot, AI_BUILD_HEADING)];
+    let join = w.join_same_build(b, sparrow, &census, &intel, &ordered);
+    assert!(
+        matches!(join, Some(Command::Build { blueprint, pos, .. }) if blueprint == sparrow && pos == spot),
+        "{join:?}"
+    );
+    // Another building is not joined.
+    let power = w.blueprints.id_of("aster_t1_power").unwrap();
+    assert!(w
+        .join_same_build(b, power, &census, &intel, &ordered)
+        .is_none());
+    // A plan the other builder is walking to is joined too.
+    w.apply_command(&PlayerCommand {
+        player: 0,
+        command: Command::Build {
+            units: vec![w.state.units.id(a)],
+            blueprint: sparrow,
+            pos: spot,
+            heading: AI_BUILD_HEADING,
+            queue: false,
+        },
+    })
+    .unwrap();
+    let planned: Vec<_> = w.planned_sites(0).map(|(_, o)| o.pos).collect();
+    let join = w.join_same_build(b, sparrow, &census, &intel, &[]);
+    assert!(
+        matches!(join, Some(Command::Build { pos, .. }) if planned.contains(&pos)),
+        "{join:?}"
+    );
+    // A Sparrow already begun is helped.
+    let site = w.spawn_unit(sparrow, 0, spot, Angle::ZERO, false).unwrap();
+    let mut census = w.survey_own(0);
+    census.sites = vec![site];
+    let join = w.join_same_build(b, sparrow, &census, &intel, &[]);
+    let target = w.state.units.id(site);
+    assert!(
+        matches!(join, Some(Command::Assist { target: t, .. }) if t == target),
+        "{join:?}"
+    );
+}

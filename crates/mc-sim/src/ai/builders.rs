@@ -47,6 +47,8 @@ impl World {
         idle.sort_by_key(|&r| (std::cmp::Reverse(self.builder_tech(r)), r));
         let best = self.best_builder_tech(player);
         let power_wanted = energy_short || pl.energy_income < census.energy_need;
+        // Builds ordered this think: a second builder choosing the same one joins it.
+        let mut ordered: Vec<(BlueprintId, FxVec2, Angle)> = Vec::new();
         for &row in idle.iter().take(skill.builders_per_think) {
             // A lesser builder helps raise the side's plants rather than starting
             // a small one of its own (`choose_job`).
@@ -119,6 +121,12 @@ impl World {
             );
             match job {
                 Some(job) => {
+                    if let Some(join) =
+                        self.join_same_build(row, job.blueprint, census, intel, &ordered)
+                    {
+                        out.push(join);
+                        continue;
+                    }
                     let bp = self.blueprints.unit(job.blueprint).clone();
                     let site = match job.place {
                         Place::Around => self.find_site(
@@ -179,15 +187,17 @@ impl World {
                         } else if bp.has(cat::SHIELD) || bp.has(cat::ARTILLERY) {
                             planned.guards.push(site);
                         }
+                        let heading = if bp.is_structure() {
+                            AI_BUILD_HEADING
+                        } else {
+                            job.heading
+                        };
+                        ordered.push((job.blueprint, site, heading));
                         out.push(Command::Build {
                             units: vec![self.state.units.id(row)],
                             blueprint: job.blueprint,
                             pos: site,
-                            heading: if bp.is_structure() {
-                                AI_BUILD_HEADING
-                            } else {
-                                job.heading
-                            },
+                            heading,
                             queue: false,
                         });
                     }
@@ -278,6 +288,60 @@ impl World {
                 }
             }
         }
+    }
+
+    /// Help with a `blueprint` already on its way up rather than start a second
+    /// one beside it: two engineers each on a Sparrow of their own finish both
+    /// late, where together they finish one in half the time and then the next.
+    /// A site begun, a plan another builder is walking to, or one ordered this
+    /// think, nearest first. Mines are each on a deposit of their own.
+    pub(super) fn join_same_build(
+        &self,
+        row: usize,
+        blueprint: BlueprintId,
+        census: &Census,
+        intel: &Intel,
+        ordered: &[(BlueprintId, FxVec2, Angle)],
+    ) -> Option<Command> {
+        if self.blueprints.unit(blueprint).mine.is_some() {
+            return None;
+        }
+        let units = &self.state.units;
+        let pos = units.pos[row];
+        let open = |p: FxVec2| self.within_reach(row, p) && !intel.danger.hot(p);
+        let begun = census
+            .sites
+            .iter()
+            .copied()
+            .filter(|&s| units.blueprint[s] == blueprint && open(units.pos[s]))
+            .min_by_key(|&s| (units.pos[s].distance_sq(pos), s));
+        if let Some(site) = begun {
+            return Some(Command::Assist {
+                units: vec![units.id(row)],
+                target: units.id(site),
+                queue: false,
+            });
+        }
+        let player = units.owner[row];
+        let planned = self
+            .planned_sites(player)
+            .filter(|(r, o)| *r != row && o.blueprint == blueprint)
+            .map(|(_, o)| (o.pos, o.heading))
+            .chain(
+                ordered
+                    .iter()
+                    .filter(|(b, ..)| *b == blueprint)
+                    .map(|&(_, p, h)| (p, h)),
+            )
+            .filter(|&(p, _)| open(p))
+            .min_by_key(|(p, _)| (p.distance_sq(pos), p.x, p.y))?;
+        Some(Command::Build {
+            units: vec![units.id(row)],
+            blueprint,
+            pos: planned.0,
+            heading: planned.1,
+            queue: false,
+        })
     }
 
     /// The nearest engineer of `row`'s side at work on its own upgrade, within reach.
