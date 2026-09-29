@@ -190,8 +190,5 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 4 anti-ship rail cannon (`zenith::ZENITH_RAIL` holds its barrel anchors).
     ModelDef::new("anti_ship_rail", 46.0, 86.0, zenith::zenith),
     // The tech 2 warp dampener (a 4x4 lot), its field emitter at the top centre.
-    ModelDef::new("warp_damper", 18.0, 46.0, warp_damper::gyre),
-    ModelDef::new("warp_damper~a", 18.0, 46.0, warp_damper::gyre),
-    ModelDef::new("warp_damper~b", 18.0, 46.0, warp_damper::spire),
-    ModelDef::new("warp_damper~c", 18.0, 46.0, warp_damper::talon),
+    ModelDef::new("warp_damper", 18.0, 46.0, warp_damper::spire),
 ];
