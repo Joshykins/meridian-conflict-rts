@@ -29,9 +29,11 @@ target it, but a blast on the water over it (a shell, a bomb) reaches down onto 
 Three escorts, none complete:
 
 - The **Marlin** (destroyer) carries interceptor tubes: a torpedo coming in is met by a
-  short torpedo of its own, and both burst under the water. It stops nothing else.
-- The **Manta** (air-defence cruiser) burns missiles inside its radius, the Argus's
-  interceptor at sea. It stops no shell and no torpedo.
+  short torpedo of its own, and both burst under the water. It stops nothing else. The
+  **Moray** carries a pair astern too, for its own hull.
+- The **Manta** (air-defence cruiser) burns missiles inside a 600 m radius with two lasers,
+  so it screens the ships around it, the Argus's interceptor at sea. It stops no shell and
+  no torpedo.
 - The **Nautilus** (shield boat) puts a bubble over the ships around it: shells and both
   kinds of missile break on it. Torpedoes run under the skirt.
 
@@ -81,10 +83,10 @@ sea after a battle pays for the battle.
 | Pike | 1 | Frigate | Deck gun, AA mount, radar. |
 | Barracuda | 1 | Attack submarine | Torpedoes, sonar. |
 | Trawler | 1 | Salvage boat | A mobile reclaim head, 600 m reach; works what it passes while it sails. |
-| Marlin | 2 | Destroyer | A bolt rifle (the Paladin's gun a size down) that lobs a little over terrain, 1350 m (a small battleship); torpedo tubes, sonar, interceptor tubes, light AA. |
-| Manta | 2 | Air-defence cruiser | A 16-cell vertical missile array fired as one ripple to 1,600 m (past any flak gun, short of the Skyguard), spread over the fliers in range; radar, missile interception, one light gun. |
+| Marlin | 2 | Destroyer | A bolt rifle (the Paladin's gun a size down) that lobs a little over terrain, 1500 m (a small battleship); torpedo tubes, sonar, interceptor tubes, light AA. |
+| Manta | 2 | Air-defence cruiser | A 16-cell vertical missile array fired as one ripple to 1,850 m (past any flak gun, short of the Skyguard), spread over the fliers in range; radar, two missile-interception lasers screening 600 m around it, one light gun. |
 | Swordfish | 2 | Cruise-missile ship | Eight sea skimmers per salvo. No other weapon. |
-| Moray | 2 | Hunter-killer submarine | Six guided torpedo tubes, sonar; a deck gun that only works surfaced. |
+| Moray | 2 | Hunter-killer submarine | Six guided torpedo tubes, sonar, stern interceptor tubes; a deck gun that only works surfaced. |
 | Nautilus | 2 | Shield boat | A bubble over the fleet. Unarmed. |
 | Leviathan | 3 | Battleship | Three triple turrets of heavy guns, secondary guns, weak AA. The hero. |
 | Atoll | 3 | Air-defence carrier | Twelve hatched long-range SAM cells (2,800 m), fleet radar (4,000 m), interceptor tubes. No gun. |
