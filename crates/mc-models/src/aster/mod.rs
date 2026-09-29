@@ -11,7 +11,6 @@ mod airbase;
 mod assault_tank;
 mod bolt_rifle;
 mod bore_tank;
-mod capacitor;
 mod citadel;
 mod culverin;
 mod drone_port;
@@ -29,6 +28,7 @@ mod parts;
 mod reactor;
 pub(super) mod reclaim_tower;
 mod reclaimers;
+mod storage;
 mod strategic;
 mod structures;
 pub(super) mod titan;
@@ -151,12 +151,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::tiered(
         "storage_mass",
         [(16.5, 8.0), (16.5, 13.0), (16.5, 19.0)],
-        structures::storage_mass,
+        storage::vault::storage_mass,
     ),
     ModelDef::tiered(
         "storage_energy",
-        capacitor::SIZES,
-        capacitor::storage_energy,
+        storage::bank::SIZES,
+        storage::bank::storage_energy,
     ),
     ModelDef::new("turret", 7.0, 9.0, structures::turret),
     ModelDef::new("turret_heavy", 14.0, 13.0, structures::turret_heavy),

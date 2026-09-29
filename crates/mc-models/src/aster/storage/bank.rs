@@ -8,14 +8,14 @@
 
 use glam::Vec3;
 
-use super::parts::*;
-use super::structures::kit;
+use super::super::parts::*;
+use super::super::structures::kit;
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
 use crate::pattern;
 
 /// Authored (radius, height) per tier.
-pub(super) const SIZES: [(f32, f32); 3] = [(14.0, 10.0), (14.0, 14.0), (14.0, 19.0)];
+pub(in crate::aster) const SIZES: [(f32, f32); 3] = [(14.0, 10.0), (14.0, 14.0), (14.0, 19.0)];
 
 /// Where the cells stand: three along x, one row each side of the bus bar.
 const CELL_X: f32 = 6.4;
@@ -124,7 +124,7 @@ fn bus(b: &mut MeshBuilder, a: Vec3, bb: Vec3, size: glam::Vec2) {
 /// end, fed from the bus bar, lit up its face and lamped on top; tech 3 adds a
 /// sloped battery rack down each flank and a box girder across the tower heads that
 /// carries the charge over the bank.
-pub(super) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
+pub(in crate::aster) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
     bank(b);
     if b.coarse() {
         if tech >= 2 {
