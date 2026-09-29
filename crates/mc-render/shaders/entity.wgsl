@@ -1494,7 +1494,7 @@ fn vs_main(in: VsIn) -> VsOut {
         p = posed[0];
         n = posed[1];
     } else if (model.icon & 0x2000000u) != 0u && in.part == 7u {
-        // Courier stern bay plug doors slide into its shoulders.
+        // Courier stern bay plug doors, and the skylight leaves over the bay, slide into its shoulders.
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
         p.y += sign(p.y) * open * 14.2;
     } else if model.capital[6].w != 0.0 && in.part == 16u {
