@@ -1,12 +1,10 @@
-//! Mines on a coast. The sea pays nothing, so the sim lets a mine on the shore reach
-//! further (`OreGrid::coastal_reach`) and its territory wraps round the coast; the
-//! survey draws that territory on the land only, its edge following the shoreline.
+//! Mines on a coast. The sea pays nothing, so the survey draws a mine's territory on
+//! the land only, its edge following the shoreline.
 
 use super::mine_marks::{overview_height, TERRITORY_SEGMENTS};
 use super::Scene;
 use glam::Vec2;
-use mc_core::{Fx, FxVec2};
-use mc_sim::mines::{OreGrid, COAST_REACH};
+use mc_sim::mines::OreGrid;
 use std::collections::BTreeMap;
 use std::f32::consts::TAU;
 
@@ -16,21 +14,14 @@ const STEP: f32 = 12.0;
 /// pointer has stood with one in hand.
 const MOST_SITES: usize = 512;
 
-/// A mine's ground as the survey draws it.
-struct Coast {
-    /// How far it works the land.
-    reach: f32,
-    /// Metres out along each of the territory's rays (`mine_marks::territory`) to
-    /// the first sea; unbounded for a mine that stands in the sea.
-    shore: Vec<f32>,
-}
-
-/// The map rasterised as the sim counts it, and each mine site's coast, worked out
-/// once: they only change with where a mine stands and its reach.
+/// The map rasterised as the sim counts it, and each mine site's shore, worked out
+/// once: it only changes with where a mine stands and its reach.
 #[derive(Default)]
 pub struct Survey {
     grid: Option<OreGrid>,
-    sites: BTreeMap<(u32, u32, u32), Coast>,
+    /// Metres out along each of the territory's rays (`mine_marks::territory`) to the
+    /// first sea, by site and reach; unbounded for a mine that stands in the sea.
+    shores: BTreeMap<(u32, u32, u32), Vec<f32>>,
 }
 
 impl Survey {
@@ -43,30 +34,8 @@ impl Survey {
         })
     }
 
-    fn coast(&mut self, s: &Scene, at: Vec2, reach: f32) -> &Coast {
-        let key = (at.x.to_bits(), at.y.to_bits(), reach.to_bits());
-        if !self.sites.contains_key(&key) {
-            if self.sites.len() >= MOST_SITES {
-                self.sites.clear();
-            }
-            let fx = FxVec2::new(Fx::from_f32(at.x), Fx::from_f32(at.y));
-            let land = self.grid(s).coastal_reach(fx, Fx::from_f32(reach)).to_f32();
-            let coast = Coast {
-                reach: land,
-                shore: shore(s, at, reach * COAST_REACH.0 as f32 / COAST_REACH.1 as f32),
-            };
-            self.sites.insert(key, coast);
-        }
-        &self.sites[&key]
-    }
-
-    /// How far a mine at `at` with `reach` works the land, as the sim has it.
-    pub(super) fn reach(&mut self, s: &Scene, at: Vec2, reach: f32) -> f32 {
-        self.coast(s, at, reach).reach
-    }
-
     /// `outline` (a territory round `at`, one point a ray) cut back to the shore
-    /// wherever the sea comes in first. `reach` is the blueprint's.
+    /// wherever the sea comes in first.
     pub(super) fn on_land(
         &mut self,
         s: &Scene,
@@ -74,10 +43,16 @@ impl Survey {
         reach: f32,
         outline: Vec<Vec2>,
     ) -> Vec<Vec2> {
-        let shore = &self.coast(s, at, reach).shore;
+        let key = (at.x.to_bits(), at.y.to_bits(), reach.to_bits());
+        if !self.shores.contains_key(&key) {
+            if self.shores.len() >= MOST_SITES {
+                self.shores.clear();
+            }
+            self.shores.insert(key, shore(s, at, reach));
+        }
         outline
             .into_iter()
-            .zip(shore)
+            .zip(&self.shores[&key])
             .map(|(p, &land)| {
                 let d = p - at;
                 at + d.normalize_or_zero() * d.length().min(land)

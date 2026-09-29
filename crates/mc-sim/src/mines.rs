@@ -12,12 +12,6 @@
 //! pays more than spreading them out. The tiers are the investment: upgrading raises what
 //! each hectare gives, not the reach.
 //!
-//! The sea pays nothing, so a mine on the shore reaches further: its circle grows
-//! until it holds as much land as a whole circle of its reach inland would, up to
-//! [`COAST_REACH`] of it (`OreGrid::coastal_reach`), and its territory wraps round the
-//! coast instead of losing half its ground to the water. A mine out at sea keeps its
-//! reach: it lives on its shaft and on the ore under the water.
-//!
 //! Ore lies deep (`OreRegion::depth`). A new mine sinks its main shaft
 //! straight down at [`SHAFT_SPEED`], and when the shaft reaches a field's
 //! depth it drives a drift out to it at [`DRIFT_SPEED`]; a field's ore pays
@@ -44,8 +38,6 @@ pub const SHAFT_SPEED: i32 = 4;
 pub const DRIFT_SPEED: i32 = 12;
 /// Metres a second the land a mine works spreads out from it.
 pub const SPREAD_SPEED: i32 = 10;
-/// How far past its reach a mine on a coast may work the land, as a fraction of it.
-pub const COAST_REACH: (i64, i64) = (8, 5);
 /// The share of its output a mine still makes with none of its energy upkeep
 /// paid, as a fraction: enough to climb out of a stall, never to live on.
 pub const UNPOWERED: (i64, i64) = (1, 4);
@@ -64,12 +56,6 @@ pub struct MineState {
     pub rings: Vec<Fx>,
     /// Ticks since it was finished. Kept through an upgrade.
     pub age: u32,
-    /// How far it works the land ([`OreGrid::coastal_reach`]), and the blueprint reach
-    /// that was worked out from: counted again when a tier changes it.
-    #[serde(default)]
-    pub reach: Fx,
-    #[serde(default)]
-    pub reach_of: Fx,
 }
 
 /// An ore field a mine draws on.
@@ -179,8 +165,6 @@ impl Mines {
         h.write_u64(self.by_unit.len() as u64);
         for (id, m) in &self.by_unit {
             h.write_u64(id.0 as u64 | (m.age as u64) << 32);
-            h.write_i64(m.reach.0);
-            h.write_i64(m.reach_of.0);
             let l = &m.land;
             for v in [
                 l.ground,
@@ -313,43 +297,6 @@ impl OreGrid {
             land_w,
             land_h,
         }
-    }
-
-    /// How far a mine at `pos` with `reach` works the land: `reach`, or on a coast
-    /// further, until its circle holds as much land as a whole circle of `reach`
-    /// would, never past [`COAST_REACH`] of it. A mine standing in the sea keeps `reach`,
-    /// and the map's edge takes nothing from what it is owed.
-    pub fn coastal_reach(&self, pos: FxVec2, reach: Fx) -> Fx {
-        let (cx, cy) = (
-            pos.x.floor_int() / GROUND_CELL_M,
-            pos.y.floor_int() / GROUND_CELL_M,
-        );
-        if self.land.is_empty() || !self.is_land(cx, cy) {
-            return reach;
-        }
-        let most = reach * Fx::ratio(COAST_REACH.0, COAST_REACH.1);
-        let (reach_sq, most_sq) = (reach * reach, most * most);
-        let r = most.ceil_int() / GROUND_CELL_M + 1;
-        let mut want = 0usize;
-        let mut land = Vec::new();
-        for y in cy - r..=cy + r {
-            for x in cx - r..=cx + r {
-                let at = FxVec2::new(cell_centre(x, GROUND_CELL_M), cell_centre(y, GROUND_CELL_M));
-                let d = at.distance_sq(pos);
-                // Off the map is no coast: only the map's own ground is owed.
-                let on_map = x >= 0 && y >= 0 && x < self.land_w && y < self.land_h;
-                want += (on_map && d <= reach_sq) as usize;
-                if d <= most_sq && self.is_land(x, y) {
-                    land.push(d.0);
-                }
-            }
-        }
-        if land.len() < want {
-            return most;
-        }
-        // Equal distances are equal numbers: an unstable sort orders them the same.
-        land.sort_unstable();
-        Fx(land[want.max(1) - 1]).sqrt().max(reach)
     }
 
     fn is_land(&self, x: i32, y: i32) -> bool {
@@ -525,15 +472,8 @@ impl World {
             m.age = m.age.saturating_add(1);
         }
         for row in units.slots.iter() {
-            let Some(spec) = self.blueprints.unit(units.blueprint[row]).mine else {
-                continue;
-            };
-            if units.is_active(row) {
-                let m = mines.entry(units.id(row)).or_default();
-                if m.reach_of != spec.reach {
-                    m.reach_of = spec.reach;
-                    m.reach = self.ore.coastal_reach(units.pos[row], spec.reach);
-                }
+            if units.is_active(row) && self.blueprints.unit(units.blueprint[row]).mine.is_some() {
+                mines.entry(units.id(row)).or_default();
             }
         }
         let placed = self.mine_sites(None);
@@ -579,11 +519,12 @@ impl World {
         self.state
             .mines
             .by_unit
-            .iter()
-            .filter(|&(&id, _)| Some(id) != except)
-            .filter_map(|(&id, m)| {
+            .keys()
+            .filter(|&&id| Some(id) != except)
+            .filter_map(|&id| {
                 let row = units.row(id)?;
-                Some((id, units.pos[row], m.reach))
+                let reach = self.bp(row).mine?.reach;
+                Some((id, units.pos[row], reach))
             })
             .collect()
     }
@@ -594,14 +535,13 @@ impl World {
         let Some(m) = bp.mine else {
             return Share::default();
         };
-        let reach = self.ore.coastal_reach(pos, m.reach);
         let others: Vec<(FxVec2, Fx)> = self
             .mine_sites(None)
             .into_iter()
-            .filter(|&(_, p, r)| p.distance(pos) < reach + r)
+            .filter(|&(_, p, r)| p.distance(pos) < m.reach + r)
             .map(|(_, p, r)| (p, r))
             .collect();
-        self.ore.share(pos, reach, &others)
+        self.ore.share(pos, m.reach, &others)
     }
 
     /// Mines' output for this tick: into `income` (per player, per tick) and each mine's flow.
