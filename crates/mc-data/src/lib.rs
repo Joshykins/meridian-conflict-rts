@@ -1095,14 +1095,18 @@ impl Blueprints {
             }
         }
         // Standing energy draw is for powered systems only (the user's rule): a shield,
-        // a radar or sonar, or a mine's dig. Guns, launchers, missile defence and
-        // reclaim (not even a tower's) run free; they cost energy to build, not to keep.
+        // a radar or sonar, a warp dampener's field, or a mine's dig. Guns, launchers,
+        // missile defence and reclaim (not even a tower's) run free; they cost energy to
+        // build, not to keep.
         for u in &units {
-            let powered =
-                u.radar > Fx::ZERO || u.sonar > Fx::ZERO || u.shield.is_some() || u.mine.is_some();
+            let powered = u.radar > Fx::ZERO
+                || u.sonar > Fx::ZERO
+                || u.shield.is_some()
+                || u.warp_damper.is_some()
+                || u.mine.is_some();
             if u.economy.energy_upkeep > Fx::ZERO && !powered {
                 return Err(DataError::Invalid(format!(
-                    "{}: only a shield, radar, sonar or mine draws energy upkeep",
+                    "{}: only a shield, radar, sonar, warp dampener or mine draws energy upkeep",
                     u.key
                 )));
             }
