@@ -65,6 +65,7 @@ mod shield;
 mod site_map;
 mod skyguard;
 mod straight_moves;
+mod stranded_ships;
 mod stream;
 mod survival;
 mod titan;

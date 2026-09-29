@@ -64,6 +64,12 @@ impl World {
                             spacing * (i / cols - cols / 2),
                         );
                         let p = self.clamp_to_map(*pos + offset);
+                        // A hull put down where it cannot stand (a ship on a headland
+                        // or in a shallow) goes on the nearest ground it can.
+                        let p = bp
+                            .motion
+                            .and_then(|m| self.nav.nearest_passable(m.layer, m.size_class, p))
+                            .unwrap_or(p);
                         rows.push(self.spawn_unit(*blueprint, *owner, p, *heading, true)?);
                     }
                 }

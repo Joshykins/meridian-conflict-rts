@@ -9,9 +9,10 @@
 
 use crate::wire::{Reader, Writer};
 use crate::{
-    Cell, CellRect, MoveLayer, PathError, SizeClass, BUILD_CELLS, MAX_MAP_CELLS, SECTOR_CELLS,
+    Cell, CellRect, MoveLayer, PathError, SizeClass, BUILD_CELLS, CELL_SIZE, MAX_MAP_CELLS,
+    SECTOR_CELLS,
 };
-use mc_core::FxVec2;
+use mc_core::{Fx, FxVec2};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -456,9 +457,14 @@ impl NavGrid {
         true
     }
 
-    /// Closest cell to `pos` that `size` fits on, searching Chebyshev rings out
-    /// to `max_radius_cells` (capped at `MAX_NEAREST_RADIUS`). The first ring
-    /// with a hit wins; within it the smallest squared distance, then y, then x.
+    /// Closest cell to `pos` that `size` fits on, by the distance from `pos` to
+    /// the cell's centre, out to `max_radius_cells` Chebyshev rings (capped at
+    /// `MAX_NEAREST_RADIUS`). Ties go to the lower y, then the lower x.
+    ///
+    /// A hit in ring `r` is not yet the answer: a cell straight across in ring
+    /// `r + 1` can be nearer than one on ring `r`'s diagonal. The search goes on
+    /// until no further ring can hold a nearer centre, so a ship put down on a
+    /// headland takes the sea beside it, not a pond on the diagonal.
     pub fn nearest_passable(
         &self,
         layer: MoveLayer,
@@ -467,9 +473,21 @@ impl NavGrid {
         max_radius_cells: i32,
     ) -> Option<Cell> {
         let origin = Cell::from_pos(pos);
+        // `pos` stands in its own cell, however far it is from the centre.
+        if self.is_passable(layer, size, origin) {
+            return Some(origin);
+        }
         let max_r = max_radius_cells.clamp(0, MAX_NEAREST_RADIUS);
-        for r in 0..=max_r {
-            let mut best: Option<(i64, Cell)> = None;
+        let mut best: Option<(i64, Cell)> = None;
+        for r in 1..=max_r {
+            if let Some((d, _)) = best {
+                // `pos` is within half a cell of the origin cell's centre, so no
+                // centre on ring `r` is nearer than this.
+                let reach = i64::from(r * CELL_SIZE - CELL_SIZE / 2) << (Fx::FRAC_BITS - 8);
+                if reach * reach >= d {
+                    break;
+                }
+            }
             let mut visit = |c: Cell| {
                 if self.is_passable(layer, size, c) {
                     let d = c.center() - pos;
@@ -480,23 +498,16 @@ impl NavGrid {
                     }
                 }
             };
-            if r == 0 {
-                visit(origin);
-            } else {
-                for i in -r..=r {
-                    visit(Cell::new(origin.x + i, origin.y - r));
-                    visit(Cell::new(origin.x + i, origin.y + r));
-                }
-                for i in (1 - r)..r {
-                    visit(Cell::new(origin.x - r, origin.y + i));
-                    visit(Cell::new(origin.x + r, origin.y + i));
-                }
+            for i in -r..=r {
+                visit(Cell::new(origin.x + i, origin.y - r));
+                visit(Cell::new(origin.x + i, origin.y + r));
             }
-            if let Some((_, c)) = best {
-                return Some(c);
+            for i in (1 - r)..r {
+                visit(Cell::new(origin.x - r, origin.y + i));
+                visit(Cell::new(origin.x + r, origin.y + i));
             }
         }
-        None
+        best.map(|(_, c)| c)
     }
 
     /// Marks a structure footprint impassable on every layer. Cells already
@@ -1010,6 +1021,29 @@ mod tests {
         assert_eq!(
             g.nearest_passable(MoveLayer::Naval, SizeClass::SMALL, inside, 40),
             Some(Cell::new(32, 5))
+        );
+    }
+
+    #[test]
+    fn nearest_passable_is_nearest_not_first_ring() {
+        // Water on ring 3's diagonal (34 m away) and straight across on ring 4 (32 m).
+        let g = NavGrid::from_fn(64, 64, |x, y| {
+            if (x, y) == (13, 13) || (x, y) == (10, 14) {
+                DEEP
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
+        let from = Cell::new(10, 10).center();
+        assert_eq!(
+            g.nearest_passable(MoveLayer::Naval, SizeClass::SMALL, from, 8),
+            Some(Cell::new(10, 14))
+        );
+        // Out of reach is still out of reach.
+        assert_eq!(
+            g.nearest_passable(MoveLayer::Naval, SizeClass::SMALL, from, 3),
+            Some(Cell::new(13, 13))
         );
     }
 }

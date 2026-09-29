@@ -64,6 +64,7 @@ pub mod slots;
 pub mod spatial;
 mod standing;
 pub mod state_hash;
+mod stranded;
 pub mod survival;
 pub mod tables;
 mod target_pick;

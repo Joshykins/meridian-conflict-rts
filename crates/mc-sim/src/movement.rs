@@ -1215,6 +1215,7 @@ impl World {
         // A strider stands wherever it can put its feet: structures are under it, not round it.
         let standing_on_blocked =
             !motion.stride && !self.nav.passable(motion.layer, motion.size_class, pos);
+        let stranded = standing_on_blocked.then(|| self.stranded(row, pos, radius, motion));
         let moving = units.flags[row] & flag::HAS_FIELD != 0 && units.flags[row] & flag::HOLD == 0;
         let goal = formation.map(|f| f.goal).unwrap_or(units.move_goal[row]);
         let to_goal = goal - pos;
@@ -1229,16 +1230,8 @@ impl World {
 
         let mut dir = FxVec2::ZERO;
         let mut waiting = false;
-        if standing_on_blocked {
-            // A structure was placed on top of us: walk out the short way.
-            if let Some(s) = self.index.nearest(pos, radius, kind::UNIT, |e| {
-                self.unit_entry_is_current(e) && self.bp(e.row as usize).is_structure()
-            }) {
-                dir = (pos - s.pos).normalize();
-            }
-            if dir == FxVec2::ZERO {
-                dir = FxVec2::from_angle(units.heading[row]);
-            }
+        if let Some(stranded) = stranded {
+            dir = stranded.dir;
         } else if moving {
             if motion.layer == MoveLayer::Air
                 || motion.stride
@@ -1416,6 +1409,9 @@ impl World {
             step
         } else if docking {
             to_goal.normalize() * (out.speed / DT).min(dist)
+        } else if let Some(out_to) = stranded.and_then(|s| s.to) {
+            // Straight for the way out, whatever the hull is facing.
+            dir * (out.speed / DT).min(pos.distance(out_to))
         } else {
             FxVec2::from_angle(out.heading) * (out.speed / DT)
         };
@@ -1438,7 +1434,10 @@ impl World {
                 if motion.stride {
                     return self.stride_footing(p);
                 }
-                standing_on_blocked || self.nav.passable(motion.layer, motion.size_class, p)
+                if self.nav.passable(motion.layer, motion.size_class, p) {
+                    return true;
+                }
+                stranded.is_some_and(|s| s.may_step(motion, pos, p))
             };
             let full = clamp(pos + step);
             let slide_x = clamp(pos + FxVec2::new(step.x, Fx::ZERO));
