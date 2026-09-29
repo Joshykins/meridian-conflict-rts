@@ -187,6 +187,11 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
         let r = d.a.z;
         let kind = d.a.w;
         let rel = xy - d.a.xy;
+        if kind == KIND_BLAST && dot(rel, rel) > r * r * 36.0 {
+            // Outside six radii both Gaussian influences are below 1e-8.
+            // Avoid evaluating blast noise over the entire million-texel field.
+            continue;
+        }
         let dist = length(rel);
         if kind == KIND_BLAST {
             // A pressure front running out from the blast: it throws the cloud

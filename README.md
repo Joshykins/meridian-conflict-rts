@@ -32,12 +32,32 @@ for developers using their own Vulkan SDK.
 detail and cloud resolution into presets. Changes apply immediately in the menu
 and in a match, and are saved for the next launch.
 
-| Preset | Render scale | Anti-aliasing | Scenery | Clouds |
-|---|---|---|---|---|
-| Low | 50% | Off | Least detail | Quarter resolution |
-| Balanced | 75% | SMAA | Reduced distant detail | Quarter resolution |
-| High | 100% | SMAA | Full detail | Third resolution |
-| Ultra | 150% | SMAA | Finer geometry | Half resolution |
+| Preset | Render scale | Anti-aliasing | Scenery | Clouds | Shading |
+|---|---|---|---|---|---|
+| Low | 50% | Off | Least detail | Quarter resolution | Simple |
+| Balanced | 75% | SMAA | Reduced distant detail | Quarter resolution | Simple |
+| High | 100% | SMAA | Full detail | Third resolution | Full |
+| Ultra | 150% | SMAA | Finer geometry | Half resolution | Full |
+
+Simple shading keeps material colours, normal maps, weather and shadows, but uses
+one terrain texture patch instead of three anti-tiling patches, hardware shadow
+filtering instead of nine taps, and refreshes one quarter of the cloud-shadow
+field per frame. Full shading retains the original detail. These paths work on
+all supported GPUs; existing Low/Balanced settings gain the cheaper shading on
+next launch without resetting preferences.
+
+The performance suite also runs natively on macOS and Linux:
+
+```bash
+PERF_SIZE=2560x1600 PERF_FOLLOW=60 \
+PERF_ENV="MERIDIAN_RENDER_SCALE=0.5 MERIDIAN_AA=off MERIDIAN_PROP_DETAIL=6,4,8 MERIDIAN_CLOUD_RES=4 MERIDIAN_SIMPLE_SHADING=1" \
+scripts/perf-suite.sh artifacts/perf-mac battle_mid
+```
+
+It saves images, logs and CPU/GPU timing reports. `PERF_EXE=/absolute/path/to/meridian`
+skips building and uses that binary; omit it to build through `play.sh`. Compare
+runs at the same size, camera and settings with other GPU applications idle.
+Headless captures take environment overrides, independently of saved settings.
 
 New Mac settings default to Balanced; other platforms default to High. Existing
 saved render scale and anti-aliasing choices are preserved. Adjusting either

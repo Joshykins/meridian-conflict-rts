@@ -36,8 +36,8 @@ impl Quality {
 
     pub fn description(self) -> &'static str {
         match self {
-            Self::Low => "Less scenery, low clouds",
-            Self::Balanced => "Reduced scenery, low clouds",
+            Self::Low => "Simple shading, less scenery",
+            Self::Balanced => "Simple shading, reduced scenery",
             Self::High => "Full scenery, medium clouds",
             Self::Ultra => "Fine scenery, high clouds",
         }
@@ -69,6 +69,7 @@ impl Quality {
         mc_render::SceneQuality {
             prop_detail,
             cloud_divisor,
+            simple_shading: matches!(self, Self::Low | Self::Balanced),
         }
     }
 }
@@ -128,6 +129,18 @@ mod tests {
             settings.apply_quality(quality);
             assert_eq!(settings.quality_label(), quality.label());
         }
+    }
+
+    #[test]
+    fn existing_low_settings_gain_simple_shading_without_changing_resolution() {
+        let mut settings: Settings = ron::from_str("(quality: Low, render_scale: 0.75)").unwrap();
+        assert!(settings.quality.scene().simple_shading);
+        assert_eq!(settings.render_scale, 0.75);
+        assert_eq!(settings.quality_label(), "Custom");
+        settings.apply_quality(Quality::High);
+        assert!(!settings.quality.scene().simple_shading);
+        settings.apply_quality(Quality::Balanced);
+        assert!(settings.quality.scene().simple_shading);
     }
 
     #[test]

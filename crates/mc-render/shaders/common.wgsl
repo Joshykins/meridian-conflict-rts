@@ -78,7 +78,7 @@ struct Globals {
     climate: vec4<f32>,
     // Prop detail (renderer `PropDetail`): x the smallest a prop is drawn at (pixels
     // of radius), y scales the LOD thresholds for props, z the smallest a prop casts
-    // a shadow at (pixels), w spare.
+    // a shadow at (pixels), w 1 for simple shading (SceneQuality).
     detail: vec4<f32>,
     // Lots settling into the ground (terrain.rs `TileCache::settling`), oldest first:
     // the rect they level (min xy, max xy metres), then their level in metres and

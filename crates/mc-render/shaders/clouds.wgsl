@@ -426,8 +426,17 @@ const SHADE_BLEND: f32 = 0.25;
 const SHADE_DETAIL: f32 = 2.0;
 
 @compute @workgroup_size(8, 8)
-fn cs_shade(@builtin(global_invocation_id) id: vec3<u32>) {
+fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>) {
     let size = textureDimensions(cloud_shade_out);
+    // Dispatch only the live texels: skipping lanes in a full-size dispatch
+    // still pays for inactive lanes on SIMD GPUs. The first frame fills all.
+    // Match the CPU dispatch and periodically refresh the entire field at wrap.
+    let frame = u32(atmos.frame.x);
+    let stagger = globals.detail.w > 0.5 && frame > 1u;
+    let stride = select(1u, 2u, stagger);
+    let phase = frame % 4u;
+    let offset = select(vec2<u32>(0u), vec2<u32>(phase & 1u, phase >> 1u), stagger);
+    let id = vec3<u32>(invocation.xy * stride + offset, 0u);
     if any(id.xy >= size) {
         return;
     }
@@ -467,7 +476,9 @@ fn cs_shade(@builtin(global_invocation_id) id: vec3<u32>) {
     let texel = vec2<i32>(id.xy);
     let old = textureLoad(cloud_shade_out, texel);
     // Alpha 0: never written (sky.rs clears it so), take this frame whole.
-    let blend = select(SHADE_BLEND, 1.0, old.a < 0.5);
+    // Four frames elapsed between these samples; keep the same response time.
+    let weight = select(SHADE_BLEND, 1.0 - pow(1.0 - SHADE_BLEND, 4.0), stagger);
+    let blend = select(weight, 1.0, old.a < 0.5);
     textureStore(cloud_shade_out, texel, vec4<f32>(mix(old.r, lit, blend), 0.0, 0.0, 1.0));
 }
 

@@ -8,6 +8,8 @@ pub struct SceneQuality {
     pub prop_detail: [f32; 3],
     /// Cloud march resolution is window resolution divided by this, in each axis.
     pub cloud_divisor: u32,
+    /// Single-patch terrain textures, cheaper shadow filtering and staggered cloud shade.
+    pub simple_shading: bool,
 }
 
 impl Default for SceneQuality {
@@ -15,6 +17,7 @@ impl Default for SceneQuality {
         Self {
             prop_detail: [1.2, 2.0, 0.0],
             cloud_divisor: 3,
+            simple_shading: false,
         }
     }
 }
@@ -36,6 +39,7 @@ impl SceneQuality {
                 quality.cloud_divisor = value;
             }
         }
+        quality.simple_shading = std::env::var("MERIDIAN_SIMPLE_SHADING").is_ok_and(|v| v == "1");
         quality.normalised()
     }
 

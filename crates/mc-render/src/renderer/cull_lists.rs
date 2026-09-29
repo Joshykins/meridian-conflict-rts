@@ -12,6 +12,7 @@ use crate::pipelines::Pipelines;
 const COMMAND_BYTES: u64 = 20;
 
 pub(super) struct CullLists {
+    pub(super) draws: super::active_draws::ActiveDraws,
     /// Per entity: its draw slot and the lists it is in.
     vis: Buffer,
     /// Per list and slot: how many instances, then where the next one goes.
@@ -34,10 +35,12 @@ impl CullLists {
         slot_count: u32,
         entities: u64,
         units: u64,
+        draws: super::active_draws::ActiveDraws,
     ) -> Result<Self, GpuError> {
         let storage = vk::BufferUsageFlags::STORAGE_BUFFER;
         let lists = cull_list::COUNT as u64;
         Ok(CullLists {
+            draws,
             vis: gpu.device_buffer(entities * 4, storage)?,
             counters: gpu.device_buffer(slot_count as u64 * lists * 4, storage)?,
             commands: gpu.device_buffer(
