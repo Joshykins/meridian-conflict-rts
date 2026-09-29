@@ -540,7 +540,8 @@ fn meshes_are_valid() {
                                 .contains(&v.part)
                             || v.part == part::LAUNCHER_HOIST
                             || v.part == part::CELL_HATCH
-                            || v.part == part::CELL_ROUND),
+                            || v.part == part::CELL_ROUND
+                            || (part::STORE_FILL_FIRST..=part::STORE_LAMP).contains(&v.part)),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
@@ -675,7 +676,7 @@ const ASSAULT_TANK_TRIANGLES: usize = 9200;
 /// (`None` keeps the rule). Each wants lighter levels, made and judged on a shot
 /// sheet; its row goes once it meets the rules.
 const OVER_BUDGET: &[Over] = &[
-    ("storage_mass", Some(102), Some(0.7), Some(2882)),
+    ("storage_mass", Some(102), Some(0.7), Some(2770)),
     ("sonar", Some(176), None, None),
     ("reclaimer", Some(122), Some(0.54), Some(3604)),
     ("airbase", None, Some(0.53), None),

@@ -385,6 +385,30 @@ shared! {
         pub const ARRAY_HOIST_SPLIT: f32 = 7.8;
     }
 
+    /// A storage structure's fill gauge and status lamps (entity.wgsl `store_material`):
+    /// the render mirror writes its side's store into `status[2]` (`mc_sim::store_lights`,
+    /// a test holds the bits equal). A fill piece is lit while the store is at least as
+    /// full as its level; a lamp shows the store's state. Without `MARK` both keep their
+    /// authored look.
+    pub mod store as "STORE_" {
+        /// How full the store is, 0 to 255.
+        pub const FILL_MASK: u32 = 0xFF;
+        pub const STATE_SHIFT: u32 = 8;
+        pub const STATE_MASK: u32 = 0x3;
+        pub const MARK: u32 = 0x1000;
+        /// States (`mc_sim::store_lights::StoreState`): lamps dark, amber, red, green.
+        pub const NEUTRAL: u32 = 0;
+        pub const DRAINING: u32 = 1;
+        pub const EMPTY: u32 = 2;
+        pub const FULL: u32 = 3;
+        /// Fill pieces are parts `PART_FILL_FIRST + level`, `level` below `FILL_LEVELS`: lit
+        /// while the store is at least `(level + 0.5) / FILL_LEVELS` full.
+        pub const PART_FILL_FIRST: u32 = 49;
+        pub const FILL_LEVELS: u32 = 16;
+        /// A status lamp's lens.
+        pub const PART_LAMP: u32 = 65;
+    }
+
     /// Hatched missile cells (`models::CellBlock`, entity.wgsl): each hatch swings up and
     /// out about its outer edge by how far the hatches are open (`UnitInstance::deploy`,
     /// `mc_sim::launch_cells`); the missile standing in a cell is drawn while its bit is

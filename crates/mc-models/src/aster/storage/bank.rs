@@ -10,6 +10,7 @@ use glam::Vec3;
 
 use super::super::parts::*;
 use super::super::structures::kit;
+use super::{fill, status_lamp};
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
 use crate::pattern;
@@ -49,9 +50,16 @@ fn bank(b: &mut MeshBuilder) {
             b.at(v3(col as f32 * CELL_X, CELL_Y, 0.0), |b| {
                 b.paint(ACCENT);
                 b.prism(v3(0.0, 0.0, 0.0), b.sides(8), CELL_R, CELL_R, 8.0);
+                // The charge rises through the bands: the lower ones cell by cell
+                // from -x, then the upper ones.
+                let k = (col + 1) as f32;
                 b.paint(GLOW);
-                b.prism(v3(0.0, 0.0, 3.0), b.sides(8), 3.05, 3.05, 0.7);
-                b.prism(v3(0.0, 0.0, 5.6), b.sides(8), 3.05, 3.05, 0.7);
+                fill(b, (k + 0.5) / 6.0, |b| {
+                    b.prism(v3(0.0, 0.0, 3.0), b.sides(8), 3.05, 3.05, 0.7)
+                });
+                fill(b, (k + 3.5) / 6.0, |b| {
+                    b.prism(v3(0.0, 0.0, 5.6), b.sides(8), 3.05, 3.05, 0.7)
+                });
                 b.paint(PLATING);
                 b.prism(v3(0.0, 0.0, 8.0), b.sides(8), 3.1, 2.0, 1.0);
             });
@@ -105,14 +113,6 @@ fn slit(b: &mut MeshBuilder, center: Vec3, out: Vec3, along: f32, height: f32) {
     b.cuboid(center, size);
 }
 
-/// A working lamp on a short dark post, `at` its foot.
-fn lamp(b: &mut MeshBuilder, at: Vec3) {
-    b.paint(ACCENT);
-    b.prism(at, 6, 0.35, 0.3, 0.9);
-    b.paint(GLOW_LAMP);
-    b.prism(at + Vec3::Z * 0.9, 6, 0.42, 0.3, 0.4);
-}
-
 /// A power bus from `a` to `bb`: a dark bar whose top carries the stored charge
 /// (`pattern::FLUX`).
 fn bus(b: &mut MeshBuilder, a: Vec3, bb: Vec3, size: glam::Vec2) {
@@ -126,6 +126,7 @@ fn bus(b: &mut MeshBuilder, a: Vec3, bb: Vec3, size: glam::Vec2) {
 /// carries the charge over the bank.
 pub(in crate::aster) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
     bank(b);
+    lamps(b, tech);
     if b.coarse() {
         if tech >= 2 {
             b.paint(PLATING);
@@ -163,15 +164,15 @@ pub(in crate::aster) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
     kit(b, tech, 2, 0.45, |b| {
         for x in [-1.0f32, 1.0] {
             b.at(v3(x * TOWER_X, 0.0, 0.0), |b| {
-                // The regulator head and its lamp.
+                // The regulator head, and its gauge up the face.
                 b.paint(PLATING_DARK);
                 b.chamfered_box(v3(0.0, 0.0, 12.8), v3(3.4, 6.0, 1.2), 0.6);
                 team_panel(b, v3(0.0, 0.0, 13.4), v2(2.4, 3.0));
                 if b.fine() {
-                    lamp(b, v3(0.0, 2.6, 12.2));
-                    lamp(b, v3(0.0, -2.6, 12.2));
-                    for z in [4.0, 6.0, 8.0] {
-                        slit(b, v3(x * 2.52, 0.0, z), Vec3::X, 5.0, 0.3);
+                    for (i, z) in [4.0, 6.0, 8.0].into_iter().enumerate() {
+                        fill(b, (i as f32 + 0.5) / 3.0, |b| {
+                            slit(b, v3(x * 2.52, 0.0, z), Vec3::X, 5.0, 0.3)
+                        });
                     }
                 }
             });
@@ -203,9 +204,12 @@ pub(in crate::aster) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
             b.block(v3(-10.2, 16.2, 0.0), v3(10.2, 16.8, 1.2));
             if b.fine() {
                 for i in -1..=1 {
-                    // Lit slits up the rack's slope.
-                    for (y, z) in [(15.4, 4.0), (14.4, 5.6)] {
-                        slit(b, v3(i as f32 * 6.4, y, z), Vec3::Y, 4.4, 0.3);
+                    // Lit slits up the rack's slope, charging as the cells do.
+                    let k = (i + 1) as f32;
+                    for (y, z, at) in [(15.4, 4.0, k + 0.5), (14.4, 5.6, k + 3.5)] {
+                        fill(b, at / 6.0, |b| {
+                            slit(b, v3(i as f32 * 6.4, y, z), Vec3::Y, 4.4, 0.3)
+                        });
                     }
                 }
             }
@@ -220,7 +224,9 @@ pub(in crate::aster) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
                     &[Section::new(13.4, 1.0), Section::new(17.6, 1.0)],
                 );
                 if b.fine() {
-                    slit(b, v3(x * 1.52, 0.0, 16.0), Vec3::X, 3.2, 0.3);
+                    fill(b, 0.95, |b| {
+                        slit(b, v3(x * 1.52, 0.0, 16.0), Vec3::X, 3.2, 0.3)
+                    });
                 }
             });
         }
@@ -236,16 +242,40 @@ pub(in crate::aster) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
         );
         team_panel(b, v3(0.0, 0.0, 18.4), v2(4.0, 1.4));
         if b.fine() {
+            // A charge bar along the girder, filling from -x.
             b.mirror_y(|b| {
                 for i in -3..=3 {
-                    slit(b, v3(i as f32 * 3.4, 1.82, 16.9), Vec3::Y, 1.6, 0.3);
+                    fill(b, ((i + 3) as f32 + 0.5) / 7.0, |b| {
+                        slit(b, v3(i as f32 * 3.4, 1.82, 16.9), Vec3::Y, 1.6, 0.3)
+                    });
                 }
             });
-            for x in [-1.0f32, 1.0] {
-                lamp(b, v3(x * TOWER_X, 0.0, 17.8));
-            }
         }
     });
+}
+
+/// The status lamps, on the tier's highest work: the bookends at tech 1, the
+/// regulator heads at tech 2, the girder at tech 3. Far off, one at each end.
+fn lamps(b: &mut MeshBuilder, tech: u8) {
+    if b.coarse() {
+        let at = match tech {
+            1 => v3(7.0, 8.8, BOOK_TOP),
+            2 => v3(TOWER_X, 0.0, 13.6),
+            _ => v3(TOWER_X, 0.0, 18.6),
+        };
+        for x in [-1.0f32, 1.0] {
+            status_lamp(b, v3(at.x * x, at.y, at.z), 0.9);
+        }
+        return;
+    }
+    let (at, r) = match tech {
+        1 => (v3(9.8, 9.1, BOOK_TOP), 0.6),
+        2 => (v3(TOWER_X, 2.3, 13.4), 0.55),
+        _ => (v3(TOWER_X + 0.4, 1.0, 17.8), 0.55),
+    };
+    for x in [-1.0f32, 1.0] {
+        b.mirror_y(|b| status_lamp(b, v3(at.x * x, at.y, at.z), r));
+    }
 }
 
 /// Where the regulator towers stand, at each open end.

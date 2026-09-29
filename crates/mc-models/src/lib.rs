@@ -231,6 +231,9 @@ pub mod part {
     const _: () = assert!(CELL_HATCH > LAUNCHER_HOIST && CELL_ROUND > CELL_HATCH);
     /// Tread / leg surfaces: the shader scrolls or bobs these with distance travelled.
     pub const LOCOMOTION: u32 = 3;
+    /// A storage structure's fill piece at `level` (`gpu_consts::store`), and its lamps.
+    pub const STORE_FILL_FIRST: u32 = crate::gpu_consts::store::PART_FILL_FIRST;
+    pub const STORE_LAMP: u32 = crate::gpu_consts::store::PART_LAMP;
 }
 
 /// How a vertex is rigged beyond its part: which bone of a walking leg it

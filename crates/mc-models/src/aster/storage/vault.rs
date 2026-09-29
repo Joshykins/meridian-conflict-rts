@@ -7,6 +7,7 @@ use glam::{Vec2, Vec3};
 
 use super::super::parts::*;
 use super::super::structures::kit;
+use super::{fill, status_lamp};
 use crate::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::material::*;
 
@@ -43,7 +44,7 @@ pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
             b.at(v3(VAULT_VAT_OUT, 0.0, 0.0), |b| {
                 b.paint(PLATING);
                 b.loft_z(
-                    &ngon(b.sides(10), VAULT_VAT_R),
+                    &ngon(b.sides(VAT_SIDES), VAULT_VAT_R),
                     &[
                         Section::new(VAULT_DECK, 1.0),
                         Section::new(6.4, 1.0),
@@ -51,17 +52,17 @@ pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
                     ],
                 );
                 b.paint(ACCENT);
-                b.prism(
-                    v3(0.0, 0.0, 2.8),
-                    b.sides(10),
-                    VAULT_VAT_R + 0.12,
-                    VAULT_VAT_R + 0.12,
-                    0.9,
-                );
+                band(b, 2.8, VAULT_VAT_R + 0.12, 0.9);
                 b.paint(METAL);
                 b.prism(v3(0.0, 0.0, 7.6), 8, 2.4, 2.0, 0.4);
                 if b.fine() {
                     glow_strip(b, v3(0.0, 0.0, 8.0), v2(1.6, 0.5), GLOW);
+                }
+                // The level gauge: lit rings up the vat, the materials rising in them.
+                for (j, z) in [2.1, 4.1, 5.95].into_iter().enumerate() {
+                    fill(b, level(j, tech), |b| {
+                        gauge_ring(b, z, VAULT_VAT_R + 0.08, 0.35)
+                    });
                 }
             });
         });
@@ -108,10 +109,10 @@ pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
             b.radial(4, |b| {
                 b.at(v3(VAULT_VAT_OUT, 0.0, 0.0), |b| {
                     b.paint(PLATING_DARK);
-                    b.prism(v3(0.0, 0.0, 7.6), b.sides(10), 3.9, 3.9, 0.6);
+                    b.prism(v3(0.0, 0.0, 7.6), b.sides(VAT_SIDES), 3.9, 3.9, 0.6);
                     b.paint(PLATING);
                     b.loft_z(
-                        &ngon(b.sides(10), 3.7),
+                        &ngon(b.sides(VAT_SIDES), 3.7),
                         &[
                             Section::new(8.2, 1.0),
                             Section::new(10.6, 1.0),
@@ -119,11 +120,8 @@ pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
                         ],
                     );
                     b.paint(METAL);
-                    b.prism(v3(0.0, 0.0, 9.2), b.sides(10), 3.82, 3.82, 0.5);
-                    if b.fine() {
-                        b.paint(GLOW);
-                        b.prism(v3(0.0, 0.0, 10.0), b.sides(10), 3.78, 3.78, 0.3);
-                    }
+                    band(b, 9.2, 3.82, 0.5);
+                    fill(b, level(3, tech), |b| gauge_ring(b, 10.0, 3.78, 0.3));
                 });
             });
         });
@@ -177,14 +175,11 @@ pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
             b.radial(4, |b| {
                 b.at(v3(VAULT_VAT_OUT, 0.0, 0.0), |b| {
                     b.paint(ACCENT);
-                    for z in [4.6, 8.4] {
-                        b.prism(
-                            v3(0.0, 0.0, z),
-                            b.sides(10),
-                            VAULT_VAT_R + 0.3,
-                            VAULT_VAT_R + 0.3,
-                            1.1,
-                        );
+                    // Relief, left to the full level.
+                    if b.fine() {
+                        for z in [4.6, 8.4] {
+                            band(b, z, VAULT_VAT_R + 0.3, 1.1);
+                        }
                     }
                 });
             });
@@ -199,10 +194,16 @@ pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
                 b.prism(at, 6, 1.8, 1.8, 1.2);
                 b.paint(PLATING);
                 b.prism(at + Vec3::Z * 1.2, 6, 1.2, 0.8, 13.0);
-                b.paint(GLOW);
-                b.prism(at + Vec3::Z * 14.2, 6, 0.9, 0.5, 1.4);
-                b.paint(METAL);
-                b.cylinder_between(at + Vec3::Z * 13.0, v3(5.4, 0.0, 15.4), 0.3, 0.3, 6);
+                if tech >= 3 {
+                    status_lamp(b, at + Vec3::Z * 14.2, 0.75);
+                } else {
+                    b.paint(PLATING_DARK);
+                    b.prism(at + Vec3::Z * 14.2, 6, 0.9, 0.5, 1.0);
+                }
+                if b.fine() {
+                    b.paint(METAL);
+                    b.cylinder_between(at + Vec3::Z * 13.0, v3(5.4, 0.0, 15.4), 0.3, 0.3, 6);
+                }
             });
         });
     });
@@ -226,11 +227,59 @@ pub(in crate::aster) fn storage_mass(b: &mut MeshBuilder, tech: u8) {
     });
     kit(b, tech, 3, 0.85, |b| {
         b.paint(GLOW);
-        b.prism(v3(0.0, 0.0, 15.8), 8, 5.7, 5.7, 0.35);
-        b.prism(v3(0.0, 0.0, 17.0), 8, 4.9, 4.7, 0.3);
+        fill(b, level(4, tech), |b| {
+            b.prism(v3(0.0, 0.0, 15.8), 8, 5.7, 5.7, 0.35)
+        });
+        fill(b, level(5, tech), |b| {
+            b.prism(v3(0.0, 0.0, 17.0), 8, 4.9, 4.7, 0.3)
+        });
         b.paint(METAL);
         b.prism(v3(0.0, 0.0, 18.4), 8, 1.4, 0.9, 0.6);
     });
+    // The status lamps: on the manifold at tech 1, the loading tower's head at tech 2,
+    // and the corner pylons' heads (above) at tech 3.
+    let lamp = match tech {
+        1 => Some((v3(2.9, 0.0, 6.9), 0.5)),
+        2 => Some((v3(1.95, 0.0, 12.6), 0.38)),
+        _ => None,
+    };
+    if let Some((at, r)) = lamp {
+        b.radial(4, |b| status_lamp(b, at, r));
+    }
+}
+
+/// Sides of a vat and its stage.
+const VAT_SIDES: usize = 8;
+
+/// The fill level at which the vault's gauge ring `j` lights (0 to 2 up each vat, 3 the
+/// vat's second stage, 4 and 5 round the strongroom), at `tech`: the rings a tier has
+/// share the store between them, bottom to top.
+fn level(j: usize, tech: u8) -> f32 {
+    let rings = match tech {
+        1 => 3.0,
+        2 => 4.0,
+        _ => 6.0,
+    };
+    (j as f32 + 0.5) / rings
+}
+
+/// A lit gauge ring round a vat, `h` tall from `z`.
+fn gauge_ring(b: &mut MeshBuilder, z: f32, r: f32, h: f32) {
+    b.paint(GLOW);
+    band(b, z, r, h);
+}
+
+/// A band round a vat in the current paint, `h` tall from `z`: open top and bottom,
+/// since the vat fills it.
+fn band(b: &mut MeshBuilder, z: f32, r: f32, h: f32) {
+    let ring = |z: f32| -> Vec<Vec3> {
+        ngon(b.sides(VAT_SIDES), r)
+            .into_iter()
+            .map(|p| v3(p[0], p[1], z))
+            .collect()
+    };
+    let (lo, hi) = (ring(z), ring(z + h));
+    b.loft(&[lo, hi], false, false);
 }
 
 /// Half-width of the vault's slab, and the top of its deck.

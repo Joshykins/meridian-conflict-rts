@@ -288,6 +288,30 @@ fn load_cycle(e: Entity, time: f32) -> vec2<f32> {
     return vec2<f32>(lid, hoist);
 }
 
+// A storage structure's fill pieces and status lamps (`gpu_consts::store`), by its side's
+// store in `status[2]`: a fill piece keeps its glow while the store is at least as full
+// as its level and goes dark below it; a lamp's lens goes amber while the store drains,
+// a blinking red when it is dry and green when it is full, and stays dark glass
+// otherwise. Unmarked (another side's, a site, a wreck): as authored.
+fn store_material(material: u32, part: u32, e: Entity) -> u32 {
+    let word = e.status[2];
+    let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
+    if part < STORE_PART_FILL_FIRST || part > STORE_PART_LAMP || (word & STORE_MARK) == 0u || !live {
+        return material;
+    }
+    if part == STORE_PART_LAMP {
+        switch (word >> STORE_STATE_SHIFT) & STORE_STATE_MASK {
+            case STORE_DRAINING: { return MAT_GLOW_AMBER; }
+            case STORE_EMPTY: { return MAT_GLOW_RED; }
+            case STORE_FULL: { return MAT_GLOW_NAV_GREEN; }
+            default: { return material; }
+        }
+    }
+    let level = f32(part - STORE_PART_FILL_FIRST) + 0.5;
+    let fill = f32(word & STORE_FILL_MASK) / f32(STORE_FILL_MASK);
+    return select(MAT_ACCENT, material, fill * f32(STORE_FILL_LEVELS) >= level);
+}
+
 // Where a core mine's pipe pieces are at `beat`, as an offset from where they are authored.
 // The driver rides up by `hammer_lift`. The string only moves when the falling driver has
 // met the new section and drives the two down together, one section by the blow: the
@@ -2054,7 +2078,7 @@ fn vs_main(in: VsIn) -> VsOut {
     } else {
         out.uv = in.uv;
     }
-    out.material = select(in.material, u32(hull), push.pass_kind == PASS_HULL);
+    out.material = select(store_material(in.material, in.part, e), u32(hull), push.pass_kind == PASS_HULL);
     out.owner_flags = e.owner_flags;
     out.state = vec4<f32>(e.build, select(e.health, 2.0, falling), in.pos.z / max(model.height, 0.1), hash11(f32(e.unit_id & 0xFFFFu)));
     out.local = unwarped;
