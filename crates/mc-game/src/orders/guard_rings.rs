@@ -70,6 +70,12 @@ pub(super) fn guard_look(blueprints: &Blueprints, unit: &UnitInstance) -> GuardL
         ORBITS
     } else if bp.motion.is_some_and(|m| m.layer == MoveLayer::Air) {
         GuardLook::stance(0.5)
+    } else if bp.builder.is_some() && bp.weapons.is_empty() {
+        // An engineer's is an Area Assist: its ring is work, not a stance.
+        GuardLook {
+            circle: 0.0,
+            tone: hud::style::Family::Engineering.tone(),
+        }
     } else {
         GuardLook::stance(0.0)
     }

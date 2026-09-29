@@ -160,6 +160,10 @@ fn doing(
                 3 => "Crossing Obstacle",
                 // An aircraft that orbits calls its guard an Orbit.
                 _ if front.kind == OrderKind::Guard && s.bp(u).orbit.is_some() => "Orbiting",
+                // An engineer on guard works its area (`mc_sim`'s `area_work.rs`).
+                _ if front.kind == OrderKind::Guard && s.bp(u).builder.is_some() => {
+                    "Working the Area"
+                }
                 _ => activity(front.kind),
             }
             .to_owned()

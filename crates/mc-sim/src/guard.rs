@@ -14,6 +14,10 @@
 //! unit, and stays where it was last if the unit is lost. A guard never ends by
 //! itself; anything queued behind it takes over at once.
 //!
+//! An engineer on guard works the area: it helps raise what goes up in it, mends
+//! friends and reclaims wrecks there, and takes up work that appears later
+//! (`area_work.rs`).
+//!
 //! Only a unit free to engage (`FireState::FireAtWill`) leaves its spot. Held
 //! position, it stays and shoots what comes into range; on hold fire, it only stands.
 
@@ -120,6 +124,10 @@ impl World {
                 .orders
                 .push_front(&mut self.state.units, row, chase)?;
             self.state.units.stuck_ticks[row] = 0;
+            return Ok(());
+        }
+        // An engineer works the whole area (`area_work.rs`).
+        if self.area_work(row, o)? {
             return Ok(());
         }
         let units = &self.state.units;

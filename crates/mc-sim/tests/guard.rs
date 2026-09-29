@@ -189,3 +189,88 @@ fn a_guard_round_a_friendly_unit_goes_with_it() {
         w.state.units.pos[escort].distance(w.state.units.pos[lead])
     );
 }
+
+#[test]
+fn an_engineer_on_guard_works_its_whole_area_and_takes_up_new_work() {
+    use mc_sim::tables::flag;
+    let mut w = field();
+    give(
+        &mut w,
+        0,
+        Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        },
+    );
+    let mason = add(&mut w, 0, "aster_t1_engineer", 500, 500);
+    let units = vec![id(&w, mason)];
+    give(
+        &mut w,
+        0,
+        Command::Guard {
+            units,
+            pos: FxVec2::from_ints(500, 500),
+            target: mc_sim::Handle::NONE,
+            radius: Fx::from_int(400),
+            queue: false,
+        },
+    );
+    // A site going up across the ring, well out of reach of the engineer's spot.
+    let power = w.blueprints.id_of("aster_t1_power").unwrap();
+    give(
+        &mut w,
+        0,
+        Command::DebugSpawn {
+            owner: 0,
+            blueprint: power,
+            pos: FxVec2::from_ints(800, 500),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 100,
+        },
+    );
+    let site = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.blueprint[r] == power)
+        .unwrap();
+    assert!(w.state.units.has_flag(site, flag::UNDER_CONSTRUCTION));
+    let raised = until(&mut w, 3000, |w| {
+        !w.state.units.has_flag(site, flag::UNDER_CONSTRUCTION)
+    });
+    assert!(raised.is_some(), "it helped raise the site");
+
+    // Then a hurt tank, and later still a wreck, turn up in the area.
+    let tank = add(&mut w, 0, "aster_t1_tank", 300, 700);
+    w.state.units.health[tank] = Fx::from_int(40);
+    let mended = until(&mut w, 3000, |w| {
+        w.state.units.health[tank] >= w.bp(tank).health
+    });
+    assert!(mended.is_some(), "it mended the tank");
+    let hulk = add(&mut w, 1, "aster_t1_tank", 650, 250);
+    let units = vec![id(&w, hulk)];
+    give(
+        &mut w,
+        0,
+        Command::DebugDamage {
+            units,
+            permille: 1000,
+        },
+    );
+    run(&mut w, 2);
+    assert_eq!(w.state.wrecks.slots.iter().count(), 1);
+    let cleared = until(&mut w, 3000, |w| w.state.wrecks.slots.iter().count() == 0);
+    assert!(cleared.is_some(), "it reclaimed the wreck");
+
+    // Nothing left: back on its spot, still on guard.
+    run(&mut w, 600);
+    let o = w.state.orders.front(&w.state.units, mason).unwrap();
+    assert_eq!(o.kind, mc_sim::tables::OrderKind::Guard);
+    assert!(
+        w.state.units.pos[mason].distance(FxVec2::from_ints(500, 500)) < Fx::from_int(20),
+        "it went back to its spot"
+    );
+}
