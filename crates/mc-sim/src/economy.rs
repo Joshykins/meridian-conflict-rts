@@ -159,7 +159,7 @@ impl World {
             let tbp = self.bp(target);
             let focus = self.state.players[self.state.units.owner[row] as usize].focus;
             let tier = if constructing {
-                focus.priority(tbp).tier()
+                focus.priority(tbp, &self.blueprints).tier()
             } else {
                 REST
             };

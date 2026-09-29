@@ -80,10 +80,15 @@ fn spawn(w: &mut World, key: &str, x: i32, y: i32, build: u16) -> UnitId {
 /// with none in store and mass to spare, with new mines paid `mines` and new power `power`. How fast each goes up, in
 /// build time a second, and the side's player record after.
 fn race(mines: Priority, power: Priority) -> (f64, f64, mc_sim::tables::Player) {
+    race_with("aster_t1_power", mines, power)
+}
+
+/// `race`, with a `first` site in place of the reactor.
+fn race_with(first: &str, mines: Priority, power: Priority) -> (f64, f64, mc_sim::tables::Player) {
     let mut w = world();
     spawn(&mut w, "aster_t1_power", 300, 300, 1000);
     spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
-    let reactor = spawn(&mut w, "aster_t1_power", 500, 500, 100);
+    let reactor = spawn(&mut w, first, 500, 500, 100);
     let factory = spawn(&mut w, "aster_t1_land_factory", 600, 500, 100);
     let a = spawn(&mut w, "aster_t1_engineer", 520, 470, 1000);
     let b = spawn(&mut w, "aster_t1_engineer", 580, 470, 1000);
@@ -219,6 +224,16 @@ fn mines_first_leaves_power_sites_with_the_rest() {
     let (neither, _, _) = race(Priority::Even, Priority::Even);
     assert!(mines_first < power_first * 0.5);
     assert!((mines_first - neither).abs() < 0.05);
+}
+
+#[test]
+fn mines_first_builds_scavenger_towers_first_and_last_never_holds_them_back() {
+    let tower = "aster_t1_reclaimer";
+    let (first, _, _) = race_with(tower, Priority::First, Priority::Even);
+    let (even, _, _) = race_with(tower, Priority::Even, Priority::Even);
+    let (last, _, _) = race_with(tower, Priority::Last, Priority::Even);
+    assert!(first > even * 1.5, "first {first} vs even {even}");
+    assert!((last - even).abs() < 0.05, "last {last} vs even {even}");
 }
 
 #[test]

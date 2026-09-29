@@ -49,6 +49,8 @@ struct Kind {
     tone: u32,
     /// What its resource's stall note tells the player to build.
     build: &'static str,
+    /// What else First puts first with it (`Focus::priority`), for the tip.
+    first_also: &'static str,
 }
 
 const KINDS: [Kind; 2] = [
@@ -56,11 +58,13 @@ const KINDS: [Kind; 2] = [
         name: "Mines",
         tone: MASS,
         build: "Materials stalling  \u{b7}  build more mines or reclaim wrecks",
+        first_also: ", reclaimers",
     },
     Kind {
         name: "Power",
         tone: ENERGY,
         build: "Energy stalling  \u{b7}  build more power generators",
+        first_also: "",
     },
 ];
 
@@ -366,7 +370,7 @@ fn control(ui: &mut Ui, row: Rect, i: usize, f: &Face) -> Option<Priority> {
     if let Some(which) = hover {
         let kind = f.kind.name.to_lowercase();
         let what = match which {
-            Priority::First => format!("{} first: in a stall, new {kind} and their upgrades are paid in full before anything else", f.kind.name),
+            Priority::First => format!("{} first: in a stall, new {kind}{} and their upgrades are paid in full before anything else", f.kind.name, f.kind.first_also),
             Priority::Even => format!("{} even: in a stall, new {kind} slow down with everything else", f.kind.name),
             Priority::Last => format!("{} last: new {kind} are built only out of what everything else leaves over", f.kind.name),
         };

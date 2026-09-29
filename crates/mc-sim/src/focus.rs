@@ -3,10 +3,11 @@
 //! When a side cannot pay for everything, everything slows by the same ratio
 //! (`economy.rs`). Its player can set new mines and new power apart: paid in full
 //! before the rest, or only out of what the rest leaves over. The rest, upkeep and
-//! the mines' own draw included, is paid in between.
+//! the mines' own draw included, is paid in between. Reclaimers go first with the
+//! mines, but are never held back with them: only First changes when they are paid.
 
 use crate::World;
-use mc_data::{cat, UnitBlueprint};
+use mc_data::{cat, Blueprints, UnitBlueprint};
 use serde::{Deserialize, Serialize};
 
 /// When a kind of construction is paid in a stall. The numbers cross the wire in
@@ -43,11 +44,13 @@ pub struct Focus {
 
 impl Focus {
     /// When building or upgrading a unit of this kind is paid under this focus.
-    pub fn priority(self, bp: &UnitBlueprint) -> Priority {
+    pub fn priority(self, bp: &UnitBlueprint, blueprints: &Blueprints) -> Priority {
         if bp.categories & cat::EXTRACTOR != 0 {
             self.mines
         } else if bp.categories & cat::POWER != 0 {
             self.power
+        } else if self.mines == Priority::First && reclaims(bp, blueprints) {
+            Priority::First
         } else {
             Priority::Even
         }
@@ -57,6 +60,16 @@ impl Focus {
     pub(crate) fn bits(self) -> u64 {
         self.mines as u64 | (self.power as u64) << 2
     }
+}
+
+/// A unit whose work is reclaiming: a scavenger tower, a salvage unit, a salvage
+/// drone or the carrier of them. Builders reclaim too, but building is their work.
+fn reclaims(bp: &UnitBlueprint, blueprints: &Blueprints) -> bool {
+    bp.builder.is_none()
+        && (bp.reclaimer.is_some()
+            || bp
+                .drone
+                .is_some_and(|d| blueprints.unit(d).reclaimer.is_some()))
 }
 
 impl World {

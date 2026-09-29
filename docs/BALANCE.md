@@ -88,7 +88,8 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   (`focus.rs`), the Mines and Power priorities in one row under the economy panel: each of
   new mines and new power (and their upgrades) is paid Last, Even or First. First is paid in
   full before the rest; Last only out of what the rest leaves over, so it is built from
-  excess. A kind put first or last shows its own build speed on the row; the stall chip gives
+  excess. Mines First also puts reclaimers (scavenger towers, salvage units, drones and
+  their carriers) first; Mines Last does not hold them back. A kind put first or last shows its own build speed on the row; the stall chip gives
   the rest's. A stalling resource's First pulses as the fix, and a note says what to build.
   The AI puts first whatever it is running out of and never puts anything last.
 - Standing energy draw (`energy_upkeep`) is only for powered systems: shields, radar, sonar
