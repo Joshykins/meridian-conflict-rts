@@ -18,12 +18,14 @@ use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
 
 pub(super) mod queue;
+mod strip;
 pub(super) use queue::Split;
+use strip::{Slot, ARROW_W};
 
-const TILE_W: f32 = 96.0;
+pub(super) const TILE_W: f32 = 96.0;
 /// Tile names: the caption face with less tracking, so most names fit on a line.
 pub(super) const NAME: crate::ui::Style = crate::ui::style(mc_render::Face::Medium, 11.0, 1.6);
-const TILE_GAP: f32 = 6.0;
+pub(super) const TILE_GAP: f32 = 6.0;
 const QUEUE_H: f32 = 62.0;
 pub const TIERS: u8 = 5;
 /// The tab past the tiers: refits.
@@ -426,24 +428,9 @@ pub fn key_cap(ui: &mut Ui, x: f32, y: f32, key: char, live: bool) {
 /// The shelf buttons over the strip.
 const SHELF_H: f32 = 24.0;
 /// Tiles on the strip: taller than a grid tile, for a bigger picture.
-const STRIP_H: f32 = 126.0;
-/// Room between the last tile of one shelf and the first of the next.
-const SHELF_GAP: f32 = 22.0;
-/// The arrow buttons at the strip's ends while it runs past the panel.
-const ARROW_W: f32 = 24.0;
+pub(super) const STRIP_H: f32 = 126.0;
 /// How far past the strip's edge a tile takes to fade out.
 const FADE: f32 = 34.0;
-
-/// A tile's place along the strip.
-struct Slot<'a> {
-    item: &'a UnitBlueprint,
-    shelf: Purpose,
-    /// Its place on its shelf, which picks its item key.
-    n: usize,
-    at: f32,
-    /// A tier upgrade: its step along the builder's line of successors.
-    climb: Option<usize>,
-}
 
 /// What a builder offers on its tier tabs.
 struct Offer<'a> {
@@ -532,90 +519,21 @@ fn tiles<'a>(
         return None;
     }
 
-    // Where every tile sits along the strip, and where each shelf starts and ends.
-    let lead = items.first().map(|b| Purpose::of(b, !is_factory));
-    let lay = |tile_w: f32, shelf_gap: f32| {
-        let mut slots: Vec<Slot> = Vec::new();
-        let mut shelves: Vec<(Purpose, f32, f32, usize)> = Vec::new();
-        let mut at = 0.0;
-        for &(i, item) in &climbs {
-            let shelf = lead.unwrap_or_else(|| Purpose::of(item, !is_factory));
-            slots.push(Slot {
-                item,
-                shelf,
-                n: usize::MAX,
-                at,
-                climb: Some(i),
-            });
-            at += tile_w + TILE_GAP;
-        }
-        for p in Purpose::ALL {
-            let on: Vec<&UnitBlueprint> = items
-                .iter()
-                .copied()
-                .filter(|b| Purpose::of(b, !is_factory) == p)
-                .collect();
-            if on.is_empty() {
-                continue;
-            }
-            if !shelves.is_empty() || !climbs.is_empty() {
-                at += shelf_gap - TILE_GAP;
-            }
-            let start = at;
-            for (n, item) in on.iter().enumerate() {
-                slots.push(Slot {
-                    item,
-                    shelf: p,
-                    n,
-                    at,
-                    climb: None,
-                });
-                at += tile_w + TILE_GAP;
-            }
-            shelves.push((p, start, at - TILE_GAP, on.len()));
-        }
-        (slots, shelves, at - TILE_GAP)
-    };
+    let strip::Layout {
+        slots,
+        shelves,
+        length,
+        tile_w,
+        overflow,
+        view,
+    } = strip::lay_out(&items, &climbs, is_factory, grid);
     let strip = Rect::new(grid.x, grid.y + SHELF_H + 8.0, grid.w, STRIP_H);
-    let (mut slots, mut shelves, mut length) = lay(TILE_W, SHELF_GAP);
-    let overflow = length > strip.w;
-    let view = if overflow {
-        Rect::new(
-            strip.x + ARROW_W + 6.0,
-            strip.y,
-            strip.w - 2.0 * (ARROW_W + 6.0),
-            STRIP_H,
-        )
-    } else {
-        strip
-    };
-    // Past the panel, the strip steps a whole tile at a time and its tiles are sized
-    // so a whole number of them fill the view: it never stops on half a tile, or on
-    // a gap where one has faded out. Shelves then meet at a rule, without the extra room.
-    let (tile_w, shelf_gap) = if overflow {
-        let fit = ((view.w + TILE_GAP) / (TILE_W + TILE_GAP)).round().max(1.0);
-        let w = (view.w + TILE_GAP) / fit - TILE_GAP;
-        // Never wider than a tile and a quarter: one more, smaller, fits better.
-        let fit = if w > TILE_W * 1.25 { fit + 1.0 } else { fit };
-        ((view.w + TILE_GAP) / fit - TILE_GAP, TILE_GAP)
-    } else {
-        (TILE_W, SHELF_GAP)
-    };
-    if overflow {
-        (slots, shelves, length) = lay(tile_w, shelf_gap);
-    }
     let pitch = tile_w + TILE_GAP;
     let max_scroll = (length - view.w).max(0.0);
     // How many tiles the view holds, and a page of them for the arrows.
     let in_view = ((view.w + TILE_GAP) / pitch).round().max(1.0);
     let page = (in_view - 1.0).max(1.0) * pitch;
-    let snap = |x: f32| {
-        if overflow {
-            ((x / pitch).round() * pitch).clamp(0.0, max_scroll)
-        } else {
-            x.clamp(0.0, max_scroll)
-        }
-    };
+    let snap = |x: f32| strip::snap(&slots, overflow, max_scroll, x);
     let start_of = |p: Purpose| shelves.iter().find(|s| s.0 == p).map(|s| s.1);
 
     // A key from the keyboard: a shelf, then an item on it.
@@ -643,7 +561,12 @@ fn tiles<'a>(
     // The wheel runs the strip along, a tile a notch; the shelf keys follow what is in view.
     if grid.contains(ui.cursor - ui.shift) && ui.input.scroll != 0.0 && overflow {
         let was = hud.build_scroll;
-        hud.build_scroll = snap(hud.build_scroll - ui.input.scroll.signum() * pitch);
+        hud.build_scroll = strip::step(
+            &slots,
+            max_scroll,
+            hud.build_scroll,
+            -ui.input.scroll.signum(),
+        );
         if hud.build_scroll != was {
             ui.audio.play(Sfx::Tick);
             hud.shelf = None;
@@ -859,13 +782,7 @@ fn tiles<'a>(
         }
         (ui.fade, ui.interactive) = (fade, interactive);
     }
-    // A rule between one shelf and the next, and after the upgrade.
-    for &(_, start, ..) in shelves.iter().skip(if climbs.is_empty() { 1 } else { 0 }) {
-        let lx = view.x + start - shown - shelf_gap * 0.5;
-        if lx > view.x && lx < view.right() {
-            ui.vline(lx, view.y + 10.0, STRIP_H - 20.0, rgb(palette::LINE, 0.22));
-        }
-    }
+    strip::dividers(ui, &shelves, !climbs.is_empty(), view, shown);
 
     if overflow {
         // Arrows at the ends, each counting the tiles out of sight its way and
