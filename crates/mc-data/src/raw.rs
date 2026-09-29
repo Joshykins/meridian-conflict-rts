@@ -278,6 +278,12 @@ pub(crate) struct Unit {
     /// A lift ship: sets down, lowers a ramp and carries land units ([`crate::Transport`]).
     #[serde(default)]
     pub transport: Option<RawTransport>,
+    /// A capital ship's warp drive ([`crate::Warp`]).
+    #[serde(default)]
+    pub warp: Option<RawWarp>,
+    /// Drags enemy warps down around it ([`crate::WarpDamper`]).
+    #[serde(default)]
+    pub warp_damper: Option<RawWarpDamper>,
     #[serde(default)]
     pub shield: Option<RawShield>,
     #[serde(default)]
@@ -556,6 +562,35 @@ pub(crate) struct RawTransport {
     pub clearance: f64,
     /// Seconds between units leaving down the ramp.
     pub unload: f64,
+}
+
+/// A capital ship's warp drive.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawWarp {
+    /// Farthest jump, metres.
+    pub range: f64,
+    /// Energy one jump's charge takes.
+    pub energy: f64,
+    /// Seconds the charge takes at full power.
+    pub spool: f64,
+    /// Seconds after coming out before it can spool again.
+    pub cooldown: f64,
+    /// Metres per second in warp.
+    pub speed: f64,
+}
+
+/// A warp dampener's field.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawWarpDamper {
+    pub radius: f64,
+    /// How many times longer a dampened transit lasts.
+    pub drag: f64,
+    /// Share of its full health a dampened ship loses coming out, 0 to 1.
+    pub damage: f64,
+    /// Seconds a dampened ship lies stunned.
+    pub stun: f64,
 }
 
 #[derive(Deserialize, Clone)]
@@ -1514,6 +1549,49 @@ impl Unit {
                     floor: fx(t.floor),
                     clearance: fx(t.clearance),
                     unload_ticks: ticks(t.unload).clamp(1, 600) as u16,
+                }),
+                None => None,
+            },
+            warp: match &self.warp {
+                Some(d)
+                    if d.range <= 0.0
+                        || d.speed <= 0.0
+                        || d.spool <= 0.0
+                        || d.energy <= 0.0
+                        || !self
+                            .motion
+                            .as_ref()
+                            .is_some_and(|m| m.layer == MoveLayer::Air) =>
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: a warp drive is on an aircraft, with a range, a speed, a spool and an energy cost"
+                    )));
+                }
+                Some(d) => Some(crate::Warp {
+                    range: fx(d.range),
+                    energy: fx(d.energy),
+                    spool_ticks: ticks(d.spool).clamp(1, 600) as u16,
+                    cooldown_ticks: ticks(d.cooldown).min(6000) as u16,
+                    speed: fx(d.speed / TICKS_PER_SECOND as f64),
+                }),
+                None => None,
+            },
+            warp_damper: match &self.warp_damper {
+                Some(d)
+                    if d.radius <= 0.0
+                        || d.drag < 1.0
+                        || !(0.0..=1.0).contains(&d.damage)
+                        || self.economy.energy_upkeep <= 0.0 =>
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: a warp dampener needs a radius, a drag of at least 1, damage 0 to 1 and energy_upkeep"
+                    )));
+                }
+                Some(d) => Some(crate::WarpDamper {
+                    radius: fx(d.radius),
+                    drag: fx(d.drag),
+                    damage: fx(d.damage),
+                    stun_ticks: ticks(d.stun).min(6000) as u16,
                 }),
                 None => None,
             },

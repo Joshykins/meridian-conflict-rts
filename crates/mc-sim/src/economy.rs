@@ -205,6 +205,19 @@ impl World {
             self.flows[row].wanted[1] += want[1];
         }
 
+        // Warp drives charging (`warp.rs`): energy only, paid with the rest.
+        let mut warps = Vec::new();
+        for row in self.state.units.slots.iter() {
+            if let Some((rate, left)) = self.warp_draw(row) {
+                let want = rate.min(left);
+                let p = self.state.units.owner[row] as usize;
+                demand[p].1 += want;
+                tiers[p][REST].add([Fx::ZERO, want], true);
+                self.flows[row].wanted[1] += want;
+                warps.push((row, rate, left));
+            }
+        }
+
         // Mines draw their upkeep with the rest, and dig as hard as the rest's energy
         // is covered. Mass is not known yet (the mines make it), so what is put first is
         // taken to spend all the energy it asks for: never more than it does.
@@ -329,6 +342,14 @@ impl World {
             self.flows[row].used[0] += want[0] * e;
             self.flows[row].used[1] += want[1] * e;
             self.advance_launchers(row, rate * e);
+        }
+
+        for &(row, rate, left) in &warps {
+            let p = self.state.units.owner[row] as usize;
+            let got = (rate * paid_energy[p][REST]).min(left);
+            spent[p].1 += got;
+            self.flows[row].used[1] += got;
+            self.state.units.warp[row].charge += got;
         }
 
         // Upkeep is paid with the rest, as far as its energy goes.

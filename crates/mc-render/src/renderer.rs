@@ -1433,6 +1433,7 @@ impl Renderer {
                     status: [0; 3],
                     mount: [0.0; 4],
                     spin_recoil: [0.0; 4],
+                    fx: [0.0; 4],
                 }
             })
             .collect();

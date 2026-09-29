@@ -745,8 +745,8 @@ impl World {
                     if bp.weapons.is_empty() {
                         continue;
                     }
-                    // Holding fire: let go of whatever it was aiming at.
-                    if units.has_flag(row, flag::PASSIVE) {
+                    // Holding fire, or stunned: let go of whatever it was aiming at.
+                    if units.has_flag(row, flag::PASSIVE) || this.stunned(row) {
                         if units.weapon_target[row] != [Handle::NONE; MAX_WEAPONS] {
                             out.push((row, [Handle::NONE; MAX_WEAPONS], 0));
                         }
@@ -910,7 +910,10 @@ impl World {
     pub(crate) fn run_weapons(&mut self) -> Result<(), SimError> {
         let rows = self.state.units.slots.rows();
         for row in 0..rows {
-            if !self.state.units.slots.is_alive(row) || !self.state.units.is_active(row) {
+            if !self.state.units.slots.is_alive(row)
+                || !self.state.units.is_active(row)
+                || self.stunned(row)
+            {
                 continue;
             }
             // A build arm that is not at work folds back to rest. A two-bone arm

@@ -811,6 +811,7 @@ pub fn screenshot(
                 status: [0; 3],
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
+                fx: [0.0; 4],
             });
         }
         let outlined = order_map.ghosts(&field, &mut ghosts);

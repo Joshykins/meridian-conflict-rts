@@ -6,8 +6,8 @@
 //! site, fights and reclaims (reclaim pays). Whoever assists it stops with it, so
 //! pausing a factory stops the whole line feeding it.
 //!
-//! A paused shield, radar, sonar or missile defence powers down instead: the
-//! system goes off and its energy upkeep stops until it is resumed.
+//! A paused shield, radar, sonar, missile defence or warp dampener powers down
+//! instead: the system goes off and its energy upkeep stops until it is resumed.
 
 use crate::tables::UnitId;
 use crate::World;
@@ -26,8 +26,8 @@ pub fn pausable(blueprints: &Blueprints, bp: &UnitBlueprint) -> bool {
 }
 
 /// Whether pausing a unit of this kind switches a powered system off, and its
-/// energy upkeep with it: a shield, radar, sonar or missile defence that draws
-/// energy. A builder's pause holds its work only, so pausing the commander's
+/// energy upkeep with it: a shield, radar, sonar, missile defence or warp dampener
+/// that draws energy. A builder's pause holds its work only, so pausing the commander's
 /// building never drops its Personal Shield.
 pub fn powers_down(bp: &UnitBlueprint) -> bool {
     bp.builder.is_none()
@@ -35,7 +35,8 @@ pub fn powers_down(bp: &UnitBlueprint) -> bool {
         && (bp.shield.is_some()
             || bp.radar > Fx::ZERO
             || bp.sonar > Fx::ZERO
-            || bp.anti_missile > Fx::ZERO)
+            || bp.anti_missile > Fx::ZERO
+            || bp.warp_damper.is_some())
 }
 
 impl World {

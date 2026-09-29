@@ -1,6 +1,6 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
-//! curving charges) must hash identically at every worker count and after a snapshot is
+//! curving charges, a warp into a dampener and the stun it leaves) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -117,6 +117,9 @@ fn setup(w: &mut World) {
             0 => {
                 add("aster_t5_titan", 1, 1000, 900);
                 add("aster_t4_nuke_silo", 1, 300, 250);
+                // A Courier that warps into the north's dampener (`warp.rs`), on its own power.
+                add("aster_t1_lift_ship", 1, 2000, 100);
+                add("aster_t3_power", 1, 400, 150);
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);
@@ -124,6 +127,7 @@ fn setup(w: &mut World) {
                 add("aster_t4_artillery", 1, 300, 250);
                 add("aster_t3_power", 1, 700, 150);
                 add("aster_t2_radar", 1, 150, 150);
+                add("aster_t2_warp_damper", 1, 1300, 300);
             }
         }
     }
@@ -178,6 +182,26 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 command: Command::LaunchNuke {
                     units: vec![silo],
                     pos: FxVec2::from_ints(900, 3300),
+                },
+            }]
+        }
+        // Charged on a strained grid by tick ~150, dragged through the dampener's field, and stunned across
+        // the snapshot at `SNAPSHOT_AT`.
+        60 => {
+            let courier = w.blueprints.id_of("aster_t1_lift_ship").unwrap();
+            let u = &w.state.units;
+            let ship = u
+                .slots
+                .iter()
+                .find(|&r| u.blueprint[r] == courier)
+                .map(|r| u.id(r))
+                .unwrap();
+            vec![PlayerCommand {
+                player: 0,
+                command: Command::Warp {
+                    units: vec![ship],
+                    pos: FxVec2::from_ints(2000, 3700),
+                    queue: false,
                 },
             }]
         }

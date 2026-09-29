@@ -17,6 +17,8 @@
         cost: (mass: 5000, energy: 60000, time: 20000),
         radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 1900, radar: 2400,
         motion: (layer: Air, size: 0, speed: 60, accel: 6, turn: 8, altitude: 560, hover: true),
+        // The longest jump of the line, and the slowest to spool and to recharge.
+        warp: (range: 12000, energy: 20000, spool: 5, cooldown: 75, speed: 4000),
         hull_mounts: true,
         weapons: [
             // Fixed along the keel: the ship turns and pitches to aim it. Charges, then one

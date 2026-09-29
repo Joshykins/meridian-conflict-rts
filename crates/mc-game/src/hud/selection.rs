@@ -175,6 +175,7 @@ pub fn activity(kind: OrderKind) -> &'static str {
         OrderKind::Board => "Boarding",
         OrderKind::Land => "Setting Down",
         OrderKind::Unload => "Unloading",
+        OrderKind::Warp => "Warping",
     }
 }
 

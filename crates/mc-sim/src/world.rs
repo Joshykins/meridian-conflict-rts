@@ -667,6 +667,10 @@ impl World {
             self.lose_orphaned_cargo()?;
         }
         {
+            let _t = mc_core::perf_span!("fn.run_warps");
+            self.run_warps()?;
+        }
+        {
             let _t = mc_core::perf_span!("fn.run_transports");
             self.run_transports();
         }

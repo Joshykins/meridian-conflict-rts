@@ -71,6 +71,7 @@ mod torpedo_bomber;
 mod trees;
 mod untrusted_input;
 mod volatile;
+mod warp;
 mod zz_ai_duel_probe;
 mod zz_ai_layout_probe;
 mod zz_ai_stall_probe;

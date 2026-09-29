@@ -238,6 +238,42 @@ pub struct Units {
     pub hangar: Vec<UnitId>,
     /// `Bombard`: the point each weapon is laying on, chosen after its last salvo.
     pub ground_aim: Vec<[FxVec2; MAX_WEAPONS]>,
+    /// A capital ship's warp drive: where it is in a jump, and its recharge (`warp.rs`).
+    pub warp: Vec<WarpState>,
+    /// Stunned by an EMP (a dampened warp): ticks left, then the whole stun's length.
+    /// A stunned unit does nothing: no orders, no fire, no way on (`warp.rs`).
+    pub stun: Vec<[u16; 2]>,
+}
+
+/// Where a capital ship is in a jump (`warp.rs`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WarpPhase {
+    #[default]
+    Idle,
+    /// Spooling the drive where it is, and bringing its nose onto the mark.
+    Spool,
+    /// Out of the world: not drawn, seen, hit or ordered. It is already where it will
+    /// come out (`pos` is `to`).
+    Transit,
+    /// Back in the world, the drive winding down.
+    Emerge,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WarpState {
+    pub phase: WarpPhase,
+    /// Ticks spent in this phase, and how many it lasts.
+    pub ticks: u16,
+    pub length: u16,
+    /// Where the jump starts and where it comes out.
+    pub from: FxVec2,
+    pub to: FxVec2,
+    /// The dampener dragging this jump down; `NONE` for a clean one.
+    pub damper: UnitId,
+    /// Ticks until the drive can spool again.
+    pub recharge: u16,
+    /// Spooling: energy charged into the drive so far, toward `Warp::energy`.
+    pub charge: Fx,
 }
 
 pub struct UnitSpawn {
@@ -322,6 +358,8 @@ impl Units {
             paused: Vec::new(),
             hangar: Vec::new(),
             ground_aim: Vec::new(),
+            warp: Vec::new(),
+            stun: Vec::new(),
         }
     }
 
@@ -402,6 +440,8 @@ impl Units {
             row,
             [FxVec2::from_ints(-1_000_000, -1_000_000); MAX_WEAPONS],
         );
+        put(&mut self.warp, row, WarpState::default());
+        put(&mut self.stun, row, [0; 2]);
         Ok(row)
     }
 
@@ -522,6 +562,23 @@ impl Units {
                 h.write_i64(p.x.0);
                 h.write_i64(p.y.0);
             }
+            let warp = &self.warp[row];
+            h.write_u64(
+                warp.phase as u64
+                    | (warp.ticks as u64) << 8
+                    | (warp.length as u64) << 24
+                    | (warp.recharge as u64) << 40,
+            );
+            h.write_i64(warp.from.x.0);
+            h.write_i64(warp.from.y.0);
+            h.write_i64(warp.to.x.0);
+            h.write_i64(warp.to.y.0);
+            h.write_i64(warp.charge.0);
+            h.write_u64(
+                warp.damper.0 as u64
+                    | (self.stun[row][0] as u64) << 32
+                    | (self.stun[row][1] as u64) << 48,
+            );
             for w in 0..MAX_WEAPONS {
                 h.write_u64(
                     self.weapon_cooldown[row][w] as u64
@@ -581,6 +638,8 @@ pub enum OrderKind {
     Unload,
     /// `AttackGround` with a giant's storm bore alone (`Command::Strike`).
     Strike,
+    /// A capital ship jumps to `pos` through warp (`warp.rs`).
+    Warp,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

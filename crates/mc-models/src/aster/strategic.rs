@@ -1214,6 +1214,15 @@ mod tests {
         assert_eq!(l::ICON_SILO, mc_data::IconKind::Silo as u32);
     }
 
+    /// The shaders read a ship's jump by `gpu_consts::warp_status`'s copy of the bits.
+    #[test]
+    fn the_warp_bits_match_the_sim() {
+        use crate::gpu_consts::warp_status as w;
+        use mc_sim::mirror as m;
+        assert_eq!(w::DAMPED, m::UNIT_WARP_DAMPED);
+        assert_eq!(w::IN_WARP, m::UNIT_IN_WARP);
+    }
+
     /// The shader reads a walker's twin arm gun by `gpu_consts::arm_twin`'s copy of the bits.
     #[test]
     fn the_twin_arm_bits_match_the_sim() {

@@ -47,7 +47,7 @@
                         health: 3000, regen: 5, build_power: 20, build_range: 5,
                         // The suite's gear comes to work (turns, opens) over this long.
                         unfold: 0.6,
-                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_aa", "aster_t2_missile_defense"],
+                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_warp_damper", "aster_t2_aa", "aster_t2_missile_defense"],
                     ),
                     (
                         key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
@@ -56,7 +56,7 @@
                         health: 7000, regen: 15, build_power: 60, build_range: 10,
                         // The lance runs out past the projector while it builds: the beam leaves its tip.
                         arm_emitter: (12.0, 4.8, 15.52),
-                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t3_sam", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery"],
+                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_warp_damper", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t3_sam", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery"],
                     ),
                 ],
             ),
@@ -207,7 +207,7 @@
         vision: 200,
         motion: (layer: Hover, size: 0, speed: 29, accel: 29, turn: 150),
         builder: (power: 20, range: 60, arm: (turn: 200, rest: 85, emitter: (2.567, 0, 2.146), pivot: (1.108, 0, 2.146), shoulder: (0, 0, 1.587)), builds: [
-            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t1_reclaimer", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t2_lift_ship",
+            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t1_reclaimer", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_warp_damper", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t2_lift_ship",
         ]),
         upgrades_to: "aster_t3_engineer",
         mesh: "engineer", icon: Engineer,
@@ -225,7 +225,7 @@
         vision: 220,
         motion: (layer: Hover, size: 1, speed: 28, accel: 28, turn: 150),
         builder: (power: 60, range: 70, arm: (turn: 200, rest: 85, emitter: (2.933, 0, 2.371), pivot: (1.267, 0, 2.371), shoulder: (0, 0, 1.753)), builds: [
-            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t1_reclaimer", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_sam", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery",
+            "aster_t1_lift_ship", "aster_t1_land_factory", "aster_t1_air_factory", "aster_t1_naval_factory", "aster_core_mine", "aster_t1_power", "aster_mass_storage", "aster_energy_storage", "aster_t1_point_defense", "aster_t1_radar", "aster_t1_sonar", "aster_wall", "aster_t1_reclaimer", "aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_t2_sonar", "aster_t2_shield", "aster_t2_warp_damper", "aster_t3_land_factory", "aster_t3_air_factory", "aster_t3_naval_factory", "aster_core_mine_t3", "aster_t3_power", "aster_t3_reclaimer", "aster_t3_radar", "aster_mass_storage_t3", "aster_t3_sonar", "aster_t3_shield", "aster_t1_aa", "aster_t2_aa", "aster_t2_missile_defense", "aster_t3_sam", "aster_t3_point_defense", "aster_t2_lift_ship", "aster_t3_frigate", "aster_t4_assault_tank", "aster_t5_titan", "aster_t4_anti_ship", "aster_t3_nuke_defense", "aster_t4_nuke_silo", "aster_t4_artillery",
         ]),
         mesh: "engineer", icon: Engineer,
         sounds: (moving: "tracks"),

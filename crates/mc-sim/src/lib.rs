@@ -73,6 +73,7 @@ pub mod trees;
 mod validate;
 pub mod veterancy;
 mod volley;
+pub mod warp;
 pub mod world;
 
 pub use command::{Command, PlayerCommand};

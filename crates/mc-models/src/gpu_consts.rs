@@ -425,6 +425,16 @@ shared! {
         pub const RIGHT: u32 = 0x20;
     }
 
+    /// A capital ship's jump in `UnitInstance::status[0]` (`mc_sim::mirror::UNIT_WARP_DAMPED`
+    /// and `UNIT_IN_WARP`; a test holds them equal). `UnitInstance::fx` carries the warp
+    /// stretch and the EMP stun.
+    pub mod warp_status as "WARP_STATUS_" {
+        /// The jump is snagged by a live enemy dampener: torn and slow.
+        pub const DAMPED: u32 = 0x1000;
+        /// In warp: listed for its own side, never drawn.
+        pub const IN_WARP: u32 = 0x2000;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

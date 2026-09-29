@@ -97,6 +97,10 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     if dynamic && (e.status[0] & 0x800u) != 0u {
         return NOT_VISIBLE;
     }
+    // A ship in warp is out of the world: listed for its side, not drawn.
+    if dynamic && (e.status[0] & WARP_STATUS_IN_WARP) != 0u {
+        return NOT_VISIBLE;
+    }
     let model = models[e.blueprint];
     let t = globals.sun.w;
     var scale = 1.0;

@@ -471,6 +471,7 @@ impl World {
             } => self.order_land(player, units, *pos, *unload, *queue),
             Command::Unload { units } => self.order_unload(player, units),
             Command::TakeOff { units } => self.order_take_off(player, units),
+            Command::Warp { units, pos, queue } => self.order_warp(player, units, *pos, *queue),
             Command::LaunchNuke { units, pos } => {
                 self.launch_nuke(player, units, *pos);
                 Ok(())
@@ -1474,6 +1475,10 @@ impl World {
             if self.state.units.drone_parent[row] != Handle::NONE {
                 continue;
             }
+            // Stunned: its orders wait for it (`warp.rs`).
+            if self.stunned(row) {
+                continue;
+            }
             let Some(o) = self.state.orders.front(&self.state.units, row).copied() else {
                 if self.is_air(row)
                     && !self.bp(row).weapons.is_empty()
@@ -1521,6 +1526,7 @@ impl World {
                 OrderKind::Guard => self.run_guard(row, &o)?,
                 OrderKind::Board => self.run_board(row, &o)?,
                 OrderKind::Land | OrderKind::Unload => self.run_land(row, &o)?,
+                OrderKind::Warp => self.run_warp_order(row, &o)?,
             }
             // A salvage vehicle, boat or aircraft clears what it passes as it goes.
             if matches!(

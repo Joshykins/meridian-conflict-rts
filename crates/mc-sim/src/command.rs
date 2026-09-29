@@ -331,6 +331,13 @@ pub enum Command {
     SetFocus {
         focus: crate::focus::Focus,
     },
+    /// Capital ships among these with a warp drive spool up, turn onto `pos` and jump
+    /// there, or as far toward it as the drive reaches (`warp.rs`).
+    Warp {
+        units: Vec<UnitId>,
+        pos: FxVec2,
+        queue: bool,
+    },
 }
 
 impl Command {
@@ -385,7 +392,8 @@ impl Command {
             | Command::TakeOff { units }
             | Command::LaunchNuke { units, .. }
             | Command::SetAutoBuild { units, .. }
-            | Command::QueueRounds { units, .. } => units.len(),
+            | Command::QueueRounds { units, .. }
+            | Command::Warp { units, .. } => units.len(),
 
             Command::Produce { factories, .. }
             | Command::CancelProduce { factories, .. }

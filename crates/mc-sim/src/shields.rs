@@ -83,9 +83,12 @@ impl World {
         !p.free_build && p.energy < DRY && p.energy_demand > p.energy_income
     }
 
-    /// This unit's shield has no power: its side's energy is stalled, or it is paused.
+    /// This unit's shield has no power: its side's energy is stalled, it is paused, or
+    /// it is stunned (`warp.rs`).
     pub(crate) fn shield_off(&self, row: usize) -> bool {
-        self.powered_down(row) || self.shields_unpowered(self.state.units.owner[row])
+        self.powered_down(row)
+            || self.stunned(row)
+            || self.shields_unpowered(self.state.units.owner[row])
     }
 
     fn shield_wants_up(&self, row: usize) -> bool {

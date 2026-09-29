@@ -7,6 +7,9 @@
         radius: 58, height: 38, footprint: (10, 6), hull: (59, 36), vision: 320,
         motion: (layer: Air, size: 0, speed: 150, accel: 42, turn: 90, altitude: 140, hover: true, deploy: 0.9),
         transport: (capacity: 8, descent: 60, hold: (14, 0), ramp: (-36, -42), width: 28, floor: 0, clearance: 26, unload: 0.25),
+        // Warp: a short-legged drive, quick to charge and quick to recharge. The charge
+        // drains its energy off the grid in the spool's seconds; slower in a stall.
+        warp: (range: 6000, energy: 1500, spool: 3, cooldown: 40, speed: 3000),
         weapons: [], mesh: "light_transport", icon: Transport,
         sounds: (death: "blast_small", moving: "aster_courier"),
     ),
@@ -237,6 +240,7 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "shell_heavy"))],
  radius: 160, height: 95, footprint: (28, 13), hull: (166, 76), vision: 520,
  motion: (layer: Air, size: 0, speed: 78, accel: 9, turn: 12, altitude: 560, hover: true, deploy: 3.5),
  transport: (capacity: 96, descent: 40, hold: (20, 0), ramp: (-16, -84), width: 40, floor: 34, clearance: 34, unload: 0.4),
+ warp: (range: 9000, energy: 8000, spool: 4, cooldown: 60, speed: 3500),
  hull_mounts: true,
  weapons: [
   // Nose: a long-reach chin turret, slower to traverse, 160 degrees across the bow.

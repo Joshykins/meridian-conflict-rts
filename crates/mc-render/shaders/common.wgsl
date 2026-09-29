@@ -135,6 +135,9 @@ struct Entity {
     mount: vec4<f32>,
     // Rotary barrels turned last tick and this, then the mounted tube's kick last tick and this.
     spin_recoil: vec4<f32>,
+    // Warp stretch last tick and this (0 whole, 1 a streak of light), then the EMP stun
+    // last tick and this (0 to 1).
+    fx: vec4<f32>,
 }
 
 // One per blueprint / prop kind.

@@ -414,6 +414,37 @@ pub struct Transport {
     pub unload_ticks: u16,
 }
 
+/// A capital ship's warp drive (`mc_sim::warp`): it spools up on the spot, turns its nose to
+/// where it is going, drops out of the world and comes out again up to `range` away.
+#[derive(Clone, Copy, Debug)]
+pub struct Warp {
+    /// Farthest jump, metres; a farther mark is brought in along the line to it.
+    pub range: Fx,
+    /// Energy one jump's charge takes, drawn over `spool_ticks` while the grid can pay
+    /// (slower while it cannot).
+    pub energy: Fx,
+    /// Ticks the drive takes to charge at full power; it jumps once charged and its nose
+    /// is on the mark.
+    pub spool_ticks: u16,
+    /// Ticks after coming out before the drive can spool again.
+    pub cooldown_ticks: u16,
+    /// Metres a tick the ship covers in warp: the transit lasts as long as the jump is far.
+    pub speed: Fx,
+}
+
+/// A warp dampener (`mc_sim::warp`): an enemy ship whose jump ends inside `radius` of it is
+/// dragged through a slow, torn warp and thrown out hurt and stunned.
+#[derive(Clone, Copy, Debug)]
+pub struct WarpDamper {
+    pub radius: Fx,
+    /// How many times longer a dampened transit lasts.
+    pub drag: Fx,
+    /// Share of its full health a dampened ship loses as it comes out.
+    pub damage: Fx,
+    /// Ticks a dampened ship lies stunned after coming out.
+    pub stun_ticks: u16,
+}
+
 /// The authored unit a compiled blueprint came from: itself, or the unit a loadout or kit is of.
 fn refits_base(refits: &[RefitSet], bp: &UnitBlueprint) -> BlueprintId {
     match bp.refit {
@@ -618,6 +649,10 @@ pub struct UnitBlueprint {
     pub reclaimer: Option<Reclaimer>,
     /// A lift ship: carries land units in its hold.
     pub transport: Option<Transport>,
+    /// A capital ship's warp drive.
+    pub warp: Option<Warp>,
+    /// A structure that drags enemy warps down around it.
+    pub warp_damper: Option<WarpDamper>,
     /// A projected dome, or a hull wrap that only covers this unit.
     pub shield: Option<Shield>,
     pub upgrades_to: Option<BlueprintId>,
@@ -1299,6 +1334,24 @@ impl Blueprints {
                     ] {
                         h.write_i64(v.0);
                     }
+                }
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.warp {
+                Some(d) => {
+                    h.write_u64(d.spool_ticks as u64 | (d.cooldown_ticks as u64) << 16);
+                    h.write_i64(d.range.0);
+                    h.write_i64(d.speed.0);
+                    h.write_i64(d.energy.0);
+                }
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.warp_damper {
+                Some(d) => {
+                    h.write_u64(d.stun_ticks as u64);
+                    h.write_i64(d.radius.0);
+                    h.write_i64(d.drag.0);
+                    h.write_i64(d.damage.0);
                 }
                 None => h.write_u64(u64::MAX),
             }

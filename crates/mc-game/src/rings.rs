@@ -714,6 +714,7 @@ mod tests {
             status: [0; 3],
             mount: [0.0; 4],
             spin_recoil: [0.0; 4],
+            fx: [0.0; 4],
         }
     }
 
@@ -821,6 +822,7 @@ mod tests {
             status: [0; 3],
             mount: [0.0; 4],
             spin_recoil: [0.0; 4],
+            fx: [0.0; 4],
         };
         let (one, drawn) = rings.collect([&unit].into_iter(), 0.5, true, &|_| 0.0);
         assert_eq!((one.len(), drawn), (1, 1));
@@ -877,6 +879,7 @@ mod tests {
             status: [0; 3],
             mount: [0.0; 4],
             spin_recoil: [0.0; 4],
+            fx: [0.0; 4],
         };
         let block: Vec<UnitInstance> = (0..15)
             .flat_map(|x| {

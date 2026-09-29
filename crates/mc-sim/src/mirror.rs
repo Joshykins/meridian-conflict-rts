@@ -21,7 +21,9 @@ use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
 mod walls;
+mod warp;
 pub use walls::{join_walls, WALL_JOINS};
+pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
 
 /// Wave origins drawn at once. A crowd on one site is clustered before it lands here.
 pub const MAX_CONSTRUCTION_WELDS: usize = 2048;
@@ -351,6 +353,45 @@ pub enum SimEvent {
         owner: u8,
         warhead: bool,
     },
+    /// A capital ship began spooling its drive at `from` for a jump to `to`; it jumps in
+    /// `ticks` at the soonest, once its nose is on the mark (`warp.rs`).
+    WarpSpooling {
+        unit: UnitId,
+        from: FxVec3,
+        to: mc_core::FxVec2,
+        ticks: u16,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
+    /// It went into warp at `from`, bound for `to`, and comes out in `ticks`: `dampened`
+    /// when an enemy dampener's field already covers `to`.
+    WarpJumped {
+        unit: UnitId,
+        from: FxVec3,
+        to: FxVec3,
+        ticks: u16,
+        dampened: bool,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
+    /// A dampener raised part way through a jump snagged it: it drags on, torn.
+    WarpSnagged {
+        unit: UnitId,
+        at: mc_core::FxVec2,
+    },
+    /// It came out of warp at `at`; `dampened`: thrown out hurt and stunned.
+    WarpArrived {
+        unit: UnitId,
+        at: FxVec3,
+        dampened: bool,
+        blueprint: BlueprintId,
+        owner: u8,
+    },
+    /// An EMP stunned `unit` for `ticks`.
+    Stunned {
+        unit: UnitId,
+        ticks: u16,
+    },
 }
 
 #[repr(C)]
@@ -421,9 +462,13 @@ pub struct UnitInstance {
     /// A rotary gun's barrels, turned last tick and this (radians, unwrapped between the
     /// two); then the mounted weapon's kick-back, last tick and this (1 the instant it fires).
     pub spin_recoil: [f32; 4],
+    /// A warp and an EMP (`crate::warp`): how far into its warp streak it is, last tick
+    /// and this (0 whole, 1 a streak of light), then how stunned it is, last tick and
+    /// this (0 to 1, falling to 0 over the stun's last seconds).
+    pub fx: [f32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<UnitInstance>() == 192);
+const _: () = assert!(std::mem::size_of::<UnitInstance>() == 208);
 
 impl UnitInstance {
     pub fn pack_veterancy(kills: u32, level: u8, progress: f32) -> u32 {
@@ -1115,6 +1160,50 @@ pub struct RenderFrame {
     pub warhead_tracks: Vec<crate::nukes::WarheadTrack>,
     /// Launches ordered and not yet away, the viewer's side only (everyone's with no viewer).
     pub planned_launches: Vec<crate::nukes::PlannedLaunch>,
+    /// Capital ships in a jump that the viewer may see (`crate::warp`).
+    pub warps: Vec<WarpView>,
+    /// Warp dampeners the viewer knows of, and their fields.
+    pub dampers: Vec<DamperView>,
+}
+
+/// A capital ship in a jump (`crate::warp`), for the effects, the sound and the interface.
+#[derive(Clone, Copy, Debug)]
+pub struct WarpView {
+    pub unit_id: u32,
+    pub owner: u8,
+    pub blueprint: BlueprintId,
+    pub phase: crate::tables::WarpPhase,
+    /// Ticks into this phase, and how many it lasts. A spool can run past its length
+    /// while the nose comes round onto the mark; a transit snagged part way grows.
+    pub ticks: u16,
+    pub length: u16,
+    /// Where it jumps from and comes out, at cruise height over each.
+    pub from: [f32; 3],
+    pub to: [f32; 3],
+    /// Which way the jump runs, radians (as `UnitInstance::heading`).
+    pub bearing: f32,
+    /// The hull's radius, metres.
+    pub radius: f32,
+    /// A live enemy dampener has the jump: slow, torn, and it comes out hurt and stunned.
+    pub dampened: bool,
+    /// Spooling: how far the drive is charged, 0 to 1 (1 from the jump on).
+    pub charge: f32,
+    /// Energy the whole charge takes.
+    pub energy: f32,
+    /// Energy the grid is asked for each second while it charges at full power.
+    pub draw: f32,
+}
+
+/// A warp dampener and its field.
+#[derive(Clone, Copy, Debug)]
+pub struct DamperView {
+    pub unit_id: u32,
+    pub owner: u8,
+    pub pos: [f32; 3],
+    /// How far its field reaches, metres.
+    pub radius: f32,
+    /// Finished and powered: its field is up.
+    pub live: bool,
 }
 
 /// A warhead or an interceptor in flight. Seen by everyone, fog or no fog.
@@ -1530,11 +1619,21 @@ impl World {
             Some(q(up[0]) | q(up[1]) << 16)
         };
         for row in s.units.slots.iter() {
-            if let Some(v) = viewer {
-                if self.are_enemies(v, s.units.owner[row]) && !self.detects_for_team(v, row) {
-                    continue;
+            let shown = self.warp_shown(viewer, row);
+            let leaving = matches!(shown, warp::Shown::Leaving);
+            match shown {
+                warp::Shown::Hidden => continue,
+                warp::Shown::Plain => {
+                    if let Some(v) = viewer {
+                        if self.are_enemies(v, s.units.owner[row]) && !self.detects_for_team(v, row)
+                        {
+                            continue;
+                        }
+                    }
                 }
+                warp::Shown::Leaving | warp::Shown::Listed => {}
             }
+            let (warp_fx, warp_marks) = self.warp_fx(row);
             let bp = self.bp(row);
             // A refit is shown on the unit being refitted, not as a second unit inside it.
             if s.units.has_flag(row, crate::tables::flag::UPGRADE) {
@@ -1559,7 +1658,15 @@ impl World {
                 });
             let step = s.units.gait_step[row];
             let mut flags = s.units.flags[row];
-            let contact = self.contact_flags(viewer, row);
+            // In warp it is out of the world, not in a factory: drawn as it leaves, then only listed.
+            if !matches!(shown, warp::Shown::Plain) {
+                flags &= !crate::tables::flag::IN_FACTORY;
+            }
+            let contact = if matches!(shown, warp::Shown::Plain) {
+                self.contact_flags(viewer, row)
+            } else {
+                0
+            };
             if contact & STATE_RADAR != 0 && flags & crate::tables::flag::IN_FACTORY != 0 {
                 continue;
             }
@@ -1665,8 +1772,14 @@ impl World {
                 },
                 prev_heading: s.units.prev_heading[row].to_radians_f32(),
                 pos: {
-                    let mut p = s.units.pos[row].extend(s.units.z[row]).to_f32();
-                    p[2] += on_deck(row, s.units.pos[row]);
+                    // The tick it jumps it is drawn where it left, streaking out (`warp.rs`).
+                    let (at, z) = if leaving {
+                        (s.units.prev_pos[row], s.units.prev_z[row])
+                    } else {
+                        (s.units.pos[row], s.units.z[row])
+                    };
+                    let mut p = at.extend(z).to_f32();
+                    p[2] += on_deck(row, at);
                     p
                 },
                 heading: s.units.heading[row].to_radians_f32(),
@@ -1782,7 +1895,8 @@ impl World {
                             UNIT_ON_DECK
                         } else {
                             0
-                        },
+                        }
+                        | warp_marks,
                     house.map_or(0, |i| (i as u32 + 1) << UNIT_HOUSE_SHIFT)
                         | twin.map_or(0, |(w, right)| {
                             (w as u32 + 1) << UNIT_TWIN_SHIFT
@@ -1802,6 +1916,7 @@ impl World {
                     ]
                 }),
                 spin_recoil: [spin[0], spin[1], prev_mount_kick, mount_kick],
+                fx: warp_fx,
             });
         }
 
@@ -2369,6 +2484,7 @@ impl World {
                 status: [0; 3],
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
+                fx: [0.0; 4],
             });
         }
 
@@ -2670,6 +2786,8 @@ impl World {
             &mut frame.warhead_tracks,
             &mut frame.planned_launches,
         );
+        self.write_warps(viewer, &mut frame.warps);
+        self.write_dampers(viewer, &mut frame.dampers);
 
         frame.fog.clear();
         frame.fog_dims = self.fog.dims();

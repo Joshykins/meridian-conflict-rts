@@ -1135,6 +1135,7 @@ impl OrderMap {
                 status: [0; 3],
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
+                fx: [0.0; 4],
             });
         }
         outlined
@@ -1507,9 +1508,11 @@ fn tone_of(kind: OrderKind) -> u32 {
         | OrderKind::AttackGround
         | OrderKind::Strike
         | OrderKind::Bombard => palette::BAD,
-        OrderKind::Move | OrderKind::Board | OrderKind::Land | OrderKind::Unload => {
-            hud::style::Family::Movement.tone()
-        }
+        OrderKind::Move
+        | OrderKind::Board
+        | OrderKind::Land
+        | OrderKind::Unload
+        | OrderKind::Warp => hud::style::Family::Movement.tone(),
         OrderKind::Patrol => PATROL,
         OrderKind::Guard => hud::style::Family::Stance.tone(),
         OrderKind::Build | OrderKind::Assist => palette::WARN,
