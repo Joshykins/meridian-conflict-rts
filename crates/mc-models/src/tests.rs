@@ -708,7 +708,7 @@ const OVER_BUDGET: &[Over] = &[
     ("precursor_seaway", None, Some(1.0), None),
     // The Corona is a small tower; most of its mid detail is its laser heads and radar.
     ("missile_defense", None, Some(0.6), None),
-    // The Vigil is small and plain; most of its mid detail is its drive and lift jets.
+    // The Vigil is small; most of its mid detail is its drive, lift jets, legs and booms.
     ("sensor_ship", None, Some(0.56), None),
     // The Valiant's mid detail is mostly its shared rig: drives, legs, lift jets, the
     // Resolute's rail house and the Bastion's rotary gun.
@@ -836,8 +836,9 @@ fn lods_reduce_and_respect_budgets() {
             // house and the rotary gun.
             8500
         } else if model.key == "sensor_ship" {
-            // 72 m tech 1 sensor spacecraft: one drive bell, lift jets, the sensor head.
-            5000
+            // 72 m tech 1 sensor spacecraft: one drive bell, lift jets, legs in belly
+            // bays, two sensor booms ringed with scan fins.
+            7500
         } else if base_key(&model.key) == "submarine_titan" {
             // The tech 4 Megalodon, 110 m, one or two a match: six bow tube doors, four
             // AEB hatches, the nuclear silo lids, two rail turrets on houses of their own.

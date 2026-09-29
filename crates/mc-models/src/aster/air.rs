@@ -84,8 +84,8 @@ pub(crate) fn light_transport(b: &mut MeshBuilder, _tech: u8) {
     courier::build(b);
 }
 
-/// Vigil: the tech 1 sensor ship, a small single-drive spacecraft with a hammerhead of
-/// sensors across its bow ([`vigil`]).
+/// Vigil: the tech 1 sensor ship, a small single-drive spacecraft with two sensor booms
+/// reaching out from its prow ([`vigil`]).
 pub(crate) fn sensor_ship(b: &mut MeshBuilder, _tech: u8) {
     vigil::build(b);
 }

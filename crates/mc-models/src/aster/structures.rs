@@ -1088,7 +1088,15 @@ fn scan_fin(b: &mut MeshBuilder, z0: f32, z1: f32, r0: f32, r1: f32, width: f32,
 
 /// Three fins around the mast. Each tier keeps a real segment, not a
 /// shrinking ring.
-fn scan_wreath(b: &mut MeshBuilder, z0: f32, z1: f32, r0: f32, r1: f32, yaw: f32, lit: bool) {
+pub(super) fn scan_wreath(
+    b: &mut MeshBuilder,
+    z0: f32,
+    z1: f32,
+    r0: f32,
+    r1: f32,
+    yaw: f32,
+    lit: bool,
+) {
     let width = ((r0 + r1) * 0.46).clamp(0.9, 1.6);
     b.yawed(Vec3::ZERO, yaw, |b| {
         b.radial(3, |b| scan_fin(b, z0, z1, r0, r1, width, lit));

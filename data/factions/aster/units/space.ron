@@ -3,10 +3,11 @@
 // of their own (`footprint` on a mobile unit) and the finished ship climbs off it.
 [
     (
-        // The Reach's eyes in the upper air: a small single-drive hull with a hammerhead of
-        // sensors across its bow, a tech 2 tower's reach that goes where the army goes.
-        // Unarmed. It hangs at fighter height, inside the reach of tech 1 anti-air, and its
-        // radar draws power like a tower's: an energy stall (or a pause) blinds it.
+        // The Reach's eyes in the upper air: a small single-drive hull with two sensor booms
+        // reaching out ahead of its prow, a tech 2 tower's reach that goes where the army goes.
+        // Unarmed. It hangs above fighter height but still inside the reach of tech 1
+        // anti-air (420 m), and its radar draws power (less than a tower's: it is a tech 1
+        // ship): an energy stall (or a pause) blinds it.
         key: "aster_t1_sensor_ship",
         name: "Vigil",
         role: "Sensor Ship",
@@ -15,10 +16,10 @@
         health: 700,
         cost: (mass: 280, energy: 4200, time: 1400),
         radius: 36, height: 22, footprint: (6, 5), hull: (36, 27), vision: 1500, radar: 6000,
-        motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 200, hover: true),
+        motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 280, hover: true),
         // Warp: a scout's light drive, cheaper to charge than the Courier's.
         warp: (energy: 1200, spool: 3, cooldown: 40, speed: 3000),
-        economy: (energy_upkeep: 100),
+        economy: (energy_upkeep: 40),
         weapons: [],
         mesh: "sensor_ship", icon: SensorShip,
         sounds: (death: "blast_small", moving: "aster_vigil"),
