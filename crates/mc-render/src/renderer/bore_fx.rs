@@ -70,16 +70,20 @@ pub(super) struct BoreFx {
     seed: u32,
     /// Bolt rifles charging and firing (renderer/bolt_rifle_fx.rs), their arcs among these strokes.
     pub(super) rifles: super::bolt_rifle_fx::BoltRifleFx,
+    /// Arc Howitzers charging and firing (renderer/arc_howitzer_fx.rs), their arcs among these strokes.
+    pub(super) howitzers: super::arc_howitzer_fx::ArcHowitzerFx,
 }
 
 impl BoreFx {
-    /// A new world: no molten ground, no lightning. The rifles' sequences are kept: this
-    /// runs every tick while a world is young, and they reset themselves when the clock
-    /// goes back.
+    /// A new world: no molten ground, no lightning. The rifles' and howitzers' sequences
+    /// are kept: this runs every tick while a world is young, and they reset themselves
+    /// when the clock goes back.
     pub(super) fn clear(&mut self) {
         let rifles = std::mem::take(&mut self.rifles);
+        let howitzers = std::mem::take(&mut self.howitzers);
         *self = BoreFx {
             rifles,
+            howitzers,
             ..BoreFx::default()
         };
     }

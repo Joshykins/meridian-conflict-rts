@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 mod aircraft_trails;
+mod arc_howitzer_fx;
 mod blast_fx;
 mod bolt_rifle_fx;
 mod bore_fx;
@@ -3164,6 +3165,7 @@ impl Renderer {
         self.write_plasma_fx(units, time);
         self.excavation_tick(units, time, camera);
         self.bolt_rifle_tick(units, time);
+        self.arc_howitzer_tick(units, &frame.houses, time);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, &frame.houses, projectiles, time);
         self.great_gun_tick(projectiles, time);
@@ -3412,6 +3414,7 @@ impl Renderer {
         self.capital_lights(time, alpha);
         self.heavy_rail_lights(time);
         self.bolt_rifle_lights(time);
+        self.arc_howitzer_lights(time);
         let dark = self.sky.darkness();
         let (list, grid) = self.lights.build(time, alpha, camera, dark);
         let list_bytes: &[u8] = bytemuck::cast_slice(list);
@@ -5061,6 +5064,7 @@ impl Renderer {
         if !self.heavy_rail_event(event, time)
             && !self.great_gun_event(event, time)
             && !self.bolt_rifle_event(event, time)
+            && !self.arc_howitzer_event(event, time)
         {
             self.effects_of_inner(event, time);
         }

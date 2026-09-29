@@ -114,10 +114,15 @@ The unit the naval design language is nailed on:
 - Four point-defence lasers (`anti_missile`, `anti_missile_mounts`) burn down missiles; each
   shot comes from the emitter nearest the missile. They do nothing against torpedoes.
 - Its main guns are nine Arc Cannons, three to a house: the Trebuchet's Arc Howitzer made a
-  naval gun, on a flatter arc (`loft: 2`). Each charges for a long beat, then fires a round
-  of blue plasma that bursts in lightning where it lands (`discharge`), a long streak behind
-  it (`streak`), and on land melts a pool of ground that glows and crusts over (`melt`), as
-  the Arc Howitzer's does. They sound like the Trebuchet's.
+  naval gun, on a flatter arc (`loft: 2`). They are direct-fire guns, not artillery
+  (`flat_fire`, as are the secondaries): their range rings are red. All three houses charge
+  together for 3.4 s, arcs running over the tubes and jumping between them, then fire a
+  broadside of blue plasma rounds that burst in lightning where they land (`discharge`), a
+  long streak behind each (`streak`), and on land melt a pool of ground that glows and
+  crusts over (`melt`); the look is the Arc Howitzer's (`howitzer`, STYLE.md).
+  The ship has its own charge and broadside sounds (`leviathan_charge`,
+  `leviathan_broadside`, data/sounds/arc_howitzer.ron): heard as one charge per hull and
+  one report per house.
 - The aft battery traverses inside its arc: from over one bow to the other it swings round
   by the stern, never across the bow it cannot bear through.
 - It outranges its own eyes.

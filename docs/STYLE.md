@@ -365,6 +365,19 @@ the ground, still gathering speed as it strikes; the tube kicks back, the
 ground takes a shock and throws up earth and dust, and a hard thump is heard
 (`aster_stake_drive`). Packing, it all runs the other way.
 
+The howitzer fires in a sequence of its own (`howitzer`: the tube's length and
+housing radius; renderer/arc_howitzer_fx.rs), bigger than the rifle's and built
+up the whole way to the shot: the plasma cells' seams light and arcs crawl over
+them, arcs run up the blade roots and jump from blade edge to blade edge, on a
+house of several tubes (the Leviathan's Arc Cannons) arcs jump between the tubes,
+and in the last part the collar crackles, arcs spit off the muzzle and a knot of
+plasma swells in the bore with sparks drawn in to it. The shot is a white-hot
+core in a blue bloom, a plasma jet down the bore, a shock front, vapour thrown
+out flat and ahead, forks of lightning and blue sparks; after it the blade seams
+flare and cool, arcs die off along the tube and the cells vent haze. Its sounds
+are data/sounds/arc_howitzer.ron: a charge that climbs to the shot and overloads,
+and a report that holds and rolls back as thunder.
+
 - **A shot is one bolt, at once.** The AEB and AEB-2 are `hitscan`: no round is
   seen leaving the gun. After the charge the whole channel lights from muzzle to
   strike: a straight, sustained white-cyan plasma column, surrounded by five
