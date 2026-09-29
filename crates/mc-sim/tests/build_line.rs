@@ -328,3 +328,44 @@ fn engineers_standing_on_a_lot_step_off_it_for_the_builder() {
     });
     assert!(raised, "the site went up instead of being refused");
 }
+
+#[test]
+fn an_engineer_assisting_a_moving_one_keeps_close_behind_it() {
+    let mut w = world();
+    let ids = spawn(
+        &mut w,
+        &[
+            ("aster_t1_engineer", 400, 400, 1000),
+            ("aster_t1_engineer", 380, 400, 1000),
+        ],
+    );
+    let (lead, helper) = (ids[0], ids[1]);
+    w.tick(&[
+        cmd(Command::Assist {
+            units: vec![helper],
+            target: lead,
+            queue: false,
+        }),
+        cmd(Command::Move {
+            units: vec![lead],
+            target: FxVec2::from_ints(1400, 900),
+            queue: false,
+        }),
+    ])
+    .unwrap();
+    let gap = |w: &World| {
+        let (a, b) = (
+            w.state.units.row(lead).unwrap(),
+            w.state.units.row(helper).unwrap(),
+        );
+        w.state.units.pos[a].distance(w.state.units.pos[b]).to_f64()
+    };
+    let mut widest = 0.0f64;
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+        widest = widest.max(gap(&w));
+    }
+    let end = gap(&w);
+    assert!(widest < 45.0, "fell {widest:.0} m behind");
+    assert!(end < 25.0, "ended {end:.0} m away");
+}

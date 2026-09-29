@@ -2827,8 +2827,12 @@ impl World {
                 // With nothing queued behind, stay on the assist until another
                 // order is given, or the target is gone. A full shield, a
                 // finished repair, an idle factory: wait nearby so work can
-                // resume when it appears.
+                // resume when it appears. A unit that walks off is followed
+                // (`assist_follow.rs`).
                 self.state.units.build_target[row] = Handle::NONE;
+                if self.bp(t).is_mobile() {
+                    return self.follow_assisted(row, t);
+                }
                 let (pos, radius) = (self.state.units.pos[t], self.bp(t).radius);
                 self.approach(row, pos, radius)?;
             }
