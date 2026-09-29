@@ -104,8 +104,12 @@ fn an_engineer_upgrades_itself_once_the_side_has_the_tier() {
         .unwrap();
     let before = w.state.units.pos[w.state.units.row(mason).unwrap()];
     // Its own build power puts the next tier on: 900 / 5 = 180 s, with some to spare.
+    let mut paid = (0.0, 0.0);
     for _ in 0..200 * TICKS_PER_SECOND {
         w.tick(&[]).unwrap();
+        let pl = &w.state.players[0];
+        paid.0 += pl.mass_spent.to_f64() / TICKS_PER_SECOND as f64;
+        paid.1 += pl.energy_spent.to_f64() / TICKS_PER_SECOND as f64;
         if w.state
             .units
             .row(mason)
@@ -121,6 +125,9 @@ fn an_engineer_upgrades_itself_once_the_side_has_the_tier() {
         .expect("the same unit after the upgrade");
     assert_eq!(w.state.units.blueprint[row], t2);
     assert_eq!(w.state.units.pos[row], before, "upgraded where it stood");
+    // It paid only what tech 2 costs over tech 1: 200 - 52 materials, 1200 - 260 energy.
+    assert!((paid.0 - 148.0).abs() < 2.0, "paid {} materials", paid.0);
+    assert!((paid.1 - 940.0).abs() < 10.0, "paid {} energy", paid.1);
     assert!(w.state.orders.front(&w.state.units, row).is_none());
     // Nothing is left behind: no second engineer, finished or not.
     let u = &w.state.units;

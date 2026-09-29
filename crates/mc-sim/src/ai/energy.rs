@@ -89,7 +89,7 @@ impl World {
             .as_ref()
             .map_or(crate::orders::SELF_UPGRADE_POWER, |b| b.power);
         if next.build_time > Fx::ZERO {
-            power * next.cost_energy / next.build_time
+            power * self.blueprints.upgrade_cost(next).1 / next.build_time
         } else {
             Fx::ZERO
         }

@@ -80,7 +80,9 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 - Reactors: 20 / 250 / 1500 energy/s for 75 / 700 / 2800 mass; each tier is cheaper per unit
   of energy than the one below.
 - Factories: build power 20 / 80 / 200, so about seven factories spend the income at every
-  tier. Engineers 5 / 20 / 60.
+  tier. Engineers 5 / 20 / 60. An engineer upgrading itself pays only what its new tier costs
+  over its old one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy);
+  structures pay for the whole new tier.
 - Commander's Material Formation Engine: +6 mass, +250 energy a second (about a good tech 1
   mine and a tech 2 reactor) for 1600 mass; it was +12 / +2000, worth a hundred tech 1 reactors.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:

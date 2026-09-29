@@ -876,6 +876,23 @@ impl Blueprints {
             .unwrap_or(1)
     }
 
+    /// What upgrading a unit into `to` costs, (materials, energy). An engineer pays only
+    /// what its new tier costs over the one it is; a structure pays for the whole new tier.
+    pub fn upgrade_cost(&self, to: &UnitBlueprint) -> (Fx, Fx) {
+        let from = self
+            .units
+            .iter()
+            .find(|u| u.upgrades_to == Some(to.id))
+            .filter(|_| to.is_mobile());
+        match from {
+            Some(f) => (
+                (to.cost_mass - f.cost_mass).max(Fx::ZERO),
+                (to.cost_energy - f.cost_energy).max(Fx::ZERO),
+            ),
+            None => (to.cost_mass, to.cost_energy),
+        }
+    }
+
     /// The tier a side must have reached before a unit may upgrade itself into `to`.
     /// Economy structures (mines, vaults, reclaim towers) climb only as far as the
     /// side's own tech: the economy cannot run a tier ahead of what can spend it.

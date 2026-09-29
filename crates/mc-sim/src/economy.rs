@@ -170,9 +170,10 @@ impl World {
                 [Fx::ZERO, tbp.cost_energy * progress / tbp.build_time]
             } else {
                 let scale = repair_scale(repair);
+                let (mass, energy) = self.work_cost(target, repair);
                 [
-                    tbp.cost_mass * progress / tbp.build_time * scale,
-                    tbp.cost_energy * progress / tbp.build_time * scale,
+                    mass * progress / tbp.build_time * scale,
+                    energy * progress / tbp.build_time * scale,
                 ]
             };
             demand[p].0 += want[0];
@@ -298,8 +299,8 @@ impl World {
             } else {
                 tbp.health
             };
-            let (build_time, cost_mass, cost_energy) =
-                (tbp.build_time, tbp.cost_mass, tbp.cost_energy);
+            let (cost_mass, cost_energy) = self.work_cost(job.target, job.repair);
+            let build_time = tbp.build_time;
             let shield_max = tbp.shield.map(|s| s.health);
             if job.shield {
                 spent[p].1 += cost_energy * step / build_time;
@@ -455,6 +456,17 @@ impl World {
         }
         self.scratch.build_jobs = jobs;
         Ok(())
+    }
+
+    /// What building (or mending) `target` in full costs, (materials, energy): an
+    /// upgrade is priced by `Blueprints::upgrade_cost`, anything else by its blueprint.
+    fn work_cost(&self, target: usize, repair: bool) -> (Fx, Fx) {
+        let tbp = self.bp(target);
+        if !repair && self.state.units.has_flag(target, flag::UPGRADE) {
+            self.blueprints.upgrade_cost(tbp)
+        } else {
+            (tbp.cost_mass, tbp.cost_energy)
+        }
     }
 
     /// What is left to do on a build or a repair, in build-time units so slow

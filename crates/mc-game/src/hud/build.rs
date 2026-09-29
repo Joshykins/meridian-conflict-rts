@@ -12,7 +12,7 @@ use crate::audio::Sfx;
 use crate::game::Mode;
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_core::{FxVec2, TICKS_PER_SECOND};
+use mc_core::{Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::{cat, BlueprintId, UnitBlueprint};
 use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
@@ -739,7 +739,15 @@ fn tiles<'a>(
         // Only inside the view, so the arrows keep the part under them.
         ui.interactive &= view.contains(ui.cursor - ui.shift);
         if let Some(i) = slot.climb {
-            let t = climb_tile(hud, ui, offer, i, item, tr);
+            let t = climb_tile(
+                hud,
+                ui,
+                offer,
+                i,
+                item,
+                tr,
+                s.blueprints.upgrade_cost(item).0,
+            );
             if t.clicked && over > 0.5 {
                 let to = if x < view.x {
                     slot.at
@@ -1043,6 +1051,8 @@ fn climb_tile(
     i: usize,
     item: &UnitBlueprint,
     tr: Rect,
+    // What the upgrade costs in materials (`Blueprints::upgrade_cost`).
+    price: Fx,
 ) -> super::Tile {
     let queued = i < offer.reached;
     // Past the side's tech: dimmed, and says what it waits for.
@@ -1086,7 +1096,7 @@ fn climb_tile(
         tr.bottom() - 10.0,
         type_scale::MICRO,
         rgb(MASS, 0.95),
-        &whole(item.cost_mass.to_f32()),
+        &whole(price.to_f32()),
     );
     if let Some((_, progress)) = offer.under_way.filter(|(b, _)| *b == item.id) {
         // Under way: its progress in the construction amber, along the foot of the picture.
@@ -1243,9 +1253,10 @@ fn upgrade_card(
         .builder
         .as_ref()
         .map_or(SELF_UPGRADE_POWER, |b| b.power.to_f32());
+    let (mass, energy) = s.blueprints.upgrade_cost(next);
     let costs = [
-        ("Materials", whole(next.cost_mass.to_f32()), MASS),
-        ("Energy", whole(next.cost_energy.to_f32()), ENERGY),
+        ("Materials", whole(mass.to_f32()), MASS),
+        ("Energy", whole(energy.to_f32()), ENERGY),
         (
             "Time",
             super::clock(next.build_time.to_f32() / power.max(0.1)),
