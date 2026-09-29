@@ -25,7 +25,7 @@ pub struct Shot {
     pub select: Option<String>,
     /// Match screenshots: where the pointer is, in pixels.
     pub cursor: Option<[f32; 2]>,
-    /// Match screenshots: show the pause card.
+    /// Match screenshots: show the match paused (the frame round the screen).
     pub paused: bool,
     /// Match screenshots: stage a network match's moment (`net_shot`).
     pub net: Option<String>,

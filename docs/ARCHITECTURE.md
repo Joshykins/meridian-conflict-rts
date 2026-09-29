@@ -196,7 +196,8 @@ follow. Render interpolation spans `0.1 s / speed`, the gap ticks really arrive 
 Orders given on pause are not left waiting for the clock: `LocalSession` hands them back as a
 `HeldReady` bundle, which the sim carries out without stepping (`World::apply_held`) and the
 replay records in front of the next tick. A spawn stands and a route shows while time stands
-still. The pause strip (`hud/pause.rs`) sits at the top of the screen, clear of the battlefield.
+still. Nothing is laid over the battlefield: the edges of the screen darken and are framed
+(`hud/pause.rs`), and the top bar's play button, lit, resumes.
 `hud` has tests that click through the real panels with synthetic pointer input.
 
 ## Combat presentation (mc-sim `mirror`, mc-render, mc-game `audio`)

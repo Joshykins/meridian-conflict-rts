@@ -841,19 +841,21 @@ fn the_top_bar_and_the_minimap_report_what_was_asked() {
 }
 
 #[test]
-fn the_pause_strip_leaves_the_battlefield_clear() {
+fn a_paused_match_leaves_the_battlefield_clear() {
     let mut rig = Rig::new("aster_t1_tank");
     rig.view.paused = true;
     rig.settle();
-    for p in [Vec2::new(960.0, 540.0), Vec2::new(960.0, 300.0)] {
-        assert!(!rig.hud.covers(p), "the pause card covers {p}");
+    // The frame round the screen is drawn, not a panel: the middle and the edges stay the field's.
+    for p in [
+        Vec2::new(960.0, 540.0),
+        Vec2::new(960.0, 300.0),
+        Vec2::new(960.0, 4.0),
+        Vec2::new(4.0, 540.0),
+    ] {
+        assert!(!rig.hud.covers(p), "the pause frame covers {p}");
     }
-    // Its Resume button sits at the top, between the economy and the clock.
-    let resume = (700..1400)
-        .step_by(8)
-        .map(|x| Vec2::new(x as f32, EDGE + 22.0))
-        .find(|&p| rig.click(p) == [HudAction::Pause]);
-    assert!(resume.is_some(), "no Resume on the pause strip");
+    // The way back is the top bar's play button.
+    assert_eq!(rig.click(pause_button()), vec![HudAction::Pause]);
 }
 
 #[test]
@@ -962,7 +964,7 @@ fn the_economy_priorities_set_each_kind_last_even_or_first() {
 }
 
 #[test]
-fn paused_work_offers_resume_on_the_card_and_the_strip() {
+fn paused_work_offers_resume_on_the_card() {
     let mut rig = Rig::new("aster_t1_land_factory");
     rig.view.frame.units[0].status[0] |= mc_sim::mirror::UNIT_PAUSED;
     assert_eq!(

@@ -118,7 +118,7 @@ straight into a match instead.
   --select KEY           match screenshot: select player 0's first unit whose blueprint key
                          contains KEY (all of them with a trailing *), not the commander
   --unit-picker          range screenshot: show the unit browser
-  --paused               match screenshot: show the pause card
+  --paused               match screenshot: show the match paused
   --net-shot STATE       match screenshot: stage a network match's moment: play | chat |
                          paused | waiting | rejoin | desync
   --plans                match screenshot: the commander has structures planned and a way to

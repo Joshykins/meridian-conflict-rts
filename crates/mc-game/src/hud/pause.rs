@@ -1,92 +1,97 @@
-//! The pause strip. A paused match is still played: the camera moves, orders and
+//! The pause frame. A paused match is still played: the camera moves, orders and
 //! spawns are carried out at once (the sim applies them without the clock moving),
-//! so the strip sits at the top of the screen, clear of the battlefield.
+//! so nothing is laid over the battlefield. The edges of the screen say time is
+//! held, and the top bar's play button lets it go.
 
-use super::{free_camera, Hud, HudAction, Scene, ECONOMY_W, EDGE, GAP, STALL_CHIP_W, TOP_BAR_W};
-use crate::audio::Sfx;
-use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Rect, Ui};
-use glam::Vec2;
+use super::Hud;
+use crate::ui::{id, palette, rgb, Rect, Ui};
 
 impl Hud {
-    /// The battlefield held still: a strip at the top of the screen, and a way back.
-    pub(super) fn pause_card(&mut self, ui: &mut Ui, s: &Scene) {
-        let fold = self.fold_begin(ui, free_camera::Part::Top);
-        let w = ui.size.x;
-        let k = ui.ease(id("pause-card", 0), 1.0, 9.0);
-        // A hairline along the top edge, brightest over the strip: the whole view is held.
-        for (x, from, to) in [(0.0, 0.0, 0.6 * k), (w * 0.5, 0.6 * k, 0.0)] {
-            ui.gradient_h(
-                Rect::new(x, 0.0, w * 0.5, 2.0),
-                rgb(palette::LINE, from),
-                rgb(palette::LINE, to),
-            );
+    /// The battlefield held still: the edges darken, a hairline and corner brackets
+    /// frame the view, and a light runs slowly round it. Drawn under every panel.
+    pub(super) fn pause_frame(&mut self, ui: &mut Ui, paused: bool) {
+        // A photo taken with the free camera keeps a clean frame.
+        let on = paused && !self.free.on;
+        let k = ui.ease(id("pause-frame", 0), if on { 1.0 } else { 0.0 }, 7.0);
+        if k < 0.01 {
+            return;
         }
-        // A network match is held for everyone, by the relay: orders wait for the clock too,
-        // and anyone playing may let it go.
-        let (note, can_resume) = match s.net.and_then(|l| l.paused_by) {
-            Some(by) => {
-                let who = if by == Some(s.view.local) && !s.view.observing {
-                    "You".to_owned()
-                } else {
-                    by.and_then(|p| s.view.status.players.get(p as usize))
-                        .map_or_else(|| "An observer".to_owned(), |p| p.name.clone())
-                };
-                (
-                    format!("{who} paused for everyone  \u{b7}  Any player may resume"),
-                    !s.view.observing,
-                )
+        let (w, h) = (ui.size.x, ui.size.y);
+        let breath = 0.85 + 0.15 * (ui.time * 1.7).sin();
+
+        // The view darkens toward every edge, as a held frame does.
+        let d = (w.min(h) * 0.16).clamp(80.0, 220.0);
+        let dark = 0.62 * k;
+        ui.scrim(Rect::new(0.0, 0.0, w, d), dark, 0.0, false);
+        ui.scrim(Rect::new(0.0, h - d, w, d), 0.0, dark, false);
+        ui.scrim(Rect::new(0.0, 0.0, d, h), dark, 0.0, true);
+        ui.scrim(Rect::new(w - d, 0.0, d, h), 0.0, dark, true);
+        // A glow just inside the edge, under the hairline.
+        let glow = rgb(palette::LINE, 0.2 * k * breath);
+        let clear = rgb(palette::LINE, 0.0);
+        let g = 22.0;
+        ui.gradient_v(Rect::new(0.0, 0.0, w, g), glow, clear);
+        ui.gradient_v(Rect::new(0.0, h - g, w, g), clear, glow);
+        ui.gradient_h(Rect::new(0.0, 0.0, g, h), glow, clear);
+        ui.gradient_h(Rect::new(w - g, 0.0, g, h), clear, glow);
+
+        // The hairline round the whole screen.
+        let line = rgb(palette::LINE, 0.7 * k * breath);
+        let t = 3.0;
+        ui.fill(Rect::new(0.0, 0.0, w, t), line);
+        ui.fill(Rect::new(0.0, h - t, w, t), line);
+        ui.fill(Rect::new(0.0, 0.0, t, h), line);
+        ui.fill(Rect::new(w - t, 0.0, t, h), line);
+
+        // Corner brackets, a little inside the hairline: the frame is held.
+        let (inset, arm, thick) = (12.0, 96.0, 4.0);
+        let tone = rgb(palette::LINE, 0.9 * k);
+        for (cx, cy, dx, dy) in [
+            (inset, inset, 1.0, 1.0),
+            (w - inset, inset, -1.0, 1.0),
+            (w - inset, h - inset, -1.0, -1.0),
+            (inset, h - inset, 1.0, -1.0),
+        ] {
+            let x = if dx > 0.0 { cx } else { cx - arm };
+            let y = if dy > 0.0 { cy } else { cy - thick };
+            ui.fill(Rect::new(x, y, arm, thick), tone);
+            let x = if dx > 0.0 { cx } else { cx - thick };
+            let y = if dy > 0.0 { cy } else { cy - arm };
+            ui.fill(Rect::new(x, y, thick, arm), tone);
+        }
+
+        // Lights running round the hairline, clockwise, a lap every seven seconds;
+        // two, half a lap apart, so one is always in sight.
+        let lap = 2.0 * (w + h);
+        let head = (ui.time * lap / 7.0) % lap;
+        for i in 0..2 {
+            sweep(ui, (head + i as f32 * lap * 0.5) % lap, 220.0, (w, h), t, k);
+        }
+    }
+}
+
+/// One running light: bright at `head`, fading out over `len` behind it. Distances
+/// run clockwise round the screen from the top-left corner.
+fn sweep(ui: &mut Ui, head: f32, len: f32, (w, h): (f32, f32), t: f32, k: f32) {
+    let lap = 2.0 * (w + h);
+    let mut start = 0.0;
+    for (e, edge) in [w, h, w, h].into_iter().enumerate() {
+        // The tail may reach back past the top-left corner, onto the left edge.
+        for wrap in [0.0, lap] {
+            let (a, b) = (head - len + wrap - start, head + wrap - start);
+            let (a0, b0) = (a.max(0.0), b.min(edge));
+            if b0 <= a0 {
+                continue;
             }
-            None => (
-                "Orders go through now  \u{b7}  The clock waits".to_owned(),
-                true,
-            ),
-        };
-        let note = note.as_str();
-        let text_w = ui.text_width(type_scale::MICRO, note).max(96.0);
-        // Centred, but clear of the economy (and its stall chip) and the clock bar.
-        let wide = text_w + 190.0;
-        let left = EDGE + ECONOMY_W + GAP + STALL_CHIP_W + GAP;
-        let right = w - EDGE - TOP_BAR_W - GAP - wide;
-        let r = Rect::new(
-            ((w - wide) * 0.5).max(left).min(right.max(left)),
-            EDGE - 6.0 * (1.0 - k),
-            wide,
-            44.0,
-        );
-        self.glass(ui, r);
-        let mid = r.mid_y();
-        // Instrument mark: broken rings turning against each other.
-        let rc = Vec2::new(r.x + 26.0, mid);
-        for i in 0..3 {
-            let a = ui.time * 0.5 + i as f32 * std::f32::consts::TAU / 3.0;
-            ui.arc(rc, 9.0, a, a + 1.5, 1.4, rgb(palette::TEXT, 0.9 * k));
-            ui.arc(rc, 13.0, -a, -a + 0.7, 1.0, rgb(palette::LINE, 0.5 * k));
+            let tail = rgb(palette::LINE, 0.95 * k * (a0 - a) / len);
+            let lead = rgb(palette::LINE, 0.95 * k * (b0 - a) / len);
+            match e {
+                0 => ui.gradient_h(Rect::new(a0, 0.0, b0 - a0, t), tail, lead),
+                1 => ui.gradient_v(Rect::new(w - t, a0, t, b0 - a0), tail, lead),
+                2 => ui.gradient_h(Rect::new(w - b0, h - t, b0 - a0, t), lead, tail),
+                _ => ui.gradient_v(Rect::new(0.0, h - b0, t, b0 - a0), lead, tail),
+            }
         }
-        ui.disc(rc, 1.5, rgb(palette::TEXT, k));
-        ui.text(
-            r.x + 50.0,
-            mid - 8.0,
-            type_scale::OVERLINE,
-            rgb(0xFFFFFF, k),
-            "Paused",
-        );
-        ui.text(
-            r.x + 50.0,
-            mid + 9.0,
-            type_scale::MICRO,
-            rgb(palette::DIM, k),
-            note,
-        );
-        if ui.button(
-            id("pause-card-resume", 0),
-            Rect::new(r.right() - 106.0, r.y + 7.0, 96.0, 30.0),
-            "Resume",
-            ButtonKind::Primary,
-            can_resume,
-        ) {
-            ui.audio.play(Sfx::Back);
-            self.actions.push(HudAction::Pause);
-        }
-        self.fold_end(ui, fold);
+        start += edge;
     }
 }

@@ -1,11 +1,11 @@
-//! What stands over the whole battlefield: loading, a match that cannot go on,
-//! and the pause strip (`pause.rs`).
+//! What stands over the whole battlefield: loading, and a match that cannot go on.
+//! A paused match is shown by the frame round the screen (`pause.rs`).
 
 use super::{Hud, Scene};
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 
 impl Hud {
-    /// Loading, a fatal error, and the pause card. The result of the match is the menu's to show.
+    /// Loading and a fatal error. The result of the match is the menu's to show.
     pub(super) fn match_state(&mut self, ui: &mut Ui, s: &Scene) {
         let view = s.view;
         let (w, h) = (ui.size.x, ui.size.y);
@@ -56,8 +56,6 @@ impl Hud {
                 Rect::new(w * 0.5 - 120.0, h * 0.46 + 34.0, 240.0, 1.0),
                 rgb(palette::LINE, 0.25),
             );
-        } else if view.paused && !view.menu_open {
-            self.pause_card(ui, s);
         }
     }
 }

@@ -45,12 +45,23 @@ impl Hud {
         // Anyone playing a network match may stop its clock; the relay tells everyone who did.
         let can_pause = owns_clock || (s.net.is_some() && !view.observing);
 
+        // Paused, this is the way back: the play mark lit in the accent, breathing with
+        // the frame round the screen (`pause.rs`).
         let pause = Rect::new(after, r.y + 7.0, 40.0, 30.0);
         let t = self.tile(ui, id("hud-pause", 0), pause, view.paused, can_pause);
-        let tone = rgb(
-            palette::TEXT,
-            if can_pause { 0.75 + 0.25 * t.glow } else { 0.3 },
-        );
+        if view.paused && can_pause {
+            let edge = rgb(
+                palette::ACCENT,
+                0.6 + 0.4 * (0.5 + 0.5 * (ui.time * 1.7).sin()),
+            );
+            ui.fill_cut(pause, 5.0, rgb(palette::ACCENT, 0.18));
+            ui.outline_cut(pause, 5.0, edge, edge);
+        }
+        let tone = match (can_pause, view.paused) {
+            (false, _) => rgb(palette::TEXT, 0.3),
+            (true, true) => rgb(palette::ACCENT, 1.0),
+            (true, false) => rgb(palette::TEXT, 0.75 + 0.25 * t.glow),
+        };
         icons::glyph(
             ui,
             if view.paused {

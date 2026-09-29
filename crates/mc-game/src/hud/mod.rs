@@ -99,7 +99,7 @@ const SPEED_W: f32 = 150.0;
 const ECONOMY_W: f32 = 292.0 * 2.0 + 46.0;
 /// The economy panel's height: its figures, and the focus switches under them.
 const ECONOMY_H: f32 = 68.0 + focus::FOCUS_H;
-/// The narrowest the stall chip right of the economy gets; the pause strip keeps clear of it.
+/// The narrowest the stall chip right of the economy gets.
 const STALL_CHIP_W: f32 = 236.0;
 /// The top bar's width: clock, speed, pause, menu.
 const TOP_BAR_W: f32 = 146.0 + 50.0 + SPEED_W + 10.0 + 50.0 + 98.0;
@@ -503,6 +503,7 @@ impl Hud {
         self.net_news(ui, s);
         // The mine survey lies on the world, under every panel.
         mine_marks(ui, s, &mut self.survey);
+        self.pause_frame(ui, view.paused && !view.menu_open);
         if !view.observing && !self.free.on {
             groups::badges(ui, s);
         }
