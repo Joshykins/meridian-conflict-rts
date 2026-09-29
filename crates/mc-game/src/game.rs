@@ -2526,16 +2526,25 @@ impl Game {
         }
     }
 
-    /// Looks at `player`'s commander, if they still have one.
+    /// Looks at `player`'s commander, if they still have one: at the lift ship it
+    /// rides in, when it is in a hold, and that ship is what gets selected.
     fn look_at_commander(&mut self, player: u8) -> bool {
-        let acu = self.view.frame.units.iter().find(|u| {
-            (u.owner_flags & 0xFF) as u8 == player
-                && u.owner_flags & KIND_WRECK == 0
-                && self
-                    .blueprints
-                    .unit(BlueprintId(u.blueprint as u16))
-                    .has(cat::COMMANDER)
-        });
+        let units = &self.view.frame.units;
+        let acu = units
+            .iter()
+            .find(|u| {
+                (u.owner_flags & 0xFF) as u8 == player
+                    && u.owner_flags & KIND_WRECK == 0
+                    && self
+                        .blueprints
+                        .unit(BlueprintId(u.blueprint as u16))
+                        .has(cat::COMMANDER)
+            })
+            .map(|u| {
+                u.carrier()
+                    .and_then(|id| units.get(*self.view.index_of.get(&id)?))
+                    .unwrap_or(u)
+            });
         if let Some(u) = acu {
             self.track = None;
             self.orbit_return_focus = false;

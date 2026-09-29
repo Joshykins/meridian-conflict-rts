@@ -74,3 +74,46 @@ fn a_reclaimer_working_a_wreck_on_its_own_is_not_idle() {
         assert!(rig.click(tile).is_empty(), "no card while it works");
     }
 }
+
+/// Puts unit 7 in the hold of a Courier, unit 9, which joins the frame.
+fn stow(rig: &mut Rig) {
+    let ship = rig.blueprints.id_of("aster_t1_lift_ship").expect("courier");
+    let mut carrier = rig.view.frame.units[0];
+    carrier.unit_id = 9;
+    carrier.blueprint = ship.0 as u32;
+    carrier.owner_flags = 0;
+    rig.view.frame.units.push(carrier);
+    rig.view.index_of.insert(9, 1);
+    let u = &mut rig.view.frame.units[0];
+    u.owner_flags |= STATE_IDLE | (flag::IN_FACTORY as u32) << 8;
+    u.status[0] |= mc_sim::mirror::UNIT_STORED;
+    u.status[2] = 9;
+}
+
+#[test]
+fn an_engineer_riding_in_a_hold_is_not_idle() {
+    let mut rig = Rig::new("aster_t1_engineer");
+    rig.view.selection.clear();
+    stow(&mut rig);
+    let card_y = EDGE + ECONOMY_H + GAP;
+    let tile = Vec2::new(EDGE + 8.0 + 66.0 + 8.0 + 18.0, card_y + 8.0 + 18.0);
+    assert!(rig.click(tile).is_empty(), "no Engineers card");
+}
+
+#[test]
+fn the_commander_card_of_a_commander_in_a_hold_selects_the_ship() {
+    let mut rig = Rig::new("aster_commander");
+    rig.view.selection.clear();
+    stow(&mut rig);
+    let card = Vec2::new(
+        EDGE + COMMANDER_W * 0.5,
+        EDGE + ECONOMY_H + GAP + COMMANDER_H * 0.5,
+    );
+    assert_eq!(
+        rig.click(card),
+        vec![HudAction::Select {
+            units: vec![9],
+            focus: true
+        }]
+    );
+}

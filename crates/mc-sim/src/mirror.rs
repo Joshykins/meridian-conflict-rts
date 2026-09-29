@@ -461,7 +461,7 @@ pub struct UnitInstance {
     /// deck state and the pause mark, 1 gun-house index, nanite and replicating marks,
     /// 2 a launcher's rounds (`nukes::LAUNCHER_*`), a cell launcher's loaded cells
     /// (`launch_cells::loaded_cells`), a mounted gun's aim or a wall
-    /// section's neighbours ([`WALL_JOINS`]); on a spent
+    /// section's neighbours ([`WALL_JOINS`]), a stored unit's carrier; on a spent
     /// casing in the air, one more than the index of the walker that threw it in
     /// `RenderFrame::units` (zero when it is not drawn).
     pub status: [u32; 3],
@@ -517,6 +517,11 @@ impl UnitInstance {
     /// Stored in a lift ship's hold (`UNIT_STORED`).
     pub fn stored(&self) -> bool {
         self.status[0] & UNIT_STORED != 0
+    }
+
+    /// The lift ship whose hold it rides in (`UNIT_STORED`), by unit id.
+    pub fn carrier(&self) -> Option<u32> {
+        self.stored().then_some(self.status[2])
     }
 
     /// Work paused by its player: it keeps its queue but builds nothing.
@@ -658,7 +663,8 @@ pub const UNIT_DIVE_GOAL: u32 = 1 << 8;
 pub const UNIT_PAUSED: u32 = 1 << 9;
 pub const UNIT_BURNING: u32 = 1 << 23;
 /// Units' `status[0]`: a unit stored in a lift ship's hold. Listed for its own side's
-/// interface (the hold, selecting and ordering it); never drawn. It is `IN_FACTORY` too.
+/// interface (the hold, selecting and ordering it); never drawn. It is `IN_FACTORY` too,
+/// and `status[2]` is the ship's unit id ([`UnitInstance::carrier`]).
 pub const UNIT_STORED: u32 = 1 << 11;
 /// Units' `status[0]` bits 16..24: a lift ship's landing gear, 0 stowed to 255 out.
 pub const UNIT_GEAR_SHIFT: u32 = 16;
@@ -1933,7 +1939,7 @@ impl World {
                         | if s.units.paused[row] { UNIT_PAUSED } else { 0 }
                         | if stored { UNIT_STORED } else { 0 }
                         | self.lift_gear(row) << UNIT_GEAR_SHIFT
-                        | if deck_up(row).is_some() {
+                        | if !stored && deck_up(row).is_some() {
                             UNIT_ON_DECK
                         } else {
                             0
@@ -1944,9 +1950,13 @@ impl World {
                             (w as u32 + 1) << UNIT_TWIN_SHIFT
                                 | if right { UNIT_TWIN_RIGHT } else { 0 }
                         }),
-                    deck_up(row)
-                        .or_else(|| self.loaded_cells(row))
-                        .unwrap_or_else(|| self.launcher_pad(row)),
+                    if stored {
+                        s.units.hangar[row].0
+                    } else {
+                        deck_up(row)
+                            .or_else(|| self.loaded_cells(row))
+                            .unwrap_or_else(|| self.launcher_pad(row))
+                    },
                 ],
                 mount: mounted.map_or([0.0; 4], |w| {
                     let off = |yaw: &[mc_core::Angle; mc_data::MAX_WEAPONS]| pitch(yaw[w] - yaw[0]);

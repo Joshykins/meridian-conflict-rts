@@ -63,7 +63,8 @@ fn status_line(ui: &mut Ui, x: f32, y: f32, w: f32, text: &str, tone: u32, k: f3
 
 /// The player's commander, always on show: its picture, health, what it is
 /// doing. It flashes when hit and pulses when idle; a click selects it and
-/// brings the camera to it.
+/// brings the camera to it. Riding in a lift ship's hold it says so, is not idle,
+/// and a click takes the ship instead.
 pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt: f32) -> bool {
     let Some(u) = s.view.frame.units.iter().find(|u| {
         (u.owner_flags & 0xFF) as u8 == s.view.local
@@ -73,6 +74,10 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
         return false;
     };
     let bp = s.bp(u);
+    let ship = u.carrier().and_then(|id| {
+        let i = *s.view.index_of.get(&id)?;
+        s.view.frame.units.get(i)
+    });
     hud.claim(ui, r);
     let me = &mut hud.builders;
     if has_flag(u, flag::HURT) {
@@ -91,11 +96,11 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
     if res.clicked {
         ui.audio.play(Sfx::Select);
         hud.actions.push(HudAction::Select {
-            units: vec![u.unit_id],
+            units: vec![ship.unwrap_or(u).unit_id],
             focus: true,
         });
     }
-    let idle = u.owner_flags & STATE_IDLE != 0 && hit == 0.0;
+    let idle = u.owner_flags & STATE_IDLE != 0 && !u.stored() && hit == 0.0;
     if idle {
         idle_edge(ui, r, palette::WARN, pulse(ui));
     }
@@ -135,6 +140,16 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
             cw - 70.0,
             "Under Fire",
             palette::BAD,
+            1.0,
+        );
+    } else if let Some(ship) = ship {
+        status_line(
+            ui,
+            x,
+            r.y + 36.0,
+            cw - 70.0,
+            &format!("Aboard {}", s.bp(ship).name),
+            palette::DIM,
             1.0,
         );
     } else if idle {
@@ -192,12 +207,14 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
     }
     if res.hovered {
         // Beside the card: under it are the idle cards.
-        build::tip(
-            ui,
-            r.right() + 8.0,
-            r.y,
-            "Click selects and finds your commander  \u{b7}  Home",
-        );
+        let tip = match ship {
+            Some(ship) => format!(
+                "Click selects and finds the {} carrying your commander  \u{b7}  Home",
+                s.bp(ship).name
+            ),
+            None => "Click selects and finds your commander  \u{b7}  Home".into(),
+        };
+        build::tip(ui, r.right() + 8.0, r.y, &tip);
     }
     true
 }
@@ -221,7 +238,9 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
     let mut kinds: [Vec<Kind<'a>>; CARDS.len()] = Default::default();
     for u in &s.view.frame.units {
         let mine = (u.owner_flags & 0xFF) as u8 == s.view.local && u.owner_flags & KIND_WRECK == 0;
+        // One in a lift ship's hold is `IN_FACTORY` too: it rides, it is not idle.
         if !mine
+            || u.stored()
             || u.owner_flags & STATE_IDLE == 0
             || has_flag(u, flag::UNDER_CONSTRUCTION | flag::IN_FACTORY)
         {

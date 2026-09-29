@@ -1235,3 +1235,28 @@ fn it_does_not_turn_its_hull_toward_what_it_shoots() {
         }
     }
 }
+
+#[test]
+fn a_stored_unit_is_listed_idle_out_of_sight_naming_its_ship() {
+    let mut w = world();
+    let ship = add(&mut w, "aster_t1_lift_ship", 0, 1600, 1600);
+    let id = w.state.units.id(ship);
+    let engineer = add(&mut w, "aster_t1_engineer", 0, 1500, 1600);
+    let eid = w.state.units.id(engineer);
+    w.tick(&[cmd(Command::Board {
+        units: vec![eid],
+        carrier: id,
+        queue: false,
+    })])
+    .unwrap();
+    assert!(run_until(&mut w, 2000, |w| w.state.units.hangar[engineer] == id).is_some());
+    let mut frame = mc_sim::mirror::RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    let u = frame.units.iter().find(|u| u.unit_id == eid.0).unwrap();
+    assert!(u.stored());
+    assert_eq!(u.carrier(), Some(id.0));
+    // Out of sight in the hold: the interface leaves it off its idle lists.
+    assert_ne!(u.owner_flags & (flag::IN_FACTORY as u32) << 8, 0);
+    let ship_seen = frame.units.iter().find(|u| u.unit_id == id.0).unwrap();
+    assert_eq!(ship_seen.carrier(), None);
+}
