@@ -36,7 +36,8 @@ Three escorts, none complete:
   kinds of missile break on it. Torpedoes run under the skirt.
 
 The **Leviathan** (battleship) has weak AA, no sonar and no torpedo defence. The **Atoll**
-(carrier) has the strongest AA afloat, interceptor tubes, and no anti-surface gun. The **Kraken** (strategic
+(carrier) is the fleet's long arm against air: a 2,800 m SAM battery and a 4,000 m radar,
+interceptor tubes, and no gun at all, so aircraft that get in close are the escorts' to meet. The **Kraken** (strategic
 submarine) gives itself away every time it launches.
 
 ## Two missile doctrines
@@ -86,7 +87,7 @@ sea after a battle pays for the battle.
 | Moray | 2 | Hunter-killer submarine | Six guided torpedo tubes, sonar; a deck gun that only works surfaced. |
 | Nautilus | 2 | Shield boat | A bubble over the fleet. Unarmed. |
 | Leviathan | 3 | Battleship | Three triple turrets of heavy guns, secondary guns, weak AA. The hero. |
-| Atoll | 3 | Carrier | Docks, repairs and launches aircraft; builds T1/T2 aircraft; strong AA. |
+| Atoll | 3 | Air-defence carrier | Twelve hatched long-range SAM cells (2,800 m), fleet radar (4,000 m), interceptor tubes. No gun. |
 | Kraken | 3 | Strategic submarine | Eight tubes; four high-arc missiles per salvo, launched dived. |
 | Narwhal | 3 | Anti-ship trimaran | A Zenith rail down the keel: the hull turns to aim, the barrel elevates. Shoots only spaceships; nothing else aboard. |
 
@@ -157,8 +158,8 @@ Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-models --l
 
 ## Not done
 
-- The Atoll does not dock, mend or launch aircraft yet, and builds none. The land airbase
-  it was meant to borrow from has been removed, so docking would have to be built fresh.
+- The Atoll's flight deck is for show: it does not dock, mend, launch or build aircraft yet.
+  How that should work is undecided, as it needs aircraft mechanics the game lacks.
 - The AI builds the new hulls as naval units but knows nothing about their roles.
 - Size-5 hulls (Leviathan, Atoll) have not been checked out of a Wharf or through the
   shipped maps' channels.

@@ -9,7 +9,7 @@ use super::{
     MeshLod, Model, LOD_COUNT,
 };
 
-mod skyguard;
+mod cells;
 
 /// The blueprints in `data/factions/aster/units/*.ron` that matter to a model.
 struct Blueprint {
@@ -243,18 +243,8 @@ const BLUEPRINTS: &[Blueprint] = &[
         &[[66.0, -3.4, 11.4], [66.0, 0.0, 11.4], [66.0, 3.4, 11.4]],
     ),
     hull_unit("rail_trimaran", 84.0, 34.0, 3, &[[86.0, 0.0, 24.0]]),
-    hull_unit(
-        "carrier",
-        60.0,
-        24.0,
-        3,
-        &[
-            [-12.0, 8.0, 8.5],
-            [-14.0, 8.0, 8.5],
-            [-12.0, -8.0, 8.5],
-            [-14.0, -8.0, 8.5],
-        ],
-    ),
+    // Its SAMs stand in hatched cells (tests/cells.rs); the interceptor tubes are under water.
+    hull_unit("carrier", 60.0, 24.0, 3, &[]),
     hull_unit(
         "submarine_strategic",
         30.0,
@@ -1456,9 +1446,8 @@ fn orange_weapons_glow_orange() {
         "artillery_light",
         "missile_launcher",
         "hover_tank",
-        // Missile cells carry orange seams; the carrier's flak and rotary gun are orange too.
+        // Missile cells carry orange seams.
         "missile_ship",
-        "carrier",
     ];
     // Whether a gun carries light is its own design's call; only the orange is ruled:
     // it is on the units above and nowhere else.
@@ -2625,33 +2614,13 @@ fn moray_and_kraken_hulls() {
     }
 }
 
-/// The Atoll: houses bound to weapons 1 and 2 at the unit file's pivots and a spinning
-/// close-in gun, the SAM cells' muzzles on the deck at every level, plasma glow, and the
-/// capital-ship budgets.
+/// The Atoll: no gun houses, the fleet radar turning on the island's mast, two blocks of
+/// six cells, plasma glow, and the capital-ship budgets.
 #[test]
-fn carrier_houses_and_muzzles() {
+fn carrier_radar_cells_and_budgets() {
     let bp = BLUEPRINTS.iter().find(|bp| bp.mesh == "carrier").unwrap();
     let model = built(bp);
-    assert_eq!(model.houses.len(), 2, "carrier: two gun houses");
-    for (weapon, pivot) in [(1u8, [20.0, 10.0, 8.6]), (2u8, [20.0, -10.0, 8.6])] {
-        let house = model
-            .houses
-            .iter()
-            .find(|h| h.weapon == weapon)
-            .expect("house per weapon");
-        assert!(
-            Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3,
-            "carrier: house {weapon} pivot {:?}",
-            house.pivot
-        );
-    }
-    assert!(
-        model.lods[0]
-            .vertices
-            .iter()
-            .any(|v| v.rig & rig::SPIN != 0),
-        "carrier: rotary gun spins"
-    );
+    assert!(model.houses.is_empty(), "carrier: no gun houses");
     assert!(
         model.lods[0]
             .vertices
@@ -2659,47 +2628,13 @@ fn carrier_houses_and_muzzles() {
             .any(|v| v.part == part::SPINNER),
         "carrier: radar turns"
     );
-    assert!(model.spinner_pivot[2] > 3.0, "carrier: radar on the mast");
-    let muzzles: [(&str, &[[f32; 3]]); 3] = [
-        (
-            "sam",
-            &[
-                [-12.0, 8.0, 8.5],
-                [-14.0, 8.0, 8.5],
-                [-12.0, -8.0, 8.5],
-                [-14.0, -8.0, 8.5],
-            ],
-        ),
-        ("flak", &[[22.4, 9.6, 8.8], [22.4, 10.4, 8.8]]),
-        ("ciws", &[[22.0, -10.0, 8.8]]),
-    ];
+    assert!(model.spinner_pivot[2] > 18.0, "carrier: radar on the mast");
+    assert_eq!(
+        model.cells.iter().map(|c| (c.nx, c.ny)).collect::<Vec<_>>(),
+        [(3, 2), (3, 2)],
+        "carrier: two blocks of six cells"
+    );
     for (lod, mesh) in model.lods.iter().enumerate() {
-        for (name, list) in muzzles {
-            // The coarse level keeps only the SAM cells.
-            if lod == 2 && name != "sam" {
-                continue;
-            }
-            for muzzle in list {
-                let p = Vec3::from(*muzzle);
-                let nearest = mesh
-                    .indices
-                    .chunks(3)
-                    .map(|t| {
-                        closest_point_on_triangle(
-                            p,
-                            position(mesh, t[0]),
-                            position(mesh, t[1]),
-                            position(mesh, t[2]),
-                        )
-                        .distance(p)
-                    })
-                    .fold(f32::MAX, f32::min);
-                assert!(
-                    nearest < 0.4,
-                    "carrier lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}"
-                );
-            }
-        }
         let team_up = mesh
             .vertices
             .iter()

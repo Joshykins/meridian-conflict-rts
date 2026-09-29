@@ -383,9 +383,14 @@ pub(crate) struct ModelInfo {
     /// A VTOL's pods (`models::Vtol::gpu`): front pivot and kind, rear pivot and the
     /// nozzle's distance behind its pivot. All zero for any other model.
     pub(crate) vtol: [[f32; 4]; 2],
+    /// Hatched missile cells (`models::CellBlock::gpu`): per block its centre, deck, pitch
+    /// and hatch half width. All zero for none.
+    pub(crate) cells: [[f32; 4]; 4],
+    /// Per block its grid word, then per block its missile order word.
+    pub(crate) cell_grid: [u32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 944);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1024);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -1022,6 +1027,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         shield_emitter: None,
         mount: None,
         houses: Vec::new(),
+        cells: Vec::new(),
         spins: Vec::new(),
         hover: false,
         pit: None,
@@ -1347,6 +1353,8 @@ impl Renderer {
                 breech: model.breech.unwrap_or([0.0; 4]),
                 plan_box,
                 vtol: model.vtol.map_or([[0.0; 4]; 2], |v| v.gpu()),
+                cells: models::CellBlock::gpu(&model.cells).0,
+                cell_grid: models::CellBlock::gpu(&model.cells).1,
                 spin: model
                     .spins
                     .iter()

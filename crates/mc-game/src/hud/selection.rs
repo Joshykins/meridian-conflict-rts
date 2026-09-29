@@ -33,10 +33,10 @@ pub fn orders_width(families: usize) -> f32 {
     families as f32 * (ORDER_W + ORDER_GAP) - ORDER_GAP + 28.0
 }
 
-/// Damage per second of one weapon.
+/// Damage per second of one weapon. `salvo` counts every projectile of a salvo;
+/// `salvo_batch` only groups them.
 pub fn weapon_dps(w: &Weapon) -> f32 {
-    w.damage.to_f32() * w.salvo.max(1) as f32 * w.salvo_batch.max(1) as f32
-        / (w.reload_ticks.max(1) as f32 * 0.1)
+    w.damage.to_f32() * w.salvo.max(1) as f32 / (w.reload_ticks.max(1) as f32 * 0.1)
 }
 
 /// Damage per second of everything a unit carries.
@@ -46,7 +46,7 @@ pub fn dps(bp: &UnitBlueprint) -> f32 {
 
 /// A weapon's name and its figures, two to a row when drawn.
 pub fn weapon_rows(w: &Weapon) -> (String, Vec<(&'static str, String)>) {
-    let shots = w.salvo.max(1) as u32 * w.salvo_batch.max(1) as u32;
+    let shots = w.salvo.max(1) as u32;
     let mut rows = vec![
         (
             "Damage",
@@ -742,7 +742,7 @@ fn weapon_card(
         y += 15.0;
     }
     y += 4.0;
-    let shots = w.salvo.max(1) as f32 * w.salvo_batch.max(1) as f32;
+    let shots = w.salvo.max(1) as f32;
     let reload = w.reload_ticks as f32 * 0.1;
     let damage = if shots > 1.0 {
         format!("{} \u{d7} {}", whole(w.damage.to_f32()), shots as u32)

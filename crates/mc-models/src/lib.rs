@@ -533,6 +533,8 @@ pub struct Model {
     pub mount: Option<[f32; 4]>,
     /// Gun houses of their own (`rig::HOUSE_FIRST + i`), in slot order.
     pub houses: Vec<House>,
+    /// Blocks of hatched missile cells (`MeshBuilder::cell_block`), at most two.
+    pub cells: Vec<CellBlock>,
     /// Axes of `rig::SPIN` barrels (a point on the axis, which runs along x), with the module
     /// tags (`rig::MODULE`, `rig::UNTIL` values) under which each applies.
     pub spins: Vec<(u32, u32, [f32; 3])>,
@@ -634,6 +636,66 @@ pub struct House {
     pub pivot: [f32; 3],
     pub travel: f32,
     pub weapon: u8,
+}
+
+/// A block of hatched missile cells (`part::CELL_HATCH`, `part::CELL_ROUND`): `nx` cells
+/// along x by `ny` along y, `pitch` apart about `centre`, their hatches lying shut on
+/// `deck`. Each hatch is hinged on its outer edge (away from the block's middle) along x,
+/// or along y when `hinge_y`, `half` out from its cell's centre, and swings up and out as
+/// the hatches open (`UnitInstance::deploy`). The missile standing in grid cell `i * ny + j`
+/// is shown while bit `first + order[i * ny + j]` of `status[2]` is set: the cells' missiles
+/// in firing order are the weapon's muzzles `first..` (`mc_sim::launch_cells`).
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CellBlock {
+    pub centre: [f32; 2],
+    pub deck: f32,
+    pub pitch: f32,
+    pub half: f32,
+    pub nx: u8,
+    pub ny: u8,
+    pub hinge_y: bool,
+    pub first: u8,
+    pub order: [u8; CellBlock::MAX_CELLS],
+}
+
+impl CellBlock {
+    /// Cells in one block (a nibble each in the shader's order word).
+    pub const MAX_CELLS: usize = 8;
+    /// Blocks on one model.
+    pub const MAX_BLOCKS: usize = 2;
+
+    /// Centre of grid cell (`i`, `j`).
+    pub fn grid_centre(&self, i: usize, j: usize) -> [f32; 2] {
+        let at = |k: usize, n: u8, c: f32| c + (k as f32 - (n as f32 - 1.0) * 0.5) * self.pitch;
+        [
+            at(i, self.nx, self.centre[0]),
+            at(j, self.ny, self.centre[1]),
+        ]
+    }
+
+    /// Centre of the cell holding the block's `k`-th missile in firing order.
+    pub fn missile_centre(&self, k: usize) -> Option<[f32; 2]> {
+        let cells = self.nx as usize * self.ny as usize;
+        let c = (0..cells).find(|&c| self.order[c] as usize == k)?;
+        Some(self.grid_centre(c / self.ny as usize, c % self.ny as usize))
+    }
+
+    /// `ModelInfo::cells` and `cell_grid` for up to two blocks: per block its centre,
+    /// deck and pitch, then its hatch half-width; its grid word (`nx | ny << 4 | hinge_y
+    /// << 8`) and its order word (the missile bit of grid cell c in nibble c).
+    pub fn gpu(blocks: &[CellBlock]) -> ([[f32; 4]; 4], [u32; 4]) {
+        let mut cells = [[0.0; 4]; 4];
+        let mut grid = [0; 4];
+        for (k, b) in blocks.iter().take(Self::MAX_BLOCKS).enumerate() {
+            cells[2 * k] = [b.centre[0], b.centre[1], b.deck, b.pitch];
+            cells[2 * k + 1] = [b.half, 0.0, 0.0, 0.0];
+            grid[k] = b.nx as u32 | (b.ny as u32) << 4 | (b.hinge_y as u32) << 8;
+            grid[2 + k] = (0..b.nx as usize * b.ny as usize)
+                .map(|c| ((b.first + b.order[c]) as u32 & 0xF) << (4 * c))
+                .fold(0, |w, n| w | n);
+        }
+        (cells, grid)
+    }
 }
 
 /// A hole a model digs into the ground (a core mine's). The vertex shader pulls what is

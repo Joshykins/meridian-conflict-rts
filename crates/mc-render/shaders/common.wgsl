@@ -220,6 +220,13 @@ struct ModelInfo {
     // A VTOL's pods (`models::Vtol::gpu`): [0] front pivot (xyz, left side), w 1 jets or 2
     // fans; [1] rear pivot, w the nozzle's distance behind it. Zero for any other model.
     vtol: array<vec4<f32>, 2>,
+    // Hatched missile cells (`models::CellBlock::gpu`), zero for none: per block b, [2b]
+    // its centre (xy), the deck its hatches shut on (z) and the cells' pitch (w); [2b + 1].x
+    // a hatch's half width.
+    cells: array<vec4<f32>, 4>,
+    // Per block its grid in x, y (nx | ny << 4 | 1 << 8 when the hatches hinge along y);
+    // then in z, w per block the missile bit of each grid cell c (i * ny + j) in nibble c.
+    cell_grid: vec4<u32>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and

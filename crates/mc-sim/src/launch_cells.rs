@@ -1,4 +1,4 @@
-//! Missiles launched out of hatched cells (the Skyguard): the hatches open before a
+//! Missiles launched out of hatched cells (the Skyguard, the Atoll): the hatches open before a
 //! salvo and shut while the cells reload (`Weapon::hatch_ticks`, counted in
 //! `Units::deploy`); each missile is boosted straight up out of its cell, coasts while
 //! its thrusters turn it over onto its mark, and only then lights its motor

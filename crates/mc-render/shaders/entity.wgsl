@@ -1585,22 +1585,43 @@ fn vs_main(in: VsIn) -> VsOut {
         } else if p.z < select(LAUNCHER_ARRAY_HOIST_SPLIT, LAUNCHER_SILO_HOIST_SPLIT, silo) {
             p.z -= cycle.y * select(LAUNCHER_ARRAY_HOIST_DROP, LAUNCHER_SILO_HOIST_DROP, silo);
         }
-    } else if in.part == CELLS_PART_HATCH || in.part == CELLS_PART_ROUND {
-        // A cell launcher's 2 x 2 cells (`gpu_consts::cells`): each hatch swings up and out
-        // about its outer edge as the hatches open (`deploy`), and a missile stands in each
-        // cell whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
+    } else if (in.part == CELLS_PART_HATCH || in.part == CELLS_PART_ROUND) && model.cell_grid.x != 0u {
+        // A block of missile cells (`models::CellBlock`): each hatch swings up and out about
+        // its outer edge as the hatches open (`deploy`), and a missile stands in each cell
+        // whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
         let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
-        let front = p.x >= CELLS_CENTRE;
-        let side = select(-1.0, 1.0, front);
+        // The nearer block's middle, then the nearest cell of its grid.
+        var blk = 0u;
+        if model.cell_grid.y != 0u
+            && distance(p.xy, model.cells[2].xy) < distance(p.xy, model.cells[0].xy) {
+            blk = 1u;
+        }
+        let at = model.cells[2u * blk];
+        let grid = select(model.cell_grid.x, model.cell_grid.y, blk == 1u);
+        let count = vec2<f32>(f32(grid & 15u), f32((grid >> 4u) & 15u));
+        let ij = clamp(round((p.xy - at.xy) / at.w + (count - 1.0) * 0.5), vec2<f32>(0.0), count - 1.0);
+        let centre = at.xy + (ij - (count - 1.0) * 0.5) * at.w;
         if in.part == CELLS_PART_HATCH {
             let open = select(0.0, smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t)), live);
-            let hinge = vec3<f32>(CELLS_CENTRE + side * (CELLS_OFFSET + CELLS_HALF), 0.0, CELLS_DECK);
-            let turn = -side * open * CELLS_SWING;
-            p = rot_xz(p - hinge, turn) + hinge;
-            n = rot_xz(n, turn);
+            let half = model.cells[2u * blk + 1u].x;
+            if ((grid >> 8u) & 1u) == 0u {
+                let side = select(-1.0, 1.0, centre.x >= at.x);
+                let hinge = vec3<f32>(centre.x + side * half, 0.0, at.z);
+                let turn = -side * open * CELLS_SWING;
+                p = rot_xz(p - hinge, turn) + hinge;
+                n = rot_xz(n, turn);
+            } else {
+                let side = select(-1.0, 1.0, centre.y >= at.y);
+                let hinge = vec3<f32>(0.0, centre.y + side * half, at.z);
+                let turn = -side * open * CELLS_SWING;
+                p = rot_x(p - hinge, turn) + hinge;
+                n = rot_x(n, turn);
+            }
         } else {
-            let cell = select(0u, 2u, front != (p.y >= 0.0)) + select(0u, 1u, front);
-            if !live || (e.status[2] & (1u << cell)) == 0u {
+            let cell = u32(ij.x) * ((grid >> 4u) & 15u) + u32(ij.y);
+            let order = select(model.cell_grid.z, model.cell_grid.w, blk == 1u);
+            let bit = (order >> (4u * cell)) & 15u;
+            if !live || (e.status[2] & (1u << bit)) == 0u {
                 p = vec3<f32>(0.0, 0.0, -50.0);
             }
         }

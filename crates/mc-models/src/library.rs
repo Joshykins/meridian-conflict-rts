@@ -172,6 +172,7 @@ fn build_fitted_made(
     let mut shield_emitter = None;
     let mut mount = None;
     let mut houses = Vec::new();
+    let mut cells = Vec::new();
     let mut spins = Vec::new();
     let mut pit = None;
     let mut excavation = None;
@@ -199,6 +200,7 @@ fn build_fitted_made(
             shield_emitter = builder.shield_emitter();
             mount = builder.mount();
             houses = builder.houses();
+            cells = builder.cells();
             spins = builder.spins();
             pit = builder.pit();
             excavation = builder.excavation();
@@ -257,6 +259,7 @@ fn build_fitted_made(
         shield_emitter,
         mount,
         houses,
+        cells,
         spins,
         pit,
         excavation,
