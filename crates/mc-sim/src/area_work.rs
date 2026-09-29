@@ -1,8 +1,10 @@
 //! Area assist: an engineer on guard works its whole ring, not only what is in reach of
 //! its spot. A few times a second it looks for work inside the area, nearest first by
 //! kind: a structure going up (or one upgrading) to help raise, then a friend to mend,
-//! then a wreck to reclaim. It goes and does it with an order put in front of the guard,
-//! which carries on when that is done, so work that turns up later is picked up too.
+//! then, only while there is room to store the mass, a wreck to reclaim. It goes and does
+//! it with an order put in front of the guard, which carries on when that is done, so
+//! work that turns up later is picked up too. Reclaim is the least of it: a wreck in hand
+//! is dropped as soon as there is raising or mending to do, or the store is full.
 
 use crate::orders::order;
 use crate::reclaim::WIDEST_TARGET;
@@ -18,14 +20,80 @@ impl World {
     /// A builder on guard with nothing to do at hand takes up the next work in its
     /// area. True when it has: an order now stands in front of the guard.
     pub(crate) fn area_work(&mut self, row: usize, o: &Order) -> Result<bool, SimError> {
-        let units = &self.state.units;
         if self.bp(row).builder.is_none()
-            || !(self.state.tick as usize + row).is_multiple_of(LOOK_TICKS)
-            || units.has_flag(row, flag::PASSIVE)
+            || !self.area_looks(row)
+            || self.state.units.has_flag(row, flag::PASSIVE)
             || self.work_paused(row)
         {
             return Ok(false);
         }
+        if let Some(help) = self.area_help(row, o) {
+            return self.area_take(row, help);
+        }
+        let owner = self.state.units.owner[row];
+        if self.no_room_for_salvage(owner) {
+            return Ok(false);
+        }
+        let (pos, centre, radius) = (self.state.units.pos[row], o.pos, o.radius);
+        let span = pos.distance(centre) + radius + WIDEST_TARGET;
+        let wrecks = &self.state.wrecks;
+        let wreck = self.index.nearest(pos, span, kind::WRECK, |e| {
+            let w = e.row as usize;
+            wrecks.slots.is_alive(w)
+                && wrecks.pos[w] == e.pos
+                && wrecks.mass[w] > Fx::ZERO
+                && e.pos.distance(centre) <= radius + e.radius
+        });
+        match wreck {
+            Some(e) => {
+                let handle = self.state.wrecks.slots.handle(e.row as usize);
+                let mut take = order(OrderKind::Reclaim, e.pos, handle);
+                take.radius = Fx::ONE;
+                self.area_take(row, take)
+            }
+            None => Ok(false),
+        }
+    }
+
+    /// An engineer reclaiming a wreck it took up from its area gives the wreck up when
+    /// there is no room left for the mass, or when something in the area wants raising
+    /// or mending, which it then goes to. True when it gave the wreck up.
+    pub(crate) fn area_reclaim_yields(&mut self, row: usize) -> Result<bool, SimError> {
+        if !self.area_looks(row) {
+            return Ok(false);
+        }
+        let units = &self.state.units;
+        let Some(guard) = self
+            .state
+            .orders
+            .iter(units, row)
+            .nth(1)
+            .copied()
+            .filter(|g| g.kind == OrderKind::Guard)
+        else {
+            return Ok(false);
+        };
+        if self.no_room_for_salvage(units.owner[row]) {
+            self.finish_order(row);
+            return Ok(true);
+        }
+        match self.area_help(row, &guard) {
+            Some(help) => {
+                self.finish_order(row);
+                self.area_take(row, help)
+            }
+            None => Ok(false),
+        }
+    }
+
+    /// Whether this is one of the ticks an engineer looks round its area.
+    fn area_looks(&self, row: usize) -> bool {
+        (self.state.tick as usize + row).is_multiple_of(LOOK_TICKS)
+    }
+
+    /// The nearest raising in the area `o` rings, else the nearest mending, as an order.
+    fn area_help(&self, row: usize, o: &Order) -> Option<Order> {
+        let units = &self.state.units;
         let (pos, owner) = (units.pos[row], units.owner[row]);
         let (centre, radius) = (o.pos, o.radius);
         let span = pos.distance(centre) + radius + WIDEST_TARGET;
@@ -41,33 +109,14 @@ impl World {
                     && self.can_repair_unit(row, e.row as usize)
             })
         };
-        if let Some(e) = raising.or_else(mending) {
-            let t = e.row as usize;
-            let mut help = order(OrderKind::Assist, e.pos, self.state.units.id(t));
-            // A site: done once it stands. Anything else: done once there is no work.
-            if self.state.units.has_flag(t, flag::UNDER_CONSTRUCTION) {
-                help.radius = Fx::ONE;
-            }
-            return self.area_take(row, help);
+        let e = raising.or_else(mending)?;
+        let t = e.row as usize;
+        let mut help = order(OrderKind::Assist, e.pos, units.id(t));
+        // A site: done once it stands. Anything else: done once there is no work.
+        if units.has_flag(t, flag::UNDER_CONSTRUCTION) {
+            help.radius = Fx::ONE;
         }
-        if self.no_room_for_salvage(owner) {
-            return Ok(false);
-        }
-        let wrecks = &self.state.wrecks;
-        let wreck = self.index.nearest(pos, span, kind::WRECK, |e| {
-            let w = e.row as usize;
-            wrecks.slots.is_alive(w)
-                && wrecks.pos[w] == e.pos
-                && wrecks.mass[w] > Fx::ZERO
-                && inside(e)
-        });
-        match wreck {
-            Some(e) => {
-                let handle = self.state.wrecks.slots.handle(e.row as usize);
-                self.area_take(row, order(OrderKind::Reclaim, e.pos, handle))
-            }
-            None => Ok(false),
-        }
+        Some(help)
     }
 
     /// Whether a builder of `owner` helps raise `t` from its area: a friendly site going

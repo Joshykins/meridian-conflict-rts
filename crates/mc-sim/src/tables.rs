@@ -641,6 +641,7 @@ pub struct Order {
     pub offset: FxVec2,
     /// `Bombard`: how far from `pos` shots may fall. `Guard`: the area watched. `Board`: one after reaching the stern approach lane.
     /// `Assist`: one when given on a unit still being built, and ends when it is done.
+    /// `Reclaim`: one when an engineer took it up from its Area Assist ring.
     /// Zero otherwise.
     pub radius: Fx,
 }

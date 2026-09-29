@@ -2780,6 +2780,7 @@ impl World {
             {
                 join.formation = 0;
                 join.offset = FxVec2::ZERO;
+                join.radius = Fx::ZERO;
                 self.state
                     .orders
                     .push_front(&mut self.state.units, row, join)?;
@@ -2850,6 +2851,10 @@ impl World {
     }
 
     fn run_reclaim(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
+        // Taken up from an Area Assist ring: it gives way to other work (`area_work.rs`).
+        if o.radius > Fx::ZERO && self.area_reclaim_yields(row)? {
+            return Ok(());
+        }
         let Some(w) = self.state.wrecks.slots.resolve(o.target) else {
             self.finish_order(row);
             return Ok(());

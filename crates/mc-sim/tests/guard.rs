@@ -274,3 +274,124 @@ fn an_engineer_on_guard_works_its_whole_area_and_takes_up_new_work() {
         "it went back to its spot"
     );
 }
+
+/// An engineer on Area Assist at work on a wreck that holds far more mass than it can
+/// take in the test: the wreck and the engineer's row.
+fn area_engineer_on_a_wreck() -> (World, usize, usize) {
+    let mut w = field();
+    // Out of the ring: only storage, so there is somewhere to put the salvage.
+    add(&mut w, 0, "aster_commander", 100, 950);
+    run(&mut w, 1);
+    w.state.players[0].mass = Fx::ZERO;
+    let mason = add(&mut w, 0, "aster_t1_engineer", 500, 500);
+    let units = vec![id(&w, mason)];
+    give(
+        &mut w,
+        0,
+        Command::Guard {
+            units,
+            pos: FxVec2::from_ints(500, 500),
+            target: mc_sim::Handle::NONE,
+            radius: Fx::from_int(400),
+            queue: false,
+        },
+    );
+    let hulk = add(&mut w, 1, "aster_t1_tank", 650, 250);
+    let units = vec![id(&w, hulk)];
+    give(
+        &mut w,
+        0,
+        Command::DebugDamage {
+            units,
+            permille: 1000,
+        },
+    );
+    run(&mut w, 2);
+    let wreck = w.state.wrecks.slots.iter().next().expect("a wreck");
+    w.state.wrecks.mass[wreck] = Fx::from_int(50_000);
+    let reclaiming = until(&mut w, 3000, |w| {
+        w.state.wrecks.mass[wreck] < Fx::from_int(50_000)
+    });
+    assert!(reclaiming.is_some(), "it went to reclaim the wreck");
+    let o = w.state.orders.front(&w.state.units, mason).unwrap();
+    assert_eq!(o.kind, OrderKind::Reclaim);
+    (w, mason, wreck)
+}
+
+#[test]
+fn an_area_engineer_leaves_a_wreck_for_a_site_going_up() {
+    let (mut w, mason, wreck) = area_engineer_on_a_wreck();
+    let power = w.blueprints.id_of("aster_t1_power").unwrap();
+    give(
+        &mut w,
+        0,
+        Command::DebugSpawn {
+            owner: 0,
+            blueprint: power,
+            pos: FxVec2::from_ints(800, 500),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 100,
+        },
+    );
+    let site = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.blueprint[r] == power)
+        .unwrap();
+    let left = until(&mut w, 10, |w| {
+        w.state
+            .orders
+            .front(&w.state.units, mason)
+            .is_some_and(|o| o.kind == OrderKind::Assist && o.target == w.state.units.id(site))
+    });
+    assert!(left.is_some(), "it left the wreck for the site at once");
+    assert!(
+        w.state.wrecks.slots.is_alive(wreck),
+        "the wreck was not done"
+    );
+    let raised = until(&mut w, 3000, |w| {
+        !w.state.units.has_flag(site, flag::UNDER_CONSTRUCTION)
+    });
+    assert!(raised.is_some(), "it raised the site");
+    let back = until(&mut w, 30, |w| {
+        w.state
+            .orders
+            .front(&w.state.units, mason)
+            .is_some_and(|o| o.kind == OrderKind::Reclaim)
+    });
+    assert!(back.is_some(), "then it went back to the wreck");
+}
+
+#[test]
+fn an_area_engineer_leaves_wrecks_alone_while_the_mass_store_is_full() {
+    let (mut w, mason, _) = area_engineer_on_a_wreck();
+    w.state.players[0].mass = w.state.players[0].mass_capacity;
+    let dropped = until(&mut w, 10, |w| {
+        w.state
+            .orders
+            .front(&w.state.units, mason)
+            .is_some_and(|o| o.kind == OrderKind::Guard)
+    });
+    assert!(dropped.is_some(), "it gave the wreck up once full");
+    for _ in 0..300 {
+        run(&mut w, 1);
+        let o = w.state.orders.front(&w.state.units, mason).unwrap();
+        assert_eq!(o.kind, OrderKind::Guard, "no reclaim taken up while full");
+    }
+    // Room again: back to the wreck.
+    w.state.players[0].mass = Fx::ZERO;
+    let back = until(&mut w, 30, |w| {
+        w.state
+            .orders
+            .front(&w.state.units, mason)
+            .is_some_and(|o| o.kind == OrderKind::Reclaim)
+    });
+    assert!(
+        back.is_some(),
+        "it went back to the wreck once there was room"
+    );
+}
