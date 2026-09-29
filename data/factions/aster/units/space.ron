@@ -39,7 +39,7 @@
         radius: 58, height: 30, footprint: (10, 5), hull: (58, 24), vision: 1400,
         motion: (layer: Air, size: 0, speed: 75, accel: 12, turn: 24, altitude: 420, hover: true),
         // Between the Vigil's light drive and the Bastion's.
-        warp: (range: 8000, energy: 4000, spool: 3, cooldown: 50, speed: 3200),
+        warp: (energy: 4000, spool: 3, cooldown: 50, speed: 3200),
         hull_mounts: true,
         weapons: [
             // The long rail cannon, the Resolute's turret gun drawn out, hung under the belly
