@@ -98,6 +98,8 @@ pub struct MeshBuilder {
     bevel: f32,
     /// The bevel rounds the ends into their caps too, not only the profile's corners.
     bevel_ends: bool,
+    /// Solids built now shade every facet flat, however shallow its turns ([`Self::with_facets`]).
+    faceted: bool,
     /// How the face being emitted gets its [`MeshVertex::face`] frame.
     framing: Framing,
     transform: Affine3A,
@@ -159,6 +161,7 @@ impl MeshBuilder {
             round: false,
             bevel: 0.0,
             bevel_ends: true,
+            faceted: false,
             framing: Framing::Flat,
             transform: root,
             turret_pivot: root.transform_point3(Vec3::ZERO),
@@ -255,6 +258,15 @@ impl MeshBuilder {
         let previous = std::mem::replace(&mut self.bevel, radius);
         f(self);
         self.bevel = previous;
+    }
+
+    /// Runs `f` with every solid it builds shaded flat, facet by facet: no run of shallow
+    /// turns is taken for a curve and no round solid is smoothed, so hard-edged armour
+    /// drawn in many facets reads as flat planes meeting at clear edges.
+    pub fn with_facets(&mut self, f: impl FnOnce(&mut Self)) {
+        let previous = std::mem::replace(&mut self.faceted, true);
+        f(self);
+        self.faceted = previous;
     }
 
     /// [`Self::with_bevel`] for the profile only: the corners a loft's rings
@@ -1313,10 +1325,14 @@ impl MeshBuilder {
 
         let round = std::mem::take(&mut self.round);
         let n = rings[0].len();
-        let smoothing = Smoothing::of(&rings, round, bevel.as_ref());
+        let smoothing = if self.faceted {
+            Smoothing::flat(n, rings.len())
+        } else {
+            Smoothing::of(&rings, round, bevel.as_ref())
+        };
         // A tube's sides are one surface: a frame that runs round it, so detail is
         // fitted to the whole drum and not to each facet. Its caps stay bare.
-        let tube = if (round || smoothing.curved) && n >= 6 {
+        let tube = if !self.faceted && (round || smoothing.curved) && n >= 6 {
             Tube::around(&rings)
         } else {
             None
@@ -1333,11 +1349,14 @@ impl MeshBuilder {
             }
         }
 
+        // Signed volume about a corner of the solid itself, so a small piece far from the
+        // model's origin (a gun on a 500 m hull) keeps the precision to tell.
+        let o = rings[0][0];
         let volume: f32 = faces
             .iter()
             .map(|(_, f)| {
                 (1..f.len() - 1)
-                    .map(|i| f[0].dot(f[i].cross(f[i + 1])))
+                    .map(|i| (f[0] - o).dot((f[i] - o).cross(f[i + 1] - o)))
                     .sum::<f32>()
             })
             .sum();
@@ -1621,18 +1640,22 @@ fn smoothing_on() -> bool {
 }
 
 impl Smoothing {
+    /// Every facet shaded flat: `n` points round, `len` rings.
+    fn flat(n: usize, len: usize) -> Smoothing {
+        Smoothing {
+            n,
+            faces: vec![vec![None; n]; len - 1],
+            caps: [None; 2],
+            down: vec![false; n],
+            round: vec![false; len],
+            curved: false,
+        }
+    }
+
     fn of(rings: &[Vec<Vec3>], round: bool, bevel: Option<&Bevel>) -> Smoothing {
         let n = rings[0].len();
         if !smoothing_on() {
-            let faces = vec![vec![None; n]; rings.len() - 1];
-            return Smoothing {
-                n,
-                faces,
-                caps: [None; 2],
-                down: vec![false; n],
-                round: vec![false; rings.len()],
-                curved: false,
-            };
+            return Smoothing::flat(n, rings.len());
         }
         let area_normal = |points: &[Vec3]| {
             let v = newell_normal(points);

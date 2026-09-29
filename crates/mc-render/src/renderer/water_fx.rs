@@ -161,6 +161,7 @@ struct Hull {
 /// A hull with a weapon that charges before it fires, as of the last tick: where the
 /// charging glow goes (`Renderer::weapon_charging`), which the sim reports by hull
 /// position and weapon only.
+#[derive(Clone)]
 pub(super) struct GunHull {
     pub(super) blueprint: u32,
     pub(super) pos: Vec3,
@@ -169,6 +170,8 @@ pub(super) struct GunHull {
     pub(super) house: Option<HousePose>,
     /// Its turret's yaw off the hull and its first gun's pitch off the rest pose.
     pub(super) turret: [f32; 2],
+    /// A capital ship's hull pitch (its spinal gun's lay), which carries everything on it.
+    pub(super) pitch: f32,
 }
 
 /// Metres a torpedo runs between the points of its path that are kept.
@@ -829,6 +832,7 @@ impl Renderer {
                 heading: u.heading,
                 house,
                 turret: [u.turret_yaw, u.arm_pitch[1]],
+                pitch: super::spinal_bore_fx::hull_pitch(u, &bp.visual.mesh),
             });
         }
     }

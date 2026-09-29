@@ -27,6 +27,7 @@ mod culverin;
 mod deck_up;
 mod determinism;
 mod determinism_gate;
+mod dreadnought;
 mod drone_port;
 mod economy;
 mod engineer_upgrade;

@@ -391,7 +391,7 @@ pub(super) const GIANT_CHARGE: f32 = 3.0;
 impl Renderer {
     /// A jagged lightning path from `from` to `to` in `kinks` pieces, `wander` metres off
     /// the straight line at most (widest in the middle), from `start` for `life` seconds.
-    fn arc(
+    pub(super) fn arc(
         &mut self,
         from: Vec3,
         to: Vec3,
@@ -934,6 +934,8 @@ pub(super) struct StormFx {
 pub(super) struct GiantFx {
     beams: Vec<StormBeam>,
     storms: Vec<StormFx>,
+    /// Warships' spinal bores charging (`spinal_bore_fx`).
+    pub(super) spinal: super::spinal_bore_fx::SpinalBores,
 }
 
 impl Renderer {
@@ -969,9 +971,10 @@ impl Renderer {
             .get(hull.blueprint as usize)?
             .weapons
             .get(weapon as usize)?;
+        // A gun fixed along the keel (a warship's spinal bore) turns on no house.
         let pose = hull
             .house
-            .filter(|_| (weapon as usize) < mc_data::MAX_HOUSES)
+            .filter(|_| (weapon as usize) < mc_data::MAX_HOUSES && w.turret_turn != 0)
             .map(|h| h.pose[weapon as usize]);
         let (yaw, pitch) = pose.map_or((0.0, 0.0), |p| (p[1], p[3]));
         let pivot = w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32()));
@@ -985,8 +988,12 @@ impl Renderer {
         };
         let local = Vec3::from(w.muzzle.to_f32());
         let on_hull = pivot + rot_z(rot_xz(local - pivot, pitch), yaw);
-        let muzzle = hull.pos + rot_z(on_hull, hull.heading);
-        let dir = rot_z(rot_z(rot_xz(Vec3::X, pitch), yaw), hull.heading);
+        // A capital ship's hull pitch carries all its guns (`GunHull::pitch`).
+        let muzzle = hull.pos + rot_z(rot_xz(on_hull, hull.pitch), hull.heading);
+        let dir = rot_z(
+            rot_xz(rot_z(rot_xz(Vec3::X, pitch), yaw), hull.pitch),
+            hull.heading,
+        );
         Some((muzzle, dir))
     }
 
@@ -1018,6 +1025,7 @@ impl Renderer {
                     heading: g.heading,
                     house: g.house,
                     turret: g.turret,
+                    pitch: g.pitch,
                 });
             // Not in the list this tick (it is filled after the events): try again next tick.
             let Some(hull) = hull else {

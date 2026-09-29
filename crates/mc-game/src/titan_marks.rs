@@ -57,6 +57,16 @@ pub fn storm_weapon(bp: &UnitBlueprint) -> Option<(usize, &Weapon)> {
         .find(|(_, w)| w.bore.is_some_and(|b| b.storm.is_some()))
 }
 
+/// The name of the storm bore a strike is from (the Behemoth's AEB-3, the Dominion's
+/// spinal AEB), for its marks and cards.
+pub fn bore_name(blueprints: &Blueprints, blueprint: BlueprintId, weapon: u8) -> &str {
+    blueprints
+        .unit(blueprint)
+        .weapons
+        .get(weapon as usize)
+        .map_or("Bore", |w| w.name.as_str())
+}
+
 fn bp_of<'a>(blueprints: &'a Blueprints, u: &UnitInstance) -> &'a UnitBlueprint {
     blueprints.unit(BlueprintId(u.blueprint as u16))
 }
@@ -879,10 +889,11 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
                 }
                 if let Some(g) = ground(ui, field, c) {
                     cross(ui, g, 16.0, rgb(tone, 1.0));
+                    let gun = bore_name(field.blueprints, s.blueprint, s.weapon);
                     let who = if enemy {
-                        "Incoming AEB-3 strike"
+                        format!("Incoming {gun} strike")
                     } else {
-                        "AEB-3 charging"
+                        format!("{gun} charging")
                     };
                     tag(
                         ui,
@@ -904,7 +915,14 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
                 ring(ui, field, c, s.radius, 2.4, rgb(tone, 0.9), true, t * 0.3);
                 if let Some(g) = ground(ui, field, c) {
                     cross(ui, g, 16.0, rgb(0xFFFFFF, 1.0));
-                    tag(ui, g + Vec2::new(0.0, 30.0), "AEB-3 fired", tone, 1.0);
+                    let gun = bore_name(field.blueprints, s.blueprint, s.weapon);
+                    tag(
+                        ui,
+                        g + Vec2::new(0.0, 30.0),
+                        &format!("{gun} fired"),
+                        tone,
+                        1.0,
+                    );
                 }
             }
             Phase::Storm(reach, f, left) => {
@@ -1080,7 +1098,7 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
             tag(
                 ui,
                 g + Vec2::new(0.0, 32.0),
-                &format!("AEB-3 storm {}  \u{b7}  {state}", metres(radius)),
+                &format!("{} storm {}  \u{b7}  {state}", w.name, metres(radius)),
                 STORM,
                 1.0,
             );

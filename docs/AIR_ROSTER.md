@@ -296,7 +296,7 @@ pods or two (`Vtol::pairs`).
 
 ## Warp drives and the Undertow dampener (2026-09-29)
 
-The Courier, the Bastion and the Resolute carry a warp drive (`warp:` in their unit
+The Courier, the Bastion, the Resolute and the Dominion carry a warp drive (`warp:` in their unit
 entries; any aircraft may be given one). `Command::Warp` (`crates/mc-sim/src/warp.rs`):
 
 1. **Charge.** The ship waits until its drive has recharged and it is up at 3/4 of its
@@ -323,6 +323,7 @@ entries; any aircraft may be given one). `Command::Warp` (`crates/mc-sim/src/war
 | Courier  | 1 500 E in 3 s  | 40 s     | 3 000 m/s  |
 | Bastion  | 8 000 E in 4 s  | 60 s     | 3 500 m/s  |
 | Resolute | 20 000 E in 5 s | 75 s     | 4 000 m/s  |
+| Dominion | 45 000 E in 7 s | 110 s    | 4 000 m/s  |
 
 **Undertow** (`aster_t2_warp_damper`, T2, 300 E/s upkeep, `warp_damper:`): an enemy
 jump that ends within 1 600 m of a finished, powered Undertow is snagged. The transit
@@ -351,7 +352,7 @@ matrix, which plays a Courier's jump into an Undertow). Headless:
 
 ## Warp: the interface (2026-09-29)
 
-The Courier, Bastion and Resolute carry warp drives (`UnitBlueprint::warp`, `mc_sim::warp`).
+The Courier, Bastion, Resolute and Dominion carry warp drives (`UnitBlueprint::warp`, `mc_sim::warp`).
 What the player sees of them:
 
 - **Order card.** A **Warp** button (key **O**) in the Movement column of any selection that
@@ -380,3 +381,25 @@ What the player sees of them:
 
 Shots: `MERIDIAN_AIM=warp scripts/shot.sh run --range --unit aster_t1_lift_ship --select
 lift_ship --cursor X,Y ...` aims the order; `--scenario warp` / `warp-dampened` jumps.
+
+## Dominion dreadnought (2026-09-29)
+
+`aster_t4_dreadnought`, mesh `space_dreadnought`, T4, built on a lot by tech 3
+engineers (the commander's Engineering Suite III, Mason III). The Resolute's rules
+hold (capital ship, lands only when told, never moves unless ordered); on top:
+
+- **Spinal AEB** (weapon 0): fixed along the keel, laid by turning and pitching the
+  whole hull (`combat::spinal_gun`). A storm bore (`bore.storm`): a 5 s charge, an
+  argon tracer, the discharge down its channel and a storm round the hit for 5 s. Its
+  2 500 m reach stays under the Zenith's 2 600 (the ship's counter outranges it;
+  `tests/dreadnought.rs` checks it).
+- **Arc Cannon Batteries** (1..=3): the Leviathan's charged shells, laid direct (a
+  `Ballistic` gun on an aircraft is a bomb bay to the sim), 2 400 m.
+- **Twin Bolt Rifles** (4, 5): flank houses, 1 600 m.
+- **Long Range SAM** (6): two hatched blocks of 8 as one launcher, 3 000 m.
+- **Hull field**: 60 000, regen 400; it draws the ship's 800 E/s upkeep and drops on
+  a stall like every shield.
+
+Presentation: `renderer/spinal_bore_fx.rs` draws the charge climbing the spine's coil
+rings (models `SpinalBore`, `spinal_bore(mesh)`) and the discharge off the prow; the
+coils' own light is `titan_charge`. Sounds: `data/sounds/dreadnought.ron`.

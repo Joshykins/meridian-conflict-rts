@@ -162,7 +162,7 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
     // Great-bore strikes: enemy, ours, allied, like warheads in flight.
     let team = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
     let tick = view.frame.tick as i64;
-    let mut sides: [Vec<(f32, Vec2, bool, f32)>; 3] = Default::default();
+    let mut sides: [Vec<(f32, Vec2, bool, f32, &str)>; 3] = Default::default();
     for st in titans.strikes.iter().filter(|st| marks::shown(view, st)) {
         let side = if !view.observing && team(st.owner) != team(view.local) {
             0
@@ -172,10 +172,11 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
             2
         };
         let c = st.centre().truncate();
+        let gun = marks::bore_name(s.blueprints, st.blueprint, st.weapon);
         match st.phase(tick, 0.0) {
-            Phase::Charging(_, left) => sides[side].push((left, c, true, st.radius)),
-            Phase::Bolt => sides[side].push((0.0, c, true, st.radius)),
-            Phase::Storm(_, _, left) => sides[side].push((left, c, false, st.radius)),
+            Phase::Charging(_, left) => sides[side].push((left, c, true, st.radius, gun)),
+            Phase::Bolt => sides[side].push((0.0, c, true, st.radius, gun)),
+            Phase::Storm(_, _, left) => sides[side].push((left, c, false, st.radius, gun)),
             Phase::Spent(_) => {}
         }
     }
@@ -186,19 +187,20 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
         let charging: Vec<f32> = group.iter().filter(|g| g.2).map(|g| g.0).collect();
         let storms = group.len() - charging.len();
         let soonest = charging.iter().copied().fold(f32::INFINITY, f32::min);
+        // Named for the first bore charging in the group (they are nearly always one kind).
+        let gun = group.iter().find(|g| g.2).map_or("Bore", |g| g.4);
         let (key, title) = match (side, charging.is_empty()) {
-            (0, false) => ("titan-strike-enemy", "AEB-3 strike incoming".to_owned()),
+            (0, false) => ("titan-strike-enemy", format!("{gun} strike incoming")),
             (0, true) => ("titan-strike-enemy", "Enemy lightning storm".to_owned()),
-            (1, false) => ("titan-strike-own", "AEB-3 charging".to_owned()),
+            (1, false) => ("titan-strike-own", format!("{gun} charging")),
             (1, true) => ("titan-strike-own", "Lightning storm raging".to_owned()),
             (_, false) => (
                 "titan-strike-ally",
                 if view.observing {
-                    "AEB-3 charging"
+                    format!("{gun} charging")
                 } else {
-                    "Allied AEB-3 charging"
-                }
-                .to_owned(),
+                    format!("Allied {gun} charging")
+                },
             ),
             _ => ("titan-strike-ally", "Lightning storm".to_owned()),
         };

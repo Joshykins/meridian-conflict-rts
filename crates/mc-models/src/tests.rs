@@ -657,11 +657,15 @@ fn solids_face_outward() {
                 let builder = build_lod(key, lod, tech);
                 let mesh = builder.mesh();
                 for range in builder.solids() {
-                    let volume: f32 = mesh.indices[range.clone()]
+                    // About a corner of the solid itself: a small piece far from the
+                    // model's origin (a gun on a 500 m hull) keeps its precision.
+                    let o = position(mesh, mesh.indices[range.start]).as_dvec3();
+                    let volume: f64 = mesh.indices[range.clone()]
                         .chunks(3)
                         .map(|t| {
-                            position(mesh, t[0])
-                                .dot(position(mesh, t[1]).cross(position(mesh, t[2])))
+                            let [a, b, c] =
+                                [t[0], t[1], t[2]].map(|i| position(mesh, i).as_dvec3() - o);
+                            a.dot(b.cross(c))
                         })
                         .sum();
                     assert!(
@@ -802,6 +806,11 @@ fn lods_reduce_and_respect_budgets() {
             // 325 m tech 3 heavy frigate in sections: trenched spine with the rail's collars,
             // bridge and search radar, four rail houses, two nacelles of two deep drives, legs.
             17000
+        } else if base_key(&model.key) == "space_dreadnought" {
+            // The tech 4 Dominion: a 490 m hull round an AEB of eight coil stages, four
+            // twin Arc Cannon casemates, two twin bolt rifle houses, sixteen SAM cells, four
+            // deep drives, legs (each design has the one budget).
+            40000
         } else if model.key == "titan" {
             // The tech 5 Behemoth: a 400 m walker, one a match; two long rigged legs, six
             // rails in a rotary cluster, the AEB-3, rocket pods, two flak turrets, and the

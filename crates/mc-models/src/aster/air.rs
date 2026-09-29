@@ -11,6 +11,11 @@ use crate::{part, pattern, rig};
 
 mod argus;
 mod bastion;
+mod dominion;
+pub(crate) use dominion::{
+    DOMINION_BORE, DOMINION_LAMPS, LIFT_JETS as DOMINION_LIFT_JETS, NOZZLES as DOMINION_NOZZLES,
+    RIG as DOMINION_RIG,
+};
 mod resolute;
 pub use resolute::SpinalRail;
 pub(crate) use resolute::{
@@ -99,6 +104,12 @@ pub(crate) fn rail_corvette(b: &mut MeshBuilder, _tech: u8) {
 /// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.
 pub(crate) fn space_frigate(b: &mut MeshBuilder, _tech: u8) {
     resolute::build(b);
+}
+
+/// Dominion: the tech 4 dreadnought laid round a spinal AEB, an arrowhead riding on a
+/// segmented keel blade with two narrower hulls stacked on its deck ([`dominion`]).
+pub(crate) fn space_dreadnought(b: &mut MeshBuilder, _tech: u8) {
+    dominion::build(b);
 }
 
 /// Bastion: capital assault transport with a vehicle hangar and fusion drives.

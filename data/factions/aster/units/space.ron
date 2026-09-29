@@ -157,6 +157,133 @@
         sounds: (death: "blast_colossal", moving: "aster_frigate"),
     ),
     (
+        // The Reach's capital ship: half a kilometre of armoured hull laid round the
+        // largest electric bore ever mounted. The spinal AEB runs the length of the keel
+        // between its charge coils and is aimed, like the frigate's rail, by turning and
+        // pitching the whole ship; its discharge sears a lane down to the mark and leaves a
+        // lightning storm feeding on what it hit. Arc Cannon casemates in its flanks fire
+        // charged shells far past most guns on the ground, two low bolt rifle houses on the
+        // spine cover ahead and astern, and two blocks of long-range SAM cells reach
+        // aircraft a Skyguard's distance off. A hull field wraps all of it, and draws power like a shield: an
+        // energy stall drops it.
+        key: "aster_t4_dreadnought",
+        name: "Dominion",
+        role: "Dreadnought",
+        tech: 4,
+        categories: ["Air", "Space", "Experimental"],
+        health: 160000,
+        cost: (mass: 16000, energy: 220000, time: 70000),
+        radius: 250, height: 110, footprint: (42, 18), hull: (255, 110), vision: 2400, radar: 3600,
+        shield: (kind: Hull, health: 60000, regen: 400),
+        economy: (energy_upkeep: 800),
+        motion: (layer: Air, size: 0, speed: 42, accel: 4, turn: 5, altitude: 700, hover: true),
+        // The heaviest drive of the line: the longest to spool and the dearest to charge.
+        warp: (energy: 45000, spool: 7, cooldown: 110, speed: 4000),
+        hull_mounts: true,
+        weapons: [
+            // Fixed along the keel: the ship turns and pitches to aim it. A long charge
+            // climbing the coils, an argon tracer too fast to see, then the whole charge down
+            // its channel: it sears a lane to the mark, bursts there, and keeps pouring into a
+            // storm round the hit for a few seconds (`storm`). Its reach stops short of the
+            // Zenith's, so the ship's counter on the ground still outranges it.
+            (
+                name: "Spinal AEB",
+                damage: 18000, splash: 60, range: 2500, reload: 32.0, speed: 12000, trajectory: Direct,
+                turret_turn: 0, arc: 4, muzzle: (250, 0, 64),
+                targets: ["Space", "Land", "Naval", "Structure"], color: Blue, flash: 0.8, impact: 3.5, shockwave: 8.0,
+                tracer: 0, trail: false, wake: 0, bolts: 0,
+                bore: (width: 34, damage: 9000, cool: 110, blast: 80, blast_time: 8, storm: (radius: 220, seconds: 5, damage: 2400)),
+                sounds: (fire: "dominion_spinal_fire", charge: "dominion_spinal_charge", charge_time: 5.0, charge_volume: 2.0, impact: "titan_bore_strike", ground: "titan_bore_strike", far: "titan_bore_far"),
+            ),
+            // Four Arc Cannon casemates let into the flanks, two a side: the battleship's
+            // gun in an armoured sleeve flush with the hull, twin barrels, a charge, then
+            // charged shells that burst in lightning. Each bears from a little off the
+            // nose to a little off the stern on its own side, so a mark dead ahead is the
+            // spinal's and the dorsal rifles'. Laid direct (a gun lobbing from an aircraft
+            // is a bomb bay to the sim). Muzzles are given as each faces the nose.
+            (
+                name: "Arc Cannon Casemate",
+                damage: 1800, splash: 30, range: 2400, reload: 10, salvo: 2, salvo_delay: 0, speed: 700, trajectory: Direct,
+                turret_turn: 30, arc: 160, facing: 90, mount: true, pivot: (90, 62, 58), muzzle: (116, 62, 58),
+                muzzles: [(116, 62, 55.5), (116, 62, 60.5)], spread: 1.2,
+                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
+                tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 8, discharge: 45, melt: 0.55,
+                howitzer: (length: 26, radius: 1.2),
+                sounds: (fire: "leviathan_broadside", charge: "leviathan_charge", charge_time: 3.4, charge_volume: 1.6, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
+            ),
+            (
+                name: "Arc Cannon Casemate",
+                damage: 1800, splash: 30, range: 2400, reload: 10, salvo: 2, salvo_delay: 0, speed: 700, trajectory: Direct,
+                turret_turn: 30, arc: 160, facing: -90, mount: true, pivot: (90, -62, 58), muzzle: (116, -62, 58),
+                muzzles: [(116, -62, 60.5), (116, -62, 55.5)], spread: 1.2,
+                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
+                tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 8, discharge: 45, melt: 0.55,
+                howitzer: (length: 26, radius: 1.2),
+                sounds: (fire: "leviathan_broadside", charge: "leviathan_charge", charge_time: 3.4, charge_volume: 1.6, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
+            ),
+            (
+                name: "Arc Cannon Casemate",
+                damage: 1800, splash: 30, range: 2400, reload: 10, salvo: 2, salvo_delay: 0, speed: 700, trajectory: Direct,
+                turret_turn: 30, arc: 160, facing: 90, mount: true, pivot: (-70, 66, 58), muzzle: (-44, 66, 58),
+                muzzles: [(-44, 66, 55.5), (-44, 66, 60.5)], spread: 1.2,
+                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
+                tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 8, discharge: 45, melt: 0.55,
+                howitzer: (length: 26, radius: 1.2),
+                sounds: (fire: "leviathan_broadside", charge: "leviathan_charge", charge_time: 3.4, charge_volume: 1.6, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
+            ),
+            (
+                name: "Arc Cannon Casemate",
+                damage: 1800, splash: 30, range: 2400, reload: 10, salvo: 2, salvo_delay: 0, speed: 700, trajectory: Direct,
+                turret_turn: 30, arc: 160, facing: -90, mount: true, pivot: (-70, -66, 58), muzzle: (-44, -66, 58),
+                muzzles: [(-44, -66, 60.5), (-44, -66, 55.5)], spread: 1.2,
+                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 2.2, impact: 2.0, shockwave: 1.6,
+                tracer: 0.35, plasma: 0.6, streak: 3, trail: true, wake: 1.0, bolts: 8, discharge: 45, melt: 0.55,
+                howitzer: (length: 26, radius: 1.2),
+                sounds: (fire: "leviathan_broadside", charge: "leviathan_charge", charge_time: 3.4, charge_volume: 1.6, impact: "aster_trebuchet_strike", ground: "aster_trebuchet_strike"),
+            ),
+            // Two low twin bolt rifle houses on the spine, one forward facing ahead and one
+            // aft facing astern: the Paladin's gun at a warship's size and reach, for what
+            // the casemates cannot bear on.
+            (
+                name: "Twin Bolt Rifle",
+                damage: 700, splash: 8, range: 1600, reload: 2.2, speed: 700, trajectory: Direct,
+                turret_turn: 60, arc: 300, facing: 0, mount: true, pivot: (150, 0, 118), muzzle: (174, 0, 118),
+                muzzles: [(174, -2.5, 118), (174, 2.5, 118)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 0.9, impact: 2.0, shockwave: 0.8,
+                tracer: 0.35, plasma: 1.0, trail: true, wake: 0.4, bolts: 6, discharge: 20,
+                sounds: (fire: "aster_bolt_rifle_heavy", charge: "aster_bolt_rifle_heavy_charge", charge_time: 0.6, impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
+            ),
+            (
+                name: "Twin Bolt Rifle",
+                damage: 700, splash: 8, range: 1600, reload: 2.2, speed: 700, trajectory: Direct,
+                turret_turn: 60, arc: 300, facing: 180, mount: true, pivot: (-150, 0, 118), muzzle: (-126, 0, 118),
+                muzzles: [(-126, 2.5, 118), (-126, -2.5, 118)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 0.9, impact: 2.0, shockwave: 0.8,
+                tracer: 0.35, plasma: 1.0, trail: true, wake: 0.4, bolts: 6, discharge: 20,
+                sounds: (fire: "aster_bolt_rifle_heavy", charge: "aster_bolt_rifle_heavy_charge", charge_time: 0.6, impact: "aster_bolt_rifle_heavy_strike", ground: "aster_bolt_rifle_heavy_strike"),
+            ),
+            // Two blocks of hatched cells amidships, port block first, as one launcher: the
+            // Atoll's long-range SAM with a little more reach, a salvo spread over the
+            // aircraft in range.
+            (
+                name: "Long Range SAM",
+                damage: 1400, range: 3000, reload: 14, speed: 560, trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (-20, 22, 126),
+                muzzles: [
+                    (-20, 22, 126), (-8, 28, 126), (-14, 22, 126), (-26, 28, 126), (-8, 22, 126), (-20, 28, 126), (-26, 22, 126), (-14, 28, 126),
+                    (-20, -22, 126), (-8, -28, 126), (-14, -22, 126), (-26, -28, 126), (-8, -22, 126), (-20, -28, 126), (-26, -22, 126), (-14, -28, 126),
+                ],
+                salvo: 16, salvo_delay: 0.25, split: true, hatch: 0.6, caliber: 1.1,
+                targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
+                cold_launch: 1.8, boost: 0.9, intercept: 140, proximity: 12, splash: 32, trail: true,
+                impact: 2, shockwave: 1,
+                sounds: (fire: "missile_launch", impact: "shell_light"),
+            ),
+        ],
+        mesh: "space_dreadnought", icon: Warship,
+        sounds: (death: "blast_colossal", moving: "aster_frigate"),
+    ),
+    (
         // The ground's answer to warships in the upper air: one enormous rail cannon on a
         // slow turntable, built at home. It reaches hulls far beyond any other gun and
         // shoots at nothing else.

@@ -124,6 +124,15 @@
             "AA Rocket Cells": "Guided rockets rippled straight up and over onto aircraft.",
         },
     ),
+    "aster_t4_dreadnought": (
+        lore: "The Reach's capital ship, laid down round the largest electric bore ever mounted. Where it hangs over a front, the front moves.",
+        weapons: {
+            "Spinal AEB": "An electric bore the length of the keel; the whole ship turns and dips its nose to lay it, and the storm it leaves feeds on what it hit.",
+            "Arc Cannon Casemate": "The battleship's Arc Cannon, paired in an armoured sleeve in the flank, firing charged shells down out of the clouds.",
+            "Twin Bolt Rifle": "A pair of plasma bolt rifles in a low house on the spine, for what the casemates cannot bear on.",
+            "Long Range SAM": "Hatched cells amidships, a salvo spread over every aircraft in reach.",
+        },
+    ),
     "aster_t4_anti_ship": (
         lore: "A rail cannon too heavy to move, built to bring warships down out of the clouds.",
         weapons: {
