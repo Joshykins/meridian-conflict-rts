@@ -1643,7 +1643,7 @@ impl World {
                 }
                 warp::Shown::Leaving | warp::Shown::Listed => {}
             }
-            let (warp_fx, warp_marks) = self.warp_fx(row);
+            let (warp_fx, warp_marks) = self.warp_fx(viewer, row);
             let bp = self.bp(row);
             // A refit is shown on the unit being refitted, not as a second unit inside it.
             if s.units.has_flag(row, crate::tables::flag::UPGRADE) {
@@ -2816,6 +2816,7 @@ impl World {
 
         frame.events.clear();
         frame.events.extend(self.events.iter().cloned());
+        self.write_warp_events(viewer, &mut frame.events);
         self.write_strategic(&mut frame.strategic);
         self.write_warhead_plans(
             viewer,

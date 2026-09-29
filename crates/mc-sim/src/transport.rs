@@ -704,7 +704,7 @@ impl World {
     /// Fastest a lift ship in `row` may fly across the map this tick (`move_unit`), if
     /// less than its top speed. Lifting off, it rises clear before it moves off and gathers
     /// way as it climbs. Setting down, it slows so that it is over the site no sooner than
-    /// it can come down to its glide floor there, at half its `descent` rate.
+    /// it can come down to its glide floor there, at three quarters of its `descent` rate.
     pub(crate) fn lift_speed_cap(&self, row: usize, pos: FxVec2, top: Fx) -> Option<Fx> {
         let descent = self.descent(row);
         let motion = self.bp(row).motion?;
@@ -727,7 +727,7 @@ impl World {
         {
             let excess = height - Fx::from_int(GLIDE_FLOOR).min(motion.altitude / 4);
             if excess > Fx::ONE {
-                let slow = pos.distance(o.pos) * (descent / 2) / excess;
+                let slow = pos.distance(o.pos) * (descent * Fx::ratio(3, 4)) / excess;
                 cap = Some(cap.map_or(slow, |c| c.min(slow)));
             }
         }
@@ -735,7 +735,7 @@ impl World {
     }
 
     /// A lift ship's climb or descent this tick toward `want_z`, metres (`run_movement`).
-    /// It gathers vertical speed at an eighth of its `descent` rate per second, tops out
+    /// It gathers vertical speed at a third of its `descent` rate per second, tops out
     /// at `descent`, and brakes so as to arrive at rest; near the ground it comes down
     /// slower still, so it settles rather than drops.
     pub(crate) fn lift_vertical(&self, row: usize, pos: FxVec2, want_z: Fx) -> Fx {
@@ -745,12 +745,12 @@ impl World {
         let z = units.z[row];
         let remaining = want_z - z;
         let dist = remaining.abs();
-        let accel = descent / 8;
+        let accel = descent / 3;
         // What it can still stop in, with a fifth in hand.
         let mut speed = descent.min((accel * dist * Fx::ratio(8, 5)).sqrt());
         if remaining < Fx::ZERO {
             let above = z - self.terrain.height_at(pos).max(self.terrain.water_level());
-            speed = speed.min(above.max(Fx::ZERO) / 2 + Fx::ONE);
+            speed = speed.min(above.max(Fx::ZERO) + Fx::ONE);
         }
         let step = speed / dt;
         let desired = if remaining < Fx::ZERO { -step } else { step };

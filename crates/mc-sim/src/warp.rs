@@ -1,7 +1,9 @@
 //! Warp: capital ships with a drive (`UnitBlueprint::warp`) jump across the map, and warp
 //! dampeners (`UnitBlueprint::warp_damper`) drag enemy jumps down.
 //!
-//! A jump (`Command::Warp`, `OrderKind::Warp`) runs through `Units::warp`:
+//! A jump (`Command::Warp`, `OrderKind::Warp`) reaches anywhere on the map. Ships sent
+//! together keep their formation: each comes out as far and as the same way from the mark
+//! as it stood from the middle of the group. It runs through `Units::warp`:
 //!
 //! - **Spool**: the ship waits for its drive to recharge and to be up at cruise height,
 //!   then stops where it is, charges the drive and brings its nose onto the mark. The
@@ -21,6 +23,8 @@
 //! dampener still stands and has power when the ship comes out, the ship loses
 //! `WarpDamper::damage` of its health and is stunned for `WarpDamper::stun_ticks`.
 //! Destroying or starving the dampener before then saves the ship the blow.
+//! The ship's own side is never shown the snag (`mirror/warp.rs`): the jump looks and
+//! sounds clean to them until it comes out hurt.
 //!
 //! A stun (`Units::stun`) is an EMP: the unit does nothing (no orders, no fire, no way
 //! on) until it runs out; a capital ship heels over, dips its nose and sinks a little
@@ -54,8 +58,15 @@ const SAG_RATE: Fx = Fx::ratio(3, 2);
 /// Its way comes off by this share a tick.
 const DRIFT_KEEP: Fx = Fx::ratio(9, 10);
 
+/// Ticks a clean transit of the jump `w` lasts at `speed` metres a tick.
+pub(crate) fn transit_ticks(w: &WarpState, speed: Fx) -> u16 {
+    ((w.from.distance(w.to) / speed).ceil_int().max(0) as u32)
+        .clamp(MIN_TRANSIT as u32, u16::MAX as u32) as u16
+}
+
 impl World {
-    /// `Command::Warp`: ships among `ids` with a drive are given a jump to `pos`.
+    /// `Command::Warp`: ships among `ids` with a drive are given a jump to `pos`, in the
+    /// formation they stand in: each keeps its place about the middle of the group.
     pub(crate) fn order_warp(
         &mut self,
         player: u8,
@@ -63,11 +74,24 @@ impl World {
         pos: FxVec2,
         queue: bool,
     ) -> Result<(), SimError> {
-        for row in self.owned(player, ids, 0) {
-            if self.bp(row).warp.is_none() {
-                continue;
-            }
-            let mut o = order(OrderKind::Warp, self.clamp_to_map(pos), Handle::NONE);
+        let rows: Vec<usize> = self
+            .owned(player, ids, 0)
+            .into_iter()
+            .filter(|&r| self.bp(r).warp.is_some())
+            .collect();
+        let Some(&first) = rows.first() else {
+            return Ok(());
+        };
+        // The middle of the group, taken about one ship so the sum stays small.
+        let base = self.state.units.pos[first];
+        let sum = rows.iter().fold(FxVec2::ZERO, |sum, &r| {
+            sum + (self.state.units.pos[r] - base)
+        });
+        let n = rows.len() as i32;
+        let middle = base + FxVec2::new(sum.x / n, sum.y / n);
+        for row in rows {
+            let to = pos + (self.state.units.pos[row] - middle);
+            let mut o = order(OrderKind::Warp, self.clamp_to_map(to), Handle::NONE);
             o.heading = self.state.units.heading[row];
             self.give(row, o, queue)?;
         }
@@ -85,7 +109,7 @@ impl World {
             return Ok(());
         }
         let from = self.state.units.pos[row];
-        let to = self.clamp_to_map(from + (o.pos - from).clamp_length(drive.range));
+        let to = o.pos;
         if from.distance(to) < self.bp(row).radius * MIN_JUMP_RADII {
             self.finish_order(row);
             return Ok(());
@@ -226,8 +250,7 @@ impl World {
             return;
         }
         // Into warp: out of the world at once, already where it comes out.
-        let transit = ((w.from.distance(w.to) / drive.speed).ceil_int().max(0) as u32)
-            .clamp(MIN_TRANSIT as u32, u16::MAX as u32) as u16;
+        let transit = transit_ticks(&w, drive.speed);
         let owner = units.owner[row];
         let damper = self.damper_at(w.to, owner);
         let (length, damper) = match damper {

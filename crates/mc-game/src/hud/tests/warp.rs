@@ -70,12 +70,12 @@ fn the_card_tells_a_jump_a_stun_and_the_drives_recharge() {
     let bp = rig
         .blueprints
         .unit(rig.blueprints.id_of("aster_t1_lift_ship").unwrap());
-    // Ready: its reach and charge, and the key.
+    // Ready: its charge and the key.
     let s = scene(&rig, &stats);
     let u = s.view.frame.units[0];
     let (label, value, ..) = super::super::warp::drive_line(&s, &u, bp).expect("a drive line");
     assert_eq!(label, "Warp drive ready  \u{b7}  O");
-    assert_eq!(value, "6.0 km  \u{b7}  1,500 E");
+    assert_eq!(value, "1,500 E");
     // Charging: the activity line and its share.
     rig.view.frame.warps = vec![spooling(0.64)];
     let s = scene(&rig, &stats);

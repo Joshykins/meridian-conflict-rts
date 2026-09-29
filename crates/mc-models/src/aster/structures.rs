@@ -837,7 +837,7 @@ fn inset(pts: &[[f32; 2]], d: f32) -> Vec<[f32; 2]> {
         .collect()
 }
 
-/// Bastion keep: black frame, four pointed outworks. White armour follows
+/// Redoubt keep: black frame, four pointed outworks. White armour follows
 /// those faces — trapezoids on the keep, a pointed shell on each outwork —
 /// black only as a rim. T2 blue conduits run the cardinal faces.
 fn bastion_keep(b: &mut MeshBuilder) {
@@ -984,7 +984,7 @@ fn bastion_keep(b: &mut MeshBuilder) {
     }
 }
 
-/// Bastion: tech 2 triple cannon battery. Dark keep, a faceted rotating
+/// Redoubt: tech 2 triple cannon battery. Dark keep, a faceted rotating
 /// house with three casemates, white plates on the black frame.
 pub(super) fn turret_heavy(b: &mut MeshBuilder, _tech: u8) {
     bastion_keep(b);

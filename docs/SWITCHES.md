@@ -24,4 +24,4 @@ Headless screenshots (`--screenshot`, `scripts/shot.sh run`) can show an order b
 
 | Variable | Values | Purpose |
 |---|---|---|
-| `MERIDIAN_AIM` | `1`, `ground`, `reclaim`, `warp` | The order in hand, aimed at `--cursor`: a warhead launch (`1`, docs/NUKES.md), a titan's strike, Reclaim, or a warp jump (each selected drive's reach, the line to its exit, the energy card, and any enemy dampener field the exit falls in). |
+| `MERIDIAN_AIM` | `1`, `ground`, `reclaim`, `warp` | The order in hand, aimed at `--cursor`: a warhead launch (`1`, docs/NUKES.md), a titan's strike, Reclaim, or a warp jump (the line from each selected ship to its exit in formation, and the energy card). |

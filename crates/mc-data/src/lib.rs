@@ -418,8 +418,6 @@ pub struct Transport {
 /// where it is going, drops out of the world and comes out again up to `range` away.
 #[derive(Clone, Copy, Debug)]
 pub struct Warp {
-    /// Farthest jump, metres; a farther mark is brought in along the line to it.
-    pub range: Fx,
     /// Energy one jump's charge takes, drawn over `spool_ticks` while the grid can pay
     /// (slower while it cannot).
     pub energy: Fx,
@@ -1332,7 +1330,6 @@ impl Blueprints {
             match &u.warp {
                 Some(d) => {
                     h.write_u64(d.spool_ticks as u64 | (d.cooldown_ticks as u64) << 16);
-                    h.write_i64(d.range.0);
                     h.write_i64(d.speed.0);
                     h.write_i64(d.energy.0);
                 }

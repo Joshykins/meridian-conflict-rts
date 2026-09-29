@@ -18,6 +18,11 @@ pub(crate) use resolute::{
     RIG as RESOLUTE_RIG, SPINAL as RESOLUTE_SPINAL, TURRET_RAIL as RESOLUTE_TURRET_RAIL,
 };
 pub(crate) mod capital;
+mod corvette;
+pub(crate) use corvette::{
+    LAMPS as VALIANT_LAMPS, LIFT_JETS as VALIANT_LIFT_JETS, NOZZLES as VALIANT_NOZZLES,
+    RAIL_CHARGE as VALIANT_RAIL_CHARGE, RIG as VALIANT_RIG,
+};
 mod courier;
 pub(crate) use bastion::{
     LAMPS as BASTION_LAMPS, LIFT_JETS as BASTION_LIFT_JETS, NOZZLES as BASTION_NOZZLES,
@@ -83,6 +88,12 @@ pub(crate) fn light_transport(b: &mut MeshBuilder, _tech: u8) {
 /// sensors across its bow ([`vigil`]).
 pub(crate) fn sensor_ship(b: &mut MeshBuilder, _tech: u8) {
     vigil::build(b);
+}
+
+/// Valiant: the tech 2 rail corvette, a small warship with a long rail cannon slung under
+/// its belly and a rotary AA cannon on its back ([`corvette`]).
+pub(crate) fn rail_corvette(b: &mut MeshBuilder, _tech: u8) {
+    corvette::build(b);
 }
 
 /// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.

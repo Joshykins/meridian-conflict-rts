@@ -158,7 +158,7 @@ Interactive Low and Balanced presets enable it automatically; High/Ultra use ful
 
 MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the selection:
 1 a warhead launch, ground a titan's strike, reclaim the Reclaim order, warp a warp jump
-(the drives' reach, exits, the energy card and any enemy dampener field in the way).
+(each ship's exit in formation and the energy card).
 
 MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
 (default: the package version with -dev).

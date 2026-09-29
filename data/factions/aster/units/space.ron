@@ -16,12 +16,55 @@
         cost: (mass: 280, energy: 4200, time: 1400),
         radius: 36, height: 22, footprint: (6, 5), hull: (36, 27), vision: 1500, radar: 6000,
         motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 200, hover: true),
-        // Warp: a scout's light drive, a little more reach than the Courier's for less charge.
-        warp: (range: 7000, energy: 1200, spool: 3, cooldown: 40, speed: 3000),
+        // Warp: a scout's light drive, cheaper to charge than the Courier's.
+        warp: (energy: 1200, spool: 3, cooldown: 40, speed: 3000),
         economy: (energy_upkeep: 100),
         weapons: [],
         mesh: "sensor_ship", icon: SensorShip,
         sounds: (death: "blast_small", moving: "aster_vigil"),
+    ),
+    (
+        // The Reach's light warship of the upper air: a small hull with one long rail cannon
+        // slung under its belly for the ground below, and a rotary cannon on its back to
+        // keep aircraft off it.
+        // It hangs below the heavy hulls, inside the reach of tech 2 anti-air, and has no
+        // shield: flak and interceptors are its answer, and the Resolute outguns it.
+        key: "aster_t2_corvette",
+        name: "Valiant",
+        role: "Rail Corvette",
+        tech: 2,
+        categories: ["Air", "Space"],
+        health: 7000,
+        cost: (mass: 1100, energy: 18000, time: 6600),
+        radius: 58, height: 30, footprint: (10, 5), hull: (58, 24), vision: 1400,
+        motion: (layer: Air, size: 0, speed: 75, accel: 12, turn: 24, altitude: 420, hover: true),
+        // Between the Vigil's light drive and the Bastion's.
+        warp: (energy: 4000, spool: 3, cooldown: 50, speed: 3200),
+        hull_mounts: true,
+        weapons: [
+            // The long rail cannon, the Resolute's turret gun drawn out, hung under the belly
+            // on a post: it turns right round and lays straight down onto the ground. It
+            // charges, then throws a slug far past anything else a tech 2 ship carries.
+            (
+                name: "Long Rail Cannon",
+                damage: 650, splash: 5, range: 1500, reload: 3.6, speed: 1400, rail: true, trajectory: Direct,
+                turret_turn: 50, arc: 360, mount: true, pivot: (10, 0, 9), muzzle: (50, 0, 9),
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, flash: 1.4, impact: 1.3, heavy_rail: 0.1,
+                sounds: (fire: "aster_rail_heavy", charge: "resolute_turret_charge", charge_time: 0.9, charge_volume: 1.2, impact: "aster_rail_hit"),
+            ),
+            // A rotary cannon on a raised barbette amidships, the sky all round it: a stream
+            // of rounds at aircraft only. It spins up before it fires, so a fighter's pass
+            // can beat it.
+            (
+                name: "AA Rotary Cannon",
+                damage: 24, range: 550, reload: 0.12, speed: 1000, trajectory: Direct,
+                turret_turn: 160, arc: 360, mount: true, pivot: (-4, 0, 42), muzzle: (6.8, 0, 42), spread: 1.2,
+                targets: ["Air"], color: Orange, flash: 1.0, impact: 1.0, tracer: 0.7,
+                rounds: 6, casings: 3, spin_up: 0.5, sounds: (fire: "aster_minigun", impact: "shell_light"),
+            ),
+        ],
+        mesh: "rail_corvette", icon: Warship,
+        sounds: (death: "blast_large", moving: "aster_corvette"),
     ),
     (
         // The Reach's first line warship. A slow, heavy armoured hull laid round one gun: the
@@ -38,8 +81,8 @@
         cost: (mass: 5000, energy: 60000, time: 20000),
         radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 1900, radar: 2400,
         motion: (layer: Air, size: 0, speed: 60, accel: 6, turn: 8, altitude: 560, hover: true),
-        // The longest jump of the line, and the slowest to spool and to recharge.
-        warp: (range: 12000, energy: 20000, spool: 5, cooldown: 75, speed: 4000),
+        // The costliest jump of the line, and the slowest to spool and to recharge.
+        warp: (energy: 20000, spool: 5, cooldown: 75, speed: 4000),
         hull_mounts: true,
         weapons: [
             // Fixed along the keel: the ship turns and pitches to aim it. Charges, then one

@@ -115,7 +115,7 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
   shrapnel streaks flung out to the edge of the splash so its reach is seen, and
   burning scraps falling away (renderer/flak_fx.rs). No blue, no energy rings.
 - **Rail guns are hardware, not emitters, and never look like a gun barrel.**
-  A gun is a dark round tube (the Bastion's jacketed battery, `parts::jacketed_gun`).
+  A gun is a dark round tube (the Redoubt's jacketed battery, `parts::jacketed_gun`).
   A rail (`parts::rail_gun`) has no tube: two bright bare-metal rails side by side
   out of a boxy power block (heat-sink fins, bus bars over its back), the bore an
   open slot between them, a ladder of close-set dark clamp yokes along them, and
@@ -777,7 +777,7 @@ same treatment.
   plate. Armour only adds a harder crack and a dull thud.
 - Energy weapons hit like guns (snap, body, real bass) and are told apart by
   the bolt: a buzzing stack of harmonics falling fast. Never a thin chirp.
-  Heavy ones (the Bastion's battery, tech 2 and 3 guns) have their own deeper
+  Heavy ones (the Redoubt's battery, tech 2 and 3 guns) have their own deeper
   sound, not the light one pitched down.
 - A death has its own sound, in stages: detonation, a second blast a beat
   later, ammunition cooking off, torn metal landing, fire coming up.

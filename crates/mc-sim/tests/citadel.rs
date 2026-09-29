@@ -1,5 +1,5 @@
 //! The Citadel, tech 3 rail point defence: it breaks heavies (Paladins) that walk into
-//! it, where a Bastion cannot, and a swarm of light tanks outpaces its reload.
+//! it, where a Redoubt cannot, and a swarm of light tanks outpaces its reload.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -117,17 +117,17 @@ fn push(defense: &str, attacker: &str, count: usize) -> Push {
 }
 
 #[test]
-fn a_citadel_breaks_a_paladin_push_that_a_bastion_cannot() {
+fn a_citadel_breaks_a_paladin_push_that_a_redoubt_cannot() {
     let citadel = push(CITADEL, "aster_t3_assault_bot", 2);
-    // At 780 m a Bastion holds off one Paladin; the same pair of them takes it.
-    let bastion = push("aster_t2_point_defense", "aster_t3_assault_bot", 2);
+    // At 780 m a Redoubt holds off one Paladin; the same pair of them takes it.
+    let redoubt = push("aster_t2_point_defense", "aster_t3_assault_bot", 2);
     assert!(
         citadel.stands && citadel.left == 0,
         "the Citadel fell to two Paladins ({} left, {} s)",
         citadel.left,
         citadel.seconds
     );
-    assert!(!bastion.stands, "a Bastion held two Paladins");
+    assert!(!redoubt.stands, "a Redoubt held two Paladins");
     // Not a wall: at 1500 m it holds three Paladins (about its own mass), but four take it.
     assert!(!push(CITADEL, "aster_t3_assault_bot", 4).stands);
 }

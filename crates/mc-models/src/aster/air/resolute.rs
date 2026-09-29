@@ -87,15 +87,19 @@ const MANTLET: (f32, f32) = (6.4, 5.0);
 
 /// Where a turret's charge crawls (`TurretRail`, metres about the pivot): along the rail
 /// tops out of the mantlet to the muzzle, six stretches evenly.
-pub(crate) const TURRET_RAIL: TurretRail = {
+pub(crate) const TURRET_RAIL: TurretRail = turret_rail(TURRET_SCALE, TURRET_REACH);
+
+/// The charge's path along a rail cannon house built at `scale` with its rails ending
+/// `reach` metres ahead of the pivot (`rail_turret_sized`).
+pub(super) const fn turret_rail(scale: f32, reach: f32) -> TurretRail {
     let front = MANTLET.0 + MANTLET.1 * 0.5;
-    let step = (TURRET_REACH / TURRET_SCALE - front) / 6.0;
-    let (first, s) = ((front + step * 0.5) * TURRET_SCALE, step * TURRET_SCALE);
+    let step = (reach / scale - front) / 6.0;
+    let (first, s) = ((front + step * 0.5) * scale, step * scale);
     TurretRail {
-        breech: GUN_BREECH * TURRET_SCALE,
-        muzzle: TURRET_REACH,
-        rail_y: (GUN_GAP + GUN_RAIL.x) * 0.5 * TURRET_SCALE,
-        rail_top: GUN_RAIL.y * 0.5 * TURRET_SCALE,
+        breech: GUN_BREECH * scale,
+        muzzle: reach,
+        rail_y: (GUN_GAP + GUN_RAIL.x) * 0.5 * scale,
+        rail_top: GUN_RAIL.y * 0.5 * scale,
         arcs: [
             first,
             first + s,
@@ -104,9 +108,9 @@ pub(crate) const TURRET_RAIL: TurretRail = {
             first + 4.0 * s,
             first + 5.0 * s,
         ],
-        arc_half: step * 0.5 * TURRET_SCALE,
+        arc_half: step * 0.5 * scale,
     }
-};
+}
 
 /// Deck height the rocket cells stand on, and their hatch tops (weapons 5 and 6: +y, -y).
 const CELL_DECK: f32 = 58.0;
@@ -1765,15 +1769,28 @@ fn house_plan() -> Vec<[f32; 2]> {
 /// its rails ending `TURRET_REACH` ahead: a low angular house on a ring, the rail gun
 /// (`parts::rail_gun`) and its mantlet pitching and kicking inside it.
 fn rail_turret(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
+    rail_turret_sized(b, weapon, pivot, TURRET_SCALE, TURRET_REACH);
+}
+
+/// The Resolute's rail cannon house at `scale` of its authored size, its rails drawn out
+/// to end `reach` metres ahead of the pivot (the unit file's `muzzle` - `pivot`). The
+/// house floor sits `HOUSE_SINK * scale` under the pivot. Charge arcs: `turret_rail`.
+pub(super) fn rail_turret_sized(
+    b: &mut MeshBuilder,
+    weapon: usize,
+    pivot: Vec3,
+    scale: f32,
+    reach: f32,
+) {
     b.with_house(weapon, pivot, 2.0, |b| {
-        let at =
-            Affine3A::from_translation(pivot) * Affine3A::from_scale(Vec3::splat(TURRET_SCALE));
-        b.with(at, turret_body);
+        let at = Affine3A::from_translation(pivot) * Affine3A::from_scale(Vec3::splat(scale));
+        b.with(at, |b| turret_body(b, reach / scale));
     });
 }
 
-/// The house and its gun about the pivot at the origin, at the authored size.
-fn turret_body(b: &mut MeshBuilder) {
+/// The house and its gun about the pivot at the origin, at the authored size, the rails
+/// ending `reach` ahead.
+fn turret_body(b: &mut MeshBuilder, reach: f32) {
     let base = -HOUSE_SINK;
     let roof = HOUSE_ROOF;
     b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -1806,7 +1823,7 @@ fn turret_body(b: &mut MeshBuilder) {
         rail_gun(
             b,
             Vec3::X * GUN_BREECH,
-            Vec3::X * (TURRET_REACH / TURRET_SCALE),
+            Vec3::X * reach,
             GUN_RAIL,
             GUN_GAP,
             Emitter::Unlit,

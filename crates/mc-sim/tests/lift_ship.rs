@@ -874,7 +874,8 @@ fn it_settles_softly_where_it_stands_and_lifts_off_before_moving_away() {
         queue: false,
     })])
     .unwrap();
-    // Ease in: the first second is slow, and no tick's change of speed is a jolt.
+    // Ease in: it gathers way over the first second, and no tick's change of speed is
+    // a jolt (a third of its descent rate a second, a tick).
     let mut speeds = Vec::new();
     let mut last = w.state.units.z[ship];
     for _ in 0..1500 {
@@ -888,13 +889,14 @@ fn it_settles_softly_where_it_stands_and_lifts_off_before_moving_away() {
     }
     assert_eq!(height(&w, ship), 0, "never set down");
     assert!(
-        speeds[5] < Fx::ONE,
-        "dropped away at once: {} m in a tick",
-        speeds[5]
+        speeds[1] < Fx::ONE && speeds[1] < speeds[8],
+        "dropped away at once: {} then {} m in a tick",
+        speeds[1],
+        speeds[8]
     );
     for pair in speeds.windows(2) {
         assert!(
-            (pair[1] - pair[0]).abs() <= Fx::ratio(6, 100),
+            (pair[1] - pair[0]).abs() <= Fx::ratio(3, 10),
             "jolted: {} -> {}",
             pair[0],
             pair[1]

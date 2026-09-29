@@ -686,6 +686,9 @@ const OVER_BUDGET: &[Over] = &[
     ("precursor_seaway", None, Some(1.0), None),
     // The Vigil is small and plain; most of its mid detail is its drive and lift jets.
     ("sensor_ship", None, Some(0.56), None),
+    // The Valiant's mid detail is mostly its shared rig: drives, legs, lift jets, the
+    // Resolute's rail house and the Bastion's rotary gun.
+    ("rail_corvette", None, Some(0.56), None),
 ];
 type Over = (&'static str, Option<usize>, Option<f32>, Option<usize>);
 
@@ -800,6 +803,10 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "light_transport" {
             // 115 m spacecraft: walk-through bay, two drive bells, lift jets, dorsal mast.
             9000
+        } else if model.key == "rail_corvette" {
+            // 130 m tech 2 warship: two drive pods, legs, lift jets, the slung rail
+            // house and the rotary gun.
+            8500
         } else if model.key == "sensor_ship" {
             // 72 m tech 1 sensor spacecraft: one drive bell, lift jets, the sensor head.
             5000

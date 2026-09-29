@@ -791,6 +791,7 @@ pub fn capital_lamps(mesh: &str) -> Option<&'static CapitalLamps> {
         "light_transport" => Some(&aster::air::COURIER_LAMPS),
         "space_frigate" => Some(&aster::air::RESOLUTE_LAMPS),
         "sensor_ship" => Some(&aster::air::VIGIL_LAMPS),
+        "rail_corvette" => Some(&aster::air::VALIANT_LAMPS),
         _ => None,
     }
 }
@@ -804,6 +805,7 @@ pub fn capital_rig(mesh: &str) -> Option<[[f32; 4]; 7]> {
         "light_transport" => Some(aster::air::COURIER_RIG.gpu()),
         "space_frigate" => Some(aster::air::RESOLUTE_RIG.gpu()),
         "sensor_ship" => Some(aster::air::VIGIL_RIG.gpu()),
+        "rail_corvette" => Some(aster::air::VALIANT_RIG.gpu()),
         _ => None,
     }
 }
@@ -844,6 +846,7 @@ pub fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRail> {
         ("citadel", 0) => Some(&aster::CITADEL_RAIL),
         ("commander", _) => Some(&aster::COMMANDER_RAIL),
         ("space_frigate", 1..=4) => Some(&aster::air::RESOLUTE_TURRET_RAIL),
+        ("rail_corvette", 0) => Some(&aster::air::VALIANT_RAIL_CHARGE),
         ("rail_trimaran", 0) => Some(&aster::NARWHAL_RAIL),
         _ => None,
     }
@@ -856,6 +859,7 @@ pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
         "light_transport" => &aster::air::COURIER_LIFT_JETS,
         "space_frigate" => &aster::air::RESOLUTE_LIFT_JETS,
         "sensor_ship" => &aster::air::VIGIL_LIFT_JETS,
+        "rail_corvette" => &aster::air::VALIANT_LIFT_JETS,
         _ => &[],
     }
 }
@@ -866,6 +870,7 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "light_transport" => &aster::air::COURIER_NOZZLES,
         "space_frigate" => &aster::air::RESOLUTE_NOZZLES,
         "sensor_ship" => &aster::air::VIGIL_NOZZLES,
+        "rail_corvette" => &aster::air::VALIANT_NOZZLES,
         "lift_ship" => &aster::air::BASTION_NOZZLES,
         "interceptor" => &[[-3.31, -0.2, 0.9], [-3.31, 0.2, 0.9]],
         "bomber" => &[[-3.0, -2.2, 1.0], [-3.0, 2.2, 1.0]],

@@ -1,15 +1,20 @@
 //! What the presentation sees of warps, dampeners and stuns (`crate::warp`).
 //!
 //! Per unit, `UnitInstance::fx` carries the warp drive (its stretch in a jump, or below
-//! zero its charge while it spools) and the stun, each last tick and this, and `status[0]` two marks (`UNIT_WARP_DAMPED`, `UNIT_IN_WARP`). The ship is drawn
-//! for one more tick after it jumps, at the place it left, stretching from nothing to a
+//! zero its charge while it spools) and the stun, each last tick and this, and
+//! `status[0]` two marks (`UNIT_WARP_DAMPED`, `UNIT_IN_WARP`). The ship is drawn for one
+//! more tick after it jumps, at the place it left, stretching from nothing to a
 //! full streak, and comes out on its first tick back going from a full streak to nothing:
 //! so the jump happens between two ticks, and the renderer's own effects
 //! (`RenderFrame::warps`) carry everything before, between and after.
+//!
+//! A dampener is a trap: its field is never shown to its enemies, and a jump it snags
+//! looks, sounds and counts down as a clean one to the ship's own side (`hides_damping`)
+//! until the ship comes out hurt and stunned. Everyone else sees it torn.
 
-use super::{DamperView, UnitInstance, WarpView};
+use super::{DamperView, SimEvent, UnitInstance, WarpView};
 use crate::tables::WarpPhase;
-use crate::warp::EMERGE_DAMPED_TICKS;
+use crate::warp::{transit_ticks, EMERGE_DAMPED_TICKS};
 use crate::World;
 use mc_core::TICKS_PER_SECOND;
 
@@ -56,13 +61,19 @@ impl World {
         }
     }
 
+    /// Whether `viewer` is on the side of a ship `owner` has in a jump, and so is not
+    /// shown that a dampener has it.
+    fn hides_damping(&self, viewer: Option<u8>, owner: u8) -> bool {
+        viewer.is_some_and(|v| !self.are_enemies(v, owner))
+    }
+
     /// `[drive last tick, drive now, stun last tick, stun now]` and the `status[0]` marks
-    /// for `row`. The drive is the stretch into a streak (0 to 1) in a jump, and minus the
-    /// charge (0 to -1) while it spools.
-    pub(super) fn warp_fx(&self, row: usize) -> ([f32; 4], u32) {
+    /// for `row`, as `viewer` sees them. The drive is the stretch into a streak (0 to 1) in
+    /// a jump, and minus the charge (0 to -1) while it spools.
+    pub(super) fn warp_fx(&self, viewer: Option<u8>, row: usize) -> ([f32; 4], u32) {
         let units = &self.state.units;
         let w = &units.warp[row];
-        let damped = self.warp_damped(row);
+        let damped = self.warp_damped(row) && !self.hides_damping(viewer, units.owner[row]);
         let stretch = match w.phase {
             // The tick it jumps: from nothing to a full streak.
             WarpPhase::Transit if w.ticks == 0 => [0.0, 1.0],
@@ -111,9 +122,10 @@ impl World {
                 .is_some_and(|d| self.damper_live(d))
     }
 
-    /// Every jump `viewer` may see: its own side's all through; an enemy's spool and exit
-    /// where it detects the ship, and its transit where it can see where the ship will come
-    /// out, or when one of its own dampeners has the jump.
+    /// Every jump `viewer` may see: its own side's all through (never dampened, and as
+    /// long as a clean transit); an enemy's spool and exit where it detects the ship, and
+    /// its transit where it can see where the ship will come out, or when one of its own
+    /// dampeners has the jump.
     pub(super) fn write_warps(&self, viewer: Option<u8>, out: &mut Vec<WarpView>) {
         out.clear();
         let s = &self.state;
@@ -123,7 +135,11 @@ impl World {
                 continue;
             }
             let owner = s.units.owner[row];
-            let damper = s.units.row(w.damper).filter(|&d| self.damper_live(d));
+            let hidden = self.hides_damping(viewer, owner);
+            let damper = s
+                .units
+                .row(w.damper)
+                .filter(|&d| self.damper_live(d) && !hidden);
             if let Some(v) = viewer.filter(|&v| self.are_enemies(v, owner)) {
                 let mask = self.team_mask(v);
                 let seen = match w.phase {
@@ -154,7 +170,12 @@ impl World {
                 blueprint: s.units.blueprint[row],
                 phase: w.phase,
                 ticks: w.ticks,
-                length: w.length,
+                length: match (w.phase, bp.warp) {
+                    (WarpPhase::Transit, Some(d)) if hidden => {
+                        w.length.min(transit_ticks(w, d.speed))
+                    }
+                    _ => w.length,
+                },
                 from: [fx, fy, surface(w.from) + cruise],
                 to: [tx, ty, surface(w.to) + cruise],
                 bearing: (w.to - w.from).angle().to_radians_f32(),
@@ -172,6 +193,28 @@ impl World {
         }
     }
 
+    /// The tick's warp events as `viewer` hears of them: a jump of its own side's is never
+    /// dampened, and never snagged.
+    pub(super) fn write_warp_events(&self, viewer: Option<u8>, out: &mut Vec<SimEvent>) {
+        out.retain_mut(|event| match event {
+            SimEvent::WarpJumped {
+                dampened, owner, ..
+            }
+            | SimEvent::WarpArrived {
+                dampened, owner, ..
+            } => {
+                *dampened &= !self.hides_damping(viewer, *owner);
+                true
+            }
+            SimEvent::WarpSnagged { unit, .. } => self
+                .state
+                .units
+                .row(*unit)
+                .is_none_or(|r| !self.hides_damping(viewer, self.state.units.owner[r])),
+            _ => true,
+        });
+    }
+
     /// Seconds before the drive in `row` may spool again (`UnitOrders::warp_recharge`).
     pub(super) fn warp_recharge_seconds(&self, row: usize) -> f32 {
         let w = &self.state.units.warp[row];
@@ -187,7 +230,8 @@ impl World {
         self.state.units.stun[row][0] as f32 / TICKS_PER_SECOND as f32
     }
 
-    /// Every warp dampener `viewer` knows of: its own side's, and an enemy's it detects.
+    /// Every warp dampener field `viewer` knows of: its own side's. An enemy's field is
+    /// never shown (the dampener itself is drawn as any unit is).
     pub(super) fn write_dampers(&self, viewer: Option<u8>, out: &mut Vec<DamperView>) {
         out.clear();
         let s = &self.state;
@@ -196,10 +240,7 @@ impl World {
                 continue;
             };
             let owner = s.units.owner[row];
-            if !s.units.is_active(row)
-                || viewer
-                    .is_some_and(|v| self.are_enemies(v, owner) && !self.detects_for_team(v, row))
-            {
+            if !s.units.is_active(row) || viewer.is_some_and(|v| self.are_enemies(v, owner)) {
                 continue;
             }
             let [x, y] = s.units.pos[row].to_f32();
