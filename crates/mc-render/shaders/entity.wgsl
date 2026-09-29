@@ -539,6 +539,36 @@ fn casing_carry(e: Entity, t: f32) -> vec3<f32> {
     return vec3<f32>(fwd * bob.x + lft * bob.y, bob.z) * hold;
 }
 
+// How far out to the side a walker's feet come down: where they stand at rest, and in
+// under the hips as it gets into its stride (`stride_upright`).
+fn stride_ankle_y(model: ModelInfo, walk: vec2<f32>) -> f32 {
+    if any(model.leg_hock.xyz != vec3<f32>(0.0)) {
+        return abs(model.leg_ankle.y);
+    }
+    return mix(abs(model.leg_ankle.y), abs(model.leg_hip.y), walk.x);
+}
+
+// A leg vertex of a walker whose feet stand out wider than its hips (the commander's
+// A-stance), brought in under them as it gets into its stride: the thigh and shin roll
+// upright about the hip and the foot slides in with the ankle, still flat. Standing it is
+// untouched. Before `walk_leg`, which bends the leg in its own (x, z) plane.
+fn stride_upright(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo,
+                  walk: vec2<f32>) -> array<vec3<f32>, 2> {
+    let side = select(-1.0, 1.0, pos.y > 0.0);
+    let hy = abs(model.leg_hip.y);
+    let out = abs(model.leg_ankle.y) - hy;
+    if limb != LIMB_THIGH && limb != LIMB_SHIN {
+        return array<vec3<f32>, 2>(pos - vec3<f32>(0.0, side * out * walk.x, 0.0), normal);
+    }
+    let a = -side * atan2(out, model.leg_hip.z - model.leg_ankle.z) * walk.x;
+    let c = cos(a);
+    let s = sin(a);
+    let q = pos.yz - vec2<f32>(side * hy, model.leg_hip.z);
+    let r = vec2<f32>(q.x * c - q.y * s, q.x * s + q.y * c) + vec2<f32>(side * hy, model.leg_hip.z);
+    let m = vec2<f32>(normal.y * c - normal.z * s, normal.y * s + normal.z * c);
+    return array<vec3<f32>, 2>(vec3<f32>(pos.x, r.x, r.y), vec3<f32>(normal.x, m.x, m.y));
+}
+
 fn walk_ground(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32) -> Footing {
     var f: Footing;
     let heading = lerp_angle(e.prev_heading, e.heading, t);
@@ -548,7 +578,7 @@ fn walk_ground(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32) -> Footing 
     let centre = terrain_height(at);
     // Half a sole or so: the slope a foot lies on, not the bumps under its heel.
     let d = max(0.12 * model.leg_hip.w, 1.0);
-    let ay = abs(model.leg_ankle.y);
+    let ay = stride_ankle_y(model, walk);
     let xl = model.leg_ankle.x + stride_foot(fract(walk.y), model) * walk.x;
     let xr = model.leg_ankle.x + stride_foot(fract(walk.y + 0.5), model) * walk.x;
     let pl = at + fwd * xl + lft * ay;
@@ -598,6 +628,7 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
         return hock_leg(pos, normal, limb, model, hip, ankle0 + foot * walk.x + vec2<f32>(0.0, ground),
             -pitch * walk.x + atan(select(footing.slope.y, footing.slope.x, left)));
     }
+    let upright = stride_upright(pos, normal, limb, model, walk);
     let l1 = distance(knee0, hip0);
     let l2 = distance(ankle0, knee0);
     let want = ankle0 + foot * walk.x + vec2<f32>(rest.x, ground + rest.y) - hip;
@@ -628,8 +659,8 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
         pivot0 = ankle0;
         pivot = ankle;
     }
-    let p = rot_xz(pos - vec3<f32>(pivot0.x, 0.0, pivot0.y), turn) + vec3<f32>(pivot.x, 0.0, pivot.y);
-    return array<vec3<f32>, 2>(p, rot_xz(normal, turn));
+    let p = rot_xz(upright[0] - vec3<f32>(pivot0.x, 0.0, pivot0.y), turn) + vec3<f32>(pivot.x, 0.0, pivot.y);
+    return array<vec3<f32>, 2>(p, rot_xz(upright[1], turn));
 }
 
 // A reverse-kneed leg (`model.leg_hock`) posed to put its ankle at `goal`, the hips at
@@ -1114,6 +1145,77 @@ fn find_hull_shield(unit_id: u32) -> i32 {
     return -1;
 }
 
+// A hovering aircraft is never quite still: a slow heave on its lift (model-space z, x)
+// and a sway on its roll (y). Zero on anything else.
+fn hover_heave(e: Entity, model: ModelInfo, t: f32) -> vec2<f32> {
+    if (model.icon & 0x80000u) == 0u || (model.icon & 0x40000u) == 0u
+        || (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) != 0u {
+        return vec2<f32>(0.0);
+    }
+    let time = globals.camera.w;
+    let seed = f32(e.unit_id & 255u) * 0.37;
+    // A spacecraft stands still on its legs: the heave fades out as the gear comes
+    // down, and a capital hull only rolls a hair in flight.
+    let transport = capital_ship(model);
+    let calm = select(1.0, 1.0 - smoothstep(0.3, 0.9, capital_gear(capital_height(e, t))), transport);
+    return vec2<f32>(
+        (0.09 * sin(time * 1.15 + seed) + 0.04 * sin(time * 2.9 + seed * 1.7)) * calm,
+        select(0.012, 0.003, transport) * sin(time * 0.8 + seed) * calm,
+    );
+}
+
+// An aircraft's pitch. A climb pitches the fuselage; hovering over sloping ground stays level.
+fn air_pitch(e: Entity, model: ModelInfo, t: f32) -> f32 {
+    let travel = e.pos - e.prev_pos;
+    var pitch = clamp(atan2(travel.z, max(length(travel.xy), 2.0)), -0.20, 0.20);
+    if (model.icon & 0x80000u) != 0u {
+        // A hover aircraft leans with its lift (`hover_flight::lean`): slot 1.
+        pitch = mix(e.arm_pitch.z, e.arm_pitch.w, t);
+    }
+    // The Thunderhead, a lift ship in flight, and any spacecraft whose hull pitches
+    // to lay a spinal gun (`combat::spinal_gun`) carry the hull's pitch in slot 0.
+    if (model.icon & 0x1100000u) != 0u || capital_ship(model) {
+        pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
+    }
+    return pitch;
+}
+
+struct Frame {
+    origin: vec3<f32>,
+    fwd: vec3<f32>,
+    left: vec3<f32>,
+    up: vec3<f32>,
+}
+
+// The frame an aircraft is drawn in, as `vs_main` draws it: turned by its heading,
+// pitched (`air_pitch`), rolled by its bank and sway, lifted by its heave. A drone docked
+// on it is drawn in this (`DOCK_RIDING`).
+fn riding_frame(src: Entity, model: ModelInfo, t: f32) -> Frame {
+    var f: Frame;
+    let heading = lerp_angle(src.prev_heading, src.heading, t);
+    f.up = vec3<f32>(0.0, 0.0, 1.0);
+    f.fwd = vec3<f32>(cos(heading), sin(heading), 0.0);
+    f.left = cross(f.up, f.fwd);
+    var sway = 0.0;
+    var heave = 0.0;
+    if (model.icon & 0x40000u) != 0u
+        && (src.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
+        let pitch = air_pitch(src, model, t);
+        let pitch_fwd = f.fwd * cos(pitch) + f.up * sin(pitch);
+        f.up = f.up * cos(pitch) - f.fwd * sin(pitch);
+        f.fwd = pitch_fwd;
+        let h = hover_heave(src, model, t);
+        heave = h.x;
+        sway = h.y;
+    }
+    let bank = mix(src._pad2.x, src._pad2.y, t) + sway;
+    let bank_left = f.left * cos(bank) + f.up * sin(bank);
+    f.up = f.up * cos(bank) - f.left * sin(bank);
+    f.left = bank_left;
+    f.origin = mix(src.prev_pos, src.pos, t) + f.up * heave;
+    return f;
+}
+
 @vertex
 fn vs_main(in: VsIn) -> VsOut {
     let entity_index = visible[in.instance];
@@ -1394,15 +1496,6 @@ fn vs_main(in: VsIn) -> VsOut {
         // Courier stern bay plug doors slide into its shoulders.
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
         p.y += sign(p.y) * open * 14.2;
-    } else if (model.icon & 0x400000u) != 0u && in.part == 7u {
-        // The Osprey's hold doors: two leaves hinged at the hold's sides, on its floor
-        // (`osprey::HOLD_HALF_WIDTH`, `HOLD_FLOOR` + 0.06), that swing down and out to let
-        // the flock drop.
-        let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
-        let hinge = vec3<f32>(0.0, sign(p.y) * 2.55, 0.56);
-        let ang = sign(p.y) * open * 1.45;
-        p = rot_x(p - hinge, ang) + hinge;
-        n = rot_x(n, ang);
     } else if model.capital[6].w != 0.0 && in.part == 16u {
         // A lift ship's belly ramp, authored lying on the ground; it swings up about
         // its hinge at the back of the hold floor to close (`CapitalRig::ramp`,
@@ -1458,12 +1551,11 @@ fn vs_main(in: VsIn) -> VsOut {
         let dr = model.capital[4];
         let cy = sign(p.y) * select(dr.z, dr.w, abs(p.y) > 0.5 * (dr.z + dr.w));
         let c = vec3<f32>(dr.x, cy, dr.y);
-        let phase = time * 0.65 * sign(p.y) + cy * 0.13;
+        // A single drive on the centre line (both |y| zero) turns one way as a whole.
+        let turn = select(sign(p.y), 1.0, dr.w == 0.0);
+        let phase = time * 0.65 * turn + cy * 0.13;
         p = rot_x(p - c, phase) + c;
         n = rot_x(n, phase);
-    } else if (model.icon & 0x400000u) != 0u && in.part == 8u {
-        // The cradles lower the drones out of the hold (`air_support::drone_socket`).
-        p.z -= mix(e.prev_deploy, e.deploy, t) * 1.9;
     } else if (in.part == 5u || in.part == 6u) && model.vtol[0].w > 0.0 {
         let front = in.part == 5u;
         let fans = model.vtol[0].w > 1.5;
@@ -1592,22 +1684,43 @@ fn vs_main(in: VsIn) -> VsOut {
         } else if p.z < select(LAUNCHER_ARRAY_HOIST_SPLIT, LAUNCHER_SILO_HOIST_SPLIT, silo) {
             p.z -= cycle.y * select(LAUNCHER_ARRAY_HOIST_DROP, LAUNCHER_SILO_HOIST_DROP, silo);
         }
-    } else if in.part == CELLS_PART_HATCH || in.part == CELLS_PART_ROUND {
-        // A cell launcher's 2 x 2 cells (`gpu_consts::cells`): each hatch swings up and out
-        // about its outer edge as the hatches open (`deploy`), and a missile stands in each
-        // cell whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
+    } else if (in.part == CELLS_PART_HATCH || in.part == CELLS_PART_ROUND) && model.cell_grid.x != 0u {
+        // A block of missile cells (`models::CellBlock`): each hatch swings up and out about
+        // its outer edge as the hatches open (`deploy`), and a missile stands in each cell
+        // whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
         let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
-        let front = p.x >= CELLS_CENTRE;
-        let side = select(-1.0, 1.0, front);
+        // The nearer block's middle, then the nearest cell of its grid.
+        var blk = 0u;
+        if model.cell_grid.y != 0u
+            && distance(p.xy, model.cells[2].xy) < distance(p.xy, model.cells[0].xy) {
+            blk = 1u;
+        }
+        let at = model.cells[2u * blk];
+        let grid = select(model.cell_grid.x, model.cell_grid.y, blk == 1u);
+        let count = vec2<f32>(f32(grid & 15u), f32((grid >> 4u) & 15u));
+        let ij = clamp(round((p.xy - at.xy) / at.w + (count - 1.0) * 0.5), vec2<f32>(0.0), count - 1.0);
+        let centre = at.xy + (ij - (count - 1.0) * 0.5) * at.w;
         if in.part == CELLS_PART_HATCH {
             let open = select(0.0, smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t)), live);
-            let hinge = vec3<f32>(CELLS_CENTRE + side * (CELLS_OFFSET + CELLS_HALF), 0.0, CELLS_DECK);
-            let turn = -side * open * CELLS_SWING;
-            p = rot_xz(p - hinge, turn) + hinge;
-            n = rot_xz(n, turn);
+            let half = model.cells[2u * blk + 1u].x;
+            if ((grid >> 8u) & 1u) == 0u {
+                let side = select(-1.0, 1.0, centre.x >= at.x);
+                let hinge = vec3<f32>(centre.x + side * half, 0.0, at.z);
+                let turn = -side * open * CELLS_SWING;
+                p = rot_xz(p - hinge, turn) + hinge;
+                n = rot_xz(n, turn);
+            } else {
+                let side = select(-1.0, 1.0, centre.y >= at.y);
+                let hinge = vec3<f32>(0.0, centre.y + side * half, at.z);
+                let turn = -side * open * CELLS_SWING;
+                p = rot_x(p - hinge, turn) + hinge;
+                n = rot_x(n, turn);
+            }
         } else {
-            let cell = select(0u, 2u, front != (p.y >= 0.0)) + select(0u, 1u, front);
-            if !live || (e.status[2] & (1u << cell)) == 0u {
+            let cell = u32(ij.x) * ((grid >> 4u) & 15u) + u32(ij.y);
+            let order = select(model.cell_grid.z, model.cell_grid.w, blk == 1u);
+            let bit = (order >> (4u * cell)) & 15u;
+            if !live || (e.status[2] & (1u << bit)) == 0u {
                 p = vec3<f32>(0.0, 0.0, -50.0);
             }
         }
@@ -1711,18 +1824,13 @@ fn vs_main(in: VsIn) -> VsOut {
         let bob = 0.10 + 0.08 * sin(time * 1.65 + f32(e.unit_id & 255u) * 0.31);
         p.z += select(bob, bob * 0.22, in.part == PART_LOCOMOTION);
     }
-    // A hovering aircraft is never quite still: a slow heave on its lift.
+    // A hovering aircraft is never quite still (`hover_heave`). A drone docked on one
+    // rides that one's heave instead (`riding_frame`).
     var hover_sway = 0.0;
-    if (model.icon & 0x80000u) != 0u && (model.icon & 0x40000u) != 0u
-        && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u
-    {
-        let seed = f32(e.unit_id & 255u) * 0.37;
-        // A spacecraft stands still on its legs: the heave fades out as the gear comes
-        // down, and a capital hull only rolls a hair in flight.
-        let transport = capital_ship(model);
-        let calm = select(1.0, 1.0 - smoothstep(0.3, 0.9, capital_gear(capital_height(e, t))), transport);
-        p.z += (0.09 * sin(time * 1.15 + seed) + 0.04 * sin(time * 2.9 + seed * 1.7)) * calm;
-        hover_sway = select(0.012, 0.003, transport) * sin(time * 0.8 + seed) * calm;
+    if (e.status[0] & DOCK_RIDING) == 0u {
+        let heave = hover_heave(e, model, t);
+        p.z += heave.x;
+        hover_sway = heave.y;
     }
 
     // A spacecraft settles on its shock struts (`capital_sink`): everything but the struts
@@ -1775,18 +1883,7 @@ fn vs_main(in: VsIn) -> VsOut {
     var fwd = cross(left, up);
     if (model.icon & 0x40000u) != 0u
         && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
-        // A climb pitches the fuselage; hovering over sloping ground stays level.
-        let travel = e.pos - e.prev_pos;
-        var pitch = clamp(atan2(travel.z, max(length(travel.xy), 2.0)), -0.20, 0.20);
-        if (model.icon & 0x80000u) != 0u {
-            // A hover aircraft leans with its lift (`hover_flight::lean`): slot 1.
-            pitch = mix(e.arm_pitch.z, e.arm_pitch.w, t);
-        }
-        // The Thunderhead, a lift ship in flight, and any spacecraft whose hull pitches
-        // to lay a spinal gun (`combat::spinal_gun`) carry the hull's pitch in slot 0.
-        if (model.icon & 0x1100000u) != 0u || capital_ship(model) {
-            pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
-        }
+        let pitch = air_pitch(e, model, t);
         let pitch_fwd = fwd * cos(pitch) + up * sin(pitch);
         up = up * cos(pitch) - fwd * sin(pitch);
         fwd = pitch_fwd;
@@ -1880,6 +1977,21 @@ fn vs_main(in: VsIn) -> VsOut {
     left = bank_left;
     var world = origin + fwd * local.x + left * local.y + up * local.z;
     var world_n = normalize(fwd * n.x + left * n.y + up * n.z);
+    // A drone docked on an aircraft is drawn where it sits in its carrier's drawn frame,
+    // so it stays on its pylon however the carrier heaves, sways and leans.
+    if (e.status[0] & DOCK_RIDING) != 0u && e.status[2] != 0u {
+        let src = dynamic_entities[e.status[2] - 1u];
+        let f = riding_frame(src, models[src.blueprint], t);
+        let src_heading = lerp_angle(src.prev_heading, src.heading, t);
+        let d = origin - mix(src.prev_pos, src.pos, t);
+        let ahead = vec2<f32>(cos(src_heading), sin(src_heading));
+        let turn = heading - src_heading;
+        let at = vec3<f32>(dot(d.xy, ahead), dot(d.xy, vec2<f32>(-ahead.y, ahead.x)), d.z)
+            + rot_z(local, turn);
+        world = f.origin + f.fwd * at.x + f.left * at.y + f.up * at.z;
+        let nt = rot_z(n, turn);
+        world_n = normalize(f.fwd * nt.x + f.left * nt.y + f.up * nt.z);
+    }
     // Into or out of warp: pulled out into a streak of light (warp_hull.wgsl).
     let warp_damped = (e.status[0] & WARP_STATUS_DAMPED) != 0u;
     let warp_seed = hash11(f32(e.unit_id & 0xFFFFu));

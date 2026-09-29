@@ -623,8 +623,9 @@ pub struct UnitBlueprint {
     pub drone_radius: Fx,
     /// Where its drones sit when home, in the turret's frame: one drone for each.
     pub drone_sockets: Vec<FxVec3>,
-    /// How far the sockets lower as it deploys.
-    pub drone_drop: Fx,
+    /// How far above (positive) or below (negative) its socket a drone lines up to
+    /// dock, and drops to letting go.
+    pub drone_approach: Fx,
     pub anti_missile: Fx,
     /// Anti-missile laser emitters in the hull's frame; empty: the unit's middle.
     pub anti_missile_mounts: Vec<FxVec3>,
@@ -1093,30 +1094,17 @@ impl Blueprints {
                 }
             }
         }
-        // Reclaiming takes no energy, not even a tower's (the user's rule): a unit that
-        // reclaims, itself or with drones, draws upkeep only for a powered system it
-        // also carries (the Argus's radar, sonar and field).
+        // Standing energy draw is for powered systems only (the user's rule): a shield,
+        // a radar or sonar, or a mine's dig. Guns, launchers, missile defence and
+        // reclaim (not even a tower's) run free; they cost energy to build, not to keep.
         for u in &units {
-            let salvage = u.reclaimer.is_some() || u.drone.is_some();
-            let powered = u.radar > Fx::ZERO || u.sonar > Fx::ZERO || u.shield.is_some();
-            if salvage && u.economy.energy_upkeep > Fx::ZERO && !powered {
+            let powered =
+                u.radar > Fx::ZERO || u.sonar > Fx::ZERO || u.shield.is_some() || u.mine.is_some();
+            if u.economy.energy_upkeep > Fx::ZERO && !powered {
                 return Err(DataError::Invalid(format!(
-                    "{}: reclaiming takes no energy, so it draws no upkeep",
+                    "{}: only a shield, radar, sonar or mine draws energy upkeep",
                     u.key
                 )));
-            }
-        }
-        // A drone is rebuilt for time alone: its parent is often the side's first salvage,
-        // built while every bit of mass is spoken for, so nothing it makes may wait on mass
-        // or energy (`mc_sim::air_support`).
-        for u in &units {
-            if let Some(d) = u.drone.map(|d| &units[d.index()]) {
-                if d.cost_mass != Fx::ZERO || d.cost_energy != Fx::ZERO {
-                    return Err(DataError::Invalid(format!(
-                        "{}: its drone {} must cost no mass or energy, only time",
-                        u.key, d.key
-                    )));
-                }
             }
         }
         Ok(Blueprints {
@@ -1229,7 +1217,7 @@ impl Blueprints {
                 h.write_i64(m.y.0);
                 h.write_i64(m.z.0);
             }
-            h.write_i64(u.drone_drop.0);
+            h.write_i64(u.drone_approach.0);
             h.write_i64(u.anti_missile.0);
             h.write_u64(u.anti_missile_lasers as u64);
             match u.turret_at {

@@ -395,7 +395,7 @@ fn range_browser_picks_t4_t5_and_space() {
             ..Default::default()
         }),
         vec![HudAction::Range(RangeAction::PickSubject(
-            rig.blueprints.id_of("aster_t2_lift_ship").unwrap()
+            rig.blueprints.id_of(&space).unwrap()
         ))]
     );
 }

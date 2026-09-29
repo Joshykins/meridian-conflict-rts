@@ -95,7 +95,11 @@ impl World {
             let units = &this.state.units;
             let mut out = Vec::new();
             for row in range {
-                if !units.slots.is_alive(row) || !units.is_active(row) || this.warp_held(row) {
+                if !units.slots.is_alive(row)
+                    || !units.is_active(row)
+                    || this.drone_seated(row)
+                    || this.warp_held(row)
+                {
                     continue;
                 }
                 if let Some(motion) = this.bp(row).motion {

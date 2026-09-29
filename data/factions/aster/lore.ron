@@ -106,6 +106,9 @@
             "Heavy Twin Flak": "A twin flak turret beside each pod. Enough for a few gunships; against a real air wing the Behemoth wants escorts.",
         },
     ),
+    "aster_t1_sensor_ship": (
+        lore: "A light hull built round one great search radar, so the Reach's picture of the field travels with its army. It carries no guns; its crews say the dome is the weapon.",
+    ),
     "aster_t3_frigate": (
         lore: "The Reach's first heavy warship of the upper air: an armoured hull laid round a single gun, with its own search radar.",
         weapons: {
@@ -370,11 +373,9 @@
         },
     ),
     "aster_t3_carrier": (
-        lore: "A flight deck at sea. Aircraft dock, mend and launch from it, and its missiles, flak and interceptor laser make it the best-defended hull afloat against anything in the air. It carries no gun that can hurt a ship.",
+        lore: "A flight deck at sea, refitted as the fleet's long arm against the air. Its radar sees further than any hull afloat, and its missiles reach aircraft long before they reach the ships it guards. It carries no gun at all: what gets in close, the escorts must meet.",
         weapons: {
-            "SAM Battery": "Cells along both sponsons.",
-            "Twin Flak": "Flak on the starboard sponson.",
-            "Close-In Gun": "A rotary gun on the port sponson for what gets past everything else.",
+            "Long Range SAM": "Twelve hatched cells in two blocks on the island's plinth, fore and aft.",
             "Interceptor Tubes": "Torpedoes under the stern that meet torpedoes coming in.",
         },
     ),

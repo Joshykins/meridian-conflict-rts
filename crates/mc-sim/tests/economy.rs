@@ -220,3 +220,58 @@ fn mines_first_leaves_power_sites_with_the_rest() {
     assert!(mines_first < power_first * 0.5);
     assert!((mines_first - neither).abs() < 0.05);
 }
+
+#[test]
+fn a_mass_stall_holds_energy_spending_back_and_says_so() {
+    // Energy to spare and almost no mass: the factory site asks for its energy at the
+    // full rate but gets only the mass-stalled share of it, and the side's record
+    // reports what was really spent (the HUD's net), not what was asked for.
+    let mut w = world();
+    spawn(&mut w, "aster_t1_power", 300, 300, 1000);
+    spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
+    spawn(&mut w, "aster_energy_storage", 360, 300, 1000);
+    let factory = spawn(&mut w, "aster_t1_land_factory", 600, 500, 100);
+    let a = spawn(&mut w, "aster_t1_engineer", 580, 470, 1000);
+    w.tick(&[cmd(Command::Assist {
+        units: vec![a],
+        target: factory,
+        queue: false,
+    })])
+    .unwrap();
+    let hz = mc_core::TICKS_PER_SECOND as f64;
+    // The engineer gets to work first.
+    for _ in 0..20 {
+        w.state.players[0].mass = Fx::ratio(1, 10);
+        w.tick(&[]).unwrap();
+    }
+    for _ in 0..20 {
+        let pl = &mut w.state.players[0];
+        pl.mass = Fx::ratio(1, 10);
+        pl.energy = pl.energy_capacity / 2;
+        let before = pl.energy;
+        w.tick(&[]).unwrap();
+        let pl = &w.state.players[0];
+        assert!(
+            pl.efficiency < Fx::ratio(1, 2),
+            "{}",
+            pl.efficiency.to_f64()
+        );
+        let (income, demand, spent) = (
+            pl.energy_income.to_f64(),
+            pl.energy_demand.to_f64(),
+            pl.energy_spent.to_f64(),
+        );
+        assert!(
+            demand > income,
+            "the old readout's drain: {demand} over {income}"
+        );
+        assert!(spent < income, "spent {spent} of {income} coming in");
+        let rise = (pl.energy - before).to_f64() * hz;
+        assert!(
+            (rise - (income - spent)).abs() < 0.05,
+            "store rose {rise}/s, reported net {}",
+            income - spent
+        );
+        assert!(pl.mass_spent > Fx::ZERO && pl.mass_spent <= pl.mass_demand);
+    }
+}

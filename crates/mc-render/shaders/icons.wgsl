@@ -340,9 +340,28 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             let fin = sd_box(p - vec2<f32>(-0.62, -0.5), vec2<f32>(0.06, 0.22));
             return min(min(min(wing, body), tail), min(torpedo, fin));
         }
+        // Sensor ship from above, nose up: a hammerhead across a slim hull with its drive,
+        // the eye-line of sensors a slot across the head (`hud/icons.rs` draws the same).
+        case 35u: {
+            var v = array<vec2<f32>, 13>(
+                vec2<f32>(0.0, 0.78), vec2<f32>(0.6, 0.52), vec2<f32>(0.94, 0.38), vec2<f32>(0.94, 0.14),
+                vec2<f32>(0.24, 0.1), vec2<f32>(0.18, -0.62), vec2<f32>(0.24, -0.92), vec2<f32>(-0.24, -0.92),
+                vec2<f32>(-0.18, -0.62), vec2<f32>(-0.24, 0.1), vec2<f32>(-0.94, 0.14), vec2<f32>(-0.94, 0.38),
+                vec2<f32>(-0.6, 0.52));
+            var d = dot(p - v[0], p - v[0]);
+            var s = 1.0;
+            for (var i = 0u; i < 13u; i++) {
+                let e = poly_edge(p, v[i], v[(i + 12u) % 13u]);
+                d = min(d, e.x);
+                s *= e.y;
+            }
+            let ship = s * sqrt(d);
+            let eyes = sd_box(p - vec2<f32>(0.0, 0.36), vec2<f32>(0.58, 0.05));
+            return max(ship, -eyes);
+        }
         // Warp dampener: its field a ring broken on the diagonals, four chevrons on the
         // axes pulling in on the point at its middle (`hud/icons.rs` draws the same).
-        case 35u: {
+        case 36u: {
             let gap = abs(abs(p.x) - abs(p.y)) * 0.7071 - 0.15;
             let ring = max(abs(length(p) - 0.76) - 0.08, -gap);
             let a = abs(p);

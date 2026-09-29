@@ -91,6 +91,8 @@ pub struct RawModule {
     #[serde(default)]
     pub drone_sockets: Vec<(f64, f64, f64)>,
     #[serde(default)]
+    pub drone_approach: f64,
+    #[serde(default)]
     pub weapons: Vec<RawWeapon>,
     /// Weapons the unit already has that move when this module goes on (a gun that
     /// makes room for a bigger one): new muzzle, and pivot when given.
@@ -559,6 +561,7 @@ fn loadout_unit(unit: &Unit, fitted: &[u8; MAX_REFIT_SLOTS]) -> Unit {
             out.drone = m.drone.clone();
             out.drone_radius = m.drone_radius;
             out.drone_sockets = m.drone_sockets.clone();
+            out.drone_approach = m.drone_approach;
         }
         out.weapons.extend(m.weapons.iter().cloned());
     }

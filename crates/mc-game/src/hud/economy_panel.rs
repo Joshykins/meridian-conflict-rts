@@ -34,6 +34,7 @@ impl Hud {
                 p.mass_capacity,
                 p.mass_income + p.reclaim_income,
                 p.mass_demand,
+                p.mass_spent,
                 MASS,
             ),
             (
@@ -42,12 +43,13 @@ impl Hud {
                 p.energy_capacity,
                 p.energy_income,
                 p.energy_demand,
+                p.energy_spent,
                 ENERGY,
             ),
         ];
         // Each resource's state this frame: dry and short, or running low.
         let mut short = [Short::Fine; 2];
-        for (i, (name, have, cap, income, demand, tone)) in rows.into_iter().enumerate() {
+        for (i, (name, have, cap, income, demand, spent, tone)) in rows.into_iter().enumerate() {
             let x = r.x + 16.0 + i as f32 * (block + 14.0);
             if i > 0 {
                 ui.vline(
@@ -57,13 +59,11 @@ impl Hud {
                     rgb(palette::LINE, 0.14),
                 );
             }
-            // What the builders are asking for, not what a stall lets them have: the
-            // sum is how far short the income falls.
-            let spend = demand;
+            let spend = shown_spend(have, income, demand, spent, free);
             let net = income - spend;
             // The store itself only drains by what is really being spent.
-            let drain = income - demand * p.efficiency;
-            let empty = !free && have < 1.0 && net < -0.05;
+            let drain = income - spent;
+            let empty = !free && have < 1.0 && income - demand < -0.05;
             // Dry within fifteen seconds, or nearly there already.
             let low = !free
                 && !empty
@@ -256,6 +256,20 @@ impl Hud {
             }
         }
         r.bottom()
+    }
+}
+
+/// The spending to show beside a resource's income. What was really spent, so a
+/// stall of the other resource (which holds this one's spending back too) does not
+/// read as a drain; but while this one is itself dry, what the builders ask for, so
+/// the net says how far short the income falls.
+pub(super) fn shown_spend(have: f32, income: f32, demand: f32, spent: f32, free: bool) -> f32 {
+    if free {
+        0.0
+    } else if have < 1.0 && demand > income + 0.05 {
+        demand
+    } else {
+        spent
     }
 }
 

@@ -21,8 +21,10 @@ impl World {
         out: &mut Vec<Command>,
     ) {
         let pl = &self.state.players[player as usize];
-        let energy_short =
-            pl.energy_demand > pl.energy_income || pl.energy < pl.energy_capacity / 5;
+        // Short when the store really drains, not when builders merely ask for more
+        // than comes in: in a mass stall they get only a share of their energy and the
+        // store fills while the demand reads high.
+        let energy_short = pl.energy_spent > pl.energy_income || pl.energy < pl.energy_capacity / 5;
         let mass_rich = pl.mass > pl.mass_capacity * Fx::ratio(7, 10);
         let mass_income = pl.mass_income;
         let energy_income = pl.energy_income;
@@ -40,7 +42,41 @@ impl World {
         } else {
             3 + (mass_income / Fx::from_int(10)).floor_int() as usize
         };
-        for &row in census.builders_idle.iter().take(skill.builders_per_think) {
+        // The best builders choose first, so they take the big plants.
+        let mut idle = census.builders_idle.clone();
+        idle.sort_by_key(|&r| (std::cmp::Reverse(self.builder_tech(r)), r));
+        let best = self.best_builder_tech(player);
+        let power_wanted = energy_short || pl.energy_income < census.energy_need;
+        // Builds ordered this think: a second builder choosing the same one joins it.
+        let mut ordered: Vec<(BlueprintId, FxVec2, Angle)> = Vec::new();
+        for &row in idle.iter().take(skill.builders_per_think) {
+            // A lesser builder helps raise the side's plants rather than starting
+            // a small one of its own (`choose_job`).
+            if power_wanted && self.builder_tech(row) < best {
+                if let Some(site) = census
+                    .sites
+                    .iter()
+                    .copied()
+                    .filter(|&s| {
+                        self.bp(s).has(cat::POWER)
+                            && self.within_reach(row, self.state.units.pos[s])
+                            && !intel.danger.hot(self.state.units.pos[s])
+                    })
+                    .min_by_key(|&s| {
+                        (
+                            self.state.units.pos[s].distance_sq(self.state.units.pos[row]),
+                            s,
+                        )
+                    })
+                {
+                    out.push(Command::Assist {
+                        units: vec![self.state.units.id(row)],
+                        target: self.state.units.id(site),
+                        queue: false,
+                    });
+                    continue;
+                }
+            }
             if let Some(site) = census
                 .sites
                 .iter()
@@ -85,6 +121,12 @@ impl World {
             );
             match job {
                 Some(job) => {
+                    if let Some(join) =
+                        self.join_same_build(row, job.blueprint, census, intel, &ordered)
+                    {
+                        out.push(join);
+                        continue;
+                    }
                     let bp = self.blueprints.unit(job.blueprint).clone();
                     let site = match job.place {
                         Place::Around => self.find_site(
@@ -145,15 +187,17 @@ impl World {
                         } else if bp.has(cat::SHIELD) || bp.has(cat::ARTILLERY) {
                             planned.guards.push(site);
                         }
+                        let heading = if bp.is_structure() {
+                            AI_BUILD_HEADING
+                        } else {
+                            job.heading
+                        };
+                        ordered.push((job.blueprint, site, heading));
                         out.push(Command::Build {
                             units: vec![self.state.units.id(row)],
                             blueprint: job.blueprint,
                             pos: site,
-                            heading: if bp.is_structure() {
-                                AI_BUILD_HEADING
-                            } else {
-                                job.heading
-                            },
+                            heading,
                             queue: false,
                         });
                     }
@@ -189,6 +233,9 @@ impl World {
                                     (self.state.units.pos[*s].distance_sq(pos), *s as u32)
                                 })
                         });
+                    // Then an engineer going up a tier: on its own power alone
+                    // the upgrade takes minutes, longer still short of materials.
+                    let assist_site = assist_site.or_else(|| self.engineer_upgrading_near(row));
                     if let Some(site) = assist_site {
                         out.push(Command::Assist {
                             units: vec![self.state.units.id(row)],
@@ -241,6 +288,100 @@ impl World {
                 }
             }
         }
+    }
+
+    /// Help with a `blueprint` already on its way up rather than start a second
+    /// one beside it: two engineers each on a Sparrow of their own finish both
+    /// late, where together they finish one in half the time and then the next.
+    /// A site begun, a plan another builder is walking to, or one ordered this
+    /// think, nearest first. Mines are each on a deposit of their own.
+    pub(super) fn join_same_build(
+        &self,
+        row: usize,
+        blueprint: BlueprintId,
+        census: &Census,
+        intel: &Intel,
+        ordered: &[(BlueprintId, FxVec2, Angle)],
+    ) -> Option<Command> {
+        if self.blueprints.unit(blueprint).mine.is_some() {
+            return None;
+        }
+        let units = &self.state.units;
+        let pos = units.pos[row];
+        let open = |p: FxVec2| self.within_reach(row, p) && !intel.danger.hot(p);
+        let begun = census
+            .sites
+            .iter()
+            .copied()
+            .filter(|&s| units.blueprint[s] == blueprint && open(units.pos[s]))
+            .min_by_key(|&s| (units.pos[s].distance_sq(pos), s));
+        if let Some(site) = begun {
+            return Some(Command::Assist {
+                units: vec![units.id(row)],
+                target: units.id(site),
+                queue: false,
+            });
+        }
+        let player = units.owner[row];
+        let planned = self
+            .planned_sites(player)
+            .filter(|(r, o)| *r != row && o.blueprint == blueprint)
+            .map(|(_, o)| (o.pos, o.heading))
+            .chain(
+                ordered
+                    .iter()
+                    .filter(|(b, ..)| *b == blueprint)
+                    .map(|&(_, p, h)| (p, h)),
+            )
+            .filter(|&(p, _)| open(p))
+            .min_by_key(|(p, _)| (p.distance_sq(pos), p.x, p.y))?;
+        Some(Command::Build {
+            units: vec![units.id(row)],
+            blueprint,
+            pos: planned.0,
+            heading: planned.1,
+            queue: false,
+        })
+    }
+
+    /// The nearest engineer of `row`'s side at work on its own upgrade, within reach.
+    fn engineer_upgrading_near(&self, row: usize) -> Option<usize> {
+        let units = &self.state.units;
+        let pos = units.pos[row];
+        units
+            .slots
+            .iter()
+            .filter(|&r| {
+                r != row
+                    && units.owner[r] == units.owner[row]
+                    && units.is_active(r)
+                    && self.bp(r).is_mobile()
+                    && self.bp(r).has(cat::ENGINEER)
+                    && self
+                        .state
+                        .orders
+                        .front(units, r)
+                        .is_some_and(|o| matches!(o.kind, OrderKind::Upgrade))
+                    && self.within_reach(row, units.pos[r])
+            })
+            .min_by_key(|&r| (units.pos[r].distance_sq(pos), r))
+    }
+
+    /// The tier of the side's best finished mobile builder, its commander included.
+    pub(super) fn best_builder_tech(&self, player: u8) -> u8 {
+        let units = &self.state.units;
+        units
+            .slots
+            .iter()
+            .filter(|&r| {
+                units.owner[r] == player
+                    && units.is_active(r)
+                    && self.bp(r).is_mobile()
+                    && self.bp(r).builder.is_some()
+            })
+            .map(|r| self.builder_tech(r))
+            .max()
+            .unwrap_or(1)
     }
 
     pub(super) fn choose_job(
@@ -301,15 +442,24 @@ impl World {
             want_factories
         }
         .min(skill.factory_cap as usize);
-        let leave_power = tech < 2
-            && energy_income >= Fx::from_int(150)
-            && self.state.units.slots.iter().any(|r| {
-                self.state.units.owner[r] == owner
-                    && self.state.units.is_active(r)
-                    && self.bp(r).is_mobile()
-                    && self.bp(r).builder.is_some()
-                    && self.builder_tech(r) >= 2
-            });
+        // A plant from a lesser builder is a poor one: a Reactor II gives 250 a
+        // second for 700 materials, a Reactor 20 for 75. Once the side has a
+        // better builder, a lesser one helps raise its plants (`direct_builders`)
+        // and starts none of its own, unless the side's energy has run out with
+        // no plant going up at all. T1 builders used to dot 50 to 100 small
+        // reactors about the base.
+        let leave_power = tech < self.best_builder_tech(owner);
+        // The biggest plant the builder can put up; a Reactor III only once the
+        // income makes its price a couple of minutes' worth.
+        let plant_tech = if tech >= 3 && mass_income >= Fx::from_int(22) {
+            3
+        } else {
+            tech.clamp(1, 2)
+        };
+        let energy_gone = {
+            let pl = &self.state.players[owner as usize];
+            pl.energy < pl.energy_capacity / 20
+        };
         // A builder far out works where it is; the base is left to those at home,
         // or it spends minutes walking back for every job.
         let far = self.state.units.pos[row].distance(start) > FAR_FROM_HOME;
@@ -417,18 +567,11 @@ impl World {
                 }
             }
         }
-        // Power before anything else in a stall. A tech 1 builder leaves new
-        // plants to a better one only while one of those is going up.
+        // Power before anything else in a stall. A lesser builder leaves new
+        // plants to a better one unless the energy is gone and none is going up.
         let power_rising = census.sites.iter().any(|&s| self.bp(s).has(cat::POWER));
-        if energy_short && (!leave_power || !power_rising) {
-            let ptech = if tech >= 3 && energy_income >= Fx::from_int(400) {
-                3
-            } else if tech >= 2 && energy_income >= Fx::from_int(100) {
-                2
-            } else {
-                1
-            };
-            if let Some(job) = power_job(ptech) {
+        if energy_short && (!leave_power || (energy_gone && !power_rising)) {
+            if let Some(job) = power_job(plant_tech) {
                 return Some(job);
             }
         }
@@ -446,8 +589,43 @@ impl World {
                 );
             }
         }
-        if energy_short && planned.power < want_power.min(6) {
-            if let Some(job) = power_job(1) {
+        if energy_short && !leave_power && planned.power < want_power.min(6) {
+            if let Some(job) = power_job(plant_tech) {
+                return Some(job);
+            }
+        }
+        // One watchtower first: it is cheap, and power always short of the
+        // side's whole draw kept it from ever going up.
+        if planned.radars.is_empty()
+            && planned.power >= 2
+            && (planned.pd >= 1 || census.extractors.len() >= FIRST_MINES)
+        {
+            let near = offset_toward(start, front, Fx::from_int(140))
+                + FxVec2::from_angle(facing + Angle::QUARTER_TURN) * Fx::from_int(72);
+            if allow(near) {
+                return self.job_structure(
+                    row,
+                    cat::INTEL,
+                    1,
+                    near,
+                    facing,
+                    Fx::from_int(20),
+                    true,
+                );
+            }
+        }
+        // Ahead of the stall, not in it: power for what every factory and
+        // builder would draw at work, not only for what they ask for now,
+        // and before far mines and turrets: behind them, the side
+        // ran out of energy a tenth of the game.
+        if !leave_power
+            && (planned.power < want_power
+                || energy_income < mass_income * skill.power_ratio
+                || energy_income < census.energy_need)
+        {
+            // The AI pays power first in a stall (`direct_focus`), so a short side
+            // still builds the biggest plant it can.
+            if let Some(job) = power_job(plant_tech) {
                 return Some(job);
             }
         }
@@ -543,43 +721,6 @@ impl World {
                     Fx::from_int(18),
                     false,
                 );
-            }
-        }
-        if planned.radars.is_empty()
-            && planned.power >= 2
-            && (planned.pd >= 1 || census.extractors.len() >= FIRST_MINES)
-        {
-            let near = offset_toward(start, front, Fx::from_int(140))
-                + FxVec2::from_angle(facing + Angle::QUARTER_TURN) * Fx::from_int(72);
-            if allow(near) {
-                return self.job_structure(
-                    row,
-                    cat::INTEL,
-                    1,
-                    near,
-                    facing,
-                    Fx::from_int(20),
-                    true,
-                );
-            }
-        }
-        // Ahead of the stall, not in it: power for what every factory and
-        // builder would draw at work, not only for what they ask for now.
-        if !leave_power
-            && (planned.power < want_power
-                || energy_income < mass_income * skill.power_ratio
-                || energy_income < census.energy_need * Fx::ratio(9, 10))
-        {
-            // Power is paid first in a stall, so a short side still builds the biggest plant it can.
-            let ptech = if mass_income >= Fx::from_int(22) && tech >= 3 {
-                3
-            } else if mass_income >= Fx::from_int(10) && tech >= 2 {
-                2
-            } else {
-                1
-            };
-            if let Some(job) = power_job(ptech) {
-                return Some(job);
             }
         }
         if let Some(job) = factory_job() {

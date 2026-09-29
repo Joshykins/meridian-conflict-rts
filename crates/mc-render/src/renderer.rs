@@ -47,6 +47,7 @@ mod cull_lists;
 mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
+mod footfalls;
 pub(crate) mod foundations;
 mod frame;
 pub(crate) mod grass;
@@ -386,9 +387,14 @@ pub(crate) struct ModelInfo {
     /// A VTOL's pods (`models::Vtol::gpu`): front pivot and kind, rear pivot and the
     /// nozzle's distance behind its pivot. All zero for any other model.
     pub(crate) vtol: [[f32; 4]; 2],
+    /// Hatched missile cells (`models::CellBlock::gpu`): per block its centre, deck, pitch
+    /// and hatch half width. All zero for none.
+    pub(crate) cells: [[f32; 4]; 4],
+    /// Per block its grid word, then per block its missile order word.
+    pub(crate) cell_grid: [u32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 944);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1024);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -1029,6 +1035,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         shield_emitter: None,
         mount: None,
         houses: Vec::new(),
+        cells: Vec::new(),
         spins: Vec::new(),
         hover: false,
         pit: None,
@@ -1165,7 +1172,7 @@ impl Renderer {
                 | (bp.motion.is_some_and(|m| m.hover) as u32) << 19
                 | ((bp.visual.mesh == "assault_air") as u32) << 20
                 | ((bp.visual.mesh == "rotor_gunship") as u32) << 21
-                | ((bp.visual.mesh == "reclaim_carrier") as u32) << 22
+                // retired: 1 << 22 (the Osprey's hold doors)
                 // A ship: rides the swell, not the ground (`entity.wgsl`).
                 | (bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval) as u32) << 23
                 // Transport flight pitch; Bastion also has ramp/gear parts (`entity.wgsl`).
@@ -1354,6 +1361,8 @@ impl Renderer {
                 breech: model.breech.unwrap_or([0.0; 4]),
                 plan_box,
                 vtol: model.vtol.map_or([[0.0; 4]; 2], |v| v.gpu()),
+                cells: models::CellBlock::gpu(&model.cells).0,
+                cell_grid: models::CellBlock::gpu(&model.cells).1,
                 spin: model
                     .spins
                     .iter()
@@ -3716,7 +3725,8 @@ impl Renderer {
         if opacity <= 0.0 || life <= 0.0 {
             return;
         }
-        // A blast or flak puff's x is its heat (blast_fx.rs, flak_fx.rs).
+        // A blast or flak puff's x is its heat (blast_fx.rs, flak_fx.rs); a blast's y above
+        // a half burns red (laser_fx.rs).
         let appearance =
             if kind == PUFF_ION || kind == blast_fx::PUFF_BLAST || kind == flak_fx::PUFF_FLAK {
                 [motion.x, motion.y, motion.z, 1.0]
@@ -4400,127 +4410,6 @@ impl Renderer {
                     (3.0 + 3.5 * strength) * scale,
                 ),
             );
-        }
-    }
-
-    /// A walker's foot coming down: a print the size of the sole, and dust from
-    /// under it. The shader plants the left foot as the stride's cycle wraps
-    /// and the right half a cycle later; this keeps the same time.
-    fn footfall(&mut self, u: &UnitInstance, legs: &Legs, time: f32, mark: bool, dust: bool) {
-        if let Some(crawl) = legs.crawl {
-            self.crawl_footfalls(u, legs, &crawl, time, dust);
-            return;
-        }
-        let cycle = |ground: f32| (ground / legs.stride * 2.0).floor();
-        let (before, now) = (cycle(u.gait[0] - u.gait[1]), cycle(u.gait[0]));
-        // A giant wades: its feet still come down in the shallows (`titan_fx`).
-        let giant = titan_fx::strides(&self.blueprints, u.blueprint);
-        if u.gait[1] <= 0.0
-            || before == now
-            || (u.pos[2] < self.map_info.water_level.to_f32() && !giant)
-        {
-            return;
-        }
-        let side = if now.rem_euclid(2.0) < 1.0 { 1.0 } else { -1.0 };
-        let forward = Vec3::new(u.heading.cos(), u.heading.sin(), 0.0);
-        let left = Vec3::new(-forward.y, forward.x, 0.0);
-        // Set down at the front of its reach.
-        let plant = Vec3::from(u.pos)
-            + forward * (legs.ankle[0] + legs.stride * legs.stance * 0.5)
-            + left * (side * legs.ankle[1]);
-        if mark && legs.foot[2] > 0.0 && giant {
-            self.giant_print(plant, forward, legs, time + self.tick_seconds * 0.5);
-        } else if mark && legs.foot[2] > 0.0 {
-            let heel = [
-                plant.x + forward.x * legs.foot[0],
-                plant.y + forward.y * legs.foot[0],
-            ];
-            let toe = [
-                plant.x + forward.x * legs.foot[1],
-                plant.y + forward.y * legs.foot[1],
-            ];
-            self.push_mark(TrackMark {
-                start_xy: heel,
-                end_xy: toe,
-                half_gauge: 0.0,
-                width: legs.foot[2],
-                start: time + self.tick_seconds * 0.5,
-                life: TRACK_MARK_LIFE,
-            });
-        }
-        if giant {
-            // When in the tick the foot lands, as the game times its sound.
-            let pace = legs.stride * 0.5;
-            let landing = now * pace;
-            let share = ((landing - (u.gait[0] - u.gait[1])) / u.gait[1]).clamp(0.0, 1.0);
-            self.giant_footfall(plant, forward, legs.foot, time + share * self.tick_seconds);
-            return;
-        }
-        if !dust {
-            return;
-        }
-        let at = plant + Vec3::Z * 0.3;
-        let weight = legs.hip[2];
-        for _ in 0..4 {
-            let out =
-                Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.15).normalize_or_zero();
-            let life = 0.9 + self.scatter.unit() * 0.7;
-            self.push_puff(
-                PUFF_DUST,
-                at + out * weight * 0.12,
-                out * (2.0 + weight * 0.5) + Vec3::Z * 0.8,
-                time + self.tick_seconds * 0.5,
-                life,
-                (weight * 0.12, weight * 0.42),
-            );
-        }
-    }
-
-    /// A many-legged walker's feet coming down (`models::Crawl`): no prints, a little dust
-    /// kicked up where each pointed foot lands, as `entity.wgsl` `crawl_leg` plants them.
-    fn crawl_footfalls(
-        &mut self,
-        u: &UnitInstance,
-        legs: &Legs,
-        crawl: &models::Crawl,
-        time: f32,
-        dust: bool,
-    ) {
-        if !dust || u.gait[1] <= 0.0 || u.pos[2] < self.map_info.water_level.to_f32() {
-            return;
-        }
-        let forward = Vec3::new(u.heading.cos(), u.heading.sin(), 0.0);
-        let left = Vec3::new(-forward.y, forward.x, 0.0);
-        let (before, now) = (
-            (u.gait[0] - u.gait[1]) / legs.stride,
-            u.gait[0] / legs.stride,
-        );
-        for i in 0..crawl.pairs {
-            let [_, _, ankle] = crawl.joints[i];
-            for side in [1.0f32, -1.0] {
-                // A foot lands when its cycle passes the stance's start (`crawl_leg`: phase 0).
-                let offset = crawl.phase[i] + if side < 0.0 { 0.5 } else { 0.0 };
-                if (now - offset).floor() == (before - offset).floor() {
-                    continue;
-                }
-                let plant = Vec3::from(u.pos)
-                    + forward * (ankle[0] + legs.stride * legs.stance * 0.5)
-                    + left * (side * ankle[1])
-                    + Vec3::Z * 0.2;
-                for _ in 0..2 {
-                    let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.2)
-                        .normalize_or_zero();
-                    let life = 0.7 + self.scatter.unit() * 0.5;
-                    self.push_puff(
-                        PUFF_DUST,
-                        plant + out * 0.3,
-                        out * 2.2 + Vec3::Z * 0.7,
-                        time + self.tick_seconds * 0.5,
-                        life,
-                        (0.35, 1.3),
-                    );
-                }
-            }
         }
     }
 

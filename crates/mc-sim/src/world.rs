@@ -345,6 +345,8 @@ impl World {
                 mass_demand: Fx::ZERO,
                 energy_demand: Fx::ZERO,
                 efficiency: Fx::ONE,
+                mass_spent: Fx::ZERO,
+                energy_spent: Fx::ZERO,
                 upkeep_efficiency: Fx::ONE,
                 build_speed: Fx::ONE,
                 mine_power: Fx::ONE,
@@ -711,6 +713,10 @@ impl World {
         {
             let _t = mc_core::perf_span!("fn.run_movement");
             self.run_movement()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.seat_drones");
+            self.seat_drones();
         }
         {
             let _t = mc_core::perf_span!("fn.run_trampling");

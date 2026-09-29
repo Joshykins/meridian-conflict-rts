@@ -1,0 +1,32 @@
+// The Vigil (`aster_t1_sensor_ship`): the Courier's size of spacecraft carrying one great
+// search radar. Its hum is its own `moving` sound; the drives, lift jets and landing are
+// the shared capital recipes (`audio/capital.rs` falls back to `capital_<part>`), made
+// lighter here as the Courier's are.
+(
+    sounds: {
+        // Reactor hum under the radar's drive: a low pair beating slowly, a thin
+        // transformer whine, and the air the turning array stirs, a soft swell of wind
+        // twice a loop (one turn of the array is about four seconds), rising as it
+        // comes round and falling away, never a beep.
+        "aster_vigil": (
+            length: 8, peak: 0.28, room: 0, looped: true,
+            layers: [
+                Drone(freq: 49, gain: 0.42, wobble: 0.125, depth: 0.06, pan: -0.12),
+                Drone(freq: 49.4, gain: 0.15, wobble: 0.125, depth: 0.05, pan: 0.12),
+                Drone(freq: 98, gain: 0.2, wobble: 0.25, depth: 0.08),
+                Drone(freq: 147, gain: 0.08, wobble: 0.375, depth: 0.1, pan: 0.1),
+                Drone(freq: 400, gain: 0.014, wobble: 0.25, depth: 0.2),
+                Drone(freq: 800, gain: 0.008, wobble: 0.125, depth: 0.3, pan: -0.1),
+                Sweep(at: 0.4, from: 260, to: 820, glide: 1.6, q: 0.9, attack: 1.2, decay: 1.6, gain: 1.2),
+                Sweep(at: 4.4, from: 280, to: 780, glide: 1.6, q: 0.9, attack: 1.2, decay: 1.6, gain: 1.1),
+                Drive(1.1),
+            ],
+        ),
+        "aster_vigil_thrust": (like: "capital_thrust", size: 0.5),
+        "aster_vigil_lift_jets": (like: "capital_lift_jets", size: 0.55),
+        "aster_vigil_spool": (like: "capital_spool", size: 0.6, length: 6.5),
+        "aster_vigil_liftoff": (like: "capital_liftoff", size: 0.6, length: 5.5),
+        // Skids, like the Courier's: a lighter thud and the drives winding down.
+        "aster_vigil_touchdown": (like: "capital_touchdown", size: 0.6, length: 5.0),
+    },
+)

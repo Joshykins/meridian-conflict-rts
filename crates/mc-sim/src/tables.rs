@@ -124,7 +124,8 @@ pub struct Units {
     /// Brief extension to regain separation after a stalled pursuit turn.
     pub air_break_ticks: Vec<u16>,
     pub drone_parent: Vec<UnitId>,
-    pub drone_progress: Vec<Fx>,
+    /// Which of its carrier's `drone_sockets` a drone rides on: its own for life.
+    pub drone_socket: Vec<u8>,
     pub intercept_cooldown: Vec<u16>,
     pub burn_ticks: Vec<u16>,
     pub burn_owner: Vec<u8>,
@@ -303,7 +304,7 @@ impl Units {
             air_turn_ticks: Vec::new(),
             air_break_ticks: Vec::new(),
             drone_parent: Vec::new(),
-            drone_progress: Vec::new(),
+            drone_socket: Vec::new(),
             intercept_cooldown: Vec::new(),
             burn_ticks: Vec::new(),
             burn_owner: Vec::new(),
@@ -380,7 +381,7 @@ impl Units {
         put(&mut self.air_turn_ticks, row, 0);
         put(&mut self.air_break_ticks, row, 0);
         put(&mut self.drone_parent, row, Handle::NONE);
-        put(&mut self.drone_progress, row, Fx::ZERO);
+        put(&mut self.drone_socket, row, 0);
         put(&mut self.intercept_cooldown, row, 0);
         put(&mut self.burn_ticks, row, 0);
         put(&mut self.burn_owner, row, 0);
@@ -488,7 +489,7 @@ impl Units {
             h.write_u32(self.air_turn_ticks[row] as u32);
             h.write_u32(self.air_break_ticks[row] as u32);
             h.write_u32(self.drone_parent[row].0);
-            h.write_i64(self.drone_progress[row].0);
+            h.write_u32(self.drone_socket[row] as u32);
             h.write_u32(self.intercept_cooldown[row] as u32);
             h.write_u32(self.burn_ticks[row] as u32);
             h.write_u32(self.burn_owner[row] as u32);
@@ -861,6 +862,12 @@ pub struct Player {
     pub energy_income: Fx,
     pub mass_demand: Fx,
     pub energy_demand: Fx,
+    /// What was really spent last tick, in units per second: the demand as far as the
+    /// stall let it be paid. A stall of one resource holds back the other's spending too.
+    #[serde(default)]
+    pub mass_spent: Fx,
+    #[serde(default)]
+    pub energy_spent: Fx,
     /// Share of requested spending that was met last tick, zero to one.
     pub efficiency: Fx,
     /// Share of upkeep's energy that was met last tick.

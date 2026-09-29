@@ -374,9 +374,11 @@ fn visor_plan(arc: usize) -> Vec<[f32; 2]> {
 
 pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
     // Lean and long in the limb, stood up rather than crouched at rest. It walks:
-    // a foot is down for over half the cycle, so one is always planted and the
+    // a foot is down for half the cycle, the other landing as it lifts, so the
     // body never leaves the ground. Its long stride needs more reach than the
-    // straight legs have, so it settles onto bent knees as it gets going.
+    // straight legs have, so it settles a little onto bent knees as it gets going
+    // (0.9 m: with the foot planted over half the stride the knees just reach).
+    // Striding, the feet come in under the hips (`entity.wgsl` `stride_upright`).
     // The hips sit in close under the pelvis and the legs run straight out to the feet,
     // near straight, as a person stands with their feet apart. Standing, it carries its weight on one leg and
     // eases the other now and then (the shader's `idle_stance`).
@@ -387,8 +389,8 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
         hip.y + (ankle.y - hip.y) * (8.7 - 4.75) / (8.7 - 1.3),
         4.75,
     );
-    b.set_legs(hip, knee, ankle, 16.0, 0.55, 1.3);
-    b.set_walk_crouch(1.3);
+    b.set_legs(hip, knee, ankle, 16.0, 0.5, 1.3);
+    b.set_walk_crouch(0.9);
     // Sole as `commander_leg` draws it: 1.2 m behind the ankle, 2.4 m ahead, 2.0 m across.
     b.set_foot(-1.2, 2.4, 2.0);
     b.mirror_y(|b| commander_leg(b, hip, knee, ankle));

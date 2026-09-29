@@ -118,9 +118,12 @@ pub enum IconKind {
     SalvageDrone = 33,
     /// A torpedo bomber from above: a gull-winged plane with a finned torpedo under it.
     TorpedoBomber = 34,
+    /// A sensor ship from above: a hammerhead of sensors across a slim hull, the
+    /// eye-line cut across the head.
+    SensorShip = 35,
     /// A warp dampener: a broken ring (its field) with four chevrons pulling in on a
     /// point at its middle, where it drags a jump down.
-    Damper = 35,
+    Damper = 36,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.
@@ -238,9 +241,10 @@ pub(crate) struct Unit {
     /// when it has one): one drone for each.
     #[serde(default)]
     pub drone_sockets: Vec<(f64, f64, f64)>,
-    /// Metres the sockets lower as the unit deploys (a hold's cradles dropping out of it).
+    /// Metres above (positive) or below (negative) its socket that a drone lines up
+    /// before it settles onto a pad or rises onto a pylon, and drops to letting go.
     #[serde(default)]
-    pub drone_drop: f64,
+    pub drone_approach: f64,
     #[serde(default)]
     pub anti_missile: f64,
     /// Where the anti-missile lasers stand on the hull (x forward, y left, z up, metres):
@@ -1472,7 +1476,7 @@ impl Unit {
                 .iter()
                 .map(|m| FxVec3::new(fx(m.0), fx(m.1), fx(m.2)))
                 .collect(),
-            drone_drop: fx(self.drone_drop),
+            drone_approach: fx(self.drone_approach),
             anti_missile: fx(self.anti_missile),
             anti_missile_mounts: self
                 .anti_missile_mounts

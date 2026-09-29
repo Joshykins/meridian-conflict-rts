@@ -9,7 +9,7 @@ use super::{
     MeshLod, Model, LOD_COUNT,
 };
 
-mod skyguard;
+mod cells;
 
 /// The blueprints in `data/factions/aster/units/*.ron` that matter to a model.
 struct Blueprint {
@@ -243,18 +243,8 @@ const BLUEPRINTS: &[Blueprint] = &[
         &[[66.0, -3.4, 11.4], [66.0, 0.0, 11.4], [66.0, 3.4, 11.4]],
     ),
     hull_unit("rail_trimaran", 84.0, 34.0, 3, &[[86.0, 0.0, 24.0]]),
-    hull_unit(
-        "carrier",
-        60.0,
-        24.0,
-        3,
-        &[
-            [-12.0, 8.0, 8.5],
-            [-14.0, 8.0, 8.5],
-            [-12.0, -8.0, 8.5],
-            [-14.0, -8.0, 8.5],
-        ],
-    ),
+    // Its SAMs stand in hatched cells (tests/cells.rs); the interceptor tubes are under water.
+    hull_unit("carrier", 60.0, 24.0, 3, &[]),
     hull_unit(
         "submarine_strategic",
         30.0,
@@ -542,7 +532,7 @@ fn meshes_are_valid() {
                 );
                 assert!(
                     v.material <= material::LAST
-                        && (v.part <= part::CRADLE
+                        && (v.part <= part::HOLD_DOOR
                             || (part::RAM..=part::SILO_ROUND).contains(&v.part)
                             || (part::WALL_FIRST..part::WALL_FIRST + part::WALL_COUNT)
                                 .contains(&v.part)
@@ -689,12 +679,13 @@ const OVER_BUDGET: &[Over] = &[
     ("airbase", None, Some(0.53), None),
     ("precursor_bastion", Some(222), None, None),
     ("precursor_boom", Some(228), None, None),
-    ("precursor_tower", Some(94), None, None),
     ("precursor_vault", Some(404), None, None),
     ("precursor_axis", Some(206), None, None),
     ("precursor_terrace", Some(112), None, None),
     ("precursor_citadel", Some(356), Some(0.61), None),
     ("precursor_seaway", None, Some(1.0), None),
+    // The Vigil is small and plain; most of its mid detail is its drive and lift jets.
+    ("sensor_ship", None, Some(0.56), None),
 ];
 type Over = (&'static str, Option<usize>, Option<f32>, Option<usize>);
 
@@ -742,6 +733,7 @@ fn lods_reduce_and_respect_budgets() {
             super::precursor_gate::TRIANGLES
         } else if super::precursor_mega::MODELS
             .iter()
+            .chain(super::precursor_tower::MODELS)
             .any(|d| d.key == model.key)
         {
             // A map's one machine: a few pieces hundreds of metres high.
@@ -808,6 +800,9 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "light_transport" {
             // 115 m spacecraft: walk-through bay, two drive bells, lift jets, dorsal mast.
             9000
+        } else if model.key == "sensor_ship" {
+            // 72 m tech 1 sensor spacecraft: one drive bell, lift jets, the sensor head.
+            5000
         } else if model.key == "battleship" {
             // 142 m hero hull: layered sides, a stepped pagoda, three triple Arc Cannon houses.
             BATTLESHIP_TRIANGLES
@@ -1460,9 +1455,8 @@ fn orange_weapons_glow_orange() {
         "artillery_light",
         "missile_launcher",
         "hover_tank",
-        // Missile cells carry orange seams; the carrier's flak and rotary gun are orange too.
+        // Missile cells carry orange seams.
         "missile_ship",
-        "carrier",
     ];
     // Whether a gun carries light is its own design's call; only the orange is ruled:
     // it is on the units above and nowhere else.
@@ -1841,7 +1835,7 @@ fn aircraft_have_swept_wings_nozzle_origins_and_bounded_lods() {
 }
 
 #[test]
-fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
+fn vtol_pods_carry_their_nozzles() {
     for key in ["gunship", "reclaim_carrier"] {
         let model = build_model(key).unwrap();
         let vtol = model.vtol.expect("VTOL pods");
@@ -1897,45 +1891,77 @@ fn vtol_pods_carry_their_nozzles_and_the_hold_fits_the_flock() {
             assert!(near < 0.15, "{key}: nozzle {p} is {near} m from its pod");
         }
     }
-    // The hold: doors and cradles at the levels that draw them, and a drone in a
-    // cradle clear of the hold's sides.
-    let model = build_model("reclaim_carrier").unwrap();
-    for (level, lod) in model.lods.iter().take(2).enumerate() {
-        assert!(
-            lod.vertices.iter().any(|v| v.part == part::HOLD_DOOR),
-            "LOD{level}: no hold doors"
-        );
-    }
-    assert!(
-        model.lods[0]
+}
+
+/// The Osprey grips a docked drone's lugs with a jaw over
+/// each, and the drones slung under the wing clear the hull, the nacelles and each other.
+#[test]
+fn osprey_pylons_grip_the_drones_lugs_and_the_flock_clears_the_airframe() {
+    assert_eq!(
+        crate::gpu_consts::dock::RIDING,
+        mc_sim::mirror::UNIT_RIDING,
+        "the riding bit the shader reads is the one the mirror sets"
+    );
+    use super::aster::air::osprey::{DOCK_Z, DRONE_HALF_WIDTH, LUG_TOP, LUG_X, PYLONS};
+    for key in ["reclaim_drone"] {
+        let drone = build_model(key).unwrap();
+        let mesh = &drone.lods[0];
+        let wide = mesh
             .vertices
             .iter()
-            .any(|v| v.part == part::CRADLE),
-        "no cradles"
-    );
-    let (cradles, ceiling) = super::carrier_cradles();
-    let drone = build_model("reclaim_drone").unwrap();
-    let half_width = drone.lods[0]
-        .vertices
-        .iter()
-        .map(|v| v.pos[1].abs())
-        .fold(0.0, f32::max);
-    let top = drone.lods[0]
-        .vertices
-        .iter()
-        .map(|v| v.pos[2])
-        .fold(0.0, f32::max);
-    for c in cradles {
+            .map(|v| v.pos[1].abs())
+            .fold(0.0, f32::max);
+        let top = mesh.vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
+        assert!(wide <= DRONE_HALF_WIDTH, "{key}: {wide} m wide a side");
         assert!(
-            c[1].abs() + half_width < super::aster::air::osprey::HOLD_HALF_WIDTH,
-            "a docked drone touches the hold's side"
+            (top - LUG_TOP).abs() < 0.01,
+            "{key}: its lugs are its top, not {top}"
+        );
+        for lx in LUG_X {
+            assert!(
+                mesh.vertices
+                    .iter()
+                    .any(|v| (v.pos[0] - lx).abs() < 0.1 && (v.pos[2] - LUG_TOP).abs() < 0.01),
+                "{key}: no lug at {lx}"
+            );
+        }
+    }
+    // Everything of the airframe below the grip, where a drone hangs.
+    for key in ["reclaim_carrier"] {
+        let model = build_model(key).unwrap();
+        let mesh = &model.lods[0];
+        for p in PYLONS {
+            for side in [1.0, -1.0] {
+                let y = p[1] * side;
+                for lx in LUG_X {
+                    assert!(
+                        mesh.vertices
+                            .iter()
+                            .any(|v| (v.pos[0] - p[0] - lx).abs() < 0.15
+                                && (v.pos[1] - y).abs() < 0.2
+                                && (v.pos[2] - (DOCK_Z + LUG_TOP)).abs() < 0.1),
+                        "{key}: no jaw over the lug at ({}, {y})",
+                        p[0] + lx
+                    );
+                }
+                // The space a docked drone fills is empty of the airframe.
+                let clash = mesh.vertices.iter().find(|v| {
+                    (v.pos[0] - p[0]).abs() < 1.2
+                        && (v.pos[1] - y).abs() < DRONE_HALF_WIDTH
+                        && v.pos[2] < DOCK_Z + LUG_TOP - 0.2
+                });
+                assert!(
+                    clash.is_none(),
+                    "{key}: {clash:?} is where a drone hangs at {y}"
+                );
+            }
+        }
+        assert!(
+            PYLONS[1][1] - PYLONS[0][1] > DRONE_HALF_WIDTH * 2.0
+                && PYLONS[0][1] > DRONE_HALF_WIDTH + 1.0,
+            "drones side by side overlap"
         );
     }
-    // Stowed 0.7 m up (`drone_socket`), a drone's top is under the ceiling.
-    assert!(
-        0.7 + top <= ceiling + 0.15,
-        "a docked drone {top} tall sticks through the ceiling at {ceiling}"
-    );
 }
 
 #[test]
@@ -2629,33 +2655,13 @@ fn moray_and_kraken_hulls() {
     }
 }
 
-/// The Atoll: houses bound to weapons 1 and 2 at the unit file's pivots and a spinning
-/// close-in gun, the SAM cells' muzzles on the deck at every level, plasma glow, and the
-/// capital-ship budgets.
+/// The Atoll: no gun houses, the fleet radar turning on the island's mast, two blocks of
+/// six cells, plasma glow, and the capital-ship budgets.
 #[test]
-fn carrier_houses_and_muzzles() {
+fn carrier_radar_cells_and_budgets() {
     let bp = BLUEPRINTS.iter().find(|bp| bp.mesh == "carrier").unwrap();
     let model = built(bp);
-    assert_eq!(model.houses.len(), 2, "carrier: two gun houses");
-    for (weapon, pivot) in [(1u8, [20.0, 10.0, 8.6]), (2u8, [20.0, -10.0, 8.6])] {
-        let house = model
-            .houses
-            .iter()
-            .find(|h| h.weapon == weapon)
-            .expect("house per weapon");
-        assert!(
-            Vec3::from(house.pivot).distance(Vec3::from(pivot)) < 1e-3,
-            "carrier: house {weapon} pivot {:?}",
-            house.pivot
-        );
-    }
-    assert!(
-        model.lods[0]
-            .vertices
-            .iter()
-            .any(|v| v.rig & rig::SPIN != 0),
-        "carrier: rotary gun spins"
-    );
+    assert!(model.houses.is_empty(), "carrier: no gun houses");
     assert!(
         model.lods[0]
             .vertices
@@ -2663,47 +2669,13 @@ fn carrier_houses_and_muzzles() {
             .any(|v| v.part == part::SPINNER),
         "carrier: radar turns"
     );
-    assert!(model.spinner_pivot[2] > 3.0, "carrier: radar on the mast");
-    let muzzles: [(&str, &[[f32; 3]]); 3] = [
-        (
-            "sam",
-            &[
-                [-12.0, 8.0, 8.5],
-                [-14.0, 8.0, 8.5],
-                [-12.0, -8.0, 8.5],
-                [-14.0, -8.0, 8.5],
-            ],
-        ),
-        ("flak", &[[22.4, 9.6, 8.8], [22.4, 10.4, 8.8]]),
-        ("ciws", &[[22.0, -10.0, 8.8]]),
-    ];
+    assert!(model.spinner_pivot[2] > 18.0, "carrier: radar on the mast");
+    assert_eq!(
+        model.cells.iter().map(|c| (c.nx, c.ny)).collect::<Vec<_>>(),
+        [(3, 2), (3, 2)],
+        "carrier: two blocks of six cells"
+    );
     for (lod, mesh) in model.lods.iter().enumerate() {
-        for (name, list) in muzzles {
-            // The coarse level keeps only the SAM cells.
-            if lod == 2 && name != "sam" {
-                continue;
-            }
-            for muzzle in list {
-                let p = Vec3::from(*muzzle);
-                let nearest = mesh
-                    .indices
-                    .chunks(3)
-                    .map(|t| {
-                        closest_point_on_triangle(
-                            p,
-                            position(mesh, t[0]),
-                            position(mesh, t[1]),
-                            position(mesh, t[2]),
-                        )
-                        .distance(p)
-                    })
-                    .fold(f32::MAX, f32::min);
-                assert!(
-                    nearest < 0.4,
-                    "carrier lod{lod}: {name} barrel ends {nearest} m from {muzzle:?}"
-                );
-            }
-        }
         let team_up = mesh
             .vertices
             .iter()

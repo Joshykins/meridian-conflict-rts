@@ -158,8 +158,12 @@ impl World {
 
     pub(super) fn ai_composition(&self, player: u8) -> BTreeMap<BlueprintId, usize> {
         let mut counts = BTreeMap::new();
+        // An upgrade's successor is not one more unit: counted, the factories
+        // took the Masons upgrading in the field for new ones and made none.
         for row in self.state.units.slots.iter() {
-            if self.state.units.owner[row] == player {
+            if self.state.units.owner[row] == player
+                && !self.state.units.has_flag(row, flag::UPGRADE)
+            {
                 *counts.entry(self.state.units.blueprint[row]).or_insert(0) += 1;
             }
         }

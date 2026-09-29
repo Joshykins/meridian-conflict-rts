@@ -20,7 +20,7 @@ All units are available through the existing tiered factories and engineer/comma
 
 Aircraft circle on the **Guard** order (Ctrl+G; see [The guard order](#the-guard-order)): press on a point or a friendly unit and drag out the area. They fly halfway between its centre and its edge, and follow the ally if one was picked. Shift queues a guard; Stop cancels it. If the ally is destroyed, the aircraft keep circling its last position. Move and attack commands replace a guard normally. (The separate Orbit order and its **O** key were merged into Guard on 2026-09-26.)
 
-Osprey (tech 1, from the first air factory) assembles up to four salvage drones for free: a drone costs nothing and takes 3 seconds, whatever the economy. Drones recover visible wreckage within **600 m of the carrier**, return when there is no work, and wait when mass storage is full. Losses are replaced. Drones depend on their parent carrier and are removed when it is destroyed. The selection shows the recovery radius.
+Osprey (tech 1, from the first air factory) builds up to four salvage drones, one at a time, each on its own pylon under the wing: a drone costs 3 mass and 30 energy over 3 seconds, paid like any build, in the tier the side's materials priority (`Focus::mines`) puts it, so Materials First fields a starved side's drones first and Materials Last leaves them waiting. The drone going up shows its construction on the pylon. Drones recover visible wreckage within **600 m of the carrier**, return when there is no work, and wait when mass storage is full. Losses are replaced. Drones depend on their parent carrier and are removed when it is destroyed. The selection shows the recovery radius.
 
 Argus has 2,800 m radar, 900 m sonar, 1,200 m sight and a small hull shield, and burns hostile missiles with two lasers within 450 m while powered. A salvage ray under its nose clears wrecks up to 1,200 m across the ground from it while it flies (`reclaimer.mobile`). A light rocket fails in one tick; heavier missiles take a longer burst, then the laser waits 0.3 seconds before the next. It cannot intercept shells or bombs. Guided AA missiles retain their own target handle; vertical launch stays upright for 0.6 seconds before curving into pursuit. Losing a target leaves a finite-lived unguided missile.
 
@@ -63,10 +63,16 @@ wing panels and a sensor spine.
 
 Osprey remains airborne even without orders. Salvage drones cannot be selected
 or directly ordered, prefer separate wrecks, and keep circling while reclaiming.
-The flock stows in a hold under the Osprey's midbody, two abreast and two deep
-(`air_support::drone_socket`, matched by the model's `CRADLES`); opening the hold
-swings its two door leaves down and lowers the cradles 1.9 m, so the drones drop
-out under the hull before they fly.
+The flock hangs from four pylons under the wing, two a side, each drone's lugs in
+its pylon's clamp jaws (`drone_sockets` in `air.ron`, matched by the model's
+`PYLONS`). Each drone keeps its own pylon (`drone_socket` in the unit table).
+Letting go, a drone drops 3 m clear (`drone_approach`) and flies; coming home it
+glides in under its pylon, slowing all the way, and rises onto the clamp
+(`air_support::seat_drones`). Docked drones are placed after movement, so they
+keep pace with the flying Osprey, and the shader draws them in the Osprey's own
+drawn frame (`mirror::UNIT_RIDING`, `entity.wgsl` `riding_frame`), so they ride
+its heave, sway and lean. The commander's drone port lands its drones on its
+back pads the same way, from above.
 
 ## Kestrel and Osprey (2026-09-23 rework)
 
@@ -83,13 +89,15 @@ engines and no engine effects at all when hovering. Each now has a file of its o
   autocannon (`pivot (4.75, 0, 0.56)`, muzzle `(7.3, 0, 0.56)`); a six-tube
   launcher under each wing ripples a 12-rocket volley off in left-right pairs
   (muzzles round `(1.45, ±2.7, 1.7)`).
-- **Osprey**: a broad lifting body, white shoulders with a graphite salvage deck
-  saddling the roof over the hold, four big ducted lift fans in pods on stub
-  wings (`osprey::NACELLES`), their five-blade fans turning in the intakes, which
-  face the sky in the hover so the camera looks down into them. Amber running
-  strips and hold louvres mark it as economy.
-- **Salvage Drone**: a ring lift fan (its blades on `part::ROTOR`) with a claw
-  arm ahead carrying the reclaim emitter, two steering jets behind.
+- **Osprey** (reworked 2026-09-29): a twin-boom tilt-jet. A deep pod fuselage
+  with a glazed nose and a chin window, a long straight shoulder wing with a
+  blue-burning jet nacelle at each tip, twin booms back to a tailplane and two
+  fins, an amber-slotted salvage hopper on the back. Four drone pylons hang under
+  the wing, each with a clamp beam, a jaw over each lug and an amber lamp.
+- **Salvage Drone** (reworked 2026-09-29): a grapple, a flat faceted wedge with a
+  lift fan through its middle (blades on `part::ROTOR`), two claw arms down to
+  the reclaim emitter, two lugs on posts for the pylon's jaws, two steering jets
+  behind.
 - **Engine effects**: a vector-thrust jet leaves a flame cone and a white-hot
   bloom at each nozzle that reach past the pod's rim (a jet pointing straight
   down is otherwise hidden under its pod from the camera), and a thin haze when
@@ -120,7 +128,7 @@ Tracking with T follows the aircraft's interpolated altitude.
 Exhaust is emitted at every zoom level and has reduced opacity. Particle type
 IDs use flat interpolation so contrails cannot become emissive plasma particles.
 AA missiles turn more firmly toward their intercept and leave white smoke.
-Flak (`flak: true`; the Squall, the Barrage's Heavy Twin Flak, the Atoll's Twin Flak, the Behemoth's Heavy Twin Flak and the commander's AA Flak Cannon) is a slow shell (320-380 m/s) on two fuses. The proximity fuse sets it off beside a hull; the timed fuse bursts it where it was laid, the lead on the aircraft (`mc-sim/src/flak.rs`), so a near miss still catches the flight in its 30-48 m splash. In flight it is a small hot round with a thin smoke wake. The burst (renderer/flak_fx.rs) is a quick knot of burning gas (blast_fx `fireball`), the charge burning on for a moment inside a hard-edged black puff (puff kind 39, puffs.wgsl `flak_smoke`) that hangs on the wind for about five seconds, a sphere of hot shrapnel streaks (puff kind 37) flung out to the edge of the splash, and burning scraps falling away trailing thin smoke. The gun's report is a tongue of flame and a ring of powder smoke punched out round the muzzle. The Barrage and the commander fire both barrels on the same tick (`salvo: 2, salvo_batch: 2`) with a few degrees of `spread`, so each shot lays two bursts apart across a flight. Reach (2026-09-28, +1/3 on all flak): Squall 480 m, Barrage and commander 640 m, Atoll 930 m, Behemoth 1,200 m. The Shatter and the Sunder (rail flak) were removed on 2026-09-27.
+Flak (`flak: true`; the Squall, the Barrage's Heavy Twin Flak, the Behemoth's Heavy Twin Flak and the commander's AA Flak Cannon) is a slow shell (320-380 m/s) on two fuses. The proximity fuse sets it off beside a hull; the timed fuse bursts it where it was laid, the lead on the aircraft (`mc-sim/src/flak.rs`), so a near miss still catches the flight in its 30-48 m splash. In flight it is a small hot round with a thin smoke wake. The burst (renderer/flak_fx.rs) is a quick knot of burning gas (blast_fx `fireball`), the charge burning on for a moment inside a hard-edged black puff (puff kind 39, puffs.wgsl `flak_smoke`) that hangs on the wind for about five seconds, a sphere of hot shrapnel streaks (puff kind 37) flung out to the edge of the splash, and burning scraps falling away trailing thin smoke. The gun's report is a tongue of flame and a ring of powder smoke punched out round the muzzle. The Barrage and the commander fire both barrels on the same tick (`salvo: 2, salvo_batch: 2`) with a few degrees of `spread`, so each shot lays two bursts apart across a flight. Reach (2026-09-28, +1/3 on all flak): Squall 480 m, Barrage and commander 640 m, Behemoth 1,200 m. The Shatter and the Sunder (rail flak) were removed on 2026-09-27.
 
 Thunderhead has 4,700 hull health, wider wings, no rockets, and forward-only
 weapons. Its rotary cannon has four-degree spread, bright conventional tracers,

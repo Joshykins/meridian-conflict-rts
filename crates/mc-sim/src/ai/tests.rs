@@ -1,4 +1,5 @@
 use super::*;
+use crate::focus::Priority;
 use crate::world::MapData;
 use crate::{MatchConfig, PlayerSetup};
 use mc_data::{Blueprints, MoveLayer};
@@ -584,14 +585,19 @@ fn mine_upgrades_go_to_the_mine_that_pays_back_soonest() {
         Some(alone)
     );
 
-    // With the lone mine taken, a crowded one pays back too slowly, unless
-    // materials pile up with nothing better to spend them on.
+    // With the lone mine taken, a crowded one pays back too slowly for Normal,
+    // unless materials go spare with nothing better to spend them on. Hard
+    // waits longer for its payback.
     census.extractors.retain(|&r| r != alone);
-    w.state.ai[0].config.difficulty = Difficulty::Hard;
+    w.state.ai[0].config.difficulty = Difficulty::Normal;
     assert_eq!(w.mine_to_upgrade(0, &census, false).map(|(r, _)| r), None);
     assert!(crowded.contains(&w.mine_to_upgrade(0, &census, true).map(|(r, _)| r).unwrap()));
-    w.state.ai[0].config.difficulty = Difficulty::Easy;
-    assert_eq!(w.mine_to_upgrade(0, &census, true).map(|(r, _)| r), None);
+    w.state.ai[0].config.difficulty = Difficulty::Hard;
+    assert!(crowded.contains(
+        &w.mine_to_upgrade(0, &census, false)
+            .map(|(r, _)| r)
+            .unwrap()
+    ));
 }
 
 #[test]
@@ -943,6 +949,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
         .unwrap();
     // Short of power: a power site is the first thing an idle builder helps with.
     w.state.players[0].energy_demand = Fx::from_int(100);
+    w.state.players[0].energy_spent = Fx::from_int(100);
     let builder = spawn(&mut w, "aster_t1_engineer", 0, 1700, 800);
     let mut census = w.survey_own(0);
     census.sites = vec![site];
@@ -1314,4 +1321,213 @@ fn a_watchtower_or_scavenger_a_builder_walks_to_counts_as_planned() {
     let planned = w.plan_counts(0, &census);
     assert_eq!(planned.radars.len(), 1);
     assert_eq!(planned.towers.len(), 1);
+}
+
+#[test]
+fn spare_materials_go_into_extra_mine_upgrades_put_last() {
+    let mut w = world_of(1024);
+    spawn(&mut w, "aster_t2_land_factory", 0, 400, 400);
+    spawn(&mut w, "aster_t1_power", 0, 600, 400);
+    spawn(&mut w, "aster_t1_power", 0, 600, 460);
+    let mines: Vec<usize> = [(1500, 300), (300, 1500), (3000, 3000), (4000, 800)]
+        .into_iter()
+        .map(|(x, y)| spawn(&mut w, "aster_core_mine", 0, x, y))
+        .collect();
+    w.tick(&[]).unwrap();
+    // Two upgrades already running: one past the budget at 20 a second.
+    w.apply_command(&PlayerCommand {
+        player: 0,
+        command: Command::Upgrade {
+            units: mines[..2].iter().map(|&r| w.state.units.id(r)).collect(),
+        },
+    })
+    .unwrap();
+    let pl = &mut w.state.players[0];
+    pl.mass_income = Fx::from_int(20);
+    pl.mass_capacity = Fx::from_int(3000);
+    pl.mass = Fx::from_int(2000);
+    // No energy to spare for another upgrade's draw.
+    pl.energy_income = Fx::from_int(100);
+    pl.energy_demand = Fx::from_int(100);
+    pl.energy_capacity = Fx::from_int(5000);
+    pl.energy = Fx::from_int(4000);
+    pl.upkeep_efficiency = Fx::ONE;
+    let census = w.survey_own(0);
+    assert_eq!(w.mine_upgrade_budget(0), 1);
+
+    let mut out = vec![];
+    w.direct_focus(0, &census, &mut out);
+    assert!(
+        matches!(out.as_slice(), [Command::SetFocus { focus }] if focus.mines == Priority::Last),
+        "upgrades past the budget take only what is left: {out:?}"
+    );
+    // With materials going spare another one starts, energy or not: it is put last too.
+    out.clear();
+    w.direct_upgrades(0, &census, &mut out);
+    assert!(
+        matches!(out.as_slice(), [Command::Upgrade { units }]
+            if mines[2..].iter().any(|&r| units == &vec![w.state.units.id(r)])),
+        "{out:?}"
+    );
+    // Without them, none past the budget.
+    w.state.players[0].mass = Fx::from_int(100);
+    out.clear();
+    w.direct_upgrades(0, &census, &mut out);
+    assert!(out.is_empty(), "{out:?}");
+}
+
+#[test]
+fn a_lesser_builder_helps_raise_a_big_plant_and_starts_no_small_one() {
+    let mut w = world_of(512);
+    spawn(&mut w, "aster_t2_engineer", 0, 420, 300);
+    let mason = spawn(&mut w, "aster_t1_engineer", 0, 320, 320);
+    let plant = w
+        .spawn_unit(
+            w.blueprints.id_of("aster_t2_power").unwrap(),
+            0,
+            FxVec2::from_ints(520, 420),
+            Angle::ZERO,
+            false,
+        )
+        .unwrap();
+    let pl = &mut w.state.players[0];
+    pl.energy_income = Fx::from_int(100);
+    pl.energy_demand = Fx::from_int(300);
+    pl.energy_spent = Fx::from_int(300);
+    pl.energy_capacity = Fx::from_int(5000);
+    pl.energy = Fx::from_int(3000);
+    let start = FxVec2::from_ints(300, 300);
+    let intel = Intel::default();
+    let run = |w: &World, sites: Vec<usize>| {
+        let mut census = w.survey_own(0);
+        census.sites = sites;
+        census.builders_idle = vec![mason];
+        let mut planned = w.plan_counts(0, &census);
+        let mut out = vec![];
+        w.direct_builders(
+            0,
+            &census,
+            &intel,
+            Stance::Expand,
+            Personality::Expander,
+            start,
+            Angle::ZERO,
+            None,
+            &mut vec![],
+            &mut planned,
+            &mut out,
+        );
+        out
+    };
+    let out = run(&w, vec![plant]);
+    assert!(
+        matches!(out.as_slice(), [Command::Assist { target, .. }] if *target == w.state.units.id(plant)),
+        "{out:?}"
+    );
+    // No plant going up: still no small one of its own while the side has energy in store.
+    let small = w.blueprints.id_of("aster_t1_power").unwrap();
+    let out = run(&w, vec![]);
+    assert!(
+        !out.iter()
+            .any(|c| matches!(c, Command::Build { blueprint, .. } if *blueprint == small)),
+        "{out:?}"
+    );
+    // A mass stall asks for more energy than comes in, but pays out only a share of it
+    // and the store fills: that is no call for power.
+    let pl = &mut w.state.players[0];
+    pl.energy_income = Fx::from_int(2000);
+    pl.energy_demand = Fx::from_int(3000);
+    pl.energy_spent = Fx::from_int(500);
+    let out = run(&w, vec![plant]);
+    assert!(
+        !out.iter().any(
+            |c| matches!(c, Command::Assist { target, .. } if *target == w.state.units.id(plant))
+        ),
+        "{out:?}"
+    );
+}
+
+#[test]
+fn an_engineer_goes_up_a_tier_once_the_side_has_it() {
+    let mut w = world_of(512);
+    spawn(&mut w, "aster_t2_land_factory", 0, 500, 500);
+    spawn(&mut w, "aster_t1_power", 0, 700, 500);
+    spawn(&mut w, "aster_t1_power", 0, 700, 560);
+    let masons: Vec<usize> = (0..3)
+        .map(|i| spawn(&mut w, "aster_t1_engineer", 0, 300 + i * 20, 300))
+        .collect();
+    let pl = &mut w.state.players[0];
+    pl.mass_income = Fx::from_int(5);
+    pl.energy_income = Fx::from_int(1000);
+    pl.energy_demand = Fx::ZERO;
+    pl.energy_capacity = Fx::from_int(5000);
+    pl.energy = pl.energy_capacity;
+    pl.upkeep_efficiency = Fx::ONE;
+    let mut out = vec![];
+    w.direct_upgrades(0, &w.survey_own(0), &mut out);
+    assert!(
+        out.iter().any(|c| matches!(c, Command::Upgrade { units }
+            if masons.iter().any(|&m| units == &vec![w.state.units.id(m)]))),
+        "{out:?}"
+    );
+    // One in three at most at a time: with one under way, none more.
+    for c in &out {
+        w.apply_command(&PlayerCommand {
+            player: 0,
+            command: c.clone(),
+        })
+        .unwrap();
+    }
+    assert!(w.engineer_to_upgrade(0).is_none());
+}
+
+#[test]
+fn a_builder_joins_the_same_building_going_up_rather_than_start_a_second() {
+    let mut w = world_of(512);
+    let a = spawn(&mut w, "aster_t1_engineer", 0, 320, 320);
+    let b = spawn(&mut w, "aster_t1_engineer", 0, 340, 320);
+    let sparrow = w.blueprints.id_of("aster_t1_aa").unwrap();
+    let spot = FxVec2::from_ints(400, 360);
+    let census = w.survey_own(0);
+    let intel = Intel::default();
+    // One ordered this think: the second builder choosing a Sparrow goes to the same lot.
+    let ordered = [(sparrow, spot, AI_BUILD_HEADING)];
+    let join = w.join_same_build(b, sparrow, &census, &intel, &ordered);
+    assert!(
+        matches!(join, Some(Command::Build { blueprint, pos, .. }) if blueprint == sparrow && pos == spot),
+        "{join:?}"
+    );
+    // Another building is not joined.
+    let power = w.blueprints.id_of("aster_t1_power").unwrap();
+    assert!(w
+        .join_same_build(b, power, &census, &intel, &ordered)
+        .is_none());
+    // A plan the other builder is walking to is joined too.
+    w.apply_command(&PlayerCommand {
+        player: 0,
+        command: Command::Build {
+            units: vec![w.state.units.id(a)],
+            blueprint: sparrow,
+            pos: spot,
+            heading: AI_BUILD_HEADING,
+            queue: false,
+        },
+    })
+    .unwrap();
+    let planned: Vec<_> = w.planned_sites(0).map(|(_, o)| o.pos).collect();
+    let join = w.join_same_build(b, sparrow, &census, &intel, &[]);
+    assert!(
+        matches!(join, Some(Command::Build { pos, .. }) if planned.contains(&pos)),
+        "{join:?}"
+    );
+    // A Sparrow already begun is helped.
+    let site = w.spawn_unit(sparrow, 0, spot, Angle::ZERO, false).unwrap();
+    let mut census = w.survey_own(0);
+    census.sites = vec![site];
+    let join = w.join_same_build(b, sparrow, &census, &intel, &[]);
+    let target = w.state.units.id(site);
+    assert!(
+        matches!(join, Some(Command::Assist { target: t, .. }) if t == target),
+        "{join:?}"
+    );
 }

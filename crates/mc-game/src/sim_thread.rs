@@ -29,6 +29,9 @@ pub struct PlayerStatus {
     pub energy_income: f32,
     pub mass_demand: f32,
     pub energy_demand: f32,
+    /// What was really spent: the demand as far as the stall let it be paid.
+    pub mass_spent: f32,
+    pub energy_spent: f32,
     pub efficiency: f32,
     /// How fast building actually goes against full speed (see `mc_sim::Player::build_speed`).
     pub build_speed: f32,
@@ -243,6 +246,8 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 energy_income: f(p.energy_income),
                 mass_demand: f(p.mass_demand),
                 energy_demand: f(p.energy_demand),
+                mass_spent: f(p.mass_spent),
+                energy_spent: f(p.energy_spent),
                 efficiency: f(p.efficiency),
                 build_speed: f(p.build_speed),
                 mine_power: f(p.mine_power),

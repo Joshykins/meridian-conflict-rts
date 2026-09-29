@@ -445,43 +445,37 @@
     (
         key: "aster_t3_carrier",
         name: "Atoll",
-        role: "Carrier",
+        role: "Air Defence Carrier",
         tech: 3,
         categories: ["Naval", "AntiAir", "Intel"],
         health: 32000,
         cost: (mass: 3400, energy: 30600, time: 11000),
         radius: 60, height: 24,
-        vision: 900, radar: 3200,
+        vision: 900, radar: 4000,
         // Four interceptor lasers: the island's, and three on deck-edge sponsons.
         anti_missile: 350,
         anti_missile_mounts: [(-20.0, -13.3, 16.75), (36.0, 15.4, 9.1), (36.0, -15.4, 9.1), (-54.0, 16.1, 9.1)],
         economy: (energy_upkeep: 120),
         motion: (layer: Naval, size: 5, speed: 17, accel: 4, turn: 18),
-        // The strongest AA afloat and no anti-surface gun at all.
+        // The fleet's long arm against air: a Skyguard's reach afloat (a little short of the
+        // fixed site's), no gun of any kind. Twelve hatched cells in two blocks on the
+        // island's plinth, fore block first; a salvo spreads over the aircraft in range.
         weapons: [
             (
-                name: "SAM Battery",
-                damage: 450, splash: 6, range: 1000, reload: 1.5, salvo: 2, salvo_delay: 0.3, speed: 440, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (-12.0, 8.0, 8.5),
-                muzzles: [(-12.0, 8.0, 8.5), (-14.0, 8.0, 8.5), (-12.0, -8.0, 8.5), (-14.0, -8.0, 8.5)],
-                targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true, cold_launch: 0.5,
-                intercept: 30, proximity: 8, trail: true,
-                sounds: (fire: "cold_eject", impact: "shell_light"),
-            ),
-            (
-                name: "Twin Flak",
-                damage: 220, splash: 30, range: 930, reload: 0.7, speed: 330, trajectory: Direct,
-                turret_turn: 200, mount: true, pivot: (20.0, 10.0, 8.6), muzzle: (22.4, 10.4, 8.8),
-                muzzles: [(22.4, 9.6, 8.8), (22.4, 10.4, 8.8)],
-                targets: ["Air"], color: Orange, flak: true, proximity: 12, casings: 2.2,
-                sounds: (fire: "flak_gun", impact: "flak_burst"),
-            ),
-            (
-                name: "Close-In Gun",
-                damage: 30, range: 630, reload: 0.12, speed: 950, trajectory: Direct,
-                turret_turn: 240, mount: true, pivot: (20.0, -10.0, 8.6), muzzle: (22.0, -10.0, 8.8),
-                targets: ["Air"], color: Orange, rounds: 8, tracer: 0.6, casings: 1.5, spin_up: 0.2,
-                sounds: (fire: "aster_minigun", impact: "shell_light"),
+                name: "Long Range SAM",
+                damage: 1400, range: 2800, reload: 15, speed: 520, trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (-15.1, -13.4, 6.8),
+                muzzles: [
+                    (-15.1, -13.4, 6.8), (-9.5, -10.6, 6.8), (-12.3, -13.4, 6.8),
+                    (-15.1, -10.6, 6.8), (-9.5, -13.4, 6.8), (-12.3, -10.6, 6.8),
+                    (-40.5, -13.4, 6.8), (-34.9, -10.6, 6.8), (-37.7, -13.4, 6.8),
+                    (-40.5, -10.6, 6.8), (-34.9, -13.4, 6.8), (-37.7, -10.6, 6.8),
+                ],
+                salvo: 12, salvo_delay: 0.3, split: true, hatch: 0.6, caliber: 0.9,
+                targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
+                cold_launch: 1.8, boost: 0.9, intercept: 140, proximity: 12, splash: 32, trail: true,
+                impact: 2, shockwave: 1,
+                sounds: (fire: "missile_launch", impact: "shell_light"),
             ),
             // Interceptor tubes under the stern: torpedoes fired at torpedoes coming in.
             (
@@ -547,7 +541,6 @@
         cost: (mass: 3800, energy: 34200, time: 11500),
         radius: 84, height: 34,
         vision: 1200,
-        economy: (energy_upkeep: 150),
         motion: (layer: Naval, size: 5, speed: 18, accel: 4, turn: 20),
         weapons: [
             (

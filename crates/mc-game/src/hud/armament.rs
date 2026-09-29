@@ -301,7 +301,7 @@ pub fn draw(ui: &mut Ui, groups: &[Group], x: f32, y: f32, cw: f32) -> f32 {
         }
 
         // Second line: the figures, under their headings.
-        let shots = w.salvo.max(1) as u32 * w.salvo_batch.max(1) as u32;
+        let shots = w.salvo.max(1) as u32;
         let dash = || "\u{2014}".to_owned();
         let figures = [
             if shots > 1 {

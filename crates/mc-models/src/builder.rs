@@ -37,6 +37,21 @@ const FLAT_CREASE: f32 = 2.0;
 /// where a twisted or folded facet would, it is shaded flat instead.
 const MOST_LEAN: f32 = 0.64;
 
+/// The layout of a block of missile cells (`MeshBuilder::cell_block`): `nx` cells along x
+/// by `ny` along y, `pitch` apart about `centre`, each hatch `half` wide each way of its
+/// cell's centre and shut on `deck`, hinged on its outer edge along y when `hinge_y`, else
+/// along x.
+#[derive(Clone, Copy, Debug)]
+pub struct CellGrid {
+    pub centre: Vec2,
+    pub deck: f32,
+    pub pitch: f32,
+    pub half: f32,
+    pub nx: u8,
+    pub ny: u8,
+    pub hinge_y: bool,
+}
+
 /// One horizontal slice of a [`MeshBuilder::loft_z`] solid.
 #[derive(Clone, Copy, Debug)]
 pub struct Section {
@@ -102,6 +117,7 @@ pub struct MeshBuilder {
     shield_emitter: Option<[f32; 3]>,
     mount: Option<[f32; 4]>,
     houses: Vec<super::House>,
+    cells: Vec<super::CellBlock>,
     spins: Vec<(u32, u32, [f32; 3])>,
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
@@ -161,6 +177,7 @@ impl MeshBuilder {
             shield_emitter: None,
             mount: None,
             houses: Vec::new(),
+            cells: Vec::new(),
             spins: Vec::new(),
             pit: None,
             excavation: None,
@@ -525,6 +542,72 @@ impl MeshBuilder {
             | if slot >= 4 { rig::HOUSE_HIGH } else { 0 };
         f(self);
         self.rig = previous;
+    }
+
+    /// Declares a block of hatched missile cells (`CellBlock`) laid out by `grid` in the
+    /// current frame. `fire` lists the grid cells (`i` along x, `j` along y) in the order
+    /// the weapon's muzzles run; the block's missiles follow any declared before it.
+    /// Returns the cells' centres in that order, in the current frame, to draw the hatches
+    /// (`part::CELL_HATCH`) and rounds (`part::CELL_ROUND`) on.
+    pub fn cell_block(&mut self, grid: CellGrid, fire: &[(u8, u8)]) -> Vec<Vec2> {
+        let CellGrid {
+            centre,
+            deck,
+            pitch,
+            half,
+            nx,
+            ny,
+            hinge_y,
+        } = grid;
+        let cells = nx as usize * ny as usize;
+        assert!(
+            self.cells.len() < super::CellBlock::MAX_BLOCKS
+                && cells <= super::CellBlock::MAX_CELLS
+                && fire.len() == cells,
+            "a cell block has 1 to 8 cells, each fired once, and a model at most two blocks"
+        );
+        let first: usize = self
+            .cells
+            .iter()
+            .map(|b| b.nx as usize * b.ny as usize)
+            .sum();
+        assert!(first + cells <= 16, "at most 16 cells on a model");
+        let mut order = [u8::MAX; super::CellBlock::MAX_CELLS];
+        for (k, &(i, j)) in fire.iter().enumerate() {
+            order[i as usize * ny as usize + j as usize] = k as u8;
+        }
+        assert!(
+            order[..cells].iter().all(|&k| k != u8::MAX),
+            "a cell is never fired"
+        );
+        let at = self.transform.transform_point3(centre.extend(deck));
+        let scale = self.transform.transform_vector3(Vec3::X).length();
+        let block = super::CellBlock {
+            centre: [at.x, at.y],
+            deck: at.z,
+            pitch: pitch * scale,
+            half: half * scale,
+            nx,
+            ny,
+            hinge_y,
+            first: first as u8,
+            order,
+        };
+        self.cells.push(block);
+        fire.iter()
+            .map(|&(i, j)| {
+                let local = super::CellBlock {
+                    centre: centre.to_array(),
+                    pitch,
+                    ..block
+                };
+                Vec2::from(local.grid_centre(i as usize, j as usize))
+            })
+            .collect()
+    }
+
+    pub fn cells(&self) -> Vec<super::CellBlock> {
+        self.cells.clone()
     }
 
     pub fn houses(&self) -> Vec<super::House> {

@@ -6,6 +6,8 @@
 //! (map, difficulty, minutes; optional `:seed` and `:swap` to trade starts).
 //! `THREAT_ROSTER=1` lists the AI's finished units by key at the end;
 //! `THREAT_AI=1` makes slot 0 an AI too (a duel with the same readout).
+//! `THREAT_ECON=1` adds each side's economy: mines, plants and engineers by tier (sites
+//! in brackets), energy stored, and the seconds of the minute out of energy.
 use mc_data::{cat, Blueprints};
 use mc_jobs::Pool;
 use mc_sim::tables::Controller;
@@ -59,6 +61,51 @@ fn line(w: &World, p: usize, enemy_start: mc_core::FxVec2) -> String {
         pl.units_killed,
         pl.units_lost,
         s.ai[p].summary(),
+    )
+}
+
+/// One side's economy: mines and power plants by tier (sites going up in
+/// brackets), energy in store, and how much of the last minute it ran out of energy.
+fn econ(w: &World, p: usize, stalled: u32, mine_power: f32) -> String {
+    let s = &w.state;
+    let pl = &s.players[p];
+    let (mut mines, mut mine_sites, mut plants, mut plant_sites) = ([0; 5], 0, [0; 5], 0);
+    let mut engineers = [0; 4];
+    for row in s
+        .units
+        .slots
+        .iter()
+        .filter(|&r| s.units.owner[r] as usize == p)
+    {
+        let bp = w.bp(row);
+        let tier = (bp.tech as usize).min(4);
+        let live = s.units.is_active(row);
+        if bp.has(cat::EXTRACTOR) && bp.mine.is_some() {
+            if live {
+                mines[tier] += 1;
+            } else {
+                mine_sites += 1;
+            }
+        } else if bp.has(cat::ENGINEER) && bp.is_mobile() && !bp.has(cat::COMMANDER) {
+            engineers[(bp.tech as usize).min(3)] += live as i32;
+        } else if bp.has(cat::POWER) && bp.is_structure() {
+            if live {
+                plants[tier] += 1;
+            } else {
+                plant_sites += 1;
+            }
+        }
+    }
+    format!(
+        "mines T1-4 {:?} (+{mine_sites}) plants T1-3 {:?} (+{plant_sites}) eng T1-3 {:?} | energy {:>6.0}/{:<6.0} energy stall {:>2}s mine power {:.2} reclaim {:.1}/s",
+        &mines[1..],
+        &plants[1..4],
+        &engineers[1..],
+        pl.energy.to_f32(),
+        pl.energy_capacity.to_f32(),
+        stalled / 10,
+        mine_power,
+        pl.reclaim_income.to_f32(),
     )
 }
 
@@ -191,9 +238,19 @@ fn threat() {
         .and_then(|n| n.parse().ok())
         .unwrap_or(0);
     let mut known = std::collections::HashSet::new();
+    let show_econ = std::env::var("THREAT_ECON").is_ok();
     for minute in 1..=minutes {
+        let mut stalled = [0u32; 2];
+        let mut mine_power = [0.0f32; 2];
         for _ in 0..600 {
             w.tick(&[]).unwrap();
+            for p in 0..2 {
+                let pl = &w.state.players[p];
+                // Out of energy with more asked than comes in (`shields_unpowered`).
+                stalled[p] +=
+                    (pl.energy.to_f32() < 1.0 && pl.energy_demand > pl.energy_income) as u32;
+                mine_power[p] += pl.mine_power.to_f32() / 600.0;
+            }
             if w.state.winner.is_some() {
                 break;
             }
@@ -237,11 +294,17 @@ fn threat() {
             line(&w, 1, s0),
             s.strategic.orders
         );
+        if show_econ {
+            println!("      econ P1: {}", econ(&w, 1, stalled[1], mine_power[1]));
+        }
         if std::env::var("THREAT_WHERE").is_ok() {
             println!("      where P1: {}", where_army(&w, 1));
         }
         if duel {
             println!("      P0 {}", line(&w, 0, s1));
+            if show_econ {
+                println!("      econ P0: {}", econ(&w, 0, stalled[0], mine_power[0]));
+            }
             if std::env::var("THREAT_WHERE").is_ok() {
                 println!("      where P0: {}", where_army(&w, 0));
             }

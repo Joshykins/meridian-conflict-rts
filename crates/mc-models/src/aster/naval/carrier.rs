@@ -1,4 +1,4 @@
-//! The Atoll: tech 3 aircraft carrier, a mobile Roost.
+//! The Atoll: tech 3 carrier refitted as the fleet's long-range air defence.
 //!
 //! A 120 m hull under a full-length flight deck that overhangs the hull on
 //! sponsons both sides: the deck is the ship. An angled landing strip runs from
@@ -6,19 +6,19 @@
 //! tracks, the owner's band and a flux conduit along both deck edges. Aft in the
 //! middle a hatch like the Roost's takes aircraft down to the hangar; a deck-edge
 //! lift each side brings them up. The island stands to starboard a third of the
-//! way from the stern: faceted, a glass bridge band, a pyramidal mast with the
-//! search radar turning on it, and a pole aft with the red masthead lamp. No
-//! anti-surface gun: four SAM cells set into the deck either side of the
-//! centreline, a twin flak house to port and a close-in rotary gun to starboard
-//! forward, and interceptor tubes in the tunnel stern. Under the water: a bulbous
+//! way from the stern: faceted, a glass bridge band, a broad mast with the fleet
+//! radar's long double-faced array turning on it, and a pole with the red masthead
+//! lamp. No gun at all: two armoured blocks of six SAM cells built onto the
+//! island's plinth fore and aft, each cell under a hatch hinged on its outer edge
+//! (`MeshBuilder::cell_block`), and interceptor tubes in the tunnel stern. Under the water: a bulbous
 //! bow, twin skegs running into a tunnel stern that holds two shrouded
 //! propulsors, and twin rudders behind them.
 //!
 //! Origin at the waterline; keel to -8 m; masthead at the data's 24 m.
 
 use super::*;
+use crate::builder::CellGrid;
 use glam::Vec2;
-use std::f32::consts::{FRAC_PI_2, TAU};
 
 /// The hull's deck edge, the sponson lip under the deck's overhang, the top of the
 /// deck's structure, and the flight deck's surface (the SAM cells' muzzle height).
@@ -59,26 +59,14 @@ const DECK_PLAN: [(f32, f32); 9] = [
 /// The island's plan centre (starboard, a third from the stern) and its half plan.
 const ISLAND: Vec3 = Vec3::new(-25.0, -12.0, DECK);
 const ISLAND_HALF: Vec2 = Vec2::new(7.5, 2.9);
-/// The island's roof, the mast's foot on it, the radar pivot on the masthead.
+/// The island's roof, the mast's foot on it, the fleet radar's pivot on the masthead.
 const ROOF: f32 = 15.45;
 const MAST_X: f32 = ISLAND.x - 1.5;
-const RADAR: Vec3 = Vec3::new(MAST_X, ISLAND.y, 21.4);
+const RADAR: Vec3 = Vec3::new(MAST_X, ISLAND.y, 20.4);
 /// The lamp pole aft on the island roof: its top is the model's height.
 const LAMP_POLE: Vec3 = Vec3::new(ISLAND.x + 5.2, ISLAND.y, ROOF);
 const LAMP_Z: f32 = 23.4;
 
-/// Weapon 0: the SAM cells, `muzzles` in the unit file.
-const SAM_CELLS: [[f32; 3]; 4] = [
-    [-12.0, 8.0, DECK],
-    [-14.0, 8.0, DECK],
-    [-12.0, -8.0, DECK],
-    [-14.0, -8.0, DECK],
-];
-/// Weapon 1: the twin flak house (port) and weapon 2: the close-in gun (starboard).
-const FLAK: Vec3 = Vec3::new(20.0, 10.0, 8.6);
-const FLAK_MUZZLE_X: f32 = 22.4;
-const CIWS: Vec3 = Vec3::new(20.0, -10.0, 8.6);
-const CIWS_MUZZLE_X: f32 = 22.0;
 /// The missile-defence lasers' heads (`anti_missile_mounts` in the unit file): the
 /// island's, then three on sponsons out from the deck edge, both bows and the port
 /// quarter.
@@ -88,7 +76,7 @@ const LASERS: [Vec3; 4] = [
     Vec3::new(36.0, -15.4, 9.1),
     Vec3::new(-54.0, 16.1, 9.1),
 ];
-/// Weapon 3: the interceptor tube mouths in the tunnel stern.
+/// Weapon 1: the interceptor tube mouths in the tunnel stern.
 const TUBES: [Vec3; 2] = [Vec3::new(-40.0, -3.0, -2.0), Vec3::new(-40.0, 3.0, -2.0)];
 
 /// The hatch's centre and half size; the lifts' centres and size.
@@ -97,12 +85,26 @@ const HATCH_HALF: f32 = 6.5;
 const LIFTS: [Vec2; 2] = [Vec2::new(3.0, 11.8), Vec2::new(-1.0, -11.8)];
 const LIFT_SIZE: Vec2 = Vec2::new(10.0, 6.4);
 
+/// Weapon 0's cells: pitch, a hatch's half width, and the hatches' deck on the blocks.
+const CELL_PITCH: f32 = 2.8;
+const CELL_HALF: f32 = 1.15;
+const CELL_DECK: f32 = DECK + 1.6;
+/// The blocks' middles, fore and aft of the island on its centreline, three cells along
+/// x by two along y each; the order each fires its cells in.
+const CELL_BLOCKS: [Vec2; 2] = [
+    Vec2::new(ISLAND.x + ISLAND_HALF.x + 5.2, ISLAND.y),
+    Vec2::new(ISLAND.x - ISLAND_HALF.x - 5.2, ISLAND.y),
+];
+const CELL_FIRE: [(u8, u8); 6] = [(0, 0), (2, 1), (1, 0), (0, 1), (2, 0), (1, 1)];
+/// Half a block's plan: its cells and the armour round them.
+const BLOCK_HALF: Vec2 = Vec2::new(3.0 * CELL_PITCH * 0.5 + 0.7, CELL_PITCH + 0.7);
+
 pub(super) fn build(b: &mut MeshBuilder) {
     hull(b, &HULL, &[0, 4, 8]);
 
     if b.coarse() {
         // Far off: the deck as one slab, the island and mast as one block, the
-        // owner's square on the stern, and a dark square at each SAM cell.
+        // owner's square on the stern, and the cell blocks with the plinth between.
         b.paint(PLATING).pattern(pattern::DECK);
         b.cuboid(
             v3(-1.5, 0.0, (HULL_DECK + DECK) * 0.5),
@@ -117,17 +119,16 @@ pub(super) fn build(b: &mut MeshBuilder) {
             v2(-1.0, 0.0),
         );
         team_panel(b, v3(-52.0, 0.0, DECK), v2(6.0, 12.0));
-        b.paint(ACCENT);
-        for m in SAM_CELLS {
-            let (x, y, z) = (m[0], m[1], m[2] + 0.02);
-            b.face(&[
-                v3(x - 0.8, y - 0.8, z),
-                v3(x + 0.8, y - 0.8, z),
-                v3(x + 0.8, y + 0.8, z),
-                v3(x - 0.8, y + 0.8, z),
-            ]);
-        }
-        houses(b);
+        // The cell blocks and the island's plinth between them, as one box.
+        b.paint(PLATING);
+        let (fore, aft) = (
+            CELL_BLOCKS[0].x + BLOCK_HALF.x,
+            CELL_BLOCKS[1].x - BLOCK_HALF.x,
+        );
+        b.cuboid(
+            v3((fore + aft) * 0.5, ISLAND.y, (DECK + CELL_DECK) * 0.5),
+            v3(fore - aft, BLOCK_HALF.y * 2.0, CELL_DECK - DECK),
+        );
         return;
     }
 
@@ -135,10 +136,12 @@ pub(super) fn build(b: &mut MeshBuilder) {
     markings(b);
     hatch(b);
     lifts(b);
-    sam_cells(b);
+    for c in CELL_BLOCKS {
+        cell_block(b, c);
+    }
     island(b);
+    fleet_radar(b);
     laser_sponsons(b);
-    houses(b);
     below_the_waterline(b);
     if b.fine() {
         furniture(b);
@@ -291,31 +294,9 @@ fn lifts(b: &mut MeshBuilder) {
     }
 }
 
-/// Weapon 0: four square SAM cell hatches set into the deck on a dark battery
-/// frame, orange seams across the lids. Fixed: plain hull geometry.
-fn sam_cells(b: &mut MeshBuilder) {
-    for y in [8.1, -8.1] {
-        b.paint(ACCENT);
-        b.plate(v3(-13.0, y, DECK), v2(4.6, 2.4), 0.05, 0.02);
-    }
-    for m in SAM_CELLS {
-        let (x, y) = (m[0], m[1]);
-        b.paint(ACCENT);
-        b.plate(v3(x, y, DECK + 0.05), v2(1.8, 1.8), 0.1, 0.03);
-        b.paint(PLATING_DARK);
-        b.plate(v3(x, y, DECK + 0.15), v2(1.4, 1.4), 0.06, 0.02);
-        if b.fine() {
-            b.paint(GLOW_ORANGE);
-            b.plate(v3(x, y, DECK + 0.21), v2(1.3, 0.1), 0.04, 0.01);
-            b.plate(v3(x, y, DECK + 0.21), v2(0.1, 1.3), 0.04, 0.01);
-        }
-    }
-}
-
 /// The island: a dark plinth, a faceted white body drawn in as it rises, the glass
-/// bridge band, a white cap under a dark coping; the pyramidal mast off the roof
-/// with the search radar turning on it; the lamp pole aft; lit sensor panels, the
-/// interceptor laser's lens, and flux running up from the deck.
+/// bridge band, a white cap under a dark coping; the lamp pole aft; lit sensor panels,
+/// the interceptor laser's lens, and flux running up from the deck.
 fn island(b: &mut MeshBuilder) {
     let plan = chamfered_rect(ISLAND_HALF, 1.3);
     let at = v3(ISLAND.x, ISLAND.y, 0.0);
@@ -358,46 +339,7 @@ fn island(b: &mut MeshBuilder) {
             ],
         );
     });
-    // The mast: a faceted pyramid off the roof.
-    b.paint(PLATING);
-    b.loft_z(
-        &chamfered_rect(v2(2.3, 1.9), 0.5),
-        &[
-            Section::new(ROOF, 1.0).shifted(MAST_X, ISLAND.y),
-            Section::scaled(18.6, 0.62, 0.62).shifted(MAST_X, ISLAND.y),
-            Section::scaled(RADAR.z, 0.34, 0.34).shifted(MAST_X, ISLAND.y),
-        ],
-    );
-    team_panel(b, v3(ISLAND.x + 2.4, ISLAND.y - 0.5, ROOF), v2(2.6, 2.6));
-
-    // Search radar on the masthead: a pedestal and a long flat array, always turning.
-    b.set_spinner_pivot(RADAR);
-    b.with_part(part::SPINNER, |b| {
-        b.paint(ACCENT);
-        b.prism(RADAR, b.sides(8), 0.5, 0.42, 0.4);
-        b.paint(PLATING);
-        b.beam(
-            RADAR + v3(0.0, -2.9, 1.0),
-            RADAR + v3(0.0, 2.9, 1.0),
-            v2(0.24, 1.2),
-            v2(0.24, 1.2),
-        );
-        if b.mid() {
-            b.paint(ACCENT);
-            b.beam(
-                RADAR + v3(0.14, -2.7, 1.0),
-                RADAR + v3(0.14, 2.7, 1.0),
-                v2(0.06, 0.95),
-                v2(0.06, 0.95),
-            );
-            b.beam(
-                RADAR + v3(0.0, 0.0, 0.4),
-                RADAR + v3(0.0, 0.0, 0.45),
-                v2(0.7, 0.5),
-                v2(0.7, 0.5),
-            );
-        }
-    });
+    team_panel(b, v3(ISLAND.x + 3.4, ISLAND.y - 0.5, ROOF), v2(2.6, 2.6));
 
     // The lamp pole aft on the roof, a yard across it, the red lamp on top.
     b.paint(ACCENT);
@@ -458,10 +400,6 @@ fn island(b: &mut MeshBuilder) {
         v3(rim_x, ISLAND.y - 0.35, DECK),
         v3(rim_x + 0.7, HATCH.y - HATCH_HALF - 1.4, DECK + 0.3),
     );
-    b.block(
-        v3(ISLAND.x + ISLAND_HALF.x + 0.2, -8.35, DECK),
-        v3(-15.4, -7.65, DECK + 0.3),
-    );
 
     if !b.fine() {
         return;
@@ -519,147 +457,100 @@ fn island(b: &mut MeshBuilder) {
     );
     // ESM domes on the mast's shoulders.
     b.paint(PLATING);
-    for y in [-1.0, 1.0] {
-        b.spheroid(v3(MAST_X, ISLAND.y + y, 18.75), v3(0.3, 0.3, 0.26), 6, 2);
+    for y in [-1.3, 1.3] {
+        b.spheroid(v3(MAST_X, ISLAND.y + y, 18.4), v3(0.3, 0.3, 0.26), 6, 2);
     }
 }
 
-/// The gun houses: weapon 1's twin flak house on the port deck and weapon 2's
-/// close-in rotary gun on the starboard, both forward of the lifts.
-fn houses(b: &mut MeshBuilder) {
-    b.with_house(1, FLAK, 0.3, |b| {
-        if b.coarse() {
-            return;
-        }
-        let (x, y, z) = (FLAK.x, FLAK.y, FLAK.z);
-        b.paint(ACCENT);
-        b.prism(v3(x, y, DECK), b.sides(10), 2.0, 1.92, 0.12);
-        // A low faceted gunhouse, drawn in over its top.
+/// A block of weapon 0's cells built onto the island's plinth at `c`: an armoured box
+/// drawn in as it rises under a dark coaming, and on it six hatches, each hinged on its
+/// outer edge along y with its knuckles, over the missile standing in the cell.
+fn cell_block(b: &mut MeshBuilder, c: Vec2) {
+    let plan = chamfered_rect(BLOCK_HALF, 0.8);
+    b.at(c.extend(0.0), |b| {
         b.paint(PLATING);
-        b.at(v3(x - 0.6, y, 0.0), |b| {
-            b.loft_z(
-                &turret_plan(2.8, 3.0),
-                &[
-                    Section::new(DECK + 0.12, 0.96),
-                    Section::new(9.15, 1.0),
-                    Section::scaled(10.3, 0.68, 0.7).shifted(-0.3, 0.0),
-                ],
-            );
-        });
-        b.with_recoil(|b| {
-            for dy in [-0.4, 0.4] {
-                gun_tube(
-                    b,
-                    v3(x + 0.7, y + dy, 8.8),
-                    v3(FLAK_MUZZLE_X, y + dy, 8.8),
-                    0.1,
-                );
-            }
-            // The mantlet the barrels come through, proud of the house's front.
-            b.paint(ACCENT);
-            b.block(v3(x + 0.6, y - 0.8, z), v3(x + 1.3, y + 0.8, 9.2));
-            if b.fine() {
-                b.paint(GLOW_ORANGE);
-                b.block(v3(x + 1.3, y - 0.62, 8.62), v3(x + 1.34, y + 0.62, 8.7));
-            }
-        });
-        if b.fine() {
-            // Ammunition feeds each side, a sight on top.
-            b.paint(ACCENT);
-            for s in [-1.0, 1.0] {
-                b.block(
-                    v3(x - 1.0, y + s * 1.2 - 0.2, DECK + 0.14),
-                    v3(x + 0.3, y + s * 1.2 + 0.2, 9.3),
-                );
-            }
-            b.block(v3(x - 0.3, y - 0.15, 10.3), v3(x + 0.3, y + 0.15, 10.55));
-            b.paint(GLASS);
-            b.block(v3(x + 0.3, y - 0.12, 10.35), v3(x + 0.34, y + 0.12, 10.52));
-        }
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(DECK, 1.08),
+                Section::new(CELL_DECK - 0.35, 1.0),
+            ],
+        );
+        b.paint(ACCENT);
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(CELL_DECK - 0.35, 1.0),
+                Section::new(CELL_DECK, 0.98),
+            ],
+        );
     });
-
-    b.with_house(2, CIWS, 0.1, |b| {
-        if b.coarse() {
-            return;
-        }
-        let (x, y, z) = (CIWS.x, CIWS.y, CIWS.z);
-        b.paint(ACCENT);
-        b.prism(v3(x, y, DECK), b.sides(10), 1.7, 1.62, 0.12);
-        // A dark drum with the magazine, a white faceted head over it.
-        b.paint(PLATING_DARK);
-        b.prism(v3(x - 0.4, y, DECK + 0.12), b.sides(8), 1.0, 0.92, 0.9);
-        b.paint(PLATING);
-        b.at(v3(x - 0.6, y, 0.0), |b| {
-            b.loft_z(
-                &chamfered_rect(v2(0.9, 0.8), 0.35),
-                &[
-                    Section::new(9.5, 1.0),
-                    Section::scaled(10.4, 0.7, 0.7).shifted(-0.2, 0.0),
-                ],
+    let grid = CellGrid {
+        centre: c,
+        deck: CELL_DECK,
+        pitch: CELL_PITCH,
+        half: CELL_HALF,
+        nx: 3,
+        ny: 2,
+        hinge_y: true,
+    };
+    for m in b.cell_block(grid, &CELL_FIRE) {
+        let side = (m.y - c.y).signum();
+        let hinge = m.y + side * CELL_HALF;
+        b.with_part(part::CELL_HATCH, |b| {
+            b.paint(PLATING);
+            b.cuboid(
+                v3(m.x, m.y, CELL_DECK + 0.12),
+                v3(CELL_HALF * 2.0, CELL_HALF * 2.0, 0.24),
             );
-        });
-        b.with_recoil(|b| {
-            // The cradle out of the drum's front and the receiver the barrels turn in.
-            b.paint(ACCENT);
-            b.block(v3(x + 0.3, y - 0.5, z), v3(x + 1.0, y + 0.5, 9.5));
-            b.cylinder_between(
-                v3(x + 0.9, y, 8.8),
-                v3(x + 1.3, y, 8.8),
-                0.25,
-                0.22,
-                b.sides(8),
-            );
-            b.with_spin(v3(0.0, y, 8.8), |b| {
-                b.paint(METAL);
-                if b.mid() {
-                    for i in 0..6 {
-                        let a = i as f32 * TAU / 6.0 + FRAC_PI_2;
-                        let off = v3(0.0, a.cos() * 0.11, a.sin() * 0.11);
-                        b.cylinder_between(
-                            v3(x + 1.3, y, 8.8) + off,
-                            v3(CIWS_MUZZLE_X, y, 8.8) + off,
-                            0.04,
-                            0.036,
-                            5,
-                        );
-                    }
-                    b.paint(ACCENT);
-                    for bx in [x + 1.55, CIWS_MUZZLE_X - 0.12] {
-                        b.cylinder_between(
-                            v3(bx, y, 8.8),
-                            v3(bx + 0.08, y, 8.8),
-                            0.18,
-                            0.18,
-                            b.sides(8),
-                        );
-                    }
-                } else {
-                    b.cylinder_between(
-                        v3(x + 1.3, y, 8.8),
-                        v3(CIWS_MUZZLE_X, y, 8.8),
-                        0.16,
-                        0.15,
-                        6,
+            if b.fine() {
+                // Raised ribs across the lid, and the knuckles it swings on.
+                b.paint(PLATING_DARK);
+                for dx in [-0.55, 0.55] {
+                    b.cuboid(
+                        v3(m.x + dx, m.y, CELL_DECK + 0.3),
+                        v3(0.2, CELL_HALF * 1.6, 0.12),
                     );
                 }
-            });
-        });
-        if b.fine() {
-            // The tracking radar's dome on the head, the ejection chute to starboard.
-            b.paint(PLATING_DARK);
-            b.spheroid(v3(x - 0.7, y, 10.6), v3(0.45, 0.45, 0.4), 8, 3);
+                b.paint(METAL);
+                for dx in [-0.65, 0.65] {
+                    b.cylinder_between(
+                        v3(m.x + dx - 0.22, hinge, CELL_DECK + 0.08),
+                        v3(m.x + dx + 0.22, hinge, CELL_DECK + 0.08),
+                        0.15,
+                        0.15,
+                        4,
+                    );
+                }
+            }
             b.paint(ACCENT);
-            b.block(
-                v3(x + 0.2, y - 0.95, DECK + 0.6),
-                v3(x + 0.7, y - 0.55, 9.3),
+            b.decal(
+                v3(m.x, m.y - side * 0.7, CELL_DECK + 0.25),
+                v2(CELL_HALF * 1.6, 0.24),
             );
-            b.paint(GLOW_ORANGE);
-            b.block(
-                v3(x + 0.4, y - 0.98, DECK + 0.7),
-                v3(x + 0.6, y - 0.95, 9.1),
+        });
+        b.with_part(part::CELL_ROUND, |b| {
+            let top = CELL_DECK - 0.25;
+            // Only its head shows over the cell's rim from further off.
+            let foot = if b.fine() { top - 5.6 } else { top - 2.0 };
+            b.paint(PLATING);
+            b.cylinder_between(
+                v3(m.x, m.y, foot),
+                v3(m.x, m.y, top - 1.0),
+                0.45,
+                0.45,
+                b.sides(6),
             );
-        }
-    });
+            b.paint(PLATING_DARK);
+            b.cylinder_between(
+                v3(m.x, m.y, top - 1.0),
+                v3(m.x, m.y, top),
+                0.45,
+                0.06,
+                b.sides(6),
+            );
+        });
+    }
 }
 
 /// Under the water: the bulbous bow, twin rudders, the two shrouded propulsors in
@@ -837,4 +728,49 @@ fn furniture(b: &mut MeshBuilder) {
         v2(0.5, 0.5),
         v2(0.3, 0.3),
     );
+}
+
+/// The fleet radar: a broad faceted mast off the island roof and a long double-faced
+/// array turning on its head.
+fn fleet_radar(b: &mut MeshBuilder) {
+    b.paint(PLATING);
+    b.loft_z(
+        &chamfered_rect(v2(3.0, 2.3), 0.6),
+        &[
+            Section::new(ROOF, 1.0).shifted(MAST_X, ISLAND.y),
+            Section::scaled(19.2, 0.5, 0.55).shifted(MAST_X, ISLAND.y),
+            Section::scaled(RADAR.z, 0.3, 0.35).shifted(MAST_X, ISLAND.y),
+        ],
+    );
+    let pivot = RADAR;
+    b.set_spinner_pivot(pivot);
+    b.with_part(part::SPINNER, |b| {
+        b.paint(ACCENT);
+        b.prism(pivot, b.sides(8), 0.8, 0.7, 0.6);
+        b.paint(PLATING);
+        b.beam(
+            pivot + v3(0.0, -6.0, 1.9),
+            pivot + v3(0.0, 6.0, 1.9),
+            v2(0.7, 2.6),
+            v2(0.7, 2.6),
+        );
+        b.paint(PLATING_DARK);
+        for s in [-1.0, 1.0] {
+            b.beam(
+                pivot + v3(s * 0.38, -5.6, 1.9),
+                pivot + v3(s * 0.38, 5.6, 1.9),
+                v2(0.06, 2.2),
+                v2(0.06, 2.2),
+            );
+        }
+        if b.mid() {
+            b.paint(ACCENT);
+            b.beam(
+                pivot + v3(0.0, -0.8, 0.6),
+                pivot + v3(0.0, 0.8, 0.6),
+                v2(0.9, 0.6),
+                v2(0.9, 0.6),
+            );
+        }
+    });
 }

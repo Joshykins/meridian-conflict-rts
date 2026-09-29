@@ -34,11 +34,13 @@ mod peregrine;
 mod petrel;
 mod raptor;
 mod shrike;
+mod vigil;
+pub(crate) use vigil::{
+    LAMPS as VIGIL_LAMPS, LIFT_JETS as VIGIL_LIFT_JETS, NOZZLES as VIGIL_NOZZLES, RIG as VIGIL_RIG,
+};
 
 pub(crate) use argus::NOZZLES as ARGUS_NOZZLES;
-pub(crate) use osprey::{
-    CRADLES as OSPREY_CRADLES, DRONE_NOZZLES, HOLD_CEILING as OSPREY_HOLD_CEILING,
-};
+pub(crate) use osprey::DRONE_NOZZLES;
 
 /// Loft rings for a hard-chined hull. Each station is x, then (half width, height)
 /// pairs from the keel up to the spine; `from..=to` picks the pairs, mirrored across
@@ -75,6 +77,12 @@ fn wing(b: &mut MeshBuilder, plan: &[[f32; 2]], z: f32, thickness: f32) {
 /// Courier: compact spacecraft with an enclosed stern cargo bay.
 pub(crate) fn light_transport(b: &mut MeshBuilder, _tech: u8) {
     courier::build(b);
+}
+
+/// Vigil: the tech 1 sensor ship, a small single-drive spacecraft with a hammerhead of
+/// sensors across its bow ([`vigil`]).
+pub(crate) fn sensor_ship(b: &mut MeshBuilder, _tech: u8) {
+    vigil::build(b);
 }
 
 /// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.

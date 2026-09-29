@@ -91,6 +91,10 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   excess. A kind put first or last shows its own build speed on the row; the stall chip gives
   the rest's. A stalling resource's First pulses as the fix, and a note says what to build.
   The AI puts first whatever it is running out of and never puts anything last.
+- Standing energy draw (`energy_upkeep`) is only for powered systems: shields, radar, sonar
+  and the mines (checked on load). Guns, missile launchers, missile defence, nuke silos and
+  reclaim cost energy to build, never to keep (2026-09-29: the Zenith, Narwhal, Sunfall,
+  Culverin and Corona lost theirs).
 - Mines run on energy: upkeep 10 / 60 / 300 / 600 per second (T1-T4), about half a T1 reactor
   at T1 and a fifth of a reactor of their own tier above that. A mine digs at the share of the
   side's energy demand that is covered (behind the focus, if one is on): at worst a quarter of its output
@@ -117,7 +121,7 @@ replacing the mines.
   split across the heads working that tick.
 - Reclaiming takes no energy, not even a tower's: no reclaimer draws upkeep for it, and an
   energy stall never stops or slows it (checked on load; the Argus's upkeep is for its radar,
-  sonar, lasers and field). Only a full mass store holds reclaim back, and never on a side
+  sonar and field). Only a full mass store holds reclaim back, and never on a side
   that builds for free (the test range).
 
   | Unit | Tier | Mass | Power | Reach | Payback (beam) |

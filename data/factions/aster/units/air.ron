@@ -104,25 +104,28 @@
  key: "aster_t1_reclaim_carrier", name: "Osprey", role: "Reclaim Carrier", tech: 1, categories: ["Air"],
  health: 460, cost: (mass: 95, energy: 900, time: 560),
  radius: 10, height: 4.5, vision: 480,
- motion: (layer: Air, size: 0, speed: 65, accel: 24, turn: 65, altitude: 22, hover: true, deploy: 2.4),
+ motion: (layer: Air, size: 0, speed: 65, accel: 24, turn: 65, altitude: 22, hover: true, deploy: 0.6),
  weapons: [], mesh: "reclaim_carrier", icon: SalvageCarrier,
- // The lift fields under the four fan pods, and the hold's amber, after dark.
+ // After dark: the blue mouths of the wingtip nacelles, and the amber lamps on the
+ // four drone pylons (the model's `pylon`).
  lights: [
-  (kind: Point, at: (3.3, 6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
-  (kind: Point, at: (3.3, -6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
-  (kind: Point, at: (-3.5, 6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
-  (kind: Point, at: (-3.5, -6.7, 1.0), color: (0.45, 0.7, 1.0), intensity: 110, range: 24),
-  (kind: Point, at: (0, 0, 0.3), color: (1.0, 0.72, 0.12), intensity: 40, range: 12),
+  (kind: Point, at: (0.3, 9.15, 1.4), color: (0.45, 0.7, 1.0), intensity: 90, range: 20),
+  (kind: Point, at: (0.3, -9.15, 1.4), color: (0.45, 0.7, 1.0), intensity: 90, range: 20),
+  (kind: Point, at: (1.02, 3.6, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
+  (kind: Point, at: (1.02, -3.6, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
+  (kind: Point, at: (1.02, 6.4, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
+  (kind: Point, at: (1.02, -6.4, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
  ],
  sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 600,
- // In the hold, two abreast and two deep, on cradles 0.7 m up (the model's `CRADLES`).
- // Opening the hold drops them 1.9 m, clear of the door leaves.
- drone_sockets: [(-1.5, 1.3, 0.7), (-1.5, -1.3, 0.7), (1.5, 1.3, 0.7), (1.5, -1.3, 0.7)], drone_drop: 1.9,
+ // Slung under the wing, two a side, each from a pylon's clamp (the model's `PYLONS`).
+ // Home, a drone lines up 3 m under its pylon and rises onto it; letting go, it drops 3 m.
+ drone_sockets: [(0.4, 3.6, 0.25), (0.4, -3.6, 0.25), (0.4, 6.4, 0.25), (0.4, -6.4, 0.25)], drone_approach: -3,
 ),
 (
  key: "aster_reclaim_drone", name: "Salvage Drone", role: "Carrier Reclaim Drone", tech: 1, categories: ["Air"],
- // Free: its carrier (or port) only takes the time to make another.
- health: 150, cost: (mass: 0, energy: 0, time: 30),
+ // Cheap: built on its carrier's pylon (or port's pad) under the side's materials
+ // priority, like any other build.
+ health: 150, cost: (mass: 3, energy: 30, time: 30),
  radius: 1.8, height: 1.2, vision: 360,
  motion: (layer: Air, size: 0, speed: 88, accel: 39, turn: 240, altitude: 22, hover: true),
  weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,

@@ -964,6 +964,11 @@ impl World {
                 // A lift ship's ramp: `run_transports`.
                 continue;
             }
+            if crate::launch_cells::hatch_ticks(self.bp(row)).is_some() {
+                // A ship's cell hatches, as a site's.
+                self.step_hatches(row);
+                continue;
+            }
             if motion.deploy_ticks == 0 {
                 // A builder's folding gear comes out while it builds, and goes away after.
                 let unfold = self.bp(row).builder.as_ref().map_or(0, |b| b.unfold_ticks);

@@ -301,6 +301,9 @@ shared! {
         /// A flak burst's smoke (renderer/flak_fx.rs): the charge burning inside a
         /// hard-edged black ball that hangs on the wind for seconds.
         pub const FLAK: u32 = 39;
+        /// An ember thrown out of a round burnt down by a missile-defence laser
+        /// (renderer/laser_fx.rs): a red glow, pink-white at first, cooling to deep red.
+        pub const INTERCEPT: u32 = 40;
         /// A capital ship's warp (renderer/warp_fx.rs, warp_puffs.wgsl). Each carries its
         /// colour in `appearance.rgb` (brightness in its size) and how torn a dampened jump
         /// makes it in `appearance.w` (0 clean, 1 torn).
@@ -360,27 +363,16 @@ shared! {
         pub const ARRAY_HOIST_SPLIT: f32 = 7.8;
     }
 
-    /// A cell launcher's 2 x 2 missile cells (the Skyguard: `models/aster/aa/skyguard.rs`,
-    /// entity.wgsl). Cell k is the one under muzzle k of the unit's weapon, numbered
-    /// corner to opposite corner so a salvo ripples across the block: 0 at (-x, -y), 1 at
-    /// (+x, +y), 2 at (-x, +y), 3 at (+x, -y), x off the block's middle (`CENTRE`) (a test holds `structures.ron` to it). Each cell's hatch is hinged along
-    /// its outer edge in x and swings up and out by how far the hatches are open
-    /// (`UnitInstance::deploy`, `mc_sim::launch_cells`); the missile standing in a cell is
-    /// drawn while the cell's bit is set in `status[2]` (`launch_cells::loaded_cells`).
+    /// Hatched missile cells (`models::CellBlock`, entity.wgsl): each hatch swings up and
+    /// out about its outer edge by how far the hatches are open (`UnitInstance::deploy`,
+    /// `mc_sim::launch_cells`); the missile standing in a cell is drawn while its bit is
+    /// set in `status[2]` (`launch_cells::loaded_cells`). The layout is the model's own
+    /// (`ModelInfo::cells`).
     pub mod cells as "CELLS_" {
         /// A hatch, and its hinge knuckles.
         pub const PART_HATCH: u32 = 47;
         /// The missile standing in a cell.
         pub const PART_ROUND: u32 = 48;
-        /// The block's middle stands this far forward (+x) of the unit's origin; the cells
-        /// are numbered, and their hatches hinged, about it.
-        pub const CENTRE: f32 = 2.5;
-        /// Cell centres stand this far off the block's middle along x and along y.
-        pub const OFFSET: f32 = 2.3;
-        /// Half a cell's mouth, and of the hatch over it.
-        pub const HALF: f32 = 0.95;
-        /// Height of the deck the hatches lie shut on.
-        pub const DECK: f32 = 7.2;
         /// How far a hatch swings open, radians: up, over and a little past upright.
         pub const SWING: f32 = 1.85;
     }
@@ -461,6 +453,14 @@ shared! {
         pub const DAMPED: u32 = 0x1000;
         /// In warp: listed for its own side, never drawn.
         pub const IN_WARP: u32 = 0x2000;
+    }
+
+    /// A salvage drone docked on an aircraft (`mc_sim::mirror::UNIT_RIDING`, a test holds
+    /// them equal): drawn in the frame its carrier is drawn in (entity.wgsl `riding_frame`).
+    pub mod dock as "DOCK_" {
+        /// `UnitInstance::status[0]`: riding; `status[2]` is one more than the carrier's
+        /// index among the frame's units.
+        pub const RIDING: u32 = 0x400;
     }
 
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the

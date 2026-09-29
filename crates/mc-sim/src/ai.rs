@@ -161,7 +161,8 @@ struct Census {
     support_idle: Vec<usize>,
     army_fast: usize,
     max_tech: u8,
-    /// Energy a second the side would draw with everything at work (`energy.rs`).
+    /// Energy a second the side would draw with everything at work, its next
+    /// mine upgrade and tier step included (`energy.rs`).
     energy_need: Fx,
 }
 
@@ -327,7 +328,7 @@ impl World {
         self.direct_factories(player, &census, &planned.salvage, stance, persona, &mut out);
         self.direct_salvagers(&census, &planned.salvage, &mut out);
         self.direct_upgrades(player, &census, &mut out);
-        self.direct_focus(player, &mut out);
+        self.direct_focus(player, &census, &mut out);
         self.direct_nukes(player, &mut out);
         self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
         self.react_tactically(player, &mut census, &intel, &mut out);
@@ -439,7 +440,10 @@ impl World {
                             && self.bp(target).is_structure()
                             && units.health[target] >= self.bp(target).health
                     });
-            let idle = (head == NO_ORDER || finished_assist) && !recovering;
+            // One with an upgrade queued behind its job is spoken for: a new
+            // job would replace the upgrade.
+            let idle =
+                (head == NO_ORDER || (finished_assist && !self.upgrading(row))) && !recovering;
             if bp.is_mobile()
                 && !bp.weapons.is_empty()
                 && !bp.has(cat::ENGINEER)
@@ -544,7 +548,17 @@ impl World {
                 }
             }
         }
-        c.energy_need = self.energy_need(player);
+        // Room for the next mine upgrade and the next tier too: power built only
+        // up to what the side draws now left none for them, and they waited on
+        // it for twenty minutes.
+        let mine = self
+            .mine_to_upgrade(player, &c, false)
+            .map_or(Fx::ZERO, |(row, next)| self.upgrade_draw(row, next));
+        let tech = self.tech_step(player, &c).map_or(Fx::ZERO, |row| {
+            let next = self.bp(row).upgrades_to.map(|n| self.blueprints.unit(n));
+            next.map_or(Fx::ZERO, |next| self.upgrade_draw(row, next))
+        });
+        c.energy_need = self.energy_need(player) + mine + tech;
         c
     }
 
@@ -748,8 +762,11 @@ impl World {
                     u.has(cat::ENGINEER) && !u.has(cat::COMMANDER) && u.builder.is_some()
                 })
                 .max_by_key(|b| (self.blueprints.unit(*b).tech, std::cmp::Reverse(b.0)));
+            // More than one of the best tier: they put up the big plants and
+            // factories, and one alone was always busy elsewhere.
             let missing_tech_builder = engineer.is_some_and(|id| {
-                self.blueprints.unit(id).tech > 1 && composition.get(&id).copied().unwrap_or(0) == 0
+                self.blueprints.unit(id).tech > 1
+                    && composition.get(&id).copied().unwrap_or(0) < 1 + census.factories.len() / 2
             });
             let scout = builder
                 .builds
@@ -773,10 +790,13 @@ impl World {
                         && !u.is_salvager()
                 })
                 .collect();
-            let blueprint = if (census.engineers + planned_engineers < want_engineers
-                || missing_tech_builder)
-                && engineer.is_some()
-                && (counter.is_multiple_of(4) || stance == Stance::Firebase)
+            // The best tier missing comes at once, not on every fourth product: the
+            // count runs over all factories, and a tech 2 factory that always fell
+            // on the wrong turn made one Mason II in five minutes.
+            let blueprint = if engineer.is_some()
+                && (missing_tech_builder
+                    || (census.engineers + planned_engineers < want_engineers
+                        && (counter.is_multiple_of(4) || stance == Stance::Firebase)))
             {
                 planned_engineers += 1;
                 engineer

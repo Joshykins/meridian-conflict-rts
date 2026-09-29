@@ -3,6 +3,27 @@
 // of their own (`footprint` on a mobile unit) and the finished ship climbs off it.
 [
     (
+        // The Reach's eyes in the upper air: a small single-drive hull with a hammerhead of
+        // sensors across its bow, a tech 2 tower's reach that goes where the army goes.
+        // Unarmed. It hangs at fighter height, inside the reach of tech 1 anti-air, and its
+        // radar draws power like a tower's: an energy stall (or a pause) blinds it.
+        key: "aster_t1_sensor_ship",
+        name: "Vigil",
+        role: "Sensor Ship",
+        tech: 1,
+        categories: ["Air", "Space", "Intel"],
+        health: 700,
+        cost: (mass: 280, energy: 4200, time: 1400),
+        radius: 36, height: 22, footprint: (6, 5), hull: (36, 27), vision: 1500, radar: 6000,
+        motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 200, hover: true),
+        // Warp: a scout's light drive, a little more reach than the Courier's for less charge.
+        warp: (range: 7000, energy: 1200, spool: 3, cooldown: 40, speed: 3000),
+        economy: (energy_upkeep: 100),
+        weapons: [],
+        mesh: "sensor_ship", icon: SensorShip,
+        sounds: (death: "blast_small", moving: "aster_vigil"),
+    ),
+    (
         // The Reach's first line warship. A slow, heavy armoured hull laid round one gun: the
         // spinal rail cannon runs the length of the keel and is aimed by turning and pitching
         // the whole ship onto the mark, far beyond its turrets. Its own search radar finds
@@ -104,7 +125,6 @@
         cost: (mass: 4000, energy: 50000, time: 16000),
         radius: 46, height: 86, footprint: (8, 8),
         vision: 600,
-        economy: (energy_upkeep: 250),
         weapons: [
             (
                 name: "Zenith Rail Cannon",

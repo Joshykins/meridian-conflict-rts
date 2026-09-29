@@ -4,6 +4,7 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
+use mc_sim::focus::{Focus, Priority};
 use mc_sim::tables::Controller;
 use mc_sim::world::MapData;
 use mc_sim::{MatchConfig, PlayerSetup, World};
@@ -142,24 +143,25 @@ fn a_lost_drone_is_rebuilt_and_the_drones_go_with_the_commander() {
         .all(|&r| !w.state.units.slots.is_alive(r)));
 }
 
-/// The Osprey is what a side short of mass builds to get some: its drones must come out
-/// of it while every bit of income goes to building and nothing is left in store. (They
-/// used to be paid for out of what was left after the economy's own spending, so they
-/// waited for a surplus a new side never has.)
-#[test]
-fn an_osprey_on_a_starved_economy_still_fields_its_drones_and_salvages() {
-    let mut w = world();
+/// A side whose every bit of income goes into a factory going up, with an Osprey whose
+/// drones are paid for under materials priority `mines`: the Osprey's row.
+fn starved_osprey(w: &mut World, mines: Priority) -> usize {
     let add = |w: &mut World, key: &str, x: i32, y: i32| {
         let id = w.blueprints.id_of(key).unwrap();
         w.spawn_unit(id, 0, FxVec2::from_ints(x, y), Angle::ZERO, true)
             .unwrap()
     };
-    add(&mut w, "aster_mass_storage", 300, 300);
-    add(&mut w, "aster_t1_power", 360, 300);
-    let engineer = add(&mut w, "aster_t1_engineer", 400, 400);
+    // The commander's trickle of mass is all the side makes.
+    add(w, "aster_commander", 250, 250);
+    add(w, "aster_mass_storage", 300, 300);
+    add(w, "aster_t1_power", 360, 300);
+    let engineer = add(w, "aster_t1_engineer", 400, 400);
     w.state.players[0].mass = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
-    // Everything that comes in goes straight into a factory going up.
+    w.state.players[0].focus = Focus {
+        mines,
+        power: Priority::Even,
+    };
     let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
     let id = w.state.units.id(engineer);
     w.tick(&[mc_sim::PlayerCommand {
@@ -173,9 +175,25 @@ fn an_osprey_on_a_starved_economy_still_fields_its_drones_and_salvages() {
         },
     }])
     .unwrap();
-    let osprey = add(&mut w, "aster_t1_reclaim_carrier", 900, 900);
+    add(w, "aster_t1_reclaim_carrier", 900, 900)
+}
+
+fn built(w: &World, drones: &[usize]) -> usize {
+    drones
+        .iter()
+        .filter(|&&r| w.state.units.is_active(r))
+        .count()
+}
+
+/// The Osprey is what a side short of mass builds to get some. Its drones cost a little,
+/// so with materials put first they come out of it while every other bit of income goes
+/// to building and nothing is left in store, and they salvage.
+#[test]
+fn an_osprey_on_a_starved_economy_fields_its_drones_with_materials_first() {
+    let mut w = world();
+    let osprey = starved_osprey(&mut w, Priority::First);
     let mut most_in_store = Fx::ZERO;
-    for _ in 0..150 {
+    for _ in 0..200 {
         w.tick(&[]).unwrap();
         most_in_store = most_in_store.max(w.state.players[0].mass);
     }
@@ -184,11 +202,10 @@ fn an_osprey_on_a_starved_economy_still_fields_its_drones_and_salvages() {
         "the economy was starved: {most_in_store:?} in store"
     );
     assert_eq!(
-        drones_of(&w, osprey).len(),
+        built(&w, &drones_of(&w, osprey)),
         4,
         "a full flock with nothing in store"
     );
-    // Then a wreck turns up in reach.
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     let wreck = w
         .state
@@ -209,4 +226,120 @@ fn an_osprey_on_a_starved_economy_still_fields_its_drones_and_salvages() {
         !w.state.wrecks.slots.is_alive(wreck) || w.state.wrecks.mass[wreck] < Fx::from_int(200),
         "the flock salvaged the wreck"
     );
+}
+
+/// With materials put last, a starved side's drones wait for what the rest leaves: the
+/// first one stands half-built on its pylon.
+#[test]
+fn materials_last_leaves_a_starved_ospreys_drones_waiting() {
+    let mut w = world();
+    let osprey = starved_osprey(&mut w, Priority::Last);
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    let drones = drones_of(&w, osprey);
+    assert_eq!(built(&w, &drones), 0, "none finished");
+    assert_eq!(drones.len(), 1, "one going up on its pylon");
+    let time = w
+        .blueprints
+        .unit(w.state.units.blueprint[drones[0]])
+        .build_time;
+    assert!(w.state.units.build_progress[drones[0]] < time / 2);
+}
+
+/// An Osprey's drones hang from pylons under its wings. Letting go they drop clear;
+/// coming home they glide in and rise onto their pylons with no jump; docked, they
+/// keep their place on the wing while it flies.
+#[test]
+fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    // Room in store for what they bring home.
+    let storage = w.blueprints.id_of("aster_mass_storage").unwrap();
+    w.spawn_unit(storage, 0, FxVec2::from_ints(300, 300), Angle::ZERO, true)
+        .unwrap();
+    let key = "aster_t1_reclaim_carrier";
+    let id = w.blueprints.id_of(key).unwrap();
+    let osprey = w
+        .spawn_unit(id, 0, FxVec2::from_ints(900, 900), Angle::ZERO, true)
+        .unwrap();
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    let drones = drones_of(&w, osprey);
+    assert_eq!(drones.len(), 4);
+    let offsets = |w: &World| -> Vec<(Fx, Fx)> {
+        drones_of(w, osprey)
+            .iter()
+            .map(|&r| {
+                (
+                    w.state.units.pos[r].distance(w.state.units.pos[osprey]),
+                    w.state.units.z[osprey] - w.state.units.z[r],
+                )
+            })
+            .collect()
+    };
+    let docked = offsets(&w);
+    for &(across, below) in &docked {
+        assert!(across > Fx::from_int(3), "out on the wing: {across:?}");
+        // Its feet hang level with the Osprey's belly, under the wing.
+        assert!(below > -Fx::ONE, "under the wing: {below:?}");
+    }
+    // Flown somewhere, the flock stays on the wing, not a tick behind.
+    let osprey_id = w.state.units.id(osprey);
+    w.tick(&[mc_sim::PlayerCommand {
+        player: 0,
+        command: mc_sim::Command::Move {
+            units: vec![osprey_id],
+            target: FxVec2::from_ints(1300, 900),
+            queue: false,
+        },
+    }])
+    .unwrap();
+    for _ in 0..40 {
+        w.tick(&[]).unwrap();
+        for (now, then) in offsets(&w).iter().zip(&docked) {
+            assert!(
+                (now.0 - then.0).abs() < Fx::ratio(1, 10)
+                    && (now.1 - then.1).abs() < Fx::ratio(1, 10),
+                "a docked drone slipped off its pylon: {now:?} (was {then:?})"
+            );
+        }
+    }
+    // A wreck turns up: they go out and come home, and no step on or off the pylon is a jump.
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let at = w.state.units.pos[osprey] + FxVec2::from_ints(120, 0);
+    w.state
+        .wrecks
+        .spawn(tank, at, Fx::from_int(20), Angle::ZERO, Fx::from_int(40), 0)
+        .unwrap();
+    let mut went_out = false;
+    // Where each drone is from the Osprey, which may still be flying.
+    let rel = |w: &World, r: usize| {
+        (w.state.units.pos[r] - w.state.units.pos[osprey])
+            .extend(w.state.units.z[r] - w.state.units.z[osprey])
+    };
+    let mut last: Vec<_> = drones.iter().map(|&r| rel(&w, r)).collect();
+    for _ in 0..1500 {
+        w.tick(&[]).unwrap();
+        for (k, &r) in drones.iter().enumerate() {
+            let now = rel(&w, r);
+            went_out |= now.xy().length() > Fx::from_int(30);
+            if w.state.units.deploy[r] != 1 {
+                let step = (now - last[k]).length();
+                assert!(
+                    step < Fx::from_int(5),
+                    "a drone jumped {step:?} m on or off its pylon"
+                );
+            }
+            last[k] = now;
+        }
+    }
+    assert!(went_out, "the drones went out to the wreck");
+    for (now, then) in offsets(&w).iter().zip(&docked) {
+        assert!(
+            (now.0 - then.0).abs() < Fx::ratio(1, 10) && (now.1 - then.1).abs() < Fx::ratio(1, 10),
+            "home on its pylon: {now:?} (was {then:?})"
+        );
+    }
 }

@@ -7,11 +7,17 @@
 //! the fire-control deckhouse: a tapered eight-sided tower with a fixed array face on
 //! each diagonal facet, laid flat on its facet. Nothing yaws.
 use super::*;
-use crate::builder::{ngon, Section};
-use crate::gpu_consts::cells::{CENTRE, DECK, HALF, OFFSET};
+use crate::builder::{ngon, CellGrid, Section};
 use crate::pattern;
 use glam::{Vec2, Vec3};
 
+/// The block's middle stands this far forward (+x) of the unit's origin; the cells stand
+/// `OFFSET` off it along x and along y, their mouths and hatches `HALF` each way, the
+/// hatches shut on `DECK`.
+const CENTRE: f32 = 2.5;
+const OFFSET: f32 = 2.3;
+const HALF: f32 = 0.95;
+const DECK: f32 = 7.2;
 /// Half the launcher block's width: the cells' outer walls.
 const BLOCK: f32 = OFFSET + HALF + 0.75;
 /// Where the block stands, on the pad's top.
@@ -42,16 +48,18 @@ pub(super) fn build(b: &mut MeshBuilder) {
     revetment(b);
 }
 
-/// Cell centres in the order the shader numbers them and the weapon's muzzles run
-/// (`gpu_consts::cells`): back left, front right, back right, front left.
-pub(super) fn centres() -> [(f32, f32); 4] {
-    [
-        (CENTRE - OFFSET, -OFFSET),
-        (CENTRE + OFFSET, OFFSET),
-        (CENTRE - OFFSET, OFFSET),
-        (CENTRE + OFFSET, -OFFSET),
-    ]
-}
+/// The cells, 2 x 2, hinged along x, fired corner to opposite corner so a salvo ripples
+/// across the block, as the weapon's muzzles run: (-x, -y), (+x, +y), (-x, +y), (+x, -y).
+const GRID: CellGrid = CellGrid {
+    centre: Vec2::new(CENTRE, 0.0),
+    deck: DECK,
+    pitch: OFFSET * 2.0,
+    half: HALF,
+    nx: 2,
+    ny: 2,
+    hinge_y: false,
+};
+const FIRE: [(u8, u8); 4] = [(0, 0), (1, 1), (0, 1), (1, 0)];
 
 /// A rectangle `hx` by `hy` (halves) with its corners cut `cut` back, counterclockwise.
 fn chamfered(hx: f32, hy: f32, cut: f32) -> Vec<[f32; 2]> {
@@ -200,7 +208,8 @@ fn block(b: &mut MeshBuilder) {
 
 /// A hatch over each cell with its hinge on the outer edge, and the missile in it.
 fn cells(b: &mut MeshBuilder) {
-    for (cx, cy) in centres() {
+    for c in b.cell_block(GRID, &FIRE) {
+        let (cx, cy) = (c.x, c.y);
         let side = (cx - CENTRE).signum();
         let hinge = CENTRE + side * (OFFSET + HALF);
         b.with_part(part::CELL_HATCH, |b| {
@@ -506,7 +515,8 @@ fn coarse(b: &mut MeshBuilder) {
         v3(CENTRE, 0.0, (FOOT + DECK) * 0.5),
         v3(BLOCK * 2.0, BLOCK * 2.0, DECK - FOOT),
     );
-    for (cx, cy) in centres() {
+    for c in b.cell_block(GRID, &FIRE) {
+        let (cx, cy) = (c.x, c.y);
         b.with_part(part::CELL_HATCH, |b| {
             b.paint(ACCENT);
             b.decal(v3(cx, cy, DECK + 0.02), v2(HALF * 2.0, HALF * 2.0));
