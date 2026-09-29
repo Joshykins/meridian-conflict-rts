@@ -1197,14 +1197,10 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             glyph: Glyph::Assist,
             label: "Assist",
             key: "C",
-            hint: "Help a builder, repair a unit, or feed a shield. Stays until another order.",
+            hint: "Assist (C): click a unit to help it build, repair it or feed its shield. Press on open ground and drag out a ring (a click there gives the usual size) for an area assist: the engineers stay on it and work everything inside, raising what goes up, mending what is hurt and reclaiming the wrecks, and take up new work as it appears. Stays until another order.",
             action: HudAction::Target(Targeting::Assist),
             lit: targeting(Targeting::Assist),
         });
-        // An armed builder (the commander) has it as Guard, among its stances.
-        if !armed {
-            work.push(Order { glyph: Glyph::Guard, label: "Area", key: "", hint: "Area Assist (Ctrl+G): press on a spot and drag out the ring. The engineers stay on it and work everything inside: they help raise what goes up, mend what is hurt and reclaim the wrecks, and take up new work as it appears. Any other order takes them off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) });
-        }
     }
     if reclaimers {
         work.push(Order {

@@ -50,6 +50,14 @@ pub(super) struct GuardLook {
 }
 
 impl GuardLook {
+    /// An engineer's guard is an area assist: its ring is work, not a stance.
+    pub(super) fn area_assist() -> GuardLook {
+        GuardLook {
+            circle: 0.0,
+            tone: hud::style::Family::Engineering.tone(),
+        }
+    }
+
     fn stance(circle: f32) -> GuardLook {
         GuardLook {
             circle,
@@ -71,11 +79,7 @@ pub(super) fn guard_look(blueprints: &Blueprints, unit: &UnitInstance) -> GuardL
     } else if bp.motion.is_some_and(|m| m.layer == MoveLayer::Air) {
         GuardLook::stance(0.5)
     } else if bp.builder.is_some() && bp.weapons.is_empty() {
-        // An engineer's is an Area Assist: its ring is work, not a stance.
-        GuardLook {
-            circle: 0.0,
-            tone: hud::style::Family::Engineering.tone(),
-        }
+        GuardLook::area_assist()
     } else {
         GuardLook::stance(0.0)
     }

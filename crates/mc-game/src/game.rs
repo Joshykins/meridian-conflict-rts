@@ -1146,7 +1146,7 @@ impl Game {
                         }
                         if matches!(
                             self.view.mode,
-                            Mode::Target(Targeting::Bombard | Targeting::Guard)
+                            Mode::Target(Targeting::Bombard | Targeting::Guard | Targeting::Assist)
                         ) {
                             self.view.circle_from =
                                 self.ground_under_cursor(r).map(|g| g.truncate());
@@ -1250,23 +1250,30 @@ impl Game {
                 Some(g) => self.lay_patrol_post(g.truncate(), audio),
                 None => audio.play(Sfx::Deny),
             },
-            Mode::Target(Targeting::Guard) => {
-                // Centred, and going with the friendly unit there, where the press landed.
+            Mode::Target(targeting @ (Targeting::Guard | Targeting::Assist)) => {
                 let centre = self.view.circle_from.take();
                 let edge = self.ground_under_cursor(r).map(|g| g.truncate());
-                let mut command =
-                    self.targeted_command(Targeting::Guard, centre, self.unit_at(from));
-                // A click keeps the area the selection has; a drag sets it.
-                if let (Some(Command::Guard { radius, .. }), Some(centre), Some(edge)) =
-                    (&mut command, centre, edge)
-                {
-                    if from.distance(self.cursor) >= DRAG_THRESHOLD {
-                        *radius = Fx::from_f32(
-                            centre
-                                .distance(edge)
-                                .clamp(MIN_GUARD_RADIUS.to_f32(), MAX_GUARD_RADIUS.to_f32()),
-                        );
+                let dragged = from.distance(self.cursor) >= DRAG_THRESHOLD;
+                let mut command = match targeting {
+                    // Assist dragged out is an area assist, centred where the press landed.
+                    Targeting::Assist if dragged => {
+                        self.targeted_command(Targeting::Assist, centre, None)
                     }
+                    Targeting::Assist => {
+                        self.targeted_command(Targeting::Assist, edge, self.unit_at(self.cursor))
+                    }
+                    // Centred, and going with the friendly unit there, where the press landed.
+                    _ => self.targeted_command(Targeting::Guard, centre, self.unit_at(from)),
+                };
+                // A click keeps the area the selection has; a drag sets it.
+                if let (Some(Command::Guard { radius, .. }), Some(centre), Some(edge), true) =
+                    (&mut command, centre, edge, dragged)
+                {
+                    *radius = Fx::from_f32(
+                        centre
+                            .distance(edge)
+                            .clamp(MIN_GUARD_RADIUS.to_f32(), MAX_GUARD_RADIUS.to_f32()),
+                    );
                 }
                 match command {
                     Some(command) => {
@@ -1723,17 +1730,34 @@ impl Game {
                 }),
                 None => None,
             },
-            Targeting::Assist => target
-                .filter(|u| {
-                    !is_wreck(u)
-                        && !self.is_enemy((u.owner_flags & 0xFF) as u8)
-                        && !self.view.selection.contains(&u.unit_id)
-                })
-                .map(|u| Command::Assist {
+            Targeting::Assist => match target.filter(|u| {
+                !is_wreck(u)
+                    && !self.is_enemy((u.owner_flags & 0xFF) as u8)
+                    && !self.view.selection.contains(&u.unit_id)
+            }) {
+                Some(u) => Some(Command::Assist {
                     units,
                     target: Handle(u.unit_id),
                     queue,
                 }),
+                // Open ground: an area assist, the builders on guard over a ring there
+                // (`mc_sim::area_work`). The rest of the selection stays out of it.
+                None if target.is_none() => point.map(|pos| Command::Guard {
+                    units: self
+                        .selected_units()
+                        .filter(|u| {
+                            let bp = self.blueprints.unit(BlueprintId(u.blueprint as u16));
+                            bp.is_mobile() && bp.builder.is_some()
+                        })
+                        .map(|u| Handle(u.unit_id))
+                        .collect(),
+                    pos,
+                    target: Handle::NONE,
+                    radius: Fx::from_f32(self.guard_radius()),
+                    queue,
+                }),
+                None => None,
+            },
             Targeting::Patrol => point.map(|p| Command::Patrol {
                 units,
                 points: vec![p],
@@ -2005,7 +2029,12 @@ impl Game {
                 }
             }
             Mode::Target(targeting) => {
-                of(self.targeted_command(targeting, ground(), self.unit_at(self.cursor)))
+                match self.targeted_command(targeting, ground(), self.unit_at(self.cursor)) {
+                    Some(Command::Guard { .. }) if targeting == Targeting::Assist => {
+                        Pointer::Assist
+                    }
+                    command => of(command),
+                }
             }
             // A box is being dragged out: the pointer is a corner of it.
             Mode::Normal

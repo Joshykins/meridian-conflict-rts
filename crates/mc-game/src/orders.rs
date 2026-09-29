@@ -25,7 +25,7 @@ use std::collections::HashSet;
 mod guard_rings;
 mod wall_line;
 
-use guard_rings::{guard_look, guard_ring, orbit_ring, selection_guard_look};
+use guard_rings::{guard_look, guard_ring, orbit_ring, selection_guard_look, GuardLook};
 
 /// How near a waypoint a press has to be to pick it up, in pixels.
 const GRAB_REACH: f32 = 20.0;
@@ -804,14 +804,25 @@ impl OrderMap {
                 }
             }
         }
-        if view.mode == Mode::Target(crate::game::Targeting::Guard) {
+        let guard = view.mode == Mode::Target(crate::game::Targeting::Guard);
+        // Assist dragged out is an area assist (`Game::left_released`).
+        let area_assist = view.mode == Mode::Target(crate::game::Targeting::Assist)
+            && view
+                .circle_from
+                .zip(ground)
+                .is_some_and(|(c, g)| c.distance(g) >= 10.0);
+        if guard || area_assist {
+            let look = if guard {
+                selection_guard_look(field)
+            } else {
+                GuardLook::area_assist()
+            };
             // Only once dragged: a click keeps the size the selection has.
             if let (Some(centre), Some(g)) = (view.circle_from, ground) {
                 if centre.distance(g) >= 10.0 {
                     let radius = centre
                         .distance(g)
                         .clamp(MIN_GUARD_RADIUS.to_f32(), MAX_GUARD_RADIUS.to_f32());
-                    let look = selection_guard_look(field);
                     guard_ring(ui, field, centre, radius, 1.0, look.tone);
                     if look.circle > 0.0 {
                         let circle = radius * look.circle;
@@ -828,7 +839,7 @@ impl OrderMap {
                     }
                 }
                 if let Some(c) = project(centre) {
-                    ui.disc(c, 3.0, ui::rgb(selection_guard_look(field).tone, 1.0));
+                    ui.disc(c, 3.0, ui::rgb(look.tone, 1.0));
                 }
             }
         }
