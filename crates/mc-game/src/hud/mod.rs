@@ -136,10 +136,6 @@ pub enum HudAction {
     PauseWork(bool),
     /// What the side's economy builds first when it stalls.
     Focus(mc_sim::focus::Focus),
-    /// Selected lift ships set down where they stand and let their holds out.
-    UnloadHere,
-    /// Selected lift ships set down where they stand.
-    LandHere,
     /// Selected lift ships that are down raise the ramp and climb back to the clouds.
     TakeOff,
     /// These units, riding in a lift ship's hold, walk out of it (`Command::Unload`).

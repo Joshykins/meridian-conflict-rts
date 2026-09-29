@@ -1099,58 +1099,11 @@ impl Game {
             .collect()
     }
 
-    /// Selected capital ships set down where they are (`unload`: and lift ships let
-    /// their holds out).
-    fn lift_here(&mut self, unload: bool) {
-        let ships: Vec<(Handle, FxVec2)> = self
-            .selected_units()
-            .filter(|u| {
-                self.blueprints
-                    .unit(BlueprintId(u.blueprint as u16))
-                    .is_capital_ship()
-            })
-            .map(|u| {
-                (
-                    Handle(u.unit_id),
-                    FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1])),
-                )
-            })
-            .collect();
-        for (ship, pos) in ships {
-            self.send(Command::Land {
-                units: vec![ship],
-                pos,
-                unload,
-                queue: false,
-            });
-        }
-    }
-
-    /// Shift+L: selected capital ships that are down (or coming down) take off; if none
-    /// is, they all set down where they are.
-    fn lift_toggle(&mut self) {
-        let down = self.selected_units().any(|u| {
-            u.set_down()
-                || self
-                    .view
-                    .status
-                    .queues
-                    .iter()
-                    .find(|q| q.unit_id == u.unit_id)
-                    .and_then(|q| q.cargo.as_ref())
-                    .is_some_and(|c| {
-                        use mc_sim::mirror::LiftPhase;
-                        matches!(
-                            c.phase,
-                            LiftPhase::RampOpening | LiftPhase::Ready | LiftPhase::Unloading
-                        )
-                    })
-        });
-        if down {
-            let ships = self.selected_lifts();
+    /// Shift+L: selected capital ships that are down (or coming down) take off.
+    fn take_off(&mut self) {
+        let ships = self.selected_lifts();
+        if !ships.is_empty() {
             self.send(Command::TakeOff { units: ships });
-        } else {
-            self.lift_here(false);
         }
     }
 
@@ -2233,14 +2186,7 @@ impl Game {
             HudAction::Dive(dive) => self.set_dive(dive),
             HudAction::PauseWork(paused) => self.set_paused(paused),
             HudAction::Focus(focus) => self.send(Command::SetFocus { focus }),
-            HudAction::UnloadHere => self.lift_here(true),
-            HudAction::LandHere => self.lift_here(false),
-            HudAction::TakeOff => {
-                let ships = self.selected_lifts();
-                if !ships.is_empty() {
-                    self.send(Command::TakeOff { units: ships });
-                }
-            }
+            HudAction::TakeOff => self.take_off(),
             HudAction::UnloadUnits(ids) => {
                 self.send(Command::Unload {
                     units: ids.into_iter().map(Handle).collect(),
@@ -3006,12 +2952,11 @@ impl Game {
             {
                 self.hud.open_refit_tab()
             }
-            KeyCode::KeyU if self.selection_lifts() && self.shift => self.lift_here(true),
             KeyCode::KeyU if self.selection_lifts() => self.arm(Targeting::Unload),
             KeyCode::KeyU => self.send(Command::Upgrade {
                 units: self.selected_ids(),
             }),
-            KeyCode::KeyL if self.selection_lands() && self.shift => self.lift_toggle(),
+            KeyCode::KeyL if self.selection_lands() && self.shift => self.take_off(),
             KeyCode::KeyL if self.selection_lands() => self.arm(Targeting::Land),
             // As the Repeat button: off if every factory repeats, all on otherwise.
             KeyCode::KeyL if self.selection_has(cat::FACTORY) => {

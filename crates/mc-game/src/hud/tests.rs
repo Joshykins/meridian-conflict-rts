@@ -1577,7 +1577,7 @@ fn a_lift_ship_hold_lets_out_what_is_clicked_and_its_card_lands_and_takes_off() 
         }]
     );
     rig.view.ctrl = false;
-    // The order card has a Transport column: down, it offers Take Off; aloft, Land Here.
+    // The order card has a Transport column: Load, Unload and, once down, Take Off.
     let card = |rig: &mut Rig, row: usize| -> Vec<HudAction> {
         (0..6)
             .flat_map(|col| {
@@ -1592,19 +1592,15 @@ fn a_lift_ship_hold_lets_out_what_is_clicked_and_its_card_lands_and_takes_off() 
             .collect()
     };
     assert!(
-        card(&mut rig, 3).contains(&HudAction::TakeOff),
+        card(&mut rig, 2).contains(&HudAction::TakeOff),
         "no Take Off on the card"
-    );
-    assert!(
-        card(&mut rig, 2).contains(&HudAction::UnloadHere),
-        "no Unload Here on the card"
     );
     assert!(card(&mut rig, 0).contains(&HudAction::Target(crate::game::Targeting::Land)));
     assert!(card(&mut rig, 1).contains(&HudAction::Target(crate::game::Targeting::Unload)));
     rig.view.status.queues[0].cargo = Some(cargo(LiftPhase::InFlight));
     assert!(
-        card(&mut rig, 3).contains(&HudAction::LandHere),
-        "no Land Here while aloft"
+        !card(&mut rig, 2).contains(&HudAction::TakeOff),
+        "Take Off while aloft"
     );
     assert_eq!(
         super::cargo::status(&cargo(LiftPhase::RampOpening)).0,

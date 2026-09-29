@@ -1147,7 +1147,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             }
         }
     }
-    // A lift ship sets down and lowers its ramp, lets its hold out, or lifts off:
+    // A lift ship loads (sets down, ramp lowered), unloads, or once down lifts off:
     // a column of its own, keys shown (a leading shift mark is Shift+key).
     let lifts: Vec<_> = units
         .iter()
@@ -1157,17 +1157,13 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     let landers: Vec<_> = units.iter().filter(|u| s.bp(u).is_capital_ship()).collect();
     if lifts.is_empty() && !landers.is_empty() {
         let down = landers.iter().any(|u| u.set_down());
-        out.push((
-            Family::Transport,
-            vec![
-                Order { glyph: Glyph::Land, label: "Land", key: "L", hint: "Land (L): click the ground. It glides down onto the nearest ground big and flat enough and stays there until given another order. It sets down only when told to. On the ground its hull cannot turn or pitch, so its spinal gun is silent; its turrets still fire.", action: HudAction::Target(Targeting::Land), lit: targeting(Targeting::Land) },
-                if down {
-                    Order { glyph: Glyph::TakeOff, label: "Take Off", key: "\u{21e7}L", hint: "Take off (Shift+L): rise straight up off the ground and climb back to cruise height. Any move order does this too.", action: HudAction::TakeOff, lit: false }
-                } else {
-                    Order { glyph: Glyph::Land, label: "Land Here", key: "\u{21e7}L", hint: "Land here (Shift+L): come down where it is, on the nearest ground big and flat enough.", action: HudAction::LandHere, lit: false }
-                },
-            ],
-        ));
+        let mut land = vec![
+            Order { glyph: Glyph::Land, label: "Land", key: "L", hint: "Land (L): click the ground. It glides down onto the nearest ground big and flat enough and stays there until given another order. It sets down only when told to. On the ground its hull cannot turn or pitch, so its spinal gun is silent; its turrets still fire.", action: HudAction::Target(Targeting::Land), lit: targeting(Targeting::Land) },
+        ];
+        if down {
+            land.push(Order { glyph: Glyph::TakeOff, label: "Take Off", key: "\u{21e7}L", hint: "Take off (Shift+L): rise straight up off the ground and climb back to cruise height. Any move order does this too.", action: HudAction::TakeOff, lit: false });
+        }
+        out.push((Family::Transport, land));
     }
     if !lifts.is_empty() {
         use mc_sim::mirror::LiftPhase;
@@ -1185,17 +1181,13 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
                 LiftPhase::RampOpening | LiftPhase::Ready | LiftPhase::Unloading
             )
         });
-        let unloading = phases.contains(&LiftPhase::Unloading);
         let mut lift = vec![
-            Order { glyph: Glyph::Land, label: "Land", key: "L", hint: "Land (L): click the ground. It glides down onto the nearest ground big and flat enough and lowers its ramp. Right-click it with land units to board them. Its guns reach the ground only once it is down out of the clouds.", action: HudAction::Target(Targeting::Land), lit: targeting(Targeting::Land) },
+            Order { glyph: Glyph::Board, label: "Load", key: "L", hint: "Load (L): click the ground. It glides down onto the nearest ground big and flat enough and lowers its ramp. Right-click it with land units to board them. Its guns reach the ground only once it is down out of the clouds.", action: HudAction::Target(Targeting::Land), lit: targeting(Targeting::Land) },
             Order { glyph: Glyph::Unload, label: "Unload", key: "U", hint: "Unload (U): click the ground. It sets down there, lowers its ramp and lets the whole hold walk out behind it. Click a unit in the hold to let out just that one.", action: HudAction::Target(Targeting::Unload), lit: targeting(Targeting::Unload) },
-            Order { glyph: Glyph::Unload, label: "Unload Here", key: "\u{21e7}U", hint: "Unload here (Shift+U): set down where it is and let the whole hold walk out behind it.", action: HudAction::UnloadHere, lit: unloading },
         ];
-        lift.push(if down {
-            Order { glyph: Glyph::TakeOff, label: "Take Off", key: "\u{21e7}L", hint: "Take off (Shift+L): raise the ramp, rise straight up off the ground and climb back to the clouds. Any move order does this too.", action: HudAction::TakeOff, lit: false }
-        } else {
-            Order { glyph: Glyph::Land, label: "Land Here", key: "\u{21e7}L", hint: "Land here (Shift+L): come down where it is, on the nearest ground big and flat enough, and lower the ramp.", action: HudAction::LandHere, lit: false }
-        });
+        if down {
+            lift.push(Order { glyph: Glyph::TakeOff, label: "Take Off", key: "\u{21e7}L", hint: "Take off (Shift+L): raise the ramp, rise straight up off the ground and climb back to the clouds. Any move order does this too.", action: HudAction::TakeOff, lit: false });
+        }
         out.push((Family::Transport, lift));
     }
 

@@ -171,11 +171,10 @@ ramp down, ready to load.
 - **Orders.** Right-click the ship with land units selected: they board (`Command::Board`;
   the pointer turns to a boarding glyph and a note says how much room they take and what
   will not fit). An idle ship up in the sky comes down where it is for them. The order
-  card has a Transport column: **Land** (L, click the ground: set down on the nearest
-  ground big and flat enough, 6 m of rise under the hull, searched out to 1.6 km),
-  **Unload** (U, click: the same and let the hold out, `Command::Land { unload }`),
-  **Unload Here** (Shift+U) and **Take Off** (Shift+L, `Command::TakeOff`; while aloft the
-  button is **Land Here**). Idle on the ground it stays down with the ramp open; idle in
+  card has a Transport column: **Load** (L, click the ground: set down on the nearest
+  ground big and flat enough, 6 m of rise under the hull, searched out to 1.6 km, and
+  lower the ramp), **Unload** (U, click: the same and let the hold out,
+  `Command::Land { unload }`) and, once down, **Take Off** (Shift+L, `Command::TakeOff`). Idle on the ground it stays down with the ramp open; idle in
   the air it stays up; any move raises the ramp and lifts it off.
 - **Landing.** Told to set down it glides in rather than stopping overhead and dropping:
   from three cruise heights (1.7 km) out the height it holds eases down a smoothstep to
