@@ -18,7 +18,6 @@
         cost: (mass: 9000, energy: 90000, time: 36000),
         radius: 42.5, height: 26, footprint: (8, 8),
         vision: 300,
-        economy: (energy_upkeep: 40),
         strategic: (
             kind: Nuke,
             // One warhead: about five minutes on the silo's own assembly line.
@@ -81,7 +80,6 @@
         cost: (mass: 10000, energy: 100000, time: 36000),
         radius: 30, height: 27, footprint: (6, 6),
         vision: 300,
-        economy: (energy_upkeep: 60),
         weapons: [(
             name: "Culverin Long Gun",
             // 22 km: from a base on a 16 km map it reaches every other base on it. The

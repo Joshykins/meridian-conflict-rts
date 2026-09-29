@@ -102,7 +102,6 @@
         cost: (mass: 4000, energy: 50000, time: 16000),
         radius: 46, height: 86, footprint: (8, 8),
         vision: 600,
-        economy: (energy_upkeep: 250),
         weapons: [
             (
                 name: "Zenith Rail Cannon",

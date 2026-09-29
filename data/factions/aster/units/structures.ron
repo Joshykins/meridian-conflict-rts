@@ -419,7 +419,7 @@
     (
         // Two missile-defence laser heads on a yoke, a tracking radar turning between
         // them. Each head burns a missile of its own, 10 hp of casing a tick (a Javelin
-        // rocket takes 0.8 s). Draws power: unpaid, the lasers go dark.
+        // rocket takes 0.8 s).
         key: "aster_t2_missile_defense",
         name: "Corona",
         role: "Tactical Missile Defence",
@@ -429,7 +429,6 @@
         cost: (mass: 360, energy: 3600, time: 900),
         radius: 5.25, height: 12, footprint: (1, 1),
         vision: 300,
-        economy: (energy_upkeep: 15),
         anti_missile: 300,
         anti_missile_mounts: [(0.0, 2.8, 10.6), (0.0, -2.8, 10.6)],
         anti_missile_lasers: 2,

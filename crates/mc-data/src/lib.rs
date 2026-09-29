@@ -1058,15 +1058,15 @@ impl Blueprints {
                 }
             }
         }
-        // Reclaiming takes no energy, not even a tower's (the user's rule): a unit that
-        // reclaims, itself or with drones, draws upkeep only for a powered system it
-        // also carries (the Argus's radar, sonar and field).
+        // Standing energy draw is for powered systems only (the user's rule): a shield,
+        // a radar or sonar, or a mine's dig. Guns, launchers, missile defence and
+        // reclaim (not even a tower's) run free; they cost energy to build, not to keep.
         for u in &units {
-            let salvage = u.reclaimer.is_some() || u.drone.is_some();
-            let powered = u.radar > Fx::ZERO || u.sonar > Fx::ZERO || u.shield.is_some();
-            if salvage && u.economy.energy_upkeep > Fx::ZERO && !powered {
+            let powered =
+                u.radar > Fx::ZERO || u.sonar > Fx::ZERO || u.shield.is_some() || u.mine.is_some();
+            if u.economy.energy_upkeep > Fx::ZERO && !powered {
                 return Err(DataError::Invalid(format!(
-                    "{}: reclaiming takes no energy, so it draws no upkeep",
+                    "{}: only a shield, radar, sonar or mine draws energy upkeep",
                     u.key
                 )));
             }

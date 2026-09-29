@@ -547,7 +547,6 @@
         cost: (mass: 3800, energy: 34200, time: 11500),
         radius: 84, height: 34,
         vision: 1200,
-        economy: (energy_upkeep: 150),
         motion: (layer: Naval, size: 5, speed: 18, accel: 4, turn: 20),
         weapons: [
             (
