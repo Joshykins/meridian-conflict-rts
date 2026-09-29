@@ -87,7 +87,10 @@ mod titan_charge;
 mod titan_fx;
 pub use gpu_timers::{to_perf as gpu_scopes_to_perf, DrawStats, GpuScope};
 
-pub const MAX_DYNAMIC: usize = mc_sim::tables::MAX_UNITS + mc_sim::tables::MAX_WRECKS + 512;
+pub const MAX_DYNAMIC: usize = mc_sim::tables::MAX_UNITS
+    + mc_sim::tables::MAX_WRECKS
+    + mc_sim::mirror::WRECK_EXTRA_INSTANCES
+    + 512;
 /// Units with gun houses of their own whose poses fit the houses buffer (`mirror::HousePose`).
 pub const MAX_HOUSES: usize = 2048;
 pub const MAX_MARKS: usize = 4096;
@@ -1174,12 +1177,20 @@ impl Renderer {
                 | ((bp.visual.mesh == "rotor_gunship") as u32) << 21
                 // retired: 1 << 22 (the Osprey's hold doors)
                 // A ship: rides the swell, not the ground (`entity.wgsl`).
-                | (bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval) as u32) << 23
+                | if bp.motion.is_some_and(|m| m.layer == mc_data::MoveLayer::Naval) {
+                    crate::gpu_consts::icon::NAVAL
+                } else {
+                    0
+                }
                 // Transport flight pitch; Bastion also has ramp/gear parts (`entity.wgsl`).
                 | (bp.transport.is_some() as u32) << 24
                 | ((bp.visual.mesh == "light_transport") as u32) << 25
                 // A spacecraft: kept clean whatever its tech (`entity.wgsl` field dirt).
-                | (bp.is_capital_ship() as u32) << 26
+                | if bp.is_capital_ship() {
+                    crate::gpu_consts::icon::CAPITAL
+                } else {
+                    0
+                }
                 // Its spinner looks about instead of turning round (`Model::spinner_scans`).
                 | (model.spinner_scans as u32) << 27;
             let pad = if bp.poured_lot() {

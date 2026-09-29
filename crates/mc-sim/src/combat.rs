@@ -2855,6 +2855,9 @@ impl World {
                     self.damage_unit(r, weapon.damage, owner, source);
                 }
             }
+            // The blast wears down the wrecks it reaches too (`wreck_damage.rs`).
+            let dealt = weapon.damage;
+            self.wear_wrecks(hit.point, weapon.splash, |_| dealt);
             if weapon.burn_ticks > 0 {
                 // The patch stays where the bomb landed. Units burn by standing in it.
                 let radius =
@@ -3010,6 +3013,7 @@ impl World {
             };
             self.damage_unit(row, damage, by, Handle::NONE);
         }
+        self.wear_wrecks(origin, db.radius, |reach| db.damage * db.falloff(reach));
         let mut felled = Vec::new();
         self.prop_index
             .query(center, db.radius * Fx::ratio(3, 4), kind::PROP, |e| {
@@ -3168,6 +3172,10 @@ impl World {
             mass: wreck_mass,
             splashed: 0,
             floor: Fx::ZERO,
+            pitch: 0,
+            prev_pitch: 0,
+            roll: units.bank[row],
+            prev_roll: units.bank[row],
         });
         // A ship goes down slowly and settles on the seabed (`sinking.rs`).
         let sinking = (visible

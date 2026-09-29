@@ -4,6 +4,7 @@
 //!use scenery
 //!use warp_hull
 //!use emp
+//!use wreck
 // Units, structures, wrecks and props. One multi-draw-indirect call renders
 // every visible model; per-instance data comes from the visible list the cull
 // pass built, so `instance_index` (which includes firstInstance) indexes it.
@@ -212,6 +213,9 @@ struct VsOut {
     // What crackles over the hull, between ticks: x how stunned by an EMP it is (emp.wgsl),
     // y how full its warp drive's charge is while it spools (warp_hull.wgsl), 0 to 1.
     @location(16) @interpolate(flat) crackle: vec2<f32>,
+    // A settled wreck's section (wreck.wgsl): the stretch of the hull it keeps along model
+    // x (metres), 1 when it draws the hull's inside, 1 when it is posed at all.
+    @location(17) @interpolate(flat) wreck: vec4<f32>,
 }
 
 struct Weld {
@@ -1047,80 +1051,6 @@ fn capital_sink(model: ModelInfo, e: Entity, t: f32, h: f32) -> f32 {
     return size * ground * (0.8 + 1.0 * exp(-12.0 * d) * cos(25.0 * d));
 }
 
-// A model vertex after the unit was destroyed. The same intact mesh, wrecked a
-// different way for every wreck (`seed`, zero to one): the turret is blown off
-// its ring and lies beside the hull, the hull is crumpled by a smooth field
-// (so faces that share a corner still meet), caved in where the killing blow
-// landed, and a vehicle settles crooked on its broken running gear. The
-// fragment shader takes its normals from the warped surface.
-//
-// `age` is seconds since the wreck was left. The turret does not appear where it
-// lands: it leaves its ring at the yaw it died at (`yaw`), flies a ballistic arc
-// tumbling as it goes, and hops once when it hits the ground. The hull crumples
-// over the blast's first moments. A wreck long settled passes a large `age`.
-fn wrecked(pos: vec3<f32>, part: u32, model: ModelInfo, seed: f32, yaw: f32, age: f32) -> vec3<f32> {
-    let r1 = hash11(seed * 173.3 + 1.7);
-    let r2 = hash11(seed * 311.9 + 5.3);
-    let r3 = hash11(seed * 97.1 + 9.1);
-    let height = max(model.height, 1.0);
-    let reach = max(model.bounds_radius, 1.0);
-    let mobile = (model.icon & 0x10000u) != 0u;
-    var p = pos;
-    if part == PART_TURRET {
-        let pivot = model.turret_pivot.xyz;
-        // Thrown clear to one side or the other, never along the hull, where it would land in it.
-        let away = select(-1.5707963, 1.5707963, r3 > 0.5) + (r2 - 0.5) * 1.1;
-        let thrown = reach * (0.95 + r1 * 0.25);
-        let land = vec3<f32>(vec2<f32>(cos(away), sin(away)) * thrown, height * 0.16);
-        // The arc's rise over the straight line, and the time it takes under a heavy,
-        // game-scale gravity so it reads as blown off, not floated off.
-        let apex = height * 0.8 + reach * 0.3;
-        let flight = clamp(2.0 * sqrt(2.0 * apex / 30.0), 0.5, 2.2);
-        let s = clamp(age / flight, 0.0, 1.0);
-        // Spin at a steady rate through the flight; one in three turns a full somersault
-        // on the way, so it lands the same way up either way.
-        let flip = select(0.0, 6.2831853, r2 > 0.66);
-        var q = rot_z(p - pivot, mix(yaw, (r1 - 0.5) * 5.0, s));
-        q = rot_x(q, (0.3 + r2 * 0.45 + flip) * s);
-        q = rot_y(q, (r3 - 0.5) * 0.5 * s);
-        var at = mix(pivot, land, s);
-        at.z += 4.0 * apex * s * (1.0 - s);
-        // One hop where it hits, a tenth of the arc's height.
-        let after = age - flight;
-        let hop = flight * 0.3;
-        if after > 0.0 && after < hop {
-            let h = after / hop;
-            at.z += apex * 0.1 * 4.0 * h * (1.0 - h);
-        }
-        p = q + at;
-        p.z = max(p.z, 0.02);
-        return p;
-    }
-    let settle = smoothstep(0.0, 0.35, age);
-    // Crumple: a smooth field of the position, nothing at the ground and most at the top.
-    let amp = clamp(height * 0.11, 0.15, 1.4);
-    let at = (p.xy + vec2<f32>(p.z * 0.61, p.z * 0.37)) / (reach * 1.7) + vec2<f32>(seed * 3.1, seed * 7.7);
-    let field = textureSampleLevel(noise_map, repeat_sampler, at, 2.0);
-    let rise = smoothstep(0.04, 0.55, p.z / height);
-    p += vec3<f32>(field.b - 0.5, field.a - 0.5, -abs(field.b - field.a)) * 2.4 * amp * rise * settle;
-    // Caved in around where it was hit.
-    let hit = vec2<f32>(r1 - 0.5, r2 - 0.5) * reach * 0.9;
-    let d = distance(p.xy, hit) / (reach * 0.5);
-    p.z *= 1.0 - 0.6 * exp(-d * d) * settle;
-    if part == PART_LOCOMOTION {
-        // Tracks thrown and splayed, legs folded.
-        p = vec3<f32>(p.x, p.y * mix(1.0, 1.07, settle), p.z * mix(1.0, 0.82, settle));
-    }
-    if mobile {
-        p = rot_y(rot_x(p, (r2 - 0.5) * 0.2 * settle), (r3 - 0.5) * 0.14 * settle);
-        // A ship's keel lies in the silt: nothing to flatten against.
-        let naval = (model.icon & 0x800000u) != 0u;
-        let sag = height * 0.03 * settle;
-        p.z = select(max(p.z - sag, 0.0), p.z - sag, naval);
-    }
-    return p;
-}
-
 // The way a hull field pushes this vertex out, and how far in pushes (`models::shell`).
 fn shell_dir(surface: u32) -> vec4<f32> {
     let s = surface >> 16u;
@@ -1233,6 +1163,20 @@ fn vs_main(in: VsIn) -> VsOut {
 
     var p = in.pos;
     var n = in.normal;
+    // A settled wreck's pose (wreck.wgsl). A hull's inside is its model mirrored across
+    // the centre line, so the faces that looked out now look in; it casts no shadow of
+    // its own.
+    let wreck = wreck_pose(e, model, globals.sun.w);
+    if wreck.inner {
+        if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
+            var hidden: VsOut;
+            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+            return hidden;
+        }
+        p.y = -p.y;
+        n.y = -n.y;
+    }
+    let unwarped = p;
     // A core mine stands in the sea on stilts, raised clear of the water, with no pit; on
     // land it has its pit and no stilts (`models::Pit`).
     let rig_afloat = model.pit.y > 0.0 && terrain_height(e.pos.xy) < globals.map.z - 0.5;
@@ -1339,8 +1283,9 @@ fn vs_main(in: VsIn) -> VsOut {
     let toppled = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x != 0.0;
     if (e.owner_flags & KIND_WRECK) != 0u && !falling {
         // A fresh wreck carries its age (`mirror::UnitInstance::gait`); one long settled lies as it fell.
-        let age = select(1000.0, mix(e.gait.x, e.gait.y, t), e.gait.z > 0.5);
-        p = wrecked(p, in.part, model, hash11(f32(e.unit_id & 0xFFFFu)), e.turret_yaw, age);
+        p = wrecked(p, in.part, model, hash11(f32(e.unit_id & 0xFFFFu)), e.turret_yaw, wreck.age, e.health, wreck);
+        // A section lies about its own middle.
+        p.x -= wreck.centre;
     } else if in.part == PART_TURRET && !(limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u) {
         // Folding gear: an arm that hangs down the back while the unit is not building. When
         // it builds the arm swings back, up and over the outside of the shoulder, then the head
@@ -1870,9 +1815,18 @@ fn vs_main(in: VsIn) -> VsOut {
 
     // Mobile units lean with the ground under them; a ship rides the water, not the seabed.
     var up = vec3<f32>(0.0, 0.0, 1.0);
+    // A wreck of anything that moved lies on the ground (or the seabed) under it, whatever
+    // it was, and down in it by how it came down (wreck.wgsl).
+    let wreck_lies = wreck.posed && (model.icon & ICON_MOBILE) != 0u;
+    origin.z -= wreck_bury(model, wreck, e.health);
     // A walker stands upright: its feet find the ground (`walk_ground`).
-    if (model.icon & 0x10000u) != 0u && (model.icon & 0x40000u) == 0u && (model.icon & 0x800000u) == 0u && !walks {
-        up = terrain_normal(origin.xy, max(e.radius, 4.0));
+    if ((model.icon & ICON_MOBILE) != 0u && (model.icon & ICON_AIR) == 0u && (model.icon & ICON_NAVAL) == 0u && !walks)
+        || wreck_lies {
+        up = terrain_normal(origin.xy, max(e.radius * select(1.0, 0.5, wreck.count > 1u), 4.0));
+        // A wreck comes onto the slope as it settles, from the pose it came down in.
+        if wreck_lies {
+            up = normalize(mix(vec3<f32>(0.0, 0.0, 1.0), up, wreck.settled));
+        }
         // On a lift ship's ramp or hold floor it leans with the deck (`mirror::UNIT_ON_DECK`).
         if (e.status[0] & 0x1000000u) != 0u {
             let d = vec2<f32>(f32(i32(e.status[2] << 16u) >> 16u), f32(i32(e.status[2]) >> 16u)) / 32767.0;
@@ -1964,7 +1918,7 @@ fn vs_main(in: VsIn) -> VsOut {
             fwd = pitch_fwd;
         }
     }
-    if falling || toppled {
+    if falling || toppled || wreck.posed {
         let pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
         let pitch_fwd = fwd * cos(pitch) + up * sin(pitch);
         up = up * cos(pitch) - fwd * sin(pitch);
@@ -2103,7 +2057,13 @@ fn vs_main(in: VsIn) -> VsOut {
     out.material = select(in.material, u32(hull), push.pass_kind == PASS_HULL);
     out.owner_flags = e.owner_flags;
     out.state = vec4<f32>(e.build, select(e.health, 2.0, falling), in.pos.z / max(model.height, 0.1), hash11(f32(e.unit_id & 0xFFFFu)));
-    out.local = in.pos;
+    out.local = unwarped;
+    out.wreck = vec4<f32>(
+        wreck.lo,
+        wreck.hi,
+        select(0.0, 1.0, wreck.inner) + select(0.0, 2.0, wreck.sank),
+        select(0.0, 1.0 + min(wreck.age, 1000.0), wreck.posed),
+    );
     // Tech in the low byte, then mobile (bit 8) from the icon flags and bit 9 when its
     // rubber is no belt (a hover skirt or a walker's soles).
     // Naval (icon bit 23) rides in bit 11.
@@ -2180,25 +2140,6 @@ fn vs_main(in: VsIn) -> VsOut {
         }
     }
     return out;
-}
-
-// Soot and scorch from the model position: several incommensurate scales so
-// the noise tile never marches across a hull, plus streaks that climb with
-// height the way fire does.
-fn wreck_burn(local: vec3<f32>, seed: f32) -> vec2<f32> {
-    let field = local.xy + vec2<f32>(local.z * 0.53, local.z * 0.29);
-    let off = vec2<f32>(seed * 47.0, seed * 19.0);
-    let at = field + off;
-    let coarse = noise_varied(at, 28.0).ba;
-    let mid = noise_varied(at, 11.0).ba;
-    let fine = textureSample(noise_map, repeat_sampler, field * 0.21 + off * 0.03).ba;
-    let climb = textureSample(noise_map, repeat_sampler, vec2<f32>(field.x * 0.08, local.z * 0.19) + off * 0.02).a;
-    let blotch = value_noise2(at, 7.0);
-    let soot = mix(coarse, mid, 0.55);
-    return vec2<f32>(
-        clamp(soot.x * 0.5 + fine.x * 0.22 + climb * 0.18 + blotch * 0.2, 0.0, 1.0),
-        clamp(soot.y * 0.55 + fine.y * 0.25 + climb * 0.2, 0.0, 1.0)
-    );
 }
 
 // `ModelInfo::icon` bit: the spinner looks about (renderer `Model::spinner_scans`).
@@ -2444,6 +2385,8 @@ fn fs_prepass(in: VsOut) {
 @fragment
 fn fs_shadow(in: VsOut) {
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
+    // A broken hull's section shadows only its own stretch.
+    if in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z) { discard; }
     if vapor_edge(in) > 0.0 { discard; }
     // Unbuilt parts of a construction site cast no shadow: neither what is still to be
     // printed nor a Naga site's swarm.
@@ -3032,21 +2975,20 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.emissive = vec3<f32>(0.0);
     }
     if wreck {
-        // Burnt out: charred, matte, dead emitters; fades into the ground as it is reclaimed.
-        // Soot, scorched paint and bare burnt steel, from a field of the model position, so
-        // two faces lying in the same plane are shaded alike and cannot flicker against each other.
-        let burn = wreck_burn(in.local, in.state.w);
-        let paint = m.albedo * 0.16;
-        let steel = vec3<f32>(0.11, 0.075, 0.055) * (0.6 + burn.y);
-        m.albedo = mix(vec3<f32>(0.022, 0.02, 0.019), mix(paint, steel, smoothstep(0.45, 0.7, burn.y)), smoothstep(0.3, 0.75, burn.x));
-        // A rotated cut of the plate map, so armour seams still read without marching.
-        let plate_uv = vec2<f32>(in.local.x * 0.07 + in.local.y * 0.04, -in.local.x * 0.04 + in.local.z * 0.08) + vec2<f32>(in.state.w * 2.3, in.state.w * 1.1);
-        let plate = textureSample(panel_map, repeat_sampler, plate_uv);
-        m.albedo *= 0.62 + plate.b * 0.38;
-        m.metallic = 0.3 * smoothstep(0.5, 0.7, burn.y);
-        m.roughness = 0.92;
-        m.emissive = vec3<f32>(0.0);
-        if in.state.z > in.state.y * 0.75 + 0.25 {
+        // Burnt out (wreck.wgsl); worn away raggedly from the top as its mass goes, and a
+        // section of a broken hull only its own stretch.
+        // A hull that went down in the sea burns out over its first seconds on the bottom,
+        // on from the paint it sank in.
+        let painted = m;
+        m = wreck_material(m, in.local, in.state.w, fract(in.wreck.z * 0.5) > 0.25);
+        if in.wreck.z > 1.5 {
+            let fresh = 1.0 - smoothstep(1.0, 5.0, in.wreck.w);
+            m.albedo = mix(m.albedo, painted.albedo * 0.5, fresh);
+            m.metallic = mix(m.metallic, painted.metallic, fresh);
+            m.roughness = mix(m.roughness, painted.roughness, fresh);
+        }
+        if wreck_worn(in.local, in.state.z, in.state.y, in.weld.z)
+            || (in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z)) {
             discard;
         }
     }

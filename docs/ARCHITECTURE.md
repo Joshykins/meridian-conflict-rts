@@ -214,6 +214,12 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   (`puffs.wgsl`: dust, smoke, clods, sparks; premultiplied alpha so one pipeline covers and adds light), and track
   marks (`ground.wgsl`). `Renderer::ground_contact` lays marks and dust for moving models that report `Treads`
   (set by `tracked_chassis`), only near the camera.
+- Wrecks (`tables::Wrecks`) carry how they came down (`Landing`: in place, crashed, sank, ditched) and the
+  pitch and roll they lie at, from the falling hull's own tumble (`aircraft_crash.rs`) or list and trim
+  (`sinking.rs`). Area damage (splash, death blasts, warheads, AEB storms) takes mass off every wreck it
+  reaches (`wreck_damage.rs`); one with none left is freed. The mirror (`mirror/wrecks.rs`) breaks a big
+  hull into sections, one instance each plus one for its inside, all with the wreck's id, and
+  `shaders/wreck.wgsl` buries, crumples, clips and burns them out from the model and the pose word alone.
 - Reclaim is `mc-sim/src/reclaim.rs`. A wreck gives mass at the reclaimer's power; a live unit
   (`Command::ReclaimUnit`, `OrderKind::ReclaimUnit`: the player's own or a detected enemy's, never an ally's) is
   unbuilt at the rate the same power would build it, pays `UNIT_YIELD` of its mass scaled by how built it is (a fifth;

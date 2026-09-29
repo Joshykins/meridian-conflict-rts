@@ -420,6 +420,10 @@ impl World {
                     None => self.damage_unit(r, damage, storm.owner, storm.source),
                 }
             }
+            self.wear_wrecks(point, reach, |d| {
+                let edge = ((d * 2 - reach) / reach.max(Fx::ONE)).clamp(Fx::ZERO, Fx::ONE);
+                per_tick * (Fx::ONE - edge * Fx::ratio(3, 5))
+            });
             // It vaporises the woods as it spreads, and scorches the ground.
             if storm.age % 3 == 0 {
                 let mut trees = Vec::new();

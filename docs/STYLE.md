@@ -640,6 +640,22 @@ same treatment.
   off and lying clear to one side, the hull crumpled and caved in where it was
   hit, settled crooked. Every wreck breaks differently. Burn shading comes from
   the model position, so faces in the same plane never flicker against each other.
+- Wrecks are dark: burnt steel and soot, well below the ground's brightness, so
+  a field of them reads as scrap and not as parked units.
+- **No wreck is made by hand for a unit.** How a wreck lies comes from its model
+  (size, height, length), its domain (structure, land, sea, air, spacecraft) and
+  how it came down (in place, out of the sky, sunk). A structure slumps onto its
+  lot; a vehicle settles into the dirt; a ship lies in the silt with the list and
+  some of the trim it sank with; an aircraft is driven in nose first; a
+  spacecraft, a big ship or a big aircraft breaks into sections along its
+  length (more of them when it came out of the sky): it breaks its back, the
+  pieces in line with a gap between them, each dug in at its own angle, torn
+  ends crushed and dark inside. Wrecks go into the ground shallowly: enough to
+  sit in it, never so far the hull is lost. The plating is
+  crumpled, dented and twisted along the hull.
+- Blasts wear wrecks away (`mc-sim/src/wreck_damage.rs`): what is left is
+  flatter, lower in the ground and ragged from the top, and a wreck with nothing
+  left is gone. Reclaim wears it the same way.
 - **A warhead is the biggest thing in the match, and a commander going up is a small one**
   (`docs/NUKES.md`): the same slow nuclear blast, smaller. What follows about the
   commander's death is how it read before; the flash, the stalk and the fire hold.

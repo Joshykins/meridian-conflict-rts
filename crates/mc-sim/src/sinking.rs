@@ -2,6 +2,7 @@
 //! list and goes down by the bow or the stern, then sinks faster and faster to
 //! the seabed, where it becomes an ordinary wreck. On the way down it is absent
 //! from targeting, selection, navigation and reclaim indexes, like a falling aircraft.
+use crate::tables::Landing;
 use crate::{SimError, SimEvent, World};
 use mc_core::{Angle, Fx, FxVec2, StateHasher};
 use mc_data::BlueprintId;
@@ -19,6 +20,9 @@ const SINK_TOP: Fx = Fx::ratio(1, 4);
 const REST: Fx = Fx::ratio(3, 10);
 /// Share of the full list and trim the hull has once it has settled.
 const SETTLED_SHARE: Fx = Fx::ratio(3, 5);
+/// Share of its trim a hull still has on the bottom: it comes most of the way level
+/// as it lands, its bow (or stern) left dug into the silt. The wreck lies so.
+const BOTTOM_TRIM: Fx = Fx::ratio(2, 5);
 /// A hull taller than this (metres) is a big ship: it trims less, and sinks faster.
 const BIG_HULL: i32 = 12;
 /// Most a big ship goes down by the head or the stern: six degrees.
@@ -43,7 +47,7 @@ pub struct SinkingHull {
     pub roll: i16,
     pub prev_roll: i16,
     /// Signed pitch, binary angle steps, positive raises the bow. `trim` is the most
-    /// it reaches; the hull comes level again as it lands on the bottom.
+    /// it reaches; the hull comes most of the way level again as it lands on the bottom.
     pub pitch: i16,
     pub prev_pitch: i16,
     pub list: i16,
@@ -160,12 +164,14 @@ impl SinkingHull {
             self.z = (self.z - self.sink).max(self.floor);
             let p = self.progress();
             self.roll = share(self.list, SETTLED_SHARE + (Fx::ONE - SETTLED_SHARE) * p);
-            // Down by the head (or the stern) while it goes under, level again on the bottom.
+            // Down by the head (or the stern) while it goes under, most of the way level
+            // again on the bottom.
             let steepen = (p * 3).min(Fx::ONE);
             let level = smooth(((p - Fx::ratio(3, 4)) * 4).clamp(Fx::ZERO, Fx::ONE));
             self.pitch = share(
                 self.trim,
-                (SETTLED_SHARE + (Fx::ONE - SETTLED_SHARE) * steepen) * (Fx::ONE - level),
+                (SETTLED_SHARE + (Fx::ONE - SETTLED_SHARE) * steepen)
+                    * (Fx::ONE - level * (Fx::ONE - BOTTOM_TRIM)),
             );
         }
         self.z <= self.floor
@@ -198,8 +204,11 @@ impl World {
                     hull.mass,
                     self.state.tick,
                 )?;
-                self.state.wrecks.bank[row] = hull.roll;
-                self.state.wrecks.prev_bank[row] = hull.roll;
+                let wrecks = &mut self.state.wrecks;
+                wrecks.bank[row] = hull.roll;
+                wrecks.prev_bank[row] = hull.roll;
+                wrecks.pitch[row] = hull.pitch;
+                wrecks.landing[row] = Landing::Sank as u8;
             }
             self.events.push(SimEvent::ShipSettled {
                 pos: hull.pos.extend(hull.floor),

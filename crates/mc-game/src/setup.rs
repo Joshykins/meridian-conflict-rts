@@ -48,6 +48,9 @@ pub enum Scene {
     AircraftCrash,
     /// The same bomber destroyed over open sea: it strikes the water and sinks to the seabed.
     AircraftDitch,
+    /// A yard of wrecks, one of each kind, all destroyed on the second tick: vehicles and
+    /// structures where they stand, aircraft and spacecraft out of the sky, ships at sea.
+    Wreckage,
     /// Core mines built out on open sea, a tier 1 and a deep core: the offshore rig.
     OffshoreMine,
     /// A tank block and a flight on patrol loops, a post added to each after the start.
@@ -83,6 +86,7 @@ impl Scene {
             "aircraft" => Scene::Aircraft,
             "aircraft-crash" => Scene::AircraftCrash,
             "aircraft-ditch" => Scene::AircraftDitch,
+            "wreckage" => Scene::Wreckage,
             "offshore-mine" => Scene::OffshoreMine,
             "patrol" => Scene::Patrol,
             "sea" => Scene::Sea,
@@ -373,6 +377,44 @@ pub fn opening_commands(
                 Angle::ZERO,
                 1,
             ));
+        }
+        Scene::Wreckage => {
+            let at = |x: i32, y: i32| range_pad(map) + FxVec2::from_ints(x, y);
+            let yard = [
+                // Vehicles where they stand, then structures.
+                ("aster_t1_scout", at(-60, -40)),
+                ("aster_t1_tank", at(-30, -40)),
+                ("aster_t2_tank", at(0, -40)),
+                ("aster_t3_artillery", at(35, -40)),
+                ("aster_t4_assault_tank", at(90, -40)),
+                ("aster_t1_power", at(-50, -110)),
+                ("aster_t2_point_defense", at(0, -110)),
+                ("aster_t1_land_factory", at(80, -120)),
+                // Out of the sky: aircraft, then spacecraft.
+                ("aster_t1_interceptor", at(-40, 40)),
+                ("aster_t1_bomber", at(0, 40)),
+                ("aster_t3_strategic_bomber", at(50, 40)),
+                ("aster_t2_corvette", at(-150, 260)),
+                ("aster_t2_lift_ship", at(200, 300)),
+            ];
+            for (key, pos) in yard {
+                out.push(spawn(0, key, pos, Angle::ZERO, 1));
+            }
+            // Ships at sea, and a bomber over them.
+            let sea = ditch_point(map);
+            for (key, dx) in [
+                ("aster_t1_frigate", -90),
+                ("aster_t3_battleship", 20),
+                ("aster_t1_bomber", 140),
+            ] {
+                out.push(spawn(
+                    0,
+                    key,
+                    sea + FxVec2::from_ints(dx, 0),
+                    Angle::ZERO,
+                    1,
+                ));
+            }
         }
         Scene::OffshoreMine => {
             let at = ditch_point(map);
@@ -835,6 +877,24 @@ pub fn opening_commands(
     out
 }
 
+/// The wreckage scene's lift ship is shot down this many ticks in, up in the clouds by then.
+pub const WRECKAGE_LATE_KILL: u32 = 450;
+
+/// Orders later in a headless run (`headless.rs`), at tick `t`: the wreckage scene shoots
+/// down what took off from its lot, so it breaks up in the sky.
+pub fn late_orders(opts: &Options, world: &mc_sim::World, t: u32) -> Vec<PlayerCommand> {
+    if opts.scene != Scene::Wreckage || t != WRECKAGE_LATE_KILL {
+        return Vec::new();
+    }
+    let u = &world.state.units;
+    vec![PlayerCommand {
+        player: 0,
+        command: Command::SelfDestruct {
+            units: u.slots.iter().map(|r| u.id(r)).collect(),
+        },
+    }]
+}
+
 /// Follow-up orders for a scene once its units exist (second tick).
 pub fn scene_orders(
     opts: &Options,
@@ -860,6 +920,20 @@ pub fn scene_orders(
             player: 0,
             command: Command::SelfDestruct {
                 units: u.slots.iter().map(|r| u.id(r)).collect(),
+            },
+        }];
+    }
+    if opts.scene == Scene::Wreckage {
+        // Everything but what is raised on a lot: that lifts off first (`late_orders`).
+        return vec![PlayerCommand {
+            player: 0,
+            command: Command::SelfDestruct {
+                units: u
+                    .slots
+                    .iter()
+                    .filter(|&r| !blueprints.unit(u.blueprint[r]).is_site_built_unit())
+                    .map(|r| u.id(r))
+                    .collect(),
             },
         }];
     }

@@ -1,6 +1,7 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
-//! curving charges, a warp into a dampener and the stun it leaves) must hash identically at every worker count and after a snapshot is
+//! curving charges, a warp into a dampener and the stun it leaves, wrecks worn down by
+//! blasts) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -131,8 +132,20 @@ fn setup(w: &mut World) {
             }
         }
     }
+    // A wreck field where the warhead lands: the blast wears it down (`wreck_damage.rs`).
+    spawns.push(PlayerCommand {
+        player: 0,
+        command: Command::DebugWrecks {
+            blueprint: w.blueprints.id_of("aster_t2_tank").unwrap(),
+            pos: WRECK_FIELD,
+            count: 9,
+        },
+    });
     w.tick(&spawns).unwrap();
 }
+
+/// Where the warhead lands, and a field of wrecks lies.
+const WRECK_FIELD: FxVec2 = FxVec2::from_ints(900, 3300);
 
 fn units_of(w: &World, player: u8) -> Vec<UnitId> {
     let u = &w.state.units;
@@ -181,7 +194,7 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 player: 0,
                 command: Command::LaunchNuke {
                     units: vec![silo],
-                    pos: FxVec2::from_ints(900, 3300),
+                    pos: WRECK_FIELD,
                 },
             }]
         }
@@ -229,6 +242,12 @@ fn reference() -> Vec<u64> {
         reclaimed.is_some_and(|m| m > mc_core::Fx::ZERO),
         "nothing was reclaimed in the match"
     );
+    // And the warhead wore down every wreck of the field it landed on.
+    let wr = &w.state.wrecks;
+    let intact = wr.slots.iter().filter(|&r| {
+        wr.pos[r].distance(WRECK_FIELD) < Fx::from_int(60) && wr.mass[r] >= wr.mass_max[r]
+    });
+    assert_eq!(intact.count(), 0, "the blast left wrecks untouched");
     hashes
 }
 

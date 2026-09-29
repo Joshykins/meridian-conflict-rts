@@ -1102,6 +1102,27 @@ pub struct Wrecks {
     pub born: Vec<u32>,
     /// Its first weapon's yaw off the hull when it died: where the thrown turret starts from.
     pub turret: Vec<Angle>,
+    /// Signed pitch the hull lies at, binary angle steps, positive raising the bow: a
+    /// crashed aircraft nose down in the ground, a sunk ship down by the head in the silt.
+    pub pitch: Vec<i16>,
+    /// How it came to lie there ([`Landing`] as its number): the renderer breaks up,
+    /// buries and settles it by this and its model.
+    pub landing: Vec<u8>,
+}
+
+/// How a wreck came to lie where it is. The numbers go to the renderer
+/// (`mirror::WRECK_LANDING_*`, `gpu_consts::wreck`): never renumber one.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub(crate) enum Landing {
+    /// Destroyed where it stood, or laid by the map.
+    InPlace = 0,
+    /// Came down out of the air onto land.
+    Crashed = 1,
+    /// A ship that went down to the seabed.
+    Sank = 2,
+    /// An aircraft that came down on the sea and sank to the bottom.
+    Ditched = 3,
 }
 
 impl Wrecks {
@@ -1119,6 +1140,8 @@ impl Wrecks {
             from_map: Vec::new(),
             born: Vec::new(),
             turret: Vec::new(),
+            pitch: Vec::new(),
+            landing: Vec::new(),
         }
     }
 
@@ -1146,6 +1169,8 @@ impl Wrecks {
         put(&mut self.from_map, row, false);
         put(&mut self.born, row, born);
         put(&mut self.turret, row, Angle(0));
+        put(&mut self.pitch, row, 0);
+        put(&mut self.landing, row, Landing::InPlace as u8);
         Ok(row)
     }
 
@@ -1162,6 +1187,7 @@ impl Wrecks {
             h.write_i64(self.z[row].0);
             h.write_i64(self.mass[row].0);
             h.write_u64(self.born[row] as u64 | (self.turret[row].0 as u64) << 32);
+            h.write_u64(self.pitch[row] as u16 as u64 | (self.landing[row] as u64) << 16);
         }
     }
 }

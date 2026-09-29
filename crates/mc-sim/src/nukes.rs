@@ -1189,6 +1189,14 @@ impl World {
             };
             self.damage_unit(row, damage, by, source);
         }
+        // Wrecks go under the front once, as it passes them.
+        self.wear_wrecks(origin, front, |reach| {
+            if reach > from {
+                blast.damage_at(reach)
+            } else {
+                Fx::ZERO
+            }
+        });
         let tree_from = from * TREE_REACH;
         let mut felled = Vec::new();
         self.prop_index.query(center, tree_front, kind::PROP, |e| {

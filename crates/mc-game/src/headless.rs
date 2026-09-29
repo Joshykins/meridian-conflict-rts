@@ -116,7 +116,7 @@ pub fn run_sim(
             let commands = match t {
                 0 => opening.clone(),
                 1 => setup::scene_orders(opts, map, blueprints, &world),
-                _ => Vec::new(),
+                _ => setup::late_orders(opts, &world, t),
             };
             world.tick(&commands).map_err(|e| e.to_string())?;
         }
@@ -477,6 +477,20 @@ pub fn screenshot(
         );
         camera.distance = 130.0;
         camera.yaw = 0.5;
+    }
+
+    if shot.camera.is_none() && opts.scene == setup::Scene::Wreckage {
+        // The yard from the south-west, the spacecraft's pieces beyond it.
+        let (pad, sea) = (setup::range_pad(&map), setup::ditch_point(&map));
+        log::info!(
+            "wreckage yard at {:?}, ships at {:?}",
+            pad.to_f32(),
+            sea.to_f32()
+        );
+        let at = (pad + mc_core::FxVec2::from_ints(40, 90)).to_f32();
+        camera.focus = glam::Vec3::new(at[0], at[1], renderer.ground_height(glam::Vec2::from(at)));
+        camera.distance = 520.0;
+        camera.yaw = -0.6;
     }
 
     // The same HUD the game draws, with `select` selected (the commander by default) so the panels show.

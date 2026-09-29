@@ -3361,3 +3361,15 @@ fn reclaim_boat_head_sweep_is_clear() {
         "{key}: emitter {mouth:?} outside the lit intake {lo:?}..{hi:?}"
     );
 }
+
+/// The wreck pose word the shader reads is the one the mirror writes.
+#[test]
+fn wreck_pose_bits_match_the_mirror() {
+    use crate::gpu_consts::wreck;
+    use mc_sim::mirror as m;
+    assert_eq!(wreck::POSED, m::WRECK_POSED);
+    assert_eq!(wreck::LANDING_MASK, m::WRECK_LANDING_MASK);
+    assert_eq!(wreck::SECTION_SHIFT, m::WRECK_SECTION_SHIFT);
+    assert_eq!(wreck::COUNT_SHIFT, m::WRECK_COUNT_SHIFT);
+    assert_eq!(wreck::INNER, m::WRECK_INNER);
+}

@@ -22,8 +22,11 @@ use std::collections::HashMap;
 
 mod walls;
 mod warp;
+mod wrecks;
+
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
+pub use wrecks::WRECK_EXTRA_INSTANCES;
 
 /// Wave origins drawn at once. A crowd on one site is clustered before it lands here.
 pub const MAX_CONSTRUCTION_WELDS: usize = 2048;
@@ -478,6 +481,16 @@ pub struct UnitInstance {
 const _: () = assert!(std::mem::size_of::<UnitInstance>() == 208);
 
 impl UnitInstance {
+    /// A settled wreck's second and later sections, and every section's inside: more of
+    /// a wreck already listed. Anything counting wrecks (salvage totals, smoke) skips them.
+    pub fn is_wreck_extra(&self) -> bool {
+        self.owner_flags & KIND_WRECK != 0
+            && self.packed == 0
+            && self.refit_modules & WRECK_POSED != 0
+            && (self.refit_modules & WRECK_INNER != 0
+                || (self.refit_modules >> WRECK_SECTION_SHIFT) & 0xF != 0)
+    }
+
     pub fn pack_veterancy(kills: u32, level: u8, progress: f32) -> u32 {
         let kills = kills.min(UNIT_KILLS_MASK);
         let progress = (progress.clamp(0.0, 1.0) * 255.0).round() as u32;
@@ -626,6 +639,17 @@ pub const WRECK_FALLING: u32 = 1;
 pub const WRECK_SINKING: u32 = 2;
 /// Seconds a wreck's `gait` counts its age for: long after its thrown turret has landed.
 const WRECK_SETTLED: f32 = 30.0;
+/// `refit_modules` of a settled wreck (`mirror/wrecks.rs`), as `mc_models::gpu_consts::wreck`
+/// spells it (a test holds them equal): the low four bits how it came down
+/// (`tables::Landing`), then which section of the hull this is and how many it broke
+/// into. `arm_pitch` is then its pitch (last tick and this) and the stretch of the hull
+/// it keeps, and `_pad2` its roll. Zero on a spent casing, which lies as it is.
+pub const WRECK_POSED: u32 = 1 << 13;
+pub const WRECK_LANDING_MASK: u32 = 0xF;
+pub const WRECK_SECTION_SHIFT: u32 = 4;
+pub const WRECK_COUNT_SHIFT: u32 = 8;
+/// A section's second instance: the hull's inside, seen through its torn ends.
+pub const WRECK_INNER: u32 = 1 << 12;
 /// Units' `status[0]`, low byte: how far a submarine has dived, 0 surfaced to 255 down.
 pub const UNIT_DIVE_MASK: u32 = 0xFF;
 /// Units' `status[0]`: the submarine is ordered down (diving or dived), else up.
@@ -2469,66 +2493,7 @@ impl World {
             }
         }
 
-        // Settled wrecks are salvage to plan around: they show under the fog
-        // anywhere the viewer's team has explored, not only in sight, and the
-        // map's own wreckage shows from the start, like the map.
-        for row in s.wrecks.slots.iter() {
-            if let (Some(v), true) = (
-                viewer,
-                s.fog_enabled && s.wrecks.from_map.get(row) != Some(&true),
-            ) {
-                if !self.fog.is_explored(s.wrecks.pos[row], self.team_mask(v)) {
-                    continue;
-                }
-            }
-            let pos = s.wrecks.pos[row].extend(s.wrecks.z[row]).to_f32();
-            let heading = s.wrecks.heading[row].to_radians_f32();
-            let bp = self.blueprints.unit(s.wrecks.blueprint[row]);
-            // Seconds since it was left, for the thrown turret; the map's own lie long settled.
-            let age = (s.tick.saturating_sub(s.wrecks.born[row]) as f32 / TICKS_PER_SECOND as f32)
-                .min(WRECK_SETTLED);
-            let fresh = !s.wrecks.from_map[row] && age < WRECK_SETTLED;
-            let turret = s.wrecks.turret[row].to_radians_f32();
-            frame.units.push(UnitInstance {
-                prev_pos: pos,
-                prev_heading: heading,
-                pos,
-                heading,
-                blueprint: bp.id.0 as u32,
-                owner_flags: KIND_WRECK,
-                health: (s.wrecks.mass[row] / s.wrecks.mass_max[row]).to_f32(),
-                build: 1.0,
-                turret_yaw: turret,
-                radius: bp.radius.to_f32(),
-                unit_id: s.wrecks.slots.handle(row).0,
-                packed: 0,
-                gait: if fresh {
-                    [(age - 1.0 / TICKS_PER_SECOND as f32).max(0.0), age, 1.0]
-                } else {
-                    [0.0; 3]
-                },
-                upgrade: 0.0,
-                arm_pitch: [0.0; 4],
-                prev_turret_yaw: turret,
-                weld: [0.0; 3],
-                recoil: 0.0,
-                prev_recoil: 0.0,
-                weld_first: 0,
-                weld_count: 0,
-                deploy: 1.0,
-                prev_deploy: 1.0,
-                // A sunk ship lies on the seabed with the list it went down with.
-                _pad2: {
-                    let bank = s.wrecks.bank[row] as f32 * (std::f32::consts::TAU / 65536.0);
-                    [bank, bank]
-                },
-                refit_modules: 0,
-                status: [0; 3],
-                mount: [0.0; 4],
-                spin_recoil: [0.0; 4],
-                fx: [0.0; 4],
-            });
-        }
+        self.push_wrecks(viewer, &mut frame.units);
 
         // Spent casings: tumbling in the air, then lying where they came down and sinking
         // away. One in the air names the walker that threw it: the shader carries it with
@@ -2610,117 +2575,8 @@ impl World {
             });
         }
 
-        for crash in &s.aircraft_crashes {
-            if let (Some(v), true) = (viewer, s.fog_enabled) {
-                if !self.fog.is_visible(crash.pos.xy(), self.team_mask(v)) {
-                    continue;
-                }
-            }
-            let bp = self.blueprints.unit(crash.blueprint);
-            let spin = crash.spin() as f32;
-            let bank = crash.bank as f32 * std::f32::consts::TAU / 65536.0;
-            let heading = crash.heading.to_radians_f32();
-            let tps = TICKS_PER_SECOND as f32;
-            // Tumbling as it falls: yaw, pitch and roll after `ticks`, `above` metres over the seabed.
-            // Once in the sea the tumble stops where it was; over two seconds the hull turns to
-            // hang nose down, and it comes level again over its last few metres to the bottom.
-            let pose = |ticks: u16, above: f32| {
-                let air = ticks.min(if crash.splashed != 0 {
-                    crash.splashed
-                } else {
-                    u16::MAX
-                });
-                let t = air as f32 / tps;
-                let heft = crate::aircraft_crash::heft(bp.radius).to_f32();
-                let (yaw, pitch, roll) = if heft < 1.0 {
-                    // A heavy hull leans into its fall and rolls a little, easing
-                    // toward a limit rather than tumbling over.
-                    let ease =
-                        |rate: f32, most: f32| most * (1.0 - (-t * rate * heft / most).exp());
-                    (
-                        heading + spin * t * 0.3 * heft,
-                        -ease(0.75, 0.15 + heft * 1.5),
-                        bank + spin * ease(2.4, 0.2 + heft * 2.0),
-                    )
-                } else {
-                    (heading + spin * t * 0.3, -t * 0.75, bank + spin * t * 2.4)
-                };
-                if crash.splashed == 0 {
-                    return (yaw, pitch, roll);
-                }
-                let under = ticks.saturating_sub(crash.splashed) as f32 / tps;
-                let turn = {
-                    let u = (under / 2.0).clamp(0.0, 1.0);
-                    u * u * (3.0 - 2.0 * u)
-                };
-                let level = {
-                    let u = ((6.0 - above) / 5.0).clamp(0.0, 1.0);
-                    u * u * (3.0 - 2.0 * u)
-                };
-                let tau = std::f32::consts::TAU;
-                let nose = (pitch / tau).round() * tau - 0.55 * (1.0 - level);
-                let flat = (roll / tau).round() * tau;
-                (
-                    yaw,
-                    pitch + (nose - pitch) * turn,
-                    roll + (flat - roll) * turn,
-                )
-            };
-            let floor = crash.floor.to_f32();
-            let (prev_yaw, prev_pitch, prev_roll) = pose(
-                crash.age.saturating_sub(1),
-                crash.prev_pos.z.to_f32() - floor,
-            );
-            let (yaw, pitch, roll) = pose(crash.age, crash.pos.z.to_f32() - floor);
-            frame.units.push(UnitInstance {
-                prev_pos: crash.prev_pos.to_f32(),
-                pos: crash.pos.to_f32(),
-                prev_heading: prev_yaw,
-                heading: yaw,
-                blueprint: bp.id.0 as u32,
-                owner_flags: KIND_WRECK,
-                health: 1.0,
-                build: 1.0,
-                radius: bp.radius.to_f32(),
-                unit_id: crash.unit_id,
-                packed: WRECK_FALLING,
-                // These otherwise unused wreck fields carry the tumble pitch.
-                arm_pitch: [prev_pitch, pitch, 0.0, 0.0],
-                _pad2: [prev_roll, roll],
-                deploy: 1.0,
-                prev_deploy: 1.0,
-                ..UnitInstance::zeroed()
-            });
-        }
-
-        for hull in &s.sinking {
-            if let (Some(v), true) = (viewer, s.fog_enabled) {
-                if !self.fog.is_visible(hull.pos, self.team_mask(v)) {
-                    continue;
-                }
-            }
-            let bp = self.blueprints.unit(hull.blueprint);
-            let angle = |a: i16| a as f32 * (std::f32::consts::TAU / 65536.0);
-            let heading = hull.heading.to_radians_f32();
-            frame.units.push(UnitInstance {
-                prev_pos: hull.pos.extend(hull.prev_z).to_f32(),
-                pos: hull.pos.extend(hull.z).to_f32(),
-                prev_heading: heading,
-                heading,
-                blueprint: bp.id.0 as u32,
-                owner_flags: KIND_WRECK,
-                health: hull.progress().to_f32(),
-                build: 1.0,
-                radius: bp.radius.to_f32(),
-                unit_id: hull.unit_id,
-                packed: WRECK_SINKING,
-                arm_pitch: [angle(hull.prev_pitch), angle(hull.pitch), 0.0, 0.0],
-                _pad2: [angle(hull.prev_roll), angle(hull.roll)],
-                deploy: 1.0,
-                prev_deploy: 1.0,
-                ..UnitInstance::zeroed()
-            });
-        }
+        self.push_crashes(viewer, &mut frame.units);
+        self.push_sinking(viewer, &mut frame.units);
 
         // Wall sections side by side are drawn as one wall.
         join_walls(&self.blueprints, &mut frame.units, &[]);

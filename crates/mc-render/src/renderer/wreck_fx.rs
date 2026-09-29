@@ -8,7 +8,7 @@
 use super::{Renderer, PUFF_TREE_SMOKE};
 use crate::camera::Camera;
 use glam::{Vec2, Vec3};
-use mc_sim::mirror::{UnitInstance, KIND_WRECK};
+use mc_sim::mirror::{UnitInstance, KIND_WRECK, WRECK_INNER};
 use std::collections::HashMap;
 
 /// Seconds a wreck smokes at full strength, and by when it has stopped.
@@ -50,7 +50,11 @@ impl Renderer {
         let mut budget = PUFFS_PER_TICK;
         for u in units {
             // Settled salvage only: a falling or sinking hull has its own trail.
-            if u.owner_flags & KIND_WRECK == 0 || u.packed != 0 {
+            // One smoke per piece a wreck broke into, not per piece's inside.
+            if u.owner_flags & KIND_WRECK == 0
+                || u.packed != 0
+                || u.refit_modules & WRECK_INNER != 0
+            {
                 continue;
             }
             let at = Vec3::from(u.pos);

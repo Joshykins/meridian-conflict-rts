@@ -126,6 +126,28 @@ shared! {
         pub const MOBILE: u32 = 0x10000;
         /// `ModelInfo::icon` bit: the unit flies.
         pub const AIR: u32 = 0x40000;
+        /// `ModelInfo::icon` bit: a ship, riding the water.
+        pub const NAVAL: u32 = 0x80_0000;
+        /// `ModelInfo::icon` bit: a spacecraft (`UnitBlueprint::is_capital_ship`).
+        pub const CAPITAL: u32 = 0x400_0000;
+    }
+
+    /// How a settled wreck lies (`mc_sim::mirror::WRECK_*`, which a test holds equal;
+    /// entity.wgsl `wreck_pose`): the word in its `refit_modules`.
+    pub mod wreck as "WRECK_" {
+        /// The word is set: the wreck is posed by it. A spent casing has none.
+        pub const POSED: u32 = 0x2000;
+        /// How it came down (`mc_sim::tables::Landing`), in the low bits.
+        pub const LANDING_MASK: u32 = 0xF;
+        pub const LANDING_IN_PLACE: u32 = 0;
+        pub const LANDING_CRASHED: u32 = 1;
+        pub const LANDING_SANK: u32 = 2;
+        pub const LANDING_DITCHED: u32 = 3;
+        /// Which section of the hull this is, and how many it broke into (4 bits each).
+        pub const SECTION_SHIFT: u32 = 4;
+        pub const COUNT_SHIFT: u32 = 8;
+        /// A section's second instance: the hull's inside, seen through its torn ends.
+        pub const INNER: u32 = 0x1000;
     }
 
     /// The selection mark (icons.wgsl `vs_ring`).

@@ -78,6 +78,7 @@ mod validate;
 pub mod veterancy;
 pub mod warp;
 pub mod world;
+mod wreck_damage;
 
 pub use command::{Command, PlayerCommand};
 pub use mirror::{Refusal, RenderFrame, SimEvent};

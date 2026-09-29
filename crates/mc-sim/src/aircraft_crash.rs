@@ -4,6 +4,7 @@
 //! or so and it sinks nose down to the seabed, where it becomes an ordinary
 //! wreck (`ShipSettled`, for the rush of air that follows it up).
 //! They are absent from targeting, selection, navigation and reclaim indexes.
+use crate::tables::Landing;
 use crate::{SimError, SimEvent, World};
 use mc_core::{Angle, Fx, FxVec3, StateHasher, TICKS_PER_SECOND};
 use mc_data::BlueprintId;
@@ -24,6 +25,15 @@ const SINK_EASE: Fx = Fx::ratio(30, 100);
 const SPIN_STEPS: i32 = 313;
 /// Hull radius, metres, up to which a dead aircraft falls and tumbles at the full rate.
 const LIGHT_RADIUS: i32 = 20;
+/// Binary angle steps in a radian (65536 / 2 pi).
+const STEPS_PER_RADIAN: i32 = 10_430;
+/// A light hull's tumble, binary angle steps a tick: the nose goes over at 0.75 rad/s...
+const TUMBLE_PITCH: i32 = 782;
+/// ...and it rolls at 2.4 rad/s.
+const TUMBLE_ROLL: i32 = 2_503;
+/// Most a crashed hull lies nose down in the ground, and rolled either way.
+const REST_PITCH: u16 = Angle::from_degrees(30).0;
+const REST_ROLL: u16 = Angle::from_degrees(20).0;
 
 /// How hard a dead aircraft of `radius` falls and tumbles, one for anything light.
 /// A capital hull (a lift ship) comes down slowly and heavily, settling rather than
@@ -48,6 +58,13 @@ pub struct AircraftCrash {
     pub splashed: u16,
     /// The seabed under it, once it is in the water.
     pub floor: Fx,
+    /// Signed pitch (bow up) and roll it tumbles through as it falls, binary angle
+    /// steps, this tick and last. They stop where they are when it hits the sea, and
+    /// the wreck it leaves on land lies the way it came down (`rest_attitude`).
+    pub pitch: i16,
+    pub prev_pitch: i16,
+    pub roll: i16,
+    pub prev_roll: i16,
 }
 
 impl AircraftCrash {
@@ -64,6 +81,54 @@ impl AircraftCrash {
         h.write_u64(self.age as u64 | (self.splashed as u64) << 16);
         h.write_i64(self.mass.0);
         h.write_i64(self.floor.0);
+        h.write_u64(
+            self.pitch as u16 as u64
+                | (self.prev_pitch as u16 as u64) << 16
+                | (self.roll as u16 as u64) << 32
+                | (self.prev_roll as u16 as u64) << 48,
+        );
+    }
+
+    /// One tick of the tumble. A light hull goes over and over; a heavy one (`heft`
+    /// under one) leans into its fall and rolls a little, easing toward a limit
+    /// rather than tumbling.
+    fn tumble(&mut self, heft: Fx) {
+        self.prev_pitch = self.pitch;
+        self.prev_roll = self.roll;
+        let spin = self.spin();
+        if heft >= Fx::ONE {
+            self.pitch = self.pitch.wrapping_sub(TUMBLE_PITCH as i16);
+            self.roll = self.roll.wrapping_add((spin * TUMBLE_ROLL) as i16);
+            return;
+        }
+        // Eased toward `most` radians at the start rate `rate * heft` rad/s, as
+        // `most * (1 - exp(-t * rate * heft / most))`.
+        let ease = |now: i16, toward: i32, rate: Fx, most: Fx| {
+            let k = rate * heft / most / TICKS_PER_SECOND as i32;
+            let step = (Fx::from_int(toward - now as i32) * k).round_int();
+            (now as i32 + step).clamp(i16::MIN as i32, i16::MAX as i32) as i16
+        };
+        let most_pitch = Fx::ratio(15, 100) + heft * Fx::ratio(3, 2);
+        let most_roll = Fx::ratio(1, 5) + heft * 2;
+        let steps = |radians: Fx| (radians * STEPS_PER_RADIAN).round_int();
+        self.pitch = ease(self.pitch, -steps(most_pitch), Fx::ratio(3, 4), most_pitch);
+        let toward = (self.bank as i32 + spin * steps(most_roll)).clamp(-32_000, 32_000);
+        self.roll = ease(self.roll, toward, Fx::ratio(12, 5), most_roll);
+    }
+
+    /// The pitch and roll the wreck it leaves on land lies at: as it came down, nose
+    /// into the ground, rolled at most so far. A light hull tumbling nose up or on
+    /// its back when it hits lies nose down all the same.
+    fn rest_attitude(&self) -> (i16, i16) {
+        let most = REST_PITCH as i32;
+        let pitch = if self.pitch < 0 && (self.pitch as i32) > -(most * 2) {
+            (self.pitch as i32).max(-most)
+        } else {
+            // Somewhere between a tenth and a quarter of the way to its limit, by the hull.
+            -(most / 4 + (self.unit_id.wrapping_mul(0x9E37_79B1) >> 20) as i32 % (most / 2))
+        };
+        let roll = (self.roll as i32).clamp(-(REST_ROLL as i32), REST_ROLL as i32);
+        (pitch as i16, roll as i16)
     }
 
     /// Which way the rendered wreck spins as it falls (mirror.rs).
@@ -100,6 +165,7 @@ impl World {
             crash.velocity.x *= Fx::ratio(98, 100);
             crash.velocity.y *= Fx::ratio(98, 100);
             let heft = heft(self.blueprints.unit(crash.blueprint).radius);
+            crash.tumble(heft);
             crash.velocity.z -= gravity * heft;
             crash.pos += crash.velocity;
             crash.pos.x = crash.pos.x.clamp(Fx::ZERO, bounds.x);
@@ -126,7 +192,7 @@ impl World {
                 continue;
             }
             if crash.mass > Fx::ZERO {
-                self.state.wrecks.spawn(
+                let row = self.state.wrecks.spawn(
                     crash.blueprint,
                     crash.pos.xy(),
                     surface,
@@ -134,6 +200,12 @@ impl World {
                     crash.mass,
                     self.state.tick,
                 )?;
+                let (pitch, roll) = crash.rest_attitude();
+                let wrecks = &mut self.state.wrecks;
+                wrecks.pitch[row] = pitch;
+                wrecks.bank[row] = roll;
+                wrecks.prev_bank[row] = roll;
+                wrecks.landing[row] = Landing::Crashed as u8;
             }
             let radius = self.blueprints.unit(crash.blueprint).radius;
             self.add_stain(crash.pos.xy(), radius * Fx::ratio(3, 2), 72)?;
@@ -148,6 +220,8 @@ impl World {
         crash: &mut AircraftCrash,
         bounds: mc_core::FxVec2,
     ) -> Result<bool, SimError> {
+        crash.prev_pitch = crash.pitch;
+        crash.prev_roll = crash.roll;
         crash.velocity.x *= WATER_DRAG;
         crash.velocity.y *= WATER_DRAG;
         crash.velocity.z += (-SINK_SPEED - crash.velocity.z) * SINK_EASE;
@@ -161,7 +235,7 @@ impl World {
         crash.pos.z = crash.floor;
         if crash.mass > Fx::ZERO {
             // It stopped spinning when it hit the water, and lies level on the bottom.
-            self.state.wrecks.spawn(
+            let row = self.state.wrecks.spawn(
                 crash.blueprint,
                 crash.pos.xy(),
                 crash.floor,
@@ -172,6 +246,7 @@ impl World {
                 crash.mass,
                 self.state.tick,
             )?;
+            self.state.wrecks.landing[row] = Landing::Ditched as u8;
         }
         self.events.push(SimEvent::ShipSettled {
             pos: crash.pos,

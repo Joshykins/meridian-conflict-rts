@@ -15,7 +15,7 @@ use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::MapFile;
 use mc_render::{Camera, FrameInput, Overlay, Renderer, SceneDesc, Target};
-use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK};
+use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK, WRECK_INNER};
 use mc_sim::{RenderFrame, World};
 use std::path::Path;
 use std::sync::Arc;
@@ -274,20 +274,53 @@ impl Studio {
     }
 }
 
+/// The unit to frame; once it is destroyed (`--scenario destruct`), its settled wreck,
+/// every piece of it when it broke up.
 fn find_subject(world: &World, frame: &RenderFrame, key: &str) -> Result<UnitInstance, String> {
-    frame
+    let is_key = |u: &UnitInstance| {
+        world
+            .blueprints
+            .unit(mc_data::BlueprintId(u.blueprint as u16))
+            .key
+            == key
+    };
+    if let Some(u) = frame
         .units
         .iter()
-        .find(|u| {
-            u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0
-                && world
-                    .blueprints
-                    .unit(mc_data::BlueprintId(u.blueprint as u16))
-                    .key
-                    == key
-        })
+        .find(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0 && is_key(u))
+    {
+        return Ok(*u);
+    }
+    let settled = |u: &&UnitInstance| {
+        u.owner_flags & KIND_WRECK != 0 && u.packed == 0 && u.refit_modules & WRECK_INNER == 0
+    };
+    let first = frame
+        .units
+        .iter()
+        .filter(settled)
+        .find(|u| is_key(u))
         .copied()
-        .ok_or_else(|| format!("{key} is not on the range to shoot (destroyed or not built?)"))
+        .ok_or_else(|| format!("{key} is not on the range to shoot (not built?)"))?;
+    let pieces: Vec<&UnitInstance> = frame
+        .units
+        .iter()
+        .filter(settled)
+        .filter(|u| u.unit_id == first.unit_id)
+        .collect();
+    let mid = pieces
+        .iter()
+        .map(|u| glam::Vec3::from(u.pos))
+        .sum::<glam::Vec3>()
+        / pieces.len() as f32;
+    let spread = pieces
+        .iter()
+        .map(|u| (glam::Vec3::from(u.pos) - mid).length())
+        .fold(0.0, f32::max);
+    Ok(UnitInstance {
+        pos: mid.into(),
+        radius: first.radius + spread,
+        ..first
+    })
 }
 
 /// Points `camera` at `subject` from `angle`, framing its whole body or, with
