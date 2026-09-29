@@ -525,6 +525,9 @@ pub(crate) struct RawReclaimer {
     /// Keeps reclaiming what it passes while it moves (`Reclaimer::mobile`).
     #[serde(default)]
     pub mobile: bool,
+    /// Its heads sweep a dimmer beam while they search (`Reclaimer::sweep`).
+    #[serde(default)]
+    pub sweep: bool,
     pub heads: Vec<RawReclaimHead>,
 }
 
@@ -1045,6 +1048,7 @@ fn compile_reclaimer(key: &str, r: &RawReclaimer, weapons: usize) -> Result<Recl
         fx(r.range),
         ticks(r.charge).clamp(0, 600) as u16,
         r.mobile,
+        r.sweep,
         &out,
     ))
 }

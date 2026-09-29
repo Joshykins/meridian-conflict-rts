@@ -38,6 +38,9 @@ pub struct ReclaimWork {
     pub relay: bool,
     /// Which of a reclaimer's heads the beam leaves (`mc_data::Reclaimer::heads`).
     pub head: u8,
+    /// A head searching, or swinging onto its next wreck: the dimmer beam on the ground
+    /// it points at (`mc_data::Reclaimer::sweep`). Nothing is taken.
+    pub sweep: bool,
 }
 
 /// `BeamInstance::kind` of a reclaim beam.
@@ -51,6 +54,9 @@ pub const BEAM_NANITE: u32 = 1;
 pub const BEAM_NANITE_SITE: u32 = 6;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
+/// A scavenger tower's head sweeping the ground for work: a dimmer reclaim beam, nothing
+/// torn off (`ReclaimWork::sweep`).
+pub const BEAM_SWEEP: u32 = 7;
 
 impl World {
     /// This tick's reclaim beams. Left out when the viewer can see neither end.
@@ -106,7 +112,7 @@ impl World {
                 }
                 (None, None) => s.units.pos[row].extend(s.units.z[row] + bp.height),
             };
-            let mut kind = BEAM_RECLAIM;
+            let mut kind = if work.sweep { BEAM_SWEEP } else { BEAM_RECLAIM };
             let (mut to_prev, mut to, mut height) = (to_prev, to, work.height);
             // Bits travel from the grip into the emitter. A relay parks the emitter
             // on the carrier's belly so the stream arrives underneath it.
@@ -123,7 +129,15 @@ impl World {
             // The drone also ferries mass home. A second key, or the renderer
             // treats the jump from the wreck to the carrier as a new beam and
             // the one that left hangs in the air.
-            sources.push(work.source.0 | if work.relay { 1 << 31 } else { 0 });
+            // A sweep too: it fades out as the beam that bites comes on, and back.
+            let key = if work.relay {
+                1 << 31
+            } else if work.sweep {
+                1 << 30
+            } else {
+                0
+            };
+            sources.push(work.source.0 | key);
             out.push(BeamInstance {
                 from: from.to_f32(),
                 kind,
@@ -207,6 +221,7 @@ impl World {
             height: bp.height,
             relay: false,
             head,
+            sweep: false,
         });
         if let Some(parent) = self
             .state
@@ -223,6 +238,7 @@ impl World {
                 height: Fx::ZERO,
                 relay: true,
                 head,
+                sweep: false,
             });
         }
         self.credit(row, take);
@@ -272,6 +288,7 @@ impl World {
             height,
             relay: false,
             head,
+            sweep: false,
         });
         self.credit(row, mass);
         gone

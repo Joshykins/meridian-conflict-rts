@@ -85,6 +85,7 @@ impl World {
             height: Fx::from_int(3),
             relay: false,
             head: 0,
+            sweep: false,
         });
         let wave = (charge % WAVE_TICKS == 0).then_some((charge / WAVE_TICKS) as u8);
         if charge == 1 || wave.is_some() {

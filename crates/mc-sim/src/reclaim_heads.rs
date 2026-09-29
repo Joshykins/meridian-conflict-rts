@@ -12,15 +12,19 @@
 //! are on this tick. Reach is measured across the map from the unit's middle, so a wreck
 //! deep under a boat or far below an aircraft is reached; the heads pitch to look at it.
 
-use crate::reclaim::WIDEST_TARGET;
+use crate::reclaim::{ReclaimWork, WIDEST_TARGET};
 use crate::spatial::kind;
-use crate::tables::flag;
+use crate::tables::{flag, Handle};
 use crate::World;
 use mc_core::{Angle, Fx, FxVec2, FxVec3};
 use mc_data::MAX_RECLAIM_HEADS;
 
 /// How near a head must point at its work before it charges, angle steps (4 degrees).
 const HEAD_AIM_TOLERANCE: u16 = 728;
+/// How far a searching head turns a tick, angle steps: 10 degrees a second.
+const SWEEP_TURN: u16 = 182;
+/// How far out a searching head sweeps its beam, of the unit's reach.
+const SWEEP_REACH: Fx = Fx::ratio(3, 5);
 /// Added to the cost of a wreck another head of the unit has taken this tick: a head
 /// only doubles up on a wreck when there is nothing else in reach.
 const CLAIMED: i64 = 1 << 40;
@@ -144,6 +148,51 @@ impl World {
         true
     }
 
+    /// A head of a sweeping reclaimer with nothing in its sights (`mc_data::Reclaimer::sweep`)
+    /// keeps a dim beam on the ground it points at, `reach` out from its pivot.
+    fn sweep_beam(&mut self, row: usize, i: usize, reach: Fx) {
+        let origin = self.head_origin(row, i);
+        let units = &self.state.units;
+        let facing = units.heading[row] + units.weapon_yaw[row][i];
+        let spot = origin + FxVec2::from_angle(facing) * reach;
+        let ground = self.terrain.height_at(spot).max(self.terrain.water_level());
+        self.reclaims.push(ReclaimWork {
+            source: units.id(row),
+            unit: Handle::NONE,
+            at: spot.extend(ground),
+            radius: Fx::from_int(3),
+            height: Fx::ZERO,
+            relay: false,
+            head: i as u8,
+            sweep: true,
+        });
+    }
+
+    /// Head `i` searches with nothing in reach: it turns slowly round, its beam on the
+    /// ground part way out.
+    fn sweep_search(&mut self, row: usize, i: usize) {
+        let Some(r) = self.bp(row).reclaimer.filter(|r| r.sweep) else {
+            return;
+        };
+        let reach = r.range * SWEEP_REACH;
+        let origin = self.head_origin(row, i);
+        let units = &self.state.units;
+        let ahead = units.heading[row] + units.weapon_yaw[row][i] + Angle(SWEEP_TURN);
+        let look = origin + FxVec2::from_angle(ahead) * reach;
+        let ground = self.terrain.height_at(look).max(self.terrain.water_level());
+        self.aim_head(row, i, look, ground);
+        self.sweep_beam(row, i, reach);
+    }
+
+    /// Head `i` is swinging onto work at `pos`: a sweeping reclaimer keeps its beam on
+    /// the ground as it goes, as far out as the work.
+    fn sweep_onto(&mut self, row: usize, i: usize, pos: FxVec2) {
+        if self.bp(row).reclaimer.is_some_and(|r| r.sweep) {
+            let reach = pos.distance(self.head_origin(row, i));
+            self.sweep_beam(row, i, reach);
+        }
+    }
+
     /// One tick of the heads whose beams are on (`jobs[i]` for head `i`), the unit's power
     /// split evenly between them. True once a target has nothing left to give.
     fn heads_drain(&mut self, row: usize, jobs: &[Option<HeadWork>]) -> bool {
@@ -180,6 +229,8 @@ impl World {
         for (i, job) in jobs.iter_mut().enumerate().take(heads) {
             if self.head_ready(row, i, pos, z) {
                 *job = Some(work);
+            } else {
+                self.sweep_onto(row, i, pos);
             }
         }
         self.heads_drain(row, &jobs[..heads])
@@ -231,12 +282,15 @@ impl World {
         for i in 0..heads {
             let Some(w) = self.head_pick_wreck(row, i, &taken[..i]) else {
                 self.state.units.weapon_cooldown[row][i] = 0;
+                self.sweep_search(row, i);
                 continue;
             };
             taken[i] = w;
             if let Some((pos, z, _)) = self.head_target(HeadWork::Wreck(w)) {
                 if self.head_ready(row, i, pos, z) {
                     jobs[i] = Some(HeadWork::Wreck(w));
+                } else {
+                    self.sweep_onto(row, i, pos);
                 }
             }
         }
