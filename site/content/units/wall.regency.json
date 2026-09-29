@@ -1,5 +1,5 @@
 {
-  "key": "naga_wall",
+  "key": "regency_wall",
   "slug": "wall",
   "faction": "regency",
   "name": "Palisade",
@@ -29,6 +29,6 @@
   "weapons": [],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_thornwall",
+  "mesh": "regency_thornwall",
   "icon": "Wall"
 }

@@ -88,12 +88,12 @@ const NAVAL: FactoryHeads = FactoryHeads {
     ],
 };
 
-/// The Naga land factory (`models::naga::brood`). Tech 1 hangs four heads from the fixed
+/// The Regency land factory (`models::regency::brood`). Tech 1 hangs four heads from the fixed
 /// race round its fabrication ring, over the corners of the bay; tech 2 adds two on posts
 /// off the press block's face. Tech 3 lifts the ring high enough for the battle scorpion
 /// to stand under it: the low race and its four heads come down, and six heads hang from
 /// the lifted race instead.
-const NAGA_LAND: FactoryHeads = FactoryHeads {
+const REGENCY_LAND: FactoryHeads = FactoryHeads {
     aim: [0.0, 0.0, 1.2],
     heads: &[
         head_until(1, 2, 8.2, 8.2, 13.4, 1.5),
@@ -111,10 +111,10 @@ const NAGA_LAND: FactoryHeads = FactoryHeads {
     ],
 };
 
-/// The Naga air factory (`models::naga::hatchery`): four heads hung from the race high
+/// The Regency air factory (`models::regency::hatchery`): four heads hung from the race high
 /// over the pad, between the towers; tech 2 adds two on masts off the flank houses, and
 /// tech 3 two more hung from the crown it raises over the race.
-const NAGA_AIR: FactoryHeads = FactoryHeads {
+const REGENCY_AIR: FactoryHeads = FactoryHeads {
     aim: [0.0, 0.0, 1.2],
     heads: &[
         head(1, 12.6, 0.0, 24.0, 1.5),
@@ -128,9 +128,9 @@ const NAGA_AIR: FactoryHeads = FactoryHeads {
     ],
 };
 
-/// The Naga naval factory (`models::naga::tidebrood`): four heads in a row under the
+/// The Regency naval factory (`models::regency::tidebrood`): four heads in a row under the
 /// gantry's bridge across the slip.
-const NAGA_NAVAL: FactoryHeads = FactoryHeads {
+const REGENCY_NAVAL: FactoryHeads = FactoryHeads {
     aim: [0.0, 0.0, 2.5],
     heads: &[
         head(1, 2.0, 11.0, 13.6, 1.5),
@@ -146,9 +146,9 @@ pub fn factory_heads(mesh: &str) -> Option<&'static FactoryHeads> {
         "factory_land" => Some(&LAND),
         "factory_air" => Some(&AIR),
         "factory_naval" => Some(&NAVAL),
-        "naga_brood" => Some(&NAGA_LAND),
-        "naga_hatchery" => Some(&NAGA_AIR),
-        "naga_tidebrood" => Some(&NAGA_NAVAL),
+        "regency_brood" => Some(&REGENCY_LAND),
+        "regency_hatchery" => Some(&REGENCY_AIR),
+        "regency_tidebrood" => Some(&REGENCY_NAVAL),
         _ => None,
     }
 }

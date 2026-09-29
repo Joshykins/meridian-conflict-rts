@@ -222,7 +222,7 @@ LIB = {
         velocity=0.5,
         gain=0.85,
     ),
-    # Naga: a folded, FM-growling bass whose filter chatters in time.
+    # Regency: a folded, FM-growling bass whose filter chatters in time.
     "growl": synth(
         [osc("Fold", 0.6, shape=0.55), osc("Fm", 0.45, shape=0.35, ratio=0.5, octave=-1)],
         filt(420, "LowPass4", 0.45, env_oct=2.2, keytrack=0.3, velocity=1.0, drive=0.5),
@@ -232,7 +232,7 @@ LIB = {
         voices=4,
         velocity=0.6,
     ),
-    # Naga: glass. FM at an irrational ratio, soft strike, long ring.
+    # Regency: glass. FM at an irrational ratio, soft strike, long ring.
     "glass": synth(
         [osc("Fm", 0.6, shape=0.22, ratio=1.41, retrigger=True), osc("Sine", 0.3, octave=2, fine=-8)],
         filt(5200, "LowPass", 0.1, keytrack=0.4),
@@ -243,7 +243,7 @@ LIB = {
         velocity=0.5,
         gain=0.8,
     ),
-    # Naga: a wailing lead, a folded sine bending under slow vibrato.
+    # Regency: a wailing lead, a folded sine bending under slow vibrato.
     "wail": synth(
         [osc("Fold", 0.55, shape=0.3), osc("Saw", 0.25, unison=3, detune=10, width=0.6, octave=1)],
         filt(1800, "BandPass", 0.35, env_oct=1.0, keytrack=0.7),
@@ -301,7 +301,7 @@ LIB["war_kit"] = kit(
     ]
 )
 
-# Naga: a hive. A soft heartbeat, clicks and chirps like insects, breath swells, a low thud.
+# Regency: a hive. A soft heartbeat, clicks and chirps like insects, breath swells, a low thud.
 LIB["hive_kit"] = kit(
     [
         drum("Heart", HEART, b=body(70, 42, 0.04, 0.3, 1.0), h=hiss(140, 0.12, 0.3, "LowPass"), drive=0.15, gain=0.95, velocity=0.6),

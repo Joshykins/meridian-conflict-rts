@@ -139,15 +139,15 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 - An impact shows on the skin of what it hits, not inside it: sparks off
   armour, a burst of earth off the ground, smoke after either.
 
-## The Naga look
+## The Regency look
 
-The Naga roster is being redone from this section (2026-09-26). The grown look
+The Regency roster is being redone from this section (2026-09-26). The grown look
 (hide, tendrils, molten pools, glassed lots) is retired. References: Shockwave
 and Scorponok from the Transformers films, the Driller concept art, and
 Megatron's Cybertronian jet.
 
 - **Confident, not improvised.** ARC is a field workshop keeping stolen tech
-  alive; the Naga understand what they hold. Their machines are dense and
+  alive; the Regency understand what they hold. Their machines are dense and
   finished, and a higher tier is more elaborate, not more lit.
 - **Symmetrical.** Most units are. The commander is the exception, as ARC's is.
 - **Layered armour over exposed machinery.** Plates overlap and sweep back;
@@ -172,9 +172,9 @@ Megatron's Cybertronian jet.
 
 ### Names
 
-Naga units and structures take short, grounded names of their own, never ARC's:
+Regency units and structures take short, grounded names of their own, never ARC's:
 a rank for the commander, a trade for the builder, and for the rest the machine
-or the job (the weapons keep their engineering names, "The Naga suite"). Tiers of a
+or the job (the weapons keep their engineering names, "The Regency suite"). Tiers of a
 structure that upgrades in place are numbered; the deepest mine is named for it.
 
 | Job | Name |
@@ -190,7 +190,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 
 ### Construction
 
-- **Construction is violet,** the Naga's counterpart to ARC's amber: it marks
+- **Construction is violet,** the Regency's counterpart to ARC's amber: it marks
   what can build.
 - **Nanites build.** A structure forms out of violet light that cools to red
   and then to plate, with thin rings and slow beams of particles round it
@@ -201,7 +201,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
     as they arrive. They bow a little apart and turn slowly round the line
     between the ends. Their heads creep out when the work starts, and their
     tails drain into the site when it stops (`beams.wgsl` `BEAM_NANITE`). A
-    Naga factory shoots them from each of its fabricator heads.
+    Regency factory shoots them from each of its fabricator heads.
   - The hull **forms from the ground up.** What has just formed glows violet,
     then slowly turns red, then becomes the finished plate. The band is a few
     metres deep on any hull. A thin hot line runs along the front with a haze
@@ -219,8 +219,8 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
     loop is a throbbing sub note with its harmonics and a rush of air over it.
     Coming on, a deep thud and the sub swells up onto the loop's note while the
     rush climbs. Stopping, everything sinks away below the loop's note and a
-    last deep thud settles it (`naga_nanite`, `_start`, `_end`).
-- **The foundation is no flat square and no brick paving.** A Naga lot is black
+    last deep thud settles it (`regency_nanite`, `_start`, `_end`).
+- **The foundation is no flat square and no brick paving.** A Regency lot is black
   and bronze and round: a black machined hub under the building, a bronze thread
   running round it with beads strung on it (three a quarter, each smaller than
   the one before), and bronze lines out to smaller discs spread towards the
@@ -229,10 +229,10 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
   building goes up, faint violet runs out along the edges and ring cuts
   (`ground.wgsl` `lot_plate`, `nanite_lot`). Not overbuilt, not formal.
 
-## The Naga suite
+## The Regency suite
 
-ARC's tech is human and hard-won; the Naga's is Precursor-derived and
-understood (docs/LORE.md). The Naga fire plasma; ARC never does. Their one
+ARC's tech is human and hard-won; the Regency's is Precursor-derived and
+understood (docs/LORE.md). The Regency fires plasma; ARC never does. Their one
 sci-fi exception is **gravity manipulation**, and their power, weapons and
 guided weapons all come from it. As with ARC, it is not a strict ladder.
 
@@ -255,11 +255,11 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     tail; impacts land as a heavy whump. No pews, no zaps.
 - **Weapon names are grounded engineering:** a grade that says how the shot
   is made, then the gun that fires it, the way ARC's Argon Electric Bore
-  does. Every Naga gun sets `plasma_grade` (`Plasmeric`, `Pinched`,
+  does. Every Regency gun sets `plasma_grade` (`Plasmeric`, `Pinched`,
   `PinchFusion`), which names its kind on the HUD; no ARC gun does (a test
   holds both). The three grades mirror ARC's direct-fire ladder, and like it they are not a strict tech ladder:
 
-  | Rung | ARC | Naga | What the shot looks like |
+  | Rung | ARC | Regency | What the shot looks like |
   |---|---|---|---|
   | 1 | Cannon | **Plasmeric** | A bound charge: a hard red slug |
   | 2 | Railgun | **Pinched-plasmeric** | Plasma condensed by gravity and driven downrange as a tight, dense stream |
@@ -272,10 +272,10 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
       defence and vehicle mounts. Size shows in the mount (Light, Twin,
       Heavy), not in a new name.
     - **Pinched-plasmeric Rifle / Pinched-plasmeric Cannon:** snipers / tanks
-      and heavy defences. The Naga's answer to an ARC rail; it stops in what
+      and heavy defences. The Regency's answer to an ARC rail; it stops in what
       it hits.
     - **Pinch-fusion Rifle / Pinch-fusion Cannon:** the same roles on the top
-      rung, the Naga's counterpart to the AEB.
+      rung, the Regency's counterpart to the AEB.
     - **Pinch-fusion Bore (PFB):** the heaviest pinch-fusion gun, for the
       biggest units (as the AEB-2 is to the AEB).
   - **Beams:** continuous fire, swept across whatever is in front of them,
@@ -293,7 +293,7 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   - **Thrown:** the **Gravitic Bomb**, a plasma charge in gravity containment,
     charged in the hands and launched to land around its target (the T3
     battle scorpion's claws).
-  - **Guided: the Gravitic Seeker.** The Naga's missiles: a gravity
+  - **Guided: the Gravitic Seeker.** The Regency's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
     exhaust plume. The family covers every role ARC's missiles do:
     - **Gravitic Seeker Pod:** salvos.
@@ -308,7 +308,7 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     about the same yield with its own effect. This one is red: a small star
     forms, holds a beat pulling debris in, then flashes, and leaves a glassed
     crater that burns red for a while; no mushroom.
-- **Nanites** build and take apart (the Naga reclaim). They are never a
+- **Nanites** build and take apart (the Regency reclaim). They are never a
   weapon.
 - **Shields:** bubble shields under the same rules as ARC's (they draw energy
   and drop when upkeep goes unpaid).
@@ -543,7 +543,7 @@ same treatment.
 
 ## Construction
 
-- **Construction is amber** for ARC (the Naga's is violet, see "The Naga
+- **Construction is amber** for ARC (the Regency's is violet, see "The Regency
   look"). Yellow-orange (`GLOW_AMBER`, the `AMBER` of the
   shaders) marks everything that builds: the lens and collar of a build arm,
   feed tanks, conduits, and the build beam itself. Blue stays energy weapons,

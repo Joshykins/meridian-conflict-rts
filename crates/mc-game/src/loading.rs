@@ -1148,7 +1148,12 @@ pub fn screenshot(
     let last = map.start_positions().len().saturating_sub(1) as u8;
     let roster: Vec<mc_sim::PlayerSetup> = [
         ("Commander", 0, mc_sim::tables::Controller::Human, "Aster"),
-        ("Naga AI 1", last, mc_sim::tables::Controller::Ai, "Naga"),
+        (
+            "Regency AI 1",
+            last,
+            mc_sim::tables::Controller::Ai,
+            "Regency",
+        ),
     ]
     .into_iter()
     .enumerate()

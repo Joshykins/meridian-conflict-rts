@@ -3,7 +3,7 @@
 // made from that on the GPU. Reclaim (kind 0): a cone that grips the target
 // and narrows into the emitter, torn-off bits streaming back up it, heating
 // from red through the Materials red-orange to white. Repair (kind 2): the inverse — mint-green
-// patches leave the emitter and settle onto the hull. `BEAM_NANITE`, a Naga builder's
+// patches leave the emitter and settle onto the hull. `BEAM_NANITE`, a Regency builder's
 // nanite stream, and `BEAM_NANITE_SITE`, the site it feeds: below. Premultiplied:
 // hot cores only add light; the coloured body also covers what is behind it, or
 // over grass it would wash out.
@@ -712,8 +712,8 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     return vec4<f32>(color * in.level, clamp(body * 0.22 + front * 0.4, 0.0, 0.7) * in.level);
 }
 
-// ---- Nanite work (the Naga) -----------------------------------------------------------
-// `BEAM_NANITE`: from a builder's emitter to the weld on a Naga site. Not a beam but a
+// ---- Nanite work (the Regency) -----------------------------------------------------------
+// `BEAM_NANITE`: from a builder's emitter to the weld on a Regency site. Not a beam but a
 // bundle of strands of particles shot slowly across the gap: each a hairline thread that
 // writhes like liquid, beaded with motes drifting along it, violet as it leaves and red by
 // the time it arrives. The strands bow apart a little and turn slowly round the line
@@ -724,7 +724,7 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
 // sizes come and go up its height (most near the build front), each turning red as it
 // fades; and filaments of red particles are blasted slowly up out of the lot, leaning
 // outward, higher than the hull will stand.
-// Colours: the violet of Naga construction, red where it has cooled toward plate.
+// Colours: the violet of Regency construction, red where it has cooled toward plate.
 
 const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const NANITE_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.08);
@@ -852,7 +852,7 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     return out;
 }
 
-// Round a Naga site while it is fed (`BEAM_NANITE_SITE`): `emitter` is the site's foot,
+// Round a Regency site while it is fed (`BEAM_NANITE_SITE`): `emitter` is the site's foot,
 // `to` the middle of its build front, `radius` and `height` the hull's.
 fn nanite_site_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     let time = globals.camera.w;

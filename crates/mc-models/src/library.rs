@@ -4,7 +4,7 @@
 use glam::{Affine3A, Vec3};
 
 use super::builder::MeshBuilder;
-use super::{aster, naga, part, props, rig, MeshLod, Model, Pit, LOD_COUNT};
+use super::{aster, part, props, regency, rig, MeshLod, Model, Pit, LOD_COUNT};
 
 /// Highest tech level a model distinguishes.
 pub(super) const MAX_TECH: u8 = 3;
@@ -72,7 +72,7 @@ impl ModelDef {
 fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
     aster::MODELS
         .iter()
-        .chain(naga::MODELS.iter())
+        .chain(regency::MODELS.iter())
         .chain(props::MODELS.iter())
         .chain(super::desert::MODELS.iter())
         .chain(super::dam::MODELS.iter())

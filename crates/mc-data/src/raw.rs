@@ -19,7 +19,7 @@ pub enum MoveLayer {
     Air,
 }
 
-/// The Naga's plasma shot, by how hard gravity squeezes it (docs/STYLE.md, "The Naga
+/// The Regency's plasma shot, by how hard gravity squeezes it (docs/STYLE.md, "The Regency
 /// suite"). The rungs mirror ARC's cannon, rail and electric bore.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
 pub enum PlasmaGrade {
@@ -169,7 +169,7 @@ pub enum Construction {
     #[default]
     Print = 0,
     /// Built by nanites: a black swarm poured from the builder in a stream condenses into
-    /// the structure, violet light with red in it running through it (the Naga).
+    /// the structure, violet light with red in it running through it (the Regency).
     Nanite = 1,
 }
 
@@ -264,7 +264,7 @@ pub(crate) struct Unit {
     #[serde(default)]
     pub anti_missile_lasers: u8,
     /// Where its turret turns (x forward, y left, metres): its muzzles and build emitter
-    /// swing about this point, not the unit's middle: the Naga battle scorpion's tail bends
+    /// swing about this point, not the unit's middle: the Regency battle scorpion's tail bends
     /// round from its root on the back. None: the middle.
     #[serde(default)]
     pub turret_at: Option<(f64, f64)>,
@@ -467,7 +467,7 @@ pub(crate) struct RawMine {
     #[serde(default)]
     pub base: f64,
     /// It drives a pile hammer, blow by blow (the ARC core mine). False: it draws its
-    /// mass up without striking (the Naga Taproot), so there is no beat to show or hear.
+    /// mass up without striking (the Regency Taproot), so there is no beat to show or hear.
     #[serde(default = "yes")]
     pub hammer: bool,
 }
@@ -665,7 +665,7 @@ pub struct RawWeapon {
     /// muzzle to what it hit rather than a traveling slug.
     #[serde(default)]
     pub hitscan: bool,
-    /// A held beam (a Naga beam weapon): a `hitscan` gun that fires every tick it bears,
+    /// A held beam (a Regency beam weapon): a `hitscan` gun that fires every tick it bears,
     /// drawn as one steady stream from the muzzle to what it strikes, glassing the ground
     /// under where it lands, and heard as its `hold` loop, not a shot a tick. Cosmetic.
     #[serde(default)]
@@ -847,7 +847,7 @@ pub struct RawWeapon {
     /// Zero (the default): the size the damage implies.
     #[serde(default)]
     pub caliber: f64,
-    /// A Naga plasma weapon's grade: names its kind on the HUD. Cosmetic. None (the
+    /// A Regency plasma weapon's grade: names its kind on the HUD. Cosmetic. None (the
     /// default): not a plasma weapon.
     #[serde(default)]
     pub plasma_grade: Option<PlasmaGrade>,
@@ -915,7 +915,7 @@ pub struct RawWeapon {
     /// high arc). Zero: no climb.
     #[serde(default)]
     pub apogee: f64,
-    /// A thrown charge that curves onto its mark (the Naga's Gravitic Bomb): degrees the
+    /// A thrown charge that curves onto its mark (the Regency's Gravitic Bomb): degrees the
     /// shots of a salvo leave off the line to the mark, fanned across it and over it, and
     /// each curves back onto the target through its own angle. It flies at `speed` under
     /// no gravity, so it is a `Direct` weapon, and it is no missile: nothing intercepts it.

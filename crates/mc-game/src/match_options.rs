@@ -128,7 +128,7 @@ mod tests {
                 slot: PlayerId(1),
                 name: "friend".into(),
                 data: SeatChoice {
-                    faction: "Naga".into(),
+                    faction: "Regency".into(),
                     random: false,
                 }
                 .encode(),
@@ -144,7 +144,7 @@ mod tests {
                 friend.controller,
                 friend.faction.as_str()
             ),
-            ("friend", Controller::Human, "Naga")
+            ("friend", Controller::Human, "Regency")
         );
         assert_eq!(built.map_id, 9);
         // Garbage from another machine is an error, never a panic.

@@ -138,8 +138,8 @@ pub mod pattern {
     /// and hard as it charges; `COIL_TURN_BACK` the other way.
     pub const COIL_TURN: u32 = COIL + COIL_STAGES;
     pub const COIL_TURN_BACK: u32 = COIL_TURN + 1;
-    /// Dark plating (`ACCENT`) whose little level lights are the Naga's red, and lit at every
-    /// tier: a Naga hide's seams of light. (Aster's black carries no lit lines at all.)
+    /// Dark plating (`ACCENT`) whose little level lights are the Regency's red, and lit at every
+    /// tier: a Regency hide's seams of light. (Aster's black carries no lit lines at all.)
     pub const EMBER: u32 = COIL_TURN_BACK + 1;
     /// A chute carrying reclaimed material (`ACCENT` faces): dark glazing over the channel,
     /// and while the unit reclaims a stream of glowing clumps falling down it, in model z,
@@ -421,7 +421,7 @@ pub const MAX_TAIL_JOINTS: usize = 12;
 /// tail per vec4, and the pincers' shoulder and jaw hinge.
 pub const CRAWL_SLOTS: usize = 1 + 3 * MAX_CRAWL_PAIRS + MAX_TAIL_JOINTS / 2 + 2;
 
-/// A many-legged walker (the Naga commander): each left leg's joints at rest, the right
+/// A many-legged walker (the Regency commander): each left leg's joints at rest, the right
 /// one its mirror. A leg's bones swing in the vertical plane through its hip and foot, and
 /// that plane turns about the hip to follow the foot through its stride.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -543,7 +543,7 @@ pub struct Model {
     pub spins: Vec<(u32, u32, [f32; 3])>,
     /// A hole the model digs into the ground, and the pipe it drives down it.
     pub pit: Option<Pit>,
-    /// The beam a Naga mine digs its bore with (`renderer/naga_mine_fx.rs`).
+    /// The beam a Regency mine digs its bore with (`renderer/regency_mine_fx.rs`).
     pub excavation: Option<Excavation>,
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).
@@ -616,7 +616,7 @@ pub struct Exhaust {
     pub radius: f32,
 }
 
-/// A mine that digs with a beam instead of a hammer (the Naga's, `models::naga::taproot`):
+/// A mine that digs with a beam instead of a hammer (the Regency's, `models::regency::taproot`):
 /// the beam runs from its emitter down into the bore (the model's `Pit`, whose opening is
 /// where the drawn beam meets the ground), converging pinch beams join it at the mouth,
 /// and ore is drawn up the column to the collector. Model space, at the blueprint's size.
@@ -730,7 +730,6 @@ pub mod foliage;
 mod footprint;
 pub mod gpu_consts;
 mod library;
-mod naga;
 mod precursor;
 mod precursor_citadel;
 mod precursor_forge;
@@ -739,6 +738,7 @@ mod precursor_mega;
 mod precursor_polar;
 mod precursor_sky;
 mod precursor_tower;
+mod regency;
 
 #[cfg(test)]
 mod preview;

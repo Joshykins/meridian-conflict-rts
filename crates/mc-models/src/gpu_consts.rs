@@ -468,9 +468,9 @@ shared! {
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
     /// (`mc_sim::reclaim`). The older kinds are still spelled out in the shader.
     pub mod beam as "BEAM_" {
-        /// A Naga builder's nanite stream, emitter to weld (`reclaim::BEAM_NANITE`).
+        /// A Regency builder's nanite stream, emitter to weld (`reclaim::BEAM_NANITE`).
         pub const NANITE: u32 = 1;
-        /// A Naga site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
+        /// A Regency site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
         pub const NANITE_SITE: u32 = 6;
         /// A scavenger tower's head searching: a dimmer reclaim beam on the ground, no
         /// bits (`reclaim::BEAM_SWEEP`).

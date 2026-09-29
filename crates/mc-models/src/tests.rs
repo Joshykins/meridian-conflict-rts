@@ -325,30 +325,30 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("nuke_silo", 42.5, 26.0, 4, 8, &[]),
     structure("nuke_defense", 18.75, 20.0, 3, 4, &[]),
     structure("culverin", 30.0, 27.0, 4, 6, &[[74.0, 0.0, 18.0]]),
-    // The Naga (data/factions/naga/units): their engineer, scout and tech 1 structures.
-    unit("naga_engineer", 3.6, 2.8, 1, &[]),
-    unit("naga_scout", 3.8, 4.0, 1, &[[1.6, 0.0, 2.3]]),
-    structure("naga_brood", 46.0, 22.0, 1, 8, &[]),
-    structure("naga_brood", 46.0, 22.0, 2, 8, &[]),
-    structure("naga_brood", 46.0, 35.0, 3, 8, &[]),
-    structure("naga_hatchery", 46.0, 30.0, 1, 8, &[]),
-    structure("naga_hatchery", 46.0, 30.0, 2, 8, &[]),
-    structure("naga_hatchery", 46.0, 38.0, 3, 8, &[]),
-    structure("naga_tidebrood", 46.0, 20.0, 1, 8, &[]),
-    structure("naga_taproot", 12.8, 11.0, 1, 3, &[]),
-    structure("naga_taproot", 12.8, 15.0, 2, 3, &[]),
-    structure("naga_taproot", 12.8, 19.0, 3, 3, &[]),
-    structure("naga_taproot", 12.8, 19.0, 4, 3, &[]),
-    structure("naga_heart", 6.9, 7.5, 1, 2, &[]),
-    structure("naga_heart_2", 18.75, 18.0, 2, 4, &[]),
-    structure("naga_heart_3", 42.5, 35.0, 3, 8, &[]),
-    structure("naga_cyst", 12.9, 8.0, 1, 3, &[]),
-    structure("naga_barb", 5.5, 8.0, 1, 1, &[[5.2, 0.0, 6.8]]),
-    structure("naga_spitter", 5.5, 8.5, 1, 1, &[[4.4, 0.0, 7.4]]),
-    structure("naga_thornwall", 6.0, 5.0, 1, 1, &[]),
-    structure("naga_eye", 7.0, 24.0, 1, 2, &[]),
-    structure("naga_eye", 7.0, 28.0, 2, 2, &[]),
-    structure("naga_eye", 7.0, 32.0, 3, 2, &[]),
+    // The Regency (data/factions/regency/units): their engineer, scout and tech 1 structures.
+    unit("regency_engineer", 3.6, 2.8, 1, &[]),
+    unit("regency_scout", 3.8, 4.0, 1, &[[1.6, 0.0, 2.3]]),
+    structure("regency_brood", 46.0, 22.0, 1, 8, &[]),
+    structure("regency_brood", 46.0, 22.0, 2, 8, &[]),
+    structure("regency_brood", 46.0, 35.0, 3, 8, &[]),
+    structure("regency_hatchery", 46.0, 30.0, 1, 8, &[]),
+    structure("regency_hatchery", 46.0, 30.0, 2, 8, &[]),
+    structure("regency_hatchery", 46.0, 38.0, 3, 8, &[]),
+    structure("regency_tidebrood", 46.0, 20.0, 1, 8, &[]),
+    structure("regency_taproot", 12.8, 11.0, 1, 3, &[]),
+    structure("regency_taproot", 12.8, 15.0, 2, 3, &[]),
+    structure("regency_taproot", 12.8, 19.0, 3, 3, &[]),
+    structure("regency_taproot", 12.8, 19.0, 4, 3, &[]),
+    structure("regency_heart", 6.9, 7.5, 1, 2, &[]),
+    structure("regency_heart_2", 18.75, 18.0, 2, 4, &[]),
+    structure("regency_heart_3", 42.5, 35.0, 3, 8, &[]),
+    structure("regency_cyst", 12.9, 8.0, 1, 3, &[]),
+    structure("regency_barb", 5.5, 8.0, 1, 1, &[[5.2, 0.0, 6.8]]),
+    structure("regency_spitter", 5.5, 8.5, 1, 1, &[[4.4, 0.0, 7.4]]),
+    structure("regency_thornwall", 6.0, 5.0, 1, 1, &[]),
+    structure("regency_eye", 7.0, 24.0, 1, 2, &[]),
+    structure("regency_eye", 7.0, 28.0, 2, 2, &[]),
+    structure("regency_eye", 7.0, 32.0, 3, 2, &[]),
 ];
 
 /// Ships: the keel is below the waterline (model z = 0), and nothing is running gear.
@@ -603,7 +603,7 @@ fn meshes_are_valid() {
                 } else if model.key == "airbase" {
                     // The parked Roost's shaft, down to the lift 21 m under the deck.
                     -22.0
-                } else if model.key == "naga_taproot" {
+                } else if model.key == "regency_taproot" {
                     // The bore the beam cuts, down to the deep core's floor (`Model::pit`).
                     -121.0
                 } else if model.key == "core_mine" {
@@ -826,7 +826,7 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key.starts_with("reclaim_tower") {
             // A 3x3 installation, a 38 m tower with the plant round its foot.
             super::aster::reclaim_tower::TRIANGLES
-        } else if let Some(budget) = super::naga::triangles(&model.key) {
+        } else if let Some(budget) = super::regency::triangles(&model.key) {
             budget
         } else if model.key == "light_transport" {
             // 115 m spacecraft: walk-through bay, two drive bells, lift jets, dorsal mast.
@@ -1029,7 +1029,7 @@ fn units_wear_team_colour_at_every_lod() {
                 "{} lod{lod}: no upward team colour",
                 bp.mesh
             );
-            // The Naga wear black hide (`PLATING_DARK`) where ARC wears its plating.
+            // The Regency wear black hide (`PLATING_DARK`) where ARC wears its plating.
             assert!(
                 mesh.vertices.iter().any(
                     |v| v.material == material::PLATING || v.material == material::PLATING_DARK
@@ -1199,7 +1199,7 @@ fn weapons_are_turrets_ending_at_the_muzzle() {
     for bp in BLUEPRINTS
         .iter()
         // Engineers' build arms are their turrets.
-        .filter(|bp| bp.muzzles.is_empty() && !["engineer", "naga_engineer"].contains(&bp.mesh))
+        .filter(|bp| bp.muzzles.is_empty() && !["engineer", "regency_engineer"].contains(&bp.mesh))
     {
         assert!(
             built(bp)

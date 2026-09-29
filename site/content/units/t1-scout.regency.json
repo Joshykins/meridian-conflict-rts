@@ -1,5 +1,5 @@
 {
-  "key": "naga_t1_scout",
+  "key": "regency_t1_scout",
   "slug": "t1-scout",
   "faction": "regency",
   "name": "Outrider",
@@ -46,6 +46,6 @@
   ],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_scout",
+  "mesh": "regency_scout",
   "icon": "Scout"
 }

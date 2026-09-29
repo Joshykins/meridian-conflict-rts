@@ -197,11 +197,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_race_on_its_own_roster_comes_first_and_the_naga_are_playable() {
+    fn a_race_on_its_own_roster_comes_first_and_the_regency_is_playable() {
         let all = races();
         assert!(all[0].stand_in.is_none());
-        let naga = race_by_key("naga").expect("the Naga are listed");
-        assert_eq!(naga.borrowed_roster(), Some("ARC"));
+        let regency = race_by_key("regency").expect("the Regency is listed");
+        assert_eq!(regency.borrowed_roster(), Some("ARC"));
         assert_eq!(race_key(200), all[0].key);
     }
 

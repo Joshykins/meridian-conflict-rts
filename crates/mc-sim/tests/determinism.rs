@@ -91,9 +91,9 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("aster_t2_torpedo_bomber", 2, 1800, 200),
     // Salvage carriers: three reclaim heads each, clearing wrecks on the attack-move.
     ("aster_t2_land_reclaimer", 2, 850, 450),
-    // The Naga battle scorpion: a held beam that runs up (`spin`), claws whose charges
+    // The Regency battle scorpion: a held beam that runs up (`spin`), claws whose charges
     // curve onto their marks (`curve.rs`).
-    ("naga_t3_scorpion", 1, 1100, 700),
+    ("regency_t3_scorpion", 1, 1100, 700),
 ];
 
 fn setup(w: &mut World) {

@@ -1014,7 +1014,7 @@ pub struct ProjectileInstance {
     /// Metres of blue plasma around the traveling slug. Zero: none.
     pub plasma: f32,
     /// One: a small-calibre tracer, drawn deep orange (a stream gun's rounds); up to two, redder;
-    /// plus twice a Naga plasma shot's look (`plasma_look`). Then how far a cruise missile's
+    /// plus twice a Regency plasma shot's look (`plasma_look`). Then how far a cruise missile's
     /// wings are out, 0 to 1 (`cruise_wings`), or below zero, a missile turning over on its
     /// thrusters (`wings_or_turn`).
     pub _pad: [f32; 2],
@@ -1028,7 +1028,7 @@ pub struct ProjectileInstance {
 
 const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 
-/// How a Naga plasma shot is drawn in flight past the red Plasmeric slug (sprites.wgsl,
+/// How a Regency plasma shot is drawn in flight past the red Plasmeric slug (sprites.wgsl,
 /// `ProjectileInstance::_pad[0]` above 2): 1 a Pinched-plasmeric stream slug, 2 a
 /// Pinch-fusion slug strobing with fusion bursts, 3 a thrown gravitic charge curving onto
 /// its mark (`Weapon::curve`). Zero for anything else.
@@ -2054,7 +2054,7 @@ impl World {
                 plasma,
                 // A stream gun's rounds are small and many: drawn a deep tracer orange, not
                 // the white-hot of a shell. Above one, it leans on to red (`Weapon::red`).
-                // A Naga plasma shot (`plasma_grade`) is drawn that way too, whatever its size,
+                // A Regency plasma shot (`plasma_grade`) is drawn that way too, whatever its size,
                 // and plus twice its look (`plasma_look`) past the Plasmeric slug.
                 if (weapon.rounds > 1 || weapon.plasma_grade.is_some())
                     && weapon.color == WeaponColor::Orange
@@ -2285,7 +2285,7 @@ impl World {
         use crate::tables::flag;
         frame.build_sources.clear();
         let mut nanite_beams: Vec<(u32, BeamInstance)> = Vec::new();
-        // The Naga sites those streams feed, by unit id.
+        // The Regency sites those streams feed, by unit id.
         let mut nanite_sites: Vec<u32> = Vec::new();
         for row in s.units.slots.iter() {
             let flags = s.units.flags[row];
@@ -2315,7 +2315,7 @@ impl World {
             let to = self.weld_on(t, from.to_f32()).0;
             frame.build_sources.push(self.build_source(row, to));
             if self.uses_nanites(row) {
-                // A Naga site is fed by one nanite stream from the builder's emitter.
+                // A Regency site is fed by one nanite stream from the builder's emitter.
                 nanite_sites.push(s.units.id(t).0);
                 nanite_beams.push((
                     s.units.id(row).0,
@@ -2367,12 +2367,12 @@ impl World {
                 let to = self.weld_on(t, first.to_f32()).0;
                 frame.build_sources.push(self.build_source(row, to));
             } else if self.uses_nanites(row) {
-                // A Naga factory without fabricator heads is heard from the hull it builds.
+                // A Regency factory without fabricator heads is heard from the hull it builds.
                 let at = s.units.pos[t].extend(s.units.z[t]).to_f32();
                 frame.build_sources.push(self.build_source(row, at));
             }
             if self.uses_nanites(row) {
-                // A Naga factory pours a nanite stream from each fabricator head. Each needs
+                // A Regency factory pours a nanite stream from each fabricator head. Each needs
                 // a source of its own (the renderer times a beam by its source).
                 if !heads.is_empty() {
                     nanite_sites.push(s.units.id(t).0);
@@ -2457,7 +2457,7 @@ impl World {
                 u.status[1] |= UNIT_NANITE;
             }
         }
-        // Round each Naga site at work, its rings and rising filaments: one record a site,
+        // Round each Regency site at work, its rings and rising filaments: one record a site,
         // timed by the site's id with bits 27..31 set (no stream's source has them all).
         nanite_sites.sort_unstable();
         nanite_sites.dedup();

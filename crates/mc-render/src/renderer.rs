@@ -60,7 +60,6 @@ mod impact_fx;
 mod laser_fx;
 mod launch_fx;
 mod mine_fx;
-mod naga_mine_fx;
 mod nuke_fx;
 mod nuke_volume;
 mod pinch_fx;
@@ -68,6 +67,7 @@ mod plasma_fx;
 mod post;
 mod quality;
 mod rail_fx;
+mod regency_mine_fx;
 mod shafts;
 mod stake_fx;
 mod stun_fx;
@@ -812,10 +812,10 @@ pub struct Renderer {
     impact_craters: impact_craters::ImpactCraters,
     /// Electric bore lightning and the molten ground it leaves (renderer/bore_fx.rs).
     bore_fx: bore_fx::BoreFx,
-    /// The Naga's held beams and plasma charges (renderer/plasma_fx.rs).
+    /// The Regency's held beams and plasma charges (renderer/plasma_fx.rs).
     plasma_fx: plasma_fx::PlasmaFx,
-    /// The Naga mines' excavation beams (renderer/naga_mine_fx.rs).
-    naga_mine_fx: naga_mine_fx::NagaMineFx,
+    /// The Regency mines' excavation beams (renderer/regency_mine_fx.rs).
+    regency_mine_fx: regency_mine_fx::RegencyMineFx,
     giant_fx: titan_fx::GiantFx,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
     /// EMP stuns and warp dampeners in the world (stun_fx.rs, damper_fx.rs).
@@ -2321,7 +2321,7 @@ impl Renderer {
             impact_craters: impact_craters::ImpactCraters::default(),
             bore_fx: bore_fx::BoreFx::default(),
             plasma_fx: plasma_fx::PlasmaFx::default(),
-            naga_mine_fx: naga_mine_fx::NagaMineFx::new(excavations),
+            regency_mine_fx: regency_mine_fx::RegencyMineFx::new(excavations),
             giant_fx: titan_fx::GiantFx::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
             emp_fx: stun_fx::EmpFx::default(),
@@ -3821,7 +3821,7 @@ impl Renderer {
             } else {
                 (u.build.clamp(0.0, 1.0) * 255.0) as u32
             };
-            // A Naga structure stands on a lot of dark machined plate, not a paved one.
+            // A Regency structure stands on a lot of dark machined plate, not a paved one.
             let nanite = self
                 .blueprints
                 .factions
@@ -5214,7 +5214,7 @@ impl Renderer {
                     );
                     return;
                 }
-                // A Naga plasma gun's own firing: a thrown charge leaving the claw, a squeezed
+                // A Regency plasma gun's own firing: a thrown charge leaving the claw, a squeezed
                 // slug's vented kick (`plasma_fx`, `pinch_fx`).
                 {
                     let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());

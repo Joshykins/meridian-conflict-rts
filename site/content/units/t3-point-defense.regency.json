@@ -1,5 +1,5 @@
 {
-  "key": "naga_t3_point_defense",
+  "key": "regency_t3_point_defense",
   "slug": "t3-point-defense",
   "faction": "regency",
   "name": "Sunspear",
@@ -46,6 +46,6 @@
   ],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_fusion_cannon",
+  "mesh": "regency_fusion_cannon",
   "icon": "Defense"
 }

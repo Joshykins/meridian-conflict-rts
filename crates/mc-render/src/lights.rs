@@ -297,7 +297,7 @@ struct Site {
     range: f32,
     size: f32,
     seed: f32,
-    /// A Naga site (`mirror::UNIT_NANITE`): lit the nanites' violet, not work amber.
+    /// A Regency site (`mirror::UNIT_NANITE`): lit the nanites' violet, not work amber.
     nanite: bool,
 }
 
@@ -490,7 +490,7 @@ impl Lights {
         }
         for b in &frame.beams {
             if b.kind == mc_sim::reclaim::BEAM_NANITE_SITE {
-                // Round a Naga site: the red of the filaments rising out of it, low down.
+                // Round a Regency site: the red of the filaments rising out of it, low down.
                 // Its violet work light is the site's own (`push_site`).
                 self.glows.push(Glow {
                     from: Vec3::from(b.from) + Vec3::Z * (b.height * 0.3 + 1.0),
@@ -583,7 +583,7 @@ impl Lights {
         // Irradiance near 12 on the ground at the hull's edge (a tree fire's is about 6
         // at its foot); the reach a few hulls out.
         let edge = r + 4.0;
-        // A Naga site or refit: violet, and dim.
+        // A Regency site or refit: violet, and dim.
         let nanite = u.status[1] & mc_sim::mirror::UNIT_NANITE != 0;
         self.sites.push(Site {
             pos: Vec3::from(u.pos) + Vec3::Z * (h * 0.6 + 1.5),

@@ -1,5 +1,5 @@
 {
-  "key": "naga_t3_scorpion",
+  "key": "regency_t3_scorpion",
   "slug": "t3-scorpion",
   "faction": "regency",
   "name": "Harrow",
@@ -63,6 +63,6 @@
   ],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_scorpion",
+  "mesh": "regency_scorpion",
   "icon": "Bot"
 }

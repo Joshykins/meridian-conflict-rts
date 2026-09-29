@@ -1,4 +1,4 @@
-//! Held beams (`Weapon::beam`, the Naga's Pinched-plasmeric Beam). The sim fires one every
+//! Held beams (`Weapon::beam`, the Regency's Pinched-plasmeric Beam). The sim fires one every
 //! tick it bears, so it is heard as its `hold` loop while the shots keep coming, not as a
 //! shot and a strike a tick: one loop per sound, from every beam firing this tick.
 

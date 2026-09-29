@@ -145,7 +145,7 @@ const readRon = (p) => parseRon(readFileSync(p, "utf8"));
 
 const FACTIONS = {
   aster: { slug: "arc", short: "ARC" },
-  naga: { slug: "regency", short: "Regency" },
+  regency: { slug: "regency", short: "Regency" },
 };
 
 function domainOf(u) {
@@ -182,7 +182,7 @@ function weaponOf(w, loreWeapons, factionKey) {
             : w.discharge
               ? "charged"
               : w.plasma
-                ? factionKey === "naga"
+                ? factionKey === "regency"
                   ? "plasma"
                   : "bolt"
                 : w.torpedo
@@ -214,7 +214,7 @@ function unitOf(u, factionKey, lore) {
   const dps = round(weapons.reduce((s, w) => s + (w.dps ?? 0) * w.count, 0));
   return {
     key: u.key,
-    slug: u.key.replace(/^(aster|naga)_/, "").replace(/_/g, "-"),
+    slug: u.key.replace(/^(aster|regency)_/, "").replace(/_/g, "-"),
     faction: FACTIONS[factionKey].slug,
     name: u.name,
     role: u.role,

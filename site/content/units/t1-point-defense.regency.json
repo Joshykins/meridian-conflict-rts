@@ -1,5 +1,5 @@
 {
-  "key": "naga_t1_point_defense",
+  "key": "regency_t1_point_defense",
   "slug": "t1-point-defense",
   "faction": "regency",
   "name": "Picket",
@@ -46,6 +46,6 @@
   ],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_barb",
+  "mesh": "regency_barb",
   "icon": "Defense"
 }

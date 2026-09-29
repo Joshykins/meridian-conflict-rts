@@ -128,7 +128,7 @@ pub struct Weapon {
     pub bombard_radius: Fx,
     /// A missile's body across, in metres, as drawn (`RawWeapon::caliber`). Zero: from its damage.
     pub caliber: f32,
-    /// A Naga plasma weapon's grade (`RawWeapon::plasma_grade`). Cosmetic. None: not plasma.
+    /// A Regency plasma weapon's grade (`RawWeapon::plasma_grade`). Cosmetic. None: not plasma.
     pub plasma_grade: Option<PlasmaGrade>,
     /// How far a gun house on a capital hull may dip below its deck; zero: no limit.
     pub depression: Angle,
@@ -215,28 +215,28 @@ mod tests {
 
     use crate::Blueprints;
 
-    /// The Naga fire plasma (docs/STYLE.md, "The Naga suite"): every gun of theirs names
+    /// The Regency fires plasma (docs/STYLE.md, "The Regency suite"): every gun of theirs names
     /// its grade, and nothing of ARC's does.
     #[test]
-    fn only_the_naga_fire_plasma() {
+    fn only_the_regency_fires_plasma() {
         let bp =
             Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
-        let naga = bp.faction_by_key("naga").unwrap().id;
-        let mut naga_guns = 0;
+        let regency = bp.faction_by_key("regency").unwrap().id;
+        let mut regency_guns = 0;
         for unit in &bp.units {
             for w in &unit.weapons {
-                let naga_gun = unit.faction == naga;
-                naga_guns += usize::from(naga_gun);
+                let regency_gun = unit.faction == regency;
+                regency_guns += usize::from(regency_gun);
                 assert_eq!(
                     w.plasma_grade.is_some(),
-                    naga_gun,
+                    regency_gun,
                     "{}: {}",
                     unit.key,
                     w.name
                 );
             }
         }
-        assert!(naga_guns > 0);
+        assert!(regency_guns > 0);
     }
 
     /// Flak (docs/STYLE.md "Flak"): a shell slow enough to follow up, on a fuse, that

@@ -1,5 +1,5 @@
 {
-  "key": "naga_t2_power",
+  "key": "regency_t2_power",
   "slug": "t2-power",
   "faction": "regency",
   "name": "Star Cage II",
@@ -29,6 +29,6 @@
   "weapons": [],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_heart_2",
+  "mesh": "regency_heart_2",
   "icon": "Power"
 }

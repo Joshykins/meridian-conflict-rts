@@ -1,0 +1,103 @@
+// The Regency's fighting units on land. Models: `models::regency::*`; a model authored at another
+// size says so, and its tests tie these numbers to it.
+[
+    // The land scout: a six-legged walker on long legs, fast, with radar and a long look. A
+    // mast curls up over its back to a turning radar array; a light plasmeric repeater in a
+    // small turret over its neck. Model: `regency_scout` (`models::regency::scout`).
+    (
+        key: "regency_t1_scout",
+        name: "Outrider",
+        role: "Land Scout",
+        tech: 1,
+        categories: ["Land", "Scout", "DirectFire"],
+        health: 40,
+        cost: (mass: 14, energy: 90, time: 70),
+        radius: 3.8, height: 4.0,
+        vision: 750, radar: 3000,
+        motion: (layer: Land, size: 0, speed: 42, accel: 48, turn: 220),
+        weapons: [(
+            name: "Light Plasmeric Repeater",
+            // A scout's gun: single light slugs, enough to finish a scout or harry an engineer.
+            damage: 4, range: 140, reload: 0.5, speed: 600, trajectory: Direct, red: 1.0,
+            turret_turn: 240, muzzle: (1.6, 0, 2.3), spread: 1.0,
+            targets: ["Land", "Naval"], color: Orange, tracer: 0.6,
+            plasma_grade: Some(Plasmeric),
+            sounds: (fire: "regency_stinger", impact: "shell_light"),
+        )],
+        mesh: "regency_scout", icon: Scout,
+        sounds: (death: "blast_small", moving: "regency_skitter"),
+    ),
+    // The battle scorpion: a heavy armoured scorpion on eight legs. Its tail is the turret:
+    // the top of it bends round to aim within `aim_arc` (60 degrees either side of the
+    // nose), and past that the scorpion turns its whole body. The tail ends in a
+    // Pinched-plasmeric Beam projector that holds a dense red stream on what it fights,
+    // glassing the ground where the stream lands. Each claw charges a Gravitic Bomb between
+    // its fingers and throws it, a salvo of three from each: fast streaks that curve in on
+    // the mark from around it.
+    //
+    // The tech 3 land factory makes it, under its lifted fabrication ring.
+    //
+    // Model: `regency_scorpion` (`models::regency::scorpion`), authored at 10.4 x 19 m and built
+    // 1.3 times bigger: every point below is the model's times 1.3.
+    (
+        key: "regency_t3_scorpion",
+        name: "Harrow",
+        role: "Battle Scorpion",
+        tech: 3,
+        categories: ["Land", "DirectFire"],
+        health: 9200,
+        cost: (mass: 900, energy: 7200, time: 5200),
+        radius: 13.52, height: 24.7,
+        vision: 360,
+        // It walks the seabed like the Paladin; wading, the tail stays above the water.
+        motion: (layer: Amphibious, size: 2, speed: 24, accel: 20, turn: 110, aim_arc: 120),
+        // The single point that best matches the tail's bending top joints (the model's
+        // `AIM_PIVOT`): the beam's muzzle turns about it, not the unit's middle.
+        turret_at: (-8.84, 0.0),
+        // The claws' bombs turn on their own, each about its own claw (`mount`, `pivot`
+        // at the muzzle: whichever way it throws, it leaves from between the fingers).
+        hull_mounts: true,
+        weapons: [
+            (
+                name: "Pinched-plasmeric Beam",
+                // A hitscan gun that fires every tick it bears: one steady stream while it
+                // holds on its mark (`beam`), sweeping onto whatever is in its cone. The
+                // projector runs up its pinch for 0.4 s before the stream lights (`spin_up`),
+                // and runs down after it: the tail braces onto the shot and eases off with it.
+                damage: 30, range: 280, reload: 0.1, hitscan: true, beam: true, trajectory: Direct,
+                spin_up: 0.4,
+                turret_turn: 50, muzzle: (5.72, 0, 22.88), pivot: (-2.08, 0, 24.18), sweep: 6,
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                flash: 1.0, impact: 1.0, plasma_grade: Some(Pinched),
+                sounds: (hold: "regency_pinched_beam"),
+            ),
+            (
+                name: "Gravitic Bomb",
+                // The left claw. Charged between its fingers, then thrown three at a time as
+                // fast streaks that curve onto the mark (`curve`): the first swung out to
+                // the left of the line, the second over it, the third across to the right,
+                // each bending back onto the target from its own side.
+                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 240,
+                trajectory: Direct, curve: 45, tracer: 1.8, salvo: 3, salvo_delay: 0.25,
+                mount: true, arc: 120, turret_turn: 90,
+                muzzle: (22.75, 4.29, 6.89), pivot: (22.75, 4.29, 6.89),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                flash: 0.9, impact: 2.2, shockwave: 1.0, plasma_grade: Some(Plasmeric),
+                sounds: (fire: "regency_gravitic_throw", charge: "regency_gravitic_charge", charge_time: 1.2, impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
+            ),
+            (
+                name: "Gravitic Bomb",
+                // The right claw: its fan the mirror of the left's.
+                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 240,
+                trajectory: Direct, curve: 45, tracer: 1.8, salvo: 3, salvo_delay: 0.25,
+                mount: true, arc: 120, turret_turn: 90,
+                muzzle: (22.75, -4.29, 6.89), pivot: (22.75, -4.29, 6.89),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                flash: 0.9, impact: 2.2, shockwave: 1.0, plasma_grade: Some(Plasmeric),
+                sounds: (fire: "regency_gravitic_throw", charge: "regency_gravitic_charge", charge_time: 1.2, impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
+            ),
+        ],
+        mesh: "regency_scorpion", icon: Bot,
+        sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
+    ),
+]

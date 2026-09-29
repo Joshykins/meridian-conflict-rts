@@ -292,7 +292,7 @@ average (budget 25 ms); GPU frame about 1 ms at 2560x1440 on an RTX 3080 Ti with
 In an unpaced `--bench` run the first cross-map flow field can take longer than the two ticks it
 is given, because ticks run back to back instead of 100 ms apart; at game speed it has 200 ms.
 
-Not built yet: the Naga's fighting units and their tech 2+ structures (they have their own
+Not built yet: the Regency's fighting units and their tech 2+ structures (they have their own
 commander, engineer and tech 1 structures, and field ARC's units from their factories until then); battle sounds beyond the first library in `data/sounds` and `data/factions/aster/sounds.ron`
 (unit files name their sounds; only the Warden's have been reviewed by ear, see `docs/STYLE.md`);
 patrol and guard orders; reclaiming trees on an order; authored art

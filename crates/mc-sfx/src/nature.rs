@@ -270,7 +270,7 @@ mod tests {
         let started = std::time::Instant::now();
         let mut seen = 0;
         for sound in &library.sounds {
-            // Only the ambience file: a Wind layer elsewhere (a Naga builder's
+            // Only the ambience file: a Wind layer elsewhere (a Regency builder's
             // particle rush) is a texture under a held machine, not a bed.
             let nature = sound.file == "ambience"
                 && sound.layers.iter().any(|l| {

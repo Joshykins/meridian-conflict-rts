@@ -1,5 +1,5 @@
 {
-  "key": "naga_t2_air_factory",
+  "key": "regency_t2_air_factory",
   "slug": "t2-air-factory",
   "faction": "regency",
   "name": "Skyforge II",
@@ -28,9 +28,9 @@
   },
   "weapons": [],
   "builds": [
-    "naga_t1_engineer"
+    "regency_t1_engineer"
   ],
-  "upgradesTo": "naga_t3_air_factory",
-  "mesh": "naga_hatchery",
+  "upgradesTo": "regency_t3_air_factory",
+  "mesh": "regency_hatchery",
   "icon": "Factory"
 }

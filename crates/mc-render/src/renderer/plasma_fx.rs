@@ -1,4 +1,4 @@
-//! The Naga's plasma weapons as they are drawn (docs/STYLE.md "The Naga suite"):
+//! The Regency's plasma weapons as they are drawn (docs/STYLE.md "The Regency suite"):
 //!
 //! - **A held beam** (`Weapon::beam`). The sim fires it every tick it bears, a hitscan shot
 //!   each time; this draws one steady stream from the muzzle to what it strikes instead of

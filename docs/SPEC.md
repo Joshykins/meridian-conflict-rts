@@ -64,7 +64,7 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 **Game**
 
 - Commander, mass and energy flow economy, engineers, factories, tech tiers, reclaimable wreckage, fog of war, strategic icons, AI opponents, multiplayer.
-- Factions are data. The engine supports many. Two are defined: Aster and the Naga. Aster is built first.
+- Factions are data. The engine supports many. Two are defined: Aster and the Regency. Aster is built first.
 - First playable: a land war. Then air. Then naval and experimentals.
 
 **The first faction: Aster**
@@ -78,11 +78,11 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 - Highlights are a bright, near-white blue, more highlights on the more advanced guns/units.
 - Most weapons fire blue. Some are orange/conventional weapons.
 
-**The second faction: the Naga (Build later not now)**
+**The second faction: the Regency (Build later not now)**
 
 - Ultra-mechanical: layered armour over exposed machinery. Very advanced.
-- Dark plating, dark bronze, red highlights; construction is violet (docs/STYLE.md "The Naga look").
-- "Naga" is the name used in code, in asset names and for short labels.
+- Dark plating, dark bronze, red highlights; construction is violet (docs/STYLE.md "The Regency look").
+- "Regency" is the name used in code, in asset names and for short labels.
 - In feel, somewhere between Aeon, Cybran and Seraphim.
 
 **Engineering**

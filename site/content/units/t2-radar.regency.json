@@ -1,5 +1,5 @@
 {
-  "key": "naga_t2_radar",
+  "key": "regency_t2_radar",
   "slug": "t2-radar",
   "faction": "regency",
   "name": "Orrery II",
@@ -27,7 +27,7 @@
   },
   "weapons": [],
   "builds": [],
-  "upgradesTo": "naga_t3_radar",
-  "mesh": "naga_eye",
+  "upgradesTo": "regency_t3_radar",
+  "mesh": "regency_eye",
   "icon": "Intel"
 }

@@ -1,5 +1,5 @@
 {
-  "key": "naga_t2_extractor",
+  "key": "regency_t2_extractor",
   "slug": "t2-extractor",
   "faction": "regency",
   "name": "Excavator II",
@@ -28,7 +28,7 @@
   },
   "weapons": [],
   "builds": [],
-  "upgradesTo": "naga_t3_extractor",
-  "mesh": "naga_taproot",
+  "upgradesTo": "regency_t3_extractor",
+  "mesh": "regency_taproot",
   "icon": "Extractor"
 }

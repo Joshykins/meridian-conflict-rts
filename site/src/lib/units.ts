@@ -22,8 +22,8 @@ export async function getUnit(faction: string, slug: string): Promise<Unit | nul
 
 /** The game key (`aster_t1_tank`) back to a directory entry. */
 export function byKey(key: string): UnitSummary | undefined {
-  const faction = key.startsWith("naga_") ? "regency" : "arc";
-  const slug = key.replace(/^(aster|naga)_/, "").replace(/_/g, "-");
+  const faction = key.startsWith("regency_") ? "regency" : "arc";
+  const slug = key.replace(/^(aster|regency)_/, "").replace(/_/g, "-");
   return units.find((u) => u.faction === faction && u.slug === slug);
 }
 

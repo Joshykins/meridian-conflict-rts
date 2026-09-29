@@ -371,7 +371,7 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     // at half cover each, which let the ground show through as a dark seam.
     let ragged = textureSample(noise_map, repeat_sampler, wp / 5.0).b;
     var edge_in = in.half_m + 0.3 - max(abs(local.x), abs(local.y));
-    // A Naga lot is no square slab: a black hub under the building, smaller discs spread out
+    // A Regency lot is no square slab: a black hub under the building, smaller discs spread out
     // round it on bronze lines (`lot_plate`), bare ground between.
     var plate = vec4<f32>(in.half_m, 0.0, 0.0, 0.0);
     let sd = pad_mesh_sd(in.uv, blueprint);
@@ -817,7 +817,7 @@ fn fs_vein(in: VeinOut) -> @location(0) vec4<f32> {
     return vec4<f32>((body + glow) * fade * hi * 2.2, 0.0);
 }
 
-// ---- A Naga lot (`PAD_NANITE`) --------------------------------------------------------
+// ---- A Regency lot (`PAD_NANITE`) --------------------------------------------------------
 // Not a paved slab: black machined discs set in bronze. A big hub lies under the building,
 // a bronze thread runs round it with beads strung on it, each smaller than the one before,
 // and bronze lines run out to smaller discs spread out towards the lot's corners (one or two

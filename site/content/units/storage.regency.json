@@ -1,5 +1,5 @@
 {
-  "key": "naga_storage",
+  "key": "regency_storage",
   "slug": "storage",
   "faction": "regency",
   "name": "Reliquary",
@@ -29,6 +29,6 @@
   "weapons": [],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_cyst",
+  "mesh": "regency_cyst",
   "icon": "Storage"
 }

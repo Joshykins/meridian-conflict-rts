@@ -3709,7 +3709,7 @@ impl Game {
                 ));
             }
         }
-        // Held beams (the Naga's): one loop per sound, heard from where they fire.
+        // Held beams (the Regency's): one loop per sound, heard from where they fire.
         loops.extend(crate::audio::beams::held_beam_loops(
             &self.view.frame.events,
             bps,

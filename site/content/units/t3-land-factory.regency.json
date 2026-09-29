@@ -1,5 +1,5 @@
 {
-  "key": "naga_t3_land_factory",
+  "key": "regency_t3_land_factory",
   "slug": "t3-land-factory",
   "faction": "regency",
   "name": "Anvil III",
@@ -27,10 +27,10 @@
   },
   "weapons": [],
   "builds": [
-    "naga_t1_engineer",
-    "naga_t3_scorpion"
+    "regency_t1_engineer",
+    "regency_t3_scorpion"
   ],
   "upgradesTo": null,
-  "mesh": "naga_brood",
+  "mesh": "regency_brood",
   "icon": "Factory"
 }

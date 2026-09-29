@@ -1533,20 +1533,22 @@ mod tests {
     }
 
     #[test]
-    fn naga_stands_in_on_the_aster_roster() {
+    fn regency_stands_in_on_the_aster_roster() {
         let bp = Blueprints::load(&data_dir()).unwrap();
         let aster = bp.faction_by_key("aster").unwrap();
-        let naga = bp.faction_by_key("naga").expect("the Naga are defined");
+        let regency = bp
+            .faction_by_key("regency")
+            .expect("the Regency is defined");
         // Aster sorts first and keeps id 0: the renderer paints with factions[0].
         assert_eq!(aster.id, FactionId(0));
         assert_eq!(aster.stand_in, None);
-        assert_eq!(naga.stand_in, Some(aster.id));
+        assert_eq!(regency.stand_in, Some(aster.id));
         // Their own commander, which builds only their own structures.
-        let commander = bp.unit(naga.commander);
-        assert_eq!(commander.key, "naga_commander");
-        assert_eq!(commander.faction, naga.id);
+        let commander = bp.unit(regency.commander);
+        assert_eq!(commander.key, "regency_commander");
+        assert_eq!(commander.faction, regency.id);
         assert!(commander.has(cat::COMMANDER));
-        let set = bp.refit_set(naga.commander).expect("it refits");
+        let set = bp.refit_set(regency.commander).expect("it refits");
         let suites: Vec<&str> = set
             .slots
             .iter()
@@ -1558,16 +1560,17 @@ mod tests {
         assert!(builds.len() >= 8);
         assert!(builds
             .iter()
-            .all(|&b| bp.unit(b).faction == naga.id && bp.unit(b).is_structure()));
+            .all(|&b| bp.unit(b).faction == regency.id && bp.unit(b).is_structure()));
         // Their factories make their own engineer and, for now, the stand-in's fighters.
         for factory in bp
             .units
             .iter()
-            .filter(|u| u.faction == naga.id && u.has(cat::FACTORY))
+            .filter(|u| u.faction == regency.id && u.has(cat::FACTORY))
         {
             let made = &factory.builder.as_ref().unwrap().builds;
             assert!(
-                made.iter().any(|&b| bp.unit(b).key == "naga_t1_engineer"),
+                made.iter()
+                    .any(|&b| bp.unit(b).key == "regency_t1_engineer"),
                 "{}",
                 factory.key
             );
@@ -1578,14 +1581,17 @@ mod tests {
             );
         }
         // Nanites build their structures, and they answer in their own voices.
-        assert_eq!(naga.construction, Construction::Nanite);
+        assert_eq!(regency.construction, Construction::Nanite);
         assert_eq!(aster.construction, Construction::Print);
-        assert!(naga.sounds.select.contains_key(&IconKind::Factory) && naga.sounds.build.is_some());
+        assert!(
+            regency.sounds.select.contains_key(&IconKind::Factory)
+                && regency.sounds.build.is_some()
+        );
     }
 
     #[test]
     fn a_builder_may_not_put_up_another_factions_structure() {
-        // The shipped data with the Naga commander told to build an ARC reactor.
+        // The shipped data with the Regency commander told to build an ARC reactor.
         let dir =
             std::env::temp_dir().join(format!("mc-data-foreign-build-{}", std::process::id()));
         let copy = |from: &Path, to: &Path| {
@@ -1608,11 +1614,11 @@ mod tests {
             out
         }
         copy(&data_dir().join("factions"), &dir.join("factions"));
-        let command = dir.join("factions/naga/units/command.ron");
+        let command = dir.join("factions/regency/units/command.ron");
         let text = std::fs::read_to_string(&command).unwrap();
         let text = text.replacen(
-            "\"naga_t1_power\",",
-            "\"naga_t1_power\", \"aster_t1_power\",",
+            "\"regency_t1_power\",",
+            "\"regency_t1_power\", \"aster_t1_power\",",
             1,
         );
         std::fs::write(&command, text).unwrap();

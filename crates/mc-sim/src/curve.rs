@@ -1,4 +1,4 @@
-//! Thrown charges that curve onto their mark (`Weapon::curve`, the Naga's Gravitic Bomb).
+//! Thrown charges that curve onto their mark (`Weapon::curve`, the Regency's Gravitic Bomb).
 //!
 //! A salvo's shots leave fanned out off the line to the mark: the first swung out to the
 //! thrower's side of it, the last across to the other, the middle ones lofted over it.

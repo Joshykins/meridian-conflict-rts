@@ -1,5 +1,5 @@
 {
-  "key": "naga_t2_point_defense",
+  "key": "regency_t2_point_defense",
   "slug": "t2-point-defense",
   "faction": "regency",
   "name": "Halberd",
@@ -46,6 +46,6 @@
   ],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_pinch_cannon",
+  "mesh": "regency_pinch_cannon",
   "icon": "Defense"
 }

@@ -118,7 +118,7 @@ fn strategic_view(dist: f32) -> f32 {
     return 1.0 - smoothstep(globals.lod.y, globals.lod.y * 4.0, tank_px);
 }
 
-// A Naga plasma shot's look (`mirror::plasma_look`): extras.z holds one plus its redness
+// A Regency plasma shot's look (`mirror::plasma_look`): extras.z holds one plus its redness
 // plus twice the look. Zero for any other shot.
 fn plasma_look(p: Projectile) -> u32 {
     if p.extras.z < 2.5 || (p.color & 0x100u) != 0u {
@@ -224,7 +224,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         head = p.pos;
         at.w = 1.0;
     }
-    // A held Naga beam (renderer/plasma_fx.rs) glides over the tick, as the units at its
+    // A held Regency beam (renderer/plasma_fx.rs) glides over the tick, as the units at its
     // two ends are drawn to: `aim` and `prev_aim` are where its tail and head get to.
     let held = fade_beam && (p.color & 0xFu) == 7u;
     if held {
@@ -259,7 +259,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if (p.color & RAIL) != 0u {
         trace = length(stride) * 0.45;
     }
-    // A Naga plasma shot past the Plasmeric slug (`mirror::plasma_look`, twice over in
+    // A Regency plasma shot past the Plasmeric slug (`mirror::plasma_look`, twice over in
     // extras.z): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug, 3 a thrown
     // gravitic charge. Each is a longer streak than a shell's trace.
     let look = plasma_look(p);
@@ -419,7 +419,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
-            // 7.6, 8.6, 9.6: the Naga plasma streaks (`fs_sprite`).
+            // 7.6, 8.6, 9.6: the Regency plasma streaks (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -821,7 +821,7 @@ fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
             return vec4<f32>(in.color * glow + plasma, 1.0);
         }
         if in.shape.y > 7.1 {
-            // A Naga plasma slug in flight (`plasma_look`): u runs 0 at the tail to 1 at the head.
+            // A Regency plasma slug in flight (`plasma_look`): u runs 0 at the tail to 1 at the head.
             let u = in.uv.x * 0.5 + 0.5;
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);

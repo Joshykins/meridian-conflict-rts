@@ -1,4 +1,4 @@
-//! The Naga's squeezed plasma guns firing and striking (docs/STYLE.md "The Naga suite"):
+//! The Regency's squeezed plasma guns firing and striking (docs/STYLE.md "The Regency suite"):
 //! the Pinched-plasmeric and Pinch-fusion grades (`Weapon::plasma_grade`) of a direct-fire
 //! gun. In flight their slugs are sprites.wgsl's (`mirror::plasma_look`); the gun's own
 //! red flash, smoke and the shell's blast where it lands are drawn as any gun's. This adds

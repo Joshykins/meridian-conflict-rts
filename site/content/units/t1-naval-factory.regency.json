@@ -1,5 +1,5 @@
 {
-  "key": "naga_t1_naval_factory",
+  "key": "regency_t1_naval_factory",
   "slug": "t1-naval-factory",
   "faction": "regency",
   "name": "Slipway",
@@ -27,9 +27,9 @@
   },
   "weapons": [],
   "builds": [
-    "naga_t1_engineer"
+    "regency_t1_engineer"
   ],
   "upgradesTo": null,
-  "mesh": "naga_tidebrood",
+  "mesh": "regency_tidebrood",
   "icon": "Factory"
 }

@@ -1,5 +1,5 @@
 {
-  "key": "naga_t1_aa",
+  "key": "regency_t1_aa",
   "slug": "t1-aa",
   "faction": "regency",
   "name": "Canopy",
@@ -46,6 +46,6 @@
   ],
   "builds": [],
   "upgradesTo": null,
-  "mesh": "naga_spitter",
+  "mesh": "regency_spitter",
   "icon": "AntiAir"
 }

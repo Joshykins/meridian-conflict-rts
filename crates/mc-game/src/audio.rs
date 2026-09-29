@@ -1083,18 +1083,18 @@ mod tests {
         }
     }
 
-    /// The Naga's set on its own, so a problem elsewhere in the library does not hide it.
+    /// The Regency's set on its own, so a problem elsewhere in the library does not hide it.
     #[test]
-    fn naga_sounds_are_clean_and_loops_join_up() {
+    fn regency_sounds_are_clean_and_loops_join_up() {
         let library = library();
         let mut seen = 0;
         for (i, sound) in library.sounds.iter().enumerate() {
-            if sound.name.starts_with("naga_") {
+            if sound.name.starts_with("regency_") {
                 seen += 1;
                 assert_library_sound(i, sound);
             }
         }
-        assert!(seen > 20, "{seen} Naga sounds");
+        assert!(seen > 20, "{seen} Regency sounds");
     }
 
     /// One library sound: clean if it plays once; if it loops, at a sane level, as long as

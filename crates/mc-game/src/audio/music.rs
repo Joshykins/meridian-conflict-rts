@@ -1053,7 +1053,7 @@ mod tests {
             Some("reach")
         );
         assert_eq!(
-            song_for(&s, &Scene::Battle("Naga".into())).as_deref(),
+            song_for(&s, &Scene::Battle("Regency".into())).as_deref(),
             Some("war")
         );
         // No survival song: the default battle song.
@@ -1341,7 +1341,7 @@ mod tests {
             .unwrap();
         std::fs::write(
             dir.join("score.ron"),
-            r#"(menu: "one", battle: {"Aster": "one", "Naga": "two", "Precursor": "broken"}, survival: "missing",
+            r#"(menu: "one", battle: {"Aster": "one", "Regency": "two", "Precursor": "broken"}, survival: "missing",
                 fade: 1.0, moments: {"nuke": "boom", "victory": "won", "titan": "absent"}, endings: ["victory"],
                 duck_db: -12.0)"#,
         )
@@ -1392,7 +1392,7 @@ mod tests {
         l.handle(Req::Scene(Scene::Menu));
         assert_eq!(sent(&deck), ["start one"]);
         // Another faction's song cross-fades in; lost with no defeat moment: a fade.
-        l.handle(Req::Scene(Scene::Battle("Naga".into())));
+        l.handle(Req::Scene(Scene::Battle("Regency".into())));
         assert_eq!(sent(&deck), ["start two"]);
         l.handle(Req::Finish { victory: false });
         assert_eq!(sent(&deck), ["fade"]);

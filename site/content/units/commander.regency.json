@@ -1,5 +1,5 @@
 {
-  "key": "naga_commander",
+  "key": "regency_commander",
   "slug": "commander",
   "faction": "regency",
   "name": "Exarch",
@@ -46,18 +46,18 @@
     }
   ],
   "builds": [
-    "naga_t1_land_factory",
-    "naga_t1_air_factory",
-    "naga_t1_naval_factory",
-    "naga_t1_extractor",
-    "naga_t1_power",
-    "naga_storage",
-    "naga_t1_point_defense",
-    "naga_t1_aa",
-    "naga_t1_radar",
-    "naga_wall"
+    "regency_t1_land_factory",
+    "regency_t1_air_factory",
+    "regency_t1_naval_factory",
+    "regency_t1_extractor",
+    "regency_t1_power",
+    "regency_storage",
+    "regency_t1_point_defense",
+    "regency_t1_aa",
+    "regency_t1_radar",
+    "regency_wall"
   ],
   "upgradesTo": null,
-  "mesh": "naga_commander",
+  "mesh": "regency_commander",
   "icon": "Commander"
 }

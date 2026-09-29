@@ -29,7 +29,7 @@ const PAT_PLASMA: u32 = 15u;
 const PAT_FLUX: u32 = 16u;
 const PAT_VEINED: u32 = 17u;
 const PAT_PRECURSOR: u32 = 18u;
-// Naga hide (`pattern::EMBER`, 29): Aster's dark plating, its level lights the Naga's red.
+// Regency hide (`pattern::EMBER`, 29): Aster's dark plating, its level lights the Regency's red.
 const PAT_EMBER: u32 = 29u;
 
 // The lights let into dark plating, and the hot end of a furnace.
@@ -45,7 +45,7 @@ const SURF_PRECURSOR_HOT: vec3<f32> = vec3<f32>(0.8, 0.9, 1.0);
 // A reactor's burning core: deep blue where it is thin, near white where it is hot.
 const SURF_PLASMA_DEEP: vec3<f32> = vec3<f32>(0.10, 0.34, 1.0);
 const SURF_PLASMA_HOT: vec3<f32> = vec3<f32>(0.72, 0.90, 1.0);
-// The Naga's light in their hide: a deep blood red, kept off orange (the tonemap lifts green first).
+// The Regency's light in their hide: a deep blood red, kept off orange (the tonemap lifts green first).
 const SURF_EMBER: vec3<f32> = vec3<f32>(1.0, 0.04, 0.05);
 
 struct SurfaceIn {
@@ -730,7 +730,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
         let worn = (1.0 - smoothstep(0.0, bevel * (1.0 + 2.5 * hurt), d_face)) * outlined;
         out.bare = worn * smoothstep(0.75 - 0.55 * hurt, 0.95 - 0.5 * hurt, scuff + worn * 0.35);
         if i.pattern == PAT_EMBER {
-            // Naga hide is not paint over steel: its edges only go raw where it is hurt.
+            // Regency hide is not paint over steel: its edges only go raw where it is hurt.
             out.bare *= hurt;
         }
 
@@ -1098,7 +1098,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                     // Only the Precursors' veins are lit: Aster's black carries no orange lines.
                     let ember = i.pattern == PAT_EMBER;
                     let veined = select(0.0, 1.0, i.pattern == PAT_VEINED || ember);
-                    // A Naga's hide is lit at every tier: it is alive, not painted.
+                    // A Regency unit's hide is lit at every tier: it is alive, not painted.
                     let hide_lit = select(i.lit, 1.0, ember);
                     let lit = surf_band(dash.d, w, fw) * surf_step(dash.along, 0.0, fw) * dash.on * outlined * veined;
                     // A slow shimmer along the line; a hurt unit's lights falter and go out.
@@ -1134,7 +1134,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                     }
                     var chipped = (1.0 - smoothstep(0.0, bevel * (0.8 + 2.0 * hurt), d_cell));
                     if i.pattern == PAT_EMBER {
-                        // Naga hide: glossy chitin with seams, not painted steel that chips pale.
+                        // Regency hide: glossy chitin with seams, not painted steel that chips pale.
                         chipped *= hurt;
                         out.rough += 0.3;
                     }

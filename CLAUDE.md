@@ -191,7 +191,10 @@ In addition:
   mesh name or sound name. That rules out `== "aster_..."`, `mesh ==
   "assault_air"` and `sound == "aster_shatter"`. Add a blueprint or model field
   instead, such as `flak`, `assault_dive` or a per-faction `air_support`, so a
-  second faction (Naga) gets the behaviour by data.
+  second faction (the Regency) gets the behaviour by data.
+- The second faction is the Regency: key `"Regency"`, ids `regency_*`,
+  `data/factions/regency`. Its old working name, Naga, is retired; do not use it
+  in code, ids, docs or talk. `naga` in this tree is only the WGSL compiler crate.
 - Per-model traits live in one record per model (one `ModelDef`), not in
   several `match mesh { ... }` tables that must all be updated together.
 

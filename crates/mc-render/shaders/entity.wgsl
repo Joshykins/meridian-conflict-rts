@@ -892,7 +892,7 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
     // The aim: the sim holds the turret within the body's `aim_arc` and turns the body for
     // the rest. The top four joints share it, 1, 2, 3 and 4 tenths from the lowest, so the
     // tail bends round at its top instead of swivelling whole. The unit file's `turret_at`
-    // is the single pivot that best matches this chain (models/naga/commander.rs test).
+    // is the single pivot that best matches this chain (models/regency/commander.rs test).
     let aim = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
     let lively = alive * mix(1.0, 0.45, busy) * (1.0 - 0.8 * clamp(kick, 0.0, 1.0)) * (1.0 + 0.5 * walk.x);
     let throb = 0.012 * kick * sin(time * 7.0 + seed);
@@ -2206,8 +2206,8 @@ fn vs_main(in: VsIn) -> VsOut {
 // `ModelInfo::icon` bit: the spinner looks about (renderer `Model::spinner_scans`).
 const ICON_SPINNER_SCANS: u32 = 0x8000000u;
 
-// ---- Nanite construction (`mc_data::Construction::Nanite`, the Naga) --------------
-// `status[1]` bit of a Naga site (`mirror::UNIT_NANITE`), and where `model_class` carries it.
+// ---- Nanite construction (`mc_data::Construction::Nanite`, the Regency) --------------
+// `status[1]` bit of a Regency site (`mirror::UNIT_NANITE`), and where `model_class` carries it.
 const UNIT_NANITE: u32 = 2u;
 const CLASS_NANITE: u32 = 0x4000u;
 const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
@@ -2226,7 +2226,7 @@ fn nanite_order(local: vec3<f32>, height: f32, seed: f32) -> f32 {
     return clamp(local.z / max(height, 1.0) + waver * 0.05, 0.0, 1.0);
 }
 
-// A Naga site's colour, and 0 in w where there is nothing there yet. It forms from the
+// A Regency site's colour, and 0 in w where there is nothing there yet. It forms from the
 // ground up: what has just condensed is glowing violet, which slowly cools through red
 // into the finished plate; a thin hot line runs along the front and a haze of violet
 // motes gathers just above it. Above that there is nothing yet (the rings and filaments
@@ -2450,7 +2450,7 @@ fn fs_shadow(in: VsOut) {
     if in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z) { discard; }
     if vapor_edge(in) > 0.0 { discard; }
     // Unbuilt parts of a construction site cast no shadow: neither what is still to be
-    // printed nor a Naga site's swarm.
+    // printed nor a Regency site's swarm.
     if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {
         if (in.model_class & CLASS_NANITE) != 0u {
             if nanite_order(in.local, in.weld.w, in.state.w) > nanite_grow(in.state.x) {
@@ -2492,7 +2492,7 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         case 13u: { m.albedo = vec3<f32>(0.3, 0.17, 0.02); m.emissive = AMBER * 4.0; m.roughness = 0.3; }
         case 14u: { m.albedo = globals.plating.rgb * vec3<f32>(0.3, 0.33, 0.39); m.metallic = 0.45; m.roughness = 0.42; }
         case 15u: { m.albedo = vec3<f32>(0.28, 0.03, 0.03); m.emissive = vec3<f32>(1.0, 0.08, 0.06) * 5.0; m.roughness = 0.28; }
-        // Naga construction: a violet with red in it (their counterpart to ARC's amber).
+        // Regency construction: a violet with red in it (their counterpart to ARC's amber).
         case 16u: { m.albedo = vec3<f32>(0.18, 0.05, 0.3); m.emissive = vec3<f32>(0.66, 0.12, 1.0) * 5.0; m.roughness = 0.25; }
         case 17u: { m.albedo = vec3<f32>(0.3, 0.02, 0.02); m.emissive = vec3<f32>(1.0, 0.07, 0.05) * 5.5; m.roughness = 0.25; }
         // Precursor alloy, its dark joints, and its cold blue-white light.
@@ -2841,7 +2841,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.metallic = mix(m.metallic, metal, detail);
         m.roughness = mix(m.roughness, rough, detail);
     }
-    // Construction emitters: ARC's amber, the Naga's violet.
+    // Construction emitters: ARC's amber, the Regency's violet.
     let builds = in.material == MAT_GLOW_AMBER || in.material == MAT_GLOW_VIOLET;
     if builds && (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0 {
         // Construction emitters run hot while the unit builds, not during a refit.
@@ -2987,8 +2987,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             low = 0.0;
             grit = 0.3;
         }
-        // Naga plate (`pattern::EMBER`) is not paint: a unit gathers dust at its feet, never
-        // grime, and a Naga building stands kept clean.
+        // Regency plate (`pattern::EMBER`) is not paint: a unit gathers dust at its feet, never
+        // grime, and a Regency building stands kept clean.
         if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
             grit = 0.0;
             low = select(0.0, low, (in.model_class & 0x100u) != 0u);
@@ -3136,13 +3136,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             color = base + replication_tint(color - base);
         }
     }
-    // A Naga refit (`mirror::UNIT_NANITE` on an upgrading unit) is nanite work: its
+    // A Regency refit (`mirror::UNIT_NANITE` on an upgrading unit) is nanite work: its
     // pieces come as a black swarm lit violet, not as ARC's amber print.
     let nanite_refit = (in.model_class & CLASS_NANITE) != 0u;
     if in.refit.z > 0.0 {
         if in.refit.x > 0.5 && in.refit.y <= 0.0 {
             // A piece whose turn has not come: a scanning hologram of it, in amber; for the
-            // Naga, the swarm holding its shape with violet bands through it.
+            // Regency, the swarm holding its shape with violet bands through it.
             let scan = fract(in.local.z * 1.4 - time * 0.9);
             let grid = step(0.8, fract(in.local.x * 2.0)) + step(0.8, fract(in.local.y * 2.0)) + step(0.85, scan);
             if nanite_refit {
@@ -3163,10 +3163,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             }
         } else if in.refit.x > 0.5 {
             // Going up: white-hot at first, cooling into the finished piece (violet from black
-            // for the Naga).
+            // for the Regency).
             let cool = smoothstep(0.0, 1.0, in.refit.y);
             if nanite_refit {
-                // The Naga: the swarm on the piece closes up and condenses into its plate,
+                // The Regency: the swarm on the piece closes up and condenses into its plate,
                 // a thin violet streak running through it until it settles.
                 let q = in.local * 0.35 + vec3<f32>(in.state.w * 11.0, 0.0, time * 0.25);
                 let holes = value_noise2(q.xy + vec2<f32>(q.z * 0.8, -q.z * 0.6), 1.0);
