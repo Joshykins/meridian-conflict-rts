@@ -284,6 +284,8 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("storage_mass", 12.9, 10.2, 2, 3, &[]),
     structure("storage_mass", 12.9, 14.9, 3, 3, &[]),
     structure("storage_energy", 14.2, 10.2, 1, 3, &[]),
+    structure("storage_energy", 14.2, 14.3, 2, 3, &[]),
+    structure("storage_energy", 14.2, 19.4, 3, 3, &[]),
     structure("turret", 5.25, 6.75, 1, 1, &[[7.5, 0.0, 5.55]]),
     structure(
         "turret_heavy",

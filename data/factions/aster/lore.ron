@@ -271,6 +271,12 @@
     "aster_energy_storage": (
         lore: "Banked cells storing reactor output for the moments a base needs a surge.",
     ),
+    "aster_energy_storage_t2": (
+        lore: "The bank built up in place, more cells racked onto the first to carry a heavier grid through a surge.",
+    ),
+    "aster_energy_storage_t3": (
+        lore: "A strategic charge reserve: enough stored power to hold shields and factories up through a long stall.",
+    ),
     "aster_t1_point_defense": (
         lore: "A basic static gun built around the same cannon the Warden tank carries.",
         weapons: {
