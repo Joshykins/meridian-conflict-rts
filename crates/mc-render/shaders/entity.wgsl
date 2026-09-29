@@ -532,6 +532,36 @@ fn casing_carry(e: Entity, t: f32) -> vec3<f32> {
     return vec3<f32>(fwd * bob.x + lft * bob.y, bob.z) * hold;
 }
 
+// How far out to the side a walker's feet come down: where they stand at rest, and in
+// under the hips as it gets into its stride (`stride_upright`).
+fn stride_ankle_y(model: ModelInfo, walk: vec2<f32>) -> f32 {
+    if any(model.leg_hock.xyz != vec3<f32>(0.0)) {
+        return abs(model.leg_ankle.y);
+    }
+    return mix(abs(model.leg_ankle.y), abs(model.leg_hip.y), walk.x);
+}
+
+// A leg vertex of a walker whose feet stand out wider than its hips (the commander's
+// A-stance), brought in under them as it gets into its stride: the thigh and shin roll
+// upright about the hip and the foot slides in with the ankle, still flat. Standing it is
+// untouched. Before `walk_leg`, which bends the leg in its own (x, z) plane.
+fn stride_upright(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo,
+                  walk: vec2<f32>) -> array<vec3<f32>, 2> {
+    let side = select(-1.0, 1.0, pos.y > 0.0);
+    let hy = abs(model.leg_hip.y);
+    let out = abs(model.leg_ankle.y) - hy;
+    if limb != LIMB_THIGH && limb != LIMB_SHIN {
+        return array<vec3<f32>, 2>(pos - vec3<f32>(0.0, side * out * walk.x, 0.0), normal);
+    }
+    let a = -side * atan2(out, model.leg_hip.z - model.leg_ankle.z) * walk.x;
+    let c = cos(a);
+    let s = sin(a);
+    let q = pos.yz - vec2<f32>(side * hy, model.leg_hip.z);
+    let r = vec2<f32>(q.x * c - q.y * s, q.x * s + q.y * c) + vec2<f32>(side * hy, model.leg_hip.z);
+    let m = vec2<f32>(normal.y * c - normal.z * s, normal.y * s + normal.z * c);
+    return array<vec3<f32>, 2>(vec3<f32>(pos.x, r.x, r.y), vec3<f32>(normal.x, m.x, m.y));
+}
+
 fn walk_ground(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32) -> Footing {
     var f: Footing;
     let heading = lerp_angle(e.prev_heading, e.heading, t);
@@ -541,7 +571,7 @@ fn walk_ground(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32) -> Footing 
     let centre = terrain_height(at);
     // Half a sole or so: the slope a foot lies on, not the bumps under its heel.
     let d = max(0.12 * model.leg_hip.w, 1.0);
-    let ay = abs(model.leg_ankle.y);
+    let ay = stride_ankle_y(model, walk);
     let xl = model.leg_ankle.x + stride_foot(fract(walk.y), model) * walk.x;
     let xr = model.leg_ankle.x + stride_foot(fract(walk.y + 0.5), model) * walk.x;
     let pl = at + fwd * xl + lft * ay;
@@ -591,6 +621,7 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
         return hock_leg(pos, normal, limb, model, hip, ankle0 + foot * walk.x + vec2<f32>(0.0, ground),
             -pitch * walk.x + atan(select(footing.slope.y, footing.slope.x, left)));
     }
+    let upright = stride_upright(pos, normal, limb, model, walk);
     let l1 = distance(knee0, hip0);
     let l2 = distance(ankle0, knee0);
     let want = ankle0 + foot * walk.x + vec2<f32>(rest.x, ground + rest.y) - hip;
@@ -621,8 +652,8 @@ fn walk_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, model: ModelInfo, walk
         pivot0 = ankle0;
         pivot = ankle;
     }
-    let p = rot_xz(pos - vec3<f32>(pivot0.x, 0.0, pivot0.y), turn) + vec3<f32>(pivot.x, 0.0, pivot.y);
-    return array<vec3<f32>, 2>(p, rot_xz(normal, turn));
+    let p = rot_xz(upright[0] - vec3<f32>(pivot0.x, 0.0, pivot0.y), turn) + vec3<f32>(pivot.x, 0.0, pivot.y);
+    return array<vec3<f32>, 2>(p, rot_xz(upright[1], turn));
 }
 
 // A reverse-kneed leg (`model.leg_hock`) posed to put its ankle at `goal`, the hips at
