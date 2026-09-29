@@ -33,7 +33,7 @@ pub mod economy;
 mod flak;
 pub mod focus;
 pub mod fog;
-mod formations;
+pub mod formations;
 mod guard;
 mod held;
 mod hover_flight;

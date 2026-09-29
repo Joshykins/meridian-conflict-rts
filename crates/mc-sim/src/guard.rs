@@ -62,7 +62,7 @@ impl World {
             .partition(|&row| self.state.units.id(row) == target);
         self.order_air_guard(followed, pos, Handle::NONE, radius, queue)?;
         self.order_air_guard(flock, pos, target, radius, queue)?;
-        for layout in self.formation_layouts(movers, pos, queue, 1) {
+        for layout in self.formation_layouts(movers, pos, queue, None, 1) {
             for (row, offset) in layout.rows.into_iter().zip(layout.offsets) {
                 let anchor = if self.state.units.id(row) == target {
                     Handle::NONE

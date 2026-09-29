@@ -15,6 +15,7 @@ mod audio;
 mod cine;
 mod clipboard;
 mod crash;
+mod formation_drag;
 mod game;
 mod headless;
 mod hud;

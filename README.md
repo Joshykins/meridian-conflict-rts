@@ -189,7 +189,7 @@ Linux builds.
 | input | action |
 |---|---|
 | left click / drag | select unit / box select (shift adds); double-click a unit to take every one of its type on screen; a box takes combat units first, then builders, then structures |
-| right click | move; attack an enemy; assist or repair a friend; reclaim a wreck (engineers, reclaimer towers), or an enemy when nothing selected is armed; on a factory, the way out for what it makes (shift queues more) |
+| right click | move (hold the button to see the formation where it will stand, and drag to turn it to face the way you drag; it moves when you let go; a left click or Esc drops it); attack an enemy; assist or repair a friend; reclaim a wreck (engineers, reclaimer towers), or an enemy when nothing selected is armed; on a factory, the way out for what it makes (shift queues more) |
 | the mouse pointer | says what a click would do. Over an enemy with anything armed selected: attack; over a wreck with builders: reclaim; over a friend with builders: assist; over one of yours otherwise: select. An armed order shows its own pointer, or the barred circle where it cannot apply, like a structure that does not fit. With shift over an order: pick it up. Open ground keeps the plain arrow: a right click there moves, as ever |
 | shift + order | queue |
 | hold shift | every order of your side shows on the map, and every planned structure as a ghost (the selection's show without shift). Drag a waypoint or a planned structure to move it: a shared waypoint moves for the whole group, a structure turns red where it cannot go. Right click or Esc puts it back |

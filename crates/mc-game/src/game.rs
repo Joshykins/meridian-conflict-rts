@@ -408,6 +408,8 @@ pub struct Game {
     place_from: Option<FxVec2>,
     /// Orders on the map: their lines, the ghosts of planned structures, the one being dragged.
     orders: OrderMap,
+    /// A move held on the right button: its formation shows, a drag turns it (`formation_drag.rs`).
+    formation_drag: Option<crate::formation_drag::FormationDrag>,
     /// What a click would do right now; the application shows it as the mouse cursor.
     pointer: Pointer,
     middle_down: bool,
@@ -569,6 +571,7 @@ impl Game {
             left_down: None,
             place_from: None,
             orders: OrderMap::default(),
+            formation_drag: None,
             pointer: Pointer::Arrow,
             middle_down: false,
             track: None,
@@ -697,6 +700,7 @@ impl Game {
                 self.alt = false;
                 self.free_chord = false;
                 self.right_down = false;
+                self.formation_drag = None;
                 self.end_orbit();
             }
             WindowEvent::ModifiersChanged(m) => {
@@ -857,6 +861,7 @@ impl Game {
                 target,
                 queue,
                 attack_move: false,
+                facing: None,
                 together: self.view.formation_together,
                 spacing: self.view.formation_spacing,
             },
@@ -869,6 +874,7 @@ impl Game {
                 target,
                 queue,
                 attack_move: true,
+                facing: None,
                 together: self.view.formation_together,
                 spacing: self.view.formation_spacing,
             },
@@ -1127,6 +1133,8 @@ impl Game {
         match (button, pressed) {
             (MouseButton::Middle, p) => self.middle_down = p,
             // A press on the HUD is the HUD's: it sees it through the interface's input.
+            // A left press drops a move held on the right button.
+            (MouseButton::Left, true) if self.formation_drag.take().is_some() => {}
             (MouseButton::Left, true) => {
                 if !self.hud.covers(self.cursor) {
                     // With shift held, a press on an order picks it up.
@@ -1208,7 +1216,27 @@ impl Game {
                     self.place_from = None;
                 } else {
                     let ground = self.ground_under_cursor(r).map(|g| g.truncate());
-                    self.context_order(ground, self.unit_at(self.cursor), audio);
+                    let command = (!self.view.observing)
+                        .then(|| self.context_command(ground, self.unit_at(self.cursor)))
+                        .flatten();
+                    // A move waits for the button to come up, its formation showing; the rest go now.
+                    match command.map(|c| crate::formation_drag::FormationDrag::new(c, self.cursor))
+                    {
+                        Some(Ok(drag)) => self.formation_drag = Some(drag),
+                        Some(Err(command)) => {
+                            audio.play(Sfx::Order);
+                            self.send(command);
+                        }
+                        None => {}
+                    }
+                }
+            }
+            (MouseButton::Right, false) => {
+                if let Some(drag) = self.formation_drag.take() {
+                    let ground = self.ground_under_cursor(r).map(|g| g.truncate());
+                    let facing = drag.facing(self.cursor, ground, DRAG_THRESHOLD);
+                    audio.play(Sfx::Order);
+                    self.send(drag.command(facing, &self.view));
                 }
             }
             _ => {}
@@ -2143,6 +2171,7 @@ impl Game {
                         target: FxVec2::new(Fx::from_f32(center.x), Fx::from_f32(center.y)),
                         queue: false,
                         attack_move: false,
+                        facing: None,
                         together: true,
                         spacing: self.view.formation_spacing,
                     });
@@ -2906,6 +2935,8 @@ impl Game {
             KeyCode::Escape => {
                 if self.orders.dragging() {
                     self.orders.cancel();
+                } else if self.formation_drag.take().is_some() {
+                    // A move held on the right button is dropped, not given.
                 } else if self.view.formation_panel {
                     self.view.formation_panel = false;
                 } else if self.view.mode != Mode::Normal {
@@ -4595,6 +4626,14 @@ impl Game {
             }
             orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
             self.orders.draw_pending(&mut ui, &field, self.cursor);
+            if let Some(drag) = &self.formation_drag {
+                let ground = self.ground_under_cursor(renderer).map(|g| g.truncate());
+                drag.draw(
+                    &mut ui,
+                    &field,
+                    drag.facing(self.cursor, ground, DRAG_THRESHOLD),
+                );
+            }
             if let Some(from) = self.left_down {
                 if self.view.mode == Mode::Normal && from.distance(self.cursor) >= DRAG_THRESHOLD {
                     hud::drag_box(&mut ui, from, self.cursor);

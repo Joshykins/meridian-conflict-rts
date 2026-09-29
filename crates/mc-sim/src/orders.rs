@@ -95,6 +95,7 @@ impl World {
                 target,
                 queue,
                 attack_move,
+                facing,
                 together,
                 spacing,
             } => self.order_formation(
@@ -107,6 +108,7 @@ impl World {
                 },
                 *target,
                 *queue,
+                *facing,
                 *together,
                 *spacing,
             ),
@@ -726,7 +728,7 @@ impl World {
             return Ok(());
         }
         let points: Vec<FxVec2> = points.iter().map(|&p| self.clamp_to_map(p)).collect();
-        for layout in self.formation_layouts(rows, points[0], queue, 1) {
+        for layout in self.formation_layouts(rows, points[0], queue, None, 1) {
             let mut route = points.clone();
             if route.len() == 1 {
                 route.push(layout.centroid);
@@ -902,7 +904,7 @@ impl World {
         target: FxVec2,
         queue: bool,
     ) -> Result<(), SimError> {
-        self.order_formation(player, ids, kind, target, queue, true, 1)
+        self.order_formation(player, ids, kind, target, queue, None, true, 1)
     }
 
     fn order_formation(
@@ -912,12 +914,13 @@ impl World {
         kind: OrderKind,
         target: FxVec2,
         queue: bool,
+        facing: Option<Angle>,
         together: bool,
         spacing_level: u8,
     ) -> Result<(), SimError> {
         let rows = self.owned(player, ids, cat::MOBILE);
         let target = self.clamp_to_map(target);
-        for layout in self.formation_layouts(rows, target, queue, spacing_level) {
+        for layout in self.formation_layouts(rows, target, queue, facing, spacing_level) {
             let n = layout.rows.len();
             let formation = if together && n > 1 {
                 self.new_formation(layout.centroid, layout.facing)
@@ -951,45 +954,23 @@ impl World {
         id
     }
 
-    /// Where each of `rows` stands in a group ordered to `target`: independent blocks
-    /// for ground layers, repeating Vs for each air altitude. Slot assignment is
-    /// spatial and stable, independent of selection order. With `queue`, the group
-    /// starts from where its queues end.
+    /// Where each of `rows` stands in a group ordered to `target` (`formations::plan`),
+    /// facing `facing` or the way it goes. With `queue`, the group starts from where
+    /// its queues end.
     pub(crate) fn formation_layouts(
         &self,
-        rows: Vec<usize>,
+        mut rows: Vec<usize>,
         target: FxVec2,
         queue: bool,
+        facing: Option<Angle>,
         spacing_level: u8,
     ) -> Vec<FormationLayout> {
-        let mut out = Vec::new();
-        let mut groups = std::collections::BTreeMap::<(u8, i64), Vec<usize>>::new();
-        for row in rows {
-            let m = self.bp(row).motion.expect("mobile");
-            groups
-                .entry((
-                    if m.layer == MoveLayer::Air {
-                        2
-                    } else if m.layer == MoveLayer::Naval {
-                        1
-                    } else {
-                        0
-                    },
-                    if m.layer == MoveLayer::Air {
-                        m.altitude.0
-                    } else {
-                        0
-                    },
-                ))
-                .or_default()
-                .push(row);
-        }
-        for (_, mut rows) in groups {
-            rows.sort_unstable();
-            rows.dedup();
-            let n = rows.len() as i32;
-            let source = |row: usize| {
-                if queue {
+        rows.sort_unstable();
+        rows.dedup();
+        let members: Vec<_> = rows
+            .iter()
+            .map(|&row| {
+                let source = if queue {
                     self.state
                         .orders
                         .iter(&self.state.units, row)
@@ -998,48 +979,17 @@ impl World {
                         .unwrap_or(self.state.units.pos[row])
                 } else {
                     self.state.units.pos[row]
-                }
-            };
-            let mut centroid = FxVec2::ZERO;
-            let mut widest = Fx::ZERO;
-            // A hull's width with room to spare round it.
-            let width = |row: usize| self.bp(row).radius * 2 + Fx::from_int(6);
-            for &row in &rows {
-                centroid += source(row);
-                widest = widest.max(width(row));
-            }
-            centroid = FxVec2::new(centroid.x / n, centroid.y / n);
-            let facing = if centroid == target {
-                self.state.units.heading[rows[0]]
-            } else {
-                (target - centroid).angle()
-            };
-            let air = self.is_air(rows[0]);
-            let scale = crate::reform::spacing_scale(spacing_level);
-            // A flight flies its Vs at its widest wing's spacing; a ground
-            // block gives each size its own, heavies in the middle.
-            let (cell, laid) = if air {
-                let slots = crate::formations::slots(n as usize, widest * scale, true);
-                (widest, slots.into_iter().map(|p| (p, 1)).collect())
-            } else {
-                let widths: Vec<_> = rows.iter().map(|&row| width(row)).collect();
-                let at: Vec<_> = rows
-                    .iter()
-                    .map(|&row| (source(row) - centroid).rotate(-facing))
-                    .collect();
-                crate::formations::block(&widths, &at, scale)
-            };
-            let spacing = cell * scale;
-            let size = |row: usize| {
-                if air {
-                    1
-                } else {
-                    crate::formations::cells(width(row), cell)
-                }
-            };
-            let offsets: Vec<_> = laid.iter().map(|&(p, _)| p).collect();
+                };
+                crate::formations::Member::new(self.bp(row), source, self.state.units.heading[row])
+                    .expect("mobile")
+            })
+            .collect();
+        let mut out = Vec::new();
+        for laid in crate::formations::plan(&members, target, facing, spacing_level) {
+            let rows: Vec<usize> = laid.members.iter().map(|&i| rows[i]).collect();
+            let rotated = &laid.offsets;
+            let (facing, centroid, spacing) = (laid.facing, laid.centroid, laid.spacing);
             // Shift the whole layout at map edges instead of crushing individual slots.
-            let rotated: Vec<_> = offsets.iter().map(|p| p.rotate(facing)).collect();
             let size_m = self.terrain.size_metres();
             let min_x = rotated.iter().map(|p| p.x).min().unwrap();
             let max_x = rotated.iter().map(|p| p.x).max().unwrap();
@@ -1058,52 +1008,9 @@ impl World {
                 fit(target.x, min_x, max_x, size_m.x),
                 fit(target.y, min_y, max_y, size_m.y),
             );
-            let center = self.clear_formation_destination(center, &rotated, &rows, spacing);
-            // Each size takes the slots laid out for its size. Within one,
-            // sort ranks front-to-back, then left-to-right. This is O(n log n),
-            // avoids selection-order crossings, and keeps large armies affordable.
-            let mut classes: Vec<u8> = laid.iter().map(|&(_, k)| k).collect();
-            classes.sort_unstable();
-            classes.dedup();
-            let mut ranked = Vec::with_capacity(rows.len());
-            let mut slots = Vec::with_capacity(rows.len());
-            for k in classes {
-                let mut rows: Vec<usize> = rows.iter().copied().filter(|&r| size(r) == k).collect();
-                rows.sort_by_key(|&row| {
-                    let p = (source(row) - centroid).rotate(-facing);
-                    (-p.x.0.div_euclid(spacing.0), -p.y.0, row)
-                });
-                let mut mine: Vec<_> = (0..laid.len()).filter(|&i| laid[i].1 == k).collect();
-                mine.sort_by_key(|&i| (-offsets[i].x.0, -offsets[i].y.0, i));
-                // Remove crossing assignments before issuing the order. Pair swaps
-                // strictly reduce squared travel, with fixed iteration order for replay.
-                // Bound work for very large selections.
-                if rows.len() <= 256 {
-                    for _ in 0..4 {
-                        let mut changed = false;
-                        for a in 0..rows.len() {
-                            for b in a + 1..rows.len() {
-                                let pa = source(rows[a]) - centroid;
-                                let pb = source(rows[b]) - centroid;
-                                let oa = rotated[mine[a]];
-                                let ob = rotated[mine[b]];
-                                if (pa - pb).dot(oa - ob) < Fx::ZERO {
-                                    mine.swap(a, b);
-                                    changed = true;
-                                }
-                            }
-                        }
-                        if !changed {
-                            break;
-                        }
-                    }
-                }
-                ranked.extend(rows);
-                slots.extend(mine);
-            }
-            let rows = ranked;
+            let center = self.clear_formation_destination(center, rotated, &rows, spacing);
             out.push(FormationLayout {
-                offsets: slots.into_iter().map(|slot| rotated[slot]).collect(),
+                offsets: laid.offsets,
                 rows,
                 facing,
                 centroid,

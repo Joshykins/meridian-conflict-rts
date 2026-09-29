@@ -258,6 +258,7 @@ fn chaos(
                 target: pos,
                 queue,
                 attack_move: rng.below(2) == 0,
+                facing: (rng.below(2) == 0).then(|| Angle(rng.below(65536) as u16)),
                 together: rng.below(2) == 0,
                 spacing: rng.below(4) as u8,
             },

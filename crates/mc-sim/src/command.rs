@@ -25,6 +25,9 @@ pub enum Command {
         target: FxVec2,
         queue: bool,
         attack_move: bool,
+        /// Which way the block faces, as the player turned it with a right-drag;
+        /// `None` faces the way it goes.
+        facing: Option<Angle>,
         together: bool,
         spacing: u8,
     },

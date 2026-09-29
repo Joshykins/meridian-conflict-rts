@@ -637,6 +637,7 @@ fn formation_spacing_and_free_move_are_real_commands() {
             target: FxVec2::from_ints(1200, 700),
             queue: false,
             attack_move: false,
+            facing: None,
             together,
             spacing,
         })
@@ -669,6 +670,39 @@ fn formation_spacing_and_free_move_are_real_commands() {
     }
     let c = command(2, true).command;
     assert_eq!(Command::decode(&c.encode()), Some(c));
+}
+
+#[test]
+fn a_turned_formation_faces_the_way_it_was_turned() {
+    let mut w = world();
+    let ids = group(&mut w, "aster_t1_tank", 12);
+    // Sent east, turned to face north (a right-drag): the block's rows run east-west
+    // and every member is told to end up facing north.
+    let north = Angle::from_degrees(90);
+    w.tick(&[cmd(Command::FormationMove {
+        units: ids.clone(),
+        target: FxVec2::from_ints(1300, 512),
+        queue: false,
+        attack_move: false,
+        facing: Some(north),
+        together: true,
+        spacing: 1,
+    })])
+    .unwrap();
+    let offsets: Vec<FxVec2> = ids
+        .iter()
+        .map(|id| {
+            let r = w.state.units.row(*id).unwrap();
+            let o = w.state.orders.front(&w.state.units, r).unwrap();
+            assert_eq!(o.heading, north);
+            o.offset
+        })
+        .collect();
+    let span = |f: fn(&FxVec2) -> Fx| {
+        offsets.iter().map(f).max().unwrap() - offsets.iter().map(f).min().unwrap()
+    };
+    // Four wide and three deep: wider across (east-west) than along the facing.
+    assert!(span(|p| p.x) > span(|p| p.y), "{offsets:?}");
 }
 
 #[test]

@@ -601,8 +601,14 @@ pub fn screenshot(
     // MERIDIAN_AIM=ground: fire on the ground being aimed instead (a titan's strike preview).
     // MERIDIAN_AIM=reclaim: the Reclaim order being given, what is under `--cursor` ringed.
     // MERIDIAN_AIM=warp: the selection's warp order being aimed at `--cursor` (`warp_marks.rs`).
+    // MERIDIAN_AIM=formation:DEG: a move held on the right button at `--cursor`, the
+    // selection's formation showing, turned to face DEG degrees (`formation_drag.rs`).
     let aim = std::env::var("MERIDIAN_AIM").ok();
-    if let Some(aim) = &aim {
+    let formation_aim = aim
+        .as_deref()
+        .and_then(|a| a.strip_prefix("formation"))
+        .map(|deg| deg.trim_start_matches(':').parse::<i32>().ok());
+    if let Some(aim) = aim.as_ref().filter(|_| formation_aim.is_none()) {
         view.mode = crate::game::Mode::Target(match aim.as_str() {
             "ground" => crate::game::Targeting::Strike,
             "reclaim" => crate::game::Targeting::Reclaim,
@@ -866,6 +872,23 @@ pub fn screenshot(
         crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, site);
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
+        if let (Some(deg), Some(at)) = (formation_aim, pointer) {
+            let command = mc_sim::Command::Move {
+                units: view
+                    .selection
+                    .iter()
+                    .map(|&id| mc_sim::Handle(id))
+                    .collect(),
+                target: mc_core::FxVec2::new(
+                    mc_core::Fx::from_f32(at.x),
+                    mc_core::Fx::from_f32(at.y),
+                ),
+                queue: false,
+            };
+            if let Ok(drag) = crate::formation_drag::FormationDrag::new(command, input.cursor) {
+                drag.draw(&mut ui, &field, deg.map(mc_core::Angle::from_degrees));
+            }
+        }
         crate::orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
         let build_grid = shot.build_grid || order_map.dragging_plan();
         let grid_focus = build_grid
