@@ -1239,7 +1239,7 @@ pub(super) fn team_panel(b: &mut MeshBuilder, base_center: Vec3, size: Vec2) {
 /// The ground stakes a siege unit plants, one on each corner (`gpu_consts::stake`, the
 /// Trebuchet and the Arbalest, both at a 1.88 m deck): a launcher tube on a ball
 /// hinge at the fender's edge and the spike it fires, authored planted, the spike driven
-/// in past the ground. Packed, the shader draws the spike back up the tube (its tip still
+/// a metre and more into the ground. Packed, the shader draws the spike back up the tube (its tip still
 /// showing) and swings the tube in along the fender.
 pub(super) fn ground_stakes(b: &mut MeshBuilder) {
     if b.coarse() {
@@ -1288,11 +1288,12 @@ pub(super) fn ground_stakes(b: &mut MeshBuilder) {
                 }
             });
             b.with_stake(true, |b| {
+                // The shaft runs on into the ground (it meets it at 3.0) and ends in
+                // a point half a metre down: planted, all that shows is the shaft going in.
                 b.paint(METAL);
-                b.cylinder_between(at(1.0), at(2.75), 0.2, 0.2, 6);
-                // A broad head that holds it in the ground.
+                b.cylinder_between(at(1.0), at(3.4), 0.2, 0.2, 6);
                 b.paint(ACCENT);
-                b.cylinder_between(at(2.75), at(3.35), 0.34, 0.02, 6);
+                b.cylinder_between(at(3.4), at(3.78), 0.2, 0.02, 6);
             });
         });
     }

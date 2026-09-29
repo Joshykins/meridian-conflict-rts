@@ -556,8 +556,8 @@ fn meshes_are_valid() {
                     .any(|family| model.key.starts_with(family));
                 // The naval yard stands in water on piles driven into the seabed.
                 let floor = if v.rig & rig::DEPLOY != 0 && v.rig & rig::STAKE_SPIKE != 0 {
-                    // A planted ground stake's head, driven into the ground.
-                    -0.5
+                    // A planted ground stake's point, driven into the ground.
+                    -1.0
                 } else if model.key == "landmark_dam" {
                     // The dam stands on the gorge's floor, far under its crest road.
                     super::dam::FLOOR
@@ -1326,8 +1326,8 @@ fn siege_stakes_plant() {
             assert!(!spike.is_empty(), "{key}: no spike on {s:?}");
             let tip = spike.iter().map(|v| v.pos[2]).fold(f32::MAX, f32::min);
             assert!(
-                tip < 0.0,
-                "{key} {s:?}: the spike stops at {tip}, above the ground"
+                tip < -0.4,
+                "{key} {s:?}: the spike stops at {tip}, not driven into the ground"
             );
             for v in &spike {
                 let q = Vec3::from(v.pos) - hinge;

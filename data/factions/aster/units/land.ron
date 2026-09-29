@@ -262,7 +262,7 @@
         radius: 11.0, height: 8.0,
         vision: 220,
         // `deploy`: the four ground stakes fire one after another (gpu_consts::stake).
-        motion: (layer: Land, size: 2, speed: 22, accel: 16, turn: 70, deploy: 2.6),
+        motion: (layer: Land, size: 2, speed: 22, accel: 16, turn: 70, deploy: 1.4),
         // The Paladin's gun made a siege howitzer (docs/STYLE.md "The electric bore"):
         // it charges for a long beat, then lobs one great round of blue plasma that bursts
         // in lightning round where it lands. It fires its four ground stakes in first.
@@ -294,7 +294,7 @@
         radius: 8.2, height: 4.2,
         vision: 1420,
         // `deploy`: the four ground stakes fire one after another (gpu_consts::stake).
-        motion: (layer: Land, size: 1, speed: 33, accel: 26, turn: 90, deploy: 2.0),
+        motion: (layer: Land, size: 1, speed: 33, accel: 26, turn: 90, deploy: 1.1),
         weapons: [(
             name: "Argon Electric Bore",
             damage: 1250, splash: 9, range: 1400, reload: 6.0, hitscan: true, trajectory: Direct,
