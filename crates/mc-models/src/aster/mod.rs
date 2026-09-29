@@ -153,22 +153,10 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(16.5, 8.0), (16.5, 13.0), (16.5, 19.0)],
         structures::storage_mass,
     ),
-    ModelDef::new("storage_energy", 14.0, 10.0, capacitor::storage_energy),
-    // Design round for the tech 2 and 3 banks: three alternatives.
     ModelDef::tiered(
-        "storage_energy~a",
+        "storage_energy",
         capacitor::SIZES,
-        capacitor::storage_energy_a,
-    ),
-    ModelDef::tiered(
-        "storage_energy~b",
-        capacitor::SIZES,
-        capacitor::storage_energy_b,
-    ),
-    ModelDef::tiered(
-        "storage_energy~c",
-        capacitor::SIZES,
-        capacitor::storage_energy_c,
+        capacitor::storage_energy,
     ),
     ModelDef::new("turret", 7.0, 9.0, structures::turret),
     ModelDef::new("turret_heavy", 14.0, 13.0, structures::turret_heavy),
