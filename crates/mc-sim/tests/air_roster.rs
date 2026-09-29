@@ -769,6 +769,48 @@ fn manta_ripples_all_sixteen_cells_and_curves_while_accelerating() {
 }
 
 #[test]
+fn a_manta_volley_spreads_over_every_flier_in_reach() {
+    let mut w = sea();
+    let aa = add(&mut w, "aster_t2_aa_cruiser", 0, 300, 1000);
+    // Two close in, one well past a flak gun's reach.
+    let fliers = [(700, 1000), (750, 1150), (1800, 1000)]
+        .map(|(x, y)| add(&mut w, "aster_t1_reclaim_carrier", 1, x, y));
+    for &f in &fliers {
+        w.state.units.flags[f] |= flag::PASSIVE | flag::INVULNERABLE;
+    }
+    let bp = w.state.units.blueprint[aa];
+    let mut chased = std::collections::BTreeMap::new();
+    let mut fired = 0;
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        fired += w
+            .events
+            .iter()
+            .filter(|e| matches!(e, SimEvent::ShotFired { blueprint, .. } if *blueprint == bp))
+            .count();
+        let p = &w.state.projectiles;
+        for i in 0..p.len() {
+            if p.blueprint[i] == bp {
+                chased.insert(p.serial[i], p.target[i]);
+            }
+        }
+        if fired >= 16 {
+            break;
+        }
+    }
+    assert!(fired >= 16, "the volley never went");
+    for &f in &fliers {
+        let id = w.state.units.id(f);
+        let on = chased.values().filter(|&&t| t == id).count();
+        assert!(
+            on >= 4,
+            "{on} of {} missiles on a flier: {chased:?}",
+            chased.len()
+        );
+    }
+}
+
+#[test]
 fn twin_flak_fires_both_barrels_at_once_and_the_shells_drift_apart() {
     let mut w = world();
     let aa = add(&mut w, "aster_t2_aa", 0, 600, 900);

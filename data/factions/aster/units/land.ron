@@ -316,6 +316,6 @@
 (key: "aster_t2_mobile_aa", name: "Squall", role: "Mobile Flak", tech: 2,
  categories: ["Land", "AntiAir"], health: 2407, cost: (mass: 300, energy: 1800, time: 1200),
  radius: 5.5, height: 4.5, vision: 360, motion: (layer: Land, size: 1, speed: 28, accel: 30, turn: 100),
- weapons: [(name: "Conventional Flak", damage: 280, range: 360, reload: 0.8, speed: 320, trajectory: Direct,
+ weapons: [(name: "Conventional Flak", damage: 280, range: 480, reload: 0.8, speed: 320, trajectory: Direct,
  turret_turn: 240, muzzle: (6, 0, 3.3), pivot: (1.2, 0, 3.3), targets: ["Air"], color: Orange, sounds: (fire: "flak_gun", impact: "flak_burst"), flak: true, proximity: 12, splash: 30,)], mesh: "mobile_aa", icon: AntiAir, sounds: (moving: "tracks")),
 ]

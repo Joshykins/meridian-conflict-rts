@@ -232,14 +232,16 @@
         motion: (layer: Naval, size: 3, speed: 22, accel: 8, turn: 34),
         weapons: [
             // A vertical array forward of the bridge: sixteen cells rippled off in one
-            // volley, each missile straight up and arcing over onto its mark.
+            // volley, each missile straight up and arcing over onto its mark. Its reach sits
+            // between the flak guns' and the Skyguard's, and a volley spreads over the
+            // fliers in range (`split`), all on one when it is alone.
             (
                 name: "Vertical Missile Array",
-                damage: 110, splash: 5, range: 800, reload: 4, speed: 380, trajectory: Direct,
+                damage: 110, splash: 5, range: 1600, reload: 4, speed: 380, trajectory: Direct,
                 turret_turn: 0, arc: 360, muzzle: (8.7, -2.7, 7.68),
                 muzzles: [(8.7, -2.7, 7.68), (8.7, -0.9, 7.68), (8.7, 0.9, 7.68), (8.7, 2.7, 7.68), (6.9, -2.7, 7.68), (6.9, -0.9, 7.68), (6.9, 0.9, 7.68), (6.9, 2.7, 7.68), (5.1, -2.7, 7.68), (5.1, -0.9, 7.68), (5.1, 0.9, 7.68), (5.1, 2.7, 7.68), (3.3, -2.7, 7.68), (3.3, -0.9, 7.68), (3.3, 0.9, 7.68), (3.3, 2.7, 7.68)],
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
-                intercept: 20, proximity: 7, salvo: 16, salvo_delay: 0.1, trail: true,
+                intercept: 20, proximity: 7, salvo: 16, salvo_delay: 0.1, split: true, trail: true,
                 sounds: (fire: "missile_launch", impact: "shell_light"),
             ),
             // One gun forward, for what comes close.
@@ -468,7 +470,7 @@
             ),
             (
                 name: "Twin Flak",
-                damage: 220, splash: 30, range: 700, reload: 0.7, speed: 330, trajectory: Direct,
+                damage: 220, splash: 30, range: 930, reload: 0.7, speed: 330, trajectory: Direct,
                 turret_turn: 200, mount: true, pivot: (20.0, 10.0, 8.6), muzzle: (22.4, 10.4, 8.8),
                 muzzles: [(22.4, 9.6, 8.8), (22.4, 10.4, 8.8)],
                 targets: ["Air"], color: Orange, flak: true, proximity: 12, casings: 2.2,

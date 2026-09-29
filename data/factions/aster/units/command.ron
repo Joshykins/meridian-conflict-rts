@@ -135,7 +135,7 @@
                             // Twin barrels fired together; the pair scatter a few degrees,
                             // so each shot lays two bursts apart across the flight.
                             name: "AA Flak Cannon", mount: true,
-                            damage: 120, range: 480, reload: 1.1, speed: 340, trajectory: Direct,
+                            damage: 120, range: 640, reload: 1.1, speed: 340, trajectory: Direct,
                             turret_turn: 240, muzzle: (4.96, -5.44, 23.28), pivot: (0, -4.96, 23.28),
                             muzzles: [(4.96, -5.44, 23.28), (4.96, -4.48, 23.28)],
                             salvo: 2, salvo_batch: 2, spread: 3,

@@ -636,7 +636,7 @@
  vision: 450, radar: 650, water_build: true,
  // A heavy twin gun: both barrels fire at once and their shells scatter, so each shot
  // lays two bursts a little apart across the flight.
- weapons: [(name: "Heavy Twin Flak", damage: 300, range: 480, reload: 1.5, speed: 360, trajectory: Direct,
+ weapons: [(name: "Heavy Twin Flak", damage: 300, range: 640, reload: 1.5, speed: 360, trajectory: Direct,
  turret_turn: 160, muzzle: (9, -0.7, 5), pivot: (1.6, 0, 5), muzzles: [(9, -0.7, 5), (9, 0.7, 5)],
  salvo: 2, salvo_batch: 2, spread: 2.5, targets: ["Air"], color: Orange, flak: true, proximity: 12, splash: 40,
  flash: 1.6, impact: 1.5, sounds: (fire: "flak_gun", impact: "flak_burst"), )], mesh: "flak_battery", icon: AntiAir, sounds: (death: "blast_large")),

@@ -162,7 +162,7 @@
                 // enough to see off a few gunships. It is not the air defence it could carry;
                 // against a real air wing it wants escorts.
                 name: "Heavy Twin Flak",
-                damage: 420, splash: 48, proximity: 16, range: 900, reload: 0.9, speed: 380, trajectory: Direct,
+                damage: 420, splash: 48, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
                 turret_turn: 160, mount: true, pivot: (-24, 132, 456), muzzle: (16, 132, 456),
                 muzzles: [(16, 128.6, 456), (16, 135.4, 456)],
                 targets: ["Air"], color: Orange, flak: true, casings: 3,
@@ -170,7 +170,7 @@
             ),
             (
                 name: "Heavy Twin Flak",
-                damage: 420, splash: 48, proximity: 16, range: 900, reload: 0.9, speed: 380, trajectory: Direct,
+                damage: 420, splash: 48, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
                 turret_turn: 160, mount: true, pivot: (-24, -132, 456), muzzle: (16, -132, 456),
                 muzzles: [(16, -135.4, 456), (16, -128.6, 456)],
                 targets: ["Air"], color: Orange, flak: true, casings: 3,
