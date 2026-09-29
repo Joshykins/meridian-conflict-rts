@@ -94,7 +94,7 @@ pub enum Scenario {
     Destruct,
     /// A lift ship: a column of tanks behind the pad boards it, and it comes down for them.
     Lift,
-    /// A ship with a warp drive charges and jumps 2.4 km down the range.
+    /// A ship with a warp drive charges and jumps 1.8 km down the range.
     Warp,
     /// `Warp` into the field of a red warp dampener: dragged, then thrown out hurt and stunned.
     WarpDampened,
@@ -971,10 +971,11 @@ fn stage(
             Ok((spawns, Some((tank, PendingOrder::Board(subject)))))
         }
         Scenario::Warp | Scenario::WarpDampened => {
-            // Stores enough for the biggest drive's charge, then the jump; dampened, a red
-            // Undertow on free power stands beside where it comes out.
+            // Stores enough for the drive's charge, then the jump; dampened, a red Undertow
+            // on free power stands near the pad (land on every map's pad), its field over
+            // where the ship comes out.
             let drive = bp.warp.ok_or("This Unit Has No Warp Drive")?;
-            let exit = east(Fx::from_int(2400), 0);
+            let exit = east(Fx::from_int(1800), 0);
             let mut spawns = vec![
                 Command::DebugStorage {
                     player: BLUE,
@@ -1000,7 +1001,7 @@ fn stage(
                 spawns.push(Command::DebugSpawn {
                     owner: RED,
                     blueprint: damper.id,
-                    pos: exit + FxVec2::from_ints(0, 700),
+                    pos: east(Fx::from_int(600), 300),
                     heading: Angle::from_degrees(270),
                     count: 1,
                     flags: flag::PASSIVE | flag::INVULNERABLE,

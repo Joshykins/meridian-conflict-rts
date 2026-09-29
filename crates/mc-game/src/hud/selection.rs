@@ -1057,6 +1057,10 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         });
         movement.push(Order { glyph: Glyph::Patrol, label: "Patrol", key: "P", hint: "Click a point: the group patrols out to it and back, in formation. Hold shift to add more posts: over a patrol already flown, each goes into the leg nearest the pointer. Shift-drag a post to move it, right-click one to drop it.", action: HudAction::Target(Targeting::Patrol), lit: targeting(Targeting::Patrol) });
     }
+    // Capital ships with a warp drive jump: charge off the grid, then out and back in.
+    if units.iter().any(|u| s.bp(u).warp.is_some()) {
+        movement.push(Order { glyph: Glyph::Warp, label: "Warp", key: "O", hint: "Warp (O): click a point. Each ship stops, charges its drive off the grid (a big draw for a few seconds; slower while energy runs short) and jumps, as far as its drive reaches toward the point. The pointer shows the energy the jump takes. An enemy dampener's field drags a jump into it and throws the ship out hurt and stunned. The drive then recharges.", action: HudAction::Target(Targeting::Warp), lit: targeting(Targeting::Warp) });
+    }
     // Unarmed aircraft have no stances; they still circle on guard, as scouts and pickets.
     if air && !armed {
         movement.push(guard());

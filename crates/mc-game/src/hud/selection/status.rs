@@ -21,6 +21,7 @@ pub(super) fn status_page(
     let (x, cw) = (r.x, r.w);
     let mut y = vitals(ui, s, u, bp, x, r.y, cw);
     y = doing(ui, s, u, bp, x, y, cw, on_strip);
+    y = crate::hud::warp::band(ui, s, u, bp, x, y, cw);
     let (mass, energy) = economy::flows(s, u, bp);
     if economy::strip(
         ui,
@@ -129,7 +130,11 @@ fn doing(
     on_strip: bool,
 ) -> f32 {
     let queue = s.queue_of(u);
-    let (label, progress, tone) = if has_flag(u, flag::UNDER_CONSTRUCTION) {
+    // A stun or a jump under way says so, with its own figure (seconds, or the charge).
+    let warp = crate::hud::warp::activity(s, u);
+    let (label, progress, tone) = if let Some(w) = &warp {
+        (w.label.clone(), w.progress, w.tone)
+    } else if has_flag(u, flag::UNDER_CONSTRUCTION) {
         let label = if u.paused() {
             "Paused  \u{b7}  Under Construction"
         } else {
@@ -188,15 +193,16 @@ fn doing(
         rgb(tone, 1.0),
         &label,
     );
+    if let Some(w) = warp
+        .as_ref()
+        .filter(|w| progress.is_none() && !w.value.is_empty())
+    {
+        ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &w.value);
+    }
     match progress {
         Some(p) => {
-            ui.text_right(
-                x + cw,
-                y,
-                type_scale::VALUE,
-                rgb(tone, 1.0),
-                &format!("{:.0}%", p * 100.0),
-            );
+            let value = warp.map_or_else(|| format!("{:.0}%", p * 100.0), |w| w.value);
+            ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &value);
             bar(ui, Rect::new(x, y + 10.0, cw, 5.0), p, tone);
             y + 30.0
         }

@@ -118,6 +118,9 @@ pub enum IconKind {
     SalvageDrone = 33,
     /// A torpedo bomber from above: a gull-winged plane with a finned torpedo under it.
     TorpedoBomber = 34,
+    /// A warp dampener: a broken ring (its field) with four chevrons pulling in on a
+    /// point at its middle, where it drags a jump down.
+    Damper = 35,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.

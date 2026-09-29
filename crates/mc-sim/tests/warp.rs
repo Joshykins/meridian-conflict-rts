@@ -335,3 +335,33 @@ fn in_warp_it_is_drawn_leaving_then_listed_for_its_side_and_unseen_by_the_enemy(
     assert!(!u.in_warp());
     assert_eq!(u.fx[..2], [1.0, 0.0]);
 }
+
+#[test]
+fn the_interface_hears_how_long_the_drive_recharges_and_the_stun_lasts() {
+    let mut w = world();
+    let ship = add(&mut w, COURIER, 0, 3000, 3000);
+    run(&mut w, seconds(10));
+    let listed = |w: &World| {
+        let mut out = Vec::new();
+        w.write_orders(Some(0), &[ship.0], None, &mut out);
+        let q = out.pop().expect("the ship is listed");
+        (q.warp_recharge, q.stunned)
+    };
+    assert_eq!(listed(&w), (0.0, 0.0), "a fresh drive is ready");
+    warp(&mut w, ship, 3000, 7000);
+    until(&mut w, ship, WarpPhase::Idle, seconds(30)).expect("it never came out");
+    // The Courier's drive recharges for 40 s after it comes out.
+    let (recharge, _) = listed(&w);
+    assert!(
+        (39.0..=40.0).contains(&recharge),
+        "the drive recharges for {recharge} s"
+    );
+    run(&mut w, seconds(10));
+    let (later, _) = listed(&w);
+    assert!((later - (recharge - 10.0)).abs() < 0.2, "{later} s left");
+    // A stun is listed in seconds.
+    let r = row(&w, ship);
+    w.state.units.stun[r] = [seconds(18) as u16, seconds(25) as u16];
+    let (_, stunned) = listed(&w);
+    assert!((stunned - 18.0).abs() < 0.01, "stunned for {stunned} s");
+}

@@ -340,6 +340,16 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             let fin = sd_box(p - vec2<f32>(-0.62, -0.5), vec2<f32>(0.06, 0.22));
             return min(min(min(wing, body), tail), min(torpedo, fin));
         }
+        // Warp dampener: its field a ring broken on the diagonals, four chevrons on the
+        // axes pulling in on the point at its middle (`hud/icons.rs` draws the same).
+        case 35u: {
+            let gap = abs(abs(p.x) - abs(p.y)) * 0.7071 - 0.15;
+            let ring = max(abs(length(p) - 0.76) - 0.08, -gap);
+            let a = abs(p);
+            let q = select(a, a.yx, a.x > a.y);
+            let chevron = sd_segment(q, vec2<f32>(0.0, 0.2), vec2<f32>(0.2, 0.46)) - 0.075;
+            return min(min(ring, chevron), length(p) - 0.11);
+        }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }

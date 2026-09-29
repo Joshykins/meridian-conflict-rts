@@ -42,13 +42,14 @@ fn every_kind() -> Vec<IconKind> {
         SalvageCarrier,
         SalvageDrone,
         TorpedoBomber,
+        Damper,
     ];
     for kind in &all {
         match kind {
             Commander | Engineer | Bot | Tank | Artillery | AntiAir | Scout | Factory
             | Extractor | Power | Storage | Defense | Intel | Wall | Shield | Fighter | Bomber
             | Ship | Submarine | Gunship | Transport | Silo | AntiNuke | Warship | Titan
-            | Salvage | SalvageBoat | SalvageCarrier | SalvageDrone | TorpedoBomber => {}
+            | Salvage | SalvageBoat | SalvageCarrier | SalvageDrone | TorpedoBomber | Damper => {}
         }
     }
     all

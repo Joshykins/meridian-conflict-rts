@@ -72,6 +72,8 @@ struct Drives {
 
 #[derive(Default)]
 pub struct CapitalSounds {
+    /// Their warp drives, the dampeners and the stuns they leave (audio/warp.rs).
+    pub warp: super::warp::WarpSounds,
     ships: HashMap<u32, Ship>,
     /// Sound ids by blueprint, for the library generation they were looked up in.
     ids: HashMap<u32, Ids>,
@@ -103,7 +105,7 @@ impl CapitalSounds {
             self.generation = Some(generation);
             self.ids.clear();
             // Every capital ship's loops glide in pitch with its drives.
-            let gliding: Vec<SoundId> = blueprints
+            let mut gliding: Vec<SoundId> = blueprints
                 .units
                 .iter()
                 .filter(|bp| bp.is_capital_ship())
@@ -113,6 +115,8 @@ impl CapitalSounds {
                 })
                 .flatten()
                 .collect();
+            // And the warp loops, which follow the charge and the rift (audio/warp.rs).
+            gliding.extend(super::warp::gliding(&library, blueprints));
             audio.set_gliding(&gliding);
         }
         let mut drives = Vec::new();

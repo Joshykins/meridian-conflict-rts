@@ -133,6 +133,8 @@ pub enum Targeting {
     Nuke,
     /// A giant's storm called down with its great bore alone (the Behemoth's Strike).
     Strike,
+    /// Capital ships with a warp drive charge it and jump toward the point (`warp_marks.rs`).
+    Warp,
 }
 
 impl Targeting {
@@ -151,6 +153,7 @@ impl Targeting {
             Targeting::Unload => "Unload",
             Targeting::Nuke => "Launch Warhead",
             Targeting::Strike => "Strike",
+            Targeting::Warp => "Warp",
         }
     }
 }
@@ -1051,6 +1054,11 @@ impl Game {
         self.selection_takers().any(|b| b.is_capital_ship())
     }
 
+    /// Whether the selection holds a ship with a warp drive.
+    fn selection_warps(&self) -> bool {
+        self.selection_takers().any(|b| b.warp.is_some())
+    }
+
     /// Selected silos of the player's own holding a warhead no launch has spoken for.
     fn armed_silos(&self) -> Vec<u32> {
         crate::hud::silo::armed_silos(&self.view, &self.blueprints)
@@ -1780,6 +1788,7 @@ impl Game {
             }),
             Targeting::AttackGround => point.map(|pos| Command::AttackGround { units, pos, queue }),
             Targeting::Strike => point.map(|pos| Command::Strike { units, pos, queue }),
+            Targeting::Warp => point.map(|pos| Command::Warp { units, pos, queue }),
             // One warhead a click; the sim gives it to the silo with the most free.
             Targeting::Nuke => point.and_then(|pos| {
                 let silos = self.armed_silos();
@@ -2023,6 +2032,7 @@ impl Game {
             Some(Command::ReclaimWreck { .. } | Command::ReclaimUnit { .. }) => Pointer::Reclaim,
             Some(Command::Move { .. } | Command::Land { .. }) => Pointer::Move,
             Some(Command::Board { .. }) => Pointer::Board,
+            Some(Command::Warp { .. }) => Pointer::Warp,
             Some(_) => Pointer::Arrow,
             None => Pointer::Denied,
         };
@@ -2785,6 +2795,7 @@ impl Game {
             Targeting::Land => self.selection_lands(),
             Targeting::Unload => self.selection_lifts(),
             Targeting::Nuke => !self.armed_silos().is_empty(),
+            Targeting::Warp => self.selection_warps(),
         };
         if able {
             self.view.patrol_posts.clear();
@@ -2888,6 +2899,7 @@ impl Game {
                 | KeyCode::KeyH
                 | KeyCode::KeyY
                 | KeyCode::KeyV
+                | KeyCode::KeyO
                 | KeyCode::KeyZ
                 | KeyCode::KeyX
         ) {
@@ -2964,6 +2976,7 @@ impl Game {
             KeyCode::KeyH => self.toggle_stance(FireState::HoldPosition),
             KeyCode::KeyY => self.toggle_stance(FireState::HoldFire),
             KeyCode::KeyV => self.toggle_dive(),
+            KeyCode::KeyO => self.arm(Targeting::Warp),
             KeyCode::KeyZ => self.toggle_paused(),
             // With a silo picked, N arms the launch; otherwise it hides the minimap.
             KeyCode::KeyN
@@ -3704,6 +3717,12 @@ impl Game {
             capital.tick(&self.view.frame.units, &self.blueprints, audio, |p| {
                 self.hear(p)
             }),
+        );
+        // Warp: charges, jumps, rifts, stuns and dampeners (audio/warp.rs).
+        loops.extend(
+            capital
+                .warp
+                .tick(&self.view.frame, &self.blueprints, audio, |p| self.hear(p)),
         );
         self.capital_sounds = capital;
         // Giant rotary guns' barrels turning (audio/titan.rs).
@@ -4596,6 +4615,7 @@ impl Game {
             );
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
+            crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             if self.pointer == Pointer::Attack {
                 if let Some(target) = self.unit_at(self.cursor) {
                     crate::line_of_fire::draw_hover(&mut ui, &field, target);
@@ -4632,6 +4652,14 @@ impl Game {
         let actions = self.hud.draw(&mut ui, &scene, dt);
         if !over_ui && !self.hud.free.on {
             hud::cursor_hint(&mut ui, &self.view, &self.blueprints, &sites);
+            let field = Field {
+                view: &self.view,
+                blueprints: &self.blueprints,
+                map: &self.map,
+                camera: &self.camera,
+                renderer,
+            };
+            crate::warp_marks::cursor_card(&mut ui, &field, self.ground_under_cursor(renderer));
             if self.pointer == Pointer::Board {
                 self.board_hint(&mut ui);
             }

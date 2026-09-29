@@ -237,6 +237,26 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             ui.disc(c, r * 0.14, color);
         }
         IconKind::Wall => ui.fill(square(c, r * 0.5, r * 0.5), color),
+        IconKind::Damper => {
+            // The field, a ring broken on the diagonals; four chevrons on the axes pulling
+            // in on the point at its middle (see `icons.wgsl`).
+            let q = PI / 4.0;
+            for i in 0..4 {
+                let a = q + i as f32 * FRAC_PI_2;
+                ui.arc(
+                    c,
+                    r * 0.76 * 0.9,
+                    a + 0.24,
+                    a + FRAC_PI_2 - 0.24,
+                    line,
+                    color,
+                );
+            }
+            for d in [Vec2::X, -Vec2::X, Vec2::Y, -Vec2::Y] {
+                arrow_head(ui, c + d * r * 0.2 * 0.9, -d, r * 0.26 * 0.9, line, color);
+            }
+            ui.disc(c, r * 0.13, color);
+        }
         IconKind::Shield => {
             let tip = c + Vec2::new(0.0, -r * 0.88);
             let bl = c + Vec2::new(-r * 0.2, r * 0.78);
@@ -592,6 +612,8 @@ pub enum Glyph {
     Board,
     /// A lift ship rises off the ground.
     TakeOff,
+    /// A capital ship jumps: streaks running into a point, and the ring it comes out of.
+    Warp,
 }
 
 /// Two strokes meeting at `tip`, opening away from `dir`.
@@ -925,6 +947,20 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
             let tip = Vec2::new(c.x, c.y - r * 0.95);
             ui.stroke(Vec2::new(c.x, hull - t * 1.6), tip, t, color);
             arrow_head(ui, tip, -Vec2::Y, r * 0.3, t, color);
+        }
+        Glyph::Warp => {
+            // Three streaks of light running in from the lower left, and the ring the
+            // ship comes out of at the far end, the jump's arrow through it.
+            let dir = Vec2::new(1.0, -1.0).normalize();
+            let side = dir.perp();
+            let exit = c + dir * r * 0.42;
+            for (off, from) in [(-0.34, -0.55), (0.0, -1.0), (0.34, -0.55)] {
+                let a = c + dir * r * from + side * r * off;
+                let b = c + dir * r * 0.05 + side * r * off * 0.45;
+                ui.stroke(a, b, t, color);
+            }
+            ui.arc(exit, r * 0.42, 0.0, TAU, t, color);
+            arrow_head(ui, exit + dir * r * 0.18, dir, r * 0.3, t, color);
         }
     }
 }

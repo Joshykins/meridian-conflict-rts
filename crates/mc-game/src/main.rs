@@ -41,6 +41,7 @@ mod survival;
 mod titan_marks;
 mod ui;
 mod unit_shot;
+mod warp_marks;
 mod window_chrome;
 
 use mc_data::Blueprints;
@@ -154,6 +155,10 @@ straight into a match instead.
 
 MERIDIAN_SIMPLE_SHADING=1 uses cheaper terrain/shadow shading in headless captures.
 Interactive Low and Balanced presets enable it automatically; High/Ultra use full shading.
+
+MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the selection:
+1 a warhead launch, ground a titan's strike, reclaim the Reclaim order, warp a warp jump
+(the drives' reach, exits, the energy card and any enemy dampener field in the way).
 
 MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
 (default: the package version with -dev).
