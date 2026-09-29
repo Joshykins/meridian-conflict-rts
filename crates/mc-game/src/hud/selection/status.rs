@@ -158,6 +158,8 @@ fn doing(
                 1 => "Forming on Move",
                 2 => "In Formation",
                 3 => "Crossing Obstacle",
+                // An aircraft that orbits calls its guard an Orbit.
+                _ if front.kind == OrderKind::Guard && s.bp(u).orbit.is_some() => "Orbiting",
                 _ => activity(front.kind),
             }
             .to_owned()

@@ -25,7 +25,7 @@ use std::collections::HashSet;
 mod guard_rings;
 mod wall_line;
 
-use guard_rings::{flies, guard_ring, orbit_ring, selection_flies};
+use guard_rings::{guard_look, guard_ring, orbit_ring, selection_guard_look};
 
 /// How near a waypoint a press has to be to pick it up, in pixels.
 const GRAB_REACH: f32 = 20.0;
@@ -811,15 +811,24 @@ impl OrderMap {
                     let radius = centre
                         .distance(g)
                         .clamp(MIN_GUARD_RADIUS.to_f32(), MAX_GUARD_RADIUS.to_f32());
-                    guard_ring(ui, field, centre, radius, 1.0);
-                    // Aircraft circle halfway out (`mc_sim`'s `orbit.rs`).
-                    if selection_flies(field) {
-                        let circle = radius / 2.0;
-                        orbit_ring(ui, &project, centre, circle, 0.9, Some(ui.time), MAX_LINES);
+                    let look = selection_guard_look(field);
+                    guard_ring(ui, field, centre, radius, 1.0, look.tone);
+                    if look.circle > 0.0 {
+                        let circle = radius * look.circle;
+                        orbit_ring(
+                            ui,
+                            &project,
+                            centre,
+                            circle,
+                            0.9,
+                            look.tone,
+                            Some(ui.time),
+                            MAX_LINES,
+                        );
                     }
                 }
                 if let Some(c) = project(centre) {
-                    ui.disc(c, 3.0, ui::rgb(hud::style::Family::Stance.tone(), 1.0));
+                    ui.disc(c, 3.0, ui::rgb(selection_guard_look(field).tone, 1.0));
                 }
             }
         }
@@ -1233,8 +1242,8 @@ impl OrderMap {
         let mut drawn: HashSet<(u8, FxVec2)> = HashSet::new();
         let mut markers: Vec<(Vec2, u32, f32, bool)> = Vec::new();
         // Aircraft circles on guard: centre and radius in world metres, strength, lively.
-        let mut rings: Vec<(Vec2, f32, f32, bool)> = Vec::new();
-        let mut guards: Vec<(Vec2, f32, f32)> = Vec::new();
+        let mut rings: Vec<(Vec2, f32, f32, u32, bool)> = Vec::new();
+        let mut guards: Vec<(Vec2, f32, f32, u32)> = Vec::new();
         let mut guarded: HashSet<(i64, i64)> = HashSet::new();
         for queue in &view.status.queues {
             let Some(unit) = view
@@ -1255,7 +1264,7 @@ impl OrderMap {
                 (false, false) => 0.35,
             };
             let lively = selected || view.shift;
-            let flies = flies(field.blueprints, unit);
+            let guard = guard_look(field.blueprints, unit);
             // A group's line leaves from the middle of the group, a lone unit's from the unit.
             let (mut origin, start) = match queue.orders.first() {
                 Some(o) if o.formation != 0 => {
@@ -1309,15 +1318,19 @@ impl OrderMap {
                 .take_while(|o| !matches!(o.kind, OrderKind::Produce | OrderKind::Upgrade))
                 .chain(&queue.standing);
             for order in route.take(24) {
-                let tone = tone_of(order.kind);
+                let tone = if order.kind == OrderKind::Guard {
+                    guard.tone
+                } else {
+                    tone_of(order.kind)
+                };
                 let at = if draggable(order.kind) {
                     self.shown(key_of(order), order.pos)
                 } else {
                     Vec2::from(order.pos)
                 };
                 // A group is sent to one point; where each member stands there is the group's business.
-                let circle = if order.kind == OrderKind::Guard && flies {
-                    order.radius / 2.0
+                let circle = if order.kind == OrderKind::Guard {
+                    order.radius * guard.circle
                 } else {
                     0.0
                 };
@@ -1359,11 +1372,11 @@ impl OrderMap {
                     && order.radius > 0.0
                     && guarded.insert((order.at.x.0, order.at.y.0))
                 {
-                    guards.push((at, order.radius, strength));
+                    guards.push((at, order.radius, strength, tone));
                 }
                 if circle > 0.0 {
                     if drawn.insert((order.kind as u8, order.at)) {
-                        rings.push((at, circle, strength, lively));
+                        rings.push((at, circle, strength, tone, lively));
                     }
                 } else if let Some(b) = ground(at).filter(|b| {
                     on_screen(*b) && nodes > 0 && drawn.insert((order.kind as u8, order.at))
@@ -1382,19 +1395,20 @@ impl OrderMap {
         }
         let scale = ui.s;
         let project = |p: Vec2| ground(p).filter(|q| sane(*q)).map(|q| q / scale);
-        for (c, radius, strength, lively) in rings {
+        for (c, radius, strength, tone, lively) in rings {
             budget = budget.saturating_sub(orbit_ring(
                 ui,
                 &project,
                 c,
                 radius,
                 strength,
+                tone,
                 lively.then_some(t),
                 budget,
             ));
         }
-        for (c, radius, strength) in guards {
-            guard_ring(ui, field, c, radius, strength);
+        for (c, radius, strength, tone) in guards {
+            guard_ring(ui, field, c, radius, strength, tone);
         }
         // Waypoints over the lines, and the groups' badges over those.
         for (c, tone, strength, selected) in markers {

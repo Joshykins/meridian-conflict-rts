@@ -25,9 +25,14 @@ fn chase_radius(radius: Fx, lead: Angle) -> Fx {
     radius / FxVec2::from_angle(Angle(lead.0 / 2)).x.max(Fx::HALF)
 }
 
-/// The circle aircraft fly on a `Guard` order: halfway between its centre and its edge.
-pub(crate) fn circle_radius(o: &Order) -> Fx {
-    o.radius / 2
+/// The circle aircraft fly on a `Guard` order: halfway between its centre and its edge,
+/// or on the edge itself for an aircraft that orbits (`UnitBlueprint::orbit`).
+pub(crate) fn circle_radius(o: &Order, orbits: bool) -> Fx {
+    if orbits {
+        o.radius
+    } else {
+        o.radius / 2
+    }
 }
 
 /// The angle a distance `arc` sweeps on a circle of `radius`.
@@ -130,7 +135,8 @@ impl World {
             };
             let units = &self.state.units;
             let first = *self.state.orders.front(units, rows[0]).unwrap();
-            let (centre, radius) = (first.pos, circle_radius(&first));
+            let orbits = self.bp(rows[0]).orbit.is_some();
+            let (centre, radius) = (first.pos, circle_radius(&first, orbits));
             let mut pace = Fx::MAX;
             let mut accel = Fx::MAX;
             let mut size = Fx::ZERO;
@@ -222,7 +228,9 @@ impl World {
         };
         let lead = Angle::from_degrees(35);
         let goal = self.clamp_to_map(
-            centre + FxVec2::from_angle(bearing + lead) * chase_radius(circle_radius(o), lead),
+            centre
+                + FxVec2::from_angle(bearing + lead)
+                    * chase_radius(circle_radius(o, self.bp(row).orbit.is_some()), lead),
         );
         self.ensure_moving(row, goal, goal)?;
         self.state.units.flags[row] |= flag::AIR_RUN;

@@ -1023,7 +1023,16 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     let builders = bps.iter().any(|b| b.is_mobile() && b.builder.is_some());
     let reclaimers = units.iter().any(|u| s.bp(u).sends_reclaimers());
     let targeting = |t: Targeting| s.view.mode == Mode::Target(t);
+    // A selection of only aircraft that orbit (the Argus) calls its guard an Orbit.
+    let orbiters = mobile
+        && bps
+            .iter()
+            .filter(|b| b.is_mobile())
+            .all(|b| b.orbit.is_some());
     let guard = || {
+        if orbiters {
+            return Order { glyph: Glyph::Guard, label: "Orbit", key: "", hint: "Orbit (Ctrl+G): press on a spot, or on a friendly unit to circle it, and drag out the ring. It flies round the ring itself, taking what it can reach and going after enemies that come in. Left with nothing to do, it orbits where it is. Shift queues; shift-drag the centre to move it. Any other order takes it off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) };
+        }
         Order { glyph: Glyph::Guard, label: "Guard", key: "", hint: "Guard (Ctrl+G): press on a spot, or on a friendly unit to go with it, and drag out the ring. These units are stationed there: they hold it and go after enemies that come in. Aircraft circle it halfway out, a group in formation. Shift queues; shift-drag the centre to move it. Any other order takes a unit off.", action: HudAction::Target(Targeting::Guard), lit: targeting(Targeting::Guard) }
     };
     // The stance most of the armed selection is in.

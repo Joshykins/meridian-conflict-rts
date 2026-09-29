@@ -629,6 +629,9 @@ pub struct UnitBlueprint {
     /// How far above (positive) or below (negative) its socket a drone lines up to
     /// dock, and drops to letting go.
     pub drone_approach: Fx,
+    /// It orbits: its guard order is an Orbit, flown on the whole ring (other aircraft
+    /// fly half way out), and left with no orders it circles where it is at this radius.
+    pub orbit: Option<Fx>,
     pub anti_missile: Fx,
     /// Anti-missile laser emitters in the hull's frame; empty: the unit's middle.
     pub anti_missile_mounts: Vec<FxVec3>,
@@ -1242,6 +1245,7 @@ impl Blueprints {
                 h.write_i64(m.z.0);
             }
             h.write_i64(u.drone_approach.0);
+            h.write_i64(u.orbit.map_or(-1, |r| r.0));
             h.write_i64(u.anti_missile.0);
             h.write_u64(u.anti_missile_lasers as u64);
             match u.turret_at {

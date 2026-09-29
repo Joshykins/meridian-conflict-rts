@@ -245,6 +245,10 @@ pub(crate) struct Unit {
     /// before it settles onto a pad or rises onto a pylon, and drops to letting go.
     #[serde(default)]
     pub drone_approach: f64,
+    /// An aircraft that orbits (`UnitBlueprint::orbit`): the radius it circles, metres,
+    /// where it is left idle.
+    #[serde(default)]
+    pub orbit: Option<f64>,
     #[serde(default)]
     pub anti_missile: f64,
     /// Where the anti-missile lasers stand on the hull (x forward, y left, z up, metres):
@@ -1144,9 +1148,9 @@ impl Unit {
                             "{key}: air units need a cruise altitude"
                         )));
                     }
-                } else if m.altitude != 0.0 {
+                } else if m.altitude != 0.0 || self.orbit.is_some() {
                     return Err(DataError::Invalid(format!(
-                        "{key}: altitude is only for air units"
+                        "{key}: altitude and orbit are only for air units"
                     )));
                 }
                 if m.stride && m.layer != MoveLayer::Land {
@@ -1486,6 +1490,7 @@ impl Unit {
                 .map(|m| FxVec3::new(fx(m.0), fx(m.1), fx(m.2)))
                 .collect(),
             drone_approach: fx(self.drone_approach),
+            orbit: self.orbit.map(fx),
             anti_missile: fx(self.anti_missile),
             anti_missile_mounts: self
                 .anti_missile_mounts

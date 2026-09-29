@@ -6,7 +6,9 @@
 //! an `Attack` pushed in front of the guard, leashed to the area and a gun's
 //! reach beyond it (`run_attack` ends it there), after which the unit walks
 //! back to its spot. Aircraft fight whatever is in the area, then circle it
-//! halfway out, a group in formation (`orbit.rs`).
+//! halfway out, a group in formation (`orbit.rs`); one that orbits
+//! (`UnitBlueprint::orbit`, the Argus) circles on the edge itself, and takes up an
+//! orbit of its own wherever it is left idle.
 //!
 //! With a friendly unit as `target`, the area goes with it: `pos` follows the
 //! unit, and stays where it was last if the unit is lost. A guard never ends by

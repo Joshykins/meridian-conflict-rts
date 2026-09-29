@@ -96,6 +96,40 @@ fn aircraft_circle_halfway_out() {
 }
 
 #[test]
+fn the_argus_orbits_on_the_whole_ring_and_circles_where_it_is_left_idle() {
+    let mut w = world();
+    let centre = FxVec2::from_ints(2000, 2000);
+    let argus = add(&mut w, "aster_t2_support", 0, 2000, 2400);
+    guard(&mut w, &[argus], centre, 500);
+    band(&mut w, &[argus], centre, 600);
+    let (near, far) = band(&mut w, &[argus], centre, 400);
+    assert!(
+        near > 440.0 && far < 560.0,
+        "orbit band {near:.0}..{far:.0}"
+    );
+
+    // Stopped, it takes up an orbit of its own where it is, 400 m round.
+    let id = w.state.units.id(argus);
+    w.tick(&[cmd(0, Command::Stop { units: vec![id] })])
+        .unwrap();
+    w.tick(&[]).unwrap();
+    let o = *w
+        .state
+        .orders
+        .front(&w.state.units, argus)
+        .expect("orbiting");
+    assert_eq!(o.kind, mc_sim::tables::OrderKind::Guard);
+    assert_eq!(o.radius, Fx::from_int(400));
+    let here = o.pos;
+    band(&mut w, &[argus], here, 900);
+    let (near, far) = band(&mut w, &[argus], here, 400);
+    assert!(
+        near > 340.0 && far < 460.0,
+        "idle orbit band {near:.0}..{far:.0}"
+    );
+}
+
+#[test]
 fn a_group_circles_in_formation() {
     let mut w = world();
     let centre = FxVec2::from_ints(2000, 2000);

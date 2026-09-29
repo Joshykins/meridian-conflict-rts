@@ -1497,6 +1497,17 @@ impl World {
                         continue;
                     }
                 }
+                // An aircraft that orbits, left with nothing to do, circles where it is.
+                if let Some(radius) = self
+                    .bp(row)
+                    .orbit
+                    .filter(|_| self.state.units.hangar[row] == Handle::NONE)
+                {
+                    let mut o = order(OrderKind::Guard, self.state.units.pos[row], Handle::NONE);
+                    o.radius = radius;
+                    self.give(row, o, false)?;
+                    continue;
+                }
                 if self.state.units.has_flag(row, flag::HAS_FIELD) {
                     self.stop_moving(row);
                 }

@@ -89,6 +89,8 @@
  motion: (layer: Air, size: 0, speed: 92, accel: 40, turn: 64, altitude: 220, hover: false),
  weapons: [], mesh: "support_air", icon: Intel,
  sounds: (death: "blast_small", moving: "aster_jet"), radar: 2800, sonar: 900, anti_missile: 450, anti_missile_lasers: 2,
+ // It orbits: its guard is an Orbit on the whole ring, and idle it circles where it is.
+ orbit: 400,
  // Radar, sonar, the lasers and its own small field draw energy; the salvage ray takes none.
  economy: (energy_upkeep: 100),
  shield: (kind: Hull, health: 1200, regen: 20),

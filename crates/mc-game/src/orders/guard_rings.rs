@@ -1,5 +1,6 @@
 //! Guard areas on the battlefield: the ring of the area guarded, and the circle
-//! aircraft fly round it.
+//! aircraft fly round it. An aircraft that orbits (`UnitBlueprint::orbit`, the Argus)
+//! has its guard drawn as an Orbit: blue, the circle on the ring itself.
 
 use super::Field;
 use crate::hud;
@@ -10,7 +11,14 @@ use mc_sim::mirror::UnitInstance;
 
 /// The edge of a guard area: a dashed ring on the ground, finer the bigger it is,
 /// with a faint second ring just inside so it reads as a zone, not a range.
-pub(super) fn guard_ring(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, strength: f32) {
+pub(super) fn guard_ring(
+    ui: &mut Ui,
+    field: &Field,
+    c: Vec2,
+    radius: f32,
+    strength: f32,
+    tone: u32,
+) {
     let segments = ((radius / 10.0) as usize).clamp(48, 192) & !1;
     let point = |i: usize, r: f32| {
         let p = c + Vec2::from_angle(i as f32 / segments as f32 * std::f32::consts::TAU) * r;
@@ -18,7 +26,6 @@ pub(super) fn guard_ring(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, stren
             .camera
             .project(p.extend(field.renderer.surface_height(p) + 1.0))
     };
-    let tone = hud::style::Family::Stance.tone();
     let inner = (radius - 6.0).max(radius * 0.97);
     for i in (0..segments).step_by(2) {
         if let (Some(a), Some(b)) = (point(i, radius), point(i + 1, radius)) {
@@ -30,21 +37,62 @@ pub(super) fn guard_ring(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, stren
     }
 }
 
-/// Whether `unit` is an aircraft: on guard, it circles the area halfway out.
-pub(super) fn flies(blueprints: &Blueprints, unit: &UnitInstance) -> bool {
-    blueprints
-        .unit(BlueprintId(unit.blueprint as u16))
-        .motion
-        .is_some_and(|m| m.layer == MoveLayer::Air)
+/// The blue of an Orbit.
+const ORBIT: u32 = 0x4F8BFF;
+
+/// How a unit's guard order is drawn.
+#[derive(Clone, Copy)]
+pub(super) struct GuardLook {
+    /// Share of the area's radius the unit circles at (`mc_sim`'s `orbit.rs`): none on
+    /// the ground or at sea, half for an aircraft, all of it for one that orbits.
+    pub circle: f32,
+    pub tone: u32,
 }
 
-/// Whether any selected unit is an aircraft.
-pub(super) fn selection_flies(field: &Field) -> bool {
+impl GuardLook {
+    fn stance(circle: f32) -> GuardLook {
+        GuardLook {
+            circle,
+            tone: hud::style::Family::Stance.tone(),
+        }
+    }
+}
+
+const ORBITS: GuardLook = GuardLook {
+    circle: 1.0,
+    tone: ORBIT,
+};
+
+/// How `unit`'s guard order is drawn.
+pub(super) fn guard_look(blueprints: &Blueprints, unit: &UnitInstance) -> GuardLook {
+    let bp = blueprints.unit(BlueprintId(unit.blueprint as u16));
+    if bp.orbit.is_some() {
+        ORBITS
+    } else if bp.motion.is_some_and(|m| m.layer == MoveLayer::Air) {
+        GuardLook::stance(0.5)
+    } else {
+        GuardLook::stance(0.0)
+    }
+}
+
+/// How a guard the selection is about to be given is drawn: as an Orbit when every
+/// aircraft in it orbits, with the aircraft's circle when any flies.
+pub(super) fn selection_guard_look(field: &Field) -> GuardLook {
     let view = field.view;
-    view.selection.iter().any(|id| {
-        view.index_of
-            .get(id)
-            .is_some_and(|&i| flies(field.blueprints, &view.frame.units[i]))
+    let looks = view
+        .selection
+        .iter()
+        .filter_map(|id| view.index_of.get(id))
+        .map(|&i| guard_look(field.blueprints, &view.frame.units[i]))
+        .filter(|l| l.circle > 0.0);
+    looks.fold(GuardLook::stance(0.0), |seen, l| {
+        if seen.circle == 0.0 {
+            l
+        } else if seen.circle == l.circle {
+            seen
+        } else {
+            GuardLook::stance(0.5)
+        }
     })
 }
 
@@ -58,6 +106,7 @@ pub(super) fn orbit_ring(
     c: Vec2,
     radius: f32,
     strength: f32,
+    tone: u32,
     time: Option<f32>,
     budget: usize,
 ) -> usize {
@@ -66,7 +115,6 @@ pub(super) fn orbit_ring(
     let on = |a: f32| project(c + Vec2::from_angle(a) * radius);
     let view = ui.size + 40.0;
     let seen = |p: Vec2| p.cmpge(Vec2::splat(-40.0)).all() && p.cmple(view).all();
-    let tone = hud::style::Family::Stance.tone();
     let mut cost = 0;
     let mut prev = on(0.0);
     for i in 1..=SEGMENTS {
