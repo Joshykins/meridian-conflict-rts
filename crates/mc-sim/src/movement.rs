@@ -1379,9 +1379,11 @@ impl World {
                 }
             }
         }
-        // Lift clear before accelerating horizontally out of a landing site.
+        // Lift clear before accelerating horizontally out of a landing site. A capital
+        // ship has its own rule (`lift_speed_cap`), and glides in lower than this.
         if motion.layer == MoveLayer::Air
             && moving
+            && !self.lands_on_order(row)
             && units.z[row] < self.ground_surface(pos) + Fx::from_int(16).min(motion.altitude)
         {
             target_speed = Fx::ZERO;

@@ -9,7 +9,7 @@ use mc_data::UnitBlueprint;
 use mc_sim::mirror::{UnitInstance, WarpView};
 use mc_sim::tables::{flag, WarpPhase};
 
-/// A drive's jump, its charge bar and its reach: a cold violet, clear of the economy's
+/// A drive's jump and its charge bar: a cold violet, clear of the economy's
 /// yellow and the interface's red-orange.
 pub const WARP: u32 = 0x9D8CFF;
 /// An EMP stun: electric cyan.
@@ -127,11 +127,7 @@ pub(super) fn drive_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Opt
     } else {
         (
             "Warp drive ready  \u{b7}  O".to_owned(),
-            format!(
-                "{:.1} km  \u{b7}  {} E",
-                d.range.to_f32() / 1000.0,
-                whole(d.energy.to_f32())
-            ),
+            format!("{} E", whole(d.energy.to_f32())),
             None,
             WARP,
             WARP,
@@ -139,7 +135,8 @@ pub(super) fn drive_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Opt
     })
 }
 
-/// A dampener's line: its field up, or down and why.
+/// A dampener's line: its field up, or down and why. Only for a field the viewer is
+/// shown: an enemy's never is.
 pub(super) fn damper_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Option<Line> {
     let spec = bp.warp_damper?;
     if has_flag(u, flag::UNDER_CONSTRUCTION) {
@@ -150,8 +147,8 @@ pub(super) fn damper_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Op
         .frame
         .dampers
         .iter()
-        .find(|d| d.unit_id == u.unit_id)
-        .is_some_and(|d| d.live);
+        .find(|d| d.unit_id == u.unit_id)?
+        .live;
     let radius = format!("{} m", whole(spec.radius.to_f32()));
     let (label, tone) = if live {
         ("Warp field up", DAMPER)

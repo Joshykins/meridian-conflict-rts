@@ -16,8 +16,8 @@
         cost: (mass: 280, energy: 4200, time: 1400),
         radius: 36, height: 22, footprint: (6, 5), hull: (36, 27), vision: 1500, radar: 6000,
         motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 200, hover: true),
-        // Warp: a scout's light drive, a little more reach than the Courier's for less charge.
-        warp: (range: 7000, energy: 1200, spool: 3, cooldown: 40, speed: 3000),
+        // Warp: a scout's light drive, cheaper to charge than the Courier's.
+        warp: (energy: 1200, spool: 3, cooldown: 40, speed: 3000),
         economy: (energy_upkeep: 100),
         weapons: [],
         mesh: "sensor_ship", icon: SensorShip,
@@ -38,8 +38,8 @@
         cost: (mass: 5000, energy: 60000, time: 20000),
         radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 1900, radar: 2400,
         motion: (layer: Air, size: 0, speed: 60, accel: 6, turn: 8, altitude: 560, hover: true),
-        // The longest jump of the line, and the slowest to spool and to recharge.
-        warp: (range: 12000, energy: 20000, spool: 5, cooldown: 75, speed: 4000),
+        // The costliest jump of the line, and the slowest to spool and to recharge.
+        warp: (energy: 20000, spool: 5, cooldown: 75, speed: 4000),
         hull_mounts: true,
         weapons: [
             // Fixed along the keel: the ship turns and pitches to aim it. Charges, then one

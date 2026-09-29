@@ -134,18 +134,63 @@ fn a_courier_charges_off_the_grid_jumps_and_comes_out_where_it_was_sent() {
 }
 
 #[test]
-fn a_mark_beyond_the_drive_is_brought_in_to_its_range() {
+fn a_jump_reaches_across_the_whole_map() {
     let mut w = world();
-    let ship = add(&mut w, COURIER, 0, 2000, 3000);
+    let ship = add(&mut w, COURIER, 0, 1000, 1000);
     run(&mut w, seconds(10));
-    warp(&mut w, ship, 14000, 3000);
+    warp(&mut w, ship, 15000, 15000);
     until(&mut w, ship, WarpPhase::Transit, seconds(10)).expect("it never jumped");
-    until(&mut w, ship, WarpPhase::Idle, seconds(10)).expect("it never came out");
-    let x = w.state.units.pos[row(&w, ship)].x.to_f32();
+    until(&mut w, ship, WarpPhase::Idle, seconds(20)).expect("it never came out");
+    let at = w.state.units.pos[row(&w, ship)];
     assert!(
-        (7990.0..8010.0).contains(&x),
-        "a 6 km drive took it to x {x}"
+        at.distance(FxVec2::from_ints(15000, 15000)) < Fx::from_int(5),
+        "a 20 km jump came out at {at:?}"
     );
+}
+
+#[test]
+fn ships_sent_together_come_out_in_the_formation_they_left_in() {
+    let mut w = world();
+    let spots = [(3000, 3000), (3400, 3000), (3200, 3500)];
+    let ships: Vec<UnitId> = spots
+        .iter()
+        .map(|&(x, y)| add(&mut w, COURIER, 0, x, y))
+        .collect();
+    run(&mut w, seconds(10));
+    let before: Vec<FxVec2> = ships
+        .iter()
+        .map(|&s| w.state.units.pos[row(&w, s)])
+        .collect();
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::Warp {
+            units: ships.clone(),
+            pos: FxVec2::from_ints(10000, 9000),
+            queue: false,
+        },
+    }])
+    .unwrap();
+    for &s in &ships {
+        until(&mut w, s, WarpPhase::Idle, seconds(30)).expect("it never came out");
+    }
+    let mut middle = FxVec2::ZERO;
+    for &s in &ships {
+        middle += w.state.units.pos[row(&w, s)] * Fx::ratio(1, 3);
+    }
+    assert!(
+        middle.distance(FxVec2::from_ints(10000, 9000)) < Fx::from_int(10),
+        "the group came out about {middle:?}"
+    );
+    for (i, &s) in ships.iter().enumerate() {
+        for (j, &t) in ships.iter().enumerate().skip(i + 1) {
+            let now = w.state.units.pos[row(&w, t)] - w.state.units.pos[row(&w, s)];
+            let was = before[j] - before[i];
+            assert!(
+                (now - was).length() < Fx::from_int(10),
+                "ships {i} and {j} stood {was:?} apart and came out {now:?} apart"
+            );
+        }
+    }
 }
 
 #[test]
@@ -249,6 +294,50 @@ fn a_jump_into_an_enemy_dampener_drags_and_throws_the_ship_out_hurt_and_stunned(
     assert_eq!(snagged.state.units.stun[r][0], 0);
     let jumped = until(&mut snagged, b, WarpPhase::Spool, seconds(90));
     assert!(jumped.is_some(), "it did not take up its orders again");
+}
+
+#[test]
+fn the_ships_own_side_never_sees_its_jump_dampened() {
+    let mut w = world();
+    let ship = add(&mut w, FRIGATE, 0, 3000, 3000);
+    let damper = add(&mut w, DAMPER, 1, 9000, 3600);
+    run(&mut w, seconds(20));
+    let mut frame = RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    assert!(frame.dampers.is_empty(), "the enemy's field is shown");
+    w.write_render_frame(Some(1), &mut frame);
+    assert!(frame.dampers.iter().any(|d| d.unit_id == damper.0));
+    warp(&mut w, ship, 9000, 3000);
+    until(&mut w, ship, WarpPhase::Transit, seconds(20)).expect("it never jumped");
+    w.tick(&[]).unwrap();
+    let clean = |w: &World| w.state.units.warp[row(w, ship)].length;
+    w.write_render_frame(Some(0), &mut frame);
+    let ours = frame.warps.iter().find(|j| j.unit_id == ship.0).unwrap();
+    assert!(!ours.dampened, "its own side sees the snag");
+    assert!(ours.length < clean(&w), "its own side sees the drag");
+    w.write_render_frame(Some(1), &mut frame);
+    let theirs = frame.warps.iter().find(|j| j.unit_id == ship.0).unwrap();
+    assert!(theirs.dampened && theirs.length == clean(&w));
+    // It comes out, hurt, as a clean jump to its own side.
+    for _ in 0..seconds(60) {
+        w.tick(&[]).unwrap();
+        let arrived = |f: &RenderFrame| {
+            f.events.iter().find_map(|e| match e {
+                SimEvent::WarpArrived { dampened, .. } => Some(*dampened),
+                _ => None,
+            })
+        };
+        w.write_render_frame(Some(0), &mut frame);
+        if let Some(dampened) = arrived(&frame) {
+            assert!(!dampened, "its own side hears a dampened exit");
+            let u = frame.units.iter().find(|u| u.unit_id == ship.0).unwrap();
+            assert_eq!(u.fx[..2], [1.0, 0.0], "its own side sees it torn out");
+            w.write_render_frame(None, &mut frame);
+            assert_eq!(arrived(&frame), Some(true));
+            return;
+        }
+    }
+    panic!("it never came out");
 }
 
 #[test]

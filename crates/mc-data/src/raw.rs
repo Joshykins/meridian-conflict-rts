@@ -575,8 +575,6 @@ pub(crate) struct RawTransport {
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawWarp {
-    /// Farthest jump, metres.
-    pub range: f64,
     /// Energy one jump's charge takes.
     pub energy: f64,
     /// Seconds the charge takes at full power.
@@ -1561,8 +1559,7 @@ impl Unit {
             },
             warp: match &self.warp {
                 Some(d)
-                    if d.range <= 0.0
-                        || d.speed <= 0.0
+                    if d.speed <= 0.0
                         || d.spool <= 0.0
                         || d.energy <= 0.0
                         || !self
@@ -1571,11 +1568,10 @@ impl Unit {
                             .is_some_and(|m| m.layer == MoveLayer::Air) =>
                 {
                     return Err(DataError::Invalid(format!(
-                        "{key}: a warp drive is on an aircraft, with a range, a speed, a spool and an energy cost"
+                        "{key}: a warp drive is on an aircraft, with a speed, a spool and an energy cost"
                     )));
                 }
                 Some(d) => Some(crate::Warp {
-                    range: fx(d.range),
                     energy: fx(d.energy),
                     spool_ticks: ticks(d.spool).clamp(1, 600) as u16,
                     cooldown_ticks: ticks(d.cooldown).min(6000) as u16,
