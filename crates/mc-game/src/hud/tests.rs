@@ -1183,48 +1183,6 @@ fn a_builders_queued_mines_bring_up_their_territories_once_each() {
 }
 
 #[test]
-fn an_idle_engineer_tile_steps_through_them_and_shift_takes_them_all() {
-    let mut rig = Rig::new("aster_t1_engineer");
-    rig.view.selection.clear();
-    rig.view.frame.units[0].owner_flags |= STATE_IDLE;
-    let mut second = rig.view.frame.units[0];
-    second.unit_id = 9;
-    rig.view.frame.units.push(second);
-    rig.view.index_of.insert(9, 1);
-    // No commander: the card sits right under the economy, its first tile right
-    // of the title block.
-    let card_y = EDGE + ECONOMY_H + GAP;
-    let tile = Vec2::new(EDGE + 8.0 + 66.0 + 8.0 + 18.0, card_y + 8.0 + 18.0);
-    let one = |id| {
-        vec![HudAction::Select {
-            units: vec![id],
-            focus: true,
-        }]
-    };
-    assert_eq!(rig.click(tile), one(7));
-    assert_eq!(rig.click(tile), one(9));
-    assert_eq!(rig.click(tile), one(7), "and round again");
-    rig.view.shift = true;
-    assert_eq!(
-        rig.click(tile),
-        vec![HudAction::Select {
-            units: vec![7, 9],
-            focus: false
-        }]
-    );
-    rig.view.selection = vec![9, 7];
-    assert_eq!(
-        rig.click(tile),
-        vec![HudAction::Select {
-            units: vec![7, 9],
-            focus: true
-        }],
-        "a second shift-click finds them"
-    );
-    rig.view.shift = false;
-}
-
-#[test]
 fn a_structure_that_upgrades_offers_it_on_its_next_tier() {
     let mut rig = Rig::new("aster_t1_radar");
     rig.frame(&Input::default());
@@ -1655,4 +1613,5 @@ fn a_lift_ship_hold_lets_out_what_is_clicked_and_its_card_lands_and_takes_off() 
     assert_eq!(super::cargo::status(&out).0, "Unloading \u{b7} 2 left");
 }
 
+mod idle;
 mod warp;

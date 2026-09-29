@@ -1,7 +1,7 @@
-//! The left column under the economy: the commander's card, then a card for idle
-//! engineers and one for idle factories. All three say "idle" the same way: an
-//! amber bar down the card's left edge and an amber dot before the word, pulsing
-//! together.
+//! The left column under the economy: the commander's card, then a card each for
+//! idle engineers, idle factories and idle reclaimers (salvage units, not towers).
+//! All of them say "idle" the same way: an amber bar down the card's left edge and
+//! an amber dot before the word, pulsing together.
 //!
 //! An idle card is one short strip: its title and idle count on the left, then a
 //! small tile per type, tier included (a T1 and a T2 engineer are two tiles). Click
@@ -31,8 +31,8 @@ pub(super) const TILE_GAP: f32 = 4.0;
 
 #[derive(Default)]
 pub(super) struct Builders {
-    /// Which idle unit a right-click goes to next, by card (0 engineers, 1
-    /// factories) and blueprint, `u32::MAX` standing for the card's ALL.
+    /// Which idle unit a click goes to next, by card (an index into [`CARDS`]) and
+    /// blueprint, `u32::MAX` standing for the card's title block.
     next: HashMap<(u8, u32), usize>,
     /// 1 when the commander was hit, fading.
     commander_hit: f32,
@@ -204,10 +204,19 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
 /// One kind of idle unit: its blueprint and the idle ones, in frame order.
 type Kind<'a> = (&'a UnitBlueprint, Vec<u32>);
 
-/// Idle engineers (not the commander, which has its own card) and idle factories,
-/// each by type, in the order the cards show them.
-fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; 2] {
-    let mut kinds: [Vec<Kind<'a>>; 2] = [Vec::new(), Vec::new()];
+/// The idle cards, top down: the title and what shift-click on the title takes.
+const CARDS: [(&str, &str); 3] = [
+    ("Engineers", "every idle engineer"),
+    ("Factories", "every idle factory"),
+    ("Reclaimers", "every idle reclaimer"),
+];
+
+/// Idle engineers (not the commander, which has its own card), idle factories and
+/// idle reclaimers, each by type, in the order the cards show them. A reclaimer is
+/// a salvage unit (`UnitBlueprint::is_salvager`), never a reclaim tower; one with
+/// no orders still working a wreck in reach is not idle.
+fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
+    let mut kinds: [Vec<Kind<'a>>; CARDS.len()] = Default::default();
     for u in &s.view.frame.units {
         let mine = (u.owner_flags & 0xFF) as u8 == s.view.local && u.owner_flags & KIND_WRECK == 0;
         if !mine
@@ -221,6 +230,8 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; 2] {
             0
         } else if bp.has(cat::FACTORY) {
             1
+        } else if bp.is_salvager() && !has_flag(u, flag::RECLAIMING | flag::WORKING) {
+            2
         } else {
             continue;
         };
@@ -256,7 +267,7 @@ pub(super) fn per_row() -> usize {
     ((super::COMMANDER_W - 3.0 * PAD - LABEL_W + TILE_GAP) / (TILE + TILE_GAP)) as usize
 }
 
-/// The idle engineer and factory cards, stacked down from `top` and kept above
+/// The idle engineer, factory and reclaimer cards, stacked down from `top` and kept above
 /// `bottom`. Returns the y under the last one drawn.
 pub(super) fn idle_cards(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom: f32) -> f32 {
     let mut y = top;
@@ -285,11 +296,7 @@ fn idle_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, card: u8, r: Rect, kinds: &[
     hud.glass(ui, r);
     let k = pulse(ui);
     idle_edge(ui, r, k);
-    let (title, every) = if card == 0 {
-        ("Engineers", "every idle engineer")
-    } else {
-        ("Factories", "every idle factory")
-    };
+    let (title, every) = CARDS[card as usize];
     let all: Vec<u32> = kinds
         .iter()
         .flat_map(|(_, ids)| ids.iter().copied())
