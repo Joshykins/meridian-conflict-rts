@@ -283,3 +283,50 @@ outer pair forward and the inner pair back in a turn. Jet pods burn a blue drive
 plume (`PUFF_THRUST`) out of each nozzle, longer and hotter the harder the
 aircraft is driven (`renderer/aircraft_trails.rs`). A VTOL may have one pair of
 pods or two (`Vtol::pairs`).
+
+## Warp drives and the Undertow dampener (2026-09-29)
+
+The Courier, the Bastion and the Resolute carry a warp drive (`warp:` in their unit
+entries; any aircraft may be given one). `Command::Warp` (`crates/mc-sim/src/warp.rs`):
+
+1. **Charge.** The ship waits until its drive has recharged and it is up at 3/4 of its
+   cruise height. Then it stops, turns its nose onto the mark and charges the drive. The
+   charge is `energy`, drawn off the grid over `spool` seconds at full power and paid
+   with the side's upkeep (`economy.rs`). A grid that cannot pay charges it more slowly
+   (never the last sliver), and a big charge can stall the grid, dropping its shields.
+   Any other order, or a stun, calls the jump off, and the charge is lost.
+2. **Jump.** Once charged and on the mark, the ship leaves at once: it is out of the
+   world (`IN_FACTORY`: not seen, hit or ordered) and already where it will come out.
+   The transit lasts `distance / speed`, and never less than 1.5 s. A mark beyond `range`
+   is brought in along the line to it.
+3. **Exit.** Back in the world, it holds still while the drive winds down (1.2 s), then
+   recharges for `cooldown` seconds. The order was done when it jumped, so the next one
+   is taken up as it comes out.
+
+| ship     | range   | charge          | cooldown | speed      |
+|----------|---------|-----------------|----------|------------|
+| Courier  | 6 km    | 1 500 E in 3 s  | 40 s     | 3 000 m/s  |
+| Bastion  | 9 km    | 8 000 E in 4 s  | 60 s     | 3 500 m/s  |
+| Resolute | 12 km   | 20 000 E in 5 s | 75 s     | 4 000 m/s  |
+
+**Undertow** (`aster_t2_warp_damper`, T2, 300 E/s upkeep, `warp_damper:`): an enemy
+jump that ends within 1 600 m of a finished, powered Undertow is snagged. The transit
+drags on 3x longer (a field raised mid-jump snags what is left of it), and if the
+Undertow still stands and has power when the ship comes out, the ship loses a quarter
+of its health and is stunned for 25 s. Destroying or starving it first spares the
+ship. Pausing it powers the field down, as with shields. Its own side's jumps pass.
+
+**EMP stun** (`Units::stun`, `World::stun`): a stunned unit takes no orders (they wait
+for it), picks no targets, fires nothing, does not move and its shield is off. A stunned
+capital ship heels 14° over, dips its nose 4°, drifts to a stop and sinks toward 85% of
+its cruise height, righting itself once the stun wears off.
+
+Presentation: `UnitInstance::fx` carries the warp stretch and the stun, `status[0]`
+`UNIT_WARP_DAMPED` / `UNIT_IN_WARP`, and `RenderFrame::warps` / `dampers` list the jumps
+and fields a viewer may see (`mirror/warp.rs`). A ship is drawn for one more tick where
+it left, stretching into a streak, and comes out of a streak on its first tick back.
+
+Check: `cargo test --profile gate -p mc-sim --test sim -- warp::` (and the determinism
+matrix, which plays a Courier's jump into an Undertow). Headless:
+`scripts/shot.sh run --range --unit aster_t1_lift_ship --scenario warp` or
+`--scenario warp-dampened` (a red Undertow beside the exit).
