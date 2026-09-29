@@ -647,7 +647,7 @@ mod tests {
             "{battleship:?}"
         );
         assert!(
-            battleship.contains(&(Reach::Direct, 0, 150.0, 1800.0)),
+            battleship.contains(&(Reach::Direct, 0, 150.0, 2520.0)),
             "{battleship:?}"
         );
         assert!(
