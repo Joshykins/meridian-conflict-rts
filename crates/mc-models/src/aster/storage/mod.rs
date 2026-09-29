@@ -67,7 +67,7 @@ mod tests {
     }
 
     /// Every tier of both stores has status lamps and a fill gauge whose levels climb
-    /// from near empty to near full, at the full and middle levels of detail.
+    /// from low to at least half way, at the full and middle levels of detail.
     #[test]
     fn every_tier_has_lamps_and_a_climbing_gauge() {
         for (key, r, heights) in [
@@ -92,7 +92,7 @@ mod tests {
                         .collect();
                     let (lo, hi) = (levels.iter().min(), levels.iter().max());
                     assert!(
-                        lo.is_some_and(|&l| l <= 2) && hi.is_some_and(|&l| l >= 12),
+                        lo.is_some_and(|&l| l <= 3) && hi.is_some_and(|&l| l >= 8),
                         "{tag}: gauge levels {lo:?}..{hi:?}"
                     );
                 }

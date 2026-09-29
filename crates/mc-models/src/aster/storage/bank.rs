@@ -50,14 +50,13 @@ fn bank(b: &mut MeshBuilder) {
             b.at(v3(col as f32 * CELL_X, CELL_Y, 0.0), |b| {
                 b.paint(ACCENT);
                 b.prism(v3(0.0, 0.0, 0.0), b.sides(8), CELL_R, CELL_R, 8.0);
-                // The charge rises through the bands: the lower ones cell by cell
-                // from -x, then the upper ones.
-                let k = (col + 1) as f32;
+                // The charge rises through the bank: the lower bands, the upper
+                // bands, then the bookends' vents, seen alike from every side.
                 b.paint(GLOW);
-                fill(b, (k + 0.5) / 6.0, |b| {
+                fill(b, 1.0 / 6.0, |b| {
                     b.prism(v3(0.0, 0.0, 3.0), b.sides(8), 3.05, 3.05, 0.7)
                 });
-                fill(b, (k + 3.5) / 6.0, |b| {
+                fill(b, 3.0 / 6.0, |b| {
                     b.prism(v3(0.0, 0.0, 5.6), b.sides(8), 3.05, 3.05, 0.7)
                 });
                 b.paint(PLATING);
@@ -81,13 +80,15 @@ fn bank(b: &mut MeshBuilder) {
         );
         if b.fine() {
             for i in 0..3 {
-                vent(
-                    b,
-                    v3(-6.4 + 6.4 * i as f32, 9.1, BOOK_TOP),
-                    v2(3.6, 1.2),
-                    4,
-                    GLOW,
-                );
+                fill(b, 5.0 / 6.0, |b| {
+                    vent(
+                        b,
+                        v3(-6.4 + 6.4 * i as f32, 9.1, BOOK_TOP),
+                        v2(3.6, 1.2),
+                        4,
+                        GLOW,
+                    )
+                });
             }
         }
     });
@@ -205,8 +206,7 @@ pub(in crate::aster) fn storage_energy(b: &mut MeshBuilder, tech: u8) {
             if b.fine() {
                 for i in -1..=1 {
                     // Lit slits up the rack's slope, charging as the cells do.
-                    let k = (i + 1) as f32;
-                    for (y, z, at) in [(15.4, 4.0, k + 0.5), (14.4, 5.6, k + 3.5)] {
+                    for (y, z, at) in [(15.4, 4.0, 1.0), (14.4, 5.6, 3.0)] {
                         fill(b, at / 6.0, |b| {
                             slit(b, v3(i as f32 * 6.4, y, z), Vec3::Y, 4.4, 0.3)
                         });
