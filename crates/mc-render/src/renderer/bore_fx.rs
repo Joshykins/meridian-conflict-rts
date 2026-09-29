@@ -387,9 +387,12 @@ impl Renderer {
     /// fronts that bend the trees, a white-hot heart swelling into a churning blue
     /// fireball that lifts off the ground, lightning re-striking out over the ground round
     /// it again and again, what it hit burning inside it and climbing off as a column of
-    /// soot, and a glassed crater. It burns for about `burn` seconds.
+    /// soot, and a glassed crater. It burns for about `burn` seconds. Over the sea (an AEB
+    /// warhead on a ship) it goes off on the water: no crater, no clods.
     pub(super) fn bore_blast(&mut self, to: Vec3, r: f32, burn: f32, start: f32) {
-        let ground = self.ground_height(to.truncate());
+        let bed = self.ground_height(to.truncate());
+        let wet = bed < self.sea_level();
+        let ground = bed.max(self.sea_level());
         let at = to.truncate().extend(ground.max(to.z.min(ground + r * 0.3)));
         let previous = self.effect_origin.replace(at);
         let outbound = std::mem::replace(&mut self.effect_outbound, true);
@@ -513,14 +516,16 @@ impl Renderer {
             let speed = 25.0 + self.scatter.unit() * 45.0;
             let size = 0.8 + self.scatter.unit() * 1.2;
             let (clod, spark) = (2.0 + self.scatter.unit(), 0.5 + self.scatter.unit() * 0.4);
-            self.push_puff(
-                PUFF_CLOD,
-                at + Vec3::Z * 2.0,
-                dir * speed,
-                start,
-                clod,
-                (size, 0.3),
-            );
+            if !wet {
+                self.push_puff(
+                    PUFF_CLOD,
+                    at + Vec3::Z * 2.0,
+                    dir * speed,
+                    start,
+                    clod,
+                    (size, 0.3),
+                );
+            }
             self.push_puff(
                 PUFF_BOLT,
                 at + Vec3::Z * 2.0,
@@ -530,13 +535,15 @@ impl Renderer {
                 (1.6, 0.4),
             );
         }
-        self.add_crater_styled(
-            at.truncate(),
-            r * 0.8,
-            0.8,
-            start,
-            super::craters::CraterStyle::Glassed,
-        );
+        if !wet {
+            self.add_crater_styled(
+                at.truncate(),
+                r * 0.8,
+                0.8,
+                start,
+                super::craters::CraterStyle::Glassed,
+            );
+        }
         self.effect_outbound = outbound;
         self.effect_origin = previous;
     }

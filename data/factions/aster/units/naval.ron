@@ -524,15 +524,17 @@
             // Four hatches behind the sail. Launched dived: a boil on the surface, then each
             // cruise missile boosts up, arcs over with its wings unfolding and runs in under
             // 25 m over ground and water, finding another mark if its own dies. Every
-            // launch paints the boat.
+            // launch paints the boat. Each carries an AEB warhead: its motor burns blue, and
+            // it goes off as the electric bore's blast (`ion_blast`), the charge striking back
+            // up its last run (`discharge`).
             (
                 name: "Cruise Missiles",
                 damage: 2400, splash: 30, range_min: 400, range: 2800, reload: 24, salvo: 4, salvo_delay: 1.5, speed: 140, trajectory: Direct,
                 turret_turn: 0, arc: 360, muzzle: (-2.0, -2.0, 1.2),
                 muzzles: [(-2.0, -2.0, 1.2), (-2.0, 2.0, 1.2), (-6.0, -2.0, 1.2), (-6.0, 2.0, 1.2)],
-                targets: ["Land", "Naval", "Structure"], color: Orange, missile: true, guided: true, vertical_launch: true, skim: 25,
-                intercept: 120, trail: true, wake: 4.0, flash: 2.0, impact: 3.0, shockwave: 1.4,
-                sounds: (fire: "cruise_missile_launch", flight: "cruise_missile_flight", impact: "shell_heavy", ground: "shell_heavy"),
+                targets: ["Land", "Naval", "Structure"], color: Blue, missile: true, guided: true, vertical_launch: true, skim: 25,
+                intercept: 120, trail: true, wake: 4.0, flash: 2.0, impact: 3.0, shockwave: 1.4, ion_blast: 26, discharge: 30,
+                sounds: (fire: "cruise_missile_launch", flight: "cruise_missile_flight", impact: "aster_bore_heavy_strike", ground: "aster_bore_heavy_strike"),
             ),
         ],
         mesh: "submarine_strategic", icon: Submarine,

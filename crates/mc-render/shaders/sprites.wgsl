@@ -392,7 +392,11 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // Energy slug: a hotter, more white-cyan streak the wake hangs off.
         out.color *= 1.85;
     }
-    if missile {
+    if missile && (p.color & 0xFu) == 0u {
+        // A blue missile carries an AEB warhead (`Weapon::ion_blast`): its motor burns
+        // electric blue-white.
+        out.color = mix(out.color, vec3<f32>(0.62, 0.84, 1.0) * 12.0, 0.45);
+    } else if missile {
         // A rocket motor burns yellow-white at the nozzle, not the weapon's orange.
         out.color = mix(out.color, vec3<f32>(1.0, 0.78, 0.45) * 12.0, 0.55);
     }

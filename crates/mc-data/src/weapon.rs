@@ -107,6 +107,9 @@ pub struct Weapon {
     /// Where a shell lands on open ground it melts a pool this many times its splash
     /// across, glowing then crusting over (`RawWeapon::melt`). Zero: none.
     pub melt: f32,
+    /// An AEB warhead: the bore's blast this many metres across where it lands, and a blue
+    /// motor (`RawWeapon::ion_blast`). Zero: none.
+    pub ion_blast: f32,
     /// A capital rail gun: its shot is drawn and heard at this scale over an ordinary rail. Zero: none.
     pub heavy_rail: f32,
     /// A bolt rifle's charge and firing sequence, drawn on a gun this many metres long

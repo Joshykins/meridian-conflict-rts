@@ -368,11 +368,17 @@ impl Renderer {
         } else {
             (0.28, (0.22, 0.55))
         };
+        // A blue missile carries an AEB warhead (`Weapon::ion_blast`): its motor burns blue.
+        let fire = if p.color & 0xF == 0 {
+            PUFF_PLASMA
+        } else {
+            PUFF_FIRE
+        };
         let flames = (span / 3.0).ceil().clamp(1.0, 6.0) as u32;
         for i in 0..flames {
             let along = (i as f32 + 1.0) / flames as f32;
             self.push_puff(
-                PUFF_FIRE,
+                fire,
                 from.lerp(to, along) - dir * (tail + 0.35),
                 -dir * 5.0,
                 time + along * duration,

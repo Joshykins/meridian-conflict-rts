@@ -48,8 +48,10 @@ submarine) gives itself away every time it launches.
   the surface, then each boosts up out of its hatch (`vertical_launch`), arcs over under
   100 m with its wings unfolding, glides down and runs in under 30 m over ground and water,
   so only close-in AA gets a shot, late. One whose target dies takes the nearest enemy it
-  can strike near where that target was. Four heavy warheads a salvo. The launch boil paints
-  the submarine on enemy sonar and radar for 8 s.
+  can strike near where that target was. Four heavy warheads a salvo, each an AEB: the motor
+  burns blue and it goes off as the electric bore's blast (`ion_blast`), lightning striking
+  back up its last run (`discharge`). The launch boil paints the submarine on enemy sonar
+  and radar for 8 s.
 - **Dumbfire rockets** (the Swordfish): thirty-two unguided rockets a salvo out of fixed,
   forward-canted cells, so the hull turns its bow onto the mark. They fly a high lob
   (`rake`) and fall over and round the mark. Each is light and easy for point defence to

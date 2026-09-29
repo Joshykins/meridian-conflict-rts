@@ -791,6 +791,12 @@ pub struct RawWeapon {
     /// then orange, then red as it crusts over and cools. Cosmetic. Zero (the default): none.
     #[serde(default)]
     pub melt: f64,
+    /// An AEB warhead: where the shot lands (not on a shield), it goes off as the electric
+    /// bore's blast, a ball of ionised air this many metres across that burns blue with
+    /// lightning striking out of it, in place of a shell's burst; its motor burns blue.
+    /// Cosmetic. Zero (the default): none.
+    #[serde(default)]
+    pub ion_blast: f64,
     /// A capital rail gun (the Resolute's spinal rail, the Zenith): the firing, the
     /// slug's path and the hit are drawn and heard far bigger than any other rail gun,
     /// scaled by this. Under 0.15 (the Resolute's turrets) only the charge and the rails'
@@ -1342,6 +1348,7 @@ impl Unit {
                 bolts: w.bolts.min(32),
                 discharge: w.discharge.clamp(0.0, 400.0) as f32,
                 melt: w.melt.clamp(0.0, 2.0) as f32,
+                ion_blast: w.ion_blast.clamp(0.0, 200.0) as f32,
                 streak: w.streak.clamp(0.0, 8.0) as f32,
                 heavy_rail: w.heavy_rail.clamp(0.0, 4.0) as f32,
                 arc_charge: w.arc_charge.clamp(0.0, 40.0) as f32,

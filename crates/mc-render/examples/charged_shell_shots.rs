@@ -1,7 +1,8 @@
 //! Native GPU look at the Leviathan's charged shells landing (`Weapon::discharge`).
 //! Run: cargo run --release -p mc-render --example charged_shell_shots -- maps/dev16.mcmap OUT_DIR
 //! Writes 24 frames (20 fps) of a three-shell salvo landing on open ground, then 16 of a
-//! Raptor's bolt rifle shots bursting on aircraft 250 m up (`storm-NN.ppm`).
+//! Raptor's bolt rifle shots bursting on aircraft 250 m up (`storm-NN.ppm`), then 24 (7 fps)
+//! of the Kraken's AEB cruise missiles going off (`Weapon::ion_blast`, `aeb-NN.ppm`).
 use glam::{Vec2, Vec3};
 use mc_core::{Fx, FxVec3};
 use mc_data::Blueprints;
@@ -173,6 +174,72 @@ fn main() {
         std::fs::write(out.join(format!("storm-{i:02}.ppm")), ppm).unwrap();
     }
     eprintln!("captured bolt rifle bursts");
+
+    // The Kraken's cruise missiles: AEB warheads skimming in low from the west, two of them
+    // a moment apart, each going off as the electric bore's blast.
+    let kraken = blueprints.id_of("aster_t3_submarine").unwrap();
+    let (cells, aeb) = blueprints
+        .unit(kraken)
+        .weapons
+        .iter()
+        .enumerate()
+        .find(|(_, w)| w.ion_blast > 0.0)
+        .expect("the Kraken has an AEB warhead");
+    let aeb_spot = spot + Vec2::new(0.0, 160.0);
+    camera.focus = aeb_spot.extend(renderer.ground_height(aeb_spot));
+    camera.distance = 240.0;
+    camera.tilt = 0.4;
+    camera.yaw = 0.6;
+    let skimming = Vec3::new(1.0, 0.05, -0.12).normalize();
+    for i in 0..24 {
+        frame.events.clear();
+        for (k, off) in [(1, Vec2::ZERO), (4, Vec2::new(40.0, -30.0))] {
+            if i != k {
+                continue;
+            }
+            let xy = aeb_spot + off;
+            let to = xy.extend(renderer.ground_height(xy) + 2.0);
+            frame.events.push(SimEvent::Impact {
+                pos: fixed(to),
+                target_motion: FxVec3::ZERO,
+                splash: aeb.splash,
+                color: aeb.color,
+                after: Fx::ZERO,
+                on_unit: false,
+                on_shield: false,
+                blueprint: kraken,
+                weapon: cells as u8,
+            });
+            frame.events.push(SimEvent::ShellDischarge {
+                from: fixed(to - skimming * aeb.discharge),
+                to: fixed(to),
+                after: Fx::ZERO,
+                blueprint: kraken,
+                weapon: cells as u8,
+            });
+        }
+        renderer
+            .render(&FrameInput {
+                camera: &camera,
+                time: 50.0 + i as f32 * 0.15,
+                alpha: 1.0,
+                sim: Some(&frame),
+                ghosts: &[],
+                marks: &[],
+                ranges: &[],
+                ranges_drawn: 0,
+                overlay: &overlay,
+                build_grid: false,
+            })
+            .unwrap();
+        let pixels = renderer.read_pixels().expect("pixels");
+        let mut ppm = b"P6\n1280 800\n255\n".to_vec();
+        for pixel in pixels.as_chunks::<4>().0 {
+            ppm.extend_from_slice(&pixel[..3]);
+        }
+        std::fs::write(out.join(format!("aeb-{i:02}.ppm")), ppm).unwrap();
+    }
+    eprintln!("captured AEB warheads");
 
     // A tech 2 shield dome and a Paladin's hull field in the faction's shield colour,
     // with a few hits on the dome.

@@ -5496,6 +5496,7 @@ impl Renderer {
                 let red = weapon.red;
                 let slug = weapon.rail;
                 let flak = weapon.flak;
+                let ion_blast = weapon.ion_blast;
                 // A hitscan shot is there the moment it is fired: no flight to wait out. It lands
                 // at the start of the tick, where the target is drawn then, not where it ends up.
                 // A bore's strike is timed and placed with its discharge (`BoreDischarge`).
@@ -5532,6 +5533,12 @@ impl Renderer {
                     return;
                 }
                 let splash = splash.to_f32();
+                if ion_blast > 0.0 {
+                    // An AEB warhead goes off as the electric bore's blast (`bore_fx`), burning
+                    // about a second for every 7.5 m of it, as the Fulgur's does.
+                    self.bore_blast(at, ion_blast, ion_blast / 7.5, start);
+                    return;
+                }
                 if flak {
                     let burst = flak_fx::FlakBurst {
                         at,
