@@ -3,14 +3,19 @@
 The public landing page and unit directory. Next.js (App Router) and Tailwind;
 every page is static, prerendered at build time from the JSON in `content/`.
 
+The site uses pnpm, pinned in `package.json` (`packageManager`). npm and yarn
+refuse to install (`engines` with `engine-strict` in `.npmrc`), so there is
+one lockfile, `pnpm-lock.yaml`. With Corepack, `corepack enable` fetches the
+pinned pnpm.
+
 ```sh
 cd site
-npm install
-npm run dev        # http://localhost:3000
-npm run build      # the static build; `npm start` serves it
-npm run sync       # refresh content/ from the game's unit data
-npm run lint
-npm run typecheck
+pnpm install
+pnpm dev           # http://localhost:3000
+pnpm build         # the static build; `pnpm start` serves it
+pnpm sync          # refresh content/ from the game's unit data
+pnpm lint
+pnpm typecheck
 ```
 
 ## Where things come from
@@ -19,7 +24,7 @@ npm run typecheck
   `lore.ron` and `codex.ron` and writes `content/units/<slug>.<faction>.json`
   (one per unit), `content/units.index.json` (the directory list) and
   `content/factions.json`. The game data is the source of truth: run
-  `npm run sync` after it changes and commit the JSON, so the site builds on
+  `pnpm sync` after it changes and commit the JSON, so the site builds on
   its own. On-screen text only: nothing from `docs/LORE.md`.
 - **Site copy and links** live in `content/site.json`: tagline, Discord link,
   the featured units and the hero video.

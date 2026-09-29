@@ -1,0 +1,3 @@
+# Dependency install scripts pnpm may run. unrs-resolver ships prebuilt binaries; its script is not needed.
+ignoredBuiltDependencies:
+  - unrs-resolver

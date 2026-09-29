@@ -1,6 +1,6 @@
 // Turns the game's unit data (data/factions/*/units/*.ron, lore.ron, codex.ron)
 // into the JSON the site reads (content/units/*.json, content/factions.json).
-// The game data stays the source of truth: run `npm run sync` after it changes
+// The game data stays the source of truth: run `pnpm sync` after it changes
 // and commit the JSON, so the site builds on its own.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, existsSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
