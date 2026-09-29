@@ -1,7 +1,7 @@
 //! The left column under the economy: the commander's card, then a card each for
 //! idle engineers, idle factories and idle reclaimers (salvage units, not towers).
-//! All of them say "idle" the same way: an amber bar down the card's left edge and
-//! an amber dot before the word, pulsing together.
+//! All of them say "idle" the same way: a bar down the card's left edge and a dot
+//! before the word, pulsing together; amber, but the reclaimers' in the mass colour.
 //!
 //! An idle card is one short strip: its title and idle count on the left, then a
 //! small tile per type, tier included (a T1 and a T2 engineer are two tiles). Click
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 use super::style::{domain_wash, Domain};
 use super::{
-    build, flag, has_flag, icons, refit, selection, whole, Hud, HudAction, Scene, HEALTHY,
+    build, flag, has_flag, icons, refit, selection, whole, Hud, HudAction, Scene, HEALTHY, MASS,
 };
 use crate::audio::Sfx;
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
@@ -43,14 +43,15 @@ fn pulse(ui: &Ui) -> f32 {
     0.55 + 0.45 * (ui.time * 3.0).sin().abs()
 }
 
-/// The amber bar down an idle card's left edge, clear of its cut corners.
-fn idle_edge(ui: &mut Ui, r: Rect, k: f32) {
+/// The bar down an idle card's left edge in `tone` (amber, or mass for the
+/// reclaimers), clear of its cut corners.
+fn idle_edge(ui: &mut Ui, r: Rect, tone: u32, k: f32) {
     let edge = Rect::new(r.x, r.y + 10.0, 3.0, r.h - 20.0);
-    ui.fill(edge, rgb(palette::WARN, k));
+    ui.fill(edge, rgb(tone, k));
     ui.gradient_h(
         Rect::new(r.x + 3.0, edge.y, 36.0, edge.h),
-        rgb(palette::WARN, 0.12 * k),
-        rgb(palette::WARN, 0.0),
+        rgb(tone, 0.12 * k),
+        rgb(tone, 0.0),
     );
 }
 
@@ -96,7 +97,7 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
     }
     let idle = u.owner_flags & STATE_IDLE != 0 && hit == 0.0;
     if idle {
-        idle_edge(ui, r, pulse(ui));
+        idle_edge(ui, r, palette::WARN, pulse(ui));
     }
     // Its picture on the left.
     let pic = Rect::new(r.x + 8.0, r.y + 8.0, r.h - 16.0, r.h - 16.0);
@@ -204,11 +205,12 @@ pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt:
 /// One kind of idle unit: its blueprint and the idle ones, in frame order.
 type Kind<'a> = (&'a UnitBlueprint, Vec<u32>);
 
-/// The idle cards, top down: the title and what shift-click on the title takes.
-const CARDS: [(&str, &str); 3] = [
-    ("Engineers", "every idle engineer"),
-    ("Factories", "every idle factory"),
-    ("Reclaimers", "every idle reclaimer"),
+/// The idle cards, top down: the title, what shift-click on the title takes, and
+/// the idle tone. Reclaimers idle in the mass colour, the stuff they bring in.
+const CARDS: [(&str, &str, u32); 3] = [
+    ("Engineers", "every idle engineer", palette::WARN),
+    ("Factories", "every idle factory", palette::WARN),
+    ("Reclaimers", "every idle reclaimer", MASS),
 ];
 
 /// Idle engineers (not the commander, which has its own card), idle factories and
@@ -295,8 +297,8 @@ pub(super) fn idle_cards(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom
 fn idle_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, card: u8, r: Rect, kinds: &[Kind]) {
     hud.glass(ui, r);
     let k = pulse(ui);
-    idle_edge(ui, r, k);
-    let (title, every) = CARDS[card as usize];
+    let (title, every, tone) = CARDS[card as usize];
+    idle_edge(ui, r, tone, k);
     let all: Vec<u32> = kinds
         .iter()
         .flat_map(|(_, ids)| ids.iter().copied())
@@ -321,7 +323,7 @@ fn idle_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, card: u8, r: Rect, kinds: &[
         label.y + 27.0,
         LABEL_W - 8.0,
         &format!("{} Idle", all.len()),
-        palette::WARN,
+        tone,
         k,
     );
     let lit = same_units(&s.view.selection, &all);
@@ -373,7 +375,7 @@ fn idle_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, card: u8, r: Rect, kinds: &[
             tr.right() - 3.0,
             tr.bottom() - 7.0,
             type_scale::MICRO,
-            rgb(palette::WARN, 1.0),
+            rgb(tone, 1.0),
             &count,
         );
         pick(hud, ui, s, (card, bp.id.0 as u32), ids, lit, t.clicked);
