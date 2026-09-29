@@ -66,7 +66,7 @@ struct Palette {
 fn palette(dampened: bool) -> Palette {
     if dampened {
         Palette {
-            core: Vec3::new(0.95, 0.6, 1.0),
+            core: Vec3::new(0.8, 0.55, 1.0),
             edge: Vec3::new(0.62, 0.12, 1.0),
             accent: Vec3::new(1.0, 0.1, 0.22),
             torn: 1.0,
@@ -123,6 +123,8 @@ struct Jump {
     to: Vec3,
     /// Close enough to the camera for the fine emitters.
     near: bool,
+    /// The least size (m) a rift or flash is drawn at, so it still reads from far out.
+    floor: f32,
 }
 
 impl Renderer {
@@ -150,6 +152,7 @@ impl Renderer {
                 from,
                 to,
                 near: at.truncate().distance(focus) < reach && camera.distance < 5000.0,
+                floor: camera.distance * 0.03,
             };
             match view.phase {
                 WarpPhase::Spool => {
@@ -301,8 +304,8 @@ impl Renderer {
             from,
             j.fwd * 6.0 * k,
             gone,
-            1.4,
-            (0.9 * r, 2.2 * r),
+            0.9,
+            (0.8 * r, 1.8 * r),
             pal.edge * 3.0,
             pal.torn,
         );
@@ -386,7 +389,7 @@ impl Renderer {
         let p = (v.ticks as f32 / v.length.max(1) as f32).clamp(0.0, 1.0);
         let life = dt * 1.8;
         let to = j.to;
-        let size = r * (0.3 + 1.3 * p.powf(1.3));
+        let size = (r * (0.3 + 1.3 * p.powf(1.3))).max(j.floor * (0.6 + p));
         let open = smoothstep(0.1, 0.85, p);
         self.push_warp(
             PUFF_WARP_RIFT,
@@ -395,10 +398,10 @@ impl Renderer {
             time,
             life,
             (size, size),
-            pal.edge * (1.0 + 2.0 * p),
+            pal.edge * (1.6 + 2.4 * p),
             pal.torn,
         );
-        let heart = r * (0.15 + 0.35 * p);
+        let heart = (r * (0.15 + 0.35 * p)).max(j.floor * 0.4);
         self.push_warp(
             PUFF_WARP_GLOW,
             to,
@@ -643,7 +646,10 @@ impl Renderer {
             Vec3::ZERO,
             start,
             0.28,
-            (0.5 * r * power, 1.6 * r * power),
+            (
+                (0.5 * r).max(j.floor) * power,
+                (1.6 * r).max(2.0 * j.floor) * power,
+            ),
             pal.core * 4.0,
             pal.torn,
         );

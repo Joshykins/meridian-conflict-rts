@@ -65,13 +65,13 @@ fn warp_hull_light(color: vec3<f32>, warp: vec4<f32>, time: f32, seed: f32) -> v
     let damped = warp.z > 0.5;
     // The stretched end is the brightest: the nose going in, the stern coming out.
     let lead = select(1.0 - warp.w, warp.w, warp.y > 0.5);
-    let white = select(vec3<f32>(0.78, 0.9, 1.0), vec3<f32>(0.95, 0.62, 1.0), damped);
-    let tint = select(vec3<f32>(0.25, 0.55, 1.0), vec3<f32>(0.75, 0.12, 0.85), damped);
+    let white = select(vec3<f32>(0.78, 0.9, 1.0), vec3<f32>(0.66, 0.36, 1.0), damped);
+    let tint = select(vec3<f32>(0.25, 0.55, 1.0), vec3<f32>(0.5, 0.06, 0.9), damped);
     var hot = mix(tint, white, lead) * (2.0 + 9.0 * e * (0.3 + 0.7 * lead));
     if damped {
         // Red flickers through the torn bands.
         let flick = hash11(floor(time * 23.0) + floor(warp.w * 9.0) * 7.0 + seed * 31.0);
-        hot = mix(hot, vec3<f32>(1.0, 0.1, 0.18) * 14.0 * e, step(0.72, flick));
+        hot = mix(hot, vec3<f32>(1.0, 0.1, 0.18) * 8.0 * e, step(0.85, flick));
     }
     return mix(color, hot, smoothstep(0.0, 0.3, e));
 }
