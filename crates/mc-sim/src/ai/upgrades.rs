@@ -16,6 +16,20 @@ impl World {
         // draw: started without it, it stalled every factory for minutes. One
         // past the budget is built from spare materials, put last (`direct_focus`),
         // so it takes only what nothing else wants, energy included.
+        // An engineer goes up a tier where it stands, alongside whatever else starts.
+        if let Some((row, next)) = self.engineer_to_upgrade(player) {
+            if self.can_fund(player, self.upgrade_draw(row, next)) {
+                let units = vec![self.state.units.id(row)];
+                // An idle one may be helping a finished factory, which never
+                // ends: it stops, or the upgrade would wait behind it for good.
+                if census.builders_idle.contains(&row) {
+                    out.push(Command::Stop {
+                        units: units.clone(),
+                    });
+                }
+                out.push(Command::Upgrade { units });
+            }
+        }
         let spare = self.spare_mass(player);
         if let Some((row, next)) = self.mine_to_upgrade(player, census, spare) {
             let extra = self.mine_upgrades_running(census) >= self.mine_upgrade_budget(player);
@@ -128,6 +142,43 @@ impl World {
                     r,
                 )
             })
+    }
+
+    /// The engineer to take up a tier, lowest tier first, once the side's
+    /// tech allows it. A third of them at most at once, so the rest keep
+    /// building: an upgrade takes a Mason out of work for about three minutes,
+    /// and gives it four times the build power and the side's bigger plants.
+    pub(super) fn engineer_to_upgrade(&self, player: u8) -> Option<(usize, &UnitBlueprint)> {
+        let units = &self.state.units;
+        let side_tech = self.side_tech(player);
+        let engineers: Vec<usize> = units
+            .slots
+            .iter()
+            .filter(|&r| {
+                let bp = self.bp(r);
+                units.owner[r] == player
+                    && units.is_active(r)
+                    && bp.is_mobile()
+                    && bp.has(cat::ENGINEER)
+                    && !bp.has(cat::COMMANDER)
+            })
+            .collect();
+        let running = engineers.iter().filter(|&&r| self.upgrading(r)).count();
+        if running >= (engineers.len() / 3).max(1) {
+            return None;
+        }
+        // A busy one too: the upgrade waits behind its job. They were seldom
+        // idle, every one on a site crawling for want of materials, and ten
+        // Masons stayed tech 1 for ten minutes after the side reached tech 2.
+        engineers
+            .iter()
+            .copied()
+            .filter(|&r| !self.upgrading(r))
+            .filter_map(|r| {
+                let next = self.blueprints.unit(self.bp(r).upgrades_to?);
+                (self.blueprints.upgrade_needs(next) <= side_tech).then_some((r, next))
+            })
+            .min_by_key(|&(r, _)| (self.bp(r).tech, r))
     }
 
     /// Whether `row` has an upgrade under way or queued behind what it is building.

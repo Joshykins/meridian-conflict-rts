@@ -75,6 +75,17 @@ per pass, rotating through larger forces.
 - While materials go spare, up to four more upgrades run past the budget, started
   whatever the energy, and the side's mines are put last (`direct_focus`): the extra
   upgrades take only the materials and energy the factories leave.
+- Power is built by the side's best builders, at the biggest plant they make (a
+  Reactor III once income reaches 22 a second). Once any builder of a higher tier
+  stands, lesser ones start no plants of their own: while power is wanted they
+  assist the nearest plant going up, and they build a small one only when the
+  energy has run out with no plant rising. The best builders pick their jobs first
+  each think. T1 Masons used to dot 50 to 100 small reactors about a base.
+- Engineers go up a tier where they stand once the side's tech allows (a third of
+  them at most at once, the upgrade queued behind any job under way); spare
+  builders assist an engineer's upgrade before a factory. A factory makes the best
+  engineer it can at once while the side has fewer than one plus one per two
+  factories of them; an upgrade's successor under construction does not count.
 - When materials pile up unspent (store over 40% and spending below income), another
   factory comes before new mines and power, at the best tier the builder and income
   allow, up to the skill's cap. At most one factory in four upgrades at a time.

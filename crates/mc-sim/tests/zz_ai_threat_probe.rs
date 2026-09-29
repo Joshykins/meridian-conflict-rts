@@ -6,7 +6,7 @@
 //! (map, difficulty, minutes; optional `:seed` and `:swap` to trade starts).
 //! `THREAT_ROSTER=1` lists the AI's finished units by key at the end;
 //! `THREAT_AI=1` makes slot 0 an AI too (a duel with the same readout).
-//! `THREAT_ECON=1` adds each side's economy: mines and plants by tier (sites
+//! `THREAT_ECON=1` adds each side's economy: mines, plants and engineers by tier (sites
 //! in brackets), energy stored, and the seconds of the minute out of energy.
 use mc_data::{cat, Blueprints};
 use mc_jobs::Pool;
@@ -70,6 +70,7 @@ fn econ(w: &World, p: usize, stalled: u32, mine_power: f32) -> String {
     let s = &w.state;
     let pl = &s.players[p];
     let (mut mines, mut mine_sites, mut plants, mut plant_sites) = ([0; 5], 0, [0; 5], 0);
+    let mut engineers = [0; 4];
     for row in s
         .units
         .slots
@@ -85,6 +86,8 @@ fn econ(w: &World, p: usize, stalled: u32, mine_power: f32) -> String {
             } else {
                 mine_sites += 1;
             }
+        } else if bp.has(cat::ENGINEER) && bp.is_mobile() && !bp.has(cat::COMMANDER) {
+            engineers[(bp.tech as usize).min(3)] += live as i32;
         } else if bp.has(cat::POWER) && bp.is_structure() {
             if live {
                 plants[tier] += 1;
@@ -94,9 +97,10 @@ fn econ(w: &World, p: usize, stalled: u32, mine_power: f32) -> String {
         }
     }
     format!(
-        "mines T1-4 {:?} (+{mine_sites}) plants T1-3 {:?} (+{plant_sites}) | energy {:>6.0}/{:<6.0} energy stall {:>2}s mine power {:.2} reclaim {:.1}/s",
+        "mines T1-4 {:?} (+{mine_sites}) plants T1-3 {:?} (+{plant_sites}) eng T1-3 {:?} | energy {:>6.0}/{:<6.0} energy stall {:>2}s mine power {:.2} reclaim {:.1}/s",
         &mines[1..],
         &plants[1..4],
+        &engineers[1..],
         pl.energy.to_f32(),
         pl.energy_capacity.to_f32(),
         stalled / 10,

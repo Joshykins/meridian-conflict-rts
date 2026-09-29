@@ -1374,3 +1374,94 @@ fn spare_materials_go_into_extra_mine_upgrades_put_last() {
     w.direct_upgrades(0, &census, &mut out);
     assert!(out.is_empty(), "{out:?}");
 }
+
+#[test]
+fn a_lesser_builder_helps_raise_a_big_plant_and_starts_no_small_one() {
+    let mut w = world_of(512);
+    spawn(&mut w, "aster_t2_engineer", 0, 420, 300);
+    let mason = spawn(&mut w, "aster_t1_engineer", 0, 320, 320);
+    let plant = w
+        .spawn_unit(
+            w.blueprints.id_of("aster_t2_power").unwrap(),
+            0,
+            FxVec2::from_ints(520, 420),
+            Angle::ZERO,
+            false,
+        )
+        .unwrap();
+    let pl = &mut w.state.players[0];
+    pl.energy_income = Fx::from_int(100);
+    pl.energy_demand = Fx::from_int(300);
+    pl.energy_capacity = Fx::from_int(5000);
+    pl.energy = Fx::from_int(3000);
+    let start = FxVec2::from_ints(300, 300);
+    let intel = Intel::default();
+    let run = |w: &World, sites: Vec<usize>| {
+        let mut census = w.survey_own(0);
+        census.sites = sites;
+        census.builders_idle = vec![mason];
+        let mut planned = w.plan_counts(0, &census);
+        let mut out = vec![];
+        w.direct_builders(
+            0,
+            &census,
+            &intel,
+            Stance::Expand,
+            Personality::Expander,
+            start,
+            Angle::ZERO,
+            None,
+            &mut vec![],
+            &mut planned,
+            &mut out,
+        );
+        out
+    };
+    let out = run(&w, vec![plant]);
+    assert!(
+        matches!(out.as_slice(), [Command::Assist { target, .. }] if *target == w.state.units.id(plant)),
+        "{out:?}"
+    );
+    // No plant going up: still no small one of its own while the side has energy in store.
+    let small = w.blueprints.id_of("aster_t1_power").unwrap();
+    let out = run(&w, vec![]);
+    assert!(
+        !out.iter()
+            .any(|c| matches!(c, Command::Build { blueprint, .. } if *blueprint == small)),
+        "{out:?}"
+    );
+}
+
+#[test]
+fn an_engineer_goes_up_a_tier_once_the_side_has_it() {
+    let mut w = world_of(512);
+    spawn(&mut w, "aster_t2_land_factory", 0, 500, 500);
+    spawn(&mut w, "aster_t1_power", 0, 700, 500);
+    spawn(&mut w, "aster_t1_power", 0, 700, 560);
+    let masons: Vec<usize> = (0..3)
+        .map(|i| spawn(&mut w, "aster_t1_engineer", 0, 300 + i * 20, 300))
+        .collect();
+    let pl = &mut w.state.players[0];
+    pl.mass_income = Fx::from_int(5);
+    pl.energy_income = Fx::from_int(1000);
+    pl.energy_demand = Fx::ZERO;
+    pl.energy_capacity = Fx::from_int(5000);
+    pl.energy = pl.energy_capacity;
+    pl.upkeep_efficiency = Fx::ONE;
+    let mut out = vec![];
+    w.direct_upgrades(0, &w.survey_own(0), &mut out);
+    assert!(
+        out.iter().any(|c| matches!(c, Command::Upgrade { units }
+            if masons.iter().any(|&m| units == &vec![w.state.units.id(m)]))),
+        "{out:?}"
+    );
+    // One in three at most at a time: with one under way, none more.
+    for c in &out {
+        w.apply_command(&PlayerCommand {
+            player: 0,
+            command: c.clone(),
+        })
+        .unwrap();
+    }
+    assert!(w.engineer_to_upgrade(0).is_none());
+}
