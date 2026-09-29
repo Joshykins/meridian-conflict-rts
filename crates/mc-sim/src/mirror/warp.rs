@@ -185,6 +185,7 @@ impl World {
                     (WarpPhase::Spool, Some(d)) => (w.charge / d.energy).to_f32().min(1.0),
                     _ => 1.0,
                 },
+                aligned: w.phase != WarpPhase::Spool || self.warp_aligned(row),
                 energy: bp.warp.map_or(0.0, |d| d.energy.to_f32()),
                 draw: bp.warp.map_or(0.0, |d| {
                     d.energy.to_f32() * TICKS_PER_SECOND as f32 / d.spool_ticks.max(1) as f32

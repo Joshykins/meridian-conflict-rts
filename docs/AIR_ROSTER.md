@@ -304,8 +304,11 @@ entries; any aircraft may be given one). `Command::Warp` (`crates/mc-sim/src/war
    charge is `energy`, drawn off the grid over `spool` seconds at full power and paid
    with the side's upkeep (`economy.rs`). A grid that cannot pay charges it more slowly
    (never the last sliver), and a big charge can stall the grid, dropping its shields.
+   The drive charges only two thirds while the nose is still coming round; the last
+   third charges once it is on the mark, so a ship always charges a moment after it
+   lines up (the card reads `Charging warp · coming onto the mark` until then).
    Any other order, or a stun, calls the jump off, and the charge is lost.
-2. **Jump.** Once charged and on the mark, the ship leaves at once: it is out of the
+2. **Jump.** Once fully charged and on the mark, the ship leaves: it is out of the
    world (`IN_FACTORY`: not seen, hit or ordered) and already where it will come out.
    The transit lasts `distance / speed`, and never less than 1.5 s. A jump reaches
    anywhere on the map. Ships sent together keep their formation: each comes out as far

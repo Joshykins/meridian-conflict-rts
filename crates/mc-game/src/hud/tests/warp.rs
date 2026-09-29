@@ -36,6 +36,7 @@ fn spooling(charge: f32) -> WarpView {
         radius: 20.0,
         dampened: false,
         charge,
+        aligned: true,
         energy: 1500.0,
         draw: 500.0,
     }

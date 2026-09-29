@@ -287,6 +287,7 @@ mod tests {
             radius: 100.0,
             dampened: true,
             charge: 1.0,
+            aligned: true,
             energy: 1.0,
             draw: 1.0,
         };

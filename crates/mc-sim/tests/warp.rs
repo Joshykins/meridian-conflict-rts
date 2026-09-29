@@ -99,6 +99,45 @@ fn until(w: &mut World, ship: UnitId, phase: WarpPhase, limit: usize) -> Option<
 }
 
 #[test]
+fn a_ship_still_charges_after_its_nose_comes_onto_the_mark() {
+    let mut w = world();
+    let ship = add(&mut w, FRIGATE, 0, 6000, 6000);
+    run(&mut w, seconds(10));
+    // Due south, a half turn behind it: the turn outlasts the charge it may take.
+    let mark = FxVec2::from_ints(6000, 2000);
+    warp(&mut w, ship, 6000, 2000);
+    let drive = w.bp(row(&w, ship)).warp.unwrap();
+    let mut lined_up = None;
+    for t in 0..seconds(30) {
+        let r = row(&w, ship);
+        let state = w.state.units.warp[r];
+        if state.phase == WarpPhase::Transit {
+            let at = lined_up.expect("it jumped before its nose was on the mark");
+            assert!(
+                t - at >= drive.spool_ticks as usize / 3,
+                "it jumped {} ticks after lining up; a third of its {}-tick charge is left then",
+                t - at,
+                drive.spool_ticks
+            );
+            return;
+        }
+        let bearing = (mark - w.state.units.pos[r]).angle();
+        let on = w.state.units.heading[r].delta_to(bearing).unsigned_abs() <= 546;
+        if state.phase == WarpPhase::Spool && !on {
+            assert!(
+                state.charge <= drive.energy * Fx::ratio(2, 3),
+                "it charged past two thirds while still turning"
+            );
+        }
+        if on && lined_up.is_none() && state.phase == WarpPhase::Spool {
+            lined_up = Some(t);
+        }
+        w.tick(&[]).unwrap();
+    }
+    panic!("it never jumped");
+}
+
+#[test]
 fn a_courier_charges_off_the_grid_jumps_and_comes_out_where_it_was_sent() {
     let mut w = world();
     let ship = add(&mut w, COURIER, 0, 3000, 3000);

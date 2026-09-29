@@ -1236,6 +1236,9 @@ pub struct WarpView {
     pub dampened: bool,
     /// Spooling: how far the drive is charged, 0 to 1 (1 from the jump on).
     pub charge: f32,
+    /// Spooling: its nose is on the mark. Until it is, the charge stops short of the
+    /// last third (`crate::warp`).
+    pub aligned: bool,
     /// Energy the whole charge takes.
     pub energy: f32,
     /// Energy the grid is asked for each second while it charges at full power.

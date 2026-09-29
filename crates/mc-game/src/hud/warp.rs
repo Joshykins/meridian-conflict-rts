@@ -74,10 +74,10 @@ pub(super) fn activity(s: &Scene, u: &UnitInstance) -> Option<Activity> {
     let w = jump_of(s, u)?;
     let tone = if w.dampened { palette::BAD } else { WARP };
     let (label, progress, value) = match w.phase {
-        WarpPhase::Spool if w.charge >= 1.0 => (
-            "Warp charged  \u{b7}  coming onto the mark",
-            Some(1.0),
-            "100%".to_owned(),
+        WarpPhase::Spool if !w.aligned => (
+            "Charging warp  \u{b7}  coming onto the mark",
+            Some(w.charge),
+            format!("{:.0}%", w.charge * 100.0),
         ),
         WarpPhase::Spool => (
             "Charging warp",

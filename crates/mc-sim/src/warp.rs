@@ -8,8 +8,9 @@
 //! - **Spool**: the ship waits for its drive to recharge and to be up at cruise height,
 //!   then stops where it is, charges the drive and brings its nose onto the mark. The
 //!   charge is `Warp::energy`, drawn off the grid over `Warp::spool_ticks` with the rest of
-//!   the side's upkeep (`economy.rs`), and slower by as much as the grid falls short. Its
-//!   turrets keep firing. Any other order, or a stun, calls the jump off, and what was
+//!   the side's upkeep (`economy.rs`), and slower by as much as the grid falls short. The
+//!   last third charges only once the nose is on the mark (`CHARGE_TURNING`), so there is
+//!   always a moment's charge between lining up and jumping. Its turrets keep firing. Any other order, or a stun, calls the jump off, and what was
 //!   charged is lost.
 //! - **Transit**: it drops out of the world at once (`IN_FACTORY`: not drawn, seen, hit or
 //!   ordered) and is already where it will come out. The jump lasts as long as it is far
@@ -43,6 +44,9 @@ pub const EMERGE_TICKS: u16 = 12;
 pub const EMERGE_DAMPED_TICKS: u16 = 30;
 /// How near the mark its nose must be before it jumps: 3 degrees.
 const ALIGNED: u16 = 546;
+/// Share of the charge a drive takes while the nose is still coming round: the rest
+/// charges only once it is on the mark, so a ship never jumps the moment it lines up.
+const CHARGE_TURNING: Fx = Fx::ratio(2, 3);
 /// A mark nearer than this many hull radii is not worth a jump.
 const MIN_JUMP_RADII: i32 = 2;
 /// Share of its cruise height a ship must have before it spools.
@@ -245,13 +249,12 @@ impl World {
         units.speed[row] = Fx::ZERO;
         units.flags[row] |= flag::HOLD;
         units.warp[row].ticks = w.ticks.saturating_add(1);
-        let aligned = units.heading[row].delta_to(bearing).unsigned_abs() <= ALIGNED;
-        if w.charge < drive.energy || !aligned {
+        if w.charge < drive.energy || !self.warp_aligned(row) {
             return;
         }
         // Into warp: out of the world at once, already where it comes out.
         let transit = transit_ticks(&w, drive.speed);
-        let owner = units.owner[row];
+        let owner = self.state.units.owner[row];
         let damper = self.damper_at(w.to, owner);
         let (length, damper) = match damper {
             Some(d) => (self.dragged(transit, 0, d), self.state.units.id(d)),
@@ -288,13 +291,26 @@ impl World {
         });
     }
 
+    /// The nose of the ship spooling in `row` is on its mark.
+    pub(crate) fn warp_aligned(&self, row: usize) -> bool {
+        let units = &self.state.units;
+        let bearing = (units.warp[row].to - units.pos[row]).angle();
+        units.heading[row].delta_to(bearing).unsigned_abs() <= ALIGNED
+    }
+
     /// The drive in `row` charging: the energy a tick it draws at full power, and what
-    /// is left to charge. `None` when it is not charging. A stall slows the draw, never
-    /// the little that is left, or that remainder would shrink for ever (`economy.rs`).
+    /// is left to charge. `None` when it is not charging, or has charged all it may
+    /// while it turns (`CHARGE_TURNING`). A stall slows the draw, never the little that
+    /// is left, or that remainder would shrink for ever (`economy.rs`).
     pub(crate) fn warp_draw(&self, row: usize) -> Option<(Fx, Fx)> {
         let w = &self.state.units.warp[row];
         let d = self.bp(row).warp?;
-        let left = d.energy - w.charge;
+        let cap = if w.phase == WarpPhase::Spool && self.warp_aligned(row) {
+            d.energy
+        } else {
+            d.energy * CHARGE_TURNING
+        };
+        let left = cap - w.charge;
         (w.phase == WarpPhase::Spool && self.state.units.is_active(row) && left > Fx::ZERO)
             .then(|| (d.energy / d.spool_ticks.max(1) as i32, left))
     }
