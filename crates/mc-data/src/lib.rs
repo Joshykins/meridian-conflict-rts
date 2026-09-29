@@ -1819,15 +1819,26 @@ mod tests {
         assert_eq!(power(t3), Fx::from_int(70));
         let sam = bp.id_of("aster_t3_sam").unwrap();
         assert!(bp.unit(t3).builder.as_ref().unwrap().builds.contains(&sam));
-        let engineer = bp.unit(bp.id_of("aster_t3_engineer").unwrap());
-        let mut engineer_builds = engineer.builder.as_ref().unwrap().builds.clone();
-        let mut commander_builds = bp.unit(t3).builder.as_ref().unwrap().builds.clone();
-        engineer_builds.sort_unstable();
-        commander_builds.sort_unstable();
-        assert_eq!(
-            commander_builds, engineer_builds,
-            "Engineering Suite III unlocks the T3 engineer's entire build roster, including experimentals"
-        );
+        // At each tier the commander builds exactly what that tier's Mason builds:
+        // bare it is a Mason, Suite II a Mason II, Suite III a Mason III (experimentals too).
+        let roster = |id: BlueprintId| {
+            let mut builds = bp.unit(id).builder.as_ref().unwrap().builds.clone();
+            builds.sort_unstable();
+            builds
+        };
+        let t2 = bp.refit_result(acu.id, eng2).unwrap();
+        for (commander, engineer) in [
+            (acu.id, "aster_t1_engineer"),
+            (t2, "aster_t2_engineer"),
+            (t3, "aster_t3_engineer"),
+        ] {
+            assert_eq!(
+                roster(commander),
+                roster(bp.id_of(engineer).unwrap()),
+                "the commander at tech {} builds what {engineer} builds",
+                bp.unit(commander).tech
+            );
+        }
 
         // The shoulder: anti-air, a howitzer, or a second projector; one at a time.
         let aa = module("shoulder", "aa");

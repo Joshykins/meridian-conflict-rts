@@ -47,7 +47,7 @@
                         health: 3000, regen: 5, build_power: 20, build_range: 5,
                         // The suite's gear comes to work (turns, opens) over this long.
                         unfold: 0.6,
-                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_energy_storage_t2", "aster_t2_sonar", "aster_t2_torpedo_defense", "aster_t2_shield", "aster_t2_warp_damper", "aster_t2_aa", "aster_t2_missile_defense"],
+                        builds: ["aster_t2_land_factory", "aster_t2_air_factory", "aster_t2_naval_factory", "aster_core_mine_t2", "aster_t2_power", "aster_t2_point_defense", "aster_t2_artillery", "aster_t2_reclaimer", "aster_t2_radar", "aster_mass_storage_t2", "aster_energy_storage_t2", "aster_t2_sonar", "aster_t2_torpedo_defense", "aster_t2_shield", "aster_t2_warp_damper", "aster_t2_aa", "aster_t2_missile_defense", "aster_t2_lift_ship", "aster_t2_corvette"],
                     ),
                     (
                         key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
