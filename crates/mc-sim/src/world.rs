@@ -709,6 +709,10 @@ impl World {
             self.run_movement()?;
         }
         {
+            let _t = mc_core::perf_span!("fn.seat_drones");
+            self.seat_drones();
+        }
+        {
             let _t = mc_core::perf_span!("fn.run_trampling");
             self.run_trampling();
         }

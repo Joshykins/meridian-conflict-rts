@@ -592,8 +592,9 @@ pub struct UnitBlueprint {
     pub drone_radius: Fx,
     /// Where its drones sit when home, in the turret's frame: one drone for each.
     pub drone_sockets: Vec<FxVec3>,
-    /// How far the sockets lower as it deploys.
-    pub drone_drop: Fx,
+    /// How far above (positive) or below (negative) its socket a drone lines up to
+    /// dock, and drops to letting go.
+    pub drone_approach: Fx,
     pub anti_missile: Fx,
     /// Anti-missile laser emitters in the hull's frame; empty: the unit's middle.
     pub anti_missile_mounts: Vec<FxVec3>,
@@ -1194,7 +1195,7 @@ impl Blueprints {
                 h.write_i64(m.y.0);
                 h.write_i64(m.z.0);
             }
-            h.write_i64(u.drone_drop.0);
+            h.write_i64(u.drone_approach.0);
             h.write_i64(u.anti_missile.0);
             h.write_u64(u.anti_missile_lasers as u64);
             match u.turret_at {

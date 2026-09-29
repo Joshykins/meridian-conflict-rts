@@ -1,10 +1,8 @@
 //! Carrier-owned salvage drones, paid production and incendiary damage.
-use crate::mirror::SimEvent;
 use crate::spatial::kind;
 use crate::tables::{flag, OrderKind};
 use crate::{Handle, SimError, World};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
-use mc_data::WeaponColor;
 
 impl World {
     pub(crate) fn run_air_support(&mut self) -> Result<(), SimError> {
@@ -47,33 +45,27 @@ impl World {
                 self.state.units.z[child] = self.state.units.z[row];
                 self.state.units.prev_z[child] = self.state.units.z[row];
                 self.state.units.drone_parent[child] = parent;
+                // Made inside the hull, it comes out underneath and flies onto its socket.
+                self.state.units.deploy[child] = dock::DOCKING;
                 self.state.players[owner as usize].units_built += 1;
             }
         }
-        let drones: Vec<_> = self
+        // A drone whose carrier is gone goes with it.
+        let orphans: Vec<_> = self
             .state
             .units
             .slots
             .iter()
-            .filter(|&r| self.state.units.drone_parent[r] != Handle::NONE)
+            .filter(|&r| {
+                self.state.units.drone_parent[r] != Handle::NONE && self.drone_carrier(r).is_none()
+            })
             .collect();
-        let mut claimed = std::collections::BTreeSet::new();
-        let mut by_parent: std::collections::BTreeMap<usize, Vec<usize>> =
-            std::collections::BTreeMap::new();
-        for row in drones {
-            let Some(parent) = self
-                .state
-                .units
-                .row(self.state.units.drone_parent[row])
-                .filter(|&p| self.state.units.health[p] > Fx::ZERO)
-            else {
-                self.state.units.flags[row] |= flag::RECLAIMED;
-                self.state.units.health[row] = Fx::ZERO;
-                continue;
-            };
-            by_parent.entry(parent).or_default().push(row);
+        for row in orphans {
+            self.state.units.flags[row] |= flag::RECLAIMED;
+            self.state.units.health[row] = Fx::ZERO;
         }
-        for (parent, children) in by_parent {
+        let mut claimed = std::collections::BTreeSet::new();
+        for (parent, children) in self.drone_flocks() {
             let carrier = self.bp(parent).drone_carrier();
             // A carrier's drones work the wreck it is told to; a port's only salvage round it.
             let task = self
@@ -90,24 +82,30 @@ impl World {
                 !self.carrier_has_work(parent)
             };
             let need = self.bp(parent).motion.map(|m| m.deploy_ticks).unwrap_or(0);
-            // A carrier launches once its hold is open; a port has nothing to open.
+            // A carrier lets its drones go once it has settled into a hover; a port
+            // has nothing to wait for.
             let open = need == 0 || self.state.units.deploy[parent] >= need;
             let center = self.state.units.pos[parent];
-            let heading = self.state.units.heading[parent];
             let reach = self.bp(parent).drone_radius;
             let owner = self.state.units.owner[parent];
             let full = self.no_room_for_salvage(owner);
             for (slot, row) in children.iter().copied().enumerate() {
                 let dock = self.drone_socket(parent, slot);
                 let pos = self.state.units.pos[row];
-                let launched = self.state.units.deploy[row] > 0;
+                let state = self.state.units.deploy[row];
                 if recalling || !open {
-                    if launched && pos.distance(dock.xy) > Fx::from_int(5) {
-                        self.ensure_moving(row, dock.xy, dock.xy)?;
-                        self.state.units.flags[row] &= !flag::AIR_RUN;
-                    } else {
-                        self.pin_drone(row, dock.xy, dock.z, heading)?;
+                    match state {
+                        dock::FLYING if pos.distance(dock.xy) <= DOCK_CAPTURE => {
+                            // Close enough to line up under (or over) its socket: the
+                            // glide in is flown after movement (`seat_drones`).
+                            self.clear_orders(row)?;
+                            self.state.units.deploy[row] = dock::DOCKING;
+                        }
+                        dock::FLYING => self.ensure_moving(row, dock.xy, dock.xy)?,
+                        dock::RELEASING => self.state.units.deploy[row] = dock::DOCKING,
+                        _ => {}
                     }
+                    self.state.units.flags[row] &= !flag::AIR_RUN;
                     continue;
                 }
                 if let Some((kind, target)) = task {
@@ -116,21 +114,9 @@ impl World {
                         continue;
                     }
                 }
-                if !launched {
-                    self.pin_drone(row, dock.xy, dock.z, heading)?;
-                    self.state.units.deploy[row] = 1;
-                    if let Some(blueprint) = self.blueprints.id_of("aster_t1_interceptor") {
-                        let at = dock.xy.extend(dock.z);
-                        self.events.push(SimEvent::ShotFired {
-                            pos: at,
-                            vel: FxVec3::new(Fx::ZERO, Fx::ZERO, Fx::from_int(2)),
-                            travel: FxVec3::ZERO,
-                            color: WeaponColor::Orange,
-                            owner,
-                            blueprint,
-                            weapon: 0,
-                        });
-                    }
+                if state != dock::FLYING {
+                    // Work to do: let go of the socket and drop clear before flying.
+                    self.state.units.deploy[row] = dock::RELEASING;
                     continue;
                 }
                 if let Some((kind, target)) = task {
@@ -235,18 +221,11 @@ impl World {
         })
     }
 
-    /// Where drone `slot` of `parent` sits when home (`drone_sockets`). On a unit with
-    /// a torso the sockets turn with it; deploying lowers them by `drone_drop`, so an
-    /// Osprey's flock drops out of its hold between the door leaves before it flies.
+    /// Where drone `slot` of `parent` sits when home (`drone_sockets`): on a pylon, a
+    /// pad or a clamp. On a unit with a torso the sockets turn with it.
     fn drone_socket(&self, parent: usize, slot: usize) -> Socket {
         let bp = self.bp(parent);
         let units = &self.state.units;
-        let need = bp.motion.map_or(0, |m| m.deploy_ticks);
-        let open = if need == 0 {
-            Fx::ZERO
-        } else {
-            Fx::from_int(units.deploy[parent].min(need) as i32) / Fx::from_int(need as i32)
-        };
         let at = bp.drone_sockets[slot % bp.drone_sockets.len()];
         let heading = units.heading[parent];
         let facing = if bp.weapons.is_empty() {
@@ -256,7 +235,96 @@ impl World {
         };
         Socket {
             xy: units.pos[parent] + bp.turret_point(at.xy(), heading, facing),
-            z: units.z[parent] + at.z - open * bp.drone_drop,
+            z: units.z[parent] + at.z,
+            heading: facing,
+        }
+    }
+
+    /// The live carrier (or port) a drone belongs to.
+    fn drone_carrier(&self, drone: usize) -> Option<usize> {
+        self.state
+            .units
+            .row(self.state.units.drone_parent[drone])
+            .filter(|&p| self.state.units.health[p] > Fx::ZERO)
+    }
+
+    /// Each live carrier's drones, in row order: a drone's place in the list is its
+    /// socket.
+    fn drone_flocks(&self) -> std::collections::BTreeMap<usize, Vec<usize>> {
+        let mut flocks: std::collections::BTreeMap<usize, Vec<usize>> =
+            std::collections::BTreeMap::new();
+        for row in self.state.units.slots.iter() {
+            if self.state.units.drone_parent[row] == Handle::NONE {
+                continue;
+            }
+            if let Some(parent) = self.drone_carrier(row) {
+                flocks.entry(parent).or_default().push(row);
+            }
+        }
+        flocks
+    }
+
+    /// Whether a drone is on or gliding to or from its socket, which `seat_drones` flies
+    /// for it, not movement.
+    pub(crate) fn drone_seated(&self, row: usize) -> bool {
+        self.state.units.drone_parent[row] != Handle::NONE
+            && self.state.units.deploy[row] != dock::FLYING
+    }
+
+    /// After movement, so a docked drone rides its carrier in step instead of a tick
+    /// behind: seat each docked drone on its socket, and fly the glides between the
+    /// socket and its line-up point (`drone_approach` below or above it). Letting go, a
+    /// drone drops clear to the line-up point and flies from there; coming home, it
+    /// slides in to the line-up point, then rises (or settles) onto the socket, slowing
+    /// all the way.
+    pub(crate) fn seat_drones(&mut self) {
+        for (parent, children) in self.drone_flocks() {
+            let approach = self.bp(parent).drone_approach;
+            for (slot, row) in children.iter().copied().enumerate() {
+                let state = self.state.units.deploy[row];
+                if state == dock::FLYING {
+                    continue;
+                }
+                let socket = self.drone_socket(parent, slot);
+                let seat = socket.xy.extend(socket.z);
+                let line_up = socket.xy.extend(socket.z + approach);
+                let here = self.state.units.pos[row].extend(self.state.units.z[row]);
+                let (goal, next) = match state {
+                    dock::RELEASING => (line_up, dock::FLYING),
+                    dock::DOCKING if here.xy().distance(socket.xy) > DOCK_ALIGNED => {
+                        (line_up, dock::DOCKING)
+                    }
+                    dock::DOCKING => (seat, dock::DOCKED),
+                    _ => {
+                        // Docked: it rides the socket exactly.
+                        let units = &mut self.state.units;
+                        units.pos[row] = socket.xy;
+                        units.z[row] = socket.z;
+                        units.heading[row] = socket.heading;
+                        units.air_velocity[row] = FxVec3::ZERO;
+                        units.speed[row] = Fx::ZERO;
+                        continue;
+                    }
+                };
+                let motion = self.bp(row).motion;
+                let fastest = motion.map_or(Fx::ONE, |m| m.speed) / (2 * TICKS_PER_SECOND as i32);
+                let left = here.distance(goal);
+                // Ease in: a fifth of the way a tick, never slower than a creep.
+                let step = (left / 5).clamp(DOCK_CREEP, fastest);
+                let at = if left <= step {
+                    self.state.units.deploy[row] = next;
+                    goal
+                } else {
+                    here.lerp(goal, step / left)
+                };
+                let turn = motion.map_or(0, |m| m.turn_rate);
+                let units = &mut self.state.units;
+                units.pos[row] = at.xy();
+                units.z[row] = at.z;
+                units.heading[row] = units.heading[row].turn_toward(socket.heading, turn);
+                units.air_velocity[row] = FxVec3::ZERO;
+                units.speed[row] = Fx::ZERO;
+            }
         }
     }
 
@@ -334,25 +402,6 @@ impl World {
         Ok(())
     }
 
-    fn pin_drone(
-        &mut self,
-        row: usize,
-        pos: FxVec2,
-        z: Fx,
-        heading: Angle,
-    ) -> Result<(), SimError> {
-        self.clear_orders(row)?;
-        let units = &mut self.state.units;
-        units.pos[row] = pos;
-        units.z[row] = z;
-        units.heading[row] = heading;
-        units.air_velocity[row] = FxVec3::ZERO;
-        units.speed[row] = Fx::ZERO;
-        units.deploy[row] = 0;
-        units.flags[row] &= !flag::AIR_RUN;
-        Ok(())
-    }
-
     /// Each live patch deals 30 damage a second to enemies standing in it.
     /// Two bombs on the same ground are two patches, so the rate is 30 times the count.
     fn tick_fires(&mut self) {
@@ -427,4 +476,23 @@ impl World {
 struct Socket {
     xy: FxVec2,
     z: Fx,
+    heading: Angle,
 }
+
+/// A drone's `deploy` word: where it is between its socket and free flight.
+mod dock {
+    /// On its socket, riding the carrier.
+    pub(super) const DOCKED: u16 = 0;
+    pub(super) const FLYING: u16 = 1;
+    /// Dropping clear of the socket to its line-up point.
+    pub(super) const RELEASING: u16 = 2;
+    /// Gliding in to the line-up point, then onto the socket.
+    pub(super) const DOCKING: u16 = 3;
+}
+
+/// How near its socket (across the ground) a drone coming home starts its glide in.
+const DOCK_CAPTURE: Fx = Fx::from_int(12);
+/// How near under (or over) its socket a docking drone is before it rises onto it.
+const DOCK_ALIGNED: Fx = Fx::ratio(1, 5);
+/// The slowest a glide moves in a tick, so it never crawls to a stop short of the socket.
+const DOCK_CREEP: Fx = Fx::ratio(1, 20);

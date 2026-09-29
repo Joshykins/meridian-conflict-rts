@@ -210,3 +210,99 @@ fn an_osprey_on_a_starved_economy_still_fields_its_drones_and_salvages() {
         "the flock salvaged the wreck"
     );
 }
+
+/// An Osprey's drones hang from pylons under its wings. Letting go they drop clear;
+/// coming home they glide in and rise onto their pylons with no jump; docked, they
+/// keep their place on the wing while it flies.
+#[test]
+fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
+    let mut w = world();
+    // Room in store for what they bring home.
+    let storage = w.blueprints.id_of("aster_mass_storage").unwrap();
+    w.spawn_unit(storage, 0, FxVec2::from_ints(300, 300), Angle::ZERO, true)
+        .unwrap();
+    let key = "aster_t1_reclaim_carrier";
+    let id = w.blueprints.id_of(key).unwrap();
+    let osprey = w
+        .spawn_unit(id, 0, FxVec2::from_ints(900, 900), Angle::ZERO, true)
+        .unwrap();
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    let drones = drones_of(&w, osprey);
+    assert_eq!(drones.len(), 4);
+    let offsets = |w: &World| -> Vec<(Fx, Fx)> {
+        drones_of(w, osprey)
+            .iter()
+            .map(|&r| {
+                (
+                    w.state.units.pos[r].distance(w.state.units.pos[osprey]),
+                    w.state.units.z[osprey] - w.state.units.z[r],
+                )
+            })
+            .collect()
+    };
+    let docked = offsets(&w);
+    for &(across, below) in &docked {
+        assert!(across > Fx::from_int(3), "out on the wing: {across:?}");
+        // Its feet hang level with the Osprey's belly, under the wing.
+        assert!(below > -Fx::ONE, "under the wing: {below:?}");
+    }
+    // Flown somewhere, the flock stays on the wing, not a tick behind.
+    let osprey_id = w.state.units.id(osprey);
+    w.tick(&[mc_sim::PlayerCommand {
+        player: 0,
+        command: mc_sim::Command::Move {
+            units: vec![osprey_id],
+            target: FxVec2::from_ints(1300, 900),
+            queue: false,
+        },
+    }])
+    .unwrap();
+    for _ in 0..40 {
+        w.tick(&[]).unwrap();
+        for (now, then) in offsets(&w).iter().zip(&docked) {
+            assert!(
+                (now.0 - then.0).abs() < Fx::ratio(1, 10)
+                    && (now.1 - then.1).abs() < Fx::ratio(1, 10),
+                "a docked drone slipped off its pylon: {now:?} (was {then:?})"
+            );
+        }
+    }
+    // A wreck turns up: they go out and come home, and no step on or off the pylon is a jump.
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let at = w.state.units.pos[osprey] + FxVec2::from_ints(120, 0);
+    w.state
+        .wrecks
+        .spawn(tank, at, Fx::from_int(20), Angle::ZERO, Fx::from_int(40), 0)
+        .unwrap();
+    let mut went_out = false;
+    // Where each drone is from the Osprey, which may still be flying.
+    let rel = |w: &World, r: usize| {
+        (w.state.units.pos[r] - w.state.units.pos[osprey])
+            .extend(w.state.units.z[r] - w.state.units.z[osprey])
+    };
+    let mut last: Vec<_> = drones.iter().map(|&r| rel(&w, r)).collect();
+    for _ in 0..1500 {
+        w.tick(&[]).unwrap();
+        for (k, &r) in drones.iter().enumerate() {
+            let now = rel(&w, r);
+            went_out |= now.xy().length() > Fx::from_int(30);
+            if w.state.units.deploy[r] != 1 {
+                let step = (now - last[k]).length();
+                assert!(
+                    step < Fx::from_int(5),
+                    "a drone jumped {step:?} m on or off its pylon"
+                );
+            }
+            last[k] = now;
+        }
+    }
+    assert!(went_out, "the drones went out to the wreck");
+    for (now, then) in offsets(&w).iter().zip(&docked) {
+        assert!(
+            (now.0 - then.0).abs() < Fx::ratio(1, 10) && (now.1 - then.1).abs() < Fx::ratio(1, 10),
+            "home on its pylon: {now:?} (was {then:?})"
+        );
+    }
+}

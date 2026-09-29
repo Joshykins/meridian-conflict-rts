@@ -118,8 +118,9 @@
                         summary: "Two salvage drones ride the back and reclaim wrecks far round the commander. Free to rebuild.",
                         cost: (mass: 450, energy: 5400, time: 700),
                         // On two pads over the back, behind the head; they turn with the torso.
+                        // Home, a drone comes in 3 m over its pad and settles onto it.
                         drone: "aster_reclaim_drone", drone_radius: 1400,
-                        drone_sockets: [(-5.3, 2.0, 21.8), (-5.3, -2.0, 21.8)],
+                        drone_sockets: [(-5.3, 2.0, 21.8), (-5.3, -2.0, 21.8)], drone_approach: 3,
                     ),
                 ],
             ),

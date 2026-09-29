@@ -235,9 +235,10 @@ pub(crate) struct Unit {
     /// when it has one): one drone for each.
     #[serde(default)]
     pub drone_sockets: Vec<(f64, f64, f64)>,
-    /// Metres the sockets lower as the unit deploys (a hold's cradles dropping out of it).
+    /// Metres above (positive) or below (negative) its socket that a drone lines up
+    /// before it settles onto a pad or rises onto a pylon, and drops to letting go.
     #[serde(default)]
-    pub drone_drop: f64,
+    pub drone_approach: f64,
     #[serde(default)]
     pub anti_missile: f64,
     /// Where the anti-missile lasers stand on the hull (x forward, y left, z up, metres):
@@ -1434,7 +1435,7 @@ impl Unit {
                 .iter()
                 .map(|m| FxVec3::new(fx(m.0), fx(m.1), fx(m.2)))
                 .collect(),
-            drone_drop: fx(self.drone_drop),
+            drone_approach: fx(self.drone_approach),
             anti_missile: fx(self.anti_missile),
             anti_missile_mounts: self
                 .anti_missile_mounts
