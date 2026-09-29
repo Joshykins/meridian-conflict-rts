@@ -1,0 +1,319 @@
+// Warp drives and warp dampeners (mc-sim `warp.rs`), played by `audio/warp.rs`: a
+// capital ship charging its drive, tearing out of the world, the rift where it will come
+// out, and the thunderclap as it does; the same jump snagged by an enemy Undertow
+// (`aster_t2_warp_damper`), dragged, torn and thrown out stunned; the stunned hull
+// arcing and its systems coming back; the dampener's field humming and surging.
+//
+// A ship may name its own `<moving>_<name>` (e.g. `aster_courier_warp_jump`); these are
+// the defaults. The game plays them lower and louder for a bigger hull (by its radius,
+// never its tier), so one recipe serves the Courier, the Bastion and the Resolute.
+//
+// The clean jump is power held in and let go: a rough electrical growl gathering, a
+// tear and a snap, air rushing into the hole. The dampened one is the same gestures
+// fighting something: detuned growls beating against each other, warbling, stuttering,
+// metal groaning under strain, and it lasts longer. Nothing here is a clean whine or a
+// struck harmonic left to ring (both read as toys or plucked strings), and the body sits
+// in 150 Hz to 3 kHz so it carries on small speakers and over a battle.
+(
+    sounds: {
+        // ---- the drive charging --------------------------------------------------------
+        // The drive engaging as the spool starts: two contactors slamming home, a deep
+        // thunk, and a rough growl drawing power in, air sucked toward the hull. It fades
+        // into the charge loops, which carry the rest.
+        "warp_spool": (
+            length: 3.6, peak: 0.7, room: 0.3,
+            layers: [
+                // The contactors, the second a beat after the first.
+                Burst(low: 250, high: 2200, attack: 0.0005, decay: 0.012, gain: 2.4, seed: 501),
+                Tone(from: 115, to: 46, glide: 0.12, attack: 0.001, decay: 0.22, gain: 0.7),
+                Burst(at: 0.17, low: 220, high: 2000, attack: 0.0005, decay: 0.014, gain: 2.8, seed: 502),
+                Tone(at: 0.17, from: 125, to: 50, glide: 0.12, attack: 0.001, decay: 0.25, gain: 0.8),
+                // The drive taking load: a transformer growl and its buzz swelling up.
+                Fm(at: 0.18, from: 48, to: 70, glide: 1.4, ratio: 0.5, index: 2.4, fade: 8.0, attack: 0.9, decay: 0.8, gain: 0.55),
+                Fm(at: 0.2, from: 96, to: 140, glide: 1.4, ratio: 0.5, index: 2.2, fade: 8.0, attack: 0.9, decay: 0.7, gain: 0.45, pan: 0.1),
+                Drive(1.5),
+                // Air drawn in toward the hull.
+                Sweep(at: 0.2, from: 250, to: 1100, glide: 1.3, q: 1.0, attack: 0.9, decay: 0.6, gain: 3.0, seed: 503),
+                Roll(at: 0.3, from: 1800, to: 2600, glide: 1.2, attack: 0.8, decay: 0.5, gain: 0.18, swell: 95, depth: 1.0, pan: -0.15, seed: 504),
+            ],
+        ),
+        // The drive charging: a steady loop the game raises in pitch (by about an octave)
+        // and level as the charge climbs, so it keeps rising however slowly the grid
+        // feeds it. A rough transformer growl and the drive's buzz over it, the air around
+        // the hull fizzing, a slow throb in the body.
+        "warp_charge": (
+            length: 4, peak: 0.6, room: 0, looped: true,
+            layers: [
+                Fm(from: 55, to: 55, glide: 1, ratio: 0.5, index: 2.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.5),
+                Fm(from: 110, to: 110, glide: 1, ratio: 0.5, index: 2.0, fade: 1000, attack: 0.01, decay: 100000, gain: 0.42, pan: -0.15),
+                Fm(from: 166, to: 166, glide: 1, ratio: 0.5, index: 1.5, fade: 1000, attack: 0.01, decay: 100000, gain: 0.24, pan: 0.15),
+                Drone(freq: 220, gain: 0.12, wobble: 0.75, depth: 0.6),
+                Drive(1.5),
+                // The fizz of the air, and a thin ionising hiss over it.
+                Rumble(freq: 480, q: 1.2, gain: 7.0, wobble: 1.5, depth: 0.5, pan: 0.1),
+                Rumble(freq: 1900, q: 1.4, gain: 2.2, wobble: 2.75, depth: 0.6, pan: -0.1),
+            ],
+        ),
+        // Arcs crawling over the drive as the charge nears full: sizzle and cracking
+        // sparks, each with a short rough buzz. The game brings it in over the second
+        // half of the charge, so the charge thickens as well as climbing.
+        "warp_charge_arcs": (
+            length: 3.3, peak: 0.7, room: 0.15, looped: true,
+            layers: [
+                Roll(from: 2600, to: 2600, glide: 1, attack: 0.01, decay: 100000, gain: 0.6, swell: 100, depth: 1.0, seed: 511),
+                Hiss(freq: 3200, q: 0.8, attack: 0.01, decay: 100000, gain: 0.05, seed: 512),
+                Burst(at: 0.13, low: 500, high: 3500, attack: 0.0005, decay: 0.012, gain: 2.0, pan: -0.4, seed: 513),
+                Fm(at: 0.13, from: 120, to: 105, glide: 0.08, ratio: 0.5, index: 3.0, fade: 100, attack: 0.004, decay: 0.07, gain: 0.35, pan: -0.4),
+                Burst(at: 0.47, low: 500, high: 3500, attack: 0.0005, decay: 0.01, gain: 1.4, pan: 0.3, seed: 514),
+                Burst(at: 0.55, low: 500, high: 3500, attack: 0.0005, decay: 0.015, gain: 2.3, pan: 0.35, seed: 515),
+                Fm(at: 0.55, from: 140, to: 118, glide: 0.1, ratio: 0.5, index: 3.0, fade: 100, attack: 0.004, decay: 0.09, gain: 0.4, pan: 0.35),
+                Burst(at: 1.02, low: 500, high: 3500, attack: 0.0005, decay: 0.012, gain: 1.7, pan: 0.1, seed: 516),
+                Burst(at: 1.41, low: 500, high: 3500, attack: 0.0005, decay: 0.018, gain: 2.5, pan: -0.2, seed: 517),
+                Fm(at: 1.41, from: 112, to: 98, glide: 0.1, ratio: 0.5, index: 3.2, fade: 100, attack: 0.004, decay: 0.12, gain: 0.45, pan: -0.2),
+                Burst(at: 1.49, low: 500, high: 3500, attack: 0.0005, decay: 0.01, gain: 1.3, pan: -0.25, seed: 518),
+                Burst(at: 1.93, low: 500, high: 3500, attack: 0.0005, decay: 0.012, gain: 1.9, pan: 0.45, seed: 519),
+                Burst(at: 2.34, low: 500, high: 3500, attack: 0.0005, decay: 0.016, gain: 2.4, pan: 0.0, seed: 520),
+                Fm(at: 2.34, from: 130, to: 110, glide: 0.1, ratio: 0.5, index: 3.0, fade: 100, attack: 0.004, decay: 0.1, gain: 0.4),
+                Burst(at: 2.69, low: 500, high: 3500, attack: 0.0005, decay: 0.01, gain: 1.5, pan: -0.45, seed: 521),
+                Burst(at: 2.75, low: 500, high: 3500, attack: 0.0005, decay: 0.014, gain: 2.1, pan: -0.4, seed: 522),
+                Burst(at: 3.08, low: 500, high: 3500, attack: 0.0005, decay: 0.012, gain: 1.8, pan: 0.2, seed: 523),
+            ],
+        ),
+
+        // ---- the jump --------------------------------------------------------------------
+        // Into warp: the drive lets go all at once. A hard snap and a metal tear, the ship
+        // streaking away as a whoosh climbing out of hearing, the hole it leaves slamming
+        // shut (a deep thump a moment later), then air rushing in behind it and settling
+        // into silence.
+        "warp_jump": (
+            length: 4.5, peak: 0.9, room: 0.3,
+            layers: [
+                Burst(low: 150, high: 4500, attack: 0.0005, decay: 0.02, gain: 3.2, seed: 531),
+                Fm(from: 220, to: 900, glide: 0.2, ratio: 1.41, index: 2.4, fade: 0.12, attack: 0.004, decay: 0.16, gain: 0.35),
+                Fm(at: 0.005, from: 150, to: 60, glide: 0.5, ratio: 0.5, index: 2.6, fade: 0.6, attack: 0.004, decay: 0.35, gain: 0.6),
+                // The hole shutting behind it.
+                Burst(at: 0.26, low: 60, high: 900, attack: 0.001, decay: 0.05, gain: 3.5, seed: 532),
+                Tone(at: 0.26, from: 95, to: 30, glide: 0.45, attack: 0.002, decay: 0.6, gain: 1.0),
+                Fm(at: 0.27, from: 120, to: 48, glide: 0.6, ratio: 0.5, index: 2.0, fade: 0.5, attack: 0.003, decay: 0.45, gain: 0.45),
+                Drive(1.6),
+                // The streak: a whoosh climbing away fast.
+                Sweep(from: 300, to: 4500, glide: 0.28, q: 1.2, attack: 0.02, decay: 0.16, gain: 5.0, seed: 533),
+                // Air rushing into the hole, from both sides, and a low roll settling.
+                Sweep(at: 0.28, from: 2200, to: 260, glide: 1.4, q: 0.9, attack: 0.12, decay: 0.7, gain: 3.5, pan: -0.3, seed: 534),
+                Sweep(at: 0.32, from: 1800, to: 220, glide: 1.6, q: 0.9, attack: 0.15, decay: 0.75, gain: 3.2, pan: 0.3, seed: 535),
+                Roll(at: 0.28, from: 1600, to: 200, glide: 2.0, attack: 0.05, decay: 0.8, gain: 0.45, swell: 5, depth: 0.6, seed: 536),
+            ],
+        ),
+        // The rift at the exit point while the ship is in warp: a hollow pressure roar
+        // with a slow throb. The game raises it in pitch and level toward the moment the
+        // ship comes out.
+        "warp_rift": (
+            length: 3, peak: 0.55, room: 0, looped: true,
+            layers: [
+                Fm(from: 41, to: 41, glide: 1, ratio: 0.5, index: 1.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.4),
+                Drone(freq: 82, gain: 0.3, wobble: 1.33, depth: 0.7),
+                Drone(freq: 164, gain: 0.22, wobble: 0.67, depth: 0.5, pan: 0.15),
+                Drive(1.3),
+                Wind(freq: 340, q: 1.6, gain: 9.0, swell: 1.5, depth: 0.6, sway: 0.5, seed: 541),
+                Wind(freq: 900, q: 1.8, gain: 2.0, swell: 2.5, depth: 0.7, sway: 0.6, pan: 0.2, seed: 542),
+                Rumble(freq: 140, q: 0.9, gain: 8.0, wobble: 0.33, depth: 0.4),
+            ],
+        ),
+        // Out of warp: a thunderclap where the ship bursts back into the world. A crack
+        // and its slap, a deep boom with body in the mids, thunder rolling away, air
+        // rushing in on the new hull, and the drive winding down under it.
+        "warp_arrive": (
+            length: 5.5, peak: 0.9, room: 0.35,
+            layers: [
+                Burst(low: 80, high: 5000, attack: 0.0004, decay: 0.025, gain: 3.5, seed: 551),
+                Burst(at: 0.012, low: 60, high: 1200, attack: 0.001, decay: 0.07, gain: 4.0, seed: 552),
+                Tone(from: 72, to: 26, glide: 0.6, attack: 0.002, decay: 0.9, gain: 0.9),
+                Fm(from: 130, to: 48, glide: 0.5, ratio: 0.5, index: 2.2, fade: 0.4, attack: 0.003, decay: 0.5, gain: 0.55),
+                // The drive winding down.
+                Fm(at: 0.5, from: 84, to: 40, glide: 2.4, ratio: 0.5, index: 1.6, fade: 3.0, attack: 0.3, decay: 1.1, gain: 0.3),
+                Drive(1.7),
+                // Thunder rolling away.
+                Roll(at: 0.02, from: 2600, to: 180, glide: 2.4, attack: 0.01, decay: 1.2, gain: 0.55, swell: 5, depth: 0.7, seed: 553),
+                Roll(at: 0.3, from: 900, to: 120, glide: 3.0, attack: 0.25, decay: 1.4, gain: 0.4, swell: 2.5, depth: 0.8, pan: 0.3, seed: 554),
+                // Air rushing in on the hull.
+                Sweep(at: 0.04, from: 4000, to: 450, glide: 1.1, q: 0.7, attack: 0.12, decay: 0.6, gain: 3.0, pan: -0.2, seed: 555),
+                Sweep(at: 0.08, from: 3200, to: 380, glide: 1.3, q: 0.7, attack: 0.15, decay: 0.65, gain: 2.6, pan: 0.2, seed: 556),
+            ],
+        ),
+
+        // ---- the dampened jump -------------------------------------------------------------
+        // Into warp with an enemy dampener's field over the mark: the same tear and snap,
+        // but caught. The tear stutters, the drive's growl beats against a detuned copy of
+        // itself, metal grinds and groans under the strain, the drive sputters, and the
+        // streak drags out slower before the hole closes.
+        "warp_jump_damped": (
+            length: 6, peak: 0.9, room: 0.35,
+            layers: [
+                // The tear catching and tearing again.
+                Burst(low: 120, high: 3500, attack: 0.0005, decay: 0.02, gain: 3.0, seed: 561),
+                Burst(at: 0.06, low: 120, high: 3000, attack: 0.0005, decay: 0.015, gain: 2.2, pan: 0.2, seed: 562),
+                Burst(at: 0.11, low: 120, high: 3000, attack: 0.0005, decay: 0.02, gain: 2.6, pan: -0.2, seed: 563),
+                Burst(at: 0.21, low: 120, high: 3000, attack: 0.0005, decay: 0.015, gain: 2.0, seed: 564),
+                Burst(at: 0.27, low: 100, high: 2500, attack: 0.0005, decay: 0.025, gain: 2.8, pan: 0.15, seed: 565),
+                // The growl beating against itself (a 7 Hz warble).
+                Fm(from: 150, to: 74, glide: 1.8, ratio: 0.5, index: 2.6, fade: 6.0, attack: 0.05, decay: 1.1, gain: 0.5, pan: -0.15),
+                Fm(from: 157, to: 78, glide: 1.8, ratio: 0.5, index: 2.6, fade: 6.0, attack: 0.05, decay: 1.1, gain: 0.45, pan: 0.15),
+                // Metal grinding, and a hull groaning under the strain.
+                Fm(at: 0.05, from: 105, to: 72, glide: 2.4, ratio: 1.41, index: 3.0, fade: 6.0, attack: 0.1, decay: 1.4, gain: 0.45),
+                Chirp(at: 0.2, from: 120, to: 80, glide: 3.0, attack: 0.3, decay: 1.4, gain: 0.5, vibrato: 5.5, bend: 0.07, ratio: 0.5, index: 2.0),
+                // The drive sputtering.
+                Chirp(at: 0.1, from: 230, to: 150, glide: 2.0, attack: 0.05, decay: 0.9, gain: 0.3, pulse: 9, ratio: 0.5, index: 2.4, pan: 0.1),
+                // The hole shutting, late and heavy.
+                Burst(at: 0.55, low: 55, high: 800, attack: 0.001, decay: 0.06, gain: 3.5, seed: 566),
+                Tone(at: 0.55, from: 85, to: 26, glide: 0.6, attack: 0.002, decay: 0.8, gain: 0.9),
+                Drive(1.8),
+                // The streak dragged out, and electrical crackle over the strain.
+                Sweep(from: 300, to: 2400, glide: 0.7, q: 1.4, attack: 0.05, decay: 0.45, gain: 4.5, seed: 567),
+                Roll(at: 0.05, from: 2200, to: 900, glide: 2.0, attack: 0.1, decay: 1.0, gain: 0.3, swell: 60, depth: 1.0, pan: -0.1, seed: 568),
+                Roll(at: 0.55, from: 1400, to: 180, glide: 2.4, attack: 0.08, decay: 1.1, gain: 0.45, swell: 3, depth: 0.7, seed: 569),
+            ],
+        ),
+        // A dampener raised under a jump already in warp catches it: a heavy metallic
+        // lurch at the exit point, a groan warbling under the strain, crackle.
+        "warp_snag": (
+            length: 4, peak: 0.8, room: 0.35,
+            layers: [
+                Burst(low: 100, high: 1800, attack: 0.0006, decay: 0.03, gain: 3.5, seed: 571),
+                Tone(from: 64, to: 28, glide: 0.4, attack: 0.002, decay: 0.55, gain: 0.8),
+                Fm(from: 115, to: 80, glide: 1.2, ratio: 1.41, index: 3.0, fade: 3.0, attack: 0.01, decay: 0.7, gain: 0.5),
+                Chirp(at: 0.05, from: 95, to: 60, glide: 2.2, attack: 0.15, decay: 1.1, gain: 0.5, vibrato: 4.2, bend: 0.08, ratio: 0.5, index: 2.4),
+                Fm(at: 0.08, from: 180, to: 120, glide: 1.6, ratio: 0.5, index: 2.4, fade: 6.0, attack: 0.1, decay: 0.8, gain: 0.3, pan: 0.2),
+                Fm(at: 0.08, from: 188, to: 126, glide: 1.6, ratio: 0.5, index: 2.4, fade: 6.0, attack: 0.1, decay: 0.8, gain: 0.28, pan: -0.2),
+                Drive(1.6),
+                Roll(at: 0.02, from: 2400, to: 1200, glide: 1.5, attack: 0.05, decay: 0.8, gain: 0.3, swell: 70, depth: 1.0, seed: 572),
+                Roll(at: 0.05, from: 900, to: 150, glide: 2.0, attack: 0.05, decay: 0.9, gain: 0.35, swell: 3, depth: 0.7, pan: 0.2, seed: 573),
+            ],
+        ),
+        // The rift of a snagged jump, three times as long: the pressure roar warbling and
+        // grinding, a stuttering rasp through it, crackle, metal straining.
+        "warp_rift_damped": (
+            length: 3.4, peak: 0.6, room: 0, looped: true,
+            layers: [
+                Chirp(from: 62, to: 62, glide: 1, attack: 0.01, decay: 100000, gain: 0.45, vibrato: 3.1, bend: 0.07, ratio: 0.5, index: 2.2),
+                Chirp(from: 131, to: 131, glide: 1, attack: 0.01, decay: 100000, gain: 0.3, pulse: 7, ratio: 0.5, index: 2.4, vibrato: 1.7, bend: 0.04, pan: 0.15),
+                Fm(from: 97, to: 97, glide: 1, ratio: 1.41, index: 2.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.25, pan: -0.15),
+                Drive(1.5),
+                Wind(freq: 340, q: 1.6, gain: 5.0, swell: 2.0, depth: 0.7, sway: 0.6, seed: 581),
+                Rumble(freq: 150, q: 0.9, gain: 8.0, wobble: 0.88, depth: 0.5),
+                Roll(from: 2200, to: 2200, glide: 1, attack: 0.01, decay: 100000, gain: 0.18, swell: 40, depth: 1.0, pan: 0.2, seed: 582),
+            ],
+        ),
+        // Thrown out of a snagged jump: violent and torn. The clap comes in pieces, the
+        // hull takes a metal blow and grinds, an EMP discharge crackles over it with a
+        // huge rough buzz, thunder rolls, and the drives fail, sputtering and groaning down.
+        "warp_arrive_damped": (
+            length: 7, peak: 0.9, room: 0.4,
+            layers: [
+                Burst(low: 80, high: 4500, attack: 0.0004, decay: 0.022, gain: 3.2, seed: 591),
+                Burst(at: 0.045, low: 80, high: 3500, attack: 0.0004, decay: 0.02, gain: 2.6, pan: 0.25, seed: 592),
+                Burst(at: 0.09, low: 70, high: 3000, attack: 0.0004, decay: 0.03, gain: 3.0, pan: -0.25, seed: 593),
+                Burst(at: 0.16, low: 60, high: 2500, attack: 0.0005, decay: 0.03, gain: 2.4, seed: 594),
+                Burst(at: 0.3, low: 60, high: 1800, attack: 0.0005, decay: 0.05, gain: 3.0, pan: 0.15, seed: 595),
+                Tone(from: 70, to: 24, glide: 0.7, attack: 0.002, decay: 1.0, gain: 0.9),
+                // The hull struck, and metal grinding.
+                Fm(at: 0.05, from: 165, to: 92, glide: 0.4, ratio: 1.41, index: 3.2, fade: 0.3, attack: 0.002, decay: 0.3, gain: 0.5),
+                Fm(at: 0.1, from: 120, to: 55, glide: 2.0, ratio: 1.41, index: 3.0, fade: 5.0, attack: 0.05, decay: 1.1, gain: 0.42),
+                // The EMP: a huge rough buzz.
+                Fm(at: 0.08, from: 125, to: 100, glide: 0.4, ratio: 0.5, index: 3.2, fade: 100, attack: 0.005, decay: 0.35, gain: 0.5),
+                Fm(at: 0.08, from: 250, to: 205, glide: 0.4, ratio: 0.5, index: 2.4, fade: 100, attack: 0.005, decay: 0.25, gain: 0.3, pan: 0.2),
+                // The drives failing: sputtering and groaning down.
+                Chirp(at: 0.5, from: 190, to: 60, glide: 2.2, attack: 0.1, decay: 1.0, gain: 0.35, pulse: 8, ratio: 0.5, index: 2.4, pan: -0.1),
+                Fm(at: 0.6, from: 150, to: 45, glide: 2.8, ratio: 0.5, index: 2.0, fade: 4.0, attack: 0.15, decay: 1.4, gain: 0.35),
+                Chirp(at: 0.4, from: 112, to: 76, glide: 3.0, attack: 0.4, decay: 1.5, gain: 0.4, vibrato: 2.5, bend: 0.05, ratio: 0.5, index: 1.8),
+                Drive(2.0),
+                Roll(at: 0.08, from: 3500, to: 1500, glide: 0.8, attack: 0.01, decay: 0.6, gain: 0.4, swell: 90, depth: 1.0, seed: 596),
+                Roll(at: 0.02, from: 2400, to: 160, glide: 2.6, attack: 0.01, decay: 1.4, gain: 0.55, swell: 4, depth: 0.75, seed: 597),
+                Sweep(at: 0.05, from: 3800, to: 400, glide: 1.4, q: 0.7, attack: 0.15, decay: 0.7, gain: 2.8, pan: -0.2, seed: 598),
+            ],
+        ),
+
+        // ---- stunned -----------------------------------------------------------------------
+        // An EMP-stunned hull: arcs crawling over it. Crackle and sizzle, cracking zaps each
+        // with a rough buzz (some long, some short, never in a rhythm), and now and then a
+        // sputtering system trying to come on. The game follows the stun's level, so it
+        // thins out as the systems come back.
+        "stun_arcs": (
+            length: 3.7, peak: 0.55, room: 0.15, looped: true,
+            layers: [
+                Roll(from: 3000, to: 3000, glide: 1, attack: 0.01, decay: 100000, gain: 0.22, swell: 70, depth: 1.0, seed: 601),
+                Burst(at: 0.08, low: 400, high: 4000, attack: 0.0004, decay: 0.012, gain: 2.4, pan: 0.3, seed: 602),
+                Fm(at: 0.08, from: 95, to: 80, glide: 0.2, ratio: 0.5, index: 3.2, fade: 100, attack: 0.004, decay: 0.22, gain: 0.45, pan: 0.3),
+                Burst(at: 0.61, low: 400, high: 4000, attack: 0.0004, decay: 0.01, gain: 1.6, pan: -0.4, seed: 603),
+                Burst(at: 0.67, low: 400, high: 4000, attack: 0.0004, decay: 0.014, gain: 2.2, pan: -0.35, seed: 604),
+                Fm(at: 0.67, from: 140, to: 125, glide: 0.1, ratio: 0.5, index: 3.0, fade: 100, attack: 0.004, decay: 0.07, gain: 0.35, pan: -0.35),
+                Chirp(at: 1.1, from: 160, to: 175, glide: 0.4, attack: 0.02, decay: 0.2, gain: 0.25, pulse: 14, ratio: 0.5, index: 2.4, pan: 0.1),
+                Burst(at: 1.52, low: 400, high: 4000, attack: 0.0004, decay: 0.016, gain: 2.6, pan: 0.05, seed: 605),
+                Fm(at: 1.52, from: 82, to: 70, glide: 0.3, ratio: 0.5, index: 3.4, fade: 100, attack: 0.004, decay: 0.3, gain: 0.5),
+                Burst(at: 2.08, low: 400, high: 4000, attack: 0.0004, decay: 0.01, gain: 1.8, pan: 0.45, seed: 606),
+                Burst(at: 2.44, low: 400, high: 4000, attack: 0.0004, decay: 0.012, gain: 2.0, pan: -0.2, seed: 607),
+                Fm(at: 2.44, from: 120, to: 108, glide: 0.1, ratio: 0.5, index: 3.0, fade: 100, attack: 0.004, decay: 0.1, gain: 0.35, pan: -0.2),
+                Burst(at: 2.53, low: 400, high: 4000, attack: 0.0004, decay: 0.01, gain: 1.4, pan: -0.25, seed: 608),
+                Chirp(at: 2.9, from: 150, to: 140, glide: 0.3, attack: 0.02, decay: 0.15, gain: 0.2, pulse: 17, ratio: 0.5, index: 2.4, pan: -0.3),
+                Burst(at: 3.24, low: 400, high: 4000, attack: 0.0004, decay: 0.014, gain: 2.3, pan: 0.25, seed: 609),
+                Fm(at: 3.24, from: 105, to: 90, glide: 0.15, ratio: 0.5, index: 3.2, fade: 100, attack: 0.004, decay: 0.16, gain: 0.4, pan: 0.25),
+            ],
+        ),
+        // Systems coming back as a stun wears off (the last three seconds of it): relays
+        // clacking home in no rhythm, a rough hum coming up, the drives spinning up in a
+        // growl, and a last lock as the ship is its own again.
+        "stun_reboot": (
+            length: 5.2, peak: 0.65, room: 0.3,
+            layers: [
+                Burst(low: 300, high: 2500, attack: 0.0005, decay: 0.01, gain: 2.2, seed: 611),
+                Burst(at: 0.31, low: 300, high: 2500, attack: 0.0005, decay: 0.01, gain: 1.8, pan: 0.3, seed: 612),
+                Burst(at: 0.38, low: 300, high: 2500, attack: 0.0005, decay: 0.012, gain: 2.0, pan: 0.25, seed: 613),
+                Tone(at: 0.38, from: 105, to: 55, glide: 0.1, attack: 0.001, decay: 0.15, gain: 0.45),
+                Burst(at: 0.74, low: 300, high: 2500, attack: 0.0005, decay: 0.01, gain: 1.7, pan: -0.3, seed: 614),
+                Burst(at: 0.97, low: 300, high: 2500, attack: 0.0005, decay: 0.012, gain: 2.2, pan: -0.1, seed: 615),
+                Burst(at: 1.03, low: 300, high: 2500, attack: 0.0005, decay: 0.01, gain: 1.6, pan: -0.15, seed: 616),
+                Tone(at: 1.03, from: 110, to: 56, glide: 0.1, attack: 0.001, decay: 0.15, gain: 0.5),
+                Burst(at: 1.33, low: 300, high: 2500, attack: 0.0005, decay: 0.012, gain: 2.0, pan: 0.35, seed: 617),
+                Burst(at: 1.62, low: 300, high: 2500, attack: 0.0005, decay: 0.01, gain: 1.9, pan: 0.1, seed: 618),
+                Burst(at: 1.68, low: 300, high: 2500, attack: 0.0005, decay: 0.012, gain: 2.1, pan: 0.05, seed: 619),
+                // The hum and the drives coming up.
+                Fm(at: 0.35, from: 50, to: 58, glide: 1.5, ratio: 0.5, index: 1.6, fade: 8.0, attack: 1.4, decay: 1.0, gain: 0.3),
+                Fm(at: 0.9, from: 32, to: 64, glide: 2.1, ratio: 0.5, index: 2.0, fade: 8.0, attack: 2.0, decay: 0.7, gain: 0.5),
+                Fm(at: 1.2, from: 92, to: 180, glide: 1.8, ratio: 0.5, index: 1.8, fade: 8.0, attack: 1.7, decay: 0.55, gain: 0.35, pan: 0.1),
+                // The lock.
+                Burst(at: 2.95, low: 150, high: 1800, attack: 0.0005, decay: 0.02, gain: 2.8, seed: 620),
+                Tone(at: 2.95, from: 120, to: 48, glide: 0.15, attack: 0.001, decay: 0.3, gain: 0.7),
+                Drive(1.4),
+                Sweep(at: 1.0, from: 200, to: 900, glide: 2.0, q: 1.0, attack: 1.8, decay: 0.5, gain: 2.5, seed: 621),
+            ],
+        ),
+
+        // ---- the dampener ------------------------------------------------------------------
+        // A live Undertow's field, heard only near it and kept low: a soft, slow-breathing
+        // hum, a deep note and its octave under a quiet rough edge, and air moving in the
+        // field. Nothing bright in it, so it never tires the ear.
+        "warp_damper_hum": (
+            length: 6, peak: 0.45, room: 0, looped: true,
+            layers: [
+                Drone(freq: 48, gain: 0.3, wobble: 0.1667, depth: 0.5),
+                Drone(freq: 96, gain: 0.2, wobble: 0.3333, depth: 0.6, pan: -0.2),
+                Fm(from: 72, to: 72, glide: 1, ratio: 0.5, index: 0.9, fade: 1000, attack: 0.01, decay: 100000, gain: 0.16, pan: 0.2),
+                Drone(freq: 144, gain: 0.07, wobble: 0.5, depth: 0.7),
+                Wind(freq: 260, q: 2.0, gain: 3.0, swell: 0.3, depth: 0.8, sway: 0.3, seed: 631),
+            ],
+        ),
+        // The field catching a jump: a deep pull surging up and letting go, a strained
+        // growl warbling, the air drawn toward the dampener.
+        "warp_damper_surge": (
+            length: 4, peak: 0.75, room: 0.3,
+            layers: [
+                Burst(low: 60, high: 900, attack: 0.001, decay: 0.05, gain: 3.0, seed: 641),
+                Fm(from: 40, to: 76, glide: 0.6, ratio: 0.5, index: 2.8, fade: 3.0, attack: 0.25, decay: 0.9, gain: 0.55),
+                Chirp(at: 0.05, from: 115, to: 82, glide: 2.0, attack: 0.2, decay: 1.0, gain: 0.4, vibrato: 4.5, bend: 0.09, ratio: 0.5, index: 2.2),
+                Fm(at: 0.1, from: 170, to: 130, glide: 1.5, ratio: 1.41, index: 2.0, fade: 2.0, attack: 0.2, decay: 0.7, gain: 0.25, pan: 0.2),
+                Drive(1.5),
+                Sweep(at: 0.02, from: 1400, to: 160, glide: 1.0, q: 1.2, attack: 0.25, decay: 0.7, gain: 3.0, seed: 642),
+                Roll(at: 0.1, from: 2000, to: 1000, glide: 1.2, attack: 0.1, decay: 0.7, gain: 0.2, swell: 60, depth: 1.0, pan: -0.2, seed: 643),
+            ],
+        ),
+    },
+)
