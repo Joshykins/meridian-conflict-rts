@@ -191,12 +191,6 @@ pub struct Units {
     /// A sweeping gun (`Weapon::sweep`) is mid-stream: it has fired and its barrels are
     /// still at speed, so it keeps firing down the barrel as it swings to its next mark.
     pub streaming: Vec<bool>,
-    /// Broadside fire (`Weapon::volley`), one bit per weapon: `[ready, busy, primed,
-    /// hold, go]`. Ready: on its mark and holding for the others. Busy: bears on its mark
-    /// but is still turning or reloading. Primed: its countdown ran out while it held, so
-    /// it needs no charge. Hold: ticks the ready ones have waited. Go: the ones that were
-    /// ready fire (or begin their charge) this tick. See `volley.rs`.
-    pub volley: Vec<[u16; 5]>,
     /// Ground covered since the unit was made, in 1/256 m, wrapping; turning on
     /// the spot counts too. Only the presentation reads it: it times a walker's stride.
     pub gait: Vec<u32>,
@@ -339,7 +333,6 @@ impl Units {
             prev_arm_pitch: Vec::new(),
             spin: Vec::new(),
             streaming: Vec::new(),
-            volley: Vec::new(),
             gait: Vec::new(),
             gait_step: Vec::new(),
             reclaim_charge: Vec::new(),
@@ -416,7 +409,6 @@ impl Units {
         put(&mut self.prev_arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
         put(&mut self.spin, row, [0; 4]);
         put(&mut self.streaming, row, false);
-        put(&mut self.volley, row, [0; 5]);
         put(&mut self.gait, row, 0);
         put(&mut self.gait_step, row, [0; 2]);
         put(&mut self.reclaim_charge, row, 0);
@@ -532,17 +524,9 @@ impl Units {
                 self.spin[row][0] as u64
                     | (self.spin[row][1] as u64) << 16
                     | (self.streaming[row] as u64) << 32
-                    | (self.shot_blocked[row] as u64) << 40
-                    | ((self.volley[row][2] & 0xFF) as u64) << 48
-                    | ((self.volley[row][3] & 0xFF) as u64) << 56,
+                    | (self.shot_blocked[row] as u64) << 40,
             );
             h.write_u64(self.spin[row][2] as u64 | (self.spin[row][3] as u64) << 16);
-            h.write_u64(
-                self.volley[row][0] as u64
-                    | (self.volley[row][1] as u64) << 16
-                    | (self.volley[row][4] as u64) << 32
-                    | ((self.volley[row][2] >> 8) as u64) << 40,
-            );
             h.write_i64(self.reclaimed[row].0);
             h.write_i64(self.shield_hp[row].0);
             h.write_u64(

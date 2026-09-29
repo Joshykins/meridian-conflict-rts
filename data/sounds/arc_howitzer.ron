@@ -99,7 +99,7 @@
         ),
 
         // ---- the Leviathan's Arc Cannons -------------------------------------------------
-        // Every battery charges at once (`volley`), so the ship is heard as one charge
+        // Batteries of one hull that charge on the same tick are heard as one charge
         // (game.rs plays one per hull a tick).
         "leviathan_charge": (
             length: 4.0, peak: 0.95, room: 0.45,

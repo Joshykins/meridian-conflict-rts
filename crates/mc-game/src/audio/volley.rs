@@ -1,8 +1,8 @@
 //! A gun whose barrels all fire on one tick (a battleship's triple turret, `salvo_delay`
 //! 0) is heard as one report, a little heavier, not one per barrel: the same recipe
 //! started three times in the same instant combs into a phasey buzz and eats the mixer's
-//! voices. Every battery of one hull charging on the same tick (`volley`) with the same
-//! sound is likewise heard as one charge.
+//! voices. Batteries of one hull that begin charging on the same tick with the same
+//! sound are likewise heard as one charge.
 
 use mc_data::Blueprints;
 use mc_sim::SimEvent;

@@ -1,5 +1,5 @@
-//! A battleship fights broadside on (`motion.broadside`) and its batteries fire as one
-//! volley (`volley: true`, docs/NAVY.md "The Leviathan").
+//! A battleship fights broadside on (`motion.broadside`), and each battery fires the
+//! moment it bears, never waiting for another (docs/NAVY.md "The Leviathan").
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -94,9 +94,9 @@ fn fired(w: &World, key: &str, owner: u8, weapon: u8) -> usize {
 
 const SHIP: &str = "aster_t3_battleship";
 
-/// Ticks on which the Leviathan fired, with the shots of each battery that tick, and the
-/// mark's bearing off its bow (degrees, signed) on the first of them.
-fn engage(tx: i32, ty: i32) -> (Vec<(u32, [usize; 3])>, f64) {
+/// Shots of each main battery over 400 ticks of an Attack on a mark at (`tx`, `ty`), and
+/// the mark's last bearing off the Leviathan's bow while it lived (degrees, signed).
+fn engage(tx: i32, ty: i32) -> ([usize; 3], f64) {
     let mut w = sea(false);
     let ship = spawn(&mut w, SHIP, 0, 600, 1000, 0);
     let target = spawn(&mut w, SHIP, 1, tx, ty, flag::PASSIVE);
@@ -109,41 +109,33 @@ fn engage(tx: i32, ty: i32) -> (Vec<(u32, [usize; 3])>, f64) {
             queue: false,
         },
     );
-    let (mut volleys, mut off) = (Vec::new(), f64::NAN);
-    for tick in 0..400 {
+    let (mut shots, mut off) = ([0usize; 3], f64::NAN);
+    for _ in 0..400 {
         run(&mut w, 1);
-        let shots = [0u8, 1, 2].map(|b| fired(&w, SHIP, 0, b));
-        if shots.iter().any(|&n| n > 0) {
-            if volleys.is_empty() {
-                let (r, t) = (row(&w, ship), row(&w, target));
-                let to = (w.state.units.pos[t] - w.state.units.pos[r]).angle();
-                off = w.state.units.heading[r].delta_to(to) as f64 * 360.0 / 65536.0;
-            }
-            volleys.push((tick, shots));
+        for (b, n) in shots.iter_mut().enumerate() {
+            *n += fired(&w, SHIP, 0, b as u8);
+        }
+        if let Some(t) = w.state.units.row(target) {
+            let r = row(&w, ship);
+            let to = (w.state.units.pos[t] - w.state.units.pos[r]).angle();
+            off = w.state.units.heading[r].delta_to(to) as f64 * 360.0 / 65536.0;
         }
     }
-    (volleys, off)
+    (shots, off)
 }
 
 #[test]
-fn a_battleship_turns_its_beam_to_a_mark_dead_ahead_and_fires_one_broadside() {
+fn a_battleship_turns_its_beam_to_a_mark_dead_ahead_and_every_battery_fires() {
     // Dead ahead, 900 m: the aft battery cannot bear until the hull comes round.
-    let (volleys, off) = engage(1500, 1080);
-    assert!(volleys.len() >= 2, "fired {} times", volleys.len());
-    for (tick, shots) in &volleys {
-        assert_eq!(
-            *shots,
-            [3, 3, 3],
-            "tick {tick}: every barrel of every battery at once"
-        );
-    }
+    let (shots, off) = engage(1500, 1080);
+    assert!(
+        shots.iter().all(|&n| n >= 6),
+        "every battery fires, all three barrels a time: {shots:?}"
+    );
     assert!(
         (60.0..=90.0).contains(&off.abs()),
-        "mark {off:.1} deg off the bow when it fired"
+        "mark {off:.1} deg off the bow once laid"
     );
-    // Reloads stay in step: one broadside every reload (12 s), give or take the hold.
-    let gap = volleys[1].0 - volleys[0].0;
-    assert!((120..=125).contains(&gap), "{gap} ticks between broadsides");
 }
 
 #[test]
@@ -268,9 +260,9 @@ fn a_missile_launcher_ashore_fires_on_a_battleship_offshore_but_not_on_a_dived_b
 #[test]
 fn battleships_on_ground_fire_fire_as_their_charge_ends() {
     // Three Leviathans shelling one area: each battery lays on a point of its own and slews
-    // to a new one after every broadside, so they come ready at different times. Whatever
-    // holds a broadside holds it before the charge: every shot comes the charge's length
-    // after that battery began charging, and no battery fires without one.
+    // to a new one after every shot, so they come ready at different times. Every shot
+    // comes the charge's length after that battery began charging, and no battery fires
+    // without one.
     let mut w = sea(false);
     let ships: Vec<UnitId> = (0..3)
         .map(|i| spawn(&mut w, SHIP, 0, 600 + i * 60, 900 + i * 90, 0))
@@ -287,7 +279,7 @@ fn battleships_on_ground_fire_fire_as_their_charge_ends() {
     let charge = w.bp(row(&w, ships[0])).weapons[0].charge_ticks as u32;
     // Per ship and battery: the tick its charge began, until it fires.
     let mut charging = [[None::<u32>; 3]; 3];
-    let mut broadsides = 0;
+    let mut shots = 0;
     for tick in 0..1500u32 {
         run(&mut w, 1);
         let at: Vec<FxVec2> = ships
@@ -316,6 +308,7 @@ fn battleships_on_ground_fire_fire_as_their_charge_ends() {
         for s in 0..3 {
             for b in 0..3 {
                 if shot[s][b] {
+                    shots += 1;
                     let began = charging[s][b].take();
                     assert_eq!(
                         began.map(|t| tick - t),
@@ -324,37 +317,22 @@ fn battleships_on_ground_fire_fire_as_their_charge_ends() {
                     );
                 }
             }
-            if shot[s].iter().all(|&f| f) {
-                broadsides += 1;
-            }
         }
     }
-    assert!(broadsides >= 9, "{broadsides} whole broadsides");
+    assert!(shots >= 27, "{shots} battery shots");
 }
 
-/// Ticks on which the Leviathan `ship` fired its main batteries over `ticks`, with the
-/// batteries that fired each time (bit per battery).
-fn broadsides(w: &mut World, ticks: u32) -> Vec<(u32, u8)> {
-    let mut out = Vec::new();
-    for tick in 0..ticks {
-        run(w, 1);
-        let fired = (0..3u8).fold(0, |acc, b| {
-            acc | if fired(w, SHIP, 0, b) > 0 { 1 << b } else { 0 }
-        });
-        if fired != 0 {
-            out.push((tick, fired));
-        }
-    }
-    out
-}
-
-#[test]
-fn a_battleship_sent_at_a_far_mark_opens_with_every_battery() {
-    // Out of reach dead ahead: it closes, and the forward batteries reach first. They wait
-    // for the hull to stop and come round so the aft one bears, and all three open together.
+/// The tick each main battery of a Leviathan first began its charge, over 400 ticks of an
+/// Attack on a mark off its starboard bow, with the aft battery (weapon 2) first slewed
+/// `aft` degrees off the bow (`None`: left at rest, astern).
+fn first_charges(aft: Option<i32>) -> [Option<u32>; 3] {
     let mut w = sea(false);
-    let ship = spawn(&mut w, SHIP, 0, 400, 200, 0);
-    let target = spawn(&mut w, SHIP, 1, 1900, 1900, flag::PASSIVE);
+    let ship = spawn(&mut w, SHIP, 0, 600, 1000, 0);
+    let r = row(&w, ship);
+    if let Some(aft) = aft {
+        w.state.units.weapon_yaw[r][2] = Angle::from_degrees(aft);
+    }
+    let target = spawn(&mut w, SHIP, 1, 1100, 500, flag::PASSIVE);
     order(
         &mut w,
         0,
@@ -364,38 +342,36 @@ fn a_battleship_sent_at_a_far_mark_opens_with_every_battery() {
             queue: false,
         },
     );
-    let fired = broadsides(&mut w, 700);
-    assert!(fired.len() >= 3, "fired {fired:?}");
-    assert!(
-        fired.iter().all(|&(_, b)| b == 0b111),
-        "every battery every time: {fired:?}"
-    );
+    let mut first = [None; 3];
+    for tick in 0..400u32 {
+        run(&mut w, 1);
+        for e in &w.events {
+            if let SimEvent::WeaponCharging { unit, weapon, .. } = e {
+                if *unit == ship && *weapon < 3 {
+                    first[*weapon as usize].get_or_insert(tick);
+                }
+            }
+        }
+    }
+    first
 }
 
 #[test]
-fn batteries_out_of_step_come_back_into_it() {
-    // Shelling a point, with the aft battery's reload up to 9 s behind the forward ones' (as closing
-    // under way used to leave it): after one broadside they fire as one.
-    for lag in [30u16, 65, 90] {
-        let mut w = sea(false);
-        let ship = spawn(&mut w, SHIP, 0, 600, 1000, 0);
-        order(
-            &mut w,
-            0,
-            Command::AttackGround {
-                units: vec![ship],
-                pos: FxVec2::from_ints(1100, 1500),
-                queue: false,
-            },
-        );
-        run(&mut w, 100);
-        let r = row(&w, ship);
-        w.state.units.weapon_cooldown[r][..3].copy_from_slice(&[40, 40, 40 + lag]);
-        let fired = broadsides(&mut w, 600);
-        assert!(fired.len() >= 3, "lag {lag}: fired {fired:?}");
-        assert!(
-            fired[1..].iter().all(|&(_, b)| b == 0b111),
-            "lag {lag}: in step after one broadside: {fired:?}"
-        );
-    }
+fn a_battery_that_bears_fires_while_another_is_still_turning() {
+    // The aft battery starts laid over the port bow and has the long way round by the
+    // stern to come onto a starboard mark. The forward batteries bear at once: they
+    // charge long before it does, and on the very tick they do with it at rest astern.
+    let (turning, laid) = (first_charges(Some(60)), first_charges(None));
+    let [Some(fore), Some(second), Some(aft)] = turning else {
+        panic!("a battery never charged: {turning:?}");
+    };
+    assert!(
+        fore.max(second) + 20 < aft,
+        "the forward batteries waited for the aft one: {turning:?}"
+    );
+    assert_eq!(
+        turning[..2],
+        laid[..2],
+        "the forward batteries' timing hangs on the aft battery's"
+    );
 }

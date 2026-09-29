@@ -78,8 +78,6 @@ pub struct Weapon {
     pub proximity: Fx,
     pub burn_ticks: u16,
     pub rear: bool,
-    /// Holds for the unit's other `volley` weapons and fires with them as one broadside.
-    pub volley: bool,
     /// Which way the weapon rests and its arc is centred, off the nose (180 for `rear`).
     /// A limited arc off the nose also limits what it takes as a target (`RawWeapon::facing`).
     pub facing: Angle,

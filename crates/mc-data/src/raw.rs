@@ -744,10 +744,6 @@ pub struct RawWeapon {
     pub burn: f64,
     #[serde(default)]
     pub rear: bool,
-    /// Fires as one broadside with the unit's other `volley` weapons: a battery that is
-    /// ready holds (a few seconds at most) for the others that can bear on the mark.
-    #[serde(default)]
-    pub volley: bool,
     /// Which way a gun house rests, degrees off the nose, positive to the left
     /// (90: port, -90: starboard, 180: aft). Its `arc` is centred there, and it only
     /// takes targets inside that arc. Unlike `rear`, its muzzle is authored as the
@@ -1330,7 +1326,6 @@ impl Unit {
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
                 rear: w.rear,
-                volley: w.volley,
                 facing: if w.facing != 0.0 {
                     Angle(steps(w.facing).round() as i64 as u16)
                 } else if w.rear {
