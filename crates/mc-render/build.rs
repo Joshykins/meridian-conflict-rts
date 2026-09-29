@@ -10,7 +10,9 @@
 //! the air near the ground) to those containing `//!use habitat`, and
 //! `shaders/scenery.wgsl` (desert bark, rock and the dam's concrete) after
 //! surface to those containing `//!use scenery`; `shaders/desert.wgsl`
-//! (canyon-country desert ground) after habitat for `//!use desert`. In front of
+//! (canyon-country desert ground) after habitat for `//!use desert`;
+//! `shaders/warp_hull.wgsl` and `shaders/warp_puffs.wgsl` (a capital ship's warp)
+//! for `//!use warp_hull` and `//!use warp_puffs`. In front of
 //! all of it go the numbers the CPU shares with the shaders, generated from
 //! `mc-models/src/gpu_consts.rs`.
 //!

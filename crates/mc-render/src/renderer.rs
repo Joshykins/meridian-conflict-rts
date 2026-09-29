@@ -71,6 +71,7 @@ mod stake_fx;
 mod survival_fx;
 mod trail_fx;
 mod tree_wind;
+mod warp_fx;
 mod water_fx;
 mod work_beams;
 mod wreck_fx;
@@ -815,6 +816,8 @@ pub struct Renderer {
     heat_haze: heat_haze::HeatHaze,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
     capital_fx: capital_fx::CapitalFx,
+    /// Capital ships' warp jumps: charge, flash, streak, rift (renderer/warp_fx.rs).
+    warp_fx: warp_fx::WarpFx,
     nodes: Buffer,
     marks: Buffer,
     ranges: Buffer,
@@ -2289,6 +2292,7 @@ impl Renderer {
             craters,
             heat_haze,
             capital_fx: capital_fx::CapitalFx::default(),
+            warp_fx: warp_fx::WarpFx::default(),
             nodes,
             marks,
             ranges,
@@ -3173,6 +3177,7 @@ impl Renderer {
         self.nuke_tick(frame, time, camera);
         self.stream_bursts(projectiles, time, camera);
         self.sea_tick(units, projectiles, time, camera);
+        self.warp_tick(frame, time, camera);
     }
 
     /// The rounds of a stream gun's shot (`Weapon::rounds`) have no sim impact of their
@@ -3412,6 +3417,7 @@ impl Renderer {
             );
         }
         self.capital_lights(time, alpha);
+        self.warp_lights(time);
         self.heavy_rail_lights(time);
         self.bolt_rifle_lights(time);
         self.arc_howitzer_lights(time);
