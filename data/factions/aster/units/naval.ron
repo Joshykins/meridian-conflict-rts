@@ -13,7 +13,7 @@
         cost: (mass: 60, energy: 330, time: 230),
         radius: 6, height: 4,
         vision: 350,
-        motion: (layer: Naval, size: 0, speed: 48, accel: 30, turn: 120),
+        motion: (layer: Naval, size: 0, speed: 60, accel: 38, turn: 120),
         // A three-barrel rotary gun on a ring at the bow. It spins up briefly before the
         // stream starts; the casings leave its port just behind the barrels.
         weapons: [(
@@ -36,7 +36,7 @@
         cost: (mass: 230, energy: 1500, time: 760),
         radius: 15, height: 10,
         vision: 650, radar: 1400,
-        motion: (layer: Naval, size: 2, speed: 22, accel: 8, turn: 36),
+        motion: (layer: Naval, size: 2, speed: 28, accel: 10, turn: 36),
         weapons: [
             // The deck gun, forward: a long-range naval rifle in a turret. It cannot
             // bear straight aft; the ship turns to bring it round.
@@ -74,7 +74,7 @@
         radius: 10, height: 3.6,
         vision: 450, sonar: 700,
         dive: (depth: 2, time: 3),
-        motion: (layer: Naval, size: 1, speed: 26, accel: 12, turn: 60),
+        motion: (layer: Naval, size: 1, speed: 32, accel: 15, turn: 60),
         // Four bow tubes, fired in pairs. They are the only thing that reaches a dived hull.
         weapons: [(
             name: "Torpedo Tubes",
@@ -147,7 +147,7 @@
         cost: (mass: 80, energy: 480, time: 300),
         radius: 8, height: 6,
         vision: 400,
-        motion: (layer: Naval, size: 1, speed: 30, accel: 14, turn: 70),
+        motion: (layer: Naval, size: 1, speed: 38, accel: 18, turn: 70),
         // A reclaim head on a house of its own atop the lattice tower amidships: it works
         // what it passes while it sails, and looks straight down at wrecks on the seabed
         // between the hulls or up at a cliff-top shore.
@@ -168,7 +168,7 @@
         cost: (mass: 920, energy: 6440, time: 3000),
         radius: 26.4, height: 14.4,
         vision: 800, radar: 1500, sonar: 900,
-        motion: (layer: Naval, size: 3, speed: 24, accel: 8, turn: 34),
+        motion: (layer: Naval, size: 3, speed: 30, accel: 10, turn: 34),
         weapons: [
             // The bolt rifle forward, in a house of its own: the Paladin's gun a size down
             // (7.4 m of it). It lobs a little (`loft`), so it reaches over a headland or a
@@ -229,7 +229,7 @@
         anti_missile: 320,
         anti_missile_mounts: [(-8.64, 0, 15.12), (-21.96, 0, 6)],
         economy: (energy_upkeep: 60),
-        motion: (layer: Naval, size: 3, speed: 22, accel: 8, turn: 34),
+        motion: (layer: Naval, size: 3, speed: 28, accel: 10, turn: 34),
         weapons: [
             // A vertical array forward of the bridge: sixteen cells rippled off in one
             // volley, each missile straight up and arcing over onto its mark. Its reach sits
@@ -266,7 +266,7 @@
         cost: (mass: 880, energy: 6160, time: 2900),
         radius: 20, height: 10,
         vision: 400, radar: 1200,
-        motion: (layer: Naval, size: 3, speed: 20, accel: 7, turn: 30),
+        motion: (layer: Naval, size: 3, speed: 25, accel: 9, turn: 30),
         // Eight cells on the deck canted 15 degrees forward. Each missile boosts up out of
         // its cell, arcs over with its wings unfolding and glides down to run in under
         // 25 m over ground and water, so only close-in AA gets a shot, late. One whose
@@ -295,7 +295,7 @@
         radius: 14, height: 4.2,
         vision: 550, sonar: 1300,
         dive: (depth: 3, time: 2.5),
-        motion: (layer: Naval, size: 2, speed: 32, accel: 14, turn: 60),
+        motion: (layer: Naval, size: 2, speed: 40, accel: 18, turn: 60),
         weapons: [
             // Six bow tubes in two banks.
             (
@@ -328,7 +328,7 @@
         cost: (mass: 700, energy: 4900, time: 2400),
         radius: 16, height: 12,
         vision: 380,
-        motion: (layer: Naval, size: 2, speed: 22, accel: 8, turn: 40),
+        motion: (layer: Naval, size: 2, speed: 28, accel: 10, turn: 40),
         // A dome over the ships around it. Shells and missiles break on it; torpedoes run
         // under its skirt. It draws energy like every shield.
         economy: (energy_upkeep: 180),
@@ -349,7 +349,7 @@
         vision: 1440,
         // Engaged and stopped, it lays its beam to the mark, a little forward of square, so
         // every battery bears.
-        motion: (layer: Naval, size: 5, speed: 15, accel: 4, turn: 18, broadside: 75),
+        motion: (layer: Naval, size: 5, speed: 19, accel: 5, turn: 18, broadside: 75),
         // Three triple turrets, each a house of its own: two forward, one astern, each
         // carrying three Arc Cannons (the Trebuchet's Arc Howitzer made a naval gun, laid
         // flatter): a long charge, then great rounds of blue plasma on a shallow arc that
@@ -456,7 +456,7 @@
         anti_missile: 350,
         anti_missile_mounts: [(-20.0, -13.3, 16.75), (36.0, 15.4, 9.1), (36.0, -15.4, 9.1), (-54.0, 16.1, 9.1)],
         economy: (energy_upkeep: 120),
-        motion: (layer: Naval, size: 5, speed: 17, accel: 4, turn: 18),
+        motion: (layer: Naval, size: 5, speed: 21, accel: 5, turn: 18),
         // The fleet's long arm against air: a Skyguard's reach afloat (a little short of the
         // fixed site's), no gun of any kind. Twelve hatched cells in two blocks on the
         // island's plinth, fore block first; a salvo spreads over the aircraft in range.
@@ -500,7 +500,7 @@
         radius: 30, height: 5,
         vision: 650, sonar: 2000,
         dive: (depth: 4, time: 4),
-        motion: (layer: Naval, size: 3, speed: 24, accel: 10, turn: 40),
+        motion: (layer: Naval, size: 3, speed: 30, accel: 12, turn: 40),
         weapons: [
             // Eight bow tubes.
             (
@@ -541,7 +541,7 @@
         cost: (mass: 3800, energy: 34200, time: 11500),
         radius: 84, height: 34,
         vision: 1200,
-        motion: (layer: Naval, size: 5, speed: 18, accel: 4, turn: 20),
+        motion: (layer: Naval, size: 5, speed: 22, accel: 5, turn: 20),
         weapons: [
             (
                 name: "Zenith Rail Cannon",
