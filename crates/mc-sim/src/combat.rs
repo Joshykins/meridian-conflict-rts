@@ -1058,12 +1058,16 @@ impl World {
             }
         }
         let mut mark = self.weapon_mark(row, w, weapon);
+        // A ship spooling its warp drive is turning onto the jump (`step_spool`): its hull is
+        // the drive's, and no gun may turn it off the mark, or the nose never lines up and
+        // the jump never goes. Turrets keep firing.
+        let spooling = self.state.units.warp[row].phase == WarpPhase::Spool;
         // A mark in a spinal gun's dead zone, too far in under the hull to dive onto, is
         // not its to take: the hull stays level and the turrets have it. Nor is any mark
-        // while the ship is set down: the hull cannot turn or pitch on the ground.
+        // while the ship is set down or spooling: the hull cannot turn or pitch for it.
         if spinal_gun(bp.unit(self.state.units.blueprint[row]), w, weapon) {
             let from = self.state.units.pos[row].extend(self.state.units.z[row]);
-            let grounded = self.grounded_hull(row);
+            let grounded = self.grounded_hull(row) || spooling;
             mark = mark.filter(|t| {
                 !grounded && spinal_bears(from, weapon.muzzle.z, t.pos.extend(t.z + t.height / 2))
             });
@@ -1486,7 +1490,7 @@ impl World {
             true
         } else if weapon.turret_turn == 0 {
             // Hull-mounted: the unit turns itself when it is not driving somewhere.
-            if units.flags[row] & flag::MOVING == 0 {
+            if units.flags[row] & flag::MOVING == 0 && !spooling {
                 if let Some(m) = bp.unit(units.blueprint[row]).motion {
                     units.heading[row] = units.heading[row].turn_toward(bearing, m.turn_rate);
                 }
@@ -1538,7 +1542,11 @@ impl World {
                 // A ship that fights broadside on (`Motion::broadside`) lays its beam to the
                 // mark instead, on whichever side is nearer, so every battery bears.
                 // A land unit with an `aim_arc` turns its body the same way.
-                if (naval || body_arc < 0x8000) && w == 0 && units.flags[row] & flag::MOVING == 0 {
+                if (naval || body_arc < 0x8000)
+                    && w == 0
+                    && units.flags[row] & flag::MOVING == 0
+                    && !spooling
+                {
                     if let Some(m) = bp.unit(units.blueprint[row]).motion {
                         if m.broadside.0 > 0 {
                             let to = (t.pos - pos).angle();

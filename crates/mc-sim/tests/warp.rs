@@ -454,3 +454,15 @@ fn the_interface_hears_how_long_the_drive_recharges_and_the_stun_lasts() {
     let (_, stunned) = listed(&w);
     assert!((stunned - 18.0).abs() < 0.01, "stunned for {stunned} s");
 }
+
+#[test]
+fn a_ship_in_a_fight_still_turns_onto_its_jump_and_goes() {
+    // Its guns lay the hull on an enemy abeam; the jump is due north. The hull is the
+    // drive's while it charges, so the fight must not hold the nose off the mark.
+    let mut w = world();
+    let ship = add(&mut w, FRIGATE, 0, 3000, 3000);
+    add(&mut w, FRIGATE, 1, 4200, 3000);
+    run(&mut w, seconds(10));
+    warp(&mut w, ship, 3000, 9000);
+    until(&mut w, ship, WarpPhase::Transit, seconds(30)).expect("it never jumped");
+}
