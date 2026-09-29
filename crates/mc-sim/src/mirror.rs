@@ -1204,6 +1204,8 @@ pub struct RenderFrame {
     pub warps: Vec<WarpView>,
     /// Warp dampeners the viewer knows of, and their fields.
     pub dampers: Vec<DamperView>,
+    /// Each side's stores as the storage structures' lamps last judged them.
+    pub stores: crate::store_lights::StoreWatch,
 }
 
 /// A capital ship in a jump (`crate::warp`), for the effects, the sound and the interface.
@@ -1985,6 +1987,8 @@ impl World {
                 u.status[2] = at + 1;
             }
         }
+        // Storage structures show their side's store (`store_lights`).
+        self.write_store_lights(viewer, frame);
 
         frame.projectiles.clear();
         frame.flights.clear();
