@@ -1,7 +1,7 @@
 //! The tower from the foundation to the head house: an armoured octagonal foot, a
 //! tapering octagonal shaft braced by four sculpted fins on its diagonals, dark inset
-//! panels with light slits, flow channels glazed into its faces, and the armoured crown
-//! (the head house) the head turns on. Symmetric about both axes but for the channels.
+//! panels, a flow channel glazed into each face, and the armoured crown (the head house)
+//! the head turns on. Symmetric about both axes.
 
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
@@ -47,8 +47,8 @@ pub(super) fn coarse(b: &mut MeshBuilder) {
     );
 }
 
-pub(super) fn body(b: &mut MeshBuilder, flow: &[u8]) {
-    spire(b, flow);
+pub(super) fn body(b: &mut MeshBuilder) {
+    spire(b);
     crown(b);
 }
 
@@ -59,8 +59,8 @@ fn faces(b: &mut MeshBuilder, quarters: &[u8], f: impl Fn(&mut MeshBuilder)) {
     }
 }
 
-/// The spire, its flow channels glazed into the faces at the quarter turns `flow`.
-fn spire(b: &mut MeshBuilder, flow: &[u8]) {
+/// The spire, a flow channel glazed into each face.
+fn spire(b: &mut MeshBuilder) {
     // The armoured foot on the foundation: sloped faces stepping in to a shoulder.
     b.paint(PLATING);
     b.with_bevel(0.2, |b| {
@@ -134,34 +134,9 @@ fn spire(b: &mut MeshBuilder, flow: &[u8]) {
         );
     });
     let (z0, z1) = (FOOT + 2.0, CAP - 2.5);
-    let plain: Vec<u8> = (0..4).filter(|q| !flow.contains(q)).collect();
-    // Tall dark panels up the faces with no channel, a light slit at each head.
-    faces(b, &plain, |b| {
-        panel(b, z0, z1);
-        if b.mid() {
-            b.paint(GLOW);
-            b.beam(
-                v3(spire_half(z1 + 0.4) + 0.05, 0.0, z1 + 0.4),
-                v3(spire_half(z1 + 0.7) + 0.05, 0.0, z1 + 0.7),
-                Vec2::new(2.4, 0.12),
-                Vec2::new(2.4, 0.12),
-            );
-        }
-        if b.fine() {
-            b.paint(ACCENT);
-            for z in [12.0, 16.0, 20.0] {
-                b.beam(
-                    v3(spire_half(z) + 0.1, 0.0, z),
-                    v3(spire_half(z + 0.4) + 0.1, 0.0, z + 0.4),
-                    Vec2::new(3.0, 0.12),
-                    Vec2::new(3.0, 0.12),
-                );
-            }
-        }
-    });
-    // The flow channels: glazed down the middle of a dark panel from the crown to the
-    // foot's shoulder, framed in steel.
-    faces(b, flow, |b| {
+    // The flow channels: glazed down the middle of a dark panel on each face, from the
+    // crown to the foot's shoulder, framed in steel.
+    faces(b, &[0, 1, 2, 3], |b| {
         panel(b, z0, z1);
         let (z0, z1) = (FOOT - 0.2, CAP + 0.2);
         b.paint(ACCENT).pattern(pattern::MASS_FLOW);

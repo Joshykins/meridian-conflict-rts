@@ -168,14 +168,7 @@ pub(super) const MODELS: &[ModelDef] = &[
         structures::radar,
     ),
     // The reclaim tower (a 3x3 lot), its head on the rig `reclaim_tower::PIVOT_Z`, `EMIT_X`.
-    // Flow channels on the flanks, or on all four faces (`~four`): open to the user
-    // (CLAUDE.md section 9).
     ModelDef::tiered("reclaim_tower", RECLAIM_TOWER, reclaim_tower::tower),
-    ModelDef::tiered(
-        "reclaim_tower~four",
-        RECLAIM_TOWER,
-        reclaim_tower::tower_four,
-    ),
     ModelDef::tiered(
         "shield",
         [(16.5, 40.0), (16.5, 40.0), (16.5, 52.0)],

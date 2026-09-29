@@ -1,14 +1,17 @@
-//! The foundation the tower stands on and the works round it: mirrored side for side,
-//! but for the control tower on the centre line behind. Each upgrade builds onto the
-//! last (the tower stays as tall; see the module docs).
+//! The foundation the tower stands on and the works round it: mirrored front to back.
+//! The right side as placed (+y) is the control tower's, the left (-y) the tanks'. Each
+//! upgrade builds onto the last (the tower stays as tall; see the module docs).
 //! - Tech 1: a two-step foundation with steps up its front and a lit kerb, the control
-//!   tower behind bridged to the shaft, and a material tank on each back corner fed by a
-//!   conduit off the flow channel on its side.
-//! - Tech 2: a refinery on each front corner piped to the foot, a collar round the shaft.
-//! - Tech 3: a capacitor stack on each flank of the foundation, armour plates on the
+//!   tower on the right bridged to the shaft, and a material tank on each left corner
+//!   fed by a conduit off the flow channel on the face nearest it.
+//! - Tech 2: a refinery on each right corner either side of the control tower, piped to
+//!   the foot, and a collar round the shaft.
+//! - Tech 3: a capacitor stack on the left between the tanks, armour plates on the
 //!   foot's flanks, conduits from the tanks up to the crown, obstruction lamps.
 
-use glam::{Vec2, Vec3};
+use std::f32::consts::{FRAC_PI_2, PI};
+
+use glam::{Affine3A, Vec2, Vec3};
 
 use super::super::parts::*;
 use super::super::structures::kit;
@@ -101,19 +104,21 @@ pub(super) fn foundation(b: &mut MeshBuilder) {
         });
         team_panel(b, v3(PLINTH - 2.2, 0.0, BASE), Vec2::new(2.0, 4.4));
     }
-    control_tower(b);
-    b.mirror_y(|b| {
+    // The control tower on the right as placed (+y); a tank on each corner of the left,
+    // each fed off the channel down the face nearest it (front or back).
+    b.yawed(Vec3::ZERO, -FRAC_PI_2, control_tower);
+    left_corners(b, |b| {
         tank(b, Vec2::new(-CORNER, CORNER));
         // The conduit off the flow channel on this side: out from the face, then back
         // along the flank over the plinth to the tank's top, on a stanchion.
         let from = v3(0.0, spire_half(10.0) + 0.3, 10.0);
-        let bend = v3(-1.5, CORNER - 0.6, 11.2);
+        let bend = v3(-3.8, CORNER - 0.6, 11.2);
         let to = v3(-CORNER + 0.8, CORNER - 0.6, TANK_TOP + 0.5);
         chute(b, from, bend, 0.6);
         chute(b, bend, to, 0.6);
         b.paint(METAL);
         b.beam(
-            v3(-1.5, CORNER - 0.6, STEP),
+            v3(-3.8, CORNER - 0.6, STEP),
             bend - Vec3::Z * 0.6,
             Vec2::splat(0.5),
             Vec2::splat(0.45),
@@ -124,16 +129,16 @@ pub(super) fn foundation(b: &mut MeshBuilder) {
 /// The upgrades' works, each on its tier's kit.
 pub(super) fn tiers(b: &mut MeshBuilder, tech: u8) {
     kit(b, tech, 2, 0.3, |b| {
-        b.mirror_y(|b| refinery(b, Vec2::new(CORNER, CORNER)));
+        mirror_x(b, |b| refinery(b, Vec2::new(CORNER, CORNER)));
     });
     kit(b, tech, 2, 0.6, collar);
     kit(b, tech, 3, 0.35, |b| {
-        b.mirror_y(capacitors);
+        b.yawed(Vec3::ZERO, PI, capacitors);
         foot_armour(b);
     });
     kit(b, tech, 3, 0.7, |b| {
-        // Conduits from the tanks' tops up to the crown's back corners.
-        b.mirror_y(|b| {
+        // Conduits from the tanks' tops up to the crown's corners over them.
+        left_corners(b, |b| {
             let top = v3(-CORNER, CORNER, TANK_TOP + 0.6);
             let bend = v3(-9.0, 7.4, 18.0);
             chute(b, top, bend, 0.6);
@@ -151,8 +156,21 @@ pub(super) fn tiers(b: &mut MeshBuilder, tech: u8) {
     });
 }
 
-/// The control tower on the centre line behind the spire: a plated column, a glazed
-/// cab on it with a sensor dome and a mast, a bridge from the cab to the shaft.
+/// Emits `f` twice: as written, and mirrored front to back (x negated).
+fn mirror_x(b: &mut MeshBuilder, f: impl Fn(&mut MeshBuilder)) {
+    f(b);
+    b.with(Affine3A::from_scale(Vec3::new(-1.0, 1.0, 1.0)), |b| f(b));
+}
+
+/// Emits `f`, written for the back corner on +y fed from the +y face, on both corners of
+/// the left (-y) side instead, each fed from the face nearest it.
+fn left_corners(b: &mut MeshBuilder, f: impl Fn(&mut MeshBuilder)) {
+    mirror_x(b, |b| b.yawed(Vec3::ZERO, FRAC_PI_2, |b| f(b)));
+}
+
+/// The control tower, built on the centre line behind the spire (-x) and turned to its
+/// right side: a plated column, a glazed cab on it with a sensor dome and a mast, a
+/// bridge from the cab to the shaft.
 fn control_tower(b: &mut MeshBuilder) {
     b.at(v3(CONTROL_X, 0.0, 0.0), |b| {
         b.paint(PLATING);
@@ -324,8 +342,8 @@ fn collar(b: &mut MeshBuilder) {
     }
 }
 
-/// Tech 3: a capacitor stack on the +y flank of the lower step: an armoured block, three
-/// cells with lit caps, cabled into the plinth.
+/// Tech 3: a capacitor stack, built on the +y flank of the lower step and turned to the
+/// left: an armoured block, three cells with lit caps, cabled into the plinth.
 fn capacitors(b: &mut MeshBuilder) {
     let at = v3(0.0, 13.7, STEP);
     b.at(at, |b| {

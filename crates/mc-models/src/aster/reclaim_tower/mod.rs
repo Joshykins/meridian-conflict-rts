@@ -12,8 +12,10 @@
 //! - The tower is as tall at every tier. Like the core mine, each tier builds onto the
 //!   last (see [`works`]); the barrel gains a cooling jacket at tech 2 and induction
 //!   rings and rails at tech 3. Never spikes or glow for menace.
-//! - It is symmetric side for side: flow channels on both flanks, a tank behind each,
-//!   and only the control tower, on the centre line behind, stands alone.
+//! - It is symmetric front to back: a flow channel down every face, and only the
+//!   control tower stands alone, on its +y side, which is the player's right as it is
+//!   placed (structures face south, `UnitBlueprint::build_heading`, and the camera
+//!   starts looking north).
 //! - It stands on a two-step foundation kept clean: the model's dust line holds the
 //!   footing's dirt to the foundation's foot (`MeshBuilder::set_dust_line`).
 //! - Glazed channels wear `pattern::MASS_FLOW`: dark glazing, and a stream of glowing
@@ -59,18 +61,7 @@ const FOOT: f32 = 7.5;
 #[cfg(test)]
 pub(crate) const TRIANGLES: usize = 7500;
 
-/// The tower with flow channels on both flanks.
 pub(super) fn tower(b: &mut MeshBuilder, tech: u8) {
-    build(b, tech, &[1, 3]);
-}
-
-/// The tower with flow channels on all four faces.
-pub(super) fn tower_four(b: &mut MeshBuilder, tech: u8) {
-    build(b, tech, &[0, 1, 2, 3]);
-}
-
-/// The tower with its flow channels on the faces at these quarter turns (0 = front).
-fn build(b: &mut MeshBuilder, tech: u8, flow: &[u8]) {
     let tech = tech.clamp(1, 3);
     b.set_dust_line(0.5);
     if b.coarse() {
@@ -79,7 +70,7 @@ fn build(b: &mut MeshBuilder, tech: u8, flow: &[u8]) {
         turret::turret(b, tech);
         return;
     }
-    body::body(b, flow);
+    body::body(b);
     works::foundation(b);
     turret::turret(b, tech);
     works::tiers(b, tech);
