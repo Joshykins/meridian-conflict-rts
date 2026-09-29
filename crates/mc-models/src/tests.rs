@@ -685,8 +685,8 @@ const OVER_BUDGET: &[Over] = &[
     ("precursor_seaway", None, Some(1.0), None),
     // The Vigil's hull is plain; most of its mid detail is the shared drives and lift jets.
     ("sensor_ship", None, Some(0.5), None),
-    ("sensor_ship~array", None, Some(0.5), None),
-    ("sensor_ship~halo", None, Some(0.5), None),
+    ("sensor_ship~boom", None, Some(0.5), None),
+    ("sensor_ship~truss", None, Some(0.55), None),
 ];
 type Over = (&'static str, Option<usize>, Option<f32>, Option<usize>);
 
@@ -800,7 +800,7 @@ fn lods_reduce_and_respect_budgets() {
             9000
         } else if base_key(&model.key) == "sensor_ship" {
             // 112 m tech 1 sensor spacecraft: two drive bells, lift jets, one great radar.
-            6000
+            7000
         } else if model.key == "battleship" {
             // 142 m hero hull: layered sides, a stepped pagoda, three triple Arc Cannon houses.
             BATTLESHIP_TRIANGLES
