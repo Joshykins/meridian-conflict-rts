@@ -22,6 +22,10 @@
 //!   the ground and settle on the pad (beams seen through the air at night), amber
 //!   beacons while the ramp moves, the hold lit down the open ramp.
 //!
+//! - Stunned by an EMP (`UnitInstance::stun`): drives, lift jets and lamps are dead; as
+//!   the stun wears off they stutter back, lit or out a tick at a time, lit more often
+//!   the nearer it is to over (`systems_up`).
+//!
 //! Emitters are capped per ship per tick (about 80 puffs low over the ground, 50 more
 //! on the touchdown or lift-off tick; a dozen lights), and ships far from the camera
 //! draw only the plumes and lamps.
@@ -117,7 +121,7 @@ struct Lamps {
 
 /// Below this height (m) the landing lights are on.
 const FLOODS_ON: f32 = 250.0;
-const PUFF_LAMP: f32 = 32.0;
+pub(super) const PUFF_LAMP: f32 = 32.0;
 const PUFF_LAMP_CONE: f32 = 33.0;
 /// Seconds from one strobe double-flash to the next (puffs.wgsl `lamp_flare` agrees).
 const STROBE_PERIOD: f32 = 1.3;
@@ -172,8 +176,9 @@ impl Renderer {
         let from = Vec3::from(u.prev_pos);
         let to = Vec3::from(u.pos);
         let travel = to - from;
-        if travel.length() > 60.0 {
-            // A jump (spawned, or the view restaged): nothing to go on this tick.
+        if travel.length() > 60.0 || u.in_warp() {
+            // A jump (spawned, warped, or the view restaged), or out of the world in warp:
+            // nothing to go on this tick.
             self.capital_fx.ships.remove(&u.unit_id);
             return;
         }
@@ -212,7 +217,11 @@ impl Renderer {
         let climb = vel.z;
         let push = (speed / kit.cruise * 0.75 + accel / 9.0 * 0.55 + climb.abs() / 30.0 * 0.25)
             .clamp(0.0, 1.0);
-        let burn_goal = if !landed {
+        // Stunned, its systems are down, or stuttering back up.
+        let up = systems_up(u.stun(1.0), self.scatter.unit());
+        let burn_goal = if !up {
+            0.0
+        } else if !landed {
             1.0
         } else if spool > 0.0 {
             0.25 + 0.5 * spool
@@ -220,7 +229,9 @@ impl Renderer {
             0.0
         };
         let closeness = (1.0 - (height - 40.0 * k) / ((JET_REACH - 40.0) * k)).clamp(0.0, 1.0);
-        let lift_goal = if landed {
+        let lift_goal = if !up {
+            0.0
+        } else if landed {
             if spool > 0.0 {
                 0.35 + 0.65 * spool
             } else {
@@ -235,9 +246,10 @@ impl Renderer {
             ship.lift = lift_goal;
             ship.throttle = push;
         } else {
-            // Light fast, wind down over a couple of seconds.
-            ship.burn = approach(ship.burn, burn_goal, 0.5, 0.07);
-            ship.lift = approach(ship.lift, lift_goal, 0.45, 0.09);
+            // Light fast, wind down over a couple of seconds; a stun cuts them at once.
+            let cut: f32 = if up { 1.0 } else { 7.0 };
+            ship.burn = approach(ship.burn, burn_goal, 0.5, (0.07 * cut).min(1.0));
+            ship.lift = approach(ship.lift, lift_goal, 0.45, (0.09 * cut).min(1.0));
             ship.throttle = approach(ship.throttle, push, 0.3, 0.12);
         }
         let (burn, lift, throttle) = (ship.burn, ship.lift, ship.throttle);
@@ -261,7 +273,7 @@ impl Renderer {
         };
         let (f0, f1) = (frame(0.0), frame(1.0));
         let near = to.truncate().distance(focus) < 4000.0;
-        ship.lamps = kit.lamps.map(|fittings| Lamps {
+        ship.lamps = kit.lamps.filter(|_| up).map(|fittings| Lamps {
             frame: [f0, f1],
             height,
             surface,
@@ -902,6 +914,13 @@ fn flood_aim(f: &Frame, i: usize, n: usize, height: f32, time: f32, seed: f32) -
 /// How far a light at `pos` aimed along `aim` reaches before the ground stops it.
 fn flood_reach(pos: Vec3, aim: Vec3, surface: f32) -> f32 {
     ((pos.z - surface) / (-aim.z).max(0.2)).clamp(5.0, 450.0)
+}
+
+/// Whether a ship stunned `stun` (0 to 1) has its drives and lamps this tick: not while
+/// the stun holds, and as it wears off, by chance (`roll`, 0 to 1), more often the nearer
+/// it is to over.
+fn systems_up(stun: f32, roll: f32) -> bool {
+    stun <= 0.0 || (stun < 0.999 && roll > stun * 0.9 + 0.05)
 }
 
 /// Whether the strobes are lit at `time`: a double flash every `STROBE_PERIOD`.

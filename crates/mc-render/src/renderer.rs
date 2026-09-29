@@ -39,6 +39,7 @@ mod bolt_rifle_fx;
 mod bore_fx;
 mod capital_fx;
 mod capture;
+mod damper_fx;
 pub use capture::Shot;
 mod clearing;
 mod craters;
@@ -68,6 +69,7 @@ mod quality;
 mod rail_fx;
 mod shafts;
 mod stake_fx;
+mod stun_fx;
 mod survival_fx;
 mod trail_fx;
 mod tree_wind;
@@ -806,6 +808,8 @@ pub struct Renderer {
     naga_mine_fx: naga_mine_fx::NagaMineFx,
     giant_fx: titan_fx::GiantFx,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
+    /// EMP stuns and warp dampeners in the world (stun_fx.rs, damper_fx.rs).
+    emp_fx: stun_fx::EmpFx,
     /// The great guns' shots, trails and hits (renderer/great_gun_fx.rs).
     great_gun: great_gun_fx::GreatGunFx,
     nuke_fx: nuke_fx::NukeFx,
@@ -2284,6 +2288,7 @@ impl Renderer {
             naga_mine_fx: naga_mine_fx::NagaMineFx::new(excavations),
             giant_fx: titan_fx::GiantFx::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
+            emp_fx: stun_fx::EmpFx::default(),
             great_gun: great_gun_fx::GreatGunFx::default(),
             nuke_fx: nuke_fx::NukeFx::default(),
             craters,
@@ -3168,6 +3173,7 @@ impl Renderer {
         self.arc_howitzer_tick(units, &frame.houses, time);
         self.write_bore_strokes(time);
         self.heavy_rail_tick(units, &frame.houses, projectiles, time);
+        self.emp_tick(frame, units, time, camera);
         self.great_gun_tick(projectiles, time);
         self.missile_trails(projectiles, time, camera);
         self.nuke_tick(frame, time, camera);
@@ -3413,6 +3419,7 @@ impl Renderer {
         }
         self.capital_lights(time, alpha);
         self.heavy_rail_lights(time);
+        self.emp_lights(time);
         self.bolt_rifle_lights(time);
         self.arc_howitzer_lights(time);
         let dark = self.sky.darkness();

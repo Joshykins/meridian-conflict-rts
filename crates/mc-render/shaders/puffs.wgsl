@@ -61,7 +61,7 @@ const PUFF_STRATEGIC_TRAIL: u32 = 34u;
 // dark blue-grey pall that thins.
 const PUFF_ARC_BALL: u32 = 35u;
 // retired: 36 (storm thunderhead)
-// PUFF_SHRAPNEL (37) and PUFF_FLAK (39) are generated from gpu_consts.rs.
+// PUFF_SHRAPNEL (37), PUFF_FLAK (39) and PUFF_VEIL (50) are generated from gpu_consts.rs.
 // A faint, solid ribbon following a bomb, separate from the airy aircraft cloud.
 const PUFF_BOMB_TRAIL: u32 = 12u;
 // retired: 13 (splinter)
@@ -365,6 +365,18 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         // dense center into a flat-bottomed dot.
         pos.z = max(pos.z, terrain_height(pos.xy) + size * 0.18);
     }
+    if kind == PUFF_VEIL {
+        // A warp dampener's field edge (renderer/damper_fx.rs): an upright curtain on
+        // the ground (or the sea) along its run, `size` tall, sunk a little at its foot.
+        let foot = p.pos + p.vel * (corner.x * 0.5);
+        let ground = max(terrain_height(foot.xy), globals.map.z);
+        let world = vec3<f32>(foot.xy, ground + (corner.y * 0.5 + 0.5) * size * 1.1 - size * 0.1);
+        out.clip = globals.view_proj * vec4<f32>(world, 1.0);
+        out.uv = corner;
+        out.world = world;
+        out.state = vec3<f32>(age, p.params.z, p.params.w);
+        return out;
+    }
     if kind == PUFF_ION || kind == PUFF_THRUST || kind == PUFF_LAMP_CONE {
         // A nozzle-anchored ribbon, entirely aft of the socket. vel stores axis *
         // length. World-space corners retain their real depth against the nacelle.
@@ -659,7 +671,7 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     let d = length(in.uv);
     let age = in.state.x;
     let kind = u32(in.state.y);
-    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && d > 1.0 {
+    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && kind != PUFF_VEIL && d > 1.0 {
         discard;
     }
     let eye = globals.camera.xyz;
@@ -738,6 +750,9 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     }
     if kind == PUFF_LAMP_CONE {
         return lamp_cone(in);
+    }
+    if kind == PUFF_VEIL {
+        return damper_veil(in);
     }
     if kind == PUFF_SHRAPNEL {
         // Hot metal, not light: a white-hot core that cools through orange to a dull
@@ -1247,6 +1262,24 @@ fn water_bead(in: PuffOut, d: f32) -> vec4<f32> {
     let body = 1.0 - smoothstep(0.3, 1.0, d + (n - 0.5) * 0.7);
     let alpha = clamp(body * 0.85 * (1.0 - smoothstep(0.7, 1.0, age)), 0.0, 1.0);
     return vec4<f32>(sea_white(in.world, in.uv.y * 0.5 + 0.5) * alpha, alpha);
+}
+
+// A warp dampener's field edge: faint light brightest at its foot, in slow upright streaks
+// drifting round the ring, swelling in and out over its life (sin squared, so two
+// generations laid half a life apart add to a steady glow) and fading at its ends
+// (neighbours overlap). Pure light: nothing it covers is hidden.
+fn damper_veil(in: PuffOut) -> vec4<f32> {
+    let age = in.state.x;
+    let h = in.uv.y * 0.5 + 0.5;
+    let swell = sin(3.14159265 * age);
+    let ends = 1.0 - smoothstep(0.6, 1.0, abs(in.uv.x));
+    let t = globals.camera.w;
+    let run = in.world.x * 0.9 + in.world.y * 1.1;
+    let streak = 0.5 + 0.5 * sin(run * 0.045 + t * 0.7 + h * 1.5)
+        * sin(run * 0.013 - t * 0.31 + in.state.z * 6.0);
+    let foot = exp(-h * 3.2) * (1.0 - smoothstep(0.85, 1.0, h));
+    let rgb = in.appearance.xyz * in.appearance.w * foot * (0.45 + 0.55 * streak) * swell * swell * ends;
+    return vec4<f32>(apply_fog_of_war(rgb, in.world.xy), 0.0);
 }
 
 @fragment
