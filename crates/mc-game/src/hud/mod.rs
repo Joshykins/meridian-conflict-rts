@@ -20,6 +20,7 @@ pub mod icons;
 mod issue_mark;
 pub use issue_mark::IssueMark;
 mod mine;
+mod mine_coast;
 mod mine_marks;
 mod minimap;
 mod net_cards;
@@ -307,8 +308,8 @@ pub struct Hud {
     refit_prompt: Option<refit::Prompt>,
     /// Open the construction panel on its upgrade/refit tab next frame.
     want_refit_tab: bool,
-    /// The map's ore fields, counted for the mine placement preview; built on first use.
-    ore: Option<mc_sim::mines::OreGrid>,
+    /// The map counted for the mine survey, and each mine's coast; built on first use.
+    survey: mine_coast::Survey,
     /// Observing: every commander's income and army over the last minutes.
     observed: observer::History,
     /// Launch warnings and what came of them (`silo::alerts`).
@@ -501,7 +502,7 @@ impl Hud {
         }
         self.net_news(ui, s);
         // The mine survey lies on the world, under every panel.
-        mine_marks(ui, s, &mut self.ore);
+        mine_marks(ui, s, &mut self.survey);
         if !view.observing && !self.free.on {
             groups::badges(ui, s);
         }

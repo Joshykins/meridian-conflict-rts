@@ -463,3 +463,37 @@ fn a_mason_iii_builds_a_deep_core_outright() {
         "and digs as a mine"
     );
 }
+
+#[test]
+fn a_mine_on_the_coast_wraps_round_it_for_the_land_an_inland_one_has() {
+    use mc_sim::mines::OreGrid;
+    // Land west of x = 2000, sea east of it.
+    let grid = OreGrid::new(&[], FxVec2::from_ints(4096, 4096), |p| {
+        p.x < Fx::from_int(2000)
+    });
+    let reach = Fx::from_int(500);
+    let at = |x: i32| FxVec2::from_ints(x, 2048);
+    let inland = grid.coastal_reach(at(1000), reach);
+    assert_eq!(inland, reach, "inland, the reach is the blueprint's");
+    assert_eq!(
+        grid.coastal_reach(at(3000), reach),
+        reach,
+        "so it is out at sea"
+    );
+    let shore = grid.coastal_reach(at(1950), reach);
+    assert!(
+        shore > reach && shore <= reach * Fx::ratio(8, 5),
+        "on the shore it reaches {}",
+        shore.to_f64()
+    );
+    // Short of the cap, it holds as much land as the inland mine.
+    let land = |x: i32, r: Fx| grid.share(at(x), r, &[]).ground.to_f64();
+    let (a, b) = (
+        land(1000, inland),
+        land(1600, grid.coastal_reach(at(1600), reach)),
+    );
+    assert!(
+        (a - b).abs() < a * 0.05,
+        "inland {a:.1} ha, near the coast {b:.1} ha"
+    );
+}
