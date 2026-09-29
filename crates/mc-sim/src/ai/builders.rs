@@ -451,6 +451,48 @@ impl World {
                 return Some(job);
             }
         }
+        // One watchtower first: it is cheap, and power always short of the
+        // side's whole draw kept it from ever going up.
+        if planned.radars.is_empty()
+            && planned.power >= 2
+            && (planned.pd >= 1 || census.extractors.len() >= FIRST_MINES)
+        {
+            let near = offset_toward(start, front, Fx::from_int(140))
+                + FxVec2::from_angle(facing + Angle::QUARTER_TURN) * Fx::from_int(72);
+            if allow(near) {
+                return self.job_structure(
+                    row,
+                    cat::INTEL,
+                    1,
+                    near,
+                    facing,
+                    Fx::from_int(20),
+                    true,
+                );
+            }
+        }
+        // Ahead of the stall, not in it: power for what every factory and
+        // builder would draw at work, not only for what they ask for now,
+        // and before far mines and turrets: behind them, the side
+        // ran out of energy a tenth of the game.
+        if !leave_power
+            && (planned.power < want_power
+                || energy_income < mass_income * skill.power_ratio
+                || energy_income < census.energy_need)
+        {
+            // The AI pays power first in a stall (`direct_focus`), so a short side
+            // still builds the biggest plant it can.
+            let ptech = if mass_income >= Fx::from_int(22) && tech >= 3 {
+                3
+            } else if mass_income >= Fx::from_int(10) && tech >= 2 {
+                2
+            } else {
+                1
+            };
+            if let Some(job) = power_job(ptech) {
+                return Some(job);
+            }
+        }
         // A wreck field near home pays a cheap tower back in well under a minute.
         if !far && !energy_short {
             if let Some(job) = self.salvage_job(row, planned, &allow) {
@@ -543,43 +585,6 @@ impl World {
                     Fx::from_int(18),
                     false,
                 );
-            }
-        }
-        if planned.radars.is_empty()
-            && planned.power >= 2
-            && (planned.pd >= 1 || census.extractors.len() >= FIRST_MINES)
-        {
-            let near = offset_toward(start, front, Fx::from_int(140))
-                + FxVec2::from_angle(facing + Angle::QUARTER_TURN) * Fx::from_int(72);
-            if allow(near) {
-                return self.job_structure(
-                    row,
-                    cat::INTEL,
-                    1,
-                    near,
-                    facing,
-                    Fx::from_int(20),
-                    true,
-                );
-            }
-        }
-        // Ahead of the stall, not in it: power for what every factory and
-        // builder would draw at work, not only for what they ask for now.
-        if !leave_power
-            && (planned.power < want_power
-                || energy_income < mass_income * skill.power_ratio
-                || energy_income < census.energy_need * Fx::ratio(9, 10))
-        {
-            // Power is paid first in a stall, so a short side still builds the biggest plant it can.
-            let ptech = if mass_income >= Fx::from_int(22) && tech >= 3 {
-                3
-            } else if mass_income >= Fx::from_int(10) && tech >= 2 {
-                2
-            } else {
-                1
-            };
-            if let Some(job) = power_job(ptech) {
-                return Some(job);
             }
         }
         if let Some(job) = factory_job() {

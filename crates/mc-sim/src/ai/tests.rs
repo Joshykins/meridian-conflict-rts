@@ -1,4 +1,5 @@
 use super::*;
+use crate::focus::Priority;
 use crate::world::MapData;
 use crate::{MatchConfig, PlayerSetup};
 use mc_data::{Blueprints, MoveLayer};
@@ -584,14 +585,19 @@ fn mine_upgrades_go_to_the_mine_that_pays_back_soonest() {
         Some(alone)
     );
 
-    // With the lone mine taken, a crowded one pays back too slowly, unless
-    // materials pile up with nothing better to spend them on.
+    // With the lone mine taken, a crowded one pays back too slowly for Normal,
+    // unless materials go spare with nothing better to spend them on. Hard
+    // waits longer for its payback.
     census.extractors.retain(|&r| r != alone);
-    w.state.ai[0].config.difficulty = Difficulty::Hard;
+    w.state.ai[0].config.difficulty = Difficulty::Normal;
     assert_eq!(w.mine_to_upgrade(0, &census, false).map(|(r, _)| r), None);
     assert!(crowded.contains(&w.mine_to_upgrade(0, &census, true).map(|(r, _)| r).unwrap()));
-    w.state.ai[0].config.difficulty = Difficulty::Easy;
-    assert_eq!(w.mine_to_upgrade(0, &census, true).map(|(r, _)| r), None);
+    w.state.ai[0].config.difficulty = Difficulty::Hard;
+    assert!(crowded.contains(
+        &w.mine_to_upgrade(0, &census, false)
+            .map(|(r, _)| r)
+            .unwrap()
+    ));
 }
 
 #[test]
@@ -1314,4 +1320,57 @@ fn a_watchtower_or_scavenger_a_builder_walks_to_counts_as_planned() {
     let planned = w.plan_counts(0, &census);
     assert_eq!(planned.radars.len(), 1);
     assert_eq!(planned.towers.len(), 1);
+}
+
+#[test]
+fn spare_materials_go_into_extra_mine_upgrades_put_last() {
+    let mut w = world_of(1024);
+    spawn(&mut w, "aster_t2_land_factory", 0, 400, 400);
+    spawn(&mut w, "aster_t1_power", 0, 600, 400);
+    spawn(&mut w, "aster_t1_power", 0, 600, 460);
+    let mines: Vec<usize> = [(1500, 300), (300, 1500), (3000, 3000), (4000, 800)]
+        .into_iter()
+        .map(|(x, y)| spawn(&mut w, "aster_core_mine", 0, x, y))
+        .collect();
+    w.tick(&[]).unwrap();
+    // Two upgrades already running: one past the budget at 20 a second.
+    w.apply_command(&PlayerCommand {
+        player: 0,
+        command: Command::Upgrade {
+            units: mines[..2].iter().map(|&r| w.state.units.id(r)).collect(),
+        },
+    })
+    .unwrap();
+    let pl = &mut w.state.players[0];
+    pl.mass_income = Fx::from_int(20);
+    pl.mass_capacity = Fx::from_int(3000);
+    pl.mass = Fx::from_int(2000);
+    // No energy to spare for another upgrade's draw.
+    pl.energy_income = Fx::from_int(100);
+    pl.energy_demand = Fx::from_int(100);
+    pl.energy_capacity = Fx::from_int(5000);
+    pl.energy = Fx::from_int(4000);
+    pl.upkeep_efficiency = Fx::ONE;
+    let census = w.survey_own(0);
+    assert_eq!(w.mine_upgrade_budget(0), 1);
+
+    let mut out = vec![];
+    w.direct_focus(0, &census, &mut out);
+    assert!(
+        matches!(out.as_slice(), [Command::SetFocus { focus }] if focus.mines == Priority::Last),
+        "upgrades past the budget take only what is left: {out:?}"
+    );
+    // With materials going spare another one starts, energy or not: it is put last too.
+    out.clear();
+    w.direct_upgrades(0, &census, &mut out);
+    assert!(
+        matches!(out.as_slice(), [Command::Upgrade { units }]
+            if mines[2..].iter().any(|&r| units == &vec![w.state.units.id(r)])),
+        "{out:?}"
+    );
+    // Without them, none past the budget.
+    w.state.players[0].mass = Fx::from_int(100);
+    out.clear();
+    w.direct_upgrades(0, &census, &mut out);
+    assert!(out.is_empty(), "{out:?}");
 }

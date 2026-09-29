@@ -67,9 +67,14 @@ per pass, rotating through larger forces.
   is near. Later bare-ground mines go only where they would get at least the skill's
   share of a whole circle of land, so the gaps between mines are left alone.
 - Mine upgrades go to the mine whose next tier pays back soonest (energy counted at 6
-  per mass), within the skill's payback, doubled while materials pile up. They start
-  only while energy flows (efficiency 90%+), and one at a time plus one per 60 mass/s.
-  The Deep Core only qualifies for Hard with materials piling up.
+  per mass), within the skill's payback (800 / 1100 / 1500 s), doubled while
+  materials go spare (store over 40%). Up to one plus one per 30 mass/s run at once
+  (`mine_upgrade_budget`), each started only with the energy to spare for it. Judged
+  by the whole stall (mass included) and held to 660 s and one at a time, the AI
+  upgraded about six mines in half an hour and its income went flat by 20 minutes.
+- While materials go spare, up to four more upgrades run past the budget, started
+  whatever the energy, and the side's mines are put last (`direct_focus`): the extra
+  upgrades take only the materials and energy the factories leave.
 - When materials pile up unspent (store over 40% and spending below income), another
   factory comes before new mines and power, at the best tier the builder and income
   allow, up to the skill's cap. At most one factory in four upgrades at a time.
@@ -147,20 +152,24 @@ AI duels, and never built anything past tech 3. What changed:
 
 - Energy is planned ahead (`ai/energy.rs`). `energy_need` is what the side would
   draw with every factory and builder at work plus the upkeep of everything standing
-  or going up. In a stall power comes first, before the rest of the opening's mines
-  and turrets; otherwise power is built until income reaches 90% of that need.
+  or going up, the draw of upgrades running, and room for the next mine upgrade and
+  tier step. In a stall power comes first, before the rest of the opening's mines
+  and turrets; otherwise power is built until income reaches that need, before far
+  mines and turrets (only the first watchtower goes ahead of it).
   While a resource is short the side's economy focus (`direct_focus`) is set to it,
   so the power or mines it builds are paid ahead of everything else.
 - An upgrade starts only with the energy to spare for its own draw (`can_fund`):
   one started at 90% efficiency stalled every
-  factory for minutes. A candidate the side cannot fund no longer holds back a
+  factory for minutes. Energy only: a side spending all it makes is short of mass
+  nearly all the time. A candidate the side cannot fund no longer holds back a
   cheaper one behind it.
 - Turrets on quiet mines wait until income reaches 6 a second or the opening's
   three mines stand; a mine under attack still gets its guard at once. Radar goes
   up once the first mines and two plants stand, not only after the first turret.
 - Tech is a step taken on purpose: one factory goes up a tier once income reaches
   the skill's `tech_income` (tech 2), then three times it (tech 3), whether or not
-  materials pile up.
+  materials pile up (`tech_step`). A busy factory is taken too, the upgrade queued
+  behind its current unit: factories kept busy were never idle when the AI looked.
 - Factories are added while the ones standing could not spend 70% of the income
   if all were busy (`factory_mass_draw`), up to the skill's cap. A factory goes to
   the firebase only when the firebase is within 3 km of home: on a big map every

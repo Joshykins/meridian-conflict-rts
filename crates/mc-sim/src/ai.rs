@@ -161,7 +161,8 @@ struct Census {
     support_idle: Vec<usize>,
     army_fast: usize,
     max_tech: u8,
-    /// Energy a second the side would draw with everything at work (`energy.rs`).
+    /// Energy a second the side would draw with everything at work, its next
+    /// mine upgrade and tier step included (`energy.rs`).
     energy_need: Fx,
 }
 
@@ -327,7 +328,7 @@ impl World {
         self.direct_factories(player, &census, &planned.salvage, stance, persona, &mut out);
         self.direct_salvagers(&census, &planned.salvage, &mut out);
         self.direct_upgrades(player, &census, &mut out);
-        self.direct_focus(player, &mut out);
+        self.direct_focus(player, &census, &mut out);
         self.direct_nukes(player, &mut out);
         self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
         self.react_tactically(player, &mut census, &intel, &mut out);
@@ -544,7 +545,17 @@ impl World {
                 }
             }
         }
-        c.energy_need = self.energy_need(player);
+        // Room for the next mine upgrade and the next tier too: power built only
+        // up to what the side draws now left none for them, and they waited on
+        // it for twenty minutes.
+        let mine = self
+            .mine_to_upgrade(player, &c, false)
+            .map_or(Fx::ZERO, |(row, next)| self.upgrade_draw(row, next));
+        let tech = self.tech_step(player, &c).map_or(Fx::ZERO, |row| {
+            let next = self.bp(row).upgrades_to.map(|n| self.blueprints.unit(n));
+            next.map_or(Fx::ZERO, |next| self.upgrade_draw(row, next))
+        });
+        c.energy_need = self.energy_need(player) + mine + tech;
         c
     }
 
