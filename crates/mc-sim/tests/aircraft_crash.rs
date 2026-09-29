@@ -306,12 +306,22 @@ fn aircraft_without_salvage_still_completes_its_crash() {
 }
 
 #[test]
-fn fog_hides_the_falling_hull() {
+fn fog_shows_the_falling_hull_only_over_explored_ground() {
     let mut w = world();
     let id = plane(&mut w);
     kill(&mut w, id);
     w.state.fog_enabled = true;
     let mut frame = mc_sim::RenderFrame::default();
     w.write_render_frame(Some(1), &mut frame);
-    assert!(frame.units.is_empty());
+    assert!(frame.units.is_empty(), "never-seen ground hides it");
+
+    // The hostile side once saw this ground but has no eyes on it now: a kill made out of
+    // sight is still seen coming down, like the wreck it leaves.
+    let at = w.state.aircraft_crashes[0].pos.xy();
+    let mask = w.team_mask(1);
+    w.fog.reveal(at, Fx::from_int(200), Fx::ZERO, mask);
+    w.fog.begin();
+    assert!(!w.fog.is_visible(at, mask));
+    w.write_render_frame(Some(1), &mut frame);
+    assert_eq!(frame.units.len(), 1, "explored ground shows it");
 }

@@ -2535,8 +2535,9 @@ impl World {
             } else {
                 sabot.at()
             };
+            // Debris, not a unit: shown anywhere explored, like wrecks.
             if let (Some(v), true) = (viewer, s.fog_enabled) {
-                if !self.fog.is_visible(here.xy(), self.team_mask(v)) {
+                if !self.fog.is_explored(here.xy(), self.team_mask(v)) {
                     continue;
                 }
             }
