@@ -15,6 +15,10 @@ pub const MINIMAP_SLOT: usize = 0;
 /// Most unit marks drawn; beyond it every n-th unit stands for its neighbours.
 const MAX_MARKS: usize = 3000;
 
+/// Overlay vertices the mine territories on the chart may use (a territory
+/// is ~250, so some 170 of them).
+const TERRITORY_BUDGET: usize = mc_render::overlay::MAX_OVERLAY_VERTICES / 6;
+
 /// Clips a segment to a rectangle (Liang-Barsky). `None` when it misses.
 fn clip(a: Vec2, b: Vec2, r: Rect) -> Option<(Vec2, Vec2)> {
     let d = b - a;
@@ -117,16 +121,24 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
             .units
             .iter()
             .any(|u| view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some());
-    let mines = super::mines_in_sight(s.blueprints, &view.frame.units);
+    let mut mines = super::mines_in_sight(s.blueprints, &view.frame.units);
+    // In id order, so the territories a full chart leaves out stay the same ones.
+    mines.sort_unstable_by_key(|&(_, _, id)| id);
     let all: Vec<(Vec2, f32)> = mines.iter().map(|&(p, r, _)| (p, r)).collect();
     let (line, fill) = if survey { (0.95, 0.22) } else { (0.45, 0.08) };
+    // Every panel and dropdown is drawn after the minimap: an 8-player match's
+    // hundred-odd territories must never use up their vertices. A fixed
+    // allowance from here, not what the marks drawn before happen to leave:
+    // those (the world's mine survey above all) move with the camera, and the
+    // cut would move with them, so mines flickered on and off the chart.
+    let budget_end = ui.o.vertices.len() + TERRITORY_BUDGET;
     for (i, &(centre, reach, _)) in mines.iter().enumerate() {
-        // Every panel and dropdown is drawn after the minimap: an 8-player
-        // match's hundred-odd territories must never use up their vertices.
-        if ui.o.vertices.len() > mc_render::overlay::MAX_OVERLAY_VERTICES / 3 {
-            break;
-        }
         let c = chart_pos(s, chart, centre);
+        // Past the allowance a mine still shows where it is, without its ground.
+        if ui.o.vertices.len() > budget_end {
+            ui.dot(c, 2.6, rgb(super::MASS, 1.0));
+            continue;
+        }
         // A territory is a few pixels across on the chart: as many points as it has pixels round.
         let px = chart_pos(s, chart, centre + Vec2::new(reach, 0.0)).x - c.x;
         let points = (px * std::f32::consts::TAU / 3.0).clamp(10.0, 80.0) as usize;
@@ -148,7 +160,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         if let (Some(&a), Some(&b)) = (pts.last(), pts.first()) {
             ui.stroke(a, b, 1.2, rgb(super::MASS, line));
         }
-        ui.disc(c, 2.6, rgb(super::MASS, 1.0));
+        ui.dot(c, 2.6, rgb(super::MASS, 1.0));
     }
 
     // Reach: the side's radar cover and shield domes, the selection's guns and eyes.
