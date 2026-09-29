@@ -315,6 +315,15 @@
                 targets: ["Land", "Naval"], color: Orange, flash: 1.6, impact: 1.2,
                 sounds: (fire: "cannon_light", impact: "shell_on_armour", ground: "shell_heavy"),
             ),
+            // Two stern tubes: interceptors fired at torpedoes coming in, surfaced or dived.
+            // A hunter-killer meets other boats' torpedoes more than anything else.
+            (
+                name: "Interceptor Tubes",
+                damage: 1, range: 240, reload: 1.8, speed: 80, trajectory: Direct,
+                muzzle: (-12.6, 0, -1.4), muzzles: [(-12.6, -0.8, -1.4), (-12.6, 0.8, -1.4)],
+                targets: ["Naval"], color: Orange, torpedo: true, intercepts: true,
+                sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
+            ),
         ],
         mesh: "submarine_hunter", icon: Submarine,
         sounds: (death: "blast", moving: "sub_motor"),

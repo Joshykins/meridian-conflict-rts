@@ -148,6 +148,16 @@ fn a_destroyer_s_interceptors_burst_the_torpedoes_coming_in() {
 }
 
 #[test]
+fn a_hunter_killer_s_stern_tubes_burst_the_torpedoes_coming_in() {
+    let (damage, met, _) = torpedoes_at("aster_t2_submarine");
+    assert!(met >= 3, "only {met} torpedoes intercepted");
+    assert!(
+        damage < Fx::from_int(170),
+        "{damage:?} got through to the Moray"
+    );
+}
+
+#[test]
 fn interceptors_never_take_a_unit_and_are_the_same_on_every_run() {
     let mut w = sea(false);
     let marlin = spawn(&mut w, "aster_t2_destroyer", 0, 1300, 1000, 0);
