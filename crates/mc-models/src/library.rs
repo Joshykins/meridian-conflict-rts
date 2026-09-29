@@ -80,6 +80,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .chain(super::replicator::MODELS.iter())
         .chain(super::precursor::MODELS.iter())
         .chain(super::precursor_mega::MODELS.iter())
+        .chain(super::precursor_tower::MODELS.iter())
         .chain(super::precursor_polar::MODELS.iter())
         .chain(super::precursor_forge::MODELS.iter())
         .chain(super::precursor_sky::MODELS.iter())

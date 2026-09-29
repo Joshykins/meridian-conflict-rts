@@ -673,6 +673,7 @@ mod precursor_gate;
 mod precursor_mega;
 mod precursor_polar;
 mod precursor_sky;
+mod precursor_tower;
 
 #[cfg(test)]
 mod preview;

@@ -1,5 +1,6 @@
 //! The Precursor megastructure: the kit a map's one machine is built from
-//! (`mc_map::PropKind::Precursor{Bastion,Boom,Tower,Span}`). Where the artifacts in
+//! (`mc_map::PropKind::Precursor{Bastion,Boom,Span}`; the tower is in
+//! `precursor_tower.rs`). Where the artifacts in
 //! `precursor.rs` are monuments tens of metres high, these are pieces of a single
 //! machine hundreds of metres high, laid out on one axis across a map and running
 //! off its edge: bastions cut into the mountains, cantilevered booms reaching out
@@ -17,8 +18,6 @@
 //! (`mc-map/src/bake/machine.rs`), and a span stands on the bench it leaves from,
 //! so decks meet at the same height. Footings go to -80 m under the bench.
 
-use std::f32::consts::FRAC_PI_4;
-
 use glam::{Affine3A, Vec3};
 
 use super::builder::{MeshBuilder, Section};
@@ -28,7 +27,6 @@ use super::precursor::{cut_rect, dark, film, fine_rect, light, pale, panel, seam
 pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("precursor_bastion", 300.0, 422.0, bastion),
     ModelDef::new("precursor_boom", 400.0, 460.0, boom),
-    ModelDef::new("precursor_tower", 110.0, 930.0, tower),
     ModelDef::new("precursor_span", 320.0, 105.0, span),
 ];
 
@@ -627,160 +625,6 @@ fn boom(b: &mut MeshBuilder, _tech: u8) {
     light(b);
     let gem = cut_rect(b, 6.0, 6.0, 2.0);
     rod.solid(b, rod.len - 2.0, rod.len + 12.0, &gem, 0.0);
-}
-
-// ---- Tower ------------------------------------------------------------------------
-//
-// A spine into the clouds, 930 m: a plinth, then three stages of dark shaft between
-// pale corner piers, each stage hovering over the one below on a neck of light, and a
-// point hovering over the last. Four blade buttresses stand out of the corners at the
-// foot. Light runs up the middle of every face; pale bands cross the dark between
-// the piers.
-
-const STAGES: [(f32, f32, f32, f32); 3] = [
-    (50.0, 360.0, 48.0, 40.0),
-    (378.0, 630.0, 38.0, 30.0),
-    (648.0, 842.0, 28.0, 15.0),
-];
-
-fn tower(b: &mut MeshBuilder, _tech: u8) {
-    pale(b);
-    let plinth = cut_rect(b, 76.0, 76.0, 24.0);
-    b.loft_z(
-        &plinth,
-        &[
-            Section::new(-80.0, 1.0),
-            Section::new(0.0, 1.0),
-            Section::new(52.0, 0.86),
-        ],
-    );
-    if !b.coarse() {
-        light(b);
-        b.loft_z(
-            &plinth,
-            &[Section::new(18.0, 0.965), Section::new(21.0, 0.962)],
-        );
-    }
-
-    for (i, &(z0, z1, h0, h1)) in STAGES.iter().enumerate() {
-        let shrink = h1 / h0;
-        // The shaft.
-        if b.coarse() {
-            pale(b);
-        } else {
-            dark(b);
-        }
-        let core = cut_rect(b, h0, h0, h0 * 0.28);
-        b.loft_z(&core, &[Section::new(z0, 1.0), Section::new(z1, shrink)]);
-        // The neck under it, lit.
-        let below = if i == 0 { 50.0 } else { STAGES[i - 1].1 };
-        if i > 0 {
-            light(b);
-            let neck = cut_rect(b, h0 * 0.5, h0 * 0.5, h0 * 0.15);
-            b.loft_z(
-                &neck,
-                &[Section::new(below - 2.0, 1.0), Section::new(z0 + 2.0, 1.0)],
-            );
-        }
-        if !b.fine() {
-            continue;
-        }
-        // Corner piers standing out of the shaft.
-        pale(b);
-        let p = h0 * 0.24;
-        let pier = fine_rect(b, p, p, p * 0.3);
-        let c0 = h0 - p + 1.8;
-        let c1 = (h0 - p + 1.8) * shrink;
-        for (sx, sy) in [(1.0f32, 1.0f32), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)] {
-            b.loft_z(
-                &pier,
-                &[
-                    Section::new(z0 - 0.5, 1.0).shifted(sx * c0, sy * c0),
-                    Section::new(z1 + 0.5, shrink).shifted(sx * c1, sy * c1),
-                ],
-            );
-        }
-        // Light up the middle of each face; pale bands across it.
-        let face = |z: f32| h0 + (h1 - h0) * (z - z0) / (z1 - z0);
-        let out = v3(z1 - z0, 0.0, h0 - h1).normalize();
-        b.radial(4, |b| {
-            seam(
-                b,
-                v3(face(z0 + 6.0), 0.0, z0 + 6.0),
-                v3(face(z1 - 6.0), 0.0, z1 - 6.0),
-                out,
-                h0 * 0.07,
-            );
-            if b.fine() {
-                pale(b);
-                let mut z = z0 + 70.0;
-                while z < z1 - 40.0 {
-                    let (za, zb) = (z, z + 6.0);
-                    let (wa, wb) = (face(za) - p * 1.5, face(zb) - p * 1.5);
-                    let quad = [
-                        v3(face(za), -wa, za),
-                        v3(face(za), wa, za),
-                        v3(face(zb), wb, zb),
-                        v3(face(zb), -wb, zb),
-                    ];
-                    panel(b, &quad, out, 1.2, 0.4);
-                    z += 90.0;
-                }
-            }
-        });
-    }
-
-    // Buttress blades out of the corners at the foot.
-    if b.mid() {
-        let blade: [[f32; 2]; 6] = [
-            [40.0, -30.0],
-            [122.0, -30.0],
-            [122.0, 18.0],
-            [86.0, 150.0],
-            [58.0, 290.0],
-            [52.0, 276.0],
-        ];
-        b.radial(4, |b| {
-            b.with(Affine3A::from_rotation_z(FRAC_PI_4), |b| {
-                pale(b);
-                b.extrude_y_chamfered(&blade, 5.5, 1.6);
-                if b.fine() {
-                    for y in [-5.5f32, 5.5] {
-                        seam(
-                            b,
-                            v3(112.0, y, 14.0),
-                            v3(84.0, y, 148.0),
-                            v3(0.0, y.signum(), 0.0),
-                            1.6,
-                        );
-                        seam(
-                            b,
-                            v3(82.0, y, 162.0),
-                            v3(59.0, y, 272.0),
-                            v3(0.0, y.signum(), 0.0),
-                            1.6,
-                        );
-                    }
-                }
-            });
-        });
-    }
-
-    // The point, hovering over the last stage, lit beneath.
-    let cap = cut_rect(b, 13.0, 13.0, 4.0);
-    if !b.coarse() {
-        light(b);
-        b.loft_z(&cap, &[Section::new(850.0, 0.25), Section::new(862.0, 1.0)]);
-    }
-    pale(b);
-    b.loft_z(
-        &cap,
-        &[
-            Section::new(862.0, 1.0),
-            Section::new(870.0, 1.0),
-            Section::new(930.0, 0.0),
-        ],
-    );
 }
 
 // ---- Span -------------------------------------------------------------------------

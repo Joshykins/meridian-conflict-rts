@@ -688,7 +688,6 @@ const OVER_BUDGET: &[Over] = &[
     ("airbase", None, Some(0.53), None),
     ("precursor_bastion", Some(222), None, None),
     ("precursor_boom", Some(228), None, None),
-    ("precursor_tower", Some(94), None, None),
     ("precursor_vault", Some(404), None, None),
     ("precursor_axis", Some(206), None, None),
     ("precursor_terrace", Some(112), None, None),
@@ -741,6 +740,7 @@ fn lods_reduce_and_respect_budgets() {
             super::precursor_gate::TRIANGLES
         } else if super::precursor_mega::MODELS
             .iter()
+            .chain(super::precursor_tower::MODELS)
             .any(|d| d.key == model.key)
         {
             // A map's one machine: a few pieces hundreds of metres high.
