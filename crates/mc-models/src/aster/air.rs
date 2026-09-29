@@ -93,8 +93,8 @@ pub(crate) fn rail_corvette(b: &mut MeshBuilder, _tech: u8) {
     corvette::build(b, corvette::Hull::Keel);
 }
 
-pub(crate) fn rail_corvette_dart(b: &mut MeshBuilder, _tech: u8) {
-    corvette::build(b, corvette::Hull::Dart);
+pub(crate) fn rail_corvette_outrigger(b: &mut MeshBuilder, _tech: u8) {
+    corvette::build(b, corvette::Hull::Outrigger);
 }
 
 pub(crate) fn rail_corvette_blade(b: &mut MeshBuilder, _tech: u8) {
