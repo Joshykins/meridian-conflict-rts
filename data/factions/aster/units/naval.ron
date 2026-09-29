@@ -176,7 +176,7 @@
             // reaches far past the other T2 hulls, with heavy, slow hits.
             (
                 name: "Bolt Rifle",
-                damage: 380, splash: 5, range: 1350, reload: 1.8, speed: 450, trajectory: Ballistic, loft: 1,
+                damage: 380, splash: 5, range: 1500, reload: 1.8, speed: 450, trajectory: Ballistic, loft: 1,
                 turret_turn: 50, arc: 300, mount: true, pivot: (14.4, 0, 6.24), muzzle: (23.28, 0, 6.24), spread: 1,
                 targets: ["Land", "Naval"], color: Blue, flash: 0.6, impact: 1.8, shockwave: 0.6,
                 tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 16, arc_charge: 7.44,
