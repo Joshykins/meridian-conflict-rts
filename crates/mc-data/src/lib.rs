@@ -881,14 +881,11 @@ impl Blueprints {
             .unwrap_or(1)
     }
 
-    /// What upgrading a unit into `to` costs, (materials, energy). An engineer pays only
-    /// what its new tier costs over the one it is; a structure pays for the whole new tier.
+    /// What upgrading a unit into `to` costs, (materials, energy): only what the new tier
+    /// costs over the one it is, for a structure as for an engineer. A refit kit (not a
+    /// tier) is paid in full.
     pub fn upgrade_cost(&self, to: &UnitBlueprint) -> (Fx, Fx) {
-        let from = self
-            .units
-            .iter()
-            .find(|u| u.upgrades_to == Some(to.id))
-            .filter(|_| to.is_mobile());
+        let from = self.units.iter().find(|u| u.upgrades_to == Some(to.id));
         match from {
             Some(f) => (
                 (to.cost_mass - f.cost_mass).max(Fx::ZERO),

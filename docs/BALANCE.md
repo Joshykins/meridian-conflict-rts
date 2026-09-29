@@ -60,8 +60,9 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 - A new mine is the good investment and each tier above it a poorer one (the user's call,
   2026-09-26): a tier 2 mine yields 2.5x a tier 1, a tier 3 5x, the Deep Core 7.5x (T1 ground
   0.010 a hectare, ore 0.9). On good ground a tier 1 mine makes about 6.4 mass/s and pays back
-  its 160 in about 25 s; the upgrade to tier 2 (1700) pays back in about 180 s, to tier 3 (7200)
-  in about 450 s, to the Deep Core in about 1000 s.
+  its 160 in about 25 s. An upgrade pays only the difference between the tiers: to tier 2
+  1540 (1700 - 160), paying back in about 165 s; to tier 3 5500, about 345 s; to the Deep
+  Core 8800, about 550 s.
 - A mine's `base` is shared with the mines next to it the way its land is: it gets the part of
   the base that matches the part of its circle it holds, land or sea. Before this, every shaft
   paid its full base however close the mines stood, so a packed block of mines made several
@@ -74,16 +75,17 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   commanders, or upgraded from a tier 3 mine, and meant to be a poor one. Like
   every tier it multiplies the mine's ground, ore and shaft yield, never a flat bonus (the user's
   call): 7.5x a tier 1, only 1.5x over tier 3 (base 8.25), for 16000 mass / 96000 energy / 2400
-  time, so it pays back in about 1000 s. It opens with tech 3 (the only tech 4 build is the
+  time built outright (8800 / 52800 as an upgrade from tier 3). It opens with tech 3 (the only tech 4 build is the
   Fulgur, raised by Mason IIIs), has 24000 health and stores 4000.
 - Mines stand on land or out at sea (`water_build`). Out at sea there is little land in reach,
   so an offshore mine lives on its shaft and on ore fields under the water.
 - Reactors: 20 / 250 / 1500 energy/s for 75 / 700 / 2800 mass; each tier is cheaper per unit
   of energy than the one below.
 - Factories: build power 20 / 80 / 200, so about seven factories spend the income at every
-  tier. Engineers 5 / 20 / 60. An engineer upgrading itself pays only what its new tier costs
-  over its old one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy);
-  structures pay for the whole new tier.
+  tier. Engineers 5 / 20 / 60.
+- Every tier upgrade, structure or engineer, pays only what the new tier costs over the old
+  one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy, core mine tier 1
+  to 2 1540 / 9240). A refit kit is paid in full.
 - Commander's Material Formation Engine: +6 mass, +250 energy a second (about a good tech 1
   mine and a tech 2 reactor) for 1600 mass; it was +12 / +2000, worth a hundred tech 1 reactors.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:

@@ -138,3 +138,15 @@ fn an_engineer_upgrades_itself_once_the_side_has_the_tier() {
         .count();
     assert_eq!(engineers, 1);
 }
+
+#[test]
+fn a_structure_upgrade_costs_only_the_difference_too() {
+    let w = world();
+    let t2 = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_core_mine_t2").unwrap());
+    assert_eq!(
+        w.blueprints.upgrade_cost(t2),
+        (Fx::from_int(1700 - 160), Fx::from_int(10200 - 960))
+    );
+}

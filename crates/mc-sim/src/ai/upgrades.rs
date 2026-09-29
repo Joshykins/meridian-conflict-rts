@@ -243,7 +243,8 @@ impl World {
         open.filter_map(|(row, next)| {
             let state = self.state.mines.by_unit.get(&units.id(row))?;
             let gain = state.full_rate(&next.mine?) - state.full_rate(&self.bp(row).mine?);
-            let cost = next.cost_mass + next.cost_energy / ENERGY_PER_MASS;
+            let (mass, energy) = self.blueprints.upgrade_cost(next);
+            let cost = mass + energy / ENERGY_PER_MASS;
             (gain > Fx::ZERO).then(|| (row, next, cost / gain))
         })
         .filter(|&(_, _, payback)| payback <= horizon)
