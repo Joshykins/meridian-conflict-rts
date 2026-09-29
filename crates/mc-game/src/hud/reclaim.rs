@@ -148,6 +148,9 @@ fn leader_detail(camera_distance: f32) -> f32 {
     1.0 - t * t * (3.0 - 2.0 * t)
 }
 
+/// Overlay vertices the survey may fill up to, leaving the rest to the panels.
+const SURVEY_BUDGET: usize = mc_render::overlay::MAX_OVERLAY_VERTICES / 2;
+
 pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
     if open < 0.02 {
         return;
@@ -174,6 +177,12 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
     salvage_badges(ui, s, rise);
     let pulse = 0.65 + 0.35 * (ui.time * 2.4).sin();
     for g in &groups {
+        // Deliberate cap: the top bar and the right column are drawn after the
+        // survey and must always have room. One-quad pips keep even thousands of
+        // wrecks far under this; only an absurd field loses its last groups.
+        if ui.o.vertices.len() > SURVEY_BUDGET {
+            break;
+        }
         let n = g.marks.len();
         // A lone wreck always keeps its leader; a group trades its leaders for brackets.
         let own = if n == 1 { 1.0 } else { detail };
@@ -218,18 +227,16 @@ pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
             // its mass. Every dark rim goes down before any fill, so a dense field
             // stays a cluster of dots instead of rims eating their neighbours.
             let fa = a * field;
-            // Deliberate cap: rims are what make a pip read against the ground, but
-            // the panels drawn after the survey must never run out of vertices, so
-            // an enormous field gives its rims up first.
-            if ui.o.vertices.len() < mc_render::overlay::MAX_OVERLAY_VERTICES / 3 {
-                for &i in &g.marks {
-                    let m = &marks[i];
-                    ui.disc(m.at, pip_radius(m.mass) + 1.3, ink(0.8 * fa));
-                }
+            // A pip is one quad (`dot`), not a fan of them: a late survival match
+            // leaves thousands of wrecks, and a survey drawn in discs used up the
+            // overlay, so the panels drawn after it flickered out.
+            for &i in &g.marks {
+                let m = &marks[i];
+                ui.dot(m.at, pip_radius(m.mass) + 1.3, ink(0.8 * fa));
             }
             for &i in &g.marks {
                 let m = &marks[i];
-                ui.disc(m.at, pip_radius(m.mass), rgb(MASS, fa));
+                ui.dot(m.at, pip_radius(m.mass), rgb(MASS, fa));
             }
         }
         if field > 0.01 {

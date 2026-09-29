@@ -15,6 +15,8 @@ struct Rig {
     overlay: Overlay,
     memory: Memory,
     hover: Option<u32>,
+    /// Control held: the reclaim survey is up.
+    reclaim: bool,
 }
 
 const VIEWPORT: Vec2 = Vec2::new(1920.0, 1080.0);
@@ -74,6 +76,7 @@ impl Rig {
             overlay: Overlay::default(),
             memory: Memory::default(),
             hover: None,
+            reclaim: false,
         }
     }
 
@@ -99,7 +102,7 @@ impl Rig {
             camera: &self.camera,
             gpu: &stats,
             hover: self.hover,
-            show_reclaim: false,
+            show_reclaim: self.reclaim,
             placing: None,
             net: None,
             net_notices: &[],
@@ -1031,6 +1034,47 @@ fn the_commander_card_is_always_there_and_selects_it() {
             focus: true
         }]
     );
+}
+
+#[test]
+fn a_late_match_reclaim_survey_leaves_the_panels_room() {
+    // Control over a survival match's seventeen hundred wrecks: the survey drew
+    // before the top bar and the right column and used up the overlay, so they
+    // flickered in and out as its size moved about the limit.
+    let mut rig = Rig::new("aster_t3_reclaimer");
+    let tank = rig.blueprints.id_of("aster_t1_tank").expect("tank");
+    let template = rig.view.frame.units[0];
+    for k in 0..1720u32 {
+        // Heaps round a few dozen fights, scattered through each.
+        let fight = Vec2::new((k % 43) as f32 * 97.0, ((k % 43) * 7 % 43) as f32 * 61.0);
+        let scatter = Vec2::new(
+            (k.wrapping_mul(2654435761) % 997) as f32 / 997.0,
+            (k.wrapping_mul(40503) % 991) as f32 / 991.0,
+        );
+        let at = Vec2::splat(2400.0) + fight + scatter * 160.0;
+        let pos = [at.x, at.y, 0.0];
+        let id = 100 + k;
+        rig.view.index_of.insert(id, rig.view.frame.units.len());
+        rig.view.frame.units.push(UnitInstance {
+            pos,
+            prev_pos: pos,
+            unit_id: id,
+            blueprint: tank.0 as u32,
+            owner_flags: mc_sim::mirror::KIND_WRECK,
+            ..template
+        });
+    }
+    rig.reclaim = true;
+    rig.camera.focus = glam::Vec3::new(4500.0, 3800.0, 0.0);
+    for distance in [250.0, 600.0, 1500.0, 3000.0, 6000.0] {
+        rig.camera.distance = distance;
+        rig.settle();
+        let used = rig.overlay.vertices.len();
+        assert!(
+            used < mc_render::overlay::MAX_OVERLAY_VERTICES / 4,
+            "{used} overlay vertices at {distance} m"
+        );
+    }
 }
 
 #[test]

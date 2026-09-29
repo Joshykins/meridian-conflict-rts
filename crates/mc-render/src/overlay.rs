@@ -288,9 +288,30 @@ impl Overlay {
         tint: [f32; 4],
         draw: impl FnOnce() -> Vec<u8>,
     ) {
-        let ([x, y], [w, h]) = (at, size);
-        if w == 0 || h == 0 || w >= FONT_ATLAS_W || h + 1 >= IMAGES_Y {
+        let [w, h] = size;
+        let Some([u0, v0, u1, v1]) = self.sprite_cell(key, w, h, draw) else {
             return;
+        };
+        let (x, y) = (at[0].round(), at[1].round());
+        let (r, b) = (x + w as f32, y + h as f32);
+        self.quad(
+            [[x, y], [r, y], [r, b], [x, b]],
+            [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
+            [tint; 4],
+        );
+    }
+
+    /// The atlas rectangle (`u0, v0, u1, v1`) of sprite `key` at `w` x `h`,
+    /// made by `draw` the first time; `None` for a size the atlas cannot hold.
+    fn sprite_cell(
+        &mut self,
+        key: u64,
+        w: usize,
+        h: usize,
+        draw: impl FnOnce() -> Vec<u8>,
+    ) -> Option<[f32; 4]> {
+        if w == 0 || h == 0 || w >= FONT_ATLAS_W || h + 1 >= IMAGES_Y {
+            return None;
         }
         let id = (key, w as u16, h as u16);
         let at = match self.sprites.get(&id) {
@@ -299,7 +320,7 @@ impl Overlay {
                 let rgba = draw();
                 if rgba.len() != w * h * 4 {
                     log::warn!("sprite {key:x}: {} bytes for {w}x{h}", rgba.len());
-                    return;
+                    return None;
                 }
                 let (ax, ay) = self.place(w, h);
                 for row in 0..h {
@@ -317,16 +338,46 @@ impl Overlay {
             at[0] as f32 / FONT_ATLAS_W as f32,
             at[1] as f32 / FONT_ATLAS_H as f32,
         );
-        let (u1, v1) = (
+        Some([
+            u0,
+            v0,
             u0 + w as f32 / FONT_ATLAS_W as f32,
             v0 + h as f32 / FONT_ATLAS_H as f32,
-        );
-        let (x, y) = (x.round(), y.round());
-        let (r, b) = (x + w as f32, y + h as f32);
+        ])
+    }
+
+    /// A small filled, anti-aliased circle as one quad: the same edge as
+    /// `disc`, drawn once into the atlas per eighth of a pixel of radius and
+    /// placed where it falls, not snapped to the pixel grid. For marks by the
+    /// thousand, where a `disc`'s fan of quads each would use up the vertices.
+    pub fn dot(&mut self, centre: [f32; 2], radius: f32, color: [f32; 4]) {
+        /// Tells the dots apart from the callers' sprite keys.
+        const DOT: u64 = 0xD07_0000_0000;
+        let steps = (radius.clamp(0.5, 24.0) * 8.0).round() as u64;
+        let radius = steps as f32 / 8.0;
+        // A texel of clear margin all round, so filtering at a fraction of a
+        // pixel off the grid fades to nothing at the quad's edge.
+        let size = (2.0 * (radius + FEATHER * 0.5)).ceil() as usize + 2;
+        let Some([u0, v0, u1, v1]) = self.sprite_cell(DOT | steps, size, size, || {
+            let half = size as f32 * 0.5;
+            (0..size * size)
+                .flat_map(|i| {
+                    let (x, y) = ((i % size) as f32 + 0.5, (i / size) as f32 + 0.5);
+                    let d = ((x - half).powi(2) + (y - half).powi(2)).sqrt();
+                    let cover = ((radius + FEATHER * 0.5 - d) / FEATHER).clamp(0.0, 1.0);
+                    [255, 255, 255, (cover * 255.0).round() as u8]
+                })
+                .collect()
+        }) else {
+            return;
+        };
+        let half = size as f32 * 0.5;
+        let (x, y) = (centre[0] - half, centre[1] - half);
+        let (r, b) = (x + size as f32, y + size as f32);
         self.quad(
             [[x, y], [r, y], [r, b], [x, b]],
             [[u0, v0], [u1, v0], [u1, v1], [u0, v1]],
-            [tint; 4],
+            [color; 4],
         );
     }
 

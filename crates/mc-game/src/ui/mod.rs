@@ -462,6 +462,13 @@ impl<'a> Ui<'a> {
         self.o.disc(centre.into(), radius * self.s, color);
     }
 
+    /// A small filled circle as one quad (see `Overlay::dot`): for marks by the thousand.
+    pub fn dot(&mut self, centre: Vec2, radius: f32, color: Color) {
+        let centre = (centre + self.shift) * self.s;
+        let color = self.c(color);
+        self.o.dot(centre.into(), radius * self.s, color);
+    }
+
     pub fn triangle(&mut self, a: Vec2, b: Vec2, c: Vec2, color: Color) {
         let p = |v: Vec2| -> [f32; 2] { ((v + self.shift) * self.s).into() };
         let color = self.c(color);
