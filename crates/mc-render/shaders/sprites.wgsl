@@ -337,7 +337,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
         // A rail path fades as it dies. An intercept laser and a held beam hold, then cut.
         let fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser || held);
-        let floor_px = select(3.4, 1.05, laser);
+        let floor_px = select(3.4, 2.4, laser);
         width_px = max(p.size * globals.lod.x / max(a.w, 1.0), floor_px) * select(0.6 + 0.5 * fade, 0.9, laser);
         width_px = width_px * select(1.0, fade, laser);
         if (p.color & 0xFu) == 4u {
@@ -364,7 +364,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             let fade = select(pow(max(1.0 - age, 0.0), 1.2), 1.0 - smoothstep(0.72, 1.0, age), laser);
             let shrink = select(0.6 + 0.5 * fade, 0.9, laser) * select(1.0, fade, laser);
             true_m = p.size * shrink;
-            floor_px = select(3.4, 1.05, laser) * shrink;
+            floor_px = select(3.4, 2.4, laser) * shrink;
             if (p.color & 0xFu) == 4u {
                 true_m = p.size;
                 floor_px = 5.0;
@@ -867,13 +867,14 @@ fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
         if in.shape.y > 3.5 {
             // Intercept laser: a hot pink-white filament in a red sheath, held steady on the
             // missile; the sheath shimmers a little along its length, nothing runs down it.
-            let core = pow(across, 10.0);
-            let sheath = pow(across, 1.7);
+            // Bright enough to pick out at strategic zoom, where it is a few pixels across.
+            let core = pow(across, 6.0);
+            let sheath = pow(across, 1.4);
             let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
             let shimmer = 0.88 + 0.12 * sin(run * 0.9 - globals.camera.w * 31.0);
             let held = in.color.r / 6.0;
-            let rgb = vec3<f32>(1.0, 0.05, 0.03) * sheath * 2.6 * shimmer
-                + vec3<f32>(1.0, 0.72, 0.68) * core * 6.0;
+            let rgb = vec3<f32>(1.0, 0.06, 0.03) * sheath * 5.0 * shimmer
+                + vec3<f32>(1.0, 0.72, 0.68) * core * 9.0;
             return vec4<f32>(rgb * held, 1.0);
         }
         if in.shape.y > 2.5 {

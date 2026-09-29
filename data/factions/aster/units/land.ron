@@ -77,6 +77,8 @@
             name: "Light Howitzer",
             damage: 120, splash: 6, range_min: 60, range: 440, reload: 5.0, speed: 140, trajectory: Ballistic, loft: 3,
             turret_turn: 70, muzzle: (3.8, 0, 3.4), pivot: (-0.75, 0, 2.25), spread: 1.2,
+            // A slow lobbed shell: missile-defence lasers can burn it down (tests/missile_defense.rs).
+            intercept: 150,
             targets: ["Land", "Naval"], color: Orange, shockwave: 0.55,
             sounds: (fire: "cannon_heavy", impact: "shell_heavy", ground: "shell_heavy"),
         )],

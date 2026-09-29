@@ -191,15 +191,17 @@ impl Weapon {
         self.cold_launch_ticks > 0 && age <= self.cold_launch_ticks && age > self.boost_ticks
     }
 
-    /// Casing hit points an intercept laser has to burn through. A non-missile
-    /// has none. A missile that does not say otherwise fails in one tick.
+    /// Casing hit points an intercept laser has to burn through; zero for a round the
+    /// lasers cannot take. A missile that does not say otherwise fails in one tick. A
+    /// shell can be taken only when it says how much (`RawWeapon::intercept`): a light
+    /// howitzer's slow lobbed round, say.
     pub fn casing_hp(&self) -> Fx {
-        if !self.missile {
-            Fx::ZERO
-        } else if self.intercept_hp > Fx::ZERO {
+        if self.intercept_hp > Fx::ZERO {
             self.intercept_hp
-        } else {
+        } else if self.missile {
             Fx::from_int(10)
+        } else {
+            Fx::ZERO
         }
     }
 }

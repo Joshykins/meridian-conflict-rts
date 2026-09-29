@@ -2426,14 +2426,14 @@ impl World {
                     }
                     let p = &self.state.projectiles;
                     let w = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
-                    if !w.missile || !self.are_enemies(owner, p.owner[i]) {
+                    let max = w.casing_hp();
+                    if max <= Fx::ZERO || !self.are_enemies(owner, p.owner[i]) {
                         continue;
                     }
                     let d2 = (p.pos[i] - center).length_sq();
                     if d2 > radius * radius {
                         continue;
                     }
-                    let max = w.casing_hp();
                     let hp = if p.hp[i] > Fx::ZERO { p.hp[i] } else { max };
                     let burning = hp < max;
                     let take = match best {

@@ -663,7 +663,8 @@ pub struct RawWeapon {
     #[serde(default)]
     pub missile: bool,
     /// Hit points an intercept laser must burn through. Zero on a missile is a
-    /// light casing that fails in one tick. Heavier missiles take a longer burst.
+    /// light casing that fails in one tick. Heavier missiles take a longer burst. On a
+    /// shell, more than zero lets the lasers shoot it down; zero, they never try.
     #[serde(default)]
     pub intercept: f64,
     #[serde(default)]
