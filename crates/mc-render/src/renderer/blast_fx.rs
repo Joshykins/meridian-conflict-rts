@@ -10,7 +10,7 @@ use crate::gpu_consts::puff;
 pub(super) const PUFF_BLAST: f32 = puff::BLAST as f32;
 
 /// How much of a blast puff's life it burns: puffs.wgsl `BLAST_BURN`.
-const BLAST_BURN: f32 = 0.34;
+pub(super) const BLAST_BURN: f32 = 0.34;
 
 impl Renderer {
     /// A ball of burning gas about `r` metres in radius at its biggest, around

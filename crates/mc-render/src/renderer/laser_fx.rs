@@ -2,12 +2,16 @@
 //! a lobbed shell): one steady red beam per emitter and round, held on it between ticks.
 //! The emitter's head flares red while it holds, the casing glows white-hot where the
 //! beam bites and throws sparks back along it, and when the casing fails the round
-//! goes up: a white flash, a fireball carried on along its line, burning pieces, smoke.
+//! goes up red: a red flash, a red glowing ball, red embers, a little smoke.
 //! Built to read at strategic zoom: the beam never thins below a few pixels.
 
-use super::{FadeBeam, Renderer, PUFF_FIREBALL, PUFF_SHARD, PUFF_SMOKE, PUFF_SPARK};
+use super::{blast_fx, FadeBeam, Renderer, PUFF_SMOKE, PUFF_SPARK};
+use crate::gpu_consts::puff;
 use glam::Vec3;
 use mc_core::FxVec3;
+
+/// A laser kill's embers (puffs.wgsl).
+const PUFF_INTERCEPT: f32 = puff::INTERCEPT as f32;
 
 /// A held beam's thickness in the world, metres.
 const BEAM_WIDTH: f32 = 0.6;
@@ -95,65 +99,68 @@ impl Renderer {
         }
     }
 
-    /// A missile burnt down by a laser: its warhead and the fuel left in it go up at once. A
-    /// hard white flash, a ragged fireball carried on along the missile's line, burning
-    /// pieces thrown out and falling, a dirty smoke ball left hanging. Not a shell hit.
+    /// A round burnt down by a laser goes up red, the colour of the beam that killed it:
+    /// a hard red flash, a glowing red ball carried on along its line that cools to a deep
+    /// red, red embers thrown out and falling, and a little dark smoke left hanging.
     fn missile_killed(&mut self, at: Vec3, motion: Vec3, time: f32) {
         let carry = motion * 0.35;
-        self.push_effect(at.to_array(), time, 9.0, 0.12, 9.0, 0.0);
-        self.push_effect(at.to_array(), time, 22.0, 0.28, 1.0, 0.0);
+        self.push_effect(at.to_array(), time, 5.0, 0.1, 8.0, 0.0);
+        self.push_effect(at.to_array(), time, 12.0, 0.18, 8.0, 0.0);
         self.push_shockwave(at.to_array(), time, 22.0, 0.34, 0.7, 1.0, Vec3::ZERO);
-        for i in 0..6 {
-            let dir = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed() * 0.6,
-            )
-            .normalize_or_zero();
-            let when = time + i as f32 * 0.02;
-            let (speed, size) = (
-                3.0 + self.scatter.unit() * 5.0,
-                4.4 + self.scatter.unit() * 1.6,
-            );
-            self.push_puff(
-                PUFF_FIREBALL,
-                at + dir * 0.8,
-                dir * speed + carry,
-                when,
-                0.5,
-                (1.4, size),
+        // The burst: the blast fireball's lumpy burning ball, in red (puffs.wgsl reads
+        // appearance.y as the red switch), carried on along the round's line.
+        let r = 5.5;
+        let life = 0.7 / blast_fx::BLAST_BURN;
+        for i in 0..4 {
+            let dir = self.scatter.upward(-0.4);
+            let (out, size) = if i == 0 {
+                (0.0, 1.0)
+            } else {
+                (
+                    0.35 + self.scatter.unit() * 0.4,
+                    0.6 + self.scatter.unit() * 0.3,
+                )
+            };
+            let grown = r * size / 0.62;
+            let lasts = life * (0.85 + self.scatter.unit() * 0.35);
+            self.push_puff_with_motion(
+                blast_fx::PUFF_BLAST,
+                at + dir * r * out * 0.3,
+                dir * r * out * 3.4 + carry,
+                time + i as f32 * 0.012,
+                lasts,
+                (grown * 0.3, grown),
+                Vec3::new(1.0, 1.0, 0.0),
             );
         }
-        for _ in 0..10 {
+        for _ in 0..18 {
             let dir = Vec3::new(
                 self.scatter.signed(),
                 self.scatter.signed(),
                 self.scatter.signed() * 0.8 + 0.2,
             )
             .normalize_or_zero();
-            let speed = 14.0 + self.scatter.unit() * 24.0;
-            self.push_puff(PUFF_SHARD, at, dir * speed + carry, time, 1.0, (0.4, 0.14));
+            let speed = 20.0 + self.scatter.unit() * 36.0;
+            let life = 0.6 + self.scatter.unit() * 0.5;
+            self.push_puff(
+                PUFF_INTERCEPT,
+                at,
+                dir * speed + carry,
+                time,
+                life,
+                (0.5, 0.2),
+            );
         }
-        for _ in 0..14 {
-            let dir = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed(),
-            )
-            .normalize_or_zero();
-            let speed = 22.0 + self.scatter.unit() * 34.0;
-            self.push_puff(PUFF_SPARK, at, dir * speed + carry, time, 0.4, (0.26, 0.05));
-        }
-        for i in 0..3 {
+        for i in 0..2 {
             let dir =
                 Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.3).normalize_or_zero();
             self.push_puff(
                 PUFF_SMOKE,
                 at + dir,
                 dir * 1.5 + carry * 0.3 + Vec3::Z * 0.8,
-                time + 0.06 + i as f32 * 0.05,
-                2.0,
-                (1.8, 4.8),
+                time + 0.12 + i as f32 * 0.05,
+                1.8,
+                (1.4, 4.0),
             );
         }
     }

@@ -61,7 +61,7 @@ const PUFF_STRATEGIC_TRAIL: u32 = 34u;
 // dark blue-grey pall that thins.
 const PUFF_ARC_BALL: u32 = 35u;
 // retired: 36 (storm thunderhead)
-// PUFF_SHRAPNEL (37) and PUFF_FLAK (39) are generated from gpu_consts.rs.
+// PUFF_SHRAPNEL (37), PUFF_FLAK (39) and PUFF_INTERCEPT (40) are generated from gpu_consts.rs.
 // A faint, solid ribbon following a bomb, separate from the airy aircraft cloud.
 const PUFF_BOMB_TRAIL: u32 = 12u;
 // retired: 13 (splinter)
@@ -232,6 +232,10 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         let drag = SHRAPNEL_DRAG;
         pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag) - vec3<f32>(0.0, 0.0, 5.0 * t * t);
         pos.z = max(pos.z, terrain_height(pos.xy) + 0.3);
+    } else if kind == PUFF_INTERCEPT {
+        // A laser kill's red burst and embers: thrown out, the air slows them, a slight fall.
+        let drag = 3.0;
+        pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag) - vec3<f32>(0.0, 0.0, 1.5 * t * t);
     } else if kind == PUFF_FLAK {
         // A flak burst's smoke: thrown out hard and stopped dead by the air, then it
         // hangs where it burst and goes off down the wind, barely rising.
@@ -480,7 +484,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         return out;
     }
     let center = globals.view_proj * vec4<f32>(pos, 1.0);
-    let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_CASING || kind == PUFF_RECLAIM;
+    let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_CASING || kind == PUFF_RECLAIM || kind == PUFF_INTERCEPT;
     // A floor keeps a fire visible once the camera is far enough that its true
     // size would fall under the cull and the whole patch would vanish at once.
     let floor_px = select(select(select(0.0, 1.2, mote), 3.2, kind == PUFF_FIRE || kind == PUFF_BLAST || kind == PUFF_FLAK), 6.0, kind == PUFF_GROUND_FIRE);
@@ -705,6 +709,15 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
         let heat = mix(vec3<f32>(1.0, 0.85, 0.5), vec3<f32>(1.0, 0.28, 0.04), age);
         let glow = pow(max(1.0 - d, 0.0), 1.5) * (1.0 - age * age);
         return vec4<f32>(heat * 9.0 * glow, 0.0);
+    }
+    if kind == PUFF_INTERCEPT {
+        let heat = mix(
+            mix(vec3<f32>(1.0, 0.5, 0.45), vec3<f32>(1.0, 0.04, 0.025), smoothstep(0.0, 0.15, age)),
+            vec3<f32>(0.35, 0.0, 0.01),
+            smoothstep(0.25, 1.0, age),
+        );
+        let glow = pow(max(1.0 - d, 0.0), 1.5) * (1.0 - age * age);
+        return vec4<f32>(heat * 10.0 * glow, 0.0);
     }
     if kind == PUFF_BOLT {
         let heat = mix(vec3<f32>(0.92, 0.99, 1.0), vec3<f32>(0.18, 0.42, 1.0), age);
@@ -1079,6 +1092,13 @@ fn blast_fireball(in: PuffOut, d: f32) -> vec4<f32> {
     var heat = mix(vec3<f32>(0.5, 0.035, 0.004), vec3<f32>(1.0, 0.26, 0.025), smoothstep(0.0, 0.45, temp));
     heat = mix(heat, vec3<f32>(1.0, 0.58, 0.16), smoothstep(0.4, 0.85, temp));
     heat = mix(heat, vec3<f32>(1.0, 0.86, 0.62), smoothstep(1.0, 1.6, temp));
+    if in.appearance.y > 0.5 {
+        // A round burnt down by a missile-defence laser (renderer/laser_fx.rs) goes up
+        // in the beam's red: deep red, red, a pink-red, pink-white at the very heart.
+        heat = mix(vec3<f32>(0.4, 0.0, 0.006), vec3<f32>(1.0, 0.045, 0.025), smoothstep(0.0, 0.45, temp));
+        heat = mix(heat, vec3<f32>(1.0, 0.2, 0.15), smoothstep(0.4, 0.85, temp));
+        heat = mix(heat, vec3<f32>(1.0, 0.62, 0.58), smoothstep(1.0, 1.6, temp));
+    }
     let hot = min(max(temp, 0.0), 1.35);
     let glow = heat * (0.8 + 2.4 * hot * hot);
     let fire = smoothstep(-0.02, 0.22, temp);
@@ -1091,7 +1111,8 @@ fn blast_fireball(in: PuffOut, d: f32) -> vec4<f32> {
     let lamp = in.lamp / (1.0 + in.lamp * 0.04);
     soot += soot * lamp * 0.12;
     soot = apply_haze(apply_fog_of_war(soot, in.world.xy), in.world, globals.camera.xyz);
-    let ember = vec3<f32>(0.9, 0.12, 0.015) * smoothstep(-0.45, 0.0, temp) * (1.0 - fire) * 1.6;
+    let ember_rgb = select(vec3<f32>(0.9, 0.12, 0.015), vec3<f32>(0.85, 0.015, 0.012), in.appearance.y > 0.5);
+    let ember = ember_rgb * smoothstep(-0.45, 0.0, temp) * (1.0 - fire) * 1.6;
     let visible = fog_at(in.world.xy).x;
     let rgb = mix(soot + ember * visible, glow * visible, fire);
 

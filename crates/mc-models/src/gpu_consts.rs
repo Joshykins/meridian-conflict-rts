@@ -301,6 +301,9 @@ shared! {
         /// A flak burst's smoke (renderer/flak_fx.rs): the charge burning inside a
         /// hard-edged black ball that hangs on the wind for seconds.
         pub const FLAK: u32 = 39;
+        /// An ember thrown out of a round burnt down by a missile-defence laser
+        /// (renderer/laser_fx.rs): a red glow, pink-white at first, cooling to deep red.
+        pub const INTERCEPT: u32 = 40;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word
