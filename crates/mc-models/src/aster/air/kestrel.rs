@@ -48,7 +48,7 @@ const HULL: [[f32; 9]; 9] = [
 /// The shoulder wing, root and tip: (y, z, leading x, trailing x, thickness).
 const WING: [(f32, f32, f32, f32, f32); 2] =
     [(1.0, 2.45, 1.15, -1.25, 0.4), (4.2, 2.4, 0.95, -0.85, 0.3)];
-/// The tailplane in plan, across the end of the boom, and a fin in side view standing
+/// The tailplane's left half in plan, from the boom out, and a fin in side view standing
 /// on its tip.
 const TAILPLANE: [[f32; 2]; 4] = [[-5.7, 0.0], [-6.55, 1.75], [-7.25, 1.75], [-7.05, 0.0]];
 const FIN: [[f32; 2]; 4] = [[-6.0, 0.0], [-6.75, 1.55], [-7.4, 1.55], [-7.2, 0.0]];
@@ -209,9 +209,10 @@ fn nacelle(b: &mut MeshBuilder, pivot: Vec3) {
 /// The H tail: a tailplane across the end of the boom with a fin standing on each tip,
 /// canted a little outward and dark-capped.
 fn h_tail(b: &mut MeshBuilder) {
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
-    b.extrude_z(&TAILPLANE, 1.88, 2.02);
     b.mirror_y(|b| {
+        // Each half of the tailplane (its plan is the left half), and its fin.
+        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.extrude_z(&TAILPLANE, 1.88, 2.02);
         let cant = Affine3A::from_translation(v3(0.0, TAILPLANE[1][1] - 0.1, 1.95))
             * Affine3A::from_rotation_x(-0.12);
         b.with(cant, |b| {
