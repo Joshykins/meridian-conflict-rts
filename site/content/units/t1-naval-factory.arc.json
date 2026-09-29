@@ -1,0 +1,39 @@
+{
+  "key": "aster_t1_naval_factory",
+  "slug": "t1-naval-factory",
+  "faction": "arc",
+  "name": "Wharf",
+  "role": "Naval Factory",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Naval",
+    "Factory"
+  ],
+  "lore": null,
+  "stats": {
+    "health": 4200,
+    "shield": null,
+    "mass": 260,
+    "energy": 2200,
+    "buildTime": 320,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": 20
+  },
+  "weapons": [],
+  "builds": [
+    "aster_t1_engineer",
+    "aster_t1_attack_boat",
+    "aster_t1_frigate",
+    "aster_t1_submarine",
+    "aster_t1_salvage_boat"
+  ],
+  "upgradesTo": "aster_t2_naval_factory",
+  "mesh": "factory_naval",
+  "icon": "Factory"
+}

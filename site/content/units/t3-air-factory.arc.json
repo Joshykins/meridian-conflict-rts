@@ -1,0 +1,51 @@
+{
+  "key": "aster_t3_air_factory",
+  "slug": "t3-air-factory",
+  "faction": "arc",
+  "name": "Aerie III",
+  "role": "Air Factory",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Air",
+    "Factory"
+  ],
+  "lore": "Taller assembly gantries over the Aerie's original apron and tower.",
+  "stats": {
+    "health": 16000,
+    "shield": null,
+    "mass": 4650,
+    "energy": 41100,
+    "buildTime": 5200,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": 200
+  },
+  "weapons": [],
+  "builds": [
+    "aster_t1_engineer",
+    "aster_t1_interceptor",
+    "aster_t1_bomber",
+    "aster_t2_engineer",
+    "aster_t3_engineer",
+    "aster_t1_air_scout",
+    "aster_t1_rotor_gunship",
+    "aster_t2_support",
+    "aster_t1_reclaim_carrier",
+    "aster_t2_gunship",
+    "aster_t2_fire_bomber",
+    "aster_t2_torpedo_bomber",
+    "aster_t2_interceptor",
+    "aster_t3_air_superiority",
+    "aster_t3_strategic_bomber",
+    "aster_t3_assault_aircraft"
+  ],
+  "upgradesTo": null,
+  "mesh": "factory_air",
+  "icon": "Factory"
+}

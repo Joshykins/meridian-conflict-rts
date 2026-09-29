@@ -1,0 +1,51 @@
+{
+  "key": "aster_t2_aa",
+  "slug": "t2-aa",
+  "faction": "arc",
+  "name": "Barrage",
+  "role": "Flak Battery",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Naval",
+    "Defense",
+    "AntiAir"
+  ],
+  "lore": "A dug-in heavy flak gun, the Squall's big sister, laid by radar and a rangefinder.",
+  "stats": {
+    "health": 5515,
+    "shield": null,
+    "mass": 520,
+    "energy": 4680,
+    "buildTime": 1560,
+    "speed": null,
+    "vision": 450,
+    "radar": 650,
+    "sonar": null,
+    "range": 640,
+    "dps": 400,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Heavy Twin Flak",
+      "damage": 300,
+      "range": 640,
+      "reload": 1.5,
+      "dps": 400,
+      "splash": 40,
+      "targets": [
+        "Air"
+      ],
+      "kind": "flak",
+      "color": "Orange",
+      "lore": "Two long barrels fired together; the shells drift apart and burst side by side across a flight.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "flak_battery",
+  "icon": "AntiAir"
+}

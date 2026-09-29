@@ -1,0 +1,95 @@
+{
+  "key": "aster_t2_fire_bomber",
+  "slug": "t2-fire-bomber",
+  "faction": "arc",
+  "name": "Hellkite",
+  "role": "Flying Fortress Fire Bomber",
+  "tech": 2,
+  "domain": "air",
+  "categories": [
+    "Air"
+  ],
+  "lore": "A four-engine flying fortress built to burn a position, not just crater it.",
+  "stats": {
+    "health": 3687,
+    "shield": null,
+    "mass": 500,
+    "energy": 17500,
+    "buildTime": 3120,
+    "speed": 89,
+    "vision": 640,
+    "radar": null,
+    "sonar": null,
+    "range": 500,
+    "dps": 358.7,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Incendiary Carpet",
+      "damage": 84,
+      "range": 500,
+      "reload": 9,
+      "dps": 224,
+      "splash": 18,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "ballistic",
+      "color": "Orange",
+      "lore": "Scatters two dozen incendiaries meant to set the ground alight.",
+      "count": 1
+    },
+    {
+      "name": "Dorsal AA",
+      "damage": 16.8,
+      "range": 240,
+      "reload": 0.35,
+      "dps": 48,
+      "splash": 0,
+      "targets": [
+        "Air"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A top-mounted gun keeping fighters off the fortress's exposed back.",
+      "count": 1
+    },
+    {
+      "name": "Port AA",
+      "damage": 13.4,
+      "range": 200,
+      "reload": 0.3,
+      "dps": 44.7,
+      "splash": 0,
+      "targets": [
+        "Air"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A side-mounted gun covering the fortress's flank on the approach.",
+      "count": 1
+    },
+    {
+      "name": "Tail AA",
+      "damage": 16.8,
+      "range": 230,
+      "reload": 0.4,
+      "dps": 42,
+      "splash": 0,
+      "targets": [
+        "Air"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A rear-facing gun watching the one approach no escort ever covers.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "fire_bomber",
+  "icon": "Bomber"
+}

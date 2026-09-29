@@ -1,0 +1,34 @@
+{
+  "key": "aster_mass_storage_t2",
+  "slug": "mass-storage-t2",
+  "faction": "arc",
+  "name": "Materials Vault II",
+  "role": "Materials Storage",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Storage"
+  ],
+  "lore": "A deeper vault, dug down to hold what the mines and the salvage crews bring in.",
+  "stats": {
+    "health": 4800,
+    "shield": null,
+    "mass": 400,
+    "energy": 4800,
+    "buildTime": 700,
+    "speed": null,
+    "vision": 100,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "aster_mass_storage_t3",
+  "mesh": "storage_mass",
+  "icon": "Storage"
+}

@@ -1,0 +1,44 @@
+{
+  "key": "naga_t1_engineer",
+  "slug": "t1-engineer",
+  "faction": "regency",
+  "name": "Artificer",
+  "role": "Engineer",
+  "tech": 1,
+  "domain": "land",
+  "categories": [
+    "Land",
+    "Engineer"
+  ],
+  "lore": "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
+  "stats": {
+    "health": 170,
+    "shield": null,
+    "mass": 55,
+    "energy": 280,
+    "buildTime": 280,
+    "speed": 28,
+    "vision": 180,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": 5
+  },
+  "weapons": [],
+  "builds": [
+    "naga_t1_land_factory",
+    "naga_t1_air_factory",
+    "naga_t1_naval_factory",
+    "naga_t1_extractor",
+    "naga_t1_power",
+    "naga_storage",
+    "naga_t1_point_defense",
+    "naga_t1_aa",
+    "naga_t1_radar",
+    "naga_wall"
+  ],
+  "upgradesTo": null,
+  "mesh": "naga_engineer",
+  "icon": "Engineer"
+}

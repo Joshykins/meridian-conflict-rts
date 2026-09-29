@@ -1,0 +1,34 @@
+{
+  "key": "aster_t1_sensor_ship",
+  "slug": "t1-sensor-ship",
+  "faction": "arc",
+  "name": "Vigil",
+  "role": "Sensor Ship",
+  "tech": 1,
+  "domain": "space",
+  "categories": [
+    "Air",
+    "Space",
+    "Intel"
+  ],
+  "lore": "A light hull built round one great search radar, so the Reach's picture of the field travels with its army. It carries no guns; its crews say the dome is the weapon.",
+  "stats": {
+    "health": 700,
+    "shield": null,
+    "mass": 280,
+    "energy": 4200,
+    "buildTime": 1400,
+    "speed": 90,
+    "vision": 1500,
+    "radar": 6000,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "sensor_ship",
+  "icon": "SensorShip"
+}

@@ -1,0 +1,63 @@
+{
+  "key": "naga_commander",
+  "slug": "commander",
+  "faction": "regency",
+  "name": "Exarch",
+  "role": "Armored Command Unit",
+  "tech": 1,
+  "domain": "command",
+  "categories": [
+    "Land",
+    "Commander",
+    "Engineer",
+    "DirectFire"
+  ],
+  "lore": "A walking command machine that comes ashore alone and puts up a stronghold with the nanite emitter in its claw; ARC crews call it the Exarch.",
+  "stats": {
+    "health": 11000,
+    "shield": null,
+    "mass": 18000,
+    "energy": 5000000,
+    "buildTime": 6000000,
+    "speed": 17,
+    "vision": 600,
+    "radar": 1500,
+    "sonar": null,
+    "range": 360,
+    "dps": 200,
+    "buildPower": 10
+  },
+  "weapons": [
+    {
+      "name": "Plasmeric Repeater",
+      "damage": 60,
+      "range": 360,
+      "reload": 0.3,
+      "dps": 200,
+      "splash": 2,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "The cannon that is its right forearm fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
+      "count": 1
+    }
+  ],
+  "builds": [
+    "naga_t1_land_factory",
+    "naga_t1_air_factory",
+    "naga_t1_naval_factory",
+    "naga_t1_extractor",
+    "naga_t1_power",
+    "naga_storage",
+    "naga_t1_point_defense",
+    "naga_t1_aa",
+    "naga_t1_radar",
+    "naga_wall"
+  ],
+  "upgradesTo": null,
+  "mesh": "naga_commander",
+  "icon": "Commander"
+}

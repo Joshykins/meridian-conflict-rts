@@ -1,0 +1,34 @@
+{
+  "key": "naga_t1_extractor",
+  "slug": "t1-extractor",
+  "faction": "regency",
+  "name": "Excavator",
+  "role": "Materials Mine",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Extractor"
+  ],
+  "lore": "A beam run straight down into the ground cuts the bore, and the ore it frees is drawn up the column round it. It draws nothing from the grid.",
+  "stats": {
+    "health": 1200,
+    "shield": null,
+    "mass": 230,
+    "energy": 800,
+    "buildTime": 200,
+    "speed": null,
+    "vision": 300,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "naga_t2_extractor",
+  "mesh": "naga_taproot",
+  "icon": "Extractor"
+}

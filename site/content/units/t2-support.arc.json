@@ -1,0 +1,33 @@
+{
+  "key": "aster_t2_support",
+  "slug": "t2-support",
+  "faction": "arc",
+  "name": "Argus",
+  "role": "Radar / Salvage / Anti-Missile Support",
+  "tech": 2,
+  "domain": "air",
+  "categories": [
+    "Air",
+    "Intel"
+  ],
+  "lore": "A radar, sonar and anti-missile airframe, built after the losses at Twin Shoals. A salvage ray under its nose strips the wrecks it flies over.",
+  "stats": {
+    "health": 720,
+    "shield": 1200,
+    "mass": 330,
+    "energy": 11000,
+    "buildTime": 1800,
+    "speed": 92,
+    "vision": 1200,
+    "radar": 2800,
+    "sonar": 900,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "support_air",
+  "icon": "Intel"
+}

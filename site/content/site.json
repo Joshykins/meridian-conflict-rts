@@ -1,0 +1,12 @@
+{
+  "name": "Meridian Conflict",
+  "tagline": "Build your base. Command huge armies.",
+  "description": "A real-time strategy game about building bases and commanding huge armies across land, sea, air and orbit. Currently in development.",
+  "discord": "https://discord.com/channels/1553517008631505097/1553517009185276016",
+  "heroVideo": {
+    "src": null,
+    "poster": null,
+    "note": "Set src (and poster) to a webm/mp4 in public/ once the trailer is cut. Until then the hero draws the valley and the meridian live."
+  },
+  "featured": ["arc/commander", "arc/t1-tank", "arc/t3-assault-bot", "arc/t3-assault-aircraft", "arc/t3-battleship", "arc/t3-frigate", "arc/t4-assault-tank", "arc/t5-titan", "regency/t3-scorpion"]
+}

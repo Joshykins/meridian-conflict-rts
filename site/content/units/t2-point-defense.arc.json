@@ -1,0 +1,51 @@
+{
+  "key": "aster_t2_point_defense",
+  "slug": "t2-point-defense",
+  "faction": "arc",
+  "name": "Redoubt",
+  "role": "Heavy Point Defense",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Defense",
+    "DirectFire"
+  ],
+  "lore": "A heavy static gun holding lines the Sentinel alone could not.",
+  "stats": {
+    "health": 7792,
+    "shield": null,
+    "mass": 1000,
+    "energy": 9000,
+    "buildTime": 2000,
+    "speed": null,
+    "vision": 300,
+    "radar": null,
+    "sonar": null,
+    "range": 780,
+    "dps": 282.5,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Triple Cannon Battery",
+      "damage": 226,
+      "range": 780,
+      "reload": 2.4,
+      "dps": 282.5,
+      "splash": 0,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "Three barrels laying down the crossfire infantry call the wall.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "turret_heavy",
+  "icon": "Defense"
+}

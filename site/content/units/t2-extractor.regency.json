@@ -1,0 +1,34 @@
+{
+  "key": "naga_t2_extractor",
+  "slug": "t2-extractor",
+  "faction": "regency",
+  "name": "Excavator II",
+  "role": "Materials Mine",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Extractor"
+  ],
+  "lore": "The rig refitted with pinch emitters that join the beam at the mouth, and a second collector ring.",
+  "stats": {
+    "health": 9600,
+    "shield": null,
+    "mass": 1700,
+    "energy": 6000,
+    "buildTime": 900,
+    "speed": null,
+    "vision": 360,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "naga_t3_extractor",
+  "mesh": "naga_taproot",
+  "icon": "Extractor"
+}

@@ -1,0 +1,51 @@
+{
+  "key": "naga_t2_point_defense",
+  "slug": "t2-point-defense",
+  "faction": "regency",
+  "name": "Halberd",
+  "role": "Heavy Point Defense",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Defense",
+    "DirectFire"
+  ],
+  "lore": "An armoured keep under a long turret, a ring turning under it and rams working in its skirt. Placeholder text.",
+  "stats": {
+    "health": 7800,
+    "shield": null,
+    "mass": 1000,
+    "energy": 9000,
+    "buildTime": 2000,
+    "speed": null,
+    "vision": 300,
+    "radar": null,
+    "sonar": null,
+    "range": 520,
+    "dps": 300,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Pinched-plasmeric Cannon",
+      "damage": 240,
+      "range": 520,
+      "reload": 2.4,
+      "dps": 300,
+      "splash": 1,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "Plasma squeezed dense by gravity and driven downrange three slugs a burst; each one stops in what it hits.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_pinch_cannon",
+  "icon": "Defense"
+}

@@ -1,0 +1,32 @@
+{
+  "key": "aster_reclaim_drone",
+  "slug": "reclaim-drone",
+  "faction": "arc",
+  "name": "Salvage Drone",
+  "role": "Carrier Reclaim Drone",
+  "tech": 1,
+  "domain": "air",
+  "categories": [
+    "Air"
+  ],
+  "lore": "A small, disposable reclaimer that lives and dies with its parent Osprey.",
+  "stats": {
+    "health": 150,
+    "shield": null,
+    "mass": 3,
+    "energy": 30,
+    "buildTime": 30,
+    "speed": 88,
+    "vision": 360,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "reclaim_drone",
+  "icon": "SalvageDrone"
+}

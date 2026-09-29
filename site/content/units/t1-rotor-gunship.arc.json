@@ -1,0 +1,67 @@
+{
+  "key": "aster_t1_rotor_gunship",
+  "slug": "t1-rotor-gunship",
+  "faction": "arc",
+  "name": "Wasp",
+  "role": "Rotor Gunship",
+  "tech": 1,
+  "domain": "air",
+  "categories": [
+    "Air"
+  ],
+  "lore": "A low-altitude helicopter built for support where fixed wings cannot loiter.",
+  "stats": {
+    "health": 120,
+    "shield": null,
+    "mass": 45,
+    "energy": 750,
+    "buildTime": 260,
+    "speed": 70,
+    "vision": 460,
+    "radar": null,
+    "sonar": null,
+    "range": 180,
+    "dps": 37.5,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Light Machine Gun",
+      "damage": 5,
+      "range": 155,
+      "reload": 0.2,
+      "dps": 25,
+      "splash": 0,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A chin-mounted gun for suppressing whatever the Wasp hovers over.",
+      "count": 1
+    },
+    {
+      "name": "Unguided Rockets",
+      "damage": 20,
+      "range": 180,
+      "reload": 3.2,
+      "dps": 12.5,
+      "splash": 3,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "missile",
+      "color": "Orange",
+      "lore": "A pair of rocket pods for targets the machine gun cannot crack.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "rotor_gunship",
+  "icon": "Gunship"
+}

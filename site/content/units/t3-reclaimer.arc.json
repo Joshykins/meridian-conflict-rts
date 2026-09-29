@@ -1,0 +1,33 @@
+{
+  "key": "aster_t3_reclaimer",
+  "slug": "t3-reclaimer",
+  "faction": "arc",
+  "name": "Scavenger III",
+  "role": "Reclaim Tower",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy"
+  ],
+  "lore": "A heavy reclaim tower whose beam strips a whole battlefield of what fell on it.",
+  "stats": {
+    "health": 9600,
+    "shield": null,
+    "mass": 1700,
+    "energy": 10200,
+    "buildTime": 1600,
+    "speed": null,
+    "vision": 900,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "reclaim_tower",
+  "icon": "Salvage"
+}

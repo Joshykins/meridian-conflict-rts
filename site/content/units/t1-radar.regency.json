@@ -1,0 +1,33 @@
+{
+  "key": "naga_t1_radar",
+  "slug": "t1-radar",
+  "faction": "regency",
+  "name": "Orrery",
+  "role": "Radar System",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Intel"
+  ],
+  "lore": "A braced mast crowned with a sensor ring that turns free of it, held by gravity alone.",
+  "stats": {
+    "health": 300,
+    "shield": null,
+    "mass": 90,
+    "energy": 700,
+    "buildTime": 90,
+    "speed": null,
+    "vision": 500,
+    "radar": 3000,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "naga_t2_radar",
+  "mesh": "naga_eye",
+  "icon": "Intel"
+}

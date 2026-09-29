@@ -1,0 +1,34 @@
+{
+  "key": "aster_t1_air_scout",
+  "slug": "t1-air-scout",
+  "faction": "arc",
+  "name": "Swift",
+  "role": "Air Scout",
+  "tech": 1,
+  "domain": "air",
+  "categories": [
+    "Air",
+    "Scout",
+    "Intel"
+  ],
+  "lore": "An unarmed radar airframe, built by Halcyon Aerospace for endurance.",
+  "stats": {
+    "health": 55,
+    "shield": null,
+    "mass": 20,
+    "energy": 350,
+    "buildTime": 120,
+    "speed": 115,
+    "vision": 1100,
+    "radar": 3600,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "air_scout",
+  "icon": "Scout"
+}

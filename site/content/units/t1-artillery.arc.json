@@ -1,0 +1,50 @@
+{
+  "key": "aster_t1_artillery",
+  "slug": "t1-artillery",
+  "faction": "arc",
+  "name": "Ballista",
+  "role": "Mobile Light Artillery",
+  "tech": 1,
+  "domain": "land",
+  "categories": [
+    "Land",
+    "Artillery"
+  ],
+  "lore": "A Light Howitzer on the Warden's own hull, for mobile fire support.",
+  "stats": {
+    "health": 140,
+    "shield": null,
+    "mass": 54,
+    "energy": 270,
+    "buildTime": 270,
+    "speed": 26,
+    "vision": 340,
+    "radar": null,
+    "sonar": null,
+    "range": 440,
+    "dps": 24,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Light Howitzer",
+      "damage": 120,
+      "range": 440,
+      "reload": 5,
+      "dps": 24,
+      "splash": 6,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "ballistic",
+      "color": "Orange",
+      "lore": "Built to displace and fire again before counter-battery answers.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "artillery_light",
+  "icon": "Artillery"
+}

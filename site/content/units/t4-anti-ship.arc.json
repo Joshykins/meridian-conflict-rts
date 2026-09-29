@@ -1,0 +1,51 @@
+{
+  "key": "aster_t4_anti_ship",
+  "slug": "t4-anti-ship",
+  "faction": "arc",
+  "name": "Zenith",
+  "role": "Anti-Ship Rail Cannon",
+  "tech": 4,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Defense",
+    "AntiAir",
+    "Experimental"
+  ],
+  "lore": "A rail cannon too heavy to move, built to bring warships down out of the clouds.",
+  "stats": {
+    "health": 40000,
+    "shield": null,
+    "mass": 4000,
+    "energy": 50000,
+    "buildTime": 16000,
+    "speed": null,
+    "vision": 600,
+    "radar": null,
+    "sonar": null,
+    "range": 2600,
+    "dps": 700,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Zenith Rail Cannon",
+      "damage": 7000,
+      "range": 2600,
+      "reload": 10,
+      "dps": 700,
+      "splash": 20,
+      "targets": [
+        "Space"
+      ],
+      "kind": "rail",
+      "color": "Orange",
+      "lore": "One slug a salvo, fast enough to cross the sky before the thunder does.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "anti_ship_rail",
+  "icon": "AntiAir"
+}

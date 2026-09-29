@@ -1,0 +1,33 @@
+{
+  "key": "aster_t2_sonar",
+  "slug": "t2-sonar",
+  "faction": "arc",
+  "name": "Hydrophone II",
+  "role": "Sonar Buoy",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Naval",
+    "Intel"
+  ],
+  "lore": "The same buoy with a longer array streamed deeper, doubling what it hears.",
+  "stats": {
+    "health": 540,
+    "shield": null,
+    "mass": 160,
+    "energy": 3000,
+    "buildTime": 700,
+    "speed": null,
+    "vision": 260,
+    "radar": null,
+    "sonar": 3200,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "aster_t3_sonar",
+  "mesh": "sonar",
+  "icon": "Intel"
+}

@@ -1,0 +1,34 @@
+{
+  "key": "aster_mass_storage_t3",
+  "slug": "mass-storage-t3",
+  "faction": "arc",
+  "name": "Materials Vault III",
+  "role": "Materials Storage",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Storage"
+  ],
+  "lore": "A reinforced strategic reserve, big enough to bank a battlefield's worth of salvage.",
+  "stats": {
+    "health": 14400,
+    "shield": null,
+    "mass": 1000,
+    "energy": 19200,
+    "buildTime": 1200,
+    "speed": null,
+    "vision": 100,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "storage_mass",
+  "icon": "Storage"
+}

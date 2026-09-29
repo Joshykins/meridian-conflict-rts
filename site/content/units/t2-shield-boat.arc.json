@@ -1,0 +1,33 @@
+{
+  "key": "aster_t2_shield_boat",
+  "slug": "t2-shield-boat",
+  "faction": "arc",
+  "name": "Nautilus",
+  "role": "Shield Boat",
+  "tech": 2,
+  "domain": "naval",
+  "categories": [
+    "Naval",
+    "Shield"
+  ],
+  "lore": "A hull built to carry a shield generator to sea. Shells and missiles break on its dome; torpedoes run under the skirt.",
+  "stats": {
+    "health": 3500,
+    "shield": 9000,
+    "mass": 700,
+    "energy": 4900,
+    "buildTime": 2400,
+    "speed": 28,
+    "vision": 380,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "shield_boat",
+  "icon": "Shield"
+}

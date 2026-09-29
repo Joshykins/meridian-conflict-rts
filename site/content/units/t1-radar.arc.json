@@ -1,0 +1,33 @@
+{
+  "key": "aster_t1_radar",
+  "slug": "t1-radar",
+  "faction": "arc",
+  "name": "Watchtower",
+  "role": "Radar System",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Intel"
+  ],
+  "lore": "Reach's basic radar mast, raised before a base's first factory finishes.",
+  "stats": {
+    "health": 160,
+    "shield": null,
+    "mass": 80,
+    "energy": 720,
+    "buildTime": 80,
+    "speed": null,
+    "vision": 500,
+    "radar": 3000,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "aster_t2_radar",
+  "mesh": "radar",
+  "icon": "Intel"
+}

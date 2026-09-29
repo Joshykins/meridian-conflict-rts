@@ -1,0 +1,33 @@
+{
+  "key": "aster_t3_radar",
+  "slug": "t3-radar",
+  "faction": "arc",
+  "name": "Watchtower III",
+  "role": "Radar System",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Intel"
+  ],
+  "lore": "The mast at full height, seeing clear across a battlefield the size of Twin Shoals.",
+  "stats": {
+    "health": 1600,
+    "shield": null,
+    "mass": 720,
+    "energy": 10800,
+    "buildTime": 2400,
+    "speed": null,
+    "vision": 720,
+    "radar": 12000,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "radar",
+  "icon": "Intel"
+}

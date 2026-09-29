@@ -1,0 +1,67 @@
+{
+  "key": "aster_t2_gunship",
+  "slug": "t2-gunship",
+  "faction": "arc",
+  "name": "Kestrel",
+  "role": "Heavy Gunship",
+  "tech": 2,
+  "domain": "air",
+  "categories": [
+    "Air"
+  ],
+  "lore": "A vector-thrust gunship built to hover over a target and grind it down.",
+  "stats": {
+    "health": 1050,
+    "shield": null,
+    "mass": 220,
+    "energy": 7600,
+    "buildTime": 1360,
+    "speed": 85,
+    "vision": 560,
+    "radar": null,
+    "sonar": null,
+    "range": 280,
+    "dps": 260,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Chin Autocannon",
+      "damage": 38,
+      "range": 250,
+      "reload": 0.22,
+      "dps": 172.7,
+      "splash": 2.5,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A long-barrelled autocannon in a chin turret, for steady fire while the gunship holds position.",
+      "count": 1
+    },
+    {
+      "name": "Rocket Pods",
+      "damage": 40,
+      "range": 280,
+      "reload": 5.5,
+      "dps": 87.3,
+      "splash": 6,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "missile",
+      "color": "Orange",
+      "lore": "Two six-tube launchers that ripple a dozen rockets off in a second, for what the cannon cannot finish.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "gunship",
+  "icon": "Gunship"
+}

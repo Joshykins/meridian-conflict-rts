@@ -1,0 +1,68 @@
+{
+  "key": "aster_commander",
+  "slug": "commander",
+  "faction": "arc",
+  "name": "ARC Commander",
+  "role": "Armored Command Unit",
+  "tech": 1,
+  "domain": "command",
+  "categories": [
+    "Land",
+    "Commander",
+    "Engineer",
+    "DirectFire"
+  ],
+  "lore": "Reach Command's chassis, landed alone to raise a foothold from nothing.",
+  "stats": {
+    "health": 11000,
+    "shield": null,
+    "mass": 18000,
+    "energy": 5000000,
+    "buildTime": 6000000,
+    "speed": 30,
+    "vision": 600,
+    "radar": 1500,
+    "sonar": null,
+    "range": 360,
+    "dps": 200,
+    "buildPower": 10
+  },
+  "weapons": [
+    {
+      "name": "Vulcan Machine Gun",
+      "damage": 40,
+      "range": 360,
+      "reload": 0.2,
+      "dps": 200,
+      "splash": 2,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A rotary gun on the right forearm, kept through every refit.",
+      "count": 1
+    }
+  ],
+  "builds": [
+    "aster_t1_lift_ship",
+    "aster_t1_sensor_ship",
+    "aster_t1_land_factory",
+    "aster_t1_air_factory",
+    "aster_t1_naval_factory",
+    "aster_core_mine",
+    "aster_t1_power",
+    "aster_mass_storage",
+    "aster_energy_storage",
+    "aster_t1_point_defense",
+    "aster_t1_radar",
+    "aster_t1_sonar",
+    "aster_wall",
+    "aster_t1_aa",
+    "aster_t1_reclaimer"
+  ],
+  "upgradesTo": null,
+  "mesh": "commander",
+  "icon": "Commander"
+}

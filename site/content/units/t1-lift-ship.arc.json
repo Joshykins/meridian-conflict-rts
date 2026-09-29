@@ -1,0 +1,32 @@
+{
+  "key": "aster_t1_lift_ship",
+  "slug": "t1-lift-ship",
+  "faction": "arc",
+  "name": "Courier",
+  "role": "Light Transport",
+  "tech": 1,
+  "domain": "air",
+  "categories": [
+    "Air"
+  ],
+  "lore": null,
+  "stats": {
+    "health": 400,
+    "shield": null,
+    "mass": 160,
+    "energy": 2400,
+    "buildTime": 800,
+    "speed": 150,
+    "vision": 320,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "light_transport",
+  "icon": "Transport"
+}

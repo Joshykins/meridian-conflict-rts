@@ -1,0 +1,34 @@
+{
+  "key": "aster_t3_power",
+  "slug": "t3-power",
+  "faction": "arc",
+  "name": "Reactor III",
+  "role": "Power Generator",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Power"
+  ],
+  "lore": "The largest fusion plant in the Reach inventory, tall enough to see for miles.",
+  "stats": {
+    "health": 9720,
+    "shield": null,
+    "mass": 2800,
+    "energy": 16800,
+    "buildTime": 3000,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "power",
+  "icon": "Power"
+}

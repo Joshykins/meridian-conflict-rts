@@ -1,0 +1,34 @@
+{
+  "key": "naga_wall",
+  "slug": "wall",
+  "faction": "regency",
+  "name": "Palisade",
+  "role": "Wall Section",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Wall",
+    "Defense"
+  ],
+  "lore": "Armoured octagons set shoulder to shoulder, their plates lapped up into spikes. Slow to build, very hard to cut.",
+  "stats": {
+    "health": 5200,
+    "shield": null,
+    "mass": 4,
+    "energy": 20,
+    "buildTime": 30,
+    "speed": null,
+    "vision": 0,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_thornwall",
+  "icon": "Wall"
+}

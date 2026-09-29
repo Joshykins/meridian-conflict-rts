@@ -1,0 +1,50 @@
+{
+  "key": "aster_t1_interceptor",
+  "slug": "t1-interceptor",
+  "faction": "arc",
+  "name": "Shrike",
+  "role": "Fighter",
+  "tech": 1,
+  "domain": "air",
+  "categories": [
+    "Air",
+    "AntiAir",
+    "DirectFire"
+  ],
+  "lore": "Reach's basic fighter, still called Shrike by pilots out of habit.",
+  "stats": {
+    "health": 90,
+    "shield": null,
+    "mass": 35,
+    "energy": 600,
+    "buildTime": 300,
+    "speed": 91,
+    "vision": 480,
+    "radar": null,
+    "sonar": null,
+    "range": 220,
+    "dps": 33.3,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Twin Autocannon",
+      "damage": 10,
+      "range": 220,
+      "reload": 0.3,
+      "dps": 33.3,
+      "splash": 0,
+      "targets": [
+        "Air"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "Built to clear scouts and bombers, not trade with heavier iron.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "interceptor",
+  "icon": "Fighter"
+}

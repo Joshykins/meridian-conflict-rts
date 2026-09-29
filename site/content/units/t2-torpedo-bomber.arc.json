@@ -1,0 +1,48 @@
+{
+  "key": "aster_t2_torpedo_bomber",
+  "slug": "t2-torpedo-bomber",
+  "faction": "arc",
+  "name": "Gannet",
+  "role": "Torpedo Bomber",
+  "tech": 2,
+  "domain": "air",
+  "categories": [
+    "Air"
+  ],
+  "lore": "A sea-patrol drone that listens for hulls under the water and comes down to the wave tops to answer them.",
+  "stats": {
+    "health": 1050,
+    "shield": null,
+    "mass": 180,
+    "energy": 6100,
+    "buildTime": 1150,
+    "speed": 86,
+    "vision": 600,
+    "radar": null,
+    "sonar": 900,
+    "range": 300,
+    "dps": 90,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Aerial Torpedoes",
+      "damage": 450,
+      "range": 300,
+      "reload": 10,
+      "dps": 90,
+      "splash": 3,
+      "targets": [
+        "Naval"
+      ],
+      "kind": "torpedo",
+      "color": "Orange",
+      "lore": "Dropped in pairs from low over the water; they find their own way once they are in.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "torpedo_bomber",
+  "icon": "TorpedoBomber"
+}

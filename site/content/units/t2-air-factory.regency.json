@@ -1,0 +1,36 @@
+{
+  "key": "naga_t2_air_factory",
+  "slug": "t2-air-factory",
+  "faction": "regency",
+  "name": "Skyforge II",
+  "role": "Air Factory",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Air",
+    "Factory"
+  ],
+  "lore": "The air factory at tech 2: flywheel presses on its houses and more fabricator heads.",
+  "stats": {
+    "health": 8800,
+    "shield": null,
+    "mass": 1580,
+    "energy": 12100,
+    "buildTime": 2030,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": 80
+  },
+  "weapons": [],
+  "builds": [
+    "naga_t1_engineer"
+  ],
+  "upgradesTo": "naga_t3_air_factory",
+  "mesh": "naga_hatchery",
+  "icon": "Factory"
+}

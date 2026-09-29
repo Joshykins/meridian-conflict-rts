@@ -1,0 +1,50 @@
+{
+  "key": "aster_t1_attack_boat",
+  "slug": "t1-attack-boat",
+  "faction": "arc",
+  "name": "Skiff",
+  "role": "Attack Boat",
+  "tech": 1,
+  "domain": "naval",
+  "categories": [
+    "Naval",
+    "DirectFire"
+  ],
+  "lore": "A harbour patrol hull with a gun ring on the bow, quick enough to pick its fights.",
+  "stats": {
+    "health": 380,
+    "shield": null,
+    "mass": 60,
+    "energy": 330,
+    "buildTime": 230,
+    "speed": 60,
+    "vision": 350,
+    "radar": null,
+    "sonar": null,
+    "range": 330,
+    "dps": 27.5,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Heavy Machine Gun",
+      "damage": 11,
+      "range": 330,
+      "reload": 0.4,
+      "dps": 27.5,
+      "splash": 0,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A rotary gun on the bow ring that shreds light hulls and anything on the shore.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "attack_boat",
+  "icon": "Ship"
+}

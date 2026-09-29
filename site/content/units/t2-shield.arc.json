@@ -1,0 +1,34 @@
+{
+  "key": "aster_t2_shield",
+  "slug": "t2-shield",
+  "faction": "arc",
+  "name": "Aegis",
+  "role": "Shield Generator",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Defense",
+    "Shield"
+  ],
+  "lore": "A shield tower raised after Twin Shoals proved a base needs one to survive.",
+  "stats": {
+    "health": 2200,
+    "shield": 9000,
+    "mass": 900,
+    "energy": 12000,
+    "buildTime": 1600,
+    "speed": null,
+    "vision": 140,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "aster_t3_shield",
+  "mesh": "shield",
+  "icon": "Shield"
+}

@@ -1,0 +1,64 @@
+[
+  {
+    "slug": "arc",
+    "key": "Aster",
+    "name": "Asterian Reach Command",
+    "short": "ARC",
+    "motto": "Hold the Reach",
+    "meaning": "The Reach is every world humanity holds, from old Earth out to Asteria and the colonies past it. Reach Command is the one military that answers for all of them, founded at Unification when Earth's blocs folded their armies into a single command.",
+    "about": "The standing military of the Asterian Reach, and for a century and a half the strongest force humanity has ever fielded. Disciplined, heavily armoured and proud of it, ARC wins by holding a line and grinding down whatever comes at it. It has never had to learn what losing looks like.",
+    "field": "Guns, rails and flak, never plasma. Heavy armour, long lines and gold shield fields, and commanders who build fast and hold what they build.",
+    "crest": [
+      {
+        "title": "The eagle",
+        "text": "Carried out from Earth's oldest banners. Its raised wings span the Reach: one for Earth, one for Asteria."
+      },
+      {
+        "title": "The shield",
+        "text": "The charter. Command exists to stand between the Reach and whatever comes for it."
+      },
+      {
+        "title": "The star",
+        "text": "The Waypoint, the first star a human ship ever reached. Every ARC ship still takes its first bearing from it."
+      },
+      {
+        "title": "The horizon",
+        "text": "Asteria rising: the garden world and capital, lit the ice blue of the Command's own drive light."
+      },
+      {
+        "title": "The scroll",
+        "text": "The full name, worn on every hull and uniform and painted on the ground wherever ARC digs in."
+      }
+    ],
+    "units": 97
+  },
+  {
+    "slug": "regency",
+    "key": "Naga",
+    "name": "The Regency",
+    "short": "Regency",
+    "motto": null,
+    "meaning": "The name is Command's translation of the title the envoys at Meridia gave: they spoke for the Regent. A regent governs in someone else's place. Whose, no one in Command can say.",
+    "about": "They came out of the dark in 175 AC, and the first battle was a massacre. They burn worlds to glass, but not every world; which ones, and why, no one in Command can yet say. Black machines lit red from inside, plasma no ARC lab can explain, and shields that hold against almost everything Command fires at them.",
+    "field": "Their own army is still to come. For now a Regency commander leads ARC units.",
+    "crest": [
+      {
+        "title": "Whose mark",
+        "text": "ARC's. No Regency banner has ever been seen; this is what Command's own artists drew for the threat boards."
+      },
+      {
+        "title": "The blades",
+        "text": "A crown cut down to blades, swept like the plates on their machines. Command drew a crown because a regent serves one."
+      },
+      {
+        "title": "The light",
+        "text": "It burns red in every Regency machine. Survivors of the Arrival say it looks at you before it fires."
+      },
+      {
+        "title": "The broken rings",
+        "text": "A world's horizon, twice. Both are open at the top: what they leave behind is never whole."
+      }
+    ],
+    "units": 27
+  }
+]

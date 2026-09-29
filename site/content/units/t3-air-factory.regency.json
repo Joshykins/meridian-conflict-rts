@@ -1,0 +1,36 @@
+{
+  "key": "naga_t3_air_factory",
+  "slug": "t3-air-factory",
+  "faction": "regency",
+  "name": "Skyforge III",
+  "role": "Air Factory",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Air",
+    "Factory"
+  ],
+  "lore": "The air factory at tech 3: a crown raised over its lift ring, and more heads hung from it.",
+  "stats": {
+    "health": 17600,
+    "shield": null,
+    "mass": 4840,
+    "energy": 39100,
+    "buildTime": 5550,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": 200
+  },
+  "weapons": [],
+  "builds": [
+    "naga_t1_engineer"
+  ],
+  "upgradesTo": null,
+  "mesh": "naga_hatchery",
+  "icon": "Factory"
+}

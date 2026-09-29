@@ -1,0 +1,65 @@
+{
+  "key": "aster_t3_assault_bot",
+  "slug": "t3-assault-bot",
+  "faction": "arc",
+  "name": "Paladin",
+  "role": "Siege Assault Bot",
+  "tech": 3,
+  "domain": "land",
+  "categories": [
+    "Land",
+    "DirectFire"
+  ],
+  "lore": "Corvus Foundries' breakthrough walker, built on the Commander's own rig.",
+  "stats": {
+    "health": 7987,
+    "shield": 2800,
+    "mass": 840,
+    "energy": 6720,
+    "buildTime": 4800,
+    "speed": 29,
+    "vision": 800,
+    "radar": null,
+    "sonar": null,
+    "range": 780,
+    "dps": 682.8,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Bolt Rifle",
+      "damage": 338,
+      "range": 780,
+      "reload": 1.4,
+      "dps": 241.4,
+      "splash": 5,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "charged",
+      "color": "Blue",
+      "lore": "Twin shoulder-mounted bolt rifles, the Raptor's gun scaled up for a walker: each bolt bursts in lightning over the ground it hits.",
+      "count": 2
+    },
+    {
+      "name": "Shin Torpedo Tubes",
+      "damage": 600,
+      "range": 600,
+      "reload": 6,
+      "dps": 200,
+      "splash": 3,
+      "targets": [
+        "Naval"
+      ],
+      "kind": "torpedo",
+      "color": "Orange",
+      "lore": "Sealed tubes on each shin, for the ships it meets walking the seabed.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "assault_bot",
+  "icon": "Bot"
+}

@@ -1,0 +1,34 @@
+{
+  "key": "aster_t2_power",
+  "slug": "t2-power",
+  "faction": "arc",
+  "name": "Reactor II",
+  "role": "Power Generator",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Power"
+  ],
+  "lore": "A larger containment drum around a hotter, more demanding core.",
+  "stats": {
+    "health": 2200,
+    "shield": null,
+    "mass": 700,
+    "energy": 4200,
+    "buildTime": 1400,
+    "speed": null,
+    "vision": 160,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "power",
+  "icon": "Power"
+}

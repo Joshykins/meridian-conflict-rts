@@ -1,0 +1,36 @@
+{
+  "key": "naga_t1_land_factory",
+  "slug": "t1-land-factory",
+  "faction": "regency",
+  "name": "Anvil",
+  "role": "Land Factory",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Factory"
+  ],
+  "lore": "A press works under swept armour: fabricators hung round a turning ring pour nanites onto the bay floor, and the machine walks out finished.",
+  "stats": {
+    "health": 4600,
+    "shield": null,
+    "mass": 250,
+    "energy": 2000,
+    "buildTime": 320,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": 20
+  },
+  "weapons": [],
+  "builds": [
+    "naga_t1_engineer",
+    "naga_t1_scout"
+  ],
+  "upgradesTo": "naga_t2_land_factory",
+  "mesh": "naga_brood",
+  "icon": "Factory"
+}

@@ -1,0 +1,34 @@
+{
+  "key": "naga_t3_extractor",
+  "slug": "t3-extractor",
+  "faction": "regency",
+  "name": "Excavator III",
+  "role": "Materials Mine",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Extractor"
+  ],
+  "lore": "The rig refitted with emitter posts round the bore and a third collector ring; the beam cuts wider still.",
+  "stats": {
+    "health": 25600,
+    "shield": null,
+    "mass": 6900,
+    "energy": 24000,
+    "buildTime": 1500,
+    "speed": null,
+    "vision": 420,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": "naga_t4_extractor",
+  "mesh": "naga_taproot",
+  "icon": "Extractor"
+}

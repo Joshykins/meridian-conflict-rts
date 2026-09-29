@@ -1,0 +1,41 @@
+{
+  "key": "aster_t1_land_factory",
+  "slug": "t1-land-factory",
+  "faction": "arc",
+  "name": "Forge",
+  "role": "Land Factory",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Factory"
+  ],
+  "lore": "Reach's basic land factory, usually the first thing an enemy tries to level.",
+  "stats": {
+    "health": 4100,
+    "shield": null,
+    "mass": 240,
+    "energy": 2100,
+    "buildTime": 300,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": 20
+  },
+  "weapons": [],
+  "builds": [
+    "aster_t1_engineer",
+    "aster_t1_scout",
+    "aster_t1_bot",
+    "aster_t1_tank",
+    "aster_t1_artillery",
+    "aster_t1_mobile_aa",
+    "aster_t1_land_reclaimer"
+  ],
+  "upgradesTo": "aster_t2_land_factory",
+  "mesh": "factory_land",
+  "icon": "Factory"
+}

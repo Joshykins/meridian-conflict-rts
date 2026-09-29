@@ -1,0 +1,34 @@
+{
+  "key": "naga_t4_extractor",
+  "slug": "t4-extractor",
+  "faction": "regency",
+  "name": "Deep Excavator",
+  "role": "Materials Mine",
+  "tech": 4,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Extractor"
+  ],
+  "lore": "The deepest bore: a heavier lens and a beam that surges, sunk far below the ore fields.",
+  "stats": {
+    "health": 48000,
+    "shield": null,
+    "mass": 23000,
+    "energy": 80000,
+    "buildTime": 2400,
+    "speed": null,
+    "vision": 480,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_taproot",
+  "icon": "Extractor"
+}

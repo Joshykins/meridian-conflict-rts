@@ -1,0 +1,34 @@
+{
+  "key": "aster_wall",
+  "slug": "wall",
+  "faction": "arc",
+  "name": "Rampart",
+  "role": "Wall Section",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Wall",
+    "Defense"
+  ],
+  "lore": "A plain wall section that joins its neighbours into one rampart, cheap enough to raise faster than guns can knock it down.",
+  "stats": {
+    "health": 4000,
+    "shield": null,
+    "mass": 3,
+    "energy": 20,
+    "buildTime": 20,
+    "speed": null,
+    "vision": 0,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "wall",
+  "icon": "Wall"
+}

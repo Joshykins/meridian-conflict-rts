@@ -1,0 +1,34 @@
+{
+  "key": "naga_t3_power",
+  "slug": "t3-power",
+  "faction": "regency",
+  "name": "Star Cage III",
+  "role": "Power Generator",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Power"
+  ],
+  "lore": "The largest star core, held by eight pylons and a double row of pinch emitters.",
+  "stats": {
+    "health": 14000,
+    "shield": null,
+    "mass": 3360,
+    "energy": 15600,
+    "buildTime": 3360,
+    "speed": null,
+    "vision": 200,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_heart_3",
+  "icon": "Power"
+}

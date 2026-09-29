@@ -1,0 +1,51 @@
+{
+  "key": "aster_t3_sam",
+  "slug": "t3-sam",
+  "faction": "arc",
+  "name": "Skyguard",
+  "role": "Long Range SAM",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Naval",
+    "Defense",
+    "AntiAir"
+  ],
+  "lore": "A slow, long-range SAM battery paired with a Watchtower for the eyes it lacks.",
+  "stats": {
+    "health": 10800,
+    "shield": null,
+    "mass": 1500,
+    "energy": 15000,
+    "buildTime": 4500,
+    "speed": null,
+    "vision": 450,
+    "radar": null,
+    "sonar": null,
+    "range": 3200,
+    "dps": 560,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Long Range SAM",
+      "damage": 1400,
+      "range": 3200,
+      "reload": 10,
+      "dps": 560,
+      "splash": 32,
+      "targets": [
+        "Air"
+      ],
+      "kind": "missile",
+      "color": "Orange",
+      "lore": "One missile carrying enough warhead to bring down almost anything.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "aa_sam",
+  "icon": "AntiAir"
+}

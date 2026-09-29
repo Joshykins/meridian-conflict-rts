@@ -1,0 +1,50 @@
+{
+  "key": "aster_t1_tank",
+  "slug": "t1-tank",
+  "faction": "arc",
+  "name": "Warden",
+  "role": "Light Tank",
+  "tech": 1,
+  "domain": "land",
+  "categories": [
+    "Land",
+    "DirectFire"
+  ],
+  "lore": "The Reach's workhorse light tank, nicknamed the brick by every crew.",
+  "stats": {
+    "health": 300,
+    "shield": null,
+    "mass": 56,
+    "energy": 266,
+    "buildTime": 280,
+    "speed": 31,
+    "vision": 320,
+    "radar": null,
+    "sonar": null,
+    "range": 300,
+    "dps": 20,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Light Cannon",
+      "damage": 26,
+      "range": 300,
+      "reload": 1.3,
+      "dps": 20,
+      "splash": 0,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A single reliable gun, the same mount the Sentinel turret carries.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "tank_light",
+  "icon": "Tank"
+}

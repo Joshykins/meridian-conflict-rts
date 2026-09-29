@@ -1,0 +1,34 @@
+{
+  "key": "aster_t3_shield",
+  "slug": "t3-shield",
+  "faction": "arc",
+  "name": "Aegis II",
+  "role": "Heavy Shield Generator",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Defense",
+    "Shield"
+  ],
+  "lore": "The same tower refitted with a far larger reactor and a wider dome.",
+  "stats": {
+    "health": 5500,
+    "shield": 36000,
+    "mass": 2800,
+    "energy": 36000,
+    "buildTime": 4000,
+    "speed": null,
+    "vision": 160,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "shield",
+  "icon": "Shield"
+}

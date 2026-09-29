@@ -1,0 +1,49 @@
+{
+  "key": "aster_t3_air_superiority",
+  "slug": "t3-air-superiority",
+  "faction": "arc",
+  "name": "Raptor",
+  "role": "Air Superiority Fighter",
+  "tech": 3,
+  "domain": "air",
+  "categories": [
+    "Air",
+    "AntiAir"
+  ],
+  "lore": "Reach's air superiority fighter, crewed by veterans of the Shrike wings.",
+  "stats": {
+    "health": 2462,
+    "shield": null,
+    "mass": 620,
+    "energy": 23500,
+    "buildTime": 3800,
+    "speed": 255,
+    "vision": 1000,
+    "radar": null,
+    "sonar": null,
+    "range": 350,
+    "dps": 880,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Bolt Rifle",
+      "damage": 440,
+      "range": 350,
+      "reload": 0.5,
+      "dps": 880,
+      "splash": 5,
+      "targets": [
+        "Air"
+      ],
+      "kind": "charged",
+      "color": "Blue",
+      "lore": "The electric bore cut down to fire bolts: each carries its own charge, and bursts into lightning round what it hits.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "superiority",
+  "icon": "Fighter"
+}

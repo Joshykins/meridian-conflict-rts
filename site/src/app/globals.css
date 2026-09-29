@@ -1,0 +1,335 @@
+@import "tailwindcss";
+
+/* The game's own palette (crates/mc-game/src/ui/mod.rs, brand/palette.json):
+   black glass, white lines, red-orange for what matters. */
+@theme {
+  --color-ink: #000000;
+  --color-void: #050506;
+  --color-text: #f2f2f0;
+  --color-dim: #a3a3a0;
+  --color-faint: #66666a;
+  --color-accent: #ff5a24;
+  --color-accent-deep: #a8300f;
+  --color-warn: #ffb43c;
+  --color-build: #ffa928;
+  --color-bad: #ff3b3b;
+
+  /* Tile colours by domain, as the in-game build strip codes them. */
+  --color-land: #74d38f;
+  --color-air: #80cdf5;
+  --color-naval: #4d8dff;
+  --color-space: #c7d2e8;
+  --color-titan: #ffb43c;
+  --color-structure: #a3a3a0;
+  --color-command: #ff5a24;
+
+  --color-regency: #e0342b;
+  --color-bronze: #9a7447;
+
+  --font-sans: var(--font-barlow), ui-sans-serif, sans-serif;
+  --font-display: var(--font-barlow-sc), var(--font-barlow), ui-sans-serif, sans-serif;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snap: cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+:root {
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.22);
+  --glass: rgb(10 10 12 / 0.62);
+  --header-h: 64px;
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-void);
+  scrollbar-color: #2a2a2e var(--color-void);
+}
+
+body {
+  background: var(--color-void);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Film grain over everything, fixed so it never repaints on scroll. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #000;
+}
+
+:focus-visible {
+  outline: 1.5px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* ---- Pieces ----------------------------------------------------------- */
+
+@utility glass {
+  background: var(--glass);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid var(--line);
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility hairline-grid {
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* A horizontal rail that starts in line with the page column but scrolls to the screen edge. */
+@utility rail {
+  --gutter: 1rem;
+  padding-inline: max(var(--gutter), calc((100% - 1480px) / 2 + var(--gutter)));
+  scroll-padding-inline: max(var(--gutter), calc((100% - 1480px) / 2 + var(--gutter)));
+  @variant sm {
+    --gutter: 2rem;
+  }
+}
+
+/* The drafting sheet behind a schematic: a fine grid that fades out to the edges. */
+@utility blueprint {
+  background-image:
+    radial-gradient(closest-side, transparent 55%, rgb(0 0 0 / 0.75)),
+    linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    14px 14px,
+    14px 14px;
+  background-position: center;
+}
+
+/* Corner ticks: the small instrument marks the menu uses round a panel. */
+@utility ticks {
+  --tick: 10px;
+  --tick-c: rgb(255 255 255 / 0.5);
+  background:
+    linear-gradient(var(--tick-c), var(--tick-c)) top left / var(--tick) 1px,
+    linear-gradient(var(--tick-c), var(--tick-c)) top left / 1px var(--tick),
+    linear-gradient(var(--tick-c), var(--tick-c)) top right / var(--tick) 1px,
+    linear-gradient(var(--tick-c), var(--tick-c)) top right / 1px var(--tick),
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom left / var(--tick) 1px,
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom left / 1px var(--tick),
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom right / var(--tick) 1px,
+    linear-gradient(var(--tick-c), var(--tick-c)) bottom right / 1px var(--tick);
+  background-repeat: no-repeat;
+}
+
+/* Things arrive: one rise per element, staggered by --i. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(4px);
+  }
+}
+@utility rise {
+  animation: rise 0.9s var(--ease-out-quint) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 80ms);
+}
+
+/* A tile dealt onto the grid: quicker and tighter than a section's rise. */
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+@utility deal {
+  animation: deal 0.42s var(--ease-out-quint) both;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@utility skeleton {
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.03) 0%, rgb(255 255 255 / 0.08) 40%, rgb(255 255 255 / 0.03) 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes scan {
+  0%,
+  100% {
+    translate: 0 -160px;
+    opacity: 0;
+  }
+  50% {
+    translate: 0 160px;
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Reveal on scroll without JS where the browser can (scroll-driven animations). */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+}
+
+/* ---- View transitions -------------------------------------------------- */
+
+:root {
+  --vt-exit: 160ms;
+  --vt-enter: 240ms;
+  --vt-move: 460ms;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+/* The header and the nav progress line never move. */
+::view-transition-group(nav-progress),
+::view-transition-new(nav-progress) {
+  animation: none;
+  z-index: 101;
+}
+::view-transition-old(nav-progress) {
+  display: none;
+}
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@keyframes vt-slide {
+  from {
+    translate: var(--vt-offset) 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes vt-rise {
+  from {
+    translate: 0 14px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+/* Page changes animate the root: a snapshot of the viewport only, cheap however
+   long the page is. The link's transition type picks the motion. */
+::view-transition-old(root) {
+  animation: var(--vt-exit) ease-in both vt-fade reverse;
+}
+::view-transition-new(root) {
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade,
+    var(--vt-move) var(--ease-snap) both vt-rise;
+}
+html:active-view-transition-type(nav-forward)::view-transition-old(root) {
+  --vt-offset: -48px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade reverse,
+    var(--vt-move) var(--ease-snap) both vt-slide reverse;
+}
+html:active-view-transition-type(nav-forward)::view-transition-new(root) {
+  --vt-offset: 48px;
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade,
+    var(--vt-move) var(--ease-snap) both vt-slide;
+}
+html:active-view-transition-type(nav-back)::view-transition-old(root) {
+  --vt-offset: 48px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade reverse,
+    var(--vt-move) var(--ease-snap) both vt-slide reverse;
+}
+html:active-view-transition-type(nav-back)::view-transition-new(root) {
+  --vt-offset: -48px;
+  animation:
+    var(--vt-enter) ease-out var(--vt-exit) both vt-fade,
+    var(--vt-move) var(--ease-snap) both vt-slide;
+}
+
+/* A unit's schematic and name fly from its tile to its page. */
+::view-transition-group(.morph) {
+  animation-duration: var(--vt-move);
+  animation-timing-function: var(--ease-snap);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: vt-via-blur;
+}
+@keyframes vt-via-blur {
+  35% {
+    filter: blur(3px) brightness(1.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  .rise,
+  .deal,
+  .reveal {
+    animation: none !important;
+  }
+}

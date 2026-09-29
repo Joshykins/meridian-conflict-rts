@@ -1,0 +1,33 @@
+{
+  "key": "naga_t3_radar",
+  "slug": "t3-radar",
+  "faction": "regency",
+  "name": "Orrery III",
+  "role": "Radar System",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Intel"
+  ],
+  "lore": "The mast refitted with a third floating ring and clamped feet; it reaches farther still.",
+  "stats": {
+    "health": 2600,
+    "shield": null,
+    "mass": 800,
+    "energy": 11000,
+    "buildTime": 2400,
+    "speed": null,
+    "vision": 720,
+    "radar": 12000,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_eye",
+  "icon": "Intel"
+}

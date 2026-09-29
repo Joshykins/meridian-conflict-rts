@@ -1,0 +1,49 @@
+{
+  "key": "aster_t3_rail_trimaran",
+  "slug": "t3-rail-trimaran",
+  "faction": "arc",
+  "name": "Narwhal",
+  "role": "Anti-Ship Trimaran",
+  "tech": 3,
+  "domain": "naval",
+  "categories": [
+    "Naval",
+    "AntiAir"
+  ],
+  "lore": "A Zenith that floats: the anti-ship rail laid down the keel of a long trimaran, so the sea can shoot back at the clouds. It carries nothing else, and dies to anything that reaches it on the water.",
+  "stats": {
+    "health": 30000,
+    "shield": null,
+    "mass": 3800,
+    "energy": 34200,
+    "buildTime": 11500,
+    "speed": 22,
+    "vision": 1200,
+    "radar": null,
+    "sonar": null,
+    "range": 2600,
+    "dps": 583.3,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Zenith Rail Cannon",
+      "damage": 7000,
+      "range": 2600,
+      "reload": 12,
+      "dps": 583.3,
+      "splash": 20,
+      "targets": [
+        "Space"
+      ],
+      "kind": "rail",
+      "color": "Orange",
+      "lore": "The hull turns to aim and the barrel rises in its cradle; the breech swings down into a well in the deck.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "rail_trimaran",
+  "icon": "Ship"
+}

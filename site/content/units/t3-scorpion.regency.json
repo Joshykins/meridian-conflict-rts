@@ -1,0 +1,68 @@
+{
+  "key": "naga_t3_scorpion",
+  "slug": "t3-scorpion",
+  "faction": "regency",
+  "name": "Harrow",
+  "role": "Battle Scorpion",
+  "tech": 3,
+  "domain": "land",
+  "categories": [
+    "Land",
+    "DirectFire"
+  ],
+  "lore": "A walking siege engine in the shape of a scorpion; ARC crews learned to fear the red line it draws before they learned its name.",
+  "stats": {
+    "health": 9200,
+    "shield": null,
+    "mass": 900,
+    "energy": 7200,
+    "buildTime": 5200,
+    "speed": 24,
+    "vision": 360,
+    "radar": null,
+    "sonar": null,
+    "range": 340,
+    "dps": 660,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Pinched-plasmeric Beam",
+      "damage": 30,
+      "range": 280,
+      "reload": 0.1,
+      "dps": 300,
+      "splash": 0,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "beam",
+      "color": "Orange",
+      "lore": "Plasma squeezed by gravity into a dense stream and held on the target; it leaves glass wherever it lands.",
+      "count": 1
+    },
+    {
+      "name": "Gravitic Bomb",
+      "damage": 300,
+      "range": 340,
+      "reload": 5,
+      "dps": 180,
+      "splash": 12,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A charge of plasma held in a gravity cage between the claws, thrown, and let go all at once where it comes down.",
+      "count": 2
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_scorpion",
+  "icon": "Bot"
+}

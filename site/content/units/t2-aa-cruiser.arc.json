@@ -1,0 +1,66 @@
+{
+  "key": "aster_t2_aa_cruiser",
+  "slug": "t2-aa-cruiser",
+  "faction": "arc",
+  "name": "Manta",
+  "role": "Air-Defence Cruiser",
+  "tech": 2,
+  "domain": "naval",
+  "categories": [
+    "Naval",
+    "AntiAir",
+    "Intel"
+  ],
+  "lore": "A wide, flat hull built round a radar. Its laser burns missiles out of the air and its sixteen cells put a whole ripple of missiles up to meet aircraft. Nothing on it touches a submarine.",
+  "stats": {
+    "health": 8500,
+    "shield": null,
+    "mass": 900,
+    "energy": 6300,
+    "buildTime": 3000,
+    "speed": 28,
+    "vision": 1000,
+    "radar": 2800,
+    "sonar": null,
+    "range": 1850,
+    "dps": 500,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Vertical Missile Array",
+      "damage": 110,
+      "range": 1850,
+      "reload": 4,
+      "dps": 440,
+      "splash": 5,
+      "targets": [
+        "Air"
+      ],
+      "kind": "missile",
+      "color": "Orange",
+      "lore": "Sixteen cells forward of the bridge, fired as one ripple. The missiles leave straight up and curve onto their marks.",
+      "count": 1
+    },
+    {
+      "name": "Deck Gun",
+      "damage": 90,
+      "range": 650,
+      "reload": 1.5,
+      "dps": 60,
+      "splash": 3,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "One gun forward, for what comes close.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "aa_cruiser",
+  "icon": "Ship"
+}

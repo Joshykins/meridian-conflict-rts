@@ -1,0 +1,50 @@
+{
+  "key": "aster_t2_hover",
+  "slug": "t2-hover",
+  "faction": "arc",
+  "name": "Skimmer",
+  "role": "Hover Tank",
+  "tech": 2,
+  "domain": "land",
+  "categories": [
+    "Land",
+    "DirectFire"
+  ],
+  "lore": "A hover tank built to cross marsh country tracked armor bogs down in.",
+  "stats": {
+    "health": 1135,
+    "shield": null,
+    "mass": 180,
+    "energy": 1080,
+    "buildTime": 1200,
+    "speed": 38,
+    "vision": 350,
+    "radar": null,
+    "sonar": null,
+    "range": 330,
+    "dps": 92.5,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Heavy Machine Gun",
+      "damage": 11.1,
+      "range": 330,
+      "reload": 0.24,
+      "dps": 92.5,
+      "splash": 0,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "Twin barrels favoring speed of fire over the weight of any single hit.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "hover_tank",
+  "icon": "Tank"
+}

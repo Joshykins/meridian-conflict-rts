@@ -1,0 +1,51 @@
+{
+  "key": "naga_t1_aa",
+  "slug": "t1-aa",
+  "faction": "regency",
+  "name": "Canopy",
+  "role": "AA Flak",
+  "tech": 1,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Naval",
+    "Defense",
+    "AntiAir"
+  ],
+  "lore": "Twin raised barrels on a braced column, fed from a drum magazine, filling the sky with bursting plasma.",
+  "stats": {
+    "health": 800,
+    "shield": null,
+    "mass": 140,
+    "energy": 1100,
+    "buildTime": 400,
+    "speed": null,
+    "vision": 450,
+    "radar": null,
+    "sonar": null,
+    "range": 300,
+    "dps": 60,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Plasmeric Flak Cannon",
+      "damage": 30,
+      "range": 300,
+      "reload": 0.5,
+      "dps": 60,
+      "splash": 9,
+      "targets": [
+        "Air"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "Each shell bursts among aircraft into a spray of hot fragments that burns every one it reaches.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_spitter",
+  "icon": "AntiAir"
+}

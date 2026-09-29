@@ -1,0 +1,53 @@
+{
+  "key": "aster_t4_artillery",
+  "slug": "t4-artillery",
+  "faction": "arc",
+  "name": "Culverin",
+  "role": "Strategic Artillery",
+  "tech": 4,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Artillery",
+    "Strategic",
+    "Experimental"
+  ],
+  "lore": "Built from the plans of a gun the old navies laid down and never finished. Nobody aims it at a unit; it is aimed at a map.",
+  "stats": {
+    "health": 30000,
+    "shield": null,
+    "mass": 10000,
+    "energy": 100000,
+    "buildTime": 36000,
+    "speed": null,
+    "vision": 300,
+    "radar": null,
+    "sonar": null,
+    "range": 22000,
+    "dps": 577.8,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Culverin Long Gun",
+      "damage": 5200,
+      "range": 22000,
+      "reload": 9,
+      "dps": 577.8,
+      "splash": 45,
+      "targets": [
+        "Structure",
+        "Land",
+        "Naval"
+      ],
+      "kind": "ballistic",
+      "color": "Orange",
+      "lore": "A shell every few seconds from the far side of the war, somewhere near what it was meant for.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "culverin",
+  "icon": "Artillery"
+}

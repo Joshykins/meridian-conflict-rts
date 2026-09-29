@@ -1,0 +1,33 @@
+{
+  "key": "aster_t3_sonar",
+  "slug": "t3-sonar",
+  "faction": "arc",
+  "name": "Hydrophone III",
+  "role": "Sonar Buoy",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Naval",
+    "Intel"
+  ],
+  "lore": "An active array that pings the sea itself, heard across half an ocean.",
+  "stats": {
+    "health": 1500,
+    "shield": null,
+    "mass": 640,
+    "energy": 9600,
+    "buildTime": 2200,
+    "speed": null,
+    "vision": 320,
+    "radar": null,
+    "sonar": 6400,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "sonar",
+  "icon": "Intel"
+}

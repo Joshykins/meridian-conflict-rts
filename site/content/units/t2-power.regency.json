@@ -1,0 +1,34 @@
+{
+  "key": "naga_t2_power",
+  "slug": "t2-power",
+  "faction": "regency",
+  "name": "Star Cage II",
+  "role": "Power Generator",
+  "tech": 2,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Economy",
+    "Power"
+  ],
+  "lore": "A bigger star in a heavier cage of six pylons; like every Regency core, it goes out rather than up.",
+  "stats": {
+    "health": 3200,
+    "shield": null,
+    "mass": 840,
+    "energy": 3900,
+    "buildTime": 1570,
+    "speed": null,
+    "vision": 160,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_heart_2",
+  "icon": "Power"
+}

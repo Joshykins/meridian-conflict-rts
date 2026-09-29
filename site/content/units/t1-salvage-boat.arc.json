@@ -1,0 +1,32 @@
+{
+  "key": "aster_t1_salvage_boat",
+  "slug": "t1-salvage-boat",
+  "faction": "arc",
+  "name": "Trawler",
+  "role": "Salvage Boat",
+  "tech": 1,
+  "domain": "naval",
+  "categories": [
+    "Naval"
+  ],
+  "lore": "A reclaim tower put to sea on two hulls. It draws what sank back up as it sails, out where no engineer can follow.",
+  "stats": {
+    "health": 600,
+    "shield": null,
+    "mass": 80,
+    "energy": 480,
+    "buildTime": 300,
+    "speed": 38,
+    "vision": 400,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "reclaim_boat",
+  "icon": "SalvageBoat"
+}

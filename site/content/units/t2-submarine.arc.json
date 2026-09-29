@@ -1,0 +1,80 @@
+{
+  "key": "aster_t2_submarine",
+  "slug": "t2-submarine",
+  "faction": "arc",
+  "name": "Moray",
+  "role": "Hunter-Killer Submarine",
+  "tech": 2,
+  "domain": "naval",
+  "categories": [
+    "Naval",
+    "DirectFire"
+  ],
+  "lore": "An angular hunter-killer with six tubes and ears that reach further than the Barracuda's. Surfaced, its deck gun raids buoys, offshore mines and shorelines; dived, only sonar finds it.",
+  "stats": {
+    "health": 5200,
+    "shield": null,
+    "mass": 600,
+    "energy": 4200,
+    "buildTime": 2200,
+    "speed": 40,
+    "vision": 550,
+    "radar": null,
+    "sonar": 1300,
+    "range": 700,
+    "dps": 338.6,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Torpedo Tubes",
+      "damage": 480,
+      "range": 700,
+      "reload": 5,
+      "dps": 288,
+      "splash": 3,
+      "targets": [
+        "Naval"
+      ],
+      "kind": "torpedo",
+      "color": "Orange",
+      "lore": "Six bow tubes in two banks, fired three at a time.",
+      "count": 1
+    },
+    {
+      "name": "Deck Gun",
+      "damage": 60,
+      "range": 450,
+      "reload": 1.2,
+      "dps": 50,
+      "splash": 2,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "A gun forward of the sail that only works with the boat on the surface.",
+      "count": 1
+    },
+    {
+      "name": "Interceptor Tubes",
+      "damage": 1,
+      "range": 240,
+      "reload": 1.8,
+      "dps": 0.6,
+      "splash": 0,
+      "targets": [
+        "Naval"
+      ],
+      "kind": "torpedo",
+      "color": "Orange",
+      "lore": "Two stern tubes that meet torpedoes coming in, surfaced or dived.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "submarine_hunter",
+  "icon": "Submarine"
+}

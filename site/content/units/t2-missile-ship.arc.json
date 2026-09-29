@@ -1,0 +1,51 @@
+{
+  "key": "aster_t2_missile_ship",
+  "slug": "t2-missile-ship",
+  "faction": "arc",
+  "name": "Swordfish",
+  "role": "Rocket Ship",
+  "tech": 2,
+  "domain": "naval",
+  "categories": [
+    "Naval",
+    "Artillery"
+  ],
+  "lore": "A narrow hull that is all launch rack. Its cells hold racks of unguided rockets, rippled out by the dozen onto a stretch of shore or a knot of ships. Point defence takes them one at a time; there are too many to take them all. It has nothing else.",
+  "stats": {
+    "health": 6000,
+    "shield": null,
+    "mass": 880,
+    "energy": 6160,
+    "buildTime": 2900,
+    "speed": 25,
+    "vision": 400,
+    "radar": 1200,
+    "sonar": null,
+    "range": 1800,
+    "dps": 240,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Dumbfire Rockets",
+      "damage": 150,
+      "range": 1800,
+      "reload": 20,
+      "dps": 240,
+      "splash": 12,
+      "targets": [
+        "Land",
+        "Naval",
+        "Structure"
+      ],
+      "kind": "missile",
+      "color": "Orange",
+      "lore": "Thirty-two unguided rockets a salvo out of eight canted cells, lobbed high and falling over and round the mark.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "missile_ship",
+  "icon": "Ship"
+}

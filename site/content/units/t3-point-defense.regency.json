@@ -1,0 +1,51 @@
+{
+  "key": "naga_t3_point_defense",
+  "slug": "t3-point-defense",
+  "faction": "regency",
+  "name": "Sunspear",
+  "role": "Pinch-fusion Point Defense",
+  "tech": 3,
+  "domain": "structure",
+  "categories": [
+    "Land",
+    "Defense",
+    "DirectFire"
+  ],
+  "lore": "A great keep carrying a fusion chamber on its turret's back. Placeholder text.",
+  "stats": {
+    "health": 20000,
+    "shield": null,
+    "mass": 2400,
+    "energy": 22000,
+    "buildTime": 5400,
+    "speed": null,
+    "vision": 360,
+    "radar": null,
+    "sonar": null,
+    "range": 620,
+    "dps": 506.7,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Pinch-fusion Cannon",
+      "damage": 760,
+      "range": 620,
+      "reload": 7.5,
+      "dps": 506.7,
+      "splash": 4,
+      "targets": [
+        "Land",
+        "Naval"
+      ],
+      "kind": "direct",
+      "color": "Orange",
+      "lore": "The squeezed plasma is pushed until it fuses, and the gun fires the fusion out: bright bursts strobing down the stream.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "naga_fusion_cannon",
+  "icon": "Defense"
+}

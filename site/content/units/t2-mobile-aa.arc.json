@@ -1,0 +1,49 @@
+{
+  "key": "aster_t2_mobile_aa",
+  "slug": "t2-mobile-aa",
+  "faction": "arc",
+  "name": "Squall",
+  "role": "Mobile Flak",
+  "tech": 2,
+  "domain": "land",
+  "categories": [
+    "Land",
+    "AntiAir"
+  ],
+  "lore": "Meridian Arms' answer to faster tech-two aircraft, mounted on treads.",
+  "stats": {
+    "health": 2407,
+    "shield": null,
+    "mass": 300,
+    "energy": 1800,
+    "buildTime": 1200,
+    "speed": 28,
+    "vision": 360,
+    "radar": null,
+    "sonar": null,
+    "range": 480,
+    "dps": 350,
+    "buildPower": null
+  },
+  "weapons": [
+    {
+      "name": "Conventional Flak",
+      "damage": 280,
+      "range": 480,
+      "reload": 0.8,
+      "dps": 350,
+      "splash": 30,
+      "targets": [
+        "Air"
+      ],
+      "kind": "flak",
+      "color": "Orange",
+      "lore": "Slow shells timed to burst in an aircraft's path rather than chase the hull.",
+      "count": 1
+    }
+  ],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "mobile_aa",
+  "icon": "AntiAir"
+}

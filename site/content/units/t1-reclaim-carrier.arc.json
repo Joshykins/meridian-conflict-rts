@@ -1,0 +1,32 @@
+{
+  "key": "aster_t1_reclaim_carrier",
+  "slug": "t1-reclaim-carrier",
+  "faction": "arc",
+  "name": "Osprey",
+  "role": "Reclaim Carrier",
+  "tech": 1,
+  "domain": "air",
+  "categories": [
+    "Air"
+  ],
+  "lore": "A cheap fan-lift carrier that fields its own Salvage Drones, called the flock. Often the first thing a new base builds after its mines.",
+  "stats": {
+    "health": 460,
+    "shield": null,
+    "mass": 95,
+    "energy": 900,
+    "buildTime": 560,
+    "speed": 65,
+    "vision": 480,
+    "radar": null,
+    "sonar": null,
+    "range": null,
+    "dps": null,
+    "buildPower": null
+  },
+  "weapons": [],
+  "builds": [],
+  "upgradesTo": null,
+  "mesh": "reclaim_carrier",
+  "icon": "SalvageCarrier"
+}
