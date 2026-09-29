@@ -546,3 +546,48 @@ fn a_reclaimer_tower_sweeps_its_wrecks_in_turn_order_not_nearest_first() {
     }
     assert_eq!(order, ["ahead", "beside", "behind"]);
 }
+
+#[test]
+fn an_engineer_assisting_one_that_reclaims_helps_take_the_wreck_apart() {
+    let mut w = world();
+    w.tick(&[
+        spawn(&w, 0, ENGINEER, 500, 0),
+        spawn(&w, 0, ENGINEER, 480, 0),
+        spawn(&w, 1, TANK, 700, flag::PASSIVE),
+    ])
+    .unwrap();
+    w.tick(&[cmd(Command::DebugDamage {
+        units: ids(&w, 1, TANK),
+        permille: 1000,
+    })])
+    .unwrap();
+    w.tick(&[]).unwrap();
+    let wreck = w.state.wrecks.slots.iter().next().unwrap();
+    let handle = w.state.wrecks.slots.handle(wreck);
+    let masons = ids(&w, 0, ENGINEER);
+    let (lead, helper) = (masons[0], masons[1]);
+    w.tick(&[
+        cmd(Command::ReclaimWreck {
+            units: vec![lead],
+            wreck: handle,
+            queue: false,
+        }),
+        cmd(Command::Assist {
+            units: vec![helper],
+            target: lead,
+            queue: false,
+        }),
+    ])
+    .unwrap();
+    run_until(&mut w, 3000, |w| !w.state.wrecks.slots.is_alive(wreck));
+    let row = w.state.units.row(helper).unwrap();
+    assert!(
+        w.state.units.reclaimed[row] > Fx::ZERO,
+        "the helper took part of the wreck"
+    );
+    assert_eq!(
+        w.state.orders.front(&w.state.units, row).map(|o| o.kind),
+        Some(mc_sim::tables::OrderKind::Assist),
+        "and went back to assisting"
+    );
+}

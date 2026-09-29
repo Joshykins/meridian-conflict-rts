@@ -2752,6 +2752,24 @@ impl World {
         } else {
             None
         };
+        // Nothing to build or mend, and the target is reclaiming: take the same thing
+        // apart with it, then come back to the assist.
+        if work.is_none() && self.bp(row).sends_reclaimers() {
+            if let Some(mut join) = self
+                .state
+                .orders
+                .front(units, t)
+                .copied()
+                .filter(|j| matches!(j.kind, OrderKind::Reclaim | OrderKind::ReclaimUnit))
+            {
+                join.formation = 0;
+                join.offset = FxVec2::ZERO;
+                self.state
+                    .orders
+                    .push_front(&mut self.state.units, row, join)?;
+                return Ok(());
+            }
+        }
         // Nothing to help with right now (or only a paused builder's work), no
         // build lined up on the target, and more orders queued behind: the
         // assist gives way to them at once. A factory between products or a
