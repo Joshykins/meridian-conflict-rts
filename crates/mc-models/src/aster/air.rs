@@ -35,7 +35,9 @@ mod petrel;
 mod raptor;
 mod shrike;
 mod vigil;
-pub(crate) use vigil::fit as vigil_fit;
+pub(crate) use vigil::{
+    LAMPS as VIGIL_LAMPS, LIFT_JETS as VIGIL_LIFT_JETS, NOZZLES as VIGIL_NOZZLES, RIG as VIGIL_RIG,
+};
 
 pub(crate) use argus::NOZZLES as ARGUS_NOZZLES;
 pub(crate) use osprey::DRONE_NOZZLES;
@@ -78,17 +80,9 @@ pub(crate) fn light_transport(b: &mut MeshBuilder, _tech: u8) {
 }
 
 /// Vigil: the tech 1 sensor ship, a small single-drive spacecraft with a hammerhead of
-/// sensors ([`vigil`]). The `~` keys are design variants of its hull, shown side by side.
+/// sensors across its bow ([`vigil`]).
 pub(crate) fn sensor_ship(b: &mut MeshBuilder, _tech: u8) {
-    vigil::build_ray(b);
-}
-
-pub(crate) fn sensor_ship_eyes(b: &mut MeshBuilder, _tech: u8) {
-    vigil::build_eyes(b);
-}
-
-pub(crate) fn sensor_ship_crescent(b: &mut MeshBuilder, _tech: u8) {
-    vigil::build_crescent(b);
+    vigil::build(b);
 }
 
 /// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.

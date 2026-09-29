@@ -118,6 +118,9 @@ pub enum IconKind {
     SalvageDrone = 33,
     /// A torpedo bomber from above: a gull-winged plane with a finned torpedo under it.
     TorpedoBomber = 34,
+    /// A sensor ship from above: a hammerhead of sensors across a slim hull, the
+    /// eye-line cut across the head.
+    SensorShip = 35,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.

@@ -92,6 +92,22 @@ const FIGHTER: [(f32, f32); 16] = [
     (-0.14, 0.2),
     (-0.12, 0.5),
 ];
+/// The sensor ship's outline, nose up (`icons.wgsl` case 35 has the same points).
+const SENSOR_SHIP: [(f32, f32); 13] = [
+    (0.0, 0.78),
+    (0.6, 0.52),
+    (0.94, 0.38),
+    (0.94, 0.14),
+    (0.24, 0.1),
+    (0.18, -0.62),
+    (0.24, -0.92),
+    (-0.24, -0.92),
+    (-0.18, -0.62),
+    (-0.24, 0.1),
+    (-0.94, 0.14),
+    (-0.94, 0.38),
+    (-0.6, 0.52),
+];
 /// A capital warship from above; its spinal gun is a slot cut down the middle.
 const WARSHIP: [(f32, f32); 15] = [
     (0.0, 0.96),
@@ -356,6 +372,15 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             ui.fill(
                 Rect::new(tail.x, tail.y, r * 0.9 * 0.6, r * 0.9 * 0.16),
                 color,
+            );
+        }
+        IconKind::SensorShip => {
+            // A hammerhead of sensors over a slim hull, the eye-line cut across the head.
+            fill_outline(ui, &airframe(c, r, &SENSOR_SHIP), color);
+            let (hw, hh) = (0.58 * 0.9 * r, 0.05 * 0.9 * r);
+            ui.fill(
+                Rect::new(c.x - hw, c.y - 0.36 * 0.9 * r - hh, hw * 2.0, hh * 2.0),
+                cut,
             );
         }
         IconKind::Warship => {

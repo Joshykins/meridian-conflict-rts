@@ -790,7 +790,7 @@ pub fn capital_lamps(mesh: &str) -> Option<&'static CapitalLamps> {
         "lift_ship" => Some(&BASTION_LAMPS),
         "light_transport" => Some(&aster::air::COURIER_LAMPS),
         "space_frigate" => Some(&aster::air::RESOLUTE_LAMPS),
-        m if m.starts_with("sensor_ship") => aster::air::vigil_fit(m).map(|f| &f.lamps),
+        "sensor_ship" => Some(&aster::air::VIGIL_LAMPS),
         _ => None,
     }
 }
@@ -803,7 +803,7 @@ pub fn capital_rig(mesh: &str) -> Option<[[f32; 4]; 7]> {
         "lift_ship" => Some(aster::air::BASTION_RIG.gpu()),
         "light_transport" => Some(aster::air::COURIER_RIG.gpu()),
         "space_frigate" => Some(aster::air::RESOLUTE_RIG.gpu()),
-        m if m.starts_with("sensor_ship") => aster::air::vigil_fit(m).map(|f| f.rig.gpu()),
+        "sensor_ship" => Some(aster::air::VIGIL_RIG.gpu()),
         _ => None,
     }
 }
@@ -855,7 +855,7 @@ pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
         "lift_ship" => &aster::air::BASTION_LIFT_JETS,
         "light_transport" => &aster::air::COURIER_LIFT_JETS,
         "space_frigate" => &aster::air::RESOLUTE_LIFT_JETS,
-        m if m.starts_with("sensor_ship") => aster::air::vigil_fit(m).map_or(&[], |f| &f.lift_jets),
+        "sensor_ship" => &aster::air::VIGIL_LIFT_JETS,
         _ => &[],
     }
 }
@@ -865,7 +865,7 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
     match mesh {
         "light_transport" => &aster::air::COURIER_NOZZLES,
         "space_frigate" => &aster::air::RESOLUTE_NOZZLES,
-        m if m.starts_with("sensor_ship") => aster::air::vigil_fit(m).map_or(&[], |f| &f.nozzles),
+        "sensor_ship" => &aster::air::VIGIL_NOZZLES,
         "lift_ship" => &aster::air::BASTION_NOZZLES,
         "interceptor" => &[[-3.31, -0.2, 0.9], [-3.31, 0.2, 0.9]],
         "bomber" => &[[-3.0, -2.2, 1.0], [-3.0, 2.2, 1.0]],

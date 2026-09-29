@@ -18,7 +18,7 @@
         motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 200, hover: true),
         economy: (energy_upkeep: 100),
         weapons: [],
-        mesh: "sensor_ship", icon: Intel,
+        mesh: "sensor_ship", icon: SensorShip,
         sounds: (death: "blast_small", moving: "aster_vigil"),
     ),
     (
