@@ -50,6 +50,8 @@ pub enum Refusal {
     PatrolTooLong,
     /// A factory keeps at most `standing::MAX_STANDING` orders for its products.
     StandingOrdersFull,
+    /// A factory's queue holds at most `orders::MAX_FACTORY_QUEUE` orders.
+    FactoryQueueFull,
 }
 
 impl Refusal {
@@ -64,6 +66,10 @@ impl Refusal {
             Refusal::StandingOrdersFull => format!(
                 "A factory keeps at most {} orders for its units",
                 crate::standing::MAX_STANDING
+            ),
+            Refusal::FactoryQueueFull => format!(
+                "A factory queue holds at most {} units",
+                crate::orders::MAX_FACTORY_QUEUE
             ),
         }
     }

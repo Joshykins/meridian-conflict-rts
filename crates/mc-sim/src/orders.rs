@@ -16,8 +16,12 @@ use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::{cat, BlueprintId, MoveLayer};
 
-/// Longest production queue per factory.
-const MAX_FACTORY_QUEUE: usize = 64;
+/// Longest production queue per factory: far past what anyone queues by hand, but a
+/// hard limit all the same, so no factory can fill the order table.
+pub(crate) const MAX_FACTORY_QUEUE: usize = 1000;
+/// Orders the table (`MAX_ORDERS`) keeps free for every other unit's: production
+/// stops short of them.
+const ORDER_RESERVE: usize = 16_384;
 /// Chasing units re-path once their quarry has moved this far from the field's goal.
 pub(crate) const CHASE_REPATH_DISTANCE: Fx = Fx::from_int(96);
 /// Shortest leash, metres, for a unit that goes after an enemy on its own.
@@ -271,7 +275,12 @@ impl World {
                         continue;
                     }
                     let queued = self.state.orders.iter(&self.state.units, row).count();
-                    let room = MAX_FACTORY_QUEUE.saturating_sub(queued);
+                    let spare =
+                        (MAX_ORDERS - ORDER_RESERVE).saturating_sub(self.state.orders.live());
+                    let room = MAX_FACTORY_QUEUE.saturating_sub(queued).min(spare);
+                    if (*count as usize) > room {
+                        self.refuse(player, Refusal::FactoryQueueFull);
+                    }
                     for _ in 0..(*count as usize).min(room) {
                         let mut o =
                             order(OrderKind::Produce, self.state.units.pos[row], Handle::NONE);

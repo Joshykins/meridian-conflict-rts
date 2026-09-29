@@ -444,3 +444,31 @@ fn a_factory_copies_another_factorys_orders_in_place_of_its_own() {
     assert_eq!(kinds(&w, tank), vec![OrderKind::Patrol, OrderKind::Patrol]);
     assert_eq!(at, [p, q]);
 }
+
+#[test]
+fn a_factory_queue_holds_a_thousand_and_says_so_past_that() {
+    use mc_sim::mirror::{Refusal, SimEvent};
+    let (mut w, fid) = with_factory();
+    let row = w.state.units.row(fid).unwrap();
+    for _ in 0..3 {
+        w.tick(&[produce(&w, fid, "aster_t1_tank", 255)]).unwrap();
+    }
+    assert_eq!(kinds(&w, row).len(), 765, "no cap near 64 any more");
+    w.tick(&[produce(&w, fid, "aster_t1_tank", 200)]).unwrap();
+    assert!(!w
+        .events
+        .iter()
+        .any(|e| matches!(e, SimEvent::CommandRefused { .. })));
+    w.tick(&[produce(&w, fid, "aster_t1_tank", 255)]).unwrap();
+    assert_eq!(kinds(&w, row).len(), 1000);
+    assert!(
+        w.events.iter().any(|e| matches!(
+            e,
+            SimEvent::CommandRefused {
+                reason: Refusal::FactoryQueueFull,
+                ..
+            }
+        )),
+        "the player is told"
+    );
+}
