@@ -505,6 +505,8 @@ impl World {
             Some(MoveLayer::Hover) | Some(MoveLayer::Naval) | Some(MoveLayer::Air) => {
                 ground.max(self.terrain.water_level())
             }
+            // A seabed installation stands on the bottom, under the water.
+            _ if bp.seabed => ground,
             _ if bp.water_build => ground.max(self.terrain.water_level()),
             _ => ground,
         };
@@ -1137,6 +1139,10 @@ pub fn hull_cells(
     if bp.has(cat::WALL) {
         return vec![(min, max)];
     }
+    // A seabed installation stands deep under the keels: ships sail over it.
+    if bp.seabed {
+        return Vec::new();
+    }
     let cell = mc_map::CELL_SIZE_M;
     let grow = Fx::from_int(cell / 2 - HULL_GRACE_M);
     let (hx, hy) = (bp.hull.0 + grow, bp.hull.1 + grow);
@@ -1233,6 +1239,14 @@ impl World {
         // Neighbouring 2x2s share the overhang cells, and those stay walkable
         // so units can squeeze through without forbidding the next building.
         let path = path_cells_of(bp.footprint, pos);
+        let water = self.terrain.water_level();
+        if bp.seabed
+            && !(path.0 .1..=path.1 .1).all(|y| {
+                (path.0 .0..=path.1 .0).all(|x| crate::placement::abyss(&self.terrain, water, x, y))
+            })
+        {
+            return false;
+        }
         if if bp.water_only() {
             !self.nav.passable_naval_terrain(path.0, path.1)
         } else if bp.water_build {

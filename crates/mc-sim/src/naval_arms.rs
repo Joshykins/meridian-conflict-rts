@@ -6,8 +6,8 @@
 //! fires it at the nearest enemy torpedo in reach that no other interceptor is
 //! already after; the shot carries that torpedo's `serial` as its `quarry` and runs
 //! at it with a lead. Both burst when they meet. Interceptors are a countermeasure:
-//! they work on a passive hull or one holding its fire, and stop while the owner's
-//! grid is dark, like the Manta's laser.
+//! they work on a passive hull or one holding its fire, and need no power: they fire
+//! on a dark grid too (unlike shields, radar and the Manta's laser).
 
 use crate::mirror::SimEvent;
 use crate::spatial::kind;
@@ -91,16 +91,27 @@ impl World {
                 if !weapon.intercepts {
                     continue;
                 }
+                let owner = self.state.units.owner[row];
+                let hull = self.state.units.pos[row].extend(self.state.units.z[row]);
+                // A launcher on a turret of its own (`turret_turn`) turns toward the nearest
+                // torpedo in reach. It fires without waiting to come round: an interceptor
+                // turns onto its quarry by itself.
+                if weapon.turret_turn > 0 {
+                    if let Some(i) = self.incoming_torpedo(owner, hull, weapon.range_max, &[]) {
+                        let units = &mut self.state.units;
+                        let pivot = weapon.pivot.unwrap_or(weapon.muzzle);
+                        let at = units.pos[row] + pivot.xy().rotate(units.heading[row]);
+                        let want =
+                            (self.state.projectiles.pos[i].xy() - at).angle() - units.heading[row];
+                        units.weapon_yaw[row][w] =
+                            units.weapon_yaw[row][w].turn_toward(want, weapon.turret_turn);
+                    }
+                }
                 let cooldown = &mut self.state.units.weapon_cooldown[row][w];
                 *cooldown = cooldown.saturating_sub(1);
                 if *cooldown > 0 {
                     continue;
                 }
-                let owner = self.state.units.owner[row];
-                if self.state.players[owner as usize].efficiency <= Fx::ZERO {
-                    continue;
-                }
-                let hull = self.state.units.pos[row].extend(self.state.units.z[row]);
                 let Some(i) = self.incoming_torpedo(owner, hull, weapon.range_max, &marked) else {
                     continue;
                 };
@@ -158,6 +169,14 @@ impl World {
             weapon.muzzle
         } else {
             weapon.muzzles[next % weapon.muzzles.len()]
+        };
+        // A launcher on a turret fires from where the turret has turned its tubes.
+        let local = match weapon.pivot.filter(|_| weapon.turret_turn > 0) {
+            Some(pivot) => {
+                let arm = (local.xy() - pivot.xy()).rotate(units.weapon_yaw[row][w]);
+                (pivot.xy() + arm).extend(local.z)
+            }
+            None => local,
         };
         let muzzle =
             (units.pos[row] + local.xy().rotate(units.heading[row])).extend(units.z[row] + local.z);

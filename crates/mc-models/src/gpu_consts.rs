@@ -130,6 +130,9 @@ shared! {
         pub const NAVAL: u32 = 0x80_0000;
         /// `ModelInfo::icon` bit: a spacecraft (`UnitBlueprint::is_capital_ship`).
         pub const CAPITAL: u32 = 0x400_0000;
+        /// `ModelInfo::icon` bit: it stands on the seabed (`UnitBlueprint::seabed`) and its
+        /// spire reaches up to the surface (`spire`).
+        pub const SEABED: u32 = 0x1000_0000;
     }
 
     /// How a settled wreck lies (`mc_sim::mirror::WRECK_*`, which a test holds equal;
@@ -148,6 +151,15 @@ shared! {
         pub const COUNT_SHIFT: u32 = 8;
         /// A section's second instance: the hull's inside, seen through its torn ends.
         pub const INNER: u32 = 0x1000;
+    }
+
+    /// A seabed installation's spire (`icon::SEABED`, models/aster/naval/seabed_defense.rs):
+    /// authored from `BASE` up to `TOP` in model metres, it is stretched in `entity.wgsl`
+    /// so `TOP` meets the water's surface however deep the installation stands. What is
+    /// authored above `TOP` (the cap that rides the surface) moves up with it unstretched.
+    pub mod spire as "SPIRE_" {
+        pub const BASE: f32 = 9.0;
+        pub const TOP: f32 = 30.0;
     }
 
     /// The selection mark (icons.wgsl `vs_ring`).

@@ -1861,6 +1861,17 @@ fn vs_main(in: VsIn) -> VsOut {
             p.y *= 1.0 - floating * 0.16;
         }
     }
+    // A seabed installation's spire runs up to the surface however deep it stands: what is
+    // authored between SPIRE_BASE and SPIRE_TOP stretches so the top meets the water, and
+    // the cap above rides up with it. Out of the water (a unit shot on land) it is as authored.
+    if (model.icon & ICON_SEABED) != 0u && p.z > SPIRE_BASE {
+        let surface = max(globals.map.z - origin.z, SPIRE_TOP);
+        if p.z <= SPIRE_TOP {
+            p.z = SPIRE_BASE + (p.z - SPIRE_BASE) * (surface - SPIRE_BASE) / (SPIRE_TOP - SPIRE_BASE);
+        } else {
+            p.z += surface - SPIRE_TOP;
+        }
+    }
     var local = p * scale;
 
     // Mobile units lean with the ground under them; a ship rides the water, not the seabed.

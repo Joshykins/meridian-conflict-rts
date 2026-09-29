@@ -622,6 +622,8 @@ pub struct UnitBlueprint {
     /// A submarine's dive.
     pub dive: Option<Dive>,
     pub water_build: bool,
+    /// Stands on the seabed under deep water (`RawUnit::seabed`).
+    pub seabed: bool,
     pub drone: Option<BlueprintId>,
     pub drone_radius: Fx,
     /// Where its drones sit when home, in the turret's frame: one drone for each.
@@ -1237,6 +1239,7 @@ impl Blueprints {
                 None => h.write_u64(u64::MAX),
             }
             h.write_u64(u.water_build as u64);
+            h.write_u64(u.seabed as u64);
             h.write_i64(u.drone_radius.0);
             h.write_u64(u.drone_sockets.len() as u64);
             for m in &u.drone_sockets {

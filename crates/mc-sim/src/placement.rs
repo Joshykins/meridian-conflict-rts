@@ -26,6 +26,8 @@ pub enum Unfit {
     Water,
     /// A naval structure without deep water under the whole lot.
     Shore,
+    /// A seabed installation without `SEABED_DEPTH` of water over the whole lot.
+    Shallow,
     /// A city block stands there.
     City,
     /// Another structure, standing or planned, has the lot.
@@ -40,6 +42,7 @@ impl Unfit {
             Unfit::Steep => "Ground too steep",
             Unfit::Water => "Needs dry ground",
             Unfit::Shore => "Needs deep water",
+            Unfit::Shallow => "Needs deeper water",
             Unfit::City => "City in the way",
             Unfit::Taken => "Lot taken",
         }
@@ -48,6 +51,22 @@ impl Unfit {
 
 /// Bit on a cell with a city block on it.
 const CITY: u8 = 1 << 7;
+/// Bit on a cell with at least `SEABED_DEPTH` of water over all of it.
+const ABYSS: u8 = 1 << 6;
+
+/// Shallowest water a seabed installation (`UnitBlueprint::seabed`) stands in: its
+/// body wholly under the surface, with room over it for a keel to pass.
+pub const SEABED_DEPTH: Fx = Fx::from_int(20);
+
+/// Whether heightfield cell (`cx`, `cy`) has `SEABED_DEPTH` of water over its highest corner.
+pub(crate) fn abyss(ground: &Heightfield, water: Fx, cx: u32, cy: u32) -> bool {
+    let high = ground
+        .sample_height(cx, cy)
+        .max(ground.sample_height(cx + 1, cy))
+        .max(ground.sample_height(cx, cy + 1))
+        .max(ground.sample_height(cx + 1, cy + 1));
+    water - high >= SEABED_DEPTH
+}
 
 /// Every 8 m cell's terrain class, and whether a city block stands on it.
 pub struct SiteMap {
@@ -75,12 +94,9 @@ impl SiteMap {
                 s.spawn(move || {
                     for (j, class) in rows.iter_mut().enumerate() {
                         let at = i * band + j;
-                        *class = cell_class(
-                            ground,
-                            water,
-                            (at % w as usize) as u32,
-                            (at / w as usize) as u32,
-                        );
+                        let (x, y) = ((at % w as usize) as u32, (at / w as usize) as u32);
+                        *class = cell_class(ground, water, x, y)
+                            | if abyss(ground, water, x, y) { ABYSS } else { 0 };
                     }
                 });
             }
@@ -130,7 +146,11 @@ impl SiteMap {
             for x in min.0..=max.0 {
                 let class = self.cell(x, y);
                 let steep = class & terrain::STEEP != 0;
-                if bp.water_only() {
+                if bp.seabed {
+                    if class & ABYSS == 0 {
+                        return Err(Unfit::Shallow);
+                    }
+                } else if bp.water_only() {
                     if class & terrain::DEEP == 0 {
                         return Err(Unfit::Shore);
                     }

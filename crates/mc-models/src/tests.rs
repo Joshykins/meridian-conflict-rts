@@ -577,8 +577,9 @@ fn meshes_are_valid() {
                 } else if NAVAL_HULLS.contains(&base_key(&model.key)) {
                     // Hulls float: the keel is under the waterline.
                     -4.5
-                } else if model.key == "sonar" {
-                    // The sonar buoy's hydrophone arrays hang under it.
+                } else if model.key == "sonar" || base_key(&model.key) == "torpedo_defense" {
+                    // The sonar buoy's hydrophone arrays hang under it, and the Breakwater's
+                    // tube mouths, listening dome and lowered arrays under that float.
                     -15.0
                 } else if model.key == "nuke_silo" {
                     // The launch tube, dug in below its mouth (`Model::pit`).
@@ -791,6 +792,10 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "citadel" {
             // The tech 3 rail keep: a 4x4 lot, corner towers, a casemate and a 54 m rail.
             4200
+        } else if base_key(&model.key) == "seabed_defense" {
+            // The tech 3 Fathom: a 4x4 seabed installation, four interceptor batteries,
+            // its own sonar, and a spire to the surface.
+            3600
         } else if base_key(&model.key) == "warp_damper" {
             // The tech 2 Undertow: a 4x4 lot, a 46 m anchor frame round spinning gear.
             4200

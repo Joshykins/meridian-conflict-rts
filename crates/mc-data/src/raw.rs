@@ -231,6 +231,11 @@ pub(crate) struct Unit {
     pub dive: Option<RawDive>,
     #[serde(default)]
     pub water_build: bool,
+    /// Built on the seabed under deep water (with `water_build`): it stands on the bottom,
+    /// wholly under the surface, so only sonar finds it and only torpedoes reach it. Its
+    /// model's spire runs up to the surface whatever the depth.
+    #[serde(default)]
+    pub seabed: bool,
     /// A salvage drone it makes for itself and sends out to reclaim wrecks.
     #[serde(default)]
     pub drone: Option<String>,
@@ -1477,6 +1482,7 @@ impl Unit {
                 None => None,
             },
             water_build: self.water_build,
+            seabed: self.seabed,
             drone: self.drone.as_ref().map(|k| lookup(k, key)).transpose()?,
             drone_radius: fx(self.drone_radius),
             drone_sockets: self

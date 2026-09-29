@@ -82,6 +82,10 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("aster_t1_attack_boat", 6, 3000, 450),
     ("aster_t1_submarine", 3, 3300, 350),
     ("aster_t1_sonar", 1, 2800, 250),
+    // Torpedo defence: a float and a seabed installation that meet the submarines'
+    // torpedoes with interceptors (`naval_arms.rs`).
+    ("aster_t1_torpedo_defense", 1, 3000, 330),
+    ("aster_t3_torpedo_defense", 1, 3400, 250),
     ("aster_t1_rotor_gunship", 4, 1200, 300),
     ("aster_t1_interceptor", 4, 1400, 250),
     ("aster_t2_torpedo_bomber", 2, 1800, 200),
@@ -121,6 +125,9 @@ fn setup(w: &mut World) {
                 // A Courier that warps into the north's dampener (`warp.rs`), on its own power.
                 add("aster_t1_lift_ship", 1, 2000, 100);
                 add("aster_t3_power", 1, 400, 150);
+                // Two submarines already in the north's waters, raiding its fleet past its
+                // torpedo defences (the north's grid is paid, so they stand to).
+                add("aster_t1_submarine", 2, 3000, 3350);
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);
@@ -235,7 +242,21 @@ fn play(w: &mut World, from: u32) -> Vec<u64> {
 fn reference() -> Vec<u64> {
     let mut w = world(0);
     setup(&mut w);
-    let hashes = play(&mut w, 1);
+    let mut intercepted = 0;
+    let hashes = (1..TICKS)
+        .map(|t| {
+            let commands = script(&mut w, t);
+            let hash = w.tick(&commands).unwrap();
+            intercepted += w
+                .events
+                .iter()
+                .filter(|e| matches!(e, mc_sim::SimEvent::TorpedoIntercepted { .. }))
+                .count();
+            hash
+        })
+        .collect();
+    // The torpedo defences met the submarines' torpedoes.
+    assert!(intercepted > 0, "no torpedo was intercepted in the match");
     // The salvage carriers' heads were at work in it, on the move.
     let reclaimed = w.state.players.iter().map(|p| p.reclaimed_mass).max();
     assert!(

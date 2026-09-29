@@ -1192,7 +1192,13 @@ impl Renderer {
                     0
                 }
                 // Its spinner looks about instead of turning round (`Model::spinner_scans`).
-                | (model.spinner_scans as u32) << 27;
+                | (model.spinner_scans as u32) << 27
+                // It stands on the seabed; its spire reaches the surface (`entity.wgsl`).
+                | if bp.seabed {
+                    crate::gpu_consts::icon::SEABED
+                } else {
+                    0
+                };
             let pad = if bp.poured_lot() {
                 let half = bp.footprint.0.max(bp.footprint.1) as f32 * (BUILD_CELL_M as f32 * 0.5);
                 models::bake_pad_footprint(&model.lods[0], half)

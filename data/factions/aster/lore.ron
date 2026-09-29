@@ -338,6 +338,21 @@
     "aster_t1_sonar": (
         lore: "A moored spar buoy whose hydrophones hear hulls no radar can see.",
     ),
+    "aster_t1_torpedo_defense": (
+        lore: "A moored float carrying an interceptor launcher. It hears torpedoes running at anything near it and puts a short torpedo into each one's path.",
+        weapons: {
+            "Interceptor Launcher": "Interceptor torpedoes, fired under the float at torpedoes coming in.",
+        },
+    ),
+    "aster_t2_torpedo_defense": (
+        lore: "The float refitted with a second launcher and longer-running interceptors: a harbour mouth or a fleet anchorage closed to torpedoes.",
+    ),
+    "aster_t3_torpedo_defense": (
+        lore: "An installation built on the seabed, a spire standing from it up to the surface. Its batteries meet torpedoes across a whole bay. Nothing above the water can see it or touch it; only sonar hears it, and only torpedoes reach it.",
+        weapons: {
+            "Interceptor Battery": "Four batteries round the installation, each firing interceptors up and out at torpedoes a kilometre off.",
+        },
+    ),
     "aster_t1_salvage_boat": (
         lore: "A reclaim tower put to sea on two hulls. It draws what sank back up as it sails, out where no engineer can follow.",
     ),
