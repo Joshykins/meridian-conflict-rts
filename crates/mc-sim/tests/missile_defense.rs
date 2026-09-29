@@ -62,7 +62,7 @@ fn spawn(w: &World, owner: u8, key: &str, x: i32, y: i32, flags: u16) -> PlayerC
 }
 
 /// Rounds burnt out of the air and rounds that got through over `ticks`, `launchers`
-/// of `key` firing from `x`, `coronas` guarding an invulnerable Bastion at x = 500.
+/// of `key` firing from `x`, `coronas` guarding an invulnerable Redoubt at x = 500.
 fn barrage(key: &str, x: i32, launchers: usize, coronas: usize, ticks: u32) -> (usize, usize) {
     let mut w = world();
     let launcher = w.blueprints.id_of(key).unwrap();

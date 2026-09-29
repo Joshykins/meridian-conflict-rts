@@ -518,10 +518,10 @@ fn trebuchet_does_not_aim_until_planted() {
 }
 
 #[test]
-fn bastion_walks_a_salvo_across_the_barrels() {
+fn redoubt_walks_a_salvo_across_the_barrels() {
     let mut w = world();
-    let bastion = w.blueprints.id_of("aster_t2_point_defense").unwrap();
-    let weapon = &w.blueprints.unit(bastion).weapons[0];
+    let redoubt = w.blueprints.id_of("aster_t2_point_defense").unwrap();
+    let weapon = &w.blueprints.unit(redoubt).weapons[0];
     assert_eq!(weapon.salvo, 3);
     assert_eq!(weapon.muzzles.len(), 3);
     assert_eq!(weapon.charge_ticks, 0);
@@ -543,10 +543,10 @@ fn bastion_walks_a_salvo_across_the_barrels() {
     let mut record = |w: &World| {
         for e in &w.events {
             match e {
-                SimEvent::WeaponCharging { blueprint, .. } if *blueprint == bastion => {
+                SimEvent::WeaponCharging { blueprint, .. } if *blueprint == redoubt => {
                     charged = true;
                 }
-                SimEvent::ShotFired { blueprint, pos, .. } if *blueprint == bastion => {
+                SimEvent::ShotFired { blueprint, pos, .. } if *blueprint == redoubt => {
                     shots.push((w.tick_count(), *pos));
                 }
                 _ => {}
@@ -559,7 +559,7 @@ fn bastion_walks_a_salvo_across_the_barrels() {
         record(&w);
     }
 
-    assert!(!charged, "the Bastion should fire without a charge");
+    assert!(!charged, "the Redoubt should fire without a charge");
     assert!(shots.len() >= 3, "the salvo was {shots:?}");
     let salvo = &shots[..3];
     assert!(

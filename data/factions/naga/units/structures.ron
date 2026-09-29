@@ -314,7 +314,7 @@
     // The tech 2 point defence: a Pinched-plasmeric Cannon on an armoured keep. Its slugs
     // are plasma squeezed dense by gravity, three to a burst, and they stop in what they
     // hit: all their weight on the one hull, next to nothing splashed. Reach and weight as
-    // a Bastion's. Placeholder name. Model: `naga_pinch_cannon` (`models::naga::pinch_guns`).
+    // a Redoubt's. Placeholder name. Model: `naga_pinch_cannon` (`models::naga::pinch_guns`).
     (
         key: "naga_t2_point_defense",
         name: "Halberd",

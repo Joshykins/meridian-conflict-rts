@@ -277,7 +277,7 @@
         },
     ),
     "aster_t3_point_defense": (
-        lore: "A keep built round one rail cannon, for the fronts where Bastions kept meeting walkers they could not stop.",
+        lore: "A keep built round one rail cannon, for the fronts where Redoubts kept meeting walkers they could not stop.",
         weapons: {
             "Citadel Rail Cannon": "One slug every few seconds, each one enough to open a Paladin's shield and the frame behind it.",
         },

@@ -258,7 +258,7 @@ pub(super) fn rail_gun(
 
 /// A heavy conventional gun barrel: a round, jacketed tube clamped by ring
 /// collars, a spine down each side, a bulky white breech with power cables into
-/// it, and a flared muzzle ring with a dark bore. The Bastion's battery. (It
+/// it, and a flared muzzle ring with a dark bore. The Redoubt's battery. (It
 /// was the rail gun's barrel until the rails were given one of their own.)
 /// `rail` and `gap` size the jacket as they used to.
 pub(super) fn jacketed_gun(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, rail: Vec2, gap: f32) {

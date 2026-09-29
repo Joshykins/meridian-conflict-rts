@@ -836,7 +836,7 @@ mod tests {
     }
 
     /// Stands in its 4x4 lot (only the barrel overhangs), to its height, bigger than the
-    /// Bastion's 2x2 keep; wears team colour, and nothing on it glows.
+    /// Redoubt's 2x2 keep; wears team colour, and nothing on it glows.
     #[test]
     fn citadel_fits_its_lot_and_is_unlit_hardware() {
         let model = built();
