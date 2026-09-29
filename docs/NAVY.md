@@ -107,12 +107,14 @@ The unit the naval design language is nailed on:
   off the bow (`motion.broadside`), on the nearer beam, a little forward of square, so all
   three batteries bear. Under way it does not wheel; it fires what bears.
 - A broadside is one event: every barrel of every battery fires on the same tick
-  (`salvo_delay: 0`, `volley: true`). A ready battery holds for the others that bear and
-  for the hull to finish coming round, four seconds at most, then fires alone. A charged
-  battery holds before its charge, not after it, so the charge always runs straight into
-  the shot; only a battery due within the hold holds the others up, so batteries that fall
-  out of step (ground fire slews each to a point of its own) are back in it within a
-  reload (mc-sim `volley.rs`).
+  (`salvo_delay: 0`, `volley: true`). A ready battery holds for the others that bear, half
+  a reload (six seconds) at most, then fires alone; the hull finishing its turn, or coming
+  to rest to fight an Attack it has closed on, does not count against that, so a ship sent
+  at a far mark opens with every battery, not with the forward two. A charged battery
+  holds before its charge, not after it, so the charge always runs straight into the shot.
+  Only a battery due within the hold holds the others up; since that is half a reload, of
+  two batteries out of step one is always due soon enough for the other to wait, and they
+  are back in step after one broadside (mc-sim `volley.rs`).
 - Its secondaries are four twin quick-firing turrets on the sponsons, two a side, resting
   trained outboard (`facing`) and covering their own side; conventional orange shells.
 - Four point-defence lasers (`anti_missile`, `anti_missile_mounts`) burn down missiles; each

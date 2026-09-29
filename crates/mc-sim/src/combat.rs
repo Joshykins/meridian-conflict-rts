@@ -1533,6 +1533,18 @@ impl World {
                 // A ship that fights broadside on (`Motion::broadside`) lays its beam to the
                 // mark instead, on whichever side is nearer, so every battery bears.
                 // A land unit with an `aim_arc` turns its body the same way.
+                // Stopping to fight (an Attack in reach), it holds its broadside until the
+                // hull is at rest and laid, so it opens with every battery, not the forward ones.
+                let stopping = flag::MOVING | flag::HOLD;
+                if w == 0
+                    && units.flags[row] & stopping == stopping
+                    && bp
+                        .unit(units.blueprint[row])
+                        .motion
+                        .is_some_and(|m| m.broadside.0 > 0)
+                {
+                    units.volley[row][1] |= crate::volley::HULL;
+                }
                 if (naval || body_arc < 0x8000) && w == 0 && units.flags[row] & flag::MOVING == 0 {
                     if let Some(m) = bp.unit(units.blueprint[row]).motion {
                         if m.broadside.0 > 0 {

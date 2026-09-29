@@ -331,3 +331,71 @@ fn battleships_on_ground_fire_fire_as_their_charge_ends() {
     }
     assert!(broadsides >= 9, "{broadsides} whole broadsides");
 }
+
+/// Ticks on which the Leviathan `ship` fired its main batteries over `ticks`, with the
+/// batteries that fired each time (bit per battery).
+fn broadsides(w: &mut World, ticks: u32) -> Vec<(u32, u8)> {
+    let mut out = Vec::new();
+    for tick in 0..ticks {
+        run(w, 1);
+        let fired = (0..3u8).fold(0, |acc, b| {
+            acc | if fired(w, SHIP, 0, b) > 0 { 1 << b } else { 0 }
+        });
+        if fired != 0 {
+            out.push((tick, fired));
+        }
+    }
+    out
+}
+
+#[test]
+fn a_battleship_sent_at_a_far_mark_opens_with_every_battery() {
+    // Out of reach dead ahead: it closes, and the forward batteries reach first. They wait
+    // for the hull to stop and come round so the aft one bears, and all three open together.
+    let mut w = sea(false);
+    let ship = spawn(&mut w, SHIP, 0, 400, 200, 0);
+    let target = spawn(&mut w, SHIP, 1, 1900, 1900, flag::PASSIVE);
+    order(
+        &mut w,
+        0,
+        Command::Attack {
+            units: vec![ship],
+            target,
+            queue: false,
+        },
+    );
+    let fired = broadsides(&mut w, 700);
+    assert!(fired.len() >= 3, "fired {fired:?}");
+    assert!(
+        fired.iter().all(|&(_, b)| b == 0b111),
+        "every battery every time: {fired:?}"
+    );
+}
+
+#[test]
+fn batteries_out_of_step_come_back_into_it() {
+    // Shelling a point, with the aft battery's reload up to 9 s behind the forward ones' (as closing
+    // under way used to leave it): after one broadside they fire as one.
+    for lag in [30u16, 65, 90] {
+        let mut w = sea(false);
+        let ship = spawn(&mut w, SHIP, 0, 600, 1000, 0);
+        order(
+            &mut w,
+            0,
+            Command::AttackGround {
+                units: vec![ship],
+                pos: FxVec2::from_ints(1100, 1500),
+                queue: false,
+            },
+        );
+        run(&mut w, 100);
+        let r = row(&w, ship);
+        w.state.units.weapon_cooldown[r][..3].copy_from_slice(&[40, 40, 40 + lag]);
+        let fired = broadsides(&mut w, 600);
+        assert!(fired.len() >= 3, "lag {lag}: fired {fired:?}");
+        assert!(
+            fired[1..].iter().all(|&(_, b)| b == 0b111),
+            "lag {lag}: in step after one broadside: {fired:?}"
+        );
+    }
+}
