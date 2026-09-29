@@ -991,30 +991,16 @@ impl World {
                 continue;
             }
             if self.bp(row).drone.is_some() {
+                // A carrier's drones work while it flies (`run_air_support`), so it never
+                // waits for them: the pylons open while there is salvage in reach and
+                // close once every drone is home.
                 let need = motion.deploy_ticks;
-                let wants_move = self
-                    .state
-                    .orders
-                    .front(&self.state.units, row)
-                    .is_some_and(|o| {
-                        matches!(
-                            o.kind,
-                            crate::tables::OrderKind::Move | crate::tables::OrderKind::AttackMove
-                        )
-                    });
                 let home = self.carrier_drones_home(row);
                 let working = self.carrier_has_work(row) || self.carrier_reclaim_ordered(row);
                 let units = &mut self.state.units;
-                if wants_move && (!home || units.deploy[row] > 0) {
-                    // Wait out drones that are still out, then shut the bays.
-                    // Drones not built yet do not count.
-                    units.flags[row] |= flag::HOLD;
-                    if home && units.deploy[row] > 0 {
-                        units.deploy[row] -= 1;
-                    }
-                } else if !wants_move && working && units.deploy[row] < need {
+                if working && units.deploy[row] < need {
                     units.deploy[row] += 1;
-                } else if !wants_move && home && units.deploy[row] > 0 {
+                } else if !working && home && units.deploy[row] > 0 {
                     units.deploy[row] -= 1;
                 }
                 continue;

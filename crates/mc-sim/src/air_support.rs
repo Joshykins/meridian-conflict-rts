@@ -82,7 +82,7 @@ impl World {
                 })
                 .map(|o| (o.kind, o.target));
             let recalling = if carrier {
-                self.carrier_recalling(parent)
+                task.is_none() && !self.carrier_has_work(parent)
             } else {
                 !self.carrier_has_work(parent)
             };
@@ -103,7 +103,13 @@ impl World {
                 let dock = self.drone_socket(parent, slot);
                 let pos = self.state.units.pos[row];
                 let state = self.state.units.deploy[row];
-                if recalling || !open {
+                // A drone left outside its carrier's reach (the carrier flew on while it
+                // worked) is called home; back inside, it picks up work again. A drone
+                // sent to an ordered wreck goes however far that is.
+                let astray = task.is_none()
+                    && state == dock::FLYING
+                    && pos.distance(center) > reach + self.work_range(row);
+                if recalling || !open || astray {
                     match state {
                         dock::FLYING if pos.distance(dock.xy) <= DOCK_CAPTURE => {
                             // Close enough to line up under (or over) its socket: the
@@ -189,15 +195,6 @@ impl World {
             .orders
             .front(&self.state.units, row)
             .is_some_and(|o| matches!(o.kind, OrderKind::Reclaim | OrderKind::ReclaimUnit))
-    }
-
-    /// A move order, or nothing left to salvage, brings the wing home.
-    pub(crate) fn carrier_recalling(&self, row: usize) -> bool {
-        let front = self.state.orders.front(&self.state.units, row);
-        let ordered = self.carrier_reclaim_ordered(row);
-        let moving =
-            front.is_some_and(|o| matches!(o.kind, OrderKind::Move | OrderKind::AttackMove));
-        moving || (!ordered && !self.carrier_has_work(row))
     }
 
     pub(crate) fn carrier_drones_home(&self, row: usize) -> bool {
@@ -334,6 +331,10 @@ impl World {
     pub(crate) fn seat_drones(&mut self) {
         for (parent, children) in self.drone_flocks() {
             let approach = self.bp(parent).drone_approach;
+            // How far the carrier flew this tick: a gliding drone is carried with it, so
+            // it closes on its pylon even under a carrier flying faster than it eases.
+            let carried = (self.state.units.pos[parent] - self.state.units.prev_pos[parent])
+                .extend(self.state.units.z[parent] - self.state.units.prev_z[parent]);
             for row in children {
                 let slot = self.state.units.drone_socket[row] as usize;
                 let state = self.state.units.deploy[row];
@@ -343,7 +344,7 @@ impl World {
                 let socket = self.drone_socket(parent, slot);
                 let seat = socket.xy.extend(socket.z);
                 let line_up = socket.xy.extend(socket.z + approach);
-                let here = self.state.units.pos[row].extend(self.state.units.z[row]);
+                let here = self.state.units.pos[row].extend(self.state.units.z[row]) + carried;
                 let (goal, next) = match state {
                     dock::RELEASING => (line_up, dock::FLYING),
                     dock::DOCKING if here.xy().distance(socket.xy) > DOCK_ALIGNED => {

@@ -129,7 +129,7 @@
  // priority, like any other build.
  health: 150, cost: (mass: 3, energy: 30, time: 30),
  radius: 1.8, height: 1.2, vision: 360,
- motion: (layer: Air, size: 0, speed: 88, accel: 39, turn: 240, altitude: 22, hover: true),
+ motion: (layer: Air, size: 0, speed: 100, accel: 45, turn: 240, altitude: 22, hover: true),
  weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,
  sounds: (death: "blast_small", moving: "aster_hover"), reclaimer: (power: 5, range: 35, heads: [(emitter: (1.15, 0, 0.35))]), wreck_fraction: 0,
 ),

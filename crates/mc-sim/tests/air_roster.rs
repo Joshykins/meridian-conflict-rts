@@ -239,6 +239,77 @@ fn carrier_reclaim_order_sends_every_drone() {
     }
     assert!(w.state.wrecks.mass[far] < Fx::from_int(300) || !w.state.wrecks.slots.is_alive(far));
 }
+/// A carrier sent on its way salvages what it passes without stopping for its
+/// drones, and a drone left behind outside its reach is called home.
+#[test]
+fn carrier_reclaims_on_the_move_and_calls_home_drones_left_behind() {
+    let mut w = world();
+    w.state.players[0].mass = Fx::from_int(100);
+    w.state.players[0].energy = Fx::from_int(100000);
+    w.state.players[0].mass_capacity = Fx::from_int(20000);
+    w.state.players[0].energy_capacity = Fx::from_int(200000);
+    add(&mut w, "aster_commander", 0, 150, 150);
+    let carrier = add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
+    for _ in 0..450 {
+        w.tick(&[]).unwrap();
+    }
+    let parent = w.state.units.id(carrier);
+    let drones: Vec<_> = w
+        .state
+        .units
+        .slots
+        .iter()
+        .filter(|&r| w.state.units.drone_parent[r] == parent)
+        .collect();
+    assert_eq!(drones.len(), 4);
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let wreck = w
+        .state
+        .wrecks
+        .spawn(
+            tank,
+            FxVec2::from_ints(1300, 950),
+            Fx::from_int(20),
+            Angle::ZERO,
+            Fx::from_int(300),
+            0,
+        )
+        .unwrap();
+    let goal = FxVec2::from_ints(1900, 900);
+    w.tick(&[cmd(Command::Move {
+        units: vec![parent],
+        target: goal,
+        queue: false,
+    })])
+    .unwrap();
+    // 1000 m at 65 m/s: under 20 s of flying, with no wait for the drones.
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        w.state.units.pos[carrier].distance(goal) < Fx::from_int(30),
+        "carrier stopped for its drones: at {:?}",
+        w.state.units.pos[carrier]
+    );
+    assert!(
+        !w.state.wrecks.slots.is_alive(wreck) || w.state.wrecks.mass[wreck] < Fx::from_int(250),
+        "nothing salvaged on the way past"
+    );
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    let reach = w
+        .blueprints
+        .unit(w.state.units.blueprint[carrier])
+        .drone_radius;
+    for &d in &drones {
+        assert!(
+            w.state.units.pos[d].distance(w.state.units.pos[carrier]) <= reach,
+            "drone left outside the carrier's reach: {:?}",
+            w.state.units.pos[d]
+        );
+    }
+}
 #[test]
 fn an_empty_economy_still_starts_a_drone() {
     let mut w = world();
