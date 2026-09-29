@@ -1053,6 +1053,23 @@ fn capital_ship(model: ModelInfo) -> bool {
     return model.capital[0].w != 0.0 || model.capital[4].x != 0.0;
 }
 
+// How hard a spacecraft's stern drives push, 0 idle to 1: its speed against its cruise
+// (`ModelInfo::capital[3].w`), and its climb or descent. Stepped a tick at a time, like the
+// drives' glow; a big hull's speed changes slowly.
+fn drive_thrust(model: ModelInfo, e: Entity) -> f32 {
+    let motion = e.pos - e.prev_pos;
+    let cruise = max(model.capital[3].w, 0.5);
+    return clamp(length(motion.xy) / cruise + abs(motion.z) / (cruise * 0.6), 0.0, 1.0);
+}
+
+// How far a spacecraft's drive nozzles swing (radians, `gpu_consts::drive`): toward the
+// side the nose turns to, by how fast it turns (renderer capital_fx.rs aims the plume the
+// same way).
+fn drive_vector(e: Entity) -> f32 {
+    let turn = lerp_angle(0.0, e.heading - e.prev_heading, 1.0);
+    return clamp(turn * DRIVE_VECTOR_GAIN, -DRIVE_VECTOR_MAX, DRIVE_VECTOR_MAX);
+}
+
 // How high a spacecraft's hull (its feet's plane) is over the ground, between ticks.
 fn capital_height(e: Entity, t: f32) -> f32 {
     let at = mix(e.prev_pos, e.pos, t);
@@ -1517,15 +1534,24 @@ fn vs_main(in: VsIn) -> VsOut {
         }
     } else if model.capital[4].x != 0.0 && in.part == 19u
         && (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
-        // A spacecraft drive's iris vanes turn about its axis (`CapitalRig::drives`).
+        // A spacecraft drive's nozzle (`CapitalRig::drives`, `gpu_consts::drive`): its
+        // petals open out with thrust, and the whole of it swivels on its gimbal ball to
+        // throw the exhaust to the side the nose is turning to.
         let dr = model.capital[4];
+        let size = max(model.capital[6].y, 0.01);
         let cy = sign(p.y) * select(dr.z, dr.w, abs(p.y) > 0.5 * (dr.z + dr.w));
-        let c = vec3<f32>(dr.x, cy, dr.y);
-        // A single drive on the centre line (both |y| zero) turns one way as a whole.
-        let turn = select(sign(p.y), 1.0, dr.w == 0.0);
-        let phase = time * 0.65 * turn + cy * 0.13;
-        p = rot_x(p - c, phase) + c;
-        n = rot_x(n, phase);
+        let mouth = vec3<f32>(dr.x, cy, dr.y);
+        let q = p - mouth;
+        let aft = DRIVE_PETAL_HINGE - q.x / size;
+        let r = length(q.yz);
+        if aft > 0.0 && r > 0.01 {
+            let flare = mix(DRIVE_FLARE_IDLE, DRIVE_FLARE_FULL, drive_thrust(model, e));
+            p = mouth + vec3<f32>(q.x, q.yz * ((r + aft * size * tan(flare)) / r));
+        }
+        let gimbal = mouth + vec3<f32>(DRIVE_GIMBAL * size, 0.0, 0.0);
+        let swing = -drive_vector(e);
+        p = rot_z(p - gimbal, swing) + gimbal;
+        n = rot_z(n, swing);
     } else if (in.part == 5u || in.part == 6u) && model.vtol[0].w > 0.0 {
         let front = in.part == 5u;
         let fans = model.vtol[0].w > 1.5;

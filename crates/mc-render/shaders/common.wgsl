@@ -194,7 +194,8 @@ struct ModelInfo {
     // A spacecraft's rig (`models::capital::CapitalRig::gpu`), zero for any other model:
     // [0] fore legs hinge x, |y|, z, stow way (+1 foot swings aft, -1 forward; 0: no gear);
     // [1] aft legs the same; [2] bay door hinges |y|: fore inner, outer, aft inner, outer;
-    // [3] door hinge z, fore leg size, aft leg size (1: a 36 m leg), unused;
+    // [3] door hinge z, fore leg size, aft leg size (1: a 36 m leg), the ship's cruise in
+    // metres a tick (the renderer fills it from the blueprint);
     // [4] stern drives: mouth x, z, |y| of the inner and outer pair (x 0: none);
     // [5] lift jets: fore x, |y|, aft x, |y| (0: none); [6] lift jet mouth z, drive size
     // (1: a 17 m deep bell), belly ramp hinge x, z (z 0: no ramp).

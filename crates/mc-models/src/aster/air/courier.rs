@@ -41,7 +41,7 @@ pub(crate) const LAMPS: crate::CapitalLamps = crate::CapitalLamps {
 
 /// Size of the stern drives against the Bastion's 12 m bells.
 const DRIVE_SCALE: f32 = 0.55;
-/// What `entity.wgsl` animates (`models::capital_rig`): the drives' glow and iris vanes, the
+/// What `entity.wgsl` animates (`models::capital_rig`): the drives' glow and swivelling nozzles, the
 /// lift jets' glow (one mouth height covers both pairs: 4.6 fore, 6.6 aft, glow 4 m up).
 /// No legs (it sets down on skids) and no ramp (plug doors, `part::HOLD_DOOR`).
 pub(crate) const RIG: CapitalRig = CapitalRig {

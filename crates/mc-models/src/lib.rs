@@ -193,7 +193,8 @@ pub mod part {
     pub const GEAR: u32 = 17;
     /// Reserved former transport fan part; spacecraft have no rotating lift fans.
     pub const FAN: u32 = 18;
-    /// A spacecraft drive's iris: vanes turning slowly about the drive's axis (`capital_rig`).
+    /// A spacecraft drive's nozzle: it swivels on its gimbal as the hull turns and opens
+    /// out with thrust (`capital_rig`, `gpu_consts::drive`).
     pub const DRIVE: u32 = 19;
     /// A lift ship's lower leg: telescoped up into its `GEAR` leg, then stowed with it.
     pub const GEAR_STRUT: u32 = 20;

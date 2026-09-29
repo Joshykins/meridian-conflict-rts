@@ -1,14 +1,15 @@
 //! The spacecraft rig shared by Aster capital ships (the Bastion first): landing legs that
-//! swing out of flush belly bays, stern drives with glowing bells, downward lift jets, and
-//! rotary cannons in houses of their own.
+//! swing out of flush belly bays, vectoring stern drives with glowing throats, downward
+//! lift jets, and rotary cannons in houses of their own.
 //!
 //! A ship describes its rig in a [`CapitalRig`], builds the pieces here at the places the
 //! rig names, and registers the rig in `models::capital_rig` by mesh key. The renderer puts
 //! [`CapitalRig::gpu`] in `ModelInfo::capital`, and `entity.wgsl` animates from that alone:
 //! - legs (`part::GEAR`, `GEAR_STRUT`, `GEAR_FOOT`) and doors (`GEAR_DOOR`) over the gear value
 //!   (`mirror::UNIT_GEAR_SHIFT`); a hovering ship with legs stops heaving once they are down;
-//! - the drives' glow with the ship's speed, the lift jets' with its climb or descent, and
-//!   the iris vanes (`part::DRIVE`) about each drive's axis;
+//! - the drives' glow with the ship's speed, the lift jets' with its climb or descent;
+//!   each drive's nozzle (`part::DRIVE`) swivels on its gimbal as the hull turns and
+//!   opens out with thrust (`gpu_consts::drive`);
 //! - the belly ramp (`part::RAMP`) about `ramp`, for a ship with one;
 //! - rotary barrels in a house (`rig::SPIN` inside `with_house`) turn while that gun fires.
 use std::f32::consts::TAU;
@@ -162,15 +163,36 @@ fn sized(b: &mut MeshBuilder, at: Vec3, size: f32, f: impl FnOnce(&mut MeshBuild
     );
 }
 
-/// One stern drive, its mouth at `c` (on the rig's drive row), facing aft: a finned can, a
-/// gimbal ring, and a flared bell lined with glow that the shader keeps dark while the
-/// drive is cold and burns hotter the deeper it goes under thrust; iris vanes
-/// (`part::DRIVE`) turn in the throat. The bell is 12 m across its mouth at `size` 1,
-/// its throat 17 m in; the can runs 35 m forward of the mouth.
+/// What lines a nozzle: glow down the throat to the petals' hinge ([`drive`]), or dark
+/// metal right down to the glowing disc at the bottom ([`drive_deep`]).
+#[derive(Clone, Copy, PartialEq)]
+enum Lining {
+    Glow,
+    Dark,
+}
+
+/// One stern drive, its mouth at `c` (on the rig's drive row), facing aft: a finned can
+/// holding a gimbal collar, and in it the nozzle (`part::DRIVE`), which the shader swivels
+/// about its gimbal ball as the hull turns and opens out as the drive pushes harder
+/// (`gpu_consts::drive`): a glowing throat, and a ring of petals flaring to the mouth,
+/// lined with glow that the shader keeps dark while the drive is cold and burns hotter
+/// the deeper it goes under thrust. The mouth is 12 m across at `size` 1, its throat
+/// 17 m in; the can runs 35 m forward of the mouth.
 pub(crate) fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
+    nozzle(b, c, size, Lining::Glow);
+}
+
+/// [`drive`] lined inside with dark ribbed metal instead of glow, so it reads as a deep
+/// hollow nozzle from astern, with the light at the bottom of it: the glowing throat.
+pub(crate) fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
+    nozzle(b, c, size, Lining::Dark);
+}
+
+fn nozzle(b: &mut MeshBuilder, c: Vec3, size: f32, lining: Lining) {
     sized(b, c, size, |b| {
         let c = Vec3::ZERO;
         let n = if b.fine() { 16 } else { 8 };
+        // The can and the gimbal collar the nozzle turns in: fixed to the hull.
         b.paint(METAL);
         b.cylinder_between(
             c + v3(35.0, 0.0, 0.0),
@@ -180,165 +202,189 @@ pub(crate) fn drive(b: &mut MeshBuilder, c: Vec3, size: f32) {
             n,
         );
         b.paint(ACCENT);
-        collar(b, c, 20.8, 17.2, [12.0, 11.4], [8.4, 8.4], n);
-        b.paint(PLATING_DARK);
-        lathe(
-            b,
-            c,
-            Vec3::X,
-            &[
-                [17.4, 9.2],
-                [12.0, 10.2],
-                [0.6, 12.2],
-                [-0.8, 12.1],
-                [-0.8, 11.7],
-                [11.0, 9.1],
-                [16.6, 8.2],
-            ],
-            n,
-        );
-        b.paint(GLOW);
-        lathe(
-            b,
-            c,
-            Vec3::X,
-            &[
-                [16.6, 8.2],
-                [11.0, 9.1],
-                [-0.5, 11.65],
-                [-0.5, 11.25],
-                [11.0, 8.7],
-                [16.6, 7.8],
-            ],
-            n,
-        );
-        b.cylinder_between(c + v3(17.2, 0.0, 0.0), c + v3(16.6, 0.0, 0.0), 7.9, 7.9, n);
-        if b.fine() {
-            // A heat ring: a band of hot metal round the bell's neck.
-            b.paint(GLOW_ORANGE);
-            let r = 10.2 - 0.18;
-            collar(b, c, 13.6, 12.4, [r + 0.3, r + 0.4], [r - 0.4, r - 0.3], n);
-        }
-        b.with_part(part::DRIVE, |b| {
-            b.paint(METAL);
-            b.cylinder_between(
-                c + v3(16.5, 0.0, 0.0),
-                c + v3(9.0, 0.0, 0.0),
-                2.4,
-                0.9,
-                b.sides(8),
-            );
-            if b.mid() {
-                let vanes = if b.fine() { 6 } else { 3 };
-                for k in 0..vanes {
-                    let a = k as f32 * TAU / vanes as f32;
-                    fin(b, c, a, 15.8, 14.8, 2.0, [7.3, 7.0], 0.7);
-                }
-            }
-        });
+        collar(b, c, 21.4, 17.8, [12.4, 11.8], [9.7, 9.7], n);
         if b.mid() {
             // Cooling fins down the can.
-            b.paint(ACCENT);
             let fins = if b.fine() { 12 } else { 6 };
             for k in 0..fins {
                 let a = (k as f32 + 0.5) * TAU / fins as f32;
-                fin(b, c, a, 27.6, 21.0, 10.3, [13.4, 12.2], 0.6);
+                fin(b, c, a, 27.6, 21.4, 10.3, [13.4, 12.2], 0.6);
             }
         }
-        if b.fine() {
-            // Actuator rams from the frame to the bell.
-            b.paint(METAL);
-            for a in [0.8f32, 3.95] {
-                let d = v3(0.0, a.cos(), a.sin());
-                b.cylinder_between(
-                    c + v3(31.0, 0.0, 0.0) + d * 12.8,
-                    c + v3(16.0, 0.0, 0.0) + d * 10.6,
-                    0.8,
-                    0.55,
-                    6,
-                );
-            }
-        }
+        // Rounds inside the collar read at fewer sides.
+        let inner = if b.fine() { 12 } else { 8 };
+        b.with_part(part::DRIVE, |b| swivelling(b, inner, n, lining));
     });
 }
 
-/// [`drive`] with a deep, dark bell: the same can, gimbal and flared bell outside, but lined
-/// inside with dark ribbed metal instead of glow, so it reads as a hollow nozzle from
-/// astern, with the light at the bottom of it: a glowing injector plate in the throat
-/// (hotter under thrust, like any drive's glow) round the turning iris.
-pub(crate) fn drive_deep(b: &mut MeshBuilder, c: Vec3, size: f32) {
-    sized(b, c, size, |b| {
-        let c = Vec3::ZERO;
-        let n = if b.fine() { 16 } else { 8 };
+/// The nozzle, mouth at the origin facing -x: all of it turns on the gimbal ball. `inner`
+/// sides for what sits in the collar, `n` for the bell.
+fn swivelling(b: &mut MeshBuilder, inner: usize, n: usize, lining: Lining) {
+    let c = Vec3::ZERO;
+    let hinge = crate::gpu_consts::drive::PETAL_HINGE;
+    // The gimbal ball, showing in the collar's mouth, and the throat's shell aft of it.
+    if b.fine() {
         b.paint(METAL);
-        b.cylinder_between(
-            c + v3(35.0, 0.0, 0.0),
-            c + v3(20.5, 0.0, 0.0),
-            10.4,
-            10.4,
-            n,
-        );
-        b.paint(ACCENT);
-        collar(b, c, 20.8, 17.2, [12.0, 11.4], [8.4, 8.4], n);
-        b.paint(PLATING_DARK);
         lathe(
             b,
             c,
             Vec3::X,
             &[
-                [17.4, 9.2],
-                [12.0, 10.2],
-                [0.6, 12.2],
-                [-0.8, 12.1],
-                [-0.8, 11.7],
-                [11.0, 9.1],
-                [16.6, 8.2],
+                [21.0, 6.0],
+                [18.4, 9.6],
+                [15.4, 8.6],
+                [15.4, 7.4],
+                [21.0, 5.0],
             ],
-            n,
+            inner,
         );
-        // Stiffening rings round the inside of the bell, standing a hand proud of it.
-        if b.fine() {
-            b.paint(ACCENT);
-            for (x, r) in [(4.0, 10.9), (11.0, 9.2)] {
-                collar(b, c, x + 0.5, x - 0.5, [r, r], [r - 0.7, r - 0.7], n);
-            }
-        }
-        // The injector plate at the bottom of the throat: a glowing disc behind a dark ring.
-        b.paint(GLOW);
-        b.cylinder_between(c + v3(16.9, 0.0, 0.0), c + v3(16.5, 0.0, 0.0), 7.6, 7.6, n);
-        b.paint(TREAD);
-        collar(b, c, 16.4, 16.0, [8.2, 8.2], [6.4, 6.4], n);
-        if b.fine() {
-            b.paint(GLOW_ORANGE);
-            let r = 10.2 - 0.18;
-            collar(b, c, 13.6, 12.4, [r + 0.3, r + 0.4], [r + 0.2, r + 0.3], n);
-        }
-        b.with_part(part::DRIVE, |b| {
-            b.paint(METAL);
-            b.cylinder_between(
-                c + v3(16.4, 0.0, 0.0),
-                c + v3(10.0, 0.0, 0.0),
-                2.4,
-                0.9,
-                b.sides(8),
+    }
+    b.paint(PLATING_DARK);
+    lathe(
+        b,
+        c,
+        Vec3::X,
+        &[
+            [15.6, 8.9],
+            [hinge + 0.4, 10.3],
+            [hinge + 0.4, 9.5],
+            [15.6, 7.9],
+        ],
+        inner,
+    );
+    if b.fine() {
+        // The petals' hinge ring, hot metal.
+        b.paint(GLOW_ORANGE);
+        collar(
+            b,
+            c,
+            hinge + 0.6,
+            hinge - 0.6,
+            [10.9, 10.9],
+            [9.9, 9.9],
+            inner,
+        );
+    }
+    // The throat: a glowing disc at the bottom, and the lining down to the mouth.
+    b.paint(GLOW);
+    b.cylinder_between(
+        c + v3(16.0, 0.0, 0.0),
+        c + v3(15.4, 0.0, 0.0),
+        8.0,
+        8.0,
+        inner,
+    );
+    match lining {
+        Lining::Glow => {
+            // Glowing down the throat to the petals' hinge, dark metal from there out.
+            lathe(
+                b,
+                c,
+                Vec3::X,
+                &[
+                    [15.5, 7.9],
+                    [hinge - 1.0, 9.8],
+                    [hinge - 1.0, 9.4],
+                    [15.5, 7.5],
+                ],
+                inner,
             );
-            if b.mid() {
-                let vanes = if b.fine() { 6 } else { 3 };
-                for k in 0..vanes {
-                    let a = k as f32 * TAU / vanes as f32;
-                    fin(b, c, a, 15.8, 14.8, 2.0, [6.4, 6.2], 0.7);
-                }
+            b.paint(TREAD);
+            lathe(
+                b,
+                c,
+                Vec3::X,
+                &[
+                    [hinge - 0.8, 9.8],
+                    [-0.4, 11.4],
+                    [-0.4, 11.0],
+                    [hinge - 0.8, 9.4],
+                ],
+                n,
+            );
+        }
+        Lining::Dark => {
+            // A glowing ring round the throat's disc, and dark metal down to the mouth,
+            // stiffened with a ring standing a hand proud of it.
+            if b.fine() {
+                collar(b, c, 15.3, 14.7, [8.6, 8.8], [7.4, 7.6], inner);
             }
-        });
-        if b.mid() {
-            b.paint(ACCENT);
-            let fins = if b.fine() { 12 } else { 6 };
-            for k in 0..fins {
-                let a = (k as f32 + 0.5) * TAU / fins as f32;
-                fin(b, c, a, 27.6, 21.0, 10.3, [13.4, 12.2], 0.6);
+            b.paint(TREAD);
+            lathe(
+                b,
+                c,
+                Vec3::X,
+                &[[14.6, 8.9], [-0.4, 11.4], [-0.4, 11.0], [14.6, 8.5]],
+                n,
+            );
+            if b.fine() {
+                b.paint(ACCENT);
+                collar(b, c, 6.5, 5.5, [10.6, 10.6], [9.9, 9.9], inner);
             }
         }
-    });
+    }
+    // The bell: petals from the hinge ring to the mouth, slots between them showing the
+    // lining; one skirt at the coarse level.
+    b.paint(PLATING_DARK);
+    let (root, lip) = ([hinge, 10.0], [-0.8, 11.9]);
+    if b.mid() {
+        let petals = if b.fine() { 12 } else { 6 };
+        for k in 0..petals {
+            let a = k as f32 * TAU / petals as f32;
+            petal(b, a, 0.36 * TAU / petals as f32, root, lip);
+        }
+    } else {
+        bell(b, root, lip, n);
+    }
+    if b.fine() {
+        // Actuator rams from the gimbal ball out to the hinge ring, one a side.
+        b.paint(METAL);
+        for k in 0..2 {
+            let a = (k as f32 + 0.5) * TAU / 2.0;
+            let d = v3(0.0, a.cos(), a.sin());
+            b.cylinder_between(
+                c + v3(18.6, 0.0, 0.0) + d * 9.8,
+                c + v3(hinge + 0.8, 0.0, 0.0) + d * 11.2,
+                0.7,
+                0.5,
+                6,
+            );
+        }
+    }
+}
+
+/// A smooth bell from `root` to `lip` ((x, radius) each), a hull thick.
+fn bell(b: &mut MeshBuilder, root: [f32; 2], lip: [f32; 2], n: usize) {
+    let mid = [
+        (root[0] + lip[0]) * 0.5,
+        root[1] + (lip[1] - root[1]) * 0.62,
+    ];
+    lathe(
+        b,
+        Vec3::ZERO,
+        Vec3::X,
+        &[
+            [root[0], root[1] + 0.2],
+            [mid[0], mid[1] + 0.35],
+            [lip[0], lip[1] + 0.35],
+            [lip[0], lip[1] - 0.2],
+            [mid[0], mid[1] - 0.2],
+            [root[0], root[1] - 0.4],
+        ],
+        n,
+    );
+}
+
+/// One petal of a nozzle's bell: a curved plate `half` radians either side of `a` round
+/// the x axis, from `root` to `lip` ((x, inner radius) each).
+fn petal(b: &mut MeshBuilder, a: f32, half: f32, root: [f32; 2], lip: [f32; 2]) {
+    let thick = 0.4;
+    let ring = |[x, r]: [f32; 2], narrow: f32| {
+        let at = |t: f32, r: f32| v3(x, (a + t).cos() * r, (a + t).sin() * r);
+        let h = half * narrow;
+        vec![at(-h, r), at(h, r), at(h, r + thick), at(-h, r + thick)]
+    };
+    b.loft(&[ring(root, 1.0), ring(lip, 0.86)], true, true);
 }
 
 /// A downward lift jet, its mouth centre at `c` (on the rig's lift jets): a gimballed bell

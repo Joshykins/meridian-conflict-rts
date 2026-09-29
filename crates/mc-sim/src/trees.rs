@@ -1,6 +1,7 @@
 //! Trees that are in the way: a builder raises a reclaim field over a lot and
 //! vaporizes the trees on it before it lays the structure down, and a big
-//! walker knocks over the trees it walks into.
+//! walker knocks over the trees it walks into, and a capital ship coming down
+//! presses flat the trees under its hull and legs.
 //!
 //! The field is one effect over the whole lot, not a beam per tree: a wave
 //! runs out from the middle every `WAVE_TICKS`, each taking the trees out to
@@ -28,6 +29,9 @@ const LOT_MARGIN: Fx = Fx::from_int(2);
 pub(crate) const TRAMPLE_RADIUS: Fx = Fx::from_int(10);
 /// Share of a walker's radius that touches trunks: its legs and hull, not its reach.
 const TRAMPLE_REACH: Fx = Fx::ratio(3, 4);
+/// A capital ship this low (a share of its height, over the ground under it) has its
+/// hull and legs down among the crowns: the trees under its hull outline go over.
+const SETTLE_SHARE: Fx = Fx::ratio(1, 2);
 
 impl World {
     fn fell(&mut self, prop: usize) {
@@ -111,12 +115,47 @@ impl World {
         false
     }
 
+    /// The trees under a capital ship's hull outline while it is low enough for its
+    /// hull and legs to be among them, pressed out from under its middle.
+    fn settle_on_trees(&self, row: usize, felled: &mut Vec<(usize, FxVec2, FxVec2)>) {
+        let units = &self.state.units;
+        let bp = self.bp(row);
+        let pos = units.pos[row];
+        let (half_x, half_y) = bp.hull;
+        if half_x <= Fx::ZERO
+            || units.has_flag(row, flag::IN_FACTORY | flag::UNDER_CONSTRUCTION)
+            || units.z[row] - self.terrain.height_at(pos) > bp.height * SETTLE_SHARE
+        {
+            return;
+        }
+        let nose = FxVec2::from_angle(units.heading[row]);
+        let side = nose.perp();
+        let motion = pos - units.prev_pos[row];
+        self.prop_index
+            .query(pos, half_x + half_y, kind::PROP, |e| {
+                let prop = e.row as usize;
+                let d = e.pos - pos;
+                if d.dot(nose).abs() <= half_x
+                    && d.dot(side).abs() <= half_y
+                    && self.map.props[prop].kind.is_tree()
+                    && self.is_prop_alive(prop)
+                {
+                    felled.push((prop, pos, motion));
+                }
+                true
+            });
+    }
+
     /// Big walkers flatten the trees they walk into, away from themselves.
     pub(crate) fn run_trampling(&mut self) {
         let units = &self.state.units;
         let mut felled = Vec::new();
         for row in units.slots.iter() {
             let bp = self.bp(row);
+            if bp.is_capital_ship() {
+                self.settle_on_trees(row, &mut felled);
+                continue;
+            }
             let walks = bp
                 .motion
                 .as_ref()

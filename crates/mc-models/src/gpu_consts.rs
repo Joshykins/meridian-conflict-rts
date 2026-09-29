@@ -251,6 +251,26 @@ shared! {
         pub const TILT_MAX: f32 = 2.25;
     }
 
+    /// A spacecraft's stern drives (`aster::air::capital::drive`, entity.wgsl, renderer
+    /// capital_fx.rs): each nozzle (`part::DRIVE`) swivels whole on a gimbal ball inside
+    /// its can as the hull turns, and its petals open wider the harder it pushes. Lengths
+    /// are for a drive of size 1 (a 12 m mouth), metres forward of the mouth.
+    pub mod drive as "DRIVE_" {
+        /// Where the nozzle swivels: the gimbal ball's centre.
+        pub const GIMBAL: f32 = 18.0;
+        /// Where the petals hinge: everything aft of this opens out with thrust.
+        pub const PETAL_HINGE: f32 = 13.0;
+        /// Radians the nozzle swings per radian a tick the hull turns: the exhaust is
+        /// thrown to the side the nose turns to, pushing the stern the other way.
+        pub const VECTOR_GAIN: f32 = 8.0;
+        /// The furthest it swings either way, radians.
+        pub const VECTOR_MAX: f32 = 0.28;
+        /// How far the petals turn out from where the model has them (radians): drawn in
+        /// a little at idle, opened well out at full thrust.
+        pub const FLARE_IDLE: f32 = -0.05;
+        pub const FLARE_FULL: f32 = 0.2;
+    }
+
     /// A wall section that joins its neighbours (`models::wall`): each quarter of
     /// its lot holds every piece that quarter could need, and the entity shader draws the
     /// one its neighbours call for. The neighbours are `status[2]`'s bits
@@ -345,6 +365,16 @@ shared! {
         /// standing on the ground along `vel` (its run), `size` metres tall, coloured
         /// `appearance.xyz` at strength `appearance.w`, swelling in and out over its life.
         pub const VEIL: u32 = 50;
+        /// A capital ship's drive exhaust (renderer/capital_fx.rs): one point of a chain
+        /// laid down the plume from the nozzle's throat. Each is a stretch of glowing tube
+        /// a step either way of it (`vel`, the step), in a tent that adds up to one with
+        /// its neighbours, so the chain is one seamless tube that bends where it bends.
+        /// Carried with the ship (`appearance.xyz`), `appearance.w` the drive's heat (0
+        /// idle to 1 flat out); `params.x` the tube's radius here, `params.y` how far down
+        /// the plume it is (0 the throat, 1 the tip), `params.w` how much further down
+        /// the next point is. Its brightness is a tent over its life too, so each
+        /// chain laid fades out as the next fades in.
+        pub const PLUME: u32 = 51;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under

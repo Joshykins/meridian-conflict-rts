@@ -219,3 +219,39 @@ fn a_tank_leaves_trees_standing() {
     }
     assert!((0..10).all(|p| w.is_prop_alive(p)));
 }
+
+#[test]
+fn a_capital_ship_setting_down_presses_flat_the_trees_under_its_hull() {
+    // A row of trees along the ship's length, under its hull, and one well clear to the side.
+    let mut props: Vec<Prop> = (0..8).map(|i| tree(900 + i * 25, 1000)).collect();
+    props.push(tree(1000, 1200));
+    let clear = props.len() - 1;
+    let mut w = world(props);
+    let ship = spawn(&mut w, "aster_t2_lift_ship", 1000, 1000);
+    for _ in 0..40 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        (0..=clear).all(|p| w.is_prop_alive(p)),
+        "felled trees from high in the sky"
+    );
+    w.tick(&[cmd(Command::Land {
+        units: vec![ship],
+        pos: FxVec2::from_ints(1000, 1000),
+        unload: false,
+        queue: false,
+    })])
+    .unwrap();
+    let mut pressed = 0;
+    for _ in 0..1500 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            if let SimEvent::TreeTrampled { prop, .. } = e {
+                assert!(!w.is_prop_alive(*prop as usize));
+                pressed += 1;
+            }
+        }
+    }
+    assert_eq!(pressed, clear, "every tree under the hull went down");
+    assert!(w.is_prop_alive(clear), "a tree clear of the hull stands");
+}

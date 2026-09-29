@@ -10,9 +10,11 @@
 //!
 //! - The stern engines burn whenever the ship is off the ground, a short faint
 //!   burn hanging still and a long white-hot plume with shock diamonds under
-//!   throttle. They wind down over a couple of seconds after touchdown and light
+//!   throttle, each one tube out of the whole nozzle mouth (`PUFF_PLUME`) along the
+//!   way the nozzle is swung (entity.wgsl `drive_vector`) and bent back through a
+//!   turn. They wind down over a couple of seconds after touchdown and light
 //!   while the ramp closes for take-off. Their light falls on the hull and, low
-//!   down, on the ground behind.
+//!   down, on the ground behind, and their wash bends the trees behind a low stern.
 //! - The lift jets fire straight down below ~190 m, hardest in the last 40 m and
 //!   while sinking or climbing. Where each one meets the ground: a hot glow and a
 //!   light, dust (or spray) rolling out in a ring, and the trees pushed over.
@@ -32,6 +34,7 @@
 
 use super::water_fx::{PUFF_DROPLET, PUFF_SPRAY};
 use super::{Puff, Renderer, PUFF_CLOUD_WISP, PUFF_RING, PUFF_SHOCK_DUST};
+use crate::gpu_consts;
 use crate::models::CapitalLamps;
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::UnitInstance;
@@ -44,6 +47,23 @@ pub(super) const PUFF_THRUST: f32 = 30.0;
 /// A soft drive glow carried with the ship: a nozzle mouth, or where a lift jet
 /// meets the ground (`appearance.w` below zero: heated ground, warmer at the rim).
 pub(super) const PUFF_THRUST_GLOW: f32 = 31.0;
+
+/// A drive plume (`gpu_consts::puff::PLUME`): one point of the tube down a stern plume.
+const PUFF_PLUME: f32 = gpu_consts::puff::PLUME as f32;
+/// Seconds the exhaust takes from the nozzle to a plume's tip: through a turn the tip
+/// trails back to where the nozzle pointed this long ago.
+const PLUME_LAG: f32 = 0.7;
+
+/// How far the stern drives' nozzles swing for a turn of `turn` radians this tick, toward
+/// the side the nose turns to (entity.wgsl `drive_vector`, which swings the nozzles).
+fn drive_vector(turn: f32) -> f32 {
+    let turn =
+        (turn + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+    (turn * gpu_consts::drive::VECTOR_GAIN).clamp(
+        -gpu_consts::drive::VECTOR_MAX,
+        gpu_consts::drive::VECTOR_MAX,
+    )
+}
 
 /// Radius (m) of the hull every size here is tuned for: the Bastion's.
 const REFERENCE_RADIUS: f32 = 160.0;
@@ -59,6 +79,8 @@ struct Kit {
     lamps: Option<&'static CapitalLamps>,
     /// Size against the reference hull.
     k: f32,
+    /// Its stern drives' size (`CapitalRig::drives`; 1: a 12 m mouth).
+    drive: f32,
     /// Full cruise speed, m/s.
     cruise: f32,
     /// Half length and half width of the hull on the ground, metres.
@@ -87,6 +109,8 @@ struct Ship {
     burn: f32,
     /// Smoothed 0..1: lift jets.
     lift: f32,
+    /// Smoothed: how fast it turns, radians a second, left positive.
+    turn: f32,
     /// Render time of the tick this ship was last seen at.
     seen: f32,
     /// When the trees under it were last pushed.
@@ -151,6 +175,8 @@ impl Renderer {
             lift_jets: crate::models::lift_jets(mesh),
             lamps: crate::models::capital_lamps(mesh),
             k: radius / REFERENCE_RADIUS,
+            drive: crate::models::capital_rig(mesh)
+                .map_or(radius / REFERENCE_RADIUS, |rig| rig[6][1]),
             cruise: bp.motion.map_or(78.0, |m| m.speed.to_f32()).max(1.0),
             half: if hull.0 > 1.0 {
                 (hull.0 * 0.9, hull.1 * 0.9)
@@ -252,7 +278,16 @@ impl Renderer {
             ship.lift = approach(ship.lift, lift_goal, 0.45, (0.09 * cut).min(1.0));
             ship.throttle = approach(ship.throttle, push, 0.3, 0.12);
         }
-        let (burn, lift, throttle) = (ship.burn, ship.lift, ship.throttle);
+        // How fast it turns (radians a second, left positive), smoothed: what bends the plumes.
+        let turn = (u.heading - u.prev_heading + std::f32::consts::PI)
+            .rem_euclid(std::f32::consts::TAU)
+            - std::f32::consts::PI;
+        ship.turn = if fresh {
+            turn / dt
+        } else {
+            ship.turn + (turn / dt - ship.turn) * 0.35
+        };
+        let (burn, lift, throttle, spin) = (ship.burn, ship.lift, ship.throttle, ship.turn);
         let gust_due = time - ship.gust >= GUST_EVERY;
         ship.lights.clear();
         // The ship's frame at both ends of the tick, as `aircraft_trails` builds it.
@@ -298,34 +333,50 @@ impl Renderer {
             return;
         }
 
-        // Stern engines: one ribbon per nozzle per slice of the tick, so a turn bends
-        // the plume, and a glow at each mouth.
+        // Stern engines: a plume out of each nozzle's whole mouth, along the way the
+        // nozzle is swung (entity.wgsl `drive_vector`), laid a few times a tick so it keeps
+        // to the nozzle as the hull turns, and bent back through a turn: what left the
+        // nozzle a moment ago left it pointing where the ship pointed then.
         if burn >= 0.02 {
             let heat = (0.18 + 0.82 * throttle) * burn;
-            let reach = (38.0 + 120.0 * throttle) * (0.35 + 0.65 * burn) * k;
-            let slices = (travel.length() / 4.0).ceil().clamp(1.0, 6.0) as usize;
+            let reach = (38.0 + 150.0 * throttle) * (0.35 + 0.65 * burn) * k;
+            let swing = drive_vector(u.heading - u.prev_heading);
+            let flare = gpu_consts::drive::FLARE_IDLE
+                + (gpu_consts::drive::FLARE_FULL - gpu_consts::drive::FLARE_IDLE) * throttle;
+            let mouth = (11.4 + gpu_consts::drive::PETAL_HINGE * flare.tan()) * kit.drive;
+            let throat = 9.0 * kit.drive;
+            let (slices, steps) = if near { (3, 7) } else { (1, 4) };
             for i in 0..slices {
-                let k = (i as f32 + 0.5) / slices as f32;
-                let f = frame(k);
-                let start = time + k * dt;
+                let at_k = i as f32 / slices as f32;
+                let f = frame(at_k);
+                let start = time + at_k * dt;
+                let life = 2.0 * dt / slices as f32;
+                let axis = -f.1 * swing.cos() + f.2 * swing.sin();
                 for &port in nozzles {
-                    let at = place(&f, port) - f.1 * 1.0;
-                    // A little wander, so the four plumes are not ruled lines.
-                    let sway =
-                        f.2 * self.scatter.signed() * 0.012 + f.3 * self.scatter.signed() * 0.012;
-                    let axis = (-f.1 + sway).normalize_or_zero();
-                    // The tip flickers: each ribbon a little longer or shorter.
-                    let length = reach * (0.9 + 0.2 * self.scatter.unit());
-                    self.push_drive(
-                        PUFF_THRUST,
-                        at,
-                        axis * length,
-                        start,
-                        dt * 1.5 / slices as f32,
-                        (8.2 * k, 8.2 * k),
-                        vel,
-                        heat,
-                    );
+                    let root = place(&f, port) - axis * throat;
+                    let length = reach + throat;
+                    let points: Vec<Vec3> = (0..=steps)
+                        .map(|j| {
+                            let along = j as f32 / steps as f32;
+                            // Gas this far down left the nozzle PLUME_LAG s ago, when the
+                            // hull pointed back that much of its turn.
+                            let back = glam::Quat::from_rotation_z(-spin * PLUME_LAG * along);
+                            f.0 + back * (root - f.0 + axis * length * along)
+                        })
+                        .collect();
+                    for (j, &p) in points.iter().enumerate() {
+                        let along = j as f32 / steps as f32;
+                        let prev = points[j.saturating_sub(1)];
+                        let next = points[(j + 1).min(steps)];
+                        let step = (next - prev) / if j == 0 || j == steps { 1.0 } else { 2.0 };
+                        // Full across the mouth, a slight swell, then drawn in to the tip.
+                        let x = (along * length - throat).max(0.0) / reach.max(1.0);
+                        let radius = mouth
+                            * (1.0 + 0.12 * (x * 6.0).min(1.0) - 0.75 * x.powf(1.3))
+                            * if along * length < throat { 0.85 } else { 1.0 };
+                        let dx = length / steps as f32 / reach.max(1.0);
+                        self.push_plume(p, step, start, life, (radius, x, dx), vel, heat);
+                    }
                 }
             }
             if speed > 1.0 && !landed {
@@ -343,20 +394,6 @@ impl Renderer {
                         (9.0 * k, 32.0 * k),
                     );
                 }
-            }
-            for &port in nozzles {
-                let at = place(&f0, port) - f0.1 * 2.5;
-                let size = (13.0 + 9.0 * heat) * (0.4 + 0.6 * burn) * k;
-                self.push_drive(
-                    PUFF_THRUST_GLOW,
-                    at,
-                    Vec3::ZERO,
-                    time,
-                    dt * 1.6,
-                    (size, size * 1.1),
-                    vel,
-                    heat,
-                );
             }
             // Light off the plumes: each pair's, from the mouths down the flame.
             let color = Vec3::new(0.45, 0.68, 1.0) * (1500.0 + 4000.0 * throttle) * burn * k * k;
@@ -537,8 +574,16 @@ impl Renderer {
             }
         }
 
-        // The trees under it lean away from the wash, pushed again every half second.
-        if strongest > 0.08 && gust_due {
+        // The trees under it lean away from the wash, pushed again every half second, and
+        // those behind a low stern away from the plumes.
+        if wash > 0.15 && gust_due && !nozzles.is_empty() {
+            let aft = -Vec3::new(f1.1.x, f1.1.y, 0.0).normalize_or_zero();
+            let mut behind = place(&f1, [stern_x, 0.0, 0.0]) + aft * 60.0 * k;
+            behind.z = surface;
+            self.tree_blasts
+                .record(behind, time, (40.0 + 60.0 * wash) * k, 0.4 * wash, false);
+        }
+        if (strongest > 0.08 || wash > 0.15) && gust_due {
             if let Some(ship) = self.capital_fx.ships.get_mut(&u.unit_id) {
                 ship.gust = time;
             }
@@ -584,6 +629,37 @@ impl Renderer {
                 }
             }
         }
+    }
+
+    /// One point of a drive plume's tube (`PUFF_PLUME`): at `pos`, `step` to its
+    /// neighbours; `shape` its radius, how far down the plume it is (0 the mouth, 1 the
+    /// tip) and how much further the next point is.
+    fn push_plume(
+        &mut self,
+        pos: Vec3,
+        step: Vec3,
+        start: f32,
+        life: f32,
+        shape: (f32, f32, f32),
+        motion: Vec3,
+        heat: f32,
+    ) {
+        let origin = self.effect_origin.unwrap_or(pos);
+        let p = Puff {
+            appearance: [motion.x, motion.y, motion.z, heat],
+            origin: origin.to_array(),
+            opacity: 1.0,
+            pos: pos.to_array(),
+            start,
+            vel: step.to_array(),
+            life,
+            params: [shape.0, shape.1, PUFF_PLUME, shape.2],
+        };
+        self.puffs.write(
+            (self.puff_cursor * size_of::<Puff>()) as u64,
+            bytemuck::bytes_of(&p),
+        );
+        self.puff_cursor = (self.puff_cursor + 1) % PUFF_RING;
     }
 
     /// A drive puff: like `push_puff_with_motion`, with the heat in `appearance.w`.

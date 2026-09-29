@@ -227,8 +227,11 @@ ramp down, ready to load.
   at 12 degrees/s and climbs/descends at 40 m/s. Flight slope, acceleration trim
   and damped banking feed the hull and its exhaust. It levels for touchdown.
   Capital hulls and their selection never clear or deform clouds. Moisture-gated
-  wisps drift behind a moving ship for 5.5 seconds. Animated magnetic iris vanes,
-  pulsing ion cores and directed blue-white plumes make its propulsion visible.
+  wisps drift behind a moving ship for 5.5 seconds. Its vectoring nozzles swing on
+  their gimbals into a turn and open their slotted petals with thrust, and each plume
+  is one tube out of the whole mouth that bends back through a turn: long and bright
+  under throttle, a short glow hovering. Landing, it presses flat the trees under its
+  hull and its wash bends those round it.
   The engine loop is a slow sub-bass reactor chord with no blade beat.
 - **Fit.** Boarding checks cargo room, hull diameter against the door width, and unit
   height against the clear hangar height. Every current T3 land unit fits, including Paladin.
@@ -257,8 +260,8 @@ stripes), a service belt with a lit amber rail down each flank, landing skids, a
 terrace on each shoulder, a wedge prow with split jaws, a dark cockpit hood with a raked
 window slit and a chin sensor keel, a dorsal spine with a lit radiator bank, a glazed
 sensor house and a mast with a turning radar bar, and two drive nacelles carrying the
-shared capital drives (`capital::drive` at 0.55: finned can, gimbal, glow-lined bell,
-turning iris) either side of a hazard-striped door portal. Four lift jets (under the
+shared capital drives (`capital::drive` at 0.55: finned can, gimbal collar, a
+vectoring nozzle of slotted petals round a glowing throat) either side of a hazard-striped door portal. Four lift jets (under the
 nacelles and the prow's chin) and the lamp fittings (floods, nav lights, strobes, door
 beacons, hold lamp) are the `LIFT_JETS` / `LAMPS` tables the renderer's capital effects
 read; `RIG` is its `CapitalRig` (no legs, no ramp). Its sounds are `data/sounds/courier.ron`

@@ -1360,7 +1360,14 @@ impl Renderer {
                         .get(4 + i)
                         .map_or(0.0, |h| h.weapon as f32 + 1.0)
                 }),
-                capital: models::capital_rig(&model.key).unwrap_or([[0.0; 4]; 7]),
+                // The rig, and in [3].w the ship's cruise in metres a tick: its drives open
+                // out as it nears that (`entity.wgsl`, the nozzle's flare).
+                capital: models::capital_rig(&model.key).map_or([[0.0; 4]; 7], |mut rig| {
+                    let cruise = bps.units.get(infos.len()).and_then(|bp| bp.motion);
+                    rig[3][3] =
+                        cruise.map_or(6.0, |m| m.speed.to_f32()) / mc_core::TICKS_PER_SECOND as f32;
+                    rig
+                }),
                 crawl: model
                     .legs
                     .and_then(|l| l.crawl)

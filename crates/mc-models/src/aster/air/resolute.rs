@@ -178,7 +178,7 @@ const LEG: f32 = 0.6;
 const BAY_SILL: f32 = KEEL - 0.7;
 
 /// What `entity.wgsl` animates (`models::capital_rig`): two pairs of short legs that stow
-/// into belly bays as the ship climbs off its lot, the drives' glow and iris vanes, and
+/// into belly bays as the ship climbs off its lot, the drives' glow and swivelling nozzles, and
 /// the lift jets' glow. No ramp.
 pub(crate) const RIG: CapitalRig = CapitalRig {
     legs: Some([

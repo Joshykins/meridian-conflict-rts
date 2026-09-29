@@ -376,9 +376,9 @@ mod tests {
             // Nothing hangs under the ground it lands on.
             assert!(v.pos[2] >= -0.61, "{:?}", v.pos);
         }
-        // The drive's vanes turn about the rig's axis: they sit on the centre line.
-        let vanes = lod.vertices.iter().filter(|v| v.part == part::DRIVE);
-        assert!(vanes
+        // The drive's nozzle swivels about the rig's axis: it sits on the centre line.
+        let nozzle = lod.vertices.iter().filter(|v| v.part == part::DRIVE);
+        assert!(nozzle
             .clone()
             .all(|v| v.pos[1].abs() < 6.0 && v.pos[0] < -20.0));
         assert_eq!(crate::capital_rig("sensor_ship"), Some(super::RIG.gpu()));

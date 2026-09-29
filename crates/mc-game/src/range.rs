@@ -87,6 +87,8 @@ pub enum Scenario {
     Refit,
     /// The subject walks down the range.
     March,
+    /// Told to go off to the left: it swings round hard as it gathers way.
+    Turn,
     /// A field of wrecks for a reclaimer (or its drones) to salvage: beside it, or most of the
     /// way out for a long reach, with a mobile one passing by it.
     Salvage,
@@ -101,7 +103,7 @@ pub enum Scenario {
 }
 
 impl Scenario {
-    pub const ALL: [Scenario; 12] = [
+    pub const ALL: [Scenario; 13] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -110,6 +112,7 @@ impl Scenario {
         Scenario::Salvage,
         Scenario::Refit,
         Scenario::March,
+        Scenario::Turn,
         Scenario::Destruct,
         Scenario::Lift,
         Scenario::Warp,
@@ -125,6 +128,7 @@ impl Scenario {
             Scenario::AtWork => "At Work",
             Scenario::Refit => "Upgrade",
             Scenario::March => "March",
+            Scenario::Turn => "Turn",
             Scenario::Destruct => "Destruct",
             Scenario::Salvage => "Salvage",
             Scenario::Lift => "Lift",
@@ -142,6 +146,7 @@ impl Scenario {
             "work" => Scenario::AtWork,
             "upgrade" => Scenario::Refit,
             "march" => Scenario::March,
+            "turn" => Scenario::Turn,
             "destruct" => Scenario::Destruct,
             "salvage" => Scenario::Salvage,
             "lift" => Scenario::Lift,
@@ -929,6 +934,22 @@ fn stage(
                         PendingOrder::Move {
                             // Far enough for a giant to take a few strides too.
                             pos: east(Fx::from_int(260).max(bp.radius * 8), 0),
+                        },
+                    )),
+                )
+            })
+            .ok_or("This unit does not move"),
+        // Off to the left and a little ahead: it swings hard round while it gathers way.
+        Scenario::Turn => bp
+            .motion
+            .map(|_| {
+                let far = Fx::from_int(260).max(bp.radius * 8);
+                (
+                    Vec::new(),
+                    Some((
+                        subject,
+                        PendingOrder::Move {
+                            pos: pad + FxVec2::new(far / 3, far),
                         },
                     )),
                 )

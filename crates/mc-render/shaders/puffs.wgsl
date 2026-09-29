@@ -310,7 +310,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         }
     } else if kind == PUFF_COLUMN {
         pos = p.pos;
-    } else if kind == PUFF_THRUST_GLOW || kind == PUFF_LAMP {
+    } else if kind == PUFF_THRUST_GLOW || kind == PUFF_LAMP || kind == PUFF_PLUME {
         pos = p.pos + p.appearance.xyz * t;
     } else if kind == PUFF_BLAST {
         // Thrown out hard, stopped by the air, then the hot gas climbs faster
@@ -443,6 +443,9 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     }
     if kind == PUFF_STRATEGIC_TRAIL {
         return strategic_trail_vertex(out, p, corner, pos, age);
+    }
+    if kind == PUFF_PLUME {
+        return plume_vertex(out, p, corner, pos, age);
     }
     if kind == PUFF_TRAIL || kind == PUFF_ARC || kind == PUFF_BOMB_TRAIL {
         // A negative end-size marks a faint ribbon (the Bulwark's wake).
@@ -601,6 +604,88 @@ fn strategic_trail_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, at: vec3<f32>,
     return out;
 }
 
+// A capital drive's plume (`PUFF_PLUME`, renderer/capital_fx.rs): the quad over one point
+// of the chain and a step either way of it, grown to hold the tube seen end on.
+fn plume_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, pos: vec3<f32>, age: f32) -> PuffOut {
+    var out = o;
+    let half = max(length(p.vel), 0.5);
+    let tangent = p.vel / half;
+    let center = globals.view_proj * vec4<f32>(pos, 1.0);
+    if center.w < 1.0 {
+        return out;
+    }
+    let radius = max(p.params.x, 0.8 * center.w / max(globals.lod.x, 1.0));
+    let eye = globals.camera.xyz;
+    let view = normalize(pos - eye);
+    var e1 = tangent - view * dot(tangent, view);
+    let el = length(e1);
+    if el < 0.001 {
+        e1 = normalize(cross(view, select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(1.0, 0.0, 0.0), abs(view.z) > 0.9)));
+    } else {
+        e1 = e1 / el;
+    }
+    let e2 = cross(view, e1);
+    let reach = radius * 2.2;
+    let depth = dot(pos - eye, view);
+    var along = reach;
+    var across = reach;
+    for (var i = 0; i < 2; i++) {
+        // Each end as the eye sees it on the quad's plane, grown by the perspective.
+        let end = pos + tangent * half * select(-1.0, 1.0, i == 1);
+        let k = clamp(depth / max(dot(end - eye, view), depth * 0.25), 0.2, 4.0);
+        let off = eye + (end - eye) * k - pos;
+        along = max(along, abs(dot(off, e1)) + reach * k);
+        across = max(across, reach * k);
+    }
+    let world = pos + e1 * corner.x * along + e2 * corner.y * across;
+    out.clip = globals.view_proj * vec4<f32>(world, 1.0);
+    // Flat: the whole quad takes the step to the next point (`plume_color`).
+    out.uv = vec2<f32>(p.params.w, 0.0);
+    out.world = world;
+    out.state = vec3<f32>(age, p.params.z, p.params.y);
+    out.roll = pos;
+    out.cloud_size = radius;
+    out.appearance = vec4<f32>(p.vel, p.appearance.w);
+    return out;
+}
+
+// A drive plume's light: a blue sheath round a white-hot core with shock diamonds down it,
+// longer and hotter with the heat. Summed along the eye's ray through a tube (a tent a
+// step either way, as `strategic_trail`), so the chain is one tube that bends with the
+// ship, filling the nozzle's mouth; looking up it from astern, a bright disc.
+fn plume_color(in: PuffOut) -> vec4<f32> {
+    let age = in.state.x;
+    let pos = in.roll;
+    let half = max(length(in.appearance.xyz), 0.5);
+    let tangent = in.appearance.xyz / half;
+    let hit = tube_ray(in.world, pos, tangent);
+    let r = max(in.cloud_size, 0.1);
+    let d2 = dot(hit.off, hit.off) / (r * r);
+    if d2 > 4.0 {
+        discard;
+    }
+    let heat = clamp(in.appearance.w, 0.0, 1.0);
+    let x = clamp(in.state.z + clamp(hit.s / half, -1.0, 1.0) * in.uv.x, 0.0, 1.0);
+    let now = globals.camera.w;
+    let sheath = exp(-d2 * 2.2) * (1.0 - smoothstep(0.5, 1.0, x)) * smoothstep(0.0, 0.08, x);
+    let core_len = mix(0.22, 0.6, heat);
+    let core = exp(-d2 * 4.5) * (1.0 - smoothstep(core_len * 0.45, core_len, x));
+    let cells = mix(3.0, 6.5, heat);
+    let c = fract(x * cells + 0.4);
+    let knot = pow(max(1.0 - abs(c * 2.0 - 1.0) * 1.3, 0.0), 1.6) * exp(-d2 * 9.0)
+        * (1.0 - smoothstep(core_len * 0.8, core_len * 1.4, x)) * smoothstep(0.04, 0.12, x);
+    let flow = 0.88 + 0.12 * sin(x * 50.0 - now * 45.0);
+    let rgb = vec3<f32>(0.1, 0.35, 1.0) * sheath * 0.55
+        + vec3<f32>(0.85, 0.95, 1.0) * core * 2.4
+        + vec3<f32>(0.95, 0.98, 1.0) * knot * 4.0;
+    // The tent along the chain, seen through the tube's width, and one over its life.
+    let sg = max(r * abs(hit.b) / (1.4142136 * hit.sin_t), 0.02 * half);
+    let along = trail_tent(hit.s, half, sg) / max(hit.sin_t, 0.6);
+    let life = 1.0 - abs(age * 2.0 - 1.0);
+    let tip = 1.0 - smoothstep(0.75, 1.0, x);
+    return vec4<f32>(rgb * (0.12 + 1.1 * heat * heat) * flow * along * life * tip, 0.0);
+}
+
 // E[max(z + U, 0)] for a unit normal U: z Phi(z) + phi(z).
 fn trail_ramp(z: f32) -> f32 {
     if z > 5.0 {
@@ -622,14 +707,19 @@ fn trail_tent(s: f32, half: f32, sg: f32) -> f32 {
     return sg / half * (trail_ramp((s + half) / sg) - 2.0 * trail_ramp(s / sg) + trail_ramp((s - half) / sg));
 }
 
-fn strategic_trail(in: PuffOut) -> vec4<f32> {
-    let age = in.state.x;
-    let pos = in.roll;
-    let half = max(length(in.appearance.xyz), 0.5);
-    let tangent = in.appearance.xyz / half;
+// Where the eye's ray through `world` passes closest to the line through `pos` along
+// `tangent` (unit): `s` how far along the line from `pos`, `off` from the line to the ray
+// there, `b` the cosine and `sin_t` the sine of the angle between them.
+struct TubeRay {
+    s: f32,
+    off: vec3<f32>,
+    b: f32,
+    sin_t: f32,
+}
+
+fn tube_ray(world: vec3<f32>, pos: vec3<f32>, tangent: vec3<f32>) -> TubeRay {
     let eye = globals.camera.xyz;
-    let ray = normalize(in.world - eye);
-    // Where the ray passes closest to the segment's line.
+    let ray = normalize(world - eye);
     let w0 = eye - pos;
     let b = dot(ray, tangent);
     let d = dot(ray, w0);
@@ -640,8 +730,20 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
         t = (b * e - d) / sin2;
     }
     let s0 = e + b * t;
-    let off = w0 + ray * t - tangent * s0;
-    let sin_t = sqrt(max(sin2, 1e-4));
+    return TubeRay(s0, w0 + ray * t - tangent * s0, b, sqrt(max(sin2, 1e-4)));
+}
+
+fn strategic_trail(in: PuffOut) -> vec4<f32> {
+    let age = in.state.x;
+    let pos = in.roll;
+    let half = max(length(in.appearance.xyz), 0.5);
+    let tangent = in.appearance.xyz / half;
+    let eye = globals.camera.xyz;
+    let hit = tube_ray(in.world, pos, tangent);
+    let s0 = hit.s;
+    let off = hit.off;
+    let b = hit.b;
+    let sin_t = hit.sin_t;
     // Ragged and lumpy as it spreads, from noise fixed in the world so neighbours agree.
     let axis_p = pos + tangent * clamp(s0, -half, half);
     // Lumps a few tube-steps long, whatever the step: 170 m on a strategic missile's.
@@ -683,12 +785,15 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     if is_warp_puff(kind) {
         return warp_puff_color(in, d);
     }
-    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && kind != PUFF_VEIL && d > 1.0 {
+    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLUME && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && kind != PUFF_VEIL && d > 1.0 {
         discard;
     }
     let eye = globals.camera.xyz;
     if kind == PUFF_STRATEGIC_TRAIL {
         return strategic_trail(in);
+    }
+    if kind == PUFF_PLUME {
+        return plume_color(in);
     }
     if kind == PUFF_CASING {
         let spin = in.roll.x;
