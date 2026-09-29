@@ -182,7 +182,7 @@ fn its_sam_cells_reach_aircraft_far_off() {
     let mut cells = false;
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
-        cells |= fired(&w, ship).iter().any(|&wi| wi == 7);
+        cells |= fired(&w, ship).contains(&7);
     }
     assert!(cells, "the SAM cells never fired");
     assert!(
