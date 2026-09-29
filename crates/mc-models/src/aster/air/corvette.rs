@@ -1,168 +1,135 @@
 //! Valiant: the ARC's tech 2 rail corvette (`aster_t2_corvette`, mesh `rail_corvette`), a
-//! small warship of the upper air carried round one long rail cannon turret on its back,
-//! the Resolute's turret house with its rails drawn out, and a rotary AA cannon slung
-//! under the bow. +X is forward, +Y port, the ground at z 0 with the legs down.
-//!
-//! The `~` keys are hull directions for picking; every hull carries the guns at the same
-//! places and its belly at `KEEL`, so the unit file's pivots and muzzles hold for all.
+//! small warship of the upper air. Its long rail cannon hangs under the belly on a post,
+//! the Resolute's turret house with its rails drawn out, free to turn right round and
+//! lay onto the ground below; a rotary AA cannon stands on a raised barbette on its back
+//! with the whole sky over it. The hull is faceted with a hard chine, a wedge bridge
+//! forward, a raised engineering block aft, and two drive pods out on swept stubs.
+//! +X is forward, +Y port, the ground at z 0 with the legs down.
 //!
 //! Contracts:
 //! - `RAIL` is weapon 0's pivot and `RAIL_REACH` how far ahead of it the rails end (the
 //!   unit file's `muzzle` - `pivot`); `RAIL_CHARGE` is where its charge crawls.
-//! - `GATLING` is weapon 1's pivot, a slung `capital::rotary_house` of `GATLING_SIZE`,
-//!   its muzzles `12 * GATLING_SIZE` ahead of the pivot as authored.
-//! - `fit(mesh)`: each hull's drives, lift jets, lamps and rig (`capital.rs`), legs
-//!   included: two pairs that stow into belly bays.
+//! - `GATLING` is weapon 1's pivot, a `capital::rotary_house` of `GATLING_SIZE`, its
+//!   muzzles `12 * GATLING_SIZE` ahead of the pivot as authored.
+//! - `NOZZLES`, `LIFT_JETS`, `LAMPS`, `RIG`: the shared spacecraft rig (`capital.rs`),
+//!   two pairs of legs that stow into belly bays included.
 use super::capital::{self, CapitalRig, Leg};
-use super::resolute::{self, HOUSE_SINK};
+use super::resolute;
 use super::*;
 use crate::{CapitalLamps, TurretRail};
 
-/// The long rail cannon's pivot, and how far ahead of it the rails end.
-pub(super) const RAIL: [f32; 3] = [22.0, 0.0, 35.0];
+/// The long rail cannon's pivot, under the belly, and how far ahead of it the rails end.
+pub(super) const RAIL: [f32; 3] = [10.0, 0.0, 9.0];
 pub(super) const RAIL_REACH: f32 = 40.0;
 /// The rail house is the Resolute's at this size (its rails drawn out to `RAIL_REACH`).
 const RAIL_SCALE: f32 = 1.0;
 pub(crate) const RAIL_CHARGE: TurretRail = resolute::turret_rail(RAIL_SCALE, RAIL_REACH);
-/// The rotary AA cannon's pivot and size (`capital::rotary_house`, slung).
-pub(super) const GATLING: [f32; 3] = [48.0, 0.0, 7.5];
+/// The house's roof over its pivot (`resolute::HOUSE_ROOF`, authored size).
+const RAIL_ROOF: f32 = RAIL[2] + 4.2 * RAIL_SCALE;
+/// The rotary AA cannon's pivot and size (`capital::rotary_house`, standing).
+pub(super) const GATLING: [f32; 3] = [-4.0, 0.0, 42.0];
 pub(super) const GATLING_SIZE: f32 = 0.9;
-/// Where the rail house's ring ends below its pivot: every hull raises a pedestal from
-/// its deck to here.
-const RAIL_RING: f32 = RAIL[2] - (HOUSE_SINK + 1.0) * RAIL_SCALE;
-/// The flat belly every hull sits on its legs at, and the deck under the rail house.
-const KEEL: f32 = 12.0;
-const DECK: f32 = 29.0;
+/// The top of the rotary gun's post: its barbette rises from the deck to here.
+const GATLING_POST: f32 = GATLING[2] - 6.6 * GATLING_SIZE;
 
-/// Leg size against the Bastion's (hinge 36 m over the foot), and the legs themselves:
-/// the fore pair stows aft, the aft pair forward, each into a bay under the belly.
-const LEG: f32 = 0.45;
-const fn legs(y: f32) -> [Leg; 2] {
-    let (hz, bay) = (36.0 * LEG, 2.6);
-    [
-        Leg {
-            hinge: [28.0, y, hz],
-            stow: 1.0,
-            bay: [13.2, 30.0, y - bay, y + bay],
-            size: LEG,
-        },
-        Leg {
-            hinge: [-26.0, y, hz],
-            stow: -1.0,
-            bay: [-27.8, -11.2, y - bay, y + bay],
-            size: LEG,
-        },
-    ]
-}
+/// The flat belly the ship sits over on its legs, the chine line, and the main deck.
+const KEEL: f32 = 16.0;
+const CHINE: f32 = 23.0;
+const DECK: f32 = 33.0;
 
-/// A hull's anchors: where its drives, lift jets and lamps are, and the rig built on them.
-pub(crate) struct Fit {
-    pub(crate) nozzles: &'static [[f32; 3]],
-    /// `[aft -y, aft +y, fore -y, fore +y]`.
-    pub(crate) lift_jets: [[f32; 3]; 4],
-    pub(crate) lamps: CapitalLamps,
-    pub(crate) rig: CapitalRig,
-    /// The drives' size against the Bastion's 12 m bells.
-    drive: f32,
-}
+/// Leg size against the Bastion's (hinge 36 m over the foot).
+const LEG: f32 = 0.55;
+const LEG_Y: f32 = 5.5;
+const BAY: f32 = 3.2;
 
-const fn rig(nozzles: &[[f32; 3]], drive: f32, leg_y: f32) -> CapitalRig {
-    let [x, y, z] = nozzles[0];
-    CapitalRig {
-        legs: Some(legs(leg_y)),
-        door_hinge: KEEL - 0.3,
-        drives: Some(([x, z, y.abs(), y.abs()], drive)),
-        lift_jets: Some(([JETS[3][0], JETS[3][1], JETS[1][0], JETS[1][1]], JETS[3][2])),
-        ramp: None,
-    }
-}
-
-/// Lift jets under the belly, clear of the leg bays: a pair amidships, a pair aft.
-const JETS: [[f32; 3]; 4] = [
-    [-40.0, -4.0, KEEL - 0.4],
-    [-40.0, 4.0, KEEL - 0.4],
-    [2.0, -4.0, KEEL - 0.4],
-    [2.0, 4.0, KEEL - 0.4],
+/// The drive mouths (model space): the exhaust trail and drive effects start here.
+pub(crate) const NOZZLES: [[f32; 3]; 2] = [[-60.0, 15.0, 23.0], [-60.0, -15.0, 23.0]];
+const DRIVE: f32 = 0.48;
+/// Lift jets under the belly, clear of the leg bays and the rail's post:
+/// `[aft -y, aft +y, fore -y, fore +y]`.
+pub(crate) const LIFT_JETS: [[f32; 3]; 4] = [
+    [-36.0, -4.0, KEEL - 0.4],
+    [-36.0, 4.0, KEEL - 0.4],
+    [-6.0, -4.0, KEEL - 0.4],
+    [-6.0, 4.0, KEEL - 0.4],
 ];
 
-const KEEL_NOZZLES: [[f32; 3]; 2] = [[-58.0, 13.0, 20.0], [-58.0, -13.0, 20.0]];
-const KEEL_FIT: Fit = Fit {
-    nozzles: &KEEL_NOZZLES,
-    lift_jets: JETS,
-    lamps: CapitalLamps {
-        floods: &[
-            [38.0, 5.0, 12.4],
-            [38.0, -5.0, 12.4],
-            [-48.0, 5.0, 13.4],
-            [-48.0, -5.0, 13.4],
-        ],
-        nav_port: [-40.0, 19.2, 20.0],
-        nav_starboard: [-40.0, -19.2, 20.0],
-        strobes: &[[61.0, 0.0, 21.0], [-18.0, 0.0, 41.6]],
-        beacons: &[[-48.0, 0.0, 27.8]],
-        hold: None,
-    },
-    rig: rig(&KEEL_NOZZLES, 0.45, 6.0),
-    drive: 0.45,
+/// Lamp fittings on the hull: floods under the bow and the stern, nav lights on the pods'
+/// flanks, strobes at the bow and on the mast, a beacon on the engineering block.
+pub(crate) const LAMPS: CapitalLamps = CapitalLamps {
+    floods: &[
+        [46.0, 4.0, 16.4],
+        [46.0, -4.0, 16.4],
+        [-44.0, 4.5, 17.6],
+        [-44.0, -4.5, 17.6],
+    ],
+    nav_port: [-44.0, 21.0, 23.0],
+    nav_starboard: [-44.0, -21.0, 23.0],
+    strobes: &[[66.4, 0.0, 25.0], [-32.0, 0.0, 45.4]],
+    beacons: &[[-44.0, 0.0, 38.8]],
+    hold: None,
 };
 
-const OUTRIGGER_NOZZLES: [[f32; 3]; 2] = [[-56.0, 25.0, 19.0], [-56.0, -25.0, 19.0]];
-const OUTRIGGER_FIT: Fit = Fit {
-    nozzles: &OUTRIGGER_NOZZLES,
-    lift_jets: JETS,
-    lamps: CapitalLamps {
-        floods: &[
-            [38.0, 5.0, 12.4],
-            [38.0, -5.0, 12.4],
-            [-48.0, 5.0, 13.4],
-            [-48.0, -5.0, 13.4],
+/// What `entity.wgsl` animates (`models::capital_rig`): two pairs of legs (the fore pair
+/// stows aft, the aft pair forward), the drives and the lift jets. No ramp.
+pub(crate) const RIG: CapitalRig = CapitalRig {
+    legs: Some([
+        Leg {
+            hinge: [38.0, LEG_Y, 36.0 * LEG],
+            stow: 1.0,
+            bay: [19.6, 40.4, LEG_Y - BAY, LEG_Y + BAY],
+            size: LEG,
+        },
+        Leg {
+            hinge: [-30.0, LEG_Y, 36.0 * LEG],
+            stow: -1.0,
+            bay: [-32.4, -11.6, LEG_Y - BAY, LEG_Y + BAY],
+            size: LEG,
+        },
+    ]),
+    door_hinge: KEEL - 0.3,
+    drives: Some((
+        [NOZZLES[0][0], NOZZLES[0][2], NOZZLES[0][1], NOZZLES[0][1]],
+        DRIVE,
+    )),
+    lift_jets: Some((
+        [
+            LIFT_JETS[3][0],
+            LIFT_JETS[3][1],
+            LIFT_JETS[1][0],
+            LIFT_JETS[1][1],
         ],
-        nav_port: [4.0, 31.4, 19.0],
-        nav_starboard: [4.0, -31.4, 19.0],
-        strobes: &[[61.0, 0.0, 21.0], [-18.0, 0.0, 41.6]],
-        beacons: &[[-48.0, 0.0, 27.8]],
-        hold: None,
-    },
-    rig: rig(&OUTRIGGER_NOZZLES, 0.45, 6.0),
-    drive: 0.45,
+        LIFT_JETS[3][2],
+    )),
+    ramp: None,
 };
 
-const BLADE_NOZZLES: [[f32; 3]; 2] = [[-54.0, 22.0, 17.0], [-54.0, -22.0, 17.0]];
-const BLADE_FIT: Fit = Fit {
-    nozzles: &BLADE_NOZZLES,
-    lift_jets: JETS,
-    lamps: CapitalLamps {
-        floods: &[
-            [40.0, 3.0, 12.4],
-            [40.0, -3.0, 12.4],
-            [-10.0, 22.0, 11.6],
-            [-10.0, -22.0, 11.6],
-        ],
-        nav_port: [8.0, 29.0, 20.0],
-        nav_starboard: [8.0, -29.0, 20.0],
-        strobes: &[[64.0, 0.0, 23.4], [-18.0, 0.0, 41.6]],
-        beacons: &[[-44.0, 0.0, 28.4]],
-        hold: None,
-    },
-    rig: rig(&BLADE_NOZZLES, 0.45, 4.2),
-    drive: 0.45,
-};
-
-/// The hull directions, by mesh key.
-#[derive(Clone, Copy)]
-pub(super) enum Hull {
-    Keel,
-    Outrigger,
-    Blade,
+/// A hull section across x with a hard chine: the belly's half width `wb` at `lo`, the
+/// chine's `wc` at `zc`, the deck edge's `wd` at `hi`.
+fn chined(x: f32, [wb, lo, wc, zc, wd, hi]: [f32; 6]) -> Vec<Vec3> {
+    [
+        (-wb, lo),
+        (wb, lo),
+        (wc, zc),
+        (wd, hi),
+        (-wd, hi),
+        (-wc, zc),
+    ]
+    .iter()
+    .map(|&(y, z)| v3(x, y, z))
+    .collect()
 }
 
-pub(crate) fn fit(mesh: &str) -> Option<&'static Fit> {
-    Some(match mesh {
-        "rail_corvette" => &KEEL_FIT,
-        "rail_corvette~outrigger" => &OUTRIGGER_FIT,
-        "rail_corvette~blade" => &BLADE_FIT,
-        _ => return None,
-    })
+/// A hull lofted through chined stations (x, then `chined`'s six numbers), capped.
+fn chined_hull(b: &mut MeshBuilder, stations: &[(f32, [f32; 6])]) {
+    b.loft(
+        &stations
+            .iter()
+            .map(|&(x, s)| chined(x, s))
+            .collect::<Vec<_>>(),
+        true,
+        true,
+    );
 }
 
 /// A chamfered box section across x: half width `w`, from `lo` to `hi`, corners cut `c`.
@@ -182,8 +149,8 @@ fn section(x: f32, w: f32, lo: f32, hi: f32, c: f32) -> Vec<Vec3> {
     .collect()
 }
 
-/// A hull lofted through `stations` (x, half width, bottom, top, chamfer), capped.
-fn hull(b: &mut MeshBuilder, stations: &[[f32; 5]]) {
+/// A block lofted through `stations` (x, half width, bottom, top, chamfer), capped.
+fn block(b: &mut MeshBuilder, stations: &[[f32; 5]]) {
     b.loft(
         &stations
             .iter()
@@ -194,101 +161,314 @@ fn hull(b: &mut MeshBuilder, stations: &[[f32; 5]]) {
     );
 }
 
-pub(super) fn build(b: &mut MeshBuilder, kind: Hull) {
-    let fit = match kind {
-        Hull::Keel => &KEEL_FIT,
-        Hull::Outrigger => &OUTRIGGER_FIT,
-        Hull::Blade => &BLADE_FIT,
-    };
+/// The main hull: x, then belly half width and height, chine half width and height, deck
+/// edge half width and height. A sharp raked prow, the full section amidships, drawn in
+/// and lifted toward the stern.
+const HULL: [(f32, [f32; 6]); 9] = [
+    (66.0, [0.6, 24.0, 1.2, 25.0, 0.6, 26.0]),
+    (60.0, [2.6, 21.0, 5.6, CHINE + 1.0, 3.4, 29.0]),
+    (50.0, [5.4, 17.6, 10.6, CHINE, 7.0, 31.6]),
+    (40.0, [7.0, KEEL, 13.0, CHINE, 8.8, DECK]),
+    (-12.0, [7.4, KEEL, 14.0, CHINE, 10.0, DECK]),
+    (-38.0, [7.0, KEEL, 13.4, CHINE, 9.6, DECK]),
+    (-46.0, [6.0, 18.0, 11.6, 23.6, 8.4, 31.6]),
+    (-52.0, [4.6, 20.0, 9.0, 24.0, 6.4, 29.6]),
+    (-54.0, [3.6, 21.0, 7.0, 24.0, 5.0, 28.4]),
+];
+
+pub(super) fn build(b: &mut MeshBuilder) {
     if b.coarse() {
         b.paint(PLATING);
-        b.cuboid(v3(2.0, 0.0, 20.5), v3(112.0, 22.0, 17.0));
+        b.cuboid(v3(4.0, 0.0, 24.5), v3(116.0, 26.0, 17.0));
         b.paint(PLATING_DARK);
-        let beam = 2.0 * fit.nozzles[0][1].abs() + 10.0;
-        b.cuboid(v3(-48.0, 0.0, 19.0), v3(20.0, beam, 10.0));
+        b.cuboid(v3(-50.0, 0.0, 23.0), v3(20.0, 40.0, 10.0));
+        b.cuboid(v3(30.0, 0.0, 9.0), v3(40.0, 4.0, 3.0));
         b.paint(ACCENT);
-        b.cuboid(v3(40.0, 0.0, 35.0), v3(40.0, 3.0, 3.0));
+        b.cuboid(v3(-4.0, 0.0, 38.0), v3(8.0, 8.0, 10.0));
         return;
     }
-    let bow_belly = match kind {
-        Hull::Keel | Hull::Outrigger => armoured_hull(b),
-        Hull::Blade => blade_hull(b),
-    };
-    match kind {
-        Hull::Keel => {
-            stubs(b);
-            for &n in fit.nozzles {
-                pod(b, n, -14.0, 5.0, fit.drive);
-            }
-        }
-        Hull::Outrigger => {
-            for &n in fit.nozzles {
-                pylon(b, n, 11.0);
-                pod(b, n, 2.0, 5.2, fit.drive);
-            }
-        }
-        Hull::Blade => {
-            for &n in fit.nozzles {
-                pylon(b, n, 8.0);
-                pod(b, n, 6.0, 5.2, fit.drive);
-            }
-        }
+    hull(b);
+    bridge(b);
+    engineering(b);
+    b.mirror_y(stub);
+    for n in NOZZLES {
+        pod(b, n);
     }
-    guns(b, bow_belly);
-    capital::gear(b, &fit.rig, KEEL - 0.7);
-    for jet in &fit.lift_jets {
+    rail_mount(b);
+    gatling_mount(b);
+    capital::gear(b, &RIG, KEEL - 0.7);
+    for jet in &LIFT_JETS {
         capital::lift_jet(b, Vec3::from(*jet), 0.5);
     }
-    lamp_fittings(b, &fit.lamps);
+    lamp_fittings(b, &LAMPS);
 }
 
-/// The guns and what carries them: a pedestal from the deck up under the rail house, and
-/// a post from the bow's belly (`bow_belly`, its height over the gun) down to the slung
-/// rotary house.
-fn guns(b: &mut MeshBuilder, bow_belly: f32) {
-    let [rx, _, _] = RAIL;
+/// The hull with its chine strakes, deck edges, ribs and seams.
+fn hull(b: &mut MeshBuilder) {
+    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    chined_hull(b, &HULL);
+    // The lower hull under the chine in dark armour, stood a little proud of the plating.
     b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-    b.prism(
-        v3(rx, 0.0, DECK - 1.0),
-        b.sides(12),
-        9.6,
-        8.6,
-        RAIL_RING - DECK + 0.2,
+    chined_hull(
+        b,
+        &[
+            (58.0, [3.1, 20.4, 6.5, CHINE + 1.1, 5.3, 24.6]),
+            (50.0, [5.8, 17.2, 11.2, CHINE, 9.4, 25.4]),
+            (40.0, [7.4, KEEL - 0.2, 13.5, CHINE, 11.6, 26.0]),
+            (-38.0, [7.4, KEEL - 0.2, 13.9, CHINE, 12.4, 26.0]),
+            (-46.0, [6.4, 17.8, 12.1, 23.6, 10.8, 26.0]),
+            (-51.0, [5.0, 19.8, 9.6, 24.0, 8.2, 25.8]),
+        ],
     );
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.prism(v3(rx, 0.0, RAIL_RING - 0.8), b.sides(12), 8.9, 8.9, 0.8);
-    resolute::rail_turret_sized(b, 0, Vec3::from(RAIL), RAIL_SCALE, RAIL_REACH);
-    let [gx, _, gz] = GATLING;
-    let post = gz + 4.9 * GATLING_SIZE;
+    b.mirror_y(|b| {
+        // The chine strake: an armoured rubbing band along the hull's widest line, the
+        // owner's colour on its forward run.
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.beam(
+            v3(50.0, 11.3, CHINE),
+            v3(-44.0, 12.8, CHINE + 0.3),
+            v2(0.8, 1.4),
+            v2(0.8, 1.4),
+        );
+        b.beam(
+            v3(50.0, 11.3, CHINE),
+            v3(60.0, 6.1, CHINE + 1.0),
+            v2(0.8, 1.2),
+            v2(0.6, 1.0),
+        );
+        b.paint(TEAM);
+        b.beam(
+            v3(54.0, 9.4, 27.4),
+            v3(42.0, 11.9, 29.8),
+            v2(1.4, 0.3),
+            v2(1.4, 0.3),
+        );
+        // Raised deck edges (coamings) along the main deck.
+        b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+        b.beam(
+            v3(40.0, 8.4, DECK + 0.4),
+            v3(-38.0, 9.2, DECK + 0.4),
+            v2(1.2, 0.8),
+            v2(1.2, 0.8),
+        );
+        if b.mid() {
+            // Frames down the flanks between the chine and the deck edge: they read the
+            // hull's length from the RTS camera.
+            b.paint(ACCENT);
+            for x in [30.0, 16.0, 2.0, -12.0, -26.0] {
+                let wc = 13.0 + (40.0 - x) * 0.012;
+                b.beam(
+                    v3(x, wc + 0.1, CHINE + 1.0),
+                    v3(x, 9.6, DECK - 0.4),
+                    v2(1.4, 0.5),
+                    v2(1.4, 0.5),
+                );
+            }
+        }
+        if b.fine() {
+            // Armoured hatches and vents on the deck, seams on the flanks.
+            b.paint(PLATING_DARK);
+            b.plate(v3(34.0, 5.0, DECK), v2(6.0, 3.0), 0.3, 0.1);
+            b.plate(v3(-18.0, 5.4, DECK), v2(8.0, 3.2), 0.3, 0.1);
+            vent(b, v3(8.0, 6.2, DECK), v2(6.0, 2.4), 5, METAL);
+            b.paint(PLATING_DARK);
+            b.beam(
+                v3(40.0, 13.2, CHINE - 2.5),
+                v3(-38.0, 13.6, CHINE - 2.5),
+                v2(0.3, 0.3),
+                v2(0.3, 0.3),
+            );
+        }
+    });
+    // A dark keel plate under the belly between the leg bays and the posts.
     b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-    b.prism(
-        v3(gx, 0.0, post - 0.2),
-        b.sides(10),
-        2.6,
-        3.8,
-        bow_belly - post + 1.5,
+    b.frustum(
+        v3(-24.0, 0.0, KEEL - 0.9),
+        v2(18.0, 3.4),
+        v2(20.0, 4.0),
+        0.9,
+        v2(0.0, 0.0),
     );
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.prism(v3(gx, 0.0, bow_belly - 0.6), b.sides(10), 5.2, 5.6, 0.8);
-    capital::rotary_house(b, 1, Vec3::from(GATLING), true, GATLING_SIZE);
+    // A sensor prong under the prow, its tip glassed.
+    b.paint(PLATING_DARK);
+    b.beam(
+        v3(58.0, 0.0, 21.8),
+        v3(69.0, 0.0, 22.6),
+        v2(2.2, 2.0),
+        v2(0.9, 0.9),
+    );
+    b.paint(VISOR);
+    b.beam(
+        v3(68.4, 0.0, 22.56),
+        v3(69.4, 0.0, 22.62),
+        v2(0.9, 0.9),
+        v2(0.5, 0.5),
+    );
 }
 
-/// A drive pod: an octagonal nacelle from `fore` back onto a drive of `size` at `nozzle`.
-fn pod(b: &mut MeshBuilder, nozzle: [f32; 3], fore: f32, r: f32, size: f32) {
+/// The wedge bridge forward on the deck: a low raked house with a band of glass.
+fn bridge(b: &mut MeshBuilder) {
+    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    block(
+        b,
+        &[
+            [48.0, 3.0, DECK - 1.0, DECK + 0.4, 0.4],
+            [44.0, 6.2, DECK - 0.5, DECK + 3.2, 1.0],
+            [30.0, 7.2, DECK - 0.5, DECK + 4.2, 1.4],
+            [22.0, 6.4, DECK - 0.5, DECK + 3.6, 1.2],
+        ],
+    );
+    b.paint(GLASS);
+    b.loft(
+        &[
+            vec![
+                v3(44.6, 5.4, DECK + 1.6),
+                v3(44.6, -5.4, DECK + 1.6),
+                v3(43.6, -5.6, DECK + 2.9),
+                v3(43.6, 5.6, DECK + 2.9),
+            ],
+            vec![
+                v3(40.6, 6.6, DECK + 2.3),
+                v3(40.6, -6.6, DECK + 2.3),
+                v3(39.6, -6.7, DECK + 3.8),
+                v3(39.6, 6.7, DECK + 3.8),
+            ],
+        ],
+        true,
+        true,
+    );
+    team_panel(b, v3(28.0, 0.0, DECK + 4.2), v2(5.0, 6.0));
+    if b.fine() {
+        b.paint(ACCENT);
+        b.mirror_y(|b| {
+            b.chamfered_box(v3(32.0, 6.9, DECK + 2.0), v3(4.0, 1.0, 2.4), 0.3);
+        });
+    }
+}
+
+/// The raised engineering block aft: radiator fins on its roof, a mast with a turning
+/// search array, a beacon.
+fn engineering(b: &mut MeshBuilder) {
+    let top = DECK + 5.0;
+    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    block(
+        b,
+        &[
+            [-22.0, 6.0, DECK - 0.5, top - 2.0, 1.2],
+            [-26.0, 8.4, DECK - 0.5, top, 1.6],
+            [-44.0, 8.4, DECK - 0.5, top, 1.6],
+            [-50.0, 6.0, 29.0, top - 1.4, 1.4],
+        ],
+    );
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.mirror_y(|b| {
+        let fins = if b.fine() { 5 } else { 3 };
+        for i in 0..fins {
+            let x = -28.0 - i as f32 * 14.0 / (fins - 1) as f32;
+            b.plate(v3(x, 4.8, top), v2(1.0, 4.0), 1.6, 0.1);
+        }
+    });
+    // The mast and its search array, which sweeps back and forth.
+    b.paint(METAL);
+    b.cylinder_between(
+        v3(-32.0, 0.0, top),
+        v3(-32.0, 0.0, top + 7.0),
+        0.9,
+        0.6,
+        b.sides(8),
+    );
+    let pivot = v3(-32.0, 0.0, top + 5.0);
+    b.set_spinner_pivot(pivot);
+    b.set_spinner_scan();
+    b.with_part(part::SPINNER, |b| {
+        b.paint(PLATING_DARK).pattern(pattern::PLAIN);
+        b.beam(
+            pivot + v3(0.4, 4.2, 0.0),
+            pivot + v3(0.4, -4.2, 0.0),
+            v2(0.5, 1.6),
+            v2(0.5, 1.6),
+        );
+        b.paint(ACCENT);
+        b.cuboid(pivot + v3(-0.4, 0.0, 0.0), v3(1.0, 1.4, 1.4));
+    });
+}
+
+/// A swept stub from the hull's quarter out to the port pod.
+fn stub(b: &mut MeshBuilder) {
+    let [nx, y, z] = NOZZLES[0];
+    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.loft(
+        &[
+            vec![
+                v3(nx + 44.0, 12.0, z - 2.0),
+                v3(nx + 44.0, 12.0, z + 2.4),
+                v3(nx + 20.0, 12.0, z + 2.4),
+                v3(nx + 20.0, 12.0, z - 2.0),
+            ],
+            vec![
+                v3(nx + 32.0, y, z - 1.4),
+                v3(nx + 32.0, y, z + 1.6),
+                v3(nx + 16.0, y, z + 1.6),
+                v3(nx + 16.0, y, z - 1.4),
+            ],
+        ],
+        true,
+        true,
+    );
+    if b.fine() {
+        b.paint(TEAM);
+        b.beam(
+            v3(nx + 41.0, 12.2, z + 2.5),
+            v3(nx + 30.0, y - 3.0, z + 1.7),
+            v2(1.4, 0.2),
+            v2(1.4, 0.2),
+        );
+    }
+}
+
+/// A drive pod: an intake ring at its nose, an armoured octagonal nacelle, the drive.
+fn pod(b: &mut MeshBuilder, nozzle: [f32; 3]) {
     let [nx, y, z] = nozzle;
-    let aft = nx + 27.6 * size;
+    let aft = nx + 27.6 * DRIVE;
+    let (fore, r) = (-18.0, 5.4);
     b.at(v3(0.0, y, 0.0), |b| {
         b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-        hull(
+        block(
             b,
             &[
-                [fore, r * 0.5, z - r * 0.5, z + r * 0.5, r * 0.2],
-                [fore - r * 1.6, r, z - r, z + r, r * 0.35],
+                [fore, r * 0.8, z - r * 0.8, z + r * 0.8, r * 0.3],
+                [fore - 4.0, r, z - r, z + r, r * 0.35],
                 [aft + 1.0, r * 1.02, z - r * 1.02, z + r * 1.02, r * 0.35],
             ],
         );
+        // The intake: a dark ring stood proud of the nose, its mouth darker still.
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        block(
+            b,
+            &[
+                [fore + 1.6, r * 0.9, z - r * 0.9, z + r * 0.9, r * 0.33],
+                [fore - 0.4, r * 0.9, z - r * 0.9, z + r * 0.9, r * 0.33],
+            ],
+        );
+        b.paint(METAL);
+        block(
+            b,
+            &[
+                [fore + 1.7, r * 0.6, z - r * 0.6, z + r * 0.6, r * 0.2],
+                [fore + 1.0, r * 0.6, z - r * 0.6, z + r * 0.6, r * 0.2],
+            ],
+        );
+        // An armour saddle over the pod, and a collar where it meets the drive.
+        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        block(
+            b,
+            &[
+                [fore - 6.0, r * 0.7, z + r * 0.6, z + r * 1.18, 0.6],
+                [aft + 4.0, r * 0.8, z + r * 0.6, z + r * 1.22, 0.6],
+            ],
+        );
         b.paint(ACCENT);
-        hull(
+        block(
             b,
             &[
                 [aft + 1.2, r * 1.06, z - r * 1.06, z + r * 1.06, r * 0.37],
@@ -297,7 +477,7 @@ fn pod(b: &mut MeshBuilder, nozzle: [f32; 3], fore: f32, r: f32, size: f32) {
         );
         if b.fine() {
             b.paint(TEAM);
-            hull(
+            block(
                 b,
                 &[
                     [aft + 6.0, r * 1.05, z - r * 1.05, z + r * 1.05, r * 0.37],
@@ -306,181 +486,57 @@ fn pod(b: &mut MeshBuilder, nozzle: [f32; 3], fore: f32, r: f32, size: f32) {
             );
         }
     });
-    capital::drive(b, Vec3::from(nozzle), size);
+    capital::drive(b, Vec3::from(nozzle), DRIVE);
 }
 
-/// Short stubs from the keel hull's quarters out to its drive pods.
-fn stubs(b: &mut MeshBuilder) {
+/// The rail cannon's post: an armoured drum from the belly down to the house's roof, so
+/// the house hangs clear under the hull, turns right round and its rails depress freely.
+fn rail_mount(b: &mut MeshBuilder) {
+    let [x, _, _] = RAIL;
     b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-    b.mirror_y(|b| {
-        b.frustum(
-            v3(-40.0, 10.0, 17.5),
-            v2(18.0, 1.0),
-            v2(12.0, 1.0),
-            4.0,
-            v2(-3.0, 0.0),
-        );
-    });
-}
-
-/// A swept pylon from the hull's side (`root` half width) out to the nacelle at `nozzle`.
-fn pylon(b: &mut MeshBuilder, nozzle: [f32; 3], root: f32) {
-    let [nx, y, z] = nozzle;
-    let s = y.signum();
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-    b.loft(
-        &[
-            vec![
-                v3(nx + 58.0, s * root, z + 1.0),
-                v3(nx + 58.0, s * root, z + 4.0),
-                v3(nx + 30.0, s * root, z + 4.0),
-                v3(nx + 30.0, s * root, z + 1.0),
-            ],
-            vec![
-                v3(nx + 44.0, y, z - 1.0),
-                v3(nx + 44.0, y, z + 1.0),
-                v3(nx + 24.0, y, z + 1.0),
-                v3(nx + 24.0, y, z - 1.0),
-            ],
-        ],
-        true,
-        true,
-    );
-    if b.fine() {
-        b.paint(TEAM);
-        b.beam(
-            v3(nx + 55.0, s * (root + 1.0), z + 4.1),
-            v3(nx + 43.0, y - s * 3.0, z + 1.6),
-            v2(1.4, 0.2),
-            v2(1.4, 0.2),
-        );
-    }
-}
-
-/// A bridge block: a stepped house from `deck` up to `top` aft of the rail house, a band
-/// of glass across its face.
-fn bridge(b: &mut MeshBuilder, x: f32, deck: f32, top: f32, w: f32) {
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
-    hull(
-        b,
-        &[
-            [x + 6.0, w * 0.6, deck, top - 2.5, 1.0],
-            [x + 3.5, w, deck, top, 1.4],
-            [x - 10.0, w, deck, top, 1.4],
-            [x - 12.0, w * 0.8, deck, top - 1.5, 1.2],
-        ],
-    );
-    b.paint(GLASS);
-    b.beam(
-        v3(x + 4.6, w * 0.7, top - 2.3),
-        v3(x + 4.6, -w * 0.7, top - 2.3),
-        v2(0.6, 1.3),
-        v2(0.6, 1.3),
+    b.prism(
+        v3(x - 2.0, 0.0, RAIL_ROOF - 0.2),
+        b.sides(10),
+        5.6,
+        7.6,
+        KEEL - RAIL_ROOF + 0.8,
     );
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.cuboid(v3(x - 4.0, 0.0, top + 0.6), v3(6.0, w * 1.2, 1.2));
-    if b.fine() {
-        // A mast on the roof with the strobe on its tip.
-        b.paint(METAL);
-        b.cylinder_between(
-            v3(x - 4.0, 0.0, top + 1.2),
-            v3(x - 4.0, 0.0, top + 4.6),
-            0.5,
-            0.3,
-            6,
-        );
-        team_panel(b, v3(x - 9.0, 0.0, top), v2(3.0, w));
-    }
-}
-
-/// The faceted armoured hull (keel and outrigger): a raked prow, a dark belt low on the
-/// sides, the bridge aft of the rail house. Returns the belly's height over the chin gun.
-fn armoured_hull(b: &mut MeshBuilder) -> f32 {
-    const STATIONS: [[f32; 5]; 7] = [
-        [61.0, 2.0, 19.0, 22.0, 0.8],
-        [54.0, 6.5, 15.5, 26.0, 2.6],
-        [40.0, 11.0, KEEL + 0.5, DECK, 4.0],
-        [0.0, 12.0, KEEL, DECK, 4.2],
-        [-30.0, 12.0, KEEL, DECK, 4.2],
-        [-44.0, 10.0, 13.5, 27.0, 3.6],
-        [-50.0, 8.0, 15.0, 25.0, 3.0],
-    ];
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
-    hull(b, &STATIONS);
-    b.paint(PLATING_DARK);
-    hull(
-        b,
-        &[
-            [52.0, 7.2, 15.0, 20.0, 2.0],
-            [40.0, 11.6, 12.2, 20.0, 3.6],
-            [-32.0, 12.6, 11.6, 20.0, 3.6],
-            [-46.0, 10.4, 13.2, 20.0, 3.0],
-        ],
+    b.prism(
+        v3(x - 2.0, 0.0, RAIL_ROOF - 0.6),
+        b.sides(10),
+        6.2,
+        6.2,
+        1.0,
     );
-    b.paint(TEAM);
-    b.mirror_y(|b| {
-        b.beam(
-            v3(52.0, 6.8, 25.5),
-            v3(42.0, 11.3, 28.4),
-            v2(1.2, 0.3),
-            v2(1.2, 0.3),
-        );
-    });
-    bridge(b, -14.0, DECK, 37.0, 6.0);
-    14.0
+    b.prism(v3(x - 2.0, 0.0, KEEL - 1.2), b.sides(10), 8.4, 8.0, 1.0);
+    resolute::rail_turret_sized(b, 0, Vec3::from(RAIL), RAIL_SCALE, RAIL_REACH);
 }
 
-/// Blade: a long, narrow armoured spine that is mostly gun mount, armoured cheeks along
-/// it, a canard each side forward; its drives hang out on swept pylons like outriggers.
-fn blade_hull(b: &mut MeshBuilder) -> f32 {
-    const SPINE: [[f32; 5]; 7] = [
-        [64.0, 1.2, 20.0, 24.0, 0.5],
-        [54.0, 4.5, 16.0, 27.0, 1.8],
-        [36.0, 8.0, KEEL, DECK, 2.6],
-        [-10.0, 8.0, KEEL, DECK, 2.8],
-        [-36.0, 8.0, KEEL, DECK, 2.8],
-        [-46.0, 6.0, 14.0, 28.0, 2.4],
-        [-50.0, 4.0, 17.0, 26.0, 1.8],
-    ];
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
-    hull(b, &SPINE);
-    b.mirror_y(|b| {
-        b.at(v3(0.0, 8.0, 0.0), |b| {
-            b.paint(PLATING_DARK);
-            hull(
-                b,
-                &[
-                    [44.0, 0.6, 18.0, 24.0, 0.3],
-                    [32.0, 2.0, 17.0, 26.0, 0.8],
-                    [-30.0, 2.0, 17.0, 26.0, 0.8],
-                    [-40.0, 0.8, 18.5, 25.0, 0.4],
-                ],
-            );
-        });
+/// The rotary gun's barbette: an armoured drum from the deck up under its post, high
+/// enough that the barrels clear the bridge and the engineering block all round.
+fn gatling_mount(b: &mut MeshBuilder) {
+    let [x, _, _] = GATLING;
+    let plan = crate::builder::chamfered_rect(v2(7.0, 7.0), 2.6);
+    b.at(v3(x, 0.0, 0.0), |b| {
         b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-        b.loft(
+        b.loft_z(
+            &plan,
             &[
-                vec![
-                    v3(42.0, 9.6, 20.0),
-                    v3(42.0, 9.6, 21.6),
-                    v3(30.0, 9.6, 21.6),
-                    v3(30.0, 9.6, 20.0),
-                ],
-                vec![
-                    v3(28.0, 20.0, 19.0),
-                    v3(28.0, 20.0, 19.8),
-                    v3(22.0, 20.0, 19.8),
-                    v3(22.0, 20.0, 19.0),
-                ],
+                Section::new(DECK - 0.5, 1.15),
+                Section::new(GATLING_POST - 1.4, 1.0),
             ],
-            true,
-            true,
         );
-        b.paint(TEAM);
-        b.cuboid(v3(25.0, 19.6, 19.4), v3(6.0, 1.0, 1.0));
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(GATLING_POST - 1.4, 0.9),
+                Section::new(GATLING_POST, 0.9),
+            ],
+        );
     });
-    bridge(b, -14.0, DECK, 37.0, 5.0);
-    14.6
+    capital::rotary_house(b, 1, Vec3::from(GATLING), false, GATLING_SIZE);
 }
 
 /// Fittings for the lamps the renderer lights: flood housings, nav pods, strobes, beacons.

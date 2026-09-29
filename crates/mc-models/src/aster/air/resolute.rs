@@ -1745,7 +1745,7 @@ fn sponson(b: &mut MeshBuilder) {
 }
 
 /// How far the house's floor sits under its pivot (the rail's axis), as authored.
-pub(super) const HOUSE_SINK: f32 = 3.6;
+const HOUSE_SINK: f32 = 3.6;
 /// The house roof over the pivot.
 const HOUSE_ROOF: f32 = 4.2;
 
