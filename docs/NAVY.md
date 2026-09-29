@@ -44,24 +44,26 @@ submarine) gives itself away every time it launches.
 
 ## Two missile doctrines
 
-- **Sea skimmers** (the Swordfish): cruise missiles. Each boosts up out of its canted deck
-  cell (`vertical_launch`, `cant`), arcs over under 100 m with its wings unfolding, glides
-  down and runs in under 30 m over ground and water, so only close-in AA gets a shot, late.
-  One whose target dies takes the nearest enemy it can strike near where that target was.
-  Small warheads, many of them, one a second.
-- **High arcs** (the Kraken): launched from under the water, they fly half an ellipse onto
-  the target: straight up, over a top of up to 1,500 m (three quarters of the span on a
-  short shot), straight down, the motor burning the whole way. In the air for tens of
-  seconds and on radar the whole way, so long-range SAMs and Mantas get many shots, but
-  each one that lands is a strategic hit. The launch boil paints the submarine on enemy
-  sonar and radar for 8 s.
+- **Sea skimmers** (the Kraken): cruise missiles launched from under the water. A boil on
+  the surface, then each boosts up out of its hatch (`vertical_launch`), arcs over under
+  100 m with its wings unfolding, glides down and runs in under 30 m over ground and water,
+  so only close-in AA gets a shot, late. One whose target dies takes the nearest enemy it
+  can strike near where that target was. Four heavy warheads a salvo. The launch boil paints
+  the submarine on enemy sonar and radar for 8 s.
+- **Dumbfire rockets** (the Swordfish): thirty-two unguided rockets a salvo out of fixed,
+  forward-canted cells, so the hull turns its bow onto the mark. They fly a high lob
+  (`rake`) and fall over and round the mark. Each is light and easy for point defence to
+  burn; the salvo is too many to burn them all.
+
+The high arc (`apogee`: straight up, over a top of up to 1,500 m, straight down) is kept for
+the tier 4 submarine's long-range missile, which is being planned (docs/NAVY.md "Not done").
 
 Every anti-missile laser comes out of a head on the model (`anti_missile_mounts`, the
 shared `pd_laser` in models/aster/naval/mod.rs) marked with steady laser red
 (`GLOW_LASER`), so the missile defence reads apart from the rest of the ship.
 
-A defender buys the right umbrella: flak and point defence for skimmers, long-range SAMs for
-arcs. One umbrella does not cover both.
+A defender buys the right umbrella: flak and point defence for skimmers, lasers for a rocket
+salvo, long-range SAMs for arcs. One umbrella does not cover them all.
 
 ## Long guns need eyes
 
@@ -85,12 +87,12 @@ sea after a battle pays for the battle.
 | Trawler | 1 | Salvage boat | A mobile reclaim head, 600 m reach; works what it passes while it sails. |
 | Marlin | 2 | Destroyer | A bolt rifle (the Paladin's gun a size down) that lobs a little over terrain, 1500 m (a small battleship); torpedo tubes, sonar, interceptor tubes, light AA. |
 | Manta | 2 | Air-defence cruiser | A 16-cell vertical missile array fired as one ripple to 1,850 m (past any flak gun, short of the Skyguard), spread over the fliers in range; radar, two missile-interception lasers screening 600 m around it, one light gun. |
-| Swordfish | 2 | Cruise-missile ship | Eight sea skimmers per salvo. No other weapon. |
+| Swordfish | 2 | Rocket ship | Thirty-two unguided rockets per salvo, lobbed from fixed cells. No other weapon. |
 | Moray | 2 | Hunter-killer submarine | Six guided torpedo tubes, sonar, stern interceptor tubes; a deck gun that only works surfaced. |
 | Nautilus | 2 | Shield boat | A bubble over the fleet. Unarmed. |
 | Leviathan | 3 | Battleship | Three triple turrets of heavy guns, secondary guns, weak AA. The hero. |
 | Atoll | 3 | Air-defence carrier | Twelve hatched long-range SAM cells (2,800 m), fleet radar (4,000 m), interceptor tubes. No gun. |
-| Kraken | 3 | Strategic submarine | Eight tubes; four high-arc missiles per salvo, launched dived. |
+| Kraken | 3 | Strategic submarine | Eight tubes; four sea-skimming cruise missiles per salvo, launched dived. |
 | Narwhal | 3 | Anti-ship trimaran | A Zenith rail down the keel: the hull turns to aim, the barrel elevates. Shoots only spaceships; nothing else aboard. |
 
 ## The Leviathan
@@ -160,6 +162,8 @@ Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-models --l
 
 ## Not done
 
+- The tier 4 submarine (nukes, a long-range anti-base missile, torpedoes, deck rails,
+  shields) is being planned with the user.
 - The Atoll's flight deck is for show: it does not dock, mend, launch or build aircraft yet.
   How that should work is undecided, as it needs aircraft mechanics the game lacks.
 - The AI builds the new hulls as naval units but knows nothing about their roles.

@@ -349,9 +349,9 @@
         },
     ),
     "aster_t2_missile_ship": (
-        lore: "A narrow hull that is all launch rack. Its cruise missiles track their marks and run in low over land and water, so only close-in guns get a shot, and late. It has nothing else.",
+        lore: "A narrow hull that is all launch rack. Its cells hold racks of unguided rockets, rippled out by the dozen onto a stretch of shore or a knot of ships. Point defence takes them one at a time; there are too many to take them all. It has nothing else.",
         weapons: {
-            "Cruise Missiles": "Eight sea skimmers a salvo, guided, under 25 m the whole way in.",
+            "Dumbfire Rockets": "Thirty-two unguided rockets a salvo out of eight canted cells, lobbed high and falling over and round the mark.",
         },
     ),
     "aster_t2_submarine": (
@@ -359,6 +359,7 @@
         weapons: {
             "Torpedo Tubes": "Six bow tubes in two banks, fired three at a time.",
             "Deck Gun": "A gun forward of the sail that only works with the boat on the surface.",
+            "Interceptor Tubes": "Two stern tubes that meet torpedoes coming in, surfaced or dived.",
         },
     ),
     "aster_t2_shield_boat": (
@@ -387,10 +388,10 @@
         },
     ),
     "aster_t3_submarine": (
-        lore: "The Reach's deterrent. It launches from under the water: a boil on the surface, then the missile climbs into the high air and falls on its mark. Every launch paints the boat for everyone listening.",
+        lore: "The Reach's deterrent. It launches from under the water: a boil on the surface, then cruise missiles that run in low over sea and shore, so only close-in guns get a shot, and late. Every launch paints the boat for everyone listening.",
         weapons: {
             "Heavy Torpedo Tubes": "Eight bow tubes, fired four at a time.",
-            "Ballistic Missiles": "Four hatches behind the sail. They climb to 1,500 m before they come down, in the air for half a minute and on radar the whole way.",
+            "Cruise Missiles": "Four hatches behind the sail. Each missile boosts clear of the water, unfolds its wings and skims in under 25 m; one whose mark dies finds another.",
         },
     ),
     "aster_t2_sonar": (

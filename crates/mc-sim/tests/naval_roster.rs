@@ -182,10 +182,10 @@ fn interceptors_never_take_a_unit_and_are_the_same_on_every_run() {
 }
 
 #[test]
-fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
+fn a_strategic_submarine_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
     let mut w = sea(false);
     let target = spawn(&mut w, "aster_t1_power", 1, 150, 1000, 0);
-    let ship = spawn(&mut w, "aster_t2_missile_ship", 0, 1050, 1000, 0);
+    let ship = spawn(&mut w, "aster_t3_submarine", 0, 1050, 1000, 0);
     let full = health(&w, target);
     let heading = w.state.units.heading[row(&w, ship)];
     order(
@@ -197,7 +197,7 @@ fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
             queue: false,
         },
     );
-    let missiles = w.blueprints.id_of("aster_t2_missile_ship").unwrap();
+    let missiles = w.blueprints.id_of("aster_t3_submarine").unwrap();
     let mark = FxVec2::from_ints(150, 1000);
     let water = Fx::from_int(WATER);
     // Each missile pops up out of its cell and arcs over, then glides down to skim:
@@ -207,7 +207,7 @@ fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
     for _ in 0..400 {
         w.tick(&[]).unwrap();
         let p = &w.state.projectiles;
-        for i in (0..p.len()).filter(|&i| p.blueprint[i] == missiles) {
+        for i in (0..p.len()).filter(|&i| p.blueprint[i] == missiles && p.weapon[i] == 1) {
             let at = p.pos[i];
             let over = at.z - w.terrain.height_at(at.xy()).max(water);
             if !settled.contains(&p.serial[i]) {
@@ -248,16 +248,16 @@ fn a_missile_ship_s_skimmers_hug_the_sea_climb_the_coast_and_strike_inland() {
     assert_eq!(
         w.state.units.heading[row(&w, ship)],
         heading,
-        "the ship turned to launch from its deck cells"
+        "the boat turned to launch from its hatches"
     );
 }
 
 #[test]
-fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
-    // A 180 m cliff straight up out of the sea, the mark on top of it.
-    let mut w = shore(false, 180);
+fn a_rocket_ship_ripples_unguided_rockets_onto_the_shore() {
+    let mut w = sea(false);
     let target = spawn(&mut w, "aster_t1_power", 1, 150, 1000, 0);
     let ship = spawn(&mut w, "aster_t2_missile_ship", 0, 1050, 1000, 0);
+    let full = health(&w, target);
     order(
         &mut w,
         0,
@@ -267,7 +267,42 @@ fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
             queue: false,
         },
     );
-    let missiles = w.blueprints.id_of("aster_t2_missile_ship").unwrap();
+    let rockets = w.blueprints.id_of("aster_t2_missile_ship").unwrap();
+    assert!(!w.blueprints.unit(rockets).weapons[0].guided);
+    let mut serials = std::collections::BTreeSet::new();
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+        let p = &w.state.projectiles;
+        serials.extend(
+            (0..p.len())
+                .filter(|&i| p.blueprint[i] == rockets)
+                .map(|i| p.serial[i]),
+        );
+    }
+    assert!(
+        serials.len() >= 32,
+        "only {} rockets in a salvo",
+        serials.len()
+    );
+    assert!(health(&w, target) < full, "the power plant was not hit");
+}
+
+#[test]
+fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
+    // A 180 m cliff straight up out of the sea, the mark on top of it.
+    let mut w = shore(false, 180);
+    let target = spawn(&mut w, "aster_t1_power", 1, 150, 1000, 0);
+    let ship = spawn(&mut w, "aster_t3_submarine", 0, 1050, 1000, 0);
+    order(
+        &mut w,
+        0,
+        Command::Attack {
+            units: vec![ship],
+            target,
+            queue: false,
+        },
+    );
+    let missiles = w.blueprints.id_of("aster_t3_submarine").unwrap();
     let mark = FxVec2::from_ints(150, 1000);
     let water = Fx::from_int(WATER);
     // Where each missile was last seen; every one must end its flight at the mark.
@@ -277,7 +312,7 @@ fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
         w.tick(&[]).unwrap();
         let p = &w.state.projectiles;
         let flying: std::collections::BTreeSet<_> = (0..p.len())
-            .filter(|&i| p.blueprint[i] == missiles)
+            .filter(|&i| p.blueprint[i] == missiles && p.weapon[i] == 1)
             .map(|i| p.serial[i])
             .collect();
         for (serial, at) in &last {
@@ -289,7 +324,7 @@ fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
             }
         }
         last.retain(|serial, _| flying.contains(serial));
-        for i in (0..p.len()).filter(|&i| p.blueprint[i] == missiles) {
+        for i in (0..p.len()).filter(|&i| p.blueprint[i] == missiles && p.weapon[i] == 1) {
             let at = p.pos[i];
             last.insert(p.serial[i], at.xy());
             if p.age[i] > 10 && at.xy().distance(mark) > Fx::from_int(40) {
@@ -311,6 +346,11 @@ fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
 #[test]
 fn a_dived_strategic_submarine_lobs_a_high_arc_and_gives_itself_away() {
     let mut w = sea(true);
+    // The Kraken's cells given a high arc (`apogee`) in place of its sea skimmers.
+    let kraken_bp = w.blueprints.id_of("aster_t3_submarine").unwrap();
+    let cells = &mut Arc::make_mut(&mut w.blueprints).units[kraken_bp.index()].weapons[1];
+    cells.skim = Fx::ZERO;
+    cells.apogee = Fx::from_int(1500);
     let target = spawn(&mut w, "aster_t1_power", 1, 150, 1000, 0);
     let kraken = spawn(&mut w, "aster_t3_submarine", 0, 1650, 1000, 0);
     // Radar reaches the submarine; nothing of theirs has sonar.
@@ -617,7 +657,7 @@ fn a_cruise_missile_whose_mark_dies_flies_on_to_another() {
     let mut w = sea(false);
     let first = spawn(&mut w, "aster_t1_frigate", 1, 400, 1000, 0);
     let second = spawn(&mut w, "aster_t1_frigate", 1, 400, 1150, 0);
-    let ship = spawn(&mut w, "aster_t2_missile_ship", 0, 1300, 1000, 0);
+    let ship = spawn(&mut w, "aster_t3_submarine", 0, 1300, 1000, 0);
     let full = health(&w, second);
     order(
         &mut w,
@@ -628,13 +668,13 @@ fn a_cruise_missile_whose_mark_dies_flies_on_to_another() {
             queue: false,
         },
     );
-    let missiles = w.blueprints.id_of("aster_t2_missile_ship").unwrap();
+    let missiles = w.blueprints.id_of("aster_t3_submarine").unwrap();
     // Wait for the first missile to be well on its way, then sink its mark.
     let mut out = false;
     for _ in 0..200 {
         w.tick(&[]).unwrap();
         let p = &w.state.projectiles;
-        if (0..p.len()).any(|i| p.blueprint[i] == missiles && p.age[i] > 20) {
+        if (0..p.len()).any(|i| p.blueprint[i] == missiles && p.weapon[i] == 1 && p.age[i] > 20) {
             out = true;
             break;
         }
@@ -645,7 +685,7 @@ fn a_cruise_missile_whose_mark_dies_flies_on_to_another() {
     w.tick(&[]).unwrap();
     let p = &w.state.projectiles;
     let retargeted = (0..p.len())
-        .filter(|&i| p.blueprint[i] == missiles)
+        .filter(|&i| p.blueprint[i] == missiles && p.weapon[i] == 1)
         .all(|i| p.target[i] == second);
     assert!(
         retargeted,
