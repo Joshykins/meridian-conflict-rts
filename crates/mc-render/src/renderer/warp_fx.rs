@@ -3,23 +3,26 @@
 //!
 //! - **Charging** (`WarpPhase::Spool`, `WarpView::charge`): the drive glow builds in the
 //!   hull and at its stern, motes of light are drawn in to it, a ripple of bent air forms
-//!   ahead of the nose along the jump, the light on the hull pulses faster and faster, and
-//!   near the end arcs crackle over the plating.
+//!   ahead of the nose along the jump, and the light on the hull pulses faster and faster.
+//!   Arcs crawl over the plating itself, thickening as it fills and gathering at the drives
+//!   and nose near the end: entity.wgsl draws those (`warp_charge_arcs` in warp_hull.wgsl)
+//!   from the charge the mirror hands it in `UnitInstance::fx.xy`.
 //! - **Going in** (the first tick of `Transit`, the ship still drawn where it left while
 //!   it stretches out): as the streak snaps away, a blinding flash, a pressure ring round
 //!   the bearing, a line of light that runs away along the bearing and fades, sparkle
 //!   hanging where the ship was, and the clouds shoved aside.
 //! - **In warp** (the rest of `Transit`): the rift forms where it will come out, a point
-//!   of light that grows into a lens of bent light round a dark heart, arms winding in and
-//!   motes drawn into it. On its last tick a streak runs in along the bearing to meet it.
+//!   of light that grows into a lens of bent light: a hard ring round a dark heart with a
+//!   white-hot point, shafts standing out from it and a flat flare across it, motes drawn
+//!   straight in. Nothing in it turns. On its last tick a streak runs in along the bearing to meet it.
 //! - **Coming out** (the first tick of `Emerge`, the streak collapsing into the hull): a
 //!   flash, a pressure ring, clouds and dust pushed out, motes thrown off, the hull lit
 //!   while it settles.
 //! - **Dampened** (`WarpView::dampened`): all of it in sickly violet with red through it
 //!   rather than blue-white, torn (stuttering, jittering, guttering), lightning round the
 //!   rift through its three-times-longer transit, and a violent exit: sparks and hot
-//!   debris thrown off, arcs over the hull and light guttering over the thirty ticks it
-//!   takes to be torn out of the streak.
+//!   debris thrown off and light guttering over the thirty ticks it takes to be torn out
+//!   of the streak (the stun it comes out with lays EMP arcs over the hull, emp.wgsl).
 //!
 //! Every size is scaled by the hull's radius. Emitters are capped per ship per tick
 //! (about 20 puffs while charging, 60 on a jump or exit tick), and ships far from the
@@ -174,8 +177,8 @@ impl Renderer {
     }
 
     /// The drive charging: glow in the hull and at the stern, motes drawn in, a ripple
-    /// ahead of the nose, a light pulsing faster as it fills, arcs over the plating near
-    /// the end.
+    /// ahead of the nose, a light pulsing faster as it fills (the arcs over the plating
+    /// are the entity shader's).
     fn warp_charge(&mut self, j: &Jump, (pos, heading): (Vec3, f32), time: f32) {
         let dt = self.tick_seconds.max(0.02);
         let (r, k, pal) = (j.r, j.k, j.pal);
@@ -257,35 +260,6 @@ impl Renderer {
                 pal.edge * (2.0 + 4.0 * c),
                 pal.torn,
             );
-        }
-        // Near the end, the plating crackles.
-        if c > 0.6 {
-            let arcs = (((c - 0.6) * 9.0) as usize + 1).min(4);
-            for _ in 0..arcs {
-                let a = pos
-                    + fwd * self.scatter.signed() * 0.8 * r
-                    + left * self.scatter.signed() * 0.35 * r
-                    + Vec3::Z * self.scatter.signed() * 0.15 * r;
-                let span = Vec3::new(
-                    self.scatter.signed(),
-                    self.scatter.signed(),
-                    0.4 * self.scatter.signed(),
-                )
-                .normalize_or_zero()
-                    * r
-                    * (0.3 + 0.4 * self.scatter.unit());
-                let roll_1 = self.scatter.unit();
-                self.push_warp(
-                    PUFF_WARP_ARC,
-                    a,
-                    span,
-                    time + roll_1 * dt,
-                    0.16,
-                    (0.09 * r, 0.09 * r),
-                    pal.core * 4.0,
-                    pal.torn,
-                );
-            }
         }
     }
 
@@ -401,7 +375,8 @@ impl Renderer {
             pal.edge * (1.6 + 2.4 * p),
             pal.torn,
         );
-        let heart = (r * (0.15 + 0.35 * p)).max(j.floor * 0.4);
+        // The white-hot point in the dark heart: small, so the heart still reads dark.
+        let heart = (r * (0.07 + 0.12 * p)).max(j.floor * 0.25);
         self.push_warp(
             PUFF_WARP_GLOW,
             to,
@@ -409,7 +384,7 @@ impl Renderer {
             time,
             life,
             (heart, heart),
-            pal.core * (0.4 + 2.5 * p * p),
+            pal.core * (0.2 + 0.8 * p * p),
             pal.torn,
         );
         self.warp_fx.light(Glow {
@@ -438,7 +413,7 @@ impl Renderer {
         if !j.near {
             return;
         }
-        // Light drawn in, wound round the heart.
+        // Light drawn straight in to the heart.
         for _ in 0..(2.0 + 4.0 * p) as usize {
             let dir = Vec3::new(
                 self.scatter.signed(),
@@ -447,13 +422,12 @@ impl Renderer {
             )
             .normalize_or_zero();
             let start = to + dir * r * (2.0 + 1.5 * self.scatter.unit());
-            let swirl = dir.cross(Vec3::Z) * r * 1.2;
             let size = 0.04 * r;
             let roll_1 = self.scatter.unit();
             self.push_warp(
                 PUFF_WARP_MOTE,
                 start,
-                (to - start + swirl) / MOTE_REACH,
+                (to - start) / MOTE_REACH,
                 time + roll_1 * dt,
                 0.9,
                 (size, size * 0.4),
@@ -479,8 +453,8 @@ impl Renderer {
                 let roll_2 = self.scatter.unit();
                 self.push_warp(
                     PUFF_WARP_ARC,
-                    to + dir * size * 0.2,
-                    dir * size * (0.5 + 0.7 * roll_1),
+                    to + dir * size * 0.36,
+                    dir * size * (0.4 + 0.6 * roll_1),
                     time + roll_2 * dt,
                     0.2,
                     (0.12 * r, 0.12 * r),
@@ -559,8 +533,8 @@ impl Renderer {
         }
     }
 
-    /// A dampened exit, tick by tick while it is torn out of the streak: arcs over the
-    /// hull, sparks falling off it, light guttering.
+    /// A dampened exit, tick by tick while it is torn out of the streak: sparks falling
+    /// off the hull, light guttering.
     fn warp_torn(&mut self, j: &Jump, time: f32) {
         let dt = self.tick_seconds.max(0.02);
         let (r, k, pal) = (j.r, j.k, j.pal);
@@ -590,33 +564,6 @@ impl Renderer {
         });
         if !j.near {
             return;
-        }
-        for _ in 0..2 {
-            let a = to
-                + j.fwd * self.scatter.signed() * 0.9 * r
-                + j.left * self.scatter.signed() * 0.35 * r;
-            let span = (j.fwd * self.scatter.signed()
-                + j.left * self.scatter.signed() * 0.5
-                + Vec3::Z * 0.3 * self.scatter.signed())
-            .normalize_or_zero()
-                * r
-                * (0.4 + 0.5 * self.scatter.unit());
-            let color = if self.scatter.unit() < 0.5 {
-                pal.accent
-            } else {
-                pal.core
-            };
-            let roll_1 = self.scatter.unit();
-            self.push_warp(
-                PUFF_WARP_ARC,
-                a,
-                span,
-                time + roll_1 * dt,
-                0.18,
-                (0.1 * r, 0.1 * r),
-                color * 5.0,
-                pal.torn,
-            );
         }
         for _ in 0..3 {
             let at = to

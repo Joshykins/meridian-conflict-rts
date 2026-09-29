@@ -1,10 +1,14 @@
-// A capital ship's hull as it goes into warp and comes out (renderer/warp_fx.rs draws the
-// light round it). Prepended to shaders with `//!use warp_hull` (entity.wgsl).
+// A capital ship's hull as its drive charges, as it goes into warp and as it comes out
+// (renderer/warp_fx.rs draws the light round it). Prepended to shaders with
+// `//!use warp_hull` (entity.wgsl).
 //
-// `Entity::fx.xy` is the stretch last tick and this (`mc_sim::mirror::warp`): 0 whole, 1 a
-// streak of light. Going in it rises, over the one tick the ship is still drawn where it
-// left: its tail stays put and its nose shoots ahead along its heading, the hull thinning
-// into a needle of light. Coming out it falls: the streak lies back along the way it came
+// While the drive spools, `Entity::fx.xy` is minus its charge (0 to -1), last tick and this:
+// arcs crawl over the plating, thickening as it fills (`warp_charge_arcs`).
+//
+// In a jump `Entity::fx.xy` is the stretch last tick and this (`mc_sim::mirror::warp`):
+// 0 whole, 1 a streak of light. Going in it rises, over the one tick the ship is still
+// drawn where it left: its tail stays put and its nose shoots ahead along its heading, the
+// hull thinning into a needle of light. Coming out it falls: the streak lies back along the way it came
 // and collapses forward into the hull. A dampened jump (`WARP_STATUS_DAMPED`) stutters:
 // the streak catches and slips, and the hull is torn sideways in jagged bands.
 
@@ -74,4 +78,53 @@ fn warp_hull_light(color: vec3<f32>, warp: vec4<f32>, time: f32, seed: f32) -> v
         hot = mix(hot, vec3<f32>(1.0, 0.1, 0.18) * 8.0 * e, step(0.85, flick));
     }
     return mix(color, hot, smoothstep(0.0, 0.3, e));
+}
+
+// How full a spooling drive's charge is, 0 to 1, between ticks: `Entity::fx.xy` carry it
+// below zero while the drive spools (`mc_sim::mirror::warp`), the stretch at or above it.
+fn warp_charge(fx: vec4<f32>, t: f32) -> f32 {
+    return clamp(-mix(fx.x, fx.y, t), 0.0, 1.0);
+}
+
+// A drive charging, as light to add over the hull's own plating: arcs like an EMP's
+// (emp.wgsl) in the drive's blue-white, a few at first and thickening and brightening as
+// the charge fills; in its last third they gather aft round the drives and at the nose,
+// and long bolts leap across the plating. The hull's light runs aft in waves, quicker as
+// it fills. (A charge is never dampened: a dampener snags the jump only as it goes.)
+// `u` is the point's place from stern (0) to nose (1), the rest as `emp_arcs`.
+fn warp_charge_arcs(local: vec3<f32>, reach: f32, px: f32, charge: f32, u: f32,
+                    time: f32, seed: f32) -> vec3<f32> {
+    if charge <= 0.0 {
+        return vec3<f32>(0.0);
+    }
+    let arc = vec3<f32>(0.3, 0.6, 1.0);
+    let core = vec3<f32>(0.85, 0.94, 1.0);
+    // Finer than a stun's arcs: more of them, each smaller.
+    let cell = clamp(reach * 0.08, 0.6, 12.0);
+    let q = local / cell;
+    let p = px / cell;
+    // Late on, the arcs leave the middle of the hull for the drives aft and the nose.
+    let gather = smoothstep(0.55, 1.0, charge);
+    let ends = max(1.0 - smoothstep(0.0, 0.3, u), 0.7 * smoothstep(0.72, 1.0, u));
+    let weight = mix(1.0, 0.3 + 1.7 * ends, gather);
+    // (The noise the patches come from seldom climbs past 0.8: below a cover of 0.2 there
+    // are next to none, at 0.3 a fair crawl.)
+    let cover = min(0.15 + (0.04 + 0.2 * charge) * weight, 0.5);
+    let a = emp_arc_layer(q, p, time, seed + 0.21, 0.25, cover);
+    let b = emp_arc_layer(q * 1.7 + 5.0, p * 1.7, time, seed + 0.53, 0.75, cover - 0.04);
+    var line = max(a.x, b.x * 0.7);
+    var hot = max(a.y, b.y);
+    // The last third: long bolts, cells four times the size, leaping across the plating.
+    let leap = smoothstep(0.65, 1.0, charge);
+    if leap > 0.0 {
+        let c = emp_arc_layer(q * 0.25 + 23.0, p * 0.25, time * 0.8, seed + 0.9, 0.1, 0.18 + 0.14 * leap);
+        line = max(line, c.x * 1.3);
+        hot = max(hot, c.y * 1.5);
+    }
+    let light = arc * line * 3.0 + core * hot * 5.5;
+    // Waves of light running aft to the drives, quicker and brighter as it fills.
+    let wave = fract(u * 1.5 + time * (0.4 + 2.2 * charge));
+    let sheen = pow(wave, 10.0) * 0.18 * charge * charge;
+    let strength = smoothstep(0.0, 0.2, charge) * (0.45 + 1.1 * charge);
+    return (light + arc * sheen) * strength;
 }

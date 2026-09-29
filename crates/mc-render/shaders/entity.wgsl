@@ -209,8 +209,9 @@ struct VsOut {
     // Into or out of warp (warp_hull.wgsl): how far into the streak, 1 going in, 1 dampened,
     // then 0 at the stern to 1 at the nose.
     @location(15) warp: vec4<f32>,
-    // How stunned by an EMP it is, 0 to 1, between ticks (emp.wgsl).
-    @location(16) @interpolate(flat) stun: f32,
+    // What crackles over the hull, between ticks: x how stunned by an EMP it is (emp.wgsl),
+    // y how full its warp drive's charge is while it spools (warp_hull.wgsl), 0 to 1.
+    @location(16) @interpolate(flat) crackle: vec2<f32>,
 }
 
 struct Weld {
@@ -2147,7 +2148,8 @@ fn vs_main(in: VsIn) -> VsOut {
         out.drive_at = vec4<f32>(f32(coil_pat - PAT_COIL), 0.0, 0.0, 3.0);
     }
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
-    out.stun = select(mix(e.fx.z, e.fx.w, t), 0.0, (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST)) != 0u);
+    let crackles = (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST)) == 0u;
+    out.crackle = select(vec2<f32>(0.0), vec2<f32>(mix(e.fx.z, e.fx.w, t), warp_charge(e.fx, t)), crackles);
     // Pieces go up one after another over the first four fifths of the refit, each taking a fifth.
     // What is coming off turns to a hologram at the start.
     let at = f32((in.rig >> 16u) & 0xFFu) / 255.0;
@@ -3015,8 +3017,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     m.emissive += lights;
     // An EMP stun (emp.wgsl): lamps, glows and drives dead, stuttering back as it wears
     // off; the paint a shade darker.
-    m.emissive *= emp_power(in.stun, time, in.state.w);
-    m.albedo = emp_albedo(m.albedo, in.stun);
+    m.emissive *= emp_power(in.crackle.x, time, in.state.w);
+    m.albedo = emp_albedo(m.albedo, in.crackle.x);
 
     if soot > 0.0 {
         // Burns from damage go over paint and dirt alike.
@@ -3179,8 +3181,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
     }
     color = warp_hull_light(color, in.warp, time, in.state.w);
-    // Arcs crawling over a stunned hull.
-    color += emp_arcs(in.local, in.weld.z, local_px, in.stun, time, in.state.w);
+    // Arcs crawling over a stunned hull, or a charging drive's gathering over the plating.
+    color += emp_arcs(in.local, in.weld.z, local_px, in.crackle.x, time, in.state.w);
+    color += warp_charge_arcs(in.local, in.weld.z, local_px, in.crackle.y, in.warp.w, time, in.state.w);
     if (flags & KIND_GHOST) != 0u {
         let pulse = 0.6 + 0.4 * sin(time * 5.0);
         let rim = pow(1.0 - max(dot(n, v), 0.0), 2.0);

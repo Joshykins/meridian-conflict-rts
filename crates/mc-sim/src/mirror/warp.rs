@@ -1,7 +1,7 @@
 //! What the presentation sees of warps, dampeners and stuns (`crate::warp`).
 //!
-//! Per unit, `UnitInstance::fx` carries the warp stretch and the stun, each last tick and
-//! this, and `status[0]` two marks (`UNIT_WARP_DAMPED`, `UNIT_IN_WARP`). The ship is drawn
+//! Per unit, `UnitInstance::fx` carries the warp drive (its stretch in a jump, or below
+//! zero its charge while it spools) and the stun, each last tick and this, and `status[0]` two marks (`UNIT_WARP_DAMPED`, `UNIT_IN_WARP`). The ship is drawn
 //! for one more tick after it jumps, at the place it left, stretching from nothing to a
 //! full streak, and comes out on its first tick back going from a full streak to nothing:
 //! so the jump happens between two ticks, and the renderer's own effects
@@ -56,8 +56,9 @@ impl World {
         }
     }
 
-    /// `[stretch last tick, stretch now, stun last tick, stun now]` and the `status[0]`
-    /// marks for `row`.
+    /// `[drive last tick, drive now, stun last tick, stun now]` and the `status[0]` marks
+    /// for `row`. The drive is the stretch into a streak (0 to 1) in a jump, and minus the
+    /// charge (0 to -1) while it spools.
     pub(super) fn warp_fx(&self, row: usize) -> ([f32; 4], u32) {
         let units = &self.state.units;
         let w = &units.warp[row];
@@ -73,6 +74,12 @@ impl World {
                 [at(w.ticks.saturating_sub(1)), at(w.ticks)]
             }
             WarpPhase::Emerge if w.ticks == 0 => [1.0, 0.0],
+            // Charging: below zero, how full the drive is (a tick's full draw back, then now).
+            WarpPhase::Spool => self.bp(row).warp.map_or([0.0, 0.0], |d| {
+                let full = |e: mc_core::Fx| -(e / d.energy).to_f32().clamp(0.0, 1.0);
+                let tick = d.energy / d.spool_ticks.max(1) as i32;
+                [full(w.charge - tick), full(w.charge)]
+            }),
             _ => [0.0, 0.0],
         };
         let [left, _] = units.stun[row];
@@ -209,9 +216,9 @@ impl World {
 
 impl UnitInstance {
     /// How far into its warp streak it is drawn, this tick and last blended by `t`:
-    /// 0 whole, 1 a streak of light.
+    /// 0 whole, 1 a streak of light (0 while the drive spools).
     pub fn warp_stretch(&self, t: f32) -> f32 {
-        self.fx[0] + (self.fx[1] - self.fx[0]) * t
+        (self.fx[0] + (self.fx[1] - self.fx[0]) * t).max(0.0)
     }
 
     /// How stunned it is, 0 to 1, blended by `t`.

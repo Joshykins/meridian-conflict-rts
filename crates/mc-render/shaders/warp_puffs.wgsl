@@ -1,5 +1,6 @@
 // The light round a capital ship's warp (renderer/warp_fx.rs): the drive's charge, the
-// streak and flash as it goes, the rift it comes out of. Prepended to shaders with
+// streak and flash as it goes, the rift it comes out of (a lens of bent light; nothing in
+// it turns). The arcs over a charging hull are the entity shader's (warp_hull.wgsl). Prepended to shaders with
 // `//!use warp_puffs` (puffs.wgsl, whose `Puff` and `PuffOut` these use).
 //
 // Every one is light added to the scene (the rift's heart also hides what is behind it).
@@ -127,50 +128,88 @@ fn warp_streak(in: PuffOut, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> v
     return vec4<f32>(light, 0.0);
 }
 
-// A jagged arc of lightning along the ribbon, re-struck fifteen times a second.
+// A bolt of lightning along the ribbon, re-struck fifteen times a second: a kinked
+// channel, thick in the middle and thinning to nothing at both ends, with a fork
+// breaking off it part way.
 fn warp_arc(in: PuffOut, rgb: vec3<f32>, age: f32, seed: f32) -> vec4<f32> {
     let now = globals.camera.w;
     let x = (in.uv.x + 1.0) * 0.5;
     let strike = floor(now * 15.0) * 17.0 + seed * 97.0;
-    let coarse = x * 7.0;
-    let fine = x * 23.0;
+    let coarse = x * 6.0;
+    let fine = x * 21.0;
     let a = mix(hash11(floor(coarse) + strike), hash11(floor(coarse) + 1.0 + strike), fract(coarse));
     let b = mix(hash11(floor(fine) + strike + 50.0), hash11(floor(fine) + 51.0 + strike), fract(fine));
-    let line = ((a - 0.5) * 1.1 + (b - 0.5) * 0.4) * sin(3.14159 * x);
+    let pin = sin(3.14159 * x);
+    let line = ((a - 0.5) * 0.9 + (b - 0.5) * 0.3) * pin;
+    // The fork leaves the channel at `split` and bends away to one side, fading out.
+    let split = 0.3 + 0.3 * hash11(strike + 7.0);
+    let away = select(-1.0, 1.0, hash11(strike + 9.0) > 0.5);
+    let past = max(x - split, 0.0);
+    let fork = line + away * past * 1.6 + (b - 0.5) * 0.25 * past;
+    let taper = sqrt(pin);
+    let w = 0.0035 * taper;
     let y = abs(in.uv.y - line);
-    let core = exp(-y * y / 0.003);
-    let halo = exp(-y * y / 0.06) * 0.35;
+    let yf = abs(in.uv.y - fork);
+    let branch = step(split, x) * (1.0 - smoothstep(0.0, 0.3, past)) * 0.7;
+    let core = exp(-y * y / max(w, 0.0002)) + exp(-yf * yf / max(w * 0.5, 0.0001)) * branch;
+    let halo = (exp(-y * y / (0.05 * taper + 0.001)) + exp(-yf * yf / 0.02) * branch) * 0.3;
     let on = step(0.22, warp_flicker(31.0, seed));
     let fade = 1.0 - age;
     let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), 0.6);
-    return vec4<f32>((white * core * 3.0 + rgb * halo) * on * fade, 0.0);
+    return vec4<f32>((white * core * 3.0 + rgb * halo * taper) * on * fade, 0.0);
 }
 
-// The rift a jump comes out of, turned to the eye. Closed (`roll.x` 0) it is a ripple, air
-// bent in rings; opening, a ring of bent light closes round a dark heart with a white-hot
-// point in it, arms of light winding in. Torn, the ring is jagged and it all flickers.
+// The rift a jump comes out of, turned to the eye: a lens of bent light. Closed
+// (`roll.x` 0) it is a shimmer of heat haze, rings of bent air running outward round a
+// faint ring. Opening, the ring tightens into a thin, hard circle of light (white inside,
+// blue at its outer edge) round a dark heart with a white-hot point in it; a fainter ghost
+// ring stands out beyond it, shafts of light stand out from it at fixed angles, each
+// flaring and dimming on its own, and a flat flare runs across the point. Nothing in it
+// turns. Torn, the ring is jagged, red lashes through it and it all flickers.
 fn warp_rift(in: PuffOut, d: f32, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> vec4<f32> {
     let now = globals.camera.w;
     let open = clamp(in.roll.x, 0.0, 1.0);
     let angle = atan2(in.uv.y, in.uv.x);
     let fade = smoothstep(0.0, 0.15, age) * (1.0 - smoothstep(0.6, 1.0, age));
-    let jag = (hash11(floor(angle * 4.0 + now * 21.0) + seed * 29.0) - 0.5) * 0.16 * torn;
-    let r0 = 0.5 + jag;
-    let ring = exp(-pow((d - r0) / (0.025 + 0.02 * open), 2.0));
-    let spin = now * (2.0 + 5.0 * open) * select(1.0, -1.0, seed > 0.5);
-    let arms = pow(0.5 + 0.5 * sin(3.0 * angle + 7.0 * log(d + 0.04) - spin + seed * 6.0), 8.0);
-    let band = smoothstep(0.1, 0.35, d) * (1.0 - smoothstep(0.6, 1.0, d));
-    let halo = pow(max(1.0 - d, 0.0), 4.0);
-    let ripple = (0.5 + 0.5 * sin(d * 34.0 - now * 9.0)) * (1.0 - d) * smoothstep(0.1, 0.4, d);
-    let heart = (1.0 - smoothstep(0.1, 0.24, d)) * open;
-    let point = exp(-d * d / (0.0006 + 0.003 * open));
-    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), 0.7);
-    var light = rgb * (ring * (0.5 + 1.6 * open) + arms * band * open * 0.8 + halo * 0.15 + ripple * 0.2 * (1.0 - open))
-        + white * point * 6.0 * open;
+    let jag = (hash11(floor(angle * 4.0 + now * 21.0) + seed * 29.0) - 0.5) * 0.14 * torn;
+    let r0 = mix(0.5, 0.36, open) + jag;
+    let width = mix(0.045, 0.014, open);
+    let ring = exp(-pow((d - r0) / width, 2.0));
+    let fringe = exp(-pow((d - r0 - width * 2.2) / (width * 2.0), 2.0));
+    let inner = exp(-max(r0 - d, 0.0) / 0.03) * step(d, r0) * 0.35;
+    let ghost = exp(-pow((d - r0 * 1.8) / 0.05, 2.0)) * 0.02;
+    // Shafts: 14 at angles set by the seed, each its own length and flaring on its own.
+    let sectors = 14.0;
+    let turn = angle / 6.28318 * sectors + seed * 5.0;
+    let i = floor(turn) - sectors * floor(floor(turn) / sectors);
+    let across = (fract(turn) - 0.5) * 7.0;
+    let reach = 0.25 + 0.6 * hash11(i + seed * 13.0);
+    let beat = mix(hash11(i + floor(now * 3.0) * 7.0), hash11(i + floor(now * 3.0 + 1.0) * 7.0), fract(now * 3.0));
+    let out_of = max(d - r0, 0.0);
+    let shaft = exp(-across * across * (1.0 + out_of * 30.0)) * smoothstep(0.0, 0.03, out_of)
+        * pow(1.0 - smoothstep(0.0, reach * (1.0 - r0), out_of), 2.0) * (0.25 + 0.75 * beat);
+    // And a haze of finer, fainter ones between them.
+    let fine_turn = angle / 6.28318 * 41.0 + seed * 3.0;
+    let j = floor(fine_turn) - 41.0 * floor(floor(fine_turn) / 41.0);
+    let fine_across = (fract(fine_turn) - 0.5) * 4.0;
+    let fine = exp(-fine_across * fine_across) * smoothstep(0.0, 0.02, out_of)
+        * pow(1.0 - smoothstep(0.0, (0.15 + 0.35 * hash11(j + seed * 7.0)) * (1.0 - r0), out_of), 2.0);
+    // A flat flare through the point, as a lens throws it.
+    let flare = exp(-pow(in.uv.y / 0.012, 2.0)) * pow(max(1.0 - abs(in.uv.x), 0.0), 2.5);
+    // Open, the halo stands outside the ring: within it is the dark heart.
+    let halo = pow(max(1.0 - d, 0.0), 4.0) * mix(1.0, smoothstep(r0 * 0.8, r0 * 1.1, d), open);
+    let haze = (0.5 + 0.5 * sin(d * 30.0 - now * 7.0)) * (1.0 - d) * smoothstep(0.15, 0.45, d);
+    let heart = (1.0 - smoothstep(r0 * 0.6, r0 * 0.97, d)) * open;
+    let point = exp(-d * d / (0.0006 + 0.0025 * open));
+    let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), 0.75);
+    var light = white * (ring * (0.6 + 1.8 * open) + inner * open)
+        + rgb * (fringe * 0.5 * open + ghost * open + (shaft * 0.5 + fine * 0.2) * open + halo * 0.15
+            + haze * 0.18 * (1.0 - open) + ring * 0.3)
+        + white * (point * 6.0 + flare * 1.4) * open;
     if torn > 0.0 {
         // A red lash through the ring now and then.
         light = mix(light, vec3<f32>(length(rgb), 0.08, 0.14) * ring * 2.5, step(0.75, warp_flicker(13.0, seed + 0.5)) * torn);
         light *= 0.35 + 1.1 * warp_flicker(17.0, seed);
     }
-    return vec4<f32>(light * fade, heart * 0.9 * fade);
+    return vec4<f32>(light * fade, heart * 0.85 * fade);
 }

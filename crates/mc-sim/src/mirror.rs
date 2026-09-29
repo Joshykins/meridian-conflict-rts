@@ -462,9 +462,10 @@ pub struct UnitInstance {
     /// A rotary gun's barrels, turned last tick and this (radians, unwrapped between the
     /// two); then the mounted weapon's kick-back, last tick and this (1 the instant it fires).
     pub spin_recoil: [f32; 4],
-    /// A warp and an EMP (`crate::warp`): how far into its warp streak it is, last tick
-    /// and this (0 whole, 1 a streak of light), then how stunned it is, last tick and
-    /// this (0 to 1, falling to 0 over the stun's last seconds).
+    /// A warp and an EMP (`crate::warp`): its warp drive, last tick and this (in a jump
+    /// how far into its streak, 0 whole to 1 a streak of light; spooling, minus how full
+    /// its charge is, 0 to -1), then how stunned it is, last tick and this (0 to 1,
+    /// falling to 0 over the stun's last seconds).
     pub fx: [f32; 4],
 }
 
