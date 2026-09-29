@@ -34,6 +34,7 @@ pub(super) mod titan;
 mod trebuchet;
 mod vehicles;
 mod wall;
+mod warp_damper;
 pub(super) mod zenith;
 
 use super::library::ModelDef;
@@ -188,4 +189,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("culverin", 30.0, 27.0, culverin::culverin).with_tier_4(),
     // The tech 4 anti-ship rail cannon (`zenith::ZENITH_RAIL` holds its barrel anchors).
     ModelDef::new("anti_ship_rail", 46.0, 86.0, zenith::zenith),
+    // The tech 2 warp dampener (a 4x4 lot), its field emitter at the top centre.
+    ModelDef::new("warp_damper", 18.0, 46.0, warp_damper::gyre),
+    ModelDef::new("warp_damper~a", 18.0, 46.0, warp_damper::gyre),
+    ModelDef::new("warp_damper~b", 18.0, 46.0, warp_damper::spire),
+    ModelDef::new("warp_damper~c", 18.0, 46.0, warp_damper::talon),
 ];
