@@ -44,6 +44,8 @@
             Silo: "select_silo",
             AntiNuke: "select_antinuke",
             Warship: "select_ship",
+            // The sensor ship answers like the radar towers it outreaches.
+            SensorShip: "select_intel",
             // A titan: its own answer (titan_alerts.ron), the size of the thing in it.
             Titan: "select_titan",
             // Salvage answers like the engineers and boats it works beside.
