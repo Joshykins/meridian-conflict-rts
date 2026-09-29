@@ -1,0 +1,27 @@
+// The Valiant (`aster_t2_corvette`): a light warship between the Courier and the Bastion
+// in size. Its hum is its own `moving` sound; the drives, lift jets and landing are the
+// shared capital recipes (`audio/capital.rs` falls back to `capital_<part>`), sized here
+// between the Courier's and the Bastion's.
+(
+    sounds: {
+        // Reactor hum: a low pair beating slowly under a hard-driven fifth, a thin coil
+        // whine from the rail gun's banks, and a slow swell of air past the hull.
+        "aster_corvette": (
+            length: 8, peak: 0.3, room: 0, looped: true,
+            layers: [
+                Drone(freq: 41, gain: 0.44, wobble: 0.125, depth: 0.06, pan: -0.1),
+                Drone(freq: 41.3, gain: 0.16, wobble: 0.125, depth: 0.05, pan: 0.1),
+                Drone(freq: 61.5, gain: 0.18, wobble: 0.25, depth: 0.08),
+                Drone(freq: 123, gain: 0.07, wobble: 0.375, depth: 0.1, pan: 0.1),
+                Drone(freq: 520, gain: 0.01, wobble: 0.25, depth: 0.25),
+                Sweep(at: 1.0, from: 180, to: 520, glide: 2.4, q: 0.8, attack: 1.8, decay: 2.4, gain: 0.9),
+                Drive(1.2),
+            ],
+        ),
+        "aster_corvette_thrust": (like: "capital_thrust", size: 0.65),
+        "aster_corvette_lift_jets": (like: "capital_lift_jets", size: 0.7),
+        "aster_corvette_spool": (like: "capital_spool", size: 0.75, length: 7.0),
+        "aster_corvette_liftoff": (like: "capital_liftoff", size: 0.75, length: 6.0),
+        "aster_corvette_touchdown": (like: "capital_touchdown", size: 0.75, length: 5.5),
+    },
+)
