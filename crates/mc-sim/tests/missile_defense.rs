@@ -64,6 +64,18 @@ fn spawn(w: &World, owner: u8, key: &str, x: i32, y: i32, flags: u16) -> PlayerC
 /// Rounds burnt out of the air and rounds that got through over `ticks`, `launchers`
 /// of `key` firing from `x`, `coronas` guarding an invulnerable Redoubt at x = 500.
 fn barrage(key: &str, x: i32, launchers: usize, coronas: usize, ticks: u32) -> (usize, usize) {
+    barrage_on(CORONA, key, x, launchers, coronas, ticks)
+}
+
+/// `barrage` against Coronas of blueprint `corona`.
+fn barrage_on(
+    corona: &str,
+    key: &str,
+    x: i32,
+    launchers: usize,
+    coronas: usize,
+    ticks: u32,
+) -> (usize, usize) {
     let mut w = world();
     let launcher = w.blueprints.id_of(key).unwrap();
     let mut spawns = vec![spawn(
@@ -81,14 +93,7 @@ fn barrage(key: &str, x: i32, launchers: usize, coronas: usize, ticks: u32) -> (
     for i in 0..coronas {
         let y = 512 + if i % 2 == 0 { 24 } else { -24 };
         let x = 540 - 24 * (i as i32 / 2);
-        spawns.push(spawn(
-            &w,
-            0,
-            "aster_t2_missile_defense",
-            x,
-            y,
-            flag::INVULNERABLE,
-        ));
+        spawns.push(spawn(&w, 0, corona, x, y, flag::INVULNERABLE));
     }
     w.tick(&spawns).unwrap();
     let (mut fired, mut killed) = (0, 0);
@@ -146,8 +151,30 @@ fn corona_burns_ballista_shells_but_a_battery_saturates_it() {
     );
 }
 
+const CORONA: &str = "aster_t2_missile_defense";
+const CORONA_T3: &str = "aster_t3_missile_defense";
 const JAVELIN: &str = "aster_t2_missile";
 const BALLISTA: &str = "aster_t1_artillery";
+
+#[test]
+fn the_tier_three_corona_holds_where_two_lasers_saturate() {
+    let w = world();
+    let t2 = w.blueprints.unit(w.blueprints.id_of(CORONA).unwrap());
+    let t3 = w.blueprints.id_of(CORONA_T3).unwrap();
+    assert_eq!(t2.upgrades_to, Some(t3));
+    let t3 = w.blueprints.unit(t3);
+    assert_eq!(t3.anti_missile_lasers, 4);
+    assert!(t3.anti_missile > t2.anti_missile);
+    let two = barrage_on(CORONA, BALLISTA, 900, 8, 1, 340);
+    let four = barrage_on(CORONA_T3, BALLISTA, 900, 8, 1, 340);
+    println!("eight ballistas (killed, through): vs T2 {two:?}, vs T3 {four:?}");
+    assert!(
+        four.1 * 2 <= two.1,
+        "a T3 Corona let {} through, a T2 {}",
+        four.1,
+        two.1
+    );
+}
 
 #[test]
 #[ignore]

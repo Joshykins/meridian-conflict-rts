@@ -684,6 +684,8 @@ const OVER_BUDGET: &[Over] = &[
     ("precursor_terrace", Some(112), None, None),
     ("precursor_citadel", Some(356), Some(0.61), None),
     ("precursor_seaway", None, Some(1.0), None),
+    // The Corona is a small tower; most of its mid detail is its laser heads and radar.
+    ("missile_defense", None, Some(0.6), None),
     // The Vigil is small and plain; most of its mid detail is its drive and lift jets.
     ("sensor_ship", None, Some(0.56), None),
     // The Valiant's mid detail is mostly its shared rig: drives, legs, lift jets, the
@@ -701,7 +703,7 @@ fn lods_reduce_and_respect_budgets() {
             "{}: {full} >= {reduced} >= {coarse}",
             model.key
         );
-        let over = OVER_BUDGET.iter().find(|o| o.0 == model.key);
+        let over = OVER_BUDGET.iter().find(|o| o.0 == base_key(&model.key));
         let coarse_cap = if model.key == "nuke_silo" {
             // The open silo's rim and tube mouth (its own test in `strategic.rs`).
             80

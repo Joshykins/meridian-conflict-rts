@@ -159,10 +159,9 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 3 rail point defence, at blueprint scale (`citadel::TRUNNION` is its pivot).
     ModelDef::new("citadel", 20.0, 17.0, citadel::citadel),
     ModelDef::new("citadel_casing", 2.2, 1.3, citadel::casing),
-    ModelDef::new(
+    ModelDef::tiered(
         "missile_defense",
-        6.0,
-        13.0,
+        [(6.0, 13.0), (6.0, 13.0), (6.0, 16.0)],
         missile_defense::missile_defense,
     ),
     ModelDef::tiered(

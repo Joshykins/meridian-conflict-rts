@@ -298,6 +298,9 @@
     "aster_t2_missile_defense": (
         lore: "Two of the fleet's interceptor lasers lifted off a cruiser's deck and set on a pole, for the bases that learned what a Javelin battery does to a factory.",
     ),
+    "aster_t3_missile_defense": (
+        lore: "Four lasers where there were two, and a reach to match: the answer to the artillery parks that learned to fire in batteries.",
+    ),
     "aster_t1_reclaimer": (
         lore: "A salvage mast with one slow head. It charges its beam before each pull, and reaches further than any engineer can walk in a minute.",
     ),
