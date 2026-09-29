@@ -2505,7 +2505,7 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         // Shield projectors, in the faction's shield colour. Saturated before it is
         // pushed, or a pale gold blows out to white in the tonemap.
         // Helmet visor: gold-orange mirror glass, lit faintly from within.
-        case 26u: { m.albedo = vec3<f32>(0.85, 0.42, 0.08); m.metallic = 1.0; m.roughness = 0.05; m.emissive = vec3<f32>(1.0, 0.4, 0.06) * 0.2; }
+        case 26u: { m.albedo = vec3<f32>(0.46, 0.2, 0.02); m.metallic = 1.0; m.roughness = 0.12; }
         case 24u: { m.albedo = globals.shield.rgb * 0.25; m.emissive = pow(globals.shield.rgb, vec3<f32>(2.2)) * 2.6; m.roughness = 0.3; }
         default: {}
     }
@@ -3065,17 +3065,21 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     var color = shade_pbr_refl(m, n, v, globals.sun.xyz, shadow, atmos.sun_color.rgb, sky,
         atmos.ground_color.rgb, ao, refl);
     if in.material == MAT_VISOR {
-        // A clear glass coat over the gold: the sky mirrored untinted, strongest
-        // toward the lens's rim, and a hard glint of the sun off its curve. From
-        // the strategic camera a face-forward lens mirrors the ground, so its
-        // reflection is bent up into the sky: the glass reads bright, never mud.
+        // Tinted glass over a dark gold film, not paint: the lens is deep amber
+        // until it catches the sky. A face-forward lens mirrors the ground from
+        // the strategic camera, so the reflection is bent up into the sky, and
+        // the bend fades toward the lens's lower half: sky-lit across the top,
+        // dark amber below, as on a real visor. Weak at face-on (glass, F0 ~ 4%),
+        // strong only at the rim, with a small hard glint of the sun.
         let r = reflect(-v, n);
-        let up_r = normalize(vec3<f32>(r.xy, abs(r.z) + 0.35));
-        let glass = env_reflection(in.world, up_r, 0.03, 1.0);
-        let fres = 0.3 + 0.7 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0);
-        let glint = pow(max(dot(up_r, globals.sun.xyz), 0.0), 180.0);
-        let tint = mix(vec3<f32>(1.0, 0.5, 0.12), vec3<f32>(1.0, 0.9, 0.75), fres * fres);
-        color += glass * tint * fres * 0.9 + atmos.sun_color.rgb * glint * 10.0 * shadow;
+        let up_r = normalize(vec3<f32>(r.xy, abs(r.z) + 0.2));
+        let glass = env_reflection(in.world, up_r, 0.04, 1.0);
+        let fres = 0.06 + 0.94 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
+        let upward = smoothstep(-0.45, 0.5, n.z + r.z * 0.5);
+        let glint = pow(max(dot(up_r, globals.sun.xyz), 0.0), 600.0);
+        let tint = mix(vec3<f32>(0.9, 0.42, 0.08), vec3<f32>(1.0, 0.8, 0.6), fres);
+        color = color * 0.75 + glass * tint * (0.08 + 0.55 * fres) * upward
+            + atmos.sun_color.rgb * vec3<f32>(1.0, 0.85, 0.6) * glint * 3.0 * shadow;
     }
     color += m.albedo * lightning_light(in.world, n) * 0.35;
     color += local_lights(m, in.world, n, v);
