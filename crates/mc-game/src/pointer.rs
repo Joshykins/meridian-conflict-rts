@@ -48,9 +48,11 @@ pub enum Pointer {
     Denied,
     /// Land units walk up this lift ship's ramp into its hold.
     Board,
+    /// The selection's warp drives jump toward here.
+    Warp,
 }
 
-pub const ALL: [Pointer; 13] = [
+pub const ALL: [Pointer; 14] = [
     Pointer::Arrow,
     Pointer::Select,
     Pointer::Move,
@@ -64,6 +66,7 @@ pub const ALL: [Pointer; 13] = [
     Pointer::Pan,
     Pointer::Denied,
     Pointer::Board,
+    Pointer::Warp,
 ];
 
 impl Pointer {
@@ -89,6 +92,7 @@ impl Pointer {
             Pointer::Pan => CursorIcon::AllScroll,
             Pointer::Denied => CursorIcon::NotAllowed,
             Pointer::Board => CursorIcon::Alias,
+            Pointer::Warp => CursorIcon::Crosshair,
         }
     }
 
@@ -194,6 +198,17 @@ impl Pointer {
             Pointer::Board => {
                 // Up the ramp into the hold, in the colour of air.
                 icons::glyph(ui, Glyph::Board, c, 11.0, tone(crate::hud::style::AIR));
+            }
+            Pointer::Warp => {
+                // The ring the ship comes out of, on the hotspot, and the streaks running into it.
+                let color = tone(crate::hud::warp::WARP);
+                ui.arc(c, 6.5, 0.0, TAU, 1.9, color);
+                ui.disc(c, 1.5, tone(palette::TEXT));
+                let dir = Vec2::new(1.0, -1.0).normalize();
+                for (off, len) in [(-3.6, 5.0), (0.0, 8.0), (3.6, 5.0)] {
+                    let end = c - dir * 8.5 + dir.perp() * off;
+                    ui.stroke(end - dir * len, end, 1.7, color);
+                }
             }
             Pointer::Denied => {
                 let color = tone(palette::BAD);

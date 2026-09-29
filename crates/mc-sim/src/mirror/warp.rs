@@ -165,6 +165,21 @@ impl World {
         }
     }
 
+    /// Seconds before the drive in `row` may spool again (`UnitOrders::warp_recharge`).
+    pub(super) fn warp_recharge_seconds(&self, row: usize) -> f32 {
+        let w = &self.state.units.warp[row];
+        if w.phase == WarpPhase::Idle {
+            w.recharge as f32 / TICKS_PER_SECOND as f32
+        } else {
+            0.0
+        }
+    }
+
+    /// Seconds before the stun on `row` wears off (`UnitOrders::stunned`).
+    pub(super) fn stun_seconds(&self, row: usize) -> f32 {
+        self.state.units.stun[row][0] as f32 / TICKS_PER_SECOND as f32
+    }
+
     /// Every warp dampener `viewer` knows of: its own side's, and an enemy's it detects.
     pub(super) fn write_dampers(&self, viewer: Option<u8>, out: &mut Vec<DamperView>) {
         out.clear();

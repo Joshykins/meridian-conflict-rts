@@ -565,11 +565,13 @@ pub fn screenshot(
     // MERIDIAN_AIM: a launch being aimed, the pointer at `--cursor` (docs/NUKES.md).
     // MERIDIAN_AIM=ground: fire on the ground being aimed instead (a titan's strike preview).
     // MERIDIAN_AIM=reclaim: the Reclaim order being given, what is under `--cursor` ringed.
+    // MERIDIAN_AIM=warp: the selection's warp order being aimed at `--cursor` (`warp_marks.rs`).
     let aim = std::env::var("MERIDIAN_AIM").ok();
     if let Some(aim) = &aim {
         view.mode = crate::game::Mode::Target(match aim.as_str() {
             "ground" => crate::game::Targeting::Strike,
             "reclaim" => crate::game::Targeting::Reclaim,
+            "warp" => crate::game::Targeting::Warp,
             _ => crate::game::Targeting::Nuke,
         });
     }
@@ -824,6 +826,7 @@ pub fn screenshot(
         });
         crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, site);
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
+        crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
         let build_grid = shot.build_grid || order_map.dragging_plan();
         let grid_focus = build_grid
@@ -852,6 +855,7 @@ pub fn screenshot(
         };
         hud.draw(&mut ui, &scene, 0.016);
         crate::hud::cursor_hint(&mut ui, &view, &world.blueprints, &[]);
+        crate::warp_marks::cursor_card(&mut ui, &field, pointer);
         memory.end_frame(&input);
         // A weapon card under `--cursor` lights its ring on the ground, as in a match.
         let focus = hud.reach_focus.take();
