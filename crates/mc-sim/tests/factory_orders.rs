@@ -268,6 +268,68 @@ fn a_factory_under_construction_takes_production_and_orders() {
 }
 
 #[test]
+fn a_structure_under_construction_queues_its_upgrade_for_when_it_stands() {
+    let mut w = world();
+    let t1 = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let t2 = w.blueprints.id_of("aster_t2_land_factory").unwrap();
+    w.tick(&[
+        cmd(Command::DebugSpawn {
+            owner: 0,
+            blueprint: t1,
+            pos: FxVec2::from_ints(600, 512),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 200,
+        }),
+        cmd(Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        }),
+    ])
+    .unwrap();
+    let row = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.blueprint[r] == t1)
+        .unwrap();
+    let fid = w.state.units.id(row);
+    w.tick(&[cmd(Command::Upgrade { units: vec![fid] })])
+        .unwrap();
+    assert_eq!(
+        kinds(&w, row),
+        vec![OrderKind::Upgrade],
+        "the upgrade is queued"
+    );
+    for _ in 0..50 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(
+        w.state.units.has_flag(row, flag::UNDER_CONSTRUCTION) && w.state.units.blueprint[row] == t1,
+        "the upgrade waits for the factory to stand"
+    );
+    // Taken out again while it is still going up, and put back.
+    w.tick(&[cmd(Command::CancelUpgrade { units: vec![fid] })])
+        .unwrap();
+    assert!(kinds(&w, row).is_empty());
+    w.tick(&[cmd(Command::Upgrade { units: vec![fid] })])
+        .unwrap();
+
+    w.tick(&[cmd(Command::DebugSetBuild {
+        units: vec![fid],
+        permille: 1000,
+    })])
+    .unwrap();
+    let done = (0..20_000).any(|_| {
+        w.tick(&[]).unwrap();
+        w.state.units.blueprint[row] == t2
+    });
+    assert!(done, "the queued upgrade ran once the factory stood");
+}
+
+#[test]
 fn standing_posts_can_be_moved_added_and_dropped() {
     let (mut w, fid) = with_factory();
     let (a, b) = (FxVec2::from_ints(900, 700), FxVec2::from_ints(1000, 400));

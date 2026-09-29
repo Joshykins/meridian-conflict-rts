@@ -65,9 +65,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             .filter(|(_, bp)| bp.has(cat::FACTORY) == kind)
             .fold(first, |best, b| if tier(b) > tier(best) { b } else { best })
     });
+    // A structure still going up queues its tiers already, to start once it stands.
     let upgrader = units.iter().map(|u| (*u, s.bp(u))).find(|(u, bp)| {
         (bp.upgrades_to.is_some() || s.blueprints.refit_set(bp.id).is_some())
-            && !has_flag(u, flag::UNDER_CONSTRUCTION)
+            && (!has_flag(u, flag::UNDER_CONSTRUCTION) || !bp.is_mobile())
     });
     let refits = upgrader.is_some_and(|(_, bp)| s.blueprints.refit_set(bp.id).is_some());
     if (builder_unit.is_none() && upgrader.is_none()) || r.w < TILE_W + 28.0 {

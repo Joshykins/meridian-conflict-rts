@@ -82,6 +82,25 @@ impl World {
             .collect()
     }
 
+    /// `ids`' own units that carry orders, and the structures among them still being built:
+    /// a structure's upgrades can be queued before it stands, to start once it does.
+    pub(crate) fn owned_or_site(&self, player: u8, ids: &[UnitId]) -> Vec<usize> {
+        let mut rows = self.owned(player, ids, 0);
+        let units = &self.state.units;
+        for row in ids.iter().filter_map(|id| units.row(*id)) {
+            let site = units.flags[row] & (flag::UNDER_CONSTRUCTION | flag::IN_FACTORY)
+                == flag::UNDER_CONSTRUCTION;
+            if units.owner[row] == player
+                && site
+                && !self.bp(row).is_mobile()
+                && !rows.contains(&row)
+            {
+                rows.push(row);
+            }
+        }
+        rows
+    }
+
     /// `ids`' own units that carry orders, and the factories among them still being built.
     pub(crate) fn owned_or_rising(&self, player: u8, ids: &[UnitId]) -> Vec<usize> {
         let mut rows = self.owned(player, ids, 0);

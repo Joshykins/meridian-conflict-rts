@@ -313,7 +313,7 @@ impl World {
                 Ok(())
             }
             Command::Upgrade { units } => {
-                for row in self.owned(player, units, 0) {
+                for row in self.owned_or_site(player, units) {
                     // Each one queues the tier after the last already queued, as refits chain.
                     let Some(next) = self.blueprints.unit(self.planned_loadout(row)).upgrades_to
                     else {
@@ -334,7 +334,7 @@ impl World {
                 Ok(())
             }
             Command::CancelUpgrade { units } => {
-                for row in self.owned(player, units, 0) {
+                for row in self.owned_or_site(player, units) {
                     self.cancel_upgrade(row)?;
                 }
                 Ok(())
