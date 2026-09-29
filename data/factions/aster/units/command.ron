@@ -177,7 +177,7 @@
     (
         key: "aster_t1_engineer",
         name: "Mason",
-        role: "Engineer",
+        role: "Engineer", title: "Engineer",
         tech: 1,
         categories: ["Land", "Engineer"],
         health: 150,
@@ -199,7 +199,7 @@
     (
         key: "aster_t2_engineer",
         name: "Mason II",
-        role: "Field Engineer",
+        role: "Field Engineer", title: "Engineer",
         tech: 2,
         categories: ["Land", "Engineer"],
         health: 420,
@@ -217,7 +217,7 @@
     (
         key: "aster_t3_engineer",
         name: "Mason III",
-        role: "Combat Engineer",
+        role: "Combat Engineer", title: "Engineer",
         tech: 3,
         categories: ["Land", "Engineer"],
         health: 900,

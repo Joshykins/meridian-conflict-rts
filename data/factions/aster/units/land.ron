@@ -2,7 +2,7 @@
     (
         key: "aster_t1_scout",
         name: "Kestrel",
-        role: "Land Scout",
+        role: "Land Scout", title: "Scout",
         tech: 1,
         categories: ["Land", "Scout", "DirectFire"],
         health: 35,
@@ -23,7 +23,7 @@
     (
         key: "aster_t1_bot",
         name: "Lancer",
-        role: "Light Assault Bot",
+        role: "Light Assault Bot", title: "Assault Bot",
         tech: 1,
         categories: ["Land", "DirectFire"],
         health: 75,
@@ -44,7 +44,7 @@
     (
         key: "aster_t1_tank",
         name: "Warden",
-        role: "Light Tank",
+        role: "Light Tank", title: "Light Tank",
         tech: 1,
         categories: ["Land", "DirectFire"],
         health: 300,
@@ -65,7 +65,7 @@
     (
         key: "aster_t1_artillery",
         name: "Ballista",
-        role: "Mobile Light Artillery",
+        role: "Mobile Light Artillery", title: "Artillery",
         tech: 1,
         categories: ["Land", "Artillery"],
         health: 140,
@@ -89,7 +89,7 @@
     (
         key: "aster_t1_land_reclaimer",
         name: "Gleaner",
-        role: "Salvage Vehicle",
+        role: "Salvage Vehicle", title: "Salvager",
         tech: 1,
         categories: ["Land"],
         health: 320,
@@ -108,7 +108,7 @@
     (
         key: "aster_t2_land_reclaimer",
         name: "Thresher",
-        role: "Salvage Carrier",
+        role: "Salvage Carrier", title: "Salvage Carrier",
         tech: 2,
         categories: ["Land"],
         health: 2200,
@@ -133,7 +133,7 @@
     (
         key: "aster_t2_tank",
         name: "Bulwark",
-        role: "Heavy Tank",
+        role: "Heavy Tank", title: "Heavy Tank",
         tech: 2,
         categories: ["Land", "DirectFire"],
         health: 1663,
@@ -157,7 +157,7 @@
     (
         key: "aster_t2_hover",
         name: "Skimmer",
-        role: "Hover Tank",
+        role: "Hover Tank", title: "Hover Tank",
         tech: 2,
         categories: ["Land", "DirectFire"],
         health: 1135,
@@ -180,7 +180,7 @@
     (
         key: "aster_t2_missile",
         name: "Javelin",
-        role: "Mobile Missile Launcher",
+        role: "Mobile Missile Launcher", title: "Missile Launcher",
         tech: 2,
         categories: ["Land", "Artillery"],
         health: 597,
@@ -208,7 +208,7 @@
     (
         key: "aster_t3_assault_bot",
         name: "Paladin",
-        role: "Siege Assault Bot",
+        role: "Siege Assault Bot", title: "Siege Bot",
         tech: 3,
         categories: ["Land", "DirectFire"],
         health: 7987,
@@ -256,7 +256,7 @@
     (
         key: "aster_t3_artillery",
         name: "Trebuchet",
-        role: "Mobile Heavy Artillery",
+        role: "Mobile Heavy Artillery", title: "Heavy Artillery",
         tech: 3,
         categories: ["Land", "Artillery"],
         health: 4715,
@@ -288,7 +288,7 @@
         // cannot defend itself up close.
         key: "aster_t3_sniper",
         name: "Arbalest",
-        role: "Lightning Sniper",
+        role: "Lightning Sniper", title: "Sniper",
         tech: 3,
         categories: ["Land", "DirectFire"],
         health: 4200,
@@ -310,12 +310,12 @@
         sounds: (death: "blast_large", moving: "tracks_heavy", stake: "aster_stake_drive"),
     ),
 
-(key: "aster_t1_mobile_aa", name: "Gnat", role: "Mobile AA Gun", tech: 1,
+(key: "aster_t1_mobile_aa", name: "Gnat", role: "Mobile AA Gun", title: "Mobile AA", tech: 1,
  categories: ["Land", "AntiAir"], health: 180, cost: (mass: 55, energy: 550, time: 220),
  radius: 4, height: 4.5, vision: 360, motion: (layer: Land, size: 0, speed: 33, accel: 30, turn: 100),
  weapons: [(name: "Single Barrel AA Gun", damage: 16, range: 240, reload: 0.15, speed: 800, trajectory: Direct,
  turret_turn: 240, muzzle: (5.5, 0, 3.5), pivot: (0, 0, 3.5), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), )], mesh: "mobile_aa", icon: AntiAir, sounds: (moving: "tracks")),
-(key: "aster_t2_mobile_aa", name: "Squall", role: "Mobile Flak", tech: 2,
+(key: "aster_t2_mobile_aa", name: "Squall", role: "Mobile Flak", title: "Mobile Flak", tech: 2,
  categories: ["Land", "AntiAir"], health: 2407, cost: (mass: 300, energy: 1800, time: 1200),
  radius: 5.5, height: 4.5, vision: 360, motion: (layer: Land, size: 1, speed: 28, accel: 30, turn: 100),
  weapons: [(name: "Conventional Flak", damage: 280, range: 480, reload: 0.8, speed: 320, trajectory: Direct,

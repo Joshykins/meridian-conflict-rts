@@ -25,6 +25,8 @@ use strip::{Slot, ARROW_W};
 pub(super) const TILE_W: f32 = 96.0;
 /// Tile names: the caption face with less tracking, so most names fit on a line.
 pub(super) const NAME: crate::ui::Style = crate::ui::style(mc_render::Face::Medium, 11.0, 1.6);
+/// A construction tile's title (its role, "Land Factory"): bigger than a name.
+const TITLE: crate::ui::Style = crate::ui::style(mc_render::Face::Bold, 13.0, 0.4);
 pub(super) const TILE_GAP: f32 = 6.0;
 const QUEUE_H: f32 = 62.0;
 pub const TIERS: u8 = 5;
@@ -699,21 +701,7 @@ fn tiles<'a>(
             true,
         );
         unit_face(hud, ui, item, tr, t.glow);
-        let name = shorten_name(ui, &item.name, tr.w - 8.0);
-        ui.text_centred(
-            tr.x + tr.w * 0.5,
-            tr.bottom() - 24.0,
-            NAME,
-            rgb(palette::TEXT, 0.88 + 0.12 * t.glow),
-            &name,
-        );
-        ui.text_centred(
-            tr.x + tr.w * 0.5,
-            tr.bottom() - 10.0,
-            type_scale::MICRO,
-            rgb(MASS, 0.95),
-            &whole(item.cost_mass.to_f32()),
-        );
+        caption(ui, item, tr, t.glow, item.cost_mass.to_f32());
         if slot.n < ITEM_KEYS.len() && slot.shelf == current {
             key_cap(ui, tr.right() - 19.0, tr.y + 4.0, ITEM_KEYS[slot.n], live);
         }
@@ -895,7 +883,7 @@ fn current_shelf(hud: &Hud, slots: &[Slot], tile_w: f32) -> Purpose {
 /// icon when it has none), and the icon small in the corner.
 pub fn unit_face(hud: &Hud, ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f32) {
     // Inside the tile's cut corners.
-    let art = Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 36.0);
+    let art = Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 44.0);
     // A darker well for the picture, lit from above where the model stands.
     ui.gradient_v(art, ink(0.5), ink(0.2));
     domain_wash(ui, art, Domain::of(item), glow);
@@ -1000,24 +988,10 @@ fn climb_tile(
         tone,
     );
     ui.text_right(end, tr.y + 11.5, type_scale::MICRO, tone, &label);
-    let name = shorten_name(ui, &item.name, tr.w - 8.0);
-    ui.text_centred(
-        tr.x + tr.w * 0.5,
-        tr.bottom() - 24.0,
-        NAME,
-        rgb(palette::TEXT, 0.88 + 0.12 * t.glow),
-        &name,
-    );
-    ui.text_centred(
-        tr.x + tr.w * 0.5,
-        tr.bottom() - 10.0,
-        type_scale::MICRO,
-        rgb(MASS, 0.95),
-        &whole(price.to_f32()),
-    );
+    caption(ui, item, tr, t.glow, price.to_f32());
     if let Some((_, progress)) = offer.under_way.filter(|(b, _)| *b == item.id) {
         // Under way: its progress in the construction amber, along the foot of the picture.
-        let track = Rect::new(tr.x + 6.0, tr.bottom() - 37.0, tr.w - 12.0, 3.0);
+        let track = Rect::new(tr.x + 6.0, tr.bottom() - 45.0, tr.w - 12.0, 3.0);
         ui.fill(track, rgb(BUILDING, 0.18));
         ui.fill(
             Rect::new(
@@ -1267,18 +1241,36 @@ fn upgrade_card(
 }
 
 /// A name on one line, cut short with a full stop when it does not fit.
-pub(super) fn shorten_name(ui: &mut Ui, text: &str, width: f32) -> String {
-    if ui.text_width(NAME, text) <= width {
-        return text.to_owned();
+/// A construction tile's foot: what it is (`title`, "Land Factory") over its name
+/// ("Forge"), then its price in materials. A unit without a title shows its name alone,
+/// in the title's place.
+fn caption(ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f32, price: f32) {
+    let x = tr.x + tr.w * 0.5;
+    let (title, name) = match &item.title {
+        Some(title) => (title.as_str(), Some(item.name.as_str())),
+        None => (item.name.as_str(), None),
+    };
+    // Big, in the names' semi-condensed bold; a long one closes up and comes down to
+    // fit the tile before it is ever cut.
+    let (st, title) = ui.fitted(TITLE, title, tr.w - 6.0);
+    ui.text_centred(
+        x,
+        tr.bottom() - 32.0,
+        st,
+        rgb(0xFFFFFF, 0.9 + 0.1 * glow),
+        &title,
+    );
+    if let Some(name) = name {
+        let (st, name) = ui.fitted(type_scale::MICRO, name, tr.w - 8.0);
+        ui.text_centred(x, tr.bottom() - 20.0, st, rgb(palette::DIM, 0.95), &name);
     }
-    let mut cut = text.to_owned();
-    while cut.pop().is_some() {
-        let candidate = format!("{}.", cut.trim_end());
-        if ui.text_width(NAME, &candidate) <= width {
-            return candidate;
-        }
-    }
-    String::new()
+    ui.text_centred(
+        x,
+        tr.bottom() - 8.5,
+        type_scale::MICRO,
+        rgb(MASS, 0.95),
+        &whole(price),
+    );
 }
 
 /// Cuts a caption short, with a full stop for the missing part, until it fits.

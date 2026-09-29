@@ -206,6 +206,9 @@ pub(crate) struct Unit {
     pub key: String,
     pub name: String,
     pub role: String,
+    /// What it is in a word or two, the build tile's title over its name (`UnitBlueprint::title`).
+    #[serde(default)]
+    pub title: Option<String>,
     pub tech: u8,
     pub categories: Vec<String>,
     pub health: f64,
@@ -1442,6 +1445,7 @@ impl Unit {
             key: key.clone(),
             name: self.name.clone(),
             role: self.role.clone(),
+            title: self.title.clone(),
             faction,
             tech: self.tech,
             categories,

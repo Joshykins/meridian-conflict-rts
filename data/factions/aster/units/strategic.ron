@@ -11,7 +11,7 @@
         // armoured warhead store under its portal crane along one side, coolant plant.
         key: "aster_t4_nuke_silo",
         name: "Sunfall",
-        role: "Strategic Missile Silo",
+        role: "Strategic Missile Silo", title: "Nuke Silo",
         tech: 4,
         categories: ["Land", "Strategic", "Experimental"],
         health: 42000,
@@ -41,7 +41,7 @@
         // finds warheads coming down, and the magazine that loads the cells.
         key: "aster_t3_nuke_defense",
         name: "Parhelion",
-        role: "Strategic Missile Defence",
+        role: "Strategic Missile Defence", title: "Nuke Defense",
         tech: 4,
         categories: ["Land", "Strategic", "Experimental"],
         health: 16000,

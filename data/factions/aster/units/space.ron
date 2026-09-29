@@ -10,7 +10,7 @@
         // ship): an energy stall (or a pause) blinds it.
         key: "aster_t1_sensor_ship",
         name: "Vigil",
-        role: "Sensor Ship",
+        role: "Sensor Ship", title: "Sensor Ship",
         tech: 1,
         categories: ["Air", "Space", "Intel"],
         health: 700,
@@ -32,7 +32,7 @@
         // shield: flak and interceptors are its answer, and the Resolute outguns it.
         key: "aster_t2_corvette",
         name: "Valiant",
-        role: "Rail Corvette",
+        role: "Rail Corvette", title: "Rail Corvette",
         tech: 2,
         categories: ["Air", "Space"],
         health: 7000,

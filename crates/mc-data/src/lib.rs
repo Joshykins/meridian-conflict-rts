@@ -597,6 +597,9 @@ pub struct UnitBlueprint {
     pub key: String,
     pub name: String,
     pub role: String,
+    /// What it is in a word or two ("Land Factory"): the build tile's title, its name
+    /// under it. None: the name alone, for a unit too much its own to sum up (Resolute).
+    pub title: Option<String>,
     pub faction: FactionId,
     pub tech: u8,
     pub categories: u32,
@@ -2006,5 +2009,24 @@ mod effect_settings_tests {
         assert_eq!(colored.dust_lifetime, 2.0);
         assert_eq!(colored.shockwave_color, Some([0.2, 0.6, 1.0]));
         assert!(ron::from_str::<EffectSettings>("(dust_lifetim: 2.0)").is_err());
+    }
+
+    #[test]
+    fn a_build_tile_title_is_a_short_role_not_the_name() {
+        let bp =
+            Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
+                .unwrap();
+        let titled: Vec<_> = bp.units.iter().filter(|u| u.title.is_some()).collect();
+        assert!(titled.len() > 50, "only {} titled", titled.len());
+        for u in titled {
+            let title = u.title.as_deref().unwrap();
+            // A word or two that fits the tile.
+            assert!(
+                !title.is_empty() && title.len() <= 16,
+                "{}: {title:?}",
+                u.key
+            );
+            assert_ne!(title, u.name, "{}: the title repeats the name", u.key);
+        }
     }
 }

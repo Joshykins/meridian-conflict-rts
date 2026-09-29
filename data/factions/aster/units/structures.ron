@@ -2,7 +2,7 @@
     (
         key: "aster_t1_land_factory",
         name: "Forge",
-        role: "Land Factory",
+        role: "Land Factory", title: "Land Factory",
         tech: 1,
         categories: ["Land", "Factory"],
         health: 4100,
@@ -19,7 +19,7 @@
     (
         key: "aster_t2_land_factory",
         name: "Forge II",
-        role: "Land Factory",
+        role: "Land Factory", title: "Land Factory",
         tech: 2,
         categories: ["Land", "Factory"],
         health: 8200,
@@ -36,7 +36,7 @@
     (
         key: "aster_t3_land_factory",
         name: "Forge III",
-        role: "Land Factory",
+        role: "Land Factory", title: "Land Factory",
         tech: 3,
         categories: ["Land", "Factory"],
         health: 16500,
@@ -52,7 +52,7 @@
     (
         key: "aster_t1_air_factory",
         name: "Aerie",
-        role: "Air Factory",
+        role: "Air Factory", title: "Air Factory",
         tech: 1,
         categories: ["Land", "Air", "Factory"],
         health: 4000,
@@ -69,7 +69,7 @@
     (
         key: "aster_t2_air_factory",
         name: "Aerie II",
-        role: "Air Factory",
+        role: "Air Factory", title: "Air Factory",
         tech: 2,
         categories: ["Land", "Air", "Factory"],
         health: 8000,
@@ -86,7 +86,7 @@
     (
         key: "aster_t3_air_factory",
         name: "Aerie III",
-        role: "Air Factory",
+        role: "Air Factory", title: "Air Factory",
         tech: 3,
         categories: ["Land", "Air", "Factory"],
         health: 16000,
@@ -102,7 +102,7 @@
     (
         key: "aster_t1_naval_factory",
         name: "Wharf",
-        role: "Naval Factory",
+        role: "Naval Factory", title: "Naval Factory",
         tech: 1,
         categories: ["Naval", "Factory"],
         health: 4200,
@@ -122,7 +122,7 @@
     (
         key: "aster_t2_naval_factory",
         name: "Wharf II",
-        role: "Naval Factory",
+        role: "Naval Factory", title: "Naval Factory",
         tech: 2,
         categories: ["Naval", "Factory"],
         health: 8400,
@@ -143,7 +143,7 @@
     (
         key: "aster_t3_naval_factory",
         name: "Wharf III",
-        role: "Naval Factory",
+        role: "Naval Factory", title: "Naval Factory",
         tech: 3,
         categories: ["Naval", "Factory"],
         health: 16800,
@@ -174,7 +174,7 @@
     (
         key: "aster_core_mine",
         name: "Core Mine",
-        role: "Materials Mine",
+        role: "Materials Mine", title: "Materials Mine",
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
         health: 1500,
@@ -193,7 +193,7 @@
     (
         key: "aster_core_mine_t2",
         name: "Core Mine II",
-        role: "Materials Mine",
+        role: "Materials Mine", title: "Materials Mine",
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
         health: 5000,
@@ -212,7 +212,7 @@
     (
         key: "aster_core_mine_t3",
         name: "Core Mine III",
-        role: "Materials Mine",
+        role: "Materials Mine", title: "Materials Mine",
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
         health: 12000,
@@ -236,7 +236,7 @@
     (
         key: "aster_core_mine_t4",
         name: "Deep Core",
-        role: "Materials Mine",
+        role: "Materials Mine", title: "Materials Mine",
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
         health: 24000,
@@ -254,7 +254,7 @@
     (
         key: "aster_t1_power",
         name: "Reactor",
-        role: "Power Generator",
+        role: "Power Generator", title: "Power Plant",
         tech: 1,
         categories: ["Land", "Economy", "Power"],
         health: 760,
@@ -269,7 +269,7 @@
     (
         key: "aster_t2_power",
         name: "Reactor II",
-        role: "Power Generator",
+        role: "Power Generator", title: "Power Plant",
         tech: 2,
         categories: ["Land", "Economy", "Power"],
         health: 2200,
@@ -284,7 +284,7 @@
     (
         key: "aster_t3_power",
         name: "Reactor III",
-        role: "Power Generator",
+        role: "Power Generator", title: "Power Plant",
         tech: 3,
         categories: ["Land", "Economy", "Power"],
         health: 9720,
@@ -299,7 +299,7 @@
     (
         key: "aster_mass_storage",
         name: "Materials Vault",
-        role: "Materials Storage",
+        role: "Materials Storage", title: "Materials Store",
         tech: 1,
         categories: ["Land", "Economy", "Storage"],
         health: 1600,
@@ -314,7 +314,7 @@
     (
         key: "aster_mass_storage_t2",
         name: "Materials Vault II",
-        role: "Materials Storage",
+        role: "Materials Storage", title: "Materials Store",
         tech: 2,
         categories: ["Land", "Economy", "Storage"],
         health: 4800,
@@ -328,7 +328,7 @@
     (
         key: "aster_mass_storage_t3",
         name: "Materials Vault III",
-        role: "Materials Storage",
+        role: "Materials Storage", title: "Materials Store",
         tech: 3,
         categories: ["Land", "Economy", "Storage"],
         health: 14400,
@@ -342,7 +342,7 @@
     (
         key: "aster_energy_storage",
         name: "Capacitor Bank",
-        role: "Energy Storage",
+        role: "Energy Storage", title: "Energy Store",
         tech: 1,
         categories: ["Land", "Economy", "Storage"],
         health: 1500,
@@ -357,7 +357,7 @@
     (
         key: "aster_energy_storage_t2",
         name: "Capacitor Bank II",
-        role: "Energy Storage",
+        role: "Energy Storage", title: "Energy Store",
         tech: 2,
         categories: ["Land", "Economy", "Storage"],
         health: 4800,
@@ -371,7 +371,7 @@
     (
         key: "aster_energy_storage_t3",
         name: "Capacitor Bank III",
-        role: "Energy Storage",
+        role: "Energy Storage", title: "Energy Store",
         tech: 3,
         categories: ["Land", "Economy", "Storage"],
         health: 14400,
@@ -385,7 +385,7 @@
     (
         key: "aster_t1_point_defense",
         name: "Sentinel",
-        role: "Point Defense",
+        role: "Point Defense", title: "Point Defense",
         tech: 1,
         categories: ["Land", "Defense", "DirectFire"],
         health: 1300,
@@ -404,7 +404,7 @@
     (
         key: "aster_t2_point_defense",
         name: "Redoubt",
-        role: "Heavy Point Defense",
+        role: "Heavy Point Defense", title: "Heavy Defense",
         tech: 2,
         categories: ["Land", "Defense", "DirectFire"],
         health: 7792,
@@ -427,7 +427,7 @@
     (
         key: "aster_t2_artillery",
         name: "Onager",
-        role: "Artillery Installation",
+        role: "Artillery Installation", title: "Artillery",
         tech: 2,
         categories: ["Land", "Defense", "Artillery"],
         health: 2900,
@@ -452,7 +452,7 @@
         // rocket takes 0.8 s).
         key: "aster_t2_missile_defense",
         name: "Corona",
-        role: "Tactical Missile Defence",
+        role: "Tactical Missile Defence", title: "Missile Defense",
         tech: 2,
         categories: ["Land", "Defense"],
         health: 1800,
@@ -471,7 +471,7 @@
         // reach. Four burning at once hold against a battery that saturates two.
         key: "aster_t3_missile_defense",
         name: "Corona II",
-        role: "Tactical Missile Defence",
+        role: "Tactical Missile Defence", title: "Missile Defense",
         tech: 3,
         categories: ["Land", "Defense"],
         health: 4200,
@@ -493,7 +493,7 @@
         // `pivot`/`muzzle` are the model's trunnion and barrel tip (models/aster/citadel.rs).
         key: "aster_t3_point_defense",
         name: "Citadel",
-        role: "Rail Point Defense",
+        role: "Rail Point Defense", title: "Rail Defense",
         tech: 3,
         categories: ["Land", "Defense", "DirectFire"],
         health: 20000,
@@ -540,7 +540,7 @@
     (
         key: "aster_t1_reclaimer",
         name: "Scavenger",
-        role: "Reclaim Tower",
+        role: "Reclaim Tower", title: "Reclaim Tower",
         tech: 1,
         categories: ["Land", "Economy"],
         health: 1200,
@@ -557,7 +557,7 @@
     (
         key: "aster_t2_reclaimer",
         name: "Scavenger II",
-        role: "Reclaim Tower",
+        role: "Reclaim Tower", title: "Reclaim Tower",
         tech: 2,
         categories: ["Land", "Economy"],
         health: 3200,
@@ -574,7 +574,7 @@
     (
         key: "aster_t3_reclaimer",
         name: "Scavenger III",
-        role: "Reclaim Tower",
+        role: "Reclaim Tower", title: "Reclaim Tower",
         tech: 3,
         categories: ["Land", "Economy"],
         health: 9600,
@@ -591,7 +591,7 @@
     (
         key: "aster_t1_radar",
         name: "Watchtower",
-        role: "Radar System",
+        role: "Radar System", title: "Radar",
         tech: 1,
         categories: ["Land", "Intel"],
         health: 160,
@@ -605,7 +605,7 @@
     (
         key: "aster_t2_radar",
         name: "Watchtower II",
-        role: "Radar System",
+        role: "Radar System", title: "Radar",
         tech: 2,
         categories: ["Land", "Intel"],
         health: 500,
@@ -619,7 +619,7 @@
     (
         key: "aster_t3_radar",
         name: "Watchtower III",
-        role: "Radar System",
+        role: "Radar System", title: "Radar",
         tech: 3,
         categories: ["Land", "Intel"],
         health: 1600,
@@ -632,7 +632,7 @@
     (
         key: "aster_t2_shield",
         name: "Aegis",
-        role: "Shield Generator",
+        role: "Shield Generator", title: "Shield",
         tech: 2,
         categories: ["Land", "Defense", "Shield"],
         health: 2200,
@@ -648,7 +648,7 @@
     (
         key: "aster_t3_shield",
         name: "Aegis II",
-        role: "Heavy Shield Generator",
+        role: "Heavy Shield Generator", title: "Heavy Shield",
         tech: 3,
         categories: ["Land", "Defense", "Shield"],
         health: 5500,
@@ -666,7 +666,7 @@
         // stunned, listing where it came out. It runs on the grid: in a stall it is off.
         key: "aster_t2_warp_damper",
         name: "Undertow",
-        role: "Warp Dampener",
+        role: "Warp Dampener", title: "Warp Damper",
         tech: 2,
         categories: ["Land", "Defense"],
         health: 3000,
@@ -681,7 +681,7 @@
     (
         key: "aster_wall",
         name: "Rampart",
-        role: "Wall Section",
+        role: "Wall Section", title: "Wall",
         tech: 1,
         categories: ["Land", "Wall", "Defense"],
         health: 4000,
@@ -691,7 +691,7 @@
         mesh: "wall", icon: Wall,
     ),
 
-(key: "aster_t1_aa", name: "Sparrow", role: "AA Gun", tech: 1, categories: ["Land", "Naval", "Defense", "AntiAir"],
+(key: "aster_t1_aa", name: "Sparrow", role: "AA Gun", title: "AA Gun", tech: 1, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 750, cost: (mass: 130, energy: 1040, time: 390), radius: 6, height: 7, footprint: (1, 1),
  vision: 450, water_build: true,
  // A rotary gun like the commander's: it spins up on a target, then each 0.2 s shot is
@@ -700,7 +700,7 @@
  turret_turn: 240, muzzle: (5.5, 0, 6), pivot: (0, 0, 6), targets: ["Air"], color: Orange, spin_up: 0.4, rounds: 8, tracer: 0.7, casings: 4.5,
  sounds: (fire: "aster_minigun", impact: "shell_light"), )], mesh: "aa_gun", icon: AntiAir, sounds: (death: "blast_large")),
 
-(key: "aster_t2_aa", name: "Barrage", role: "Flak Battery", tech: 2, categories: ["Land", "Naval", "Defense", "AntiAir"],
+(key: "aster_t2_aa", name: "Barrage", role: "Flak Battery", title: "Flak Battery", tech: 2, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 5515, cost: (mass: 520, energy: 4680, time: 1560), radius: 10, height: 8, footprint: (2, 2),
  vision: 450, radar: 650, water_build: true,
  // A heavy twin gun: both barrels fire at once and their shells scatter, so each shot
@@ -709,7 +709,7 @@
  turret_turn: 160, muzzle: (9, -0.7, 5), pivot: (1.6, 0, 5), muzzles: [(9, -0.7, 5), (9, 0.7, 5)],
  salvo: 2, salvo_batch: 2, spread: 2.5, targets: ["Air"], color: Orange, flak: true, proximity: 12, splash: 40,
  flash: 1.6, impact: 1.5, sounds: (fire: "flak_gun", impact: "flak_burst"), )], mesh: "flak_battery", icon: AntiAir, sounds: (death: "blast_large")),
-(key: "aster_t3_sam", name: "Skyguard", role: "Long Range SAM", tech: 3, categories: ["Land", "Naval", "Defense", "AntiAir"],
+(key: "aster_t3_sam", name: "Skyguard", role: "Long Range SAM", title: "SAM Site", tech: 3, categories: ["Land", "Naval", "Defense", "AntiAir"],
  health: 10800, cost: (mass: 1500, energy: 15000, time: 4500), radius: 12, height: 14, footprint: (2, 2),
  vision: 450, water_build: true,
  weapons: [(name: "Long Range SAM", damage: 1400, range: 3200, reload: 10, speed: 520, trajectory: Direct,
