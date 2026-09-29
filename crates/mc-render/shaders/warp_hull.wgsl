@@ -41,7 +41,7 @@ fn warp_stretch(world: vec3<f32>, origin: vec3<f32>, fwd: vec3<f32>, left: vec3<
     let along = select(-pow(1.0 - u, 1.6), pow(u, 1.6), state.y > 0.5) * length;
     let rel = world - origin;
     let ax = dot(rel, fwd);
-    let thin = mix(1.0, WARP_THIN, smoothstep(0.0, 0.7, e));
+    let thin = mix(1.0, WARP_THIN, smoothstep(0.0, 0.3, e));
     var out = origin + fwd * (ax + along) + (rel - fwd * ax) * thin;
     if damped {
         // Torn in bands along the streak, each thrown aside its own way and re-thrown often.
@@ -67,11 +67,11 @@ fn warp_hull_light(color: vec3<f32>, warp: vec4<f32>, time: f32, seed: f32) -> v
     let lead = select(1.0 - warp.w, warp.w, warp.y > 0.5);
     let white = select(vec3<f32>(0.78, 0.9, 1.0), vec3<f32>(0.95, 0.62, 1.0), damped);
     let tint = select(vec3<f32>(0.25, 0.55, 1.0), vec3<f32>(0.75, 0.12, 0.85), damped);
-    var hot = mix(tint, white, lead) * (3.0 + 26.0 * e * (0.4 + 0.6 * lead));
+    var hot = mix(tint, white, lead) * (2.0 + 9.0 * e * (0.3 + 0.7 * lead));
     if damped {
         // Red flickers through the torn bands.
         let flick = hash11(floor(time * 23.0) + floor(warp.w * 9.0) * 7.0 + seed * 31.0);
         hot = mix(hot, vec3<f32>(1.0, 0.1, 0.18) * 14.0 * e, step(0.72, flick));
     }
-    return mix(color, hot, smoothstep(0.0, 0.45, e));
+    return mix(color, hot, smoothstep(0.0, 0.3, e));
 }

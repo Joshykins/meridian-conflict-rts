@@ -386,7 +386,7 @@ impl Renderer {
         let p = (v.ticks as f32 / v.length.max(1) as f32).clamp(0.0, 1.0);
         let life = dt * 1.8;
         let to = j.to;
-        let size = r * (0.4 + 1.8 * p.powf(1.3));
+        let size = r * (0.3 + 1.3 * p.powf(1.3));
         let open = smoothstep(0.1, 0.85, p);
         self.push_warp(
             PUFF_WARP_RIFT,
@@ -398,7 +398,7 @@ impl Renderer {
             pal.edge * (1.0 + 2.0 * p),
             pal.torn,
         );
-        let heart = r * (0.25 + 0.7 * p);
+        let heart = r * (0.15 + 0.35 * p);
         self.push_warp(
             PUFF_WARP_GLOW,
             to,
@@ -642,9 +642,9 @@ impl Renderer {
             at,
             Vec3::ZERO,
             start,
-            0.55,
-            (1.2 * r * power, 3.4 * r * power),
-            pal.core * 9.0,
+            0.28,
+            (0.5 * r * power, 1.6 * r * power),
+            pal.core * 4.0,
             pal.torn,
         );
         let saved = self.effect_settings;
@@ -663,7 +663,7 @@ impl Renderer {
         self.sky.blast(at, 4.0 * r * power, 1.2 * power, start);
         self.warp_fx.light(Glow {
             pos: at,
-            color: pal.core * 90_000.0 * k * k * power,
+            color: pal.core * 40_000.0 * k * k * power,
             range: 7.0 * r,
             start,
             life: 0.55,

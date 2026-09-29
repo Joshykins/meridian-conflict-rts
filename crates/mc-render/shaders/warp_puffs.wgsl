@@ -156,17 +156,17 @@ fn warp_rift(in: PuffOut, d: f32, rgb: vec3<f32>, torn: f32, age: f32, seed: f32
     let fade = smoothstep(0.0, 0.15, age) * (1.0 - smoothstep(0.6, 1.0, age));
     let jag = (hash11(floor(angle * 4.0 + now * 21.0) + seed * 29.0) - 0.5) * 0.16 * torn;
     let r0 = 0.5 + jag;
-    let ring = exp(-pow((d - r0) / (0.05 + 0.04 * open), 2.0));
+    let ring = exp(-pow((d - r0) / (0.025 + 0.02 * open), 2.0));
     let spin = now * (2.0 + 5.0 * open) * select(1.0, -1.0, seed > 0.5);
-    let arms = pow(0.5 + 0.5 * sin(3.0 * angle + 7.0 * log(d + 0.04) - spin + seed * 6.0), 3.0);
+    let arms = pow(0.5 + 0.5 * sin(3.0 * angle + 7.0 * log(d + 0.04) - spin + seed * 6.0), 8.0);
     let band = smoothstep(0.1, 0.35, d) * (1.0 - smoothstep(0.6, 1.0, d));
-    let halo = pow(max(1.0 - d, 0.0), 2.0);
+    let halo = pow(max(1.0 - d, 0.0), 4.0);
     let ripple = (0.5 + 0.5 * sin(d * 34.0 - now * 9.0)) * (1.0 - d) * smoothstep(0.1, 0.4, d);
-    let heart = (1.0 - smoothstep(0.14, 0.3, d)) * open;
-    let point = exp(-d * d / (0.002 + 0.012 * open));
+    let heart = (1.0 - smoothstep(0.1, 0.24, d)) * open;
+    let point = exp(-d * d / (0.0006 + 0.003 * open));
     let white = mix(rgb, vec3<f32>(length(rgb) * 0.6), 0.7);
-    var light = rgb * (ring * (0.35 + 1.4 * open) + arms * band * open * 1.1 + halo * 0.3 + ripple * 0.25 * (1.0 - open))
-        + white * point * 5.0 * open;
+    var light = rgb * (ring * (0.5 + 1.6 * open) + arms * band * open * 0.8 + halo * 0.15 + ripple * 0.2 * (1.0 - open))
+        + white * point * 6.0 * open;
     if torn > 0.0 {
         // A red lash through the ring now and then.
         light = mix(light, vec3<f32>(length(rgb), 0.08, 0.14) * ring * 2.5, step(0.75, warp_flicker(13.0, seed + 0.5)) * torn);
