@@ -381,7 +381,7 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
     // near straight, as a person stands with their feet apart. Standing, it carries its weight on one leg and
     // eases the other now and then (the shader's `idle_stance`).
     // The knee on the line from hip to ankle, so the leg runs straight out.
-    let (hip, ankle) = (v3(-0.1, 1.15, 8.7), v3(-0.3, 2.45, 1.3));
+    let (hip, ankle) = (v3(-0.1, 1.15, 8.7), v3(-0.3, 2.1, 1.3));
     let knee = v3(
         0.7,
         hip.y + (ankle.y - hip.y) * (8.7 - 4.75) / (8.7 - 1.3),
