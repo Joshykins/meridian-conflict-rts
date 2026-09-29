@@ -147,6 +147,10 @@ fn shadow_coord(i: u32, world: vec3<f32>, n: vec3<f32>) -> vec4<f32> {
 
 // 3x3 bilinear PCF in one cascade.
 fn shadow_pcf(i: u32, c: vec4<f32>) -> f32 {
+    if globals.detail.w > 0.5 {
+        // Hardware bilinear comparison still softens edges without nine filter taps.
+        return textureSampleCompareLevel(shadow_map, shadow_sampler, c.xy, i, c.z);
+    }
     let texel = 1.0 / vec2<f32>(textureDimensions(shadow_map));
     var lit = 0.0;
     for (var y = -1; y <= 1; y++) {
@@ -293,6 +297,17 @@ fn terrain_patch(uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>, id: vec2<f32>,
 
 fn terrain_projection(uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>, layer: i32,
     ray: vec2<f32>, relief: f32) -> TerrainPatch {
+    if globals.detail.w > 0.5 {
+        // Keep every material and its normal/roughness; save the three rotated
+        // anti-tiling patches and relief trace on the lower quality presets.
+        var out: TerrainPatch;
+        out.color = textureSampleGrad(terrain_materials, repeat_sampler, uv, layer, dx, dy);
+        let n = textureSampleGrad(terrain_materials, repeat_sampler, uv, layer + 1, dx, dy);
+        let packed = n.xy * 2.0 - 1.0;
+        out.normal = vec4<f32>(packed, sqrt(max(1.0 - dot(packed, packed), 0.0)), n.a);
+        out.height = n.b;
+        return out;
+    }
     let lattice = vec2<f32>(uv.x - uv.y * 0.57735027, uv.y * 1.1547005) / 1.8;
     let cell = floor(lattice);
     let f = fract(lattice);

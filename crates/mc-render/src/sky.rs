@@ -16,6 +16,7 @@
 //!
 //! Everything here is cosmetic and client-side: nothing feeds back into the sim.
 
+mod shade;
 mod targets;
 
 use crate::camera::Camera;
@@ -1693,58 +1694,6 @@ impl Sky {
         }
         self.readback_pending = true;
         self.reset = false;
-    }
-
-    /// The clouds' shade on the land: after `record_sim`, before anything is lit.
-    pub fn record_shade(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
-        if !self.clouds {
-            return;
-        }
-        let dev = &gpu.device;
-        let groups = SHADE_RES.div_ceil(8);
-        let shaders = vk::PipelineStageFlags::VERTEX_SHADER
-            | vk::PipelineStageFlags::FRAGMENT_SHADER
-            | vk::PipelineStageFlags::COMPUTE_SHADER;
-        // SAFETY: the renderer calls `record_shade` with its recording `cmd`, outside any
-        // render pass; `shade_pipeline` was made with `draw_pipeline_layout`, whose set 0 is
-        // `scene_set`'s layout.
-        unsafe {
-            // Last frame's lighting read it; this dispatch reads and rewrites it.
-            let before = [vk::MemoryBarrier::default()
-                .src_access_mask(vk::AccessFlags::SHADER_READ)
-                .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)];
-            dev.cmd_pipeline_barrier(
-                cmd,
-                shaders,
-                vk::PipelineStageFlags::COMPUTE_SHADER,
-                vk::DependencyFlags::empty(),
-                &before,
-                &[],
-                &[],
-            );
-            dev.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::COMPUTE, self.shade_pipeline);
-            dev.cmd_bind_descriptor_sets(
-                cmd,
-                vk::PipelineBindPoint::COMPUTE,
-                self.draw_pipeline_layout,
-                0,
-                &[scene_set, self.draw_sets[0]],
-                &[],
-            );
-            dev.cmd_dispatch(cmd, groups, groups, 1);
-            let after = [vk::MemoryBarrier::default()
-                .src_access_mask(vk::AccessFlags::SHADER_WRITE)
-                .dst_access_mask(vk::AccessFlags::SHADER_READ)];
-            dev.cmd_pipeline_barrier(
-                cmd,
-                vk::PipelineStageFlags::COMPUTE_SHADER,
-                shaders,
-                vk::DependencyFlags::empty(),
-                &after,
-                &[],
-                &[],
-            );
-        }
     }
 
     /// The sky behind everything: inside the scene pass, set 0 bound, after the opaque scene.

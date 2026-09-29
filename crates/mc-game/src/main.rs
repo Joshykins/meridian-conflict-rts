@@ -150,6 +150,9 @@ straight into a match instead.
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
 
+MERIDIAN_SIMPLE_SHADING=1 uses cheaper terrain/shadow shading in headless captures.
+Interactive Low and Balanced presets enable it automatically; High/Ultra use full shading.
+
 MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
 (default: the package version with -dev).
 ";
