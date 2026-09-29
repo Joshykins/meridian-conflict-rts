@@ -590,6 +590,10 @@ pub const UNIT_GEAR_SHIFT: u32 = 16;
 /// (`transport::Deck::up`). `status[2]` then holds its up vector's x and y, each an
 /// i16 over 32767 (low half x), for the shader to lean it with the ramp, not the ground.
 pub const UNIT_ON_DECK: u32 = 1 << 24;
+/// Units' `status[0]`: a drone docked on an aircraft (`World::drone_riding`), drawn in the
+/// frame its carrier is drawn in. `status[2]` is one more than the carrier's index in
+/// `RenderFrame::units`. `mc_models::gpu_consts::dock::RIDING`; a test holds them equal.
+pub const UNIT_RIDING: u32 = 1 << 10;
 /// Units' `status[1]`: the unit is being printed by a replicator (Survival). Its
 /// construction fill is drawn in replication violet instead of construction amber.
 pub const UNIT_REPLICATING: u32 = 1 << 0;
@@ -1803,6 +1807,32 @@ impl World {
                 }),
                 spin_recoil: [spin[0], spin[1], prev_mount_kick, mount_kick],
             });
+        }
+
+        // A drone docked on an aircraft rides it as it is drawn, heave, sway and lean
+        // included (`entity.wgsl` `riding_frame`): it names its carrier's instance.
+        let drawn: std::collections::BTreeMap<u32, u32> = frame
+            .units
+            .iter()
+            .enumerate()
+            .filter(|(_, u)| u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0)
+            .map(|(i, u)| (u.unit_id, i as u32))
+            .collect();
+        for u in frame.units.iter_mut() {
+            if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0 {
+                continue;
+            }
+            let Some(carrier) = s
+                .units
+                .row(crate::Handle(u.unit_id))
+                .and_then(|row| self.drone_riding(row))
+            else {
+                continue;
+            };
+            if let Some(&at) = drawn.get(&s.units.id(carrier).0) {
+                u.status[0] |= UNIT_RIDING;
+                u.status[2] = at + 1;
+            }
         }
 
         frame.projectiles.clear();

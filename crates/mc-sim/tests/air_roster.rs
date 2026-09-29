@@ -246,7 +246,7 @@ fn an_empty_economy_still_makes_drones() {
     for _ in 0..100 {
         w.tick(&[]).unwrap();
     }
-    assert!(w.state.units.drone_progress[c] > Fx::ZERO || w.state.units.slots.live() > 1);
+    assert!(w.state.units.slots.live() > 1, "a drone is going up");
 }
 #[test]
 fn sam_launches_vertically_then_curves_to_a_moving_aircraft() {

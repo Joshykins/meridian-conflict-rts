@@ -115,7 +115,7 @@
                     ),
                     (
                         key: "drone_port", icon: SalvageCarrier, name: "Salvage Drone Port",
-                        summary: "Two salvage drones ride the back and reclaim wrecks far round the commander. Free to rebuild.",
+                        summary: "Two salvage drones ride the back and reclaim wrecks far round the commander. Cheap to rebuild.",
                         cost: (mass: 450, energy: 5400, time: 700),
                         // On two pads over the back, behind the head; they turn with the torso.
                         // Home, a drone comes in 3 m over its pad and settles onto it.

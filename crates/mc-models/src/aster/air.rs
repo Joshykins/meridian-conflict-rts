@@ -324,21 +324,9 @@ pub(crate) fn support(b: &mut MeshBuilder, _: u8) {
 pub(crate) fn carrier(b: &mut MeshBuilder, _: u8) {
     osprey::build(b);
 }
-pub(crate) fn carrier_b(b: &mut MeshBuilder, _: u8) {
-    osprey::build_b(b);
-}
-pub(crate) fn carrier_c(b: &mut MeshBuilder, _: u8) {
-    osprey::build_c(b);
-}
 /// The Salvage Drone the Osprey fields ([`osprey::drone`]).
 pub(crate) fn drone(b: &mut MeshBuilder, _: u8) {
     osprey::drone(b);
-}
-pub(crate) fn drone_b(b: &mut MeshBuilder, _: u8) {
-    osprey::drone_b(b);
-}
-pub(crate) fn drone_c(b: &mut MeshBuilder, _: u8) {
-    osprey::drone_c(b);
 }
 /// The Kestrel: the tech 2 vector-thrust heavy gunship ([`kestrel`]).
 pub(crate) fn gunship(b: &mut MeshBuilder, _: u8) {

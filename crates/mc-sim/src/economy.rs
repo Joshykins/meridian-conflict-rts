@@ -204,6 +204,17 @@ impl World {
             self.flows[row].wanted[0] += want[0];
             self.flows[row].wanted[1] += want[1];
         }
+        // Drones going up on their carriers (`air_support.rs`): paid in the tier the
+        // side's materials priority puts them in, and shown on the carrier.
+        let drones = self.drone_jobs();
+        for job in &drones {
+            let p = self.state.units.owner[job.drone] as usize;
+            demand[p].0 += job.want[0];
+            demand[p].1 += job.want[1];
+            tiers[p][job.tier].add(job.want, false);
+            self.flows[job.carrier].wanted[0] += job.want[0];
+            self.flows[job.carrier].wanted[1] += job.want[1];
+        }
 
         // Mines draw their upkeep with the rest, and dig as hard as the rest's energy
         // is covered. Mass is not known yet (the mines make it), so what is put first is
@@ -330,6 +341,24 @@ impl World {
             self.flows[row].used[1] += want[1] * e;
             self.advance_launchers(row, rate * e);
         }
+        for job in &drones {
+            let p = self.state.units.owner[job.drone] as usize;
+            let e = paid[p][job.tier];
+            power[p][job.tier].0 += job.rate;
+            power[p][job.tier].1 += job.rate * e;
+            spent[p].0 += job.want[0] * e;
+            spent[p].1 += job.want[1] * e;
+            self.flows[job.carrier].used[0] += job.want[0] * e;
+            self.flows[job.carrier].used[1] += job.want[1] * e;
+            let bp = self.bp(job.drone);
+            let (time, health) = (bp.build_time, bp.health);
+            let units = &mut self.state.units;
+            // A stall slows it down, never the little that is left (as for builders).
+            let step = e.min(time - units.build_progress[job.drone]);
+            units.build_progress[job.drone] = (units.build_progress[job.drone] + step).min(time);
+            units.health[job.drone] =
+                (units.health[job.drone] + health * step / time * Fx::ratio(9, 10)).min(health);
+        }
 
         // Upkeep is paid with the rest, as far as its energy goes.
         for row in self.state.units.slots.iter() {
@@ -394,6 +423,11 @@ impl World {
                 && units.build_progress[job.target] >= self.bp(job.target).build_time
             {
                 self.complete_unit(job.target)?;
+            }
+        }
+        for job in &drones {
+            if self.state.units.build_progress[job.drone] >= self.bp(job.drone).build_time {
+                self.complete_unit(job.drone)?;
             }
         }
         self.scratch.build_jobs = jobs;

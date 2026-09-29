@@ -103,8 +103,11 @@
  radius: 10, height: 4.5, vision: 480,
  motion: (layer: Air, size: 0, speed: 65, accel: 24, turn: 65, altitude: 22, hover: true, deploy: 0.6),
  weapons: [], mesh: "reclaim_carrier", icon: SalvageCarrier,
- // The amber lamps on the four drone pylons, after dark (the model's `pylon`).
+ // After dark: the blue mouths of the wingtip nacelles, and the amber lamps on the
+ // four drone pylons (the model's `pylon`).
  lights: [
+  (kind: Point, at: (0.3, 9.15, 1.4), color: (0.45, 0.7, 1.0), intensity: 90, range: 20),
+  (kind: Point, at: (0.3, -9.15, 1.4), color: (0.45, 0.7, 1.0), intensity: 90, range: 20),
   (kind: Point, at: (1.02, 3.6, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
   (kind: Point, at: (1.02, -3.6, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
   (kind: Point, at: (1.02, 6.4, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
@@ -117,8 +120,9 @@
 ),
 (
  key: "aster_reclaim_drone", name: "Salvage Drone", role: "Carrier Reclaim Drone", tech: 1, categories: ["Air"],
- // Free: its carrier (or port) only takes the time to make another.
- health: 150, cost: (mass: 0, energy: 0, time: 30),
+ // Cheap: built on its carrier's pylon (or port's pad) under the side's materials
+ // priority, like any other build.
+ health: 150, cost: (mass: 3, energy: 30, time: 30),
  radius: 1.8, height: 1.2, vision: 360,
  motion: (layer: Air, size: 0, speed: 88, accel: 39, turn: 240, altitude: 22, hover: true),
  weapons: [], mesh: "reclaim_drone", icon: SalvageDrone,

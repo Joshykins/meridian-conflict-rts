@@ -1072,19 +1072,6 @@ impl Blueprints {
                 )));
             }
         }
-        // A drone is rebuilt for time alone: its parent is often the side's first salvage,
-        // built while every bit of mass is spoken for, so nothing it makes may wait on mass
-        // or energy (`mc_sim::air_support`).
-        for u in &units {
-            if let Some(d) = u.drone.map(|d| &units[d.index()]) {
-                if d.cost_mass != Fx::ZERO || d.cost_energy != Fx::ZERO {
-                    return Err(DataError::Invalid(format!(
-                        "{}: its drone {} must cost no mass or energy, only time",
-                        u.key, d.key
-                    )));
-                }
-            }
-        }
         Ok(Blueprints {
             factions,
             units,

@@ -16,39 +16,44 @@ impl World {
                 continue;
             };
             let parent = self.state.units.id(row);
-            let count = self
+            let flock: Vec<usize> = self
                 .state
                 .units
                 .slots
                 .iter()
                 .filter(|&r| self.state.units.drone_parent[r] == parent)
-                .count();
-            // Deliberate: a unit keeps one drone for each socket, and rebuilds none while
-            // the unit table is full, so drones never take the last rows from real production.
-            if count >= self.bp(row).drone_sockets.len()
-                || self.state.units.slots.live() >= crate::tables::MAX_UNITS
+                .collect();
+            // One drone at a time goes up, on the first socket without one.
+            if flock
+                .iter()
+                .any(|&r| self.state.units.has_flag(r, flag::UNDER_CONSTRUCTION))
             {
                 continue;
             }
-            // Drones cost time alone (checked on load): paid out of what was left in store
-            // after the economy's own spending, a drone that cost mass waited for a surplus
-            // that a new side, the one that most needs its salvage, never has.
-            let time = self.blueprints.unit(drone).build_time;
-            let work = Fx::ONE.min(time - self.state.units.drone_progress[row]);
-            self.state.units.drone_progress[row] += work;
-            if self.state.units.drone_progress[row] >= time {
-                self.state.units.drone_progress[row] = Fx::ZERO;
-                let owner = self.state.units.owner[row];
-                let pos = self.state.units.pos[row];
-                let heading = self.state.units.heading[row];
-                let child = self.spawn_unit(drone, owner, pos, heading, true)?;
-                self.state.units.z[child] = self.state.units.z[row];
-                self.state.units.prev_z[child] = self.state.units.z[row];
-                self.state.units.drone_parent[child] = parent;
-                // Made inside the hull, it comes out underneath and flies onto its socket.
-                self.state.units.deploy[child] = dock::DOCKING;
-                self.state.players[owner as usize].units_built += 1;
+            let sockets = self.bp(row).drone_sockets.len();
+            let Some(slot) = (0..sockets).find(|&k| {
+                !flock
+                    .iter()
+                    .any(|&r| self.state.units.drone_socket[r] as usize == k)
+            }) else {
+                continue;
+            };
+            // Deliberate: no drone is started while the unit table is full, so drones
+            // never take the last rows from real production.
+            if self.state.units.slots.live() >= crate::tables::MAX_UNITS {
+                continue;
             }
+            // It is built on its socket (paid for by the economy, `drone_jobs`) and let go
+            // from there like any docked drone once it is done.
+            let socket = self.drone_socket(row, slot);
+            let owner = self.state.units.owner[row];
+            let child = self.spawn_unit(drone, owner, socket.xy, socket.heading, false)?;
+            let units = &mut self.state.units;
+            units.drone_parent[child] = parent;
+            units.drone_socket[child] = slot as u8;
+            units.deploy[child] = dock::DOCKED;
+            units.z[child] = socket.z;
+            units.prev_z[child] = socket.z;
         }
         // A drone whose carrier is gone goes with it.
         let orphans: Vec<_> = self
@@ -89,7 +94,12 @@ impl World {
             let reach = self.bp(parent).drone_radius;
             let owner = self.state.units.owner[parent];
             let full = self.no_room_for_salvage(owner);
-            for (slot, row) in children.iter().copied().enumerate() {
+            for row in children {
+                if !self.state.units.is_active(row) {
+                    // Still going up on its socket (`seat_drones` holds it there).
+                    continue;
+                }
+                let slot = self.state.units.drone_socket[row] as usize;
                 let dock = self.drone_socket(parent, slot);
                 let pos = self.state.units.pos[row];
                 let state = self.state.units.deploy[row];
@@ -248,8 +258,7 @@ impl World {
             .filter(|&p| self.state.units.health[p] > Fx::ZERO)
     }
 
-    /// Each live carrier's drones, in row order: a drone's place in the list is its
-    /// socket.
+    /// Each live carrier's drones, in row order.
     fn drone_flocks(&self) -> std::collections::BTreeMap<usize, Vec<usize>> {
         let mut flocks: std::collections::BTreeMap<usize, Vec<usize>> =
             std::collections::BTreeMap::new();
@@ -262,6 +271,51 @@ impl World {
             }
         }
         flocks
+    }
+
+    /// Drones going up on their sockets, for the economy to pay for like any build:
+    /// (carrier, drone, build-time units a tick at full speed, mass and energy that
+    /// asks for, the tier it is paid in). A drone makes materials, so the side's
+    /// materials priority (`Focus::mines`) says when it is paid in a stall.
+    pub(crate) fn drone_jobs(&self) -> Vec<DroneJob> {
+        let units = &self.state.units;
+        units
+            .slots
+            .iter()
+            .filter(|&r| {
+                units.drone_parent[r] != Handle::NONE && units.has_flag(r, flag::UNDER_CONSTRUCTION)
+            })
+            .filter_map(|drone| {
+                let carrier = self.drone_carrier(drone)?;
+                let bp = self.bp(drone);
+                let rate = Fx::ONE.min(bp.build_time - units.build_progress[drone]);
+                let want = [
+                    bp.cost_mass * rate / bp.build_time,
+                    bp.cost_energy * rate / bp.build_time,
+                ];
+                let focus = self.state.players[units.owner[drone] as usize].focus;
+                Some(DroneJob {
+                    carrier,
+                    drone,
+                    rate,
+                    want,
+                    tier: focus.mines.tier(),
+                })
+            })
+            .collect()
+    }
+
+    /// The aircraft a drone is docked on, which it rides as that is drawn (`mirror`).
+    pub(crate) fn drone_riding(&self, drone: usize) -> Option<usize> {
+        let units = &self.state.units;
+        if units.drone_parent[drone] == Handle::NONE || units.deploy[drone] != dock::DOCKED {
+            return None;
+        }
+        self.drone_carrier(drone).filter(|&c| {
+            self.bp(c)
+                .motion
+                .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
+        })
     }
 
     /// Whether a drone is on or gliding to or from its socket, which `seat_drones` flies
@@ -280,7 +334,8 @@ impl World {
     pub(crate) fn seat_drones(&mut self) {
         for (parent, children) in self.drone_flocks() {
             let approach = self.bp(parent).drone_approach;
-            for (slot, row) in children.iter().copied().enumerate() {
+            for row in children {
+                let slot = self.state.units.drone_socket[row] as usize;
                 let state = self.state.units.deploy[row];
                 if state == dock::FLYING {
                     continue;
@@ -471,6 +526,15 @@ impl World {
             }
         }
     }
+}
+
+/// A drone going up on its socket this tick (`World::drone_jobs`).
+pub(crate) struct DroneJob {
+    pub carrier: usize,
+    pub drone: usize,
+    pub rate: Fx,
+    pub want: [Fx; 2],
+    pub tier: usize,
 }
 
 struct Socket {

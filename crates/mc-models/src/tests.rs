@@ -1827,12 +1827,7 @@ fn aircraft_have_swept_wings_nozzle_origins_and_bounded_lods() {
 
 #[test]
 fn vtol_pods_carry_their_nozzles() {
-    for key in [
-        "gunship",
-        "reclaim_carrier",
-        "reclaim_carrier~b",
-        "reclaim_carrier~c",
-    ] {
+    for key in ["gunship", "reclaim_carrier"] {
         let model = build_model(key).unwrap();
         let vtol = model.vtol.expect("VTOL pods");
         // Each pod's nozzle, lying along the hull (the rest pose).
@@ -1889,12 +1884,17 @@ fn vtol_pods_carry_their_nozzles() {
     }
 }
 
-/// Each Osprey (and each of its variants) grips a docked drone's lugs with a jaw over
+/// The Osprey grips a docked drone's lugs with a jaw over
 /// each, and the drones slung under the wing clear the hull, the nacelles and each other.
 #[test]
 fn osprey_pylons_grip_the_drones_lugs_and_the_flock_clears_the_airframe() {
+    assert_eq!(
+        crate::gpu_consts::dock::RIDING,
+        mc_sim::mirror::UNIT_RIDING,
+        "the riding bit the shader reads is the one the mirror sets"
+    );
     use super::aster::air::osprey::{DOCK_Z, DRONE_HALF_WIDTH, LUG_TOP, LUG_X, PYLONS};
-    for key in ["reclaim_drone", "reclaim_drone~b", "reclaim_drone~c"] {
+    for key in ["reclaim_drone"] {
         let drone = build_model(key).unwrap();
         let mesh = &drone.lods[0];
         let wide = mesh
@@ -1918,7 +1918,7 @@ fn osprey_pylons_grip_the_drones_lugs_and_the_flock_clears_the_airframe() {
         }
     }
     // Everything of the airframe below the grip, where a drone hangs.
-    for key in ["reclaim_carrier", "reclaim_carrier~b", "reclaim_carrier~c"] {
+    for key in ["reclaim_carrier"] {
         let model = build_model(key).unwrap();
         let mesh = &model.lods[0];
         for p in PYLONS {

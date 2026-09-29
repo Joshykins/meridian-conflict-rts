@@ -1107,6 +1107,77 @@ fn find_hull_shield(unit_id: u32) -> i32 {
     return -1;
 }
 
+// A hovering aircraft is never quite still: a slow heave on its lift (model-space z, x)
+// and a sway on its roll (y). Zero on anything else.
+fn hover_heave(e: Entity, model: ModelInfo, t: f32) -> vec2<f32> {
+    if (model.icon & 0x80000u) == 0u || (model.icon & 0x40000u) == 0u
+        || (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) != 0u {
+        return vec2<f32>(0.0);
+    }
+    let time = globals.camera.w;
+    let seed = f32(e.unit_id & 255u) * 0.37;
+    // A spacecraft stands still on its legs: the heave fades out as the gear comes
+    // down, and a capital hull only rolls a hair in flight.
+    let transport = capital_ship(model);
+    let calm = select(1.0, 1.0 - smoothstep(0.3, 0.9, capital_gear(capital_height(e, t))), transport);
+    return vec2<f32>(
+        (0.09 * sin(time * 1.15 + seed) + 0.04 * sin(time * 2.9 + seed * 1.7)) * calm,
+        select(0.012, 0.003, transport) * sin(time * 0.8 + seed) * calm,
+    );
+}
+
+// An aircraft's pitch. A climb pitches the fuselage; hovering over sloping ground stays level.
+fn air_pitch(e: Entity, model: ModelInfo, t: f32) -> f32 {
+    let travel = e.pos - e.prev_pos;
+    var pitch = clamp(atan2(travel.z, max(length(travel.xy), 2.0)), -0.20, 0.20);
+    if (model.icon & 0x80000u) != 0u {
+        // A hover aircraft leans with its lift (`hover_flight::lean`): slot 1.
+        pitch = mix(e.arm_pitch.z, e.arm_pitch.w, t);
+    }
+    // The Thunderhead, a lift ship in flight, and any spacecraft whose hull pitches
+    // to lay a spinal gun (`combat::spinal_gun`) carry the hull's pitch in slot 0.
+    if (model.icon & 0x1100000u) != 0u || capital_ship(model) {
+        pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
+    }
+    return pitch;
+}
+
+struct Frame {
+    origin: vec3<f32>,
+    fwd: vec3<f32>,
+    left: vec3<f32>,
+    up: vec3<f32>,
+}
+
+// The frame an aircraft is drawn in, as `vs_main` draws it: turned by its heading,
+// pitched (`air_pitch`), rolled by its bank and sway, lifted by its heave. A drone docked
+// on it is drawn in this (`DOCK_RIDING`).
+fn riding_frame(src: Entity, model: ModelInfo, t: f32) -> Frame {
+    var f: Frame;
+    let heading = lerp_angle(src.prev_heading, src.heading, t);
+    f.up = vec3<f32>(0.0, 0.0, 1.0);
+    f.fwd = vec3<f32>(cos(heading), sin(heading), 0.0);
+    f.left = cross(f.up, f.fwd);
+    var sway = 0.0;
+    var heave = 0.0;
+    if (model.icon & 0x40000u) != 0u
+        && (src.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
+        let pitch = air_pitch(src, model, t);
+        let pitch_fwd = f.fwd * cos(pitch) + f.up * sin(pitch);
+        f.up = f.up * cos(pitch) - f.fwd * sin(pitch);
+        f.fwd = pitch_fwd;
+        let h = hover_heave(src, model, t);
+        heave = h.x;
+        sway = h.y;
+    }
+    let bank = mix(src._pad2.x, src._pad2.y, t) + sway;
+    let bank_left = f.left * cos(bank) + f.up * sin(bank);
+    f.up = f.up * cos(bank) - f.left * sin(bank);
+    f.left = bank_left;
+    f.origin = mix(src.prev_pos, src.pos, t) + f.up * heave;
+    return f;
+}
+
 @vertex
 fn vs_main(in: VsIn) -> VsOut {
     let entity_index = visible[in.instance];
@@ -1713,18 +1784,13 @@ fn vs_main(in: VsIn) -> VsOut {
         let bob = 0.10 + 0.08 * sin(time * 1.65 + f32(e.unit_id & 255u) * 0.31);
         p.z += select(bob, bob * 0.22, in.part == PART_LOCOMOTION);
     }
-    // A hovering aircraft is never quite still: a slow heave on its lift.
+    // A hovering aircraft is never quite still (`hover_heave`). A drone docked on one
+    // rides that one's heave instead (`riding_frame`).
     var hover_sway = 0.0;
-    if (model.icon & 0x80000u) != 0u && (model.icon & 0x40000u) != 0u
-        && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u
-    {
-        let seed = f32(e.unit_id & 255u) * 0.37;
-        // A spacecraft stands still on its legs: the heave fades out as the gear comes
-        // down, and a capital hull only rolls a hair in flight.
-        let transport = capital_ship(model);
-        let calm = select(1.0, 1.0 - smoothstep(0.3, 0.9, capital_gear(capital_height(e, t))), transport);
-        p.z += (0.09 * sin(time * 1.15 + seed) + 0.04 * sin(time * 2.9 + seed * 1.7)) * calm;
-        hover_sway = select(0.012, 0.003, transport) * sin(time * 0.8 + seed) * calm;
+    if (e.status[0] & DOCK_RIDING) == 0u {
+        let heave = hover_heave(e, model, t);
+        p.z += heave.x;
+        hover_sway = heave.y;
     }
 
     // A spacecraft settles on its shock struts (`capital_sink`): everything but the struts
@@ -1777,18 +1843,7 @@ fn vs_main(in: VsIn) -> VsOut {
     var fwd = cross(left, up);
     if (model.icon & 0x40000u) != 0u
         && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
-        // A climb pitches the fuselage; hovering over sloping ground stays level.
-        let travel = e.pos - e.prev_pos;
-        var pitch = clamp(atan2(travel.z, max(length(travel.xy), 2.0)), -0.20, 0.20);
-        if (model.icon & 0x80000u) != 0u {
-            // A hover aircraft leans with its lift (`hover_flight::lean`): slot 1.
-            pitch = mix(e.arm_pitch.z, e.arm_pitch.w, t);
-        }
-        // The Thunderhead, a lift ship in flight, and any spacecraft whose hull pitches
-        // to lay a spinal gun (`combat::spinal_gun`) carry the hull's pitch in slot 0.
-        if (model.icon & 0x1100000u) != 0u || capital_ship(model) {
-            pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
-        }
+        let pitch = air_pitch(e, model, t);
         let pitch_fwd = fwd * cos(pitch) + up * sin(pitch);
         up = up * cos(pitch) - fwd * sin(pitch);
         fwd = pitch_fwd;
@@ -1882,6 +1937,21 @@ fn vs_main(in: VsIn) -> VsOut {
     left = bank_left;
     var world = origin + fwd * local.x + left * local.y + up * local.z;
     var world_n = normalize(fwd * n.x + left * n.y + up * n.z);
+    // A drone docked on an aircraft is drawn where it sits in its carrier's drawn frame,
+    // so it stays on its pylon however the carrier heaves, sways and leans.
+    if (e.status[0] & DOCK_RIDING) != 0u && e.status[2] != 0u {
+        let src = dynamic_entities[e.status[2] - 1u];
+        let f = riding_frame(src, models[src.blueprint], t);
+        let src_heading = lerp_angle(src.prev_heading, src.heading, t);
+        let d = origin - mix(src.prev_pos, src.pos, t);
+        let ahead = vec2<f32>(cos(src_heading), sin(src_heading));
+        let turn = heading - src_heading;
+        let at = vec3<f32>(dot(d.xy, ahead), dot(d.xy, vec2<f32>(-ahead.y, ahead.x)), d.z)
+            + rot_z(local, turn);
+        world = f.origin + f.fwd * at.x + f.left * at.y + f.up * at.z;
+        let nt = rot_z(n, turn);
+        world_n = normalize(f.fwd * nt.x + f.left * nt.y + f.up * nt.z);
+    }
     // A standing tree bends over its foot with the wind and away from blasts
     // (`tree_air`). The stem is a bending pole: stiff at the foot, curving most
     // low down and running straight through the crown, so the crown tips over

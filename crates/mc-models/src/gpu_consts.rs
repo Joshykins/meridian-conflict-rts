@@ -417,6 +417,14 @@ shared! {
         pub const RIGHT: u32 = 0x20;
     }
 
+    /// A salvage drone docked on an aircraft (`mc_sim::mirror::UNIT_RIDING`, a test holds
+    /// them equal): drawn in the frame its carrier is drawn in (entity.wgsl `riding_frame`).
+    pub mod dock as "DOCK_" {
+        /// `UnitInstance::status[0]`: riding; `status[2]` is one more than the carrier's
+        /// index among the frame's units.
+        pub const RIDING: u32 = 0x400;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {
