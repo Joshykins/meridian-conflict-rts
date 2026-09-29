@@ -264,3 +264,70 @@ fn a_missile_launcher_ashore_fires_on_a_battleship_offshore_but_not_on_a_dived_b
     }
     assert_eq!(shots, 0, "a missile rack cannot touch a dived boat");
 }
+
+#[test]
+fn battleships_on_ground_fire_fire_as_their_charge_ends() {
+    // Three Leviathans shelling one area: each battery lays on a point of its own and slews
+    // to a new one after every broadside, so they come ready at different times. Whatever
+    // holds a broadside holds it before the charge: every shot comes the charge's length
+    // after that battery began charging, and no battery fires without one.
+    let mut w = sea(false);
+    let ships: Vec<UnitId> = (0..3)
+        .map(|i| spawn(&mut w, SHIP, 0, 600 + i * 60, 900 + i * 90, 0))
+        .collect();
+    order(
+        &mut w,
+        0,
+        Command::AttackGround {
+            units: ships.clone(),
+            pos: FxVec2::from_ints(1600, 1500),
+            queue: false,
+        },
+    );
+    let charge = w.bp(row(&w, ships[0])).weapons[0].charge_ticks as u32;
+    // Per ship and battery: the tick its charge began, until it fires.
+    let mut charging = [[None::<u32>; 3]; 3];
+    let mut broadsides = 0;
+    for tick in 0..1500u32 {
+        run(&mut w, 1);
+        let at: Vec<FxVec2> = ships
+            .iter()
+            .map(|&s| w.state.units.pos[row(&w, s)])
+            .collect();
+        let mut shot = [[false; 3]; 3];
+        for e in &w.events {
+            match e {
+                SimEvent::WeaponCharging { unit, weapon, .. } if *weapon < 3 => {
+                    let s = ships.iter().position(|&s| s == *unit).unwrap();
+                    charging[s][*weapon as usize] = Some(tick);
+                }
+                SimEvent::ShotFired {
+                    weapon,
+                    pos,
+                    owner: 0,
+                    ..
+                } if *weapon < 3 => {
+                    let s = (0..3).min_by_key(|&s| at[s].distance(pos.xy())).unwrap();
+                    shot[s][*weapon as usize] = true;
+                }
+                _ => {}
+            }
+        }
+        for s in 0..3 {
+            for b in 0..3 {
+                if shot[s][b] {
+                    let began = charging[s][b].take();
+                    assert_eq!(
+                        began.map(|t| tick - t),
+                        Some(charge),
+                        "ship {s} battery {b} fired at tick {tick}, charge began {began:?}"
+                    );
+                }
+            }
+            if shot[s].iter().all(|&f| f) {
+                broadsides += 1;
+            }
+        }
+    }
+    assert!(broadsides >= 9, "{broadsides} whole broadsides");
+}

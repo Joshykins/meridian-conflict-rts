@@ -193,7 +193,8 @@ pub struct Units {
     /// Broadside fire (`Weapon::volley`), one bit per weapon: `[ready, busy, primed,
     /// hold, go]`. Ready: on its mark and holding for the others. Busy: bears on its mark
     /// but is still turning or reloading. Primed: its countdown ran out while it held, so
-    /// it needs no charge. Hold: ticks the ready ones have waited. Go: this tick they fire.
+    /// it needs no charge. Hold: ticks the ready ones have waited. Go: the ones that were
+    /// ready fire (or begin their charge) this tick. See `volley.rs`.
     pub volley: Vec<[u16; 5]>,
     /// Ground covered since the unit was made, in 1/256 m, wrapping; turning on
     /// the spot counts too. Only the presentation reads it: it times a walker's stride.

@@ -146,10 +146,6 @@ pub(crate) const GRAVITY: Fx = Fx::ratio(40, (DT * DT) as i64);
 const LASER_BITE: Fx = Fx::from_int(10);
 /// Ticks after a kill before the laser acquires another missile.
 const LASER_GAP: u16 = 3;
-/// Longest a ready broadside battery (`Weapon::volley`) holds for the others: 4 s.
-const VOLLEY_HOLD: u16 = 40;
-/// `Units::volley` busy bit for a broadside hull still turning onto its lay.
-const VOLLEY_HULL: u16 = 1 << 15;
 
 /// A shot's aim error, angle steps across and along (or up): a point drawn evenly from a
 /// disc of radius `spread`, so the misses scatter in a circle round the aim point rather
@@ -1031,23 +1027,6 @@ impl World {
             .max_by_key(|&i| (weapons[i].damage, std::cmp::Reverse(i)))
     }
 
-    /// Decides whether this tick is a broadside (`Weapon::volley`): the batteries that
-    /// were ready last tick fire once none of the others that bear is still turning or
-    /// reloading, or once they have held `VOLLEY_HOLD` ticks. Then clears the tick's record.
-    fn volley_turn(&mut self, row: usize) {
-        let v = &mut self.state.units.volley[row];
-        let (ready, busy) = (v[0], v[1]);
-        let go = ready != 0 && (busy == 0 || v[3] >= VOLLEY_HOLD);
-        v[3] = if ready != 0 && !go {
-            v[3].saturating_add(1)
-        } else {
-            0
-        };
-        v[4] = go as u16;
-        v[0] = 0;
-        v[1] = 0;
-    }
-
     fn step_weapon(&mut self, row: usize, w: usize) -> Result<(), SimError> {
         let bp = self.blueprints.clone();
         let weapon = &bp.unit(self.state.units.blueprint[row]).weapons[w];
@@ -1137,7 +1116,7 @@ impl World {
         // True if this tick used up a countdown (reload or a first-shot charge).
         // A weapon that sat ready (cooldown already 0) still has to charge before it fires.
         let cooling = units.weapon_cooldown[row][w] > 0;
-        if cooling {
+        if cooling && !crate::volley::waits_to_charge(units, row, w, weapon) {
             units.weapon_cooldown[row][w] -= 1;
         }
         if held && weapon.mount {
@@ -1566,7 +1545,7 @@ impl World {
                             units.heading[row] = units.heading[row].turn_toward(lay, m.turn_rate);
                             // Still coming round: the broadside waits for the hull too.
                             if units.heading[row] != lay {
-                                units.volley[row][1] |= VOLLEY_HULL;
+                                units.volley[row][1] |= crate::volley::HULL;
                             }
                         } else if d.unsigned_abs() > half_arc || body_arc < 0x8000 {
                             // A land unit with an `aim_arc` squares up to what it fights,
@@ -1714,7 +1693,11 @@ impl World {
                     .delta_to(Angle::ZERO)
                     .unsigned_abs()
                     <= weapon.half_arc);
-        if !aligned || !pitched_on || hidden || units.weapon_cooldown[row][w] > 0 {
+        let laid = aligned && pitched_on && !hidden;
+        if crate::volley::countdown(units, row, w, weapon, laid, bears) {
+            return Ok(());
+        }
+        if !laid || units.weapon_cooldown[row][w] > 0 {
             if bears {
                 units.volley[row][1] |= 1 << w;
             }
@@ -1750,8 +1733,12 @@ impl World {
             return Ok(());
         }
         // Broadside fire: on its mark and ready, it holds until the turn's `go`. Held on the
-        // tick its countdown ran out, it is primed and fires without a fresh charge.
-        let cooling = if weapon.volley && units.weapon_salvo_left[row][w] == 0 {
+        // tick its countdown ran out, it is primed and fires without a fresh charge. A
+        // charged battery held before its charge instead (`volley.rs`): it fires as it ends.
+        let cooling = if weapon.volley
+            && units.weapon_salvo_left[row][w] == 0
+            && !(cooling && crate::volley::charged(weapon))
+        {
             let bit = 1u16 << w;
             let v = &mut units.volley[row];
             if v[4] == 0 {
