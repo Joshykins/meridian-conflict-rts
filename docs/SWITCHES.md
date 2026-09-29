@@ -17,3 +17,11 @@ Interactive play takes its graphics settings from Settings → Display instead.
 capture size, followed ticks and overrides. Native `PERF_EXE` selects an existing
 binary; otherwise the suite uses `play.sh`. Commands and shell expansions are not
 supported inside `PERF_ENV`.
+
+## Interface shots
+
+Headless screenshots (`--screenshot`, `scripts/shot.sh run`) can show an order being aimed.
+
+| Variable | Values | Purpose |
+|---|---|---|
+| `MERIDIAN_AIM` | `1`, `ground`, `reclaim`, `warp` | The order in hand, aimed at `--cursor`: a warhead launch (`1`, docs/NUKES.md), a titan's strike, Reclaim, or a warp jump (each selected drive's reach, the line to its exit, the energy card, and any enemy dampener field the exit falls in). |

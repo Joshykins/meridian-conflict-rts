@@ -43,6 +43,7 @@ mod titan;
 mod top_bar;
 mod unit_picker;
 mod volatile;
+pub mod warp;
 
 use crate::audio::Sfx;
 use crate::game::{Mode, Targeting, View};
@@ -870,7 +871,8 @@ pub fn cursor_hint(
     let placing = sites.len();
     let fit = sites.iter().filter(|(_, f)| f.is_ok()).count();
     let (text, tone) = match view.mode {
-        Mode::Normal => return,
+        // The warp order's card says what the jump takes (`warp_marks::cursor_card`).
+        Mode::Normal | Mode::Target(Targeting::Warp) => return,
         Mode::Target(t) => (
             t.label().to_owned(),
             match t {
@@ -885,6 +887,7 @@ pub fn cursor_hint(
                 Targeting::Guard => style::Family::Stance.tone(),
                 Targeting::Land | Targeting::Unload => style::Family::Transport.tone(),
                 Targeting::Nuke => silo::WARHEAD,
+                Targeting::Warp => warp::WARP,
             },
         ),
         Mode::Place(b) => {

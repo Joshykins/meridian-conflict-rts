@@ -32,6 +32,8 @@
             Intel: "select_intel",
             Wall: "select_wall",
             Shield: "select_shield",
+            // A warp dampener answers like the shields it stands among (until it has its own).
+            Damper: "select_shield",
             Fighter: "select_fighter",
             Bomber: "select_bomber",
             TorpedoBomber: "select_bomber",

@@ -32,6 +32,8 @@ pub enum Reach {
     AntiMissile,
     /// Sonar: where dived hulls are found.
     Sonar,
+    /// A warp dampener's field: an enemy jump that ends inside it is snagged.
+    Damper,
 }
 
 impl Reach {
@@ -48,6 +50,7 @@ impl Reach {
             Reach::Shield => "SHIELD",
             Reach::AntiMissile => "ANTI-MISSILE",
             Reach::Sonar => "SONAR",
+            Reach::Damper => "WARP FIELD",
         }
     }
 
@@ -65,6 +68,7 @@ impl Reach {
             Reach::Shield => 0x7AD4FF,
             Reach::AntiMissile => 0xFF7A1A,
             Reach::Sonar => 0x1D7A3A,
+            Reach::Damper => crate::hud::warp::DAMPER,
         }
     }
 
@@ -217,6 +221,11 @@ pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
             .filter(|s| s.is_dome())
             .map_or(0.0, |s| s.radius.to_f32()),
         "Shield Dome",
+    ));
+    all.push(Projection::round(
+        Reach::Damper,
+        bp.warp_damper.map_or(0.0, |d| d.radius.to_f32()),
+        "Warp Field",
     ));
     all.retain(|p| p.outer > 0.0);
     // Farthest first; of two alike, the one that reaches round first.
@@ -515,7 +524,7 @@ impl Rings {
 
     /// The HUD's key to `rings`: each kind and rank drawn, with its farthest reach and that ring's dead zone.
     pub fn key(rings: &[RangeRing]) -> Vec<(Reach, u8, f32, f32)> {
-        const ALL: [Reach; 11] = [
+        const ALL: [Reach; 12] = [
             Reach::Direct,
             Reach::Indirect,
             Reach::Missile,
@@ -527,6 +536,7 @@ impl Rings {
             Reach::Build,
             Reach::Reclaim,
             Reach::Shield,
+            Reach::Damper,
         ];
         ALL.into_iter()
             .flat_map(|reach| (0..RANKS).map(move |rank| (reach, rank)))
@@ -618,6 +628,11 @@ mod tests {
         assert_eq!(
             of(&b, "aster_t3_shield"),
             vec![(Reach::Shield, 0, 0.0, 180.0)]
+        );
+        // The Undertow's field, where an enemy jump is snagged.
+        assert_eq!(
+            of(&b, "aster_t2_warp_damper"),
+            vec![(Reach::Damper, 0, 0.0, 1600.0)]
         );
         assert_eq!(
             of(&b, "aster_commander"),

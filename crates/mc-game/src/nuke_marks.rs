@@ -31,17 +31,17 @@ mod cover;
 /// Points a flight is drawn with.
 const PATH_POINTS: usize = 72;
 
-fn surface(field: &Field, p: Vec2) -> f32 {
+pub(crate) fn surface(field: &Field, p: Vec2) -> f32 {
     field.renderer.surface_height(p)
 }
 
-fn project(ui: &Ui, field: &Field, p: Vec3) -> Option<Vec2> {
+pub(crate) fn project(ui: &Ui, field: &Field, p: Vec3) -> Option<Vec2> {
     field.camera.project(p).map(|q| q / ui.s)
 }
 
 /// A ring on the ground, `radius` metres round `c`: dashed (`dash` of every 2 segments
 /// drawn) or solid.
-fn ground_ring(
+pub(crate) fn ground_ring(
     ui: &mut Ui,
     field: &Field,
     c: Vec2,
@@ -70,7 +70,7 @@ fn ground_ring(
 }
 
 /// A dashed screen line from `a` to `b`, the dashes crawling toward `b`.
-fn dashed(ui: &mut Ui, a: Vec2, b: Vec2, width: f32, color: ui::Color, speed: f32) {
+pub(crate) fn dashed(ui: &mut Ui, a: Vec2, b: Vec2, width: f32, color: ui::Color, speed: f32) {
     let len = a.distance(b);
     if len < 2.0 {
         return;
@@ -94,7 +94,7 @@ fn clock(seconds: f32) -> String {
 }
 
 /// A label with a dark backing, centred on `at`.
-fn tag(ui: &mut Ui, at: Vec2, text: &str, color: u32) {
+pub(crate) fn tag(ui: &mut Ui, at: Vec2, text: &str, color: u32) {
     let w = ui.text_width(type_scale::MICRO, text) + 14.0;
     let r = ui::Rect::new(at.x - w * 0.5, at.y - 9.0, w, 18.0);
     ui.fill(r, ui::ink(0.72));

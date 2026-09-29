@@ -626,7 +626,7 @@
         vision: 300,
         economy: (energy_upkeep: 300),
         warp_damper: (radius: 1600, drag: 3, damage: 0.25, stun: 25),
-        mesh: "warp_damper", icon: Shield,
+        mesh: "warp_damper", icon: Damper,
         sounds: (death: "blast_large"),
     ),
     (

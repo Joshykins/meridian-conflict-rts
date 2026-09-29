@@ -283,3 +283,35 @@ outer pair forward and the inner pair back in a turn. Jet pods burn a blue drive
 plume (`PUFF_THRUST`) out of each nozzle, longer and hotter the harder the
 aircraft is driven (`renderer/aircraft_trails.rs`). A VTOL may have one pair of
 pods or two (`Vtol::pairs`).
+
+## Warp: the interface (2026-09-29)
+
+The Courier, Bastion and Resolute carry warp drives (`UnitBlueprint::warp`, `mc_sim::warp`).
+What the player sees of them:
+
+- **Order card.** A **Warp** button (key **O**) in the Movement column of any selection that
+  holds a ship with a drive. Click a point: each ship charges and jumps as far as its drive
+  reaches toward it; shift queues. The pointer is the warp pointer (an exit ring with streaks
+  running into it) wherever a click would send the jump.
+- **With the order in hand** (`warp_marks.rs`): each ship's reach as a dashed violet ring, a
+  line to where it comes out (the mark brought in to the reach, kept on the map, as the sim
+  does), and a ghost ring there. Every enemy Undertow known has its field outlined in magenta
+  (dashed while it is down); an exit inside a live one turns that field and the exit red and
+  tags it **DAMPENED**. Next to the pointer a card totals the energy the jumps take
+  (`Warp 9,500 E`) with a bar of the store against it, the store itself (warning-coloured,
+  with how much it falls short, when it cannot cover the charge: the jump still goes, the
+  charge just runs slower), and how long the charge takes at full power.
+- **In the world.** A charge bar over a ship while it spools (`Charging warp 64%`), a pulsing
+  ring and the seconds left where one of ours will come out while it is in warp, and over a
+  stunned unit an electric bolt and **STUNNED 18 s** (the seconds only for our own).
+- **Unit card.** The activity line reads `Charging warp 64%` with a bar, `In warp 3 s`,
+  `Leaving warp` (or `Thrown out of warp`), or `Stunned · systems down 18 s` in electric cyan.
+  Under it the drive's line: `Warp drive recharging 32 s` with a bar, or `Warp drive ready ·
+  O` with its reach and charge. An Undertow's card says `Warp field up 1,600 m`, or `Warp field
+  down · powered down` / `· no power`.
+- **The Undertow** has an icon of its own (`IconKind::Damper`: a ring broken on the
+  diagonals, four chevrons pulling in on its middle), and selected or being placed its field
+  is a magenta range ring (`Reach::Damper`, WARP FIELD in the key).
+
+Shots: `MERIDIAN_AIM=warp scripts/shot.sh run --range --unit aster_t1_lift_ship --select
+lift_ship --cursor X,Y ...` aims the order; `--scenario warp` / `warp-dampened` jumps.
