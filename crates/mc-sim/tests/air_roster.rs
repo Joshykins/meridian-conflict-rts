@@ -238,11 +238,11 @@ fn carrier_reclaim_order_sends_every_drone() {
     assert!(w.state.wrecks.mass[far] < Fx::from_int(300) || !w.state.wrecks.slots.is_alive(far));
 }
 #[test]
-fn an_empty_economy_still_makes_drones() {
+fn an_empty_economy_still_starts_a_drone() {
     let mut w = world();
     w.state.players[0].mass = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
-    let c = add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
+    add(&mut w, "aster_t1_reclaim_carrier", 0, 900, 900);
     for _ in 0..100 {
         w.tick(&[]).unwrap();
     }
