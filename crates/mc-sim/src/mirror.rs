@@ -719,6 +719,11 @@ pub struct UnitOrders {
     pub hidden_target: Option<[f32; 3]>,
     /// A lift ship: what is in its hold.
     pub cargo: Option<CargoView>,
+    /// Seconds before its warp drive may spool again (`Warp::cooldown_ticks`); zero when
+    /// ready or without a drive.
+    pub warp_recharge: f32,
+    /// Seconds before its stun wears off (`crate::warp`); zero when not stunned.
+    pub stunned: f32,
 }
 
 /// A lift ship as the interface shows it: its hold (`transport.rs`).
@@ -2930,6 +2935,8 @@ impl World {
                     [p[0], p[1], (s.units.z[t] + self.bp(t).height / 2).to_f32()]
                 }),
                 cargo: self.cargo_view(row),
+                warp_recharge: self.warp_recharge_seconds(row),
+                stunned: self.stun_seconds(row),
             });
         }
     }
