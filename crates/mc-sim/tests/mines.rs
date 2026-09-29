@@ -401,3 +401,65 @@ fn a_mine_short_of_energy_digs_slower_down_to_a_quarter() {
     assert!((lost - full * 0.75).abs() < 0.01, "lost {lost}");
     assert!(w.state.players[0].upkeep_efficiency < Fx::ONE);
 }
+
+#[test]
+fn a_mason_iii_builds_a_deep_core_outright() {
+    let mut w = world(vec![square(3000, 3000, 200)]);
+    let key = |w: &World, k: &str| w.blueprints.id_of(k).unwrap();
+    let (engineer, deep) = (key(&w, "aster_t3_engineer"), key(&w, "aster_core_mine_t4"));
+    w.tick(&[
+        cmd(
+            0,
+            Command::DebugSpawn {
+                owner: 0,
+                blueprint: engineer,
+                pos: FxVec2::from_ints(2900, 2900),
+                heading: Angle::ZERO,
+                count: 1,
+                flags: 0,
+                build: 1000,
+            },
+        ),
+        cmd(
+            0,
+            Command::DebugFreeBuild {
+                player: 0,
+                on: true,
+            },
+        ),
+    ])
+    .unwrap();
+    let u = &w.state.units;
+    let mason = u.id(u
+        .slots
+        .iter()
+        .find(|&r| u.blueprint[r] == engineer)
+        .unwrap());
+    w.tick(&[cmd(
+        0,
+        Command::Build {
+            units: vec![mason],
+            blueprint: deep,
+            pos: FxVec2::from_ints(3000, 3000),
+            heading: Angle::ZERO,
+            queue: false,
+        },
+    )])
+    .unwrap();
+    let built = (0..60_000).any(|_| {
+        w.tick(&[]).unwrap();
+        let u = &w.state.units;
+        u.slots.iter().any(|r| {
+            u.blueprint[r] == deep && !u.has_flag(r, mc_sim::tables::flag::UNDER_CONSTRUCTION)
+        })
+    });
+    assert!(built, "the deep core went up where it was placed");
+    // Standing mines are counted in at the start of a tick.
+    w.tick(&[]).unwrap();
+    let u = &w.state.units;
+    let row = u.slots.iter().find(|&r| u.blueprint[r] == deep).unwrap();
+    assert!(
+        w.state.mines.by_unit.contains_key(&u.id(row)),
+        "and digs as a mine"
+    );
+}

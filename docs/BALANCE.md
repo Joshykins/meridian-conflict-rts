@@ -70,7 +70,8 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   in about 12 s and three Paladins a tier 3 in about 15. A raid on the mines is meant to pay.
 - Measured with the duel probe on Serac Divide, Hard against Hard: 25-29 mass/s at 15 minutes
   (was 40-49 with 3x per tier), 48-65 at 30.
-- The Deep Core (T4, `aster_core_mine_t4`) is an upgrade only, and meant to be a poor one. Like
+- The Deep Core (T4, `aster_core_mine_t4`) is built by Mason IIIs and Engineering Suite III
+  commanders, or upgraded from a tier 3 mine, and meant to be a poor one. Like
   every tier it multiplies the mine's ground, ore and shaft yield, never a flat bonus (the user's
   call): 7.5x a tier 1, only 1.5x over tier 3 (base 8.25), for 16000 mass / 96000 energy / 2400
   time, so it pays back in about 1000 s. It opens with tech 3 (the only tech 4 build is the
