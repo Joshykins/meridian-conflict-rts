@@ -1,4 +1,5 @@
 //!use bindings
+//!use warp_puffs
 // Particles that are not light: dust off the tracks, gun smoke, clods of earth
 // thrown by an impact, and the sparks that go with them. Like the flashes they
 // are written once and animate on the GPU from their birth time.
@@ -195,6 +196,9 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         let moisture = (1.0-cloud_shadow_coarse(vec3<f32>(source,p.pos.z))) * 3.0;
         out.opacity *= smoothstep(0.12,0.65,weather.x)*altitude*clamp(moisture,0.0,1.0);
         if out.opacity < 0.015 { return out; }
+    }
+    if is_warp_puff(kind) {
+        return warp_puff_vertex(p, corner, t, age, out);
     }
     var pos: vec3<f32>;
     // How far a casing has tumbled (radians), frozen once it lies still.
@@ -659,6 +663,9 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     let d = length(in.uv);
     let age = in.state.x;
     let kind = u32(in.state.y);
+    if is_warp_puff(kind) {
+        return warp_puff_color(in, d);
+    }
     if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && d > 1.0 {
         discard;
     }

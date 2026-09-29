@@ -6,12 +6,20 @@
 //! WGSL has no include mechanism, so `common.wgsl` goes in front of every
 //! shader (after the numbers the CPU shares with the shaders, generated from
 //! `gpu_consts.rs`), and `bindings.wgsl` with `lights.wgsl` in front of those
-//! containing the line `//!use bindings`; then `habitat`, `desert`, `surface`
-//! and `scenery` for their own `//!use` lines, in that order.
+//! containing the line `//!use bindings`; then `habitat`, `desert`, `surface`,
+//! `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order.
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 7] = [
-    "common", "bindings", "surface", "lights", "habitat", "scenery", "desert",
+pub(crate) const PRELUDES: [&str; 9] = [
+    "common",
+    "bindings",
+    "surface",
+    "lights",
+    "habitat",
+    "scenery",
+    "desert",
+    "warp_hull",
+    "warp_puffs",
 ];
 
 /// The prelude files' text.
@@ -22,6 +30,8 @@ pub(crate) struct Preludes {
     habitat: String,
     scenery: String,
     desert: String,
+    warp_hull: String,
+    warp_puffs: String,
 }
 
 impl Preludes {
@@ -35,6 +45,8 @@ impl Preludes {
             habitat: read("habitat"),
             scenery: read("scenery"),
             desert: read("desert"),
+            warp_hull: read("warp_hull"),
+            warp_puffs: read("warp_puffs"),
         }
     }
 
@@ -61,6 +73,14 @@ impl Preludes {
         // Desert scenery's looks (needs surface).
         if uses("scenery") {
             prelude = format!("{prelude}\n{}", self.scenery);
+        }
+        // A capital ship's warp: its hull drawn as a streak (entity.wgsl), and the light
+        // round a jump (puffs.wgsl; needs bindings).
+        if uses("warp_hull") {
+            prelude = format!("{prelude}\n{}", self.warp_hull);
+        }
+        if uses("warp_puffs") {
+            prelude = format!("{prelude}\n{}", self.warp_puffs);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

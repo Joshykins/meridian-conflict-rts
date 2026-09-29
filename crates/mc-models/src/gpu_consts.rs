@@ -301,6 +301,21 @@ shared! {
         /// A flak burst's smoke (renderer/flak_fx.rs): the charge burning inside a
         /// hard-edged black ball that hangs on the wind for seconds.
         pub const FLAK: u32 = 39;
+        /// A capital ship's warp (renderer/warp_fx.rs, warp_puffs.wgsl). Each carries its
+        /// colour in `appearance.rgb` (brightness in its size) and how torn a dampened jump
+        /// makes it in `appearance.w` (0 clean, 1 torn).
+        /// A soft glow that swells and fades: the drive charging, a jump's flash.
+        pub const WARP_GLOW: u32 = 44;
+        /// A streak of light from `pos` along `vel` (axis times length): its head runs out
+        /// along it over the first part of its life, and the line fades behind.
+        pub const WARP_STREAK: u32 = 45;
+        /// The rift a jump comes out of, turned to the eye: a lens of bent light round a
+        /// dark heart, its arms wound in; `vel.x` how far it is open (0 a ripple, 1 open).
+        pub const WARP_RIFT: u32 = 46;
+        /// A jagged arc of lightning from `pos` along `vel`, flickering.
+        pub const WARP_ARC: u32 = 47;
+        /// A mote of charged light carried on `vel` and stopped by the air.
+        pub const WARP_MOTE: u32 = 48;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word
