@@ -561,7 +561,28 @@ pub fn screenshot(
     if shot.select.as_deref().is_some_and(|k| !k.ends_with('*')) {
         view.selection.truncate(1);
     }
-    view.groups[1] = view.selection.clone();
+    view.groups.set(1, &view.selection);
+    // `MERIDIAN_GROUPS=KEY,KEY,...`: control groups 2, 3, ... hold player 0's
+    // units whose blueprint key contains each KEY.
+    if let Ok(keys) = std::env::var("MERIDIAN_GROUPS") {
+        for (n, key) in (2..10).zip(keys.split(',')) {
+            let members: Vec<u32> = frame
+                .units
+                .iter()
+                .filter(|u| {
+                    u.owner_flags & 0xFF == 0
+                        && u.owner_flags & mc_sim::mirror::KIND_WRECK == 0
+                        && world
+                            .blueprints
+                            .unit(mc_data::BlueprintId(u.blueprint as u16))
+                            .key
+                            .contains(key)
+                })
+                .map(|u| u.unit_id)
+                .collect();
+            view.groups.set(n, &members);
+        }
+    }
     // MERIDIAN_AIM: a launch being aimed, the pointer at `--cursor` (docs/NUKES.md).
     // MERIDIAN_AIM=ground: fire on the ground being aimed instead (a titan's strike preview).
     // MERIDIAN_AIM=reclaim: the Reclaim order being given, what is under `--cursor` ringed.

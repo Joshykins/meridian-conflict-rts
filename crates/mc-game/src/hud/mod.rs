@@ -15,6 +15,7 @@ mod economy;
 mod economy_panel;
 mod focus;
 pub mod free_camera;
+mod groups;
 pub mod icons;
 mod issue_mark;
 pub use issue_mark::IssueMark;
@@ -501,6 +502,9 @@ impl Hud {
         self.net_news(ui, s);
         // The mine survey lies on the world, under every panel.
         mine_marks(ui, s, &mut self.ore);
+        if !view.observing && !self.free.on {
+            groups::badges(ui, s);
+        }
         let fold = self.fold_begin(ui, free_camera::Part::Top);
         let speed_hits = self.speed_hits(ui);
         self.fold_end(ui, fold);
@@ -517,9 +521,10 @@ impl Hud {
             under_economy += GAP + self.range_tall;
         }
         if !view.observing {
-            // Down to the chip line over the deck.
+            // Down to the line over the deck, where chat rises from.
             let bottom = h - EDGE - DECK_H - 24.0 - 8.0 - GAP;
-            builders::idle_cards(self, ui, s, under_economy, bottom);
+            let under_idle = builders::idle_cards(self, ui, s, under_economy, bottom);
+            groups::card(self, ui, s, under_idle, bottom);
         }
         self.fold_end(ui, fold);
         if self.reclaim_seen && s.show_reclaim != self.reclaim_open {
@@ -610,7 +615,7 @@ impl Hud {
 
         // The bottom deck: whatever the selection is.
         let deck_y = h - EDGE - DECK_H;
-        // Chat rises from over the idle chips.
+        // Chat rises from over the deck.
         self.net_chat(ui, s, deck_y - 24.0 - 8.0 - 12.0, dt);
 
         let selected: Vec<&UnitInstance> = view
@@ -686,9 +691,6 @@ impl Hud {
         ui.fade *= deck_k;
         ui.shift.y += (1.0 - deck_k) * 36.0;
         ui.interactive &= !closing;
-        if !view.observing {
-            self.group_chips(ui, s, EDGE, deck_y - 24.0 - 8.0);
-        }
         // Above where a queue strip would be, so the two never overlap.
         self.reach_key(ui, s, deck_y - 62.0 - GAP - 24.0 - 8.0);
         if !units.is_empty() {
@@ -804,34 +806,6 @@ impl Hud {
         self.claim(ui, prof);
         let x = card.x.min(prof.x);
         self.issues.column = Rect::new(x, card.y, right - x, prof.bottom() - card.y);
-    }
-
-    /// The control groups that hold something, over the selection panel.
-    fn group_chips(&mut self, ui: &mut Ui, s: &Scene, mut x: f32, y: f32) {
-        // In keyboard order: 1..9, then 0.
-        for n in (1..10).chain([0]) {
-            let members = &s.view.groups[n];
-            if members.is_empty() {
-                continue;
-            }
-            let (clicked, w) = self.chip(
-                ui,
-                id("group", n),
-                x,
-                y,
-                &format!("Group {n}"),
-                &members.len().to_string(),
-                palette::TEXT,
-            );
-            if clicked {
-                ui.audio.play(Sfx::Select);
-                self.actions.push(HudAction::Select {
-                    units: members.clone(),
-                    focus: false,
-                });
-            }
-            x += w + 6.0;
-        }
     }
 
     /// What the colours of the range rings on the ground mean, from the right edge inward.

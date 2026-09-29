@@ -162,6 +162,9 @@ MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the 
 
 MERIDIAN_ISSUE_NOTE=TEXT with --screenshot: the F1 report card's note, as if typed.
 
+MERIDIAN_GROUPS=KEY,KEY,... with --screenshot: control groups 2, 3, ... hold player 0's
+units whose blueprint key contains each KEY (group 1 is the selection).
+
 MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
 (default: the package version with -dev).
 ";

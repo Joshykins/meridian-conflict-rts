@@ -39,6 +39,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 mod ambience_notes;
 #[path = "game_cine.rs"]
 mod cine_input;
+#[path = "game_groups.rs"]
+pub(crate) mod groups;
 #[path = "game_music.rs"]
 mod music_notes;
 #[path = "game_survival.rs"]
@@ -58,8 +60,6 @@ const ZOOM_RATE: f32 = 12.0;
 const TICK_SECONDS: f32 = 0.1;
 /// Most selected units whose order queues are asked for (and drawn).
 const MAX_WATCHED: usize = 64;
-/// A control group's key pressed twice within this long also brings the camera.
-const DOUBLE_TAP: f32 = 0.35;
 /// A unit clicked twice within this long selects every one of its type on screen.
 const DOUBLE_CLICK: f32 = 0.35;
 /// Test range: how far east of the pad the camera looks, so the pad clears the panel.
@@ -195,8 +195,8 @@ pub struct View {
     pub shift: bool,
     /// Ctrl is held: a click on a tile picks rather than acts (a lift ship's hold).
     pub ctrl: bool,
-    /// Control groups, by their key.
-    pub groups: [Vec<u32>; 10],
+    /// Control groups, by their key (`game_groups.rs`).
+    pub groups: groups::ControlGroups,
     /// The test range, when this match is one.
     pub range: Option<Range>,
     /// The range weather the renderer was last given (live or from a recording),
@@ -3054,17 +3054,8 @@ impl Game {
                     if self.view.observing && !self.ctrl {
                         // Observers have no groups to call: the digits are whose eyes to use.
                         self.set_vision(n.checked_sub(1).map(|p| p as u8), audio);
-                    } else if self.ctrl {
-                        self.view.groups[n] = self.view.selection.clone();
-                    } else if !self.view.groups[n].is_empty() {
-                        self.view.selection = self.view.groups[n].clone();
-                        let now = Instant::now();
-                        if self.last_group.is_some_and(|(key, at)| {
-                            key == n && (now - at).as_secs_f32() < DOUBLE_TAP
-                        }) {
-                            self.focus_selection();
-                        }
-                        self.last_group = Some((n, now));
+                    } else {
+                        self.group_key(n, audio);
                     }
                 }
             }
@@ -3155,9 +3146,7 @@ impl Game {
         self.view.selection.retain(|id| selectable.contains(id));
         // A death is not a selection: nobody answers for it.
         self.answered.retain(|id| index_of.contains_key(id));
-        for group in &mut self.view.groups {
-            group.retain(|id| selectable.contains(id));
-        }
+        self.view.groups.retain(|id| selectable.contains(&id));
         true
     }
 

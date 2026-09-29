@@ -22,12 +22,12 @@ use mc_data::{cat, UnitBlueprint};
 use mc_sim::mirror::{KIND_WRECK, STATE_IDLE};
 
 /// Inside margin of an idle card.
-const PAD: f32 = 8.0;
+pub(super) const PAD: f32 = 8.0;
 /// The label block on the card's left: the title over the idle count.
-const LABEL_W: f32 = 66.0;
+pub(super) const LABEL_W: f32 = 66.0;
 /// Square tiles in rows to the label's right.
-const TILE: f32 = 36.0;
-const TILE_GAP: f32 = 4.0;
+pub(super) const TILE: f32 = 36.0;
+pub(super) const TILE_GAP: f32 = 4.0;
 
 #[derive(Default)]
 pub(super) struct Builders {
@@ -246,13 +246,13 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; 2] {
     kinds
 }
 
-/// How tall an idle card is with `types` tiles.
-fn card_height(types: usize) -> f32 {
+/// How tall an idle (or groups) card is with `types` tiles.
+pub(super) fn card_height(types: usize) -> f32 {
     let rows = types.div_ceil(per_row()).max(1);
     2.0 * PAD + rows as f32 * (TILE + TILE_GAP) - TILE_GAP
 }
 
-fn per_row() -> usize {
+pub(super) fn per_row() -> usize {
     ((super::COMMANDER_W - 3.0 * PAD - LABEL_W + TILE_GAP) / (TILE + TILE_GAP)) as usize
 }
 
@@ -426,6 +426,6 @@ fn tip(ui: &mut Ui, card: Rect, y: f32, all: &str) {
 }
 
 /// Whether the selection is exactly these units, in any order.
-fn same_units(selection: &[u32], ids: &[u32]) -> bool {
+pub(super) fn same_units(selection: &[u32], ids: &[u32]) -> bool {
     selection.len() == ids.len() && ids.iter().all(|id| selection.contains(id))
 }
