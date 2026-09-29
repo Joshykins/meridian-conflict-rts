@@ -288,3 +288,43 @@ fn lower_tiers_help_what_only_a_higher_tier_can_start() {
     }
     assert!(!has_order(&w2, ids[1]), "the T1 engineer gave up");
 }
+
+#[test]
+fn engineers_standing_on_a_lot_step_off_it_for_the_builder() {
+    let mut w = world();
+    // The builder, and an engineer assisting it parked on the lot it is about to raise.
+    let ids = spawn(
+        &mut w,
+        &[
+            ("aster_t1_engineer", 400, 400, 1000),
+            ("aster_t1_engineer", 600, 600, 1000),
+        ],
+    );
+    let (builder, helper) = (ids[0], ids[1]);
+    let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let lot = FxVec2::from_ints(600, 600);
+    w.tick(&[
+        cmd(Command::Build {
+            units: vec![builder],
+            blueprint: factory,
+            pos: lot,
+            heading: Angle::ZERO,
+            queue: false,
+        }),
+        cmd(Command::Assist {
+            units: vec![helper],
+            target: builder,
+            queue: false,
+        }),
+    ])
+    .unwrap();
+    let raised = (0..2000).any(|_| {
+        w.tick(&[]).unwrap();
+        w.state
+            .units
+            .slots
+            .iter()
+            .any(|r| w.state.units.blueprint[r] == factory)
+    });
+    assert!(raised, "the site went up instead of being refused");
+}

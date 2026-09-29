@@ -2581,7 +2581,9 @@ impl World {
             return Ok(());
         }
         if self.mobile_units_in_footprint(&bp, o.pos, row, o.blueprint) {
-            // Friendly units standing on the site get a moment to clear off.
+            // Friendly units standing on the site get a moment to clear off; the
+            // builder's own side's are sent off it (`site_clearing.rs`).
+            self.send_off_site(&bp, o.pos, row, o.blueprint)?;
             if self.state.units.stuck_ticks[row] < 50 {
                 self.state.units.stuck_ticks[row] += 1;
                 return Ok(());
@@ -2718,7 +2720,12 @@ impl World {
     }
 
     /// True when `row` is already ordered to start or join this structure.
-    fn building_this_site(&self, row: usize, blueprint: BlueprintId, pos: FxVec2) -> bool {
+    pub(crate) fn building_this_site(
+        &self,
+        row: usize,
+        blueprint: BlueprintId,
+        pos: FxVec2,
+    ) -> bool {
         self.state
             .orders
             .front(&self.state.units, row)
