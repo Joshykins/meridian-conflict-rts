@@ -25,8 +25,10 @@ pub(super) fn bolt_rifle(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32
             coarse(b, length, r);
             return;
         }
-        if !b.fine() {
-            // Mid distance: the housing, the core with its spine blade, the collar.
+        if b.fine() {
+            housing(b, length, r);
+        } else {
+            // Mid distance: the housing as one block.
             b.paint(PLATING).pattern(pattern::PLAIN);
             b.beam(
                 v3(-0.04 * length, 0.0, 0.0),
@@ -34,40 +36,59 @@ pub(super) fn bolt_rifle(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32
                 v2(r * 2.3, r * 2.3),
                 v2(r * 1.5, r * 1.4),
             );
-            b.with_recoil(|b| {
-                b.paint(PLATING);
-                b.beam(
-                    v3(0.88 * length, 0.0, 0.0),
-                    Vec3::X * length,
-                    v2(r * 1.25, r * 1.2),
-                    v2(r * 0.95, r * 0.9),
-                );
-                b.paint(PLATING_DARK);
-                b.beam(
-                    v3(0.3 * length, 0.0, 0.0),
-                    v3(0.88 * length, 0.0, 0.0),
-                    v2(r * 0.84, r * 0.84),
-                    v2(r * 0.84, r * 0.84),
-                );
-                b.paint(PLATING);
-                b.extrude_y(
-                    &[
-                        [0.36 * length, r * 0.3],
-                        [0.84 * length, r * 0.3],
-                        [0.4 * length, r * 1.05],
-                    ],
-                    -r * 0.05,
-                    r * 0.05,
-                );
-            });
+        }
+        barrel(b, length, r);
+    });
+}
+
+/// [`bolt_rifle`] without its housing, for a mount that encloses the housing itself (the
+/// Marlin's gunhouse cowl): the bladed core and the collar, from `0.3` of the way along.
+/// Far away it is the whole gun's bar.
+pub(super) fn bolt_rifle_barrel(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) {
+    let length = muzzle.x - breech.x;
+    b.at(breech, |b| {
+        if b.coarse() {
+            // Far away the whole gun is one bar, cowl and all.
+            coarse(b, length, r);
             return;
         }
-        housing(b, length, r);
-        // The barrel runs back into the housing as it fires (`MeshBuilder::set_recoil`).
-        b.with_recoil(|b| {
+        barrel(b, length, r);
+    });
+}
+
+/// The core and the collar, which run back into the housing as the gun fires
+/// (`MeshBuilder::set_recoil`). Mid distance: the core with its spine blade, the collar.
+fn barrel(b: &mut MeshBuilder, length: f32, r: f32) {
+    b.with_recoil(|b| {
+        if b.fine() {
             finned_core(b, length, r, 0.9);
             collar(b, length, r);
-        });
+            return;
+        }
+        b.paint(PLATING);
+        b.beam(
+            v3(0.88 * length, 0.0, 0.0),
+            Vec3::X * length,
+            v2(r * 1.25, r * 1.2),
+            v2(r * 0.95, r * 0.9),
+        );
+        b.paint(PLATING_DARK);
+        b.beam(
+            v3(0.3 * length, 0.0, 0.0),
+            v3(0.88 * length, 0.0, 0.0),
+            v2(r * 0.84, r * 0.84),
+            v2(r * 0.84, r * 0.84),
+        );
+        b.paint(PLATING);
+        b.extrude_y(
+            &[
+                [0.36 * length, r * 0.3],
+                [0.84 * length, r * 0.3],
+                [0.4 * length, r * 1.05],
+            ],
+            -r * 0.05,
+            r * 0.05,
+        );
     });
 }
 

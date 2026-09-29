@@ -11,7 +11,7 @@
 //! Fixed: 1 torpedo tubes (16, ±0.8, -1.2 / -2.0) in the bulb; 3 interceptor
 //! tubes (-14, ±1.4, -1.0) under the quarterdeck.
 use super::*;
-use crate::aster::bolt_rifle::bolt_rifle;
+use crate::aster::bolt_rifle::{bolt_rifle_barrel, hexagon, ring};
 
 /// Stern first: a long lean hull, a flat run aft, the forefoot rising into a
 /// raked stem over the bulb.
@@ -35,6 +35,10 @@ const GUN_MUZZLE: Vec3 = Vec3::new(19.4, 0.0, 5.2);
 /// Half the rifle housing's height: the Paladin's proportions (`r` 0.44 on a 4.1 m gun),
 /// so its firing sequence (`arc_charge`, the gun's drawn length) lies on the blades.
 const GUN_R: f32 = 0.66;
+/// The cowl round the rifle's housing, out of the gunhouse front: where it starts inside
+/// the house, where its taper begins, and its mouth, where the bladed core comes out
+/// (0.34 of the gun's length, the housing's front).
+const COWL: (f32, f32, f32) = (12.2, 14.3, 15.3);
 /// The point-defence house's pivot, and where its barrels end (y ±0.3).
 const PD: Vec3 = Vec3::new(-9.0, 0.0, 9.0);
 const PD_MUZZLE: Vec3 = Vec3::new(-7.0, 0.3, 9.2);
@@ -262,7 +266,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         } else {
             gun_house(b, gun_deck);
         }
-        bolt_rifle(b, v3(GUN_BREECH_X, 0.0, GUN.z), GUN_MUZZLE, GUN_R);
+        bolt_rifle_barrel(b, v3(GUN_BREECH_X, 0.0, GUN.z), GUN_MUZZLE, GUN_R);
     });
 
     // The point-defence tub over the hangar, its gun house turning on the collar.
@@ -493,8 +497,9 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.mirror_y(|b| b.block(v3(-21.0, 0.8, qz), v3(-20.2, 0.95, qz + 1.1)));
 }
 
-/// The faceted gunhouse, the rifle's housing coming out of its front face through a
-/// dark mantlet; a hatch, a vent and the ranging optic on it.
+/// The faceted gunhouse and, out of its front face, a cowl enclosing the rifle's housing
+/// (as the Paladin's shoulder hoods its gun): the plasma cell's blue seam down each
+/// flank, a dark mouth the bladed core runs out of. A hatch and a vent on the house.
 fn gun_house(b: &mut MeshBuilder, gun_deck: f32) {
     let house_x = GUN.x - 0.4;
     b.paint(PLATING);
@@ -508,18 +513,40 @@ fn gun_house(b: &mut MeshBuilder, gun_deck: f32) {
             ],
         );
     });
+    let (start, taper, mouth) = COWL;
+    let at = |x: f32, w: f32, h: f32| {
+        let mut r = ring(&hexagon(w, h), x);
+        for p in &mut r {
+            p.z += GUN.z;
+        }
+        r
+    };
+    b.loft(
+        &[
+            at(start, 2.5, 1.8),
+            at(taper, 2.5, 1.8),
+            at(mouth, 1.6, 1.2),
+        ],
+        false,
+        false,
+    );
+    // The mouth: a dark stepped ring round the core.
     b.paint(ACCENT);
-    b.block(
-        v3(GUN_BREECH_X - 0.5, -1.0, GUN.z - 0.85),
-        v3(GUN_BREECH_X + 0.05, 1.0, GUN.z + 0.75),
+    b.loft(
+        &[at(mouth - 0.02, 1.6, 1.2), at(mouth + 0.08, 1.2, 0.9)],
+        false,
+        true,
     );
     if b.fine() {
+        b.paint(GLOW);
+        b.mirror_y(|b| {
+            b.block(
+                v3(start + 1.3, 1.24, GUN.z - 0.05),
+                v3(taper - 0.1, 1.27, GUN.z + 0.05),
+            )
+        });
+        b.paint(ACCENT);
         b.plate(v3(house_x - 0.6, 0.55, 6.0), v2(0.6, 0.5), 0.05, 0.02);
         b.block(v3(house_x - 2.3, -0.55, 4.5), v3(house_x - 2.18, 0.55, 5.1));
-        b.paint(GLASS);
-        b.block(
-            v3(house_x + 0.9, -1.05, 5.75),
-            v3(house_x + 1.05, -0.75, 5.85),
-        );
     }
 }
