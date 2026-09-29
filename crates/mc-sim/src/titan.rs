@@ -395,7 +395,7 @@ impl World {
                     if self.unit_entry_is_current(e)
                         && self.state.units.is_active(r)
                         && self.are_enemies(storm.owner, self.state.units.owner[r])
-                        && self.hittable(r, storm.mask)
+                        && self.blast_hittable(r, storm.mask)
                     {
                         let d = self.state.units.pos[r].distance(storm.pos) - self.bp(r).radius;
                         if d <= reach {
@@ -537,7 +537,7 @@ impl World {
                 if self.unit_entry_is_current(e)
                     && self.state.units.is_active(r)
                     && self.are_enemies(sabot.owner, self.state.units.owner[r])
-                    && self.hittable(r, cat::LAND | cat::NAVAL | cat::STRUCTURE)
+                    && self.blast_hittable(r, cat::LAND | cat::NAVAL | cat::STRUCTURE)
                     && self.state.units.pos[r].distance(at.xy()) <= spec.splash + self.bp(r).radius
                 {
                     struck.push(r);

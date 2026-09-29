@@ -419,7 +419,8 @@ fn on_torso(weapons: &[Weapon], w: usize) -> bool {
 }
 
 impl World {
-    /// Whether `row` is wholly under water, below the reach of every weapon.
+    /// Whether `row` is wholly under water: no gun aims at it, only torpedoes and blasts
+    /// (`blast_reaches`) reach it.
     pub(crate) fn submerged(&self, row: usize) -> bool {
         self.state.units.z[row] + self.bp(row).height < self.terrain.water_level()
     }
@@ -429,10 +430,18 @@ impl World {
         self.target_layers(target) & mask != 0 && !self.submerged(target)
     }
 
+    /// Whether a blast that hits `mask` can strike `target`: the right kind, over the water
+    /// or under it. A burst is not aimed, so it takes a dived hull within its reach too.
+    pub(crate) fn blast_hittable(&self, target: usize, mask: u32) -> bool {
+        self.target_layers(target) & mask != 0
+    }
+
     /// Whether a blast at `point` from `weapon` reaches `row`. A burst on the water carries
     /// straight down through it onto a unit walking the bed, measured across only. A hull
-    /// afloat or dived is only reached by what `weapon_reaches` it with (a dived one by a
-    /// torpedo alone), measured to the nearest point between its keel and its top.
+    /// afloat or dived is measured to the nearest point between its keel and its top, so a
+    /// burst on the water over a dived submarine reaches down the few metres to it: no gun
+    /// aims at a dived hull, but a blast is not aimed. A torpedo still takes only what
+    /// `weapon_reaches`.
     fn blast_reaches(&self, point: FxVec3, row: usize, weapon: &Weapon) -> bool {
         let units = &self.state.units;
         let bp = self.bp(row);
@@ -443,7 +452,12 @@ impl World {
                 && point.z <= self.terrain.water_level() + Fx::ONE
                 && units.pos[row].distance(point.xy()) <= reach;
         }
-        if !self.weapon_reaches(row, weapon) {
+        let kind = if weapon.torpedo {
+            self.weapon_reaches(row, weapon)
+        } else {
+            self.blast_hittable(row, weapon.target_mask)
+        };
+        if !kind {
             return false;
         }
         let z = if afloat {

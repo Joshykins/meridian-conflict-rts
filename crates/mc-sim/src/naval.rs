@@ -2,8 +2,9 @@
 //!
 //! A naval hull's origin is its waterline. A dived submarine sits lower by its
 //! height plus `Dive::depth`, so water closes over it (`World::submerged`).
-//! Under water only sonar finds a hull and only a torpedo reaches one; a torpedo
-//! in turn only strikes what floats in the water.
+//! Under water only sonar finds a hull and only a torpedo aims at one (a blast on
+//! the water over it still reaches it); a torpedo in turn only strikes what floats
+//! in the water.
 
 use crate::tables::*;
 use crate::World;

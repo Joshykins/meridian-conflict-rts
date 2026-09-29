@@ -696,14 +696,15 @@ same treatment.
   makes the hull turn. The AA mount turns on its own and out-ranges the deck
   gun, so an escort covers the ships around it. No helipads on a tech 1 hull.
 - **Submarines dive by default, and a dived hull is another world.** Only
-  sonar finds it (vision and radar do not), only torpedoes reach it (no
-  splash either), and it passes under surface ships without touching them.
+  sonar finds it (vision and radar do not), only torpedoes aim at it (a
+  blast on the water over it still reaches it), and it passes under surface ships without touching them.
   V dives or surfaces the selection. Sonar is dark green on the rings;
   torpedo reach is green.
 - **The Paladin walks the seabed.** It is amphibious and keeps to the bottom.
   Wading, it is seen and shot at like anything ashore and its projectors fire;
   once the sea closes over it, it is under water with the dived hulls: only
-  sonar finds it and only torpedoes reach it. A gun whose muzzle is under the
+  sonar finds it and only torpedoes aim at it (a blast on the water over it
+  still reaches it). A gun whose muzzle is under the
   water is silent; the tubes on its shins fire only from under it.
 - **Sonar is a buoy**, not a hut: a float at the waterline, a mast, and the
   hydrophone array hanging under the water. Three tiers, each refitted onto

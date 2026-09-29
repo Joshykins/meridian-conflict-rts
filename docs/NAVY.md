@@ -21,7 +21,8 @@ surfaces to use its deck gun. Nothing in the roster is useless on a map with a c
 
 The other way round: every gun, howitzer, missile and bomb that hits land also hits ships
 on the surface (their `targets` list `Naval`), so a coast is dangerous to a fleet and
-shore batteries matter. A dived hull is still only found by sonar and hit by torpedoes.
+shore batteries matter. A dived hull is still only found by sonar, and no gun aims at it; only torpedoes
+target it, but a blast on the water over it (a shell, a bomb) reaches down onto it.
 
 ## Capital ships have holes on purpose
 

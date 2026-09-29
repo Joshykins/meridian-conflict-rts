@@ -3,8 +3,9 @@
 //! An amphibious walker keeps to the bottom wherever it goes. In water shallower than it
 //! stands tall it wades, seen and shot at like anything ashore; once the sea closes over
 //! its top it is under water with the dived hulls: only sonar finds it and only a torpedo
-//! reaches it. Its guns fire only while their muzzles are out of the water, and its
-//! torpedo tubes only while theirs are under it.
+//! aims at it, though a blast on the water over it still reaches it. Its guns fire only
+//! while their muzzles are out of the water, and its torpedo tubes only while theirs are
+//! under it.
 
 use mc_core::Fx;
 use mc_data::{MoveLayer, Weapon};

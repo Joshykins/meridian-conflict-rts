@@ -1,5 +1,5 @@
 //! Naval rules: submarines dive by themselves and on order, only sonar finds a
-//! dived hull, only torpedoes reach one, and dead ships sink to the seabed.
+//! dived hull, no gun aims at one (torpedoes and blasts reach it), and dead ships sink to the seabed.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::{cat, Blueprints};
@@ -254,7 +254,7 @@ fn only_sonar_finds_a_dived_submarine() {
 }
 
 #[test]
-fn guns_never_reach_a_dived_submarine() {
+fn guns_never_aim_at_a_dived_submarine_but_blasts_reach_it() {
     let mut w = sea(false);
     let sub = spawn(&mut w, "aster_t1_submarine", 0, 1000, 1000, flag::PASSIVE);
     run(&mut w, 40);
@@ -268,7 +268,7 @@ fn guns_never_reach_a_dived_submarine() {
             assert!(!w.state.units.weapon_target[row(&w, id)].contains(&sub));
         }
     }
-    // Shelling the water right over it: the splash stays on the surface.
+    // Shelling the water right over it: the splash carries down onto the hull.
     let mut shots = 0;
     let over = w.state.units.pos[row(&w, sub)];
     order(
@@ -280,16 +280,23 @@ fn guns_never_reach_a_dived_submarine() {
             queue: false,
         },
     );
-    for _ in 0..100 {
+    // The rifle scatters: shell until a round falls close enough.
+    for _ in 0..600 {
         w.tick(&[]).unwrap();
         shots += w
             .events
             .iter()
             .filter(|e| matches!(e, SimEvent::Impact { .. }))
             .count();
+        if w.state.units.health[row(&w, sub)] < health {
+            break;
+        }
     }
     assert!(shots > 0, "the frigate shelled the spot");
-    assert_eq!(w.state.units.health[row(&w, sub)], health);
+    assert!(
+        w.state.units.health[row(&w, sub)] < health,
+        "{shots} rounds on the water over the submarine never reached it"
+    );
     // Told to attack it, the frigate gives up.
     order(
         &mut w,
