@@ -174,7 +174,7 @@ impl Renderer {
             // Bowed off the skin, away from the hull's middle.
             let mid = (a + b) * 0.5;
             let out = Vec3::new(0.0, mid.y, mid.z - height * 0.4).normalize_or(Vec3::Z);
-            let bow = place(mid + out * reach * (0.12 + 0.2 * self.scatter.unit()));
+            let bow = place(mid + out * reach * (0.05 + 0.1 * self.scatter.unit()));
             let start = time + self.scatter.unit() * dt;
             let life = 0.06 + self.scatter.unit() * 0.1;
             let wander = reach * 0.1;

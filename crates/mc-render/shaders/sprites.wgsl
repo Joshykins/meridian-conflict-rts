@@ -446,7 +446,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             // white-pink core, crackling as it holds.
             let envelope = 1.0 - smoothstep(0.4, 1.0, age);
             let flicker = 0.7 + 0.3 * sin((globals.camera.w - p.extras.x) * 71.0 + f32(instance));
-            out.color = vec3<f32>(1.0, 0.1, 0.26) * 9.0 * envelope * flicker;
+            out.color = vec3<f32>(1.0, 0.04, 0.16) * 8.0 * envelope * flicker;
             out.shape = vec2<f32>(-distance(head, tail), 3.0);
         } else if (p.color & 0xFu) == 6u {
             // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
