@@ -135,7 +135,7 @@
             // over onto the aircraft. Enough to see off a few fighters, not a wing of them.
             (
                 name: "AA Rocket Cells",
-                damage: 320, splash: 10, range: 700, reload: 1.6, speed: 420, trajectory: Direct,
+                damage: 320, splash: 10, range: 1200, reload: 1.6, speed: 420, trajectory: Direct,
                 turret_turn: 0, arc: 360, muzzle: (18, 13.8, 62.2),
                 muzzles: [(18, 13.8, 62.2), (18, 19.2, 62.2), (26, 13.8, 62.2), (26, 19.2, 62.2), (34, 13.8, 62.2), (34, 19.2, 62.2), (42, 13.8, 62.2), (42, 19.2, 62.2)],
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
@@ -144,7 +144,7 @@
             ),
             (
                 name: "AA Rocket Cells",
-                damage: 320, splash: 10, range: 700, reload: 1.6, speed: 420, trajectory: Direct,
+                damage: 320, splash: 10, range: 1200, reload: 1.6, speed: 420, trajectory: Direct,
                 turret_turn: 0, arc: 360, muzzle: (18, -13.8, 62.2),
                 muzzles: [(18, -13.8, 62.2), (18, -19.2, 62.2), (26, -13.8, 62.2), (26, -19.2, 62.2), (34, -13.8, 62.2), (34, -19.2, 62.2), (42, -13.8, 62.2), (42, -19.2, 62.2)],
                 targets: ["Air"], color: Orange, missile: true, guided: true, vertical_launch: true,
