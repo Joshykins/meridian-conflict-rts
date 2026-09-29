@@ -330,13 +330,15 @@ impl World {
             } else {
                 pos
             };
-            return self.ensure_moving(row, goal, pos);
+            self.ensure_moving(row, goal, pos)?;
+            return self.reclaim_on_the_way(row);
         }
         if !self.approach(row, pos, radius)? {
             if self.state.units.stuck_ticks[row] == u16::MAX {
                 self.finish_order(row);
+                return Ok(());
             }
-            return Ok(());
+            return self.reclaim_on_the_way(row);
         }
         let done = if self.bp(row).reclaimer.is_some() {
             self.heads_work(row, HeadWork::Unit(t))
@@ -367,6 +369,12 @@ impl World {
     /// aims its heads instead (`reclaim_heads.rs`).
     pub(crate) fn reclaim_ready(&mut self, row: usize, pos: FxVec2) -> bool {
         self.face_work(row, pos)
+    }
+
+    /// On its way to what it was ordered to reclaim, a unit takes the wrecks it passes
+    /// within its reach, as it would idle, without stopping for them.
+    pub(crate) fn reclaim_on_the_way(&mut self, row: usize) -> Result<(), SimError> {
+        self.idle_reclaim(row)
     }
 
     /// What a reclaimer with no orders does by itself: it clears the wrecks within

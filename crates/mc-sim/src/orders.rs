@@ -2810,8 +2810,9 @@ impl World {
         if !self.approach(row, pos, radius)? {
             if self.state.units.stuck_ticks[row] == u16::MAX {
                 self.finish_order(row);
+                return Ok(());
             }
-            return Ok(());
+            return self.reclaim_on_the_way(row);
         }
         let done = if self.bp(row).reclaimer.is_some() {
             self.heads_work(row, crate::reclaim_heads::HeadWork::Wreck(w))

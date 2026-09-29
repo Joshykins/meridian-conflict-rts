@@ -194,6 +194,52 @@ fn own_structures_can_be_reclaimed_and_allies_cannot() {
 }
 
 #[test]
+fn an_engineer_sent_to_reclaim_a_far_wreck_takes_what_it_passes_on_the_way() {
+    let mut w = world();
+    w.tick(&[
+        spawn(&w, 0, ENGINEER, 300, 0),
+        spawn(&w, 1, TANK, 600, flag::PASSIVE),
+        spawn(&w, 1, TANK, 1000, flag::PASSIVE),
+    ])
+    .unwrap();
+    w.tick(&[cmd(Command::DebugDamage {
+        units: ids(&w, 1, TANK),
+        permille: 1000,
+    })])
+    .unwrap();
+    w.tick(&[]).unwrap();
+    let wrecks = &w.state.wrecks;
+    let at = |x: i32| {
+        wrecks
+            .slots
+            .iter()
+            .find(|&r| wrecks.pos[r].x == Fx::from_int(x))
+            .unwrap()
+    };
+    let (passed, far) = (at(600), at(1000));
+    let (full, far_id) = (wrecks.mass[passed], wrecks.slots.handle(far));
+    w.tick(&[cmd(Command::ReclaimWreck {
+        units: ids(&w, 0, ENGINEER),
+        wreck: far_id,
+        queue: false,
+    })])
+    .unwrap();
+    let engineer = w.state.units.row(ids(&w, 0, ENGINEER)[0]).unwrap();
+    run_until(&mut w, 2000, |w| {
+        w.state.units.pos[engineer].x > Fx::from_int(700)
+    });
+    assert!(
+        !w.state.wrecks.slots.is_alive(passed) || w.state.wrecks.mass[passed] < full,
+        "it took from the wreck it passed"
+    );
+    run_until(&mut w, 3000, |w| !w.state.wrecks.slots.is_alive(far));
+    assert!(
+        !w.state.wrecks.slots.is_alive(far),
+        "and reclaimed the one it was sent to"
+    );
+}
+
+#[test]
 fn an_idle_engineer_clears_the_wrecks_in_reach_while_there_is_room() {
     let mut w = world();
     let setup = [
