@@ -531,9 +531,14 @@ fn the_range_panel_reports_what_was_asked() {
         range(RangeAction::Scenario(Scenario::March)),
         "the second row: what the subject does itself"
     );
+    // The third row: the warp jumps.
+    assert_eq!(
+        rig.click(Vec2::new(300.0, 394.0 + focus::FOCUS_H)),
+        range(RangeAction::Scenario(Scenario::WarpDampened))
+    );
     // The panel is shorter on this tab, and Reset came up with it.
     assert_eq!(
-        rig.click(Vec2::new(184.0, 405.0 + focus::FOCUS_H)),
+        rig.click(Vec2::new(184.0, 441.0 + focus::FOCUS_H)),
         range(RangeAction::Reset)
     );
 

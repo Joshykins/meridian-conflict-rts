@@ -49,7 +49,7 @@ impl Tab {
     fn body_h(self) -> f32 {
         match self {
             Tab::Unit => 16.0 + ROW + 4.0 + ROW + 8.0 + ROW,
-            Tab::Stage => 2.0 * (ROW + 4.0) + 4.0,
+            Tab::Stage => 3.0 * (ROW + 4.0) + 2.0 * 4.0,
             Tab::Economy => 26.0 + 2.0 * (22.0 + ROW + 10.0) + ROW + 6.0 + ROW,
             Tab::Sky => crate::ui::sky::ROWS as f32 * (ROW + 4.0) + ROW,
             Tab::Range => 16.0 + ROW + 4.0 + ROW + 4.0 + ROW,
@@ -436,12 +436,17 @@ fn unit_page(
     }
 }
 
-/// Scenarios: around the subject first, then what the subject is told to do itself.
+/// Scenarios: around the subject first, then what the subject is told to do itself, then
+/// its warp jumps.
 fn stage_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>) {
     let mut y = r.y;
-    for (n, line) in [&Scenario::ALL[..4], &Scenario::ALL[4..]]
-        .into_iter()
-        .enumerate()
+    for (n, line) in [
+        &Scenario::ALL[..4],
+        &Scenario::ALL[4..10],
+        &Scenario::ALL[10..],
+    ]
+    .into_iter()
+    .enumerate()
     {
         for (i, (scenario, cell)) in line
             .iter()

@@ -94,10 +94,14 @@ pub enum Scenario {
     Destruct,
     /// A lift ship: a column of tanks behind the pad boards it, and it comes down for them.
     Lift,
+    /// A ship with a warp drive charges and jumps 2.4 km down the range.
+    Warp,
+    /// `Warp` into the field of a red warp dampener: dragged, then thrown out hurt and stunned.
+    WarpDampened,
 }
 
 impl Scenario {
-    pub const ALL: [Scenario; 10] = [
+    pub const ALL: [Scenario; 12] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -108,6 +112,8 @@ impl Scenario {
         Scenario::March,
         Scenario::Destruct,
         Scenario::Lift,
+        Scenario::Warp,
+        Scenario::WarpDampened,
     ];
 
     pub fn label(self) -> &'static str {
@@ -122,6 +128,8 @@ impl Scenario {
             Scenario::Destruct => "Destruct",
             Scenario::Salvage => "Salvage",
             Scenario::Lift => "Lift",
+            Scenario::Warp => "Warp",
+            Scenario::WarpDampened => "Dampened",
         }
     }
 
@@ -137,6 +145,8 @@ impl Scenario {
             "destruct" => Scenario::Destruct,
             "salvage" => Scenario::Salvage,
             "lift" => Scenario::Lift,
+            "warp" => Scenario::Warp,
+            "warp-dampened" => Scenario::WarpDampened,
             _ => return None,
         })
     }
@@ -229,6 +239,9 @@ enum PendingOrder {
     /// Board the lift ship of this blueprint (the subject): given to every unit of the
     /// builder's type at once, not only the first.
     Board(BlueprintId),
+    Warp {
+        pos: FxVec2,
+    },
 }
 
 impl PendingOrder {
@@ -286,6 +299,11 @@ impl PendingOrder {
                 queue: false,
             }],
             PendingOrder::Destruct => vec![Command::SelfDestruct { units: who }],
+            PendingOrder::Warp { pos } => vec![Command::Warp {
+                units: who,
+                pos,
+                queue: false,
+            }],
             PendingOrder::Board(_) => Vec::new(),
         }
     }
@@ -952,6 +970,45 @@ fn stage(
             }
             Ok((spawns, Some((tank, PendingOrder::Board(subject)))))
         }
+        Scenario::Warp | Scenario::WarpDampened => {
+            // Stores enough for the biggest drive's charge, then the jump; dampened, a red
+            // Undertow on free power stands beside where it comes out.
+            let drive = bp.warp.ok_or("This Unit Has No Warp Drive")?;
+            let exit = east(Fx::from_int(2400), 0);
+            let mut spawns = vec![
+                Command::DebugStorage {
+                    player: BLUE,
+                    mass: 0,
+                    energy: (drive.energy * 2).ceil_int().max(0) as u32,
+                },
+                Command::DebugStock {
+                    player: BLUE,
+                    mass: None,
+                    energy: Some(1000),
+                },
+            ];
+            if scenario == Scenario::WarpDampened {
+                let damper = blueprints
+                    .units
+                    .iter()
+                    .find(|d| d.warp_damper.is_some() && blueprints.is_listed(d.id))
+                    .ok_or("No Warp Dampener")?;
+                spawns.push(Command::DebugFreeBuild {
+                    player: RED,
+                    on: true,
+                });
+                spawns.push(Command::DebugSpawn {
+                    owner: RED,
+                    blueprint: damper.id,
+                    pos: exit + FxVec2::from_ints(0, 700),
+                    heading: Angle::from_degrees(270),
+                    count: 1,
+                    flags: flag::PASSIVE | flag::INVULNERABLE,
+                    build: 1000,
+                });
+            }
+            Ok((spawns, Some((subject, PendingOrder::Warp { pos: exit }))))
+        }
         Scenario::Salvage => {
             // Wrecks of the medium tank a short way east, inside a carrier's drone reach
             // and a builder's walk, for a reclaimer to get to work on. A reclaimer with a
@@ -1194,7 +1251,9 @@ mod tests {
                 Scenario::AtWork,
                 Scenario::Salvage,
                 Scenario::Refit,
-                Scenario::Lift
+                Scenario::Lift,
+                Scenario::Warp,
+                Scenario::WarpDampened
             ],
             "the default subject supports everything a tank can do"
         );
@@ -1205,7 +1264,12 @@ mod tests {
             .collect();
         assert_eq!(
             cannot,
-            [Scenario::BuildIt, Scenario::Lift],
+            [
+                Scenario::BuildIt,
+                Scenario::Lift,
+                Scenario::Warp,
+                Scenario::WarpDampened
+            ],
             "nothing builds a commander; it does everything else"
         );
     }
