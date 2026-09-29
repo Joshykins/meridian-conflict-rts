@@ -344,15 +344,10 @@ fn cruise_missiles_climb_a_sheer_coast_without_flying_into_it() {
 }
 
 #[test]
-fn a_dived_strategic_submarine_lobs_a_high_arc_and_gives_itself_away() {
+fn a_dived_experimental_submarine_lobs_a_high_arc_and_gives_itself_away() {
     let mut w = sea(true);
-    // The Kraken's cells given a high arc (`apogee`) in place of its sea skimmers.
-    let kraken_bp = w.blueprints.id_of("aster_t3_submarine").unwrap();
-    let cells = &mut Arc::make_mut(&mut w.blueprints).units[kraken_bp.index()].weapons[1];
-    cells.skim = Fx::ZERO;
-    cells.apogee = Fx::from_int(1500);
     let target = spawn(&mut w, "aster_t1_power", 1, 150, 1000, 0);
-    let kraken = spawn(&mut w, "aster_t3_submarine", 0, 1650, 1000, 0);
+    let kraken = spawn(&mut w, "aster_t4_submarine", 0, 1650, 1000, 0);
     // Radar reaches the submarine; nothing of theirs has sonar.
     spawn(
         &mut w,
@@ -377,7 +372,7 @@ fn a_dived_strategic_submarine_lobs_a_high_arc_and_gives_itself_away() {
             queue: false,
         },
     };
-    let arcs = w.blueprints.id_of("aster_t3_submarine").unwrap();
+    let arcs = w.blueprints.id_of("aster_t4_submarine").unwrap();
     let (mut launches, mut last, mut highest) = (0, None, Fx::ZERO);
     let mut hit = None;
     for t in 0..260u32 {

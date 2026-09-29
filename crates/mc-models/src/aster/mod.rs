@@ -21,7 +21,7 @@ pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
 mod missile_defense;
 mod naval;
-pub(crate) use naval::NARWHAL_RAIL;
+pub(crate) use naval::{MEGALODON_RAIL, NARWHAL_RAIL};
 #[cfg(test)]
 pub(crate) use naval::{RECLAIM_BOAT_PIVOT, RECLAIM_BOAT_REACH, RECLAIM_BOAT_SWEEP};
 mod parts;
@@ -124,6 +124,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("carrier", 60.0, 24.0, naval::carrier),
     ModelDef::new("rail_trimaran", 84.0, 34.0, naval::rail_trimaran),
     ModelDef::new("submarine_strategic", 30.0, 5.0, naval::submarine_strategic),
+    ModelDef::new("submarine_titan", 55.0, 7.0, naval::submarine_titan),
     // Structures.
     ModelDef::tiered(
         "factory_land",

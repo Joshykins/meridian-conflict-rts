@@ -261,6 +261,20 @@ const BLUEPRINTS: &[Blueprint] = &[
             [28.0, 2.2, -2.6],
         ],
     ),
+    hull_unit(
+        "submarine_titan",
+        55.0,
+        7.0,
+        4,
+        &[
+            [52.0, -1.4, -1.6],
+            [52.0, 1.4, -1.6],
+            [52.0, -1.4, -3.0],
+            [52.0, 1.4, -3.0],
+            [52.0, -2.8, -2.3],
+            [52.0, 2.8, -2.3],
+        ],
+    ),
     structure("factory_land", 46.0, 28.0, 1, 8, &[]),
     structure("factory_land", 46.0, 34.0, 2, 8, &[]),
     structure("factory_land", 46.0, 42.0, 3, 8, &[]),
@@ -352,6 +366,7 @@ const NAVAL_HULLS: &[&str] = &[
     "carrier",
     "rail_trimaran",
     "submarine_strategic",
+    "submarine_titan",
 ];
 /// The capital ships: 120 m hulls with the triangle budget of a factory.
 const CAPITAL_SHIPS: &[&str] = &["battleship", "carrier", "rail_trimaran"];
@@ -571,6 +586,7 @@ fn meshes_are_valid() {
                     -91.0
                 } else if CAPITAL_SHIPS.contains(&model.key.as_str())
                     || model.key == "submarine_strategic"
+                    || base_key(&model.key) == "submarine_titan"
                 {
                     // A capital ship's keel, or a big submarine's hull, runs deep.
                     -12.0
@@ -666,6 +682,8 @@ const FACTORY_TRIANGLES: usize = 6000;
 /// and nine Arc Cannons (the Trebuchet's howitzer tube, about 700 triangles each).
 const BATTLESHIP_TRIANGLES: usize = 15000;
 const CORE_MINE_TRIANGLES: usize = 9000;
+/// The tech 4 Megalodon: a 110 m experimental submarine, under the Leviathan's budget.
+const SUBMARINE_TITAN_TRIANGLES: usize = 8000;
 /// The tech 4 assault tank runs on four open track units (road wheels, toothed
 /// sprockets, return rollers seen through the side) and carries two bolt rifles and the
 /// capacitor-fed AEB-2, and finned heat sinks.
@@ -820,6 +838,10 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "sensor_ship" {
             // 72 m tech 1 sensor spacecraft: one drive bell, lift jets, the sensor head.
             5000
+        } else if base_key(&model.key) == "submarine_titan" {
+            // The tech 4 Megalodon, 110 m, one or two a match: six bow tube doors, four
+            // AEB hatches, the nuclear silo lids, two rail turrets on houses of their own.
+            SUBMARINE_TITAN_TRIANGLES
         } else if model.key == "battleship" {
             // 142 m hero hull: layered sides, a stepped pagoda, three triple Arc Cannon houses.
             BATTLESHIP_TRIANGLES

@@ -104,10 +104,19 @@ impl World {
 
     /// Lays weapon `w` of `row` on the target in range the fewest of its own missiles are
     /// chasing, the nearest of those first; with every one already chased, on the least.
-    /// Nothing else in range: it stays on what it has.
+    /// Nothing else in range: it stays on what it has. A unit ordered onto a mark
+    /// (`OrderKind::Attack`) keeps the whole volley on it.
     pub(crate) fn split_target(&mut self, row: usize, w: usize) {
         let weapon = &self.bp(row).weapons[w];
         let units = &self.state.units;
+        let ordered = self
+            .state
+            .orders
+            .front(units, row)
+            .is_some_and(|o| o.kind == crate::tables::OrderKind::Attack);
+        if ordered {
+            return;
+        }
         let (at, id) = (units.pos[row], units.id(row));
         let p = &self.state.projectiles;
         let chased = |t: usize| {

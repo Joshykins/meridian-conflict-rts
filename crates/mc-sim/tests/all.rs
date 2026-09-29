@@ -42,6 +42,7 @@ mod javelin_role;
 mod lift_ship;
 mod line_of_fire;
 mod map_wreckage;
+mod megalodon;
 mod mines;
 mod missile_defense;
 mod naga;

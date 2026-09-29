@@ -128,6 +128,9 @@ fn setup(w: &mut World) {
                 // Two submarines already in the north's waters, raiding its fleet past its
                 // torpedo defences (the north's grid is paid, so they stand to).
                 add("aster_t1_submarine", 2, 3000, 3350);
+                // The experimental submarine: strike missiles on a high arc spread over the
+                // north's buildings, deck rails that wait for the surface.
+                add("aster_t4_submarine", 1, 3600, 500);
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);
@@ -243,10 +246,20 @@ fn reference() -> Vec<u64> {
     let mut w = world(0);
     setup(&mut w);
     let mut intercepted = 0;
+    let mut struck = 0;
+    let titan_sub = w.blueprints.id_of("aster_t4_submarine").unwrap();
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
             let hash = w.tick(&commands).unwrap();
+            struck += w
+                .events
+                .iter()
+                .filter(|e| {
+                    matches!(e, mc_sim::SimEvent::ShotFired { blueprint, weapon: 1, .. }
+                        if *blueprint == titan_sub)
+                })
+                .count();
             intercepted += w
                 .events
                 .iter()
@@ -257,6 +270,8 @@ fn reference() -> Vec<u64> {
         .collect();
     // The torpedo defences met the submarines' torpedoes.
     assert!(intercepted > 0, "no torpedo was intercepted in the match");
+    // The experimental submarine's strike missiles went up on their high arc.
+    assert!(struck > 0, "no strike missile was launched in the match");
     // The salvage carriers' heads were at work in it, on the move.
     let reclaimed = w.state.players.iter().map(|p| p.reclaimed_mass).max();
     assert!(

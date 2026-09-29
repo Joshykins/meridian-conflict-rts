@@ -852,6 +852,7 @@ pub fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRail> {
         ("space_frigate", 1..=4) => Some(&aster::air::RESOLUTE_TURRET_RAIL),
         ("rail_corvette", 0) => Some(&aster::air::VALIANT_RAIL_CHARGE),
         ("rail_trimaran", 0) => Some(&aster::NARWHAL_RAIL),
+        ("submarine_titan", 3..=4) => Some(&aster::MEGALODON_RAIL),
         _ => None,
     }
 }

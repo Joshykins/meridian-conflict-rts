@@ -74,8 +74,11 @@ missile lasers go down).
   (`rake`) and fall over and round the mark. Each is light and easy for point defence to
   burn; the salvo is too many to burn them all.
 
-The high arc (`apogee`: straight up, over a top of up to 1,500 m, straight down) is kept for
-the tier 4 submarine's long-range missile, which is being planned (docs/NAVY.md "Not done").
+- **High arcs** (the Megalodon's AEB strike missiles): launched dived, each climbs over a top
+  of up to 2,500 m (`apogee`) and falls on a base up to 6 km off, going off as the electric
+  bore's blast. A volley of four spreads over four marks (`split`) unless the boat is ordered
+  onto one (an Attack), when all four fall on it. In the air for a long time and on radar
+  the whole way: long-range SAMs and Mantas get many shots.
 
 Every anti-missile laser comes out of a head on the model (`anti_missile_mounts`, the
 shared `pd_laser` in models/aster/naval/mod.rs) marked with steady laser red
@@ -114,6 +117,7 @@ sea after a battle pays for the battle.
 | Kraken | 3 | Strategic submarine | Eight tubes; four sea-skimming cruise missiles per salvo, launched dived. |
 | Breakwater | 1 | Torpedo defence | A moored float firing interceptors at torpedoes within 400 m; refitted to tier 2 (two launchers, 650 m). |
 | Fathom | 3 | Seabed torpedo defence | Built on the seabed in deep water; four interceptor batteries (1,000 m); only sonar finds it, only torpedoes reach it. |
+| Megalodon | 4 | Experimental submarine | Built by engineers on the water. AEB strike missiles to 6 km (volleys of four over four marks), its own nuclear warheads (assembled aboard, four at most, launched dived), long-range torpedoes, interceptors, two deck rail turrets that work only surfaced, a hull shield that holds dived too. |
 | Narwhal | 3 | Anti-ship trimaran | A Zenith rail down the keel: the hull turns to aim, the barrel elevates. Shoots only spaceships; nothing else aboard. |
 
 ## The Leviathan
@@ -162,6 +166,7 @@ The unit the naval design language is nailed on:
 cargo test -p mc-sim --test sim -- naval::
 cargo test -p mc-sim --test sim -- naval_roster::
 cargo test -p mc-sim --test sim -- torpedo_defense::
+cargo test -p mc-sim --test sim -- megalodon::
 cargo test -p mc-sim --test sim -- broadside::
 cargo test -p mc-path --test big_hulls
 cargo test -p mc-models --lib tests::
@@ -179,8 +184,6 @@ Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-models --l
 
 ## Not done
 
-- The tier 4 submarine (nukes, a long-range anti-base missile, torpedoes, deck rails,
-  shields) is being planned with the user.
 - The Atoll's flight deck is for show: it does not dock, mend, launch or build aircraft yet.
   How that should work is undecided, as it needs aircraft mechanics the game lacks.
 - The AI builds the new hulls as naval units but knows nothing about their roles.

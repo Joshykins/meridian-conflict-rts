@@ -30,6 +30,7 @@ mod seabed_defense;
 mod shield_boat;
 mod submarine_hunter;
 mod submarine_strategic;
+mod submarine_titan;
 mod torpedo_defense;
 mod trimaran;
 
@@ -37,9 +38,11 @@ mod trimaran;
 pub(crate) use reclaim_boat::{
     PIVOT as RECLAIM_BOAT_PIVOT, REACH as RECLAIM_BOAT_REACH, SWEEP as RECLAIM_BOAT_SWEEP,
 };
+pub(crate) use submarine_titan::RAIL as MEGALODON_RAIL;
 pub(crate) use trimaran::RAIL as NARWHAL_RAIL;
 
 pub(super) use seabed_defense::build as seabed_defense;
+pub(super) use submarine_titan::build as submarine_titan;
 pub(super) use torpedo_defense::build as torpedo_defense;
 
 pub(super) fn reclaim_boat(b: &mut MeshBuilder, _tech: u8) {

@@ -353,6 +353,15 @@
             "Interceptor Battery": "Four batteries round the installation, each firing interceptors up and out at torpedoes a kilometre off.",
         },
     ),
+    "aster_t4_submarine": (
+        lore: "The largest hull the Reach ever sent under the water, built where it floats because no slip could hold it. It carries its own warheads, assembled aboard, and missiles that climb out of the sea and fall on bases half a map away. Up on the surface its rail turrets fight; under it, only sonar hears it and its shield holds.",
+        weapons: {
+            "Long-Range Torpedoes": "Six heavy bow tubes whose torpedoes run far.",
+            "AEB Strike Missiles": "Four hatches aft of the sail. A volley climbs into the high air and falls on as many marks, each going off as an electric bore's blast.",
+            "Interceptor Tubes": "Torpedoes aft that meet torpedoes coming in.",
+            "Deck Rail Turret": "A rail turret fore and aft of the sail, working only with the boat surfaced.",
+        },
+    ),
     "aster_t1_salvage_boat": (
         lore: "A reclaim tower put to sea on two hulls. It draws what sank back up as it sails, out where no engineer can follow.",
     ),
