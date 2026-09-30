@@ -26,7 +26,7 @@ impl Hud {
         self.glass(ui, r);
         // The test range's free build spends nothing, whatever the builders ask for.
         let free = s.view.range.as_ref().is_some_and(|range| range.free_build);
-        // Materials come in from the mines and from reclaim; the reclaim's share is shown too.
+        // Materials come in from the mines and from reclaim; the reclaim is shown apart too.
         let rows = [
             (
                 "Materials",
@@ -177,21 +177,17 @@ impl Hud {
                     rgb(palette::LINE, 0.25),
                 );
             }
-            let end = ui.text(
-                x,
-                r.y + 54.0,
-                type_scale::MICRO,
-                rgb(palette::DIM, 1.0),
-                &format!("Income  +{income:.1}"),
-            );
-            if i == 0 && p.reclaim_income > 0.05 {
-                let share = p.reclaim_income / income.max(0.01) * 100.0;
+            let spend_text = format!("Spend  -{spend:.1}");
+            let spend_x = x + block - 12.0 - ui.text_width(type_scale::MICRO, &spend_text);
+            if i == 0 {
+                materials_income(ui, p, x, r.y + 54.0, spend_x - 10.0);
+            } else {
                 ui.text(
-                    end + 8.0,
+                    x,
                     r.y + 54.0,
                     type_scale::MICRO,
-                    rgb(MASS, 0.95),
-                    &format!("{share:.0}% reclaim"),
+                    rgb(palette::DIM, 1.0),
+                    &format!("Income  +{income:.1}"),
                 );
             }
             ui.text_right(
@@ -199,7 +195,7 @@ impl Hud {
                 r.y + 54.0,
                 type_scale::MICRO,
                 rgb(palette::DIM, 1.0),
-                &format!("Spend  -{spend:.1}"),
+                &spend_text,
             );
         }
         focus::strip(self, ui, p, r, short, dt);
@@ -257,6 +253,56 @@ impl Hud {
         }
         r.bottom()
     }
+}
+
+/// The materials' income line up to `limit`: what the mines and generators make, what
+/// that grows to once every mine has spread over its territory and dug out to its ore,
+/// powered (left out once they all have, so a grown economy reads as one number), and
+/// what reclaim brings in, while it brings anything. Short of room it is spelt tighter.
+fn materials_income(ui: &mut Ui, p: &crate::sim_thread::PlayerStatus, x: f32, y: f32, limit: f32) {
+    let rate = |v: f32| {
+        if v >= 10.0 {
+            format!("{v:.0}")
+        } else {
+            format!("{v:.1}")
+        }
+    };
+    let made = format!("Income  +{}", rate(p.mass_income));
+    let max = (p.mine_growth > 0.05).then(|| rate(p.mass_income + p.mine_lost + p.mine_growth));
+    let reclaim = (p.reclaim_income > 0.05).then(|| rate(p.reclaim_income));
+    let spelt = |long: bool| {
+        let max = max.as_ref().map_or(String::new(), |m| {
+            if long {
+                format!(" / {m} max")
+            } else {
+                format!(" / {m}")
+            }
+        });
+        let reclaim = reclaim.as_ref().map_or(String::new(), |r| {
+            if long {
+                format!("   Reclaim  +{r}")
+            } else {
+                format!("  Reclaim +{r}")
+            }
+        });
+        (max, reclaim)
+    };
+    let (mut max_text, mut reclaim_text) = spelt(true);
+    let made_w = ui.text_width(type_scale::MICRO, &made);
+    let long_w = ui.text_width(type_scale::MICRO, &max_text)
+        + ui.text_width(type_scale::MICRO, &reclaim_text);
+    if x + made_w + long_w > limit {
+        (max_text, reclaim_text) = spelt(false);
+    }
+    let end = ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &made);
+    let end = ui.text(
+        end,
+        y,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        &max_text,
+    );
+    ui.text(end, y, type_scale::MICRO, rgb(MASS, 0.95), &reclaim_text);
 }
 
 /// The spending to show beside a resource's income. What was really spent, so a
