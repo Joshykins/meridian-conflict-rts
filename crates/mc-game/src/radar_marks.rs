@@ -13,6 +13,8 @@ use glam::Vec2;
 use mc_data::BlueprintId;
 use mc_sim::mirror::{KIND_GHOST, KIND_PROP, KIND_WRECK};
 
+/// Each post's own reach: the radar blue, lightened to read over the ground.
+const REACH: u32 = 0x9DB6FF;
 /// Construction amber, for posts still being built.
 const BUILDING: u32 = 0xFFA928;
 
@@ -24,7 +26,6 @@ pub fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec2)>) {
         return;
     };
     let view = field.view;
-    let tone = Reach::Radar.tone();
     let t = ui.time;
     let (mut standing, mut building) = (Vec::new(), 0);
     for u in &view.frame.units {
@@ -38,7 +39,7 @@ pub fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec2)>) {
         };
         let at = Vec2::new(u.pos[0], u.pos[1]);
         if u.build >= 1.0 {
-            ground_ring(ui, field, at, r, 1.6, rgb(0x9DB6FF, 0.6), true, 0.0);
+            ground_ring(ui, field, at, r, 1.6, rgb(REACH, 0.6), true, 0.0);
             standing.push((at, r));
         } else {
             // Its cover to come, apart from the network until it stands.
