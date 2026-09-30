@@ -729,7 +729,7 @@ impl Ambience {
         let ids = self.ids.as_ref().expect("looked up above");
         let focus = cues.focus.truncate();
         let reach = (cues.distance * 0.6).clamp(120.0, 1500.0);
-        let climate = mc_render::shore::climate_scale(cues.desert, cues.tropical);
+        let climate = mc_render::shore::climate_scale(cues.desert, cues.tropical, cues.wind);
         let mut hits = Vec::new();
         self.surf.step(
             ground, cues.sea, focus, reach, cues.clock, climate, dt, &mut hits,

@@ -116,23 +116,22 @@ fn breakers(spot: &Spot, clock: f32, climate: f32, from: f32, to: f32, out: &mut
         + 1;
     for k in -1..=ahead {
         let wave = next.wave + k as f32;
-        // Wave n lands at n * PERIOD less the shore's lag: `next`'s landing moved on by
-        // whole periods, the same for every wave whichever of them is next.
-        let lands = next.lands + k as f32 * surf::PERIOD;
         let size = shore::size(wave, spot.xy) * climate;
-        // As `shore::next_breaker` has it: it breaks in water as deep as it is high times
-        // the ratio, the swell's travel time from there before it lands.
-        let breaks = lands - shore::travel(surf::HEIGHT * size * surf::BREAK_RATIO, spot.slope);
-        // Those use the shore's lag as it is now; the shader reads it as it will be
-        // then, which drifts by a few hundredths of a second over a second or two.
-        // It is found by looking the lag up again at the moment found, twice.
-        let now = shore::lag(spot.xy, clock);
-        let settle = |t: f32| {
-            let once = t + now - shore::lag(spot.xy, t);
-            t + now - shore::lag(spot.xy, once)
-        };
-        let (breaks, lands) = (settle(breaks), settle(lands));
+        // As `shore::next_breaker` has it: it lands when its crest reaches the
+        // waterline, and breaks in water as deep as it is high times the ratio, the
+        // swell's travel time from there before.
+        let lands = shore::crest_time(spot.xy, wave, 0.0);
+        let breaks = shore::crest_time(
+            spot.xy,
+            wave,
+            shore::travel(surf::HEIGHT * size * surf::BREAK_RATIO, spot.slope),
+        );
+        // A section that rolls in unbroken (`shore::breaking`) is heard only washing up.
+        let crashes = shore::breaking(wave, spot.xy) > 0.3;
         for (at, wash, lead) in [(breaks, false, CRASH_AT), (lands, true, WASH_AT)] {
+            if !wash && !crashes {
+                continue;
+            }
             let start = at - lead / pitch(size);
             if start > from && start <= to {
                 out.push(Hit {
@@ -221,9 +220,10 @@ mod tests {
     fn breakers_are_heard_on_a_shore_as_they_break_and_not_at_sea_or_inland() {
         let hits = listen(&beach, Vec2::new(1400.0, 1024.0), 120.0);
         let crashes: Vec<_> = hits.iter().filter(|h| !h.1.wash).collect();
-        // Up to four points along the beach, a breaker every 7.5 s at each.
+        // Up to four points along the beach, a breaker every 7.5 s at each, less the
+        // sections that roll in unbroken (`shore::breaking`) and are not heard crashing.
         assert!(
-            (30..=70).contains(&crashes.len()),
+            (20..=70).contains(&crashes.len()),
             "{} crashes in two minutes",
             crashes.len()
         );
@@ -237,8 +237,8 @@ mod tests {
             let lead = if h.wash { WASH_AT } else { CRASH_AT };
             assert!((h.at - h.start - lead / pitch(h.size)).abs() < 1e-3);
         }
-        // A crash for every wave at each point: none twice, none missed. (On a
-        // shelf a big wave breaks further out, so two may break close together.)
+        // A crash for every breaking wave at each point: none twice. (On a shelf a
+        // big wave breaks further out, so two may break close together.)
         let mut at_spot: std::collections::BTreeMap<i32, Vec<(f32, f32)>> = Default::default();
         for (_, h) in &crashes {
             at_spot
@@ -247,7 +247,7 @@ mod tests {
                 .push((h.at, h.size));
         }
         for waves in at_spot.values() {
-            assert!((14..=18).contains(&waves.len()), "{waves:?}");
+            assert!((8..=18).contains(&waves.len()), "{waves:?}");
             for (i, a) in waves.iter().enumerate() {
                 assert!(
                     waves[i + 1..].iter().all(|b| b.1 != a.1),

@@ -56,12 +56,18 @@ fn shore_at(xy: vec2<f32>, depth: f32) -> Shore {
 }
 
 // The breakers' size on this map's water: open coast, a reef-sheltered tropical
-// shore, or a canyon lake.
+// shore, or a canyon lake, and bigger the harder the wind blows (`surf_wind`).
 fn surf_climate() -> f32 {
+    var base = select(1.0, SURF_TROPICAL, tropical());
     if desert() {
-        return SURF_DESERT;
+        base = SURF_DESERT;
     }
-    return select(1.0, SURF_TROPICAL, tropical());
+    return base * surf_wind(length(atmos.wind.zw));
+}
+
+// The breakers' size in a wind of `speed` m/s, 1 on a fair day's 12 m/s.
+fn surf_wind(speed: f32) -> f32 {
+    return clamp(0.4 + speed * SURF_WIND_GAIN, 0.6, 1.5);
 }
 
 // The bed the breakers roll in over: as far out as the real one, never steeper
@@ -78,19 +84,33 @@ fn surf_travel(depth: f32, slope: f32) -> f32 {
 }
 
 // Seconds by which the breakers here run ahead of the ones further along: slow
-// sines only, so the CPU gets the very same number.
+// sines only, so the CPU gets the very same number. The long terms bend the
+// crests along the shore, the short ones kink them, and the terms in time let
+// the gap between one wave and the next come and go by a second or so.
 fn surf_lag(xy: vec2<f32>, time: f32) -> f32 {
     return 1.4 * sin(dot(xy, vec2<f32>(0.0061, 0.0023)) + time * 0.021)
         + 0.9 * sin(dot(xy, vec2<f32>(-0.0027, 0.0074)) + 1.7)
-        + 0.4 * sin(dot(xy, vec2<f32>(0.0152, -0.0101)) + time * 0.05);
+        + 0.4 * sin(dot(xy, vec2<f32>(0.0152, -0.0101)) + time * 0.05)
+        + 1.1 * sin(dot(xy, vec2<f32>(0.043, 0.029)) + time * 0.09)
+        + 0.7 * sin(dot(xy, vec2<f32>(-0.071, 0.052)) + 2.3)
+        + 0.9 * sin(dot(xy, vec2<f32>(0.0009, 0.0013)) + time * 0.11);
 }
 
-// The size of breaker `m` at `xy`, about 1: the swell comes in sets of bigger
-// waves, and each wave is bigger in some stretches of the shore than others.
+// The size of breaker `m` at `xy`, about 1 at its biggest: the swell comes in
+// uneven sets, and each wave stands up in sections along the shore, big in one
+// stretch and too small to break in the next.
 fn surf_size(m: f32, xy: vec2<f32>) -> f32 {
-    let sets = 0.62 + 0.38 * sin(m * 0.93 + 0.4);
-    let stretch = 0.72 + 0.28 * sin(dot(xy, vec2<f32>(0.0113, 0.0041)) + m * 1.7);
-    return sets * stretch;
+    let sets = 0.6 + 0.4 * (0.65 * sin(m * 0.93 + 0.4) + 0.35 * sin(m * 2.39 + 1.3));
+    let along = 0.5 * sin(dot(xy, vec2<f32>(0.0113, 0.0041)) + m * 1.7)
+        + 0.3 * sin(dot(xy, vec2<f32>(-0.021, 0.033)) + m * 2.9)
+        + 0.2 * sin(dot(xy, vec2<f32>(0.061, 0.047)) + m * 4.3);
+    return sets * (0.68 + 0.32 * along);
+}
+
+// How much of breaker `m` at `xy` breaks white, 0-1: a section too small for
+// its water rolls in as a plain swell, a gap in the line of white.
+fn surf_breaking(m: f32, xy: vec2<f32>) -> f32 {
+    return smoothstep(0.22, 0.42, surf_size(m, xy));
 }
 
 // Its height in metres on this map.
@@ -155,31 +175,56 @@ fn surf(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Surf {
     // The bed rises along `up`: a crest seaward of here (d < 0) slopes the water
     // down toward the shore in front of it.
     // (Faded out halfway between crests, where the next wave takes over.)
-    let lift = height * 0.5 * grow * mix(1.0, 0.4, broken) * (1.0 - smoothstep(0.4, 0.5, abs(d)));
+    // The swell stands up in humps along its crest, not as one even ridge: each
+    // wave's are its own, and the gaps between them are where it lies low.
+    let humps = mix(0.25, 1.15, smoothstep(0.2, 0.8, grad_noise2(xy + vec2<f32>(m * 41.0, m * 23.0), 48.0)));
+    let lift = height * 0.5 * grow * mix(1.0, 0.4, broken) * (1.0 - smoothstep(0.4, 0.5, abs(d))) * humps;
     out.slope = s.up * rise * lift * shown;
-    out.face = face * grow * unbroken * shown;
+    out.face = face * grow * unbroken * shown * humps * humps;
+    // Rip channels: every couple of hundred metres the bed is cut deeper, the
+    // breakers stand down over it and the white water they drop drains out
+    // through it in a tongue of foam reaching past the surf.
+    let rip = smoothstep(0.64, 0.8, grad_noise2(xy + vec2<f32>(-431.0, 977.0), 170.0));
+    // Old foam lying all over the surf zone, broken into patches: by the average
+    // wave's surf zone, so it has no seam where one wave hands over to the next.
+    // It reaches further out along some stretches of the shore than others.
+    let reach = mix(0.55, 1.6, grad_noise2(xy + vec2<f32>(211.0, -37.0), 95.0));
+    let zone = SURF_HEIGHT * surf_climate() * 0.8 * SURF_BREAK_RATIO * reach * (1.0 + rip * 1.4);
+    let inside = 1.0 - smoothstep(zone * 0.8, zone * 1.2, depth);
+    // Patches tens of metres across where more has gathered, and bare water between.
+    let drift = grad_noise2(xy + vec2<f32>(time * 0.4, -time * 0.3), 38.0);
+    let lying = (0.12 + 0.3 * smoothstep(0.35, 0.75, drift) + rip * 0.25) * inside
+        * (0.5 + 0.5 * clamp(1.0 - depth / zone, 0.0, 1.0));
+    // Averaged over a period, from high up.
+    let mean = (0.25 + 0.3 * clamp(1.0 - depth / zone, 0.0, 1.0)) * inside * surf_climate() * (0.7 + 0.6 * drift);
     if depth > breaks * 1.15 {
+        out.foam = mix(mean, lying, shown);
         return out;
     }
+    // How much of this wave breaks here: whole sections of it roll in unbroken,
+    // and over a rip it hardly breaks at all.
+    let white = surf_breaking(m, xy) * (1.0 - rip * 0.75);
+    // The broken crest's line is ragged: it goes over sooner in one spot than the
+    // next, and each wave's ragged edge is its own.
+    let ragged = (soft_ripple(xy * 0.37 + vec2<f32>(m * 31.0, m * 17.0), pixel * 0.37) - 0.5) * (3.0 + height * 3.0)
+        + (soft_ripple(xy * 0.11 + vec2<f32>(-m * 19.0, m * 5.0), pixel * 0.11) - 0.5) * (6.0 + height * 4.0);
+    let xr = x + ragged;
+    // Tufts along the crest: the white comes over in heaps, not an even rope.
+    let heaps = mix(0.1, 1.2, smoothstep(0.3, 0.65, soft_ripple(xy * 0.3 + vec2<f32>(m * 13.0, -m * 7.0), pixel * 0.3)));
     // Where it breaks: the lip curls over, a band of solid white along the crest
     // just behind the front, widest the moment it goes.
     let lip_w = max(0.8 + height * 1.2, pixel);
     let at_break = 1.0 - smoothstep(0.0, 0.5, broken);
-    let lip = exp(-(x + lip_w * 0.3) * (x + lip_w * 0.3) / (lip_w * lip_w)) * smoothstep(breaks * 1.15, breaks * 0.9, depth);
-    out.lip = lip * mix(0.55, 1.0, at_break) * mix(0.6, 1.0, surf_size(m, xy) - 0.3) * shown;
-    // White water left behind the broken crest as it runs in, thinning out.
+    let lip = exp(-(xr + lip_w * 0.3) * (xr + lip_w * 0.3) / (lip_w * lip_w)) * smoothstep(breaks * 1.15, breaks * 0.9, depth);
+    out.lip = lip * mix(0.55, 1.0, at_break) * mix(0.6, 1.0, surf_size(m, xy) - 0.3) * shown * white * heaps;
+    // White water left behind the broken crest as it runs in, thinning out, torn
+    // into streaks and holes as it goes.
     let age = max(d, 0.0) * SURF_PERIOD;
-    let trail = exp(-age / (1.2 + 1.6 * broken)) * step(0.0, x) * (1.0 - smoothstep(0.3, 0.5, d));
-    let ahead = exp(-x * x / (lip_w * lip_w * 0.6)) * (1.0 - unbroken);
-    let bore = max(trail, ahead) * (1.0 - unbroken) * smoothstep(0.0, 0.25, broken + 0.2);
-    // Old foam lying all over the surf zone, broken into patches: by the average
-    // wave's surf zone, so it has no seam where one wave hands over to the next.
-    let zone = SURF_HEIGHT * surf_climate() * 0.8 * SURF_BREAK_RATIO;
-    let inside = 1.0 - smoothstep(zone * 0.8, zone * 1.2, depth);
-    let lying = 0.22 * inside * (0.5 + 0.5 * clamp(1.0 - depth / zone, 0.0, 1.0));
+    let trail = exp(-age / (1.2 + 1.6 * broken)) * step(0.0, xr) * (1.0 - smoothstep(0.3, 0.5, d));
+    let ahead = exp(-xr * xr / (lip_w * lip_w * 0.6)) * (1.0 - unbroken);
+    let torn = mix(0.55, 1.1, soft_ripple(xy * 0.21 + vec2<f32>(m * 7.0, time * 0.15), pixel * 0.21));
+    let bore = max(trail, ahead) * (1.0 - unbroken) * smoothstep(0.0, 0.25, broken + 0.2) * white * torn;
     let detail = max(bore * 0.95, lying);
-    // Averaged over a period, from high up.
-    let mean = (0.25 + 0.3 * clamp(1.0 - depth / zone, 0.0, 1.0)) * inside * surf_climate();
     out.foam = mix(mean, detail, shown);
     return out;
 }
@@ -214,7 +259,10 @@ fn wash(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Wash {
     let size = surf_size(m, xy) * surf_climate();
     // Each wash runs up in lobes of its own, further here and less there, so its
     // front and the wet it leaves are never one clean line along the shore.
-    let lobes = 1.0 + (grad_noise2(xy + vec2<f32>(m * 37.0, m * 11.0), 11.0) - 0.5) * 0.8;
+    // Over longer stretches, too: one wave runs far up one part of the beach and
+    // barely wets the next.
+    let lobes = (1.0 + (grad_noise2(xy + vec2<f32>(m * 37.0, m * 11.0), 11.0) - 0.5) * 0.8)
+        * (0.55 + 0.9 * grad_noise2(xy + vec2<f32>(m * 53.0, -m * 29.0), 64.0));
     let reach = min(SURF_RUNUP * size, SURF_RUNUP_RISE * size / slope) * lobes;
     let damp = 1.0 + (grad_noise2(xy, 9.0) - 0.5) * 0.5;
     if up > reach * 1.3 + pixel * 2.0 || reach < 0.05 {
@@ -224,13 +272,19 @@ fn wash(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Wash {
     let q = since / run;
     // The wash rises and falls back like a thrown thing: a parabola in time.
     let front = select(0.0, reach * 4.0 * q * (1.0 - q), q < 1.0)
-        + (soft_ripple(xy + vec2<f32>(m * 5.0, 0.0), pixel) - 0.5) * min(reach * 0.25, 1.2);
+        + (soft_ripple(xy + vec2<f32>(m * 5.0, 0.0), pixel) - 0.5) * min(reach * 0.3, 1.5)
+        + (soft_ripple(xy * 0.23 + vec2<f32>(0.0, m * 7.0), pixel * 0.23) - 0.5) * min(reach * 0.5, 3.0);
     let soft = max(pixel * 1.2, 0.25);
     // Only up on the sand: under the water's own edge the sea is drawn over it.
     out.cover = (1.0 - smoothstep(front - soft, front + soft, up)) * smoothstep(-0.2, 0.4, up);
     // The frothing edge as it runs up; a thinning lace behind it as it drains.
     let edge_w = max(0.35 + reach * 0.05, pixel);
-    let edge = exp(-(up - front) * (up - front) / (edge_w * edge_w)) * select(0.55, 1.0, q < 0.5) * step(0.0, front - 0.05);
+    // (Only while a wash is running: between washes a front resting at the
+    // waterline drew one even white line all along the shore.)
+    let edge = exp(-(up - front) * (up - front) / (edge_w * edge_w)) * select(0.55, 1.0, q < 0.5)
+        * smoothstep(0.1, 0.6, front) * step(q, 1.0)
+        // Torn: the froth rides the front in clots with bare gaps between.
+        * smoothstep(0.3, 0.62, soft_ripple(xy * 0.45 + vec2<f32>(m * 11.0, time * 0.3), pixel * 0.45));
     // (None out under the water's edge, where it drew a white outline round the shore.)
     out.foam = max(edge, out.cover * max(0.35 - 0.3 * q, 0.0)) * smoothstep(-0.2, 0.4, up);
     // Sand the wash left: wettest where it has only just drained. Each spot drained

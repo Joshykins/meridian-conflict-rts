@@ -73,22 +73,32 @@ struct SeaWaves {
     slope: vec2<f32>,
     // The mid-scale waves' height here in units of their spread: past 2 on the steepest crests.
     crest: f32,
+    // The same a second and two and a half seconds ago: a crest that broke here
+    // then has left its foam lying where it was.
+    crest_then: vec2<f32>,
     // The long swell's height, -1 in a trough to 1 on a crest (for the view from far off).
     swell: f32,
     // Slope variance of the trains the pixel is too coarse to show.
     lost: f32,
 }
 
-// `long` scales the swell (calm in the shallows), `chop` the short waves (gusts).
-fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, long: f32, chop: f32) -> SeaWaves {
+// Seconds back the foam left by a breaking crest is looked for (`crest_then`).
+const SEA_FOAM_BACK: vec2<f32> = vec2<f32>(1.0, 2.5);
+
+// `long` scales the swell (calm in the shallows), `wind` the wind waves (the sea
+// state), `chop` the short waves (gusts). `pixel` is the footprint's long side,
+// which filters the slope; `across` its mean width, which filters the crests the
+// whitecaps break on, so seen low across the water they still break.
+fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind: f32, chop: f32) -> SeaWaves {
     var out: SeaWaves;
     out.slope = vec2<f32>(0.0);
     out.lost = 0.0;
     var crest = 0.0;
+    var crest_then = vec2<f32>(0.0);
     var crest_var = 0.0;
     var swell = 0.0;
     var swell_w = 0.0;
-    let wind = atan2(SEA_WIND.y, SEA_WIND.x);
+    let heading = atan2(SEA_WIND.y, SEA_WIND.x);
     // Four broad fields drifting downwind. Each train takes its strength and a
     // bend in its crests from its own blend of them: endless plane waves summed
     // tile into a lattice the eye picks out, where real trains come and go in
@@ -105,10 +115,12 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, long: f32, chop: f32) -> SeaW
         let lambda = 150.0 * pow(0.735, fi);
         let k = 6.283185 / lambda;
         // Steepness (k times height): gentle swell, steeper wind waves.
-        let steep = mix(0.03, 0.075, smoothstep(1.0, 9.0, fi)) * select(1.0, long, i < 6u) * select(1.0, chop, i > 11u);
+        let steep = mix(0.03, 0.075, smoothstep(1.0, 9.0, fi)) * select(1.0, long, i < 6u) * select(1.0, chop, i > 11u)
+            * select(1.0, wind, i >= 4u);
         let fade = smoothstep(1.5, 5.0, lambda / max(pixel, 0.001));
+        let fade_crest = smoothstep(1.5, 5.0, lambda / max(across, 0.001));
         out.lost += steep * steep * 0.3 * (1.0 - fade);
-        if fade <= 0.0 {
+        if fade_crest <= 0.0 {
             continue;
         }
         let spread = mix(0.8, 2.3, fi / f32(SEA_TRAINS - 1u));
@@ -118,7 +130,7 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, long: f32, chop: f32) -> SeaW
         let lot = clamp(0.5 + dot(fields, mix_a) * 1.6, 0.0, 1.0);
         let strength = mix(0.2, 1.55, lot * lot * (3.0 - 2.0 * lot));
         let bend = dot(fields, mix_b) * 2.2;
-        let a = wind + (fract(fi * 0.618034 + 0.13) * 2.0 - 1.0) * spread;
+        let a = heading + (fract(fi * 0.618034 + 0.13) * 2.0 - 1.0) * spread;
         let dir = vec2<f32>(cos(a), sin(a));
         // In cycles, folded before the multiply so kilometres of map and hours of
         // play keep the phase precise.
@@ -128,11 +140,20 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, long: f32, chop: f32) -> SeaW
         let s = sin(phase);
         // exp(sin - 1): sharp crests, broad troughs, as wind waves stand.
         let e = exp(s - 1.0);
-        let amp = steep / k * fade * strength;
-        out.slope += dir * (amp * k * e * cos(phase));
+        let amp = steep / k * fade_crest * strength;
+        out.slope += dir * (amp * k * e * cos(phase)) * (fade / fade_crest);
         if lambda > 3.0 && lambda < 70.0 {
-            crest += amp * (e - 0.466);
-            crest_var += amp * amp * 0.0915;
+            // Weighed by steepness more than height: a crest breaks where the water
+            // is steep, and weighed by height the two longest trains ruled the sum
+            // and set the caps out on a diamond lattice.
+            let weight = amp * pow(k, 0.7);
+            crest += weight * (e - 0.466);
+            crest_var += weight * weight * 0.0915;
+            // Seconds ago the phase here was further on by the train's angular frequency.
+            let w = sqrt(9.81 * k);
+            let then_a = exp(sin(phase + w * SEA_FOAM_BACK.x) - 1.0);
+            let then_b = exp(sin(phase + w * SEA_FOAM_BACK.y) - 1.0);
+            crest_then += weight * (vec2<f32>(then_a, then_b) - 0.466);
         }
         if lambda >= 40.0 {
             swell += s * fade;
@@ -140,8 +161,72 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, long: f32, chop: f32) -> SeaW
         }
     }
     out.crest = crest * inverseSqrt(max(crest_var, 1e-8));
+    out.crest_then = crest_then * inverseSqrt(max(crest_var, 1e-8));
     out.swell = swell / max(swell_w, 0.001);
     return out;
+}
+
+// The weather on the water here, from the sky's weather map.
+struct SeaState {
+    // The wind over the water against a fair day's 12 m/s, squalls under a storm
+    // included: 0.7 a light breeze, 1 fair, past 2 a gale.
+    wind: f32,
+    // 0-1: how much of a storm is overhead.
+    storm: f32,
+    // 0-1: how hard it rains.
+    rain: f32,
+}
+
+fn sea_state(xy: vec2<f32>) -> SeaState {
+    let w = weather_at(xy);
+    var out: SeaState;
+    out.storm = clamp(w.y, 0.0, 1.0);
+    out.rain = clamp(w.w, 0.0, 1.0);
+    // A canyon lake is sheltered: the wind has no fetch to raise a sea.
+    out.wind = length(atmos.wind.zw) / 12.0 * (1.0 + out.storm * 0.9) * select(1.0, 0.55, desert());
+    return out;
+}
+
+// What share of the open sea is breaking white in this wind, about: none in a
+// calm, a scattering on a fair day, most crests in a gale (the Beaufort scale's
+// whitecaps). The z-score of `SeaWaves::crest` a crest must pass to break.
+fn cap_threshold(wind: f32) -> f32 {
+    return mix(2.2, 0.8, smoothstep(0.4, 2.6, wind));
+}
+
+// Raindrops landing on the water: rings spreading from each, a few a square
+// metre a second in a downpour. Drawn only close up, where a ring is pixels
+// across; the slope they add to the surface.
+fn rain_rings(xy: vec2<f32>, time: f32, pixel: f32, rain: f32) -> vec2<f32> {
+    let shown = 1.0 - smoothstep(0.08, 0.3, pixel);
+    if rain < 0.02 || shown <= 0.0 {
+        return vec2<f32>(0.0);
+    }
+    var slope = vec2<f32>(0.0);
+    for (var layer = 0u; layer < 3u; layer++) {
+        let fl = f32(layer);
+        let cell = 0.9 + fl * 0.35;
+        let p = xy / cell + vec2<f32>(fl * 0.37, fl * 0.71);
+        let id = floor(p) - LATTICE_CELLS * floor(floor(p) / LATTICE_CELLS);
+        // One drop a cell each beat; whether this beat's lands at all goes by the rain.
+        let beat = time * 1.4 + hash21(id + fl * 13.0) * 7.0;
+        let n = floor(beat);
+        let t = beat - n;
+        let seed = id + vec2<f32>(n * 0.61, n * 1.37) + fl * 5.0;
+        if hash21(seed) > rain * 0.9 {
+            continue;
+        }
+        let centre = vec2<f32>(hash21(seed + 3.1), hash21(seed + 7.7)) * 0.4 + 0.3;
+        let d = (p - floor(p) - centre) * cell;
+        let r = length(d);
+        // The ring runs out and dies in about half a second.
+        let front = t * 0.35 * cell;
+        let x = r - front;
+        let w = 0.035 + t * 0.03;
+        let amp = (1.0 - t) * (1.0 - t) * 0.018;
+        slope += d / max(r, 0.001) * (-2.0 * x / (w * w)) * exp(-x * x / (w * w)) * amp * w;
+    }
+    return slope * shown;
 }
 
 // ---------------------------------------------------------------- the scene below
@@ -839,7 +924,7 @@ struct FarSea {
 // darkening the water as they run across it, and whitecaps breaking and
 // fading, thickest in the gusts. Everything drifts downwind fast enough to see
 // moving from a strategic height.
-fn far_sea(xy: vec2<f32>, time: f32, pixel: f32) -> FarSea {
+fn far_sea(xy: vec2<f32>, time: f32, pixel: f32, sea: SeaState) -> FarSea {
     var out: FarSea;
     let wind = normalize(SEA_WIND);
     // The wind's frame: `a` downwind, `c` across it.
@@ -863,7 +948,8 @@ fn far_sea(xy: vec2<f32>, time: f32, pixel: f32) -> FarSea {
     let id = floor(p);
     let f = p - id - 0.5;
     let h = hash21(id + vec2<f32>(17.0, -3.0));
-    let chance = 0.35 * gust * gust;
+    // In a light breeze a cap here and there in the gusts; in a gale most cells break.
+    let chance = mix(0.03, 0.75, smoothstep(0.55, 2.2, sea.wind)) * mix(0.3, 1.0, max(gust, sea.storm));
     let life = fract(time / 6.5 + h * 13.7);
     let flare = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.06, 0.55, life));
     // A streak of spume blown out downwind of where it broke, off the cell's middle.
@@ -872,7 +958,13 @@ fn far_sea(xy: vec2<f32>, time: f32, pixel: f32) -> FarSea {
     let shape = (1.0 - smoothstep(0.03, 0.2, length(vec2<f32>(trail, off.y * 2.6)))) * 0.8;
     let cap = flare * shape * step(hash21(id - 31.0), chance);
     let shown = smoothstep(1.5, 4.0, cell / max(pixel, 0.001));
-    out.foam = mix(chance * 0.02, cap, shown);
+    // Unresolved, the caps and the foam they leave are a whitening of the whole sea.
+    out.foam = mix(chance * 0.14, cap, shown);
+    // A gale blows the spume out in long streaks down the wind.
+    let streaks = smoothstep(0.58, 0.78, soft_noise(vec2<f32>((a - time * 5.0) * 0.08, c), 9.0, pixel))
+        * smoothstep(1.3, 2.3, sea.wind);
+    out.foam = max(out.foam, mix(smoothstep(1.3, 2.3, sea.wind) * 0.12, streaks * 0.5, shown));
+    out.tone -= sea.storm * 0.15;
     return out;
 }
 
@@ -935,6 +1027,9 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let behind = sea_world(uv, behind_d);
 
     // ---- the surface
+    // The weather on the water: the wind raises the sea, a storm whips it up and
+    // the rain pocks it.
+    let sea = sea_state(xy);
     // The swell calms toward the shore, where the breakers take over; the
     // short waves come and go in gusts running downwind.
     let amp = smoothstep(0.2, 5.0, depth);
@@ -943,12 +1038,17 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // strategic height, where the far sea's lanes, gusts and swell take over.
     let far = smoothstep(1.5, 6.0, pixel) * smoothstep(4.0, 16.0, depth);
     let gust = grad_noise2(xy - SEA_WIND * time * 5.0 + vec2<f32>(37.0, 11.0), 120.0);
-    let chop = mix(0.45, 1.35, smoothstep(0.3, 0.72, gust));
-    let waves = sea_waves(xy, time, pixel, amp, chop);
+    let chop = mix(0.45, 1.35, smoothstep(0.3, 0.72, gust)) * mix(0.85, 1.1, smoothstep(0.6, 2.0, sea.wind));
+    let long = amp * mix(1.0, 2.0, smoothstep(0.8, 2.4, sea.wind));
+    let wind_sea = mix(0.8, 1.9, smoothstep(0.5, 2.4, sea.wind));
+    // The footprint's mean width, for what reads as a shape rather than a glint.
+    let across = sqrt(length(dpdx(xy)) * length(dpdy(xy)));
+    let waves = sea_waves(xy, time, pixel, across, long, wind_sea, chop);
     var far_fx: FarSea;
     if far > 0.0 {
-        far_fx = far_sea(xy, time, pixel);
+        far_fx = far_sea(xy, time, pixel, sea);
     }
+    let drops = rain_rings(xy, time, pixel, sea.rain);
     // Rings, wakes and foam from what is happening on the water.
     var stir: SeaStir;
     if dist < 6000.0 {
@@ -961,7 +1061,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     }
     // A muzzle blast presses the waves flat for a moment.
     let unpressed = 1.0 - stir.flat;
-    let n = normalize(vec3<f32>(-(waves.slope * unpressed + stir.slope + breakers.slope), 1.0));
+    let n = normalize(vec3<f32>(-(waves.slope * unpressed + stir.slope + breakers.slope + drops), 1.0));
     let n_dot_v = clamp(dot(n, v), 0.0001, 1.0);
 
     // Schlick with the water's 2% at normal incidence.
@@ -1007,7 +1107,10 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let lit = mix(0.45, 1.0, shadow) * (0.55 + 0.45 * sun_in);
     // Over a hull the water keeps the colour of the depth it stands in, so a
     // dived boat does not show as a patch of shallow-water green.
-    let optics = water_optics(mix(sink, max(sink, depth), hull), lit);
+    var optics = water_optics(mix(sink, max(sink, depth), hull), lit);
+    // Under a storm the sea goes a dull grey-green: little sun gets into it.
+    let grey = dot(optics.scatter, vec3<f32>(0.3, 0.5, 0.2)) * vec3<f32>(0.85, 1.0, 0.95);
+    optics.scatter = mix(optics.scatter, grey, sea.storm * 0.6) * mix(1.0, 0.65, sea.storm);
     let through = exp(-optics.absorb * path);
     var below = vec3<f32>(0.0);
     if !seen_open {
@@ -1040,7 +1143,8 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let l = globals.sun.xyz;
     let h = normalize(v + l);
     let n_dot_l = max(dot(n, l), 0.0);
-    let rough = sqrt(0.003 + waves.lost * unpressed + stir.rough + far_fx.rough * far);
+    // Rain too fine to draw roughens the water, dulling the sun's glitter.
+    let rough = sqrt(0.003 + waves.lost * unpressed + stir.rough + far_fx.rough * far + sea.rain * 0.012);
     let a2 = rough * rough;
     let n_dot_h = max(dot(n, h), 0.0);
     let dd = n_dot_h * n_dot_h * (a2 - 1.0) + 1.0;
@@ -1058,6 +1162,8 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     color += optics.scatter * glow * (0.4 + 0.6 * sun_in) * 1.6;
     // Pressed flat, the water shows darker: no waves catching the sky.
     color *= 1.0 - 0.5 * stir.flat;
+    // Rain dulls it: the pocked surface scatters the sky's reflection.
+    color *= 1.0 - 0.12 * sea.rain;
     // From far off the lanes and gusts, and the long swell's crests catching the light.
     color *= 1.0 + (far_fx.tone * select(1.0, 0.55, desert()) + waves.swell * 0.06) * far;
 
@@ -1089,14 +1195,41 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
         cover = max(cover, ring * 0.9);
     }
     cover = max(cover, stir.foam);
-    // Whitecaps where the waves pile up steepest, in the gusts; out in open
-    // water only. Under a few pixels a cap is only its average.
-    let caps_shown = smoothstep(1.2, 3.5, 3.0 / max(pixel, 0.001));
-    let caps = smoothstep(2.1, 3.2, waves.crest) * smoothstep(0.5, 0.85, gust) * amp * (1.0 - calm);
-    cover = max(cover, caps * caps_shown * 0.6);
-    // A sheltered lake: few whitecaps, calmer lanes.
-    let sheltered = select(1.0, 0.25, desert());
-    let far_caps = far_fx.foam * far * sheltered;
+    // Whitecaps where the waves pile up steepest, more of them the harder the wind
+    // blows and most in the gusts; out in open water only. A crest breaks solid
+    // white, and the foam it drops lies where it broke, thinning into lace, while
+    // the wave runs on. Under a few pixels a cap is only its average (`far_sea`).
+    let open_sea = amp * (1.0 - calm);
+    let th = cap_threshold(sea.wind);
+    let gusty = mix(0.4, 1.0, max(smoothstep(0.35, 0.75, gust), sea.storm)) * open_sea;
+    // (By the footprint's width: seen low across the water a cap is still metres
+    // wide on screen though the pixel runs a long way into the distance.)
+    let caps_shown = smoothstep(1.2, 3.5, 8.0 / max(across, 0.001));
+    // A cap has a soft, broken rim: its own mask, not the lace's hard-edged one,
+    // which cut caps out like paper.
+    let tumble = soft_noise(xy + SEA_WIND * time * 0.8, 1.6, across) * 0.6
+        + soft_noise(xy + vec2<f32>(31.0, -17.0) - SEA_WIND * time * 0.5, 0.6, across) * 0.4;
+    // Only some crests go over: groups of breakers drift downwind with the waves,
+    // come and go, and leave the water between them unbroken.
+    let groups = smoothstep(0.42, 0.7, mix(
+        grad_noise2(xy - SEA_WIND * time * 6.0, 34.0),
+        grad_noise2(xy.yx + vec2<f32>(77.0, -41.0) - SEA_WIND.yx * time * 5.0, 21.0),
+        0.5 + 0.5 * sin(time * 0.21)));
+    let breaking = smoothstep(th - 0.3, th + 0.8, waves.crest) * (0.55 + 0.9 * tumble) * mix(0.25, 1.15, groups);
+    let cap = smoothstep(0.3, 0.95, breaking) * gusty * caps_shown;
+    // The foam a crest dropped is drawn out in threads down the wind as it thins.
+    let wind_a = dot(xy, SEA_WIND);
+    let wind_c = dot(xy, vec2<f32>(-SEA_WIND.y, SEA_WIND.x));
+    let threads = soft_noise(vec2<f32>(wind_a * 0.25, wind_c), 1.1, across);
+    let dropped = max(smoothstep(th - 0.2, th + 0.6, waves.crest_then.x) * 0.55, smoothstep(th - 0.1, th + 0.6, waves.crest_then.y) * 0.4)
+        * mix(0.35, 1.25, threads);
+    // What it drops lies as lace.
+    cover = max(cover, max(breaking * 0.4, dropped) * gusty * caps_shown);
+    // A gale blows the spume from the crests out in streaks down the wind.
+    let spume = smoothstep(0.6, 0.8, soft_noise(vec2<f32>((wind_a - time * 4.0) * 0.08, wind_c), 2.5, pixel))
+        * smoothstep(1.3, 2.3, sea.wind) * open_sea;
+    cover = max(cover, spume * 0.65);
+    let far_caps = far_fx.foam * far;
     let foam = foam_lace(xy, time, pixel, cover * 0.85);
     let foam_color = vec3<f32>(0.80, 0.86, 0.88) * (0.35 + 0.65 * shadow) * (0.55 + 0.45 * sun_in);
     // Water a hull has churned full of air: paler and greener, lit from within,
@@ -1105,7 +1238,10 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     color = mix(color, foam_color * vec3<f32>(0.42, 0.7, 0.68), aerate);
     color = mix(color, foam_color, foam * 0.92);
     // A breaking lip is solid white water.
-    let lip = clamp(breakers.lip, 0.0, 1.0);
+    // Close up a cap is churned white water: a translucent sheet with bubbly
+    // foam in it, not a flat wash of white.
+    let cap_foam = foam_lace(xy + vec2<f32>(57.0, 13.0), time * 1.6, pixel, clamp(cap * 1.1, 0.0, 1.0));
+    let lip = clamp(max(breakers.lip, max(cap * 0.55, cap_foam) * mix(1.0, 0.92, cap)), 0.0, 1.0);
     color = mix(color, foam_color * 1.08, lip * 0.95);
     color = mix(color, foam_color, far_caps * 0.9);
     let white = max(foam, lip);
@@ -1134,6 +1270,61 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
 }
 
 // ---------------------------------------------------------------- under the sea
+
+// Where the surface focuses the sunlight into beams, 0-1, seen from `down`
+// metres under it: shafts a few metres across and a dozen apart, swaying as the
+// swell overhead passes, with fine threads in them just under the surface.
+// Coarse on purpose: a view ray crosses many beams, and a fine pattern averages
+// away into a flat glow.
+fn shaft_pattern(at: vec2<f32>, time: f32, down: f32) -> f32 {
+    let warp = vec2<f32>(
+        grad_noise2(at + vec2<f32>(time * 0.6, 0.0), 23.0),
+        grad_noise2(at + vec2<f32>(19.0, -time * 0.5), 23.0),
+    ) - 0.5;
+    let q = at + warp * 7.0;
+    let beams = smoothstep(0.56, 0.8, grad_noise2(q + vec2<f32>(time * 0.3, -time * 0.2), 6.5));
+    let fine = smoothstep(0.35, 0.75, grad_noise2(q + vec2<f32>(17.0 - time * 0.5, time * 0.4), 2.2));
+    return beams * mix(1.0, 0.3 + 0.7 * fine, exp(-down / 12.0));
+}
+
+// The light scattered toward the eye along `dir` for `reach` metres out of the
+// sunbeams slanting down through the water: the sun bent by the surface,
+// brightest looking toward it, dimmed by the depth it has come down through and
+// by cloud over the surface above. `clip` breaks up the march's steps.
+fn sea_shafts(eye: vec3<f32>, dir: vec3<f32>, reach: f32, clip: vec2<f32>, time: f32, sun_in: f32, optics: Optics) -> vec3<f32> {
+    if sun_in <= 0.02 {
+        return vec3<f32>(0.0);
+    }
+    let water = globals.map.z;
+    // The sun's rays after the surface bent them, heading down.
+    let beam = refract(-globals.sun.xyz, vec3<f32>(0.0, 0.0, 1.0), 1.0 / 1.33);
+    // Metres along the surface per metre of depth, back up a beam to where it came in.
+    let back = -beam.xy / max(-beam.z, 0.2);
+    // Forward scattering (Henyey-Greenstein, g 0.75): the shafts blaze looking up
+    // toward the sun and still show, fainter, looking away.
+    let g = 0.75;
+    let cos_t = dot(dir, -beam);
+    let phase = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cos_t, 1.5) * 0.08 + 0.05;
+    // Cloud over the surface: the shafts go out under a storm.
+    let above = vec3<f32>(eye.xy + back * max(water - eye.z, 0.0), water);
+    let cloud = smoothstep(0.35, 0.9, cloud_shadow(above));
+    let steps = 24;
+    let far = min(reach, 60.0);
+    let jitter = fract(52.9829189 * fract(dot(clip, vec2<f32>(0.06711056, 0.00583715))));
+    var sum = vec3<f32>(0.0);
+    for (var i = 0; i < steps; i++) {
+        let s = (f32(i) + jitter) / f32(steps) * far;
+        let q = eye + dir * s;
+        let down = max(water - q.z, 0.0);
+        let at = q.xy + back * down;
+        let lit = shaft_pattern(at, time, down);
+        // Down through the water to here, then across to the eye.
+        let lost = exp(-optics.absorb * (down / max(-beam.z, 0.2) * 0.35 + s * 0.25));
+        sum += lost * lit;
+    }
+    let sun = atmos.sun_color.rgb * sun_in;
+    return sun * sum * (far / f32(steps)) * phase * cloud * 0.25;
+}
 
 // The free camera under the water: the whole view is drawn here, over the
 // opaque scene. What it sees is dimmed and tinted by the water in between; the
@@ -1165,7 +1356,7 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
     let optics = water_optics(12.0, 0.55 + 0.45 * sun_in);
     let toward_sun = pow(max(dot(dir, globals.sun.xyz), 0.0), 3.0);
     // Bright overhead, dark looking down into the deep.
-    let fog_color = optics.scatter * (4.0 + 4.0 * toward_sun) * mix(0.3, 1.5, clamp(dir.z * 0.6 + 0.5, 0.0, 1.0))
+    let fog_color = optics.scatter * (3.0 + 4.0 * toward_sun) * mix(0.25, 1.4, clamp(dir.z * 0.6 + 0.5, 0.0, 1.0))
         * exp(-optics.absorb * deep * 0.5);
     // The water is clearer than the colour absorbed in it suggests: past 60 m
     // or so nothing shows but the water itself.
@@ -1176,7 +1367,8 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
     if t_top < t_scene {
         // ---- the surface from below
         let p = eye + dir * t_top;
-        let waves = sea_waves(p.xy, time, pixel, 1.0, 1.0);
+        let sea = sea_state(p.xy);
+        let waves = sea_waves(p.xy, time, pixel, pixel, 1.0, mix(0.8, 1.9, smoothstep(0.5, 2.4, sea.wind)), 1.0);
         var stir: SeaStir;
         if t_top < 600.0 {
             stir = sea_stir(p.xy, time, pixel);
@@ -1228,23 +1420,8 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
         color = fog_color;
     }
     color = color * through + fog_color * (vec3<f32>(1.0) - through);
-    // Shafts of sunlight slanting down from the surface: brighter where the
-    // waves overhead focused it, fading into the depth.
-    if sun_in > 0.05 {
-        var shafts = 0.0;
-        let reach = min(t, 70.0);
-        let slant = globals.sun.xy / max(globals.sun.z, 0.2);
-        for (var i = 0; i < 8; i++) {
-            let s = (f32(i) + 0.5) / 8.0 * reach;
-            let q = eye + dir * s;
-            let down = max(water - q.z, 0.0);
-            // Where the ray down to this point met the surface.
-            let at = q.xy + slant * down;
-            let beam = caustics(at * 0.12, time * 0.35, 0.1);
-            shafts += beam * exp(-down * 0.06) * exp(-s * 0.035);
-        }
-        color += optics.scatter * shafts / 8.0 * reach * 0.18 * sun_in * (0.6 + 0.8 * toward_sun);
-    }
+    // Shafts of sunlight slanting down from the surface (`sea_shafts`).
+    color += sea_shafts(eye, dir, min(t, 400.0), clip.xy, time, sun_in, optics) * mix(0.6, 1.0, 1.0 - exp(-deep * 0.5));
     color = apply_fog_of_war(color, end.xy);
     return vec4<f32>(color, 1.0);
 }
