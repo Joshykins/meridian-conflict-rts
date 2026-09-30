@@ -477,18 +477,6 @@ impl World {
         self.state.players[player as usize].allies
     }
 
-    /// Bit `p` set for every player on `player`'s side, itself included: what
-    /// [`SpatialIndex::query_foes`] passes over when looking for an enemy.
-    pub(crate) fn friends(&self, player: u8) -> u64 {
-        let team = self.state.players[player as usize].team;
-        self.state
-            .players
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| p.team == team)
-            .fold(0, |mask, (i, _)| mask | 1 << i)
-    }
-
     #[inline]
     pub fn are_enemies(&self, a: u8, b: u8) -> bool {
         self.state.players[a as usize].team != self.state.players[b as usize].team

@@ -319,7 +319,7 @@ impl World {
                 let owner = p.owner[i];
                 let mark = p.mark[i].xy();
                 let mut best: Option<(Fx, usize)> = None;
-                let friends = self.friends(owner);
+                let friends = self.team_mask(owner);
                 self.index
                     .query_foes(mark, RETARGET_REACH, kind::UNIT, friends, |e| {
                         let t = e.row as usize;

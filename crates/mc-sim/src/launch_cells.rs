@@ -128,7 +128,7 @@ impl World {
             mine.iter().filter(|&&m| m == target).count()
         };
         let mut near: Vec<(usize, Fx, usize)> = Vec::new();
-        let friends = self.friends(units.owner[row]);
+        let friends = self.team_mask(units.owner[row]);
         self.index.query_foes(
             at,
             weapon.range_max,

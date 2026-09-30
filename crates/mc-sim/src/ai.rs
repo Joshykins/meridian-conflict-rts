@@ -609,7 +609,7 @@ impl World {
                 intel.enemy_factories.push(c.pos);
             }
         }
-        let friends = self.friends(player);
+        let friends = self.team_mask(player);
         let mut held = vec![start];
         held.extend(census.extractor_pos.iter().copied().take(16));
         if let Some(f) = self.state.ai[player as usize].firebase {

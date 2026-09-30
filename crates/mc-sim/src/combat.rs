@@ -477,7 +477,7 @@ impl World {
         let units = &self.state.units;
         let facing = units.heading[row] + units.weapon_yaw[row][w];
         let mut found = false;
-        let friends = self.friends(units.owner[row]);
+        let friends = self.team_mask(units.owner[row]);
         self.index
             .query_foes(units.pos[row], weapon.range_max, kind::UNIT, friends, |e| {
                 let t = e.row as usize;
@@ -735,9 +735,6 @@ impl World {
         let rows = self.state.units.slots.rows();
         let incoming = self.incoming_damage(rows);
         let this = &*self;
-        let friends: Vec<u64> = (0..self.state.players.len() as u8)
-            .map(|p| self.friends(p))
-            .collect();
         let picks: Vec<Vec<(usize, [UnitId; MAX_WEAPONS], u8)>> =
             self.pool.parallel_map_chunks(rows, CHUNK, |_, range| {
                 let units = &this.state.units;
@@ -816,7 +813,7 @@ impl World {
                                     units.pos[row],
                                     weapon.range_max + this.gun_offset(row, weapon),
                                     kind::UNIT,
-                                    friends[units.owner[row] as usize],
+                                    this.team_mask(units.owner[row]),
                                     |e| {
                                         this.unit_entry_is_current(e)
                                             && !doomed(e.row as usize)
@@ -2694,7 +2691,7 @@ impl World {
             let mid = from.xy() + seg * Fx::HALF;
             let reach = seg.length() / 2 + weapon.proximity;
             self.index
-                .query_foes(mid, reach, kind::UNIT, self.friends(p.owner[i]), |e| {
+                .query_foes(mid, reach, kind::UNIT, self.team_mask(p.owner[i]), |e| {
                     let row = e.row as usize;
                     let units = &self.state.units;
                     // An interceptor runs at torpedoes, never at hulls.

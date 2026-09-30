@@ -116,7 +116,7 @@ impl World {
         let units = &self.state.units;
         let at = units.pos[row];
         let mut near: Vec<(Fx, usize)> = Vec::new();
-        let friends = self.friends(units.owner[row]);
+        let friends = self.team_mask(units.owner[row]);
         self.index
             .query_foes(at, weapon.range_max, kind::UNIT, friends, |e| {
                 let t = e.row as usize;

@@ -8,7 +8,7 @@
 //! and within a layer in (cell row-major, insertion) order, which depends only
 //! on table contents.
 
-use mc_core::{Fx, FxVec2};
+use mc_core::{Fx, FxVec2, PlayerMask};
 
 /// Entity kinds an entry can refer to. Queries filter by a mask of these.
 pub mod kind {
@@ -133,7 +133,7 @@ impl Layer {
         center: FxVec2,
         radius: Fx,
         kinds: u8,
-        skip: u64,
+        skip: PlayerMask,
         tested: &mut u64,
         hits: &mut u64,
         cells: &mut i64,
@@ -179,8 +179,8 @@ impl Layer {
 
 /// The bit of `owner` in a mask of players; none for [`NO_OWNER`].
 #[inline]
-fn owner_bit(owner: u8) -> u64 {
-    1u64.checked_shl(owner as u32).unwrap_or(0)
+fn owner_bit(owner: u8) -> PlayerMask {
+    PlayerMask::from(owner != NO_OWNER) << (owner as u32 % PlayerMask::BITS)
 }
 
 /// Stable counting sort of `from` into `to` by `key(e)` in `0..buckets`;
@@ -278,7 +278,7 @@ impl SpatialIndex {
         center: FxVec2,
         radius: Fx,
         kinds: u8,
-        friends: u64,
+        friends: PlayerMask,
         mut visit: impl FnMut(&Entry) -> bool,
     ) {
         let (mut tested, mut hits, mut cells) = (0u64, 0u64, 0i64);
@@ -330,7 +330,7 @@ impl SpatialIndex {
         center: FxVec2,
         radius: Fx,
         kinds: u8,
-        friends: u64,
+        friends: PlayerMask,
         mut accept: impl FnMut(&Entry) -> bool,
     ) -> Option<Entry> {
         let mut best: Option<(Fx, Entry)> = None;

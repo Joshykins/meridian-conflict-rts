@@ -1649,7 +1649,7 @@ impl World {
         if fighter {
             return self.air_spread_pick(row, mask, reach);
         }
-        let friends = self.friends(units.owner[row]);
+        let friends = self.team_mask(units.owner[row]);
         self.index
             .nearest_foe(units.pos[row], reach, kind::UNIT, friends, |e| {
                 self.unit_entry_is_current(e)
@@ -1674,7 +1674,7 @@ impl World {
         let pos = units.pos[row];
         let crowd = self.bp(row).vision / 4;
         let mut best: Option<(Fx, usize)> = None;
-        let friends = self.friends(units.owner[row]);
+        let friends = self.team_mask(units.owner[row]);
         self.index.query_foes(pos, reach, kind::UNIT, friends, |e| {
             let t = e.row as usize;
             if !self.unit_entry_is_current(e)
@@ -1698,7 +1698,7 @@ impl World {
         let id = units.id(target);
         let owner = units.owner[row];
         let mut count = 0;
-        let foes = !self.friends(owner);
+        let foes = !self.team_mask(owner);
         self.index.query_foes(
             units.pos[target],
             self.bp(row).vision,
@@ -2323,7 +2323,7 @@ impl World {
         let (home, owner) = (units.pos[row], units.owner[row]);
         let Some(t) = self
             .index
-            .nearest_foe(home, reach, kind::UNIT, self.friends(owner), |e| {
+            .nearest_foe(home, reach, kind::UNIT, self.team_mask(owner), |e| {
                 let t = e.row as usize;
                 self.unit_entry_is_current(e)
                     && self.are_enemies(owner, units.owner[t])
