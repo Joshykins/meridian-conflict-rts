@@ -1458,6 +1458,11 @@ impl Renderer {
                         let raise = pivot as f32 * scale;
                         ([pitch, pitch, -raise, 0.0], stretched.round() as u32)
                     }
+                    // A tree stands at a height of its own (`fallen_trees::height_stretch`).
+                    None if kind < fallen_trees::TREE_KINDS => (
+                        [0.0, 0.0, 0.0, fallen_trees::height_stretch(i as u32)],
+                        p.scale_milli as u32,
+                    ),
                     None => ([0.0; 4], p.scale_milli as u32),
                 };
                 UnitInstance {
@@ -3776,9 +3781,7 @@ impl Renderer {
                     }
                     Some(nuke_fx::TreeFate::Gone) => continue,
                     Some(nuke_fx::TreeFate::Burning) => {
-                        let height = fallen_trees::TREE_HEIGHTS[kind as usize]
-                            * instance.packed as f32
-                            * 0.001;
+                        let height = fallen_trees::tree_height(kind, &instance);
                         // Lit by the flash, not all in the same instant.
                         let start = time - self.scatter.unit() * 1.5;
                         self.burning_trees.push(BurningTree {
@@ -3811,8 +3814,7 @@ impl Renderer {
                 if !blasted && !seared {
                     continue;
                 }
-                let height =
-                    fallen_trees::TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001;
+                let height = fallen_trees::tree_height(kind, &instance);
                 self.burning_trees.push(BurningTree {
                     instance,
                     start: time,

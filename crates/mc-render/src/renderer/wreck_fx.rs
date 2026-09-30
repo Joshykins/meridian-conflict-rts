@@ -80,8 +80,8 @@ impl HullFrame {
     }
 }
 
-/// Zero to one, fixed for a wreck and a salt.
-fn hash(id: u32, salt: u32) -> f32 {
+/// Zero to one, fixed for an id (a wreck, a prop) and a salt.
+pub(super) fn hash(id: u32, salt: u32) -> f32 {
     let mut n = id.wrapping_mul(0x9E37_79B9) ^ salt.wrapping_mul(0x85EB_CA6B);
     n ^= n >> 15;
     n = n.wrapping_mul(0x2C1B_3C6D);

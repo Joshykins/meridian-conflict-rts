@@ -438,6 +438,8 @@ pub struct UnitInstance {
     /// Zero, or how far along the unit's refit is: above zero from its first tick, one when done.
     pub upgrade: f32,
     /// Pitch of the gun arm last tick and this, then of the build arm: radians, up positive.
+    /// A prop's pose instead (the renderer's): a wire span's pitch and raise, a fallen
+    /// tree's pitch and sink, and a tree's stretch in height in the last.
     pub arm_pitch: [f32; 4],
     /// `turret_yaw` last tick, so the turret glides between ticks like the hull does.
     pub prev_turret_yaw: f32,

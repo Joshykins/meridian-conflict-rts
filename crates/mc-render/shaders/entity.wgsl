@@ -1206,6 +1206,8 @@ fn vs_main(in: VsIn) -> VsOut {
     if (e.owner_flags & KIND_PROP) != 0u && e.packed != 0u {
         scale = f32(e.packed) * 0.001;
     }
+    // A tree's own stretch in height (renderer/fallen_trees.rs `height_stretch`).
+    let stretch = select(1.0, e.arm_pitch.w, (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.w > 0.0);
     // Which props the pre-pass and each shadow cascade draw at all is decided per
     // instance, by the cull (cull.wgsl `other_lists`).
 
@@ -1255,7 +1257,7 @@ fn vs_main(in: VsIn) -> VsOut {
     let is_tree = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x == 0.0
         && (in.material == MAT_FOLIAGE || in.material == MAT_BARK);
     if is_tree {
-        tree = tree_air(e.pos, max(model.height * scale, 1.0), e.unit_id, blast_sway(entity_index));
+        tree = tree_air(e.pos, max(model.height * scale * stretch, 1.0), e.unit_id, blast_sway(entity_index));
     }
     if in.material == MAT_FOLIAGE {
         // Leaf cards are lit as the crown they belong to: the mesh carries the
@@ -1879,7 +1881,11 @@ fn vs_main(in: VsIn) -> VsOut {
             p.z += surface - SPIRE_TOP;
         }
     }
-    var local = p * scale;
+    var local = vec3<f32>(p.xy, p.z * stretch) * scale;
+    // Stretched up, a trunk's sides lean less.
+    if stretch != 1.0 {
+        n = normalize(vec3<f32>(n.xy, n.z / stretch));
+    }
 
     // Mobile units lean with the ground under them; a ship rides the water, not the seabed.
     var up = vec3<f32>(0.0, 0.0, 1.0);
@@ -2033,7 +2039,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // with the stem where it crosses it and carried along its arc, so nothing
     // stretches and the top comes down as it goes over.
     if is_tree {
-        let tall = max(model.height * scale, 1.0);
+        let tall = max(model.height * scale * stretch, 1.0);
         let reach = length(tree.xy);
         if reach > 0.001 {
             let dir = tree.xy / reach;

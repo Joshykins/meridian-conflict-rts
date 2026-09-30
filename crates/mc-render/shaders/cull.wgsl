@@ -298,7 +298,8 @@ fn cs_cull(@builtin(global_invocation_id) id: vec3<u32>) {
     // A standing prop (a trampled tree is past caring): what the blasts do to it.
     if (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x == 0.0 {
         let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u);
-        let tall = max(models[e.blueprint].height * scale, 1.0);
+        let stretch = select(1.0, e.arm_pitch.w, e.arm_pitch.w > 0.0);
+        let tall = max(models[e.blueprint].height * scale * stretch, 1.0);
         tree_sway[out_index] = vec4<f32>(tree_blast(e.pos, tall), 0.0);
     }
     atomicAdd(&counters[slot], 1u);

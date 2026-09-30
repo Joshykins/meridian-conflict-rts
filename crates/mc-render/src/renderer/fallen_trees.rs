@@ -3,7 +3,8 @@
 //! over from its foot, away from the walker, lands in a puff of dust, lies
 //! there a while and then sinks into the ground. The vertex shader poses it:
 //! a prop with a nonzero `arm_pitch.x` is pitched about its foot along its
-//! heading, and `arm_pitch.z` lowers it by that many metres.
+//! heading, and `arm_pitch.z` lowers it by that many metres. `arm_pitch.w` is
+//! the tree's own stretch in height (`height_stretch`), standing or fallen.
 
 use super::{Renderer, PUFF_CLOD, PUFF_DUST};
 use glam::{Vec2, Vec3};
@@ -28,6 +29,27 @@ pub(super) const TREE_KINDS: u32 = 9;
 /// Roughly how tall each of those trees stands at scale 1, metres.
 pub(super) const TREE_HEIGHTS: [f32; TREE_KINDS as usize] =
     [12.0, 14.0, 18.0, 9.0, 15.0, 22.0, 6.0, 9.0, 17.0];
+
+/// Tree `prop`'s own stretch in height, over what its map scale gives it, kept in
+/// its instance's `arm_pitch[3]`: the vertex shader stretches the tree up by it, so
+/// a wood's trees stand at uneven heights whatever the size of their crowns.
+/// Two rolls averaged, so most stay near their size and a few stand well over or
+/// under their neighbours.
+pub(super) fn height_stretch(prop: u32) -> f32 {
+    let roll =
+        (super::wreck_fx::hash(prop, 0x7472_6565) + super::wreck_fx::hash(prop, 0x7461_6C6C)) * 0.5;
+    0.7 + 0.6 * roll
+}
+
+/// How tall a tree prop stands, metres: its kind's height at its scale and stretch.
+pub(super) fn tree_height(kind: u32, instance: &UnitInstance) -> f32 {
+    let stretch = if instance.arm_pitch[3] > 0.0 {
+        instance.arm_pitch[3]
+    } else {
+        1.0
+    };
+    TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001 * stretch
+}
 
 #[derive(Clone, Copy)]
 pub(super) struct FallenTree {
@@ -73,7 +95,7 @@ impl Renderer {
             let ahead = Vec2::from(motion.to_f32()).normalize_or_zero();
             // Mostly the way the walker goes, pushed off to the side it passed on.
             let dir = (ahead + away * 0.7).normalize_or(ahead);
-            let height = TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001;
+            let height = tree_height(kind, &instance);
             let mut instance = instance;
             // A little turn of its own, so a row of trees does not fall in step.
             let heading = dir.y.atan2(dir.x) + self.scatter.signed() * 0.25;
@@ -115,7 +137,7 @@ impl Renderer {
         if kind >= TREE_KINDS {
             return;
         }
-        let height = TREE_HEIGHTS[kind as usize] * instance.packed as f32 * 0.001;
+        let height = tree_height(kind, &instance);
         let mut instance = instance;
         let heading = away.y.atan2(away.x) + self.scatter.signed() * 0.12;
         instance.heading = heading;
@@ -178,7 +200,7 @@ impl Renderer {
                 let mut instance = tree.instance;
                 // Negative pitch leans the top along the heading.
                 let pitch = -tilt.max(1e-4);
-                instance.arm_pitch = [pitch, pitch, sink, 0.0];
+                instance.arm_pitch = [pitch, pitch, sink, instance.arm_pitch[3]];
                 instance
             })
             .chain(self.vapor_instances(time))
