@@ -9,7 +9,7 @@
 //!
 //! `cargo test --profile gate -p mc-sim --test sim -- zz_dogfight_probe:: --ignored --nocapture`
 //! Knobs: DOGFIGHT_SIDES=<seed><flip 0|1> prints the named swarm fight second by
-//! second, DOGFIGHT_IDLE_B leaves player b's swarm without orders, DOGFIGHT_TRACE prints the first strike fighter tick by tick; DOGFIGHT_KEY=<fighter key> for the first part (default the Peregrine),
+//! second (speed, height and order census per side), DOGFIGHT_IDLE_B leaves player b's swarm without orders, DOGFIGHT_TRACE prints the first strike fighter tick by tick; DOGFIGHT_KEY=<fighter key> for the first part (default the Peregrine),
 //! DOGFIGHT_SWARM=<key> and DOGFIGHT_N=<per side> for the second (default 25 Raptors).
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
@@ -262,15 +262,53 @@ fn swarms(
                 shots[*owner as usize] += 1;
             }
         }
-        if trace && tick % 10 == 0 && merged {
+        if trace && tick % 10 == 0 {
+            let mean = |s: usize, f: &dyn Fn(usize) -> Fx| {
+                let rows: Vec<usize> = ids[s]
+                    .iter()
+                    .filter_map(|&id| w.state.units.row(id))
+                    .collect();
+                rows.iter().map(|&r| f(r).to_f32()).sum::<f32>() / rows.len().max(1) as f32
+            };
             println!(
-                "  {:.0} s: alive {} v {}, shots {} v {}",
+                "  {:.0} s: alive {} v {}, shots {} v {}, speed {:.0} v {:.0}, height {:.0} v {:.0}",
                 tick as f32 / TICKS_PER_SECOND as f32,
                 alive(&w, 0),
                 alive(&w, 1),
                 shots[0],
-                shots[1]
+                shots[1],
+                mean(0, &|r| w.state.units.speed[r]),
+                mean(1, &|r| w.state.units.speed[r]),
+                mean(0, &|r| w.state.units.z[r]),
+                mean(1, &|r| w.state.units.z[r]),
             );
+            for side in 0..2 {
+                let mut kinds = std::collections::BTreeMap::new();
+                for &id in &ids[side] {
+                    if let Some(r) = w.state.units.row(id) {
+                        let u = &w.state.units;
+                        let o = match w.state.orders.front(u, r) {
+                            Some(o) => format!(
+                                "{:?}{}{}",
+                                o.kind,
+                                if u.row(o.target).is_some() {
+                                    "+target"
+                                } else {
+                                    ""
+                                },
+                                if u.has_flag(r, flag::AIR_RUN) {
+                                    "+run"
+                                } else {
+                                    ""
+                                }
+                            ),
+                            None => "idle".into(),
+                        };
+                        *kinds.entry(o).or_insert(0) += 1;
+                    }
+                }
+                println!("    side {side}: {kinds:?}");
+            }
         }
         end = tick;
         if alive(&w, 0) == 0 || alive(&w, 1) == 0 {
