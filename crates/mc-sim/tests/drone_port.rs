@@ -314,6 +314,7 @@ fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
         .spawn(tank, at, Fx::from_int(20), Angle::ZERO, Fx::from_int(40), 0)
         .unwrap();
     let mut went_out = false;
+    let (mut reclaimed, mut busy) = (false, true);
     // Where each drone is from the Osprey, which may still be flying.
     let rel = |w: &World, r: usize| {
         (w.state.units.pos[r] - w.state.units.pos[osprey])
@@ -322,6 +323,15 @@ fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
     let mut last: Vec<_> = drones.iter().map(|&r| rel(&w, r)).collect();
     for _ in 0..1500 {
         w.tick(&[]).unwrap();
+        // A drone reclaiming keeps the Osprey off the idle Reclaimers card.
+        use mc_sim::tables::flag::{RECLAIMING, WORKING};
+        if drones
+            .iter()
+            .any(|&r| w.state.units.has_flag(r, RECLAIMING))
+        {
+            reclaimed = true;
+            busy &= w.state.units.has_flag(osprey, WORKING);
+        }
         for (k, &r) in drones.iter().enumerate() {
             let now = rel(&w, r);
             went_out |= now.xy().length() > Fx::from_int(30);
@@ -336,6 +346,16 @@ fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
         }
     }
     assert!(went_out, "the drones went out to the wreck");
+    assert!(
+        reclaimed && busy,
+        "the Osprey is working while its drones reclaim"
+    );
+    assert!(
+        !w.state
+            .units
+            .has_flag(osprey, mc_sim::tables::flag::WORKING),
+        "the wreck gone, it is idle again"
+    );
     for (now, then) in offsets(&w).iter().zip(&docked) {
         assert!(
             (now.0 - then.0).abs() < Fx::ratio(1, 10) && (now.1 - then.1).abs() < Fx::ratio(1, 10),

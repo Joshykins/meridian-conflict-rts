@@ -86,6 +86,11 @@ impl World {
             } else {
                 !self.carrier_has_work(parent)
             };
+            if carrier && !recalling {
+                // Its drones are its tools: while they have work it is busy, not idle
+                // (the HUD's idle Reclaimers card).
+                self.state.units.flags[parent] |= flag::WORKING;
+            }
             let need = self.bp(parent).motion.map(|m| m.deploy_ticks).unwrap_or(0);
             // A carrier lets its drones go once it has settled into a hover; a port
             // has nothing to wait for.
