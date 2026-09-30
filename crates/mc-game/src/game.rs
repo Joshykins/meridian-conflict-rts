@@ -4549,7 +4549,7 @@ impl Game {
             .map(|&i| &self.view.frame.units[i])
             .filter(|u| !u.stored());
         self.rings.focus = self.hud.reach_focus.take();
-        let (ranges, ranges_drawn) = self.rings.collect(
+        let (mut ranges, mut ranges_drawn) = self.rings.collect(
             ghosts[..placing]
                 .iter()
                 .chain(self.orders.ghost_in_hand(&ghosts[placing..]))
@@ -4558,6 +4558,17 @@ impl Game {
             fresh,
             &|p| renderer.ground_height(Vec2::from(p)),
         );
+        // Placing a radar: our standing radars' rings too, merged with the new one's.
+        if let Mode::Place(bp) = self.view.mode {
+            let network = crate::rings::radar_network(
+                &self.blueprints,
+                bp,
+                None,
+                self.view.local,
+                self.view.frame.units.iter(),
+            );
+            crate::rings::prepend(&mut ranges, &mut ranges_drawn, network);
+        }
         self.view.reaches = Rings::key(&ranges);
 
         // A single-player match holds its clock under the menu and on the player's
@@ -4616,6 +4627,7 @@ impl Game {
                 self.ground_under_cursor(renderer),
                 placing,
             );
+            crate::radar_marks::draw(&mut ui, &field, placing);
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));

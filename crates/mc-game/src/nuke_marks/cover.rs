@@ -6,7 +6,7 @@
 //! the network (what it adds bright, what it overlaps faint, and how much ground is new),
 //! and while an array is selected (then without the card: the unit panel has its rounds).
 
-use super::{owner_of, project, surface, tag};
+use super::{new_ground, owner_of, project, surface, tag};
 use crate::hud::silo::{self, Launcher, INTERCEPT};
 use crate::orders::Field;
 use crate::ui::{self, palette, rgb, type_scale, Rect, Ui};
@@ -132,27 +132,6 @@ fn outline(
             }
         }
     }
-}
-
-/// Share of the ground within `radius` of `c` that none of `circles` covers yet, 0..1.
-fn new_ground(c: Vec2, radius: f32, circles: &[(Vec2, f32)]) -> f32 {
-    const N: i32 = 28;
-    let (mut inside, mut fresh) = (0u32, 0u32);
-    for y in 0..N {
-        for x in 0..N {
-            let d = Vec2::new(
-                (x as f32 + 0.5) / N as f32 * 2.0 - 1.0,
-                (y as f32 + 0.5) / N as f32 * 2.0 - 1.0,
-            );
-            if d.length_squared() > 1.0 {
-                continue;
-            }
-            let p = c + d * radius;
-            inside += 1;
-            fresh += u32::from(!circles.iter().any(|&(o, r)| p.distance(o) < r));
-        }
-    }
-    fresh as f32 / inside.max(1) as f32
 }
 
 /// A row of pips over an array: one per round it holds room for, lit when loaded, the

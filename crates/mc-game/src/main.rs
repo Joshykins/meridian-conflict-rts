@@ -30,6 +30,7 @@ mod orders;
 mod perf_out;
 mod pick;
 mod pointer;
+mod radar_marks;
 mod range;
 mod recorder;
 mod replay;

@@ -69,6 +69,27 @@ pub(crate) fn ground_ring(
     }
 }
 
+/// Share of the ground within `radius` of `c` that none of `circles` covers yet, 0..1.
+pub(crate) fn new_ground(c: Vec2, radius: f32, circles: &[(Vec2, f32)]) -> f32 {
+    const N: i32 = 28;
+    let (mut inside, mut fresh) = (0u32, 0u32);
+    for y in 0..N {
+        for x in 0..N {
+            let d = Vec2::new(
+                (x as f32 + 0.5) / N as f32 * 2.0 - 1.0,
+                (y as f32 + 0.5) / N as f32 * 2.0 - 1.0,
+            );
+            if d.length_squared() > 1.0 {
+                continue;
+            }
+            let p = c + d * radius;
+            inside += 1;
+            fresh += u32::from(!circles.iter().any(|&(o, r)| p.distance(o) < r));
+        }
+    }
+    fresh as f32 / inside.max(1) as f32
+}
+
 /// A dashed screen line from `a` to `b`, the dashes crawling toward `b`.
 pub(crate) fn dashed(ui: &mut Ui, a: Vec2, b: Vec2, width: f32, color: ui::Color, speed: f32) {
     let len = a.distance(b);
