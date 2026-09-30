@@ -60,6 +60,7 @@ mod player_orders;
 mod radar;
 mod range;
 mod reclaim;
+mod reclaim_area;
 mod reclaim_heads;
 mod reform;
 mod regency;

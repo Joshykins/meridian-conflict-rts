@@ -56,6 +56,7 @@ pub mod placement;
 pub use mc_core::print_heads;
 mod ranks;
 pub mod reclaim;
+mod reclaim_area;
 mod reclaim_heads;
 mod reform;
 pub mod repair;

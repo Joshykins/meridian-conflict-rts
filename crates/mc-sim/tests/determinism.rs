@@ -191,6 +191,26 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }])
             .collect(),
+        // The north's salvage carriers clear the wreck field in a circle (`reclaim_area.rs`).
+        2 => {
+            let carrier = w.blueprints.id_of("aster_t2_land_reclaimer").unwrap();
+            let u = &w.state.units;
+            let units = u
+                .slots
+                .iter()
+                .filter(|&r| u.owner[r] == 1 && u.blueprint[r] == carrier)
+                .map(|r| u.id(r))
+                .collect();
+            vec![PlayerCommand {
+                player: 1,
+                command: Command::ReclaimArea {
+                    units,
+                    pos: WRECK_FIELD,
+                    radius: Fx::from_int(120),
+                    queue: false,
+                },
+            }]
+        }
         40 => {
             let silo_bp = w.blueprints.id_of("aster_t4_nuke_silo").unwrap();
             let u = &w.state.units;

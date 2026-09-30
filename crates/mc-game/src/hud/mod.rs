@@ -933,6 +933,9 @@ pub fn cursor_hint(
         }
         Mode::Target(Targeting::Patrol) => "Click the next post  \u{b7}  Release shift to finish",
         Mode::Target(Targeting::Bombard) => "Press on the centre, drag out its size",
+        Mode::Target(Targeting::Reclaim) => {
+            "Click a wreck or unit  \u{b7}  Click ground to reclaim on the way  \u{b7}  Drag out an area to clear"
+        }
         Mode::Target(Targeting::Assist) => {
             "Click a unit to help it  \u{b7}  Press on the ground, drag out an area to work"
         }

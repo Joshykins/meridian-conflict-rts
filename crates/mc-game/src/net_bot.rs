@@ -242,7 +242,7 @@ fn chaos(
             .unwrap_or(any_bp);
         let pos = near(rng, anchor);
         let queue = rng.below(3) == 0;
-        let command = match rng.below(35) {
+        let command = match rng.below(36) {
             0..=4 => Command::Move {
                 units: group,
                 target: pos,
@@ -400,6 +400,13 @@ fn chaos(
                     },
                 }
             }
+            // A point (no radius), or a circle wider than any the sim takes.
+            34 => Command::ReclaimArea {
+                units: group,
+                pos,
+                radius: Fx::from_int(rng.below(3000) as i32),
+                queue,
+            },
             _ => {
                 // Bytes that do not decode are skipped everywhere the same way.
                 let len = rng.below(40) as usize;

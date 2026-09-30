@@ -260,6 +260,12 @@ impl World {
                 }
                 Ok(())
             }
+            Command::ReclaimArea {
+                units,
+                pos,
+                radius,
+                queue,
+            } => self.order_reclaim_area(player, units, *pos, *radius, *queue),
             Command::Produce {
                 factories,
                 blueprint,
@@ -594,6 +600,7 @@ impl World {
                 | OrderKind::Strike
                 | OrderKind::Bombard
                 | OrderKind::Guard
+                | OrderKind::ReclaimArea
         ) {
             return Ok(());
         }
@@ -1463,6 +1470,7 @@ impl World {
                 OrderKind::Board => self.run_board(row, &o)?,
                 OrderKind::Land | OrderKind::Unload => self.run_land(row, &o)?,
                 OrderKind::Warp => self.run_warp_order(row, &o)?,
+                OrderKind::ReclaimArea => self.run_reclaim_area(row, &o)?,
             }
             // A salvage vehicle, boat or aircraft clears what it passes as it goes.
             if matches!(

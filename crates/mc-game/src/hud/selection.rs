@@ -164,7 +164,7 @@ pub fn activity(kind: OrderKind) -> &'static str {
         OrderKind::Attack => "Attacking",
         OrderKind::Build => "Building",
         OrderKind::Assist => "Assisting",
-        OrderKind::Reclaim | OrderKind::ReclaimUnit => "Reclaiming",
+        OrderKind::Reclaim | OrderKind::ReclaimUnit | OrderKind::ReclaimArea => "Reclaiming",
         OrderKind::Produce => "Producing",
         OrderKind::Upgrade => "Upgrading",
         OrderKind::AttackGround => "Firing on Ground",

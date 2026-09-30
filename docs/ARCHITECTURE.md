@@ -230,7 +230,10 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   unbuilt at the rate the same power would build it, pays `UNIT_YIELD` of its mass scaled by how built it is (a fifth;
   less than a repair's quarter, so there is no loop to profit from), and when its health runs out gets `flag::RECLAIMED`:
   `despawn_unit` then emits `SimEvent::Reclaimed` instead of `UnitDied` and leaves no wreck or stain (commanders
-  excepted). A unit with no orders runs `idle_repair` then `idle_reclaim`: it never moves and holds no order (so it still counts as idle
+  excepted). An area reclaim (`Command::ReclaimArea`, `OrderKind::ReclaimArea`, `reclaim_area.rs`) sends mobile
+  reclaimers to a point, taking the wrecks within a short step of the way, and with a radius clears every wreck in
+  that circle: each wreck is a `Reclaim` pushed in front of the area order, one another reclaimer nearby is on is left
+  to it while there are others. A unit with no orders runs `idle_repair` then `idle_reclaim`: it never moves and holds no order (so it still counts as idle
   to the HUD and the AI). A mobile builder mends wounded allies within reach (`flag::REPAIRING`) unless a friend is already taking the hull apart; a reclaimer
   clears wrecks within reach while the player's mass store has room. A reclaimer tower
   (`UnitBlueprint::reclaimer`) is the same with a longer reach, a slow turret (`turn`) and a charge

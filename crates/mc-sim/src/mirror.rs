@@ -729,7 +729,8 @@ pub struct QueuedOrder {
     /// What `Build`, `Produce` and `Upgrade` make.
     pub blueprint: BlueprintId,
     /// `Bombard`: how far from `at` shots may fall; `Guard`: the area watched (aircraft
-    /// circle it halfway out), metres. Zero for every other kind.
+    /// circle it halfway out); `ReclaimArea`: the circle cleared, metres. Zero for every
+    /// other kind.
     pub radius: f32,
 }
 

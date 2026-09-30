@@ -23,7 +23,10 @@ use mc_sim::{Command, Handle};
 use std::collections::HashSet;
 
 mod guard_rings;
+mod reclaim_rings;
 mod wall_line;
+
+pub(crate) use reclaim_rings::reclaim_radius;
 
 use guard_rings::{guard_look, guard_ring, orbit_ring, selection_guard_look, GuardLook};
 
@@ -105,6 +108,7 @@ fn draggable(kind: OrderKind) -> bool {
             | OrderKind::Build
             | OrderKind::Patrol
             | OrderKind::Guard
+            | OrderKind::ReclaimArea
     )
 }
 
@@ -804,6 +808,7 @@ impl OrderMap {
                 }
             }
         }
+        reclaim_rings::draw_reclaim_drag(ui, field, ground, &project);
         let guard = view.mode == Mode::Target(crate::game::Targeting::Guard);
         // Assist dragged out is an area assist (`Game::left_released`).
         let area_assist = view.mode == Mode::Target(crate::game::Targeting::Assist)
@@ -1381,7 +1386,8 @@ impl OrderMap {
                         }
                     }
                 }
-                if order.kind == OrderKind::Guard
+                // A guard's area, or a circle being cleared of wrecks.
+                if matches!(order.kind, OrderKind::Guard | OrderKind::ReclaimArea)
                     && order.radius > 0.0
                     && guarded.insert((order.at.x.0, order.at.y.0))
                 {
@@ -1506,7 +1512,7 @@ fn tone_of(kind: OrderKind) -> u32 {
         OrderKind::Patrol => PATROL,
         OrderKind::Guard => hud::style::Family::Stance.tone(),
         OrderKind::Build | OrderKind::Assist => palette::WARN,
-        OrderKind::Reclaim | OrderKind::ReclaimUnit => hud::MASS,
+        OrderKind::Reclaim | OrderKind::ReclaimUnit | OrderKind::ReclaimArea => hud::MASS,
         _ => palette::ACCENT,
     }
 }

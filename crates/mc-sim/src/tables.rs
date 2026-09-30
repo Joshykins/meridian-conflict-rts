@@ -625,6 +625,9 @@ pub enum OrderKind {
     Strike,
     /// A capital ship jumps to `pos` through warp (`warp.rs`).
     Warp,
+    /// Head for `pos` reclaiming the wrecks along the way, and with a `radius`, every
+    /// wreck within it of `pos` (`reclaim_area.rs`). `target`: the wreck last taken up.
+    ReclaimArea,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -642,6 +645,7 @@ pub struct Order {
     /// `Bombard`: how far from `pos` shots may fall. `Guard`: the area watched. `Board`: one after reaching the stern approach lane.
     /// `Assist`: one when given on a unit still being built, and ends when it is done.
     /// `Reclaim`: one when an engineer took it up from its Area Assist ring.
+    /// `ReclaimArea`: the circle cleared, zero for a point.
     /// Zero otherwise.
     pub radius: Fx,
 }

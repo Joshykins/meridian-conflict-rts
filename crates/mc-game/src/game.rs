@@ -43,6 +43,8 @@ mod cine_input;
 pub(crate) mod groups;
 #[path = "game_music.rs"]
 mod music_notes;
+#[path = "game_reclaim.rs"]
+mod reclaim_input;
 #[path = "game_survival.rs"]
 mod survival_notes;
 #[path = "game_work.rs"]
@@ -931,6 +933,11 @@ impl Game {
             }
             | Command::ReclaimWreck { units, .. }
             | Command::ReclaimUnit { units, .. }
+            | Command::ReclaimArea {
+                units,
+                queue: false,
+                ..
+            }
             | Command::AttackGround {
                 units,
                 queue: false,
@@ -1154,7 +1161,12 @@ impl Game {
                         }
                         if matches!(
                             self.view.mode,
-                            Mode::Target(Targeting::Bombard | Targeting::Guard | Targeting::Assist)
+                            Mode::Target(
+                                Targeting::Bombard
+                                    | Targeting::Guard
+                                    | Targeting::Assist
+                                    | Targeting::Reclaim
+                            )
                         ) {
                             self.view.circle_from =
                                 self.ground_under_cursor(r).map(|g| g.truncate());
@@ -1314,6 +1326,7 @@ impl Game {
                     None => audio.play(Sfx::Deny),
                 }
             }
+            Mode::Target(Targeting::Reclaim) => self.reclaim_released(from, r, audio),
             Mode::Target(Targeting::Bombard) => {
                 let ground = self.ground_under_cursor(r).map(|g| g.truncate());
                 if let (Some(centre), Some(edge)) = (self.view.circle_from.take(), ground) {
@@ -1823,27 +1836,36 @@ impl Game {
                 radius: Fx::from_f32(crate::orders::BOMBARD_MIN),
                 queue,
             }),
-            // A wreck, or a live unit: the player's own (not an ally's) or an enemy's.
-            Targeting::Reclaim => target.and_then(|u| {
-                let owner = (u.owner_flags & 0xFF) as u8;
-                if is_wreck(&u) {
-                    Some(Command::ReclaimWreck {
-                        units,
-                        wreck: Handle(u.unit_id),
-                        queue,
-                    })
-                } else if (owner == self.view.local || self.is_enemy(owner))
-                    && !self.view.selection.contains(&u.unit_id)
-                {
-                    Some(Command::ReclaimUnit {
-                        units,
-                        target: Handle(u.unit_id),
-                        queue,
-                    })
-                } else {
-                    None
+            // A wreck, or a live unit: the player's own (not an ally's) or an enemy's. Open
+            // ground: head there, reclaiming the wrecks on the way.
+            Targeting::Reclaim => match target {
+                None => point.map(|pos| Command::ReclaimArea {
+                    units,
+                    pos,
+                    radius: Fx::ZERO,
+                    queue,
+                }),
+                Some(u) => {
+                    let owner = (u.owner_flags & 0xFF) as u8;
+                    if is_wreck(&u) {
+                        Some(Command::ReclaimWreck {
+                            units,
+                            wreck: Handle(u.unit_id),
+                            queue,
+                        })
+                    } else if (owner == self.view.local || self.is_enemy(owner))
+                        && !self.view.selection.contains(&u.unit_id)
+                    {
+                        Some(Command::ReclaimUnit {
+                            units,
+                            target: Handle(u.unit_id),
+                            queue,
+                        })
+                    } else {
+                        None
+                    }
                 }
-            }),
+            },
         }
     }
 
@@ -2034,7 +2056,11 @@ impl Game {
             }) => Pointer::AttackMove,
             Some(Command::FormationMove { .. }) => Pointer::Move,
             Some(Command::Assist { .. } | Command::CopyFactoryOrders { .. }) => Pointer::Assist,
-            Some(Command::ReclaimWreck { .. } | Command::ReclaimUnit { .. }) => Pointer::Reclaim,
+            Some(
+                Command::ReclaimWreck { .. }
+                | Command::ReclaimUnit { .. }
+                | Command::ReclaimArea { .. },
+            ) => Pointer::Reclaim,
             Some(Command::Move { .. } | Command::Land { .. }) => Pointer::Move,
             Some(Command::Board { .. }) => Pointer::Board,
             Some(Command::Warp { .. }) => Pointer::Warp,

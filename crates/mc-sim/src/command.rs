@@ -16,6 +16,8 @@ pub const MAX_PATROL_POINTS: usize = 32;
 /// Narrowest and widest area a `Guard` may cover, metres.
 pub const MIN_GUARD_RADIUS: Fx = Fx::from_int(40);
 pub const MAX_GUARD_RADIUS: Fx = Fx::from_int(2400);
+/// Widest circle a `ReclaimArea` may clear, metres.
+pub const MAX_RECLAIM_RADIUS: Fx = Fx::from_int(2400);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Command {
@@ -78,6 +80,14 @@ pub enum Command {
         target: UnitId,
         queue: bool,
     },
+    /// Mobile reclaimers head for `pos`, reclaiming the wrecks they pass; with a `radius`
+    /// (up to `MAX_RECLAIM_RADIUS`), they clear every wreck within it of `pos` too.
+    ReclaimArea {
+        units: Vec<UnitId>,
+        pos: FxVec2,
+        radius: Fx,
+        queue: bool,
+    },
     /// Append `count` of `blueprint` to each factory's queue.
     Produce {
         factories: Vec<UnitId>,
@@ -123,7 +133,7 @@ pub enum Command {
     },
     Resign,
     /// Moves the `kind` orders (`Move`, `AttackMove`, `Build`, `Patrol`, `AttackGround`,
-    /// `Bombard` or `Guard`) these units hold at exactly `from` to `to`. A `Build` is snapped
+    /// `Bombard`, `Guard` or `ReclaimArea`) these units hold at exactly `from` to `to`. A `Build` is snapped
     /// to the build grid and has to fit where it lands. A `Guard` round a unit is found near
     /// `from` and stops following it.
     RelocateOrder {
@@ -368,6 +378,7 @@ impl Command {
             | Command::Assist { units, .. }
             | Command::ReclaimWreck { units, .. }
             | Command::ReclaimUnit { units, .. }
+            | Command::ReclaimArea { units, .. }
             | Command::Upgrade { units }
             | Command::CancelUpgrade { units }
             | Command::Refit { units, .. }
