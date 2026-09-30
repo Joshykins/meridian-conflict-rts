@@ -103,12 +103,21 @@ impl WorkBeams {
             let head = heads.entry(source).or_insert(0);
             let key = (source, *head);
             *head += 1;
+            let mut beam = *beam;
             let mut start = on_since;
             let mut from_prev = beam.from;
-            let mut trip_len = length_of(beam);
+            let mut trip_len = length_of(&beam);
             if let Some(old) = was.remove(&key) {
+                // A sweep's foot is wherever its head points, a kilometre out on a Scavenger
+                // III, so it moves tens of metres a tick: it is the same beam going round,
+                // gliding from last tick's spot, never a new one. Ended each tick, it left a
+                // fan of fading beams behind the head.
+                let sweep = beam.kind == mc_sim::reclaim::BEAM_SWEEP;
+                if sweep {
+                    beam.to_prev = old.beam.to;
+                }
                 let jump = Vec3::from(old.beam.to).distance(Vec3::from(beam.to_prev));
-                if jump <= JUMP + beam.radius {
+                if sweep || jump <= JUMP + beam.radius {
                     start = old.start;
                     from_prev = old.beam.from;
                     trip_len = old.trip_len;
@@ -126,7 +135,7 @@ impl WorkBeams {
             self.live.insert(
                 key,
                 GpuBeam {
-                    beam: *beam,
+                    beam,
                     from_prev,
                     seed: seed_of(key),
                     start,
@@ -208,6 +217,40 @@ mod tests {
         };
         let back = pose.back(Vec3::new(10.0, 2.0, 6.0));
         assert!(back.distance(Vec3::new(2.0, 0.0, 6.0)) < 1e-4, "{back}");
+    }
+
+    #[test]
+    fn a_fast_sweep_stays_one_beam_gliding_round() {
+        // A Scavenger III's sweep: 1020 m out, turning a degree a tick, so its foot
+        // moves ~18 m a tick, far past `JUMP`.
+        let at = |tick: u32| {
+            let a = (tick as f32).to_radians();
+            [1020.0 * a.cos(), 1020.0 * a.sin(), 0.0]
+        };
+        let mut beams = WorkBeams::default();
+        let mut drawn = Vec::new();
+        for tick in 0..10 {
+            let mut frame = RenderFrame {
+                tick,
+                ..Default::default()
+            };
+            frame.beam_sources.push(7 | 1 << 30);
+            frame.beams.push(mc_sim::reclaim::BeamInstance {
+                from: [0.0, 0.0, 34.0],
+                kind: mc_sim::reclaim::BEAM_SWEEP,
+                to_prev: at(tick),
+                radius: 3.0,
+                to: at(tick),
+                height: 0.0,
+            });
+            drawn = beams.tick(&frame, tick as f32 / 10.0);
+        }
+        assert_eq!(drawn.len(), 1, "no fan of ended beams behind the head");
+        assert_eq!(
+            drawn[0].beam.to_prev,
+            at(8),
+            "the foot glides from last tick's spot"
+        );
     }
 
     #[test]
