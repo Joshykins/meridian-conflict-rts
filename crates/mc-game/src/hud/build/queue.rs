@@ -382,7 +382,7 @@ fn switch(hud: &mut Hud, ui: &mut Ui, tr: Rect, sw: Switch) -> Option<bool> {
     } else {
         tr.mid_y()
     };
-    ui.text(
+    let label_end = ui.text(
         tr.x + 30.0,
         label_y,
         type_scale::MICRO,
@@ -404,14 +404,18 @@ fn switch(hud: &mut Hud, ui: &mut Ui, tr: Rect, sw: Switch) -> Option<bool> {
         None => (false, sw.key),
     };
     let key_x = tr.right() - 5.0 - ui.text_width(type_scale::MICRO, key);
-    ui.text(
-        key_x,
-        tr.y + 8.0,
-        type_scale::MICRO,
-        rgb(palette::FAINT, 1.0),
-        key,
-    );
-    if shift {
+    // A long label (Batch x3) takes the key's corner: the key is in the tip.
+    let key_room = label_end < key_x - if shift { 13.0 } else { 4.0 };
+    if key_room {
+        ui.text(
+            key_x,
+            tr.y + 8.0,
+            type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            key,
+        );
+    }
+    if shift && key_room {
         crate::hud::selection::shift_mark(
             ui,
             Vec2::new(key_x - 7.0, tr.y + 8.0),
@@ -482,7 +486,7 @@ fn batch_switches(hud: &mut Hud, ui: &mut Ui, r: Rect, queue: &Queue, right: f32
         )
     } else if split.all() && linked > 1 {
         format!(
-            "{linked} factories linked: their units form up at their own doors and leave together. Click: each leaves as it is made."
+            "{linked} factories linked: their units form up at their own doors and leave together.  Click or Shift+L: each leaves as it is made."
         )
     } else if split.all() {
         "Units form up outside and leave together once the batch is full. Click: each leaves as it is made."
@@ -590,14 +594,14 @@ fn size_stepper(hud: &mut Hud, ui: &mut Ui, sr: Rect, m: Muster) -> f32 {
     ui.stroke(plus - Vec2::Y * 4.0, plus + Vec2::Y * 4.0, 1.6, lit(!left));
     ui.text_centred(
         sr.x + sr.w * 0.5,
-        sr.y + 10.0,
+        sr.y + 11.0,
         type_scale::MICRO,
-        rgb(palette::FAINT, 1.0),
+        rgb(palette::DIM, 1.0),
         if m.fixed { "SIZE" } else { "LAP" },
     );
     ui.text_centred(
         sr.x + sr.w * 0.5,
-        sr.y + 23.0,
+        sr.y + 24.0,
         type_scale::ITEM,
         rgb(if m.fixed { BATCH } else { palette::TEXT }, 1.0),
         &m.size.to_string(),
