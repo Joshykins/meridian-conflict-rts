@@ -14,8 +14,12 @@ use mc_sim::mirror::{RenderFrame, SimEvent, UnitInstance};
 const MOST: usize = 2048;
 /// Most fallen and vaporizing trees drawn at once (`fallen_tree_instances`).
 pub(super) const MOST_SHOWN: usize = MOST + super::clearing::VAPOR_MOST;
-/// Seconds to go from standing to lying down.
+/// Seconds a blast-thrown tree takes to go from standing to lying down, and the
+/// most a trampled one takes: a walker's falls follow its pace (`trample_fall`).
 const FALL: f32 = 1.1;
+/// The least a trampled tree takes to fall, however fast the walker: quicker
+/// reads as the tree vanishing rather than going over.
+const FALL_QUICKEST: f32 = 0.3;
 /// How far over a tree ends up, radians: its branches prop it a little off the ground.
 const LIE: f32 = 1.48;
 /// Seconds it lies there before it starts to sink, and how long sinking takes.
@@ -56,8 +60,22 @@ pub(super) struct FallenTree {
     instance: UnitInstance,
     prop: u32,
     start: f32,
+    /// Seconds from standing to lying down.
+    fall: f32,
     height: f32,
     landed: bool,
+}
+
+/// Seconds a tree knocked over at `at` by a walker at `from` moving `motion` a tick
+/// takes to fall: it is down by the time the walker's middle reaches its foot, so
+/// the walker never wades through the part still standing. A slow walker's trees
+/// take their time, a fast one's go over at once.
+fn trample_fall(at: Vec2, from: Vec2, motion: Vec2) -> f32 {
+    let speed = motion.length() * mc_core::TICKS_PER_SECOND as f32;
+    if speed <= 1e-3 {
+        return FALL;
+    }
+    (at.distance(from) / speed).clamp(FALL_QUICKEST, FALL)
 }
 
 /// Trees drawn as dynamic props: knocked over, or coming apart in a clearing
@@ -91,8 +109,11 @@ impl Renderer {
                 continue;
             }
             let at = Vec2::new(instance.pos[0], instance.pos[1]);
-            let away = (at - Vec2::from(from.to_f32())).normalize_or_zero();
-            let ahead = Vec2::from(motion.to_f32()).normalize_or_zero();
+            let from = Vec2::from(from.to_f32());
+            let motion = Vec2::from(motion.to_f32());
+            let fall = trample_fall(at, from, motion);
+            let away = (at - from).normalize_or_zero();
+            let ahead = motion.normalize_or_zero();
             // Mostly the way the walker goes, pushed off to the side it passed on.
             let dir = (ahead + away * 0.7).normalize_or(ahead);
             let height = tree_height(kind, &instance);
@@ -107,7 +128,9 @@ impl Renderer {
             self.fallen_trees.fallen.push(FallenTree {
                 instance,
                 prop: *prop,
-                start: time + self.scatter.unit() * 0.15,
+                // Out of step a little, by a share of its fall.
+                start: time + self.scatter.unit() * 0.15 * fall / FALL,
+                fall,
                 height,
                 landed: false,
             });
@@ -151,6 +174,7 @@ impl Renderer {
             instance,
             prop,
             start,
+            fall: FALL,
             height,
             landed: false,
         });
@@ -160,7 +184,7 @@ impl Renderer {
     pub(super) fn land_fallen_trees(&mut self, time: f32) {
         for i in 0..self.fallen_trees.fallen.len() {
             let tree = self.fallen_trees.fallen[i];
-            if tree.landed || time - tree.start < FALL {
+            if tree.landed || time - tree.start < tree.fall {
                 continue;
             }
             self.fallen_trees.fallen[i].landed = true;
@@ -189,10 +213,10 @@ impl Renderer {
             .map(|tree| {
                 let age = (time - tree.start).max(0.0);
                 // Slow to start, as a tree goes: it picks up speed as it leans.
-                let f = (age / FALL).min(1.0);
+                let f = (age / tree.fall).min(1.0);
                 let mut tilt = LIE * f * f;
                 // A small bounce on the branches as it lands.
-                let bounce = (age - FALL) / 0.45;
+                let bounce = (age - tree.fall) / 0.45;
                 if (0.0..1.0).contains(&bounce) {
                     tilt -= 0.07 * (bounce * std::f32::consts::PI).sin();
                 }
@@ -212,6 +236,29 @@ impl Renderer {
 mod tests {
     use super::super::*;
     use glam::Vec2;
+
+    /// A trampled tree is down by the time the walker's middle reaches its foot:
+    /// a fast walker's trees fall quicker than a slow one's, within bounds.
+    #[test]
+    fn trampled_trees_fall_at_the_walkers_pace() {
+        use super::{trample_fall, FALL, FALL_QUICKEST};
+        let at = Vec2::new(8.0, 0.0);
+        // The commander's 30 m/s: 3 m a tick, the foot 8 m off.
+        let quick = trample_fall(at, Vec2::ZERO, Vec2::new(3.0, 0.0));
+        // A titan's slow tread: 1 m a tick.
+        let slow = trample_fall(at, Vec2::ZERO, Vec2::new(1.0, 0.0));
+        assert!(quick < slow, "{quick} vs {slow}");
+        assert!(
+            quick <= 8.0 / 30.0 + 0.05,
+            "down before the commander is on it: {quick}"
+        );
+        assert_eq!(trample_fall(at, Vec2::ZERO, Vec2::new(0.1, 0.0)), FALL);
+        assert_eq!(
+            trample_fall(at, Vec2::ZERO, Vec2::new(50.0, 0.0)),
+            FALL_QUICKEST
+        );
+        assert_eq!(trample_fall(at, Vec2::ZERO, Vec2::ZERO), FALL);
+    }
 
     /// Real Vulkan check: a walker's path knocks over a clump of trees.
     /// `FALLEN_TREES_DIR` gets a picture before, during and after the fall.
