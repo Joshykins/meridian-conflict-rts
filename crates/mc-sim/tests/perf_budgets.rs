@@ -194,10 +194,21 @@ fn ring_point(p: u8, players: u8, radius: f32) -> FxVec2 {
     )
 }
 
+/// Where the armies of [`armies`] go.
+#[derive(Clone, Copy, PartialEq)]
+enum Plan {
+    /// Nowhere: they stand.
+    Idle,
+    /// Every army on the centre.
+    Pile,
+    /// Each army on the one beside it on the ring: one battle per pair of sides.
+    Pairs,
+}
+
 /// `total` units shared out between `players` armies, each four blocks of tanks,
 /// bots, heavy tanks and interceptors `gap` metres apart, `radius` metres from
-/// the centre. With `fight` every army attack-moves on the centre.
-fn armies(players: u8, total: u32, radius: f32, gap: i32, fight: bool) -> World {
+/// the centre, sent as `plan` says.
+fn armies(players: u8, total: u32, radius: f32, gap: i32, plan: Plan) -> World {
     let mut w = ring_world(players, true);
     let per = total / players as u32;
     let mix = [
@@ -219,9 +230,19 @@ fn armies(players: u8, total: u32, radius: f32, gap: i32, fight: bool) -> World 
             );
             ids.extend(block(&mut w, key, p, per * share / 10, corner, gap, 0));
         }
-        orders.push(attack_move(p, ids, (8192, 8192)));
+        let to = match plan {
+            Plan::Pairs => {
+                let (a, b) = (
+                    ring_point(p, players, radius),
+                    ring_point(p ^ 1, players, radius),
+                );
+                ((a.x + b.x).floor_int() / 2, (a.y + b.y).floor_int() / 2)
+            }
+            _ => (8192, 8192),
+        };
+        orders.push(attack_move(p, ids, to));
     }
-    if fight {
+    if plan != Plan::Idle {
         w.tick(&orders).unwrap();
     }
     w
@@ -231,7 +252,7 @@ fn armies(players: u8, total: u32, radius: f32, gap: i32, fight: bool) -> World 
 /// query that stops scaling with the crowd around it.
 #[test]
 fn eight_armies_clash() {
-    let mut w = armies(8, 4000, 900.0, 6, true);
+    let mut w = armies(8, 4000, 900.0, 6, Plan::Pile);
     let report = w
         .perf_ticks("eight_armies_clash", 200, |_, _| Vec::new())
         .unwrap();
@@ -252,11 +273,13 @@ fn eight_armies_clash() {
 /// How the tick grows with unit and player count, for the 30 000 unit goal.
 /// Not a budget: it prints a table per case.
 ///
-/// `MERIDIAN_SCALE="8:4000 8:8000:idle 32:30000" cargo test --profile gate -p mc-sim
-/// --test perf_budgets -- --ignored zz_scale_probe --nocapture`
+/// `MERIDIAN_SCALE="8:4000 32:30000:pairs 32:30000:idle" cargo test --profile gate
+/// -p mc-sim --test perf_budgets -- --ignored zz_scale_probe --nocapture`
 ///
-/// Each case is `players:units`, fighting in the middle; `:idle` spreads the
-/// armies 20 m apart on the start ring and gives no orders.
+/// Each case is `players:units`, every army fighting in the middle (the worst
+/// crowd there is); `:pairs` sets each army on its neighbour on a 3 km ring,
+/// one battle per two sides as a big match plays; `:idle` spreads the armies
+/// 20 m apart on that ring and gives no orders.
 #[test]
 #[ignore]
 fn zz_scale_probe() {
@@ -265,11 +288,10 @@ fn zz_scale_probe() {
         let parts: Vec<&str> = case.split(':').collect();
         let players: u8 = parts[0].parse().unwrap();
         let total: u32 = parts[1].parse().unwrap();
-        let idle = parts.get(2) == Some(&"idle");
-        let mut w = if idle {
-            armies(players, total, 3000.0, 20, false)
-        } else {
-            armies(players, total, 900.0, 6, true)
+        let mut w = match parts.get(2) {
+            Some(&"idle") => armies(players, total, 3000.0, 20, Plan::Idle),
+            Some(&"pairs") => armies(players, total, 3000.0, 6, Plan::Pairs),
+            _ => armies(players, total, 900.0, 6, Plan::Pile),
         };
         let report = w
             .perf_ticks(&format!("scale {case}"), 300, |_, _| Vec::new())

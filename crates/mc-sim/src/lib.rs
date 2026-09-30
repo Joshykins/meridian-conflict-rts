@@ -103,7 +103,6 @@ pub enum Table {
     Orders,
     Projectiles,
     Wrecks,
-    Stains,
     Pads,
     Fires,
     Flattens,

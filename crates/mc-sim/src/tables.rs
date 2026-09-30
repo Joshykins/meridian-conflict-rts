@@ -1222,7 +1222,9 @@ impl Default for Wrecks {
 }
 
 /// Scorch marks and craters. They are decals: the ground itself is untouched.
-/// Append-only; overlapping impacts deepen an existing stain instead of adding one.
+/// Overlapping impacts deepen an existing stain instead of adding one. Once
+/// `MAX_STAINS` are down, a new mark takes the place of the oldest: a long
+/// battle wears the ground, it never runs out of it.
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Stains {
     pub pos: Vec<FxVec2>,
@@ -1230,6 +1232,9 @@ pub struct Stains {
     /// 1..=255, how dark the mark is.
     pub strength: Vec<u8>,
     pub seed: Vec<u16>,
+    /// With the table full, the row the next mark replaces.
+    #[serde(default)]
+    pub oldest: u32,
 }
 
 impl Stains {
@@ -1245,21 +1250,19 @@ impl Stains {
         *self = Stains::default();
     }
 
-    pub fn push(
-        &mut self,
-        pos: FxVec2,
-        radius: Fx,
-        strength: u8,
-        seed: u16,
-    ) -> Result<usize, SimError> {
+    pub fn push(&mut self, pos: FxVec2, radius: Fx, strength: u8, seed: u16) -> usize {
         if self.len() >= MAX_STAINS {
-            return Err(SimError::TableFull(Table::Stains));
+            let i = self.oldest as usize % self.len();
+            self.oldest = ((i + 1) % self.len()) as u32;
+            (self.pos[i], self.radius[i]) = (pos, radius);
+            (self.strength[i], self.seed[i]) = (strength, seed);
+            return i;
         }
         self.pos.push(pos);
         self.radius.push(radius);
         self.strength.push(strength);
         self.seed.push(seed);
-        Ok(self.len() - 1)
+        self.len() - 1
     }
 
     pub fn hash(&self, h: &mut StateHasher) {
@@ -1270,6 +1273,7 @@ impl Stains {
             h.write_i64(self.radius[i].0);
             h.write_u64(self.strength[i] as u64 | (self.seed[i] as u64) << 8);
         }
+        h.write_u64(self.oldest as u64);
     }
 }
 

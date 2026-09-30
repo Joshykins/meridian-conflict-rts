@@ -446,7 +446,7 @@ impl World {
                 }
             }
             if storm.age % 10 == 0 {
-                self.add_stain(storm.pos, reach, 160)?;
+                self.add_stain(storm.pos, reach, 160);
             }
             storm.age += 1;
             if storm.age < storm.ticks {
@@ -563,7 +563,7 @@ impl World {
         if in_water {
             return Ok(());
         }
-        self.add_stain(at.xy(), spec.splash / 2, 90)?;
+        self.add_stain(at.xy(), spec.splash / 2, 90);
         Ok(())
     }
 }

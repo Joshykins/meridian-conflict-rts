@@ -208,7 +208,7 @@ impl World {
                 wrecks.landing[row] = Landing::Crashed as u8;
             }
             let radius = self.blueprints.unit(crash.blueprint).radius;
-            self.add_stain(crash.pos.xy(), radius * Fx::ratio(3, 2), 72)?;
+            self.add_stain(crash.pos.xy(), radius * Fx::ratio(3, 2), 72);
         }
         Ok(())
     }

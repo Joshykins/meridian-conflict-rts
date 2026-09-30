@@ -1394,8 +1394,11 @@ impl World {
     }
 
     pub(crate) fn run_orders(&mut self) -> Result<(), SimError> {
-        self.run_rollouts()?;
-        self.run_batches()?;
+        {
+            let _span = mc_core::perf_span!("orders.rollouts");
+            self.run_rollouts()?;
+            self.run_batches()?;
+        }
         // Units spawned while orders run start acting next tick.
         let rows = self.state.units.slots.rows();
         for row in 0..rows {
@@ -1423,7 +1426,10 @@ impl World {
                     } else {
                         bp.vision
                     };
-                    if let Some(target) = self.air_engage_target_within(row, scramble) {
+                    let span = mc_core::perf_span!("orders.scramble");
+                    let found = self.air_engage_target_within(row, scramble);
+                    drop(span);
+                    if let Some(target) = found {
                         // Idle armed aircraft launch a flight before using their weapons.
                         let mut home = order(
                             OrderKind::AttackMove,
@@ -1450,6 +1456,7 @@ impl World {
                 if self.state.units.has_flag(row, flag::HAS_FIELD) {
                     self.stop_moving(row);
                 }
+                let _span = mc_core::perf_span!("orders.idle");
                 if self.idle_chase(row)? || self.idle_air_land(row)? {
                     continue;
                 }
@@ -1459,8 +1466,14 @@ impl World {
                 continue;
             };
             match o.kind {
-                OrderKind::Move | OrderKind::AttackMove => self.run_move(row, &o)?,
-                OrderKind::Attack => self.run_attack(row, &o)?,
+                OrderKind::Move | OrderKind::AttackMove => {
+                    let _span = mc_core::perf_span!("orders.move");
+                    self.run_move(row, &o)?
+                }
+                OrderKind::Attack => {
+                    let _span = mc_core::perf_span!("orders.attack");
+                    self.run_attack(row, &o)?
+                }
                 OrderKind::Build => self.run_build(row, &o)?,
                 OrderKind::Assist => self.run_assist(row, &o)?,
                 OrderKind::Reclaim if self.bp(row).drone_carrier() => {}
@@ -1673,22 +1686,32 @@ impl World {
         let units = &self.state.units;
         let pos = units.pos[row];
         let crowd = self.bp(row).vision / 4;
-        let mut best: Option<(Fx, usize)> = None;
+        let mut near: Vec<(Fx, usize)> = Vec::new();
         let friends = self.team_mask(units.owner[row]);
         self.index.query_foes(pos, reach, kind::UNIT, friends, |e| {
             let t = e.row as usize;
-            if !self.unit_entry_is_current(e)
-                || !self.air_can_harass(row, t)
-                || !self.hittable(t, mask)
+            if self.unit_entry_is_current(e)
+                && self.air_can_harass(row, t)
+                && self.hittable(t, mask)
             {
-                return true;
-            }
-            let score = pos.distance(e.pos) + crowd * self.air_pursuers(row, t);
-            if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
-                best = Some((score, t));
+                near.push((pos.distance(e.pos), t));
             }
             true
         });
+        // Nearest first: a crowd only adds to the distance, so once one is
+        // further than the best score so far, none after it can win. Only the
+        // few near the front are counted for pursuers, not a whole enemy army.
+        near.sort_unstable();
+        let mut best: Option<(Fx, usize)> = None;
+        for (distance, t) in near {
+            if best.is_some_and(|(s, _)| distance > s) {
+                break;
+            }
+            let score = distance + crowd * self.air_pursuers(row, t);
+            if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
+                best = Some((score, t));
+            }
+        }
         best.map(|(_, t)| t)
     }
 

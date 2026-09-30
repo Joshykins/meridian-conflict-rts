@@ -140,7 +140,7 @@ impl World {
             if at.z - ground > bore.width * 2 {
                 continue;
             }
-            self.add_stain(at.xy(), bore.width * Fx::ratio(3, 2), 80)?;
+            self.add_stain(at.xy(), bore.width * Fx::ratio(3, 2), 80);
         }
         Ok(())
     }

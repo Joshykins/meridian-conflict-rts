@@ -2985,7 +2985,7 @@ impl World {
                         self.state.props_dead[prop / 64] |= 1 << (prop % 64);
                     }
                 }
-                self.add_stain(hit.point.xy(), weapon.splash, 96)?;
+                self.add_stain(hit.point.xy(), weapon.splash, 96);
             }
         } else {
             if let Some(row) = hit.unit {
@@ -2995,7 +2995,7 @@ impl World {
                     hit.point.xy(),
                     Fx::from_int(2) + weapon.damage.sqrt() / 4,
                     40,
-                )?;
+                );
             }
         }
         Ok(())
@@ -3047,13 +3047,7 @@ impl World {
     /// the blast's damage, less toward the edge. Shields between take it instead.
     /// `afloat`: it went up on the water (a ship, or a structure built on the sea),
     /// so the blast starts at the surface, not on the seabed under it.
-    fn death_blast(
-        &mut self,
-        center: FxVec2,
-        db: mc_data::DeathBlast,
-        owner: u8,
-        afloat: bool,
-    ) -> Result<(), SimError> {
+    fn death_blast(&mut self, center: FxVec2, db: mc_data::DeathBlast, owner: u8, afloat: bool) {
         let mut victims = Vec::new();
         self.index.query(center, db.radius, kind::UNIT, |e| {
             let row = e.row as usize;
@@ -3125,15 +3119,10 @@ impl World {
     }
 
     /// Adds a ground stain, or deepens one that is already there.
-    pub(crate) fn add_stain(
-        &mut self,
-        pos: FxVec2,
-        radius: Fx,
-        strength: u8,
-    ) -> Result<(), SimError> {
+    pub(crate) fn add_stain(&mut self, pos: FxVec2, radius: Fx, strength: u8) {
         // Water leaves no scorch.
         if self.terrain.height_at(pos) < self.terrain.water_level() {
-            return Ok(());
+            return;
         }
         let mut existing = None;
         self.index.query(pos, Fx::ZERO, kind::STAIN, |e| {
@@ -3151,10 +3140,9 @@ impl World {
             }
             _ => {
                 let seed = self.state.rng.next_u32() as u16;
-                stains.push(pos, radius, strength, seed)?;
+                stains.push(pos, radius, strength, seed);
             }
         }
-        Ok(())
     }
 
     pub(crate) fn reap_dead(&mut self) -> Result<(), SimError> {
@@ -3318,7 +3306,7 @@ impl World {
             } else if let Some(hull) = sinking {
                 self.state.sinking.push(hull);
             } else if leave_wreck && !reclaimed {
-                self.add_stain(pos, bp.radius * Fx::ratio(3, 2), 72)?;
+                self.add_stain(pos, bp.radius * Fx::ratio(3, 2), 72);
                 let mass = wreck_mass;
                 if complete && mass > Fx::ZERO {
                     let wreck_z = if bp.motion.map(|m| m.layer) == Some(mc_data::MoveLayer::Air) {
@@ -3346,7 +3334,7 @@ impl World {
         if let Some(db) = bp.death_blast.filter(|_| complete && visible && !reclaimed) {
             let afloat = bp.motion.map(|m| m.layer) == Some(mc_data::MoveLayer::Naval)
                 || (bp.water_build && self.terrain.height_at(pos) < self.terrain.water_level());
-            self.death_blast(pos, db, owner, afloat)?;
+            self.death_blast(pos, db, owner, afloat);
         }
         if complete && visible && bp.has(cat::COMMANDER) {
             // A commander's reactor goes up as a small nuclear blast (`nukes.rs`).
