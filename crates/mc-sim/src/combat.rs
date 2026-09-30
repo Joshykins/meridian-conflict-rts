@@ -732,6 +732,7 @@ impl World {
 
     pub(crate) fn run_targeting(&mut self) {
         let rows = self.state.units.slots.rows();
+        let incoming = self.incoming_damage(rows);
         let this = &*self;
         let picks: Vec<Vec<(usize, [UnitId; MAX_WEAPONS], u8)>> =
             self.pool.parallel_map_chunks(rows, CHUNK, |_, range| {
@@ -769,6 +770,22 @@ impl World {
                                         .is_some_and(|m| m.layer == mc_data::MoveLayer::Air))
                         })
                         .and_then(|o| units.row(o.target));
+                    // A fighter's guns leave an enemy the shots already on their way
+                    // will kill, unless an order names it: a pack otherwise pours its
+                    // first pass into the lead fighter and lets the rest fly free.
+                    let fighter = bp.has(cat::ANTI_AIR)
+                        && bp
+                            .motion
+                            .is_some_and(|m| m.layer == mc_data::MoveLayer::Air && !m.hover);
+                    let doomed = |t: usize| fighter && incoming[t] >= units.health[t];
+                    let ordered = ordered.filter(|&t| {
+                        !doomed(t)
+                            || this
+                                .state
+                                .orders
+                                .front(units, row)
+                                .is_some_and(|o| o.kind == OrderKind::Attack)
+                    });
                     let ground = this.ground_mark(row).is_some();
                     let strike = this.striking(row);
                     let mut targets = units.weapon_target[row];
@@ -785,7 +802,9 @@ impl World {
                         // Stick with the current target while it lives and stays in
                         // range. A closer enemy is not a reason to turn the gun.
                         let current = units.row(targets[w]).filter(|t| {
-                            this.is_valid_target(row, *t, weapon) && this.fires_at_will(row)
+                            this.is_valid_target(row, *t, weapon)
+                                && this.fires_at_will(row)
+                                && (!doomed(*t) || ordered == Some(*t))
                         });
                         let in_grid = |prefer: u32| {
                             this.index
@@ -795,6 +814,7 @@ impl World {
                                     kind::UNIT,
                                     |e| {
                                         this.unit_entry_is_current(e)
+                                            && !doomed(e.row as usize)
                                             && this.is_valid_target(row, e.row as usize, weapon)
                                             && (prefer == 0
                                                 || this.hittable(e.row as usize, prefer))
@@ -872,6 +892,22 @@ impl World {
             self.state.units.shot_blocked[row] = blocked;
             self.storm_retargets(row, before);
         }
+    }
+
+    /// Damage on its way to each unit row: the shots in flight that were fired at it.
+    fn incoming_damage(&self, rows: usize) -> Vec<Fx> {
+        let units = &self.state.units;
+        let shots = &self.state.projectiles;
+        let mut incoming = vec![Fx::ZERO; rows];
+        for i in 0..shots.len() {
+            if let Some(t) = units.row(shots.target[i]) {
+                let bp = self.blueprints.unit(shots.blueprint[i]);
+                if let Some(weapon) = bp.weapons.get(shots.weapon[i] as usize) {
+                    incoming[t] += weapon.damage;
+                }
+            }
+        }
+        incoming
     }
 
     /// A giant bore that changes its mark part way through a charge (its target died, or

@@ -9,7 +9,7 @@
 //!
 //! `cargo test --profile gate -p mc-sim --test sim -- zz_dogfight_probe:: --ignored --nocapture`
 //! Knobs: DOGFIGHT_SIDES=<seed><flip 0|1> prints the named swarm fight second by
-//! second, DOGFIGHT_TRACE prints the first strike fighter tick by tick; DOGFIGHT_KEY=<fighter key> for the first part (default the Peregrine),
+//! second, DOGFIGHT_IDLE_B leaves player b's swarm without orders, DOGFIGHT_TRACE prints the first strike fighter tick by tick; DOGFIGHT_KEY=<fighter key> for the first part (default the Peregrine),
 //! DOGFIGHT_SWARM=<key> and DOGFIGHT_N=<per side> for the second (default 25 Raptors).
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
@@ -212,7 +212,8 @@ fn swarms(
         }
     }
     let mut cmds = Vec::new();
-    for owner in 0..2u8 {
+    let idle_b = std::env::var("DOGFIGHT_IDLE_B").is_ok();
+    for owner in 0..if idle_b { 1u8 } else { 2 } {
         let target = w.state.units.pos[sides[1 - owner as usize][0]];
         cmds.push(PlayerCommand {
             player: owner,

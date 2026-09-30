@@ -1421,7 +1421,7 @@ fn sustained_fighter_combat_varies_speed_and_turn_radius() {
                 other.hash(),
                 "fighter maneuver diverged after restore"
             );
-        } else if w.state.units.air_break_ticks[0] > 0 {
+        } else if w.state.units.air_turn_ticks[0] > 5 {
             let mut other = world();
             other.pool = Arc::new(Pool::new(4));
             other
@@ -1455,7 +1455,7 @@ fn sustained_fighter_combat_varies_speed_and_turn_radius() {
     }
     assert!(
         restored.is_some(),
-        "fixture never exercised a pursuit breakaway"
+        "fixture never restored mid-way through a pursuit turn"
     );
     assert!(
         shots.iter().sum::<i32>() > 10,

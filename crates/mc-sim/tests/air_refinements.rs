@@ -591,3 +591,62 @@ fn thunderhead_looses_its_talons_on_an_attack_ground_run() {
         "rockets {rockets}, landed {landed}"
     );
 }
+
+/// Fighters on a big slow air target attack, bank and attack again: they never settle
+/// into circling it with their guns off it, nor fly away to come back later.
+#[test]
+fn fighters_keep_passing_a_big_air_target_without_long_gaps() {
+    let mut w = world();
+    let t = add(&mut w, "aster_t2_corvette", 1, 1000, 1000);
+    w.state.units.flags[t] |= flag::PASSIVE | flag::INVULNERABLE;
+    let fighters: Vec<usize> = (0..3)
+        .map(|k| add(&mut w, "aster_t2_interceptor", 0, 600, 950 + 50 * k))
+        .collect();
+    w.tick(&[cmd(Command::Attack {
+        units: fighters.iter().map(|&f| w.state.units.id(f)).collect(),
+        target: w.state.units.id(t),
+        queue: false,
+    })])
+    .unwrap();
+    let mut last = [None::<usize>; 3];
+    let mut worst = [0usize; 3];
+    let mut shots = [0usize; 3];
+    let mut farthest = Fx::ZERO;
+    for tick in 0..400 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            if let SimEvent::ShotFired { owner: 0, pos, .. } = e {
+                let i = (0..3)
+                    .min_by_key(|&i| w.state.units.pos[fighters[i]].distance(pos.xy()))
+                    .unwrap();
+                shots[i] += 1;
+                if let Some(l) = last[i] {
+                    worst[i] = worst[i].max(tick - l);
+                }
+                last[i] = Some(tick);
+            }
+        }
+        if tick > 60 {
+            for &f in &fighters {
+                farthest = farthest.max(w.state.units.pos[f].distance(w.state.units.pos[t]));
+            }
+        }
+    }
+    for i in 0..3 {
+        // A missile pair every 1.3 s at best; a pass and a turn back take about two.
+        assert!(
+            shots[i] >= 30,
+            "fighter {i} fired only {} shots in 40 s",
+            shots[i]
+        );
+        assert!(
+            worst[i] <= 30,
+            "fighter {i} went {} ticks without firing: it circled or flew off",
+            worst[i]
+        );
+    }
+    assert!(
+        farthest < Fx::from_int(300),
+        "a fighter flew {farthest:?} away from the target between passes"
+    );
+}
