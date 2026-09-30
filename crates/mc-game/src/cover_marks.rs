@@ -1,32 +1,69 @@
-//! Placing a radar post: the side's radar cover on the map.
+//! Placing a radar, sonar or missile defence post: the side's cover of that kind on the map.
 //!
-//! The renderer draws the cover as one merged outline (`rings::radar_network` puts every
-//! standing post's ring in the radar group, beside the new site's). Over it this draws
+//! The renderer draws the cover as one merged outline (`rings::cover_network` puts every
+//! standing post's ring in the cover's group, beside the new site's). Over it this draws
 //! each post's own reach, faint and dashed, so what overlaps shows; posts still being
 //! built, dashed amber; and a card at the site saying how much ground it adds.
 
 use crate::nuke_marks::{ground_ring, new_ground, project, surface, tag};
 use crate::orders::Field;
-use crate::rings::{radar_post, Reach};
+use crate::rings::Cover;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_data::BlueprintId;
 use mc_sim::mirror::{KIND_GHOST, KIND_PROP, KIND_WRECK};
 
-/// Each post's own reach: the radar blue, lightened to read over the ground.
-const REACH: u32 = 0x9DB6FF;
 /// Construction amber, for posts still being built.
 const BUILDING: u32 = 0xFFA928;
 
-/// The side's radar posts and the card, if a radar post is being placed at `placing`.
+/// What the HUD calls a cover and its posts, and how it draws their reach.
+struct Words {
+    network: &'static str,
+    post: &'static str,
+    posts: &'static str,
+    first: &'static str,
+    /// Each post's own reach: the cover's ring tone, lightened to read over the ground.
+    reach: u32,
+}
+
+fn words(cover: Cover) -> Words {
+    match cover {
+        Cover::Radar => Words {
+            network: "Radar network",
+            post: "radar",
+            posts: "radars",
+            first: "First radar cover",
+            reach: 0x9DB6FF,
+        },
+        Cover::Sonar => Words {
+            network: "Sonar network",
+            post: "sonar buoy",
+            posts: "sonar buoys",
+            first: "First sonar cover",
+            reach: 0x74D895,
+        },
+        Cover::AntiMissile => Words {
+            network: "Missile defence",
+            post: "defence",
+            posts: "defences",
+            first: "First missile cover",
+            reach: 0xFFB27A,
+        },
+    }
+}
+
+/// The side's posts and the card, if a radar, sonar or missile defence post is being
+/// placed at `placing`.
 pub fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec2)>) {
-    let Some((reach, site)) =
-        placing.and_then(|(bp, at)| Some((radar_post(field.blueprints.unit(bp))?, at)))
-    else {
+    let Some((cover, reach, site)) = placing.and_then(|(bp, at)| {
+        let (cover, reach) = Cover::post(field.blueprints.unit(bp))?;
+        Some((cover, reach, at))
+    }) else {
         return;
     };
     let view = field.view;
     let t = ui.time;
+    let tone = words(cover).reach;
     let (mut standing, mut building) = (Vec::new(), 0);
     for u in &view.frame.units {
         if u.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0
@@ -34,12 +71,12 @@ pub fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec2)>) {
         {
             continue;
         }
-        let Some(r) = radar_post(field.blueprints.unit(BlueprintId(u.blueprint as u16))) else {
+        let Some(r) = cover.of(field.blueprints.unit(BlueprintId(u.blueprint as u16))) else {
             continue;
         };
         let at = Vec2::new(u.pos[0], u.pos[1]);
         if u.build >= 1.0 {
-            ground_ring(ui, field, at, r, 1.6, rgb(REACH, 0.6), true, 0.0);
+            ground_ring(ui, field, at, r, 1.6, rgb(tone, 0.6), true, 0.0);
             standing.push((at, r));
         } else {
             // Its cover to come, apart from the network until it stands.
@@ -61,6 +98,7 @@ pub fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec2)>) {
     card(
         ui,
         g,
+        cover,
         reach,
         &standing,
         building,
@@ -72,13 +110,16 @@ pub fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec2)>) {
 fn card(
     ui: &mut Ui,
     anchor: Vec2,
+    cover: Cover,
     reach: f32,
     standing: &[(Vec2, f32)],
     building: usize,
     fresh: f32,
 ) {
-    let tone = Reach::Radar.tone();
-    let r = Rect::new(anchor.x + 26.0, anchor.y - 34.0, 236.0, 72.0);
+    let words = words(cover);
+    let tone = cover.reach().tone();
+    // Above the placing hint, which hangs 22 px below the pointer (`hud::cursor_hint`).
+    let r = Rect::new(anchor.x + 26.0, anchor.y - 60.0, 236.0, 72.0);
     ui.frost(r, 0.72);
     ui.fill(Rect::new(r.x, r.y, 2.0, r.h), rgb(tone, 1.0));
     let x = r.x + 12.0;
@@ -87,12 +128,12 @@ fn card(
         r.y + 14.0,
         type_scale::MICRO,
         rgb(palette::TEXT, 0.95),
-        "Radar network",
+        words.network,
     );
     let posts = match standing.len() {
-        0 => "No radar standing".to_owned(),
-        1 => "1 radar".to_owned(),
-        n => format!("{n} radars"),
+        0 => "None standing".to_owned(),
+        1 => format!("1 {}", words.post),
+        n => format!("{n} {}", words.posts),
     };
     ui.text_right(
         r.right() - 10.0,
@@ -102,7 +143,7 @@ fn card(
         &posts,
     );
     let (text, color) = if standing.is_empty() {
-        ("First radar cover".to_owned(), palette::TEXT)
+        (words.first.to_owned(), palette::TEXT)
     } else if fresh < 0.02 {
         ("No new ground".to_owned(), palette::WARN)
     } else {

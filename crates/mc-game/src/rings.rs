@@ -394,31 +394,64 @@ fn hidden(rings: &[RangeRing]) -> Vec<bool> {
         .collect()
 }
 
-/// How far `bp` sees on radar if it is a radar post: a structure with a radar.
-pub fn radar_post(bp: &UnitBlueprint) -> Option<f32> {
-    (bp.is_structure() && bp.radar.to_f32() > 0.0).then(|| bp.radar.to_f32())
+/// A cover a side builds up post by post: placing a post shows the side's network of it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Cover {
+    Radar,
+    Sonar,
+    AntiMissile,
 }
 
-/// While a radar post is being placed: the radar ring of each of `owner`'s standing posts,
-/// in the radar group, so the renderer merges them and the new site's own ring into one
-/// outline of the side's cover. Empty while placing anything else. `site` adds the new
-/// site's ring too, for a caller that draws no ghost of it (a headless shot).
-pub fn radar_network<'a>(
+impl Cover {
+    /// A post with more than one cover is placed for the first of these it has.
+    const ALL: [Cover; 3] = [Cover::AntiMissile, Cover::Sonar, Cover::Radar];
+
+    pub fn reach(self) -> Reach {
+        match self {
+            Cover::Radar => Reach::Radar,
+            Cover::Sonar => Reach::Sonar,
+            Cover::AntiMissile => Reach::AntiMissile,
+        }
+    }
+
+    /// How far `bp` covers of this kind if it is a post of it: a structure that has it.
+    pub fn of(self, bp: &UnitBlueprint) -> Option<f32> {
+        let r = match self {
+            Cover::Radar => bp.radar,
+            Cover::Sonar => bp.sonar,
+            Cover::AntiMissile => bp.anti_missile,
+        }
+        .to_f32();
+        (bp.is_structure() && r > 0.0).then_some(r)
+    }
+
+    /// The cover `bp` is a post of, and its reach.
+    pub fn post(bp: &UnitBlueprint) -> Option<(Cover, f32)> {
+        Cover::ALL.into_iter().find_map(|c| Some((c, c.of(bp)?)))
+    }
+}
+
+/// While a post (`Cover::post`) is being placed: the ring of that cover for each of
+/// `owner`'s standing posts of it, in its group, so the renderer merges them and the new
+/// site's own ring into one outline of the side's cover. Empty while placing anything
+/// else. `site` adds the new site's ring too, for a caller that draws no ghost of it (a
+/// headless shot).
+pub fn cover_network<'a>(
     blueprints: &Blueprints,
     placing: BlueprintId,
     site: Option<[f32; 2]>,
     owner: u8,
     units: impl Iterator<Item = &'a UnitInstance>,
 ) -> Vec<RangeRing> {
-    let Some(reach) = radar_post(blueprints.unit(placing)) else {
+    let Some((cover, reach)) = Cover::post(blueprints.unit(placing)) else {
         return Vec::new();
     };
     let ring = |center: [f32; 2], outer: f32| RangeRing {
         center,
         inner: 0.0,
         outer,
-        color: Reach::Radar.linear(),
-        group: Reach::Radar as u32,
+        color: cover.reach().linear(),
+        group: cover.reach() as u32,
         facing: 0.0,
         half_arc: FULL_ARC,
         _pad: [0.0; 2],
@@ -430,7 +463,7 @@ pub fn radar_network<'a>(
                 && u.build >= 1.0
         })
         .filter_map(|u| {
-            let r = radar_post(blueprints.unit(BlueprintId(u.blueprint as u16)))?;
+            let r = cover.of(blueprints.unit(BlueprintId(u.blueprint as u16)))?;
             Some(ring([u.pos[0], u.pos[1]], r))
         })
         .chain(site.map(|at| ring(at, reach)))

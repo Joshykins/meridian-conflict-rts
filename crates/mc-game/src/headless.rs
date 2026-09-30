@@ -713,7 +713,7 @@ pub fn screenshot(
         &|p| renderer.ground_height(glam::Vec2::from(p)),
     );
     view.reaches = crate::rings::Rings::key(&ranges);
-    let mut radar_network = false;
+    let mut cover_network = false;
     // Titan strikes and storms under way, read off the world (`titan_marks::seed`).
     crate::titan_marks::seed(&mut view, &world, &world.blueprints.clone());
     let mut hud = crate::hud::Hud::default();
@@ -871,7 +871,7 @@ pub fn screenshot(
             Some((bp, glam::Vec2::from(at.to_f32())))
         });
         crate::nuke_marks::draw(&mut ui, &field, 1.0, pointer, site);
-        crate::radar_marks::draw(&mut ui, &field, site);
+        crate::cover_marks::draw(&mut ui, &field, site);
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
         if let (Some(deg), Some(at)) = (formation_aim, pointer) {
@@ -934,11 +934,11 @@ pub fn screenshot(
                 true,
                 &|p| renderer.ground_height(glam::Vec2::from(p)),
             );
-            radar_network = false;
+            cover_network = false;
         }
-        // Placing a radar: our radars' rings and the site's, merged (no ghost draws its ring here).
-        if let (false, Some((bp, at))) = (radar_network, site) {
-            let network = crate::rings::radar_network(
+        // Placing a post: our posts' rings and the site's, merged (no ghost draws its ring here).
+        if let (false, Some((bp, at))) = (cover_network, site) {
+            let network = crate::rings::cover_network(
                 &world.blueprints,
                 bp,
                 Some(at.into()),
@@ -946,7 +946,7 @@ pub fn screenshot(
                 frame.units.iter(),
             );
             crate::rings::prepend(&mut ranges, &mut ranges_drawn, network);
-            radar_network = true;
+            cover_network = true;
         }
         if let Some((centre, radius, lots)) = grid_focus {
             renderer.set_build_grid(centre, radius, &lots);

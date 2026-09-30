@@ -391,17 +391,50 @@ fn placing_a_radar_shows_our_radar_network() {
         post("aster_t1_radar", 400.0, KIND_WRECK, 1.0),
         post("aster_t1_tank", 500.0, 0, 1.0),
     ];
-    let network = radar_network(&b, id("aster_t2_radar"), None, 0, units.iter());
+    let network = cover_network(&b, id("aster_t2_radar"), None, 0, units.iter());
     let reach: Vec<(f32, f32)> = network.iter().map(|r| (r.center[0], r.outer)).collect();
     assert_eq!(reach, [(0.0, 3000.0), (100.0, 12000.0)]);
     assert!(network.iter().all(|r| r.group == Reach::Radar as u32));
 
     // A headless shot draws no ghost: the site's own ring comes last.
-    let with_site = radar_network(&b, id("aster_t2_radar"), Some([9.0, 9.0]), 0, units.iter());
+    let with_site = cover_network(&b, id("aster_t2_radar"), Some([9.0, 9.0]), 0, units.iter());
     assert_eq!(
         with_site.last().map(|r| (r.center, r.outer)),
         Some(([9.0, 9.0], 6000.0))
     );
 
-    assert!(radar_network(&b, id("aster_t1_tank"), None, 0, units.iter()).is_empty());
+    assert!(cover_network(&b, id("aster_t1_tank"), None, 0, units.iter()).is_empty());
+}
+
+/// Sonar buoys and missile defences show their networks the same way, each only its own
+/// kind: a radar is not part of the sonar network.
+#[test]
+fn placing_sonar_or_missile_defence_shows_that_network() {
+    let b = blueprints();
+    let id = |key: &str| b.id_of(key).unwrap();
+    let post = |key: &str, x: f32| UnitInstance {
+        blueprint: id(key).0 as u32,
+        owner_flags: 0,
+        build: 1.0,
+        ..unit_at(x, 0.0)
+    };
+    let units = [
+        post("aster_t1_radar", 0.0),
+        post("aster_t1_sonar", 100.0),
+        post("aster_t3_sonar", 200.0),
+        post("aster_t2_missile_defense", 300.0),
+    ];
+    let reach = |placing: &str| -> Vec<(f32, f32, u32)> {
+        cover_network(&b, id(placing), None, 0, units.iter())
+            .iter()
+            .map(|r| (r.center[0], r.outer, r.group))
+            .collect()
+    };
+    let sonar = Reach::Sonar as u32;
+    assert_eq!(
+        reach("aster_t2_sonar"),
+        [(100.0, 1600.0, sonar), (200.0, 6400.0, sonar)]
+    );
+    let am = Reach::AntiMissile as u32;
+    assert_eq!(reach("aster_t3_missile_defense"), [(300.0, 300.0, am)]);
 }

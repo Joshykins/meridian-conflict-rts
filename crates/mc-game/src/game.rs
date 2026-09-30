@@ -4558,9 +4558,10 @@ impl Game {
             fresh,
             &|p| renderer.ground_height(Vec2::from(p)),
         );
-        // Placing a radar: our standing radars' rings too, merged with the new one's.
+        // Placing a radar, sonar or missile defence post: our standing posts' rings too,
+        // merged with the new one's.
         if let Mode::Place(bp) = self.view.mode {
-            let network = crate::rings::radar_network(
+            let network = crate::rings::cover_network(
                 &self.blueprints,
                 bp,
                 None,
@@ -4627,7 +4628,7 @@ impl Game {
                 self.ground_under_cursor(renderer),
                 placing,
             );
-            crate::radar_marks::draw(&mut ui, &field, placing);
+            crate::cover_marks::draw(&mut ui, &field, placing);
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
