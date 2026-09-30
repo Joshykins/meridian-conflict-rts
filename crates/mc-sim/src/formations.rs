@@ -295,17 +295,28 @@ pub(crate) fn block(widths: &[Fx], stands: &[FxVec2], scale: Fx) -> (Fx, Vec<(Fx
         let k = sizes[i] as i32;
         let want_r = ranks - 1 - (stands[i].x / half).round_int();
         let want_c = cols - 1 + (stands[i].y / half).round_int();
-        let (c, r) = (0..=depth - k)
-            .flat_map(|r| (0..=cols - k).map(move |c| (c, r)))
-            .filter(|&(c, r)| free(&taken, c, r, k))
-            .min_by_key(|&(c, r)| {
-                let (dr, dc) = (
-                    (2 * r + k - 1 - want_r) as i64,
-                    (2 * c + k - 1 - want_c) as i64,
-                );
-                (dr * dr + dc * dc, r, c)
-            })
-            .expect("room in a block deep enough for every heavy");
+        // The free square nearest where it wants to be, ties to the front then
+        // the left. Ranks are tried nearest first, and once a rank is further
+        // off than the best square found, none after it can be nearer: a big
+        // army's heavies no longer each search the whole block.
+        let mut near: Vec<i32> = (0..=depth - k).collect();
+        near.sort_by_key(|&r| ((2 * r + k - 1 - want_r).abs(), r));
+        // (distance squared, rank, column) of the best free square.
+        let mut best: Option<(i64, i32, i32)> = None;
+        for r in near {
+            let dr = (2 * r + k - 1 - want_r) as i64;
+            if best.is_some_and(|(d2, _, _)| dr * dr > d2) {
+                break;
+            }
+            for c in 0..=cols - k {
+                let dc = (2 * c + k - 1 - want_c) as i64;
+                let key = (dr * dr + dc * dc, r, c);
+                if best.is_none_or(|b| key < b) && free(&taken, c, r, k) {
+                    best = Some(key);
+                }
+            }
+        }
+        let (_, r, c) = best.expect("room in a block deep enough for every heavy");
         for y in r..r + k {
             for x in c..c + k {
                 taken[(y * cols + x) as usize] = true;

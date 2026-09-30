@@ -16,6 +16,10 @@ use crate::{SimError, World};
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::{cat, BlueprintId, MoveLayer};
 
+/// How far a fighter looks first for a mark (`air_spread_pick`), metres, and
+/// how much further each look after: a thin ring at a time is all it checks.
+const SCRAMBLE_PROBE: Fx = Fx::from_int(128);
+
 /// Longest production queue per factory: far past what anyone queues by hand, but a
 /// hard limit all the same, so no factory can fill the order table.
 pub(crate) const MAX_FACTORY_QUEUE: usize = 1000;
@@ -933,7 +937,11 @@ impl World {
     ) -> Result<(), SimError> {
         let rows = self.owned(player, ids, cat::MOBILE);
         let target = self.clamp_to_map(target);
-        for layout in self.formation_layouts(rows, target, queue, facing, spacing_level) {
+        let span = mc_core::perf_span!("cmd.layouts");
+        let layouts = self.formation_layouts(rows, target, queue, facing, spacing_level);
+        drop(span);
+        let _span = mc_core::perf_span!("cmd.give");
+        for layout in layouts {
             let n = layout.rows.len();
             let formation = if together && n > 1 {
                 self.new_formation(layout.centroid, layout.facing)
@@ -998,7 +1006,10 @@ impl World {
             })
             .collect();
         let mut out = Vec::new();
-        for laid in crate::formations::plan(&members, target, facing, spacing_level) {
+        let span = mc_core::perf_span!("cmd.plan");
+        let plans = crate::formations::plan(&members, target, facing, spacing_level);
+        drop(span);
+        for laid in plans {
             let rows: Vec<usize> = laid.members.iter().map(|&i| rows[i]).collect();
             let rotated = &laid.offsets;
             let (facing, centroid, spacing) = (laid.facing, laid.centroid, laid.spacing);
@@ -1068,6 +1079,46 @@ impl World {
         let striders = rows
             .iter()
             .all(|&r| self.bp(r).motion.is_some_and(|m| m.stride));
+        // Everything that could stand in the layout's way anywhere the search
+        // below looks, gathered once and binned by 16 m cell: the slots of a
+        // big block over a few hundred spots are then checked against these.
+        let rings = 10;
+        let widest = offsets.iter().map(|o| o.length()).fold(Fx::ZERO, Fx::max);
+        let area = widest + spacing.max(Fx::from_int(12)) * rings + radius + Fx::from_int(6);
+        let mut blockers = std::collections::BTreeMap::<(i32, i32), Vec<(FxVec2, Fx)>>::new();
+        let bin = |p: FxVec2| (p.x.floor_int() >> 4, p.y.floor_int() >> 4);
+        self.index.query(center, area, kind::UNIT, |e| {
+            let other = e.row as usize;
+            if selected.contains(&other) || !self.unit_entry_is_current(e) {
+                return true;
+            }
+            let Some(m) = self.bp(other).motion else {
+                return true;
+            };
+            if (m.layer == MoveLayer::Air) != air
+                || self.state.units.has_flag(other, flag::IN_FACTORY)
+                || self.state.units.has_flag(other, flag::HAS_FIELD)
+            {
+                return true;
+            }
+            // Ships and dived submarines may share a spot, one under the other.
+            if rows.iter().all(|&r| self.hulls_pass(r, other)) {
+                return true;
+            }
+            if air && (m.altitude - first.altitude).abs() > self.bp(other).height + Fx::ONE {
+                return true;
+            }
+            blockers
+                .entry(bin(e.pos))
+                .or_default()
+                .push((e.pos, e.radius));
+            true
+        });
+        let widest_blocker = blockers
+            .values()
+            .flatten()
+            .map(|&(_, r)| r)
+            .fold(Fx::ZERO, Fx::max);
         let free = |candidate: FxVec2| {
             offsets.iter().all(|offset| {
                 let pos = candidate + *offset;
@@ -1077,37 +1128,17 @@ impl World {
                 if !self.terrain.in_bounds(pos) || !self.nav.passable(layer, size, pos) {
                     return false;
                 }
-                let mut clear = true;
-                self.index
-                    .query(pos, radius + Fx::from_int(6), kind::UNIT, |e| {
-                        let other = e.row as usize;
-                        if selected.contains(&other) || !self.unit_entry_is_current(e) {
-                            return true;
-                        }
-                        let Some(m) = self.bp(other).motion else {
-                            return true;
-                        };
-                        if (m.layer == MoveLayer::Air) != air
-                            || self.state.units.has_flag(other, flag::IN_FACTORY)
-                        {
-                            return true;
-                        }
-                        if self.state.units.has_flag(other, flag::HAS_FIELD) {
-                            return true;
-                        }
-                        // Ships and dived submarines may share a spot, one under the other.
-                        if rows.iter().all(|&r| self.hulls_pass(r, other)) {
-                            return true;
-                        }
-                        if air
-                            && (m.altitude - first.altitude).abs() > self.bp(other).height + Fx::ONE
-                        {
-                            return true;
-                        }
-                        clear = pos.distance(e.pos) >= radius + e.radius + Fx::from_int(6);
-                        clear
-                    });
-                clear
+                let reach = radius + widest_blocker + Fx::from_int(6);
+                let (x0, y0) = bin(pos - FxVec2::new(reach, reach));
+                let (x1, y1) = bin(pos + FxVec2::new(reach, reach));
+                (y0..=y1).all(|y| {
+                    (x0..=x1).all(|x| {
+                        blockers.get(&(x, y)).is_none_or(|near| {
+                            near.iter()
+                                .all(|&(at, r)| pos.distance(at) >= radius + r + Fx::from_int(6))
+                        })
+                    })
+                })
             })
         };
         if free(center) {
@@ -1117,7 +1148,7 @@ impl World {
             .iter()
             .fold(FxVec2::ZERO, |p, &r| p + self.state.units.pos[r]);
         let from = FxVec2::new(sum.x / rows.len() as i32, sum.y / rows.len() as i32);
-        for ring in 1..=10 {
+        for ring in 1..=rings {
             let mut best = None;
             for spoke in 0..16 {
                 let shift = FxVec2::from_angle(Angle(spoke * 4096))
@@ -1413,9 +1444,13 @@ impl World {
                 continue;
             }
             let Some(o) = self.state.orders.front(&self.state.units, row).copied() else {
+                // Looked at a few times a second, spread over the rows, like
+                // `idle_chase`: a sky full of fighters seeing an army at once
+                // would otherwise all search on one tick.
                 if self.is_air(row)
                     && !self.bp(row).weapons.is_empty()
                     && !self.state.units.has_flag(row, flag::PASSIVE)
+                    && (self.state.tick as usize + row).is_multiple_of(4)
                 {
                     // An idle fighter scrambles a little before the enemy is in its own
                     // sight, once radar or a friend has it: parked, it would otherwise
@@ -1686,65 +1721,102 @@ impl World {
         let units = &self.state.units;
         let pos = units.pos[row];
         let crowd = self.bp(row).vision / 4;
-        let mut near: Vec<(Fx, usize)> = Vec::new();
         let friends = self.team_mask(units.owner[row]);
-        self.index.query_foes(pos, reach, kind::UNIT, friends, |e| {
-            let t = e.row as usize;
-            if self.unit_entry_is_current(e)
-                && self.air_can_harass(row, t)
-                && self.hittable(t, mask)
-            {
-                near.push((pos.distance(e.pos), t));
-            }
-            true
-        });
-        // Nearest first: a crowd only adds to the distance, so once one is
-        // further than the best score so far, none after it can win. Only the
-        // few near the front are counted for pursuers, not a whole enemy army.
-        near.sort_unstable();
+        // What it may go after further than `inner` and within `r` (and within
+        // `reach` of its edge), with its distance.
+        let within = |inner: Fx, r: Fx| {
+            let mut near: Vec<(Fx, usize)> = Vec::new();
+            self.index.query_foes(pos, r, kind::UNIT, friends, |e| {
+                let t = e.row as usize;
+                let distance = pos.distance(e.pos);
+                if distance > inner
+                    && distance <= reach + e.radius
+                    && self.unit_entry_is_current(e)
+                    && self.air_can_harass(row, t)
+                    && self.hittable(t, mask)
+                {
+                    near.push((distance, t));
+                }
+                true
+            });
+            near
+        };
+        // Marks are scored nearest first, and a score is the distance plus some
+        // crowd, so once one is further than the best score none after it can
+        // win. The search widens a ring at a time only while one could: a
+        // fighter near an enemy army looks at its nearest marks, not the army.
+        let vision = self.bp(row).vision;
         let mut best: Option<(Fx, usize)> = None;
-        for (distance, t) in near {
-            if best.is_some_and(|(s, _)| distance > s) {
+        let mut inner = Fx::from_int(-1);
+        let mut radius = SCRAMBLE_PROBE;
+        loop {
+            let r = radius.min(reach);
+            let last = r >= reach;
+            let mut ring: Vec<(Fx, usize)> = within(inner, r)
+                .into_iter()
+                .filter(|&(d, _)| last || d <= r)
+                .collect();
+            ring.sort_unstable();
+            mc_core::perf_count!("scramble.candidates", ring.len());
+            let chasing = if ring.is_empty() {
+                Default::default()
+            } else {
+                self.air_pursuers(row, r)
+            };
+            for (distance, t) in ring {
+                if best.is_some_and(|(s, _)| distance > s) {
+                    return best.map(|(_, t)| t);
+                }
+                // Other friendly fighters on it within this one's sight of it, up to three.
+                let id = units.id(t);
+                let pursuers = chasing.get(&id).map_or(0, |on| {
+                    on.iter()
+                        .filter(|&&(at, r)| at.distance(units.pos[t]) <= vision + r)
+                        .take(3)
+                        .count()
+                }) as i32;
+                let score = distance + crowd * pursuers;
+                if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
+                    best = Some((score, t));
+                }
+            }
+            if last || best.is_some_and(|(s, _)| s <= r) {
                 break;
             }
-            let score = distance + crowd * self.air_pursuers(row, t);
-            if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
-                best = Some((score, t));
-            }
+            inner = r;
+            radius = r + SCRAMBLE_PROBE;
         }
         best.map(|(_, t)| t)
     }
 
-    /// How many other friendly fighters are already flying at `target`, up to three.
-    fn air_pursuers(&self, row: usize, target: usize) -> i32 {
+    /// The other friendly fighters on an attack run that could be in `row`'s
+    /// sight of a mark within `reach` of it, by the mark they fly at, with
+    /// where they are and their radius: gathered once for all its candidates.
+    fn air_pursuers(
+        &self,
+        row: usize,
+        reach: Fx,
+    ) -> std::collections::BTreeMap<UnitId, Vec<(FxVec2, Fx)>> {
         let units = &self.state.units;
-        let id = units.id(target);
         let owner = units.owner[row];
-        let mut count = 0;
+        let around = reach + self.bp(row).vision + self.index.max_radius();
+        let mut chasing = std::collections::BTreeMap::<UnitId, Vec<(FxVec2, Fx)>>::new();
         let foes = !self.team_mask(owner);
-        self.index.query_foes(
-            units.pos[target],
-            self.bp(row).vision,
-            kind::AIRCRAFT,
-            foes,
-            |e| {
+        self.index
+            .query_foes(units.pos[row], around, kind::AIRCRAFT, foes, |e| {
                 let other = e.row as usize;
                 if other != row
                     && self.unit_entry_is_current(e)
                     && !self.are_enemies(owner, units.owner[other])
                     && units.has_flag(other, flag::AIR_RUN)
-                    && self
-                        .state
-                        .orders
-                        .front(units, other)
-                        .is_some_and(|o| o.target == id)
                 {
-                    count += 1;
+                    if let Some(o) = self.state.orders.front(units, other) {
+                        chasing.entry(o.target).or_default().push((e.pos, e.radius));
+                    }
                 }
-                count < 3
-            },
-        );
-        count
+                true
+            });
+        chasing
     }
 
     fn air_can_harass(&self, shooter: usize, target: usize) -> bool {
