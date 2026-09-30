@@ -127,7 +127,7 @@ impl Renderer {
                 .apply_edits(&frame.terrain_edits, input.time, &mut self.upload_scratch);
             self.foundations.update(&frame.terrain_edits, input.time);
         }
-        let ghosts = &input.ghosts[..input.ghosts.len().min(512)];
+        let ghosts = &input.ghosts[..input.ghosts.len().min(MAX_GHOSTS)];
         self.dynamic.write(
             (self.sim_units as usize * size_of::<UnitInstance>()) as u64,
             bytemuck::cast_slice(ghosts),
@@ -186,6 +186,7 @@ impl Renderer {
         let (ringed, bare): (Vec<&Mark>, Vec<&Mark>) = input
             .marks
             .iter()
+            // One per entity at most (`MAX_MARKS`): never cut.
             .take(MAX_MARKS)
             .filter(|m| m.unit_index < self.sim_units)
             .partition(|m| m.kind & Mark::BARS_ONLY == 0);

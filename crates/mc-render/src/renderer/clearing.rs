@@ -19,6 +19,8 @@ use mc_sim::trees::{CLEAR_WAVES, WAVE_TICKS};
 pub(super) const PUFF_RECLAIM: f32 = 22.0;
 /// Seconds a tree takes to come apart once the front reaches it.
 const VAPORIZE: f32 = 1.1;
+/// Most trees coming apart at once; the oldest go first.
+pub(super) const VAPOR_MOST: usize = 512;
 /// Share of a wave's period its front takes to cross its band.
 const SWEEP: f32 = 0.85;
 /// Metres between motes along the edge curtain and along a front.
@@ -122,7 +124,7 @@ impl Renderer {
                     let k = ((d - f.from) / (f.to - f.from).max(0.01)).clamp(0.0, 1.0);
                     f.start + k * period * SWEEP
                 });
-            if self.fallen_trees.vapor.len() >= 512 {
+            if self.fallen_trees.vapor.len() >= VAPOR_MOST {
                 self.fallen_trees.vapor.remove(0);
             }
             self.fallen_trees.vapor.push(VaporTree {

@@ -579,6 +579,13 @@ shared! {
         pub const RIGHT: u32 = 0x20;
     }
 
+    /// A unit's gun-house poses (`mc_sim::mirror::UNIT_HOUSE_SHIFT` in `UnitInstance::status[1]`;
+    /// a test holds them equal): bits `SHIFT..` hold its index in the houses buffer plus
+    /// one, zero for none.
+    pub mod unit_house as "UNIT_HOUSE_" {
+        pub const SHIFT: u32 = 8;
+    }
+
     /// A capital ship's jump in `UnitInstance::status[0]` (`mc_sim::mirror::UNIT_WARP_DAMPED`
     /// and `UNIT_IN_WARP`; a test holds them equal). `UnitInstance::fx` carries the warp
     /// stretch and the EMP stun.

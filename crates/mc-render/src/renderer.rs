@@ -91,13 +91,21 @@ mod titan_charge;
 mod titan_fx;
 pub use gpu_timers::{to_perf as gpu_scopes_to_perf, DrawStats, GpuScope};
 
-pub const MAX_DYNAMIC: usize = mc_sim::tables::MAX_UNITS
-    + mc_sim::tables::MAX_WRECKS
-    + mc_sim::mirror::WRECK_EXTRA_INSTANCES
-    + 512;
-/// Units with gun houses of their own whose poses fit the houses buffer (`mirror::HousePose`).
-pub const MAX_HOUSES: usize = 2048;
-pub const MAX_MARKS: usize = 4096;
+/// Everything the mirror can hand over: every unit and wreck the sim's tables hold,
+/// and the extra sections broken wrecks are drawn in.
+const MAX_SIM_ENTITIES: usize =
+    mc_sim::tables::MAX_UNITS + mc_sim::tables::MAX_WRECKS + mc_sim::mirror::WRECK_EXTRA_INSTANCES;
+/// Placement ghosts drawn at once: a drag line longer than this shows its first ones (a
+/// cosmetic cap; the orders are not cut).
+const MAX_GHOSTS: usize = 512;
+/// The dynamic buffer: the mirror's entities, then ghosts, burning trees and fallen ones,
+/// each with room for its own most, so raising a sim table raises this with it.
+pub const MAX_DYNAMIC: usize =
+    MAX_SIM_ENTITIES + MAX_GHOSTS + MAX_BURNING_TREES + fallen_trees::MOST_SHOWN;
+/// Gun-house poses (`mirror::HousePose`): at most one per unit, so every unit can have one.
+pub const MAX_HOUSES: usize = mc_sim::tables::MAX_UNITS;
+/// Selection rings and status bars: at most one per unit or wreck drawn.
+pub const MAX_MARKS: usize = mc_sim::tables::MAX_UNITS + mc_sim::tables::MAX_WRECKS;
 pub const MAX_EFFECTS: usize = 2048;
 /// Expanding 3D pressure spheres. The oldest are overwritten.
 pub const MAX_SHOCKWAVES: usize = 64;
@@ -3035,7 +3043,9 @@ impl Renderer {
     }
 
     fn upload_sim(&mut self, frame: &RenderFrame, time: f32, camera: &Camera) {
-        let units = &frame.units[..frame.units.len().min(MAX_DYNAMIC - 768)];
+        // The sim's tables bound the mirror, so this never cuts; it only keeps a mirror
+        // that broke that promise out of the buffer's tail.
+        let units = &frame.units[..frame.units.len().min(MAX_SIM_ENTITIES)];
         if units.len() < frame.units.len() {
             log::error!(
                 "render mirror has {} entities; the renderer holds {}",
@@ -3047,6 +3057,7 @@ impl Renderer {
         let patched = self.capital_fx.swing.patch(&self.blueprints, patched);
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
+        // One per unit at most (`MAX_HOUSES`): never cut.
         let houses = &frame.houses[..frame.houses.len().min(MAX_HOUSES)];
         if !houses.is_empty() {
             self.houses.write(0, bytemuck::cast_slice(houses));

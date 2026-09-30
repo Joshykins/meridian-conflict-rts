@@ -146,13 +146,21 @@ fn breech_open(prev: f32, now: f32, t: f32) -> f32 {
 fn arm_kick(e: Entity, t: f32, y: f32) -> f32 {
     let twin = (e.status[1] >> ARM_TWIN_SHIFT) & ARM_TWIN_MASK;
     let right = (e.status[1] & ARM_TWIN_RIGHT) != 0u;
-    if twin == 0u || (e.status[1] >> 8u) == 0u || (y < 0.0) != right {
+    if twin == 0u || (e.status[1] >> UNIT_HOUSE_SHIFT) == 0u || (y < 0.0) != right {
         return mix(e.prev_recoil, e.recoil, t);
     }
     let w = twin - 1u;
-    let kicks = houses[(e.status[1] >> 8u) - 1u].kick[w / 2u];
+    let kicks = house_pose(e).kick[w / 2u];
     let k = select(kicks.xy, kicks.zw, (w & 1u) == 1u);
     return mix(k.x, k.y, t);
+}
+
+// The unit's gun-house poses (`mirror::HousePose`), for a unit whose `status[1]` names
+// some. The index is held inside the buffer: a bad one reads the wrong pose, never
+// past the end.
+fn house_pose(e: Entity) -> HousePose {
+    let i = (e.status[1] >> UNIT_HOUSE_SHIFT) - 1u;
+    return houses[min(i, arrayLength(&houses) - 1u)];
 }
 
 // How far into a refit what it takes off has faded and gone.
@@ -947,11 +955,11 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
 fn claw_throw(model: ModelInfo, e: Entity, t: f32, side: f32) -> f32 {
     let code = u32(model.crawl[20u].w + 0.5);
     let slot = select((code >> 4u) & 15u, code & 15u, side > 0.0);
-    if slot == 0u || (e.status[1] >> 8u) == 0u {
+    if slot == 0u || (e.status[1] >> UNIT_HOUSE_SHIFT) == 0u {
         return 0.0;
     }
     let w = slot - 1u;
-    let kicks = houses[(e.status[1] >> 8u) - 1u].kick[w / 2u];
+    let kicks = house_pose(e).kick[w / 2u];
     let k = select(kicks.xy, kicks.zw, (w & 1u) == 1u);
     return pow(clamp(mix(k.x, k.y, t), 0.0, 1.0), 6.0);
 }
@@ -1572,13 +1580,13 @@ fn vs_main(in: VsIn) -> VsOut {
         n = rot_xz(n, tilt);
     } else if limb >= LIMB_HOUSE && limb < LIMB_HOUSE + 4u
         && house_weapon_of(model, limb - LIMB_HOUSE + select(0u, 4u, (in.rig & RIG_HOUSE_HIGH) != 0u)) > 0.5
-        && (e.status[1] >> 8u) > 0u {
+        && (e.status[1] >> UNIT_HOUSE_SHIFT) > 0u {
         // A gun house of its own on the hull (a warship's turret): turns about its pivot by its
         // weapon's yaw off the hull; what recoils inside it pitches about the pivot and kicks back.
         let slot = limb - LIMB_HOUSE + select(0u, 4u, (in.rig & RIG_HOUSE_HIGH) != 0u);
         let house = house_of(model, slot);
         let w = u32(house_weapon_of(model, slot) + 0.5) - 1u;
-        let hp = houses[(e.status[1] >> 8u) - 1u];
+        let hp = house_pose(e);
         let pose = hp.pose[w];
         let pivot = house.xyz;
         if (in.rig & RIG_RECOIL) != 0u {
@@ -1940,8 +1948,8 @@ fn vs_main(in: VsIn) -> VsOut {
         // Guns on houses of their own kick the hull: a broadside heels it away from the
         // side it fired to and shoves it a little sideways. The heel rises over the first
         // quarter of the recoil's run and settles through the rest, a turret at a time.
-        if (e.status[1] >> 8u) > 0u && (model.icon & 0x800000u) != 0u {
-            let hp = houses[(e.status[1] >> 8u) - 1u];
+        if (e.status[1] >> UNIT_HOUSE_SHIFT) > 0u && (model.icon & 0x800000u) != 0u {
+            let hp = house_pose(e);
             var heel = 0.0;
             for (var slot = 0u; slot < 8u; slot++) {
                 if house_weapon_of(model, slot) < 0.5 {

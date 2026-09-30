@@ -11,6 +11,8 @@ use mc_sim::mirror::{RenderFrame, SimEvent, UnitInstance};
 
 /// Most fallen trees kept at once; the oldest go first.
 const MOST: usize = 2048;
+/// Most fallen and vaporizing trees drawn at once (`fallen_tree_instances`).
+pub(super) const MOST_SHOWN: usize = MOST + super::clearing::VAPOR_MOST;
 /// Seconds to go from standing to lying down.
 const FALL: f32 = 1.1;
 /// How far over a tree ends up, radians: its branches prop it a little off the ground.
