@@ -19,7 +19,7 @@ mod groups;
 pub mod icons;
 mod issue_mark;
 pub use issue_mark::IssueMark;
-mod mine;
+pub(crate) mod mine;
 mod mine_coast;
 mod mine_marks;
 mod minimap;

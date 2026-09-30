@@ -757,6 +757,9 @@ pub struct UnitOrders {
     /// Seconds of game time before that thing is finished at last tick's pace, every
     /// builder on it counted; `None` when it builds nothing or the work stands still.
     pub eta: Option<f32>,
+    /// The unit id of that thing (itself while it goes up with builders on it), so a
+    /// site's own tag can read the time left off the builders at it.
+    pub building: Option<u32>,
     /// Per second, last tick. Made: what it produced (generator or mine output, materials
     /// reclaimed). Wanted: what its building, repairs and upkeep asked for at the full rate.
     /// Used: what it was given of that; less than wanted while its side stalls.
@@ -2588,6 +2591,7 @@ impl World {
                 standing,
                 progress,
                 eta,
+                building: building.map(|t| s.units.id(t).0),
                 mass_made: rate(flow.made[0]),
                 energy_made: rate(flow.made[1]),
                 mass_wanted: rate(flow.wanted[0]),

@@ -276,8 +276,14 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
     };
     let item = s.blueprints.unit(first.blueprint);
     let name = crate::hud::refit::queued_name(s.blueprints, first.blueprint).unwrap_or(&item.name);
-    let pct = format!("{:.0}%", p * 100.0);
-    let pct_w = ui.text_width(type_scale::ITEM, &pct);
+    // One figure at the right: the time left while the work moves (the rail under it
+    // shows how far along), the percentage while it stands still.
+    let eta = queue.eta.filter(|_| !paused);
+    let figure = match eta {
+        Some(t) => crate::hud::mine::duration(t.ceil()),
+        None => format!("{:.0}%", p * 100.0),
+    };
+    let figure_w = ui.text_width(type_scale::ITEM, &figure);
     ui.text(
         tx,
         r.y + 13.0,
@@ -285,20 +291,10 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
         rgb(BUILDING, 0.85 * lit),
         doing,
     );
-    // How long it has left, over the percentage.
-    if let Some(t) = queue.eta.filter(|_| !paused) {
-        ui.text_right(
-            tx + w,
-            r.y + 13.0,
-            type_scale::MICRO,
-            rgb(0xFFE3A0, 0.85),
-            &format!("{} left", crate::hud::mine::duration(t.ceil())),
-        );
-    }
     ui.text_fit_left(
         tx,
         r.y + 28.0,
-        w - pct_w - 10.0,
+        w - figure_w - 10.0,
         type_scale::CAPTION,
         rgb(palette::TEXT, if paused { 0.7 } else { 1.0 }),
         name,
@@ -307,8 +303,8 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
         tx + w,
         r.y + 23.0,
         type_scale::ITEM,
-        rgb(if paused { BUILDING } else { 0xFFE3A0 }, lit),
-        &pct,
+        rgb(if eta.is_some() { 0xFFE3A0 } else { BUILDING }, lit),
+        &figure,
     );
     // The rail: filled to the progress, a glint running along it while it moves.
     let rail = Rect::new(tx, r.y + 38.0, w, 3.0);

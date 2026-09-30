@@ -1,8 +1,9 @@
 //! Work under way shows without a selection. Whatever a side builds carries its
 //! progress bar (bars only, no ring): a site going up, a structure upgrading, a
 //! factory's product, an engineer's build or assist. A site also carries its
-//! percentage on a tab hanging from its construction bar; the engineers round it
-//! do not, so a crowd of them does not repeat the figure.
+//! percentage, and the time it has left while its builders are at it, on a tab
+//! hanging from its construction bar; the engineers round it do not, so a crowd of
+//! them does not repeat the figure.
 
 use super::{unit_bar_shield, unit_bar_work, View};
 use crate::orders::Field;
@@ -75,10 +76,19 @@ const BUILD_H: f32 = 5.0;
 const SHIELD_H: f32 = 4.0;
 const GAP: f32 = 2.0;
 
-/// The percentage tag under each friendly site's bars.
+/// The percentage tag under each friendly site's bars, with the time left when a
+/// builder of the viewer's is on it.
 pub(crate) fn draw_tags(ui: &mut Ui, field: &Field, alpha: f32, friend: impl Fn(u8) -> bool) {
     let _t = mc_core::perf_span!("ui.work_tags");
     let view = field.view;
+    // Every builder on a site sees the same pace, so any one of them gives its time.
+    let eta_of = |id: u32| {
+        view.status
+            .queues
+            .iter()
+            .find(|q| q.building == Some(id))
+            .and_then(|q| q.eta)
+    };
     let camera = field.camera;
     let eye = camera.eye();
     let scale = camera.projection_scale();
@@ -117,6 +127,7 @@ pub(crate) fn draw_tags(ui: &mut Ui, field: &Field, alpha: f32, friend: impl Fn(
             2.0 * half_w / ui.s,
             bottom / ui.s,
             share,
+            eta_of(u.unit_id).filter(|_| !u.paused()),
             u.paused(),
         );
         ui.fade = was;
@@ -124,9 +135,17 @@ pub(crate) fn draw_tags(ui: &mut Ui, field: &Field, alpha: f32, friend: impl Fn(
 }
 
 /// A tab hanging from the construction bar where its fill ends, in the bar's own
-/// colour: one reading of progress, not a second bar. `left`/`width` are the bar's
-/// span and `bottom` its lower edge, in points.
-fn tab(ui: &mut Ui, left: f32, width: f32, bottom: f32, share: f32, paused: bool) {
+/// colour: one reading of progress, not a second bar, and after a rule the time left.
+/// `left`/`width` are the bar's span and `bottom` its lower edge, in points.
+fn tab(
+    ui: &mut Ui,
+    left: f32,
+    width: f32,
+    bottom: f32,
+    share: f32,
+    eta: Option<f32>,
+    paused: bool,
+) {
     let share = share.clamp(0.0, 1.0);
     let tone = if paused { PAUSED } else { BAR };
     let text = if paused {
@@ -134,8 +153,13 @@ fn tab(ui: &mut Ui, left: f32, width: f32, bottom: f32, share: f32, paused: bool
     } else {
         format!("{:.0}%", (share * 100.0).floor())
     };
-    let (h, notch, cut) = (20.0, 4.0, 3.0);
-    let w = ui.text_width(FIGURE, &text) + 16.0;
+    let time = eta.map(|t| crate::hud::mine::duration(t.ceil()));
+    let (h, notch, cut, pad, rule) = (20.0, 4.0, 3.0, 8.0, 13.0);
+    let text_w = ui.text_width(FIGURE, &text);
+    let time_w = time
+        .as_ref()
+        .map_or(0.0, |t| ui.text_width(FIGURE, t) + rule);
+    let w = text_w + time_w + 2.0 * pad;
     let tip = left + width * share;
     // Centred on the fill's end, kept under the bar.
     let x = (tip - w * 0.5).clamp(left, (left + width - w).max(left));
@@ -150,11 +174,20 @@ fn tab(ui: &mut Ui, left: f32, width: f32, bottom: f32, share: f32, paused: bool
         Vec2::new(tip - notch, r.y + 0.5),
         rgb(tone, 0.9),
     );
-    ui.text_centred(
-        r.x + r.w * 0.5,
-        r.y + h * 0.5 + 0.5,
-        FIGURE,
-        rgb(tone, 1.0),
-        &text,
-    );
+    let mid = r.y + h * 0.5 + 0.5;
+    let end = ui.text(r.x + pad, mid, FIGURE, rgb(tone, 1.0), &text);
+    if let Some(time) = time {
+        let at = end + rule * 0.5;
+        ui.fill(
+            Rect::new(at - 0.5, r.y + 5.0, 1.0, h - 10.0),
+            rgb(tone, 0.35),
+        );
+        ui.text(
+            at + rule * 0.5,
+            mid,
+            FIGURE,
+            rgb(palette::TEXT, 0.95),
+            &time,
+        );
+    }
 }
