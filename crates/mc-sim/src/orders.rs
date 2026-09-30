@@ -1758,40 +1758,64 @@ impl World {
         Ok(true)
     }
 
-    /// Pursue the predicted intercept instead of orbiting a fixed contact point.
-    /// Speed and turn authority respond to this pursuit bearing in movement.
+    /// Pursue the predicted intercept: attack, bank, attack. The nose is always on the
+    /// target or coming round onto it at the hardest turn the fighter has (movement
+    /// slows it to its corner speed while the target is off the nose). Two things make
+    /// it fly straight instead. A target inside the turning circle on its side cannot
+    /// be brought onto the nose by turning, only circled, so it flies on until the
+    /// target falls outside the circle. And a turning fight that has not brought the
+    /// guns to bear for a few seconds (two fighters chasing each other round one
+    /// circle) is broken off for under a second, at a moment staggered per fighter so
+    /// matched opponents do not mirror each other forever.
     fn air_dogfight(&mut self, row: usize, target: usize) -> Result<(), SimError> {
         let units = &self.state.units;
         let pos = units.pos[row];
         let motion = self.bp(row).motion.expect("air");
-        // `prev_pos` is refreshed at the top of the tick, before orders run.
         let tvel = units.air_velocity[target].xy();
         let intercept_time = (pos.distance(units.pos[target]) / motion.speed)
             .clamp(Fx::ratio(1, 5), Fx::ratio(3, 2));
         let lead = units.pos[target] + tvel * Fx::from_int(DT) * intercept_time;
-        let to = lead - pos;
         let nose = FxVec2::from_angle(units.heading[row]);
+        // The guns bear inside this much of the nose.
+        let bears = self
+            .bp(row)
+            .weapons
+            .iter()
+            .filter(|w| w.target_mask & cat::AIR != 0)
+            .map(|w| w.half_arc)
+            .max()
+            .unwrap_or(0x2000)
+            .clamp(0x0800, 0x2000);
+        let to = lead - pos;
         let off = units.heading[row].delta_to(to.angle()).unsigned_abs();
-        let mut turn_ticks = if off > 0x2000 {
+        // The turning circle at the present speed, on the side the target lies.
+        let speed = units.speed[row].max(motion.speed * Fx::ratio(5, 9));
+        let yaw = self.air_turn_rate(row, &motion).max(1);
+        let radius = speed.mul_div(10430, yaw as i64 * DT as i64);
+        let side = if nose.perp().dot(to) < Fx::ZERO {
+            -nose.perp()
+        } else {
+            nose.perp()
+        };
+        let inside = lead.distance(pos + side * radius) < radius;
+        let mut turn_ticks = if off > bears {
             units.air_turn_ticks[row].saturating_add(1)
         } else {
             0
         };
         let mut break_ticks = units.air_break_ticks[row];
+        let stagger = (row as u16).wrapping_mul(7919) % 15;
         let goal = if break_ticks > 0 {
             break_ticks -= 1;
             turn_ticks = 0;
-            units.move_goal[row]
-        } else if turn_ticks >= 30 + (row % 3) as u16 * 7 {
-            // Sustained unsuccessful pursuit can settle into a mutual circle.
-            // Unload the turn and regain separation before the next intercept.
-            // Stagger the decision so matched opponents do not mirror forever.
+            pos + nose * motion.speed
+        } else if turn_ticks >= 25 + stagger {
             turn_ticks = 0;
-            break_ticks = 18 + (row % 2) as u16 * 8;
-            pos + nose * (motion.speed * 2)
-        } else if to.length() < Fx::from_int(16) {
+            break_ticks = 6 + stagger / 2;
+            pos + nose * motion.speed
+        } else if inside || to.length() < Fx::from_int(16) {
             // Finish the crossing before reversing; never pivot on the target.
-            pos + nose * (motion.speed / 2)
+            pos + nose * motion.speed
         } else {
             lead
         };

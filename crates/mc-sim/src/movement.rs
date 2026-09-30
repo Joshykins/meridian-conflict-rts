@@ -352,8 +352,19 @@ impl World {
                 _ => {
                     let bank = units.bank[row] as i32;
                     let delta = want_bank - bank;
-                    units.bank[row] =
-                        (bank + if delta.abs() <= 4 { delta } else { delta / 4 }) as i16;
+                    // A fighter in a fight snaps into its bank: steering reads its
+                    // turn back from the bank, so a slow roll is a slow turn.
+                    let ease = if attack_altitudes[row].is_some() {
+                        2
+                    } else {
+                        4
+                    };
+                    units.bank[row] = (bank
+                        + if delta.abs() <= 4 {
+                            delta
+                        } else {
+                            delta / ease
+                        }) as i16;
                 }
             }
             units.gait[row] = units.gait[row].wrapping_add(step as u32);
@@ -980,7 +991,7 @@ impl World {
 
     /// Lower airspeed buys a tighter fighter turn, up to 1.8 times cruise yaw.
     /// Both roll feedback and steering use the same rate so bank stays bounded.
-    fn air_turn_rate(&self, row: usize, motion: &Motion) -> i32 {
+    pub(crate) fn air_turn_rate(&self, row: usize, motion: &Motion) -> i32 {
         if self.state.units.has_flag(row, flag::AIR_RUN) && self.bp(row).has(cat::ANTI_AIR) {
             let speed = self.state.units.speed[row].max(motion.speed * Fx::ratio(5, 9));
             (Fx::from_int(motion.turn_rate as i32) * (motion.speed / speed).max(Fx::ONE))
@@ -1326,9 +1337,12 @@ impl World {
                 // Roll into the turn over time instead of instantly applying
                 // maximum yaw. Bank is deterministic, serialized flight state.
                 let limit = self.air_turn_rate(row, motion);
-                let want_turn = (out.heading.delta_to(facing) as i32 / 8).clamp(-limit, limit);
+                // A fighter in a fight pulls hard to put its nose on the target; a
+                // gentle roll-in lets a target off the wing hold it in a circle.
+                let gain = if engaged { 3 } else { 8 };
+                let want_turn = (out.heading.delta_to(facing) as i32 / gain).clamp(-limit, limit);
                 let old_turn = -(units.bank[row] as i32) * limit / 8192;
-                let slew = (limit / 5).max(1);
+                let slew = (limit / if engaged { 3 } else { 5 }).max(1);
                 let turn = old_turn + (want_turn - old_turn).clamp(-slew, slew);
                 out.heading = mc_core::Angle(out.heading.0.wrapping_add(turn as i16 as u16));
             } else {
@@ -1341,9 +1355,17 @@ impl World {
             if motion.layer == MoveLayer::Air {
                 target_speed = max_speed;
                 if engaged {
-                    // Trade speed for turn radius when the opponent is off the
-                    // nose, then accelerate back onto the firing line.
-                    let turning = Fx::ratio(off.min(0x4000) as i64, 0x4000);
+                    // Trade speed for turn radius while the opponent is off the
+                    // nose, down to corner speed at 60 degrees off, then accelerate
+                    // back onto the firing line. Off the nose is measured to the
+                    // opponent too, not only to the goal: flying straight out of a
+                    // turning circle it lies inside, the slower the fighter goes
+                    // the sooner the target is outside the circle to turn in on.
+                    let aim_off = out
+                        .heading
+                        .delta_to((units.air_aim[row] - pos).angle())
+                        .unsigned_abs();
+                    let turning = Fx::ratio(off.max(aim_off).min(0x2AAA) as i64, 0x2AAA);
                     target_speed = max_speed * (Fx::ONE - turning * Fx::ratio(9, 20));
                     // Close pursuit also sheds speed to avoid endlessly passing
                     // through a slower opponent at full throttle.
