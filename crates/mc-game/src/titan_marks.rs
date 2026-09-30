@@ -1003,7 +1003,7 @@ pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
     // ---- aiming an attack --------------------------------------------------------------
     let aiming = matches!(
         view.mode,
-        Mode::Target(Targeting::Attack | Targeting::AttackGround | Targeting::Strike)
+        Mode::Target(Targeting::Attack | Targeting::Bombard | Targeting::Strike)
     );
     let ours: Vec<&&UnitInstance> = picked
         .iter()

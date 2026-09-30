@@ -51,7 +51,7 @@ mod survival_notes;
 pub(crate) mod work;
 pub use cine_input::CursorMode;
 
-const DRAG_THRESHOLD: f32 = 6.0;
+pub(crate) const DRAG_THRESHOLD: f32 = 6.0;
 /// The guard area a click without a drag gives, metres of radius.
 const GUARD_DEFAULT: f32 = 250.0;
 /// Distance factor of one wheel notch.
@@ -121,8 +121,8 @@ pub enum Targeting {
     /// The first click sets the group patrolling out to it and back; with shift
     /// held, each further click adds a post to that loop.
     Patrol,
-    AttackGround,
-    /// Press on the centre, drag out the size.
+    /// A click fires on that point (`Command::AttackGround`); a press on the centre
+    /// dragged out spreads the fire over the circle (`Command::Bombard`).
     Bombard,
     /// Press on the spot to hold (or on a friendly unit to go with it), drag out the
     /// area watched around it. Aircraft circle it halfway out.
@@ -148,7 +148,6 @@ impl Targeting {
             Targeting::Assist => "Assist",
             Targeting::Reclaim => "Reclaim",
             Targeting::Patrol => "Patrol",
-            Targeting::AttackGround => "Fire on Ground",
             Targeting::Bombard => "Bombard",
             Targeting::Guard => "Guard",
             Targeting::Land => "Land",
@@ -1326,7 +1325,11 @@ impl Game {
             Mode::Target(Targeting::Reclaim) => self.reclaim_released(from, r, audio),
             Mode::Target(Targeting::Bombard) => {
                 let ground = self.ground_under_cursor(r).map(|g| g.truncate());
-                if let (Some(centre), Some(edge)) = (self.view.circle_from.take(), ground) {
+                let centre = self.view.circle_from.take();
+                // A click fires on the point pressed; a drag spreads it over the circle.
+                if from.distance(self.cursor) < DRAG_THRESHOLD {
+                    self.targeted_order(Targeting::Bombard, centre.or(ground), None, audio);
+                } else if let (Some(centre), Some(edge)) = (centre, ground) {
                     let radius = crate::orders::bombard_radius(
                         self.selection_takers(),
                         centre.distance(edge),
@@ -1801,7 +1804,6 @@ impl Game {
                 points: vec![p],
                 queue,
             }),
-            Targeting::AttackGround => point.map(|pos| Command::AttackGround { units, pos, queue }),
             Targeting::Strike => point.map(|pos| Command::Strike { units, pos, queue }),
             Targeting::Warp => point.map(|pos| Command::Warp { units, pos, queue }),
             // One warhead a click; the sim gives it to the silo with the most free.
@@ -1827,12 +1829,9 @@ impl Game {
                 radius: Fx::from_f32(self.guard_radius()),
                 queue,
             }),
-            Targeting::Bombard => point.map(|pos| Command::Bombard {
-                units,
-                pos,
-                radius: Fx::from_f32(crate::orders::BOMBARD_MIN),
-                queue,
-            }),
+            // A click (or the minimap): fire on the point. A drag is a `Command::Bombard`
+            // (`Game::left_released`).
+            Targeting::Bombard => point.map(|pos| Command::AttackGround { units, pos, queue }),
             // A wreck, or a live unit: the player's own (not an ally's) or an enemy's. Open
             // ground: head there, reclaiming the wrecks on the way.
             Targeting::Reclaim => match target {
@@ -2834,7 +2833,7 @@ impl Game {
                     .iter()
                     .any(|w| w.bore.is_some_and(|b| b.storm.is_some()))
             }),
-            Targeting::AttackGround | Targeting::Bombard => self.selection_takers().any(|b| {
+            Targeting::Bombard => self.selection_takers().any(|b| {
                 b.weapons
                     .iter()
                     .any(|w| w.target_mask & (cat::LAND | cat::NAVAL | cat::STRUCTURE) != 0)
@@ -2952,7 +2951,6 @@ impl Game {
                 | KeyCode::KeyC
                 | KeyCode::KeyR
                 | KeyCode::KeyP
-                | KeyCode::KeyJ
                 | KeyCode::KeyK
                 | KeyCode::KeyH
                 | KeyCode::KeyY
@@ -3031,7 +3029,6 @@ impl Game {
             KeyCode::KeyC => self.arm(Targeting::Assist),
             KeyCode::KeyR => self.arm(Targeting::Reclaim),
             KeyCode::KeyP => self.arm(Targeting::Patrol),
-            KeyCode::KeyJ => self.arm(Targeting::AttackGround),
             KeyCode::KeyK => self.arm(Targeting::Bombard),
             KeyCode::KeyH => self.toggle_stance(FireState::HoldPosition),
             KeyCode::KeyY => self.toggle_stance(FireState::HoldFire),

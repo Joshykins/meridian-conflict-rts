@@ -192,7 +192,8 @@ fn ground_ring(ui: &mut Ui, field: &Field, c: Vec2, radius: f32, color: [f32; 4]
 fn to_fx(p: Vec2) -> FxVec2 {
     FxVec2::new(Fx::from_f32(p.x), Fx::from_f32(p.y))
 }
-/// Smallest bombardment, metres of radius: what a click without a drag gives.
+/// Smallest bombardment, metres of radius: what the shortest drag gives. (A click
+/// fires on the point instead.)
 pub(crate) const BOMBARD_MIN: f32 = 30.0;
 
 /// The bombardment circle a drag of `drag` metres sets for units of `blueprints`: no
@@ -802,7 +803,15 @@ impl OrderMap {
             }
         }
         if view.mode == Mode::Target(crate::game::Targeting::Bombard) {
-            if let (Some(centre), Some(g)) = (view.circle_from, ground) {
+            // Only once the press is dragged: a click fires on the point, with no circle.
+            let dragged = |c: Vec2, g: Vec2| {
+                project(c)
+                    .zip(project(g))
+                    .is_some_and(|(a, b)| a.distance(b) * scale >= crate::game::DRAG_THRESHOLD)
+            };
+            if let Some((centre, g)) =
+                (view.circle_from.zip(ground)).filter(|&(c, g)| dragged(c, g))
+            {
                 let selected = (view.selection.iter())
                     .filter_map(|id| view.index_of.get(id))
                     .map(|&i| {

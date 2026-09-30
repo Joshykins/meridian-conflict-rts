@@ -1112,18 +1112,10 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
     }
     if hits_ground {
         combat.push(Order {
-            glyph: Glyph::GroundAttack,
-            label: "Ground",
-            key: "J",
-            hint: "Click the ground: shell that spot until told otherwise.",
-            action: HudAction::Target(Targeting::AttackGround),
-            lit: targeting(Targeting::AttackGround),
-        });
-        combat.push(Order {
             glyph: Glyph::Bombard,
             label: "Bombard",
             key: "K",
-            hint: "Shell an area: press on its centre and drag out its size.",
+            hint: "Click the ground: shell that spot until told otherwise. Press on a centre and drag out a circle: spread the shells over it.",
             action: HudAction::Target(Targeting::Bombard),
             lit: targeting(Targeting::Bombard),
         });

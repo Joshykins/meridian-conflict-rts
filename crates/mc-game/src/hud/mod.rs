@@ -906,7 +906,6 @@ pub fn cursor_hint(
             match t {
                 Targeting::Attack
                 | Targeting::AttackMove
-                | Targeting::AttackGround
                 | Targeting::Strike
                 | Targeting::Bombard => style::Family::Combat.tone(),
                 Targeting::Move | Targeting::Patrol => style::Family::Movement.tone(),
@@ -973,7 +972,9 @@ pub fn cursor_hint(
             "Click to patrol  \u{b7}  Shift adds posts  \u{b7}  RMB cancels"
         }
         Mode::Target(Targeting::Patrol) => "Click the next post  \u{b7}  Release shift to finish",
-        Mode::Target(Targeting::Bombard) => "Press on the centre, drag out its size",
+        Mode::Target(Targeting::Bombard) => {
+            "Click to fire on a point  \u{b7}  Press on the centre, drag out an area to shell"
+        }
         Mode::Target(Targeting::Reclaim) => {
             "Click a wreck or unit  \u{b7}  Click ground to reclaim on the way  \u{b7}  Drag out an area to clear"
         }
