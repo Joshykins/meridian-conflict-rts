@@ -173,7 +173,9 @@ struct Ridge {
 }
 
 /// Ranges and ridges. The massif and the bluffs stand between the bays and
-/// the bases: shells from the water hit rock, not the base.
+/// the bases: shells from the water hit rock, not the base. The corner base
+/// sits in a ring of mountains broken by three passes: north to the lake,
+/// east to the plain, south-east to the south edge.
 const RIDGES: &[Ridge] = &[
     // The massif on the cove base's seaward flank, between the bay and the base.
     Ridge {
@@ -184,16 +186,16 @@ const RIDGES: &[Ridge] = &[
             (96.0, 542.0),
             (112.0, 558.0),
         ],
-        half: 34.0,
-        tall: 260.0,
+        half: 33.0,
+        tall: 560.0,
         crag: 1.0,
     },
     // Its spur west to the edge, over the neck.
     Ridge {
         line: &[(-20.0, 520.0), (38.0, 496.0)],
-        half: 15.0,
-        tall: 70.0,
-        crag: 0.7,
+        half: 16.0,
+        tall: 120.0,
+        crag: 0.8,
     },
     // The wall along the cove's south shore, between the cove and the plain.
     Ridge {
@@ -203,9 +205,9 @@ const RIDGES: &[Ridge] = &[
             (290.0, 661.0),
             (318.0, 646.0),
         ],
-        half: 10.0,
-        tall: 60.0,
-        crag: 0.5,
+        half: 11.0,
+        tall: 90.0,
+        crag: 0.6,
     },
     // Bluffs along the far bay's shore, in front of the front base.
     Ridge {
@@ -216,9 +218,9 @@ const RIDGES: &[Ridge] = &[
             (386.0, 760.0),
             (383.0, 800.0),
         ],
-        half: 11.0,
-        tall: 45.0,
-        crag: 0.3,
+        half: 12.0,
+        tall: 60.0,
+        crag: 0.4,
     },
     // The range along the west edge, behind the corner base.
     Ridge {
@@ -229,22 +231,60 @@ const RIDGES: &[Ridge] = &[
             (30.0, 1000.0),
             (45.0, 1060.0),
         ],
-        half: 40.0,
-        tall: 240.0,
+        half: 42.0,
+        tall: 480.0,
         crag: 1.0,
     },
-    // The ridge on the corner base's east side, walling its valley off the plain.
+    // The corner base's ring, north-west: from the west range to the north pass.
     Ridge {
         line: &[
-            (118.0, 815.0),
-            (140.0, 855.0),
-            (162.0, 895.0),
-            (185.0, 935.0),
-            (205.0, 965.0),
+            (2.4, 886.1),
+            (9.1, 868.2),
+            (19.1, 851.8),
+            (32.1, 837.7),
+            (47.5, 826.3),
+            (64.8, 818.0),
         ],
-        half: 14.0,
-        tall: 110.0,
-        crag: 0.8,
+        half: 18.0,
+        tall: 330.0,
+        crag: 1.0,
+    },
+    // North-east, between the north pass and the east pass.
+    Ridge {
+        line: &[
+            (132.5, 819.9),
+            (149.8, 828.2),
+            (165.2, 839.7),
+            (178.0, 854.1),
+            (187.8, 870.6),
+        ],
+        half: 18.0,
+        tall: 320.0,
+        crag: 1.0,
+    },
+    // East, a lone peak between the east pass and the south-east pass.
+    Ridge {
+        line: &[(198.6, 920.7), (195.4, 938.7), (188.9, 955.8)],
+        half: 16.0,
+        tall: 280.0,
+        crag: 1.0,
+    },
+    // South, from the south-east pass round to the west range.
+    Ridge {
+        line: &[
+            (142.8, 1001.9),
+            (123.2, 1009.0),
+            (102.5, 1011.9),
+            (81.6, 1010.5),
+            (61.5, 1004.7),
+            (43.1, 994.9),
+            (27.1, 981.5),
+            (14.2, 965.0),
+            (5.0, 946.2),
+        ],
+        half: 19.0,
+        tall: 340.0,
+        crag: 1.0,
     },
     // Along the south edge.
     Ridge {
@@ -255,23 +295,23 @@ const RIDGES: &[Ridge] = &[
             (380.0, 1005.0),
             (430.0, 1040.0),
         ],
-        half: 22.0,
-        tall: 90.0,
-        crag: 0.6,
+        half: 24.0,
+        tall: 200.0,
+        crag: 0.9,
     },
     // The low hills north-west of the far-shore base.
     Ridge {
         line: &[(232.0, 905.0), (270.0, 885.0), (318.0, 855.0)],
-        half: 9.0,
-        tall: 35.0,
-        crag: 0.4,
+        half: 10.0,
+        tall: 60.0,
+        crag: 0.5,
     },
     // The headland's bluff over the far bay.
     Ridge {
         line: &[(430.0, 915.0), (470.0, 935.0), (500.0, 975.0)],
-        half: 12.0,
-        tall: 40.0,
-        crag: 0.3,
+        half: 13.0,
+        tall: 60.0,
+        crag: 0.4,
     },
     // Rock knobs out on the plain.
     Ridge {
@@ -369,14 +409,14 @@ const ORE: &[(f64, f64, f64)] = &[
     // The lake's west shore.
     (92.0, 742.0, 65.0),
     // The corner valley's mouth, and out past its ridge.
-    (82.0, 834.0, 70.0),
-    (150.0, 962.0, 65.0),
+    (100.0, 848.0, 70.0),
+    (138.0, 948.0, 65.0),
     // Out on the plain.
     (200.0, 796.0, 75.0),
     (336.0, 798.0, 75.0),
     // Among the hills, and on the south edge.
     (232.0, 872.0, 70.0),
-    (300.0, 962.0, 70.0),
+    (295.0, 942.0, 70.0),
     // The headland.
     (472.0, 992.0, 70.0),
     // On the island.
@@ -564,7 +604,9 @@ impl Terrain {
         let plain = self.both(x, y, |p| {
             smoothstep(PLAIN.1 + 40.0, PLAIN.1 - 20.0, polyline(p, PLAIN.0))
         });
-        let open = 1.0 - 0.8 * plain;
+        // The corner base's valley floor, inside its ring of mountains.
+        let corner = self.both(x, y, |p| smoothstep(95.0, 55.0, dist(p, STARTS[3])));
+        let open = (1.0 - 0.8 * plain) * (1.0 - corner);
         // Rolling ground, low hill ranges.
         let roll = n(&|x, y| self.tilt.fbm(x / 1_500.0, y / 1_500.0, 3, 0.5));
         land += 9.0 * roll * (0.4 + 0.6 * inland);
@@ -586,6 +628,7 @@ impl Terrain {
         // Smaller hills and hollows everywhere, which is what the eye reads at play zoom.
         let lumps = n(&|x, y| self.mtn_height.fbm(x / 650.0, y / 650.0, 3, 0.5));
         land += (0.35 + 0.65 * open)
+            * (1.0 - 0.7 * corner)
             * 55.0
             * (lumps + 0.05)
             * smoothstep(100.0, 700.0, s)
@@ -642,21 +685,40 @@ impl Terrain {
         let peaks = n(&|x, y| self.ridge.fbm(x / 1_100.0 + 17.0, y / 1_100.0, 3, 0.5));
         // Ranges and ridges; their outline frays in buttresses and gullies,
         // the more the rockier.
-        let ragged = n(&|x, y| self.mtn_gap.fbm(x / 700.0, y / 700.0, 4, 0.55)) * 380.0;
+        let ragged = n(&|x, y| self.mtn_gap.fbm(x / 700.0, y / 700.0, 4, 0.55)) * 500.0;
+        // Arêtes with hollows between them, and the spurs and crags on their
+        // flanks: they grow from the foot to the crest, so the mountains
+        // rise from smooth skirts into broken rock.
+        let arete = n(&|x, y| self.mtn.ridged(x / 900.0 + 3.3, y / 900.0 - 1.9, 3, 0.5));
+        let spur = n(&|x, y| self.mtn.ridged(x / 330.0 - 6.1, y / 330.0 + 4.4, 3, 0.5));
         h += self.both(x, y, |p| {
             RIDGES
                 .iter()
                 .map(|r| {
-                    let (d, along) = polyline_at(p, r.line);
-                    let d = self.bm(d) + ragged * (0.4 + 0.6 * r.crag);
+                    let d = self.bm(polyline(p, r.line)) + ragged * (0.3 + 0.7 * r.crag);
                     let half = self.bm(r.half);
-                    // Highest mid-crest, lower toward the ends.
-                    let crest = 0.45 + 0.55 * (PI * along).sin();
+                    // Highest mid-crest, falling toward the ends into saddles
+                    // and passes. By the distance to the nearer end, not the
+                    // way along: inside a bend that would jump from arm to arm.
+                    let len: f64 = r.line.windows(2).map(|w| dist(w[0], w[1])).sum();
+                    let end = dist(p, r.line[0]).min(dist(p, r.line[r.line.len() - 1]));
+                    let crest = 0.3 + 0.7 * smoothstep(0.0, 0.45 * len, end);
                     let tall =
-                        r.tall * crest * (1.0 + 1.6 * peaks) * (1.0 + 0.8 * r.crag * (crag - 0.4));
-                    tall.max(0.0) * smoothstep(half + 200.0, -0.4 * half, d).powf(1.3)
+                        r.tall * crest * (1.0 + 0.5 * peaks) * (1.0 + 0.6 * r.crag * (crag - 0.6));
+                    let m = smoothstep(half + 200.0 + 0.3 * half, -0.4 * half, d);
+                    let body = m.powf(1.3);
+                    let sharp = smoothstep(0.2, 0.8, m) * r.crag;
+                    tall.max(0.0)
+                        * (body * (1.0 + 0.7 * sharp * (arete - 0.6))
+                            + 0.3 * sharp * m * (spur - 0.6))
                 })
-                .fold(0.0, f64::max)
+                // Where two ranges meet they merge in a rounded saddle, not a crease.
+                .fold(0.0, |a: f64, b: f64| {
+                    // Only where both stand: away from them it is a plain max.
+                    let k = 30.0 * smoothstep(0.0, 60.0, a.min(b)) + 1e-9;
+                    let t = (0.5 + 0.5 * (b - a) / k).clamp(0.0, 1.0);
+                    a + (b - a) * t + k * t * (1.0 - t)
+                })
         });
         // The cove's rock islets.
         h = h.max(self.both(x, y, |p| {
@@ -682,7 +744,10 @@ impl Terrain {
                 let best = self.bm(best);
                 let bed = source - (source - mouth) * smoothstep(0.55, 1.0, t);
                 // Negative: this stream wants the ground this much lower.
+                // Past the valley the stream no longer cuts: its walls would
+                // otherwise shave the tops off mountains kilometres away.
                 bed + grade * (best + meander - self.bm(half)).max(0.0)
+                    + 2_000.0 * smoothstep(500.0, 900.0, best)
             });
             h = h.min(cut);
         }
@@ -762,14 +827,29 @@ impl Terrain {
         let raw: Vec<f32> = h
             .iter()
             .zip(&before)
-            .map(|(a, b)| ((a - b) * VERTICAL).clamp(-30.0, 10.0))
+            .map(|(a, b)| {
+                // The mountains take deep gullies and big fans; the lowland only a little.
+                let high = smoothstep(80.0, 250.0, (b * VERTICAL) as f64) as f32;
+                ((a - b) * VERTICAL).clamp(-30.0 - 45.0 * high, 10.0 + 20.0 * high)
+            })
+            .collect();
+        // Softened once everywhere, and three times more on the mountains,
+        // where single droplets would otherwise scratch thin straight lines.
+        let high: Vec<f32> = before
+            .iter()
+            .map(|&b| smoothstep(80.0, 250.0, (b * VERTICAL) as f64) as f32)
             .collect();
         let mut soft = raw.clone();
-        for j in 1..n - 1 {
-            for i in 1..n - 1 {
-                let at = j * n + i;
-                soft[at] =
-                    0.5 * raw[at] + 0.125 * (raw[at - 1] + raw[at + 1] + raw[at - n] + raw[at + n]);
+        for pass in 0..4 {
+            let from = soft.clone();
+            for j in 1..n - 1 {
+                for i in 1..n - 1 {
+                    let at = j * n + i;
+                    let blur = 0.5 * from[at]
+                        + 0.125 * (from[at - 1] + from[at + 1] + from[at - n] + from[at + n]);
+                    let w = if pass == 0 { 1.0 } else { high[at] };
+                    soft[at] = from[at] + (blur - from[at]) * w;
+                }
             }
         }
         // The same both ways round: blended across the diagonal like the noise.

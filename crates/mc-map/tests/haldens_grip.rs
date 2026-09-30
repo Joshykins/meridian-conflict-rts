@@ -137,14 +137,17 @@ fn haldens_grip_plays_the_same_from_both_sides() {
     }
     // From start 1's twin (start 0) and so on: the walk to the one side's
     // ore is as long as the twin's walk to the other's.
-    let mut island = 0;
+    let (mut island, mut cut_off) = (0, Vec::new());
     for region in map.file.ore_regions() {
         let c = region.centre();
         let c = (c.x.to_f64(), c.y.to_f64());
         for i in (0..8).step_by(2) {
             let (a, b) = (at(&walks[i], c), at(&walks[i + 1], turn(c)));
             if a < 0 && b < 0 {
-                island += (i == 0) as usize;
+                if i == 0 {
+                    island += 1;
+                    cut_off.push(format!("({:.0}, {:.0})", c.0, c.1));
+                }
                 continue;
             }
             if a < 0 || b < 0 {
@@ -164,7 +167,10 @@ fn haldens_grip_plays_the_same_from_both_sides() {
         map.file.ore_regions().len()
     );
     if island != 2 {
-        problems.push(format!("{island} ore fields cannot be walked to; the two island fields should be the only ones"));
+        problems.push(format!(
+            "{island} ore fields cannot be walked to ({}); the two island fields should be the only ones",
+            cut_off.join(", ")
+        ));
     }
 
     // Two seas, one in each bay, each crossable end to end, and the two
