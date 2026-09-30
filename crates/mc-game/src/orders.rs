@@ -808,7 +808,7 @@ impl OrderMap {
                 }
             }
         }
-        reclaim_rings::draw_reclaim_drag(ui, field, ground, &project);
+        reclaim_rings::draw_reclaim_drag(ui, field, ground, project);
         let guard = view.mode == Mode::Target(crate::game::Targeting::Guard);
         // Assist dragged out is an area assist (`Game::left_released`).
         let area_assist = view.mode == Mode::Target(crate::game::Targeting::Assist)
