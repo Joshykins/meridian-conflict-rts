@@ -1400,7 +1400,16 @@ impl World {
                     && !self.bp(row).weapons.is_empty()
                     && !self.state.units.has_flag(row, flag::PASSIVE)
                 {
-                    if let Some(target) = self.air_engage_target(row) {
+                    // An idle fighter scrambles a little before the enemy is in its own
+                    // sight, once radar or a friend has it: parked, it would otherwise
+                    // still be getting up to speed when an attack reaches it.
+                    let bp = self.bp(row);
+                    let scramble = if bp.has(cat::ANTI_AIR) {
+                        bp.vision * Fx::ratio(3, 2)
+                    } else {
+                        bp.vision
+                    };
+                    if let Some(target) = self.air_engage_target_within(row, scramble) {
                         // Idle armed aircraft launch a flight before using their weapons.
                         let mut home = order(
                             OrderKind::AttackMove,
@@ -1579,6 +1588,12 @@ impl World {
     }
 
     pub(crate) fn air_engage_target(&self, row: usize) -> Option<usize> {
+        self.air_engage_target_within(row, self.bp(row).vision)
+    }
+
+    /// What the aircraft flies at: the target its order names, else a detected enemy
+    /// within `reach`.
+    fn air_engage_target_within(&self, row: usize, reach: Fx) -> Option<usize> {
         let bp = self.bp(row);
         // A lift ship never flies at anything: its guns shoot what comes in reach.
         if bp.weapons.is_empty() || bp.transport.is_some() {
@@ -1617,10 +1632,10 @@ impl World {
             return None;
         }
         if fighter {
-            return self.air_spread_pick(row, mask);
+            return self.air_spread_pick(row, mask, reach);
         }
         self.index
-            .nearest(units.pos[row], bp.vision, kind::UNIT, |e| {
+            .nearest(units.pos[row], reach, kind::UNIT, |e| {
                 self.unit_entry_is_current(e)
                     && self.air_can_harass(row, e.row as usize)
                     && self.hittable(e.row as usize, mask)
@@ -1635,16 +1650,15 @@ impl World {
     /// its own opponent, rather than piling onto the first few it sees while the
     /// rest of the enemy flies free. Orders run in row order, so a fighter sees the
     /// picks the fighters before it made this tick.
-    fn air_spread_pick(&self, row: usize, mask: u32) -> Option<usize> {
+    fn air_spread_pick(&self, row: usize, mask: u32, reach: Fx) -> Option<usize> {
         if !self.fires_at_will(row) {
             return None;
         }
         let units = &self.state.units;
         let pos = units.pos[row];
-        let vision = self.bp(row).vision;
-        let crowd = vision / 4;
+        let crowd = self.bp(row).vision / 4;
         let mut best: Option<(Fx, usize)> = None;
-        self.index.query(pos, vision, kind::UNIT, |e| {
+        self.index.query(pos, reach, kind::UNIT, |e| {
             let t = e.row as usize;
             if !self.unit_entry_is_current(e)
                 || !self.air_can_harass(row, t)
