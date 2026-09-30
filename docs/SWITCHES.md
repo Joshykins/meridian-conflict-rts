@@ -11,7 +11,7 @@ Interactive play takes its graphics settings from Settings → Display instead.
 | `MERIDIAN_PROP_DETAIL` | `minimum radius,LOD bias,shadow radius` | Scenery detail; Low is `6,4,8`, Balanced is `4,3,6`. |
 | `MERIDIAN_CLOUD_RES` | `1`–`4` | Divide output dimensions by this for the cloud march. |
 | `MERIDIAN_GPU_TIMERS` | `0` to disable | A/B profiling overhead. GPU timing values are unavailable when off; compare `cpu.render` instead. |
-| `MERIDIAN_GPU_CRUMBS` | `1` to enable | Finding a lost device (AMD, `VK_AMD_buffer_marker`): a breadcrumb before each ground decal, missile and model draw, models drawn one draw slot at a time, so the error log names the draw the GPU stopped in. Costs frame time; off by default. |
+| `MERIDIAN_GPU_CRUMBS` | `0` to disable | Finding a lost device on AMD GPUs (`VK_AMD_buffer_marker`), on by default there: a breadcrumb before every scope, ground decal, grass band, missile and model draw (models drawn one draw slot at a time), so the error log lists which draws the GPU reached and finished. Costs some frame time; `0` keeps only the scope edges. Other GPUs have no breadcrumbs. |
 
 `scripts/perf-suite.sh OUT_DIR [CASE...]` runs native macOS/Linux or Windows via WSL.
 `PERF_SIZE`, `PERF_FOLLOW`, and whitespace-separated `PERF_ENV` assignments set the

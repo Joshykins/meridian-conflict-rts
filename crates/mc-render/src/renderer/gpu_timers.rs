@@ -79,6 +79,9 @@ pub(super) struct GpuTimers {
     /// `MERIDIAN_GPU_TIMERS=0` records nothing, to A/B the timers' own cost.
     on: bool,
     breadcrumbs: Option<Breadcrumbs>,
+    /// What `render` was doing last (waiting on the fence, acquiring, submitting,
+    /// presenting), so a lost device's report says which call saw it.
+    step: std::cell::Cell<&'static str>,
 }
 
 impl GpuTimers {
@@ -121,6 +124,7 @@ impl GpuTimers {
         })?;
         Ok(GpuTimers {
             breadcrumbs,
+            step: std::cell::Cell::new("start"),
             timestamps,
             stats,
             period: gpu.limits.timestamp_period,
@@ -323,8 +327,14 @@ impl GpuTimers {
         )
     }
 
+    /// Notes what `render` is about to do, for a lost device's report.
+    pub(super) fn step(&self, step: &'static str) {
+        self.step.set(step);
+    }
+
     /// After the device is lost: logs where the GPU stopped (`breadcrumbs.rs`).
     pub(super) fn lost(&self) {
+        log::error!("device loss seen at: {}", self.step.get());
         match &self.breadcrumbs {
             Some(b) => b.report(),
             None => log::error!("device lost; no breadcrumbs (no VK_AMD_buffer_marker)"),

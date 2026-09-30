@@ -17,7 +17,7 @@ const KEEP: usize = 10;
 /// Log lines kept for the reports: the first ones (the GPU and driver are named
 /// at start-up), and the last ones.
 const HEAD_LINES: usize = 40;
-const TAIL_LINES: usize = 200;
+const TAIL_LINES: usize = 400;
 
 struct Kept {
     head: Vec<String>,

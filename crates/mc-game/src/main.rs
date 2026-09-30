@@ -158,8 +158,8 @@ straight into a match instead.
 MERIDIAN_SIMPLE_SHADING=1 uses cheaper terrain/shadow shading in headless captures.
 Interactive Low and Balanced presets enable it automatically; High/Ultra use full shading.
 
-MERIDIAN_GPU_CRUMBS=1 marks every model and decal draw on AMD GPUs, so a lost device's
-error log names the draw it stopped in (models are drawn one at a time; slower).
+On AMD GPUs every draw is marked so a lost device's error log names the draw the GPU
+stopped in (models drawn one at a time, a little slower); MERIDIAN_GPU_CRUMBS=0 turns it off.
 
 MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the selection:
 1 a warhead launch, ground a titan's strike, reclaim the Reclaim order, warp a warp jump

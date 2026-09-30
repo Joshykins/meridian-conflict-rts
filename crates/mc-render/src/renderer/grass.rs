@@ -475,7 +475,14 @@ impl Grass {
 
     /// Inside the scene pass, after the ground and its decals. Leaves set 0
     /// bound for the scene's layout (the two layouts share it).
-    pub(super) fn draw(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
+    /// `crumb` marks each band's draw for a lost device's report (`breadcrumbs.rs`).
+    pub(super) fn draw(
+        &self,
+        gpu: &Gpu,
+        cmd: vk::CommandBuffer,
+        scene_set: vk::DescriptorSet,
+        crumb: impl Fn(u64),
+    ) {
         if !self.grown {
             return;
         }
@@ -497,6 +504,7 @@ impl Grass {
             dev.cmd_bind_index_buffer(cmd, self.indices.buffer, 0, vk::IndexType::UINT32);
             // Near to far, so the nearest blades hide the most behind them.
             for band in 0..BANDS.len() as u64 {
+                crumb(band);
                 dev.cmd_draw_indexed_indirect(cmd, self.args.buffer, band * 20, 1, 20);
             }
         }

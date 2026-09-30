@@ -8,12 +8,46 @@ impl Renderer {
         let result = self.render_frame(input);
         if matches!(result, Err(GpuError::Vk(vk::Result::ERROR_DEVICE_LOST))) {
             self.timers.lost();
+            log::error!("{}", self.loss_context(input));
             match self.gpu.fault_report() {
                 Some(report) => log::error!("{report}"),
                 None => log::error!("no fault report (VK_EXT_device_fault is not available)"),
             }
         }
         result
+    }
+
+    /// What was on screen when the device was lost: the counts every pass draws by.
+    fn loss_context(&self, input: &FrameInput) -> String {
+        let c = input.camera;
+        format!(
+            "scene at the loss: output {}x{}, scene {}x{}, time {:.2} s, camera focus {:?} \
+             distance {:.0} yaw {:.2} tilt {:.2}\n  units {} (dynamic {}, static {}), draw slots {}, stains {}, pads {}, \
+             ore tiles {}, tracks {}, prints {}, missiles {}, shields {} (hull {}), \
+             fresh sim frame {}",
+            self.width,
+            self.height,
+            self.scene_width,
+            self.scene_height,
+            input.time,
+            c.focus,
+            c.distance,
+            c.yaw,
+            c.tilt,
+            self.sim_units,
+            self.dynamic_count,
+            self.static_count,
+            self.slot_count,
+            self.stain_count,
+            self.pad_count,
+            self.deposit_count,
+            self.track_count,
+            self.prints.count,
+            self.projectile_count,
+            self.shield_count,
+            self.hull_shield_count,
+            input.sim.is_some(),
+        )
     }
 
     /// A draw slot's model, for a breadcrumb: the blueprint's key, or a prop kind.
@@ -32,11 +66,13 @@ impl Renderer {
         {
             // Time spent waiting for the GPU to finish the frame before this one.
             let _t = mc_core::perf_span!("cpu.gpu_wait");
+            self.timers.step("waiting for the last frame's fence");
             // SAFETY: the fence is this device's and was submitted (or created signalled), so
             // the wait ends.
             unsafe {
                 device.wait_for_fences(&[self.fence], true, u64::MAX)?;
             }
+            self.timers.step("recording");
         }
         for b in self.garbage.drain(..) {
             self.gpu.destroy_buffer(b);
@@ -47,6 +83,7 @@ impl Renderer {
         let image_index = match &self.output {
             Output::Window(sc) => {
                 let swapchain_fn = self.gpu.swapchain_fn.as_ref().expect("window target");
+                self.timers.step("acquiring a swapchain image");
                 // SAFETY: the chain and semaphore are this device's; the semaphore has no
                 // pending signal: every successful acquire is followed by the submit that
                 // waits on it (an error in between is fatal to the app), and that submit's
@@ -746,7 +783,9 @@ impl Renderer {
             }
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.grass");
-            self.grass.draw(&self.gpu, cmd, self.scene_set);
+            self.grass.draw(&self.gpu, cmd, self.scene_set, |band| {
+                self.timers.crumb(cmd, || format!("grass band {band}"))
+            });
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.entities");
             draw_entities(self.pipelines.entity, pass::MAIN, cull_list::MAIN);
@@ -1400,6 +1439,7 @@ impl Renderer {
                     .wait_dst_stage_mask(&stages)
                     .signal_semaphores(&signal);
             }
+            self.timers.step("submitting the frame");
             device.queue_submit(self.gpu.queue, &[submit], self.fence)?;
         }
         self.timers.submitted();
@@ -1413,6 +1453,7 @@ impl Renderer {
                 .wait_semaphores(&wait)
                 .swapchains(&swapchains)
                 .image_indices(&indices);
+            self.timers.step("presenting");
             // SAFETY: `image_index` was acquired from this chain this frame, and
             // `render_finished` is signalled by the submit just made; the arrays in `present`
             // live to the end of the call.
