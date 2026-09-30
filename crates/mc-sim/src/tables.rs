@@ -637,7 +637,7 @@ pub struct Order {
     pub formation: u64,
     pub kind: OrderKind,
     pub pos: FxVec2,
-    /// Unit or wreck, depending on `kind`.
+    /// Unit or wreck, depending on `kind`. `Build`: the site once it is started or joined.
     pub target: Handle,
     pub blueprint: BlueprintId,
     pub heading: Angle,

@@ -369,3 +369,50 @@ fn an_engineer_assisting_a_moving_one_keeps_close_behind_it() {
     assert!(widest < 45.0, "fell {widest:.0} m behind");
     assert!(end < 25.0, "ended {end:.0} m away");
 }
+
+#[test]
+fn an_engineer_whose_site_is_destroyed_does_not_lay_it_again() {
+    let mut w = world();
+    let engineer = spawn(&mut w, &[("aster_t1_engineer", 560, 470, 1000)])[0];
+    let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    w.tick(&[cmd(Command::Build {
+        units: vec![engineer],
+        blueprint: factory,
+        pos: FxVec2::from_ints(600, 516),
+        heading: Angle::ZERO,
+        queue: false,
+    })])
+    .unwrap();
+    let site_of = |w: &World| {
+        let units = &w.state.units;
+        units
+            .slots
+            .iter()
+            .find(|&r| units.blueprint[r] == factory)
+            .map(|r| units.id(r))
+    };
+    let site = (0..1000)
+        .find_map(|_| {
+            w.tick(&[]).unwrap();
+            site_of(&w)
+        })
+        .expect("the site was never started");
+    for _ in 0..30 {
+        w.tick(&[]).unwrap();
+    }
+    w.tick(&[cmd(Command::DebugDamage {
+        units: vec![site],
+        permille: 1000,
+    })])
+    .unwrap();
+    assert!(w.state.units.row(site).is_none(), "the site survived");
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+        assert!(site_of(&w).is_none(), "the engineer laid the site again");
+    }
+    let row = w.state.units.row(engineer).unwrap();
+    assert!(
+        w.state.orders.front(&w.state.units, row).is_none(),
+        "the build order outlived its site"
+    );
+}

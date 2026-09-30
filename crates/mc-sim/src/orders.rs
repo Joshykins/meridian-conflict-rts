@@ -687,8 +687,9 @@ impl World {
                 o.heading = heading;
             }
             self.state.orders.order[node].pos = to;
-            // Put down somewhere, a guard holds that spot and no longer follows anyone.
-            if kind == OrderKind::Guard {
+            // Put down somewhere, a guard holds that spot and no longer follows anyone,
+            // and a build is a fresh plan there, not the site it may have lost.
+            if matches!(kind, OrderKind::Guard | OrderKind::Build) {
                 self.state.orders.order[node].target = Handle::NONE;
             }
             if current {
@@ -2707,6 +2708,13 @@ impl World {
             }
             return Ok(());
         }
+        // The site it started or joined is gone (destroyed, or taken apart): the
+        // order ends with it rather than laying the lot down again.
+        if o.target != Handle::NONE && units.row(o.target).is_none() {
+            self.state.units.build_target[row] = Handle::NONE;
+            self.finish_order(row);
+            return Ok(());
+        }
         // Another builder with the same queue finished it first: on to the next,
         // without walking over to be told the lot is taken.
         if self.finished_site(row, o.blueprint, o.pos) {
@@ -2730,7 +2738,7 @@ impl World {
         }
         // Someone may have started this exact structure already: join in.
         if let Some(existing) = self.joinable_site(row, o.blueprint, o.pos) {
-            self.state.units.build_target[row] = self.state.units.id(existing);
+            self.take_site(row, existing);
             return Ok(());
         }
         // A builder below its tier only helps: it waits by the lot for one that can
@@ -2747,7 +2755,7 @@ impl World {
             // Same-tick start: the lot is blocked but the site is not in the
             // index yet. Join that, rather than bounce and drop the order.
             if let Some(existing) = self.unindexed_joinable_site(row, o.blueprint, o.pos) {
-                self.state.units.build_target[row] = self.state.units.id(existing);
+                self.take_site(row, existing);
                 return Ok(());
             }
             self.events.push(SimEvent::BuildRejected {
@@ -2782,8 +2790,20 @@ impl World {
             o.heading
         };
         let site = self.spawn_unit(o.blueprint, owner, o.pos, heading, false)?;
-        self.state.units.build_target[row] = self.state.units.id(site);
+        self.take_site(row, site);
         Ok(())
+    }
+
+    /// `row` works on `site` from now on. Its build order (the front one) keeps the
+    /// site's id as well, since `build_target` is also left naming whatever it last
+    /// mended: when the site dies, `run_build` can tell and ends the order.
+    fn take_site(&mut self, row: usize, site: usize) {
+        let id = self.state.units.id(site);
+        self.state.units.build_target[row] = id;
+        let front = self.state.orders.nodes(&self.state.units, row).next();
+        if let Some(node) = front {
+            self.state.orders.order[node as usize].target = id;
+        }
     }
 
     fn site_is_joinable(
