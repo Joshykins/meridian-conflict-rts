@@ -4,11 +4,12 @@
 //!   arc and reach, the share it was off the nose and the nose was not coming round,
 //!   and the longest spell between two shots.
 //! - Equal fighter swarms flown into each other (attack-move at the other side's
-//!   start), both ways round and at three spacings: survivors per side, seconds to
-//!   the end, and how far from the merge the fight wandered.
+//!   start), eight fights at different spacings, owners and spawn orders: survivors
+//!   per side, seconds to the end, and how far from the merge the fight wandered.
 //!
 //! `cargo test --profile gate -p mc-sim --test sim -- zz_dogfight_probe:: --ignored --nocapture`
-//! Knobs: DOGFIGHT_KEY=<fighter key> for the first part (default the Peregrine),
+//! Knobs: DOGFIGHT_SIDES=<seed><flip 0|1> prints the named swarm fight second by
+//! second, DOGFIGHT_TRACE prints the first strike fighter tick by tick; DOGFIGHT_KEY=<fighter key> for the first part (default the Peregrine),
 //! DOGFIGHT_SWARM=<key> and DOGFIGHT_N=<per side> for the second (default 25 Raptors).
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
@@ -70,18 +71,20 @@ fn zz_dogfight_probe() {
     strike(&key);
     let swarm = std::env::var("DOGFIGHT_SWARM").unwrap_or("aster_t3_air_superiority".into());
     let n: i32 = std::env::var("DOGFIGHT_N").map_or(25, |v| v.parse().unwrap());
-    let mut totals = [0usize; 2];
-    for (seed, gap) in [(1u64, 2400), (2, 3000), (3, 3600)] {
-        for (flip, late) in [(false, false), (true, false), (false, true)] {
-            let (a, b, secs, wander) = swarms(&swarm, n, seed, gap, flip, late);
-            totals[0] += a;
-            totals[1] += b;
-            println!(
-                "swarm {swarm} {n}v{n} seed {seed} gap {gap} flip {flip} b-first {late}: survivors a {a} b {b}, over in {secs:.1} s, wandered {wander:.0} m"
-            );
-        }
+    let mut winners = Vec::new();
+    for seed in 1..=8u64 {
+        let gap = 2200 + seed as i32 * 200;
+        let (a, b, secs, wander) = swarms(&swarm, n, seed, gap, seed % 2 == 0, seed % 3 == 0);
+        winners.push(a.max(b));
+        println!(
+            "swarm {swarm} {n}v{n} seed {seed} gap {gap}: survivors a {a} b {b}, over in {secs:.1} s, wandered {wander:.0} m"
+        );
     }
-    println!("swarm totals a {} b {}", totals[0], totals[1]);
+    winners.sort_unstable();
+    println!(
+        "swarm {swarm}: winner's survivors {winners:?}, mean {:.1}",
+        winners.iter().sum::<usize>() as f32 / winners.len() as f32
+    );
 }
 
 fn strike(key: &str) {
@@ -238,6 +241,8 @@ fn swarms(
     };
     let mut end = 0;
     let mut merged = false;
+    let mut shots = [0usize; 2];
+    let trace = std::env::var("DOGFIGHT_SIDES").is_ok_and(|v| v == format!("{seed}{}", flip as u8));
     for tick in 0..(180 * TICKS_PER_SECOND as usize) {
         w.tick(&[]).unwrap();
         merged |= w
@@ -253,6 +258,21 @@ fn swarms(
                     wander = wander.max(w.state.units.pos[r].distance(mid));
                 }
             }
+        }
+        for e in &w.events {
+            if let SimEvent::ShotFired { owner, .. } = e {
+                shots[*owner as usize] += 1;
+            }
+        }
+        if trace && tick % 10 == 0 && merged {
+            println!(
+                "  {:.0} s: alive {} v {}, shots {} v {}",
+                tick as f32 / TICKS_PER_SECOND as f32,
+                alive(&w, 0),
+                alive(&w, 1),
+                shots[0],
+                shots[1]
+            );
         }
         end = tick;
         if alive(&w, 0) == 0 || alive(&w, 1) == 0 {

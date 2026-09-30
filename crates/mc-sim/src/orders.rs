@@ -1602,16 +1602,22 @@ impl World {
         if !chases {
             return None;
         }
-        for id in units.weapon_target[row] {
-            if let Some(t) = units.row(id) {
-                if self.air_can_harass(row, t) {
-                    return Some(t);
+        let fighter = bp.has(cat::ANTI_AIR) && bp.motion.is_some_and(|m| !m.hover);
+        if !fighter {
+            for id in units.weapon_target[row] {
+                if let Some(t) = units.row(id) {
+                    if self.air_can_harass(row, t) {
+                        return Some(t);
+                    }
                 }
             }
         }
         let mask = bp.weapons.iter().fold(0u32, |acc, w| acc | w.target_mask);
         if mask == 0 {
             return None;
+        }
+        if fighter {
+            return self.air_spread_pick(row, mask);
         }
         self.index
             .nearest(units.pos[row], bp.vision, kind::UNIT, |e| {
@@ -1621,6 +1627,64 @@ impl World {
                     && self.fires_at_will(row)
             })
             .map(|e| e.row as usize)
+    }
+
+    /// A fighter looking for something to fight takes the nearest enemy that no
+    /// friendly fighter is on yet, or one a few hundred metres further than a
+    /// crowded one: a swarm meeting a swarm splits into pairs, each turning after
+    /// its own opponent, rather than piling onto the first few it sees while the
+    /// rest of the enemy flies free. Orders run in row order, so a fighter sees the
+    /// picks the fighters before it made this tick.
+    fn air_spread_pick(&self, row: usize, mask: u32) -> Option<usize> {
+        if !self.fires_at_will(row) {
+            return None;
+        }
+        let units = &self.state.units;
+        let pos = units.pos[row];
+        let vision = self.bp(row).vision;
+        let crowd = vision / 4;
+        let mut best: Option<(Fx, usize)> = None;
+        self.index.query(pos, vision, kind::UNIT, |e| {
+            let t = e.row as usize;
+            if !self.unit_entry_is_current(e)
+                || !self.air_can_harass(row, t)
+                || !self.hittable(t, mask)
+            {
+                return true;
+            }
+            let score = pos.distance(e.pos) + crowd * self.air_pursuers(row, t);
+            if best.is_none_or(|(s, b)| score < s || (score == s && t < b)) {
+                best = Some((score, t));
+            }
+            true
+        });
+        best.map(|(_, t)| t)
+    }
+
+    /// How many other friendly fighters are already flying at `target`, up to three.
+    fn air_pursuers(&self, row: usize, target: usize) -> i32 {
+        let units = &self.state.units;
+        let id = units.id(target);
+        let owner = units.owner[row];
+        let mut count = 0;
+        self.index
+            .query(units.pos[target], self.bp(row).vision, kind::UNIT, |e| {
+                let other = e.row as usize;
+                if other != row
+                    && self.unit_entry_is_current(e)
+                    && !self.are_enemies(owner, units.owner[other])
+                    && units.has_flag(other, flag::AIR_RUN)
+                    && self
+                        .state
+                        .orders
+                        .front(units, other)
+                        .is_some_and(|o| o.target == id)
+                {
+                    count += 1;
+                }
+                count < 3
+            });
+        count
     }
 
     fn air_can_harass(&self, shooter: usize, target: usize) -> bool {
