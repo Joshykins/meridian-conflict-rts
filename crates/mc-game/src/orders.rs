@@ -20,7 +20,7 @@ use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK, STATE_RADA
 use mc_sim::placement::Unfit;
 use mc_sim::tables::OrderKind;
 use mc_sim::{Command, Handle};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 mod guard_rings;
 mod muster;
@@ -689,6 +689,14 @@ fn aircraft_guides(ui: &mut Ui, field: &Field, alpha: f32) {
     }
 }
 
+/// Where an order line's next leg starts: the unit's own drawn point, or the ground
+/// under a waypoint (put on screen only when a leg from it is drawn).
+#[derive(Clone, Copy)]
+enum Leg {
+    Projected(Option<Vec2>),
+    Ground(Vec2),
+}
+
 impl OrderMap {
     pub fn dragging(&self) -> bool {
         self.drag.is_some()
@@ -1155,14 +1163,21 @@ impl OrderMap {
     /// in that group, and out of any other; one that was ordered elsewhere leaves; an idle
     /// one stays where it was. The dead, and groups of fewer than two, drop away.
     fn keep_groups(&mut self, view: &View) {
+        // The group each unit is in (one at most), looked up by unit: a side of thousands
+        // in a few big groups costs a pass over its queues, not a search of every group's
+        // members for every unit.
+        let mut group_of: HashMap<u32, u64> = self
+            .kept
+            .iter()
+            .flat_map(|(&formation, members)| members.iter().map(move |&id| (id, formation)))
+            .collect();
         for id in self.ordered.take() {
-            for (&formation, members) in &mut self.kept {
-                if members.contains(&id) {
-                    members.retain(|m| *m != id);
-                    self.left.insert((id, formation));
-                }
+            if let Some(formation) = group_of.remove(&id) {
+                self.left.insert((id, formation));
             }
         }
+        // Units that joined a group just now, in the order met: they go on the end of it.
+        let mut joining: Vec<(u64, u32)> = Vec::new();
         for queue in &view.status.queues {
             let Some(front) = queue.orders.first() else {
                 continue;
@@ -1172,24 +1187,22 @@ impl OrderMap {
                 && !matches!(front.kind, OrderKind::Produce | OrderKind::Upgrade)
                 && !self.left.contains(&(id, front.formation));
             if joined {
-                for (&formation, members) in &mut self.kept {
-                    if formation != front.formation && members.contains(&id) {
-                        members.retain(|m| *m != id);
-                    }
-                }
-                let members = self.kept.entry(front.formation).or_default();
-                if !members.contains(&id) {
-                    members.push(id);
+                if group_of.insert(id, front.formation) != Some(front.formation) {
+                    joining.push((front.formation, id));
                 }
             } else if front.formation == 0 {
                 // Walking on its own now: out of every group.
-                for members in self.kept.values_mut() {
-                    members.retain(|m| *m != id);
-                }
+                group_of.remove(&id);
             }
         }
-        for members in self.kept.values_mut() {
-            members.retain(|id| view.index_of.contains_key(id));
+        group_of.retain(|id, _| view.index_of.contains_key(id));
+        for (formation, members) in self.kept.iter_mut() {
+            members.retain(|id| group_of.get(id) == Some(formation));
+        }
+        for (formation, id) in joining {
+            if group_of.get(&id) == Some(&formation) {
+                self.kept.entry(formation).or_default().push(id);
+            }
         }
         self.kept.retain(|_, members| members.len() > 1);
         let live: HashSet<u64> = self.kept.keys().copied().collect();
@@ -1312,7 +1325,10 @@ impl OrderMap {
                 }
                 None => start,
             };
-            let mut from = camera.project(start);
+            // Where the line so far ends on screen, worked out only for a leg that is
+            // drawn: a group's members share their legs, and thousands of them each
+            // finding the ground under every waypoint was most of this pass.
+            let mut from = Leg::Projected(camera.project(start));
             // Where the line so far ends, world metres: a circling guard's line stops at its circle.
             let mut from_world = start.truncate();
             // A patrol is a loop: its last post runs back to its first.
@@ -1381,9 +1397,12 @@ impl OrderMap {
                 } else {
                     at + Vec2::from(order.offset)
                 };
-                let to = ground(destination);
                 if legs.insert((origin, order.kind as u8, order.at)) {
-                    if let (Some(a), Some(b)) = (from, to) {
+                    let a = match from {
+                        Leg::Projected(p) => p,
+                        Leg::Ground(w) => ground(w),
+                    };
+                    if let (Some(a), Some(b)) = (a, ground(destination)) {
                         // Far off-screen ends would make for enormous quads; the line is not worth it.
                         let visible = on_screen(a)
                             || on_screen(b)
@@ -1413,9 +1432,12 @@ impl OrderMap {
                     if drawn.insert((order.kind as u8, order.at)) {
                         rings.push((at, circle, strength, tone, lively));
                     }
-                } else if let Some(b) = ground(at).filter(|b| {
-                    on_screen(*b) && nodes > 0 && drawn.insert((order.kind as u8, order.at))
-                }) {
+                } else if let Some(b) = (nodes > 0
+                    && !drawn.contains(&(order.kind as u8, order.at)))
+                .then(|| ground(at))
+                .flatten()
+                .filter(|b| on_screen(*b) && drawn.insert((order.kind as u8, order.at)))
+                {
                     nodes -= 1;
                     markers.push((b / ui.s, tone, strength, selected));
                 }
@@ -1424,7 +1446,7 @@ impl OrderMap {
                 } else {
                     Origin::Unit(queue.unit_id)
                 };
-                from = to;
+                from = Leg::Ground(destination);
                 from_world = destination;
             }
         }
