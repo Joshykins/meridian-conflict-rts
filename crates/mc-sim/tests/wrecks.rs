@@ -1,6 +1,6 @@
 //! Wrecks: how they lie once they come down, and blasts wearing them away.
 
-use mc_core::{Angle, Fx, FxVec2};
+use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
@@ -107,6 +107,10 @@ fn a_blast_wears_down_the_wrecks_it_reaches_and_blows_the_nearest_apart() {
     let handle = |w: &World, r: usize| w.state.wrecks.slots.handle(r);
     let (near_id, edge_id, far_id) = (handle(&w, near), handle(&w, edge), handle(&w, far));
     let full = w.state.wrecks.mass[edge];
+    // Past the moment a fresh wreck is spared.
+    for _ in 0..TICKS_PER_SECOND {
+        w.tick(&[]).unwrap();
+    }
     destroy(&mut w, reactor);
     w.tick(&[]).unwrap();
     let wr = &w.state.wrecks;
@@ -124,6 +128,40 @@ fn a_blast_wears_down_the_wrecks_it_reaches_and_blows_the_nearest_apart() {
         .resolve(far_id)
         .expect("the far wreck is untouched");
     assert_eq!(wr.mass[far], full);
+}
+
+/// The wreck a unit leaves takes no blast damage for about a second, so the splash of
+/// the shell that killed it, or of the next one in the salvo, does not blow it away.
+#[test]
+fn a_fresh_wreck_is_spared_blasts_for_a_second() {
+    let mut w = world();
+    let tank = spawn(&mut w, "aster_t2_tank", 800, 850);
+    destroy(&mut w, tank);
+    let wr = &w.state.wrecks;
+    let row = wr.slots.iter().next().expect("the tank left a wreck");
+    let id = wr.slots.handle(row);
+    let full = wr.mass[row];
+    // A reactor going up beside it at once: close enough to blow an old wreck apart.
+    let reactor = spawn(&mut w, "aster_t3_power", 800, 800);
+    destroy(&mut w, reactor);
+    let wr = &w.state.wrecks;
+    let row = wr
+        .slots
+        .resolve(id)
+        .expect("the fresh wreck was blown away");
+    assert_eq!(wr.mass[row], full, "the fresh wreck lost mass");
+
+    // A second on, the next blast wears it as any other.
+    for _ in 0..TICKS_PER_SECOND {
+        w.tick(&[]).unwrap();
+    }
+    let reactor = spawn(&mut w, "aster_t3_power", 800, 800);
+    destroy(&mut w, reactor);
+    let wr = &w.state.wrecks;
+    assert!(
+        wr.slots.resolve(id).is_none_or(|r| wr.mass[r] < full),
+        "a blast a second later left it whole"
+    );
 }
 
 #[test]
