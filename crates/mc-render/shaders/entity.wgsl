@@ -1,6 +1,7 @@
 //!use bindings
 //!use habitat
 //!use surface
+//!use regency
 //!use scenery
 //!use warp_hull
 //!use emp
@@ -2701,6 +2702,31 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             m.metallic = clamp(m.metallic + 0.3 * broad, 0.0, 1.0);
         }
     }
+    // Regency plate and bronze (regency.wgsl): panels, bolts, vents and red lines cut in
+    // the model's own space, turned and engraved bronze.
+    var regency = regency_none();
+    let bronze = in.material == MAT_METAL;
+    if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER && (bronze || in.material == MAT_PLATING_DARK)
+        && (flags & (KIND_GHOST | KIND_PROP)) == 0u && !wreck {
+        let dl1 = dpdx(in.local);
+        let dl2 = dpdy(in.local);
+        var ri: RegencyIn;
+        ri.local = in.local;
+        ri.n = normalize(cross(dl1, dl2) + vec3<f32>(0.0, 0.0, 1e-9));
+        ri.px = local_px;
+        ri.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
+        ri.time = time;
+        ri.health = select(in.state.y, 1.0, (flags & FLAG_UNDER_CONSTRUCTION) != 0u);
+        ri.along = in.face.y;
+        ri.along_dir = vec3<f32>(0.0);
+        if in.face.z < 0.0 {
+            let grad = reg_face_grad(dpdx(in.face.y), dpdy(in.face.y), dl1, dl2);
+            ri.along_dir = grad * inverseSqrt(max(dot(grad, grad), 1e-12));
+        }
+        regency = regency_look(ri, bronze);
+        n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));
+        lights += regency.emissive;
+    }
     // Mineral props share the terrain's rock texture and correctly oriented normals.
     if in.material == 10u {
         let rock = terrain_surface(in.world, n, 7.3, 0, 0.8);
@@ -3013,23 +3039,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
             grit = 0.0;
             kick = select(0.0, kick, (in.model_class & 0x100u) != 0u);
-            // Keeps the plate's own light and shade, recoloured.
-            let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
-            if in.material == MAT_METAL {
-                // The working machinery under the plates (rams, ribs, joints, cables) is a
-                // dark bronze, a little off true bronze.
-                m.albedo = vec3<f32>(0.3, 0.19, 0.095) * clamp(0.75 + lum, 0.75, 1.3);
-                m.metallic = 0.85;
-                m.roughness = clamp(m.roughness, 0.34, 0.46);
-            } else {
-                // The armour is a dark gunmetal with a cool cast, not the shared palette's
-                // steel. The seams between plates (`ACCENT`) stay darker than the plates.
-                m.albedo = vec3<f32>(0.02, 0.021, 0.025) * clamp(0.6 + lum * 3.5, 0.6, 2.8);
-                // A satin gunmetal: it catches the light, but a broad flat plate at the
-                // sun's mirror angle must not glint white across its whole face.
-                m.roughness = clamp(m.roughness * 0.8, 0.56, 0.68);
-                m.metallic = min(m.metallic, 0.25);
-            }
+            // Dark gunmetal plate, darker seams, dark bronze machinery (regency.wgsl).
+            m = regency_paint(m, in.material == MAT_METAL, regency);
         }
         let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);
         let rise = in.state.z / max(line, 0.02);

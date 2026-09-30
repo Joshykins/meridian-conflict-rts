@@ -7,15 +7,16 @@
 //! shader (after the numbers the CPU shares with the shaders, generated from
 //! `gpu_consts.rs`), and `bindings.wgsl` with `lights.wgsl` in front of those
 //! containing the line `//!use bindings`; then `shore`, `habitat`, `desert`, `surface`,
-//! `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
+//! `regency`, `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 12] = [
+pub(crate) const PRELUDES: [&str; 13] = [
     "common",
     "bindings",
     "shore",
     "surface",
+    "regency",
     "lights",
     "habitat",
     "scenery",
@@ -32,6 +33,7 @@ pub(crate) struct Preludes {
     bindings: String,
     shore: String,
     surface: String,
+    regency: String,
     habitat: String,
     scenery: String,
     desert: String,
@@ -50,6 +52,7 @@ impl Preludes {
             bindings: format!("{}\n{}", read("bindings"), read("lights")),
             shore: read("shore"),
             surface: read("surface"),
+            regency: read("regency"),
             habitat: read("habitat"),
             scenery: read("scenery"),
             desert: read("desert"),
@@ -83,6 +86,10 @@ impl Preludes {
         }
         if uses("surface") {
             prelude = format!("{prelude}\n{}", self.surface);
+        }
+        // Regency plate and bronze (needs surface).
+        if uses("regency") {
+            prelude = format!("{prelude}\n{}", self.regency);
         }
         // Desert scenery's looks (needs surface).
         if uses("scenery") {

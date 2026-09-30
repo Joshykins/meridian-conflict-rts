@@ -6,7 +6,8 @@
 //! every shader, and `shaders/bindings.wgsl` to those containing the line
 //! `//!use bindings`. GPU structs and set 0 then match across all passes.
 //! `shaders/surface.wgsl` (what is drawn on a unit's faces) follows for those
-//! containing `//!use surface`, and `shaders/habitat.wgsl` (where things grow,
+//! containing `//!use surface` (then `shaders/regency.wgsl`, Regency plate and
+//! bronze, for `//!use regency`), and `shaders/habitat.wgsl` (where things grow,
 //! the air near the ground) to those containing `//!use habitat`, and
 //! `shaders/scenery.wgsl` (desert bark, rock and the dam's concrete) after
 //! surface to those containing `//!use scenery`; `shaders/desert.wgsl`

@@ -175,6 +175,14 @@ without toes.
   machinery under the plates: pistons, ribs, joints, cables. The plates stay
   dark, so from above a unit reads as dark armour over bronze workings.
 - **Red highlights:** lit lines, optics and weapon heat.
+- **Detail is cut, not painted** (`shaders/regency.wgsl`). The plate is cut into
+  panels in the model's own space, so a seam runs on round a faceted solid from
+  facet to facet, with chamfered corners, and on black the panels are drawn by
+  light: a sunk seam with a bright steel lip, each panel its own sheen, small
+  bolt heads, chevron vents, machine plate of hairline hatches and slots, and a
+  red line let into a few pin lines. The bronze is turned (collars and lathe
+  grooves on rams and cables) or engraved (inset lines and keys on blocks),
+  dark in its grooves and worn to gold on its high metal.
 
 ### Names
 

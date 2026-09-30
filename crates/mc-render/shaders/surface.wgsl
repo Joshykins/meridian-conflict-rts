@@ -590,7 +590,8 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
                 let dash = surf_dashes(i, st, cell);
                 let slot = surf_band(dash.d, i.scale * 0.022, 0.0) * step(0.0, dash.along) * dash.on;
                 h -= 0.6 * slot * outlined;
-            } else if small > i.scale * 0.3 {
+            } else if small > i.scale * 0.3 && i.pattern != PAT_EMBER {
+                // Regency plate is cut into panels of its own (regency.wgsl).
                 h = min(h, surf_relief_plates(i, st, bevel, gap));
             }
         }
@@ -1182,7 +1183,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                     out.cavity = 1.0 - 0.5 * surf_band(dash.d, w * 1.9, fw) * surf_step(dash.along, -w, fw) * dash.on * outlined * veined;
                     // Scuffed edges read lighter on black, which is what draws its forms.
                     out.bare = max(out.bare, 0.55 * (1.0 - smoothstep(0.0, bevel * 0.9, d_face)) * outlined);
-                } else if small > i.scale * 0.3 {
+                } else if small > i.scale * 0.3 && i.pattern != PAT_EMBER {
                     let cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
                     let d_cell = surf_edge(cell.p, cell.half);
                     out.cavity = 1.0 - 0.62 * surf_band(d_cell, gap, fw);
@@ -1201,12 +1202,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                         let f = fract((cell.p.y + bank.y) / pitch);
                         out.cavity *= 1.0 - 0.7 * surf_step(e, 0.0, fw) * surf_step(f, 0.55, fw / pitch);
                     }
-                    var chipped = (1.0 - smoothstep(0.0, bevel * (0.8 + 2.0 * hurt), d_cell));
-                    if i.pattern == PAT_EMBER {
-                        // Regency hide: glossy chitin with seams, not painted steel that chips pale.
-                        chipped *= hurt;
-                        out.rough += 0.3;
-                    }
+                    let chipped = (1.0 - smoothstep(0.0, bevel * (0.8 + 2.0 * hurt), d_cell));
                     out.bare = max(out.bare, chipped * smoothstep(0.8 - 0.5 * hurt, 0.97 - 0.45 * hurt, scuff + chipped * 0.3));
                 } else {
                     out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
