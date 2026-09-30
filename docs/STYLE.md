@@ -146,8 +146,11 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 
 The Regency roster is being redone from this section (2026-09-26). The grown look
 (hide, tendrils, molten pools, glassed lots) is retired. References: Shockwave
-and Scorponok from the Transformers films, the Driller concept art, and
-Megatron's Cybertronian jet.
+and Scorponok from the Transformers films, the Driller concept art,
+Megatron's Cybertronian jet, and Megatron from Revenge of the Fallen for the
+commander: tall and long-limbed, every mass a faceted solid (no sticks with
+blades glued on), a keeled chest, spiked pauldrons swept back, armoured boots
+without toes.
 
 - **Confident, not improvised.** ARC is a field workshop keeping stolen tech
   alive; the Regency understand what they hold. Their machines are dense and

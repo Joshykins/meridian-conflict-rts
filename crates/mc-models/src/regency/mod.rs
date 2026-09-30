@@ -36,8 +36,8 @@ use super::library::ModelDef;
 pub(super) const COMMANDER_TRIANGLES: usize = 9000;
 
 pub(super) const MODELS: &[ModelDef] = &[
-    // The commander: a reverse-kneed walker, cannon arm and claw (`commander`).
-    ModelDef::new("regency_commander", 10.4, 23.0, commander::commander),
+    // The commander: a tall walker, fusion cannon forearm and taloned hand (`commander`).
+    ModelDef::new("regency_commander", 10.4, 25.0, commander::commander),
     // The tech 3 battle scorpion: the old commander's scorpion, built bigger (`scorpion`).
     ModelDef::new(
         "regency_scorpion",
@@ -100,7 +100,8 @@ pub(super) const MODELS: &[ModelDef] = &[
 /// model gets more than the library's default. `None` for a key that is not theirs.
 #[cfg(test)]
 pub(super) fn triangles(key: &str) -> Option<usize> {
-    Some(match key {
+    // A design variant (`mesh~name`) has its mesh's budget.
+    Some(match key.split('~').next().unwrap_or(key) {
         "regency_commander" => COMMANDER_TRIANGLES,
         "regency_scorpion" => 14000,
         // The land and air factories' tech 3, with their tech 2 kit and more.

@@ -22,11 +22,6 @@ pub(super) fn plate(b: &mut MeshBuilder, outline: &[Vec3], thick: Vec3) {
     );
 }
 
-/// A plate lying in the x-z plane: `profile` (x, z) from `y0` out to `y1`.
-pub(super) fn side_plate(b: &mut MeshBuilder, profile: &[[f32; 2]], y0: f32, y1: f32) {
-    b.extrude_y(profile, y0, y1);
-}
-
 /// A joint: a bronze drum `radius` round `at`, `half` either side along its axis, with a
 /// dark hub proud of each face up close.
 pub(super) fn joint(b: &mut MeshBuilder, at: Vec3, half: Vec3, radius: f32) {

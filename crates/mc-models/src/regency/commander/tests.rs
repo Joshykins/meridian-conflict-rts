@@ -3,7 +3,7 @@ use glam::Vec3;
 use super::*;
 use crate::{build_model, build_model_fitted, Model};
 
-const HEIGHT: f32 = 23.0;
+const HEIGHT: f32 = 25.0;
 
 fn fitted() -> Model {
     build_model_fitted("regency_commander", 10.4, HEIGHT, 1, &["eng_2", "eng_3"]).unwrap()
@@ -137,11 +137,10 @@ fn the_unit_files_muzzle_emitter_and_elbows_are_the_models() {
 }
 
 #[test]
-fn walks_on_reverse_kneed_legs_with_long_high_steps() {
+fn walks_on_knees_forward_with_long_high_steps() {
     let model = build_model("regency_commander").unwrap();
     let legs = model.legs.expect("it walks");
-    let (hock, _) = legs.hock.expect("reverse-kneed");
-    assert_eq!(hock, HOCK.to_array());
+    assert!(legs.hock.is_none(), "knees forward");
     assert!(legs.crawl.is_none());
     assert!(
         legs.stride >= 16.0 && legs.lift > 1.5,
@@ -161,9 +160,9 @@ fn walks_on_reverse_kneed_legs_with_long_high_steps() {
     );
     for lod in 0..3 {
         let bones: &[u32] = if lod < 2 {
-            &[rig::THIGH, rig::SHIN, rig::TARSUS, rig::FOOT]
+            &[rig::THIGH, rig::SHIN, rig::FOOT]
         } else {
-            &[rig::THIGH, rig::SHIN, rig::TARSUS]
+            &[rig::THIGH, rig::SHIN]
         };
         for &bone in bones {
             let on = |left: bool| {
