@@ -625,7 +625,11 @@ impl World {
         let dist = to_goal.length();
         let transit_air = motion.layer == MoveLayer::Air
             && (motion.hover || units.flags[row] & flag::AIR_RUN == 0);
+        // A lone aircraft with another waypoint queued flies through this one:
+        // it neither brakes for it nor docks on it (`run_air_move` moves it on).
+        let passing = transit_air && formation.is_none() && self.air_waypoint_after(row).is_some();
         let docking = transit_air
+            && !passing
             && moving
             && dist <= AIR_DOCK_RADIUS
             && units.speed[row] <= (motion.speed / 3).min(AIR_DOCK_SPEED);
@@ -768,6 +772,7 @@ impl World {
                 if moving
                     && !standing_on_blocked
                     && !cruising
+                    && !passing
                     && (motion.hover || units.flags[row] & flag::AIR_RUN == 0)
                 {
                     // Begin braking by stopping distance; the final hover

@@ -169,10 +169,13 @@ impl World {
         let first = *self.state.orders.front(&self.state.units, rows[0]).unwrap();
         let target = first.pos;
         let air = self.bp(rows[0]).motion.unwrap().layer == MoveLayer::Air;
+        let hover = self.bp(rows[0]).motion.unwrap().hover;
         // A flight on patrol sweeps round its loop like one aircraft: it
         // never stops on a post, and turns no faster than its wings follow.
-        let sweep =
-            air && first.kind == OrderKind::Patrol && !self.bp(rows[0]).motion.unwrap().hover;
+        // So does a flight through a waypoint with another queued behind it.
+        let sweep = air
+            && ((first.kind == OrderKind::Patrol && !hover)
+                || self.air_waypoint_after(rows[0]).is_some());
         let mut mean = FxVec2::ZERO;
         let mut pace = Fx::MAX;
         let mut accel = Fx::MAX;
@@ -191,15 +194,24 @@ impl World {
         // The anchor turns at half the slowest wing's rate, so the outside
         // of the flight has room to keep station through the turn.
         let yaw = (yaw / 2).max(1);
-        if group.phase == 0 && sweep {
-            // Carry on the way the flight is already going, at its airspeed:
-            // the slots do not swing round to the new leg, and nobody brakes.
-            let units = &self.state.units;
-            let (mut dir, mut speed) = (FxVec2::ZERO, Fx::ZERO);
+        // Carry on the way the flight is already going, at its airspeed: the
+        // slots do not swing round to the new leg, and nobody brakes. On patrol
+        // always; on a move, when it is flying on from the last waypoint.
+        let units = &self.state.units;
+        let (mut dir, mut speed) = (FxVec2::ZERO, Fx::ZERO);
+        if air && group.phase == 0 {
             for &row in &rows {
-                dir += FxVec2::from_angle(units.heading[row]);
+                // A hovering airframe may face off its way: go by where it is going.
+                dir += if hover {
+                    units.air_velocity[row].xy()
+                } else {
+                    FxVec2::from_angle(units.heading[row])
+                };
                 speed += units.speed[row];
             }
+        }
+        let flying_on = speed * 2 >= pace * rows.len() as i32;
+        if group.phase == 0 && (sweep || flying_on) {
             group.heading = if dir == FxVec2::ZERO {
                 first.heading
             } else {
@@ -743,20 +755,25 @@ impl World {
         }
     }
 
-    /// Whether a flight on patrol, its anchor where `group` has it, should
-    /// begin its turn onto the leg after its post now. It turns in early by
-    /// the lead its turn radius needs for the corner, so it rolls out on the
+    /// Whether a flight on patrol or through a waypoint, its anchor where
+    /// `group` has it, should begin its turn onto the leg after its post now.
+    /// It turns in early by the lead its turn radius needs for the corner, so
+    /// it rolls out on the
     /// new leg instead of overshooting the post and weaving back; a post it
     /// has already passed abeam is taken as reached.
     fn turn_onto_next_leg(&self, row: usize, group: &crate::formations::Group, yaw: i32) -> bool {
         let units = &self.state.units;
-        let mut posts = self
-            .state
-            .orders
-            .iter(units, row)
-            .filter(|o| o.kind == OrderKind::Patrol)
-            .map(|o| o.pos);
-        let (Some(post), Some(next)) = (posts.next(), posts.next()) else {
+        let mut queue = self.state.orders.iter(units, row);
+        let Some(first) = queue.next() else {
+            return false;
+        };
+        // Round a patrol loop, the next post; otherwise the next waypoint.
+        let next = if first.kind == OrderKind::Patrol {
+            queue.find(|o| o.kind == OrderKind::Patrol)
+        } else {
+            queue.next()
+        };
+        let (post, Some(next)) = (first.pos, next.map(|o| o.pos)) else {
             return false;
         };
         let to_post = post - group.anchor;

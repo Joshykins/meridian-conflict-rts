@@ -1613,6 +1613,26 @@ impl World {
         }
         let goal = self.clamp_to_map(o.pos + o.offset);
         let motion = self.bp(row).motion.expect("air");
+        // With another waypoint queued behind it, it flies through this one onto
+        // the next leg: a flight once its anchor turns in, a lone aircraft once
+        // it is close enough to turn in itself.
+        if let Some(next) = self.air_waypoint_after(row) {
+            let through = match self.state.formations.get(&o.formation) {
+                Some(g) => g.phase == crate::movement::PHASE_NEXT_LEG,
+                None => {
+                    self.state.units.pos[row].distance(goal)
+                        <= self.air_sweep_reach(row, goal, Some(next))
+                }
+            };
+            if through {
+                self.finish_order(row);
+                // Left without a goal for the tick, it would shed speed and roll level.
+                if let Some(n) = self.state.orders.front(&self.state.units, row).copied() {
+                    self.ensure_moving(row, n.pos, self.clamp_to_map(n.pos + n.offset))?;
+                }
+                return Ok(());
+            }
+        }
         // Dock into the assigned slot before dropping the order. Cruise-speed
         // waypoint tolerances leave a braking-distance-sized hole in a V.
         let group_arrived = o.formation == 0
@@ -1635,6 +1655,39 @@ impl World {
         }
         self.state.units.flags[row] &= !flag::AIR_RUN;
         self.ensure_moving(row, o.pos, goal)
+    }
+
+    /// Where an aircraft flies on to from the waypoint it is making for, when it
+    /// passes through that one rather than stopping on it: a move or attack-move
+    /// with another move, attack-move or patrol queued behind it.
+    pub(crate) fn air_waypoint_after(&self, row: usize) -> Option<FxVec2> {
+        let mut queue = self.state.orders.iter(&self.state.units, row);
+        let (front, next) = (queue.next()?, queue.next()?);
+        let waypoint = |k| matches!(k, OrderKind::Move | OrderKind::AttackMove);
+        (waypoint(front.kind) && (waypoint(next.kind) || next.kind == OrderKind::Patrol))
+            .then(|| self.clamp_to_map(next.pos + next.offset))
+    }
+
+    /// How close to `goal` an aircraft sweeping through it onto the leg to `next`
+    /// takes it as reached: turning in early enough to roll out on the next leg
+    /// instead of overshooting.
+    fn air_sweep_reach(&self, row: usize, goal: FxVec2, next: Option<FxVec2>) -> Fx {
+        let motion = self.bp(row).motion.expect("air");
+        let reach = motion.speed / 2 + self.bp(row).radius + Fx::from_int(8);
+        match next {
+            Some(next) if !motion.hover => {
+                let units = &self.state.units;
+                let turn_radius =
+                    units.speed[row].mul_div(10430, (motion.turn_rate as i64 * DT as i64).max(1));
+                reach.max(crate::movement::patrol_lead(
+                    units.heading[row],
+                    goal,
+                    next,
+                    turn_radius,
+                ))
+            }
+            _ => reach,
+        }
     }
 
     pub(crate) fn has_live_target(&self, row: usize) -> bool {
@@ -2466,27 +2519,14 @@ impl World {
             // Aircraft sweep through a waypoint rather than settle on it, turning
             // in early enough to roll out on the next leg instead of overshooting.
             let motion = self.bp(row).motion.expect("air");
-            let mut reach = motion.speed / 2 + self.bp(row).radius + Fx::from_int(8);
-            if !motion.hover {
-                let units = &self.state.units;
-                let next = self
-                    .state
-                    .orders
-                    .iter(units, row)
-                    .filter(|p| p.kind == OrderKind::Patrol)
-                    .nth(1)
-                    .map(|p| self.clamp_to_map(p.pos + p.offset));
-                if let Some(next) = next {
-                    let turn_radius = units.speed[row]
-                        .mul_div(10430, (motion.turn_rate as i64 * DT as i64).max(1));
-                    reach = reach.max(crate::movement::patrol_lead(
-                        units.heading[row],
-                        goal,
-                        next,
-                        turn_radius,
-                    ));
-                }
-            }
+            let next = self
+                .state
+                .orders
+                .iter(&self.state.units, row)
+                .filter(|p| p.kind == OrderKind::Patrol)
+                .nth(1)
+                .map(|p| self.clamp_to_map(p.pos + p.offset));
+            let reach = self.air_sweep_reach(row, goal, next);
             if on_its_own && self.state.units.pos[row].distance(goal) <= reach {
                 return self.next_patrol_leg(row);
             }
