@@ -214,9 +214,23 @@ fn ground_air(xy: vec2<f32>) -> vec2<f32> {
     return (atmos.wind.zw + flow_at(xy).xy) * 0.5;
 }
 
-// Gusts: patches of stronger air rolling over the ground downwind, 0-1.
+// Which way the prevailing wind blows, a unit vector. It veers only slowly, so it
+// sets where the rocking and the waves run: the local air (`ground_air`) swings
+// round wherever a blast or an aircraft stirs it, and a phase along that swinging
+// direction, taken kilometres from the origin, jumped by whole turns a frame.
+fn wind_heading() -> vec2<f32> {
+    let w = atmos.wind.zw;
+    return select(vec2<f32>(1.0, 0.0), w / max(length(w), 1e-4), dot(w, w) > 1e-6);
+}
+
+// Gusts: patches of stronger air rolling over the ground downwind, 0-1. The
+// noise's height (b), whose broad octaves make patches tens of metres across that
+// take seconds to pass a tree: its slope (g) is mostly the finest octave, and
+// running that past at wind speed shook every tree and blade several times a second.
+// Mip 3 (texels ~4 m) drops what fine octaves the height still has; the mips
+// only start fading toward grey past it (textures.rs `flatten_noise_mips`).
 fn gust_at(xy: vec2<f32>) -> f32 {
-    let n = textureSampleLevel(noise_map, repeat_sampler, tile_uv(xy - atmos.wind.xy * 1.4, 170.0), 0.0).g;
+    let n = textureSampleLevel(noise_map, repeat_sampler, tile_uv(xy - atmos.wind.xy * 1.4, 240.0), 3.0).b;
     return smoothstep(0.3, 0.8, n);
 }
 
@@ -234,18 +248,18 @@ fn grass_wave(xy: vec2<f32>) -> vec4<f32> {
     if speed < 0.05 {
         return vec4<f32>(air, 0.0, 0.0);
     }
-    let dir = air / speed;
     let gust = gust_at(xy);
     let storm = clamp(weather_at(xy).y, 0.0, 1.0);
     let p = xy - atmos.wind.xy * 0.85;
     let strong = textureSampleLevel(noise_map, repeat_sampler, tile_uv(p, 41.0), 0.0).b;
     let k = mix(0.42, 0.28, storm);
     // Crests bow a little across the wind, so they are not ruled lines.
-    let across = dot(p, vec2<f32>(-dir.y, dir.x));
-    let band = sin(dot(p, dir) * k + strong * 5.0 + sin(across * 0.045) * 2.0) * 0.5 + 0.5;
+    let run = wind_heading();
+    let across = dot(p, vec2<f32>(-run.y, run.x));
+    let band = sin(dot(p, run) * k + strong * 5.0 + sin(across * 0.045) * 2.0) * 0.5 + 0.5;
     // A second train, turned off the wind and set wider apart: where the two
     // meet the crests break up and gather, as real ones do.
-    let turned = vec2<f32>(dir.x * 0.9 - dir.y * 0.44, dir.x * 0.44 + dir.y * 0.9);
+    let turned = vec2<f32>(run.x * 0.9 - run.y * 0.44, run.x * 0.44 + run.y * 0.9);
     let band2 = sin(dot(p, turned) * k * 0.73 + strong * 3.0 + 1.7) * 0.5 + 0.5;
     // Crests are narrow gusts running through, not half the field.
     var wave = smoothstep(0.45, 0.95, (band * 0.62 + band2 * 0.38) * (0.35 + strong * 1.05));

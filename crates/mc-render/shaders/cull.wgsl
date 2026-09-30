@@ -247,6 +247,10 @@ fn tree_blast(foot: vec3<f32>, tall: f32) -> vec3<f32> {
         lean += dir * min(force, tall * 0.35) * shape;
         stir = max(stir, min(force / tall * 4.0, 1.0) * exp(-since * 1.2));
     }
+    // A barrage's pushes add up, but a tree only bends so far: the sum eases into a
+    // limit instead of throwing the crown past the ground.
+    let most = tall * 0.4;
+    lean *= inverseSqrt(1.0 + dot(lean, lean) / (most * most));
     return vec3<f32>(lean, stir);
 }
 

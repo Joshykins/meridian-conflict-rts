@@ -2360,7 +2360,7 @@ fn tree_air(foot: vec3<f32>, tall: f32, id: u32, blast: vec3<f32>) -> vec3<f32> 
         let gust = gust_at(foot.xy);
         let storm = clamp(weather_at(foot.xy).y, 0.0, 1.0);
         let steady = min(tall * 0.011 * speed * (0.45 + 0.9 * gust + 0.5 * storm) * give, tall * 0.2);
-        let phase = time * swing - dot(foot.xy, dir) * 0.06 + seed * 0.37;
+        let phase = time * swing - dot(foot.xy, wind_heading()) * 0.06 + seed * 0.37;
         let rock = sin(phase) * (0.2 + 0.45 * gust) + sin(phase * 2.31 + seed) * 0.08;
         let side = sin(time * swing * 1.37 + seed * 1.3) * 0.12;
         lean += (dir * (steady * (1.0 + rock)) + vec2<f32>(-dir.y, dir.x) * steady * side) * still;
