@@ -160,7 +160,7 @@
     "aster_t1_bomber": (
         lore: "A light bomber that has flown every Reach campaign since Twin Shoals.",
         weapons: {
-            "Bomb Bay": "Two staggered racks releasing eight bombs across a single pass.",
+            "Bomb Bay": "A pair of heavy bombs let go together, wide enough to take a work crew in one pass.",
         },
     ),
     "aster_t1_air_scout": (

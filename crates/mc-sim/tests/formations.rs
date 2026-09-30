@@ -422,8 +422,9 @@ fn bomber_repeats_committed_passes() {
         }
     }
     assert!(crossings >= 3, "only {crossings} passes");
+    // Two passes of the Petrel's pair.
     assert!(
-        shots.len() >= 16,
+        shots.len() >= 4,
         "only {} bombs in repeated passes",
         shots.len()
     );
@@ -1033,7 +1034,8 @@ fn a_bomber_attacks_near_the_map_edge_without_getting_pinned() {
             .filter(|e| matches!(e, mc_sim::SimEvent::ShotFired { .. }))
             .count();
     }
-    assert!(bombs >= 16, "edge target received only {bombs} bombs");
+    // Two passes of the Petrel's pair.
+    assert!(bombs >= 4, "edge target received only {bombs} bombs");
 }
 
 #[test]
@@ -1074,8 +1076,9 @@ fn bomber_returns_to_last_seen_target_after_egress_into_fog() {
             .count();
     }
     assert!(hidden > 100, "fixture did not leave vision during return");
+    // Two passes of the Petrel's pair.
     assert!(
-        bombs >= 16,
+        bombs >= 4,
         "forgot target during wide return: {bombs} bombs"
     );
 }
@@ -1620,9 +1623,9 @@ fn bomber_attack_move_drops_on_each_pass_through_a_cluster() {
                 "not enough passes, fog {fog}, heading {heading}: {passes:?}"
             );
             // A launch facing away may need one pass to reach release speed
-            // and altitude. Every subsequent pass must finish a full rack.
+            // and altitude. Every subsequent pass must drop its full pair.
             assert!(
-                passes.iter().skip(1).all(|&(_, bombs)| bombs == 8),
+                passes.iter().skip(1).all(|&(_, bombs)| bombs == 2),
                 "skipped return pass, fog {fog}, heading {heading}: {passes:?}"
             );
         }

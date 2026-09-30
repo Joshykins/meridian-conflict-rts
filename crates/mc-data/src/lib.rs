@@ -1694,7 +1694,7 @@ mod tests {
             "nose guns, not a free turret"
         );
         let bomber = bp.unit(bp.id_of("aster_t1_bomber").unwrap());
-        assert_eq!(bomber.weapons[0].salvo, 8);
+        assert_eq!(bomber.weapons[0].salvo, 2);
         assert_eq!(bomber.weapons[0].salvo_batch, 2);
         assert_eq!(interceptor.weapons[0].salvo_batch, 1);
         assert_eq!(bomber.weapons[0].trajectory, Trajectory::Ballistic);

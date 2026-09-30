@@ -1431,21 +1431,19 @@ fn engineers_keep_assisting_a_shield_until_ordered_otherwise() {
 }
 
 #[test]
-fn petrel_carpets_a_salvo_of_bombs() {
+fn petrel_drops_a_heavy_pair_of_bombs() {
     let mut w = world();
     let bomber = w.blueprints.id_of("aster_t1_bomber").unwrap();
     let weapon = &w.blueprints.unit(bomber).weapons[0];
-    assert_eq!(weapon.salvo, 8);
-    assert_eq!(weapon.muzzles.len(), 8);
+    assert_eq!(weapon.salvo, 2);
+    assert_eq!(weapon.muzzles.len(), 2);
     assert_eq!(weapon.salvo_batch, 2);
-    let spacing = weapon.salvo_delay_ticks as u32;
-    assert_eq!(spacing, 1);
     let fighter = w
         .blueprints
         .unit(w.blueprints.id_of("aster_t1_interceptor").unwrap());
+    // Fighters run raids down: about 1.4x the bomber's speed (docs/BALANCE.md).
     let speed = w.blueprints.unit(bomber).motion.unwrap().speed;
-    assert!(speed < fighter.motion.unwrap().speed);
-    assert!(speed >= fighter.motion.unwrap().speed * Fx::ratio(9, 10));
+    assert!(speed * Fx::ratio(13, 10) <= fighter.motion.unwrap().speed);
 
     w.tick(&[
         spawn(&w, 0, "aster_t1_bomber", 500, 0),
@@ -1508,23 +1506,12 @@ fn petrel_carpets_a_salvo_of_bombs() {
         w.tick(&[]).unwrap();
         record(&w);
     }
-    assert!(fire_ticks.len() >= 8, "the carpet was {fire_ticks:?}");
-    let salvo = &fire_ticks[..8];
-    assert!(
-        salvo
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .all(|pair| pair[0] == pair[1]),
-        "bombs must drop in simultaneous pairs: {fire_ticks:?}"
+    assert!(fire_ticks.len() >= 2, "the drop was {fire_ticks:?}");
+    assert_eq!(
+        fire_ticks[0], fire_ticks[1],
+        "the pair must drop together: {fire_ticks:?}"
     );
-    assert!(
-        [salvo[0], salvo[2], salvo[4], salvo[6]]
-            .windows(2)
-            .all(|pair| pair[1] - pair[0] == spacing),
-        "the bay lost its paired release cadence: {fire_ticks:?}"
-    );
-    for pair in drop_positions[..8].as_chunks::<2>().0 {
+    for pair in drop_positions[..2].as_chunks::<2>().0 {
         let separation = pair[0].distance(pair[1]);
         assert!(
             separation > Fx::ratio(1, 2) && separation < Fx::from_int(3),
@@ -1678,8 +1665,9 @@ fn interceptors_dogfight_instead_of_facing_each_other() {
         flying >= 40,
         "they only flew {flying} ticks; fighters should stay in the air"
     );
+    // About three seconds of flight: they turn back into each other, not away.
     assert!(
-        farthest < Fx::from_int(280),
+        farthest < cruise * 3,
         "they flew the fight across the map ({farthest:?} from the merge)"
     );
     assert!(turned, "fighter A never banked; they flew a straight slash");

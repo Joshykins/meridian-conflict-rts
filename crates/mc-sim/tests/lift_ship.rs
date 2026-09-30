@@ -1215,8 +1215,10 @@ fn it_does_not_turn_its_hull_toward_what_it_shoots() {
     let ship_id = w.state.units.id(ship);
     assert!(run_until(&mut w, 900, |w| height(w, ship) > 500).is_some());
     let before = w.state.units.heading[ship];
-    // An aircraft off its port beam, and an attack order on it.
+    // An aircraft off its port beam that stays there (it neither dies nor flies off, so
+    // the ship never has a reason to move), and an attack order on it.
     let foe = add(&mut w, "aster_t1_interceptor", 1, 1500, 1700);
+    w.state.units.flags[foe] |= flag::PASSIVE | flag::INVULNERABLE;
     let foe_id = w.state.units.id(foe);
     w.tick(&[cmd(Command::Attack {
         units: vec![ship_id],

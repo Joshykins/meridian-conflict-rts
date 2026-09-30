@@ -1,5 +1,5 @@
-//! Probe: how fast T1 Petrels kill early targets. `cargo test -p mc-sim --test
-//! zz_petrel_probe -- --ignored --nocapture`
+//! Probe: how fast T1 Petrels kill early targets. `cargo test --profile gate -p mc-sim
+//! --test sim -- zz_petrel_probe:: --ignored --nocapture`
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;

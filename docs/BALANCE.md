@@ -12,7 +12,9 @@ Tier 1 is the anchor: its combat stats set the scale. Each tier costs about 4x t
 to reach the target; range specialists (SAM, strategic bomber) are capped at 3x.
 
 Lines: tank (Warden -> Bulwark and Skimmer -> Paladin), artillery, mobile AA,
-fighters, bombers, gunships, point defence, static AA.
+fighters, bombers, gunships, point defence, static AA. Aircraft and anti-air follow the
+rules in "Air and anti-air" below instead: they are measured by what one pass or one shot
+kills, which `sqrt(health * dps)` cannot see.
 
 Off the lines, measured the same way:
 
@@ -38,6 +40,34 @@ Off the lines, measured the same way:
   area only about one shell in ten lands on the building it was aimed at, the rest on
   what stands round it. A dome is the answer: a T2 dome (9000, 90/s) goes down in about 20 s of hits, a T3
   dome (36000, 360/s) holds one gun off for nearly 3 minutes and two for under one.
+
+## Air and anti-air
+
+Set 2026-09-30 against Forged Alliance (FAF), whose land units our T1/T2 already match
+almost exactly (a T1 tank is 56 mass / 300 health in both). Aircraft raid and live through
+a pass; anti-air punishes them over seconds, not in one shot.
+
+- **No AA shell or bullet one-shots a same-tier aircraft.** Flak keeps its wide splash
+  (it still takes a whole bunched flight), but a shell does less than a T1 aircraft's health:
+  Squall 200 a shell, Barrage 2 x 220; T1 aircraft have 160-300. A T1 AA gun takes about
+  5 s (Gnat) or 2 s (Sparrow) to down a T1 bomber (FAF: 8 s / 3 s).
+- **AA outreaches the ground guns of its tier**, so it can stand behind the line: Gnat 360 m
+  and Sparrow 480 m against a T1 tank's 300 m. T3 AA still buys reach, not efficiency.
+- **Fighters are about 1.4x faster than the bombers of their tier** and tougher than them,
+  so they catch raids (Shrike 120 against the Petrel's 84, 250 health against 250).
+  A higher-tier fighter's shot kills a lower-tier fighter in one or two hits, which is
+  where its tier gap shows.
+- **Bombers raid.** The Petrel's one pass (two 130 bombs together, 20 m blast) takes a
+  knot of engineers or light AA but leaves a T1 tank standing; mines and reactors take
+  several bombers or passes. The Eclipse is a glass hammer: 5000 a bomb (a T2 mine in one,
+  a bare commander in three), 6000 health, so two Skyguard volleys or about 9 s of one
+  Raptor bring it down.
+- **Gunships hit like the ground of their tier, not harder.** Damage per mass against the
+  same-tier tank: FAF's gunships 0.6-0.8x. The Kestrel is about 0.8x (it killed T2 tanks
+  at 3x before); the Thunderhead is 0.6x our Paladin line and stays as it is.
+
+Measure in the sim with `zz_aa_probe` (what each AA lands on each aircraft) and
+`zz_petrel_probe` (Petrel passes on engineers, reactors, mines and tanks).
 
 ## Energy per mass
 
