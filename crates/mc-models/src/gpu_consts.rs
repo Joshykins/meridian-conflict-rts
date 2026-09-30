@@ -637,6 +637,17 @@ shared! {
         pub const WIND_GAIN: f32 = 0.05;
     }
 
+    /// Lengths of the water's effect list (`renderer/water_fx.rs`, water.wgsl `SeaFxList`):
+    /// the rings, wakes and muzzle blasts that go up each frame, and the points of a wake's
+    /// path.
+    pub mod sea_fx as "SEA_FX_" {
+        pub const RIPPLES: u32 = 64;
+        /// Hull wakes and torpedo lines together: a squadron's volley is dozens of lines.
+        pub const WAKES: u32 = 64;
+        pub const BLASTS: u32 = 16;
+        pub const WAKE_POINTS: u32 = 12;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

@@ -16,8 +16,11 @@ const DT: i32 = TICKS_PER_SECOND as i32;
 /// Share of its height a hull reaches below the waterline: the keel. A dived
 /// submarine keeps this much water under it, and a torpedo strikes this deep.
 pub(crate) const KEEL: Fx = Fx::ratio(3, 5);
-/// Metres under the surface a torpedo runs at when its mark floats.
+/// Shallowest a torpedo runs at when its mark floats. Against a deeper hull it
+/// runs halfway down the hull's draught, up to `DEEPEST_RUN`, so it is seen
+/// under the water, not skimming it.
 const RUN_DEPTH: Fx = Fx::ratio(6, 5);
+const DEEPEST_RUN: Fx = Fx::from_int(6);
 /// Shallowest a torpedo may be: a metre under the surface.
 const CEILING: Fx = Fx::ONE;
 /// Angle steps a torpedo turns in a tick: 75 degrees a second.
@@ -399,7 +402,8 @@ impl World {
                         // Halfway between the keel and the top of the hull.
                         units.z[t] + self.bp(t).height * (Fx::ONE - KEEL) / 2
                     } else {
-                        water - RUN_DEPTH
+                        let draught = self.bp(t).height * KEEL / 2;
+                        water - draught.clamp(RUN_DEPTH, DEEPEST_RUN)
                     };
                     ((aim - pos.xy()).angle(), depth)
                 });

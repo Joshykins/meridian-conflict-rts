@@ -444,19 +444,19 @@ struct SeaWake {
     bound: vec4<f32>,
     // Bow, stern, then the path the stern took, newest first (a torpedo: its head,
     // then its line back to the tubes in the first 8): xy, the speed it had there, the water's age in seconds.
-    trail: array<vec4<f32>, 12>,
+    trail: array<vec4<f32>, SEA_FX_WAKE_POINTS>,
     // The path the bow took, newest first (the live bow, then where it was): xy,
     // the speed it had there, the water's age. The Kelvin arms spread from it, so a
     // turning hull leaves its wedge curving through the water behind it.
-    arms: array<vec4<f32>, 12>,
+    arms: array<vec4<f32>, SEA_FX_WAKE_POINTS>,
 }
 
 struct SeaFxList {
     // x rings, y wakes, z muzzle blasts.
     counts: vec4<u32>,
-    ripples: array<SeaRipple, 64>,
-    wakes: array<SeaWake, 48>,
-    blasts: array<SeaBlast, 16>,
+    ripples: array<SeaRipple, SEA_FX_RIPPLES>,
+    wakes: array<SeaWake, SEA_FX_WAKES>,
+    blasts: array<SeaBlast, SEA_FX_BLASTS>,
 }
 
 @group(1) @binding(0) var<storage, read> sea_fx: SeaFxList;
@@ -498,7 +498,7 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
     out.aerate = 0.0;
     out.flat = 0.0;
     out.ember = 0.0;
-    let rings = min(sea_fx.counts.x, 64u);
+    let rings = min(sea_fx.counts.x, SEA_FX_RIPPLES);
     for (var i = 0u; i < rings; i++) {
         let e = sea_fx.ripples[i];
         let t = time - e.start;
@@ -548,7 +548,7 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
     // Muzzle blasts: the sea pressed flat and dark in a fan out in front of the guns,
     // its front running out fast as a band of ruffled water with a sheet of spray
     // breaking white along it, heaviest downrange. One soft front, no wave train.
-    let blasts = min(sea_fx.counts.z, 16u);
+    let blasts = min(sea_fx.counts.z, SEA_FX_BLASTS);
     for (var i = 0u; i < blasts; i++) {
         let e = sea_fx.blasts[i];
         let t = time - e.params.y;
@@ -599,13 +599,17 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
     // from the stern as a hull gets going and is left lying when it stops.
     var churn = 0.0;
     var torpedo_air = 0.0;
-    let wakes = min(sea_fx.counts.y, 48u);
+    let wakes = min(sea_fx.counts.y, SEA_FX_WAKES);
     for (var i = 0u; i < wakes; i++) {
         // Read field by field: copying the whole record would put its path in
         // local memory, which the loop below then indexes.
         let bound = sea_fx.wakes[i].bound;
         let rel = xy - bound.xy;
-        if dot(rel, rel) > bound.z * bound.z {
+        // Lines are never thinner than a pixel and a half, so from high up they
+        // reach past the CPU's circle, which knows nothing of pixels: without this
+        // the circle's edge cut them off.
+        let reach = bound.z + pixel * 8.0;
+        if dot(rel, rel) > reach * reach {
             continue;
         }
         let shape = sea_fx.wakes[i].shape;
@@ -633,52 +637,62 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
             let sprint = look == 2u;
             let plasma = look == 1u;
             var c = sea_fx.wakes[i].trail[0];
+            // The bubbles' specks, looked up once and only near a line.
+            var specks = -1.0;
             // Metres back along the line from the head, for the gulps and the snaking.
             var run = 0.0;
-            for (var j = 0u; j < 11u; j++) {
+            for (var j = 0u; j < SEA_FX_WAKE_POINTS - 1u; j++) {
                 let a = c;
                 c = sea_fx.wakes[i].trail[j + 1u];
                 let ab = c.xy - a.xy;
                 let len = length(ab);
                 let run_a = run;
                 run += len;
-                // Padding past the end of the path.
-                if a.z <= 0.0 && c.z <= 0.0 {
+                // Padding past the end of the path, and a point laid twice: a stretch
+                // with no length has no across, and drew a disc (or, snaking, lines
+                // right across the circle round it).
+                if (a.z <= 0.0 && c.z <= 0.0) || len < 0.01 {
                     continue;
                 }
-                let raw = dot(xy - a.xy, ab) / max(len * len, 0.0001);
+                let raw = dot(xy - a.xy, ab) / (len * len);
                 let u = clamp(raw, 0.0, 1.0);
                 let rel = xy - a.xy - ab * u;
                 var d = length(rel);
                 // Across the line, signed: square to the stretch, not round its ends.
-                let across = dot(rel, vec2<f32>(-ab.y, ab.x)) / max(len, 0.001);
+                let across = dot(rel, vec2<f32>(-ab.y, ab.x)) / len;
+                let along = raw >= 0.0 && raw <= 1.0;
                 let back = run_a + u * len;
                 // (Negative while its air is still on the way up.)
                 let age = mix(a.w, c.w, u);
                 let spd = mix(a.z, c.z, u);
-                var true_w = 0.6 + max(age, 0.0) * 0.45;
+                var true_w = 0.35 + max(age, 0.0) * 0.22;
                 if sprint {
-                    // Snakes as it steers: the line weaves across its path.
-                    d = abs(across - sin(back * 0.21 + f32(i)) * 1.1);
-                    true_w = 0.3 + max(age, 0.0) * 0.3;
+                    // Snakes as it steers: the line weaves across its path. Only along
+                    // a stretch: past its ends `across` runs on for ever.
+                    if along {
+                        d = abs(across - sin(back * 0.21 + f32(i)) * 1.1);
+                    }
+                    true_w = 0.22 + max(age, 0.0) * 0.16;
                 } else if heavy {
-                    true_w = 0.9 + max(age, 0.0) * 0.5;
+                    true_w = 0.55 + max(age, 0.0) * 0.3;
                 } else if plasma {
-                    true_w = 0.45 + max(age, 0.0) * 0.3;
+                    true_w = 0.28 + max(age, 0.0) * 0.16;
                 }
                 let width = max(true_w, pixel * 1.5);
-                let band = width * select(2.6, 3.4, heavy);
+                let band = width * select(2.0, 2.6, heavy);
                 if d > band * 2.0 {
                     continue;
                 }
                 let fade = (1.0 - smoothstep(life * 0.35, life, age)) * smoothstep(-0.2, 0.4, age)
-                    * smoothstep(1.0, 6.0, spd) * sqrt(true_w / width) * strength;
-                let specks = smoothstep(0.3, 0.7, soft_noise(xy + vec2<f32>(time * 0.25, 0.0), 1.3, pixel));
+                    * smoothstep(1.0, 6.0, spd) * sqrt(true_w / width) * strength * 0.7;
+                if specks < 0.0 {
+                    specks = smoothstep(0.3, 0.7, soft_noise(xy + vec2<f32>(time * 0.25, 0.0), 1.3, pixel));
+                }
                 var seam = exp(-d * d / (width * width));
-                if heavy && raw >= 0.0 && raw <= 1.0 {
+                if heavy && along {
                     // Two screws: two seams either side of the line, merging as they
                     // spread. Only along a stretch: round its ends they drew rings.
-                    let apart = 0.9 + max(age, 0.0) * 0.25;
+                    let apart = 0.6 + max(age, 0.0) * 0.16;
                     let e = abs(across) - apart;
                     seam = max(seam * 0.55, exp(-e * e / (width * width * 0.5)));
                 }
@@ -751,7 +765,7 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
         // Metres the bow has run since it passed the stretch's newer end.
         var run = 0.0;
         var c = sea_fx.wakes[i].arms[0];
-        for (var j = 0u; j < 11u; j++) {
+        for (var j = 0u; j < SEA_FX_WAKE_POINTS - 1u; j++) {
             let a = c;
             c = sea_fx.wakes[i].arms[j + 1u];
             let ab = c.xy - a.xy;
@@ -770,7 +784,7 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
             let d2 = dot(off, off);
             let age = max(mix(a.w, c.w, u), 0.0);
             let spd = mix(a.z, c.z, u);
-            let last = j == 10u || all(sea_fx.wakes[i].arms[min(j + 2u, 11u)].xy == c.xy);
+            let last = j == SEA_FX_WAKE_POINTS - 2u || all(sea_fx.wakes[i].arms[min(j + 2u, SEA_FX_WAKE_POINTS - 1u)].xy == c.xy);
             // Metres past an end of the whole path, where the arms give out.
             var over = 0.0;
             var arms = true;
@@ -820,7 +834,7 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
         // Churned white water behind the stern, widening as it goes: point 1 of the
         // trail is the stern, then where it was.
         c = sea_fx.wakes[i].trail[1];
-        for (var j = 1u; j < 11u; j++) {
+        for (var j = 1u; j < SEA_FX_WAKE_POINTS - 1u; j++) {
             let a = c;
             c = sea_fx.wakes[i].trail[j + 1u];
             let ab = c.xy - a.xy;
@@ -880,7 +894,7 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
         // Broken up along its length: foam comes up in patches, not as a painted line.
         let patchy = 0.7 + 0.3 * soft_noise(xy + vec2<f32>(time * 0.3, 0.0), 6.0, pixel);
         out.foam = max(out.foam, churn * patchy);
-        out.aerate = max(out.aerate, torpedo_air * 0.5);
+        out.aerate = max(out.aerate, torpedo_air * 0.3);
         out.rough += churn * 0.03 + torpedo_air * 0.02;
     }
     return out;
@@ -893,7 +907,7 @@ fn sea_stir(xy: vec2<f32>, time: f32, pixel: f32) -> SeaStir {
 fn sea_flash(world: vec3<f32>, n: vec3<f32>, v: vec3<f32>, rough: f32, fresnel: f32, time: f32, pixel: f32) -> vec3<f32> {
     var light = vec3<f32>(0.0);
     let water = globals.map.z;
-    let rings = min(sea_fx.counts.x, 64u);
+    let rings = min(sea_fx.counts.x, SEA_FX_RIPPLES);
     for (var i = 0u; i < rings; i++) {
         let e = sea_fx.ripples[i];
         let flash = e.params.z;

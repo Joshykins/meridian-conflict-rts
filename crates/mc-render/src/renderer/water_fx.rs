@@ -19,6 +19,7 @@ use super::dive_fx::DivingHull;
 use super::{Renderer, PUFF_FIRE, PUFF_FIREBALL, PUFF_SMOKE, PUFF_SPARK};
 use crate::camera::Camera;
 use crate::gpu::Buffer;
+use crate::gpu_consts::sea_fx;
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec2, Vec3};
@@ -45,15 +46,16 @@ pub(super) const PUFF_BUBBLE: f32 = 26.0;
 /// White vapour off a hot hull meeting the water.
 pub(super) const PUFF_STEAM: f32 = 27.0;
 
-/// What the water shader gets at most: the rings nearest the camera, and the wakes.
-const MOST_RIPPLES: usize = 64;
-const MOST_WAKES: usize = 48;
-const MOST_BLASTS: usize = 16;
+/// What the water shader gets at most (`gpu_consts::sea_fx`): the rings, wakes and
+/// muzzle blasts on screen, the biggest there first (`keep_seen`).
+const MOST_RIPPLES: usize = sea_fx::RIPPLES as usize;
+const MOST_WAKES: usize = sea_fx::WAKES as usize;
+const MOST_BLASTS: usize = sea_fx::BLASTS as usize;
 /// Rings kept on the CPU side; the nearest `MOST_RIPPLES` go up each frame.
 const KEPT_RIPPLES: usize = 256;
 /// Points of a wake: the bow and the stern where they are now, then where the
 /// stern was, newest first.
-const WAKE_POINTS: usize = 12;
+const WAKE_POINTS: usize = sea_fx::WAKE_POINTS as usize;
 /// Seconds between the points a hull leaves behind, and how long white water lasts.
 const WAKE_STEP: f32 = 1.3;
 /// Metres a hull may run before it leaves a point sooner than `WAKE_STEP`: a fast
@@ -186,6 +188,59 @@ const TORPEDO_LINE: [f32; 5] = [10.0, 8.0, 3.5, 16.0, 11.0];
 /// The look a torpedo's `ProjectileInstance::wake` carries, as an index into `TORPEDO_LINE`.
 fn torpedo_look(p: &ProjectileInstance) -> usize {
     (p.wake.round().max(0.0) as usize).min(TORPEDO_LINE.len() - 1)
+}
+
+/// Points of a torpedo's path kept: its head goes up with them, in one wake record.
+const TORPEDO_POINTS: usize = WAKE_POINTS - 1;
+
+/// Keeps a torpedo's path within `TORPEDO_POINTS` by dropping every other point
+/// (never the first or the last) once it is full. The points kept stay where they
+/// were, so the line drawn through them does not shift from one tick to the next;
+/// picking a fresh spread of points each tick made a long or curving line jitter.
+fn thin_path(path: &mut Vec<[f32; 4]>) {
+    if path.len() <= TORPEDO_POINTS {
+        return;
+    }
+    let last = path.len() - 1;
+    let mut k = 0;
+    path.retain(|_| {
+        let keep = k % 2 == 0 || k == last;
+        k += 1;
+        keep
+    });
+}
+
+/// Cuts `list` to `most` when it is longer: first what is off screen (a circle
+/// `reach` round each on the water, outside the view's sides), then the smallest
+/// as seen from the eye. It used to keep those nearest the camera's focus, so in a
+/// big fight the rings and torpedo lines round the edge of the screen came and
+/// went as the view moved, and only those in the middle were drawn.
+fn keep_seen<T>(
+    list: &mut Vec<T>,
+    most: usize,
+    camera: &Camera,
+    water: f32,
+    reach: impl Fn(&T) -> (Vec2, f32),
+) {
+    if list.len() <= most {
+        return;
+    }
+    let planes = camera.frustum();
+    let eye = camera.eye();
+    list.retain(|e| {
+        let (at, r) = reach(e);
+        let at = at.extend(water);
+        planes[..4].iter().all(|p| p.truncate().dot(at) + p.w >= -r)
+    });
+    if list.len() <= most {
+        return;
+    }
+    let seen = |e: &T| {
+        let (at, r) = reach(e);
+        r / at.extend(water).distance(eye).max(1.0)
+    };
+    list.sort_by(|a, b| seen(b).total_cmp(&seen(a)));
+    list.truncate(most);
 }
 
 /// A torpedo in the water, and the line its air leaves on the surface.
@@ -1638,6 +1693,16 @@ impl Renderer {
         let delay = |at: Vec3| ((water - at.z).max(0.0) / (BUBBLE_RISE * 2.5)).min(1.2);
         let mut was = std::mem::take(&mut self.water_fx.torpedoes);
         let mut now = HashMap::new();
+        // Runs another torpedo carries on exactly, which no near match may take.
+        let exact: std::collections::HashSet<[u32; 3]> = projectiles
+            .iter()
+            .filter(|p| p.color & PROJECTILE_TORPEDO != 0)
+            .map(|p| {
+                let from = Vec3::from(p.prev_pos);
+                super::trail_key(Vec3::new(from.x, from.y, from.z.min(water)))
+            })
+            .filter(|k| was.contains_key(k))
+            .collect();
         for p in projectiles {
             if p.color & PROJECTILE_TORPEDO == 0 {
                 continue;
@@ -1663,8 +1728,23 @@ impl Renderer {
             let from = Vec3::new(from.x, from.y, from.z.min(water));
             let ends = ((p.color >> PROJECTILE_ENDS_SHIFT) & 0xFF) as f32 / 255.0;
             let span = if ends > 0.0 { ends } else { 1.0 };
-            let mut run = was
-                .remove(&super::trail_key(from))
+            // Its run from last tick: exactly where it ended, or failing that the
+            // nearest live one within a metre (a boat's launch ease or a lead turn can
+            // move where the sim draws it by a hair, and a missed match restarted the
+            // line, which then flickered).
+            let key = super::trail_key(from);
+            let key = if was.contains_key(&key) {
+                Some(key)
+            } else {
+                was.iter()
+                    .filter(|(k, r)| r.ended.is_none() && !exact.contains(*k))
+                    .map(|(k, r)| (*k, r.pos.distance_squared(from)))
+                    .filter(|(_, d)| *d < 1.0)
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .map(|(k, _)| k)
+            };
+            let mut run = key
+                .and_then(|k| was.remove(&k))
                 .filter(|r| r.ended.is_none())
                 .unwrap_or_else(|| Torpedo {
                     prev: from,
@@ -1688,6 +1768,7 @@ impl Renderer {
                 // Never earlier than the air behind it: the line fills in toward the head.
                 run.path
                     .push([to.x, to.y, run.speed, (time + run.delay).max(last[3])]);
+                thin_path(&mut run.path);
             }
             if ends > 0.0 {
                 run.ended = Some(time);
@@ -1704,6 +1785,7 @@ impl Renderer {
                     run.speed,
                     (time + run.delay).max(last[3]),
                 ]);
+                thin_path(&mut run.path);
                 run.ended = Some(time);
             }
             now.insert(key, run);
@@ -1719,9 +1801,9 @@ impl Renderer {
         self.water_fx.torpedoes = now;
     }
 
-    /// Once a frame: the rings and wakes nearest the camera, for the water shader.
+    /// Once a frame: the rings and wakes on screen, for the water shader.
     pub(super) fn upload_sea_fx(&mut self, time: f32, alpha: f32, camera: &Camera) {
-        let focus = camera.focus.truncate();
+        let water = self.sea_level();
         let alpha = alpha.clamp(0.0, 1.0);
         let fx = &mut self.water_fx;
         fx.ripples.retain(|r| time < r.start + r.params[1]);
@@ -1731,14 +1813,14 @@ impl Renderer {
             .filter(|r| r.start <= time + 1.5)
             .copied()
             .collect();
-        if ripples.len() > MOST_RIPPLES {
-            ripples.sort_by(|a, b| {
-                let da = Vec2::new(a.pos[0], a.pos[1]).distance_squared(focus);
-                let db = Vec2::new(b.pos[0], b.pos[1]).distance_squared(focus);
-                da.total_cmp(&db)
-            });
-            ripples.truncate(MOST_RIPPLES);
-        }
+        // A ring's flash lights the water well past its ring.
+        keep_seen(&mut ripples, MOST_RIPPLES, camera, water, |r| {
+            let flash = r.params[2].abs();
+            (
+                Vec2::new(r.pos[0], r.pos[1]),
+                r.params[0] * (1.0 + flash * 0.3) + 4.0,
+            )
+        });
         let mut wakes: Vec<GpuWake> = Vec::new();
         for hull in fx.hulls.values() {
             let pos = hull.prev.lerp(hull.pos, alpha);
@@ -1813,23 +1895,14 @@ impl Renderer {
             };
             let dir = (run.pos - run.prev).truncate().normalize_or_zero();
             // Newest first: where it is now, its air not up yet, then its path back
-            // toward the tubes, thinned to fit and always keeping the oldest point.
+            // toward the tubes (`thin_path` keeps it short enough to fit).
             let mut trail = [[0.0f32; 4]; WAKE_POINTS];
             let mut n = 0;
             if live {
                 trail[0] = [head.x, head.y, run.speed, -run.delay];
                 n = 1;
             }
-            let room = WAKE_POINTS - n;
-            let len = run.path.len();
-            let take = len.min(room);
-            for k in 0..take {
-                let i = if len <= room {
-                    len - 1 - k
-                } else {
-                    (len - 1) - (k * (len - 1) + (room - 1) / 2) / (room - 1)
-                };
-                let p = run.path[i];
+            for p in run.path.iter().rev().take(WAKE_POINTS - n) {
                 trail[n] = [p[0], p[1], p[2], time - p[3]];
                 n += 1;
             }
@@ -1840,29 +1913,33 @@ impl Renderer {
                 trail[i] = trail[n - 1];
                 trail[i][2] = 0.0;
             }
-            // Round every point, as wide as its line has spread by now.
+            // Round the box of its points, as wide as its line has spread by now
+            // (mirrors the widest band `sea_stir` draws: a heavy line at the end of
+            // its life). Centred on the box, not the head: a circle round the head
+            // took in twice the line's length of sea, and every pixel in it walked
+            // the whole line.
             let line = TORPEDO_LINE[run.look];
-            let spread = (1.2 + line * 0.45) * 3.0;
-            let mut radius = spread;
-            for p in &trail[..n] {
-                radius = radius.max(Vec2::new(p[0], p[1]).distance(head.truncate()) + spread);
-            }
+            let spread = (0.55 + line * 0.3) * 2.6 * 2.0;
+            let (lo, hi) = trail[..n].iter().fold(
+                (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)),
+                |(lo, hi), p| {
+                    let p = Vec2::new(p[0], p[1]);
+                    (lo.min(p), hi.max(p))
+                },
+            );
+            let centre = (lo + hi) * 0.5;
+            let radius = (hi - lo).length() * 0.5 + spread;
             wakes.push(GpuWake {
                 at: [head.x, head.y, dir.x, dir.y],
                 shape: [run.speed, line, 0.3, 2.0 + run.look as f32],
-                bound: [head.x, head.y, radius, 1.0],
+                bound: [centre.x, centre.y, radius, 1.0],
                 trail,
                 arms: [[0.0; 4]; WAKE_POINTS],
             });
         }
-        if wakes.len() > MOST_WAKES {
-            wakes.sort_by(|a, b| {
-                let da = Vec2::new(a.at[0], a.at[1]).distance(focus) - a.bound[2];
-                let db = Vec2::new(b.at[0], b.at[1]).distance(focus) - b.bound[2];
-                da.total_cmp(&db)
-            });
-            wakes.truncate(MOST_WAKES);
-        }
+        keep_seen(&mut wakes, MOST_WAKES, camera, water, |w| {
+            (Vec2::new(w.bound[0], w.bound[1]), w.bound[2])
+        });
         fx.blasts
             .retain(|b| time < b.gpu.params[1] + b.gpu.params[2]);
         let mut blasts: Vec<GpuBlast> = fx
@@ -1871,14 +1948,9 @@ impl Renderer {
             .map(|b| b.gpu)
             .filter(|b| b.params[1] <= time + 1.5)
             .collect();
-        if blasts.len() > MOST_BLASTS {
-            blasts.sort_by(|a, b| {
-                let da = Vec2::new(a.at[0], a.at[1]).distance_squared(focus);
-                let db = Vec2::new(b.at[0], b.at[1]).distance_squared(focus);
-                da.total_cmp(&db)
-            });
-            blasts.truncate(MOST_BLASTS);
-        }
+        keep_seen(&mut blasts, MOST_BLASTS, camera, water, |b| {
+            (Vec2::new(b.at[0], b.at[1]), b.params[0])
+        });
         let counts = [
             ripples.len() as u32,
             wakes.len() as u32,
