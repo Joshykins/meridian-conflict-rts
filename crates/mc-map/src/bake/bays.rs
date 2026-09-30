@@ -3,21 +3,28 @@
 //!
 //! [`Layout::TwinBays`], 16 km. One bay fills the north-west, its twin the
 //! south-east; the land runs corner to corner between them and pinches to a
-//! low, open bridge at the middle. Each side's four bases: one on its beach of the nearer bay,
-//! one at the front where the land bridge starts, one on the shore of the
-//! farther bay and one back in the corner under the mountains. Every bay is
-//! shared, so each is a sea war of its own; a rocky island stands off the
-//! edge in each.
+//! low, open bridge at the middle. Each side's four bases: one above the
+//! islet cove on the nearer bay, one at the front on the open plain where the
+//! land bridge starts, one on the shore of the farther bay and one in a high
+//! valley in the corner mountains. Every bay is shared, so each is a sea war
+//! of its own; a hill island stands off the edge in each.
+//!
+//! What makes the original play the way it does, and is kept here: a
+//! mountain massif on the cove base's seaward flank that ships cannot shoot
+//! through; a cove fenced by rock islets and a wall ridge; a sealed cove at
+//! the map edge where a navy can be built out of reach of the bay; a shallow
+//! lake with an island in the back country; the corner base's valley
+//! between two ranges; low bluffs along the far bay's shore; and an open
+//! plain from the bridge to the far-shore base.
 //!
 //! Fairness: the map is the same under a half turn about its centre. The
-//! designed pieces (the bay's coast, rises, rocks, ponds, ore) are listed
-//! once, for the south-west side, and evaluated at the point and at the point
-//! turned about the centre. Noise is blended between the two across a band
-//! on the north-west to south-east diagonal, so it is exact under the turn
-//! and has no crease.
+//! designed pieces are listed once, for the south-west side, and evaluated at
+//! the point and at the point turned about the centre. Noise is blended
+//! between the two across a band on the north-west to south-east diagonal,
+//! so it is exact under the turn and has no crease.
 //!
-//! Coordinates are pixels of the 288 px reference drawing, y down (north up):
-//! world `(x, y)` is `(px / 288 * size, (1 - py / 288) * size)`.
+//! Coordinates are pixels of a 1024 px reference drawing, y down (north up):
+//! world `(x, y)` is `(px / 1024 * size, (1 - py / 1024) * size)`.
 
 use super::{OreField, Pad, Terrain};
 use crate::noise::smoothstep;
@@ -25,102 +32,298 @@ use crate::BUILD_CELL_M;
 use std::f64::consts::PI;
 
 /// Edge of the reference drawing, in its pixels.
-const REF: f64 = 288.0;
+const REF: f64 = 1024.0;
 
-/// The north-west bay's coast, land on the right going round: from beyond
-/// the north edge, down the east shore, along the south shore and out
-/// beyond the west edge, closed round the corner off the map.
+/// The north-west bay's coast: from beyond the north edge, down the east
+/// shore to the land bridge, west along the south shore (round the islet
+/// cove) and out beyond the west edge, closed round the corner off the map.
 const BAY: &[(f64, f64)] = &[
     (-40.0, -40.0),
-    (140.0, -40.0),
-    (144.0, 0.0),
-    (150.0, 16.0),
-    (164.0, 30.0),
-    (177.0, 42.0),
-    (179.0, 60.0),
-    (173.0, 76.0),
-    (168.0, 95.0),
-    (163.0, 113.0),
-    (152.0, 125.0),
-    (137.0, 135.0),
-    (119.0, 145.0),
-    (101.0, 150.0),
-    (89.0, 159.0),
-    (80.0, 171.0),
-    (70.0, 180.0),
-    (60.0, 179.0),
-    (57.0, 167.0),
-    (49.0, 153.0),
-    (38.0, 146.0),
-    (22.0, 141.0),
-    (8.0, 139.0),
-    (0.0, 138.0),
-    (-40.0, 136.0),
+    (528.0, -40.0),
+    (523.0, 38.0),
+    (513.0, 61.0),
+    (520.0, 93.0),
+    (526.0, 105.0),
+    (541.0, 111.0),
+    (562.0, 132.0),
+    (619.0, 153.0),
+    (630.0, 222.0),
+    (640.0, 242.0),
+    (638.0, 273.0),
+    (621.0, 289.0),
+    (594.0, 347.0),
+    (593.0, 399.0),
+    (587.0, 414.0),
+    (540.0, 446.0),
+    (508.0, 488.0),
+    (481.0, 500.0),
+    (450.0, 528.0),
+    (377.0, 517.0),
+    (344.0, 548.0),
+    (331.0, 607.0),
+    (326.0, 617.0),
+    (312.0, 623.0),
+    (305.0, 640.0),
+    (241.0, 654.0),
+    (206.0, 633.0),
+    (200.0, 612.0),
+    (207.0, 574.0),
+    (201.0, 543.0),
+    (164.0, 508.0),
+    (121.0, 484.0),
+    (74.0, 491.0),
+    (54.0, 478.0),
+    (33.0, 482.0),
+    (3.0, 474.0),
+    (-40.0, 474.0),
 ];
 
-/// Starts, south-west side: the near bay's beach, the front, the far bay's
-/// shore, the corner. Each is followed on the map by its turned twin.
-const STARTS: &[(f64, f64)] = &[(45.0, 173.0), (100.0, 188.0), (96.0, 241.0), (27.0, 255.0)];
-
-/// Islands: centre, radius (px).
-const ISLANDS: &[(f64, f64, f64)] = &[(6.0, 79.0, 17.0)];
-
-type Rock = ((f64, f64), (f64, f64), f64, f64);
-/// Rock: capsules from `a` to `b`, half width (px), height (m). Nothing
-/// climbs them; they wall the coast and the corners.
-const ROCKS: &[Rock] = &[
-    // The cliffs along the near bay's south shore, west of the beach base.
-    ((6.0, 142.0), (40.0, 149.0), 4.5, 70.0),
-    // The mountains in the corner behind the corner base.
-    ((-6.0, 222.0), (6.0, 292.0), 11.0, 210.0),
-    ((6.0, 294.0), (52.0, 294.0), 9.0, 170.0),
-    // The island's crags, along its seaward side.
-    ((0.0, 66.0), (2.0, 92.0), 7.0, 60.0),
+/// The sealed cove in the west edge: deep enough for ships, joined to
+/// neither bay, so a navy built there is out of the bay's reach.
+const INLET: &[(f64, f64)] = &[
+    (-40.0, 570.0),
+    (3.0, 570.0),
+    (46.0, 583.0),
+    (53.0, 590.0),
+    (60.0, 610.0),
+    (52.0, 625.0),
+    (32.0, 645.0),
+    (-40.0, 646.0),
 ];
 
-type Stream = (&'static [(f64, f64)], f64, f64);
-/// Streams, source to mouth (px), the valley floor's half width (px) and
-/// the bed's height at the mouth (below zero: an estuary).
+/// The hill island off the west edge, in the bay.
+const ISLAND: &[(f64, f64)] = &[
+    (-40.0, 233.0),
+    (35.0, 233.0),
+    (50.0, 239.0),
+    (62.0, 260.0),
+    (64.0, 289.0),
+    (69.0, 302.0),
+    (61.0, 329.0),
+    (23.0, 348.0),
+    (-40.0, 349.0),
+];
+
+/// The back-country lake, shallower than a ship draws.
+const LAKE: &[(f64, f64)] = &[
+    (122.0, 687.0),
+    (120.0, 695.0),
+    (122.0, 703.0),
+    (112.0, 705.0),
+    (110.0, 716.0),
+    (118.0, 734.0),
+    (136.0, 739.0),
+    (129.0, 755.0),
+    (150.0, 772.0),
+    (155.0, 773.0),
+    (162.0, 769.0),
+    (168.0, 753.0),
+    (196.0, 747.0),
+    (204.0, 730.0),
+    (192.0, 717.0),
+    (159.0, 720.0),
+    (134.0, 700.0),
+];
+
+/// The lake's island: centre, radius (px).
+const LAKE_ISLE: (f64, f64, f64) = (137.0, 725.0, 7.0);
+
+/// Rock islets fencing the cove below the cove base: centre, radius (px),
+/// height (m). They stand close enough to the shore to screen ships moored
+/// behind them.
+const ISLETS: &[(f64, f64, f64, f64)] = &[
+    (215.0, 610.0, 4.5, 30.0),
+    (216.0, 625.0, 4.0, 24.0),
+    (226.0, 623.0, 2.5, 16.0),
+    (246.0, 640.0, 3.5, 22.0),
+    (232.0, 634.0, 2.0, 12.0),
+    (214.0, 638.0, 2.0, 14.0),
+];
+
+/// Starts, south-west side: the cove base, the front, the far bay's shore,
+/// the corner valley. Each is followed on the map by its turned twin.
+const STARTS: &[(f64, f64)] = &[
+    (172.0, 600.0),
+    (357.0, 673.0),
+    (365.0, 862.0),
+    (99.0, 912.0),
+];
+
+/// Broad rises the land stands on: centre, radius (px), height (m).
+const UPLANDS: &[(f64, f64, f64, f64)] = &[
+    // The corner base's highland.
+    (55.0, 950.0, 175.0, 42.0),
+    // The cove base's shelf under the massif.
+    (125.0, 595.0, 75.0, 12.0),
+    // The neck of land between the bay and the sealed cove.
+    (20.0, 525.0, 60.0, 16.0),
+    // The headland on the far bay.
+    (470.0, 955.0, 55.0, 12.0),
+];
+
+struct Ridge {
+    /// Crest line, px.
+    line: &'static [(f64, f64)],
+    /// Half width of the crest's foot, px.
+    half: f64,
+    /// Height of the crest above the land round it, m.
+    tall: f64,
+    /// 0 for a smooth grassy ridge, 1 for a broken range of bare rock.
+    crag: f64,
+}
+
+/// Ranges and ridges. The massif and the bluffs stand between the bays and
+/// the bases: shells from the water hit rock, not the base.
+const RIDGES: &[Ridge] = &[
+    // The massif on the cove base's seaward flank, between the bay and the base.
+    Ridge {
+        line: &[
+            (38.0, 496.0),
+            (62.0, 506.0),
+            (80.0, 520.0),
+            (96.0, 542.0),
+            (112.0, 558.0),
+        ],
+        half: 34.0,
+        tall: 260.0,
+        crag: 1.0,
+    },
+    // Its spur west to the edge, over the neck.
+    Ridge {
+        line: &[(-20.0, 520.0), (38.0, 496.0)],
+        half: 15.0,
+        tall: 70.0,
+        crag: 0.7,
+    },
+    // The wall along the cove's south shore, between the cove and the plain.
+    Ridge {
+        line: &[
+            (212.0, 657.0),
+            (250.0, 666.0),
+            (290.0, 661.0),
+            (318.0, 646.0),
+        ],
+        half: 10.0,
+        tall: 60.0,
+        crag: 0.5,
+    },
+    // Bluffs along the far bay's shore, in front of the front base.
+    Ridge {
+        line: &[
+            (452.0, 585.0),
+            (425.0, 640.0),
+            (403.0, 705.0),
+            (386.0, 760.0),
+            (383.0, 800.0),
+        ],
+        half: 11.0,
+        tall: 45.0,
+        crag: 0.3,
+    },
+    // The range along the west edge, behind the corner base.
+    Ridge {
+        line: &[
+            (-10.0, 780.0),
+            (5.0, 850.0),
+            (12.0, 930.0),
+            (30.0, 1000.0),
+            (45.0, 1060.0),
+        ],
+        half: 40.0,
+        tall: 240.0,
+        crag: 1.0,
+    },
+    // The ridge on the corner base's east side, walling its valley off the plain.
+    Ridge {
+        line: &[
+            (118.0, 815.0),
+            (140.0, 855.0),
+            (162.0, 895.0),
+            (185.0, 935.0),
+            (205.0, 965.0),
+        ],
+        half: 14.0,
+        tall: 110.0,
+        crag: 0.8,
+    },
+    // Along the south edge.
+    Ridge {
+        line: &[
+            (190.0, 1040.0),
+            (240.0, 1000.0),
+            (310.0, 992.0),
+            (380.0, 1005.0),
+            (430.0, 1040.0),
+        ],
+        half: 22.0,
+        tall: 90.0,
+        crag: 0.6,
+    },
+    // The low hills north-west of the far-shore base.
+    Ridge {
+        line: &[(232.0, 905.0), (270.0, 885.0), (318.0, 855.0)],
+        half: 9.0,
+        tall: 35.0,
+        crag: 0.4,
+    },
+    // The headland's bluff over the far bay.
+    Ridge {
+        line: &[(430.0, 915.0), (470.0, 935.0), (500.0, 975.0)],
+        half: 12.0,
+        tall: 40.0,
+        crag: 0.3,
+    },
+    // Rock knobs out on the plain.
+    Ridge {
+        line: &[(229.0, 733.0), (236.0, 737.0)],
+        half: 5.0,
+        tall: 16.0,
+        crag: 1.0,
+    },
+    Ridge {
+        line: &[(306.0, 760.0), (314.0, 763.0)],
+        half: 5.0,
+        tall: 14.0,
+        crag: 1.0,
+    },
+    Ridge {
+        line: &[(348.0, 781.0), (355.0, 783.0)],
+        half: 4.5,
+        tall: 12.0,
+        crag: 1.0,
+    },
+];
+
+/// The open plain from the land bridge to the far-shore base: its spine
+/// (px) and half width (px). The rolling hills die away on it.
+const PLAIN: (&[(f64, f64)], f64) = (
+    &[
+        (560.0, 470.0),
+        (470.0, 560.0),
+        (300.0, 720.0),
+        (300.0, 830.0),
+    ],
+    90.0,
+);
+
+/// Streams, source to mouth (px), the valley floor's half width (px) and the
+/// bed's height at the source and at the mouth (below zero: an estuary).
+type Stream = (&'static [(f64, f64)], f64, f64, f64);
 const STREAMS: &[Stream] = &[
-    // From the ponds down to the beach base's bay.
+    // The lake's outlet, down the vale to the sealed cove.
     (
         &[
-            (36.0, 196.0),
-            (46.0, 191.0),
-            (57.0, 186.0),
-            (66.0, 181.0),
-            (72.0, 177.0),
+            (114.0, 700.0),
+            (101.0, 694.0),
+            (93.0, 675.0),
+            (79.0, 664.0),
+            (73.0, 644.0),
+            (60.0, 631.0),
+            (50.0, 615.0),
         ],
-        1.2,
+        4.5,
+        1.0,
         -3.0,
-    ),
-    // From the ponds across the back country to the far bay.
-    (
-        &[
-            (48.0, 213.0),
-            (60.0, 222.0),
-            (76.0, 226.0),
-            (92.0, 223.0),
-            (106.0, 218.0),
-            (121.0, 212.0),
-        ],
-        1.4,
-        -3.0,
-    ),
-    // Off the corner uplands, round the corner base to the south coast.
-    (
-        &[
-            (8.0, 226.0),
-            (20.0, 236.0),
-            (46.0, 238.0),
-            (52.0, 256.0),
-            (66.0, 266.0),
-            (90.0, 265.0),
-            (108.0, 276.0),
-            (126.0, 286.0),
-        ],
-        1.1,
-        2.0,
     ),
 ];
 
@@ -130,7 +333,7 @@ fn stream_courses() -> &'static [Vec<(f64, f64)>] {
     COURSES.get_or_init(|| {
         STREAMS
             .iter()
-            .map(|&(line, _, _)| {
+            .map(|&(line, ..)| {
                 let at = |i: isize| line[i.clamp(0, line.len() as isize - 1) as usize];
                 let mut out = Vec::new();
                 for i in 0..line.len() as isize - 1 {
@@ -153,29 +356,36 @@ fn stream_courses() -> &'static [Vec<(f64, f64)>] {
     })
 }
 
-/// Ponds: centre, radius (px).
-const PONDS: &[(f64, f64, f64)] = &[(37.0, 201.0, 7.0), (45.0, 212.0, 4.5), (30.0, 213.0, 3.5)];
-
 /// Ore away from the bases: centre (px), radius (m).
 const ORE: &[(f64, f64, f64)] = &[
-    // On the bridge, either side of the middle.
-    (138.0, 151.0, 90.0),
+    // On the bridge.
+    (495.0, 535.0, 80.0),
     // Forward of the front base, toward the bridge.
-    (116.0, 168.0, 80.0),
-    // Between the bases.
-    (70.0, 213.0, 75.0),
-    (60.0, 248.0, 70.0),
-    // The west beach and the south coast.
-    (14.0, 186.0, 70.0),
-    (126.0, 268.0, 75.0),
-    (78.0, 276.0, 65.0),
+    (378.0, 565.0, 75.0),
+    // Round the cove base: under the massif, toward the lake, on the bay shore.
+    (72.0, 592.0, 70.0),
+    (138.0, 655.0, 70.0),
+    (178.0, 532.0, 65.0),
+    // The lake's west shore.
+    (92.0, 742.0, 65.0),
+    // The corner valley's mouth, and out past its ridge.
+    (82.0, 834.0, 70.0),
+    (150.0, 962.0, 65.0),
+    // Out on the plain.
+    (200.0, 796.0, 75.0),
+    (336.0, 798.0, 75.0),
+    // Among the hills, and on the south edge.
+    (232.0, 872.0, 70.0),
+    (300.0, 962.0, 70.0),
+    // The headland.
+    (472.0, 992.0, 70.0),
     // On the island.
-    (9.0, 79.0, 85.0),
+    (38.0, 300.0, 85.0),
 ];
 
 /// How far the coast is pushed out to sea (metres; negative pulls it in):
-/// headlands and bays on the scale of kilometres, coves on hundreds of
-/// metres. Calmer round the bases, so the sea keeps off their pads.
+/// small headlands and bights on a coast that already has its shape. Calmer
+/// round the bases, so the sea keeps off their pads.
 fn wobble_of(t: &Terrain, x: f64, y: f64) -> f64 {
     let near = t.both(x, y, |p| {
         STARTS
@@ -183,10 +393,10 @@ fn wobble_of(t: &Terrain, x: f64, y: f64) -> f64 {
             .map(|&(sx, sy)| -((p.0 - sx).powi(2) + (p.1 - sy).powi(2)).sqrt())
             .fold(f64::MIN, f64::max)
     });
-    let calm = 0.3 + 0.7 * smoothstep(t.bm(12.0), t.bm(22.0), -near);
+    let calm = 0.3 + 0.7 * smoothstep(t.bm(43.0), t.bm(78.0), -near);
     calm * t.even(x, y, |x, y| {
-        t.coast.fbm(x / 2_400.0, y / 2_400.0, 4, 0.55) * 2_800.0
-            + t.coast_warp.fbm(x / 650.0, y / 650.0, 3, 0.5) * 900.0
+        t.coast.fbm(x / 1_400.0, y / 1_400.0, 4, 0.55) * 900.0
+            + t.coast_warp.fbm(x / 450.0, y / 450.0, 3, 0.5) * 500.0
     })
 }
 
@@ -201,6 +411,31 @@ pub(super) fn segment(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> (f64, f64)
     let t = (((p.0 - a.0) * ux + (p.1 - a.1) * uy) / (ux * ux + uy * uy)).clamp(0.0, 1.0);
     let (dx, dy) = (p.0 - a.0 - t * ux, p.1 - a.1 - t * uy);
     ((dx * dx + dy * dy).sqrt(), t)
+}
+
+/// Distance from `p` to a polyline.
+fn polyline(p: (f64, f64), line: &[(f64, f64)]) -> f64 {
+    polyline_at(p, line).0
+}
+
+/// Distance from `p` to a polyline, and how far along it the nearest point
+/// lies (0 at the first point, 1 at the last).
+fn polyline_at(p: (f64, f64), line: &[(f64, f64)]) -> (f64, f64) {
+    let (mut best, mut at, mut run) = (f64::INFINITY, 0.0, 0.0);
+    for w in line.windows(2) {
+        let len = dist(w[1], w[0]);
+        let (d, t) = segment(p, w[0], w[1]);
+        if d < best {
+            (best, at) = (d, run + t * len);
+        }
+        run += len;
+    }
+    (best, at / run)
+}
+
+/// Distance from `p` to a point.
+fn dist(p: (f64, f64), (cx, cy): (f64, f64)) -> f64 {
+    ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt()
 }
 
 /// How far `p` is inside the closed polygon (negative outside).
@@ -269,24 +504,28 @@ impl Terrain {
     /// Metres in from the shore (negative out to sea).
     fn bays_land(&self, x: f64, y: f64) -> f64 {
         let wobble = wobble_of(self, x, y);
-        // Out of both bays (each seen from the point and from its twin).
-        let bay = -self.both(x, y, |p| inside(p, BAY));
-        let island = self.both(x, y, |p| {
-            ISLANDS
+        // Out of both bays and both sealed coves (each seen from the point
+        // and from its twin).
+        let sea = -self.both(x, y, |p| inside(p, BAY).max(inside(p, INLET)));
+        let island = self.both(x, y, |p| inside(p, ISLAND));
+        // The cove keeps its outline round the islets (the stacks rise from
+        // the sea floor in `bays_shape`).
+        let islets = self.both(x, y, |p| {
+            ISLETS
                 .iter()
-                .map(|&(ix, iy, r)| r - ((p.0 - ix).powi(2) + (p.1 - iy).powi(2)).sqrt())
+                .map(|&(ix, iy, r, _)| r - dist(p, (ix, iy)))
                 .fold(f64::MIN, f64::max)
         });
-        self.bm(bay.max(island)) + wobble
+        let calm = smoothstep(-40.0, -15.0, -islets.abs());
+        self.bm(sea.max(island)) + wobble * (1.0 - calm)
     }
 
     /// 1 in open country, falling to 0 round the bases and the ore: the
-    /// rough shaping (terrace cliffs, crags, erosion) keeps off what must be
-    /// built on.
+    /// rough shaping (crags, erosion) keeps off what must be built on.
     fn bays_keep(&self, x: f64, y: f64) -> f64 {
         let near = |p: (f64, f64), list: &mut dyn Iterator<Item = (f64, f64, f64)>| {
             list.map(|(cx, cy, reach)| {
-                let d = self.bm(((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt());
+                let d = self.bm(dist(p, (cx, cy)));
                 smoothstep(reach, reach + 300.0, d)
             })
             .fold(1.0, f64::min)
@@ -307,24 +546,30 @@ impl Terrain {
         let n = |f: &dyn Fn(f64, f64) -> f64| self.even(x, y, f);
 
         // -- the land, as if there were no sea --
-        // Uplands toward the back country, lowland along the bridge and the shores.
-        let inland = smoothstep(150.0, 3_200.0, s);
-        let upland = smoothstep(
-            -0.25,
-            0.3,
-            n(&|x, y| self.mtn_mask.fbm(x / 4_200.0, y / 4_200.0, 3, 0.5)),
-        );
-        let rise = inland * (14.0 + 80.0 * upland);
-        let mut land = 13.0 + rise;
-        // Rolling ground, low hill ranges, and outcrops of bare rock.
-        // The bridge stays low and open: the hills die away toward the middle.
-        let from_middle =
-            ((x - self.size_x / 2.0).powi(2) + (y - self.size_y / 2.0).powi(2)).sqrt();
-        let open = smoothstep(2_200.0, 4_800.0, from_middle);
+        // Lowland along the shores and the bridge, rising a little inland,
+        // and the designed rises, their outlines frayed.
+        let inland = smoothstep(150.0, 3_000.0, s);
+        let mut land = 13.0 + 10.0 * inland;
+        let fray = n(&|x, y| self.mtn_mask.fbm(x / 1_600.0, y / 1_600.0, 3, 0.5)) * 1_200.0;
+        land += self.both(x, y, |p| {
+            UPLANDS
+                .iter()
+                .map(|&(cx, cy, r, tall)| {
+                    let r = self.bm(r);
+                    tall * smoothstep(r + 400.0, 0.3 * r, self.bm(dist(p, (cx, cy))) + fray)
+                })
+                .fold(0.0, f64::max)
+        });
+        // The plain from the bridge to the far-shore base stays open.
+        let plain = self.both(x, y, |p| {
+            smoothstep(PLAIN.1 + 40.0, PLAIN.1 - 20.0, polyline(p, PLAIN.0))
+        });
+        let open = 1.0 - 0.8 * plain;
+        // Rolling ground, low hill ranges.
         let roll = n(&|x, y| self.tilt.fbm(x / 1_500.0, y / 1_500.0, 3, 0.5));
         land += 9.0 * roll * (0.4 + 0.6 * inland);
         // Hills: warped noise, its highs rounded into domes and spurs (a
-        // ridged field's highs would be thin worms). Knolls: small round rises.
+        // ridged field's highs would be thin worms).
         let hills = n(&|x, y| {
             let (wx, wy) = (
                 self.warp_x.get(x / 2_400.0, y / 2_400.0) * 900.0,
@@ -333,7 +578,7 @@ impl Terrain {
             self.mtn.fbm((x + wx) / 1_900.0, (y + wy) / 1_900.0, 4, 0.5)
         });
         land += open
-            * 75.0
+            * 40.0
             * smoothstep(-0.05, 0.45, hills).powf(1.4)
             * (0.25 + 0.75 * inland)
             * smoothstep(80.0, 600.0, s)
@@ -341,12 +586,12 @@ impl Terrain {
         // Smaller hills and hollows everywhere, which is what the eye reads at play zoom.
         let lumps = n(&|x, y| self.mtn_height.fbm(x / 650.0, y / 650.0, 3, 0.5));
         land += (0.35 + 0.65 * open)
-            * 70.0
+            * 55.0
             * (lumps + 0.05)
             * smoothstep(100.0, 700.0, s)
             * (0.5 + 0.5 * keep)
             * (0.45 + 0.55 * inland);
-        // Hollows bottom out as dry meadow: only the designed ponds hold water.
+        // Hollows bottom out as dry meadow: only the designed lake holds water.
         land = if land < 8.0 {
             4.0 + 4.0 * smoothstep(-6.0, 8.0, land)
         } else {
@@ -366,7 +611,7 @@ impl Terrain {
         let bases = self.both(x, y, |p| {
             STARTS
                 .iter()
-                .map(|&(sx, sy)| -self.bm(((p.0 - sx).powi(2) + (p.1 - sy).powi(2)).sqrt()))
+                .map(|&(sx, sy)| -self.bm(dist(p, (sx, sy))))
                 .fold(f64::MIN, f64::max)
         });
         let cliffy = smoothstep(
@@ -381,81 +626,80 @@ impl Terrain {
         sea += 5.0
             * n(&|x, y| self.lake.fbm(x / 700.0, y / 700.0, 3, 0.5))
             * smoothstep(-60.0, -500.0, s);
+        // The sealed coves are narrow: they fall away faster, so ships fit.
+        let cove = self.both(x, y, |p| inside(p, INLET));
+        sea = sea.min(-18.0 * smoothstep(0.0, 14.0, cove));
         let w = smoothstep(-25.0, run, s);
         let mut h = sea.min(0.2) * (1.0 - w) + land * w;
         // Sea stacks off the cliffs.
         let stack = n(&|x, y| self.crag.get(x / 170.0 - 7.0, y / 170.0 + 3.0));
         let band = smoothstep(-520.0, -260.0, s) * (1.0 - smoothstep(-90.0, -30.0, s));
-        h = h.max(-8.0 + 40.0 * smoothstep(0.42, 0.62, stack) * band * cliffy);
+        h = h.max(-8.0 + 40.0 * smoothstep(0.5, 0.66, stack) * band * cliffy);
 
         // -- designed pieces --
         let crag = n(&|x, y| self.crag.ridged(x / 700.0, y / 700.0, 4, 0.5));
-        // Rock: the coast cliffs, the corner mountains, the island's crags.
-        // Their outline frays in buttresses and gullies.
+        // Peaks and saddles along each crest.
+        let peaks = n(&|x, y| self.ridge.fbm(x / 1_100.0 + 17.0, y / 1_100.0, 3, 0.5));
+        // Ranges and ridges; their outline frays in buttresses and gullies,
+        // the more the rockier.
         let ragged = n(&|x, y| self.mtn_gap.fbm(x / 700.0, y / 700.0, 4, 0.55)) * 380.0;
-        let rock = self.both(x, y, |p| {
-            ROCKS
+        h += self.both(x, y, |p| {
+            RIDGES
                 .iter()
-                .map(|&(a, b, half, tall)| {
-                    let d = self.bm(segment(p, a, b).0) + ragged;
-                    let half = self.bm(half);
-                    tall * smoothstep(half + 120.0, 0.2 * half, d).powf(0.8)
+                .map(|r| {
+                    let (d, along) = polyline_at(p, r.line);
+                    let d = self.bm(d) + ragged * (0.4 + 0.6 * r.crag);
+                    let half = self.bm(r.half);
+                    // Highest mid-crest, lower toward the ends.
+                    let crest = 0.45 + 0.55 * (PI * along).sin();
+                    let tall =
+                        r.tall * crest * (1.0 + 1.6 * peaks) * (1.0 + 0.8 * r.crag * (crag - 0.4));
+                    tall.max(0.0) * smoothstep(half + 200.0, -0.4 * half, d).powf(1.3)
                 })
                 .fold(0.0, f64::max)
         });
-        h += rock * (0.7 + 0.8 * (crag - 0.4));
+        // The cove's rock islets.
+        h = h.max(self.both(x, y, |p| {
+            ISLETS
+                .iter()
+                .map(|&(ix, iy, r, tall)| {
+                    // Sheer sides, a broken crown.
+                    let d = self.bm(dist(p, (ix, iy))) + 40.0 * (rough - 0.5);
+                    let rise = smoothstep(self.bm(r) + 12.0, 0.55 * self.bm(r), d).powf(0.5);
+                    -20.0 + (tall + 20.0) * (1.0 + 0.6 * (crag - 0.4)) * rise
+                })
+                .fold(-DEEP, f64::max)
+        }));
 
         // Streams: each cuts its valley down to a bed that falls to the sea,
         // sides no steeper than a unit can climb.
         let meander = 150.0 * n(&|x, y| self.ridge.fbm(x / 800.0 - 40.0, y / 800.0, 3, 0.5));
         // Some reaches run in a steep-sided cut, some in a broad open vale.
         let grade = 0.14 + 0.1 * n(&|x, y| self.ramp.fbm(x / 900.0 + 12.0, y / 900.0, 2, 0.5));
-        for (&(_, half, mouth), line) in STREAMS.iter().zip(stream_courses()) {
+        for (&(_, half, source, mouth), line) in STREAMS.iter().zip(stream_courses()) {
             let cut = -self.both(x, y, |p| -{
-                let (mut best, mut at, mut run, mut total) = (f64::INFINITY, 0.0, 0.0, 0.0);
-                for w in line.windows(2) {
-                    let len =
-                        self.bm(((w[1].0 - w[0].0).powi(2) + (w[1].1 - w[0].1).powi(2)).sqrt());
-                    let (d, t) = segment(p, w[0], w[1]);
-                    if self.bm(d) < best {
-                        (best, at) = (self.bm(d), run + t * len);
-                    }
-                    run += len;
-                    total = run;
-                }
-                let t = at / total;
-                let bed = 6.0 - (6.0 - mouth) * smoothstep(0.55, 1.0, t);
+                let (best, t) = polyline_at(p, line);
+                let best = self.bm(best);
+                let bed = source - (source - mouth) * smoothstep(0.55, 1.0, t);
                 // Negative: this stream wants the ground this much lower.
                 bed + grade * (best + meander - self.bm(half)).max(0.0)
             });
             h = h.min(cut);
         }
 
-        // Ponds in the back country, shallower than a ship draws.
-        // Each pond is lobed: its radius swings with the bearing, and the
-        // shore frays on a finer scale. It lies in a hollow the land slopes into.
+        // The lake, shallower than a ship draws. It lies in a hollow the
+        // land slopes into; the shore frays on a finer scale.
         let fray = n(&|x, y| self.lake_shore.fbm(x / 160.0, y / 160.0, 3, 0.5)) * 70.0;
-        let pond = self.bm(self.both(x, y, |p| {
-            PONDS
-                .iter()
-                .enumerate()
-                .map(|(k, &(cx, cy, r))| {
-                    let a = (p.1 - cy).atan2(p.0 - cx);
-                    let k = k as f64;
-                    let lobes = 1.0
-                        + 0.28 * (2.0 * a + 1.3 * k).sin()
-                        + 0.16 * (3.0 * a + 2.1 + k).sin()
-                        + 0.1 * (5.0 * a + 0.4 * k).sin();
-                    r * lobes - ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt()
-                })
-                .fold(f64::MIN, f64::max)
-        })) + fray;
-        if pond > -700.0 {
-            let hollow = smoothstep(-700.0, 0.0, pond);
-            let floor = -1.5 - 3.0 * smoothstep(0.0, 220.0, pond);
-            let shore = 5.0 + 0.02 * (-pond).max(0.0);
+        let lake = self.bm(self.both(x, y, |p| inside(p, LAKE))) + fray;
+        if lake > -700.0 {
+            let hollow = smoothstep(-700.0, 0.0, lake);
+            let floor = -1.5 - 3.0 * smoothstep(0.0, 220.0, lake);
+            let shore = 5.0 + 0.02 * (-lake).max(0.0);
             h = h.min(h * (1.0 - hollow) + shore * hollow);
-            h += (floor - h) * smoothstep(-12.0, 12.0, pond);
+            h += (floor - h) * smoothstep(-12.0, 12.0, lake);
+            // Its island: a low wooded rise.
+            let isle = self.both(x, y, |p| LAKE_ISLE.2 - dist(p, (LAKE_ISLE.0, LAKE_ISLE.1)));
+            h = h.max(-3.0 + 12.0 * smoothstep(-2.0, 5.0, isle + fray / 30.0));
         }
         h
     }
@@ -683,7 +927,8 @@ mod tests {
 
 /// `BAYS_RELIEF=x0,y0,span,px,out.ppm cargo test --release -p mc-map --lib bays_relief -- --ignored`:
 /// a hillshade of the land (sun from the north-west, water tinted), to judge
-/// the landforms without the game.
+/// the landforms without the game, and the heights beside it as
+/// little-endian f32 rows, north first (`out.ppm.f32`).
 #[cfg(test)]
 #[test]
 #[ignore]
@@ -699,6 +944,7 @@ fn bays_relief() {
     let t = Terrain::new(&crate::bake::BakeParams::twin_bays("t", 8, 7));
     let step = span / px as f64;
     let mut out = format!("P6 {px} {px} 255\n").into_bytes();
+    let mut raw = Vec::with_capacity(px * px * 4);
     for j in 0..px {
         for i in 0..px {
             let (x, y) = (
@@ -707,6 +953,7 @@ fn bays_relief() {
             );
             let e = step.max(4.0);
             let h = t.height(x, y);
+            raw.extend((h as f32).to_le_bytes());
             let gx = (t.height(x + e, y) - t.height(x - e, y)) / (2.0 * e);
             let gy = (t.height(x, y + e) - t.height(x, y - e)) / (2.0 * e);
             let (nx, ny, nz) = (-gx, -gy, 1.0);
@@ -725,4 +972,5 @@ fn bays_relief() {
         }
     }
     std::fs::write(v[4], out).unwrap();
+    std::fs::write(format!("{}.f32", v[4]), raw).unwrap();
 }
