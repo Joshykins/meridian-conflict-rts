@@ -137,7 +137,7 @@ pub(super) struct Match {
     /// Set while paused: by whom (`None`: an observer or the relay).
     pub(super) paused: Option<Option<PlayerId>>,
     /// Slots whose desync report has been passed on.
-    pub(super) desync_reported: u8,
+    pub(super) desync_reported: mc_core::PlayerMask,
 }
 
 pub(super) struct Hub {
@@ -158,7 +158,7 @@ pub(super) struct Hub {
     /// The seat of the player who may start the match.
     pub(super) host: Option<usize>,
     /// Seats a person may take.
-    pub(super) open: u8,
+    pub(super) open: mc_core::PlayerMask,
     /// When the countdown to the start runs out.
     pub(super) countdown: Option<Instant>,
     /// The host's `Listing`: map and mode.
@@ -672,7 +672,13 @@ impl Hub {
         Ok(())
     }
 
-    fn on_chat(&mut self, id: ConnId, from: Option<PlayerId>, to: u8, text: String) {
+    fn on_chat(
+        &mut self,
+        id: ConnId,
+        from: Option<PlayerId>,
+        to: mc_core::PlayerMask,
+        text: String,
+    ) {
         let now = Instant::now();
         let Some(conn) = self.conns.get_mut(&id) else {
             return;
@@ -707,7 +713,7 @@ impl Hub {
             .conns
             .iter()
             .filter(|(cid, c)| match c.kind {
-                Kind::Player(s) => **cid == id || to & (1 << s.0) != 0,
+                Kind::Player(s) => **cid == id || to & mc_core::player_bit(s.0) != 0,
                 _ => false,
             })
             .map(|(cid, _)| *cid)
@@ -761,7 +767,7 @@ impl Hub {
         };
         let seated: Vec<&Slot> = self.slots.iter().filter(|s| s.occupied).collect();
         let free = (0..self.slots.len())
-            .filter(|&i| self.open & (1 << i) != 0 && !self.slots[i].occupied)
+            .filter(|&i| self.open & mc_core::player_bit(i as u8) != 0 && !self.slots[i].occupied)
             .count() as u8;
         let status = RoomStatus {
             title: self.config.title.clone(),
@@ -812,10 +818,8 @@ impl Hub {
 }
 
 /// One bit for each of the first `seats` slots.
-pub(super) fn seat_mask(seats: u8) -> u8 {
-    if seats >= 8 {
-        u8::MAX
-    } else {
-        (1u8 << seats) - 1
-    }
+pub(super) fn seat_mask(seats: u8) -> mc_core::PlayerMask {
+    mc_core::PlayerMask::MAX
+        .checked_shr(mc_core::PlayerMask::BITS - u32::from(seats))
+        .unwrap_or(0)
 }

@@ -82,7 +82,7 @@ struct Client<S: Session> {
     chat: Vec<(Option<PlayerId>, String)>,
     /// The last `Clock`: paused, by whom, input delay.
     clock: Option<(bool, Option<PlayerId>, u32)>,
-    loading: Option<u8>,
+    loading: Option<mc_core::PlayerMask>,
     stats: Vec<PeerStat>,
     details: Vec<(PlayerId, Vec<u64>)>,
     /// Say `Loaded` as soon as the match starts (a real game says it once built).

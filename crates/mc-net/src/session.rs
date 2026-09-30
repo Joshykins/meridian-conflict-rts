@@ -72,13 +72,13 @@ pub enum SessionEvent {
     Chat {
         from: Option<PlayerId>,
         name: String,
-        to: u8,
+        to: mc_core::PlayerMask,
         text: String,
     },
     /// After `Started`: which slots have loaded (one bit each). The clock starts
     /// when all have, or when the relay stops waiting.
     Loading {
-        loaded: u8,
+        loaded: mc_core::PlayerMask,
     },
     /// The match clock changed: paused or running (and who did it; `None` is an
     /// observer or the relay), and the input delay now in force.
@@ -152,7 +152,7 @@ pub trait Session {
 
     /// Says `text` to the slots in `to` (one bit each; 0 is everyone). Only a network
     /// match has anyone to hear it.
-    fn chat(&mut self, _text: &str, _to: u8) -> Result<(), NetError> {
+    fn chat(&mut self, _text: &str, _to: mc_core::PlayerMask) -> Result<(), NetError> {
         Err(NetError::Limit("there is nobody to talk to"))
     }
 

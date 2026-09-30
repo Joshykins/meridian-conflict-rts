@@ -263,10 +263,10 @@ fn oversized_frames_are_rejected_both_ways() {
 
     let too_big = Message::Bundle(TickBundle {
         tick: 0,
-        players: (0..8)
+        players: (0..MAX_PLAYERS as u8)
             .map(|s| PlayerCommands {
                 slot: PlayerId(s),
-                commands: vec![vec![0; 60_000]; 3],
+                commands: vec![vec![0; 60_000]; MAX_FRAME_LEN / 60_000 / MAX_PLAYERS + 1],
             })
             .collect(),
     });
@@ -275,7 +275,7 @@ fn oversized_frames_are_rejected_both_ways() {
         Err(NetError::FrameTooLarge { .. })
     ));
 
-    // A full-budget bundle from eight players does fit.
+    // A full-budget bundle from every player a match can have does fit.
     let mut pending = vec![vec![0u8; 1020]; 200];
     let mut budget = MAX_COMMANDS_BYTES;
     let per_player = take_commands(&mut pending, &mut budget);
@@ -283,7 +283,7 @@ fn oversized_frames_are_rejected_both_ways() {
     assert_eq!(pending.len(), 200 - per_player.len());
     let full = Message::Bundle(TickBundle {
         tick: 0,
-        players: (0..8)
+        players: (0..MAX_PLAYERS as u8)
             .map(|s| PlayerCommands {
                 slot: PlayerId(s),
                 commands: per_player.clone(),

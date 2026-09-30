@@ -77,7 +77,7 @@ impl Hud {
                 rgb(palette::TEXT, 1.0),
                 name,
             );
-            let (tag, tone) = if loaded & (1 << slot) != 0 {
+            let (tag, tone) = if loaded & mc_core::player_bit(slot) != 0 {
                 ("Ready".to_owned(), palette::TEXT)
             } else if p.link == Link::Dropped {
                 ("Disconnected".to_owned(), palette::WARN)

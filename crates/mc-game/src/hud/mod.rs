@@ -179,7 +179,7 @@ pub enum HudAction {
     /// Say `text` in a network match, to the slots in `to` (0: everyone).
     Chat {
         text: String,
-        to: u8,
+        to: mc_core::PlayerMask,
     },
     /// Leave the match for the front end, now (a network match that cannot go on).
     Leave,

@@ -103,7 +103,7 @@ pub struct RelayConfig {
     pub replay_dir: Option<PathBuf>,
     pub title: String,
     /// Seats a person may take until the host says otherwise, one bit per slot.
-    pub open_seats: u8,
+    pub open_seats: mc_core::PlayerMask,
 }
 
 impl Default for RelayConfig {
@@ -126,7 +126,7 @@ impl Default for RelayConfig {
             content: None,
             replay_dir: None,
             title: String::new(),
-            open_seats: u8::MAX,
+            open_seats: mc_core::PlayerMask::MAX,
         }
     }
 }
@@ -135,7 +135,7 @@ impl RelayConfig {
     fn check(&self) -> io::Result<()> {
         let invalid = |what| Err(io::Error::new(io::ErrorKind::InvalidInput, what));
         if self.players == 0 || self.players as usize > MAX_PLAYERS {
-            return invalid("players must be 1..=8");
+            return invalid("players must be 1..=MAX_PLAYERS");
         }
         if self.input_delay == 0 || self.input_delay > MAX_INPUT_DELAY {
             return invalid("input_delay must be 1..=50 ticks");

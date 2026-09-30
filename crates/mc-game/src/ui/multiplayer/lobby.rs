@@ -105,7 +105,7 @@ pub struct Lobby {
     /// The host's map, when this machine does not have it.
     pub missing_map: Option<String>,
     /// The plan as last published, to publish only changes.
-    published: Option<(Vec<u8>, u8, u64)>,
+    published: Option<(Vec<u8>, mc_core::PlayerMask, u64)>,
     pub choice: SeatChoice,
     pub stats: Vec<PeerStat>,
     pub chat: Vec<ChatLine>,
@@ -188,7 +188,7 @@ impl Lobby {
     /// Who sits in each seat, as the line-up shows them.
     pub fn occupants(&self) -> Vec<Option<Occupant>> {
         let seats = self.lineup.as_ref().map_or(0, |l| l.roster.seats.len());
-        let mut out: Vec<Option<Occupant>> = vec![None; seats.max(8)];
+        let mut out: Vec<Option<Occupant>> = vec![None; seats.max(mc_core::MAX_PLAYERS)];
         let Some(state) = &self.state else {
             return out;
         };
@@ -378,7 +378,7 @@ impl Lobby {
         // Seats open to people, one bit each: the relay seats them there.
         let open = (0..lineup.roster.in_play())
             .filter(|&i| lineup.roster.seats[i].control == Control::Person)
-            .fold(0u8, |m, i| m | 1 << i);
+            .fold(0, |m, i| m | mc_core::player_bit(i as u8));
         let now = (bytes, open, options.map_id);
         if self.published.as_ref() == Some(&now) {
             return;

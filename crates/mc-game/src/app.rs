@@ -1385,7 +1385,7 @@ pub fn lobby(
     use mc_net::{Session, SessionEvent};
     let config = net_config(name, mc_net::Role::Player, content);
     let seats = crate::match_options::MatchOptions::decode(&template)
-        .map_or(0, |o| o.config.players.len().min(8));
+        .map_or(0, |o| o.config.players.len().min(mc_core::MAX_PLAYERS));
     let mut session = mc_net::NetSession::connect(addr, config)
         .map_err(|e| format!("could not reach the relay at {addr}: {e}"))?;
     let mut slot = None;
@@ -1402,11 +1402,9 @@ pub fn lobby(
                             .set_match_options(template.clone())
                             .map_err(|e| e.to_string())?;
                         // Any of the template's seats may be taken; empty ones stay as templated.
-                        session.set_open_seats(if seats >= 8 {
-                            u8::MAX
-                        } else {
-                            (1u8 << seats) - 1
-                        });
+                        session.set_open_seats(
+                            (0..seats).fold(0, |m, i| m | mc_core::player_bit(i as u8)),
+                        );
                     }
                     session.set_ready(true);
                     if welcome.in_progress {

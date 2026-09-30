@@ -24,14 +24,16 @@ use mc_core::{PlayerId, MAX_PLAYERS};
 use crate::wire::{Dec, Enc, NetError, Result};
 
 /// Bumped on any incompatible change. Checked before anything else in `Hello`.
-pub const PROTOCOL_VERSION: u32 = 28;
+pub const PROTOCOL_VERSION: u32 = 29;
 
 /// Hard cap on a frame payload, enforced on both send and receive.
-pub const MAX_FRAME_LEN: usize = 1 << 20;
+pub const MAX_FRAME_LEN: usize = 4 << 20;
 /// Largest single command blob.
 pub const MAX_COMMAND_LEN: usize = 64 << 10;
 /// Budget for one player's commands in one tick, counted by [`command_cost`].
-/// Eight players at full budget still fit one bundle frame. Commands over the
+/// `MAX_PLAYERS` (32) players at full budget still fit one bundle frame
+/// (32 x 96 KB is 3 MB of [`MAX_FRAME_LEN`]), and it holds a whole
+/// [`MAX_COMMAND_LEN`] command. Commands over the
 /// budget are carried into the following tick, never dropped.
 pub const MAX_COMMANDS_BYTES: usize = 96 << 10;
 /// Snapshot blobs travel in chunks of this size.
@@ -375,7 +377,7 @@ pub struct LobbyState {
     pub observers: u16,
     pub options: Vec<u8>,
     /// Seats a person may take, one bit per slot; the host sets it.
-    pub open: u8,
+    pub open: mc_core::PlayerMask,
     /// Milliseconds left before the match starts; 0 when no start is under way.
     pub countdown_ms: u32,
     pub title: String,

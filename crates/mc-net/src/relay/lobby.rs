@@ -98,8 +98,9 @@ impl Hub {
             s.received_through = None;
             PlayerId(i as u8)
         } else {
-            let free = (0..self.slots.len())
-                .find(|&i| !self.slots[i].occupied && self.open & (1 << i) != 0);
+            let free = (0..self.slots.len()).find(|&i| {
+                !self.slots[i].occupied && self.open & mc_core::player_bit(i as u8) != 0
+            });
             let Some(i) = free else {
                 return self.refuse(id, RefuseReason::LobbyFull, "every seat is taken");
             };
@@ -269,11 +270,11 @@ impl Hub {
         }
     }
 
-    pub(super) fn set_open(&mut self, mask: u8) {
+    pub(super) fn set_open(&mut self, mask: mc_core::PlayerMask) {
         // A seat somebody sits in stays open: closing it is the kick's job.
         let occupied = (0..self.slots.len())
             .filter(|&i| self.slots[i].occupied)
-            .fold(0u8, |m, i| m | 1 << i);
+            .fold(0, |m, i| m | mc_core::player_bit(i as u8));
         self.open = (mask & seat_mask(self.config.players)) | occupied;
         self.cancel_countdown();
         self.broadcast_lobby();
@@ -281,7 +282,10 @@ impl Hub {
 
     pub(super) fn take_seat(&mut self, id: ConnId, from: PlayerId, to: PlayerId) {
         let (f, t) = (from.index(), to.index());
-        if t >= self.slots.len() || self.slots[t].occupied || self.open & (1 << t) == 0 {
+        if t >= self.slots.len()
+            || self.slots[t].occupied
+            || self.open & mc_core::player_bit(t as u8) == 0
+        {
             return;
         }
         let mut moved = std::mem::take(&mut self.slots[f]);

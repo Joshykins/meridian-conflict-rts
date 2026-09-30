@@ -75,7 +75,7 @@ pub struct NetLink {
     /// Set while the match is paused: by whom (`None`: an observer or the relay).
     pub paused_by: Option<Option<u8>>,
     /// Set after the start until the clock runs: the slots that have loaded.
-    pub loading: Option<u8>,
+    pub loading: Option<mc_core::PlayerMask>,
     pub rejoining: Option<Rejoining>,
     pub desync: Option<DesyncReport>,
     /// This player surrendered to leave: since when. The match is left once the
@@ -118,7 +118,7 @@ pub struct NetShared {
 pub enum NetRequest {
     Chat {
         text: String,
-        to: u8,
+        to: mc_core::PlayerMask,
     },
     Pause(bool),
     /// Give up the match (so this side is defeated, not left standing idle), then leave.

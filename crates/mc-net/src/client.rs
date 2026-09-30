@@ -232,7 +232,7 @@ impl NetSession {
     }
 
     /// Host only: the seats a person may take, one bit per slot.
-    pub fn set_open_seats(&mut self, mask: u8) {
+    pub fn set_open_seats(&mut self, mask: mc_core::PlayerMask) {
         let _ = self.send(&Message::SetOpenSeats(mask));
     }
 
@@ -374,7 +374,7 @@ impl Session for NetSession {
     }
 
     /// `to`: the slots it is for, one bit each (the relay adds the sender); 0 is everyone.
-    fn chat(&mut self, text: &str, to: u8) -> Result<(), NetError> {
+    fn chat(&mut self, text: &str, to: mc_core::PlayerMask) -> Result<(), NetError> {
         if text.len() > MAX_CHAT_LEN {
             return Err(NetError::Limit("chat message over MAX_CHAT_LEN"));
         }

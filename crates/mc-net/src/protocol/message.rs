@@ -1,6 +1,6 @@
 //! Every message of the match protocol and its byte layout.
 
-use mc_core::{PlayerId, MAX_PLAYERS};
+use mc_core::{PlayerId, PlayerMask, MAX_PLAYERS};
 
 use super::{
     decode_commands, decode_slot, encode_commands, ContentId, Hello, Link, LobbyPlayer, LobbyState,
@@ -40,7 +40,7 @@ pub enum Message {
     /// Stop (`true`) or restart the match clock. Any player may do either.
     Pause(bool),
     /// Host only, in the lobby: the seats a person may take, one bit per slot.
-    SetOpenSeats(u8),
+    SetOpenSeats(PlayerMask),
     /// In the lobby: move to this free, open seat.
     TakeSeat(PlayerId),
     /// Host only, in the lobby: remove that player.
@@ -75,7 +75,7 @@ pub enum Message {
     MatchEnd,
     /// After `Start`: the slots that have loaded, one bit each.
     Loading {
-        loaded: u8,
+        loaded: PlayerMask,
     },
     /// One player's `DesyncReport`, passed on to everyone.
     DesyncDetail {
@@ -106,7 +106,7 @@ pub enum Message {
     Chat {
         from: Option<PlayerId>,
         name: String,
-        to: u8,
+        to: PlayerMask,
         text: String,
     },
 }
@@ -244,7 +244,7 @@ impl Message {
                 }
                 e.u16(l.observers);
                 e.bytes(&l.options);
-                e.u8(l.open);
+                e.u32(l.open);
                 e.u32(l.countdown_ms);
                 e.str(&l.title);
             }
@@ -329,7 +329,7 @@ impl Message {
                 e.u8(tag::CHAT);
                 encode_opt_slot(e, *from);
                 e.str(name);
-                e.u8(*to);
+                e.u32(*to);
                 e.str(text);
             }
             Message::Leave => e.u8(tag::LEAVE),
@@ -346,7 +346,7 @@ impl Message {
             }
             Message::SetOpenSeats(mask) => {
                 e.u8(tag::SET_OPEN_SEATS);
-                e.u8(*mask);
+                e.u32(*mask);
             }
             Message::TakeSeat(s) => {
                 e.u8(tag::TAKE_SEAT);
@@ -368,7 +368,7 @@ impl Message {
             }
             Message::Loading { loaded } => {
                 e.u8(tag::LOADING);
-                e.u8(*loaded);
+                e.u32(*loaded);
             }
             Message::DesyncDetail {
                 tick,
@@ -476,7 +476,7 @@ impl Message {
                     players,
                     observers: d.u16()?,
                     options: d.bytes(MAX_OPTIONS_LEN)?,
-                    open: d.u8()?,
+                    open: d.u32()?,
                     countdown_ms: d.u32()?,
                     title: d.str(MAX_TITLE_LEN)?,
                 })
@@ -521,7 +521,7 @@ impl Message {
             tag::CHAT => Message::Chat {
                 from: decode_opt_slot(d)?,
                 name: d.str(MAX_NAME_LEN)?,
-                to: d.u8()?,
+                to: d.u32()?,
                 text: d.str(MAX_CHAT_LEN)?,
             },
             tag::LEAVE => Message::Leave,
@@ -532,7 +532,7 @@ impl Message {
                 sections: decode_sections(d)?,
             },
             tag::PAUSE => Message::Pause(d.bool()?),
-            tag::SET_OPEN_SEATS => Message::SetOpenSeats(d.u8()?),
+            tag::SET_OPEN_SEATS => Message::SetOpenSeats(d.u32()?),
             tag::TAKE_SEAT => Message::TakeSeat(decode_slot(d)?),
             tag::KICK => Message::Kick(decode_slot(d)?),
             tag::SET_CONTENT => Message::SetContent(ContentId {
@@ -543,7 +543,7 @@ impl Message {
                 map: d.str(MAX_TITLE_LEN)?,
                 mode: d.str(MAX_TITLE_LEN)?,
             },
-            tag::LOADING => Message::Loading { loaded: d.u8()? },
+            tag::LOADING => Message::Loading { loaded: d.u32()? },
             tag::DESYNC_DETAIL => Message::DesyncDetail {
                 tick: d.u32()?,
                 slot: decode_slot(d)?,

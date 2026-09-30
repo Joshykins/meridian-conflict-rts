@@ -69,7 +69,7 @@ fn name_of(s: &Scene, slot: u8) -> String {
 }
 
 /// The local player's side, the sender included, as a slot mask; 0 with no allies.
-fn allies_mask(s: &Scene) -> u8 {
+fn allies_mask(s: &Scene) -> mc_core::PlayerMask {
     if s.view.observing {
         return 0;
     }
@@ -81,7 +81,7 @@ fn allies_mask(s: &Scene) -> u8 {
         .iter()
         .enumerate()
         .filter(|(_, p)| p.team == me.team)
-        .fold(0u8, |m, (i, _)| m | 1 << i);
+        .fold(0, |m, (i, _)| m | mc_core::player_bit(i as u8));
     // Alone on a team: nobody to whisper to.
     if mask.count_ones() > 1 {
         mask
@@ -219,7 +219,14 @@ impl Hud {
         self.feed(ui, s, bottom, open, allies);
     }
 
-    fn feed(&mut self, ui: &mut Ui, s: &Scene, bottom: f32, open: bool, allies: u8) {
+    fn feed(
+        &mut self,
+        ui: &mut Ui,
+        s: &Scene,
+        bottom: f32,
+        open: bool,
+        allies: mc_core::PlayerMask,
+    ) {
         let k = ui.ease(id("chat-open", 0), if open { 1.0 } else { 0.0 }, 14.0);
         let input_h = 38.0 * k;
         let shown = if open { SHOWN_OPEN } else { SHOWN };
@@ -274,7 +281,7 @@ impl Hud {
         }
     }
 
-    fn chat_input(&mut self, ui: &mut Ui, r: Rect, k: f32, allies: u8) {
+    fn chat_input(&mut self, ui: &mut Ui, r: Rect, k: f32, allies: mc_core::PlayerMask) {
         let Some(draft) = &mut self.net.draft else {
             return;
         };

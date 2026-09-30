@@ -213,7 +213,7 @@ impl DirectoryClient {
             return Err(NetError::Limit("title over MAX_TITLE_LEN"));
         }
         if seats == 0 || seats as usize > mc_core::MAX_PLAYERS {
-            return Err(NetError::Limit("seats must be 1..=8"));
+            return Err(NetError::Limit("seats must be 1..=MAX_PLAYERS"));
         }
         self.shared.request(&DirMessage::CreateRoom(NewRoom {
             title: title.to_owned(),

@@ -80,7 +80,7 @@ impl Hub {
             .iter()
             .enumerate()
             .filter(|(_, s)| s.loaded)
-            .fold(0u8, |m, (i, _)| m | 1 << i);
+            .fold(0, |m, (i, _)| m | mc_core::player_bit(i as u8));
         self.broadcast(&Message::Loading { loaded });
     }
 
@@ -405,7 +405,7 @@ impl Hub {
     /// Passes a player's hash sections at the desync tick on to everyone, once per player.
     pub(super) fn on_desync_report(&mut self, slot: PlayerId, tick: u32, sections: Vec<u64>) {
         let Some(m) = &mut self.game else { return };
-        let bit = 1u8 << slot.0;
+        let bit = mc_core::player_bit(slot.0);
         if self.summary.desync_tick != Some(tick)
             || m.desync_reported & bit != 0
             || sections.len() > MAX_SECTIONS
