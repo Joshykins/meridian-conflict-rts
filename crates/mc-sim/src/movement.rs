@@ -76,7 +76,9 @@ struct MoveOut {
 impl World {
     pub(crate) fn run_movement(&mut self) -> Result<(), SimError> {
         let rows = self.state.units.slots.rows();
+        let span = mc_core::perf_span!("move.formation");
         let formation = self.formation_motion();
+        drop(span);
         // Resolve the same visible engagement as the order controller before
         // applying any moves, so altitude pursuit cannot depend on row order.
         let attack_altitudes: Vec<_> = (0..rows)
@@ -98,6 +100,7 @@ impl World {
             })
             .collect();
         let this = &*self;
+        let span = mc_core::perf_span!("move.steer");
         let results: Vec<Vec<MoveOut>> = self.pool.parallel_map_chunks(rows, CHUNK, |_, range| {
             let units = &this.state.units;
             let mut out = Vec::new();
@@ -118,7 +121,11 @@ impl World {
         });
 
         let mut moves: Vec<_> = results.into_iter().flatten().collect();
+        drop(span);
+        let span = mc_core::perf_span!("move.contacts");
         self.resolve_mobile_contacts(&mut moves);
+        drop(span);
+        let _span = mc_core::perf_span!("move.apply");
         // Striding walkers' ground counters before this move: their footfalls land after it.
         let striders: Vec<(usize, u32)> = moves
             .iter()
@@ -454,14 +461,19 @@ impl World {
         pairs.sort_unstable();
         // A crowd pressed against a slope needs more passes to spread; stop
         // as soon as a pass finds nothing to push apart.
+        let radii: Vec<Fx> = moves.iter().map(|m| self.bp(m.row).radius).collect();
         for _ in 0..8 {
             let mut pushed_any = false;
             for &(i, j) in &pairs {
                 let (a, b) = (moves[i].row, moves[j].row);
                 let delta = moves[i].pos - moves[j].pos;
+                let (ra, rb) = (radii[i], radii[j]);
+                // Clear by more than the square root can round: no need to take it.
+                let clear = ra + rb + Fx::from_int(2);
+                if delta.length_sq() > clear * clear {
+                    continue;
+                }
                 let dist = delta.length();
-                let ra = self.bp(a).radius;
-                let rb = self.bp(b).radius;
                 let overlap = ra + rb + Fx::ONE - dist;
                 if overlap <= Fx::ZERO {
                     continue;

@@ -2286,22 +2286,39 @@ impl World {
     }
 
     pub(crate) fn run_projectiles(&mut self) -> Result<(), SimError> {
+        let span = mc_core::perf_span!("shots.guide");
         self.guide_and_intercept_missiles();
         self.steer_torpedoes();
         self.steer_interceptors();
         self.steer_curving_shots();
+        drop(span);
+        let span = mc_core::perf_span!("shots.sweep");
         let count = self.state.projectiles.len();
+        // The domes up this tick, found once: a battle's shells each look only at them.
+        let domes: Vec<usize> = self
+            .scratch
+            .shielded
+            .iter()
+            .copied()
+            .filter(|&row| {
+                self.state.units.slots.is_alive(row)
+                    && self.shield_blocking(row)
+                    && self.bp(row).shield.is_some_and(|s| !s.is_hull())
+            })
+            .collect();
         let this = &*self;
         let hits: Vec<Vec<Hit>> = self.pool.parallel_map_chunks(count, CHUNK, |_, range| {
             let mut out = Vec::new();
             for i in range {
-                if let Some(hit) = this.sweep_projectile(i) {
+                if let Some(hit) = this.sweep_projectile(i, &domes) {
                     out.push(hit);
                 }
             }
             out
         });
         let hits: Vec<Hit> = hits.into_iter().flatten().collect();
+        drop(span);
+        let _span = mc_core::perf_span!("shots.impacts");
 
         let p = &mut self.state.projectiles;
         for i in 0..count {
@@ -2349,12 +2366,16 @@ impl World {
             self.apply_impact(i, hit)?;
             remove.push(i);
         }
+        let mut struck = vec![false; count];
+        for &i in &remove {
+            struck[i] = true;
+        }
         // A bore's tracer that met nothing still carries the charge: it strikes where it ends.
         let spent: Vec<usize> = (0..count)
             .filter(|&i| {
                 let p = &self.state.projectiles;
                 p.ticks_left[i] == 0
-                    && !remove.contains(&i)
+                    && !struck[i]
                     && self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize]
                         .bore
                         .is_some()
@@ -2365,7 +2386,7 @@ impl World {
             self.bore_discharge(i, to, None, Fx::ONE)?;
         }
         let p = &self.state.projectiles;
-        for i in (0..count).filter(|&i| p.ticks_left[i] == 0 && !remove.contains(&i)) {
+        for i in (0..count).filter(|&i| p.ticks_left[i] == 0 && !struck[i]) {
             let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
             #[expect(
                 clippy::disallowed_types,
@@ -2390,6 +2411,18 @@ impl World {
 
     fn guide_and_intercept_missiles(&mut self) {
         let mut killed = Vec::new();
+        // Only a round with a casing to burn through can be lased: a battle's
+        // shells are passed over once here, not once per laser.
+        let casings: Vec<usize> = {
+            let p = &self.state.projectiles;
+            (0..p.len())
+                .filter(|&i| {
+                    self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize].casing_hp()
+                        > Fx::ZERO
+                })
+                .collect()
+        };
+        let mut gone = vec![false; self.state.projectiles.len()];
         let defenders: Vec<_> = self
             .state
             .units
@@ -2422,8 +2455,8 @@ impl World {
             for _ in 0..self.bp(r).anti_missile_lasers {
                 // Stay on a casing already burning. Otherwise the nearest full one.
                 let mut best: Option<(usize, bool, Fx, Fx)> = None;
-                for i in 0..self.state.projectiles.len() {
-                    if killed.contains(&i) || lased.contains(&i) {
+                for &i in &casings {
+                    if gone[i] || lased.contains(&i) {
                         continue;
                     }
                     let p = &self.state.projectiles;
@@ -2475,6 +2508,7 @@ impl World {
                 });
                 if dead {
                     killed.push(i);
+                    gone[i] = true;
                     self.state.units.intercept_cooldown[r] = LASER_GAP;
                 } else {
                     self.state.projectiles.hp[i] = left;
@@ -2582,7 +2616,7 @@ impl World {
     }
 
     /// Finds what projectile `i` runs into during this tick's step, if anything.
-    fn sweep_projectile(&self, i: usize) -> Option<Hit> {
+    fn sweep_projectile(&self, i: usize, domes: &[usize]) -> Option<Hit> {
         let p = &self.state.projectiles;
         let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
         let mut vel = p.vel[i];
@@ -2658,8 +2692,9 @@ impl World {
             let seg = vel.xy();
             let len_sq = seg.length_sq().max(Fx::EPSILON);
             let mid = from.xy() + seg * Fx::HALF;
+            let reach = seg.length() / 2 + weapon.proximity;
             self.index
-                .query(mid, seg.length() / 2 + weapon.proximity, kind::UNIT, |e| {
+                .query_foes(mid, reach, kind::UNIT, self.friends(p.owner[i]), |e| {
                     let row = e.row as usize;
                     let units = &self.state.units;
                     // An interceptor runs at torpedoes, never at hulls.
@@ -2724,15 +2759,17 @@ impl World {
                     true
                 });
         }
-        self.sweep_shields(i, from, vel, &mut best_t, &mut best);
+        self.sweep_shields(i, domes, from, vel, &mut best_t, &mut best);
         best
     }
 
     /// Incoming fire hits the first enemy dome along the step. Shots that
-    /// already started inside a bubble pass through it.
+    /// already started inside a bubble pass through it. `domes` are the rows
+    /// whose dome (not hull field) is up.
     fn sweep_shields(
         &self,
         projectile: usize,
+        domes: &[usize],
         from: FxVec3,
         vel: FxVec3,
         best_t: &mut Fx,
@@ -2748,14 +2785,10 @@ impl World {
         {
             return;
         }
-        for row in self.state.units.slots.iter() {
-            if !self.shield_blocking(row) || !self.are_enemies(owner, self.state.units.owner[row]) {
-                continue;
-            }
-            let spec = self.bp(row).shield.unwrap();
-            // Hull fields are the unit they wrap; the unit sweep already
-            // charges them. A dome is the only thing that stops a shot early.
-            if spec.is_hull() {
+        // Hull fields are the unit they wrap; the unit sweep already charges
+        // them. A dome is the only thing that stops a shot early.
+        for &row in domes {
+            if !self.are_enemies(owner, self.state.units.owner[row]) {
                 continue;
             }
             let radius = self.dome_radius(row);
@@ -2981,8 +3014,8 @@ impl World {
     ) -> Option<usize> {
         let mut best = None;
         let mut first = Fx::MAX;
-        for row in self.state.units.slots.iter() {
-            if !self.shield_blocking(row) {
+        for &row in &self.scratch.shielded {
+            if !self.state.units.slots.is_alive(row) || !self.shield_blocking(row) {
                 continue;
             }
             let spec = self.bp(row).shield.unwrap();

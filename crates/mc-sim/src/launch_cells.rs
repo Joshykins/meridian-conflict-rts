@@ -119,13 +119,13 @@ impl World {
         }
         let (at, id) = (units.pos[row], units.id(row));
         let p = &self.state.projectiles;
+        let mine: Vec<crate::UnitId> = (0..p.len())
+            .filter(|&i| p.source[i] == id && p.weapon[i] as usize == w)
+            .map(|i| p.target[i])
+            .collect();
         let chased = |t: usize| {
             let target = units.id(t);
-            (0..p.len())
-                .filter(|&i| {
-                    p.source[i] == id && p.weapon[i] as usize == w && p.target[i] == target
-                })
-                .count()
+            mine.iter().filter(|&&m| m == target).count()
         };
         let mut near: Vec<(usize, Fx, usize)> = Vec::new();
         let friends = self.friends(units.owner[row]);

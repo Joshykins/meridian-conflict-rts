@@ -178,6 +178,10 @@ pub struct World {
 pub(crate) struct Scratch {
     pub build_jobs: Vec<crate::economy::BuildJob>,
     pub dead: Vec<usize>,
+    /// Rows whose blueprint carries a shield, in row order, listed with the
+    /// index and again after the tick's commands: blast and shot checks look
+    /// only at these. It can still hold a row that has died since.
+    pub shielded: Vec<usize>,
 }
 
 /// Radius props occupy in the spatial index.
@@ -672,6 +676,7 @@ impl World {
         for c in ai_commands.iter().chain(commands) {
             self.apply_command(c)?;
         }
+        self.list_shielded();
         phase(&mut self.timings, "commands");
 
         {
@@ -893,6 +898,19 @@ impl World {
             );
         }
         self.index.build();
+        self.list_shielded();
+    }
+
+    /// Refreshes `scratch.shielded`.
+    pub(crate) fn list_shielded(&mut self) {
+        let units = &self.state.units;
+        self.scratch.shielded.clear();
+        self.scratch.shielded.extend(
+            units
+                .slots
+                .iter()
+                .filter(|&row| self.blueprints.unit(units.blueprint[row]).shield.is_some()),
+        );
     }
 
     /// True when a unit entry from the index still describes a live unit. The

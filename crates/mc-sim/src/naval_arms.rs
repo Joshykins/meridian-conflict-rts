@@ -225,12 +225,18 @@ impl World {
     pub(crate) fn steer_interceptors(&mut self) {
         let water = self.terrain.water_level();
         let mut gone: Vec<usize> = Vec::new();
+        let p = &self.state.projectiles;
+        if (0..p.len()).all(|i| p.quarry[i] == 0) {
+            return;
+        }
+        let by_serial: std::collections::BTreeMap<u32, usize> =
+            (0..p.len()).map(|j| (p.serial[j], j)).collect();
         for i in 0..self.state.projectiles.len() {
             let p = &self.state.projectiles;
             if p.quarry[i] == 0 || gone.contains(&i) {
                 continue;
             }
-            let Some(q) = (0..p.len()).find(|&j| p.serial[j] == p.quarry[i]) else {
+            let Some(&q) = by_serial.get(&p.quarry[i]) else {
                 continue;
             };
             if gone.contains(&q) {
@@ -291,14 +297,25 @@ impl World {
             let p = &self.state.projectiles;
             let units = &self.state.units;
             let alive = |id: UnitId| units.row(id).filter(|&t| units.health[t] > Fx::ZERO);
-            for i in 0..p.len() {
+            let lost: Vec<usize> = (0..p.len())
+                .filter(|&i| {
+                    let weapon =
+                        &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+                    weapon.guided
+                        && weapon.skim > Fx::ZERO
+                        && p.target[i] != UnitId::NONE
+                        && alive(p.target[i]).is_none()
+                })
+                .collect();
+            // What every side's rounds run at, counted once for all the lost ones.
+            let mut runs_at = std::collections::BTreeMap::<(u8, UnitId), usize>::new();
+            if !lost.is_empty() {
+                for j in 0..p.len() {
+                    *runs_at.entry((p.owner[j], p.target[j])).or_default() += 1;
+                }
+            }
+            for i in lost {
                 let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
-                if !weapon.guided || weapon.skim <= Fx::ZERO || p.target[i] == UnitId::NONE {
-                    continue;
-                }
-                if alive(p.target[i]).is_some() {
-                    continue;
-                }
                 let owner = p.owner[i];
                 let mark = p.mark[i].xy();
                 let mut best: Option<(Fx, usize)> = None;
@@ -316,9 +333,7 @@ impl World {
                             return true;
                         }
                         let id = units.id(t);
-                        let taken = (0..p.len())
-                            .filter(|&j| p.owner[j] == owner && p.target[j] == id)
-                            .count()
+                        let taken = runs_at.get(&(owner, id)).copied().unwrap_or(0)
                             + chosen.iter().filter(|c| c.1 == id).count();
                         let score = units.pos[t].distance(mark) + RETARGET_SHARE * taken as i32;
                         if best.is_none_or(|(s, _)| score < s) {
