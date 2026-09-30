@@ -7,6 +7,7 @@
 use glam::{Affine3A, Vec2, Vec3};
 
 use super::bolt_rifle::{bolt_rifle, rifle_shoulder};
+use super::commander_head;
 use super::parts::*;
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
@@ -348,30 +349,6 @@ fn commander_foot(b: &mut MeshBuilder) {
     b.plate(v3(0.2, 0.0, h), v2(1.4, 1.55), 0.1, 0.04);
 }
 
-/// The commander's helmet in plan: an elliptical front of `arc` * 2 facets
-/// sweeping round to a flat back.
-fn helmet_plan(arc: usize) -> Vec<[f32; 2]> {
-    let mut plan: Vec<[f32; 2]> = (0..=arc * 2)
-        .map(|i| {
-            let a = (-100.0 + 200.0 * i as f32 / (arc * 2) as f32).to_radians();
-            [0.1 + 0.75 * a.cos(), 0.65 * a.sin()]
-        })
-        .collect();
-    plan.extend([[-0.55, 0.5], [-0.62, 0.2], [-0.62, -0.2], [-0.55, -0.5]]);
-    plan
-}
-
-/// The visor's plan: the front of [`helmet_plan`]'s ellipse, closed by a chord
-/// buried in the helmet.
-fn visor_plan(arc: usize) -> Vec<[f32; 2]> {
-    (0..=arc * 2)
-        .map(|i| {
-            let a = (-72.0 + 144.0 * i as f32 / (arc * 2) as f32).to_radians();
-            [0.1 + 0.75 * a.cos(), 0.65 * a.sin()]
-        })
-        .collect()
-}
-
 pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
     // Lean and long in the limb, stood up rather than crouched at rest. It walks:
     // a foot is down for half the cycle, the other landing as it lifts, so the
@@ -570,53 +547,7 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
         on_slope(b, [-1.7, 13.2], [-2.2, 11.7], 0.55, |b| {
             b.mirror_y(|b| b.plate(v3(0.0, 1.1, 0.0), v2(1.05, 0.95), 0.12, 0.05))
         });
-        // Head, sunk between the shoulders: black helmet, white crown and cheeks.
-        // It looks about while the commander stands idle.
-        b.with_head(v3(0.3, 0.0, 13.2), |b| {
-            b.at(v3(0.4, 0.0, 0.0), |b| {
-                // A rounded helmet in three courses: the jaw, a narrower core,
-                // and a domed brow. The visor is a curved band of gold-orange
-                // mirror glass round the core's face, so it lies set back
-                // between the jaw and the brow; ear pieces close the sides.
-                let arc = if b.fine() { 4 } else { 2 };
-                let helmet = helmet_plan(arc);
-                b.paint(ACCENT);
-                b.loft_z(
-                    &helmet,
-                    &[Section::new(13.2, 0.85), Section::new(13.58, 1.0)],
-                );
-                b.loft_z(
-                    &helmet,
-                    &[Section::new(13.58, 0.86), Section::new(13.97, 0.86)],
-                );
-                b.loft_z(
-                    &helmet,
-                    &[
-                        Section::new(13.97, 1.0),
-                        Section::new(14.25, 0.93),
-                        Section::scaled(14.52, 0.55, 0.6).shifted(-0.12, 0.0),
-                    ],
-                );
-                b.paint(VISOR).pattern(pattern::PLAIN);
-                b.loft_z(
-                    &visor_plan(arc),
-                    &[
-                        Section::new(13.6, 0.9),
-                        Section::new(13.78, 0.93),
-                        Section::new(13.95, 0.9),
-                    ],
-                );
-                if b.fine() {
-                    b.paint(PLATING);
-                    b.plate(v3(-0.14, 0.0, 14.5), v2(0.5, 0.52), 0.06, 0.025);
-                    b.mirror_y(|b| b.block(v3(-0.36, 0.5, 13.56), v3(0.12, 0.66, 13.99)));
-                }
-            });
-            if b.fine() {
-                // A short aerial off the back of the helmet.
-                antenna_unlit(b, v3(-0.35, -0.45, 14.3), 1.2, 0.18);
-            }
-        });
+        commander_head::head(b, v3(0.3, 0.0, 13.2));
 
         // Shoulders: black pauldrons carrying the team colour, white plates on
         // the cap and a guard along the outer edge, black in the gaps.
