@@ -16,14 +16,41 @@ const HISTORY: usize = 240;
 pub(super) const HEADER_H: f32 = 108.0;
 pub(super) const CARD_FULL: f32 = 118.0;
 const CARD_SHORT: f32 = 62.0;
+/// A commander's card as one line: what a crowded match (up to 32) gets.
+const CARD_LINE: f32 = 30.0;
 /// A team's heading over its commanders' cards.
 const TEAM_H: f32 = 28.0;
+/// The narrowest a vision chip gets before the chips wrap onto more lines.
+const CHIP_MIN: f32 = 24.0;
+/// A wrapped chip's width, and the pitch of the lines of chips.
+const CHIP_WRAPPED: f32 = 28.0;
+const CHIP_LINE: f32 = 30.0;
+/// The line under the cards that says they scroll.
+const SCROLL_HINT_H: f32 = 20.0;
 
-/// Materials income sampled once a game second, per commander.
+/// How much of a commander a card shows: as much as fits.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Density {
+    Full,
+    Short,
+    Line,
+}
+
+/// What goes down the panel under the header, in order.
+#[derive(Clone, Copy)]
+enum Item {
+    Heading(u8),
+    Card(usize),
+}
+
+/// Materials income sampled once a game second, per commander; and how far
+/// the cards are scrolled when they do not all fit.
 #[derive(Default)]
 pub struct History {
     last_second: Option<u32>,
     mass: Vec<VecDeque<f32>>,
+    /// The first item shown (`Item`), when the cards scroll.
+    scroll: usize,
 }
 
 impl History {
@@ -61,6 +88,47 @@ fn team_order(players: &[PlayerStatus]) -> (Vec<usize>, bool) {
     (order, allied)
 }
 
+/// Where each commander's vision chip goes in the header `r`, in team order,
+/// and how many lines they take. They share one line while each can be
+/// `CHIP_MIN` wide; past that they wrap, a team kept on one line when it fits.
+pub(super) fn chip_places(players: &[PlayerStatus], r: Rect) -> (Vec<(usize, Rect)>, usize) {
+    let (order, allied) = team_order(players);
+    let teams = teams::sizes(&players.iter().map(|p| p.team).collect::<Vec<_>>()).len();
+    let gaps = if allied { teams.saturating_sub(1) } else { 0 };
+    // Past the "All" chip.
+    let x0 = r.x + 76.0;
+    let right = r.right() - 10.0;
+    let one = (right - x0 - 8.0 * gaps as f32) / players.len().max(1) as f32 - 4.0;
+    let chip_w = if one >= CHIP_MIN {
+        one.min(34.0)
+    } else {
+        CHIP_WRAPPED
+    };
+    let (mut x, mut y, mut lines) = (x0, r.y + 34.0, 1);
+    let mut out = Vec::with_capacity(order.len());
+    for (k, &i) in order.iter().enumerate() {
+        let team = players[i].team;
+        let new_team = k > 0 && players[order[k - 1]].team != team;
+        if allied && new_team {
+            x += 8.0;
+            let size = order[k..]
+                .iter()
+                .take_while(|&&j| players[j].team == team)
+                .count();
+            let need = size as f32 * (chip_w + 4.0) - 4.0;
+            if x + need > right && x0 + need <= right {
+                (x, y, lines) = (x0, y + CHIP_LINE, lines + 1);
+            }
+        }
+        if x + chip_w > right {
+            (x, y, lines) = (x0, y + CHIP_LINE, lines + 1);
+        }
+        out.push((i, Rect::new(x, y, chip_w, 26.0)));
+        x += chip_w + 4.0;
+    }
+    (out, lines)
+}
+
 fn short(v: f32) -> String {
     if v >= 10_000.0 {
         format!("{:.0}k", v / 1000.0)
@@ -86,41 +154,115 @@ impl Hud {
         let players = &view.status.players;
         self.observed.sample(view.status.tick, players);
 
-        let header = Rect::new(EDGE, EDGE, WIDTH, HEADER_H);
+        let (_, lines) = chip_places(players, Rect::new(EDGE, EDGE, WIDTH, HEADER_H));
+        let header = Rect::new(EDGE, EDGE, WIDTH, HEADER_H + (lines - 1) as f32 * CHIP_LINE);
         self.glass(ui, header);
         self.observer_header(ui, s, header);
 
         // Cards go in team order under a heading per team when anyone is allied.
         let (order, allied) = team_order(players);
-        let headings = if allied {
-            teams::sizes(&players.iter().map(|p| p.team).collect::<Vec<_>>()).len()
-        } else {
-            0
-        };
-
-        // Full cards when they fit above the deck, a line or two each when they do not.
-        let room = bottom - header.bottom() - GAP - headings as f32 * (TEAM_H + 6.0);
-        let n = players.len().max(1) as f32;
-        let full = n * (CARD_FULL + 6.0) <= room;
-        let card_h = if full { CARD_FULL } else { CARD_SHORT };
-        let mut y = header.bottom() + GAP;
-        let mut team = None;
+        let mut items = Vec::with_capacity(order.len() * 2);
         for (k, &i) in order.iter().enumerate() {
-            if allied && team != Some(players[i].team) {
-                team = Some(players[i].team);
-                let r = Rect::new(EDGE, y, WIDTH, TEAM_H);
-                if r.bottom() > bottom && k > 0 {
-                    break;
-                }
-                self.team_heading(ui, s, players[i].team, r);
-                y = r.bottom() + 6.0;
+            if allied && (k == 0 || players[order[k - 1]].team != players[i].team) {
+                items.push(Item::Heading(players[i].team));
             }
-            let r = Rect::new(EDGE, y, WIDTH, card_h);
-            if r.bottom() > bottom && k > 0 {
+            items.push(Item::Card(i));
+        }
+        let height = |item: &Item, card: f32| match item {
+            Item::Heading(_) => TEAM_H + 6.0,
+            Item::Card(_) => card + 6.0,
+        };
+        let need = |card: f32| items.iter().map(|it| height(it, card)).sum::<f32>();
+
+        // Full cards when they fit above the deck, a line or two each when they do not,
+        // one line each past that; and when even those do not fit, they scroll.
+        let top = header.bottom() + GAP;
+        let room = bottom - top;
+        let density = if need(CARD_FULL) <= room {
+            Density::Full
+        } else if need(CARD_SHORT) <= room {
+            Density::Short
+        } else {
+            Density::Line
+        };
+        let card_h = match density {
+            Density::Full => CARD_FULL,
+            Density::Short => CARD_SHORT,
+            Density::Line => CARD_LINE,
+        };
+        let scrolls = need(card_h) > room;
+        let limit = if scrolls {
+            bottom - SCROLL_HINT_H
+        } else {
+            bottom
+        };
+        if scrolls {
+            // The first item from which the rest all fit: the scroll goes no further.
+            let mut last_first = items.len();
+            let mut tail = 0.0;
+            while last_first > 0 && tail + height(&items[last_first - 1], card_h) <= limit - top {
+                last_first -= 1;
+                tail += height(&items[last_first], card_h);
+            }
+            let panel = Rect::new(EDGE, top, WIDTH, room);
+            let mut scroll = self.observed.scroll;
+            if ui.interactive && panel.contains(ui.cursor) && ui.input.scroll != 0.0 {
+                scroll = if ui.input.scroll > 0.0 {
+                    scroll.saturating_sub(1)
+                } else {
+                    scroll + 1
+                };
+            }
+            self.observed.scroll = scroll.min(last_first);
+        } else {
+            self.observed.scroll = 0;
+        }
+
+        let mut y = top;
+        let (mut shown, mut first_card) = (0, None);
+        for (k, item) in items.iter().enumerate().skip(self.observed.scroll) {
+            let r = Rect::new(EDGE, y, WIDTH, height(item, card_h) - 6.0);
+            // A heading goes only with at least its first card under it.
+            let under = match item {
+                Item::Heading(_) => card_h + 6.0,
+                Item::Card(_) => 0.0,
+            };
+            if r.bottom() + under > limit && k > self.observed.scroll {
                 break;
             }
-            self.player_card(ui, s, i, r, full);
+            match *item {
+                Item::Heading(team) => self.team_heading(ui, s, team, r),
+                Item::Card(i) => {
+                    self.player_card(ui, s, i, r, density);
+                    shown += 1;
+                    first_card = first_card.or(Some(
+                        items[..k]
+                            .iter()
+                            .filter(|it| matches!(it, Item::Card(_)))
+                            .count(),
+                    ));
+                }
+            }
             y = r.bottom() + 6.0;
+        }
+        if scrolls {
+            let from = first_card.unwrap_or(0);
+            let note = Rect::new(EDGE, y, WIDTH, SCROLL_HINT_H - 4.0);
+            self.claim(ui, note);
+            ui.fill(note, ink(0.6));
+            ui.text(
+                EDGE + 10.0,
+                note.mid_y(),
+                type_scale::MICRO,
+                rgb(palette::DIM, 1.0),
+                &format!(
+                    "Commanders {}-{} of {}  \u{b7}  Scroll for more",
+                    from + 1,
+                    from + shown,
+                    players.len()
+                ),
+            );
+            y += SCROLL_HINT_H;
         }
         y
     }
@@ -239,16 +381,10 @@ impl Hud {
             &seeing,
         );
 
-        // Whose eyes: everything, or one commander's. Keys 0..8 do the same.
-        // Chips narrow so all eight fit, with a gap between teams.
-        let gaps = if allied {
-            teams::sizes(&players.iter().map(|p| p.team).collect::<Vec<_>>()).len() - 1
-        } else {
-            0
-        };
-        let room = r.w - 28.0 - 58.0 - 8.0 * gaps as f32;
-        let chip_w = (room / players.len().max(1) as f32 - 4.0).min(34.0);
-        let mut x = r.x + 18.0;
+        // Whose eyes: everything, or one commander's. Key 0 does the first, 1..9 the
+        // first nine commanders. Chips narrow to fit on one line, with a gap between teams, and
+        // wrap onto more lines when there are too many (`chip_places`).
+        let x = r.x + 18.0;
         let y = r.y + 34.0;
         let all = Rect::new(x, y, 52.0, 26.0);
         if self.vision_chip(
@@ -261,19 +397,11 @@ impl Hud {
         ) {
             self.actions.push(HudAction::Vision(None));
         }
-        x = all.right() + 6.0;
-        // Chips in team order, each team's under one bracket.
-        let (order, _) = team_order(players);
+        // Chips in team order, each team's run on a line under one bracket.
+        let (chips, lines) = chip_places(players, r);
         let mut group: Option<(u8, f32, f32)> = None;
-        for (k, &i) in order.iter().enumerate() {
+        for (k, &(i, chip)) in chips.iter().enumerate() {
             let p = &players[i];
-            if allied && group.is_some_and(|(t, _, _)| t != p.team) {
-                x += 8.0;
-            }
-            let chip = Rect::new(x, y, chip_w, 26.0);
-            if chip.right() > r.right() - 10.0 {
-                break;
-            }
             let mut c = s.team_color(i as u8);
             if p.defeated {
                 c[3] = 0.35;
@@ -291,22 +419,32 @@ impl Hud {
             }
             if allied {
                 group = match group {
-                    Some((t, from, _)) if t == p.team => Some((t, from, chip.right())),
+                    Some((t, from, _)) if t == p.team && from <= chip.x => {
+                        Some((t, from, chip.right()))
+                    }
                     _ => Some((p.team, chip.x, chip.right())),
                 };
-                let last = order.get(k + 1).is_none_or(|&j| players[j].team != p.team);
+                let last = chips
+                    .get(k + 1)
+                    .is_none_or(|&(j, next)| players[j].team != p.team || next.y != chip.y);
                 if let Some((_, from, to)) = group.filter(|_| last) {
                     let under = chip.bottom() + 4.0;
                     ui.hline(from, under, to - from, rgb(palette::LINE, 0.45));
                     ui.vline(from, under - 3.0, 3.0, rgb(palette::LINE, 0.45));
                     ui.vline(to - 1.0, under - 3.0, 3.0, rgb(palette::LINE, 0.45));
+                    group = None;
                 }
             }
-            x = chip.right() + 4.0;
         }
 
         // How the armies weigh against each other, by worth, in team order.
-        let bar = Rect::new(r.x + 18.0, r.y + 80.0, r.w - 36.0, 8.0);
+        let (order, _) = team_order(players);
+        let bar = Rect::new(
+            r.x + 18.0,
+            r.y + 80.0 + (lines - 1) as f32 * CHIP_LINE,
+            r.w - 36.0,
+            8.0,
+        );
         ui.text(
             bar.x,
             bar.y - 8.0,
@@ -403,14 +541,14 @@ impl Hud {
 
     /// One commander: name and team, both stores with what flows in and out,
     /// the materials income over the last minutes, and what they field.
-    fn player_card(&mut self, ui: &mut Ui, s: &Scene, i: usize, r: Rect, full: bool) {
+    fn player_card(&mut self, ui: &mut Ui, s: &Scene, i: usize, r: Rect, density: Density) {
         let view = s.view;
         let p = &view.status.players[i];
         let viewing = view.perspective == Some(i as u8);
         let alive = if p.defeated { 0.4 } else { 1.0 };
         self.glass(ui, r);
         // The camera button takes its clicks before the card under it can.
-        let find = Rect::new(r.right() - 66.0, r.y + 5.0, 58.0, 22.0);
+        let find = Rect::new(r.right() - 66.0, r.y + 4.0, 58.0, 22.0);
         if !p.defeated {
             let t = self.tile(ui, id("obs-find", i), find, false, true);
             ui.text_centred(
@@ -446,7 +584,7 @@ impl Hud {
 
         // Name line: number and name (the team is the heading above); on the
         // right, stalls and the camera button.
-        let y = r.y + 16.0;
+        let y = r.y + 15.0;
         ui.text(
             r.x + 14.0,
             y,
@@ -462,6 +600,32 @@ impl Hud {
             &p.name,
         );
         let status_right = find.x - 10.0;
+        if density == Density::Line && !p.defeated {
+            // One line: a stall, else what they field and what they earn.
+            let (text, tone) = if p.efficiency < 0.999 {
+                (
+                    format!("Stalling {:.0}%", p.build_speed * 100.0),
+                    palette::BAD,
+                )
+            } else {
+                (
+                    format!(
+                        "Army {}  +{}",
+                        short(p.forces.army_value),
+                        rate(p.mass_income + p.reclaim_income)
+                    ),
+                    palette::DIM,
+                )
+            };
+            ui.text_right(
+                status_right,
+                y,
+                type_scale::MICRO,
+                rgb(if viewing { palette::ACCENT } else { tone }, 1.0),
+                &text,
+            );
+            return;
+        }
         if p.defeated {
             ui.text_right(
                 r.right() - 12.0,
@@ -496,7 +660,10 @@ impl Hud {
             );
         }
 
-        if !full {
+        if density == Density::Line {
+            return;
+        }
+        if density == Density::Short {
             // One line: both stores and their nets, then what they field.
             let y = r.y + 42.0;
             let mut x = r.x + 14.0;

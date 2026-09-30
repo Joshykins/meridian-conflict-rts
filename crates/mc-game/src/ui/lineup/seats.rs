@@ -39,6 +39,10 @@ const FORCE_PRESETS: [[u8; 3]; 4] = [[100, 100, 100], [160, 60, 60], [60, 160, 6
 const FORCE_LABELS: [&str; 4] = ["Balanced", "Land", "Air", "Naval"];
 /// Height of a team's heading over its rows.
 const TEAM_HEAD_H: f32 = 30.0;
+/// Room kept under the rows for the team layouts and the note under them.
+const LAYOUTS_H: f32 = 96.0;
+/// The line under the rows that says they scroll.
+const SCROLL_NOTE_H: f32 = 22.0;
 /// A colour swatch in the strip that opens under a row, and the gap between swatches.
 const SWATCH: f32 = 26.0;
 const SWATCH_GAP: f32 = 8.0;
@@ -128,12 +132,32 @@ pub fn commanders(
     let mut hover_team = None;
     let mut heading: Option<(u8, f32)> = None;
     let mut y = head + 16.0;
-    for i in order {
+    // More seats than fit (a 32-seat map): the rows scroll under the wheel, and a
+    // note under them says which are shown.
+    let rows_top = y;
+    let limit = area.bottom() - LAYOUTS_H - SCROLL_NOTE_H;
+    let scroll = lineup.seat_scroll.min(n.saturating_sub(1));
+    let (mut shown, mut hidden) = (0, 0);
+    for (k, i) in order.into_iter().enumerate() {
         // An earlier row's change may have moved seats: skip what is gone.
         let Some(&seat) = lineup.roster.seats.get(i) else {
             continue;
         };
-        if allied && heading.map(|(t, _)| t) != seat.open().then_some(seat.team) {
+        if k < scroll {
+            continue;
+        }
+        let heads = allied && heading.map(|(t, _)| t) != seat.open().then_some(seat.team);
+        let head_h = match (heads, seat.open()) {
+            (false, _) => 0.0,
+            (true, true) => TEAM_HEAD_H,
+            (true, false) => 10.0,
+        };
+        if hidden > 0 || (shown > 0 && y + head_h + ROW_H > limit) {
+            hidden += 1;
+            continue;
+        }
+        shown += 1;
+        if heads {
             if let Some((t, top)) = heading.take() {
                 team_rail(ui, area.x, top, y - (ROW_PITCH - ROW_H), t);
             }
@@ -189,6 +213,32 @@ pub fn commanders(
         team_rail(ui, area.x, top, y - (ROW_PITCH - ROW_H), t);
     }
     lineup.hover_team = hover_team;
+    let rows = Rect::new(area.x, rows_top, area.w, y - rows_top);
+    if ui.interactive && rows.contains(ui.cursor) && ui.input.scroll != 0.0 {
+        if ui.input.scroll > 0.0 {
+            lineup.seat_scroll = scroll.saturating_sub(1);
+        } else if hidden > 0 {
+            lineup.seat_scroll = scroll + 1;
+        }
+    } else {
+        lineup.seat_scroll = scroll;
+    }
+    if scroll > 0 || hidden > 0 {
+        ui.text(
+            area.x,
+            y + 8.0,
+            type_scale::MICRO,
+            rgb(palette::DIM, 1.0),
+            &format!(
+                "Seats {}-{} of {}  \u{b7}  Scroll for {}",
+                scroll + 1,
+                scroll + shown,
+                n,
+                if hidden > 0 { "more" } else { "the first" }
+            ),
+        );
+        y += SCROLL_NOTE_H;
+    }
 
     let y = y + 8.0;
     if survival {
@@ -630,9 +680,10 @@ fn layouts(ui: &mut Ui, lineup: &mut Lineup, catalog: &Catalog, table: &Table, a
         ("Free for All", open, open > 2),
         ("Two Sides", 2, open > 2),
         ("Pairs", open / 2, open >= 6 && open.is_multiple_of(2)),
+        ("Fours", open / 4, open >= 12 && open.is_multiple_of(4)),
     ];
     for (n, (label, groups, enabled)) in options.into_iter().enumerate() {
-        let r = Rect::new(area.x + 64.0 + n as f32 * 128.0, y, 120.0, 32.0);
+        let r = Rect::new(area.x + 64.0 + n as f32 * 110.0, y, 104.0, 32.0);
         if ui.button(
             id("team-layout", n),
             r,

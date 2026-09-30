@@ -93,18 +93,33 @@ impl Hud {
         let mut y = r.bottom() + GAP;
         // An observer has them all down the left instead.
         if players.len() > 1 && !view.observing {
-            let (wide, row_h) = (250.0, 22.0);
-            let list = Rect::new(
-                r.right() - wide,
-                y,
-                wide,
-                players.len() as f32 * row_h + 12.0,
-            );
+            // Past ten commanders (up to 32) they go in columns of eight, a colour and
+            // a name each; a defeated one is dimmed rather than labelled.
+            let columns = if players.len() > 10 {
+                players.len().div_ceil(8)
+            } else {
+                1
+            };
+            let per_column = players.len().div_ceil(columns);
+            let compact = columns > 1;
+            let (column_w, row_h) = if compact {
+                (150.0, 20.0)
+            } else {
+                (250.0, 22.0)
+            };
+            let wide = column_w * columns as f32;
+            let list = Rect::new(r.right() - wide, y, wide, per_column as f32 * row_h + 12.0);
             self.claim(ui, list);
             ui.fill(list, ink(0.6));
             ui.frame(list, rgb(palette::LINE, 0.12));
             for (i, p) in players.iter().enumerate() {
-                let row = Rect::new(list.x, list.y + 6.0 + i as f32 * row_h, list.w, row_h);
+                let (column, line) = (i / per_column, i % per_column);
+                let row = Rect::new(
+                    list.x + column as f32 * column_w,
+                    list.y + 6.0 + line as f32 * row_h,
+                    column_w,
+                    row_h,
+                );
                 let res = ui.interact(id("hud-player", i), row, !p.defeated);
                 if res.clicked {
                     ui.audio.play(Sfx::Select);
@@ -117,15 +132,26 @@ impl Hud {
                 let alive = if p.defeated { 0.35 } else { 1.0 };
                 let mut c = s.team_color(i as u8);
                 c[3] = alive;
-                ui.fill(Rect::new(list.x + 12.0, ry - 4.0, 8.0, 8.0), c);
+                ui.fill(Rect::new(row.x + 12.0, ry - 4.0, 8.0, 8.0), c);
                 if i == view.local as usize {
                     ui.frame(
-                        Rect::new(list.x + 9.0, ry - 7.0, 14.0, 14.0),
+                        Rect::new(row.x + 9.0, ry - 7.0, 14.0, 14.0),
                         rgb(palette::TEXT, 0.8),
                     );
                 }
+                if compact {
+                    ui.text_fit_left(
+                        row.x + 28.0,
+                        ry,
+                        row.w - 36.0,
+                        type_scale::CAPTION,
+                        rgb(palette::TEXT, 0.9 * alive),
+                        &p.name,
+                    );
+                    continue;
+                }
                 ui.text(
-                    list.x + 32.0,
+                    row.x + 32.0,
                     ry,
                     type_scale::CAPTION,
                     rgb(palette::TEXT, 0.9 * alive),

@@ -39,12 +39,17 @@ impl Hud {
             .iter()
             .filter(|p| (p.slot.index()) < s.view.status.players.len())
             .collect();
-        let row = 30.0;
+        // Past twelve seats (up to 32) they go in columns of up to sixteen, tighter.
+        let columns = seats.len().div_ceil(16).max(1);
+        let per_column = seats.len().div_ceil(columns).max(1);
+        let row = if columns > 1 { 24.0 } else { 30.0 };
+        let column_w = 420.0;
+        let wide = column_w * columns as f32;
         let r = Rect::new(
-            (w - 420.0) * 0.5,
-            h * 0.36,
-            420.0,
-            96.0 + seats.len() as f32 * row,
+            (w - wide) * 0.5,
+            (h * 0.36).min(h - 120.0 - per_column as f32 * row),
+            wide,
+            96.0 + per_column as f32 * row,
         );
         self.claim(ui, r);
         ui.panel(r);
@@ -66,12 +71,13 @@ impl Hud {
         );
         let loaded = link.loading.unwrap_or(0);
         for (i, p) in seats.iter().enumerate() {
-            let y = r.y + 88.0 + i as f32 * row;
+            let x = r.x + (i / per_column) as f32 * column_w;
+            let y = r.y + 88.0 + (i % per_column) as f32 * row;
             let slot = p.slot.0;
-            ui.fill(Rect::new(r.x + 34.0, y - 4.0, 8.0, 8.0), s.team_color(slot));
+            ui.fill(Rect::new(x + 34.0, y - 4.0, 8.0, 8.0), s.team_color(slot));
             let name = &s.view.status.players[slot as usize].name;
             ui.text(
-                r.x + 54.0,
+                x + 54.0,
                 y,
                 type_scale::VALUE,
                 rgb(palette::TEXT, 1.0),
@@ -86,7 +92,7 @@ impl Hud {
                 (format!("Loading{dots}"), palette::DIM)
             };
             ui.text_right(
-                r.right() - 34.0,
+                x + column_w - 34.0,
                 y,
                 type_scale::CAPTION,
                 rgb(tone, 1.0),

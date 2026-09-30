@@ -223,6 +223,9 @@ pub struct Lineup {
     tuning: Option<u8>,
     /// The row (by seat key) whose colour swatches are open under it.
     coloring: Option<u8>,
+    /// Rows scrolled past at the top of the commanders column, when there are more
+    /// seats than fit (a 32-seat map).
+    seat_scroll: usize,
     /// The team whose heading the pointer was over last frame.
     hover_team: Option<u8>,
     /// A survival fronts chip under the pointer.
@@ -247,6 +250,7 @@ impl Lineup {
             sheet: Sheet::default(),
             tuning: None,
             coloring: None,
+            seat_scroll: 0,
             hover_team: None,
             hover_domain: None,
             chart_of: None,

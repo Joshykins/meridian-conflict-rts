@@ -23,13 +23,17 @@ pub fn sizes(teams: &[u8]) -> Vec<(u8, usize)> {
     out
 }
 
-/// "2 v 2", "1 v 1 v 1", or "Free for All" when nobody is allied.
+/// "2 v 2", "1 v 1 v 1", or "Free for All" when nobody is allied; past four
+/// even teams, "8 Teams of 4".
 pub fn matchup(teams: &[u8]) -> String {
     if free_for_all(teams) {
         return format!("Free for All \u{b7} {}", teams.len());
     }
-    sizes(teams)
-        .iter()
+    let s = sizes(teams);
+    if s.len() > 4 && !uneven(teams) {
+        return format!("{} Teams of {}", s.len(), s[0].1);
+    }
+    s.iter()
         .map(|(_, n)| n.to_string())
         .collect::<Vec<_>>()
         .join(" v ")
@@ -214,6 +218,8 @@ mod tests {
         assert!(!uneven(&[0, 1, 0, 1]));
         assert_eq!(matchup(&[0, 1, 2, 3]), "Free for All \u{b7} 4");
         assert_eq!(matchup(&[0, 0, 1, 1, 2, 2]), "2 v 2 v 2");
+        let eights: Vec<u8> = (0..32).map(|i| i / 4).collect();
+        assert_eq!(matchup(&eights), "8 Teams of 4");
     }
 
     #[test]

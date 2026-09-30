@@ -675,10 +675,22 @@ fn row_face(row: Rect) -> Rect {
     Rect::new(row.x, row.y, (row.w - 140.0).max(0.0), row.h)
 }
 
-/// Seats as pips, the taken ones lit.
+/// Seats as pips, the taken ones lit: a line of eight, or for a bigger room
+/// two lines of smaller ones in the same width.
 fn pips(ui: &mut Ui, x: f32, y: f32, taken: usize, seats: usize) {
-    for i in 0..seats.min(8) {
-        let r = Rect::new(x + i as f32 * 14.0, y - 5.0, 10.0, 10.0);
+    let seats = seats.min(mc_core::MAX_PLAYERS);
+    let per_line = if seats <= 8 { 8 } else { seats.div_ceil(2) };
+    let pitch = 112.0 / per_line as f32;
+    let size = (pitch - 4.0).min(10.0);
+    let lines = seats.div_ceil(per_line);
+    for i in 0..seats {
+        let (line, col) = (i / per_line, i % per_line);
+        let r = Rect::new(
+            x + col as f32 * pitch,
+            y - 5.0 + (line as f32 - (lines as f32 - 1.0) * 0.5) * (size + 3.0),
+            size,
+            size,
+        );
         if i < taken {
             ui.fill(r, rgb(palette::TEXT, 0.9));
         } else {

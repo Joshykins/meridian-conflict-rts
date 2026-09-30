@@ -1359,6 +1359,29 @@ fn an_observer_cannot_order_the_selection() {
 }
 
 #[test]
+fn an_observer_of_thirty_two_reaches_every_commander() {
+    let mut rig = Rig::new("aster_t1_tank");
+    rig.view.observing = true;
+    rig.view.status.players = (0..mc_core::MAX_PLAYERS)
+        .map(|i| crate::sim_thread::PlayerStatus {
+            team: (i / 4) as u8,
+            ..Default::default()
+        })
+        .collect();
+    let header = crate::ui::Rect::new(EDGE, EDGE, observer::WIDTH, observer::HEADER_H);
+    let (chips, lines) = observer::chip_places(&rig.view.status.players, header);
+    assert_eq!(chips.len(), mc_core::MAX_PLAYERS, "a chip for everyone");
+    assert!(lines > 1, "they wrap rather than shrink to nothing");
+    let (last, chip) = *chips.last().unwrap();
+    assert!(chip.right() <= header.right());
+    assert_eq!(
+        rig.click(Vec2::new(chip.x + chip.w * 0.5, chip.mid_y())),
+        vec![HudAction::Vision(Some(last as u8))],
+        "the last chip picks the last commander"
+    );
+}
+
+#[test]
 fn hovering_a_unit_fills_the_info_panel_when_nothing_is_selected() {
     let mut rig = Rig::new("aster_t1_tank");
     rig.view.selection.clear();

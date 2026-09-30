@@ -146,7 +146,13 @@ fn zones(
 
     let mut take = None;
     lineup.markers.clear();
-    for n in 0..map.start_positions().len().min(mc_core::MAX_PLAYERS) {
+    let zones = map.start_positions().len().min(mc_core::MAX_PLAYERS);
+    // A crowded ring (up to 32 zones): one badge per team, outside its first zone,
+    // rather than one on every marker.
+    let crowded = zones > 12;
+    let mut badged: Vec<u8> = Vec::new();
+    let centre = Vec2::new(frame.x + side * 0.5, frame.y + side * 0.5);
+    for n in 0..zones {
         let p = at_zone(n);
         lineup.markers.push(p + ui.shift);
         let holder = seats.iter().position(|s| s.open() && s.start as usize == n);
@@ -193,14 +199,14 @@ fn zones(
         // Whose side the zone is on.
         if let Some(i) = holder.filter(|_| allied) {
             let team = seats[i].team;
-            teams::badge(
-                ui,
-                p.x + 9.0,
-                p.y - 17.0,
-                team,
-                1.0,
-                lineup.hover_team == Some(team),
-            );
+            let lit = lineup.hover_team == Some(team);
+            if !crowded {
+                teams::badge(ui, p.x + 9.0, p.y - 17.0, team, 1.0, lit);
+            } else if !badged.contains(&team) {
+                badged.push(team);
+                let out = p + (p - centre).normalize_or_zero() * 34.0;
+                teams::badge(ui, out.x - 12.0, out.y, team, 1.0, lit);
+            }
         }
         if res.glow > 0.05 {
             let tip = match holder {
