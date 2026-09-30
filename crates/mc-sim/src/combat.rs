@@ -1526,13 +1526,16 @@ impl World {
             // Launch cells on a hull (a capital ship's too), or a missile that homes: no
             // need to point the hull.
             true
-        } else if weapon.turret_turn == 0
-            && weapon.torpedo
-            && bp.unit(units.blueprint[row]).motion.is_none()
-        {
-            // Fixed tubes on a structure (the Fathom's batteries): it cannot turn, and a
-            // torpedo steers itself onto the mark once it is out of the tube, so the tubes
-            // fire at anything inside their arc.
+        } else if weapon.turret_turn == 0 && weapon.torpedo && aircraft.is_none() {
+            // Fixed tubes on a hull or a structure (the Fathom's batteries): a torpedo
+            // steers itself onto the mark once it is out of the tube, so the tubes fire at
+            // anything inside their arc, bow tubes all round, astern too. A hull that is
+            // not driving somewhere still comes round onto the mark.
+            if units.flags[row] & flag::MOVING == 0 && !spooling {
+                if let Some(m) = bp.unit(units.blueprint[row]).motion {
+                    units.heading[row] = units.heading[row].turn_toward(bearing, m.turn_rate);
+                }
+            }
             units.heading[row]
                 .delta_to(bearing - weapon.facing)
                 .unsigned_abs()
@@ -1555,7 +1558,7 @@ impl World {
             }
             // A started salvo stays pickled through a bombing run as the target
             // slides aft; the first drop still needs a tight heading.
-            // A torpedo steers itself onto the mark once it is out of the tube.
+            // An aerial torpedo steers itself onto the mark once it is in the water.
             let slack = if weapon.torpedo {
                 Angle::from_degrees(40).0
             } else if units.weapon_salvo_left[row][w] > 0 {

@@ -684,6 +684,8 @@ fn torpedoes_away() -> (World, UnitId) {
 #[test]
 fn a_torpedo_whose_mark_is_gone_bursts_where_it_is() {
     let (mut w, boat) = torpedoes_away();
+    // Out of the submarine's reach (550 m): no other mark for the torpedoes.
+    spawn(&mut w, "aster_t1_attack_boat", 1, 1700, 1000, flag::PASSIVE);
     let remove = PlayerCommand {
         player: 1,
         command: Command::DebugRemove { units: vec![boat] },
@@ -709,6 +711,63 @@ fn a_torpedo_whose_mark_is_gone_bursts_where_it_is() {
     }
     assert!(bursts >= 1);
     assert!(w.state.projectiles.pos.is_empty());
+}
+
+#[test]
+fn a_torpedo_whose_mark_is_gone_takes_another_in_reach() {
+    let (mut w, boat) = torpedoes_away();
+    let other = spawn(&mut w, "aster_t1_attack_boat", 1, 1250, 1150, flag::PASSIVE);
+    let remove = PlayerCommand {
+        player: 1,
+        command: Command::DebugRemove { units: vec![boat] },
+    };
+    w.tick(std::slice::from_ref(&remove)).unwrap();
+    assert!(
+        !w.state.projectiles.pos.is_empty(),
+        "the torpedoes burst instead of taking the other boat"
+    );
+    assert!(w.state.projectiles.target.iter().all(|&t| t == other));
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::Impact { on_unit, .. } if *on_unit))
+        {
+            return;
+        }
+    }
+    panic!("the torpedoes never struck the other boat");
+}
+
+#[test]
+fn a_submarine_fires_astern_then_comes_round() {
+    let mut w = sea(false);
+    spawn(&mut w, "aster_t1_attack_boat", 1, 700, 1000, flag::PASSIVE);
+    let sub = spawn(&mut w, "aster_t1_submarine", 0, 1000, 1000, 0);
+    let mut fired = false;
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        let r = w.state.units.row(sub).unwrap();
+        let heading = Angle::ZERO
+            .delta_to(w.state.units.heading[r])
+            .unsigned_abs();
+        if !fired
+            && w.events
+                .iter()
+                .any(|e| matches!(e, SimEvent::ShotFired { owner: 0, .. }))
+        {
+            assert!(
+                heading < Angle::from_degrees(90).0,
+                "it came round before firing astern"
+            );
+            fired = true;
+        }
+        if fired && heading > Angle::from_degrees(170).0 {
+            return;
+        }
+    }
+    assert!(fired, "the submarine never fired astern");
+    panic!("the submarine never came round onto its mark");
 }
 
 #[test]

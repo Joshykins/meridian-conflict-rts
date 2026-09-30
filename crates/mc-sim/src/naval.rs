@@ -6,6 +6,7 @@
 //! the water over it still reaches it); a torpedo in turn only strikes what floats
 //! in the water.
 
+use crate::spatial::kind;
 use crate::tables::*;
 use crate::World;
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
@@ -243,8 +244,8 @@ impl World {
     }
 
     /// When torpedo `i` bursts with no hull to hit, as a share of this tick's step: at
-    /// once when the mark it was fired at is gone, dead, out of the water or no longer
-    /// detected; at the end of the step on its last tick of running. One fired at a
+    /// once when its mark is gone, dead, out of the water or no longer detected, and
+    /// no other was left to take (`retarget_torpedoes`); at the end of the step on its last tick of running. One fired at a
     /// point in the water runs out there (`torpedo_launch`).
     pub(crate) fn torpedo_burst(&self, i: usize, weapon: &Weapon) -> Option<Fx> {
         if !weapon.torpedo {
@@ -255,25 +256,82 @@ impl World {
             return Some(Fx::ZERO);
         }
         let p = &self.state.projectiles;
-        if p.target[i] != Handle::NONE {
-            let units = &self.state.units;
-            // One dropped from the air homes by itself on a mark close enough to hear.
-            let dropped = self
-                .blueprints
-                .unit(p.blueprint[i])
-                .motion
-                .is_some_and(|m| m.layer == MoveLayer::Air);
-            let lost = units.row(p.target[i]).is_none_or(|t| {
-                units.health[t] <= Fx::ZERO
-                    || !self.torpedo_can_mark(t)
-                    || (!self.detects(p.owner[i], t)
-                        && !(dropped && units.pos[t].distance(p.pos[i].xy()) <= SEEKER))
-            });
-            if lost {
-                return Some(Fx::ZERO);
-            }
+        if p.target[i] != Handle::NONE && !self.torpedo_holds(i) {
+            return Some(Fx::ZERO);
         }
         (p.ticks_left[i] <= 1).then_some(Fx::ONE)
+    }
+
+    /// Whether torpedo `i` still has its mark: alive, in the water and detected. One
+    /// dropped from the air homes by itself on a mark close enough to hear.
+    fn torpedo_holds(&self, i: usize) -> bool {
+        let p = &self.state.projectiles;
+        self.state
+            .units
+            .row(p.target[i])
+            .is_some_and(|t| self.torpedo_may_take(i, t))
+    }
+
+    /// Whether torpedo `i` may run at `t`: alive, in the water, and detected by its
+    /// side or, dropped from the air, close enough for its own seeker to hear.
+    fn torpedo_may_take(&self, i: usize, t: usize) -> bool {
+        let p = &self.state.projectiles;
+        let units = &self.state.units;
+        let dropped = self
+            .blueprints
+            .unit(p.blueprint[i])
+            .motion
+            .is_some_and(|m| m.layer == MoveLayer::Air);
+        units.health[t] > Fx::ZERO
+            && self.torpedo_can_mark(t)
+            && (self.detects(p.owner[i], t)
+                || (dropped && units.pos[t].distance(p.pos[i].xy()) <= SEEKER))
+    }
+
+    /// Torpedoes whose mark is gone (dead, out of the water, lost to sonar) take the
+    /// nearest other enemy their weapon can strike inside the firer's reach, with no
+    /// land between; one with none left bursts where it is (`torpedo_burst`), as does
+    /// one whose firer is gone. One fired at a point keeps to the point.
+    fn retarget_torpedoes(&mut self) {
+        for i in 0..self.state.projectiles.len() {
+            let p = &self.state.projectiles;
+            let weapon = &self.blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+            if !weapon.torpedo
+                || p.quarry[i] != 0
+                || p.target[i] == Handle::NONE
+                || self.torpedo_holds(i)
+            {
+                continue;
+            }
+            let units = &self.state.units;
+            let Some(firer) = units.row(p.source[i]) else {
+                continue;
+            };
+            let (from, reach, owner) = (units.pos[firer], weapon.range_max, p.owner[i]);
+            let at = p.pos[i].xy();
+            // The nearest to the torpedo, the lowest row on a tie.
+            let mut best: Option<(Fx, usize)> = None;
+            self.index.query(from, reach, kind::UNIT, |e| {
+                let t = e.row as usize;
+                let gap = units.pos[t].distance_sq(at);
+                if best.is_none_or(|b| (gap, t) < b)
+                    && self.unit_entry_is_current(e)
+                    && !units.has_flag(t, flag::IN_FACTORY)
+                    && self.are_enemies(owner, units.owner[t])
+                    && units.pos[t].distance(from) - self.bp(t).radius <= reach
+                    && self.weapon_reaches(t, weapon)
+                    && self.torpedo_may_take(i, t)
+                    && self.torpedo_run_clear(at, units.pos[t])
+                {
+                    best = Some((gap, t));
+                }
+                true
+            });
+            if let Some((_, t)) = best {
+                let handle = self.state.units.slots.handle(t);
+                self.state.projectiles.target[i] = handle;
+            }
+        }
     }
 
     /// The least climb per tick that keeps a torpedo at `pos`, running `way` over the
@@ -305,8 +363,10 @@ impl World {
     /// Torpedoes run level under the water at their own speed, turning onto a lead
     /// on their mark and easing to its depth: just under the surface for a floating
     /// hull, the middle of a dived one. They follow the seabed over any mound on the
-    /// way (`bed_climb`). With no mark left they run on straight.
+    /// way (`bed_climb`). A torpedo whose mark is gone takes another first
+    /// (`retarget_torpedoes`); with no mark left they run on straight.
     pub(crate) fn steer_torpedoes(&mut self) {
+        self.retarget_torpedoes();
         let blueprints = self.blueprints.clone();
         let water = self.terrain.water_level();
         for i in 0..self.state.projectiles.len() {
