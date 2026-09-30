@@ -427,10 +427,11 @@ fn blister(b: &mut MeshBuilder, at: Vec3, yaw: f32) {
     b.paint(PLATING).pattern(pattern::PLAIN);
     b.spheroid(at + Vec3::Z * 0.8, v3(2.3, 2.3, 1.5), b.sides(8), 3);
     if b.fine() {
+        // The yawed frame is at the blister: the barrels are placed in it, not by `at`.
         b.yawed(at, yaw, |b| {
             b.paint(METAL);
             for y in [-0.45, 0.45] {
-                b.cylinder_between(at + v3(1.2, y, 1.3), at + v3(5.2, y, 1.6), 0.22, 0.18, 5);
+                b.cylinder_between(v3(1.2, y, 1.3), v3(5.2, y, 1.6), 0.22, 0.18, 5);
             }
         });
     }
@@ -1048,6 +1049,21 @@ mod tests {
         };
         let (lo, hi) = span(0);
         assert!(hi - lo >= 288.0, "capital hull length {}", hi - lo);
+        // Fine detail sits on the hull the mid level already has: nothing of it floats
+        // clear above or beside it (the blisters' twin guns once hung 80 m off the stern).
+        let mid = &model.lods[1];
+        for axis in 0..3 {
+            let (mlo, mhi) = mid
+                .vertices
+                .iter()
+                .map(|v| v.pos[axis])
+                .fold((f32::MAX, f32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)));
+            let (flo, fhi) = span(axis);
+            assert!(
+                flo >= mlo - 2.0 && fhi <= mhi + 2.0,
+                "fine level spans {flo}..{fhi} on axis {axis}, the mid level {mlo}..{mhi}"
+            );
+        }
         assert!(span(2).0 >= -0.01);
         // Stowed (pads folded, strut in, leg swung up), every leg piece is inside the hull.
         for v in &mesh.vertices {
