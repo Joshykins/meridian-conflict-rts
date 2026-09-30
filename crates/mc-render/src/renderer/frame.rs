@@ -315,7 +315,9 @@ impl Renderer {
                 climate_code(self.climate),
                 self.grass.enabled as u32 as f32,
                 grass::reach(camera.projection_scale()),
-                0.0,
+                // How many sim ticks this frame covers (game time is sim time), so a
+                // treads' links blur when they move too far a frame to read (entity.wgsl).
+                ((input.time - self.last_time) * mc_core::TICKS_PER_SECOND as f32).clamp(0.0, 4.0),
             ],
             detail: [
                 self.quality.prop_detail[0],

@@ -307,7 +307,8 @@ pub(crate) struct Globals {
     /// x the map's climate: 0 temperate, 1 tropical, 2 desert (`climate_code`;
     /// terrain.wgsl, water.wgsl);
     /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it;
-    /// z how far from the eye it grows (`grass::reach`).
+    /// z how far from the eye it grows (`grass::reach`);
+    /// w how many sim ticks this frame covers (the treads' motion blur, entity.wgsl).
     pub(crate) climate: [f32; 4],
     /// Prop detail: common.wgsl `Globals::detail`.
     pub(crate) detail: [f32; 4],

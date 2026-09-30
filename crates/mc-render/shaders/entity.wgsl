@@ -234,16 +234,20 @@ struct Weld {
 
 @group(0) @binding(15) var<storage, read> welds: array<Weld>;
 
-// Distance along a track belt, increasing in the circulation that drives
-// the hull forward: top run +x, front down, underside -x, rear up. Side
-// faces (the lozenge you see from the flank) split on height, so the
-// visible upper half matches the top run.
 // One track link's pitch in model units: 0.4 on a tank, growing with the body (`reach`,
 // its radius) to 1.0 on the biggest, so a giant's belt is heavy links, not a fine mesh.
 fn tread_pitch(reach: f32) -> f32 {
     return 0.4 * clamp(reach / 6.0, 1.0, 2.5);
 }
 
+// Links in one period of a belt's wear bands, which still read as it rolls when the
+// links themselves are a blur.
+const TREAD_WRAP: f32 = 8.0;
+
+// Distance along a track belt, increasing in the circulation that drives
+// the hull forward: top run +x, front down, underside -x, rear up. Side
+// faces (the lozenge you see from the flank) split on height, so the
+// visible upper half matches the top run.
 fn tread_along(p: vec3<f32>, n: vec3<f32>) -> f32 {
     let side = abs(n.y) > abs(n.x) && abs(n.y) > abs(n.z);
     if side {
@@ -2123,14 +2127,21 @@ fn vs_main(in: VsIn) -> VsOut {
     // likewise). `model_class` bit 9 carries the same test to the fragment stage.
     let belt = (model.icon & 0x20000u) == 0u && model.leg_hip.w <= 0.0;
     if in.material == MAT_TREAD && belt {
-        // The links move by the ground the hull has covered (the sim's gait, metres), one
-        // link pitch (`tread_pitch`) wrapped, so a stopped belt stays put and a nudge moves it a nudge.
+        // The links move by the ground the hull has covered (the sim's gait, metres),
+        // wrapped at `TREAD_WRAP` links (the wear bands' period), so a stopped belt stays
+        // put and a nudge moves it a nudge. uv.y carries how many links the belt moves a
+        // frame: at speed that is more than one, and the fragment stage blurs the links
+        // rather than let them strobe backwards.
         let pitch = tread_pitch(max(select(model.bounds_radius, model.surface.x, model.surface.x > 0.0), 1.0));
         var rolled = 0.0;
-        if terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
-            rolled = fract((e.gait.x - e.gait.y * (1.0 - globals.sun.w)) / pitch) * pitch;
+        var travel = 0.0;
+        // A wreck's gait is its age, not ground covered: its belt lies still.
+        if terrain_height(e.pos.xy) >= globals.map.z - 0.25 && (e.owner_flags & KIND_WRECK) == 0u {
+            let wrap = TREAD_WRAP * pitch;
+            rolled = fract((e.gait.x - e.gait.y * (1.0 - globals.sun.w)) / wrap) * wrap;
+            travel = e.gait.y * globals.climate.w / pitch;
         }
-        out.uv = vec2<f32>(tread_along(in.pos, in.normal) + rolled, in.uv.y);
+        out.uv = vec2<f32>(tread_along(in.pos, in.normal) + rolled, travel);
     } else {
         out.uv = in.uv;
     }
@@ -2578,6 +2589,59 @@ fn precursor_cutaway(in: VsOut) -> bool {
     return door < fade * 0.97;
 }
 
+// A track link's look at one point of it (`tread_link`).
+struct TreadLink {
+    albedo: vec3<f32>,
+    metal: f32,
+    rough: f32,
+}
+
+// Taps across one link for its average look (`tread_link`), when it moves too fast to see.
+const TREAD_TAPS: u32 = 12u;
+
+// Each link is a steel shoe: a worn grouser bar across it, rubber pads either side of a
+// centre guide horn, end connectors at its edges, a dark hinge gap to the next. Seen from
+// the flank it is the links' side plates and their pins. `link` is how far along the link
+// (0..1), `q` how far across the shoe from its centre (0..0.5), `shade` its wear.
+fn tread_link(link: f32, q: f32, flank: bool, shade: f32) -> TreadLink {
+    let gap = smoothstep(0.9, 0.93, link);
+    let steel = vec3<f32>(0.045, 0.044, 0.043);
+    let worn = vec3<f32>(0.2, 0.195, 0.185);
+    var albedo = steel * shade;
+    var metal = 0.35;
+    var rough = 0.7;
+    var recess = gap;
+    if flank {
+        // Side plates, a pin boss at each joint, a bevel catching light on the lead edge.
+        let lead = smoothstep(0.02, 0.07, link) * (1.0 - smoothstep(0.1, 0.16, link));
+        let pin = smoothstep(0.78, 0.8, link) * (1.0 - smoothstep(0.88, 0.9, link));
+        albedo = mix(albedo, worn * 0.7, lead * 0.6);
+        albedo = mix(albedo, worn, pin);
+        metal = mix(metal, 0.85, pin);
+        rough = mix(rough, 0.35, pin);
+    } else {
+        // Across the shoe, every 1.1 m or so: pad, horn, pad, and a connector at each end.
+        let grouser = smoothstep(0.06, 0.09, link) * (1.0 - smoothstep(0.3, 0.33, link));
+        let pad_along = smoothstep(0.4, 0.43, link) * (1.0 - smoothstep(0.84, 0.87, link));
+        let horn = 1.0 - smoothstep(0.05, 0.07, q);
+        let pad = pad_along * smoothstep(0.1, 0.12, q) * (1.0 - smoothstep(0.42, 0.44, q));
+        let connector = smoothstep(0.46, 0.475, q) * (1.0 - gap);
+        albedo = mix(albedo, worn * shade, max(grouser, connector * 0.7));
+        metal = mix(metal, 0.85, max(grouser, connector));
+        rough = mix(rough, 0.3, grouser);
+        albedo = mix(albedo, vec3<f32>(0.016, 0.016, 0.018), pad);
+        rough = mix(rough, 0.95, pad);
+        metal = mix(metal, 0.0, pad);
+        albedo = mix(albedo, worn * 1.15, horn * pad_along);
+        metal = mix(metal, 0.9, horn * pad_along);
+        // Dirt packs the edges of the pads.
+        recess = max(recess, pad * (smoothstep(0.36, 0.43, q) + 1.0 - smoothstep(0.1, 0.17, q)) * 0.6);
+    }
+    albedo = mix(albedo, vec3<f32>(0.006), gap);
+    albedo = mix(albedo, vec3<f32>(0.075, 0.058, 0.04), recess * 0.55 * (1.0 - gap));
+    return TreadLink(albedo, metal, rough);
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if precursor_cutaway(in) { discard; }
@@ -2837,53 +2901,37 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // underside crawls back so it stays on the ground. A hover skirt uses the same
         // rubber but is not a belt. The crawl is already in uv.x (vertex stage, from the
         // ground covered); afloat the belt has nothing to drive on and stands still.
-        //
-        // Each link is a steel shoe: a worn grouser bar across it, rubber pads either
-        // side of a centre guide horn, end connectors at its edges, a dark hinge gap to
-        // the next. Seen from the flank it is the links' side plates and their pins.
         tread = 0.45;
         let pitch = tread_pitch(in.weld.z);
         let along = in.uv.x / pitch;
-        let link = fract(along);
-        let shade = 0.85 + 0.3 * hash11(floor(along) + in.state.w * 97.0);
         let detail = clamp(1.0 - dist / 500.0, 0.0, 1.0);
         let flank = dot(face_n, face_n) > 1e-12 && abs(normalize(face_n).y) > 0.7;
-        let gap = smoothstep(0.9, 0.93, link);
-        let steel = vec3<f32>(0.045, 0.044, 0.043);
-        let worn = vec3<f32>(0.2, 0.195, 0.185);
-        var albedo = steel * shade;
-        var metal = 0.35;
-        var rough = 0.7;
-        var recess = gap;
-        if flank {
-            // Side plates, a pin boss at each joint, a bevel catching light on the lead edge.
-            let lead = smoothstep(0.02, 0.07, link) * (1.0 - smoothstep(0.1, 0.16, link));
-            let pin = smoothstep(0.78, 0.8, link) * (1.0 - smoothstep(0.88, 0.9, link));
-            albedo = mix(albedo, worn * 0.7, lead * 0.6);
-            albedo = mix(albedo, worn, pin);
-            metal = mix(metal, 0.85, pin);
-            rough = mix(rough, 0.35, pin);
-        } else {
-            // Across the shoe, every 1.1 m or so: pad, horn, pad, and a connector at each end.
-            let q = abs(fract(in.local.y * 0.36 / pitch + 0.5) - 0.5);
-            let grouser = smoothstep(0.06, 0.09, link) * (1.0 - smoothstep(0.3, 0.33, link));
-            let pad_along = smoothstep(0.4, 0.43, link) * (1.0 - smoothstep(0.84, 0.87, link));
-            let horn = 1.0 - smoothstep(0.05, 0.07, q);
-            let pad = pad_along * smoothstep(0.1, 0.12, q) * (1.0 - smoothstep(0.42, 0.44, q));
-            let connector = smoothstep(0.46, 0.475, q) * (1.0 - gap);
-            albedo = mix(albedo, worn * shade, max(grouser, connector * 0.7));
-            metal = mix(metal, 0.85, max(grouser, connector));
-            rough = mix(rough, 0.3, grouser);
-            albedo = mix(albedo, vec3<f32>(0.016, 0.016, 0.018), pad);
-            rough = mix(rough, 0.95, pad);
-            metal = mix(metal, 0.0, pad);
-            albedo = mix(albedo, worn * 1.15, horn * pad_along);
-            metal = mix(metal, 0.9, horn * pad_along);
-            // Dirt packs the edges of the pads.
-            recess = max(recess, pad * (smoothstep(0.36, 0.43, q) + 1.0 - smoothstep(0.1, 0.17, q)) * 0.6);
+        let q = abs(fract(in.local.y * 0.36 / pitch + 0.5) - 0.5);
+        // A tank runs at tens of metres a second, more than a link a frame: the eye pairs
+        // each link with the one behind it and the belt seems to run backwards. Past a
+        // quarter link a frame the links fade to their average (a camera's motion blur),
+        // and slow wear bands, a few metres long, are left to show it rolling forward.
+        let blur = smoothstep(0.25, 0.45, in.uv.y);
+        let index = floor(along) - TREAD_WRAP * floor(along / TREAD_WRAP);
+        let band = sin((along / TREAD_WRAP + in.state.w) * 2.0 * PI);
+        let shade = mix(0.85 + 0.3 * hash11(index + in.state.w * 97.0), 1.0, blur);
+        var look = tread_link(fract(along), q, flank, shade);
+        if blur > 0.0 {
+            // The whole link's average, taken at fixed points so it holds still as the belt moves.
+            var mean = TreadLink(vec3<f32>(0.0), 0.0, 0.0);
+            for (var i = 0u; i < TREAD_TAPS; i++) {
+                let tap = tread_link((f32(i) + 0.5) / f32(TREAD_TAPS), q, flank, shade);
+                mean.albedo += tap.albedo / f32(TREAD_TAPS);
+                mean.metal += tap.metal / f32(TREAD_TAPS);
+                mean.rough += tap.rough / f32(TREAD_TAPS);
+            }
+            look.albedo = mix(look.albedo, mean.albedo * (1.0 + 0.45 * band), blur);
+            look.metal = mix(look.metal, mean.metal, blur);
+            look.rough = mix(look.rough, mean.rough, blur);
         }
-        albedo = mix(albedo, vec3<f32>(0.006), gap);
-        albedo = mix(albedo, vec3<f32>(0.075, 0.058, 0.04), recess * 0.55 * (1.0 - gap));
+        let albedo = look.albedo;
+        let metal = look.metal;
+        let rough = look.rough;
         m.albedo = mix(m.albedo, albedo, detail);
         m.metallic = mix(m.metallic, metal, detail);
         m.roughness = mix(m.roughness, rough, detail);
