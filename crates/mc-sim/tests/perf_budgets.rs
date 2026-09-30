@@ -236,7 +236,17 @@ fn eight_armies_clash() {
         .perf_ticks("eight_armies_clash", 200, |_, _| Vec::new())
         .unwrap();
     mc_sim::perf::save(&report);
-    mc_sim::perf::budget(&report, &[("sim.tick", 40.0)]);
+    // Counts, not milliseconds: they hold on a machine busy with other builds.
+    // The time budget only catches a collapse.
+    mc_sim::perf::budget(
+        &report,
+        &[
+            ("spatial.tested", 750_000.0),
+            ("targeting>spatial.tested", 60_000.0),
+            ("orders>spatial.tested", 25_000.0),
+            ("sim.tick", 250.0),
+        ],
+    );
 }
 
 /// How the tick grows with unit and player count, for the 30 000 unit goal.
@@ -329,5 +339,8 @@ fn one_order_for_an_army() {
         ids.len()
     );
     mc_sim::perf::save(&report);
-    mc_sim::perf::budget(&report, &[("sim.tick", 40.0)]);
+    mc_sim::perf::budget(
+        &report,
+        &[("spatial.tested", 3_300_000.0), ("sim.tick", 250.0)],
+    );
 }
