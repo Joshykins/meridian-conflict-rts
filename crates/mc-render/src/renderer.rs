@@ -869,7 +869,6 @@ pub struct Renderer {
     fog: Image,
     fog_dims: (u32, u32),
     noise: Image,
-    panel: Image,
     terrain_materials: Image,
     ground_cover: Image,
     /// Sun, sky and weather (sky.rs).
@@ -1692,7 +1691,8 @@ impl Renderer {
             &vec![255u8; (fog_dims.0 * fog_dims.1 * 2) as usize],
             true,
         )?;
-        let rgba_mips = |data: Vec<u8>, flatten: bool| -> Result<Image, GpuError> {
+        let noise = {
+            let data = textures::noise_map();
             let n = textures::SIZE as u32;
             let mips = 32 - n.leading_zeros();
             let image = gpu.image(&ImageDesc {
@@ -1706,16 +1706,12 @@ impl Renderer {
             })?;
             gpu.upload_image(&image, 0, 0, None, &data, true)?;
             let mut chain = textures::mip_chain(&data, textures::SIZE);
-            if flatten {
-                textures::flatten_noise_mips(&mut chain);
-            }
+            textures::flatten_noise_mips(&mut chain);
             for (level, (_, pixels)) in chain.iter().enumerate() {
                 gpu.upload_image(&image, 0, level as u32 + 1, None, pixels, false)?;
             }
-            Ok(image)
+            image
         };
-        let noise = rgba_mips(textures::noise_map(), true)?;
-        let panel = rgba_mips(textures::panel_map(), false)?;
         let material_layers = textures::terrain_materials();
         let terrain_materials = gpu.image(&ImageDesc {
             width: textures::SIZE as u32,
@@ -1999,7 +1995,6 @@ impl Renderer {
             (7, &tile_index),
             (8, &fog),
             (9, &noise),
-            (10, &panel),
             (16, &pad_footprints),
             (17, &hull_plans),
             (18, &terrain_materials),
@@ -2379,7 +2374,6 @@ impl Renderer {
             fog,
             fog_dims,
             noise,
-            panel,
             terrain_materials,
             ground_cover,
             sky,
@@ -6000,7 +5994,6 @@ impl Drop for Renderer {
             &self.tile_index,
             &self.fog,
             &self.noise,
-            &self.panel,
             &self.terrain_materials,
             &self.ground_cover,
             &self.pad_footprints,

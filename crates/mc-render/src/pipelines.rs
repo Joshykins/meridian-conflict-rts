@@ -484,7 +484,7 @@ pub(crate) const SCENE_SET: &[(u32, vk::DescriptorType)] = &[
     (7, vk::DescriptorType::SAMPLED_IMAGE),
     (8, vk::DescriptorType::SAMPLED_IMAGE),
     (9, vk::DescriptorType::SAMPLED_IMAGE),
-    (10, vk::DescriptorType::SAMPLED_IMAGE),
+    // retired: 10 (the tiled plate map)
     (11, vk::DescriptorType::SAMPLED_IMAGE),
     (12, vk::DescriptorType::SAMPLER),
     (13, vk::DescriptorType::SAMPLER),

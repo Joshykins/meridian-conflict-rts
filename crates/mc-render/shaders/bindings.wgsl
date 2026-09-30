@@ -24,7 +24,7 @@ fn desert() -> bool {
 @group(0) @binding(7) var tile_index: texture_2d<u32>;
 @group(0) @binding(8) var fog_map: texture_2d<f32>;
 @group(0) @binding(9) var noise_map: texture_2d<f32>;
-@group(0) @binding(10) var panel_map: texture_2d<f32>;
+// retired: 10 (the tiled plate map)
 @group(0) @binding(11) var shadow_map: texture_depth_2d_array;
 @group(0) @binding(12) var repeat_sampler: sampler;
 @group(0) @binding(13) var clamp_sampler: sampler;

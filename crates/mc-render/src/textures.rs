@@ -42,22 +42,6 @@ fn hash_u(x: u32, y: u32, seed: u32) -> u32 {
     h
 }
 
-fn hash(x: u32, y: u32, seed: u32) -> f32 {
-    (hash_u(x, y, seed) & 0xFFFF) as f32 / 65535.0
-}
-
-/// Value noise that repeats every `period` lattice cells.
-fn value_noise(x: f32, y: f32, period: u32, seed: u32) -> f32 {
-    let (xi, yi) = (x.floor(), y.floor());
-    let (fx, fy) = (x - xi, y - yi);
-    let (sx, sy) = (fx * fx * (3.0 - 2.0 * fx), fy * fy * (3.0 - 2.0 * fy));
-    let wrap = |v: f32| (v as i64).rem_euclid(period as i64) as u32;
-    let (x0, y0, x1, y1) = (wrap(xi), wrap(yi), wrap(xi + 1.0), wrap(yi + 1.0));
-    let top = hash(x0, y0, seed) * (1.0 - sx) + hash(x1, y0, seed) * sx;
-    let bottom = hash(x0, y1, seed) * (1.0 - sx) + hash(x1, y1, seed) * sx;
-    top * (1.0 - sy) + bottom * sy
-}
-
 /// Gradient noise that repeats every `period` lattice cells. Roughly `[-1, 1]`.
 fn gradient_noise(x: f32, y: f32, period: u32, seed: u32) -> f32 {
     let (xi, yi) = (x.floor(), y.floor());
@@ -139,85 +123,6 @@ fn noise_map_made() -> Vec<u8> {
         }
     }
     pack(&a, &b, 6.0)
-}
-
-/// Armour plating: courses of plates of uneven length, like welded and
-/// bolted steel, not a square grid. Seams are narrow; some plates sit a
-/// little proud, some carry a row of bolts or an inset access cover.
-/// rg = normal, b = cavity darkening (1 = clean plate), a unused (opaque).
-pub fn panel_map() -> Vec<u8> {
-    static KEPT: Kept<Vec<u8>> = Mutex::new(Vec::new());
-    kept(&KEPT, 0, panel_map_made)
-}
-
-fn panel_map_made() -> Vec<u8> {
-    // Course heights and the plate lengths to draw from, in texels; both sum to / divide into SIZE.
-    const COURSES: [usize; 5] = [96, 64, 136, 80, 136];
-    const LENGTHS: [usize; 5] = [72, 104, 136, 176, 216];
-    const SEAM: f32 = 2.0;
-    let mut height = vec![1.0f32; SIZE * SIZE];
-    let mut cavity = vec![1.0f32; SIZE * SIZE];
-    let mut y0 = 0;
-    for (course, &h) in COURSES.iter().enumerate() {
-        // Each course starts somewhere else along its length, so seams never line up into a grid.
-        let start = (hash(course as u32, 0, 3) * SIZE as f32) as usize;
-        let mut x_run = 0;
-        let mut index = 0u32;
-        while x_run < SIZE {
-            let mut w = LENGTHS
-                [(hash(course as u32, index, 5) * LENGTHS.len() as f32) as usize % LENGTHS.len()];
-            if SIZE - x_run < w + 56 {
-                w = SIZE - x_run;
-            }
-            let lift = hash(course as u32, index, 9) * 0.3;
-            let style = hash(course as u32, index, 13);
-            for y in 0..h {
-                for x in 0..w {
-                    let edge = x.min(y).min(w - 1 - x).min(h - 1 - y) as f32;
-                    let seam = (edge / SEAM).min(1.0);
-                    let i = (y0 + y) * SIZE + (start + x_run + x) % SIZE;
-                    let mut z = seam * (0.7 + lift);
-                    let mut dark = 0.3 + 0.7 * seam;
-                    let (fx, fy) = (x as f32, y as f32);
-                    if style < 0.4 {
-                        // A row of bolts along the top and bottom edges.
-                        let along = (fx - 12.0).rem_euclid(26.0) - 13.0;
-                        for by in [9.0, h as f32 - 10.0] {
-                            let d = (along * along + (fy - by).powi(2)).sqrt();
-                            if d < 2.6 && fx > 6.0 && fx < w as f32 - 7.0 {
-                                z += (1.0 - d / 2.6) * 0.3;
-                                dark = dark.min(0.55 + 0.45 * (d / 2.6));
-                            }
-                        }
-                    } else if style < 0.55 && w >= 104 && h >= 80 {
-                        // An inset access cover.
-                        let (cx, cy, hw, hh) = (
-                            w as f32 * 0.5,
-                            h as f32 * 0.5,
-                            w as f32 * 0.24,
-                            h as f32 * 0.26,
-                        );
-                        let d = ((fx - cx).abs() - hw).max((fy - cy).abs() - hh);
-                        if d.abs() < 1.5 {
-                            z -= 0.35 * (1.0 - d.abs() / 1.5);
-                            dark = dark.min(0.45 + 0.55 * d.abs() / 1.5);
-                        }
-                    }
-                    height[i] = z;
-                    cavity[i] = dark;
-                }
-            }
-            x_run += w;
-            index += 1;
-        }
-        y0 += h;
-    }
-    let mut rgba = pack(&height, &cavity, 3.0);
-    for (texel, dark) in rgba.chunks_exact_mut(4).zip(&cavity) {
-        texel[2] = (dark * 255.0) as u8;
-        texel[3] = 255;
-    }
-    rgba
 }
 
 /// CC0 scanned ground materials, packed offline by scripts/import-terrain-materials.py,
