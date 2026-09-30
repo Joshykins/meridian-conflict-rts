@@ -12,8 +12,15 @@ use mc_sim::tables::flag;
 /// The overlay image slot the chart lives in during a match.
 pub const MINIMAP_SLOT: usize = 0;
 
-/// Most unit marks drawn; beyond it every n-th unit stands for its neighbours.
-const MAX_MARKS: usize = 3000;
+/// Chart pixels between unit mark bins (`Marks`): a mobile unit's mark is 2.4 px
+/// across, so the units sharing a bin are drawn as one mark and hide nothing.
+const BIN_PX: f32 = 2.0;
+
+/// Radar and shield rings on the chart at most: each is a few hundred vertices, and past
+/// this many the rings of a big base are a solid wash anyway (a cosmetic cap).
+const MAX_COVER_RINGS: usize = 400;
+/// Range and vision rings of the selection at most (a cosmetic cap, as above).
+const MAX_SELECTION_RINGS: usize = 60;
 
 /// Overlay vertices the mine territories on the chart may use (a territory
 /// is ~250, so some 170 of them).
@@ -177,8 +184,12 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         (u.owner_flags & 0xFF) as u8 == view.local
             && u.owner_flags & KIND_WRECK == 0
             && !has_flag(u, flag::UNDER_CONSTRUCTION | flag::IN_FACTORY)
+            && {
+                let bp = s.bp(u);
+                bp.radar.to_f32() > 0.0 || bp.shield.is_some_and(|sh| !sh.is_hull())
+            }
     });
-    for u in reach_marks.take(400) {
+    for u in reach_marks.take(MAX_COVER_RINGS) {
         let bp = s.bp(u);
         let c = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
         if bp.radar.to_f32() > 0.0 {
@@ -197,7 +208,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     for u in view
         .selection
         .iter()
-        .take(60)
+        .take(MAX_SELECTION_RINGS)
         .filter_map(|id| view.index_of.get(id))
         .map(|&i| &view.frame.units[i])
     {
@@ -218,40 +229,36 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         }
     }
 
-    // Units. Structures are squares a touch larger; the selection is white.
-    let units = &view.frame.units;
-    let stride = units.len().div_ceil(MAX_MARKS).max(1);
-    for u in units.iter().step_by(stride) {
+    // Units. Structures are squares a touch larger; the selection is white. Every unit
+    // is marked, through bins a mark wide, so tens of thousands cost what the chart's
+    // few thousand bins do.
+    let mut marks = Marks::new(chart);
+    for (i, u) in view.frame.units.iter().enumerate() {
         if u.owner_flags & KIND_WRECK != 0 || has_flag(u, flag::IN_FACTORY) {
             continue;
         }
         let p = chart_pos(s, chart, Vec2::new(u.pos[0], u.pos[1]));
         let unknown = u.owner_flags & STATE_UNIDENTIFIED != 0;
-        let half = if !unknown && s.bp(u).is_structure() {
-            1.7
+        let layer = if view.selection.contains(&u.unit_id) {
+            Layer::Selected
+        } else if !unknown && s.bp(u).is_structure() {
+            Layer::Structure
         } else {
-            1.2
+            Layer::Mobile
+        };
+        marks.put(layer, p, i as u32);
+    }
+    for (layer, p, i) in marks.drawn() {
+        let u = &view.frame.units[i as usize];
+        let (half, tone) = match layer {
+            Layer::Selected => (1.4, rgb(0xFFFFFF, 1.0)),
+            _ if u.owner_flags & STATE_UNIDENTIFIED != 0 => (1.2, rgb(0x9AA0A8, 1.0)),
+            Layer::Structure => (1.7, s.team_color((u.owner_flags & 0xFF) as u8)),
+            Layer::Mobile => (1.2, s.team_color((u.owner_flags & 0xFF) as u8)),
         };
         ui.fill(
             Rect::new(p.x - half, p.y - half, half * 2.0, half * 2.0),
-            if unknown {
-                rgb(0x9AA0A8, 1.0)
-            } else {
-                s.team_color((u.owner_flags & 0xFF) as u8)
-            },
-        );
-    }
-    for unit in view
-        .selection
-        .iter()
-        .take(400)
-        .filter_map(|id| view.index_of.get(id))
-        .map(|&i| &units[i])
-    {
-        let p = chart_pos(s, chart, Vec2::new(unit.pos[0], unit.pos[1]));
-        ui.fill(
-            Rect::new(p.x - 1.4, p.y - 1.4, 2.8, 2.8),
-            rgb(0xFFFFFF, 1.0),
+            tone,
         );
     }
 
@@ -313,7 +320,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     let silo_at = |id: u32| {
         view.index_of
             .get(&id)
-            .map(|&i| Vec2::new(units[i].pos[0], units[i].pos[1]))
+            .map(|&i| Vec2::new(view.frame.units[i].pos[0], view.frame.units[i].pos[1]))
     };
     let queued = view
         .frame
@@ -394,6 +401,56 @@ fn ring(ui: &mut Ui, chart: Rect, c: Vec2, radius: f32, color: crate::ui::Color)
         if let Some((a, b)) = clip(at(i), at(i + 1), chart) {
             ui.stroke(a, b, 1.0, color);
         }
+    }
+}
+
+/// What a unit mark on the chart is, in the order they are drawn.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Layer {
+    Mobile = 0,
+    Structure = 1,
+    Selected = 2,
+}
+
+const LAYERS: [Layer; 3] = [Layer::Mobile, Layer::Structure, Layer::Selected];
+
+/// Unit marks binned by chart pixel: per layer and `BIN_PX` bin, the last unit put
+/// there (its index in the frame) and where it is.
+struct Marks {
+    origin: Vec2,
+    side: usize,
+    bins: Vec<Option<(Vec2, u32)>>,
+}
+
+impl Marks {
+    fn new(chart: Rect) -> Marks {
+        let side = (chart.w.max(chart.h) / BIN_PX).ceil().max(1.0) as usize;
+        Marks {
+            origin: Vec2::new(chart.x, chart.y),
+            side,
+            bins: vec![None; side * side * LAYERS.len()],
+        }
+    }
+
+    fn put(&mut self, layer: Layer, at: Vec2, unit: u32) {
+        let c = ((at - self.origin) / BIN_PX).floor();
+        if c.x < 0.0 || c.y < 0.0 {
+            return;
+        }
+        let (x, y) = (c.x as usize, c.y as usize);
+        if x >= self.side || y >= self.side {
+            return;
+        }
+        self.bins[(layer as usize * self.side + y) * self.side + x] = Some((at, unit));
+    }
+
+    /// Every bin's mark, a layer at a time (the selection on top).
+    fn drawn(&self) -> impl Iterator<Item = (Layer, Vec2, u32)> + '_ {
+        let per = self.side * self.side;
+        self.bins
+            .iter()
+            .enumerate()
+            .filter_map(move |(k, b)| b.map(|(at, unit)| (LAYERS[k / per], at, unit)))
     }
 }
 
