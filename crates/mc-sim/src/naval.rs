@@ -192,7 +192,7 @@ impl World {
     }
 
     /// The waterline height of a submarine over `pos`, as far down as its dive has
-    /// gone. None for anything that does not dive. Fully down it keeps a keel's
+    /// gone, eased at both ends. None for anything that does not dive. Fully down it keeps a keel's
     /// depth of water under it, so over shallows it cannot get all the way under.
     pub(crate) fn dive_z(&self, row: usize, pos: FxVec2) -> Option<Fx> {
         let bp = self.bp(row);
@@ -203,7 +203,11 @@ impl World {
         let down = (water - bp.height - dive.depth)
             .max(ground + bp.height * KEEL)
             .min(surface);
-        let share = Fx::ratio(self.state.units.dive[row] as i64, 255);
+        // Eased in and out (smoothstep): the hull gathers way down, or up, and settles
+        // at its depth instead of starting and stopping dead. The drawn pitch follows the
+        // rate (entity.wgsl), so it too comes on and goes off smoothly.
+        let s = Fx::ratio(self.state.units.dive[row] as i64, 255);
+        let share = s * s * (Fx::from_int(3) - s * 2);
         Some(surface + (down - surface) * share)
     }
 

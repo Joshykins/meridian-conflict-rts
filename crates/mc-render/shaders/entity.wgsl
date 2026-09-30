@@ -1921,9 +1921,14 @@ fn vs_main(in: VsIn) -> VsOut {
         let travel = e.pos - e.prev_pos;
         let ahead = dot(travel.xy, fwd0.xy);
         let turn = lerp_angle(0.0, e.heading - e.prev_heading, 1.0);
+        // Diving takes the bow down and surfacing brings it up, by how fast the hull is
+        // going down or up (metres a tick). The sim eases the dive at both ends, so the
+        // trim comes on and goes off with it; a soft limit, not a clamp, so it never
+        // stops at a corner. A long hull trims less.
+        let trim = mix(0.13, 0.09, smoothstep(20.0, 50.0, e.radius));
         let pitch = (0.035 * s2 + 0.018 * s3) * k * afloat
             + clamp(ahead * 0.012 * k, 0.0, 0.07)
-            + clamp(travel.z * 1.5, -0.14, 0.14);
+            + trim * tanh(travel.z * 3.0);
         let pitch_fwd = fwd * cos(pitch) + up * sin(pitch);
         up = up * cos(pitch) - fwd * sin(pitch);
         fwd = pitch_fwd;

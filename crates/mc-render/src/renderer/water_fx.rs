@@ -15,6 +15,7 @@
 //! water, so a puff under it would show on top, unrefracted. Bubbles are the
 //! one thing drawn under it, dimmed and tinted by their depth.
 
+use super::dive_fx::DivingHull;
 use super::{Renderer, PUFF_FIRE, PUFF_FIREBALL, PUFF_SMOKE, PUFF_SPARK};
 use crate::camera::Camera;
 use crate::gpu::Buffer;
@@ -1424,7 +1425,9 @@ impl Renderer {
             } else if hover {
                 (0.0, 0.45)
             } else {
-                (0.0, 1.0)
+                // A hull on its way under loses its white water as it goes, so the
+                // wake is already faint when it turns into a dived one's.
+                (0.0, 1.0 - 0.75 * (dive as f32 / 160.0).clamp(0.0, 1.0))
             };
             // A big hull is fuller in the beam and shoulders more water aside: its white
             // water is wider for its length.
@@ -1434,6 +1437,19 @@ impl Renderer {
             } else {
                 (r * 0.95, r * (0.22 + 0.06 * big))
             };
+            if naval && bp.dive.is_some() && to.truncate().distance(focus) <= reach {
+                let fwd = heading_dir(u.heading);
+                let hull = DivingHull {
+                    from,
+                    to,
+                    fwd,
+                    right: Vec3::new(fwd.y, -fwd.x, 0.0),
+                    half_length,
+                    half_beam,
+                    height: bp.height.to_f32(),
+                };
+                self.dive_churn(u, &hull, time);
+            }
             let track = self
                 .water_fx
                 .hulls

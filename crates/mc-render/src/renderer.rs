@@ -40,6 +40,7 @@ mod bore_fx;
 mod capital_fx;
 mod capture;
 mod damper_fx;
+mod dive_fx;
 pub use capture::Shot;
 mod clearing;
 mod craters;
