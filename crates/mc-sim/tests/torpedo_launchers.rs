@@ -1,9 +1,9 @@
-//! Torpedo defence structures (docs/NAVY.md): the Breakwater float, which meets torpedoes
-//! running at anything near it, and the Fathom on the seabed, which only sonar finds and
-//! only torpedoes reach.
+//! Torpedo launchers (docs/NAVY.md): the Breakwater float, which puts attack torpedoes
+//! into hulls a little past a Barracuda's reach, and the Fathom on the seabed, which only
+//! sonar finds and only torpedoes reach, and which also meets torpedoes coming in.
 
 use mc_core::{Angle, Fx, FxVec2};
-use mc_data::Blueprints;
+use mc_data::{Blueprints, UnitBlueprint};
 use mc_jobs::Pool;
 use mc_map::Heightfield;
 use mc_sim::tables::{flag, Controller};
@@ -15,6 +15,7 @@ use std::sync::Arc;
 /// The sea: 45 m of water over a flat bed at zero; a shelf 15 m under the surface from
 /// x 320 to 640 m, and land west of it.
 const WATER: i32 = 45;
+const BREAKWATER: &str = "aster_t1_torpedo_defense";
 const FATHOM: &str = "aster_t3_torpedo_defense";
 
 fn sea(fog: bool) -> World {
@@ -80,6 +81,25 @@ fn attack(w: &mut World, player: u8, unit: UnitId, target: UnitId) {
             units: vec![unit],
             target,
             queue: false,
+        },
+    }])
+    .unwrap();
+}
+
+/// Takes a structure's attack torpedoes off, leaving its interceptors.
+fn only_interceptors(w: &mut World, key: &str) {
+    let id = w.blueprints.id_of(key).unwrap();
+    Arc::make_mut(&mut w.blueprints).units[id.index()]
+        .weapons
+        .retain(|weapon| weapon.intercepts);
+}
+
+fn dive(w: &mut World, player: u8, unit: UnitId) {
+    w.tick(&[PlayerCommand {
+        player,
+        command: Command::SetDive {
+            units: vec![unit],
+            dive: true,
         },
     }])
     .unwrap();
@@ -162,29 +182,10 @@ fn only_sonar_finds_a_seabed_installation_and_only_torpedoes_reach_it() {
 }
 
 #[test]
-fn a_breakwater_bursts_torpedoes_running_at_a_ship_beside_it() {
-    let mut w = sea(false);
-    let pike = spawn(&mut w, "aster_t1_frigate", 0, 1300, 1000, flag::PASSIVE);
-    spawn(&mut w, "aster_t1_torpedo_defense", 0, 1300, 1100, 0);
-    let full = health(&w, pike);
-    let sub = spawn(&mut w, "aster_t1_submarine", 1, 1000, 1000, 0);
-    attack(&mut w, 1, sub, pike);
-    let mut seen = 0;
-    for _ in 0..140 {
-        w.tick(&[]).unwrap();
-        seen += met(&w);
-    }
-    assert!(seen >= 3, "only {seen} torpedoes intercepted");
-    assert!(
-        health(&w, pike) > full - Fx::from_int(170),
-        "the Pike took a salvo"
-    );
-}
-
-#[test]
 fn a_seabed_installation_covers_a_whole_bay() {
     let mut w = sea(false);
-    // A ship 450 m off the installation, past a tier 1 float's reach.
+    only_interceptors(&mut w, FATHOM);
+    // A ship 450 m off the installation.
     let pike = spawn(&mut w, "aster_t1_frigate", 0, 1400, 1450, flag::PASSIVE);
     spawn(&mut w, FATHOM, 0, 1400, 1000, 0);
     let full = health(&w, pike);
@@ -200,14 +201,53 @@ fn a_seabed_installation_covers_a_whole_bay() {
 }
 
 #[test]
-fn torpedo_defence_needs_no_power() {
+fn a_breakwater_sinks_a_dived_barracuda_that_cannot_reach_it() {
+    let mut w = sea(false);
+    let float = spawn(&mut w, BREAKWATER, 0, 1300, 1000, 0);
+    // 580 m off: inside the float's 600 m, outside the Barracuda's 550.
+    let sub = spawn(&mut w, "aster_t1_submarine", 1, 720, 1000, 0);
+    dive(&mut w, 1, sub);
+    let full = health(&w, float);
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+        if w.state.units.row(sub).is_none() {
+            // (A kill's veterancy can lift its health past where it started.)
+            assert!(health(&w, float) >= full, "the Barracuda reached the float");
+            return;
+        }
+    }
+    panic!(
+        "the Barracuda lived through a minute of torpedoes ({:?} left)",
+        health(&w, sub)
+    );
+}
+
+#[test]
+fn a_seabed_installation_puts_torpedoes_into_ships_over_it() {
+    let mut w = sea(false);
+    spawn(&mut w, FATHOM, 0, 1400, 1000, 0);
+    let pike = spawn(&mut w, "aster_t1_frigate", 1, 1400, 1800, flag::PASSIVE);
+    let full = health(&w, pike);
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+        if health(&w, pike) < full {
+            return;
+        }
+    }
+    panic!("no torpedo reached a frigate 800 m off");
+}
+
+#[test]
+fn torpedo_launchers_need_no_power() {
     let mut w = sea(false);
     // Shields drawing far more than the side makes: its grid goes dark.
     for x in [900, 1000, 1100] {
         spawn(&mut w, "aster_t3_shield", 0, x, 1800, 0);
     }
-    let pike = spawn(&mut w, "aster_t1_frigate", 0, 1300, 1000, flag::PASSIVE);
-    spawn(&mut w, "aster_t1_torpedo_defense", 0, 1300, 1100, 0);
+    spawn(&mut w, BREAKWATER, 0, 1300, 1000, 0);
+    only_interceptors(&mut w, FATHOM);
+    let pike = spawn(&mut w, "aster_t1_frigate", 0, 1300, 1300, flag::PASSIVE);
+    spawn(&mut w, FATHOM, 0, 1500, 1300, 0);
     for _ in 0..60 {
         w.tick(&[]).unwrap();
     }
@@ -217,7 +257,8 @@ fn torpedo_defence_needs_no_power() {
         "the grid is not dark"
     );
     let full = health(&w, pike);
-    let sub = spawn(&mut w, "aster_t1_submarine", 1, 1000, 1000, 0);
+    let sub = spawn(&mut w, "aster_t1_submarine", 1, 1000, 1300, 0);
+    let sub_full = health(&w, sub);
     attack(&mut w, 1, sub, pike);
     let mut seen = 0;
     for _ in 0..140 {
@@ -229,44 +270,55 @@ fn torpedo_defence_needs_no_power() {
         "only {seen} torpedoes intercepted on a dark grid"
     );
     assert!(health(&w, pike) > full - Fx::from_int(170));
+    assert!(
+        health(&w, sub) < sub_full,
+        "the float held fire on a dark grid"
+    );
 }
 
+/// Damage per second of what a unit carries against hulls (interceptors left out).
+fn attack_dps(bp: &UnitBlueprint) -> f32 {
+    bp.weapons
+        .iter()
+        .filter(|w| !w.intercepts && w.torpedo)
+        .map(|w| w.damage.to_f32() * w.salvo.max(1) as f32 * 10.0 / w.reload_ticks.max(1) as f32)
+        .sum()
+}
+
+fn torpedo_range(bp: &UnitBlueprint) -> f32 {
+    bp.weapons
+        .iter()
+        .filter(|w| !w.intercepts && w.torpedo)
+        .map(|w| w.range_max.to_f32())
+        .fold(0.0, f32::max)
+}
+
+/// A launcher gives up moving, so at each tier it carries far more torpedo DPS and hull
+/// per unit of mass than the submarine it meets, and it reaches past that submarine.
 #[test]
-fn a_breakwater_turret_turns_toward_the_torpedoes_and_fires_before_it_is_round() {
-    let mut w = sea(false);
-    let pike = spawn(&mut w, "aster_t1_frigate", 0, 1300, 1000, flag::PASSIVE);
-    // Its turret rests facing east; the torpedoes come in from the west.
-    let float = spawn(&mut w, "aster_t1_torpedo_defense", 0, 1300, 1100, 0);
-    let sub = spawn(&mut w, "aster_t1_submarine", 1, 1000, 1000, 0);
-    attack(&mut w, 1, sub, pike);
-    let bp = w.blueprints.id_of("aster_t1_torpedo_defense").unwrap();
-    let mut first_shot_yaw = None;
-    let mut widest = 0u16;
-    for _ in 0..140 {
-        w.tick(&[]).unwrap();
-        let r = row(&w, float);
-        let yaw = w.state.units.weapon_yaw[r][0]
-            .delta_to(mc_core::Angle::ZERO)
-            .unsigned_abs();
-        widest = widest.max(yaw);
-        let fired = w
-            .events
-            .iter()
-            .any(|e| matches!(e, SimEvent::ShotFired { blueprint, .. } if *blueprint == bp));
-        if fired && first_shot_yaw.is_none() {
-            first_shot_yaw = Some(yaw);
-        }
+fn launchers_are_far_more_mass_efficient_than_submarines() {
+    let w = sea(false);
+    let bp = |key: &str| w.blueprints.unit(w.blueprints.id_of(key).unwrap());
+    for (launcher, sub) in [
+        (BREAKWATER, "aster_t1_submarine"),
+        ("aster_t2_torpedo_defense", "aster_t2_submarine"),
+        (FATHOM, "aster_t3_submarine"),
+    ] {
+        let (l, s) = (bp(launcher), bp(sub));
+        let per_mass = |b: &UnitBlueprint, v: f32| v / b.cost_mass.to_f32();
+        let dps = per_mass(l, attack_dps(l)) / per_mass(s, attack_dps(s));
+        let hp = per_mass(l, l.health.to_f32()) / per_mass(s, s.health.to_f32());
+        assert!(
+            dps >= 1.7,
+            "{launcher}: only {dps:.2}x {sub}'s torpedo DPS per mass"
+        );
+        assert!(
+            hp >= 1.7,
+            "{launcher}: only {hp:.2}x {sub}'s health per mass"
+        );
+        assert!(
+            torpedo_range(l) > torpedo_range(s),
+            "{launcher} does not outrange {sub}"
+        );
     }
-    let quarter = mc_core::Angle::from_degrees(90)
-        .delta_to(mc_core::Angle::ZERO)
-        .unsigned_abs();
-    let first = first_shot_yaw.expect("the float never fired");
-    assert!(
-        first < quarter * 3 / 2,
-        "it waited to come round before firing"
-    );
-    assert!(
-        widest > quarter * 3 / 2,
-        "the turret never turned toward the torpedoes"
-    );
 }

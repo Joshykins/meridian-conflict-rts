@@ -107,7 +107,7 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(6.0, 12.0), (6.0, 15.0), (6.0, 18.0)],
         naval::sonar,
     ),
-    // Torpedo defence: the Breakwater float (tech 1, refitted to 2) and the Fathom on the
+    // Torpedo launchers: the Breakwater float (tech 1, refitted to 2) and the Fathom on the
     // seabed, its spire stretched to the surface (`gpu_consts::spire`).
     ModelDef::tiered(
         "torpedo_defense",

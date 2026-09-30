@@ -1092,9 +1092,11 @@ impl World {
         } else {
             w == 0
         };
-        // A shoulder gun under water is silent; so is every gun of a unit that is building,
+        // A shoulder gun under water is silent (a torpedo launcher's house is meant to be
+        // under it, as the Breakwater's is); so is every gun of a unit that is building,
         // except one on a turret of its own.
         let drowned = (weapon.mount
+            && !weapon.torpedo
             && self.state.units.z[row] + weapon.pivot.unwrap_or(weapon.muzzle).z
                 < self.terrain.water_level())
             || self.drowned_on_seabed(row, weapon);
@@ -1488,6 +1490,17 @@ impl World {
             // Launch cells on a hull (a capital ship's too), or a missile that homes: no
             // need to point the hull.
             true
+        } else if weapon.turret_turn == 0
+            && weapon.torpedo
+            && bp.unit(units.blueprint[row]).motion.is_none()
+        {
+            // Fixed tubes on a structure (the Fathom's batteries): it cannot turn, and a
+            // torpedo steers itself onto the mark once it is out of the tube, so the tubes
+            // fire at anything inside their arc.
+            units.heading[row]
+                .delta_to(bearing - weapon.facing)
+                .unsigned_abs()
+                <= weapon.half_arc
         } else if weapon.turret_turn == 0 {
             // Hull-mounted: the unit turns itself when it is not driving somewhere.
             if units.flags[row] & flag::MOVING == 0 && !spooling {

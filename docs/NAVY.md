@@ -42,22 +42,27 @@ The **Leviathan** (battleship) has weak AA, no sonar and no torpedo defence. The
 interceptor tubes, and no gun at all, so aircraft that get in close are the escorts' to meet. The **Kraken** (strategic
 submarine) gives itself away every time it launches.
 
-## Torpedo defence on station
+## Torpedo launchers on station
 
-Interceptor tubes are not only a hull's own: three structures meet torpedoes running at
-anything near them, whatever they run at (`intercepts`, the same interceptor torpedoes).
+Three structures put attack torpedoes into any hull in reach, dived submarines included.
+A launcher gives up moving, so it wins on cost: at each tier it carries about twice the
+torpedo DPS and twice the health per unit of mass of the submarine it meets, and it
+reaches a little past that submarine's tubes (`torpedo_launchers.rs` checks all three).
 
-- The **Breakwater** (tier 1, 400 m) is a moored float with one launcher firing under it.
-  Refitted where it floats to the **Breakwater II** (tier 2): a second launcher, and
-  interceptors that run further (650 m).
-- The **Fathom** (tier 3, 1,000 m, four batteries) is built on the seabed, where there is
-  at least 20 m of water over the whole lot (`seabed`, `placement::SEABED_DEPTH`): wholly
-  under the surface, so only sonar finds it and only torpedoes reach it, and ships sail
-  over it. Its spire runs up to the surface however deep it stands (the model is
-  stretched between `gpu_consts::spire::BASE` and `TOP`, entity.wgsl).
+- The **Breakwater** (tier 1, 600 m, past the Barracuda's 550) is a moored float with one
+  twin-tube launcher turning under it. Refitted where it floats to the **Breakwater II**
+  (tier 2, 800 m, past the Moray's 700): a second launcher and heavier torpedoes.
+- The **Fathom** (tier 3, 1,000 m, past the Kraken's 900) is built on the seabed, where
+  there is at least 20 m of water over the whole lot (`seabed`,
+  `placement::SEABED_DEPTH`): wholly under the surface, so only sonar finds it and only
+  torpedoes reach it, and ships sail over it. Its four batteries fire heavy torpedoes at
+  hulls from fixed tubes (a torpedo turns onto its mark by itself), and interceptors
+  (`intercepts`) at torpedoes running at anything near it. Its spire runs up to the
+  surface however deep it stands (the model is stretched between
+  `gpu_consts::spire::BASE` and `TOP`, entity.wgsl).
 
-Interceptors need no power: on a dark grid they still fire (shields, radar and the
-missile lasers go down).
+Launchers need no power: on a dark grid they still fire (shields, radar and the missile
+lasers go down).
 
 ## Two missile doctrines
 
@@ -115,8 +120,8 @@ sea after a battle pays for the battle.
 | Leviathan | 3 | Battleship | Three triple turrets of heavy guns, secondary guns, weak AA. The hero. |
 | Atoll | 3 | Air-defence carrier | Twelve hatched long-range SAM cells (2,800 m), fleet radar (4,000 m), interceptor tubes. No gun. |
 | Kraken | 3 | Strategic submarine | Eight tubes; four sea-skimming cruise missiles per salvo, launched dived. |
-| Breakwater | 1 | Torpedo defence | A moored float firing interceptors at torpedoes within 400 m; refitted to tier 2 (two launchers, 650 m). |
-| Fathom | 3 | Seabed torpedo defence | Built on the seabed in deep water; four interceptor batteries (1,000 m); only sonar finds it, only torpedoes reach it. |
+| Breakwater | 1 | Torpedo launcher | A moored float firing attack torpedoes at hulls within 600 m (past a Barracuda); refitted to tier 2 (two launchers, 800 m). |
+| Fathom | 3 | Seabed torpedo launcher | Built on the seabed in deep water; heavy torpedoes at hulls and interceptors at torpedoes from four batteries (1,000 m); only sonar finds it, only torpedoes reach it. |
 | Megalodon | 4 | Experimental submarine | Built by engineers on the water. AEB strike missiles to 6 km (volleys of four over four marks), its own nuclear warheads (assembled aboard, four at most, launched dived), long-range torpedoes, interceptors, two deck rail turrets that work only surfaced, a hull shield that holds dived too. |
 | Narwhal | 3 | Anti-ship trimaran | A Zenith rail down the keel: the hull turns to aim, the barrel elevates. Shoots only spaceships; nothing else aboard. |
 
@@ -165,7 +170,7 @@ The unit the naval design language is nailed on:
 ```sh
 cargo test -p mc-sim --test sim -- naval::
 cargo test -p mc-sim --test sim -- naval_roster::
-cargo test -p mc-sim --test sim -- torpedo_defense::
+cargo test -p mc-sim --test sim -- torpedo_launchers::
 cargo test -p mc-sim --test sim -- megalodon::
 cargo test -p mc-sim --test sim -- broadside::
 cargo test -p mc-path --test big_hulls

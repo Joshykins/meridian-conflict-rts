@@ -74,7 +74,7 @@ mod survival;
 mod titan;
 mod titan_water;
 mod torpedo_bomber;
-mod torpedo_defense;
+mod torpedo_launchers;
 mod trees;
 mod untrusted_input;
 mod volatile;

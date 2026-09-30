@@ -82,8 +82,9 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("aster_t1_attack_boat", 6, 3000, 450),
     ("aster_t1_submarine", 3, 3300, 350),
     ("aster_t1_sonar", 1, 2800, 250),
-    // Torpedo defence: a float and a seabed installation that meet the submarines'
-    // torpedoes with interceptors (`naval_arms.rs`).
+    // Torpedo launchers: a float firing attack torpedoes at the submarines, and a seabed
+    // installation that does too and meets their torpedoes with interceptors
+    // (`naval_arms.rs`).
     ("aster_t1_torpedo_defense", 1, 3000, 330),
     ("aster_t3_torpedo_defense", 1, 3400, 250),
     ("aster_t1_rotor_gunship", 4, 1200, 300),
@@ -126,7 +127,7 @@ fn setup(w: &mut World) {
                 add("aster_t1_lift_ship", 1, 2000, 100);
                 add("aster_t3_power", 1, 400, 150);
                 // Two submarines already in the north's waters, raiding its fleet past its
-                // torpedo defences (the north's grid is paid, so they stand to).
+                // torpedo launchers (the north's grid is paid, so they stand to).
                 add("aster_t1_submarine", 2, 3000, 3350);
                 // The experimental submarine: strike missiles on a high arc spread over the
                 // north's buildings, deck rails that wait for the surface.
@@ -268,7 +269,7 @@ fn reference() -> Vec<u64> {
             hash
         })
         .collect();
-    // The torpedo defences met the submarines' torpedoes.
+    // The seabed installation's interceptors met the submarines' torpedoes.
     assert!(intercepted > 0, "no torpedo was intercepted in the match");
     // The experimental submarine's strike missiles went up on their high arc.
     assert!(struck > 0, "no strike missile was launched in the match");

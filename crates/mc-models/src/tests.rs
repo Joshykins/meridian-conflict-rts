@@ -820,7 +820,7 @@ fn lods_reduce_and_respect_budgets() {
             // The tech 3 rail keep: a 4x4 lot, corner towers, a casemate and a 54 m rail.
             4200
         } else if base_key(&model.key) == "seabed_defense" {
-            // The tech 3 Fathom: a 4x4 seabed installation, four interceptor batteries,
+            // The tech 3 Fathom: a 4x4 seabed installation, four torpedo batteries,
             // its own sonar, and a spire to the surface.
             3600
         } else if base_key(&model.key) == "warp_damper" {

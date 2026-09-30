@@ -133,30 +133,33 @@
         mesh: "sonar", icon: Intel,
         sounds: (death: "blast"),
     ),
-    // Torpedo defence: moored launchers that fire interceptor torpedoes at any enemy
-    // torpedo in reach, whatever it runs at (docs/NAVY.md). The tier 2 is refitted onto
-    // the tier 1 where it floats; the tier 3 is an installation of its own on the seabed.
+    // Torpedo launchers: moored and seabed defences that put attack torpedoes into any
+    // hull in reach, dived submarines included (docs/NAVY.md). A launcher gives up moving,
+    // so it wins on cost: at each tier it carries about twice a submarine's DPS and HP per
+    // unit of mass. The tier 1 reaches a little past the Barracuda's tubes. The tier 2 is
+    // refitted onto the tier 1 where it floats; the tier 3 is an installation of its own on
+    // the seabed, and the only one that still meets torpedoes coming in.
     (
         key: "aster_t1_torpedo_defense",
         name: "Breakwater",
-        role: "Torpedo Defence", title: "Torpedo Defense",
+        role: "Torpedo Launcher", title: "Torpedo Launcher",
         tech: 1,
-        categories: ["Naval", "Defense"],
-        health: 900,
+        categories: ["Naval", "Defense", "DirectFire"],
+        health: 1300,
         cost: (mass: 110, energy: 880, time: 300),
         radius: 7, height: 5, footprint: (2, 2),
         // Its hydrophones hear a little past its launcher's reach.
-        vision: 220, sonar: 480, water_build: true,
+        vision: 220, sonar: 700, water_build: true,
         upgrades_to: "aster_t2_torpedo_defense",
-        // A twin-tube launcher on a turret under the float. It turns toward the nearest
-        // torpedo in reach and fires without waiting to come round: the interceptor turns
-        // onto its quarry by itself.
+        // A twin-tube launcher on a turret under the float, fired in pairs. At 600 m it
+        // reaches a little past a Barracuda's 550.
         weapons: [(
-            name: "Interceptor Launcher",
-            damage: 1, range: 400, reload: 2.0, speed: 80, trajectory: Direct,
+            name: "Torpedo Launcher",
+            damage: 170, splash: 3, range: 600, reload: 3.5, speed: 50, trajectory: Direct,
+            salvo: 2, salvo_delay: 0.6,
             turret_turn: 120, mount: true, pivot: (0, 0, -3.0), muzzle: (3.2, 0, -3.0),
             muzzles: [(3.2, -0.45, -3.0), (3.2, 0.45, -3.0)],
-            targets: ["Naval"], color: Orange, torpedo: true, intercepts: true,
+            targets: ["Naval"], color: Orange, torpedo: true, impact: 2.2, shockwave: 0.6,
             sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
         )],
         mesh: "torpedo_defense", icon: Defense,
@@ -165,29 +168,32 @@
     (
         key: "aster_t2_torpedo_defense",
         name: "Breakwater II",
-        role: "Torpedo Defence", title: "Torpedo Defense",
+        role: "Torpedo Launcher", title: "Torpedo Launcher",
         tech: 2,
-        categories: ["Naval", "Defense"],
-        health: 2600,
-        cost: (mass: 380, energy: 3800, time: 1100),
+        categories: ["Naval", "Defense", "DirectFire"],
+        health: 6800,
+        cost: (mass: 400, energy: 4000, time: 1100),
         radius: 7, height: 7, footprint: (2, 2),
-        vision: 260, sonar: 780, water_build: true,
-        // Two launcher turrets, one under the other, each reaching further than the tier 1's.
+        vision: 260, sonar: 1000, water_build: true,
+        // Two launcher turrets, one under the other, with heavier torpedoes that run
+        // further than the tier 1's and past a Moray's 700 m.
         weapons: [
             (
-                name: "Interceptor Launcher",
-                damage: 1, range: 650, reload: 1.4, speed: 90, trajectory: Direct,
+                name: "Torpedo Launcher",
+                damage: 400, splash: 3, range: 800, reload: 4, speed: 54, trajectory: Direct,
+                salvo: 2, salvo_delay: 0.5,
                 turret_turn: 120, mount: true, pivot: (0, 0, -3.0), muzzle: (3.2, 0, -3.0),
                 muzzles: [(3.2, -0.45, -3.0), (3.2, 0.45, -3.0)],
-                targets: ["Naval"], color: Orange, torpedo: true, intercepts: true,
+                targets: ["Naval"], color: Orange, torpedo: true, impact: 2.4, shockwave: 0.7,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
             (
-                name: "Interceptor Launcher",
-                damage: 1, range: 650, reload: 1.4, speed: 90, trajectory: Direct,
+                name: "Torpedo Launcher",
+                damage: 400, splash: 3, range: 800, reload: 4, speed: 54, trajectory: Direct,
+                salvo: 2, salvo_delay: 0.5,
                 turret_turn: 120, mount: true, pivot: (0, 0, -5.5), muzzle: (3.2, 0, -5.5),
                 muzzles: [(3.2, -0.45, -5.5), (3.2, 0.45, -5.5)],
-                targets: ["Naval"], color: Orange, torpedo: true, intercepts: true,
+                targets: ["Naval"], color: Orange, torpedo: true, impact: 2.4, shockwave: 0.7,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
         ],
@@ -195,19 +201,38 @@
         sounds: (death: "blast_small"),
     ),
     (
-        // Built on the seabed under deep water: a hardened installation of interceptor
-        // launchers, a spire standing from it up to the surface. Wholly under the water,
+        // Built on the seabed under deep water: a hardened installation of torpedo
+        // batteries, a spire standing from it up to the surface. Wholly under the water,
         // only sonar finds it and only torpedoes reach it.
         key: "aster_t3_torpedo_defense",
         name: "Fathom",
-        role: "Seabed Torpedo Defence", title: "Torpedo Defense",
+        role: "Seabed Torpedo Launcher", title: "Torpedo Launcher",
         tech: 3,
-        categories: ["Naval", "Defense"],
-        health: 14000,
+        categories: ["Naval", "Defense", "DirectFire"],
+        health: 40000,
         cost: (mass: 2200, energy: 22000, time: 5500),
         radius: 16, height: 9, footprint: (4, 4),
         vision: 200, sonar: 1200, water_build: true, seabed: true,
+        // Each of the four batteries' tube pairs fires heavy torpedoes at hulls (two
+        // batteries to each launcher weapon, fixed tubes that fire all round: a torpedo
+        // turns onto its mark by itself) and interceptors at torpedoes coming in.
         weapons: [
+            (
+                name: "Heavy Torpedo Launcher",
+                damage: 1500, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
+                salvo: 4, salvo_delay: 0.4, turret_turn: 0, arc: 360,
+                muzzle: (6, 0, 7), muzzles: [(6, -3, 7), (6, 3, 7), (-6, -3, 7), (-6, 3, 7)],
+                targets: ["Naval"], color: Orange, torpedo: true, impact: 3.0, shockwave: 1.0,
+                sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
+            ),
+            (
+                name: "Heavy Torpedo Launcher",
+                damage: 1500, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
+                salvo: 4, salvo_delay: 0.4, turret_turn: 0, arc: 360,
+                muzzle: (0, 6, 7), muzzles: [(-3, 6, 7), (3, 6, 7), (-3, -6, 7), (3, -6, 7)],
+                targets: ["Naval"], color: Orange, torpedo: true, impact: 3.0, shockwave: 1.0,
+                sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
+            ),
             (
                 name: "Interceptor Battery",
                 damage: 1, range: 1000, reload: 1.2, speed: 100, trajectory: Direct,

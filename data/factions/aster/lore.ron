@@ -348,17 +348,18 @@
         lore: "A moored spar buoy whose hydrophones hear hulls no radar can see.",
     ),
     "aster_t1_torpedo_defense": (
-        lore: "A moored float carrying an interceptor launcher. It hears torpedoes running at anything near it and puts a short torpedo into each one's path.",
+        lore: "A moored float carrying a torpedo launcher. Its hydrophones hear hulls a little past a hunting boat's reach, and it puts torpedoes into them first, dived or not.",
         weapons: {
-            "Interceptor Launcher": "Interceptor torpedoes, fired under the float at torpedoes coming in.",
+            "Torpedo Launcher": "A twin-tube launcher turning under the float, fired in pairs at hulls up to 600 m off, submarines included.",
         },
     ),
     "aster_t2_torpedo_defense": (
-        lore: "The float refitted with a second launcher and longer-running interceptors: a harbour mouth or a fleet anchorage closed to torpedoes.",
+        lore: "The float refitted with a second launcher and heavier torpedoes that run further: a harbour mouth or a fleet anchorage no submarine gets into.",
     ),
     "aster_t3_torpedo_defense": (
-        lore: "An installation built on the seabed, a spire standing from it up to the surface. Its batteries meet torpedoes across a whole bay. Nothing above the water can see it or touch it; only sonar hears it, and only torpedoes reach it.",
+        lore: "An installation built on the seabed, a spire standing from it up to the surface. Its batteries put heavy torpedoes into hulls across a whole bay and meet the torpedoes coming back. Nothing above the water can see it or touch it; only sonar hears it, and only torpedoes reach it.",
         weapons: {
+            "Heavy Torpedo Launcher": "The batteries' tubes, firing heavy torpedoes at hulls a kilometre off, four to a salvo.",
             "Interceptor Battery": "Four batteries round the installation, each firing interceptors up and out at torpedoes a kilometre off.",
         },
     ),

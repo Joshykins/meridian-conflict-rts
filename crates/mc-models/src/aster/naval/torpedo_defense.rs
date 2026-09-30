@@ -1,11 +1,11 @@
-//! The Breakwater, a moored torpedo-defence float (tech 1, refitted to tech 2 where it
-//! floats): interceptor launchers on turrets under the water (`aster_t1_torpedo_defense`).
+//! The Breakwater, a moored torpedo-launcher float (tech 1, refitted to tech 2 where it
+//! floats): torpedo launchers on turrets under the water (`aster_t1_torpedo_defense`).
 //!
 //! No hull under the launcher: a spar through the waterline stands on three outrigger
 //! floats on arms (a three-pointed plan), with a work platform where the arms meet and
 //! the training gear's drum on top. Under the water, a twin-tube launcher turns on the
 //! spar on a gun house of its own (weapon 0, `MeshBuilder::with_house`), toward the
-//! torpedo it fires at; the tracker head on the drum turns with it, so the float shows
+//! hull it fires at; the tracker head on the drum turns with it, so the float shows
 //! from above where it is aiming. The tech 2 refit hangs a second launcher lower on the
 //! spar (weapon 1), joins the floats with a triangular truss walk, and runs a lattice
 //! mast with a fire-control director up out of the drum. The origin is the waterline;

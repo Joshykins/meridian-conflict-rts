@@ -1,14 +1,15 @@
-//! The Fathom, a tech 3 torpedo-defence installation on the seabed
-//! (`aster_t3_torpedo_defense`): interceptor batteries round a hardened body, and a
+//! The Fathom, a tech 3 torpedo-launcher installation on the seabed
+//! (`aster_t3_torpedo_defense`): torpedo batteries round a hardened body, and a
 //! spire from it to the surface (`gpu_consts::spire`).
 //!
 //! The origin is on the sea floor. The body stands below `spire::BASE`; what is authored
 //! from there to `spire::TOP` is stretched up to the surface however deep the water is
 //! (two to six times and more), so the spire is long plain members and thin bands only,
 //! and every horizontal detail sits below `BASE` or above `TOP` (the small float that
-//! rides the surface). Four batteries of two interceptor tubes, one on each face, fire
-//! up and out at 45 degrees from the muzzles in `naval.ron` ((6, ±3, 7) turned by
-//! quarter turns). Nothing is lit but the float's obstruction lamp.
+//! rides the surface). Four batteries of two torpedo tubes, one on each face, fire
+//! heavy torpedoes and interceptors up and out at 45 degrees from the muzzles in
+//! `naval.ron` ((6, ±3, 7) turned by quarter turns). Nothing is lit but the float's
+//! obstruction lamp.
 
 use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4};
 
@@ -19,7 +20,7 @@ use crate::gpu_consts::spire::{BASE, TOP};
 
 /// The +x battery's two muzzles (the others are it turned by quarter turns).
 const MUZZLES: [Vec3; 2] = [Vec3::new(6.0, -3.0, 7.0), Vec3::new(6.0, 3.0, 7.0)];
-/// Up and out: the way every interceptor leaves its tube, on the +x battery.
+/// Up and out: the way every torpedo leaves its tube, on the +x battery.
 const FIRE: Vec3 = Vec3::new(FRAC_1_SQRT_2, 0.0, FRAC_1_SQRT_2);
 
 /// Runs `f` once per battery, in a frame turned so that battery faces +x.
@@ -32,7 +33,7 @@ fn diagonals(b: &mut MeshBuilder, f: impl Fn(&mut MeshBuilder)) {
     b.radial(4, |b| b.yawed(Vec3::ZERO, FRAC_PI_4, |b| f(b)));
 }
 
-/// A round interceptor tube along `FIRE` ending at `muzzle`: a gunmetal barrel, a
+/// A round torpedo tube along `FIRE` ending at `muzzle`: a gunmetal barrel, a
 /// heavy collar at the mouth and the dark bore.
 fn round_tube(b: &mut MeshBuilder, muzzle: Vec3, length: f32, r: f32) {
     let sides = b.sides(10);
