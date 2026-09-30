@@ -232,10 +232,20 @@ const CARDS: [(&str, &str, u32); 3] = [
 
 /// Idle engineers (not the commander, which has its own card), idle factories and
 /// idle reclaimers, each by type, in the order the cards show them. A reclaimer is
-/// a salvage unit (`UnitBlueprint::is_salvager`), never a reclaim tower; one with
-/// no orders still working a wreck in reach is not idle.
+/// a salvage unit (`UnitBlueprint::is_salvager`), never a reclaim tower, and it is
+/// idle only with no orders and no wreck in reach: one with wreckage round it will
+/// clear it by itself, or is waiting for room to store it.
 fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
     let mut kinds: [Vec<Kind<'a>>; CARDS.len()] = Default::default();
+    // Settled wrecks (not hulls still falling or sinking): where they lie and how big.
+    let wrecks: Vec<(Vec2, f32)> = s
+        .view
+        .frame
+        .units
+        .iter()
+        .filter(|w| w.owner_flags & KIND_WRECK != 0 && w.packed == 0)
+        .map(|w| (Vec2::new(w.pos[0], w.pos[1]), w.radius))
+        .collect();
     for u in &s.view.frame.units {
         let mine = (u.owner_flags & 0xFF) as u8 == s.view.local && u.owner_flags & KIND_WRECK == 0;
         // One in a lift ship's hold is `IN_FACTORY` too: it rides, it is not idle.
@@ -251,7 +261,10 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
             0
         } else if bp.has(cat::FACTORY) {
             1
-        } else if bp.is_salvager() && !has_flag(u, flag::RECLAIMING | flag::WORKING) {
+        } else if bp.is_salvager()
+            && !has_flag(u, flag::RECLAIMING | flag::WORKING)
+            && !wreck_in_reach(bp, u.pos, &wrecks)
+        {
             2
         } else {
             continue;
@@ -276,6 +289,17 @@ fn idle_kinds<'a>(s: &'a Scene) -> [Vec<Kind<'a>>; CARDS.len()] {
         card.sort_unstable_by_key(|(bp, _)| rank(bp));
     }
     kinds
+}
+
+/// Whether a wreck lies within a salvage unit's reach of `pos`: its reclaim range, or
+/// a carrier's drone radius.
+fn wreck_in_reach(bp: &UnitBlueprint, pos: [f32; 3], wrecks: &[(Vec2, f32)]) -> bool {
+    let reach = bp
+        .reclaims()
+        .map_or(bp.drone_radius, |(_, range)| range)
+        .to_f32();
+    let at = Vec2::new(pos[0], pos[1]);
+    wrecks.iter().any(|&(w, r)| w.distance(at) <= reach + r)
 }
 
 /// How tall an idle (or groups) card is with `types` tiles.

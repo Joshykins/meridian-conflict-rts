@@ -75,6 +75,20 @@ fn a_reclaimer_working_a_wreck_on_its_own_is_not_idle() {
     }
 }
 
+#[test]
+fn a_reclaimer_with_a_wreck_in_reach_is_not_idle() {
+    for (off, idle) in [(20.0, false), (5000.0, true)] {
+        let (mut rig, tile) = reclaimer_rig();
+        let mut wreck = rig.view.frame.units[0];
+        wreck.unit_id = 11;
+        wreck.owner_flags = mc_sim::mirror::KIND_WRECK;
+        wreck.pos[0] += off;
+        wreck.radius = 2.0;
+        rig.view.frame.units.push(wreck);
+        assert_eq!(!rig.click(tile).is_empty(), idle, "a wreck {off} m off");
+    }
+}
+
 /// Puts unit 7 in the hold of a Courier, unit 9, which joins the frame.
 fn stow(rig: &mut Rig) {
     let ship = rig.blueprints.id_of("aster_t1_lift_ship").expect("courier");
