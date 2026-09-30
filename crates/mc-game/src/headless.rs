@@ -789,7 +789,10 @@ pub fn screenshot(
     if let Some(bp) = place {
         view.mode = crate::game::Mode::Place(bp);
     }
+    // What the interface costs a frame (orders, marks, the HUD), over the warm-up frames.
+    let mut ui_ns: Vec<u64> = Vec::new();
     for i in 0..warmup_frames {
+        let ui_started = Instant::now();
         overlay.clear();
         memory.begin_frame();
         let mut ui = crate::ui::Ui::new(
@@ -953,6 +956,7 @@ pub fn screenshot(
         if let Some((centre, radius, lots)) = grid_focus {
             renderer.set_build_grid(centre, radius, &lots);
         }
+        ui_ns.push(ui_started.elapsed().as_nanos() as u64);
         renderer.set_ore_highlight(
             if place.is_some_and(|bp| world.blueprints.unit(bp).mine.is_some()) {
                 1.0
@@ -990,7 +994,9 @@ pub fn screenshot(
             Vec::new()
         };
         world.tick(&owed).map_err(|e| e.to_string())?;
+        let mirror = Instant::now();
         world.write_render_frame(shot_eyes(opts), &mut frame);
+        let mirror_ns = mirror.elapsed().as_nanos() as u64;
         let last = k + 1 == shot.follow;
         for (i, alpha) in [
             if last { shot.alpha * 0.5 } else { 0.5 },
@@ -1020,6 +1026,8 @@ pub fn screenshot(
                 f.push("cpu.render", 1, Some(cpu.elapsed().as_nanos() as u64));
                 if i == 0 {
                     f.merge(&world.perf);
+                    // The sim-to-render mirror, built once a tick (on the sim thread in a match).
+                    f.push("cpu.mirror", 1, Some(mirror_ns));
                 }
                 // Scopes of the frame before this one: queries read after its fence.
                 mc_render::gpu_scopes_to_perf(&renderer.stats.gpu_scopes, &mut f);
@@ -1051,7 +1059,16 @@ pub fn screenshot(
         }
         time += 1.0 / mc_core::TICKS_PER_SECOND as f32;
     }
-    if let Some(r) = &perf_frames {
+    ui_ns.sort_unstable();
+    let ui_ms = ui_ns
+        .get(ui_ns.len() / 2)
+        .map_or(0.0, |&ns| ns as f64 / 1e6);
+    println!(
+        "interface ms median {ui_ms:.2} over {} warm-up frames",
+        ui_ns.len()
+    );
+    if let Some(r) = &mut perf_frames {
+        r.note("interface ms (warm-up median)", format!("{ui_ms:.2}"));
         crate::perf_out::save(r, "frames");
     }
     for (name, mut ms) in pass_ms {

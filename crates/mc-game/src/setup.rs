@@ -705,12 +705,28 @@ pub fn opening_commands(
         Scene::Matchup => {
             // 800 m apart across the centre, facing each other.
             let gap = FxVec2::from_ints(400, 0);
+            // A spawn puts down one square block of at most `MAX_COMMAND_UNITS`: a bigger
+            // army (a stress test of thousands) is several blocks, one behind another.
+            let block = mc_sim::command::MAX_COMMAND_UNITS as u16;
+            // How far back each side's last block reaches (the first is centred on its spot).
+            let mut depth: [Option<i32>; 2] = [None; 2];
             for (side, key, count) in &opts.matchup {
-                let (pos, facing) = match side {
-                    0 => (centre - gap, Angle::ZERO),
-                    _ => (centre + gap, Angle::HALF_TURN),
+                let (pos, facing, back) = match side {
+                    0 => (centre - gap, Angle::ZERO, -1),
+                    _ => (centre + gap, Angle::HALF_TURN, 1),
                 };
-                out.push(spawn(*side, key, pos, facing, *count));
+                let spacing = blueprints.unit(id(key)).radius.ceil_int() * 2 + 3;
+                let mut left = (*count).max(1);
+                while left > 0 {
+                    let n = left.min(block);
+                    let side_len = (n as f32).sqrt().ceil() as i32 * spacing;
+                    let reach = &mut depth[(*side).min(1) as usize];
+                    let middle = reach.map_or(0, |r| r + 20 + side_len / 2);
+                    *reach = Some(middle + side_len / 2);
+                    let at = pos + FxVec2::from_ints(back * middle, 0);
+                    out.push(spawn(*side, key, at, facing, n));
+                    left -= n;
+                }
             }
         }
         Scene::Stress => {
