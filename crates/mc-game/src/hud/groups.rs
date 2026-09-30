@@ -141,7 +141,7 @@ pub(super) fn card(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom: f32)
                     }
                 }
                 HudAction::Select {
-                    units,
+                    units: units.to_vec(),
                     focus: false,
                 }
             } else {

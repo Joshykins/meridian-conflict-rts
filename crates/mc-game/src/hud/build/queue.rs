@@ -90,9 +90,7 @@ pub(crate) fn batch_linked(
     let groups: Vec<Option<u32>> = factories
         .into_iter()
         .map(|id| {
-            queues
-                .iter()
-                .find(|q| q.unit_id == id)
+            crate::sim_thread::queue_of(queues, id)
                 .and_then(|q| q.batch.as_ref())
                 .map(|b| b.group)
         })

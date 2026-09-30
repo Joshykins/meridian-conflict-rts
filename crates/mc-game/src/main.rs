@@ -35,6 +35,7 @@ mod range;
 mod recorder;
 mod replay;
 mod rings;
+mod selected;
 mod settings;
 mod setup;
 mod shot_server;

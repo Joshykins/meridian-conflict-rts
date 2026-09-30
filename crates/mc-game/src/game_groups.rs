@@ -91,7 +91,7 @@ impl Game {
                 if groups.get(n).is_empty() {
                     return;
                 }
-                self.view.selection = groups.get(n).to_vec();
+                self.view.selection = groups.get(n).iter().copied().collect();
                 audio.play(Sfx::Select);
                 let now = Instant::now();
                 if self

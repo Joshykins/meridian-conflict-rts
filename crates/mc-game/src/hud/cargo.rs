@@ -278,7 +278,7 @@ pub fn panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, ship: u32, view: &CargoView,
             if s.view.ctrl {
                 // Picked alongside the ship: their orders are carried out once they are off.
                 ui.audio.play(crate::audio::Sfx::Select);
-                let mut sel: Vec<u32> = s.view.selection.clone();
+                let mut sel: Vec<u32> = s.view.selection.to_vec();
                 if picked {
                     sel.retain(|v| !units.iter().any(|u| u.unit_id == *v));
                 } else {

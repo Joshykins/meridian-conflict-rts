@@ -667,6 +667,7 @@ pub fn screenshot(
     view.shift = shot.plans;
     // As the game asks: the whole side's queues, so every group's badge shows.
     world.write_orders(Some(0), &view.selection, Some(0), &mut view.status.queues);
+    crate::sim_thread::sort_queues(&mut view.status.queues);
     world.write_plans(0, &mut view.status.plans);
     let mut marks: Vec<mc_render::Mark> = view
         .selection

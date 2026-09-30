@@ -1653,6 +1653,7 @@ impl Unit {
             lore: String::new(),
             refit: None,
             scrap: false,
+            carried_drone: false,
         })
     }
 }

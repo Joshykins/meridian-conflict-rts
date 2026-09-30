@@ -35,11 +35,7 @@ fn jump_of<'a>(s: &'a Scene, u: &UnitInstance) -> Option<&'a WarpView> {
 /// Seconds `u` stays stunned: `Some(Some(s))` for our own listed units, `Some(None)` for
 /// anyone else stunned (the mirror only says it is, fading over its last seconds).
 pub fn stun_left(view: &crate::game::View, u: &UnitInstance) -> Option<Option<f32>> {
-    let listed = view
-        .status
-        .queues
-        .iter()
-        .find(|q| q.unit_id == u.unit_id)
+    let listed = crate::sim_thread::queue_of(&view.status.queues, u.unit_id)
         .map(|q| q.stunned)
         .filter(|&t| t > 0.0);
     if listed.is_some() {

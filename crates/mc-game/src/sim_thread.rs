@@ -90,7 +90,7 @@ pub struct SimStatus {
     pub winner: Option<u8>,
     /// This machine owns the match clock: it can pause and change the game speed.
     pub owns_clock: bool,
-    /// Order queues of the units named in `SimHandle::watch`.
+    /// Order queues of the units named in `SimHandle::watch`, in unit id order (`queue_of`).
     pub queues: Vec<UnitOrders>,
     /// Every structure the watched side has planned and not begun.
     pub plans: Vec<PlannedBuild>,
@@ -309,6 +309,21 @@ fn mine_growth_of(world: &World, players: &mut [PlayerStatus]) {
 
 /// The orders the interface asked for. With cheats on (test scenes) any side's may be
 /// asked for; otherwise only the local player's are handed out.
+/// Puts order queues in unit id order, which `queue_of` looks them up by.
+pub fn sort_queues(queues: &mut [UnitOrders]) {
+    queues.sort_unstable_by_key(|q| q.unit_id);
+}
+
+/// The queue of unit `id` among queues in unit id order (`sort_queues`; `SimStatus::queues`
+/// always is): a binary search, since the interface asks for the queue of each of a
+/// few thousand selected units every frame.
+pub fn queue_of(queues: &[UnitOrders], id: u32) -> Option<&UnitOrders> {
+    queues
+        .binary_search_by_key(&id, |q| q.unit_id)
+        .ok()
+        .map(|i| &queues[i])
+}
+
 fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut SimStatus) {
     let viewer = if world.state.cheats { None } else { local };
     let side = if world.state.cheats {
@@ -322,6 +337,7 @@ fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut S
         side.filter(|_| watch.everyone),
         &mut status.queues,
     );
+    sort_queues(&mut status.queues);
     status.plans.clear();
     if local.is_none() {
         // An observer sees every side's planned structures.

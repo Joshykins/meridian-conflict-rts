@@ -66,7 +66,7 @@ impl Rig {
             _pad3: [0.0; 2],
         });
         view.index_of.insert(7, 0);
-        view.selection = vec![7];
+        view.selection = vec![7].into();
         view.status.owns_clock = true;
         view.status.tick = 50;
         view.status.players = vec![Default::default(), Default::default()];
@@ -1472,13 +1472,13 @@ fn details_close_when_the_selection_changes_or_comes_back() {
     rig.frame(&Input::default());
     assert!(!rig.hud.details_open, "deselecting closes the card");
 
-    rig.view.selection = vec![7];
+    rig.view.selection = vec![7].into();
     rig.settle();
     rig.click(details);
     assert!(rig.hud.details_open);
     rig.view.selection.clear();
     rig.frame(&Input::default());
-    rig.view.selection = vec![7];
+    rig.view.selection = vec![7].into();
     rig.frame(&Input::default());
     assert!(
         !rig.hud.details_open,

@@ -2783,6 +2783,9 @@ impl World {
         let watched = watch
             .iter()
             .filter_map(|&id| s.units.row(crate::Handle(id)));
+        // Sorted, for the test below against every unit of the side.
+        let mut watching = watch.to_vec();
+        watching.sort_unstable();
         let rest = s.units.slots.iter().filter(|&row| {
             everyone == Some(s.units.owner[row])
                 // Builders too, standing or not: a factory's product shows its progress unselected.
@@ -2790,7 +2793,7 @@ impl World {
                     && (self.bp(row).is_mobile() || self.bp(row).builder.is_some())
                     && s.orders.front(&s.units, row).is_some())
                     || !s.units.standing[row].is_empty())
-                && !watch.contains(&s.units.id(row).0)
+                && watching.binary_search(&s.units.id(row).0).is_err()
         });
         for row in watched.chain(rest.take(MAX_LISTED_UNITS)) {
             let id = s.units.id(row).0;

@@ -697,6 +697,9 @@ pub struct UnitBlueprint {
     /// Scrap a giant gun throws out (`Weapon::sabot`): it only ever lies about as a wreck,
     /// so it is in no list or menu.
     pub scrap: bool,
+    /// Some unit's salvage drone (`drone`): it flies for its carrier, is neither picked
+    /// nor selected on its own, and is never ordered.
+    pub carried_drone: bool,
 }
 
 impl UnitBlueprint {
@@ -1061,6 +1064,10 @@ impl Blueprints {
             .collect();
         for id in scrap {
             units[id.index()].scrap = true;
+        }
+        let drones: Vec<BlueprintId> = units.iter().filter_map(|u| u.drone).collect();
+        for id in drones {
+            units[id.index()].carried_drone = true;
         }
         for bp in &mut units {
             // A loadout reads its unit's text, and its modules' weapons theirs.

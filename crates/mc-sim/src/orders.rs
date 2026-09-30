@@ -534,7 +534,7 @@ impl World {
                     // Units in a lift ship's hold take orders too.
                     && (units.is_active(row) || units.hangar[row] != Handle::NONE)
                     && units.drone_parent[row] == Handle::NONE
-                    && self.bp(row).visual.mesh != "reclaim_drone"
+                    && !self.bp(row).carried_drone
                     && self.bp(row).has(categories)
             })
             .collect()
@@ -3151,7 +3151,7 @@ impl World {
                 let units = &self.state.units;
                 if units.drone_parent[row] == Handle::NONE
                     && self.bp(row).drone.is_none()
-                    && self.bp(row).visual.mesh != "reclaim_drone"
+                    && !self.bp(row).carried_drone
                     && units.order_head[row] == NO_ORDER
                     && !units.has_flag(row, flag::AIR_RUN)
                     && units.speed[row] <= Fx::ONE
@@ -3185,7 +3185,7 @@ impl World {
         // Only once it has stopped at cruise height: a hull on the ground or
         // still settling is left to `stand_z`.
         if bp.drone.is_some()
-            || bp.visual.mesh == "reclaim_drone"
+            || bp.carried_drone
             || bp.is_capital_ship()
             || units.has_flag(row, flag::IN_FACTORY)
             || units.has_flag(row, flag::AIR_RUN)

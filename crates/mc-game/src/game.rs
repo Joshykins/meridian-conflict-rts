@@ -178,7 +178,7 @@ pub struct View {
     pub status: SimStatus,
     /// Unit id -> index in `frame.units`.
     pub index_of: HashMap<u32, usize>,
-    pub selection: Vec<u32>,
+    pub selection: crate::selected::Selection,
     pub mode: Mode,
     pub formation_panel: bool,
     pub formation_together: bool,
@@ -233,7 +233,7 @@ impl View {
             frame: RenderFrame::default(),
             status: SimStatus::default(),
             index_of: HashMap::new(),
-            selection: Vec::new(),
+            selection: Default::default(),
             mode: Mode::Normal,
             formation_panel: false,
             formation_together: true,
@@ -992,12 +992,10 @@ impl Game {
     fn can_inspect(&self, u: &UnitInstance) -> bool {
         u.owner_flags & KIND_WRECK == 0
             && u.owner_flags & STATE_UNIDENTIFIED == 0
-            && self
+            && !self
                 .blueprints
                 .unit(BlueprintId(u.blueprint as u16))
-                .visual
-                .mesh
-                != "reclaim_drone"
+                .carried_drone
     }
 
     /// The unit (or wreck) drawn nearest to a pixel, its body or its icon (`pick.rs`).
@@ -1088,12 +1086,7 @@ impl Game {
             .filter(|u| u.unit_id != ship.unit_id)
             .map(|u| BlueprintId(u.blueprint as u16))
             .collect();
-        let free = self
-            .view
-            .status
-            .queues
-            .iter()
-            .find(|q| q.unit_id == ship.unit_id)
+        let free = sim_thread::queue_of(&self.view.status.queues, ship.unit_id)
             .and_then(|q| q.cargo.as_ref())
             .map(|c| c.capacity.saturating_sub(c.used));
         let bp = self.blueprints.unit(BlueprintId(ship.blueprint as u16));
@@ -1479,7 +1472,7 @@ impl Game {
                         .is_some_and(|u| self.is_enemy((u.owner_flags & 0xFF) as u8))
                 });
                 if inspecting {
-                    self.view.selection = picked;
+                    self.view.selection = picked.into();
                 } else if self.shift {
                     for id in picked {
                         if !self.view.selection.contains(&id) {
@@ -1487,7 +1480,7 @@ impl Game {
                         }
                     }
                 } else {
-                    self.view.selection = picked;
+                    self.view.selection = picked.into();
                 }
             }
         }
@@ -2298,7 +2291,7 @@ impl Game {
             HudAction::SetSpeed(pct) => self.set_speed(pct),
             HudAction::Select { units, focus } => {
                 self.view.mode = Mode::Normal;
-                self.view.selection = units;
+                self.view.selection = units.into();
                 if focus {
                     self.focus_selection();
                 }
@@ -2618,7 +2611,7 @@ impl Game {
             self.camera.distance = self.camera.distance.min(900.0);
             self.zoom_target = None;
             if self.view.observing || player == self.view.local {
-                self.view.selection = vec![u.unit_id];
+                self.view.selection = vec![u.unit_id].into();
             }
             if self.view.observing {
                 self.view.local = player;
@@ -3200,21 +3193,18 @@ impl Game {
             }
         }
         let index_of = &self.view.index_of;
-        let selectable: std::collections::HashSet<_> = index_of
-            .iter()
-            .filter(|(_, &i)| {
-                self.blueprints
-                    .unit(BlueprintId(self.view.frame.units[i].blueprint as u16))
-                    .visual
-                    .mesh
-                    != "reclaim_drone"
+        let (units, blueprints) = (&self.view.frame.units, &self.blueprints);
+        let selectable = |id: &u32| {
+            index_of.get(id).is_some_and(|&i| {
+                !blueprints
+                    .unit(BlueprintId(units[i].blueprint as u16))
+                    .carried_drone
             })
-            .map(|(&id, _)| id)
-            .collect();
-        self.view.selection.retain(|id| selectable.contains(id));
+        };
+        self.view.selection.retain(&selectable);
         // A death is not a selection: nobody answers for it.
         self.answered.retain(|id| index_of.contains_key(id));
-        self.view.groups.retain(|id| selectable.contains(&id));
+        self.view.groups.retain(|id| selectable(&id));
         true
     }
 
@@ -3920,7 +3910,7 @@ impl Game {
         // The formation panel belongs to the selection it was opened for.
         self.view.formation_panel = false;
         let before: HashSet<u32> = self.answered.iter().copied().collect();
-        self.answered.clone_from(&self.view.selection);
+        self.answered = self.view.selection.to_vec();
         self.sound_table(audio);
         let Some(table) = &self.sounds else { return };
         let new = self.view.selection.iter().any(|id| !before.contains(id));
@@ -4902,7 +4892,7 @@ pub(crate) fn unit_bar_work(u: &UnitInstance, queues: &[UnitOrders]) -> f32 {
     if let Some(l) = crate::hud::silo::Launcher::of(u) {
         return if l.assembling() { l.progress } else { -1.0 };
     }
-    let Some(q) = queues.iter().find(|q| q.unit_id == u.unit_id) else {
+    let Some(q) = sim_thread::queue_of(queues, u.unit_id) else {
         return -1.0;
     };
     let making = q.orders.first().is_some_and(|o| {

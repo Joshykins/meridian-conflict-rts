@@ -215,11 +215,7 @@ impl Scene<'_> {
         if u.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP) != 0 {
             return None;
         }
-        self.view
-            .status
-            .queues
-            .iter()
-            .find(|q| q.unit_id == u.unit_id)
+        crate::sim_thread::queue_of(&self.view.status.queues, u.unit_id)
     }
 
     fn team_color(&self, owner: u8) -> Color {

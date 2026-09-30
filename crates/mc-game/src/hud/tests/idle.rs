@@ -32,7 +32,7 @@ fn an_idle_engineer_tile_steps_through_them_and_shift_takes_them_all() {
             focus: false
         }]
     );
-    rig.view.selection = vec![9, 7];
+    rig.view.selection = vec![9, 7].into();
     assert_eq!(
         rig.click(tile),
         vec![HudAction::Select {

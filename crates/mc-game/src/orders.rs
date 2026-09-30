@@ -562,7 +562,7 @@ pub fn patrol_start(view: &View) -> Option<Vec2> {
     for id in &view.selection {
         let queued = view
             .shift
-            .then(|| view.status.queues.iter().find(|q| q.unit_id == *id))
+            .then(|| crate::sim_thread::queue_of(&view.status.queues, *id))
             .flatten()
             .and_then(|q| {
                 q.route()
@@ -1899,7 +1899,7 @@ mod tests {
                 ..Default::default()
             })
             .collect();
-        view.selection = vec![1, 2];
+        view.selection = vec![1, 2].into();
         assert_eq!(patrol_legs(&view), vec![(a, b), (b, c), (c, a)]);
         assert_eq!(
             patrol_insert_leg(&view, Vec2::new(50.0, -10.0)),

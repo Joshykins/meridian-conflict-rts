@@ -27,7 +27,7 @@ pub(crate) fn unit_at(
     let mut best: Option<(f32, usize)> = None;
     for (i, u) in units.iter().enumerate() {
         let bp = blueprints.unit(BlueprintId(u.blueprint as u16));
-        if bp.visual.mesh == "reclaim_drone" && u.owner_flags & KIND_WRECK == 0 {
+        if bp.carried_drone && u.owner_flags & KIND_WRECK == 0 {
             continue;
         }
         // Falling hull IDs belong to the former unit, never the wreck table.
