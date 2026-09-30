@@ -1,7 +1,7 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
 //! curving charges, a warp into a dampener and the stun it leaves, wrecks worn down by
-//! blasts, a factory's batch forming up) must hash identically at every worker count and after a snapshot is
+//! blasts, two factories' linked batch forming up) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -126,9 +126,10 @@ fn setup(w: &mut World) {
                 // A Courier that warps into the north's dampener (`warp.rs`), on its own power.
                 add("aster_t1_lift_ship", 1, 2000, 100);
                 add("aster_t3_power", 1, 400, 150);
-                // A factory with batch on: its scouts form up by it and join the attack
+                // Two factories linked in one batch: their scouts form up by them and join the attack
                 // together (`batch.rs`), one of them waiting across the snapshot.
                 add("aster_t1_land_factory", 1, 200, 450);
+                add("aster_t1_land_factory", 1, 450, 450);
                 // Two submarines already in the north's waters, raiding its fleet past its
                 // torpedo launchers (the north's grid is paid, so they stand to).
                 add("aster_t1_submarine", 2, 3000, 3350);
@@ -170,10 +171,10 @@ fn units_of(w: &World, player: u8) -> Vec<UnitId> {
         .collect()
 }
 
-/// The south's factory, its standing orders the tick-1 attack-move: batch on, three
-/// scouts a lap, repeating.
+/// The south's factories, their standing orders the tick-1 attack-move: linked in one
+/// batch of five, three scouts a lap each, repeating.
 fn batch_on(w: &World) -> Vec<PlayerCommand> {
-    let factories = vec![factory(w)];
+    let factories = factories(w);
     [
         // The mass storage's worth in hand to build them with.
         Command::DebugStock {
@@ -184,6 +185,11 @@ fn batch_on(w: &World) -> Vec<PlayerCommand> {
         Command::SetBatch {
             factories: factories.clone(),
             batch: true,
+        },
+        // The two linked in one batch that leaves at five, short of their laps' six.
+        Command::SetBatchSize {
+            factories: factories.clone(),
+            size: Some(5),
         },
         Command::SetRepeat {
             factories: factories.clone(),
@@ -200,14 +206,15 @@ fn batch_on(w: &World) -> Vec<PlayerCommand> {
     .collect()
 }
 
-fn factory(w: &World) -> UnitId {
+/// The south's two factories.
+fn factories(w: &World) -> Vec<UnitId> {
     let bp = w.blueprints.id_of("aster_t1_land_factory").unwrap();
     let u = &w.state.units;
     u.slots
         .iter()
-        .find(|&r| u.blueprint[r] == bp)
+        .filter(|&r| u.blueprint[r] == bp)
         .map(|r| u.id(r))
-        .unwrap()
+        .collect()
 }
 
 /// The commands given on `tick`, the same in every run.
@@ -313,7 +320,7 @@ fn reference() -> Vec<u64> {
     let mut intercepted = 0;
     let mut struck = 0;
     let titan_sub = w.blueprints.id_of("aster_t4_submarine").unwrap();
-    let fid = factory(&w);
+    let fid = factories(&w)[0];
     let (mut last_held, mut batches_sent, mut held_at_snapshot) = (0, 0, 0);
     let hashes = (1..TICKS)
         .map(|t| {
@@ -327,9 +334,15 @@ fn reference() -> Vec<u64> {
                         if *blueprint == titan_sub)
                 })
                 .count();
-            let held = w.state.batches.get(&fid).map_or(0, |b| b.held.len());
-            // Two waiting, then none: the third came out and all three left.
-            if last_held == 2 && held == 0 {
+            let held = w
+                .state
+                .batches
+                .values()
+                .find(|b| b.factories.iter().any(|f| f.0 == fid))
+                .map_or(0, |b| b.held.len());
+            // Four waiting, then fewer: the fifth came out and the batch left (the other
+            // factory's scout out that same tick may already wait in the next).
+            if last_held >= 4 && held < last_held {
                 batches_sent += 1;
             }
             last_held = held;

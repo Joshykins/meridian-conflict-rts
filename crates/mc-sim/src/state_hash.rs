@@ -100,15 +100,19 @@ impl World {
                     h.write_i64(r.exit.x.0);
                     h.write_i64(r.exit.y.0);
                 }
-                h.write_u64(s.batches.len() as u64);
-                for (&id, b) in &s.batches {
-                    h.write_u64(id.0 as u64);
-                    h.write_u64(b.made as u64);
+                h.write_u64(s.batches.len() as u64 | (s.next_batch as u64) << 32);
+                for (&g, b) in &s.batches {
+                    h.write_u64(g as u64 | (b.owner as u64) << 32);
+                    h.write_u64(b.size.map_or(u64::MAX, u64::from));
+                    h.write_u64(b.factories.len() as u64);
+                    for &(f, made) in &b.factories {
+                        h.write_u64(f.0 as u64 | (made as u64) << 32);
+                    }
                     h.write_u64(b.held.len() as u64);
-                    for (u, at) in &b.held {
-                        h.write_u64(u.0 as u64);
-                        h.write_i64(at.x.0);
-                        h.write_i64(at.y.0);
+                    for held in &b.held {
+                        h.write_u64(held.unit.0 as u64 | (held.factory.0 as u64) << 32);
+                        h.write_i64(held.at.x.0);
+                        h.write_i64(held.at.y.0);
                     }
                 }
             }),

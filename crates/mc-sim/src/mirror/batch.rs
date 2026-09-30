@@ -10,16 +10,23 @@ pub const UNIT_BATCH: u32 = 1 << 14;
 /// A factory's batch as the interface shows it (`UnitOrders::batch`).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BatchView {
-    /// Products this batch has had so far, and how many it will have.
-    pub made: u16,
+    /// Which batch it is in: factories with the same number are linked.
+    pub group: u32,
+    /// The batch's count so far and what it leaves at: products out of the laps' total,
+    /// or, with a size set (`fixed`), units waiting of the size.
+    pub count: u16,
     pub size: u16,
-    /// Each place in the muster block, and whether a unit stands in it: those taken first,
-    /// then those still to fill.
+    pub fixed: bool,
+    /// Each place in this factory's muster block, and whether a unit stands in it: those
+    /// taken first, then those still to fill.
     pub places: Vec<([f32; 2], bool)>,
     /// The way the block faces (the factory's), a unit vector.
     pub facing: [f32; 2],
     /// Distance between places, metres.
     pub spacing: f32,
+    /// Where each linked factory's block starts, in the batch's order; this one is `index`.
+    pub linked: Vec<[f32; 2]>,
+    pub index: usize,
 }
 
 impl World {
@@ -27,8 +34,10 @@ impl World {
         let m = self.muster(row)?;
         let a = self.state.units.heading[row];
         Some(BatchView {
-            made: m.made,
+            group: m.group,
+            count: m.count,
             size: m.size,
+            fixed: m.fixed,
             places: m
                 .places
                 .iter()
@@ -36,11 +45,13 @@ impl World {
                 .collect(),
             facing: [a.cos().to_f32(), a.sin().to_f32()],
             spacing: m.spacing.to_f32(),
+            linked: m.linked.iter().map(|p| p.to_f32()).collect(),
+            index: m.index,
         })
     }
 
-    /// Whether the factory in `row` has batch on.
+    /// Whether the factory in `row` is in a batch.
     pub(super) fn batching(&self, row: usize) -> bool {
-        self.state.batches.contains_key(&self.state.units.id(row))
+        self.batch_of(self.state.units.id(row)).is_some()
     }
 }

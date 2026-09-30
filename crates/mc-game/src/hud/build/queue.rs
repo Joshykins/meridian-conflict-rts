@@ -1,7 +1,8 @@
 //! The queue strip over the construction panel: what the builder has queued, and the
 //! Pause, Batch and Repeat switches. A selection of several builders can be split on any
-//! switch; the buttons show how it is split and what a click will do. While a batch is
-//! forming up, a Send tile beside Batch lets it go early.
+//! switch; the buttons show how it is split and what a click will do. Batch on several
+//! factories links them into one batch. While batch is on, a Send tile lets it go early
+//! and a Size stepper sets how many it waits for.
 
 use super::{pause_mark, tip, Stack, BUILDING};
 use crate::audio::Sfx;
@@ -55,16 +56,54 @@ pub(super) struct Queue<'a> {
     pub(super) is_factory: bool,
     /// The selected factories that build their queues over and over.
     pub(super) repeat: Split,
-    /// The selected factories whose products form up and leave together.
+    /// The selected factories in one batch: `on` counts those in the batch most of them
+    /// share, so the switch is all on only when they are all linked in one.
     pub(super) batch: Split,
-    /// This factory's batch while it has one on: products out so far, and how many it takes.
-    pub(super) muster: Option<(u16, u16)>,
+    /// This factory's batch while it is in one.
+    pub(super) muster: Option<Muster>,
     /// The selected builders whose work is paused.
     pub(super) pause: Split,
     /// This builder's work is paused: its queue waits, the front entry holds where it got to.
     pub(super) paused: bool,
     /// What the front entry is (producing, building, upgrading), when it heads the queue.
     pub(super) front: Option<OrderKind>,
+}
+
+/// A factory's batch as the strip shows it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Muster {
+    /// How far along it is and what it leaves at.
+    pub(super) count: u16,
+    pub(super) size: u16,
+    /// The size was set by hand; else it is the factories' laps.
+    pub(super) fixed: bool,
+    /// Factories linked in it.
+    pub(super) linked: usize,
+}
+
+/// How many of `factories` (unit ids) are in the batch most of them share, and how many
+/// there are: what the Batch switch and Shift+L go by. All in one batch is all on.
+pub(crate) fn batch_linked(
+    queues: &[mc_sim::mirror::UnitOrders],
+    factories: impl IntoIterator<Item = u32>,
+) -> (usize, usize) {
+    let groups: Vec<Option<u32>> = factories
+        .into_iter()
+        .map(|id| {
+            queues
+                .iter()
+                .find(|q| q.unit_id == id)
+                .and_then(|q| q.batch.as_ref())
+                .map(|b| b.group)
+        })
+        .collect();
+    let most = groups
+        .iter()
+        .flatten()
+        .map(|g| groups.iter().filter(|o| **o == Some(*g)).count())
+        .max()
+        .unwrap_or(0);
+    (most, groups.len())
 }
 
 /// How wide the strip's head is: the caption, or what is under way and how far along.
@@ -311,7 +350,7 @@ struct Switch<'a> {
     id: &'static str,
     split: Split,
     glyph: icons::Glyph,
-    label: &'static str,
+    label: &'a str,
     key: &'static str,
     /// The colour it lights in while on.
     tone: u32,
@@ -434,25 +473,38 @@ pub(in crate::hud) const BATCH: u32 = crate::hud::style::Family::Movement.tone()
 fn batch_switches(hud: &mut Hud, ui: &mut Ui, r: Rect, queue: &Queue, right: f32) -> f32 {
     let split = queue.batch;
     let tr = Rect::new(right - 96.0, r.y + (r.h - 34.0) * 0.5, 96.0, 34.0);
-    let waiting = queue.muster.map_or(0, |(made, _)| made);
+    let waiting = queue.muster.map_or(0, |m| m.count);
+    let linked = queue.muster.map_or(1, |m| m.linked);
     let hint = if split.mixed() {
         format!(
-            "{} of {} factories batch.  Click: all batch  \u{b7}  Right-Click: none do",
+            "{} of {} factories are in this batch.  Click: link them all into one  \u{b7}  Right-Click: none batch",
             split.on, split.of
         )
+    } else if split.all() && linked > 1 {
+        format!(
+            "{linked} factories linked: their units form up at their own doors and leave together. Click: each leaves as it is made."
+        )
     } else if split.all() {
-        "Units form up outside and leave together once the queue is out. Click: each leaves as it is made."
+        "Units form up outside and leave together once the batch is full. Click: each leaves as it is made."
+            .to_owned()
+    } else if split.of > 1 {
+        "Link these factories into one batch: units form up at each door and all leave together once it is full."
             .to_owned()
     } else {
         "Units form up outside the factory and wait for the rest of the queue (one lap, repeating), then leave together on its orders."
             .to_owned()
     };
-    let line = queue.muster.map(|(made, size)| {
+    let line = queue.muster.map(|m| {
         (
-            format!("{made}/{size} ready"),
-            made as f32 / size.max(1) as f32,
+            format!("{}/{} ready", m.count, m.size),
+            m.count as f32 / m.size.max(1) as f32,
         )
     });
+    let label = if linked > 1 && split.all() {
+        format!("Batch \u{d7}{linked}")
+    } else {
+        "Batch".to_owned()
+    };
     let set = switch(
         hud,
         ui,
@@ -461,7 +513,7 @@ fn batch_switches(hud: &mut Hud, ui: &mut Ui, r: Rect, queue: &Queue, right: f32
             id: "queue-batch",
             split,
             glyph: icons::Glyph::Batch,
-            label: "Batch",
+            label: &label,
             key: "\u{21e7}L",
             tone: BATCH,
             hint: &hint,
@@ -516,7 +568,65 @@ fn batch_switches(hud: &mut Hud, ui: &mut Ui, r: Rect, queue: &Queue, right: f32
         }
         right = sr.x - 10.0;
     }
+    if let Some(m) = queue.muster.filter(|_| split.on > 0) {
+        right = size_stepper(hud, ui, Rect::new(right - 84.0, tr.y, 84.0, 34.0), m);
+    }
     right
+}
+
+/// How many a batch waits for: its laps (LAP) or a size set by hand (SIZE), a minus at the
+/// left and a plus at the right. A click on either half steps it (from the laps' total, the
+/// first step sets a size); a right-click goes back to the laps. Returns the x left of it.
+fn size_stepper(hud: &mut Hud, ui: &mut Ui, sr: Rect, m: Muster) -> f32 {
+    let t = hud.tile(ui, id("queue-batch-size", 0), sr, m.fixed, true);
+    let left = ui.cursor.x < sr.x + sr.w * 0.5;
+    let (minus, plus) = (
+        Vec2::new(sr.x + 12.0, sr.mid_y()),
+        Vec2::new(sr.right() - 12.0, sr.mid_y()),
+    );
+    let lit = |on: bool| rgb(BATCH, if t.hovered && on { 1.0 } else { 0.55 });
+    ui.stroke(minus - Vec2::X * 4.0, minus + Vec2::X * 4.0, 1.6, lit(left));
+    ui.stroke(plus - Vec2::X * 4.0, plus + Vec2::X * 4.0, 1.6, lit(!left));
+    ui.stroke(plus - Vec2::Y * 4.0, plus + Vec2::Y * 4.0, 1.6, lit(!left));
+    ui.text_centred(
+        sr.x + sr.w * 0.5,
+        sr.y + 10.0,
+        type_scale::MICRO,
+        rgb(palette::FAINT, 1.0),
+        if m.fixed { "SIZE" } else { "LAP" },
+    );
+    ui.text_centred(
+        sr.x + sr.w * 0.5,
+        sr.y + 23.0,
+        type_scale::ITEM,
+        rgb(if m.fixed { BATCH } else { palette::TEXT }, 1.0),
+        &m.size.to_string(),
+    );
+    if t.hovered {
+        let hint = if m.fixed {
+            format!(
+                "Leaves once {} are formed up.  Click \u{2212}/+ to change  \u{b7}  Right-Click: once the queues are out",
+                m.size
+            )
+        } else {
+            "Leaves once every factory's queue is out (one lap).  Click \u{2212}/+ to set a size instead".to_owned()
+        };
+        tip(ui, sr.x, sr.y - 46.0, &hint);
+    }
+    let max = mc_sim::batch::MAX_BATCH;
+    if t.clicked {
+        let size = if left {
+            m.size.saturating_sub(1).max(1)
+        } else {
+            (m.size + 1).min(max)
+        };
+        ui.audio.play(Sfx::Select);
+        hud.actions.push(HudAction::BatchSize(Some(size)));
+    } else if t.right_clicked && m.fixed {
+        ui.audio.play(Sfx::Back);
+        hud.actions.push(HudAction::BatchSize(None));
+    }
+    sr.x - 10.0
 }
 
 /// A frame of short dashes just inside `r`.

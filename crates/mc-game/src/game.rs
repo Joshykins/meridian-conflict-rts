@@ -2268,6 +2268,10 @@ impl Game {
             HudAction::SendBatch => self.send(Command::ReleaseBatch {
                 factories: self.selected_ids(),
             }),
+            HudAction::BatchSize(size) => self.send(Command::SetBatchSize {
+                factories: self.selected_ids(),
+                size,
+            }),
             HudAction::CancelOrder { kind, pos } => self.send(Command::CancelOrder {
                 units: self.selected_ids(),
                 kind,
@@ -3060,19 +3064,21 @@ impl Game {
             }),
             KeyCode::KeyL if self.selection_lands() && self.shift => self.take_off(),
             KeyCode::KeyL if self.selection_lands() => self.arm(Targeting::Land),
-            // As the Batch button: off if every factory batches, all on otherwise.
+            // As the Batch button: off if the factories are all in one batch, else linked into one.
             KeyCode::KeyL if self.shift && self.selection_has(cat::FACTORY) => {
-                let all = self
-                    .selected_units()
-                    .filter(|u| {
-                        self.blueprints
-                            .unit(BlueprintId(u.blueprint as u16))
-                            .has(cat::FACTORY)
-                    })
-                    .all(|u| u.batching());
+                let (on, of) = hud::batch_linked(
+                    &self.view.status.queues,
+                    self.selected_units()
+                        .filter(|u| {
+                            self.blueprints
+                                .unit(BlueprintId(u.blueprint as u16))
+                                .has(cat::FACTORY)
+                        })
+                        .map(|u| u.unit_id),
+                );
                 self.send(Command::SetBatch {
                     factories: self.selected_ids(),
-                    batch: !all,
+                    batch: on < of,
                 });
             }
             // As the Repeat button: off if every factory repeats, all on otherwise.

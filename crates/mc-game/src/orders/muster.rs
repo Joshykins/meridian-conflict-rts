@@ -1,6 +1,6 @@
 //! A batching factory's muster block on the ground (`mc_sim::batch`): a pad for each
 //! place its batch takes, lit as a unit stands in it, corner brackets round the block,
-//! and how many are ready over it.
+//! and how many are ready over it. Linked factories' blocks are joined by a dashed line.
 
 use super::Field;
 use crate::ui::{self, type_scale, Rect, Ui};
@@ -51,6 +51,21 @@ pub(super) fn muster_block(ui: &mut Ui, field: &Field, batch: &BatchView, streng
         }
     }
 
+    // Linked: a dashed line on to the next factory's block, so the batch reads as one.
+    if let (Some(&a), Some(&b)) = (
+        batch.linked.get(batch.index),
+        batch.linked.get(batch.index + 1),
+    ) {
+        let (a, b) = (Vec2::from(a), Vec2::from(b));
+        let steps = ((a.distance(b) / 8.0) as usize).clamp(2, 400);
+        for i in (0..steps).step_by(2) {
+            let p = |k: usize| a.lerp(b, k as f32 / steps as f32);
+            if let (Some(x), Some(y)) = (ground(p(i)), ground(p(i + 1))) {
+                ui.stroke(x, y, 1.4, ui::rgb(TONE, 0.6 * strength));
+            }
+        }
+    }
+
     // Corner brackets round the whole block, in its own frame.
     let local = |p: [f32; 2]| {
         let v = Vec2::from(p);
@@ -96,7 +111,12 @@ pub(super) fn muster_block(ui: &mut Ui, field: &Field, batch: &BatchView, streng
     .filter_map(|&l| ground(world(l)))
     .min_by(|a, b| a.y.total_cmp(&b.y));
     if let Some(at) = top {
-        let (label, count) = ("BATCH", format!("{}/{}", batch.made, batch.size));
+        let label = match batch.linked.len() {
+            0 | 1 => "BATCH".to_owned(),
+            n => format!("BATCH \u{d7}{n}"),
+        };
+        let label = label.as_str();
+        let count = format!("{}/{}", batch.count, batch.size);
         let lw = ui.text_width(type_scale::MICRO, label);
         let cw = ui.text_width(type_scale::ITEM, &count);
         let w = 10.0 + lw + 8.0 + cw + 10.0;

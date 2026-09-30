@@ -1,5 +1,6 @@
-//! A factory's batch: its products form up outside it and wait for the rest of the
-//! queue, then leave together on the factory's orders (`batch.rs`).
+//! Factory batches: products form up outside their factory and wait until the batch is
+//! full, then leave together on their factories' orders (`batch.rs`). Several factories
+//! can be linked into one batch.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -110,7 +111,10 @@ fn produce(w: &World, fid: UnitId, key: &str, count: u8) -> PlayerCommand {
 }
 
 fn batch_of(w: &World, fid: UnitId) -> Option<&mc_sim::batch::Batch> {
-    w.state.batches.get(&fid)
+    w.state
+        .batches
+        .values()
+        .find(|b| b.factories.iter().any(|f| f.0 == fid))
 }
 
 /// Where `row` is headed: its front order's position, or where it stands.
@@ -182,7 +186,7 @@ fn a_batch_forms_up_outside_and_leaves_together_once_the_lap_is_done() {
     assert!(all.iter().all(|&t| formation(t) == formation(all[0])));
     let b = batch_of(&w, fid).unwrap();
     assert!(
-        b.held.is_empty() && b.made == 0,
+        b.held.is_empty() && b.factories.iter().all(|f| f.1 == 0),
         "the next lap starts empty"
     );
 
@@ -273,4 +277,183 @@ fn a_plain_queue_is_one_batch_and_leaves_for_the_rally_point_without_orders() {
     for t in [first, second] {
         assert!(goal(&w, t).distance(rally) < Fx::from_int(60));
     }
+}
+
+/// Two factories side by side, 400 m apart, both facing +x.
+fn two_factories() -> (World, UnitId, UnitId) {
+    let (mut w, a) = with_factory();
+    w.tick(&[spawn(&w, "aster_t1_land_factory", 1000)]).unwrap();
+    let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let b = w
+        .state
+        .units
+        .slots
+        .iter()
+        .map(|r| w.state.units.id(r))
+        .find(|&id| id != a && w.state.units.blueprint[w.state.units.row(id).unwrap()] == factory)
+        .expect("the second factory spawned");
+    (w, a, b)
+}
+
+/// Every unit that has left a factory so far, by row.
+fn out(w: &World, key: &str) -> Vec<usize> {
+    let bp = w.blueprints.id_of(key).unwrap();
+    let u = &w.state.units;
+    u.slots
+        .iter()
+        .filter(|&r| u.blueprint[r] == bp && u.is_active(r) && !u.has_flag(r, flag::IN_FACTORY))
+        .collect()
+}
+
+#[test]
+fn linked_factories_wait_for_each_other_and_leave_as_one_group() {
+    let (mut w, a, b) = two_factories();
+    let post = FxVec2::from_ints(1400, 900);
+    w.tick(&[
+        // One order for both: they share the way out, so their units leave as one group.
+        cmd(Command::Move {
+            units: vec![a, b],
+            target: post,
+            queue: false,
+        }),
+        cmd(Command::SetBatch {
+            factories: vec![a, b],
+            batch: true,
+        }),
+        produce(&w, a, "aster_t1_tank", 1),
+        produce(&w, b, "aster_t1_tank", 2),
+    ])
+    .unwrap();
+    assert_eq!(batch_of(&w, a).unwrap().factories.len(), 2, "one batch");
+    let first = out_tanks_after(&mut w, &[], 2);
+    for &t in &first {
+        assert!(
+            goal(&w, t).distance(post) > Fx::from_int(300),
+            "the first two wait: the second factory's lap is not out"
+        );
+    }
+    let all = out_tanks_after(&mut w, &first, 1);
+    for &t in &all {
+        assert!(
+            goal(&w, t).distance(post) < Fx::from_int(60),
+            "all three leave"
+        );
+    }
+    let formation = |t: usize| w.state.orders.front(&w.state.units, t).unwrap().formation;
+    assert!(
+        formation(all[0]) != 0 && all.iter().all(|&t| formation(t) == formation(all[0])),
+        "as one group"
+    );
+}
+
+#[test]
+fn a_linked_batch_with_a_size_leaves_once_that_many_are_formed_up() {
+    let (mut w, a, b) = two_factories();
+    let post = FxVec2::from_ints(1400, 900);
+    w.tick(&[
+        cmd(Command::Move {
+            units: vec![a, b],
+            target: post,
+            queue: false,
+        }),
+        cmd(Command::SetBatch {
+            factories: vec![a, b],
+            batch: true,
+        }),
+        cmd(Command::SetBatchSize {
+            factories: vec![b],
+            size: Some(3),
+        }),
+        produce(&w, a, "aster_t1_tank", 5),
+        produce(&w, b, "aster_t1_tank", 5),
+    ])
+    .unwrap();
+    assert_eq!(
+        batch_of(&w, a).unwrap().size,
+        Some(3),
+        "the size is the batch's"
+    );
+    let two = out_tanks_after(&mut w, &[], 2);
+    assert!(two
+        .iter()
+        .all(|&t| goal(&w, t).distance(post) > Fx::from_int(300)));
+    let three = out_tanks_after(&mut w, &two, 1);
+    assert!(three
+        .iter()
+        .all(|&t| goal(&w, t).distance(post) < Fx::from_int(60)));
+    // Well short of both queues: the size, not the laps, sent it, and the next one starts
+    // (a tank out of the other factory that same tick may already stand in it).
+    assert!(batch_of(&w, a).unwrap().held.len() < 3);
+    // The size is clamped to what a batch may hold.
+    w.tick(&[cmd(Command::SetBatchSize {
+        factories: vec![a],
+        size: Some(60_000),
+    })])
+    .unwrap();
+    assert_eq!(
+        batch_of(&w, a).unwrap().size,
+        Some(mc_sim::batch::MAX_BATCH)
+    );
+}
+
+#[test]
+fn linking_keeps_the_units_waiting_and_unlinking_one_sends_only_its_own() {
+    let (mut w, a, b) = two_factories();
+    let post = FxVec2::from_ints(1400, 900);
+    w.tick(&[
+        cmd(Command::Move {
+            units: vec![a, b],
+            target: post,
+            queue: false,
+        }),
+        cmd(Command::SetBatch {
+            factories: vec![a],
+            batch: true,
+        }),
+        cmd(Command::SetBatch {
+            factories: vec![b],
+            batch: true,
+        }),
+        cmd(Command::SetRepeat {
+            factories: vec![a, b],
+            repeat: true,
+        }),
+        produce(&w, a, "aster_t1_tank", 3),
+        produce(&w, b, "aster_t1_tank", 3),
+    ])
+    .unwrap();
+    assert_ne!(
+        batch_of(&w, a).map(|x| x as *const _),
+        batch_of(&w, b).map(|x| x as *const _),
+        "two batches"
+    );
+    let first = out_tanks_after(&mut w, &[], 2);
+    w.tick(&[cmd(Command::SetBatch {
+        factories: vec![a, b],
+        batch: true,
+    })])
+    .unwrap();
+    let batch = batch_of(&w, a).unwrap();
+    assert_eq!(batch.factories.len(), 2, "linked into one");
+    assert_eq!(batch.held.len(), 2, "the units waiting came along");
+    assert!(first
+        .iter()
+        .all(|&t| goal(&w, t).distance(post) > Fx::from_int(300)));
+
+    // Unlinking a: its unit leaves, b's keeps waiting in a batch of b alone.
+    w.tick(&[cmd(Command::SetBatch {
+        factories: vec![a],
+        batch: false,
+    })])
+    .unwrap();
+    assert!(batch_of(&w, a).is_none());
+    let rest = batch_of(&w, b).unwrap();
+    assert_eq!(rest.factories.len(), 1);
+    let waiting: Vec<UnitId> = rest.held.iter().map(|h| h.unit).collect();
+    for &t in &first {
+        let id = w.state.units.id(t);
+        let left = goal(&w, t).distance(post) < Fx::from_int(60);
+        assert_eq!(left, !waiting.contains(&id));
+    }
+    assert_eq!(out(&w, "aster_t1_tank").len(), 2);
 }

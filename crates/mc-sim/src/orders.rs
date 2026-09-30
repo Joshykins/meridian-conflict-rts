@@ -327,6 +327,10 @@ impl World {
             }
             Command::SetBatch { factories, batch } => self.set_batch(player, factories, *batch),
             Command::ReleaseBatch { factories } => self.send_batches(player, factories),
+            Command::SetBatchSize { factories, size } => {
+                self.set_batch_size(player, factories, *size);
+                Ok(())
+            }
             Command::CopyFactoryOrders { factories, from } => {
                 self.copy_standing(player, factories, *from);
                 Ok(())
