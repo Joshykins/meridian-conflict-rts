@@ -552,7 +552,7 @@ fn a_mine_at_sea_spreads_slower_than_one_on_land() {
     }
     let m = w.state.mines.by_unit[&sea].clone();
     // A minute on it works a circle of SEA_SPREAD_SPEED metres a second.
-    assert!(mc_sim::mines::SEA_SPREAD_SPEED < mc_sim::mines::SPREAD_SPEED);
+    const { assert!(mc_sim::mines::SEA_SPREAD_SPEED < mc_sim::mines::SPREAD_SPEED) };
     let r = (mc_sim::mines::SEA_SPREAD_SPEED * 60) as f64;
     let circle = std::f64::consts::PI * r * r / 10_000.0;
     let worked = m.worked_ground().to_f64();
