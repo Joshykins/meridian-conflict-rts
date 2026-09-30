@@ -158,6 +158,33 @@ pub(crate) struct Faction {
     /// Its own voices, over the shared ones (`data/sounds`). A unit file's own still wins.
     #[serde(default)]
     pub sounds: FactionSounds,
+    /// How its torpedoes look running. Presentation only.
+    #[serde(default)]
+    pub torpedo_look: TorpedoLook,
+}
+
+/// How a torpedo looks running: its body under the water (sprites.wgsl) and what it
+/// leaves on the surface (renderer `water_fx`, water.wgsl). A weapon names its own
+/// (`RawWeapon::torpedo_look`); otherwise an interceptor runs `Sprint` and any other
+/// torpedo its side's faction's. The number crosses to the renderer in
+/// `ProjectileInstance::wake`: never renumber one.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
+#[repr(u8)]
+pub enum TorpedoLook {
+    /// Compressed air: a white seam of bubbles coming up over a pale band (ARC).
+    #[default]
+    Bubbles = 0,
+    /// A plasma drive boiling the water: a glassy steam line with few bubbles and a
+    /// red glow under it (the Regency).
+    Plasma = 1,
+    /// An interceptor's sprint: a thin fizzing line snaking behind a small bright
+    /// motor, gone in a few seconds.
+    Sprint = 2,
+    /// A heavy torpedo: a long fat body, twin screws throwing up a broad doubled
+    /// wake that lies on the water a long time.
+    Heavy = 3,
+    /// A long-range pump-jet: quiet, its air let go in gulps, a dotted line.
+    Pulse = 4,
 }
 
 /// How a faction's construction sites look while they go up. The number reaches the
@@ -912,6 +939,9 @@ pub struct RawWeapon {
     /// can reach a submerged hull. Direct trajectory only.
     #[serde(default)]
     pub torpedo: bool,
+    /// A torpedo's own look, over the one its faction's torpedoes have. Cosmetic.
+    #[serde(default)]
+    pub torpedo_look: Option<TorpedoLook>,
     /// A guided missile that flies this many metres over the ground or water until its
     /// terminal run (a sea skimmer). Zero: it flies straight at its mark.
     #[serde(default)]
@@ -1387,6 +1417,7 @@ impl Unit {
                 casings: w.casings.clamp(0.0, 40.0) as f32,
                 red: w.red.clamp(0.0, 1.0) as f32,
                 torpedo: w.torpedo,
+                torpedo_look: w.torpedo_look,
                 skim: fx(w.skim),
                 apogee: fx(w.apogee),
                 curve: Angle(steps(w.curve.clamp(0.0, 80.0)).round() as i64 as u16),

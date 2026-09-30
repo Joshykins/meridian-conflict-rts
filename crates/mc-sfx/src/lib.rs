@@ -248,7 +248,10 @@ fn build(sound: &Sound, rate: u32, only: Option<usize>, heard: Option<&Levels>) 
                 });
             }
             Layer::Drive(_) => {}
-            Layer::Wind { .. } | Layer::Chirp { .. } | Layer::Chorus { .. } => nature::layer(
+            Layer::Wind { .. }
+            | Layer::Foam { .. }
+            | Layer::Chirp { .. }
+            | Layer::Chorus { .. } => nature::layer(
                 &mut b,
                 layer,
                 auto,

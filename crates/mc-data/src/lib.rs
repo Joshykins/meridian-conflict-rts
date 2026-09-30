@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 pub use raw::{
     BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade, ShieldKind,
-    Trajectory, UnitSounds, WeaponColor, WeaponSounds,
+    TorpedoLook, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -150,6 +150,8 @@ pub struct Faction {
     pub construction: Construction,
     /// Its own selection answers and building sounds. Presentation only.
     pub sounds: FactionSounds,
+    /// How its torpedoes look running. Presentation only.
+    pub torpedo_look: TorpedoLook,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1111,6 +1113,7 @@ impl Blueprints {
                 shield_color: f.shield_color,
                 construction: f.construction,
                 sounds: f.sounds.clone(),
+                torpedo_look: f.torpedo_look,
             });
         }
         // A builder puts up only its own faction's structures. Mobile units may also come
@@ -1604,6 +1607,8 @@ mod tests {
         // Nanites build their structures, and they answer in their own voices.
         assert_eq!(regency.construction, Construction::Nanite);
         assert_eq!(aster.construction, Construction::Print);
+        assert_eq!(regency.torpedo_look, TorpedoLook::Plasma);
+        assert_eq!(aster.torpedo_look, TorpedoLook::Bubbles);
         assert!(
             regency.sounds.select.contains_key(&IconKind::Factory)
                 && regency.sounds.build.is_some()

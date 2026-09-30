@@ -180,6 +180,28 @@ pub enum Layer {
         #[serde(default)]
         seed: Option<u32>,
     },
+    /// Water breaking up: noise through a band gliding from `from` to `to` over `glide`
+    /// seconds, soft above it as `Wind` is, its level shaken at random about `swell`
+    /// times a second, `depth` deep (zero to one), under `attack` and `decay`. A slow
+    /// `swell` (2 to 5) is white water rolling in; a fast one (20 to 40) with a full
+    /// `depth` is foam fizzing, bubbles bursting, a trickle draining through sand.
+    Foam {
+        #[serde(default)]
+        at: f32,
+        from: f32,
+        to: f32,
+        glide: f32,
+        q: f32,
+        attack: f32,
+        decay: f32,
+        gain: f32,
+        swell: f32,
+        depth: f32,
+        #[serde(default)]
+        pan: f32,
+        #[serde(default)]
+        seed: Option<u32>,
+    },
     /// A call: a sine gliding from `from` to `to` as `Tone` does, with a warble of
     /// `bend` (a share of the pitch) `vibrato` times a second, its level beaten into
     /// `pulse` separate syllables a second (none at zero), and made reedy or harsh by a
@@ -579,6 +601,24 @@ impl Layer {
                 at, freq, decay, ..
             } => (*at, *freq, *decay) = (*at * size, *freq * k, *decay * size),
             Layer::Roll {
+                at,
+                from,
+                to,
+                glide,
+                decay,
+                swell,
+                ..
+            } => {
+                (*at, *from, *to, *glide, *decay, *swell) = (
+                    *at * size,
+                    *from * k,
+                    *to * k,
+                    *glide * size,
+                    *decay * size,
+                    *swell * k,
+                )
+            }
+            Layer::Foam {
                 at,
                 from,
                 to,

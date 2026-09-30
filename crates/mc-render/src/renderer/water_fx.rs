@@ -54,8 +54,6 @@ const KEPT_RIPPLES: usize = 256;
 /// Points of a wake: the bow and the stern where they are now, then where the
 /// stern was, newest first.
 const WAKE_POINTS: usize = 12;
-/// Of those, what a torpedo's line uses (`sea_stir` walks that many).
-const TORPEDO_POINTS: usize = 8;
 /// Seconds between the points a hull leaves behind, and how long white water lasts.
 const WAKE_STEP: f32 = 1.3;
 /// Metres a hull may run before it leaves a point sooner than `WAKE_STEP`: a fast
@@ -96,7 +94,8 @@ struct GpuRipple {
 struct GpuWake {
     /// Where the hull is this frame, then its heading as a unit vector.
     at: [f32; 4],
-    /// Speed m/s, half length, half beam, kind (0 a hull on the surface, 1 dived, 2 a torpedo).
+    /// Speed m/s, half length, half beam, kind (0 a hull on the surface, 1 dived, 2 and
+    /// up a torpedo: 2 plus its look). A torpedo's half length is its line's life in seconds.
     shape: [f32; 4],
     /// A circle round everything the wake touches (xy, radius), then how strong it is.
     bound: [f32; 4],
@@ -179,9 +178,15 @@ pub(super) struct GunHull {
 
 /// Metres a torpedo runs between the points of its path that are kept.
 const TORPEDO_STEP: f32 = 10.0;
-/// Seconds a torpedo's line lies on the water once its air is up (`life` in
-/// water.wgsl's `sea_stir`).
-const TORPEDO_LINE: f32 = 4.0;
+/// Seconds a torpedo's line lies on the water once its air is up (handed to
+/// water.wgsl's `sea_stir` as the line's `shape.y`), by its look
+/// (`mc_data::TorpedoLook`: air, plasma, interceptor, heavy, pump-jet).
+const TORPEDO_LINE: [f32; 5] = [10.0, 8.0, 3.5, 16.0, 11.0];
+
+/// The look a torpedo's `ProjectileInstance::wake` carries, as an index into `TORPEDO_LINE`.
+fn torpedo_look(p: &ProjectileInstance) -> usize {
+    (p.wake.round().max(0.0) as usize).min(TORPEDO_LINE.len() - 1)
+}
 
 /// A torpedo in the water, and the line its air leaves on the surface.
 struct Torpedo {
@@ -195,6 +200,8 @@ struct Torpedo {
     path: Vec<[f32; 4]>,
     /// When it burst or ran out: its line still lies on the water a while.
     ended: Option<f32>,
+    /// How it looks (`torpedo_look`).
+    look: usize,
 }
 
 pub(super) struct WaterFx {
@@ -1666,6 +1673,7 @@ impl Renderer {
                     delay: delay(from),
                     path: vec![[from.x, from.y, 0.0, time + delay(from)]],
                     ended: None,
+                    look: torpedo_look(p),
                 });
             run.prev = from;
             run.pos = to;
@@ -1701,11 +1709,12 @@ impl Renderer {
             now.insert(key, run);
         }
         now.retain(|_, run| {
+            let line = TORPEDO_LINE[run.look];
             // Keep one point past the end of the line so its tail fades rather than jumps.
-            while run.path.len() > 2 && time - run.path[1][3] > TORPEDO_LINE {
+            while run.path.len() > 2 && time - run.path[1][3] > line {
                 run.path.remove(0);
             }
-            run.ended.is_none() || time - run.path.last().unwrap()[3] < TORPEDO_LINE
+            run.ended.is_none() || time - run.path.last().unwrap()[3] < line
         });
         self.water_fx.torpedoes = now;
     }
@@ -1811,7 +1820,7 @@ impl Renderer {
                 trail[0] = [head.x, head.y, run.speed, -run.delay];
                 n = 1;
             }
-            let room = TORPEDO_POINTS - n;
+            let room = WAKE_POINTS - n;
             let len = run.path.len();
             let take = len.min(room);
             for k in 0..take {
@@ -1832,15 +1841,16 @@ impl Renderer {
                 trail[i][2] = 0.0;
             }
             // Round every point, as wide as its line has spread by now.
-            let spread = (0.35 + TORPEDO_LINE * 0.35) * 3.0;
+            let line = TORPEDO_LINE[run.look];
+            let spread = (1.2 + line * 0.45) * 3.0;
             let mut radius = spread;
             for p in &trail[..n] {
                 radius = radius.max(Vec2::new(p[0], p[1]).distance(head.truncate()) + spread);
             }
             wakes.push(GpuWake {
                 at: [head.x, head.y, dir.x, dir.y],
-                shape: [run.speed, 1.5, 0.3, 2.0],
-                bound: [head.x, head.y, radius, 0.75],
+                shape: [run.speed, line, 0.3, 2.0 + run.look as f32],
+                bound: [head.x, head.y, radius, 1.0],
                 trail,
                 arms: [[0.0; 4]; WAKE_POINTS],
             });

@@ -222,7 +222,7 @@
                 damage: 1500, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
                 salvo: 4, salvo_delay: 0.4, turret_turn: 0, arc: 360,
                 muzzle: (6, 0, 7), muzzles: [(6, -3, 7), (6, 3, 7), (-6, -3, 7), (-6, 3, 7)],
-                targets: ["Naval"], color: Orange, torpedo: true, impact: 3.0, shockwave: 1.0,
+                targets: ["Naval"], color: Orange, torpedo: true, torpedo_look: Heavy, impact: 3.0, shockwave: 1.0,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
             (
@@ -230,7 +230,7 @@
                 damage: 1500, splash: 4, range: 1000, reload: 5, speed: 58, trajectory: Direct,
                 salvo: 4, salvo_delay: 0.4, turret_turn: 0, arc: 360,
                 muzzle: (0, 6, 7), muzzles: [(-3, 6, 7), (3, 6, 7), (-3, -6, 7), (3, -6, 7)],
-                targets: ["Naval"], color: Orange, torpedo: true, impact: 3.0, shockwave: 1.0,
+                targets: ["Naval"], color: Orange, torpedo: true, torpedo_look: Heavy, impact: 3.0, shockwave: 1.0,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
             (
@@ -649,7 +649,7 @@
                 damage: 1800, splash: 4, range: 900, reload: 6, speed: 55, trajectory: Direct,
                 salvo: 4, salvo_delay: 0.4,
                 muzzle: (28.0, 0, -1.5), muzzles: [(28.0, -1.0, -1.5), (28.0, 1.0, -1.5), (28.0, -2.2, -1.5), (28.0, 2.2, -1.5), (28.0, -1.0, -2.6), (28.0, 1.0, -2.6), (28.0, -2.2, -2.6), (28.0, 2.2, -2.6)],
-                targets: ["Naval"], color: Orange, torpedo: true, impact: 3.0, shockwave: 1.0,
+                targets: ["Naval"], color: Orange, torpedo: true, torpedo_look: Heavy, impact: 3.0, shockwave: 1.0,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
             // Four hatches behind the sail. Launched dived: a boil on the surface, then each
@@ -709,7 +709,7 @@
                 damage: 2400, splash: 5, range: 1400, reload: 8, speed: 60, trajectory: Direct,
                 salvo: 3, salvo_delay: 0.5,
                 muzzle: (70.2, 0, -2.7), muzzles: [(70.2, -1.89, -2.16), (70.2, 1.89, -2.16), (70.2, -1.89, -4.05), (70.2, 1.89, -4.05), (70.2, -3.78, -3.1), (70.2, 3.78, -3.1)],
-                targets: ["Naval"], color: Orange, torpedo: true, impact: 3.2, shockwave: 1.1,
+                targets: ["Naval"], color: Orange, torpedo: true, torpedo_look: Pulse, impact: 3.2, shockwave: 1.1,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
             // Four hatches aft of the sail. A volley of four climbs into the high air and

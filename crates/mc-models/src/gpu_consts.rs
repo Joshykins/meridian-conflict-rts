@@ -604,6 +604,36 @@ shared! {
         pub const RIDING: u32 = 0x400;
     }
 
+    /// Waves breaking on the shore (shore.wgsl), heard where they break
+    /// (`mc_render::shore`, the ambience's wave sounds).
+    pub mod surf as "SURF_" {
+        /// Seconds between one breaker and the next.
+        pub const PERIOD: f32 = 7.5;
+        /// A breaker's height in metres before the set and the climate scale it.
+        pub const HEIGHT: f32 = 1.1;
+        /// A wave breaks where the water is this many times shallower than it is high.
+        pub const BREAK_RATIO: f32 = 1.3;
+        /// Seabed slope, rise per metre, below which a shelf counts as this slope.
+        pub const MIN_SLOPE: f32 = 0.012;
+        /// The steepest the breakers take the bed to be: over a shore that drops off
+        /// faster they roll in as if over this, so the surf has room to be seen.
+        pub const MAX_SLOPE: f32 = 0.045;
+        /// Metres either side of a point the seabed's slope is measured over.
+        pub const SLOPE_REACH: f32 = 20.0;
+        /// Metres of water past which a swell is not yet a breaker.
+        pub const REACH_DEPTH: f32 = 9.0;
+        /// Metres up the beach (along it, level) the biggest wash runs.
+        pub const RUNUP: f32 = 12.0;
+        /// The most the wash climbs, metres of height, however steep the shore.
+        pub const RUNUP_RISE: f32 = 1.2;
+        /// Share of the period the wash runs up and back for.
+        pub const SWASH: f32 = 0.62;
+        /// The breakers on a sheltered canyon lake, and on a reef-sheltered tropical
+        /// shore, as a share of the open coast's.
+        pub const DESERT: f32 = 0.25;
+        pub const TROPICAL: f32 = 0.8;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

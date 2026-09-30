@@ -2990,6 +2990,12 @@ impl Renderer {
         (self.sky.darkness(), self.sky.wind_speed(), self.climate)
     }
 
+    /// The clock the shaders animate by (`Globals::camera.w`), as of the last frame:
+    /// what `shore::next_breaker` reads, so a wave is heard as it is seen to break.
+    pub fn time(&self) -> f32 {
+        self.last_time
+    }
+
     /// Lightning since the last call, for thunder.
     pub fn take_thunder(&mut self) -> Vec<crate::sky::Thunder> {
         self.sky.take_thunder()

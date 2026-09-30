@@ -1028,6 +1028,8 @@ pub struct SpentShot {
     pub lead: [f32; 3],
     pub blueprint: BlueprintId,
     pub weapon: u8,
+    /// Whose it was: a torpedo looks as its side's faction's do (`torpedo_look`).
+    pub owner: u8,
 }
 
 #[repr(C)]
@@ -1038,7 +1040,8 @@ pub struct ProjectileInstance {
     pub color: u32,
     pub pos: [f32; 3],
     pub size: f32,
-    /// Seconds the energy wake lasts. Zero: the usual hang, or none.
+    /// Seconds the energy wake lasts. Zero: the usual hang, or none. A torpedo's is
+    /// its look instead (`mc_data::TorpedoLook` as a number, `torpedo_look`).
     pub wake: f32,
     /// Metres of blue plasma around the traveling slug. Zero: none.
     pub plasma: f32,
@@ -1435,6 +1438,23 @@ impl World {
             .collect()
     }
 
+    /// How a torpedo of `owner`'s looks running, as `ProjectileInstance::wake` carries it:
+    /// the weapon's own look, else an interceptor's sprint, else its side's faction's.
+    fn torpedo_look(&self, weapon: &mc_data::Weapon, owner: u8) -> f32 {
+        let look = weapon.torpedo_look.unwrap_or_else(|| {
+            if weapon.intercepts {
+                mc_data::TorpedoLook::Sprint
+            } else {
+                self.state
+                    .players
+                    .get(owner as usize)
+                    .and_then(|p| self.blueprints.factions.get(p.faction as usize))
+                    .map_or(mc_data::TorpedoLook::Bubbles, |f| f.torpedo_look)
+            }
+        });
+        f32::from(look as u8)
+    }
+
     /// Where a construction beam leaves this builder.
     /// Whether `faction` builds with nanites (`mc_data::Construction::Nanite`).
     fn faction_uses_nanites(&self, faction: mc_data::FactionId) -> bool {
@@ -1822,6 +1842,11 @@ impl World {
                 look(s.projectiles.blueprint[i], s.projectiles.weapon[i]);
             let weapon = &self.blueprints.unit(s.projectiles.blueprint[i]).weapons
                 [s.projectiles.weapon[i] as usize];
+            let wake = if weapon.torpedo {
+                self.torpedo_look(weapon, s.projectiles.owner[i])
+            } else {
+                wake
+            };
             // Age has advanced after this step.
             let color = color
                 | if weapon.motor_out(s.projectiles.age[i]) {
@@ -1865,6 +1890,12 @@ impl World {
                 continue;
             }
             let (color, size, wake, plasma, hot) = look(shot.blueprint, shot.weapon);
+            let shot_weapon = &self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize];
+            let wake = if shot_weapon.torpedo {
+                self.torpedo_look(shot_weapon, shot.owner)
+            } else {
+                wake
+            };
             let ends = ((shot.after.to_f32() * 255.0) as u32).clamp(1, 255);
             let from = shot.from.to_f32();
             let caliber =

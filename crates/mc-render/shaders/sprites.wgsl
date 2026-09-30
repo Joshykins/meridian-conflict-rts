@@ -587,8 +587,23 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         // From strategic view it is a yellow marker like every other shot: wider,
         // solid, and not dimmed by the water over it.
         let strategic = strategic_view(center.w);
-        let length_px = max(2.8 * scale, mix(2.0, 3.6, strategic));
-        let width_px = max(0.32 * scale, mix(0.8, 2.0, strategic));
+        // Its look (`mc_data::TorpedoLook`, carried in `extras.x`): 0 air-driven,
+        // 1 a Regency plasma drive, 2 an interceptor, 3 heavy, 4 a long-range pump-jet.
+        let look = u32(p.extras.x + 0.5);
+        var long = 2.8;
+        var wide = 0.32;
+        if look == 2u {
+            long = 1.7;
+            wide = 0.22;
+        } else if look == 3u {
+            long = 4.4;
+            wide = 0.52;
+        } else if look == 4u {
+            long = 3.6;
+            wide = 0.34;
+        }
+        let length_px = max(long * scale, mix(2.0, 3.6, strategic));
+        let width_px = max(wide * scale, mix(0.8, 2.0, strategic));
         let offset = axis * corner.x * length_px + side * corner.y * width_px;
         let ndc = center.xy / center.w + offset * globals.viewport.zw;
         let depth = max(globals.map.z - head.z, 0.0);
@@ -597,6 +612,13 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         body.clip = vec4<f32>(ndc * center.w, center.z, center.w);
         body.uv = corner;
         body.color = mix(vec3<f32>(0.015, 0.035, 0.04), vec3<f32>(0.01, 0.07, 0.08), 1.0 - seen);
+        if look == 1u {
+            // The plasma drive glows red through the water over it.
+            body.color = mix(vec3<f32>(0.9, 0.1, 0.05), vec3<f32>(0.35, 0.08, 0.06), 1.0 - seen);
+        } else if look == 2u {
+            // An interceptor's hot little motor, pale blue-white.
+            body.color = mix(vec3<f32>(0.7, 0.95, 1.1), vec3<f32>(0.2, 0.45, 0.5), 1.0 - seen);
+        }
         body.color = mix(body.color, SHOT_YELLOW * 2.2, strategic);
         body.shape = vec2<f32>(-2.0, mix(0.85 * mix(0.35, 1.0, seen), 1.0, strategic));
         body.share = layer_share(strategic, true);

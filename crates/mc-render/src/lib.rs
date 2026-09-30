@@ -19,6 +19,7 @@ pub mod pipelines;
 pub mod renderer;
 mod shader_prelude;
 pub mod shader_reload;
+pub mod shore;
 pub mod sky;
 mod splash;
 mod swapchain;

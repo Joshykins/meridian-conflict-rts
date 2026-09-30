@@ -112,6 +112,10 @@ fn fs_shafts_march(in: ShaftOut) -> @location(0) vec4<f32> {
 // Full size, in `scene_over`: the walk's result, taken off the picture.
 @fragment
 fn fs_shafts_composite(in: ShaftOut) -> @location(0) vec4<f32> {
+    // Under the sea its own shafts are drawn (water.wgsl `under_sea`).
+    if globals.camera.z < globals.map.z {
+        discard;
+    }
     let removed = textureSampleLevel(shaft_march, clamp_sampler, in.clip.xy / globals.scene.xy, 0.0).rgb;
     // Negative where a gap lets more sun through than around it: reverse-subtract adds it.
     return vec4<f32>(removed, 0.0);

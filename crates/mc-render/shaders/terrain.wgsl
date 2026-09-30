@@ -1,4 +1,5 @@
 //!use bindings
+//!use shore
 //!use habitat
 //!use desert
 // Terrain: CDLOD quadtree patches over a streamed heightmap.
@@ -1149,6 +1150,21 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         crater_sky = cs.sky;
         crater_metal = cs.metal;
         n = normalize(mix(n, base_n, cs.fused * 0.9) - vec3<f32>(cs.slope, 0.0));
+    }
+
+    // The breakers' wash running up the beach and draining back (shore.wgsl):
+    // a thin sheet of water, glossy and darker, a froth along its front, and the
+    // sand wet and dark behind it.
+    if alt > -0.6 && alt < SURF_RUNUP_RISE * 1.4 {
+        let sw = wash(xy, shore_at(xy, -alt), globals.camera.w, px);
+        albedo *= 1.0 - 0.3 * sw.wet;
+        rough = mix(rough, 0.28, sw.wet * 0.75);
+        albedo = mix(albedo, albedo * vec3<f32>(0.72, 0.84, 0.86), sw.cover * 0.8);
+        rough = mix(rough, 0.2, sw.cover);
+        n = normalize(mix(n, base_n, sw.cover * 0.85));
+        let froth = foam_lace(xy, globals.camera.w, px, sw.foam * 0.7);
+        albedo = mix(albedo, vec3<f32>(0.78, 0.82, 0.84), froth * 0.8);
+        rough = mix(rough, 0.6, froth);
     }
 
     // Seabed: a little darker and bluer with depth. The water drawn on top

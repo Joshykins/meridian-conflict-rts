@@ -776,6 +776,23 @@ same treatment.
 - **Torpedo defence is a torpedo.** Interceptor tubes (`intercepts: true`) fire
   a short torpedo at one coming in; both burst under the water
   (`TorpedoIntercepted`). No decoys, no radius.
+- **You can tell a torpedo by its line.** Every torpedo leaves a line on the
+  water that reads from strategic height, and its look (`TorpedoLook`: the
+  weapon's `torpedo_look`, else an interceptor's `Sprint`, else its side's
+  faction's) sets its body and its line: ARC air-driven torpedoes a white seam
+  of bubbles over a pale band; heavy ones a long fat body and twin screw seams
+  that lie long; long-range pump-jets a dotted line of gulps; interceptors a
+  short body with a hot pale motor and a thin fizzing line that snakes and is
+  soon gone; the Regency's plasma drives a red glow under a glassy steam line.
+- **Shores have surf.** Breakers roll in square to every shore, bunching up as
+  the water shoals, break into a white lip, run in as white water and wash up
+  the sand in ragged lobes, leaving it wet and dark behind them (shore.wgsl).
+  They come in sets, and a crash is heard where and when one is seen to break
+  (`mc_render::shore`, the ambience). A canyon lake has little surf.
+- **The sea from under it.** The free camera may go under the water: the view
+  is tinted and dimmed by the water, the surface overhead shows the sky through
+  a round window and mirrors the water beyond it, and light shafts slant down.
+  The play camera never goes under.
 - **A dived launch is a boil.** A missile leaving a dived hull (`DivedLaunch`)
   bubbles up, breaches in a spray column, then climbs on a cold lob before the
   motor lights; the boat is on radar for the next eight seconds. A high-arc

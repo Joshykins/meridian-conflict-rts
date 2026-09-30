@@ -16,7 +16,11 @@
 //! zoom only a faint high wind is left. All of it plays on the weather volume.
 //! The beds are loops handed to `Audio::set_weather_loops` with the rain's
 //! (`Game::battle_sounds` merges them); the calls are one-shots, scattered at
-//! random times, places and pitches, some repeated or answered.
+//! random times, places and pitches, some repeated or answered. The waves are
+//! not scattered: each breaker is heard crashing where and when it is seen to
+//! break, and from close by its foam washing up the sand (`surf`).
+
+mod surf;
 
 use crate::audio::Audio;
 use glam::{Vec2, Vec3};
@@ -31,6 +35,7 @@ use std::sync::Arc;
 const LEVEL: f32 = 1.0;
 
 /// What the ambience listens to each frame, besides the map.
+#[derive(Clone, Copy)]
 pub struct Cues {
     pub focus: Vec3,
     /// The camera's distance from its focus, metres: how far out it is zoomed.
@@ -46,6 +51,10 @@ pub struct Cues {
     /// Canyon-country desert: ravens and wrens instead of songbirds, no frogs,
     /// sparse crickets, and a sheltered lake's lapping instead of open swell.
     pub desert: bool,
+    /// The water level, metres.
+    pub sea: f32,
+    /// The clock the shaders animate by (`Renderer::time`), which times the breakers.
+    pub clock: f32,
 }
 
 /// The ambience's sounds by name, looked up again whenever the library changes.
@@ -61,7 +70,7 @@ struct Ids {
     night_tropical: Option<SoundId>,
     frogs: Option<SoundId>,
     wave_break: Option<SoundId>,
-    wave_lap: Option<SoundId>,
+    wave_wash: Option<SoundId>,
     leaves_gust: Option<SoundId>,
     owl: Option<SoundId>,
     frog_croak: Option<SoundId>,
@@ -92,7 +101,7 @@ impl Ids {
             night_tropical: id("amb_night_tropical"),
             frogs: id("amb_frogs"),
             wave_break: id("wave_break"),
-            wave_lap: id("wave_lap"),
+            wave_wash: id("wave_wash"),
             leaves_gust: id("leaves_gust"),
             owl: id("owl_hoot"),
             frog_croak: id("frog_croak"),
@@ -311,6 +320,10 @@ pub struct Ambience {
     /// Whether the score is playing, checked now and then.
     music: bool,
     music_check: f32,
+    /// The breakers along the shore near the focus, and how loud the last ones
+    /// near by were, fading (the surf bed swells with them).
+    surf: surf::Surf,
+    surge: f32,
     loops: Vec<(SoundId, f32, f32, f32)>,
     /// Calls to play this frame, as (sound, gain, pan, pitch, delay).
     calls: Vec<(SoundId, f32, f32, f32, f32)>,
@@ -358,8 +371,16 @@ impl Ambience {
     }
 
     /// Moves the ambience on by `dt`: eases the beds towards what the place,
-    /// the sky and the battle call for, and scatters the calls.
-    pub fn frame(&mut self, map: &Arc<MapFile>, cues: &Cues, audio: &Audio, dt: f32) {
+    /// the sky and the battle call for, and scatters the calls. `ground` is the
+    /// terrain's height at a point (`Renderer::ground_height`), for the shore.
+    pub fn frame(
+        &mut self,
+        map: &Arc<MapFile>,
+        cues: &Cues,
+        ground: &dyn Fn(Vec2) -> f32,
+        audio: &Audio,
+        dt: f32,
+    ) {
         self.start_habitat(map);
         self.dice
             .get_or_insert_with(|| Dice((map.content_id() as u32) | 1));
@@ -369,7 +390,7 @@ impl Ambience {
             self.music = audio.music_status().is_some();
         }
         let (library, generation) = audio.library();
-        self.step(&library, generation, cues, dt);
+        self.step(&library, generation, cues, ground, dt);
         if *self
             .log
             .get_or_insert_with(|| std::env::var_os("MERIDIAN_AMBIENCE_LOG").is_some())
@@ -403,7 +424,14 @@ impl Ambience {
     }
 
     /// `frame` without the device: the beds into `loops`, the calls into `calls`.
-    fn step(&mut self, library: &SoundLibrary, generation: u32, cues: &Cues, dt: f32) {
+    fn step(
+        &mut self,
+        library: &SoundLibrary,
+        generation: u32,
+        cues: &Cues,
+        ground: &dyn Fn(Vec2) -> f32,
+        dt: f32,
+    ) {
         let dt = dt.clamp(0.0, 0.25);
         if self
             .ids
@@ -483,6 +511,7 @@ impl Ambience {
         let calm_birds = smoothstep(6.0, 25.0, self.quiet);
         let calm_insects = smoothstep(2.0, 10.0, self.quiet);
         let duck = LEVEL / (1.0 + self.battle * 1.5) * if self.music { 0.8 } else { 1.0 };
+        self.surge *= (-dt / 2.5).exp();
 
         let g: [f32; 5] = [
             self.gusts[0].step(dt, dice, (3.0, 9.0)),
@@ -515,7 +544,7 @@ impl Ambience {
             (trees(g[2]) * conifer * detail * 0.22, -0.5, 1.0),
             (trees(g[3]) * conifer * detail * 0.22, 0.5, 1.02),
             (
-                shore * wide * (0.7 + 0.3 * windy) * 0.3,
+                shore * wide * (0.7 + 0.3 * windy) * 0.3 * (0.8 + 0.5 * self.surge),
                 s.water_pan * 0.6,
                 1.0,
             ),
@@ -666,29 +695,6 @@ impl Ambience {
                 ));
             }
         }
-        // Waves breaking along the shore, and lapping right at it from close by.
-        let breaks = shore * detail.powf(0.7) * (0.6 + 0.4 * windy) / 7.0;
-        if let (Some(wave), true) = (ids.wave_break, dice.chance(breaks, dt)) {
-            let pan = (s.water_pan * 0.6 + dice.range(-0.3, 0.3)).clamp(-0.9, 0.9);
-            self.calls.push((
-                wave,
-                dice.range(0.1, 0.2) * duck * detail.powf(0.6),
-                pan,
-                dice.range(0.9, 1.08),
-                0.0,
-            ));
-        }
-        let laps = shore * detail * detail / 2.5;
-        if let (Some(lap), true) = (ids.wave_lap, dice.chance(laps, dt)) {
-            let pan = (s.water_pan * 0.5 + dice.range(-0.4, 0.4)).clamp(-0.9, 0.9);
-            self.calls.push((
-                lap,
-                dice.range(0.06, 0.12) * duck * detail,
-                pan,
-                dice.range(0.85, 1.15),
-                0.0,
-            ));
-        }
         // A strong gust through the trees now and then, on top of the rustle.
         let rush = s.forest * detail * windy * (g[2].max(g[3]) - 1.2).max(0.0) / 3.0;
         if let (Some(gust), true) = (ids.leaves_gust, dice.chance(rush, dt)) {
@@ -700,6 +706,58 @@ impl Ambience {
                 dice.range(0.9, 1.1),
                 0.0,
             ));
+        }
+        self.waves(cues, ground, dt, detail, (windy, duck));
+    }
+
+    /// The breakers along the shore near the focus: each crash played so it lands as
+    /// the wave is seen to break, louder and a little lower the bigger the wave and
+    /// quieter the further along the shore; close up, the wash as the foam reaches the
+    /// sand. `windy` and `duck` are the wind's and the battle's say.
+    fn waves(
+        &mut self,
+        cues: &Cues,
+        ground: &dyn Fn(Vec2) -> f32,
+        dt: f32,
+        detail: f32,
+        (windy, duck): (f32, f32),
+    ) {
+        // Nothing to hear from strategic zoom, so no looking for the shore either.
+        if cues.distance > 5000.0 {
+            return;
+        }
+        let ids = self.ids.as_ref().expect("looked up above");
+        let focus = cues.focus.truncate();
+        let reach = (cues.distance * 0.6).clamp(120.0, 1500.0);
+        let climate = mc_render::shore::climate_scale(cues.desert, cues.tropical);
+        let mut hits = Vec::new();
+        self.surf.step(
+            ground, cues.sea, focus, reach, cues.clock, climate, dt, &mut hits,
+        );
+        let right = Vec2::new(cues.yaw.cos(), -cues.yaw.sin());
+        // How far along the shore a breaker is still heard well.
+        let earshot = 150.0 + 0.6 * cues.distance;
+        let close = detail * detail.sqrt();
+        for hit in hits {
+            let offset = hit.xy - focus;
+            let near = 1.0 / (1.0 + (offset.length() / earshot).powi(2));
+            let pan = (offset.dot(right) / (offset.length() + 0.3 * earshot)).clamp(-0.9, 0.9);
+            let (sound, gain) = if hit.wash {
+                (ids.wave_wash, 0.16 * hit.size.powf(0.6) * near * close)
+            } else {
+                self.surge = self.surge.max(hit.size * near);
+                (
+                    ids.wave_break,
+                    0.3 * hit.size.powf(1.3) * near * detail.powf(0.6),
+                )
+            };
+            let gain = gain * duck * (0.8 + 0.2 * windy.min(1.5));
+            // `start` is the recipe's lead-in before the crash, at this pitch.
+            let delay = (hit.start - cues.clock).max(0.0);
+            if let (Some(sound), true) = (sound, gain > 0.004) {
+                self.calls
+                    .push((sound, gain, pan, surf::pitch(hit.size), delay));
+            }
         }
     }
 
@@ -786,7 +844,14 @@ mod tests {
             rain: 0.0,
             tropical: false,
             desert: false,
+            sea: 0.0,
+            clock: 0.0,
         }
+    }
+
+    /// The ground under `habitat()`: rising 3 in 100 from the sea's edge at x = 1472 m.
+    fn ground(xy: Vec2) -> f32 {
+        (1472.0 - xy.x) * 0.03
     }
 
     /// Runs `seconds` of frames and returns the names of the beds sounding at the
@@ -798,8 +863,10 @@ mod tests {
         seconds: f32,
     ) -> (Vec<(String, f32)>, Vec<String>) {
         let mut heard = Vec::new();
-        for _ in 0..(seconds * 30.0) as usize {
-            amb.step(library, 0, cues, 1.0 / 30.0);
+        let mut now = *cues;
+        for f in 0..(seconds * 30.0) as usize {
+            now.clock = cues.clock + f as f32 / 30.0;
+            amb.step(library, 0, &now, &ground, 1.0 / 30.0);
             heard.extend(amb.calls.drain(..).map(|c| library.sound(c.0).name.clone()));
         }
         let beds = amb
@@ -864,6 +931,38 @@ mod tests {
                 .any(|c| c.starts_with("wave") || c.starts_with("frog")),
             "{calls:?}"
         );
+    }
+
+    /// On the beach the breakers are heard, each started just ahead of the moment
+    /// its crash is due, and the wash too from close by; inland, none.
+    #[test]
+    fn the_shore_has_its_breakers_and_inland_has_none() {
+        let library = library();
+        let mut amb = fresh();
+        let at = cues(1440.0, 150.0, 0.0);
+        let (mut crashes, mut washes) = (0, 0);
+        for f in 0..60 * 30 {
+            let now = Cues {
+                clock: f as f32 / 30.0,
+                ..at
+            };
+            amb.step(&library, 0, &now, &ground, 1.0 / 30.0);
+            for (sound, gain, _, _, delay) in amb.calls.drain(..) {
+                let name = &library.sound(sound).name;
+                crashes += (name == "wave_break") as u32;
+                washes += (name == "wave_wash") as u32;
+                if name.starts_with("wave") {
+                    assert!(gain > 0.0 && (0.0..0.2).contains(&delay), "{name} {delay}");
+                }
+            }
+        }
+        assert!(
+            (12..=40).contains(&crashes),
+            "{crashes} crashes in a minute"
+        );
+        assert!(washes >= 6, "{washes} washes");
+        let (_, inland) = run(&mut fresh(), &library, &cues(760.0, 150.0, 0.0), 60.0);
+        assert!(inland.iter().all(|c| !c.starts_with("wave")), "{inland:?}");
     }
 
     #[test]

@@ -16,6 +16,9 @@
     // swarm holding the building's shape condenses into plate, violet light running through
     // it, instead of it being printed under a beam.
     construction: Nanite,
+    // Their torpedoes are driven by plasma: a glassy line of steam boiling up over a red
+    // glow in the water, where ARC's leave a white seam of air.
+    torpedo_look: Plasma,
     // Their own voices (data/factions/regency/sounds.ron): heavy machines, bronze struck and
     // rings spinning up, not ARC's servos and chimes.
     sounds: (

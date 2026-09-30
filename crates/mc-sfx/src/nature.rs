@@ -1,6 +1,6 @@
-//! The layers of the living world's sounds (`Layer::Wind`, `Chirp`, `Chorus`):
-//! the ambient bed of wind, leaves and surf, and the birds, insects and frogs
-//! that call over it (`ambience.rs` plays them, `data/sounds/ambience.ron` has
+//! The layers of the living world's sounds (`Layer::Wind`, `Foam`, `Chirp`,
+//! `Chorus`): the ambient bed of wind, leaves and surf, the waves breaking on
+//! the shore, and the birds, insects and frogs that call over it (`ambience.rs` plays them, `data/sounds/ambience.ron` has
 //! the recipes).
 //!
 //! Nature is never steady. Wind is noise whose level and band both wander at
@@ -76,6 +76,36 @@ pub(crate) fn layer(b: &mut Buf, layer: &Layer, seed: u32, looped: f32) {
             depth,
             sway,
             pan,
+            own.unwrap_or(seed),
+        ),
+        Layer::Foam {
+            at,
+            from,
+            to,
+            glide,
+            q,
+            attack,
+            decay,
+            gain,
+            swell,
+            depth,
+            pan,
+            seed: own,
+        } => foam(
+            b,
+            Foam {
+                at,
+                from,
+                to,
+                glide,
+                q,
+                attack,
+                decay,
+                gain,
+                swell,
+                depth,
+                pan,
+            },
             own.unwrap_or(seed),
         ),
         Layer::Chirp {
@@ -179,6 +209,45 @@ fn wind(
     });
 }
 
+struct Foam {
+    at: f32,
+    from: f32,
+    to: f32,
+    glide: f32,
+    q: f32,
+    attack: f32,
+    decay: f32,
+    gain: f32,
+    swell: f32,
+    depth: f32,
+    pan: f32,
+}
+
+/// Noise through a gliding band, soft above it, shaken at random: white water. The
+/// band eases from `from` to `to` (settling into it, as `Tone`'s pitch does) and
+/// lifts a little with each swell, as the fizz of a bigger burst is brighter.
+fn foam(b: &mut Buf, f: Foam, seed: u32) {
+    let (mut noise, mut air) = (Noise(seed), Air::default());
+    let (mut slow, mut fast) = (
+        Wander::new(seed ^ 0xF0A3),
+        Wander::new(seed.rotate_left(7) ^ 0x0B1B),
+    );
+    let depth = f.depth.clamp(0.0, 1.0);
+    let rate = b.rate;
+    b.add(f.at, f.pan, |t| {
+        let env = pluck(t, f.attack, f.decay);
+        if env < 1e-5 && t > f.attack {
+            return 0.0;
+        }
+        let k = (t / f.glide.max(1e-4)).min(1.0);
+        let centre = f.from + (f.to - f.from) * (1.0 - (1.0 - k) * (1.0 - k));
+        let v = 0.62 * slow.at(t * f.swell) + 0.38 * fast.at(t * f.swell * 2.37 + 17.0);
+        let level = 1.0 - depth + depth * 7.5 * (v * v) * (v * v);
+        let cutoff = centre * (0.35 * (v - 0.5)).exp2();
+        air.step(noise.next(), cutoff, f.q, rate) * level * env * f.gain
+    });
+}
+
 struct Chorus {
     freq: f32,
     voices: u32,
@@ -277,6 +346,7 @@ mod tests {
                     matches!(
                         l,
                         mc_data::sounds::Layer::Wind { .. }
+                            | mc_data::sounds::Layer::Foam { .. }
                             | mc_data::sounds::Layer::Chirp { .. }
                             | mc_data::sounds::Layer::Chorus { .. }
                     )

@@ -1035,6 +1035,13 @@ fn describe(layer: &Layer) -> String {
         }
         Layer::Rumble { freq, .. } => format!("Steady noise around {}", hz(freq)),
         Layer::Drone { freq, .. } => format!("Steady hum at {}", hz(freq)),
+        Layer::Foam {
+            at,
+            from,
+            to,
+            decay,
+            ..
+        } => format!("Foam, noise {}{}", pitch(from, to), when(at, decay)),
         Layer::Wind { freq, .. } => format!("Wind around {}", hz(freq)),
         Layer::Chirp {
             at,

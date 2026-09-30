@@ -31,7 +31,10 @@ impl Game {
             rain: self.rain_here,
             tropical: climate == mc_data::weather::Climate::Tropical,
             desert: climate == mc_data::weather::Climate::Desert,
+            sea: self.map.info().water_level.to_f32(),
+            clock: renderer.time(),
         };
-        self.ambience.frame(&self.map, &cues, audio, dt);
+        let ground = |xy| renderer.ground_height(xy);
+        self.ambience.frame(&self.map, &cues, &ground, audio, dt);
     }
 }

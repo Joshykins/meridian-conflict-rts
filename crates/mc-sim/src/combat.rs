@@ -2351,6 +2351,7 @@ impl World {
                     lead: crate::mirror::launch_shift(back, p.age[i] as f32 - 1.0),
                     blueprint: p.blueprint[i],
                     weapon: p.weapon[i],
+                    owner: p.owner[i],
                 });
                 if weapon.rounds > 1 {
                     let lands = p.age[i] as f32 - 1.0 + hit.after.to_f32();

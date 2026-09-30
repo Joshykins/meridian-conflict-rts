@@ -100,26 +100,51 @@
         ),
 
         // -- water and wind, once ------------------------------------------------
-        // A wave: the water rising, the crash of the break, the foam running out
-        // and the hiss as it drains back.
+        // A breaker, played so its crash lands as the wave is seen to break
+        // (ambience.rs `CRASH_AT`: the crash is 1.0 s in). The swell rising under
+        // the lip as it feathers, the crash tumbling over (a burst with its body in
+        // the mids, a rumble rolling away under it), then the white water rolling
+        // in, its hiss thinning and brightening as it spreads, fizzing as the
+        // bubbles burst. A bigger wave is the same sound louder and a little lower
+        // (ambience.rs plays it at its size), never a different one.
         "wave_break": (
-            length: 6.0, peak: 0.5, room: 0.4,
+            length: 9.0, peak: 0.5, room: 0.35,
             layers: [
-                Roll(from: 260, to: 700, glide: 0.9, attack: 0.7, decay: 0.8, gain: 0.8, swell: 3, depth: 0.4),
-                Sweep(at: 0.75, from: 2400, to: 900, glide: 1.8, q: 0.5, attack: 0.03, decay: 0.8, gain: 1.6, pan: 0.15),
-                Sweep(at: 0.8, from: 900, to: 300, glide: 1.5, q: 0.6, attack: 0.05, decay: 0.9, gain: 1.2, pan: -0.15),
-                Sweep(at: 2.0, from: 1400, to: 3000, glide: 1.6, q: 0.9, attack: 0.5, decay: 0.7, gain: 0.45),
+                // The swell: a low roar rising into the crash.
+                Roll(from: 90, to: 320, glide: 1.0, attack: 0.9, decay: 0.45, gain: 0.2, swell: 2, depth: 0.3),
+                // The lip feathering, a soft hiss climbing with it.
+                Foam(from: 600, to: 1400, glide: 1.0, q: 0.6, attack: 0.85, decay: 0.3, gain: 0.5, swell: 3, depth: 0.4, pan: -0.1),
+                // The crash: a broad burst, not a click.
+                Burst(at: 0.98, low: 150, high: 1900, attack: 0.03, decay: 0.25, gain: 1.4),
+                // The water tumbling over: a boom that rolls down and away.
+                Roll(at: 0.97, from: 1400, to: 320, glide: 1.8, attack: 0.05, decay: 1.0, gain: 0.5, swell: 3, depth: 0.25),
+                // Its body in the mids, churning.
+                Foam(at: 0.98, from: 1300, to: 800, glide: 0.7, q: 0.5, attack: 0.04, decay: 0.7, gain: 2.5, swell: 5, depth: 0.3, pan: 0.1),
+                // The white water rolling in: the hiss thins and brightens as it spreads.
+                Foam(at: 1.1, from: 1000, to: 2400, glide: 4.0, q: 0.6, attack: 0.4, decay: 2.0, gain: 0.7, swell: 2.5, depth: 0.55, pan: -0.15),
+                // The foam fizzing: bubbles bursting all through it.
+                Foam(at: 1.3, from: 1900, to: 3000, glide: 3.5, q: 0.9, attack: 0.6, decay: 1.8, gain: 0.15, swell: 26, depth: 0.9, pan: 0.2),
             ],
         ),
-        // A small wave lapping at the edge: a slap, a slosh, a bubble, a trickle.
-        "wave_lap": (
-            length: 1.4, peak: 0.4, room: 0.3,
+        // The white water running up the sand and draining back, played as a
+        // breaker's foam reaches the waterline (ambience.rs `WASH_AT`): a slosh,
+        // the sheet of foam hissing up the beach (rising, then falling as it
+        // slows), and the trickle and fizz of it draining back through the sand.
+        "wave_wash": (
+            length: 5.6, peak: 0.4, room: 0.25,
             layers: [
-                Hiss(freq: 900, q: 1.2, attack: 0.005, decay: 0.04, gain: 0.6),
-                Sweep(from: 700, to: 350, glide: 0.25, q: 0.8, attack: 0.04, decay: 0.16, gain: 1.4),
-                Chirp(at: 0.05, from: 380, to: 900, glide: 0.02, attack: 0.002, decay: 0.02, gain: 0.12),
-                Chirp(at: 0.19, from: 520, to: 1300, glide: 0.015, attack: 0.002, decay: 0.015, gain: 0.07),
-                Sweep(at: 0.12, from: 1500, to: 2600, glide: 0.4, q: 1.0, attack: 0.05, decay: 0.2, gain: 0.4),
+                // The slosh as the foam arrives.
+                Roll(from: 520, to: 220, glide: 0.6, attack: 0.2, decay: 0.45, gain: 0.12, swell: 3, depth: 0.4),
+                // The run-up: a fizz that rises as it spreads up the beach, then falls.
+                Foam(from: 650, to: 1300, glide: 1.8, q: 0.6, attack: 0.9, decay: 0.8, gain: 1.0, swell: 4, depth: 0.5),
+                // The sheet thinning at the top of its run, grains of sand in it.
+                Foam(at: 0.6, from: 2400, to: 3200, glide: 1.4, q: 0.9, attack: 0.7, decay: 0.6, gain: 0.05, swell: 14, depth: 0.8, pan: 0.2),
+                // The drain back: a gurgling trickle, falling.
+                Foam(at: 1.9, from: 2000, to: 1100, glide: 2.2, q: 1.2, attack: 0.6, decay: 0.8, gain: 0.12, swell: 30, depth: 0.85, pan: -0.2),
+                // A few bubbles popping as it goes.
+                Chirp(at: 2.35, from: 800, to: 1500, glide: 0.03, attack: 0.004, decay: 0.02, gain: 0.07),
+                Chirp(at: 2.8, from: 1100, to: 1900, glide: 0.025, attack: 0.004, decay: 0.015, gain: 0.05, pan: 0.3),
+                Chirp(at: 3.3, from: 950, to: 1700, glide: 0.03, attack: 0.004, decay: 0.018, gain: 0.04, pan: -0.3),
             ],
         ),
         // A strong gust going through the trees: the rush climbs and falls away.

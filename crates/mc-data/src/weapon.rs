@@ -163,6 +163,9 @@ pub struct Weapon {
     pub red: f32,
     /// Runs under the water, homing, and can hit a submerged hull (nothing else can).
     pub torpedo: bool,
+    /// A torpedo's own look (`TorpedoLook`); `None`: its faction's, or `Sprint` for an
+    /// interceptor. Cosmetic: not in the content hash.
+    pub torpedo_look: Option<crate::TorpedoLook>,
     /// A guided missile's cruise height over ground and water (a sea skimmer); zero for none.
     pub skim: Fx,
     /// A guided missile's climb before it comes down on its mark (a high arc); zero for none.

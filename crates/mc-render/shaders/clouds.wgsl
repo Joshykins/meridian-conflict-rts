@@ -934,6 +934,9 @@ fn vs_rain(@builtin(vertex_index) vertex: u32, @builtin(instance_index) drop: u3
 
 @fragment
 fn fs_rain(in: RainOut) -> @location(0) vec4<f32> {
+    if globals.camera.z < globals.map.z {
+        discard;
+    }
     let edge = 1.0 - abs(in.streak.y);
     let fade = smoothstep(0.0, 0.15, in.streak.x) * (1.0 - smoothstep(0.55, 1.0, in.streak.x));
     let a = edge * fade * in.streak.z * 0.42;
@@ -1095,6 +1098,10 @@ fn to_screen(p: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
+    // From under the sea the sky shows only through the surface (water.wgsl `under_sea`).
+    if globals.camera.z < globals.map.z {
+        discard;
+    }
     // The accumulated clouds, whose texels are several pixels wide, read through a
     // cubic B-spline: smooth across texels, so a ragged edge is not a row of
     // squares (a small tent showed each texel as one at low camera angles).

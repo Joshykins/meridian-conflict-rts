@@ -2748,8 +2748,8 @@ impl Game {
         true
     }
 
-    /// The focus's height follows the ground, averaged over a patch that grows
-    /// with the zoom and eased in. Snapped every frame to the ground under the
+    /// The focus's height follows the ground (over water, the sea's surface),
+    /// averaged over a patch that grows with the zoom and eased in. Snapped every frame to the ground under the
     /// middle of the screen, every hill and cliff the view scrolled over bobbed
     /// the eye up and down by as much, and the clouds, far nearer the eye than
     /// the ground is, swelled and shrank with it: they jittered as it panned.
@@ -2757,10 +2757,13 @@ impl Game {
     fn ease_focus_height(&mut self, renderer: &Renderer, dt: f32) {
         let at = self.camera.focus.truncate();
         let reach = (self.camera.distance * 0.12).clamp(20.0, 1500.0);
-        let mut sum = renderer.ground_height(at) * 2.0;
+        // Over the sea, the surface: the seabed would put the eye under it.
+        let sea = self.map.info().water_level.to_f32();
+        let surface = |xy: Vec2| renderer.ground_height(xy).max(sea);
+        let mut sum = surface(at) * 2.0;
         for k in 0..8 {
             let a = k as f32 * std::f32::consts::FRAC_PI_4;
-            sum += renderer.ground_height(at + Vec2::from_angle(a) * reach);
+            sum += surface(at + Vec2::from_angle(a) * reach);
         }
         let ground = sum / 10.0;
         let jumped = self
@@ -4315,6 +4318,10 @@ impl Game {
             } else {
                 self.focus_eased_at = None;
             }
+            // The play camera never looks from under the sea: a dived boat it
+            // follows is framed from the surface above it.
+            let sea = self.map.info().water_level.to_f32();
+            self.camera.focus.z = self.camera.focus.z.max(sea);
         }
         self.cine.hand_back_apply(&mut self.camera, dt);
         if fresh {

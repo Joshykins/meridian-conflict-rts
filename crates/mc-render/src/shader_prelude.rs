@@ -6,14 +6,15 @@
 //! WGSL has no include mechanism, so `common.wgsl` goes in front of every
 //! shader (after the numbers the CPU shares with the shaders, generated from
 //! `gpu_consts.rs`), and `bindings.wgsl` with `lights.wgsl` in front of those
-//! containing the line `//!use bindings`; then `habitat`, `desert`, `surface`,
+//! containing the line `//!use bindings`; then `shore`, `habitat`, `desert`, `surface`,
 //! `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 11] = [
+pub(crate) const PRELUDES: [&str; 12] = [
     "common",
     "bindings",
+    "shore",
     "surface",
     "lights",
     "habitat",
@@ -29,6 +30,7 @@ pub(crate) const PRELUDES: [&str; 11] = [
 pub(crate) struct Preludes {
     common: String,
     bindings: String,
+    shore: String,
     surface: String,
     habitat: String,
     scenery: String,
@@ -46,6 +48,7 @@ impl Preludes {
             common: format!("{consts}\n{}", read("common")),
             // Local lights (lights.rs) ride along with set 0.
             bindings: format!("{}\n{}", read("bindings"), read("lights")),
+            shore: read("shore"),
             surface: read("surface"),
             habitat: read("habitat"),
             scenery: read("scenery"),
@@ -66,6 +69,10 @@ impl Preludes {
         } else {
             self.common.clone()
         };
+        // Waves on the shore (needs bindings).
+        if uses("shore") {
+            prelude = format!("{prelude}\n{}", self.shore);
+        }
         // Where things grow and the air near the ground (needs bindings).
         if uses("habitat") {
             prelude = format!("{prelude}\n{}", self.habitat);
