@@ -223,9 +223,9 @@ pub struct Lineup {
     tuning: Option<u8>,
     /// The row (by seat key) whose colour swatches are open under it.
     coloring: Option<u8>,
-    /// Rows scrolled past at the top of the commanders column, when there are more
-    /// seats than fit (a 32-seat map).
-    seat_scroll: usize,
+    /// How far the commanders list is scrolled, in pixels, when its rows do not
+    /// all fit (a 32-seat map). Eased on screen (`seats::commanders`).
+    seat_scroll: f32,
     /// The team whose heading the pointer was over last frame.
     hover_team: Option<u8>,
     /// A survival fronts chip under the pointer.
@@ -250,7 +250,7 @@ impl Lineup {
             sheet: Sheet::default(),
             tuning: None,
             coloring: None,
-            seat_scroll: 0,
+            seat_scroll: 0.0,
             hover_team: None,
             hover_domain: None,
             chart_of: None,
@@ -565,19 +565,10 @@ pub fn header(ui: &mut Ui, title: &str, caption: &str, enter: f32) {
 
 /// The columns, each side one on its glass: (left, centre, right). A
 /// `left_w` of 0 leaves the left out, and the centre starts at the margin.
-pub fn columns(ui: &mut Ui, left_w: f32, seats: usize) -> (Rect, Rect, Rect) {
+pub fn columns(ui: &mut Ui, left_w: f32) -> (Rect, Rect, Rect) {
     let (w, h) = (ui.size.x, ui.size.y);
     let (top, bottom) = (160.0, h - 172.0);
-    let gap = 50.0;
-    // A map of many seats takes the commanders' two columns of one-line rows
-    // (`seats::commanders`) while the chart keeps a useful size.
-    let wide = 1180.0;
-    let room = w - 2.0 * LEFT - if left_w > 0.0 { left_w + gap } else { 0.0 } - gap;
-    let right_w = if seats > seats::DENSE_FROM && room - wide >= 480.0 {
-        wide
-    } else {
-        660.0
-    };
+    let (right_w, gap) = (660.0, 50.0);
     let left = Rect::new(LEFT, top, left_w, bottom - top);
     let right = Rect::new(w - LEFT - right_w, top, right_w, bottom - top);
     let from = if left_w > 0.0 {

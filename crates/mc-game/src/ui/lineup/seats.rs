@@ -33,15 +33,18 @@ const LOBBY_CONTROL: [&str; 5] = [
 ];
 const ROW_H: f32 = 54.0;
 const ROW_PITCH: f32 = 60.0;
-/// Rows of a map with more seats than `DENSE_FROM`: one line each, so a
-/// 32-seat map's commanders fit two columns without scrolling.
+/// Rows of a map with more seats than `DENSE_FROM`: one line each, so more of
+/// a 32-seat map's commanders show at once.
 const DENSE_ROW_H: f32 = 28.0;
 const DENSE_ROW_PITCH: f32 = 30.0;
-pub(super) const DENSE_FROM: usize = 12;
-/// Narrowest commanders area that takes two columns of dense rows.
-const TWO_COLUMNS_W: f32 = 1000.0;
-/// Between the two columns.
-const COLUMN_GAP: f32 = 34.0;
+const DENSE_FROM: usize = 12;
+/// Rows fade out over this much at the top and bottom of a list that scrolls.
+const EDGE_FADE: f32 = 56.0;
+/// One notch of the wheel scrolls this many rows.
+const WHEEL_ROWS: f32 = 3.0;
+/// The scrollbar beside the rows: its hit width and how far right of them.
+const BAR_HIT_W: f32 = 16.0;
+const BAR_GAP: f32 = 6.0;
 /// The doctrine strip that opens under an AI row.
 const TUNE_H: f32 = 74.0;
 const FORCE_PRESETS: [[u8; 3]; 4] = [[100, 100, 100], [160, 60, 60], [60, 160, 60], [60, 60, 160]];
@@ -51,14 +54,13 @@ const TEAM_HEAD_H: f32 = 30.0;
 const DENSE_TEAM_HEAD_H: f32 = 22.0;
 /// Room kept under the rows for the team layouts and the note under them.
 const LAYOUTS_H: f32 = 96.0;
-/// The line under the rows that says they scroll.
-const SCROLL_NOTE_H: f32 = 22.0;
 /// A colour swatch in the strip that opens under a row, and the gap between swatches.
 const SWATCH: f32 = 26.0;
 const SWATCH_GAP: f32 = 8.0;
 
 /// Where a row's cells sit, and how wide they are.
 struct Columns {
+    left: f32,
     name: f32,
     swatch: f32,
     race: f32,
@@ -75,6 +77,7 @@ struct Columns {
 impl Columns {
     fn of(area: Rect) -> Columns {
         Columns {
+            left: area.x,
             name: area.x + 58.0,
             swatch: 26.0,
             race: area.right() - 470.0,
@@ -92,6 +95,7 @@ impl Columns {
     /// One-line rows, narrower cells.
     fn dense(area: Rect) -> Columns {
         Columns {
+            left: area.x,
             name: area.x + 40.0,
             swatch: 20.0,
             race: area.right() - 394.0,
@@ -131,13 +135,37 @@ impl Columns {
     }
 }
 
-/// What one column of rows drew.
-struct Drawn {
-    asks: Vec<Ask>,
-    /// Under its last row.
+/// The part of the list on screen: rows are laid out from `top` as if nothing
+/// scrolled, then drawn `offset` higher. What crosses `top` or `bottom` is left
+/// out; an edge with more rows past it fades what nears it, over up to
+/// `EDGE_FADE`, so rows melt away there instead of being cut.
+#[derive(Clone, Copy)]
+struct View {
+    top: f32,
     bottom: f32,
-    shown: usize,
-    hidden: usize,
+    offset: f32,
+    /// How far rows fade at each edge: none where the list ends.
+    fade_top: f32,
+    fade_bottom: f32,
+}
+
+impl View {
+    /// How much of a thing laid out at `y`, `h` tall, shows, 0 to 1; None when
+    /// it is not drawn at all.
+    fn show(&self, y: f32, h: f32) -> Option<f32> {
+        let (top, bottom) = (y - self.offset, y - self.offset + h);
+        if top < self.top - 0.5 || bottom > self.bottom + 0.5 {
+            return None;
+        }
+        let edge = |gap: f32, fade: f32| {
+            if fade <= 0.0 {
+                1.0
+            } else {
+                (gap / fade).clamp(0.0, 1.0)
+            }
+        };
+        Some(edge(top - self.top, self.fade_top).min(edge(self.bottom - bottom, self.fade_bottom)))
+    }
 }
 
 /// The commanders column in `area`. On one machine `observe` is the watch
@@ -228,82 +256,65 @@ pub fn commanders(
         let s = &lineup.roster.seats[i];
         (!s.open(), if allied { s.team } else { 0 }, i)
     });
-    let dense = n > DENSE_FROM;
-    let parts: Vec<Rect> = if dense && area.w >= TWO_COLUMNS_W {
-        let w = (area.w - COLUMN_GAP) / 2.0;
-        vec![
-            Rect::new(area.x, area.y, w, area.h),
-            Rect::new(area.x + w + COLUMN_GAP, area.y, w, area.h),
-        ]
+    let cols = if n > DENSE_FROM {
+        Columns::dense(area)
     } else {
-        vec![area]
+        Columns::of(area)
     };
     let head = area.y + 44.0;
-    let rows_top = head + 16.0;
-    // More seats than fit: the rows scroll under the wheel, and a note under
-    // them says which are shown.
-    let limit = area.bottom() - LAYOUTS_H - SCROLL_NOTE_H;
-    let per = n.div_ceil(parts.len());
-    let scroll = lineup.seat_scroll.min(per.saturating_sub(1));
-    let mut hover_team = None;
-    let (mut bottom, mut shown, mut hidden) = (rows_top, 0, 0);
-    for (part, rows) in parts.iter().zip(order.chunks(per.max(1))) {
-        let cols = if dense {
-            Columns::dense(*part)
-        } else {
-            Columns::of(*part)
-        };
-        for (x, label) in [
-            (cols.name, "Commander"),
-            (cols.race, "Faction"),
-            (cols.control, "Control"),
-            (cols.team, if survival { "" } else { "Team" }),
-            (cols.zone, "Zone"),
-        ] {
-            ui.text(x, head, type_scale::MICRO, rgb(palette::DIM, 0.8), label);
+    for (x, label) in [
+        (cols.name, "Commander"),
+        (cols.race, "Faction"),
+        (cols.control, "Control"),
+        (cols.team, if survival { "" } else { "Team" }),
+        (cols.zone, "Zone"),
+    ] {
+        ui.text(x, head, type_scale::MICRO, rgb(palette::DIM, 0.8), label);
+    }
+    // More seats than fit (a 32-seat map): the rows scroll under the wheel or
+    // the bar beside them, eased, fading at the edges.
+    let top = head + 16.0;
+    let bottom = area.bottom() - LAYOUTS_H;
+    let shown = ui.ease(id("seat-scroll", 0), lineup.seat_scroll, 16.0);
+    // Last frame's height of all the rows says whether any lie past the bottom.
+    let before = ui
+        .mem
+        .anims
+        .get(&id("seat-content", 0))
+        .copied()
+        .unwrap_or(0.0);
+    let view = View {
+        top,
+        bottom,
+        offset: shown,
+        fade_top: shown.min(EDGE_FADE),
+        fade_bottom: (before - (bottom - top) - shown).clamp(0.0, EDGE_FADE),
+    };
+    let rows = seat_rows(ui, lineup, catalog, table, &cols, view, &order, allied);
+    let content = rows.height;
+    ui.snap(id("seat-content", 0), content);
+    asks.extend(rows.asks);
+    let room = bottom - top;
+    let most = (content - room).max(0.0);
+    let list = Rect::new(area.x, top, area.w, room);
+    if ui.interactive && list.contains(ui.cursor - ui.shift) && ui.input.scroll != 0.0 {
+        lineup.seat_scroll -= ui.input.scroll.signum() * WHEEL_ROWS * cols.pitch();
+    }
+    if most > 0.0 {
+        lineup.seat_scroll = scrollbar(ui, list, lineup.seat_scroll, room, content);
+        // A page at a time from the hints over the faded edges.
+        let page = room - 2.0 * cols.pitch();
+        if rows.above > 0 && more_hint(ui, list, top + 12.0, rows.above, true) {
+            lineup.seat_scroll -= page;
+            ui.audio.play(Sfx::Tick);
         }
-        let drawn = seat_column(
-            ui,
-            lineup,
-            catalog,
-            table,
-            &cols,
-            (*part, rows_top, limit),
-            &rows[scroll.min(rows.len())..],
-            allied,
-            &mut hover_team,
-        );
-        asks.extend(drawn.asks);
-        bottom = bottom.max(drawn.bottom);
-        shown += drawn.shown;
-        hidden += drawn.hidden;
-    }
-    lineup.hover_team = hover_team;
-    let rows = Rect::new(area.x, rows_top, area.w, bottom - rows_top);
-    if ui.interactive && rows.contains(ui.cursor) && ui.input.scroll != 0.0 {
-        if ui.input.scroll > 0.0 {
-            lineup.seat_scroll = scroll.saturating_sub(1);
-        } else if hidden > 0 {
-            lineup.seat_scroll = scroll + 1;
+        if rows.below > 0 && more_hint(ui, list, bottom - 12.0, rows.below, false) {
+            lineup.seat_scroll += page;
+            ui.audio.play(Sfx::Tick);
         }
-    } else {
-        lineup.seat_scroll = scroll;
     }
-    let mut y = bottom;
-    if scroll > 0 || hidden > 0 {
-        ui.text(
-            area.x,
-            y + 8.0,
-            type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
-            &format!(
-                "{shown} of {n} seats shown  \u{b7}  Scroll for {}",
-                if hidden > 0 { "more" } else { "the first" }
-            ),
-        );
-        y += SCROLL_NOTE_H;
-    }
-
+    lineup.seat_scroll = lineup.seat_scroll.clamp(0.0, most);
+    let y = top + content.min(room);
     let y = y + 8.0;
     if survival {
         let top = y + 12.0;
@@ -324,52 +335,61 @@ pub fn commanders(
     asks
 }
 
-/// One column of seat rows, `order` from the top (`part`, its first row's
-/// top, and the lowest a row may reach), under team headings when `allied`.
+/// The seat rows in `order`, under team headings when `allied`, laid out in
+/// `view`. Returns what the lobby must do and how tall all the rows are.
 #[expect(
     clippy::too_many_arguments,
-    reason = "one column of the commanders list: the screen state and where it goes"
+    reason = "the commanders list: the screen state, its columns and where it shows"
 )]
-fn seat_column(
+fn seat_rows(
     ui: &mut Ui,
     lineup: &mut Lineup,
     catalog: &Catalog,
     table: &Table,
     cols: &Columns,
-    (part, top, limit): (Rect, f32, f32),
+    view: View,
     order: &[usize],
     allied: bool,
-    hover_team: &mut Option<u8>,
-) -> Drawn {
+) -> Rows {
     let sizes = teams::sizes(&lineup.roster.seated_teams());
-    let mut out = Drawn {
-        asks: Vec::new(),
-        bottom: top,
-        shown: 0,
-        hidden: 0,
-    };
+    let (fade, live) = (ui.fade, ui.interactive);
+    let mut asks = Vec::new();
+    let (mut above, mut below) = (0, 0);
+    let mut hover_team = None;
     let (row_h, pitch) = (cols.row_h(), cols.pitch());
+    let area_x = cols.left;
+    let area_w = cols.zone + cols.zone_w - area_x;
     let mut heading: Option<(u8, f32)> = None;
-    let mut y = top;
+    let mut y = view.top;
+    // Draws `f` for a thing laid out at `y`, `h` tall, as much as it shows:
+    // faded near an edge, and a thing mostly faded takes no pointer.
+    let shown = |ui: &mut Ui, y: f32, h: f32, f: &mut dyn FnMut(&mut Ui, f32)| {
+        if let Some(k) = view.show(y, h) {
+            ui.fade = fade * k;
+            ui.interactive = live && k >= 0.5;
+            f(ui, y - view.offset);
+            ui.fade = fade;
+            ui.interactive = live;
+        }
+    };
+    let rail = |ui: &mut Ui, team: u8, from: f32, to: f32| {
+        let (from, to) = (
+            (from - view.offset).max(view.top),
+            (to - view.offset).min(view.bottom),
+        );
+        if to > from {
+            team_rail(ui, area_x, from, to, team);
+        }
+    };
     for &i in order {
         // An earlier row's change may have moved seats: skip what is gone.
         let Some(&seat) = lineup.roster.seats.get(i) else {
             continue;
         };
         let heads = allied && heading.map(|(t, _)| t) != seat.open().then_some(seat.team);
-        let head_h = match (heads, seat.open()) {
-            (false, _) => 0.0,
-            (true, true) => cols.head_h(),
-            (true, false) => 10.0,
-        };
-        if out.hidden > 0 || (out.shown > 0 && y + head_h + row_h > limit) {
-            out.hidden += 1;
-            continue;
-        }
-        out.shown += 1;
         if heads {
             if let Some((t, top)) = heading.take() {
-                team_rail(ui, part.x, top, y - (pitch - row_h), t);
+                rail(ui, t, top, y - (pitch - row_h));
             }
             if seat.open() {
                 let hy = glide(ui, id("team-head-y", seat.team as usize), y);
@@ -377,15 +397,13 @@ fn seat_column(
                     .iter()
                     .find(|&&(t, _)| t == seat.team)
                     .map_or(0, |&(_, n)| n);
-                if team_heading(
-                    ui,
-                    Rect::new(part.x, hy, part.w, cols.head_h() - 4.0),
-                    seat.team,
-                    count,
-                    lineup.hover_team == Some(seat.team),
-                ) {
-                    *hover_team = Some(seat.team);
-                }
+                let lit = lineup.hover_team == Some(seat.team);
+                shown(ui, hy, cols.head_h(), &mut |ui, at| {
+                    let r = Rect::new(area_x, at, area_w, cols.head_h() - 4.0);
+                    if team_heading(ui, r, seat.team, count, lit) {
+                        hover_team = Some(seat.team);
+                    }
+                });
                 heading = Some((seat.team, y));
                 y += cols.head_h();
             } else {
@@ -393,38 +411,118 @@ fn seat_column(
             }
         }
         let row_y = glide(ui, id("slot-y", seat.key as usize), y);
-        let row = Rect::new(part.x, row_y, part.w, row_h);
-        out.asks
-            .extend(seat_row(ui, lineup, catalog, table, cols, i, seat, row));
+        if y - view.offset < view.top {
+            above += 1;
+        } else if y + row_h - view.offset > view.bottom {
+            below += 1;
+        }
+        shown(ui, row_y, row_h, &mut |ui, at| {
+            let row = Rect::new(area_x, at, area_w, row_h);
+            asks.extend(seat_row(ui, lineup, catalog, table, cols, i, seat, row));
+        });
         y += pitch;
+        let under = Rect::new(area_x + 14.0, 0.0, area_w - 14.0, 0.0);
         if lineup.tuning == Some(seat.key) {
-            if let Some(i) = lineup.roster.index_of(seat.key) {
-                ai_tuning(
-                    ui,
-                    &mut lineup.roster.seats[i],
-                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, TUNE_H),
-                );
-            }
+            let at_y = row_y + row_h;
+            shown(ui, at_y, TUNE_H, &mut |ui, at| {
+                if let Some(i) = lineup.roster.index_of(seat.key) {
+                    let r = Rect::new(under.x, at, under.w, TUNE_H);
+                    ai_tuning(ui, &mut lineup.roster.seats[i], r);
+                }
+            });
             y += TUNE_H;
         }
         if lineup.coloring == Some(seat.key) {
-            let strip_h = swatch_strip_h(row.w - 14.0);
-            if let Some(i) = lineup.roster.index_of(seat.key) {
-                colour_picker(
-                    ui,
-                    lineup,
-                    i,
-                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, strip_h),
-                );
-            }
+            let strip_h = swatch_strip_h(under.w);
+            let at_y = row_y + row_h;
+            shown(ui, at_y, strip_h, &mut |ui, at| {
+                if let Some(i) = lineup.roster.index_of(seat.key) {
+                    colour_picker(ui, lineup, i, Rect::new(under.x, at, under.w, strip_h));
+                }
+            });
             y += strip_h;
         }
     }
     if let Some((t, top)) = heading {
-        team_rail(ui, part.x, top, y - (pitch - row_h), t);
+        rail(ui, t, top, y - (pitch - row_h));
     }
-    out.bottom = y;
-    out
+    lineup.hover_team = hover_team;
+    Rows {
+        asks,
+        height: y - view.top,
+        above,
+        below,
+    }
+}
+
+/// What the rows of `seat_rows` came to.
+struct Rows {
+    asks: Vec<Ask>,
+    /// All of them, scrolled or not.
+    height: f32,
+    /// Seats past the top and the bottom of the view.
+    above: usize,
+    below: usize,
+}
+
+/// "N more" over the faded edge of the list at `y`, pointing `up` or down;
+/// true when clicked.
+fn more_hint(ui: &mut Ui, list: Rect, y: f32, count: usize, up: bool) -> bool {
+    let text = format!("{count} more");
+    let w = 96.0;
+    let r = Rect::new(list.x + (list.w - w) / 2.0, y - 11.0, w, 22.0);
+    let res = ui.interact(id("seat-more", up as usize), r, true);
+    ui.fill(r, ink(0.75 + 0.2 * res.glow));
+    ui.frame(r, rgb(palette::LINE, 0.25 + 0.4 * res.glow));
+    let tone = rgb(palette::TEXT, 0.75 + 0.25 * res.glow);
+    ui.text_centred(
+        r.x + r.w / 2.0 - 6.0,
+        r.mid_y(),
+        type_scale::MICRO,
+        tone,
+        &text,
+    );
+    // A caret on the way the hidden rows lie.
+    let (cx, cy) = (r.right() - 14.0, r.mid_y());
+    let d = if up { -1.0 } else { 1.0 };
+    ui.triangle(
+        Vec2::new(cx - 4.0, cy - 2.0 * d),
+        Vec2::new(cx + 4.0, cy - 2.0 * d),
+        Vec2::new(cx, cy + 2.5 * d),
+        tone,
+    );
+    res.clicked
+}
+
+/// A thin bar right of the rows in `list` when they are `content` tall and
+/// only `room` shows; dragging its thumb or clicking the track scrolls.
+/// Returns the scroll, in pixels.
+fn scrollbar(ui: &mut Ui, list: Rect, scroll: f32, room: f32, content: f32) -> f32 {
+    let most = content - room;
+    let track = Rect::new(list.right() + BAR_GAP, list.y + 2.0, 3.0, room - 4.0);
+    let hit = Rect::new(
+        track.x - (BAR_HIT_W - track.w) / 2.0,
+        list.y,
+        BAR_HIT_W,
+        room,
+    );
+    let res = ui.interact_with(id("seat-scrollbar", 0), hit, true, false);
+    let thumb_h = (track.h * room / content).max(24.0);
+    let mut scroll = scroll;
+    if res.held {
+        // The thumb's middle follows the pointer.
+        let k = (ui.cursor.y - ui.shift.y - track.y - thumb_h / 2.0) / (track.h - thumb_h);
+        scroll = k.clamp(0.0, 1.0) * most;
+    }
+    let glow = res.glow.max(if res.held { 1.0 } else { 0.0 });
+    ui.fill(track, rgb(palette::LINE, 0.16 + 0.12 * glow));
+    let thumb_y = track.y + (track.h - thumb_h) * (scroll / most).clamp(0.0, 1.0);
+    let wide = 1.0 + 2.0 * glow;
+    ui.fill(
+        Rect::new(track.x - wide / 2.0, thumb_y, track.w + wide, thumb_h),
+        rgb(palette::TEXT, 0.55 + 0.4 * glow),
+    );
+    scroll
 }
 
 fn watch_switch(ui: &mut Ui, observe: &mut bool, area: Rect, switch_w: f32) {
