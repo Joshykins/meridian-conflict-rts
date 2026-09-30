@@ -138,6 +138,10 @@ pub struct Module {
     pub cost_mass: Fx,
     pub cost_energy: Fx,
     pub build_time: Fx,
+    /// It adds to the unit's mass income and to its energy income. A refit to it is
+    /// paid under the economy focus of what it makes (mc-sim `focus.rs`).
+    pub makes_mass: bool,
+    pub makes_energy: bool,
     /// The hidden blueprint a refit to this module assembles: its price and time.
     pub kit: BlueprintId,
     /// Its bit in the model's look. The mesh tags this module's pieces with its key.
@@ -384,6 +388,8 @@ pub(crate) fn expand(
                     cost_mass: units[kit.index()].cost_mass,
                     cost_energy: units[kit.index()].cost_energy,
                     build_time: units[kit.index()].build_time,
+                    makes_mass: raw.economy.mass_income > 0.0,
+                    makes_energy: raw.economy.energy_income > 0.0,
                     kit,
                     bit,
                 });

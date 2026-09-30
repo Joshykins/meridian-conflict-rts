@@ -290,3 +290,20 @@ fn a_mass_stall_holds_energy_spending_back_and_says_so() {
         assert!(pl.mass_spent > Fx::ZERO && pl.mass_spent <= pl.mass_demand);
     }
 }
+
+#[test]
+fn a_refit_that_makes_resources_goes_first_with_either_of_them() {
+    let w = world();
+    let bp = |key: &str| w.blueprints.unit(w.blueprints.id_of(key).unwrap());
+    let (mfe, shield) = (bp("aster_commander#mfe"), bp("aster_commander#shield"));
+    let at = |mines, power, kit| Focus { mines, power }.priority(kit, &w.blueprints);
+    use Priority::{Even, First, Last};
+    // The Material Formation Engine makes both: either one First puts it first.
+    assert_eq!(at(First, Even, mfe), First);
+    assert_eq!(at(Last, First, mfe), First);
+    // Neither First: nothing changes, and it is never held back to Last.
+    assert_eq!(at(Even, Even, mfe), Even);
+    assert_eq!(at(Last, Last, mfe), Even);
+    // A refit that makes nothing is not moved.
+    assert_eq!(at(First, First, shield), Even);
+}

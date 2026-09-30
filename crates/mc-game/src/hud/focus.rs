@@ -58,13 +58,13 @@ const KINDS: [Kind; 2] = [
         name: "Mines",
         tone: MASS,
         build: "Materials stalling  \u{b7}  build more mines or reclaim wrecks",
-        first_also: ", reclaimers",
+        first_also: ", reclaimers, economy refits",
     },
     Kind {
         name: "Power",
         tone: ENERGY,
         build: "Energy stalling  \u{b7}  build more power generators",
-        first_also: "",
+        first_also: ", economy refits",
     },
 ];
 

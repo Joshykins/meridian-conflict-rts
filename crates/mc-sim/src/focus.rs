@@ -5,6 +5,8 @@
 //! before the rest, or only out of what the rest leaves over. The rest, upkeep and
 //! the mines' own draw included, is paid in between. Reclaimers go first with the
 //! mines, but are never held back with them: only First changes when they are paid.
+//! A refit that makes materials or energy goes First with either resource it makes,
+//! and is likewise never held back.
 
 use crate::World;
 use mc_data::{cat, Blueprints, UnitBlueprint};
@@ -51,6 +53,18 @@ impl Focus {
             self.power
         } else if self.mines == Priority::First && reclaims(bp, blueprints) {
             Priority::First
+        } else if let Some((set, slot, module)) = blueprints.kit(bp.id) {
+            // A refit that makes materials or energy (the Material Formation Engine) goes
+            // first when what it makes does. It is never held back to Last: it is also
+            // the commander's, and stays with the rest.
+            let m = set.module(slot, module);
+            let first = (m.makes_mass && self.mines == Priority::First)
+                || (m.makes_energy && self.power == Priority::First);
+            if first {
+                Priority::First
+            } else {
+                Priority::Even
+            }
         } else {
             Priority::Even
         }
