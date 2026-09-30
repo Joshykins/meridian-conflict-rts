@@ -654,3 +654,52 @@ struct CraterList {
     items: array<Crater, 48>,
 }
 @group(0) @binding(29) var<storage, read> ground_craters: CraterList;
+
+// ---------------------------------------------------------------- under the sea
+
+// Light lost per metre of this map's water, red first (water.wgsl `water_optics`):
+// clear green coastal water, the Bahamas' very clear water (`tropical()`), or a
+// canyon reservoir's (`desert()`).
+fn sea_absorb() -> vec3<f32> {
+    if tropical() {
+        return vec3<f32>(0.30, 0.042, 0.026);
+    }
+    if desert() {
+        return vec3<f32>(0.40, 0.068, 0.095);
+    }
+    return vec3<f32>(0.17, 0.032, 0.025);
+}
+
+// Light lost per metre along a view from under the water: clearer than the
+// absorption says, so the seabed and a fight read out to 100 m or so.
+fn under_sea_extinction() -> vec3<f32> {
+    return sea_absorb() * 0.2 + vec3<f32>(0.004);
+}
+
+// With the free camera under the water (water.wgsl `under_sea`), what is drawn
+// after the water is seen through it: the pixel at `clip` (its depth tells where
+// it is) is dimmed by the water between it and the eye (xyz), and nothing above
+// the surface shows (w 0): spray, smoke and the sky reach the eye only as the
+// surface shows them. Everything is kept whole with the eye above the water.
+fn under_sea_veil(clip: vec4<f32>) -> vec4<f32> {
+    let water = globals.map.z;
+    let eye = globals.camera.xyz;
+    if eye.z >= water {
+        return vec4<f32>(1.0);
+    }
+    let uv = clip.xy / globals.scene.xy;
+    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let h = globals.inv_view_proj * vec4<f32>(ndc, max(clip.z, 0.0000001), 1.0);
+    let world = h.xyz / h.w;
+    let range = distance(eye, world);
+    // Nor what is right at the lens: a burst of air a few metres off filled the view white.
+    let keep = (1.0 - smoothstep(water - 0.3, water + 0.3, world.z)) * smoothstep(1.5, 12.0, range);
+    let through = exp(-under_sea_extinction() * min(range, 400.0));
+    return vec4<f32>(through, keep);
+}
+
+// A colour drawn after the water, seen through it (`under_sea_veil`).
+fn under_sea_seen(color: vec4<f32>, clip: vec4<f32>) -> vec4<f32> {
+    let veil = under_sea_veil(clip);
+    return vec4<f32>(color.rgb * veil.xyz * veil.w, color.a * veil.w * dot(veil.xyz, vec3<f32>(0.2, 0.5, 0.3)));
+}

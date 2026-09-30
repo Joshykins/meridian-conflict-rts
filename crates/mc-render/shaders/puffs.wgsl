@@ -1416,8 +1416,7 @@ fn damper_veil(in: PuffOut) -> vec4<f32> {
     return vec4<f32>(apply_fog_of_war(rgb, in.world.xy), 0.0);
 }
 
-@fragment
-fn fs_puff(in: PuffOut) -> @location(0) vec4<f32> {
+fn fs_puff_lit(in: PuffOut) -> vec4<f32> {
     // An origin above 1e8 m: a muzzle's own puff, leaving through the firer's shield
     // (renderer `PUFF_UNCLIPPED_Z`).
     if in.origin.z < 1.0e8 && effect_blocked(in.origin, in.world) { discard; }
@@ -1426,4 +1425,10 @@ fn fs_puff(in: PuffOut) -> @location(0) vec4<f32> {
     // Pure additive sparks have RGB with zero alpha; retain that emitted light.
     let scale = min(in.opacity, 1.0 / max(puff.a, 0.00001));
     return vec4<f32>(puff.rgb * scale, alpha);
+}
+
+// fs_puff, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+@fragment
+fn fs_puff(in: PuffOut) -> @location(0) vec4<f32> {
+    return under_sea_seen(fs_puff_lit(in), in.clip);
 }

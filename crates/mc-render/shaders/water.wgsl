@@ -888,19 +888,19 @@ fn water_optics(column: f32, lit: f32) -> Optics {
     if tropical() {
         // Bahamas water: very clear, so sand shows through turquoise over the
         // banks, cyan-teal at 10-20 m, and sapphire in the deep channels.
-        o.absorb = TROPIC_ABSORB;
+        o.absorb = sea_absorb();
         let deep_hue = mix(TROPIC_AZURE, TROPIC_DEEP, smoothstep(TROPIC_SCATTER_DEPTHS.y, TROPIC_SCATTER_DEPTHS.z, column));
         o.scatter = mix(TROPIC_SHALLOW, deep_hue, smoothstep(TROPIC_SCATTER_DEPTHS.x, TROPIC_SCATTER_DEPTHS.y, column)) * lit;
     } else if desert() {
         // A canyon reservoir (Lake Powell, Lake Mead): clear and very saturated,
         // jade over the pale shallows, teal-blue, then cobalt down the old channel.
-        o.absorb = DESERT_ABSORB;
+        o.absorb = sea_absorb();
         let deep_hue = mix(DESERT_TEAL, DESERT_DEEP, smoothstep(DESERT_SCATTER_DEPTHS.y, DESERT_SCATTER_DEPTHS.z, column));
         o.scatter = mix(DESERT_JADE, deep_hue, smoothstep(DESERT_SCATTER_DEPTHS.x, DESERT_SCATTER_DEPTHS.y, column)) * lit;
     } else {
         // Clear, lightly green coastal water: red is gone in a few metres, and
         // the seabed reads through a dozen metres or so of it.
-        o.absorb = vec3<f32>(0.17, 0.032, 0.025);
+        o.absorb = sea_absorb();
         o.scatter = mix(vec3<f32>(0.010, 0.050, 0.052), vec3<f32>(0.0045, 0.020, 0.036), smoothstep(2.0, 30.0, column)) * lit;
     }
     return o;
@@ -1169,7 +1169,7 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
         * exp(-optics.absorb * deep * 0.5);
     // The water is clearer than the colour absorbed in it suggests: past 60 m
     // or so nothing shows but the water itself.
-    let extinction = optics.absorb * 0.4 + vec3<f32>(0.006);
+    let extinction = under_sea_extinction();
     let through = exp(-extinction * min(t, 400.0));
 
     var color: vec3<f32>;
@@ -1251,7 +1251,6 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
 
 // The tropical sea (`tropical()`): absorption per metre, the colour scattered
 // back over the shallows and the deep, and the depths it turns between.
-const TROPIC_ABSORB: vec3<f32> = vec3<f32>(0.30, 0.042, 0.026);
 const TROPIC_SHALLOW: vec3<f32> = vec3<f32>(0.012, 0.075, 0.080);
 // Over the drop-off: bright azure, before the channels' sapphire.
 const TROPIC_AZURE: vec3<f32> = vec3<f32>(0.004, 0.042, 0.105);
@@ -1260,7 +1259,6 @@ const TROPIC_DEEP: vec3<f32> = vec3<f32>(0.0015, 0.011, 0.068);
 const TROPIC_SCATTER_DEPTHS: vec3<f32> = vec3<f32>(7.0, 20.0, 50.0);
 
 // The canyon reservoir (`desert()`): the same, greener in the shallows.
-const DESERT_ABSORB: vec3<f32> = vec3<f32>(0.40, 0.068, 0.095);
 const DESERT_JADE: vec3<f32> = vec3<f32>(0.006, 0.050, 0.036);
 const DESERT_TEAL: vec3<f32> = vec3<f32>(0.002, 0.026, 0.050);
 const DESERT_DEEP: vec3<f32> = vec3<f32>(0.001, 0.007, 0.034);

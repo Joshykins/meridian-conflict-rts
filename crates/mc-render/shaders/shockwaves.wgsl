@@ -104,8 +104,7 @@ struct WavePixel {
     @builtin(frag_depth) depth: f32,
 }
 
-@fragment
-fn fs_shockwave(in: WaveOut) -> WavePixel {
+fn fs_shockwave_lit(in: WaveOut) -> WavePixel {
     let eye = globals.camera.xyz;
     let outside = length(eye - in.center) > in.reach;
     let mesh_facing = dot(in.world - in.center, eye - in.world);
@@ -184,4 +183,12 @@ fn fs_shockwave(in: WaveOut) -> WavePixel {
     out.color = vec4<f32>(color, alpha);
     out.depth = clip.z / clip.w;
     return out;
+}
+
+// fs_shockwave, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+@fragment
+fn fs_shockwave(in: WaveOut) -> WavePixel {
+    var px = fs_shockwave_lit(in);
+    px.color = under_sea_seen(px.color, in.clip);
+    return px;
 }

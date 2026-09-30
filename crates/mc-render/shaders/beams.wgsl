@@ -278,8 +278,7 @@ fn beam_pulse(run: f32, run_px: f32, time: f32, repair: bool) -> f32 {
     return 0.55 + 0.45 * level;
 }
 
-@fragment
-fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
+fn fs_beam_lit(in: BeamOut) -> vec4<f32> {
     let time = globals.camera.w;
     let run = in.state.y;
     // Kind 3 is the ferry home: reclaim colours, particles only.
@@ -1047,4 +1046,10 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     // A mote: red, a few hot.
     let color = mix(NANITE_RED, NANITE_HOT, step(0.8, in.state.z) * fall);
     return vec4<f32>(color * fall * 3.0 * in.level, 0.0);
+}
+
+// fs_beam, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+@fragment
+fn fs_beam(in: BeamOut) -> @location(0) vec4<f32> {
+    return under_sea_seen(fs_beam_lit(in), in.clip);
 }

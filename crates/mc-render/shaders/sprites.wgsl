@@ -683,8 +683,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     return out;
 }
 
-@fragment
-fn fs_shot(in: SpriteOut) -> @location(0) vec4<f32> {
+fn fs_shot_lit(in: SpriteOut) -> vec4<f32> {
     if in.shape.x < 0.0 {
         let body = length(vec2<f32>(max(abs(in.uv.x) - 0.35, 0.0) * 1.3, in.uv.y));
         // A torpedo (-2) carries how much of it the water lets through.
@@ -819,8 +818,7 @@ fn vs_effect(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: 
     return out;
 }
 
-@fragment
-fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
+fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
     if in.origin.w > 0.5 && effect_blocked(in.origin.xyz, in.world) { discard; }
     var glow: f32;
     if in.shape.x < 0.5 {
@@ -1096,8 +1094,25 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     out.normal = axis * normal.x + side * normal.y + up * normal.z;
     return out;
 }
-@fragment
-fn fs_missile(in: MissileOut) -> @location(0) vec4<f32> {
+fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
     let light = 0.45 + 0.55 * abs(dot(normalize(in.normal), normalize(vec3<f32>(0.4, -0.5, 0.8))));
     return vec4<f32>(vec3<f32>(0.024, 0.028, 0.033) * light, 1.0);
+}
+
+// fs_shot, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+@fragment
+fn fs_shot(in: SpriteOut) -> @location(0) vec4<f32> {
+    return under_sea_seen(fs_shot_lit(in), in.clip);
+}
+
+// fs_sprite, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+@fragment
+fn fs_sprite(in: SpriteOut) -> @location(0) vec4<f32> {
+    return under_sea_seen(fs_sprite_lit(in), in.clip);
+}
+
+// fs_missile, seen through the water from under it (bindings.wgsl `under_sea_seen`).
+@fragment
+fn fs_missile(in: MissileOut) -> @location(0) vec4<f32> {
+    return under_sea_seen(fs_missile_lit(in), in.clip);
 }
