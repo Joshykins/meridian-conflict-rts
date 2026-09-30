@@ -102,7 +102,8 @@ impl Preludes {
     }
 }
 
-/// Parses, validates and writes SPIR-V 1.3; the error is naga's, with source lines.
+/// Parses, validates and writes SPIR-V 1.3 with bounds checks; the error is naga's, with
+/// source lines.
 pub(crate) fn compile(source: &str) -> Result<(naga::Module, Vec<u32>), String> {
     let module = naga::front::wgsl::parse_str(source).map_err(|e| e.emit_to_string(source))?;
     let info = naga::valid::Validator::new(
@@ -111,8 +112,19 @@ pub(crate) fn compile(source: &str) -> Result<(naga::Module, Vec<u32>), String> 
     )
     .validate(&module)
     .map_err(|e| e.emit_to_string(source))?;
+    // Every index, buffer access and texel load clamped in range. naga's default is
+    // unchecked: one index past the end then reads unmapped memory, which NVIDIA
+    // shrugs off and AMD answers with a page fault, the device lost (a friend's
+    // RX 7900 XTX, 2026-09-29).
+    let restrict = naga::proc::BoundsCheckPolicy::Restrict;
     let options = naga::back::spv::Options {
         lang_version: (1, 3),
+        bounds_check_policies: naga::proc::BoundsCheckPolicies {
+            index: restrict,
+            buffer: restrict,
+            image_load: restrict,
+            binding_array: restrict,
+        },
         ..Default::default()
     };
     let words =
