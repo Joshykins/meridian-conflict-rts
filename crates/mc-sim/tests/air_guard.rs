@@ -7,7 +7,7 @@ use mc_jobs::Pool;
 use mc_map::Heightfield;
 use mc_sim::tables::{Controller, OrderKind};
 use mc_sim::world::MapData;
-use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, World};
+use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -190,6 +190,8 @@ fn guarding_bombers_break_off_to_attack_then_circle_again() {
             "the bombers never killed the tank near their circle"
         );
     }
+    // The chase ends on the orders pass after the kill.
+    w.tick(&[]).unwrap();
     for &r in &rows {
         let o = w.state.orders.front(&w.state.units, r).unwrap();
         assert_eq!(o.kind, OrderKind::Guard, "still on guard");
@@ -363,5 +365,68 @@ fn dragging_a_followed_guard_leaves_the_unit() {
         (o.kind, o.pos),
         (OrderKind::Guard, to),
         "circles the new spot, not the tank"
+    );
+}
+
+#[test]
+fn a_guarding_bomber_holds_one_mark_through_its_run_over_a_crowd() {
+    // A loose army across the area, and a bomber flying in to it from its
+    // factory well outside: the enemy nearest the bomber changes every few
+    // ticks, and a pass needs one mark from the run in to the release line, the
+    // same one its bay aims at (mark 2 of 20260930-194544: a Hellkite flew over
+    // a whole army on guard at one enemy with its bay on another, and never
+    // opened it).
+    let mut w = world();
+    let centre = FxVec2::from_ints(2000, 3000);
+    let bomber = add(&mut w, "aster_t2_fire_bomber", 0, 1600, 150);
+    let drive: Vec<_> = (0..12)
+        .map(|i| {
+            let (x, y) = (
+                1700 + (i * 7 % 5) * 250 + (i / 5) * 40,
+                2000 + (i / 5) * 200,
+            );
+            let row = add(&mut w, "aster_t1_tank", 1, x, y);
+            cmd(
+                1,
+                Command::Move {
+                    units: vec![w.state.units.id(row)],
+                    target: FxVec2::from_ints(x, y + 1500),
+                    queue: false,
+                },
+            )
+        })
+        .collect();
+    w.tick(&drive).unwrap();
+    guard(&mut w, &[bomber], centre, 1500);
+    let hellkite = w.state.units.blueprint[bomber];
+    let (mut bombs, mut passes, mut quiet) = (0, 0, u32::MAX);
+    for _ in 0..1200 {
+        w.tick(&[]).unwrap();
+        let dropped = w
+            .events
+            .iter()
+            .filter(|e| {
+                matches!(e, SimEvent::ShotFired { blueprint, weapon: 0, .. } if *blueprint == hellkite)
+            })
+            .count();
+        if dropped > 0 && quiet > 30 {
+            // The bay opened: on the mark the pilot is flying at.
+            passes += 1;
+            let units = &w.state.units;
+            let o = w.state.orders.front(units, bomber).unwrap();
+            assert_eq!(o.kind, OrderKind::Attack, "bombing from the guard itself");
+            assert_eq!(units.weapon_target[bomber][0], o.target, "bay off the mark");
+        }
+        quiet = if dropped > 0 {
+            0
+        } else {
+            quiet.saturating_add(1)
+        };
+        bombs += dropped;
+    }
+    // A carpet is 24 bombs, one every 9 s at most.
+    assert!(
+        passes >= 3 && bombs >= 72,
+        "{bombs} bombs in {passes} passes in 120 s over the army"
     );
 }

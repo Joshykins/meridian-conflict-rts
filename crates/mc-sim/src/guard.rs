@@ -5,7 +5,8 @@
 //! naval unit that sees an enemy it can strike inside the area goes after it:
 //! an `Attack` pushed in front of the guard, leashed to the area and a gun's
 //! reach beyond it (`run_attack` ends it there), after which the unit walks
-//! back to its spot. Aircraft fight whatever is in the area, then circle it
+//! back to its spot. Aircraft chase what is in the area the same way (leashed
+//! wider, for a bombing pass carries them well out), then circle it
 //! halfway out, a group in formation (`orbit.rs`); one that orbits
 //! (`UnitBlueprint::orbit`, the Argus) circles on the edge itself, and takes up an
 //! orbit of its own wherever it is left idle.
@@ -216,10 +217,26 @@ impl World {
     }
 
     /// An aircraft on guard: fights what is in the area; when it is clear, it circles.
+    ///
+    /// It goes after an intruder as an `Attack` pushed in front of the guard, as a
+    /// ground unit does, so it keeps one mark from the run in to the release line
+    /// and its weapons aim at that mark too (`run_targeting`). Picking the nearest
+    /// enemy afresh every tick, a bomber over a crowd flew at one unit while its bay
+    /// was on another, and never opened.
     fn air_guard(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        if let Some(t) = self.guard_intruder(row, o, true) {
-            return self.air_fight(row, t);
-        }
-        self.fly_circle(row, o)
+        let Some(t) = self.guard_intruder(row, o, true) else {
+            return self.fly_circle(row, o);
+        };
+        // The pass carries it out past the area's edge and round again; one still
+        // flying in from further out (off the factory floor) is leashed from there.
+        let units = &self.state.units;
+        let leash = (o.radius + self.bp(row).vision / 2).max(units.pos[row].distance(o.pos))
+            + self.air_run_distance(row, units.pos[t]);
+        let mut chase = crate::orders::order(OrderKind::Attack, o.pos, self.state.units.id(t));
+        chase.radius = leash;
+        self.state
+            .orders
+            .push_front(&mut self.state.units, row, chase)?;
+        self.air_fight(row, t)
     }
 }

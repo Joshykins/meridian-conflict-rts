@@ -2125,7 +2125,7 @@ impl World {
         (height * 2 / crate::combat::GRAVITY).sqrt()
     }
 
-    fn air_run_distance(&self, row: usize, aim: FxVec2) -> Fx {
+    pub(crate) fn air_run_distance(&self, row: usize, aim: FxVec2) -> Fx {
         let motion = self.bp(row).motion.expect("air");
         let turn_radius = motion
             .speed
