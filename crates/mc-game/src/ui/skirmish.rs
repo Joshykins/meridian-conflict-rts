@@ -23,7 +23,7 @@ pub struct MatchRequest {
     pub map: Arc<MapFile>,
     pub config: MatchConfig,
     /// Player colours by player index, linear RGB.
-    pub colors: [[f32; 3]; 8],
+    pub colors: crate::setup::Palette,
     /// Set for a survival match: the engine, its fronts and the rules.
     pub survival: Option<mc_sim::SurvivalConfig>,
 }

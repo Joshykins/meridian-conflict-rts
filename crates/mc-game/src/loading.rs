@@ -77,7 +77,7 @@ pub struct Order {
     pub map: MapSource,
     pub blueprints: Arc<Blueprints>,
     pub pool: Arc<Pool>,
-    pub colors: [[f32; 3]; 8],
+    pub colors: crate::setup::Palette,
     /// Draw the unit pictures, in this side's colours.
     pub pictures: Option<[f32; 3]>,
 }
@@ -360,7 +360,7 @@ impl Curtain {
         &mut self,
         map: &MapFile,
         roster: &[mc_sim::PlayerSetup],
-        colors: &[[f32; 3]; 8],
+        colors: &crate::setup::Palette,
         ours: Option<usize>,
     ) {
         self.map_name = map.name().to_owned();
@@ -413,7 +413,7 @@ impl Curtain {
                         at: at(p.start as usize)?,
                         name: p.name.clone(),
                         role,
-                        color: colors[slot % 8],
+                        color: colors[slot % mc_core::MAX_PLAYERS],
                         ours,
                         faction: p.faction.clone(),
                     })

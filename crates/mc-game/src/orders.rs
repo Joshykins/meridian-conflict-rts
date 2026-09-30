@@ -678,7 +678,7 @@ fn aircraft_guides(ui: &mut Ui, field: &Field, alpha: f32) {
             continue;
         }
         drawn += 1;
-        let team = field.view.colors[(unit.owner_flags & 0xFF) as usize % 8];
+        let team = field.view.colors[(unit.owner_flags & 0xFF) as usize % mc_core::MAX_PLAYERS];
         let color = [team[0], team[1], team[2], 0.7];
         ui.stroke(top / ui.s, foot / ui.s, 1.0, color);
         if on_screen(foot) {
@@ -1763,7 +1763,7 @@ mod tests {
 
     #[test]
     fn a_group_outlives_its_orders_until_its_members_are_ordered_away() {
-        let mut view = View::new(0, [[1.0; 3]; 8], false);
+        let mut view = View::new(0, [[1.0; 3]; mc_core::MAX_PLAYERS], false);
         let mut map = OrderMap::default();
         side(&mut view, &[Some(7), Some(7), Some(7), Some(7)]);
         map.keep_groups(&view);
@@ -1871,7 +1871,7 @@ mod tests {
 
     #[test]
     fn a_shift_click_goes_into_the_nearest_patrol_leg() {
-        let mut view = View::new(0, [[1.0; 3]; 8], false);
+        let mut view = View::new(0, [[1.0; 3]; mc_core::MAX_PLAYERS], false);
         let post = |x, y| FxVec2::from_ints(x, y);
         let (a, b, c) = (post(0, 0), post(100, 0), post(100, 100));
         // Two units flying one loop, a post apart.

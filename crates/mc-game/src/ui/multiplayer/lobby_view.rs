@@ -351,7 +351,7 @@ fn chat(ui: &mut Ui, lobby: &mut Lobby, r: Rect) {
         let mut x = r.x;
         if !who.is_empty() {
             let tone = from.map_or(rgb(palette::DIM, 1.0), |s| {
-                let c = TEAM_COLORS[s as usize % 8];
+                let c = TEAM_COLORS[s as usize % TEAM_COLORS.len()];
                 [c[0], c[1], c[2], 1.0]
             });
             x = ui.text(x, y, type_scale::VALUE, tone, who) + 8.0;

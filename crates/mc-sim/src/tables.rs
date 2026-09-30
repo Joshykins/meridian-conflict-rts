@@ -1355,8 +1355,8 @@ impl Fires {
 pub struct Pads {
     pub pos: Vec<FxVec2>,
     pub radius: Vec<Fx>,
-    /// Same packing the renderer already uses for a pad: owner, well flag,
-    /// ghost, build, blueprint. See [`crate::world::pack_structure_pad`].
+    /// Same packing the renderer already uses for a pad: owner, ghost,
+    /// nanite, build, blueprint. See [`crate::world::pack_structure_pad`].
     pub packed: Vec<u32>,
 }
 

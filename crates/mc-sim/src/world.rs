@@ -594,8 +594,8 @@ impl World {
             .factions
             .get(bp.faction.0 as usize)
             .is_some_and(|f| f.construction == mc_data::Construction::Nanite);
-        let packed = pack_structure_pad(owner, 255, bp.id.0, false, false)
-            | if nanite { PAD_NANITE } else { 0 };
+        let packed =
+            pack_structure_pad(owner, 255, bp.id.0, false) | if nanite { PAD_NANITE } else { 0 };
         self.state.pads.upsert(pos, radius, packed)?;
         Ok(())
     }
@@ -1092,20 +1092,23 @@ fn cells_overlap(a: ((u32, u32), (u32, u32)), b: ((u32, u32), (u32, u32))) -> bo
     a.0 .0 <= b.1 .0 && b.0 .0 <= a.1 .0 && a.0 .1 <= b.1 .1 && b.0 .1 <= a.1 .1
 }
 
-/// Pad `packed` bit: an extractor well, one poured slab per cell of the 2x2
-/// with the crack pit left open. The pad shader reads this at bit 3.
-pub const PAD_WELL: u32 = 1 << 3;
+/// Pad `packed`: the owner's slot, bits 0..5 (room for `mc_core::MAX_PLAYERS`).
+pub const PAD_OWNER_MASK: u32 = 0x1F;
+/// Pad `packed` bit: a plan not yet started, drawn as a ghost. Bit 6.
+pub const PAD_GHOST: u32 = 1 << 6;
 /// Pad `packed` bit: the lot of a faction that builds with nanites
-/// (`mc_data::Construction::Nanite`): laid in dark machined plate, not paved. Bit 5.
-pub const PAD_NANITE: u32 = 1 << 5;
+/// (`mc_data::Construction::Nanite`): laid in dark machined plate, not paved. Bit 7.
+pub const PAD_NANITE: u32 = 1 << 7;
 
-/// Packing the pad shader reads: owner in 0..2, well flag at bit 3, ghost at
-/// bit 4, build in 8..16, blueprint index in 16..32. The slab is the mesh
-/// plan for that blueprint, not a hashed lot.
-pub fn pack_structure_pad(owner: u8, build: u8, blueprint: u16, ghost: bool, well: bool) -> u32 {
-    (owner as u32 & 7)
-        | if well { PAD_WELL } else { 0 }
-        | u32::from(ghost) << 4
+const _: () = assert!(MAX_PLAYERS <= PAD_OWNER_MASK as usize + 1);
+
+/// Packing the pad shader reads (`mc_models::gpu_consts::pad`; a test holds the
+/// two equal): owner in 0..5, ghost at bit 6, nanite at bit 7, build in 8..16,
+/// blueprint index in 16..32. The slab is the mesh plan for that blueprint,
+/// not a hashed lot.
+pub fn pack_structure_pad(owner: u8, build: u8, blueprint: u16, ghost: bool) -> u32 {
+    (owner as u32 & PAD_OWNER_MASK)
+        | if ghost { PAD_GHOST } else { 0 }
         | (build as u32) << 8
         | (blueprint as u32) << 16
 }
@@ -1505,10 +1508,10 @@ mod tests {
 
     #[test]
     fn pad_packing_names_the_blueprint() {
-        let p = pack_structure_pad(3, 200, 42, true, true);
-        assert_eq!(p & 7, 3);
-        assert_ne!(p & PAD_WELL, 0);
-        assert_ne!(p & (1 << 4), 0, "ghost");
+        let p = pack_structure_pad(31, 200, 42, true);
+        assert_eq!(p & PAD_OWNER_MASK, 31);
+        assert_ne!(p & PAD_GHOST, 0, "ghost");
+        assert_eq!(p & PAD_NANITE, 0);
         assert_eq!((p >> 8) & 0xFF, 200);
         assert_eq!(p >> 16, 42);
     }

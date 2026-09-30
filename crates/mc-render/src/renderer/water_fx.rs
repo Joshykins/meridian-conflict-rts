@@ -1979,7 +1979,7 @@ mod sea_shots {
                 map: map.clone(),
                 blueprints: blueprints.clone(),
                 pool: Arc::new(mc_jobs::Pool::new(2)),
-                team_colors: [[0.1, 0.6, 0.9]; 8],
+                team_colors: [[0.1, 0.6, 0.9]; mc_core::MAX_PLAYERS],
             },
         )
         .unwrap();

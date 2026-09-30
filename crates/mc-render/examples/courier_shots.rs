@@ -30,7 +30,7 @@ fn main() {
             map: map.clone(),
             blueprints: blueprints.clone(),
             pool: Arc::new(Pool::new(4)),
-            team_colors: [[0.1, 0.45, 0.95]; 8],
+            team_colors: [[0.1, 0.45, 0.95]; mc_core::MAX_PLAYERS],
         },
     )
     .unwrap();

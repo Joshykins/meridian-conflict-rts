@@ -295,9 +295,6 @@ mod tests {
         let src = include_str!("../../../mc-render/shaders/entity.wgsl");
         let line = format!("const UNIT_NANITE: u32 = {}u;", mc_sim::mirror::UNIT_NANITE);
         assert!(src.contains(&line), "entity.wgsl should say {line}");
-        let src = include_str!("../../../mc-render/shaders/ground.wgsl");
-        let line = format!("const PAD_NANITE: u32 = {}u;", mc_sim::PAD_NANITE);
-        assert!(src.contains(&line), "ground.wgsl should say {line}");
     }
 
     #[test]

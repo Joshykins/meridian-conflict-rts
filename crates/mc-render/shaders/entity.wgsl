@@ -2483,7 +2483,7 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         case 0u: { m.albedo = globals.plating.rgb; m.metallic = 0.3; m.roughness = 0.6; }
         case 1u: { m.albedo = globals.accent.rgb; m.metallic = 0.7; m.roughness = 0.42; }
         case 2u: { m.albedo = globals.glow.rgb * 0.2; m.emissive = globals.glow.rgb * 5.0; m.roughness = 0.3; }
-        case 3u: { m.albedo = globals.team_colors[owner & 7u].rgb * TEAM_PAINT; m.metallic = 0.3; m.roughness = 0.4; m.emissive = globals.team_colors[owner & 7u].rgb * TEAM_GLOW; }
+        case 3u: { m.albedo = globals.team_colors[owner & OWNER_MASK].rgb * TEAM_PAINT; m.metallic = 0.3; m.roughness = 0.4; m.emissive = globals.team_colors[owner & OWNER_MASK].rgb * TEAM_GLOW; }
         case 4u: { m.albedo = vec3<f32>(0.32, 0.33, 0.36); m.metallic = 0.95; m.roughness = 0.32; }
         case 5u: { m.albedo = vec3<f32>(0.02, 0.05, 0.09); m.metallic = 0.9; m.roughness = 0.08; m.emissive = globals.glow.rgb * 0.15; }
         case 6u: { m.albedo = vec3<f32>(0.03, 0.03, 0.035); m.roughness = 0.9; }
@@ -2651,7 +2651,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         n = normalize(n - ts * sf.slope.x - bs * sf.slope.y);
 
         m.albedo = mix(m.albedo, sf.paint.rgb, sf.paint.a);
-        let team_rgb = globals.team_colors[owner & 7u].rgb;
+        let team_rgb = globals.team_colors[owner & OWNER_MASK].rgb;
         m.albedo = mix(m.albedo, team_rgb * TEAM_PAINT, sf.team);
         m.emissive = mix(m.emissive, team_rgb * TEAM_GLOW, sf.team);
         m.albedo *= sf.cavity;
@@ -3446,7 +3446,7 @@ fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
     // The faction's shield colour (faction.ron `shield_color`), as shields.wgsl draws it:
     // a denser version for the knot and contact, a paler one toward white for the rings.
     let energy = globals.shield.rgb;
-    let team_c = globals.team_colors[s.packed & 7u].rgb;
+    let team_c = globals.team_colors[s.packed & OWNER_MASK].rgb;
     let rim_c = mix(energy, team_c, 0.16);
     let ice = mix(energy, mix(energy, vec3<f32>(1.0), 0.45), 0.45);
     let deep = pow(energy, vec3<f32>(2.2));

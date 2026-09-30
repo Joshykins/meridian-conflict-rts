@@ -39,7 +39,7 @@ struct Globals {
     plating: vec4<f32>,
     accent: vec4<f32>,
     glow: vec4<f32>,
-    team_colors: array<vec4<f32>, 8>,
+    team_colors: array<vec4<f32>, OWNER_COLORS>,
     // Build grid: pointer xy, radius it shows within, taken lot count.
     build_cursor: vec4<f32>,
     // Taken lots (structures and plans) near the pointer: min xy, max xy.

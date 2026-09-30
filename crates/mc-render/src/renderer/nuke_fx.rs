@@ -884,7 +884,7 @@ impl Renderer {
                 use crate::gpu_consts::missile::*;
                 let size = ((scale * SCALE_STEPS).round() as u32).clamp(1, SCALE_MASK);
                 (m.kind & KIND_MASK
-                    | (m.owner & OWNER_MASK) << OWNER_SHIFT
+                    | (m.owner & crate::gpu_consts::owner::MASK) << OWNER_SHIFT
                     | (plume as u32).min(PLUME_MASK) << PLUME_SHIFT
                     | size << SCALE_SHIFT) as f32
             };
@@ -981,7 +981,7 @@ mod shots {
                 map: map.clone(),
                 blueprints,
                 pool: Arc::new(mc_jobs::Pool::new(2)),
-                team_colors: [[0.1, 0.6, 0.9]; 8],
+                team_colors: [[0.1, 0.6, 0.9]; mc_core::MAX_PLAYERS],
             },
         )
         .unwrap();

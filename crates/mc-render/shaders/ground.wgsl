@@ -316,10 +316,9 @@ fn pad_mesh_sd(uv: vec2<f32>, layer: u32) -> f32 {
 
 // Metres the pad runs past its lot: the grit that spills off the kerb.
 const PAD_SPILL_M: f32 = 1.2;
-// The lot of a faction that builds with nanites (`mc_sim::PAD_NANITE`): not paved, but
+// The lot of a faction that builds with nanites (`PAD_NANITE`): not paved, but
 // black discs ringed in bronze and joined by bronze lines, violet light in their grooves
 // while it builds.
-const PAD_NANITE: u32 = 32u;
 const LOT_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const LOT_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.1);
 
@@ -353,10 +352,10 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     if above < 0.0 {
         discard;
     }
-    let owner = in.packed & 7u;
-    let build = f32((in.packed >> 8u) & 0xFFu) / 255.0;
-    let blueprint = in.packed >> 16u;
-    let ghost = (in.packed >> 4u) & 1u;
+    let owner = in.packed & OWNER_MASK;
+    let build = f32((in.packed >> PAD_BUILD_SHIFT) & PAD_BUILD_MASK) / 255.0;
+    let blueprint = in.packed >> PAD_BLUEPRINT_SHIFT;
+    let ghost = select(0u, 1u, (in.packed & PAD_GHOST) != 0u);
     let team = globals.team_colors[owner].rgb;
 
     let wp = in.world.xy;

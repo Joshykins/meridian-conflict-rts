@@ -22,7 +22,7 @@ pub struct MatchOptions {
     /// Set for a survival match.
     pub survival: Option<SurvivalConfig>,
     /// Seat colours, linear RGB, by seat.
-    pub colors: [[f32; 3]; 8],
+    pub colors: crate::setup::Palette,
     /// The map as the lobby shows it; `map_id` is what every machine loads.
     pub map: String,
     pub map_id: u64,

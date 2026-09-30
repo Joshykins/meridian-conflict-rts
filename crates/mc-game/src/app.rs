@@ -659,7 +659,11 @@ impl App {
     /// Replaces the renderer with one for `map`, blocking this thread. The old
     /// one goes first: two cannot share the window's surface. Only for a
     /// change of vertical sync; loads go through `load` and never block.
-    fn build_renderer(&mut self, map: &Arc<MapFile>, colors: [[f32; 3]; 8]) -> Result<(), String> {
+    fn build_renderer(
+        &mut self,
+        map: &Arc<MapFile>,
+        colors: crate::setup::Palette,
+    ) -> Result<(), String> {
         self.renderer = None;
         let target = self.window_target()?;
         let scene = SceneDesc {

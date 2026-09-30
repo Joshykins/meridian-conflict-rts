@@ -1018,7 +1018,7 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     let b = globals.strategic[in.slot * 2u + 1u];
     let a = globals.strategic[in.slot * 2u];
     let heat = b.w;
-    let owner = (u32(a.w) >> MISSILE_OWNER_SHIFT) & MISSILE_OWNER_MASK;
+    let owner = (u32(a.w) >> MISSILE_OWNER_SHIFT) & OWNER_MASK;
     let warhead = in.kind == 0u;
     // Light metal, dark bands at the stage joint and the re-entry vehicle, a team ring.
     var base = vec3<f32>(0.62, 0.64, 0.66);

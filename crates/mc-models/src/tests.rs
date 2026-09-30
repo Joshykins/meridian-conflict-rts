@@ -3413,3 +3413,27 @@ fn wreck_pose_bits_match_the_mirror() {
     assert_eq!(wreck::COUNT_SHIFT, m::WRECK_COUNT_SHIFT);
     assert_eq!(wreck::INNER, m::WRECK_INNER);
 }
+
+/// The owner bits and the structure pad's word the shaders read are the ones the sim
+/// writes, and every player slot has a team colour.
+#[test]
+fn owner_and_pad_bits_match_the_sim() {
+    use crate::gpu_consts::{missile, owner, pad};
+    const {
+        assert!(mc_core::MAX_PLAYERS <= owner::MASK as usize + 1);
+        assert!(mc_core::MAX_PLAYERS <= owner::COLORS as usize);
+        assert!(pad::GHOST & owner::MASK == 0);
+        // A strategic missile's word stays whole in an f32: 24 bits.
+        assert!(missile::SCALE_MASK << missile::SCALE_SHIFT < 1 << 24);
+        assert!(owner::MASK << missile::OWNER_SHIFT < 1 << missile::PLUME_SHIFT);
+        assert!(missile::KIND_MASK & owner::MASK << missile::OWNER_SHIFT == 0);
+    }
+    assert_eq!(owner::MASK, mc_sim::PAD_OWNER_MASK);
+    assert_eq!(pad::GHOST, mc_sim::PAD_GHOST);
+    assert_eq!(pad::NANITE, mc_sim::PAD_NANITE);
+    let p = mc_sim::pack_structure_pad(owner::MASK as u8, 200, 42, true);
+    assert_eq!(p & owner::MASK, owner::MASK);
+    assert_ne!(p & pad::GHOST, 0);
+    assert_eq!((p >> pad::BUILD_SHIFT) & pad::BUILD_MASK, 200);
+    assert_eq!(p >> pad::BLUEPRINT_SHIFT, 42);
+}

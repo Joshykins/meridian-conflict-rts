@@ -7,8 +7,11 @@ use mc_sim::tables::Controller;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup};
 use std::path::PathBuf;
 
+/// A colour per player slot, linear RGB.
+pub type Palette = [[f32; 3]; mc_core::MAX_PLAYERS];
+
 /// Player colours by slot, linear RGB.
-pub const TEAM_COLORS: [[f32; 3]; 8] = [
+pub const TEAM_COLORS: Palette = [
     [0.05, 0.35, 1.0],
     [1.0, 0.08, 0.06],
     [0.1, 0.85, 0.2],

@@ -466,7 +466,7 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     if outline <= 0.01 && mark_edge <= 0.01 {
         discard;
     }
-    var color = globals.team_colors[in.owner_flags & 7u].rgb;
+    var color = globals.team_colors[in.owner_flags & OWNER_MASK].rgb;
     if (in.owner_flags & STATE_UNIDENTIFIED) != 0u {
         color = vec3<f32>(0.62, 0.65, 0.70);
     } else if (in.owner_flags & FLAG_UNDER_CONSTRUCTION) != 0u {

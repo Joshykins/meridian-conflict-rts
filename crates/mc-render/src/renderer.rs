@@ -172,7 +172,7 @@ pub struct SceneDesc {
     pub blueprints: Arc<Blueprints>,
     pub pool: Arc<Pool>,
     /// Colour per player slot, linear RGB.
-    pub team_colors: [[f32; 3]; 8],
+    pub team_colors: [[f32; 3]; mc_core::MAX_PLAYERS],
 }
 
 /// Selection / hover marker on an entity of the current render frame.
@@ -268,7 +268,7 @@ pub(crate) struct Globals {
     pub(crate) plating: [f32; 4],
     pub(crate) accent: [f32; 4],
     pub(crate) glow: [f32; 4],
-    pub(crate) team_colors: [[f32; 4]; 8],
+    pub(crate) team_colors: [[f32; 4]; crate::gpu_consts::owner::COLORS as usize],
     pub(crate) build_cursor: [f32; 4],
     pub(crate) build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
     /// The 3D scene's size in pixels, the render scale, and how far the selection's
@@ -898,7 +898,7 @@ pub struct Renderer {
     upload_scratch: Vec<TerrainUpload>,
     map_info: mc_map::MapInfo,
     palette: [[f32; 4]; 4],
-    team_colors: [[f32; 4]; 8],
+    team_colors: [[f32; 4]; crate::gpu_consts::owner::COLORS as usize],
     slot_count: u32,
     static_count: u32,
     dynamic_count: u32,
@@ -2227,7 +2227,7 @@ impl Renderer {
 
         let faction = &bps.factions[0];
         let rgba = |c: [f32; 3]| [c[0], c[1], c[2], 1.0];
-        let mut team_colors = [[1.0; 4]; 8];
+        let mut team_colors = [[1.0; 4]; crate::gpu_consts::owner::COLORS as usize];
         for (i, c) in scene.team_colors.iter().enumerate() {
             team_colors[i] = rgba(*c);
         }
@@ -3836,11 +3836,10 @@ impl Renderer {
                 pos,
                 radius: half,
                 strength_seed: mc_sim::pack_structure_pad(
-                    (u.owner_flags & 7) as u8,
+                    (u.owner_flags & crate::gpu_consts::owner::MASK) as u8,
                     build as u8,
                     u.blueprint as u16,
                     ghost,
-                    false,
                 ) | if nanite { mc_sim::PAD_NANITE } else { 0 },
             });
         }
@@ -6066,7 +6065,7 @@ mod environment_tests {
                 map: map.clone(),
                 blueprints,
                 pool: Arc::new(Pool::new(2)),
-                team_colors: [[0.1, 0.6, 0.9]; 8],
+                team_colors: [[0.1, 0.6, 0.9]; mc_core::MAX_PLAYERS],
             },
         )
         .unwrap();
@@ -6256,7 +6255,7 @@ mod shockwave_tests {
                 map: map.clone(),
                 blueprints,
                 pool: Arc::new(Pool::new(2)),
-                team_colors: [[0.1, 0.6, 0.9]; 8],
+                team_colors: [[0.1, 0.6, 0.9]; mc_core::MAX_PLAYERS],
             },
         )
         .unwrap();
@@ -6473,7 +6472,7 @@ mod glass_tests {
                 map: map.clone(),
                 blueprints,
                 pool: Arc::new(Pool::new(2)),
-                team_colors: [[0.1, 0.6, 0.9]; 8],
+                team_colors: [[0.1, 0.6, 0.9]; mc_core::MAX_PLAYERS],
             },
         )
         .unwrap();

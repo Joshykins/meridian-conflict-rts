@@ -83,7 +83,7 @@ const ORBIT_RETURN_RATE: f32 = 3.0;
 pub struct GameStart {
     pub map: Arc<MapFile>,
     /// Player colours by player index, linear RGB.
-    pub colors: [[f32; 3]; 8],
+    pub colors: crate::setup::Palette,
     pub session: Box<dyn mc_net::Session + Send>,
     /// Session events already polled while waiting in a lobby, `Started` included.
     pub prefetched: Vec<mc_net::SessionEvent>,
@@ -189,7 +189,7 @@ pub struct View {
     /// The in-match menu is up: the HUD leaves the middle of the screen to it.
     pub menu_open: bool,
     /// Player colours by player index, linear RGB.
-    pub colors: [[f32; 3]; 8],
+    pub colors: crate::setup::Palette,
     /// Game speed, percent of real time.
     pub speed: u32,
     /// The player stopped the clock (single-player only).
@@ -227,7 +227,7 @@ pub struct View {
 }
 
 impl View {
-    pub fn new(local: u8, colors: [[f32; 3]; 8], show_profiler: bool) -> View {
+    pub fn new(local: u8, colors: crate::setup::Palette, show_profiler: bool) -> View {
         View {
             local,
             frame: RenderFrame::default(),
@@ -621,7 +621,7 @@ impl Game {
 
     /// The side whose colours the unit pictures are drawn in.
     pub fn picture_team(start: &GameStart) -> [f32; 3] {
-        start.colors[start.local as usize % 8]
+        start.colors[start.local as usize % mc_core::MAX_PLAYERS]
     }
 
     /// A failure the application ran into on the match's behalf (a reload that did not parse).
@@ -4222,7 +4222,7 @@ impl Game {
             self.chart_ready = true;
         }
         if !self.hud.thumbs.baked() {
-            let team = self.view.colors[self.view.local as usize % 8];
+            let team = self.view.colors[self.view.local as usize % mc_core::MAX_PLAYERS];
             self.hud.thumbs.bake(overlay, &self.blueprints, team);
         }
         self.view.fps = self.view.fps * 0.95 + (1.0 / dt.max(1e-4)) * 0.05;

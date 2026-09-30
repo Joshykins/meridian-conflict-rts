@@ -223,7 +223,7 @@ impl Scene<'_> {
     }
 
     fn team_color(&self, owner: u8) -> Color {
-        let c = self.view.colors[owner as usize % 8];
+        let c = self.view.colors[owner as usize % mc_core::MAX_PLAYERS];
         [c[0], c[1], c[2], 1.0]
     }
 }

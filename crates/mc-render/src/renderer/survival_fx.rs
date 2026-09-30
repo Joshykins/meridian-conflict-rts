@@ -74,16 +74,16 @@ mod survival_shots {
                 map: map.clone(),
                 blueprints: blueprints.clone(),
                 pool: Arc::new(mc_jobs::Pool::new(2)),
-                team_colors: [
-                    [0.85, 0.12, 0.1],
-                    [0.1, 0.6, 0.9],
-                    [0.9, 0.7, 0.1],
-                    [0.3, 0.9, 0.3],
-                    [0.8, 0.3, 0.9],
-                    [0.9, 0.5, 0.2],
-                    [0.5, 0.5, 0.5],
-                    [0.2, 0.9, 0.9],
-                ],
+                team_colors: {
+                    let mut c = [[0.5; 3]; mc_core::MAX_PLAYERS];
+                    c[..4].copy_from_slice(&[
+                        [0.85, 0.12, 0.1],
+                        [0.1, 0.6, 0.9],
+                        [0.9, 0.7, 0.1],
+                        [0.3, 0.9, 0.3],
+                    ]);
+                    c
+                },
             },
         )
         .unwrap();

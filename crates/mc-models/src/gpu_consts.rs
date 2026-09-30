@@ -69,6 +69,30 @@ impl Literal for f32 {
 }
 
 shared! {
+    /// A player slot as the GPU sees it: the low bits of `UnitInstance::owner_flags`, of a
+    /// structure pad's word (`pad`), a shield's `packed` and a strategic missile's word, and
+    /// the index into `Globals::team_colors`. Slots run `0..mc_core::MAX_PLAYERS`, which must
+    /// fit (a test holds it).
+    pub mod owner as "OWNER_" {
+        pub const MASK: u32 = 0x1F;
+        /// Entries in `Globals::team_colors`: one per slot `MASK` can name.
+        pub const COLORS: u32 = 32;
+    }
+
+    /// A structure's pad under it (`mc_sim::pack_structure_pad`, ground.wgsl `fs_pad`; a
+    /// test holds the sim's bits equal): owner in the low bits (`owner::MASK`), two flags
+    /// above it, the build fraction in the second byte and the blueprint index in the top
+    /// half.
+    pub mod pad as "PAD_" {
+        /// A plan not yet started: drawn as a ghost.
+        pub const GHOST: u32 = 0x40;
+        /// The lot of a faction that builds with nanites: dark machined plate, not paving.
+        pub const NANITE: u32 = 0x80;
+        pub const BUILD_SHIFT: u32 = 8;
+        pub const BUILD_MASK: u32 = 0xFF;
+        pub const BLUEPRINT_SHIFT: u32 = 16;
+    }
+
     /// What a draw is for, in the low byte of the entity and terrain push constant
     /// `pass_kind`; a shadow pass puts its cascade in the next byte.
     pub mod pass as "PASS_" {
@@ -428,12 +452,12 @@ shared! {
     }
 
     /// A strategic missile in flight (`Globals::strategic`, nuke_fx.rs, nuke.wgsl): the word
-    /// in its first vec4's w packs its kind, owner, plume length in metres and drawn size
-    /// (`scale * SCALE_STEPS`), each a whole number so the float holds it exactly.
+    /// in its first vec4's w packs its kind (2 bits), owner (`owner::MASK`), plume length in
+    /// metres and drawn size (`scale * SCALE_STEPS`), each a whole number, 24 bits in all, so
+    /// the float holds it exactly.
     pub mod missile as "MISSILE_" {
-        pub const KIND_MASK: u32 = 0xF;
-        pub const OWNER_SHIFT: u32 = 4;
-        pub const OWNER_MASK: u32 = 0x7;
+        pub const KIND_MASK: u32 = 0x3;
+        pub const OWNER_SHIFT: u32 = 2;
         pub const PLUME_SHIFT: u32 = 8;
         pub const PLUME_MASK: u32 = 0xFF;
         pub const SCALE_SHIFT: u32 = 16;

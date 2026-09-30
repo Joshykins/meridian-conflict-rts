@@ -52,16 +52,11 @@ fn main() {
             map: map.clone(),
             blueprints: blueprints.clone(),
             pool: Arc::new(Pool::new(4)),
-            team_colors: [
-                [0.1, 0.45, 0.95],
-                [0.9, 0.15, 0.1],
-                [0.1, 0.45, 0.95],
-                [0.1, 0.45, 0.95],
-                [0.1, 0.45, 0.95],
-                [0.1, 0.45, 0.95],
-                [0.1, 0.45, 0.95],
-                [0.1, 0.45, 0.95],
-            ],
+            team_colors: {
+                let mut c = [[0.1, 0.45, 0.95]; mc_core::MAX_PLAYERS];
+                c[1] = [0.9, 0.15, 0.1];
+                c
+            },
         },
     )
     .expect("renderer");

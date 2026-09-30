@@ -1017,7 +1017,7 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
             let fuse = exp(-fusion_gap(p, owner, team_of(s)) * 0.34);
             let paint = projector_paint(p, s, hx, seam, time);
 
-            let team_c = globals.team_colors[s.packed & 7u].rgb;
+            let team_c = globals.team_colors[s.packed & OWNER_MASK].rgb;
             let energy = energy_of(s);
             let rim_c = mix(energy, team_c, 0.16);
             let fuse_c = mix(mix(shield_deep(), shield_base(), 0.6), team_c, 0.1);
