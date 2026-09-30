@@ -7,10 +7,12 @@
 //! - A weapon's `far` sound: the same for its hits (the AEB-3's strike).
 //! - A rotary gun's `spin`: heard as its barrels start to turn (`Weapon::spin_up`).
 //! - A giant rail gun's spent sabot bursting where it lands (`SimEvent::SabotLanded`).
+//! - The trees a giant or a settling capital ship knocks over (`trees.rs`).
 //!
 //! Heard the moment it happens, however far, like a nuclear blast (game.rs
 //! `nuke_sounds`): the user wants a sound with its event, not the real lag of sound.
 
+mod trees;
 mod tremor;
 
 use super::Audio;
@@ -53,6 +55,9 @@ pub struct GiantSounds {
     rotary: [Option<SoundId>; 2],
     /// Ground shocks the camera feels.
     tremors: tremor::Tremors,
+    /// Trees knocked over, and `tree_fall`.
+    trees: trees::TreeFalls,
+    tree_fall: Option<SoundId>,
     ids: HashMap<u32, Ids>,
     generation: Option<u32>,
 }
@@ -77,6 +82,7 @@ impl GiantSounds {
             self.generation = Some(generation);
             self.rotary =
                 ["titan_gatling_whir", "titan_gatling_spindown"].map(|n| library.id_of(n));
+            self.tree_fall = library.id_of("tree_fall");
         }
         let [whir, spindown] = self.rotary;
         self.whirs.clear();
@@ -247,6 +253,8 @@ impl GiantSounds {
                 jolts.push((Vec3::from(pos.to_f32()), 0.35, s.ticks as f32 * 0.1, reach));
             }
         }
+        self.trees
+            .tick(events, self.tree_fall, audio, focus.z, tick_seconds, &hear);
         for (at, strength, ring, reach) in jolts {
             self.tremors.jolt(at, strength, ring, reach, focus);
         }
