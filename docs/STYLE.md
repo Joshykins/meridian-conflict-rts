@@ -406,7 +406,10 @@ and a report that holds and rolls back as thunder.
   pool that glows white-yellow when fresh, orange, then dull red, while a dark
   glassy crust closes over it from the rim in, last glowing only in its
   cracks. The charcoal scorch under it stays. The Arbalest leaves only a small
-  pool where it strikes.
+  pool where it strikes. It melts as fast as the channel is low: a ground gun's
+  track melts at once, while under a shot struck down from high up (the
+  Dominion's spinal) the ground takes seconds to heat, glowing up from the
+  strike outward and slowest under the channel's high end.
 - Sound (`data/sounds/bore.ron`): capacitors filling (two contactors, a climbing
   stack), a crack at the muzzle as the charge goes, then the strike: a snap, a
   buzzing stack falling fast, a deep thump and thunder rolling back twice. The

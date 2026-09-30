@@ -6,6 +6,8 @@
 //! lightning re-igniting around it in a sustained train of return strokes; a flash at each kink that lights the ground; and,
 //! where the channel ran low over the ground, a molten track that glows white, then
 //! orange, then dull red as it crusts over and cools. The sim's scorch stays under it.
+//! The ground takes time to melt by how high the channel ran over it (`heat_up`): at
+//! once under a shot laid along the ground, seconds under one struck down from the air.
 //!
 //! Presentation only. The molten track is ground stains with `STAIN_MOLTEN` set, whose
 //! low byte is the heat left (0 to 255), rewritten every frame as the track cools, and
@@ -29,6 +31,15 @@ const PLASMA_COLUMN: u32 = 4;
 const SHELL_MELT_HEIGHT: f32 = 8.0;
 /// Seconds a melting shell's pool takes to cool, for a 20 m pool.
 const SHELL_MELT_COOL: f32 = 10.0;
+/// Metres of channel height the ground under a bore's channel takes a second to heat
+/// through (`heat_up`), and the longest it takes.
+const HEAT_RATE: f32 = 120.0;
+const MOST_HEAT_UP: f32 = 8.0;
+/// Share of its heating time a pool shows nothing (the ground is only warming).
+const LATENT: f32 = 0.4;
+/// Heat a pool shows at once it starts to glow: below about this the shader draws the
+/// crust of a pool gone cold, and a warming track would look burnt before it melted.
+const WARMING: f32 = 0.62;
 /// Bolt strokes kept, at most.
 const MAX_STROKES: usize = 12288;
 /// Overlapping return strokes keep the channel alive while its branching shape changes.
@@ -48,7 +59,18 @@ struct Molten {
     peak: f32,
     seed: u32,
     start: f32,
+    /// Seconds from `start` it takes to heat up to `peak` (spreading out to its radius as
+    /// it does); it cools across `cool` seconds after that.
+    rise: f32,
     cool: f32,
+}
+
+/// Seconds the ground under a bore's channel takes to melt, where the channel runs
+/// `height` metres over it on a shot that came down `drop` metres from the muzzle: a
+/// channel laid along the ground melts it at once, one struck down from high up heats
+/// it slowly, the ground right under the high end slowest.
+fn heat_up(drop: f32, height: f32) -> f32 {
+    ((drop * 0.5 + height.max(0.0)) / HEAT_RATE).min(MOST_HEAT_UP)
 }
 
 struct Stroke {
@@ -107,6 +129,7 @@ impl BoreFx {
             peak: 1.0,
             seed,
             start,
+            rise: 0.0,
             cool,
         });
     }
@@ -149,15 +172,35 @@ impl BoreFx {
     pub(super) fn molten_stains(&mut self, time: f32) -> &[StainInstance] {
         self.stains.clear();
         for m in &self.molten {
-            let age = (time - m.start) / m.cool.max(0.01);
-            if !(0.0..1.0).contains(&age) {
+            let since = time - m.start;
+            let age = (since - m.rise) / m.cool.max(0.01);
+            if since < 0.0 || age >= 1.0 {
                 continue;
             }
-            let heat = (m.peak * (1.0 - age) * 255.0).round() as u32;
+            // Heating up: nothing shows for the first part of it, then it glows up out of
+            // a small dull spot, spreading to its full size and heat.
+            let warm = if m.rise > 0.0 {
+                let k = ((since / m.rise - LATENT) / (1.0 - LATENT)).min(1.0);
+                if k < 0.0 {
+                    continue;
+                }
+                k * k * (3.0 - 2.0 * k)
+            } else {
+                1.0
+            };
+            // Heating, a spot glows dull orange (lower is drawn as crust, as if burnt and cooled).
+            let glow = if m.rise > 0.0 {
+                WARMING + (m.peak - WARMING) * warm
+            } else {
+                m.peak
+            };
+            let heat = glow * (1.0 - age.max(0.0));
             self.stains.push(StainInstance {
                 pos: m.pos.to_array(),
-                radius: m.radius,
-                strength_seed: STAIN_MOLTEN | heat.min(255) | (m.seed & 0x7FFF) << 8,
+                radius: m.radius * (0.35 + 0.65 * warm),
+                strength_seed: STAIN_MOLTEN
+                    | ((heat * 255.0).round() as u32).min(255)
+                    | (m.seed & 0x7FFF) << 8,
             });
         }
         &self.stains
@@ -308,6 +351,9 @@ impl Renderer {
         }
 
         let water = self.map_info.water_level.to_f32();
+        // How far the shot came down: the higher the gun stood over its mark, the longer
+        // the ground takes to melt (`heat_up`).
+        let drop = (from.z - to.z).max(0.0);
         // What the strike alone melts: a small pool where it landed.
         let pool = (splash * 0.7).max(2.0);
         if to.z - self.ground_height(to.truncate()) < pool
@@ -320,6 +366,7 @@ impl Renderer {
                 peak: 1.0,
                 seed,
                 start,
+                rise: heat_up(drop, 0.0),
                 cool,
             });
         }
@@ -331,6 +378,9 @@ impl Renderer {
         // ground a wide white-hot gouge that stays molten longest, higher up a narrower
         // track that starts dull and crusts over sooner, and nothing past `reach`. The
         // reach clears the muzzle, so the ground melts from right in front of the gun.
+        // It melts as soon as the channel strikes where the channel runs low on a shot
+        // laid along the ground; under a channel struck down from high up it takes
+        // seconds to heat through, longest where the channel ran highest (`heat_up`).
         let muzzle = from.z - self.ground_height(from.truncate());
         let reach = (width * 2.0).max(muzzle + width * 1.5);
         let wind = self.sky.wind_heading();
@@ -352,19 +402,22 @@ impl Renderer {
             }
             let seed = self.bore_fx.bump();
             let wobble = 0.75 + (seed % 97) as f32 / 97.0 * 0.5;
+            let rise = heat_up(drop, at.z - ground);
             self.bore_fx.push_molten(Molten {
                 pos: at.truncate(),
                 radius: radius * wobble,
                 peak: 0.45 + 0.55 * close,
                 seed,
                 start,
+                rise,
                 cool: cool * (0.35 + 0.65 * close),
             });
+            let melted = start + rise;
             let ground_at = at.truncate().extend(ground + 0.5);
             if k.is_multiple_of(5) && close > 0.4 {
                 let spark =
                     Vec3::new(self.scatter.unit() - 0.5, self.scatter.unit() - 0.5, 1.0) * 14.0;
-                self.push_puff(PUFF_SPARK, ground_at, spark, start, 0.6, (0.5, 0.2));
+                self.push_puff(PUFF_SPARK, ground_at, spark, melted, 0.6, (0.5, 0.2));
             }
             // A thin wisp now and then off the cooling track, carried off on the wind.
             if k % 20 == 7 && close > 0.3 {
@@ -374,7 +427,7 @@ impl Renderer {
                     PUFF_TREE_SMOKE,
                     ground_at,
                     drift,
-                    start + 0.5,
+                    melted + 0.5,
                     life,
                     (width * 0.15, width * 0.6),
                 );
