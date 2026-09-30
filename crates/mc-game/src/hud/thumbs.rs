@@ -29,6 +29,9 @@ pub struct Thumbs {
     /// The soft pool of light a picture stands in (`stage_light`).
     stage: Option<(usize, [f32; 4])>,
     baked: bool,
+    /// Each slot's pixels, to put back after something borrowed the slots
+    /// (the test range's map browser).
+    sheets: Vec<(usize, Vec<u8>)>,
 }
 
 impl Thumbs {
@@ -47,7 +50,13 @@ impl Thumbs {
         self.baked = true;
         self.at = baked.at;
         self.stage = baked.stage;
-        for (slot, sheet) in baked.slots.iter().zip(&baked.sheets) {
+        self.sheets = baked.slots.into_iter().zip(baked.sheets).collect();
+        self.reinstall(overlay);
+    }
+
+    /// Puts the pictures back into their slots.
+    pub fn reinstall(&self, overlay: &mut Overlay) {
+        for (slot, sheet) in &self.sheets {
             overlay.set_image(*slot, IMAGE_SLOT, IMAGE_SLOT, sheet);
         }
     }

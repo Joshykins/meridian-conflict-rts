@@ -30,6 +30,7 @@ mod observer;
 mod pause;
 mod profiler;
 mod range;
+mod range_maps;
 mod reclaim;
 mod replay_bar;
 pub use replay_bar::{clock as replay_clock, ReplayBar};
@@ -172,6 +173,8 @@ pub enum HudAction {
     SetSpeed(u32),
     /// The test range's panel.
     Range(crate::range::RangeAction),
+    /// Test range: stand it back up on the map with this file stem.
+    RangeMap(String),
     /// A command as it stands (a panel that builds its own).
     Send(mc_sim::Command),
     /// Watching a replay: jump to this tick.
@@ -262,6 +265,8 @@ pub struct Hud {
     unit_picker: Option<unit_picker::Picker>,
     /// The unit browser's filters, kept between openings.
     unit_picker_filters: unit_picker::Filters,
+    /// Test range: the map browser.
+    range_maps: range_maps::RangeMaps,
     /// Whether the reclaim survey was up last frame, so the cue plays on the edge.
     reclaim_seen: bool,
     reclaim_open: bool,
@@ -372,6 +377,12 @@ impl Hud {
         self.unit_picker = Some(unit_picker::Picker::new());
     }
 
+    /// Opens the range's map browser at once, every map in `maps/` read (shots).
+    pub fn browse_range_maps(&mut self, current: &MapFile) {
+        self.range_maps.load_now(crate::setup::list_maps());
+        self.range_maps.open_now(current);
+    }
+
     /// Opens the construction panel on the selection's upgrade or refit tab.
     pub fn open_refit_tab(&mut self) {
         self.want_refit_tab = true;
@@ -379,6 +390,11 @@ impl Hud {
 
     pub fn unit_picker_open(&self) -> bool {
         self.unit_picker.is_some()
+    }
+
+    /// A browser over the screen owns the input: the unit browser or the range's maps.
+    pub fn browser_open(&self) -> bool {
+        self.unit_picker_open() || self.range_maps.is_open()
     }
 
     /// Whether the HUD had something under this window pixel last frame.
@@ -492,6 +508,19 @@ impl Hud {
         self.actions.clear();
         let (w, h) = (ui.size.x, ui.size.y);
         let view = s.view;
+
+        // The range's map browser has the unit pictures' slots: nothing else is
+        // drawn until it has gone, then the pictures go back.
+        if self.range_maps.is_shown() {
+            self.claim(ui, Rect::new(0.0, 0.0, w, h));
+            if let Some(stem) = self.range_maps.draw(ui, s.map) {
+                self.actions.push(HudAction::RangeMap(stem));
+            }
+            if !self.range_maps.is_shown() {
+                self.thumbs.reinstall(ui.o);
+            }
+            return std::mem::take(&mut self.actions);
+        }
 
         let interactive = ui.interactive;
         if self.unit_picker_open() {

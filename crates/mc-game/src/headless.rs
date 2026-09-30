@@ -31,6 +31,8 @@ pub struct Shot {
     pub net: Option<String>,
     /// Range screenshot: show the searchable subject catalog.
     pub unit_picker: bool,
+    /// Range screenshot: show the map browser.
+    pub range_maps: bool,
     /// Match screenshots: the construction panel open on its refit (upgrade) tab.
     pub refit_tab: bool,
     /// Match screenshots: the selected unit's DETAILS card open.
@@ -725,6 +727,9 @@ pub fn screenshot(
     }
     if shot.unit_picker {
         hud.browse_range_subject();
+    }
+    if shot.range_maps {
+        hud.browse_range_maps(&map);
     }
     hud.details_open = shot.details;
     // `MERIDIAN_ISSUE_NOTE=TEXT`: the report card's note, typed.

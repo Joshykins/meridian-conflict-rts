@@ -555,6 +555,48 @@ fn the_range_panel_reports_what_was_asked() {
 }
 
 #[test]
+fn the_range_map_browser_picks_another_map_and_gives_the_pictures_back() {
+    use crate::range::{Range, RangeAction};
+    let mut rig = Rig::new("aster_t1_tank");
+    let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
+    rig.view.range = Some(Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank));
+    rig.hud.range_maps.load_now(crate::ui::test_maps::paths());
+    rig.hud.open_range_tab("Range");
+    // The Range tab's page starts at 306: camera presets, then the map under its name.
+    assert!(
+        rig.click(Vec2::new(180.0, 388.0 + focus::FOCUS_H))
+            .is_empty(),
+        "opening the browser is not an order"
+    );
+    assert!(rig.hud.browser_open());
+    rig.settle();
+    assert!(
+        rig.hud.covers(Vec2::new(1800.0, 700.0)),
+        "the battlefield takes no clicks under the browser"
+    );
+    let browser = rig.hud.range_maps.browser().unwrap();
+    let (_, other) = browser.cards[1];
+    let choose = browser.select_at;
+    assert!(rig.tap(other).is_empty(), "one click only picks the card");
+    let asked = rig.tap(choose);
+    assert_eq!(asked.len(), 1);
+    let HudAction::RangeMap(stem) = &asked[0] else {
+        panic!("choosing a map asks for it, not {asked:?}");
+    };
+    assert!(crate::ui::test_maps::paths()
+        .iter()
+        .any(|p| p.file_stem().is_some_and(|s| s == stem.as_str())));
+    assert!(!rig.hud.browser_open());
+    // Once it has faded, the panel is back and the unit pictures are in their slots.
+    rig.settle();
+    assert!(!rig.hud.range_maps.is_shown());
+    assert_eq!(
+        rig.click(Vec2::new(184.0, 424.0 + focus::FOCUS_H)),
+        vec![HudAction::Range(RangeAction::Reload)]
+    );
+}
+
+#[test]
 fn the_range_economy_tab_fills_starves_and_scatters_wrecks() {
     use crate::range::{Range, RangeAction, BLUE, INCOME_NORMAL, RED};
     let mut rig = Rig::new("aster_t1_tank");

@@ -270,6 +270,11 @@ pub enum GameEvent {
     Quit,
     /// Test range: read `data/` again and open the range on this blueprint key.
     ReloadRange(String),
+    /// Test range: open it on the map with this file stem, with this blueprint key on the pad.
+    RangeMap {
+        stem: String,
+        subject: String,
+    },
 }
 
 /// What a frame needs from the application around the match.
@@ -679,7 +684,7 @@ impl Game {
             return;
         }
         // The browser owns input, including keys that normally issue orders.
-        if self.hud.unit_picker_open() {
+        if self.hud.browser_open() {
             self.keys.clear();
             self.middle_down = false;
             self.end_orbit();
@@ -723,14 +728,13 @@ impl Game {
                 // Ctrl+Alt together frees the camera or gives the panels back; that
                 // press does not orbit, whichever key went down first.
                 let chord = self.ctrl && alt;
-                if chord && !self.free_chord && self.menu.is_none() && !self.hud.unit_picker_open()
-                {
+                if chord && !self.free_chord && self.menu.is_none() && !self.hud.browser_open() {
                     self.set_free_camera(!self.hud.free.on, r, audio);
                 }
                 self.free_chord = chord;
                 if alt != self.alt {
                     self.alt = alt;
-                    if self.menu.is_some() || self.hud.unit_picker_open() {
+                    if self.menu.is_some() || self.hud.browser_open() {
                         if !alt {
                             self.end_orbit();
                         }
@@ -753,7 +757,7 @@ impl Game {
                     if self.menu.is_none() {
                         self.free_camera_motion(delta, false);
                     }
-                } else if self.menu.is_none() && !self.hud.unit_picker_open() {
+                } else if self.menu.is_none() && !self.hud.browser_open() {
                     if let Some((yaw, tilt)) = &mut self.orbit_aim {
                         *yaw += delta.x * ORBIT_YAW;
                         let (lo, hi) = self.camera.tilt_limits();
@@ -2322,6 +2326,14 @@ impl Game {
             HudAction::Pause => self.toggle_pause(),
             HudAction::Seek(tick) => *self.sim.seek.lock().unwrap() = Some(tick),
             HudAction::Range(action) => self.range_action(action, audio),
+            HudAction::RangeMap(stem) => {
+                if let Some(range) = &self.view.range {
+                    self.event = Some(GameEvent::RangeMap {
+                        stem,
+                        subject: self.blueprints.unit(range.subject).key.clone(),
+                    });
+                }
+            }
             HudAction::LineUp(units) => self.range_line_up(&units, audio),
         }
     }
@@ -4232,10 +4244,7 @@ impl Game {
         // Keyboard camera. Alt owns the view: the usual keys must not pan underneath an orbit.
         let cine = self.hud.free.on;
         self.cine.hand_back_lift(&mut self.camera);
-        if self.orbit_saved.is_none()
-            && !self.hud.unit_picker_open()
-            && !self.hud.net.typing()
-            && !cine
+        if self.orbit_saved.is_none() && !self.hud.browser_open() && !self.hud.net.typing() && !cine
         {
             let mut pan = Vec2::ZERO;
             for (key, d) in [

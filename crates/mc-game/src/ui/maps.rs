@@ -318,6 +318,11 @@ impl Browser {
         self.open
     }
 
+    /// Open, or still fading out after closing.
+    pub fn is_shown(&self) -> bool {
+        self.open || self.shown > 0.0
+    }
+
     /// Opens on `selected`.
     pub fn open(&mut self, selected: usize) {
         self.open = true;

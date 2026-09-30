@@ -1145,7 +1145,11 @@ impl App {
                         ));
                     }
                     Some(FrontEvent::Range) => {
-                        let path = setup::find_map(None)?;
+                        // The map last picked on the range, while it is still there.
+                        let path = Some(self.settings.range_map.as_str())
+                            .filter(|stem| !stem.is_empty())
+                            .and_then(|stem| setup::find_map(Some(stem)).ok())
+                            .map_or_else(|| setup::find_map(None), Ok)?;
                         let map = Arc::new(
                             MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))?,
                         );
@@ -1222,6 +1226,29 @@ impl App {
                         ));
                     }
                     Some(GameEvent::Quit) => quit = true,
+                    Some(GameEvent::RangeMap { stem, subject }) => {
+                        let opened = setup::find_map(Some(&stem)).and_then(|path| {
+                            MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))
+                        });
+                        match opened {
+                            Ok(map) => {
+                                let map = Arc::new(map);
+                                let start =
+                                    range_start(&map, &self.args.blueprints, &subject, None)?;
+                                self.settings.range_map = stem;
+                                settings_changed.0 = true;
+                                next = Some((
+                                    Pending::Match(Box::new(start)),
+                                    "Test Range",
+                                    map.name().to_owned(),
+                                ));
+                            }
+                            Err(e) => {
+                                log::error!("range map: {e}");
+                                game.complain(&format!("That map did not open: {e}"));
+                            }
+                        }
+                    }
                     // Stats, weapons and costs are data: read them again and stand the range back up.
                     Some(GameEvent::ReloadRange(subject)) => {
                         // Units, and the sounds they name: both are read again, and have to agree.

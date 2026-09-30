@@ -42,6 +42,8 @@ pub struct Settings {
     pub skirmish_sky: mc_data::weather::SkyChoice,
     /// The test range's weather.
     pub range_sky: crate::range::RangeSky,
+    /// File stem of the map last chosen for the test range; empty is the default map.
+    pub range_map: String,
     /// File stem of the map last chosen for survival.
     pub survival_map: String,
     /// The engine's rules last set up for survival.
@@ -76,6 +78,7 @@ impl Default for Settings {
             skirmish_fog: true,
             skirmish_sky: Default::default(),
             range_sky: Default::default(),
+            range_map: String::new(),
             survival_map: String::new(),
             survival_rules: Default::default(),
             survival_spawn: 0,

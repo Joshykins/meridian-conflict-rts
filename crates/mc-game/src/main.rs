@@ -123,6 +123,7 @@ straight into a match instead.
   --select KEY           match screenshot: select player 0's first unit whose blueprint key
                          contains KEY (all of them with a trailing *), not the commander
   --unit-picker          range screenshot: show the unit browser
+  --range-maps           range screenshot: show the map browser
   --paused               match screenshot: show the match paused
   --net-shot STATE       match screenshot: stage a network match's moment: play | chat |
                          paused | waiting | rejoin | desync
@@ -219,6 +220,7 @@ fn run() -> Result<(), String> {
     let mut paused = false;
     let mut net_shot: Option<String> = None;
     let mut unit_picker = false;
+    let mut range_maps = false;
     let mut refit_tab = false;
     let mut details = false;
     let mut range_tab: Option<String> = None;
@@ -317,7 +319,7 @@ fn run() -> Result<(), String> {
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--at" => at = Some(value("--at")?),
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -343,6 +345,7 @@ fn run() -> Result<(), String> {
             "--paused" => paused = true,
             "--net-shot" => net_shot = Some(value("--net-shot")?),
             "--unit-picker" => unit_picker = true,
+            "--range-maps" => range_maps = true,
             "--refit-tab" => refit_tab = true,
             "--details" => details = true,
             "--range-tab" => range_tab = Some(value("--range-tab")?),
@@ -498,6 +501,7 @@ fn run() -> Result<(), String> {
         shot.camera = camera;
         shot.focus_z = focus_z;
         shot.unit_picker = unit_picker;
+        shot.range_maps = range_maps;
         shot.refit_tab = refit_tab;
         shot.details = details;
         shot.range_tab = range_tab;

@@ -52,7 +52,7 @@ impl Tab {
             Tab::Stage => 3.0 * (ROW + 4.0) + 2.0 * 4.0,
             Tab::Economy => 26.0 + 2.0 * (22.0 + ROW + 10.0) + ROW + 6.0 + ROW,
             Tab::Sky => crate::ui::sky::ROWS as f32 * (ROW + 4.0) + ROW,
-            Tab::Range => 16.0 + ROW + 4.0 + ROW + 4.0 + ROW,
+            Tab::Range => 16.0 + ROW + 8.0 + 16.0 + ROW + 8.0 + ROW,
         }
     }
 }
@@ -271,7 +271,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
         Tab::Stage => stage_page(hud, ui, body, &mut asked),
         Tab::Economy => economy_page(hud, ui, s, range, body, &mut asked),
         Tab::Sky => sky_page(hud, ui, range, body, &mut asked),
-        Tab::Range => range_page(hud, ui, body, &mut asked),
+        Tab::Range => range_page(hud, ui, s, body, &mut asked),
     }
     ui.fade = fade;
 
@@ -788,8 +788,8 @@ fn sky_page(hud: &mut Hud, ui: &mut Ui, range: &Range, r: Rect, asked: &mut Vec<
     hud.range_sky = pending.then_some(sky);
 }
 
-/// The camera presets and reloading the data.
-fn range_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>) {
+/// The camera presets, the map, and reloading the data.
+fn range_page(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, asked: &mut Vec<RangeAction>) {
     let (x, w) = (r.x, r.w);
     let mut y = r.y;
     ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Camera");
@@ -813,6 +813,36 @@ fn range_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>)
         }
     }
     y += ROW + 4.0 + 4.0;
+
+    // The map: the browser shows each one's chart, so the pick is made by sight.
+    ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Map");
+    ui.text_right(
+        x + w,
+        y,
+        type_scale::MICRO,
+        rgb(palette::TEXT, 1.0),
+        s.map.name(),
+    );
+    y += 16.0;
+    hud.range_maps.prepare();
+    let ready = hud.range_maps.ready();
+    if word_tile(
+        hud,
+        ui,
+        id("range-map", 0),
+        Rect::new(x, y, w, ROW),
+        if ready {
+            "Change Map  ..."
+        } else {
+            "Reading the maps  ..."
+        },
+        false,
+        ready,
+        palette::ACCENT,
+    ) {
+        hud.range_maps.open(s.map);
+    }
+    y += ROW + 8.0;
     if word_tile(
         hud,
         ui,
