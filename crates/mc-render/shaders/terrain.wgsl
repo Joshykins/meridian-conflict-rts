@@ -1170,6 +1170,16 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Seabed: a little darker and bluer with depth. The water drawn on top
     // does most of the dimming, so a wreck field on the bottom still reads.
     let depth = max(-alt, 0.0);
+    if depth > 3.0 && !desert() {
+        // Past a few metres the land's tiled ground scans give way to silt and
+        // sand varied only by broad world-space noise: through clear water from
+        // high up, a scan's repeats showed as rows of blotches across the sea.
+        let silty = smoothstep(3.0, 14.0, depth);
+        let drift = grad_noise2(xy, 140.0) * 0.6 + grad_noise2(xy + vec2<f32>(53.0, 17.0), 37.0) * 0.4;
+        let silt = mix(vec3<f32>(0.2, 0.2, 0.16), vec3<f32>(0.3, 0.28, 0.21), drift);
+        albedo = mix(albedo, silt, silty * 0.9);
+        n = normalize(mix(n, base_n, silty * 0.85));
+    }
     if tropical() {
         // Pale sand banks, so the sea over them goes turquoise (water.wgsl),
         // giving way to darker ground in the deep channels.

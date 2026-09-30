@@ -89,6 +89,17 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, long: f32, chop: f32) -> SeaW
     var swell = 0.0;
     var swell_w = 0.0;
     let wind = atan2(SEA_WIND.y, SEA_WIND.x);
+    // Four broad fields drifting downwind. Each train takes its strength and a
+    // bend in its crests from its own blend of them: endless plane waves summed
+    // tile into a lattice the eye picks out, where real trains come and go in
+    // patches and their crests wander.
+    let drift = SEA_WIND * time * 1.5;
+    let fields = vec4<f32>(
+        grad_noise2(xy - drift, 910.0),
+        grad_noise2(xy.yx + vec2<f32>(311.0, -127.0) - drift * 0.7, 530.0),
+        grad_noise2(xy + vec2<f32>(-743.0, 219.0) - drift * 1.3, 290.0),
+        grad_noise2(xy.yx + vec2<f32>(97.0, 613.0) - drift * 0.5, 170.0),
+    ) - 0.5;
     for (var i = 0u; i < SEA_TRAINS; i++) {
         let fi = f32(i);
         let lambda = 150.0 * pow(0.735, fi);
@@ -100,18 +111,24 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, long: f32, chop: f32) -> SeaW
         if fade <= 0.0 {
             continue;
         }
-        let spread = mix(0.45, 2.3, fi / f32(SEA_TRAINS - 1u));
+        let spread = mix(0.8, 2.3, fi / f32(SEA_TRAINS - 1u));
+        // This train's blend of the fields: one for its strength, another for its bend.
+        let mix_a = vec4<f32>(sin(fi * 1.7), cos(fi * 2.3), sin(fi * 0.9 + 1.0), cos(fi * 3.1 + 2.0));
+        let mix_b = vec4<f32>(cos(fi * 1.3 + 0.5), sin(fi * 2.9), cos(fi * 0.7 + 2.0), sin(fi * 1.9 + 1.0));
+        let lot = clamp(0.5 + dot(fields, mix_a) * 1.6, 0.0, 1.0);
+        let strength = mix(0.2, 1.55, lot * lot * (3.0 - 2.0 * lot));
+        let bend = dot(fields, mix_b) * 2.2;
         let a = wind + (fract(fi * 0.618034 + 0.13) * 2.0 - 1.0) * spread;
         let dir = vec2<f32>(cos(a), sin(a));
         // In cycles, folded before the multiply so kilometres of map and hours of
         // play keep the phase precise.
         let along = dot(dir, xy) / lambda;
         let cycles = sqrt(9.81 * k) / 6.283185 * time;
-        let phase = 6.283185 * (fract(along) - fract(cycles) + fract(fi * 0.3713));
+        let phase = 6.283185 * (fract(along) - fract(cycles) + fract(fi * 0.3713)) + bend * 6.283185;
         let s = sin(phase);
         // exp(sin - 1): sharp crests, broad troughs, as wind waves stand.
         let e = exp(s - 1.0);
-        let amp = steep / k * fade;
+        let amp = steep / k * fade * strength;
         out.slope += dir * (amp * k * e * cos(phase));
         if lambda > 3.0 && lambda < 70.0 {
             crest += amp * (e - 0.466);
@@ -1034,9 +1051,10 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
 
     var color = optics.scatter * (vec3<f32>(1.0) - through) * (1.0 - fresnel)
         + reflected * fresnel + sun_color * spec * shadow;
-    // Light through the thin water of a crest, and of a breaker's rearing face,
-    // glows the water's own colour.
-    let glow = smoothstep(0.6, 2.6, waves.crest) * amp * 0.9 + breakers.face * 1.6;
+    // Light through the thin water of a breaker's rearing face glows the water's
+    // own colour. (Not every crest's: lit where the open sea's trains stack up,
+    // they drew a regular grid of pale blotches across it from high up.)
+    let glow = breakers.face * 1.6;
     color += optics.scatter * glow * (0.4 + 0.6 * sun_in) * 1.6;
     // Pressed flat, the water shows darker: no waves catching the sky.
     color *= 1.0 - 0.5 * stir.flat;
