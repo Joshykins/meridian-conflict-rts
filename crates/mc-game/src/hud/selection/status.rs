@@ -183,6 +183,17 @@ fn doing(
     } else {
         ("Idle".to_owned(), None, palette::DIM)
     };
+    // How long the work has left, beside how far along it is.
+    let eta = queue
+        .and_then(|q| q.eta)
+        .filter(|_| warp.is_none() && progress.is_some());
+    let value = match (&warp, progress) {
+        (Some(w), _) => w.value.clone(),
+        (None, Some(p)) => progress_value(p, eta),
+        (None, None) => String::new(),
+    };
+    // The label keeps clear of the figure, and of the right edge's first 48 points.
+    let value_w = (ui.text_width(type_scale::VALUE, &value) + 16.0).max(48.0);
     // A dot in the line's colour leads, lit while there is work under way.
     let busy = tone != palette::DIM;
     let dot = Vec2::new(x + 3.0, y);
@@ -194,25 +205,29 @@ fn doing(
     ui.text_fit_left(
         x + 12.0,
         y,
-        cw - 60.0,
+        cw - 12.0 - value_w,
         type_scale::CAPTION,
         rgb(tone, 1.0),
         &label,
     );
-    if let Some(w) = warp
-        .as_ref()
-        .filter(|w| progress.is_none() && !w.value.is_empty())
-    {
-        ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &w.value);
+    if !value.is_empty() {
+        ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &value);
     }
     match progress {
         Some(p) => {
-            let value = warp.map_or_else(|| format!("{:.0}%", p * 100.0), |w| w.value);
-            ui.text_right(x + cw, y, type_scale::VALUE, rgb(tone, 1.0), &value);
             bar(ui, Rect::new(x, y + 10.0, cw, 5.0), p, tone);
             y + 30.0
         }
         None => y + 22.0,
+    }
+}
+
+/// How far along a build is, and how long it has left when it is moving: `42%  ·  1m 05s`.
+fn progress_value(p: f32, eta: Option<f32>) -> String {
+    let pct = format!("{:.0}%", p * 100.0);
+    match eta {
+        Some(t) => format!("{pct}  \u{b7}  {}", crate::hud::mine::duration(t.ceil())),
+        None => pct,
     }
 }
 

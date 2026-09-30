@@ -742,6 +742,9 @@ pub struct UnitOrders {
     pub standing: Vec<QueuedOrder>,
     /// Zero to one: how far along the thing this unit is building is. Zero when it builds nothing.
     pub progress: f32,
+    /// Seconds of game time before that thing is finished at last tick's pace, every
+    /// builder on it counted; `None` when it builds nothing or the work stands still.
+    pub eta: Option<f32>,
     /// Per second, last tick. Made: what it produced (generator or mine output, materials
     /// reclaimed). Wanted: what its building, repairs and upkeep asked for at the full rate.
     /// Used: what it was given of that; less than wanted while its side stalls.
@@ -2811,11 +2814,19 @@ impl World {
                     }
                 })
                 .collect();
-            let progress = s.units.row(s.units.build_target[row]).map_or(0.0, |t| {
+            let target = s.units.row(s.units.build_target[row]);
+            let progress = target.map_or(0.0, |t| {
                 (s.units.build_progress[t] / self.bp(t).build_time).to_f32()
             });
             let flow = self.flows.get(row).copied().unwrap_or_default();
             let rate = |v: Fx| (v * TICKS_PER_SECOND as i32).to_f32();
+            // What it builds, or itself while it goes up with builders on it.
+            let building = target.or_else(|| (flow.built > Fx::ZERO).then_some(row));
+            let eta = building.and_then(|t| {
+                let pace = rate(self.flows.get(t).map_or(Fx::ZERO, |f| f.built));
+                let left = (self.bp(t).build_time - s.units.build_progress[t]).to_f32();
+                (pace > 0.0 && left > 0.0).then(|| left / pace)
+            });
             let standing = self
                 .standing_view(row)
                 .into_iter()
@@ -2836,6 +2847,7 @@ impl World {
                 orders,
                 standing,
                 progress,
+                eta,
                 mass_made: rate(flow.made[0]),
                 energy_made: rate(flow.made[1]),
                 mass_wanted: rate(flow.wanted[0]),

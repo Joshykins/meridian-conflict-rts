@@ -924,6 +924,10 @@ fn a_stalled_engineer_gets_its_share_of_what_it_wants() {
     assert!(full.energy_wanted > 0.0);
     assert!((full.mass_used - full.mass_wanted).abs() < 1e-3, "{full:?}");
     assert_eq!(full.efficiency, 1.0);
+    let eta = full
+        .eta
+        .expect("a site going up at full pace has a finish time");
+    assert!(eta > 0.0, "{full:?}");
 
     // A third of a tick's want in store: the side stalls and the engineer slows.
     let per_tick = Fx::from_f32(full.mass_wanted / 10.0);
@@ -939,6 +943,9 @@ fn a_stalled_engineer_gets_its_share_of_what_it_wants() {
     let expect = stalled.mass_wanted * stalled.efficiency;
     assert!((stalled.mass_used - expect).abs() < 1e-2, "{stalled:?}");
     assert!((stalled.energy_used - stalled.energy_wanted * stalled.efficiency).abs() < 1e-2);
+    // At under half the pace the finish is over twice as far off.
+    let slow = stalled.eta.expect("a stalled site still moves");
+    assert!(slow > eta * 1.5, "{eta} then {slow}");
 }
 
 #[test]

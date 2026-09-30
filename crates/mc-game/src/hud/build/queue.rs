@@ -49,6 +49,8 @@ pub(super) struct Queue<'a> {
     pub(super) stacks: &'a [Stack],
     /// How far along the front entry is.
     pub(super) progress: f32,
+    /// Seconds before the front entry is done at the pace it is going, when it is moving.
+    pub(super) eta: Option<f32>,
     pub(super) is_factory: bool,
     /// The selected factories that build their queues over and over.
     pub(super) repeat: Split,
@@ -238,6 +240,16 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
         rgb(BUILDING, 0.85 * lit),
         doing,
     );
+    // How long it has left, over the percentage.
+    if let Some(t) = queue.eta.filter(|_| !paused) {
+        ui.text_right(
+            tx + w,
+            r.y + 13.0,
+            type_scale::MICRO,
+            rgb(0xFFE3A0, 0.85),
+            &format!("{} left", crate::hud::mine::duration(t.ceil())),
+        );
+    }
     ui.text_fit_left(
         tx,
         r.y + 28.0,

@@ -57,6 +57,9 @@ pub struct UnitFlow {
     pub wanted: [Fx; 2],
     /// What it was given of that, after the side's efficiency.
     pub used: [Fx; 2],
+    /// Build time it gained as a site or product under construction, from every builder
+    /// on it together: what the interface times its finish by.
+    pub built: Fx,
 }
 
 /// One builder working on one target this tick.
@@ -336,6 +339,7 @@ impl World {
                 } else {
                     units.build_progress[job.target] =
                         (units.build_progress[job.target] + step).min(build_time);
+                    self.flows[job.target].built += step;
                     // Health grows with progress from the 10% a fresh site starts with.
                     units.health[job.target] = (units.health[job.target]
                         + max_health * step / build_time * Fx::ratio(9, 10))
@@ -370,6 +374,7 @@ impl World {
             // A stall slows it down, never the little that is left (as for builders).
             let step = e.min(time - units.build_progress[job.drone]);
             units.build_progress[job.drone] = (units.build_progress[job.drone] + step).min(time);
+            self.flows[job.drone].built += step;
             units.health[job.drone] =
                 (units.health[job.drone] + health * step / time * Fx::ratio(9, 10)).min(health);
         }

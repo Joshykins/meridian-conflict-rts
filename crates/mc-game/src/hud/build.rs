@@ -365,6 +365,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         let strip = queue::Queue {
             stacks: &stacks,
             progress: queue.map_or(0.0, |q| q.progress),
+            eta: queue.and_then(|q| q.eta),
             is_factory,
             repeat: Split::count(
                 units
