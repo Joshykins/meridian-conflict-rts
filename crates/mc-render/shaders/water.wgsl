@@ -110,14 +110,35 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
         grad_noise2(xy + vec2<f32>(-743.0, 219.0) - drift * 1.3, 290.0),
         grad_noise2(xy.yx + vec2<f32>(97.0, 613.0) - drift * 0.5, 170.0),
     ) - 0.5;
+    // The fields above bend a short train's crests by a fraction of a wave over
+    // hundreds of them, so it still runs dead straight for dozens of metres and
+    // two of them cross in a regular hatch. These wander at the scale of a few
+    // wavelengths, as chop does: a coarse pair for the wind waves, finer pairs
+    // for the short waves and the ripples, faded out once their cells are under
+    // a few pixels.
+    let wander = vec4<f32>(
+        grad_noise2(xy - drift * 1.1 + vec2<f32>(57.0, 211.0), 31.0),
+        grad_noise2(xy.yx - drift * 0.9 + vec2<f32>(-389.0, 43.0), 31.0),
+        soft_noise(xy - drift * 1.4 + vec2<f32>(131.0, -71.0), 9.0, pixel),
+        soft_noise(xy.yx - drift * 1.2 + vec2<f32>(19.0, 457.0), 9.0, pixel),
+    ) - 0.5;
+    let ripple = vec2<f32>(
+        soft_noise(xy - drift * 1.6 + vec2<f32>(-23.0, 97.0), 3.0, pixel),
+        soft_noise(xy.yx - drift * 1.5 + vec2<f32>(71.0, -13.0), 3.0, pixel),
+    ) - 0.5;
     for (var i = 0u; i < SEA_TRAINS; i++) {
         let fi = f32(i);
-        let lambda = 150.0 * pow(0.735, fi);
+        // Off a strict geometric series by up to 8%: exact ratios between the
+        // trains' lengths line their crossings up into a repeating diamond.
+        let lambda = 150.0 * pow(0.735, fi) * (1.0 + 0.16 * (fract(fi * 0.7548777 + 0.31) - 0.5));
         let k = 6.283185 / lambda;
         // Steepness (k times height): gentle swell, steeper wind waves.
         let steep = mix(0.03, 0.075, smoothstep(1.0, 9.0, fi)) * select(1.0, long, i < 6u) * select(1.0, chop, i > 11u)
             * select(1.0, wind, i >= 4u);
-        let fade = smoothstep(1.5, 5.0, lambda / max(pixel, 0.001));
+        // A train only a few pixels long is handed to the roughness: its sharp
+        // crests carry harmonics finer than the pixels, and in the sun's glint
+        // they alias into a hatch of hard lines.
+        let fade = smoothstep(2.5, 8.0, lambda / max(pixel, 0.001));
         let fade_crest = smoothstep(1.5, 5.0, lambda / max(across, 0.001));
         out.lost += steep * steep * 0.3 * (1.0 - fade);
         if fade_crest <= 0.0 {
@@ -128,8 +149,17 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
         let mix_a = vec4<f32>(sin(fi * 1.7), cos(fi * 2.3), sin(fi * 0.9 + 1.0), cos(fi * 3.1 + 2.0));
         let mix_b = vec4<f32>(cos(fi * 1.3 + 0.5), sin(fi * 2.9), cos(fi * 0.7 + 2.0), sin(fi * 1.9 + 1.0));
         let lot = clamp(0.5 + dot(fields, mix_a) * 1.6, 0.0, 1.0);
-        let strength = mix(0.2, 1.55, lot * lot * (3.0 - 2.0 * lot));
-        let bend = dot(fields, mix_b) * 2.2;
+        // Close to, a few trains still rule a whole screen and two of them cross
+        // in diamonds: the short ones also come and go in patches a few waves across.
+        let near = clamp(0.5 + dot(wander, mix_b.wzyx) * 2.4, 0.0, 1.0);
+        let local = mix(1.0, mix(0.3, 1.45, near), smoothstep(30.0, 12.0, lambda));
+        let strength = mix(0.2, 1.55, lot * lot * (3.0 - 2.0 * lot)) * local;
+        // Cycles of wander each field may add: bounded so its gradient never
+        // stretches the train's wavelength by more than about a third.
+        let turn = vec2<f32>(cos(fi * 2.13 + 0.4), sin(fi * 2.13 + 0.4));
+        let wobble = dot(wander.xy, turn) * min(2.0, 22.0 / lambda) + dot(wander.zw, turn.yx) * min(1.6, 7.0 / lambda)
+            + dot(ripple, turn) * min(1.2, 2.4 / lambda);
+        let bend = dot(fields, mix_b) * 2.2 + wobble;
         let a = heading + (fract(fi * 0.618034 + 0.13) * 2.0 - 1.0) * spread;
         let dir = vec2<f32>(cos(a), sin(a));
         // In cycles, folded before the multiply so kilometres of map and hours of
