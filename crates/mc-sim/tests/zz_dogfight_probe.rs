@@ -282,9 +282,9 @@ fn swarms(
                 mean(0, &|r| w.state.units.z[r]),
                 mean(1, &|r| w.state.units.z[r]),
             );
-            for side in 0..2 {
+            for (side, flight) in ids.iter().enumerate() {
                 let mut kinds = std::collections::BTreeMap::new();
-                for &id in &ids[side] {
+                for &id in flight {
                     if let Some(r) = w.state.units.row(id) {
                         let u = &w.state.units;
                         let o = match w.state.orders.front(u, r) {
