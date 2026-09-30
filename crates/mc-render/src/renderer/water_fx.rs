@@ -29,6 +29,8 @@ use mc_sim::mirror::{
 };
 use std::collections::HashMap;
 
+mod sinking;
+
 /// Water thrown up: a blob of droplets or a torn sheet. It flies an arc and is
 /// gone when it falls back into the sea.
 pub(super) const PUFF_DROPLET: f32 = 23.0;
@@ -1601,105 +1603,6 @@ impl Renderer {
         self.water_fx.hulls.retain(|_, h| h.seen);
         self.sinking_hulls(&sinking_now, time, camera);
         self.torpedo_trails(projectiles, time);
-    }
-
-    fn sinking_hulls(&mut self, hulls: &[UnitInstance], time: f32, camera: &Camera) {
-        let blueprints = self.blueprints.clone();
-        let water = self.sea_level();
-        let tick = self.tick_seconds.max(0.02);
-        let reach = camera.distance * 2.5 + 400.0;
-        let alive: Vec<u32> = hulls.iter().map(|u| u.unit_id).collect();
-        self.water_fx.sinking.retain(|id, _| alive.contains(id));
-        for u in hulls {
-            let (from, to) = (Vec3::from(u.prev_pos), Vec3::from(u.pos));
-            if to.distance(camera.focus) > reach {
-                continue;
-            }
-            let bp = blueprints.unit(BlueprintId(u.blueprint as u16));
-            let (r, h) = (bp.radius.to_f32(), bp.height.to_f32());
-            let progress = u.health.clamp(0.0, 1.0);
-            let fwd = heading_dir(u.heading);
-            let pitch = u.arm_pitch[1];
-            // Fire dies down as the hull goes; steam where it is still hot and meets the sea.
-            let heat = (1.0 - progress * 1.6).clamp(0.0, 1.0);
-            let mut crossing = false;
-            for k in [-0.75f32, 0.0, 0.75] {
-                let t = self.scatter.unit();
-                let centre = from.lerp(to, t);
-                let deck = centre + fwd * k * r + Vec3::Z * (h * 0.55 + k * r * pitch.sin());
-                let above = deck.z - water;
-                let start = time + t * tick;
-                let side = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.15;
-                if above > 0.6 {
-                    if self.scatter.unit() < 0.7 * heat {
-                        let rise = Vec3::new(0.5, 0.2, 2.0 + self.scatter.unit() * 2.0);
-                        self.push_puff(
-                            PUFF_FIRE,
-                            deck + side,
-                            rise,
-                            start,
-                            0.9,
-                            (r * 0.1, r * 0.28),
-                        );
-                    }
-                    if self.scatter.unit() < 0.3 + 0.4 * heat {
-                        let drift = Vec3::new(
-                            1.4 + self.scatter.signed() * 0.6,
-                            0.5 + self.scatter.signed() * 0.6,
-                            2.6 + self.scatter.unit() * 1.5,
-                        );
-                        self.push_puff(
-                            PUFF_SMOKE,
-                            deck + side + Vec3::Z,
-                            drift,
-                            start,
-                            4.2,
-                            (r * 0.15, r * 0.75),
-                        );
-                    }
-                }
-                if above.abs() < h * 0.7 {
-                    crossing = true;
-                    let at = Vec3::new(deck.x + side.x, deck.y + side.y, water + 0.3);
-                    if self.scatter.unit() < 0.25 + 0.6 * heat {
-                        let drift = Vec3::new(self.scatter.signed(), self.scatter.signed(), 1.5);
-                        self.push_puff(PUFF_STEAM, at, drift, start, 2.6, (r * 0.1, r * 0.5));
-                    }
-                    if self.scatter.unit() < 0.5 {
-                        let vel = self.scatter.upward(0.5) * (1.5 + self.scatter.unit() * 2.5);
-                        self.push_puff(PUFF_DROPLET, at, vel, start, 1.2, (0.18, 0.35));
-                    }
-                }
-                if above < -0.5 && self.scatter.unit() < 0.8 {
-                    self.push_bubbles(deck, r * 0.25, 2, start, tick, 0.45);
-                }
-            }
-            // Rings and foam round it while it is going through the surface, fainter as it goes.
-            let last = self
-                .water_fx
-                .sinking
-                .get(&u.unit_id)
-                .copied()
-                .unwrap_or(f32::MIN);
-            let every = if crossing { 0.7 } else { 1.8 };
-            if time - last >= every {
-                self.water_fx.sinking.insert(u.unit_id, time);
-                let foam = if crossing { 0.9 } else { 0.35 };
-                let size = r * if crossing { 0.75 } else { 0.4 };
-                self.push_ripple(
-                    Vec3::new(to.x, to.y, water),
-                    time,
-                    size,
-                    5.0,
-                    0.0,
-                    foam * (1.0 - progress * 0.6),
-                );
-                if !crossing {
-                    // Air still escaping, reaching the surface in gulps.
-                    self.push_bubbles(to + Vec3::Z * h * 0.3, r * 0.4, 6, time, 0.6, 0.6);
-                }
-            }
-        }
     }
 
     /// Follows each torpedo along its run, from the tube it left, for the line

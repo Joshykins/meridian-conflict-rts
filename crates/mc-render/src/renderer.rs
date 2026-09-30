@@ -627,6 +627,8 @@ pub(crate) struct TrackMark {
 struct BurnSite {
     grid: models::burns::BurnGrid,
     reach: f32,
+    /// The model's bounds radius: what a wreck section's stretch is in shares of.
+    bounds: f32,
     height: f32,
     turret_pivot: Vec3,
 }
@@ -1227,6 +1229,7 @@ impl Renderer {
                 grid: models::burns::BurnGrid::bake(&model.lods[0]),
                 // As `entity.wgsl` hands them to the surface shader, so the marks agree.
                 reach: model.surface_reach.max(1.0),
+                bounds: model.bounds_radius.max(1.0),
                 height: plan_h.max(1.0),
                 turret_pivot: Vec3::from(model.turret_pivot),
             });
