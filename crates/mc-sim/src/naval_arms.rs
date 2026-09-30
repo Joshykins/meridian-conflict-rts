@@ -302,28 +302,30 @@ impl World {
                 let owner = p.owner[i];
                 let mark = p.mark[i].xy();
                 let mut best: Option<(Fx, usize)> = None;
-                self.index.query(mark, RETARGET_REACH, kind::UNIT, |e| {
-                    let t = e.row as usize;
-                    if !self.unit_entry_is_current(e)
-                        || units.health[t] <= Fx::ZERO
-                        || units.has_flag(t, flag::IN_FACTORY)
-                        || !self.are_enemies(owner, units.owner[t])
-                        || !self.weapon_reaches(t, weapon)
-                        || !self.detects(owner, t)
-                    {
-                        return true;
-                    }
-                    let id = units.id(t);
-                    let taken = (0..p.len())
-                        .filter(|&j| p.owner[j] == owner && p.target[j] == id)
-                        .count()
-                        + chosen.iter().filter(|c| c.1 == id).count();
-                    let score = units.pos[t].distance(mark) + RETARGET_SHARE * taken as i32;
-                    if best.is_none_or(|(s, _)| score < s) {
-                        best = Some((score, t));
-                    }
-                    true
-                });
+                let friends = self.friends(owner);
+                self.index
+                    .query_foes(mark, RETARGET_REACH, kind::UNIT, friends, |e| {
+                        let t = e.row as usize;
+                        if !self.unit_entry_is_current(e)
+                            || units.health[t] <= Fx::ZERO
+                            || units.has_flag(t, flag::IN_FACTORY)
+                            || !self.are_enemies(owner, units.owner[t])
+                            || !self.weapon_reaches(t, weapon)
+                            || !self.detects(owner, t)
+                        {
+                            return true;
+                        }
+                        let id = units.id(t);
+                        let taken = (0..p.len())
+                            .filter(|&j| p.owner[j] == owner && p.target[j] == id)
+                            .count()
+                            + chosen.iter().filter(|c| c.1 == id).count();
+                        let score = units.pos[t].distance(mark) + RETARGET_SHARE * taken as i32;
+                        if best.is_none_or(|(s, _)| score < s) {
+                            best = Some((score, t));
+                        }
+                        true
+                    });
                 if let Some((_, t)) = best {
                     chosen.push((i, units.id(t)));
                 }

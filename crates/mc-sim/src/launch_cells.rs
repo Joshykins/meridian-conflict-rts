@@ -128,14 +128,20 @@ impl World {
                 .count()
         };
         let mut near: Vec<(usize, Fx, usize)> = Vec::new();
-        self.index
-            .query(at, weapon.range_max, crate::spatial::kind::UNIT, |e| {
+        let friends = self.friends(units.owner[row]);
+        self.index.query_foes(
+            at,
+            weapon.range_max,
+            crate::spatial::kind::UNIT,
+            friends,
+            |e| {
                 let t = e.row as usize;
                 if self.unit_entry_is_current(e) && self.is_valid_target(row, t, weapon) {
                     near.push((chased(t), at.distance(units.pos[t]), t));
                 }
                 true
-            });
+            },
+        );
         // Rows are unique, so equal keys never tie.
         near.sort_unstable();
         let pick = near

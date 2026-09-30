@@ -116,14 +116,18 @@ impl World {
         let units = &self.state.units;
         let at = units.pos[row];
         let mut near: Vec<(Fx, usize)> = Vec::new();
-        self.index.query(at, weapon.range_max, kind::UNIT, |e| {
-            let t = e.row as usize;
-            if t != hidden && self.unit_entry_is_current(e) && self.is_valid_target(row, t, weapon)
-            {
-                near.push((at.distance(units.pos[t]), t));
-            }
-            true
-        });
+        let friends = self.friends(units.owner[row]);
+        self.index
+            .query_foes(at, weapon.range_max, kind::UNIT, friends, |e| {
+                let t = e.row as usize;
+                if t != hidden
+                    && self.unit_entry_is_current(e)
+                    && self.is_valid_target(row, t, weapon)
+                {
+                    near.push((at.distance(units.pos[t]), t));
+                }
+                true
+            });
         near.sort_unstable();
         near.into_iter()
             .take(MAX_CANDIDATES)

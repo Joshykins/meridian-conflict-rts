@@ -609,6 +609,7 @@ impl World {
                 intel.enemy_factories.push(c.pos);
             }
         }
+        let friends = self.friends(player);
         let mut held = vec![start];
         held.extend(census.extractor_pos.iter().copied().take(16));
         if let Some(f) = self.state.ai[player as usize].firebase {
@@ -617,8 +618,10 @@ impl World {
         // Flooded only once something turns up near a held point.
         let mut home: Option<Option<staging::HomeGround>> = None;
         for at in held {
-            if let Some(e) = self.index.nearest(at, RAID_RADIUS, kind::UNIT, |e| {
-                self.unit_entry_is_current(e)
+            if let Some(e) = self
+                .index
+                .nearest_foe(at, RAID_RADIUS, kind::UNIT, friends, |e| {
+                    self.unit_entry_is_current(e)
                     && self.are_enemies(player, self.state.units.owner[e.row as usize])
                     && self.detects(player, e.row as usize)
                     && (!self.state.fog_enabled
@@ -636,7 +639,8 @@ impl World {
                     && self.bp(e.row as usize).motion.is_some_and(|m| {
                         !matches!(m.layer, mc_data::MoveLayer::Air | mc_data::MoveLayer::Naval)
                     })
-            }) {
+                })
+            {
                 // A hover tank out on a lake or a unit up on a shelf is out of
                 // the army's reach: sent at it every think, the whole army
                 // piled up on the shore, never went idle and never left.

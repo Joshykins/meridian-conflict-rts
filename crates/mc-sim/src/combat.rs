@@ -477,8 +477,9 @@ impl World {
         let units = &self.state.units;
         let facing = units.heading[row] + units.weapon_yaw[row][w];
         let mut found = false;
+        let friends = self.friends(units.owner[row]);
         self.index
-            .query(units.pos[row], weapon.range_max, kind::UNIT, |e| {
+            .query_foes(units.pos[row], weapon.range_max, kind::UNIT, friends, |e| {
                 let t = e.row as usize;
                 found = self.unit_entry_is_current(e)
                     && self.is_valid_target(row, t, weapon)
@@ -734,6 +735,9 @@ impl World {
         let rows = self.state.units.slots.rows();
         let incoming = self.incoming_damage(rows);
         let this = &*self;
+        let friends: Vec<u64> = (0..self.state.players.len() as u8)
+            .map(|p| self.friends(p))
+            .collect();
         let picks: Vec<Vec<(usize, [UnitId; MAX_WEAPONS], u8)>> =
             self.pool.parallel_map_chunks(rows, CHUNK, |_, range| {
                 let units = &this.state.units;
@@ -808,10 +812,11 @@ impl World {
                         });
                         let in_grid = |prefer: u32| {
                             this.index
-                                .nearest(
+                                .nearest_foe(
                                     units.pos[row],
                                     weapon.range_max + this.gun_offset(row, weapon),
                                     kind::UNIT,
+                                    friends[units.owner[row] as usize],
                                     |e| {
                                         this.unit_entry_is_current(e)
                                             && !doomed(e.row as usize)

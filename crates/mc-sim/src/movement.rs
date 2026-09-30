@@ -14,6 +14,11 @@ use mc_data::{cat, Motion, MoveLayer};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
 const CHUNK: usize = 128;
+/// Room left in the contact search for the pushes that part a crowd: two
+/// passes of the largest correction, from both sides.
+const CONTACT_PUSH_ROOM: Fx = Fx::from_int(12);
+/// The widest contact search past touching, whatever the steps.
+const CONTACT_REACH: Fx = Fx::from_int(31);
 /// Inside this distance a unit heads straight for its own slot instead of the shared field.
 const DIRECT_RADIUS: Fx = Fx::from_int(72);
 /// Neighbours considered for avoidance; the nearest cells are visited first.
@@ -402,35 +407,51 @@ impl World {
         for (i, m) in moves.iter().enumerate() {
             index[m.row] = i;
         }
-        let mut pairs = Vec::new();
-        for (i, m) in moves.iter().enumerate() {
-            let row = m.row;
-            // Flight spacing belongs to formations, not ground hull contacts.
-            if self.bp(row).motion.unwrap().layer == MoveLayer::Air {
-                continue;
-            }
-            self.index.query(
-                self.state.units.pos[row],
-                self.bp(row).radius + Fx::from_int(32),
-                kind::UNIT,
-                |e| {
-                    let other = e.row as usize;
-                    if other <= row || !self.unit_entry_is_current(e) || index[other] == usize::MAX
-                    {
-                        return true;
+        // Two hulls can only meet this tick if their proposed spots come within
+        // reach: the gap now, less both steps, plus room for the pushes below.
+        let step = |m: &MoveOut| m.pos.distance(self.state.units.pos[m.row]);
+        let widest_step = moves.iter().map(step).fold(Fx::ZERO, Fx::max);
+        let chunks: Vec<Vec<(usize, usize)>> =
+            self.pool
+                .parallel_map_chunks(moves.len(), CHUNK, |_, range| {
+                    let mut pairs = Vec::new();
+                    for i in range {
+                        let m = &moves[i];
+                        let row = m.row;
+                        // Flight spacing belongs to formations, not ground hull contacts.
+                        if self.bp(row).motion.unwrap().layer == MoveLayer::Air {
+                            continue;
+                        }
+                        let slack = (step(m) + widest_step + CONTACT_PUSH_ROOM).min(CONTACT_REACH);
+                        self.index.query(
+                            self.state.units.pos[row],
+                            self.bp(row).radius + Fx::ONE + slack,
+                            kind::UNIT,
+                            |e| {
+                                let other = e.row as usize;
+                                if other <= row
+                                    || !self.unit_entry_is_current(e)
+                                    || index[other] == usize::MAX
+                                {
+                                    return true;
+                                }
+                                // A dived submarine slips under a floating hull, and it over it.
+                                if self.bp(other).motion.unwrap().layer == MoveLayer::Air
+                                    || self.hulls_pass(row, other)
+                                    || self.steps_over(row, other)
+                                {
+                                    return true;
+                                }
+                                pairs.push((i, index[other]));
+                                true
+                            },
+                        );
                     }
-                    // A dived submarine slips under a floating hull, and it over it.
-                    if self.bp(other).motion.unwrap().layer == MoveLayer::Air
-                        || self.hulls_pass(row, other)
-                        || self.steps_over(row, other)
-                    {
-                        return true;
-                    }
-                    pairs.push((i, index[other]));
-                    true
-                },
-            );
-        }
+                    pairs
+                });
+        let mut pairs: Vec<(usize, usize)> = chunks.into_iter().flatten().collect();
+        // Pushes land in pair order: sort it so it follows the rows, not the index layout.
+        pairs.sort_unstable();
         // A crowd pressed against a slope needs more passes to spread; stop
         // as soon as a pass finds nothing to push apart.
         for _ in 0..8 {

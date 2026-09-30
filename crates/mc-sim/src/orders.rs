@@ -1649,8 +1649,9 @@ impl World {
         if fighter {
             return self.air_spread_pick(row, mask, reach);
         }
+        let friends = self.friends(units.owner[row]);
         self.index
-            .nearest(units.pos[row], reach, kind::UNIT, |e| {
+            .nearest_foe(units.pos[row], reach, kind::UNIT, friends, |e| {
                 self.unit_entry_is_current(e)
                     && self.air_can_harass(row, e.row as usize)
                     && self.hittable(e.row as usize, mask)
@@ -1673,7 +1674,8 @@ impl World {
         let pos = units.pos[row];
         let crowd = self.bp(row).vision / 4;
         let mut best: Option<(Fx, usize)> = None;
-        self.index.query(pos, reach, kind::UNIT, |e| {
+        let friends = self.friends(units.owner[row]);
+        self.index.query_foes(pos, reach, kind::UNIT, friends, |e| {
             let t = e.row as usize;
             if !self.unit_entry_is_current(e)
                 || !self.air_can_harass(row, t)
@@ -1696,8 +1698,13 @@ impl World {
         let id = units.id(target);
         let owner = units.owner[row];
         let mut count = 0;
-        self.index
-            .query(units.pos[target], self.bp(row).vision, kind::UNIT, |e| {
+        let foes = !self.friends(owner);
+        self.index.query_foes(
+            units.pos[target],
+            self.bp(row).vision,
+            kind::AIRCRAFT,
+            foes,
+            |e| {
                 let other = e.row as usize;
                 if other != row
                     && self.unit_entry_is_current(e)
@@ -1712,7 +1719,8 @@ impl World {
                     count += 1;
                 }
                 count < 3
-            });
+            },
+        );
         count
     }
 
@@ -2315,7 +2323,7 @@ impl World {
         let (home, owner) = (units.pos[row], units.owner[row]);
         let Some(t) = self
             .index
-            .nearest(home, reach, kind::UNIT, |e| {
+            .nearest_foe(home, reach, kind::UNIT, self.friends(owner), |e| {
                 let t = e.row as usize;
                 self.unit_entry_is_current(e)
                     && self.are_enemies(owner, units.owner[t])

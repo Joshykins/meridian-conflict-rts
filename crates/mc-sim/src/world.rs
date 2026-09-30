@@ -5,7 +5,7 @@ use crate::command::PlayerCommand;
 use crate::fog::Fog;
 use crate::mirror::SimEvent;
 use crate::nav::Nav;
-use crate::spatial::{kind, SpatialIndex};
+use crate::spatial::{kind, SpatialIndex, NO_OWNER};
 use crate::tables::*;
 use crate::{SimError, Table};
 use mc_core::{player_bit, Angle, Fx, FxVec2, PlayerMask, Rng, MAX_PLAYERS};
@@ -376,7 +376,7 @@ impl World {
         crate::tables::derive_allies(&mut players);
         let mut prop_index = SpatialIndex::new(size);
         for (i, p) in map.props.iter().enumerate() {
-            prop_index.insert(kind::PROP, i, p.pos, PROP_RADIUS);
+            prop_index.insert(kind::PROP, NO_OWNER, i, p.pos, PROP_RADIUS);
         }
         prop_index.build();
 
@@ -471,6 +471,18 @@ impl World {
     #[inline]
     pub fn team_mask(&self, player: u8) -> PlayerMask {
         self.state.players[player as usize].allies
+    }
+
+    /// Bit `p` set for every player on `player`'s side, itself included: what
+    /// [`SpatialIndex::query_foes`] passes over when looking for an enemy.
+    pub(crate) fn friends(&self, player: u8) -> u64 {
+        let team = self.state.players[player as usize].team;
+        self.state
+            .players
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.team == team)
+            .fold(0, |mask, (i, _)| mask | 1 << i)
     }
 
     #[inline]
@@ -855,18 +867,30 @@ impl World {
         self.index.clear();
         for row in s.units.slots.iter() {
             if !s.units.has_flag(row, flag::IN_FACTORY) {
-                let radius = self.blueprints.unit(s.units.blueprint[row]).radius;
-                self.index.insert(kind::UNIT, row, s.units.pos[row], radius);
+                let bp = self.blueprints.unit(s.units.blueprint[row]);
+                let air = bp.motion.is_some_and(|m| m.layer == MoveLayer::Air);
+                let kinds = if air {
+                    kind::UNIT | kind::AIRCRAFT
+                } else {
+                    kind::UNIT
+                };
+                self.index
+                    .insert(kinds, s.units.owner[row], row, s.units.pos[row], bp.radius);
             }
         }
         for row in s.wrecks.slots.iter() {
             let radius = self.blueprints.unit(s.wrecks.blueprint[row]).radius;
             self.index
-                .insert(kind::WRECK, row, s.wrecks.pos[row], radius);
+                .insert(kind::WRECK, NO_OWNER, row, s.wrecks.pos[row], radius);
         }
         for row in 0..s.stains.len() {
-            self.index
-                .insert(kind::STAIN, row, s.stains.pos[row], s.stains.radius[row]);
+            self.index.insert(
+                kind::STAIN,
+                NO_OWNER,
+                row,
+                s.stains.pos[row],
+                s.stains.radius[row],
+            );
         }
         self.index.build();
     }
