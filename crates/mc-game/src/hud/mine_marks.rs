@@ -1297,7 +1297,8 @@ fn mine_card(
             type_scale::MICRO,
             rgb(share_tone(view.share), 1.0),
             &format!(
-                "Shares its land  \u{b7}  {:.0}% efficient",
+                "Shares its {}  \u{b7}  {:.0}% efficient",
+                if view.sea { "sea" } else { "land" },
                 view.share * 100.0
             ),
         );

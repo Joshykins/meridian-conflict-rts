@@ -12,6 +12,10 @@ use std::f32::consts::TAU;
 
 /// Metres between the samples a ray takes looking for the shore.
 const STEP: f32 = 12.0;
+/// A stretch of the other kind of ground a ray looks past: a rock off the coast, or a
+/// pond inland. The sim still counts the ground beyond it, cell by cell; cutting the
+/// outline there would leave a wedge of it undrawn.
+const GAP: f32 = 240.0;
 /// Sites remembered before the memory is cleared: every mine, and wherever the
 /// pointer has stood with one in hand.
 const MOST_SITES: usize = 512;
@@ -87,7 +91,12 @@ fn shore(s: &Scene, at: Vec2, most: f32) -> Vec<f32> {
             let u = Vec2::from_angle(i as f32 / TERRITORY_SEGMENTS as f32 * TAU);
             let mut t = STEP;
             while t < most {
-                if !ours(at + u * t) {
+                if !ours(at + u * t)
+                    && !(1..=(GAP / STEP) as i32).any(|k| {
+                        let ahead = t + k as f32 * STEP;
+                        ahead < most && ours(at + u * ahead)
+                    })
+                {
                     // Between the last sample on our side and this one: halve in on the shore.
                     let (mut lo, mut hi) = (t - STEP, t);
                     for _ in 0..4 {
