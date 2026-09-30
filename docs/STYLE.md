@@ -15,9 +15,12 @@ unit is the Warden (`aster_t1_tank`); the rules below come from its review.
   belong to tech 2 and up, and there should be visibly more of them at each
   tier. A unit that looks more advanced than its tier is wrong even if it
   looks good.
-- **Dirt follows the tier.** Tech 1 is the dirtiest (dust over the running
-  gear and lower hull, grime in the wear map); higher tiers stay closer to
-  parade white. The unit shader scales this by tech level. The dust stops at
+- **Dirt follows the tier.** Tech 1 is the dirtiest (caked mud and spatter
+  over the running gear and lower hull, thin runs down the steep faces, grime
+  packed in the plate seams); higher tiers stay closer to parade white. The
+  unit shader scales this by tech level. Dirt is fine detail over a smooth
+  fade, never patches a hand to a metre across: on a hull a few metres long
+  those read as camouflage (`surf_dirt`). The dust stops at
   the deck: a low hull under a tall mount (the Gnat's radar) says where its
   deck is, or the whole hull reads as camouflage blotches.
 - A unit's role line says what it is in plain words: "Light Tank", not a

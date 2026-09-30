@@ -144,7 +144,7 @@ fn noise_map_made() -> Vec<u8> {
 /// Armour plating: courses of plates of uneven length, like welded and
 /// bolted steel, not a square grid. Seams are narrow; some plates sit a
 /// little proud, some carry a row of bolts or an inset access cover.
-/// rg = normal, b = cavity darkening (1 = clean plate), a = wear (dirt and scuffs gather where it is high).
+/// rg = normal, b = cavity darkening (1 = clean plate), a unused (opaque).
 pub fn panel_map() -> Vec<u8> {
     static KEPT: Kept<Vec<u8>> = Mutex::new(Vec::new());
     kept(&KEPT, 0, panel_map_made)
@@ -213,15 +213,9 @@ fn panel_map_made() -> Vec<u8> {
         y0 += h;
     }
     let mut rgba = pack(&height, &cavity, 3.0);
-    for y in 0..SIZE {
-        for x in 0..SIZE {
-            let (u, v) = (x as f32 / SIZE as f32, y as f32 / SIZE as f32);
-            // Broad dirt with fine scuffs on top.
-            let wear = fbm(u, v, 41) * 0.75 + value_noise(u * 64.0, v * 64.0, 64, 43) * 0.25;
-            let i = (y * SIZE + x) * 4;
-            rgba[i + 2] = (cavity[y * SIZE + x] * 255.0) as u8;
-            rgba[i + 3] = (wear.clamp(0.0, 1.0) * 255.0) as u8;
-        }
+    for (texel, dark) in rgba.chunks_exact_mut(4).zip(&cavity) {
+        texel[2] = (dark * 255.0) as u8;
+        texel[3] = 255;
     }
     rgba
 }

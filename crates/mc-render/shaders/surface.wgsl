@@ -689,6 +689,75 @@ fn surf_damage(i: SurfaceIn) -> vec3<f32> {
     return vec3<f32>(soot, core, 0.0);
 }
 
+// ---- field dirt -------------------------------------------------------------
+
+// A thresholded noise field `v` whose features are `cell` metres across, as coverage:
+// a crisp edge where the cell can be drawn, else the share of area it would cover.
+// The edge is as wide as a pixel is in noise units, so it never stipples.
+fn surf_blot(v: f32, at: f32, cell: f32, px: f32) -> f32 {
+    let w = max(0.02, 1.5 * px / cell);
+    let crisp = smoothstep(at - w, at + w, v);
+    let share = saturate(1.6 * (0.82 - at));
+    return mix(share, crisp, surf_resolved(cell, px));
+}
+
+const SURF_DIRT_TURN: mat3x3<f32> = mat3x3<f32>(vec3<f32>(0.7986, 0.5047, 0.3278),
+    vec3<f32>(-0.6018, 0.6698, 0.4350), vec3<f32>(0.0, -0.5446, 0.8387));
+const SURF_DIRT_TURN_Z: mat3x3<f32> = mat3x3<f32>(vec3<f32>(0.7986, 0.6018, 0.0),
+    vec3<f32>(-0.6018, 0.7986, 0.0), vec3<f32>(0.0, 0.0, 1.0));
+
+// Field dirt on a unit's paint (entity.wgsl): x how much of the paint it covers, y how
+// wet and dark it is (0 dry dust, 1 caked mud), z a tone to vary it by, around zero.
+// The broad shape is smooth (thickest at the running gear, thinning up the hull); all
+// the detail is fine: grain, spatter, crusts, narrow runs and packed seams, each 3D
+// noise in model space fading to its share as it goes under a few pixels. Nothing in
+// it is blotches a hand to a metre across: on a hull a few metres long that reads as
+// camouflage, not dirt.
+//   p     model-space point in metres, offset per unit
+//   rise  height over the dust line: 0 on the ground, 1 where thrown dust gives out
+//   up    how much the surface faces the sky
+//   kick  1 where running gear throws dirt up, 0 where nothing does
+//   grit  how much weathering settles above that: runs, deck dust, packed seams
+//   seam  how deep in a plate seam or rivet ring this is (1 - cavity)
+fn surf_dirt(p_model: vec3<f32>, rise: f32, up: f32, kick: f32, grit: f32, seam: f32, px: f32) -> vec3<f32> {
+    // Value noise has a lattice, and on a boxy hull whose faces lie along it the lattice
+    // shows as squares: the fields are turned off the model's axes (`hz` only about the
+    // vertical, for the ones stretched up and down).
+    let p = SURF_DIRT_TURN * p_model;
+    let hz = SURF_DIRT_TURN_Z * p_model;
+    let grain = surf_fbm3(p + vec3<f32>(5.3, 1.7, 8.1), 0.05, px);
+    // Thrown up by the tracks or wheels: thickest low, its top edge a little ragged.
+    let at = rise + surf_fbm3(hz * vec3<f32>(1.0, 1.0, 2.0), 0.14, px) * 0.35;
+    let film = (1.0 - smoothstep(0.0, 1.0, at)) * (0.8 + grain * 0.7);
+    // Mud caked on at the very bottom, with a crust edge.
+    let crust = at + surf_fbm3(p + vec3<f32>(7.1, 3.3, 1.9), 0.035, px) * 0.12;
+    let caked = 1.0 - smoothstep(0.22, 0.25, crust);
+    // Drying unevenly: pale crust and dark wet mud in patches a few centimetres across,
+    // and here and there the paint showing through.
+    let drying = surf_fbm3(p + vec3<f32>(13.0, 29.0, 3.0), 0.04, px);
+    let cake = caked * saturate(0.95 + drying * 0.6 + grain * 0.8);
+    // Spatter flung up past it: flecks a few centimetres across, thicker low down.
+    let fleck_cell = 0.018;
+    let flecks = surf_blot(surf_noise3(p / fleck_cell + vec3<f32>(41.0, 13.0, 29.0)),
+        mix(0.6, 0.8, saturate(rise * 0.8)), fleck_cell, px) * (1.0 - smoothstep(0.8, 1.4, at));
+    let thrown = max(max(film * 0.8, cake), flecks * 0.8) * kick;
+
+    // Runs down the steep faces: grime washed from the ledges in narrow streaks.
+    let steep = 1.0 - smoothstep(0.35, 0.8, abs(up));
+    let run_cell = 0.05;
+    let run = surf_noise3(vec3<f32>(hz.x / run_cell, hz.y / run_cell, hz.z / 0.9) + vec3<f32>(3.0, 19.0, 7.0));
+    let runs = surf_blot(run, 0.62, run_cell, px) * steep;
+    // A thin, even dust on what faces the sky.
+    let deck = smoothstep(0.55, 0.9, up) * (0.7 + grain * 0.8);
+    // Grime packed into the plate seams and round the rivets.
+    let packed = saturate(seam * 2.2);
+    let weather = max(max(runs * 0.5, deck * 0.25), packed * 0.8) * grit;
+
+    let amount = max(thrown, weather);
+    let wet = saturate(max(max(caked * (0.6 - drying * 1.4), flecks * 0.7), max(runs, packed * 0.8)) - deck * 0.5);
+    return vec3<f32>(amount, wet, grain);
+}
+
 // ---- the surface ------------------------------------------------------------
 
 fn surface_at(i: SurfaceIn) -> Surface {

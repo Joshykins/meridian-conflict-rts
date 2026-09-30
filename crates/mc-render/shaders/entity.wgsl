@@ -2598,6 +2598,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // as it is hurt. Armour only: a gunmetal tube is left a plain tube. Wrecks skip
     // it: they are burnt out all over further down (`wreck_surface`).
     var soot = 0.0;
+    // How deep in a plate seam or rivet ring: field dirt packs in there.
+    var seam = 0.0;
     var lights = vec3<f32>(0.0);
     let precursor = in.material == MAT_PRECURSOR || in.material == MAT_PRECURSOR_DARK;
     if ((in.material < MAT_METAL && in.material != MAT_GLOW) || in.material == MAT_PLATING_DARK || precursor)
@@ -2649,6 +2651,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.albedo = mix(m.albedo, team_rgb * TEAM_PAINT, sf.team);
         m.emissive = mix(m.emissive, team_rgb * TEAM_GLOW, sf.team);
         m.albedo *= sf.cavity;
+        seam = 1.0 - sf.cavity;
         // Bare steel where paint is scuffed or burnt off.
         m.albedo = mix(m.albedo, vec3<f32>(0.2, 0.19, 0.185), sf.bare);
         m.metallic = mix(m.metallic, 0.85, sf.bare);
@@ -2965,33 +2968,33 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     if (flags & (KIND_PROP | KIND_GHOST)) == 0u && in.material != MAT_GLOW && in.material != MAT_GLOW_ORANGE && in.material != MAT_GLOW_AMBER && in.material != MAT_GLOW_RED && in.material != MAT_GLOW_VIOLET && in.material != MAT_GLOW_LASER && in.material != MAT_GLOW_PRECURSOR
         && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR && in.material != MASS_GLOW_MATERIAL {
-        // Field dirt: dust thrown up over the running gear and lower hull, and
-        // grime settling where the wear map says. Plain tech 1 kit is the
-        // dirtiest; the higher tiers stay closer to parade white. A capital ship
-        // is a spacecraft kept clean at any tier: no dust, no grime.
+        // Field dirt (`surf_dirt`): mud and spatter thrown up over the running gear and
+        // lower hull, runs down the steep faces, dust on the decks, grime in the seams.
+        // Plain tech 1 kit is the dirtiest; the higher tiers stay closer to parade white.
+        // A capital ship is a spacecraft kept clean at any tier: no dust, no grime.
         let tech = f32(max(in.model_class & 0xFFu, 1u));
         let amount = select(1.25 / tech, 0.0, (in.model_class & 0x2000u) != 0u);
-        let wear = textureSample(panel_map, repeat_sampler, in.uv * 0.11 + vec2<f32>(in.state.w * 7.0)).a;
-        var low = 1.0 - smoothstep(0.0, in.dust, in.state.z);
+        var line = in.dust;
+        var kick = 1.0;
         var grit = 1.0;
         if (in.model_class & 0x100u) == 0u {
             // Structures only pick it up around the footing — not on a
             // howitzer tube sitting over the pit — and no higher than a dust line
             // the model sets for a raised, kept foundation (`Model::dust_line`).
-            low = 1.0 - smoothstep(0.0, min(0.12, in.dust), in.state.z);
-            grit = low;
+            line = min(0.12, in.dust);
+            grit = 0.0;
         }
         if (in.model_class & 0x800u) != 0u {
             // A ship throws up spray, not dust, and the sea keeps it rinsed: its
             // waterline and grime are the hull pattern's.
-            low = 0.0;
+            kick = 0.0;
             grit = 0.3;
         }
         // Regency plate (`pattern::EMBER`) is not paint: a unit gathers dust at its feet, never
         // grime, and a Regency building stands kept clean.
         if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
             grit = 0.0;
-            low = select(0.0, low, (in.model_class & 0x100u) != 0u);
+            kick = select(0.0, kick, (in.model_class & 0x100u) != 0u);
             // Keeps the plate's own light and shade, recoloured.
             let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
             if in.material == MAT_METAL {
@@ -3010,9 +3013,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 m.metallic = min(m.metallic, 0.25);
             }
         }
-        let dust = clamp((low * 0.95 + smoothstep(0.42, 0.78, wear) * 0.5 * grit) * amount * tread, 0.0, 0.85);
-        m.albedo = mix(m.albedo, vec3<f32>(0.2, 0.165, 0.12) * (0.7 + wear * 0.6), dust);
-        m.roughness = mix(m.roughness, 0.92, dust);
+        let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);
+        let rise = in.state.z / max(line, 0.02);
+        let dirt = surf_dirt(in.local + unit_at, rise, n.z, kick, grit, seam, local_px);
+        let dust = clamp(dirt.x * amount * tread, 0.0, 0.9);
+        // Dry dust is pale and dull; wet mud dark, with a little sheen.
+        let dirt_rgb = mix(vec3<f32>(0.24, 0.205, 0.155), vec3<f32>(0.1, 0.078, 0.055), dirt.y);
+        m.albedo = mix(m.albedo, dirt_rgb * (1.0 + dirt.z * 0.6), dust);
+        m.roughness = mix(m.roughness, mix(0.95, 0.72, dirt.y), dust);
         m.metallic *= 1.0 - dust;
         m.emissive *= 1.0 - dust;
         // A lamp under dust is dimmer, not out: deck and apron lights sit in the footing's dirt.

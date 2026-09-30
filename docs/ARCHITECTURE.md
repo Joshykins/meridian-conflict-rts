@@ -297,7 +297,7 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   `MeshVertex::surface` holds the face's `pattern` and a random byte (mirrored halves share it). `entity.wgsl` hands
   these to `shaders/surface.wgsl` (prepended by `build.rs` for shaders with `//!use surface`), which returns relief as
   a slope (a height function differenced over about a pixel, so it is filtered at any zoom), cavity, paint, team mask,
-  bare steel, soot and HDR emission. The old tiled `panel_map` now only serves dirt/wear; wrecks are burnt out from their faces' plates and model-position noise (`wreck.wgsl` `wreck_surface`). `MeshVertex` is
+  bare steel, soot and HDR emission. Field dirt is `surf_dirt` (surface.wgsl), 3D noise in model space; wrecks are burnt out from their faces' plates and model-position noise (`wreck.wgsl` `wreck_surface`). `MeshVertex` is
   64 bytes (locations 6 and 7 are new). Burn marks are placed by integer arithmetic on the unit id, written twice and
   kept line for line alike: `surf_ihash`/`surf_damage` in the shader paint them, `models::burns` (`burn_hash`,
   `burn_marks`) gives the renderer the same marks, and `BurnGrid` (a 32x32 top-surface height grid baked per model at
