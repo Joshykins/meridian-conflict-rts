@@ -11,7 +11,7 @@
 //! - The stern engines burn whenever the ship is off the ground, a short faint
 //!   burn hanging still and a long white-hot plume with shock diamonds under
 //!   throttle, each one tube out of the whole nozzle mouth (`PUFF_PLUME`) along the
-//!   way the nozzle is swung (entity.wgsl `drive_vector`) and bent back through a
+//!   way the nozzle is swung (drive_swing.rs) and bent back through a
 //!   turn. They wind down over a couple of seconds after touchdown and light
 //!   while the ramp closes for take-off. Their light falls on the hull and, low
 //!   down, on the ground behind, and their wash bends the trees behind a low stern.
@@ -53,17 +53,6 @@ const PUFF_PLUME: f32 = gpu_consts::puff::PLUME as f32;
 /// Seconds the exhaust takes from the nozzle to a plume's tip: through a turn the tip
 /// trails back to where the nozzle pointed this long ago.
 const PLUME_LAG: f32 = 0.7;
-
-/// How far the stern drives' nozzles swing for a turn of `turn` radians this tick, toward
-/// the side the nose turns to (entity.wgsl `drive_vector`, which swings the nozzles).
-fn drive_vector(turn: f32) -> f32 {
-    let turn =
-        (turn + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
-    (turn * gpu_consts::drive::VECTOR_GAIN).clamp(
-        -gpu_consts::drive::VECTOR_MAX,
-        gpu_consts::drive::VECTOR_MAX,
-    )
-}
 
 /// Radius (m) of the hull every size here is tuned for: the Bastion's.
 const REFERENCE_RADIUS: f32 = 160.0;
@@ -155,6 +144,8 @@ const BEACON_TURN: f32 = 7.0;
 #[derive(Default)]
 pub(super) struct CapitalFx {
     ships: HashMap<u32, Ship>,
+    /// The stern nozzles' eased swing (drive_swing.rs), for the GPU and the plumes.
+    pub(super) swing: super::drive_swing::DriveSwing,
 }
 
 fn approach(from: f32, to: f32, up: f32, down: f32) -> f32 {
@@ -334,13 +325,14 @@ impl Renderer {
         }
 
         // Stern engines: a plume out of each nozzle's whole mouth, along the way the
-        // nozzle is swung (entity.wgsl `drive_vector`), laid a few times a tick so it keeps
+        // nozzle is swung (drive_swing.rs), laid a few times a tick so it keeps
         // to the nozzle as the hull turns, and bent back through a turn: what left the
         // nozzle a moment ago left it pointing where the ship pointed then.
         if burn >= 0.02 {
             let heat = (0.18 + 0.82 * throttle) * burn;
             let reach = (38.0 + 150.0 * throttle) * (0.35 + 0.65 * burn) * k;
-            let swing = drive_vector(u.heading - u.prev_heading);
+            // The nozzles' swing over the tick, eased as the shader draws it.
+            let [swing0, swing1] = self.capital_fx.swing.of(u.unit_id).unwrap_or([0.0; 2]);
             let flare = gpu_consts::drive::FLARE_IDLE
                 + (gpu_consts::drive::FLARE_FULL - gpu_consts::drive::FLARE_IDLE) * throttle;
             let mouth = (11.4 + gpu_consts::drive::PETAL_HINGE * flare.tan()) * kit.drive;
@@ -351,6 +343,7 @@ impl Renderer {
                 let f = frame(at_k);
                 let start = time + at_k * dt;
                 let life = 2.0 * dt / slices as f32;
+                let swing = swing0 + (swing1 - swing0) * at_k;
                 let axis = -f.1 * swing.cos() + f.2 * swing.sin();
                 for &port in nozzles {
                     let root = place(&f, port) - axis * throat;

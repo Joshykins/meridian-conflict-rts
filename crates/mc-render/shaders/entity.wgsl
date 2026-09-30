@@ -1062,12 +1062,11 @@ fn drive_thrust(model: ModelInfo, e: Entity) -> f32 {
     return clamp(length(motion.xy) / cruise + abs(motion.z) / (cruise * 0.6), 0.0, 1.0);
 }
 
-// How far a spacecraft's drive nozzles swing (radians, `gpu_consts::drive`): toward the
-// side the nose turns to, by how fast it turns (renderer capital_fx.rs aims the plume the
-// same way).
-fn drive_vector(e: Entity) -> f32 {
-    let turn = lerp_angle(0.0, e.heading - e.prev_heading, 1.0);
-    return clamp(turn * DRIVE_VECTOR_GAIN, -DRIVE_VECTOR_MAX, DRIVE_VECTOR_MAX);
+// How far a spacecraft's drive nozzles are swung between ticks (radians, `gpu_consts::drive`):
+// toward the side the nose turns to, eased by the renderer (drive_swing.rs, which the
+// plumes in capital_fx.rs follow too).
+fn drive_vector(e: Entity, t: f32) -> f32 {
+    return mix(e.drive_swing.x, e.drive_swing.y, t);
 }
 
 // How high a spacecraft's hull (its feet's plane) is over the ground, between ticks.
@@ -1549,7 +1548,7 @@ fn vs_main(in: VsIn) -> VsOut {
             p = mouth + vec3<f32>(q.x, q.yz * ((r + aft * size * tan(flare)) / r));
         }
         let gimbal = mouth + vec3<f32>(DRIVE_GIMBAL * size, 0.0, 0.0);
-        let swing = -drive_vector(e);
+        let swing = -drive_vector(e, t);
         p = rot_z(p - gimbal, swing) + gimbal;
         n = rot_z(n, swing);
     } else if (in.part == 5u || in.part == 6u) && model.vtol[0].w > 0.0 {

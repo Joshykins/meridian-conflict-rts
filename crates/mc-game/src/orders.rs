@@ -1119,6 +1119,8 @@ impl OrderMap {
                 mount: [0.0; 4],
                 spin_recoil: [0.0; 4],
                 fx: [0.0; 4],
+                drive_swing: [0.0; 2],
+                _pad3: [0.0; 2],
             });
         }
         outlined

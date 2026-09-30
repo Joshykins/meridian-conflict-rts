@@ -476,9 +476,15 @@ pub struct UnitInstance {
     /// its charge is, 0 to -1), then how stunned it is, last tick and this (0 to 1,
     /// falling to 0 over the stun's last seconds).
     pub fx: [f32; 4],
+    /// A spacecraft's stern drives (`CapitalRig::drives`): how far their nozzles are swung,
+    /// last tick and this (radians, toward the side the nose turns to). The mirror leaves
+    /// it zero; the renderer eases it toward the hull's turn in the copy it draws
+    /// (`capital_fx.rs` `drive_swing`), so the nozzles glide instead of jumping each tick.
+    pub drive_swing: [f32; 2],
+    pub _pad3: [f32; 2],
 }
 
-const _: () = assert!(std::mem::size_of::<UnitInstance>() == 208);
+const _: () = assert!(std::mem::size_of::<UnitInstance>() == 224);
 
 impl UnitInstance {
     /// A settled wreck's second and later sections, and every section's inside: more of
@@ -1972,6 +1978,8 @@ impl World {
                 }),
                 spin_recoil: [spin[0], spin[1], prev_mount_kick, mount_kick],
                 fx: warp_fx,
+                drive_swing: [0.0; 2],
+                _pad3: [0.0; 2],
             });
         }
 

@@ -41,6 +41,7 @@ mod capital_fx;
 mod capture;
 mod damper_fx;
 mod dive_fx;
+mod drive_swing;
 pub use capture::Shot;
 mod clearing;
 mod craters;
@@ -1478,6 +1479,8 @@ impl Renderer {
                     mount: [0.0; 4],
                     spin_recoil: [0.0; 4],
                     fx: [0.0; 4],
+                    drive_swing: [0.0; 2],
+                    _pad3: [0.0; 2],
                 }
             })
             .collect();
@@ -3040,6 +3043,7 @@ impl Renderer {
             );
         }
         let patched = self.titan_charge.patch(units, time);
+        let patched = self.capital_fx.swing.patch(&self.blueprints, patched);
         self.dynamic.write(0, bytemuck::cast_slice(&patched));
         self.sim_units = units.len() as u32;
         let houses = &frame.houses[..frame.houses.len().min(MAX_HOUSES)];

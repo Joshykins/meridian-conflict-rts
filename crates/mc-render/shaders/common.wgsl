@@ -89,7 +89,7 @@ struct Globals {
 }
 
 
-// Mirrors mc_sim::mirror::UnitInstance (192 bytes).
+// Mirrors mc_sim::mirror::UnitInstance (224 bytes).
 //!rust mc_sim::mirror::UnitInstance
 struct Entity {
     prev_pos: vec3<f32>,
@@ -138,6 +138,9 @@ struct Entity {
     // Warp stretch last tick and this (0 whole, 1 a streak of light), then the EMP stun
     // last tick and this (0 to 1).
     fx: vec4<f32>,
+    // A spacecraft's drive nozzles, swung last tick and this (radians; renderer capital_fx.rs).
+    drive_swing: vec2<f32>,
+    _pad3: vec2<f32>,
 }
 
 // One per blueprint / prop kind.
