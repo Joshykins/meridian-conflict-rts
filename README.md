@@ -77,6 +77,7 @@ Maps are baked files and are not checked in. Bake them once:
 ```bash
 cargo run --release -p mc-map --bin mc-bake -- --size-km 16 --seed 7 --name "Dev Basin 16" -o maps/dev16.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --size-km 80 --seed 7 --name "Meridian Basin" -o maps/meridian_basin.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --size-km 80 --seed 7 --players 32 --name "Meridian Crown" -o maps/meridian_crown.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout islands --size-km 10 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout threshold --size-km 16 --seed 31 --name "The Threshold" -o maps/threshold.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout alpine --size-km 8 --seed 3 --name "Serac Divide" -o maps/serac_divide.mcmap
@@ -106,6 +107,7 @@ Direct Cargo commands also work when the Vulkan runtime is on your library path
 cargo run --release -p mc-game                                   # the front end: main menu, skirmish set-up, settings
 cargo run --release -p mc-game -- --map dev16                    # straight into a skirmish against the AI
 cargo run --release -p mc-game -- --map meridian_basin --players 8   # 8-way on the 80 km map
+cargo run --release -p mc-game -- --map meridian_crown --players 32 --teams 8 --observe   # 32 AI commanders, eight teams of four
 cargo run --release -p mc-game -- --scene battle                 # two pre-built armies (test scene)
 cargo run --release -p mc-game -- --scene stress --map meridian_basin --players 8 --army 500   # full load
 cargo run --release -p mc-game -- --scene showcase               # one of every unit

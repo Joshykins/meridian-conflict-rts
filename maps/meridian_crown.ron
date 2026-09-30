@@ -1,0 +1,10 @@
+// Meridian Crown: thirty-two starts on one continent, a ring of lakes inside
+// the ring of starts and a crown of ranges round the coast. Built for 32-player
+// matches (eight teams of four sit side by side on the ring). A clear afternoon.
+// Skirmish set-up can override the weather and the time of day.
+(
+    biome: Temperate,
+    style: Teams,
+    weather: Fair,
+    time: Afternoon,
+)

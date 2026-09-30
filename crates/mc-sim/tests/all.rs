@@ -73,6 +73,7 @@ mod straight_moves;
 mod stranded_ships;
 mod stream;
 mod survival;
+mod thirty_two;
 mod titan;
 mod titan_water;
 mod torpedo_bomber;
