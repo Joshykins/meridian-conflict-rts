@@ -66,6 +66,7 @@ fn status_line(ui: &mut Ui, x: f32, y: f32, w: f32, text: &str, tone: u32, k: f3
 /// brings the camera to it. Riding in a lift ship's hold it says so, is not idle,
 /// and a click takes the ship instead.
 pub(super) fn commander_card(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, dt: f32) -> bool {
+    let _t = mc_core::perf_span!("ui.commander_card");
     let Some(u) = s.view.frame.units.iter().find(|u| {
         (u.owner_flags & 0xFF) as u8 == s.view.local
             && u.owner_flags & KIND_WRECK == 0
@@ -315,6 +316,7 @@ pub(super) fn per_row() -> usize {
 /// The idle engineer, factory and reclaimer cards, stacked down from `top` and kept above
 /// `bottom`. Returns the y under the last one drawn.
 pub(super) fn idle_cards(hud: &mut Hud, ui: &mut Ui, s: &Scene, top: f32, bottom: f32) -> f32 {
+    let _t = mc_core::perf_span!("ui.idle_cards");
     let mut y = top;
     for (card, kinds) in idle_kinds(s).into_iter().enumerate() {
         if kinds.is_empty() {

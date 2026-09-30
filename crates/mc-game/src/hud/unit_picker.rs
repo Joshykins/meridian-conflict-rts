@@ -106,6 +106,7 @@ pub(super) fn fitted(ui: &mut Ui, text: &str, width: f32, style: crate::ui::Styl
 }
 
 pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene) {
+    let _t = mc_core::perf_span!("ui.unit_picker");
     let Some(mut picker) = hud.unit_picker.take() else {
         return;
     };

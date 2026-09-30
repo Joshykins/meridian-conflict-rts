@@ -175,6 +175,7 @@ fn tip(ui: &mut Ui, card: Rect, y: f32, text: &str) {
 /// where its bars sit (`icons.wgsl` `vs_bar`: on the ground in front of the
 /// hull, as wide as it).
 pub(super) fn badges(ui: &mut Ui, s: &Scene) {
+    let _t = mc_core::perf_span!("ui.group_badges");
     let viewport = s.camera.viewport;
     let eye = s.camera.eye();
     let scale = s.camera.projection_scale();

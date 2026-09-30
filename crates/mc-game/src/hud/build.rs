@@ -54,6 +54,7 @@ struct Stack {
 }
 
 pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
+    let _t = mc_core::perf_span!("ui.build");
     // The highest tier of builder in the selection speaks for it, among builders of the
     // first one's kind (engineers, or factories): what it can start, the others help
     // raise. A factory still going up takes its queue already: it starts on it once it

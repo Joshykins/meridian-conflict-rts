@@ -33,6 +33,7 @@ const FOOT_H: f32 = 30.0;
 
 /// The first unit of `units` that is a lift ship with a hold to show, and its hold.
 pub fn ship_of<'a>(s: &Scene, units: &[&'a UnitInstance]) -> Option<(&'a UnitInstance, CargoView)> {
+    let _t = mc_core::perf_span!("ui.cargo_ship_of");
     units.iter().find_map(|u| {
         s.queue_of(u)
             .and_then(|q| q.cargo.clone())

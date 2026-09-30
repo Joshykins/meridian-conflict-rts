@@ -152,6 +152,7 @@ fn leader_detail(camera_distance: f32) -> f32 {
 const SURVEY_BUDGET: usize = mc_render::overlay::MAX_OVERLAY_VERTICES / 2;
 
 pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
+    let _t = mc_core::perf_span!("ui.reclaim");
     if open < 0.02 {
         return;
     }

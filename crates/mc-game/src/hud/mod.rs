@@ -621,6 +621,7 @@ impl Hud {
         // Chat rises from over the deck.
         self.net_chat(ui, s, deck_y - 24.0 - 8.0 - 12.0, dt);
 
+        let deck_prep = mc_core::perf_span!("ui.deck_prep");
         let selected: Vec<&UnitInstance> = view
             .selection
             .iter()
@@ -694,6 +695,7 @@ impl Hud {
         ui.fade *= deck_k;
         ui.shift.y += (1.0 - deck_k) * 36.0;
         ui.interactive &= !closing;
+        drop(deck_prep);
         // Above where a queue strip would be, so the two never overlap.
         self.reach_key(ui, s, deck_y - 62.0 - GAP - 24.0 - 8.0);
         if !units.is_empty() {

@@ -206,6 +206,7 @@ pub fn launcher_of<'a>(
     s: &Scene,
     units: &[&'a UnitInstance],
 ) -> Option<(&'a UnitInstance, Launcher)> {
+    let _t = mc_core::perf_span!("ui.silo_launcher_of");
     units.iter().find_map(|u| {
         s.blueprints
             .unit(BlueprintId(u.blueprint as u16))
@@ -821,6 +822,7 @@ pub struct Alerts {
 /// on a time strip, and a click steps through where they will land. What just happened
 /// (a warhead intercepted, a warhead ready) goes up as a note that counts repeats.
 pub fn alerts(hud: &mut Hud, s: &Scene) {
+    let _t = mc_core::perf_span!("ui.silo_alerts");
     use super::notices::{Glyph, Live};
     use mc_sim::mirror::{SimEvent, STRATEGIC_WARHEAD};
     let view = s.view;

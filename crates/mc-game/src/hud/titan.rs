@@ -45,6 +45,7 @@ fn owner_of(u: &UnitInstance) -> u8 {
 
 /// Calls for what just happened, and this frame's live cards.
 pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
+    let _t = mc_core::perf_span!("ui.titan_alerts");
     let view = s.view;
     let titans = &view.titans;
     let (library, _) = ui.audio.library();
@@ -258,6 +259,7 @@ pub fn alerts(hud: &mut Hud, ui: &mut Ui, s: &Scene, dt: f32) {
 
 /// The first of our own finished titans among the selection, and how many there are.
 pub fn titan_of<'a>(s: &Scene, units: &[&'a UnitInstance]) -> Option<(&'a UnitInstance, usize)> {
+    let _t = mc_core::perf_span!("ui.titan_of");
     let ours: Vec<&&UnitInstance> = units
         .iter()
         .filter(|u| {

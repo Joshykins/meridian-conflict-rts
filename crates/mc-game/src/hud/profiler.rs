@@ -6,6 +6,7 @@ use glam::Vec2;
 
 /// Draws the panel with its top-right corner at `corner`; returns what it covered.
 pub fn draw(ui: &mut Ui, s: &Scene, corner: Vec2) -> Rect {
+    let _t = mc_core::perf_span!("ui.profiler");
     let st = &s.view.status;
     let gpu = s.gpu;
     let ms = |ns: u64| format!("{:.2} ms", ns as f32 / 1e6);

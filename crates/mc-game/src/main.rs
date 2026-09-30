@@ -110,9 +110,11 @@ straight into a match instead.
   --drop-at TICK         with --bot: hang up at this tick and rejoin with the reconnect token
   --threads N            worker threads (default: all cores)
   --bench TICKS          run the scene headless and print sim timings
-  --blue KEY:N, --red KEY:N  matchup scene: two armies meet at the map centre (repeatable)
+  --blue KEY:N, --red KEY:N  matchup scene: two armies meet at the map centre (repeatable;
+                         past 1024 an army stands in blocks, one behind another)
   --perf FILE.json       with --bench or --screenshot: write cost reports (FILE.sim.json,
-                         FILE.frames.json and .txt tables; see perf_out.rs)
+                         FILE.frames.json, FILE.ui.json for the interface over a shot's
+                         warm-up frames, and .txt tables; see perf_out.rs)
   --screenshot FILE.png  render one frame headless after --ticks and exit
   --ticks N              ticks to simulate before a screenshot (default 0)
   --camera X,Y,DIST[,YAW[,Z]]  screenshot camera: focus in metres, eye distance, yaw in degrees,

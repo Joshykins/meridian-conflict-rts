@@ -1243,6 +1243,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
 
 /// How many families the order card will show, for laying out the deck.
 pub fn order_families(s: &Scene, units: &[&UnitInstance]) -> usize {
+    let _t = mc_core::perf_span!("ui.order_families");
     families(s, units).len()
 }
 

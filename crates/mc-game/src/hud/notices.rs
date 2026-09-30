@@ -120,6 +120,7 @@ impl Notices {
 /// Draws the stack from `top` down: live cards first, then notes. Clears this frame's
 /// live cards.
 pub fn draw(hud: &mut Hud, ui: &mut Ui, top: f32, dt: f32) {
+    let _t = mc_core::perf_span!("ui.notices");
     let t = ui.time;
     let w = ui.size.x;
     let mut y = top;
