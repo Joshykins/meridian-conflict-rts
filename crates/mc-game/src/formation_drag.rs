@@ -1,7 +1,9 @@
 //! A move order held on the right button: while it is held the formation the
 //! selection would take shows on the ground, and dragging turns it to face the
 //! way the drag goes. Letting go gives the order; a click without a drag gives
-//! it facing the way it goes, as before.
+//! it facing the way it goes, as before. The formation shows only once the
+//! button has been held for `SHOW_AFTER` or dragged, so a quick click gives its
+//! order without the block flashing up.
 //!
 //! The slots come from `mc_sim::formations::plan`, the layout the sim itself
 //! gives the order, so what shows is where the units go (short of the sim moving
@@ -17,14 +19,20 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::BlueprintId;
 use mc_sim::formations::{plan, Member};
 use mc_sim::Command;
+use std::time::{Duration, Instant};
 
 /// Metres the pointer must be from where it was pressed, on the ground, to turn the block.
 const TURN_REACH: f32 = 4.0;
+
+/// How long the button must be held before the formation shows, if it is not dragged.
+const SHOW_AFTER: Duration = Duration::from_millis(250);
 
 /// A right-press that would give a move, not yet let go.
 pub struct FormationDrag {
     /// Where it was pressed, pixels.
     pressed_at: Vec2,
+    /// When it was pressed.
+    pressed: Instant,
     /// The ground it was pressed on: the middle of the block.
     anchor: Vec2,
     /// The order a click gives: a `Move`, `AttackMove` or `FormationMove`.
@@ -46,9 +54,15 @@ impl FormationDrag {
         };
         Ok(FormationDrag {
             pressed_at,
+            pressed: Instant::now(),
             anchor: Vec2::from(target.to_f32()),
             command,
         })
+    }
+
+    /// Whether the formation shows yet: held past `SHOW_AFTER`, or dragged `threshold` pixels.
+    pub fn showing(&self, cursor: Vec2, threshold: f32) -> bool {
+        self.pressed.elapsed() >= SHOW_AFTER || cursor.distance(self.pressed_at) >= threshold
     }
 
     /// Which way the drag has turned the block: `None` until the pointer has left the press.

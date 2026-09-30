@@ -4638,7 +4638,11 @@ impl Game {
             }
             orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
             self.orders.draw_pending(&mut ui, &field, self.cursor);
-            if let Some(drag) = &self.formation_drag {
+            if let Some(drag) = self
+                .formation_drag
+                .as_ref()
+                .filter(|d| d.showing(self.cursor, DRAG_THRESHOLD))
+            {
                 let ground = self.ground_under_cursor(renderer).map(|g| g.truncate());
                 drag.draw(
                     &mut ui,
