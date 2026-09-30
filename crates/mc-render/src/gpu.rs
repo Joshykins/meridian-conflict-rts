@@ -51,6 +51,27 @@ impl From<vk::Result> for GpuError {
     }
 }
 
+/// The driver version as the vendor numbers it: NVIDIA packs 10.8.8.6 bits, Intel on
+/// Windows 18.14 bits; everyone else uses the Vulkan major.minor.patch packing.
+fn driver_version(vendor: u32, v: u32) -> String {
+    match vendor {
+        0x10de => format!(
+            "{}.{}.{}.{}",
+            v >> 22,
+            (v >> 14) & 0xff,
+            (v >> 6) & 0xff,
+            v & 0x3f
+        ),
+        0x8086 if cfg!(windows) => format!("{}.{}", v >> 14, v & 0x3fff),
+        _ => format!(
+            "{}.{}.{}",
+            vk::api_version_major(v),
+            vk::api_version_minor(v),
+            vk::api_version_patch(v)
+        ),
+    }
+}
+
 impl Gpu {
     /// `surface_extensions` are the instance extensions the window system
     /// needs; empty for headless rendering.
@@ -167,10 +188,26 @@ impl Gpu {
 
         // SAFETY: `physical` was enumerated from this live instance.
         let props = unsafe { instance.get_physical_device_properties(physical) };
-        log::info!("Vulkan device: {device_name}");
+        // SAFETY: `physical` was enumerated from this live instance.
+        let memory = unsafe { instance.get_physical_device_memory_properties(physical) };
+        let vram_mib: u64 = memory.memory_heaps[..memory.memory_heap_count as usize]
+            .iter()
+            .filter(|h| h.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL))
+            .map(|h| h.size >> 20)
+            .sum();
+        log::info!(
+            "Vulkan device: {device_name} ({:?}, vendor {:04x}, device {:04x}), driver {}, \
+             Vulkan {}.{}.{}, {vram_mib} MiB device memory",
+            props.device_type,
+            props.vendor_id,
+            props.device_id,
+            driver_version(props.vendor_id, props.driver_version),
+            vk::api_version_major(props.api_version),
+            vk::api_version_minor(props.api_version),
+            vk::api_version_patch(props.api_version),
+        );
         Ok(Gpu {
-            // SAFETY: `physical` was enumerated from this live instance.
-            memory: unsafe { instance.get_physical_device_memory_properties(physical) },
+            memory,
             limits: props.limits,
             entry,
             instance,

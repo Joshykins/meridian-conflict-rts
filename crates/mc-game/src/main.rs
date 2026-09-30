@@ -175,6 +175,7 @@ fn main() {
     crash::install();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_millis()
+        .target(env_logger::Target::Pipe(Box::new(crash::LogTee)))
         .init();
     if let Err(e) = run() {
         eprintln!("error: {e}");

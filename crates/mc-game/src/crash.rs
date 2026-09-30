@@ -1,14 +1,60 @@
 //! Crash reports. The Windows build has no console, so a panic would otherwise
 //! vanish with the window. Every panic, on any thread, is written with a
 //! backtrace to `crash-<unix seconds>.log` beside the settings file, and the
-//! default hook still prints it to stderr.
+//! default hook still prints it to stderr. Every report ends with the last lines
+//! of the log (the GPU and driver, how far loading got), which a player's stderr
+//! would otherwise lose.
 
+use std::collections::VecDeque;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Keeps this many reports; older ones are deleted when a new one is written.
 const KEEP: usize = 10;
+
+/// Log lines kept for the reports.
+const TAIL_LINES: usize = 200;
+
+static TAIL: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+
+/// The log's writer: everything goes to stderr as before, and the last
+/// `TAIL_LINES` lines are kept for a report.
+pub struct LogTee;
+
+impl Write for LogTee {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if let Ok(mut tail) = TAIL.lock() {
+            for line in String::from_utf8_lossy(buf).lines() {
+                if tail.len() == TAIL_LINES {
+                    tail.pop_front();
+                }
+                tail.push_back(line.to_owned());
+            }
+        }
+        std::io::stderr().write_all(buf)?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        std::io::stderr().flush()
+    }
+}
+
+/// The kept log lines, or nothing when the lock is held or poisoned (a panic
+/// while a line was being kept): a report never waits on it.
+fn log_tail() -> String {
+    let Ok(tail) = TAIL.try_lock() else {
+        return String::new();
+    };
+    let mut text = String::from("\nrecent log:\n");
+    for line in tail.iter() {
+        text.push_str(line);
+        text.push('\n');
+    }
+    text
+}
 
 pub fn install() {
     let default = std::panic::take_hook();
@@ -29,10 +75,11 @@ fn write_report(info: &std::panic::PanicHookInfo<'_>) -> Option<PathBuf> {
     let path = dir.join(format!("crash-{secs}.log"));
     let thread = std::thread::current();
     let report = format!(
-        "meridian {} crashed\nthread: {}\n{info}\n\n{}\n",
-        env!("CARGO_PKG_VERSION"),
+        "meridian {} crashed\nthread: {}\n{info}\n\n{}\n{}",
+        env!("MERIDIAN_BUILD"),
         thread.name().unwrap_or("<unnamed>"),
         std::backtrace::Backtrace::force_capture(),
+        log_tail(),
     );
     std::fs::File::create(&path)
         .and_then(|mut f| f.write_all(report.as_bytes()))
@@ -50,6 +97,13 @@ pub fn report_error(message: &str) {
     #[cfg(windows)]
     {
         let mut text = format!("Meridian Conflict could not continue:\n\n{message}");
+        // How ash words VK_ERROR_DEVICE_LOST.
+        if message.contains("device has been lost") {
+            text.push_str(
+                "\n\nThe graphics driver reset the GPU. Updating the graphics driver \
+                 usually fixes this; if not, please send the file named below.",
+            );
+        }
         if let Some(path) = &path {
             text.push_str(&format!("\n\nThis was saved to {}", path.display()));
         }
@@ -66,7 +120,11 @@ fn write_error(message: &str) -> Option<PathBuf> {
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
     let path = dir.join(format!("error-{secs}.log"));
-    let report = format!("meridian {} stopped\n{message}\n", env!("MERIDIAN_BUILD"));
+    let report = format!(
+        "meridian {} stopped\n{message}\n{}",
+        env!("MERIDIAN_BUILD"),
+        log_tail()
+    );
     std::fs::write(&path, report).ok()?;
     Some(path)
 }
