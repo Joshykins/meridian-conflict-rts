@@ -233,10 +233,23 @@ impl Roster {
         }
     }
 
+    /// Opens every closed seat to an AI commander. Returns the seats it opened.
+    pub fn fill_ai(
+        &mut self,
+        zones: usize,
+        occupied: impl Fn(usize) -> bool,
+    ) -> Result<Vec<usize>, Refusal> {
+        let mut filled = Vec::new();
+        while let Some(i) = self.seats.iter().position(|s| !s.open()) {
+            filled.push(self.set_control(i, Control::Ai, zones, &occupied)?);
+        }
+        Ok(filled)
+    }
+
     /// Keeps the roster possible on a map with `zones` zones: seats beyond it
     /// go, zones and colours stay unique. Fails when a seat that would go is occupied.
     pub fn fit(&mut self, zones: usize, occupied: impl Fn(usize) -> bool) -> Result<(), Refusal> {
-        let zones = zones.clamp(1, 8);
+        let zones = zones.clamp(1, mc_core::MAX_PLAYERS);
         if let Some(i) = (zones..self.seats.len()).find(|&i| self.seats[i].open() && occupied(i)) {
             return Err(format!(
                 "Seat {} is taken, and the map has {zones} landing zones",
@@ -253,7 +266,9 @@ impl Roster {
             self.seats.remove(at);
         }
         while self.seats.len() < zones {
-            let key = (0..8u8).find(|k| self.index_of(*k).is_none()).unwrap_or(0);
+            let key = (0..mc_core::MAX_PLAYERS as u8)
+                .find(|k| self.index_of(*k).is_none())
+                .unwrap_or(0);
             self.seats.push(Seat {
                 key,
                 control: Control::Closed,
@@ -354,5 +369,26 @@ mod tests {
         k.sort_unstable();
         k.dedup();
         assert_eq!(k.len(), 6);
+    }
+
+    #[test]
+    fn fill_ai_opens_every_closed_seat() {
+        let mut r = Roster::new(32, 1, 1, false);
+        let filled = r.fill_ai(32, |_| false).unwrap();
+        assert_eq!(filled.len(), 30);
+        assert_eq!(r.in_play(), 32);
+        assert!(r.seats[1..].iter().all(|s| s.control == Control::Ai));
+        assert_eq!(r.seats[0].control, Control::Person);
+    }
+
+    #[test]
+    fn a_thirty_two_start_map_seats_thirty_two() {
+        let mut r = Roster::new(8, 2, 2, false);
+        assert!(r.fit(32, |_| false).is_ok());
+        assert_eq!(r.seats.len(), mc_core::MAX_PLAYERS);
+        let mut k = keys(&r);
+        k.sort_unstable();
+        k.dedup();
+        assert_eq!(k.len(), 32);
     }
 }

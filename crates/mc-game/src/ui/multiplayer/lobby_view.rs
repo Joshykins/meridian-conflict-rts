@@ -102,7 +102,7 @@ fn screen(
     table: &Table,
 ) -> Vec<Ask> {
     let mut asks = Vec::new();
-    let (left, centre, right) = lineup::columns(ui, CHAT_W);
+    let (left, centre, right) = lineup::columns(ui, CHAT_W, plan.roster.seats.len());
     chat(
         ui,
         lobby,

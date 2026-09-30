@@ -201,7 +201,8 @@ fn screen(ui: &mut Ui, state: &mut SkirmishState, enter: f32) -> Option<Skirmish
         },
         enter,
     );
-    let (_, centre, right) = lineup::columns(ui, 0.0);
+    let seats = state.lineup.roster.seats.len();
+    let (_, centre, right) = lineup::columns(ui, 0.0, seats);
     let chips = [
         lineup::settings::fog_chip(state.lineup.fog),
         lineup::settings::seed_chip(state.lineup.seed),

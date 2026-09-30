@@ -33,12 +33,22 @@ const LOBBY_CONTROL: [&str; 5] = [
 ];
 const ROW_H: f32 = 54.0;
 const ROW_PITCH: f32 = 60.0;
+/// Rows of a map with more seats than `DENSE_FROM`: one line each, so a
+/// 32-seat map's commanders fit two columns without scrolling.
+const DENSE_ROW_H: f32 = 28.0;
+const DENSE_ROW_PITCH: f32 = 30.0;
+pub(super) const DENSE_FROM: usize = 12;
+/// Narrowest commanders area that takes two columns of dense rows.
+const TWO_COLUMNS_W: f32 = 1000.0;
+/// Between the two columns.
+const COLUMN_GAP: f32 = 34.0;
 /// The doctrine strip that opens under an AI row.
 const TUNE_H: f32 = 74.0;
 const FORCE_PRESETS: [[u8; 3]; 4] = [[100, 100, 100], [160, 60, 60], [60, 160, 60], [60, 60, 160]];
 const FORCE_LABELS: [&str; 4] = ["Balanced", "Land", "Air", "Naval"];
-/// Height of a team's heading over its rows.
+/// Height of a team's heading over its rows, and over dense rows.
 const TEAM_HEAD_H: f32 = 30.0;
+const DENSE_TEAM_HEAD_H: f32 = 22.0;
 /// Room kept under the rows for the team layouts and the note under them.
 const LAYOUTS_H: f32 = 96.0;
 /// The line under the rows that says they scroll.
@@ -47,27 +57,93 @@ const SCROLL_NOTE_H: f32 = 22.0;
 const SWATCH: f32 = 26.0;
 const SWATCH_GAP: f32 = 8.0;
 
-/// Where a row's cells sit.
+/// Where a row's cells sit, and how wide they are.
 struct Columns {
+    name: f32,
+    swatch: f32,
     race: f32,
+    race_w: f32,
     control: f32,
+    control_w: f32,
     team: f32,
+    team_w: f32,
     zone: f32,
+    zone_w: f32,
+    dense: bool,
 }
 
 impl Columns {
     fn of(area: Rect) -> Columns {
         Columns {
+            name: area.x + 58.0,
+            swatch: 26.0,
             race: area.right() - 470.0,
+            race_w: 110.0,
             control: area.right() - 358.0,
+            control_w: 150.0,
             team: area.right() - 196.0,
+            team_w: 100.0,
             zone: area.right() - 84.0,
+            zone_w: 84.0,
+            dense: false,
+        }
+    }
+
+    /// One-line rows, narrower cells.
+    fn dense(area: Rect) -> Columns {
+        Columns {
+            name: area.x + 40.0,
+            swatch: 20.0,
+            race: area.right() - 394.0,
+            race_w: 96.0,
+            control: area.right() - 300.0,
+            control_w: 130.0,
+            team: area.right() - 164.0,
+            team_w: 92.0,
+            zone: area.right() - 68.0,
+            zone_w: 68.0,
+            dense: true,
+        }
+    }
+
+    fn row_h(&self) -> f32 {
+        if self.dense {
+            DENSE_ROW_H
+        } else {
+            ROW_H
+        }
+    }
+
+    fn pitch(&self) -> f32 {
+        if self.dense {
+            DENSE_ROW_PITCH
+        } else {
+            ROW_PITCH
+        }
+    }
+
+    fn head_h(&self) -> f32 {
+        if self.dense {
+            DENSE_TEAM_HEAD_H
+        } else {
+            TEAM_HEAD_H
         }
     }
 }
 
+/// What one column of rows drew.
+struct Drawn {
+    asks: Vec<Ask>,
+    /// Under its last row.
+    bottom: f32,
+    shown: usize,
+    hidden: usize,
+}
+
 /// The commanders column in `area`. On one machine `observe` is the watch
-/// switch beside the heading. Returns what the lobby must do.
+/// switch beside the heading. Returns what the lobby must do. A map with more
+/// than `DENSE_FROM` seats gets one-line rows, in two columns where the area
+/// is wide enough (`columns` makes it so when the screen has room).
 pub fn commanders(
     ui: &mut Ui,
     lineup: &mut Lineup,
@@ -79,25 +155,49 @@ pub fn commanders(
     let mut asks = Vec::new();
     let survival = lineup.mode == Mode::Survival;
     let switch_w = 236.0;
+    let fill_w = 132.0;
+    // Every empty seat an AI at once: a 32-seat map is otherwise 30 clicks.
+    let fill = table.host && lineup.roster.seats.iter().any(|s| !s.open());
+    let title_w = area.w - switch_w - 16.0 - if fill { fill_w + 12.0 } else { 0.0 };
     ui.section(
         area.x,
         area.y + 6.0,
-        area.w - switch_w - 16.0,
+        title_w,
         if survival { "Defenders" } else { "Commanders" },
     );
+    let fill_at = Rect::new(
+        area.right() - switch_w - 12.0 - fill_w,
+        area.y - 10.0,
+        fill_w,
+        32.0,
+    );
+    if fill
+        && ui.button(
+            id("seat-fill-ai", 0),
+            fill_at,
+            "Fill with AI",
+            ButtonKind::Secondary,
+            true,
+        )
+    {
+        let zones = lineup.zones(catalog);
+        match lineup.roster.fill_ai(zones, |j| table.occupied(j)) {
+            Ok(filled) => {
+                if survival {
+                    for i in filled {
+                        lineup.roster.seats[i].team = 0;
+                    }
+                }
+                ui.audio.play(Sfx::Select);
+            }
+            Err(e) => {
+                ui.audio.play(Sfx::Deny);
+                asks.push(Ask::Say(e));
+            }
+        }
+    }
     if let Some(observe) = observe {
         watch_switch(ui, observe, area, switch_w);
-    }
-    let cols = Columns::of(area);
-    let head = area.y + 44.0;
-    for (x, label) in [
-        (area.x + 58.0, "Commander"),
-        (cols.race, "Faction"),
-        (cols.control, "Control"),
-        (cols.team, if survival { "" } else { "Team" }),
-        (cols.zone, "Zone"),
-    ] {
-        ui.text(x, head, type_scale::MICRO, rgb(palette::DIM, 0.8), label);
     }
     // Open strips follow their row; a row that is no longer an editable AI closes its own.
     let is_ai_row = |k: u8| {
@@ -128,92 +228,58 @@ pub fn commanders(
         let s = &lineup.roster.seats[i];
         (!s.open(), if allied { s.team } else { 0 }, i)
     });
-    let sizes = teams::sizes(&lineup.roster.seated_teams());
-    let mut hover_team = None;
-    let mut heading: Option<(u8, f32)> = None;
-    let mut y = head + 16.0;
-    // More seats than fit (a 32-seat map): the rows scroll under the wheel, and a
-    // note under them says which are shown.
-    let rows_top = y;
+    let dense = n > DENSE_FROM;
+    let parts: Vec<Rect> = if dense && area.w >= TWO_COLUMNS_W {
+        let w = (area.w - COLUMN_GAP) / 2.0;
+        vec![
+            Rect::new(area.x, area.y, w, area.h),
+            Rect::new(area.x + w + COLUMN_GAP, area.y, w, area.h),
+        ]
+    } else {
+        vec![area]
+    };
+    let head = area.y + 44.0;
+    let rows_top = head + 16.0;
+    // More seats than fit: the rows scroll under the wheel, and a note under
+    // them says which are shown.
     let limit = area.bottom() - LAYOUTS_H - SCROLL_NOTE_H;
-    let scroll = lineup.seat_scroll.min(n.saturating_sub(1));
-    let (mut shown, mut hidden) = (0, 0);
-    for (k, i) in order.into_iter().enumerate() {
-        // An earlier row's change may have moved seats: skip what is gone.
-        let Some(&seat) = lineup.roster.seats.get(i) else {
-            continue;
+    let per = n.div_ceil(parts.len());
+    let scroll = lineup.seat_scroll.min(per.saturating_sub(1));
+    let mut hover_team = None;
+    let (mut bottom, mut shown, mut hidden) = (rows_top, 0, 0);
+    for (part, rows) in parts.iter().zip(order.chunks(per.max(1))) {
+        let cols = if dense {
+            Columns::dense(*part)
+        } else {
+            Columns::of(*part)
         };
-        if k < scroll {
-            continue;
+        for (x, label) in [
+            (cols.name, "Commander"),
+            (cols.race, "Faction"),
+            (cols.control, "Control"),
+            (cols.team, if survival { "" } else { "Team" }),
+            (cols.zone, "Zone"),
+        ] {
+            ui.text(x, head, type_scale::MICRO, rgb(palette::DIM, 0.8), label);
         }
-        let heads = allied && heading.map(|(t, _)| t) != seat.open().then_some(seat.team);
-        let head_h = match (heads, seat.open()) {
-            (false, _) => 0.0,
-            (true, true) => TEAM_HEAD_H,
-            (true, false) => 10.0,
-        };
-        if hidden > 0 || (shown > 0 && y + head_h + ROW_H > limit) {
-            hidden += 1;
-            continue;
-        }
-        shown += 1;
-        if heads {
-            if let Some((t, top)) = heading.take() {
-                team_rail(ui, area.x, top, y - (ROW_PITCH - ROW_H), t);
-            }
-            if seat.open() {
-                let hy = glide(ui, id("team-head-y", seat.team as usize), y);
-                let count = sizes
-                    .iter()
-                    .find(|&&(t, _)| t == seat.team)
-                    .map_or(0, |&(_, n)| n);
-                if team_heading(
-                    ui,
-                    Rect::new(area.x, hy, area.w, TEAM_HEAD_H - 4.0),
-                    seat.team,
-                    count,
-                    lineup.hover_team == Some(seat.team),
-                ) {
-                    hover_team = Some(seat.team);
-                }
-                heading = Some((seat.team, y));
-                y += TEAM_HEAD_H;
-            } else {
-                y += 10.0;
-            }
-        }
-        let row_y = glide(ui, id("slot-y", seat.key as usize), y);
-        let row = Rect::new(area.x, row_y, area.w, ROW_H);
-        asks.extend(seat_row(ui, lineup, catalog, table, &cols, i, seat, row));
-        y += ROW_PITCH;
-        if lineup.tuning == Some(seat.key) {
-            if let Some(i) = lineup.roster.index_of(seat.key) {
-                ai_tuning(
-                    ui,
-                    &mut lineup.roster.seats[i],
-                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, TUNE_H),
-                );
-            }
-            y += TUNE_H;
-        }
-        if lineup.coloring == Some(seat.key) {
-            let strip_h = swatch_strip_h(row.w - 14.0);
-            if let Some(i) = lineup.roster.index_of(seat.key) {
-                colour_picker(
-                    ui,
-                    lineup,
-                    i,
-                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, strip_h),
-                );
-            }
-            y += strip_h;
-        }
-    }
-    if let Some((t, top)) = heading {
-        team_rail(ui, area.x, top, y - (ROW_PITCH - ROW_H), t);
+        let drawn = seat_column(
+            ui,
+            lineup,
+            catalog,
+            table,
+            &cols,
+            (*part, rows_top, limit),
+            &rows[scroll.min(rows.len())..],
+            allied,
+            &mut hover_team,
+        );
+        asks.extend(drawn.asks);
+        bottom = bottom.max(drawn.bottom);
+        shown += drawn.shown;
+        hidden += drawn.hidden;
     }
     lineup.hover_team = hover_team;
-    let rows = Rect::new(area.x, rows_top, area.w, y - rows_top);
+    let rows = Rect::new(area.x, rows_top, area.w, bottom - rows_top);
     if ui.interactive && rows.contains(ui.cursor) && ui.input.scroll != 0.0 {
         if ui.input.scroll > 0.0 {
             lineup.seat_scroll = scroll.saturating_sub(1);
@@ -223,6 +289,7 @@ pub fn commanders(
     } else {
         lineup.seat_scroll = scroll;
     }
+    let mut y = bottom;
     if scroll > 0 || hidden > 0 {
         ui.text(
             area.x,
@@ -230,10 +297,7 @@ pub fn commanders(
             type_scale::MICRO,
             rgb(palette::DIM, 1.0),
             &format!(
-                "Seats {}-{} of {}  \u{b7}  Scroll for {}",
-                scroll + 1,
-                scroll + shown,
-                n,
+                "{shown} of {n} seats shown  \u{b7}  Scroll for {}",
                 if hidden > 0 { "more" } else { "the first" }
             ),
         );
@@ -260,7 +324,109 @@ pub fn commanders(
     asks
 }
 
-/// Command or Observe: whether you play your seat or an AI takes it while you watch.
+/// One column of seat rows, `order` from the top (`part`, its first row's
+/// top, and the lowest a row may reach), under team headings when `allied`.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one column of the commanders list: the screen state and where it goes"
+)]
+fn seat_column(
+    ui: &mut Ui,
+    lineup: &mut Lineup,
+    catalog: &Catalog,
+    table: &Table,
+    cols: &Columns,
+    (part, top, limit): (Rect, f32, f32),
+    order: &[usize],
+    allied: bool,
+    hover_team: &mut Option<u8>,
+) -> Drawn {
+    let sizes = teams::sizes(&lineup.roster.seated_teams());
+    let mut out = Drawn {
+        asks: Vec::new(),
+        bottom: top,
+        shown: 0,
+        hidden: 0,
+    };
+    let (row_h, pitch) = (cols.row_h(), cols.pitch());
+    let mut heading: Option<(u8, f32)> = None;
+    let mut y = top;
+    for &i in order {
+        // An earlier row's change may have moved seats: skip what is gone.
+        let Some(&seat) = lineup.roster.seats.get(i) else {
+            continue;
+        };
+        let heads = allied && heading.map(|(t, _)| t) != seat.open().then_some(seat.team);
+        let head_h = match (heads, seat.open()) {
+            (false, _) => 0.0,
+            (true, true) => cols.head_h(),
+            (true, false) => 10.0,
+        };
+        if out.hidden > 0 || (out.shown > 0 && y + head_h + row_h > limit) {
+            out.hidden += 1;
+            continue;
+        }
+        out.shown += 1;
+        if heads {
+            if let Some((t, top)) = heading.take() {
+                team_rail(ui, part.x, top, y - (pitch - row_h), t);
+            }
+            if seat.open() {
+                let hy = glide(ui, id("team-head-y", seat.team as usize), y);
+                let count = sizes
+                    .iter()
+                    .find(|&&(t, _)| t == seat.team)
+                    .map_or(0, |&(_, n)| n);
+                if team_heading(
+                    ui,
+                    Rect::new(part.x, hy, part.w, cols.head_h() - 4.0),
+                    seat.team,
+                    count,
+                    lineup.hover_team == Some(seat.team),
+                ) {
+                    *hover_team = Some(seat.team);
+                }
+                heading = Some((seat.team, y));
+                y += cols.head_h();
+            } else {
+                y += 10.0;
+            }
+        }
+        let row_y = glide(ui, id("slot-y", seat.key as usize), y);
+        let row = Rect::new(part.x, row_y, part.w, row_h);
+        out.asks
+            .extend(seat_row(ui, lineup, catalog, table, cols, i, seat, row));
+        y += pitch;
+        if lineup.tuning == Some(seat.key) {
+            if let Some(i) = lineup.roster.index_of(seat.key) {
+                ai_tuning(
+                    ui,
+                    &mut lineup.roster.seats[i],
+                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, TUNE_H),
+                );
+            }
+            y += TUNE_H;
+        }
+        if lineup.coloring == Some(seat.key) {
+            let strip_h = swatch_strip_h(row.w - 14.0);
+            if let Some(i) = lineup.roster.index_of(seat.key) {
+                colour_picker(
+                    ui,
+                    lineup,
+                    i,
+                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, strip_h),
+                );
+            }
+            y += strip_h;
+        }
+    }
+    if let Some((t, top)) = heading {
+        team_rail(ui, part.x, top, y - (pitch - row_h), t);
+    }
+    out.bottom = y;
+    out
+}
+
 fn watch_switch(ui: &mut Ui, observe: &mut bool, area: Rect, switch_w: f32) {
     for (k, (label, watch)) in [("Command", false), ("Observe", true)]
         .into_iter()
@@ -327,9 +493,11 @@ fn seat_row(
     // Colour swatch: the host opens every colour under the row.
     let coloring = lineup.coloring == Some(seat.key);
     let c = TEAM_COLORS[seat.color as usize % TEAM_COLORS.len()];
-    let hit = Rect::new(row.x, row.y, 48.0, row.h);
+    let hit = Rect::new(row.x, row.y, cols.name - row.x - 10.0, row.h);
     let res = ui.interact(id("slot-color", key), hit, open && table.host);
-    let swatch = Rect::new(row.x + 8.0, row.mid_y() - 13.0, 26.0, 26.0).inset(-2.0 * res.glow);
+    let side = cols.swatch;
+    let swatch =
+        Rect::new(row.x + 8.0, row.mid_y() - side / 2.0, side, side).inset(-2.0 * res.glow);
     ui.fill(
         Rect::new(row.x, row.y, 3.0, row.h),
         [c[0], c[1], c[2], live],
@@ -356,8 +524,8 @@ fn seat_row(
     }
 
     // Who: a person, an AI with its doctrine under its name, an open seat, or nobody.
-    let name_w = cols.race - row.x - 70.0;
-    let x = row.x + 58.0;
+    let name_w = cols.race - cols.name - 12.0;
+    let x = cols.name;
     let name = who(lineup, table, i, &seat);
     let waiting = table.lobby && seat.control == Control::Person && occupant.is_none();
     let name_tone = if waiting {
@@ -367,9 +535,21 @@ fn seat_row(
     } else {
         rgb(palette::TEXT, live)
     };
-    let name_y = if open { row.y + 18.0 } else { row.mid_y() };
+    let name_y = if open && !cols.dense {
+        row.y + 18.0
+    } else {
+        row.mid_y()
+    };
     ui.text_fit_left(x, name_y, name_w, type_scale::BODY, name_tone, &name);
-    if ai && table.host {
+    if cols.dense {
+        // One line: the name opens an AI's doctrine strip, as its summary would.
+        let tune = Rect::new(x - 4.0, row.y, name_w + 8.0, row.h);
+        if ai && table.host && ui.interact(id("slot-ai-tune", key), tune, true).clicked {
+            lineup.tuning = if tuning { None } else { Some(seat.key) };
+            lineup.coloring = None;
+            ui.audio.play(Sfx::Select);
+        }
+    } else if ai && table.host {
         if ai_summary(ui, key, &seat, tuning, x, row, name_w) {
             lineup.tuning = if tuning { None } else { Some(seat.key) };
             lineup.coloring = None;
@@ -400,7 +580,8 @@ fn seat_row(
         );
     }
 
-    let field = |x: f32, w: f32| Rect::new(x, row.y + 10.0, w, row.h - 20.0);
+    let inset = if cols.dense { 2.0 } else { 10.0 };
+    let field = |x: f32, w: f32| Rect::new(x, row.y + inset, w, row.h - 2.0 * inset);
     // Race: yours in your own seat, the host's for the rest.
     let can_race = if table.lobby {
         mine || (table.host && occupant.is_none())
@@ -411,7 +592,7 @@ fn seat_row(
     if race_cell(
         ui,
         id("slot-race", key),
-        field(cols.race - 10.0, 110.0),
+        field(cols.race - 10.0, cols.race_w),
         race,
         open && can_race,
     ) {
@@ -425,14 +606,14 @@ fn seat_row(
         table,
         i,
         &seat,
-        field(cols.control, 150.0),
+        field(cols.control, cols.control_w),
     ));
 
     if lineup.mode == Mode::Skirmish {
         let n = lineup.roster.seats.len().max(1);
         let step = ui.stepper(
             id("slot-team", key),
-            field(cols.team, 100.0),
+            field(cols.team, cols.team_w),
             &format!("Team {}", seat.team + 1),
             rgb(palette::TEXT, 1.0),
             open && table.host,
@@ -446,7 +627,7 @@ fn seat_row(
     let zones = lineup.zones(catalog);
     let step = ui.stepper(
         id("slot-start", key),
-        field(cols.zone, 84.0),
+        field(cols.zone, cols.zone_w),
         &format!("{}", seat.start + 1),
         rgb(palette::TEXT, 1.0),
         open && zones > 1 && table.host,
