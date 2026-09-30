@@ -55,6 +55,14 @@ pub struct RawStrategic {
     pub blast: Option<RawNuclearBlast>,
     #[serde(default)]
     pub coverage: f64,
+    /// The missile's drawn size against the Sunfall's round (1, the default): a boat's
+    /// warhead is a smaller missile than a silo's.
+    #[serde(default = "one")]
+    pub missile_scale: f64,
+}
+
+fn one() -> f64 {
+    1.0
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -112,6 +120,9 @@ pub struct Strategic {
     pub blast: Option<NuclearBlast>,
     /// Metres round the array a warhead must be coming down in to be shot at.
     pub coverage: Fx,
+    /// Presentation only, and not hashed: the missile body, its plume and its trail are
+    /// drawn this size against the Sunfall's (nuke_fx.rs, nuke.wgsl).
+    pub missile_scale: Fx,
 }
 
 impl RawStrategic {
@@ -147,6 +158,9 @@ impl RawStrategic {
             (StrategicKind::Interceptor, Some(_)) => return bad("an interceptor has no blast"),
             (StrategicKind::Interceptor, None) => None,
         };
+        if !(0.1..=4.0).contains(&self.missile_scale) {
+            return bad("missile_scale must be between 0.1 and 4");
+        }
         if self.kind == StrategicKind::Interceptor && self.coverage <= 0.0 {
             return bad("an interceptor needs a coverage");
         }
@@ -161,6 +175,7 @@ impl RawStrategic {
             apogee: fx(self.apogee.max(0.0)),
             blast,
             coverage: fx(self.coverage.max(0.0)),
+            missile_scale: fx(self.missile_scale),
         })
     }
 }

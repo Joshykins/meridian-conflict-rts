@@ -427,6 +427,23 @@ shared! {
         pub const ARRAY_HOIST_SPLIT: f32 = 7.8;
     }
 
+    /// A strategic missile in flight (`Globals::strategic`, nuke_fx.rs, nuke.wgsl): the word
+    /// in its first vec4's w packs its kind, owner, plume length in metres and drawn size
+    /// (`scale * SCALE_STEPS`), each a whole number so the float holds it exactly.
+    pub mod missile as "MISSILE_" {
+        pub const KIND_MASK: u32 = 0xF;
+        pub const OWNER_SHIFT: u32 = 4;
+        pub const OWNER_MASK: u32 = 0x7;
+        pub const PLUME_SHIFT: u32 = 8;
+        pub const PLUME_MASK: u32 = 0xFF;
+        pub const SCALE_SHIFT: u32 = 16;
+        pub const SCALE_MASK: u32 = 0xFF;
+        pub const SCALE_STEPS: f32 = 64.0;
+        /// A warhead's body at scale 1 (the Sunfall's round), nose to nozzle, and its radius.
+        pub const WARHEAD_LENGTH: f32 = 36.0;
+        pub const WARHEAD_RADIUS: f32 = 2.5;
+    }
+
     /// A storage structure's fill gauge and status lamps (entity.wgsl `store_material`):
     /// the render mirror writes its side's store into `status[2]` (`mc_sim::store_lights`,
     /// a test holds the bits equal). A fill piece is lit while the store is at least as

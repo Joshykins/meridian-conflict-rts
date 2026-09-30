@@ -1282,9 +1282,11 @@ pub struct StrategicInstance {
     /// A warhead: 1 while still on its boost out of the tube.
     pub boost: f32,
     pub quarry: u32,
+    /// How big the missile is drawn against the Sunfall's (`Strategic::missile_scale`).
+    pub scale: f32,
 }
 
-const _: () = assert!(std::mem::size_of::<StrategicInstance>() == 64);
+const _: () = assert!(std::mem::size_of::<StrategicInstance>() == 68);
 
 pub const STRATEGIC_WARHEAD: u32 = 0;
 pub const STRATEGIC_INTERCEPTOR: u32 = 1;

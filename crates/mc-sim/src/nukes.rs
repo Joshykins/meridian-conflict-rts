@@ -1289,6 +1289,12 @@ impl World {
                     0.0
                 },
                 quarry: m.quarry,
+                scale: self
+                    .blueprints
+                    .unit(m.blueprint)
+                    .strategic
+                    .as_ref()
+                    .map_or(1.0, |s| s.missile_scale.to_f32()),
             });
         }
     }

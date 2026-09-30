@@ -684,7 +684,7 @@
         categories: ["Naval", "DirectFire", "Artillery", "Experimental"],
         health: 48000,
         cost: (mass: 14000, energy: 150000, time: 48000),
-        radius: 55, height: 7, footprint: (10, 4), hull: (55, 10),
+        radius: 74.25, height: 9.45, footprint: (14, 5), hull: (74.25, 13.5),
         vision: 800, sonar: 2600, water_build: true,
         dive: (depth: 6, time: 6),
         shield: (kind: Hull, health: 24000, regen: 160),
@@ -694,6 +694,8 @@
             kind: Nuke,
             // A warhead assembled aboard, as the silo's, and held four at most.
             missile: (mass: 6000, energy: 120000, time: 18000),
+            // Drawn as a boat's missile, smaller than the silo's round.
+            missile_scale: 0.35,
             power: 60,
             stock: 4,
             speed: 320,
@@ -706,7 +708,7 @@
                 name: "Long-Range Torpedoes",
                 damage: 2400, splash: 5, range: 1400, reload: 8, speed: 60, trajectory: Direct,
                 salvo: 3, salvo_delay: 0.5,
-                muzzle: (52.0, 0, -2.0), muzzles: [(52.0, -1.4, -1.6), (52.0, 1.4, -1.6), (52.0, -1.4, -3.0), (52.0, 1.4, -3.0), (52.0, -2.8, -2.3), (52.0, 2.8, -2.3)],
+                muzzle: (70.2, 0, -2.7), muzzles: [(70.2, -1.89, -2.16), (70.2, 1.89, -2.16), (70.2, -1.89, -4.05), (70.2, 1.89, -4.05), (70.2, -3.78, -3.1), (70.2, 3.78, -3.1)],
                 targets: ["Naval"], color: Orange, torpedo: true, impact: 3.2, shockwave: 1.1,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
@@ -716,8 +718,8 @@
             (
                 name: "AEB Strike Missiles",
                 damage: 5000, splash: 40, range_min: 800, range: 6000, reload: 45, salvo: 4, salvo_delay: 1.5, speed: 280, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (-8.0, -3.0, 3.1),
-                muzzles: [(-8.0, -3.0, 3.1), (-8.0, 3.0, 3.1), (-14.0, -3.0, 3.1), (-14.0, 3.0, 3.1)],
+                turret_turn: 0, arc: 360, muzzle: (-10.8, -4.05, 4.19),
+                muzzles: [(-10.8, -4.05, 4.19), (-10.8, 4.05, 4.19), (-18.9, -4.05, 4.19), (-18.9, 4.05, 4.19)],
                 targets: ["Structure", "Land", "Naval"], prefer: ["Structure"], color: Blue, missile: true, guided: true, vertical_launch: true,
                 apogee: 2500, split: true, intercept: 200, trail: true, wake: 3.0, flash: 2.5, impact: 4.0, shockwave: 2.0, ion_blast: 45, discharge: 45,
                 sounds: (fire: "cold_eject", impact: "aster_bore_heavy_strike", ground: "aster_bore_heavy_strike"),
@@ -726,7 +728,7 @@
             (
                 name: "Interceptor Tubes",
                 damage: 1, range: 400, reload: 1.2, speed: 90, trajectory: Direct,
-                muzzle: (-50.0, 0, -2.0), muzzles: [(-50.0, -2.0, -2.0), (-50.0, 2.0, -2.0)],
+                muzzle: (-67.5, 0, -2.7), muzzles: [(-67.5, -2.7, -2.7), (-67.5, 2.7, -2.7)],
                 targets: ["Naval"], color: Orange, torpedo: true, intercepts: true,
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
@@ -734,14 +736,14 @@
             (
                 name: "Deck Rail Turret",
                 damage: 700, splash: 5, range: 1400, reload: 3.0, speed: 1400, rail: true, trajectory: Direct,
-                turret_turn: 60, arc: 300, mount: true, surfaced: true, pivot: (26.0, 0, 4.0), muzzle: (36.0, 0, 4.4),
+                turret_turn: 60, arc: 300, mount: true, surfaced: true, pivot: (35.1, 0, 5.4), muzzle: (48.6, 0, 5.94),
                 targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.4, impact: 1.3, heavy_rail: 0.1,
                 sounds: (fire: "aster_rail_heavy", charge: "resolute_turret_charge", charge_time: 0.9, impact: "aster_rail_hit"),
             ),
             (
                 name: "Deck Rail Turret",
                 damage: 700, splash: 5, range: 1400, reload: 3.0, speed: 1400, rail: true, trajectory: Direct,
-                turret_turn: 60, arc: 300, rear: true, mount: true, surfaced: true, pivot: (-26.0, 0, 4.0), muzzle: (16.0, 0, 4.4),
+                turret_turn: 60, arc: 300, rear: true, mount: true, surfaced: true, pivot: (-35.1, 0, 5.4), muzzle: (21.6, 0, 5.94),
                 targets: ["Land", "Naval", "Structure"], color: Orange, flash: 1.4, impact: 1.3, heavy_rail: 0.1,
                 sounds: (fire: "aster_rail_heavy", charge: "resolute_turret_charge", charge_time: 0.9, impact: "aster_rail_hit"),
             ),

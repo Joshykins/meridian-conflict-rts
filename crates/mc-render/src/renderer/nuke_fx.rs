@@ -44,8 +44,8 @@ pub(super) const NUKE_PUFF_SLOTS: usize = 6144;
 pub(super) const PUFF_STRATEGIC_TRAIL: f32 = 34.0;
 /// A warhead's damage radius: the size everything here is drawn for (`scale` 1).
 const WARHEAD_RADIUS: f32 = 520.0;
-/// A warhead's body, nose to nozzle (nuke.wgsl `WARHEAD_LENGTH`).
-const WARHEAD_LENGTH: f32 = 36.0;
+/// A warhead's body at scale 1, nose to nozzle (shared with nuke.wgsl).
+const WARHEAD_LENGTH: f32 = crate::gpu_consts::missile::WARHEAD_LENGTH;
 /// Seconds a blast is drawn for (nuke.wgsl `fade_left`).
 const BLAST_LIFE: f32 = 75.0;
 /// How fast the shock runs on past the damage radius, m/s; the trees bend at it.
@@ -585,8 +585,14 @@ impl Renderer {
                 .find(|(s, _)| *s == m.serial)
                 .map(|(_, p)| *p)
                 .unwrap_or(Vec3::from(m.prev_pos));
+            // A smaller missile (a boat's) lays a thinner trail, in shorter steps.
+            let scale = m.scale;
             let (step, life, size) = if warhead {
-                (TRAIL_STEP * spread, TRAIL_LIFE, (12.0, 120.0))
+                (
+                    TRAIL_STEP * spread * scale.max(0.5),
+                    TRAIL_LIFE,
+                    (12.0 * scale, 120.0 * scale),
+                )
             } else {
                 (TRAIL_STEP * spread, TRAIL_LIFE * 0.5, (6.0, 60.0))
             };
@@ -600,7 +606,7 @@ impl Renderer {
             // (the plume covers the gap while the motor burns). Under the ground, in the
             // tube, there is none.
             let axis = (now - Vec3::from(m.prev_pos)).normalize_or(dir);
-            let behind = axis * (if warhead { WARHEAD_LENGTH } else { 9.0 } + step);
+            let behind = axis * (if warhead { WARHEAD_LENGTH * scale } else { 9.0 } + step);
             for k in 1..=count.min(96) {
                 let p = last + dir * step * k as f32 - behind;
                 if p.z < self.ground_height(p.truncate()) + 1.0 {
@@ -640,10 +646,12 @@ impl Renderer {
                 if now.z - low.z < 400.0 {
                     for _ in 0..3 {
                         let a = self.scatter.unit() * std::f32::consts::TAU;
-                        let out =
-                            Vec3::new(a.cos(), a.sin(), 0.2) * (8.0 + self.scatter.unit() * 14.0);
+                        let out = Vec3::new(a.cos(), a.sin(), 0.2)
+                            * (8.0 + self.scatter.unit() * 14.0)
+                            * scale;
                         let r0 = self.scatter.unit();
-                        self.push_puff(PUFF_SMOKE, low, out, time, 9.0 + r0 * 5.0, (10.0, 38.0));
+                        let s = (10.0 * scale, 38.0 * scale);
+                        self.push_puff(PUFF_SMOKE, low, out, time, 9.0 + r0 * 5.0, s);
                     }
                 }
             }
@@ -870,19 +878,32 @@ impl Renderer {
             } else {
                 0.0
             };
-            let kind = m.kind as f32 + (m.owner.min(7) * 16) as f32 + (plume as u32 * 256) as f32;
+            let scale = if warhead { m.scale } else { 1.0 };
+            let plume = plume * scale;
+            let kind = {
+                use crate::gpu_consts::missile::*;
+                let size = ((scale * SCALE_STEPS).round() as u32).clamp(1, SCALE_MASK);
+                (m.kind & KIND_MASK
+                    | (m.owner & OWNER_MASK) << OWNER_SHIFT
+                    | (plume as u32).min(PLUME_MASK) << PLUME_SHIFT
+                    | size << SCALE_SHIFT) as f32
+            };
             missiles[drawn * 2] = [at.x, at.y, at.z, kind];
             missiles[drawn * 2 + 1] = [axis.x, axis.y, axis.z, heat];
             drawn += 1;
             // The motor's light, and the re-entry glow's.
             if plume > 0.0 {
-                let nozzle = at - axis * if warhead { WARHEAD_LENGTH } else { 9.0 };
-                let power = if warhead { 1.4e5 } else { 3.0e4 };
+                let nozzle = at - axis * if warhead { WARHEAD_LENGTH * scale } else { 9.0 };
+                let power = if warhead {
+                    1.4e5 * scale * scale
+                } else {
+                    3.0e4
+                };
                 self.lights.lamp(
                     nozzle,
                     -axis,
                     Vec3::new(1.0, 0.62, 0.3) * power,
-                    if warhead { 420.0 } else { 160.0 },
+                    if warhead { 420.0 * scale } else { 160.0 },
                     180.0,
                     1.0,
                 );
@@ -1086,6 +1107,7 @@ mod shots {
                             eta: (1.0 - s) * 12.0,
                             boost: 0.0,
                             quarry: 0,
+                            scale: 1.0,
                         });
                     }
                     let up = at + Vec2::new(900.0, 400.0);
@@ -1101,6 +1123,7 @@ mod shots {
                         eta: 0.0,
                         boost: 0.0,
                         quarry: 1,
+                        scale: 1.0,
                     });
                 }
             }

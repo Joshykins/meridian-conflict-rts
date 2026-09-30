@@ -1,15 +1,18 @@
-//! The Megalodon, the tier 4 experimental submarine (`aster_t4_submarine`, 110 m).
+//! The Megalodon, the tier 4 experimental submarine (`aster_t4_submarine`), authored
+//! 110 m long at radius 55; its unit file draws it 1.35 times over (radius 74.25, about
+//! 150 m), and places its muzzles and pivots at that size.
 //!
 //! A blended manta wing 44 m across, riding low, with a boomer's missile hump standing out
-//! of it down the middle ([`build`]). What the unit file places, it places: six heavy
-//! torpedo doors in a raked bow plane at x = 52 ([`TUBES`]), four big square AEB strike
-//! hatches on the hump aft of the sail with their door tops at the muzzles ([`AEB`]), the
-//! nuclear silos' round lids (the boat's own warheads) that read apart from them, two rail
-//! turrets on houses of their own on the hump (weapons 3 and 4, [`RAILS`]; the aft one
-//! `rear`, authored facing forward), the interceptor tube doors in the transom
-//! ([`INTERCEPTORS`]) and the hull shield's projector (`set_shield_emitter`). Kraken
-//! lineage: black anechoic tiles, a white sail, dark doors. Nothing is lit but a ship's own
-//! sidelights and the shield lens; the rails are bare hardware (`parts::rail_gun`).
+//! of it down the middle ([`build`]). What the unit file places, it places (here in model
+//! space; the file's numbers are these x1.35): six heavy torpedo doors in a raked bow plane
+//! at x = 52 ([`TUBES`]), four big square AEB strike hatches on the hump aft of the sail
+//! with their door tops at the muzzles ([`AEB`]), the nuclear silos' round lids (the boat's
+//! own warheads) that read apart from them, two rail turrets on houses of their own on the
+//! hump (weapons 3 and 4, [`RAILS`]; the aft one `rear`, authored facing forward), the
+//! interceptor tube doors in the transom ([`INTERCEPTORS`]) and the hull shield's projector
+//! (`set_shield_emitter`). Kraken lineage: black anechoic tiles, a white sail, dark doors.
+//! Nothing is lit but a ship's own sidelights and the shield lens; the rails are bare
+//! hardware (`parts::rail_gun`).
 //!
 //! x forward, y left, z up; origin at the waterline, the keel about 7 m down.
 use std::f32::consts::{FRAC_PI_2, TAU};

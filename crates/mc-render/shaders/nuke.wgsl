@@ -938,8 +938,10 @@ fn interceptor_ring(k: u32) -> vec2<f32> {
     return p[min(k, 11u)];
 }
 
-// A warhead's body, nose to nozzle, in metres.
-const WARHEAD_LENGTH: f32 = 36.0;
+// A missile's drawn size against the Sunfall's round (nuke_fx.rs packs it).
+fn missile_scale(word: f32) -> f32 {
+    return f32((u32(word) >> MISSILE_SCALE_SHIFT) & MISSILE_SCALE_MASK) / MISSILE_SCALE_STEPS;
+}
 
 const SIDES: u32 = 14u;
 // 11 bands of SIDES quads, then 4 fins (two faces each).
@@ -957,13 +959,14 @@ fn vs_strategic(@builtin(vertex_index) vertex: u32, @builtin(instance_index) ins
     }
     let a = globals.strategic[instance * 2u];
     let b = globals.strategic[instance * 2u + 1u];
-    let kind = u32(a.w) & 15u;
+    let kind = u32(a.w) & MISSILE_KIND_MASK;
     out.kind = kind;
     let axis = normalize(select(b.xyz, vec3<f32>(0.0, 0.0, 1.0), dot(b.xyz, b.xyz) < 1e-6));
     let warhead = kind == 0u;
-    // Mirrors WARHEAD_LENGTH in nuke_fx.rs, and the round in its silo (strategic.rs).
-    let length = select(9.0, WARHEAD_LENGTH, warhead);
-    let radius = select(0.55, 2.5, warhead);
+    // A warhead is the round in the Sunfall's silo (strategic.rs) at scale 1.
+    let size = missile_scale(a.w);
+    let length = select(9.0, MISSILE_WARHEAD_LENGTH * size, warhead);
+    let radius = select(0.55, MISSILE_WARHEAD_RADIUS * size, warhead);
     var local = vec3<f32>(0.0);
     var normal = vec3<f32>(1.0, 0.0, 0.0);
     let quad = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
@@ -1015,7 +1018,7 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     let b = globals.strategic[in.slot * 2u + 1u];
     let a = globals.strategic[in.slot * 2u];
     let heat = b.w;
-    let owner = (u32(a.w) >> 4u) & 7u;
+    let owner = (u32(a.w) >> MISSILE_OWNER_SHIFT) & MISSILE_OWNER_MASK;
     let warhead = in.kind == 0u;
     // Light metal, dark bands at the stage joint and the re-entry vehicle, a team ring.
     var base = vec3<f32>(0.62, 0.64, 0.66);
@@ -1083,17 +1086,18 @@ struct PlumeFrame {
 fn plume_frame(slot: u32) -> PlumeFrame {
     let a = globals.strategic[slot * 2u];
     let b = globals.strategic[slot * 2u + 1u];
-    let warhead = (u32(a.w) & 15u) == 0u;
+    let warhead = (u32(a.w) & MISSILE_KIND_MASK) == 0u;
     let axis = normalize(select(b.xyz, vec3<f32>(0.0, 0.0, 1.0), dot(b.xyz, b.xyz) < 1e-6));
-    let body = select(9.0, WARHEAD_LENGTH, warhead);
-    let radius = select(0.55, 2.5, warhead);
+    let size = missile_scale(a.w);
+    let body = select(9.0, MISSILE_WARHEAD_LENGTH * size, warhead);
+    let radius = select(0.55, MISSILE_WARHEAD_RADIUS * size, warhead);
     let reference = select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(0.0, 1.0, 0.0), abs(axis.z) > 0.95);
     var f: PlumeFrame;
     f.nozzle = a.xyz - axis * body;
     f.back = -axis;
     f.side = normalize(cross(axis, reference));
     f.up = cross(f.side, axis);
-    f.length = f32(u32(a.w) >> 8u);
+    f.length = f32((u32(a.w) >> MISSILE_PLUME_SHIFT) & MISSILE_PLUME_MASK);
     // The tail ring's radius (warhead_ring / interceptor_ring).
     f.mouth = radius * select(0.9, 0.88, warhead);
     f.power = select(0.7, 1.0, warhead);
