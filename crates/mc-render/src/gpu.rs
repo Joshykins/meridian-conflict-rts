@@ -23,6 +23,8 @@ pub struct Gpu {
     /// `VK_AMD_buffer_marker`, where the driver has it: the GPU timer scopes leave
     /// breadcrumbs with it, so a lost device can say which pass never finished.
     pub(crate) buffer_marker: Option<ash::amd::buffer_marker::Device>,
+    /// `VK_EXT_device_fault`, where the driver has it (`fault_report`).
+    device_fault: Option<ash::ext::device_fault::Device>,
     /// Device memory allocations not yet freed. Every buffer and image goes through
     /// `allocate` and the `destroy_*` functions, so a resource its owner forgot shows
     /// up here when the device goes (CLAUDE.md section 6: GPU resources are owned).
@@ -154,7 +156,10 @@ impl Gpu {
             .draw_indirect_first_instance(true)
             .sampler_anisotropy(supported.sampler_anisotropy == vk::TRUE)
             .depth_clamp(supported.depth_clamp == vk::TRUE)
-            .pipeline_statistics_query(pipeline_stats);
+            .pipeline_statistics_query(pipeline_stats)
+            // Buffer reads the shaders' own bounds checks cannot see (vertex fetch, a draw's
+            // index range) stay in the buffer instead of faulting: AMD loses the device on one.
+            .robust_buffer_access(supported.robust_buffer_access == vk::TRUE);
         let mut extensions: Vec<*const c_char> = Vec::new();
         if !headless {
             extensions.push(ash::khr::swapchain::NAME.as_ptr());
@@ -174,10 +179,31 @@ impl Gpu {
         if has_marker {
             extensions.push(ash::amd::buffer_marker::NAME.as_ptr());
         }
-        let device_info = vk::DeviceCreateInfo::default()
+        // VK_EXT_device_fault: after a loss, the driver says whether it was a page fault
+        // (and where) or a hang.
+        let mut fault_features = vk::PhysicalDeviceFaultFeaturesEXT::default();
+        if available
+            .iter()
+            .any(|e| e.extension_name_as_c_str() == Ok(ash::ext::device_fault::NAME))
+        {
+            let mut query = vk::PhysicalDeviceFeatures2::default().push_next(&mut fault_features);
+            // SAFETY: `physical` belongs to this live instance (Vulkan 1.2, so the query is
+            // core), and `query` chains only the fault features struct, which lives to the end.
+            unsafe { instance.get_physical_device_features2(physical, &mut query) };
+        }
+        let has_fault = fault_features.device_fault == vk::TRUE;
+        let mut fault_enable =
+            vk::PhysicalDeviceFaultFeaturesEXT::default().device_fault(has_fault);
+        if has_fault {
+            extensions.push(ash::ext::device_fault::NAME.as_ptr());
+        }
+        let mut device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_info)
             .enabled_features(&features)
             .enabled_extension_names(&extensions);
+        if has_fault {
+            device_info = device_info.push_next(&mut fault_enable);
+        }
         // SAFETY: `physical` belongs to `instance`; `device_info` and the queue, priority,
         // feature and extension arrays it borrows live to the end of the call; multi-draw
         // indirect and first-instance were checked in `pick_device`, and the optional features
@@ -189,6 +215,8 @@ impl Gpu {
             (!headless).then(|| ash::khr::swapchain::Device::new(&instance, &device));
         let buffer_marker =
             has_marker.then(|| ash::amd::buffer_marker::Device::new(&instance, &device));
+        let device_fault =
+            has_fault.then(|| ash::ext::device_fault::Device::new(&instance, &device));
 
         let pool_info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(queue_family)
@@ -232,6 +260,7 @@ impl Gpu {
             command_pool,
             pipeline_stats,
             buffer_marker,
+            device_fault,
             live_allocations: Default::default(),
         })
     }
@@ -286,6 +315,62 @@ impl Gpu {
         best.map(|(_, p, f, n)| (p, f, n)).ok_or_else(|| {
             GpuError::NoDevice("need a device with graphics+compute and multi-draw indirect".into())
         })
+    }
+
+    /// After the device is lost: what the driver says happened (`VK_EXT_device_fault`), a
+    /// page fault and its address, or nothing for a hang. `None` without the extension.
+    pub(crate) fn fault_report(&self) -> Option<String> {
+        let fault = self.device_fault.as_ref()?;
+        let get = fault.fp().get_device_fault_info_ext;
+        let mut counts = vk::DeviceFaultCountsEXT::default();
+        // SAFETY: the device is this extension's; a null info asks only for the counts.
+        let r = unsafe { get(self.device.handle(), &mut counts, std::ptr::null_mut()) };
+        if r != vk::Result::SUCCESS && r != vk::Result::INCOMPLETE {
+            return Some(format!("device fault query failed: {r}"));
+        }
+        let mut addresses =
+            vec![vk::DeviceFaultAddressInfoEXT::default(); counts.address_info_count as usize];
+        let mut vendor =
+            vec![vk::DeviceFaultVendorInfoEXT::default(); counts.vendor_info_count as usize];
+        counts.vendor_binary_size = 0;
+        let mut info = vk::DeviceFaultInfoEXT {
+            p_address_infos: addresses.as_mut_ptr(),
+            p_vendor_infos: vendor.as_mut_ptr(),
+            ..Default::default()
+        };
+        // SAFETY: `addresses` and `vendor` hold exactly the counts passed back in `counts`,
+        // and no vendor binary is asked for (its size is zeroed, its pointer null).
+        let r = unsafe { get(self.device.handle(), &mut counts, &mut info) };
+        if r != vk::Result::SUCCESS && r != vk::Result::INCOMPLETE {
+            return Some(format!("device fault query failed: {r}"));
+        }
+        let text = |c: &[std::ffi::c_char]| {
+            let bytes: Vec<u8> = c
+                .iter()
+                .take_while(|&&b| b != 0)
+                .map(|&b| b as u8)
+                .collect();
+            String::from_utf8_lossy(&bytes).into_owned()
+        };
+        let mut out = format!("device fault: \"{}\"", text(&info.description));
+        for a in addresses.iter().take(counts.address_info_count as usize) {
+            out.push_str(&format!(
+                "\n  {:?} at {:#x} (+/- {:#x})",
+                a.address_type, a.reported_address, a.address_precision
+            ));
+        }
+        for v in vendor.iter().take(counts.vendor_info_count as usize) {
+            out.push_str(&format!(
+                "\n  vendor: \"{}\" code {:#x} data {:#x}",
+                text(&v.description),
+                v.vendor_fault_code,
+                v.vendor_fault_data
+            ));
+        }
+        if counts.address_info_count == 0 && counts.vendor_info_count == 0 {
+            out.push_str(" (no fault addresses: a hang, not a bad memory access)");
+        }
+        Some(out)
     }
 
     pub fn memory_type(&self, type_bits: u32, flags: vk::MemoryPropertyFlags) -> Option<u32> {

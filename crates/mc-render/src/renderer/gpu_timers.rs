@@ -13,12 +13,12 @@
 //! statistics query per command buffer and forbids it crossing a pass edge.
 //! Results arrive one frame late, after the fence, as [`GpuScope`]s.
 //!
-//! Where the driver has `VK_AMD_buffer_marker`, every scope also leaves a
-//! breadcrumb: its number when it reaches the GPU and again when it is done. If
-//! the device is lost (a hang the driver reset), [`GpuTimers::lost`] logs which
-//! scope started and never finished.
+//! Every scope's edges are also breadcrumbs (`breadcrumbs.rs`), so a lost device
+//! can say where the GPU stopped.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
+
+use super::breadcrumbs::Breadcrumbs;
 
 use ash::vk;
 
@@ -81,30 +81,6 @@ pub(super) struct GpuTimers {
     breadcrumbs: Option<Breadcrumbs>,
 }
 
-/// Two words the GPU writes as scopes pass: the last scope to start (top of pipe)
-/// and the last to finish (bottom of pipe), each `frame << 8 | scope`.
-struct Breadcrumbs {
-    marker: ash::amd::buffer_marker::Device,
-    buffer: crate::gpu::Buffer,
-    frame: Cell<u32>,
-}
-
-impl Breadcrumbs {
-    const STARTED: u64 = 0;
-    const FINISHED: u64 = 4;
-
-    fn write(&self, cmd: vk::CommandBuffer, stage: vk::PipelineStageFlags, at: u64, scope: u32) {
-        let value = (self.frame.get() << 8) | scope;
-        // SAFETY: `cmd` is recording (the timers are called only while the frame's buffer
-        // records); `buffer` is this device's, made with TRANSFER_DST, and `at` + 4 lies
-        // inside its 8 bytes on a 4-byte boundary.
-        unsafe {
-            self.marker
-                .cmd_write_buffer_marker(cmd, stage, self.buffer.buffer, at, value)
-        };
-    }
-}
-
 impl GpuTimers {
     pub(super) fn new(gpu: &crate::gpu::Gpu) -> Result<GpuTimers, vk::Result> {
         // SAFETY: the device is alive and the create info lives to the end of the call.
@@ -139,21 +115,10 @@ impl GpuTimers {
                 .get_physical_device_queue_family_properties(gpu.physical)
         }[gpu.queue_family as usize]
             .timestamp_valid_bits;
-        // `MAX_SCOPES` must fit the marker's low byte.
-        const _: () = assert!(MAX_SCOPES <= 256);
-        let breadcrumbs = match &gpu.buffer_marker {
-            Some(marker) => Some(Breadcrumbs {
-                marker: marker.clone(),
-                buffer: gpu
-                    .host_buffer(8, vk::BufferUsageFlags::TRANSFER_DST)
-                    .map_err(|e| match e {
-                        crate::gpu::GpuError::Vk(e) => e,
-                        _ => vk::Result::ERROR_OUT_OF_HOST_MEMORY,
-                    })?,
-                frame: Cell::new(0),
-            }),
-            None => None,
-        };
+        let breadcrumbs = Breadcrumbs::new(gpu).map_err(|e| match e {
+            crate::gpu::GpuError::Vk(e) => e,
+            _ => vk::Result::ERROR_OUT_OF_DEVICE_MEMORY,
+        })?;
         Ok(GpuTimers {
             breadcrumbs,
             timestamps,
@@ -187,7 +152,7 @@ impl GpuTimers {
         }
         *self.rec.borrow_mut() = Recording::default();
         if let Some(b) = &self.breadcrumbs {
-            b.frame.set(b.frame.get().wrapping_add(1) & 0x00ff_ffff);
+            b.next_frame();
         }
     }
 
@@ -226,12 +191,7 @@ impl GpuTimers {
         rec.scopes.push((name, depth, slot));
         rec.open.push(index);
         if let Some(b) = &self.breadcrumbs {
-            b.write(
-                cmd,
-                vk::PipelineStageFlags::TOP_OF_PIPE,
-                Breadcrumbs::STARTED,
-                index,
-            );
+            b.point(cmd, format!("{}{name}", "  ".repeat(depth as usize)).into());
         }
         // SAFETY: `cmd` is recording; `index * 2` < `MAX_SCOPES * 2` (checked above), that
         // query was reset this frame, and `new` turns the timers off on a queue without
@@ -280,11 +240,10 @@ impl GpuTimers {
             )
         };
         if let Some(b) = &self.breadcrumbs {
-            b.write(
+            let (name, depth, _) = rec.scopes[index as usize];
+            b.point(
                 cmd,
-                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                Breadcrumbs::FINISHED,
-                index,
+                format!("{}end {name}", "  ".repeat(depth as usize)).into(),
             );
         }
         if rec.stats_open == Some(index) {
@@ -364,46 +323,25 @@ impl GpuTimers {
         )
     }
 
-    /// After the device is lost: logs the scopes of the frame on the GPU, marking
-    /// the last to start and the last to finish, so a hang names its pass. Only the
-    /// one frame is ever in flight, so the recording is that frame's.
+    /// After the device is lost: logs where the GPU stopped (`breadcrumbs.rs`).
     pub(super) fn lost(&self) {
-        let Some(b) = &self.breadcrumbs else {
-            log::error!("device lost; no breadcrumbs (VK_AMD_buffer_marker is not available)");
-            return;
-        };
-        let mut words = [0u8; 8];
-        b.buffer.read(0, &mut words);
-        let word = |at: usize| {
-            u32::from_le_bytes([words[at], words[at + 1], words[at + 2], words[at + 3]])
-        };
-        let (started, finished) = (word(0), word(4));
-        let rec = self.rec.borrow();
-        let frame = b.frame.get();
-        log::error!(
-            "device lost in frame {frame}: last scope started {} (frame {}), last finished {} (frame {})",
-            started & 0xff,
-            started >> 8,
-            finished & 0xff,
-            finished >> 8,
-        );
-        let path: Vec<String> = rec
-            .scopes
-            .iter()
-            .enumerate()
-            .map(|(i, &(name, depth, _))| {
-                let i = i as u32;
-                let mark = if started >> 8 == frame && started & 0xff == i {
-                    " <- last started"
-                } else if finished >> 8 == frame && finished & 0xff == i {
-                    " <- last finished"
-                } else {
-                    ""
-                };
-                format!("{i:>3} {}{name}{mark}", "  ".repeat(depth as usize))
-            })
-            .collect();
-        log::error!("scopes of the lost frame:\n{}", path.join("\n"));
+        match &self.breadcrumbs {
+            Some(b) => b.report(),
+            None => log::error!("device lost; no breadcrumbs (no VK_AMD_buffer_marker)"),
+        }
+    }
+
+    /// A breadcrumb before one draw, named by `label`, when fine crumbs are on
+    /// (`MERIDIAN_GPU_CRUMBS=1`).
+    pub(super) fn crumb(&self, cmd: vk::CommandBuffer, label: impl FnOnce() -> String) {
+        if let Some(b) = self.breadcrumbs.as_ref().filter(|b| b.fine) {
+            b.point(cmd, label().into());
+        }
+    }
+
+    /// Fine crumbs are on: models are drawn a slot at a time, each with its crumb.
+    pub(super) fn fine(&self) -> bool {
+        self.breadcrumbs.as_ref().is_some_and(|b| b.fine)
     }
 
     pub(super) fn destroy(&mut self, gpu: &crate::gpu::Gpu) {
@@ -416,7 +354,7 @@ impl GpuTimers {
             }
         }
         if let Some(b) = self.breadcrumbs.take() {
-            gpu.destroy_buffer(b.buffer);
+            b.destroy(gpu);
         }
     }
 }

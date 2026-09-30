@@ -70,6 +70,14 @@ impl ActiveDraws {
             }
         }
     }
+
+    /// The first model drawing `slot` (a unit blueprint, or past them a prop kind),
+    /// for naming it in a breadcrumb.
+    pub(super) fn owner(&self, slot: u32) -> Option<usize> {
+        self.models
+            .iter()
+            .position(|&[start, count]| (start..start + count).contains(&slot))
+    }
 }
 
 #[cfg(test)]

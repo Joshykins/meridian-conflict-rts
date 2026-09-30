@@ -84,6 +84,7 @@ mod wreck_fx;
 pub(crate) use effect_barriers::EffectBarrier;
 pub use post::Antialiasing;
 pub use quality::SceneQuality;
+mod breadcrumbs;
 mod gpu_timers;
 mod shadow_cascades;
 mod titan_charge;

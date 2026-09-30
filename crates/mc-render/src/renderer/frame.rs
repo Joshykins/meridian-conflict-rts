@@ -8,8 +8,23 @@ impl Renderer {
         let result = self.render_frame(input);
         if matches!(result, Err(GpuError::Vk(vk::Result::ERROR_DEVICE_LOST))) {
             self.timers.lost();
+            match self.gpu.fault_report() {
+                Some(report) => log::error!("{report}"),
+                None => log::error!("no fault report (VK_EXT_device_fault is not available)"),
+            }
         }
         result
+    }
+
+    /// A draw slot's model, for a breadcrumb: the blueprint's key, or a prop kind.
+    fn slot_label(&self, slot: u32) -> String {
+        match self.cull.draws.owner(slot) {
+            Some(b) => match self.blueprints.units.get(b) {
+                Some(bp) => format!("slot {slot}: {}", bp.key),
+                None => format!("slot {slot}: prop kind {}", b - self.blueprints.units.len()),
+            },
+            None => format!("slot {slot}: strategic icons"),
+        }
     }
 
     fn render_frame(&mut self, input: &FrameInput) -> Result<bool, GpuError> {
@@ -423,6 +438,20 @@ impl Renderer {
             device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
             let first = self.cull.first_command(list);
             for range in &self.cull.draws.ranges {
+                if self.timers.fine() {
+                    // One slot at a time, each named, to find a draw that hangs the GPU.
+                    for slot in range.clone() {
+                        self.timers.crumb(cmd, || self.slot_label(slot));
+                        device.cmd_draw_indexed_indirect(
+                            cmd,
+                            self.cull.commands.buffer,
+                            first + slot as u64 * 20,
+                            1,
+                            20,
+                        );
+                    }
+                    continue;
+                }
                 device.cmd_draw_indexed_indirect(
                     cmd,
                     self.cull.commands.buffer,
@@ -641,6 +670,8 @@ impl Renderer {
                 device.cmd_bind_index_buffer(cmd, self.patch_ib.buffer, 0, vk::IndexType::UINT32);
                 // Ore fields are ground, under the foundations and the scorch marks.
                 if self.deposit_count > 0 {
+                    self.timers
+                        .crumb(cmd, || format!("ore fields x{}", self.deposit_count));
                     device.cmd_bind_pipeline(
                         cmd,
                         vk::PipelineBindPoint::GRAPHICS,
@@ -656,6 +687,8 @@ impl Renderer {
                     );
                 }
                 if self.pad_count > 0 {
+                    self.timers
+                        .crumb(cmd, || format!("pads x{}", self.pad_count));
                     device.cmd_bind_pipeline(
                         cmd,
                         vk::PipelineBindPoint::GRAPHICS,
@@ -671,6 +704,8 @@ impl Renderer {
                     );
                 }
                 if self.stain_count > 0 {
+                    self.timers
+                        .crumb(cmd, || format!("stains x{}", self.stain_count));
                     device.cmd_bind_pipeline(
                         cmd,
                         vk::PipelineBindPoint::GRAPHICS,
@@ -680,6 +715,8 @@ impl Renderer {
                 }
             }
             if self.track_count > 0 {
+                self.timers
+                    .crumb(cmd, || format!("tracks x{}", self.track_count));
                 device.cmd_bind_pipeline(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -691,6 +728,8 @@ impl Renderer {
                 device.cmd_draw_indexed(cmd, 6, self.track_count, 0, 0, 0);
             }
             if self.prints.count > 0 {
+                self.timers
+                    .crumb(cmd, || format!("prints x{}", self.prints.count));
                 device.cmd_bind_pipeline(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -713,6 +752,8 @@ impl Renderer {
             draw_entities(self.pipelines.entity, pass::MAIN, cull_list::MAIN);
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.missiles");
+            self.timers
+                .crumb(cmd, || format!("missiles x{}", self.projectile_count));
             device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.missile);
             bind_pass_set(self.sprites_set);
             // Eight-sided casing, nose, rear cap, four fins, and a cruise missile's wings.
@@ -720,6 +761,8 @@ impl Renderer {
             // Strategic missiles: a lathed body and four fins each (nuke.wgsl `MISSILE_VERTS`).
             let (nuke_count, strategic_count) = (nuke_view[2] as u32, nuke_view[3] as u32);
             if strategic_count > 0 {
+                self.timers
+                    .crumb(cmd, || format!("strategic missiles x{strategic_count}"));
                 device.cmd_bind_pipeline(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
