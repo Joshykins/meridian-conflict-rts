@@ -45,8 +45,11 @@ game it does.
 
 The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
 mass, build power by tier, reactors 15 / 350 / 2000): rerun the search before leaning on them.
-On the new numbers the old best plan still finishes at 12-13 minutes on serac_divide, dev16
-and twin_shoals (was 11-13).
+Searched again on the new numbers (4 maps x 2 starts): the best plan is the same but with
+**3 mines instead of 6**, at 12.4 minutes. With mine upgrades now costing build power, builders
+spent climbing the one Deep Core line beat builders spent spreading mines. Upgrading Masons
+(+0.2 min) and Forge-carried tech (+4.5) still lose; no other single dial helps by more than
+0.15 minutes.
 
 `crates/mc-sim/tests/zz_eco_race_probe.rs` is one scripted Aster player alone on a map.
 It has no enemy and no goal but finishing a Deep Core. Its choices are ~25 dials:
