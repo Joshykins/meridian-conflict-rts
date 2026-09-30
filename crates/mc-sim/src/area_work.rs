@@ -1,6 +1,7 @@
 //! Area assist: an engineer on guard works its whole ring, not only what is in reach of
 //! its spot. A few times a second it looks for work inside the area, nearest first by
-//! kind: a structure going up (or a unit upgrading or refitting) to help raise, then a friend to mend,
+//! kind: a structure going up (or a unit upgrading or refitting, or a factory's product) to help
+//! raise, then a friend to mend,
 //! then, only while there is room to store the mass, a wreck to reclaim. It goes and does
 //! it with an order put in front of the guard, which carries on when that is done, so
 //! work that turns up later is picked up too. Reclaim is the least of it: a wreck in hand
@@ -110,7 +111,11 @@ impl World {
             })
         };
         let e = raising.or_else(mending)?;
-        let t = e.row as usize;
+        // A factory at work: help with its product, done once that rolls out, so the
+        // engineer looks round again between products rather than staying on the factory.
+        let t = self
+            .factory_product(e.row as usize)
+            .unwrap_or(e.row as usize);
         let mut help = order(OrderKind::Assist, e.pos, units.id(t));
         // A site: done once it stands. Anything else: done once there is no work.
         if units.has_flag(t, flag::UNDER_CONSTRUCTION) {
@@ -121,7 +126,7 @@ impl World {
 
     /// Whether a builder of `owner` helps raise `t` from its area: a friendly site going
     /// up, or a friendly unit putting its next tier on (a structure's upgrade, or a
-    /// commander's refit).
+    /// commander's refit, or a factory's product).
     fn area_raise(&self, owner: u8, t: usize) -> bool {
         let units = &self.state.units;
         if self.are_enemies(owner, units.owner[t]) || units.has_flag(t, flag::IN_FACTORY) {
@@ -131,6 +136,21 @@ impl World {
             || units
                 .row(units.build_target[t])
                 .is_some_and(|u| units.has_flag(u, flag::UPGRADE))
+            || self.factory_product(t).is_some()
+    }
+
+    /// The product a factory in `t` is building, while it is not paused. An upgrade's or
+    /// a refit's new body is helped through the unit itself, not here.
+    fn factory_product(&self, t: usize) -> Option<usize> {
+        let units = &self.state.units;
+        if units.has_flag(t, flag::UNDER_CONSTRUCTION) || self.work_paused(t) {
+            return None;
+        }
+        units.row(units.build_target[t]).filter(|&p| {
+            units.has_flag(p, flag::IN_FACTORY)
+                && units.has_flag(p, flag::UNDER_CONSTRUCTION)
+                && !units.has_flag(p, flag::UPGRADE)
+        })
     }
 
     fn area_take(&mut self, row: usize, work: Order) -> Result<bool, SimError> {

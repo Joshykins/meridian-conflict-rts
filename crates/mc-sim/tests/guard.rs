@@ -330,6 +330,73 @@ fn an_area_engineer_helps_a_commander_refit_in_its_ring() {
 }
 
 #[test]
+fn an_area_engineer_helps_a_factory_in_its_ring() {
+    let mut w = field();
+    give(
+        &mut w,
+        0,
+        Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        },
+    );
+    let mason = add(&mut w, 0, "aster_t1_engineer", 500, 500);
+    let factory = add(&mut w, 0, "aster_t1_land_factory", 750, 500);
+    let units = vec![id(&w, mason)];
+    give(
+        &mut w,
+        0,
+        Command::Guard {
+            units,
+            pos: FxVec2::from_ints(500, 500),
+            target: mc_sim::Handle::NONE,
+            radius: Fx::from_int(400),
+            queue: false,
+        },
+    );
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let factories = vec![id(&w, factory)];
+    give(
+        &mut w,
+        0,
+        Command::Produce {
+            factories,
+            blueprint: tank,
+            count: 2,
+        },
+    );
+    let helping = until(&mut w, 600, |w| {
+        let units = &w.state.units;
+        w.state.orders.front(units, mason).is_some_and(|o| {
+            o.kind == OrderKind::Assist
+                && units
+                    .row(o.target)
+                    .is_some_and(|p| units.has_flag(p, flag::IN_FACTORY))
+        }) && units.has_flag(mason, flag::BUILDING)
+    });
+    assert!(
+        helping.is_some(),
+        "it went to help with the factory's product"
+    );
+    let made = until(&mut w, 6000, |w| {
+        w.state
+            .units
+            .slots
+            .iter()
+            .filter(|&r| {
+                w.state.units.blueprint[r] == tank
+                    && !w.state.units.has_flag(r, flag::UNDER_CONSTRUCTION)
+            })
+            .count()
+            == 2
+    });
+    assert!(made.is_some(), "both tanks rolled out");
+    run(&mut w, 30);
+    let o = w.state.orders.front(&w.state.units, mason).unwrap();
+    assert_eq!(o.kind, OrderKind::Guard, "then it went back on guard");
+}
+
+#[test]
 fn an_area_engineer_helps_an_engineer_upgrade_in_its_ring() {
     let mut w = field();
     give(

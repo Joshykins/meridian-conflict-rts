@@ -1198,7 +1198,7 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
             glyph: Glyph::Assist,
             label: "Assist",
             key: "C",
-            hint: "Assist (C): click a unit to help it build, repair it or feed its shield. Press on open ground and drag out a ring (a click there gives the usual size) for an area assist: the engineers stay on it and work everything inside, raising what goes up and mending what is hurt first, reclaiming wrecks only while there is room for the mass, and take up new work as it appears. Stays until another order.",
+            hint: "Assist (C): click a unit to help it build, repair it or feed its shield. Press on open ground and drag out a ring (a click there gives the usual size) for an area assist: the engineers stay on it and work everything inside, raising what goes up (factories' products too) and mending what is hurt first, reclaiming wrecks only while there is room for the mass, and take up new work as it appears. Stays until another order.",
             action: HudAction::Target(Targeting::Assist),
             lit: targeting(Targeting::Assist),
         });
