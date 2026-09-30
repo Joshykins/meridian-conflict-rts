@@ -183,7 +183,7 @@
         vision: 300, water_build: true,
         economy: (mass_storage: 250, energy_upkeep: 10),
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.010, per_hectare: 0.9, base: 1.1,
         ),
         upgrades_to: "aster_core_mine_t2",
@@ -202,7 +202,7 @@
         vision: 360, water_build: true,
         economy: (mass_storage: 750, energy_upkeep: 60),
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.025, per_hectare: 2.25, base: 2.75,
         ),
         upgrades_to: "aster_core_mine_t3",
@@ -221,7 +221,7 @@
         vision: 420, water_build: true,
         economy: (mass_storage: 2000, energy_upkeep: 300),
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.05, per_hectare: 4.5, base: 5.5,
         ),
         upgrades_to: "aster_core_mine_t4",
@@ -245,7 +245,7 @@
         vision: 480, water_build: true,
         economy: (mass_storage: 4000, energy_upkeep: 600),
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.075, per_hectare: 6.75, base: 8.25,
         ),
         mesh: "core_mine", icon: Extractor,

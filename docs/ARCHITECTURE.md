@@ -60,7 +60,7 @@ A replay is `(map id, blueprint hash, seed, player setup, command log)`.
 
 **Materials and core mines** (`mc_sim::mines`). Maps carry ore fields as polygons
 (`mc_map::OreRegion`, format v2). A blueprint with `mine` is a core mine: every hectare of
-land within `reach` (1800 m, the same for every tier) pays `ground` materials a second and
+land within `reach` (1000 m, the same for every tier) pays `ground` materials a second and
 every hectare of ore `per_hectare`, counted on grids (`OreGrid`: land at 32 m, the overview's
 pitch, ore at 8 m). Overlapping mines, anyone's, divide the ground as a power diagram: a cell
 goes to the mine with the least `distance^2 - reach^2`, so the border between two is the
@@ -69,7 +69,11 @@ territory (`Share`: land and ore it has, and would have alone; efficiency is the
 re-counted only when the set of mines changes. There is no feed or investment: the tiers
 (`aster_core_mine` -> `_t2` -> `_t3`, upgraded in place, same unit id) are the investment and
 raise the per-hectare yield; `_t4`, the deep core, adds only to the shaft's `base`. Mines may
-stand anywhere a structure fits, on open water too (`water_build`). Ore lies deep
+stand anywhere a structure fits, on open water too (`water_build`). A mine whose ground
+cell is sea (`OreGrid::at_sea`, `MineState::sea`) works the sea instead: its territory is the
+sea cells within its `sea_reach`, its shaft's share counted on those alone, and it divides
+ground only with other mines at sea, as land mines only with land mines; its worked water
+spreads at `SEA_SPREAD_SPEED`. Ore counts for the kind of ground above it. Ore lies deep
 (`OreRegion::depth`, 140-400 m, hashed from the outline): a mine sinks its main shaft at
 `SHAFT_SPEED` and drives a drift to each field at `DRIFT_SPEED` once the shaft reaches that
 depth; a field's ore pays only from `Vein::reached_at` (mine age, kept through upgrades).

@@ -3,7 +3,7 @@
 //! rings and workings underground, the cards on it and its ore fields, and
 //! what a mine would make at the site under the pointer.
 
-use super::mine_coast::Survey;
+use super::mine_coast::{at_sea, Survey};
 use super::{Scene, MASS};
 use crate::game::Mode;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
@@ -25,18 +25,34 @@ fn ore_centres(map: &MapFile) -> Vec<Vec2> {
         .collect()
 }
 
-/// Core mines in sight (or remembered): position, reach and id. Anyone's; a
-/// mine's territory does not care whose the next one is.
+/// A core mine in sight: where, its reach, its id, and whether it stands in the sea.
+pub(super) struct Sighted {
+    pub(super) at: Vec2,
+    pub(super) reach: f32,
+    pub(super) id: u32,
+    pub(super) sea: bool,
+}
+
+/// Core mines in sight (or remembered). Anyone's; a mine's territory does not
+/// care whose the next one is.
 pub(super) fn mines_in_sight(
+    map: &MapFile,
     blueprints: &Blueprints,
     units: &[UnitInstance],
-) -> Vec<(Vec2, f32, u32)> {
+) -> Vec<Sighted> {
     units
         .iter()
         .filter(|u| u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0)
         .filter_map(|u| {
             let m = blueprints.unit(BlueprintId(u.blueprint as u16)).mine?;
-            Some((Vec2::new(u.pos[0], u.pos[1]), m.reach.to_f32(), u.unit_id))
+            let at = Vec2::new(u.pos[0], u.pos[1]);
+            let sea = at_sea(map, at);
+            Some(Sighted {
+                at,
+                reach: m.reach_on(sea).to_f32(),
+                id: u.unit_id,
+                sea,
+            })
         })
         .collect()
 }
@@ -44,10 +60,15 @@ pub(super) fn mines_in_sight(
 /// Which ore fields, in map order, a mine the viewer has seen is working:
 /// its middle lies in some mine's reach.
 pub fn ore_tapped(map: &MapFile, blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<bool> {
-    let mines = mines_in_sight(blueprints, units);
+    let mines = mines_in_sight(map, blueprints, units);
     ore_centres(map)
         .into_iter()
-        .map(|c| mines.iter().any(|(p, r, _)| p.distance(c) < *r))
+        .map(|c| {
+            let sea = at_sea(map, c);
+            mines
+                .iter()
+                .any(|m| m.sea == sea && m.at.distance(c) < m.reach)
+        })
         .collect()
 }
 
@@ -456,9 +477,12 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
     let planned = planned_sites(s, &mines);
     mines.extend(planned);
     let ghost = placing.and_then(|(bp, m)| {
+        let at = Vec2::from(s.placing?.to_f32());
+        let sea = at_sea(s.map, at);
         Some(Site {
-            at: Vec2::from(s.placing?.to_f32()),
-            reach: m.reach.to_f32(),
+            at,
+            reach: m.reach_on(sea).to_f32(),
+            sea,
             id: u32::MAX,
             tier: s.blueprints.unit(bp).tech,
             age: None,
@@ -468,9 +492,7 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
     });
     let ghost_at = ghost.as_ref().map(|g| g.at);
     mines.extend(ghost);
-    let all: Vec<(Vec2, f32)> = mines.iter().map(|m| (m.at, m.reach)).collect();
-
-    for plan in plan_surveys(ui, s, survey, &mines, &all, &selected) {
+    for plan in plan_surveys(ui, s, survey, &mines, &selected) {
         // Only if the estimates were far out: the panels drawn next need room.
         if ui.o.vertices.len() > mc_render::overlay::MAX_OVERLAY_VERTICES * 3 / 4 {
             break;
@@ -484,6 +506,12 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
         };
         draw_territory(ui, s, site, &plan, strength, far, time);
         if plan.full {
+            // Mines of the other kind work other ground: they take none of its ore.
+            let all: Vec<(Vec2, f32)> = mines
+                .iter()
+                .filter(|m| m.sea == site.sea)
+                .map(|m| (m.at, m.reach))
+                .collect();
             draw_workings(ui, s, site, &fields, &all, strength, far, time);
         }
     }
@@ -502,18 +530,22 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
         .filter(|m| m.kind != SiteKind::Ghost)
         .map(|m| (m.at, m.reach))
         .collect();
+    // The sim leaves out neighbours of the other kind itself.
     ghost_readout(ui, s, survey, (bp, mine), (fx, site), &others);
 }
 
 /// A core mine the survey draws.
 struct Site {
     at: Vec2,
+    /// Its sea reach if it stands in the sea.
     reach: f32,
+    /// It stands in the sea and works the sea, sharing only with mines at sea.
+    sea: bool,
     id: u32,
     tier: u8,
     /// Seconds it has been digging; unknown (anyone else's) counts as long done.
     age: Option<f32>,
-    /// Metres out the land it works reaches so far.
+    /// Metres out the land (or sea) it works reaches so far.
     spread: f32,
     kind: SiteKind,
 }
@@ -539,9 +571,12 @@ fn built_sites(s: &Scene) -> Vec<Site> {
             let bp = s.bp(u);
             let m = bp.mine?;
             let view = s.queue_of(u).and_then(|q| q.mine);
+            let at = Vec2::new(u.pos[0], u.pos[1]);
+            let sea = at_sea(s.map, at);
             Some(Site {
-                at: Vec2::new(u.pos[0], u.pos[1]),
-                reach: m.reach.to_f32(),
+                at,
+                reach: m.reach_on(sea).to_f32(),
+                sea,
                 id: u.unit_id,
                 tier: bp.tech,
                 age: Some(view.map_or(1.0e9, |v| v.age)),
@@ -572,9 +607,11 @@ fn planned_sites(s: &Scene, built: &[Site]) -> Vec<Site> {
         {
             continue;
         }
+        let sea = at_sea(s.map, at);
         planned.push(Site {
             at,
-            reach: m.reach.to_f32(),
+            reach: m.reach_on(sea).to_f32(),
+            sea,
             // Below the ghost's, one each, so the draw order stays put.
             id: u32::MAX - 1 - planned.len() as u32,
             tier: bp.tech,
@@ -614,7 +651,6 @@ fn plan_surveys(
     s: &Scene,
     survey: &mut Survey,
     mines: &[Site],
-    all: &[(Vec2, f32)],
     selected: &[u32],
 ) -> Vec<Plan> {
     let scale = ui.s;
@@ -629,11 +665,14 @@ fn plan_surveys(
             Some(c) if on_screen(viewport, c, reach_px * 1.5 + 200.0) => c,
             _ => continue,
         };
-        let others: Vec<(Vec2, f32)> = all
+        // Only mines of its own kind: land mines and sea mines work different ground.
+        let others: Vec<(Vec2, f32)> = mines
             .iter()
             .enumerate()
-            .filter(|&(j, &(p, r))| j != i && p.distance(site.at) < site.reach + r)
-            .map(|(_, &o)| o)
+            .filter(|&(j, m)| {
+                j != i && m.sea == site.sea && m.at.distance(site.at) < site.reach + m.reach
+            })
+            .map(|(_, m)| (m.at, m.reach))
             .collect();
         // Zoomed out a territory is small on screen: keep its segments a few
         // points long rather than drawing 240 of them. Every stride divides
@@ -653,7 +692,7 @@ fn plan_surveys(
         // lines show side by side, each in its own tier's look.
         let inset = 3.0 * site.reach / reach_px.max(1.0);
         let whole: Vec<Vec2> = survey
-            .on_land(
+            .on_own_ground(
                 s,
                 site.at,
                 site.reach,
@@ -1003,10 +1042,12 @@ fn ghost_readout(
     others: &[(Vec2, f32)],
 ) {
     let grid = survey.grid(s);
+    let sea = grid.at_sea(fx);
+    let reach = mine.reach_on(sea);
     let others: Vec<(mc_core::FxVec2, mc_core::Fx)> = others
         .iter()
         .copied()
-        .filter(|&(p, r)| p.distance(site) < mine.reach.to_f32() + r)
+        .filter(|&(p, r)| p.distance(site) < reach.to_f32() + r)
         .map(|(p, r)| {
             (
                 mc_core::FxVec2::new(mc_core::Fx::from_f32(p.x), mc_core::Fx::from_f32(p.y)),
@@ -1014,7 +1055,7 @@ fn ghost_readout(
             )
         })
         .collect();
-    let share = grid.share(fx, mine.reach, &others);
+    let share = grid.share(fx, reach, &others);
     let rate = share.rate(&mine).to_f32();
     let efficiency = share.efficiency(&mine).to_f32();
     let cost = s.blueprints.unit(bp).cost_mass.to_f32();
@@ -1023,14 +1064,18 @@ fn ghost_readout(
         return;
     };
     let c = p / ui.s;
+    let ground = if sea { "sea" } else { "land" };
     let land = if share.ore > mc_core::Fx::ZERO {
         format!(
-            "{:.0} ha of land  \u{b7}  {:.1} ha of ore",
+            "{:.0} ha of {ground}  \u{b7}  {:.1} ha of ore",
             share.ground.to_f32(),
             share.ore.to_f32()
         )
     } else {
-        format!("{:.0} ha of land  \u{b7}  no ore", share.ground.to_f32())
+        format!(
+            "{:.0} ha of {ground}  \u{b7}  no ore",
+            share.ground.to_f32()
+        )
     };
     let tone = if efficiency >= 0.9 {
         palette::TEXT
@@ -1167,10 +1212,10 @@ fn mine_card(
     time: f32,
     taken: &mut Vec<Rect>,
 ) {
-    let reach = bp.mine.map_or(1.0, |m| m.reach.to_f32());
+    let reach = bp.mine.map_or(1.0, |m| m.reach_on(view.sea).to_f32());
     let spread = view.spread.min(reach);
     // Grown once the land is all worked and the last drift is in.
-    let land_left = (reach - spread) / mc_sim::mines::SPREAD_SPEED as f32;
+    let land_left = (reach - spread) / mc_sim::mines::spread_speed(view.sea) as f32;
     let left = veins
         .iter()
         .map(|v| v.eta)

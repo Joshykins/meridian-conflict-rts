@@ -121,10 +121,9 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
             .units
             .iter()
             .any(|u| view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some());
-    let mut mines = super::mines_in_sight(s.blueprints, &view.frame.units);
+    let mut mines = super::mines_in_sight(s.map, s.blueprints, &view.frame.units);
     // In id order, so the territories a full chart leaves out stay the same ones.
-    mines.sort_unstable_by_key(|&(_, _, id)| id);
-    let all: Vec<(Vec2, f32)> = mines.iter().map(|&(p, r, _)| (p, r)).collect();
+    mines.sort_unstable_by_key(|m| m.id);
     let (line, fill) = if survey { (0.95, 0.22) } else { (0.45, 0.08) };
     // Every panel and dropdown is drawn after the minimap: an 8-player match's
     // hundred-odd territories must never use up their vertices. A fixed
@@ -132,7 +131,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     // those (the world's mine survey above all) move with the camera, and the
     // cut would move with them, so mines flickered on and off the chart.
     let budget_end = ui.o.vertices.len() + TERRITORY_BUDGET;
-    for (i, &(centre, reach, _)) in mines.iter().enumerate() {
+    for (i, mine) in mines.iter().enumerate() {
+        let (centre, reach) = (mine.at, mine.reach);
         let c = chart_pos(s, chart, centre);
         // Past the allowance a mine still shows where it is, without its ground.
         if ui.o.vertices.len() > budget_end {
@@ -142,13 +142,19 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         // A territory is a few pixels across on the chart: as many points as it has pixels round.
         let px = chart_pos(s, chart, centre + Vec2::new(reach, 0.0)).x - c.x;
         let points = (px * std::f32::consts::TAU / 3.0).clamp(10.0, 80.0) as usize;
-        let others: Vec<(Vec2, f32)> = all
+        // Land mines and sea mines work different ground: each shares only with its own kind.
+        let others: Vec<(Vec2, f32)> = mines
             .iter()
             .enumerate()
-            .filter(|&(j, &(p, r))| j != i && p.distance(centre) < reach + r)
-            .map(|(_, &o)| o)
+            .filter(|&(j, m)| {
+                j != i && m.sea == mine.sea && m.at.distance(centre) < reach + m.reach
+            })
+            .map(|(_, m)| (m.at, m.reach))
             .collect();
-        let pts: Vec<Vec2> = super::territory(centre, reach, &others)
+        let territory = super::territory(centre, reach, &others);
+        let pts: Vec<Vec2> = hud
+            .survey
+            .on_own_ground(s, centre, reach, territory)
             .into_iter()
             .step_by(super::TERRITORY_SEGMENTS.div_ceil(points))
             .map(|p| chart_pos(s, chart, p))

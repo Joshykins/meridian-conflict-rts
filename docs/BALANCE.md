@@ -78,8 +78,12 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   call): 7.5x a tier 1, only 1.5x over tier 3 (base 8.25), for 16000 mass / 96000 energy / 2400
   time built outright (8800 / 52800 as an upgrade from tier 3). It opens with tech 3 (the only tech 4 build is the
   Fulgur, raised by Mason IIIs), has 24000 health and stores 4000.
-- Mines stand on land or out at sea (`water_build`). Out at sea there is little land in reach,
-  so an offshore mine lives on its shaft and on ore fields under the water.
+- Mines stand on land or out at sea (`water_build`). A mine at sea mines only the sea, and a
+  mine on land only the land: each territory stops at the shore, and land and sea mines never
+  share ground with each other, only with their own kind (the user's call, 2026-09-29). At sea
+  the reach is wider, 1500 m (`sea_reach`, so a whole circle of sea is 2.25x a land circle, at
+  the same `ground` a hectare, with no ore), but the worked water spreads at only 4 m/s
+  (`SEA_SPREAD_SPEED`: full in about 375 s against 100 on land).
 - Reactors: 20 / 250 / 1500 energy/s for 75 / 700 / 2800 mass; each tier is cheaper per unit
   of energy than the one below.
 - Factories: build power 20 / 80 / 200, so about seven factories spend the income at every

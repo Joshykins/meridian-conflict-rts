@@ -23,10 +23,36 @@ fn square(x: i32, y: i32, half: i32) -> OreRegion {
 }
 
 fn world(ore: Vec<OreRegion>) -> World {
+    world_on(Heightfield::flat(1280, 1280, Fx::from_int(20)), ore)
+}
+
+/// Where land gives way to sea in [`coast`], metres east.
+const SHORE: i32 = 5000;
+
+/// Land 20 m up west of [`SHORE`], sea 20 m deep east of it.
+fn coast() -> Heightfield {
+    let flat = Heightfield::flat(1280, 1280, Fx::ZERO);
+    let (land, sea) = (
+        flat.height_to_sample(Fx::from_int(20)),
+        flat.height_to_sample(Fx::from_int(-20)),
+    );
+    let samples = (0..=1280)
+        .flat_map(|_| (0..=1280).map(|x| if x * 8 < SHORE { land } else { sea }))
+        .collect();
+    Heightfield::from_samples(
+        1280,
+        1280,
+        samples,
+        mc_map::DEFAULT_MIN_Z,
+        mc_map::DEFAULT_Z_STEP,
+        Fx::ZERO,
+    )
+}
+
+fn world_on(terrain: Heightfield, ore: Vec<OreRegion>) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
-    let terrain = Heightfield::flat(1280, 1280, Fx::from_int(20));
     let map = MapData {
         name: "mines".into(),
         content_id: 1,
@@ -461,5 +487,77 @@ fn a_mason_iii_builds_a_deep_core_outright() {
     assert!(
         w.state.mines.by_unit.contains_key(&u.id(row)),
         "and digs as a mine"
+    );
+}
+
+/// Hectares of a circle of `r` metres on the far side of a line `d` metres from its middle.
+fn segment(r: f64, d: f64) -> f64 {
+    (r * r * (d / r).acos() - d * (r * r - d * d).sqrt()) / 10_000.0
+}
+
+#[test]
+fn a_mine_at_sea_works_only_the_sea_out_to_its_wider_reach() {
+    let mut w = world_on(coast(), Vec::new());
+    // 800 m out to sea, and 500 m inland: each circle crosses the shore.
+    let sea = mine(&mut w, 0, SHORE + 802, 5002);
+    let land = mine(&mut w, 0, SHORE - 498, 5002);
+    w.tick(&[]).unwrap();
+    let spec = spec(&w);
+    assert!(spec.sea_reach > spec.reach);
+    let (s, l) = (
+        w.state.mines.by_unit[&sea].clone(),
+        w.state.mines.by_unit[&land].clone(),
+    );
+    assert!(s.sea && !l.sea);
+    // The sea mine's territory is the sea in its circle, stopping at the shore.
+    let r = spec.sea_reach.to_f64();
+    let water = hectares(spec.sea_reach) - segment(r, 800.0);
+    let got = s.land.ground.to_f64();
+    assert!((got - water).abs() < water * 0.03, "{got} of {water} ha");
+    // Its shaft's share is counted on the sea alone too: all of it is its own.
+    assert_eq!(s.land.rock, s.land.rock_alone);
+    // The land mine keeps the land, and neither takes from the other: they work
+    // different ground, though their circles overlap.
+    let dry = hectares(spec.reach) - segment(spec.reach.to_f64(), 500.0);
+    let got = l.land.ground.to_f64();
+    assert!((got - dry).abs() < dry * 0.03, "{got} of {dry} ha");
+    assert_eq!(s.land.ground, s.land.ground_alone);
+    assert_eq!(l.land.ground, l.land.ground_alone);
+    assert_eq!(s.land.efficiency(&spec), Fx::ONE);
+    assert_eq!(l.land.efficiency(&spec), Fx::ONE);
+}
+
+#[test]
+fn mines_at_sea_split_the_sea_between_them() {
+    let mut w = world_on(coast(), Vec::new());
+    let a = mine(&mut w, 0, 7002, 4002);
+    let b = mine(&mut w, 0, 7002, 5502);
+    w.tick(&[]).unwrap();
+    let spec = spec(&w);
+    let (a, b) = (
+        w.state.mines.by_unit[&a].clone(),
+        w.state.mines.by_unit[&b].clone(),
+    );
+    assert!(a.land.ground < a.land.ground_alone);
+    assert!(b.land.ground < b.land.ground_alone);
+    assert!(a.land.efficiency(&spec) < Fx::ONE);
+}
+
+#[test]
+fn a_mine_at_sea_spreads_slower_than_one_on_land() {
+    let mut w = world_on(coast(), Vec::new());
+    let sea = mine(&mut w, 0, 8002, 5002);
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+    }
+    let m = w.state.mines.by_unit[&sea].clone();
+    // A minute on it works a circle of SEA_SPREAD_SPEED metres a second.
+    assert!(mc_sim::mines::SEA_SPREAD_SPEED < mc_sim::mines::SPREAD_SPEED);
+    let r = (mc_sim::mines::SEA_SPREAD_SPEED * 60) as f64;
+    let circle = std::f64::consts::PI * r * r / 10_000.0;
+    let worked = m.worked_ground().to_f64();
+    assert!(
+        (worked - circle).abs() < circle * 0.2,
+        "{worked} ha vs {circle}"
     );
 }

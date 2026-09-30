@@ -167,7 +167,7 @@
         economy: (mass_storage: 250),
         // The beam lifts the ore with no hammer: no blows to show or hear.
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.010, per_hectare: 0.9, base: 1.1, hammer: false,
         ),
         upgrades_to: "regency_t2_extractor",
@@ -185,7 +185,7 @@
         vision: 360, water_build: true,
         economy: (mass_storage: 750),
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.039, per_hectare: 3.6, base: 4.5, hammer: false,
         ),
         upgrades_to: "regency_t3_extractor",
@@ -203,7 +203,7 @@
         vision: 420, water_build: true,
         economy: (mass_storage: 2000),
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.117, per_hectare: 10.8, base: 13.5, hammer: false,
         ),
         upgrades_to: "regency_t4_extractor",
@@ -221,7 +221,7 @@
         vision: 480, water_build: true,
         economy: (mass_storage: 4000),
         mine: (
-            reach: 1000,
+            reach: 1000, sea_reach: 1500,
             ground: 0.117, per_hectare: 10.8, base: 53.5, hammer: false,
         ),
         mesh: "regency_taproot", icon: Extractor,

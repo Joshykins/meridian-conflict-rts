@@ -468,7 +468,8 @@ over about a minute. Both are drawn only near the camera.
 - **The survey** (placing or selecting a core mine, or holding Ctrl): the
   fields light up with their veins, branching orange lines at depth under
   each field; every mine in sight shows its territory, its circle cut
-  straight where it meets a neighbour, and a shaft sunk from the mine to each
+  straight where it meets a neighbour of its own kind and back to the
+  shore (a mine at sea shows only sea, one on land only land), and a shaft sunk from the mine to each
   field that falls to it. Placing shows what the mine would make there, its
   efficiency and its payback.
 - **The core mine is major infrastructure**: a 3x3 lot (the model is

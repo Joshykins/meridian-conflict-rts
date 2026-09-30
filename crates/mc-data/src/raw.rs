@@ -465,6 +465,8 @@ pub struct RawEconomy {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawMine {
     pub reach: f64,
+    /// Its reach standing in the sea, where it mines only the sea.
+    pub sea_reach: f64,
     pub ground: f64,
     pub per_hectare: f64,
     #[serde(default)]
@@ -1522,6 +1524,7 @@ impl Unit {
             },
             mine: self.mine.as_ref().map(|m| Mine {
                 reach: fx(m.reach),
+                sea_reach: fx(m.sea_reach),
                 ground: fx(m.ground),
                 per_hectare: fx(m.per_hectare),
                 base: fx(m.base),

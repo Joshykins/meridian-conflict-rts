@@ -250,10 +250,13 @@ pub struct Economy {
 /// A core mine. Every patch of land within its reach is worth materials a
 /// second, ore much more than bare ground; where mines' reaches overlap the
 /// ground is divided between them. Higher tiers get more out of each hectare.
+/// One standing in the sea mines the sea instead, up to the shore.
 #[derive(Clone, Copy, Debug)]
 pub struct Mine {
-    /// Metres around itself it mines.
+    /// Metres around itself it mines, on land.
     pub reach: Fx,
+    /// Metres around itself it mines when it stands in the sea.
+    pub sea_reach: Fx,
     /// Materials per second per hectare of land in its territory.
     pub ground: Fx,
     /// Materials per second per hectare of ore in its territory (instead of `ground` there).
@@ -263,6 +266,17 @@ pub struct Mine {
     pub base: Fx,
     /// Strikes a pile hammer in a beat (`RawMine::hammer`). Presentation only.
     pub hammer: bool,
+}
+
+impl Mine {
+    /// Its reach, standing in the sea or on land.
+    pub fn reach_on(&self, sea: bool) -> Fx {
+        if sea {
+            self.sea_reach
+        } else {
+            self.reach
+        }
+    }
 }
 
 /// What a volatile unit does when it is destroyed: a blast that hurts every unit
@@ -1221,7 +1235,7 @@ impl Blueprints {
             }
             match &u.mine {
                 Some(m) => {
-                    for v in [m.reach, m.ground, m.per_hectare, m.base] {
+                    for v in [m.reach, m.sea_reach, m.ground, m.per_hectare, m.base] {
                         h.write_i64(v.0);
                     }
                 }

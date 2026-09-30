@@ -1,10 +1,12 @@
-//! Mines on a coast. The sea pays nothing, so the survey draws a mine's territory on
-//! the land only, its edge following the shoreline.
+//! Mines on a coast. A mine on land works only land and one in the sea only the sea,
+//! so the survey draws a mine's territory on its own side of the shoreline, its edge
+//! following the shore.
 
 use super::mine_marks::{overview_height, TERRITORY_SEGMENTS};
 use super::Scene;
 use glam::Vec2;
-use mc_sim::mines::OreGrid;
+use mc_map::MapFile;
+use mc_sim::mines::{OreGrid, GROUND_CELL_M};
 use std::collections::BTreeMap;
 use std::f32::consts::TAU;
 
@@ -20,7 +22,7 @@ const MOST_SITES: usize = 512;
 pub struct Survey {
     grid: Option<OreGrid>,
     /// Metres out along each of the territory's rays (`mine_marks::territory`) to the
-    /// first sea, by site and reach; unbounded for a mine that stands in the sea.
+    /// shore (or the map's edge), by site and reach.
     shores: BTreeMap<(u32, u32, u32), Vec<f32>>,
 }
 
@@ -35,8 +37,8 @@ impl Survey {
     }
 
     /// `outline` (a territory round `at`, one point a ray) cut back to the shore
-    /// wherever the sea comes in first.
-    pub(super) fn on_land(
+    /// wherever the other side of it comes in first.
+    pub(super) fn on_own_ground(
         &mut self,
         s: &Scene,
         at: Vec2,
@@ -61,25 +63,36 @@ impl Survey {
     }
 }
 
-/// Metres out from `at` to the first sea along each of the territory's rays, no
-/// further than `most`. From a point in the sea, every ray runs to `most`.
+/// Whether a mine at `at` stands in the sea, as the sim's grid (and [`Survey::grid`])
+/// counts it: by the ground cell it is in.
+pub(super) fn at_sea(map: &MapFile, at: Vec2) -> bool {
+    let pitch = GROUND_CELL_M as f32;
+    let size = Vec2::from(map.info().size_metres().to_f32());
+    let cell = (at / pitch).floor();
+    let centre = cell * pitch + pitch * 0.5;
+    let inside = cell.x >= 0.0 && cell.y >= 0.0 && centre.x < size.x && centre.y < size.y;
+    !inside || overview_height(map, centre) <= map.info().water_level.to_f32()
+}
+
+/// Metres out from `at` along each of the territory's rays to where the ground turns
+/// to the other kind (land to sea, or sea to land) or the map ends, no further than `most`.
 fn shore(s: &Scene, at: Vec2, most: f32) -> Vec<f32> {
     let water = s.map.info().water_level.to_f32();
+    let size = Vec2::from(s.map.info().size_metres().to_f32());
     let dry = |p: Vec2| overview_height(s.map, p) > water;
-    if !dry(at) {
-        return vec![f32::MAX; TERRITORY_SEGMENTS + 1];
-    }
+    let home = dry(at);
+    let ours = |p: Vec2| p.cmpge(Vec2::ZERO).all() && p.cmplt(size).all() && dry(p) == home;
     (0..=TERRITORY_SEGMENTS)
         .map(|i| {
             let u = Vec2::from_angle(i as f32 / TERRITORY_SEGMENTS as f32 * TAU);
             let mut t = STEP;
             while t < most {
-                if !dry(at + u * t) {
-                    // Between the last dry sample and this one: halve in on the shore.
+                if !ours(at + u * t) {
+                    // Between the last sample on our side and this one: halve in on the shore.
                     let (mut lo, mut hi) = (t - STEP, t);
                     for _ in 0..4 {
                         let mid = (lo + hi) * 0.5;
-                        if dry(at + u * mid) {
+                        if ours(at + u * mid) {
                             lo = mid;
                         } else {
                             hi = mid;

@@ -850,8 +850,10 @@ pub struct MineView {
     pub full: f32,
     /// Seconds it has been digging.
     pub age: f32,
-    /// Metres out from it the land it works reaches by now.
+    /// Metres out from it the land (or sea) it works reaches by now.
     pub spread: f32,
+    /// It stands in the sea and mines the sea.
+    pub sea: bool,
 }
 
 impl UnitOrders {
@@ -2893,6 +2895,7 @@ impl World {
             full: m.full_rate(&spec).to_f32(),
             age: m.age as f32 / TICKS_PER_SECOND as f32,
             spread: m.spread().to_f32(),
+            sea: m.sea,
         })
     }
 
