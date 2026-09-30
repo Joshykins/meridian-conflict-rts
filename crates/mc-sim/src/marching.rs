@@ -2,16 +2,37 @@
 //! way, and every member is steered to its rank round it (`movement.rs` then
 //! drives them there).
 
+use crate::formations::Group;
 use crate::movement::{patrol_lead, FormationMotion, PHASE_NEXT_LEG};
 use crate::nav::Steer;
 use crate::tables::*;
 use crate::World;
 use mc_core::{Fx, FxVec2, TICKS_PER_SECOND};
-use mc_data::MoveLayer;
+use mc_data::{Motion, MoveLayer};
 
 const DT: i32 = TICKS_PER_SECOND as i32;
 /// Members handed to one worker at a time.
 const CHUNK: usize = 128;
+
+/// A block's heading and way this tick (`block_head`), for its anchor to move on by.
+struct Head {
+    id: u64,
+    rows: Vec<usize>,
+    group: Group,
+    first: Order,
+    target: FxVec2,
+    air: bool,
+    sweep: bool,
+    mean: FxVec2,
+    pace: Fx,
+    accel: Fx,
+    radius: Fx,
+    yaw: i32,
+    delta: FxVec2,
+    m: Motion,
+    clear_ahead: bool,
+    route: FxVec2,
+}
 
 /// A marching block's decisions for this tick, for its members to keep rank by.
 struct Ranks {
@@ -57,396 +78,54 @@ impl World {
         }
         self.state.formations.retain(|id, _| live.contains(id));
         self.orbit_formation_motion(circling, &mut out);
-        for (id, rows) in active {
-            let Some(mut group) = self.state.formations.get(&id).cloned() else {
-                continue;
-            };
-            let first = *self.state.orders.front(&self.state.units, rows[0]).unwrap();
-            let target = first.pos;
-            let air = self.bp(rows[0]).motion.unwrap().layer == MoveLayer::Air;
-            // A flight on patrol sweeps round its loop like one aircraft: it
-            // never stops on a post, and turns no faster than its wings follow.
-            let sweep =
-                air && first.kind == OrderKind::Patrol && !self.bp(rows[0]).motion.unwrap().hover;
-            let mut mean = FxVec2::ZERO;
-            let mut pace = Fx::MAX;
-            let mut accel = Fx::MAX;
-            let mut radius = Fx::ZERO;
-            let mut yaw = i32::MAX;
-            for &row in &rows {
-                let o = self.state.orders.front(&self.state.units, row).unwrap();
-                mean += self.state.units.pos[row] - o.offset;
-                let m = self.bp(row).motion.unwrap();
-                pace = pace.min(m.speed);
-                accel = accel.min(m.accel);
-                yaw = yaw.min(m.turn_rate as i32);
-                radius = radius.max(self.bp(row).radius);
-            }
-            mean = FxVec2::new(mean.x / rows.len() as i32, mean.y / rows.len() as i32);
-            // The anchor turns at half the slowest wing's rate, so the outside
-            // of the flight has room to keep station through the turn.
-            let yaw = (yaw / 2).max(1);
-            if group.phase == 0 && sweep {
-                // Carry on the way the flight is already going, at its airspeed:
-                // the slots do not swing round to the new leg, and nobody brakes.
-                let units = &self.state.units;
-                let (mut dir, mut speed) = (FxVec2::ZERO, Fx::ZERO);
-                for &row in &rows {
-                    dir += FxVec2::from_angle(units.heading[row]);
-                    speed += units.speed[row];
-                }
-                group.heading = if dir == FxVec2::ZERO {
-                    first.heading
-                } else {
-                    dir.angle()
-                };
-                let mut anchor = FxVec2::ZERO;
-                for &row in &rows {
-                    let o = self.state.orders.front(units, row).unwrap();
-                    anchor += units.pos[row] - o.offset.rotate(group.heading - o.heading);
-                }
-                let n = rows.len() as i32;
-                group.anchor = FxVec2::new(anchor.x / n, anchor.y / n);
-                group.speed = (speed / n).min(pace);
-                group.phase = 1;
-            }
-            if group.phase == 0 {
-                group.anchor = mean;
-                group.heading = first.heading;
-                group.phase = 1;
-            }
-            let delta = target - group.anchor;
-            let m = self.bp(rows[0]).motion.unwrap();
-            let probe = group.anchor + delta.clamp_length(Fx::from_int(128));
-            // Straight on only while the block fits that way, not just its
-            // middle: a gap the anchor alone threads is for the route to find.
-            let clear_ahead = air
-                || self
-                    .nav
-                    .clear_segment(m.layer, m.size_class, group.anchor, probe)
-                    && {
-                        let shut = rows
-                            .iter()
-                            .filter(|&&row| {
-                                let o = self.state.orders.front(&self.state.units, row).unwrap();
-                                let slot =
-                                    group.anchor + o.offset.rotate(group.heading - o.heading);
-                                let mo = self.bp(row).motion.unwrap();
-                                !self.nav.clear_segment(
-                                    mo.layer,
-                                    mo.size_class,
-                                    slot,
-                                    slot + (probe - group.anchor),
-                                )
-                            })
-                            .count();
-                        shut * 3 <= rows.len()
-                    };
-            let mut on_field = false;
-            let route = if sweep {
-                if delta != FxVec2::ZERO {
-                    group.heading = group.heading.turn_toward(delta.angle(), yaw as u16);
-                }
-                FxVec2::from_angle(group.heading)
-            } else {
-                // Straight at the goal while the way is open and the field agrees
-                // with it; the probe sees only so far, and open ground that ends
-                // in a ridge's pocket is for the field to lead the block round.
-                let straight = delta.normalize();
-                match self
-                    .nav
-                    .sample(self.state.units.field[rows[0]], group.anchor)
-                {
-                    Steer::Direction(d) if !(clear_ahead && d.dot(straight) > Fx::HALF) => {
-                        on_field = true;
-                        d
-                    }
-                    _ => straight,
-                }
-            };
-            // Slots turn with the route, returning to the requested facing on arrival.
-            let facing = if delta.length() < pace {
-                first.heading
-            } else if on_field && !air {
-                // A block faces where its way goes over the next stretch, not
-                // each kink the field makes under its anchor.
-                self.way_ahead(
-                    self.state.units.field[rows[0]],
-                    group.anchor,
-                    route,
-                    delta.length(),
-                )
-                .angle()
-            } else {
-                route.angle()
-            };
-            if !sweep && (group.phase == 1 || group.phase == 2) {
-                // A block wheels no faster than its outside ranks can keep up
-                // with speed in hand, or its inside ranks crowd together.
-                let wheel = if air {
-                    m.turn_rate / 2
-                } else {
-                    let mut reach = Fx::ONE;
-                    for &row in &rows {
-                        reach = reach.max(
-                            self.state
-                                .orders
-                                .front(&self.state.units, row)
-                                .unwrap()
-                                .offset
-                                .length(),
-                        );
-                    }
-                    let spare = pace * Fx::ratio(3, 10);
-                    let cap = (spare * 10430 / (reach * DT))
-                        .floor_int()
-                        .clamp(1, (m.turn_rate / 2) as i32) as u16;
-                    // Beside a slope it turns with its way, to keep its ranks
-                    // off it. Only worth asking when the cap holds it back.
-                    let look = route
-                        * (pace * 3)
-                            .clamp(Fx::from_int(24), Fx::from_int(64))
-                            .min(delta.length());
-                    let hemmed = || {
-                        rows.iter().any(|&row| {
-                            let o = self.state.orders.front(&self.state.units, row).unwrap();
-                            let slot = group.anchor + o.offset.rotate(group.heading - o.heading);
-                            let mo = self.bp(row).motion.unwrap();
-                            !self
-                                .nav
-                                .clear_segment(mo.layer, mo.size_class, slot, slot + look)
-                        })
-                    };
-                    if group.heading.delta_to(facing).unsigned_abs() > cap && hemmed() {
-                        m.turn_rate / 2
-                    } else {
-                        cap
-                    }
-                };
-                group.heading = group.heading.turn_toward(facing, wheel);
-            }
+        // Each block's heading and way, side by side on the pool; then the
+        // ranks of those that reform are handed round (it moves their orders'
+        // slots, one block at a time), and each anchor moves on, on the pool.
+        let blocks: Vec<(u64, Vec<usize>, Group)> = active
+            .into_iter()
+            .filter_map(|(id, rows)| Some((id, rows, self.state.formations.get(&id)?.clone())))
+            .collect();
+        let this = &*self;
+        let heads: Vec<Head> = self
+            .pool
+            .parallel_map_chunks(blocks.len(), 1, |_, range| {
+                blocks[range]
+                    .iter()
+                    .map(|(id, rows, group)| this.block_head(*id, rows.clone(), group.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .into_iter()
+            .flatten()
+            .collect();
+        for head in &heads {
             // Out of order after a pass, or wheeling through a turn: hand slots
             // to whoever is nearest them instead of swinging the whole block.
-            if !air
+            let group = &head.group;
+            if !head.air
                 && (group.phase == 1
-                    || (group.phase == 2 && (self.state.tick as u64 + id).is_multiple_of(4)))
+                    || (group.phase == 2 && (self.state.tick as u64 + head.id).is_multiple_of(4)))
             {
-                self.regroup_ranks(&rows, group.anchor, group.heading);
+                self.regroup_ranks(&head.rows, group.anchor, group.heading);
             }
-            let offset = |o: &Order| o.offset.rotate(group.heading - o.heading);
-            // Whether a member's rank, moved from `from` to `to` with the anchor, crosses ground it cannot.
-            let cut_off = |row: usize, from: FxVec2, to: FxVec2| {
-                let m = self.bp(row).motion.unwrap();
-                !self.nav.clear_segment(m.layer, m.size_class, from, to)
-            };
-            let n = rows.len();
-            // A spur or a boulder may cut off a few hulls: they go round it on
-            // their own and the block marches on. It files through only where
-            // most of its ranks cannot pass.
-            let crowded = |cut: usize| cut * 3 > n;
-            let mut worst = Fx::ZERO;
-            let mut cut = 0;
-            let mut astray = 0;
-            for &row in &rows {
-                let o = self.state.orders.front(&self.state.units, row).unwrap();
-                let slot = group.anchor + offset(o);
-                let pos = self.state.units.pos[row];
-                astray += (pos.distance(slot) > pace * 2) as usize;
-                if cut_off(row, pos, slot) {
-                    cut += 1;
-                } else {
-                    // The march paces itself on the members that can reach their ranks.
-                    worst = worst.max(pos.distance(slot));
-                }
-            }
-            // Clear of a pass once the ranks fit again and the way on is open,
-            // straight at the goal or along the route the next stretch.
-            let reopened = || {
-                let look = route
-                    * (pace * 3)
-                        .clamp(Fx::from_int(24), Fx::from_int(64))
-                        .min(delta.length());
-                let ahead = rows
+        }
+        let this = &*self;
+        let marched: Vec<(u64, Group, Option<Ranks>)> = self
+            .pool
+            .parallel_map_chunks(heads.len(), 1, |_, range| {
+                heads[range]
                     .iter()
-                    .filter(|&&row| {
-                        let o = self.state.orders.front(&self.state.units, row).unwrap();
-                        let slot = group.anchor + offset(o);
-                        cut_off(row, slot, slot + look)
+                    .map(|head| {
+                        let (group, block) = this.block_march(head);
+                        (head.id, group, block)
                     })
-                    .count();
-                cut * 4 <= n && (clear_ahead || ahead * 4 <= n)
-            };
-            if crowded(cut) || (group.phase == 3 && !reopened()) {
-                // A narrow passage may not fit the whole block. Let the existing
-                // per-hull navigation cross it, then recover ranks while moving on open ground.
-                group.anchor = mean;
-                group.phase = 3;
-                group.speed = Fx::ZERO;
-                self.state.formations.insert(id, group);
-                continue;
-            }
-            if group.phase == 3 {
-                group.phase = 1;
-                group.anchor = mean;
-            }
-            if air && astray * 2 > rows.len() {
-                // A flight coming off its attack runs is strewn over the sky
-                // round an anchor nobody was moving. Form up where the aircraft
-                // are and on the way, not back at slots left behind.
-                group.anchor = mean;
-            }
-            if group.phase == 1 && worst <= radius.max(Fx::from_int(5)) {
-                group.phase = 2;
-            }
-            // Leave immediately, keeping speed in reserve for members catching up.
-            // Formation error can slow the march, but must never create a rally pause.
-            // A flight on patrol holds its pace: its wings have speed in hand
-            // to close up, and an anchor that slows leaves them ahead of it.
-            let share = if sweep || worst < radius * 2 + Fx::from_int(14) {
-                Fx::ratio(7, 10)
-            } else {
-                Fx::ratio(2, 5)
-            };
-            let speed = if sweep {
-                pace * share
-            } else {
-                (pace * share).min(delta.length() * 2)
-            };
-            group.speed = group.speed.approach(speed, accel / DT);
-            let advance = if sweep {
-                route * (group.speed / DT)
-            } else {
-                route * (group.speed / DT).min(delta.length())
-            };
-            let mut candidate = group.anchor + advance;
-            let side = route.perp();
-            let blocked_by = |to: FxVec2| {
-                rows.iter()
-                    .filter(|&&row| {
-                        let o = self.state.orders.front(&self.state.units, row).unwrap();
-                        cut_off(row, group.anchor + offset(o), to + offset(o))
-                    })
-                    .count()
-            };
-            let mut cut = blocked_by(candidate);
-            if !air {
-                // Ranks the next stretch runs into ground: side the block away from
-                // them, so it skirts a mountain's flank a rank's width off instead
-                // of scraping along it. A pass pinching from both sides nets out.
-                // Ground past the goal is none of the block's business.
-                let look = route
-                    * (pace * 3)
-                        .clamp(Fx::from_int(24), Fx::from_int(64))
-                        .min(delta.length());
-                let mut lean = 0i32;
-                let mut facing_ground = false;
-                let mut width = Fx::ZERO;
-                for &row in &rows {
-                    let o = self.state.orders.front(&self.state.units, row).unwrap();
-                    let slot = group.anchor + offset(o);
-                    let across = offset(o).dot(side);
-                    width = width.max(across.abs());
-                    if cut_off(row, slot, slot + look) {
-                        facing_ground = true;
-                        if across.abs() > radius {
-                            lean -= across.signum() as i32;
-                        }
-                    }
-                }
-                let mut dodge = false;
-                let far = route
-                    * (pace * 8)
-                        .clamp(Fx::from_int(48), Fx::from_int(128))
-                        .min(delta.length());
-                if lean == 0 && !facing_ground {
-                    // Look further down the road for ground square across the front.
-                    facing_ground = rows.iter().all(|&row| {
-                        let o = self.state.orders.front(&self.state.units, row).unwrap();
-                        let slot = group.anchor + offset(o);
-                        cut_off(row, slot, slot + far)
-                    });
-                }
-                if lean == 0 && facing_ground {
-                    // Ground square across the whole front, a mountain dead ahead:
-                    // the block goes round it on one side rather than splitting
-                    // either side of it. Take the side with more open ground,
-                    // then the one the route already bends to.
-                    let shut = |shift: FxVec2| {
-                        rows.iter()
-                            .filter(|&&row| {
-                                let o = self.state.orders.front(&self.state.units, row).unwrap();
-                                let slot = group.anchor + shift + offset(o);
-                                !self.nav.passable(m.layer, m.size_class, slot + far)
-                            })
-                            .count()
-                    };
-                    let step = side * (width + radius * 2);
-                    let left = shut(step) + shut(step * Fx::from_int(2));
-                    let right = shut(-step) + shut(-step * Fx::from_int(2));
-                    let bend = delta.normalize().cross(route);
-                    lean = match left.cmp(&right) {
-                        std::cmp::Ordering::Less => 1,
-                        std::cmp::Ordering::Greater => -1,
-                        _ if bend < Fx::ZERO => -1,
-                        _ => 1,
-                    };
-                    dodge = true;
-                }
-                if lean != 0 {
-                    // Edge off only as fast as the ranks can follow.
-                    let rate = if dodge {
-                        pace / DT
-                    } else if worst < radius * 2 + Fx::from_int(14) {
-                        pace / DT / 2
-                    } else {
-                        pace / DT / 4
-                    };
-                    let slid = candidate + if lean > 0 { side } else { -side } * rate;
-                    let slid_cut = blocked_by(slid);
-                    if slid_cut <= cut && self.nav.passable(m.layer, m.size_class, slid) {
-                        candidate = slid;
-                        cut = slid_cut;
-                    }
-                }
-            }
-            // The anchor keeps to ground the block can drive, so a ridge too
-            // thin to cut off many ranks at once is not walked straight over.
-            let anchor_clear = !self.nav.passable(m.layer, m.size_class, group.anchor)
-                || self
-                    .nav
-                    .clear_segment(m.layer, m.size_class, group.anchor, candidate);
-            if anchor_clear && !crowded(cut) {
-                group.anchor = candidate;
-            } else {
-                group.phase = 3;
-                group.speed = Fx::ZERO;
-                group.anchor = mean;
-                self.state.formations.insert(id, group);
-                continue;
-            }
-            if sweep {
-                if group.phase != 3 && self.turn_onto_next_leg(rows[0], &group, yaw) {
-                    group.phase = PHASE_NEXT_LEG;
-                }
-            } else if group.anchor.distance(target) <= Fx::HALF {
-                group.anchor = target;
-                group.heading = first.heading;
-                group.speed = Fx::ZERO;
-            }
-            ranks.push(Ranks {
-                rows,
-                anchor: group.anchor,
-                heading: group.heading,
-                speed: group.speed,
-                route,
-                pace,
-                radius,
-                side,
-                target,
-                sweep,
-                air,
-            });
+                    .collect::<Vec<_>>()
+            })
+            .into_iter()
+            .flatten()
+            .collect();
+        for (id, group, block) in marched {
             self.state.formations.insert(id, group);
+            ranks.extend(block);
         }
         // Each member's way to its rank reads the ground round it: the members
         // of every block, side by side on the pool.
@@ -468,6 +147,428 @@ impl World {
             out[row] = Some(motion);
         }
         out
+    }
+
+    /// A block's heading and way this tick, before its ranks are handed round.
+    fn block_head(&self, id: u64, rows: Vec<usize>, mut group: Group) -> Head {
+        let first = *self.state.orders.front(&self.state.units, rows[0]).unwrap();
+        let target = first.pos;
+        let air = self.bp(rows[0]).motion.unwrap().layer == MoveLayer::Air;
+        // A flight on patrol sweeps round its loop like one aircraft: it
+        // never stops on a post, and turns no faster than its wings follow.
+        let sweep =
+            air && first.kind == OrderKind::Patrol && !self.bp(rows[0]).motion.unwrap().hover;
+        let mut mean = FxVec2::ZERO;
+        let mut pace = Fx::MAX;
+        let mut accel = Fx::MAX;
+        let mut radius = Fx::ZERO;
+        let mut yaw = i32::MAX;
+        for &row in &rows {
+            let o = self.state.orders.front(&self.state.units, row).unwrap();
+            mean += self.state.units.pos[row] - o.offset;
+            let m = self.bp(row).motion.unwrap();
+            pace = pace.min(m.speed);
+            accel = accel.min(m.accel);
+            yaw = yaw.min(m.turn_rate as i32);
+            radius = radius.max(self.bp(row).radius);
+        }
+        mean = FxVec2::new(mean.x / rows.len() as i32, mean.y / rows.len() as i32);
+        // The anchor turns at half the slowest wing's rate, so the outside
+        // of the flight has room to keep station through the turn.
+        let yaw = (yaw / 2).max(1);
+        if group.phase == 0 && sweep {
+            // Carry on the way the flight is already going, at its airspeed:
+            // the slots do not swing round to the new leg, and nobody brakes.
+            let units = &self.state.units;
+            let (mut dir, mut speed) = (FxVec2::ZERO, Fx::ZERO);
+            for &row in &rows {
+                dir += FxVec2::from_angle(units.heading[row]);
+                speed += units.speed[row];
+            }
+            group.heading = if dir == FxVec2::ZERO {
+                first.heading
+            } else {
+                dir.angle()
+            };
+            let mut anchor = FxVec2::ZERO;
+            for &row in &rows {
+                let o = self.state.orders.front(units, row).unwrap();
+                anchor += units.pos[row] - o.offset.rotate(group.heading - o.heading);
+            }
+            let n = rows.len() as i32;
+            group.anchor = FxVec2::new(anchor.x / n, anchor.y / n);
+            group.speed = (speed / n).min(pace);
+            group.phase = 1;
+        }
+        if group.phase == 0 {
+            group.anchor = mean;
+            group.heading = first.heading;
+            group.phase = 1;
+        }
+        let delta = target - group.anchor;
+        let m = self.bp(rows[0]).motion.unwrap();
+        let probe = group.anchor + delta.clamp_length(Fx::from_int(128));
+        // Straight on only while the block fits that way, not just its
+        // middle: a gap the anchor alone threads is for the route to find.
+        let clear_ahead = air
+            || self
+                .nav
+                .clear_segment(m.layer, m.size_class, group.anchor, probe)
+                && {
+                    let shut = rows
+                        .iter()
+                        .filter(|&&row| {
+                            let o = self.state.orders.front(&self.state.units, row).unwrap();
+                            let slot = group.anchor + o.offset.rotate(group.heading - o.heading);
+                            let mo = self.bp(row).motion.unwrap();
+                            !self.nav.clear_segment(
+                                mo.layer,
+                                mo.size_class,
+                                slot,
+                                slot + (probe - group.anchor),
+                            )
+                        })
+                        .count();
+                    shut * 3 <= rows.len()
+                };
+        let mut on_field = false;
+        let route = if sweep {
+            if delta != FxVec2::ZERO {
+                group.heading = group.heading.turn_toward(delta.angle(), yaw as u16);
+            }
+            FxVec2::from_angle(group.heading)
+        } else {
+            // Straight at the goal while the way is open and the field agrees
+            // with it; the probe sees only so far, and open ground that ends
+            // in a ridge's pocket is for the field to lead the block round.
+            let straight = delta.normalize();
+            match self
+                .nav
+                .sample(self.state.units.field[rows[0]], group.anchor)
+            {
+                Steer::Direction(d) if !(clear_ahead && d.dot(straight) > Fx::HALF) => {
+                    on_field = true;
+                    d
+                }
+                _ => straight,
+            }
+        };
+        // Slots turn with the route, returning to the requested facing on arrival.
+        let facing = if delta.length() < pace {
+            first.heading
+        } else if on_field && !air {
+            // A block faces where its way goes over the next stretch, not
+            // each kink the field makes under its anchor.
+            self.way_ahead(
+                self.state.units.field[rows[0]],
+                group.anchor,
+                route,
+                delta.length(),
+            )
+            .angle()
+        } else {
+            route.angle()
+        };
+        if !sweep && (group.phase == 1 || group.phase == 2) {
+            // A block wheels no faster than its outside ranks can keep up
+            // with speed in hand, or its inside ranks crowd together.
+            let wheel = if air {
+                m.turn_rate / 2
+            } else {
+                let mut reach = Fx::ONE;
+                for &row in &rows {
+                    reach = reach.max(
+                        self.state
+                            .orders
+                            .front(&self.state.units, row)
+                            .unwrap()
+                            .offset
+                            .length(),
+                    );
+                }
+                let spare = pace * Fx::ratio(3, 10);
+                let cap = (spare * 10430 / (reach * DT))
+                    .floor_int()
+                    .clamp(1, (m.turn_rate / 2) as i32) as u16;
+                // Beside a slope it turns with its way, to keep its ranks
+                // off it. Only worth asking when the cap holds it back.
+                let look = route
+                    * (pace * 3)
+                        .clamp(Fx::from_int(24), Fx::from_int(64))
+                        .min(delta.length());
+                let hemmed = || {
+                    rows.iter().any(|&row| {
+                        let o = self.state.orders.front(&self.state.units, row).unwrap();
+                        let slot = group.anchor + o.offset.rotate(group.heading - o.heading);
+                        let mo = self.bp(row).motion.unwrap();
+                        !self
+                            .nav
+                            .clear_segment(mo.layer, mo.size_class, slot, slot + look)
+                    })
+                };
+                if group.heading.delta_to(facing).unsigned_abs() > cap && hemmed() {
+                    m.turn_rate / 2
+                } else {
+                    cap
+                }
+            };
+            group.heading = group.heading.turn_toward(facing, wheel);
+        }
+        Head {
+            id,
+            rows,
+            group,
+            first,
+            target,
+            air,
+            sweep,
+            mean,
+            pace,
+            accel,
+            radius,
+            yaw,
+            delta,
+            m,
+            clear_ahead,
+            route,
+        }
+    }
+
+    /// Where a block's anchor moves this tick, and what its members keep rank
+    /// by (`None` when it stops to file through a pass).
+    fn block_march(&self, head: &Head) -> (Group, Option<Ranks>) {
+        let Head {
+            id: _,
+            ref rows,
+            ref group,
+            first,
+            target,
+            air,
+            sweep,
+            mean,
+            pace,
+            accel,
+            radius,
+            yaw,
+            delta,
+            m,
+            clear_ahead,
+            route,
+        } = *head;
+        let rows = rows.clone();
+        let mut group = group.clone();
+        let offset = |o: &Order| o.offset.rotate(group.heading - o.heading);
+        // Whether a member's rank, moved from `from` to `to` with the anchor, crosses ground it cannot.
+        let cut_off = |row: usize, from: FxVec2, to: FxVec2| {
+            let m = self.bp(row).motion.unwrap();
+            !self.nav.clear_segment(m.layer, m.size_class, from, to)
+        };
+        let n = rows.len();
+        // A spur or a boulder may cut off a few hulls: they go round it on
+        // their own and the block marches on. It files through only where
+        // most of its ranks cannot pass.
+        let crowded = |cut: usize| cut * 3 > n;
+        let mut worst = Fx::ZERO;
+        let mut cut = 0;
+        let mut astray = 0;
+        for &row in &rows {
+            let o = self.state.orders.front(&self.state.units, row).unwrap();
+            let slot = group.anchor + offset(o);
+            let pos = self.state.units.pos[row];
+            astray += (pos.distance(slot) > pace * 2) as usize;
+            if cut_off(row, pos, slot) {
+                cut += 1;
+            } else {
+                // The march paces itself on the members that can reach their ranks.
+                worst = worst.max(pos.distance(slot));
+            }
+        }
+        // Clear of a pass once the ranks fit again and the way on is open,
+        // straight at the goal or along the route the next stretch.
+        let reopened = || {
+            let look = route
+                * (pace * 3)
+                    .clamp(Fx::from_int(24), Fx::from_int(64))
+                    .min(delta.length());
+            let ahead = rows
+                .iter()
+                .filter(|&&row| {
+                    let o = self.state.orders.front(&self.state.units, row).unwrap();
+                    let slot = group.anchor + offset(o);
+                    cut_off(row, slot, slot + look)
+                })
+                .count();
+            cut * 4 <= n && (clear_ahead || ahead * 4 <= n)
+        };
+        if crowded(cut) || (group.phase == 3 && !reopened()) {
+            // A narrow passage may not fit the whole block. Let the existing
+            // per-hull navigation cross it, then recover ranks while moving on open ground.
+            group.anchor = mean;
+            group.phase = 3;
+            group.speed = Fx::ZERO;
+            return (group, None);
+        }
+        if group.phase == 3 {
+            group.phase = 1;
+            group.anchor = mean;
+        }
+        if air && astray * 2 > rows.len() {
+            // A flight coming off its attack runs is strewn over the sky
+            // round an anchor nobody was moving. Form up where the aircraft
+            // are and on the way, not back at slots left behind.
+            group.anchor = mean;
+        }
+        if group.phase == 1 && worst <= radius.max(Fx::from_int(5)) {
+            group.phase = 2;
+        }
+        // Leave immediately, keeping speed in reserve for members catching up.
+        // Formation error can slow the march, but must never create a rally pause.
+        // A flight on patrol holds its pace: its wings have speed in hand
+        // to close up, and an anchor that slows leaves them ahead of it.
+        let share = if sweep || worst < radius * 2 + Fx::from_int(14) {
+            Fx::ratio(7, 10)
+        } else {
+            Fx::ratio(2, 5)
+        };
+        let speed = if sweep {
+            pace * share
+        } else {
+            (pace * share).min(delta.length() * 2)
+        };
+        group.speed = group.speed.approach(speed, accel / DT);
+        let advance = if sweep {
+            route * (group.speed / DT)
+        } else {
+            route * (group.speed / DT).min(delta.length())
+        };
+        let mut candidate = group.anchor + advance;
+        let side = route.perp();
+        let blocked_by = |to: FxVec2| {
+            rows.iter()
+                .filter(|&&row| {
+                    let o = self.state.orders.front(&self.state.units, row).unwrap();
+                    cut_off(row, group.anchor + offset(o), to + offset(o))
+                })
+                .count()
+        };
+        let mut cut = blocked_by(candidate);
+        if !air {
+            // Ranks the next stretch runs into ground: side the block away from
+            // them, so it skirts a mountain's flank a rank's width off instead
+            // of scraping along it. A pass pinching from both sides nets out.
+            // Ground past the goal is none of the block's business.
+            let look = route
+                * (pace * 3)
+                    .clamp(Fx::from_int(24), Fx::from_int(64))
+                    .min(delta.length());
+            let mut lean = 0i32;
+            let mut facing_ground = false;
+            let mut width = Fx::ZERO;
+            for &row in &rows {
+                let o = self.state.orders.front(&self.state.units, row).unwrap();
+                let slot = group.anchor + offset(o);
+                let across = offset(o).dot(side);
+                width = width.max(across.abs());
+                if cut_off(row, slot, slot + look) {
+                    facing_ground = true;
+                    if across.abs() > radius {
+                        lean -= across.signum() as i32;
+                    }
+                }
+            }
+            let mut dodge = false;
+            let far = route
+                * (pace * 8)
+                    .clamp(Fx::from_int(48), Fx::from_int(128))
+                    .min(delta.length());
+            if lean == 0 && !facing_ground {
+                // Look further down the road for ground square across the front.
+                facing_ground = rows.iter().all(|&row| {
+                    let o = self.state.orders.front(&self.state.units, row).unwrap();
+                    let slot = group.anchor + offset(o);
+                    cut_off(row, slot, slot + far)
+                });
+            }
+            if lean == 0 && facing_ground {
+                // Ground square across the whole front, a mountain dead ahead:
+                // the block goes round it on one side rather than splitting
+                // either side of it. Take the side with more open ground,
+                // then the one the route already bends to.
+                let shut = |shift: FxVec2| {
+                    rows.iter()
+                        .filter(|&&row| {
+                            let o = self.state.orders.front(&self.state.units, row).unwrap();
+                            let slot = group.anchor + shift + offset(o);
+                            !self.nav.passable(m.layer, m.size_class, slot + far)
+                        })
+                        .count()
+                };
+                let step = side * (width + radius * 2);
+                let left = shut(step) + shut(step * Fx::from_int(2));
+                let right = shut(-step) + shut(-step * Fx::from_int(2));
+                let bend = delta.normalize().cross(route);
+                lean = match left.cmp(&right) {
+                    std::cmp::Ordering::Less => 1,
+                    std::cmp::Ordering::Greater => -1,
+                    _ if bend < Fx::ZERO => -1,
+                    _ => 1,
+                };
+                dodge = true;
+            }
+            if lean != 0 {
+                // Edge off only as fast as the ranks can follow.
+                let rate = if dodge {
+                    pace / DT
+                } else if worst < radius * 2 + Fx::from_int(14) {
+                    pace / DT / 2
+                } else {
+                    pace / DT / 4
+                };
+                let slid = candidate + if lean > 0 { side } else { -side } * rate;
+                let slid_cut = blocked_by(slid);
+                if slid_cut <= cut && self.nav.passable(m.layer, m.size_class, slid) {
+                    candidate = slid;
+                    cut = slid_cut;
+                }
+            }
+        }
+        // The anchor keeps to ground the block can drive, so a ridge too
+        // thin to cut off many ranks at once is not walked straight over.
+        let anchor_clear = !self.nav.passable(m.layer, m.size_class, group.anchor)
+            || self
+                .nav
+                .clear_segment(m.layer, m.size_class, group.anchor, candidate);
+        if anchor_clear && !crowded(cut) {
+            group.anchor = candidate;
+        } else {
+            group.phase = 3;
+            group.speed = Fx::ZERO;
+            group.anchor = mean;
+            return (group, None);
+        }
+        if sweep {
+            if group.phase != 3 && self.turn_onto_next_leg(rows[0], &group, yaw) {
+                group.phase = PHASE_NEXT_LEG;
+            }
+        } else if group.anchor.distance(target) <= Fx::HALF {
+            group.anchor = target;
+            group.heading = first.heading;
+            group.speed = Fx::ZERO;
+        }
+        let block = Ranks {
+            rows,
+            anchor: group.anchor,
+            heading: group.heading,
+            speed: group.speed,
+            route,
+            pace,
+            radius,
+            side,
+            target,
+            sweep,
+            air,
+        };
+        (group, Some(block))
     }
 
     /// Where member `row` of a block drives this tick to keep its rank.
