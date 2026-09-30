@@ -16,6 +16,7 @@ use super::{
     build, flag, has_flag, icons, refit, selection, whole, Hud, HudAction, Scene, HEALTHY, MASS,
 };
 use crate::audio::Sfx;
+use crate::selected::Selection;
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_data::{cat, UnitBlueprint};
@@ -480,6 +481,6 @@ fn tip(ui: &mut Ui, card: Rect, y: f32, all: &str) {
 }
 
 /// Whether the selection is exactly these units, in any order.
-pub(super) fn same_units(selection: &[u32], ids: &[u32]) -> bool {
+pub(super) fn same_units(selection: &Selection, ids: &[u32]) -> bool {
     selection.len() == ids.len() && ids.iter().all(|id| selection.contains(id))
 }
