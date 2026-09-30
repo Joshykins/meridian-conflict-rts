@@ -1,9 +1,9 @@
 //! Crash reports. The Windows build has no console, so a panic would otherwise
 //! vanish with the window. Every panic, on any thread, is written with a
 //! backtrace to `crash-<unix seconds>.log` beside the settings file, and the
-//! default hook still prints it to stderr. Every report ends with the last lines
-//! of the log (the GPU and driver, how far loading got), which a player's stderr
-//! would otherwise lose.
+//! default hook still prints it to stderr. Every report ends with the log's first
+//! lines (the GPU and driver) and its last (how far the game got), which a
+//! player's stderr would otherwise lose.
 
 use std::collections::VecDeque;
 use std::io::Write;
@@ -14,23 +14,41 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Keeps this many reports; older ones are deleted when a new one is written.
 const KEEP: usize = 10;
 
-/// Log lines kept for the reports.
+/// Log lines kept for the reports: the first ones (the GPU and driver are named
+/// at start-up), and the last ones.
+const HEAD_LINES: usize = 40;
 const TAIL_LINES: usize = 200;
 
-static TAIL: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+struct Kept {
+    head: Vec<String>,
+    tail: VecDeque<String>,
+    /// Lines dropped between the head and the tail.
+    skipped: usize,
+}
 
-/// The log's writer: everything goes to stderr as before, and the last
-/// `TAIL_LINES` lines are kept for a report.
+static KEPT: Mutex<Kept> = Mutex::new(Kept {
+    head: Vec::new(),
+    tail: VecDeque::new(),
+    skipped: 0,
+});
+
+/// The log's writer: everything goes to stderr as before, and the first
+/// `HEAD_LINES` and last `TAIL_LINES` lines are kept for a report.
 pub struct LogTee;
 
 impl Write for LogTee {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if let Ok(mut tail) = TAIL.lock() {
+        if let Ok(mut kept) = KEPT.lock() {
             for line in String::from_utf8_lossy(buf).lines() {
-                if tail.len() == TAIL_LINES {
-                    tail.pop_front();
+                if kept.head.len() < HEAD_LINES {
+                    kept.head.push(line.to_owned());
+                    continue;
                 }
-                tail.push_back(line.to_owned());
+                if kept.tail.len() == TAIL_LINES {
+                    kept.tail.pop_front();
+                    kept.skipped += 1;
+                }
+                kept.tail.push_back(line.to_owned());
             }
         }
         std::io::stderr().write_all(buf)?;
@@ -45,11 +63,18 @@ impl Write for LogTee {
 /// The kept log lines, or nothing when the lock is held or poisoned (a panic
 /// while a line was being kept): a report never waits on it.
 fn log_tail() -> String {
-    let Ok(tail) = TAIL.try_lock() else {
+    let Ok(kept) = KEPT.try_lock() else {
         return String::new();
     };
-    let mut text = String::from("\nrecent log:\n");
-    for line in tail.iter() {
+    let mut text = String::from("\nlog:\n");
+    for line in &kept.head {
+        text.push_str(line);
+        text.push('\n');
+    }
+    if kept.skipped > 0 {
+        text.push_str(&format!("... {} lines ...\n", kept.skipped));
+    }
+    for line in &kept.tail {
         text.push_str(line);
         text.push('\n');
     }

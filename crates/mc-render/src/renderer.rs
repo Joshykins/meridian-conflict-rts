@@ -5910,7 +5910,7 @@ impl Drop for Renderer {
             for fb in self.bloom_fbs.drain(..).chain(self.glass_fbs.drain(..)) {
                 device.destroy_framebuffer(fb, None);
             }
-            self.timers.destroy(device);
+            self.timers.destroy(&self.gpu);
             self.capture.destroy(&self.gpu);
             device.destroy_fence(self.fence, None);
             device.destroy_semaphore(self.image_available, None);

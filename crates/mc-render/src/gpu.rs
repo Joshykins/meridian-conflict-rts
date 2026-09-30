@@ -20,6 +20,9 @@ pub struct Gpu {
     pub command_pool: vk::CommandPool,
     /// Pipeline statistics queries (triangles, shader invocations) are enabled.
     pub pipeline_stats: bool,
+    /// `VK_AMD_buffer_marker`, where the driver has it: the GPU timer scopes leave
+    /// breadcrumbs with it, so a lost device can say which pass never finished.
+    pub(crate) buffer_marker: Option<ash::amd::buffer_marker::Device>,
     /// Device memory allocations not yet freed. Every buffer and image goes through
     /// `allocate` and the `destroy_*` functions, so a resource its owner forgot shows
     /// up here when the device goes (CLAUDE.md section 6: GPU resources are owned).
@@ -165,6 +168,12 @@ impl Gpu {
         {
             extensions.push(ash::khr::portability_subset::NAME.as_ptr());
         }
+        let has_marker = available
+            .iter()
+            .any(|e| e.extension_name_as_c_str() == Ok(ash::amd::buffer_marker::NAME));
+        if has_marker {
+            extensions.push(ash::amd::buffer_marker::NAME.as_ptr());
+        }
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_info)
             .enabled_features(&features)
@@ -178,6 +187,8 @@ impl Gpu {
         let queue = unsafe { device.get_device_queue(queue_family, 0) };
         let swapchain_fn =
             (!headless).then(|| ash::khr::swapchain::Device::new(&instance, &device));
+        let buffer_marker =
+            has_marker.then(|| ash::amd::buffer_marker::Device::new(&instance, &device));
 
         let pool_info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(queue_family)
@@ -220,6 +231,7 @@ impl Gpu {
             swapchain_fn,
             command_pool,
             pipeline_stats,
+            buffer_marker,
             live_allocations: Default::default(),
         })
     }

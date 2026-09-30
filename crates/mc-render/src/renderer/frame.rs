@@ -5,6 +5,14 @@ use super::*;
 impl Renderer {
     /// Renders one frame. Returns `false` if the swapchain had to be rebuilt and the frame was skipped.
     pub fn render(&mut self, input: &FrameInput) -> Result<bool, GpuError> {
+        let result = self.render_frame(input);
+        if matches!(result, Err(GpuError::Vk(vk::Result::ERROR_DEVICE_LOST))) {
+            self.timers.lost();
+        }
+        result
+    }
+
+    fn render_frame(&mut self, input: &FrameInput) -> Result<bool, GpuError> {
         let device = self.gpu.device.clone();
         {
             // Time spent waiting for the GPU to finish the frame before this one.
