@@ -54,6 +54,7 @@ mod nukes;
 mod path_budget;
 mod patrol;
 mod pause;
+mod pinned_hulls;
 mod place;
 mod player_orders;
 mod radar;

@@ -24,6 +24,8 @@ const PERSONAL_SPACE: Fx = Fx::from_int(2);
 const MAX_PUSH: Fx = Fx::from_int(2);
 /// A unit that has made no headway for this long gives up on its order.
 const GIVE_UP_TICKS: u16 = 300;
+/// Ticks without progress before the crowd stops steering a hull onto ground it cannot stand on.
+const PINNED_TICKS: u16 = 20;
 /// Landing is slower than climb/cruise terrain following, with a soft final flare.
 const LANDING_SPEED: Fx = Fx::from_int(12);
 const TOUCHDOWN_SPEED: Fx = Fx::from_int(2);
@@ -1275,7 +1277,24 @@ impl World {
         let mut target_speed = Fx::ZERO;
         if dir != FxVec2::ZERO && !waiting && !(transit_air && dist <= Fx::HALF) {
             let crowd = (push.length() / radius).min(Fx::ratio(3, 2));
-            let steer = dir + push.normalize() * crowd;
+            let mut steer = dir + push.normalize() * crowd;
+            // Once it is getting nowhere, the crowd no longer turns a hull onto ground
+            // it cannot stand on: pinned against a bank by a neighbour, it would face
+            // the bank and never leave. (Before then the crowd steers it as ever: a
+            // block marching round a slope keeps its spacing that way.)
+            if steer != FxVec2::ZERO
+                && motion.layer != MoveLayer::Air
+                && units.stuck_ticks[row] >= PINNED_TICKS
+                && [Fx::from_int(4), radius].into_iter().any(|ahead| {
+                    !self.nav.passable(
+                        motion.layer,
+                        motion.size_class,
+                        pos + steer.normalize() * ahead,
+                    )
+                })
+            {
+                steer = dir;
+            }
             let want = if steer == FxVec2::ZERO {
                 dir.angle()
             } else {
@@ -1419,6 +1438,8 @@ impl World {
             out.speed = Fx::ZERO;
             step = FxVec2::ZERO;
         }
+        // The hull's own drive, before the crowd's push goes on top.
+        let drive = step;
         if push != FxVec2::ZERO {
             step += push.clamp_length(MAX_PUSH) * Fx::HALF;
         }
@@ -1448,6 +1469,11 @@ impl World {
                 out.pos = slide_x;
             } else if step.y != Fx::ZERO && ok(slide_y) {
                 out.pos = slide_y;
+            } else if drive != step && drive != FxVec2::ZERO && ok(clamp(pos + drive)) {
+                // The crowd shoves it onto ground it cannot stand on: two big hulls
+                // overlapping by a bank push each other into it, and with the push
+                // in every step neither could ever gather way and drive clear.
+                out.pos = clamp(pos + drive);
             } else {
                 out.speed = Fx::ZERO;
             }
