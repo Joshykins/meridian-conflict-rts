@@ -1,6 +1,6 @@
 //! Area assist: an engineer on guard works its whole ring, not only what is in reach of
 //! its spot. A few times a second it looks for work inside the area, nearest first by
-//! kind: a structure going up (or one upgrading) to help raise, then a friend to mend,
+//! kind: a structure going up (or a unit upgrading or refitting) to help raise, then a friend to mend,
 //! then, only while there is room to store the mass, a wreck to reclaim. It goes and does
 //! it with an order put in front of the guard, which carries on when that is done, so
 //! work that turns up later is picked up too. Reclaim is the least of it: a wreck in hand
@@ -120,17 +120,17 @@ impl World {
     }
 
     /// Whether a builder of `owner` helps raise `t` from its area: a friendly site going
-    /// up, or a friendly structure putting its next tier on.
+    /// up, or a friendly unit putting its next tier on (a structure's upgrade, or a
+    /// commander's refit).
     fn area_raise(&self, owner: u8, t: usize) -> bool {
         let units = &self.state.units;
         if self.are_enemies(owner, units.owner[t]) || units.has_flag(t, flag::IN_FACTORY) {
             return false;
         }
         units.has_flag(t, flag::UNDER_CONSTRUCTION)
-            || (!self.bp(t).is_mobile()
-                && units
-                    .row(units.build_target[t])
-                    .is_some_and(|u| units.has_flag(u, flag::UPGRADE)))
+            || units
+                .row(units.build_target[t])
+                .is_some_and(|u| units.has_flag(u, flag::UPGRADE))
     }
 
     fn area_take(&mut self, row: usize, work: Order) -> Result<bool, SimError> {

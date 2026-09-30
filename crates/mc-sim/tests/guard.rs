@@ -275,6 +275,60 @@ fn an_engineer_on_guard_works_its_whole_area_and_takes_up_new_work() {
     );
 }
 
+#[test]
+fn an_area_engineer_helps_a_commander_refit_in_its_ring() {
+    let mut w = field();
+    give(
+        &mut w,
+        0,
+        Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        },
+    );
+    let mason = add(&mut w, 0, "aster_t1_engineer", 500, 500);
+    let acu = add(&mut w, 0, "aster_commander", 750, 500);
+    let units = vec![id(&w, mason)];
+    give(
+        &mut w,
+        0,
+        Command::Guard {
+            units,
+            pos: FxVec2::from_ints(500, 500),
+            target: mc_sim::Handle::NONE,
+            radius: Fx::from_int(400),
+            queue: false,
+        },
+    );
+    let bare = w.state.units.blueprint[acu];
+    let kit = w
+        .blueprints
+        .refit_set(bare)
+        .unwrap()
+        .slots
+        .iter()
+        .flat_map(|s| &s.modules)
+        .find(|m| m.key == "eng_2")
+        .unwrap()
+        .kit;
+    let units = vec![id(&w, acu)];
+    give(&mut w, 0, Command::Refit { units, kit });
+    let commander = id(&w, acu);
+    let helping = until(&mut w, 600, |w| {
+        w.state
+            .orders
+            .front(&w.state.units, mason)
+            .is_some_and(|o| o.kind == OrderKind::Assist && o.target == commander)
+            && w.state.units.has_flag(mason, flag::BUILDING)
+    });
+    assert!(helping.is_some(), "it went to help with the refit");
+    let refitted = until(&mut w, 3000, |w| w.state.units.blueprint[acu] != bare);
+    assert!(refitted.is_some(), "the refit finished");
+    run(&mut w, 30);
+    let o = w.state.orders.front(&w.state.units, mason).unwrap();
+    assert_eq!(o.kind, OrderKind::Guard, "then it went back on guard");
+}
+
 /// An engineer on Area Assist at work on a wreck that holds far more mass than it can
 /// take in the test: the wreck and the engineer's row.
 fn area_engineer_on_a_wreck() -> (World, usize, usize) {
