@@ -100,6 +100,17 @@ impl World {
                     h.write_i64(r.exit.x.0);
                     h.write_i64(r.exit.y.0);
                 }
+                h.write_u64(s.batches.len() as u64);
+                for (&id, b) in &s.batches {
+                    h.write_u64(id.0 as u64);
+                    h.write_u64(b.made as u64);
+                    h.write_u64(b.held.len() as u64);
+                    for (u, at) in &b.held {
+                        h.write_u64(u.0 as u64);
+                        h.write_i64(at.x.0);
+                        h.write_i64(at.y.0);
+                    }
+                }
             }),
             section(&|h| {
                 if let Some(survival) = &s.survival {

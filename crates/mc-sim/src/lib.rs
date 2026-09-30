@@ -25,6 +25,7 @@ mod air_support;
 pub mod aircraft_crash;
 mod area_work;
 mod assist_follow;
+pub mod batch;
 pub mod combat;
 pub mod command;
 mod curve;

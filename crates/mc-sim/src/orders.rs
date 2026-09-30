@@ -325,6 +325,8 @@ impl World {
                 }
                 Ok(())
             }
+            Command::SetBatch { factories, batch } => self.set_batch(player, factories, *batch),
+            Command::ReleaseBatch { factories } => self.send_batches(player, factories),
             Command::CopyFactoryOrders { factories, from } => {
                 self.copy_standing(player, factories, *from);
                 Ok(())
@@ -1389,6 +1391,7 @@ impl World {
 
     pub(crate) fn run_orders(&mut self) -> Result<(), SimError> {
         self.run_rollouts()?;
+        self.run_batches()?;
         // Units spawned while orders run start acting next tick.
         let rows = self.state.units.slots.rows();
         for row in 0..rows {
@@ -3017,8 +3020,12 @@ impl World {
         })
     }
 
-    /// A hull out of the bay takes its factory's standing orders, or heads for the rally point.
+    /// A hull out of the bay joins its factory's batch, or takes its standing orders, or
+    /// heads for the rally point.
     fn send_off(&mut self, row: usize, t: usize, exit: FxVec2) -> Result<(), SimError> {
+        if self.join_batch(row, t)? {
+            return Ok(());
+        }
         let pos = self.state.units.pos[row];
         // Standing orders are the way out; without any, or none it can carry out, the rally point.
         if !self.inherit_standing(row, t)? {

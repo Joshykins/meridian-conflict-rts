@@ -123,6 +123,11 @@ pub enum HudAction {
     /// Take the refit to this kit, or the upgrade to this tier, out of the selection's queues.
     CancelRefit(BlueprintId),
     Repeat(bool),
+    /// The selected factories' products form up outside and leave together (`true`), or
+    /// each leaves as it is made, those waiting at once.
+    Batch(bool),
+    /// The selected factories' batches leave now, as many as are waiting.
+    SendBatch,
     /// Take one queued order out of the selection's queues: the one of `kind` at `pos`.
     CancelOrder {
         kind: mc_sim::tables::OrderKind,

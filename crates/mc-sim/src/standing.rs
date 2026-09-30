@@ -246,22 +246,40 @@ impl World {
     ) -> Result<bool, SimError> {
         let units = &mut self.state.units;
         units.fire_state[product] = units.fire_state[factory];
-        if units.standing[factory].is_empty() {
-            return Ok(false);
-        }
-        let owner = units.owner[factory];
         let id = units.id(product);
-        for mut command in units.standing[factory].clone() {
-            if let Some((units, _)) = keepable(&mut command) {
-                *units = vec![id];
-            }
-            self.apply_as(owner, &command)?;
+        if !self.give_standing(factory, &[id], false)? {
+            return Ok(false);
         }
         Ok(self
             .state
             .orders
             .front(&self.state.units, product)
             .is_some())
+    }
+
+    /// Gives `ids` the factory's standing orders as one group; with `replace`, in place of
+    /// whatever they were doing, else behind it. False if it has none.
+    pub(crate) fn give_standing(
+        &mut self,
+        factory: usize,
+        ids: &[UnitId],
+        replace: bool,
+    ) -> Result<bool, SimError> {
+        let units = &self.state.units;
+        if units.standing[factory].is_empty() {
+            return Ok(false);
+        }
+        let owner = units.owner[factory];
+        for (i, mut command) in units.standing[factory].clone().into_iter().enumerate() {
+            if let Some((units, queue)) = keepable(&mut command) {
+                *units = ids.to_vec();
+                if replace && i == 0 {
+                    *queue = false;
+                }
+            }
+            self.apply_as(owner, &command)?;
+        }
+        Ok(true)
     }
 
     /// A factory's standing orders, front first, as the interface draws them.

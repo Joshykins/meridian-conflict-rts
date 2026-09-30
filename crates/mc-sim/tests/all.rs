@@ -33,6 +33,7 @@ mod economy;
 mod engineer_upgrade;
 mod factions;
 mod factory;
+mod factory_batch;
 mod factory_orders;
 mod fog;
 mod formation_terrain;

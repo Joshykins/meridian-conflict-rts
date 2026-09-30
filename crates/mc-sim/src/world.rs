@@ -109,6 +109,9 @@ pub struct State {
     /// Finished hulls driving off their factory's pad while it prints the next (`orders.rs`).
     #[serde(default)]
     pub rollouts: std::collections::BTreeMap<UnitId, crate::orders::Rollout>,
+    /// Factories with batch on, by factory, and the units each holds (`batch.rs`).
+    #[serde(default)]
+    pub batches: std::collections::BTreeMap<UnitId, crate::batch::Batch>,
     /// Nuclear silos and interceptor arrays, warheads in flight, blasts running out (`nukes.rs`).
     #[serde(default)]
     pub strategic: crate::nukes::Strategic,
@@ -401,6 +404,7 @@ impl World {
             mines: Default::default(),
             survival: None,
             rollouts: Default::default(),
+            batches: Default::default(),
             strategic: Default::default(),
         };
         let water = terrain.water_level();

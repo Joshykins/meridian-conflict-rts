@@ -1,7 +1,7 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
 //! curving charges, a warp into a dampener and the stun it leaves, wrecks worn down by
-//! blasts) must hash identically at every worker count and after a snapshot is
+//! blasts, a factory's batch forming up) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -126,6 +126,9 @@ fn setup(w: &mut World) {
                 // A Courier that warps into the north's dampener (`warp.rs`), on its own power.
                 add("aster_t1_lift_ship", 1, 2000, 100);
                 add("aster_t3_power", 1, 400, 150);
+                // A factory with batch on: its scouts form up by it and join the attack
+                // together (`batch.rs`), one of them waiting across the snapshot.
+                add("aster_t1_land_factory", 1, 200, 450);
                 // Two submarines already in the north's waters, raiding its fleet past its
                 // torpedo launchers (the north's grid is paid, so they stand to).
                 add("aster_t1_submarine", 2, 3000, 3350);
@@ -167,6 +170,46 @@ fn units_of(w: &World, player: u8) -> Vec<UnitId> {
         .collect()
 }
 
+/// The south's factory, its standing orders the tick-1 attack-move: batch on, three
+/// scouts a lap, repeating.
+fn batch_on(w: &World) -> Vec<PlayerCommand> {
+    let factories = vec![factory(w)];
+    [
+        // The mass storage's worth in hand to build them with.
+        Command::DebugStock {
+            player: 0,
+            mass: Some(1000),
+            energy: None,
+        },
+        Command::SetBatch {
+            factories: factories.clone(),
+            batch: true,
+        },
+        Command::SetRepeat {
+            factories: factories.clone(),
+            repeat: true,
+        },
+        Command::Produce {
+            factories,
+            blueprint: w.blueprints.id_of("aster_t1_scout").unwrap(),
+            count: 3,
+        },
+    ]
+    .into_iter()
+    .map(|command| PlayerCommand { player: 0, command })
+    .collect()
+}
+
+fn factory(w: &World) -> UnitId {
+    let bp = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let u = &w.state.units;
+    u.slots
+        .iter()
+        .find(|&r| u.blueprint[r] == bp)
+        .map(|r| u.id(r))
+        .unwrap()
+}
+
 /// The commands given on `tick`, the same in every run.
 fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
     match tick {
@@ -180,6 +223,7 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                     queue: false,
                 },
             })
+            .chain(batch_on(w))
             // The economy's focus (`focus.rs`): held in each side's state, and restored.
             .chain([PlayerCommand {
                 player: 1,
@@ -269,6 +313,8 @@ fn reference() -> Vec<u64> {
     let mut intercepted = 0;
     let mut struck = 0;
     let titan_sub = w.blueprints.id_of("aster_t4_submarine").unwrap();
+    let fid = factory(&w);
+    let (mut last_held, mut batches_sent, mut held_at_snapshot) = (0, 0, 0);
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -281,6 +327,15 @@ fn reference() -> Vec<u64> {
                         if *blueprint == titan_sub)
                 })
                 .count();
+            let held = w.state.batches.get(&fid).map_or(0, |b| b.held.len());
+            // Two waiting, then none: the third came out and all three left.
+            if last_held == 2 && held == 0 {
+                batches_sent += 1;
+            }
+            last_held = held;
+            if t == SNAPSHOT_AT {
+                held_at_snapshot = held;
+            }
             intercepted += w
                 .events
                 .iter()
@@ -289,6 +344,9 @@ fn reference() -> Vec<u64> {
             hash
         })
         .collect();
+    // The factory's scouts formed up, waited across the snapshot and left together.
+    assert!(held_at_snapshot > 0, "no batch was waiting at the snapshot");
+    assert!(batches_sent > 0, "no batch filled and left");
     // The seabed installation's interceptors met the submarines' torpedoes.
     assert!(intercepted > 0, "no torpedo was intercepted in the match");
     // The experimental submarine's strike missiles went up on their high arc.

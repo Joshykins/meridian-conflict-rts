@@ -242,7 +242,7 @@ fn chaos(
             .unwrap_or(any_bp);
         let pos = near(rng, anchor);
         let queue = rng.below(3) == 0;
-        let command = match rng.below(36) {
+        let command = match rng.below(38) {
             0..=4 => Command::Move {
                 units: group,
                 target: pos,
@@ -407,6 +407,11 @@ fn chaos(
                 radius: Fx::from_int(rng.below(3000) as i32),
                 queue,
             },
+            35 => Command::SetBatch {
+                factories: group,
+                batch: rng.below(2) == 0,
+            },
+            36 => Command::ReleaseBatch { factories: group },
             _ => {
                 // Bytes that do not decode are skipped everywhere the same way.
                 let len = rng.below(40) as usize;

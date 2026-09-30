@@ -928,8 +928,10 @@ fn a_factory_card_orders_its_units_and_its_queue_holds_repeat() {
     assert_eq!(rig.click(order_slot(3, 2)), vec![HudAction::Stop]);
     let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
     assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
-    // Pause sits beside it on the strip.
-    let pause = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
+    // Batch sits beside it on the strip, and Pause beside that.
+    let batch = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
+    assert_eq!(rig.click(batch), vec![HudAction::Batch(true)]);
+    let pause = Vec2::new(batch.x - 48.0 - 10.0 - 48.0, repeat.y);
     assert_eq!(rig.click(pause), vec![HudAction::PauseWork(true)]);
 }
 
@@ -974,7 +976,7 @@ fn paused_work_offers_resume_on_the_card() {
         vec![HudAction::PauseWork(false)]
     );
     let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
-    let resume = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
+    let resume = Vec2::new(repeat.x - 2.0 * (48.0 + 10.0 + 48.0), repeat.y);
     assert_eq!(rig.click(resume), vec![HudAction::PauseWork(false)]);
     // A tank has no work to pause: its card has no such order.
     let mut rig = Rig::new("aster_t1_tank");
@@ -1613,5 +1615,6 @@ fn a_lift_ship_hold_lets_out_what_is_clicked_and_its_card_lands_and_takes_off() 
     assert_eq!(super::cargo::status(&out).0, "Unloading \u{b7} 2 left");
 }
 
+mod batch;
 mod idle;
 mod warp;

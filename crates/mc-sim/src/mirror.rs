@@ -20,10 +20,12 @@ use mc_core::{Fx, FxVec3, TICKS_PER_SECOND};
 use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
+mod batch;
 mod walls;
 mod warp;
 mod wrecks;
 
+pub use batch::{BatchView, UNIT_BATCH};
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
 pub use wrecks::WRECK_EXTRA_INSTANCES;
@@ -530,6 +532,12 @@ impl UnitInstance {
         self.stored().then_some(self.status[2])
     }
 
+    /// A factory with batch on (`UNIT_BATCH`): its products form up and leave together.
+    pub fn batching(&self) -> bool {
+        self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
+            && self.status[0] & UNIT_BATCH != 0
+    }
+
     /// Work paused by its player: it keeps its queue but builds nothing.
     pub fn paused(&self) -> bool {
         self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) == 0
@@ -775,6 +783,8 @@ pub struct UnitOrders {
     pub warp_recharge: f32,
     /// Seconds before its stun wears off (`crate::warp`); zero when not stunned.
     pub stunned: f32,
+    /// A factory with batch on: its muster block and who stands in it.
+    pub batch: Option<BatchView>,
 }
 
 /// A lift ship as the interface shows it: its hold (`transport.rs`).
@@ -1711,8 +1721,9 @@ impl World {
                 continue;
             }
             // A pause is an order, not something the enemy can see: no mark on their side.
-            let paused_mark = s.units.paused[row]
-                && !viewer.is_some_and(|v| self.are_enemies(v, s.units.owner[row]));
+            let own_view = !viewer.is_some_and(|v| self.are_enemies(v, s.units.owner[row]));
+            let paused_mark = s.units.paused[row] && own_view;
+            let batch_mark = own_view && self.batching(row);
             let site = self.structure_upgrade(row);
             let refit = s.orders.front(&s.units, row).filter(|o| {
                 o.kind == crate::tables::OrderKind::Upgrade && self.upgrades_in_place(row)
@@ -1957,6 +1968,7 @@ impl World {
                             0
                         }
                         | if paused_mark { UNIT_PAUSED } else { 0 }
+                        | if batch_mark { UNIT_BATCH } else { 0 }
                         | if stored { UNIT_STORED } else { 0 }
                         | self.lift_gear(row) << UNIT_GEAR_SHIFT
                         | if !stored && deck_up(row).is_some() {
@@ -2877,6 +2889,7 @@ impl World {
                 cargo: self.cargo_view(row),
                 warp_recharge: self.warp_recharge_seconds(row),
                 stunned: self.stun_seconds(row),
+                batch: self.batch_view(row),
             });
         }
     }

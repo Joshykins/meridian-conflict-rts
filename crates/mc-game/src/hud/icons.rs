@@ -639,6 +639,8 @@ pub enum Glyph {
     TakeOff,
     /// A capital ship jumps: streaks running into a point, and the ring it comes out of.
     Warp,
+    /// A factory's batch: a block of units held behind a gate.
+    Batch,
 }
 
 /// Two strokes meeting at `tip`, opening away from `dir`.
@@ -767,6 +769,27 @@ pub fn glyph(ui: &mut Ui, glyph: Glyph, c: Vec2, r: f32, color: Color) {
                 c + Vec2::from_angle(5.75) * r * 0.8,
                 Vec2::from_angle(5.75 + FRAC_PI_2),
                 r * 0.35,
+                t,
+                color,
+            );
+        }
+        Glyph::Batch => {
+            // Two rows of three, waiting behind the gate on the right.
+            let s = r * 0.34;
+            for (dx, dy) in [
+                (-0.85, -0.42),
+                (-0.3, -0.42),
+                (0.25, -0.42),
+                (-0.85, 0.42),
+                (-0.3, 0.42),
+                (0.25, 0.42),
+            ] {
+                let p = c + Vec2::new(dx * r, dy * r);
+                ui.fill(Rect::new(p.x - s * 0.5, p.y - s * 0.5, s, s), color);
+            }
+            ui.stroke(
+                c + Vec2::new(r * 0.8, -r * 0.9),
+                c + Vec2::new(r * 0.8, r * 0.9),
                 t,
                 color,
             );

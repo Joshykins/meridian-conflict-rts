@@ -373,6 +373,15 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                     .filter(|u| s.bp(u).has(cat::FACTORY))
                     .map(|u| has_flag(u, flag::REPEAT)),
             ),
+            batch: Split::count(
+                units
+                    .iter()
+                    .filter(|u| s.bp(u).has(cat::FACTORY))
+                    .map(|u| u.batching()),
+            ),
+            muster: queue
+                .and_then(|q| q.batch.as_ref())
+                .map(|b| (b.made, b.size)),
             pause: Split::count(
                 units
                     .iter()

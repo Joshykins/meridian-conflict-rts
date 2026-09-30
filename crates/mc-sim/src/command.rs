@@ -351,6 +351,17 @@ pub enum Command {
         pos: FxVec2,
         queue: bool,
     },
+    /// Batch on: each factory's products form up outside it and wait for the rest of its
+    /// queue (one lap of a repeating one), then leave together on its standing orders
+    /// (`batch.rs`). Off: whoever is waiting leaves at once.
+    SetBatch {
+        factories: Vec<UnitId>,
+        batch: bool,
+    },
+    /// Each factory's batch leaves now, as many as have formed up.
+    ReleaseBatch {
+        factories: Vec<UnitId>,
+    },
 }
 
 impl Command {
@@ -413,7 +424,9 @@ impl Command {
             | Command::CancelProduce { factories, .. }
             | Command::SetRepeat { factories, .. }
             | Command::SetRally { factories, .. }
-            | Command::CopyFactoryOrders { factories, .. } => factories.len(),
+            | Command::CopyFactoryOrders { factories, .. }
+            | Command::SetBatch { factories, .. }
+            | Command::ReleaseBatch { factories } => factories.len(),
             Command::Resign
             | Command::DebugSpawn { .. }
             | Command::DebugClear

@@ -23,6 +23,7 @@ use mc_sim::{Command, Handle};
 use std::collections::HashSet;
 
 mod guard_rings;
+mod muster;
 mod reclaim_rings;
 mod wall_line;
 
@@ -1283,6 +1284,9 @@ impl OrderMap {
             };
             let lively = selected || view.shift;
             let guard = guard_look(field.blueprints, unit);
+            if let Some(batch) = &queue.batch {
+                muster::muster_block(ui, field, batch, strength);
+            }
             // A group's line leaves from the middle of the group, a lone unit's from the unit.
             let (mut origin, start) = match queue.orders.first() {
                 Some(o) if o.formation != 0 => {
@@ -1295,6 +1299,15 @@ impl OrderMap {
                     Origin::Unit(queue.unit_id),
                     Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha),
                 ),
+            };
+            // A batch leaves from where it forms up, not from the factory.
+            let start = match queue.batch.as_ref().filter(|b| !b.places.is_empty()) {
+                Some(b) => {
+                    let sum: Vec2 = b.places.iter().map(|&(p, _)| Vec2::from(p)).sum();
+                    let c = sum / b.places.len() as f32;
+                    c.extend(renderer.surface_height(c))
+                }
+                None => start,
             };
             let mut from = camera.project(start);
             // Where the line so far ends, world metres: a circling guard's line stops at its circle.

@@ -1339,7 +1339,7 @@ pub fn orders(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r:
 }
 
 /// The shift key's mark, an outlined arrow up, centred on `c`: before a key cap it means Shift+key.
-fn shift_mark(ui: &mut Ui, c: Vec2, color: crate::ui::Color) {
+pub(in crate::hud) fn shift_mark(ui: &mut Ui, c: Vec2, color: crate::ui::Color) {
     let (top, w, stem) = (c + Vec2::new(0.0, -5.5), 4.5, 2.2);
     let points = [
         top,

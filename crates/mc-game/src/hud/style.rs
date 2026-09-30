@@ -113,7 +113,7 @@ pub enum Family {
 }
 
 impl Family {
-    pub fn tone(self) -> u32 {
+    pub const fn tone(self) -> u32 {
         match self {
             Family::Movement => 0x7FD0FF,
             Family::Combat => 0xFF4B3A,
