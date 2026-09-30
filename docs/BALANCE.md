@@ -1,6 +1,7 @@
 # Economy and tier balance
 
 The rules the Aster numbers follow. Change the rule, then the numbers, not one unit at a time.
+How to play them, and the economy race that measures it, is in `ECONOMY.md`.
 
 ## Tiers
 

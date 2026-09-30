@@ -87,6 +87,7 @@ mod zz_ai_stall_probe;
 mod zz_ai_stream_probe;
 mod zz_ai_threat_probe;
 mod zz_dogfight_probe;
+mod zz_eco_race_probe;
 mod zz_naval_duel_probe;
 mod zz_petrel_probe;
 mod zz_restore_probe;
