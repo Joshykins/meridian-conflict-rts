@@ -27,6 +27,7 @@
 //! shares of its length and radii of `HowitzerLook::radius`, is the model's
 //! (models `siege_howitzer`).
 
+use super::spinal_bore_fx::DrawnHull;
 use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_BOLT, PUFF_PLASMA, PUFF_SPARK};
 use glam::Vec3;
@@ -254,8 +255,7 @@ impl Renderer {
         let Some(look) = w.howitzer else {
             return Vec::new();
         };
-        let pos = Vec3::from(u.prev_pos).lerp(Vec3::from(u.pos), f);
-        let heading = lerp_angle(u.prev_heading, u.heading, f);
+        let hull = DrawnHull::of(u, &bp.visual.mesh, f);
         let rot_z = |v: Vec3, a: f32| {
             let (s, c) = a.sin_cos();
             Vec3::new(v.x * c - v.y * s, v.x * s + v.y * c, v.z)
@@ -290,7 +290,7 @@ impl Renderer {
                 Some(p) if turret => rot_z(p + rot_xz(local - p, pitch), yaw),
                 _ => local,
             };
-            pos + rot_z(on_hull, heading)
+            hull.place(on_hull)
         };
         let mouths: Vec<Vec3> = if w.muzzles.is_empty() {
             vec![Vec3::from(w.muzzle.to_f32())]

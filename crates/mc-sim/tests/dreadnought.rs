@@ -326,3 +326,106 @@ fn w_cost(key: &str) -> f32 {
     let bp = w.blueprints.unit(w.blueprints.id_of(key).unwrap());
     bp.cost_mass.to_f32()
 }
+
+/// Where the entity shader draws the tips of weapon `wi`'s barrels on `u`: each muzzle
+/// pitched and turned in its house about the pivot (`HousePose`), then carried by the
+/// hull's bank, its pitch (a capital ship laying its spinal gun) and its heading.
+fn drawn_barrel_tips(
+    w: &World,
+    frame: &mc_sim::RenderFrame,
+    u: &mc_sim::mirror::UnitInstance,
+    wi: usize,
+) -> Vec<[f32; 3]> {
+    let weapon = &w
+        .blueprints
+        .unit(mc_data::BlueprintId(u.blueprint as u16))
+        .weapons[wi];
+    let house = frame.houses[(u.status[1] >> mc_sim::mirror::UNIT_HOUSE_SHIFT) as usize - 1];
+    let [_, yaw, _, pitch] = house.pose[wi];
+    let rot_z = |v: [f32; 3], a: f32| {
+        let (s, c) = a.sin_cos();
+        [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]]
+    };
+    let rot_xz = |v: [f32; 3], a: f32| {
+        let (s, c) = a.sin_cos();
+        [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c]
+    };
+    let roll = |v: [f32; 3], a: f32| {
+        let (s, c) = a.sin_cos();
+        [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]
+    };
+    let pivot = weapon.pivot.unwrap().to_f32();
+    weapon
+        .muzzles
+        .iter()
+        .map(|m| {
+            let m = m.to_f32();
+            let arm = rot_z(
+                rot_xz([m[0] - pivot[0], m[1] - pivot[1], m[2] - pivot[2]], pitch),
+                yaw,
+            );
+            let local = [pivot[0] + arm[0], pivot[1] + arm[1], pivot[2] + arm[2]];
+            let world = rot_z(rot_xz(roll(local, u._pad2[1]), u.arm_pitch[1]), u.heading);
+            [
+                u.pos[0] + world[0],
+                u.pos[1] + world[1],
+                u.pos[2] + world[2],
+            ]
+        })
+        .collect()
+}
+
+#[test]
+fn casemate_shots_leave_the_barrels_as_drawn_on_a_pitched_hull() {
+    let mut w = world();
+    // Nose east; tanks off the port beam: the casemates fire at them while the hull
+    // pitches and comes round to lay the spinal.
+    let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
+    settle(&mut w);
+    let marks: Vec<_> = [-200, 0, 200]
+        .iter()
+        .map(|dx| add(&mut w, "aster_t4_assault_tank", 1, 3000 + dx, 4200, 0))
+        .collect();
+    for &m in &marks {
+        hold_fire(&mut w, m);
+    }
+    let mut frame = mc_sim::RenderFrame::default();
+    let (mut shots, mut steepest) = (0, 0.0f32);
+    for _ in 0..seconds(40) {
+        w.tick(&[]).unwrap();
+        let casemate = |wi: u8| (1..=4).contains(&wi);
+        if !fired(&w, ship).into_iter().any(casemate) {
+            continue;
+        }
+        w.write_render_frame(None, &mut frame);
+        let u = *frame.units.iter().find(|u| u.unit_id == ship.0).unwrap();
+        for e in &frame.events {
+            let SimEvent::ShotFired { pos, weapon, .. } = e else {
+                continue;
+            };
+            if !casemate(*weapon) {
+                continue;
+            }
+            let at = pos.to_f32();
+            let off = drawn_barrel_tips(&w, &frame, &u, *weapon as usize)
+                .iter()
+                .map(|t| {
+                    ((t[0] - at[0]).powi(2) + (t[1] - at[1]).powi(2) + (t[2] - at[2]).powi(2))
+                        .sqrt()
+                })
+                .fold(f32::MAX, f32::min);
+            assert!(
+                off < 0.5,
+                "casemate {weapon}'s shot left {off:.1} m from its drawn barrels (hull pitched {:.1} deg)",
+                u.arm_pitch[1].to_degrees()
+            );
+            shots += 1;
+            steepest = steepest.max(u.arm_pitch[1].abs().to_degrees());
+        }
+    }
+    assert!(shots >= 4, "only {shots} casemate shots");
+    assert!(
+        steepest > 5.0,
+        "the hull never pitched while they fired ({steepest:.1} deg)"
+    );
+}

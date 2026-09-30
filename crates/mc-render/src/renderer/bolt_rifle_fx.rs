@@ -16,6 +16,7 @@
 //! gun on a house of its own (the Marlin's), the house's yaw and pitch about it. They are
 //! lightning strokes among the bore's (`BoreFx::lightning`).
 
+use super::spinal_bore_fx::DrawnHull;
 use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_BOLT, PUFF_SPARK};
 use glam::Vec3;
@@ -200,8 +201,12 @@ impl Renderer {
 
     /// Where `u`'s rifle `weapon` (`w`) is drawn `f` of the way through the tick.
     fn rifle_frame(&self, u: &UnitInstance, weapon: u8, w: &Weapon, f: f32) -> Frame {
-        let pos = Vec3::from(u.prev_pos).lerp(Vec3::from(u.pos), f);
-        let heading = lerp_angle(u.prev_heading, u.heading, f);
+        let mesh = &self
+            .blueprints
+            .unit(BlueprintId(u.blueprint as u16))
+            .visual
+            .mesh;
+        let hull = DrawnHull::of(u, mesh, f);
         // A gun on a house of its own (a warship's) has its pose in the houses list.
         let house = (u.status[1] >> UNIT_HOUSE_SHIFT)
             .checked_sub(1)
@@ -236,9 +241,9 @@ impl Renderer {
             } else {
                 rot_z(pivot + rot_xz(local - pivot, pitch), yaw)
             };
-            pos + rot_z(on_hull, heading)
+            hull.place(on_hull)
         };
-        let turn = |v: Vec3| rot_z(rot_z(rot_xz(v, pitch), yaw), heading);
+        let turn = |v: Vec3| hull.turn(rot_z(rot_xz(v, pitch), yaw));
         Frame {
             muzzle: place(muzzle),
             dir: turn(Vec3::X),
