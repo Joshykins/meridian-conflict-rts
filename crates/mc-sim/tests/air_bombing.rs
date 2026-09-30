@@ -534,10 +534,11 @@ fn bombers_drop_on_a_column_driving_at_them() {
                 open[i] = if fired { 30 } else { open[i].saturating_sub(1) };
             }
         }
-        // About 210 ticks a pass, head-on and from behind in turn: seven passes. It
-        // was five, every head-on pass flown over with the bay shut.
+        // Head-on and from behind in turn: six or seven passes, the ones from behind
+        // long with the column driving away at its full pace. It was five, every
+        // head-on pass flown over with the bay shut, with the column at 70% of it.
         assert!(
-            salvos.iter().all(|&s| s >= 7),
+            salvos.iter().all(|&s| s >= 6),
             "attack_move {attack_move}: salvos per bomber {salvos:?}"
         );
         assert!(

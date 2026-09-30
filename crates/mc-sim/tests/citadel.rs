@@ -117,19 +117,24 @@ fn push(defense: &str, attacker: &str, count: usize) -> Push {
 }
 
 #[test]
-fn a_citadel_breaks_a_paladin_push_that_a_redoubt_cannot() {
-    let citadel = push(CITADEL, "aster_t3_assault_bot", 2);
-    // At 780 m a Redoubt holds off one Paladin; the same pair of them takes it.
-    let redoubt = push("aster_t2_point_defense", "aster_t3_assault_bot", 2);
+fn a_citadel_breaks_a_paladin_that_a_redoubt_cannot() {
+    // A block closes at its full pace, so the gun gets its shots in only on the way in.
+    let citadel = push(CITADEL, "aster_t3_assault_bot", 1);
+    let redoubt = push("aster_t2_point_defense", "aster_t3_assault_bot", 1);
     assert!(
         citadel.stands && citadel.left == 0,
-        "the Citadel fell to two Paladins ({} left, {} s)",
-        citadel.left,
+        "the Citadel fell to one Paladin ({} s)",
         citadel.seconds
     );
-    assert!(!redoubt.stands, "a Redoubt held two Paladins");
-    // Not a wall: at 1500 m it holds three Paladins (about its own mass), but four take it.
-    assert!(!push(CITADEL, "aster_t3_assault_bot", 4).stands);
+    assert!(!redoubt.stands, "a Redoubt held a Paladin");
+    // Not a wall: two Paladins take it, but it breaks one of them first.
+    let pair = push(CITADEL, "aster_t3_assault_bot", 2);
+    assert!(
+        !pair.stands && pair.left == 1,
+        "two Paladins on a Citadel: stands {}, {} left",
+        pair.stands,
+        pair.left
+    );
 }
 
 /// Every slug kills a light tank outright and most of it is wasted, so a swarm does
