@@ -203,3 +203,103 @@ fn a_queued_area_reclaim_waits_its_turn() {
     run_until_idle(&mut w, &units, 4000);
     assert!(wrecks_left(&w).is_empty());
 }
+
+/// An Osprey at `(x, y)` with its four drones built and docked.
+fn carrier(w: &mut World, x: i32, y: i32) -> UnitId {
+    let blueprint = w.blueprints.id_of("aster_t1_reclaim_carrier").unwrap();
+    let row = w
+        .spawn_unit(blueprint, 0, FxVec2::from_ints(x, y), Angle::ZERO, true)
+        .unwrap();
+    let commander = w.blueprints.id_of("aster_commander").unwrap();
+    w.spawn_unit(commander, 0, FxVec2::from_ints(150, 150), Angle::ZERO, true)
+        .unwrap();
+    w.state.players[0].mass = Fx::from_int(1000);
+    w.state.players[0].energy = Fx::from_int(100_000);
+    w.state.players[0].energy_capacity = Fx::from_int(200_000);
+    for _ in 0..450 {
+        w.tick(&[]).unwrap();
+    }
+    let id = w.state.units.id(row);
+    let u = &w.state.units;
+    let drones = u.slots.iter().filter(|&r| u.drone_parent[r] == id).count();
+    assert_eq!(drones, 4, "the carrier's drones are built");
+    id
+}
+
+/// The mass left in the wreck nearest `(x, y)`, zero once it is gone.
+fn mass_near(w: &World, x: i32, y: i32) -> Fx {
+    let at = FxVec2::from_ints(x, y);
+    let wr = &w.state.wrecks;
+    wr.slots
+        .iter()
+        .filter(|&r| wr.pos[r].distance(at) < Fx::from_int(30))
+        .map(|r| wr.mass[r])
+        .sum()
+}
+
+#[test]
+fn a_carrier_given_a_circle_sends_its_drones_only_into_the_circle() {
+    let mut w = world();
+    let osprey = carrier(&mut w, 300, 1000);
+    let centre = FxVec2::from_ints(1000, 1000);
+    let radius = Fx::from_int(100);
+    wrecks(&mut w, 1000, 1000, 3);
+    // Well inside the carrier's drone reach, well outside the circle.
+    wrecks(&mut w, 1000, 1400, 1);
+    wrecks(&mut w, 650, 1250, 1);
+    let outside = [mass_near(&w, 1000, 1400), mass_near(&w, 650, 1250)];
+    w.tick(&[cmd(Command::ReclaimArea {
+        units: vec![osprey],
+        pos: centre,
+        radius,
+        queue: false,
+    })])
+    .unwrap();
+    run_until_idle(&mut w, &[osprey], 3000);
+    let inside = wrecks_left(&w)
+        .iter()
+        .filter(|p| p.distance(centre) <= radius)
+        .count();
+    assert_eq!(inside, 0, "the circle is cleared");
+    assert_eq!(
+        [mass_near(&w, 1000, 1400), mass_near(&w, 650, 1250)],
+        outside,
+        "drones took wrecks outside the circle"
+    );
+}
+
+#[test]
+fn a_carrier_sent_to_a_point_salvages_on_the_way() {
+    let mut w = world();
+    let osprey = carrier(&mut w, 300, 1000);
+    // On the way, a little off it, and well off it but in the drones' reach.
+    let fields = [(700, 1000), (1000, 1150), (1300, 750)];
+    for (x, y) in fields {
+        wrecks(&mut w, x, y, 3);
+    }
+    let before = fields.map(|(x, y)| mass_near(&w, x, y));
+    let goal = FxVec2::from_ints(1700, 1000);
+    w.tick(&[cmd(Command::ReclaimArea {
+        units: vec![osprey],
+        pos: goal,
+        radius: Fx::ZERO,
+        queue: false,
+    })])
+    .unwrap();
+    // 1400 m at 65 m/s: about 22 s of flying, with no wait for the drones.
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+    }
+    let row = w.state.units.row(osprey).unwrap();
+    let at = w.state.units.pos[row];
+    assert!(
+        at.distance(goal) < Fx::from_int(30),
+        "carrier went on: at {at:?}"
+    );
+    for (k, (x, y)) in fields.into_iter().enumerate() {
+        assert!(
+            mass_near(&w, x, y) < before[k],
+            "nothing salvaged from the field at ({x}, {y}) on the way past"
+        );
+    }
+}

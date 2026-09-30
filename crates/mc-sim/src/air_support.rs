@@ -149,17 +149,7 @@ impl World {
                     .wrecks
                     .slots
                     .iter()
-                    .filter(|&w| {
-                        if full {
-                            return false;
-                        }
-                        self.state.wrecks.pos[w].distance(center) <= reach
-                            && self.state.wrecks.mass[w] > Fx::ZERO
-                            && (!self.state.fog_enabled
-                                || self
-                                    .fog
-                                    .is_detected(self.state.wrecks.pos[w], self.team_mask(owner)))
-                    })
+                    .filter(|&w| !full && self.drones_may_take(parent, w))
                     .min_by_key(|&w| {
                         (
                             claimed.contains(&w),
@@ -217,20 +207,32 @@ impl World {
     }
 
     pub(crate) fn carrier_has_work(&self, row: usize) -> bool {
-        let center = self.state.units.pos[row];
-        let reach = self.bp(row).drone_radius;
-        let owner = self.state.units.owner[row];
-        if self.no_room_for_salvage(owner) {
-            return false;
-        }
-        self.state.wrecks.slots.iter().any(|w| {
-            self.state.wrecks.pos[w].distance(center) <= reach
-                && self.state.wrecks.mass[w] > Fx::ZERO
-                && (!self.state.fog_enabled
-                    || self
-                        .fog
-                        .is_detected(self.state.wrecks.pos[w], self.team_mask(owner)))
-        })
+        !self.no_room_for_salvage(self.state.units.owner[row])
+            && self
+                .state
+                .wrecks
+                .slots
+                .iter()
+                .any(|w| self.drones_may_take(row, w))
+    }
+
+    /// Whether the drones of carrier `row` may go for wreck `w` unordered: one with mass
+    /// left that its side has seen, within the drones' reach of the carrier and, while
+    /// it is clearing a circle (`ReclaimArea`), inside that circle.
+    fn drones_may_take(&self, row: usize, w: usize) -> bool {
+        let units = &self.state.units;
+        let wrecks = &self.state.wrecks;
+        let at = wrecks.pos[w];
+        let circle = self
+            .state
+            .orders
+            .front(units, row)
+            .filter(|o| o.kind == OrderKind::ReclaimArea && o.radius > Fx::ZERO);
+        at.distance(units.pos[row]) <= self.bp(row).drone_radius
+            && circle.is_none_or(|o| at.distance(o.pos) <= o.radius)
+            && wrecks.mass[w] > Fx::ZERO
+            && (!self.state.fog_enabled
+                || self.fog.is_detected(at, self.team_mask(units.owner[row])))
     }
 
     /// Where drone `slot` of `parent` sits when home (`drone_sockets`): on a pylon, a

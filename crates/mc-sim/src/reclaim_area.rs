@@ -11,6 +11,9 @@
 //!
 //! On a point, the order ends once the unit stands there. On a circle, it ends once
 //! the unit is inside and nothing is left in it to take.
+//!
+//! A drone carrier takes nothing itself: it flies to the spot while its drones clear
+//! what is in their reach, and on a circle only what is inside the circle.
 
 use crate::orders::order;
 use crate::reclaim::WIDEST_TARGET;
@@ -61,6 +64,9 @@ impl World {
     /// `OrderKind::ReclaimArea`: see the module notes.
     pub(crate) fn run_reclaim_area(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
         let looks = (self.state.tick as usize + row).is_multiple_of(LOOK_TICKS);
+        if self.bp(row).drone_carrier() {
+            return self.run_carrier_area(row, o, looks);
+        }
         if looks {
             if let Some(w) = self.next_area_wreck(row, o) {
                 return self.take_area_wreck(row, w);
@@ -89,6 +95,28 @@ impl World {
         self.ensure_moving(row, spot, spot)?;
         // Anything in reach is taken without stopping, as on an ordered reclaim.
         self.reclaim_on_the_way(row)
+    }
+
+    /// A carrier on an area order flies to its spot and lets its drones work as it goes
+    /// (`run_air_support`, which keeps them inside a circle). A circle is done once the
+    /// carrier is inside it and its drones have nothing left there to take.
+    fn run_carrier_area(&mut self, row: usize, o: &Order, looks: bool) -> Result<(), SimError> {
+        let pos = self.state.units.pos[row];
+        let spot = self.clamp_to_map(o.pos + o.offset);
+        let stuck = self.state.units.stuck_ticks[row] == u16::MAX;
+        let done = if o.radius > Fx::ZERO {
+            looks && (pos.distance(o.pos) <= o.radius || stuck) && !self.carrier_has_work(row)
+        } else {
+            pos.distance(spot) <= self.bp(row).radius / 2 + Fx::from_int(3) || stuck
+        };
+        if done {
+            self.finish_order(row);
+            return Ok(());
+        }
+        if !stuck {
+            self.ensure_moving(row, spot, spot)?;
+        }
+        Ok(())
     }
 
     /// The wreck this reclaimer should take next, nearest first: in the circle, or a
