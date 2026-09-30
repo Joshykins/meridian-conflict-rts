@@ -360,8 +360,8 @@ pub struct Reclaimer {
     /// It keeps clearing the wrecks within reach while it moves or patrols, without
     /// stopping for them (a salvage vehicle, boat or aircraft). A tower never moves.
     pub mobile: bool,
-    /// While a head has no work in its sights, searching its reach or swinging onto the
-    /// next wreck, it keeps a dimmer beam on the ground it points at (a scavenger tower).
+    /// While a head swings onto its next wreck it keeps a dimmer beam on the ground it
+    /// points at, and with nothing in reach it turns slowly round, beam off (a scavenger tower).
     pub sweep: bool,
     heads: [ReclaimHead; MAX_RECLAIM_HEADS],
     head_count: u8,

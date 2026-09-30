@@ -22,9 +22,9 @@ use mc_data::MAX_RECLAIM_HEADS;
 /// How near a head must point at its work before it charges, angle steps (4 degrees).
 const HEAD_AIM_TOLERANCE: u16 = 728;
 /// How far a searching head turns a tick, angle steps: 10 degrees a second.
-const SWEEP_TURN: u16 = 182;
-/// How far out a searching head sweeps its beam, of the unit's reach.
-const SWEEP_REACH: Fx = Fx::ratio(3, 5);
+const SEARCH_TURN: u16 = 182;
+/// How far out a searching head looks, of the unit's reach: it pitches to the ground there.
+const SEARCH_REACH: Fx = Fx::ratio(3, 5);
 /// Added to the cost of a wreck another head of the unit has taken this tick: a head
 /// only doubles up on a wreck when there is nothing else in reach.
 const CLAIMED: i64 = 1 << 40;
@@ -148,7 +148,7 @@ impl World {
         true
     }
 
-    /// A head of a sweeping reclaimer with nothing in its sights (`mc_data::Reclaimer::sweep`)
+    /// A head of a sweeping reclaimer swinging onto its work (`mc_data::Reclaimer::sweep`)
     /// keeps a dim beam on the ground it points at, `reach` out from its pivot.
     fn sweep_beam(&mut self, row: usize, i: usize, reach: Fx) {
         let origin = self.head_origin(row, i);
@@ -168,20 +168,19 @@ impl World {
         });
     }
 
-    /// Head `i` searches with nothing in reach: it turns slowly round, its beam on the
-    /// ground part way out.
-    fn sweep_search(&mut self, row: usize, i: usize) {
+    /// Head `i` of a sweeping reclaimer searches with nothing in reach: it turns slowly
+    /// round, looking at the ground part way out, its beam off.
+    fn search(&mut self, row: usize, i: usize) {
         let Some(r) = self.bp(row).reclaimer.filter(|r| r.sweep) else {
             return;
         };
-        let reach = r.range * SWEEP_REACH;
+        let reach = r.range * SEARCH_REACH;
         let origin = self.head_origin(row, i);
         let units = &self.state.units;
-        let ahead = units.heading[row] + units.weapon_yaw[row][i] + Angle(SWEEP_TURN);
+        let ahead = units.heading[row] + units.weapon_yaw[row][i] + Angle(SEARCH_TURN);
         let look = origin + FxVec2::from_angle(ahead) * reach;
         let ground = self.terrain.height_at(look).max(self.terrain.water_level());
         self.aim_head(row, i, look, ground);
-        self.sweep_beam(row, i, reach);
     }
 
     /// Head `i` is swinging onto work at `pos`: a sweeping reclaimer keeps its beam on
@@ -282,7 +281,7 @@ impl World {
         for i in 0..heads {
             let Some(w) = self.head_pick_wreck(row, i, &taken[..i]) else {
                 self.state.units.weapon_cooldown[row][i] = 0;
-                self.sweep_search(row, i);
+                self.search(row, i);
                 continue;
             };
             taken[i] = w;

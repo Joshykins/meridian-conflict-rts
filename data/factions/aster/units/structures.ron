@@ -535,7 +535,8 @@
     // The Scavenger line: one reclaim tower that upgrades in place, T1 to T3. Cheap for
     // what it pulls (a wreck field pays it back in well under a minute of beam), with a
     // reach far past any engineer's. Its beam bites the moment the head is on a wreck, and
-    // sweeps the ground, dimmer, while it searches or swings onto the next.
+    // sweeps the ground, dimmer, while it swings onto the next. With nothing in reach the
+    // head turns slowly round, beam off.
     // Live units take an order. The head is a turret in a house of its own (weapon slot 0).
     (
         key: "aster_t1_reclaimer",

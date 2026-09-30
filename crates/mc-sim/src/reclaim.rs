@@ -38,8 +38,7 @@ pub struct ReclaimWork {
     pub relay: bool,
     /// Which of a reclaimer's heads the beam leaves (`mc_data::Reclaimer::heads`).
     pub head: u8,
-    /// A head searching, or swinging onto its next wreck: the dimmer beam on the ground
-    /// it points at (`mc_data::Reclaimer::sweep`). Nothing is taken.
+    /// A head swinging onto its next wreck: the dimmer beam on the ground it points at (`mc_data::Reclaimer::sweep`). Nothing is taken.
     pub sweep: bool,
 }
 
@@ -54,8 +53,8 @@ pub const BEAM_NANITE: u32 = 1;
 pub const BEAM_NANITE_SITE: u32 = 6;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
-/// A scavenger tower's head sweeping the ground for work: a dimmer reclaim beam, nothing
-/// torn off (`ReclaimWork::sweep`).
+/// A scavenger tower's head swinging onto its next wreck: a dimmer reclaim beam on the
+/// ground it passes over, nothing torn off (`ReclaimWork::sweep`).
 pub const BEAM_SWEEP: u32 = 7;
 
 impl World {

@@ -108,10 +108,10 @@ impl WorkBeams {
             let mut from_prev = beam.from;
             let mut trip_len = length_of(&beam);
             if let Some(old) = was.remove(&key) {
-                // A sweep's foot is wherever its head points, a kilometre out on a Scavenger
-                // III, so it moves tens of metres a tick: it is the same beam going round,
-                // gliding from last tick's spot, never a new one. Ended each tick, it left a
-                // fan of fading beams behind the head.
+                // A sweep's foot is wherever its head points as it swings onto a wreck, up to
+                // 1.7 km out, so it moves tens of metres a tick: it is the same beam going
+                // round, gliding from last tick's spot, never a new one. Ended each tick, it
+                // left a fan of fading beams behind the head.
                 let sweep = beam.kind == mc_sim::reclaim::BEAM_SWEEP;
                 if sweep {
                     beam.to_prev = old.beam.to;
@@ -221,8 +221,8 @@ mod tests {
 
     #[test]
     fn a_fast_sweep_stays_one_beam_gliding_round() {
-        // A Scavenger III's sweep: 1020 m out, turning a degree a tick, so its foot
-        // moves ~18 m a tick, far past `JUMP`.
+        // A Scavenger swinging onto a wreck 1020 m out, a degree a tick: its foot moves
+        // ~18 m a tick, far past `JUMP`.
         let at = |tick: u32| {
             let a = (tick as f32).to_radians();
             [1020.0 * a.cos(), 1020.0 * a.sin(), 0.0]

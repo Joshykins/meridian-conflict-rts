@@ -513,8 +513,8 @@ shared! {
         pub const NANITE: u32 = 1;
         /// A Regency site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
         pub const NANITE_SITE: u32 = 6;
-        /// A scavenger tower's head searching: a dimmer reclaim beam on the ground, no
-        /// bits (`reclaim::BEAM_SWEEP`).
+        /// A scavenger tower's head swinging onto its next wreck: a dimmer reclaim beam on
+        /// the ground, no bits (`reclaim::BEAM_SWEEP`).
         pub const SWEEP: u32 = 7;
         /// How bright a sweep is beside the beam that bites: a little dimmer.
         pub const SWEEP_LEVEL: f32 = 0.6;
