@@ -112,6 +112,10 @@ pub struct ReplayStatus {
 
 pub struct Published {
     pub frame: RenderFrame,
+    /// `frame` is a mirror the interface has not taken yet. Taking it swaps the
+    /// interface's last frame in (`SimHandle::pull`), so the sim thread writes its next
+    /// tick into that one: three frames go round, and none is copied under the lock.
+    pub fresh: bool,
     pub status: SimStatus,
     /// Bumped on every publish.
     pub serial: u64,
@@ -152,9 +156,9 @@ pub struct SimHandle {
 }
 
 impl SimHandle {
-    /// Copies out the latest published tick if it is newer than `serial`.
-    /// Returns when it was published, for interpolation. Events are handed
-    /// over exactly once.
+    /// Takes the latest published tick if it is newer than `serial`, swapping `frame`
+    /// for it (the sim thread writes a later tick into the old one). Returns when it
+    /// was published, for interpolation. Events are handed over exactly once.
     pub fn pull(
         &self,
         serial: &mut u64,
@@ -166,9 +170,14 @@ impl SimHandle {
             return None;
         }
         *serial = p.serial;
-        frame.clone_from(&p.frame);
-        p.frame.events.clear();
-        *status = p.status.clone();
+        // A new status alone (the watched queues changed) leaves the frame as it is.
+        if p.fresh {
+            std::mem::swap(frame, &mut p.frame);
+            p.fresh = false;
+            // What comes back is the interface's old frame: its events were handed over.
+            p.frame.events.clear();
+        }
+        status.clone_from(&p.status);
         Some(p.published_at)
     }
 }
@@ -366,6 +375,7 @@ fn eyes(fog: bool, local: Option<u8>, watch: &Watch) -> Option<u8> {
 pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle {
     let shared: Shared = Arc::new(Mutex::new(Published {
         frame: RenderFrame::default(),
+        fresh: false,
         status: SimStatus::default(),
         serial: 0,
         published_at: Instant::now(),
@@ -602,6 +612,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 back.events = carried;
                             }
                             std::mem::swap(&mut p.frame, &mut back);
+                            p.fresh = true;
                             p.status = status;
                             p.serial += 1;
                             // Held: the frame is new but no time passed, so nothing re-interpolates.
@@ -677,6 +688,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 let events = std::mem::take(&mut p.frame.events);
                                 world.write_render_frame(eyes_now, &mut p.frame);
                                 p.frame.events = events;
+                                p.fresh = true;
                             }
                             write_watched(world, local, &watched, &mut p.status);
                             p.serial += 1;
