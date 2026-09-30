@@ -31,6 +31,16 @@ const TILE_RADIUS: Fx = Fx::from_int(16);
 /// Moves handed to one worker at a time while pairing.
 const CHUNK: usize = 128;
 
+/// What a push needs of a hull, looked up once a tick instead of per push.
+#[derive(Clone, Copy)]
+struct Hull {
+    row: usize,
+    radius: Fx,
+    mass: Fx,
+    layer: MoveLayer,
+    size_class: u8,
+}
+
 /// A tile, and the pairs of its hulls it could not hold.
 type Built = (Tile, Vec<(usize, usize)>);
 
@@ -52,7 +62,20 @@ impl World {
         drop(span);
         let span = mc_core::perf_span!("contacts.tiles");
         mc_core::perf_count!("move.pairs", pairs.len());
-        let radii: Vec<Fx> = rows.iter().map(|&r| self.bp(r).radius).collect();
+        let hulls: Vec<Hull> = rows
+            .iter()
+            .map(|&row| {
+                let motion = self.bp(row).motion.unwrap();
+                Hull {
+                    row,
+                    radius: self.bp(row).radius,
+                    mass: self.crowd_mass(row),
+                    layer: motion.layer,
+                    size_class: motion.size_class,
+                }
+            })
+            .collect();
+        let radii: Vec<Fx> = hulls.iter().map(|h| h.radius).collect();
         let (turns, apart) = tiles(&self.pool, &pairs, at, &radii);
         mc_core::perf_count!("move.apart_pairs", apart.len());
         mc_core::perf_count!("move.tiles", turns.iter().map(Vec::len).sum::<usize>());
@@ -79,6 +102,7 @@ impl World {
                 let done: Vec<(bool, Vec<Vec<FxVec2>>)> =
                     self.pool
                         .parallel_map_chunks(turn.len(), chunk, |_, range| {
+                            let _work = mc_core::perf_span!("contacts.tile_work");
                             let mut any = false;
                             let moved = turn[range]
                                 .iter()
@@ -89,8 +113,8 @@ impl World {
                                         let (i, j) =
                                             (tile.units[a as usize], tile.units[b as usize]);
                                         let (pa, pb) = (local[a as usize], local[b as usize]);
-                                        if let Some((pa, pb)) = self
-                                            .push_pair(rows[i], rows[j], radii[i], radii[j], pa, pb)
+                                        if let Some((pa, pb)) =
+                                            self.push_pair(&hulls[i], &hulls[j], pa, pb)
                                         {
                                             any = true;
                                             (local[a as usize], local[b as usize]) = (pa, pb);
@@ -111,9 +135,7 @@ impl World {
                 }
             }
             for &(i, j) in &apart {
-                if let Some((pa, pb)) =
-                    self.push_pair(rows[i], rows[j], radii[i], radii[j], at[i], at[j])
-                {
+                if let Some((pa, pb)) = self.push_pair(&hulls[i], &hulls[j], at[i], at[j]) {
                     pushed_any = true;
                     (at[i], at[j]) = (pa, pb);
                 }
@@ -147,6 +169,7 @@ impl World {
                         }
                         let slack = (step(i) + widest_step + CONTACT_PUSH_ROOM).min(CONTACT_REACH);
                         let reach = self.bp(row).radius + Fx::ONE + slack;
+                        let first = pairs.len();
                         self.index.query(units.pos[row], reach, kind::UNIT, |e| {
                             let other = e.row as usize;
                             if other <= row
@@ -165,26 +188,21 @@ impl World {
                             pairs.push((i, index[other]));
                             true
                         });
+                        // Pushes land in pair order: sort each hull's so it follows
+                        // the rows, not the index layout. The moves are in row
+                        // order and the chunks come back in order, so the whole
+                        // list is sorted.
+                        pairs[first..].sort_unstable();
                     }
                     pairs
                 });
-        let mut pairs: Vec<(usize, usize)> = chunks.into_iter().flatten().collect();
-        // Pushes land in pair order: sort it so it follows the rows, not the index layout.
-        pairs.sort_unstable();
-        pairs
+        chunks.into_iter().flatten().collect()
     }
 
     /// Where hulls `a` at `pa` and `b` at `pb` stand once pushed apart, or
     /// `None` when they are not in touch.
-    fn push_pair(
-        &self,
-        a: usize,
-        b: usize,
-        ra: Fx,
-        rb: Fx,
-        pa: FxVec2,
-        pb: FxVec2,
-    ) -> Option<(FxVec2, FxVec2)> {
+    fn push_pair(&self, a: &Hull, b: &Hull, pa: FxVec2, pb: FxVec2) -> Option<(FxVec2, FxVec2)> {
+        let (ra, rb) = (a.radius, b.radius);
         let delta = pa - pb;
         // Clear by more than the square root can round: no need to take it.
         let clear = ra + rb + Fx::from_int(2);
@@ -199,19 +217,18 @@ impl World {
         let dir = if dist > Fx::EPSILON {
             delta.normalize()
         } else {
-            FxVec2::from_angle(mc_core::Angle((a as u16).wrapping_mul(9973)))
+            FxVec2::from_angle(mc_core::Angle((a.row as u16).wrapping_mul(9973)))
         };
         mc_core::perf_count!("move.pushes");
         let correction = overlap.min(MOST_PUSH);
         // Where `row` from `from` stands pushed `amount` along `direction`, if it can stand there.
-        let pushed = |row: usize, from: FxVec2, direction: FxVec2, amount: Fx| {
-            let motion = self.bp(row).motion.unwrap();
+        let pushed = |hull: &Hull, from: FxVec2, direction: FxVec2, amount: Fx| {
             let candidate = self.clamp_to_map(from + direction * amount);
             self.nav
-                .passable(motion.layer, motion.size_class, candidate)
+                .passable(hull.layer, hull.size_class, candidate)
                 .then_some(candidate)
         };
-        let (share_a, share_b) = (self.give_way(a, b), self.give_way(b, a));
+        let (share_a, share_b) = (share(a.mass, b.mass), share(b.mass, a.mass));
         let na = pushed(a, pa, dir, correction * share_a);
         let nb = pushed(b, pb, -dir, correction * share_b);
         // A hull pressed against a slope cannot give way; the other
@@ -240,16 +257,20 @@ impl World {
     /// other, or a column pressing on a parked Fulgur walks it off a tank's
     /// width at a time.
     pub(crate) fn give_way(&self, row: usize, other: usize) -> Fx {
-        let (mine, theirs) = (self.crowd_mass(row), self.crowd_mass(other));
-        if mine == theirs {
-            return Fx::HALF;
-        }
-        let share = theirs / (mine + theirs).max(Fx::EPSILON);
-        if share < Fx::ratio(1, 8) {
-            Fx::ZERO
-        } else {
-            share
-        }
+        share(self.crowd_mass(row), self.crowd_mass(other))
+    }
+}
+
+/// [`World::give_way`] from the two crowd masses.
+fn share(mine: Fx, theirs: Fx) -> Fx {
+    if mine == theirs {
+        return Fx::HALF;
+    }
+    let share = theirs / (mine + theirs).max(Fx::EPSILON);
+    if share < Fx::ratio(1, 8) {
+        Fx::ZERO
+    } else {
+        share
     }
 }
 
