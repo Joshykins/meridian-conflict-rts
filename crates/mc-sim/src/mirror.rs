@@ -1709,6 +1709,9 @@ impl World {
             if stored && viewer.is_some_and(|v| self.are_enemies(v, s.units.owner[row])) {
                 continue;
             }
+            // A pause is an order, not something the enemy can see: no mark on their side.
+            let paused_mark = s.units.paused[row]
+                && !viewer.is_some_and(|v| self.are_enemies(v, s.units.owner[row]));
             let site = self.structure_upgrade(row);
             let refit = s.orders.front(&s.units, row).filter(|o| {
                 o.kind == crate::tables::OrderKind::Upgrade && self.upgrades_in_place(row)
@@ -1952,7 +1955,7 @@ impl World {
                         } else {
                             0
                         }
-                        | if s.units.paused[row] { UNIT_PAUSED } else { 0 }
+                        | if paused_mark { UNIT_PAUSED } else { 0 }
                         | if stored { UNIT_STORED } else { 0 }
                         | self.lift_gear(row) << UNIT_GEAR_SHIFT
                         | if !stored && deck_up(row).is_some() {

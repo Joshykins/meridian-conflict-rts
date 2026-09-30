@@ -305,3 +305,23 @@ fn a_paused_shield_or_radar_powers_down_and_stops_its_upkeep() {
     assert!(w.state.units.shield_open[d] > 0, "the dome is back up");
     assert!(w.flows[d].wanted[1] > mc_core::Fx::ZERO);
 }
+
+#[test]
+fn only_its_own_side_sees_that_a_unit_is_paused() {
+    let mut w = world();
+    let mason = spawn(&mut w, "aster_t1_engineer", 500);
+    pause(&mut w, vec![mason], true);
+    let mut frame = mc_sim::mirror::RenderFrame::default();
+    let mark = |w: &World, frame: &mut mc_sim::mirror::RenderFrame, viewer| {
+        w.write_render_frame(viewer, frame);
+        frame
+            .units
+            .iter()
+            .find(|u| u.unit_id == mason.0)
+            .expect("drawn")
+            .paused()
+    };
+    assert!(mark(&w, &mut frame, Some(0)), "its owner sees the pause");
+    assert!(mark(&w, &mut frame, None), "an observer sees the pause");
+    assert!(!mark(&w, &mut frame, Some(1)), "the enemy sees the pause");
+}
