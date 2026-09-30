@@ -175,31 +175,35 @@ pub fn intern(name: &str) -> &'static str {
     s
 }
 
-/// Adds a frame recorded on another thread (a pool worker's chunk) to this
-/// thread's totals, so scopes open here include it.
-pub fn absorb(frame: &Frame) {
-    if frame.entries.is_empty() {
-        return;
-    }
-    let mut names = NAMES.lock().unwrap_or_else(|e| e.into_inner());
+/// Adds what another thread recorded to this thread's totals: how pool work
+/// run on workers is counted as the caller's.
+pub fn absorb(recorded: &Recorded) {
     LOCAL.with(|t| {
         let mut t = t.borrow_mut();
-        for e in &frame.entries {
-            let i = match names.iter().position(|n| *n == e.name) {
-                Some(i) => i,
-                None => {
-                    names.push(e.name);
-                    names.len() - 1
-                }
-            };
+        for &(i, n, ns, span) in &recorded.entries {
+            let i = i as usize;
             t.slot(i);
-            t.n[i] += e.n;
-            if let Some(ns) = e.ns {
+            t.n[i] += n;
+            if span {
                 t.ns[i] += ns;
                 t.span[i] = true;
             }
         }
     });
+}
+
+/// What one thread recorded between [`Scope::begin`] and [`Scope::recorded`],
+/// by site slot: cheap to take on a worker for every chunk of pool work, as it
+/// looks up no names and takes no lock.
+#[derive(Default)]
+pub struct Recorded {
+    entries: Vec<(u32, u64, u64, bool)>,
+}
+
+impl Recorded {
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 /// Records what this thread does between `begin` and `end`.
@@ -212,6 +216,23 @@ impl Scope {
         Scope {
             start: LOCAL.with(|t| t.borrow().clone()),
         }
+    }
+
+    /// What was recorded since `begin`, for [`absorb`] on another thread.
+    pub fn recorded(self) -> Recorded {
+        LOCAL.with(|t| {
+            let now = t.borrow();
+            let mut out = Recorded::default();
+            for i in 0..now.n.len() {
+                let n0 = self.start.n.get(i).copied().unwrap_or(0);
+                let ns0 = self.start.ns.get(i).copied().unwrap_or(0);
+                let (n, ns) = (now.n[i] - n0, now.ns[i] - ns0);
+                if n != 0 || ns != 0 {
+                    out.entries.push((i as u32, n, ns, now.span[i]));
+                }
+            }
+            out
+        })
     }
 
     /// What was recorded since `begin`, as a frame.

@@ -142,24 +142,24 @@ impl Pool {
         // Chunks run on other threads hand back what `mc_core::perf` recorded,
         // so the caller's timers and counters include the whole call.
         let owner = std::thread::current().id();
-        let recorded: Mutex<Vec<mc_core::perf::Frame>> = Mutex::new(Vec::new());
+        let recorded: Mutex<Vec<mc_core::perf::Recorded>> = Mutex::new(Vec::new());
         let run = |chunk: usize| {
             if std::thread::current().id() == owner {
                 return body(chunk, chunk_range(len, chunk_size, chunk));
             }
             let scope = mc_core::perf::Scope::begin();
             body(chunk, chunk_range(len, chunk_size, chunk));
-            let frame = scope.end();
-            if !frame.is_empty() {
-                lock(&recorded).push(frame);
+            let done = scope.recorded();
+            if !done.is_empty() {
+                lock(&recorded).push(done);
             }
         };
         self.shared.run_chunks(chunks, &run);
-        for frame in recorded
+        for done in recorded
             .into_inner()
             .unwrap_or_else(PoisonError::into_inner)
         {
-            mc_core::perf::absorb(&frame);
+            mc_core::perf::absorb(&done);
         }
     }
 

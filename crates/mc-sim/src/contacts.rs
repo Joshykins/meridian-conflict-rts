@@ -1,0 +1,322 @@
+//! Hull contacts: after steering proposes where every ground unit goes this
+//! tick, hulls that would sink into each other are pushed apart.
+//!
+//! A crowd of thousands is split into 64 m tiles. Each pair of hulls in touch
+//! belongs to the tile of its first unit, and only reaches into the tiles
+//! round it, so tiles three apart share no unit: the nine tiles of a 3 x 3
+//! block take turns, and all the tiles of one turn run side by side. Pairs that
+//! reach further (a giant's) are pushed after the tiles, one by one. The order
+//! is fixed by rows and tiles, so every machine pushes the same way.
+
+use crate::spatial::kind;
+use crate::tables::flag;
+use crate::World;
+use mc_core::{Fx, FxVec2};
+use mc_data::MoveLayer;
+
+/// Room left in the contact search for the pushes that part a crowd: two
+/// passes of the largest correction, from both sides.
+const CONTACT_PUSH_ROOM: Fx = Fx::from_int(12);
+/// The widest contact search past touching, whatever the steps.
+const CONTACT_REACH: Fx = Fx::from_int(31);
+/// Most a hull is pushed by one pair in one pass, metres.
+const MOST_PUSH: Fx = Fx::from_int(6);
+/// A crowd pressed against a slope needs more passes to spread.
+const PASSES: usize = 8;
+/// Tile edge: 64 m. Two hulls of the fine index layer (radius up to 16 m) in
+/// touch within `CONTACT_REACH` stand in the same tile or next-door ones.
+const TILE_SHIFT: u32 = 6;
+/// Widest hull a tile takes; pairs with a bigger one are pushed after.
+const TILE_RADIUS: Fx = Fx::from_int(16);
+/// Moves handed to one worker at a time while pairing.
+const CHUNK: usize = 128;
+
+/// A tile, and the pairs of its hulls it could not hold.
+type Built = (Tile, Vec<(usize, usize)>);
+
+/// The pairs of one tile, over the few units they touch.
+struct Tile {
+    /// Indices into the moves, ascending.
+    units: Vec<usize>,
+    /// Pairs as indices into `units`, in row order.
+    pairs: Vec<(u32, u32)>,
+}
+
+impl World {
+    /// Resolve overlaps between the proposed positions `at` of the moving units
+    /// `rows`, including different ground locomotion types. Steering alone is
+    /// not a collision constraint.
+    pub(crate) fn resolve_mobile_contacts(&self, rows: &[usize], at: &mut [FxVec2]) {
+        let span = mc_core::perf_span!("contacts.pairs");
+        let pairs = self.contact_pairs(rows, at);
+        drop(span);
+        let span = mc_core::perf_span!("contacts.tiles");
+        mc_core::perf_count!("move.pairs", pairs.len());
+        let radii: Vec<Fx> = rows.iter().map(|&r| self.bp(r).radius).collect();
+        let (turns, apart) = tiles(&self.pool, &pairs, at, &radii);
+        mc_core::perf_count!("move.apart_pairs", apart.len());
+        mc_core::perf_count!("move.tiles", turns.iter().map(Vec::len).sum::<usize>());
+        mc_core::perf_count!(
+            "move.biggest_tile",
+            turns
+                .iter()
+                .flatten()
+                .map(|t| t.pairs.len())
+                .max()
+                .unwrap_or(0)
+        );
+        drop(span);
+        let _span = mc_core::perf_span!("contacts.passes");
+        for _ in 0..PASSES {
+            mc_core::perf_count!("move.pair_passes");
+            let mut pushed_any = false;
+            for turn in &turns {
+                // A few tiles to a worker: one tile is too little work to hand out.
+                let chunk = turn
+                    .len()
+                    .div_ceil(self.pool.thread_count().max(1) * 2)
+                    .max(1);
+                let done: Vec<(bool, Vec<Vec<FxVec2>>)> =
+                    self.pool
+                        .parallel_map_chunks(turn.len(), chunk, |_, range| {
+                            let mut any = false;
+                            let moved = turn[range]
+                                .iter()
+                                .map(|tile| {
+                                    let mut local: Vec<FxVec2> =
+                                        tile.units.iter().map(|&k| at[k]).collect();
+                                    for &(a, b) in &tile.pairs {
+                                        let (i, j) =
+                                            (tile.units[a as usize], tile.units[b as usize]);
+                                        let (pa, pb) = (local[a as usize], local[b as usize]);
+                                        if let Some((pa, pb)) = self
+                                            .push_pair(rows[i], rows[j], radii[i], radii[j], pa, pb)
+                                        {
+                                            any = true;
+                                            (local[a as usize], local[b as usize]) = (pa, pb);
+                                        }
+                                    }
+                                    local
+                                })
+                                .collect();
+                            (any, moved)
+                        });
+                for (tiles, (any, moved)) in turn.chunks(chunk).zip(done) {
+                    pushed_any |= any;
+                    for (tile, local) in tiles.iter().zip(moved) {
+                        for (&k, pos) in tile.units.iter().zip(local) {
+                            at[k] = pos;
+                        }
+                    }
+                }
+            }
+            for &(i, j) in &apart {
+                if let Some((pa, pb)) =
+                    self.push_pair(rows[i], rows[j], radii[i], radii[j], at[i], at[j])
+                {
+                    pushed_any = true;
+                    (at[i], at[j]) = (pa, pb);
+                }
+            }
+            if !pushed_any {
+                break;
+            }
+        }
+    }
+
+    /// Every pair of moving ground hulls that could meet this tick, as indices
+    /// into `rows`, sorted. Two hulls can only meet if their proposed spots come
+    /// within reach: the gap now, less both steps, plus room for the pushes.
+    fn contact_pairs(&self, rows: &[usize], at: &[FxVec2]) -> Vec<(usize, usize)> {
+        let units = &self.state.units;
+        let mut index = vec![usize::MAX; units.slots.rows()];
+        for (i, &row) in rows.iter().enumerate() {
+            index[row] = i;
+        }
+        let step = |i: usize| at[i].distance(units.pos[rows[i]]);
+        let widest_step = (0..rows.len()).map(step).fold(Fx::ZERO, Fx::max);
+        let chunks: Vec<Vec<(usize, usize)>> =
+            self.pool
+                .parallel_map_chunks(rows.len(), CHUNK, |_, range| {
+                    let mut pairs = Vec::new();
+                    for i in range {
+                        let row = rows[i];
+                        // Flight spacing belongs to formations, not ground hull contacts.
+                        if self.bp(row).motion.unwrap().layer == MoveLayer::Air {
+                            continue;
+                        }
+                        let slack = (step(i) + widest_step + CONTACT_PUSH_ROOM).min(CONTACT_REACH);
+                        let reach = self.bp(row).radius + Fx::ONE + slack;
+                        self.index.query(units.pos[row], reach, kind::UNIT, |e| {
+                            let other = e.row as usize;
+                            if other <= row
+                                || !self.unit_entry_is_current(e)
+                                || index[other] == usize::MAX
+                            {
+                                return true;
+                            }
+                            // A dived submarine slips under a floating hull, and it over it.
+                            if self.bp(other).motion.unwrap().layer == MoveLayer::Air
+                                || self.hulls_pass(row, other)
+                                || self.steps_over(row, other)
+                            {
+                                return true;
+                            }
+                            pairs.push((i, index[other]));
+                            true
+                        });
+                    }
+                    pairs
+                });
+        let mut pairs: Vec<(usize, usize)> = chunks.into_iter().flatten().collect();
+        // Pushes land in pair order: sort it so it follows the rows, not the index layout.
+        pairs.sort_unstable();
+        pairs
+    }
+
+    /// Where hulls `a` at `pa` and `b` at `pb` stand once pushed apart, or
+    /// `None` when they are not in touch.
+    fn push_pair(
+        &self,
+        a: usize,
+        b: usize,
+        ra: Fx,
+        rb: Fx,
+        pa: FxVec2,
+        pb: FxVec2,
+    ) -> Option<(FxVec2, FxVec2)> {
+        let delta = pa - pb;
+        // Clear by more than the square root can round: no need to take it.
+        let clear = ra + rb + Fx::from_int(2);
+        if delta.length_sq() > clear * clear {
+            return None;
+        }
+        let dist = delta.length();
+        let overlap = ra + rb + Fx::ONE - dist;
+        if overlap <= Fx::ZERO {
+            return None;
+        }
+        let dir = if dist > Fx::EPSILON {
+            delta.normalize()
+        } else {
+            FxVec2::from_angle(mc_core::Angle((a as u16).wrapping_mul(9973)))
+        };
+        mc_core::perf_count!("move.pushes");
+        let correction = overlap.min(MOST_PUSH);
+        // Where `row` from `from` stands pushed `amount` along `direction`, if it can stand there.
+        let pushed = |row: usize, from: FxVec2, direction: FxVec2, amount: Fx| {
+            let motion = self.bp(row).motion.unwrap();
+            let candidate = self.clamp_to_map(from + direction * amount);
+            self.nav
+                .passable(motion.layer, motion.size_class, candidate)
+                .then_some(candidate)
+        };
+        let (share_a, share_b) = (self.give_way(a, b), self.give_way(b, a));
+        let na = pushed(a, pa, dir, correction * share_a);
+        let nb = pushed(b, pb, -dir, correction * share_b);
+        // A hull pressed against a slope cannot give way; the other
+        // takes the whole push, or two hulls stay sunk into each other.
+        let (na, nb) = match (na, nb) {
+            (None, Some(_)) => (None, pushed(b, pb, -dir, correction).or(nb)),
+            (Some(_), None) => (pushed(a, pa, dir, correction).or(na), None),
+            both => both,
+        };
+        Some((na.unwrap_or(pa), nb.unwrap_or(pb)))
+    }
+
+    /// How firmly a hull holds its ground in a crowd: the ground it covers,
+    /// twice over while it is on its way somewhere. A Fulgur shoulders a
+    /// column of tanks aside and they cannot shove it back; a unit under
+    /// orders makes a parked one of its size step aside.
+    fn crowd_mass(&self, row: usize) -> Fx {
+        let r = self.bp(row).radius;
+        let flags = self.state.units.flags[row];
+        let going = flags & flag::HAS_FIELD != 0 && flags & flag::HOLD == 0;
+        r * r * if going { 2 } else { 1 }
+    }
+
+    /// The share of an overlap between `row` and `other` that `row` gives way
+    /// by. Under an eighth, none: a hull that much heavier is a wall to the
+    /// other, or a column pressing on a parked Fulgur walks it off a tank's
+    /// width at a time.
+    pub(crate) fn give_way(&self, row: usize, other: usize) -> Fx {
+        let (mine, theirs) = (self.crowd_mass(row), self.crowd_mass(other));
+        if mine == theirs {
+            return Fx::HALF;
+        }
+        let share = theirs / (mine + theirs).max(Fx::EPSILON);
+        if share < Fx::ratio(1, 8) {
+            Fx::ZERO
+        } else {
+            share
+        }
+    }
+}
+
+/// Sorts `pairs` (sorted, as `contact_pairs` gives them) into tiles by where
+/// their first hull stands, grouped into the nine turns of a 3 x 3 block, and
+/// the pairs no tile can hold (a hull wider than `TILE_RADIUS`, or the other
+/// hull beyond the next tile). The hulls are sorted into tiles, not the pairs,
+/// and each tile is put together on the pool.
+fn tiles(
+    pool: &mc_jobs::Pool,
+    pairs: &[(usize, usize)],
+    at: &[FxVec2],
+    radii: &[Fx],
+) -> (Vec<Vec<Tile>>, Vec<(usize, usize)>) {
+    let cell = |p: FxVec2| (p.x.floor_int() >> TILE_SHIFT, p.y.floor_int() >> TILE_SHIFT);
+    // `starts[i]..starts[i + 1]`: the pairs whose first hull is `i`.
+    let mut starts = vec![0usize; at.len() + 1];
+    for &(i, _) in pairs {
+        starts[i + 1] += 1;
+    }
+    for i in 1..starts.len() {
+        starts[i] += starts[i - 1];
+    }
+    let mut firsts: Vec<((i32, i32), usize)> = (0..at.len())
+        .filter(|&i| starts[i + 1] > starts[i])
+        .map(|i| (cell(at[i]), i))
+        .collect();
+    // Hulls are unique, so the sort is total: each tile's pairs stay in row order.
+    firsts.sort_unstable();
+    let runs: Vec<&[((i32, i32), usize)]> = firsts.chunk_by(|a, b| a.0 == b.0).collect();
+    let built: Vec<Vec<Built>> = pool.parallel_map_chunks(runs.len(), 16, |_, range| {
+        runs[range]
+            .iter()
+            .map(|run| {
+                let tile = run[0].0;
+                let (mut held, mut apart) = (Vec::new(), Vec::new());
+                for &(_, i) in *run {
+                    for &(i, j) in &pairs[starts[i]..starts[i + 1]] {
+                        let tj = cell(at[j]);
+                        if radii[i] > TILE_RADIUS
+                            || radii[j] > TILE_RADIUS
+                            || (tile.0 - tj.0).abs() > 1
+                            || (tile.1 - tj.1).abs() > 1
+                        {
+                            apart.push((i, j));
+                        } else {
+                            held.push((i, j));
+                        }
+                    }
+                }
+                let mut units: Vec<usize> = held.iter().flat_map(|&(i, j)| [i, j]).collect();
+                units.sort_unstable();
+                units.dedup();
+                let local = |k: usize| units.binary_search(&k).unwrap() as u32;
+                let pairs = held.iter().map(|&(i, j)| (local(i), local(j))).collect();
+                (Tile { units, pairs }, apart)
+            })
+            .collect()
+    });
+    let mut turns: Vec<Vec<Tile>> = (0..9).map(|_| Vec::new()).collect();
+    let mut apart = Vec::new();
+    for (run, (tile, far)) in runs.iter().zip(built.into_iter().flatten()) {
+        let (x, y) = run[0].0;
+        apart.extend(far);
+        if !tile.pairs.is_empty() {
+            turns[(x.rem_euclid(3) * 3 + y.rem_euclid(3)) as usize].push(tile);
+        }
+    }
+    (turns, apart)
+}

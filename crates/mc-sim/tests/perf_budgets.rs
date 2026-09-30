@@ -144,8 +144,9 @@ fn paladins_vs_paladins() {
     mc_sim::perf::budget(&report, &[("sim.tick", 10.0)]);
 }
 
-/// A flat 16 km map with `players` starts on a 3 km ring round the centre.
-fn ring_world(players: u8, fog: bool) -> World {
+/// A flat 16 km map with `players` starts on a 3 km ring round the centre,
+/// on a pool of `threads` workers (all the machine's with `None`).
+fn ring_world(players: u8, fog: bool, threads: Option<usize>) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -176,14 +177,8 @@ fn ring_world(players: u8, fog: bool) -> World {
         fog,
         spawn_commanders: false,
     };
-    World::with_terrain(
-        terrain,
-        map,
-        blueprints,
-        Arc::new(Pool::with_default_threads()),
-        &config,
-    )
-    .unwrap()
+    let pool = threads.map_or_else(Pool::with_default_threads, Pool::new);
+    World::with_terrain(terrain, map, blueprints, Arc::new(pool), &config).unwrap()
 }
 
 fn ring_point(p: u8, players: u8, radius: f32) -> FxVec2 {
@@ -208,8 +203,15 @@ enum Plan {
 /// `total` units shared out between `players` armies, each four blocks of tanks,
 /// bots, heavy tanks and interceptors `gap` metres apart, `radius` metres from
 /// the centre, sent as `plan` says.
-fn armies(players: u8, total: u32, radius: f32, gap: i32, plan: Plan) -> World {
-    let mut w = ring_world(players, true);
+fn armies(
+    players: u8,
+    total: u32,
+    radius: f32,
+    gap: i32,
+    plan: Plan,
+    threads: Option<usize>,
+) -> World {
+    let mut w = ring_world(players, true, threads);
     let per = total / players as u32;
     let mix = [
         ("aster_t1_tank", 4),
@@ -252,7 +254,7 @@ fn armies(players: u8, total: u32, radius: f32, gap: i32, plan: Plan) -> World {
 /// query that stops scaling with the crowd around it.
 #[test]
 fn eight_armies_clash() {
-    let mut w = armies(8, 4000, 900.0, 6, Plan::Pile);
+    let mut w = armies(8, 4000, 900.0, 6, Plan::Pile, None);
     let report = w
         .perf_ticks("eight_armies_clash", 200, |_, _| Vec::new())
         .unwrap();
@@ -280,6 +282,10 @@ fn eight_armies_clash() {
 /// crowd there is); `:pairs` sets each army on its neighbour on a 3 km ring,
 /// one battle per two sides as a big match plays; `:idle` spreads the armies
 /// 20 m apart on that ring and gives no orders.
+///
+/// With `MERIDIAN_SCALE_SERIAL=1` the tick runs on this thread alone and the
+/// table ends with its CPU time per tick, which a machine busy with other
+/// work barely moves: the number to compare two versions by.
 #[test]
 #[ignore]
 fn zz_scale_probe() {
@@ -288,15 +294,22 @@ fn zz_scale_probe() {
         let parts: Vec<&str> = case.split(':').collect();
         let players: u8 = parts[0].parse().unwrap();
         let total: u32 = parts[1].parse().unwrap();
+        let serial = std::env::var("MERIDIAN_SCALE_SERIAL").is_ok_and(|v| v == "1");
+        let threads = serial.then_some(0);
         let mut w = match parts.get(2) {
-            Some(&"idle") => armies(players, total, 3000.0, 20, Plan::Idle),
-            Some(&"pairs") => armies(players, total, 3000.0, 6, Plan::Pairs),
-            _ => armies(players, total, 900.0, 6, Plan::Pile),
+            Some(&"idle") => armies(players, total, 3000.0, 20, Plan::Idle, threads),
+            Some(&"pairs") => armies(players, total, 3000.0, 6, Plan::Pairs, threads),
+            _ => armies(players, total, 900.0, 6, Plan::Pile, threads),
         };
+        let cpu_before = thread_cpu_ns();
         let report = w
             .perf_ticks(&format!("scale {case}"), 300, |_, _| Vec::new())
             .unwrap();
         println!("{}", report.text());
+        if serial {
+            let per_tick = (thread_cpu_ns() - cpu_before) as f64 / 300.0 / 1e6;
+            println!("   cpu ms per tick (this thread): {per_tick:.2}");
+        }
     }
 }
 
@@ -305,7 +318,7 @@ fn zz_scale_probe() {
 /// cap and dropped). The order must go through and not stall the tick.
 #[test]
 fn one_order_for_an_army() {
-    let mut w = ring_world(2, false);
+    let mut w = ring_world(2, false, None);
     let mix = [
         ("aster_t1_tank", 3000),
         ("aster_t1_bot", 2000),
@@ -365,4 +378,12 @@ fn one_order_for_an_army() {
         &report,
         &[("spatial.tested", 3_300_000.0), ("sim.tick", 250.0)],
     );
+}
+
+/// CPU time this thread has run, nanoseconds (Linux; 0 elsewhere).
+fn thread_cpu_ns() -> u64 {
+    std::fs::read_to_string("/proc/thread-self/schedstat")
+        .ok()
+        .and_then(|s| s.split_whitespace().next()?.parse().ok())
+        .unwrap_or(0)
 }
