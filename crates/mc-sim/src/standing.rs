@@ -125,7 +125,8 @@ impl World {
                 None => return,
             },
         };
-        let rows = self.owned_factories(player, &ids);
+        // Factories linked in a batch share their orders: what one is given, all are.
+        let rows = self.with_batch_mates(self.owned_factories(player, &ids));
         if rows.is_empty() {
             return;
         }
@@ -217,9 +218,10 @@ impl World {
         }
     }
 
-    /// `factories` drop their standing orders and rally point for `from`'s, so there is
-    /// one patrol, not theirs and its one after the other. A rally point left on `from`
-    /// itself (none set) stays none: each keeps its own default way out.
+    /// `factories`, and those linked in a batch with them, drop their standing orders and
+    /// rally point for `from`'s, so there is one patrol, not theirs and its one after the
+    /// other. A rally point left on `from` itself (none set) stays none: each keeps its own
+    /// default way out.
     pub(crate) fn copy_standing(&mut self, player: u8, factories: &[UnitId], from: UnitId) {
         let Some(&src) = self.owned_factories(player, &[from]).first() else {
             return;
@@ -227,7 +229,7 @@ impl World {
         let units = &mut self.state.units;
         let standing = units.standing[src].clone();
         let rally = (units.rally[src] != units.pos[src]).then_some(units.rally[src]);
-        for row in self.owned_factories(player, factories) {
+        for row in self.with_batch_mates(self.owned_factories(player, factories)) {
             if row == src {
                 continue;
             }

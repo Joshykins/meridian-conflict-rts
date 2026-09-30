@@ -324,7 +324,8 @@ impl World {
             }
             Command::SetRally { factories, pos } => {
                 let pos = self.clamp_to_map(*pos);
-                for row in self.owned_factories(player, factories) {
+                // A batch has one way out: its factories share the rally point.
+                for row in self.with_batch_mates(self.owned_factories(player, factories)) {
                     self.state.units.rally[row] = pos;
                 }
                 Ok(())
@@ -332,8 +333,7 @@ impl World {
             Command::SetBatch { factories, batch } => self.set_batch(player, factories, *batch),
             Command::ReleaseBatch { factories } => self.send_batches(player, factories),
             Command::SetBatchSize { factories, size } => {
-                self.set_batch_size(player, factories, *size);
-                Ok(())
+                self.set_batch_size(player, factories, *size)
             }
             Command::CopyFactoryOrders { factories, from } => {
                 self.copy_standing(player, factories, *from);

@@ -1,62 +1,82 @@
-//! A factory's batch on the queue strip: the Batch switch, how many are ready, Send while
-//! some wait, and the size stepper.
+//! A factory's batch on the queue strip: the Batch switch, and while it is on, the size
+//! stepper joined to its left and Send beside that while some are ready. The strip folds
+//! to fit a narrow screen.
 
 use super::*;
 use mc_sim::mirror::{BatchView, UNIT_BATCH};
 
-/// The strip's Repeat switch, and each switch or tile a step left of it.
+/// The strip's Repeat switch, and each switch a step left of it.
 fn strip(step: f32) -> Vec2 {
     let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
     Vec2::new(repeat.x - step * (48.0 + 10.0 + 48.0), repeat.y)
 }
 
-#[test]
-fn a_batching_factory_shows_what_is_ready_and_sends_it_early() {
-    let mut rig = Rig::new("aster_t1_land_factory");
-    let batch = strip(1.0);
-    assert_eq!(rig.click(batch), vec![HudAction::Batch(true)]);
-
-    // On, with two of three formed up: the switch turns it off, and Send appears beside it.
+/// A factory batching with `count` of `size` ready.
+fn batching(rig: &mut Rig, count: u16, size: u16) {
     rig.view.frame.units[0].status[0] |= UNIT_BATCH;
     rig.view.status.queues = vec![UnitOrders {
         unit_id: 7,
         batch: Some(BatchView {
             group: 0,
-            count: 2,
-            size: 3,
-            fixed: false,
-            units: vec![20, 21],
+            count,
+            size,
+            units: (0..u32::from(count)).map(|i| 20 + i).collect(),
             next: Some([100.0, 20.0]),
-            linked: vec![[100.0, 0.0]],
-            index: 0,
+            linked: vec![7],
         }),
         ..Default::default()
     }];
     rig.settle();
-    assert_eq!(rig.click(batch), vec![HudAction::Batch(false)]);
-    let send = Vec2::new(batch.x - 48.0 - 10.0 - 31.0, batch.y);
-    assert_eq!(rig.click(send), vec![HudAction::SendBatch]);
+}
 
-    // Nothing waiting: Send stays where it is, dark, and Pause with it.
-    rig.view.status.queues[0].batch.as_mut().unwrap().count = 0;
-    rig.settle();
-    assert_eq!(rig.click(send), vec![]);
-    // The size stepper beside it: its laps (3) until a step sets a size.
-    let size = Vec2::new(send.x - 31.0 - 10.0 - 42.0, batch.y);
+#[test]
+fn a_batching_factory_sets_its_size_and_sends_what_is_ready_early() {
+    let mut rig = Rig::new("aster_t1_land_factory");
+    let batch = strip(2.0);
+    assert_eq!(rig.click(batch), vec![HudAction::Batch(true)]);
+
+    // On, with two of ten ready: the switch turns it off, the stepper beside it sets the
+    // size, and Send beside that lets the two go.
+    batching(&mut rig, 2, 10);
+    assert_eq!(rig.click(batch), vec![HudAction::Batch(false)]);
+    let size = Vec2::new(batch.x - 48.0 - 4.0 - 38.0, batch.y);
     assert_eq!(
         rig.click(size - Vec2::X * 25.0),
-        vec![HudAction::BatchSize(Some(2))]
+        vec![HudAction::BatchSize(9)]
     );
     assert_eq!(
         rig.click(size + Vec2::X * 25.0),
-        vec![HudAction::BatchSize(Some(4))]
+        vec![HudAction::BatchSize(11)]
     );
-    assert_eq!(rig.right_click(size), vec![], "no size set to clear");
-    let view = rig.view.status.queues[0].batch.as_mut().unwrap();
-    (view.fixed, view.size) = (true, 20);
-    assert_eq!(rig.right_click(size), vec![HudAction::BatchSize(None)]);
-    let pause = Vec2::new(size.x - 42.0 - 10.0 - 48.0, batch.y);
+    let send = Vec2::new(size.x - 38.0 - 4.0 - 32.0, batch.y);
+    assert_eq!(rig.click(send), vec![HudAction::SendBatch]);
+
+    // Nothing ready: no Send. The size goes no lower than one.
+    batching(&mut rig, 0, 1);
+    assert_eq!(rig.click(send), vec![]);
+    assert_eq!(rig.click(size - Vec2::X * 25.0), vec![]);
+    // Pause and Repeat stay where they were.
+    assert_eq!(rig.click(strip(1.0)), vec![HudAction::PauseWork(true)]);
+    assert_eq!(rig.click(strip(0.0)), vec![HudAction::Repeat(true)]);
+}
+
+#[test]
+fn on_a_narrow_screen_the_switches_fold_to_their_glyphs() {
+    // A 4:3 screen: the canvas is 1440 points across, not 1920.
+    let mut rig = Rig::sized("aster_t1_land_factory", Vec2::new(1440.0, 1080.0));
+    batching(&mut rig, 3, 10);
+    // Folded switches are 40 wide, 6 apart, from the strip's right end.
+    let repeat = Vec2::new(1440.0 - EDGE - 12.0 - 20.0, DECK_Y - GAP - 31.0);
+    assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
+    let pause = repeat - Vec2::X * 46.0;
     assert_eq!(rig.click(pause), vec![HudAction::PauseWork(true)]);
+    let batch = pause - Vec2::X * 46.0;
+    assert_eq!(rig.click(batch), vec![HudAction::Batch(false)]);
+    let size = batch - Vec2::X * (20.0 + 3.0 + 31.0);
+    assert_eq!(
+        rig.click(size + Vec2::X * 20.0),
+        vec![HudAction::BatchSize(11)]
+    );
 }
 
 #[test]
@@ -72,7 +92,7 @@ fn factories_count_as_batched_only_when_linked_in_one() {
     };
     let queues = [q(1, Some(4)), q(2, Some(4)), q(3, Some(9)), q(5, None)];
     let linked =
-        |ids: &[u32]| super::super::build::queue::batch_linked(&queues, ids.iter().copied());
+        |ids: &[u32]| super::super::build::batch::batch_linked(&queues, ids.iter().copied());
     assert_eq!(linked(&[1, 2]), (2, 2), "one batch: all on");
     assert_eq!(
         linked(&[1, 2, 3]),

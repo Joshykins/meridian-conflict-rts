@@ -1235,31 +1235,7 @@ impl OrderMap {
             }
             (middle / found.len().max(1) as f32, found)
         };
-        let batches = view.status.queues.iter().filter_map(|q| {
-            let b = q.batch.as_ref()?;
-            let (middle, members) = middle_of(&b.units);
-            let factory_lit = view.shift || view.selection.contains(&q.unit_id);
-            // None waiting yet: an empty badge where the first will stand, on the selected
-            // factory only.
-            let middle = if members.is_empty() {
-                let at = Vec2::from(b.next.filter(|_| factory_lit)?);
-                at.extend(field.renderer.surface_height(at))
-            } else {
-                middle
-            };
-            Some(Group {
-                formation: 0,
-                middle,
-                selected: factory_lit || members.iter().any(|id| view.selection.contains(id)),
-                members,
-                batch: Some(Filling {
-                    factory: q.unit_id,
-                    count: b.count,
-                    size: b.size,
-                    fixed: b.fixed,
-                }),
-            })
-        });
+        let batches = muster::batch_groups(field, &middle_of);
         self.kept
             .iter()
             .filter_map(|(&formation, members)| {
@@ -1311,6 +1287,7 @@ impl OrderMap {
         let ground = |p: Vec2| camera.project(p.extend(renderer.surface_height(p) + 1.0));
         let t = ui.time;
         let groups = self.groups(field, alpha);
+        muster::links(ui, field);
         let mut budget = MAX_LINES;
         let mut nodes = MAX_NODES;
         // Legs and waypoints several units share are drawn once.
@@ -1341,9 +1318,6 @@ impl OrderMap {
             };
             let lively = selected || view.shift;
             let guard = guard_look(field.blueprints, unit);
-            if let Some(batch) = &queue.batch {
-                muster::muster_marks(ui, field, batch, strength);
-            }
             // A group's line leaves from the middle of the group, a lone unit's from the unit.
             let (mut origin, start) = match queue.orders.first() {
                 Some(o) if o.formation != 0 => {
@@ -1357,14 +1331,22 @@ impl OrderMap {
                     Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha),
                 ),
             };
-            // A batch leaves from where it forms up, not from the factory.
-            let forming = queue.batch.as_ref().and_then(|_| {
-                groups
-                    .iter()
-                    .find(|g| g.batch.is_some_and(|b| b.factory == queue.unit_id))
-                    .map(|g| g.middle)
+            // A batch has one set of orders, and one line: from where it forms up nearest
+            // where it goes, not from each factory.
+            let batch = queue.batch.as_ref().and_then(|b| {
+                let to = queue
+                    .standing
+                    .first()
+                    .map_or(start.truncate(), |o| Vec2::from(o.pos));
+                Some((b.group, muster::exit(field, &groups, b, to)?))
             });
-            let start = forming.unwrap_or(start);
+            let start = match batch {
+                Some((group, at)) => {
+                    origin = Origin::Batch(group);
+                    at
+                }
+                None => start,
+            };
             // Where the line so far ends on screen, worked out only for a leg that is
             // drawn: a group's members share their legs, and thousands of them each
             // finding the ground under every waypoint was most of this pass.
@@ -1481,7 +1463,10 @@ impl OrderMap {
                     nodes -= 1;
                     markers.push((b / ui.s, tone, strength, selected));
                 }
-                origin = if order.formation != 0 {
+                origin = if batch.is_some() {
+                    // Its legs are the batch's, whichever of its factories draws them.
+                    origin
+                } else if order.formation != 0 {
                     Origin::Post(order.kind as u8, order.at)
                 } else {
                     Origin::Unit(queue.unit_id)
@@ -1609,6 +1594,8 @@ enum Origin {
     Unit(u32),
     Group(u64),
     Post(u8, FxVec2),
+    /// A factory batch's orders, by its number.
+    Batch(u32),
 }
 
 /// A command group on the map, as its badge shows it.
@@ -1625,11 +1612,11 @@ struct Group {
 /// How far a forming batch has got, and what it leaves at.
 #[derive(Clone, Copy)]
 struct Filling {
-    factory: u32,
-    /// Products out of the lap, or with a size set (`fixed`), units waiting of it.
+    /// The batch it is part of (`BatchView::group`).
+    group: u32,
+    /// Units waiting in the whole batch, and how many it leaves at.
     count: u16,
     size: u16,
-    fixed: bool,
 }
 
 /// Points between the pulses running down a line, and how fast they run, points a second.

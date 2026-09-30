@@ -2516,7 +2516,9 @@ impl World {
                 && ((s.units.is_active(row)
                     && (self.bp(row).is_mobile() || self.bp(row).builder.is_some())
                     && s.orders.front(&s.units, row).is_some())
-                    || !s.units.standing[row].is_empty())
+                    || !s.units.standing[row].is_empty()
+                    // A batching factory, idle or not: its batch is drawn on the ground.
+                    || self.batching(row))
                 && watching.binary_search(&s.units.id(row).0).is_err()
         });
         for row in watched.chain(rest.take(MAX_LISTED_UNITS)) {

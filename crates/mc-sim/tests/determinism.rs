@@ -189,7 +189,7 @@ fn batch_on(w: &World) -> Vec<PlayerCommand> {
         // The two linked in one batch that leaves at five, short of their laps' six.
         Command::SetBatchSize {
             factories: factories.clone(),
-            size: Some(5),
+            size: 5,
         },
         Command::SetRepeat {
             factories: factories.clone(),
@@ -338,7 +338,7 @@ fn reference() -> Vec<u64> {
                 .state
                 .batches
                 .values()
-                .find(|b| b.factories.iter().any(|f| f.0 == fid))
+                .find(|b| b.factories.contains(&fid))
                 .map_or(0, |b| b.held.len());
             // Four waiting, then fewer: the fifth came out and the batch left (the other
             // factory's scout out that same tick may already wait in the next).

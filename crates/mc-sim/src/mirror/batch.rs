@@ -12,18 +12,15 @@ pub const UNIT_BATCH: u32 = 1 << 14;
 pub struct BatchView {
     /// Which batch it is in: factories with the same number are linked.
     pub group: u32,
-    /// The batch's count so far and what it leaves at: products out of the laps' total,
-    /// or, with a size set (`fixed`), units waiting of the size.
+    /// Units waiting in the whole batch, and how many it leaves at.
     pub count: u16,
     pub size: u16,
-    pub fixed: bool,
     /// The units waiting at this factory: to the player, one group.
     pub units: Vec<u32>,
     /// Where the next one out will stand, while more are to come.
     pub next: Option<[f32; 2]>,
-    /// Where each linked factory's block starts, in the batch's order; this one is `index`.
-    pub linked: Vec<[f32; 2]>,
-    pub index: usize,
+    /// The factories linked in the batch, this one among them.
+    pub linked: Vec<u32>,
 }
 
 impl World {
@@ -33,11 +30,9 @@ impl World {
             group: m.group,
             count: m.count,
             size: m.size,
-            fixed: m.fixed,
             units: m.units.iter().map(|u| u.0).collect(),
             next: m.next.map(|p| p.to_f32()),
-            linked: m.linked.iter().map(|p| p.to_f32()).collect(),
-            index: m.index,
+            linked: m.linked.iter().map(|f| f.0).collect(),
         })
     }
 

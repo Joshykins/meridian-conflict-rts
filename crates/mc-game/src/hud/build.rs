@@ -17,6 +17,7 @@ use mc_data::{cat, BlueprintId, UnitBlueprint};
 use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
 
+pub(super) mod batch;
 pub(super) mod queue;
 mod strip;
 pub(super) use queue::Split;
@@ -375,7 +376,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                     .map(|u| has_flag(u, flag::REPEAT)),
             ),
             batch: {
-                let (on, of) = queue::batch_linked(
+                let (on, of) = batch::batch_linked(
                     &s.view.status.queues,
                     units
                         .iter()
@@ -384,10 +385,9 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                 );
                 Split { on, of }
             },
-            muster: queue.and_then(|q| q.batch.as_ref()).map(|b| queue::Muster {
+            muster: queue.and_then(|q| q.batch.as_ref()).map(|b| batch::Muster {
                 count: b.count,
                 size: b.size,
-                fixed: b.fixed,
                 linked: b.linked.len(),
             }),
             pause: Split::count(

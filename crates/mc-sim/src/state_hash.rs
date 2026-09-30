@@ -103,10 +103,10 @@ impl World {
                 h.write_u64(s.batches.len() as u64 | (s.next_batch as u64) << 32);
                 for (&g, b) in &s.batches {
                     h.write_u64(g as u64 | (b.owner as u64) << 32);
-                    h.write_u64(b.size.map_or(u64::MAX, u64::from));
+                    h.write_u64(u64::from(b.size));
                     h.write_u64(b.factories.len() as u64);
-                    for &(f, made) in &b.factories {
-                        h.write_u64(f.0 as u64 | (made as u64) << 32);
+                    for &f in &b.factories {
+                        h.write_u64(f.0 as u64);
                     }
                     h.write_u64(b.held.len() as u64);
                     for held in &b.held {

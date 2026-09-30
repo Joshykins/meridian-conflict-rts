@@ -1,8 +1,7 @@
 //! The queue strip over the construction panel: what the builder has queued, and the
-//! Pause, Batch and Repeat switches. A selection of several builders can be split on any
-//! switch; the buttons show how it is split and what a click will do. Batch on several
-//! factories links them into one batch. While batch is on, a Send tile lets it go early
-//! and a Size stepper sets how many it waits for.
+//! Repeat, Pause and Batch switches (`batch.rs`). A selection of several builders can be
+//! split on any switch; the buttons show how it is split and what a click will do. On a
+//! narrow screen the switches fold to their glyphs, so the strip always fits.
 
 use super::{pause_mark, tip, Stack, BUILDING};
 use crate::audio::Sfx;
@@ -60,7 +59,7 @@ pub(super) struct Queue<'a> {
     /// share, so the switch is all on only when they are all linked in one.
     pub(super) batch: Split,
     /// This factory's batch while it is in one.
-    pub(super) muster: Option<Muster>,
+    pub(super) muster: Option<super::batch::Muster>,
     /// The selected builders whose work is paused.
     pub(super) pause: Split,
     /// This builder's work is paused: its queue waits, the front entry holds where it got to.
@@ -69,53 +68,70 @@ pub(super) struct Queue<'a> {
     pub(super) front: Option<OrderKind>,
 }
 
-/// A factory's batch as the strip shows it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct Muster {
-    /// How far along it is and what it leaves at.
-    pub(super) count: u16,
-    pub(super) size: u16,
-    /// The size was set by hand; else it is the factories' laps.
-    pub(super) fixed: bool,
-    /// Factories linked in it.
-    pub(super) linked: usize,
+/// The strip's measures: full, or folded to fit a narrow screen.
+pub(super) struct Layout {
+    /// The head: the caption, or what is under way and how far along.
+    head: f32,
+    /// A switch, and the gap between switches.
+    pub(super) switch: f32,
+    gap: f32,
+    /// The batch size stepper and Send, and the gap joining them to the Batch switch.
+    pub(super) stepper: f32,
+    pub(super) send: f32,
+    pub(super) join: f32,
 }
 
-/// How many of `factories` (unit ids) are in the batch most of them share, and how many
-/// there are: what the Batch switch and Shift+L go by. All in one batch is all on.
-pub(crate) fn batch_linked(
-    queues: &[mc_sim::mirror::UnitOrders],
-    factories: impl IntoIterator<Item = u32>,
-) -> (usize, usize) {
-    let groups: Vec<Option<u32>> = factories
-        .into_iter()
-        .map(|id| {
-            crate::sim_thread::queue_of(queues, id)
-                .and_then(|q| q.batch.as_ref())
-                .map(|b| b.group)
-        })
-        .collect();
-    let most = groups
-        .iter()
-        .flatten()
-        .map(|g| groups.iter().filter(|o| **o == Some(*g)).count())
-        .max()
-        .unwrap_or(0);
-    (most, groups.len())
-}
+const FULL: Layout = Layout {
+    head: 176.0,
+    switch: 96.0,
+    gap: 10.0,
+    stepper: 76.0,
+    send: 64.0,
+    join: 4.0,
+};
 
-/// How wide the strip's head is: the caption, or what is under way and how far along.
-const HEAD_W: f32 = 176.0;
+/// Switches as glyphs alone (the label and key are in the tip), a shorter head.
+const FOLDED: Layout = Layout {
+    head: 132.0,
+    switch: 40.0,
+    gap: 6.0,
+    stepper: 62.0,
+    send: 30.0,
+    join: 3.0,
+};
+
+/// A queued tile, and the gap after it.
+const STACK_W: f32 = 48.0;
+const STACK_GAP: f32 = 5.0;
+
+/// The measures that fit `w`: full while the head, the switches and a queued tile or two
+/// fit at full size.
+fn layout(w: f32, queue: &Queue) -> &'static Layout {
+    let wants = |l: &Layout| {
+        let mut switches = l.switch;
+        if queue.is_factory {
+            switches += l.gap + l.switch + l.gap + super::batch::width(queue, l);
+        }
+        14.0 + l.head + 18.0 + 2.0 * (STACK_W + STACK_GAP) + 30.0 + switches + l.gap + 12.0
+    };
+    if w >= wants(&FULL) {
+        &FULL
+    } else {
+        &FOLDED
+    }
+}
 
 pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
     hud.glass(ui, r);
-    let end = head(ui, s, r, queue);
+    let l = layout(r.w, queue);
+    let end = head(ui, s, r, queue, l.head);
     let pause = queue.pause;
 
     // Repeat, for a factory: build the queue over and over.
     let mut right = r.right() - 12.0;
+    let mut batch_right = None;
     if queue.is_factory {
-        let tr = Rect::new(right - 96.0, r.y + (r.h - 34.0) * 0.5, 96.0, 34.0);
+        let tr = Rect::new(right - l.switch, r.y + (r.h - 34.0) * 0.5, l.switch, 34.0);
         let hint = if queue.repeat.mixed() {
             format!(
                 "{} of {} factories repeat.  Click: all repeat  \u{b7}  Right-Click: none do",
@@ -128,6 +144,7 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
             hud,
             ui,
             tr,
+            l,
             Switch {
                 id: "queue-repeat",
                 split: queue.repeat,
@@ -142,12 +159,11 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
         if let Some(on) = set {
             hud.actions.push(HudAction::Repeat(on));
         }
-        right = tr.x - 10.0;
-        right = batch_switches(hud, ui, r, queue, right);
+        right = tr.x - l.gap;
     }
     // Pause, for any builder: the queue stays, the spending stops.
     {
-        let tr = Rect::new(right - 96.0, r.y + (r.h - 34.0) * 0.5, 96.0, 34.0);
+        let tr = Rect::new(right - l.switch, r.y + (r.h - 34.0) * 0.5, l.switch, 34.0);
         let (glyph, label, hint) = if pause.mixed() {
             (
                 icons::Glyph::Pause,
@@ -174,6 +190,7 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
             hud,
             ui,
             tr,
+            l,
             Switch {
                 id: "queue-pause",
                 split: pause,
@@ -188,7 +205,15 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
         if let Some(paused) = set {
             hud.actions.push(HudAction::PauseWork(paused));
         }
-        right = tr.x - 10.0;
+        right = tr.x - l.gap;
+        if queue.is_factory {
+            batch_right = Some(right);
+        }
+    }
+    // Batch, for a factory, leftmost: it is the one that grows, and it grows away from
+    // the other switches.
+    if let Some(at) = batch_right {
+        right = super::batch::control(hud, ui, s, r, queue, l, at) - l.gap;
     }
     stack_tiles(hud, ui, s, r, queue, end + 18.0, right);
 }
@@ -196,7 +221,7 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
 /// The strip's head. While something is under way: what the builder is doing, to what,
 /// how far along in the construction amber, and what waits behind it. With nothing under
 /// way: the queue's caption. Returns the x after it.
-fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
+fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
     let x = r.x + 14.0;
     let total: usize = queue.stacks.iter().map(|k| k.count).sum();
     let pause = queue.pause;
@@ -236,21 +261,23 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
                 Rect::new(x, r.mid_y() - 5.0, 3.0, 10.0),
                 rgb(palette::TEXT, 0.9),
             );
-            let end = ui.text(
+            ui.text_fit_left(
                 x + 12.0,
                 r.mid_y() - 8.0,
+                head_w - 12.0,
                 type_scale::CAPTION,
                 rgb(palette::DIM, 1.0),
                 label,
             );
-            let note_end = ui.text(
+            ui.text_fit_left(
                 x + 12.0,
                 r.mid_y() + 9.0,
+                head_w - 12.0,
                 type_scale::MICRO,
                 rgb(tone, 1.0),
                 &note,
             );
-            return end.max(note_end);
+            return x + head_w;
         }
     };
 
@@ -267,7 +294,7 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
         Rect::new(x, r.y + 12.0, 3.0, r.h - 24.0),
         rgb(BUILDING, 0.9 * breathe),
     );
-    let (tx, w) = (x + 12.0, HEAD_W - 12.0);
+    let (tx, w) = (x + 12.0, head_w - 12.0);
     // What it is doing, and to what: a refit by its module's name.
     let doing = if paused {
         "Paused"
@@ -336,41 +363,66 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
         );
     }
     ui.text_fit_left(tx, r.y + 51.0, w, type_scale::MICRO, rgb(tone, 1.0), &note);
-    x + HEAD_W
+    x + head_w
 }
 
 /// A switch button on the strip.
-struct Switch<'a> {
-    id: &'static str,
-    split: Split,
-    glyph: icons::Glyph,
-    label: &'a str,
-    key: &'static str,
+pub(super) struct Switch<'a> {
+    pub(super) id: &'static str,
+    pub(super) split: Split,
+    pub(super) glyph: icons::Glyph,
+    pub(super) label: &'a str,
+    pub(super) key: &'static str,
     /// The colour it lights in while on.
-    tone: u32,
-    hint: &'a str,
+    pub(super) tone: u32,
+    pub(super) hint: &'a str,
     /// While on for the whole selection: a line under the label, and how full the gauge
     /// along the foot is.
-    detail: Option<(&'a str, f32)>,
+    pub(super) detail: Option<(&'a str, f32)>,
 }
 
 /// Draws a switch: lit while all of the selection has it on, dark while none does. A split
 /// selection gets a half-lit frame, a gauge along the foot filled to the share that has it
 /// on, and the count under the label. Returns what a click sets the selection to: `next`
-/// on a click, and on a split selection a right-click turns it all off.
-fn switch(hud: &mut Hud, ui: &mut Ui, tr: Rect, sw: Switch) -> Option<bool> {
+/// on a click, and on a split selection a right-click turns it all off. Folded, it is its
+/// glyph alone, and the tip names it.
+pub(super) fn switch(hud: &mut Hud, ui: &mut Ui, tr: Rect, l: &Layout, sw: Switch) -> Option<bool> {
     let Switch { split, tone, .. } = sw;
     let (all, mixed) = (split.all(), split.mixed());
     let t = hud.tile(ui, id(sw.id, 0), tr, all, true);
     let lit = if all { tone } else { palette::TEXT };
+    let folded = l.switch < FULL.switch;
     icons::glyph(
         ui,
         sw.glyph,
-        Vec2::new(tr.x + 16.0, tr.mid_y()),
+        Vec2::new(
+            if folded {
+                tr.x + tr.w * 0.5
+            } else {
+                tr.x + 16.0
+            },
+            tr.mid_y() - if folded { 2.0 } else { 0.0 },
+        ),
         7.0,
         rgb(lit, 0.8 + 0.2 * t.glow),
     );
     let detail = sw.detail.filter(|_| all);
+    if folded {
+        if mixed {
+            dashed_frame(ui, tr, rgb(tone, 0.55 + 0.3 * t.glow));
+            gauge(ui, tr, tone, split.on as f32 / split.of as f32);
+        }
+        if let Some((_, full)) = detail {
+            gauge(ui, tr, tone, full);
+        }
+        if t.hovered {
+            let key = sw.key.replace('\u{21e7}', "Shift+");
+            let line = detail.map_or(String::new(), |(d, _)| format!("  \u{b7}  {d}"));
+            let hint = format!("{} ({key}){line}  \u{b7}  {}", sw.label, sw.hint);
+            tip(ui, tr.x, tr.y - 46.0, &hint);
+        }
+        return switch_click(ui, t, split);
+    }
     let label_y = if mixed || detail.is_some() {
         tr.mid_y() - 5.0
     } else {
@@ -441,6 +493,12 @@ fn switch(hud: &mut Hud, ui: &mut Ui, tr: Rect, sw: Switch) -> Option<bool> {
     if t.hovered {
         tip(ui, tr.x, tr.y - 46.0, sw.hint);
     }
+    switch_click(ui, t, split)
+}
+
+/// What a click on a switch sets the selection to.
+fn switch_click(ui: &mut Ui, t: crate::hud::Tile, split: Split) -> Option<bool> {
+    let mixed = split.mixed();
     if t.clicked {
         ui.audio.play(Sfx::Select);
         Some(split.next())
@@ -460,180 +518,6 @@ fn gauge(ui: &mut Ui, tr: Rect, tone: u32, full: f32) {
         Rect::new(gauge.x, gauge.y, gauge.w * full.clamp(0.0, 1.0), gauge.h),
         rgb(tone, 0.95),
     );
-}
-
-/// The colour of a batch: a way of moving out.
-pub(in crate::hud) const BATCH: u32 = crate::hud::style::Family::Movement.tone();
-
-/// Batch, for a factory: its products form up outside and leave together once the queue
-/// (a lap of it, repeating) is out; and while some are waiting, Send, to let them go now.
-/// Drawn leftward from `right`; returns the x left of them.
-fn batch_switches(hud: &mut Hud, ui: &mut Ui, r: Rect, queue: &Queue, right: f32) -> f32 {
-    let split = queue.batch;
-    let tr = Rect::new(right - 96.0, r.y + (r.h - 34.0) * 0.5, 96.0, 34.0);
-    let waiting = queue.muster.map_or(0, |m| m.count);
-    let linked = queue.muster.map_or(1, |m| m.linked);
-    let hint = if split.mixed() {
-        format!(
-            "{} of {} factories are in this batch.  Click: link them all into one  \u{b7}  Right-Click: none batch",
-            split.on, split.of
-        )
-    } else if split.all() && linked > 1 {
-        format!(
-            "{linked} factories linked: their units form up at their own doors and leave together.  Click or Shift+L: each leaves as it is made."
-        )
-    } else if split.all() {
-        "Units form up outside and leave together once the batch is full. Click: each leaves as it is made."
-            .to_owned()
-    } else if split.of > 1 {
-        "Link these factories into one batch: units form up at each door and all leave together once it is full."
-            .to_owned()
-    } else {
-        "Units form up outside the factory and wait for the rest of the queue (one lap, repeating), then leave together on its orders."
-            .to_owned()
-    };
-    // A lap counts products out (some may have been taken away); a size, units waiting.
-    let line = queue.muster.map(|m| {
-        (
-            if m.fixed {
-                format!("{}/{} ready", m.count, m.size)
-            } else {
-                format!("lap {}/{}", m.count, m.size)
-            },
-            m.count as f32 / m.size.max(1) as f32,
-        )
-    });
-    let label = if linked > 1 && split.all() {
-        format!("Batch \u{d7}{linked}")
-    } else {
-        "Batch".to_owned()
-    };
-    let set = switch(
-        hud,
-        ui,
-        tr,
-        Switch {
-            id: "queue-batch",
-            split,
-            glyph: icons::Glyph::Batch,
-            label: &label,
-            key: "\u{21e7}L",
-            tone: BATCH,
-            hint: &hint,
-            detail: line.as_ref().map(|(text, full)| (text.as_str(), *full)),
-        },
-    );
-    if let Some(on) = set {
-        hud.actions.push(HudAction::Batch(on));
-    }
-    let mut right = tr.x - 10.0;
-    // Send, while batch is on: live only while units stand waiting. It keeps its place
-    // when none do, so Pause never moves under the pointer as a batch leaves.
-    if split.on > 0 {
-        let sr = Rect::new(right - 62.0, tr.y, 62.0, 34.0);
-        let live = waiting > 0;
-        let t = hud.tile(ui, id("queue-send", 0), sr, false, live);
-        let lit = if live {
-            0.75 + 0.25 * (ui.time * 2.4).sin().abs() + 0.2 * t.glow
-        } else {
-            0.3
-        };
-        icons::glyph(
-            ui,
-            icons::Glyph::Move,
-            Vec2::new(sr.x + 14.0, sr.mid_y()),
-            6.5,
-            rgb(BATCH, lit),
-        );
-        ui.text(
-            sr.x + 26.0,
-            sr.mid_y(),
-            type_scale::MICRO,
-            rgb(
-                if live { palette::TEXT } else { palette::FAINT },
-                0.9 + 0.1 * t.glow,
-            ),
-            "Send",
-        );
-        if t.hovered {
-            let hint = match waiting {
-                0 => "Nothing is waiting yet.".to_owned(),
-                1 => "Send the one waiting now. The next batch starts forming.".to_owned(),
-                n => format!(
-                    "Send the {n} waiting now, without the rest. The next batch starts forming."
-                ),
-            };
-            tip(ui, sr.x, sr.y - 46.0, &hint);
-        }
-        if t.clicked && live {
-            ui.audio.play(Sfx::Select);
-            hud.actions.push(HudAction::SendBatch);
-        }
-        right = sr.x - 10.0;
-    }
-    if let Some(m) = queue.muster.filter(|_| split.on > 0) {
-        right = size_stepper(hud, ui, Rect::new(right - 84.0, tr.y, 84.0, 34.0), m);
-    }
-    right
-}
-
-/// How many a batch waits for: its laps (LAP) or a size set by hand (SIZE), a minus at the
-/// left and a plus at the right. A click on either half steps it (from the laps' total, the
-/// first step sets a size), as does the wheel over it; a right-click goes back to the laps.
-/// Returns the x left of it.
-fn size_stepper(hud: &mut Hud, ui: &mut Ui, sr: Rect, m: Muster) -> f32 {
-    let t = hud.tile(ui, id("queue-batch-size", 0), sr, m.fixed, true);
-    let left = ui.cursor.x < sr.x + sr.w * 0.5;
-    let (minus, plus) = (
-        Vec2::new(sr.x + 12.0, sr.mid_y()),
-        Vec2::new(sr.right() - 12.0, sr.mid_y()),
-    );
-    let lit = |on: bool| rgb(BATCH, if t.hovered && on { 1.0 } else { 0.55 });
-    ui.stroke(minus - Vec2::X * 4.0, minus + Vec2::X * 4.0, 1.6, lit(left));
-    ui.stroke(plus - Vec2::X * 4.0, plus + Vec2::X * 4.0, 1.6, lit(!left));
-    ui.stroke(plus - Vec2::Y * 4.0, plus + Vec2::Y * 4.0, 1.6, lit(!left));
-    ui.text_centred(
-        sr.x + sr.w * 0.5,
-        sr.y + 11.0,
-        type_scale::MICRO,
-        rgb(palette::DIM, 1.0),
-        if m.fixed { "SIZE" } else { "LAP" },
-    );
-    ui.text_centred(
-        sr.x + sr.w * 0.5,
-        sr.y + 24.0,
-        type_scale::ITEM,
-        rgb(if m.fixed { BATCH } else { palette::TEXT }, 1.0),
-        &m.size.to_string(),
-    );
-    if t.hovered {
-        let hint = if m.fixed {
-            format!(
-                "Leaves once {} are formed up.  Click \u{2212}/+ or wheel to change  \u{b7}  Right-Click: once the queues are out",
-                m.size
-            )
-        } else {
-            "Leaves once every factory's queue is out (one lap).  Click \u{2212}/+ or wheel to set a size instead".to_owned()
-        };
-        tip(ui, sr.x, sr.y - 46.0, &hint);
-    }
-    let max = mc_sim::batch::MAX_BATCH;
-    let wheel = if t.hovered { ui.input.scroll } else { 0.0 };
-    if t.clicked || wheel != 0.0 {
-        let down = if wheel != 0.0 { wheel < 0.0 } else { left };
-        let size = if down {
-            m.size.saturating_sub(1).max(1)
-        } else {
-            (m.size + 1).min(max)
-        };
-        ui.audio
-            .play(if t.clicked { Sfx::Select } else { Sfx::Tick });
-        hud.actions.push(HudAction::BatchSize(Some(size)));
-    } else if t.right_clicked && m.fixed {
-        ui.audio.play(Sfx::Back);
-        hud.actions.push(HudAction::BatchSize(None));
-    }
-    sr.x - 10.0
 }
 
 /// A frame of short dashes just inside `r`.
@@ -670,9 +554,15 @@ fn stack_tiles(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, x:
         paused,
         ..
     } = *queue;
-    let (w, h, gap) = (48.0, 46.0, 5.0);
+    let (w, h, gap) = (STACK_W, 46.0, STACK_GAP);
     let mut x = x;
-    let room = (((right - 40.0 - x) / (w + gap)).max(0.0) as usize).max(1);
+    // Room for every tile, or for as many as fit with the count of the rest after them.
+    let fits = |room: f32| ((room + gap) / (w + gap)).max(0.0) as usize;
+    let room = if fits(right - x) >= stacks.len() {
+        stacks.len()
+    } else {
+        fits(right - 30.0 - x)
+    };
     for (i, k) in stacks.iter().take(room).enumerate() {
         let item = s.blueprints.unit(k.blueprint);
         let tr = Rect::new(x, r.y + (r.h - h) * 0.5, w, h);
@@ -782,7 +672,7 @@ fn stack_tiles(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, x:
         }
         x += w + gap;
     }
-    if stacks.len() > room {
+    if stacks.len() > room && right - x >= 24.0 {
         ui.text(
             x + 4.0,
             r.mid_y(),

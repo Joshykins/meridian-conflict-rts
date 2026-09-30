@@ -357,9 +357,10 @@ pub enum Command {
         pos: FxVec2,
         queue: bool,
     },
-    /// Batch on: the factories become one batch. Each one's products form up outside it
-    /// and wait until the batch is full, then all leave together on their standing orders
-    /// (`batch.rs`). Off: each leaves its batch, and whoever it has waiting leaves at once.
+    /// Batch on: the factories become one batch with one set of standing orders. Each
+    /// one's products form up outside it and wait until the batch is full, then all leave
+    /// together on those orders (`batch.rs`). Off: each leaves its batch, and whoever it
+    /// has waiting leaves at once.
     SetBatch {
         factories: Vec<UnitId>,
         batch: bool,
@@ -368,11 +369,11 @@ pub enum Command {
     ReleaseBatch {
         factories: Vec<UnitId>,
     },
-    /// The batches these factories are in leave once `size` units are formed up (at most
-    /// `batch::MAX_BATCH`); `None`: once every factory's queue is out.
+    /// The batches these factories are in leave once `size` units are formed up (1 to
+    /// `batch::MAX_BATCH`).
     SetBatchSize {
         factories: Vec<UnitId>,
-        size: Option<u16>,
+        size: u16,
     },
 }
 

@@ -38,7 +38,7 @@ mod refit;
 mod selection;
 pub mod silo;
 pub mod survival;
-pub(crate) use build::queue::batch_linked;
+pub(crate) use build::batch::batch_linked;
 pub use selection::ordered_as;
 mod match_state;
 pub mod style;
@@ -130,8 +130,8 @@ pub enum HudAction {
     Batch(bool),
     /// The selected factories' batches leave now, as many as are waiting.
     SendBatch,
-    /// The selected factories' batches wait for this many (`None`: for their queues' laps).
-    BatchSize(Option<u16>),
+    /// The selected factories' batches leave once this many are ready.
+    BatchSize(u16),
     /// Take one queued order out of the selection's queues: the one of `kind` at `pos`.
     CancelOrder {
         kind: mc_sim::tables::OrderKind,

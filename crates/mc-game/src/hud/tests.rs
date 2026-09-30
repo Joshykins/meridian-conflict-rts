@@ -17,18 +17,24 @@ struct Rig {
     hover: Option<u32>,
     /// Control held: the reclaim survey is up.
     reclaim: bool,
+    viewport: Vec2,
 }
 
 const VIEWPORT: Vec2 = Vec2::new(1920.0, 1080.0);
 
 impl Rig {
     fn new(key: &str) -> Rig {
+        Rig::sized(key, VIEWPORT)
+    }
+
+    /// A rig on a screen `viewport` points across.
+    fn sized(key: &str, viewport: Vec2) -> Rig {
         let blueprints = Arc::new(
             Blueprints::load(&Blueprints::locate_data_dir().expect("data dir"))
                 .expect("blueprints"),
         );
         let map = MapFile::open(crate::ui::test_maps::field()).expect("map opens");
-        let camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), VIEWPORT);
+        let camera = Camera::new(Vec2::from(map.info().size_metres().to_f32()), viewport);
         let mut view = View::new(0, crate::setup::TEAM_COLORS, false);
         let blueprint = blueprints.id_of(key).expect("blueprint exists");
         let pos = [4000.0, 4000.0, 0.0];
@@ -80,6 +86,7 @@ impl Rig {
             memory: Memory::default(),
             hover: None,
             reclaim: false,
+            viewport,
         }
     }
 
@@ -93,7 +100,7 @@ impl Rig {
             input,
             &mut self.memory,
             &audio,
-            VIEWPORT,
+            self.viewport,
             1.0,
             1.0,
             0.016,
@@ -966,11 +973,11 @@ fn a_factory_card_orders_its_units_and_its_queue_holds_repeat() {
     assert_eq!(rig.click(order_slot(3, 2)), vec![HudAction::Stop]);
     let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
     assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
-    // Batch sits beside it on the strip, and Pause beside that.
-    let batch = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
-    assert_eq!(rig.click(batch), vec![HudAction::Batch(true)]);
-    let pause = Vec2::new(batch.x - 48.0 - 10.0 - 48.0, repeat.y);
+    // Pause sits beside it on the strip, and Batch beside that.
+    let pause = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
     assert_eq!(rig.click(pause), vec![HudAction::PauseWork(true)]);
+    let batch = Vec2::new(pause.x - 48.0 - 10.0 - 48.0, repeat.y);
+    assert_eq!(rig.click(batch), vec![HudAction::Batch(true)]);
 }
 
 #[test]
@@ -1014,7 +1021,7 @@ fn paused_work_offers_resume_on_the_card() {
         vec![HudAction::PauseWork(false)]
     );
     let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
-    let resume = Vec2::new(repeat.x - 2.0 * (48.0 + 10.0 + 48.0), repeat.y);
+    let resume = Vec2::new(repeat.x - (48.0 + 10.0 + 48.0), repeat.y);
     assert_eq!(rig.click(resume), vec![HudAction::PauseWork(false)]);
     // A tank has no work to pause: its card has no such order.
     let mut rig = Rig::new("aster_t1_tank");
