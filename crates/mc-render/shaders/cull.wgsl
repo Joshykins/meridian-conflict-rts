@@ -161,6 +161,12 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     return model.slot + 2u;
 }
 
+// A unit drawn as a model less than this many pixels in radius on screen is left
+// out of the depth pre-pass.
+const UNIT_PREPASS_PX: f32 = 3.0;
+// A unit whose radius is under this many of a cascade's texels casts nothing into it.
+const UNIT_SHADOW_TEXELS: f32 = 1.0;
+
 // `vis` holds a model slot with, above it, the lists besides the colour pass's
 // that the entity is in (bit `l` for list `l`).
 const LISTS_SHIFT: u32 = 24u;
@@ -183,8 +189,9 @@ fn other_lists(e: Entity) -> u32 {
     var lists = 0u;
     // The depth pre-pass leaves out props only a few pixels across: they cost it a
     // whole alpha-tested draw and hide almost nothing, and the colour pass writes
-    // their depth itself.
-    if !prop || on_screen >= 10.0 {
+    // their depth itself. So with units a couple of pixels across: an army seen
+    // from afar is tens of thousands of them.
+    if on_screen >= select(UNIT_PREPASS_PX, 10.0, prop) {
         lists |= 1u << CULL_LIST_PREPASS;
     }
     // Props stand on the streamed surface, which can sit well off the height their
@@ -196,6 +203,11 @@ fn other_lists(e: Entity) -> u32 {
         // shadows are specks on screen. Big props (the Precursor works) keep theirs.
         // None either from props too small on screen (Globals::detail.z pixels).
         if prop && ((c >= 2u && r < 30.0) || r < 2.5 * globals.shadow_info[c].x || on_screen < globals.detail.z) {
+            continue;
+        }
+        // Nor from a unit less than a couple of the cascade's texels across: its shadow
+        // there is a speck, and an army is tens of thousands of them in every cascade.
+        if !prop && r < UNIT_SHADOW_TEXELS * globals.shadow_info[c].x {
             continue;
         }
         // Only what stands inside the cascade's square, seen from the sun.
