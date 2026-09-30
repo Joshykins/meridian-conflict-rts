@@ -4137,6 +4137,13 @@ impl Game {
             10.0 / self.view.speed.max(5) as f32,
             |p| self.hear(p),
         );
+        giants.felled_trees(
+            &self.view.frame.events,
+            audio,
+            self.camera.focus,
+            10.0 / self.view.speed.max(5) as f32,
+            |p| self.ear().hear_close(p),
+        );
         self.giant_sounds = giants;
         let mut stakes = std::mem::take(&mut self.stake_sounds);
         stakes.tick(

@@ -253,11 +253,23 @@ impl GiantSounds {
                 jolts.push((Vec3::from(pos.to_f32()), 0.35, s.ticks as f32 * 0.1, reach));
             }
         }
-        self.trees
-            .tick(events, self.tree_fall, audio, focus.z, tick_seconds, &hear);
         for (at, strength, ring, reach) in jolts {
             self.tremors.jolt(at, strength, ring, reach, focus);
         }
+    }
+
+    /// This tick's felled trees (`trees.rs`), after `tick` has looked the library up.
+    /// `hear` is close hearing: a tree is a small sound, heard only near the camera.
+    pub fn felled_trees(
+        &mut self,
+        events: &[SimEvent],
+        audio: &Audio,
+        focus: Vec3,
+        tick_seconds: f32,
+        hear: impl Fn(Vec3) -> (f32, f32),
+    ) {
+        self.trees
+            .tick(events, self.tree_fall, audio, focus.z, tick_seconds, hear);
     }
 
     /// `camera` as the ground shocks near it shake it this frame (`tremor.rs`).

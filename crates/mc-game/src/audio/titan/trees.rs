@@ -3,9 +3,10 @@
 //! and the crash as it lands, timed to the fall the renderer draws (fallen_trees.rs).
 //! Presentation only.
 //!
-//! - Each tree is heard from where the walker stood as it went over (the event carries
-//!   no height; the ear only measures height for the free camera, and a tree is within
-//!   a walker's reach of it).
+//! - A tree is a small sound: heard only with the camera close (`Ear::hear_close`),
+//!   not across the map like a gun. Each is heard from where the walker stood as it
+//!   went over (the event carries no height; the ear only measures height for the free
+//!   camera, and a tree is within a walker's reach of it).
 //! - A giant wading through a wood fells trees every tick, and a ship coming down
 //!   presses dozens flat at once. A deliberate cap: falls start at most `RATE` a second
 //!   (up to `BURST` together), the loudest first, so a forest going over is a run of

@@ -72,6 +72,15 @@ impl Ear<'_> {
         (near * near * height, pan)
     }
 
+    /// `hear_work`, for small sounds of the world (a tree going over): heard only with
+    /// the camera close to them, fading as it pulls back, so a wood going down in a
+    /// zoomed-out view is not heard over the battle.
+    pub(crate) fn hear_close(self, pos: Vec3) -> (f32, f32) {
+        let (gain, pan) = self.hear_work(pos);
+        let close = self.closeness(pos);
+        (gain * close * close, pan)
+    }
+
     /// Beside the sound, 1; far from it (strategic zoom, or a free eye far away), near 0.
     pub(crate) fn closeness(self, pos: Vec3) -> f32 {
         let d = if self.free {
