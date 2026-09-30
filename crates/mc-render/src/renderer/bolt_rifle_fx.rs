@@ -28,7 +28,7 @@ use std::f32::consts::{PI, TAU};
 /// charge past it is not drawn (its shot and its flash still are), so a hundred Paladins
 /// firing at once cost no more than this many guns' arcs. A gun has about 60 strokes alive
 /// on average through its charge and at most about 130 at its top, so under 3200 in all
-/// (of `MAX_PROJECTILES`, 16384, shared with every shot).
+/// (of `MAX_PROJECTILES`, 32768, shared with every shot).
 const MAX_GUNS: usize = 24;
 /// Seconds the blade seams flare and cool after the shot.
 const FLARE: f32 = 0.35;

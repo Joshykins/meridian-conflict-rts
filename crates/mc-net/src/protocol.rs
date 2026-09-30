@@ -24,18 +24,19 @@ use mc_core::{PlayerId, MAX_PLAYERS};
 use crate::wire::{Dec, Enc, NetError, Result};
 
 /// Bumped on any incompatible change. Checked before anything else in `Hello`.
-pub const PROTOCOL_VERSION: u32 = 29;
+pub const PROTOCOL_VERSION: u32 = 30;
 
 /// Hard cap on a frame payload, enforced on both send and receive.
-pub const MAX_FRAME_LEN: usize = 4 << 20;
-/// Largest single command blob.
-pub const MAX_COMMAND_LEN: usize = 64 << 10;
+pub const MAX_FRAME_LEN: usize = 6 << 20;
+/// Largest single command blob: an order to every unit a side can field
+/// (`mc_sim::command::MAX_COMMAND_BYTES`, 132 KB, fits).
+pub const MAX_COMMAND_LEN: usize = 160 << 10;
 /// Budget for one player's commands in one tick, counted by [`command_cost`].
 /// `MAX_PLAYERS` (32) players at full budget still fit one bundle frame
-/// (32 x 96 KB is 3 MB of [`MAX_FRAME_LEN`]), and it holds a whole
+/// (32 x 160 KB is 5 MB of [`MAX_FRAME_LEN`]), and it holds a whole
 /// [`MAX_COMMAND_LEN`] command. Commands over the
 /// budget are carried into the following tick, never dropped.
-pub const MAX_COMMANDS_BYTES: usize = 96 << 10;
+pub const MAX_COMMANDS_BYTES: usize = (160 << 10) + 4;
 /// Snapshot blobs travel in chunks of this size.
 pub const SNAPSHOT_CHUNK_LEN: usize = 256 << 10;
 /// Largest snapshot either end will assemble.

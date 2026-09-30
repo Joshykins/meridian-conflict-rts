@@ -38,7 +38,7 @@ use std::f32::consts::{PI, TAU};
 /// Guns (a weapon on a hull) in their sequence at once. A deliberate cosmetic cap: a
 /// charge past it is not drawn (its shot still is), so a fleet firing costs no more than
 /// this many guns' arcs. A tube has about 40 strokes alive at the top of its charge, a
-/// Leviathan's nine some 300 (strokes share `MAX_PROJECTILES`, 16384, with every shot).
+/// Leviathan's nine some 300 (strokes share `MAX_PROJECTILES`, 32768, with every shot).
 const MAX_GUNS: usize = 16;
 /// Tubes of one gun drawn (a house holds three).
 const MAX_TUBES: usize = 4;

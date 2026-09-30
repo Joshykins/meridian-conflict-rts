@@ -16,15 +16,16 @@ use serde::{Deserialize, Serialize};
 pub type UnitId = Handle;
 pub type WreckId = Handle;
 
-pub const MAX_UNITS: usize = 8_192;
-pub const MAX_PROJECTILES: usize = 16_384;
-pub const MAX_WRECKS: usize = 16_384;
+/// Room for the 30 000 units of a 32-player match. Handles index rows in 16 bits.
+pub const MAX_UNITS: usize = 32_768;
+pub const MAX_PROJECTILES: usize = 32_768;
+pub const MAX_WRECKS: usize = 32_768;
 pub const MAX_STAINS: usize = 32_768;
 /// Incendiary patches. A Hellkite salvo is 24 bombs, and several bombers can be alight at once.
 pub const MAX_FIRES: usize = 2_048;
 /// Poured structure lots. They stay after the building dies.
 pub const MAX_PADS: usize = 32_768;
-pub const MAX_ORDERS: usize = 131_072;
+pub const MAX_ORDERS: usize = 262_144;
 pub const MAX_FLATTENS: usize = 32_768;
 
 pub const NO_ORDER: u32 = u32::MAX;

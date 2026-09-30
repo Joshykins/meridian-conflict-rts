@@ -453,6 +453,10 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                         r.note(note.encode());
                     }
                 }
+                // An order to a whole army travels as one command.
+                const _: () = assert!(
+                    mc_sim::command::MAX_COMMAND_BYTES as usize <= mc_net::MAX_COMMAND_LEN
+                );
                 let pending: Vec<Vec<u8>> = rx.try_iter().map(|c| c.encode()).collect();
                 if !pending.is_empty() {
                     if let Err(e) = session.submit(pending) {

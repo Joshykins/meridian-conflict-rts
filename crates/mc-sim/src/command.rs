@@ -9,8 +9,12 @@ use mc_core::{Angle, Fx, FxVec2};
 use mc_data::BlueprintId;
 use serde::{Deserialize, Serialize};
 
-/// Most units one command may address. Larger selections are split by the client.
-pub const MAX_COMMAND_UNITS: usize = 1024;
+/// Most units one command may address: every unit a side can field, so one
+/// order moves a whole selection as one block.
+pub const MAX_COMMAND_UNITS: usize = crate::tables::MAX_UNITS;
+/// Largest encoded command [`Command::decode`] takes: a handle per unit, and
+/// room for the rest (a patrol's points, a factory's queue).
+pub const MAX_COMMAND_BYTES: u64 = 4 * MAX_COMMAND_UNITS as u64 + (4 << 10);
 /// Most waypoints one `Patrol` takes; a longer route is refused (`SimEvent::CommandRefused`).
 pub const MAX_PATROL_POINTS: usize = 32;
 /// Narrowest and widest area a `Guard` may cover, metres.
@@ -382,7 +386,7 @@ impl Command {
         let cmd: Command = bincode::options()
             .with_fixint_encoding()
             .allow_trailing_bytes()
-            .with_limit(64 * 1024)
+            .with_limit(MAX_COMMAND_BYTES)
             .deserialize(bytes)
             .ok()?;
         let units = match &cmd {
@@ -509,6 +513,17 @@ mod tests {
         ] {
             assert_eq!(Command::decode(&cmd.encode()), Some(cmd));
         }
+        // A whole army in one order decodes; one more unit than a side can have does not.
+        let army = Command::FormationMove {
+            units: vec![Handle::new(1, 0); MAX_COMMAND_UNITS],
+            target: at,
+            queue: false,
+            attack_move: true,
+            facing: None,
+            together: true,
+            spacing: 1,
+        };
+        assert_eq!(Command::decode(&army.encode()), Some(army));
         let crowd = Command::Patrol {
             units: vec![Handle::new(1, 0); MAX_COMMAND_UNITS + 1],
             points: vec![at],

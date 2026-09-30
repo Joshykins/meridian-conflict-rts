@@ -267,3 +267,67 @@ fn zz_scale_probe() {
         println!("{}", report.text());
     }
 }
+
+/// One order to a whole army of 6000: the user's report of 2026-09-30 that a
+/// selection of 3000 took no orders at all (the command was over a 1024-unit
+/// cap and dropped). The order must go through and not stall the tick.
+#[test]
+fn one_order_for_an_army() {
+    let mut w = ring_world(2, false);
+    let mix = [
+        ("aster_t1_tank", 3000),
+        ("aster_t1_bot", 2000),
+        ("aster_t2_tank", 1000),
+    ];
+    let mut ids = Vec::new();
+    for (i, (key, n)) in mix.iter().enumerate() {
+        ids.extend(block(
+            &mut w,
+            key,
+            0,
+            *n,
+            (4000 + i as i32 * 700, 7000),
+            8,
+            0,
+        ));
+    }
+    let order = PlayerCommand {
+        player: 0,
+        command: Command::FormationMove {
+            units: ids.clone(),
+            target: FxVec2::from_ints(9000, 9000),
+            queue: false,
+            attack_move: true,
+            facing: None,
+            together: true,
+            spacing: 1,
+        },
+    };
+    let encoded = order.command.encode();
+    assert_eq!(Command::decode(&encoded).as_ref(), Some(&order.command));
+    let report = w
+        .perf_ticks("one_order_for_an_army", 100, |t, _| {
+            if t == 0 {
+                vec![order.clone()]
+            } else {
+                Vec::new()
+            }
+        })
+        .unwrap();
+    let moving = ids
+        .iter()
+        .filter(|&&id| {
+            w.state
+                .units
+                .row(id)
+                .is_some_and(|r| w.state.units.pos[r].y > Fx::from_int(7300))
+        })
+        .count();
+    assert!(
+        moving > ids.len() / 2,
+        "only {moving} of {} moved off",
+        ids.len()
+    );
+    mc_sim::perf::save(&report);
+    mc_sim::perf::budget(&report, &[("sim.tick", 40.0)]);
+}
