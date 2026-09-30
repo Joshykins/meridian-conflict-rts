@@ -102,6 +102,9 @@ pub fn by_ground(points: &[Vec2], groups: usize) -> Vec<u8> {
     let mut sizes: Vec<usize> = (0..groups)
         .map(|g| n / groups + usize::from(g < n % groups))
         .collect();
+    if n > EXACT_MAX {
+        return by_arcs(points, &sizes);
+    }
     let mut best = (
         f32::INFINITY,
         (0..n).map(|i| (i % groups) as u8).collect::<Vec<u8>>(),
@@ -148,6 +151,56 @@ pub fn by_ground(points: &[Vec2], groups: usize) -> Vec<u8> {
     best.1
 }
 
+/// Past this many points the exact search in [`by_ground`] takes too long: it
+/// grows like the number of ways to split them.
+const EXACT_MAX: usize = 12;
+
+/// [`by_ground`] for many points: each team takes a run of neighbours around
+/// the middle (on a ring of starts, an arc of the ring), from whichever first
+/// point gives the least distance between team-mates.
+fn by_arcs(points: &[Vec2], sizes: &[usize]) -> Vec<u8> {
+    let n = points.len();
+    let centre = points.iter().copied().sum::<Vec2>() / n as f32;
+    let angle = |i: usize| {
+        let d = points[i] - centre;
+        d.y.atan2(d.x)
+    };
+    let mut around: Vec<usize> = (0..n).collect();
+    around.sort_by(|&a, &b| angle(a).total_cmp(&angle(b)));
+    let mut best = (f32::INFINITY, vec![0u8; n]);
+    for shift in 0..n {
+        let mut team = vec![0u8; n];
+        let mut k = shift;
+        for (g, &size) in sizes.iter().enumerate() {
+            for _ in 0..size {
+                team[around[k % n]] = g as u8;
+                k += 1;
+            }
+        }
+        let cost: f32 = (0..n)
+            .flat_map(|a| (a + 1..n).map(move |b| (a, b)))
+            .filter(|&(a, b)| team[a] == team[b])
+            .map(|(a, b)| points[a].distance(points[b]))
+            .sum();
+        if cost < best.0 {
+            best = (cost, team);
+        }
+    }
+    // Teams numbered in order of first point, as the exact search numbers them.
+    let mut names = vec![u8::MAX; sizes.len()];
+    let mut next = 0;
+    best.1
+        .iter()
+        .map(|&t| {
+            if names[t as usize] == u8::MAX {
+                names[t as usize] = next;
+                next += 1;
+            }
+            names[t as usize]
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,5 +237,22 @@ mod tests {
             assert_eq!(t[2 * k], t[2 * k + 1]);
         }
         assert_eq!(links(&p, &t).len(), 4);
+    }
+
+    #[test]
+    fn a_ring_of_thirty_two_splits_into_arcs_at_once() {
+        let p: Vec<Vec2> = (0..32)
+            .map(|k| Vec2::from_angle(k as f32 * std::f32::consts::TAU / 32.0) * 1000.0)
+            .collect();
+        for groups in [2, 4, 8] {
+            let t = by_ground(&p, groups);
+            assert_eq!(t[0], 0, "numbered from the first point");
+            for g in 0..groups as u8 {
+                assert_eq!(t.iter().filter(|&&x| x == g).count(), 32 / groups);
+            }
+            // Each team is one run around the ring: it changes team `groups` times.
+            let changes = (0..32).filter(|&k| t[k] != t[(k + 1) % 32]).count();
+            assert_eq!(changes, groups);
+        }
     }
 }

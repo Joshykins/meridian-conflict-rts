@@ -39,8 +39,9 @@ const FORCE_PRESETS: [[u8; 3]; 4] = [[100, 100, 100], [160, 60, 60], [60, 160, 6
 const FORCE_LABELS: [&str; 4] = ["Balanced", "Land", "Air", "Naval"];
 /// Height of a team's heading over its rows.
 const TEAM_HEAD_H: f32 = 30.0;
-/// The colour strip that opens under a row.
-const SWATCH_H: f32 = 52.0;
+/// A colour swatch in the strip that opens under a row, and the gap between swatches.
+const SWATCH: f32 = 26.0;
+const SWATCH_GAP: f32 = 8.0;
 
 /// Where a row's cells sit.
 struct Columns {
@@ -172,15 +173,16 @@ pub fn commanders(
             y += TUNE_H;
         }
         if lineup.coloring == Some(seat.key) {
+            let strip_h = swatch_strip_h(row.w - 14.0);
             if let Some(i) = lineup.roster.index_of(seat.key) {
                 colour_picker(
                     ui,
                     lineup,
                     i,
-                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, SWATCH_H),
+                    Rect::new(row.x + 14.0, row.bottom(), row.w - 14.0, strip_h),
                 );
             }
-            y += SWATCH_H;
+            y += strip_h;
         }
     }
     if let Some((t, top)) = heading {
@@ -742,6 +744,17 @@ fn force_label(weights: [u8; 3]) -> &'static str {
 
 /// Every colour for seat `i`; one another commander wears shows their seat
 /// number, and picking it swaps the two.
+/// Swatches a line of the colour strip `width` wide holds.
+fn swatches_per_line(width: f32) -> usize {
+    (((width - 84.0) / (SWATCH + SWATCH_GAP)) as usize).max(1)
+}
+
+/// The colour strip's height: as many lines of swatches as every colour needs.
+fn swatch_strip_h(width: f32) -> f32 {
+    let lines = TEAM_COLORS.len().div_ceil(swatches_per_line(width));
+    lines as f32 * (SWATCH + SWATCH_GAP) + 18.0
+}
+
 fn colour_picker(ui: &mut Ui, lineup: &mut Lineup, i: usize, area: Rect) {
     ui.fill(area, ink(0.35));
     ui.fill(
@@ -750,26 +763,28 @@ fn colour_picker(ui: &mut Ui, lineup: &mut Lineup, i: usize, area: Rect) {
     );
     ui.text(
         area.x + 12.0,
-        area.mid_y(),
+        area.y + 13.0 + SWATCH * 0.5,
         type_scale::MICRO,
         rgb(palette::DIM, 1.0),
         "Colour",
     );
     let seats = &lineup.roster.seats;
     let key = seats[i].key as usize;
-    let size = 34.0;
+    let size = SWATCH;
+    let per_line = swatches_per_line(area.w);
     let mut pick = None;
     for (n, c) in TEAM_COLORS.iter().enumerate() {
+        let (line, col) = (n / per_line, n % per_line);
         let r = Rect::new(
-            area.x + 72.0 + n as f32 * (size + 10.0),
-            area.mid_y() - size * 0.5,
+            area.x + 72.0 + col as f32 * (size + SWATCH_GAP),
+            area.y + 9.0 + line as f32 * (size + SWATCH_GAP),
             size,
             size,
         );
         let mine = seats[i].color as usize == n;
         let holder =
             (0..seats.len()).find(|&k| k != i && seats[k].open() && seats[k].color as usize == n);
-        let res = ui.interact(id("slot-swatch", key * 16 + n), r, !mine);
+        let res = ui.interact(id("slot-swatch", key * TEAM_COLORS.len() + n), r, !mine);
         let grow = r.inset(-2.0 * res.glow);
         ui.fill(
             grow,
@@ -791,7 +806,7 @@ fn colour_picker(ui: &mut Ui, lineup: &mut Lineup, i: usize, area: Rect) {
         if res.glow > 0.3 && holder.is_some() {
             ui.text_right(
                 area.right() - 12.0,
-                area.mid_y(),
+                area.bottom() - 6.0,
                 type_scale::MICRO,
                 rgb(palette::DIM, 1.0),
                 "Taken \u{b7} Click to Swap",
