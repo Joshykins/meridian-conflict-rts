@@ -71,8 +71,10 @@ mod quality;
 mod rail_fx;
 mod regency_mine_fx;
 mod shafts;
+mod shield_upload;
 mod spinal_bore_fx;
 mod stake_fx;
+mod structure_pads;
 mod stun_fx;
 mod survival_fx;
 mod trail_fx;
@@ -3290,152 +3292,6 @@ impl Renderer {
         self.welds.write(0, bytemuck::cast_slice(&gpu));
     }
 
-    fn upload_shields(&mut self, frame: &RenderFrame, eye: Vec3) {
-        let n = frame.shields.len().min(MAX_SHIELDS);
-        let src = &frame.shields[..n];
-        self.live_effect_barriers.clear();
-        for s in src {
-            if s.open < 200.0 / 255.0
-                || s.health <= 0.0
-                || s.packed & ((1 << 24) | (1 << 26)) != 0
-                || s.radius <= 0.01
-            {
-                continue;
-            }
-            self.live_effect_barriers
-                .push(EffectBarrier::of(s, self.map_info.water_level.to_f32()));
-        }
-        self.effect_barriers.write(
-            0,
-            bytemuck::cast_slice(&[self.live_effect_barriers.len() as u32, 0, 0, 0]),
-        );
-        self.effect_barriers
-            .write(16, bytemuck::cast_slice(&self.live_effect_barriers));
-        let units = &frame.units[..self.sim_units as usize];
-        let skip_hull = KIND_GHOST | KIND_PROP | (mc_sim::tables::flag::IN_FACTORY as u32) << 8;
-        let mut gpu = Vec::with_capacity(n);
-        for (i, s) in src.iter().enumerate() {
-            let team = (s.packed >> 8) & 255;
-            let hull = (s.packed >> 25) & 1 == 1;
-            let mut overlap = 0u32;
-            // Hull wraps stay their own membrane: they do not fuse with a dome. Nor does a veil.
-            if !hull && s.packed & mc_sim::mirror::SHIELD_VEIL == 0 {
-                for (j, other) in src.iter().enumerate() {
-                    if i == j
-                        || ((other.packed >> 8) & 255) != team
-                        || (other.packed >> 25) & 1 == 1
-                        || other.packed & mc_sim::mirror::SHIELD_VEIL != 0
-                    {
-                        continue;
-                    }
-                    let dx = s.pos[0] - other.pos[0];
-                    let dy = s.pos[1] - other.pos[1];
-                    let dz = s.pos[2] - other.pos[2];
-                    let r = s.radius + other.radius + SHIELD_PAD * 2.0;
-                    if dx * dx + dy * dy + dz * dz <= r * r {
-                        overlap = 1;
-                        break;
-                    }
-                }
-            }
-            let mut contacts = [0u32; SHIELD_CONTACTS];
-            let mut scores = [f32::MAX; SHIELD_CONTACTS];
-            let mut contact_n = 0u32;
-            let shell = s.radius;
-            // The dome is flattened (`mc_data::dome_height`): measure in the space where it is round.
-            let stretch = if hull {
-                1.0
-            } else {
-                s.radius / mc_data::dome_height_f32(s.radius).max(0.001)
-            };
-            for (ei, e) in units.iter().enumerate() {
-                if e.unit_id == s.unit_id || e.radius < 0.4 || e.owner_flags & skip_hull != 0 {
-                    continue;
-                }
-                let reach = e.radius * 2.2 + 4.0;
-                let ox = e.pos[0] - s.pos[0];
-                let oy = e.pos[1] - s.pos[1];
-                let mut oz = (e.pos[2] - s.pos[2]) * stretch;
-                if !hull {
-                    // Under the rim the glass is the wall down to the ground: only
-                    // the distance across counts there.
-                    oz = oz.max(0.0);
-                }
-                let d2 = ox * ox + oy * oy + oz * oz;
-                let lo = shell - reach;
-                let hi = shell + reach;
-                if d2 < lo.max(0.0) * lo.max(0.0) || d2 > hi * hi {
-                    continue;
-                }
-                let ex = e.pos[0] - eye.x;
-                let ey = e.pos[1] - eye.y;
-                let ez = e.pos[2] - eye.z;
-                let score = ex * ex + ey * ey + ez * ez;
-                if contact_n < SHIELD_CONTACTS as u32 {
-                    let k = contact_n as usize;
-                    contacts[k] = ei as u32;
-                    scores[k] = score;
-                    contact_n += 1;
-                    continue;
-                }
-                let mut worst = 0usize;
-                for k in 1..SHIELD_CONTACTS {
-                    if scores[k] > scores[worst] {
-                        worst = k;
-                    }
-                }
-                if score < scores[worst] {
-                    contacts[worst] = ei as u32;
-                    scores[worst] = score;
-                }
-            }
-            gpu.push(GpuShield {
-                pos: s.pos,
-                radius: s.radius,
-                prev_open: s.prev_open,
-                open: s.open,
-                health: s.health,
-                packed: s.packed,
-                unit_id: s.unit_id,
-                projector: s.projector,
-                height: s.height,
-                overlap,
-                contact_n,
-                prev_radius: s.prev_radius,
-                _pad: [0; 2],
-                contacts,
-            });
-        }
-        if n > 0 {
-            self.shields.write(0, bytemuck::cast_slice(&gpu));
-        }
-        let prev = self.shield_count as usize;
-        if n < prev {
-            let zeros = vec![GpuShield::zeroed(); prev - n];
-            self.shields.write(
-                (n * size_of::<GpuShield>()) as u64,
-                bytemuck::cast_slice(&zeros),
-            );
-        }
-        self.shield_count = n as u32;
-        self.hull_shield_count = src.iter().filter(|s| (s.packed >> 25) & 1 == 1).count() as u32;
-        self.hull_draws.clear();
-        for s in src.iter().filter(|s| (s.packed >> 25) & 1 == 1) {
-            let unit = frame.units.iter().find(|u| u.unit_id == s.unit_id);
-            let Some(&[first, lods]) =
-                unit.and_then(|u| self.model_draws.get(u.blueprint as usize))
-            else {
-                self.hull_draws.clear();
-                break;
-            };
-            for slot in first..first + lods {
-                if !self.hull_draws.contains(&slot) {
-                    self.hull_draws.push(slot);
-                }
-            }
-        }
-    }
-
     /// Everything that shines this frame, into scene set bindings 25 and 26.
     fn upload_lights(&mut self, time: f32, alpha: f32, camera: &Camera) {
         // The nearest few hundred burning trees light the ground; past that it is a glow.
@@ -3801,60 +3657,6 @@ impl Renderer {
         );
         self.track_cursor = (self.track_cursor + 1) % MAX_TRACK_MARKS;
         self.track_count = (self.track_count + 1).min(MAX_TRACK_MARKS as u32);
-    }
-
-    /// Ground lots for structures: persisted pours first, then any live site,
-    /// ghost or wreck that is not already on that centre. Death does not
-    /// remove a lot; the scorch stain is drawn on top of it.
-    fn structure_pads(
-        &self,
-        units: &[UnitInstance],
-        persisted: &[StainInstance],
-        room: usize,
-    ) -> Vec<StainInstance> {
-        let mut pads = persisted.iter().copied().take(room).collect::<Vec<_>>();
-        for u in units {
-            if pads.len() >= room || u.owner_flags & (KIND_PROP | STATE_RADAR) != 0 {
-                continue;
-            }
-            let Some(bp) = self.blueprints.units.get(u.blueprint as usize) else {
-                continue;
-            };
-            if !bp.poured_lot() {
-                continue;
-            }
-            let pos = [u.pos[0], u.pos[1]];
-            if pads
-                .iter()
-                .any(|p| (p.pos[0] - pos[0]).abs() < 0.5 && (p.pos[1] - pos[1]).abs() < 0.5)
-            {
-                continue;
-            }
-            let half = bp.footprint.0.max(bp.footprint.1) as f32 * (BUILD_CELL_M as f32 * 0.5);
-            let ghost = u.owner_flags & KIND_GHOST != 0;
-            let build = if u.owner_flags & KIND_WRECK != 0 {
-                255
-            } else {
-                (u.build.clamp(0.0, 1.0) * 255.0) as u32
-            };
-            // A Regency structure stands on a lot of dark machined plate, not a paved one.
-            let nanite = self
-                .blueprints
-                .factions
-                .get(bp.faction.0 as usize)
-                .is_some_and(|f| f.construction == mc_data::Construction::Nanite);
-            pads.push(StainInstance {
-                pos,
-                radius: half,
-                strength_seed: mc_sim::pack_structure_pad(
-                    (u.owner_flags & crate::gpu_consts::owner::MASK) as u8,
-                    build as u8,
-                    u.blueprint as u16,
-                    ghost,
-                ) | if nanite { mc_sim::PAD_NANITE } else { 0 },
-            });
-        }
-        pads
     }
 
     /// The flame is a draped wave in the reserved effect slots. Smoke stays in
