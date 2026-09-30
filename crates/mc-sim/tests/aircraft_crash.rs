@@ -325,3 +325,33 @@ fn fog_shows_the_falling_hull_only_over_explored_ground() {
     w.write_render_frame(Some(1), &mut frame);
     assert_eq!(frame.units.len(), 1, "explored ground shows it");
 }
+
+#[test]
+fn capital_hull_falls_at_a_steady_pace() {
+    let mut w = world();
+    w.tick(&[spawn(&w, 0, "aster_t4_dreadnought", 512, flag::PASSIVE)])
+        .unwrap();
+    let id = w.state.units.id(w.state.units.slots.iter().next().unwrap());
+    kill(&mut w, id);
+    assert_eq!(w.state.aircraft_crashes.len(), 1);
+    w.state.aircraft_crashes[0].pos.z = Fx::from_int(700);
+    // 30 m/s at the heaviest (aircraft_crash.rs `HEAVY_FALL`), a tick's worth.
+    let most = Fx::from_int(30) / mc_core::TICKS_PER_SECOND as i32;
+    let mut fastest = Fx::ZERO;
+    let mut ticks = 0;
+    while !w.state.aircraft_crashes.is_empty() && ticks < 1000 {
+        w.tick(&[]).unwrap();
+        if let Some(crash) = w.state.aircraft_crashes.first() {
+            fastest = fastest.max(-crash.velocity.z);
+        }
+        ticks += 1;
+    }
+    assert!(w.state.aircraft_crashes.is_empty());
+    assert!(fastest <= most, "fell {fastest:?} a tick");
+    assert!(fastest * 2 > most, "never got going: {fastest:?} a tick");
+    // Nearly 700 m at 30 m/s: well over twenty seconds down, not the 17 of free fall.
+    assert!(
+        ticks > 22 * mc_core::TICKS_PER_SECOND as i32,
+        "down in {ticks} ticks"
+    );
+}

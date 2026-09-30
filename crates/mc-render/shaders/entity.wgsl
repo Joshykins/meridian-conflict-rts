@@ -2463,7 +2463,11 @@ fn vapor_edge(in: VsOut) -> f32 {
 @fragment
 fn fs_prepass(in: VsOut) {
     let flags = in.owner_flags;
-    if (flags & (FLAG_UNDER_CONSTRUCTION | KIND_GHOST | KIND_WRECK)) != 0u || in.refit.z > 0.0 {
+    // A hull still falling or sinking (health 2, see `fs_main`) is the whole unit, solid as
+    // it was alive, so it goes in: left out, GTAO read the ground under it through it, and
+    // a dying capital ship high over a wood wore the trees' occlusion on its plating.
+    let hull_down = (flags & KIND_WRECK) != 0u && in.state.y > 1.5;
+    if ((flags & (FLAG_UNDER_CONSTRUCTION | KIND_GHOST | KIND_WRECK)) != 0u && !hull_down) || in.refit.z > 0.0 {
         discard;
     }
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }

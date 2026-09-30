@@ -34,12 +34,25 @@ const TUMBLE_ROLL: i32 = 2_503;
 /// Most a crashed hull lies nose down in the ground, and rolled either way.
 const REST_PITCH: u16 = Angle::from_degrees(30).0;
 const REST_ROLL: u16 = Angle::from_degrees(20).0;
+/// The steadiest a dead hull's fall gets, m/s: the heaviest (`heft` at its floor) comes
+/// down no faster than `HEAVY_FALL`, and the most it may reach grows by `FALL_PER_HEFT`
+/// for each whole of heft over that floor, so a fighter (heft one) is never held back.
+/// A capital hull hundreds of metres long reads as falling far too fast at the pace
+/// its free fall reaches (80 m/s from its cruise height).
+const HEAVY_FALL: i32 = 30;
+const FALL_PER_HEFT: i32 = 150;
 
 /// How hard a dead aircraft of `radius` falls and tumbles, one for anything light.
 /// A capital hull (a lift ship) comes down slowly and heavily, settling rather than
 /// spinning (mirror.rs scales its tumble by the same share).
 pub fn heft(radius: Fx) -> Fx {
     (Fx::from_int(LIGHT_RADIUS) / radius.max(Fx::ONE)).clamp(Fx::ratio(1, 5), Fx::ONE)
+}
+
+/// The fastest a dead hull of `heft` falls, metres a tick (`HEAVY_FALL`).
+fn most_fall(heft: Fx) -> Fx {
+    let over = (heft - Fx::ratio(1, 5)).max(Fx::ZERO);
+    (Fx::from_int(HEAVY_FALL) + over * FALL_PER_HEFT) / TICKS_PER_SECOND as i32
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -167,6 +180,7 @@ impl World {
             let heft = heft(self.blueprints.unit(crash.blueprint).radius);
             crash.tumble(heft);
             crash.velocity.z -= gravity * heft;
+            crash.velocity.z = crash.velocity.z.max(-most_fall(heft));
             crash.pos += crash.velocity;
             crash.pos.x = crash.pos.x.clamp(Fx::ZERO, bounds.x);
             crash.pos.y = crash.pos.y.clamp(Fx::ZERO, bounds.y);

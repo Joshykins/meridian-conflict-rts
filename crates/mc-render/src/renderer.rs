@@ -37,6 +37,7 @@ mod arc_howitzer_fx;
 mod blast_fx;
 mod bolt_rifle_fx;
 mod bore_fx;
+mod capital_crash_fx;
 mod capital_fx;
 mod capture;
 mod damper_fx;
@@ -825,6 +826,8 @@ pub struct Renderer {
     water_fx: water_fx::WaterFx,
     /// The smoke off wrecks (renderer/wreck_fx.rs).
     wreck_fx: wreck_fx::WreckFx,
+    /// Capital hulls falling, for how they break up when they hit (capital_crash_fx.rs).
+    hull_crash_fx: capital_crash_fx::HullCrashFx,
     /// Craters where blasts struck the ground (renderer/impact_craters.rs).
     impact_craters: impact_craters::ImpactCraters,
     /// Electric bore lightning and the molten ground it leaves (renderer/bore_fx.rs).
@@ -2338,6 +2341,7 @@ impl Renderer {
             tree_blasts: Default::default(),
             water_fx: water_fx::WaterFx::new(sea_fx, sea_set),
             wreck_fx: wreck_fx::WreckFx::default(),
+            hull_crash_fx: capital_crash_fx::HullCrashFx::default(),
             impact_craters: impact_craters::ImpactCraters::default(),
             bore_fx: bore_fx::BoreFx::default(),
             plasma_fx: plasma_fx::PlasmaFx::default(),
@@ -3100,6 +3104,7 @@ impl Renderer {
         // a warhead leaves no sim scorch, so its crater must not be wiped with it.
         if frame.stains.is_empty() && frame.tick < 50 {
             self.wreck_fx.clear();
+            self.hull_crash_fx.clear();
             self.impact_craters.clear();
             self.bore_fx.clear();
             self.plasma_fx.clear();
@@ -3994,6 +3999,7 @@ impl Renderer {
     /// only occasionally a wisp of smoke leaving that flame. A spent casing in the air
     /// (`UnitBlueprint::scrap`) is cold metal and trails nothing.
     fn aircraft_crash_trails(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
+        self.forget_falling_hulls(time);
         for u in units {
             let falling = u.owner_flags & KIND_WRECK != 0
                 && u.packed == mc_sim::mirror::WRECK_FALLING
@@ -4004,6 +4010,18 @@ impl Renderer {
             let burning = u.owner_flags & (KIND_WRECK | STATE_RADAR) == 0
                 && u.packed & mc_sim::mirror::UNIT_BURNING != 0;
             if !falling && !burning {
+                continue;
+            }
+            // A capital hull burns along its length (capital_crash_fx.rs).
+            if falling
+                && self
+                    .blueprints
+                    .unit(mc_data::BlueprintId(u.blueprint as u16))
+                    .is_capital_ship()
+            {
+                if Vec3::from(u.pos).distance(camera.focus) <= camera.distance * 3.0 + 800.0 {
+                    self.capital_falling(u, time);
+                }
                 continue;
             }
             let from = Vec3::from(u.prev_pos);
@@ -5514,8 +5532,18 @@ impl Renderer {
                 airborne: true,
                 ..
             } => {
-                let r = self.blueprints.unit(*blueprint).radius.to_f32();
-                self.air_blast(Vec3::from(pos.to_f32()), r, time);
+                let bp = self.blueprints.unit(*blueprint);
+                let at = Vec3::from(pos.to_f32());
+                if bp.is_capital_ship() {
+                    self.capital_air_death(at, blueprint.0 as u32, time);
+                } else {
+                    self.air_blast(at, bp.radius.to_f32(), time);
+                }
+            }
+            SimEvent::AircraftCrashed { pos, blueprint }
+                if self.blueprints.unit(*blueprint).is_capital_ship() =>
+            {
+                self.capital_crash(Vec3::from(pos.to_f32()), blueprint.0 as u32, time);
             }
             SimEvent::UnitDied { pos, blueprint, .. }
             | SimEvent::AircraftCrashed { pos, blueprint } => {
