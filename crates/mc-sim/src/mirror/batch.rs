@@ -1,5 +1,5 @@
 //! What the interface sees of a factory's batch (`crate::batch`): a mark on the factory
-//! for its own side (`UNIT_BATCH`), and for a factory it asks about, the muster block.
+//! for its own side (`UNIT_BATCH`), and for a factory it asks about, who waits there.
 
 use crate::World;
 
@@ -17,13 +17,10 @@ pub struct BatchView {
     pub count: u16,
     pub size: u16,
     pub fixed: bool,
-    /// Each place in this factory's muster block, and whether a unit stands in it: those
-    /// taken first, then those still to fill.
-    pub places: Vec<([f32; 2], bool)>,
-    /// The way the block faces (the factory's), a unit vector.
-    pub facing: [f32; 2],
-    /// Distance between places, metres.
-    pub spacing: f32,
+    /// The units waiting at this factory: to the player, one group.
+    pub units: Vec<u32>,
+    /// Where the next one out will stand, while more are to come.
+    pub next: Option<[f32; 2]>,
     /// Where each linked factory's block starts, in the batch's order; this one is `index`.
     pub linked: Vec<[f32; 2]>,
     pub index: usize,
@@ -32,19 +29,13 @@ pub struct BatchView {
 impl World {
     pub(super) fn batch_view(&self, row: usize) -> Option<BatchView> {
         let m = self.muster(row)?;
-        let a = self.state.units.heading[row];
         Some(BatchView {
             group: m.group,
             count: m.count,
             size: m.size,
             fixed: m.fixed,
-            places: m
-                .places
-                .iter()
-                .map(|&(p, here)| (p.to_f32(), here))
-                .collect(),
-            facing: [a.cos().to_f32(), a.sin().to_f32()],
-            spacing: m.spacing.to_f32(),
+            units: m.units.iter().map(|u| u.0).collect(),
+            next: m.next.map(|p| p.to_f32()),
             linked: m.linked.iter().map(|p| p.to_f32()).collect(),
             index: m.index,
         })

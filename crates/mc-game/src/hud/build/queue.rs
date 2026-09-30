@@ -496,9 +496,14 @@ fn batch_switches(hud: &mut Hud, ui: &mut Ui, r: Rect, queue: &Queue, right: f32
         "Units form up outside the factory and wait for the rest of the queue (one lap, repeating), then leave together on its orders."
             .to_owned()
     };
+    // A lap counts products out (some may have been taken away); a size, units waiting.
     let line = queue.muster.map(|m| {
         (
-            format!("{}/{} ready", m.count, m.size),
+            if m.fixed {
+                format!("{}/{} ready", m.count, m.size)
+            } else {
+                format!("lap {}/{}", m.count, m.size)
+            },
             m.count as f32 / m.size.max(1) as f32,
         )
     });
@@ -578,7 +583,8 @@ fn batch_switches(hud: &mut Hud, ui: &mut Ui, r: Rect, queue: &Queue, right: f32
 
 /// How many a batch waits for: its laps (LAP) or a size set by hand (SIZE), a minus at the
 /// left and a plus at the right. A click on either half steps it (from the laps' total, the
-/// first step sets a size); a right-click goes back to the laps. Returns the x left of it.
+/// first step sets a size), as does the wheel over it; a right-click goes back to the laps.
+/// Returns the x left of it.
 fn size_stepper(hud: &mut Hud, ui: &mut Ui, sr: Rect, m: Muster) -> f32 {
     let t = hud.tile(ui, id("queue-batch-size", 0), sr, m.fixed, true);
     let left = ui.cursor.x < sr.x + sr.w * 0.5;
@@ -607,22 +613,25 @@ fn size_stepper(hud: &mut Hud, ui: &mut Ui, sr: Rect, m: Muster) -> f32 {
     if t.hovered {
         let hint = if m.fixed {
             format!(
-                "Leaves once {} are formed up.  Click \u{2212}/+ to change  \u{b7}  Right-Click: once the queues are out",
+                "Leaves once {} are formed up.  Click \u{2212}/+ or wheel to change  \u{b7}  Right-Click: once the queues are out",
                 m.size
             )
         } else {
-            "Leaves once every factory's queue is out (one lap).  Click \u{2212}/+ to set a size instead".to_owned()
+            "Leaves once every factory's queue is out (one lap).  Click \u{2212}/+ or wheel to set a size instead".to_owned()
         };
         tip(ui, sr.x, sr.y - 46.0, &hint);
     }
     let max = mc_sim::batch::MAX_BATCH;
-    if t.clicked {
-        let size = if left {
+    let wheel = if t.hovered { ui.input.scroll } else { 0.0 };
+    if t.clicked || wheel != 0.0 {
+        let down = if wheel != 0.0 { wheel < 0.0 } else { left };
+        let size = if down {
             m.size.saturating_sub(1).max(1)
         } else {
             (m.size + 1).min(max)
         };
-        ui.audio.play(Sfx::Select);
+        ui.audio
+            .play(if t.clicked { Sfx::Select } else { Sfx::Tick });
         hud.actions.push(HudAction::BatchSize(Some(size)));
     } else if t.right_clicked && m.fixed {
         ui.audio.play(Sfx::Back);

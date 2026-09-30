@@ -1,22 +1,76 @@
-//! A batching factory's muster block on the ground (`mc_sim::batch`): a pad for each
-//! place its batch takes, lit as a unit stands in it, corner brackets round the block,
-//! and how many are ready over it. Linked factories' blocks are joined by a dashed line.
+//! A batching factory's forming units on the ground (`mc_sim::batch`). They are a group
+//! like any other, under the same count badge (`orders.rs`); a ring round the badge fills
+//! as the batch does. With the factory selected, a mark shows where the next one will
+//! stand, and linked factories' batches are joined by a dashed line.
 
-use super::Field;
-use crate::ui::{self, type_scale, Rect, Ui};
+use super::{Field, Filling};
+use crate::ui::{self, type_scale, Ui};
 use glam::Vec2;
 use mc_sim::mirror::BatchView;
+use std::f32::consts::{FRAC_PI_2, TAU};
 
 /// The colour of a batch, as on its switch.
 const TONE: u32 = crate::hud::style::Family::Movement.tone();
 
-/// Draws `batch`'s block, at `strength` (one for a selected factory).
-pub(super) fn muster_block(ui: &mut Ui, field: &Field, batch: &BatchView, strength: f32) {
-    if batch.places.is_empty() {
-        return;
+/// Round a batch's badge (centre `c`, radius `r`, points): a ring that fills as the batch
+/// does, and while it is lit or hovered, how full it is under it.
+pub(super) fn filling_ring(
+    ui: &mut Ui,
+    c: Vec2,
+    r: f32,
+    filling: Filling,
+    lit: bool,
+    hovered: bool,
+    time: f32,
+) {
+    let ring = r + if hovered { 5.5 } else { 3.5 };
+    let strength = if hovered || lit { 1.0 } else { 0.7 };
+    let full = (f32::from(filling.count) / f32::from(filling.size.max(1))).clamp(0.0, 1.0);
+    ui.arc(c, ring, 0.0, TAU, 2.0, ui::rgb(TONE, 0.18 * strength));
+    if full > 0.0 {
+        let from = -FRAC_PI_2;
+        ui.arc(
+            c,
+            ring,
+            from,
+            from + TAU * full,
+            2.0,
+            ui::rgb(TONE, 0.9 * strength),
+        );
     }
-    let ahead = Vec2::from(batch.facing);
-    let across = ahead.perp();
+    // Where the ring has got to breathes: the batch is still forming.
+    if full < 1.0 {
+        let a = -FRAC_PI_2 + TAU * full;
+        let glow = 0.5 + 0.5 * (time * 2.4).sin();
+        ui.disc(
+            c + Vec2::from_angle(a) * ring,
+            1.6 + glow,
+            ui::rgb(TONE, (0.5 + 0.4 * glow) * strength),
+        );
+    }
+    if lit || hovered {
+        let text = if filling.fixed {
+            format!("{}/{}", filling.count, filling.size)
+        } else {
+            format!("lap {}/{}", filling.count, filling.size)
+        };
+        let y = c.y + ring + 9.0;
+        for d in [Vec2::X, -Vec2::X, Vec2::Y, -Vec2::Y] {
+            ui.text_centred(
+                c.x + d.x,
+                y + d.y,
+                type_scale::MICRO,
+                ui::rgb(0x000000, 0.7),
+                &text,
+            );
+        }
+        ui.text_centred(c.x, y, type_scale::MICRO, ui::rgb(TONE, 1.0), &text);
+    }
+}
+
+/// The selected factory's batch: where the next one out will stand, and a dashed line on
+/// to the next linked factory's, so a linked batch reads as one.
+pub(super) fn muster_marks(ui: &mut Ui, field: &Field, batch: &BatchView, strength: f32) {
     let scale = ui.s;
     let ground = |p: Vec2| {
         field
@@ -24,34 +78,22 @@ pub(super) fn muster_block(ui: &mut Ui, field: &Field, batch: &BatchView, streng
             .project(p.extend(field.renderer.surface_height(p) + 1.0))
             .map(|q| q / scale)
     };
-    let pad = batch.spacing * 0.32;
-    let breathe = 0.75 + 0.25 * (ui.time * 2.2).sin();
-    for &(p, here) in &batch.places {
-        let c = Vec2::from(p);
-        let corners = [
-            c + (ahead + across) * pad,
-            c + (ahead - across) * pad,
-            c - (ahead + across) * pad,
-            c - (ahead - across) * pad,
-        ];
-        let Some(q) = corners
-            .iter()
-            .map(|&k| ground(k))
-            .collect::<Option<Vec<Vec2>>>()
-        else {
-            continue;
-        };
-        if here {
-            ui.triangle(q[0], q[1], q[2], ui::rgb(TONE, 0.28 * strength));
-            ui.triangle(q[0], q[2], q[3], ui::rgb(TONE, 0.28 * strength));
-            ui.polyline(&q, 1.6, ui::rgb(TONE, 0.95 * strength), true);
-        } else {
-            // Still to fill: a faint outline that breathes while the batch forms.
-            ui.polyline(&q, 1.1, ui::rgb(TONE, 0.45 * breathe * strength), true);
+    // The next place, once some wait (with none, the badge stands on it): a small ring
+    // that breathes.
+    if let Some(next) = batch.next.filter(|_| !batch.units.is_empty()) {
+        if let Some(p) = ground(Vec2::from(next)) {
+            let breathe = 0.6 + 0.4 * (ui.time * 2.4).sin();
+            ui.arc(
+                p,
+                5.0,
+                0.0,
+                TAU,
+                1.3,
+                ui::rgb(TONE, 0.6 * breathe * strength),
+            );
+            ui.disc(p, 1.5, ui::rgb(TONE, 0.8 * strength));
         }
     }
-
-    // Linked: a dashed line on to the next factory's block, so the batch reads as one.
     if let (Some(&a), Some(&b)) = (
         batch.linked.get(batch.index),
         batch.linked.get(batch.index + 1),
@@ -61,91 +103,8 @@ pub(super) fn muster_block(ui: &mut Ui, field: &Field, batch: &BatchView, streng
         for i in (0..steps).step_by(2) {
             let p = |k: usize| a.lerp(b, k as f32 / steps as f32);
             if let (Some(x), Some(y)) = (ground(p(i)), ground(p(i + 1))) {
-                ui.stroke(x, y, 1.4, ui::rgb(TONE, 0.6 * strength));
+                ui.stroke(x, y, 1.4, ui::rgb(TONE, 0.5 * strength));
             }
         }
-    }
-
-    // Corner brackets round the whole block, in its own frame.
-    let local = |p: [f32; 2]| {
-        let v = Vec2::from(p);
-        Vec2::new(v.dot(ahead), v.dot(across))
-    };
-    let (lo, hi) = batch.places.iter().fold(
-        (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)),
-        |(lo, hi), &(p, _)| (lo.min(local(p)), hi.max(local(p))),
-    );
-    let margin = batch.spacing * 0.5 + 3.0;
-    let (lo, hi) = (lo - Vec2::splat(margin), hi + Vec2::splat(margin));
-    let world = |l: Vec2| ahead * l.x + across * l.y;
-    let arm = (batch.spacing * 0.9).min((hi - lo).min_element() * 0.4);
-    let color = ui::rgb(TONE, 0.8 * strength);
-    for (corner, dx, dy) in [
-        (Vec2::new(lo.x, lo.y), 1.0, 1.0),
-        (Vec2::new(lo.x, hi.y), 1.0, -1.0),
-        (Vec2::new(hi.x, lo.y), -1.0, 1.0),
-        (Vec2::new(hi.x, hi.y), -1.0, -1.0),
-    ] {
-        let points: Option<Vec<Vec2>> = [
-            corner + Vec2::new(dx * arm, 0.0),
-            corner,
-            corner + Vec2::new(0.0, dy * arm),
-        ]
-        .iter()
-        .map(|&l| ground(world(l)))
-        .collect();
-        if let Some(points) = points {
-            ui.polyline(&points, 1.8, color, false);
-        }
-    }
-
-    // How many are ready, on a tag over the block's top corner on screen, clear of the
-    // line its orders leave along.
-    let top = [
-        Vec2::new(lo.x, lo.y),
-        Vec2::new(lo.x, hi.y),
-        Vec2::new(hi.x, lo.y),
-        Vec2::new(hi.x, hi.y),
-    ]
-    .iter()
-    .filter_map(|&l| ground(world(l)))
-    .min_by(|a, b| a.y.total_cmp(&b.y));
-    if let Some(at) = top {
-        let label = match batch.linked.len() {
-            0 | 1 => "BATCH".to_owned(),
-            n => format!("BATCH \u{d7}{n}"),
-        };
-        let label = label.as_str();
-        let count = format!("{}/{}", batch.count, batch.size);
-        let lw = ui.text_width(type_scale::MICRO, label);
-        let cw = ui.text_width(type_scale::ITEM, &count);
-        let w = 10.0 + lw + 8.0 + cw + 10.0;
-        let tag = Rect::new(at.x - w * 0.5, at.y - 30.0, w, 20.0);
-        ui.fill_cut(tag, 4.0, ui::ink(0.72 * strength));
-        ui.fill(
-            Rect::new(tag.x, tag.y + 4.0, 2.0, tag.h - 8.0),
-            ui::rgb(TONE, strength),
-        );
-        ui.text(
-            tag.x + 10.0,
-            tag.mid_y(),
-            type_scale::MICRO,
-            ui::rgb(TONE, 0.8 * strength),
-            label,
-        );
-        ui.text(
-            tag.x + 18.0 + lw,
-            tag.mid_y(),
-            type_scale::ITEM,
-            ui::rgb(0xFFFFFF, strength),
-            &count,
-        );
-        // A tick down to the corner it names.
-        ui.stroke(
-            Vec2::new(at.x, tag.bottom()),
-            Vec2::new(at.x, at.y - 3.0),
-            1.0,
-            ui::rgb(TONE, 0.6 * strength),
-        );
     }
 }

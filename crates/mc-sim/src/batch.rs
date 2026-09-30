@@ -7,7 +7,9 @@
 //! rally point, or stay formed up. Turning batch off for a factory, or
 //! `Command::ReleaseBatch`, sends whoever is waiting at once.
 //!
-//! A unit the player orders away from its place leaves the batch.
+//! The units waiting at a factory are one group to the player: a unit ordered away from
+//! its place leaves the batch, and those left close ranks, so taking some away leaves two
+//! tidy groups, the batch and the ones taken.
 
 use crate::tables::{flag, OrderKind, UnitId};
 use crate::{Command, SimError, World};
@@ -55,10 +57,10 @@ pub(crate) struct Muster {
     pub count: u16,
     pub size: u16,
     pub fixed: bool,
-    /// Each place in this factory's block, and whether a unit stands in it.
-    pub places: Vec<(FxVec2, bool)>,
-    /// Distance between places, metres.
-    pub spacing: Fx,
+    /// The units waiting at this factory, in place order.
+    pub units: Vec<UnitId>,
+    /// Where the next one out will stand, while more are to come.
+    pub next: Option<FxVec2>,
     /// Where each linked factory's block starts, in the batch's order, and which is this one.
     pub linked: Vec<FxVec2>,
     pub index: usize,
@@ -177,19 +179,12 @@ impl World {
             return Ok(false);
         };
         let b = &self.state.batches[&g];
-        // Numbered by products out, not units waiting, so a lost one's place stays empty.
         let made = b.factories.iter().find(|m| m.0 == id).map_or(0, |m| m.1);
+        // The next free place: those waiting stand closed up in the first ones.
+        let waiting = b.held.iter().filter(|h| h.factory == id).count();
         let places = self.block_size(factory, b, made + 1);
         let spacing = self.muster_spacing(factory, Some(product));
-        let mut at = self.muster_place(factory, usize::from(made), places, spacing);
-        if let Some(m) = self.bp(product).motion {
-            at = self
-                .nav
-                .nearest_passable(m.layer, m.size_class, at)
-                .filter(|&p| self.terrain.in_bounds(p))
-                .unwrap_or(at);
-        }
-        let at = self.clamp_to_map(at);
+        let at = self.standing_place(factory, product, waiting, places, spacing);
         let units = &mut self.state.units;
         units.fire_state[product] = units.fire_state[factory];
         let mut o = crate::orders::order(OrderKind::Move, at, crate::Handle::NONE);
@@ -232,13 +227,76 @@ impl World {
             if b.factories.is_empty() {
                 continue;
             }
+            let before = b.held.clone();
             b.held.retain(|h| self.still_held(b.owner, h));
+            let thinned = b.held.len() < before.len();
             self.state.batches.insert(g, b);
+            if thinned {
+                self.close_ranks(g, &before)?;
+            }
             if self.batch_full(g) {
                 self.release(g, None)?;
             }
         }
         Ok(())
+    }
+
+    /// Batch `g`'s waiting units move up into the first places of their blocks (`before`:
+    /// who held which place, in order), so a block some were taken from stays one tidy group.
+    fn close_ranks(&mut self, g: u32, before: &[Held]) -> Result<(), SimError> {
+        let Some(b) = self.state.batches.get(&g) else {
+            return Ok(());
+        };
+        let mut moves = Vec::new();
+        for &(f, _) in &b.factories {
+            let mut places = before.iter().filter(|h| h.factory == f).map(|h| h.at);
+            let waiting = b.held.iter().enumerate().filter(|(_, h)| h.factory == f);
+            for ((i, h), at) in waiting.zip(places.by_ref()) {
+                if at != h.at {
+                    moves.push((i, at));
+                }
+            }
+        }
+        for (i, at) in moves {
+            let h = self.state.batches[&g].held[i];
+            let Some(row) = self.state.units.row(h.unit) else {
+                continue;
+            };
+            let heading = self
+                .state
+                .units
+                .row(h.factory)
+                .map_or(self.state.units.heading[row], |f| {
+                    self.state.units.heading[f]
+                });
+            let mut o = crate::orders::order(OrderKind::Move, at, crate::Handle::NONE);
+            o.heading = heading;
+            self.give(row, o, false)?;
+            if let Some(b) = self.state.batches.get_mut(&g) {
+                b.held[i].at = at;
+            }
+        }
+        Ok(())
+    }
+
+    /// Place `k` of `factory`'s block for `unit`: on ground it can stand on, on the map.
+    fn standing_place(
+        &self,
+        factory: usize,
+        unit: usize,
+        k: usize,
+        places: u16,
+        spacing: Fx,
+    ) -> FxVec2 {
+        let mut at = self.muster_place(factory, k, places, spacing);
+        if let Some(m) = self.bp(unit).motion {
+            at = self
+                .nav
+                .nearest_passable(m.layer, m.size_class, at)
+                .filter(|&p| self.terrain.in_bounds(p))
+                .unwrap_or(at);
+        }
+        self.clamp_to_map(at)
     }
 
     /// Whether `h` is still waiting: alive, its side's, and either standing with no
@@ -360,18 +418,41 @@ impl World {
         for (f, ids) in groups {
             let units = &self.state.units;
             let (rally, pos) = (units.rally[f], units.pos[f]);
-            if !self.give_standing(f, &ids, true)? && rally != pos {
-                self.apply_as(
-                    owner,
-                    &Command::Move {
-                        units: ids,
-                        target: rally,
-                        queue: false,
-                    },
-                )?;
+            if self.give_standing(f, &ids, true)? {
+                continue;
             }
+            // Nowhere to go: they march out as one group, clear of where the next forms up.
+            let target = if rally != pos {
+                rally
+            } else {
+                self.clear_of_muster(f, ids.len())
+            };
+            self.apply_as(
+                owner,
+                &Command::Move {
+                    units: ids,
+                    target,
+                    queue: false,
+                },
+            )?;
         }
         Ok(())
+    }
+
+    /// Where `n` units a batch sends off with no orders and no rally point stand: ahead of
+    /// `factory`'s muster block, with room for them to form up short of it.
+    fn clear_of_muster(&self, factory: usize, n: usize) -> FxVec2 {
+        let spacing = self.muster_spacing(factory, None);
+        let size = self
+            .batch_of(self.state.units.id(factory))
+            .and_then(|g| self.state.batches.get(&g))
+            .map_or(1, |b| self.block_size(factory, b, 0).max(1));
+        let far = self.muster_place(factory, 0, size, spacing);
+        let n = i32::try_from(n).unwrap_or(i32::MAX);
+        let rows = (n + MUSTER_COLUMNS - 1) / MUSTER_COLUMNS;
+        let ahead = FxVec2::from_angle(self.state.units.heading[factory]);
+        let at = far + ahead * (Fx::from_int(MUSTER_GAP) + spacing * (rows / 2 + 1));
+        self.clamp_to_map(at)
     }
 
     /// Whether factories `a` and `b` send their units the same way: the same standing
@@ -435,23 +516,19 @@ impl World {
         let units = &self.state.units;
         let made = b.factories.iter().find(|m| m.0 == id).map_or(0, |m| m.1);
         let spacing = self.muster_spacing(factory, None);
-        let held = b.held.iter().filter(|h| h.factory == id).map(|h| {
-            let here = units
-                .row(h.unit)
-                .is_some_and(|r| units.pos[r].distance(h.at) < self.bp(r).radius + Fx::from_int(6));
-            (h.at, here)
-        });
-        // The places still to fill (with a size set, the next one); a lost unit's place is
-        // not shown.
+        let waiting: Vec<UnitId> = b
+            .held
+            .iter()
+            .filter(|h| h.factory == id)
+            .map(|h| h.unit)
+            .collect();
         let places = self.block_size(factory, b, made);
-        let to_fill = match b.size {
-            Some(n) if b.held.len() < usize::from(n) => usize::from(made) + 1,
-            Some(_) => usize::from(made),
-            None => usize::from(places),
+        let more = match b.size {
+            Some(n) => b.held.len() < usize::from(n),
+            None => made < places,
         };
-        let to_come = (usize::from(made)..to_fill.min(usize::from(MAX_BATCH)))
-            .map(|k| (self.muster_place(factory, k, places, spacing), false));
-        let places_shown = held.chain(to_come).collect();
+        let next = (more && waiting.len() < usize::from(MAX_BATCH))
+            .then(|| self.muster_place(factory, waiting.len(), places.max(1), spacing));
         let (count, size) = match b.size {
             Some(n) => (u16::try_from(b.held.len()).unwrap_or(u16::MAX), n),
             None => b
@@ -476,8 +553,8 @@ impl World {
             count,
             size,
             fixed: b.size.is_some(),
-            places: places_shown,
-            spacing,
+            units: waiting,
+            next,
             linked,
             index: b.factories.iter().position(|m| m.0 == id).unwrap_or(0),
         })

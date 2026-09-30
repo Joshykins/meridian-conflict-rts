@@ -1210,28 +1210,60 @@ impl OrderMap {
             .retain(|(id, formation)| live.contains(formation) && view.index_of.contains_key(id));
     }
 
-    /// Each kept command group: the middle of its members (the world, interpolated) and who they are.
+    /// Each kept command group: the middle of its members (the world, interpolated) and who
+    /// they are; and each batch forming at a factory, a group like any other.
     fn groups(&self, field: &Field, alpha: f32) -> Vec<Group> {
         let view = field.view;
+        let middle_of = |members: &[u32]| {
+            let mut middle = Vec3::ZERO;
+            let mut found = Vec::new();
+            for id in members {
+                let Some(unit) = view.index_of.get(id).map(|&i| &view.frame.units[i]) else {
+                    continue;
+                };
+                middle += Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha);
+                found.push(*id);
+            }
+            (middle / found.len().max(1) as f32, found)
+        };
+        let batches = view.status.queues.iter().filter_map(|q| {
+            let b = q.batch.as_ref()?;
+            let (middle, members) = middle_of(&b.units);
+            let factory_lit = view.shift || view.selection.contains(&q.unit_id);
+            // None waiting yet: an empty badge where the first will stand, on the selected
+            // factory only.
+            let middle = if members.is_empty() {
+                let at = Vec2::from(b.next.filter(|_| factory_lit)?);
+                at.extend(field.renderer.surface_height(at))
+            } else {
+                middle
+            };
+            Some(Group {
+                formation: 0,
+                middle,
+                selected: factory_lit || members.iter().any(|id| view.selection.contains(id)),
+                members,
+                batch: Some(Filling {
+                    factory: q.unit_id,
+                    count: b.count,
+                    size: b.size,
+                    fixed: b.fixed,
+                }),
+            })
+        });
         self.kept
             .iter()
             .filter_map(|(&formation, members)| {
-                let mut middle = Vec3::ZERO;
-                let mut found = Vec::new();
-                for id in members {
-                    let Some(unit) = view.index_of.get(id).map(|&i| &view.frame.units[i]) else {
-                        continue;
-                    };
-                    middle += Vec3::from(unit.prev_pos).lerp(Vec3::from(unit.pos), alpha);
-                    found.push(*id);
-                }
+                let (middle, found) = middle_of(members);
                 (found.len() > 1).then(|| Group {
                     formation,
-                    middle: middle / found.len() as f32,
+                    middle,
                     selected: found.iter().any(|id| view.selection.contains(id)),
                     members: found,
+                    batch: None,
                 })
             })
+            .chain(batches)
             .collect()
     }
 
@@ -1240,7 +1272,7 @@ impl OrderMap {
         let scale = self.scale.max(0.4);
         self.groups(field, 1.0)
             .into_iter()
-            .filter(|g| g.members.len() > 1)
+            .filter(|g| !g.members.is_empty())
             .filter_map(|g| {
                 let p = field.camera.project(g.middle)?;
                 let d = p.distance(cursor) / scale;
@@ -1301,7 +1333,7 @@ impl OrderMap {
             let lively = selected || view.shift;
             let guard = guard_look(field.blueprints, unit);
             if let Some(batch) = &queue.batch {
-                muster::muster_block(ui, field, batch, strength);
+                muster::muster_marks(ui, field, batch, strength);
             }
             // A group's line leaves from the middle of the group, a lone unit's from the unit.
             let (mut origin, start) = match queue.orders.first() {
@@ -1317,14 +1349,13 @@ impl OrderMap {
                 ),
             };
             // A batch leaves from where it forms up, not from the factory.
-            let start = match queue.batch.as_ref().filter(|b| !b.places.is_empty()) {
-                Some(b) => {
-                    let sum: Vec2 = b.places.iter().map(|&(p, _)| Vec2::from(p)).sum();
-                    let c = sum / b.places.len() as f32;
-                    c.extend(renderer.surface_height(c))
-                }
-                None => start,
-            };
+            let forming = queue.batch.as_ref().and_then(|_| {
+                groups
+                    .iter()
+                    .find(|g| g.batch.is_some_and(|b| b.factory == queue.unit_id))
+                    .map(|g| g.middle)
+            });
+            let start = forming.unwrap_or(start);
             // Where the line so far ends on screen, worked out only for a leg that is
             // drawn: a group's members share their legs, and thousands of them each
             // finding the ground under every waypoint was most of this pass.
@@ -1471,14 +1502,22 @@ impl OrderMap {
         for (c, tone, strength, selected) in markers {
             waypoint(ui, c, tone, strength, selected, t);
         }
-        for g in groups.iter().filter(|g| g.members.len() > 1) {
+        for g in groups
+            .iter()
+            .filter(|g| g.members.len() > 1 || g.batch.is_some())
+        {
             let Some(p) = camera.project(g.middle).filter(|p| on_screen(*p)) else {
                 continue;
             };
             let c = p / ui.s;
             let r = badge_radius(g.members.len());
-            let hovered = !self.dragging() && ui.cursor.distance(c) <= r + 3.0;
-            badge(ui, c, g.members.len(), g.selected || view.shift, hovered, t);
+            let hovered =
+                !self.dragging() && !g.members.is_empty() && ui.cursor.distance(c) <= r + 3.0;
+            let lit = g.selected || view.shift;
+            badge(ui, c, g.members.len(), lit, hovered, t);
+            if let Some(filling) = g.batch {
+                muster::filling_ring(ui, c, r, filling, lit, hovered, t);
+            }
         }
         // What a press would pick up, or what is in hand.
         let held = self
@@ -1570,6 +1609,18 @@ struct Group {
     middle: Vec3,
     members: Vec<u32>,
     selected: bool,
+    /// Units forming up in a factory's batch: how full it is.
+    batch: Option<Filling>,
+}
+
+/// How far a forming batch has got, and what it leaves at.
+#[derive(Clone, Copy)]
+struct Filling {
+    factory: u32,
+    /// Products out of the lap, or with a size set (`fixed`), units waiting of it.
+    count: u16,
+    size: u16,
+    fixed: bool,
 }
 
 /// Points between the pulses running down a line, and how fast they run, points a second.

@@ -245,6 +245,75 @@ fn a_unit_ordered_away_leaves_the_batch() {
     );
 }
 
+#[test]
+fn taking_some_away_leaves_two_groups_and_the_rest_close_ranks() {
+    let (mut w, fid) = with_factory();
+    w.tick(&[
+        cmd(Command::SetBatch {
+            factories: vec![fid],
+            batch: true,
+        }),
+        produce(&w, fid, "aster_t1_tank", 5),
+    ])
+    .unwrap();
+    let out = out_tanks_after(&mut w, &[], 3);
+    let places: Vec<FxVec2> = batch_of(&w, fid)
+        .unwrap()
+        .held
+        .iter()
+        .map(|h| h.at)
+        .collect();
+    // The first two are taken away together.
+    let elsewhere = FxVec2::from_ints(300, 300);
+    let taken: Vec<UnitId> = out[..2].iter().map(|&t| w.state.units.id(t)).collect();
+    w.tick(&[cmd(Command::Move {
+        units: taken,
+        target: elsewhere,
+        queue: false,
+    })])
+    .unwrap();
+    w.tick(&[]).unwrap();
+    let formation = |t: usize| w.state.orders.front(&w.state.units, t).unwrap().formation;
+    assert!(
+        formation(out[0]) != 0 && formation(out[0]) == formation(out[1]),
+        "those taken go as a group of their own"
+    );
+    let b = batch_of(&w, fid).unwrap();
+    assert_eq!(b.held.len(), 1, "the third still waits");
+    assert_eq!(
+        goal(&w, out[2]),
+        places[0],
+        "and moves up into the first place"
+    );
+    let fourth = next_product(&mut w, "aster_t1_tank", &out);
+    assert_eq!(goal(&w, fourth), places[1], "the next one stands beside it");
+}
+
+#[test]
+fn with_nowhere_to_go_a_batch_marches_clear_as_one_group() {
+    let (mut w, fid) = with_factory();
+    w.tick(&[
+        cmd(Command::SetBatch {
+            factories: vec![fid],
+            batch: true,
+        }),
+        produce(&w, fid, "aster_t1_tank", 2),
+    ])
+    .unwrap();
+    let first = next_product(&mut w, "aster_t1_tank", &[]);
+    let place = goal(&w, first);
+    let second = next_product(&mut w, "aster_t1_tank", &[first]);
+    let factory = w.state.units.pos[w.state.units.row(fid).unwrap()];
+    let formation = |t: usize| w.state.orders.front(&w.state.units, t).unwrap().formation;
+    assert!(formation(first) != 0 && formation(first) == formation(second));
+    for t in [first, second] {
+        assert!(
+            goal(&w, t).distance(factory) > place.distance(factory) + Fx::from_int(20),
+            "they march out past where the next batch forms up"
+        );
+    }
+}
+
 /// Ticks until `n` more tanks than `skip` are out.
 fn out_tanks_after(w: &mut World, skip: &[usize], n: usize) -> Vec<usize> {
     let mut rows = skip.to_vec();
