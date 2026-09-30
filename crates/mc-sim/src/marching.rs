@@ -13,6 +13,19 @@ use mc_data::{Motion, MoveLayer};
 const DT: i32 = TICKS_PER_SECOND as i32;
 /// Members handed to one worker at a time.
 const CHUNK: usize = 128;
+/// Share of its pace a block keeps to while forming up, wheeling or edging
+/// round ground: the rest is speed in hand for its ranks to keep up.
+const RESERVE: Fx = Fx::ratio(7, 10);
+/// The least share of its pace a block forming up keeps to, waiting for a slow
+/// member far off its rank.
+const FORMING: Fx = Fx::ratio(2, 5);
+/// How far a block's heading may lie off its way before it counts as wheeling.
+const WHEELING: u16 = 0x0400;
+/// Speed a formed-up block gives up per metre a member is off its rank (per
+/// second), down to its `RESERVE` pace: small slips close in a couple of
+/// seconds, and a member far off costs no more than forming up does. A member
+/// with speed of its own to spare makes up its ground itself.
+const LAG_GAIN: Fx = Fx::ONE;
 
 /// A block's heading and way this tick (`block_head`), for its anchor to move on by.
 struct Head {
@@ -32,6 +45,8 @@ struct Head {
     m: Motion,
     clear_ahead: bool,
     route: FxVec2,
+    /// The block is still wheeling onto its way: its outside ranks need speed in hand.
+    wheeling: bool,
 }
 
 /// A marching block's decisions for this tick, for its members to keep rank by.
@@ -269,6 +284,7 @@ impl World {
         } else {
             route.angle()
         };
+        let mut wheeling = false;
         if !sweep && (group.phase == 1 || group.phase == 2) {
             // A block wheels no faster than its outside ranks can keep up
             // with speed in hand, or its inside ranks crowd together.
@@ -313,6 +329,7 @@ impl World {
                 }
             };
             group.heading = group.heading.turn_toward(facing, wheel);
+            wheeling = group.heading.delta_to(facing).unsigned_abs() > WHEELING;
         }
         Head {
             id,
@@ -331,6 +348,7 @@ impl World {
             m,
             clear_ahead,
             route,
+            wheeling,
         }
     }
 
@@ -354,6 +372,7 @@ impl World {
             m,
             clear_ahead,
             route,
+            wheeling,
         } = *head;
         let rows = rows.clone();
         let mut group = group.clone();
@@ -369,6 +388,10 @@ impl World {
         // most of its ranks cannot pass.
         let crowded = |cut: usize| cut * 3 > n;
         let mut worst = Fx::ZERO;
+        // Members off their ranks (reachable ones): out of rank at all, and far out.
+        let (mut off_rank, mut far_off) = (0, 0);
+        let cut_off_rank = radius.max(Fx::from_int(5));
+        let far_off_rank = radius * 2 + Fx::from_int(14);
         let mut cut = 0;
         let mut astray = 0;
         for &row in &rows {
@@ -380,7 +403,10 @@ impl World {
                 cut += 1;
             } else {
                 // The march paces itself on the members that can reach their ranks.
-                worst = worst.max(pos.distance(slot));
+                let d = pos.distance(slot);
+                worst = worst.max(d);
+                off_rank += (d > cut_off_rank) as usize;
+                far_off += (d >= far_off_rank) as usize;
             }
         }
         // Clear of a pass once the ranks fit again and the way on is open,
@@ -418,22 +444,76 @@ impl World {
             // are and on the way, not back at slots left behind.
             group.anchor = mean;
         }
-        if group.phase == 1 && worst <= radius.max(Fx::from_int(5)) {
+        // A block on the ground or at sea is formed up with one in eight still
+        // out: one hull that cannot find its rank must not hold a big block
+        // at a crawl for good. Formed up, it paces itself on them.
+        let stragglers = if air { 0 } else { n / 8 };
+        if group.phase == 1 && off_rank <= stragglers {
             group.phase = 2;
         }
         // Leave immediately, keeping speed in reserve for members catching up.
         // Formation error can slow the march, but must never create a rally pause.
-        // A flight on patrol holds its pace: its wings have speed in hand
-        // to close up, and an anchor that slows leaves them ahead of it.
-        let share = if sweep || worst < radius * 2 + Fx::from_int(14) {
-            Fx::ratio(7, 10)
-        } else {
-            Fx::ratio(2, 5)
-        };
-        let speed = if sweep {
+        let speed = if air {
+            // A flight keeps speed in reserve for its wings to close up. On
+            // patrol it holds its pace: its wings have speed in hand to close
+            // up, and an anchor that slows leaves them ahead of it.
+            let share = if sweep || far_off == 0 {
+                RESERVE
+            } else {
+                FORMING
+            };
             pace * share
         } else {
-            (pace * share).min(delta.length() * 2)
+            // A block on the ground or at sea keeps speed in hand for its ranks
+            // while it forms up, wheels, or has ground ahead of a rank to edge
+            // off or go round (it looks further than it steers, to be at that
+            // pace by then). Formed up on open ground or water it goes at its
+            // slowest member's own speed.
+            let warn = route
+                * (pace * 12)
+                    .clamp(Fx::from_int(96), Fx::from_int(256))
+                    .min(delta.length());
+            let ground_ahead = || {
+                rows.iter().any(|&row| {
+                    let o = self.state.orders.front(&self.state.units, row).unwrap();
+                    let slot = group.anchor + offset(o);
+                    cut_off(row, slot, slot + warn)
+                })
+            };
+            let forming = group.phase != 2;
+            let full = if forming || wheeling || ground_ahead() {
+                pace * RESERVE
+            } else {
+                pace
+            };
+            // It gives up only what a member off its rank needs to close up at
+            // its own speed: a member with speed to spare makes up its ground
+            // itself. Forming up it may wait longer than on the march.
+            let most = pace - pace * if forming { FORMING } else { RESERVE };
+            let mut keep_up = full;
+            for &row in &rows {
+                let o = self.state.orders.front(&self.state.units, row).unwrap();
+                let slot = group.anchor + offset(o);
+                let pos = self.state.units.pos[row];
+                if cut_off(row, pos, slot) {
+                    continue;
+                }
+                // Ahead of its rank a member eases off by itself; behind or
+                // beside it, it needs speed in hand.
+                let error = slot - pos;
+                let lag = error.dot(route);
+                let off = (error - route * lag).length().max(lag);
+                if off > Fx::ZERO {
+                    let own = self.bp(row).motion.unwrap().speed;
+                    keep_up = keep_up.min(own - (off * LAG_GAIN).min(most));
+                }
+            }
+            keep_up
+        };
+        let speed = if sweep {
+            speed
+        } else {
+            speed.min(delta.length() * 2)
         };
         group.speed = group.speed.approach(speed, accel / DT);
         let advance = if sweep {

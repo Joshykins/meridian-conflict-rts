@@ -787,16 +787,39 @@ impl World {
                     }
                 }
             } else {
+                // On the march a member chases a point a few lengths ahead of
+                // its rank, and the anchor brakes the block into its goal. A
+                // ship gets under way so slowly that braking for that point
+                // would hold it well under the block's pace.
+                let marching = formation.is_some_and(|f| !f.settling);
+                // A ship marching in a block keeps way on through a turn and
+                // carves it, with open water off its bow to carve it in. Alone,
+                // picking its own way through a strait, or with its bow to the
+                // shore, it swings (nearly) in place, as a tank pivots.
+                let carves = motion.layer == MoveLayer::Naval
+                    && marching
+                    && self.nav.clear_segment(
+                        motion.layer,
+                        motion.size_class,
+                        pos,
+                        pos + FxVec2::from_angle(out.heading) * (max_speed + radius),
+                    );
                 target_speed = if off > 0x2000 {
-                    if formation.is_some() {
+                    if carves {
+                        max_speed / 2
+                    } else if formation.is_some() {
                         Fx::ZERO
                     } else {
-                        max_speed / 5
+                        // Swinging round onto a goal close by, the turning circle
+                        // must fit inside the distance left, or the hull circles it.
+                        let yaw = Fx::ratio(motion.turn_rate as i64 * DT as i64 * 355, 113 * 32768);
+                        (max_speed / 5).min(dist * yaw / 2)
                     }
                 } else {
                     max_speed
                 };
-                if moving && !standing_on_blocked {
+                if moving && !standing_on_blocked && !(marching && motion.layer == MoveLayer::Naval)
+                {
                     target_speed = target_speed
                         .min(dist * 2)
                         .min((motion.accel * dist * 2).sqrt());

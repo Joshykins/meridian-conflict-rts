@@ -96,6 +96,7 @@ mod zz_naval_duel_probe;
 mod zz_petrel_probe;
 mod zz_restore_probe;
 mod zz_tempest_probe;
+mod zz_travel_probe;
 
 #[test]
 fn every_test_file_is_listed() {
