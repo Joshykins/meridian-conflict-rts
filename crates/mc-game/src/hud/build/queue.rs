@@ -375,7 +375,7 @@ fn switch(hud: &mut Hud, ui: &mut Ui, tr: Rect, sw: Switch) -> Option<bool> {
     if shift {
         crate::hud::selection::shift_mark(
             ui,
-            Vec2::new(key_x - 5.0, tr.y + 8.0),
+            Vec2::new(key_x - 7.0, tr.y + 8.0),
             rgb(palette::FAINT, 1.0),
         );
     }

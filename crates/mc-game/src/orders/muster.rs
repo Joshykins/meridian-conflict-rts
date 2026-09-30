@@ -3,7 +3,7 @@
 //! and how many are ready over it.
 
 use super::Field;
-use crate::ui::{self, type_scale, Ui};
+use crate::ui::{self, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_sim::mirror::BatchView;
 
@@ -84,15 +84,48 @@ pub(super) fn muster_block(ui: &mut Ui, field: &Field, batch: &BatchView, streng
         }
     }
 
-    // How many are ready, over the far edge of the block.
-    let far = world(Vec2::new(hi.x, (lo.y + hi.y) * 0.5));
-    if let Some(at) = ground(far) {
-        ui.text_centred(
-            at.x,
-            at.y - 12.0,
-            type_scale::MICRO,
+    // How many are ready, on a tag over the block's top corner on screen, clear of the
+    // line its orders leave along.
+    let top = [
+        Vec2::new(lo.x, lo.y),
+        Vec2::new(lo.x, hi.y),
+        Vec2::new(hi.x, lo.y),
+        Vec2::new(hi.x, hi.y),
+    ]
+    .iter()
+    .filter_map(|&l| ground(world(l)))
+    .min_by(|a, b| a.y.total_cmp(&b.y));
+    if let Some(at) = top {
+        let (label, count) = ("BATCH", format!("{}/{}", batch.made, batch.size));
+        let lw = ui.text_width(type_scale::MICRO, label);
+        let cw = ui.text_width(type_scale::ITEM, &count);
+        let w = 10.0 + lw + 8.0 + cw + 10.0;
+        let tag = Rect::new(at.x - w * 0.5, at.y - 30.0, w, 20.0);
+        ui.fill_cut(tag, 4.0, ui::ink(0.72 * strength));
+        ui.fill(
+            Rect::new(tag.x, tag.y + 4.0, 2.0, tag.h - 8.0),
             ui::rgb(TONE, strength),
-            &format!("BATCH  {}/{}", batch.made, batch.size),
+        );
+        ui.text(
+            tag.x + 10.0,
+            tag.mid_y(),
+            type_scale::MICRO,
+            ui::rgb(TONE, 0.8 * strength),
+            label,
+        );
+        ui.text(
+            tag.x + 18.0 + lw,
+            tag.mid_y(),
+            type_scale::ITEM,
+            ui::rgb(0xFFFFFF, strength),
+            &count,
+        );
+        // A tick down to the corner it names.
+        ui.stroke(
+            Vec2::new(at.x, tag.bottom()),
+            Vec2::new(at.x, at.y - 3.0),
+            1.0,
+            ui::rgb(TONE, 0.6 * strength),
         );
     }
 }
