@@ -8,7 +8,7 @@ use crate::nav::Nav;
 use crate::spatial::{kind, SpatialIndex};
 use crate::tables::*;
 use crate::{SimError, Table};
-use mc_core::{Angle, Fx, FxVec2, Rng, MAX_PLAYERS};
+use mc_core::{player_bit, Angle, Fx, FxVec2, PlayerMask, Rng, MAX_PLAYERS};
 use mc_data::{cat, BlueprintId, Blueprints, MoveLayer, UnitBlueprint};
 use mc_jobs::Pool;
 use mc_map::{Heightfield, MapFile, Prop};
@@ -338,6 +338,7 @@ impl World {
                 name: p.name.clone(),
                 faction: faction.id.0,
                 team: p.team,
+                allies: 0,
                 controller: p.controller,
                 start,
                 defeated: false,
@@ -372,6 +373,7 @@ impl World {
             });
         }
 
+        crate::tables::derive_allies(&mut players);
         let mut prop_index = SpatialIndex::new(size);
         for (i, p) in map.props.iter().enumerate() {
             prop_index.insert(kind::PROP, i, p.pos, PROP_RADIUS);
@@ -466,15 +468,9 @@ impl World {
     }
 
     /// Bit mask of the players allied with `player`, including itself.
-    pub fn team_mask(&self, player: u8) -> u8 {
-        let team = self.state.players[player as usize].team;
-        let mut mask = 0;
-        for (i, p) in self.state.players.iter().enumerate() {
-            if p.team == team {
-                mask |= 1 << i;
-            }
-        }
-        mask
+    #[inline]
+    pub fn team_mask(&self, player: u8) -> PlayerMask {
+        self.state.players[player as usize].allies
     }
 
     #[inline]
@@ -901,9 +897,6 @@ impl World {
 
     pub(crate) fn update_fog(&mut self) {
         self.fog.begin();
-        let masks: Vec<u8> = (0..self.state.players.len())
-            .map(|p| self.team_mask(p as u8))
-            .collect();
         let rows: Vec<usize> = self.state.units.slots.iter().collect();
         for &row in &rows {
             if self.state.units.has_flag(row, flag::IN_FACTORY) {
@@ -921,12 +914,12 @@ impl World {
                 self.state.units.pos[row],
                 vision,
                 radar,
-                masks[self.state.units.owner[row] as usize],
+                self.team_mask(self.state.units.owner[row]),
             );
             self.fog.reveal_sonar(
                 self.state.units.pos[row],
                 self.live_sonar(row),
-                masks[self.state.units.owner[row] as usize],
+                self.team_mask(self.state.units.owner[row]),
             );
         }
         self.survival_reveal();
@@ -948,7 +941,7 @@ impl World {
     pub fn detects(&self, player: u8, row: usize) -> bool {
         !self.state.fog_enabled
             || !self.are_enemies(player, self.state.units.owner[row])
-            || self.detected_by(row, 1 << player)
+            || self.detected_by(row, player_bit(player))
     }
 
     fn check_victory(&mut self) {
@@ -1006,6 +999,7 @@ impl World {
             self.terrain.apply_flatten(&e.record());
         }
         self.state = state;
+        crate::tables::derive_allies(&mut self.state.players);
         self.rebuild_lots();
         self.rebuild_index();
         // Not rebuilt: what each side has seen, and the vision the next tick reads, are the

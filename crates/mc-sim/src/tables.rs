@@ -826,6 +826,18 @@ impl Default for Orders {
     }
 }
 
+/// Fills in every player's [`Player::allies`] from the teams.
+pub(crate) fn derive_allies(players: &mut [Player]) {
+    for i in 0..players.len() {
+        let team = players[i].team;
+        players[i].allies = players
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.team == team)
+            .fold(0, |m, (j, _)| m | mc_core::player_bit(j as u8));
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Controller {
     Human,
@@ -838,6 +850,11 @@ pub struct Player {
     pub faction: u8,
     /// Players with the same team are allied and share vision.
     pub team: u8,
+    /// The players on this one's team, itself included: derived from every
+    /// player's `team` by [`derive_allies`] when a match is set up or restored,
+    /// so it is neither in snapshots nor hashed.
+    #[serde(skip)]
+    pub allies: mc_core::PlayerMask,
     pub controller: Controller,
     pub start: FxVec2,
     pub defeated: bool,

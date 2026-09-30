@@ -23,6 +23,18 @@ pub const TICKS_PER_SECOND: u32 = 10;
 /// Most players a match supports.
 pub const MAX_PLAYERS: usize = 8;
 
+/// A set of player slots: bit `p` stands for slot `p`. Fog layers, team
+/// vision and the lobby's seat sets are all masks of this width.
+pub type PlayerMask = u32;
+
+const _: () = assert!(MAX_PLAYERS <= PlayerMask::BITS as usize);
+
+/// The mask holding slot `player` alone.
+#[inline]
+pub const fn player_bit(player: u8) -> PlayerMask {
+    1 << player
+}
+
 /// Index of a player slot, `0..MAX_PLAYERS`.
 #[derive(
     Clone,

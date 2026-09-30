@@ -129,7 +129,7 @@ impl World {
     /// A hull under water answers to sonar alone, except for the few seconds after a
     /// missile launch gave it away (`Units::revealed`), when radar and eyes find it too;
     /// sonar also picks up anything floating, the way radar would.
-    pub(crate) fn detected_by(&self, row: usize, mask: u8) -> bool {
+    pub(crate) fn detected_by(&self, row: usize, mask: mc_core::PlayerMask) -> bool {
         let pos = self.state.units.pos[row];
         if self.submerged(row) {
             return self.fog.is_sonar(pos, mask)
@@ -139,7 +139,7 @@ impl World {
     }
 
     /// Whether the players in `mask` see `row` with their eyes. Nobody sees under water.
-    pub(crate) fn seen_by(&self, row: usize, mask: u8) -> bool {
+    pub(crate) fn seen_by(&self, row: usize, mask: mc_core::PlayerMask) -> bool {
         !self.submerged(row) && self.fog.is_visible(self.state.units.pos[row], mask)
     }
 

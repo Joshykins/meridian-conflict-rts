@@ -1267,7 +1267,7 @@ impl crate::World {
             return;
         };
         let side = s.config.engine_player;
-        let mut mask = 0u8;
+        let mut mask: mc_core::PlayerMask = 0;
         for p in 0..self.state.players.len() {
             if p as u8 != side {
                 mask |= self.team_mask(p as u8);

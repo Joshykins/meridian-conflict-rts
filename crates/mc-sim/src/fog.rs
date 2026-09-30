@@ -8,7 +8,7 @@
 //! memory is hashed. Radar detects units without lighting the ground. Sonar is
 //! the only layer that finds a hull under water (`naval.rs`).
 
-use mc_core::{Fx, FxVec2, StateHasher};
+use mc_core::{Fx, FxVec2, PlayerMask, StateHasher};
 use serde::{Deserialize, Serialize};
 
 /// Fog cell edge: 64 m.
@@ -19,15 +19,15 @@ pub struct Fog {
     width: i32,
     height: i32,
     /// Bit `p` set: player `p` sees this cell right now.
-    visible: Vec<u8>,
+    visible: Vec<PlayerMask>,
     /// Bit `p` set: the cell is inside player `p`'s radar coverage.
-    radar: Vec<u8>,
+    radar: Vec<PlayerMask>,
     /// Bit `p` set: the cell is inside player `p`'s sonar coverage.
-    sonar: Vec<u8>,
-    explored: Vec<u8>,
+    sonar: Vec<PlayerMask>,
+    explored: Vec<PlayerMask>,
     /// Bit `p` set: player `p` has seen this unit row with vision. A generation
     /// stamp keeps a reused row from staying known.
-    identified: Vec<u8>,
+    identified: Vec<PlayerMask>,
     identified_gen: Vec<u16>,
     /// Bumped on every rebuild so the renderer knows when to re-upload.
     #[serde(skip)]
@@ -64,7 +64,7 @@ impl Fog {
     }
 
     /// Marks the disc around `pos` for the players in `mask`.
-    pub fn reveal(&mut self, pos: FxVec2, vision: Fx, radar: Fx, mask: u8) {
+    pub fn reveal(&mut self, pos: FxVec2, vision: Fx, radar: Fx, mask: PlayerMask) {
         if vision > Fx::ZERO {
             Self::stamp(
                 &mut self.visible,
@@ -90,7 +90,7 @@ impl Fog {
     }
 
     /// Marks the sonar disc around `pos` for the players in `mask`.
-    pub fn reveal_sonar(&mut self, pos: FxVec2, sonar: Fx, mask: u8) {
+    pub fn reveal_sonar(&mut self, pos: FxVec2, sonar: Fx, mask: PlayerMask) {
         if sonar > Fx::ZERO {
             Self::stamp(
                 &mut self.sonar,
@@ -105,13 +105,13 @@ impl Fog {
     }
 
     fn stamp(
-        grid: &mut [u8],
-        mut also: Option<&mut Vec<u8>>,
+        grid: &mut [PlayerMask],
+        mut also: Option<&mut Vec<PlayerMask>>,
         width: i32,
         height: i32,
         pos: FxVec2,
         radius: Fx,
-        mask: u8,
+        mask: PlayerMask,
     ) {
         let cx = pos.x.floor_int() >> CELL_SHIFT;
         let cy = pos.y.floor_int() >> CELL_SHIFT;
@@ -153,37 +153,37 @@ impl Fog {
 
     /// True when any player in `mask` currently sees `pos`.
     #[inline]
-    pub fn is_visible(&self, pos: FxVec2, mask: u8) -> bool {
+    pub fn is_visible(&self, pos: FxVec2, mask: PlayerMask) -> bool {
         self.visible[self.cell(pos)] & mask != 0
     }
 
     /// True when any player in `mask` has ever seen `pos`.
     #[inline]
-    pub fn is_explored(&self, pos: FxVec2, mask: u8) -> bool {
+    pub fn is_explored(&self, pos: FxVec2, mask: PlayerMask) -> bool {
         self.explored[self.cell(pos)] & mask != 0
     }
 
     /// Visible or on radar: good enough to shoot at.
     #[inline]
-    pub fn is_detected(&self, pos: FxVec2, mask: u8) -> bool {
+    pub fn is_detected(&self, pos: FxVec2, mask: PlayerMask) -> bool {
         let c = self.cell(pos);
         (self.visible[c] | self.radar[c]) & mask != 0
     }
 
     /// True when `pos` is inside the sonar coverage of any player in `mask`.
     #[inline]
-    pub fn is_sonar(&self, pos: FxVec2, mask: u8) -> bool {
+    pub fn is_sonar(&self, pos: FxVec2, mask: PlayerMask) -> bool {
         self.sonar[self.cell(pos)] & mask != 0
     }
 
     /// Players who currently see `pos` with vision.
     #[inline]
-    pub fn visible_mask(&self, pos: FxVec2) -> u8 {
+    pub fn visible_mask(&self, pos: FxVec2) -> PlayerMask {
         self.visible[self.cell(pos)]
     }
 
     /// Records that the players in `mask` have seen this occupant with vision.
-    pub fn identify(&mut self, row: usize, generation: u16, mask: u8) {
+    pub fn identify(&mut self, row: usize, generation: u16, mask: PlayerMask) {
         if self.identified.len() <= row {
             self.identified.resize(row + 1, 0);
             self.identified_gen.resize(row + 1, 0);
@@ -197,19 +197,19 @@ impl Fog {
 
     /// True when any player in `mask` has seen this occupant with vision.
     #[inline]
-    pub fn is_identified(&self, row: usize, generation: u16, mask: u8) -> bool {
+    pub fn is_identified(&self, row: usize, generation: u16, mask: PlayerMask) -> bool {
         self.identified
             .get(row)
             .is_some_and(|&m| self.identified_gen[row] == generation && m & mask != 0)
     }
 
-    pub fn visible_cells(&self) -> &[u8] {
+    pub fn visible_cells(&self) -> &[PlayerMask] {
         &self.visible
     }
 
     /// What the simulation reads of the fog's memory: who has identified which unit.
     pub fn hash_memory(&self, h: &mut StateHasher) {
-        h.write_u8s(&self.identified);
+        h.write_u32s(&self.identified);
         h.write_u64(self.identified_gen.len() as u64);
         for &g in &self.identified_gen {
             h.write_u32(g as u32);
@@ -234,7 +234,7 @@ impl Fog {
         Ok(())
     }
 
-    pub fn explored_cells(&self) -> &[u8] {
+    pub fn explored_cells(&self) -> &[PlayerMask] {
         &self.explored
     }
 }
