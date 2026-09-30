@@ -119,3 +119,47 @@ fn a_radar_is_refitted_in_place_and_stays_the_same_unit() {
     assert_eq!(frame.units[0].upgrade, 0.0);
     assert_eq!(w.blueprints.unit(t1).visual.mesh, "radar");
 }
+
+/// Intel climbs only as far as the side's own tech: a radar (or a Hydrophone) cannot
+/// be refitted to tier 2 before the side has reached tech 2, nor to tier 3 before 3.
+#[test]
+fn an_intel_upgrade_waits_for_the_side_to_reach_its_tech() {
+    let mut w = world();
+    let spawn = |w: &World, key: &str, x: i32| {
+        cmd(Command::DebugSpawn {
+            owner: 0,
+            blueprint: w.blueprints.id_of(key).unwrap(),
+            pos: FxVec2::from_ints(x, 512),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 1000,
+        })
+    };
+    let first = spawn(&w, "aster_t1_radar", 512);
+    w.tick(&[first]).unwrap();
+    let id = w.state.units.id(w.state.units.slots.iter().next().unwrap());
+    let row = w.state.units.row(id).unwrap();
+    assert_eq!(w.side_tech(0), 1);
+    let queued = |w: &World| {
+        w.state
+            .orders
+            .iter(&w.state.units, row)
+            .filter(|o| o.kind == OrderKind::Upgrade)
+            .count()
+    };
+
+    w.tick(&[cmd(Command::Upgrade { units: vec![id] })])
+        .unwrap();
+    assert_eq!(queued(&w), 0, "refitted to tier 2 at tech 1");
+
+    let engineer = spawn(&w, "aster_t2_engineer", 900);
+    w.tick(&[engineer]).unwrap();
+    assert_eq!(w.side_tech(0), 2);
+    w.tick(&[cmd(Command::Upgrade { units: vec![id] })])
+        .unwrap();
+    assert_eq!(queued(&w), 1, "tier 2 opens with tech 2");
+    w.tick(&[cmd(Command::Upgrade { units: vec![id] })])
+        .unwrap();
+    assert_eq!(queued(&w), 1, "tier 3 queued behind it at tech 2");
+}

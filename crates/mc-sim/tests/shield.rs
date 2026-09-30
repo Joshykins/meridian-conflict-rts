@@ -312,16 +312,23 @@ fn a_dome_drops_when_a_trickle_of_income_cannot_pay_its_upkeep() {
 fn a_dome_drops_when_construction_stalls_the_grid() {
     let (mut w, generator) = with_shield();
     let row = w.state.units.row(generator).unwrap();
-    w.tick(&[cmd(Command::DebugSpawn {
-        owner: 0,
-        blueprint: w.blueprints.id_of("aster_t1_power").unwrap(),
-        pos: FxVec2::from_ints(700, 700),
-        heading: Angle::ZERO,
-        count: 1,
-        flags: 0,
-        build: 1000,
-    })])
-    .unwrap();
+    // The power plant, and a tier 3 engineer: the side needs tech 3 for the tier 3 dome.
+    let spawn = |key: &str, x: i32| {
+        cmd(Command::DebugSpawn {
+            owner: 0,
+            blueprint: w.blueprints.id_of(key).unwrap(),
+            pos: FxVec2::from_ints(x, 700),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: 0,
+            build: 1000,
+        })
+    };
+    let spawns = [
+        spawn("aster_t1_power", 700),
+        spawn("aster_t3_engineer", 900),
+    ];
+    w.tick(&spawns).unwrap();
     let p = &mut w.state.players[0];
     p.free_build = false;
     p.income_permille[1] = 12_000;
