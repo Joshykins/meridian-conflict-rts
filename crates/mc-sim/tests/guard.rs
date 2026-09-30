@@ -329,6 +329,56 @@ fn an_area_engineer_helps_a_commander_refit_in_its_ring() {
     assert_eq!(o.kind, OrderKind::Guard, "then it went back on guard");
 }
 
+#[test]
+fn an_area_engineer_helps_an_engineer_upgrade_in_its_ring() {
+    let mut w = field();
+    give(
+        &mut w,
+        0,
+        Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        },
+    );
+    // A tech 2 factory brings the side to the tier the upgrade needs.
+    add(&mut w, 0, "aster_t2_land_factory", 1200, 1200);
+    let mason = add(&mut w, 0, "aster_t1_engineer", 500, 500);
+    let other = add(&mut w, 0, "aster_t1_engineer", 750, 500);
+    let units = vec![id(&w, mason)];
+    give(
+        &mut w,
+        0,
+        Command::Guard {
+            units,
+            pos: FxVec2::from_ints(500, 500),
+            target: mc_sim::Handle::NONE,
+            radius: Fx::from_int(400),
+            queue: false,
+        },
+    );
+    let t1 = w.state.units.blueprint[other];
+    let units = vec![id(&w, other)];
+    give(&mut w, 0, Command::Upgrade { units });
+    assert_eq!(
+        w.state.orders.front(&w.state.units, other).map(|o| o.kind),
+        Some(OrderKind::Upgrade)
+    );
+    let upgrading = id(&w, other);
+    let helping = until(&mut w, 600, |w| {
+        w.state
+            .orders
+            .front(&w.state.units, mason)
+            .is_some_and(|o| o.kind == OrderKind::Assist && o.target == upgrading)
+            && w.state.units.has_flag(mason, flag::BUILDING)
+    });
+    assert!(helping.is_some(), "it went to help with the upgrade");
+    let upgraded = until(&mut w, 6000, |w| w.state.units.blueprint[other] != t1);
+    assert!(upgraded.is_some(), "the upgrade finished");
+    run(&mut w, 30);
+    let o = w.state.orders.front(&w.state.units, mason).unwrap();
+    assert_eq!(o.kind, OrderKind::Guard, "then it went back on guard");
+}
+
 /// An engineer on Area Assist at work on a wreck that holds far more mass than it can
 /// take in the test: the wreck and the engineer's row.
 fn area_engineer_on_a_wreck() -> (World, usize, usize) {
