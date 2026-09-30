@@ -399,6 +399,9 @@ impl World {
         // Bounded reaction cadence avoids cancelling movement/volleys on every think.
         let offset = (self.state.tick as usize / config.think_period().max(40) as usize * 128)
             % census.combat_rows.len().max(1);
+        let span = mc_core::perf_span!("ai.tactics.rows");
+        // What the enemy has at the worst threat, found the first time a unit asks.
+        let mut threat_kinds: Option<u32> = None;
         for &row in census
             .combat_rows
             .iter()
@@ -469,8 +472,9 @@ impl World {
                 }
             } else if let Some(&(_, enemy)) = intel.threats.first() {
                 // Recall nearby fighting units as well as idle ones; air-only weapons stay on air defense.
+                let near_threat = *threat_kinds.get_or_insert_with(|| self.kinds_at(player, enemy));
                 if pos.distance(start) < Fx::from_int(1100)
-                    && self.can_engage_at(row, player, enemy)
+                    && bp.weapons.iter().any(|w| w.target_mask & near_threat != 0)
                 {
                     defenders.push(row);
                 }
@@ -533,6 +537,7 @@ impl World {
                 });
             }
         }
+        drop(span);
         let available = |r: &usize| !withdrawn.contains(r) && !defenders.contains(r);
         census.army_idle.retain(available);
         census.artillery_idle.retain(available);
@@ -543,17 +548,24 @@ impl World {
             self.state.tick + config.think_period().max(40);
     }
 
-    fn can_engage_at(&self, row: usize, player: u8, pos: FxVec2) -> bool {
-        self.state.units.slots.iter().any(|enemy| {
-            self.state.units.pos[enemy].distance(pos) < Fx::from_int(80)
-                && self.are_enemies(player, self.state.units.owner[enemy])
-                && self.detects(player, enemy)
-                && self
-                    .bp(row)
-                    .weapons
-                    .iter()
-                    .any(|w| w.target_mask & self.bp(enemy).target_categories() != 0)
-        })
+    /// The target categories of the enemies `player` detects within 80 m of `pos`:
+    /// a unit whose weapons take none of them cannot engage there.
+    fn kinds_at(&self, player: u8, pos: FxVec2) -> u32 {
+        let units = &self.state.units;
+        let mut kinds = 0;
+        let reach = Fx::from_int(80);
+        self.index
+            .query_foes(pos, reach, kind::UNIT, self.team_mask(player), |e| {
+                let enemy = e.row as usize;
+                if self.unit_entry_is_current(e)
+                    && units.pos[enemy].distance(pos) < reach
+                    && self.detects(player, enemy)
+                {
+                    kinds |= self.bp(enemy).target_categories();
+                }
+                true
+            });
+        kinds
     }
 
     /// Split movement by hull and project destinations onto valid terrain. A future ship

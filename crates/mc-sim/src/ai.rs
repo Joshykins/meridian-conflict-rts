@@ -263,9 +263,11 @@ impl World {
             {
                 continue;
             }
-            if (self.state.tick + p as u32 * 3)
-                .is_multiple_of(self.state.ai[p].config.think_period())
-            {
+            // Sides think in turn, spread evenly over the period: with 32 of them
+            // a fixed step would pile several onto one tick.
+            let period = self.state.ai[p].config.think_period();
+            let turn = p as u32 * period / self.state.players.len() as u32;
+            if (self.state.tick + turn).is_multiple_of(period) {
                 self.think(p as u8);
             }
         }
@@ -273,7 +275,10 @@ impl World {
     }
 
     fn think(&mut self, player: u8) {
+        let span = mc_core::perf_span!("ai.remember");
         self.remember_enemies(player);
+        drop(span);
+        let span = mc_core::perf_span!("ai.survey");
         let mut census = self.survey_own(player);
         let intel = self.survey_intel(player, &census);
         let start = self.state.players[player as usize].start;
@@ -281,6 +286,7 @@ impl World {
             .enemy_start
             .map(|e| (e - start).angle())
             .unwrap_or(Angle::ZERO);
+        drop(span);
         let persona = self.ai_personality(player, &census, &intel);
 
         if self.state.ai[player as usize].firebase.is_none()
@@ -295,6 +301,7 @@ impl World {
         let stance = self.decide_stance(&census, &intel, firebase, persona, player);
         self.state.ai[player as usize].set_stance(stance);
 
+        let span = mc_core::perf_span!("ai.claimed");
         let mut out: Vec<Command> = Vec::new();
         let mut claimed: Vec<Claim> = self
             .planned_sites(player)
@@ -310,8 +317,14 @@ impl World {
                 }
             })
             .collect();
+        drop(span);
+        let span = mc_core::perf_span!("ai.plan");
         let mut planned = self.plan_counts(player, &census);
+        drop(span);
+        let span = mc_core::perf_span!("ai.wrecks");
         planned.salvage = self.wreck_fields(start, &intel);
+        drop(span);
+        let span = mc_core::perf_span!("ai.builders");
         self.direct_builders(
             player,
             &census,
@@ -325,17 +338,25 @@ impl World {
             &mut planned,
             &mut out,
         );
+        drop(span);
+        let span = mc_core::perf_span!("ai.rest");
         self.direct_factories(player, &census, &planned.salvage, stance, persona, &mut out);
         self.direct_salvagers(&census, &planned.salvage, &mut out);
         self.direct_upgrades(player, &census, &mut out);
         self.direct_focus(player, &census, &mut out);
         self.direct_nukes(player, &mut out);
         self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
+        drop(span);
+        let span = mc_core::perf_span!("ai.tactics");
         self.react_tactically(player, &mut census, &intel, &mut out);
+        drop(span);
+        let span = mc_core::perf_span!("ai.army");
         self.direct_army(
             player, &census, &intel, stance, persona, start, facing, firebase, &mut out,
         );
 
+        drop(span);
+        let _span = mc_core::perf_span!("ai.route");
         let out = self.route_ai_commands(out);
         self.state.ai_pending.extend(
             out.into_iter()

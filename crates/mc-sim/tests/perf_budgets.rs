@@ -146,7 +146,7 @@ fn paladins_vs_paladins() {
 
 /// A flat 16 km map with `players` starts on a 3 km ring round the centre,
 /// on a pool of `threads` workers (all the machine's with `None`).
-fn ring_world(players: u8, fog: bool, threads: Option<usize>) -> World {
+fn ring_world(players: u8, fog: bool, threads: Option<usize>, ai: bool) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -169,13 +169,17 @@ fn ring_world(players: u8, fog: bool, threads: Option<usize>) -> World {
                 faction: "Aster".into(),
                 ai: Default::default(),
                 team: p,
-                controller: Controller::Human,
+                controller: if ai {
+                    Controller::Ai
+                } else {
+                    Controller::Human
+                },
                 start: p,
             })
             .collect(),
         cheats: true,
         fog,
-        spawn_commanders: false,
+        spawn_commanders: ai,
     };
     let pool = threads.map_or_else(Pool::with_default_threads, Pool::new);
     World::with_terrain(terrain, map, blueprints, Arc::new(pool), &config).unwrap()
@@ -198,6 +202,8 @@ enum Plan {
     Pile,
     /// Each army on the one beside it on the ring: one battle per pair of sides.
     Pairs,
+    /// No orders: every side is an AI with a commander, and it runs its army.
+    Ai,
 }
 
 /// `total` units shared out between `players` armies, each four blocks of tanks,
@@ -211,7 +217,7 @@ fn armies(
     plan: Plan,
     threads: Option<usize>,
 ) -> World {
-    let mut w = ring_world(players, true, threads);
+    let mut w = ring_world(players, true, threads, plan == Plan::Ai);
     let per = total / players as u32;
     let mix = [
         ("aster_t1_tank", 4),
@@ -244,7 +250,7 @@ fn armies(
         };
         orders.push(attack_move(p, ids, to));
     }
-    if plan != Plan::Idle {
+    if !matches!(plan, Plan::Idle | Plan::Ai) {
         w.tick(&orders).unwrap();
     }
     w
@@ -281,7 +287,8 @@ fn eight_armies_clash() {
 /// Each case is `players:units`, every army fighting in the middle (the worst
 /// crowd there is); `:pairs` sets each army on its neighbour on a 3 km ring,
 /// one battle per two sides as a big match plays; `:idle` spreads the armies
-/// 20 m apart on that ring and gives no orders.
+/// 20 m apart on that ring and gives no orders; `:ai` makes every side an AI
+/// with a commander and the army to run.
 ///
 /// With `MERIDIAN_SCALE_SERIAL=1` the tick runs on this thread alone and the
 /// table ends with its CPU time per tick, which a machine busy with other
@@ -299,6 +306,7 @@ fn zz_scale_probe() {
         let mut w = match parts.get(2) {
             Some(&"idle") => armies(players, total, 3000.0, 20, Plan::Idle, threads),
             Some(&"pairs") => armies(players, total, 3000.0, 6, Plan::Pairs, threads),
+            Some(&"ai") => armies(players, total, 3000.0, 6, Plan::Ai, threads),
             _ => armies(players, total, 900.0, 6, Plan::Pile, threads),
         };
         let cpu_before = thread_cpu_ns();
@@ -318,7 +326,7 @@ fn zz_scale_probe() {
 /// cap and dropped). The order must go through and not stall the tick.
 #[test]
 fn one_order_for_an_army() {
-    let mut w = ring_world(2, false, None);
+    let mut w = ring_world(2, false, None, false);
     let mix = [
         ("aster_t1_tank", 3000),
         ("aster_t1_bot", 2000),

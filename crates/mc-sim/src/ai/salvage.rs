@@ -42,12 +42,16 @@ impl World {
             .filter(|&w| {
                 wrecks.mass[w] > Fx::ZERO
                     && wrecks.pos[w].distance(start) <= Fx::from_int(SALVAGE_RADIUS)
-                    && !intel.danger.hot(wrecks.pos[w])
             })
             .map(|w| (wrecks.pos[w].distance_sq(start), w))
             .collect();
         near.sort_unstable();
-        near.truncate(MOST_WRECKS);
+        // Nearest first, so the danger map is asked only until enough safe ones are found.
+        let near: Vec<(Fx, usize)> = near
+            .into_iter()
+            .filter(|&(_, w)| !intel.danger.hot(wrecks.pos[w]))
+            .take(MOST_WRECKS)
+            .collect();
         let reach = Fx::from_int(FIELD_RADIUS);
         let mut around: Vec<(Fx, usize)> = near
             .iter()
