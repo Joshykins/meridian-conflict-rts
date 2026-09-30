@@ -110,13 +110,13 @@ fn strike(key: &str) {
         .clone();
     let weapon = &bp.weapons[0];
     let ticks = 60 * TICKS_PER_SECOND as usize;
-    let mut trained = vec![0usize; 5];
-    let mut adrift = vec![0usize; 5];
-    let mut last_shot = vec![0usize; 5];
-    let mut worst_gap = vec![0usize; 5];
-    let mut shots = vec![0usize; 5];
-    let mut first_shot = vec![usize::MAX; 5];
-    let mut prev_off = vec![0u16; 5];
+    let mut trained = [0usize; 5];
+    let mut adrift = [0usize; 5];
+    let mut last_shot = [0usize; 5];
+    let mut worst_gap = [0usize; 5];
+    let mut shots = [0usize; 5];
+    let mut first_shot = [usize::MAX; 5];
+    let mut prev_off = [0u16; 5];
     for tick in 0..ticks {
         w.tick(&[]).unwrap();
         let tp = w.state.units.pos[t];
@@ -250,11 +250,8 @@ fn swarms(
             .events
             .iter()
             .any(|e| matches!(e, SimEvent::ShotFired { .. }));
-        for s in 0..2 {
-            if !merged {
-                break;
-            }
-            for &id in &ids[s] {
+        if merged {
+            for &id in ids.iter().flatten() {
                 if let Some(r) = w.state.units.row(id) {
                     wander = wander.max(w.state.units.pos[r].distance(mid));
                 }
