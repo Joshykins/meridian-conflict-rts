@@ -145,3 +145,20 @@ replacing the mines.
   unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 mass.
 - Economy structures (mines, vaults, Scavengers) upgrade only as far as the side's tech.
 - The HUD shows reclaim in the materials income and its share ("40% reclaim").
+
+## Warships
+
+Warships (the Valiant, Resolute and Dominion) fly in the air layer with everything else: there is
+no separate space layer, and any anti-air weapon can hit them.
+
+- Warships are expensive, and they are countered by:
+  - anti-space guns;
+  - other warships;
+  - fighters, against most hulls, when the ship has no anti-air cover.
+- A ground anti-space gun outranges the warship it answers and beats it for less mass:
+  - one Zenith (T4, 11,200 mass, 3,200 m) reliably kills one Dominion (16,000 mass, 2,500 m) at
+    about 70% of its mass;
+  - the Narwhal (T3, 3,800 mass, 3,000 m) does the same to a Resolute at about three quarters
+    of its mass, but on its own it loses to a Dominion.
+- `tests/dreadnought.rs` and `tests/narwhal.rs` fight each of these duels three ways: parked
+  close, parked at the ship's own reach, and with the ship ordered in from out of range.

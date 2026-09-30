@@ -165,3 +165,59 @@ fn it_leaves_ships_and_land_units_alone() {
         "the rail fired on something that is not a spaceship"
     );
 }
+
+/// One Narwhal (owner 1) against one warship `ship` (owner 0, fighting back, field
+/// powered) `range` metres off, parked there or ordered to attack the Narwhal. Returns
+/// the seconds until one of them died (or the cap) and both health fractions then.
+fn duel(ship: &str, range: i32, attack: bool) -> (u32, f32, f32) {
+    let mut w = sea();
+    w.state.players[0].free_build = true;
+    let s = add(&mut w, ship, 0, 600, 2000, 0);
+    for _ in 0..seconds(30) {
+        w.tick(&[]).unwrap();
+    }
+    let row = w.state.units.row(s).unwrap();
+    w.state.units.fire_state[row] = FireState::FireAtWill;
+    let g = add(&mut w, NARWHAL, 1, 600 + range, 2000, 180);
+    if attack {
+        let cmd = mc_sim::PlayerCommand {
+            player: 0,
+            command: mc_sim::Command::Attack {
+                units: vec![s],
+                target: g,
+                queue: false,
+            },
+        };
+        w.tick(&[cmd]).unwrap();
+    }
+    let (ship_full, gun_full) = (health(&w, s), health(&w, g));
+    for t in 0..seconds(240) {
+        w.tick(&[]).unwrap();
+        if w.state.units.row(s).is_none() || w.state.units.row(g).is_none() {
+            return (
+                t as u32 / TICKS_PER_SECOND,
+                health(&w, s) / ship_full,
+                health(&w, g) / gun_full,
+            );
+        }
+    }
+    (240, health(&w, s) / ship_full, health(&w, g) / gun_full)
+}
+
+/// One Narwhal costs about three quarters of a Resolute and brings it down however the
+/// frigate comes at it; it is no match for a Dominion on its own.
+#[test]
+fn one_narwhal_brings_down_a_resolute_but_not_a_dominion() {
+    for (range, attack) in [(1500, false), (2300, false), (3200, true)] {
+        let (t, ship, gun) = duel(FRIGATE, range, attack);
+        assert!(
+            ship == 0.0 && gun > 0.4,
+            "Resolute at {range} m (attack {attack}) after {t} s: ship {ship:.2}, Narwhal {gun:.2}"
+        );
+    }
+    let (t, ship, gun) = duel("aster_t4_dreadnought", 2300, false);
+    assert!(
+        gun == 0.0 && ship > 0.5,
+        "Dominion after {t} s: ship {ship:.2}, Narwhal {gun:.2}"
+    );
+}

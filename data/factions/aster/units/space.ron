@@ -292,14 +292,14 @@
         role: "Anti-Ship Rail Cannon",
         tech: 4,
         categories: ["Land", "Defense", "AntiAir", "Experimental"],
-        health: 40000,
-        cost: (mass: 4000, energy: 50000, time: 16000),
+        health: 100000,
+        cost: (mass: 11200, energy: 150000, time: 48000),
         radius: 46, height: 86, footprint: (8, 8),
         vision: 600,
         weapons: [
             (
                 name: "Zenith Rail Cannon",
-                damage: 7000, splash: 20, range: 2600, reload: 10.0, speed: 3000, rail: true, trajectory: Direct,
+                damage: 40000, splash: 20, range: 3200, reload: 7.0, speed: 3000, rail: true, trajectory: Direct,
                 turret_turn: 20, pivot: (0, 0, 78), muzzle: (135, 0, 78),
                 targets: ["Space"], color: Orange,
                 flash: 4.0, impact: 4.0, shockwave: 3.0, heavy_rail: 1.0,

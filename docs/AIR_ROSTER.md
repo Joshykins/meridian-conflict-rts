@@ -391,7 +391,7 @@ hold (capital ship, lands only when told, never moves unless ordered); on top:
 - **Spinal AEB** (weapon 0): fixed along the keel, laid by turning and pitching the
   whole hull (`combat::spinal_gun`). A storm bore (`bore.storm`): a 5 s charge, an
   argon tracer, the discharge down its channel and a storm round the hit for 5 s. Its
-  2 500 m reach stays under the Zenith's 2 600 (the ship's counter outranges it;
+  2 500 m reach stays under the Zenith's 3 200 (the ship's counter outranges it;
   `tests/dreadnought.rs` checks it).
 - **Arc Cannon Batteries** (1..=3): the Leviathan's charged shells, laid direct (a
   `Ballistic` gun on an aircraft is a bomb bay to the sim), 2 400 m.

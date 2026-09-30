@@ -206,10 +206,14 @@ fn its_hull_field_takes_fire_before_the_plates() {
     let _gun = add(&mut w, "aster_t4_anti_ship", 1, 4200, 3000, 180);
     let full = health(&w, ship);
     let mut lowest = shield;
+    // Up to the first round only: one Zenith shot is less than the field holds.
     for _ in 0..seconds(25) {
         w.tick(&[]).unwrap();
         let row = w.state.units.row(ship).unwrap();
         lowest = lowest.min(w.state.units.shield_hp[row]);
+        if lowest < shield {
+            break;
+        }
     }
     assert!(lowest < shield, "the field took nothing");
     assert!(
@@ -259,4 +263,66 @@ fn attack_ground_lays_the_spinal_on_the_point() {
         (heading - 270.0).abs() < 6.0,
         "the hull did not lay onto the point: {heading}"
     );
+}
+
+/// One `gun` (owner 1) against one `ship` (owner 0, field powered) `range` metres off,
+/// the ship either parked there or ordered to attack the gun from there. Returns the
+/// seconds until one of them died (or the cap) and both health fractions at that time.
+fn duel(ship: &str, gun: &str, range: i32, attack: bool) -> (u32, f32, f32) {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    let s = add(&mut w, ship, 0, 3000, 3000, 0);
+    hold_fire(&mut w, s);
+    settle(&mut w);
+    let row = w.state.units.row(s).unwrap();
+    w.state.units.fire_state[row] = FireState::default();
+    let g = add(&mut w, gun, 1, 3000 + range, 3000, 180);
+    if attack {
+        let cmd = PlayerCommand {
+            player: 0,
+            command: Command::Attack {
+                units: vec![s],
+                target: g,
+                queue: false,
+            },
+        };
+        w.tick(&[cmd]).unwrap();
+    }
+    let (ship_full, gun_full) = (health(&w, s), health(&w, g));
+    for t in 0..seconds(240) {
+        w.tick(&[]).unwrap();
+        if w.state.units.row(s).is_none() || w.state.units.row(g).is_none() {
+            return (
+                t as u32 / TICKS_PER_SECOND,
+                health(&w, s) / ship_full,
+                health(&w, g) / gun_full,
+            );
+        }
+    }
+    (240, health(&w, s) / ship_full, health(&w, g) / gun_full)
+}
+
+/// One Zenith costs about 70% of a Dominion and brings it down reliably: parked close,
+/// parked at the ship's own reach, or with the ship ordered in from out of range.
+#[test]
+fn one_zenith_brings_down_a_dominion() {
+    let ship = w_cost(DREADNOUGHT);
+    let gun = w_cost("aster_t4_anti_ship");
+    assert!(
+        (0.6..=0.8).contains(&(gun / ship)),
+        "Zenith {gun} vs Dominion {ship}"
+    );
+    for (range, attack) in [(1500, false), (2300, false), (4000, true)] {
+        let (t, ship, gun) = duel(DREADNOUGHT, "aster_t4_anti_ship", range, attack);
+        assert!(
+            ship == 0.0 && gun > 0.5,
+            "at {range} m (attack {attack}) after {t} s: ship {ship:.2}, Zenith {gun:.2}"
+        );
+    }
+}
+
+fn w_cost(key: &str) -> f32 {
+    let w = world();
+    let bp = w.blueprints.unit(w.blueprints.id_of(key).unwrap());
+    bp.cost_mass.to_f32()
 }

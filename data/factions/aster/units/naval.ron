@@ -760,7 +760,7 @@
         role: "Anti-Ship Trimaran", title: "Rail Trimaran",
         tech: 3,
         categories: ["Naval", "AntiAir"],
-        health: 30000,
+        health: 40000,
         cost: (mass: 3800, energy: 34200, time: 11500),
         radius: 84, height: 34,
         vision: 1200,
@@ -768,7 +768,7 @@
         weapons: [
             (
                 name: "Zenith Rail Cannon",
-                damage: 7000, splash: 20, range: 2600, reload: 12.0, speed: 3000, rail: true, trajectory: Direct,
+                damage: 12000, splash: 20, range: 3000, reload: 6.0, speed: 3000, rail: true, trajectory: Direct,
                 turret_turn: 16, arc: 6, mount: true, pivot: (-22.0, 0, 24.0), muzzle: (86.0, 0, 24.0),
                 targets: ["Space"], color: Orange,
                 flash: 4.0, impact: 4.0, shockwave: 3.0, heavy_rail: 1.0,

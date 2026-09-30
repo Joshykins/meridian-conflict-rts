@@ -61,6 +61,14 @@ fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32, heading: i32) -> Uni
     w.state.units.id(row)
 }
 
+/// A Zenith that holds its fire: a hard structure for the frigate to shoot at.
+fn mark(w: &mut World, x: i32, y: i32, heading: i32) -> UnitId {
+    let id = add(w, ZENITH, 1, x, y, heading);
+    let row = w.state.units.row(id).unwrap();
+    w.state.units.fire_state[row] = FireState::HoldFire;
+    id
+}
+
 fn health(w: &World, id: UnitId) -> f32 {
     w.state
         .units
@@ -85,7 +93,7 @@ fn the_spinal_rail_turns_the_whole_ship_onto_a_structure() {
     // Nose east; the mark is due north, well inside the spinal's reach but beyond the turrets'.
     let ship = add(&mut w, FRIGATE, 0, 3000, 3000, 0);
     settle(&mut w);
-    let mark = add(&mut w, ZENITH, 1, 3000, 4100, 0);
+    let mark = mark(&mut w, 3000, 4100, 0);
     let full = health(&w, mark);
     let mut hit_at = None;
     for t in 0..seconds(90) {
@@ -134,7 +142,12 @@ fn the_zenith_reaches_a_warship_far_beyond_any_other_gun() {
     let ship = add(&mut w, FRIGATE, 1, 4400, 3000, 180);
     let row = w.state.units.row(ship).unwrap();
     w.state.units.fire_state[row] = FireState::HoldFire;
+    // The gun waits for the ship to reach its cruise height.
+    let gun = w.state.units.row(zenith).unwrap();
+    w.state.units.fire_state[gun] = FireState::HoldFire;
     settle(&mut w);
+    let gun = w.state.units.row(zenith).unwrap();
+    w.state.units.fire_state[gun] = FireState::FireAtWill;
     let full = health(&w, ship);
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
@@ -223,7 +236,7 @@ fn the_spinal_rail_reaches_well_beyond_its_turrets() {
     // A structure 1.9 km off the bow: past the old 1.4 km reach, far past the turrets'.
     let _ship = add(&mut w, FRIGATE, 0, 3000, 3000, 0);
     settle(&mut w);
-    let mark = add(&mut w, ZENITH, 1, 4900, 3000, 0);
+    let mark = mark(&mut w, 4900, 3000, 0);
     let full = health(&w, mark);
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
@@ -311,7 +324,7 @@ fn a_mark_in_under_the_hull_is_left_to_the_turrets_and_the_hull_stays_level() {
     let ship = add(&mut w, FRIGATE, 0, 3000, 3000, 0);
     settle(&mut w);
     // A structure almost under the bow: far too steep to dive onto.
-    let mark = add(&mut w, ZENITH, 1, 3150, 3000, 0);
+    let mark = mark(&mut w, 3150, 3000, 0);
     let full = health(&w, mark);
     let frigate = w.blueprints.id_of(FRIGATE).unwrap();
     let mut steepest = 0.0f32;
@@ -486,7 +499,7 @@ fn its_turrets_stay_on_their_marks_while_the_hull_is_pitched() {
     settle(&mut w);
     // The spinal rail pitches the hull down onto a structure off the bow, while the
     // turrets take tanks off the bows and beams.
-    let _mark = add(&mut w, ZENITH, 1, 4500, 3000, 0);
+    let _mark = mark(&mut w, 4500, 3000, 0);
     for (x, y) in [(3600, 3100), (3000, 3450), (3100, 2550)] {
         let tank = add(&mut w, "aster_t2_tank", 1, x, y, 0);
         let row = w.state.units.row(tank).unwrap();
