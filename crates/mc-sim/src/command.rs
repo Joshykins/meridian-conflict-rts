@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 /// Most units one command may address: every unit a side can field, so one
 /// order moves a whole selection as one block.
 pub const MAX_COMMAND_UNITS: usize = crate::tables::MAX_UNITS;
+/// Most units one `DebugSpawn` puts down (a block of them); a bigger count is cut to it.
+pub const MAX_DEBUG_SPAWN: u16 = 1024;
 /// Largest encoded command [`Command::decode`] takes: a handle per unit, and
 /// room for the rest (a patrol's points, a factory's queue).
 pub const MAX_COMMAND_BYTES: u64 = 4 * MAX_COMMAND_UNITS as u64 + (4 << 10);

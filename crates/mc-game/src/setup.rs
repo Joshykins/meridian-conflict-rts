@@ -705,9 +705,9 @@ pub fn opening_commands(
         Scene::Matchup => {
             // 800 m apart across the centre, facing each other.
             let gap = FxVec2::from_ints(400, 0);
-            // A spawn puts down one square block of at most `MAX_COMMAND_UNITS`: a bigger
+            // A spawn puts down one square block of at most `MAX_DEBUG_SPAWN`: a bigger
             // army (a stress test of thousands) is several blocks, one behind another.
-            let block = mc_sim::command::MAX_COMMAND_UNITS as u16;
+            let block = mc_sim::command::MAX_DEBUG_SPAWN;
             // How far back each side's last block reaches (the first is centred on its spot).
             let mut depth: [Option<i32>; 2] = [None; 2];
             for (side, key, count) in &opts.matchup {

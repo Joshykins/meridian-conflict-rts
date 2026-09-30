@@ -55,7 +55,7 @@ impl World {
                     }
                 } else {
                     // A square block centred on `pos`.
-                    let n = (*count).clamp(1, 1024) as i32;
+                    let n = (*count).clamp(1, crate::command::MAX_DEBUG_SPAWN) as i32;
                     let cols = (Fx::from_int(n).sqrt().ceil_int()).max(1);
                     let spacing = bp.radius * 2 + Fx::from_int(3);
                     for i in 0..n {
