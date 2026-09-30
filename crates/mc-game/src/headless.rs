@@ -789,9 +789,12 @@ pub fn screenshot(
     if let Some(bp) = place {
         view.mode = crate::game::Mode::Place(bp);
     }
-    // What the interface costs a frame (orders, marks, the HUD), over the warm-up frames.
-    let mut ui_ns: Vec<u64> = Vec::new();
+    // What the interface costs a frame (orders, marks, the HUD, each by its `ui.*` span)
+    // over the warm-up frames: `--perf` writes it as FILE.ui.{json,txt}.
+    let mut ui_report =
+        mc_core::perf::Report::new(format!("interface, {:?} on {}", opts.scene, map.name()));
     for i in 0..warmup_frames {
+        let ui_scope = mc_core::perf::Scope::begin();
         let ui_started = Instant::now();
         overlay.clear();
         memory.begin_frame();
@@ -956,7 +959,9 @@ pub fn screenshot(
         if let Some((centre, radius, lots)) = grid_focus {
             renderer.set_build_grid(centre, radius, &lots);
         }
-        ui_ns.push(ui_started.elapsed().as_nanos() as u64);
+        let mut f = ui_scope.end();
+        f.push("ui", 1, Some(ui_started.elapsed().as_nanos() as u64));
+        ui_report.add(&f, "ui");
         renderer.set_ore_highlight(
             if place.is_some_and(|bp| world.blueprints.unit(bp).mine.is_some()) {
                 1.0
@@ -1059,16 +1064,8 @@ pub fn screenshot(
         }
         time += 1.0 / mc_core::TICKS_PER_SECOND as f32;
     }
-    ui_ns.sort_unstable();
-    let ui_ms = ui_ns
-        .get(ui_ns.len() / 2)
-        .map_or(0.0, |&ns| ns as f64 / 1e6);
-    println!(
-        "interface ms median {ui_ms:.2} over {} warm-up frames",
-        ui_ns.len()
-    );
-    if let Some(r) = &mut perf_frames {
-        r.note("interface ms (warm-up median)", format!("{ui_ms:.2}"));
+    if let Some(r) = &perf_frames {
+        crate::perf_out::save(&ui_report, "ui");
         crate::perf_out::save(r, "frames");
     }
     for (name, mut ms) in pass_ms {

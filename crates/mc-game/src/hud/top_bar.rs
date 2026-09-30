@@ -14,6 +14,7 @@ use mc_net::Link;
 impl Hud {
     /// Clock, game speed, pause and menu; the commanders under them. Returns the y below it all.
     pub(super) fn top_bar(&mut self, ui: &mut Ui, s: &Scene) -> f32 {
+        let _t = mc_core::perf_span!("ui.top_bar");
         let view = s.view;
         let owns_clock = view.status.owns_clock;
         let wide = TOP_BAR_W;

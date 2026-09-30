@@ -101,6 +101,7 @@ pub fn jumps(field: &Field, mark: Vec2, alpha: f32) -> Vec<Jump> {
 
 /// Everything above but the pointer's card, for this frame.
 pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
+    let _t = mc_core::perf_span!("ui.warp_marks");
     if field.view.mode == Mode::Target(Targeting::Warp) {
         if let Some(c) = cursor {
             aim(ui, field, c.truncate(), alpha);

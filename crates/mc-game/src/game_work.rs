@@ -77,6 +77,7 @@ const GAP: f32 = 2.0;
 
 /// The percentage tag under each friendly site's bars.
 pub(crate) fn draw_tags(ui: &mut Ui, field: &Field, alpha: f32, friend: impl Fn(u8) -> bool) {
+    let _t = mc_core::perf_span!("ui.work_tags");
     let view = field.view;
     let camera = field.camera;
     let eye = camera.eye();

@@ -813,6 +813,7 @@ pub fn shown(view: &View, s: &Strike) -> bool {
 
 /// Everything above, for this frame.
 pub fn draw(ui: &mut Ui, field: &Field, alpha: f32, cursor: Option<Vec3>) {
+    let _t = mc_core::perf_span!("ui.titan_marks");
     let view = field.view;
     let t = ui.time;
     let tick = view.frame.tick as i64;

@@ -182,6 +182,7 @@ pub fn activity(kind: OrderKind) -> &'static str {
 /// `strip`: the construction panel and its queue strip are up beside the card, so what a
 /// builder makes, and how far along, shows there instead.
 pub fn info(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect, strip: bool) {
+    let _t = mc_core::perf_span!("ui.selection_info");
     hud.glass(ui, r);
     let (x, cw) = (r.x + 16.0, r.w - 32.0);
     if let [u] = units {
@@ -1246,6 +1247,7 @@ pub fn order_families(s: &Scene, units: &[&UnitInstance]) -> usize {
 }
 
 pub fn orders(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: Rect) {
+    let _t = mc_core::perf_span!("ui.selection_orders");
     hud.glass(ui, r);
     let x = r.x + 14.0;
     let card = families(s, units);

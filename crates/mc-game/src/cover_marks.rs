@@ -55,6 +55,7 @@ fn words(cover: Cover) -> Words {
 /// The side's posts and the card, if a radar, sonar or missile defence post is being
 /// placed at `placing`.
 pub fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec2)>) {
+    let _t = mc_core::perf_span!("ui.cover_marks");
     let Some((cover, reach, site)) = placing.and_then(|(bp, at)| {
         let (cover, reach) = Cover::post(field.blueprints.unit(bp))?;
         Some((cover, reach, at))

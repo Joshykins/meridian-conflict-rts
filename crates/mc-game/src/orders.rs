@@ -1009,6 +1009,7 @@ impl OrderMap {
     /// Once a frame, before anything is drawn: where the order in hand would go, what the
     /// pointer could pick up, and which dropped orders the sim has caught up with.
     pub fn update(&mut self, field: &Field, cursor: Vec2, over_ui: bool) {
+        let _t = mc_core::perf_span!("ui.orders_update");
         self.keep_groups(field.view);
         let status = &field.view.status;
         // A guard in hand round a unit: keep up with where its centre has got to, so the
@@ -1068,6 +1069,7 @@ impl OrderMap {
     /// placed or a plan is in hand), and how many of them is returned: those get
     /// the lot outline.
     pub fn ghosts(&self, field: &Field, out: &mut Vec<UnitInstance>) -> usize {
+        let _t = mc_core::perf_span!("ui.orders_ghosts");
         let Field {
             view, blueprints, ..
         } = field;
@@ -1239,6 +1241,7 @@ impl OrderMap {
     /// through the waypoints: the selection's, and with shift held the whole side's.
     /// Every command group wears the count of its members in its middle, always.
     pub fn draw(&mut self, ui: &mut Ui, field: &Field, alpha: f32) {
+        let _t = mc_core::perf_span!("ui.orders_draw");
         self.scale = ui.s;
         aircraft_guides(ui, field, alpha);
         let Field {

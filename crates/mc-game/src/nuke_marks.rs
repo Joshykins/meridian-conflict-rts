@@ -233,6 +233,7 @@ pub fn draw(
     cursor: Option<Vec3>,
     placing: Option<(BlueprintId, Vec2)>,
 ) {
+    let _t = mc_core::perf_span!("ui.nuke_marks");
     let view = field.view;
     let t = ui.time;
     let local = view.local;

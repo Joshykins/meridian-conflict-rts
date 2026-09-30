@@ -46,6 +46,7 @@ fn clip(a: Vec2, b: Vec2, r: Rect) -> Option<(Vec2, Vec2)> {
 }
 
 pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
+    let _t = mc_core::perf_span!("ui.minimap");
     hud.glass(ui, outer);
     let view = s.view;
     let header = 22.0;

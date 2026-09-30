@@ -490,6 +490,7 @@ impl Hud {
     }
 
     pub fn draw(&mut self, ui: &mut Ui, s: &Scene, dt: f32) -> Vec<HudAction> {
+        let _t = mc_core::perf_span!("ui.hud");
         self.covered.clear();
         self.actions.clear();
         let (w, h) = (ui.size.x, ui.size.y);

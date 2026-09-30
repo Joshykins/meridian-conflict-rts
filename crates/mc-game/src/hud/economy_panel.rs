@@ -13,6 +13,7 @@ const FIGURES_H: f32 = 68.0;
 impl Hud {
     /// Returns the y below it.
     pub(super) fn economy(&mut self, ui: &mut Ui, s: &Scene, dt: f32) -> f32 {
+        let _t = mc_core::perf_span!("ui.economy");
         if s.view.observing {
             // Down to the deck.
             let bottom = ui.size.y - EDGE - DECK_H - GAP;

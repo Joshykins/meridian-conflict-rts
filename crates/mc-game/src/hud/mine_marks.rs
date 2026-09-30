@@ -439,6 +439,7 @@ fn dashed_by(
 /// depth, dug over time, the ore flowing back once it arrives. A mine being
 /// placed shows the workings it would dig, and what it would make.
 pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
+    let _t = mc_core::perf_span!("ui.mine_marks");
     let placing = match s.view.mode {
         Mode::Place(bp) => s.blueprints.unit(bp).mine.map(|m| (bp, m)),
         _ => None,
