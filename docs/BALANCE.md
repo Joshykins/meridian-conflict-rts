@@ -25,7 +25,7 @@ Off the lines, measured the same way:
   18000 hull field, about 1067 direct dps from the AEB-2 and two bolt rifles, so about 2.6 per
   unit of mass, near the Paladin's. What puts it over is the AEB-2's channel: 2000 damage to
   everything within 7 m of it, which a column or a clump pays for many times. Raised on a
-  lot by Mason IIIs (build power 60: one takes about 330 s); it has no factory.
+  lot by Mason IIIs (build power 150: one takes about 135 s); it has no factory.
 
 - Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 mass) assembles warheads
   of 6000 mass / 120000 energy in about 300 s at its own power (60), holds 2, and each does
@@ -98,26 +98,28 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   the base that matches the part of its circle it holds, land or sea. Before this, every shaft
   paid its full base however close the mines stood, so a packed block of mines made several
   times what four spread out did (test `packing_mines_together_...`).
-- Mines are easy to hurt: 1500 / 5000 / 12000 health (T1-T3), so six Wardens kill a tier 1 mine
-  in about 12 s and three Paladins a tier 3 in about 15. A raid on the mines is meant to pay.
+- Mines are easy to hurt: 600 / 2000 / 5000 / 10000 health (T1-T4; 1500 / 5000 / 12000 / 24000
+  before 2026-09-30, when the user found tier 1 mines "bulky and hard to raid"). Three Wardens
+  kill a tier 1 mine in about 10 s, and three Petrels in one pass. A raid on the mines is meant
+  to pay: the mine that goes up again digs its land out from nothing, about 100 s.
 - Measured with the duel probe on Serac Divide, Hard against Hard: 25-29 mass/s at 15 minutes
   (was 40-49 with 3x per tier), 48-65 at 30.
 - The Deep Core (T4, `aster_core_mine_t4`) is built by Mason IIIs and Engineering Suite III
   commanders, or upgraded from a tier 3 mine, and meant to be a poor one. Like
   every tier it multiplies the mine's ground, ore and shaft yield, never a flat bonus (the user's
-  call): 7.5x a tier 1, only 1.5x over tier 3 (base 8.25), for 16000 mass / 96000 energy / 2400
+  call): 7.5x a tier 1, only 1.5x over tier 3 (base 8.25), for 16000 mass / 96000 energy / 14000
   time built outright (8800 / 52800 as an upgrade from tier 3). It opens with tech 3 (the only tech 4 build is the
-  Fulgur, raised by Mason IIIs), has 24000 health and stores 4000.
+  Fulgur, raised by Mason IIIs), has 10000 health and stores 4000.
 - Mines stand on land or out at sea (`water_build`). A mine at sea mines only the sea, and a
   mine on land only the land: each territory stops at the shore, and land and sea mines never
   share ground with each other, only with their own kind (the user's call, 2026-09-29). At sea
   the reach is wider, 1500 m (`sea_reach`, so a whole circle of sea is 2.25x a land circle, at
   the same `ground` a hectare, with no ore), but the worked water spreads at only 4 m/s
   (`SEA_SPREAD_SPEED`: full in about 375 s against 100 on land).
-- Reactors: 20 / 250 / 1500 energy/s for 75 / 700 / 2800 mass; each tier is cheaper per unit
-  of energy than the one below.
-- Factories: build power 20 / 80 / 200, so about seven factories spend the income at every
-  tier. Engineers 5 / 20 / 60.
+- Reactors: 15 / 350 / 2000 energy/s for 75 / 700 / 2800 mass: 5 / 2 / 1.4 mass per energy a
+  second, so each tier is far cheaper per unit of energy than the one below. A field of tier 1
+  reactors is the stopgap of the opening, not the way to power a side (the user, 2026-09-30:
+  "t1 pgens are too good of a deal"; they were 20 / 250 / 1500, only a third dearer than tier 2).
 - Every tier upgrade, structure or engineer, pays only what the new tier costs over the old
   one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy, core mine tier 1
   to 2 1540 / 9240). A refit kit is paid in full.
@@ -136,8 +138,8 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   and the mines (checked on load). Guns, missile launchers, missile defence, nuke silos and
   reclaim cost energy to build, never to keep (2026-09-29: the Zenith, Narwhal, Sunfall,
   Culverin and Corona lost theirs).
-- Mines run on energy: upkeep 10 / 60 / 300 / 600 per second (T1-T4), about half a T1 reactor
-  at T1 and a fifth of a reactor of their own tier above that. A mine digs at the share of the
+- Mines run on energy: upkeep 10 / 60 / 300 / 600 per second (T1-T4), about two thirds of a T1
+  reactor at T1 and a sixth of a reactor of their own tier above that. A mine digs at the share of the
   side's energy demand that is covered (behind the focus, if one is on): at worst a quarter of its output
   (`UNPOWERED` in `mines.rs`), so a side out of energy loses most of its mass too. That is why
   an energy stall is the one to prevent. A mass stall does not slow the mines, or it would feed
@@ -145,6 +147,30 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 
 The throwaway mine probe (a test that places mines on the real maps and prints their output
 over time) is the check for any change to the mine numbers.
+
+### Build power (2026-09-30)
+
+The user found that playing the economy well ran them out of build power, that late in a game
+they could not get enough of it to spend their income, and that they were almost never short
+of materials even while building big weapons and units. The ledger probe
+(`zz_eco_ledger_probe`, AI against AI) showed why: an economy grew almost free of build power
+(a mine upgrade was 0.3-0.8 build-power seconds per material paid, against 4-7 for a unit), so
+income outran what the factories could turn into anything. At 30 minutes the AIs stood 50-115k
+materials of economy against 5-12k of army. Two rules since:
+
+- **Build time follows mass.** Every build takes about as long per material as others of its
+  kind, economy included: a mine upgrade takes about 1.6 build-power seconds per material it
+  pays (core mine times 160 / 2500 / 8800 / 14000), reactors about 1.7 (Reactor III 4800).
+  Growing income now competes for build power with spending it.
+- **Build power gets cheaper by tier.** Factories 20 / 120 / 360, so each tier's factory rolls
+  out its line tank in 11-14 s (Warden 14, Bulwark 11, Paladin 13). Engineers 5 / 30 / 150
+  (0.10 / 0.15 / 0.19 build power per material); the commander's Engineering Suite II 30,
+  Suite III 150, Auxiliary Engineering Suite 60. A late-game side buys the build power to spend
+  its income with a few tier 3 engineers, not dozens of Masons.
+
+Measured on 8 AI duels (40 min, Hard): mass mined over a game fell by a third to a half (dev16
+317k to 202k, Meridian Crown 309k to 145k), and income at 24 minutes to 46-108/s (was 108-226). Army standing at 30
+minutes rose against economy standing (about 1:2 to 1:3, was 1:4 to 1:9).
 
 ## Reclaim
 

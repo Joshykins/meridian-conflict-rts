@@ -50,7 +50,7 @@
         cost: (mass: 1580, energy: 12100, time: 2030),
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
-        builder: (power: 80, range: 0, builds: [
+        builder: (power: 120, range: 0, builds: [
             "regency_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
         ]),
         upgrades_to: "regency_t3_land_factory",
@@ -70,7 +70,7 @@
         cost: (mass: 4840, energy: 39100, time: 5550),
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
-        builder: (power: 200, range: 0, builds: [
+        builder: (power: 360, range: 0, builds: [
             "regency_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "regency_t3_scorpion",
         ]),
         mesh: "regency_brood", icon: Factory,
@@ -106,7 +106,7 @@
         radius: 46, height: 30, footprint: (8, 8),
         vision: 200,
         // No reclaim carrier: the Regency reclaim nothing.
-        builder: (power: 80, range: 0, builds: [
+        builder: (power: 120, range: 0, builds: [
             "regency_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
         ]),
         upgrades_to: "regency_t3_air_factory",
@@ -125,7 +125,7 @@
         cost: (mass: 4840, energy: 39100, time: 5550),
         radius: 46, height: 38, footprint: (8, 8),
         vision: 200,
-        builder: (power: 200, range: 0, builds: [
+        builder: (power: 360, range: 0, builds: [
             "regency_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
         ]),
         mesh: "regency_hatchery", icon: Factory,
@@ -160,7 +160,7 @@
         role: "Materials Mine",
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
-        health: 1200,
+        health: 480,
         cost: (mass: 230, energy: 800, time: 200),
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300, water_build: true,
@@ -179,8 +179,8 @@
         role: "Materials Mine",
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
-        health: 9600,
-        cost: (mass: 1700, energy: 6000, time: 900),
+        health: 3840,
+        cost: (mass: 1700, energy: 6000, time: 2350),
         radius: 12.8, height: 15, footprint: (3, 3),
         vision: 360, water_build: true,
         economy: (mass_storage: 750),
@@ -197,8 +197,8 @@
         role: "Materials Mine",
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
-        health: 25600,
-        cost: (mass: 6900, energy: 24000, time: 1500),
+        health: 10240,
+        cost: (mass: 6900, energy: 24000, time: 8300),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 420, water_build: true,
         economy: (mass_storage: 2000),
@@ -215,8 +215,8 @@
         role: "Materials Mine",
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
-        health: 48000,
-        cost: (mass: 23000, energy: 80000, time: 2400),
+        health: 19200,
+        cost: (mass: 23000, energy: 80000, time: 25800),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 480, water_build: true,
         economy: (mass_storage: 4000),
@@ -239,7 +239,7 @@
         cost: (mass: 90, energy: 420, time: 140),
         radius: 6.9, height: 7.5, footprint: (2, 2),
         vision: 120,
-        economy: (energy_income: 20),
+        economy: (energy_income: 15),
         mesh: "regency_heart", icon: Power,
     ),
     // The tech 2 and 3 star cores: bigger stars in more cage, on lots of their own (like
@@ -255,7 +255,7 @@
         cost: (mass: 840, energy: 3900, time: 1570),
         radius: 18.75, height: 18, footprint: (4, 4),
         vision: 160,
-        economy: (energy_income: 250),
+        economy: (energy_income: 350),
         mesh: "regency_heart_2", icon: Power,
     ),
     (
@@ -265,10 +265,10 @@
         tech: 3,
         categories: ["Land", "Economy", "Power"],
         health: 14000,
-        cost: (mass: 3360, energy: 15600, time: 3360),
+        cost: (mass: 3360, energy: 15600, time: 5700),
         radius: 42.5, height: 35, footprint: (8, 8),
         vision: 200,
-        economy: (energy_income: 1500),
+        economy: (energy_income: 2000),
         mesh: "regency_heart_3", icon: Power,
     ),
     // A mass vault between two energy cells: less mass than a Vault, less energy than a

@@ -12,7 +12,7 @@ speed of whichever of the three is shortest.
 | Valve | What it is | Rule of thumb |
 |---|---|---|
 | Income | materials a second | a T1 mine is ~6/s on good ground for 160 |
-| Build power | how fast you can spend | nearly everything early costs about **1 material per build-power second** (T1 mine 1.0, reactor 0.6, T1→T2 mine 1.2, commander suites 0.8), so you want about as much build power as income |
+| Build power | how fast you can spend | a new mine or reactor takes about **1-1.7 build-power seconds per material**, a mine upgrade about 1.6, units 4-7: growing the economy and spending it both take build power (since 2026-09-30). Buy it by tier: engineers 5 / 30 / 150, factories 20 / 120 / 360 |
 | Energy | the tax on spending | **6 energy per material** on economy (10 on commander refits), plus the mines' upkeep; when it runs dry everything slows, the mines included |
 
 **The materials store is the gauge.** Read it every few seconds:
@@ -43,6 +43,11 @@ game it does.
 
 ## The race
 
+The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
+mass, build power by tier, reactors 15 / 350 / 2000): rerun the search before leaning on them.
+On the new numbers the old best plan still finishes at 12-13 minutes on serac_divide, dev16
+and twin_shoals (was 11-13).
+
 `crates/mc-sim/tests/zz_eco_race_probe.rs` is one scripted Aster player alone on a map.
 It has no enemy and no goal but finishing a Deep Core. Its choices are ~25 dials:
 - how many mines, how far out, when to build the Forge and how many Masons
@@ -65,12 +70,12 @@ on the unseen dev16, the_axis and serac_sound).
    cannot spend even two mines' income: the store sits full from minute 3.
 2. **Eight Masons** as soon as the Forge stands. They put down six T1 mines out to
    4.5 km and T1 reactors wherever they stand.
-3. **Energy at 9 per material of income**, over the mines' upkeep. Mostly T1 reactors:
-   they are only a third dearer per energy than T2 (3.75 against 2.8 materials per energy/s) and can be built at once, anywhere, in
-   parallel.
+3. **Energy at 9 per material of income**, over the mines' upkeep. Mostly T1 reactors
+   (when searched they were only a third dearer per energy than T2; since 2026-09-30 they
+   are 2.5 times as dear, 5 against 2 materials per energy/s).
 4. **MFE on the commander** at 10 materials/s (~minute 4).
 5. **Engineering Suite II at 20/s, Suite III at 25/s** (~minutes 7 and 8.5). The
-   commander carries the tech: cheaper than Forge II and III, and it gets build power 60.
+   commander carries the tech: cheaper than Forge II and III, and it gets build power 160 (then 70).
 6. **One mine climbs the whole line**, each tier the moment it opens (T2 at tech 2, T3
    and T4 at tech 3). Every builder with nothing else to do assists it. No other mine
    is upgraded.

@@ -1842,7 +1842,7 @@ mod tests {
             .unwrap();
         assert_eq!(bp.unit(t3).tech, 3);
         let power = |id: BlueprintId| bp.unit(id).builder.as_ref().unwrap().power;
-        assert_eq!(power(t3), Fx::from_int(70));
+        assert_eq!(power(t3), Fx::from_int(160));
         let sam = bp.id_of("aster_t3_sam").unwrap();
         assert!(bp.unit(t3).builder.as_ref().unwrap().builds.contains(&sam));
         // At each tier the commander builds exactly what that tier's Mason builds:
@@ -1873,7 +1873,7 @@ mod tests {
         assert!(bp.unit(full).has(cat::ANTI_AIR));
         assert_eq!(bp.unit(full).weapons.len(), 3);
         let builder = bp.refit_result(t3, aux).unwrap();
-        assert_eq!(power(builder), Fx::from_int(110));
+        assert_eq!(power(builder), Fx::from_int(220));
         let b = bp.unit(builder).builder.as_ref().unwrap();
         assert_eq!(b.emitters.len(), 1);
         assert!(b.unfold_ticks > 0);
