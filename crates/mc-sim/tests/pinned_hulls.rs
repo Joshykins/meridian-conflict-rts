@@ -78,7 +78,7 @@ fn to_the_edge(w: &World, key: &str, mut pos: FxVec2, ways: &[FxVec2]) -> FxVec2
     for _ in 0..4 {
         for &way in ways {
             while afloat(w, key, pos + way) {
-                pos = pos + way;
+                pos += way;
             }
         }
     }
