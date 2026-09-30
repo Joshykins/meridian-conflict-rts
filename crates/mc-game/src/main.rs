@@ -84,7 +84,7 @@ straight into a match instead.
   --scenario NAME        open the range with a scenario staged: under-fire | close | targets
                          | build | work | salvage | upgrade | march | turn | destruct | lift | warp
                          | warp-dampened (a jump into a red warp dampener's field)
-  --players N            player slots, 1-8 (default 2; slot 0 is you, the rest are AI)
+  --players N            player slots, 1-32 (default 2; slot 0 is you, the rest are AI)
   --teams N              split the players into N sides by where their zones lie (default: all alone)
   --observe              watch an all-AI match (no human slot; the camera opens on the whole map)
   --ai-difficulty NAME  easy | normal | hard (how well it spends: builders, mines, factories, waves)

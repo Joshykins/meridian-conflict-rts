@@ -417,7 +417,7 @@ mod tests {
         assert_eq!(state.lineup.map, other);
         assert_eq!(
             state.lineup.roster.seats.len(),
-            state.catalog.maps[other].starts.min(8),
+            state.catalog.maps[other].starts.min(mc_core::MAX_PLAYERS),
             "the seats follow the new map"
         );
         assert_eq!(state.request().config.players[0].faction, "Aster");

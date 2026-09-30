@@ -47,7 +47,7 @@ pub struct MapCard {
 impl MapCard {
     pub fn new(stem: String, map: Arc<MapFile>, config: &MapConfig) -> MapCard {
         let size_m = map.info().size_metres().to_f32();
-        let starts = map.start_positions().len().min(8);
+        let starts = map.start_positions().len().min(mc_core::MAX_PLAYERS);
         MapCard {
             stem,
             name: map.name().to_owned(),
@@ -795,7 +795,13 @@ impl Browser {
         }
         ui.brackets(frame.inset(-6.0), 14.0, rgb(palette::ACCENT, 0.7));
         // Landing zones on the chart.
-        for (n, s) in m.map.start_positions().iter().enumerate().take(8) {
+        for (n, s) in m
+            .map
+            .start_positions()
+            .iter()
+            .enumerate()
+            .take(mc_core::MAX_PLAYERS)
+        {
             let p = Vec2::new(frame.x, frame.y) + preview::locate(&m.map, s.to_f32(), side);
             ui.disc(p, 9.0, ink(0.85));
             ui.arc(

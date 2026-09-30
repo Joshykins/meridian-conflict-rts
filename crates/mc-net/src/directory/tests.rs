@@ -151,11 +151,11 @@ fn hostile_counts_and_values_are_errors() {
         e.u32(code);
         assert!(decode_dir_payload(&e.buf).is_err());
     }
-    // Nine seats.
+    // One seat past MAX_PLAYERS.
     let mut frame = encode_dir_frame(&samples()[2]).unwrap();
     let seats_at = 4 + 1 + 2 + "Friday".len();
     assert_eq!(frame[seats_at], 8);
-    frame[seats_at] = 9;
+    frame[seats_at] = mc_core::MAX_PLAYERS as u8 + 1;
     assert!(decode_dir_payload(&frame[4..]).is_err());
     // Trailing bytes.
     let mut frame = encode_dir_frame(&DirMessage::Leave).unwrap();

@@ -518,7 +518,7 @@ fn bad_parameters_are_errors() {
     .is_err());
     assert!(bake(
         &BakeParams {
-            players: 9,
+            players: MAX_START_POSITIONS as u32 + 1,
             ..BakeParams::square("x", 2, 1)
         },
         &path

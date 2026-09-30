@@ -60,7 +60,8 @@ const ORE_CORNERS: usize = 28;
 /// The overall shape of the map.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Layout {
-    /// A continent of terraces, ranges and lakes around a central city, for 1..=8 players.
+    /// A continent of terraces, ranges and lakes around a central city, for any number of
+    /// players up to [`MAX_START_POSITIONS`].
     #[default]
     Basin,
     /// A main island with a central lake and two flanking town islands. Two players only.
@@ -109,7 +110,7 @@ pub struct BakeParams {
     pub tiles_w: u32,
     pub tiles_h: u32,
     pub seed: u64,
-    /// Start positions, 1..=8. [`Layout::Islands`] takes exactly 2.
+    /// Start positions, `1..=MAX_START_POSITIONS`. [`Layout::Islands`] takes exactly 2.
     pub players: u32,
     /// Worker threads; 0 uses every core. Does not affect the result.
     pub threads: usize,

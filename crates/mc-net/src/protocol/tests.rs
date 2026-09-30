@@ -317,7 +317,7 @@ fn truncated_and_foreign_input_is_an_error() {
         Err(NetError::Malformed(_))
     ));
     assert!(matches!(
-        decode_payload(&[tag::PLAYER_DROPPED, 8]),
+        decode_payload(&[tag::PLAYER_DROPPED, MAX_PLAYERS as u8]),
         Err(NetError::Malformed(_))
     ));
 

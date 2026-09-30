@@ -21,7 +21,7 @@ pub use vec::{FxVec2, FxVec3};
 pub const TICKS_PER_SECOND: u32 = 10;
 
 /// Most players a match supports.
-pub const MAX_PLAYERS: usize = 8;
+pub const MAX_PLAYERS: usize = 32;
 
 /// A set of player slots: bit `p` stands for slot `p`. Fog layers, team
 /// vision and the lobby's seat sets are all masks of this width.

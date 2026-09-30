@@ -347,7 +347,7 @@ fn open_lobby(state: &mut MultiplayerState, form: &mut Form) {
         let Some(client) = state.server.client() else {
             return state.say("The server is not connected.");
         };
-        match client.create_room(&title, 8, form.private, content) {
+        match client.create_room(&title, mc_core::MAX_PLAYERS as u8, form.private, content) {
             Ok(()) => {
                 form.busy = true;
                 state.creating = Some((plan, form.private, title));
@@ -370,7 +370,7 @@ fn host_here(
     content: mc_net::ContentId,
 ) -> std::io::Result<Lobby> {
     let config = RelayConfig {
-        players: 8,
+        players: mc_core::MAX_PLAYERS as u8,
         title: title.to_owned(),
         // Only the host's own seat until the lobby publishes the plan.
         open_seats: 0b1,

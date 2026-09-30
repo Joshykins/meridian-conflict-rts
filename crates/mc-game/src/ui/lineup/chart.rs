@@ -146,7 +146,7 @@ fn zones(
 
     let mut take = None;
     lineup.markers.clear();
-    for n in 0..map.start_positions().len().min(8) {
+    for n in 0..map.start_positions().len().min(mc_core::MAX_PLAYERS) {
         let p = at_zone(n);
         lineup.markers.push(p + ui.shift);
         let holder = seats.iter().position(|s| s.open() && s.start as usize == n);

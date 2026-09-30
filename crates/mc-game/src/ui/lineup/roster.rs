@@ -52,7 +52,7 @@ impl Roster {
     /// `zones` seats: the first `people` for people, then `ai` AI commanders, the
     /// rest closed. Everyone on a team of their own (all on one for `allied`).
     pub fn new(zones: usize, people: usize, ai: usize, allied: bool) -> Roster {
-        let zones = zones.min(8);
+        let zones = zones.min(mc_core::MAX_PLAYERS);
         Roster {
             seats: (0..zones)
                 .map(|i| Seat {

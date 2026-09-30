@@ -279,7 +279,7 @@ impl Lineup {
             Mode::Skirmish => self.card(catalog).map_or(0, |m| m.starts),
             Mode::Survival => self.theatre(catalog).map_or(0, |t| t.layout.spawns.len()),
         }
-        .min(8)
+        .min(mc_core::MAX_PLAYERS)
     }
 
     /// Each zone's map start position.
@@ -492,7 +492,7 @@ impl Lineup {
         let spawns = self.theatre(catalog).map(|t| t.layout.spawns.clone());
         let mut seats = Vec::new();
         for (i, p) in options.config.players.iter().enumerate() {
-            if Some(i) == engine || seats.len() >= 8 {
+            if Some(i) == engine || seats.len() >= mc_core::MAX_PLAYERS {
                 continue;
             }
             let start = match &spawns {

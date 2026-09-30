@@ -46,8 +46,9 @@ usage: mc-bake -o <file.mcmap> [options]
                    canyon: \"Vermilion Gorge\", 3v3 across a desert canyon, a
                    reservoir in its middle, an arch dam at the south;
                    exactly 12 km
-  --players <n>    start positions, 1-8 (default: 2 up to 8 km, 4 up to 24 km,
-                   else 8; islands and alpine: always 2)
+  --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
+                   else 8; islands and alpine: always 2; the 8-player layouts
+                   take exactly 8)
   --threads <n>    worker threads (default: all cores; does not change the result)
   --preview <ppm>  also write a shaded overview image with markers
   --verify         re-read the file and check its content id

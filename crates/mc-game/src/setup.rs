@@ -20,6 +20,31 @@ pub const TEAM_COLORS: Palette = [
     [0.05, 0.85, 0.85],
     [1.0, 0.4, 0.05],
     [0.9, 0.9, 0.9],
+    // Past the first eight: other hues, then darker and paler turns of them.
+    [1.0, 0.22, 0.55],
+    [0.55, 1.0, 0.08],
+    [0.3, 0.6, 1.0],
+    [0.45, 0.02, 0.04],
+    [0.0, 0.42, 0.36],
+    [0.55, 0.3, 0.04],
+    [0.78, 0.62, 1.0],
+    [0.3, 0.3, 0.33],
+    [0.02, 0.32, 0.06],
+    [1.0, 0.52, 0.42],
+    [0.03, 0.08, 0.45],
+    [0.42, 0.45, 0.04],
+    [0.85, 0.02, 0.85],
+    [0.42, 1.0, 0.65],
+    [1.0, 0.8, 0.52],
+    [0.32, 0.02, 0.36],
+    [0.62, 1.0, 1.0],
+    [0.62, 0.14, 0.02],
+    [0.14, 0.28, 0.5],
+    [1.0, 1.0, 0.45],
+    [0.62, 0.08, 0.3],
+    [0.08, 0.62, 0.45],
+    [0.4, 0.32, 1.0],
+    [0.06, 0.06, 0.07],
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -280,7 +305,10 @@ pub fn match_config(opts: &Options, map: &MapFile) -> MatchConfig {
     } else {
         opts.players
     };
-    let count = wanted.clamp(1, map.start_positions().len().clamp(1, 8));
+    let count = wanted.clamp(
+        1,
+        map.start_positions().len().clamp(1, mc_core::MAX_PLAYERS),
+    );
     let sides = match opts.teams {
         0 => (0..count as u8).collect(),
         n => {
