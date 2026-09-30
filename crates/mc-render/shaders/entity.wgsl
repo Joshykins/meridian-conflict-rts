@@ -2596,7 +2596,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Plating is textured from each face's own shape (surface.wgsl): outlines, fitted
     // plates and rivets, lights in the black, the patterns a model asks for, and burns
     // as it is hurt. Armour only: a gunmetal tube is left a plain tube. Wrecks skip
-    // it: the mesh is crumpled, and they are burnt out all over further down.
+    // it: they are burnt out all over further down (`wreck_surface`).
     var soot = 0.0;
     var lights = vec3<f32>(0.0);
     let precursor = in.material == MAT_PRECURSOR || in.material == MAT_PRECURSOR_DARK;
@@ -3041,7 +3041,38 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // A hull that went down in the sea burns out over its first seconds on the bottom,
         // on from the paint it sank in.
         let painted = m;
-        m = wreck_material(m, in.local, in.state.w, fract(in.wreck.z * 0.5) > 0.25);
+        var si: SurfaceIn;
+        si.st = in.face.xy;
+        si.half = abs(in.face.zw);
+        si.wraps = in.face.z < 0.0;
+        si.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
+        si.unit = in.state.w;
+        si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
+        si.local = in.local;
+        si.reach = in.weld.z;
+        si.height = in.weld.w;
+        let dp1 = dpdx(in.world);
+        let dp2 = dpdy(in.world);
+        si.px = max(length(dp1), length(dp2));
+        let ws = wreck_surface(m, si, n.z, fract(in.wreck.z * 0.5) > 0.25, dpdx(in.local), dpdy(in.local));
+        m = ws.m;
+        // The buckled plates' relief, on the face's axes in the world (as the live plating's).
+        let ds1 = dpdx(in.face.xy);
+        let ds2 = dpdy(in.face.xy);
+        let dp2perp = cross(dp2, n);
+        let dp1perp = cross(n, dp1);
+        let tangent = dp2perp * ds1.x + dp1perp * ds2.x;
+        let bitangent = dp2perp * ds1.y + dp1perp * ds2.y;
+        let ts = tangent * inverseSqrt(max(dot(tangent, tangent), 1e-12));
+        let bs = bitangent * inverseSqrt(max(dot(bitangent, bitangent), 1e-12));
+        n = normalize(n - ts * ws.slope.x - bs * ws.slope.y);
+        // The deep relief, from its rise one pixel over each way (surface gradient, no tangents),
+        // exaggerated: it is the wreck's texture, and has to read from the game's camera.
+        let r1 = cross(dp2, n);
+        let r2 = cross(n, dp1);
+        let det = dot(dp1, r1);
+        let grad = sign(det) * (ws.bump.x * r1 + ws.bump.y * r2);
+        n = normalize(abs(det) * n - grad * 2.2);
         if in.wreck.z > 1.5 {
             let fresh = 1.0 - smoothstep(1.0, 5.0, in.wreck.w);
             m.albedo = mix(m.albedo, painted.albedo * 0.5, fresh);

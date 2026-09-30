@@ -195,45 +195,195 @@ fn wreck_worn(local: vec3<f32>, height: f32, health: f32, reach: f32) -> bool {
     return height + ragged > health * 0.75 + 0.25;
 }
 
-// Soot and scorch from the model position: several incommensurate scales so
-// the noise tile never marches across a hull, plus streaks that climb with
-// height the way fire does.
-fn wreck_burn(local: vec3<f32>, seed: f32) -> vec2<f32> {
-    let field = local.xy + vec2<f32>(local.z * 0.53, local.z * 0.29);
-    let off = vec2<f32>(seed * 47.0, seed * 19.0);
-    let at = field + off;
-    let coarse = noise_varied(at, 28.0).ba;
-    let mid = noise_varied(at, 11.0).ba;
-    let fine = textureSample(noise_map, repeat_sampler, field * 0.21 + off * 0.03).ba;
-    let climb = textureSample(noise_map, repeat_sampler, vec2<f32>(field.x * 0.08, local.z * 0.19) + off * 0.02).a;
-    let blotch = value_noise2(at, 7.0);
-    let soot = mix(coarse, mid, 0.55);
-    return vec2<f32>(
-        clamp(soot.x * 0.5 + fine.x * 0.22 + climb * 0.18 + blotch * 0.2, 0.0, 1.0),
-        clamp(soot.y * 0.55 + fine.y * 0.25 + climb * 0.2, 0.0, 1.0)
-    );
+// ---- the burnt-out surface --------------------------------------------------
+//
+// Nothing here tiles. What a wreck is made of comes from three places, so no two
+// stretches of a big hull and no two wrecks look alike:
+// - the face's own plates (`surf_courses` on the face frame): each plate burnt its
+//   own way, charred in its paint, burnt to bare steel, or gone, showing the dark
+//   inside; buckled, with its seams and the edges of the face scraped bright;
+// - a field of the model position (`surf_fbm3`, hashed, never a texture), at scales
+//   from the hull's size down to a hand's width: where the fire took hold, heat
+//   tint on the bare steel, rust, ash settled on what faces up, streaks run down
+//   what stands up, grime low down;
+// - a tone of its own for every face, so the broad flat facets of a big hull break up.
+// Faces lying in the same plane share the model-position field, so they cannot
+// flicker against each other.
+
+const WRECK_SOOT: vec3<f32> = vec3<f32>(0.011, 0.0105, 0.01);
+const WRECK_STEEL: vec3<f32> = vec3<f32>(0.06, 0.05, 0.043);
+const WRECK_STRAW: vec3<f32> = vec3<f32>(0.07, 0.05, 0.03);
+const WRECK_BLUED: vec3<f32> = vec3<f32>(0.036, 0.034, 0.042);
+const WRECK_RUST: vec3<f32> = vec3<f32>(0.075, 0.038, 0.02);
+const WRECK_ASH: vec3<f32> = vec3<f32>(0.12, 0.112, 0.102);
+const WRECK_DIRT: vec3<f32> = vec3<f32>(0.08, 0.066, 0.05);
+const WRECK_SCRAPE: vec3<f32> = vec3<f32>(0.2, 0.19, 0.18);
+
+struct WreckSurface {
+    m: Pbr,
+    // Slope of the relief along the face's s and t, as `Surface::slope`.
+    slope: vec2<f32>,
+    // The deep relief's rise, metres, one screen pixel right and one down (`wreck_depth`).
+    bump: vec2<f32>,
 }
 
-// Burnt out: charred, matte, dead emitters. Soot, scorched paint and bare burnt steel,
-// from a field of the model position, so two faces lying in the same plane are shaded
-// alike and cannot flicker against each other. A hull's inside is soot-black.
-fn wreck_material(m_in: Pbr, local: vec3<f32>, seed: f32, inner: bool) -> Pbr {
-    var m = m_in;
-    let burn = wreck_burn(local, seed);
-    let paint = m.albedo * 0.1;
-    let steel = vec3<f32>(0.075, 0.052, 0.04) * (0.6 + burn.y);
-    m.albedo = mix(vec3<f32>(0.015, 0.014, 0.013), mix(paint, steel, smoothstep(0.45, 0.7, burn.y)), smoothstep(0.3, 0.75, burn.x));
-    // A rotated cut of the plate map, so armour seams still read without marching.
-    let plate_uv = vec2<f32>(local.x * 0.07 + local.y * 0.04, -local.x * 0.04 + local.z * 0.08) + vec2<f32>(seed * 2.3, seed * 1.1);
-    let plate = textureSample(panel_map, repeat_sampler, plate_uv);
-    m.albedo *= 0.6 + plate.b * 0.4;
-    m.metallic = 0.3 * smoothstep(0.5, 0.7, burn.y);
-    m.roughness = 0.93;
+// The deep relief of burnt, battered metal, metres out of the surface at a model
+// position: broad dents, crumple creases (ridged, so they fold rather than roll),
+// blistered char and corrosion pits. Scaled to the hull but bounded, so a tank is
+// as battered up close as a battleship is from the game's camera. Octaves finer
+// than a few pixels fade out (`surf_fbm3`), so it never sparkles.
+// Turned off the noise lattice's axes, each octave its own way: value noise's grid
+// shows in relief as boxy creases square to the hull.
+const WRECK_TURN_A: mat3x3<f32> = mat3x3<f32>(
+    vec3<f32>(0.64, 0.6, -0.48), vec3<f32>(-0.77, 0.48, -0.42), vec3<f32>(-0.02, 0.64, 0.77));
+const WRECK_TURN_B: mat3x3<f32> = mat3x3<f32>(
+    vec3<f32>(0.36, -0.8, 0.48), vec3<f32>(0.93, 0.29, -0.22), vec3<f32>(0.04, 0.53, 0.85));
+
+fn wreck_depth(p: vec3<f32>, size: f32, fw: f32) -> f32 {
+    let a = WRECK_TURN_A * p;
+    let b = WRECK_TURN_B * p;
+    let dent_cell = clamp(size * 0.1, 0.9, 9.0);
+    let dent = surf_fbm3(a + vec3<f32>(13.1, 7.7, 3.3), dent_cell, fw) * dent_cell * 0.22;
+    let fold_cell = clamp(size * 0.03, 0.35, 2.4);
+    let fold = (0.3 - abs(surf_fbm3(b + vec3<f32>(41.3, 17.9, 5.1), fold_cell, fw))) * fold_cell * 0.3;
+    let blister = surf_fbm3(b + vec3<f32>(3.9, 29.3, 61.7), 0.3, fw) * 0.035;
+    let pit = -smoothstep(0.08, 0.3, surf_fbm3(a + vec3<f32>(77.7, 51.3, 2.9), 0.12, fw)) * 0.02;
+    return dent + fold + blister + pit;
+}
+
+// One plate of a face, burnt its own way: x its random, y distance inside its edge.
+fn wreck_plate(i: SurfaceIn, st: vec2<f32>) -> vec2<f32> {
+    let cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
+    return vec2<f32>(cell.id, surf_edge(cell.p, cell.half));
+}
+
+// The plates' relief: the fitted plating the unit had (seams, rivets, hatches),
+// each plate buckled out or in by its own amount across its width.
+fn wreck_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
+    let cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
+    let q = cell.p / max(cell.half, vec2<f32>(1e-3));
+    let buckle = (hash11(cell.id * 61.3 + 0.7) - 0.5) * (1.0 - dot(q, q) * 0.5)
+        + (hash11(cell.id * 23.9 + 0.2) - 0.5) * q.x * q.y;
+    return surf_relief_plates(i, st, i.scale * 0.035, i.scale * 0.012) + buckle * 1.6;
+}
+
+// `i` is the face as `surface_at` takes it; `up` the world normal's z; `paint` the
+// material as the unit wore it; `inner` a hull's inside.
+// `dl1`/`dl2` are the model position's steps to the next pixel right and down.
+fn wreck_surface(paint: Pbr, i: SurfaceIn, up: f32, inner: bool, dl1: vec3<f32>, dl2: vec3<f32>) -> WreckSurface {
+    var out: WreckSurface;
+    out.slope = vec2<f32>(0.0);
+    out.bump = vec2<f32>(0.0);
+    var m = paint;
     m.emissive = vec3<f32>(0.0);
+    let fw = max(i.px, 1e-4);
+    let p = i.local + vec3<f32>(i.unit * 53.0, i.unit * 91.0, i.unit * 17.0);
+    let size = clamp(i.reach, 2.0, 200.0);
+    // Where the fire took hold, from the hull's size down: broad, patches, then flakes
+    // and pitting at sizes fixed in metres, so a tank and a battleship are both close-grained.
+    // Off the lattice's axes and warped, or the patches come out square along the hull.
+    let pa = WRECK_TURN_A * p;
+    let pb = WRECK_TURN_B * p;
+    let broad_cell = clamp(size * 0.3, 2.0, 36.0);
+    let warp = vec3<f32>(surf_fbm3(pb, broad_cell * 0.45, fw), surf_fbm3(pb + vec3<f32>(19.3, 5.1, 8.7), broad_cell * 0.45, fw), 0.0)
+        * broad_cell * 0.9;
+    let broad = surf_fbm3(pa + warp, broad_cell, fw);
+    let mid = surf_fbm3(pb + warp * 0.6 + vec3<f32>(31.7, 12.9, 7.1), clamp(size * 0.09, 0.8, 8.0), fw);
+    let flake = surf_fbm3(pa + warp * 0.2 + vec3<f32>(5.3, 44.1, 19.7), 1.4, fw);
+    let pit = surf_fbm3(pb + vec3<f32>(71.1, 3.9, 27.3), 0.35, fw);
+    // Stretched up the hull: what ran down and what the fire drew up.
+    let run = surf_fbm3(vec3<f32>(p.x, p.y, p.z * 0.1) + vec3<f32>(9.1, 61.7, 0.0), clamp(size * 0.025, 0.3, 2.2), fw);
+    // Deep relief, differenced one pixel each way, and how far down in it this point lies.
+    let d0 = wreck_depth(p, size, fw);
+    out.bump = vec2<f32>(wreck_depth(p + dl1, size, fw) - d0, wreck_depth(p + dl2, size, fw) - d0);
+    let hollow = saturate(0.5 - d0 / max(clamp(size * 0.1, 0.9, 9.0) * 0.18, 0.05));
+
     if inner {
-        m.albedo = vec3<f32>(0.008, 0.0075, 0.007) * (0.6 + burn.x);
+        m.albedo = WRECK_SOOT * (0.55 + 1.2 * saturate(0.5 + broad + pit));
         m.metallic = 0.0;
         m.roughness = 1.0;
+        out.m = m;
+        return out;
     }
-    return m;
+
+    // Each face its own tone.
+    let face_tone = 0.86 + 0.28 * hash11(i.seed * 97.3 + i.unit * 13.1);
+    // The face's plates, where it has a frame to lay them on.
+    let framed = max(i.half.x, i.half.y) > 0.0;
+    var plate = vec2<f32>(0.5, 1e3);
+    if framed {
+        plate = wreck_plate(i, i.st);
+        let e = max(fw * 0.75, i.scale * 0.002);
+        let h0 = wreck_relief(i, i.st);
+        let depth = i.scale * 0.06;
+        out.slope = vec2<f32>(wreck_relief(i, i.st + vec2<f32>(e, 0.0)) - h0, wreck_relief(i, i.st + vec2<f32>(0.0, e)) - h0) * (depth / e);
+        out.slope *= 1.0 - smoothstep(i.scale * 0.1, i.scale * 0.3, fw);
+    }
+    let roll = hash11(plate.x * 53.1 + 0.3);
+    let plate_tone = 0.9 + 0.2 * hash11(plate.x * 19.7 + 0.9);
+    // Plates want room before they are lost or stripped: a sliver of a face stays as it is.
+    let roomy = framed && min(i.half.x, i.half.y) > i.scale * 0.4;
+    // Whole plates only lean the burn one way or the other: a plate flipped wholesale
+    // reads as a grid of squares across a big hull. One is torn away only where the fire
+    // was hottest.
+    let gone = roomy && roll < 0.12 && broad + mid * 0.5 > 0.12;
+    let stripped = select(0.0, 0.12, roomy && roll >= 0.12 && roll < 0.4);
+
+    // Charred paint, down to soot where it burnt hardest.
+    let lum = dot(paint.albedo, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let charred = mix(vec3<f32>(lum), paint.albedo, 0.3) * 0.09;
+    let burn = saturate(0.58 + broad * 1.5 + mid * 0.9 + flake * 0.5 + pit * 0.4);
+    var albedo = mix(charred, WRECK_SOOT, smoothstep(0.3, 0.75, burn));
+    // Bare steel where the paint burnt off, temper-tinted straw to blue by the heat it took.
+    // Ragged down to the flakes and pits, never a clean-edged patch.
+    let bare = smoothstep(0.52, 0.8, 0.42 + mid * 0.8 + flake * 1.4 + pit * 0.9 + stripped);
+    let heat = saturate(0.5 + broad * 3.0 + flake);
+    let tint = mix(WRECK_STRAW, WRECK_BLUED, smoothstep(0.35, 0.75, heat));
+    let steel = mix(WRECK_STEEL, tint, 0.4 + 0.3 * flake) * (0.6 + 0.7 * saturate(0.5 + pit * 2.0));
+    albedo = mix(albedo, steel, bare);
+    // Rust on the bare steel, and run down from it over what stands up.
+    let steep = 1.0 - abs(up);
+    let rust = smoothstep(0.08, 0.3, run + mid * 0.5) * (bare * 0.7 + steep * 0.3);
+    albedo = mix(albedo, WRECK_RUST * (0.7 + 0.6 * saturate(0.5 + pit * 2.0)), rust * 0.75);
+    // Soot drawn up the walls by the fire.
+    albedo = mix(albedo, WRECK_SOOT, steep * smoothstep(0.02, 0.2, -run) * 0.7);
+    // Ash settled on what faces the sky.
+    let ash = smoothstep(0.55, 0.9, up) * smoothstep(0.0, 0.3, mid * 0.6 + flake * 0.6 + pit * 0.5 - broad * 0.4);
+    albedo = mix(albedo, WRECK_ASH * (0.7 + 0.5 * saturate(0.5 + pit * 2.0)), ash * 0.35);
+    // Grime and earth thrown up low down.
+    let share = i.local.z / max(i.height, 1.0);
+    let low = (1.0 - smoothstep(0.0, 0.22, share + flake * 0.15)) * (0.5 + 0.5 * steep);
+    albedo = mix(albedo, WRECK_DIRT, low * 0.6);
+
+    albedo *= face_tone * plate_tone;
+    // Soot and shadow gathered in the dents and folds.
+    albedo *= 1.0 - 0.55 * smoothstep(0.35, 0.95, hollow);
+    // Burnt steel is dull: a sheen, not a mirror of the sky.
+    var metallic = 0.3 * bare * (1.0 - rust);
+    var roughness = mix(mix(0.96, 0.74, bare), 1.0, max(ash, rust * 0.8));
+
+    if framed {
+        // Seams gape and edges take the knocks: paint scraped back to bright steel along them.
+        let seam = surf_band(plate.y, i.scale * 0.02, fw);
+        let d_face = surf_face_edge(i, i.st);
+        let scrape = (1.0 - smoothstep(0.0, i.scale * 0.06, d_face)) * smoothstep(0.1, 0.3, flake + pit * 0.8);
+        albedo = mix(albedo, WRECK_SCRAPE * face_tone, scrape * 0.8);
+        metallic = mix(metallic, 0.85, scrape);
+        roughness = mix(roughness, 0.45, scrape);
+        albedo *= 1.0 - 0.7 * seam;
+        if gone {
+            // The plate is gone: the dark inside shows, its torn edge lighter.
+            let lip = 1.0 - smoothstep(0.0, i.scale * 0.06, plate.y);
+            albedo = mix(WRECK_SOOT * 0.6, WRECK_STEEL * 0.8, lip);
+            metallic = 0.2 * lip;
+            roughness = 1.0;
+            out.slope = vec2<f32>(0.0);
+        }
+    }
+
+    m.albedo = albedo;
+    m.metallic = metallic;
+    m.roughness = roughness;
+    out.m = m;
+    return out;
 }
