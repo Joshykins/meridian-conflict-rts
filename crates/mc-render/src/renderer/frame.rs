@@ -118,6 +118,7 @@ impl Renderer {
             // alpha 0; the frame that brings it may already be part way through it.
             let tick_start = input.time - input.alpha.clamp(0.0, 1.0) * self.tick_seconds;
             self.upload_sim(frame, tick_start, camera);
+            let _t = mc_core::perf_span!("cpu.upload.draws_terrain");
             self.cull
                 .draws
                 .set_units(&frame.units[..self.sim_units as usize]);

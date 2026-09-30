@@ -487,6 +487,7 @@ impl Hud {
 
     pub fn draw(&mut self, ui: &mut Ui, s: &Scene, dt: f32) -> Vec<HudAction> {
         let _t = mc_core::perf_span!("ui.hud");
+        let part = mc_core::perf_span!("ui.hud.panels");
         self.covered.clear();
         self.actions.clear();
         let (w, h) = (ui.size.x, ui.size.y);
@@ -621,6 +622,8 @@ impl Hud {
         // Chat rises from over the deck.
         self.net_chat(ui, s, deck_y - 24.0 - 8.0 - 12.0, dt);
 
+        drop(part);
+        let part = mc_core::perf_span!("ui.hud.deck");
         let deck_prep = mc_core::perf_span!("ui.deck_prep");
         let selected: Vec<&UnitInstance> = view
             .selection
@@ -753,6 +756,8 @@ impl Hud {
             }
         }
         (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
+        drop(part);
+        let _part = mc_core::perf_span!("ui.hud.after");
         if let Some(u) = hovered {
             if !selected.iter().any(|s| s.unit_id == u.unit_id) && !selected.is_empty() {
                 let card = selection::hover_card(

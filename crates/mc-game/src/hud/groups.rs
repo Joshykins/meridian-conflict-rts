@@ -173,14 +173,31 @@ fn tip(ui: &mut Ui, card: Rect, y: f32, text: &str) {
 
 /// Each group member's number on the battlefield: a small key cap left of
 /// where its bars sit (`icons.wgsl` `vs_bar`: on the ground in front of the
-/// hull, as wide as it).
+/// hull, as wide as it). A group with more than `EACH_MOST` members on screen
+/// wears one cap in the middle of them instead: a cap on each of thousands is a
+/// carpet of digits, and costs more than the rest of the interface together.
 pub(super) fn badges(ui: &mut Ui, s: &Scene) {
     let _t = mc_core::perf_span!("ui.group_badges");
+    const EACH_MOST: usize = 64;
     let viewport = s.camera.viewport;
     let eye = s.camera.eye();
     let scale = s.camera.projection_scale();
+    let cap = |ui: &mut Ui, at: Vec2, digit: &str| {
+        let r = Rect::new(at.x - BADGE, at.y - BADGE * 0.5, BADGE, BADGE);
+        ui.fill(r, ink(0.8));
+        ui.frame(r, rgb(0xFFFFFF, 0.85));
+        ui.text_centred(
+            r.x + r.w * 0.5 + 0.5,
+            r.mid_y(),
+            BADGE_DIGIT,
+            rgb(0xFFFFFF, 1.0),
+            digit,
+        );
+    };
+    let mut shown: Vec<Vec2> = Vec::new();
     for (n, members) in s.view.groups.filled() {
         let digit = n.to_string();
+        shown.clear();
         for id in members {
             let Some(&i) = s.view.index_of.get(id) else {
                 continue;
@@ -200,18 +217,18 @@ pub(super) fn badges(ui: &mut Ui, s: &Scene) {
             let px = scale / eye.distance(at).max(1.0);
             let half_w = (u.radius * 0.8 * px).max(16.0);
             let below = (u.radius * 0.6 * px).max(6.0) + 2.0;
-            let right = (p.x - half_w - 3.0) / ui.s;
-            let mid = (p.y + below + 3.0) / ui.s;
-            let r = Rect::new(right - BADGE, mid - BADGE * 0.5, BADGE, BADGE);
-            ui.fill(r, ink(0.8));
-            ui.frame(r, rgb(0xFFFFFF, 0.85));
-            ui.text_centred(
-                r.x + r.w * 0.5 + 0.5,
-                r.mid_y(),
-                BADGE_DIGIT,
-                rgb(0xFFFFFF, 1.0),
-                &digit,
-            );
+            shown.push(Vec2::new(
+                (p.x - half_w - 3.0) / ui.s,
+                (p.y + below + 3.0) / ui.s,
+            ));
+        }
+        if shown.len() > EACH_MOST {
+            let middle = shown.iter().copied().sum::<Vec2>() / shown.len() as f32;
+            cap(ui, middle, &digit);
+        } else {
+            for &at in &shown {
+                cap(ui, at, &digit);
+            }
         }
     }
 }

@@ -3045,6 +3045,7 @@ impl Renderer {
     }
 
     fn upload_sim(&mut self, frame: &RenderFrame, time: f32, camera: &Camera) {
+        let part = mc_core::perf_span!("cpu.upload.instances");
         // The sim's tables bound the mirror, so this never cuts; it only keeps a mirror
         // that broke that promise out of the buffer's tail.
         let units = &frame.units[..frame.units.len().min(MAX_SIM_ENTITIES)];
@@ -3064,6 +3065,8 @@ impl Renderer {
         if !houses.is_empty() {
             self.houses.write(0, bytemuck::cast_slice(houses));
         }
+        drop(part);
+        let part = mc_core::perf_span!("cpu.upload.lists");
         self.note_gun_hulls(units, houses);
         self.stake_strikes(units, time);
         self.upload_welds(frame);
@@ -3166,6 +3169,8 @@ impl Renderer {
         }
         self.last_tick_time = time;
 
+        drop(part);
+        let part = mc_core::perf_span!("cpu.upload.unit_fx");
         self.ground_contact(units, time, camera);
         self.storm_beams(time);
         self.spinal_charges_tick(time);
@@ -3176,6 +3181,8 @@ impl Renderer {
         self.aircraft_crash_trails(units, time, camera);
         self.damage_smoke(units, time, camera);
         self.wreck_smoke(units, time, camera);
+        drop(part);
+        let part = mc_core::perf_span!("cpu.upload.events");
         self.construction(frame, time, camera);
         // A blast is known before the trees it kills are looked at (`nuke_fx::tree_fate`).
         for event in &frame.events {
@@ -3191,6 +3198,8 @@ impl Renderer {
             self.stir_clouds(event, time);
             self.impact_crater(event, time);
         }
+        drop(part);
+        let part = mc_core::perf_span!("cpu.upload.sky");
         self.sky.set_units(units.iter().map(|u| {
             let bp = self
                 .blueprints
@@ -3218,6 +3227,8 @@ impl Renderer {
             })
             .collect();
         self.sky.set_flyers(flyers.into_iter());
+        drop(part);
+        let _part = mc_core::perf_span!("cpu.upload.weapon_fx");
         self.ground_fires(&frame.fires, time);
         self.flush_rail_misses(time);
         self.rail_wakes(projectiles, time, camera);
