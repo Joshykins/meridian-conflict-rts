@@ -1,23 +1,23 @@
-//! The front end: main menu, skirmish set-up and settings over the live
+//! The front end: main menu, match set-up and settings over the live
 //! backdrop, and the transitions between them. It knows nothing about windows
 //! or renderers, so the headless screenshot tool drives it the same way the
 //! game does.
 
 use super::backdrop::Director;
+use super::lineup::Mode;
 use super::menu::{self, MenuAction, MenuState, Telemetry};
 use super::multiplayer::{self, MultiplayerAction, MultiplayerState};
 use super::options;
 use super::replays::{self, ReplaysAction, ReplaysState};
-use super::skirmish::{self, MatchRequest, SkirmishAction, SkirmishState};
-use super::survival::{self, SurvivalAction, SurvivalState};
+use super::setup::{self, MatchRequest, SetupAction, SetupState};
 use super::{rgb, Rect, Ui};
 use crate::settings::Settings;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Screen {
     Menu,
-    Skirmish,
-    Survival,
+    /// Setting up a match, arriving in this mode (skirmish and survival share the screen).
+    Setup(Mode),
     Replays,
     Multiplayer,
     Options,
@@ -27,8 +27,8 @@ impl Screen {
     pub fn parse(s: &str) -> Option<Screen> {
         Some(match s {
             "menu" => Screen::Menu,
-            "skirmish" => Screen::Skirmish,
-            "survival" => Screen::Survival,
+            "skirmish" => Screen::Setup(Mode::Skirmish),
+            "survival" => Screen::Setup(Mode::Survival),
             "multiplayer" => Screen::Multiplayer,
             "settings" => Screen::Options,
             "replays" => Screen::Replays,
@@ -79,8 +79,7 @@ pub struct Front {
     /// Presence of the current screen, 0..1.
     enter: f32,
     menu: MenuState,
-    skirmish: Option<SkirmishState>,
-    survival: Option<SurvivalState>,
+    setup: Option<SetupState>,
     replays: Option<ReplaysState>,
     multiplayer: Option<MultiplayerState>,
     /// This build's unit data, which network matches must share.
@@ -103,8 +102,7 @@ impl Front {
             target: Screen::Menu,
             enter: 0.0,
             menu: MenuState::default(),
-            skirmish: None,
-            survival: None,
+            setup: None,
             replays: None,
             multiplayer: None,
             blueprint_hash,
@@ -121,10 +119,14 @@ impl Front {
         self.enter = 1.0;
         // Shots see the map thumbnails; `MERIDIAN_MAP_BROWSER=1` opens the browser.
         let browse = std::env::var("MERIDIAN_MAP_BROWSER").is_ok_and(|v| v == "1");
-        if let (Screen::Skirmish, Some(s)) = (screen, &mut self.skirmish) {
-            s.catalog.browser.wait_for_thumbs();
+        if let (Screen::Setup(mode), Some(s)) = (screen, &mut self.setup) {
+            let browser = match mode {
+                Mode::Skirmish => &mut s.catalog.browser,
+                Mode::Survival => &mut s.catalog.theatre_browser,
+            };
+            browser.wait_for_thumbs();
             if browse {
-                s.catalog.browser.open_now(0);
+                browser.open_now(0);
             }
             // `MERIDIAN_SKIRMISH_TEAMS=N`: every seat an AI, split into N sides.
             if let Some(n) = std::env::var("MERIDIAN_SKIRMISH_TEAMS")
@@ -134,26 +136,14 @@ impl Front {
                 s.seat_teams_for_shot(n);
             }
         }
-        if let (Screen::Survival, Some(s)) = (screen, &mut self.survival) {
-            s.browser.wait_for_thumbs();
-            if browse {
-                s.browser.open_now(0);
-            }
-        }
     }
 
     fn go(&mut self, screen: Screen, settings: &Settings) {
-        if screen == Screen::Skirmish && self.skirmish.is_none() {
-            let mut state = SkirmishState::new(
-                &settings.skirmish_map,
-                settings.skirmish_fog,
-                &settings.player_name,
-            );
-            state.sky = settings.skirmish_sky;
-            self.skirmish = Some(state);
-        }
-        if screen == Screen::Survival && self.survival.is_none() {
-            self.survival = Some(SurvivalState::new(settings));
+        if let Screen::Setup(mode) = screen {
+            match &mut self.setup {
+                Some(s) => s.set_mode(mode),
+                None => self.setup = Some(SetupState::new(settings, mode, self.blueprint_hash)),
+            }
         }
         // Read afresh every visit: a match may have been recorded or marked since.
         if screen == Screen::Replays {
@@ -162,13 +152,20 @@ impl Front {
         if screen == Screen::Multiplayer && self.multiplayer.is_none() {
             self.multiplayer = Some(MultiplayerState::new(settings, self.blueprint_hash));
         }
-        // Skirmish and multiplayer share an image slot for their charts.
-        if let Some(s) = &mut self.skirmish {
+        // Set-up and multiplayer share an image slot for their charts.
+        if let Some(s) = &mut self.setup {
             s.chart_lost();
         }
         if let Some(m) = &mut self.multiplayer {
             m.chart_lost();
         }
+        self.target = screen;
+    }
+
+    /// Swaps to `screen` at once, without leaving and arriving: the set-up and
+    /// its lobby are one screen to the eye.
+    fn swap(&mut self, screen: Screen) {
+        self.screen = screen;
         self.target = screen;
     }
 
@@ -207,8 +204,8 @@ impl Front {
         match self.screen {
             Screen::Menu => {
                 match menu::draw(ui, &mut self.menu, &mut self.director, telemetry, enter) {
-                    Some(MenuAction::Skirmish) => self.go(Screen::Skirmish, settings),
-                    Some(MenuAction::Survival) => self.go(Screen::Survival, settings),
+                    Some(MenuAction::Skirmish) => self.go(Screen::Setup(Mode::Skirmish), settings),
+                    Some(MenuAction::Survival) => self.go(Screen::Setup(Mode::Survival), settings),
                     Some(MenuAction::Multiplayer) => self.go(Screen::Multiplayer, settings),
                     Some(MenuAction::Range) => self.launching = Some((Launching::Range, 0.0)),
                     Some(MenuAction::Replays) => self.go(Screen::Replays, settings),
@@ -217,41 +214,33 @@ impl Front {
                     None => {}
                 }
             }
-            Screen::Skirmish => {
-                let state = self.skirmish.as_mut().expect("created on the way in");
-                match skirmish::draw(ui, state, enter) {
-                    Some(SkirmishAction::Back) => self.target = Screen::Menu,
-                    Some(SkirmishAction::Start(request)) => {
+            Screen::Setup(_) => {
+                let Some(state) = self.setup.as_mut() else {
+                    // Handed on to the lobby it opened.
+                    return out;
+                };
+                match setup::draw(ui, state, enter) {
+                    Some(SetupAction::Back) => self.target = Screen::Menu,
+                    Some(SetupAction::Start(request)) => {
                         self.launching = Some((Launching::Match(request), 0.0))
+                    }
+                    Some(SetupAction::Host(hosted)) => {
+                        // The set-up becomes its lobby in place: the same screen, now with
+                        // the room's chat and code. Its maps go with it.
+                        if let Some(setup) = self.setup.take() {
+                            self.multiplayer = Some(MultiplayerState::hosted(
+                                settings,
+                                self.blueprint_hash,
+                                setup.catalog,
+                                *hosted,
+                            ));
+                            self.swap(Screen::Multiplayer);
+                        }
+                        return out;
                     }
                     None => {}
                 }
                 // What was set up is what the screen opens with next time.
-                let name = crate::settings::clean_name(&state.name);
-                if settings.skirmish_map != state.selected_stem()
-                    || settings.skirmish_fog != state.fog()
-                    || settings.skirmish_sky != state.sky
-                    || (settings.player_name != name && ui.mem.editing.is_none())
-                {
-                    settings.skirmish_map = state.selected_stem().to_owned();
-                    settings.skirmish_fog = state.fog();
-                    settings.skirmish_sky = state.sky;
-                    if ui.mem.editing.is_none() {
-                        state.name = name.clone();
-                        settings.player_name = name;
-                    }
-                    out.settings_changed = true;
-                }
-            }
-            Screen::Survival => {
-                let state = self.survival.as_mut().expect("created on the way in");
-                match survival::draw(ui, state, enter) {
-                    Some(SurvivalAction::Back) => self.target = Screen::Menu,
-                    Some(SurvivalAction::Start(request)) => {
-                        self.launching = Some((Launching::Match(request), 0.0))
-                    }
-                    None => {}
-                }
                 if state.store(settings, ui.mem.editing.is_some()) {
                     out.settings_changed = true;
                 }
@@ -279,6 +268,21 @@ impl Front {
                     Some(MultiplayerAction::Launch(launch)) => {
                         self.multiplayer = None;
                         self.launching = Some((Launching::Net(launch), 0.0));
+                    }
+                    Some(MultiplayerAction::Host) => {
+                        let mode = self.setup.as_ref().map_or(Mode::Skirmish, SetupState::mode);
+                        self.go(Screen::Setup(mode), settings);
+                        if let Some(s) = &mut self.setup {
+                            s.open_share();
+                        }
+                    }
+                    Some(MultiplayerAction::Resume(resume)) => {
+                        // Leaving a lobby opened from the set-up: back to it, as it stands.
+                        self.multiplayer = None;
+                        let setup = SetupState::resume(settings, self.blueprint_hash, *resume);
+                        self.swap(Screen::Setup(setup.mode()));
+                        self.setup = Some(setup);
+                        return out;
                     }
                     None => {}
                 }

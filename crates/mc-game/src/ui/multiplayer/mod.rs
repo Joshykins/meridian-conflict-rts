@@ -1,16 +1,18 @@
 //! Multiplayer: find a game on a server or on this network, host one, and the
 //! lobby before the start.
 //!
-//! Three pages share one state: the browser (`browse.rs`), the host form
-//! (`host.rs`) and the lobby (`lobby_view.rs`, over the model in `lobby.rs`).
+//! Two pages share one state: the browser (`browse.rs`) and the lobby
+//! (`lobby_view.rs`, over the model in `lobby.rs`). A game is hosted from the
+//! set-up screen, the same one as a match on this machine: its Open to Others
+//! sheet (`share.rs`) opens the lobby, and leaving that lobby goes back to it.
 //! The server link (`server.rs`) lives as long as the screen does, and on into
 //! the match: its sign-in ticket is what lets a dropped player back in.
 
 mod browse;
-mod host;
 pub mod lobby;
 mod lobby_view;
 pub mod server;
+pub mod share;
 #[cfg(test)]
 mod tests;
 
@@ -29,6 +31,16 @@ const CHART_SLOT: usize = 0;
 pub enum MultiplayerAction {
     Back,
     Launch(Box<Launch>),
+    /// Host Game: set a game up on the set-up screen, then open it to others.
+    Host,
+    /// A lobby opened from the set-up screen was left: back to setting it up.
+    Resume(Box<Resume>),
+}
+
+/// The set-up a left lobby goes back to: its maps and its plan as it stood.
+pub struct Resume {
+    pub catalog: Catalog,
+    pub lineup: Lineup,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -39,7 +51,6 @@ enum Tab {
 
 enum Page {
     Browse,
-    Host(host::Form),
     Lobby(Box<Lobby>),
 }
 
@@ -63,8 +74,8 @@ pub struct MultiplayerState {
     blueprint_hash: u64,
     /// A line for the player about the last thing tried, and when it was said.
     notice: Option<(String, Instant)>,
-    /// A room asked for and not yet created: its plan and whether it is private.
-    creating: Option<(Lineup, bool, String)>,
+    /// The lobby was opened from the set-up screen, and leaving it goes back there.
+    from_setup: bool,
 }
 
 /// The key that keeps this computer's name its own on a server, made on first use.
@@ -125,7 +136,42 @@ impl MultiplayerState {
             next: None,
             blueprint_hash,
             notice: None,
-            creating: None,
+            from_setup: false,
+        }
+    }
+
+    /// The lobby the set-up screen opened, over the maps it was set up with.
+    pub fn hosted(
+        settings: &crate::settings::Settings,
+        blueprint_hash: u64,
+        catalog: Catalog,
+        hosted: share::Hosted,
+    ) -> MultiplayerState {
+        let share::Hosted {
+            lobby,
+            server,
+            identity,
+        } = hosted;
+        MultiplayerState {
+            catalog,
+            server,
+            scanner: None,
+            lan: Vec::new(),
+            identity,
+            name: settings.player_name.clone(),
+            address: settings.server.clone(),
+            code: String::new(),
+            direct: String::new(),
+            tab: if settings.server.is_empty() {
+                Tab::Network
+            } else {
+                Tab::Online
+            },
+            page: Page::Lobby(Box::new(lobby)),
+            next: None,
+            blueprint_hash,
+            notice: None,
+            from_setup: true,
         }
     }
 
@@ -197,39 +243,8 @@ impl MultiplayerState {
     fn answers(&mut self) {
         for answer in std::mem::take(&mut self.server.answers) {
             match answer {
-                Answer::Created(code) => {
-                    let Some((plan, private, title)) = self.creating.take() else {
-                        continue;
-                    };
-                    let map_id = plan.card(&self.catalog).map_or(0, |m| m.map.content_id());
-                    let content = self.content(map_id);
-                    let joined = self.server.client().and_then(|c| {
-                        Some((
-                            c.server_addr().to_string(),
-                            c.join_config(code, Role::Player, content)?,
-                        ))
-                    });
-                    let Some((addr, config)) = joined else {
-                        self.say("The server went away before the game could open.");
-                        continue;
-                    };
-                    let rx = open(addr.clone(), config.clone());
-                    self.next = Some(Page::Lobby(Box::new(Lobby::new(
-                        rx,
-                        Place::Server { code, private },
-                        addr,
-                        config,
-                        Some(plan),
-                        title,
-                    ))));
-                }
-                Answer::Refused(why) => {
-                    self.creating = None;
-                    self.say(format!("The server would not open the game: {why}."));
-                    if let Some(Page::Host(form)) = &mut self.next {
-                        form.busy = false;
-                    }
-                }
+                // Rooms are opened from the set-up screen's sheet, which takes its own answers.
+                Answer::Created(_) | Answer::Refused(_) => {}
                 Answer::Found(listing) => self.join_room(&listing, Role::Player),
                 Answer::NotFound(code) => self.say(format!(
                     "No game with the code {code} is open on this server."
@@ -248,7 +263,6 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
     }
     let mode = match &state.page {
         Page::Browse => None,
-        Page::Host(form) => Some(form.mode()),
         Page::Lobby(lobby) => lobby.lineup.as_ref().map(|l| l.mode),
     };
     if let Some(mode) = mode {
@@ -264,7 +278,6 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
     let mut page = std::mem::replace(&mut state.page, Page::Browse);
     let action = match &mut page {
         Page::Browse => browse::draw(ui, state, enter),
-        Page::Host(form) => host::draw(ui, state, form, enter),
         Page::Lobby(lobby) => {
             lobby.pump(&state.catalog);
             match lobby.launch(&state.catalog, Vec::new()) {
@@ -287,6 +300,21 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
             }
         }
     };
+    // Leaving a lobby the set-up screen opened goes back to the set-up, as it stands.
+    if let (true, Some(Page::Browse), Page::Lobby(lobby)) =
+        (state.from_setup, &state.next, &mut page)
+    {
+        if let Some(lineup) = lobby.lineup.take() {
+            let catalog = std::mem::replace(
+                &mut state.catalog,
+                Catalog::new(Vec::new(), Vec::new(), Vec::new()),
+            );
+            return Some(MultiplayerAction::Resume(Box::new(Resume {
+                catalog,
+                lineup,
+            })));
+        }
+    }
     state.page = state.next.take().unwrap_or(page);
     action
 }

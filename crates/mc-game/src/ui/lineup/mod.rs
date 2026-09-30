@@ -1,7 +1,9 @@
 //! The line-up: setting up a match, the same on one machine and over a
-//! network. Skirmish and the multiplayer lobby both draw it: the chart under a
-//! bar that names the map and sums up the rules (all of them are on the
-//! settings sheet it opens), and the commanders on the right.
+//! network. The set-up screen (skirmish and survival) and the multiplayer
+//! lobby all draw it: the chart under a bar that names the map and sums up the
+//! rules (all of them are on the settings sheet it opens), and the commanders
+//! on the right. A set-up on one machine opens to others as a lobby with the
+//! same plan (`multiplayer::share`).
 //!
 //! `Lineup` is the plan (mode, map, seats, rules) with the screen's own state.
 //! On one machine the player edits it; in a lobby the host edits theirs and
@@ -60,10 +62,26 @@ pub enum Mode {
 }
 
 impl Mode {
+    /// As a game is listed for others to join.
     pub fn label(self) -> &'static str {
         match self {
             Mode::Skirmish => "Skirmish",
             Mode::Survival => "Co-op Survival",
+        }
+    }
+
+    /// As the set-up screen names it.
+    pub fn title(self) -> &'static str {
+        match self {
+            Mode::Skirmish => "Skirmish",
+            Mode::Survival => "Survival",
+        }
+    }
+
+    fn index(self) -> usize {
+        match self {
+            Mode::Skirmish => 0,
+            Mode::Survival => 1,
         }
     }
 }
@@ -85,29 +103,27 @@ impl Catalog {
         Catalog::load_from(crate::setup::list_maps(), survival)
     }
 
-    /// [`Self::load`] over the maps at `paths`.
+    /// [`Self::load`] over the maps at `paths`. Each map's settings file is read
+    /// once: a survival block makes it a theatre, and only theatres are opened then.
     pub(crate) fn load_from(paths: Vec<std::path::PathBuf>, survival: bool) -> Catalog {
-        let mut maps: Vec<MapCard> = paths
-            .into_iter()
-            .filter_map(|path| {
-                let config = mc_data::weather::MapConfig::for_map(&path).unwrap_or_else(|e| {
-                    log::warn!("{e}");
-                    Default::default()
-                });
-                config
-                    .survival
-                    .is_none()
-                    .then(|| maps::open_card(&path, &config))
-                    .flatten()
-            })
-            .collect();
+        let mut maps: Vec<MapCard> = Vec::new();
+        let mut found = Vec::new();
+        for path in paths {
+            let config = mc_data::weather::MapConfig::for_map(&path).unwrap_or_else(|e| {
+                log::warn!("{e}");
+                Default::default()
+            });
+            if config.survival.is_none() {
+                maps.extend(maps::open_card(&path, &config));
+            } else if survival {
+                found.extend(super::survival::theatre_of(&path, config));
+            }
+        }
         // Smallest first: the quick 1v1 maps lead the list.
         maps.sort_by_key(|m| (m.map.info().tile_count(), m.stem.clone()));
-        let (theatres, theatre_cards) = if survival {
-            super::survival::load_theatres()
-        } else {
-            (Vec::new(), Vec::new())
-        };
+        found
+            .sort_by_key(|(t, _): &(Theatre, MapCard)| (t.map.info().tile_count(), t.stem.clone()));
+        let (theatres, theatre_cards) = found.into_iter().unzip();
         Catalog::new(maps, theatres, theatre_cards)
     }
 
@@ -216,6 +232,8 @@ pub struct Lineup {
     pub seed: u64,
     /// Survival's rules (ignored in skirmish).
     pub rules: SurvivalRules,
+    /// Each mode's map as last picked, so switching back finds it again.
+    pub last_map: [usize; 2],
     pub races: RacePicker,
     /// The settings sheet: the theatre and the rules.
     pub sheet: Sheet,
@@ -246,6 +264,7 @@ impl Lineup {
             fog: true,
             seed: fresh_seed(),
             rules: SurvivalRules::default(),
+            last_map: [0; 2],
             races: RacePicker::default(),
             sheet: Sheet::default(),
             tuning: None,
@@ -256,6 +275,7 @@ impl Lineup {
             chart_of: None,
             markers: Vec::new(),
         };
+        lineup.last_map[mode.index()] = map;
         lineup.roster = Roster::new(lineup.zones(catalog), people, ai, mode == Mode::Survival);
         lineup.settle(catalog);
         lineup
@@ -264,6 +284,29 @@ impl Lineup {
     /// Something else drew in the chart's image slot: draw the chart again.
     pub fn chart_lost(&mut self) {
         self.chart_of = None;
+    }
+
+    /// The same plan (mode, map, seats, rules) with the screen's state fresh:
+    /// what a set-up takes to the lobby it opens.
+    pub fn plan(&self) -> Lineup {
+        Lineup {
+            mode: self.mode,
+            map: self.map,
+            roster: self.roster.clone(),
+            fog: self.fog,
+            seed: self.seed,
+            rules: self.rules,
+            last_map: self.last_map,
+            races: RacePicker::default(),
+            sheet: Sheet::default(),
+            tuning: None,
+            coloring: None,
+            seat_scroll: 0.0,
+            hover_team: None,
+            hover_domain: None,
+            chart_of: None,
+            markers: Vec::new(),
+        }
     }
 
     pub fn card<'a>(&self, catalog: &'a Catalog) -> Option<&'a MapCard> {
@@ -340,11 +383,12 @@ impl Lineup {
             (self.map, self.roster) = before;
             return Err(e);
         }
+        self.last_map[self.mode.index()] = map;
         self.settle(catalog);
         Ok(())
     }
 
-    /// Switches between skirmish and co-op survival, on the mode's first map.
+    /// Switches between skirmish and survival, on the map last picked in that mode.
     pub fn set_mode(
         &mut self,
         catalog: &Catalog,
@@ -359,7 +403,7 @@ impl Lineup {
         }
         let before = (self.mode, self.map, self.roster.clone());
         self.mode = mode;
-        self.map = 0;
+        self.map = self.last_map[mode.index()].min(catalog.cards(mode).len() - 1);
         let zones = self.zones(catalog);
         if let Err(e) = self.roster.fit(zones, occupied) {
             (self.mode, self.map, self.roster) = before;
@@ -487,6 +531,7 @@ impl Lineup {
         }
         self.mode = mode;
         self.map = map;
+        self.last_map[mode.index()] = map;
         self.fog = options.config.fog;
         self.seed = options.config.seed;
         let engine = options.survival.as_ref().map(|s| s.engine_player as usize);
@@ -533,14 +578,20 @@ impl Lineup {
     }
 }
 
-/// The screen's header: emblem, title and a caption, over the dark backdrop.
-pub fn header(ui: &mut Ui, title: &str, caption: &str, enter: f32) {
+/// The screen's header: the mode's mark and name (the emblem and "Lobby"
+/// while a lobby has no plan yet) and a caption, over the dark backdrop.
+pub fn header(ui: &mut Ui, mode: Option<Mode>, caption: &str, enter: f32) {
     let (w, h) = (ui.size.x, ui.size.y);
     ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.66 * enter));
     ui.scrim(Rect::new(0.0, 0.0, w, 220.0), 0.6 * enter, 0.0, false);
     ui.fade = enter;
     ui.shift.y = 14.0 * (1.0 - enter);
-    ui.emblem(Vec2::new(LEFT + 15.0, 84.0), 13.0, rgb(palette::TEXT, 0.9));
+    let mark = Vec2::new(LEFT + 15.0, 84.0);
+    match mode {
+        Some(Mode::Survival) => super::survival::engine_mark(ui, mark, 12.0, 1.0, false),
+        _ => ui.emblem(mark, 13.0, rgb(palette::TEXT, 0.9)),
+    }
+    let title = mode.map_or("Lobby", Mode::title);
     let end = ui.text(
         LEFT + 50.0,
         84.0,
@@ -784,7 +835,7 @@ pub fn rule_label(ui: &mut Ui, r: Rect, label: &str) {
     );
 }
 
-/// The rules every set-up shares, from `y`: the mode (a lobby's), fog, and the
+/// The rules every set-up shares, from `y`: the mode, fog, and the
 /// seed (one machine's; a network match's seed is the relay's). Only the host
 /// changes them. Returns the y under the last row.
 fn rules(
@@ -798,7 +849,7 @@ fn rules(
     let mut y = area.y + 26.0;
     let row = |y: f32| Rect::new(area.x, y, area.w, RULE_PITCH - 4.0);
     let mut ask = None;
-    if table.lobby {
+    {
         let r = row(y);
         rule_label(ui, r, "Mode");
         let modes = [Mode::Skirmish, Mode::Survival];
@@ -920,16 +971,27 @@ pub fn overlays(
     asks
 }
 
-/// The footer: back on the left, the launch on the right with a line beside it
-/// in `tone`, and a notice over that line. Returns (back, launch) as clicked.
+/// What the footer's buttons were clicked for.
+#[derive(Default)]
+pub struct Footer {
+    pub back: bool,
+    pub launch: bool,
+    /// The button beside the launch (Open to Others), when there is one.
+    pub beside: bool,
+}
+
+/// The footer: back on the left, the launch on the right with `beside` (a
+/// label, and whether it may be clicked) left of it, a line beside those in
+/// `tone`, and a notice over that line.
 pub fn footer(
     ui: &mut Ui,
     back: &str,
     launch: (&str, ButtonKind, bool),
+    beside: Option<(&str, bool)>,
     line: &str,
     tone: u32,
     notice: Option<&str>,
-) -> (bool, bool) {
+) -> Footer {
     let (w, h) = (ui.size.x, ui.size.y);
     let back = ui.button(
         id("lineup-back", 0),
@@ -940,6 +1002,14 @@ pub fn footer(
     );
     let go_rect = Rect::new(w - LEFT - 340.0, h - 64.0 - 58.0, 340.0, 58.0);
     let go = ui.button(id("lineup-go", 0), go_rect, launch.0, launch.1, launch.2);
+    let mut text_x = go_rect.x;
+    let mut side = false;
+    if let Some((label, can)) = beside {
+        let r = Rect::new(go_rect.x - 16.0 - 240.0, go_rect.y, 240.0, go_rect.h);
+        side = ui.button(id("lineup-beside", 0), r, label, ButtonKind::Secondary, can) && can;
+        text_x = r.x;
+    }
+    let go_rect = Rect::new(text_x, go_rect.y, go_rect.w, go_rect.h);
     ui.text_right(
         go_rect.x - 24.0,
         go_rect.mid_y(),
@@ -956,7 +1026,11 @@ pub fn footer(
             text,
         );
     }
-    (back, go && launch.2)
+    Footer {
+        back,
+        launch: go && launch.2,
+        beside: side,
+    }
 }
 
 /// The line beside the launch: the matchup and who plays, or the problem.

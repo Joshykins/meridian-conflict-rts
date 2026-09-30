@@ -101,15 +101,18 @@ Games hosted from the client (LAN, direct IP) do not check names.
 
 1. **Browse.** The client opens a directory connection, signs in, and
    subscribes to the game list. The server pushes changes.
-2. **Host.** The client asks for a room (title, slot count, public or
-   private, the content it will bring). The server makes a hub and answers with
+2. **Host.** A game is set up on the set-up screen, the same one as a match
+   on one machine, and its Open to Others sheet (`ui/multiplayer/share.rs`)
+   picks where it goes. For a server game the client asks for a room (title,
+   slot count, public or private, the content it will bring). The server makes a hub and answers with
    a room code. Private rooms are not listed and are joined by their code.
 3. **Lobby.** Every player (and observer) opens a match connection to the room
    with `Hello { room, ticket }`, the creator first. Whoever opens the room
    hosts (then the lowest occupied seat, if they leave): the host's match
    options (mode, map, rules, the seat template with AI commanders) define the
    match, and the host opens the seats others may take. The lobby is the same
-   set-up screen as skirmish (`ui/lineup`): the host sets every seat's control,
+   set-up screen as skirmish and survival (`ui/lineup`), with the plan the host
+   set up before opening it; leaving it takes the host back to that set-up. The host sets every seat's control,
    team, zone and colour; each player picks its own race, takes an open seat
    and readies up. Chat works. The host starts once everyone is ready; a short
    countdown runs on every screen. The mode is skirmish (teams, any skirmish

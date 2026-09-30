@@ -25,12 +25,12 @@ pub(super) fn draw(
 ) -> Option<MultiplayerAction> {
     let live = ui.interactive;
     let mode = lobby.lineup.as_ref().map(|l| l.mode);
-    let caption = match (lobby.title.is_empty(), mode) {
-        (true, _) => "Waiting for commanders".to_owned(),
-        (false, Some(m)) => format!("{}  \u{b7}  {}", lobby.title, m.label()),
-        (false, None) => lobby.title.clone(),
+    let caption = if lobby.title.is_empty() {
+        "Waiting for commanders".to_owned()
+    } else {
+        format!("{}  \u{b7}  Lobby", lobby.title)
     };
-    lineup::header(ui, "Lobby", &caption, enter);
+    lineup::header(ui, mode, &caption, enter);
     where_chip(ui, lobby);
 
     let problem = lobby.error.clone().or_else(|| {
@@ -108,10 +108,7 @@ fn screen(
         lobby,
         Rect::new(left.x, left.y + 6.0, left.w, left.h - 6.0),
     );
-    let chips = [
-        plan.mode.label().to_owned(),
-        lineup::settings::fog_chip(plan.fog),
-    ];
+    let chips = [lineup::settings::fog_chip(plan.fog)];
     let chart = lineup::bar(ui, plan, &mut state.catalog, table.host, &chips, centre);
     lineup::chart(ui, plan, &state.catalog, table, CHART_SLOT, chart);
     asks.extend(lineup::commanders(
@@ -195,7 +192,8 @@ fn footer(
     } else {
         ("Ready", ButtonKind::Primary, true)
     };
-    let (leave, go) = lineup::footer(ui, "Leave", launch, &line, tone, notice.as_deref());
+    let clicked = lineup::footer(ui, "Leave", launch, None, &line, tone, notice.as_deref());
+    let (leave, go) = (clicked.back, clicked.launch);
     if go {
         if table.host {
             ui.audio.play(Sfx::Launch);

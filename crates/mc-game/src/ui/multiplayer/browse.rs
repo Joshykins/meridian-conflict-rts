@@ -3,7 +3,7 @@
 //! what to try, and games on this network still work.
 
 use super::server::{Problem, Status};
-use super::{host, MultiplayerAction, MultiplayerState, Page, Tab};
+use super::{MultiplayerAction, MultiplayerState, Tab};
 use crate::audio::Sfx;
 use crate::ui::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use glam::Vec2;
@@ -14,7 +14,7 @@ const SIDE_W: f32 = 400.0;
 const ROW_H: f32 = 66.0;
 
 /// The page header shared by the multiplayer pages.
-pub(super) fn header(ui: &mut Ui, title: &str, caption: &str, enter: f32) {
+fn header(ui: &mut Ui, title: &str, caption: &str, enter: f32) {
     let (w, h) = (ui.size.x, ui.size.y);
     ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.66 * enter));
     ui.scrim(Rect::new(0.0, 0.0, w, 220.0), 0.6 * enter, 0.0, false);
@@ -119,7 +119,7 @@ pub(super) fn draw(
         action = Some(MultiplayerAction::Back);
     } else if host {
         ui.audio.play(Sfx::Select);
-        state.next = Some(Page::Host(host::Form::new(state)));
+        action = Some(MultiplayerAction::Host);
     }
     ui.fade = 1.0;
     ui.shift.y = 0.0;

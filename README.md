@@ -131,9 +131,12 @@ at build time by naga. Direct Linux Cargo runs under WSL may use the CPU rasteri
 Sound needs a system audio API: Windows and macOS builds have it; on Linux build with
 `--features alsa` (needs ALSA's headers), otherwise the game runs silent.
 
-**Multiplayer** on the main menu finds games on a server or on your own network, hosts
-them, and holds the lobby: the skirmish set-up screen with chat, ready and start, for a
-skirmish or co-op survival against the Progenitor. Internet games go
+**Skirmish** and **Survival** on the main menu open one set-up screen (the mode is
+switched in its Match Settings), and **Open to Others** at its foot takes the match as
+set up to a lobby friends join: over the internet or on your own network, public or
+private by code. The lobby is the same screen with chat, ready and start; leaving it goes
+back to the set-up. **Multiplayer** on the main menu finds games on a server or on your
+own network, and its Host Game leads to the same set-up screen. Internet games go
 through `meridian-server`: it lists open games, hosts rooms by code, checks names against
 each player's device key and relays every match. `docs/SERVER.md` is the guide to running
 one (on a small VPS, or at home on a Mac); `docs/MULTIPLAYER.md` explains the design. Games

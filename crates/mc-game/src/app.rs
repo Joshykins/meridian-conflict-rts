@@ -17,7 +17,7 @@ use crate::sim_thread::{self, SimHandle, SimSetup, SimStatus};
 use crate::ui::backdrop::Director;
 use crate::ui::front::{Front, FrontEvent};
 use crate::ui::menu::{Telemetry, PREVIEW_SLOT};
-use crate::ui::skirmish::MatchRequest;
+use crate::ui::setup::MatchRequest;
 use crate::ui::{self, Key, Ui};
 use crate::window_chrome;
 use glam::Vec2;
@@ -1327,7 +1327,7 @@ impl App {
             let waited = self.stage_since.elapsed().as_secs_f32();
             match (&self.stage, self.smoke_step) {
                 (Stage::Front(_), 0) if waited > 4.0 => {
-                    let request = ui::skirmish::default_request(&self.settings)
+                    let request = ui::setup::default_request(&self.settings)
                         .ok_or("smoke: the default skirmish is not startable")?;
                     log::info!(
                         "smoke: front end is up; starting a skirmish on {:?}",

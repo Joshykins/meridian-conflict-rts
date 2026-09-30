@@ -71,8 +71,8 @@ fn build_label() -> String {
 const USAGE: &str = "\
 meridian [options]
 
-With no match options the game opens its front end: main menu, skirmish set-up,
-survival set-up, settings. Any of --map, --scene, --players, --seed, --army, --connect or --observe goes
+With no match options the game opens its front end: main menu, match set-up
+(skirmish and survival), multiplayer, settings. Any of --map, --scene, --players, --seed, --army, --connect or --observe goes
 straight into a match instead.
 
   --map NAME|PATH        map to play (default: maps/dev16.mcmap, else maps/meridian_basin.mcmap)
@@ -149,7 +149,8 @@ straight into a match instead.
                          DIR as NAME.req files (one argument per line; --reload re-reads data/,
                          --shaders recompiles the WGSL); writes NAME.done; scripts/shot.sh drives it
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
-                         menu | skirmish | survival | settings
+                         menu | skirmish | survival (the set-up screen in that mode) |
+                         multiplayer | replays | settings
   --loading SECONDS      with --screenshot: the loading screen that long after it came up;
                          FROM:TO:FPS shoots a run of numbered frames (FILE-0000.png, ...)
   --opening              with --loading: the run's opening screen instead of a map's
@@ -336,7 +337,7 @@ fn run() -> Result<(), String> {
             }
             "--loading" => loading_at = Some(loading_times(&value("--loading")?).ok_or("--loading takes SECONDS or FROM:TO:FPS")?),
             "--opening" => opening = true,
-            "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish, survival or settings")?),
+            "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish, survival, multiplayer, replays or settings")?),
             "--cursor" => {
                 let v: Vec<f32> = value("--cursor")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 cursor = Some([*v.first().ok_or("--cursor takes X,Y")?, *v.get(1).ok_or("--cursor takes X,Y")?]);
@@ -605,7 +606,7 @@ fn run() -> Result<(), String> {
             } else {
                 None
             };
-            let request = ui::skirmish::MatchRequest {
+            let request = ui::setup::MatchRequest {
                 map: map.clone(),
                 config,
                 colors,

@@ -49,13 +49,31 @@ impl Sheet {
         live: bool,
         body: impl FnOnce(&mut Ui, Rect),
     ) {
+        if self.draw_with(ui, title, size, live, ("Done", true), body) {
+            ui.audio.play(Sfx::Back);
+            self.open = false;
+        }
+    }
+
+    /// [`Self::draw`] with `action` (a label, and whether it may be clicked) in
+    /// place of Done: true the frame it is clicked, and the sheet stays open.
+    /// Escape and a click outside still put it away.
+    pub fn draw_with(
+        &mut self,
+        ui: &mut Ui,
+        title: &str,
+        size: Vec2,
+        live: bool,
+        action: (&str, bool),
+        body: impl FnOnce(&mut Ui, Rect),
+    ) -> bool {
         self.shown = if self.open {
             (self.shown + ui.dt * 6.0).min(1.0)
         } else {
             (self.shown - ui.dt * 8.0).max(0.0)
         };
         if self.shown <= 0.0 {
-            return;
+            return false;
         }
         let k = 1.0 - (1.0 - self.shown) * (1.0 - self.shown);
         let (fade, shift, interactive) = (ui.fade, ui.shift, ui.interactive);
@@ -92,10 +110,10 @@ impl Sheet {
         let done = ui.button(
             id("sheet-done", 0),
             Rect::new(inner.right() - 220.0, inner.bottom() - 46.0, 220.0, 46.0),
-            "Done",
+            action.0,
             ButtonKind::Primary,
-            true,
-        );
+            action.1,
+        ) && action.1;
         // After the body, so its controls take the pointer first: the panel
         // itself swallows clicks, and a click on the dim around it puts it away.
         let inside = ui.interact_with(id("sheet-panel", 0), panel, true, false);
@@ -108,9 +126,11 @@ impl Sheet {
         let typing = ui.mem.editing.is_some();
         let listing = ui.mem.popup.is_some();
         let away = outside.clicked && !inside.clicked && !listing;
+        let acted = self.open && ui.interactive && done;
         if self.open
             && ui.interactive
-            && (done || away || (ui.input.key(Key::Escape) && !typing && !listing))
+            && !done
+            && (away || (ui.input.key(Key::Escape) && !typing && !listing))
         {
             ui.audio.play(Sfx::Back);
             self.open = false;
@@ -118,6 +138,11 @@ impl Sheet {
         ui.fade = fade;
         ui.shift = shift;
         ui.interactive = interactive;
+        acted
+    }
+
+    pub fn close(&mut self) {
+        self.open = false;
     }
 }
 

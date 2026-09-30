@@ -4,7 +4,7 @@
 
 use crate::hud::style::{AIR, LAND, NAVY};
 use crate::survival::ENGINE_COLOR;
-use crate::ui::{ink, palette, rgb, type_scale, Color, Rect, Style, Ui};
+use crate::ui::{ink, palette, rgb, type_scale, Color, Rect, Ui};
 use glam::Vec2;
 use mc_data::survival::Domain;
 use mc_data::IconKind;
@@ -165,21 +165,6 @@ pub(super) fn anchor(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
         t,
         color,
     );
-}
-
-/// `text` cut short with an ellipsis to fit `width`, in `st` as given.
-pub(super) fn clip(ui: &mut Ui, st: Style, text: &str, width: f32) -> String {
-    if ui.text_width(st, text) <= width {
-        return text.to_owned();
-    }
-    let mut cut = text.to_owned();
-    while cut.pop().is_some() {
-        let candidate = format!("{}\u{2026}", cut.trim_end());
-        if ui.text_width(st, &candidate) <= width {
-            return candidate;
-        }
-    }
-    String::new()
 }
 
 /// A tooltip card: a title in `accent`, then lines of text.
