@@ -72,7 +72,7 @@ pub mod material {
     /// reclaimer's emitter tips use it, so reclaim never reads as construction amber.
     pub const GLOW_MATERIALS: u32 = crate::gpu_consts::mass::GLOW_MATERIAL;
     /// Pinch fusion's light (`gpu_consts::prism`): a white-hot face with a soft pastel
-    /// prism turning round its rim, pink through violet, blue, cyan and gold. A Regency star
+    /// prism turning round its rim, rose, magenta, lavender and peach-gold. A Regency star
     /// core. Emissive.
     pub const GLOW_PRISM: u32 = crate::gpu_consts::prism::GLOW_MATERIAL;
     pub const LAST: u32 = GLOW_PRISM;

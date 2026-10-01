@@ -283,17 +283,17 @@ fn hash11(n: f32) -> f32 {
     return fract(sin(n * 12.9898) * 43758.5453);
 }
 
-// Pinch fusion's prism (gpu_consts `prism`): a pastel colour that runs pink, violet,
-// blue, cyan, gold, rose and back to pink as `t` goes once round (one per unit of t).
-// Unit brightness; the caller pushes it.
+// Pinch fusion's prism (gpu_consts `prism`): the pinks of the Bifrost, a pastel that runs
+// rose, magenta, lavender, pale pink, peach-gold and back to rose as `t` goes once round
+// (one per unit of t). No blues or greens. Unit brightness; the caller pushes it.
 fn prism(t: f32) -> vec3<f32> {
     var stops = array<vec3<f32>, 6>(
-        vec3<f32>(1.0, 0.3, 0.72),
-        vec3<f32>(0.62, 0.28, 1.0),
-        vec3<f32>(0.3, 0.52, 1.0),
-        vec3<f32>(0.36, 0.95, 1.0),
-        vec3<f32>(1.0, 0.82, 0.42),
-        vec3<f32>(1.0, 0.45, 0.55),
+        vec3<f32>(1.0, 0.42, 0.68),
+        vec3<f32>(0.95, 0.3, 0.85),
+        vec3<f32>(0.72, 0.46, 1.0),
+        vec3<f32>(1.0, 0.62, 0.82),
+        vec3<f32>(1.0, 0.74, 0.56),
+        vec3<f32>(1.0, 0.4, 0.58),
     );
     let x = fract(t) * 6.0;
     let i = min(u32(x), 5u);

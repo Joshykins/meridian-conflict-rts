@@ -296,9 +296,11 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 
 - **Pinch fusion's light is the prism.** Where plasma fuses it burns
   white-hot, and only toward its edge breaks into a turning pastel prism:
-  pink, violet, blue, cyan, gold (the Bifrost; a pink-white beam in space).
-  Mostly white, a little colour. The star cores have it; the Pinch-fusion
-  guns are to follow. The lower grades stay red. One colour source:
+  rose, magenta, lavender, peach-gold (the Bifrost; a pink-white beam in
+  space). No blues or greens. Mostly white, a little colour. The star cores
+  have it; the Pinch-fusion guns' charge and strike draw their own rim
+  (plasma_puffs.wgsl), which the user signed off as it is. The lower grades
+  stay red. One colour source:
   `gpu_consts::prism` and common.wgsl `prism`.
 
 - **The set**

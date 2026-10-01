@@ -7,7 +7,7 @@
 //!
 //! - The star in the middle: a white-hot core wrapped in flares, all pinch fusion's
 //!   light (`GLOW_PRISM`): white where it faces you, breaking into a turning pastel
-//!   prism, pink, violet, blue, cyan and gold, toward its rim.
+//!   prism, rose, magenta, lavender and peach-gold, toward its rim.
 //! - The gravity cage round it: fixed bronze rings crossed about it, and turning ones
 //!   (`part::SPINNER`) with their weights; tech 1 has two fixed and one turning, tech 2
 //!   three and two, tech 3 four and three.

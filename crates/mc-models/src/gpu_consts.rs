@@ -552,9 +552,9 @@ shared! {
         pub const GLOW_MATERIAL: u32 = 27;
     }
 
-    /// Pinch fusion's light: the Regency's star cores. Plasma
-    /// pinched until it fuses burns white-hot at the heart with a pastel prism round it,
-    /// running pink, violet, blue, cyan and gold (common.wgsl `prism`), like the light of a
+    /// Pinch fusion's light: the Regency's star cores. Plasma pinched
+    /// until it fuses burns white-hot at the heart with a pastel prism round it, running
+    /// rose, magenta, lavender and peach-gold (common.wgsl `prism`), like the light of a
     /// bridge between stars, not the red of the lesser grades.
     pub mod prism as "PRISM_" {
         /// `material::GLOW_PRISM`: a star core and its flares, the prism turning over them.
