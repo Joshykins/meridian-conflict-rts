@@ -1,0 +1,75 @@
+use super::*;
+use std::path::Path;
+
+fn roster() -> Blueprints {
+    Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap()
+}
+
+fn profile(b: &Blueprints, key: &str) -> Profile {
+    Profile::of(b.unit(b.id_of(key).unwrap()))
+}
+
+#[test]
+fn roles_come_from_what_a_unit_can_do() {
+    let b = roster();
+    let has = |key: &str, r: u32| profile(&b, key).has(r);
+    assert!(has("aster_t1_tank", role::LINE));
+    assert!(has("aster_t1_mobile_aa", role::ANTI_AIR));
+    assert!(has("aster_t1_lift_ship", role::TRANSPORT | role::WARP));
+    assert!(has("aster_t2_lift_ship", role::TRANSPORT | role::PROJECT));
+    assert!(has("aster_t1_sensor_ship", role::SENSOR | role::WARP));
+    assert!(has("aster_t4_artillery", role::MAP_GUN | role::PROJECT));
+    assert!(has("aster_t4_nuke_silo", role::STRATEGIC));
+    assert!(has("aster_t3_nuke_defense", role::INTERCEPTOR));
+    assert!(has("aster_t1_submarine", role::HUNTER | role::ANTI_SHIP));
+    assert!(has("aster_t1_bomber", role::STRIKE));
+    assert!(has("aster_t4_anti_ship", role::ANTI_SPACE));
+    assert!(!has("aster_t1_tank", role::ANTI_AIR));
+    let sub = profile(&b, "aster_t1_submarine");
+    assert_eq!(sub.is, Some(Target::Submerged));
+    assert_eq!(sub.domain, Some(Domain::Sub));
+}
+
+/// Every armed unit any race can field has a place in the Commander's plans: it
+/// fights on the ground, in the air, at sea, under it, or shells from afar. A unit
+/// that fits none would never be built. Run with `--nocapture` for the whole table.
+#[test]
+fn every_armed_unit_of_every_race_has_a_role() {
+    let b = roster();
+    let combat = role::LINE
+        | role::RAIDER
+        | role::ARTILLERY
+        | role::ANTI_AIR
+        | role::ANTI_SHIP
+        | role::HUNTER
+        | role::SIEGE
+        | role::MAP_GUN
+        | role::DEFENSE
+        | role::STRIKE
+        | role::ANTI_SPACE;
+    let mut missing = vec![];
+    for bp in &b.units {
+        let p = Profile::of(bp);
+        println!(
+            "{:<32} t{} {:?} roles {:#07x} cost {:>7} dps land {:>6} air {:>6} ship {:>6} sub {:>6}",
+            bp.key,
+            p.tech,
+            p.domain,
+            p.roles,
+            p.cost.floor_int(),
+            p.dps[0].floor_int(),
+            p.dps[2].floor_int(),
+            p.dps[3].floor_int(),
+            p.dps[4].floor_int(),
+        );
+        // Armed spaceships fight as a fleet of their own.
+        let warship = p.domain == Some(Domain::Space) && p.armed();
+        if p.armed() && p.roles & combat == 0 && !warship && !bp.has(cat::COMMANDER) {
+            missing.push(bp.key.clone());
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "armed units no plan can use: {missing:?}"
+    );
+}

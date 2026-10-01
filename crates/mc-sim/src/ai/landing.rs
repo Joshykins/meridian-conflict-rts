@@ -129,7 +129,11 @@ impl World {
     /// Land units of the home guard a side with no land route keeps back, plus
     /// what its lift ships could carry, so landings have cargo (`theatre.rs`).
     pub(super) fn land_guard_cap(&self, player: u8, census: &Census) -> usize {
-        if !self.holds(player, Gambit::Landing) {
+        let commander_lands = self.state.ai[player as usize]
+            .commander
+            .plan(super::commander::state::PlanKind::Landing)
+            > super::commander::state::Stake::Off;
+        if !self.holds(player, Gambit::Landing) && !commander_lands {
             return theatre::HOME_GUARD;
         }
         let room: usize = census

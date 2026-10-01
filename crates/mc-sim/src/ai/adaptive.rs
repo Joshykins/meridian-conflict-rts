@@ -71,6 +71,14 @@ impl AiState {
 
     /// A compact diagnostic for headless match reports.
     pub fn summary(&self) -> String {
+        if self.config.brain == crate::Brain::Commander {
+            return format!(
+                "commander waves={} contacts={} {}",
+                self.waves,
+                self.contacts.len(),
+                self.commander.summary()
+            );
+        }
         format!(
             "stance={} waves={} raids={} contacts={} recovering={} production={} land_route={} plans={} landings={} landing={}",
             self.stance,
@@ -332,6 +340,27 @@ impl World {
 
     pub(super) fn factory_domain_score(&self, player: u8, bp: &UnitBlueprint) -> i64 {
         let d = domain(bp);
+        // The Commander builds factories for the forces its plans want.
+        if self.commander_directives(player).is_some() {
+            let shares = self.force_shares(player);
+            let want = match d {
+                0 => shares[0],
+                1 => shares[1],
+                _ => shares[2] + shares[3],
+            };
+            let held = self
+                .state
+                .units
+                .slots
+                .iter()
+                .filter(|&r| {
+                    self.state.units.owner[r] == player
+                        && self.bp(r).has(cat::FACTORY)
+                        && domain(self.bp(r)) == d
+                })
+                .count() as i64;
+            return want * 100 / (1 + held);
+        }
         let ai = &self.state.ai[player as usize];
         let count = self
             .state

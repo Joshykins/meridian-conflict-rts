@@ -82,6 +82,8 @@ impl World {
                 && self.are_enemies(self.state.units.owner[row], victim_owner)
             {
                 self.state.units.kills[row] = self.state.units.kills[row].saturating_add(1);
+                let mass = self.bp(victim).cost_mass;
+                self.note_kill_for_ai(killer_player, killer, mass);
             }
         }
         let credits = std::mem::take(&mut self.state.units.damage[victim]);

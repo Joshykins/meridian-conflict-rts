@@ -90,6 +90,7 @@ straight into a match instead.
   --observe              watch an all-AI match (no human slot; the camera opens on the whole map)
   --ai-difficulty NAME  easy | normal | hard (how well it spends: builders, mines, factories, waves)
   --ai-doctrine NAME    adaptive | aggressive | economic | defensive
+  --ai-brain NAME       classic | commander (the planning AI, docs/AI_COMMANDER.md)
   --ai-adaptation N     counter-production strength, 0-100 (default 75)
   --ai-domains L,A,N    land, air, naval production preferences, 0-200 each
   --army N               units per player in the stress scene (default 500)
@@ -260,6 +261,7 @@ fn run() -> Result<(), String> {
                 | "--observe"
                 | "--ai-difficulty"
                 | "--ai-doctrine"
+                | "--ai-brain"
                 | "--ai-adaptation"
                 | "--ai-domains"
         );
@@ -277,6 +279,10 @@ fn run() -> Result<(), String> {
                 "adaptive" => mc_sim::Doctrine::Adaptive, "aggressive" => mc_sim::Doctrine::Aggressive,
                 "economic" => mc_sim::Doctrine::Economic, "defensive" => mc_sim::Doctrine::Defensive,
                 _ => return Err("--ai-doctrine takes adaptive, aggressive, economic or defensive".into()),
+            },
+            "--ai-brain" => opts.ai.brain = match value("--ai-brain")?.as_str() {
+                "classic" => mc_sim::Brain::Classic, "commander" => mc_sim::Brain::Commander,
+                _ => return Err("--ai-brain takes classic or commander".into()),
             },
             "--ai-adaptation" => {
                 let n: u8 = value("--ai-adaptation")?.parse().map_err(|_| "--ai-adaptation takes 0-100")?;

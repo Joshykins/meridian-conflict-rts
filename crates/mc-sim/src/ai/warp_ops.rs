@@ -272,7 +272,7 @@ impl World {
     }
 
     /// `row` back to `home`: by warp when it is far and the drive is ready.
-    fn go_home(&self, row: usize, home: FxVec2, out: &mut Vec<Command>) {
+    pub(super) fn go_home(&self, row: usize, home: FxVec2, out: &mut Vec<Command>) {
         let far = self.state.units.pos[row].distance(home) >= WORTH_A_JUMP;
         let units = vec![self.state.units.id(row)];
         out.push(if far && self.can_jump(row) {

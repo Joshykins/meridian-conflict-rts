@@ -295,7 +295,7 @@ impl World {
 
     /// The nearest remembered contact some ship of `fleet` can reach within
     /// weapon range of, on water `sea` reaches.
-    fn fleet_target(
+    pub(super) fn fleet_target(
         &self,
         player: u8,
         fleet: &[usize],
@@ -326,7 +326,12 @@ impl World {
     }
 
     /// With no contact, the fleet's own water nearest an enemy start.
-    fn enemy_water(&self, player: u8, sea: &super::sea::SeaReach, from: FxVec2) -> Option<FxVec2> {
+    pub(super) fn enemy_water(
+        &self,
+        player: u8,
+        sea: &super::sea::SeaReach,
+        from: FxVec2,
+    ) -> Option<FxVec2> {
         self.state
             .players
             .iter()

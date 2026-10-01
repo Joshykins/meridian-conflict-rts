@@ -14,6 +14,7 @@ mod adaptive;
 mod army;
 mod arrival;
 mod builders;
+mod commander;
 mod danger;
 mod energy;
 mod groups;
@@ -121,6 +122,9 @@ pub struct AiState {
     /// Landings started (`landing.rs`).
     #[serde(default)]
     pub landings: u32,
+    /// The Commander's plans and operations (`commander/`), when it plays this side.
+    #[serde(default)]
+    commander: commander::state::CommanderState,
 }
 
 impl AiState {
@@ -144,6 +148,7 @@ impl AiState {
         }
         h.write_u64(self.next_hunt as u64 | (self.sweeps as u64) << 32);
         h.write_u64(self.landings as u64);
+        self.commander.hash(h);
         match self.firebase {
             Some(p) => {
                 h.write_u64(1);
@@ -339,7 +344,10 @@ impl World {
             .map(|e| (e - start).angle())
             .unwrap_or(Angle::ZERO);
         drop(span);
-        self.review_strategy(player, &census, &intel);
+        let commander = self.state.ai[player as usize].config.brain == crate::Brain::Commander;
+        if !commander {
+            self.review_strategy(player, &census, &intel);
+        }
         let persona = self.ai_personality(player, &census, &intel);
 
         if self.state.ai[player as usize].firebase.is_none()
@@ -397,19 +405,21 @@ impl World {
         self.direct_salvagers(&census, &planned.salvage, &mut out);
         self.direct_upgrades(player, &census, &mut out);
         self.direct_focus(player, &census, &mut out);
-        self.direct_nukes(player, &mut out);
-        self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
-        self.direct_sensor_ships(player, &census, start, &mut out);
         drop(span);
-        let span = mc_core::perf_span!("ai.tactics");
-        self.react_tactically(player, &mut census, &intel, &mut out);
-        drop(span);
-        let span = mc_core::perf_span!("ai.army");
-        self.direct_army(
-            player, &census, &intel, stance, persona, start, facing, firebase, &mut out,
-        );
-
-        drop(span);
+        if commander {
+            let _span = mc_core::perf_span!("ai.commander");
+            self.command(player, &census, &intel, &mut out);
+        } else {
+            let span = mc_core::perf_span!("ai.classic");
+            self.direct_nukes(player, &mut out);
+            self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
+            self.direct_sensor_ships(player, &census, start, &mut out);
+            self.react_tactically(player, &mut census, &intel, &mut out);
+            self.direct_army(
+                player, &census, &intel, stance, persona, start, facing, firebase, &mut out,
+            );
+            drop(span);
+        }
         let _span = mc_core::perf_span!("ai.route");
         let out = self.route_ai_commands(out);
         self.state.ai_pending.extend(

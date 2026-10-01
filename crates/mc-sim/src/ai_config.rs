@@ -21,9 +21,21 @@ pub enum Doctrine {
     Defensive,
 }
 
+/// Which AI plays the side: the rule-driven one (`docs/AI.md`) or the Commander
+/// (`docs/AI_COMMANDER.md`), which plans, runs operations and reads the roster
+/// from its data. Both play in one match for the tournament.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum Brain {
+    #[default]
+    Classic,
+    Commander,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AiConfig {
+    pub brain: Brain,
     pub difficulty: Difficulty,
     pub doctrine: Doctrine,
     /// How strongly observed enemies affect production (0..=100).
@@ -67,6 +79,7 @@ pub struct Skill {
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
+            brain: Brain::Classic,
             difficulty: Difficulty::Normal,
             doctrine: Doctrine::Adaptive,
             adaptation: 75,
@@ -150,7 +163,8 @@ impl AiConfig {
             self.difficulty as u64
                 | (self.doctrine as u64) << 8
                 | (self.adaptation as u64) << 16
-                | (self.retreat_health as u64) << 24,
+                | (self.retreat_health as u64) << 24
+                | (self.brain as u64) << 32,
         );
         for w in self.domain_weights {
             h.write_u64(w as u64);

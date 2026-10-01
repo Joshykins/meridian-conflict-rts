@@ -40,7 +40,7 @@ impl World {
                     Personality::Turtle => n + 1,
                     Personality::Aggressive => n,
                 }
-            };
+            } + self.commander_directives(player).map_or(0, |d| d.engineers);
             let engineer = builder
                 .builds
                 .iter()
@@ -113,7 +113,12 @@ impl World {
                 planned_salvagers += 1;
                 Some(salvager)
             } else {
-                self.choose_combat_unit(player, &fighters, &composition, stance, counter)
+                match self.commander_directives(player) {
+                    Some(_) => self.solve_production(player, &fighters, &composition, counter),
+                    None => {
+                        self.choose_combat_unit(player, &fighters, &composition, stance, counter)
+                    }
+                }
             };
             if let Some(id) = blueprint {
                 *composition.entry(id).or_insert(0) += 1;

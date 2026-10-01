@@ -441,7 +441,10 @@ impl World {
         } else {
             want_factories
         }
-        .min(skill.factory_cap as usize);
+        .min(skill.factory_cap as usize)
+            + self
+                .commander_directives(owner as u8)
+                .map_or(0, |d| d.factories);
         // A plant from a lesser builder is a poor one: a Reactor II gives 250 a
         // second for 700 materials, a Reactor 20 for 75. Once the side has a
         // better builder, a lesser one helps raise its plants (`direct_builders`)
@@ -685,8 +688,15 @@ impl World {
                 return Some(job);
             }
         }
+        // The Commander's plans choose the side's projects (`commander/solver.rs`).
+        if !far && !energy_short {
+            if let Some(job) = self.commander_job(row, start, facing) {
+                return Some(job);
+            }
+        }
         // An experimental or a strategic weapon, once the economy carries one.
-        if !far {
+        let classic = self.commander_directives(owner as u8).is_none();
+        if !far && classic {
             if let Some(job) = self.project_job(row, persona, start, facing, planned, energy_short)
             {
                 return Some(job);
