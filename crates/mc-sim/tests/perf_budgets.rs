@@ -117,7 +117,9 @@ fn paladins_vs_titan() {
     mc_sim::perf::budget(&report, &[("sim.tick", 10.0)]);
 }
 
-/// The same fight without the giant, as the yardstick for what it adds.
+/// The same fight without the giant, as the yardstick for what it adds. Its budget is 16
+/// ms: the Paladin's rifles fire every 0.7 s (twice the shots, each with its lightning
+/// burst), which took it from ~7 to ~10 ms quiet and 14 under load.
 #[test]
 fn paladins_vs_paladins() {
     let mut w = world(1024);
@@ -141,7 +143,7 @@ fn paladins_vs_paladins() {
         })
         .unwrap();
     mc_sim::perf::save(&report);
-    mc_sim::perf::budget(&report, &[("sim.tick", 10.0)]);
+    mc_sim::perf::budget(&report, &[("sim.tick", 16.0)]);
 }
 
 /// A flat 16 km map with `players` starts on a 3 km ring round the centre,

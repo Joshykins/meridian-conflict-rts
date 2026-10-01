@@ -177,6 +177,46 @@ fn paladin_projectors_take_turns() {
     }
 }
 
+/// Guns that sat idle both charge on the same tick once a target appears; they must
+/// still come out of the charge a half reload apart, and stay that way.
+#[test]
+fn paladin_projectors_take_turns_after_sitting_idle() {
+    let mut w = world();
+    let paladin = w.blueprints.id_of("aster_t3_assault_bot").unwrap();
+    w.tick(&[spawn(&w, 0, "aster_t3_assault_bot", 500, 0)])
+        .unwrap();
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+    }
+    w.tick(&[spawn(
+        &w,
+        1,
+        "aster_t1_tank",
+        650,
+        flag::PASSIVE | flag::INVULNERABLE,
+    )])
+    .unwrap();
+    let mut shots = Vec::new();
+    for _ in 0..150 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            if let SimEvent::ShotFired {
+                blueprint, weapon, ..
+            } = e
+            {
+                if *blueprint == paladin {
+                    shots.push((w.tick_count(), *weapon));
+                }
+            }
+        }
+    }
+    assert!(shots.len() >= 4, "the Paladin never opened up: {shots:?}");
+    for pair in shots.windows(2) {
+        assert_ne!(pair[0].0, pair[1].0, "fired together: {shots:?}");
+        assert_ne!(pair[0].1, pair[1].1, "same projector twice: {shots:?}");
+    }
+}
+
 #[test]
 fn javelin_ripples_a_volley_out_the_tubes() {
     let mut w = world();

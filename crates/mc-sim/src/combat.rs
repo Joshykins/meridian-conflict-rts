@@ -1862,7 +1862,9 @@ impl World {
                     .map(|(i, _)| i)
                     .collect();
                 for i in later {
-                    if units.weapon_cooldown[row][i] == 0 && units.weapon_salvo_left[row][i] == 0 {
+                    // Ready, or counting its last tick (a twin that charged beside this one
+                    // would otherwise fire on this very tick and stay in step for good).
+                    if units.weapon_cooldown[row][i] <= 1 && units.weapon_salvo_left[row][i] == 0 {
                         units.weapon_cooldown[row][i] = stagger;
                     }
                 }
