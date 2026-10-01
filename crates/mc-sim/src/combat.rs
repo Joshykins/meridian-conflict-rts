@@ -3296,6 +3296,7 @@ impl World {
                     blueprint: bp.id,
                     owner,
                     airborne,
+                    complete,
                 }
             });
             self.state.players[owner as usize].units_lost += 1;

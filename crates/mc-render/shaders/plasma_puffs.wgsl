@@ -12,7 +12,7 @@
 
 fn is_plasma_puff(kind: u32) -> bool {
     return kind == PUFF_PLASMA_ORB || kind == PUFF_PLASMA_BURST || kind == PUFF_PLASMA_GLOB
-        || kind == PUFF_PLASMA_WAKE || kind == PUFF_STAR_CORE;
+        || kind == PUFF_PLASMA_WAKE || kind == PUFF_STAR_CORE || kind == PUFF_SUPERNOVA;
 }
 
 // Turned to the eye, where it was born; a burst is drawn a little toward the eye so the
@@ -24,6 +24,10 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, age: f32, o: PuffOut) -> PuffO
     var grow = select(age, 1.0 - pow(1.0 - age, 3.0), kind == PUFF_PLASMA_BURST);
     if kind == PUFF_PLASMA_WAKE {
         grow = sqrt(age);
+    }
+    if kind == PUFF_SUPERNOVA {
+        // Torn outward and slowed by what it sweeps up.
+        grow = 1.0 - pow(1.0 - age, 2.6);
     }
     let size = mix(p.params.x, p.params.y, grow);
     out.state = vec3<f32>(age, p.params.z, p.params.w);
@@ -46,7 +50,14 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, age: f32, o: PuffOut) -> PuffO
     // A burst on a hull stands in front of it: it is the hit, not something inside it.
     // A star stands at its face: rings passing in front of it hide it.
     let lift = select(select(0.5, 0.9, kind == PUFF_PLASMA_BURST), 0.42, kind == PUFF_STAR_CORE);
-    out.clip = vec4<f32>(ndc * center.w, front_depth(pos, size * lift) * center.w, center.w);
+    var depth = front_depth(pos, size * lift);
+    if kind == PUFF_SUPERNOVA {
+        // A shell this big cannot be pulled in front of the ground under it, and light
+        // this bright is not hidden by it: drawn in front of everything, as the brightest
+        // flash is (sprites.wgsl).
+        depth = 0.9999;
+    }
+    out.clip = vec4<f32>(ndc * center.w, depth * center.w, center.w);
     out.world = effect_billboard_world(pos, corner, size);
     return out;
 }
@@ -66,6 +77,9 @@ fn plasma_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     }
     if u32(in.state.y) == PUFF_STAR_CORE {
         return star_core(in, d);
+    }
+    if u32(in.state.y) == PUFF_SUPERNOVA {
+        return supernova(in, d);
     }
     return plasma_burst(in, d);
 }
@@ -249,7 +263,8 @@ fn star_core(in: PuffOut, d: f32) -> vec4<f32> {
     let flash = step(0.55, hash11(floor(now * 9.0) + seed * 17.0 + floor(angle * 2.0)));
     let vein = pow(ridge, 14.0) * (0.35 + 0.65 * flash);
     // Colour: the prism's pinks, drifting over the face and round the rim.
-    let hue = prism(seed + now * PRISM_RATE * 0.4 + cells * 0.5 + angle / 6.2831853 * 0.5);
+    // Round the rim by its direction, not its angle: an angle jumps where it wraps.
+    let hue = prism(seed + now * PRISM_RATE * 0.4 + cells * 0.5 + round.x * 0.25 + round.y * 0.15);
     let deep = mix(hue, hue * hue * hue, 0.75);
     let white = vec3<f32>(1.0, 0.95, 0.98);
     let heat = clamp(mu * 0.75 + (cells - 0.5) * 0.9 + 0.2, 0.0, 1.0);
@@ -268,9 +283,45 @@ fn star_core(in: PuffOut, d: f32) -> vec4<f32> {
     let corona = exp(-out_t * reach) * (0.1 + 2.6 * pow(streams, 3.0) + 1.4 * pow(licks, 4.0))
         + exp(-out_t * 14.0) * 1.3;
     let flicker = 0.88 + 0.12 * sin(now * 11.0 + seed * 7.0 + angle * 3.0);
-    let glow_hue = prism(seed + now * PRISM_RATE * 0.4 + angle / 6.2831853 + out_t * 0.6);
+    let glow_hue = prism(seed + now * PRISM_RATE * 0.4 + round.x * 0.5 + round.y * 0.3 + out_t * 0.6);
     let halo = mix(glow_hue, glow_hue * glow_hue * glow_hue, 0.7) * corona * flicker * 0.9
         * (1.0 - smoothstep(0.7, 1.0, d));
     let light = (face * on_face + halo * (1.0 - on_face)) * (1.0 + flare * 0.5);
     return vec4<f32>(light * in.appearance.rgb * tent, 0.0);
+}
+
+// A Regency power generator's star gone supernova: a shell of plasma tearing outward. Light through a thin
+// shell is brightest where the eye looks along it, so it reads as a ring with a lit face;
+// it tears into knots and strands as it goes, its edge ragged. White-hot at first, then
+// the prism's pinks drifting over it, dying to a deep rose as it thins. The hot flash
+// fills it for a moment at the start. `appearance.w` its seed.
+fn supernova(in: PuffOut, d: f32) -> vec4<f32> {
+    let age = in.state.x;
+    // Kept small: the noise's hash loses its grain far from the origin and goes blocky.
+    let seed = fract(in.appearance.w * 0.137) * 10.0;
+    let round = in.uv / max(d, 1e-4);
+    let rag = star_fbm3(vec3<f32>(round * 2.5 + seed, age * 1.5 + seed));
+    let rim = 0.78 * (0.92 + 0.14 * rag);
+    let q = d / rim;
+    // The path the eye takes through the shell, 1 at its inner edge; it thickens as it goes.
+    let inner = 1.0 - mix(0.1, 0.3, age);
+    let path = sqrt(max(1.0 - q * q, 0.0)) - sqrt(max(inner * inner - q * q, 0.0));
+    let limb = path / sqrt(1.0 - inner * inner);
+    // Knots and strands across it, seen on a ball.
+    let face = in.uv / rim;
+    let mu = sqrt(max(1.0 - dot(face, face), 0.0));
+    let n = vec3<f32>(face, mu);
+    let knots = star_fbm3(n * 4.0 + vec3<f32>(seed * 3.0, age * 2.0, 0.0));
+    let strands = pow(1.0 - abs(star_noise3(n * 7.0 + vec3<f32>(0.0, seed * 5.0, age * 3.0)) * 2.0 - 1.0), 6.0);
+    let body = limb * (0.3 + 1.4 * knots * knots + 0.9 * strands);
+    // A soft glow off its outer edge.
+    let halo = exp(-max(q - 1.0, 0.0) * 12.0) * step(1.0, q) * 0.45;
+    let white = vec3<f32>(1.0, 0.95, 0.98);
+    let hue = prism(seed + knots * 0.6 + round.x * 0.2 + round.y * 0.12 + age * 0.4);
+    var colour = mix(white * 1.6, hue * 1.2, smoothstep(0.02, 0.25, age));
+    colour = mix(colour, vec3<f32>(0.9, 0.1, 0.22), smoothstep(0.45, 1.0, age));
+    let fill = exp(-q * q * 3.0) * pow(1.0 - age, 8.0) * 2.5;
+    let fade = pow(1.0 - age, 1.4) * smoothstep(0.0, 0.03, age);
+    let light = (colour * (body + halo) + white * fill) * in.appearance.rgb * fade;
+    return vec4<f32>(light * (1.0 - smoothstep(0.85, 1.0, d)), 0.0);
 }

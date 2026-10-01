@@ -82,6 +82,7 @@ mod stake_fx;
 mod star_core_fx;
 mod structure_pads;
 mod stun_fx;
+mod supernova_fx;
 mod survival_fx;
 mod trail_fx;
 mod tree_wind;
@@ -5257,6 +5258,13 @@ impl Renderer {
             | SimEvent::AircraftCrashed { pos, blueprint } => {
                 // A unit going up is an event, not a big impact (blast_fx.rs).
                 let at = Vec3::from(pos.to_f32());
+                let complete = !matches!(
+                    event,
+                    SimEvent::UnitDied {
+                        complete: false,
+                        ..
+                    }
+                );
                 let bp = self.blueprints.unit(*blueprint);
                 let (r, h) = (bp.radius.to_f32(), bp.height.to_f32());
                 if bp.has(mc_data::cat::COMMANDER) {
@@ -5264,7 +5272,8 @@ impl Renderer {
                     // `NuclearDetonation` draws it (nuke_fx.rs).
                     return;
                 }
-                if let Some(db) = bp.death_blast {
+                // Only a finished plant goes up, as the sim's blast does.
+                if let Some(db) = bp.death_blast.filter(|_| complete) {
                     // A volatile plant: the same detonation, sized to its blast. The
                     // fireball's puffs keep the commander's proportion to the blast,
                     // not the building's footprint.
@@ -5272,7 +5281,10 @@ impl Renderer {
                     self.reactor_death(*blueprint, at, h, blast, time);
                     return;
                 }
-                self.unit_blast(at, r, h, time);
+                // A Regency power generator's burning star breaks free and goes supernova.
+                if !self.star_nova(at, time) {
+                    self.unit_blast(at, r, h, time);
+                }
             }
             SimEvent::Reclaimed {
                 pos,

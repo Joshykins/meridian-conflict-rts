@@ -92,6 +92,9 @@ pub enum SimEvent {
         blueprint: BlueprintId,
         owner: u8,
         airborne: bool,
+        /// Built: false for a build site (or a unit still in its factory's frame), which
+        /// goes up as a frame does, not as the finished thing.
+        complete: bool,
     },
     /// The second detonation, at the end of a dead aircraft's fall.
     AircraftCrashed {

@@ -312,6 +312,9 @@ struct SoundTable {
     /// The library generation the ids belong to (`Audio::library`).
     generation: u32,
     units: Vec<UnitSoundIds>,
+    /// The library's default death: what a build site goes up with, whatever it was to be
+    /// (a Regency generator's supernova and a reactor's blast are the finished plant's).
+    frame_death: Option<mc_data::SoundId>,
     /// The library's `reclaim_beam` loop, `reclaim_start` and `reclaim_end`: every reclaimer shares them.
     reclaim: [Option<mc_data::SoundId>; 3],
     /// `repair_beam`, `repair_start`, `repair_end`: every builder shares them.
@@ -3313,6 +3316,7 @@ impl Game {
         self.sounds = Some(SoundTable {
             generation,
             units,
+            frame_death: id(&None, &d.death),
             reclaim: ["reclaim_beam", "reclaim_start", "reclaim_end"]
                 .map(|name| library.id_of(name)),
             repair: ["repair_beam", "repair_start", "repair_end"].map(|name| library.id_of(name)),
@@ -3562,6 +3566,18 @@ impl Game {
                     // steal the four impact slots the tick the dome goes.
                     (2, table.shield_break, pos.to_f32(), radius.to_f32(), 0.0)
                 }
+                mc_sim::SimEvent::UnitDied {
+                    pos,
+                    blueprint,
+                    complete: false,
+                    ..
+                } => (
+                    2,
+                    table.frame_death,
+                    pos.to_f32(),
+                    bps.unit(*blueprint).health.to_f32() * 0.2,
+                    0.0,
+                ),
                 mc_sim::SimEvent::UnitDied { pos, blueprint, .. }
                 | mc_sim::SimEvent::AircraftCrashed { pos, blueprint } => (
                     2,

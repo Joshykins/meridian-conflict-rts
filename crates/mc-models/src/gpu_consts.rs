@@ -474,6 +474,12 @@ shared! {
         /// ticks long; `params.x` the quad's half size (the face is 0.42 of it),
         /// `appearance.rgb` its brightness, `appearance.w` the star's own seed.
         pub const STAR_CORE: u32 = 56;
+        /// A Regency power generator's star gone supernova (renderer/supernova_fx.rs, plasma_puffs.wgsl):
+        /// a shell of plasma tearing outward, brightest at its limb, ragged and knotted,
+        /// white-hot at first, then the prism's pinks, dying to a deep rose. It grows from
+        /// `params.x` to `params.y` (the quad's half size; the shell is 0.78 of it),
+        /// fast and then slowing; `appearance.rgb` its brightness, `appearance.w` its seed.
+        pub const SUPERNOVA: u32 = 57;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under

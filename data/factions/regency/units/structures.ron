@@ -228,8 +228,10 @@
         mesh: "regency_taproot", icon: Extractor,
     ),
     // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what
-    // a Reactor gives, but a breached field lets the plasma spread and go out, so it dies
-    // without a blast and can be packed tight. Tougher, dearer.
+    // a Reactor gives, but a breached field frees the star to swell and go supernova, all
+    // light and no blast, so it can be packed tight. Tougher, dearer. The death sound keeps
+    // time with the star's swell (renderer supernova_fx.rs): tech 3's at size 1, the
+    // smaller stars `like` it.
     (
         key: "regency_t1_power",
         name: "Power Generator",
@@ -242,6 +244,7 @@
         vision: 120,
         economy: (energy_income: 15),
         mesh: "regency_heart", icon: Power,
+        sounds: (death: "regency_supernova_small"),
     ),
     // The tech 2 and 3 generators: bigger cores in more rings, on lots of their own (like
     // Reactor II and III, built new, not upgraded). The same trade as the tech 1 generator:
@@ -258,6 +261,7 @@
         vision: 160,
         economy: (energy_income: 350),
         mesh: "regency_heart_2", icon: Power,
+        sounds: (death: "regency_supernova_mid"),
     ),
     (
         key: "regency_t3_power",
@@ -271,6 +275,7 @@
         vision: 200,
         economy: (energy_income: 2000),
         mesh: "regency_heart_3", icon: Power,
+        sounds: (death: "regency_supernova"),
     ),
     // A mass vault between two energy cells: less mass than a Vault, less energy than a
     // Capacitor Bank, in one lot and one build. It upgrades in place, each tier holding four

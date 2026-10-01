@@ -3,7 +3,8 @@
 //! (plasma_puffs.wgsl `star_core`: a ball of fusing plasma boiling in cells, white-hot at
 //! the heart, the prism's pinks drifting over it, a ragged flickering corona), now and then
 //! a filament of lightning cracking off it into the cage, and it lights the cage round it in
-//! the prism's pink.
+//! the prism's pink. When a burning star's cage is breached it goes supernova
+//! (`supernova_fx.rs`).
 //!
 //! Presentation only; the renderer's own clock. A plant under construction, unpowered, a
 //! wreck, a ghost or a radar blip has no star.
@@ -15,18 +16,32 @@ use super::Renderer;
 use crate::camera::Camera;
 use crate::gpu_consts::puff;
 
-const STAR: f32 = puff::STAR_CORE as f32;
-const ARC: f32 = puff::WARP_ARC as f32;
+pub(super) const STAR: f32 = puff::STAR_CORE as f32;
+pub(super) const ARC: f32 = puff::WARP_ARC as f32;
 /// The star's light on its cage: the prism's rose.
-const ROSE: Vec3 = Vec3::new(1.0, 0.5, 0.78);
+pub(super) const ROSE: Vec3 = Vec3::new(1.0, 0.5, 0.78);
 /// The arcs it throws: white into pale lavender.
-const WHITE: Vec3 = Vec3::new(1.0, 0.95, 1.0);
-const LAVENDER: Vec3 = Vec3::new(0.8, 0.62, 1.0);
+pub(super) const WHITE: Vec3 = Vec3::new(1.0, 0.95, 1.0);
+pub(super) const LAVENDER: Vec3 = Vec3::new(0.8, 0.62, 1.0);
+/// How bright the star burns (`appearance.rgb` of its puff).
+pub(super) const GLARE: f32 = 1.6;
 
-/// Each blueprint's star (`None`: it has none), and the stars burning this tick.
+/// A star burning this tick: where its plant stands, its middle, its face's radius and
+/// its own seed.
+#[derive(Clone, Copy)]
+pub(super) struct Burning {
+    pub(super) at: Vec3,
+    pub(super) centre: Vec3,
+    pub(super) r: f32,
+    pub(super) seed: f32,
+}
+
+/// Each blueprint's star (`None`: it has none), the stars burning this tick, and the
+/// ones going supernova.
 pub(super) struct StarCoreFx {
     stars: Vec<Option<[f32; 4]>>,
-    burning: Vec<(Vec3, f32, f32)>,
+    pub(super) burning: Vec<Burning>,
+    pub(super) novae: Vec<super::supernova_fx::Nova>,
 }
 
 impl StarCoreFx {
@@ -35,6 +50,7 @@ impl StarCoreFx {
         Self {
             stars,
             burning: Vec::new(),
+            novae: Vec::new(),
         }
     }
 }
@@ -43,6 +59,7 @@ impl Renderer {
     /// Once a sim tick: lays every running Regency power generator's star and its arcs.
     pub(super) fn star_core_tick(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
         self.star_core_fx.burning.clear();
+        self.novae_tick(time);
         if self.star_core_fx.stars.iter().all(Option::is_none) {
             return;
         }
@@ -75,7 +92,12 @@ impl Renderer {
                 );
             let r = star[3];
             let seed = (u.unit_id % 97) as f32 * 0.613;
-            self.star_core_fx.burning.push((centre, r, seed));
+            self.star_core_fx.burning.push(Burning {
+                at,
+                centre,
+                r,
+                seed,
+            });
             // The quad holds the corona too: the face is the middle 0.42 of it.
             let across = r / 0.42;
             self.push_lit(
@@ -85,7 +107,7 @@ impl Renderer {
                 time,
                 life,
                 (across, across),
-                Vec3::splat(1.0),
+                Vec3::splat(GLARE),
                 seed,
             );
             if close && self.scatter.unit() < 0.22 {
@@ -115,17 +137,18 @@ impl Renderer {
 
     /// Every frame: the burning stars light their cages, breathing with the star's beat.
     pub(super) fn star_core_lights(&mut self, time: f32) {
-        for &(at, r, seed) in &self.star_core_fx.burning {
+        for b in &self.star_core_fx.burning {
             let beat =
-                0.85 + 0.1 * (time * 1.3 + seed).sin() + 0.05 * (time * 3.7 + seed * 2.0).sin();
+                0.85 + 0.1 * (time * 1.3 + b.seed).sin() + 0.05 * (time * 3.7 + b.seed * 2.0).sin();
             self.lights.lamp(
-                at,
+                b.centre,
                 Vec3::NEG_Z,
-                ROSE * (6.0 * r * beat),
-                r * 6.0,
+                ROSE * (9.0 * b.r * beat),
+                b.r * 7.0,
                 180.0,
                 1.0,
             );
         }
+        self.novae_lights(time);
     }
 }

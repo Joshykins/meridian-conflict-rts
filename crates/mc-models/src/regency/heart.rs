@@ -17,8 +17,9 @@
 //! crackling in the prism's pinks, while the plant runs. The mesh carries only a small
 //! white-hot heart under it (`material::GLOW_PRISM`), for the portraits and far off.
 //! Each ring tumbles about an axis of its own (`MeshBuilder::with_orbit`) round the star.
-//! Nothing on it can go off: a breached cage lets the star fall in on itself and go out
-//! (no Regency power generator has a death blast).
+//! Nothing on it can go off: a breached field frees the star, which swells, falls in on
+//! itself and goes supernova (renderer `supernova_fx.rs`), all light and no harm (no
+//! Regency power generator has a death blast).
 
 use std::f32::consts::{PI, TAU};
 
@@ -193,7 +194,7 @@ pub(super) fn heart(b: &mut MeshBuilder, _tech: u8) {
     // The bronze cup the core sits over, lit from inside.
     metal(b);
     b.cylinder_between(v3(0.0, 0.0, 1.7), v3(0.0, 0.0, 2.6), 0.9, 1.6, sides);
-    core(b, T1_CORE, 1.35);
+    core(b, T1_CORE, 1.6);
     for (k, &(normal, spin, rate, r)) in [
         (v3(0.0, 0.7, 1.0), Vec3::X, 0.9, 1.95),
         (v3(0.7, 0.0, 1.0), v3(0.0, 1.0, 0.4), -1.3, 2.45),
@@ -248,7 +249,7 @@ fn coarse_t1(b: &mut MeshBuilder) {
         b.face(&[d * 3.0 - side, d * 3.0 + v3(0.0, 0.0, 7.4), d * 7.8]);
         team_tab(b, d * 2.4 + v3(0.0, 0.0, 7.45), d, 0.5);
     }
-    core(b, T1_CORE, 1.35);
+    core(b, T1_CORE, 1.6);
 }
 
 // ---- tech 2: the yoke ---------------------------------------------------------------
@@ -286,7 +287,7 @@ pub(super) fn heart_2(b: &mut MeshBuilder, _tech: u8) {
             dark_plate(b);
             b.face(&[v3(-3.0, 4.0, 2.2), v3(0.0, 15.0, 0.3), v3(3.0, 4.0, 2.2)]);
         });
-        core(b, T2_CORE, 3.1);
+        core(b, T2_CORE, 3.65);
         return;
     }
     seam(b);
@@ -303,7 +304,7 @@ pub(super) fn heart_2(b: &mut MeshBuilder, _tech: u8) {
     b.cylinder_between(v3(0.0, 0.0, 2.4), v3(0.0, 0.0, 3.6), 2.0, 3.4, sides);
     seam(b);
     b.cylinder_between(v3(0.0, 0.0, 3.6), v3(0.0, 0.0, 3.8), 3.4, 3.0, sides);
-    core(b, T2_CORE, 3.1);
+    core(b, T2_CORE, 3.65);
     // The first ring turns on the trunnions' line; the others tumble their own ways.
     let rings = [
         (Vec3::Y, Vec3::X, 0.55, 4.2, 4),
@@ -472,7 +473,7 @@ pub(super) fn heart_3(b: &mut MeshBuilder, _tech: u8) {
             ]);
             team_tab(b, d * CROWN_R + v3(0.0, 0.0, CROWN_Z + 1.1), d, 1.4);
         }
-        core(b, T3_CORE, 8.0);
+        core(b, T3_CORE, 9.4);
         return;
     }
     seam(b);
@@ -484,7 +485,7 @@ pub(super) fn heart_3(b: &mut MeshBuilder, _tech: u8) {
     b.cylinder_between(v3(0.0, 0.0, 4.2), v3(0.0, 0.0, 5.4), 4.5, 7.5, sides);
     seam(b);
     b.cylinder_between(v3(0.0, 0.0, 5.4), v3(0.0, 0.0, 5.8), 7.5, 6.8, sides);
-    core(b, T3_CORE, 8.0);
+    core(b, T3_CORE, 9.4);
     for (normal, spin, rate, r, weights) in [
         (v3(0.0, 0.5, 1.0), Vec3::X, 0.45, 10.0, 4),
         (v3(1.0, 0.0, 0.5), v3(0.0, 1.0, 0.3), -0.7, 11.8, 6),

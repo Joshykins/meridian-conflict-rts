@@ -2268,6 +2268,7 @@ mod sea_shots {
                                 blueprint: frigate,
                                 owner: 0,
                                 airborne: false,
+                                complete: true,
                             });
                         }
                         if k >= 3 {
@@ -2308,6 +2309,7 @@ mod sea_shots {
                                 blueprint: sub,
                                 owner: 0,
                                 airborne: false,
+                                complete: true,
                             });
                         }
                     }
