@@ -107,7 +107,6 @@ pub enum Table {
     Projectiles,
     Wrecks,
     Pads,
-    Fires,
     Flattens,
     FlowFields,
 }

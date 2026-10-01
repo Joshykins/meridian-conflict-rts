@@ -2950,7 +2950,7 @@ impl World {
                 // A stream gun lands ten rounds a second in one place: a round that falls
                 // within half a patch of one the same gun lit rekindles it rather than
                 // lighting another, so a strafe leaves a burning line, not a stack of
-                // patches ten deep (and the fires table does not fill).
+                // patches ten deep (and the fires table stays small).
                 let fires = &mut self.state.fires;
                 let rekindle = (weapon.rounds > 1)
                     .then(|| {
@@ -2971,7 +2971,7 @@ impl World {
                     } else {
                         hit.point.z
                     };
-                    fires.push(
+                    fires.light(
                         xy,
                         z,
                         radius,
@@ -2980,7 +2980,7 @@ impl World {
                         owner,
                         source,
                         weapon.target_mask,
-                    )?;
+                    );
                 }
             }
             if on_land {

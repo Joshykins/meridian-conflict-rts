@@ -21,8 +21,10 @@ pub const MAX_UNITS: usize = 32_768;
 pub const MAX_PROJECTILES: usize = 32_768;
 pub const MAX_WRECKS: usize = 32_768;
 pub const MAX_STAINS: usize = 32_768;
-/// Incendiary patches. A Hellkite salvo is 24 bombs, and several bombers can be alight at once.
-pub const MAX_FIRES: usize = 2_048;
+/// Incendiary patches. A Hellkite pass is 24 bombs that burn 20 s, so one bomber keeps ~50
+/// alight and a big air war a few thousand. When it is full the patch nearest to burning out
+/// gives way to the new one (`Fires::light`): the match never stops for fire.
+pub const MAX_FIRES: usize = 8_192;
 /// Poured structure lots. They stay after the building dies.
 pub const MAX_PADS: usize = 32_768;
 pub const MAX_ORDERS: usize = 262_144;
@@ -1307,7 +1309,11 @@ impl Fires {
         *self = Fires::default();
     }
 
-    pub fn push(
+    /// Lights a patch. A full table is a deliberate cap, not an
+    /// error: the patch with the fewest ticks left (the lowest row on a tie) goes out
+    /// early and the new one takes its row, so a fire war shortens the oldest burns
+    /// instead of stopping the match.
+    pub fn light(
         &mut self,
         pos: FxVec2,
         z: Fx,
@@ -1317,20 +1323,31 @@ impl Fires {
         owner: u8,
         source: UnitId,
         target_mask: u32,
-    ) -> Result<usize, SimError> {
-        if self.len() >= MAX_FIRES {
-            return Err(SimError::TableFull(Table::Fires));
+    ) {
+        if self.len() < MAX_FIRES {
+            self.pos.push(pos);
+            self.z.push(z);
+            self.radius.push(radius);
+            self.ticks.push(ticks);
+            self.span.push(ticks);
+            self.dps.push(dps);
+            self.owner.push(owner);
+            self.source.push(source);
+            self.target_mask.push(target_mask);
+            return;
         }
-        self.pos.push(pos);
-        self.z.push(z);
-        self.radius.push(radius);
-        self.ticks.push(ticks);
-        self.span.push(ticks);
-        self.dps.push(dps);
-        self.owner.push(owner);
-        self.source.push(source);
-        self.target_mask.push(target_mask);
-        Ok(self.len() - 1)
+        let i = (0..self.len())
+            .min_by_key(|&i| (self.ticks[i], i))
+            .unwrap_or(0);
+        self.pos[i] = pos;
+        self.z[i] = z;
+        self.radius[i] = radius;
+        self.ticks[i] = ticks;
+        self.span[i] = ticks;
+        self.dps[i] = dps;
+        self.owner[i] = owner;
+        self.source[i] = source;
+        self.target_mask[i] = target_mask;
     }
 
     pub fn swap_remove(&mut self, i: usize) {

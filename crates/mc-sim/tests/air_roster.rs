@@ -501,6 +501,37 @@ fn incendiary_hit_burns_after_the_initial_explosion() {
     assert!(w.state.units.health[t] < after - Fx::from_int(10));
 }
 #[test]
+fn a_full_fire_table_puts_out_the_patch_nearest_to_burning_out() {
+    // Replay 20261001-064349 mark 2: seven AIs' Hellkites filled the table and the match stopped.
+    let mut w = world();
+    let t = add(&mut w, "aster_t2_tank", 1, 900, 900);
+    w.state.units.flags[t] |= flag::PASSIVE;
+    let far = FxVec2::new(Fx::from_int(100), Fx::from_int(100));
+    let fires = &mut w.state.fires;
+    for i in 0..mc_sim::tables::MAX_FIRES {
+        let ticks = if i == 7 { 3 } else { 400 };
+        fires.light(
+            far,
+            Fx::ZERO,
+            Fx::from_int(4),
+            ticks,
+            Fx::ONE,
+            0,
+            mc_sim::Handle::NONE,
+            0,
+        );
+    }
+    let pos = w.state.units.pos[t].extend(w.state.units.z[t] + Fx::from_int(2));
+    drop_incendiary(&mut w, pos);
+    w.tick(&[]).unwrap();
+    assert_eq!(w.state.fires.len(), mc_sim::tables::MAX_FIRES);
+    assert!(w.state.fires.pos[7].distance(pos.xy()) < Fx::from_int(40));
+    for _ in 0..15 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(w.state.units.burn_ticks[t] > 0);
+}
+#[test]
 fn overlapping_incendiaries_stack_and_the_patch_has_an_edge() {
     let mut w = world();
     let t = add(&mut w, "aster_t2_tank", 1, 900, 900);
