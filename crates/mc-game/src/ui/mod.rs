@@ -25,6 +25,7 @@ pub mod pause;
 pub mod preview;
 pub mod race_picker;
 pub mod replays;
+pub mod report;
 pub mod setup;
 pub mod sky;
 pub mod survival;

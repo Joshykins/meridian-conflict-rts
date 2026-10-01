@@ -12,6 +12,7 @@
 mod ambience;
 mod app;
 mod audio;
+mod chronicle;
 mod cine;
 mod clipboard;
 mod cover_marks;
@@ -129,6 +130,10 @@ straight into a match instead.
   --paused               match screenshot: show the match paused
   --net-shot STATE       match screenshot: stage a network match's moment: play | chat |
                          paused | waiting | rejoin | desync
+  --report PAGE[@M:SS]   match screenshot: the battle report over the match, open on PAGE
+                         (overview, economy, military, battlefield, timeline); the
+                         battlefield replay stands at M:SS, or at the end. With --observe
+                         and --ticks long enough the match is decided and has its verdict
   --plans                match screenshot: the commander has structures planned and a way to
                          walk, and shift is held: ghosts, order lines, the order under --cursor
   --drag X,Y             with --plans: the order under --cursor has been dragged to this pixel
@@ -226,6 +231,7 @@ fn run() -> Result<(), String> {
     let mut range_maps = false;
     let mut refit_tab = false;
     let mut details = false;
+    let mut report = None;
     let mut range_tab: Option<String> = None;
     let mut place: Option<String> = None;
     let (mut plans, mut drag): (bool, Option<[f32; 2]>) = (false, None);
@@ -327,7 +333,7 @@ fn run() -> Result<(), String> {
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--at" => at = Some(value("--at")?),
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, report: None, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -356,6 +362,7 @@ fn run() -> Result<(), String> {
             "--range-maps" => range_maps = true,
             "--refit-tab" => refit_tab = true,
             "--details" => details = true,
+            "--report" => report = Some(value("--report")?),
             "--range-tab" => range_tab = Some(value("--range-tab")?),
             "--place" => place = Some(value("--place")?),
             "--plans" => plans = true,
@@ -486,7 +493,7 @@ fn run() -> Result<(), String> {
     );
 
     if let Some(ticks) = bench {
-        headless::run_sim(&opts, &map, &blueprints, &pool, ticks, true)?;
+        headless::run_sim(&opts, &map, &blueprints, &pool, ticks, true, None)?;
         return Ok(());
     }
     if let Some(dir) = shot_server {
@@ -512,6 +519,7 @@ fn run() -> Result<(), String> {
         shot.range_maps = range_maps;
         shot.refit_tab = refit_tab;
         shot.details = details;
+        shot.report = report;
         shot.range_tab = range_tab;
         shot.place = place;
         (shot.width, shot.height) = size;

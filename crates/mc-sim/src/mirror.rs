@@ -98,6 +98,17 @@ pub enum SimEvent {
         /// goes up as a frame does, not as the finished thing.
         complete: bool,
     },
+    /// Side `by` is credited with killing an `owner` unit of `blueprint` (`veterancy::settle_kill`).
+    /// The `UnitDied` follows when the unit is reaped. `weapon_of`: the killing unit's
+    /// blueprint, when it was a unit. Read by the battle report, never by the sim.
+    UnitKilled {
+        blueprint: BlueprintId,
+        owner: u8,
+        by: u8,
+        weapon_of: Option<BlueprintId>,
+        /// Built: false for a build site or a frame still in its factory.
+        complete: bool,
+    },
     /// The second detonation, at the end of a dead aircraft's fall.
     AircraftCrashed {
         pos: FxVec3,

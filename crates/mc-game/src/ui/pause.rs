@@ -1,7 +1,7 @@
 //! The in-match menu: resume, settings, leave, quit. A single-player match
 //! holds its clock while this is open; a lockstep match cannot, so there it is
-//! a panel over a battle that carries on. It also reports the result when the
-//! match is decided.
+//! a panel over a battle that carries on. Once the match is decided (or for an
+//! observer, at any time) it opens the battle report (`report`).
 
 use super::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use crate::audio::Sfx;
@@ -11,16 +11,9 @@ use crate::settings::Settings;
 pub enum PauseAction {
     Resume,
     Settings,
+    Report,
     Leave,
     Quit,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Heading {
-    Menu,
-    Victory,
-    Defeat,
-    Complete,
 }
 
 pub struct PauseOutcome {
@@ -29,11 +22,12 @@ pub struct PauseOutcome {
 }
 
 /// `surrender`: a network match this player is still in; leaving it gives it up.
+/// `report`: the battle report can be opened.
 pub fn draw(
     ui: &mut Ui,
-    heading: Heading,
     holds_clock: bool,
     surrender: bool,
+    report: bool,
     settings: &mut Settings,
     enter: f32,
 ) -> PauseOutcome {
@@ -46,36 +40,21 @@ pub fn draw(
     ui.fade = enter;
     ui.shift.y = 18.0 * (1.0 - enter);
 
-    let panel = Rect::new((w - 460.0) * 0.5, (h - 532.0) * 0.5, 460.0, 532.0);
+    let tall = 532.0 + if report { 62.0 } else { 0.0 };
+    let panel = Rect::new((w - 460.0) * 0.5, (h - tall) * 0.5, 460.0, tall);
     ui.panel(panel);
     let (x, cw) = (panel.x + 30.0, panel.w - 60.0);
-    let (title, note, ink) = match heading {
-        Heading::Menu if holds_clock => {
-            ("Command Menu", "The Battlefield Is Holding", palette::TEXT)
-        }
-        Heading::Menu => (
-            "Command Menu",
-            "The battle continues while this is open",
-            palette::TEXT,
-        ),
-        Heading::Victory => (
-            "Victory",
-            "Every enemy commander is destroyed",
-            palette::ACCENT,
-        ),
-        Heading::Defeat => ("Defeat", "Your commander has been destroyed", palette::BAD),
-        Heading::Complete => (
-            "Engagement Complete",
-            "The last commander standing holds the field",
-            palette::ACCENT,
-        ),
+    let note = if holds_clock {
+        "The Battlefield Is Holding"
+    } else {
+        "The battle continues while this is open"
     };
     ui.text_centred(
         panel.x + panel.w * 0.5 + 7.0,
         panel.y + 56.0,
         type_scale::TITLE,
-        rgb(ink, 1.0),
-        title,
+        rgb(palette::TEXT, 1.0),
+        "Command Menu",
     );
     ui.text_centred(
         panel.x + panel.w * 0.5,
@@ -95,16 +74,11 @@ pub fn draw(
         rgb(palette::LINE, 0.0),
     );
 
-    let resume = if heading == Heading::Menu {
-        "Resume"
-    } else {
-        "Keep Watching"
-    };
     let mut y = panel.y + 146.0;
     if ui.button(
         id("pause-resume", 0),
         Rect::new(x, y, cw, 54.0),
-        resume,
+        "Resume",
         ButtonKind::Primary,
         true,
     ) || (ui.input.key(Key::Escape) && ui.interactive)
@@ -122,6 +96,19 @@ pub fn draw(
     ) {
         ui.audio.play(Sfx::Select);
         out.action = Some(PauseAction::Settings);
+    }
+    if report {
+        y += 62.0;
+        if ui.button(
+            id("pause-report", 0),
+            Rect::new(x, y, cw, 50.0),
+            "Battle Report",
+            ButtonKind::Secondary,
+            true,
+        ) {
+            ui.audio.play(Sfx::Select);
+            out.action = Some(PauseAction::Report);
+        }
     }
     y += 74.0;
     // Narrower than the settings screen's rows, so the slider is laid out by hand there; here just volume.

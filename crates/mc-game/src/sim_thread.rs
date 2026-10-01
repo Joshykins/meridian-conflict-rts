@@ -154,6 +154,8 @@ pub struct SimHandle {
     pub watch: Arc<Mutex<Watch>>,
     /// A replay being watched: the tick to jump to (`replay::Scrubber`).
     pub seek: Arc<Mutex<Option<u32>>>,
+    /// The whole match as it went, for the battle report (`chronicle.rs`).
+    pub chronicle: Arc<Mutex<crate::chronicle::Chronicle>>,
     stop: Arc<AtomicBool>,
 }
 
@@ -397,6 +399,10 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
     let (speed_flag, watch_list) = (speed.clone(), watch.clone());
     let seek: Arc<Mutex<Option<u32>>> = Arc::default();
     let seek_asked = seek.clone();
+    let chronicle = Arc::new(Mutex::new(crate::chronicle::Chronicle::new(
+        glam::Vec2::from(setup.map.info().size_metres().to_f32()),
+    )));
+    let chronicle_kept = chronicle.clone();
     let (mut net, net_play) = match setup.net {
         Some((driver, play)) => (Some(driver), Some(play)),
         None => (None, None),
@@ -578,6 +584,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                     recent.pop_front();
                                 }
                             }
+                            chronicle_kept.lock().unwrap().record(world);
                             // A seek runs up to its tick without drawing, showing progress now and then.
                             let rushing = match &mut scrub {
                                 Some(s) => {
@@ -714,6 +721,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
         speed,
         watch,
         seek,
+        chronicle,
         stop,
     }
 }

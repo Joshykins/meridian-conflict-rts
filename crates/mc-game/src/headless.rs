@@ -37,6 +37,9 @@ pub struct Shot {
     pub refit_tab: bool,
     /// Match screenshots: the selected unit's DETAILS card open.
     pub details: bool,
+    /// Match screenshots: the battle report over the match, open on this page
+    /// (`PAGE[@M:SS]`, `ui::report`).
+    pub report: Option<String>,
     /// Range screenshots: the range panel open on this tab (unit, stage, economy, sky, range).
     pub range_tab: Option<String>,
     /// Match screenshots: placing the structure with this blueprint key, at `cursor`.
@@ -54,7 +57,8 @@ pub struct Shot {
     pub build_grid: bool,
 }
 
-/// Builds the world for `opts` and runs it for `ticks`.
+/// Builds the world for `opts` and runs it for `ticks`; `chronicle` keeps the
+/// record the battle report reads.
 pub fn run_sim(
     opts: &Options,
     map: &Arc<MapFile>,
@@ -62,6 +66,7 @@ pub fn run_sim(
     pool: &Arc<Pool>,
     ticks: u32,
     report: bool,
+    mut chronicle: Option<&mut crate::chronicle::Chronicle>,
 ) -> Result<World, String> {
     let mut playback = opts
         .replay
@@ -121,6 +126,9 @@ pub fn run_sim(
                 _ => setup::late_orders(opts, &world, t),
             };
             world.tick(&commands).map_err(|e| e.to_string())?;
+        }
+        if let Some(c) = chronicle.as_deref_mut() {
+            c.record(&world);
         }
         if opts.scene == setup::Scene::Survival && report {
             crate::survival::log_tick(&world, t + 1);
@@ -266,7 +274,17 @@ pub fn screenshot(
     ticks: u32,
     shot: &Shot,
 ) -> Result<(), String> {
-    let mut world = run_sim(opts, &map, &blueprints, &pool, ticks, true)?;
+    let mut chronicle =
+        crate::chronicle::Chronicle::new(glam::Vec2::from(map.info().size_metres().to_f32()));
+    let mut world = run_sim(
+        opts,
+        &map,
+        &blueprints,
+        &pool,
+        ticks,
+        true,
+        shot.report.is_some().then_some(&mut chronicle),
+    )?;
     // A selected factory gets a queue to show: a few of its first two products.
     if let Some(key) = &shot.select {
         let u = &world.state.units;
@@ -755,6 +773,14 @@ pub fn screenshot(
     if shot.refit_tab {
         hud.open_refit_tab();
     }
+    let mut report = shot
+        .report
+        .as_deref()
+        .map(|page| {
+            let local = (!opts.observe).then_some(0);
+            crate::ui::report::Report::staged(&chronicle, &world.blueprints, local, page)
+        })
+        .transpose()?;
     let audio = crate::audio::Audio::silent();
     let input = crate::ui::Input {
         cursor: shot
@@ -942,9 +968,24 @@ pub fn screenshot(
             show_reclaim: std::env::var("MERIDIAN_RECLAIM").is_ok_and(|v| v == "1"),
             placing,
         };
+        // The report, like the in-match menu, has the pointer to itself.
+        ui.interactive = report.is_none();
         hud.draw(&mut ui, &scene, 0.016);
         crate::hud::cursor_hint(&mut ui, &view, &world.blueprints, &[]);
         crate::warp_marks::cursor_card(&mut ui, &field, pointer);
+        if let Some(report) = &mut report {
+            ui.interactive = true;
+            let ctx = crate::ui::report::Ctx {
+                blueprints: &world.blueprints,
+                colors: &view.colors,
+                local: (!opts.observe).then_some(0),
+                map_name: map.name(),
+                thumbs: &hud.thumbs,
+                chart: crate::hud::MINIMAP_SLOT,
+                surrender: false,
+            };
+            report.draw(&mut ui, &ctx, 1.0);
+        }
         memory.end_frame(&input);
         // A weapon card under `--cursor` lights its ring on the ground, as in a match.
         let focus = hud.reach_focus.take();
@@ -1192,7 +1233,7 @@ pub fn ui_screenshot(
         fog: false,
         ..Default::default()
     };
-    let world = run_sim(&opts, &map, &blueprints, &pool, ticks.max(2), false)?;
+    let world = run_sim(&opts, &map, &blueprints, &pool, ticks.max(2), false, None)?;
     let mut frame = RenderFrame::default();
     world.write_render_frame(None, &mut frame);
     let status = crate::sim_thread::status_of(&world, 0);

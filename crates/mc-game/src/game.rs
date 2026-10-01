@@ -11,8 +11,7 @@ use crate::range::{self, Range, RangeAction};
 use crate::rings::{Reach, Rings};
 use crate::settings::Settings;
 use crate::sim_thread::{self, SceneScript, SimHandle, SimSetup, SimStatus, Watch};
-use crate::ui::pause::{self, Heading, PauseAction};
-use crate::ui::{self, options, palette, Ui};
+use crate::ui::{self, palette, Ui};
 use glam::{Vec2, Vec3};
 use mc_core::{Fx, FxVec2};
 use mc_data::{cat, BlueprintId, Blueprints};
@@ -41,6 +40,8 @@ mod ambience_notes;
 mod cine_input;
 #[path = "game_groups.rs"]
 pub(crate) mod groups;
+#[path = "game_menu.rs"]
+mod menu_screens;
 #[path = "game_music.rs"]
 mod music_notes;
 #[path = "game_reclaim.rs"]
@@ -299,17 +300,6 @@ pub struct FrameCtx<'a> {
     pub cover: Option<&'a mut crate::loading::Curtain>,
 }
 
-struct Menu {
-    heading: Heading,
-    enter: f32,
-    closing: bool,
-    /// Opened since the last frame: the key press that opened it (Escape) is still in
-    /// this frame's input and must not close it again.
-    fresh: bool,
-    /// The settings screen is up over the menu; how far in it is.
-    settings: Option<(f32, bool)>,
-}
-
 /// What each blueprint sounds like, as ids into the sound library in use.
 struct SoundTable {
     /// The library generation the ids belong to (`Audio::library`).
@@ -460,8 +450,9 @@ pub struct Game {
     zoom_anchor: Option<(Vec3, Vec2)>,
     /// Where the last zoom step left the focus: a pan or a jump since then drops the anchor.
     zoom_focus: Vec2,
-    menu: Option<Menu>,
-    result_shown: bool,
+    menu: Option<menu_screens::Menu>,
+    /// The match's result, and when its report comes up (`game_menu.rs`).
+    result: menu_screens::ResultCue,
     /// What the sim thread was last asked to publish orders for.
     watched: Watch,
     chart_ready: bool,
@@ -603,7 +594,7 @@ impl Game {
             zoom_anchor: None,
             zoom_focus: Vec2::ZERO,
             menu: None,
-            result_shown: false,
+            result: Default::default(),
             watched: Watch::default(),
             chart_ready: false,
             last_group: None,
@@ -657,29 +648,6 @@ impl Game {
 
     pub fn resized(&mut self, viewport: Vec2) {
         self.camera.viewport = viewport;
-    }
-
-    fn open_menu(&mut self, heading: Heading, audio: &Audio) {
-        if self.menu.is_none() {
-            // Opened by a key, so there is no control to make the sound. The result has its stinger.
-            if heading == Heading::Menu {
-                audio.play(Sfx::Select);
-            }
-            self.menu = Some(Menu {
-                heading,
-                enter: 0.0,
-                closing: false,
-                fresh: true,
-                settings: None,
-            });
-            // Held keys and drags must not carry on underneath the menu.
-            self.keys.clear();
-            self.left_down = None;
-            self.place_from = None;
-            self.orders.cancel();
-            self.middle_down = false;
-            self.end_orbit();
-        }
     }
 
     pub fn window_event(&mut self, event: &WindowEvent, r: &Renderer, audio: &Audio) {
@@ -2349,7 +2317,7 @@ impl Game {
                     self.targeted_order(targeting, Some(at), None, audio);
                 }
             }
-            HudAction::Menu => self.open_menu(Heading::Menu, audio),
+            HudAction::Menu => self.open_menu(audio),
             HudAction::Pause => self.toggle_pause(),
             HudAction::Seek(tick) => *self.sim.seek.lock().unwrap() = Some(tick),
             HudAction::Range(action) => self.range_action(action, audio),
@@ -3020,11 +2988,11 @@ impl Game {
                 } else if !self.view.selection.is_empty() {
                     self.view.selection.clear();
                 } else {
-                    self.open_menu(Heading::Menu, audio);
+                    self.open_menu(audio);
                 }
             }
             KeyCode::F1 => self.view.show_profiler = !self.view.show_profiler,
-            KeyCode::F10 => self.open_menu(Heading::Menu, audio),
+            KeyCode::F10 => self.open_menu(audio),
             KeyCode::F5 if self.view.range.is_some() => {
                 self.range_action(RangeAction::Reset, audio)
             }
@@ -4438,27 +4406,7 @@ impl Game {
         }
         self.answer_selection(audio, now);
 
-        // The result, once: a stinger and the menu with the verdict on it.
-        if let (Some(team), false) = (self.view.status.winner, self.result_shown) {
-            self.result_shown = true;
-            let heading = if self.view.observing {
-                Heading::Complete
-            } else if self
-                .view
-                .status
-                .players
-                .get(self.view.local as usize)
-                .is_some_and(|p| p.team == team)
-            {
-                Heading::Victory
-            } else {
-                Heading::Defeat
-            };
-            // No stinger: a commander's end is its own detonation, and a ringing chord
-            // over it cut across the blast (user ask, 2026-09-24).
-            self.menu = None;
-            self.open_menu(heading, audio);
-        }
+        self.result_frame(dt);
 
         // Selection and hover marks.
         let over_ui = self.menu.is_some() || self.hud.covers(self.cursor);
@@ -4708,10 +4656,7 @@ impl Game {
 
         // A single-player match holds its clock under the menu and on the player's
         // pause; a network match plays on.
-        let menu_holds = self
-            .menu
-            .as_ref()
-            .is_some_and(|m| m.heading == Heading::Menu && !m.closing);
+        let menu_holds = self.menu_holds_clock();
         self.sim.paused.store(
             self.view.status.owns_clock && (menu_holds || self.view.paused),
             Ordering::Relaxed,
@@ -4827,51 +4772,14 @@ impl Game {
             .is_some_and(|l| l.desync.is_none() && l.rejoining.is_none())
             && !self.view.observing
             && !self.defeated();
-        if let Some(menu) = &mut self.menu {
-            menu.enter =
-                (menu.enter + if menu.closing { -dt / 0.14 } else { dt / 0.28 }).clamp(0.0, 1.0);
-            let in_settings = menu.settings.is_some();
-            ui.interactive = !menu.closing && !in_settings && !menu.fresh;
-            menu.fresh = false;
-            let eased = 1.0 - (1.0 - menu.enter).powi(3);
-            let out = pause::draw(
-                &mut ui,
-                menu.heading,
-                self.view.status.owns_clock,
-                surrender,
-                settings,
-                eased,
-            );
-            *settings_changed |= out.settings_changed;
-            match out.action {
-                Some(PauseAction::Resume) => menu.closing = true,
-                Some(PauseAction::Settings) => menu.settings = Some((0.0, false)),
-                Some(PauseAction::Leave) if surrender => {
-                    // Leaving a network match gives it up first: the side is defeated on
-                    // every machine rather than left standing idle.
-                    if let Some(net) = &self.sim.net {
-                        net.request(crate::netplay::NetRequest::Surrender);
-                    }
-                    menu.closing = true;
-                }
-                Some(PauseAction::Leave) => event = Some(GameEvent::Leave),
-                Some(PauseAction::Quit) => event = Some(GameEvent::Quit),
-                None => {}
-            }
-            if let (Some((enter, closing)), true) = (&mut menu.settings, in_settings) {
-                *enter = (*enter + if *closing { -dt / 0.14 } else { dt / 0.24 }).clamp(0.0, 1.0);
-                ui.interactive = !*closing;
-                let out = options::draw(&mut ui, settings, 1.0 - (1.0 - *enter).powi(3));
-                *settings_changed |= out.changed;
-                *display_changed |= out.display_changed;
-                *closing |= out.back;
-                if *closing && *enter <= 0.0 {
-                    menu.settings = None;
-                }
-            }
-            if menu.closing && menu.enter <= 0.0 {
-                self.menu = None;
-            }
+        if let Some(e) = self.menu_frame(
+            &mut ui,
+            settings,
+            (settings_changed, display_changed),
+            surrender,
+            dt,
+        ) {
+            event = Some(e);
         }
         // A surrender goes out with the next turn; the match is left once it has been
         // carried out, so every machine sees this side fall rather than stand idle.

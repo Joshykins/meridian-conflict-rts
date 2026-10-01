@@ -77,6 +77,14 @@ impl World {
             self.state.players[killer_player as usize].units_killed += 1;
         }
         let victim_owner = self.state.units.owner[victim];
+        let units = &self.state.units;
+        self.events.push(crate::SimEvent::UnitKilled {
+            blueprint: units.blueprint[victim],
+            owner: victim_owner,
+            by: killer_player,
+            weapon_of: units.row(killer).map(|row| units.blueprint[row]),
+            complete: !units.has_flag(victim, flag::UNDER_CONSTRUCTION | flag::IN_FACTORY),
+        });
         if let Some(row) = self.state.units.row(killer) {
             if self.state.units.health[row] > Fx::ZERO
                 && self.are_enemies(self.state.units.owner[row], victim_owner)

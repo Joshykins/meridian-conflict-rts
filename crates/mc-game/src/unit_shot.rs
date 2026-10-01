@@ -208,6 +208,7 @@ impl Studio {
             &self.pool,
             ticks.max(5),
             false,
+            None,
         )?;
         let mut frame = RenderFrame::default();
         world.write_render_frame(None, &mut frame);
