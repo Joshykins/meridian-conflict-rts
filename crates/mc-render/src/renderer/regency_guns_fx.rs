@@ -14,8 +14,9 @@
 //!   plasma out as one shot, a jet a quarter of a second long (the shot's rounds,
 //!   `Weapon::round_span`): a hard red flash as it opens, a pulse at the mouth for each
 //!   round, the ball draining as the jet leaves it, plasma thrown down the line of fire.
-//!   In flight the jet leaves a red wake hanging in the air (`regency_wakes`). Where its
-//!   head lands it bursts in a billowing red bloom over a white heart, a spout of plasma
+//!   In flight the jet leaves a thin red trail that cools and breaks up
+//!   (`regency_trails`). Where its head lands it bursts in a hard red heart over a white
+//!   one, filaments torn out of it, a spout of plasma
 //!   thrown up out of it, globs and molten spatter thrown out low in place of a shock
 //!   ring, and the ground seared: a glassed scorch that glows and crusts over. The rest
 //!   of the jet pours in after it, each round a red splash (`pinched_pour`).
@@ -25,29 +26,29 @@
 //!   strobing. It launches with a blinding white flash, a cone of plasma thrown out down
 //!   the line of fire, globs thrown off round the bore and arcs snapping forward; heat
 //!   rises off the gun's back. The shot is a jet of fusion pinched out, long and fast: a
-//!   white-hot core in a broad sheath of the prism, strobing, and behind it a white thread
-//!   in a long wake that takes the prism and cools through pink and red as it hangs,
-//!   shedding sparks. Where it lands it opens in a blinding flash, white with the prism
-//!   in its fringe, billowing out in lumps and cooling back to red, a column of plasma
+//!   white-hot core in a broad sheath of the prism, strobing, and behind it a white-hot
+//!   trail that takes the prism and cools through pink and red, breaking up, shedding
+//!   sparks. Where it lands it opens in a blinding flash, a hard white heart with
+//!   filaments torn out of it, the prism in them, cooling back to red, a column of plasma
 //!   rising out of it, a lumpy skirt of it rolling out over the ground, streaks and globs
 //!   flung wide and lightning thrown into the ground round it; the ground melted into a wide glowing pool and a knot of fusion left burning
 //!   over it for seconds, slowly letting white lightning go into the ground round it while
 //!   red sparkles cool and drift off the edges.
 //!
-//! Nothing is wound round a middle (no spiral arms, no rings): the plasma boils and
-//! billows (plasma_puffs.wgsl).
+//! Nothing is wound round a middle (no spiral arms, no rings), and nothing hangs as a
+//! mist: the plasma is hard-edged and goes out fast (plasma_puffs.wgsl).
 //!
 //! Presentation only; the renderer's own clock. The light is plasma_puffs.wgsl's (the
-//! ball, the bursts, the globs, the wakes) and warp_puffs.wgsl's (motes, filaments, arcs,
-//! flash), which take any colour.
+//! ball, the bursts, the globs, the thrown clumps), warp_puffs.wgsl's (motes, filaments,
+//! arcs, flash), which take any colour, and sprites.wgsl's (the trails).
 
 use super::{Puff, Renderer, PUFF_RING, PUFF_TREE_SMOKE};
-use crate::gpu_consts::puff;
+use crate::gpu_consts::{fade_beam, puff};
 use glam::Vec3;
 use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{
     ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
-    PROJECTILE_MISSILE, PROJECTILE_STARTS_SHIFT,
+    PROJECTILE_FADE_BEAM, PROJECTILE_MISSILE, PROJECTILE_STARTS_SHIFT,
 };
 use std::mem::size_of;
 
@@ -78,14 +79,15 @@ const MAX_GLOWS: usize = 96;
 /// Guns charging at once that are drawn. A deliberate cosmetic cap: a charge past it is
 /// not drawn (its shot still is), so a wall of guns charging costs no more than this.
 const MAX_CHARGES: usize = 48;
-/// Wake puffs laid a tick at most, over every shot in flight. A deliberate cosmetic cap:
-/// past it a shot's wake is left out for that tick (the shot itself is still drawn).
-const MAX_WAKE_PUFFS: usize = 900;
-/// Metres apart a shot's wake is laid, and the seconds it hangs: a Pinched bolt's, then a
-/// Pinch-fusion round's.
-/// A Pinched jet's rounds each lay one over the same path, so theirs are far apart.
-const BOLT_WAKE: (f32, f32) = (6.4, 0.9);
-const FUSION_WAKE: (f32, f32) = (2.5, 2.8);
+/// Sparks a fusion round's trail sheds a tick at most, over every shot in flight. A
+/// deliberate cosmetic cap: past it the trail is laid without them.
+const MAX_TRAIL_SPARKS: usize = 200;
+/// Trail pieces held at most. A deliberate cosmetic cap: the oldest goes first.
+const MAX_TRAILS: usize = 2400;
+/// Metres a piece of a shot's trail runs, and the seconds it glows: a Pinched bolt's, then
+/// a Pinch-fusion round's.
+const BOLT_TRAIL: (f32, f32) = (12.0, 0.7);
+const FUSION_TRAIL: (f32, f32) = (10.0, 1.8);
 
 /// What a direct-fire Regency plasma gun is drawn as.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -145,13 +147,29 @@ struct Glow {
     pulse: f32,
 }
 
+/// A piece of a shot's trail: from `start` for `life` seconds, cooling as it goes.
+#[derive(Clone, Copy)]
+struct Trail {
+    from: Vec3,
+    to: Vec3,
+    start: f32,
+    life: f32,
+    width: f32,
+    fusion: bool,
+}
+
 #[derive(Default)]
 pub(super) struct RegencyGunFx {
     charges: Vec<Charge>,
     glows: Vec<Glow>,
+    trails: Vec<Trail>,
 }
 
 impl RegencyGunFx {
+    fn trail(&mut self, trail: Trail) {
+        self.trails.push(trail);
+    }
+
     fn light(&mut self, glow: Glow) {
         if self.glows.len() >= MAX_GLOWS {
             self.glows.remove(0);
@@ -286,105 +304,108 @@ impl Renderer {
         }
     }
 
-    /// The wakes Pinched bolts and Pinch-fusion rounds leave hanging in the air (from
-    /// `upload_sim`, once a tick): puffs laid down the stretch each shot flies this tick,
-    /// each appearing as the shot passes it. A fusion round's is wide and long, white going
-    /// pink and red as it hangs, and sheds sparks; a bolt's is a thin red one.
-    pub(super) fn regency_wakes(&mut self, projectiles: &[ProjectileInstance], time: f32) {
+    /// The trails Pinched bolts and Pinch-fusion rounds leave behind them (from
+    /// `upload_sim`, once a tick, after this tick's shots are written): a hot filament laid
+    /// down the stretch each shot flies this tick, each piece lit as the shot passes it,
+    /// cooling and breaking up as it hangs (sprites.wgsl `FADE_BEAM_PLASMA_TRAIL`). A
+    /// fusion round's is white-hot, takes the prism and cools through pink and red,
+    /// shedding sparks; a bolt's is a thin red one. No puffs: a wake of them reads as mist.
+    pub(super) fn regency_trails(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         let tick = self.tick_seconds.max(0.02);
-        let mut laid = 0;
+        let mut sparks = 0;
         for p in projectiles {
             let fusion = match drawn_look(p) {
                 1 => false,
                 2 => true,
                 _ => continue,
             };
-            let (step, life) = if fusion { FUSION_WAKE } else { BOLT_WAKE };
             // A round of a jet that leaves the muzzle part of the way through the tick
-            // (`PROJECTILE_STARTS_SHIFT`) has `prev_pos` behind the gun: its wake starts
+            // (`PROJECTILE_STARTS_SHIFT`) has `prev_pos` behind the gun: its trail starts
             // where it leaves, as sprites.wgsl `shot_muzzle` draws it.
             let ends = ((p.color >> PROJECTILE_ENDS_SHIFT) & 0xFF) as f32 / 255.0;
             let span = if ends > 0.0 { ends } else { 1.0 };
             let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
             let to = Vec3::from(p.pos);
             let from = Vec3::from(p.prev_pos).lerp(to, (starts / span).min(1.0));
+            let (step, life) = if fusion { FUSION_TRAIL } else { BOLT_TRAIL };
             // A deliberate cosmetic cap on one shot's stretch: a tick's flight is far
-            // under this many steps.
-            let n = ((from.distance(to) / step).ceil() as usize).clamp(1, 64);
-            if laid + n > MAX_WAKE_PUFFS {
-                continue;
-            }
-            laid += n;
+            // under this many pieces.
+            let n = ((from.distance(to) / step).ceil() as usize).clamp(1, 16);
             for k in 0..n {
-                let f = (k as f32 + self.scatter.unit()) / n as f32;
-                let drift = Vec3::new(
-                    self.scatter.signed(),
-                    self.scatter.signed(),
-                    self.scatter.signed(),
-                );
-                let at = from.lerp(to, f) + drift * p.size * 0.06;
-                let when = time + tick * (starts + (span - starts).max(0.0) * f);
-                // A bolt is thin: its wake is fatter than it, or it hangs in dots.
-                let fat = if fusion { 0.3 } else { 0.7 };
-                let puff = p.size * fat * (1.0 + 0.5 * self.scatter.unit());
-                if fusion {
-                    // A white-hot thread where the round passed, gone in a moment, in a
-                    // broad sheath of fusion that takes the prism and hangs, cooling
-                    // through pink and red.
-                    let roll0 = self.scatter.unit();
-                    self.push_lit(
-                        WAKE,
-                        from.lerp(to, f),
-                        Vec3::ZERO,
-                        when,
-                        0.35 + 0.2 * roll0,
-                        (p.size * 0.22, p.size * 0.4),
-                        WHITE * 7.0,
-                        1.0,
+                let (f0, f1) = (k as f32 / n as f32, (k + 1) as f32 / n as f32);
+                let (a, b) = (from.lerp(to, f0), from.lerp(to, f1));
+                let when = time + tick * (starts + (span - starts).max(0.0) * f1);
+                let fx = &mut self.plasma_fx.guns;
+                // The thread where it passed, and the sheath round it that goes out sooner.
+                fx.trail(Trail {
+                    from: a,
+                    to: b,
+                    start: when,
+                    life,
+                    width: p.size * if fusion { 0.32 } else { 0.22 },
+                    fusion,
+                });
+                fx.trail(Trail {
+                    from: a,
+                    to: b,
+                    start: when,
+                    life: life * 0.35,
+                    width: p.size * if fusion { 0.9 } else { 0.5 },
+                    fusion,
+                });
+                // A fusion round sheds sparks that fall away from its trail. A deliberate
+                // cosmetic cap on them a tick.
+                if fusion && sparks < MAX_TRAIL_SPARKS && self.scatter.unit() < 0.6 {
+                    sparks += 1;
+                    let at = a.lerp(b, self.scatter.unit());
+                    let drift = Vec3::new(
+                        self.scatter.signed(),
+                        self.scatter.signed(),
+                        self.scatter.signed(),
                     );
+                    let dot = 0.3 + 0.3 * self.scatter.unit();
                     let roll0 = self.scatter.unit();
                     let roll1 = self.scatter.unit();
                     self.push_lit(
-                        WAKE,
+                        MOTE,
                         at,
-                        drift * 2.0,
+                        drift * 8.0 - Vec3::Z * 3.0,
                         when,
-                        life * (0.8 + 0.4 * roll0),
-                        (puff * 1.4, puff * 4.0),
-                        WHITE.lerp(HOT, 0.1 + 0.3 * roll1) * 4.2,
-                        1.0,
-                    );
-                    if self.scatter.unit() < 0.5 {
-                        let dot = 0.35 + 0.35 * self.scatter.unit();
-                        let roll0 = self.scatter.unit();
-                        let roll1 = self.scatter.unit();
-                        self.push_lit(
-                            MOTE,
-                            at,
-                            drift * 8.0 - Vec3::Z * 3.0,
-                            when,
-                            0.8 + 0.8 * roll0,
-                            (dot, dot * 0.4),
-                            WHITE.lerp(HOT, roll1) * 5.0,
-                            0.0,
-                        );
-                    }
-                } else {
-                    let roll0 = self.scatter.unit();
-                    let roll1 = self.scatter.unit();
-                    self.push_lit(
-                        WAKE,
-                        at,
-                        drift,
-                        when,
-                        life * (0.8 + 0.4 * roll0),
-                        (puff, puff * 2.2),
-                        RED.lerp(HOT, 0.3 * roll1) * 2.4,
+                        0.6 + 0.6 * roll0,
+                        (dot, dot * 0.4),
+                        WHITE.lerp(HOT, roll1) * 5.0,
                         0.0,
                     );
                 }
             }
         }
+        self.write_regency_trails(time);
+    }
+
+    /// This tick's trails among the fading beams.
+    fn write_regency_trails(&mut self, time: f32) {
+        let fx = &mut self.plasma_fx.guns;
+        fx.trails.retain(|t| time < t.start + t.life);
+        if fx.trails.len() > MAX_TRAILS {
+            let extra = fx.trails.len() - MAX_TRAILS;
+            fx.trails.drain(..extra);
+        }
+        let out: Vec<ProjectileInstance> = fx
+            .trails
+            .iter()
+            .map(|t| ProjectileInstance {
+                prev_pos: t.from.to_array(),
+                color: PROJECTILE_FADE_BEAM | fade_beam::PLASMA_TRAIL,
+                pos: t.to.to_array(),
+                size: t.width,
+                wake: t.start,
+                plasma: t.life,
+                _pad: [0.0; 2],
+                aim: [0.0, 0.0, 0.0, if t.fusion { 1.0 } else { 0.0 }],
+                prev_aim: [0.0; 4],
+            })
+            .collect();
+        self.push_projectiles(&out);
     }
 
     /// `span` seconds of a charge `f` of the way done, at `at`.
@@ -730,8 +751,8 @@ impl Renderer {
                         from,
                         Vec3::Z * (3.0 + 3.0 * roll0) + across * side * 1.5,
                         when,
-                        1.6,
-                        (puff, puff * 3.0),
+                        0.9,
+                        (puff, puff * 1.6),
                         RED.lerp(HOT, 0.3) * 1.6 * (1.0 - k as f32 / 20.0),
                         0.0,
                     );
@@ -754,9 +775,9 @@ impl Renderer {
     /// Pinched bolt, white going pink for fusion.
     fn plasma_jet(&mut self, at: Vec3, dir: Vec3, size: f32, fusion: bool, time: f32) {
         let (count, speed, life) = if fusion {
-            (18, size * 9.0, 1.1)
+            (14, size * 9.0, 0.6)
         } else {
-            (7, size * 8.0, 0.5)
+            (7, size * 8.0, 0.35)
         };
         for _ in 0..count {
             let spread = Vec3::new(
@@ -779,7 +800,7 @@ impl Renderer {
                 v,
                 time + roll0 * 0.05,
                 life * (0.7 + 0.6 * roll1),
-                (puff, puff * 2.6),
+                (puff, puff * 1.5),
                 rgb,
                 if fusion { 0.8 } else { 0.0 },
             );
@@ -983,7 +1004,7 @@ impl Renderer {
         });
     }
 
-    /// A Pinched-plasmeric bolt bursting: a billowing red bloom over a white heart, a spout of
+    /// A Pinched-plasmeric bolt bursting: a hard red heart over a white one, a spout of
     /// plasma thrown up out of it, molten spatter and globs thrown out low in place of a
     /// shock ring, the ground seared.
     fn pinched_burst(&mut self, at: Vec3, impact: f32, size: f32, ground: bool, start: f32) {
@@ -1003,19 +1024,19 @@ impl Renderer {
             at,
             Vec3::ZERO,
             start,
-            0.6,
-            (s * 0.35, s * 1.7),
-            RED * 2.8,
+            0.4,
+            (s * 0.35, s * 1.3),
+            RED * 3.0,
             0.0,
         );
         self.push_lit(
             BURST,
             at + Vec3::Z * s * 0.2,
             Vec3::ZERO,
-            start + 0.08,
-            0.9,
-            (s * 0.5, s * 1.3),
-            RED.lerp(HOT, 0.2) * 1.8,
+            start + 0.06,
+            0.5,
+            (s * 0.4, s * 1.0),
+            RED.lerp(HOT, 0.2) * 2.0,
             0.0,
         );
         // A spout of plasma thrown up out of it, cooling as it climbs.
@@ -1028,8 +1049,8 @@ impl Renderer {
                 at,
                 (Vec3::Z + lean) * s * (2.2 + 1.6 * k as f32 / 6.0),
                 start + k as f32 * 0.03,
-                0.8 + 0.3 * roll0,
-                (puff, puff * 2.4),
+                0.45 + 0.2 * roll0,
+                (puff, puff * 1.4),
                 RED.lerp(HOT, 0.5 - k as f32 * 0.07) * 3.0,
                 0.0,
             );
@@ -1198,8 +1219,8 @@ impl Renderer {
             at + Vec3::Z * s * 0.45,
             Vec3::ZERO,
             start,
-            0.45,
-            (s * 0.9, s * 1.9),
+            0.25,
+            (s * 0.7, s * 1.3),
             WHITE * 16.0,
             0.0,
         );
@@ -1208,8 +1229,8 @@ impl Renderer {
             at,
             Vec3::ZERO,
             start,
-            0.7,
-            (s * 0.5, s * 1.7),
+            0.5,
+            (s * 0.5, s * 1.3),
             WHITE * 6.0,
             1.0,
         );
@@ -1217,9 +1238,9 @@ impl Renderer {
             BURST,
             at + Vec3::Z * s * 0.15,
             Vec3::ZERO,
-            start + 0.15,
-            2.0,
-            (s * 0.6, s * 2.0),
+            start + 0.12,
+            0.9,
+            (s * 0.5, s * 1.3),
             RED * 3.4,
             0.0,
         );
@@ -1240,33 +1261,33 @@ impl Renderer {
                 at + off,
                 Vec3::ZERO,
                 when,
-                0.8 + 0.6 * roll0,
-                (lump * 0.4, lump * 1.4),
+                0.45 + 0.3 * roll0,
+                (lump * 0.4, lump * 1.1),
                 WHITE.lerp(HOT, 0.3) * 4.0,
                 1.0,
             );
         }
         // A column of plasma rising out of it: white low down and early, cooling to red
         // as it climbs and swells.
-        for k in 0..22 {
-            let f = k as f32 / 22.0;
+        for k in 0..12 {
+            let f = k as f32 / 12.0;
             let lean = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 0.12;
-            let puff = s * (0.3 + 0.16 * self.scatter.unit());
+            let puff = s * (0.17 + 0.1 * self.scatter.unit());
             let roll0 = self.scatter.unit();
             self.push_lit(
                 WAKE,
                 at + Vec3::Z * s * 0.1,
                 (Vec3::Z + lean) * s * (1.2 + 3.0 * f),
                 start + 0.05 + f * 0.3,
-                1.8 + 1.0 * roll0,
-                (puff, puff * (2.4 + f)),
+                0.9 + 0.5 * roll0,
+                (puff, puff * 1.5),
                 WHITE.lerp(RED, 0.2 + 0.6 * f) * (4.0 - 1.4 * f),
                 1.0 - 0.6 * f,
             );
         }
         // A lumpy skirt of plasma rolling out over the ground, not a ring: puffs at their
         // own bearings, speeds and sizes.
-        for _ in 0..26 {
+        for _ in 0..14 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
             let out = Vec3::new(a.cos(), a.sin(), 0.08);
             let puff = s * (0.18 + 0.15 * self.scatter.unit());
@@ -1279,8 +1300,8 @@ impl Renderer {
                 at + out * s * 0.2 + Vec3::Z * s * 0.06,
                 out * s * (1.4 + 1.6 * roll0),
                 start + 0.05 + roll1 * 0.12,
-                1.4 + 0.8 * roll2,
-                (puff, puff * 2.6),
+                0.7 + 0.4 * roll2,
+                (puff, puff * 1.4),
                 WHITE.lerp(RED, 0.2 + 0.6 * roll3) * 3.4,
                 0.8,
             );

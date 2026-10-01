@@ -1,6 +1,6 @@
 // The Regency's squeezed plasma as light (renderer/regency_guns_fx.rs): the charge a
 // Pinched or Pinch-fusion gun gathers in front of its bore, the burst where a plasma shot
-// lets go, the globs of plasma it throws and the wake a shot leaves hanging behind it.
+// lets go, the globs of plasma it throws and the clumps a blast or a muzzle throws out.
 // Prepended to puffs.wgsl with `//!use plasma_puffs` (it uses that file's `Puff` and
 // `PuffOut`).
 //
@@ -151,48 +151,48 @@ fn plasma_orb(in: PuffOut, d: f32) -> vec4<f32> {
     return vec4<f32>(light * tent * shiver, 0.0);
 }
 
-// Where a plasma shot lets go: no ring and no dust, a lumpy bloom of plasma billowing out
-// from a white-hot heart, cells of hotter plasma churning through it, red at its edges,
-// that breaks up into glowing shreds and goes out. In fusion it opens white with the
-// prism's pinks in its fringe, then cools back to red.
+// Where a plasma shot lets go: no ring and no dust, and no soft bloom. A hard-edged heart
+// of plasma, white-hot, that shrinks back fast as it cools, and filaments of it torn out
+// round it, thin and bright, crackling as they go out. In fusion it opens white with the
+// prism's pinks in its threads, then cools back to red.
 fn plasma_burst(in: PuffOut, d: f32) -> vec4<f32> {
     let seed = in.state.z;
     let age = in.state.x;
     let rgb = in.appearance.rgb;
     let fusion = clamp(in.appearance.w, 0.0, 1.0);
-    // Its edge billows in lumps laid over the quad, not by angle, so nothing runs round it.
+    // Its reach is ragged in lumps laid over the quad, not by angle, so nothing runs round it.
     let lump_a = value_noise2(in.uv * 2.3 + vec2<f32>(seed * 17.0, age * 1.4), 1.0);
     let lump_b = value_noise2(in.uv * 4.8 + vec2<f32>(-age * 2.2, seed * 9.0), 1.0);
     let lumps = lump_a * 0.62 + lump_b * 0.38;
-    let reach = mix(0.5, 1.0, lumps);
-    let field = 1.0 - d / reach;
-    // Shreds: as it ages the bloom tears into pieces that each go out on their own.
-    let shred = value_noise2(in.uv * 6.0 + vec2<f32>(seed * 31.0, age * 2.0), 1.0);
-    let torn = smoothstep(age * 1.1 - 0.1, age * 1.1 + 0.15, shred + field * 0.6);
-    if field <= 0.0 || torn <= 0.001 {
+    let field = 1.0 - d / mix(0.55, 1.0, lumps);
+    if field <= 0.0 {
         discard;
     }
-    // Hot white heart early, the colour in the body, dark red at the edges and as it dies.
-    let heat = clamp(field * (1.25 - age * 1.2), 0.0, 1.0);
     let level = length(rgb);
-    let white = vec3<f32>(level * 0.8);
-    let ember = vec3<f32>(level * 0.5, level * 0.03, level * 0.015);
-    // Cells of hotter plasma churning through the body.
-    let churn = value_noise2(in.uv * 5.5 + vec2<f32>(seed * 13.0, -age * 4.0), 1.0);
-    var c = mix(ember, rgb * (0.7 + churn * 1.1), smoothstep(0.05, 0.35, heat));
-    c = mix(c, white * 1.3, smoothstep(0.7, 0.98, heat) * (1.0 - smoothstep(0.0, 0.5, age)));
-    // Fusion opens with the prism in its fringe; it cools back to red.
-    let fringe = exp(-pow((field - 0.18) / 0.12, 2.0)) * (1.0 - smoothstep(0.1, 0.6, age));
-    c += prism(lumps * 1.3 + churn * 0.5 + seed) * level * fringe * fusion * 1.4;
-    let fade = pow(1.0 - age, 1.5);
-    // Mottled through, so it is a body of plasma and not a flat shape.
-    let mottle = 0.5 + 0.5 * value_noise2(in.uv * 3.5 + vec2<f32>(seed * 13.0, -age * 3.0), 1.0);
-    return vec4<f32>(c * mottle * smoothstep(0.0, 0.22, field) * torn * fade, 0.0);
+    let white = vec3<f32>(level * 0.85);
+    // The heart: a solid, sharp-edged body that falls back into itself as it cools.
+    let heat = clamp(field * (1.35 - age * 1.7), 0.0, 1.0);
+    let solid = smoothstep(0.3, 0.38, heat);
+    let heart = mix(rgb * 1.2, white * 1.6, smoothstep(0.55, 0.85, heat)) * solid;
+    // Filaments: ridges of a warped noise, thin bright threads torn out of the heart.
+    let warp = value_noise2(in.uv * 3.0 + vec2<f32>(seed * 5.0, age), 1.0);
+    let ridge_a = 1.0 - abs(value_noise2(in.uv * 4.5 + warp * 1.6 + vec2<f32>(seed * 17.0, age * 2.5), 1.0) * 2.0 - 1.0);
+    let ridge_b = 1.0 - abs(value_noise2(in.uv * 9.0 - warp * 1.2 + vec2<f32>(-age * 3.5, seed * 7.0), 1.0) * 2.0 - 1.0);
+    let threads = pow(ridge_a, 12.0) + 0.6 * pow(ridge_b, 16.0);
+    // They go out in pieces, each on its own, from the edge in.
+    let grain = value_noise2(in.uv * 7.0 + vec2<f32>(seed * 31.0, 0.0), 1.0);
+    let alive = smoothstep(age * 1.2 - 0.02, age * 1.2 + 0.04, grain * 0.6 + field * 0.6);
+    let thread_rgb = mix(rgb * 1.4, white * 1.2, smoothstep(0.4, 0.9, field) * (1.0 - age));
+    var c = heart + thread_rgb * threads * smoothstep(0.0, 0.12, field) * alive * 2.4;
+    // Fusion: the prism in its threads while it is hot.
+    c += prism(lumps * 1.3 + warp * 0.5 + seed) * level * threads * fusion * (1.0 - smoothstep(0.1, 0.6, age)) * 1.6;
+    return vec4<f32>(c * pow(1.0 - age, 1.3), 0.0);
 }
 
-// A plasma shot's wake: a soft, lumpy puff of glowing plasma, white-hot at its heart while
-// fresh, its colour in the body, cooling through deep red to nothing as it swells. Gone
-// over to fusion, its body takes the prism's pinks in drifting patches while it is hot.
+// Plasma thrown up or out of a blast or a gun's mouth: a ragged clump of it, hot at its
+// heart while fresh and red in its body, with a sharp edge. It does not spread into a
+// haze: as it cools it is eaten through in holes from the edge in, hard-edged, until it
+// is gone. Gone over to fusion, its body takes the prism's pinks while it is hot.
 fn plasma_wake(in: PuffOut, d: f32) -> vec4<f32> {
     let seed = in.state.z;
     let age = in.state.x;
@@ -203,18 +203,23 @@ fn plasma_wake(in: PuffOut, d: f32) -> vec4<f32> {
     if field <= 0.0 {
         discard;
     }
+    // Eaten through as it cools.
+    let grain = value_noise2(in.uv * 6.0 + vec2<f32>(seed * 13.0, age * 0.8), 1.0);
+    let alive = smoothstep(-0.02, 0.03, grain * 0.55 + field * 0.75 - age * 1.05 - 0.05);
+    if alive <= 0.001 {
+        discard;
+    }
     let level = length(rgb);
-    let body = pow(field, 1.4);
-    let heat = 1.0 - smoothstep(0.0, 0.65, age);
+    let heat = 1.0 - smoothstep(0.0, 0.6, age);
     let ember = vec3<f32>(level * 0.45, level * 0.025, level * 0.012);
     let churn = value_noise2(in.uv * 5.0 + vec2<f32>(-age * 3.0, seed * 11.0), 1.0);
     let hue = prism(lumps + churn * 0.4 + seed + age * 0.6);
     var c = mix(ember, rgb * (0.75 + 0.6 * churn), heat);
     c = mix(c, hue * level * (0.7 + 0.6 * churn), fusion * fusion * heat * 0.75);
-    c += vec3<f32>(level * 0.9, level * 0.8, level * 0.8) * pow(field, 4.0) * (1.0 - smoothstep(0.0, 0.3, age));
-    c += hue * level * fusion * heat * field * 0.9;
-    let fade = pow(1.0 - age, 1.6);
-    return vec4<f32>(c * body * fade * (0.55 + 0.6 * lumps), 0.0);
+    c += vec3<f32>(level * 0.9, level * 0.8, level * 0.8) * pow(field, 3.0) * (1.0 - smoothstep(0.0, 0.3, age));
+    // Solid through: brightest at its heart, but no soft falloff to a glow at its rim.
+    let body = 0.45 + 0.55 * smoothstep(0.0, 0.5, field);
+    return vec4<f32>(c * body * alive * pow(1.0 - age, 1.2), 0.0);
 }
 
 // A thrown glob: a soft red blob, its heart hot pink-white while it is fresh, cooling to

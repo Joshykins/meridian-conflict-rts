@@ -518,6 +518,9 @@ shared! {
         /// A warp dampener's tether (renderer/damper_fx.rs): crimson lightning with a
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;
+        /// A Regency plasma shot's trail (renderer/regency_guns_fx.rs): a hot filament that
+        /// cools to red and breaks up along its length. `aim.w` 1 for a fusion round's.
+        pub const PLASMA_TRAIL: u32 = 11;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

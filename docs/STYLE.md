@@ -287,16 +287,21 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     and it cools). It launches with a blinding white flash and a cone of
     fusion, pinching out a jet of fusion, long and fast (a white-hot core in a
     sheath of the prism, the fastest Regency shot), arcing a little onto its
-    mark (laid flat, `flat_fire`) with a long wake taking the prism and
+    mark (laid flat, `flat_fire`) with a long hot trail taking the prism and
     cooling through pink and red behind it. Where it lands it is far bigger
-    and brighter than any lower grade: a blinding flash, opening white with
-    the prism in its fringe and billowing out in lumps before it cools back to
-    red; it throws a column of plasma up, streaks and globs out and lightning
+    and brighter than any lower grade: a blinding flash, a hard white heart
+    with filaments torn out of it, the prism in them, cooling back to red; it
+    throws a column of plasma up, streaks and globs out and lightning
     into the ground, rolls a lumpy skirt of plasma out over the ground, melts the ground into a wide glowing pool, and leaves a knot of
     fusion burning over it for seconds, slowly letting white lightning go
     while red sparkles cool off the edges.
   - **No spirals, no rings:** the plasma boils, churns and billows in cells
     and lumps; nothing is wound round a middle in arms (user, 2026-09-30).
+  - **No mist:** plasma is hard-edged and goes out fast. A trail is a hot
+    filament that cools and breaks up, not a chain of puffs; a blast is a
+    sharp heart and torn filaments, not a soft bloom, and what it throws is
+    eaten through as it cools rather than spreading into a haze (user,
+    2026-10-01: the puffy trails and blasts looked bad).
   - **Sound:** plasmatic and heavy: compression, sizzle and roar, never a pew,
     a zap or a cannon crack.
 - **Weapon names are grounded engineering:** a grade that says how the shot

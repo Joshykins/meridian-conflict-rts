@@ -456,6 +456,19 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             let flicker = 0.7 + 0.3 * sin((globals.camera.w - p.extras.x) * 71.0 + f32(instance));
             out.color = vec3<f32>(1.0, 0.04, 0.16) * 8.0 * envelope * flicker;
             out.shape = vec2<f32>(-distance(head, tail), 3.0);
+        } else if (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL {
+            // A Regency plasma shot's trail (renderer/regency_guns_fx.rs): hot where the shot
+            // has just passed, cooling to a deep red as it goes out. A fusion round's starts
+            // white, takes the prism's pinks and cools through them to red. The age goes to
+            // `fs_sprite` in the shape, for the breaking up.
+            let heat = max(1.0 - age, 0.0);
+            let fusion = p.aim.w > 0.5;
+            let red = mix(vec3<f32>(0.45, 0.012, 0.008), vec3<f32>(1.0, 0.06, 0.035), smoothstep(0.0, 0.45, heat));
+            let hue = prism(f32(instance) * 0.137 + globals.camera.w * PRISM_RATE * 3.0);
+            var warm = mix(red, mix(vec3<f32>(1.0, 0.45, 0.42), hue, select(0.0, 0.8, fusion)), smoothstep(0.45, 0.8, heat));
+            warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat));
+            out.color = warm * select(7.0, 9.0, fusion) * pow(heat, 0.8);
+            out.shape = vec2<f32>(-distance(head, tail), 6.6 + 0.4 * clamp(age, 0.0, 1.0));
         } else if (p.color & 0xFu) == 6u {
             // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
             // cooling through orange to a dull red before it goes out.
@@ -516,7 +529,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let p = projectiles[instance];
     // Lightning segments have their own soft caps. The ordinary shot-head sprite
     // would put a bead at every kink, turning dark as the light faded.
-    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER)) {
+    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL)) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
@@ -905,6 +918,22 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let rgb = red * pow(across, 2.2) * 3.2
                 + white * pow(across, 7.0) * 10.0 * dense;
             return vec4<f32>(rgb * smoothstep(0.0, 0.35, u) * in.color.r, 1.0);
+        }
+        if in.shape.y > 6.55 {
+            // A plasma shot's trail (shape.y 6.6 to 7.0 over its life): a hot thread in a
+            // thin sheath, and as it cools it breaks into stretches that go out on their own,
+            // sharp-edged, never a soft haze.
+            let age = (in.shape.y - 6.6) / 0.4;
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let grain = value_noise2(vec2<f32>(run * 0.45, 3.7), 1.0) * 0.7
+                + value_noise2(vec2<f32>(run * 1.7, 9.1), 1.0) * 0.3;
+            // Whole while hot; from a third of its life it breaks up.
+            let cut = (age - 0.3) * 1.5;
+            let alive = smoothstep(cut - 0.05, cut + 0.02, grain);
+            // It thins as it cools.
+            let thread = pow(across, mix(4.0, 9.0, age));
+            let sheath = pow(across, 2.2) * 0.3 * (1.0 - age);
+            return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
         }
         if in.shape.y > 5.5 {
             // A Pinched-plasmeric beam: plasma squeezed into a dense stream. A white-hot core

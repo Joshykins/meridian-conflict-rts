@@ -3286,7 +3286,7 @@ impl Renderer {
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
         self.regency_guns_tick(units, time);
-        self.regency_wakes(projectiles, time);
+        self.regency_trails(projectiles, time);
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
