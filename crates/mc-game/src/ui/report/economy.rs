@@ -4,7 +4,7 @@
 
 use super::analysis::{clock, short, Metric, SPEND_KINDS};
 use super::chart::{self, Series};
-use super::{block, chips, ease, legend, well, Ctx, Report};
+use super::{block, chips, ease, legend, metric_title, well, Ctx, Report};
 use crate::ui::{id, palette, rgb, type_scale, Color, Rect, Ui};
 
 /// The curves to pick from, with the chip each is picked by.
@@ -19,8 +19,7 @@ const METRICS: [(Metric, &str); 8] = [
     (Metric::Efficiency, "Efficiency"),
 ];
 
-/// A colour for each of `SPEND_KINDS`.
-const SPEND_TONES: [u32; 6] = [0xFF5A24, 0xFFB43C, 0xE9D98A, 0x6FD08C, 0x5AA9FF, 0x9A9AA2];
+use super::tones::{self, SPEND as SPEND_TONES};
 
 pub fn draw(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     // Three columns: the curves; where the materials came from and went, and the
@@ -73,7 +72,7 @@ fn spend_row(sides: usize) -> f32 {
 
 fn curves(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     let inner = block(ui, r, "Over the Match");
-    let names: Vec<&str> = METRICS.iter().map(|m| m.1).collect();
+    let names: Vec<(&str, u32)> = METRICS.iter().map(|m| (m.1, tones::metric(m.0))).collect();
     let chosen = METRICS
         .iter()
         .position(|m| m.0 == report.economy)
@@ -89,11 +88,12 @@ fn curves(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         // The new curves draw in afresh.
         report.tab_age = report.tab_age.min(0.35);
     }
+    metric_title(ui, report.economy, inner.right(), inner.y + 54.0);
     legend(
         report,
         ui,
         ctx,
-        Rect::new(inner.x + 50.0, inner.y + 44.0, inner.w - 50.0, 20.0),
+        Rect::new(inner.x + 50.0, inner.y + 44.0, inner.w - 250.0, 20.0),
     );
     let colors: Vec<Color> = (0..report.a.sides.len())
         .map(|i| report.color(ctx, i))
@@ -251,31 +251,35 @@ fn spending(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     }
 }
 
-/// A ledger heading, and how a side's figure under it reads.
-type LedgerColumn = (&'static str, fn(&super::analysis::SideReport) -> String);
+/// A ledger heading, the colour of what it counts, and how a side's figure under it reads.
+type LedgerColumn = (
+    &'static str,
+    u32,
+    fn(&super::analysis::SideReport) -> String,
+);
 
 /// The totals: a line a side.
 fn ledger(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     let inner = block(ui, r, "Ledger");
     well(ui, inner);
     let cols: [LedgerColumn; 5] = [
-        ("Collected", |s| short(s.collected)),
-        ("Reclaimed", |s| short(s.reclaimed)),
-        ("Energy", |s| short(s.energy_collected)),
-        ("Best /s", |s| short(s.peak_income)),
-        ("Stalled", |s| {
+        ("Collected", tones::MATERIALS, |s| short(s.collected)),
+        ("Reclaimed", tones::SALVAGE, |s| short(s.reclaimed)),
+        ("Energy", tones::ENERGY, |s| short(s.energy_collected)),
+        ("Best /s", tones::MATERIALS, |s| short(s.peak_income)),
+        ("Stalled", tones::STALLED, |s| {
             clock((s.stalled * mc_core::TICKS_PER_SECOND as f32) as u32)
         }),
     ];
     let name_w = 120.0;
     let col_w = (inner.w - name_w - 12.0) / cols.len() as f32;
     let head = inner.y + 16.0;
-    for (c, (title, _)) in cols.iter().enumerate() {
+    for (c, (title, tone, _)) in cols.iter().enumerate() {
         ui.text_right(
             inner.x + name_w + (c + 1) as f32 * col_w,
             head,
             type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
+            rgb(*tone, 1.0),
             title,
         );
     }
@@ -299,7 +303,7 @@ fn ledger(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         ui.fill(Rect::new(inner.x + 12.0, y - 4.0, 8.0, 8.0), c);
         let (st, name) = ui.fitted(type_scale::CAPTION, &s.name, name_w - 30.0);
         ui.text(inner.x + 26.0, y, st, rgb(palette::TEXT, 0.9), &name);
-        for (c, (_, value)) in cols.iter().enumerate() {
+        for (c, (_, _, value)) in cols.iter().enumerate() {
             ui.text_right(
                 inner.x + name_w + (c + 1) as f32 * col_w,
                 y,

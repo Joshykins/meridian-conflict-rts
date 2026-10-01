@@ -33,16 +33,6 @@ fn kind_name(k: MomentKind) -> &'static str {
     }
 }
 
-fn kind_tone(k: MomentKind) -> u32 {
-    match k {
-        MomentKind::Battle | MomentKind::End | MomentKind::Lead => palette::ACCENT,
-        MomentKind::Warhead | MomentKind::Experimental => palette::WARN,
-        MomentKind::Defeat | MomentKind::ExperimentalLost => palette::BAD,
-        MomentKind::Salvage => super::SALVAGE,
-        _ => palette::DIM,
-    }
-}
-
 /// Returns the tick of a moment picked to see on the battlefield.
 pub fn draw(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) -> Option<u32> {
     let left = Rect::new(r.x, r.y, r.w * 0.6, r.h);
@@ -98,11 +88,11 @@ fn list(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) -> Option<u32> {
             spine - 16.0,
             mid + 10.0,
             type_scale::MICRO,
-            rgb(kind_tone(m.kind), 0.9 * k),
+            rgb(super::tones::moment(m.kind), 0.9 * k),
             kind_name(m.kind),
         );
         // The node on the spine, in the side's colour.
-        let tone = m.side.map_or(rgb(kind_tone(m.kind), 1.0), |s| {
+        let tone = m.side.map_or(rgb(super::tones::moment(m.kind), 1.0), |s| {
             report.color(ctx, s as usize)
         });
         let c = Vec2::new(spine + 0.5, mid);
@@ -176,7 +166,7 @@ fn locator(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         if report.timeline.shown == Some(i) {
             continue;
         }
-        let tone = rgb(kind_tone(m.kind), 0.45);
+        let tone = rgb(super::tones::moment(m.kind), 0.45);
         ui.dot(at(p), 3.0, tone);
     }
     let Some(m) = report.timeline.shown.and_then(|i| a.moments.get(i)) else {
@@ -192,7 +182,7 @@ fn locator(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     if let Some(p) = m.at {
         let c = at(p);
         let pulse = (ui.time * 1.5).fract();
-        let tone = kind_tone(m.kind);
+        let tone = super::tones::moment(m.kind);
         ui.arc(
             c,
             10.0 + 26.0 * pulse,
@@ -228,7 +218,7 @@ fn locator(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         inner.x,
         y + 44.0,
         type_scale::CAPTION,
-        rgb(kind_tone(m.kind), 1.0),
+        rgb(super::tones::moment(m.kind), 1.0),
         &format!("{}  \u{b7}  {}", clock(m.tick), place),
     );
 }

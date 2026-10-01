@@ -179,8 +179,9 @@ MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the 
 
 MERIDIAN_ISSUE_NOTE=TEXT with --screenshot: the F1 report card's note, as if typed.
 
-MERIDIAN_HISTORY_REPORT=N with --ui history: match N's battle report (1 = the newest),
-read from the replay first when no record was kept.
+MERIDIAN_HISTORY_REPORT=N[:PAGE] with --ui history: match N's battle report (1 = the
+newest) on PAGE (overview, economy, military, battlefield, timeline), read from the replay
+first when no record was kept.
 
 MERIDIAN_GROUPS=KEY,KEY,... with --screenshot: control groups 2, 3, ... hold player 0's
 units whose blueprint key contains each KEY (group 1 is the selection).

@@ -147,13 +147,13 @@ impl Front {
         self.open(settings, true);
         self.screen = screen;
         self.enter = 1.0;
-        // `MERIDIAN_HISTORY_REPORT=N`: Match History with match N's battle report open.
+        // `MERIDIAN_HISTORY_REPORT=N[:PAGE]`: Match History with match N's battle report open.
         if let (Screen::History, Some(h)) = (screen, &mut self.history) {
-            if let Some(n) = std::env::var("MERIDIAN_HISTORY_REPORT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-            {
-                h.open_report_now(n);
+            if let Ok(spec) = std::env::var("MERIDIAN_HISTORY_REPORT") {
+                let (n, page) = spec.split_once(':').unwrap_or((&spec, ""));
+                if let Ok(n) = n.parse() {
+                    h.open_report_now(n, page);
+                }
             }
         }
         // Shots see the map thumbnails; `MERIDIAN_MAP_BROWSER=1` opens the browser.

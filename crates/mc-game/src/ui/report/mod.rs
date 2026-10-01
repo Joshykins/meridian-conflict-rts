@@ -15,6 +15,7 @@ mod salvage;
 #[cfg(test)]
 mod tests;
 mod timeline;
+mod tones;
 
 use super::{id, ink, palette, rgb, style, type_scale, ButtonKind, Color, Key, Rect, Ui};
 use crate::audio::Sfx;
@@ -204,6 +205,13 @@ impl Report {
         (self.age, self.tab_age) = (10.0, 10.0);
     }
 
+    /// Opens on the page of that name (`overview`, `economy`, ...), if there is one.
+    pub fn open_page(&mut self, name: &str) {
+        if let Some(tab) = Tab::parse(name) {
+            self.tab = tab;
+        }
+    }
+
     fn turn_to(&mut self, ui: &mut Ui, tab: Tab) {
         if tab != self.tab {
             ui.audio.play(Sfx::Select);
@@ -370,24 +378,32 @@ impl Report {
             (
                 "Duration",
                 clock((self.count(self.a.length as f32, 0.2)) as u32),
+                palette::TEXT,
             ),
             (
                 "Materials Destroyed",
                 short(self.count(self.a.total_destroyed, 0.3)),
+                tones::DESTROYED,
             ),
             (
                 "Units Lost",
                 format!("{:.0}", self.count(self.a.total_deaths as f32, 0.4)),
+                tones::LOST,
             ),
             (
                 "Materials Reclaimed",
                 short(self.count(self.a.total_reclaimed, 0.5)),
+                tones::SALVAGE,
             ),
-            ("Battles", format!("{}", self.a.battles.len())),
+            (
+                "Battles",
+                format!("{}", self.a.battles.len()),
+                palette::TEXT,
+            ),
         ];
         let fw = 168.0;
         let mut x = r.right() - fw * figures.len() as f32;
-        for (i, (label, value)) in figures.iter().enumerate() {
+        for (i, (label, value, tone)) in figures.iter().enumerate() {
             let k = ease((self.age - 0.15 * i as f32) / 0.5);
             let y = r.y + 40.0 + 8.0 * (1.0 - k);
             ui.vline(x, r.y + 22.0, 70.0, rgb(palette::LINE, 0.14 * k));
@@ -396,8 +412,7 @@ impl Report {
                 x + 16.0,
                 y + 34.0,
                 style(Face::Light, 34.0, 0.5),
-                // Reclaim in its own colour wherever it shows.
-                rgb(if i == 3 { SALVAGE } else { palette::TEXT }, k),
+                rgb(*tone, k),
                 value,
             );
             x += fw;
@@ -550,29 +565,38 @@ pub(super) fn side_color(colors: &[[f32; 3]], side: usize) -> Color {
     ]
 }
 
-/// Reclaim's colour throughout the report, and the mined materials it is set against.
-const SALVAGE: u32 = 0x3FE0C5;
-const MINED: u32 = 0xFFB43C;
-
 /// A labelled block on a page: a section heading over it. Returns the space under it.
 fn block(ui: &mut Ui, r: Rect, title: &str) -> Rect {
     ui.section(r.x, r.y + 6.0, r.w, title);
     Rect::new(r.x, r.y + 24.0, r.w, r.h - 24.0)
 }
 
-/// A row of chips to pick one of `options`; returns the one clicked.
-fn chips(ui: &mut Ui, key: &str, r: Rect, options: &[&str], chosen: usize) -> Option<usize> {
+/// A row of chips to pick one of `options`, each marked in the colour of what it
+/// counts (`tones`); returns the one clicked.
+fn chips(ui: &mut Ui, key: &str, r: Rect, options: &[(&str, u32)], chosen: usize) -> Option<usize> {
     let mut x = r.x;
     let mut out = None;
-    for (i, o) in options.iter().enumerate() {
-        let w = ui.text_width(type_scale::CAPTION, o) + 28.0;
+    for (i, &(o, tone)) in options.iter().enumerate() {
+        let w = ui.text_width(type_scale::CAPTION, o) + 40.0;
         if x + w > r.right() {
             break;
         }
         let c = Rect::new(x, r.y, w, r.h);
-        let res = ui.tile(id(key, i), c, i == chosen, true);
+        let lit = i == chosen;
+        let res = ui.tile(id(key, i), c, lit, true);
+        // What it counts: a swatch before the name, and a rule along the foot when picked.
+        ui.fill(
+            Rect::new(c.x + 12.0, c.mid_y() - 4.0, 8.0, 8.0),
+            rgb(tone, if lit { 1.0 } else { 0.7 + 0.3 * res.glow }),
+        );
+        if lit {
+            ui.fill(
+                Rect::new(c.x + 4.0, c.bottom() - 2.0, c.w - 8.0, 2.0),
+                rgb(tone, 0.9),
+            );
+        }
         ui.text_centred(
-            c.x + c.w * 0.5,
+            c.x + 6.0 + c.w * 0.5,
             c.mid_y() - 1.0,
             type_scale::CAPTION,
             rgb(
@@ -592,6 +616,20 @@ fn chips(ui: &mut Ui, key: &str, r: Rect, options: &[&str], chosen: usize) -> Op
         x += w + 6.0;
     }
     out
+}
+
+/// What a chart's curves count, over its right-hand end in that figure's colour.
+fn metric_title(ui: &mut Ui, metric: Metric, right: f32, y: f32) {
+    let tone = tones::metric(metric);
+    let unit = metric.unit();
+    let text = if unit.is_empty() {
+        metric.name().to_owned()
+    } else {
+        format!("{}  {unit}", metric.name())
+    };
+    let end = right - ui.text_width(type_scale::CAPTION, &text);
+    ui.text(end, y, type_scale::CAPTION, rgb(tone, 1.0), &text);
+    ui.fill(Rect::new(end - 22.0, y - 1.5, 14.0, 3.0), rgb(tone, 1.0));
 }
 
 /// The sides as a legend in a row; hovering one picks it out on the charts.

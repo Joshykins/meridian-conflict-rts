@@ -65,9 +65,9 @@ impl HistoryState {
         self.summary.is_none() && std::mem::take(&mut self.slots_taken)
     }
 
-    /// A headless shot of match `n`'s battle report (1 = newest): waits for the list
+    /// A headless shot of match `n`'s battle report (1 = newest) on `page`: waits for the list
     /// and for the report to be worked out (`MERIDIAN_HISTORY_REPORT`).
-    pub fn open_report_now(&mut self, n: usize) {
+    pub fn open_report_now(&mut self, n: usize, page: &str) {
         let found = loop {
             if let Some(list) = self.found.lock().unwrap().take() {
                 break list;
@@ -80,7 +80,7 @@ impl HistoryState {
         }
         *self.found.lock().unwrap() = Some(found);
         if let Some(summary) = &mut self.summary {
-            summary.wait();
+            summary.wait(page);
         }
     }
 

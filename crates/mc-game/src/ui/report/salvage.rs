@@ -3,7 +3,8 @@
 //! whose fields those were), and the richest wrecks it hauled in.
 
 use super::analysis::{clock, region, short};
-use super::{block, ease, Ctx, Report, MINED, SALVAGE};
+use super::tones::{MATERIALS as MINED, SALVAGE};
+use super::{block, ease, Ctx, Report};
 use crate::ui::{ink, palette, preview, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 

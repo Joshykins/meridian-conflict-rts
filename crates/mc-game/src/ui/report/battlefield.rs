@@ -357,7 +357,7 @@ fn salvage(
         ui.dot(
             p,
             (3.0 + 8.0 * heat) * scale,
-            rgb(super::SALVAGE, 0.18 + 0.45 * heat),
+            rgb(super::tones::SALVAGE, 0.18 + 0.45 * heat),
         );
     }
     for f in a.frames[first..].iter().take_while(|f| f.tick as f32 <= t) {
@@ -369,7 +369,7 @@ fn salvage(
                 let rad = (3.0 + mass.sqrt() * 0.5).min(11.0) * scale;
                 let fade = 1.0 - age;
                 ui.dot(p, rad * 2.2, [c[0], c[1], c[2], 0.12 * fade]);
-                ui.dot(p, rad * 0.8, rgb(super::SALVAGE, 0.9 * fade));
+                ui.dot(p, rad * 0.8, rgb(super::tones::SALVAGE, 0.9 * fade));
                 // A glint that turns as it fades.
                 let spin = Vec2::from_angle(ui.time * 1.5 + cell as f32) * rad * 1.6 * fade;
                 ui.stroke(p - spin, p + spin, 1.0, rgb(0xFFFFFF, 0.6 * fade));

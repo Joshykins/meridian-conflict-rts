@@ -5,6 +5,7 @@
 use super::analysis::{clock, seconds, short, Metric, BIN_TICKS, DOMAINS};
 use super::chart::{self, Series};
 use super::{block, chips, ease, legend, Ctx, Report};
+use crate::hud::style::{domain_wash, Domain};
 use crate::ui::{id, ink, palette, rgb, type_scale, Color, Rect, Ui};
 use mc_data::BlueprintId;
 
@@ -15,7 +16,7 @@ const METRICS: [Metric; 4] = [
     Metric::Lost,
 ];
 
-const DOMAIN_TONES: [u32; 4] = [0x7FCF6A, 0x7CC6FF, 0x3F7BFF, 0x9A9AA2];
+use super::tones::{self, DOMAINS as DOMAIN_TONES};
 
 pub fn draw(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     let left = Rect::new(r.x, r.y, r.w * 0.62, r.h);
@@ -61,7 +62,10 @@ pub fn draw(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
 
 fn armies(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     let inner = block(ui, r, "Forces");
-    let names: Vec<&str> = METRICS.iter().map(|m| m.name()).collect();
+    let names: Vec<(&str, u32)> = METRICS
+        .iter()
+        .map(|&m| (m.name(), tones::metric(m)))
+        .collect();
     let chosen = METRICS
         .iter()
         .position(|&m| m == report.military)
@@ -76,11 +80,12 @@ fn armies(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         report.military = METRICS[i];
         report.tab_age = report.tab_age.min(0.35);
     }
+    super::metric_title(ui, report.military, inner.right(), inner.y + 54.0);
     legend(
         report,
         ui,
         ctx,
-        Rect::new(inner.x + 50.0, inner.y + 44.0, inner.w - 50.0, 20.0),
+        Rect::new(inner.x + 50.0, inner.y + 44.0, inner.w - 250.0, 20.0),
     );
     let colors: Vec<Color> = (0..report.a.sides.len())
         .map(|i| report.color(ctx, i))
@@ -344,6 +349,9 @@ fn deadliest(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             [c[0], c[1], c[2], t],
         );
         let pic = Rect::new(row.x + 8.0, row.y + 2.0, row.h - 4.0, row.h - 4.0);
+        // Where it fought, as its tile in the HUD shows it.
+        let unit = ctx.blueprints.unit(bp);
+        domain_wash(ui, pic, Domain::of(unit), 0.0);
         ctx.thumbs.draw(ui, bp, pic, t);
         let name = &ctx.blueprints.unit(bp).name;
         let tx = pic.right() + 8.0;
@@ -363,7 +371,7 @@ fn deadliest(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             row.right() - 10.0,
             row.y + 29.0,
             type_scale::MICRO,
-            rgb(palette::FAINT, t),
+            rgb(tones::DESTROYED, 0.85 * t),
             &format!("{kills} {}", if kills == 1 { "kill" } else { "kills" }),
         );
         // How it compares with the deadliest.

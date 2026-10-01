@@ -51,6 +51,8 @@ pub struct SummaryState {
     /// The worker's result, waited for by a headless shot (`wait`) and taken in by
     /// the next frame; the report then opens already drawn in.
     arrived: Option<Result<Ready, String>>,
+    /// The page a headless shot opens on.
+    page: String,
     /// Ticks played through so far, of `length`, when there was no kept record.
     played: Arc<AtomicU32>,
     length: u32,
@@ -121,6 +123,7 @@ impl SummaryState {
             blueprints: blueprints.clone(),
             thumbs: Thumbs::default(),
             arrived: None,
+            page: String::new(),
             stage: match spawned {
                 Ok(_) => Stage::Working(rx),
                 Err(e) => Stage::Failed(format!("could not start: {e}")),
@@ -140,7 +143,8 @@ impl SummaryState {
 
     /// Blocks until the report is worked out, and has it open fully drawn in: a
     /// headless shot (`MERIDIAN_HISTORY_REPORT`).
-    pub fn wait(&mut self) {
+    pub fn wait(&mut self, page: &str) {
+        self.page = page.to_owned();
         if let Stage::Working(rx) = &self.stage {
             self.arrived = Some(rx.recv().unwrap_or_else(|_| Err(LOST.into())));
             self.enter = 1.0;
@@ -172,6 +176,7 @@ impl SummaryState {
                 );
                 if waited {
                     ready.report.settle();
+                    ready.report.open_page(&self.page);
                 }
                 Stage::Shown(ready.report)
             }

@@ -3,7 +3,8 @@
 
 use super::analysis::{clock, short, Metric, SideReport};
 use super::chart::{self, Series};
-use super::{block, ease, legend, well, Ctx, Report};
+use super::tones;
+use super::{block, ease, legend, metric_title, well, Ctx, Report};
 use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 
 /// A scoreboard column: heading, width share, the figure and how it reads.
@@ -13,8 +14,8 @@ struct Column {
     text: fn(f32) -> String,
     /// Lower is better (losses).
     low_wins: bool,
-    /// Drawn in reclaim's colour.
-    salvage: bool,
+    /// The colour of what it counts (`tones`).
+    tone: u32,
 }
 
 const COLUMNS: [Column; 9] = [
@@ -23,63 +24,63 @@ const COLUMNS: [Column; 9] = [
         value: |s| s.collected,
         text: short,
         low_wins: false,
-        salvage: false,
+        tone: tones::MATERIALS,
     },
     Column {
         title: "Reclaimed",
         value: |s| s.reclaimed,
         text: short,
         low_wins: false,
-        salvage: true,
+        tone: tones::SALVAGE,
     },
     Column {
         title: "Peak Army",
         value: |s| s.peak_army,
         text: short,
         low_wins: false,
-        salvage: false,
+        tone: tones::ARMY,
     },
     Column {
         title: "Built",
         value: |s| s.built as f32,
         text: |v| format!("{v:.0}"),
         low_wins: false,
-        salvage: false,
+        tone: tones::BUILT,
     },
     Column {
         title: "Kills",
         value: |s| s.kills as f32,
         text: |v| format!("{v:.0}"),
         low_wins: false,
-        salvage: false,
+        tone: tones::DESTROYED,
     },
     Column {
         title: "Losses",
         value: |s| s.losses as f32,
         text: |v| format!("{v:.0}"),
         low_wins: true,
-        salvage: false,
+        tone: tones::LOST,
     },
     Column {
         title: "Destroyed",
         value: |s| s.destroyed,
         text: short,
         low_wins: false,
-        salvage: false,
+        tone: tones::DESTROYED,
     },
     Column {
         title: "Lost",
         value: |s| s.lost,
         text: short,
         low_wins: true,
-        salvage: false,
+        tone: tones::LOST,
     },
     Column {
         title: "Efficiency",
         value: |s| s.efficiency * 100.0,
         text: |v| format!("{v:.0}%"),
         low_wins: false,
-        salvage: false,
+        tone: tones::EFFICIENCY,
     },
 ];
 
@@ -140,14 +141,7 @@ fn scoreboard(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect, row_h: f32, grou
             col_x0 + (c + 1) as f32 * col_w - 12.0,
             hy,
             type_scale::MICRO,
-            rgb(
-                if col.salvage {
-                    super::SALVAGE
-                } else {
-                    palette::DIM
-                },
-                1.0,
-            ),
+            rgb(col.tone, 1.0),
             col.title,
         );
     }
@@ -297,11 +291,7 @@ fn side_row(
             right,
             mid - 4.0,
             type_scale::VALUE,
-            match (col.salvage, top) {
-                (true, _) => rgb(super::SALVAGE, if top { k } else { 0.75 * k }),
-                (false, true) => rgb(palette::TEXT, k),
-                (false, false) => rgb(palette::DIM, k),
-            },
+            rgb(if top { palette::TEXT } else { palette::DIM }, k),
             &(col.text)(shown),
         );
         // A bar under each figure against the column's largest.
@@ -313,11 +303,7 @@ fn side_row(
         );
         ui.fill(
             Rect::new(right - bw * frac, mid + 10.0, bw * frac, 2.0),
-            if col.salvage {
-                rgb(super::SALVAGE, (if top { 1.0 } else { 0.55 }) * k)
-            } else {
-                [c[0], c[1], c[2], (if top { 1.0 } else { 0.55 }) * k]
-            },
+            [c[0], c[1], c[2], (if top { 1.0 } else { 0.55 }) * k],
         );
         if top {
             ui.fill(
@@ -331,11 +317,12 @@ fn side_row(
 /// Every side's army worth over the match.
 fn strength(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     let inner = block(ui, r, "Army Strength");
+    metric_title(ui, Metric::ArmyValue, inner.right(), inner.y + 10.0);
     legend(
         report,
         ui,
         ctx,
-        Rect::new(inner.x + 44.0, inner.y, inner.w - 44.0, 20.0),
+        Rect::new(inner.x + 44.0, inner.y, inner.w - 244.0, 20.0),
     );
     let colors: Vec<_> = (0..report.a.sides.len())
         .map(|i| report.color(ctx, i))
