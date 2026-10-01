@@ -85,6 +85,7 @@ mod volatile;
 mod warp;
 mod wrecks;
 mod zz_aa_probe;
+mod zz_ai_domain_probe;
 mod zz_ai_duel_probe;
 mod zz_ai_layout_probe;
 mod zz_ai_stall_probe;
