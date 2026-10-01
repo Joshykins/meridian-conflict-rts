@@ -243,12 +243,14 @@ fn match_up() {
             println!("{minute:>3}m");
             for (p, pl) in w.state.players.iter().enumerate() {
                 println!(
-                    "  P{p} side {} mass {:>5}/s energy {:>6}/s eff {:>3}% build {:>3}% mines {} worth {:>7} kills {} lost {} | {}",
+                    "  P{p} side {} mass {:>5}/s energy {:>6}/s eff {:>3}% build {:>3}% store {:>3}%/{:>3}% mines {} worth {:>7} kills {} lost {} | {}",
                     ["A", "B"][pl.team as usize],
                     pl.mass_income.floor_int(),
                     pl.energy_income.floor_int(),
                     (pl.upkeep_efficiency * 100).floor_int(),
                     (pl.build_speed * 100).floor_int(),
+                    (pl.mass * 100 / pl.mass_capacity.max(mc_core::Fx::ONE)).floor_int(),
+                    (pl.energy * 100 / pl.energy_capacity.max(mc_core::Fx::ONE)).floor_int(),
                     w.state.units.slots.iter().filter(|&r| w.state.units.owner[r] as usize == p && w.bp(r).mine.is_some() && w.state.units.is_active(r)).count(),
                     worth(&w, pl.team).floor_int(),
                     pl.units_killed,

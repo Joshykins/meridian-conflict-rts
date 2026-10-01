@@ -2,9 +2,11 @@
 //! (`docs/AI_COMMANDER.md`, "Overlay"): its plans with their stakes and appeal,
 //! each operation's group, target, phase and trade, what has hurt it, and its
 //! last decisions with why. Read-only: nothing here goes back into the sim.
+use super::economy::Power;
 use super::state::{OpKind, Phase, PLANS};
 use crate::{Brain, World};
 use mc_core::Fx;
+use mc_data::cat;
 
 /// One way to win the side weighs.
 #[derive(Clone, Debug, PartialEq)]
@@ -48,6 +50,29 @@ pub struct MindNote {
     pub why: &'static str,
 }
 
+/// How its economy reads (`economy.rs`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct MindEconomy {
+    /// "floating", "stalling" or "balanced".
+    pub state: &'static str,
+    /// The materials store's fill and the build speed, in percent.
+    pub fill: i32,
+    pub speed: i32,
+    /// "enough", "wanted" or "urgent", and energy a second short.
+    pub power: &'static str,
+    pub power_short: i32,
+    /// Engineers and factories it has, and wants.
+    pub engineers: (u32, u32),
+    pub factories: (u32, u32),
+    /// Engineers claiming mines, and free ore left on its half.
+    pub expanders: u32,
+    pub free_ore: u32,
+    /// Mine upgrades it allows at once.
+    pub upgrades: u32,
+    /// Metres the commander may work out from home (zero: home).
+    pub roam: i32,
+}
+
 /// A Commander's mind, for the overlay.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AiMind {
@@ -61,6 +86,7 @@ pub struct AiMind {
     pub seen: Vec<(&'static str, Option<u32>)>,
     /// Where the waves gather.
     pub rally: Option<(i32, i32)>,
+    pub economy: MindEconomy,
 }
 
 const HURT_NAMES: [&str; 6] = ["land", "artillery", "air", "space", "sea", "turrets"];
@@ -134,7 +160,47 @@ impl World {
             ("space", ago(s.space_seen)),
             ("nukes", ago(s.nukes_seen)),
         ];
+        let e = &c.eco;
+        let count = |f: &dyn Fn(&mc_data::UnitBlueprint) -> bool| {
+            self.state
+                .units
+                .slots
+                .iter()
+                .filter(|&r| {
+                    self.state.units.owner[r] == player
+                        && self.state.units.is_active(r)
+                        && f(self.bp(r))
+                })
+                .count() as u32
+        };
+        let economy = MindEconomy {
+            state: if e.floating {
+                "floating"
+            } else if e.stalling {
+                "stalling"
+            } else {
+                "balanced"
+            },
+            fill: (e.fill * 100).floor_int(),
+            speed: (e.speed * 100).floor_int(),
+            power: match e.power {
+                Power::Enough => "enough",
+                Power::Want => "wanted",
+                Power::Urgent => "urgent",
+            },
+            power_short: e.power_short.floor_int(),
+            engineers: (
+                count(&|b| b.is_mobile() && b.has(cat::ENGINEER) && !b.has(cat::COMMANDER)),
+                e.engineers as u32,
+            ),
+            factories: (count(&|b| b.has(cat::FACTORY)), e.factories as u32),
+            expanders: e.expanders.len() as u32,
+            free_ore: e.free_ore as u32,
+            upgrades: e.upgrades as u32,
+            roam: e.roam.floor_int(),
+        };
         Some(AiMind {
+            economy,
             plans,
             ops,
             notes,

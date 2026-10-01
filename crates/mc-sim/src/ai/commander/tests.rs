@@ -178,3 +178,47 @@ fn an_observer_can_read_a_commanders_mind() {
     assert!(mind.ops.iter().all(|o| o.units == 0 || o.at.is_some()));
     assert!(w.ai_mind(1).is_none(), "a human side has none");
 }
+
+#[test]
+fn the_economy_sets_expanders_apart_and_claims_mines() {
+    let mut w = world();
+    run(&mut w, 3600);
+    let mines = w
+        .state
+        .units
+        .slots
+        .iter()
+        .filter(|&r| w.state.units.owner[r] == 0 && w.bp(r).mine.is_some())
+        .count();
+    let eco = &w.state.ai[0].commander.eco;
+    assert!(
+        mines >= 4,
+        "only {mines} mines: {}",
+        w.state.ai[0].commander.summary()
+    );
+    assert!(
+        w.state.players[0].mine_power >= Fx::ratio(9, 10),
+        "the mines go unpaid: {}",
+        w.state.ai[0].commander.summary()
+    );
+    assert!(eco.engineers >= 2, "{}", w.state.ai[0].commander.summary());
+}
+
+#[test]
+fn a_filling_store_is_read_as_floating_and_asks_for_sinks() {
+    let mut w = world();
+    run(&mut w, 1200);
+    let before = w.state.ai[0].commander.eco.clone();
+    let cap = w.state.players[0].mass_capacity;
+    for _ in 0..8 {
+        w.state.players[0].mass = cap;
+        run(&mut w, 30);
+    }
+    let eco = &w.state.ai[0].commander.eco;
+    assert!(eco.floating, "{}", w.state.ai[0].commander.summary());
+    assert!(
+        eco.upgrades > before.upgrades && eco.payback > before.payback,
+        "more mine upgrades, and longer ones, while it floats: {}",
+        w.state.ai[0].commander.summary()
+    );
+}

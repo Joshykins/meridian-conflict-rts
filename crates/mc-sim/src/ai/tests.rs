@@ -981,6 +981,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
             salvage: vec![],
             projects: 0,
             guards: vec![],
+            failed_mines: vec![],
         },
         &mut out,
     );

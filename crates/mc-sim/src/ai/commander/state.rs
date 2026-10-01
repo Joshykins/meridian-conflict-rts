@@ -414,6 +414,9 @@ pub(in crate::ai) struct CommanderState {
     /// tier waits (`upgrades.rs`).
     #[serde(default)]
     pub behind: bool,
+    /// The economy's reading and what it tells the builders (`economy.rs`).
+    #[serde(default)]
+    pub eco: super::economy::Eco,
 }
 
 impl CommanderState {
@@ -470,6 +473,7 @@ impl CommanderState {
         }
         h.write_i64(self.rally_back.0);
         h.write_u64(self.behind as u64);
+        self.eco.hash(h);
         match self.rally {
             Some(r) => {
                 h.write_i64(r.x.0);
@@ -561,8 +565,24 @@ impl CommanderState {
             .filter(|(_, t)| t.killed + t.lost > Fx::ZERO)
             .map(|(i, t)| format!("{}:{}k/{}k", OPS[i].name(), k(t.killed), k(t.lost)))
             .collect();
+        let e = &self.eco;
+        let eco = format!(
+            "fill {}% speed {}% {}{}power {:?} short {} eng {} fac {} exp {} ore {} upg {} roam {}",
+            (e.fill * 100).floor_int(),
+            (e.speed * 100).floor_int(),
+            if e.floating { "FLOAT " } else { "" },
+            if e.stalling { "STALL " } else { "" },
+            e.power,
+            e.power_short.floor_int(),
+            e.engineers,
+            e.factories,
+            e.expanders.len(),
+            e.free_ore,
+            e.upgrades,
+            e.roam.floor_int()
+        );
         format!(
-            "trades [{}] plans [{}] appeal [{}] ops [{}] notes [{}] salvos {}",
+            "eco [{eco}] trades [{}] plans [{}] appeal [{}] ops [{}] notes [{}] salvos {}",
             trades.join(" "),
             plans.join(" "),
             appeal.join(" "),

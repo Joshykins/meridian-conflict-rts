@@ -201,7 +201,7 @@ Ground rules learnt in the tournaments (each is a comment at its code):
   not enough, groups out in the field: the commander dying at home loses the game;
 - a raid far from home is answered only by enough to win, or let go.
 
-### 7. Production and economy (`solver.rs`, `builders.rs`, `energy.rs`)
+### 7. Production and economy (`solver.rs`, `economy.rs`, `builders.rs`, `energy.rs`)
 
 **Force shares**: each force (land, air, surface, submarine) gets a share of new
 units from the stakes of the plans that use it, plus what has been hurting the side
@@ -217,19 +217,42 @@ belief, lift ships, silos, map guns, titans, warships, shields, coastal guns whe
 ships hurt it, anti-air where it was bombed and by the `AirDefense` stake, a sensor
 ship once income allows. The commander unit takes only wants at home.
 
-**Economy**: the classic builders place mines, power and factories; the Commander
-steers them:
+**Economy** (`economy.rs`): a controller run at the top of every think, before the
+builders, factories and upgrades it steers. It balances three things all game:
 
-- extra engineers by the `Boom` stake, but none while a materials stall leaves the
-  ones it has waiting (building below 70%);
-- mines claimed as far out as a classic side pushing out, while `Boom` or a real
-  `Pressure` stake holds;
-- power for what its factories and builders draw **at the speed materials pay
-  for**: counting them at full draw in a stall built a third more plants than the
-  classic AI and no mines for three minutes;
-- tech 3 waits while its army is behind the one it believes in (never less than two
-  minutes of their income): a tech 3 factory begun at half the enemy's army left
-  nothing to hold the base with.
+- **Never float.** A full materials store throws away what the mines dig. A store
+  filling up (its fill smoothed over a few thinks, past 40%) calls for sinks: mine
+  upgrades first (they pay back; more at once, and a longer payback allowed), a
+  factory ahead of more far mines, then more builders.
+- **Never stall energy.** Mines dig less while their upkeep goes unpaid. Power is
+  kept ahead of spending the whole income at the difficulty's energy ratio (8 a
+  unit of mass on Hard; costs run 4 to 7) plus the upkeep of everything standing
+  or going up, a tenth over. Wanted: plants come after the mine claims at home;
+  urgent (the store under 15%, or mines short of upkeep): plants come first,
+  every builder helps, expanders included, and new mine upgrades wait. Only as
+  many plants are started as the shortfall less what is already going up.
+- **Build power matched to income.** Factories get the army's share of the income
+  (half, more with a push on, less while booming), builders the rest. No new
+  engineers or factories while building runs under 80% of full speed. One more
+  engineer while every builder is busy and power, ore or a factory is waiting,
+  up to twice what the builders' share could keep at full speed.
+
+And it grows:
+
+- **Expanders**: one to three engineers set apart (more on a boom, more with
+  plenty of ore) claim free ore on the side's half one mine after another,
+  nearest first. A deposit no lot could be found by is skipped for three minutes.
+- **The opening** follows the user's: the commander puts up a factory, its first
+  mine at home, then power; the factory's first engineer goes straight out as an
+  expander, then a reclaimer (one early, more as income grows) before scouts.
+- **The commander roams** for its first twelve minutes: mines and reclaim out to
+  two fifths of the way to the enemy (2.5 km at most), home as soon as 200 mass of
+  armed enemy is within 1.6 km of it, or its health falls under 70%.
+- **Tech 3** waits while its army is behind the one it believes in.
+
+The overlay's ECONOMY lines show all of it: floating, stalling or balanced, store
+and build speed, the power call, engineers and factories against what it wants,
+expanders and free ore, mine upgrades, and how far the commander may roam.
 
 ### 8. Personalities
 
@@ -306,6 +329,18 @@ games a run.
 | t44 | the commander unit stays home | 0.36 | -0.95 |
 | t45 | base raids recall armies; tech 3 waits while behind | 0.43 | -0.33 |
 | t47 | plans committed for three minutes | 0.43 | -0.32 |
+| t51 | the economy controller (`economy.rs`) | 0.48 | -0.24 |
+
+The economy against the classic AI's (adaptive both, 8 games of 20 minutes on the
+same four maps, means; "dry" is an energy store under 10% with building slowed):
+
+| | Commander | Classic |
+|---|---|---|
+| Income at 10 / 15 / 20 min | 43 / 74 / 142 a s | 37 / 73 / 96 a s |
+| Build speed (share of full speed paid) | 66-75% | 42-56% |
+| Player-minutes floating (store 90% full) | 4 of 160 | 2 of 160 |
+| Player-minutes dry of energy | 16 of 160 | 3 of 160 |
+| Army mass at 20 min | 20.5k | 14.3k |
 
 Score: a win 1, a lead 0.75, a draw 0.5. The classic AI still has the edge, mostly
 on serac_divide; dev16 and meridian_basin are now draws. Per-operation trades over
@@ -339,8 +374,9 @@ Open (the next things to build):
 
 - **army trades**: gather nearer cover (turrets, shields) without giving up the
   front; meet raids on the gathering wave with the wave;
-- **army share**: the classic AI fields about twice the army at the same income by
-  minute 14; the economy still over-builds engineers and factories;
+- **energy**: still short more often than the classic AI (which keeps its store
+  full by overbuilding), early while expanders outrun the plants and late when
+  tech 2 and 3 mines raise upkeep sixfold;
 - **Easy and Normal** have not been tuned; the order budget is the dial;
 - **the Regency**: plays through the same profiles, not yet tournament-tested on its
   own roster;

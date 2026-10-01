@@ -16,49 +16,13 @@ impl World {
         intel: &Intel,
         bare: Option<Fx>,
     ) -> Option<FxVec2> {
-        let mine = self
-            .blueprints
-            .units
-            .iter()
-            .find(|b| b.mine.is_some() && b.tech == 1)?;
+        let mine = self.first_mine()?;
         let m = mine.mine?;
-        // Mines may stand close, but split the ground between them: keep them
-        // a reach apart, where each still has about 80% of its circle. A mine
-        // at sea shares only with mines at sea and reaches farther, so it is
-        // kept a sea reach from those and nowhere near the land's: held a land
-        // reach off every mine, an island's own mines left it no sea to mine.
-        let at_sea = |p: FxVec2| self.ore.at_sea(p);
-        let units = &self.state.units;
-        let crowded = |d: FxVec2| {
-            let sea = at_sea(d);
-            let spacing = m.reach_on(sea);
-            units.slots.iter().any(|row| {
-                self.bp(row).mine.is_some()
-                    && units.pos[row].distance_sq(d) < spacing * spacing
-                    && at_sea(units.pos[row]) == sea
-            })
-        };
-        let open = |d: &FxVec2| {
-            d.distance(from) <= range
-                && !crowded(*d)
-                // A planned mine counts like a built one. Its site can stand well off
-                // the deposit (the middle may be steep), so a check near the site
-                // alone sent every idle builder back to the same deposit, one
-                // think after another, and piled mines up around it.
-                && !claimed.iter().any(|c| {
-                    let same = c.mine && at_sea(c.pos) == at_sea(*d);
-                    c.pos.distance(*d) < if same { m.reach_on(at_sea(*d)) } else { Fx::from_int(32) }
-                })
-                && intel.enemy_start.is_none_or(|e| {
-                    d.distance(e) > Fx::from_int(480) || d.distance(from) < d.distance(e)
-                })
-                && !intel.danger.hot(*d)
-        };
+        let open = |d: &FxVec2| self.deposit_open(&m, *d, from, range, claimed, intel);
         let ore = self
-            .ore_centres()
+            .free_ores(from, claimed, range, intel)
             .into_iter()
-            .filter(|d| open(d))
-            .min_by_key(|d| (d.distance_sq(from), d.x, d.y));
+            .next();
         // No ore left in range: a bare mine still pays, but only where it keeps
         // enough ground. Filling the gaps between mines only takes ground from
         // them: the side gains little more than the new shaft's base.
@@ -92,5 +56,75 @@ impl World {
                 .max_by_key(|&(worth, d)| (worth, std::cmp::Reverse((d.x, d.y))))
                 .map(|(_, d)| d)
         })
+    }
+
+    /// The tech 1 mine: the one a new deposit is claimed with.
+    fn first_mine(&self) -> Option<&mc_data::UnitBlueprint> {
+        self.blueprints
+            .units
+            .iter()
+            .find(|b| b.mine.is_some() && b.tech == 1)
+    }
+
+    /// Ore fields with room for another mine within `range` of `from`, nearest
+    /// first (`free_deposit`'s rule for ore).
+    pub(super) fn free_ores(
+        &self,
+        from: FxVec2,
+        claimed: &[Claim],
+        range: Fx,
+        intel: &Intel,
+    ) -> Vec<FxVec2> {
+        let Some(m) = self.first_mine().and_then(|b| b.mine) else {
+            return Vec::new();
+        };
+        let mut ore: Vec<FxVec2> = self
+            .ore_centres()
+            .into_iter()
+            .filter(|d| self.deposit_open(&m, *d, from, range, claimed, intel))
+            .collect();
+        ore.sort_by_key(|d| (d.distance_sq(from), d.x, d.y));
+        ore
+    }
+
+    /// Whether a mine may go at `d`: in range, not crowding another mine (built or
+    /// planned), off the enemy's doorstep, and out of danger.
+    fn deposit_open(
+        &self,
+        m: &mc_data::Mine,
+        d: FxVec2,
+        from: FxVec2,
+        range: Fx,
+        claimed: &[Claim],
+        intel: &Intel,
+    ) -> bool {
+        // Mines may stand close, but split the ground between them: keep them
+        // a reach apart, where each still has about 80% of its circle. A mine
+        // at sea shares only with mines at sea and reaches farther, so it is
+        // kept a sea reach from those and nowhere near the land's: held a land
+        // reach off every mine, an island's own mines left it no sea to mine.
+        let at_sea = |p: FxVec2| self.ore.at_sea(p);
+        let units = &self.state.units;
+        let sea = at_sea(d);
+        let spacing = m.reach_on(sea);
+        let crowded = units.slots.iter().any(|row| {
+            self.bp(row).mine.is_some()
+                && units.pos[row].distance_sq(d) < spacing * spacing
+                && at_sea(units.pos[row]) == sea
+        });
+        d.distance(from) <= range
+            && !crowded
+            // A planned mine counts like a built one. Its site can stand well off
+            // the deposit (the middle may be steep), so a check near the site
+            // alone sent every idle builder back to the same deposit, one
+            // think after another, and piled mines up around it.
+            && !claimed.iter().any(|c| {
+                let same = c.mine && at_sea(c.pos) == sea;
+                c.pos.distance(d) < if same { m.reach_on(sea) } else { Fx::from_int(32) }
+            })
+            && intel.enemy_start.is_none_or(|e| {
+                d.distance(e) > Fx::from_int(480) || d.distance(from) < d.distance(e)
+            })
+            && !intel.danger.hot(d)
     }
 }

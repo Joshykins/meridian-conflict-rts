@@ -45,7 +45,7 @@ impl Hud {
         let w = 340.0;
         let (plans, ops) = lines(m);
         let want =
-            HEAD * 4.0 + LINE * (plans + ops + 2 + NOTES.min(m.notes.len().max(1))) as f32 + 16.0;
+            HEAD * 5.0 + LINE * (plans + ops + 5 + NOTES.min(m.notes.len().max(1))) as f32 + 22.0;
         let h = want.min(bottom - top);
         if h < HEAD * 3.0 {
             return;
@@ -114,6 +114,73 @@ impl Hud {
                 type_scale::VALUE,
                 if on { text } else { faint },
                 &plan.appeal.to_string(),
+            );
+            y += LINE;
+        }
+        y += 6.0;
+
+        // The economy: whether it floats or stalls, its power, and what it builds up.
+        if fits(y) {
+            heading(ui, &mut y, "ECONOMY");
+        }
+        let e = &m.economy;
+        if fits(y) {
+            let tone = match e.state {
+                "floating" => rgb(palette::WARN, 1.0),
+                "stalling" => rgb(palette::BAD, 1.0),
+                _ => text,
+            };
+            let end = ui.text(x, y, type_scale::CAPTION, tone, e.state);
+            ui.text(
+                end + 8.0,
+                y,
+                type_scale::MICRO,
+                dim,
+                &format!("store {}%  \u{b7}  building {}%", e.fill, e.speed),
+            );
+            let power = if e.power_short > 0 {
+                format!("power {} -{}/s", e.power, e.power_short)
+            } else {
+                format!("power {}", e.power)
+            };
+            ui.text_right(
+                x2,
+                y,
+                type_scale::MICRO,
+                match e.power {
+                    "urgent" => rgb(palette::BAD, 1.0),
+                    "wanted" => rgb(palette::WARN, 1.0),
+                    _ => dim,
+                },
+                &power,
+            );
+            y += LINE;
+        }
+        if fits(y) {
+            ui.text(
+                x,
+                y,
+                type_scale::MICRO,
+                dim,
+                &format!(
+                    "engineers {}/{}  \u{b7}  factories {}/{}  \u{b7}  upgrades {}",
+                    e.engineers.0, e.engineers.1, e.factories.0, e.factories.1, e.upgrades
+                ),
+            );
+            y += LINE;
+        }
+        if fits(y) {
+            let roam = if e.roam > 0 {
+                format!("  \u{b7}  commander roams {:.1} km", e.roam as f32 / 1000.0)
+            } else {
+                "  \u{b7}  commander home".to_string()
+            };
+            ui.text(
+                x,
+                y,
+                type_scale::MICRO,
+                dim,
+                &format!("expanding {} (free ore {}){roam}", e.expanders, e.free_ore),
             );
             y += LINE;
         }

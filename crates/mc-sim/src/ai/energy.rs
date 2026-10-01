@@ -22,10 +22,13 @@ impl World {
         // A Commander counts what builds at the speed its materials pay for: at
         // full draw, a side building at a fifth of full speed put up 27 plants to
         // the classic AI's 18 and claimed no mine from minute five to eight.
-        let paid = if self.commander_directives(player).is_some() {
-            self.state.players[player as usize]
-                .build_speed
-                .clamp(Fx::ratio(1, 3), Fx::ONE)
+        // Only a materials stall with energy to spare: in an energy stall the slow
+        // build speed is the want of power itself, and counting it so asked for no
+        // plants at all.
+        let pl = &self.state.players[player as usize];
+        let energy_stalled = pl.energy < pl.energy_capacity / 2;
+        let paid = if self.commander_directives(player).is_some() && !energy_stalled {
+            pl.build_speed.clamp(Fx::ratio(1, 3), Fx::ONE)
         } else {
             Fx::ONE
         };

@@ -15,7 +15,7 @@ mod army;
 mod arrival;
 mod builders;
 mod commander;
-pub use commander::mind::{AiMind, MindNote, MindOp, MindPlan};
+pub use commander::mind::{AiMind, MindEconomy, MindNote, MindOp, MindPlan};
 mod danger;
 mod energy;
 mod groups;
@@ -252,6 +252,8 @@ struct Planned {
     /// Strategic projects going up (`projects.rs`).
     projects: usize,
     guards: Vec<FxVec2>,
+    /// Deposits a mine was chosen for this think and could not be placed by.
+    failed_mines: Vec<FxVec2>,
 }
 
 struct Job {
@@ -379,6 +381,10 @@ impl World {
                 }
             })
             .collect();
+        // A Commander skips deposits it lately failed to place a mine by.
+        if commander {
+            claimed.extend(self.blocked_claims(player));
+        }
         drop(span);
         let span = mc_core::perf_span!("ai.plan");
         let mut planned = self.plan_counts(player, &census);
@@ -386,6 +392,9 @@ impl World {
         let span = mc_core::perf_span!("ai.wrecks");
         planned.salvage = self.wreck_fields(start, &intel);
         drop(span);
+        if commander {
+            self.plan_economy(player, &census, &intel);
+        }
         let span = mc_core::perf_span!("ai.builders");
         self.direct_builders(
             player,
@@ -400,6 +409,9 @@ impl World {
             &mut planned,
             &mut out,
         );
+        if commander {
+            self.note_failed_mines(player, &planned.failed_mines);
+        }
         drop(span);
         let span = mc_core::perf_span!("ai.rest");
         self.direct_factories(player, &census, &planned.salvage, stance, persona, &mut out);
@@ -454,6 +466,7 @@ impl World {
                 .chain(&census.shields)
                 .copied()
                 .collect(),
+            failed_mines: Vec::new(),
         };
 
         for &row in &census.sites {

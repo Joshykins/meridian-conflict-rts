@@ -6,6 +6,7 @@
 //! side has seen, plans reviewed, operations kept and given units, then each
 //! operation's orders as far as the side's attention goes.
 mod beliefs;
+pub(in crate::ai) mod economy;
 mod matchup;
 pub(in crate::ai) mod mind;
 mod ops;
@@ -131,6 +132,7 @@ impl World {
         let theirs = beliefs.army_mass().max(beliefs.income * Fx::from_int(120));
         self.state.ai[player as usize].commander.behind = ours < theirs;
         self.ops_upkeep(player);
+        self.recall_commander(player, out);
         // What hurt it fades: a minute and a half's losses count most.
         for h in &mut self.state.ai[player as usize].commander.hurt {
             *h -= *h / 60;

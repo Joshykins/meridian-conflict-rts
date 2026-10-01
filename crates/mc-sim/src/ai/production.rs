@@ -33,21 +33,19 @@ impl World {
             let Some(builder) = &self.bp(row).builder else {
                 continue;
             };
-            let want_engineers = {
-                let n = 2 + census.factories.len() * 2;
-                match persona {
-                    Personality::Expander => n + 2,
-                    Personality::Turtle => n + 1,
-                    Personality::Aggressive => n,
-                }
-            } + self.commander_directives(player).map_or(0, |d| d.engineers);
-            // A Commander in a materials stall has builders enough: more only wait.
+            // A Commander's economy says how many (`commander/economy.rs`).
             let want_engineers = match self.commander_directives(player) {
-                Some(_) if self.state.players[player as usize].build_speed < Fx::ratio(7, 10) => {
-                    want_engineers.min(4)
+                Some(d) => d.engineers,
+                None => {
+                    let n = 2 + census.factories.len() * 2;
+                    match persona {
+                        Personality::Expander => n + 2,
+                        Personality::Turtle => n + 1,
+                        Personality::Aggressive => n,
+                    }
                 }
-                _ => want_engineers,
             };
+            let commander = self.commander_directives(player).is_some();
             let engineer = builder
                 .builds
                 .iter()
@@ -100,13 +98,22 @@ impl World {
             // The best tier missing comes at once, not on every fourth product: the
             // count runs over all factories, and a tech 2 factory that always fell
             // on the wrong turn made one Mason II in five minutes.
+            // A Commander makes an engineer whenever it is short of them: the
+            // first one out claims mines, the rest follow as the income allows.
             let blueprint = if engineer.is_some()
                 && (missing_tech_builder
                     || (census.engineers + planned_engineers < want_engineers
-                        && (counter.is_multiple_of(4) || stance == Stance::Firebase)))
+                        && (commander || counter.is_multiple_of(4) || stance == Stance::Firebase)))
             {
                 planned_engineers += 1;
                 engineer
+            } else if let Some(salvager) = commander
+                .then(|| self.salvage_product(row, census, planned_salvagers, salvage))
+                .flatten()
+            {
+                // Then something to fetch the reclaim lying about, before scouts.
+                planned_salvagers += 1;
+                Some(salvager)
             } else if census.scouts + planned_scouts < want_scouts
                 && scout.is_some()
                 && counter % 5 == 1

@@ -14,13 +14,25 @@ use std::collections::BTreeMap;
 /// Enemy types, the heaviest by mass seen, a unit is judged against.
 const MATCHED_AGAINST: usize = 8;
 
-/// How the plans steer the classic builders and factories.
-#[derive(Clone, Copy, Default)]
+/// How the Commander steers the classic builders, factories and upgrades: its
+/// economy's reading (`economy.rs`).
+#[derive(Clone, Copy)]
 pub(in crate::ai) struct Directives {
-    /// Engineers kept over the classic count.
+    /// Engineers and factories the side should have.
     pub engineers: usize,
-    /// Builders go as far for mines as a classic side pushing out.
-    pub expand: bool,
+    pub factories: usize,
+    pub power: super::economy::Power,
+    /// Energy a second short, for how many plants to start at once.
+    pub power_short: Fx,
+    /// Mine upgrades at once, and the most seconds one may take to pay back.
+    pub upgrades: i32,
+    pub payback: u32,
+    /// Metres from home the commander may work out to (zero: home).
+    pub roam: Fx,
+    /// How far out builders claim mines.
+    pub reach: Fx,
+    /// The store is filling: sinks before anything else.
+    pub floating: bool,
 }
 
 fn s(stake: Stake) -> i64 {
@@ -52,17 +64,17 @@ impl World {
         if ai.config.brain != Brain::Commander {
             return None;
         }
-        let c = &ai.commander;
-        let boom = c.plan(PlanKind::Boom);
-        // More builders only while the economy pays for the ones it has: building
-        // at a fifth of full speed, twice the classic AI's engineers built no more.
-        let paid = self.state.players[player as usize].build_speed >= Fx::ratio(9, 10);
+        let e = &ai.commander.eco;
         Some(Directives {
-            engineers: if paid { [0, 1, 3, 6][boom as usize] } else { 0 },
-            // Any stake in growing, or an army out to cover far mines: the classic
-            // side reached 800 m further for them and had twice the mines by
-            // minute eight.
-            expand: boom > Stake::Off || c.plan(PlanKind::Pressure) >= Stake::Invest,
+            engineers: e.engineers as usize,
+            factories: e.factories as usize,
+            power: e.power,
+            power_short: e.power_short,
+            upgrades: e.upgrades as i32,
+            payback: e.payback,
+            roam: e.roam,
+            reach: e.reach,
+            floating: e.floating,
         })
     }
 
