@@ -22,6 +22,8 @@ const ALL_IN_AT: i32 = 150;
 const HOLD: i32 = 15;
 /// How far past a stake's mark a plan must go to take it up, or below to give it up.
 const MARGIN: i32 = 12;
+/// Ticks a newly taken stake is held against a dip in its appeal (three minutes).
+const COMMIT: u32 = 1800;
 /// Mass traded before a plan's record counts for or against it.
 const EVIDENCE: Fx = Fx::from_int(1200);
 
@@ -372,13 +374,19 @@ impl World {
             } else {
                 Stake::Off
             };
-            // One step a review: commitment, not flipping.
+            // One step a review: commitment, not flipping. A stake taken lately is
+            // kept for a while unless it fails or is answered: plans dropped a
+            // minute after they were raised wasted what had gone into them.
+            let committed = held.as_ref().is_some_and(|p| tick < p.changed + COMMIT)
+                && !matches!(why, Some(Why::Failing | Why::Answered));
             let next = match want.cmp(&now) {
                 std::cmp::Ordering::Greater => now.up(),
+                std::cmp::Ordering::Less if committed => now,
                 std::cmp::Ordering::Less => now.down(),
                 std::cmp::Ordering::Equal => now,
             };
-            scored.push((k, a, next, why.or(Some(Why::Appeal))));
+            let why = why.unwrap_or(if next < now { Why::Faded } else { Why::Appeal });
+            scored.push((k, a, next, Some(why)));
         }
         let mut appeals = [0i16; PLANS.len()];
         for &(k, a, _, _) in &scored {

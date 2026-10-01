@@ -345,6 +345,8 @@ pub(in crate::ai) enum Why {
     Hedge = 4,
     /// Held long enough with nothing to show: something else gets a turn.
     Stale = 5,
+    /// Something else looks better now.
+    Faded = 6,
 }
 
 impl Why {
@@ -356,6 +358,7 @@ impl Why {
             Why::Answered => "answered",
             Why::Hedge => "hedge",
             Why::Stale => "stale",
+            Why::Faded => "less appealing",
         }
     }
 }

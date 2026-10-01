@@ -399,6 +399,46 @@ fn ai_players_fight_a_whole_match_deterministically() {
     }
 }
 
+/// The planning AI (`docs/AI_COMMANDER.md`) against the classic one: the same
+/// at any worker count, and a snapshot mid-match restores its plans, operations
+/// and memory to the same future.
+#[test]
+fn a_commander_ai_plays_deterministically_and_restores_from_a_snapshot() {
+    let commander = |threads| {
+        let mut w = flat_world(threads, true, true);
+        w.state.ai[1].config.brain = mc_sim::Brain::Commander;
+        w
+    };
+    let run = |threads| {
+        let mut w = commander(threads);
+        let hashes: Vec<u64> = (0..4000).map(|_| w.tick(&[]).unwrap()).collect();
+        (hashes, w)
+    };
+    let (a, mut w) = run(0);
+    let (b, _) = run(6);
+    assert_eq!(a.iter().zip(&b).position(|(x, y)| x != y), None);
+    let blob = w.snapshot();
+    let mut back = commander(2);
+    back.restore(
+        Heightfield::flat(MAP_CELLS, MAP_CELLS, Fx::from_int(20)),
+        &blob,
+    )
+    .unwrap();
+    assert_eq!(w.hash(), back.hash());
+    for t in 0..1200 {
+        assert_eq!(
+            w.tick(&[]).unwrap(),
+            back.tick(&[]).unwrap(),
+            "diverged {t} ticks after the snapshot"
+        );
+    }
+    assert!(
+        w.ai_mind(1)
+            .is_some_and(|m| m.plans.iter().any(|p| p.level > 0)),
+        "the Commander holds plans"
+    );
+}
+
 /// The AI spreads its yard and guards mass points instead of stacking
 /// everything on the start marker.
 #[test]
