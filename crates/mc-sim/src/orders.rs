@@ -1512,9 +1512,10 @@ impl World {
                 }
                 OrderKind::Build => self.run_build(row, &o)?,
                 OrderKind::Assist => self.run_assist(row, &o)?,
-                OrderKind::Reclaim if self.bp(row).drone_carrier() => {}
+                OrderKind::Reclaim | OrderKind::ReclaimUnit if self.bp(row).drone_carrier() => {
+                    self.run_carrier_reclaim(row, &o)?
+                }
                 OrderKind::Reclaim => self.run_reclaim(row, &o)?,
-                OrderKind::ReclaimUnit if self.bp(row).drone_carrier() => {}
                 OrderKind::ReclaimUnit => self.run_reclaim_unit(row, &o)?,
                 OrderKind::Produce => self.run_produce(row, &o)?,
                 OrderKind::Upgrade => self.run_upgrade(row, &o)?,

@@ -269,15 +269,35 @@ fn a_carrier_given_a_circle_sends_its_drones_only_into_the_circle() {
 }
 
 #[test]
-fn a_carrier_sent_to_a_point_salvages_on_the_way() {
+fn a_carrier_given_a_circle_wider_than_its_drones_reach_clears_all_of_it() {
+    let mut w = world();
+    let osprey = carrier(&mut w, 1000, 200);
+    let centre = FxVec2::from_ints(1000, 1000);
+    // Farther apart than the drones' 600 m, and none within reach of the middle.
+    let fields = [(250, 1000), (1750, 1000), (1000, 1750)];
+    for (x, y) in fields {
+        wrecks(&mut w, x, y, 2);
+    }
+    w.tick(&[cmd(Command::ReclaimArea {
+        units: vec![osprey],
+        pos: centre,
+        radius: Fx::from_int(900),
+        queue: false,
+    })])
+    .unwrap();
+    run_until_idle(&mut w, &[osprey], 6000);
+    assert!(wrecks_left(&w).is_empty(), "left: {:?}", wrecks_left(&w));
+}
+
+#[test]
+fn a_carrier_sent_to_a_point_stops_for_the_wrecks_on_its_way() {
     let mut w = world();
     let osprey = carrier(&mut w, 300, 1000);
-    // On the way, a little off it, and well off it but in the drones' reach.
-    let fields = [(700, 1000), (1000, 1150), (1300, 750)];
+    // On the way, and a little off it.
+    let fields = [(700, 1000), (1100, 1100)];
     for (x, y) in fields {
         wrecks(&mut w, x, y, 3);
     }
-    let before = fields.map(|(x, y)| mass_near(&w, x, y));
     let goal = FxVec2::from_ints(1700, 1000);
     w.tick(&[cmd(Command::ReclaimArea {
         units: vec![osprey],
@@ -286,20 +306,53 @@ fn a_carrier_sent_to_a_point_salvages_on_the_way() {
         queue: false,
     })])
     .unwrap();
-    // 1400 m at 65 m/s: about 22 s of flying, with no wait for the drones.
-    for _ in 0..300 {
-        w.tick(&[]).unwrap();
-    }
+    run_until_idle(&mut w, &[osprey], 4000);
     let row = w.state.units.row(osprey).unwrap();
     let at = w.state.units.pos[row];
     assert!(
         at.distance(goal) < Fx::from_int(30),
         "carrier went on: at {at:?}"
     );
-    for (k, (x, y)) in fields.into_iter().enumerate() {
-        assert!(
-            mass_near(&w, x, y) < before[k],
-            "nothing salvaged from the field at ({x}, {y}) on the way past"
+    for (x, y) in fields {
+        assert_eq!(
+            mass_near(&w, x, y),
+            Fx::ZERO,
+            "the field at ({x}, {y}) was passed by"
         );
     }
+}
+
+#[test]
+fn a_carrier_told_to_reclaim_a_wreck_stops_over_it() {
+    let mut w = world();
+    let osprey = carrier(&mut w, 300, 1000);
+    w.tick(&[cmd(Command::Move {
+        units: vec![osprey],
+        target: FxVec2::from_ints(1800, 1000),
+        queue: false,
+    })])
+    .unwrap();
+    for _ in 0..40 {
+        w.tick(&[]).unwrap();
+    }
+    wrecks(&mut w, 1000, 1600, 1);
+    let wreck = {
+        let wr = &w.state.wrecks;
+        let r = wr.slots.iter().next().unwrap();
+        wr.slots.handle(r)
+    };
+    w.tick(&[cmd(Command::ReclaimWreck {
+        units: vec![osprey],
+        wreck,
+        queue: false,
+    })])
+    .unwrap();
+    run_until_idle(&mut w, &[osprey], 3000);
+    assert!(wrecks_left(&w).is_empty());
+    let row = w.state.units.row(osprey).unwrap();
+    let at = w.state.units.pos[row];
+    assert!(
+        at.distance(FxVec2::from_ints(1000, 1600)) < Fx::from_int(200),
+        "carrier flew on instead of stopping over the wreck: at {at:?}"
+    );
 }

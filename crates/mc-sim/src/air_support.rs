@@ -216,10 +216,16 @@ impl World {
                 .any(|w| self.drones_may_take(row, w))
     }
 
-    /// Whether the drones of carrier `row` may go for wreck `w` unordered: one with mass
-    /// left that its side has seen, within the drones' reach of the carrier and, while
-    /// it is clearing a circle (`ReclaimArea`), inside that circle.
+    /// Whether the drones of carrier `row` may go for wreck `w` unordered: one it is
+    /// after (`carrier_wants`) within the drones' reach of the carrier.
     fn drones_may_take(&self, row: usize, w: usize) -> bool {
+        self.state.wrecks.pos[w].distance(self.state.units.pos[row]) <= self.bp(row).drone_radius
+            && self.carrier_wants(row, w)
+    }
+
+    /// Whether carrier `row` is after wreck `w` at all: one with mass left that its side
+    /// has seen and, while it is clearing a circle (`ReclaimArea`), inside that circle.
+    pub(crate) fn carrier_wants(&self, row: usize, w: usize) -> bool {
         let units = &self.state.units;
         let wrecks = &self.state.wrecks;
         let at = wrecks.pos[w];
@@ -228,8 +234,7 @@ impl World {
             .orders
             .front(units, row)
             .filter(|o| o.kind == OrderKind::ReclaimArea && o.radius > Fx::ZERO);
-        at.distance(units.pos[row]) <= self.bp(row).drone_radius
-            && circle.is_none_or(|o| at.distance(o.pos) <= o.radius)
+        circle.is_none_or(|o| at.distance(o.pos) <= o.radius)
             && wrecks.mass[w] > Fx::ZERO
             && (!self.state.fog_enabled
                 || self.fog.is_detected(at, self.team_mask(units.owner[row])))
