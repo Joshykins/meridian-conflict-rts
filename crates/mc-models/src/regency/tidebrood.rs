@@ -6,17 +6,16 @@
 //! of a slip, a gantry across it, a turntable at its head.
 //!
 //! - Each arm is a pontoon under rows of plates either side of a ridge, lapped back
-//!   like feathers into spikes past its stern, a bronze drive shaft along the ridge and
-//!   a ribbed winch drum across it under the gantry. Its
-//!   inner face, over the slip, is open machinery: ribbed bronze frames, mooring rams
-//!   working in turn (`part::PUMP`), a lit seam. Its bow carries red optics and a violet
+//!   like feathers into spikes past its stern, a bronze winch drum across it under the
+//!   gantry. Its inner face, over the slip, is open machinery: bronze frames, mooring
+//!   blocks, a lit seam. Its bow carries red optics and a violet
 //!   edge where the ship leaves.
 //! - Across the slip a gantry on bronze trestles standing in a winch bay open across each
 //!   arm, two plated crabs riding its bridge, the fabricator heads hung under it aimed
 //!   at the work (their mounts are `mc_core::print_heads`, where the nanite
 //!   streams pour from). The violet runs hot while the dock builds.
 //! - At the slip's head a caisson block, a toothed turntable turning on its roof
-//!   (`part::SPINNER`) between press rams.
+//!   (`part::SPINNER`).
 //! - The owner's colour runs along each arm's ridge.
 
 use glam::{Vec2, Vec3};
@@ -187,14 +186,13 @@ fn arm(b: &mut MeshBuilder) {
             }
         }
     }
-    // The winch in the bay: a ribbed drum across the arm, its bearings, the gantry's
+    // The winch in the bay: a drum across the arm, its bearings, the gantry's
     // trestle standing on them.
-    ribbed(
+    shaft(
         b,
         v3(BRIDGE_X, INNER + 1.0, RIDGE_Z - 1.6),
         v3(BRIDGE_X, OUTER - 1.0, RIDGE_Z - 1.6),
         2.0,
-        if fine { 5 } else { 0 },
     );
     for y in [INNER + 1.5, OUTER - 1.5] {
         dark_plate(b);
@@ -203,14 +201,7 @@ fn arm(b: &mut MeshBuilder) {
             v3(BRIDGE_X + 2.4, y + 1.0, RIDGE_Z - 1.0),
         );
     }
-    // The drive shaft along the ridge, the owner's colour beside it.
-    ribbed(
-        b,
-        v3(bow_x(RIDGE_Y) - 3.0, RIDGE_Y, RIDGE_Z + 1.0),
-        v3(STERN + 2.0, RIDGE_Y, RIDGE_Z + 1.0),
-        0.6,
-        if fine { 6 } else { 0 },
-    );
+    // The owner's colour along the ridge.
     b.paint(TEAM);
     b.face(&[
         v3(-12.0, RIDGE_Y - 1.6, RIDGE_Z + 1.6),
@@ -220,33 +211,19 @@ fn arm(b: &mut MeshBuilder) {
     ]);
 }
 
-/// An arm's inner face over the slip (+y side): ribbed bronze frames, mooring rams
-/// working down toward the water in turn, a lit seam.
+/// An arm's inner face over the slip (+y side): bronze frames, mooring blocks, a lit
+/// seam.
 fn gallery(b: &mut MeshBuilder) {
-    let fine = b.fine();
     let face = INNER - 0.3;
     let frames = [-26.0, -12.0, 12.0, 26.0];
     for &x in &frames {
-        ribbed(
-            b,
-            v3(x, face, 0.4),
-            v3(x, face, SIDE_Z + 2.2),
-            0.6,
-            if fine { 2 } else { 0 },
-        );
+        shaft(b, v3(x, face, 0.4), v3(x, face, SIDE_Z + 2.2), 0.6);
     }
     for x in [-19.0, 19.0, 33.0] {
         dark_plate(b);
         b.block(
             v3(x - 1.4, face - 1.6, SIDE_Z + 0.6),
             v3(x + 1.4, face + 1.0, SIDE_Z + 1.6),
-        );
-        piston(
-            b,
-            v3(x, face - 0.8, SIDE_Z + 5.0),
-            v3(x, face - 0.8, 1.0),
-            0.6,
-            true,
         );
     }
     red_slot(b, v3(0.0, face - 0.1, 1.6), -Vec3::Y, Vec3::X, 40.0, 0.2);
@@ -278,25 +255,22 @@ fn bow(b: &mut MeshBuilder) {
 }
 
 /// The gantry's trestle on an arm (+y side): two bronze legs up to the bridge, braced by
-/// a ram.
+/// a plated strut.
 fn trestle(b: &mut MeshBuilder) {
-    let fine = b.fine();
     let top = v3(BRIDGE_X, RIDGE_Y - 2.0, BRIDGE_Z - 1.2);
     for dx in [-4.5f32, 4.5] {
-        ribbed(
+        shaft(
             b,
             v3(BRIDGE_X + dx, RIDGE_Y - 1.0, RIDGE_Z - 0.4),
             top + v3(dx * 0.3, 0.0, 0.0),
             0.7,
-            if fine { 3 } else { 0 },
         );
     }
-    piston(
+    strut(
         b,
         v3(BRIDGE_X, OUTER - 3.0, SIDE_Z + 1.0),
         top + v3(0.0, 1.2, -1.5),
         0.55,
-        false,
     );
 }
 
@@ -342,8 +316,7 @@ fn bridge(b: &mut MeshBuilder) {
     }
 }
 
-/// The caisson across the slip's head: a plated block, the turntable turning on it
-/// between two press rams.
+/// The caisson across the slip's head: a plated block, the turntable turning on it.
 fn caisson(b: &mut MeshBuilder) {
     let fine = b.fine();
     let [back, front] = CAISSON;
@@ -372,18 +345,6 @@ fn caisson(b: &mut MeshBuilder) {
             tail: 3.0,
         }
         .lay(b, &f);
-        dark_plate(b);
-        b.block(
-            v3(TURNTABLE.x - 1.2, 4.4, CAISSON_Z),
-            v3(TURNTABLE.x + 1.2, 6.8, CAISSON_Z + 0.8),
-        );
-        piston(
-            b,
-            v3(TURNTABLE.x, 5.6, CAISSON_Z + 0.8),
-            v3(TURNTABLE.x, 5.6, CAISSON_Z + 5.5),
-            0.6,
-            true,
-        );
     });
     b.with_part(part::SPINNER, |b| {
         metal(b);

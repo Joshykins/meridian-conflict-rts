@@ -3,8 +3,7 @@
 //! One building keeps mass and energy both:
 //!
 //! - The mass vault in the middle: an armoured octagon, plates lapped down its faces into
-//!   spikes, a bronze hatch drum on its roof between two hatch rams (`part::PUMP`), the
-//!   owner's colour across the hatch.
+//!   spikes, a bronze hatch drum on its roof, the owner's colour across the hatch.
 //! - Either side a long energy cell lying along x: a plated drum in bronze bands on plated
 //!   saddles, bronze end caps, a red slot along its crown showing the charge, a course of
 //!   plates lapped back along its top.
@@ -56,8 +55,8 @@ fn coarse(b: &mut MeshBuilder) {
     b.face(&[v3(r, 0.0, z), v3(0.0, r, z), v3(-r, 0.0, z), v3(0.0, -r, z)]);
 }
 
-/// The mass vault: its plated octagon, plates lapped down its faces, the hatch drum and
-/// its rams on the roof, the owner's colour across the hatch.
+/// The mass vault: its plated octagon, plates lapped down its faces, the hatch drum on
+/// the roof, the owner's colour across the hatch.
 fn vault(b: &mut MeshBuilder) {
     let fine = b.fine();
     let (r0, r1, h) = VAULT;
@@ -83,7 +82,7 @@ fn vault(b: &mut MeshBuilder) {
         }
         .lay(b, &f);
     }
-    // The hatch drum lying across the roof, and the rams either side that work it.
+    // The hatch drum lying across the roof.
     collar(b, v3(0.0, 0.0, h + 1.0), Vec3::Y, 1.5, 5.2);
     if fine {
         for y in [-2.9f32, 2.9] {
@@ -97,11 +96,6 @@ fn vault(b: &mut MeshBuilder) {
         v3(0.9, 2.4, h + 2.52),
         v3(-0.9, 2.4, h + 2.52),
     ]);
-    for x in [-3.0f32, 3.0] {
-        dark_plate(b);
-        b.block(v3(x - 0.8, -0.8, h), v3(x + 0.8, 0.8, h + 0.6));
-        piston(b, v3(x, 0.0, h + 0.6), v3(x, 0.0, h + 3.2), 0.4, true);
-    }
 }
 
 /// One energy cell (+y side): its saddles, the plated drum in bronze bands, its end caps,

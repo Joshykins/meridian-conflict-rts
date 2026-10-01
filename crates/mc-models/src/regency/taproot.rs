@@ -11,9 +11,9 @@
 //!   glassed dark with lit red bands where the beam has cut, white-hot at the bottom where
 //!   it bites, the beam's core running down it (`Model::pit`: the shader shows it through
 //!   the ground).
-//! - Four outrigger legs on the diagonals brace the rig against the ore field: ribbed
-//!   bronze struts under plates lapped down and out into spikes, a clamp ram working at
-//!   each foot (`part::PUMP`), a clawed pad gripping the ground (`part::ASHORE`). They
+//! - Four outrigger legs on the diagonals brace the rig against the ore field: bronze
+//!   struts under plates lapped down and out into spikes, a foot block, a clawed pad
+//!   gripping the ground (`part::ASHORE`). They
 //!   carry a plated yoke over the mouth, and the emitter head hangs in it: a plated body,
 //!   the owner's colour on its cap, a bronze lens barrel aimed down, its tip lit red.
 //! - A collector ring floats round the beam over the mouth, turning (`part::SPINNER`),
@@ -319,13 +319,12 @@ fn collar_ring(b: &mut MeshBuilder, tech: u8) {
     }
 }
 
-/// One outrigger leg, standing out along +x (turned into place by the caller): a ribbed
-/// bronze strut from the yoke down to its foot, plates lapped down it into spikes, a
-/// clamp ram and a clawed pad on the ground (a pile down into the water afloat).
+/// One outrigger leg, standing out along +x (turned into place by the caller): a bronze
+/// strut from the yoke down to its foot, plates lapped down it into spikes, a foot
+/// block and a clawed pad on the ground (a pile down into the water afloat).
 fn leg(b: &mut MeshBuilder) {
-    let fine = b.fine();
     let (root, foot) = leg_line();
-    ribbed(b, root, foot, 0.55, if fine { 3 } else { 0 });
+    shaft(b, root, foot, 0.55);
     // Its plates, lapped down and out along the strut.
     let down = (foot - root).normalize();
     let up = v3(-down.z, 0.0, down.x);
@@ -341,19 +340,9 @@ fn leg(b: &mut MeshBuilder) {
         tail: 1.6,
     }
     .lay(b, &f);
-    // The foot block the strut lands on, and the clamp rams either side of it working
-    // down into the pad.
+    // The foot block the strut lands on.
     dark_plate(b);
     b.block(v3(REACH - 3.0, -1.3, 1.2), v3(REACH, 1.3, 4.4));
-    for y in [-1.75f32, 1.75] {
-        piston(
-            b,
-            v3(REACH - 1.5, y, 4.2),
-            v3(REACH - 1.5, y, 1.0),
-            0.45,
-            true,
-        );
-    }
     red_slot(b, v3(REACH + 0.02, 0.0, 3.2), Vec3::X, Vec3::Y, 1.6, 0.2);
     b.with_part(part::ASHORE, |b| {
         // The pad, its claws bitten into the ore.
@@ -570,7 +559,7 @@ fn crown(b: &mut MeshBuilder) {
             .lay(b, &f);
         });
     }
-    ribbed(b, Vec3::Z * CAP_TOP, Vec3::Z * (HUB - 2.2), 0.5, 2);
+    shaft(b, Vec3::Z * CAP_TOP, Vec3::Z * (HUB - 2.2), 0.5);
     dark_plate(b);
     b.prism(Vec3::Z * (HUB - 2.4), sides, 1.6, 1.0, 2.4);
     b.paint(TEAM);
@@ -616,11 +605,11 @@ fn post(b: &mut MeshBuilder) {
     red_slot(b, v3(x + 1.02, 0.0, 2.6), Vec3::X, Vec3::Z, 1.2, 0.18);
 }
 
-/// Tech 3's stage on the hub: a ribbed column with plates lapped down it, red slots
+/// Tech 3's stage on the hub: a bronze column with plates lapped down it, red slots
 /// between them, the owner's colour on top.
 fn stage(b: &mut MeshBuilder) {
     let sides = b.sides(8);
-    ribbed(b, Vec3::Z * HUB, Vec3::Z * (STAGE - 0.8), 0.6, 3);
+    shaft(b, Vec3::Z * HUB, Vec3::Z * (STAGE - 0.8), 0.6);
     for k in 0..4 {
         let a = (45.0 + 90.0 * k as f32).to_radians();
         let d = v3(a.cos(), a.sin(), 0.0);
@@ -733,7 +722,7 @@ mod tests {
             let h = HEIGHTS[tech as usize - 1];
             super::super::check_at("regency_taproot", tech, 12.8, h, Some(3), &[]);
             // Built on water it stands on piles, its grip on the ground and its bore left
-            // out, and its clamp rams work.
+            // out.
             let model = built(tech);
             assert!(
                 model.pit.is_some_and(|p| p.afloat_lift > 0.0),
@@ -747,12 +736,13 @@ mod tests {
                     );
                 }
             }
-            for kind in [part::PUMP, part::SPINNER] {
-                assert!(
-                    model.lods[0].vertices.iter().any(|v| v.part == kind),
-                    "tech {tech}: no part {kind}"
-                );
-            }
+            assert!(
+                model.lods[0]
+                    .vertices
+                    .iter()
+                    .any(|v| v.part == part::SPINNER),
+                "tech {tech}: no spinner"
+            );
             // The next tier goes up in the refit; the deep core is the last.
             let refit = model.lods[0]
                 .vertices

@@ -4,9 +4,10 @@
 //! - Armour: thick dark plates (`kit::dark_plate`) with bevelled edges, laid in courses that
 //!   overlap and sweep back. A spike is the swept trailing edge of a plate
 //!   ([`swept`], [`Course`]), never a thorn stuck on.
-//! - Machinery under and between the plates, in dark bronze (`kit::metal`): rams
-//!   ([`piston`]), collars and drums ([`collar`]), ribbed shafts ([`ribbed`]), toothed
-//!   rings ([`hoop`], [`teeth`]), cable runs (`kit::cable`).
+//! - Machinery under and between the plates, in dark bronze (`kit::metal`): collars and
+//!   drums ([`collar`]), shafts ([`shaft`]), rings ([`hoop`]) and cable runs
+//!   (`kit::cable`). Teeth ([`teeth`]) go only on a ring that turns; no rams, no gears.
+//! - What braces one part off another is a plated strut ([`strut`]).
 //! - Light: a lit red slot ([`red_slot`]) where the machine looks out or runs hot, and
 //!   construction violet only on what builds ([`fabricator`]).
 //!
@@ -20,7 +21,6 @@ use mc_core::print_heads::{factory_heads, PrintHead, TUBE};
 
 use crate::builder::MeshBuilder;
 use crate::material::*;
-use crate::part;
 
 use super::kit::{dark_plate, metal, seam};
 
@@ -81,7 +81,8 @@ pub(super) fn armour(b: &mut MeshBuilder, f: &Frame, outline: &[[f32; 2]], thick
             true,
         );
     } else {
-        b.loft(&[ring(0.0, 0.0), ring(thick, 0.0)], true, true);
+        // Its underside lies against what it covers: not drawn below full detail.
+        b.loft(&[ring(0.0, 0.0), ring(thick, 0.0)], false, true);
     }
 }
 
@@ -133,42 +134,11 @@ impl Course {
     }
 }
 
-/// A ram from `a` (its barrel's foot) to `c` (the rod's eye), `r` the barrel's radius: a
-/// dark bronze barrel with a seam-dark gland at its mouth, and a bronze rod. With
-/// `pumps`, the rod works up and down on the building's beat (`part::PUMP`, along z
-/// only, so give it an upright ram); its top is sunk far enough into the barrel that it
-/// never leaves it. Below full detail it is one tube.
-pub(super) fn piston(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32, pumps: bool) {
-    if b.coarse() {
-        return;
-    }
-    metal(b);
-    if !b.fine() {
-        b.cylinder_between(a, c, r, r * 0.55, 5);
-        return;
-    }
-    let sides = 8;
-    let mouth = a.lerp(c, 0.55);
-    b.cylinder_between(a, mouth, r, r, sides);
-    seam(b);
-    let axis = (c - a).normalize();
-    b.cylinder_between(
-        mouth - axis * 0.25,
-        mouth + axis * 0.2,
-        r * 1.2,
-        r * 1.2,
-        sides,
-    );
-    let rod = |b: &mut MeshBuilder| {
-        metal(b);
-        b.cylinder_between(a.lerp(c, 0.25), c, r * 0.5, r * 0.5, 6);
-        b.cylinder_between(c - axis * 0.3, c + axis * 0.05, r * 0.8, r * 0.8, 6);
-    };
-    if pumps {
-        b.with_part(part::PUMP, rod);
-    } else {
-        rod(b);
-    }
+/// A plated strut from `a` to `c`, `r` its half-width: what braces one part of a
+/// structure off another.
+pub(super) fn strut(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32) {
+    dark_plate(b);
+    b.beam(a, c, Vec2::splat(r * 2.0), Vec2::splat(r * 1.6));
 }
 
 /// A bronze collar or drum `width` long about `axis` at `at`.
@@ -179,20 +149,11 @@ pub(super) fn collar(b: &mut MeshBuilder, at: Vec3, axis: Vec3, r: f32, width: f
     b.cylinder_between(at - half, at + half, r, r, sides);
 }
 
-/// A bronze shaft from `a` to `c` of radius `r`, ringed by `ribs` raised collars: the
-/// ribbed segments that show between plates.
-pub(super) fn ribbed(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32, ribs: usize) {
+/// A plain bronze shaft from `a` to `c` of radius `r`.
+pub(super) fn shaft(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32) {
     metal(b);
-    let sides = b.sides(8);
+    let sides = if b.fine() { 8 } else { 4 };
     b.cylinder_between(a, c, r, r, sides);
-    if !b.fine() {
-        return;
-    }
-    let axis = (c - a).normalize();
-    for i in 0..ribs {
-        let at = a.lerp(c, (i as f32 + 0.5) / ribs as f32);
-        b.cylinder_between(at - axis * 0.18, at + axis * 0.18, r * 1.3, r * 1.3, 6);
-    }
 }
 
 /// A flat ring about the z axis through `c`: `r` to its middle, `w` across, `h` deep,

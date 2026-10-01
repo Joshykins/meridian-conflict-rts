@@ -3,11 +3,11 @@
 //! The aircraft is made on the pad at the lot origin and lifts off it; the lane toward +x
 //! is left open. From above the frame is an X of four swept towers round a ring.
 //!
-//! - The pad: a low plated deck, a bronze cradle ring on it, clamp rams round it.
+//! - The pad: a low plated deck, a bronze cradle ring on it, clamp blocks round it.
 //! - Four towers stand on the diagonals, each leaning in over the pad from a footing near
-//!   the lot's corner: a pair of ribbed bronze legs laddered together, the back of it
-//!   armoured with plates lapped down toward the ground and out into spikes, a brace ram
-//!   under it, a press ram working at its foot (`part::PUMP`).
+//!   the lot's corner: a pair of bronze legs laddered together, the back of it armoured
+//!   with plates lapped down toward the ground and out into spikes, a plated strut
+//!   under it.
 //! - Their heads carry a fixed plated race high over the pad, a toothed bronze lift ring
 //!   turning inside it (`part::SPINNER`), and hang the violet fabricator heads aimed at
 //!   the work (their mounts are `mc_core::print_heads`, where the nanite streams pour
@@ -60,7 +60,7 @@ pub(super) fn hatchery(b: &mut MeshBuilder, tech: u8) {
     ring(b);
     tier(b, tech, 2, 0.2, |b| {
         for deg in HOUSES {
-            b.yawed(Vec3::ZERO, deg.to_radians(), flywheels);
+            b.yawed(Vec3::ZERO, deg.to_radians(), annex);
         }
         masts(b);
     });
@@ -121,7 +121,7 @@ fn coarse(b: &mut MeshBuilder, crowned: bool) {
     ]);
 }
 
-/// The pad the aircraft is made on: a plated deck, the bronze cradle ring and clamp rams.
+/// The pad the aircraft is made on: a plated deck, the bronze cradle ring and clamp blocks.
 fn pad(b: &mut MeshBuilder) {
     let fine = b.fine();
     let sides = b.sides(16);
@@ -138,8 +138,8 @@ fn pad(b: &mut MeshBuilder) {
         0.5,
         if fine { 32 } else { 16 },
     );
-    // Clamp rams round the cradle, lying toward the middle, on the diagonals between the
-    // towers and fore and aft of the lane.
+    // Clamp blocks round the cradle, lying toward the middle, on the diagonals between
+    // the towers and fore and aft of the lane.
     for k in 0..8 {
         let a = (22.5 + 45.0 * k as f32).to_radians();
         let d = v3(a.cos(), a.sin(), 0.0);
@@ -150,18 +150,11 @@ fn pad(b: &mut MeshBuilder) {
             Vec2::new(2.4, 1.1),
             Vec2::new(2.0, 1.1),
         );
-        piston(
-            b,
-            d * (PAD_R + 1.5) + Vec3::Z * 1.1,
-            d * (PAD_R - 4.5) + Vec3::Z * 1.1,
-            0.5,
-            false,
-        );
     }
 }
 
 /// One tower, standing out along +x (turned into place by the caller): its footing, the
-/// laddered bronze legs up to its head, the plates lapped down its back, its rams.
+/// laddered bronze legs up to its head, the plates lapped down its back, its strut.
 fn tower(b: &mut MeshBuilder) {
     let fine = b.fine();
     let foot = v3(FOOT, 0.0, 3.2);
@@ -179,12 +172,11 @@ fn tower(b: &mut MeshBuilder) {
     red_slot(b, v3(FOOT + 6.4, 0.0, 1.6), Vec3::X, Vec3::Y, 4.0, 0.35);
     // The legs, laddered together.
     for y in [-2.3f32, 2.3] {
-        ribbed(
+        shaft(
             b,
             foot + v3(-1.0, y * 1.2, 0.0),
             head + v3(0.8, y * 0.7, -0.6),
             0.75,
-            if fine { 5 } else { 0 },
         );
     }
     if fine {
@@ -231,21 +223,12 @@ fn tower(b: &mut MeshBuilder) {
         }
         .lay(b, &f);
     });
-    // The brace ram under it, and a press ram working at the footing's inner end.
-    piston(
+    // The strut under it.
+    strut(
         b,
         v3(FOOT - 7.5, 0.0, 1.2),
         foot.lerp(head, 0.62) - back * 0.9,
         0.7,
-        false,
-    );
-    collar(b, v3(FOOT - 7.5, 0.0, 1.2), Vec3::Y, 1.0, 2.4);
-    piston(
-        b,
-        v3(FOOT - 4.8, 0.0, 3.2),
-        v3(FOOT - 4.8, 0.0, 8.4),
-        0.6,
-        true,
     );
     // Its head: a plated block that takes the race, the owner's colour on top.
     dark_plate(b);
@@ -267,10 +250,9 @@ fn tower(b: &mut MeshBuilder) {
 }
 
 /// A machine house between two towers, standing out along +x (turned into place by the
-/// caller): a plated block with its plates lapped outward into spikes, a gear laid on
-/// its roof between two press rams, a drum across its inner end.
+/// caller): a plated block with its plates lapped outward into spikes, a drum across
+/// its inner end.
 fn house(b: &mut MeshBuilder) {
-    let fine = b.fine();
     let (x0, x1, half, top) = (25.0, 41.0, 8.0, 6.5);
     seam(b);
     b.frustum_open(
@@ -295,18 +277,6 @@ fn house(b: &mut MeshBuilder) {
         }
         .lay(b, &f);
     });
-    // The gear on its roof, between the two plate courses, and its rams.
-    let gear_at = v3((x0 + x1) * 0.5 - 1.0, 0.0, top + 0.5);
-    metal(b);
-    b.prism(gear_at - Vec3::Z * 0.5, b.sides(16), 2.2, 2.2, 1.0);
-    if fine {
-        teeth(b, gear_at, 2.0, 10, v3(0.6, 0.7, 0.9));
-    }
-    for x in [x0 + 2.0, x1 - 2.5] {
-        dark_plate(b);
-        b.block(v3(x - 1.2, -1.2, top), v3(x + 1.2, 1.2, top + 0.8));
-        piston(b, v3(x, 0.0, top + 0.8), v3(x, 0.0, top + 5.0), 0.6, true);
-    }
     // A drum across its inner end.
     collar(b, v3(x0 - 0.2, 0.0, 2.6), Vec3::Y, 2.2, half * 1.6);
     red_slot(b, v3(x1 + 0.05, 0.0, 3.5), Vec3::X, Vec3::Y, 5.0, 0.3);
@@ -353,11 +323,10 @@ fn ring(b: &mut MeshBuilder) {
     });
 }
 
-/// Tech 2: a flywheel press on a house's outer end, standing out along +x (turned into
-/// place by the caller): a plated block, a ribbed shaft across it turning two flywheels,
-/// a ram working beside each, plates lapped down over its outer edge.
-fn flywheels(b: &mut MeshBuilder) {
-    let fine = b.fine();
+/// Tech 2: an annex on a house's outer end, standing out along +x (turned into place by
+/// the caller): a plated block, plates lapped down over its outer edge, a lit slot
+/// looking out.
+fn annex(b: &mut MeshBuilder) {
     let (x0, x1, half, top) = (41.0, 44.8, 6.6, 5.0);
     seam(b);
     b.frustum_open(
@@ -367,43 +336,8 @@ fn flywheels(b: &mut MeshBuilder) {
         top,
         Vec2::ZERO,
     );
-    let shaft = v3(x0 + 2.0, 0.0, top + 2.8);
-    ribbed(
-        b,
-        shaft - Vec3::Y * (half - 0.4),
-        shaft + Vec3::Y * (half - 0.4),
-        0.5,
-        if fine { 2 } else { 0 },
-    );
-    dark_plate(b);
-    for y in [-(half - 1.0), half - 1.0] {
-        b.block(
-            v3(shaft.x - 1.0, y - 0.6, top),
-            v3(shaft.x + 1.0, y + 0.6, shaft.z),
-        );
-    }
-    for y in [-2.6f32, 2.6] {
-        collar(b, shaft + Vec3::Y * y, Vec3::Y, 2.8, 0.9);
-        if fine {
-            seam(b);
-            let sides = b.sides(10);
-            b.cylinder_between(
-                shaft + Vec3::Y * (y - 0.5),
-                shaft + Vec3::Y * (y + 0.5),
-                0.8,
-                0.8,
-                sides,
-            );
-        }
-    }
+    red_slot(b, v3(x1 + 0.05, 0.0, 2.5), Vec3::X, Vec3::Y, 6.0, 0.3);
     b.mirror_y(|b| {
-        piston(
-            b,
-            v3(x0 + 0.9, half - 2.4, top),
-            v3(x0 + 0.9, half - 2.4, top + 5.0),
-            0.5,
-            true,
-        );
         let f = Frame::new(
             v3(x1 - 2.0, 2.2, top + 1.0),
             v3(1.0, 0.0, -0.5),
@@ -424,7 +358,7 @@ fn flywheels(b: &mut MeshBuilder) {
 }
 
 /// Tech 2: a fabricator head on a plated mast off each flank house's inner end, aimed at
-/// the work, a ram bracing the mast.
+/// the work, a plated strut bracing the mast.
 fn masts(b: &mut MeshBuilder) {
     for (mount, s, aim) in tier_heads("regency_hatchery", 2) {
         let out = mount.truncate().normalize().extend(0.0);
@@ -444,12 +378,11 @@ fn masts(b: &mut MeshBuilder) {
             Vec2::new(1.1, 1.0),
             Vec2::new(0.9, 0.9),
         );
-        piston(
+        strut(
             b,
             foot + out * 2.4 + Vec3::Z * 0.3,
             foot.lerp(mount, 0.6) + out * 0.8,
             0.35,
-            false,
         );
         red_slot(
             b,
@@ -492,7 +425,7 @@ fn tower_blades(b: &mut MeshBuilder) {
     });
 }
 
-/// Tech 3: the crown, a fixed race raised over the lift ring on ribbed masts off the
+/// Tech 3: the crown, a fixed race raised over the lift ring on bronze masts off the
 /// towers' heads, a ring of blade plates lapped round it sweeping out into spikes, and two
 /// more fabricator heads hung from it aimed down through the ring at the work.
 fn crown(b: &mut MeshBuilder) {
@@ -502,7 +435,7 @@ fn crown(b: &mut MeshBuilder) {
         let d = v3(deg.to_radians().cos(), deg.to_radians().sin(), 0.0);
         let foot = d * (HEAD + 0.2) + Vec3::Z * HEAD_TOP;
         let top = d * CROWN_R + Vec3::Z * (CROWN.z - 0.6);
-        ribbed(b, foot, top, 0.9, if fine { 3 } else { 0 });
+        shaft(b, foot, top, 0.9);
         dark_plate(b);
         b.block(foot - v3(1.5, 1.5, 0.2), foot + v3(1.5, 1.5, 0.9));
         b.frustum(

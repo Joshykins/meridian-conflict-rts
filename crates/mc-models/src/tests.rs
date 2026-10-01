@@ -881,7 +881,10 @@ fn lods_reduce_and_respect_budgets() {
             "{}: full LOD draws {drawn} triangles",
             model.key
         );
-        let share = over.and_then(|o| o.2).unwrap_or(0.45);
+        let share = over
+            .and_then(|o| o.2)
+            .or_else(|| super::regency::reduced_share(&model.key))
+            .unwrap_or(0.45);
         assert!(
             reduced as f32 <= full as f32 * share + 20.0,
             "{}: reduced LOD {reduced} of {full}",

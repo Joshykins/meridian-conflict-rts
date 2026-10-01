@@ -14,7 +14,6 @@
 //!   out toward the lot's edge, aim bronze pinch emitters at the star, their tips lit red,
 //!   and carry a plated frame over it, open in the middle so the star shows from above.
 //!   The owner's colour is on the pylons' heads.
-//! - Coolant rams work in turn between the pylons (`part::PUMP`).
 //! - From tech 2 each pylon is banded with bronze field collars; tech 3 adds a second
 //!   row of pinch emitters, aimed down at the star from the frame, and swept plates
 //!   lapped out over the frame.
@@ -124,7 +123,6 @@ fn plant(b: &mut MeshBuilder, p: &Plant) {
             });
         }
         frame(b, p);
-        rams(b, p);
     });
 }
 
@@ -300,12 +298,11 @@ fn pylon(b: &mut MeshBuilder, p: &Plant) {
             collar(b, v3(x - 0.1, 0.0, z), Vec3::Z, 1.25, 0.35);
         }
         // Plates lapped down each flank of the post, over a ribbed bronze spine.
-        ribbed(
+        shaft(
             b,
             v3(x + 0.95, 0.0, 1.0),
             v3(x + 0.75, 0.0, TOP - 1.2),
             0.22,
-            4,
         );
         b.mirror_y(|b| {
             let f = Frame::new(
@@ -354,7 +351,7 @@ fn emitter(b: &mut MeshBuilder, from: Vec3, to: Vec3, mount: f32) {
     let d = (to - from).normalize();
     collar(b, from, d, mount, 0.8);
     metal(b);
-    b.cylinder_between(from, to, 0.3, 0.22, if fine { 8 } else { 6 });
+    b.cylinder_between(from, to, 0.3, 0.22, if fine { 8 } else { 4 });
     b.paint(GLOW_LASER);
     b.cylinder_between(to, to + d * 0.25, 0.24, 0.1, 6);
 }
@@ -368,19 +365,6 @@ fn frame(b: &mut MeshBuilder, p: &Plant) {
     for (k, &a0) in heads.iter().enumerate() {
         let a1 = heads[(k + 1) % heads.len()];
         b.beam(at(a0), at(a1), Vec2::new(0.9, 0.8), Vec2::new(0.9, 0.8));
-    }
-}
-
-/// The coolant rams between the pylons, each on a block, working in turn.
-fn rams(b: &mut MeshBuilder, p: &Plant) {
-    let step = 360.0 / p.pylons as f32;
-    let reach = if p.pylons > 6 { 6.1 } else { 6.4 };
-    for k in 0..p.pylons {
-        let a = (step * k as f32).to_radians();
-        let at = v3(a.cos(), a.sin(), 0.0) * reach;
-        dark_plate(b);
-        b.block(at - v3(0.9, 0.9, 0.0), at + v3(0.9, 0.9, 0.8));
-        piston(b, at + Vec3::Z * 0.8, at + Vec3::Z * 4.0, 0.4, true);
     }
 }
 
@@ -400,12 +384,13 @@ mod tests {
         for (key, r, h, cells) in TIERS {
             super::super::check(key, r, h, Some(cells), &[]);
             let model = build_model_scaled(key, r, h, 1).unwrap();
-            for kind in [part::PUMP, part::SPINNER] {
-                assert!(
-                    model.lods[0].vertices.iter().any(|v| v.part == kind),
-                    "{key}: no part {kind}"
-                );
-            }
+            assert!(
+                model.lods[0]
+                    .vertices
+                    .iter()
+                    .any(|v| v.part == part::SPINNER),
+                "{key}: no spinner"
+            );
         }
     }
 

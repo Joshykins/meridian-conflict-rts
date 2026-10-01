@@ -5,7 +5,7 @@
 //!   and a low wedge of a turret with its plates lapped back, levelling a heavy repeater:
 //!   three bronze barrels in one plated shroud, cooling rings, pressure vents either side
 //!   and a muzzle brake with its rim glowing red. A brawler, low and heavy.
-//! - Canopy: a ribbed bronze column braced by four plated legs, and on it a flak
+//! - Canopy: a bronze column braced by four plated legs, and on it a flak
 //!   mount: a drum magazine across the back between armoured cheeks, twin barrels raised
 //!   at the sky, a red sensor slit over them. From above it is an X under a cross.
 //! - Palisade: an armoured octagonal block on a bronze waist, a glacis plate on each
@@ -125,8 +125,6 @@ fn barb_base(b: &mut MeshBuilder) {
         if fine { 16 } else { 6 },
     );
     if fine {
-        seam(b);
-        teeth(b, Vec3::Z * 3.7, 3.3, 20, v3(0.4, 0.35, 0.5));
         for k in 0..4 {
             let a = (45.0 + 90.0 * k as f32).to_radians();
             let d = v3(a.cos(), a.sin(), 0.0);
@@ -291,31 +289,21 @@ fn spitter_coarse(b: &mut MeshBuilder) {
     });
 }
 
-/// The column: ribbed bronze on a plated foot, braced by four legs on the diagonals,
+/// The column: bronze on a plated foot, braced by four legs on the diagonals,
 /// each plated and lapped down into a spike, the owner's colour on the foot.
 fn spitter_base(b: &mut MeshBuilder) {
     let fine = b.fine();
     seam(b);
     b.prism(Vec3::ZERO, 8, 2.6, 2.2, 1.4);
-    ribbed(
-        b,
-        Vec3::Z * 1.4,
-        Vec3::Z * 4.8,
-        1.0,
-        if fine { 3 } else { 0 },
-    );
+    shaft(b, Vec3::Z * 1.4, Vec3::Z * 4.8, 1.0);
     metal(b);
     hoop(b, Vec3::Z * 4.95, 1.6, 1.2, 0.5, if fine { 16 } else { 6 });
-    if fine {
-        seam(b);
-        teeth(b, Vec3::Z * 4.95, 2.2, 16, v3(0.35, 0.3, 0.45));
-    }
     for k in 0..4 {
         let a = (45.0 + 90.0 * k as f32).to_radians();
         b.yawed(Vec3::ZERO, a, |b| {
             let (root, foot) = (v3(1.0, 0.0, 4.2), v3(4.6, 0.0, 0.4));
             let down = (foot - root).normalize();
-            ribbed(b, root, foot, 0.32, if fine { 2 } else { 0 });
+            shaft(b, root, foot, 0.32);
             let f = Frame::new(root + Vec3::Z * 0.55, down, v3(-down.z, 0.0, down.x));
             dark_plate(b);
             Course {
@@ -331,7 +319,7 @@ fn spitter_base(b: &mut MeshBuilder) {
             dark_plate(b);
             b.block(v3(4.0, -0.7, 0.0), v3(5.2, 0.7, 0.8));
             if fine {
-                piston(b, v3(4.6, 0.0, 0.8), v3(3.0, 0.0, 2.2), 0.22, false);
+                strut(b, v3(4.6, 0.0, 0.8), v3(3.0, 0.0, 2.2), 0.22);
             }
         });
     }
@@ -355,8 +343,10 @@ fn spitter_head(b: &mut MeshBuilder) {
         1.0,
         b.sides(10),
     );
-    collar(b, drum - Vec3::Y * 1.45, Vec3::Y, 0.8, 0.2);
-    collar(b, drum + Vec3::Y * 1.45, Vec3::Y, 0.8, 0.2);
+    if fine {
+        collar(b, drum - Vec3::Y * 1.45, Vec3::Y, 0.8, 0.2);
+        collar(b, drum + Vec3::Y * 1.45, Vec3::Y, 0.8, 0.2);
+    }
     b.paint(TEAM);
     b.face(&[
         v3(-1.8, -0.8, 7.62),

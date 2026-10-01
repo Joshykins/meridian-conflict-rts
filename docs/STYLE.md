@@ -157,12 +157,15 @@ without toes.
   finished, and a higher tier is more elaborate, not more lit.
 - **Symmetrical.** Most units are. The commander is the exception, as ARC's is.
 - **Layered armour over exposed machinery.** Plates overlap and sweep back;
-  pistons, ribs, cables and rings show in the gaps between them. Every joint is
-  a visible gap, never a smooth sleeve.
+  shafts, cables and rings show in the gaps between them. Every joint is a
+  visible gap, never a smooth sleeve.
 - **Spikes are plate edges.** A spike is the swept-back trailing edge of an
   armour plate, never a thorn stuck on.
 - **Buildings are ultra mechanical:** machinery seen working, such as rotating
-  rings, pistons and shells that open and close.
+  rings and shells that open and close. No gears, rams or ribbed shafts on
+  buildings (2026-09-30: the user found them ugly); teeth go only on a ring that
+  turns, like the toothed lift ring over a factory, which the user likes. A
+  brace is a plated strut.
 - **Nothing ceremonial.** No arches, obelisks, daises or crests: the look is
   machine all through.
 - **The outline reads from above,** swept and pointed where ARC's is squared.
@@ -172,7 +175,7 @@ without toes.
 
 - **Dark plating**, a little brighter than the old lacquer black.
 - **Dark bronze**, a little off true bronze (Scorponok), on the exposed
-  machinery under the plates: pistons, ribs, joints, cables. The plates stay
+  machinery under the plates: shafts, joints, cables, rings. The plates stay
   dark, so from above a unit reads as dark armour over bronze workings.
 - **Red highlights:** lit lines, optics and weapon heat.
 - **Detail is cut, not painted** (`shaders/regency.wgsl`). The plate is cut into

@@ -14,9 +14,8 @@
 //!   from above they widen upward into a scope of rings. The spindle's cap carries red
 //!   optics and the owner's colour.
 //! - Tech 2 adds the second ring and braces the legs: a second course of plates on
-//!   each and a ram from the mast out to it, cables up the mast. Tech 3 adds the third
-//!   ring, clamp rams working at each foot (`part::PUMP`) and an armoured collar round
-//!   the mast's foot.
+//!   each and a plated strut from the mast out to it, cables up the mast. Tech 3 adds the third
+//!   ring, a heavier block at each foot and an armoured collar round the mast's foot.
 
 use glam::{Vec2, Vec3};
 
@@ -131,7 +130,7 @@ fn mast(b: &mut MeshBuilder) {
     let (z0, z1, r) = MAST;
     seam(b);
     b.prism(Vec3::ZERO, 8, 2.6, 2.2, z0 + 1.0);
-    ribbed(b, Vec3::Z * z0, Vec3::Z * z1, r, if fine { 8 } else { 0 });
+    shaft(b, Vec3::Z * z0, Vec3::Z * z1, r);
     // The sleeves: four plates round the mast at each, lapped down.
     for (k, &z) in [7.0f32, 11.6, 16.0].iter().enumerate() {
         let spread = 1.25 - 0.12 * k as f32;
@@ -173,7 +172,7 @@ fn leg(b: &mut MeshBuilder) {
     let fine = b.fine();
     let root = v3(MAST.2 + 0.1, 0.0, 7.6);
     let foot = v3(FOOT - 0.8, 0.0, 1.0);
-    ribbed(b, root, foot, 0.42, if fine { 3 } else { 0 });
+    shaft(b, root, foot, 0.42);
     let down = (foot - root).normalize();
     let out = v3(-down.z, 0.0, down.x);
     let f = Frame::new(root + out * 0.55, down, out);
@@ -208,13 +207,7 @@ fn stage(b: &mut MeshBuilder, t: u8, top: bool) {
         TOPS[i - 1] - CAP
     };
     let to = TOPS[i] - CAP;
-    ribbed(
-        b,
-        Vec3::Z * from,
-        Vec3::Z * to,
-        SPINDLE,
-        if fine { 2 } else { 0 },
-    );
+    shaft(b, Vec3::Z * from, Vec3::Z * to, SPINDLE);
     // The collar and its studs: bronze arms out from the spindle, their tips lit red,
     // stopping well short of the ring.
     collar(b, Vec3::Z * z, Vec3::Z, SPINDLE + 0.35, 0.8);
@@ -339,7 +332,7 @@ fn cap(b: &mut MeshBuilder, top: f32) {
 }
 
 /// Tech 2's brace on one leg (along +x): a second course of plates lapped over the
-/// strut, a ram from the mast out to its middle, a cable up the mast.
+/// strut, a plated strut from the mast out to its middle, a cable up the mast.
 fn brace(b: &mut MeshBuilder) {
     let root = v3(MAST.2 + 0.1, 0.0, 7.6);
     let foot = v3(FOOT - 0.8, 0.0, 1.0);
@@ -358,7 +351,7 @@ fn brace(b: &mut MeshBuilder) {
         tail: 0.8,
     }
     .lay(b, &f);
-    piston(b, v3(MAST.2 + 0.2, 0.0, 12.5), mid + out * 0.3, 0.28, false);
+    strut(b, v3(MAST.2 + 0.2, 0.0, 12.5), mid + out * 0.3, 0.28);
     metal(b);
     cable(
         b,
@@ -371,14 +364,11 @@ fn brace(b: &mut MeshBuilder) {
     );
 }
 
-/// Tech 3's clamp at one foot (along +x): a pair of rams working down either side of the
-/// foot block, a red slot between them.
+/// Tech 3's clamp at one foot (along +x): a heavier block over the foot, a red slot on
+/// its face.
 fn clamp(b: &mut MeshBuilder) {
     dark_plate(b);
     b.block(v3(FOOT - 2.6, -1.7, 0.0), v3(FOOT - 1.0, 1.7, 2.0));
-    for y in [-1.35f32, 1.35] {
-        piston(b, v3(FOOT - 1.4, y, 4.0), v3(FOOT - 1.4, y, 1.8), 0.3, true);
-    }
     red_slot(b, v3(FOOT - 0.98, 0.0, 1.4), Vec3::X, Vec3::Y, 0.9, 0.16);
 }
 

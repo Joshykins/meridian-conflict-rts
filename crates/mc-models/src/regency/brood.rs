@@ -6,18 +6,18 @@
 //!
 //! - Each wing is a machine hall under three rows of heavy plates that overlap like
 //!   feathers and sweep back, the last of each row running out into a spike. Bronze
-//!   shows wherever they part: the ribbed deck they ride on, drive shafts between the
-//!   rows, and a gear bay open across the roof, a train of gears between two press rams.
-//!   Rams brace the outer row off the plinth. The inner face, toward the bay, is open
-//!   machinery under the plates' eaves: ribbed bronze columns, press rams working in turn
-//!   (`part::PUMP`), pipe runs, a lit seam. Its prow is a door post, its edge lit violet
-//!   where the unit leaves, red optics looking down the way.
-//! - Over the bay, a fixed plated race carried off the wings' gear bays, the fabricator
+//!   shows wherever they part: the ribbed deck they ride on. Across the roof, between
+//!   the front and back courses, a plated hatch with a lit seam down it. Plated struts
+//!   brace the outer row off the plinth. The inner face, toward the bay, is open
+//!   machinery under the plates' eaves: bronze columns, pipe runs, a lit seam. Its prow
+//!   is a door post, its edge lit violet where the unit leaves, red optics looking down
+//!   the way.
+//! - Over the bay, a fixed plated race carried off the wings' hatches, the fabricator
 //!   heads hung from it aimed at the work (their mounts are `mc_core::print_heads`, where
 //!   the nanite streams pour from), and inside it a toothed bronze ring turning on four
 //!   carriages (`part::SPINNER`). The violet runs hot while the works builds.
 //! - Behind the bay the press block: two feed rollers under a plated hood facing the bay,
-//!   a row of press rams working in a slot down its roof, plates lapped back over it.
+//!   a slot down its roof, plates lapped back over it.
 //! - The owner's colour runs along the leading plate of each wing, over the bay, and
 //!   down the press block's slot.
 
@@ -50,8 +50,8 @@ const THICK: f32 = 0.9;
 const RING: Vec3 = Vec3::new(0.0, 0.0, 15.2);
 const RING_R: f32 = 10.6;
 const RACE_R: f32 = 12.0;
-/// The gear bay open across each wing's roof, between its front and back courses.
-const GEAR_BAY: [f32; 2] = [7.0, -7.0];
+/// The hatch across each wing's roof, between its front and back courses.
+const HATCH: [f32; 2] = [7.0, -7.0];
 /// The press block behind the bay.
 const PRESS: [f32; 2] = [-38.0, -18.0];
 const PRESS_TOP: f32 = 9.0;
@@ -62,8 +62,8 @@ const BANK_Y: [f32; 2] = [37.2, 44.6];
 const BANK_X: [f32; 2] = [-20.0, 16.0];
 const BANK_TOP: f32 = 5.0;
 /// Tech 3's lifted ring: its middle (the spinner's pivot once lifted), the ring's and the
-/// race's radii, and the pylons carrying the race (one each side of the gear bay, both
-/// wings): the +x, +y one's foot in the gear bay and its head on the race.
+/// race's radii, and the pylons carrying the race (one each side of the hatch, both
+/// wings): the +x, +y one's foot in the hatch and its head on the race.
 const HIGH: Vec3 = Vec3::new(0.0, 0.0, 33.0);
 const HIGH_RING_R: f32 = 12.0;
 const HIGH_RACE_R: f32 = 14.2;
@@ -178,7 +178,7 @@ fn coarse(b: &mut MeshBuilder, lifted: bool) {
 }
 
 /// One wing (+y): the hall's core, the bronze deck on it, three rows of plates lapped
-/// back over it, the drive shafts between them and the rams bracing the outer row.
+/// back over it, the hatch between them and the struts bracing the outer row.
 fn wing(b: &mut MeshBuilder) {
     let fine = b.fine();
     // The hall's core, standing on the lot.
@@ -244,7 +244,7 @@ fn wing(b: &mut MeshBuilder) {
 
     // Three rows of blade plates lapped back over the deck, the inner one over the
     // gallery's eaves, the outer one hanging past the wall. Each row is two courses,
-    // with the gear bay open between them.
+    // with the hatch open between them.
     let rows: [(f32, f32); 3] = [
         (INNER - 1.2, INNER + 7.0),
         (INNER + 8.4, INNER + 15.4),
@@ -259,7 +259,7 @@ fn wing(b: &mut MeshBuilder) {
         // The last plate's spike ends inside the wing's cut corner, at the row's outer edge.
         let tail = 6.0;
         let back = back_x(y1.max(y0) + 1.0) + tail + 0.5;
-        let [bay_front, bay_back] = GEAR_BAY;
+        let [bay_front, bay_back] = HATCH;
         let half = slope.length() * 0.5;
         dark_plate(b);
         let mut plates = Vec::new();
@@ -301,121 +301,53 @@ fn wing(b: &mut MeshBuilder) {
             ]);
         }
     }
-    gear_bay(b);
-    // Drive shafts in the gaps between the rows, and the rams under the outer row.
-    for gap in [INNER + 7.7, INNER + 16.1] {
-        let z = roof(gap) - 0.1;
-        ribbed(
-            b,
-            v3(swept_x(FRONT, gap) - 1.0, gap, z),
-            v3(back_x(gap) + 1.0, gap, z),
-            0.65,
-            if fine { 4 } else { 0 },
-        );
-    }
+    hatch(b);
+    // The struts under the outer row.
     if fine {
         for k in 0..3 {
             let y = OUTER + 0.6;
             let x = swept_x(FRONT, y) - 8.0 - k as f32 * 18.0;
-            piston(
-                b,
-                v3(x, y, 1.4),
-                v3(x + 1.5, y - 3.2, EAVE + 0.4),
-                0.55,
-                false,
-            );
-            collar(b, v3(x, y, 1.4), Vec3::X, 0.8, 1.6);
+            strut(b, v3(x, y, 1.4), v3(x + 1.5, y - 3.2, EAVE + 0.4), 0.55);
         }
     }
 }
 
-/// The gear bay across a wing's roof (+y side): a train of bronze gears laid on the
-/// deck, a press ram working at each end, and the pivot the ring's arms come off.
-fn gear_bay(b: &mut MeshBuilder) {
-    let fine = b.fine();
-    let mid = (GEAR_BAY[0] + GEAR_BAY[1]) * 0.5;
-    let on_deck = |y: f32, up: f32| {
-        let n = v3(0.0, RIDGE - EAVE, OUTER - INNER).normalize();
-        v3(mid, y, roof(y) - 0.4) + n * up
-    };
+/// The hatch across a wing's roof (+y side), where the ring's arms come off: a plate laid
+/// down the roof between the front and back courses, a lit seam down its middle.
+fn hatch(b: &mut MeshBuilder) {
+    let mid = (HATCH[0] + HATCH[1]) * 0.5;
+    let (y0, y1) = (INNER + 0.5, OUTER - 1.0);
     let normal = v3(0.0, RIDGE - EAVE, OUTER - INNER);
-    for (y, r) in [(INNER + 4.6, 4.2), (INNER + 11.7, 3.0), (INNER + 18.8, 4.2)] {
-        gear(
-            b,
-            on_deck(y, 0.3),
-            normal,
-            r,
-            1.2,
-            if fine { 10 } else { 0 },
-        );
-    }
-    // The press rams at the bay's ends, working up and down.
-    for y in [INNER + 1.4, OUTER - 3.5] {
-        let foot = on_deck(y, 0.0);
-        dark_plate(b);
-        b.block(foot - v3(1.8, 1.4, 0.4), foot + v3(1.8, 1.4, 0.8));
-        piston(b, foot + Vec3::Z * 0.8, foot + Vec3::Z * 6.5, 0.8, true);
-    }
-}
-
-/// A bronze gear lying on a face whose normal is `axis`: a disc `r` round and `width`
-/// deep centred on `at`, with `count` teeth (none below full detail).
-fn gear(b: &mut MeshBuilder, at: Vec3, axis: Vec3, r: f32, width: f32, count: usize) {
-    let axis = axis.normalize();
-    let half = axis * (width * 0.5);
-    metal(b);
-    let sides = b.sides(16);
-    b.cylinder_between(at - half, at + half, r, r, sides);
-    let across = axis.cross(Vec3::X).try_normalize().unwrap_or(Vec3::Y);
-    let other = axis.cross(across);
-    for k in 0..count {
-        let a = std::f32::consts::TAU * k as f32 / count as f32;
-        let d = across * a.cos() + other * a.sin();
-        b.beam(
-            at + d * (r - 0.2),
-            at + d * (r + 0.7),
-            Vec2::new(0.8, width),
-            Vec2::new(0.5, width),
-        );
+    let f = Frame::new(
+        v3(mid, y0, roof(y0) - 0.1),
+        v3(0.0, y1 - y0, roof(y1) - roof(y0)),
+        normal,
+    );
+    let len = v3(0.0, y1 - y0, roof(y1) - roof(y0)).length();
+    let half = (HATCH[0] - HATCH[1]) * 0.5 - 1.0;
+    dark_plate(b);
+    armour(
+        b,
+        &f,
+        &[[0.0, -half], [0.0, half], [len, half], [len, -half]],
+        THICK,
+    );
+    if b.fine() {
+        red_slot(b, f.at(len * 0.5, 0.0, THICK), f.n, f.u, len - 4.0, 0.25);
     }
 }
 
 /// A wing's inner face toward the bay (+y side): the hall's core stands back under the
-/// eaves, and in front of it ribbed bronze columns, press rams working in turn, pipe
-/// runs and a lit seam.
+/// eaves, and in front of it bronze columns, pipe runs and a lit seam.
 fn gallery(b: &mut MeshBuilder) {
     let fine = b.fine();
     let face = INNER + 1.4;
     let top = RIDGE - 1.6;
     let columns = [-22.0, -9.0, 4.0, 17.0, 29.0];
     for &x in &columns {
-        ribbed(
-            b,
-            v3(x, face, 1.2),
-            v3(x, face, top),
-            0.7,
-            if fine { 2 } else { 0 },
-        );
+        shaft(b, v3(x, face, 1.2), v3(x, face, top), 0.7);
         dark_plate(b);
         b.block(v3(x - 1.2, face - 0.9, 0.0), v3(x + 1.2, face + 1.4, 1.6));
-    }
-    for w in columns.windows(2) {
-        let x = (w[0] + w[1]) * 0.5;
-        // A press ram: the barrel stands on its foot, the rod works up and down.
-        dark_plate(b);
-        b.block(v3(x - 1.6, face - 1.0, 0.0), v3(x + 1.6, face + 1.2, 1.2));
-        piston(
-            b,
-            v3(x, face - 0.2, 1.2),
-            v3(x, face - 0.2, top - 2.2),
-            0.8,
-            true,
-        );
-        dark_plate(b);
-        b.block(
-            v3(x - 1.4, face - 1.2, top - 1.8),
-            v3(x + 1.4, face + 1.2, top - 0.6),
-        );
     }
     if fine {
         metal(b);
@@ -477,7 +409,7 @@ fn prow(b: &mut MeshBuilder) {
 }
 
 /// A plated arm from the fixed race out to the wing's ridge (+y side, at `angle` round
-/// the ring), a bronze ram under it.
+/// the ring), a plated strut under it.
 fn ring_arm(b: &mut MeshBuilder, angle: f32) {
     let d = v3(angle.cos(), angle.sin(), 0.0);
     let from = RING + d * (RACE_R + 0.6) + Vec3::Z * 0.4;
@@ -485,12 +417,11 @@ fn ring_arm(b: &mut MeshBuilder, angle: f32) {
     dark_plate(b);
     b.beam(from, to, Vec2::new(1.8, 1.3), Vec2::new(2.6, 1.6));
     if b.fine() {
-        piston(
+        strut(
             b,
             v3(to.x, INNER + 1.4, RIDGE - 3.5),
             from - Vec3::Z * 0.6,
             0.35,
-            false,
         );
     }
 }
@@ -538,7 +469,7 @@ fn ring(b: &mut MeshBuilder) {
 }
 
 /// The press block behind the bay: its core, two feed rollers under a hood facing the
-/// bay, a row of press rams down a slot in its roof, and plates lapped back over it.
+/// bay, a slot down its roof in the owner's colour, and plates lapped back over it.
 fn press(b: &mut MeshBuilder) {
     let fine = b.fine();
     let [back, front] = PRESS;
@@ -589,7 +520,7 @@ fn press(b: &mut MeshBuilder) {
         }
         .lay(b, &f);
     });
-    // The press rams down the slot: barrels on the block, rods working down in turn.
+    // The owner's colour down the slot.
     b.paint(TEAM);
     b.face(&[
         v3(front - 3.0, -1.2, PRESS_TOP + 0.05),
@@ -597,26 +528,11 @@ fn press(b: &mut MeshBuilder) {
         v3(back + 2.0, 1.2, PRESS_TOP + 0.05),
         v3(back + 2.0, -1.2, PRESS_TOP + 0.05),
     ]);
-    for x in [-23.0, -29.0, -35.0] {
-        dark_plate(b);
-        b.block(
-            v3(x - 1.4, -1.4, PRESS_TOP),
-            v3(x + 1.4, 1.4, PRESS_TOP + 1.0),
-        );
-        piston(
-            b,
-            v3(x, 0.0, PRESS_TOP + 1.0),
-            v3(x, 0.0, PRESS_TOP + 7.0),
-            0.8,
-            true,
-        );
-    }
 }
 
 /// Tech 2: an outboard machine bank along a wing's outside (+y side): a low plated
-/// housing, a ribbed drive shaft down its inner side turning two toothed wheels in the
-/// gap by the wing's wall, rams working at its ends, and a course of plates lapped back
-/// along its outer edge into a spike.
+/// housing, feed lines up the wing's wall, and a course of plates lapped back along its
+/// outer edge into a spike.
 fn outboard(b: &mut MeshBuilder) {
     let fine = b.fine();
     let [y0, y1] = BANK_Y;
@@ -629,46 +545,7 @@ fn outboard(b: &mut MeshBuilder) {
         BANK_TOP,
         Vec2::ZERO,
     );
-    // The drive shaft and its wheels, in the gap between the wall and the plates.
-    let shaft_y = y0 + 1.8;
-    let shaft_z = BANK_TOP + 1.2;
-    ribbed(
-        b,
-        v3(x0 + 1.0, shaft_y, shaft_z),
-        v3(x1 - 1.0, shaft_y, shaft_z),
-        0.55,
-        if fine { 4 } else { 0 },
-    );
-    for x in [-8.0, 5.0] {
-        gear(
-            b,
-            v3(x, shaft_y, shaft_z),
-            Vec3::X,
-            3.2,
-            1.2,
-            if fine { 7 } else { 0 },
-        );
-        dark_plate(b);
-        b.block(
-            v3(x - 1.4, shaft_y - 1.2, BANK_TOP - 0.2),
-            v3(x + 1.4, shaft_y + 1.2, BANK_TOP + 0.6),
-        );
-    }
-    // Rams at its ends, working up and down.
-    for x in [x0 + 2.6, x1 - 2.6] {
-        dark_plate(b);
-        b.block(
-            v3(x - 1.5, shaft_y - 1.3, BANK_TOP),
-            v3(x + 1.5, shaft_y + 1.3, BANK_TOP + 0.9),
-        );
-        piston(
-            b,
-            v3(x, shaft_y, BANK_TOP + 0.9),
-            v3(x, shaft_y, BANK_TOP + 6.4),
-            0.7,
-            true,
-        );
-    }
+    let wall_y = y0 + 1.8;
     // The plates along the outer edge, shedding outward, lapped back into a spike.
     let f = Frame::new(
         v3(x1 + 1.0, y1 - 2.7, BANK_TOP + 0.4),
@@ -701,7 +578,7 @@ fn outboard(b: &mut MeshBuilder) {
             cable(
                 b,
                 &[
-                    v3(x, shaft_y + 0.6, BANK_TOP),
+                    v3(x, wall_y + 0.6, BANK_TOP),
                     v3(x, OUTER + 0.4, BANK_TOP + 0.2),
                     v3(x, OUTER - 0.4, EAVE + 0.2),
                 ],
@@ -712,7 +589,7 @@ fn outboard(b: &mut MeshBuilder) {
 }
 
 /// Tech 2: two fabricator heads on plated arms off the press block's face, over the hood,
-/// aimed at the work, a bronze ram under each arm.
+/// aimed at the work, a plated strut under each arm.
 fn press_heads(b: &mut MeshBuilder) {
     for (mount, s, aim) in tier_heads("regency_brood", 2) {
         let foot = v3(PRESS[1] - 4.0, mount.y, PRESS_TOP + 1.0);
@@ -724,18 +601,17 @@ fn press_heads(b: &mut MeshBuilder) {
             Vec2::new(1.6, 1.3),
             Vec2::new(1.2, 1.0),
         );
-        piston(
+        strut(
             b,
             foot + v3(1.4, 0.0, 0.2),
             mount + v3(-0.5, 0.0, -0.4),
             0.4,
-            false,
         );
         fabricator(b, mount, aim, s);
     }
 }
 
-/// Tech 3: the lifted ring. Four pylons (a pair off each wing's gear bay) lean in to
+/// Tech 3: the lifted ring. Four pylons (a pair off each wing's hatch) lean in to
 /// carry a fixed race high over the bay, the fabricator heads hung from it aimed at the
 /// work, a toothed bronze ring turning inside it on four carriages. `spins`: whether
 /// this is the ring the spinner turns (not while it is still an upgrade piece).
@@ -800,24 +676,17 @@ fn high_ring(b: &mut MeshBuilder, spins: bool) {
     }
 }
 
-/// One pylon of the lifted ring (+y wing, `sx` the side of the gear bay): a ribbed
-/// bronze leg from a plated foot in the gear bay, leaning in to a plated head under the
-/// race; plates lapped down its outer face into spikes, a lift ram bracing it off the
+/// One pylon of the lifted ring (+y wing, `sx` the side of the hatch): a
+/// bronze leg from a plated foot in the hatch, leaning in to a plated head under the
+/// race; plates lapped down its outer face into spikes, a plated strut bracing it off the
 /// wing's roof.
 fn pylon(b: &mut MeshBuilder, sx: f32) {
-    let fine = b.fine();
     let foot = v3(HIGH_FOOT.x * sx, HIGH_FOOT.y, HIGH_FOOT.z);
     let head = v3(HIGH_TOP.x * sx, HIGH_TOP.y, HIGH_TOP.z - 1.0);
     let up = (head - foot).normalize();
     dark_plate(b);
     b.block(foot - v3(2.4, 2.6, 1.6), foot + v3(2.4, 2.6, 0.8));
-    ribbed(
-        b,
-        foot + Vec3::Z * 0.6,
-        head - Vec3::Z * 0.4,
-        0.95,
-        if fine { 3 } else { 0 },
-    );
+    shaft(b, foot + Vec3::Z * 0.6, head - Vec3::Z * 0.4, 0.95);
     // Its outer face, armoured: plates lapped down from the head toward the foot, their
     // spikes pointing down and out.
     let out = v3(0.0, up.z, -up.y).normalize();
@@ -833,9 +702,9 @@ fn pylon(b: &mut MeshBuilder, sx: f32) {
         tail: 2.6,
     }
     .lay(b, &f);
-    // The lift ram off the wing's roof, and the head that takes the race.
+    // The strut off the wing's roof, and the head that takes the race.
     let brace = v3(foot.x, OUTER - 7.0, roof(OUTER - 7.0) + 0.2);
-    piston(b, brace, foot.lerp(head, 0.55) + out * 0.6, 0.6, false);
+    strut(b, brace, foot.lerp(head, 0.55) + out * 0.6, 0.6);
     dark_plate(b);
     b.frustum(
         head + v3(0.0, 0.0, -1.2),

@@ -3,12 +3,12 @@
 //!
 //! - **Pinched-plasmeric Cannon** (tech 2, a 2 x 2 lot): an armoured octagonal keep skirted
 //!   in plates lapped down into spikes, a toothed bronze ring turning slowly round its top
-//!   under the turret and four rams pumping between the skirt plates. On it a long wedge
+//!   under the turret. On it a long wedge
 //!   of a turret, plates lapped back, the gravity pinch drum across its back. The gun is a
 //!   bronze bore through a column of pinch rings, a plated spine along its top, pressure
 //!   ports either side behind the muzzle and a red-rimmed muzzle block.
 //! - **Pinch-fusion Cannon** (tech 3, a 4 x 4 lot): the same keep twice the size, worked
-//!   harder (eight rams, a second ring), and a heavier turret with the fusion chamber on
+//!   harder (a second ring), and a heavier turret with the fusion chamber on
 //!   its back: a caged red core held in three bronze hoops, conduits running forward from
 //!   it to the breech. Its gun is longer, its pinch rings closer and more, the spine
 //!   doubled, the ports paired.
@@ -39,7 +39,7 @@ struct Gun {
     muzzle: Vec3,
     /// Pinch rings along the bore.
     rings: usize,
-    /// The tech 3 machine: more rams and rings, the fusion chamber, paired ports.
+    /// The tech 3 machine: more rings, the fusion chamber, paired ports.
     fusion: bool,
 }
 
@@ -130,7 +130,7 @@ fn coarse(b: &mut MeshBuilder, g: &Gun) {
 }
 
 /// The keep: a seam-dark plinth, an armoured octagonal drum skirted in plates lapped down
-/// into spikes, rams pumping in the gaps between them, the owner's colour round its top,
+/// into spikes, the owner's colour round its top,
 /// a toothed bronze ring turning under the turret's race.
 fn keep(b: &mut MeshBuilder, g: &Gun) {
     let (s, fine) = (g.s, b.fine());
@@ -146,19 +146,6 @@ fn keep(b: &mut MeshBuilder, g: &Gun) {
         b.yawed(Vec3::ZERO, std::f32::consts::PI / plates as f32, |b| {
             skirt(b, plates, 7.0 * s, 3.2 * s, 8.8 * s, 1.5 * s);
         });
-    }
-    // Rams pumping in the gaps between the skirt plates.
-    let rams = if g.fusion { 8 } else { 4 };
-    for k in 0..rams {
-        let a = std::f32::consts::TAU * k as f32 / rams as f32 + 0.35;
-        let d = v3(a.cos(), a.sin(), 0.0);
-        piston(
-            b,
-            d * 8.4 * s + Vec3::Z * 0.6 * s,
-            d * 7.9 * s + Vec3::Z * 4.4 * s,
-            0.32 * s,
-            true,
-        );
     }
     b.paint(TEAM);
     hoop(b, Vec3::Z * 4.85 * s, 6.2 * s, 0.7 * s, 0.1, segs);
@@ -508,10 +495,6 @@ mod tests {
             assert!(
                 lod.vertices.iter().any(|v| v.part == part::SPINNER),
                 "{key}: ring"
-            );
-            assert!(
-                lod.vertices.iter().any(|v| v.part == part::PUMP),
-                "{key}: rams"
             );
             assert!(
                 lod.vertices.iter().any(|v| v.rig & rig::RECOIL != 0),
