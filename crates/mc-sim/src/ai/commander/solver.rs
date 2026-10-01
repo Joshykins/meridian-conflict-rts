@@ -78,12 +78,58 @@ impl World {
         })
     }
 
+    /// Mass of the enemy's aircraft and warships seen whose guns outreach the side's
+    /// anti-air: the mobile kinds it can make and the turrets it has standing. Only
+    /// fighters or a longer-reaching turret answer those. Corvettes shot a commander
+    /// from a kilometre while 480 m anti-air tanks stood under them.
+    pub(in crate::ai) fn outranging_air(&self, player: u8, profiles: &Profiles) -> Fx {
+        let menu = self.side_menu(player);
+        let units = &self.state.units;
+        let standing = units
+            .slots
+            .iter()
+            .filter(|&r| units.owner[r] == player && units.is_active(r))
+            .map(|r| units.blueprint[r]);
+        let ground_aa: Vec<&Profile> = menu
+            .ids
+            .iter()
+            .map(|&id| profiles.get(id))
+            .filter(|p| p.mobile())
+            .chain(standing.map(|id| profiles.get(id)).filter(|p| !p.mobile()))
+            .filter(|p| {
+                p.has(role::ANTI_AIR) && !matches!(p.domain, Some(Domain::Air | Domain::Space))
+            })
+            .collect();
+        let best = |t: super::profile::Target| -> Fx {
+            ground_aa
+                .iter()
+                .map(|p| p.reach[t as usize])
+                .max()
+                .unwrap_or(Fx::ZERO)
+        };
+        self.state.ai[player as usize]
+            .contacts
+            .iter()
+            .map(|c| profiles.get(c.blueprint))
+            .filter(|p| matches!(p.domain, Some(Domain::Air | Domain::Space)) && p.armed())
+            .filter(|p| {
+                let reach = p.reach[super::profile::Target::Land as usize]
+                    .max(p.reach[super::profile::Target::Structure as usize]);
+                p.is.is_some_and(|t| reach > best(t))
+            })
+            .map(|p| p.mass)
+            .sum()
+    }
+
     /// The share of new combat units each force should get, from the stakes of the
     /// plans that use it: land, air, surface ships, submarines.
     pub(in crate::ai) fn force_shares(&self, player: u8) -> [i64; FORCES] {
         let c = &self.state.ai[player as usize].commander;
         let p = |k: PlanKind| points(c.plan(k));
         let land_route = self.land_route_to_enemy(player);
+        let outranging = self
+            .outranging_air(player, &Profiles::build(&self.blueprints))
+            .floor_int() as i64;
         [
             p(PlanKind::Pressure)
                 + p(PlanKind::Raid)
@@ -95,7 +141,10 @@ impl World {
                 // Hit from above: fighters to hunt what the guns cannot reach.
                 + (c.hurt[Hurt::Air as usize] + c.hurt[Hurt::Space as usize])
                     .floor_int() as i64
-                    / 1500,
+                    / 1500
+                // Aircraft its ground anti-air cannot reach: fighters, a point for
+                // each thousand mass of them.
+                + (outranging / 1000).min(6),
             p(PlanKind::SeaControl) + if land_route { 0 } else { 2 },
             p(PlanKind::SubWar),
         ]
@@ -167,7 +216,8 @@ impl World {
                 .map(|r| profiles.get(units.blueprint[r]).mass)
                 .sum()
         };
-        let aa_enough = our_aa * 2 >= air * 3 + Fx::from_int(1500);
+        let outranging = self.outranging_air(player, &profiles);
+        let aa_enough = our_aa * 2 >= (air - outranging).max(Fx::ZERO) * 3 + Fx::from_int(1500);
         let aa_land = if aa_enough {
             if air_seen {
                 60
@@ -195,7 +245,9 @@ impl World {
             vec![
                 (
                     Box::new(|p: &Profile| p.has(role::ANTI_AIR)),
-                    if aa_enough {
+                    if outranging > Fx::from_int(1000) {
+                        700
+                    } else if aa_enough {
                         150
                     } else {
                         (air_share * 8 / 10).clamp(150, 700) + 100 * stake(PlanKind::AirDefense)

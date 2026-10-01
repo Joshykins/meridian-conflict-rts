@@ -7,6 +7,7 @@
 //! operation's orders as far as the side's attention goes.
 mod beliefs;
 pub(in crate::ai) mod economy;
+mod king;
 mod matchup;
 pub(in crate::ai) mod mind;
 mod ops;
@@ -179,6 +180,7 @@ impl World {
         self.raise_defence(&ctx, &incursions);
         self.load_landings(&ctx, out);
         self.run_ops(&ctx, out);
+        self.guard_commander(&ctx, out);
         self.direct_strategic(&ctx, out);
     }
 

@@ -452,7 +452,12 @@ impl World {
         let Some(r) = units.row(pl.commander).filter(|&r| units.is_active(r)) else {
             return;
         };
-        let roam = self.state.ai[player as usize].commander.eco.roam;
+        let c = &self.state.ai[player as usize].commander;
+        // Keeping out of reach of what was shooting it (`king.rs`).
+        if self.state.tick < c.king_fled {
+            return;
+        }
+        let roam = c.eco.roam;
         let out_there = units.pos[r].distance(pl.start) > HOME_RADIUS + Fx::from_int(200);
         let homeward = self.state.orders.front(units, r).is_some_and(|o| {
             matches!(o.kind, crate::tables::OrderKind::Move)

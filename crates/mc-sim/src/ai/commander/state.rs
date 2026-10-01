@@ -412,6 +412,12 @@ pub(in crate::ai) struct CommanderState {
     /// The economy's reading and what it tells the builders (`economy.rs`).
     #[serde(default)]
     pub eco: super::economy::Eco,
+    /// The commander unit's health at the last think, and the tick until which it
+    /// keeps out of reach of what was shooting it (`king.rs`).
+    #[serde(default)]
+    pub king_health: Fx,
+    #[serde(default)]
+    pub king_fled: u32,
 }
 
 impl CommanderState {
@@ -469,6 +475,8 @@ impl CommanderState {
         h.write_i64(self.rally_back.0);
         h.write_u64(self.behind as u64);
         self.eco.hash(h);
+        h.write_i64(self.king_health.0);
+        h.write_u64(self.king_fled as u64);
         match self.rally {
             Some(r) => {
                 h.write_i64(r.x.0);

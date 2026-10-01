@@ -305,7 +305,10 @@ impl World {
                         .map(|r| ctx.profiles.get(units.blueprint[r]).mass.floor_int())
                         .sum()
                 };
-                let covered = our_aa * 2 >= air * 3 + 1500;
+                // Aircraft that outreach its ground anti-air are not covered by it.
+                let outranging = self.outranging_air(ctx.player, ctx.profiles).floor_int();
+                let covered =
+                    outranging < 1000 && our_aa * 2 >= (air - outranging).max(0) * 3 + 1500;
                 (b.air.max(b.space) * 2 / 3 + (air / 100).min(90) + (from_above / 50).min(80)
                     - 70 * covered as i32)
                     .max(0)
@@ -833,6 +836,31 @@ impl World {
             && held(&aa) < 2 + (above / 1500).floor_int() as usize
         {
             want(pick(&aa, 2, above > Fx::from_int(3000)));
+        }
+        // Aircraft that outreach its anti-air: the longest-reaching anti-air turret
+        // it can afford, one for each three thousand mass of them. The cheapest
+        // turret reached 640 m; corvettes shot from 1500.
+        let outranging = self.outranging_air(ctx.player, ctx.profiles);
+        if outranging >= Fx::from_int(1000) {
+            let budget = (income * Fx::from_int(240)).max(Fx::from_int(1500));
+            let longest = menu
+                .items
+                .iter()
+                .filter(|p| aa(p) && p.mass <= budget)
+                .max_by_key(|p| {
+                    (
+                        p.reach[super::profile::Target::Air as usize],
+                        p.mass,
+                        std::cmp::Reverse(p.id.0),
+                    )
+                })
+                .map(|p| p.id);
+            if let Some(id) = longest {
+                let have = held(&|p: &Profile| p.id == id);
+                if have < 1 + (outranging / 3000).floor_int() as usize {
+                    want(Some(id));
+                }
+            }
         }
         let air_def =
             stake(PlanKind::AirDefense).max(if b.air > 60 { Stake::Probe } else { Stake::Off });
