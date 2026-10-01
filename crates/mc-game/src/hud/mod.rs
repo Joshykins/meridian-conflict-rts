@@ -7,6 +7,7 @@
 //! battlefield) and returns what the player asked for as `HudAction`s. The HUD
 //! never sends commands itself.
 
+mod ai_mind;
 mod armament;
 mod build;
 mod builders;
@@ -580,6 +581,7 @@ impl Hud {
         // the profiler, then survival's card.
         let mut right_top =
             under_top + 2.0 * GAP + if self.minimap_hidden { 26.0 } else { MINIMAP };
+        let under_map = right_top;
         // F1 does not fold with the column: an issue seen through the free camera
         // gets marked from it. The panel rises to the corner, under any cinema bars.
         self.fold_end(ui, fold);
@@ -645,6 +647,15 @@ impl Hud {
             MINIMAP,
             h - EDGE - DECK_H - GAP,
         );
+        // An observer watching a Commander sees its mind under that, or beside the
+        // profiler's column when that fills the right side.
+        let (mind_right, mind_top) = if right_top > under_map && self.issues.column.h > 0.0 {
+            (self.issues.column.x - GAP, under_map)
+        } else {
+            let top = self.survival_card.map_or(right_top, |c| c.bottom() + GAP);
+            (w - EDGE, top)
+        };
+        self.ai_mind(ui, s, mind_right, mind_top, h - EDGE - DECK_H - GAP);
         self.fold_end(ui, fold);
         let fold = self.fold_begin(ui, free_camera::Part::Deck);
 

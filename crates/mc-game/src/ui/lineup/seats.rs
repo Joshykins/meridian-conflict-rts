@@ -14,7 +14,7 @@ use crate::setup::TEAM_COLORS;
 use crate::ui::race_picker::race_cell;
 use crate::ui::{id, ink, palette, rgb, teams, type_scale, ButtonKind, Id, Rect, Ui};
 use glam::Vec2;
-use mc_sim::{Difficulty, Doctrine};
+use mc_sim::{Brain, Difficulty, Doctrine};
 
 const DIFFICULTIES: [Difficulty; 3] = [Difficulty::Easy, Difficulty::Normal, Difficulty::Hard];
 /// A seat's Control list on one machine; a lobby's adds Open (for a person) first.
@@ -1163,9 +1163,9 @@ fn ai_tuning(ui: &mut Ui, seat: &mut Seat, area: Rect) {
     let key = seat.key as usize;
     let ai = &mut seat.ai;
     let gap = 14.0;
-    let w = (area.w - 24.0 - 2.0 * gap) / 3.0;
+    let w = (area.w - 24.0 - 3.0 * gap) / 4.0;
     let field = |k: f32| Rect::new(area.x + 12.0 + k * (w + gap), area.y + 30.0, w, 32.0);
-    for (k, label) in ["Doctrine", "Force Preference", "Adaptation"]
+    for (k, label) in ["Mind", "Doctrine", "Force Preference", "Adaptation"]
         .into_iter()
         .enumerate()
     {
@@ -1188,8 +1188,20 @@ fn ai_tuning(ui: &mut Ui, seat: &mut Seat, area: Rect) {
         .iter()
         .position(|d| *d == ai.doctrine)
         .unwrap_or(0);
+    // Which AI plays the seat: the planning Commander or the classic one.
+    const BRAINS: [Brain; 2] = [Brain::Commander, Brain::Classic];
+    let brain_at = BRAINS.iter().position(|b| *b == ai.brain).unwrap_or(0);
+    if let Some(pick) = ui.dropdown(
+        id("ai-brain", key),
+        field(0.0),
+        &["Commander", "Classic"],
+        brain_at,
+        true,
+    ) {
+        ai.brain = BRAINS[pick];
+    }
     let labels = DOCTRINES.map(doctrine_label);
-    if let Some(pick) = ui.dropdown(id("ai-doctrine", key), field(0.0), &labels, at, true) {
+    if let Some(pick) = ui.dropdown(id("ai-doctrine", key), field(1.0), &labels, at, true) {
         ai.doctrine = DOCTRINES[pick];
     }
     // A custom mix (from a saved config) shows as its nearest preset until changed.
@@ -1197,12 +1209,12 @@ fn ai_tuning(ui: &mut Ui, seat: &mut Seat, area: Rect) {
         .iter()
         .position(|w| *w == ai.domain_weights)
         .unwrap_or(0);
-    if let Some(pick) = ui.dropdown(id("ai-domain", key), field(1.0), &FORCE_LABELS, at, true) {
+    if let Some(pick) = ui.dropdown(id("ai-domain", key), field(2.0), &FORCE_LABELS, at, true) {
         ai.domain_weights = FORCE_PRESETS[pick];
     }
     let step = ui.stepper(
         id("ai-adaptation", key),
-        field(2.0),
+        field(3.0),
         &format!("{}%", ai.adaptation),
         rgb(palette::TEXT, 1.0),
         true,

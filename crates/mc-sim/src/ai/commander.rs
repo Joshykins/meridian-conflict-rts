@@ -7,6 +7,7 @@
 //! operation's orders as far as the side's attention goes.
 mod beliefs;
 mod matchup;
+pub(in crate::ai) mod mind;
 mod ops;
 mod ops_air_sea;
 mod ops_ground;

@@ -15,6 +15,7 @@ mod army;
 mod arrival;
 mod builders;
 mod commander;
+pub use commander::mind::{AiMind, MindNote, MindOp, MindPlan};
 mod danger;
 mod energy;
 mod groups;

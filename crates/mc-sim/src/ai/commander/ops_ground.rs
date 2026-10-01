@@ -300,7 +300,10 @@ impl World {
                         super::state::Stake::AllIn => Fx::ONE,
                         _ => Fx::ratio(13, 10),
                     };
-                    let seen = ctx.beliefs.army_at.is_some() || probe;
+                    // Not blind: their army has been seen, or their base lately with
+                    // none there to see.
+                    let seen =
+                        ctx.beliefs.army_at.is_some() || ctx.beliefs.base_unseen < 1200 || probe;
                     // And enough anti-air for the enemy's air and warships it believes
                     // in: a wave of tanks marched 22 km under corvettes and bombers
                     // and died without a shot.

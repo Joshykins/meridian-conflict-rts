@@ -50,6 +50,8 @@ pub struct PlayerStatus {
     pub forces: Forces,
     pub units_lost: u32,
     pub units_killed: u32,
+    /// What its AI is thinking, when a Commander plays it (the observer's overlay).
+    pub mind: Option<mc_sim::ai::AiMind>,
 }
 
 /// A side's standing units, for the observer's panel.
@@ -246,7 +248,8 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         players: s
             .players
             .iter()
-            .map(|p| PlayerStatus {
+            .enumerate()
+            .map(|(i, p)| PlayerStatus {
                 name: p.name.clone(),
                 team: p.team,
                 defeated: p.defeated,
@@ -271,6 +274,7 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 forces: Forces::default(),
                 units_lost: p.units_lost,
                 units_killed: p.units_killed,
+                mind: world.ai_mind(i as u8),
             })
             .collect(),
         phases: world.timings.phases.clone(),

@@ -113,15 +113,16 @@ impl World {
                 }
             }
         }
-        // Eyes on a cell now: it is fresh.
+        // Eyes on a cell now: it is fresh. Without fog every cell always is.
         let mask = self.team_mask(player);
         let tick = self.state.tick;
+        let fog = self.state.fog_enabled;
         let seen = &mut self.state.ai[player as usize].commander.seen;
         if seen.len() != n {
             *seen = vec![0; n];
         }
         for (i, s) in seen.iter_mut().enumerate() {
-            if self.fog.is_visible(m.centre(i), mask) {
+            if !fog || self.fog.is_visible(m.centre(i), mask) {
                 *s = tick;
             }
         }
