@@ -69,11 +69,14 @@
     // crosses land (`Hover`) and every Regency factory makes it. A housing on its back turns to
     // the work, then the fabricator arm pitches at it about its trunnion (`pivot`); the beam
     // leaves the violet emitter at the arm's tip (`emitter`). Model: `regency_engineer`
-    // (`models::regency::engineer`).
+    // (`models::regency::engineer`), the higher tiers drawn bigger with their own kit on it.
+    //
+    // Each lift bell casts red plasma under it (the model's `lifts`, renderer `lift_fx.rs`),
+    // which lights the ground (the lamp below, day and night).
     (
         key: "regency_t1_engineer",
         name: "Artificer",
-        role: "Engineer",
+        role: "Engineer", title: "Engineer",
         tech: 1,
         categories: ["Land", "Engineer"],
         health: 170,
@@ -84,8 +87,54 @@
         builder: (power: 5, range: 55, arm: (turn: 200, emitter: (2.15, 0, 2.05), pivot: (0.35, 0, 2.05)), builds: [
             "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_wall",
         ]),
+        // Once the side has tech 2 it can build its own next tier onto itself, where it stands.
+        upgrades_to: "regency_t2_engineer",
         mesh: "regency_engineer", icon: Engineer,
+        lights: [(kind: Point, at: (-0.3, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 40, range: 9, night_only: false)],
         // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (moving: "aster_hover"),
+    ),
+    // Tech 2: bigger, its arm's emitter between twin violet prongs, a feed drum on the
+    // housing's back, a fourth plate in each sponson's course and a third lift collar under
+    // each sponson's trailing point. Drawn at 7/6 the tech 1's size.
+    (
+        key: "regency_t2_engineer",
+        name: "Artificer II",
+        role: "Field Engineer", title: "Engineer",
+        tech: 2,
+        categories: ["Land", "Engineer"],
+        health: 460,
+        cost: (mass: 210, energy: 1260, time: 940),
+        radius: 4.2, height: 3.267,
+        vision: 200,
+        motion: (layer: Hover, size: 0, speed: 27, accel: 28, turn: 160),
+        builder: (power: 30, range: 60, arm: (turn: 200, emitter: (2.508, 0, 2.392), pivot: (0.408, 0, 2.392)), builds: [
+            "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_wall", "regency_t2_power", "regency_t2_point_defense",
+        ]),
+        upgrades_to: "regency_t3_engineer",
+        mesh: "regency_engineer", icon: Engineer,
+        lights: [(kind: Point, at: (-0.35, 0, 0.35), color: (1.0, 0.14, 0.06), intensity: 60, range: 11, night_only: false)],
+        sounds: (moving: "aster_hover"),
+    ),
+    // Tech 3: all of tech 2's, and a ring of violet emitter fins round the nozzle, a chin ram
+    // under the nose with a third pair of optics, an armoured skirt down each sponson and two
+    // lifts under the body for the one. Drawn at 4/3 the tech 1's size.
+    (
+        key: "regency_t3_engineer",
+        name: "Artificer III",
+        role: "Combat Engineer", title: "Engineer",
+        tech: 3,
+        categories: ["Land", "Engineer"],
+        health: 980,
+        cost: (mass: 840, energy: 6700, time: 3300),
+        radius: 4.8, height: 3.733,
+        vision: 220,
+        motion: (layer: Hover, size: 1, speed: 26, accel: 26, turn: 150),
+        builder: (power: 150, range: 70, arm: (turn: 200, emitter: (2.867, 0, 2.733), pivot: (0.467, 0, 2.733)), builds: [
+            "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_wall", "regency_t2_power", "regency_t2_point_defense", "regency_t3_power", "regency_t3_point_defense",
+        ]),
+        mesh: "regency_engineer", icon: Engineer,
+        lights: [(kind: Point, at: (-0.4, 0, 0.4), color: (1.0, 0.14, 0.06), intensity: 90, range: 13, night_only: false)],
         sounds: (moving: "aster_hover"),
     ),
 ]

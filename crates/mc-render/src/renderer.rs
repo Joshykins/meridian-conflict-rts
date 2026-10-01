@@ -63,6 +63,7 @@ mod impact_craters;
 mod impact_fx;
 mod laser_fx;
 mod launch_fx;
+mod lift_fx;
 mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
@@ -848,6 +849,8 @@ pub struct Renderer {
     craters: craters::Craters,
     /// Hot air shimmering over running engines' exhausts (renderer/heat_haze.rs, screen set 8).
     heat_haze: heat_haze::HeatHaze,
+    /// Red plasma under the bells of craft on gravity lift (renderer/lift_fx.rs).
+    lift_fx: lift_fx::LiftFx,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
     capital_fx: capital_fx::CapitalFx,
     /// Capital ships' warp jumps: charge, flash, streak, rift (renderer/warp_fx.rs).
@@ -1272,6 +1275,8 @@ impl Renderer {
         let mut coil_models: Vec<bool> = Vec::new();
         // Each model slot's exhaust ports (`heat_haze`).
         let mut exhaust_models: Vec<Vec<models::Exhaust>> = Vec::new();
+        // Each model slot's plasma lift bells (`lift_fx`).
+        let mut lift_models: Vec<Vec<models::Lift>> = Vec::new();
         // Per blueprint: its ground stakes' scale, if it plants any (`stake_fx`).
         let mut stake_scales: Vec<Option<f32>> = Vec::new();
         let mut model_draws: Vec<[u32; 2]> = Vec::new();
@@ -1299,6 +1304,7 @@ impl Renderer {
             let (model, _) = &model_list[at];
             model_draws.push([first_slot[at], model.lods.len() as u32]);
             exhaust_models.push(model.exhausts.clone());
+            lift_models.push(model.lifts.clone());
             stake_scales.push(models::stakes::stake_scale(model));
             coil_models.push(model.lods[0].vertices.iter().any(|v| {
                 (models::pattern::COIL..=models::pattern::COIL_TURN_BACK)
@@ -2355,6 +2361,7 @@ impl Renderer {
             nuke_fx: nuke_fx::NukeFx::default(),
             craters,
             heat_haze,
+            lift_fx: lift_fx::LiftFx::new(lift_models),
             capital_fx: capital_fx::CapitalFx::default(),
             warp_fx: warp_fx::WarpFx::default(),
             nodes,

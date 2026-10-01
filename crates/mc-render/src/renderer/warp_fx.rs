@@ -655,7 +655,7 @@ impl Renderer {
 
     /// One warp puff (`warp_puffs.wgsl`): `rgb` its colour and brightness, `torn` how
     /// torn a dampened jump makes it.
-    fn push_warp(
+    pub(super) fn push_warp(
         &mut self,
         kind: f32,
         pos: Vec3,

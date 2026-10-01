@@ -1,6 +1,7 @@
 //! What units do to the ground they cross: the track marks and dust of tracked vehicles,
 //! a walker's footprints (`footfalls.rs`), the downwash a hovercraft keeps under itself,
-//! and the wash of a hovering aircraft's lift.
+//! the red plasma under a craft on gravity lift (`lift_fx.rs`), and the wash of a hovering
+//! aircraft's lift.
 
 use super::{water_fx, Renderer, TrackMark, PUFF_DUST, STATE_RADAR, TRACK_MARK_LIFE};
 use crate::camera::Camera;
@@ -26,6 +27,7 @@ impl Renderer {
                 as u32)
                 << 8;
         let previous = (self.effect_origin, self.effect_settings);
+        self.lift_fx.new_tick();
         for u in units {
             self.effect_origin = Some(Vec3::from(u.pos));
             self.effect_settings = self
@@ -48,6 +50,14 @@ impl Renderer {
                 && u.pos[2] >= water
             {
                 self.hover_downwash(u, time, moving);
+            }
+            if dust
+                && close
+                && u.build >= 1.0
+                && u.owner_flags & hidden_aircraft == 0
+                && self.lift_fx.lifts(u.blueprint)
+            {
+                self.plasma_lift(u, time, moving);
             }
             if dust && close && u.build >= 1.0 && u.owner_flags & hidden_aircraft == 0 {
                 let bp = self

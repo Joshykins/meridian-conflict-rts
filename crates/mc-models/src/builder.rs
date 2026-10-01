@@ -124,6 +124,7 @@ pub struct MeshBuilder {
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
     exhausts: Vec<super::Exhaust>,
+    lifts: Vec<super::Lift>,
     vtol: Option<super::Vtol>,
     dust_line: Option<f32>,
     /// The pattern byte leaf cards carry: which leaf atlas the shader samples
@@ -185,6 +186,7 @@ impl MeshBuilder {
             pit: None,
             excavation: None,
             exhausts: Vec::new(),
+            lifts: Vec::new(),
             vtol: None,
             dust_line: None,
             leaf_atlas: pattern::NONE,
@@ -468,6 +470,22 @@ impl MeshBuilder {
     /// The exhaust ports marked so far (`add_exhaust`).
     pub fn exhausts(&self) -> Vec<super::Exhaust> {
         self.exhausts.clone()
+    }
+
+    /// Marks a plasma lift bell (current frame): the middle of its mouth, where the lift
+    /// leaves it downward, and the mouth's radius. Red plasma crackles under it while the
+    /// craft is up (`Model::lifts`, renderer `lift_fx.rs`).
+    pub fn add_lift(&mut self, at: Vec3, radius: f32) {
+        let scale = self.transform.transform_vector3(Vec3::X).length();
+        self.lifts.push(super::Lift {
+            at: self.transform.transform_point3(at).to_array(),
+            radius: radius * scale,
+        });
+    }
+
+    /// The lift bells marked so far (`add_lift`).
+    pub fn lifts(&self) -> Vec<super::Lift> {
+        self.lifts.clone()
     }
 
     /// Declares the model's tilting VTOL pods (`Model::vtol`), in the current frame.

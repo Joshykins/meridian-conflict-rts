@@ -13,7 +13,8 @@
 // - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
 // - Palisade: slow to build, very hard to cut.
 //
-// Their factories turn out the Regency's own Artificer and, until the Regency has fighting units
+// Their factories turn out the Regency's own Artificer (its tech 2 and 3 from the factories of
+// that tier) and, until the Regency has fighting units
 // of their own, the stand-in roster's (ARC) units of their tier, poured by nanite streams
 // from fabricator heads whose mounts are in `mc_sim::print_heads`. The land and air
 // factories upgrade in place to tech 3, like ARC's; the tech 3 land factory also makes the
@@ -51,7 +52,7 @@
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
-            "regency_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
+            "regency_t1_engineer", "regency_t2_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
         ]),
         upgrades_to: "regency_t3_land_factory",
         mesh: "regency_brood", icon: Factory,
@@ -71,7 +72,7 @@
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "regency_t3_scorpion",
+            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "regency_t3_scorpion",
         ]),
         mesh: "regency_brood", icon: Factory,
         sounds: (death: "blast_large"),
@@ -107,7 +108,7 @@
         vision: 200,
         // No reclaim carrier: the Regency reclaim nothing.
         builder: (power: 120, range: 0, builds: [
-            "regency_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+            "regency_t1_engineer", "regency_t2_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
         ]),
         upgrades_to: "regency_t3_air_factory",
         mesh: "regency_hatchery", icon: Factory,
@@ -126,7 +127,7 @@
         radius: 46, height: 38, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
+            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
         ]),
         mesh: "regency_hatchery", icon: Factory,
         sounds: (death: "blast_large"),

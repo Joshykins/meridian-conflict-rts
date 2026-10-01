@@ -327,6 +327,8 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("culverin", 30.0, 27.0, 4, 6, &[[74.0, 0.0, 18.0]]),
     // The Regency (data/factions/regency/units): their engineer, scout and tech 1 structures.
     unit("regency_engineer", 3.6, 2.8, 1, &[]),
+    unit("regency_engineer", 4.2, 3.267, 2, &[]),
+    unit("regency_engineer", 4.8, 3.733, 3, &[]),
     unit("regency_scout", 3.8, 4.0, 1, &[[1.6, 0.0, 2.3]]),
     structure("regency_brood", 46.0, 22.0, 1, 8, &[]),
     structure("regency_brood", 46.0, 22.0, 2, 8, &[]),

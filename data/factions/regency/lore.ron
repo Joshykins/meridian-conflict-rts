@@ -18,6 +18,14 @@
         lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},
     ),
+    "regency_t2_engineer": (
+        lore: "A heavier lift craft for field work: twin emitters on its arm and a feed drum on its back build the larger machines of a holding.",
+        weapons: {},
+    ),
+    "regency_t3_engineer": (
+        lore: "The Regency's heaviest builder craft, rammed and skirted for the front, its arm crowned with a ring of emitters; it raises their greatest works.",
+        weapons: {},
+    ),
     "regency_t1_scout": (
         lore: "A fast six-legged walker that carries a radar array on a mast over its back; it goes ahead of everything else.",
         weapons: {

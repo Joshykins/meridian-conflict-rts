@@ -548,6 +548,9 @@ pub struct Model {
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).
     pub exhausts: Vec<Exhaust>,
+    /// Plasma lift bells that cast red plasma under the craft (`MeshBuilder::add_lift`,
+    /// renderer `lift_fx.rs`).
+    pub lifts: Vec<Lift>,
     /// A VTOL's tilting engine pods (`part::VTOL_FRONT`, `VTOL_REAR`).
     pub vtol: Option<Vtol>,
 }
@@ -612,6 +615,17 @@ pub struct Exhaust {
     pub at: [f32; 3],
     /// Which way the gas leaves it (unit length).
     pub toward: [f32; 3],
+    /// The mouth's radius.
+    pub radius: f32,
+}
+
+/// A plasma lift bell under a hovercraft: red plasma crackles from its mouth to the ground
+/// and trails behind as the craft moves (renderer `lift_fx.rs`). Model space, at the
+/// blueprint's size.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Lift {
+    /// The middle of the bell's mouth.
+    pub at: [f32; 3],
     /// The mouth's radius.
     pub radius: f32,
 }

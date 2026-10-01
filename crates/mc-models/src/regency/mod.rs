@@ -45,8 +45,8 @@ pub(super) const MODELS: &[ModelDef] = &[
         scorpion::HEIGHT,
         scorpion::scorpion,
     ),
-    // The engineer: a craft on gravity lift, its fabricator arm on a turning housing
-    // (`engineer`).
+    // The engineer: a craft on gravity lift, its fabricator arm on a turning housing, more
+    // kit on it at each tier (`engineer`).
     ModelDef::new("regency_engineer", 3.6, 2.8, engineer::engineer),
     // The land scout: a six-legged walker, a radar array on a mast over its back
     // (`scout`).
@@ -114,7 +114,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_heart_2" => 6000,
         "regency_heart_3" => 9000,
         "regency_eye" => 7000,
-        "regency_engineer" | "regency_scout" => 3000,
+        "regency_scout" => 3000,
+        // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
+        "regency_engineer" => 3600,
         // Walls come by the dozen.
         "regency_thornwall" => 1500,
         "regency_pinch_cannon" => 5000,
