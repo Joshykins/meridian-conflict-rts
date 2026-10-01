@@ -356,3 +356,29 @@ fn a_carrier_told_to_reclaim_a_wreck_stops_over_it() {
         "carrier flew on instead of stopping over the wreck: at {at:?}"
     );
 }
+
+/// Replay 20261001-172856 mark 1: an Osprey given a circle of wrecks its side had seen
+/// but had no eyes on any more ended the order where it stood. The player is shown
+/// wrecks anywhere explored, so the carrier goes for those too.
+#[test]
+fn a_carrier_given_a_circle_out_of_sight_flies_to_the_wrecks_it_knows_of() {
+    let mut w = world();
+    w.state.fog_enabled = true;
+    let osprey = carrier(&mut w, 300, 300);
+    let centre = FxVec2::from_ints(1700, 1700);
+    wrecks(&mut w, 1700, 1700, 3);
+    // Seen once, then left behind under the fog.
+    let mask = w.team_mask(0);
+    w.fog.reveal(centre, Fx::from_int(300), Fx::ZERO, mask);
+    w.tick(&[]).unwrap();
+    assert!(w.fog.is_explored(centre, mask) && !w.fog.is_detected(centre, mask));
+    w.tick(&[cmd(Command::ReclaimArea {
+        units: vec![osprey],
+        pos: centre,
+        radius: Fx::from_int(200),
+        queue: false,
+    })])
+    .unwrap();
+    run_until_idle(&mut w, &[osprey], 6000);
+    assert!(wrecks_left(&w).is_empty(), "left: {:?}", wrecks_left(&w));
+}

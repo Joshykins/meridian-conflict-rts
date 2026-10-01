@@ -54,6 +54,19 @@ pub const BEAM_RELAY: u32 = 3;
 // retired: 7 (a scavenger tower's dim sweep beam)
 
 impl World {
+    /// Whether `player` knows of wreck `w`: a settled wreck is salvage to plan around, so
+    /// it counts anywhere the player's team has explored, not only in sight, and the
+    /// map's own wreckage from the start. What the player is shown (`push_wrecks`) and
+    /// what a drone carrier goes for (`carrier_wants`) follow this one rule.
+    pub(crate) fn wreck_known(&self, w: usize, player: u8) -> bool {
+        let s = &self.state;
+        !s.fog_enabled
+            || s.wrecks.from_map[w]
+            || self
+                .fog
+                .is_explored(s.wrecks.pos[w], self.team_mask(player))
+    }
+
     /// This tick's reclaim beams. Left out when the viewer can see neither end.
     #[expect(
         clippy::disallowed_methods,

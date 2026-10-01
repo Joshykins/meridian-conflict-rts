@@ -134,20 +134,13 @@ fn sections(
 }
 
 impl World {
-    /// Settled wrecks. They are salvage to plan around: they show under the fog anywhere
-    /// the viewer's team has explored, not only in sight, and the map's own wreckage
-    /// shows from the start, like the map.
+    /// Settled wrecks, shown wherever the viewer knows of them (`wreck_known`).
     pub(super) fn push_wrecks(&self, viewer: Option<u8>, units: &mut Vec<UnitInstance>) {
         let s = &self.state;
         let mut extra = 0;
         for row in s.wrecks.slots.iter() {
-            if let (Some(v), true) = (
-                viewer,
-                s.fog_enabled && s.wrecks.from_map.get(row) != Some(&true),
-            ) {
-                if !self.fog.is_explored(s.wrecks.pos[row], self.team_mask(v)) {
-                    continue;
-                }
+            if viewer.is_some_and(|v| !self.wreck_known(row, v)) {
+                continue;
             }
             let at = s.wrecks.pos[row];
             let pos = at.extend(s.wrecks.z[row]).to_f32();

@@ -224,7 +224,7 @@ impl World {
     }
 
     /// Whether carrier `row` is after wreck `w` at all: one with mass left that its side
-    /// has seen and, while it is clearing a circle (`ReclaimArea`), inside that circle.
+    /// knows of (`wreck_known`, as the player is shown it) and, while it is clearing a circle (`ReclaimArea`), inside that circle.
     pub(crate) fn carrier_wants(&self, row: usize, w: usize) -> bool {
         let units = &self.state.units;
         let wrecks = &self.state.wrecks;
@@ -236,8 +236,7 @@ impl World {
             .filter(|o| o.kind == OrderKind::ReclaimArea && o.radius > Fx::ZERO);
         circle.is_none_or(|o| at.distance(o.pos) <= o.radius)
             && wrecks.mass[w] > Fx::ZERO
-            && (!self.state.fog_enabled
-                || self.fog.is_detected(at, self.team_mask(units.owner[row])))
+            && self.wreck_known(w, units.owner[row])
     }
 
     /// Where drone `slot` of `parent` sits when home (`drone_sockets`): on a pylon, a
