@@ -228,9 +228,9 @@
         mesh: "regency_taproot", icon: Extractor,
     ),
     // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what
-    // a Reactor gives, but a breached field frees the star to swell and go supernova, all
+    // a Reactor gives, but a breached field frees the star to flare and go supernova, all
     // light and no blast, so it can be packed tight. Tougher, dearer. The death sound keeps
-    // time with the star's swell (renderer supernova_fx.rs): tech 3's at size 1, the
+    // time with the star's flare (renderer supernova_fx.rs): tech 3's at size 1, the
     // smaller stars `like` it.
     (
         key: "regency_t1_power",

@@ -17,8 +17,8 @@
 //! crackling in the prism's pinks, while the plant runs. The mesh carries only a small
 //! white-hot heart under it (`material::GLOW_PRISM`), for the portraits and far off.
 //! Each ring tumbles about an axis of its own (`MeshBuilder::with_orbit`) round the star.
-//! Nothing on it can go off: a breached field frees the star, which swells, falls in on
-//! itself and goes supernova (renderer `supernova_fx.rs`), all light and no harm (no
+//! Nothing on it can go off: a breached field frees the star, which flares and goes
+//! supernova (renderer `supernova_fx.rs`), all light and no harm (no
 //! Regency power generator has a death blast).
 
 use std::f32::consts::{PI, TAU};

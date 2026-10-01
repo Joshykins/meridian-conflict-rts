@@ -692,98 +692,44 @@
         // ---- the Regency power generators' supernova ----
         // A Regency power generator's star going supernova (renderer supernova_fx.rs), written for the
         // crown's star: its sizes keep time with the picture, so the smaller stars are
-        // `like` it at their own size (structures.ron). Four acts. The cage snapping. The
-        // star swelling for 1.9 s: its plasma roaring up, a growl under it, a glassy
-        // shimmer swelling in, the air drawn in toward it and lightning cracking off it,
-        // ever more often. Then it falls in on itself: everything sucked down into one
-        // falling note and a breath of nothing. The supernova at 2.2 s: a crack and a
-        // deep boom, the shell tearing out past you wide in both ears, a low chord of the
-        // prism blooming in and sinking away under thunder rolling off. Last, the remnant
-        // beating: soft clicks with a thump, in time with its pulse on screen, fading.
+        // `like` it at their own size (structures.ron). One explosion, and no thunder: it is
+        // light, not a blast. The cage snapping, and for 0.3 s the freed star flaring: a
+        // rough growl and a rush climbing into it. The supernova at 0.3 s: a glassy tearing
+        // crack over a deep soft whump, the shell's plasma hissing out past you wide in both
+        // ears, a sizzle of it all round. Then the nebula lingering: the prism's chord
+        // swelling in and sinking slowly away over a low wash, a few last crackles, gone.
         "regency_supernova": (
-            length: 12.0, peak: 0.85, room: 0.9,
+            length: 8.0, peak: 0.85, room: 0.9,
             layers: [
-                // The cage giving way: a crack and a struck clang of its armour.
-                Burst(low: 400, high: 2400, attack: 0.0003, decay: 0.012, gain: 6),
-                Fm(from: 176, to: 140, glide: 0.3, ratio: 1.41, index: 1.1, fade: 0.15, attack: 0.002, decay: 0.3, gain: 0.35),
-                Tone(from: 130, to: 50, glide: 0.12, attack: 0.002, decay: 0.15, gain: 0.9),
-                // The star swelling: a deep growl leaning up a little, held rough.
-                Fm(at: 0.05, from: 46, to: 66, glide: 1.8, ratio: 0.5, index: 2.0, fade: 1000, attack: 1.8, decay: 0.1, gain: 0.55),
-                Fm(at: 0.05, from: 92, to: 128, glide: 1.8, ratio: 0.5, index: 1.4, fade: 1000, attack: 1.8, decay: 0.1, gain: 0.25, pan: 0.1),
-                // The prism's shimmer swelling in: never struck, cut off as it falls in.
-                Stack(at: 0.2, from: 520, to: 560, glide: 1.6, attack: 1.65, decay: 0.08, gain: 0.1, detune: 1.006, width: 0.6, partials: [(1, 1), (1.5, 0.5), (2.76, 0.3), (4.1, 0.15)]),
-                // Lightning cracking off it, irregular and closer together as it swells.
-                Burst(at: 0.31, low: 900, high: 3500, attack: 0.0004, decay: 0.008, gain: 1.2, pan: -0.4),
-                Burst(at: 0.74, low: 900, high: 3500, attack: 0.0004, decay: 0.01, gain: 1.5, pan: 0.35),
-                Burst(at: 1.02, low: 800, high: 3500, attack: 0.0004, decay: 0.01, gain: 1.8, pan: -0.2),
-                Burst(at: 1.27, low: 900, high: 3500, attack: 0.0004, decay: 0.012, gain: 2.0, pan: 0.5),
-                Burst(at: 1.41, low: 800, high: 3500, attack: 0.0004, decay: 0.01, gain: 2.2, pan: -0.5),
-                Burst(at: 1.56, low: 900, high: 3500, attack: 0.0004, decay: 0.012, gain: 2.5, pan: 0.15),
-                Burst(at: 1.63, low: 800, high: 3500, attack: 0.0004, decay: 0.01, gain: 2.6, pan: -0.3),
-                Burst(at: 1.74, low: 900, high: 3500, attack: 0.0004, decay: 0.012, gain: 2.8, pan: 0.4),
-                Burst(at: 1.8, low: 800, high: 3500, attack: 0.0004, decay: 0.01, gain: 2.8, pan: -0.1),
+                // The cage giving way: a crack and a short clang of its armour.
+                Burst(low: 500, high: 3200, attack: 0.0003, decay: 0.01, gain: 5),
+                Fm(from: 196, to: 160, glide: 0.2, ratio: 1.41, index: 1.0, fade: 0.1, attack: 0.002, decay: 0.16, gain: 0.3),
+                // The freed star flaring: a rough growl leaning up and a rush climbing into the bang.
+                Fm(at: 0.02, from: 70, to: 120, glide: 0.28, ratio: 0.5, index: 2.2, fade: 1000, attack: 0.26, decay: 0.03, gain: 0.5),
+                Sweep(at: 0.02, from: 700, to: 4200, glide: 0.28, q: 0.8, attack: 0.26, decay: 0.03, gain: 0.5),
+                Roll(at: 0.02, from: 1800, to: 3200, glide: 0.28, attack: 0.25, decay: 0.04, gain: 0.25, swell: 100, depth: 0.9, seed: 8811),
+                // The supernova: a glassy tearing crack over a deep, soft whump.
+                Burst(at: 0.3, low: 1200, high: 6500, attack: 0.0004, decay: 0.03, gain: 6),
+                Burst(at: 0.3, low: 50, high: 420, attack: 0.006, decay: 0.3, gain: 12),
+                Tone(at: 0.3, from: 120, to: 42, glide: 0.5, attack: 0.008, decay: 0.7, gain: 1.8),
+                Fm(at: 0.3, from: 160, to: 55, glide: 0.6, ratio: 0.5, index: 1.6, fade: 0.6, attack: 0.004, decay: 0.6, gain: 0.7),
+                Tone(at: 0.32, from: 52, to: 34, glide: 1.5, attack: 0.15, decay: 1.6, gain: 1.1),
                 Drive(1.4),
-                // Its plasma boiling louder and brighter.
-                Roll(at: 0.05, from: 220, to: 1500, glide: 1.8, attack: 1.8, decay: 0.12, gain: 0.7, swell: 9, depth: 0.6, seed: 8801),
-                // The arcs' fizz under it.
-                Roll(at: 0.3, from: 2600, to: 3400, glide: 1.5, attack: 1.55, decay: 0.08, gain: 0.12, swell: 40, depth: 0.9, seed: 8802),
-                // The air drawn in toward it.
-                Sweep(at: 0.05, from: 3200, to: 500, glide: 1.85, q: 0.7, attack: 1.8, decay: 0.07, gain: 0.45),
-                // Falling in: one note sucked down, and the air with it.
-                Tone(at: 1.87, from: 420, to: 38, glide: 0.3, attack: 0.008, decay: 0.12, gain: 1.3),
-                Fm(at: 1.87, from: 210, to: 30, glide: 0.3, ratio: 0.5, index: 1.5, fade: 0.2, attack: 0.008, decay: 0.12, gain: 0.5),
-                Sweep(at: 1.87, from: 2400, to: 160, glide: 0.28, q: 0.8, attack: 0.01, decay: 0.1, gain: 0.5),
-                // The supernova: a crack, and everything at once, low.
-                Burst(at: 2.2, low: 300, high: 2600, attack: 0.0003, decay: 0.02, gain: 12),
-                Burst(at: 2.2, low: 60, high: 600, attack: 0.001, decay: 0.18, gain: 16),
-                Burst(at: 2.202, low: 35, high: 260, attack: 0.004, decay: 0.5, gain: 14),
-                Tone(at: 2.2, from: 230, to: 55, glide: 0.12, attack: 0.001, decay: 0.25, gain: 2.0),
-                Tone(at: 2.2, from: 140, to: 36, glide: 0.4, attack: 0.002, decay: 0.8, gain: 2.4),
-                Tone(at: 2.21, from: 80, to: 30, glide: 1.2, attack: 0.006, decay: 1.6, gain: 2.0),
-                Fm(at: 2.2, from: 110, to: 40, glide: 0.6, ratio: 0.5, index: 1.8, fade: 0.5, attack: 0.002, decay: 0.7, gain: 0.8),
-                Drive(1.6),
-                // The prism's chord blooming in after the boom and sinking away: swelled, never struck.
-                Stack(at: 2.3, from: 330, to: 296, glide: 4.0, attack: 0.7, decay: 1.6, gain: 0.14, detune: 1.007, width: 0.8, partials: [(1, 1), (1.5, 0.55), (2, 0.35), (3, 0.18), (4.02, 0.1)]),
-                Stack(at: 2.45, from: 220, to: 197, glide: 4.0, attack: 0.8, decay: 1.8, gain: 0.12, detune: 1.005, width: 0.7, partials: [(1, 1), (2, 0.4), (3, 0.2), (5.04, 0.08)]),
-                // The shell tearing out past: a wide rush falling away, one in each ear.
-                Sweep(at: 2.21, from: 4200, to: 260, glide: 3.0, q: 0.6, attack: 0.02, decay: 1.4, gain: 1.0, pan: -0.55, seed: 8803),
-                Sweep(at: 2.26, from: 3800, to: 240, glide: 3.2, q: 0.6, attack: 0.03, decay: 1.5, gain: 1.0, pan: 0.55, seed: 8804),
-                // Thunder rolling off, and the ground answering.
-                Roll(at: 2.25, from: 320, to: 85, glide: 4.0, attack: 0.15, decay: 2.8, gain: 0.55, swell: 1.3, depth: 0.75, seed: 8805),
-                Roll(at: 2.6, from: 190, to: 70, glide: 6.0, attack: 0.8, decay: 3.5, gain: 0.45, swell: 0.8, depth: 0.85, pan: -0.45, seed: 8806),
-                Roll(at: 2.8, from: 170, to: 66, glide: 6.0, attack: 1.0, decay: 3.8, gain: 0.45, swell: 0.7, depth: 0.85, pan: 0.45, seed: 8807),
-                Burst(at: 3.3, low: 40, high: 320, attack: 0.004, decay: 0.3, gain: 6, pan: -0.3),
-                Tone(at: 3.3, from: 100, to: 30, glide: 0.6, attack: 0.004, decay: 0.9, gain: 1.3, pan: -0.3),
-                // The last of the lightning crackling in the remnant.
-                Roll(at: 2.4, from: 3000, to: 2200, glide: 2.0, attack: 0.1, decay: 1.2, gain: 0.08, swell: 35, depth: 0.9, seed: 8808),
-                Burst(at: 2.62, low: 900, high: 3500, attack: 0.0004, decay: 0.01, gain: 1.4, pan: 0.45),
-                Burst(at: 3.07, low: 900, high: 3500, attack: 0.0004, decay: 0.01, gain: 1.0, pan: -0.5),
-                Burst(at: 3.71, low: 900, high: 3500, attack: 0.0004, decay: 0.01, gain: 0.7, pan: 0.2),
-                // The remnant beating, 2.4 times a second from the bang, as it does on screen.
-                Burst(at: 3.033, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 1.8, pan: -0.15),
-                Tone(at: 3.033, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.57, pan: -0.15),
-                Burst(at: 3.450, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 1.61, pan: 0.15),
-                Tone(at: 3.450, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.51, pan: 0.15),
-                Burst(at: 3.867, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 1.43, pan: -0.15),
-                Tone(at: 3.867, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.45, pan: -0.15),
-                Burst(at: 4.283, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 1.25, pan: 0.15),
-                Tone(at: 4.283, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.4, pan: 0.15),
-                Burst(at: 4.700, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 1.1, pan: -0.15),
-                Tone(at: 4.700, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.35, pan: -0.15),
-                Burst(at: 5.117, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 0.95, pan: 0.15),
-                Tone(at: 5.117, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.3, pan: 0.15),
-                Burst(at: 5.533, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 0.81, pan: -0.15),
-                Tone(at: 5.533, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.26, pan: -0.15),
-                Burst(at: 5.950, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 0.68, pan: 0.15),
-                Tone(at: 5.950, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.22, pan: 0.15),
-                Burst(at: 6.367, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 0.57, pan: -0.15),
-                Tone(at: 6.367, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.18, pan: -0.15),
-                Burst(at: 6.783, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 0.48, pan: 0.15),
-                Tone(at: 6.783, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.15, pan: 0.15),
-                Burst(at: 7.200, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 0.4, pan: -0.15),
-                Tone(at: 7.200, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.13, pan: -0.15),
-                Burst(at: 7.617, low: 220, high: 1400, attack: 0.001, decay: 0.012, gain: 0.35, pan: 0.15),
-                Tone(at: 7.617, from: 150, to: 84, glide: 0.05, attack: 0.003, decay: 0.07, gain: 0.11, pan: 0.15),
+                // The shell's plasma hissing out past: a wide rush falling away, one in each ear.
+                Sweep(at: 0.31, from: 6000, to: 500, glide: 2.4, q: 0.6, attack: 0.02, decay: 1.3, gain: 0.9, pan: -0.55, seed: 8812),
+                Sweep(at: 0.35, from: 5400, to: 460, glide: 2.6, q: 0.6, attack: 0.03, decay: 1.4, gain: 0.9, pan: 0.55, seed: 8813),
+                // Its sizzle all round, thinning out.
+                Roll(at: 0.32, from: 3600, to: 2400, glide: 2.0, attack: 0.05, decay: 1.4, gain: 0.22, swell: 100, depth: 0.9, pan: -0.3, seed: 8814),
+                Roll(at: 0.36, from: 3200, to: 2200, glide: 2.0, attack: 0.05, decay: 1.5, gain: 0.22, swell: 95, depth: 0.9, pan: 0.3, seed: 8815),
+                // The nebula: the prism's chord swelling in, never struck, sinking slowly away.
+                Stack(at: 0.4, from: 440, to: 392, glide: 4.0, attack: 0.6, decay: 1.8, gain: 0.13, detune: 1.006, width: 0.8, partials: [(1, 1), (1.5, 0.55), (2, 0.35), (3, 0.18)]),
+                Stack(at: 0.55, from: 294, to: 262, glide: 4.0, attack: 0.8, decay: 2.0, gain: 0.12, detune: 1.005, width: 0.7, partials: [(1, 1), (2, 0.4), (3, 0.2), (5.04, 0.08)]),
+                // A low wash under it, breathing out.
+                Roll(at: 0.5, from: 420, to: 160, glide: 4.0, attack: 0.4, decay: 2.0, gain: 0.3, swell: 2.5, depth: 0.6, seed: 8816),
+                // The last crackles in the remnant.
+                Burst(at: 1.1, low: 1200, high: 4500, attack: 0.0004, decay: 0.008, gain: 1.2, pan: 0.45),
+                Burst(at: 1.7, low: 1200, high: 4500, attack: 0.0004, decay: 0.008, gain: 0.9, pan: -0.4),
+                Burst(at: 2.5, low: 1200, high: 4500, attack: 0.0004, decay: 0.008, gain: 0.6, pan: 0.2),
             ],
         ),
         "regency_supernova_mid": (like: "regency_supernova", size: 0.693, peak: 0.75),

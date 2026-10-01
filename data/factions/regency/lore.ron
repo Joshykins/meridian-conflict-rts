@@ -77,7 +77,7 @@
         weapons: {},
     ),
     "regency_t1_power": (
-        lore: "Turning gravity rings squeeze plasma to the pressure inside a star until it fuses. Breach the field and the freed star swells, falls in on itself and goes supernova: a sight across the field, and harmless to all of it.",
+        lore: "Turning gravity rings squeeze plasma to the pressure inside a star until it fuses. Breach the field and the freed star flares and goes supernova: a sight across the field, and harmless to all of it.",
         weapons: {},
     ),
     "regency_t2_power": (

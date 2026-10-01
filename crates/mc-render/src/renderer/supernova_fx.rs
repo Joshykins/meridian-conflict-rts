@@ -1,19 +1,19 @@
 //! A Regency power generator's star going supernova when its field is breached (`star_core_fx.rs`). It
 //! does no harm (the sim has no blast for it: the Regency's trade for tough, packable
-//! power), but it is the biggest light a plant makes. In three acts, all of it sized by
+//! power), but it is the biggest light a plant makes. One explosion, all of it sized by
 //! the star, the tech 3 crown's being the reference:
 //!
-//! - **Swell**: the cage breaks (sparks and plates, no fireball: nothing in it burns),
-//!   and freed of it the star swells to several times its size, shuddering,
-//!   brightening, lightning lashing off it ever more often.
-//! - **Collapse**: in the last moment it falls in on itself to a white point.
-//! - **Supernova**: a white flash and dust driven out across the ground, then a shell of
-//!   plasma tearing outward in the prism's pinks (plasma_puffs.wgsl `supernova`), a
-//!   second slower one inside it, a bright ring thrown out round its waist, a jet up
-//!   from its pole and globs of plasma flung off; the light floods the ground rose
-//!   and white. What is left is a small pulsing remnant that beats and fades.
+//! - **Break**: the cage gives way (sparks and plates, no fireball: nothing in it burns)
+//!   and the freed star flares, swelling and whitening for a moment.
+//! - **Supernova**: straight out of the flare, a white flash and dust driven out across the
+//!   ground, a hollow shell of plasma tearing outward from the star's face (plasma_puffs.wgsl
+//!   `supernova`), a second inside it, streamers flung out round its waist, up from its
+//!   pole and every way (`nova_wisp`), and a spray of sparks; the light floods the ground
+//!   white, then lavender. No reds or oranges anywhere: it is the star's light, not fire.
+//! - **Nebula**: what lingers is a slow, faint shell torn into violet strands and a small
+//!   hot core, both fading.
 //!
-//! The swell lasts `SWELL * scale` seconds, and the death sound (`regency_supernova`,
+//! The break lasts `BREAK * scale` seconds, and the death sound (`regency_supernova`,
 //! data/factions/regency/sounds.ron) is written for the same beat: tech 3 at size 1,
 //! tech 1 and 2 `like` it at their scale. Change one and change the other.
 //!
@@ -24,16 +24,15 @@ use std::f32::consts::TAU;
 
 use super::star_core_fx::{ARC, GLARE, LAVENDER, ROSE, STAR, WHITE};
 use super::stun_fx::Flash;
-use super::{Renderer, PUFF_DUST, PUFF_SHARD, PUFF_SMOKE, PUFF_SPARK};
+use super::{Renderer, PUFF_DUST, PUFF_SHARD, PUFF_SPARK};
 use crate::gpu_consts::puff;
 
 const SHELL: f32 = puff::SUPERNOVA as f32;
-const WAKE: f32 = puff::PLASMA_WAKE as f32;
-const GLOB: f32 = puff::PLASMA_GLOB as f32;
-/// Seconds the tech 3 star swells before it goes.
-const SWELL: f32 = 2.2;
-/// The share of the swell it spends growing; the rest it falls in.
-const GROWING: f32 = 0.85;
+const WISP: f32 = puff::NOVA_WISP as f32;
+/// Seconds the tech 3 star flares between its cage breaking and the supernova.
+const BREAK: f32 = 0.3;
+/// How long the flare outlasts the bang, as the shell takes its light over.
+const HANDOVER: f32 = 0.4;
 
 /// A star going supernova.
 #[derive(Clone, Copy)]
@@ -72,7 +71,7 @@ impl Renderer {
             return false;
         };
         let s = scale(b.r);
-        let bang = time + SWELL * s;
+        let bang = time + BREAK * s;
         let nova = Nova {
             centre: b.centre,
             r: b.r,
@@ -80,19 +79,19 @@ impl Renderer {
             s,
             start: time,
             bang,
-            until: bang + 3.0 + 5.0 * s,
+            until: bang + 4.0 + 5.0 * s,
             now_r: b.r,
             now_glow: GLARE,
         };
         self.star_core_fx.novae.push(nova);
-        self.cage_breaks(at, &nova, time);
+        self.cage_breaks(&nova, time);
         self.supernova(&nova);
         true
     }
 
-    /// The cage giving way round the star: a white blink, sparks and plates thrown off,
-    /// a little smoke from its footing.
-    fn cage_breaks(&mut self, at: Vec3, nova: &Nova, time: f32) {
+    /// The cage giving way round the star: a white blink, sparks and plates thrown off.
+    /// No smoke: dark puffs would hang in front of the light.
+    fn cage_breaks(&mut self, nova: &Nova, time: f32) {
         let Nova { centre, r, s, .. } = *nova;
         self.push_effect(centre.to_array(), time, r * 3.0, 0.25, 9.0, 0.0);
         for _ in 0..(20.0 + 40.0 * s) as usize {
@@ -115,19 +114,6 @@ impl Renderer {
                 (plate, plate * 0.55),
             );
         }
-        for _ in 0..(4.0 + 6.0 * s) as usize {
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 1.5;
-            let vel = Vec3::Z * (2.0 + 2.0 * self.scatter.unit());
-            let life = 2.5 + 1.5 * self.scatter.unit();
-            self.push_puff(
-                PUFF_SMOKE,
-                at + off + Vec3::Z * 1.0,
-                vel,
-                time,
-                life,
-                (r * 0.6, r * 2.0),
-            );
-        }
     }
 
     /// Once a sim tick: the swelling stars and the remnants.
@@ -136,29 +122,21 @@ impl Renderer {
         let life = self.tick_seconds.clamp(0.03, 0.25) * 2.0;
         for i in 0..self.star_core_fx.novae.len() {
             let mut n = self.star_core_fx.novae[i];
-            let grown = n.r * (2.0 + 2.2 * n.s);
             let (r, glow, lash) = if time < n.bang {
+                // Freed: flaring, swelling and whitening, shuddering, lashing out.
                 let u = (time - n.start) / (n.bang - n.start);
-                if u < GROWING {
-                    // Swelling, shuddering harder as it goes.
-                    let e = u / GROWING;
-                    let shudder = 1.0 + 0.05 * e * (time * 41.0 + n.seed).sin();
-                    let r = (n.r + (grown - n.r) * e.powf(1.6)) * shudder;
-                    (r, GLARE + 3.0 * e * e, 0.25 + 0.75 * e)
-                } else {
-                    // Falling in on itself, whiter as it goes.
-                    let c = (u - GROWING) / (1.0 - GROWING);
-                    let r = n.r * 0.2 + (grown - n.r * 0.2) * (1.0 - c) * (1.0 - c);
-                    (r, GLARE + 3.0 + 6.0 * c, 0.0)
-                }
+                let shudder = 1.0 + 0.06 * u * (time * 47.0 + n.seed).sin();
+                let r = n.r * (1.0 + 0.6 * u * u) * shudder;
+                (r, GLARE + 6.0 * u * u, 0.5 + 0.5 * u)
             } else {
-                // The remnant: a small hot core beating fast, fading.
-                let k = (time - n.bang) / (n.until - n.bang);
-                // Beating 2.4 times a second at the crown's size from the bang, as its sound does.
-                let pulse = (-((time - n.bang) * 2.4 / n.s).fract() * 7.0).exp();
-                let fade = (1.0 - k).powf(1.5);
-                let r = n.r * 0.3 * (1.0 + 0.5 * pulse);
-                (r, (2.0 + 5.0 * pulse) * fade, 0.12 * fade)
+                // The flare handing its light to the shell, and under it the hot core left
+                // behind, fading with the nebula.
+                let e = time - n.bang;
+                let flare = (1.0 - e / HANDOVER).max(0.0);
+                let fade = (1.0 - e / (n.until - n.bang)).max(0.0).powf(1.5);
+                let r = n.r * (0.4 + 1.4 * flare);
+                let glow = (GLARE + 6.0) * flare * flare + 2.4 * fade * (1.0 - flare);
+                (r, glow, 0.15 * fade)
             };
             n.now_r = r;
             n.now_glow = glow;
@@ -217,7 +195,11 @@ impl Renderer {
                 // The flash carries the light of the bang itself.
                 continue;
             }
-            let colour = if time < n.bang { ROSE } else { LAVENDER };
+            let colour = if time < n.bang {
+                WHITE.lerp(ROSE, 0.5)
+            } else {
+                LAVENDER
+            };
             self.lights.lamp(
                 n.centre,
                 Vec3::NEG_Z,
@@ -243,12 +225,14 @@ impl Renderer {
         let ground = ground_xy.extend(self.ground_height(ground_xy));
         // How far the shell gets: the crown's about 130 m.
         let reach = r * (6.0 + 8.0 * s);
+        // The flare's size at the bang: the shell starts at the star's face.
+        let face = r * 1.6;
         // The flash: white beyond the screen, then a broader, slower one.
         self.push_effect(centre.to_array(), bang, r * 10.0, 0.4, 9.0, 0.0);
         self.push_effect(centre.to_array(), bang + 0.04, r * 6.0, 0.8, 9.0, 0.0);
         // How fast the shock drives the dust out across the ground.
         let shock = 40.0 + 200.0 * s * s;
-        // The light of it on everything round: white, then rose as the shell spreads.
+        // The light of it on everything round: white, then lavender as the shell spreads.
         self.emp_fx.flashes.push(Flash {
             pos: centre,
             start: bang,
@@ -261,98 +245,111 @@ impl Renderer {
             pos: centre,
             start: bang + 0.2,
             life: 1.5 + 2.0 * s,
-            color: ROSE * (15.0 + 50.0 * s),
+            color: LAVENDER * (12.0 + 40.0 * s),
             range: (reach * 1.5).min(900.0),
             flicker: 0.3,
         });
-        // The shell, and a slower one inside it.
-        let life = 2.4 + 3.6 * s;
+        // The shell, a slower one inside it, and the nebula: a faint one that lingers.
+        let life = 2.8 + 3.6 * s;
         self.push_lit(
             SHELL,
             centre,
             Vec3::ZERO,
             bang,
             life,
-            (r * 0.8, reach / 0.78),
-            Vec3::splat(3.2),
+            (face / 0.78, reach / 0.78),
+            Vec3::splat(1.6),
             seed,
         );
         self.push_lit(
             SHELL,
             centre,
             Vec3::ZERO,
-            bang + 0.12,
+            bang + 0.1,
             life * 1.3,
-            (r * 0.5, reach * 0.62 / 0.78),
-            Vec3::splat(2.2),
+            (face * 0.8 / 0.78, reach * 0.62 / 0.78),
+            Vec3::splat(1.0),
             seed + 3.7,
         );
-        // The ring thrown out round its waist, tilted a little its own way.
+        self.push_lit(
+            SHELL,
+            centre,
+            Vec3::ZERO,
+            bang + 0.3,
+            life * 2.0,
+            (face / 0.78, reach * 0.85 / 0.78),
+            Vec3::splat(0.6),
+            seed + 6.1,
+        );
+        // Streamers thrown out round its waist, the ring tilted a little its own way.
         let tilt = 0.45 * self.scatter.signed();
         let (ts, tc) = tilt.sin_cos();
         let yaw = self.scatter.unit() * TAU;
-        let around = (40.0 + 100.0 * s) as usize;
+        let around = (36.0 + 72.0 * s) as usize;
         for i in 0..around {
             let a = (i as f32 + 0.5 * self.scatter.unit()) * TAU / around as f32;
             let flat = Vec2::from_angle(a + yaw);
             let dir = Vec3::new(flat.x, flat.y * tc, flat.y * ts);
-            // A wake drifts `vel / 1.6` in all (plasma_puffs.wgsl).
-            let speed = reach * (0.8 + 0.2 * self.scatter.unit()) * 1.6;
-            let puff = r * (0.6 + 0.3 * self.scatter.unit());
-            let tint = WHITE.lerp(ROSE, 0.3 * self.scatter.unit());
+            let go = reach * (0.75 + 0.25 * self.scatter.unit());
+            let size = r * (0.9 + 0.5 * self.scatter.unit());
             let (roll0, roll1) = (self.scatter.unit(), self.scatter.unit());
             self.push_lit(
-                WAKE,
-                centre + dir * r,
-                dir * speed,
+                WISP,
+                centre + dir * face,
+                dir * go * puff::NOVA_WISP_DRAG,
                 bang + 0.03 * roll0,
-                1.8 + 1.6 * s + 0.6 * roll1,
-                (puff, puff * 3.5),
-                tint * 3.0,
-                1.0,
+                2.4 + 2.0 * s + 0.6 * roll1,
+                (size, size * 3.2),
+                Vec3::splat(1.3),
+                0.0,
             );
         }
-        // A jet up from its pole: a column laid over half a second, the first highest.
-        let jet = (24.0 + 30.0 * s) as usize;
+        // A jet up from its pole: a column laid over a third of a second, the first highest.
+        let jet = (14.0 + 20.0 * s) as usize;
         for i in 0..jet {
             let k = i as f32 / jet as f32;
             let lean = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 0.06;
             let dir = (Vec3::Z + lean).normalize();
-            let speed = reach * (1.1 + 0.2 * self.scatter.unit()) * 1.6;
-            let puff = r * (0.5 + 0.3 * self.scatter.unit());
+            let go = reach * (1.0 - 0.4 * k) * (0.9 + 0.2 * self.scatter.unit());
+            let size = r * (0.45 + 0.3 * self.scatter.unit());
             self.push_lit(
-                WAKE,
-                centre + dir * r,
-                dir * speed,
-                bang + 0.05 + 0.5 * k,
-                1.6 + 1.4 * s,
-                (puff, puff * 3.0),
-                WHITE.lerp(LAVENDER, k) * 2.6,
-                1.0,
+                WISP,
+                centre + dir * face,
+                dir * go * puff::NOVA_WISP_DRAG,
+                bang + 0.35 * k,
+                2.0 + 1.6 * s,
+                (size, size * 2.6),
+                Vec3::splat(2.4),
+                0.0,
             );
         }
-        // Globs of the star flung off every way.
-        for _ in 0..(16.0 + 34.0 * s) as usize {
+        // Streamers flung every way, thinner and quicker to go out.
+        for _ in 0..(20.0 + 40.0 * s) as usize {
             let dir = Vec3::new(
                 self.scatter.signed(),
                 self.scatter.signed(),
-                self.scatter.signed() * 0.8 + 0.2,
+                self.scatter.signed() * 0.8 + 0.3,
             )
             .normalize_or(Vec3::Z);
-            // A glob travels `vel / 3` before the air stops it.
-            let speed = reach * (0.5 + 0.6 * self.scatter.unit()) * 3.0;
-            let blob = r * (0.18 + 0.14 * self.scatter.unit());
-            let tint = WHITE.lerp(ROSE, self.scatter.unit());
+            let go = reach * (0.4 + 0.6 * self.scatter.unit());
+            let size = r * (0.22 + 0.16 * self.scatter.unit());
             self.push_lit(
-                GLOB,
-                centre + dir * r * 0.5,
-                dir * speed,
+                WISP,
+                centre + dir * face * 0.8,
+                dir * go * puff::NOVA_WISP_DRAG,
                 bang,
-                1.0 + 0.8 * s,
-                (blob, blob * 0.3),
-                tint * 4.0,
+                1.4 + 1.2 * s,
+                (size, size * 2.4),
+                Vec3::splat(2.8),
                 0.0,
             );
+        }
+        // Sparks sprayed out of the bang.
+        for _ in 0..(60.0 + 120.0 * s) as usize {
+            let vel = self.scatter.upward(0.0) * (30.0 + 60.0 * self.scatter.unit()) * s.sqrt();
+            let life = 1.2 + 1.2 * self.scatter.unit();
+            let size = 0.5 + 0.5 * self.scatter.unit();
+            self.push_puff(PUFF_SPARK, centre, vel, bang, life, (size, 0.1));
         }
         // Dust driven out flat across the ground ahead of the shock.
         let dust = (16.0 + 28.0 * s) as usize;

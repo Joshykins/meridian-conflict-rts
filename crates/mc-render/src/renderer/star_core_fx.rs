@@ -53,6 +53,11 @@ impl StarCoreFx {
             novae: Vec::new(),
         }
     }
+
+    /// Whether blueprint `bp` holds a star.
+    pub(super) fn holds_star(&self, bp: usize) -> bool {
+        matches!(self.stars.get(bp), Some(Some(_)))
+    }
 }
 
 impl Renderer {

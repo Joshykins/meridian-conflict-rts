@@ -105,6 +105,8 @@ impl Renderer {
             if u.owner_flags & KIND_WRECK == 0
                 || u.packed != 0
                 || u.refit_modules & WRECK_INNER != 0
+                // Nothing in a Regency generator burns: its star went up as light.
+                || self.star_core_fx.holds_star(u.blueprint as usize)
             {
                 continue;
             }
