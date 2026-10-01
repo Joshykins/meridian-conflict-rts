@@ -287,8 +287,8 @@ impl Renderer {
     /// lightning thrown every way out of it, a blue ring across the ground.
     fn plasma_burst(&mut self, at: Vec3, core: Vec3, blast: f32, bang: f32) {
         let s = blast / BLAST_REF;
-        // The ball's radius: a plant's own size and a little more.
-        let r = blast * 0.17;
+        // The ball's radius: big enough to swallow the plant's hull, so it shows over it.
+        let r = blast * 0.25;
         // Fewer, not only smaller, puffs for a small plant: a row of them going up
         // must not eat the puff budget.
         let n = |count: u32| ((count as f32 * s.sqrt().clamp(0.35, 1.0)).ceil()) as u32;
