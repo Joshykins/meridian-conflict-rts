@@ -1,7 +1,11 @@
 //! The chart in the middle of the line-up: the map with every seat's landing
 //! zone in its colour, allies joined up. In co-op survival it is the siege
-//! chart, with the Progenitor's fronts. Whoever may plan clicks a zone to
-//! deploy there; whoever held it takes theirs.
+//! chart, with the Progenitor's fronts.
+//!
+//! Whoever may plan moves commanders here: click a commander's zone (or the
+//! Zone cell in their row) to pick them up, then the zone they go to; whoever
+//! held it takes theirs. A free zone clicked with nobody picked up takes your
+//! own commander. Escape or a right click puts a picked-up commander down.
 
 use super::roster::Seat;
 use super::{Catalog, Lineup, Mode, Table};
@@ -100,16 +104,57 @@ pub fn chart(
     slot: usize,
     area: Rect,
 ) {
-    // Only the host moves commanders, and only their own by a click.
-    let mover = table.me.filter(|_| table.host);
-    let picked = match lineup.mode {
-        Mode::Skirmish => zones(ui, lineup, catalog, table, slot, mover, area),
-        Mode::Survival => siege_chart(ui, lineup, catalog, table, slot, mover, area),
-    };
-    if let (Some(me), Some(n)) = (mover, picked) {
-        lineup.roster.take_zone(me, n);
-        ui.audio.play(Sfx::Select);
+    let cancel = ui.input.right_pressed
+        || (ui.input.key(crate::ui::Key::Escape)
+            && ui.mem.popup.is_none()
+            && ui.mem.editing.is_none());
+    if lineup.placing.is_some() && (!table.host || (ui.interactive && cancel)) {
+        lineup.placing = None;
+        ui.audio.play(Sfx::Back);
     }
+    // The commander pointed at in the list last frame; the chart says who it points at now.
+    let lit = lineup.hover_seat.take();
+    let picked = match lineup.mode {
+        Mode::Skirmish => zones(ui, lineup, catalog, table, slot, lit, area),
+        Mode::Survival => siege_chart(ui, lineup, catalog, table, slot, area),
+    };
+    if let Some(n) = picked.filter(|_| table.host) {
+        let sfx = lineup.place(table, n);
+        ui.audio.play(sfx);
+    }
+    if let Some(i) = lineup.placing.and_then(|k| lineup.roster.index_of(k)) {
+        let name = super::seats::who(lineup, table, i, &lineup.roster.seats[i]);
+        moving_banner(ui, &name, colour(&lineup.roster.seats[i]), area);
+    }
+}
+
+/// Over the top of the chart while a commander is picked up: who, and what to do.
+fn moving_banner(ui: &mut Ui, name: &str, c: [f32; 3], area: Rect) {
+    let text = format!("Moving {name}: click a landing zone");
+    let hint = "Esc or Right Click to Cancel";
+    let tw = ui.text_width(type_scale::CAPTION, &text);
+    let hw = ui.text_width(type_scale::MICRO, hint);
+    let w = (tw + hw + 70.0).min(area.w);
+    let r = Rect::new(area.x + (area.w - w) * 0.5, area.y + 12.0, w, 34.0);
+    let pulse = 0.5 + 0.5 * (ui.time * 4.0).sin();
+    ui.fill(r, ink(0.88));
+    ui.frame(r, rgb(palette::ACCENT, 0.45 + 0.35 * pulse));
+    ui.fill(Rect::new(r.x, r.y, 4.0, r.h), [c[0], c[1], c[2], 1.0]);
+    let end = ui.text(
+        r.x + 18.0,
+        r.mid_y(),
+        type_scale::CAPTION,
+        rgb(palette::TEXT, 1.0),
+        &text,
+    );
+    ui.text_fit_left(
+        end + 16.0,
+        r.mid_y() + 0.5,
+        r.right() - end - 26.0,
+        type_scale::MICRO,
+        rgb(palette::DIM, 1.0),
+        hint,
+    );
 }
 
 fn colour(s: &Seat) -> [f32; 3] {
@@ -122,10 +167,13 @@ fn siege_chart(
     catalog: &Catalog,
     table: &Table,
     slot: usize,
-    mover: Option<usize>,
     area: Rect,
 ) -> Option<u8> {
     let theatre = catalog.theatres.get(lineup.map)?;
+    let moving = lineup
+        .placing
+        .and_then(|k| lineup.roster.index_of(k))
+        .map(|i| super::seats::who(lineup, table, i, &lineup.roster.seats[i]));
     let holders: Vec<Holder> = lineup
         .roster
         .seats
@@ -150,7 +198,8 @@ fn siege_chart(
         rules: &lineup.rules,
         hover_domain: lineup.hover_domain,
         holders: &holders,
-        can_pick: mover.is_some(),
+        can_pick: table.host,
+        moving: moving.as_deref(),
         slot,
         drawn: lineup.picture.show(
             ui,
@@ -171,10 +220,12 @@ fn zones(
     catalog: &Catalog,
     table: &Table,
     slot: usize,
-    mover: Option<usize>,
+    lit: Option<u8>,
     area: Rect,
 ) -> Option<u8> {
     let entry = catalog.maps.get(lineup.map)?;
+    let host = table.host;
+    let moving = lineup.placing.and_then(|k| lineup.roster.index_of(k));
     let drawn = lineup.picture.show(
         ui,
         slot,
@@ -249,33 +300,29 @@ fn zones(
             true,
         );
         let yours = holder.is_some() && holder == table.me;
-        if res.clicked && !yours && mover.is_some() {
+        if res.clicked && host {
             take = Some(n as u8);
         }
-        let color = holder.map_or(rgb(palette::DIM, 0.9), |i| {
-            let c = colour(&seats[i]);
-            [c[0], c[1], c[2], 1.0]
-        });
-        ui.disc(p, 13.0 + 2.0 * res.glow, ink(0.85));
-        ui.arc(
-            p,
-            13.0 + 2.0 * res.glow,
-            0.0,
-            std::f32::consts::TAU,
-            if holder.is_some() { 2.2 } else { 1.2 },
-            color,
-        );
-        if yours && !table.observe {
-            let pulse = (ui.time * 0.8).fract();
-            ui.arc(
-                p,
-                14.0 + 16.0 * pulse,
-                0.0,
-                std::f32::consts::TAU,
-                1.4,
-                [color[0], color[1], color[2], 0.8 * (1.0 - pulse)],
-            );
+        if res.hovered {
+            lineup.hover_seat = holder.map(|i| seats[i].key);
         }
+        let fill = holder.map(|i| colour(&seats[i]));
+        let picked_up = holder.is_some() && holder == moving;
+        // Pointed at in the list, or this marker under the pointer.
+        let pointed = holder.is_some_and(|i| lit == Some(seats[i].key)) || res.hovered;
+        let look = Marker {
+            fill,
+            hover: res.glow,
+            lit: ui.ease(
+                id("start-marker-lit", n),
+                if pointed || picked_up { 1.0 } else { 0.0 },
+                12.0,
+            ),
+            picked_up,
+            target: moving.is_some() && !picked_up,
+            yours: yours && !table.observe && moving.is_none(),
+        };
+        marker(ui, p, n, &look);
         ui.text_centred(
             p.x + 1.0,
             p.y,
@@ -296,17 +343,7 @@ fn zones(
             }
         }
         if res.glow > 0.05 {
-            let tip = match holder {
-                _ if yours && table.observe => "AI Landing Zone".to_owned(),
-                _ if yours => "Your Landing Zone".to_owned(),
-                Some(i) if mover.is_some() => format!(
-                    "Click to Swap Places with {}",
-                    holder_name(lineup, table, i)
-                ),
-                Some(i) => holder_name(lineup, table, i),
-                None if mover.is_some() => "Click to Deploy Here".to_owned(),
-                None => "Unoccupied".to_owned(),
-            };
+            let tip = zone_tip(lineup, table, holder, moving, n);
             let tw = ui.text_width(type_scale::MICRO, &tip);
             let tag = Rect::new(
                 (p.x - tw * 0.5 - 8.0).clamp(frame.x, (frame.right() - tw - 16.0).max(frame.x)),
@@ -325,8 +362,87 @@ fn zones(
         }
     }
 
-    // Under the chart (the bar over it names the map): its size, and the key,
-    // which drops to a line of its own when the chart is too narrow for both.
+    caption(ui, &map, frame, allied);
+    take
+}
+
+/// How a landing zone's marker looks this frame.
+struct Marker {
+    /// The colour of the commander who holds it, if anyone does.
+    fill: Option<[f32; 3]>,
+    /// Under the pointer, eased.
+    hover: f32,
+    /// Its commander pointed at here or in the list, or picked up, eased.
+    lit: f32,
+    /// Its commander is picked up to move.
+    picked_up: bool,
+    /// Somewhere a picked-up commander may go.
+    target: bool,
+    /// Yours, with nobody picked up.
+    yours: bool,
+}
+
+/// Landing zone `n`'s marker at `p`: filled in its commander's colour, ringed
+/// while lit, spinning while picked up, a faint target while a commander is
+/// moving, a pulse when it is yours.
+fn marker(ui: &mut Ui, p: Vec2, n: usize, m: &Marker) {
+    use std::f32::consts::TAU;
+    let color = m
+        .fill
+        .map_or(rgb(palette::DIM, 0.9), |c| [c[0], c[1], c[2], 1.0]);
+    let radius = 13.0 + 2.0 * m.hover + 2.0 * m.lit;
+    ui.disc(p, radius, ink(0.85));
+    if let Some(c) = m.fill {
+        // The commander's colour fills the marker, so a zone reads as theirs at a glance.
+        ui.disc(p, radius - 3.0, [c[0], c[1], c[2], 0.35 + 0.25 * m.lit]);
+    }
+    ui.arc(
+        p,
+        radius,
+        0.0,
+        TAU,
+        if m.fill.is_some() { 2.2 } else { 1.2 },
+        color,
+    );
+    if m.picked_up {
+        let a = ui.time * 3.0;
+        ui.arc(p, radius + 6.0, a, a + 4.4, 2.0, rgb(palette::ACCENT, 1.0));
+    } else if m.lit > 0.01 {
+        ui.arc(
+            p,
+            radius + 5.0,
+            0.0,
+            TAU,
+            1.4,
+            [color[0], color[1], color[2], 0.8 * m.lit],
+        );
+    }
+    if m.target {
+        let pulse = (ui.time * 1.2 + n as f32 * 0.13).fract();
+        ui.arc(
+            p,
+            radius + 3.0 + 10.0 * pulse,
+            0.0,
+            TAU,
+            1.0,
+            rgb(palette::ACCENT, 0.6 * (1.0 - pulse)),
+        );
+    } else if m.yours {
+        let pulse = (ui.time * 0.8).fract();
+        ui.arc(
+            p,
+            radius + 1.0 + 16.0 * pulse,
+            0.0,
+            TAU,
+            1.4,
+            [color[0], color[1], color[2], 0.8 * (1.0 - pulse)],
+        );
+    }
+}
+
+/// Under the chart: the map's size, and the key, which drops to a line of its
+/// own when the chart is too narrow for both.
+fn caption(ui: &mut Ui, map: &MapFile, frame: Rect, allied: bool) {
     let size_m = map.info().size_metres().to_f32();
     let y = frame.bottom() + 24.0;
     let end = ui.text(
@@ -364,7 +480,40 @@ fn zones(
             key,
         );
     }
-    take
+}
+
+/// What a zone's tip says: whose it is, and what a click on it would do.
+fn zone_tip(
+    lineup: &Lineup,
+    table: &Table,
+    holder: Option<usize>,
+    moving: Option<usize>,
+    n: usize,
+) -> String {
+    let host = table.host;
+    let yours = holder.is_some() && holder == table.me;
+    match (moving, holder) {
+        (Some(m), h) if h == Some(m) => "Click to Put Down".to_owned(),
+        (Some(m), Some(h)) => format!(
+            "Move {} Here  \u{b7}  {} Takes Theirs",
+            holder_name(lineup, table, m),
+            holder_name(lineup, table, h)
+        ),
+        (Some(m), None) => format!("Move {} Here", holder_name(lineup, table, m)),
+        (None, Some(_)) if yours && table.observe => {
+            "AI Landing Zone  \u{b7}  Click to Move".to_owned()
+        }
+        (None, Some(_)) if yours && host => "Your Landing Zone  \u{b7}  Click to Move".to_owned(),
+        (None, Some(_)) if yours => "Your Landing Zone".to_owned(),
+        (None, Some(h)) if host => {
+            format!("{}  \u{b7}  Click to Move", holder_name(lineup, table, h))
+        }
+        (None, Some(h)) => holder_name(lineup, table, h),
+        (None, None) if host && table.me.is_some() => {
+            format!("Zone {}  \u{b7}  Click to Deploy Here", n + 1)
+        }
+        (None, None) => format!("Zone {}  \u{b7}  Unoccupied", n + 1),
+    }
 }
 
 /// Who holds seat `i`, as a zone's tip names them.

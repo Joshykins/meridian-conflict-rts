@@ -32,8 +32,11 @@ pub struct Siege<'a> {
     /// A fronts chip under the pointer: its lanes light up.
     pub hover_domain: Option<Domain>,
     pub holders: &'a [Holder],
-    /// Clicking a free zone, or its number key, moves your commander there.
+    /// Whoever may plan: a click on any zone, or a free zone's number key,
+    /// is returned (the line-up decides who moves).
     pub can_pick: bool,
+    /// The commander picked up to move, by name: every zone offers to take them.
+    pub moving: Option<&'a str>,
     /// Image slot for the chart.
     pub slot: usize,
     /// The theatre's picture is in the slot (it is drawn on a worker).
@@ -233,7 +236,7 @@ pub fn chart(ui: &mut Ui, view: &Siege, markers: &mut Markers, area: Rect) -> Op
             Rect::new(p.x - 18.0, p.y - 18.0, 36.0, 36.0),
             true,
         );
-        if res.clicked && free(i) {
+        if res.clicked && view.can_pick {
             pick_spawn = Some(i);
         }
         spawn_res.push(res);
@@ -648,11 +651,18 @@ fn zone(
         },
         lines: vec![
             layout.spawns[i].blurb.clone(),
-            match held {
-                Some(h) if h.you => "Your landing zone".into(),
-                Some(h) => format!("{} deploys here", h.name),
-                None if can_pick => format!("Click or press {} to deploy here", i + 1),
-                None => "Nobody deploys here".into(),
+            match (view.moving, held) {
+                (Some(m), Some(h)) if h.name == m => "Click to put them down".into(),
+                (Some(m), Some(h)) => format!("Click to move {m} here; {} takes theirs", h.name),
+                (Some(m), None) => format!("Click to move {m} here"),
+                (None, Some(h)) if h.you && can_pick => "Your landing zone: click to move".into(),
+                (None, Some(h)) if h.you => "Your landing zone".into(),
+                (None, Some(h)) if can_pick => {
+                    format!("{} deploys here: click to move them", h.name)
+                }
+                (None, Some(h)) => format!("{} deploys here", h.name),
+                (None, None) if can_pick => format!("Click or press {} to deploy here", i + 1),
+                (None, None) => "Nobody deploys here".into(),
             },
         ],
         glow: res.glow,

@@ -4,7 +4,8 @@
 //! Two pages share one state: the browser (`browse.rs`) and the lobby
 //! (`lobby_view.rs`, over the model in `lobby.rs`). A game is hosted from the
 //! set-up screen, the same one as a match on this machine: its Open to Others
-//! sheet (`share.rs`) opens the lobby, and leaving that lobby goes back to it.
+//! sheet (`share.rs`) opens the lobby. Opening is one way: leaving that lobby
+//! closes it, and the screen goes on to the browser like any other lobby's.
 //! The server link (`server.rs`) lives as long as the screen does, and on into
 //! the match: its sign-in ticket is what lets a dropped player back in.
 
@@ -16,7 +17,7 @@ pub mod share;
 #[cfg(test)]
 mod tests;
 
-use super::lineup::{Catalog, Lineup};
+use super::lineup::Catalog;
 use super::Ui;
 use crate::match_options::SeatChoice;
 use lobby::{Launch, Lobby, Place};
@@ -33,15 +34,6 @@ pub enum MultiplayerAction {
     Launch(Box<Launch>),
     /// Host Game: set a game up on the set-up screen, then open it to others.
     Host,
-    /// A lobby opened from the set-up screen was left: back to setting it up.
-    Resume(Box<Resume>),
-}
-
-/// The set-up a left lobby goes back to: its maps and its plan as it stood.
-pub struct Resume {
-    pub catalog: Catalog,
-    pub lineup: Lineup,
-    pub chat: super::lineup::chat::Chat,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -75,8 +67,6 @@ pub struct MultiplayerState {
     blueprint_hash: u64,
     /// A line for the player about the last thing tried, and when it was said.
     notice: Option<(String, Instant)>,
-    /// The lobby was opened from the set-up screen, and leaving it goes back there.
-    from_setup: bool,
 }
 
 /// The key that keeps this computer's name its own on a server, made on first use.
@@ -141,7 +131,6 @@ impl MultiplayerState {
             next: None,
             blueprint_hash,
             notice: None,
-            from_setup: false,
         }
     }
 
@@ -176,7 +165,6 @@ impl MultiplayerState {
             next: None,
             blueprint_hash,
             notice: None,
-            from_setup: true,
         }
     }
 
@@ -305,22 +293,6 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
             }
         }
     };
-    // Leaving a lobby the set-up screen opened goes back to the set-up, as it stands.
-    if let (true, Some(Page::Browse), Page::Lobby(lobby)) =
-        (state.from_setup, &state.next, &mut page)
-    {
-        if let Some(lineup) = lobby.lineup.take() {
-            let catalog = std::mem::replace(
-                &mut state.catalog,
-                Catalog::new(Vec::new(), Vec::new(), Vec::new()),
-            );
-            return Some(MultiplayerAction::Resume(Box::new(Resume {
-                catalog,
-                lineup,
-                chat: std::mem::take(&mut lobby.chat),
-            })));
-        }
-    }
     state.page = state.next.take().unwrap_or(page);
     action
 }

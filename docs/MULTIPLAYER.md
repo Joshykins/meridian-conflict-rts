@@ -112,7 +112,8 @@ Games hosted from the client (LAN, direct IP) do not check names.
    options (mode, map, rules, the seat template with AI commanders) define the
    match, and the host opens the seats others may take. The lobby is the same
    set-up screen as skirmish and survival (`ui/lineup`), with the plan the host
-   set up before opening it; leaving it takes the host back to that set-up. The host sets every seat's control,
+   set up before opening it. Opening is one way: the host leaving closes the
+   lobby, and there is no going back to the set-up on one machine. The host sets every seat's control,
    team, zone and colour; each player picks its own race, takes an open seat
    and readies up. Chat works, and notes every change to the plan on every
    screen (`ui/lineup/chat.rs`). The host starts once everyone is ready; a short

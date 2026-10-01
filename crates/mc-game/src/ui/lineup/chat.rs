@@ -2,7 +2,7 @@
 //! say, and a note each time the plan changes (the map, the mode, a seat's
 //! team, race or colour, somebody joining), so everyone sees what moved. On one
 //! machine it is the notes alone; Open to Others takes the chat to the lobby,
-//! where it can be typed in, and leaving the lobby brings it back.
+//! where it can be typed in.
 //!
 //! The notes come from comparing the plan with how it was last seen
 //! ([`Facts`]), so a change made anywhere (this screen, the settings sheet, the
@@ -16,8 +16,6 @@ use glam::Vec2;
 use mc_sim::SurvivalRules;
 use std::time::{Duration, Instant};
 
-/// Width of the chat column.
-pub const WIDTH: f32 = 372.0;
 /// Lines the chat keeps.
 const KEPT: usize = 80;
 /// A change to the same thing this soon after the last note replaces it,
@@ -185,7 +183,7 @@ impl Facts {
                     Some(r) => format!("the {}", r.name),
                     None => "a random race".to_owned(),
                 },
-                tuning: (s.control == Control::Ai).then(|| seats::tuning_label(&s.ai)),
+                tuning: (s.control == Control::Ai).then(|| super::ai::tuning_label(&s.ai)),
             })
             .collect();
         Facts {
@@ -352,9 +350,10 @@ pub fn draw(ui: &mut Ui, chat: &mut Chat, r: Rect, input: Input) -> Option<Reply
             Input::Live => "Say hello: type below and press Enter.",
             Input::Closed(_) => "Changes to the match show here.",
         };
-        ui.text(
+        ui.text_fit_left(
             r.x,
             area.y + 12.0,
+            r.w,
             type_scale::BODY,
             rgb(palette::FAINT, 1.0),
             hint,
@@ -365,9 +364,10 @@ pub fn draw(ui: &mut Ui, chat: &mut Chat, r: Rect, input: Input) -> Option<Reply
             let at = id("lineup-chat", 0);
             ui.text_field(at, field, &mut chat.draft, 200);
             if chat.draft.is_empty() && ui.mem.editing != Some(at) {
-                ui.text(
+                ui.text_fit_left(
                     field.x + 12.0,
                     field.mid_y(),
+                    field.w - 24.0,
                     type_scale::BODY,
                     rgb(palette::FAINT, 1.0),
                     "Message the lobby",
@@ -385,9 +385,10 @@ pub fn draw(ui: &mut Ui, chat: &mut Chat, r: Rect, input: Input) -> Option<Reply
             let res = ui.interact(id("lineup-chat-closed", 0), field, true);
             ui.fill(field, ink(0.35 + 0.15 * res.glow));
             ui.frame(field, rgb(palette::LINE, 0.12 + 0.25 * res.glow));
-            ui.text(
+            ui.text_fit_left(
                 field.x + 12.0,
                 field.mid_y(),
+                field.w - 24.0,
                 type_scale::BODY,
                 mix(rgb(palette::FAINT, 1.0), rgb(palette::TEXT, 1.0), res.glow),
                 hint,

@@ -11,7 +11,6 @@ use crate::ui::lineup::{self, Ask, Lineup, Mode, Table};
 use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use glam::Vec2;
 
-const LEFT: f32 = lineup::LEFT;
 /// The last seconds before the start, large.
 const COUNTDOWN: crate::ui::Style = crate::ui::style(mc_render::Face::Light, 64.0, 2.0);
 
@@ -102,14 +101,16 @@ fn screen(
     table: &Table,
 ) -> Vec<Ask> {
     let mut asks = Vec::new();
-    let (left, centre, right) = lineup::columns(ui, chat::WIDTH);
-    let room = Rect::new(left.x, left.y + 6.0, left.w, left.h - 6.0);
+    // Escape puts down a commander being moved before it leaves the lobby.
+    let placing = plan.placing();
+    let (left, centre, right) = lineup::columns(ui);
+    let chips = [lineup::settings::fog_chip(plan.fog)];
+    let below = lineup::match_card(ui, plan, &mut state.catalog, table.host, &chips, left);
+    let room = Rect::new(left.x, below + 22.0, left.w, left.bottom() - below - 22.0);
     if let Some(Reply::Send(text)) = chat::draw(ui, &mut lobby.chat, room, Input::Live) {
         lobby.send_chat(&text);
     }
-    let chips = [lineup::settings::fog_chip(plan.fog)];
-    let chart = lineup::bar(ui, plan, &mut state.catalog, table.host, &chips, centre);
-    lineup::chart(ui, plan, &state.catalog, table, CHART_SLOT, chart);
+    lineup::chart(ui, plan, &state.catalog, table, CHART_SLOT, centre);
     asks.extend(lineup::commanders(
         ui,
         plan,
@@ -118,7 +119,7 @@ fn screen(
         None,
         right,
     ));
-    footer(ui, state, lobby, plan, table);
+    footer(ui, state, lobby, plan, table, placing);
     asks
 }
 
@@ -128,6 +129,7 @@ fn footer(
     lobby: &mut Lobby,
     plan: &Lineup,
     table: &Table,
+    placing: bool,
 ) {
     let host_slot = lobby.state.as_ref().and_then(|s| s.host);
     let waiting: Vec<String> = lobby
@@ -191,7 +193,9 @@ fn footer(
     } else {
         ("Ready", ButtonKind::Primary, true)
     };
-    let clicked = lineup::footer(ui, "Leave", launch, None, &line, tone, notice.as_deref());
+    // The host leaving ends the room: say so on the button.
+    let back = if table.host { "Close Lobby" } else { "Leave" };
+    let clicked = lineup::footer(ui, back, launch, None, &line, tone, notice.as_deref());
     let (leave, go) = (clicked.back, clicked.launch);
     if go {
         if table.host {
@@ -205,7 +209,8 @@ fn footer(
     }
     let typing = ui.mem.editing.is_some();
     let listing = ui.mem.popup.is_some();
-    if leave || (ui.input.key(Key::Escape) && !typing && !listing && ui.interactive) {
+    let escape = ui.input.key(Key::Escape) && !typing && !listing && !placing;
+    if leave || (escape && ui.interactive) {
         ui.audio.play(Sfx::Back);
         state.next = Some(Page::Browse);
     }
@@ -224,17 +229,18 @@ fn where_chip(ui: &mut Ui, lobby: &Lobby) {
         ),
         Place::Lan { addr } => ("On This Network  \u{b7}  Join At", addr.clone()),
     };
-    let right = ui.size.x - LEFT;
+    let right = ui.size.x - lineup::margin(ui);
+    let y = lineup::title_y(ui);
     ui.text_right(
         right,
-        72.0,
+        y - 12.0,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
         label,
     );
     ui.text_right(
         right,
-        98.0,
+        y + 14.0,
         type_scale::TITLE,
         rgb(palette::ACCENT, 1.0),
         &value,

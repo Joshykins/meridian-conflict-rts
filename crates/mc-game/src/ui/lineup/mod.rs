@@ -14,8 +14,10 @@
 //! Two modes: skirmish (teams on any skirmish map) and survival (every seat a
 //! defender, on one team, against the Progenitor on a survival map).
 
+mod ai;
 mod chart;
 pub mod chat;
+mod layout;
 pub mod roster;
 mod seats;
 pub mod settings;
@@ -37,12 +39,12 @@ use roster::{Control, Roster, Seat};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
 pub use chart::chart;
+pub use layout::{columns, footer, header, margin, title_y};
 pub use seats::commanders;
-pub use settings::{BarAsk, Sheet};
+pub use settings::{CardAsk, Sheet};
 
 /// What a seat open to people is called in published options until someone takes it.
 pub const OPEN_NAME: &str = "Open Seat";
-pub const LEFT: f32 = 64.0;
 
 /// A new match's seed: consecutive clock readings give unrelated seeds.
 pub fn fresh_seed() -> u64 {
@@ -288,8 +290,15 @@ pub struct Lineup {
     pub races: RacePicker,
     /// The settings sheet: the theatre and the rules.
     pub sheet: Sheet,
-    /// The AI row (by seat key) whose doctrine is open under it.
+    /// The AI row (by seat key) whose settings are open under it, when the
+    /// rows are too many to show every AI's.
     tuning: Option<u8>,
+    /// The commander (by seat key) being moved: the next landing zone clicked
+    /// on the chart is theirs.
+    placing: Option<u8>,
+    /// The commander (by seat key) under the pointer, on the chart or in the
+    /// list: the other lights up too.
+    hover_seat: Option<u8>,
     /// The row (by seat key) whose colour swatches are open under it.
     coloring: Option<u8>,
     /// How far the commanders list is scrolled, in pixels, when its rows do not
@@ -303,6 +312,8 @@ pub struct Lineup {
     picture: chart::Picture,
     /// Where the chart's zone markers were drawn (tests click them).
     pub markers: Vec<Vec2>,
+    /// Where each row's zone cell was drawn, by seat key (tests click them).
+    pub zone_cells: Vec<(u8, Vec2)>,
 }
 
 impl Lineup {
@@ -319,12 +330,15 @@ impl Lineup {
             races: RacePicker::default(),
             sheet: Sheet::default(),
             tuning: None,
+            placing: None,
+            hover_seat: None,
             coloring: None,
             seat_scroll: 0.0,
             hover_team: None,
             hover_domain: None,
             picture: chart::Picture::default(),
             markers: Vec::new(),
+            zone_cells: Vec::new(),
         };
         lineup.last_map[mode.index()] = map;
         lineup.roster = Roster::new(lineup.zones(catalog), people, ai, mode == Mode::Survival);
@@ -335,6 +349,45 @@ impl Lineup {
     /// Something else drew in the chart's image slot: draw the chart again.
     pub fn chart_lost(&mut self) {
         self.picture.lost();
+    }
+
+    /// A commander is being moved, and Escape puts that down before it leaves the screen.
+    pub fn placing(&self) -> bool {
+        self.placing.is_some()
+    }
+
+    /// Landing zone `n` was clicked by whoever may plan: the commander being
+    /// moved goes there (whoever held it takes theirs). With nobody being
+    /// moved, a held zone picks up its commander to move, and a free one
+    /// takes yours.
+    fn place(&mut self, table: &Table, n: u8) -> Sfx {
+        let holder = self
+            .roster
+            .seats
+            .iter()
+            .position(|s| s.open() && s.start == n);
+        let moving = self.placing.and_then(|k| self.roster.index_of(k));
+        match (moving, holder) {
+            (Some(p), h) => {
+                self.placing = None;
+                if h == Some(p) {
+                    return Sfx::Back;
+                }
+                self.roster.take_zone(p, n);
+                Sfx::Tick
+            }
+            (None, Some(h)) => {
+                self.placing = Some(self.roster.seats[h].key);
+                Sfx::Select
+            }
+            (None, None) => match table.me {
+                Some(me) => {
+                    self.roster.take_zone(me, n);
+                    Sfx::Tick
+                }
+                None => Sfx::Deny,
+            },
+        }
     }
 
     /// The map's picture is in the chart's image slot.
@@ -357,12 +410,15 @@ impl Lineup {
             races: RacePicker::default(),
             sheet: Sheet::default(),
             tuning: None,
+            placing: None,
+            hover_seat: None,
             coloring: None,
             seat_scroll: 0.0,
             hover_team: None,
             hover_domain: None,
             picture: chart::Picture::default(),
             markers: Vec::new(),
+            zone_cells: Vec::new(),
         }
     }
 
@@ -632,99 +688,27 @@ impl Lineup {
     }
 }
 
-/// The screen's header: the mode's mark and name (the emblem and "Lobby"
-/// while a lobby has no plan yet) and a caption, over the dark backdrop.
-pub fn header(ui: &mut Ui, mode: Option<Mode>, caption: &str, enter: f32) {
-    let (w, h) = (ui.size.x, ui.size.y);
-    ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.66 * enter));
-    ui.scrim(Rect::new(0.0, 0.0, w, 220.0), 0.6 * enter, 0.0, false);
-    ui.fade = enter;
-    ui.shift.y = 14.0 * (1.0 - enter);
-    let mark = Vec2::new(LEFT + 15.0, 84.0);
-    match mode {
-        Some(Mode::Survival) => super::survival::engine_mark(ui, mark, 12.0, 1.0, false),
-        _ => ui.emblem(mark, 13.0, rgb(palette::TEXT, 0.9)),
-    }
-    let title = mode.map_or("Lobby", Mode::title);
-    let end = ui.text(
-        LEFT + 50.0,
-        84.0,
-        type_scale::TITLE,
-        rgb(0xFFFFFF, 1.0),
-        title,
-    );
-    ui.text(
-        end + 18.0,
-        90.0,
-        type_scale::CAPTION,
-        rgb(palette::DIM, 1.0),
-        caption,
-    );
-    ui.fill(Rect::new(LEFT, 124.0, 58.0, 2.0), rgb(palette::ACCENT, 1.0));
-    ui.gradient_h(
-        Rect::new(LEFT + 66.0, 124.0, w - 2.0 * LEFT - 66.0, 1.0),
-        rgb(palette::LINE, 0.35),
-        rgb(palette::LINE, 0.04),
-    );
-}
-
-/// The columns, each side one on its glass: (left, centre, right). A
-/// `left_w` of 0 leaves the left out, and the centre starts at the margin.
-pub fn columns(ui: &mut Ui, left_w: f32) -> (Rect, Rect, Rect) {
-    let (w, h) = (ui.size.x, ui.size.y);
-    let (top, bottom) = (160.0, h - 172.0);
-    let (right_w, gap) = (660.0, 50.0);
-    let left = Rect::new(LEFT, top, left_w, bottom - top);
-    let right = Rect::new(w - LEFT - right_w, top, right_w, bottom - top);
-    let from = if left_w > 0.0 {
-        left.right() + gap
-    } else {
-        LEFT
-    };
-    let centre = Rect::new(from, top, right.x - gap - from, bottom - top);
-    if left_w > 0.0 {
-        ui.panel(Rect::new(
-            left.x - 22.0,
-            top - 20.0,
-            left.w + 44.0,
-            left.h + 40.0,
-        ));
-    }
-    ui.panel(Rect::new(
-        right.x - 22.0,
-        top - 20.0,
-        right.w + 44.0,
-        right.h + 40.0,
-    ));
-    (left, centre, right)
-}
-
-/// The bar over the chart in `centre`: the map and a chip per setting in
-/// `chips`. Change Map opens the browser, Settings the sheet. Returns the
-/// chart's area under the bar.
-pub fn bar(
+/// The match card at the top of `left`, with a chip per setting in `chips`.
+/// Change Map opens the browser, Settings the sheet. Returns the y under it.
+pub fn match_card(
     ui: &mut Ui,
     lineup: &mut Lineup,
     catalog: &mut Catalog,
     host: bool,
     chips: &[String],
-    centre: Rect,
-) -> Rect {
-    let below = match lineup.mode {
-        Mode::Skirmish => 64.0,
-        Mode::Survival => 84.0,
-    };
-    let (bar, chart) = settings::over_chart(centre, below);
+    left: Rect,
+) -> f32 {
     let (browser, cards) = match lineup.mode {
         Mode::Skirmish => (&mut catalog.browser, &catalog.maps),
         Mode::Survival => (&mut catalog.theatre_browser, &catalog.theatre_cards),
     };
-    match settings::bar(ui, bar, browser, cards, lineup.map, chips, host) {
-        Some(BarAsk::ChangeMap) => browser.open(lineup.map),
-        Some(BarAsk::Settings) => lineup.sheet.open(),
+    let (ask, h) = settings::card(ui, left, browser, cards, lineup.map, chips, host);
+    match ask {
+        Some(CardAsk::ChangeMap) => browser.open(lineup.map),
+        Some(CardAsk::Settings) => lineup.sheet.open(),
         None => {}
     }
-    chart
+    left.y + h
 }
 
 /// The settings sheet over the screen, when open: the theatre on the left, the
@@ -1023,68 +1007,6 @@ pub fn overlays(
     ui.fade = fade;
     ui.shift = shift;
     asks
-}
-
-/// What the footer's buttons were clicked for.
-#[derive(Default)]
-pub struct Footer {
-    pub back: bool,
-    pub launch: bool,
-    /// The button beside the launch (Open to Others), when there is one.
-    pub beside: bool,
-}
-
-/// The footer: back on the left, the launch on the right with `beside` (a
-/// label, and whether it may be clicked) left of it, a line beside those in
-/// `tone`, and a notice over that line.
-pub fn footer(
-    ui: &mut Ui,
-    back: &str,
-    launch: (&str, ButtonKind, bool),
-    beside: Option<(&str, bool)>,
-    line: &str,
-    tone: u32,
-    notice: Option<&str>,
-) -> Footer {
-    let (w, h) = (ui.size.x, ui.size.y);
-    let back = ui.button(
-        id("lineup-back", 0),
-        Rect::new(LEFT, h - 64.0 - 52.0, 200.0, 52.0),
-        back,
-        ButtonKind::Secondary,
-        true,
-    );
-    let go_rect = Rect::new(w - LEFT - 340.0, h - 64.0 - 58.0, 340.0, 58.0);
-    let go = ui.button(id("lineup-go", 0), go_rect, launch.0, launch.1, launch.2);
-    let mut text_x = go_rect.x;
-    let mut side = false;
-    if let Some((label, can)) = beside {
-        let r = Rect::new(go_rect.x - 16.0 - 240.0, go_rect.y, 240.0, go_rect.h);
-        side = ui.button(id("lineup-beside", 0), r, label, ButtonKind::Secondary, can) && can;
-        text_x = r.x;
-    }
-    let go_rect = Rect::new(text_x, go_rect.y, go_rect.w, go_rect.h);
-    ui.text_right(
-        go_rect.x - 24.0,
-        go_rect.mid_y(),
-        type_scale::CAPTION,
-        rgb(tone, 1.0),
-        line,
-    );
-    if let Some(text) = notice {
-        ui.text_right(
-            go_rect.x - 24.0,
-            go_rect.mid_y() - 26.0,
-            type_scale::CAPTION,
-            rgb(palette::WARN, 1.0),
-            text,
-        );
-    }
-    Footer {
-        back,
-        launch: go && launch.2,
-        beside: side,
-    }
 }
 
 /// The line beside the launch: the matchup and who plays, or the problem.

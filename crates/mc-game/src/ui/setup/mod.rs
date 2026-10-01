@@ -125,23 +125,6 @@ impl SetupState {
         state
     }
 
-    /// Back from a lobby this screen opened: its maps and its plan as it stood.
-    pub fn resume(
-        settings: &Settings,
-        blueprint_hash: u64,
-        resume: super::multiplayer::Resume,
-    ) -> SetupState {
-        let mut state =
-            SetupState::with_catalog(resume.catalog, settings, resume.lineup.mode, blueprint_hash);
-        state.lineup = resume.lineup.plan();
-        state.shown = state.lineup.mode;
-        state.chat = resume.chat;
-        state
-            .chat
-            .note("Closed to others: the match is on this machine again.");
-        state
-    }
-
     /// Something else drew in the chart's image slot: draw the chart again.
     pub fn chart_lost(&mut self) {
         self.lineup.chart_lost();
@@ -363,6 +346,8 @@ pub fn draw(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupActi
 
 fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction> {
     let mode = state.lineup.mode;
+    // Escape puts down a commander being moved before it leaves the screen.
+    let placing = state.lineup.placing();
     let defenders = state.lineup.roster.seated_teams().len();
     let caption = match mode {
         Mode::Skirmish if state.observing() => "Watch the Commanders Fight",
@@ -371,26 +356,26 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
         Mode::Survival => "Hold Out Against the Progenitor",
     };
     lineup::header(ui, Some(mode), caption, enter);
-    let (left, centre, right) = lineup::columns(ui, chat::WIDTH);
-    let log = Rect::new(left.x, left.y + 6.0, left.w, left.h - 6.0);
-    let hint = "Open to Others to chat with friends";
-    if let Some(Reply::Open) = chat::draw(ui, &mut state.chat, log, Input::Closed(hint)) {
-        ui.audio.play(Sfx::Select);
-        state.open_share();
-    }
+    let (left, centre, right) = lineup::columns(ui);
     let chips = [
         lineup::settings::fog_chip(state.lineup.fog),
         lineup::settings::seed_chip(state.lineup.seed),
         lineup::settings::sky_chip(&state.sky()),
     ];
-    let chart = lineup::bar(
+    let below = lineup::match_card(
         ui,
         &mut state.lineup,
         &mut state.catalog,
         true,
         &chips,
-        centre,
+        left,
     );
+    let log = Rect::new(left.x, below + 22.0, left.w, left.bottom() - below - 22.0);
+    let hint = "Open to Others to chat with friends";
+    if let Some(Reply::Open) = chat::draw(ui, &mut state.chat, log, Input::Closed(hint)) {
+        ui.audio.play(Sfx::Select);
+        state.open_share();
+    }
     let table = table_of(state.observe, &state.name);
     lineup::chart(
         ui,
@@ -398,7 +383,7 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
         &state.catalog,
         &table,
         PREVIEW_SLOT,
-        chart,
+        centre,
     );
     let mut observe = state.observe;
     let asks = lineup::commanders(
@@ -451,7 +436,8 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
     let typing = ui.mem.editing.is_some();
     let mut action = None;
     let listing = ui.mem.popup.is_some();
-    if clicked.back || (ui.input.key(Key::Escape) && !typing && !listing && ui.interactive) {
+    let escape = ui.input.key(Key::Escape) && !typing && !listing && !placing;
+    if clicked.back || (escape && ui.interactive) {
         ui.audio.play(Sfx::Back);
         action = Some(SetupAction::Back);
     } else if clicked.beside {

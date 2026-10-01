@@ -3,10 +3,16 @@
 //! anyone is allied; quick team layouts under them. In co-op survival the rows
 //! are the defenders, with the Progenitor's rules under them.
 //!
+//! An AI's settings (its mind, doctrine, forces and adaptation) sit in a line
+//! of choices under its row, open from the moment the seat becomes an AI. When
+//! there are more rows than room for every AI's line, each row's summary opens
+//! its own. The Zone cell picks the commander up to move on the chart.
+//!
 //! On one machine every cell is yours to change. In a lobby the host changes
 //! the plan and each person picks their own race; an open seat shows who sits
 //! there, or a Sit Here for everyone else.
 
+use super::ai::{ai_line, caret, settings_toggle, summary, AI_LINE};
 use super::roster::{Control, Seat};
 use super::{Ask, Catalog, Lineup, Mode, Occupant, Table};
 use crate::audio::Sfx;
@@ -14,7 +20,7 @@ use crate::setup::TEAM_COLORS;
 use crate::ui::race_picker::race_cell;
 use crate::ui::{id, ink, palette, rgb, teams, type_scale, ButtonKind, Id, Rect, Ui};
 use glam::Vec2;
-use mc_sim::{Brain, Difficulty, Doctrine};
+use mc_sim::Difficulty;
 
 const DIFFICULTIES: [Difficulty; 3] = [Difficulty::Easy, Difficulty::Normal, Difficulty::Hard];
 /// A seat's Control list on one machine; a lobby's adds Open (for a person) first.
@@ -45,10 +51,6 @@ const WHEEL_ROWS: f32 = 3.0;
 /// The scrollbar beside the rows: its hit width and how far right of them.
 const BAR_HIT_W: f32 = 16.0;
 const BAR_GAP: f32 = 6.0;
-/// The doctrine strip that opens under an AI row.
-const TUNE_H: f32 = 74.0;
-const FORCE_PRESETS: [[u8; 3]; 4] = [[100, 100, 100], [160, 60, 60], [60, 160, 60], [60, 60, 160]];
-const FORCE_LABELS: [&str; 4] = ["Balanced", "Land", "Air", "Naval"];
 /// Height of a team's heading over its rows, and over dense rows.
 const TEAM_HEAD_H: f32 = 30.0;
 const DENSE_TEAM_HEAD_H: f32 = 22.0;
@@ -72,41 +74,73 @@ struct Columns {
     zone: f32,
     zone_w: f32,
     dense: bool,
+    /// Every AI row shows its settings line; when false only the one opened does.
+    ai_lines: bool,
 }
 
 impl Columns {
+    /// Full cells from 660 wide, narrowing to what they need at 560.
     fn of(area: Rect) -> Columns {
-        Columns {
-            left: area.x,
-            name: area.x + 58.0,
-            swatch: 26.0,
-            race: area.right() - 470.0,
-            race_w: 110.0,
-            control: area.right() - 358.0,
-            control_w: 150.0,
-            team: area.right() - 196.0,
-            team_w: 100.0,
-            zone: area.right() - 84.0,
-            zone_w: 84.0,
-            dense: false,
-        }
+        let k = ((area.w - 560.0) / 100.0).clamp(0.0, 1.0);
+        let lerp = |a: f32, b: f32| a + (b - a) * k;
+        let gap = lerp(8.0, 12.0);
+        Columns::from_right(
+            area,
+            58.0,
+            26.0,
+            [
+                lerp(96.0, 110.0),
+                lerp(128.0, 150.0),
+                lerp(88.0, 100.0),
+                72.0,
+            ],
+            gap,
+            false,
+        )
     }
 
     /// One-line rows, narrower cells.
     fn dense(area: Rect) -> Columns {
+        let k = ((area.w - 560.0) / 100.0).clamp(0.0, 1.0);
+        let lerp = |a: f32, b: f32| a + (b - a) * k;
+        Columns::from_right(
+            area,
+            40.0,
+            20.0,
+            [lerp(88.0, 96.0), lerp(118.0, 130.0), lerp(84.0, 92.0), 60.0],
+            lerp(6.0, 8.0),
+            true,
+        )
+    }
+
+    /// The cells (race, control, team, zone widths) laid from the right edge.
+    fn from_right(
+        area: Rect,
+        name: f32,
+        swatch: f32,
+        [race_w, control_w, team_w, zone_w]: [f32; 4],
+        gap: f32,
+        dense: bool,
+    ) -> Columns {
+        let zone = area.right() - zone_w;
+        let team = zone - gap - team_w;
+        let control = team - gap - control_w;
+        // The race cell starts 10 left of its heading (its crest leads).
+        let race = control - gap - race_w + 10.0;
         Columns {
             left: area.x,
-            name: area.x + 40.0,
-            swatch: 20.0,
-            race: area.right() - 394.0,
-            race_w: 96.0,
-            control: area.right() - 300.0,
-            control_w: 130.0,
-            team: area.right() - 164.0,
-            team_w: 92.0,
-            zone: area.right() - 68.0,
-            zone_w: 68.0,
-            dense: true,
+            name: area.x + name,
+            swatch,
+            race,
+            race_w,
+            control,
+            control_w,
+            team,
+            team_w,
+            zone,
+            zone_w,
+            dense,
+            ai_lines: false,
         }
     }
 
@@ -173,6 +207,124 @@ impl View {
 /// than `DENSE_FROM` seats gets one-line rows, in two columns where the area
 /// is wide enough (`columns` makes it so when the screen has room).
 pub fn commanders(
+    ui: &mut Ui,
+    lineup: &mut Lineup,
+    catalog: &mut Catalog,
+    table: &Table,
+    observe: Option<&mut bool>,
+    area: Rect,
+) -> Vec<Ask> {
+    let mut asks = heading(ui, lineup, catalog, table, observe, area);
+    let survival = lineup.mode == Mode::Survival;
+
+    // Rows go in team order under a heading per team when anyone is allied;
+    // closed seats follow. A row that changes team eases over to its new side.
+    let allied = lineup.roster.allied() && !survival;
+    let n = lineup.roster.seats.len();
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by_key(|&i| {
+        let s = &lineup.roster.seats[i];
+        (!s.open(), if allied { s.team } else { 0 }, i)
+    });
+    let mut cols = if n > DENSE_FROM {
+        Columns::dense(area)
+    } else {
+        Columns::of(area)
+    };
+    let head = area.y + 44.0;
+    lineup.zone_cells.clear();
+    for (x, label) in [
+        (cols.name, "Commander"),
+        (cols.race, "Faction"),
+        (cols.control, "Control"),
+        (cols.team, if survival { "" } else { "Team" }),
+        (cols.zone, "Zone"),
+    ] {
+        ui.text(x, head, type_scale::MICRO, rgb(palette::DIM, 0.8), label);
+    }
+    // More seats than fit (a 32-seat map): the rows scroll under the wheel or
+    // the bar beside them, eased, fading at the edges.
+    let top = head + 16.0;
+    let bottom = area.bottom() - LAYOUTS_H;
+    // Every AI's settings in view when they all fit; otherwise each row opens its own.
+    let ai_rows = lineup
+        .roster
+        .seats
+        .iter()
+        .filter(|s| table.is_ai(s))
+        .count();
+    let heads = if allied {
+        lineup.roster.seated_teams().len()
+    } else {
+        0
+    };
+    let need =
+        n as f32 * cols.pitch() + ai_rows as f32 * AI_LINE + heads as f32 * cols.head_h() + 10.0;
+    cols.ai_lines = !cols.dense && need <= bottom - top;
+    let shown = ui.ease(id("seat-scroll", 0), lineup.seat_scroll, 16.0);
+    // Last frame's height of all the rows says whether any lie past the bottom.
+    let before = ui
+        .mem
+        .anims
+        .get(&id("seat-content", 0))
+        .copied()
+        .unwrap_or(0.0);
+    let view = View {
+        top,
+        bottom,
+        offset: shown,
+        fade_top: shown.min(EDGE_FADE),
+        fade_bottom: (before - (bottom - top) - shown).clamp(0.0, EDGE_FADE),
+    };
+    let rows = seat_rows(ui, lineup, catalog, table, &cols, view, &order, allied);
+    let content = rows.height;
+    ui.snap(id("seat-content", 0), content);
+    asks.extend(rows.asks);
+    let room = bottom - top;
+    let most = (content - room).max(0.0);
+    let list = Rect::new(area.x, top, area.w, room);
+    if ui.interactive && list.contains(ui.cursor - ui.shift) && ui.input.scroll != 0.0 {
+        lineup.seat_scroll -= ui.input.scroll.signum() * WHEEL_ROWS * cols.pitch();
+    }
+    if most > 0.0 {
+        lineup.seat_scroll = scrollbar(ui, list, lineup.seat_scroll, room, content);
+        // A page at a time from the hints over the faded edges.
+        let page = room - 2.0 * cols.pitch();
+        if rows.above > 0 && more_hint(ui, list, top + 12.0, rows.above, true) {
+            lineup.seat_scroll -= page;
+            ui.audio.play(Sfx::Tick);
+        }
+        if rows.below > 0 && more_hint(ui, list, bottom - 12.0, rows.below, false) {
+            lineup.seat_scroll += page;
+            ui.audio.play(Sfx::Tick);
+        }
+    }
+    lineup.seat_scroll = lineup.seat_scroll.clamp(0.0, most);
+    let y = top + content.min(room);
+    let y = y + 8.0;
+    if survival {
+        let top = y + 12.0;
+        let counts = lineup.counts(catalog);
+        let live = ui.interactive;
+        ui.interactive = live && table.host;
+        crate::ui::survival::rules::engagement(
+            ui,
+            &mut lineup.rules,
+            counts,
+            &mut lineup.hover_domain,
+            Rect::new(area.x, top, area.w, area.bottom() - top),
+        );
+        ui.interactive = live;
+    } else {
+        layouts(ui, lineup, catalog, table, area, y);
+    }
+    asks
+}
+
+/// The column's heading: its title, Fill with AI while any seat is empty, and
+/// on one machine the watch switch. Strips open under rows that no longer
+/// have them to show close here.
+fn heading(
     ui: &mut Ui,
     lineup: &mut Lineup,
     catalog: &mut Catalog,
@@ -247,91 +399,6 @@ pub fn commanders(
         lineup.coloring = None;
     }
 
-    // Rows go in team order under a heading per team when anyone is allied;
-    // closed seats follow. A row that changes team eases over to its new side.
-    let allied = lineup.roster.allied() && !survival;
-    let n = lineup.roster.seats.len();
-    let mut order: Vec<usize> = (0..n).collect();
-    order.sort_by_key(|&i| {
-        let s = &lineup.roster.seats[i];
-        (!s.open(), if allied { s.team } else { 0 }, i)
-    });
-    let cols = if n > DENSE_FROM {
-        Columns::dense(area)
-    } else {
-        Columns::of(area)
-    };
-    let head = area.y + 44.0;
-    for (x, label) in [
-        (cols.name, "Commander"),
-        (cols.race, "Faction"),
-        (cols.control, "Control"),
-        (cols.team, if survival { "" } else { "Team" }),
-        (cols.zone, "Zone"),
-    ] {
-        ui.text(x, head, type_scale::MICRO, rgb(palette::DIM, 0.8), label);
-    }
-    // More seats than fit (a 32-seat map): the rows scroll under the wheel or
-    // the bar beside them, eased, fading at the edges.
-    let top = head + 16.0;
-    let bottom = area.bottom() - LAYOUTS_H;
-    let shown = ui.ease(id("seat-scroll", 0), lineup.seat_scroll, 16.0);
-    // Last frame's height of all the rows says whether any lie past the bottom.
-    let before = ui
-        .mem
-        .anims
-        .get(&id("seat-content", 0))
-        .copied()
-        .unwrap_or(0.0);
-    let view = View {
-        top,
-        bottom,
-        offset: shown,
-        fade_top: shown.min(EDGE_FADE),
-        fade_bottom: (before - (bottom - top) - shown).clamp(0.0, EDGE_FADE),
-    };
-    let rows = seat_rows(ui, lineup, catalog, table, &cols, view, &order, allied);
-    let content = rows.height;
-    ui.snap(id("seat-content", 0), content);
-    asks.extend(rows.asks);
-    let room = bottom - top;
-    let most = (content - room).max(0.0);
-    let list = Rect::new(area.x, top, area.w, room);
-    if ui.interactive && list.contains(ui.cursor - ui.shift) && ui.input.scroll != 0.0 {
-        lineup.seat_scroll -= ui.input.scroll.signum() * WHEEL_ROWS * cols.pitch();
-    }
-    if most > 0.0 {
-        lineup.seat_scroll = scrollbar(ui, list, lineup.seat_scroll, room, content);
-        // A page at a time from the hints over the faded edges.
-        let page = room - 2.0 * cols.pitch();
-        if rows.above > 0 && more_hint(ui, list, top + 12.0, rows.above, true) {
-            lineup.seat_scroll -= page;
-            ui.audio.play(Sfx::Tick);
-        }
-        if rows.below > 0 && more_hint(ui, list, bottom - 12.0, rows.below, false) {
-            lineup.seat_scroll += page;
-            ui.audio.play(Sfx::Tick);
-        }
-    }
-    lineup.seat_scroll = lineup.seat_scroll.clamp(0.0, most);
-    let y = top + content.min(room);
-    let y = y + 8.0;
-    if survival {
-        let top = y + 12.0;
-        let counts = lineup.counts(catalog);
-        let live = ui.interactive;
-        ui.interactive = live && table.host;
-        crate::ui::survival::rules::engagement(
-            ui,
-            &mut lineup.rules,
-            counts,
-            &mut lineup.hover_domain,
-            Rect::new(area.x, top, area.w, area.bottom() - top),
-        );
-        ui.interactive = live;
-    } else {
-        layouts(ui, lineup, catalog, table, area, y);
-    }
     asks
 }
 
@@ -416,25 +483,21 @@ fn seat_rows(
         } else if y + row_h - view.offset > view.bottom {
             below += 1;
         }
-        shown(ui, row_y, row_h, &mut |ui, at| {
-            let row = Rect::new(area_x, at, area_w, row_h);
+        // An AI's settings line is part of its row.
+        let line = if table.is_ai(&seat) && (cols.ai_lines || lineup.tuning == Some(seat.key)) {
+            AI_LINE
+        } else {
+            0.0
+        };
+        shown(ui, row_y, row_h + line, &mut |ui, at| {
+            let row = Rect::new(area_x, at, area_w, row_h + line);
             asks.extend(seat_row(ui, lineup, catalog, table, cols, i, seat, row));
         });
-        y += pitch;
+        y += pitch + line;
         let under = Rect::new(area_x + 14.0, 0.0, area_w - 14.0, 0.0);
-        if lineup.tuning == Some(seat.key) {
-            let at_y = row_y + row_h;
-            shown(ui, at_y, TUNE_H, &mut |ui, at| {
-                if let Some(i) = lineup.roster.index_of(seat.key) {
-                    let r = Rect::new(under.x, at, under.w, TUNE_H);
-                    ai_tuning(ui, &mut lineup.roster.seats[i], r);
-                }
-            });
-            y += TUNE_H;
-        }
         if lineup.coloring == Some(seat.key) {
             let strip_h = swatch_strip_h(under.w);
-            let at_y = row_y + row_h;
+            let at_y = row_y + row_h + line;
             shown(ui, at_y, strip_h, &mut |ui, at| {
                 if let Some(i) = lineup.roster.index_of(seat.key) {
                     colour_picker(ui, lineup, i, Rect::new(under.x, at, under.w, strip_h));
@@ -555,7 +618,8 @@ fn watch_switch(ui: &mut Ui, observe: &mut bool, area: Rect, switch_w: f32) {
     }
 }
 
-/// One seat's row at `row`.
+/// One seat's row at `row`: its first line of cells, and under it, when the
+/// row is that tall, the AI's settings line.
 #[expect(clippy::too_many_arguments, reason = "a row reads the whole table")]
 fn seat_row(
     ui: &mut Ui,
@@ -570,116 +634,42 @@ fn seat_row(
     let mut asks = Vec::new();
     let key = seat.key as usize;
     let open = seat.open();
-    let ai = table.is_ai(&seat);
     let occupant = table.occupant(i);
     let mine = table.me == Some(i);
     let tuning = lineup.tuning == Some(seat.key);
-    let live = if open { 1.0 } else { 0.4 };
+    let placing = lineup.placing == Some(seat.key);
+    let top = Rect::new(row.x, row.y, row.w, cols.row_h());
+    let with_line = row.h > top.h + 1.0;
+    // Pointed at here or on the chart: both light up.
+    if open && ui.interactive && row.contains(ui.cursor - ui.shift) {
+        lineup.hover_seat = Some(seat.key);
+    }
+    let lit = ui.ease(
+        id("slot-lit", key),
+        if lineup.hover_seat == Some(seat.key) {
+            1.0
+        } else {
+            0.0
+        },
+        12.0,
+    );
     ui.fill(row, ink(if mine && table.lobby { 0.55 } else { 0.5 }));
+    ui.gradient_h(row, rgb(palette::LINE, 0.05 * lit), rgb(palette::LINE, 0.0));
     ui.frame(
         row,
-        rgb(
-            if tuning {
-                palette::ACCENT
-            } else {
-                palette::LINE
-            },
-            if tuning { 0.5 } else { 0.12 },
-        ),
+        if placing {
+            rgb(palette::ACCENT, 0.75)
+        } else if tuning && !cols.ai_lines {
+            rgb(palette::ACCENT, 0.5)
+        } else {
+            rgb(palette::LINE, 0.12 + 0.18 * lit)
+        },
     );
 
-    // Colour swatch: the host opens every colour under the row.
-    let coloring = lineup.coloring == Some(seat.key);
-    let c = TEAM_COLORS[seat.color as usize % TEAM_COLORS.len()];
-    let hit = Rect::new(row.x, row.y, cols.name - row.x - 10.0, row.h);
-    let res = ui.interact(id("slot-color", key), hit, open && table.host);
-    let side = cols.swatch;
-    let swatch =
-        Rect::new(row.x + 8.0, row.mid_y() - side / 2.0, side, side).inset(-2.0 * res.glow);
-    ui.fill(
-        Rect::new(row.x, row.y, 3.0, row.h),
-        [c[0], c[1], c[2], live],
-    );
-    ui.fill(swatch, [c[0], c[1], c[2], live]);
-    ui.frame(
-        swatch,
-        rgb(0xFFFFFF, if coloring { 0.9 } else { 0.15 + 0.6 * res.glow }),
-    );
-    if open && table.host {
-        // A caret in the corner says it opens.
-        let k = Vec2::new(swatch.right() - 5.0, swatch.bottom() - 5.0);
-        ui.triangle(
-            k + Vec2::new(-4.0, 0.0),
-            k + Vec2::new(0.0, 0.0),
-            k + Vec2::new(0.0, -4.0),
-            ink(0.8),
-        );
-    }
-    if res.clicked {
-        lineup.coloring = if coloring { None } else { Some(seat.key) };
-        lineup.tuning = None;
-        ui.audio.play(Sfx::Select);
-    }
-
-    // Who: a person, an AI with its doctrine under its name, an open seat, or nobody.
-    let name_w = cols.race - cols.name - 12.0;
-    let x = cols.name;
-    let name = who(lineup, table, i, &seat);
-    let waiting = table.lobby && seat.control == Control::Person && occupant.is_none();
-    let name_tone = if waiting {
-        rgb(palette::DIM, 0.55 + 0.25 * (ui.time * 2.0 + i as f32).sin())
-    } else if occupant.is_some() {
-        rgb(0xFFFFFF, 1.0)
-    } else {
-        rgb(palette::TEXT, live)
-    };
-    let name_y = if open && !cols.dense {
-        row.y + 18.0
-    } else {
-        row.mid_y()
-    };
-    ui.text_fit_left(x, name_y, name_w, type_scale::BODY, name_tone, &name);
-    if cols.dense {
-        // One line: the name opens an AI's doctrine strip, as its summary would.
-        let tune = Rect::new(x - 4.0, row.y, name_w + 8.0, row.h);
-        if ai && table.host && ui.interact(id("slot-ai-tune", key), tune, true).clicked {
-            lineup.tuning = if tuning { None } else { Some(seat.key) };
-            lineup.coloring = None;
-            ui.audio.play(Sfx::Select);
-        }
-    } else if ai && table.host {
-        if ai_summary(ui, key, &seat, tuning, x, row, name_w) {
-            lineup.tuning = if tuning { None } else { Some(seat.key) };
-            lineup.coloring = None;
-            ui.audio.play(Sfx::Select);
-        }
-    } else {
-        let (line, tone) = match occupant {
-            Some(p) => (p.tags.join("  \u{b7}  "), palette::DIM),
-            None if ai => (
-                format!(
-                    "{}  \u{b7}  {}",
-                    doctrine_label(seat.ai.doctrine),
-                    force_label(seat.ai.domain_weights)
-                ),
-                palette::DIM,
-            ),
-            None if waiting => ("Waiting for a player".to_owned(), palette::FAINT),
-            None if seat.control == Control::Person => ("You Command".to_owned(), palette::ACCENT),
-            None => (String::new(), palette::DIM),
-        };
-        ui.text_fit_left(
-            x,
-            row.y + 38.0,
-            name_w,
-            type_scale::MICRO,
-            rgb(tone, 1.0),
-            &line,
-        );
-    }
-
+    swatch_cell(ui, lineup, table.host, cols, seat, row);
+    let name = name_cell(ui, lineup, table, cols, i, seat, top);
     let inset = if cols.dense { 2.0 } else { 10.0 };
-    let field = |x: f32, w: f32| Rect::new(x, row.y + inset, w, row.h - 2.0 * inset);
+    let field = |x: f32, w: f32| Rect::new(x, top.y + inset, w, top.h - 2.0 * inset);
     // Race: yours in your own seat, the host's for the rest.
     let can_race = if table.lobby {
         mine || (table.host && occupant.is_none())
@@ -722,22 +712,196 @@ fn seat_row(
             }
         }
     }
+    // Zone: picks the commander up to move on the chart.
     let zones = lineup.zones(catalog);
-    let step = ui.stepper(
-        id("slot-start", key),
-        field(cols.zone, cols.zone_w),
-        &format!("{}", seat.start + 1),
-        rgb(palette::TEXT, 1.0),
-        open && zones > 1 && table.host,
-    );
-    if step != 0 {
+    let f = field(cols.zone, cols.zone_w);
+    lineup
+        .zone_cells
+        .push((seat.key, Vec2::new(f.x + f.w * 0.5, f.mid_y()) + ui.shift));
+    if open && zone_cell(ui, key, f, &seat, placing, table.host && zones > 1) {
+        lineup.placing = if placing { None } else { Some(seat.key) };
+        lineup.coloring = None;
+        ui.audio.play(if placing { Sfx::Back } else { Sfx::Select });
+    }
+
+    if with_line {
+        let line = Rect::new(
+            cols.name,
+            top.bottom() - 4.0,
+            row.right() - 10.0 - cols.name,
+            AI_LINE - 10.0,
+        );
         if let Some(i) = lineup.roster.index_of(seat.key) {
-            lineup
-                .roster
-                .step_unique(i, step, zones, |s| s.start, |s, v| s.start = v);
+            ai_line(ui, &mut lineup.roster.seats[i], line, table.host);
         }
     }
     asks
+}
+
+/// The seat's colour down the row and as a swatch; the host opens every colour under the row.
+fn swatch_cell(
+    ui: &mut Ui,
+    lineup: &mut Lineup,
+    host: bool,
+    cols: &Columns,
+    seat: Seat,
+    row: Rect,
+) {
+    let key = seat.key as usize;
+    let open = seat.open();
+    let live = if open { 1.0 } else { 0.4 };
+    let top = Rect::new(row.x, row.y, row.w, cols.row_h());
+    // Colour swatch: the host opens every colour under the row.
+    let coloring = lineup.coloring == Some(seat.key);
+    let c = TEAM_COLORS[seat.color as usize % TEAM_COLORS.len()];
+    let hit = Rect::new(top.x, top.y, cols.name - top.x - 10.0, top.h);
+    let res = ui.interact(id("slot-color", key), hit, open && host);
+    let side = cols.swatch;
+    let swatch =
+        Rect::new(top.x + 8.0, top.mid_y() - side / 2.0, side, side).inset(-2.0 * res.glow);
+    ui.fill(
+        Rect::new(row.x, row.y, 3.0, row.h),
+        [c[0], c[1], c[2], live],
+    );
+    ui.fill(swatch, [c[0], c[1], c[2], live]);
+    ui.frame(
+        swatch,
+        rgb(0xFFFFFF, if coloring { 0.9 } else { 0.15 + 0.6 * res.glow }),
+    );
+    if open && host {
+        // A caret in the corner says it opens.
+        let k = Vec2::new(swatch.right() - 5.0, swatch.bottom() - 5.0);
+        ui.triangle(
+            k + Vec2::new(-4.0, 0.0),
+            k + Vec2::new(0.0, 0.0),
+            k + Vec2::new(0.0, -4.0),
+            ink(0.8),
+        );
+    }
+    if res.clicked {
+        lineup.coloring = if coloring { None } else { Some(seat.key) };
+        ui.audio.play(Sfx::Select);
+    }
+}
+
+/// Who sits in the seat: a person, an AI, an open seat, or nobody, and what
+/// they are under the name (an AI's settings toggle, when the list is too
+/// crowded for every AI's line). Returns the name.
+fn name_cell(
+    ui: &mut Ui,
+    lineup: &mut Lineup,
+    table: &Table,
+    cols: &Columns,
+    i: usize,
+    seat: Seat,
+    top: Rect,
+) -> String {
+    let key = seat.key as usize;
+    let open = seat.open();
+    let ai = table.is_ai(&seat);
+    let occupant = table.occupant(i);
+    let tuning = lineup.tuning == Some(seat.key);
+    let live = if open { 1.0 } else { 0.4 };
+    // Who: a person, an AI, an open seat, or nobody; what they are under the name.
+    let name_w = cols.race - 10.0 - cols.name - 12.0;
+    let x = cols.name;
+    let name = who(lineup, table, i, &seat);
+    let waiting = table.lobby && seat.control == Control::Person && occupant.is_none();
+    let name_tone = if waiting {
+        rgb(palette::DIM, 0.55 + 0.25 * (ui.time * 2.0 + i as f32).sin())
+    } else if occupant.is_some() {
+        rgb(0xFFFFFF, 1.0)
+    } else {
+        rgb(palette::TEXT, live)
+    };
+    // Too many rows for every AI's line: each opens its own from under its name.
+    let toggles = ai && table.host && !cols.ai_lines && !cols.dense;
+    // An AI whose settings line always shows needs nothing under its name.
+    let one_line = cols.dense || !open || (ai && cols.ai_lines);
+    let name_y = if one_line { top.mid_y() } else { top.y + 18.0 };
+    ui.text_fit_left(x, name_y, name_w, type_scale::BODY, name_tone, &name);
+    if toggles {
+        if settings_toggle(ui, key, tuning, x, top, name_w) {
+            lineup.tuning = if tuning { None } else { Some(seat.key) };
+            lineup.coloring = None;
+            ui.audio.play(Sfx::Select);
+        }
+    } else if ai && table.host && cols.dense {
+        // One line: the name opens or closes the AI's settings line.
+        let tune = Rect::new(x - 4.0, top.y, name_w + 8.0, top.h);
+        let res = ui.interact(id("slot-ai-tune", key), tune, true);
+        let end = x + ui.text_width(type_scale::BODY, &name).min(name_w) + 10.0;
+        caret(ui, end, top.mid_y(), tuning, res.glow);
+        if res.clicked {
+            lineup.tuning = if tuning { None } else { Some(seat.key) };
+            lineup.coloring = None;
+            ui.audio.play(Sfx::Select);
+        }
+    } else if !one_line {
+        let (line, tone) = match occupant {
+            Some(p) => (p.tags.join("  \u{b7}  "), palette::DIM),
+            None if ai => (summary(&seat.ai), palette::DIM),
+            None if waiting => ("Waiting for a player".to_owned(), palette::FAINT),
+            None if seat.control == Control::Person => ("You Command".to_owned(), palette::ACCENT),
+            None => (String::new(), palette::DIM),
+        };
+        ui.text_fit_left(
+            x,
+            top.y + 38.0,
+            name_w,
+            type_scale::MICRO,
+            rgb(tone, 1.0),
+            &line,
+        );
+    }
+
+    name
+}
+
+/// A seat's landing zone as a cell: its marker, in the seat's colour, with
+/// the zone's number. A click picks the commander up to move on the chart
+/// (and puts them down again); true when clicked.
+fn zone_cell(ui: &mut Ui, key: usize, f: Rect, seat: &Seat, placing: bool, enabled: bool) -> bool {
+    let res = ui.interact(id("slot-zone", key), f, enabled);
+    let pulse = 0.5 + 0.5 * (ui.time * 5.0).sin();
+    let glow = if placing { 1.0 } else { res.glow };
+    ui.fill(f, ink(0.35 + 0.15 * glow));
+    ui.frame(
+        f,
+        if placing {
+            rgb(palette::ACCENT, 0.55 + 0.4 * pulse)
+        } else {
+            rgb(
+                palette::LINE,
+                if enabled { 0.16 + 0.3 * glow } else { 0.08 },
+            )
+        },
+    );
+    let c = TEAM_COLORS[seat.color as usize % TEAM_COLORS.len()];
+    let p = Vec2::new(f.x + f.w * 0.5, f.mid_y());
+    let r = (f.h * 0.5 - 3.0).min(12.0);
+    ui.disc(p, r, ink(0.85));
+    ui.disc(p, r - 2.5, [c[0], c[1], c[2], 0.4 + 0.2 * glow]);
+    ui.arc(
+        p,
+        r,
+        0.0,
+        std::f32::consts::TAU,
+        1.8,
+        [c[0], c[1], c[2], 1.0],
+    );
+    if placing {
+        let a = ui.time * 3.0;
+        ui.arc(p, r + 4.0, a, a + 4.4, 1.6, rgb(palette::ACCENT, 1.0));
+    }
+    ui.text_centred(
+        p.x + 0.5,
+        p.y,
+        type_scale::MICRO,
+        rgb(palette::TEXT, if enabled || placing { 1.0 } else { 0.7 }),
+        &format!("{}", seat.start + 1),
+    );
+    res.clicked
 }
 
 /// The name a row shows.
@@ -749,54 +913,6 @@ pub(super) fn who(lineup: &Lineup, table: &Table, i: usize, seat: &Seat) -> Stri
         (Control::Person, None) if table.lobby => "Open Seat".to_owned(),
         _ => table.name.to_owned(),
     }
-}
-
-/// An AI's doctrine under its name, which opens its tuning. True when clicked.
-fn ai_summary(
-    ui: &mut Ui,
-    key: usize,
-    seat: &Seat,
-    tuning: bool,
-    x: f32,
-    row: Rect,
-    name_w: f32,
-) -> bool {
-    let tune = Rect::new(row.x + 48.0, row.y + 28.0, name_w + 10.0, 22.0);
-    let res = ui.interact(id("slot-ai-tune", key), tune, true);
-    let summary = format!(
-        "{}  \u{b7}  {}",
-        doctrine_label(seat.ai.doctrine),
-        force_label(seat.ai.domain_weights),
-    );
-    let tone = rgb(
-        if tuning || res.glow > 0.3 {
-            palette::ACCENT
-        } else {
-            palette::DIM
-        },
-        1.0,
-    );
-    ui.text_fit_left(
-        x,
-        row.y + 38.0,
-        name_w - 16.0,
-        type_scale::MICRO,
-        tone,
-        &summary,
-    );
-    // A caret: down to open the tuning, up to close it.
-    let tw = ui
-        .text_width(type_scale::MICRO, &summary)
-        .min(name_w - 16.0);
-    let c = Vec2::new(x + tw + 9.0, row.y + 38.0);
-    let d = if tuning { -1.0 } else { 1.0 };
-    ui.triangle(
-        c + Vec2::new(-3.5, -2.0 * d),
-        c + Vec2::new(3.5, -2.0 * d),
-        c + Vec2::new(0.0, 2.5 * d),
-        tone,
-    );
-    res.clicked
 }
 
 /// Who plays the seat: a list for whoever may change it, the person's state,
@@ -912,6 +1028,10 @@ fn control_cell(
         Ok(at) => {
             if let Some(d) = difficulty {
                 lineup.roster.seats[at].ai.difficulty = d;
+                // A new AI shows its settings at once, however crowded the list.
+                if seat.control != Control::Ai {
+                    lineup.tuning = Some(lineup.roster.seats[at].key);
+                }
             }
             if lineup.mode == Mode::Survival {
                 lineup.roster.seats[at].team = 0;
@@ -944,20 +1064,6 @@ pub(super) fn control_label(seat: &Seat) -> &'static str {
         Control::Closed => CONTROL[0],
         Control::Ai => CONTROL[1 + difficulty_at(seat.ai.difficulty)],
     }
-}
-
-/// An AI's tuning in a line: "Commander \u{b7} Aggressive \u{b7} Air \u{b7} 50%".
-pub(super) fn tuning_label(ai: &mc_sim::AiConfig) -> String {
-    let brain = match ai.brain {
-        Brain::Commander => "Commander",
-        Brain::Classic => "Classic",
-    };
-    format!(
-        "{brain}  \u{b7}  {}  \u{b7}  {}  \u{b7}  adapts {}%",
-        doctrine_label(ai.doctrine),
-        force_label(ai.domain_weights),
-        ai.adaptation
-    )
 }
 
 fn difficulty_at(d: Difficulty) -> usize {
@@ -1089,13 +1195,6 @@ fn team_rail(ui: &mut Ui, x: f32, top: f32, bottom: f32, team: u8) {
     ui.hline(x, bottom - 1.0, 5.0, rgb(palette::LINE, 0.55));
 }
 
-fn force_label(weights: [u8; 3]) -> &'static str {
-    FORCE_PRESETS
-        .iter()
-        .position(|w| *w == weights)
-        .map_or("Custom", |i| FORCE_LABELS[i])
-}
-
 /// Every colour for seat `i`; one another commander wears shows their seat
 /// number, and picking it swaps the two.
 /// Swatches a line of the colour strip `width` wide holds.
@@ -1174,85 +1273,5 @@ fn colour_picker(ui: &mut Ui, lineup: &mut Lineup, i: usize, area: Rect) {
         lineup.roster.take_color(i, n);
         lineup.coloring = None;
         ui.audio.play(Sfx::Tick);
-    }
-}
-
-/// Doctrine, force preference and adaptation for an AI seat, opened under its row.
-fn ai_tuning(ui: &mut Ui, seat: &mut Seat, area: Rect) {
-    ui.fill(area, ink(0.35));
-    ui.fill(
-        Rect::new(area.x, area.y, 2.0, area.h),
-        rgb(palette::ACCENT, 0.6),
-    );
-    let key = seat.key as usize;
-    let ai = &mut seat.ai;
-    let gap = 14.0;
-    let w = (area.w - 24.0 - 3.0 * gap) / 4.0;
-    let field = |k: f32| Rect::new(area.x + 12.0 + k * (w + gap), area.y + 30.0, w, 32.0);
-    for (k, label) in ["Mind", "Doctrine", "Force Preference", "Adaptation"]
-        .into_iter()
-        .enumerate()
-    {
-        let f = field(k as f32);
-        ui.text(
-            f.x,
-            f.y - 12.0,
-            type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
-            label,
-        );
-    }
-    const DOCTRINES: [Doctrine; 4] = [
-        Doctrine::Adaptive,
-        Doctrine::Aggressive,
-        Doctrine::Economic,
-        Doctrine::Defensive,
-    ];
-    let at = DOCTRINES
-        .iter()
-        .position(|d| *d == ai.doctrine)
-        .unwrap_or(0);
-    // Which AI plays the seat: the planning Commander or the classic one.
-    const BRAINS: [Brain; 2] = [Brain::Commander, Brain::Classic];
-    let brain_at = BRAINS.iter().position(|b| *b == ai.brain).unwrap_or(0);
-    if let Some(pick) = ui.dropdown(
-        id("ai-brain", key),
-        field(0.0),
-        &["Commander", "Classic"],
-        brain_at,
-        true,
-    ) {
-        ai.brain = BRAINS[pick];
-    }
-    let labels = DOCTRINES.map(doctrine_label);
-    if let Some(pick) = ui.dropdown(id("ai-doctrine", key), field(1.0), &labels, at, true) {
-        ai.doctrine = DOCTRINES[pick];
-    }
-    // A custom mix (from a saved config) shows as its nearest preset until changed.
-    let at = FORCE_PRESETS
-        .iter()
-        .position(|w| *w == ai.domain_weights)
-        .unwrap_or(0);
-    if let Some(pick) = ui.dropdown(id("ai-domain", key), field(2.0), &FORCE_LABELS, at, true) {
-        ai.domain_weights = FORCE_PRESETS[pick];
-    }
-    let step = ui.stepper(
-        id("ai-adaptation", key),
-        field(3.0),
-        &format!("{}%", ai.adaptation),
-        rgb(palette::TEXT, 1.0),
-        true,
-    );
-    if step != 0 {
-        ai.adaptation = ((ai.adaptation as i32 / 25 + step).rem_euclid(5) * 25) as u8;
-    }
-}
-
-fn doctrine_label(d: Doctrine) -> &'static str {
-    match d {
-        Doctrine::Adaptive => "Adaptive",
-        Doctrine::Aggressive => "Aggressive",
-        Doctrine::Economic => "Economic",
-        Doctrine::Defensive => "Defensive",
     }
 }

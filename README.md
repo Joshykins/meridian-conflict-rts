@@ -138,7 +138,7 @@ switched in its Match Settings), and **Open to Others** at its foot takes the ma
 set up to a lobby friends join: over the internet or on your own network, public or
 private by code. The chat down the set-up's left notes every change to the match as it
 is made; in the lobby it says how friends can join and opens for typing. The lobby is the
-same screen with ready and start; leaving it goes back to the set-up. **Multiplayer** on the main menu finds games on a server or on your
+same screen with ready and start; opening is one way, and leaving the lobby closes it. **Multiplayer** on the main menu finds games on a server or on your
 own network, and its Host Game leads to the same set-up screen. Internet games go
 through `meridian-server`: it lists open games, hosts rooms by code, checks names against
 each player's device key and relays every match. `docs/SERVER.md` is the guide to running

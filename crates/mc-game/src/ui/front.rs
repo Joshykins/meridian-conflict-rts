@@ -376,14 +376,6 @@ impl Front {
                             s.open_share();
                         }
                     }
-                    Some(MultiplayerAction::Resume(resume)) => {
-                        // Leaving a lobby opened from the set-up: back to it, as it stands.
-                        self.multiplayer = None;
-                        let setup = SetupState::resume(settings, self.blueprint_hash, *resume);
-                        self.swap(Screen::Setup(setup.mode()));
-                        self.setup = Some(setup);
-                        return out;
-                    }
                     None => {}
                 }
                 // The callsign and server are remembered once they are typed.

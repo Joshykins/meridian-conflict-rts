@@ -354,51 +354,6 @@ fn each_mode_keeps_its_own_map_fog_and_sky() {
 }
 
 #[test]
-fn a_left_lobby_goes_back_to_the_plan_it_had() {
-    let mut state = survival();
-    let zones = state.lineup.zones(&state.catalog);
-    state
-        .lineup
-        .roster
-        .set_control(1, Control::Ai, zones, |_| false)
-        .unwrap();
-    let plan = state.lineup.plan();
-    let seats = plan.roster.seats.clone();
-    let catalog = std::mem::replace(
-        &mut state.catalog,
-        Catalog::new(Vec::new(), Vec::new(), Vec::new()),
-    );
-    let mut chat = crate::ui::lineup::chat::Chat::default();
-    chat.said(Some(1), "Ana".to_owned(), "gg".to_owned());
-    let back = SetupState::resume(
-        &Settings::default(),
-        0,
-        crate::ui::multiplayer::Resume {
-            catalog,
-            lineup: plan,
-            chat,
-        },
-    );
-    assert_eq!(
-        back.chat.lines.len(),
-        2,
-        "the lobby's chat comes back, and says so"
-    );
-    assert_eq!(back.mode(), Mode::Survival);
-    assert_eq!(back.lineup.roster.seats, seats);
-    assert_eq!(
-        back.request()
-            .config
-            .players
-            .iter()
-            .filter(|p| p.controller == Controller::Ai && p.team == 0)
-            .count(),
-        1,
-        "the AI defender is still beside you"
-    );
-}
-
-#[test]
 fn the_chart_is_drawn_off_the_frame_and_kept_for_coming_back() {
     let mut state = state();
     let (mut overlay, mut memory) = (Overlay::default(), Memory::default());
@@ -421,4 +376,80 @@ fn the_chart_is_drawn_off_the_frame_and_kept_for_coming_back() {
         state.lineup.chart_shown(),
         "a picture lost to another screen goes back without being drawn again"
     );
+}
+
+/// Where seat `key`'s Zone cell was drawn last frame.
+fn zone_cell(state: &SetupState, key: u8) -> Vec2 {
+    state
+        .lineup
+        .zone_cells
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, at)| *at)
+        .expect("the seat's row is on screen")
+}
+
+#[test]
+fn a_zone_cell_picks_a_commander_up_and_the_chart_puts_them_down() {
+    let mut state = state();
+    let Some(big) = state.catalog.maps.iter().position(|m| m.starts >= 4) else {
+        return;
+    };
+    state
+        .lineup
+        .set_map(&state.catalog, big, |_| false)
+        .unwrap();
+    state.seat_teams_for_shot(2);
+    let (mut overlay, mut memory) = (Overlay::default(), Memory::default());
+    frame(&mut state, &mut overlay, &mut memory, &Input::default());
+    let ai = state.lineup.roster.seats[1];
+    let free_zone = |state: &SetupState| -> Option<u8> {
+        (0..state.lineup.markers.len() as u8).find(|&n| {
+            !state
+                .lineup
+                .roster
+                .seats
+                .iter()
+                .any(|s| s.open() && s.start == n)
+        })
+    };
+    // The AI's Zone cell, then where it goes on the chart: an AI moves, not you.
+    let mine = state.lineup.roster.seats[0].start;
+    let cell = zone_cell(&state, ai.key);
+    click(&mut state, &mut overlay, &mut memory, cell);
+    assert!(state.lineup.placing(), "the cell picks the commander up");
+    let target = match free_zone(&state) {
+        Some(n) => n,
+        None => mine,
+    };
+    let at = state.lineup.markers[target as usize];
+    click(&mut state, &mut overlay, &mut memory, at);
+    assert!(!state.lineup.placing(), "and the chart puts them down");
+    assert_eq!(state.lineup.roster.seats[1].start, target);
+    if target == mine {
+        assert_eq!(
+            state.lineup.roster.seats[0].start, ai.start,
+            "whoever held the zone takes theirs"
+        );
+    } else {
+        assert_eq!(state.lineup.roster.seats[0].start, mine, "you stay put");
+    }
+
+    // A held marker picks its commander up; Escape puts them down and stays on the screen.
+    let held = state.lineup.markers[state.lineup.roster.seats[1].start as usize];
+    click(&mut state, &mut overlay, &mut memory, held);
+    assert!(state.lineup.placing());
+    let escape = Input {
+        keys: vec![crate::ui::Key::Escape],
+        ..Default::default()
+    };
+    assert!(
+        frame(&mut state, &mut overlay, &mut memory, &escape).is_none(),
+        "Escape cancels the move, not the screen"
+    );
+    assert!(!state.lineup.placing());
+    assert!(matches!(
+        frame(&mut state, &mut overlay, &mut memory, &escape),
+        Some(SetupAction::Back)
+    ));
 }

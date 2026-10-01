@@ -1188,6 +1188,84 @@ impl<'a> Ui<'a> {
         None
     }
 
+    /// `Label  Value ▾` in a slim box over `options`: a click opens the whole
+    /// list (the dropdown's, without its arrows, for a line of several).
+    /// Returns the new index when it changes.
+    pub fn choice(
+        &mut self,
+        id: Id,
+        r: Rect,
+        label: &str,
+        options: &[&str],
+        selected: usize,
+        enabled: bool,
+    ) -> Option<usize> {
+        if let Some((from, i)) = self.mem.picked {
+            if from == id {
+                self.mem.picked = None;
+                return (i != selected).then_some(i);
+            }
+        }
+        let open = self.mem.popup.as_ref().is_some_and(|p| p.id == id);
+        let res = self.interact(id, r, enabled);
+        let glow = if open { 1.0 } else { res.glow };
+        self.fill(r, ink(0.35 + 0.15 * glow));
+        self.frame(
+            r,
+            if open {
+                rgb(palette::ACCENT, 0.7)
+            } else {
+                rgb(palette::LINE, 0.14 + 0.3 * glow)
+            },
+        );
+        let mut x = r.x + 9.0;
+        if !label.is_empty() {
+            x = self.text(
+                x,
+                r.mid_y(),
+                type_scale::MICRO,
+                rgb(palette::DIM, if enabled { 1.0 } else { 0.6 }),
+                label,
+            ) + 7.0;
+        }
+        let value = options.get(selected).copied().unwrap_or("");
+        let tone = match (open, enabled) {
+            (true, _) => rgb(palette::ACCENT, 1.0),
+            (false, true) => rgb(palette::TEXT, 0.85 + 0.15 * glow),
+            (false, false) => rgb(palette::TEXT, 0.6),
+        };
+        let caret = if enabled { 16.0 } else { 6.0 };
+        self.text_fit_left(
+            x,
+            r.mid_y(),
+            r.right() - caret - x,
+            type_scale::CAPTION,
+            tone,
+            value,
+        );
+        if enabled {
+            let c = Vec2::new(r.right() - 10.0, r.mid_y() + if open { -1.0 } else { 1.0 });
+            let flip = if open { -1.0 } else { 1.0 };
+            self.triangle(
+                c + Vec2::new(-3.5, -2.0 * flip),
+                c + Vec2::new(3.5, -2.0 * flip),
+                c + Vec2::new(0.0, 2.0 * flip),
+                rgb(palette::DIM, 0.8 + 0.2 * glow),
+            );
+        }
+        if res.clicked && enabled {
+            self.audio.play(Sfx::Select);
+            self.mem.popup = Some(Popup {
+                id,
+                anchor: r,
+                shift: self.shift,
+                options: options.iter().map(|o| o.to_string()).collect(),
+                selected,
+            });
+        }
+        None
+    }
+
     /// The open dropdown's list, over everything else. Call once, last, each
     /// frame the screen draws: a click on a row picks it, a click anywhere
     /// else (or Escape) closes the list.

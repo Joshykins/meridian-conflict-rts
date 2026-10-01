@@ -182,12 +182,14 @@ impl Share {
         let what = lineup.card(catalog).map_or(String::new(), |m| {
             format!("{} on {}", lineup.mode.label(), m.name)
         });
-        ui.text(
+        // Opening is one way: say so before it is done.
+        ui.text_fit_left(
             area.x,
             area.y + 4.0,
+            area.w,
             type_scale::BODY,
             rgb(palette::DIM, 1.0),
-            &format!("{what}, as set up here. Friends join from Multiplayer."),
+            &format!("{what}, as set up here. Once open it stays open: leaving closes the lobby."),
         );
         let tile_w = (area.w - 12.0) * 0.5;
         let mut y = area.y + 36.0;

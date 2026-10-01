@@ -1,17 +1,13 @@
-//! Match settings, out of the way: a slim bar over the chart names the map and
-//! sums up the rules, and its Settings button opens a sheet with all of them
-//! (the theatre, the rules, the sky, your callsign). Skirmish, the lobby and
-//! survival all use it, so their set-up screens keep their room for the chart
-//! and the commanders.
+//! Match settings, out of the way: a card at the top of the left column names
+//! the map and sums up the rules, and its Settings button opens a sheet with
+//! all of them (the theatre, the rules, the sky, your callsign). The chat runs
+//! under the card. Skirmish, survival and the lobby all use it, so their set-up
+//! screens keep the middle for the chart.
 
 use super::super::maps::{Browser, MapCard};
 use super::super::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use crate::audio::Sfx;
 use glam::Vec2;
-
-/// Height of the bar over the chart, and the gap under it.
-pub const BAR_H: f32 = 64.0;
-pub const BAR_GAP: f32 = 22.0;
 
 /// The settings sheet: open or not, and how far it has faded in.
 #[derive(Default)]
@@ -20,9 +16,9 @@ pub struct Sheet {
     shown: f32,
 }
 
-/// What the bar was asked for.
+/// What the match card was asked for.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BarAsk {
+pub enum CardAsk {
     ChangeMap,
     Settings,
 }
@@ -159,10 +155,11 @@ pub fn sheet_columns(body: Rect) -> (Rect, Rect) {
 /// The sheet's usual size.
 pub const SHEET: Vec2 = Vec2::new(1000.0, 540.0);
 
-/// The bar over the chart in `r`: the map's thumbnail, name and facts, then
-/// `chips` (a word on each setting) as far as they fit, then Change Map (for
-/// whoever may plan) and Settings.
-pub fn bar(
+/// The match card in the width of `r`, from its top: the map's thumbnail,
+/// name and facts, then `chips` (a word on each setting) in as many lines as
+/// they need, then Change Map (for whoever may plan) and Settings. Returns
+/// what was asked and the card's height.
+pub fn card(
     ui: &mut Ui,
     r: Rect,
     browser: &mut Browser,
@@ -170,123 +167,133 @@ pub fn bar(
     selected: usize,
     chips: &[String],
     host: bool,
-) -> Option<BarAsk> {
-    ui.fill(r, ink(0.5));
-    ui.gradient_h(r, rgb(palette::ACCENT, 0.10), rgb(palette::ACCENT, 0.0));
-    ui.frame(r, rgb(palette::LINE, 0.14));
-    ui.fill(Rect::new(r.x, r.y, 3.0, r.h), rgb(palette::ACCENT, 1.0));
+) -> (Option<CardAsk>, f32) {
     let mut ask = None;
+    let side = (r.w * 0.3).clamp(72.0, 104.0);
+    let head = Rect::new(r.x, r.y, r.w, side + 20.0);
+    // The map: a click on it opens the browser too.
+    let res = ui.interact(id("card-map", 0), head, host && !maps.is_empty());
+    ui.fill(head, ink(0.5));
+    ui.gradient_h(
+        head,
+        rgb(palette::ACCENT, 0.12 + 0.08 * res.glow),
+        rgb(palette::ACCENT, 0.0),
+    );
+    ui.frame(head, rgb(palette::LINE, 0.14 + 0.2 * res.glow));
+    ui.fill(
+        Rect::new(head.x, head.y, 3.0, head.h),
+        rgb(palette::ACCENT, 1.0),
+    );
+    if res.clicked && host {
+        ui.audio.play(Sfx::Select);
+        ask = Some(CardAsk::ChangeMap);
+    }
+    match maps.get(selected) {
+        Some(m) => {
+            let thumb = Rect::new(head.x + 12.0, head.y + 10.0, side, side);
+            browser.thumb(ui, selected, thumb, 0.92 + 0.08 * res.glow);
+            let x = thumb.right() + 14.0;
+            let w = head.right() - x - 10.0;
+            ui.text_fit_left(
+                x,
+                head.y + 26.0,
+                w,
+                type_scale::ITEM,
+                rgb(palette::ACCENT, 0.9 + 0.1 * res.glow),
+                &m.name,
+            );
+            let lines = [
+                format!(
+                    "{:.0} km  \u{b7}  {} Players  \u{b7}  {}",
+                    m.km,
+                    m.starts,
+                    m.size_class().label()
+                ),
+                format!("{}  \u{b7}  {}", m.style.label(), m.biome.label()),
+                format!("{} Ore Fields", m.ores),
+            ];
+            let pitch = ((side - 30.0) / 3.0).min(19.0);
+            for (k, line) in lines.iter().enumerate() {
+                ui.text_fit_left(
+                    x + 1.0,
+                    head.y + 52.0 + k as f32 * pitch,
+                    w,
+                    type_scale::MICRO,
+                    rgb(palette::DIM, 1.0),
+                    line,
+                );
+            }
+        }
+        None => {
+            ui.text(
+                head.x + 20.0,
+                head.mid_y(),
+                type_scale::BODY,
+                rgb(palette::WARN, 1.0),
+                "No maps in maps/",
+            );
+        }
+    }
 
-    // The buttons from the right.
+    // The chips, in lines across the card's width.
+    let (chip_h, gap) = (26.0, 6.0);
+    let mut y = head.bottom() + 10.0;
+    let mut x = r.x;
+    for chip in chips {
+        let cw = (ui.text_width(type_scale::MICRO, chip) + 20.0).min(r.w);
+        if x > r.x && x + cw > r.right() {
+            x = r.x;
+            y += chip_h + gap;
+        }
+        let c = Rect::new(x, y, cw, chip_h);
+        ui.fill(c, ink(0.4));
+        ui.frame(c, rgb(palette::LINE, 0.16));
+        ui.text_fit_left(
+            c.x + 10.0,
+            c.mid_y(),
+            cw - 20.0,
+            type_scale::MICRO,
+            rgb(palette::TEXT, 0.85),
+            chip,
+        );
+        x = c.right() + gap;
+    }
+    if !chips.is_empty() {
+        y += chip_h + 10.0;
+    }
+
+    // The buttons, side by side across the card.
     let bh = 38.0;
-    let by = r.mid_y() - bh * 0.5;
-    let settings = Rect::new(r.right() - 12.0 - 120.0, by, 120.0, bh);
+    let settings = if host {
+        let half = (r.w - 10.0) * 0.5;
+        if ui.button(
+            id("card-change-map", 0),
+            Rect::new(r.x, y, half, bh),
+            "Change Map",
+            ButtonKind::Secondary,
+            !maps.is_empty(),
+        ) {
+            ui.audio.play(Sfx::Select);
+            ask = Some(CardAsk::ChangeMap);
+        }
+        Rect::new(r.x + half + 10.0, y, half, bh)
+    } else {
+        Rect::new(r.x, y, r.w, bh)
+    };
     if ui.button(
-        id("bar-settings", 0),
+        id("card-settings", 0),
         settings,
-        "Settings",
+        if host { "Settings" } else { "Match Settings" },
         ButtonKind::Secondary,
         true,
     ) {
         ui.audio.play(Sfx::Select);
-        ask = Some(BarAsk::Settings);
+        ask = Some(CardAsk::Settings);
     }
-    let mut right = settings.x - 10.0;
-    if host {
-        let change = Rect::new(right - 136.0, by, 136.0, bh);
-        if ui.button(
-            id("bar-change-map", 0),
-            change,
-            "Change Map",
-            ButtonKind::Secondary,
-            true,
-        ) {
-            ui.audio.play(Sfx::Select);
-            ask = Some(BarAsk::ChangeMap);
-        }
-        right = change.x - 10.0;
-    }
-
-    // The map on the left; a click on it opens the browser too.
-    let Some(m) = maps.get(selected) else {
-        ui.text(
-            r.x + 20.0,
-            r.mid_y(),
-            type_scale::BODY,
-            rgb(palette::WARN, 1.0),
-            "No maps in maps/",
-        );
-        return ask;
-    };
-    let side = r.h - 14.0;
-    let thumb = Rect::new(r.x + 12.0, r.y + 7.0, side, side);
-    browser.thumb(ui, selected, thumb, 1.0);
-    let x = thumb.right() + 16.0;
-    // The name and facts take what the chips leave them, but never less than this.
-    let text_min = 160.0;
-    let name_w = ui
-        .text_width(type_scale::ITEM, &m.name)
-        .max(ui.text_width(type_scale::MICRO, &facts(m)))
-        .clamp(text_min, 360.0);
-    let map_hit = Rect::new(r.x, r.y, (x + name_w - r.x).min(right - r.x), r.h);
-    let res = ui.interact(id("bar-map", 0), map_hit, host);
-    if res.clicked && host {
-        ui.audio.play(Sfx::Select);
-        ask = Some(BarAsk::ChangeMap);
-    }
-    let text_w = (right - x - 12.0).clamp(0.0, name_w);
-    ui.text_fit_left(
-        x,
-        r.mid_y() - 10.0,
-        text_w,
-        type_scale::ITEM,
-        rgb(palette::ACCENT, 0.9 + 0.1 * res.glow),
-        &m.name,
-    );
-    ui.text_fit_left(
-        x + 1.0,
-        r.mid_y() + 13.0,
-        text_w,
-        type_scale::MICRO,
-        rgb(palette::DIM, 1.0),
-        &facts(m),
-    );
-
-    // Chips, right to left from the buttons, as many as fit whole.
-    let mut cx = right - 6.0;
-    let floor = x + text_w + 20.0;
-    for chip in chips.iter().rev() {
-        let cw = ui.text_width(type_scale::CAPTION, chip) + 24.0;
-        if cx - cw < floor {
-            break;
-        }
-        let c = Rect::new(cx - cw, r.mid_y() - 14.0, cw, 28.0);
-        ui.fill(c, ink(0.4));
-        ui.frame(c, rgb(palette::LINE, 0.16));
-        ui.text(
-            c.x + 12.0,
-            c.mid_y(),
-            type_scale::CAPTION,
-            rgb(palette::TEXT, 0.85),
-            chip,
-        );
-        cx = c.x - 8.0;
-    }
-    ask
+    (ask, y + bh - r.y)
 }
 
-/// The map's facts under its name in the bar.
-fn facts(m: &MapCard) -> String {
-    format!(
-        "{:.0} km  \u{b7}  {} Players  \u{b7}  {}  \u{b7}  {}",
-        m.km,
-        m.starts,
-        m.style.label(),
-        m.biome.label()
-    )
-}
-
-/// The bar's chip for the sky.
+/// The card's chip for the sky.
 pub fn sky_chip(sky: &mc_data::weather::SkyChoice) -> String {
     match (sky.preset, sky.time) {
         (None, None) => "Map's Own Sky".to_owned(),
@@ -296,28 +303,12 @@ pub fn sky_chip(sky: &mc_data::weather::SkyChoice) -> String {
     }
 }
 
-/// The bar's chip for fog of war.
+/// The card's chip for fog of war.
 pub fn fog_chip(fog: bool) -> String {
     if fog { "Fog of War" } else { "No Fog" }.to_owned()
 }
 
-/// The bar's chip for a seed.
+/// The card's chip for a seed.
 pub fn seed_chip(seed: u64) -> String {
     format!("Seed {:04X}-{:04X}", seed >> 16 & 0xFFFF, seed & 0xFFFF)
-}
-
-/// Where the bar goes over a chart in `centre`, and the chart's area under it
-/// (`below` is the chart's caption). The bar spans the centre, but no more than
-/// a little wider than the chart on a very wide screen.
-pub fn over_chart(centre: Rect, below: f32) -> (Rect, Rect) {
-    let chart = Rect::new(
-        centre.x,
-        centre.y + BAR_H + BAR_GAP,
-        centre.w,
-        centre.h - BAR_H - BAR_GAP,
-    );
-    let side = chart.w.min(chart.h - below);
-    let w = (side + 400.0).min(centre.w);
-    let bar = Rect::new(centre.x + (centre.w - w) * 0.5, centre.y, w, BAR_H);
-    (bar, chart)
 }
