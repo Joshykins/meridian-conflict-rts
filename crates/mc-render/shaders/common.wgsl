@@ -373,6 +373,54 @@ fn grad_noise2(xy: vec2<f32>, cell: f32) -> f32 {
     return clamp(mix(mix(v00, v10, u.x), mix(v01, v11, u.x), u.y) * 0.70710678 * 0.5 + 0.5, 0.0, 1.0);
 }
 
+// ---- Molten rock and cooling cracks: blast craters' glassed pools (terrain.wgsl
+// craters_at), molten ground (ground.wgsl molten), rock and ice faces. ----
+
+// Molten rock's glow at `t` (0 cold, 1 white-hot), in HDR: the brightness climbs
+// steeply with the heat, so a red crack is dim beside a yellow pool.
+fn crater_heat_rgb(t: f32) -> vec3<f32> {
+    let k = clamp(t, 0.0, 1.0);
+    var c = mix(vec3<f32>(0.32, 0.018, 0.0), vec3<f32>(1.0, 0.2, 0.02), smoothstep(0.08, 0.42, k));
+    c = mix(c, vec3<f32>(1.0, 0.52, 0.14), smoothstep(0.42, 0.72, k));
+    c = mix(c, vec3<f32>(1.0, 0.86, 0.66), smoothstep(0.75, 1.0, k));
+    return c * (k * 1.5 + k * k * k * 6.0);
+}
+
+// Cooling cracks: cells one unit across. x how far from the nearest crack (F2 - F1, in
+// cells), y the nearest cell's own random number.
+fn crater_cells(p: vec2<f32>) -> vec2<f32> {
+    let i = floor(p);
+    let f = p - i;
+    var d1 = 8.0;
+    var d2 = 8.0;
+    var id = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let g = vec2<f32>(f32(x), f32(y));
+            let h = i + g;
+            let r = g + vec2<f32>(hash21(h), hash21(h + 19.7)) * 0.8 + 0.1 - f;
+            let d = dot(r, r);
+            if d < d1 {
+                d2 = d1;
+                d1 = d;
+                id = hash21(h + 7.3);
+            } else if d < d2 {
+                d2 = d;
+            }
+        }
+    }
+    return vec2<f32>(sqrt(d2) - sqrt(d1), id);
+}
+
+// A crack line's cover of a pixel: `edge` from crater_cells, `width` in cells, `pc`
+// the pixel in cells. Thinner than a pixel it fades by the share it covers; once the
+// cells themselves near a pixel it becomes their average, so it never sparkles.
+fn crater_crack(edge: f32, width: f32, pc: f32) -> f32 {
+    let aa = max(width, pc * 1.5);
+    let line = (1.0 - smoothstep(0.0, aa, edge)) * (width / aa);
+    return mix(line, width * 1.6, smoothstep(0.25, 0.7, pc));
+}
+
 // ACES filmic curve (Narkowicz fit).
 fn tonemap(x: vec3<f32>) -> vec3<f32> {
     let a = 2.51;

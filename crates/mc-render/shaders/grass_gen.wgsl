@@ -22,7 +22,7 @@ struct Press {
     a: vec2<f32>,
     b: vec2<f32>,
     // Mover: half length, half width. Track: half gauge, one track's width.
-    // Scorch: radius, strength. Lot: unused.
+    // Scorch: radius, strength. Molten: radius, heat. Lot: unused.
     r: vec2<f32>,
     // Mover: travel direction (cos/sin packed as f16), weight. Track: how fresh.
     s: f32,
@@ -35,6 +35,8 @@ const PRESS_SCORCH: u32 = 3u;
 const PRESS_TRACK: u32 = 4u;
 // A boulder, ruin or other prop on the ground: centre, radius.
 const PRESS_STONE: u32 = 5u;
+// Molten ground (a stain with STAIN_MOLTEN): centre.
+const PRESS_MOLTEN: u32 = 6u;
 
 //!rust crate::renderer::grass::GrassPush
 struct GrassPush {
@@ -180,11 +182,11 @@ fn cs_gather_stains(@builtin(global_invocation_id) id: vec3<u32>) {
     p.a = s.pos;
     p.b = vec2<f32>(0.0);
     if id.x < scorches {
-        if !in_reach(s.pos, s.radius * 1.3) {
+        if !in_reach(s.pos, s.radius * 1.4) {
             return;
         }
         p.r = vec2<f32>(s.radius, f32(s.strength_seed & 0xFFu) / 255.0);
-        p.kind = PRESS_SCORCH;
+        p.kind = select(PRESS_SCORCH, PRESS_MOLTEN, (s.strength_seed & STAIN_MOLTEN) != 0u);
     } else {
         if !in_reach(s.pos, s.radius * 1.5) {
             return;
@@ -290,6 +292,7 @@ fn cs_trample(
             case PRESS_LOT: { reach = p.r.x + 1.5; }
             case PRESS_STONE: { reach = p.r.x + 1.0; }
             case PRESS_SCORCH: { reach = p.r.x * 1.3; }
+            case PRESS_MOLTEN: { reach = p.r.x * 1.4; }
             default: {
                 box_lo = min(p.a, p.b);
                 box_hi = max(p.a, p.b);
@@ -361,6 +364,13 @@ fn cs_trample(
             case PRESS_SCORCH: {
                 let d = distance(xy, p.a);
                 burnt = max(burnt, (1.0 - smoothstep(0.55, 1.1, d / max(p.r.x, 0.3))) * mix(0.55, 1.0, p.r.y));
+            }
+            case PRESS_MOLTEN: {
+                // Nothing grows in the pool, and the grass round it is burnt black. It
+                // comes back only as the cold pool fades out (ground.wgsl `molten`).
+                let d = distance(xy, p.a) / max(p.r.x, 0.3);
+                stands = max(stands, (1.0 - smoothstep(0.75, 1.0, d)) * smoothstep(0.0, 0.08, p.r.y));
+                burnt = max(burnt, 1.0 - smoothstep(0.9, 1.4, d));
             }
             default: {
                 // Both tracks of a vehicle's run.

@@ -4,20 +4,19 @@
 //! and shows up as the burst lands. The sim's charcoal scorch for the same hit lies
 //! round it.
 //!
-//! Presentation only: craters are ground stains with `STAIN_CRATER` set (ground.wgsl
+//! Presentation only: craters are ground stains with `stain::CRATER` set (ground.wgsl
 //! `fs_stain` draws a bowl, lip and spoil for them), uploaded after the sim's own
 //! stains. Nothing is made up after the fact: a wreck first seen (map wreckage, or one
 //! scrolled into view) gets none. Beams, plasma and the heavy rail mark the ground
 //! their own way; fire weapons scorch, they do not dig.
 
 use super::Renderer;
+use crate::gpu_consts::stain;
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::{SimEvent, StainInstance};
 
 /// Craters kept, at most; past that the oldest go first.
 const MAX_CRATERS: usize = 1024;
-/// `strength_seed` bit that makes a stain a crater.
-const STAIN_CRATER: u32 = 1 << 31;
 /// Smallest splash, metres, that digs a crater. A tank gun's round or a light rocket
 /// only scorches.
 const MIN_SPLASH: f32 = 5.0;
@@ -51,7 +50,7 @@ impl ImpactCraters {
             StainInstance {
                 pos: at.to_array(),
                 radius,
-                strength_seed: strength | seed << 8 | STAIN_CRATER,
+                strength_seed: strength | seed << 8 | stain::CRATER,
             },
         ));
     }

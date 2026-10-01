@@ -9,17 +9,16 @@
 //! The ground takes time to melt by how high the channel ran over it (`heat_up`): at
 //! once under a shot laid along the ground, seconds under one struck down from the air.
 //!
-//! Presentation only. The molten track is ground stains with `STAIN_MOLTEN` set, whose
+//! Presentation only. The molten track is ground stains with `stain::MOLTEN` set, whose
 //! low byte is the heat left (0 to 255), rewritten every frame as the track cools, and
 //! uploaded after the impact craters.
 
 use super::{Renderer, PUFF_BOLT, PUFF_CLOD, PUFF_SPARK, PUFF_TREE_SMOKE};
+use crate::gpu_consts::stain;
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::{ProjectileInstance, StainInstance, PROJECTILE_FADE_BEAM};
 use std::mem::size_of;
 
-/// `strength_seed` bit that makes a stain molten ground (ground.wgsl `molten`).
-const STAIN_MOLTEN: u32 = 1 << 30;
 /// Molten patches kept, at most; the oldest go first.
 const MAX_MOLTEN: usize = 8192;
 /// Colour byte of a lightning stroke among the fading beams (sprites.wgsl).
@@ -198,7 +197,7 @@ impl BoreFx {
             self.stains.push(StainInstance {
                 pos: m.pos.to_array(),
                 radius: m.radius * (0.35 + 0.65 * warm),
-                strength_seed: STAIN_MOLTEN
+                strength_seed: stain::MOLTEN
                     | ((heat * 255.0).round() as u32).min(255)
                     | (m.seed & 0x7FFF) << 8,
             });

@@ -665,6 +665,16 @@ shared! {
         pub const DEEP: f32 = 14.0;
     }
 
+    /// Kind bits of a ground stain's `strength_seed` (ground.wgsl `fs_stain`,
+    /// grass_gen.wgsl `cs_gather_stains`); neither set is a plain scorch.
+    pub mod stain as "STAIN_" {
+        /// A crater where a blast struck the ground (renderer/impact_craters.rs).
+        pub const CRATER: u32 = 1 << 31;
+        /// Ground left molten (renderer/bore_fx.rs): the low byte is the heat left, 255
+        /// fresh to 0 cold, rewritten every frame. No grass grows in the pool.
+        pub const MOLTEN: u32 = 1 << 30;
+    }
+
     /// Bits of a selection mark's `kind` (renderer `Mark`, icons.wgsl `fs_ring`).
     pub mod mark as "MARK_" {
         /// Hovered; without it the mark is a selection.
