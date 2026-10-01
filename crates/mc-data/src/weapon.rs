@@ -77,6 +77,8 @@ pub struct Weapon {
     pub split: bool,
     pub proximity: Fx,
     pub burn_ticks: u16,
+    /// Damage a second its burning ground does to each enemy standing in it.
+    pub burn_dps: Fx,
     pub rear: bool,
     /// Which way the weapon rests and its arc is centred, off the nose (180 for `rear`).
     /// A limited arc off the nose also limits what it takes as a target (`RawWeapon::facing`).

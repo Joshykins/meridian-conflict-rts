@@ -2945,7 +2945,7 @@ impl World {
             if weapon.burn_ticks > 0 {
                 // The patch stays where the bomb landed. Units burn by standing in it.
                 let radius =
-                    (Fx::from_int(4) + weapon.splash * Fx::ratio(11, 20)).min(Fx::from_int(16));
+                    (Fx::from_int(4) + weapon.splash * Fx::ratio(11, 20)).min(Fx::from_int(32));
                 let xy = hit.point.xy();
                 // A stream gun lands ten rounds a second in one place: a round that falls
                 // within half a patch of one the same gun lit rekindles it rather than
@@ -2976,6 +2976,7 @@ impl World {
                         z,
                         radius,
                         weapon.burn_ticks,
+                        weapon.burn_dps,
                         owner,
                         source,
                         weapon.target_mask,

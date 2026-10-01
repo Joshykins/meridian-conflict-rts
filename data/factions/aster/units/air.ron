@@ -155,12 +155,14 @@
 ),
 (
  key: "aster_t2_fire_bomber", name: "Hellkite", role: "Flying Fortress Fire Bomber", title: "Fire Bomber", tech: 2, categories: ["Air"],
- health: 3687, cost: (mass: 500, energy: 17500, time: 3120),
+ health: 3687, cost: (mass: 250, energy: 8750, time: 1560),
  radius: 13, height: 5, vision: 640,
- motion: (layer: Air, size: 0, speed: 89, accel: 39, turn: 35, altitude: 230, hover: false),
- weapons: [(name: "Incendiary Carpet", damage: 84, splash: 18, range: 500, reload: 9, salvo: 24, salvo_batch: 1, salvo_delay: 0.15,
+ motion: (layer: Air, size: 0, speed: 115, accel: 45, turn: 55, altitude: 280, hover: false),
+ // Big incendiaries: each leaves a patch ~29 m across that burns 20 s at 75 damage a second.
+ // Range 700: from 280 m at 115 m/s the bay opens ~640 m out, and a target must be seen first.
+ weapons: [(name: "Incendiary Carpet", damage: 84, splash: 45, range: 700, reload: 9, salvo: 24, salvo_batch: 1, salvo_delay: 0.15,
 speed: 90, trajectory: Ballistic, loft: 0.4, muzzle: (0, 0, 0.5), spread: 12, targets: ["Land", "Naval", "Structure"], color: Orange,
-burn: 10, flash: 0.2, impact: 2, trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "fire_bomb")),(name: "Dorsal AA", damage: 16.8, range: 240, reload: 0.35, speed: 650, trajectory: Direct,
+burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "fire_bomb")),(name: "Dorsal AA", damage: 16.8, range: 240, reload: 0.35, speed: 650, trajectory: Direct,
  turret_turn: 240, muzzle: (2, 0, 4.8), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), ),(name: "Port AA", damage: 13.4, range: 200, reload: 0.3, speed: 650, trajectory: Direct,
  turret_turn: 240, muzzle: (1.4, 3, 2.8), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), ),(name: "Tail AA", damage: 16.8, range: 230, reload: 0.4, speed: 650, trajectory: Direct,
  turret_turn: 240, muzzle: (-10, 0, 2.8), targets: ["Air"], color: Orange, sounds: (fire: "autocannon", impact: "shell_light"), rear: true, arc: 150,)], mesh: "fire_bomber", icon: Bomber,

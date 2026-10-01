@@ -1470,6 +1470,7 @@ impl Blueprints {
                         | (w.split as u64) << 48,
                 );
                 h.write_i64(w.proximity.0);
+                h.write_i64(w.burn_dps.0);
                 h.write_i64(w.bombard_radius.0);
                 h.write_u64(
                     w.burn_ticks as u64

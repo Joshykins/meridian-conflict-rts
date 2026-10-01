@@ -1287,6 +1287,8 @@ pub struct Fires {
     pub ticks: Vec<u16>,
     /// Ticks the patch was lit for. The renderer fades across this.
     pub span: Vec<u16>,
+    /// Damage a second to each enemy standing in it (`Weapon::burn_dps`).
+    pub dps: Vec<Fx>,
     pub owner: Vec<u8>,
     pub source: Vec<UnitId>,
     pub target_mask: Vec<u32>,
@@ -1311,6 +1313,7 @@ impl Fires {
         z: Fx,
         radius: Fx,
         ticks: u16,
+        dps: Fx,
         owner: u8,
         source: UnitId,
         target_mask: u32,
@@ -1323,6 +1326,7 @@ impl Fires {
         self.radius.push(radius);
         self.ticks.push(ticks);
         self.span.push(ticks);
+        self.dps.push(dps);
         self.owner.push(owner);
         self.source.push(source);
         self.target_mask.push(target_mask);
@@ -1335,6 +1339,7 @@ impl Fires {
         self.radius.swap_remove(i);
         self.ticks.swap_remove(i);
         self.span.swap_remove(i);
+        self.dps.swap_remove(i);
         self.owner.swap_remove(i);
         self.source.swap_remove(i);
         self.target_mask.swap_remove(i);
@@ -1348,6 +1353,7 @@ impl Fires {
             h.write_i64(self.z[i].0);
             h.write_i64(self.radius[i].0);
             h.write_u64(self.ticks[i] as u64 | (self.span[i] as u64) << 16);
+            h.write_i64(self.dps[i].0);
             h.write_u64(self.owner[i] as u64 | (self.target_mask[i] as u64) << 8);
             h.write_u32(self.source[i].0);
         }

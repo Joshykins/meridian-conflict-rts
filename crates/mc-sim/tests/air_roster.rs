@@ -519,8 +519,11 @@ fn overlapping_incendiaries_stack_and_the_patch_has_an_edge() {
     for _ in 0..10 {
         w.tick(&[]).unwrap();
     }
-    // Two patches, 30 each per second, for one second.
-    assert_eq!(w.state.units.health[t], after - Fx::from_int(60));
+    // Two patches, each the bay's `burn_dps`, for one second.
+    let bomber = w.blueprints.id_of("aster_t2_fire_bomber").unwrap();
+    let dps = w.blueprints.unit(bomber).weapons[0].burn_dps;
+    assert!(dps > Fx::ZERO);
+    assert_eq!(w.state.units.health[t], after - dps * 2);
     assert_eq!(w.state.units.health[far], far_before);
 }
 #[test]

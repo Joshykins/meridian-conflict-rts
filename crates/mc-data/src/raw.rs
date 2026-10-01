@@ -802,8 +802,12 @@ pub struct RawWeapon {
     pub split: bool,
     #[serde(default)]
     pub proximity: f64,
+    /// Seconds the ground burns where a round lands; zero: it does not.
     #[serde(default)]
     pub burn: f64,
+    /// Damage a second that burning ground does to each enemy standing in it.
+    #[serde(default = "default_burn_dps")]
+    pub burn_dps: f64,
     #[serde(default)]
     pub rear: bool,
     /// Which way a gun house rests, degrees off the nose, positive to the left
@@ -1052,6 +1056,10 @@ pub struct UnitSounds {
 
 fn one() -> u8 {
     1
+}
+
+fn default_burn_dps() -> f64 {
+    30.0
 }
 
 fn one_f64() -> f64 {
@@ -1389,6 +1397,7 @@ impl Unit {
                 split: w.split,
                 proximity: fx(w.proximity),
                 burn_ticks: ticks(w.burn).min(600) as u16,
+                burn_dps: fx(w.burn_dps.max(0.0)),
                 rear: w.rear,
                 facing: if w.facing != 0.0 {
                     Angle(steps(w.facing).round() as i64 as u16)

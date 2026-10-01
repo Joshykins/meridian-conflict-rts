@@ -470,10 +470,9 @@ impl World {
         Ok(())
     }
 
-    /// Each live patch deals 30 damage a second to enemies standing in it.
-    /// Two bombs on the same ground are two patches, so the rate is 30 times the count.
+    /// Each live patch deals its weapon's `burn_dps` to enemies standing in it.
+    /// Two bombs on the same ground are two patches, so the rate adds up.
     fn tick_fires(&mut self) {
-        let damage = Fx::ratio(30, TICKS_PER_SECOND as i64);
         let n = self.state.fires.len();
         let mut burning = Vec::new();
         for i in 0..n {
@@ -485,6 +484,7 @@ impl World {
             let owner = self.state.fires.owner[i];
             let source = self.state.fires.source[i];
             let mask = self.state.fires.target_mask[i];
+            let damage = self.state.fires.dps[i] / TICKS_PER_SECOND as i32;
             let point = pos.extend(self.state.fires.z[i]);
             let mut victims = Vec::new();
             self.index.query(pos, radius, kind::UNIT, |e| {
