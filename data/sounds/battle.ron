@@ -305,9 +305,10 @@
         ),
         "blast_small": (like: "blast", size: 0.75, peak: 0.7),
         "blast_large": (like: "blast", size: 1.5, peak: 0.88),
-        // A reactor losing containment: the commander's detonation, tighter and
-        // shorter. One sound for every tier; how far it carries comes from the blast.
-        "reactor_blast": (like: "commander_death", size: 0.75, length: 10.0, peak: 0.9),
+        // A reactor losing containment: its charge breaking loose, electric, not a
+        // nuclear roar: the electric bore's strike (titan.ron), a little tighter. One
+        // sound for every tier; how far it carries comes from the blast.
+        "reactor_blast": (like: "titan_bore_strike", size: 0.85, length: 8.0, peak: 0.9),
         // A commander's reactor going up. The biggest sound in the game, and nearly all of
         // it bass: the containment cracking, a breath of nothing while the fireball eats the
         // air, the detonation itself, and then the shock rolling out across the map for

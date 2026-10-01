@@ -34,9 +34,6 @@ pub(super) struct ReactorFx {
     left: usize,
     /// Craters of plants gone up, still crackling (`reactor_blast.rs`).
     pub(super) aftermath: Vec<Aftermath>,
-    /// Plants whose breach is under way: where, how big a blast, and when it goes up
-    /// as a fireball of the nuclear kind (`nuke_fx.rs`).
-    pub(super) detonations: Vec<(Vec3, f32, f32)>,
 }
 
 /// A plant's crater crackling after it went up.
@@ -56,7 +53,6 @@ impl ReactorFx {
             vents,
             left: 0,
             aftermath: Vec::new(),
-            detonations: Vec::new(),
         }
     }
 

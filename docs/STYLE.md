@@ -385,7 +385,9 @@ Anything standing on a plant stands on a still deck: never on a turning disc. No
 (the user turned each down, 2026-09-23 to 2026-10-01): heat sinks on tech 1 and 2, pumps
 and pistons, a turntable under the core, a big or blotchy orb, orbs on sticks, towers,
 arches, cooling towers, a cup the core sits in, plain stacked cylinders. A plant going up
-breaks its charge loose before the fireball (`renderer/reactor_blast.rs`).
+breaks its charge loose and bursts electric blue: a ball of ionised air, lightning out of it
+and along the ground, a blue shock ring. Never a fireball or a mushroom cloud (the user,
+2026-10-01); those are the commander's and the warheads' (`renderer/reactor_blast.rs`).
 
 ## The electric bore
 
