@@ -345,6 +345,8 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("regency_heart_2", 18.75, 18.0, 2, 4, &[]),
     structure("regency_heart_3", 42.5, 35.0, 3, 8, &[]),
     structure("regency_cyst", 12.9, 8.0, 1, 3, &[]),
+    structure("regency_cyst", 12.9, 12.0, 2, 3, &[]),
+    structure("regency_cyst", 12.9, 16.0, 3, 3, &[]),
     structure("regency_barb", 5.5, 8.0, 1, 1, &[[5.2, 0.0, 6.8]]),
     structure("regency_spitter", 5.5, 8.5, 1, 1, &[[4.4, 0.0, 7.4]]),
     structure("regency_palisade", 6.0, 5.4, 1, 1, &[]),

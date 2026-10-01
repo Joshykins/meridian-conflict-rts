@@ -92,6 +92,14 @@
         lore: "An armoured mass vault between two long energy cells: one building holds both.",
         weapons: {},
     ),
+    "regency_storage_t2": (
+        lore: "The vault and its cells built up a storey: more mass under armour, more charge in the cells.",
+        weapons: {},
+    ),
+    "regency_storage_t3": (
+        lore: "The largest Reliquary, its vault and cells built up again under heavier machinery.",
+        weapons: {},
+    ),
     "regency_t1_point_defense": (
         lore: "A squat armoured drum under a low turret: a three-barrelled repeater that tracks anything close and punches through it.",
         weapons: {

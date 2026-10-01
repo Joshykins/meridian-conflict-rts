@@ -7,7 +7,7 @@
 //   mass up front.
 // - Star Cage: a caged star that never explodes; Star Cages can be packed tight where ARC
 //   reactors cannot.
-// - Reliquary: one building holds mass and energy both.
+// - Reliquary: one building holds mass and energy both, in three tiers.
 // - Picket: a short-ranged brawler, more damage than a Sentinel inside its reach.
 // - Canopy: bursting flak that hurts a whole flight, not one plane.
 // - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
@@ -273,7 +273,9 @@
         mesh: "regency_heart_3", icon: Power,
     ),
     // A mass vault between two energy cells: less mass than a Vault, less energy than a
-    // Capacitor Bank, in one lot and one build.
+    // Capacitor Bank, in one lot and one build. It upgrades in place, each tier holding four
+    // times the one below as ARC's stores do, for about two thirds of the mass and half the
+    // energy the two ARC stores of that tier cost together.
     (
         key: "regency_storage",
         name: "Reliquary",
@@ -285,7 +287,36 @@
         radius: 12.9, height: 8, footprint: (3, 3),
         vision: 100,
         economy: (mass_storage: 1000, energy_storage: 3000),
+        upgrades_to: "regency_storage_t2",
         mesh: "regency_cyst", icon: Storage,
+    ),
+    (
+        key: "regency_storage_t2",
+        name: "Reliquary II",
+        role: "Storage",
+        tech: 2,
+        categories: ["Land", "Economy", "Storage"],
+        health: 5400,
+        cost: (mass: 540, energy: 4400, time: 900),
+        radius: 12.9, height: 12, footprint: (3, 3),
+        vision: 100,
+        economy: (mass_storage: 4000, energy_storage: 12000),
+        upgrades_to: "regency_storage_t3",
+        mesh: "regency_cyst", icon: Storage,
+    ),
+    (
+        key: "regency_storage_t3",
+        name: "Reliquary III",
+        role: "Storage",
+        tech: 3,
+        categories: ["Land", "Economy", "Storage"],
+        health: 16200,
+        cost: (mass: 1340, energy: 17700, time: 1500),
+        radius: 12.9, height: 16, footprint: (3, 3),
+        vision: 100,
+        economy: (mass_storage: 16000, energy_storage: 48000),
+        mesh: "regency_cyst", icon: Storage,
+        sounds: (death: "blast_large"),
     ),
     // ---- Defence ------------------------------------------------------------------------
     // A plasmeric repeater on a squat mount: shorter reach than a Sentinel, a third more

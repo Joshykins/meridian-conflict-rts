@@ -77,7 +77,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_heart", 6.9, 7.5, heart::heart),
     ModelDef::new("regency_heart_2", 18.75, 18.0, heart::heart_2),
     ModelDef::new("regency_heart_3", 42.5, 35.0, heart::heart_3),
-    ModelDef::new("regency_cyst", 12.9, 8.0, cyst::cyst),
+    ModelDef::tiered(
+        "regency_cyst",
+        [(12.9, 8.0), (12.9, 12.0), (12.9, 16.0)],
+        cyst::cyst,
+    ),
     // Defence: point defence and anti-air (`defense`), the wall (`palisade`).
     ModelDef::new("regency_barb", 5.5, 8.0, defense::barb),
     ModelDef::new("regency_spitter", 5.5, 8.5, defense::spitter),
@@ -108,7 +112,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The land and air factories' tech 3, with their tech 2 kit and more.
         "regency_brood" | "regency_hatchery" => 15000,
         "regency_tidebrood" => 9000,
-        "regency_cyst" => 5000,
+        // Three tiers, and the next one's pieces waiting on each.
+        "regency_cyst" => 6000,
         // Four tiers, and the next one's pieces waiting on each.
         "regency_taproot" => 8500,
         "regency_heart" | "regency_barb" | "regency_spitter" => 4000,
