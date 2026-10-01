@@ -18,10 +18,13 @@ mod energy;
 mod groups;
 mod layout;
 mod lots;
+mod mine_sites;
+mod production;
 mod projects;
 mod salvage;
 mod sea;
 mod staging;
+mod theatre;
 mod upgrades;
 use crate::command::{Command, PlayerCommand, MAX_COMMAND_UNITS};
 use crate::spatial::kind;
@@ -47,7 +50,7 @@ const ENERGY_PER_MASS: i32 = 6;
 /// Mines a side puts down before anything but its first factory.
 const FIRST_MINES: usize = 3;
 /// Open-ground mine spots whose share is counted per search, nearest first.
-const BARE_MINE_PROBES: usize = 8;
+const BARE_MINE_PROBES: usize = 12;
 /// Enemies this close to a held point count as a raid.
 const RAID_RADIUS: Fx = Fx::from_int(550);
 /// Commander stays inside this radius of the start.
@@ -94,6 +97,10 @@ pub struct AiState {
     /// Where its buildings were destroyed lately (`danger.rs`).
     #[serde(default)]
     losses: Vec<Loss>,
+    /// Which enemy starts its land army can walk to, found on the first think
+    /// (`theatre.rs`).
+    #[serde(default)]
+    land_route: Option<theatre::LandRoute>,
 }
 
 impl AiState {
@@ -109,6 +116,7 @@ impl AiState {
         h.write_u64(self.raids as u64);
         h.write_u64(self.waves as u64 | (self.production_counter as u64) << 32);
         h.write_u64(self.stance as u64 | (self.scouts_sent as u64) << 32);
+        h.write_u64(self.land_route.map_or(u64::MAX, |r| r.reaches as u64));
         match self.firebase {
             Some(p) => {
                 h.write_u64(1);
@@ -140,6 +148,7 @@ struct Census {
     anti_air: usize,
     engineer_factories: usize,
     air_factories: usize,
+    naval_factories: usize,
     /// Reclaim towers standing: where, and how far each reaches.
     towers: Vec<(FxVec2, Fx)>,
     /// Salvage units (`UnitBlueprint::is_salvager`), and those with no orders.
@@ -158,6 +167,15 @@ struct Census {
     scouts: usize,
     combat_rows: Vec<usize>,
     naval_idle: Vec<usize>,
+    /// Armed spaceships with no orders (`groups.rs`).
+    capital_idle: Vec<usize>,
+    /// Land-only combat units with no orders on a map where they cannot walk to
+    /// any enemy: they guard home and never go out with a wave (`theatre.rs`).
+    home_guard: Vec<usize>,
+    /// Land-only combat units the side has, busy or not.
+    land_bound: usize,
+    /// The land army can walk to an enemy still in the game.
+    land_route: bool,
     support_idle: Vec<usize>,
     army_fast: usize,
     max_tech: u8,
@@ -182,6 +200,7 @@ struct Planned {
     anti_air: usize,
     engineer_factories: usize,
     air_factories: usize,
+    naval_factories: usize,
     power: usize,
     /// Land radar standing, going up or queued, with its range.
     radars: Vec<(FxVec2, Fx)>,
@@ -278,6 +297,7 @@ impl World {
         let span = mc_core::perf_span!("ai.remember");
         self.remember_enemies(player);
         drop(span);
+        self.find_land_route_once(player);
         let span = mc_core::perf_span!("ai.survey");
         let mut census = self.survey_own(player);
         let intel = self.survey_intel(player, &census);
@@ -372,6 +392,7 @@ impl World {
             anti_air: census.anti_air,
             engineer_factories: census.engineer_factories,
             air_factories: census.air_factories,
+            naval_factories: census.naval_factories,
             power: census.power.len(),
             radars: census.radar.clone(),
             pd: census.pd.len(),
@@ -396,6 +417,7 @@ impl World {
             planned.engineer_factories +=
                 (bp.has(cat::FACTORY) && self.blueprint_trains_engineers(bp)) as usize;
             planned.air_factories += bp.has(cat::FACTORY | cat::AIR) as usize;
+            planned.naval_factories += (bp.has(cat::FACTORY) && adaptive::domain(bp) == 2) as usize;
             planned.power += bp.has(cat::POWER) as usize;
             planned.anti_air += bp.has(cat::DEFENSE | cat::ANTI_AIR) as usize;
             // A shield going up covers already: without this a second one was
@@ -425,8 +447,12 @@ impl World {
 
     fn survey_own(&self, player: u8) -> Census {
         let units = &self.state.units;
-        let mut c = Census::default();
-        // Land units that are where they were sent count as free, though the
+        let land_route = self.land_route_to_enemy(player);
+        let mut c = Census {
+            land_route,
+            ..Census::default()
+        };
+        // Land units and ships that are where they were sent count as free, though the
         // crowd there keeps their order from ending (`arrival.rs`).
         let arrived = self.arrived_army(player);
         for row in units.slots.iter() {
@@ -471,7 +497,9 @@ impl World {
                 && !bp.has(cat::COMMANDER)
             {
                 c.combat_rows.push(row);
-                if !recovering {
+                let stuck = !land_route && theatre::land_bound(bp);
+                c.land_bound += theatre::land_bound(bp) as usize;
+                if !recovering && !stuck {
                     c.army += 1;
                 }
             }
@@ -490,6 +518,7 @@ impl World {
                 if bp.has(cat::AIR) {
                     c.air_factories += 1;
                 }
+                c.naval_factories += (adaptive::domain(bp) == 2) as usize;
                 if idle {
                     c.factories_idle.push(row);
                 }
@@ -542,8 +571,13 @@ impl World {
                 .motion
                 .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
             {
+                let idle = idle || (!recovering && arrived.binary_search(&row).is_ok());
                 if idle && !bp.weapons.is_empty() {
                     c.naval_idle.push(row);
+                }
+            } else if bp.is_mobile() && bp.has(cat::SPACE) {
+                if idle && !bp.weapons.is_empty() {
+                    c.capital_idle.push(row);
                 }
             } else if bp.is_mobile() && bp.has(cat::AIR) {
                 if idle {
@@ -555,7 +589,11 @@ impl World {
                 }
             } else if bp.is_mobile() && !bp.weapons.is_empty() {
                 let idle = idle || (!recovering && arrived.binary_search(&row).is_ok());
-                if bp.has(cat::ARTILLERY) {
+                if !land_route && theatre::land_bound(bp) {
+                    if idle {
+                        c.home_guard.push(row);
+                    }
+                } else if bp.has(cat::ARTILLERY) {
                     if idle {
                         c.artillery_idle.push(row);
                     }
@@ -748,110 +786,6 @@ impl World {
         (size as i32 + delta).clamp(4, 40) as usize
     }
 
-    fn direct_factories(
-        &mut self,
-        player: u8,
-        census: &Census,
-        salvage: &[salvage::Field],
-        stance: Stance,
-        persona: Personality,
-        out: &mut Vec<Command>,
-    ) {
-        let mut counter = self.state.ai[player as usize].production_counter;
-        let mut composition = self.ai_composition(player);
-        let mut planned_engineers = 0;
-        let mut planned_scouts = 0;
-        let mut planned_salvagers = 0;
-        // No rally point: a finished unit rolls out idle and the army sends it
-        // to the staging point with the rest. A rally among the base's buildings
-        // jammed: units stuck a few metres short of it in the crowd never
-        // finished the move, never counted as idle and never joined a wave.
-        for &row in &census.factories_idle {
-            let Some(builder) = &self.bp(row).builder else {
-                continue;
-            };
-            let want_engineers = {
-                let n = 2 + census.factories.len() * 2;
-                match persona {
-                    Personality::Expander => n + 2,
-                    Personality::Turtle => n + 1,
-                    Personality::Aggressive => n,
-                }
-            };
-            let engineer = builder
-                .builds
-                .iter()
-                .copied()
-                .filter(|b| {
-                    let u = self.blueprints.unit(*b);
-                    u.has(cat::ENGINEER) && !u.has(cat::COMMANDER) && u.builder.is_some()
-                })
-                .max_by_key(|b| (self.blueprints.unit(*b).tech, std::cmp::Reverse(b.0)));
-            // More than one of the best tier: they put up the big plants and
-            // factories, and one alone was always busy elsewhere.
-            let missing_tech_builder = engineer.is_some_and(|id| {
-                self.blueprints.unit(id).tech > 1
-                    && composition.get(&id).copied().unwrap_or(0) < 1 + census.factories.len() / 2
-            });
-            let scout = builder
-                .builds
-                .iter()
-                .copied()
-                .find(|b| self.blueprints.unit(*b).has(cat::SCOUT));
-            let fighters: Vec<BlueprintId> = builder
-                .builds
-                .iter()
-                .copied()
-                .filter(|b| {
-                    let u = self.blueprints.unit(*b);
-                    u.is_mobile()
-                        && (!u.weapons.is_empty()
-                            || u.shield.is_some()
-                            || u.radar > Fx::ZERO
-                            || u.anti_missile > Fx::ZERO
-                            || u.drone.is_some())
-                        && !u.has(cat::COMMANDER)
-                        && !u.has(cat::ENGINEER)
-                        && !u.is_salvager()
-                })
-                .collect();
-            // The best tier missing comes at once, not on every fourth product: the
-            // count runs over all factories, and a tech 2 factory that always fell
-            // on the wrong turn made one Mason II in five minutes.
-            let blueprint = if engineer.is_some()
-                && (missing_tech_builder
-                    || (census.engineers + planned_engineers < want_engineers
-                        && (counter.is_multiple_of(4) || stance == Stance::Firebase)))
-            {
-                planned_engineers += 1;
-                engineer
-            } else if census.scouts + planned_scouts < 2 && scout.is_some() && counter % 5 == 1 {
-                planned_scouts += 1;
-                scout
-            } else if let Some(salvager) = (counter % 3 == 2)
-                .then(|| self.salvage_product(row, census, planned_salvagers, salvage))
-                .flatten()
-            {
-                planned_salvagers += 1;
-                Some(salvager)
-            } else {
-                self.choose_combat_unit(player, &fighters, &composition, stance, counter)
-            };
-            if let Some(id) = blueprint {
-                *composition.entry(id).or_insert(0) += 1;
-            }
-            counter = counter.wrapping_add(1);
-            if let Some(blueprint) = blueprint {
-                out.push(Command::Produce {
-                    factories: vec![self.state.units.id(row)],
-                    blueprint,
-                    count: 1,
-                });
-            }
-        }
-        self.state.ai[player as usize].production_counter = counter;
-    }
-
     fn direct_scouts(
         &mut self,
         player: u8,
@@ -910,6 +844,7 @@ impl World {
         out: &mut Vec<Command>,
     ) {
         self.direct_fleet(player, census, out);
+        self.direct_capital(player, census, intel, start, out);
         for &row in &census.support_idle {
             let escort = census
                 .combat_rows
@@ -929,6 +864,7 @@ impl World {
             && census.artillery_idle.is_empty()
             && census.bombers_idle.is_empty()
             && census.interceptors_idle.is_empty()
+            && census.home_guard.is_empty()
         {
             return;
         }
@@ -944,7 +880,15 @@ impl World {
                 )
             });
 
-        let mut army_idle = census.army_idle.clone();
+        // Land units that cannot walk to any enemy answer raids on their own
+        // ground with the rest (`theatre.rs`).
+        let mut army_idle: Vec<usize> = census
+            .army_idle
+            .iter()
+            .chain(&census.home_guard)
+            .copied()
+            .collect();
+        army_idle.sort_unstable();
         if let Some(&(at, enemy)) = intel.threats.first().filter(|(_, enemy)| {
             stance == Stance::Defend || enemy.distance(start) < Fx::from_int(420)
         }) {
@@ -955,8 +899,7 @@ impl World {
             };
             if enemy.distance(start) < Fx::from_int(420) {
                 // The base itself: everything goes.
-                let ids: Vec<UnitId> = census
-                    .army_idle
+                let ids: Vec<UnitId> = army_idle
                     .iter()
                     .chain(&census.artillery_idle)
                     .chain(&census.bombers_idle)
@@ -988,6 +931,27 @@ impl World {
         }
 
         self.direct_air(player, census, intel, start, staging, out);
+        // The home guard never goes out with a wave: one that went to meet a
+        // raid comes back to wait at the staging point.
+        let guard_home = staging.distance(start) + Fx::from_int(400);
+        let guard_back: Vec<usize> = army_idle
+            .iter()
+            .copied()
+            .filter(|r| census.home_guard.contains(r))
+            .filter(|&r| self.state.units.pos[r].distance(start) > guard_home)
+            .collect();
+        if !guard_back.is_empty() {
+            out.push(Command::Move {
+                units: guard_back
+                    .iter()
+                    .take(MAX_COMMAND_UNITS)
+                    .map(|&r| self.state.units.id(r))
+                    .collect(),
+                target: staging,
+                queue: false,
+            });
+        }
+        army_idle.retain(|r| !census.home_guard.contains(r));
 
         let wave = self.wave_size(player, persona);
         let ids = |rows: &[usize]| -> Vec<UnitId> {
@@ -1215,11 +1179,14 @@ impl World {
         })
     }
 
+    /// The factory a builder should put up: of domain `only` if given
+    /// (`adaptive::domain`), else the domain the side most wants.
     fn pick_factory(
         &self,
         builder_row: usize,
         max_tech: u8,
         want_air: bool,
+        only: Option<usize>,
     ) -> Option<BlueprintId> {
         let builder = self.bp(builder_row).builder.as_ref()?;
         let mut cands: Vec<BlueprintId> = builder
@@ -1233,11 +1200,16 @@ impl World {
                 // A factory with nothing to train (a yard before its hulls exist) is no use.
                 bp.has(cat::FACTORY)
                     && bp.is_structure()
+                    && only.is_none_or(|d| d == domain)
                     && bp.builder.as_ref().is_some_and(|f| !f.builds.is_empty())
                     && bp.tech <= max_tech
                     && self.state.ai[player].config.domain_weights[domain] > 0
-                    && self
-                        .find_site(
+                    && if domain == 2 {
+                        // A shipyard goes on the water nearest home (`theatre.rs`).
+                        self.shipyard_anchor(bp, self.state.players[player].start)
+                            .is_some()
+                    } else {
+                        self.find_site(
                             bp,
                             self.state.units.pos[builder_row],
                             &[],
@@ -1247,6 +1219,7 @@ impl World {
                             None,
                         )
                         .is_some()
+                    }
             })
             .collect();
         // Air factories also train engineers, and their keys sort before land,
@@ -1297,72 +1270,6 @@ impl World {
                     .unwrap_or(1)
             })
             .unwrap_or(1)
-    }
-
-    /// Nearest ore field with room for another mine, within `range` of `from`,
-    /// staying off the enemy's doorstep until the army can contest it; with
-    /// `bare`, else open ground where a mine gets at least that share of what a
-    /// whole circle of land would give it. Its centre; the builder's site search finds the lot.
-    fn free_deposit(
-        &self,
-        from: FxVec2,
-        claimed: &[Claim],
-        range: Fx,
-        intel: &Intel,
-        bare: Option<Fx>,
-    ) -> Option<FxVec2> {
-        let mine = self
-            .blueprints
-            .units
-            .iter()
-            .find(|b| b.mine.is_some() && b.tech == 1)?;
-        // Mines may stand close, but split the ground between them: keep
-        // them a reach apart, where each still has about 80% of its circle.
-        let spacing = mine.mine?.reach;
-        let open = |d: &FxVec2| {
-            d.distance(from) <= range
-                && !self.mine_within(*d, spacing)
-                // A planned mine counts like a built one. Its site can stand well off
-                // the deposit (the middle may be steep), so a check near the site
-                // alone sent every idle builder back to the same deposit, one
-                // think after another, and piled mines up around it.
-                && !claimed.iter().any(|c| {
-                    c.pos.distance(*d) < if c.mine { spacing } else { Fx::from_int(32) }
-                })
-                && intel.enemy_start.is_none_or(|e| {
-                    d.distance(e) > Fx::from_int(480) || d.distance(from) < d.distance(e)
-                })
-                && !intel.danger.hot(*d)
-        };
-        let ore = self
-            .ore_centres()
-            .into_iter()
-            .filter(|d| open(d))
-            .min_by_key(|d| (d.distance_sq(from), d.x, d.y));
-        // No ore left in range: a bare mine still pays, but only where it keeps
-        // enough ground. Filling the gaps between mines only takes ground from
-        // them: the side gains little more than the new shaft's base.
-        ore.or_else(|| {
-            let least = bare?;
-            let mut spots: Vec<FxVec2> = (1..=(range * 2 / spacing).floor_int().max(1))
-                .flat_map(|ring| {
-                    let r = spacing * ring / 2;
-                    let n = 6 * ring;
-                    (0..n)
-                        .map(move |k| from + FxVec2::from_angle(Angle((k * 65536 / n) as u16)) * r)
-                })
-                .filter(|d| self.terrain.in_bounds(*d) && open(d))
-                .collect();
-            spots.sort_by_key(|d| (d.distance_sq(from), d.x, d.y));
-            let m = mine.mine?;
-            // Against a whole circle of land, so the sea and the map's edge count as lost ground.
-            let hectares = m.reach * m.reach * Fx::ratio(355, 113) / 10000;
-            let whole = crate::mines::land_rate(&m, hectares, Fx::ZERO);
-            spots.into_iter().take(BARE_MINE_PROBES).find(|d| {
-                let share = self.mine_share_at(mine, *d);
-                crate::mines::land_rate(&m, share.ground, share.ore) >= whole * least
-            })
-        })
     }
 
     fn pick_firebase(&self, start: FxVec2, intel: &Intel, persona: Personality) -> Option<FxVec2> {

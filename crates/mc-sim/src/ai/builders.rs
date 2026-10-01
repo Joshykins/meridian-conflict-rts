@@ -476,6 +476,14 @@ impl World {
                     ..job
                 })
         };
+        // A new factory is built at the best tier the income can keep busy.
+        let factory_tech = if tech >= 3 && mass_income >= Fx::from_int(60) {
+            3
+        } else if tech >= 2 && mass_income >= Fx::from_int(12) {
+            2
+        } else {
+            1
+        };
         let factory_job = || {
             // Past the first two, a factory is left to the side's best builders:
             // a tech 1 factory late on is nearly no build power at all.
@@ -504,29 +512,19 @@ impl World {
             if !allow(near) {
                 return None;
             }
-            // A new factory is built at the best tier the income can keep busy.
-            let ftech = if tech >= 3 && mass_income >= Fx::from_int(60) {
-                3
-            } else if tech >= 2 && mass_income >= Fx::from_int(12) {
-                2
-            } else {
-                1
-            };
-            self.pick_factory(row, ftech, want_air)
-                .map(|blueprint| Job {
-                    blueprint,
-                    near,
-                    heading: facing,
-                    min_r: Fx::from_int(12),
-                    keep_off_deposits: true,
-                    place: Place::Around,
-                })
+            self.pick_factory(row, factory_tech, want_air, None)
+                .map(|blueprint| self.factory_at(blueprint, near, start, facing))
         };
 
         if planned.engineer_factories == 0 {
             let near = self.yard_anchor(start, facing, 0);
             if allow(near) {
-                if let Some(blueprint) = self.pick_factory(row, 1, false) {
+                // A land factory first, wherever the war goes: it makes the
+                // engineers, and the side's first shipyard follows soon after.
+                if let Some(blueprint) = self
+                    .pick_factory(row, 1, false, Some(0))
+                    .or_else(|| self.pick_factory(row, 1, false, None))
+                {
                     return Some(Job {
                         blueprint,
                         near,
@@ -587,6 +585,22 @@ impl World {
                     Fx::ZERO,
                     false,
                 );
+            }
+        }
+        // No land route to the enemy: the war goes by sea, and the first
+        // shipyard comes right after the opening, ahead of more power and mines.
+        if !census.land_route
+            && !far
+            && planned.naval_factories == 0
+            && planned.factories >= 1
+            && mass_income >= Fx::from_int(5)
+        {
+            if let Some(job) = self
+                .pick_factory(row, factory_tech, false, Some(2))
+                .map(|blueprint| self.factory_at(blueprint, start, start, facing))
+                .filter(|job| allow(job.near))
+            {
+                return Some(job);
             }
         }
         if energy_short && !leave_power && planned.power < want_power.min(6) {
@@ -677,10 +691,15 @@ impl World {
             {
                 return Some(job);
             }
+            if let Some(job) = self
+                .spotter_job(row, start, facing)
+                .filter(|_| !energy_short)
+            {
+                return Some(job);
+            }
         }
         let mex_range = self.mex_range(is_commander, census, persona, stance, skill);
-        let bare = (!energy_short && !census.pd.is_empty())
-            .then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
+        let bare = (!energy_short).then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
         if let Some(deposit) = self.free_deposit(start, claimed, mex_range, intel, bare) {
             if allow(deposit) {
                 return self.job_structure(
@@ -847,6 +866,32 @@ impl World {
             }
         }
         None
+    }
+
+    /// A factory job near `near`; a shipyard goes on the water nearest `start`.
+    fn factory_at(
+        &self,
+        blueprint: BlueprintId,
+        near: FxVec2,
+        start: FxVec2,
+        facing: Angle,
+    ) -> Job {
+        let bp = self.blueprints.unit(blueprint);
+        let shipyard = (adaptive::domain(bp) == 2)
+            .then(|| self.shipyard_anchor(bp, start))
+            .flatten();
+        Job {
+            blueprint,
+            near: shipyard.unwrap_or(near),
+            heading: facing,
+            min_r: if shipyard.is_some() {
+                Fx::ZERO
+            } else {
+                Fx::from_int(12)
+            },
+            keep_off_deposits: true,
+            place: Place::Around,
+        }
     }
 
     pub(super) fn firebase_job(

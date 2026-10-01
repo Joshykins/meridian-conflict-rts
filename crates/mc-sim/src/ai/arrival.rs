@@ -5,6 +5,8 @@
 //! they never go idle. The army counted only idle units as gathered, so on
 //! Serac Divide 190 of 256 units sat in the staging blob under a move order,
 //! the staging point looked empty, and no full wave left for twenty minutes.
+//! A fleet gathering at its anchorage did the same: on The Axis fifty ships
+//! stood within 90 m of it under orders they never finished, and never sailed.
 use super::*;
 use std::collections::BTreeMap;
 
@@ -15,7 +17,7 @@ const ARRIVED_SLACK: i32 = 40;
 const ARRIVED_PER_ROOT: i32 = 10;
 
 impl World {
-    /// Rows of `player`'s land army with a move or attack-move order whose
+    /// Rows of `player`'s land army and fleet with a move or attack-move order whose
     /// target they have reached, as near as the crowd sent there lets them.
     /// Sorted, for a binary search.
     pub(super) fn arrived_army(&self, player: u8) -> Vec<usize> {
@@ -26,7 +28,7 @@ impl World {
             .filter(|&row| {
                 units.owner[row] == player
                     && units.is_active(row)
-                    && adaptive::domain(self.bp(row)) == 0
+                    && adaptive::domain(self.bp(row)) != 1
                     && !self.bp(row).weapons.is_empty()
                     && self.bp(row).categories & (cat::ENGINEER | cat::COMMANDER) == 0
             })

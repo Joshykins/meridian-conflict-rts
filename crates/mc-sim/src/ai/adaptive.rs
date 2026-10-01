@@ -72,13 +72,15 @@ impl AiState {
     /// A compact diagnostic for headless match reports.
     pub fn summary(&self) -> String {
         format!(
-            "stance={} waves={} raids={} contacts={} recovering={} production={}",
+            "stance={} waves={} raids={} contacts={} recovering={} production={} land_route={}",
             self.stance,
             self.waves,
             self.raids,
             self.contacts.len(),
             self.recovering.len(),
-            self.production_counter
+            self.production_counter,
+            self.land_route
+                .map_or("?".into(), |r| format!("{:b}", r.reaches)),
         )
     }
 }
@@ -330,8 +332,17 @@ impl World {
             .iter()
             .filter(|c| domain(self.blueprints.unit(c.blueprint)) == d)
             .count() as i64;
-        (ai.config.domain_weights[d] as i64 + demand.min(20) * ai.config.adaptation as i64 / 10)
-            / (1 + count)
+        let score = (ai.config.domain_weights[d] as i64
+            + demand.min(20) * ai.config.adaptation as i64 / 10)
+            / (1 + count);
+        // With no land route to the enemy the land factories make only a home
+        // guard, hovers and engineers; the war goes by sea and air (`theatre.rs`).
+        match d {
+            _ if self.land_route_to_enemy(player) => score,
+            0 => score / 3,
+            2 => score * 2,
+            _ => score,
+        }
     }
 
     pub(super) fn visible_air_target(&self, player: u8, from: FxVec2) -> Option<FxVec2> {
@@ -475,6 +486,7 @@ impl World {
                 let near_threat = *threat_kinds.get_or_insert_with(|| self.kinds_at(player, enemy));
                 if pos.distance(start) < Fx::from_int(1100)
                     && bp.weapons.iter().any(|w| w.target_mask & near_threat != 0)
+                    && self.can_shoot_from_its_ground(bp, enemy)
                 {
                     defenders.push(row);
                 }
@@ -546,6 +558,25 @@ impl World {
         census.naval_idle.retain(available);
         self.state.ai[player as usize].next_tactical_tick =
             self.state.tick + config.think_period().max(40);
+    }
+
+    /// Whether a unit of `bp` can stand somewhere within weapon range of `at`.
+    /// A ship sent at a raider inland was given no order (its target projected
+    /// onto the water missed), stood idle off home for as long as the raid
+    /// lasted, and was kept from the fleet all that time as a defender.
+    fn can_shoot_from_its_ground(&self, bp: &UnitBlueprint, at: FxVec2) -> bool {
+        let Some(m) = bp.motion.filter(|m| m.layer == MoveLayer::Naval) else {
+            return true;
+        };
+        let range = bp
+            .weapons
+            .iter()
+            .map(|w| w.range_max)
+            .max()
+            .unwrap_or(Fx::ZERO);
+        self.nav
+            .nearest_passable(m.layer, m.size_class, at)
+            .is_some_and(|p| p.distance(at) <= range)
     }
 
     /// The target categories of the enemies `player` detects within 80 m of `pos`:

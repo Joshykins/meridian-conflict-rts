@@ -970,6 +970,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
             anti_air: 0,
             engineer_factories: 1,
             air_factories: 0,
+            naval_factories: 0,
             power: 0,
             radars: vec![],
             pd: 0,

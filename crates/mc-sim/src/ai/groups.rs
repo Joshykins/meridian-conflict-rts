@@ -20,6 +20,22 @@ const FLEET_HOME: Fx = Fx::from_int(360);
 const FLEET_DEFENSE: Fx = Fx::from_int(800);
 /// Ships a fleet waits for before it sails.
 const FLEET_WAVE: usize = 4;
+/// Spaceships this close to the staging point have gathered: their hulls are
+/// up to half a kilometre long.
+const CAPITAL_HOME: Fx = Fx::from_int(600);
+/// Mass of armed spaceships a strike waits for: a lone corvette waits for a
+/// second, a heavy frigate goes on its own.
+const CAPITAL_WAVE_MASS: i32 = 2000;
+
+/// Idle ships of one hull size and the water they reach.
+struct Fleet {
+    sea: super::sea::SeaReach,
+    idle: Vec<usize>,
+    /// Its water nearest home, where it gathers.
+    anchorage: FxVec2,
+    at_home: Vec<usize>,
+    away: Vec<usize>,
+}
 
 /// `rows` grouped around seeds: each row joins the first group whose seed is
 /// within `radius`, else starts its own.
@@ -166,6 +182,84 @@ impl World {
         }
     }
 
+    /// Armed spaceships gather at the staging point and strike together once
+    /// they carry `CAPITAL_WAVE_MASS`, at the base itself when it is raided.
+    /// They were counted as bombers: a wing of four 1100-mass corvettes was
+    /// waited for, and they went after mines.
+    pub(super) fn direct_capital(
+        &mut self,
+        player: u8,
+        census: &Census,
+        intel: &Intel,
+        start: FxVec2,
+        out: &mut Vec<Command>,
+    ) {
+        if census.capital_idle.is_empty() {
+            return;
+        }
+        let units = &self.state.units;
+        let staging = offset_toward(start, intel.enemy_start.unwrap_or(start), Fx::from_int(400));
+        let mass = |rows: &[usize]| -> i32 {
+            rows.iter().map(|&r| self.bp(r).cost_mass.floor_int()).sum()
+        };
+        // A raid on the base: every idle warship answers it.
+        if let Some(&(_, enemy)) = intel
+            .threats
+            .iter()
+            .find(|(_, e)| e.distance(start) < HOME_RADIUS * 2)
+        {
+            out.push(Command::AttackMove {
+                units: self.ids_of(&census.capital_idle),
+                target: enemy,
+                queue: false,
+            });
+            return;
+        }
+        let (home, away): (Vec<usize>, Vec<usize>) = census
+            .capital_idle
+            .iter()
+            .partition(|&&r| units.pos[r].distance(staging) <= CAPITAL_HOME);
+        // Out at the front: a group strong enough moves on to the next target,
+        // what is left of one comes home to wait for the next.
+        let armed: Vec<usize> = census
+            .combat_rows
+            .iter()
+            .copied()
+            .filter(|&r| {
+                self.bp(r).has(cat::SPACE) && units.pos[r].distance(staging) > CAPITAL_HOME
+            })
+            .collect();
+        for (seed, members) in clusters(&units.pos, &armed, Fx::from_int(900)) {
+            let idle: Vec<usize> = members
+                .iter()
+                .copied()
+                .filter(|r| away.contains(r))
+                .collect();
+            if idle.is_empty() || idle.len() * 3 < members.len() * 2 {
+                continue;
+            }
+            let target = (mass(&members) >= CAPITAL_WAVE_MASS)
+                .then(|| self.attack_target(player, seed, intel, Stance::Expand))
+                .flatten()
+                .unwrap_or(staging);
+            out.push(Command::AttackMove {
+                units: self.ids_of(&idle),
+                target,
+                queue: false,
+            });
+        }
+        if mass(&home) >= CAPITAL_WAVE_MASS {
+            if let Some(target) = self.attack_target(player, staging, intel, Stance::Expand) {
+                self.state.ai[player as usize].raids += 1;
+                out.push(Command::AttackMove {
+                    units: self.ids_of(&home),
+                    target,
+                    queue: false,
+                });
+            }
+        }
+    }
+
     /// Ships gather at the fleet's anchorage, the water it can reach nearest
     /// home, and sail as one fleet. A fleet out at sea that went idle presses on
     /// if enough of it is left, and falls back to the anchorage if not.
@@ -189,58 +283,77 @@ impl World {
                 }
             }
         }
-        for (_, _, sea, idle) in seas {
-            let Some(anchorage) = sea.nearest(start) else {
-                continue;
-            };
-            let target_from = |from: FxVec2| self.fleet_target(player, &idle, &sea, from);
-            let (at_home, away): (Vec<usize>, Vec<usize>) = idle
-                .iter()
-                .partition(|&&r| units.pos[r].distance(anchorage) <= FLEET_HOME);
-            // The whole fleet on this water, busy or not, out past the anchorage.
+        // Each hull size floods its own water, but they all sail as one fleet:
+        // split by size, boats, frigates and submarines each gathered two or
+        // three at home, and none of those groups ever made a fleet of four.
+        let fleets: Vec<Fleet> = seas
+            .into_iter()
+            .filter_map(|(_, _, sea, idle)| {
+                let anchorage = sea.nearest(start)?;
+                let (at_home, away) = idle
+                    .iter()
+                    .partition(|&&r| units.pos[r].distance(anchorage) <= FLEET_HOME);
+                Some(Fleet {
+                    sea,
+                    idle,
+                    anchorage,
+                    at_home,
+                    away,
+                })
+            })
+            .collect();
+        let gathered: usize = fleets.iter().map(|f| f.at_home.len()).sum();
+        let all_away: Vec<usize> = fleets.iter().flat_map(|f| f.away.iter().copied()).collect();
+        for f in &fleets {
+            let (sea, anchorage) = (&f.sea, f.anchorage);
+            let target_from = |from: FxVec2| self.fleet_target(player, &f.idle, sea, from);
+            // The whole fleet, busy or not, out past the anchorage.
             let out_there: Vec<usize> = census
                 .combat_rows
                 .iter()
                 .copied()
                 .filter(|&r| {
                     adaptive::domain(self.bp(r)) == 2
-                        && sea.reaches(units.pos[r])
                         && units.pos[r].distance(anchorage) > FLEET_HOME
                 })
                 .collect();
             for (seed, members) in clusters(&units.pos, &out_there, Fx::from_int(600)) {
-                let idle: Vec<usize> = members
+                let idle = members.iter().filter(|r| all_away.contains(r)).count();
+                // Most of it still fighting: the rest waits for it.
+                if idle == 0 || idle * 3 < members.len() * 2 {
+                    continue;
+                }
+                let ours: Vec<usize> = members
                     .iter()
                     .copied()
-                    .filter(|r| away.contains(r))
+                    .filter(|r| f.away.contains(r))
                     .collect();
-                // Most of it still fighting: the rest waits for it.
-                if idle.is_empty() || idle.len() * 3 < members.len() * 2 {
+                if ours.is_empty() {
                     continue;
                 }
                 let target = (members.len() >= FLEET_WAVE)
-                    .then(|| target_from(seed).or_else(|| self.enemy_water(player, &sea, seed)))
+                    .then(|| target_from(seed).or_else(|| self.enemy_water(player, sea, seed)))
                     .flatten()
                     .unwrap_or(anchorage);
                 out.push(Command::AttackMove {
-                    units: self.ids_of(&idle),
+                    units: self.ids_of(&ours),
                     target,
                     queue: false,
                 });
             }
-            if at_home.is_empty() {
+            if f.at_home.is_empty() {
                 continue;
             }
             let target = target_from(anchorage);
             let threatened = target.is_some_and(|t| t.distance(anchorage) <= FLEET_DEFENSE);
-            let target = if at_home.len() >= FLEET_WAVE || threatened {
-                target.or_else(|| self.enemy_water(player, &sea, anchorage))
+            let target = if gathered >= FLEET_WAVE || threatened {
+                target.or_else(|| self.enemy_water(player, sea, anchorage))
             } else {
                 None
             };
             if let Some(target) = target {
                 out.push(Command::AttackMove {
-                    units: self.ids_of(&at_home),
+                    units: self.ids_of(&f.at_home),
                     target,
                     queue: false,
                 });

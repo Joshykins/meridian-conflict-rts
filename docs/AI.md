@@ -229,6 +229,56 @@ Before the grouping above, almost every air and sea order was one or two units.
 economy every three minutes (`DUEL=map:diff:diff:minutes[:seed[:swap]]`, `DUEL_JOBS=1`
 lists every builder's order, `DUEL_WHY=1` the upgrade gates).
 
+## Island maps: sea, sea mines and spaceships
+
+Measured on 2026-09-30 with `tests/zz_ai_domain_probe.rs` on The Axis (8 AIs, two
+seeds, 40 minutes): every side had one land factory and no shipyard for the whole
+game, one or two sea mines, 55 to 196 land units of which up to 77 stood parked at
+home, and 29 to 60 unarmed Vigils. No side was beaten. What changed:
+
+- The land route (`ai/theatre.rs`): on its first think a side floods the land it can
+  walk from its start, on a 64 m grid from the terrain alone, and keeps which enemy
+  starts that reaches. With no land route to an enemy still in the game:
+  - land-only combat units are made only up to a home guard of eight; past that a
+    land factory makes hovers, amphibious units and engineers. The guard answers
+    raids on its own ground and otherwise waits at the staging point; it is never
+    part of a wave, and the army's size for stance and waves leaves it out.
+  - land-only scouts and land-only experimentals are not built.
+  - the first shipyard comes right after the opening mines, ahead of more power;
+    land factories count a third and shipyards double when the next factory's
+    domain is chosen. The first factory is a land factory on every map: it makes
+    the engineers.
+  - warships of the upper air come first among the strategic projects.
+- A shipyard goes on the water nearest the start where one can stand, found in
+  rings out to 2.4 km (`shipyard_anchor`), not by a site search around the base's
+  yard, which reached the coast only on small islands.
+- Sea mines: a mine at sea shares only with mines at sea, and reaches 1.5 km, so it
+  is kept a sea reach from those and is not kept off by the island's own land mines
+  (a land reach from every mine left a small island no sea to mine). Off-ore mines
+  no longer wait for a turret. Of the nearest twelve open spots, the one that yields
+  most for the walk there is taken.
+- A ship joins the defence of home only against a raider it can shoot from the
+  water. Sent at a tank inland, it got no order, sat idle off the coast for the
+  whole raid and was kept from the fleet.
+- Ships of every hull size gather into one fleet: a fleet sails once four ships,
+  of any size, are at home. Split by size, boats, frigates and submarines each
+  gathered two or three at home and never sailed.
+- Spaceships with guns (`direct_capital` in `ai/groups.rs`) gather 400 m out from
+  the start toward the enemy and strike once those gathered carry 2000 mass (a
+  heavy frigate alone, two corvettes), at the enemy's factories, mines or start;
+  a raid on the base calls them all home. They were counted as bombers: a wing of
+  four was waited for, and they went after mines.
+- An unarmed ship is not a strategic project. A side builds one radar ship (the
+  Vigil) once its income reaches 25 a second, and it escorts the army.
+
+`tests/zz_ai_domain_probe.rs` plays an all-AI team match, west against east, and
+prints per side every few minutes its mines on land and at sea, its factories by
+domain, and its army by domain (land, hover, naval, air, space): at home, out past
+1.5 km and in the enemy's half, with how many have stood in one place for three
+minutes (`DOMAIN=map:players:minutes[:seed[:difficulty]]`, `DOMAIN_EVERY=N`,
+`DOMAIN_WHY=1` lists what the parked units are doing, `DOMAIN_ROSTER=1` each side's
+units at the end).
+
 ## Extending the roster
 
 There are no unit blueprint names in production or tactical selection. Add units to
@@ -245,10 +295,9 @@ separate objectives; shoreline attack positions must be navigable and within wea
 range of the target. Movement destinations are projected onto each hull's valid terrain.
 A synthetic ship test exercises these paths before the real navy roster arrives.
 
-This is a foundation for naval combat, not transport or amphibious-invasion planning.
-Destination validation does not prove connectivity across separate seas/islands;
-global route-aware theater planning and naval roster balance still need real maps
-and ships. Unit special abilities beyond the metadata above need their own orders.
+The AI knows whether its land army can walk to the enemy (above), but it does not
+plan transports or amphibious landings, and naval roster balance still needs real
+games. Unit special abilities beyond the metadata above need their own orders.
 
 ## Verification and diagnostics
 

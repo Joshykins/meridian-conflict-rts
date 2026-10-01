@@ -24,6 +24,8 @@ const NUKE_WORTH: i64 = 2;
 const FRESH: u32 = 100;
 /// Value put on the enemy commander under a warhead: its loss ends the game.
 const COMMANDER_WORTH: i64 = 60_000;
+/// Mass income a second before a side builds its radar ship.
+const SPOTTER_INCOME: i32 = 25;
 
 /// What a project is for, from its data.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -45,6 +47,10 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
         || bp.mine.is_some()
         || bp.transport.is_some()
         || bp.cost_mass <= Fx::ZERO
+        // An unarmed ship (the Vigil) is no project: counted as one, each Vigil
+        // finished freed the slot for the next, and sides had 30 to 60 of them
+        // by forty minutes (`spotter_job` builds the one a side wants).
+        || (bp.is_mobile() && bp.weapons.is_empty())
     {
         return None;
     }
@@ -101,13 +107,16 @@ impl World {
             let energy = pl.energy_income * Fx::from_int(seconds) * Fx::ratio(PROJECT_SHARE, 100);
             bp.cost_mass <= budget && bp.cost_energy <= energy
         };
+        // A walker with no land route to the enemy would stand at home all match.
+        let land_route = self.land_route_to_enemy(player);
         let menu: Vec<(Project, BlueprintId)> = builder
             .builds
             .iter()
             .filter_map(|&id| {
                 let bp = self.blueprints.unit(id);
                 let kind = project_kind(bp)?;
-                (affordable(bp) && !bp.water_only()).then_some((kind, id))
+                (affordable(bp) && !bp.water_only() && (land_route || !theatre::land_bound(bp)))
+                    .then_some((kind, id))
             })
             .collect();
         if menu.is_empty() {
@@ -130,7 +139,9 @@ impl World {
         .map(|(ours, _)| ours);
         // Otherwise the doctrine's order, the kind it holds fewest of first,
         // so a long game sees the whole strategic roster.
+        // With no land route, warships that cross the water come first.
         let order: &[Project] = match persona {
+            _ if !land_route => &[Project::Mobile, Project::Nuke, Project::MapGun],
             Personality::Aggressive => &[Project::Mobile, Project::Nuke, Project::MapGun],
             Personality::Expander => &[Project::Nuke, Project::Mobile, Project::MapGun],
             Personality::Turtle => &[Project::MapGun, Project::Nuke, Project::Mobile],
@@ -166,6 +177,46 @@ impl World {
             blueprint: *blueprint,
             near,
             heading: bp.build_heading(),
+            min_r: Fx::from_int(24),
+            keep_off_deposits: true,
+            place: Place::Around,
+        })
+    }
+
+    /// One unarmed radar ship of the upper air to go with the army, once the
+    /// side has the income to spare (`SPOTTER_INCOME`).
+    pub(super) fn spotter_job(&self, row: usize, start: FxVec2, facing: Angle) -> Option<Job> {
+        let player = self.state.units.owner[row];
+        if self.state.players[player as usize].mass_income < Fx::from_int(SPOTTER_INCOME) {
+            return None;
+        }
+        let spotter = |id: BlueprintId| {
+            let bp = self.blueprints.unit(id);
+            bp.has(cat::SPACE) && bp.is_mobile() && bp.weapons.is_empty() && bp.radar > Fx::ZERO
+        };
+        let units = &self.state.units;
+        let held = units
+            .slots
+            .iter()
+            .any(|r| units.owner[r] == player && spotter(units.blueprint[r]))
+            || self
+                .planned_sites(player)
+                .any(|(_, o)| spotter(o.blueprint));
+        if held {
+            return None;
+        }
+        let blueprint = self
+            .bp(row)
+            .builder
+            .as_ref()?
+            .builds
+            .iter()
+            .copied()
+            .find(|&id| spotter(id))?;
+        Some(Job {
+            blueprint,
+            near: start + FxVec2::from_angle(facing + Angle::HALF_TURN) * Fx::from_int(260),
+            heading: self.blueprints.unit(blueprint).build_heading(),
             min_r: Fx::from_int(24),
             keep_off_deposits: true,
             place: Place::Around,
