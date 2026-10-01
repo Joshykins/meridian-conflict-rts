@@ -161,6 +161,21 @@ pub(crate) struct Faction {
     /// How its torpedoes look running. Presentation only.
     #[serde(default)]
     pub torpedo_look: TorpedoLook,
+    /// How its structures light themselves after dusk. Presentation only.
+    #[serde(default)]
+    pub structure_lamps: StructureLamps,
+}
+
+/// The lamps a faction's structures carry at night when their data names none
+/// (mc-render `lights`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
+pub enum StructureLamps {
+    /// Warm sodium floodlights high on the corners, thrown across the yard (ARC).
+    #[default]
+    Sodium,
+    /// Low red embers round the foot of the plating: pools of dull red light on the
+    /// ground and the lower plates, the yard left dark (the Regency).
+    Ember,
 }
 
 /// How a torpedo looks running: its body under the water (sprites.wgsl) and what it

@@ -10,7 +10,7 @@
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3, Vec4};
-use mc_data::{cat, Blueprints, LampKind, LightMount};
+use mc_data::{cat, Blueprints, LampKind, LightMount, StructureLamps};
 use mc_sim::mirror::{
     FireInstance, ProjectileInstance, RenderFrame, KIND_GHOST, KIND_PROP, KIND_WRECK,
     PROJECTILE_APOGEE, PROJECTILE_BEAM, PROJECTILE_BOMB, PROJECTILE_MISSILE, PROJECTILE_SKIM,
@@ -200,8 +200,9 @@ impl Lamp {
     }
 }
 
-/// The lamps a blueprint carries when its data names none.
-fn usual_lamps(bp: &mc_data::UnitBlueprint) -> Vec<LightMount> {
+/// The lamps a blueprint carries when its data names none; a structure's in its
+/// faction's `style`.
+fn usual_lamps(bp: &mc_data::UnitBlueprint, style: StructureLamps) -> Vec<LightMount> {
     let radius = bp.radius.to_f32();
     let height = bp.height.to_f32().max(0.5);
     if let Some(motion) = &bp.motion {
@@ -224,6 +225,9 @@ fn usual_lamps(bp: &mc_data::UnitBlueprint) -> Vec<LightMount> {
     }
     if bp.categories & cat::STRUCTURE == 0 || bp.categories & cat::WALL != 0 || radius < 2.5 {
         return Vec::new();
+    }
+    if style == StructureLamps::Ember {
+        return ember_lamps(radius);
     }
     // Sodium floodlights high on the corners, thrown out and down across the yard,
     // spilling back onto the walls.
@@ -252,6 +256,33 @@ fn usual_lamps(bp: &mc_data::UnitBlueprint) -> Vec<LightMount> {
             range: radius * 2.4 + 40.0,
             cone: 55.0,
             ..LightMount::default()
+        })
+        .collect()
+}
+
+/// Red embers low round the foot of a structure's plating, one on each face of its
+/// octagon (four on a small one): each lights a pool of ground and the plates above
+/// it, and leaves the yard between them dark.
+fn ember_lamps(radius: f32) -> Vec<LightMount> {
+    let faces = if radius < 7.0 { 4 } else { 8 };
+    // Just inside the hull's foot, so the plates over it catch the light from below.
+    let out = radius * 0.95;
+    (0..faces)
+        .map(|i| {
+            let a = std::f32::consts::TAU * i as f32 / faces as f32
+                + if faces == 4 {
+                    std::f32::consts::FRAC_PI_4
+                } else {
+                    0.0
+                };
+            LightMount {
+                kind: LampKind::Point,
+                at: [a.cos() * out, a.sin() * out, 0.7],
+                color: [1.0, 0.07, 0.04],
+                intensity: 7.0 * radius,
+                range: radius * 0.8 + 8.0,
+                ..LightMount::default()
+            }
         })
         .collect()
 }
@@ -336,7 +367,15 @@ impl Lights {
             .units
             .iter()
             .map(|bp| {
-                let mounts = bp.visual.lights.clone().unwrap_or_else(|| usual_lamps(bp));
+                let style = blueprints
+                    .factions
+                    .get(bp.faction.0 as usize)
+                    .map_or(StructureLamps::Sodium, |f| f.structure_lamps);
+                let mounts = bp
+                    .visual
+                    .lights
+                    .clone()
+                    .unwrap_or_else(|| usual_lamps(bp, style));
                 mounts.iter().map(Lamp::from_mount).collect()
             })
             .collect();

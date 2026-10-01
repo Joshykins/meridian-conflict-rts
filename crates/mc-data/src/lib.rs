@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 pub use raw::{
     BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade, ShieldKind,
-    TorpedoLook, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
+    StructureLamps, TorpedoLook, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -152,6 +152,8 @@ pub struct Faction {
     pub sounds: FactionSounds,
     /// How its torpedoes look running. Presentation only.
     pub torpedo_look: TorpedoLook,
+    /// How its structures are lit at night. Presentation only.
+    pub structure_lamps: StructureLamps,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1114,6 +1116,7 @@ impl Blueprints {
                 construction: f.construction,
                 sounds: f.sounds.clone(),
                 torpedo_look: f.torpedo_look,
+                structure_lamps: f.structure_lamps,
             });
         }
         // A builder puts up only its own faction's structures. Mobile units may also come
@@ -1609,6 +1612,8 @@ mod tests {
         assert_eq!(aster.construction, Construction::Print);
         assert_eq!(regency.torpedo_look, TorpedoLook::Plasma);
         assert_eq!(aster.torpedo_look, TorpedoLook::Bubbles);
+        assert_eq!(regency.structure_lamps, StructureLamps::Ember);
+        assert_eq!(aster.structure_lamps, StructureLamps::Sodium);
         assert!(
             regency.sounds.select.contains_key(&IconKind::Factory)
                 && regency.sounds.build.is_some()

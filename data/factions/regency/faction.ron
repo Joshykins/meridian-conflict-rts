@@ -19,6 +19,9 @@
     // Their torpedoes are driven by plasma: a glassy line of steam boiling up over a red
     // glow in the water, where ARC's leave a white seam of air.
     torpedo_look: Plasma,
+    // Their structures are lit from below at night: low red embers round the foot of the
+    // plating, not floodlights over the yard.
+    structure_lamps: Ember,
     // Their own voices (data/factions/regency/sounds.ron): heavy machines, bronze struck and
     // rings spinning up, not ARC's servos and chimes.
     sounds: (
