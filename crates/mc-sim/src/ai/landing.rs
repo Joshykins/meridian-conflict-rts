@@ -39,8 +39,10 @@ const GUN_REACH: Fx = Fx::from_int(600);
 const KEEP_HOME: usize = 4;
 /// A lift ship needs this share of its health to go.
 const SHIP_HEALTH: Fx = Fx::ratio(7, 10);
-/// Seconds of the side's mass income, at `PROJECT_SHARE`, a lift ship may cost.
+/// Seconds of the side's mass income, three fifths of it, a lift ship may cost.
 const LIFT_SECONDS: i32 = 300;
+/// Most lift ships a side keeps.
+const MOST_LIFTS: usize = 2;
 
 /// One landing under way.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,8 +64,10 @@ impl Landing {
 }
 
 impl World {
-    /// A lift ship to build while the side holds `Gambit::Landing` and has none:
-    /// the biggest with a warp drive the builder makes and the income carries.
+    /// A lift ship to build while the side holds `Gambit::Landing`: the biggest
+    /// with a warp drive the builder makes and the income carries, while the
+    /// side has none that big. A Courier early on is followed by a Bastion once
+    /// it can be paid for: by then the army has outgrown the Courier's hold.
     pub(super) fn lift_job(
         &self,
         row: usize,
@@ -72,7 +76,7 @@ impl World {
         facing: Angle,
     ) -> Option<Job> {
         let player = self.state.units.owner[row];
-        if !self.holds(player, Gambit::Landing) || !census.lifts.is_empty() {
+        if !self.holds(player, Gambit::Landing) || census.lifts.len() >= MOST_LIFTS {
             return None;
         }
         let lift = |bp: &UnitBlueprint| bp.transport.is_some() && bp.warp.is_some();
@@ -85,6 +89,7 @@ impl World {
         }
         let pl = &self.state.players[player as usize];
         let budget = pl.mass_income * Fx::from_int(LIFT_SECONDS) * Fx::ratio(3, 5);
+        let room = |id: BlueprintId| self.blueprints.unit(id).transport.map_or(0, |t| t.capacity);
         let blueprint = self
             .bp(row)
             .builder
@@ -96,10 +101,16 @@ impl World {
                 let bp = self.blueprints.unit(id);
                 lift(bp) && bp.cost_mass <= budget.max(Fx::from_int(200))
             })
-            .max_by_key(|&id| {
-                let t = self.blueprints.unit(id).transport.map_or(0, |t| t.capacity);
-                (t, std::cmp::Reverse(id.0))
-            })?;
+            .max_by_key(|&id| (room(id), std::cmp::Reverse(id.0)))?;
+        let held = census
+            .lifts
+            .iter()
+            .map(|&r| room(self.state.units.blueprint[r]))
+            .max()
+            .unwrap_or(0);
+        if held >= room(blueprint) {
+            return None;
+        }
         Some(Job {
             blueprint,
             near: start + FxVec2::from_angle(facing + Angle::HALF_TURN) * Fx::from_int(260),
@@ -149,60 +160,46 @@ impl World {
             return;
         }
         let units = &self.state.units;
-        let Some(ship) = census.lifts.iter().copied().find(|&r| {
-            units.order_head[r] == NO_ORDER
-                && units.warp[r].phase == WarpPhase::Idle
-                && units.health[r] >= self.bp(r).health * SHIP_HEALTH
-                && units.pos[r].distance(start) <= FAR_FROM_HOME
-        }) else {
-            // An idle ship out in the field comes home for the next.
-            for &r in &census.lifts {
-                if units.order_head[r] == NO_ORDER && units.pos[r].distance(start) > FAR_FROM_HOME {
-                    out.push(Command::Move {
-                        units: vec![units.id(r)],
-                        target: staging,
-                        queue: false,
-                    });
-                }
+        // An idle ship out in the field comes home for the next.
+        for &r in &census.lifts {
+            if units.order_head[r] == NO_ORDER && units.pos[r].distance(start) > FAR_FROM_HOME {
+                out.push(Command::Move {
+                    units: vec![units.id(r)],
+                    target: staging,
+                    queue: false,
+                });
             }
-            return;
-        };
-        let Some(t) = self.bp(ship).transport else {
-            return;
-        };
-        // Those that fit, nearest the ship first; a side with no land route
-        // keeps a few at home.
-        let ship_pos = units.pos[ship];
-        let mut keep = if census.land_route { 0 } else { KEEP_HOME };
-        let mut cands: Vec<usize> = army_idle
+        }
+        let mut ships: Vec<usize> = census
+            .lifts
             .iter()
             .copied()
             .filter(|&r| {
-                self.cargo_fits(r, ship)
-                    && (units.pos[r].distance(staging) <= Fx::from_int(600)
-                        || units.pos[r].distance(start) <= HOME_RADIUS)
+                units.order_head[r] == NO_ORDER
+                    && units.warp[r].phase == WarpPhase::Idle
+                    && units.health[r] >= self.bp(r).health * SHIP_HEALTH
+                    && units.pos[r].distance(start) <= FAR_FROM_HOME
             })
             .collect();
-        cands.sort_by_key(|&r| (units.pos[r].distance_sq(ship_pos), r));
-        let mut room = t.capacity.saturating_sub(self.cargo_used(ship));
-        let mut taken = Vec::new();
-        for r in cands {
-            let need = self.bp(r).cargo_room().unwrap_or(u16::MAX);
-            if keep > 0 && census.home_guard.contains(&r) {
-                keep -= 1;
-                continue;
-            }
-            if need <= room {
-                room -= need;
-                taken.push(r);
-            }
-        }
-        // Worth a trip: most of a small hold, or a wave's worth for a big one.
-        let filled = t.capacity - room;
-        let enough = (t.capacity * 2 / 3).min(wave as u16 * 2).max(2);
-        if taken.len() < 2 || filled < enough {
+        // The biggest hold first: a Courier takes none of a later army's tanks.
+        ships.sort_by_key(|&r| {
+            let room = self.bp(r).transport.map_or(0, |t| t.capacity);
+            (std::cmp::Reverse(room), r)
+        });
+        let Some((ship, t, taken)) = ships.into_iter().find_map(|ship| {
+            let t = self.bp(ship).transport?;
+            let taken = self.cargo_for(ship, census, army_idle, start, staging);
+            let filled: u16 = taken
+                .iter()
+                .map(|&r| self.bp(r).cargo_room().unwrap_or(0))
+                .sum::<u16>()
+                + self.cargo_used(ship);
+            // Worth a trip: most of a small hold, or a wave's worth for a big one.
+            let enough = (t.capacity * 2 / 3).min(wave as u16 * 2).max(2);
+            (taken.len() >= 2 && filled >= enough).then_some((ship, t, taken))
+        }) else {
             return;
-        }
+        };
         let Some(target) = self.landing_target(player, intel, t.capacity >= ASSAULT_ROOM) else {
             return;
         };
@@ -367,6 +364,48 @@ impl World {
             }
         });
         None
+    }
+
+    /// Idle land units at `staging` or home that fit `ship`, nearest it first,
+    /// as many as its hold takes; a side with no land route keeps a few home.
+    fn cargo_for(
+        &self,
+        ship: usize,
+        census: &Census,
+        army_idle: &[usize],
+        start: FxVec2,
+        staging: FxVec2,
+    ) -> Vec<usize> {
+        let units = &self.state.units;
+        let Some(t) = self.bp(ship).transport else {
+            return Vec::new();
+        };
+        let ship_pos = units.pos[ship];
+        let mut keep = if census.land_route { 0 } else { KEEP_HOME };
+        let mut cands: Vec<usize> = army_idle
+            .iter()
+            .copied()
+            .filter(|&r| {
+                self.cargo_fits(r, ship)
+                    && (units.pos[r].distance(staging) <= Fx::from_int(600)
+                        || units.pos[r].distance(start) <= HOME_RADIUS)
+            })
+            .collect();
+        cands.sort_by_key(|&r| (units.pos[r].distance_sq(ship_pos), r));
+        let mut room = t.capacity.saturating_sub(self.cargo_used(ship));
+        let mut taken = Vec::new();
+        for r in cands {
+            let need = self.bp(r).cargo_room().unwrap_or(u16::MAX);
+            if keep > 0 && census.home_guard.contains(&r) {
+                keep -= 1;
+                continue;
+            }
+            if need <= room {
+                room -= need;
+                taken.push(r);
+            }
+        }
+        taken
     }
 
     /// Where a landing goes: for a flank, the enemy mine or plant least covered
