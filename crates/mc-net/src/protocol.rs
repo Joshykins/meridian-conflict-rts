@@ -24,7 +24,7 @@ use mc_core::{PlayerId, MAX_PLAYERS};
 use crate::wire::{Dec, Enc, NetError, Result};
 
 /// Bumped on any incompatible change. Checked before anything else in `Hello`.
-pub const PROTOCOL_VERSION: u32 = 32;
+pub const PROTOCOL_VERSION: u32 = 33;
 
 /// Hard cap on a frame payload, enforced on both send and receive.
 pub const MAX_FRAME_LEN: usize = 6 << 20;
