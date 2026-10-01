@@ -138,11 +138,6 @@ pub(in crate::ai) struct Ledger {
 }
 
 impl Ledger {
-    pub(in crate::ai) fn add(&mut self, o: &Ledger) {
-        self.committed += o.committed;
-        self.killed += o.killed;
-        self.lost += o.lost;
-    }
     /// Mass destroyed per mass lost; 1 when nothing has happened yet.
     pub(in crate::ai) fn trade(&self) -> Fx {
         if self.killed + self.lost < Fx::from_int(200) {

@@ -152,9 +152,33 @@ impl World {
         // Roles within each force and the share (per mille) of its mass each
         // should hold; the first role a unit fits is the one it counts toward.
         type Fits = Box<dyn Fn(&Profile) -> bool>;
-        let aa_land = (air_share * 7 / 10).min(400)
-            + if air_seen { 80 } else { 0 }
-            + 60 * stake(PlanKind::AirDefense);
+        // Anti-air held against the aircraft seen: once it outweighs them by half,
+        // only a little more. Held to the plan's stake alone, a side lost 1065
+        // anti-air tanks (a third of all it lost) to ground armies while the enemy
+        // flew a few bombers.
+        let our_aa: Fx = {
+            let units = &self.state.units;
+            units
+                .slots
+                .iter()
+                .filter(|&r| {
+                    units.owner[r] == player && profiles.get(units.blueprint[r]).has(role::ANTI_AIR)
+                })
+                .map(|r| profiles.get(units.blueprint[r]).mass)
+                .sum()
+        };
+        let aa_enough = our_aa * 2 >= air * 3 + Fx::from_int(1500);
+        let aa_land = if aa_enough {
+            if air_seen {
+                60
+            } else {
+                0
+            }
+        } else {
+            (air_share * 7 / 10).min(400)
+                + if air_seen { 80 } else { 0 }
+                + 60 * stake(PlanKind::AirDefense)
+        };
         let roles: [Vec<(Fits, i64)>; FORCES] = [
             vec![
                 (Box::new(|p: &Profile| p.has(role::ANTI_AIR)), aa_land),
@@ -171,7 +195,11 @@ impl World {
             vec![
                 (
                     Box::new(|p: &Profile| p.has(role::ANTI_AIR)),
-                    (air_share * 8 / 10).clamp(150, 700) + 100 * stake(PlanKind::AirDefense),
+                    if aa_enough {
+                        150
+                    } else {
+                        (air_share * 8 / 10).clamp(150, 700) + 100 * stake(PlanKind::AirDefense)
+                    },
                 ),
                 (
                     Box::new(|p: &Profile| p.has(role::STRIKE)),
@@ -361,6 +389,9 @@ impl World {
                     Some((at, t)) if self.state.tick < t + 1800 => at + toward * Fx::from_int(40),
                     _ => start - toward * Fx::from_int(120),
                 }
+            } else if p.has(role::INTERCEPTOR) {
+                self.uncovered_value(player, bp)
+                    .unwrap_or(start - toward * Fx::from_int(260))
             } else if p.has(role::DEFENSE) {
                 start + toward * Fx::from_int(160)
             } else {
@@ -376,6 +407,57 @@ impl World {
             });
         }
         None
+    }
+
+    /// Where an interceptor of `bp` guards the most: the side's richest ground no
+    /// interceptor of its own (standing, rising or planned) covers yet. Every one
+    /// stood behind the factories, and warheads took the mines out of their reach.
+    fn uncovered_value(&self, player: u8, bp: &mc_data::UnitBlueprint) -> Option<FxVec2> {
+        let reach = bp.strategic.as_ref()?.coverage * 7 / 10;
+        let units = &self.state.units;
+        let mut guards: Vec<FxVec2> =
+            units
+                .slots
+                .iter()
+                .filter(|&r| {
+                    units.owner[r] == player
+                        && self.bp(r).strategic.as_ref().is_some_and(|s| {
+                            s.kind == mc_data::strategic::StrategicKind::Interceptor
+                        })
+                })
+                .map(|r| units.pos[r])
+                .collect();
+        guards.extend(
+            self.planned_sites(player)
+                .filter(|(_, o)| {
+                    self.blueprints
+                        .unit(o.blueprint)
+                        .strategic
+                        .as_ref()
+                        .is_some_and(|s| s.kind == mc_data::strategic::StrategicKind::Interceptor)
+                })
+                .map(|(_, o)| o.pos),
+        );
+        let valued: Vec<(FxVec2, Fx)> = units
+            .slots
+            .iter()
+            .filter(|&r| units.owner[r] == player && self.bp(r).is_structure())
+            .map(|r| (units.pos[r], self.bp(r).cost_mass))
+            .collect();
+        valued
+            .iter()
+            .filter(|(at, _)| guards.iter().all(|g| g.distance(*at) > reach))
+            .map(|&(at, _)| {
+                let near: Fx = valued
+                    .iter()
+                    .filter(|(o, _)| o.distance(at) < reach)
+                    .map(|(_, m)| *m)
+                    .sum();
+                (near, at)
+            })
+            .max_by_key(|&(v, at)| (v, std::cmp::Reverse((at.x, at.y))))
+            .filter(|&(v, _)| v >= Fx::from_int(3000))
+            .map(|(_, at)| at)
     }
 
     /// Warheads: the classic launch rule already salvoes past interceptors it can

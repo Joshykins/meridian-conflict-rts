@@ -161,6 +161,11 @@ impl World {
         let from_above = hurt_by(super::state::Hurt::Air) + hurt_by(super::state::Hurt::Space);
         let by_guns = hurt_by(super::state::Hurt::Artillery) + hurt_by(super::state::Hurt::Static);
         let fortified = b.fortified.floor_int() + by_guns;
+        // A big project is a smaller commitment the more the side earns: at 300 a
+        // second a 16 000-mass warship is under a minute of income. Without this a
+        // side earning twice its enemy's income built no project in 88 minutes and
+        // lost to the enemy's dreadnoughts and nukes.
+        let rich = ((income - 80) / 4).clamp(0, 50);
         match k {
             PlanKind::Pressure => {
                 if island && !has(&|p| p.domain == Some(Domain::Hover) && p.armed()) {
@@ -240,21 +245,23 @@ impl World {
                 {
                     return 0;
                 }
-                50 + 40 * weak_aa as i32 + 30 * island as i32
+                50 + 40 * weak_aa as i32 + 30 * island as i32 + rich
             }
             PlanKind::Siege => {
                 let map_gun = has(&|p| p.has(role::MAP_GUN));
                 if !map_gun && !has(&|p| p.has(role::ARTILLERY)) {
                     return 0;
                 }
-                20 + (fortified / 800).min(60) + 30 * (map_gun && income >= 40) as i32
+                20 + (fortified / 800).min(60)
+                    + 30 * (map_gun && income >= 40) as i32
+                    + rich * map_gun as i32
             }
             PlanKind::Strategic => {
                 if !has(&|p| p.has(role::STRATEGIC)) || income < 30 {
                     return 0;
                 }
                 let open = b.interceptors.is_empty() && b.base_unseen < 6000;
-                20 + 40 * open as i32 + 25 * (income >= 100) as i32
+                20 + 40 * open as i32 + 25 * (income >= 100) as i32 + rich
             }
             PlanKind::Titan => {
                 let big = |p: &Profile| {
@@ -266,7 +273,9 @@ impl World {
                 if !has(&big) || income < 40 {
                     return 0;
                 }
-                20 + 40 * (income >= 80) as i32 + 20 * (our_land * 10 >= their_land * 8) as i32
+                20 + 40 * (income >= 80) as i32
+                    + 20 * (our_land * 10 >= their_land * 8) as i32
+                    + rich
             }
             PlanKind::Fortify => {
                 // A hedge: an interceptor slowly while their nukes are a maybe.
@@ -282,7 +291,23 @@ impl World {
             PlanKind::AirDefense => {
                 let air =
                     (b.army[Domain::Air as usize] + b.army[Domain::Space as usize]).floor_int();
-                (b.air.max(b.space) * 2 / 3 + (air / 100).min(90) + (from_above / 50).min(80))
+                // Anti-air already outweighing their aircraft by half: little more
+                // is needed unless it is still being hit from above.
+                let our_aa: i32 = {
+                    let units = &self.state.units;
+                    units
+                        .slots
+                        .iter()
+                        .filter(|&r| {
+                            units.owner[r] == ctx.player
+                                && ctx.profiles.get(units.blueprint[r]).has(role::ANTI_AIR)
+                        })
+                        .map(|r| ctx.profiles.get(units.blueprint[r]).mass.floor_int())
+                        .sum()
+                };
+                let covered = our_aa * 2 >= air * 3 + 1500;
+                (b.air.max(b.space) * 2 / 3 + (air / 100).min(90) + (from_above / 50).min(80)
+                    - 70 * covered as i32)
                     .max(0)
             }
         }
@@ -720,8 +745,12 @@ impl World {
         let b = ctx.beliefs;
         // Answers first: interceptors against their nukes, by how sure we are.
         let interceptor = |p: &Profile| p.has(role::INTERCEPTOR);
+        // Seen: one for each of their launchers and one over, so a salvo from all of
+        // them is met (five silos fired eighteen warheads, some in salvos of four,
+        // at a side that kept three interceptors all game).
         let need_int = match b.nukes {
-            90.. => 1 + (b.nukes >= 100) as usize,
+            100.. => (2 + b.silos).min(8),
+            90.. => 1,
             40..=89 if stake(PlanKind::Fortify) >= Stake::Probe => 1,
             _ => 0,
         };
@@ -748,13 +777,15 @@ impl World {
         }
         let strategic = stake(PlanKind::Strategic);
         let silo = |p: &Profile| p.has(role::STRATEGIC);
-        if held(&silo) < [0, 0, 1, 2][strategic as usize] {
+        // A probe builds one only when it is cheap: `pick` finds none dearer than two
+        // minutes of income.
+        if held(&silo) < [0, 1, 1, 2][strategic as usize] {
             want(pick(&silo, minutes(strategic), false));
         }
         let siege = stake(PlanKind::Siege);
         let gun = |p: &Profile| p.has(role::MAP_GUN);
-        if held(&gun) < [0, 0, 1, 3][siege as usize] {
-            want(pick(&gun, minutes(siege), true));
+        if held(&gun) < [0, 1, 1, 3][siege as usize] {
+            want(pick(&gun, minutes(siege), siege >= Stake::Invest));
         }
         let titan = stake(PlanKind::Titan);
         let big = |p: &Profile| {
@@ -764,7 +795,7 @@ impl World {
                 && !p.has(role::TRANSPORT)
                 && p.domain != Some(Domain::Space)
         };
-        if held(&big) < [0, 0, 1, 2][titan as usize] {
+        if held(&big) < [0, 1, 1, 2][titan as usize] {
             want(pick(&big, minutes(titan) + 2, true));
         }
         let warships = stake(PlanKind::Warships);

@@ -28,6 +28,8 @@ pub(in crate::ai) struct Beliefs {
     pub space: Sure,
     /// They have, or are building, a strategic launcher.
     pub nukes: Sure,
+    /// Strategic launchers of theirs we know of.
+    pub silos: usize,
     /// Interceptor rounds they hold that we know of, and where (with coverage).
     pub interceptors: Vec<(FxVec2, Fx, u32)>,
     /// Sonar coverage seen (structures and ships with sonar).
@@ -81,6 +83,7 @@ impl World {
             }
             if p.has(role::STRATEGIC) {
                 sticky.nukes_seen = tick.max(1);
+                b.silos += 1;
             }
             if let Some(s) = bp.strategic.as_ref().filter(|_| p.has(role::INTERCEPTOR)) {
                 b.interceptors.push((c.pos, s.coverage, s.stock as u32));

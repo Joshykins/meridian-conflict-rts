@@ -77,12 +77,17 @@ impl World {
 
     /// Drops dead members (their cost lost) and finished operations, and credits
     /// the kills made since the last think to the operations whose units made them.
-    /// The trades of finished operations go to their plans.
+    /// Every trade goes to the operation's plan as it happens: standing operations
+    /// (the air guard, the fleet) never finish, and a plan that heard of its trades
+    /// only from finished ones held anti-air all in for forty minutes while its
+    /// fighters traded 1:5.
     pub(in crate::ai) fn ops_upkeep(&mut self, player: u8) {
         let units = &self.state.units;
         let alive = |id: UnitId| units.row(id).is_some();
         let c = &mut self.state.ai[player as usize].commander;
         let kills = std::mem::take(&mut c.kills);
+        // (plan, killed, lost) to credit once the operations are walked.
+        let mut credit: Vec<(PlanKind, Fx, Fx)> = Vec::new();
         for (killer, mass) in kills {
             if let Some(op) = c
                 .ops
@@ -91,6 +96,7 @@ impl World {
             {
                 op.ledger.killed += mass;
                 c.trades[op.kind as usize].killed += mass;
+                credit.push((op.plan, mass, Fx::ZERO));
             }
         }
         for op in &mut c.ops {
@@ -105,6 +111,9 @@ impl World {
             });
             op.ledger.lost += lost;
             c.trades[op.kind as usize].lost += lost;
+            if lost > Fx::ZERO {
+                credit.push((op.plan, Fx::ZERO, lost));
+            }
             if !alive(op.carrier) {
                 op.carrier = Handle::NONE;
             }
@@ -113,18 +122,11 @@ impl World {
                 op.phase = Phase::Done;
             }
         }
-        let mut finished = Vec::new();
-        c.ops.retain(|o| {
-            if o.phase == Phase::Done {
-                finished.push((o.plan, o.ledger));
-                false
-            } else {
-                true
-            }
-        });
-        for (plan, ledger) in finished {
+        c.ops.retain(|o| o.phase != Phase::Done);
+        for (plan, killed, lost) in credit {
             if let Some(p) = c.plans.iter_mut().find(|p| p.kind == plan) {
-                p.ledger.add(&ledger);
+                p.ledger.killed += killed;
+                p.ledger.lost += lost;
             }
         }
     }
