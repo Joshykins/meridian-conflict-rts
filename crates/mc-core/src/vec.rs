@@ -70,6 +70,13 @@ impl FxVec2 {
         Fx(crate::fx::isqrt((x * x + y * y) as u128) as i64)
     }
 
+    /// `self.length() < len`, without taking the square root.
+    #[inline]
+    pub fn shorter_than(self, len: Fx) -> bool {
+        let (x, y) = (self.x.0 as i128, self.y.0 as i128);
+        len.0 > 0 && ((x * x + y * y) as u128) < (len.0 as i128 * len.0 as i128) as u128
+    }
+
     #[inline]
     pub fn distance(self, o: Self) -> Fx {
         (self - o).length()
@@ -273,6 +280,22 @@ vec_ops!(FxVec3, x, y, z);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shorter_than_matches_length() {
+        let mut x = 0x2545_F491_4F6C_DD1Du64;
+        for i in 0..20_000 {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            let v = FxVec2::new(Fx((x as i64) >> 36), Fx(((x >> 7) as i64) >> 37));
+            // Around the length itself, where rounding would show.
+            let len = v.length() + Fx(i % 5 - 2);
+            assert_eq!(v.shorter_than(len), v.length() < len, "{v:?} {len:?}");
+        }
+        assert!(!FxVec2::ZERO.shorter_than(Fx::ZERO));
+        assert!(FxVec2::ZERO.shorter_than(Fx(1)));
+    }
 
     #[test]
     fn lengths() {

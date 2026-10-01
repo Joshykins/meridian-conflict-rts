@@ -46,6 +46,8 @@ type Built = (Tile, Vec<(usize, usize)>);
 struct Tile {
     /// Indices into the moves, ascending.
     units: Vec<usize>,
+    /// Their hulls, side by side for the passes.
+    hulls: Vec<Hull>,
     /// Pairs as indices into `units`, in row order.
     pairs: Vec<(u32, u32)>,
 }
@@ -73,8 +75,7 @@ impl World {
                 }
             })
             .collect();
-        let radii: Vec<Fx> = hulls.iter().map(|h| h.radius).collect();
-        let (turns, apart) = tiles(&self.pool, &pairs, at, &radii);
+        let (turns, apart) = tiles(&self.pool, &pairs, at, &hulls);
         mc_core::perf_count!("move.apart_pairs", apart.len());
         mc_core::perf_count!("move.tiles", turns.iter().map(Vec::len).sum::<usize>());
         mc_core::perf_count!(
@@ -124,14 +125,13 @@ impl World {
                                     let mut local: Vec<FxVec2> =
                                         tile.units.iter().map(|&k| at[k]).collect();
                                     for &(a, b) in &tile.pairs {
-                                        let (i, j) =
-                                            (tile.units[a as usize], tile.units[b as usize]);
-                                        let (pa, pb) = (local[a as usize], local[b as usize]);
+                                        let (a, b) = (a as usize, b as usize);
+                                        let (pa, pb) = (local[a], local[b]);
                                         if let Some((pa, pb)) =
-                                            self.push_pair(&hulls[i], &hulls[j], pa, pb)
+                                            self.push_pair(&tile.hulls[a], &tile.hulls[b], pa, pb)
                                         {
                                             any = true;
-                                            (local[a as usize], local[b as usize]) = (pa, pb);
+                                            (local[a], local[b]) = (pa, pb);
                                         }
                                     }
                                     (any, local)
@@ -229,16 +229,13 @@ impl World {
     fn push_pair(&self, a: &Hull, b: &Hull, pa: FxVec2, pb: FxVec2) -> Option<(FxVec2, FxVec2)> {
         let (ra, rb) = (a.radius, b.radius);
         let delta = pa - pb;
-        // Clear by more than the square root can round: no need to take it.
-        let clear = ra + rb + Fx::from_int(2);
-        if delta.length_sq() > clear * clear {
+        let touch = ra + rb + Fx::ONE;
+        // Out of touch is decided before the square root, exactly.
+        if !delta.shorter_than(touch) {
             return None;
         }
         let dist = delta.length();
-        let overlap = ra + rb + Fx::ONE - dist;
-        if overlap <= Fx::ZERO {
-            return None;
-        }
+        let overlap = touch - dist;
         let dir = if dist > Fx::EPSILON {
             // `delta.normalize()` without taking the root again.
             FxVec2::new(delta.x / dist, delta.y / dist)
@@ -309,7 +306,7 @@ fn tiles(
     pool: &mc_jobs::Pool,
     pairs: &[(usize, usize)],
     at: &[FxVec2],
-    radii: &[Fx],
+    hulls: &[Hull],
 ) -> (Vec<Vec<Tile>>, Vec<(usize, usize)>) {
     let cell = |p: FxVec2| (p.x.floor_int() >> TILE_SHIFT, p.y.floor_int() >> TILE_SHIFT);
     // `starts[i]..starts[i + 1]`: the pairs whose first hull is `i`.
@@ -328,6 +325,9 @@ fn tiles(
     firsts.sort_unstable();
     let runs: Vec<&[((i32, i32), usize)]> = firsts.chunk_by(|a, b| a.0 == b.0).collect();
     let built: Vec<Vec<Built>> = pool.parallel_map_chunks(runs.len(), 16, |_, range| {
+        // Each hull's place in the tile being put together; `NONE` between tiles.
+        const NONE: u32 = u32::MAX;
+        let mut place = vec![NONE; at.len()];
         runs[range]
             .iter()
             .map(|run| {
@@ -336,8 +336,8 @@ fn tiles(
                 for &(_, i) in *run {
                     for &(i, j) in &pairs[starts[i]..starts[i + 1]] {
                         let tj = cell(at[j]);
-                        if radii[i] > TILE_RADIUS
-                            || radii[j] > TILE_RADIUS
+                        if hulls[i].radius > TILE_RADIUS
+                            || hulls[j].radius > TILE_RADIUS
                             || (tile.0 - tj.0).abs() > 1
                             || (tile.1 - tj.1).abs() > 1
                         {
@@ -350,9 +350,22 @@ fn tiles(
                 let mut units: Vec<usize> = held.iter().flat_map(|&(i, j)| [i, j]).collect();
                 units.sort_unstable();
                 units.dedup();
-                let local = |k: usize| units.binary_search(&k).unwrap() as u32;
-                let pairs = held.iter().map(|&(i, j)| (local(i), local(j))).collect();
-                (Tile { units, pairs }, apart)
+                for (n, &k) in units.iter().enumerate() {
+                    place[k] = n as u32;
+                }
+                let pairs = held.iter().map(|&(i, j)| (place[i], place[j])).collect();
+                for &k in &units {
+                    place[k] = NONE;
+                }
+                let hulls = units.iter().map(|&k| hulls[k]).collect();
+                (
+                    Tile {
+                        units,
+                        hulls,
+                        pairs,
+                    },
+                    apart,
+                )
             })
             .collect()
     });
