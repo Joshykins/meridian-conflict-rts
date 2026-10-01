@@ -157,7 +157,7 @@ straight into a match instead.
                          --shaders recompiles the WGSL); writes NAME.done; scripts/shot.sh drives it
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
                          menu | skirmish | survival (the set-up screen in that mode) |
-                         multiplayer | replays | settings
+                         multiplayer | history | settings
   --loading SECONDS      with --screenshot: the loading screen that long after it came up;
                          FROM:TO:FPS shoots a run of numbered frames (FILE-0000.png, ...)
   --opening              with --loading: the run's opening screen instead of a map's
@@ -178,6 +178,9 @@ MERIDIAN_AIM=MODE with --screenshot: an order being aimed at --cursor, with the 
 (each ship's exit in formation and the energy card).
 
 MERIDIAN_ISSUE_NOTE=TEXT with --screenshot: the F1 report card's note, as if typed.
+
+MERIDIAN_HISTORY_REPORT=N with --ui history: match N's battle report (1 = the newest),
+read from the replay first when no record was kept.
 
 MERIDIAN_GROUPS=KEY,KEY,... with --screenshot: control groups 2, 3, ... hold player 0's
 units whose blueprint key contains each KEY (group 1 is the selection).
@@ -350,7 +353,7 @@ fn run() -> Result<(), String> {
             }
             "--loading" => loading_at = Some(loading_times(&value("--loading")?).ok_or("--loading takes SECONDS or FROM:TO:FPS")?),
             "--opening" => opening = true,
-            "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish, survival, multiplayer, replays or settings")?),
+            "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish, survival, multiplayer, history or settings")?),
             "--cursor" => {
                 let v: Vec<f32> = value("--cursor")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 cursor = Some([*v.first().ok_or("--cursor takes X,Y")?, *v.get(1).ok_or("--cursor takes X,Y")?]);

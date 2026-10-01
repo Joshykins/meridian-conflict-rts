@@ -1,46 +1,92 @@
-//! The Replays screen: every recorded match, newest first, with its map,
-//! length, players and the marks made on it. Watch one from the start or
-//! from any mark.
+//! The Match History screen: every recorded match, newest first, with its map,
+//! length, players and the marks made on it. Read its battle report
+//! (`summary.rs`), or watch its replay from the start or from any mark.
+
+mod summary;
 
 use super::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use crate::audio::Sfx;
 use crate::hud::replay_clock as clock;
 use crate::replay::Summary;
 use glam::Vec2;
+use mc_data::Blueprints;
+use mc_jobs::Pool;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use summary::{SummaryAction, SummaryState};
 
 /// A jump to a mark lands this far in front of it, as on the timeline: 5 s.
 const LEAD_IN: u32 = 5 * mc_core::TICKS_PER_SECOND;
 const ROW_H: f32 = 62.0;
 
-pub enum ReplaysAction {
+pub enum HistoryAction {
     Back,
     /// Watch this replay, jumping to the tick if one is given.
     Watch(PathBuf, Option<u32>),
 }
 
-pub struct ReplaysState {
+pub struct HistoryState {
     /// Filled by a background read of every file.
     found: Arc<Mutex<Option<Vec<Summary>>>>,
     selected: usize,
     /// First row shown.
     scroll: usize,
+    /// What a battle report is worked out with.
+    blueprints: Arc<Blueprints>,
+    pool: Arc<Pool>,
+    /// The selected match's battle report, over the list.
+    summary: Option<SummaryState>,
+    /// A report had the image slots; what the other screens keep there must go back.
+    slots_taken: bool,
 }
 
-impl ReplaysState {
-    pub fn new() -> ReplaysState {
+impl HistoryState {
+    pub fn new(blueprints: Arc<Blueprints>, pool: Arc<Pool>) -> HistoryState {
         let found: Arc<Mutex<Option<Vec<Summary>>>> = Arc::default();
         let into = found.clone();
         std::thread::spawn(move || {
             let list = crate::replay::summaries();
             *into.lock().unwrap() = Some(list);
         });
-        ReplaysState {
+        HistoryState {
             found,
             selected: 0,
             scroll: 0,
+            blueprints,
+            pool,
+            summary: None,
+            slots_taken: false,
         }
+    }
+
+    /// True once after a battle report closed: it drew over the image slots the
+    /// menu, set-up and map browser keep their pictures in.
+    pub fn take_slots_back(&mut self) -> bool {
+        self.summary.is_none() && std::mem::take(&mut self.slots_taken)
+    }
+
+    /// A headless shot of match `n`'s battle report (1 = newest): waits for the list
+    /// and for the report to be worked out (`MERIDIAN_HISTORY_REPORT`).
+    pub fn open_report_now(&mut self, n: usize) {
+        let found = loop {
+            if let Some(list) = self.found.lock().unwrap().take() {
+                break list;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        self.selected = n.saturating_sub(1).min(found.len().saturating_sub(1));
+        if let Some(s) = found.get(self.selected) {
+            self.open_report(s);
+        }
+        *self.found.lock().unwrap() = Some(found);
+        if let Some(summary) = &mut self.summary {
+            summary.wait();
+        }
+    }
+
+    fn open_report(&mut self, s: &Summary) {
+        self.summary = Some(SummaryState::open(s, &self.blueprints, &self.pool));
+        self.slots_taken = true;
     }
 }
 
@@ -67,9 +113,26 @@ fn when(id: &str) -> String {
     }
 }
 
-pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<ReplaysAction> {
+pub fn draw(ui: &mut Ui, state: &mut HistoryState, enter: f32) -> Option<HistoryAction> {
+    // An open report has the pointer and keys; the list stands still under it.
+    let interactive = ui.interactive;
+    ui.interactive &= state.summary.is_none();
+    let mut action = list(ui, state, enter);
+    ui.interactive = interactive;
+    if let Some(summary) = &mut state.summary {
+        match summary.draw(ui) {
+            Some(SummaryAction::Close) => state.summary = None,
+            Some(SummaryAction::Watch(path)) => action = Some(HistoryAction::Watch(path, None)),
+            None => {}
+        }
+    }
+    action
+}
+
+fn list(ui: &mut Ui, state: &mut HistoryState, enter: f32) -> Option<HistoryAction> {
     let (w, h) = (ui.size.x, ui.size.y);
     let mut action = None;
+    let mut report = None;
     ui.fill(Rect::new(0.0, 0.0, w, h), ink(0.66 * enter));
     ui.fade = enter;
     ui.shift.y = 14.0 * (1.0 - enter);
@@ -81,14 +144,14 @@ pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<Replays
         84.0,
         type_scale::TITLE,
         rgb(0xFFFFFF, 1.0),
-        "Replays",
+        "Match History",
     );
     ui.text(
         end + 18.0,
         90.0,
         type_scale::CAPTION,
         rgb(palette::DIM, 1.0),
-        "Recorded Matches and Their Marks",
+        "Battle Reports and Replays of Every Recorded Match",
     );
     ui.fill(Rect::new(left, 124.0, 58.0, 2.0), rgb(palette::ACCENT, 1.0));
     ui.gradient_h(
@@ -107,7 +170,8 @@ pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<Replays
     );
     ui.panel(list);
 
-    let guard = state.found.lock().unwrap();
+    let found = state.found.clone();
+    let guard = found.lock().unwrap();
     match guard.as_deref() {
         None => {
             ui.text(
@@ -115,7 +179,7 @@ pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<Replays
                 list.y + 40.0,
                 type_scale::BODY,
                 rgb(palette::DIM, 1.0),
-                "Reading replays\u{2026}",
+                "Reading match history\u{2026}",
             );
         }
         Some([]) => {
@@ -124,7 +188,7 @@ pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<Replays
                 list.y + 40.0,
                 type_scale::BODY,
                 rgb(palette::DIM, 1.0),
-                "No replays yet: every skirmish and survival match is recorded.",
+                "No matches yet: every skirmish and survival match is recorded.",
             );
         }
         Some(found) => {
@@ -159,7 +223,7 @@ pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<Replays
                 );
                 if row(ui, i, r, s, i == state.selected) {
                     if i == state.selected && s.playable() {
-                        action = Some(ReplaysAction::Watch(s.path.clone(), None));
+                        report = Some(i);
                     }
                     state.selected = i;
                 }
@@ -179,14 +243,23 @@ pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<Replays
                 );
             }
             if let Some(s) = found.get(state.selected) {
-                action = action.or(details(ui, detail, s));
+                match details(ui, detail, s) {
+                    Some(Pick::Report) => report = Some(state.selected),
+                    Some(Pick::Watch(at)) => {
+                        action = Some(HistoryAction::Watch(s.path.clone(), at))
+                    }
+                    None => {}
+                }
+            }
+            if let Some(s) = report.and_then(|i| found.get(i)) {
+                state.open_report(s);
             }
         }
     }
     drop(guard);
 
     let back = ui.button(
-        id("replays-back", 0),
+        id("history-back", 0),
         Rect::new(left, h - 64.0 - 52.0, 200.0, 52.0),
         "Back",
         ButtonKind::Secondary,
@@ -194,7 +267,7 @@ pub fn draw(ui: &mut Ui, state: &mut ReplaysState, enter: f32) -> Option<Replays
     );
     if back || (ui.input.key(Key::Escape) && ui.interactive) {
         ui.audio.play(Sfx::Back);
-        action = Some(ReplaysAction::Back);
+        action = Some(HistoryAction::Back);
     }
     ui.fade = 1.0;
     ui.shift.y = 0.0;
@@ -273,8 +346,15 @@ fn row(ui: &mut Ui, i: usize, r: Rect, s: &Summary, lit: bool) -> bool {
     res.clicked
 }
 
-/// The selected replay: who played, its marks, and the watch buttons.
-fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<ReplaysAction> {
+/// What the selected match's card asks for.
+enum Pick {
+    Report,
+    /// Watch the replay, from the tick if one is given.
+    Watch(Option<u32>),
+}
+
+/// The selected match: who played, its marks, and the report and watch buttons.
+fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<Pick> {
     let mut action = None;
     ui.panel(r);
     let (x, cw) = (r.x + 28.0, r.w - 56.0);
@@ -296,6 +376,16 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<ReplaysAction> {
                 clock(s.length)
             } else {
                 format!("{} (cut short)", clock(s.length))
+            },
+        ),
+        (
+            "Report",
+            if !s.playable() {
+                "-".into()
+            } else if s.report_kept {
+                "Ready".into()
+            } else {
+                "Read from the replay when first opened".into()
             },
         ),
     ] {
@@ -388,25 +478,32 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<ReplaysAction> {
             );
             if res.clicked {
                 ui.audio.play(Sfx::Select);
-                action = Some(ReplaysAction::Watch(
-                    s.path.clone(),
-                    Some(m.tick.saturating_sub(LEAD_IN)),
-                ));
+                action = Some(Pick::Watch(Some(m.tick.saturating_sub(LEAD_IN))));
             }
             y += 36.0;
         }
     }
 
     if ui.button(
-        id("replay-watch", 0),
+        id("replay-report", 0),
         Rect::new(x, buttons_y, 220.0, 52.0),
-        "Watch",
+        "Battle Report",
         ButtonKind::Primary,
         s.playable(),
     ) || (ui.input.key(Key::Enter) && ui.interactive && s.playable())
     {
         ui.audio.play(Sfx::Select);
-        action = Some(ReplaysAction::Watch(s.path.clone(), None));
+        action = Some(Pick::Report);
+    }
+    if ui.button(
+        id("replay-watch", 0),
+        Rect::new(x + 232.0, buttons_y, 220.0, 52.0),
+        "Watch Replay",
+        ButtonKind::Secondary,
+        s.playable(),
+    ) {
+        ui.audio.play(Sfx::Select);
+        action = Some(Pick::Watch(None));
     }
     action
 }

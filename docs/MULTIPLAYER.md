@@ -158,8 +158,8 @@ Games hosted from the client (LAN, direct IP) do not check names.
 ## Replays
 
 Every match is recorded on every client (`replays/` beside the settings):
-the start message plus the bundle log. The Replays screen lists them (map,
-players, length, date); playback has play/pause, speed, a timeline to seek
+the start message plus the bundle log. The Match History screen lists them (map,
+players, length, date) and opens each one's battle report; playback has play/pause, speed, a timeline to seek
 (keyframe snapshots make seeking back quick) and the observer's perspective
 switch.
 

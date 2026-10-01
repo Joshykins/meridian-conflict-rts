@@ -4,21 +4,25 @@
 //! game does.
 
 use super::backdrop::Director;
+use super::history::{self, HistoryAction, HistoryState};
 use super::lineup::{Mode, ReadAhead};
 use super::menu::{self, MenuAction, MenuState, Telemetry};
 use super::multiplayer::{self, MultiplayerAction, MultiplayerState};
 use super::options;
-use super::replays::{self, ReplaysAction, ReplaysState};
 use super::setup::{self, MatchRequest, SetupAction, SetupState};
 use super::{rgb, Rect, Ui};
 use crate::settings::Settings;
+use mc_data::Blueprints;
+use mc_jobs::Pool;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Screen {
     Menu,
     /// Setting up a match, arriving in this mode (skirmish and survival share the screen).
     Setup(Mode),
-    Replays,
+    /// Match History: recorded matches, their battle reports and replays.
+    History,
     Multiplayer,
     Options,
 }
@@ -31,7 +35,7 @@ impl Screen {
             "survival" => Screen::Setup(Mode::Survival),
             "multiplayer" => Screen::Multiplayer,
             "settings" => Screen::Options,
-            "replays" => Screen::Replays,
+            "history" => Screen::History,
             _ => return None,
         })
     }
@@ -80,12 +84,19 @@ pub struct Front {
     enter: f32,
     menu: MenuState,
     setup: Option<SetupState>,
-    replays: Option<ReplaysState>,
+    history: Option<HistoryState>,
     multiplayer: Option<MultiplayerState>,
     /// The maps the set-up and multiplayer screens list, read before they open.
     maps: ReadAhead,
-    /// This build's unit data, which network matches must share.
+    /// This build's unit data, which network matches must share and Match History's
+    /// battle reports are worked out with, and the workers they use.
+    blueprints: Arc<Blueprints>,
+    pool: Arc<Pool>,
     blueprint_hash: u64,
+    /// The backdrop map's preview (`menu::PREVIEW_SLOT`), kept to put back after a
+    /// battle report borrowed the slot; whether it is due in the slot.
+    preview: Option<Vec<u8>>,
+    preview_due: bool,
     pub director: Director,
     /// `None` inside is the test range: there is nothing to set up first.
     launching: Option<(Launching, f32)>,
@@ -99,17 +110,26 @@ fn smooth(t: f32) -> f32 {
 
 impl Front {
     /// Over the backdrop's `director`, listing the maps `maps` is reading.
-    pub fn new(director: Director, blueprint_hash: u64, maps: ReadAhead) -> Front {
+    pub fn new(
+        director: Director,
+        blueprints: Arc<Blueprints>,
+        pool: Arc<Pool>,
+        maps: ReadAhead,
+    ) -> Front {
         Front {
             screen: Screen::Menu,
             target: Screen::Menu,
             enter: 0.0,
             menu: MenuState::default(),
             setup: None,
-            replays: None,
+            history: None,
             multiplayer: None,
             maps,
-            blueprint_hash,
+            blueprint_hash: blueprints.content_hash(),
+            blueprints,
+            pool,
+            preview: None,
+            preview_due: false,
             director,
             launching: None,
             quitting: None,
@@ -127,6 +147,15 @@ impl Front {
         self.open(settings, true);
         self.screen = screen;
         self.enter = 1.0;
+        // `MERIDIAN_HISTORY_REPORT=N`: Match History with match N's battle report open.
+        if let (Screen::History, Some(h)) = (screen, &mut self.history) {
+            if let Some(n) = std::env::var("MERIDIAN_HISTORY_REPORT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+            {
+                h.open_report_now(n);
+            }
+        }
         // Shots see the map thumbnails; `MERIDIAN_MAP_BROWSER=1` opens the browser.
         let browse = std::env::var("MERIDIAN_MAP_BROWSER").is_ok_and(|v| v == "1");
         if let (Screen::Setup(mode), Some(s)) = (screen, &mut self.setup) {
@@ -153,8 +182,11 @@ impl Front {
             s.set_mode(mode);
         }
         // Read afresh every visit: a match may have been recorded or marked since.
-        if screen == Screen::Replays {
-            self.replays = Some(ReplaysState::new());
+        if screen == Screen::History {
+            self.history = Some(HistoryState::new(
+                self.blueprints.clone(),
+                self.pool.clone(),
+            ));
         }
         // Set-up and multiplayer share an image slot for their charts.
         if let Some(s) = &mut self.setup {
@@ -206,6 +238,25 @@ impl Front {
         self.target = screen;
     }
 
+    /// The backdrop map's preview, put in its slot by the next frame.
+    pub fn set_preview(&mut self, chart: Vec<u8>) {
+        self.preview = Some(chart);
+        self.preview_due = true;
+    }
+
+    /// Something drew over every image slot (a battle report's unit pictures and
+    /// chart): each screen puts its pictures back.
+    fn slots_lost(&mut self) {
+        self.preview_due = true;
+        super::maps::slots_lost();
+        if let Some(s) = &mut self.setup {
+            s.chart_lost();
+        }
+        if let Some(m) = &mut self.multiplayer {
+            m.chart_lost();
+        }
+    }
+
     pub fn frame(
         &mut self,
         ui: &mut Ui,
@@ -213,6 +264,14 @@ impl Front {
         telemetry: &Telemetry,
     ) -> FrontOutcome {
         let mut out = FrontOutcome::default();
+        if let (true, Some(preview)) = (std::mem::take(&mut self.preview_due), &self.preview) {
+            ui.o.set_image(
+                menu::PREVIEW_SLOT,
+                super::preview::SIZE,
+                super::preview::SIZE,
+                preview,
+            );
+        }
         self.director.update(ui.dt);
         ui.fill(
             Rect::new(0.0, 0.0, ui.size.x, ui.size.y),
@@ -245,7 +304,7 @@ impl Front {
                     Some(MenuAction::Survival) => self.go(Screen::Setup(Mode::Survival), settings),
                     Some(MenuAction::Multiplayer) => self.go(Screen::Multiplayer, settings),
                     Some(MenuAction::Range) => self.launching = Some((Launching::Range, 0.0)),
-                    Some(MenuAction::Replays) => self.go(Screen::Replays, settings),
+                    Some(MenuAction::History) => self.go(Screen::History, settings),
                     Some(MenuAction::Options) => self.go(Screen::Options, settings),
                     Some(MenuAction::Quit) => self.quitting = Some(0.0),
                     None => {}
@@ -282,15 +341,18 @@ impl Front {
                     out.settings_changed = true;
                 }
             }
-            Screen::Replays => {
-                let state = self.replays.as_mut().expect("created on the way in");
-                match replays::draw(ui, state, enter) {
-                    Some(ReplaysAction::Back) => self.target = Screen::Menu,
-                    Some(ReplaysAction::Watch(path, at)) => {
+            Screen::History => {
+                let state = self.history.as_mut().expect("created on the way in");
+                match history::draw(ui, state, enter) {
+                    Some(HistoryAction::Back) => self.target = Screen::Menu,
+                    Some(HistoryAction::Watch(path, at)) => {
                         self.launching =
                             Some((Launching::Event(FrontEvent::Replay(path, at)), 0.0));
                     }
                     None => {}
+                }
+                if state.take_slots_back() {
+                    self.slots_lost();
                 }
             }
             Screen::Multiplayer => {

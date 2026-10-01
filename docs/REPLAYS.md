@@ -40,8 +40,16 @@ Marks made while watching a replay go on that replay's match.
 
 ## Watching
 
-Main menu, **Replays**: every recording, newest first, with map, date, length,
-commanders and marks. Watch from the start, or click a mark to start 5 s before it.
+Main menu, **Match History**: every recording, newest first, with map, date, length,
+commanders and marks. **Battle Report** opens the match's end-of-match report (the same
+pages as at the end of a match); **Watch Replay** plays it from the start, and a click on a
+mark starts 5 s before it.
+
+The report reads the record a match keeps beside its replay, `replays/<id>.mcreport`
+(written when the match is decided, or as far as it went when it is left, and deleted with
+its replay). A replay without one (recorded before reports were kept, or by other unit
+data) is played through once, headless and as fast as it goes, with a progress bar, and
+the record it makes is kept for next time.
 In the match, the timeline along the bottom shows the match clock and every mark (hover
 for its note). Click or drag the track to go anywhere; Start, -30 s, Play/Pause, +30 s,
 and Prev/Next Mark step about. Game speed works as in a match; the replay stops at its
@@ -73,7 +81,7 @@ that, and the game checks each:
 | Replay format | `REPLAY_FORMAT_VERSION` in the file header | Refused; listed as "recorded by another build" |
 | Unit data | `blueprint_hash` in the start message | Plays, but may diverge |
 | Map | `map_id` (content id) in the start message | Refused when no map in `maps/` has it |
-| Simulation code | the build name (record 5) | Plays, but may diverge; the Replays screen warns |
+| Simulation code | the build name (record 5) | Plays, but may diverge; Match History warns |
 
 Divergence is caught: the recording keeps the state hash of every tick, and playback logs
 `replay diverged at tick N` at the first tick that differs.

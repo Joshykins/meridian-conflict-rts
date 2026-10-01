@@ -132,6 +132,12 @@ impl SizeClass {
 /// Which browser last wrote the thumbnail slots: another screen's browser may
 /// have put its own there since, and then ours go back in.
 static SLOT_OWNER: AtomicU64 = AtomicU64::new(0);
+
+/// Something else drew over the cells' slot: the next browser drawn puts its cells back.
+pub fn slots_lost() {
+    SLOT_OWNER.store(0, Ordering::Relaxed);
+}
+
 static NEXT_BROWSER: AtomicU64 = AtomicU64::new(1);
 
 /// The thumbnails: drawn on a worker, handed out to cells as they are shown.

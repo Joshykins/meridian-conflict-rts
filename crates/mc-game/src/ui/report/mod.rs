@@ -1,8 +1,9 @@
 //! The battle report: the whole match told back when it is decided. A verdict
 //! over the battlefield, then five pages: the scoreboard and honours, the
 //! economy, the fighting, the battlefield replayed from above, and the moments
-//! of the match in order. Opened by the match's end, and from the in-match
-//! menu once the match is over (or at any time by an observer).
+//! of the match in order. Opened by the match's end, from the in-match menu
+//! once the match is over (or at any time by an observer), and from Match
+//! History for any recorded match.
 
 pub mod analysis;
 mod battlefield;
@@ -35,14 +36,24 @@ pub struct Ctx<'a> {
     pub thumbs: &'a Thumbs,
     /// The overlay image slot holding the map's chart.
     pub chart: usize,
-    /// Leaving gives up a network match this side is still in.
-    pub surrender: bool,
+    pub place: Place,
+}
+
+/// Where the report is read, which sets the way out of it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Place {
+    /// Over its match; leaving gives up a network match this side is still in.
+    Match { surrender: bool },
+    /// From Match History, long after: back to the list, or watch the replay.
+    History,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ReportAction {
-    /// Back to the battlefield.
+    /// Back to the battlefield, or to Match History.
     Close,
+    /// Watch the match's replay (from Match History).
+    Watch,
     Leave,
     Quit,
 }
@@ -100,6 +111,8 @@ enum Verdict {
     Complete,
     /// Not decided yet: an observer looking in part way through.
     Running,
+    /// A recording that stops before the match was decided.
+    CutShort,
 }
 
 pub struct Report {
@@ -146,6 +159,16 @@ impl Report {
         }
     }
 
+    /// The report on a recorded match, read from Match History: one that was never
+    /// decided was cut short, not still running.
+    pub fn of_record(chronicle: &Chronicle, blueprints: &Blueprints, local: Option<u8>) -> Report {
+        let mut report = Report::new(chronicle, blueprints, local);
+        if report.verdict == Verdict::Running {
+            report.verdict = Verdict::CutShort;
+        }
+        report
+    }
+
     /// A report as a headless shot shows it (`--report PAGE[@M:SS]`): open on PAGE,
     /// with everything drawn in, and the battlefield replay stopped at M:SS (or the end).
     pub fn staged(
@@ -160,7 +183,7 @@ impl Report {
             let pages: Vec<String> = Tab::ALL.iter().map(|t| t.name().to_lowercase()).collect();
             format!("--report takes one of {}", pages.join(", "))
         })?;
-        (report.age, report.tab_age) = (10.0, 10.0);
+        report.settle();
         let tick = match at.split_once(':') {
             Some((m, s)) => {
                 let (m, s): (u32, u32) = m
@@ -174,6 +197,11 @@ impl Report {
         };
         report.field.seek(tick);
         Ok(report)
+    }
+
+    /// Opens with everything already drawn in, as a still shows it.
+    pub fn settle(&mut self) {
+        (self.age, self.tab_age) = (10.0, 10.0);
     }
 
     fn turn_to(&mut self, ui: &mut Ui, tab: Tab) {
@@ -292,6 +320,10 @@ impl Report {
                 ),
             ),
             Verdict::Running => ("Battle Report", "The match so far".to_string()),
+            Verdict::CutShort => (
+                "Battle Report",
+                "The recording ends before the match was decided".to_string(),
+            ),
         };
         // The overline, its bar running out as the report opens.
         let bar = 34.0 * ease(self.age / 0.5);
@@ -301,10 +333,10 @@ impl Report {
             r.y + 5.0,
             type_scale::OVERLINE,
             rgb(tone, 1.0),
-            if self.verdict == Verdict::Running {
-                "In Progress"
-            } else {
-                "Battle Report"
+            match self.verdict {
+                Verdict::Running => "In Progress",
+                Verdict::CutShort => "Cut Short",
+                _ => "Battle Report",
             },
         );
         // The verdict, spaced wide as it lands and closing up.
@@ -419,8 +451,12 @@ impl Report {
     fn footer(&self, ui: &mut Ui, ctx: &Ctx, r: Rect) -> Option<ReportAction> {
         let mut out = None;
         // The keys, as caps.
+        let back_key = match ctx.place {
+            Place::Match { .. } => "Back to the battlefield",
+            Place::History => "Back to Match History",
+        };
         let mut x = r.x;
-        for (key, what) in [("Esc", "Back to the battlefield"), ("1-5", "Turn the page")] {
+        for (key, what) in [("Esc", back_key), ("1-5", "Turn the page")] {
             let w = ui.text_width(type_scale::MICRO, key) + 12.0;
             let cap = Rect::new(x, r.mid_y() - 9.0, w, 18.0);
             ui.frame(cap, rgb(palette::LINE, 0.4));
@@ -441,52 +477,54 @@ impl Report {
         }
         let bw = 220.0;
         let mut x = r.right() - bw;
-        if ui.button(
-            id("report-quit", 0),
-            Rect::new(x, r.y, bw, r.h),
-            "Exit to Desktop",
-            ButtonKind::Secondary,
-            true,
-        ) {
-            ui.audio.play(Sfx::Back);
-            out = Some(ReportAction::Quit);
-        }
-        x -= bw + 12.0;
-        let leave = if ctx.surrender {
-            "Surrender and Leave"
-        } else {
-            "Leave Match"
+        let mut button = |ui: &mut Ui, key: &str, label: &str, kind: ButtonKind| {
+            let clicked = ui.button(id(key, 0), Rect::new(x, r.y, bw, r.h), label, kind, true);
+            x -= bw + 12.0;
+            clicked
         };
         let primary = self.verdict != Verdict::Running;
-        if ui.button(
-            id("report-leave", 0),
-            Rect::new(x, r.y, bw, r.h),
-            leave,
+        let first = |primary: bool| {
             if primary {
                 ButtonKind::Primary
             } else {
                 ButtonKind::Secondary
-            },
-            true,
-        ) {
-            ui.audio.play(Sfx::Select);
-            out = Some(ReportAction::Leave);
-        }
-        x -= bw + 12.0;
-        let back = if primary {
-            "Keep Watching"
-        } else {
-            "Back to the Match"
+            }
         };
-        if ui.button(
-            id("report-close", 0),
-            Rect::new(x, r.y, bw, r.h),
-            back,
-            ButtonKind::Secondary,
-            true,
-        ) {
-            ui.audio.play(Sfx::Back);
-            out = Some(ReportAction::Close);
+        match ctx.place {
+            Place::History => {
+                if button(ui, "report-watch", "Watch Replay", ButtonKind::Primary) {
+                    ui.audio.play(Sfx::Select);
+                    out = Some(ReportAction::Watch);
+                }
+                if button(ui, "report-close", "Back", ButtonKind::Secondary) {
+                    ui.audio.play(Sfx::Back);
+                    out = Some(ReportAction::Close);
+                }
+            }
+            Place::Match { surrender } => {
+                if button(ui, "report-quit", "Exit to Desktop", ButtonKind::Secondary) {
+                    ui.audio.play(Sfx::Back);
+                    out = Some(ReportAction::Quit);
+                }
+                let leave = if surrender {
+                    "Surrender and Leave"
+                } else {
+                    "Leave Match"
+                };
+                if button(ui, "report-leave", leave, first(primary)) {
+                    ui.audio.play(Sfx::Select);
+                    out = Some(ReportAction::Leave);
+                }
+                let back = if primary {
+                    "Keep Watching"
+                } else {
+                    "Back to the Match"
+                };
+                if button(ui, "report-close", back, ButtonKind::Secondary) {
+                    ui.audio.play(Sfx::Back);
+                    out = Some(ReportAction::Close);
+                }
+            }
         }
         out
     }

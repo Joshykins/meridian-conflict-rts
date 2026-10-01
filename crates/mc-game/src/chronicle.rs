@@ -18,7 +18,7 @@ pub const FRAME_TICKS: u32 = 50;
 /// Cells a side of the map is split into for the snapshots.
 pub const GRID: usize = 64;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct SideInfo {
     pub name: String,
     pub team: u8,
@@ -27,7 +27,7 @@ pub struct SideInfo {
 }
 
 /// One side's economy and forces at a sample.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct SideSample {
     /// Materials and energy a second: made (mines and generators), reclaimed, spent.
     pub mass_income: f32,
@@ -52,19 +52,20 @@ pub struct SideSample {
     pub factories: u32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Sample {
     pub tick: u32,
     pub sides: Vec<SideSample>,
 }
 
 /// Where one side stood at a snapshot: cells of `GRID` (row-major, y down the map).
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct SideFrame {
     /// Each occupied cell and the worth of the army in it.
     pub army: Vec<(u16, f32)>,
     /// Each cell with a finished structure, and how many.
     pub bases: Vec<(u16, u16)>,
+    #[serde(with = "xy_opt")]
     pub commander: Option<Vec2>,
     /// Each cell where the side reclaimed since the last snapshot, and how much.
     pub salvage: Vec<(u16, f32)>,
@@ -72,22 +73,23 @@ pub struct SideFrame {
     pub reclaimed: f32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Frame {
     pub tick: u32,
     pub sides: Vec<SideFrame>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Death {
     pub tick: u32,
+    #[serde(with = "xy")]
     pub pos: Vec2,
     pub owner: u8,
     pub blueprint: BlueprintId,
     pub complete: bool,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Kill {
     pub tick: u32,
     pub by: u8,
@@ -97,7 +99,7 @@ pub struct Kill {
     pub complete: bool,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Built {
     pub tick: u32,
     pub owner: u8,
@@ -107,9 +109,10 @@ pub struct Built {
 }
 
 /// A wreck reclaimed to the last plate.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Salvage {
     pub tick: u32,
+    #[serde(with = "xy")]
     pub pos: Vec2,
     /// The wreck's unit.
     pub blueprint: BlueprintId,
@@ -118,17 +121,19 @@ pub struct Salvage {
 }
 
 /// A nuclear warhead's blast (a commander's reactor is a `Death`, not one of these).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Blast {
     pub tick: u32,
+    #[serde(with = "xy")]
     pub pos: Vec2,
     pub owner: u8,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Chronicle {
     pub sides: Vec<SideInfo>,
     /// The map's extent in metres.
+    #[serde(with = "xy")]
     pub size: Vec2,
     pub samples: Vec<Sample>,
     pub frames: Vec<Frame>,
@@ -144,9 +149,11 @@ pub struct Chronicle {
     pub tick: u32,
     /// Upgrades finished whose unit has not been handed its new blueprint yet: that
     /// hand-over is announced as a second completion, which is not a new unit.
+    #[serde(skip)]
     swaps: Vec<(u8, BlueprintId)>,
     /// Ticks each side's reclaim beams spent on each cell since the last snapshot: how
     /// the materials it reclaimed in that time are shared out over the map.
+    #[serde(skip)]
     beams: Vec<Vec<u32>>,
 }
 
@@ -433,4 +440,113 @@ impl Chronicle {
 pub fn cell_centre(size: Vec2, c: u16) -> Vec2 {
     let (x, y) = (c as usize % GRID, c as usize / GRID);
     (Vec2::new(x as f32, y as f32) + 0.5) / GRID as f32 * size
+}
+
+/// The kept record's file beside a replay: `<id>.mcreport` next to `<id>.mcreplay`.
+pub fn file_for(replay: &std::path::Path) -> std::path::PathBuf {
+    replay.with_extension(FILE_EXTENSION)
+}
+
+pub const FILE_EXTENSION: &str = "mcreport";
+/// Bumped whenever the record's layout changes; an older file is worked out again.
+const FILE_FORMAT: u32 = 1;
+/// The most a kept record may take to decode: a long match's is a few megabytes.
+const MAX_FILE_BYTES: u64 = 256 << 20;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct File {
+    format: u32,
+    /// The unit data it names blueprints from (`Blueprints::content_hash`).
+    blueprints: u64,
+    chronicle: Chronicle,
+}
+
+impl Chronicle {
+    /// Keeps the record beside its replay, so Match History opens its report at once.
+    pub fn save(&self, path: &std::path::Path, blueprints: u64) -> std::io::Result<()> {
+        let file = File {
+            format: FILE_FORMAT,
+            blueprints,
+            chronicle: self.clone(),
+        };
+        let bytes = bincode::serialize(&file).map_err(std::io::Error::other)?;
+        // Written whole and then renamed: a half-written record is never read.
+        let part = path.with_extension("mcreport-part");
+        std::fs::write(&part, bytes)?;
+        std::fs::rename(&part, path)
+    }
+
+    /// A kept record, when there is one this build can read for these blueprints.
+    /// The file is outside the process: it is decoded with a limit and checked.
+    pub fn load(path: &std::path::Path, blueprints: &mc_data::Blueprints) -> Option<Chronicle> {
+        let bytes = std::fs::read(path).ok()?;
+        let file: File = mc_sim::decode_untrusted(&bytes, MAX_FILE_BYTES).ok()?;
+        (file.format == FILE_FORMAT
+            && file.blueprints == blueprints.content_hash()
+            && file.chronicle.sound(blueprints.units.len()))
+        .then_some(file.chronicle)
+    }
+
+    /// Every side, blueprint and cell the record names is one there is: what the
+    /// report indexes by.
+    fn sound(&self, blueprints: usize) -> bool {
+        let n = self.sides.len();
+        let side = |s: u8| (s as usize) < n;
+        let bp = |b: BlueprintId| b.index() < blueprints;
+        let cell = |c: u16| (c as usize) < GRID * GRID;
+        let finite = |v: Vec2| v.is_finite();
+        self.size.is_finite()
+            && self.size.min_element() >= 1.0
+            && self.samples.iter().all(|s| s.sides.len() == n)
+            && self.frames.iter().all(|f| {
+                f.sides.len() == n
+                    && f.sides.iter().all(|s| {
+                        s.army.iter().all(|c| cell(c.0))
+                            && s.bases.iter().all(|c| cell(c.0))
+                            && s.salvage.iter().all(|c| cell(c.0))
+                            && s.commander.is_none_or(finite)
+                    })
+            })
+            && self
+                .deaths
+                .iter()
+                .all(|d| side(d.owner) && bp(d.blueprint) && finite(d.pos))
+            && self.kills.iter().all(|k| {
+                side(k.by) && side(k.victim) && bp(k.blueprint) && k.weapon_of.is_none_or(bp)
+            })
+            && self.built.iter().all(|b| side(b.owner) && bp(b.blueprint))
+            && self.defeats.iter().all(|d| side(d.1))
+            && self.blasts.iter().all(|b| side(b.owner) && finite(b.pos))
+            && self
+                .salvages
+                .iter()
+                .all(|s| bp(s.blueprint) && s.by.is_none_or(side) && finite(s.pos))
+    }
+}
+
+/// `Vec2` as two floats in the kept record.
+mod xy {
+    use glam::Vec2;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub(super) fn serialize<S: Serializer>(v: &Vec2, s: S) -> Result<S::Ok, S::Error> {
+        v.to_array().serialize(s)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec2, D::Error> {
+        <[f32; 2]>::deserialize(d).map(Vec2::from)
+    }
+}
+
+mod xy_opt {
+    use glam::Vec2;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub(super) fn serialize<S: Serializer>(v: &Option<Vec2>, s: S) -> Result<S::Ok, S::Error> {
+        v.map(|v| v.to_array()).serialize(s)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Vec2>, D::Error> {
+        Option::<[f32; 2]>::deserialize(d).map(|v| v.map(Vec2::from))
+    }
 }

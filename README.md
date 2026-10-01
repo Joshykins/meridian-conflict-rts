@@ -289,7 +289,7 @@ from orbit, pause and game speed still work, and a click on the roster jumps to 
 Three maps: the 80 km Meridian Basin, a 16 km dev
 basin, and Twin Shoals, a 10 km 1v1 island map (both commanders on the main island around a
 central lake, a ridge in each passage, two town islands reachable by amphibious units and hovers). Local matches are recorded to `replays/<id>.mcreplay` (the relay records with `--replay-dir`);
-the main menu's **Replays** watches them with a timeline to scrub, and F1's **Mark Issue** flags a
+the main menu's **Match History** opens each one's battle report or watches it with a timeline to scrub, and F1's **Mark Issue** flags a
 moment with a note, the timings and a screenshot for later: see `docs/REPLAYS.md`.
 
 Implemented and tested at the crate level, but not yet exercised end to end from the game

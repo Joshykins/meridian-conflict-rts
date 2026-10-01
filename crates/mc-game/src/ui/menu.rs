@@ -14,7 +14,7 @@ pub enum MenuAction {
     Multiplayer,
     Survival,
     Range,
-    Replays,
+    History,
     Options,
     Quit,
 }
@@ -47,9 +47,9 @@ const ENTRIES: [Entry; 7] = [
         action: Some(MenuAction::Multiplayer),
     },
     Entry {
-        label: "Replays",
-        blurb: "Watch recorded matches and jump to their marks",
-        action: Some(MenuAction::Replays),
+        label: "Match History",
+        blurb: "Battle reports and replays of your matches",
+        action: Some(MenuAction::History),
     },
     Entry {
         label: "Settings",

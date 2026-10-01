@@ -17,7 +17,7 @@ use crate::sim_thread::{self, SimHandle, SimSetup, SimStatus};
 use crate::ui::backdrop::Director;
 use crate::ui::front::{Front, FrontEvent};
 use crate::ui::lineup::ReadAhead;
-use crate::ui::menu::{Telemetry, PREVIEW_SLOT};
+use crate::ui::menu::Telemetry;
 use crate::ui::setup::MatchRequest;
 use crate::ui::{self, Key, Ui};
 use crate::window_chrome;
@@ -450,7 +450,7 @@ impl FrontStage {
         let size = Vec2::from(map.info().size_metres().to_f32());
         let director = Director::new(&map, settings.backdrop_auto_advance);
         Ok(FrontStage {
-            front: Front::new(director, args.blueprints.content_hash(), maps),
+            front: Front::new(director, args.blueprints.clone(), args.pool.clone(), maps),
             map,
             sim,
             serial: 0,
@@ -488,6 +488,7 @@ impl FrontStage {
                 scene,
                 net: None,
                 recorder: None,
+                keep_chronicle: None,
             },
             start.session,
         ))
@@ -825,10 +826,9 @@ impl App {
             Pending::Front => {
                 self.backdrop = Some(map.clone());
                 let maps = self.maps.take().unwrap_or_else(ReadAhead::start);
-                let stage =
+                let mut stage =
                     FrontStage::new(&self.args, &self.settings, self.viewport(), map, maps)?;
-                self.overlay
-                    .set_image(PREVIEW_SLOT, ui::preview::SIZE, ui::preview::SIZE, &chart);
+                stage.front.set_preview(chart);
                 self.stage = Stage::Front(Box::new(stage));
             }
             Pending::Match(start) => {

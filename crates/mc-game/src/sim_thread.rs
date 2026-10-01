@@ -209,6 +209,9 @@ pub struct SimSetup {
     pub net: Option<(crate::netplay::NetDriver, crate::netplay::NetPlay)>,
     /// Records what is played, for a match whose session does not record itself.
     pub recorder: Option<crate::recorder::Recorder>,
+    /// The battle report's record is kept here once the match is decided, or as far
+    /// as it went when it is left (`chronicle::file_for` the match's replay).
+    pub keep_chronicle: Option<std::path::PathBuf>,
 }
 
 /// Counts every side's finished units.
@@ -433,10 +436,20 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
             let mut watched = Watch::default();
             let mut scrub = session.length().map(|_| crate::replay::Scrubber::new());
             let mut recorder = setup.recorder;
+            let blueprint_hash = setup.blueprints.content_hash();
+            let mut keep_chronicle = setup.keep_chronicle;
+            let mut keep = |chronicle: &crate::chronicle::Chronicle| {
+                if let Some(path) = keep_chronicle.take().filter(|_| !chronicle.samples.is_empty()) {
+                    if let Err(e) = chronicle.save(&path, blueprint_hash) {
+                        log::warn!("the battle report's record was not kept: {e}");
+                    }
+                }
+            };
             // A replay: the range's weather as it was recorded, by the last note played.
             let mut range_sky = None;
             loop {
                 if stop_flag.load(Ordering::Relaxed) {
+                    keep(&chronicle_kept.lock().unwrap());
                     return;
                 }
                 if let Some(n) = &mut net {
@@ -584,7 +597,13 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                     recent.pop_front();
                                 }
                             }
-                            chronicle_kept.lock().unwrap().record(world);
+                            {
+                                let mut chronicle = chronicle_kept.lock().unwrap();
+                                chronicle.record(world);
+                                if chronicle.ended.is_some() {
+                                    keep(&chronicle);
+                                }
+                            }
                             // A seek runs up to its tick without drawing, showing progress now and then.
                             let rushing = match &mut scrub {
                                 Some(s) => {

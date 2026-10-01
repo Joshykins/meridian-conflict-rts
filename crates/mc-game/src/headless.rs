@@ -990,7 +990,7 @@ pub fn screenshot(
                 map_name: map.name(),
                 thumbs: &hud.thumbs,
                 chart: crate::hud::MINIMAP_SLOT,
-                surrender: false,
+                place: crate::ui::report::Place::Match { surrender: false },
             };
             report.draw(&mut ui, &ctx, 1.0);
         }
@@ -1246,11 +1246,10 @@ pub fn ui_screenshot(
     world.write_render_frame(None, &mut frame);
     let status = crate::sim_thread::status_of(&world, 0);
 
-    let blueprint_hash = blueprints.content_hash();
     let scene = SceneDesc {
         map: map.clone(),
-        blueprints,
-        pool,
+        blueprints: blueprints.clone(),
+        pool: pool.clone(),
         team_colors: setup::TEAM_COLORS,
     };
     let mut renderer = Renderer::new(
@@ -1283,18 +1282,17 @@ pub fn ui_screenshot(
     settings.survival_rules = crate::survival::env_rules();
     let mut front = Front::new(
         Director::new(&map, true),
-        blueprint_hash,
+        blueprints,
+        pool,
         ui::lineup::ReadAhead::start(),
     );
+    front.set_preview(ui::preview::render(
+        &map,
+        &crate::setup::map_config(&map).look(),
+    ));
     front.show(screen, &settings);
     let audio = crate::audio::Audio::silent();
     let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());
-    overlay.set_image(
-        menu::PREVIEW_SLOT,
-        ui::preview::SIZE,
-        ui::preview::SIZE,
-        &ui::preview::render(&map, &crate::setup::map_config(&map).look()),
-    );
     let still = ui::Input {
         cursor: cursor.map_or(glam::Vec2::splat(-100.0), glam::Vec2::from),
         ..Default::default()

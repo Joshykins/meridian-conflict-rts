@@ -268,7 +268,7 @@ fn every_page_draws_at_every_size() {
                 map_name: "Test Field",
                 thumbs: &thumbs,
                 chart: crate::hud::MINIMAP_SLOT,
-                surrender: false,
+                place: super::Place::Match { surrender: false },
             };
             assert_eq!(report.draw(&mut ui, &ctx, 1.0), None);
             memory.end_frame(&input);
@@ -285,4 +285,47 @@ fn verdicts() {
     assert_eq!(Report::new(&c, &bp, None).verdict, Verdict::Complete);
     c.ended = None;
     assert_eq!(Report::new(&c, &bp, None).verdict, Verdict::Running);
+}
+
+/// Match History reads the record a match kept: it comes back whole, and a damaged
+/// file, one for other unit data, or one naming a side that is not there is refused.
+#[test]
+fn a_kept_record_reads_back_and_bad_ones_are_refused() {
+    let bp = blueprints();
+    let c = chronicle(&bp);
+    let dir = std::env::temp_dir().join(format!("mc-report-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = crate::chronicle::file_for(&dir.join("match.mcreplay"));
+    c.save(&path, bp.content_hash()).unwrap();
+    let back = Chronicle::load(&path, &bp).expect("reads back");
+    assert_eq!(
+        Analysis::of(&back, &bp).total_deaths,
+        Analysis::of(&c, &bp).total_deaths
+    );
+    assert_eq!(back.samples.len(), c.samples.len());
+
+    c.save(&path, bp.content_hash() ^ 1).unwrap();
+    assert!(Chronicle::load(&path, &bp).is_none(), "other unit data");
+
+    let mut bad = c.clone();
+    bad.deaths[0].owner = 7;
+    bad.save(&path, bp.content_hash()).unwrap();
+    assert!(
+        Chronicle::load(&path, &bp).is_none(),
+        "a side not in the match"
+    );
+
+    c.save(&path, bp.content_hash()).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    for cut in [0, 8, bytes.len() / 2, bytes.len() - 1] {
+        std::fs::write(&path, &bytes[..cut]).unwrap();
+        assert!(Chronicle::load(&path, &bp).is_none(), "cut at {cut}");
+    }
+    let mut flipped = bytes.clone();
+    for i in (16..flipped.len()).step_by(97) {
+        flipped[i] ^= 0xA5;
+    }
+    std::fs::write(&path, &flipped).unwrap();
+    let _ = Chronicle::load(&path, &bp);
+    let _ = std::fs::remove_dir_all(&dir);
 }

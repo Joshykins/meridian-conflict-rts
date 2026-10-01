@@ -2,10 +2,13 @@
 //! for a screenshot, `--bench` or `--perf` report of a marked moment, or in a
 //! window to watch.
 
+use crate::chronicle::Chronicle;
 use crate::setup;
 use mc_net::{Replay, TickBundle};
 use mc_sim::{Command, MatchConfig, PlayerCommand, World};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
 
 /// The build a recording says made it: `MERIDIAN_BUILD` at compile time (a
 /// release pipeline sets it), else the package version marked `-dev`.
@@ -79,6 +82,46 @@ impl Playback {
     }
 }
 
+/// The battle report's record of a recorded match: the one kept beside it, or else
+/// worked out by playing it through, headless and as fast as it goes, and then kept.
+/// `played` counts the ticks played so far, out of `Playback::ticks`; setting `stop`
+/// gives up part way.
+pub fn chronicle_of(
+    path: &Path,
+    map: &mc_map::MapFile,
+    blueprints: &Arc<mc_data::Blueprints>,
+    pool: &Arc<mc_jobs::Pool>,
+    played: &AtomicU32,
+    stop: &AtomicBool,
+) -> Result<Chronicle, String> {
+    let kept = crate::chronicle::file_for(path);
+    if let Some(chronicle) = Chronicle::load(&kept, blueprints) {
+        return Ok(chronicle);
+    }
+    let mut playback = Playback::open(path)?;
+    let mut world = World::new(map, blueprints.clone(), pool.clone(), &playback.config)
+        .map_err(|e| e.to_string())?;
+    if let Some(survival) = playback.survival.clone() {
+        world.begin_survival(survival).map_err(|e| e.to_string())?;
+    }
+    let mut chronicle = Chronicle::new(glam::Vec2::from(map.info().size_metres().to_f32()));
+    for t in 0..playback.ticks() {
+        if stop.load(Ordering::Relaxed) {
+            return Err("stopped".into());
+        }
+        playback.step(&mut world, t)?;
+        chronicle.record(&world);
+        played.store(t + 1, Ordering::Relaxed);
+        if chronicle.ended.is_some() {
+            break;
+        }
+    }
+    if let Err(e) = chronicle.save(&kept, blueprints.content_hash()) {
+        log::warn!("the report of {} was not kept: {e}", path.display());
+    }
+    Ok(chronicle)
+}
+
 /// The test range's weather a recording showed in front of `tick`, if it kept any.
 pub fn range_sky_at(path: &Path, tick: u32) -> Option<crate::range::RangeSky> {
     let replay = Replay::load(path).ok()?;
@@ -120,16 +163,22 @@ pub fn find_map(start: &mc_net::MatchStart) -> Result<PathBuf, String> {
         })
 }
 
+/// The sides' colours a recorded match is shown in.
+pub fn colors(survival: bool) -> setup::Palette {
+    let mut colors = setup::TEAM_COLORS;
+    if survival {
+        colors[1] = crate::survival::ENGINE_COLOR;
+    }
+    colors
+}
+
 /// Watching the replay in a window, as an observer, at the pace it was played.
 pub fn game_start(
     playback: Playback,
     map: std::sync::Arc<mc_map::MapFile>,
     seek: Option<u32>,
 ) -> crate::game::GameStart {
-    let mut colors = setup::TEAM_COLORS;
-    if playback.survival.is_some() {
-        colors[1] = crate::survival::ENGINE_COLOR;
-    }
+    let colors = colors(playback.survival.is_some());
     let roster = playback.config.players.clone();
     // Marks made while watching go on this match's id.
     let record = playback
@@ -273,12 +322,13 @@ pub fn tick_at(replay: &Path, at: &str) -> Result<u32, String> {
     Ok(secs * mc_core::TICKS_PER_SECOND)
 }
 
-/// What the Replays screen lists about one recording.
+/// What Match History lists about one recording.
 pub struct Summary {
     pub path: PathBuf,
     pub id: String,
-    /// The map's name, when a map in maps/ has its content id.
+    /// The map's name and file, when a map in maps/ has its content id.
     pub map: Option<String>,
+    pub map_path: Option<PathBuf>,
     pub length: u32,
     /// False when the recording stopped without its end marker: still running, or crashed.
     pub complete: bool,
@@ -290,6 +340,8 @@ pub struct Summary {
     pub problem: Option<String>,
     /// The build that recorded it, when it said (older recordings did not).
     pub build: Option<String>,
+    /// Its battle report's record is kept beside it, so the report opens at once.
+    pub report_kept: bool,
 }
 
 impl Summary {
@@ -300,10 +352,12 @@ impl Summary {
 
 /// Every recording in replays/, newest first. Reads every file, so off the UI thread.
 pub fn summaries() -> Vec<Summary> {
-    let maps: Vec<(u64, String)> = setup::list_maps()
-        .iter()
-        .filter_map(|p| mc_map::MapFile::open(p).ok())
-        .map(|m| (m.content_id(), m.name().to_owned()))
+    let maps: Vec<(u64, String, PathBuf)> = setup::list_maps()
+        .into_iter()
+        .filter_map(|p| {
+            let m = mc_map::MapFile::open(&p).ok()?;
+            Some((m.content_id(), m.name().to_owned(), p))
+        })
         .collect();
     let mut paths: Vec<PathBuf> = std::fs::read_dir(crate::issues::DIR)
         .into_iter()
@@ -317,7 +371,7 @@ pub fn summaries() -> Vec<Summary> {
     paths.into_iter().map(|p| summary(p, &maps)).collect()
 }
 
-fn summary(path: PathBuf, maps: &[(u64, String)]) -> Summary {
+fn summary(path: PathBuf, maps: &[(u64, String, PathBuf)]) -> Summary {
     let id = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -328,13 +382,16 @@ fn summary(path: PathBuf, maps: &[(u64, String)]) -> Summary {
         id,
         path,
         map: None,
+        map_path: None,
         length: 0,
         complete: false,
         players: Vec::new(),
         survival: false,
         problem: None,
         build: None,
+        report_kept: false,
     };
+    out.report_kept = crate::chronicle::file_for(&out.path).exists();
     let replay = match Replay::load(&out.path) {
         Ok(r) => r,
         Err(mc_net::NetError::Version { theirs }) => {
@@ -352,10 +409,10 @@ fn summary(path: PathBuf, maps: &[(u64, String)]) -> Summary {
     out.length = replay.bundles.len() as u32;
     out.build = replay.build.clone();
     out.complete = replay.complete;
-    out.map = maps
-        .iter()
-        .find(|m| m.0 == replay.start.content.map_id)
-        .map(|m| m.1.clone());
+    if let Some(m) = maps.iter().find(|m| m.0 == replay.start.content.map_id) {
+        out.map = Some(m.1.clone());
+        out.map_path = Some(m.2.clone());
+    }
     if out.map.is_none() {
         out.problem = Some("Its map is not in maps/ (rebaked since?)".into());
     }

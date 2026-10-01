@@ -191,6 +191,8 @@ fn prune(dir: &Path) {
     let excess = old.len().saturating_sub(KEEP);
     for p in &old[..excess] {
         let _ = std::fs::remove_file(p);
+        // Its battle report's record goes with it.
+        let _ = std::fs::remove_file(crate::chronicle::file_for(p));
     }
 }
 

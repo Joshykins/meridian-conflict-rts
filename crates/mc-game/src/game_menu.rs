@@ -6,7 +6,7 @@ use super::{Game, GameEvent};
 use crate::audio::{Audio, Sfx};
 use crate::settings::Settings;
 use crate::ui::pause::{self, PauseAction};
-use crate::ui::report::{Ctx, Report, ReportAction};
+use crate::ui::report::{Ctx, Place, Report, ReportAction};
 use crate::ui::{options, Ui};
 
 /// Seconds between the match being decided and its report coming up: the last
@@ -146,7 +146,7 @@ impl Game {
                     map_name: ctx_map.name(),
                     thumbs: &self.hud.thumbs,
                     chart: crate::hud::MINIMAP_SLOT,
-                    surrender,
+                    place: Place::Match { surrender },
                 };
                 // It goes with the menu when that closes (the result's report does).
                 let shown = (1.0 - (1.0 - *enter).powi(3)) * (1.0 - (1.0 - menu.enter).powi(3));
@@ -159,7 +159,7 @@ impl Game {
                     }
                     Some(ReportAction::Leave) => event = Some(GameEvent::Leave),
                     Some(ReportAction::Quit) => event = Some(GameEvent::Quit),
-                    None => {}
+                    Some(ReportAction::Watch) | None => {}
                 }
                 if *closing && *enter <= 0.0 {
                     menu.report = None;

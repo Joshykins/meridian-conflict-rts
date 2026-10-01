@@ -493,6 +493,13 @@ impl Game {
                     crate::netplay::pair(Some(rejoin), local, start.keep)
                 }),
                 recorder: start.recorder,
+                // A match played here keeps its report for Match History; a replay
+                // being watched has one kept already, or worked out there.
+                keep_chronicle: start
+                    .record
+                    .as_ref()
+                    .filter(|_| watching.is_none())
+                    .map(|r| crate::chronicle::file_for(&r.replay)),
             },
             start.session,
         );
