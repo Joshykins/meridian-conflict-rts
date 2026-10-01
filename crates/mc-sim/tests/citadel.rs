@@ -127,10 +127,11 @@ fn a_citadel_breaks_a_paladin_that_a_redoubt_cannot() {
         citadel.seconds
     );
     assert!(!redoubt.stands, "a Redoubt held a Paladin");
-    // Not a wall: two Paladins take it, but it breaks one of them first.
+    // Its 400 m range leaves the Paladin a long walk under the Citadel's 1500 m gun:
+    // two of them (1680 mass against its 2400) both fall.
     let pair = push(CITADEL, "aster_t3_assault_bot", 2);
     assert!(
-        !pair.stands && pair.left == 1,
+        pair.stands && pair.left == 0,
         "two Paladins on a Citadel: stands {}, {} left",
         pair.stands,
         pair.left
