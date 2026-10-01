@@ -201,8 +201,7 @@ fn zz_matchup_probe() {
         .filter(|p| {
             p.mobile()
                 && p.armed()
-                && p.roles & role::PROJECT == 0
-                && p.domain != Some(Domain::Space)
+                && (p.roles & role::PROJECT == 0 || p.domain == Some(Domain::Space))
         })
         .collect();
     let (mut right, mut wrong, mut n) = (0, 0, 0usize);

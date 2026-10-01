@@ -114,3 +114,30 @@ fn an_army_that_has_gathered_goes_for_the_enemy_and_trades_are_kept() {
         c.summary()
     );
 }
+
+#[test]
+fn bombers_seen_bring_anti_air_into_the_army() {
+    let mut w = world();
+    let f = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let row = w
+        .spawn_unit(f, 0, FxVec2::from_ints(1400, 1300), Angle::ZERO, true)
+        .unwrap();
+    let menu = w.bp(row).builder.as_ref().unwrap().builds.clone();
+    let bomber = w.blueprints.id_of("aster_t1_bomber").unwrap();
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let seen = w.state.tick;
+    for i in 0..12 {
+        w.state.ai[0].contacts.push(crate::ai::adaptive::Contact {
+            id: crate::tables::UnitId::new(500 + i, 0),
+            blueprint: if i < 8 { bomber } else { tank },
+            pos: FxVec2::from_ints(5000, 5000),
+            seen,
+        });
+    }
+    w.state.ai[0].commander.sticky.air_seen = seen.max(1);
+    let picks: Vec<String> = (0..6)
+        .filter_map(|n| w.solve_production(0, &menu, &Default::default(), n))
+        .map(|id| w.blueprints.unit(id).key.clone())
+        .collect();
+    assert!(picks.iter().any(|k| k.contains("mobile_aa")), "{picks:?}");
+}

@@ -18,7 +18,7 @@ pub(in crate::ai) struct Beliefs {
     pub tech: u8,
     /// Enemy armed mobile mass seen lately, by domain (`Domain as usize`).
     pub army: [Fx; 7],
-    /// Mass of their static defences seen.
+    /// Mass of what holds their ground seen: turrets, map guns, artillery.
     pub fortified: Fx,
     /// Strength of their anti-air seen.
     pub anti_air: Fx,
@@ -69,7 +69,8 @@ impl World {
             let p = profiles.get(c.blueprint);
             sticky.max_tech = sticky.max_tech.max(bp.tech);
             mines += bp.has(cat::EXTRACTOR) as i32;
-            if p.has(role::DEFENSE) || p.has(role::MAP_GUN) {
+            // Guns that hold ground: turrets, map guns, and an artillery park.
+            if p.has(role::DEFENSE) || p.has(role::MAP_GUN) || p.has(role::ARTILLERY) {
                 b.fortified += bp.cost_mass;
             }
             if p.has(role::ANTI_AIR) {
@@ -171,6 +172,13 @@ impl World {
             })
             .unwrap_or(0);
         b.base_unseen = seen_ago(base_seen);
+        // Under fog an army is mostly unseen: never believe in less land army than
+        // a minute and a half of their income (seen, it was a fraction of the real one).
+        let land = Domain::Land as usize;
+        let floor = b.income * Fx::from_int(90);
+        if b.army[land] + b.army[Domain::Hover as usize] < floor {
+            b.army[land] = floor - b.army[Domain::Hover as usize];
+        }
         // Quiet: little army seen for what they earn.
         let spent = b.income * Fx::from_int(240);
         b.quiet = minutes >= 10 && b.army_mass() * 3 < spent;

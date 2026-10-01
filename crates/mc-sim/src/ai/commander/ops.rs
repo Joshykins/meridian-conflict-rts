@@ -24,7 +24,7 @@ pub(in crate::ai) fn fits(kind: OpKind, p: &Profile, land_route: bool) -> bool {
                     & (role::LINE | role::ARTILLERY | role::ANTI_AIR | role::SHIELD | role::SENSOR)
                     != 0
         }
-        OpKind::Raid => ground && (land_route || crosses) && p.has(role::RAIDER),
+        OpKind::Raid | OpKind::Guard => ground && (land_route || crosses) && p.has(role::RAIDER),
         OpKind::Siege => ground && p.has(role::ARTILLERY),
         OpKind::Landing => (ground && p.armed() && p.room > 0) || p.has(role::TRANSPORT),
         OpKind::Strike => p.domain == Some(Domain::Air) && p.has(role::STRIKE),
@@ -67,6 +67,8 @@ impl World {
             ledger: Ledger::default(),
             carrier: Handle::NONE,
             ordered: 0,
+            launched: Fx::ZERO,
+            health: Fx::ZERO,
         });
         id
     }
@@ -164,7 +166,22 @@ impl World {
         let units = &self.state.units;
         let mut free: Vec<usize> = free.to_vec();
         let c = &mut self.state.ai[player as usize].commander;
-        for op in &mut c.ops {
+        // The most particular first: defences, landings, the raid guard, raids,
+        // sieges; the standing operations soak up what is left.
+        let mut order: Vec<usize> = (0..c.ops.len()).collect();
+        order.sort_by_key(|&i| {
+            let rank = match c.ops[i].kind {
+                OpKind::Defend => 0,
+                OpKind::Landing => 1,
+                OpKind::Guard => 2,
+                OpKind::Raid => 3,
+                OpKind::Siege => 4,
+                _ => 5,
+            };
+            (rank, c.ops[i].id)
+        });
+        for i in order {
+            let op = &mut c.ops[i];
             if matches!(op.phase, Phase::Done | Phase::Withdrawing) {
                 continue;
             }
@@ -182,10 +199,11 @@ impl World {
             }
             // Only gathering operations take new units, except the standing ones
             // that soak up every unit of their kind.
+            // A land army on the move takes none: new units gather for the next wave
+            // instead of crossing the map to it alone.
             let soaks = matches!(
                 op.kind,
-                OpKind::Army
-                    | OpKind::AirGuard
+                OpKind::AirGuard
                     | OpKind::Fleet
                     | OpKind::Wolfpack
                     | OpKind::Warships
@@ -204,7 +222,10 @@ impl World {
             .min(room);
             let mut took = 0;
             free.retain(|&r| {
-                if took >= limit || op.units.len() >= MOST_UNITS {
+                if took >= limit
+                    || op.units.len() >= MOST_UNITS
+                    || (op.kind == OpKind::Guard && op.mass() >= op.want)
+                {
                     return true;
                 }
                 let p = profiles.get(units.blueprint[r]);

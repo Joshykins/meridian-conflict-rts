@@ -7,7 +7,8 @@
 //! `aggressive`, `economic` or `defensive`). With 2 players slot 0 is side A; with
 //! more, the starts west of the middle are side A. `TOURNEY_EVERY=N` prints each
 //! side's state every N minutes, `TOURNEY_ROSTER=1` each player's units at the end,
-//! `TOURNEY_DEATHS=1` every unit that dies, where and when.
+//! `TOURNEY_DEATHS=1` every unit that dies, where and when, `TOURNEY_OPS=N` slot N's
+//! operations whenever one changes (every 10 s).
 //! The `RESULT key=value ...` line sums the match up.
 //!
 //! `TOURNEY=serac_divide:2:40:7:commander/adaptive:classic/adaptive cargo test --profile gate -p mc-sim --test sim -- zz_ai_tournament:: --ignored --nocapture`
@@ -69,6 +70,10 @@ fn match_up() {
         _ => Difficulty::Hard,
     };
     let deaths = std::env::var("TOURNEY_DEATHS").is_ok();
+    let ops_trace: Option<usize> = std::env::var("TOURNEY_OPS")
+        .ok()
+        .and_then(|p| p.parse().ok());
+    let mut last_ops: Vec<String> = Vec::new();
     let every: u32 = std::env::var("TOURNEY_EVERY")
         .ok()
         .and_then(|n| n.parse().ok())
@@ -141,8 +146,28 @@ fn match_up() {
                         ..
                     } if deaths => {
                         let start = w.state.players[*owner as usize].start;
+                        // The nearest enemy unit: likely what killed it.
+                        let near = w
+                            .state
+                            .units
+                            .slots
+                            .iter()
+                            .filter(|&r| {
+                                w.state.players[w.state.units.owner[r] as usize].team
+                                    != w.state.players[*owner as usize].team
+                                    && !w.bp(r).weapons.is_empty()
+                            })
+                            .min_by_key(|&r| w.state.units.pos[r].distance_sq(pos.xy()))
+                            .map(|r| {
+                                format!(
+                                    "{} at {} m",
+                                    w.bp(r).key,
+                                    w.state.units.pos[r].distance(pos.xy()).floor_int()
+                                )
+                            })
+                            .unwrap_or_default();
                         println!(
-                            "  died {:>4}s P{owner} {} {} m from home",
+                            "  died {:>4}s P{owner} {} {} m from home, nearest enemy {near}",
                             w.state.tick / 10,
                             w.blueprints.unit(*blueprint).key,
                             (pos.xy().distance(start)).floor_int()
@@ -156,6 +181,15 @@ fn match_up() {
             }
             if first_blood.is_none() && w.state.players.iter().any(|p| p.units_lost > 0) {
                 first_blood = Some(w.state.tick / 60);
+            }
+            if let Some(p) = ops_trace.filter(|_| w.state.tick % 100 == 0) {
+                let lines = w.state.ai[p].op_report();
+                for l in &lines {
+                    if !last_ops.contains(l) {
+                        println!("  {:>4}s P{p} {l}", w.state.tick / 10);
+                    }
+                }
+                last_ops = lines;
             }
             if w.state.winner.is_some() {
                 break;

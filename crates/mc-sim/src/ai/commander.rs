@@ -79,6 +79,18 @@ impl World {
         }
     }
 
+    /// A unit of `player` worth `mass` was killed by a unit of blueprint `by`: what
+    /// hurts the side, by the killer's kind (`state::Hurt`), steers production.
+    pub(crate) fn note_loss_for_ai(&mut self, player: u8, by: mc_data::BlueprintId, mass: Fx) {
+        let kind = state::Hurt::of(self.blueprints.unit(by));
+        let Some(ai) = self.state.ai.get_mut(player as usize) else {
+            return;
+        };
+        if ai.config.brain == Brain::Commander {
+            ai.commander.hurt[kind as usize] += mass;
+        }
+    }
+
     /// One think of the Commander for `player`: everything but the builders, which
     /// it steers (`plans.rs`, `solver.rs`) and the classic code places.
     pub(super) fn command(
@@ -94,13 +106,16 @@ impl World {
         let wm = self.world_model(player, &profiles);
         let beliefs = self.beliefs(player, &profiles);
         self.ops_upkeep(player);
+        // What hurt it fades: a minute and a half's losses count most.
+        for h in &mut self.state.ai[player as usize].commander.hurt {
+            *h -= *h / 60;
+        }
         let start = self.state.players[player as usize].start;
         let enemy_start = intel.enemy_start;
-        let staging = {
-            let want = offset_toward(start, enemy_start.unwrap_or(start), Fx::from_int(260));
-            self.home_ground(start, 0)
-                .map_or(want, |g| self.reachable_staging(start, want, &g))
-        };
+        // The rally point creeps back up to the front while the wave is not shelled.
+        let c = &mut self.state.ai[player as usize].commander;
+        c.rally_back = (c.rally_back - Fx::from_int(30)).max(Fx::ZERO);
+        let staging = self.front_line(player, start, enemy_start, census, &reach, &wm);
         let mut arrived = self.arrived_army(player);
         arrived.sort_unstable();
         let ctx = Ctx {
@@ -120,10 +135,54 @@ impl World {
         self.keep_ops(&ctx);
         let free = self.free_units(player, &profiles);
         self.assign(player, &profiles, &free, census.land_route);
-        self.raise_defence(&ctx, &intel.threats);
+        let incursions = self.incursions(&ctx);
+        self.raise_defence(&ctx, &incursions);
         self.load_landings(&ctx, out);
         self.run_ops(&ctx, out);
         self.direct_strategic(&ctx, out);
+    }
+
+    /// Where the land army gathers: on the front line, a little behind the furthest
+    /// of the side's own mines toward the enemy (never more than 45% of the way),
+    /// so a raid on them runs into it, but out of the enemy's known reach; by the
+    /// base when nothing is out yet.
+    fn front_line(
+        &self,
+        player: u8,
+        start: FxVec2,
+        enemy: Option<FxVec2>,
+        census: &Census,
+        reach: &reach::Reach,
+        wm: &WorldModel,
+    ) -> FxVec2 {
+        let near = offset_toward(start, enemy.unwrap_or(start), Fx::from_int(260));
+        let home = self
+            .home_ground(start, 0)
+            .map_or(near, |g| self.reachable_staging(start, near, &g));
+        let Some(enemy) = enemy else {
+            return home;
+        };
+        let span = enemy.distance(start).max(Fx::ONE);
+        let dir = (enemy - start).normalize();
+        let furthest = census
+            .extractor_pos
+            .iter()
+            .map(|m| (*m - start).dot(dir))
+            .filter(|t| *t > Fx::ZERO)
+            .max()
+            .unwrap_or(Fx::ZERO);
+        let back = self.state.ai[player as usize].commander.rally_back;
+        let t =
+            (furthest - Fx::from_int(150) - back).clamp(Fx::from_int(260), span * Fx::ratio(9, 20));
+        // Back toward home until the army can walk there and no enemy fire known
+        // reaches it: units walking up one by one to a rally under the enemy's
+        // artillery were picked off one every few seconds.
+        let safe =
+            |p: &FxVec2| reach.reaches(*p) && wm.threat_at(*p, profile::Target::Land) == Fx::ZERO;
+        (0..12)
+            .map(|k| start + dir * (t - Fx::from_int(200 * k)).max(Fx::from_int(260)))
+            .find(safe)
+            .unwrap_or(home)
     }
 
     /// Each operation's orders, the most urgent first, while the side's attention
@@ -146,9 +205,11 @@ impl World {
             .iter()
             .find(|o| o.kind == OpKind::Strike && o.phase == Phase::Executing)
             .map(|o| o.target);
+        // Fighters cover the army: the one on the move, else the one gathering.
         let army: Option<FxVec2> = ops
             .iter()
-            .find(|o| o.kind == OpKind::Army && o.phase == Phase::Executing)
+            .filter(|o| o.kind == OpKind::Army)
+            .min_by_key(|o| o.phase != Phase::Executing)
             .and_then(|o| self.centre_of(&self.op_rows(o)));
         for op in &mut ops {
             if self.state.ai[player].commander.attention < Fx::ONE {
@@ -176,7 +237,7 @@ impl World {
         out: &mut Vec<Command>,
     ) -> u32 {
         match op.kind {
-            OpKind::Army | OpKind::Defend | OpKind::Raid | OpKind::Siege => {
+            OpKind::Army | OpKind::Defend | OpKind::Raid | OpKind::Siege | OpKind::Guard => {
                 self.run_land_op(ctx, op, out)
             }
             OpKind::Landing => self.run_landing(ctx, op, out),

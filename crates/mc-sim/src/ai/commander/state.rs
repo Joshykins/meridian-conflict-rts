@@ -186,6 +186,8 @@ pub(in crate::ai) enum OpKind {
     Warships = 8,
     Siege = 9,
     Scout = 10,
+    /// Fast units held among the side's mines that answer raids anywhere.
+    Guard = 11,
 }
 
 impl OpKind {
@@ -202,6 +204,7 @@ impl OpKind {
             OpKind::Warships => "warships",
             OpKind::Siege => "siege",
             OpKind::Scout => "scout",
+            OpKind::Guard => "guard",
         }
     }
 }
@@ -250,6 +253,13 @@ pub(in crate::ai) struct Operation {
     pub carrier: UnitId,
     /// Tick of its last order.
     pub ordered: u32,
+    /// Mass it set out with: it falls back once it has lost a third of it.
+    #[serde(default)]
+    pub launched: Fx,
+    /// Its units' health at the last think: losing it while gathering means it
+    /// is under fire from something it may not see.
+    #[serde(default)]
+    pub health: Fx,
 }
 
 impl Operation {
@@ -258,6 +268,41 @@ impl Operation {
     }
     pub(in crate::ai) fn mass(&self) -> Fx {
         self.units.iter().map(|(_, c)| *c).sum()
+    }
+}
+
+/// What killed the side's units, by the killer's kind (`CommanderState::hurt`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub(in crate::ai) enum Hurt {
+    /// Ground units in the line.
+    Land = 0,
+    /// Artillery and map guns: guns that out-range what they hit.
+    Artillery = 1,
+    Air = 2,
+    /// Warships of the upper air.
+    Space = 3,
+    /// Ships and submarines.
+    Sea = 4,
+    /// Turrets and other static guns.
+    Static = 5,
+}
+
+pub(in crate::ai) const HURTS: usize = 6;
+
+impl Hurt {
+    pub(in crate::ai) fn of(bp: &mc_data::UnitBlueprint) -> Hurt {
+        use mc_data::{cat, MoveLayer};
+        if bp.has(cat::ARTILLERY) {
+            return Hurt::Artillery;
+        }
+        match bp.motion.map(|m| m.layer) {
+            None => Hurt::Static,
+            Some(MoveLayer::Air) if bp.has(cat::SPACE) || bp.is_capital_ship() => Hurt::Space,
+            Some(MoveLayer::Air) => Hurt::Air,
+            Some(MoveLayer::Naval) => Hurt::Sea,
+            Some(_) => Hurt::Land,
+        }
     }
 }
 
@@ -326,6 +371,13 @@ pub(in crate::ai) struct CommanderState {
     /// Structures the plans want built, best first (`plans.rs`): the builders take
     /// the first one they can place.
     pub wants: Vec<BlueprintId>,
+    /// Mass the side has lost lately to each kind of killer (`Hurt`), fading.
+    #[serde(default)]
+    pub hurt: [Fx; HURTS],
+    /// Metres the army's rally point stands back from the front line: it grows while
+    /// the gathering wave is shelled and creeps back once it is quiet.
+    #[serde(default)]
+    pub rally_back: Fx,
 }
 
 impl CommanderState {
@@ -361,6 +413,8 @@ impl CommanderState {
             h.write_i64(o.want.0);
             o.ledger.hash(h);
             h.write_u64(o.carrier.0 as u64 | (o.ordered as u64) << 32);
+            h.write_i64(o.launched.0);
+            h.write_i64(o.health.0);
         }
         for (u, m) in &self.kills {
             h.write_u64(u.0 as u64);
@@ -377,6 +431,10 @@ impl CommanderState {
         }
         for w in &self.wants {
             h.write_u64(w.0 as u64);
+        }
+        h.write_i64(self.rally_back.0);
+        for x in &self.hurt {
+            h.write_i64(x.0);
         }
         for n in &self.notes {
             h.write_u64(
@@ -434,6 +492,30 @@ impl CommanderState {
             notes.join("; "),
             self.salvos
         )
+    }
+
+    /// One line per operation: what, where it stands, its target, its trade.
+    pub(in crate::ai) fn op_lines(&self) -> Vec<String> {
+        self.ops
+            .iter()
+            .map(|o| {
+                format!(
+                    "#{} {} {} {}u {}m to ({},{}) rally ({},{}) want {} kill {} lost {}",
+                    o.id,
+                    o.kind.name(),
+                    o.phase.name(),
+                    o.units.len(),
+                    o.mass().floor_int(),
+                    o.target.x.floor_int(),
+                    o.target.y.floor_int(),
+                    o.rally.x.floor_int(),
+                    o.rally.y.floor_int(),
+                    o.want.floor_int(),
+                    o.ledger.killed.floor_int(),
+                    o.ledger.lost.floor_int()
+                )
+            })
+            .collect()
     }
 
     pub(in crate::ai) fn plan(&self, kind: PlanKind) -> Stake {

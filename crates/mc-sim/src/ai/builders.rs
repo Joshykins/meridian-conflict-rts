@@ -441,10 +441,7 @@ impl World {
         } else {
             want_factories
         }
-        .min(skill.factory_cap as usize)
-            + self
-                .commander_directives(owner as u8)
-                .map_or(0, |d| d.factories);
+        .min(skill.factory_cap as usize);
         // A plant from a lesser builder is a poor one: a Reactor II gives 250 a
         // second for 700 materials, a Reactor 20 for 75. Once the side has a
         // better builder, a lesser one helps raise its plants (`direct_builders`)

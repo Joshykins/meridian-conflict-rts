@@ -70,6 +70,16 @@ fn taste(d: Doctrine) -> Taste {
     Taste { bias, risk }
 }
 
+/// Minutes of income a project may cost at each stake: a probe is cheap.
+fn minutes(s: Stake) -> i32 {
+    match s {
+        Stake::Off => 0,
+        Stake::Probe => 2,
+        Stake::Invest => 4,
+        Stake::AllIn => 8,
+    }
+}
+
 fn points(s: Stake) -> i32 {
     match s {
         Stake::Off => 0,
@@ -143,7 +153,12 @@ impl World {
         let scouted = !ctx.intel.enemy_factories.is_empty();
         let weak_aa = scouted && b.anti_air * 5 < Fx::from_int(income.max(5) * 60);
         let has = |f: &dyn Fn(&Profile) -> bool| menu.any(f);
-        let fortified = b.fortified.floor_int();
+        // What has been killing the side lately, in mass.
+        let hurt = self.state.ai[ctx.player as usize].commander.hurt;
+        let hurt_by = |k: super::state::Hurt| hurt[k as usize].floor_int();
+        let from_above = hurt_by(super::state::Hurt::Air) + hurt_by(super::state::Hurt::Space);
+        let by_guns = hurt_by(super::state::Hurt::Artillery) + hurt_by(super::state::Hurt::Static);
+        let fortified = b.fortified.floor_int() + by_guns;
         match k {
             PlanKind::Pressure => {
                 if island && !has(&|p| p.domain == Some(Domain::Hover) && p.armed()) {
@@ -151,7 +166,8 @@ impl World {
                 }
                 let ahead = (our_land * 10 > their_land * 13) as i32;
                 let base = if island { 25 } else { 70 };
-                base + 40 * ahead - (fortified / 3000).min(30)
+                // Waves into an artillery park behind turrets lose, however big.
+                base + 40 * ahead - (fortified / 2000).min(50)
             }
             PlanKind::Raid => {
                 if !has(&|p| p.has(role::RAIDER)) || island || census.factories.is_empty() {
@@ -165,7 +181,8 @@ impl World {
                         bp.has(mc_data::cat::EXTRACTOR) || bp.has(mc_data::cat::ENGINEER)
                     })
                     .count() as i32;
-                30 + soft.min(6) * 6
+                // Early on, raids take the map: engineers and mines on the edges.
+                45 + soft.min(6) * 6
             }
             PlanKind::Landing => {
                 if !has(&|p| p.has(role::TRANSPORT)) || census.factories.len() < 2 {
@@ -178,7 +195,9 @@ impl World {
                     return 0;
                 }
                 let heavy_aa = b.anti_air * 5 > Fx::from_int(income.max(5) * 240);
-                35 + 50 * weak_aa as i32 + 20 * island as i32 - 60 * heavy_aa as i32
+                // Bombers are the answer to ground that is held but not covered.
+                let entrenched = (fortified / 2000).min(40) * weak_aa as i32;
+                35 + 50 * weak_aa as i32 + 20 * island as i32 - 60 * heavy_aa as i32 + entrenched
             }
             PlanKind::SeaControl => {
                 if !has(&|p| p.domain == Some(Domain::Naval) && p.armed())
@@ -206,7 +225,7 @@ impl World {
             PlanKind::Warships => {
                 if !has(&|p| {
                     p.domain == Some(Domain::Space) && p.armed() && !p.has(role::TRANSPORT)
-                }) || income < 15
+                }) || income < 30
                 {
                     return 0;
                 }
@@ -250,8 +269,10 @@ impl World {
                 30 + 40 * blind as i32 + 30 * unsure as i32
             }
             PlanKind::AirDefense => {
-                let air = b.army[Domain::Air as usize].floor_int();
-                (b.air * 2 / 3 + (air / 200).min(60)).max(0)
+                let air =
+                    (b.army[Domain::Air as usize] + b.army[Domain::Space as usize]).floor_int();
+                (b.air.max(b.space) * 2 / 3 + (air / 100).min(90) + (from_above / 50).min(80))
+                    .max(0)
             }
         }
     }
@@ -427,9 +448,7 @@ impl World {
         let player = ctx.player as usize;
         let tick = self.state.tick;
         let stake = |w: &World, k: PlanKind| w.state.ai[player].commander.plan(k);
-        let b = ctx.beliefs;
         let income = self.state.players[player].mass_income;
-        let enemy_land = b.army[Domain::Land as usize] + b.army[Domain::Hover as usize];
         let back = super::super::offset_toward(
             ctx.start,
             ctx.start + (ctx.start - ctx.staging),
@@ -452,11 +471,11 @@ impl World {
             OpKind::Warships,
             OpKind::Scout,
         ] {
-            let exists = self.state.ai[player]
-                .commander
-                .ops
-                .iter()
-                .any(|o| o.kind == kind);
+            // The army: one wave always gathering at staging, whatever is out.
+            let exists =
+                self.state.ai[player].commander.ops.iter().any(|o| {
+                    o.kind == kind && (kind != OpKind::Army || o.phase == Phase::Gathering)
+                });
             let needed = free.iter().any(|&r| {
                 super::ops::fits(
                     kind,
@@ -476,6 +495,29 @@ impl World {
                 };
                 self.open_op(ctx.player, kind, plan, rally, rally, Fx::ZERO);
             }
+        }
+        // The raid guard: fast units held among the mines, sized by income.
+        let raiders = free.iter().any(|&r| {
+            super::ops::fits(
+                OpKind::Guard,
+                ctx.profiles.get(self.state.units.blueprint[r]),
+                ctx.land_route,
+            )
+        });
+        let has_guard = self.state.ai[player]
+            .commander
+            .ops
+            .iter()
+            .any(|o| o.kind == OpKind::Guard);
+        if raiders && !has_guard {
+            self.open_op(
+                ctx.player,
+                OpKind::Guard,
+                PlanKind::Pressure,
+                ctx.start,
+                ctx.start,
+                Fx::ZERO,
+            );
         }
         // Plan operations, as many as each stake holds.
         let count = |w: &World, k: OpKind| {
@@ -527,6 +569,30 @@ impl World {
                 Fx::from_int(900),
             );
         }
+        // The guard waits among the mines, a third of the way back toward home.
+        let guard_post = {
+            let units = &self.state.units;
+            let mines: Vec<FxVec2> = units
+                .slots
+                .iter()
+                .filter(|&r| units.owner[r] == ctx.player && self.bp(r).mine.is_some())
+                .map(|r| units.pos[r])
+                .collect();
+            if mines.is_empty() {
+                ctx.start
+            } else {
+                let base = mines[0];
+                let sum = mines.iter().fold(FxVec2::ZERO, |s, m| s + (*m - base));
+                let mid =
+                    base + FxVec2::new(sum.x / mines.len() as i32, sum.y / mines.len() as i32);
+                let at = mid.lerp(ctx.start, Fx::ratio(1, 3));
+                if ctx.can_walk(at) {
+                    at
+                } else {
+                    ctx.start
+                }
+            }
+        };
         // Plans dropped: their gathering operations end, their units go back.
         let c = &mut self.state.ai[player].commander;
         let held: Vec<(PlanKind, Stake)> = c.plans.iter().map(|p| (p.kind, p.stake)).collect();
@@ -552,12 +618,13 @@ impl World {
             let stale = tick > o.phase_since + 3000 && o.phase == Phase::Gathering;
             let want = match o.kind {
                 // Off: the army holds at home and answers raids. Otherwise a wave is
-                // so many seconds of income, and enough for what has been seen.
+                // so many seconds of income: sized by what had been seen, the first
+                // wave waited nine minutes while the enemy took the map.
                 OpKind::Army => match pressure {
                     Stake::Off => Fx::ZERO,
-                    Stake::Probe => Fx::from_int(500 + i * 25).max(enemy_land * 7 / 10),
-                    Stake::Invest => Fx::from_int(800 + i * 45).max(enemy_land * 11 / 10),
-                    Stake::AllIn => Fx::from_int(1500 + i * 90).max(enemy_land * 3 / 2),
+                    Stake::Probe => Fx::from_int(400 + i * 15),
+                    Stake::Invest => Fx::from_int(600 + i * 25),
+                    Stake::AllIn => Fx::from_int(1000 + i * 50),
                 },
                 OpKind::Strike => Fx::from_int(by_stake(air, [600, 2000, 5000]).max(600) as i32),
                 OpKind::Fleet => Fx::from_int(by_stake(sea, [1500, 4000, 9000]).max(1500) as i32),
@@ -573,6 +640,10 @@ impl World {
             o.want = if stale { want * 3 / 4 } else { want };
             if o.kind == OpKind::Army {
                 o.rally = ctx.staging;
+            }
+            if o.kind == OpKind::Guard {
+                o.want = Fx::from_int((i * 12).clamp(300, 1500));
+                o.rally = guard_post;
             }
         }
     }
@@ -642,11 +713,7 @@ impl World {
                     .max()
                     .unwrap_or(0)
             };
-            let best = pick(
-                &lift,
-                if landing >= Stake::Invest { 6 } else { 3 },
-                landing >= Stake::Invest,
-            );
+            let best = pick(&lift, minutes(landing), landing >= Stake::Invest);
             if best.is_some_and(|id| ctx.profiles.get(id).carry > biggest_held) && held(&lift) < 2 {
                 want(best);
             }
@@ -654,12 +721,12 @@ impl World {
         let strategic = stake(PlanKind::Strategic);
         let silo = |p: &Profile| p.has(role::STRATEGIC);
         if held(&silo) < [0, 0, 1, 2][strategic as usize] {
-            want(pick(&silo, 8, false));
+            want(pick(&silo, minutes(strategic), false));
         }
         let siege = stake(PlanKind::Siege);
         let gun = |p: &Profile| p.has(role::MAP_GUN);
         if held(&gun) < [0, 0, 1, 3][siege as usize] {
-            want(pick(&gun, 9, true));
+            want(pick(&gun, minutes(siege), true));
         }
         let titan = stake(PlanKind::Titan);
         let big = |p: &Profile| {
@@ -670,7 +737,7 @@ impl World {
                 && p.domain != Some(Domain::Space)
         };
         if held(&big) < [0, 0, 1, 2][titan as usize] {
-            want(pick(&big, if titan == Stake::AllIn { 14 } else { 9 }, true));
+            want(pick(&big, minutes(titan) + 2, true));
         }
         let warships = stake(PlanKind::Warships);
         let warship = |p: &Profile| {
@@ -680,7 +747,7 @@ impl World {
                 && p.has(role::PROJECT)
         };
         if held(&warship) < [0, 1, 3, 6][warships as usize] {
-            want(pick(&warship, 6, warships >= Stake::Invest));
+            want(pick(&warship, minutes(warships), warships >= Stake::Invest));
         }
         let shield = |p: &Profile| p.has(role::SHIELD) && !p.mobile();
         let fortify = stake(PlanKind::Fortify);
@@ -692,12 +759,12 @@ impl World {
         let air_def =
             stake(PlanKind::AirDefense).max(if b.air > 60 { Stake::Probe } else { Stake::Off });
         if held(&aa) < [0, 2, 4, 7][air_def as usize] {
-            want(pick(&aa, 3, air_def >= Stake::Invest));
+            want(pick(&aa, 2, air_def >= Stake::Invest));
         }
-        if stake(PlanKind::Intel) >= Stake::Probe && income >= Fx::from_int(15) {
+        if stake(PlanKind::Intel) >= Stake::Probe && income >= Fx::from_int(25) {
             let sensor = |p: &Profile| p.has(role::SENSOR) && p.has(role::WARP);
             if held(&sensor) == 0 {
-                want(pick(&sensor, 4, false));
+                want(pick(&sensor, 2, false));
             }
         }
         self.state.ai[player].commander.wants = wants;

@@ -182,10 +182,8 @@ impl World {
         (0..seen.len())
             .map(|i| (i, ctx.wm.centre(i)))
             .filter(|(_, c)| !taken.iter().any(|t| t.distance(*c) < Fx::from_int(1500)))
-            .filter(|(_, c)| {
-                ctx.wm.threat_at(*c, Target::Air) == Fx::ZERO
-                    || c.distance(enemy) < Fx::from_int(600)
-            })
+            // Never where anti-air is known to be: three Vigils were lost over bases.
+            .filter(|(_, c)| ctx.wm.threat_at(*c, Target::Air) == Fx::ZERO)
             .map(|(i, c)| {
                 let age = tick.saturating_sub(seen[i]) as i64;
                 // Their half counts double, their start four times.

@@ -69,6 +69,11 @@ impl AiState {
         }
     }
 
+    /// The Commander's operations, a line each, for headless reports.
+    pub fn op_report(&self) -> Vec<String> {
+        self.commander.op_lines()
+    }
+
     /// A compact diagnostic for headless match reports.
     pub fn summary(&self) -> String {
         if self.config.brain == crate::Brain::Commander {

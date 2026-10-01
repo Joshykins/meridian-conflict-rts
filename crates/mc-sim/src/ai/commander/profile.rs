@@ -353,7 +353,11 @@ fn roles(bp: &UnitBlueprint, p: &Profile) -> u32 {
         if matches!(p.domain, Some(Domain::Land | Domain::Hover)) {
             r |= role::LINE;
         }
-        if p.speed >= RAIDER_SPEED && matches!(p.domain, Some(Domain::Land | Domain::Hover)) {
+        // A scout is fast and armed, but it scouts.
+        if p.speed >= RAIDER_SPEED
+            && matches!(p.domain, Some(Domain::Land | Domain::Hover))
+            && !bp.has(cat::SCOUT)
+        {
             r |= role::RAIDER;
         }
     }
