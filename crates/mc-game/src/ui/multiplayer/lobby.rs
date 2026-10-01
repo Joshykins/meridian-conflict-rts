@@ -10,6 +10,7 @@
 
 use crate::match_options::{MatchOptions, SeatChoice};
 use crate::ui::faction::Pick;
+use crate::ui::lineup::chat::Chat;
 use crate::ui::lineup::roster::Control;
 use crate::ui::lineup::{Catalog, Lineup, Mode, Occupant, OPEN_NAME};
 use mc_core::PlayerId;
@@ -21,8 +22,6 @@ use mc_sim::tables::Controller;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::{Duration, Instant};
 
-/// Chat lines a lobby keeps.
-const CHAT_KEPT: usize = 80;
 /// A lobby that has not shown its plan this long after we set off to join it
 /// says so, rather than spin on.
 const JOIN_TIMEOUT: Duration = Duration::from_secs(20);
@@ -67,12 +66,6 @@ pub enum Place {
     Lan { addr: String },
 }
 
-pub struct ChatLine {
-    pub from: Option<u8>,
-    pub name: String,
-    pub text: String,
-}
-
 /// Everything the match needs once the room starts it.
 pub struct Launch {
     pub session: NetSession,
@@ -108,8 +101,8 @@ pub struct Lobby {
     published: Option<(Vec<u8>, mc_core::PlayerMask, u64)>,
     pub choice: SeatChoice,
     pub stats: Vec<PeerStat>,
-    pub chat: Vec<ChatLine>,
-    pub draft: String,
+    /// What the room says, and what changed in the plan.
+    pub chat: Chat,
     pub error: Option<String>,
     pub title: String,
     pub hosting: Option<LanHost>,
@@ -147,8 +140,7 @@ impl Lobby {
             published: None,
             choice: SeatChoice::default(),
             stats: Vec::new(),
-            chat: Vec::new(),
-            draft: String::new(),
+            chat: Chat::default(),
             error: None,
             title,
             hosting: None,
@@ -281,16 +273,7 @@ impl Lobby {
                 }
                 SessionEvent::Chat {
                     from, name, text, ..
-                } => {
-                    self.chat.push(ChatLine {
-                        from: from.map(|p| p.0),
-                        name,
-                        text,
-                    });
-                    if self.chat.len() > CHAT_KEPT {
-                        self.chat.remove(0);
-                    }
-                }
+                } => self.chat.said(from.map(|p| p.0), name, text),
                 SessionEvent::NetStats(stats) => self.stats = stats,
                 SessionEvent::Started(start) => {
                     let mut rest = vec![SessionEvent::Started(start)];
@@ -449,17 +432,34 @@ impl Lobby {
         }
     }
 
-    pub fn send_chat(&mut self) {
-        let text = self.draft.trim().to_owned();
-        self.draft.clear();
-        if text.is_empty() {
-            return;
-        }
+    pub fn send_chat(&mut self, text: &str) {
         if let Some(s) = &mut self.session {
-            if let Err(e) = s.chat(&text, 0) {
+            if let Err(e) = s.chat(text, 0) {
                 log::warn!("lobby chat not sent: {e}");
+                self.chat
+                    .warn("Not sent: the connection is having trouble.");
             }
         }
+    }
+
+    /// The set-up screen opened this lobby: its chat comes along, and says
+    /// who can now join and how.
+    pub fn adopt_chat(&mut self, mut chat: Chat) {
+        chat.note(match &self.place {
+            Place::Server {
+                code,
+                private: false,
+            } => format!("Open to the public: anyone on the server can join. Game code {code}."),
+            Place::Server {
+                code,
+                private: true,
+            } => format!("Open to friends with the code {code}. The game is not listed."),
+            Place::Lan { addr } => {
+                format!("Open on this network: friends find it under Network, or join at {addr}.")
+            }
+        });
+        chat.note("Chat is open: type below to talk to whoever joins.");
+        self.chat = chat;
     }
 
     /// Once the room has started: what the match needs. `keep` holds what must outlive

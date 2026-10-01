@@ -741,7 +741,7 @@ fn seat_row(
 }
 
 /// The name a row shows.
-fn who(lineup: &Lineup, table: &Table, i: usize, seat: &Seat) -> String {
+pub(super) fn who(lineup: &Lineup, table: &Table, i: usize, seat: &Seat) -> String {
     match (seat.control, table.occupant(i)) {
         (Control::Closed, _) => "Empty Slot".to_owned(),
         (_, Some(p)) => p.name.clone(),
@@ -934,6 +934,30 @@ fn state_of(p: &Occupant) -> (&'static str, u32) {
     } else {
         ("Not Ready", palette::FAINT)
     }
+}
+
+/// What a seat's Control cell says on one machine: "Closed", "AI \u{b7} Hard";
+/// "Open" for a seat played by a person.
+pub(super) fn control_label(seat: &Seat) -> &'static str {
+    match seat.control {
+        Control::Person => "Open",
+        Control::Closed => CONTROL[0],
+        Control::Ai => CONTROL[1 + difficulty_at(seat.ai.difficulty)],
+    }
+}
+
+/// An AI's tuning in a line: "Commander \u{b7} Aggressive \u{b7} Air \u{b7} 50%".
+pub(super) fn tuning_label(ai: &mc_sim::AiConfig) -> String {
+    let brain = match ai.brain {
+        Brain::Commander => "Commander",
+        Brain::Classic => "Classic",
+    };
+    format!(
+        "{brain}  \u{b7}  {}  \u{b7}  {}  \u{b7}  adapts {}%",
+        doctrine_label(ai.doctrine),
+        force_label(ai.domain_weights),
+        ai.adaptation
+    )
 }
 
 fn difficulty_at(d: Difficulty) -> usize {

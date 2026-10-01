@@ -41,6 +41,7 @@ pub enum MultiplayerAction {
 pub struct Resume {
     pub catalog: Catalog,
     pub lineup: Lineup,
+    pub chat: super::lineup::chat::Chat,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -316,6 +317,7 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
             return Some(MultiplayerAction::Resume(Box::new(Resume {
                 catalog,
                 lineup,
+                chat: std::mem::take(&mut lobby.chat),
             })));
         }
     }

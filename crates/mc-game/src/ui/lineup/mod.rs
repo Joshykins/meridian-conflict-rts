@@ -15,6 +15,7 @@
 //! defender, on one team, against the Progenitor on a survival map).
 
 mod chart;
+pub mod chat;
 pub mod roster;
 mod seats;
 pub mod settings;

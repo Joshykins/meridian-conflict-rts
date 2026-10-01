@@ -6,7 +6,7 @@
 use super::lobby::{Lobby, Place};
 use super::{choice_of, MultiplayerAction, MultiplayerState, Page, CHART_SLOT};
 use crate::audio::Sfx;
-use crate::setup::TEAM_COLORS;
+use crate::ui::lineup::chat::{self, Facts, Input, Reply};
 use crate::ui::lineup::{self, Ask, Lineup, Mode, Table};
 use crate::ui::{id, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use glam::Vec2;
@@ -14,8 +14,6 @@ use glam::Vec2;
 const LEFT: f32 = lineup::LEFT;
 /// The last seconds before the start, large.
 const COUNTDOWN: crate::ui::Style = crate::ui::style(mc_render::Face::Light, 64.0, 2.0);
-/// Width of the chat column.
-const CHAT_W: f32 = 372.0;
 
 pub(super) fn draw(
     ui: &mut Ui,
@@ -76,13 +74,15 @@ pub(super) fn draw(
             enter,
             CHART_SLOT,
         ));
+        let facts = Facts::of(&plan, &state.catalog, &table);
         lobby.lineup = Some(plan);
+        lobby.chat.watch(facts);
         for ask in asks {
             match ask {
                 Ask::Sit(i) => lobby.take_seat(i as u8),
                 Ask::Kick(i) => lobby.kick(i as u8),
                 Ask::MyRace(pick) => lobby.set_choice(choice_of(pick)),
-                Ask::Say(text) => state.say(text),
+                Ask::Say(text) => lobby.chat.warn(text),
             }
         }
         countdown(ui, lobby);
@@ -102,12 +102,11 @@ fn screen(
     table: &Table,
 ) -> Vec<Ask> {
     let mut asks = Vec::new();
-    let (left, centre, right) = lineup::columns(ui, CHAT_W);
-    chat(
-        ui,
-        lobby,
-        Rect::new(left.x, left.y + 6.0, left.w, left.h - 6.0),
-    );
+    let (left, centre, right) = lineup::columns(ui, chat::WIDTH);
+    let room = Rect::new(left.x, left.y + 6.0, left.w, left.h - 6.0);
+    if let Some(Reply::Send(text)) = chat::draw(ui, &mut lobby.chat, room, Input::Live) {
+        lobby.send_chat(&text);
+    }
     let chips = [lineup::settings::fog_chip(plan.fog)];
     let chart = lineup::bar(ui, plan, &mut state.catalog, table.host, &chips, centre);
     lineup::chart(ui, plan, &state.catalog, table, CHART_SLOT, chart);
@@ -313,78 +312,6 @@ fn joining(ui: &mut Ui, state: &mut MultiplayerState, lobby: &Lobby) {
     {
         ui.audio.play(Sfx::Back);
         state.next = Some(Page::Browse);
-    }
-}
-
-fn chat(ui: &mut Ui, lobby: &mut Lobby, r: Rect) {
-    ui.section(r.x, r.y, r.w, "Chat");
-    let input = Rect::new(r.x, r.bottom() - 40.0, r.w, 40.0);
-    let area = Rect::new(r.x, r.y + 22.0, r.w, input.y - r.y - 30.0);
-    let line_h = 21.0;
-    let mut lines: Vec<(Option<u8>, String, String)> = Vec::new();
-    for c in lobby.chat.iter().rev() {
-        let who = if c.from.is_none() && c.name.is_empty() {
-            String::new()
-        } else {
-            format!("{}:", c.name)
-        };
-        let prefix_w = ui.text_width(type_scale::VALUE, &who) + 8.0;
-        let wrapped = ui.wrap(type_scale::BODY, &c.text, r.w - prefix_w);
-        for (k, l) in wrapped.iter().enumerate().rev() {
-            lines.push((
-                c.from,
-                if k == 0 { who.clone() } else { String::new() },
-                l.clone(),
-            ));
-        }
-        if lines.len() as f32 * line_h > area.h {
-            break;
-        }
-    }
-    let mut y = area.bottom() - line_h * 0.5;
-    for (from, who, text) in &lines {
-        if y < area.y {
-            break;
-        }
-        let mut x = r.x;
-        if !who.is_empty() {
-            let tone = from.map_or(rgb(palette::DIM, 1.0), |s| {
-                let c = TEAM_COLORS[s as usize % TEAM_COLORS.len()];
-                [c[0], c[1], c[2], 1.0]
-            });
-            x = ui.text(x, y, type_scale::VALUE, tone, who) + 8.0;
-        } else if from.is_none() {
-            ui.text(x, y, type_scale::BODY, rgb(palette::WARN, 1.0), text);
-            y -= line_h;
-            continue;
-        }
-        ui.text(x, y, type_scale::BODY, rgb(palette::TEXT, 0.9), text);
-        y -= line_h;
-    }
-    if lobby.chat.is_empty() {
-        ui.text(
-            r.x,
-            area.y + 12.0,
-            type_scale::BODY,
-            rgb(palette::FAINT, 1.0),
-            "Say hello: type below and press Enter.",
-        );
-    }
-    let field = id("lobby-chat", 0);
-    ui.text_field(field, input, &mut lobby.draft, 200);
-    if lobby.draft.is_empty() && ui.mem.editing != Some(field) {
-        ui.text(
-            input.x + 12.0,
-            input.mid_y(),
-            type_scale::BODY,
-            rgb(palette::FAINT, 1.0),
-            "Message the lobby",
-        );
-    }
-    if ui.mem.editing == Some(field) && ui.input.key(Key::Enter) {
-        lobby.send_chat();
-        // Keep the keyboard: chat is a conversation.
-        ui.mem.editing = Some(field);
     }
 }
 

@@ -114,7 +114,8 @@ Games hosted from the client (LAN, direct IP) do not check names.
    set-up screen as skirmish and survival (`ui/lineup`), with the plan the host
    set up before opening it; leaving it takes the host back to that set-up. The host sets every seat's control,
    team, zone and colour; each player picks its own race, takes an open seat
-   and readies up. Chat works. The host starts once everyone is ready; a short
+   and readies up. Chat works, and notes every change to the plan on every
+   screen (`ui/lineup/chat.rs`). The host starts once everyone is ready; a short
    countdown runs on every screen. The mode is skirmish (teams, any skirmish
    map) or co-op survival (every seat a defender on its own landing zone,
    against the Progenitor on a survival map). Seats in play come first and

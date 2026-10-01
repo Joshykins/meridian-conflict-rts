@@ -5,6 +5,7 @@
 //! and Open to Others, which takes the plan as it stands to a lobby friends
 //! join (`multiplayer::share`).
 
+use super::lineup::chat::{self, Chat, Facts, Input, Reply};
 use super::lineup::roster::Control;
 use super::lineup::{self, Ask, Catalog, Lineup, Mode, Table, RULE_PITCH};
 use super::multiplayer::share::{self, Hosted, Share, ShareAsk};
@@ -54,6 +55,8 @@ pub struct SetupState {
     server: String,
     /// This build's unit data, which a network match must share.
     blueprint_hash: u64,
+    /// What changed, as it changed; it goes with the plan to a lobby.
+    pub chat: Chat,
 }
 
 fn slot(mode: Mode) -> usize {
@@ -116,6 +119,7 @@ impl SetupState {
             share: Share::default(),
             server: settings.server.clone(),
             blueprint_hash,
+            chat: Chat::default(),
         };
         state.settle_mode();
         state
@@ -131,6 +135,10 @@ impl SetupState {
             SetupState::with_catalog(resume.catalog, settings, resume.lineup.mode, blueprint_hash);
         state.lineup = resume.lineup.plan();
         state.shown = state.lineup.mode;
+        state.chat = resume.chat;
+        state
+            .chat
+            .note("Closed to others: the match is on this machine again.");
         state
     }
 
@@ -271,7 +279,10 @@ impl SetupState {
             }
         };
         match lobby {
-            Ok(lobby) => self.share.hosted(lobby),
+            Ok(mut lobby) => {
+                lobby.adopt_chat(std::mem::take(&mut self.chat));
+                self.share.hosted(lobby)
+            }
             Err(e) => {
                 self.share.say(e);
                 None
@@ -312,14 +323,16 @@ pub fn draw(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupActi
     let table = table_of(state.observe, &callsign);
     let sky = &mut state.skies[slot(state.lineup.mode)];
     let name = &mut state.name;
-    lineup::sheet(
+    let mut asks: Vec<Ask> = lineup::sheet(
         ui,
         &mut state.lineup,
         &mut state.catalog,
         &table,
         !over,
         |ui, area, y| callsign_and_sky(ui, name, sky, area, y),
-    );
+    )
+    .into_iter()
+    .collect();
     state.settle_mode();
     let content = state.content();
     let hosted = state
@@ -327,14 +340,17 @@ pub fn draw(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupActi
         .draw(ui, &state.lineup, &state.catalog, content, &callsign, !over)
         .and_then(|ask| state.host(ask));
     let table = table_of(state.observe, &state.name);
-    lineup::overlays(
+    asks.extend(lineup::overlays(
         ui,
         &mut state.lineup,
         &mut state.catalog,
         &table,
         enter,
         PREVIEW_SLOT,
-    );
+    ));
+    let facts = Facts::of(&state.lineup, &state.catalog, &table).with_sky(&state.sky());
+    state.chat.watch(facts);
+    refused(&mut state.chat, asks);
     if let Some(hosted) = hosted {
         return Some(SetupAction::Host(hosted));
     }
@@ -355,7 +371,13 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
         Mode::Survival => "Hold Out Against the Progenitor",
     };
     lineup::header(ui, Some(mode), caption, enter);
-    let (_, centre, right) = lineup::columns(ui, 0.0);
+    let (left, centre, right) = lineup::columns(ui, chat::WIDTH);
+    let log = Rect::new(left.x, left.y + 6.0, left.w, left.h - 6.0);
+    let hint = "Open to Others to chat with friends";
+    if let Some(Reply::Open) = chat::draw(ui, &mut state.chat, log, Input::Closed(hint)) {
+        ui.audio.play(Sfx::Select);
+        state.open_share();
+    }
     let chips = [
         lineup::settings::fog_chip(state.lineup.fog),
         lineup::settings::seed_chip(state.lineup.seed),
@@ -388,7 +410,7 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
         right,
     );
     state.observe = observe;
-    debug_assert!(asks.iter().all(|a| matches!(a, Ask::Say(_))));
+    refused(&mut state.chat, asks);
 
     // Footer.
     let problem = state.problem();
@@ -445,6 +467,16 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
     ui.fade = 1.0;
     ui.shift.y = 0.0;
     action
+}
+
+/// On one machine the line-up asks only to say why a change was refused: the chat says it.
+fn refused(chat: &mut Chat, asks: Vec<Ask>) {
+    for ask in asks {
+        match ask {
+            Ask::Say(text) => chat.warn(text),
+            other => log::warn!("a set-up on one machine was asked {other:?}"),
+        }
+    }
 }
 
 /// Your callsign under the shared rules, then the sky: the map's own weather

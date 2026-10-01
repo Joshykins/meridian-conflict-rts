@@ -368,13 +368,21 @@ fn a_left_lobby_goes_back_to_the_plan_it_had() {
         &mut state.catalog,
         Catalog::new(Vec::new(), Vec::new(), Vec::new()),
     );
+    let mut chat = crate::ui::lineup::chat::Chat::default();
+    chat.said(Some(1), "Ana".to_owned(), "gg".to_owned());
     let back = SetupState::resume(
         &Settings::default(),
         0,
         crate::ui::multiplayer::Resume {
             catalog,
             lineup: plan,
+            chat,
         },
+    );
+    assert_eq!(
+        back.chat.lines.len(),
+        2,
+        "the lobby's chat comes back, and says so"
     );
     assert_eq!(back.mode(), Mode::Survival);
     assert_eq!(back.lineup.roster.seats, seats);
