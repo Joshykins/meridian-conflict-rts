@@ -130,7 +130,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 /// The tech 3 land and air factories are mostly armour plates, which keep their sides at
 /// the reduced level, and have no gears or rams for the full level to spend on. The Picket
 /// and the Halberd are the same: plated legs, buttresses and gun shrouds, little else; so
-/// are the tech 2 and 3 Star Cages.
+/// are the tech 2 and 3 power generators.
 #[cfg(test)]
 pub(super) fn reduced_share(key: &str) -> Option<f32> {
     match key.split('~').next().unwrap_or(key) {

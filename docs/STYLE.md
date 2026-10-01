@@ -200,7 +200,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Battle scorpion (T3) | Harrow |
 | Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway |
 | Mine | Excavator (II, III), Deep Excavator |
-| Power | Star Cage (II, III) |
+| Power | Power Generator (II, III) |
 | Storage | Reliquary |
 | Point defence T1 / T2 / T3 | Picket / Halberd / Sunspear |
 | Anti-air, radar, wall | Canopy, Orrery (II, III), Palisade |

@@ -79,7 +79,7 @@ mod regency_mine_fx;
 mod shafts;
 mod shield_upload;
 mod stake_fx;
-mod star_cage_fx;
+mod star_core_fx;
 mod structure_pads;
 mod stun_fx;
 mod survival_fx;
@@ -843,8 +843,8 @@ pub struct Renderer {
     plasma_fx: plasma_fx::PlasmaFx,
     /// The Regency mines' excavation beams (renderer/regency_mine_fx.rs).
     regency_mine_fx: regency_mine_fx::RegencyMineFx,
-    /// The Regency Star Cages' stars (renderer/star_cage_fx.rs).
-    star_cage_fx: star_cage_fx::StarCageFx,
+    /// The Regency power generators' stars (renderer/star_core_fx.rs).
+    star_core_fx: star_core_fx::StarCoreFx,
     giant_fx: titan_fx::GiantFx,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
     /// EMP stuns and warp dampeners in the world (stun_fx.rs, damper_fx.rs).
@@ -2380,7 +2380,7 @@ impl Renderer {
             bore_fx: bore_fx::BoreFx::default(),
             plasma_fx: plasma_fx::PlasmaFx::default(),
             regency_mine_fx: regency_mine_fx::RegencyMineFx::new(excavations),
-            star_cage_fx: star_cage_fx::StarCageFx::new(stars),
+            star_core_fx: star_core_fx::StarCoreFx::new(stars),
             giant_fx: titan_fx::GiantFx::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
             emp_fx: stun_fx::EmpFx::default(),
@@ -3290,7 +3290,7 @@ impl Renderer {
         self.regency_guns_tick(units, time);
         self.regency_wakes(projectiles, time);
         self.excavation_tick(units, time, camera);
-        self.star_cage_tick(units, time, camera);
+        self.star_core_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
         self.arc_howitzer_tick(units, &frame.houses, time);
         self.write_bore_strokes(time);
@@ -3401,7 +3401,7 @@ impl Renderer {
         self.capital_lights(time, alpha);
         self.warp_lights(time);
         self.regency_guns_lights(time);
-        self.star_cage_lights(time);
+        self.star_core_lights(time);
         self.heavy_rail_lights(time);
         self.emp_lights(time);
         self.bolt_rifle_lights(time);

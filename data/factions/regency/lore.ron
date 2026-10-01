@@ -77,11 +77,11 @@
         weapons: {},
     ),
     "regency_t1_power": (
-        lore: "A small star pinched out of plasma and held in a turning gravity cage. Breach the cage and the star falls in on itself and goes out, taking nothing with it.",
+        lore: "Turning gravity rings squeeze plasma to the pressure inside a star until it fuses. Breach the field and the plasma spreads and goes out, taking nothing with it.",
         weapons: {},
     ),
     "regency_t2_power": (
-        lore: "A bigger star in a heavier cage of six pylons; like every Regency core, it goes out rather than up.",
+        lore: "A bigger core under more rings; like every Regency generator, it goes out rather than up.",
         weapons: {},
     ),
     "regency_t3_power": (

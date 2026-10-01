@@ -212,8 +212,8 @@ fn star_fbm3(p: vec3<f32>) -> f32 {
     return star_noise3(p) * 0.55 + star_noise3(p * 2.03 + 7.1) * 0.28 + star_noise3(p * 4.1 + 13.7) * 0.17;
 }
 
-// A Star Cage's star (renderer/star_cage_fx.rs): a ball of fusing plasma, not a solid. Its
-// face boils in cells that drift and turn, white-hot at the heart and breaking into the
+// A Regency power generator's star (renderer/star_core_fx.rs): a ball of fusing plasma, not a
+// solid. Its face boils in cells that drift and turn, white-hot at the heart and breaking into the
 // prism's pinks toward the rim, its edge soft and never quite still; bright veins crackle
 // across it and flash out; a ragged corona of streamers flickers off it; every few seconds
 // it flares. Laid once a tick, each lasting two, so its light is a tent over its life and

@@ -2,7 +2,7 @@
   "key": "regency_t1_power",
   "slug": "t1-power",
   "faction": "regency",
-  "name": "Star Cage",
+  "name": "Power Generator",
   "role": "Power Generator",
   "tech": 1,
   "domain": "structure",
@@ -11,7 +11,7 @@
     "Economy",
     "Power"
   ],
-  "lore": "A small star pinched out of plasma and held in a turning gravity cage. Breach the cage and the star falls in on itself and goes out, taking nothing with it.",
+  "lore": "Turning gravity rings squeeze plasma to the pressure inside a star until it fuses. Breach the field and the plasma spreads and goes out, taking nothing with it.",
   "stats": {
     "health": 1100,
     "shield": null,

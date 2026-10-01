@@ -581,8 +581,8 @@ pub struct Model {
     pub pit: Option<Pit>,
     /// The beam a Regency mine digs its bore with (`renderer/regency_mine_fx.rs`).
     pub excavation: Option<Excavation>,
-    /// A Regency Star Cage's star (xyz its middle, w its radius): drawn as light by the
-    /// renderer (`renderer/star_cage_fx.rs`) while the plant runs.
+    /// A Regency power generator's star (xyz its middle, w its radius): drawn as light by the
+    /// renderer (`renderer/star_core_fx.rs`) while the plant runs.
     pub star_core: Option<[f32; 4]>,
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).

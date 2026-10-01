@@ -2,7 +2,7 @@
   "key": "regency_t2_power",
   "slug": "t2-power",
   "faction": "regency",
-  "name": "Star Cage II",
+  "name": "Power Generator II",
   "role": "Power Generator",
   "tech": 2,
   "domain": "structure",
@@ -11,7 +11,7 @@
     "Economy",
     "Power"
   ],
-  "lore": "A bigger star in a heavier cage of six pylons; like every Regency core, it goes out rather than up.",
+  "lore": "A bigger core under more rings; like every Regency generator, it goes out rather than up.",
   "stats": {
     "health": 3200,
     "shield": null,

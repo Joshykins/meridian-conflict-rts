@@ -838,8 +838,8 @@ impl MeshBuilder {
         self.excavation.clone()
     }
 
-    /// Records a Star Cage's star, its middle and radius (given in the current frame),
-    /// which the renderer draws as light (`Model::star_core`).
+    /// Records a Regency power generator's star, its middle and radius (given in the current
+    /// frame), which the renderer draws as light (`Model::star_core`).
     pub fn set_star_core(&mut self, at: Vec3, radius: f32) {
         let at = self.transform.transform_point3(at);
         let r = self

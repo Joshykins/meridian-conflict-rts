@@ -1542,7 +1542,7 @@
   {
     "slug": "t1-power",
     "faction": "regency",
-    "name": "Star Cage",
+    "name": "Power Generator",
     "role": "Power Generator",
     "tech": 1,
     "domain": "structure",
@@ -1551,7 +1551,7 @@
     "mass": 90,
     "dps": null,
     "range": null,
-    "lore": "A small star pinched out of plasma and held in a turning gravity cage. Breach the cage and the star falls in on itself and goes out, taking nothing with it."
+    "lore": "Turning gravity rings squeeze plasma to the pressure inside a star until it fuses. Breach the field and the plasma spreads and goes out, taking nothing with it."
   },
   {
     "slug": "t2-land-factory",
@@ -1626,7 +1626,7 @@
   {
     "slug": "t2-power",
     "faction": "regency",
-    "name": "Star Cage II",
+    "name": "Power Generator II",
     "role": "Power Generator",
     "tech": 2,
     "domain": "structure",
@@ -1635,7 +1635,7 @@
     "mass": 840,
     "dps": null,
     "range": null,
-    "lore": "A bigger star in a heavier cage of six pylons; like every Regency core, it goes out rather than up."
+    "lore": "A bigger core under more rings; like every Regency generator, it goes out rather than up."
   },
   {
     "slug": "t3-land-factory",
@@ -1696,7 +1696,7 @@
   {
     "slug": "t3-power",
     "faction": "regency",
-    "name": "Star Cage III",
+    "name": "Power Generator III",
     "role": "Power Generator",
     "tech": 3,
     "domain": "structure",

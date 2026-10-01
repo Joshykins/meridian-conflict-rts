@@ -467,7 +467,7 @@ shared! {
         /// colour through deep red to nothing. Also the plasma a strike throws up.
         /// `appearance` as `PLASMA_ORB`'s.
         pub const PLASMA_WAKE: u32 = 55;
-        /// A Regency Star Cage's star, lit while the plant runs (renderer/star_cage_fx.rs,
+        /// A Regency power generator's star, lit while the plant runs (renderer/star_core_fx.rs,
         /// plasma_puffs.wgsl): a ball of fusing plasma, its face boiling in cells, white-hot
         /// at the heart, the prism's pinks (common.wgsl `prism`) drifting over it, a ragged
         /// corona flickering off its rim and veins crackling across it. Laid once a tick, two

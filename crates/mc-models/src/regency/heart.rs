@@ -1,4 +1,4 @@
-//! The Star Cage, the Regency power plant: a star core held in a gyroscope of gravity
+//! The Regency power generator: a star core held in a gyroscope of gravity
 //! rings. Three tiers, each its own structure (built new, not upgraded), each held a
 //! different way so the three read apart from above and from the ground (docs/STYLE.md,
 //! "The Regency suite"):
@@ -13,12 +13,12 @@
 //!   rings and a toothed drive ring under it.
 //!
 //! The star itself is light, not a solid: the renderer draws it where the model says it is
-//! (`Model::star_core`, renderer `star_cage_fx.rs`), a ball of fusing plasma boiling and
+//! (`Model::star_core`, renderer `star_core_fx.rs`), a ball of fusing plasma boiling and
 //! crackling in the prism's pinks, while the plant runs. The mesh carries only a small
 //! white-hot heart under it (`material::GLOW_PRISM`), for the portraits and far off.
 //! Each ring tumbles about an axis of its own (`MeshBuilder::with_orbit`) round the star.
 //! Nothing on it can go off: a breached cage lets the star fall in on itself and go out
-//! (no Star Cage has a death blast).
+//! (no Regency power generator has a death blast).
 
 use std::f32::consts::{PI, TAU};
 

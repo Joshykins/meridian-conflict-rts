@@ -5,8 +5,8 @@
 //
 // - Excavator: cuts the ore with an excavation beam and needs no power, but costs more
 //   mass up front.
-// - Star Cage: a caged star that never explodes; Star Cages can be packed tight where ARC
-//   reactors cannot.
+// - Power Generator: gravity squeezes plasma to a star's pressure until it fuses; it never
+//   explodes, so generators can be packed tight where ARC reactors cannot.
 // - Reliquary: one building holds mass and energy both, in three tiers.
 // - Picket: a short-ranged brawler, more damage than a Sentinel inside its reach.
 // - Canopy: bursting flak that hurts a whole flight, not one plane.
@@ -227,12 +227,12 @@
         ),
         mesh: "regency_taproot", icon: Extractor,
     ),
-    // A small star held in a gravity cage: it gives what a Reactor gives, but a breached
-    // cage lets the star fall in on itself and go out, so it dies without a blast and can
-    // be packed tight. Tougher, dearer.
+    // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what
+    // a Reactor gives, but a breached field lets the plasma spread and go out, so it dies
+    // without a blast and can be packed tight. Tougher, dearer.
     (
         key: "regency_t1_power",
-        name: "Star Cage",
+        name: "Power Generator",
         role: "Power Generator",
         tech: 1,
         categories: ["Land", "Economy", "Power"],
@@ -243,12 +243,12 @@
         economy: (energy_income: 15),
         mesh: "regency_heart", icon: Power,
     ),
-    // The tech 2 and 3 star cores: bigger stars in more cage, on lots of their own (like
-    // Reactor II and III, built new, not upgraded). The same trade as the Star Cage: tougher
-    // and dearer than the Reactor of their tier, and no blast when the cage is breached.
+    // The tech 2 and 3 generators: bigger cores in more rings, on lots of their own (like
+    // Reactor II and III, built new, not upgraded). The same trade as the tech 1 generator:
+    // tougher and dearer than the Reactor of their tier, and no blast when it is breached.
     (
         key: "regency_t2_power",
-        name: "Star Cage II",
+        name: "Power Generator II",
         role: "Power Generator",
         tech: 2,
         categories: ["Land", "Economy", "Power"],
@@ -261,7 +261,7 @@
     ),
     (
         key: "regency_t3_power",
-        name: "Star Cage III",
+        name: "Power Generator III",
         role: "Power Generator",
         tech: 3,
         categories: ["Land", "Economy", "Power"],

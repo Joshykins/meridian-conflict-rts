@@ -2,7 +2,7 @@
   "key": "regency_t3_power",
   "slug": "t3-power",
   "faction": "regency",
-  "name": "Star Cage III",
+  "name": "Power Generator III",
   "role": "Power Generator",
   "tech": 3,
   "domain": "structure",

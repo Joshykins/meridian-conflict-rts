@@ -1,4 +1,4 @@
-//! A Regency Star Cage's star while the plant runs (`Model::star_core`,
+//! A Regency power generator's star while the plant runs (`Model::star_core`,
 //! `models::regency::heart`): light, not a solid. Each tick it lays the star
 //! (plasma_puffs.wgsl `star_core`: a ball of fusing plasma boiling in cells, white-hot at
 //! the heart, the prism's pinks drifting over it, a ragged flickering corona), now and then
@@ -24,12 +24,12 @@ const WHITE: Vec3 = Vec3::new(1.0, 0.95, 1.0);
 const LAVENDER: Vec3 = Vec3::new(0.8, 0.62, 1.0);
 
 /// Each blueprint's star (`None`: it has none), and the stars burning this tick.
-pub(super) struct StarCageFx {
+pub(super) struct StarCoreFx {
     stars: Vec<Option<[f32; 4]>>,
     burning: Vec<(Vec3, f32, f32)>,
 }
 
-impl StarCageFx {
+impl StarCoreFx {
     /// `stars`: per blueprint, in id order.
     pub(super) fn new(stars: Vec<Option<[f32; 4]>>) -> Self {
         Self {
@@ -40,10 +40,10 @@ impl StarCageFx {
 }
 
 impl Renderer {
-    /// Once a sim tick: lays every running Star Cage's star and its arcs.
-    pub(super) fn star_cage_tick(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
-        self.star_cage_fx.burning.clear();
-        if self.star_cage_fx.stars.iter().all(Option::is_none) {
+    /// Once a sim tick: lays every running Regency power generator's star and its arcs.
+    pub(super) fn star_core_tick(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
+        self.star_core_fx.burning.clear();
+        if self.star_core_fx.stars.iter().all(Option::is_none) {
             return;
         }
         let hidden = KIND_WRECK
@@ -59,7 +59,7 @@ impl Renderer {
             if u.owner_flags & hidden != 0 {
                 continue;
             }
-            let Some(Some(star)) = self.star_cage_fx.stars.get(u.blueprint as usize) else {
+            let Some(Some(star)) = self.star_core_fx.stars.get(u.blueprint as usize) else {
                 continue;
             };
             let at = Vec3::from(u.pos);
@@ -75,7 +75,7 @@ impl Renderer {
                 );
             let r = star[3];
             let seed = (u.unit_id % 97) as f32 * 0.613;
-            self.star_cage_fx.burning.push((centre, r, seed));
+            self.star_core_fx.burning.push((centre, r, seed));
             // The quad holds the corona too: the face is the middle 0.42 of it.
             let across = r / 0.42;
             self.push_lit(
@@ -114,8 +114,8 @@ impl Renderer {
     }
 
     /// Every frame: the burning stars light their cages, breathing with the star's beat.
-    pub(super) fn star_cage_lights(&mut self, time: f32) {
-        for &(at, r, seed) in &self.star_cage_fx.burning {
+    pub(super) fn star_core_lights(&mut self, time: f32) {
+        for &(at, r, seed) in &self.star_core_fx.burning {
             let beat =
                 0.85 + 0.1 * (time * 1.3 + seed).sin() + 0.05 * (time * 3.7 + seed * 2.0).sin();
             self.lights.lamp(
