@@ -12,8 +12,9 @@
 //! - **A thrown plasma charge landing**: the cage lets go at once, a white-hot flash over
 //!   the gun's own blast, molten spatter, and a glassed scorch that glows and cools.
 //!
-//! The squeezed plasma guns (Pinched-plasmeric, Pinch-fusion) fire and strike in
-//! `pinch_fx.rs`; every plasma shot in flight is drawn by sprites.wgsl (`plasma_look`).
+//! The direct-fire plasma guns (Plasmeric bolts and flak, Pinched-plasmeric,
+//! Pinch-fusion) charge, fire and strike in `regency_guns_fx.rs`; every plasma shot in
+//! flight is drawn by sprites.wgsl (`plasma_look`).
 //!
 //! Presentation only; the renderer's own clock.
 
@@ -75,6 +76,8 @@ struct Charge {
 pub(super) struct PlasmaFx {
     held: Vec<Held>,
     charges: Vec<Charge>,
+    /// The direct-fire guns' charges and lights (`regency_guns_fx`).
+    pub(super) guns: super::regency_guns_fx::RegencyGunFx,
 }
 
 impl PlasmaFx {
@@ -300,9 +303,9 @@ impl Renderer {
         self.push_shockwave(at.to_array(), time, size * 0.5, 0.2, 0.35, 1.0, Vec3::ZERO);
     }
 
-    /// A plasma shot landed (its `Impact`): the gun's own blast is drawn as any shell's;
-    /// this adds the cage letting go of a thrown charge, or a squeezed slug's own strike
-    /// (`pinch_landed`).
+    /// A thrown plasma charge landed (its `Impact`): the gun's own blast is drawn as any
+    /// shell's; this adds the cage letting go. A direct-fire plasma gun's strike is all its
+    /// own (`regency_guns_fx`).
     pub(super) fn plasma_landed(
         &mut self,
         blueprint: BlueprintId,
@@ -313,7 +316,6 @@ impl Renderer {
     ) {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         if !thrown_plasma(w) {
-            self.pinch_landed(blueprint, weapon, at, on_unit, start);
             return;
         }
         let splash = w.splash.to_f32().max(2.0);

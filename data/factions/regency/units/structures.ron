@@ -319,8 +319,9 @@
         sounds: (death: "blast_large"),
     ),
     // ---- Defence ------------------------------------------------------------------------
-    // A plasmeric repeater on a squat mount: shorter reach than a Sentinel, a third more
-    // damage inside it. It wants to be where the fight comes to, not where it can see.
+    // A plasmeric repeater: a steady stream of plasma bolts, five a second. Shorter reach
+    // than a Sentinel, a third more damage inside it. It wants to be where the fight comes
+    // to, not where it can see.
     (
         key: "regency_t1_point_defense",
         name: "Picket",
@@ -333,20 +334,21 @@
         vision: 240,
         weapons: [(
             name: "Plasmeric Repeater",
-            // Three slugs a shot (`rounds`): 75 every 0.9 s.
-            damage: 75, splash: 1, range: 220, reload: 0.9, speed: 700, trajectory: Direct,
+            // A bolt every 0.2 s: 85 a second, as the old three-slug burst.
+            damage: 17, splash: 1, range: 220, reload: 0.2, speed: 420, trajectory: Direct,
             turret_turn: 160, muzzle: (5.2, 0, 6.8), pivot: (0, 0, 6),
-            targets: ["Land", "Naval"], color: Orange, red: 1.0, rounds: 3,
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Plasmeric),
-            flash: 1.4, impact: 1.2, tracer: 0.8,
-            sounds: (fire: "regency_barb", impact: "shell_light"),
+            flash: 1.0, impact: 1.0, tracer: 1.2,
+            sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
         )],
         mesh: "regency_barb", icon: Defense,
     ),
-    // The tech 2 point defence: a Pinched-plasmeric Cannon on an armoured keep. Its slugs
-    // are plasma squeezed dense by gravity, three to a burst, and they stop in what they
-    // hit: all their weight on the one hull, next to nothing splashed. Reach and weight as
-    // a Redoubt's. Placeholder name. Model: `regency_pinch_cannon` (`models::regency::pinch_guns`).
+    // The tech 2 point defence: a Pinched-plasmeric Cannon. It gathers its plasma in front
+    // of the bore and squeezes it dense by gravity (a second's charge), then fires it out
+    // three bolts in quick succession; they burst where they hit and sear the ground, all
+    // their weight on the one hull, next to nothing splashed. Reach and weight as a
+    // Redoubt's. Model: `regency_pinch_cannon` (`models::regency::turrets::halberd`).
     (
         key: "regency_t2_point_defense",
         name: "Halberd",
@@ -364,17 +366,20 @@
             turret_turn: 90, muzzle: (11.6, 0, 8.4), pivot: (0, 0, 8.4),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Pinched),
-            flash: 1.1, impact: 1.4, shockwave: 0.5,
-            sounds: (fire: "regency_pinched_cannon", impact: "regency_pinched_hit", ground: "regency_pinched_hit"),
+            flash: 1.1, impact: 1.4,
+            sounds: (
+                fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+            ),
         )],
         mesh: "regency_pinch_cannon", icon: Defense,
         sounds: (death: "blast_large"),
     ),
-    // The tech 3 point defence: a Pinch-fusion Cannon. The plasma is squeezed until it
-    // fuses, and the gun fires the fusion out as a stream of bursts, five to a shot, each
-    // flaring white where it lands. The Citadel's weight a shot, spread over five hits:
-    // it breaks heavies as the Citadel does, and wastes less on light hulls. Placeholder
-    // name. Model: `regency_fusion_cannon` (`models::regency::pinch_guns`).
+    // The tech 3 point defence: a Pinch-fusion Cannon. Its charge is squeezed until it
+    // fuses (over two seconds, going white), then launched as one shot that melts the
+    // ground where it lands and leaves a knot of fusion burning there. Near the Citadel's
+    // weight a shot, a little of it splashed. Model: `regency_fusion_cannon`
+    // (`models::regency::turrets::sunspear`).
     (
         key: "regency_t3_point_defense",
         name: "Sunspear",
@@ -387,19 +392,22 @@
         vision: 360,
         weapons: [(
             name: "Pinch-fusion Cannon",
-            damage: 760, splash: 4, range: 620, reload: 7.5, salvo: 5, salvo_delay: 0.1,
-            speed: 1100, trajectory: Direct,
-            turret_turn: 18, muzzle: (26, 0, 14.2), pivot: (0, 0, 14.2),
+            damage: 3400, splash: 8, range: 620, reload: 7.5, speed: 1000, trajectory: Direct,
+            turret_turn: 18, muzzle: (25, 0, 13.6), pivot: (0, 0, 13.6),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion),
-            flash: 1.4, impact: 1.8, shockwave: 1.1,
-            sounds: (fire: "regency_fusion_cannon", impact: "regency_fusion_hit", ground: "regency_fusion_hit"),
+            flash: 0.6, impact: 1.2,
+            sounds: (
+                fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.2,
+                charge_volume: 1.6,
+                impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+            ),
         )],
         mesh: "regency_fusion_cannon", icon: Defense,
         sounds: (death: "blast_large"),
     ),
-    // Plasmeric flak that bursts among aircraft: less on one plane than a
-    // Sparrow's rotary, but every plane in the burst takes it.
+    // Plasmeric flak: bolts that burst among aircraft in a spray of plasma. Less on one
+    // plane than a Sparrow's rotary, but every plane in the burst takes it.
     (
         key: "regency_t1_aa",
         name: "Canopy",
@@ -413,11 +421,11 @@
         weapons: [(
             name: "Plasmeric Flak Cannon",
             damage: 30, splash: 9, range: 300, reload: 0.5, speed: 650, trajectory: Direct,
-            turret_turn: 240, muzzle: (4.4, 0, 7.4), pivot: (0, 0, 6.2),
+            turret_turn: 240, muzzle: (2.18, 0, 8.91), pivot: (0, 0, 5.8),
             targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
             plasma_grade: Some(Plasmeric),
             flash: 1.2, impact: 1.4, tracer: 0.7,
-            sounds: (fire: "regency_spit", impact: "regency_needle_burst"),
+            sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
         )],
         mesh: "regency_spitter", icon: AntiAir,
         sounds: (death: "blast_large"),

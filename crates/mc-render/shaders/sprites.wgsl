@@ -259,9 +259,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if (p.color & RAIL) != 0u {
         trace = length(stride) * 0.45;
     }
-    // A Regency plasma shot past the Plasmeric slug (`mirror::plasma_look`, twice over in
-    // extras.z): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug, 3 a thrown
-    // gravitic charge. Each is a longer streak than a shell's trace.
+    // A Regency plasma shot (`mirror::plasma_look`, twice over in extras.z): 1 a
+    // Pinched-plasmeric stream slug, 2 a Pinch-fusion slug, 3 a thrown gravitic charge,
+    // each a longer streak than a shell's trace; 4 a Plasmeric bolt, a short fat teardrop.
     let look = plasma_look(p);
     if look == 1u {
         trace = length(stride) * 0.5;
@@ -269,6 +269,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         trace = length(stride) * 0.6;
     } else if look == 3u {
         trace = length(stride) * 0.85;
+    } else if look == 4u {
+        trace = min(length(stride) * 0.4, max(p.size, 0.5) * 5.5);
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -324,7 +326,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         width_px *= 1.45;
     }
     // Pinched: tight; a thrown charge: its containment is wider than the core it holds.
-    width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u);
+    width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.2, look == 4u);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -419,7 +421,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
-            // 7.6, 8.6, 9.6: the Regency plasma streaks (`fs_sprite`).
+            // 7.6, 8.6, 9.6, 10.6: the Regency plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -655,6 +657,9 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     } else if look == 3u {
         // A thrown charge: red-white in its cage.
         out.color = vec3<f32>(1.2, 0.3, 0.2);
+    } else if look == 4u {
+        // A Plasmeric bolt's heart: pink-white.
+        out.color = vec3<f32>(1.2, 0.55, 0.55);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -846,6 +851,26 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 10.1 {
+                // A Plasmeric bolt: a fat teardrop of plasma, a round head and a short tail
+                // that narrows behind it; a pink-white heart in a red body, wobbling.
+                let head = 0.68;
+                let prof = select(
+                    mix(0.1, 1.0, pow(u / head, 1.4)),
+                    sqrt(max(1.0 - pow((u - head) / (1.0 - head), 2.0), 0.0)),
+                    u > head,
+                );
+                let y = abs(in.uv.y) / max(prof, 0.01);
+                if y >= 1.0 {
+                    discard;
+                }
+                let body = pow(1.0 - y, 1.3);
+                let heart = pow(max(1.0 - y * 1.7, 0.0), 2.0) * smoothstep(0.3, 0.75, u);
+                let wobble = 0.82 + 0.18 * sin(time * 41.0 + u * 11.0 + in.uv.y * 3.0);
+                let rgb = vec3<f32>(1.0, 0.07, 0.07) * body * 4.6 * wobble
+                    + vec3<f32>(1.0, 0.62, 0.66) * heart * 6.5;
+                return vec4<f32>(rgb * in.color.r, 1.0);
+            }
             if in.shape.y > 9.1 {
                 // A thrown gravitic charge: a red plasma streak held in a cage, dark bands of
                 // the containment running back along it, a white-hot knot at its head.

@@ -1065,10 +1065,11 @@ pub struct ProjectileInstance {
 
 const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 
-/// How a Regency plasma shot is drawn in flight past the red Plasmeric slug (sprites.wgsl,
-/// `ProjectileInstance::_pad[0]` above 2): 1 a Pinched-plasmeric stream slug, 2 a
-/// Pinch-fusion slug strobing with fusion bursts, 3 a thrown gravitic charge curving onto
-/// its mark (`Weapon::curve`). Zero for anything else.
+/// How a Regency plasma shot is drawn in flight (sprites.wgsl, `ProjectileInstance::_pad[0]`
+/// above 2): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug strobing with fusion
+/// bursts, 3 a thrown gravitic charge curving onto its mark (`Weapon::curve`), 4 a
+/// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws). Zero for anything
+/// else.
 pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
     use mc_data::PlasmaGrade;
     match weapon.plasma_grade {
@@ -1076,7 +1077,8 @@ pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
         Some(_) if weapon.curve.0 > 0 => 3,
         Some(PlasmaGrade::Pinched) => 1,
         Some(PlasmaGrade::PinchFusion) => 2,
-        _ => 0,
+        Some(PlasmaGrade::Plasmeric) => 4,
+        None => 0,
     }
 }
 
@@ -1817,7 +1819,7 @@ impl World {
                 // A stream gun's rounds are small and many: drawn a deep tracer orange, not
                 // the white-hot of a shell. Above one, it leans on to red (`Weapon::red`).
                 // A Regency plasma shot (`plasma_grade`) is drawn that way too, whatever its size,
-                // and plus twice its look (`plasma_look`) past the Plasmeric slug.
+                // and plus twice its look (`plasma_look`).
                 if (weapon.rounds > 1 || weapon.plasma_grade.is_some())
                     && weapon.color == WeaponColor::Orange
                 {

@@ -1,0 +1,173 @@
+//! The Canopy (anti-air, a one-cell lot): a Plasmeric Flak Cannon throwing proximity
+//! rounds at aircraft, two a shot: the organ. Four short flak tubes side by side in one
+//! clamped block, held up at the sky even at rest so it reads as anti-air from any angle,
+//! on a tripod of plated struts round a bronze column.
+//!
+//! Its pivot and muzzle are the unit file's (`data/factions/regency/units/structures.ron`):
+//! one muzzle, the middle of the row of tube mouths.
+
+use glam::{Vec2, Vec3};
+
+use crate::builder::MeshBuilder;
+use crate::material::*;
+use crate::{part, rig};
+
+use super::super::kit::{dark_plate, metal, seam, segment, v3};
+use super::super::machine::*;
+use super::*;
+
+/// The organ's trunnion and its middle muzzle: the bore raised about 55 degrees. Its
+/// four tubes stand side by side across it (`TUBES`), their mouths in a row through the
+/// muzzle.
+pub(super) const LINE: Line = Line::new(Vec3::new(0.0, 0.0, 5.8), Vec3::new(2.18, 0.0, 8.91));
+/// The tubes across the bore.
+const TUBES: [f32; 4] = [-1.35, -0.45, 0.45, 1.35];
+const THICK: f32 = 0.3;
+
+pub(crate) fn canopy(b: &mut MeshBuilder, _tech: u8) {
+    LINE.rig(b, 0.4);
+    if b.coarse() {
+        coarse(
+            b,
+            &LINE,
+            &Coarse {
+                base_r: 5.6,
+                base_h: 4.8,
+                x0: -1.8,
+                x1: 1.2,
+                half: 2.0,
+                top: LINE.pivot.z + 0.6,
+                gun: Vec2::new(1.1, 1.2),
+                tip: Vec2::new(0.5, 0.4),
+                mouth: None,
+            },
+        );
+        return;
+    }
+    tripod(b);
+    b.with_part(part::TURRET, |b| {
+        cradle(b, 5.3, 2.05);
+        b.with_limb(rig::ARM_GUN, |b| {
+            gun_frame(b, &LINE, |b| organ(b, LINE.len()))
+        });
+    });
+}
+
+/// A bronze column on three plated struts raked out to pads, a strut under each,
+/// and a collar on top with the owner's colour round it.
+fn tripod(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    seam(b);
+    b.prism(Vec3::ZERO, 6, 1.6, 1.5, 0.5);
+    shaft(b, Vec3::Z * 0.5, Vec3::Z * 4.8, 0.7);
+    for k in 0..3 {
+        b.yawed(Vec3::ZERO, (120.0 * k as f32).to_radians(), |b| {
+            let (hip, foot) = (v3(0.8, 0.0, 4.2), v3(4.9, 0.0, 0.5));
+            dark_plate(b);
+            segment(b, &[(hip, 0.45, 0.45), (foot, 0.32, 0.32)], Vec3::Z);
+            b.prism(foot.with_z(0.0), 6, 0.9, 0.65, 0.5);
+            dark_plate(b);
+            armour(
+                b,
+                &Frame::new(hip + Vec3::Z * 0.45, foot - hip, v3(1.0, 0.0, 1.0)),
+                &swept(3.4, 0.6, 0.0, 0.6),
+                0.22,
+            );
+            strut(b, v3(0.9, 0.0, 0.5), v3(2.7, 0.0, 2.5), 0.2);
+            if fine {
+                slit(
+                    b,
+                    v3(3.0, 0.0, 2.4),
+                    v3(1.0, 0.0, 1.0),
+                    v3(1.0, 0.0, -1.0),
+                    0.9,
+                    0.12,
+                );
+            }
+        });
+    }
+    step(b, 6, 1.9, 1.7, 4.8, 0.5);
+    b.paint(TEAM);
+    hoop(
+        b,
+        Vec3::Z * 5.32,
+        1.45,
+        0.4,
+        0.05,
+        if fine { 16 } else { 6 },
+    );
+}
+
+/// The turret: a saddle on the base's top at `z` and a cheek either side of the guns,
+/// `half` out, each swept back and up into a spike.
+fn cradle(b: &mut MeshBuilder, z: f32, half: f32) {
+    step(b, 6, 1.6, 1.3, z, 0.5);
+    b.mirror_y(|b| {
+        dark_plate(b);
+        b.block(v3(-1.0, half - 0.2, z + 0.1), v3(0.9, half + 0.2, z + 1.4));
+        armour(
+            b,
+            &Frame::new(v3(0.9, half + 0.2, z + 0.4), v3(-1.0, 0.0, 0.5), Vec3::Y),
+            &swept(2.6, 0.6, 0.0, 0.45),
+            THICK,
+        );
+    });
+}
+
+/// The organ in its own frame: four flak tubes in a row through a plated breech and two
+/// clamps, a red sight on the breech; the inner tubes and their hot-rimmed sleeves recoil.
+fn organ(b: &mut MeshBuilder, len: f32) {
+    let fine = b.fine();
+    collar(b, Vec3::ZERO, Vec3::Y, 0.45, 4.3);
+    dark_plate(b);
+    hull_x(
+        b,
+        &[[-1.6, 3.4, 1.2, 0.0], [-0.3, 3.6, 1.3, 0.0]],
+        &CHAMFERED,
+    );
+    let clamps: &[f32] = if fine { &[0.6, 2.0] } else { &[1.3] };
+    for &x in clamps {
+        dark_plate(b);
+        hull_x(
+            b,
+            &[[x - 0.25, 3.9, 1.0, 0.0], [x + 0.25, 3.9, 1.0, 0.0]],
+            &CHAMFERED,
+        );
+    }
+    if fine {
+        slit(b, v3(-0.9, 0.0, 0.66), Vec3::Z, Vec3::Y, 2.2, 0.14);
+    }
+    let sides = b.sides(8);
+    for y in TUBES {
+        dark_plate(b);
+        b.cylinder_between(v3(-0.3, y, 0.0), v3(2.7, y, 0.0), 0.38, 0.36, sides);
+        b.with_recoil(|b| {
+            if fine {
+                metal(b);
+                b.cylinder_between(v3(2.5, y, 0.0), v3(3.4, y, 0.0), 0.26, 0.26, sides);
+            }
+            dark_plate(b);
+            b.cylinder_between(v3(3.2, y, 0.0), v3(len, y, 0.0), 0.36, 0.4, sides);
+            if fine {
+                b.paint(GLOW_LASER);
+                hoop_on(b, v3(len - 0.05, y, 0.0), Vec3::X, 0.3, 0.12, 0.1, sides);
+            }
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canopy_fits() {
+        super::super::super::check(
+            "regency_spitter",
+            5.5,
+            8.5,
+            Some(1),
+            &[LINE.muzzle.to_array()],
+        );
+    }
+}

@@ -288,82 +288,255 @@
         ),
 
         // ---- weapons -------------------------------------------------------------------
-        // Every Regency gun speaks the same way (docs/STYLE.md "The Regency suite"): a deep
-        // compression thump as the pinch lets go, under a cannon's crack and the report's
-        // body, the slug's dark buzz falling away, and a short low sizzle behind. No pews,
-        // no zaps: nothing bright above the crack's first milliseconds.
+        // Every Regency turret throws plasma, and every one is heard as plasma: a hot,
+        // wet thump of the bolt leaving the pinch and a sizzle riding on it, never a
+        // laser pew, never a slug's crack (docs/STYLE.md "The Regency suite"). The tiers
+        // are told apart by what the gun does before and after, not by pitch alone: the
+        // Picket spits, the Halberd squeezes and slams three times, the Sunspear draws
+        // the air in until it goes critical and roars. Every sizzle is noise (`Foam`,
+        // `Roll`), and no tone above the low mids ever falls: that is the pew.
         //
-        // The Picket. Each 0.9 s shot is drawn as three slugs (`rounds: 3` in structures.ron),
-        // the time to the next shot shared out: so three rounds 0.3 s apart, heavier than
-        // the Exarch's.
-        "regency_barb": (
-            length: 1.05, peak: 0.5, room: 0.18,
+        // The Picket's Plasmeric Repeater: one bolt a play, 5.5 a second from one turret
+        // and several turrets at once, so it is short and finished. A rough low-mid
+        // "thoom" as the bolt is spat, a little wet throat noise, and a hot fizz riding
+        // off with it.
+        "regency_picket_bolt": (
+            length: 0.32, peak: 0.42, room: 0.1,
             layers: [
-                Burst(at: 0.0, low: 420, high: 1900, attack: 0.0002, decay: 0.005, gain: 7.00),
-                Burst(at: 0.0, low: 90, high: 650, attack: 0.0006, decay: 0.028, gain: 6.00),
-                Tone(at: 0.0, from: 150, to: 46, glide: 0.07, attack: 0.001, decay: 0.09, gain: 1.0),
-                Fm(at: 0.0, from: 110, to: 55, glide: 0.06, ratio: 0.5, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3),
-                Stack(at: 0.004, from: 230, to: 82, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.32, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
-                Burst(at: 0.3, low: 420, high: 1900, attack: 0.0002, decay: 0.005, gain: 6.65, pan: 0.12),
-                Burst(at: 0.3, low: 90, high: 650, attack: 0.0006, decay: 0.028, gain: 5.70, pan: 0.12),
-                Tone(at: 0.3, from: 152, to: 47, glide: 0.07, attack: 0.001, decay: 0.09, gain: 1.0, pan: 0.12),
-                Fm(at: 0.3, from: 110, to: 55, glide: 0.06, ratio: 0.5, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3, pan: 0.12),
-                Stack(at: 0.304, from: 234, to: 83, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.32, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
-                Burst(at: 0.6, low: 420, high: 1900, attack: 0.0002, decay: 0.005, gain: 7.00, pan: -0.12),
-                Burst(at: 0.6, low: 90, high: 650, attack: 0.0006, decay: 0.028, gain: 6.00, pan: -0.12),
-                Tone(at: 0.6, from: 150, to: 46, glide: 0.07, attack: 0.001, decay: 0.09, gain: 1.0, pan: -0.12),
-                Fm(at: 0.6, from: 110, to: 55, glide: 0.06, ratio: 0.5, index: 1.4, fade: 0.05, attack: 0.001, decay: 0.07, gain: 0.3, pan: -0.12),
-                Stack(at: 0.604, from: 230, to: 82, glide: 0.05, attack: 0.002, decay: 0.06, gain: 0.32, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.5), (3, 0.25)]),
-                Burst(at: 0.001, low: 40, high: 220, attack: 0.002, decay: 0.06, gain: 3),
-                Burst(at: 0.301, low: 40, high: 220, attack: 0.002, decay: 0.06, gain: 3),
-                Burst(at: 0.601, low: 40, high: 220, attack: 0.002, decay: 0.06, gain: 3),
-                Drive(1.5),
-                Sweep(at: 0.010, from: 1300, to: 400, glide: 0.16, q: 0.9, attack: 0.008, decay: 0.09, gain: 0.24),
-                Sweep(at: 0.310, from: 1300, to: 400, glide: 0.16, q: 0.9, attack: 0.008, decay: 0.09, gain: 0.24, pan: 0.12),
-                Sweep(at: 0.610, from: 1300, to: 400, glide: 0.16, q: 0.9, attack: 0.008, decay: 0.09, gain: 0.24, pan: -0.12),
-            ],
-        ),
-        // The Canopy's launch. Each 0.5 s shot is two shells (`rounds: 2`), 0.25 s
-        // apart: a crack and a thump from the mount, the shell's buzz, and a short low hiss
-        // as it goes up.
-        "regency_spit": (
-            length: 0.72, peak: 0.42, room: 0.15,
-            layers: [
-                Burst(at: 0.0, low: 350, high: 1800, attack: 0.0002, decay: 0.004, gain: 5),
-                Burst(at: 0.0, low: 80, high: 600, attack: 0.0006, decay: 0.025, gain: 5),
-                Tone(at: 0.0, from: 160, to: 50, glide: 0.05, attack: 0.001, decay: 0.07, gain: 1.0),
-                Fm(at: 0.0, from: 130, to: 65, glide: 0.05, ratio: 0.5, index: 1.3, fade: 0.04, attack: 0.001, decay: 0.05, gain: 0.25),
-                Stack(at: 0.004, from: 250, to: 115, glide: 0.04, attack: 0.002, decay: 0.04, gain: 0.25, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.45), (3, 0.2)]),
-                Burst(at: 0.25, low: 350, high: 1800, attack: 0.0002, decay: 0.004, gain: 5, pan: 0.1),
-                Burst(at: 0.25, low: 80, high: 600, attack: 0.0006, decay: 0.025, gain: 5, pan: 0.1),
-                Tone(at: 0.25, from: 160, to: 50, glide: 0.05, attack: 0.001, decay: 0.07, gain: 1.0, pan: 0.1),
-                Fm(at: 0.25, from: 130, to: 65, glide: 0.05, ratio: 0.5, index: 1.3, fade: 0.04, attack: 0.001, decay: 0.05, gain: 0.25, pan: 0.1),
-                Stack(at: 0.254, from: 250, to: 115, glide: 0.04, attack: 0.002, decay: 0.04, gain: 0.25, detune: 1.008, width: 0.2, partials: [(1, 1), (2, 0.45), (3, 0.2)]),
+                // The spit: a soft-edged push of air, all body, almost no crack.
+                Burst(low: 140, high: 1100, attack: 0.0012, decay: 0.022, gain: 5),
+                // The thoom: a growl that starts rough and settles low within 60 ms.
+                Fm(from: 215, to: 112, glide: 0.05, ratio: 0.5, index: 2.2, fade: 0.03, attack: 0.002, decay: 0.05, gain: 0.85),
+                Tone(from: 120, to: 70, glide: 0.04, attack: 0.002, decay: 0.045, gain: 0.35),
                 Drive(1.45),
-                // The shells going up.
-                Sweep(at: 0.015, from: 600, to: 1500, glide: 0.12, q: 1.4, attack: 0.01, decay: 0.07, gain: 0.22),
-                Sweep(at: 0.265, from: 580, to: 1450, glide: 0.12, q: 1.4, attack: 0.01, decay: 0.07, gain: 0.2, pan: 0.1),
+                // The plasma's throat: a wide noise band settling, wet rather than whistling.
+                Sweep(at: 0.004, from: 900, to: 420, glide: 0.06, q: 1.1, attack: 0.004, decay: 0.045, gain: 0.6),
+                // A wet gurgle in the throat as the bolt leaves.
+                Roll(at: 0.003, from: 1100, to: 350, glide: 0.08, attack: 0.004, decay: 0.05, gain: 0.45, swell: 28, depth: 0.7),
+                // The fizz riding off with the bolt.
+                Foam(at: 0.006, from: 2300, to: 1500, glide: 0.12, q: 1.0, attack: 0.006, decay: 0.07, gain: 2.4, swell: 40, depth: 0.6),
             ],
         ),
-        // A flak shell bursting among aircraft, heard from the ground: a hard whump in the
-        // air, the fragments ticking out of it, a low sizzle as they spray and fall away,
-        // and the report rolling off.
-        "regency_needle_burst": (
-            length: 1.4, peak: 0.52, room: 0.5,
+        // A Picket bolt splashing: a soft wet pop, a small low slap, and the plasma
+        // sizzling off whatever it hit. Short: a stream of them lands.
+        "regency_picket_hit": (
+            length: 0.5, peak: 0.4, room: 0.15,
             layers: [
-                Burst(low: 300, high: 1700, attack: 0.0003, decay: 0.006, gain: 6),
-                Burst(low: 70, high: 500, attack: 0.001, decay: 0.04, gain: 7),
-                Tone(from: 125, to: 56, glide: 0.12, attack: 0.002, decay: 0.13, gain: 1.0),
-                Fm(from: 105, to: 66, glide: 0.1, ratio: 0.5, index: 1.2, fade: 0.06, attack: 0.002, decay: 0.12, gain: 0.45),
+                Burst(low: 220, high: 1600, attack: 0.0005, decay: 0.007, gain: 5),
+                Burst(low: 80, high: 700, attack: 0.001, decay: 0.026, gain: 6),
+                Fm(from: 175, to: 88, glide: 0.06, ratio: 0.5, index: 2.0, fade: 0.04, attack: 0.002, decay: 0.06, gain: 0.6),
                 Drive(1.4),
-                Burst(at: 0.018, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.6, pan: 0.3),
-                Burst(at: 0.037, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.3, pan: -0.35),
-                Burst(at: 0.052, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.4, pan: 0.2),
-                Burst(at: 0.081, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 1.0, pan: -0.2),
-                Burst(at: 0.11, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 0.9, pan: 0.4),
-                Burst(at: 0.15, low: 260, high: 1400, attack: 0.0003, decay: 0.002, gain: 0.7, pan: -0.45),
-                Sweep(at: 0.01, from: 1400, to: 350, glide: 0.35, q: 0.8, attack: 0.01, decay: 0.14, gain: 0.24),
-                Roll(at: 0.02, from: 700, to: 140, glide: 0.6, attack: 0.02, decay: 0.3, gain: 0.22, swell: 7, depth: 0.5),
+                // The plasma spattering and frying.
+                Foam(at: 0.004, from: 2200, to: 1200, glide: 0.3, q: 0.9, attack: 0.004, decay: 0.1, gain: 1.4, swell: 36, depth: 0.9),
+                Hiss(at: 0.01, freq: 1000, q: 0.8, attack: 0.01, decay: 0.08, gain: 0.2),
+            ],
+        ),
+
+        // The Halberd's Pinched-plasmeric Cannon, heard 1.0 s before its salvo: plasma
+        // drawn in and squeezed into a ball by gravity. A field closing with a clunk, a
+        // deep rough hum filling up and only leaning upward, the air rushing in (a noise
+        // band that falls as it is drawn tight), a sizzle and a slow random throb
+        // swelling under it, and at the end the pinch snapping shut into the shot.
+        "regency_halberd_charge": (
+            length: 1.2, peak: 0.36, room: 0.2,
+            layers: [
+                // The gravity field engaging.
+                Burst(low: 80, high: 600, attack: 0.0008, decay: 0.016, gain: 3),
+                Tone(from: 72, to: 50, glide: 0.05, attack: 0.002, decay: 0.08, gain: 0.4),
+                // The squeeze: a deep growl and its rough mid body filling up.
+                Fm(at: 0.02, from: 52, to: 64, glide: 0.95, ratio: 0.5, index: 2.2, fade: 3.0, attack: 0.93, decay: 0.035, gain: 0.5),
+                Fm(at: 0.12, from: 150, to: 172, glide: 0.85, ratio: 0.5, index: 1.4, fade: 3.0, attack: 0.83, decay: 0.035, gain: 0.6),
+                Drive(1.4),
+                // Plasma drawn in: the band falls as it is pulled tight.
+                Sweep(at: 0.05, from: 2600, to: 650, glide: 0.9, q: 1.1, attack: 0.88, decay: 0.035, gain: 0.7, seed: 11),
+                // The pressure throbbing at random, harder as it fills.
+                Roll(at: 0.15, from: 320, to: 520, glide: 0.8, attack: 0.8, decay: 0.035, gain: 0.8, swell: 9, depth: 0.85, seed: 12),
+                // The ball's skin sizzling.
+                Foam(at: 0.3, from: 1700, to: 2300, glide: 0.7, q: 1.0, attack: 0.67, decay: 0.035, gain: 1.0, swell: 34, depth: 0.9, seed: 13),
+                // The pinch snapping shut, swelling into the shot.
+                Burst(at: 0.955, low: 150, high: 1000, attack: 0.03, decay: 0.012, gain: 3, seed: 14),
+            ],
+        ),
+        // A Halberd bolt leaving: three a salvo 0.1 s apart, so it plays three times over
+        // itself and each onset must stand clear of the last. A hard pressure crack,
+        // a dense compressed thoom with a short rough growl, the plasma tearing off in
+        // a fizz, a brief roll of the air. No slapback: three are already a lot.
+        "regency_halberd_fire": (
+            length: 0.75, peak: 0.55, room: 0.25,
+            layers: [
+                Burst(low: 500, high: 2200, attack: 0.0002, decay: 0.0045, gain: 8),
+                Burst(low: 90, high: 800, attack: 0.0005, decay: 0.028, gain: 10),
+                Burst(at: 0.001, low: 40, high: 240, attack: 0.002, decay: 0.07, gain: 6),
+                Tone(from: 125, to: 56, glide: 0.07, attack: 0.001, decay: 0.09, gain: 0.9),
+                Fm(from: 105, to: 62, glide: 0.06, ratio: 0.5, index: 2.4, fade: 0.05, attack: 0.001, decay: 0.08, gain: 0.7),
+                Drive(1.55),
+                // The plasma tearing off down range.
+                Foam(at: 0.005, from: 2000, to: 1000, glide: 0.2, q: 0.9, attack: 0.006, decay: 0.08, gain: 2.2, swell: 30, depth: 0.6),
+                Roll(at: 0.008, from: 750, to: 150, glide: 0.4, attack: 0.012, decay: 0.12, gain: 0.6, swell: 10, depth: 0.5),
+            ],
+        ),
+        // A Halberd bolt striking: the squeezed plasma lets go. A crack, a heavy whump,
+        // a rough growl inside it, the blast rolling off, and the ground searing: a
+        // sizzling hiss that cools over a second.
+        "regency_halberd_hit": (
+            length: 2.0, peak: 0.66, room: 0.35,
+            layers: [
+                Burst(low: 450, high: 2400, attack: 0.0003, decay: 0.006, gain: 10),
+                Burst(low: 70, high: 600, attack: 0.001, decay: 0.05, gain: 12),
+                Burst(at: 0.002, low: 35, high: 220, attack: 0.003, decay: 0.15, gain: 8),
+                Tone(from: 130, to: 50, glide: 0.15, attack: 0.002, decay: 0.18, gain: 1.0),
+                Fm(from: 110, to: 60, glide: 0.15, ratio: 0.5, index: 2.2, fade: 0.1, attack: 0.002, decay: 0.18, gain: 0.6),
+                Drive(1.5),
+                Roll(at: 0.015, from: 900, to: 140, glide: 0.7, attack: 0.02, decay: 0.35, gain: 0.45, swell: 10, depth: 0.55),
+                // The ground searing.
+                Foam(at: 0.02, from: 2400, to: 1100, glide: 1.4, q: 0.9, attack: 0.03, decay: 0.55, gain: 0.7, swell: 32, depth: 0.85),
+                Hiss(at: 0.05, freq: 1600, q: 0.7, attack: 0.05, decay: 0.35, gain: 0.08),
+            ],
+        ),
+
+        // The Sunspear's Pinch-fusion Cannon, heard 2.2 s before its one shot: the plasma
+        // squeezed until it fuses. It starts low and quiet so the end can be big: a deep
+        // field clunk, the air drawn in, a gravity heave throbbing slowly under a growl
+        // that fills and only leans up, then the core going white: a fizz spreading up
+        // into the highs, crackle thickening at random (never on an even beat) and an
+        // overload growl an octave up, until the pinch slams shut on the launch.
+        "regency_sunspear_charge": (
+            length: 2.4, peak: 0.48, room: 0.3,
+            layers: [
+                // The field engaging, deep.
+                Burst(low: 50, high: 420, attack: 0.001, decay: 0.03, gain: 4),
+                Tone(from: 56, to: 38, glide: 0.1, attack: 0.002, decay: 0.15, gain: 0.5),
+                // Gravity pressure: a deep rough hum filling the whole charge.
+                Fm(at: 0.02, from: 36, to: 44, glide: 2.1, ratio: 0.5, index: 2.6, fade: 6.0, attack: 2.12, decay: 0.035, gain: 0.55),
+                // Its mid body, coming in later.
+                Fm(at: 0.5, from: 108, to: 126, glide: 1.65, ratio: 0.5, index: 2.0, fade: 6.0, attack: 1.64, decay: 0.035, gain: 0.9),
+                // The overload: a rougher growl an octave up, only in the last stretch.
+                Fm(at: 1.45, from: 210, to: 236, glide: 0.75, ratio: 0.5, index: 1.6, fade: 6.0, attack: 0.69, decay: 0.035, gain: 0.5),
+                Drive(1.45),
+                // The air drawn in early on, its band falling as it is pulled in, then settling.
+                Sweep(at: 0.05, from: 2800, to: 500, glide: 1.4, q: 0.9, attack: 0.9, decay: 0.5, gain: 0.6, seed: 21),
+                // The gravity heave: a slow random throb that grows.
+                Roll(at: 0.1, from: 240, to: 460, glide: 2.0, attack: 2.04, decay: 0.035, gain: 0.9, swell: 5, depth: 0.9, seed: 22),
+                // The core going white: a fizz spreading upward, then crackle thickening.
+                Foam(at: 0.9, from: 1500, to: 2800, glide: 1.3, q: 0.9, attack: 1.25, decay: 0.035, gain: 1.4, swell: 42, depth: 0.9, seed: 23),
+                Roll(at: 1.3, from: 2300, to: 3000, glide: 0.9, attack: 0.86, decay: 0.03, gain: 0.8, swell: 60, depth: 1.0, seed: 24),
+                Burst(at: 1.37, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.0, pan: -0.3, seed: 31),
+                Burst(at: 1.58, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 1.3, pan: 0.35, seed: 32),
+                Burst(at: 1.64, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.1, pan: 0.1, seed: 33),
+                Burst(at: 1.83, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 1.6, pan: -0.25, seed: 34),
+                Burst(at: 1.91, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.3, seed: 35),
+                Burst(at: 2.03, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 1.9, pan: -0.1, seed: 36),
+                Burst(at: 2.07, low: 900, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.5, pan: 0.2, seed: 37),
+                Burst(at: 2.14, low: 900, high: 2800, attack: 0.0002, decay: 0.004, gain: 2.0, pan: -0.2, seed: 38),
+                // The pinch slamming shut into the launch.
+                Burst(at: 2.15, low: 90, high: 1100, attack: 0.04, decay: 0.012, gain: 4, seed: 39),
+            ],
+        ),
+        // The Sunspear launching its one fusion bolt: thunderous, but a roar, not a
+        // cannon's boom. A hard crack and a blast, a deep boom that holds, a rough growl
+        // that stays rough for a long beat, and the plasma roaring off, fluttering like
+        // a flame, a fizz streaming with it and the air rolling away low.
+        "regency_sunspear_fire": (
+            length: 2.6, peak: 0.8, room: 0.45,
+            layers: [
+                Burst(low: 600, high: 2500, attack: 0.0002, decay: 0.006, gain: 12),
+                Burst(low: 80, high: 700, attack: 0.0005, decay: 0.06, gain: 18),
+                Burst(at: 0.002, low: 30, high: 200, attack: 0.003, decay: 0.25, gain: 12),
+                Tone(from: 92, to: 38, glide: 0.2, attack: 0.001, decay: 0.35, gain: 1.4),
+                Tone(from: 50, to: 30, glide: 0.5, attack: 0.004, decay: 0.6, gain: 0.8),
+                // The fusion core's growl, rough for longer than any ARC gun's.
+                Fm(from: 82, to: 54, glide: 0.3, ratio: 0.5, index: 2.6, fade: 0.25, attack: 0.002, decay: 0.42, gain: 0.75),
+                Fm(at: 0.004, from: 165, to: 120, glide: 0.25, ratio: 0.5, index: 1.8, fade: 0.15, attack: 0.003, decay: 0.22, gain: 0.35),
+                Drive(1.5),
+                // The roar: fluttering like a torch, its band falling as the bolt goes.
+                Roll(at: 0.006, from: 1700, to: 260, glide: 1.3, attack: 0.02, decay: 0.75, gain: 0.8, swell: 22, depth: 0.7, seed: 41),
+                // The plasma streaming off.
+                Foam(at: 0.01, from: 2400, to: 900, glide: 1.2, q: 0.9, attack: 0.015, decay: 0.5, gain: 1.0, swell: 30, depth: 0.6, seed: 42),
+                // The air rolling away low.
+                Roll(at: 0.05, from: 320, to: 60, glide: 1.6, attack: 0.06, decay: 0.75, gain: 0.32, swell: 4, depth: 0.5, seed: 43),
+            ],
+        ),
+        // A Sunspear bolt detonating: the fusion lets go. A white crack, a huge whump,
+        // a deep boom and growl, the ground roaring as it melts. Then for three seconds
+        // the core lets out what is left: white lightning snapping out at random, each
+        // a crack with a short buzz, further apart and softer as it goes, over a
+        // sizzle cooling and sinking.
+        "regency_sunspear_hit": (
+            length: 4.8, peak: 0.85, room: 0.45,
+            layers: [
+                Burst(low: 500, high: 2800, attack: 0.0003, decay: 0.008, gain: 14),
+                Burst(low: 70, high: 600, attack: 0.001, decay: 0.08, gain: 20),
+                Burst(at: 0.002, low: 30, high: 200, attack: 0.004, decay: 0.4, gain: 14),
+                Tone(from: 110, to: 40, glide: 0.25, attack: 0.002, decay: 0.3, gain: 1.4),
+                Tone(from: 55, to: 26, glide: 1.0, attack: 0.006, decay: 0.9, gain: 1.0),
+                Fm(from: 92, to: 50, glide: 0.3, ratio: 0.5, index: 2.4, fade: 0.2, attack: 0.002, decay: 0.45, gain: 0.6),
+                Drive(1.6),
+                // The ground roaring as it melts.
+                Roll(at: 0.01, from: 1400, to: 150, glide: 1.2, attack: 0.02, decay: 0.65, gain: 0.55, swell: 14, depth: 0.6, seed: 51),
+                Roll(at: 0.1, from: 300, to: 50, glide: 2.0, attack: 0.1, decay: 1.1, gain: 0.3, swell: 3, depth: 0.5, seed: 52),
+                // The molten pool sizzling, cooling and sinking for seconds.
+                Foam(at: 0.1, from: 2600, to: 800, glide: 3.5, q: 0.9, attack: 0.2, decay: 1.1, gain: 1.2, swell: 28, depth: 0.7, seed: 53),
+                // The core letting go: lightning snapping out at random, thinning.
+                Burst(at: 0.42, low: 900, high: 3000, attack: 0.0002, decay: 0.005, gain: 5, pan: -0.4, seed: 60),
+                Roll(at: 0.42, from: 2600, to: 1200, glide: 0.08, attack: 0.002, decay: 0.05, gain: 0.35, swell: 70, depth: 1.0, pan: -0.4, seed: 61),
+                Burst(at: 0.66, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 4, pan: 0.45, seed: 62),
+                Burst(at: 0.71, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 3, pan: 0.3, seed: 63),
+                Fm(at: 0.66, from: 130, to: 120, glide: 0.05, ratio: 0.5, index: 3.0, fade: 0.05, attack: 0.001, decay: 0.035, gain: 0.25, pan: 0.4),
+                Burst(at: 1.04, low: 900, high: 3000, attack: 0.0002, decay: 0.005, gain: 4.5, pan: -0.15, seed: 64),
+                Roll(at: 1.04, from: 2600, to: 1200, glide: 0.08, attack: 0.002, decay: 0.06, gain: 0.3, swell: 70, depth: 1.0, pan: -0.15, seed: 65),
+                Burst(at: 1.37, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 3.5, pan: 0.35, seed: 66),
+                Burst(at: 1.45, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 2.6, pan: 0.2, seed: 67),
+                Fm(at: 1.37, from: 125, to: 115, glide: 0.05, ratio: 0.5, index: 3.0, fade: 0.05, attack: 0.001, decay: 0.035, gain: 0.2, pan: 0.3),
+                Burst(at: 1.86, low: 900, high: 3000, attack: 0.0002, decay: 0.005, gain: 3.4, pan: -0.45, seed: 68),
+                Roll(at: 1.86, from: 2500, to: 1100, glide: 0.08, attack: 0.002, decay: 0.05, gain: 0.22, swell: 70, depth: 1.0, pan: -0.45, seed: 69),
+                Burst(at: 2.31, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 2.6, pan: 0.15, seed: 70),
+                Burst(at: 2.79, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 2.4, pan: -0.25, seed: 71),
+                Burst(at: 2.84, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.1, seed: 72),
+                Fm(at: 2.79, from: 120, to: 112, glide: 0.05, ratio: 0.5, index: 3.0, fade: 0.05, attack: 0.001, decay: 0.03, gain: 0.14, pan: -0.2),
+                Burst(at: 3.38, low: 900, high: 3000, attack: 0.0002, decay: 0.004, gain: 1.8, pan: 0.4, seed: 73),
+                Burst(at: 3.97, low: 900, high: 3000, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.35, seed: 74),
+            ],
+        ),
+
+        // The Canopy's launch: two rounds a 0.5 s shot (`rounds: 2`), 0.25 s apart, so
+        // both are in the one sound. Each a short hot plasma thump up out of the mount,
+        // a rough growl inside it and a breath of noise rising as the round climbs.
+        "regency_canopy_fire": (
+            length: 0.55, peak: 0.4, room: 0.15,
+            layers: [
+                Burst(low: 120, high: 900, attack: 0.0008, decay: 0.018, gain: 6),
+                Fm(from: 150, to: 84, glide: 0.04, ratio: 0.5, index: 1.8, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.8),
+                Tone(from: 105, to: 60, glide: 0.04, attack: 0.001, decay: 0.05, gain: 0.35),
+                Burst(at: 0.25, low: 120, high: 900, attack: 0.0008, decay: 0.018, gain: 6, pan: 0.12),
+                Fm(at: 0.25, from: 146, to: 82, glide: 0.04, ratio: 0.5, index: 1.8, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.8, pan: 0.12),
+                Tone(at: 0.25, from: 102, to: 58, glide: 0.04, attack: 0.001, decay: 0.05, gain: 0.35, pan: 0.12),
+                Drive(1.45),
+                // The rounds climbing: a noise band rising, not a tone.
+                Sweep(at: 0.008, from: 500, to: 1300, glide: 0.1, q: 1.1, attack: 0.01, decay: 0.05, gain: 0.5),
+                Foam(at: 0.006, from: 1900, to: 2400, glide: 0.1, q: 1.0, attack: 0.005, decay: 0.05, gain: 0.8, swell: 40, depth: 0.85),
+                Sweep(at: 0.258, from: 480, to: 1250, glide: 0.1, q: 1.1, attack: 0.01, decay: 0.05, gain: 0.46, pan: 0.12),
+                Foam(at: 0.256, from: 1900, to: 2400, glide: 0.1, q: 1.0, attack: 0.005, decay: 0.05, gain: 0.75, swell: 40, depth: 0.85, pan: 0.12),
+            ],
+        ),
+        // A Canopy round bursting among aircraft, heard from the ground: a sharp hot pop,
+        // the plasma scattering out of it in crackles to either side, a fizz as it
+        // spends itself, and the pop's report rolling off.
+        "regency_canopy_burst": (
+            length: 0.8, peak: 0.45, room: 0.4,
+            layers: [
+                Burst(low: 400, high: 2600, attack: 0.0002, decay: 0.004, gain: 8),
+                Burst(low: 120, high: 900, attack: 0.0006, decay: 0.022, gain: 8),
+                Tone(from: 210, to: 100, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.5),
+                Fm(from: 130, to: 80, glide: 0.05, ratio: 0.5, index: 2.0, fade: 0.04, attack: 0.001, decay: 0.07, gain: 0.5),
+                Drive(1.4),
+                Burst(at: 0.016, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 2.0, pan: 0.35, seed: 81),
+                Burst(at: 0.029, low: 800, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.6, pan: -0.4, seed: 82),
+                Burst(at: 0.047, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 1.7, pan: 0.15, seed: 83),
+                Burst(at: 0.061, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 1.2, pan: -0.25, seed: 84),
+                Burst(at: 0.094, low: 800, high: 2800, attack: 0.0002, decay: 0.003, gain: 1.0, pan: 0.45, seed: 85),
+                Burst(at: 0.13, low: 800, high: 2800, attack: 0.0002, decay: 0.002, gain: 0.7, pan: -0.5, seed: 86),
+                Foam(at: 0.004, from: 2400, to: 1300, glide: 0.25, q: 0.9, attack: 0.004, decay: 0.1, gain: 0.9, swell: 40, depth: 0.9),
+                Roll(at: 0.01, from: 700, to: 150, glide: 0.5, attack: 0.015, decay: 0.2, gain: 0.25, swell: 7, depth: 0.5),
             ],
         ),
 
@@ -492,90 +665,6 @@
                 Drive(1.45),
                 Sweep(at: 0.02, from: 900, to: 260, glide: 0.5, q: 0.9, attack: 0.02, decay: 0.2, gain: 0.22),
                 Roll(at: 0.02, from: 500, to: 110, glide: 0.9, attack: 0.02, decay: 0.6, gain: 0.5, swell: 6, depth: 0.5),
-            ],
-        ),
-        // The tech 2 point defence's Pinched-plasmeric Cannon: three slugs a salvo, 0.1 s
-        // apart, so this plays three times over itself. A hard slam of crack and deep
-        // compression thump together, the dense slug's buzz, the report rolling along the
-        // ground, a short sizzle and a slapback.
-        "regency_pinched_cannon": (
-            length: 1.6, peak: 0.62, room: 0.4,
-            layers: [
-                Burst(low: 600, high: 2400, attack: 0.0002, decay: 0.005, gain: 12),
-                Burst(low: 110, high: 850, attack: 0.0005, decay: 0.035, gain: 11),
-                Burst(at: 0.001, low: 40, high: 260, attack: 0.002, decay: 0.1, gain: 7),
-                Tone(from: 190, to: 58, glide: 0.06, attack: 0.001, decay: 0.08, gain: 0.8),
-                Tone(from: 110, to: 46, glide: 0.12, attack: 0.001, decay: 0.16, gain: 1.0),
-                Fm(at: 0.002, from: 140, to: 62, glide: 0.08, ratio: 0.5, index: 1.6, fade: 0.06, attack: 0.001, decay: 0.09, gain: 0.3),
-                Stack(at: 0.004, from: 320, to: 120, glide: 0.06, attack: 0.002, decay: 0.07, gain: 0.3, detune: 1.008, width: 0.25, partials: [(1, 1), (2, 0.55), (3, 0.3), (4, 0.15)]),
-                Drive(1.6),
-                Roll(at: 0.008, from: 800, to: 110, glide: 0.5, attack: 0.012, decay: 0.26, gain: 0.45, swell: 9, depth: 0.5),
-                Sweep(at: 0.012, from: 1600, to: 450, glide: 0.2, q: 1.0, attack: 0.008, decay: 0.1, gain: 0.22),
-                Burst(at: 0.16, low: 140, high: 850, attack: 0.0008, decay: 0.016, gain: 2.5, pan: 0.35),
-                Tone(at: 0.16, from: 95, to: 40, glide: 0.1, attack: 0.002, decay: 0.12, gain: 0.18, pan: 0.35),
-            ],
-        ),
-        // A Pinched-plasmeric slug striking: the bind breaks at once. A hard crack, a
-        // heavy whump, a molten sizzle, the blast rolling off.
-        "regency_pinched_hit": (
-            length: 1.8, peak: 0.66, room: 0.35,
-            layers: [
-                Burst(low: 350, high: 2000, attack: 0.0003, decay: 0.006, gain: 8),
-                Burst(low: 70, high: 500, attack: 0.001, decay: 0.045, gain: 8),
-                Tone(from: 140, to: 54, glide: 0.15, attack: 0.002, decay: 0.18, gain: 1.0),
-                Tone(at: 0.003, from: 80, to: 42, glide: 0.3, attack: 0.006, decay: 0.3, gain: 0.4),
-                Fm(from: 120, to: 66, glide: 0.15, ratio: 0.5, index: 1.4, fade: 0.08, attack: 0.002, decay: 0.18, gain: 0.5),
-                Drive(1.45),
-                Sweep(at: 0.015, from: 1100, to: 320, glide: 0.35, q: 0.9, attack: 0.015, decay: 0.15, gain: 0.2),
-                Roll(at: 0.02, from: 450, to: 110, glide: 0.7, attack: 0.02, decay: 0.45, gain: 0.4, swell: 6, depth: 0.5),
-            ],
-        ),
-        // The tech 3 point defence's Pinch-fusion Cannon: five bursts a salvo, 0.1 s apart.
-        // A heavier slam than the Pinched gun, lower and longer, and inside it the fusion
-        // going off: three hard low pops strobing after the crack. The report rolls far
-        // and slaps back twice.
-        "regency_fusion_cannon": (
-            length: 2.6, peak: 0.72, room: 0.5,
-            layers: [
-                Burst(low: 600, high: 2400, attack: 0.0002, decay: 0.006, gain: 14),
-                Burst(low: 100, high: 800, attack: 0.0005, decay: 0.045, gain: 13),
-                Burst(at: 0.001, low: 35, high: 220, attack: 0.003, decay: 0.14, gain: 9),
-                Tone(from: 170, to: 50, glide: 0.08, attack: 0.001, decay: 0.1, gain: 0.8),
-                Tone(from: 90, to: 32, glide: 0.18, attack: 0.002, decay: 0.26, gain: 1.0),
-                Tone(at: 0.004, from: 58, to: 27, glide: 0.35, attack: 0.005, decay: 0.4, gain: 0.55),
-                Fm(at: 0.002, from: 120, to: 50, glide: 0.1, ratio: 0.5, index: 1.7, fade: 0.08, attack: 0.001, decay: 0.12, gain: 0.35),
-                Burst(at: 0.028, low: 180, high: 1300, attack: 0.0003, decay: 0.006, gain: 4, pan: 0.15),
-                Tone(at: 0.028, from: 130, to: 55, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.45, pan: 0.15),
-                Burst(at: 0.061, low: 180, high: 1300, attack: 0.0003, decay: 0.006, gain: 3.4, pan: -0.15),
-                Tone(at: 0.061, from: 125, to: 52, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.4, pan: -0.15),
-                Burst(at: 0.09, low: 180, high: 1300, attack: 0.0003, decay: 0.006, gain: 2.6),
-                Tone(at: 0.09, from: 120, to: 50, glide: 0.03, attack: 0.001, decay: 0.04, gain: 0.32),
-                Stack(at: 0.004, from: 300, to: 95, glide: 0.09, attack: 0.003, decay: 0.1, gain: 0.32, detune: 1.01, width: 0.3, partials: [(1, 1), (2, 0.6), (3, 0.35), (5, 0.12)]),
-                Drive(1.65),
-                Roll(at: 0.01, from: 900, to: 90, glide: 0.8, attack: 0.015, decay: 0.5, gain: 0.55, swell: 8, depth: 0.55),
-                Sweep(at: 0.015, from: 1700, to: 400, glide: 0.3, q: 1.0, attack: 0.01, decay: 0.14, gain: 0.25),
-                Burst(at: 0.22, low: 130, high: 800, attack: 0.001, decay: 0.02, gain: 3.5, pan: 0.4),
-                Tone(at: 0.22, from: 85, to: 36, glide: 0.12, attack: 0.002, decay: 0.16, gain: 0.22, pan: 0.4),
-                Burst(at: 0.55, low: 90, high: 450, attack: 0.0015, decay: 0.03, gain: 1.8, pan: -0.4),
-                Sweep(at: 0.55, from: 240, to: 60, glide: 0.6, q: 0.5, attack: 0.03, decay: 0.3, gain: 0.15, pan: -0.4),
-            ],
-        ),
-        // A Pinch-fusion burst striking: a white crack, a huge whump, and a beat later the
-        // fusion letting go as a second whump; a molten sizzle, the blast rolling far.
-        "regency_fusion_hit": (
-            length: 3.2, peak: 0.8, room: 0.45,
-            layers: [
-                Burst(low: 400, high: 2200, attack: 0.0003, decay: 0.007, gain: 10),
-                Burst(low: 60, high: 500, attack: 0.001, decay: 0.06, gain: 11),
-                Tone(from: 140, to: 46, glide: 0.2, attack: 0.002, decay: 0.26, gain: 1.0),
-                Tone(at: 0.004, from: 72, to: 34, glide: 0.5, attack: 0.008, decay: 0.5, gain: 0.6),
-                Fm(from: 100, to: 45, glide: 0.2, ratio: 0.5, index: 1.5, fade: 0.1, attack: 0.002, decay: 0.22, gain: 0.35),
-                Burst(at: 0.05, low: 50, high: 400, attack: 0.002, decay: 0.07, gain: 7),
-                Tone(at: 0.05, from: 105, to: 44, glide: 0.35, attack: 0.004, decay: 0.4, gain: 0.7),
-                Fm(at: 0.05, from: 110, to: 62, glide: 0.3, ratio: 0.5, index: 1.3, fade: 0.1, attack: 0.003, decay: 0.3, gain: 0.45),
-                Drive(1.5),
-                Sweep(at: 0.02, from: 1300, to: 300, glide: 0.5, q: 0.9, attack: 0.02, decay: 0.2, gain: 0.22),
-                Roll(at: 0.03, from: 600, to: 80, glide: 1.2, attack: 0.03, decay: 0.9, gain: 0.55, swell: 5, depth: 0.55),
             ],
         ),
     },

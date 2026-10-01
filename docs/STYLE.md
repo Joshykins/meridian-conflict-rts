@@ -258,19 +258,30 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   star burns in pinch fusion's prism (below). A
   breached core collapses inward before it flashes out, never a plain
   explosion.
-- **Weapons are plasma, and it punches.** The plasma is bound by gravity so
-  tight it behaves like a slug of metal until the bind breaks. It is never a
-  glowing cloud of gas.
-  - **In flight:** a small, hard-edged white-hot core with a thin red rim and
-    a short tight trace, like a shell. No halo, no fuzzy trail, no sparkles.
-  - **Firing:** the gun kicks like a cannon: recoil, a pressure flash vented
-    from side ports, heat shimmer.
-  - **Impact carries the weight.** The bind breaks and the star-stuff
-    decompresses at once: a sharp white flash, a hard shock ring, dirt and
-    armour thrown, molten spatter, and a glassed scorch that glows red and
-    cools.
-  - **Sound:** a deep compression thump under a cannon crack, a short sizzle
-    tail; impacts land as a heavy whump. No pews, no zaps.
+- **Weapons are plasma, and it is heavy.** Hyper-advanced plasma weaponry:
+  never ARC's look (no shock ring, no dust and clods, no powder smoke or
+  muzzle flash) and never comical (user direction, 2026-09-30, replacing
+  "plasma that behaves like a slug of metal"). Each grade has its own charge,
+  shot and strike (`renderer/regency_guns_fx.rs`, `plasma_puffs.wgsl`):
+  - **Plasmeric bolt** (a plasma repeater, as Halo's): a steady stream of fat
+    glowing teardrops, a pink-white heart in a red body; a small red bloom at
+    the mouth for each; a small ragged splash, sparkles and a seared spot where
+    one lands. **Plasmeric flak** throws the same bolts and bursts as a wide
+    red bloom flinging sparkles and streaks of plasma.
+  - **Pinched-plasmeric:** plasma gathered and squeezed in front of the bore
+    (a ball, motes and filaments drawn in, the air shimmering round it), then
+    fired out as a quick burst; each bolt bursts in ragged red fronds over a
+    white heart, throws molten spatter and globs of plasma out low (in place of
+    a shock ring) and sears the ground a little.
+  - **Pinch-fusion:** the same charge far harder: lightning crackles round
+    it and it goes over to fusion, white at the heart with every colour round
+    the rim. It launches with a blinding white flash, opens where it lands
+    white with every colour in its fringe and cools back to red, melts the
+    ground into a wide glowing pool, and leaves a knot of fusion burning over
+    it for seconds, slowly letting white lightning go while red sparkles cool
+    off the edges.
+  - **Sound:** plasmatic and heavy: compression, sizzle and roar, never a pew,
+    a zap or a cannon crack.
 - **Weapon names are grounded engineering:** a grade that says how the shot
   is made, then the gun that fires it, the way ARC's Argon Electric Bore
   does. Every Regency gun sets `plasma_grade` (`Plasmeric`, `Pinched`,
@@ -279,9 +290,9 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 
   | Rung | ARC | Regency | What the shot looks like |
   |---|---|---|---|
-  | 1 | Cannon | **Plasmeric** | A bound charge: a hard red slug |
-  | 2 | Railgun | **Pinched-plasmeric** | Plasma condensed by gravity and driven downrange as a tight, dense stream |
-  | 3 | AEB | **Pinch-fusion** | The condensed plasma is pushed until it starts fusing, and the gun fires those fusion events out: bright white bursts strobing along the stream |
+  | 1 | Cannon | **Plasmeric** | A plasma bolt: a fat red teardrop with a pink-white heart |
+  | 2 | Railgun | **Pinched-plasmeric** | Plasma gathered and condensed by gravity in front of the bore, fired out as a tight, dense stream |
+  | 3 | AEB | **Pinch-fusion** | The condensed plasma is pushed until it fuses (white, every colour round its rim) and launched: bright white bursts strobing along the stream |
 
 - **Pinch fusion's light is the prism.** Where plasma fuses it burns
   white-hot, and only toward its edge breaks into a turning pastel prism:
@@ -312,8 +323,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
   - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**.
-  - **AA:** **Plasmeric Flak Cannon**, shots that burst into a spray of hot
-    fragments.
+  - **AA:** **Plasmeric Flak Cannon**, bolts that burst into a spray of
+    plasma.
   - **Air-dropped:** **Plasmeric Bomb**.
   - **Thrown:** the **Gravitic Bomb**, a plasma charge in gravity containment,
     charged in the hands and launched to land around its target (the T3

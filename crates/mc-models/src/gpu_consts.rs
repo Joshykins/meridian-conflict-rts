@@ -411,6 +411,20 @@ shared! {
         /// the next point is. Its brightness is a tent over its life too, so each
         /// chain laid fades out as the next fades in.
         pub const PLUME: u32 = 51;
+        /// A Regency Pinched or Pinch-fusion gun's charge, held in front of its bore
+        /// (renderer/regency_guns_fx.rs, plasma_puffs.wgsl): a ball of plasma whose skin
+        /// boils, filaments wound in to a white heart. Laid once a tick, two ticks long.
+        /// `appearance.rgb` its colour and brightness, `appearance.w` how far it has gone
+        /// over to fusion (white at the heart, every colour round the rim).
+        pub const PLASMA_ORB: u32 = 52;
+        /// Where a Regency plasma shot lets go (plasma_puffs.wgsl): a ragged bloom of
+        /// plasma in licking fronds from a white-hot heart that tears into shreds and goes
+        /// out; no ring, no dust. `appearance` as `PLASMA_ORB`'s.
+        pub const PLASMA_BURST: u32 = 53;
+        /// A glob of plasma thrown out of a Regency strike (plasma_puffs.wgsl): a soft red
+        /// blob with a hot heart, carried off at `vel`, slowed by the air and pulled down a
+        /// little, shrinking and cooling as it goes. `appearance` as `PLASMA_ORB`'s.
+        pub const PLASMA_GLOB: u32 = 54;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under

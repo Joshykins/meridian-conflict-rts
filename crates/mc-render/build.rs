@@ -13,7 +13,8 @@
 //! surface to those containing `//!use scenery`; `shaders/desert.wgsl`
 //! (canyon-country desert ground) after habitat for `//!use desert`;
 //! `shaders/warp_hull.wgsl` and `shaders/warp_puffs.wgsl` (a capital ship's warp)
-//! for `//!use warp_hull` and `//!use warp_puffs`; `shaders/emp.wgsl` and
+//! for `//!use warp_hull` and `//!use warp_puffs`; `shaders/plasma_puffs.wgsl` (the
+//! Regency's squeezed plasma) for `//!use plasma_puffs`; `shaders/emp.wgsl` and
 //! `shaders/wreck.wgsl` (how a wreck lies and burns out) for their own. In front of
 //! all of it go the numbers the CPU shares with the shaders, generated from
 //! `mc-models/src/gpu_consts.rs`.

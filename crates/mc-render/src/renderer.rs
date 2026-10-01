@@ -68,11 +68,11 @@ mod lift_fx;
 mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
-mod pinch_fx;
 mod plasma_fx;
 mod post;
 mod quality;
 mod rail_fx;
+mod regency_guns_fx;
 mod regency_mine_fx;
 mod shafts;
 mod shield_upload;
@@ -3259,6 +3259,7 @@ impl Renderer {
         self.rail_wakes(projectiles, time, camera);
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
+        self.regency_guns_tick(units, time);
         self.excavation_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
         self.arc_howitzer_tick(units, &frame.houses, time);
@@ -3365,6 +3366,7 @@ impl Renderer {
         }
         self.capital_lights(time, alpha);
         self.warp_lights(time);
+        self.regency_guns_lights(time);
         self.heavy_rail_lights(time);
         self.emp_lights(time);
         self.bolt_rifle_lights(time);
@@ -4796,7 +4798,17 @@ impl Renderer {
                     Vec3::from(pos.to_f32()),
                     time,
                 );
-                self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
+                // A squeezed plasma gun gathers its charge in front of the bore
+                // (`regency_guns_fx`), not as an ordinary gun's glow.
+                if !self.regency_charging(
+                    unit.0,
+                    *blueprint,
+                    *weapon,
+                    Vec3::from(pos.to_f32()),
+                    time,
+                ) {
+                    self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
+                }
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
                 if w.bore.is_some() && seconds >= titan_fx::GIANT_CHARGE {
@@ -4882,13 +4894,17 @@ impl Renderer {
                     );
                     return;
                 }
-                // A Regency plasma gun's own firing: a thrown charge leaving the claw, a squeezed
-                // slug's vented kick (`plasma_fx`, `pinch_fx`).
+                // A Regency plasma gun's own firing: a thrown charge leaving the claw
+                // (`plasma_fx`); a direct-fire plasma gun's is all its own (`regency_guns_fx`).
                 {
                     let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
                     let dir = Vec3::from(vel.to_f32()).normalize_or_zero();
                     self.plasma_thrown(*owner, *blueprint, *weapon, at, time);
-                    self.pinch_fired(*blueprint, *weapon, at, dir, time);
+                    let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
+                    let gap = mc_sim::mirror::round_gap(w) * self.tick_seconds;
+                    if self.regency_fired(*blueprint, *weapon, at, dir, gap, time) {
+                        return;
+                    }
                 }
                 let unit = self.blueprints.unit(*blueprint);
                 let weapon = &unit.weapons[*weapon as usize];
@@ -5171,6 +5187,12 @@ impl Renderer {
                     let start = time + after.to_f32() * self.tick_seconds;
                     let at = Vec3::from(pos.to_f32());
                     self.plasma_landed(*blueprint, *weapon, at, *on_unit || *on_shield, start);
+                    // A direct-fire plasma gun's strike is all its own: no shell's blast.
+                    // On a shield it is the shield's hit, as any shot's (below).
+                    if !*on_shield && self.regency_landed(*blueprint, *weapon, at, *on_unit, start)
+                    {
+                        return;
+                    }
                 }
                 let weapon = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 // A blue hitscan gun (the commander's rail cannon) lands with the heavy blue

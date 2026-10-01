@@ -14,7 +14,6 @@
 mod brood;
 mod commander;
 mod cyst;
-mod defense;
 mod engineer;
 mod eye;
 mod hatchery;
@@ -22,12 +21,12 @@ mod heart;
 mod kit;
 mod machine;
 mod palisade;
-mod pinch_guns;
 mod plating;
 mod scorpion;
 mod scout;
 mod taproot;
 mod tidebrood;
+mod turrets;
 
 use super::library::ModelDef;
 
@@ -82,17 +81,13 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(12.9, 8.0), (12.9, 12.0), (12.9, 16.0)],
         cyst::cyst,
     ),
-    // Defence: point defence and anti-air (`defense`), the wall (`palisade`).
-    ModelDef::new("regency_barb", 5.5, 8.0, defense::barb),
-    ModelDef::new("regency_spitter", 5.5, 8.5, defense::spitter),
+    // Gun emplacements (`turrets`): point defence at three tiers, anti-air. The wall
+    // (`palisade`).
+    ModelDef::new("regency_barb", 5.5, 8.0, turrets::picket),
+    ModelDef::new("regency_spitter", 5.5, 8.5, turrets::canopy),
+    ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
+    ModelDef::new("regency_fusion_cannon", 20.0, 17.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
-    ModelDef::new("regency_pinch_cannon", 10.5, 11.0, pinch_guns::pinch_cannon),
-    ModelDef::new(
-        "regency_fusion_cannon",
-        20.0,
-        17.0,
-        pinch_guns::fusion_cannon,
-    ),
     // Radar (`eye`).
     ModelDef::tiered(
         "regency_eye",
@@ -133,11 +128,13 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 
 /// The reduced level's largest share of the full level, where it is not the library's 0.45.
 /// The tech 3 land and air factories are mostly armour plates, which keep their sides at
-/// the reduced level, and have no gears or rams for the full level to spend on.
+/// the reduced level, and have no gears or rams for the full level to spend on. The Picket
+/// and the Halberd are the same: plated legs, buttresses and gun shrouds, little else.
 #[cfg(test)]
 pub(super) fn reduced_share(key: &str) -> Option<f32> {
     match key.split('~').next().unwrap_or(key) {
         "regency_brood" | "regency_hatchery" => Some(0.57),
+        "regency_barb" | "regency_pinch_cannon" => Some(0.52),
         _ => None,
     }
 }
@@ -161,6 +158,34 @@ pub(super) fn check_at(
     height: f32,
     cells: Option<u32>,
     muzzles: &[[f32; 3]],
+) {
+    check_shots(key, tech, radius, height, cells, muzzles, None);
+}
+
+/// [`check`] for a gun that gathers its charge in front of its bore (the pinch guns): each
+/// `charges` point is held between projectors, so the turret frames it, on opposite sides
+/// within `hold` of it, but leaves the middle clear for the charge.
+#[cfg(test)]
+pub(super) fn check_charge(
+    key: &str,
+    radius: f32,
+    height: f32,
+    cells: Option<u32>,
+    charges: &[[f32; 3]],
+    hold: f32,
+) {
+    check_shots(key, 1, radius, height, cells, charges, Some(hold));
+}
+
+#[cfg(test)]
+fn check_shots(
+    key: &str,
+    tech: u8,
+    radius: f32,
+    height: f32,
+    cells: Option<u32>,
+    muzzles: &[[f32; 3]],
+    hold: Option<f32>,
 ) {
     use super::{material, part, rig};
     let model = super::build_model_scaled(key, radius, height, tech).expect(key);
@@ -247,13 +272,30 @@ pub(super) fn check_at(
         );
         for m in muzzles {
             let m = glam::Vec3::from(*m);
-            let near = mesh
-                .vertices
-                .iter()
-                .filter(|v| v.part == part::TURRET)
-                .map(|v| glam::Vec3::from(v.pos).distance(m))
-                .fold(f32::MAX, f32::min);
-            assert!(near < 0.4, "{name}: turret {near} m from muzzle {m}");
+            let turret = || {
+                mesh.vertices
+                    .iter()
+                    .filter(|v| v.part == part::TURRET)
+                    .map(|v| glam::Vec3::from(v.pos) - m)
+            };
+            let near = turret().map(glam::Vec3::length).fold(f32::MAX, f32::min);
+            match hold {
+                None => assert!(near < 0.4, "{name}: turret {near} m from muzzle {m}"),
+                Some(hold) => {
+                    assert!(
+                        near > hold * 0.4,
+                        "{name}: projectors {near} m into the charge at {m}"
+                    );
+                    let round: Vec<glam::Vec3> = turret()
+                        .filter(|d| d.length() < hold)
+                        .map(|d| d.with_x(0.0))
+                        .collect();
+                    assert!(
+                        round.iter().any(|a| round.iter().any(|c| a.dot(*c) < 0.0)),
+                        "{name}: nothing holds the charge at {m} from both sides"
+                    );
+                }
+            }
             let past = mesh
                 .vertices
                 .iter()

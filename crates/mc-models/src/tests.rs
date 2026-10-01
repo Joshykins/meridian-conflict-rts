@@ -348,7 +348,23 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("regency_cyst", 12.9, 12.0, 2, 3, &[]),
     structure("regency_cyst", 12.9, 16.0, 3, 3, &[]),
     structure("regency_barb", 5.5, 8.0, 1, 1, &[[5.2, 0.0, 6.8]]),
-    structure("regency_spitter", 5.5, 8.5, 1, 1, &[[4.4, 0.0, 7.4]]),
+    structure("regency_spitter", 5.5, 8.5, 1, 1, &[[2.18, 0.0, 8.91]]),
+    structure(
+        "regency_pinch_cannon",
+        10.5,
+        11.0,
+        2,
+        2,
+        &[[11.6, 0.0, 8.4]],
+    ),
+    structure(
+        "regency_fusion_cannon",
+        20.0,
+        17.0,
+        3,
+        4,
+        &[[25.0, 0.0, 13.6]],
+    ),
     structure("regency_palisade", 6.0, 5.4, 1, 1, &[]),
     structure("regency_eye", 7.0, 24.0, 1, 2, &[]),
     structure("regency_eye", 7.0, 28.0, 2, 2, &[]),
@@ -1057,9 +1073,32 @@ fn units_wear_team_colour_at_every_lod() {
     }
 }
 
+/// The meshes whose gun gathers its charge ahead of the bore, between projectors, and
+/// fires from there: a pinched or pinch-fusion plasma gun that is not a beam (the unit
+/// files' `plasma_grade`).
+fn charge_guns() -> Vec<String> {
+    use mc_data::PlasmaGrade;
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let bps = mc_data::Blueprints::load(&data).unwrap();
+    bps.units
+        .iter()
+        .filter(|u| {
+            u.weapons.iter().any(|w| {
+                matches!(
+                    w.plasma_grade,
+                    Some(PlasmaGrade::Pinched | PlasmaGrade::PinchFusion)
+                ) && !w.beam
+            })
+        })
+        .map(|u| u.visual.mesh.clone())
+        .collect()
+}
+
 #[test]
 fn weapons_are_turrets_ending_at_the_muzzle() {
+    let charged = charge_guns();
     for bp in BLUEPRINTS.iter().filter(|bp| !bp.muzzles.is_empty()) {
+        let charge = charged.iter().any(|m| m == bp.mesh);
         let model = built(bp);
         let weapon_part = if bp.turreted {
             part::TURRET
@@ -1085,11 +1124,21 @@ fn weapons_are_turrets_ending_at_the_muzzle() {
                         .distance(muzzle_point)
                     })
                     .fold(f32::MAX, f32::min);
-                assert!(
-                    nearest < 0.4,
-                    "{} lod{lod}: barrel ends {nearest} m from muzzle {muzzle:?}",
-                    bp.mesh
-                );
+                if charge {
+                    // A pinch gun's muzzle is the charge it gathers ahead of its bore:
+                    // its projectors stand round that point, close, but clear of it.
+                    assert!(
+                        nearest > 0.5 && nearest < bp.radius * 0.3,
+                        "{} lod{lod}: projectors {nearest} m from the charge {muzzle:?}",
+                        bp.mesh
+                    );
+                } else {
+                    assert!(
+                        nearest < 0.4,
+                        "{} lod{lod}: barrel ends {nearest} m from muzzle {muzzle:?}",
+                        bp.mesh
+                    );
+                }
                 // Nothing of the weapon pokes far beyond the muzzle either.
                 if bp.turreted {
                     let overshoot = mesh
