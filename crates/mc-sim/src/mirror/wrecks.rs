@@ -27,6 +27,8 @@ const OPEN: f32 = 4.0;
 /// Extra instances sections and hull insides may add to a frame. A cosmetic cap: past
 /// it, further big wrecks are drawn whole (`mc_render::MAX_DYNAMIC` has room for these).
 pub const WRECK_EXTRA_INSTANCES: usize = 4096;
+/// Seconds since reclaim last worked a wreck, at most: by then its glow has long cooled.
+const RECLAIM_COOLED: f32 = 600.0;
 
 /// One section of a wreck: the stretch of the hull it keeps, along the model's length in
 /// shares of its reach (-1 the stern, 1 the bow), and where it lies relative to where
@@ -154,6 +156,20 @@ impl World {
             let landing = landing_of(s.wrecks.landing[row]);
             let angle = |a: i16| a as f32 * (TAU / 65536.0);
             let id = s.wrecks.slots.handle(row).0;
+            // The hull is drawn whole however much reclaim has taken: the share it took
+            // shows as the work's glow, so only blasts and weather wear the hull away.
+            let (mass, reclaimed) = (s.wrecks.mass[row], s.wrecks.reclaimed[row]);
+            let health = ((mass + reclaimed) / s.wrecks.mass_max[row])
+                .to_f32()
+                .min(1.0);
+            let unmade = if reclaimed > mc_core::Fx::ZERO {
+                (reclaimed / (mass + reclaimed)).to_f32()
+            } else {
+                0.0
+            };
+            let since = (s.tick.saturating_sub(s.wrecks.drained[row]) as f32
+                / TICKS_PER_SECOND as f32)
+                .min(RECLAIM_COOLED);
             let mut pieces = [Section {
                 lo: 0.0,
                 hi: 0.0,
@@ -213,7 +229,7 @@ impl World {
                     heading: heading + piece.yaw,
                     blueprint: bp.id.0 as u32,
                     owner_flags: KIND_WRECK,
-                    health: (s.wrecks.mass[row] / s.wrecks.mass_max[row]).to_f32(),
+                    health,
                     build: 1.0,
                     turret_yaw: turret,
                     prev_turret_yaw: turret,
@@ -228,6 +244,7 @@ impl World {
                     arm_pitch: [piece.pitch, piece.pitch, piece.lo, piece.hi],
                     _pad2: [piece.roll, piece.roll],
                     refit_modules: word,
+                    fx: [0.0, 0.0, unmade, since],
                     deploy: 1.0,
                     prev_deploy: 1.0,
                     ..UnitInstance::zeroed()

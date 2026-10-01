@@ -495,7 +495,8 @@ pub struct UnitInstance {
     /// A warp and an EMP (`crate::warp`): its warp drive, last tick and this (in a jump
     /// how far into its streak, 0 whole to 1 a streak of light; spooling, minus how full
     /// its charge is, 0 to -1), then how stunned it is, last tick and this (0 to 1,
-    /// falling to 0 over the stun's last seconds).
+    /// falling to 0 over the stun's last seconds). A settled wreck: zero, zero, then the
+    /// share of the hull reclaim has taken (0 to 1) and seconds since reclaim last worked it.
     pub fx: [f32; 4],
     /// A spacecraft's stern drives (`CapitalRig::drives`): how far their nozzles are swung,
     /// last tick and this (radians, toward the side the nose turns to). The mirror leaves
@@ -516,6 +517,12 @@ impl UnitInstance {
             && self.refit_modules & WRECK_POSED != 0
             && (self.refit_modules & WRECK_INNER != 0
                 || (self.refit_modules >> WRECK_SECTION_SHIFT) & 0xF != 0)
+    }
+
+    /// A settled wreck: the share of a fresh wreck's mass still in it. Its `health` leaves
+    /// out what reclaim took, since reclaim does not wear the hull away (`fx`).
+    pub fn wreck_left(&self) -> f32 {
+        self.health * (1.0 - self.fx[2])
     }
 
     pub fn pack_veterancy(kills: u32, level: u8, progress: f32) -> u32 {

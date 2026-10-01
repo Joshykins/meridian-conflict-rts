@@ -287,6 +287,45 @@ fn an_idle_engineer_clears_the_wrecks_in_reach_while_there_is_room() {
 }
 
 #[test]
+fn a_wreck_left_half_reclaimed_is_drawn_whole_with_the_share_taken() {
+    let mut w = world();
+    let setup = [
+        spawn(&w, 0, ENGINEER, 500, 0),
+        spawn(&w, 1, TANK, 540, flag::PASSIVE),
+    ];
+    w.tick(&setup).unwrap();
+    w.tick(&[cmd(Command::DebugDamage {
+        units: ids(&w, 1, TANK),
+        permille: 1000,
+    })])
+    .unwrap();
+    w.state.players[0].mass = Fx::ZERO;
+    let row = w.state.wrecks.slots.iter().next().unwrap();
+    let full = w.state.wrecks.mass_max[row];
+    run_until(&mut w, 2000, |w| w.state.wrecks.mass[row] * 2 < full);
+    // Stores full: the work stops with the wreck half taken.
+    w.state.players[0].mass = w.state.players[0].mass_capacity;
+    for _ in 0..30 {
+        w.tick(&[]).unwrap();
+    }
+    let wrecks = &w.state.wrecks;
+    assert_eq!(wrecks.mass[row] + wrecks.reclaimed[row], full);
+    let mut frame = RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    let drawn = frame
+        .units
+        .iter()
+        .find(|u| u.owner_flags & mc_sim::mirror::KIND_WRECK != 0)
+        .unwrap();
+    assert_eq!(drawn.health, 1.0, "reclaim wears none of the hull away");
+    let taken = (wrecks.reclaimed[row] / full).to_f32();
+    assert!((drawn.fx[2] - taken).abs() < 1e-3 && taken > 0.5);
+    assert!(drawn.fx[3] >= 2.5, "the work has cooled: {}", drawn.fx[3]);
+    let left = (wrecks.mass[row] / full).to_f32();
+    assert!((drawn.wreck_left() - left).abs() < 1e-3);
+}
+
+#[test]
 fn a_reclaimer_tower_clears_wrecks_by_itself_but_only_takes_live_units_on_an_order() {
     let mut w = world();
     let setup = [

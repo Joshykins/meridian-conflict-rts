@@ -204,6 +204,8 @@ impl World {
             return false;
         }
         wrecks.mass[w] -= take;
+        wrecks.reclaimed[w] += take;
+        wrecks.drained[w] = self.state.tick;
         let bp = self.blueprints.unit(wrecks.blueprint[w]);
         let at = wrecks.pos[w].extend(wrecks.z[w]);
         let gone = wrecks.mass[w] <= Fx::ZERO;

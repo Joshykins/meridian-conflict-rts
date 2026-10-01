@@ -105,7 +105,7 @@ fn reclaim_mass(s: &Scene, u: &UnitInstance) -> f32 {
     if flags & KIND_WRECK == 0 || u.packed == WRECK_FALLING || u.is_wreck_extra() {
         return 0.0;
     }
-    (cost * bp.wreck_fraction.to_f32() * u.health).max(0.0)
+    (cost * bp.wreck_fraction.to_f32() * u.wreck_left()).max(0.0)
 }
 
 /// Where a leader from `from` meets the label pill.

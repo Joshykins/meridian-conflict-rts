@@ -139,7 +139,7 @@ impl Renderer {
             let age = time - first;
             let burning = 1.0 - smoothstep(SMOKE_FULL, SMOKE_OUT, age);
             // Most of the hull reclaimed: little left to burn.
-            let burning = burning * (0.35 + 0.65 * u.health.clamp(0.0, 1.0));
+            let burning = burning * (0.35 + 0.65 * u.wreck_left().clamp(0.0, 1.0));
             if burning <= 0.01 || budget == 0 || at.distance(camera.focus) > reach {
                 continue;
             }

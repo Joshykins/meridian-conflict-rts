@@ -186,9 +186,9 @@ fn wreck_keeps(local: vec3<f32>, lo: f32, hi: f32, reach: f32) -> bool {
     return x >= lo && x < hi;
 }
 
-// Where a wreck is worn away from the top as its mass goes (reclaimed or blasted),
-// raggedly: `height` is the point's share of the model's height, `health` of the mass
-// that is left.
+// Where a wreck is worn away from the top as blasts (or the years, for a map's own)
+// take its mass, raggedly: `height` is the point's share of the model's height, `health`
+// of the mass left. Reclaim does not wear it away (`wreck_reclaim`).
 fn wreck_worn(local: vec3<f32>, height: f32, health: f32, reach: f32) -> bool {
     let wear = 1.0 - clamp(health, 0.0, 1.0);
     let ragged = (value_noise2(local.xy + vec2<f32>(local.z * 0.7, local.z * 0.4), max(reach * 0.15, 0.8)) - 0.5) * 0.7 * wear;
@@ -385,5 +385,93 @@ fn wreck_surface(paint: Pbr, i: SurfaceIn, up: f32, inner: bool, dl1: vec3<f32>,
     m.metallic = metallic;
     m.roughness = roughness;
     out.m = m;
+    return out;
+}
+
+// ---- reclaim taking a wreck apart -------------------------------------------
+//
+// Reclaim does not wear a wreck away: the hull stays whole, and the share reclaim has
+// taken (`Entity::fx.z`) shows on it as the work, eaten in from the top down, raggedly.
+// While a beam works it (`fx.w`, seconds since reclaim last took mass) what is taken is
+// blackened metal run through with a net of glowing Materials red-orange, light pouring
+// up it toward the beam, motes lifting off, and a white-hot edge crawling on where it
+// eats in, the metal ahead of it heating. Once the beam stops the work cools over a few
+// seconds to a dull ember that barely breathes: a dim red net and a banked rim, so a
+// wreck left half taken looks it.
+
+const RECLAIM_RED: vec3<f32> = vec3<f32>(0.85, 0.05, 0.02);
+const RECLAIM_WHITE: vec3<f32> = vec3<f32>(1.0, 0.84, 0.74);
+
+struct WreckReclaim {
+    // Share of the metal's albedo kept: stripped dark where it is taken.
+    keep: f32,
+    glow: vec3<f32>,
+}
+
+// `local` the unwarped model position, `height` its share of the model's height,
+// `unmade` the share taken, `since` seconds since the work last went on, `px` a pixel
+// in metres, `seed` the wreck's own random.
+fn wreck_reclaim(local: vec3<f32>, height: f32, reach: f32, unmade: f32, since: f32, px: f32, seed: f32, time: f32) -> WreckReclaim {
+    var out: WreckReclaim;
+    out.keep = 1.0;
+    out.glow = vec3<f32>(0.0);
+    if unmade <= 0.0 {
+        return out;
+    }
+    let size = clamp(reach, 2.0, 200.0);
+    let fw = max(px, 1e-4);
+    let p = WRECK_TURN_B * (local + vec3<f32>(seed * 37.0, seed * 71.0, seed * 13.0));
+    // The order it is taken in: the top first, the front ragged at the hull's scale and finer.
+    let rag = surf_fbm3(p, clamp(size * 0.3, 1.5, 30.0), fw)
+        + 0.45 * surf_fbm3(p + vec3<f32>(7.3, 2.9, 4.1), clamp(size * 0.07, 0.5, 7.0), fw);
+    let key = (1.0 - clamp(height, 0.0, 1.0)) * 0.7 + 0.15 + rag * 0.55;
+    let front = mix(0.1, 1.1, clamp(unmade, 0.0, 1.0));
+    let inside = front - key;
+    // The work on (1) or long cooled (0); a wreck left alone keeps a faint ember, dimming
+    // a little more over its first minute or two.
+    let on = 1.0 - smoothstep(0.3, 3.0, since);
+    let ember = mix(1.0, 0.6, smoothstep(5.0, 120.0, since));
+    let band = 0.015 + 0.03 * on;
+    let taken = smoothstep(0.0, band * 0.6, inside);
+    let materials = vec3<f32>(MASS_R, MASS_G, MASS_B);
+
+    // The net through the taken metal: the zero lines of two noise fields, the finer
+    // fainter, each fading out before it is finer than a few pixels.
+    let cell = clamp(size * 0.11, 0.7, 9.0);
+    let n1 = surf_fbm3(p + vec3<f32>(29.1, 3.3, 17.7), cell, fw);
+    let n2 = surf_fbm3(WRECK_TURN_A * p + vec3<f32>(5.9, 41.3, 8.1), cell * 0.38, fw);
+    let line1 = (1.0 - smoothstep(0.0, 0.03, abs(n1))) * surf_resolved(cell * 0.5, fw);
+    let line2 = (1.0 - smoothstep(0.0, 0.025, abs(n2))) * surf_resolved(cell * 0.2, fw);
+    let net = max(line1, line2 * 0.65);
+    // A soft heat between the lines, so the taken metal reads from far off too.
+    let wash = 0.5 + 0.5 * surf_fbm3(p + vec3<f32>(13.7, 9.1, 2.3), cell * 1.6, fw);
+
+    // Working: light pours up the net toward the beam, in pulses broken by the field.
+    let rise = clamp(size * 0.06, 0.5, 5.0);
+    let pulse = pow(0.5 + 0.5 * sin((local.z / rise - time * 1.7 + n1 * 5.0) * 6.2831853), 6.0);
+    let working = materials * (2.6 * net + 0.06 * wash * wash) + RECLAIM_WHITE * 5.0 * net * pulse;
+    // Motes of material lifting off the taken metal.
+    let mote_cell = clamp(size * 0.045, 0.4, 3.0);
+    let q = vec3<f32>(local.x, local.y, local.z - time * 1.3 * mote_cell) / mote_cell;
+    let id = floor(q);
+    let at = vec3<f32>(surf_hash3(id + 0.31), surf_hash3(id + 7.17), surf_hash3(id + 3.71)) * 0.6 + 0.2;
+    let mote = (1.0 - smoothstep(0.0, 0.14, distance(fract(q), at)))
+        * step(0.8, surf_hash3(id + 11.3)) * surf_resolved(mote_cell * 0.3, fw);
+    // Left: a dull red net that breathes slowly, barely warm between.
+    let breath = 0.8 + 0.2 * sin(time * 0.7 + seed * 40.0 + n1 * 3.0);
+    let left = (RECLAIM_RED * 0.3 * net + RECLAIM_RED * 0.01 * wash) * breath * ember;
+    out.glow = mix(left, working + RECLAIM_WHITE * 3.0 * mote, on) * taken;
+
+    // The edge where it eats in: white-hot at the front and flickering while it works,
+    // a banked dull rim once it stops; the metal just ahead heating.
+    let edge = exp(-pow(inside / band, 2.0));
+    let core = exp(-pow(inside / (band * 0.35), 2.0));
+    let flicker = 0.75 + 0.25 * sin(time * 9.0 + n2 * 20.0 + seed * 17.0);
+    let hot = (materials * 2.4 * edge + RECLAIM_WHITE * 5.0 * core) * flicker
+        + RECLAIM_RED * 0.8 * smoothstep(-band * 4.0, 0.0, inside) * (1.0 - taken);
+    let banked = (RECLAIM_RED * 0.12 * edge + RECLAIM_RED * 0.25 * core) * breath * ember;
+    out.glow += mix(banked, hot, on);
+    // Stripped to the blackened frame where it is taken.
+    out.keep = mix(1.0, 0.25, taken);
     return out;
 }

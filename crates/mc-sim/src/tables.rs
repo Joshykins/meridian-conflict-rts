@@ -1145,6 +1145,12 @@ pub struct Wrecks {
     /// How it came to lie there ([`Landing`] as its number): the renderer breaks up,
     /// buries and settles it by this and its model.
     pub landing: Vec<u8>,
+    /// Mass reclaim has taken out of it (blasts take theirs off `mass_max`'s share
+    /// without counting here): the renderer shows that share of the hull being unmade.
+    pub reclaimed: Vec<Fx>,
+    /// Tick reclaim last took mass from it: the renderer burns the work bright while it
+    /// goes on and lets it cool once it stops. Meaningless while `reclaimed` is zero.
+    pub drained: Vec<u32>,
 }
 
 /// How a wreck came to lie where it is. The numbers go to the renderer
@@ -1179,6 +1185,8 @@ impl Wrecks {
             turret: Vec::new(),
             pitch: Vec::new(),
             landing: Vec::new(),
+            reclaimed: Vec::new(),
+            drained: Vec::new(),
         }
     }
 
@@ -1208,6 +1216,8 @@ impl Wrecks {
         put(&mut self.turret, row, Angle(0));
         put(&mut self.pitch, row, 0);
         put(&mut self.landing, row, Landing::InPlace as u8);
+        put(&mut self.reclaimed, row, Fx::ZERO);
+        put(&mut self.drained, row, 0);
         Ok(row)
     }
 
@@ -1225,6 +1235,8 @@ impl Wrecks {
             h.write_i64(self.mass[row].0);
             h.write_u64(self.born[row] as u64 | (self.turret[row].0 as u64) << 32);
             h.write_u64(self.pitch[row] as u16 as u64 | (self.landing[row] as u64) << 16);
+            h.write_i64(self.reclaimed[row].0);
+            h.write_u32(self.drained[row]);
         }
     }
 }
