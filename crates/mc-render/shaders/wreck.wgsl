@@ -398,6 +398,11 @@ fn wreck_surface(paint: Pbr, i: SurfaceIn, up: f32, inner: bool, dl1: vec3<f32>,
 // eats in, the metal ahead of it heating. Once the beam stops the work cools over a few
 // seconds to a dull ember that barely breathes: a dim red net and a banked rim, so a
 // wreck left half taken looks it.
+//
+// The last of it going (renderer wreck_finish.rs): the sim has freed the wreck and a
+// copy of its hull says how far it has gone as `unmade` past 1. The net runs over the
+// whole hull and flares, then the metal burns away from the top down behind a white-hot
+// edge (`wreck_going`).
 
 const RECLAIM_RED: vec3<f32> = vec3<f32>(0.85, 0.05, 0.02);
 const RECLAIM_WHITE: vec3<f32> = vec3<f32>(1.0, 0.84, 0.74);
@@ -418,6 +423,7 @@ fn wreck_reclaim(local: vec3<f32>, height: f32, reach: f32, unmade: f32, since: 
     if unmade <= 0.0 {
         return out;
     }
+    let finish = clamp(unmade - 1.0, 0.0, 1.0);
     let size = clamp(reach, 2.0, 200.0);
     let fw = max(px, 1e-4);
     let p = WRECK_TURN_B * (local + vec3<f32>(seed * 37.0, seed * 71.0, seed * 13.0));
@@ -425,7 +431,8 @@ fn wreck_reclaim(local: vec3<f32>, height: f32, reach: f32, unmade: f32, since: 
     let rag = surf_fbm3(p, clamp(size * 0.3, 1.5, 30.0), fw)
         + 0.45 * surf_fbm3(p + vec3<f32>(7.3, 2.9, 4.1), clamp(size * 0.07, 0.5, 7.0), fw);
     let key = (1.0 - clamp(height, 0.0, 1.0)) * 0.7 + 0.15 + rag * 0.55;
-    let front = mix(0.1, 1.1, clamp(unmade, 0.0, 1.0));
+    // Going, the net spreads over the rest of the hull within its first tenth.
+    let front = mix(0.1, 1.1, clamp(unmade, 0.0, 1.0)) + finish * 3.0;
     let inside = front - key;
     // The work on (1) or long cooled (0); a wreck left alone keeps a faint ember, dimming
     // a little more over its first minute or two.
@@ -471,7 +478,33 @@ fn wreck_reclaim(local: vec3<f32>, height: f32, reach: f32, unmade: f32, since: 
         + RECLAIM_RED * 0.8 * smoothstep(-band * 4.0, 0.0, inside) * (1.0 - taken);
     let banked = (RECLAIM_RED * 0.12 * edge + RECLAIM_RED * 0.25 * core) * breath * ember;
     out.glow += mix(banked, hot, on);
+    if finish > 0.0 {
+        // Going: the whole hull flares as the net takes it, and a white-hot edge burns
+        // down it with the metal just under it heating.
+        let flare = 1.0 + 1.5 * smoothstep(0.0, 0.15, finish) * (1.0 - smoothstep(0.5, 1.0, finish));
+        out.glow *= flare;
+        let g = wreck_going(local, height, reach, unmade, seed);
+        let going_edge = exp(-pow(g / 0.04, 2.0));
+        let heating = exp(-g / 0.18) * step(0.0, g);
+        out.glow += RECLAIM_WHITE * 9.0 * going_edge * flicker + materials * 2.5 * heating;
+    }
     // Stripped to the blackened frame where it is taken.
     out.keep = mix(1.0, 0.25, taken);
     return out;
+}
+
+// The last of a wreck going (`unmade` past 1: 1 + how far, 0 to 1): how far under the
+// edge burning down the hull from the top this point lies, raggedly; under zero where
+// it is gone. Over the hull's first fifth the edge is still above it, and by the end it
+// is under its keel (wreck_finish.rs `front` follows it). Cheap, as the depth pre-pass
+// and the shadow pass cut by it too.
+fn wreck_going(local: vec3<f32>, height: f32, reach: f32, unmade: f32, seed: f32) -> f32 {
+    let finish = unmade - 1.0;
+    if finish <= 0.0 {
+        return 1.0;
+    }
+    let rag = value_noise2(local.xy + vec2<f32>(local.z * 0.6 + seed * 31.0, local.z * 0.45 + seed * 17.0), max(reach * 0.12, 0.6)) - 0.5;
+    let key = 1.0 - clamp(height, 0.0, 1.0) + rag * 0.45;
+    let front = mix(-0.3, 1.3, smoothstep(0.2, 1.0, finish));
+    return key - front;
 }

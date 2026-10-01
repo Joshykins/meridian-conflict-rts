@@ -497,6 +497,8 @@ pub struct UnitInstance {
     /// its charge is, 0 to -1), then how stunned it is, last tick and this (0 to 1,
     /// falling to 0 over the stun's last seconds). A settled wreck: zero, zero, then the
     /// share of the hull reclaim has taken (0 to 1) and seconds since reclaim last worked it.
+    /// The renderer's copy of a wreck whose last mass went sends 1 + how far it has gone
+    /// in the share (`mc_render` wreck_finish.rs).
     pub fx: [f32; 4],
     /// A spacecraft's stern drives (`CapitalRig::drives`): how far their nozzles are swung,
     /// last tick and this (radians, toward the side the nose turns to). The mirror leaves

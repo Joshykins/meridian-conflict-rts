@@ -220,8 +220,8 @@ struct VsOut {
     @location(15) warp: vec4<f32>,
     // What crackles over the hull, between ticks: x how stunned by an EMP it is (emp.wgsl),
     // y how full its warp drive's charge is while it spools (warp_hull.wgsl), 0 to 1.
-    // A wreck instead: x the share reclaim has taken, y seconds since it last worked it
-    // (`wreck_reclaim`).
+    // A wreck instead: x the share reclaim has taken (past 1, the last of it going:
+    // `wreck_going`), y seconds since it last worked it (`wreck_reclaim`).
     @location(16) @interpolate(flat) crackle: vec2<f32>,
     // A settled wreck's section (wreck.wgsl): the stretch of the hull it keeps along model
     // x (metres), 1 when it draws the hull's inside, 1 when it is posed at all.
@@ -2561,7 +2561,8 @@ fn fs_prepass(in: VsOut) {
     let hull_down = (flags & KIND_WRECK) != 0u && in.state.y > 1.5;
     if (flags & KIND_WRECK) != 0u && !hull_down
         && (wreck_worn(in.local, in.state.z, in.state.y, in.weld.z)
-            || (in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z))) {
+            || (in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z))
+            || wreck_going(in.local, in.state.z, in.weld.z, in.crackle.x, in.state.w) < 0.0) {
         discard;
     }
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
@@ -2576,6 +2577,8 @@ fn fs_shadow(in: VsOut) {
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }
     // A broken hull's section shadows only its own stretch.
     if in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z) { discard; }
+    // The last of a reclaimed wreck, burning away (`wreck_going`).
+    if (in.owner_flags & KIND_WRECK) != 0u && wreck_going(in.local, in.state.z, in.weld.z, in.crackle.x, in.state.w) < 0.0 { discard; }
     if vapor_edge(in) > 0.0 { discard; }
     // Unbuilt parts of a construction site cast no shadow: neither what is still to be
     // printed nor a Regency site's swarm.
@@ -3399,7 +3402,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.metallic *= rc.keep;
         m.emissive += rc.glow;
         if wreck_worn(in.local, in.state.z, in.state.y, in.weld.z)
-            || (in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z)) {
+            || (in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z))
+            || wreck_going(in.local, in.state.z, in.weld.z, in.crackle.x, in.state.w) < 0.0 {
             discard;
         }
     }

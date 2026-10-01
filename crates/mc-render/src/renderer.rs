@@ -90,6 +90,7 @@ mod tree_wind;
 mod warp_fx;
 mod water_fx;
 mod work_beams;
+mod wreck_finish;
 mod wreck_fx;
 pub(crate) use effect_barriers::EffectBarrier;
 pub use post::Antialiasing;
@@ -108,10 +109,14 @@ const MAX_SIM_ENTITIES: usize =
 /// Placement ghosts drawn at once: a drag line longer than this shows its first ones (a
 /// cosmetic cap; the orders are not cut).
 const MAX_GHOSTS: usize = 512;
-/// The dynamic buffer: the mirror's entities, then ghosts, burning trees and fallen ones,
-/// each with room for its own most, so raising a sim table raises this with it.
-pub const MAX_DYNAMIC: usize =
-    MAX_SIM_ENTITIES + MAX_GHOSTS + MAX_BURNING_TREES + fallen_trees::MOST_SHOWN;
+/// The dynamic buffer: the mirror's entities, then ghosts, burning trees, fallen ones and
+/// reclaimed hulls going, each with room for its own most, so raising a sim table raises
+/// this with it.
+pub const MAX_DYNAMIC: usize = MAX_SIM_ENTITIES
+    + MAX_GHOSTS
+    + MAX_BURNING_TREES
+    + fallen_trees::MOST_SHOWN
+    + wreck_finish::MOST_SHOWN;
 /// Gun-house poses (`mirror::HousePose`): at most one per unit, so every unit can have one.
 pub const MAX_HOUSES: usize = mc_sim::tables::MAX_UNITS;
 /// Selection rings and status bars: at most one per unit or wreck drawn.
@@ -823,6 +828,8 @@ pub struct Renderer {
     water_fx: water_fx::WaterFx,
     /// The smoke off wrecks (renderer/wreck_fx.rs).
     wreck_fx: wreck_fx::WreckFx,
+    /// The last of reclaimed wrecks burning away (renderer/wreck_finish.rs).
+    wreck_finish: wreck_finish::WreckFinish,
     /// Capital hulls falling, for how they break up when they hit (capital_crash_fx.rs).
     hull_crash_fx: capital_crash_fx::HullCrashFx,
     /// Craters where blasts struck the ground (renderer/impact_craters.rs).
@@ -2365,6 +2372,7 @@ impl Renderer {
             tree_blasts: Default::default(),
             water_fx: water_fx::WaterFx::new(sea_fx, sea_set),
             wreck_fx: wreck_fx::WreckFx::default(),
+            wreck_finish: wreck_finish::WreckFinish::default(),
             hull_crash_fx: capital_crash_fx::HullCrashFx::default(),
             impact_craters: impact_craters::ImpactCraters::default(),
             bore_fx: bore_fx::BoreFx::default(),
@@ -3129,6 +3137,7 @@ impl Renderer {
         // a warhead leaves no sim scorch, so its crater must not be wiped with it.
         if frame.stains.is_empty() && frame.tick < 50 {
             self.wreck_fx.clear();
+            self.wreck_finish.clear();
             self.hull_crash_fx.clear();
             self.impact_craters.clear();
             self.bore_fx.clear();
@@ -3222,6 +3231,7 @@ impl Renderer {
         self.aircraft_crash_trails(units, time, camera);
         self.damage_smoke(units, time, camera);
         self.wreck_smoke(units, time, camera);
+        self.wreck_finish(units, &frame.events, time, camera);
         drop(part);
         let part = mc_core::perf_span!("cpu.upload.events");
         self.construction(frame, time, camera);
@@ -5277,38 +5287,7 @@ impl Renderer {
                 pos,
                 blueprint,
                 wreck,
-            } => {
-                // The last of it goes up the beam: a soft flare and a few embers, no blast, no smoke.
-                let bp = self.blueprints.unit(*blueprint);
-                let (r, h) = (
-                    bp.radius.to_f32(),
-                    bp.height.to_f32() * if *wreck { 0.25 } else { 0.5 },
-                );
-                let core = Vec3::from(pos.to_f32()) + Vec3::Z * h;
-                // In the Materials red-orange of the beam it went up, not a gun's orange.
-                self.push_effect(
-                    core.to_array(),
-                    time,
-                    r * 1.3,
-                    0.3,
-                    crate::gpu_consts::effect::MATERIALS as f32,
-                    0.0,
-                );
-                for _ in 0..10 {
-                    let vel = self.scatter.upward(0.6) * (2.0 + self.scatter.unit() * 4.0);
-                    let off =
-                        Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.6;
-                    let life = 0.4 + self.scatter.unit() * 0.5;
-                    self.push_puff(
-                        clearing::PUFF_RECLAIM,
-                        core + off,
-                        vel,
-                        time,
-                        life,
-                        (0.14 + r * 0.02, 0.04),
-                    );
-                }
-            }
+            } => self.reclaimed_flare(Vec3::from(pos.to_f32()), *blueprint, *wreck, time),
             _ => {}
         }
     }

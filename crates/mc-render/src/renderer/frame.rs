@@ -170,9 +170,19 @@ impl Renderer {
             bytemuck::cast_slice(fallen),
         );
         self.dynamic_count += fallen.len() as u32;
+        // Reclaimed wrecks' last hulls burning away (wreck_finish.rs).
+        let going = self.wreck_finish.instances(input.time);
+        let going = &going[..going
+            .len()
+            .min(MAX_DYNAMIC.saturating_sub(self.dynamic_count as usize))];
+        self.dynamic.write(
+            (self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
+            bytemuck::cast_slice(going),
+        );
+        self.dynamic_count += going.len() as u32;
         self.cull
             .draws
-            .update(ghosts.iter().chain(&trees).chain(fallen));
+            .update(ghosts.iter().chain(&trees).chain(fallen).chain(going));
 
         let z_range = (
             self.map_info.min_z.to_f32(),
