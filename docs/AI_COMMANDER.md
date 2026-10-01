@@ -39,8 +39,9 @@ plays much the same game every time. What was asked for:
 - **Group orders only.** Every order goes to an operation's units together and is
   one a player could give: move, attack-move, board, unload, warp, launch, build,
   produce. No per-unit retreats or kiting; units fight with their own behaviour.
-  The one exception kept from the classic AI is the commander unit itself, which
-  stays home (a player guards their king).
+  The one exception is the commander unit itself (a player guards their king):
+  it stays home, and under fire it cannot answer, or worn under three fifths of
+  its health, it walks out past the shooters' reach for half a minute (`king.rs`).
 - **Bounded.** Orders a minute are capped by difficulty (`orders_a_minute`: Easy
   24, Normal 50, Hard 100): operations rank by urgency and the rest keep their last
   orders. Resources are never handicapped.
@@ -160,6 +161,15 @@ taste, plus `HOLD` if held, plus its record. A stake is taken past its mark
 Hedges are just plans held low: `Fortify` at a probe builds an interceptor slowly
 while `nukes` confidence is middling; `AirDefense` answers aircraft seen or felt.
 
+A plan's record is its operations' kills and losses, credited as they happen
+(standing operations such as the air guard never finish, so a plan that heard
+only from finished ones never learnt it was losing).
+
+Big projects (titans, silos, map guns, warships) grow in appeal with income
+(`rich`, up to 50 from 80 a second on): at 300 a second a 16 000-mass warship
+is under a minute of income. A probe of such a plan builds one when it costs
+under two minutes of income.
+
 Each change is a `Note` (tick, plan, stake, why), shown in the overlay.
 
 ### 6. Operations (`ops.rs`, `ops_ground.rs`, `ops_air_sea.rs`, `ops_space.rs`)
@@ -211,11 +221,20 @@ raiders by `Raid`, the line for the rest. Each idle factory builds for the force
 and role furthest under its share, choosing among its menu by `fight` against the
 believed enemy composition, per cost. Nothing names a unit.
 
+**Anti-air against what is in the air.** Anti-air production and the `AirDefense`
+plan ease off once the side's anti-air outweighs the aircraft it has seen by half.
+Aircraft whose guns outreach every mobile anti-air it can make and every anti-air
+turret it has standing (`outranging_air`: corvettes' 1500 m rails against 480 m
+anti-air tanks) do not count as covered: they raise the air force's share and its
+fighters, and call for the longest-reaching anti-air turret it can afford.
+
 **Wants** (`choose_wants`): structures and projects the plans call for, sized in
 minutes of income by stake (probe 2, invest 4, all-in 8): interceptors by the nukes
-belief, lift ships, silos, map guns, titans, warships, shields, coastal guns where
-ships hurt it, anti-air where it was bombed and by the `AirDefense` stake, a sensor
-ship once income allows. The commander unit takes only wants at home.
+belief (seen: one for each of their silos and one over, up to eight, each sited
+over the richest ground none covers), lift ships, silos, map guns, titans,
+warships, shields, coastal guns where ships hurt it, anti-air where it was bombed,
+by the `AirDefense` stake and against outranging aircraft, a sensor ship once
+income allows. The commander unit takes only wants at home.
 
 **Economy** (`economy.rs`): a controller run at the top of every think, before the
 builders, factories and upgrades it steers. It balances three things all game:
@@ -249,6 +268,10 @@ And it grows:
   two fifths of the way to the enemy (2.5 km at most), home as soon as 200 mass of
   armed enemy is within 1.6 km of it, or its health falls under 70%.
 - **Tech 3** waits while its army is behind the one it believes in.
+- **Mine upgrades are never put last** (`direct_focus`): begun as the sink for a
+  filling store, they once went last behind factories asking ten times the
+  income and none finished in thirteen minutes. Whether an upgrade can be powered
+  is judged by the energy spent, not asked for (`can_fund`), for every AI.
 
 The overlay's ECONOMY lines show all of it: floating, stalling or balanced, store
 and build speed, the power call, engineers and factories against what it wants,
