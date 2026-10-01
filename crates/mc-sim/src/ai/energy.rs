@@ -113,12 +113,16 @@ impl World {
     /// against the full `energy_need` no upgrade ever started: builders are
     /// seldom all at work at once.) Energy only: a side spending all its
     /// materials is short of mass nearly all the time, and judged by the whole
-    /// stall it upgraded six mines in half an hour.
+    /// stall it upgraded six mines in half an hour. What is spent, not what is asked
+    /// for: in a materials stall everything asks for more energy than it can use,
+    /// and judged by the asking a side with a full energy store started no mine
+    /// upgrade for twelve minutes while its income stood at 50 a second.
     pub(super) fn can_fund(&self, player: u8, draw: Fx) -> bool {
         let pl = &self.state.players[player as usize];
+        let brimming = pl.energy >= pl.energy_capacity * Fx::ratio(9, 10);
         pl.upkeep_efficiency >= Fx::ratio(9, 10)
             && pl.energy > pl.energy_capacity * Fx::ratio(3, 10)
-            && pl.energy_income >= pl.energy_demand + draw
+            && (brimming || pl.energy_income >= pl.energy_spent + draw)
     }
 
     /// Puts first (`focus.rs`) whatever the side is running out of: new power while
@@ -141,10 +145,16 @@ impl World {
         if energy_short {
             focus.power = Priority::First;
         }
-        if self.mine_upgrades_running(census) > self.mine_upgrade_budget(player) {
+        let mass_short = short(pl.mass, pl.mass_capacity, pl.mass_income, pl.mass_demand);
+        // A Commander starts its upgrades as the sink for a filling store and never
+        // puts them last: once the store stopped filling its budget fell under the
+        // four it had begun, they went last behind factories asking ten times its
+        // income, and none of them finished in thirteen minutes while its income
+        // stood still at 50 a second.
+        let commander = self.commander_directives(player).is_some();
+        if !commander && self.mine_upgrades_running(census) > self.mine_upgrade_budget(player) {
             focus.mines = Priority::Last;
-        } else if !energy_short && short(pl.mass, pl.mass_capacity, pl.mass_income, pl.mass_demand)
-        {
+        } else if !energy_short && mass_short {
             focus.mines = Priority::First;
         }
         if focus != pl.focus {
