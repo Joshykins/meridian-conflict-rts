@@ -412,7 +412,7 @@ pub fn screenshot(
     )
     .map_err(|e| e.to_string())?;
     // The map's own palette (`MERIDIAN_CLIMATE` overrides it).
-    renderer.set_climate(setup::map_config(&map).climate);
+    renderer.set_map_look(&setup::map_config(&map).look());
     // A recorded test range: the weather it showed at this tick.
     if let Some(sky) = opts
         .replay

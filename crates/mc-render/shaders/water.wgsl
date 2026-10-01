@@ -205,6 +205,8 @@ struct SeaState {
     storm: f32,
     // 0-1: how hard it rains.
     rain: f32,
+    // How open the water is to the wind: 1 the open sea, 0.55 a canyon lake.
+    open: f32,
 }
 
 fn sea_state(xy: vec2<f32>) -> SeaState {
@@ -212,8 +214,10 @@ fn sea_state(xy: vec2<f32>) -> SeaState {
     var out: SeaState;
     out.storm = clamp(w.y, 0.0, 1.0);
     out.rain = clamp(w.w, 0.0, 1.0);
-    // A canyon lake is sheltered: the wind has no fetch to raise a sea.
-    out.wind = length(atmos.wind.zw) / 12.0 * (1.0 + out.storm * 0.9) * select(1.0, 0.55, desert());
+    // A canyon lake is sheltered: the wind has no fetch to raise a sea. (Either side
+    // of a climate divide the sea changes over a stretch of water, not on the line.)
+    out.open = side_mix(1.0, 0.55, climate_within(xy, DIVIDE_SKY_BLEND_M).y);
+    out.wind = length(atmos.wind.zw) / 12.0 * (1.0 + out.storm * 0.9) * out.open;
     return out;
 }
 
@@ -1019,26 +1023,31 @@ struct Optics {
     scatter: vec3<f32>,
 }
 
-fn water_optics(column: f32, lit: f32) -> Optics {
+// `climate` is `climate_at` where the water is: how much of the tropical (x) and the
+// desert's (y) water it is, all or nothing but where a climate divide's two meet.
+fn water_optics(column: f32, lit: f32, climate: vec2<f32>) -> Optics {
     var o: Optics;
-    if tropical() {
+    o.absorb = sea_absorb(climate);
+    let temperate = 1.0 - climate.x - climate.y;
+    var scatter = vec3<f32>(0.0);
+    if climate.x > 0.0 {
         // Bahamas water: very clear, so sand shows through turquoise over the
         // banks, cyan-teal at 10-20 m, and sapphire in the deep channels.
-        o.absorb = sea_absorb();
         let deep_hue = mix(TROPIC_AZURE, TROPIC_DEEP, smoothstep(TROPIC_SCATTER_DEPTHS.y, TROPIC_SCATTER_DEPTHS.z, column));
-        o.scatter = mix(TROPIC_SHALLOW, deep_hue, smoothstep(TROPIC_SCATTER_DEPTHS.x, TROPIC_SCATTER_DEPTHS.y, column)) * lit;
-    } else if desert() {
+        scatter += mix(TROPIC_SHALLOW, deep_hue, smoothstep(TROPIC_SCATTER_DEPTHS.x, TROPIC_SCATTER_DEPTHS.y, column)) * climate.x;
+    }
+    if climate.y > 0.0 {
         // A canyon reservoir (Lake Powell, Lake Mead): clear and very saturated,
         // jade over the pale shallows, teal-blue, then cobalt down the old channel.
-        o.absorb = sea_absorb();
         let deep_hue = mix(DESERT_TEAL, DESERT_DEEP, smoothstep(DESERT_SCATTER_DEPTHS.y, DESERT_SCATTER_DEPTHS.z, column));
-        o.scatter = mix(DESERT_JADE, deep_hue, smoothstep(DESERT_SCATTER_DEPTHS.x, DESERT_SCATTER_DEPTHS.y, column)) * lit;
-    } else {
+        scatter += mix(DESERT_JADE, deep_hue, smoothstep(DESERT_SCATTER_DEPTHS.x, DESERT_SCATTER_DEPTHS.y, column)) * climate.y;
+    }
+    if temperate > 0.0 {
         // Clear, lightly green coastal water: red is gone in a few metres, and
         // the seabed reads through a dozen metres or so of it.
-        o.absorb = sea_absorb();
-        o.scatter = mix(vec3<f32>(0.010, 0.050, 0.052), vec3<f32>(0.0045, 0.020, 0.036), smoothstep(2.0, 30.0, column)) * lit;
+        scatter += mix(vec3<f32>(0.010, 0.050, 0.052), vec3<f32>(0.0045, 0.020, 0.036), smoothstep(2.0, 30.0, column)) * temperate;
     }
+    o.scatter = scatter * lit;
     return o;
 }
 
@@ -1151,7 +1160,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let lit = mix(0.45, 1.0, shadow) * (0.55 + 0.45 * sun_in);
     // Over a hull the water keeps the colour of the depth it stands in, so a
     // dived boat does not show as a patch of shallow-water green.
-    var optics = water_optics(mix(sink, max(sink, depth), hull), lit);
+    var optics = water_optics(mix(sink, max(sink, depth), hull), lit, climate_at(xy, pixel));
     // Under a storm the sea goes a dull grey-green: little sun gets into it.
     let grey = dot(optics.scatter, vec3<f32>(0.3, 0.5, 0.2)) * vec3<f32>(0.85, 1.0, 0.95);
     optics.scatter = mix(optics.scatter, grey, sea.storm * 0.6) * mix(1.0, 0.65, sea.storm);
@@ -1209,7 +1218,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Rain dulls it: the pocked surface scatters the sky's reflection.
     color *= 1.0 - 0.12 * sea.rain;
     // From far off the lanes and gusts, and the long swell's crests catching the light.
-    color *= 1.0 + (far_fx.tone * select(1.0, 0.55, desert()) + waves.swell * 0.06) * far;
+    color *= 1.0 + (far_fx.tone * sea.open + waves.swell * 0.06) * far;
 
     // ---- foam
     var cover = breakers.foam;
@@ -1305,6 +1314,10 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
         // The build grid while a structure is being placed, on the surface where it would stand.
         color = build_grid_overlay(color, xy, dist);
     }
+    if divided() {
+        // The climate wall's foot on the water, shimmering with the waves.
+        color += divide_seam(xy + n.xy * 5.0, pixel) * (1.0 - white * 0.6);
+    }
     color = apply_fog_of_war(color, xy) + seen_through * (1.0 - white * 0.92) * (1.0 - aerate);
     color = apply_haze(color, world, eye);
     // Shore pixels blend out through the height-field edge, so the coastline
@@ -1397,7 +1410,7 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
     let deep = max(water - eye.z, 0.0);
     // The water's own glow: the light scattered toward the eye, brightest near
     // the surface and dimming with depth, strongest looking up toward the sun.
-    let optics = water_optics(12.0, 0.55 + 0.45 * sun_in);
+    let optics = water_optics(12.0, 0.55 + 0.45 * sun_in, climate_at(eye.xy, 0.0));
     let toward_sun = pow(max(dot(dir, globals.sun.xyz), 0.0), 3.0);
     // Bright overhead, dark looking down into the deep.
     let fog_color = optics.scatter * (3.0 + 4.0 * toward_sun) * mix(0.25, 1.4, clamp(dir.z * 0.6 + 0.5, 0.0, 1.0))
@@ -1470,7 +1483,7 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(color, 1.0);
 }
 
-// The tropical sea (`tropical()`): absorption per metre, the colour scattered
+// The tropical sea (`water_optics`): absorption per metre, the colour scattered
 // back over the shallows and the deep, and the depths it turns between.
 const TROPIC_SHALLOW: vec3<f32> = vec3<f32>(0.012, 0.075, 0.080);
 // Over the drop-off: bright azure, before the channels' sapphire.
@@ -1479,7 +1492,7 @@ const TROPIC_DEEP: vec3<f32> = vec3<f32>(0.0015, 0.011, 0.068);
 // Shallow to azure over x..y metres of water, azure to deep over y..z.
 const TROPIC_SCATTER_DEPTHS: vec3<f32> = vec3<f32>(7.0, 20.0, 50.0);
 
-// The canyon reservoir (`desert()`): the same, greener in the shallows.
+// The canyon reservoir (`water_optics`): the same, greener in the shallows.
 const DESERT_JADE: vec3<f32> = vec3<f32>(0.006, 0.050, 0.036);
 const DESERT_TEAL: vec3<f32> = vec3<f32>(0.002, 0.026, 0.050);
 const DESERT_DEEP: vec3<f32> = vec3<f32>(0.001, 0.007, 0.034);

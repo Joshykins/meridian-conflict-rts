@@ -17,7 +17,10 @@
 //! Everything here is cosmetic and client-side: nothing feeds back into the sim.
 
 mod shade;
+mod sides;
 mod targets;
+
+pub(crate) use sides::divide_points;
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
@@ -2056,7 +2059,10 @@ mod shots {
         let climate = std::env::var("SKY_CLIMATE")
             .ok()
             .and_then(|v| mc_data::weather::Climate::from_name(&v));
-        renderer.set_climate(climate.unwrap_or(config.climate));
+        renderer.set_map_look(&match climate {
+            Some(climate) => mc_data::weather::MapLook::single(climate),
+            None => config.look(),
+        });
         // SKY_NORAIN: the overcast preset without its rain.
         if std::env::var("SKY_NORAIN").is_ok() {
             let mut w: mc_data::weather::Weather = mc_data::weather::WeatherPreset::Overcast.into();

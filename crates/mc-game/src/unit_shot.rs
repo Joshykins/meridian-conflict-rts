@@ -180,7 +180,7 @@ impl Studio {
             },
         )
         .map_err(|e| e.to_string())?;
-        renderer.set_climate(setup::map_config(&map).climate);
+        renderer.set_map_look(&setup::map_config(&map).look());
         Ok(Studio {
             renderer,
             map,

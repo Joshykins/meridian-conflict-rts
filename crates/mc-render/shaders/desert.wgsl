@@ -1,4 +1,4 @@
-// Canyon-country desert (`desert()` in bindings.wgsl): Grand Canyon and Lake
+// Canyon-country desert (`desert_at` in bindings.wgsl): Grand Canyon and Lake
 // Powell. build.rs inserts this file after habitat.wgsl into shaders that
 // contain the line `//!use desert` (terrain.wgsl).
 //
@@ -62,10 +62,11 @@ const CANYON_VARNISH: vec3<f32> = vec3<f32>(0.035, 0.026, 0.022);
 const CANYON_BLACKBRUSH: vec3<f32> = vec3<f32>(0.058, 0.058, 0.043);
 const CANYON_SAGE: vec3<f32> = vec3<f32>(0.13, 0.14, 0.105);
 
-// Where the beds lie under `xy`: the height shifted by a slow wobble of a few
-// metres, since real beds are only near level.
+// Where the beds lie under `xy`, which stands `alt` above the water: the height
+// (and the map's `strata_lift`, on a map whose desert lies lower than the Gorge's)
+// shifted by a slow wobble of a few metres, since real beds are only near level.
 fn canyon_bed_alt(xy: vec2<f32>, alt: f32) -> f32 {
-    return alt + (grad_noise2(xy + 1733.0, 1100.0) - 0.5) * 5.0 + (grad_noise2(xy - 911.0, 260.0) - 0.5) * 2.0;
+    return (alt + strata_lift()) + (grad_noise2(xy + 1733.0, 1100.0) - 0.5) * 5.0 + (grad_noise2(xy - 911.0, 260.0) - 0.5) * 2.0;
 }
 
 fn canyon_edge(a: f32, at: f32, w: f32) -> f32 {
@@ -264,11 +265,13 @@ fn canyon_ring(xy: vec2<f32>, alt: f32, steep: f32, streak: f32, dz: f32) -> Can
     var r: CanyonRing;
     let top = CANYON_RING_TOP + (grad_noise2(xy + 71.0, 700.0) - 0.5) * 0.5;
     let w = max(dz * 0.7, 0.05);
+    // The old stands by the beds' heights (`strata_lift`), the water's edge by its own.
+    let stand = alt + strata_lift();
     // A crisp upper edge: the line the water stood at for years.
-    let inside = (1.0 - smoothstep(top - w - 0.12, top + w, alt)) * smoothstep(-0.05, 0.15, alt);
+    let inside = (1.0 - smoothstep(top - w - 0.12, top + w, stand)) * smoothstep(-0.05, 0.15, alt);
     // Whitest just under the top, where the water stood longest; streaky lower
     // down, where the crust ran and washed.
-    let fresh = smoothstep(top - 16.0, top - 1.5, alt);
+    let fresh = smoothstep(top - 16.0, top - 1.5, stand);
     let patchy = 0.72 + 0.28 * smoothstep(0.3, 0.7, streak);
     r.crust = inside * steep * mix(0.78 * patchy, 1.0, fresh);
     r.silt = inside * (1.0 - steep);
@@ -277,7 +280,7 @@ fn canyon_ring(xy: vec2<f32>, alt: f32, steep: f32, streak: f32, dz: f32) -> Can
     let levels = array<f32, 5>(44.5, 37.0, 28.0, 17.0, 8.5);
     for (var i = 0; i < 5; i++) {
         let at = levels[i] + (grad_noise2(xy + f32(i) * 97.0, 500.0) - 0.5) * 0.6;
-        let d = alt - at;
+        let d = stand - at;
         let band = 1.0 - smoothstep(0.0, max(0.5, w * 1.5), abs(d + 0.4));
         let lip = 1.0 - smoothstep(0.0, max(0.25, w), abs(d - 0.2));
         lines += (lip * 0.12 - band * 0.18) * (1.0 - smoothstep(0.3, 1.2, w));
@@ -410,7 +413,7 @@ fn canyon_shrub_density(xy: vec2<f32>, a: f32, alt: f32, slope: f32, sand: f32, 
     d = mix(d, 0.3, canyon_edge(a, CANYON_HERMIT_TOP, 6.0));
     d = mix(d, 0.62, canyon_edge(a, CANYON_RIM_BASE, 8.0));
     // Old lake bed: a few only, above the water.
-    d *= mix(0.12, 1.0, smoothstep(CANYON_RING_TOP - 1.0, CANYON_RING_TOP + 3.0, alt)) * smoothstep(0.5, 2.0, alt);
+    d *= mix(0.12, 1.0, smoothstep(CANYON_RING_TOP - 1.0, CANYON_RING_TOP + 3.0, alt + strata_lift())) * smoothstep(0.5, 2.0, alt);
     let clumps = smoothstep(0.25, 0.75, grad_noise2(xy + 401.0, 70.0) * 0.7 + patchy * 0.5);
     return d * (0.25 + 1.1 * clumps) * (1.0 - smoothstep(0.035, 0.1, slope)) * (1.0 - sand * 0.7) * (1.0 - canopy * 0.6)
         * (1.0 - smoothstep(0.05, 0.4, way));

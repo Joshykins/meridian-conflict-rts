@@ -378,6 +378,20 @@ shared! {
         pub const SECONDS: f32 = 5.0;
     }
 
+    /// A map's climate divide (`mc_data::weather::ClimateDivide`): the line that splits
+    /// its ground and sea in two (`Globals::divide`;
+    /// common.wgsl `divide_east_of`).
+    pub mod divide as "DIVIDE_" {
+        /// Points the line may have (`ClimateDivide::MAX_POINTS`), one vec4 each.
+        pub const POINTS: u32 = 8;
+        /// The ground and the sea hand over from one climate to the other within this
+        /// many metres either side of the line (wider only where a pixel is).
+        pub const BLEND_M: f32 = 6.0;
+        /// The air, the sea's waves and the surf hand over within this many metres
+        /// either side of it: a stretch of coast, not a ruled line.
+        pub const SKY_BLEND_M: f32 = 160.0;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.

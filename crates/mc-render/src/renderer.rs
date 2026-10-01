@@ -65,6 +65,7 @@ mod impact_fx;
 mod laser_fx;
 mod launch_fx;
 mod lift_fx;
+mod map_look;
 mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
@@ -311,8 +312,8 @@ pub(crate) struct Globals {
     pub(crate) nuke_view: [f32; 4],
     /// Strategic missiles in flight: nose and kind, then axis and heat (nuke_fx.rs).
     pub(crate) strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
-    /// x the map's climate: 0 temperate, 1 tropical, 2 desert (`climate_code`;
-    /// terrain.wgsl, water.wgsl);
+    /// x the map's climate, or west of its climate divide: 0 temperate, 1 tropical,
+    /// 2 desert (map_look.rs; `climate_at` in bindings.wgsl);
     /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it;
     /// z how far from the eye it grows (`grass::reach`);
     /// w how many sim ticks this frame covers (the treads' motion blur, entity.wgsl).
@@ -324,27 +325,15 @@ pub(crate) struct Globals {
     pub(crate) settling: [[f32; 4]; settle::SLOTS as usize * 2],
     /// x how many of `settling` are in use.
     pub(crate) settle: [f32; 4],
+    /// The map's climate divide (map_look.rs): its line's points, xy in map metres.
+    pub(crate) divide: [[f32; 4]; crate::gpu_consts::divide::POINTS as usize],
+    /// x how many points of `divide` are in use (0: no divide), y the climate east of
+    /// the line (as `climate.x`), z the map's `strata_lift` in metres.
+    pub(crate) divide_info: [f32; 4],
 }
 
 /// Lots the build grid shows as taken, at most.
 pub const BUILD_BLOCKED_MAX: usize = 48;
-
-/// `MERIDIAN_CLIMATE=temperate|tropical|desert`: draws any map in that climate (`Renderer::set_climate`).
-fn climate_override() -> Option<mc_data::weather::Climate> {
-    std::env::var("MERIDIAN_CLIMATE")
-        .ok()
-        .and_then(|v| mc_data::weather::Climate::from_name(&v))
-}
-
-/// The climate as the shaders read it (`Globals::climate.x`; `tropical()` and
-/// `desert()` in bindings.wgsl).
-fn climate_code(climate: mc_data::weather::Climate) -> f32 {
-    match climate {
-        mc_data::weather::Climate::Temperate => 0.0,
-        mc_data::weather::Climate::Tropical => 1.0,
-        mc_data::weather::Climate::Desert => 2.0,
-    }
-}
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -998,8 +987,8 @@ pub struct Renderer {
     fog_enabled: bool,
     /// Survival: how awake the Precursor facility is (`RenderFrame::precursor_activity`).
     precursor_activity: f32,
-    /// The palette the ground and sea are drawn in (`set_climate`).
-    climate: mc_data::weather::Climate,
+    /// How the ground and sea are drawn: the map's climate and its divide (`set_map_look`).
+    look: mc_data::weather::MapLook,
     /// Where the build grid is drawn around: pointer xy, radius, taken lot count.
     build_cursor: [f32; 4],
     build_blocked: [[f32; 4]; BUILD_BLOCKED_MAX],
@@ -2510,7 +2499,7 @@ impl Renderer {
             last_tick_time: 0.0,
             fog_enabled: false,
             precursor_activity: 0.0,
-            climate: climate_override().unwrap_or_default(),
+            look: map_look::initial(),
             build_cursor: [0.0; 4],
             build_blocked: [[0.0; 4]; BUILD_BLOCKED_MAX],
             last_time: 0.0,
@@ -3014,12 +3003,6 @@ impl Renderer {
         self.sky.set_hour(hour);
     }
 
-    /// The palette the map's ground and sea are drawn in (its `MapConfig`).
-    /// `MERIDIAN_CLIMATE=temperate|tropical|desert` overrides it, for shots and tests.
-    pub fn set_climate(&mut self, climate: mc_data::weather::Climate) {
-        self.climate = climate_override().unwrap_or(climate);
-    }
-
     /// Parks a raging storm over `at` (the test range's "storm overhead"),
     /// or lets the weather run by itself again.
     pub fn park_storm(&mut self, at: Option<glam::Vec2>) {
@@ -3029,13 +3012,6 @@ impl Renderer {
     /// How hard it is raining where the camera looks, 0 to 1, for the rain's sound.
     pub fn rain_here(&self) -> f32 {
         self.sky.rain_here()
-    }
-
-    /// What the ambient sound listens for (mc-game's ambience.rs): how dark it is,
-    /// 0 in daylight to 1 at night; the wind over the ground, metres a second; and
-    /// the climate the map is drawn in.
-    pub fn ambience_cues(&self) -> (f32, f32, mc_data::weather::Climate) {
-        (self.sky.darkness(), self.sky.wind_speed(), self.climate)
     }
 
     /// The clock the shaders animate by (`Globals::camera.w`), as of the last frame:

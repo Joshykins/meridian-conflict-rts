@@ -46,6 +46,11 @@ struct Habitat {
     // 3 mossy litter, 4 needle floor, 5 scree, 6 dry dirt, 7 high rock, 8 sand,
     // 9 mud. 0 unused (the cliff face is `rock_face`).
     w: array<f32, 10>,
+    // How much of the tropical and the desert look this ground takes, 0-1
+    // (`climate_at`): 0 or 1 but for the few metres where a climate divide's two
+    // sides meet. Everything above is already mixed by them.
+    tropical: f32,
+    desert: f32,
 }
 
 // A canyon trail's floor, 0-1, from Habitat::way (its margin is
@@ -65,6 +70,9 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     h.alt = z - water;
     let alt = h.alt;
     let slope = h.slope;
+    let climate = climate_at(xy, px);
+    h.tropical = climate.x;
+    h.desert = climate.y;
 
     // Warped, non-periodic fields: soil patches (tens of metres), habitats
     // (hundreds) and moisture (the better part of a kilometre).
@@ -88,9 +96,9 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     // Water gathers in hollows and near the shore; ridges and high ground dry out.
     var wet = clamp(moist_field * 0.75 + curvature * 1.4 + (1.0 - smoothstep(4.0, 40.0, alt)) * 0.35
         - smoothstep(120.0, 320.0, alt) * 0.3, 0.0, 1.0);
-    if desert() {
+    if h.desert > 0.0 {
         // Dry country: only the hollows hold a little damp.
-        wet = clamp(curvature * 0.8 + (moist_field - 0.5) * 0.2, 0.0, 0.35);
+        wet = side_mix(wet, clamp(curvature * 0.8 + (moist_field - 0.5) * 0.2, 0.0, 0.35), h.desert);
     }
     h.wet = wet;
     let cover = ground_cover_at(xy);
@@ -99,7 +107,7 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     h.canopy = canopy;
 
     var sand_w = 1.0 - smoothstep(2.5, 10.0, alt + (patchy - 0.5) * 6.0);
-    if tropical() {
+    if h.tropical > 0.0 {
         // The tropics lay a wider beach, and it does not end on a contour: grass
         // runs down it in tongues and tufts and sand shows through the grass
         // above it, over a band several metres of height deep.
@@ -110,19 +118,21 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         let shown = smoothstep(1.0, 3.0, 3.4 / max(px, 0.001));
         let tuft = mix(0.5, grad_noise2(xy + 91.0, 3.4) * 0.65 + grad_noise2(xy - 47.0, 8.5) * 0.35, shown);
         let mixed = sqrt(clamp(band * (1.0 - band) * 4.0, 0.0, 1.0));
-        sand_w = clamp(band + (tuft - 0.5) * 2.4 * mixed, 0.0, 1.0);
+        sand_w = side_mix(sand_w, clamp(band + (tuft - 0.5) * 2.4 * mixed, 0.0, 1.0), h.tropical);
     }
-    if desert() {
+    if h.desert > 0.0 {
         // A narrow beach along the lake (it rises and falls, so no wide strand),
         // and sand drifted into the washes and hollows of gentle ground.
         let beach = 1.0 - smoothstep(0.6, 3.5, alt + (patchy - 0.5) * 2.5 + (fine - 0.5) * 1.2);
         let wash = smoothstep(0.18, 0.55, concavity + (fine - 0.5) * 0.16 + (patchy - 0.5) * 0.14)
             * smoothstep(3.0, 8.0, alt);
-        sand_w = max(beach, wash * 0.8) * (1.0 - smoothstep(0.04, 0.12, slope + (fine - 0.5) * 0.03));
+        var arid = max(beach, wash * 0.8) * (1.0 - smoothstep(0.04, 0.12, slope + (fine - 0.5) * 0.03));
         // The trails down the walls (the map's ways layer, 16 m samples): the
         // ground's own patchiness frays their edges.
-        h.way = clamp(ground_way_at(xy) + (fine - 0.5) * 0.35 + (patchy - 0.5) * 0.2, 0.0, 1.0);
-        sand_w *= 1.0 - canyon_trail_floor(h.way);
+        let way = clamp(ground_way_at(xy) + (fine - 0.5) * 0.35 + (patchy - 0.5) * 0.2, 0.0, 1.0);
+        arid *= 1.0 - canyon_trail_floor(way);
+        h.way = way * h.desert;
+        sand_w = side_mix(sand_w, arid, h.desert);
     }
     h.sand_w = sand_w;
     let rock_face = smoothstep(0.10, 0.27, slope + (patchy - 0.5) * 0.12) * (1.0 - canyon_trail_floor(h.way) * 0.8);
@@ -138,9 +148,10 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     let by_height = smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0)
         * (1.0 - smoothstep(0.25, 0.45, slope));
     h.snow_w = mix(by_height, h.lying, layer.z) * (1.0 - h.ice_w);
-    if desert() {
-        // The canyon's rim is high desert, not snowfield.
-        h.snow_w = 0.0;
+    if h.desert > 0.0 {
+        // The canyon's rim is high desert, not snowfield (and no glacier reaches it).
+        h.snow_w *= 1.0 - h.desert;
+        h.ice_w *= 1.0 - h.desert;
     }
     let open = (1.0 - sand_w) * (1.0 - canopy);
     let highland = smoothstep(140.0, 300.0, alt + (broad - 0.5) * 140.0);
@@ -174,20 +185,21 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         + smoothstep(0.78, 0.9, broad * 0.6 + patchy * 0.5) * 0.9) * (1.0 - canopy);
     h.w[8] = sand_w * 2.0;
     h.w[9] = (1.0 - sand_w) * smoothstep(0.55, 0.85, wet + concavity * 0.6) * (1.0 - smoothstep(0.08, 0.2, slope)) * 1.2;
-    if desert() {
+    if h.desert > 0.0 {
         // Nothing lush: dry dirt, talus, slickrock and sand (desert.wgsl colours them).
         let ground = 1.0 - sand_w;
-        h.w[1] = 0.0;
-        h.w[2] = 0.0;
-        h.w[3] = 0.0;
-        h.w[4] = 0.0;
-        h.w[9] = 0.0;
-        h.w[5] = ground * (smoothstep(0.03, 0.12, slope) * (1.0 - rock_face) * 1.5
-            + smoothstep(0.62, 0.8, patchy) * 0.35);
-        h.w[6] = ground * (0.75 + canopy * 0.5) * (1.0 - smoothstep(0.05, 0.14, slope) * 0.6);
+        let k = h.desert;
+        h.w[1] = side_mix(h.w[1], 0.0, k);
+        h.w[2] = side_mix(h.w[2], 0.0, k);
+        h.w[3] = side_mix(h.w[3], 0.0, k);
+        h.w[4] = side_mix(h.w[4], 0.0, k);
+        h.w[9] = side_mix(h.w[9], 0.0, k);
+        h.w[5] = side_mix(h.w[5], ground * (smoothstep(0.03, 0.12, slope) * (1.0 - rock_face) * 1.5
+            + smoothstep(0.62, 0.8, patchy) * 0.35), k);
+        h.w[6] = side_mix(h.w[6], ground * (0.75 + canopy * 0.5) * (1.0 - smoothstep(0.05, 0.14, slope) * 0.6), k);
         // Slickrock: the bed's own rock bare on convex ground and in broad patches.
-        h.w[7] = ground * (smoothstep(0.6, 0.85, broad * 0.55 + patchy * 0.5 - curvature * 0.6)
-            + smoothstep(0.04, 0.1, slope) * 0.3) * (1.0 - canopy);
+        h.w[7] = side_mix(h.w[7], ground * (smoothstep(0.6, 0.85, broad * 0.55 + patchy * 0.5 - curvature * 0.6)
+            + smoothstep(0.04, 0.1, slope) * 0.3) * (1.0 - canopy), k);
     }
     return h;
 }
@@ -197,9 +209,9 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
 // terrain multiplies its scans by it, and the grass its blades, so the two agree.
 fn ground_tone(h: Habitat, green_part: f32) -> vec3<f32> {
     var tint = mix(vec3<f32>(1.07, 1.0, 0.84), vec3<f32>(0.90, 1.04, 0.94), h.wet);
-    if tropical() {
+    if h.tropical > 0.0 {
         // Tropical green does not bleach to straw where it is dry.
-        tint = mix(vec3<f32>(1.02, 1.03, 0.88), vec3<f32>(0.92, 1.05, 0.96), h.wet);
+        tint = side_mix3(tint, mix(vec3<f32>(1.02, 1.03, 0.88), vec3<f32>(0.92, 1.05, 0.96), h.wet), h.tropical);
     }
     return mix(vec3<f32>(1.0), tint, green_part * 0.7) * (0.78 + h.broad * 0.28 + h.patchy * 0.16 + h.fine * 0.1);
 }
@@ -321,7 +333,7 @@ const GRASS_MOSS: u32 = 2u;
 const GRASS_TROPICAL: u32 = 3u;
 const GRASS_HIGHLAND: u32 = 4u;
 // Canyon country's sparse dry bunchgrass, and its shrubs (desert.wgsl) seen up
-// close (`desert()`).
+// close (`Habitat::desert`).
 const GRASS_DESERT: u32 = 5u;
 const GRASS_SHRUB: u32 = 6u;
 
@@ -342,13 +354,17 @@ fn grass_share(h: Habitat) -> vec4<f32> {
     for (var i = 1; i < 10; i++) {
         sum += ws[i];
     }
-    if desert() {
+    var arid = vec4<f32>(0.0);
+    if h.desert > 0.0 {
         // Scattered bunchgrass clumps between the shrubs on the bench and the rim,
         // never a field: none in the old lake bed, on sand or on anything steep.
-        let benches = smoothstep(58.0, 70.0, h.alt);
+        let benches = smoothstep(58.0, 70.0, h.alt + strata_lift());
         let d = 0.05 * h.open * benches * (1.0 - h.rock_face) * (1.0 - smoothstep(0.05, 0.12, h.slope))
             * (0.3 + 1.2 * smoothstep(0.35, 0.75, h.tussock)) * (1.0 - smoothstep(0.1, 0.5, h.way));
-        return vec4<f32>(d, 0.0, 1.0, 0.0);
+        arid = vec4<f32>(d, 0.0, 1.0, 0.0);
+        if h.desert >= 1.0 {
+            return arid;
+        }
     }
     let lush = ws[1];
     let meadow = ws[2];
@@ -362,7 +378,12 @@ fn grass_share(h: Habitat) -> vec4<f32> {
         * smoothstep(0.3, 1.4, h.alt)
         * (1.0 - h.canopy * 0.92)
         * (1.0 - h.sand_w);
-    return vec4<f32>(density, lush, meadow, moss);
+    let green = vec4<f32>(density, lush, meadow, moss);
+    if h.desert > 0.0 {
+        // Where a climate divide's two sides meet.
+        return mix(green, arid, h.desert);
+    }
+    return green;
 }
 
 // How much of the grass is drawn at `world` (1 all of it, 0 none): it thins
@@ -440,13 +461,7 @@ fn grass_mass(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
     let dry = grass_dryness(h);
     var lush = grass_colours(GRASS_LUSH, dry);
     var meadow = grass_colours(GRASS_MEADOW, dry);
-    if tropical() {
-        lush = grass_colours(GRASS_TROPICAL, dry);
-        meadow = lush;
-    } else if desert() {
-        lush = grass_colours(GRASS_DESERT, dry);
-        meadow = lush;
-    } else {
+    if h.tropical + h.desert < 1.0 {
         // Highland grass takes over the heights, as `cs_tufts` picks it.
         let high = smoothstep(0.5, 0.9, h.highland);
         let wiry = grass_colours(GRASS_HIGHLAND, dry);
@@ -454,6 +469,21 @@ fn grass_mass(g: vec4<f32>, h: Habitat, tip: f32) -> vec3<f32> {
         lush.tip = mix(lush.tip, wiry.tip, high);
         meadow.mid = mix(meadow.mid, wiry.mid, high);
         meadow.tip = mix(meadow.tip, wiry.tip, high);
+    }
+    // One kind of grass in the tropics, and one in the desert.
+    if h.tropical > 0.0 {
+        let c = grass_colours(GRASS_TROPICAL, dry);
+        lush.mid = side_mix3(lush.mid, c.mid, h.tropical);
+        lush.tip = side_mix3(lush.tip, c.tip, h.tropical);
+        meadow.mid = side_mix3(meadow.mid, c.mid, h.tropical);
+        meadow.tip = side_mix3(meadow.tip, c.tip, h.tropical);
+    }
+    if h.desert > 0.0 {
+        let c = grass_colours(GRASS_DESERT, dry);
+        lush.mid = side_mix3(lush.mid, c.mid, h.desert);
+        lush.tip = side_mix3(lush.tip, c.tip, h.desert);
+        meadow.mid = side_mix3(meadow.mid, c.mid, h.desert);
+        meadow.tip = side_mix3(meadow.tip, c.tip, h.desert);
     }
     let moss = grass_colours(GRASS_MOSS, dry);
     let total = max(g.y + g.z + g.w, 1e-4);

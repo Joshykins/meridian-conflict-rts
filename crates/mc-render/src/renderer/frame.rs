@@ -261,6 +261,7 @@ impl Renderer {
             self.nuke_frame(input.time, input.alpha.clamp(0.0, 1.0), camera, view_proj);
         let mut settling = [[0.0; 4]; settle::SLOTS as usize * 2];
         let settling_count = self.tile_cache.settling(input.time, &mut settling);
+        let climate = self.climate_globals();
         let globals = Globals {
             view_proj: view_proj.to_cols_array_2d(),
             inv_view_proj: view_proj.inverse().to_cols_array_2d(),
@@ -317,7 +318,7 @@ impl Renderer {
             nuke_view,
             strategic,
             climate: [
-                climate_code(self.climate),
+                climate.climate,
                 self.grass.enabled as u32 as f32,
                 grass::reach(camera.projection_scale()),
                 // How many sim ticks this frame covers (game time is sim time), so a
@@ -332,6 +333,8 @@ impl Renderer {
             ],
             settling,
             settle: [settling_count as f32, 0.0, 0.0, 0.0],
+            divide: climate.divide,
+            divide_info: climate.divide_info,
         };
         self.globals.write(0, bytemuck::bytes_of(&globals));
         self.last_time = input.time;

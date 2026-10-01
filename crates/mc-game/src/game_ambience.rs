@@ -11,7 +11,7 @@ impl Game {
     /// handed over as it is played (`battle_sounds`, `nuke_sounds`).
     pub(super) fn ambience_frame(&mut self, renderer: &Renderer, audio: &Audio, dt: f32) {
         let camera = &self.camera;
-        let (darkness, wind, climate) = renderer.ambience_cues();
+        let (darkness, wind, climate) = renderer.ambience_cues(camera.focus.truncate());
         let cues = Cues {
             focus: camera.focus,
             distance: camera.distance,

@@ -55,12 +55,14 @@ fn shore_at(xy: vec2<f32>, depth: f32) -> Shore {
     return out;
 }
 
-// The breakers' size on this map's water: open coast, a reef-sheltered tropical
+// The breakers' size on the water at `xy`: open coast, a reef-sheltered tropical
 // shore, or a canyon lake, and bigger the harder the wind blows (`surf_wind`).
-fn surf_climate() -> f32 {
-    var base = select(1.0, SURF_TROPICAL, tropical());
-    if desert() {
-        base = SURF_DESERT;
+fn surf_climate(xy: vec2<f32>) -> f32 {
+    // (Either side of a climate divide the surf changes over a stretch of shore.)
+    let climate = climate_within(xy, DIVIDE_SKY_BLEND_M);
+    var base = side_mix(1.0, SURF_TROPICAL, climate.x);
+    if climate.y > 0.0 {
+        base = side_mix(base, SURF_DESERT, climate.y);
     }
     return base * surf_wind(length(atmos.wind.zw));
 }
@@ -115,7 +117,7 @@ fn surf_breaking(m: f32, xy: vec2<f32>) -> f32 {
 
 // Its height in metres on this map.
 fn surf_height(m: f32, xy: vec2<f32>) -> f32 {
-    return SURF_HEIGHT * surf_size(m, xy) * surf_climate();
+    return SURF_HEIGHT * surf_size(m, xy) * surf_climate(xy);
 }
 
 // The waves at `xy` on the water.
@@ -189,14 +191,14 @@ fn surf(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Surf {
     // wave's surf zone, so it has no seam where one wave hands over to the next.
     // It reaches further out along some stretches of the shore than others.
     let reach = mix(0.55, 1.6, grad_noise2(xy + vec2<f32>(211.0, -37.0), 95.0));
-    let zone = SURF_HEIGHT * surf_climate() * 0.8 * SURF_BREAK_RATIO * reach * (1.0 + rip * 1.4);
+    let zone = SURF_HEIGHT * surf_climate(xy) * 0.8 * SURF_BREAK_RATIO * reach * (1.0 + rip * 1.4);
     let inside = 1.0 - smoothstep(zone * 0.8, zone * 1.2, depth);
     // Patches tens of metres across where more has gathered, and bare water between.
     let drift = grad_noise2(xy + vec2<f32>(time * 0.4, -time * 0.3), 38.0);
     let lying = (0.12 + 0.3 * smoothstep(0.35, 0.75, drift) + rip * 0.25) * inside
         * (0.5 + 0.5 * clamp(1.0 - depth / zone, 0.0, 1.0));
     // Averaged over a period, from high up.
-    let mean = (0.25 + 0.3 * clamp(1.0 - depth / zone, 0.0, 1.0)) * inside * surf_climate() * (0.7 + 0.6 * drift);
+    let mean = (0.25 + 0.3 * clamp(1.0 - depth / zone, 0.0, 1.0)) * inside * surf_climate(xy) * (0.7 + 0.6 * drift);
     if depth > breaks * 1.15 {
         out.foam = mix(mean, lying, shown);
         return out;
@@ -256,7 +258,7 @@ fn wash(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Wash {
     let p = (time + surf_lag(xy, time)) / SURF_PERIOD;
     let m = floor(p);
     let since = (p - m) * SURF_PERIOD;
-    let size = surf_size(m, xy) * surf_climate();
+    let size = surf_size(m, xy) * surf_climate(xy);
     // Each wash runs up in lobes of its own, further here and less there, so its
     // front and the wet it leaves are never one clean line along the shore.
     // Over longer stretches, too: one wave runs far up one part of the beach and

@@ -3,17 +3,102 @@
 
 @group(0) @binding(0) var<uniform> globals: Globals;
 
-// The map is drawn in the tropical palette (`Globals::climate`): bright coral
-// sand, lush green, turquoise shallows. Temperate when neither this nor desert().
+// The map's climate is tropical (`Globals::climate`): bright coral sand, lush green,
+// turquoise shallows. Temperate when neither this nor desert(). What is drawn at a
+// place asks `climate_at` instead: a map with a climate divide has this climate only
+// west of its line.
 fn tropical() -> bool {
     return globals.climate.x > 0.5 && globals.climate.x < 1.5;
 }
 
-// The map is drawn as canyon-country desert (`Globals::climate` 2): red-rock
+// The map's climate is canyon-country desert (`Globals::climate` 2): red-rock
 // strata by height, the reservoir's bathtub ring, red sand and pale caliche
 // dotted with dark shrubs, jade-to-cobalt lake water.
 fn desert() -> bool {
     return globals.climate.x > 1.5;
+}
+
+// The map is split in two climates along a line (`Globals::divide`): `tropical()` and
+// `desert()` hold west of it, `Globals::divide_info.y` east of it. Anything drawn at a
+// place asks `climate_at` (or `desert_at`, `tropical_at`) instead of those two.
+fn divided() -> bool {
+    return globals.divide_info.x > 1.5;
+}
+
+// Metres east of the climate divide's line (negative west of it). Only on a `divided()` map.
+fn divide_east(xy: vec2<f32>) -> f32 {
+    return divide_east_of(globals.divide, u32(globals.divide_info.x), xy);
+}
+
+// How much of each climate's look the ground or sea at `xy` takes, 0-1: x tropical,
+// y desert (temperate what is left). On a map of one climate, exactly `tropical()`
+// and `desert()`. Across a divide's line the two sides hand over within `half` metres
+// either side of it: a ruled line from any height, so `half` is at least a pixel or
+// two (`px`, the metres a pixel covers there).
+fn climate_within(xy: vec2<f32>, half: f32) -> vec2<f32> {
+    let west = vec2<f32>(select(0.0, 1.0, tropical()), select(0.0, 1.0, desert()));
+    if !divided() {
+        return west;
+    }
+    let c = globals.divide_info.y;
+    let east = vec2<f32>(select(0.0, 1.0, c > 0.5 && c < 1.5), select(0.0, 1.0, c > 1.5));
+    let k = smoothstep(-half, half, divide_east(xy));
+    if k <= 0.0 {
+        return west;
+    }
+    if k >= 1.0 {
+        return east;
+    }
+    return mix(west, east, k);
+}
+
+fn climate_at(xy: vec2<f32>, px: f32) -> vec2<f32> {
+    return climate_within(xy, max(DIVIDE_BLEND_M, px * 1.5));
+}
+
+// How much of the desert's look `xy` takes: `f32(desert())` on a map of one climate.
+fn desert_at(xy: vec2<f32>, px: f32) -> f32 {
+    return climate_at(xy, px).y;
+}
+
+// How much of the tropical look `xy` takes: `f32(tropical())` on a map of one climate.
+fn tropical_at(xy: vec2<f32>, px: f32) -> f32 {
+    return climate_at(xy, px).x;
+}
+
+// The foot of the climate wall that stands on a divide's line: a line of Precursor
+// light on the ground and the sea, the cold blue-white of their working parts
+// (entity.wgsl `MAT_GLOW_PRECURSOR`). A bright core a few metres wide, never thinner
+// than a pixel or so, so it reads as a ruled line from the strategic view; a soft
+// glow some 35 m either side; slow pulses of brighter light running north along it.
+// Light to add at `xy`, where a pixel covers `px` metres. Only on a `divided()` map.
+fn divide_seam(xy: vec2<f32>, px: f32) -> vec3<f32> {
+    let d = abs(divide_east(xy));
+    if d > 40.0 + px {
+        return vec3<f32>(0.0);
+    }
+    let time = globals.camera.w;
+    let half = max(1.7, px * 0.6);
+    let soft = max(px * 0.75, 0.25);
+    let core = 1.0 - smoothstep(half - soft, half + soft, d);
+    // Hottest along its middle, so up close it is a beam of light and not a painted band.
+    let heart = 1.0 - smoothstep(0.0, half, d);
+    let halo = 1.0 - smoothstep(0.0, 36.0, d);
+    // As `precursor_pulse` (surface.wgsl): the light breathes, and bands of it travel.
+    let breath = 0.85 + 0.15 * sin(time * 0.75);
+    // (A band's leading edge eased over a few metres: cut off, it flickered as it moved.)
+    let f = fract(xy.y / 520.0 - time * 0.07);
+    let band = pow(f, 8.0) * (1.0 - smoothstep(0.975, 1.0, f));
+    let light = vec3<f32>(0.45, 0.78, 1.0);
+    return light * breath * (core * (0.8 + 1.4 * heart * heart + 1.6 * band) + halo * halo * (0.16 + 0.2 * band));
+}
+
+// Metres the desert's rock beds lie lower on this map than in Vermilion Gorge
+// (`MapConfig::strata_lift`): added to a height above the water wherever it picks a
+// bed, its soil, its shrubs or the reservoir's ring (desert.wgsl), never where the
+// water itself matters (the beach, the wet line).
+fn strata_lift() -> f32 {
+    return globals.divide_info.z;
 }
 @group(0) @binding(1) var<storage, read> dynamic_entities: array<Entity>;
 @group(0) @binding(2) var<storage, read> static_entities: array<Entity>;
@@ -612,7 +697,14 @@ const DAMP_MIE: f32 = 3.5e-5;
 fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
     // Desert air is dry and clear: far less haze, so what is left is mostly
     // the air's own blue, the blue-violet that fills a canyon's depths.
-    let dry_air = select(vec2<f32>(1.0), vec2<f32>(0.7, 0.4), desert());
+    // (Over a climate divide the air changes over a few hundred metres, not on the line.)
+    let dry = climate_within(world.xy, DIVIDE_SKY_BLEND_M).y;
+    var dry_air = vec2<f32>(1.0);
+    if dry >= 1.0 {
+        dry_air = vec2<f32>(0.7, 0.4);
+    } else if dry > 0.0 {
+        dry_air = mix(dry_air, vec2<f32>(0.7, 0.4), dry);
+    }
     let damp = atmos.view.w;
     let low = air_column(eye, world, AERIAL_H);
     let column_r = (air_column(eye, world, RAYLEIGH_H) * HAZE_SCALE + low * AERIAL) * dry_air.x;
@@ -674,23 +766,28 @@ struct CraterList {
 
 // ---------------------------------------------------------------- under the sea
 
-// Light lost per metre of this map's water, red first (water.wgsl `water_optics`):
-// clear green coastal water, the Bahamas' very clear water (`tropical()`), or a
-// canyon reservoir's (`desert()`).
-fn sea_absorb() -> vec3<f32> {
-    if tropical() {
-        return vec3<f32>(0.30, 0.042, 0.026);
+// Light lost per metre of the water, red first (water.wgsl `water_optics`): clear
+// green coastal water, the Bahamas' very clear water (tropical), or a canyon
+// reservoir's (desert). `climate` is `climate_at` where the water is.
+fn sea_absorb(climate: vec2<f32>) -> vec3<f32> {
+    let temperate = 1.0 - climate.x - climate.y;
+    var absorb = vec3<f32>(0.0);
+    if climate.x > 0.0 {
+        absorb += vec3<f32>(0.30, 0.042, 0.026) * climate.x;
     }
-    if desert() {
-        return vec3<f32>(0.40, 0.068, 0.095);
+    if climate.y > 0.0 {
+        absorb += vec3<f32>(0.40, 0.068, 0.095) * climate.y;
     }
-    return vec3<f32>(0.17, 0.032, 0.025);
+    if temperate > 0.0 {
+        absorb += vec3<f32>(0.17, 0.032, 0.025) * temperate;
+    }
+    return absorb;
 }
 
-// Light lost per metre along a view from under the water: clearer than the
-// absorption says, so the seabed and a fight read out to 100 m or so.
+// Light lost per metre along a view from under the water the eye is in: clearer
+// than the absorption says, so the seabed and a fight read out to 100 m or so.
 fn under_sea_extinction() -> vec3<f32> {
-    return sea_absorb() * 0.2 + vec3<f32>(0.004);
+    return sea_absorb(climate_at(globals.camera.xy, 0.0)) * 0.2 + vec3<f32>(0.004);
 }
 
 // With the free camera under the water (water.wgsl `under_sea`), what is drawn

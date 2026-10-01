@@ -842,7 +842,7 @@ impl App {
                 if let Some(r) = &mut self.renderer {
                     r.set_weather(sky.weather(&config));
                     r.set_hour(sky.hour(&config));
-                    r.set_climate(config.climate);
+                    r.set_map_look(&config.look());
                 }
                 let mut game = Game::new(
                     *start,

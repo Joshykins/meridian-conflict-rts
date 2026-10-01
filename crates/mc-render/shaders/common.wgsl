@@ -72,8 +72,9 @@ struct Globals {
     // Strategic missiles: nose xyz and kind | owner << 4 | plume metres << 8, then axis
     // xyz and nose heat. Size mirrors nuke_fx::MISSILE_SLOTS * 2.
     strategic: array<vec4<f32>, 128>,
-    // x the map's climate (mc_data::weather::Climate): 0 temperate, 1 tropical
-    // (`tropical()` in bindings.wgsl); y 1 while grass is grown (renderer/grass.rs);
+    // x the map's climate (mc_data::weather::Climate), or the one west of its climate
+    // divide: 0 temperate, 1 tropical, 2 desert (`tropical()`, `desert()` and `climate_at`
+    // in bindings.wgsl); y 1 while grass is grown (renderer/grass.rs);
     // z how far from the eye it grows (`grass::reach`); w how many sim ticks this frame
     // covers (the treads' motion blur, entity.wgsl).
     climate: vec4<f32>,
@@ -87,6 +88,60 @@ struct Globals {
     settling: array<vec4<f32>, SETTLE_SLOTS * 2u>,
     // x how many of `settling`'s pairs are in use.
     settle: vec4<f32>,
+    // The map's climate divide (mc_data::weather::ClimateDivide): its line's points,
+    // south to north, xy in map metres (`divide_east_of`).
+    divide: array<vec4<f32>, DIVIDE_POINTS>,
+    // x how many points `divide` holds (0: one climate over the whole map, `climate.x`);
+    // y the climate east of the line, as `climate.x`; z metres the desert's rock beds
+    // are lowered (`MapConfig::strata_lift`, desert.wgsl).
+    divide_info: vec4<f32>,
+}
+
+// Metres from `xy` to a climate divide's line (the first `count` points of `line`,
+// south to north): positive east of it, negative west. Past its ends the line runs on
+// due south and north. mc_data's `ClimateDivide::east_distance` is the same.
+fn divide_east_of(line: array<vec4<f32>, DIVIDE_POINTS>, count: u32, xy: vec2<f32>) -> f32 {
+    let first = line[0].xy;
+    let last = line[count - 1u].xy;
+    // How far east of the line along x.
+    var offset = xy.x - select(first.x, last.x, xy.y > last.y);
+    var nearest = 1.0e9;
+    if xy.y < first.y || xy.y > last.y {
+        nearest = abs(offset);
+    }
+    for (var i = 1u; i < count; i++) {
+        let a = line[i - 1u].xy;
+        let e = line[i].xy - a;
+        let p = xy - a;
+        let t = clamp(dot(p, e) / dot(e, e), 0.0, 1.0);
+        nearest = min(nearest, length(p - e * t));
+        if p.y > 0.0 && p.y <= e.y {
+            offset = p.x - e.x * p.y / e.y;
+        }
+    }
+    return select(-nearest, nearest, offset >= 0.0);
+}
+
+// `a` where `w` is 0 and `b` where it is 1, exactly (so a map of one climate is drawn
+// as it always was), and a mix between: how the two sides of a climate divide meet.
+fn side_mix(a: f32, b: f32, w: f32) -> f32 {
+    if w <= 0.0 {
+        return a;
+    }
+    if w >= 1.0 {
+        return b;
+    }
+    return mix(a, b, w);
+}
+
+fn side_mix3(a: vec3<f32>, b: vec3<f32>, w: f32) -> vec3<f32> {
+    if w <= 0.0 {
+        return a;
+    }
+    if w >= 1.0 {
+        return b;
+    }
+    return mix(a, b, w);
 }
 
 
