@@ -362,9 +362,6 @@ pub struct Reclaimer {
     /// It keeps clearing the wrecks within reach while it moves or patrols, without
     /// stopping for them (a salvage vehicle, boat or aircraft). A tower never moves.
     pub mobile: bool,
-    /// While a head swings onto its next wreck it keeps a dimmer beam on the ground it
-    /// points at, and with nothing in reach it turns slowly round, beam off (a scavenger tower).
-    pub sweep: bool,
     heads: [ReclaimHead; MAX_RECLAIM_HEADS],
     head_count: u8,
 }
@@ -392,7 +389,6 @@ impl Reclaimer {
         range: Fx,
         charge_ticks: u16,
         mobile: bool,
-        sweep: bool,
         heads: &[ReclaimHead],
     ) -> Self {
         assert!((1..=MAX_RECLAIM_HEADS).contains(&heads.len()));
@@ -403,7 +399,6 @@ impl Reclaimer {
             range,
             charge_ticks,
             mobile,
-            sweep,
             heads: all,
             head_count: heads.len() as u8,
         }

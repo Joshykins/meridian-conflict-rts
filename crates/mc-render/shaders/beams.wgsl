@@ -13,7 +13,7 @@
 struct Beam {
     emitter: vec3<f32>,
     // 0 reclaim. 1 nanite stream. 2 repair. 3 relay. 4 replication ray, 5 print beam,
-    // 6 nanite site. `BEAM_SWEEP`: a scavenger tower swinging onto a wreck, a dimmer reclaim beam.
+    // 6 nanite site. 7 retired.
     kind: u32,
     to_prev: vec3<f32>,
     radius: f32,
@@ -99,9 +99,7 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if b.kind == BEAM_NANITE_SITE {
         return nanite_site_vertex(b, slot, corner);
     }
-    // A swinging tower's beam is a reclaim beam, dimmer, with nothing torn off it.
-    let sweep = b.kind == BEAM_SWEEP;
-    if b.kind >= 4u && !sweep {
+    if b.kind >= 4u {
         return replicator_vertex(b, slot, corner, instance);
     }
     if b.kind == BEAM_NANITE {
@@ -154,12 +152,6 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     var power = smoothstep(0.0, 0.18, time - b.start);
     if b.end >= 0.0 {
         power = power * (1.0 - smoothstep(0.0, 0.25, time - b.end));
-    }
-    if sweep {
-        if slot > 2u {
-            return hidden();
-        }
-        power = power * BEAM_SWEEP_LEVEL;
     }
     out.level = power;
 

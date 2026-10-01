@@ -355,8 +355,8 @@ fn a_reclaimer_tower_clears_wrecks_by_itself_but_only_takes_live_units_on_an_ord
 }
 
 #[test]
-fn a_scavenger_tower_bites_at_once_searches_dark_and_sweeps_onto_its_next_wreck() {
-    use mc_sim::reclaim::{BEAM_RECLAIM, BEAM_SWEEP};
+fn a_scavenger_tower_bites_at_once_and_shows_no_beam_until_it_does() {
+    use mc_sim::reclaim::BEAM_RECLAIM;
     let kinds = |frame: &RenderFrame| frame.beams.iter().map(|b| b.kind).collect::<Vec<_>>();
     let mut w = world();
     w.tick(&[
@@ -373,32 +373,36 @@ fn a_scavenger_tower_bites_at_once_searches_dark_and_sweeps_onto_its_next_wreck(
     w.tick(&[]).unwrap();
     assert_eq!(w.state.wrecks.slots.iter().count(), 1);
     // Facing east, the wreck in front and below: the beam bites as soon as the head has
-    // pitched down onto it, with no charge after, and sweeps down onto it until then.
+    // pitched down onto it, with no charge after, and is dark until then.
     let mut frame = RenderFrame::default();
     let on = (0..30).position(|_| {
         w.tick(&[]).unwrap();
         w.write_render_frame(None, &mut frame);
-        kinds(&frame) == [BEAM_RECLAIM]
+        match kinds(&frame)[..] {
+            [BEAM_RECLAIM] => true,
+            [] => false,
+            ref other => panic!("{other:?}"),
+        }
     });
     assert!(on.is_some_and(|t| t < 25), "bit after {on:?} ticks");
     assert!(w.state.players[0].reclaimed_mass > Fx::ZERO);
     run_until(&mut w, 400, |w| w.state.wrecks.slots.iter().count() == 0);
 
-    // Nothing in reach: the head turns slowly round, its beam off.
+    // Nothing in reach: the head holds still, its beam off.
     let tower = w.state.units.row(ids(&w, 0, TOWER)[0]).unwrap();
     w.tick(&[]).unwrap();
-    let searching = w.state.units.weapon_yaw[tower][0];
+    let resting = w.state.units.weapon_yaw[tower][0];
     for _ in 0..10 {
         w.tick(&[]).unwrap();
         w.write_render_frame(None, &mut frame);
-        assert_eq!(kinds(&frame), vec![], "no beam while it searches");
+        assert_eq!(kinds(&frame), vec![], "no beam with nothing in reach");
     }
-    assert_ne!(
-        w.state.units.weapon_yaw[tower][0], searching,
-        "the head turns as it searches"
+    assert_eq!(
+        w.state.units.weapon_yaw[tower][0], resting,
+        "the head holds still"
     );
 
-    // A wreck behind it: the sweep swings round onto it, then bites.
+    // A wreck behind it: the head swings round onto it dark, then bites.
     w.tick(&[spawn(&w, 1, TANK, 420, flag::PASSIVE)]).unwrap();
     let rear = ids(&w, 1, TANK);
     w.tick(&[cmd(Command::DebugDamage {
@@ -406,22 +410,23 @@ fn a_scavenger_tower_bites_at_once_searches_dark_and_sweeps_onto_its_next_wreck(
         permille: 1000,
     })])
     .unwrap();
-    let mut swept = 0;
+    let mut dark = 0;
     let bit = (0..80).any(|_| {
         w.tick(&[]).unwrap();
         w.write_render_frame(None, &mut frame);
         match kinds(&frame)[..] {
-            [BEAM_SWEEP] => {
-                swept += 1;
+            [] => {
+                dark += 1;
                 false
             }
             [BEAM_RECLAIM] => true,
-            // Still searching until the wreck is down.
-            [] if swept == 0 => false,
             ref other => panic!("{other:?}"),
         }
     });
-    assert!(bit && swept > 2, "swept for {swept} ticks, then bit: {bit}");
+    assert!(
+        bit && dark > 2,
+        "swung dark for {dark} ticks, then bit: {bit}"
+    );
 }
 
 #[test]

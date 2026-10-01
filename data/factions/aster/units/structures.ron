@@ -534,9 +534,7 @@
     ),
     // The Scavenger line: one reclaim tower that upgrades in place, T1 to T3. Cheap for
     // what it pulls (a wreck field pays it back in well under a minute of beam), with a
-    // reach far past any engineer's. Its beam bites the moment the head is on a wreck, and
-    // sweeps the ground, dimmer, while it swings onto the next. With nothing in reach the
-    // head turns slowly round, beam off.
+    // reach far past any engineer's. Its beam bites the moment the head is on a wreck.
     // Live units take an order. The head is a turret in a house of its own (weapon slot 0).
     (
         key: "aster_t1_reclaimer",
@@ -548,7 +546,7 @@
         cost: (mass: 120, energy: 900, time: 240),
         radius: 16.9, height: 38, footprint: (3, 3),
         vision: 400,
-        reclaimer: (power: 6, range: 640, sweep: true, heads: [
+        reclaimer: (power: 6, range: 640, heads: [
             (pivot: (0, 0, 34.2), emitter: (11.04, 0, 34.2), turn: 30, pitch: (-40, 80)),
         ]),
         upgrades_to: "aster_t2_reclaimer",
@@ -565,7 +563,7 @@
         cost: (mass: 420, energy: 3200, time: 800),
         radius: 16.9, height: 38, footprint: (3, 3),
         vision: 600,
-        reclaimer: (power: 40, range: 1100, sweep: true, heads: [
+        reclaimer: (power: 40, range: 1100, heads: [
             (pivot: (0, 0, 34.2), emitter: (11.04, 0, 34.2), turn: 36, pitch: (-40, 80)),
         ]),
         upgrades_to: "aster_t3_reclaimer",
@@ -583,7 +581,7 @@
         radius: 16.9, height: 38, footprint: (3, 3),
         vision: 900,
         // Five times the tech 2 tower's pull, half as far again: it clears a battlefield.
-        reclaimer: (power: 200, range: 1700, sweep: true, heads: [
+        reclaimer: (power: 200, range: 1700, heads: [
             (pivot: (0, 0, 34.2), emitter: (11.04, 0, 34.2), turn: 45, pitch: (-40, 80)),
         ]),
         mesh: "reclaim_tower", icon: Salvage,

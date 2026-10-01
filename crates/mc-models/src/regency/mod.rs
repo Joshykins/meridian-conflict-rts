@@ -322,6 +322,5 @@ mod tests {
         use crate::gpu_consts::beam;
         assert_eq!(beam::NANITE, mc_sim::reclaim::BEAM_NANITE);
         assert_eq!(beam::NANITE_SITE, mc_sim::reclaim::BEAM_NANITE_SITE);
-        assert_eq!(beam::SWEEP, mc_sim::reclaim::BEAM_SWEEP);
     }
 }

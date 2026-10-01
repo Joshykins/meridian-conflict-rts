@@ -513,11 +513,7 @@ shared! {
         pub const NANITE: u32 = 1;
         /// A Regency site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
         pub const NANITE_SITE: u32 = 6;
-        /// A scavenger tower's head swinging onto its next wreck: a dimmer reclaim beam on
-        /// the ground, no bits (`reclaim::BEAM_SWEEP`).
-        pub const SWEEP: u32 = 7;
-        /// How bright a sweep is beside the beam that bites: a little dimmer.
-        pub const SWEEP_LEVEL: f32 = 0.6;
+        // retired: 7 (a scavenger tower's dim sweep beam)
         /// Quads drawn per beam (renderer `work_beams`, beams.wgsl `vs_beam`). A reclaim or
         /// repair beam uses as many of them for its bits as its length asks for.
         pub const QUADS: u32 = 64;

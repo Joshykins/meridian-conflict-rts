@@ -540,7 +540,7 @@ impl Lights {
                 });
                 continue;
             }
-            if b.kind >= 4 && b.kind != mc_sim::reclaim::BEAM_SWEEP {
+            if b.kind >= 4 {
                 self.replication_light(b);
                 continue;
             }
@@ -570,8 +570,6 @@ impl Lights {
                 (Vec3::new(0.18, 0.82, 0.52), 30.0)
             } else if b.kind == mc_sim::reclaim::BEAM_RELAY {
                 (MATERIALS, 10.0)
-            } else if b.kind == mc_sim::reclaim::BEAM_SWEEP {
-                (MATERIALS, 26.0 * crate::gpu_consts::beam::SWEEP_LEVEL)
             } else {
                 (MATERIALS, 26.0)
             };
