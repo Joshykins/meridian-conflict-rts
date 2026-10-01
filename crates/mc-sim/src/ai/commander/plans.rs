@@ -419,6 +419,11 @@ impl World {
         for (k, _, stake, why) in scored {
             match c.plans.iter_mut().find(|p| p.kind == k) {
                 Some(p) if p.stake != stake => {
+                    // Cut to fit the budget after its review: something else won out.
+                    let why = match why {
+                        Some(Why::Appeal) if stake < p.stake => Some(Why::Faded),
+                        w => w,
+                    };
                     if stake < p.stake && why == Some(Why::Failing) {
                         p.strikes = p.strikes.saturating_add(1);
                     } else if stake > p.stake {
