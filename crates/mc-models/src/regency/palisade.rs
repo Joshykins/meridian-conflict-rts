@@ -3,8 +3,8 @@
 //! - `CAP`: a quarter of an octagonal tower, a glacis plate on each face, a corner
 //!   plate lapped up past the top into a spike, a red slot in the bronze waist under it;
 //! - `RUN_A`, `RUN_B`: a battered wall of dark plate on a bronze waist, its face
-//!   hung with plates lapped down into spikes over the waist, a bronze ram in the gap
-//!   between them, a ribbed bronze rail along the crest;
+//!   hung with plates lapped down into spikes over the waist, a plated strut in the gap
+//!   between them, a bronze rail along the crest;
 //! - `JOIN`: the inside of a turn, the wall mitred;
 //! - `FULL`: a quarter of a block raised to the towers' height, decked in plate.
 //!
@@ -13,8 +13,8 @@
 
 use glam::Vec3;
 
-use super::kit::{dark_plate, metal, v3};
-use super::machine::{armour, piston, red_slot, ribbed, Course, Frame};
+use super::kit::{dark_plate, v3};
+use super::machine::{armour, red_slot, shaft, strut, Course, Frame};
 use crate::builder::MeshBuilder;
 use crate::gpu_consts::wall;
 use crate::material::*;
@@ -26,10 +26,10 @@ const STEP_FOOT: f32 = 4.0;
 /// Cut off a tower's outer corner: from above it is an octagon.
 const CHAMFER: f32 = 1.8;
 /// Plates hung on the wall's face, by the middle of each along the wall, and half
-/// their width. A ram stands in the gap between them.
+/// their width. A strut braces the face in the gap between them.
 const HUNG: [f32; 2] = [1.5, 4.5];
 const HUNG_HALF: f32 = 1.3;
-const RAM_AT: f32 = 3.0;
+const BRACE_AT: f32 = 3.0;
 /// The crest rail: how far out from the middle, and its height.
 const RAIL: (f32, f32) = (0.85, 4.5);
 const THICK: f32 = 0.25;
@@ -162,15 +162,8 @@ fn run_a(b: &mut MeshBuilder) {
         hung_plate(b, x);
     }
     if b.fine() {
-        ram(b, RAM_AT);
-        metal(b);
-        ribbed(
-            b,
-            v3(0.0, RAIL.0, RAIL.1),
-            v3(EDGE, RAIL.0, RAIL.1),
-            0.16,
-            2,
-        );
+        brace(b, BRACE_AT);
+        shaft(b, v3(0.0, RAIL.0, RAIL.1), v3(EDGE, RAIL.0, RAIL.1), 0.16);
     }
 }
 
@@ -208,12 +201,11 @@ fn join(b: &mut MeshBuilder) {
     hung_plate(b, HUNG[1]);
     b.with(diagonal(), |b| hung_plate(b, HUNG[1]));
     if b.fine() {
-        ram(b, RAM_AT);
-        b.with(diagonal(), |b| ram(b, RAM_AT));
+        brace(b, BRACE_AT);
+        b.with(diagonal(), |b| brace(b, BRACE_AT));
         let (r, z) = RAIL;
-        metal(b);
-        ribbed(b, v3(EDGE, r, z), v3(r, r, z), 0.16, 1);
-        ribbed(b, v3(r, r, z), v3(r, EDGE, z), 0.16, 1);
+        shaft(b, v3(EDGE, r, z), v3(r, r, z), 0.16);
+        shaft(b, v3(r, r, z), v3(r, EDGE, z), 0.16);
     }
 }
 
@@ -388,15 +380,15 @@ fn hung_plate(b: &mut MeshBuilder, x: f32) {
     .lay(b, &plate);
 }
 
-/// A bronze ram up the wall's face at `x`, in the gap between two hung plates.
-fn ram(b: &mut MeshBuilder, x: f32) {
+/// A plated strut up the wall's face at `x`, in the gap between two hung plates, from
+/// the waist to under the crest.
+fn brace(b: &mut MeshBuilder, x: f32) {
     let lift = Vec3::Y * 0.2;
-    piston(
+    strut(
         b,
         v3(x, 2.55, 0.9) + lift,
         face(3.9) + Vec3::X * x + lift,
         0.2,
-        false,
     );
 }
 
