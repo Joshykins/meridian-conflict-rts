@@ -18,7 +18,7 @@ pub struct Theatre {
     pub stem: String,
     pub map: Arc<MapFile>,
     pub layout: SurvivalLayout,
-    pub climate: mc_data::weather::Climate,
+    pub look: mc_data::weather::MapLook,
 }
 
 /// The map at `path` as a theatre and as the browser shows it, when its
@@ -34,7 +34,7 @@ pub(super) fn theatre_of(
             stem: card.stem.clone(),
             map: card.map.clone(),
             layout,
-            climate: card.climate,
+            look: card.look.clone(),
         },
         card,
     ))

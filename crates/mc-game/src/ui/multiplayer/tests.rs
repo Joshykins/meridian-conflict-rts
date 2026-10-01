@@ -235,7 +235,7 @@ fn friends_defend_together_in_co_op_survival() {
         stem: card.stem.clone(),
         map: card.map.clone(),
         layout,
-        climate: card.climate,
+        look: card.look.clone(),
     };
     let catalog = Catalog::new(Vec::new(), vec![theatre], vec![card]);
     let plan = Lineup::new(&catalog, Mode::Survival, 0, 2, 0);

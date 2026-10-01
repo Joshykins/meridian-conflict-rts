@@ -11,7 +11,7 @@
 use super::{id, ink, palette, preview, rgb, type_scale, ButtonKind, Key, Rect, Ui};
 use crate::audio::Sfx;
 use glam::Vec2;
-use mc_data::weather::{Biome, Climate, MapConfig, MapStyle};
+use mc_data::weather::{Biome, MapConfig, MapLook, MapStyle};
 use mc_map::MapFile;
 use mc_render::overlay::IMAGE_SLOT;
 use std::path::Path;
@@ -40,8 +40,8 @@ pub struct MapCard {
     pub ores: usize,
     pub biome: Biome,
     pub style: MapStyle,
-    /// The palette its preview is drawn in.
-    pub climate: Climate,
+    /// What its preview is drawn in: its climate, and its climate divide if it has one.
+    pub look: MapLook,
 }
 
 impl MapCard {
@@ -57,7 +57,7 @@ impl MapCard {
             ores: map.ore_regions().len(),
             biome: config.biome(),
             style: config.style(starts),
-            climate: config.climate,
+            look: config.look(),
             map,
         }
     }
@@ -150,15 +150,15 @@ struct Thumbs {
 }
 
 impl Thumbs {
-    fn start(maps: Vec<(Arc<MapFile>, Climate)>) -> Thumbs {
+    fn start(maps: Vec<(Arc<MapFile>, MapLook)>) -> Thumbs {
         let n = maps.len();
         let (tx, rx) = channel();
         let spawned = std::thread::Builder::new()
             .name("map-thumbs".into())
             .spawn(move || {
-                for (i, (map, climate)) in maps.into_iter().enumerate() {
+                for (i, (map, look)) in maps.into_iter().enumerate() {
                     if tx
-                        .send((i, preview::render_at(&map, climate, THUMB)))
+                        .send((i, preview::render_at(&map, &look, THUMB)))
                         .is_err()
                     {
                         return;
@@ -300,7 +300,11 @@ impl Browser {
             chosen: 0,
             top_row: 0,
             last_click: None,
-            thumbs: Thumbs::start(maps.iter().map(|m| (m.map.clone(), m.climate)).collect()),
+            thumbs: Thumbs::start(
+                maps.iter()
+                    .map(|m| (m.map.clone(), m.look.clone()))
+                    .collect(),
+            ),
             detail: Detail::default(),
             select_at: Vec2::ZERO,
             cards: Vec::new(),
@@ -769,17 +773,17 @@ impl Browser {
                     slot,
                     preview::SIZE,
                     preview::SIZE,
-                    &preview::render(&m.map, m.climate),
+                    &preview::render(&m.map, &m.look),
                 );
                 d.shown = Some(i);
             } else {
                 let (tx, rx) = channel();
-                let (map, climate) = (m.map.clone(), m.climate);
+                let (map, look) = (m.map.clone(), m.look.clone());
                 let spawned =
                     std::thread::Builder::new()
                         .name("map-chart".into())
                         .spawn(move || {
-                            let _ = tx.send(preview::render(&map, climate));
+                            let _ = tx.send(preview::render(&map, &look));
                         });
                 if spawned.is_ok() {
                     d.job = Some((i, rx));
@@ -939,8 +943,8 @@ mod tests {
         assert_eq!(CELLS, 16);
         for path in crate::setup::list_maps() {
             let map = MapFile::open(&path).unwrap();
-            let climate = MapConfig::for_map(&path).unwrap_or_default().climate;
-            let rgba = preview::render_at(&map, climate, THUMB);
+            let look = MapConfig::for_map(&path).unwrap_or_default().look();
+            let rgba = preview::render_at(&map, &look, THUMB);
             assert_eq!(rgba.len(), THUMB * THUMB * 4, "{}", path.display());
         }
     }

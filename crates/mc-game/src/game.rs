@@ -4249,7 +4249,7 @@ impl Game {
                 hud::MINIMAP_SLOT,
                 ui::preview::SIZE,
                 ui::preview::SIZE,
-                &ui::preview::render(&self.map, crate::setup::map_config(&self.map).climate),
+                &ui::preview::render(&self.map, &crate::setup::map_config(&self.map).look()),
             );
             self.chart_ready = true;
         }

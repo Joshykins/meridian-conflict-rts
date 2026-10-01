@@ -519,7 +519,7 @@ pub fn screenshot(
         crate::hud::MINIMAP_SLOT,
         crate::ui::preview::SIZE,
         crate::ui::preview::SIZE,
-        &crate::ui::preview::render(&map, crate::setup::map_config(&map).climate),
+        &crate::ui::preview::render(&map, &crate::setup::map_config(&map).look()),
     );
     let mut view = crate::game::View::new(
         0,
@@ -1285,7 +1285,7 @@ pub fn ui_screenshot(
         menu::PREVIEW_SLOT,
         ui::preview::SIZE,
         ui::preview::SIZE,
-        &ui::preview::render(&map, crate::setup::map_config(&map).climate),
+        &ui::preview::render(&map, &crate::setup::map_config(&map).look()),
     );
     let still = ui::Input {
         cursor: cursor.map_or(glam::Vec2::splat(-100.0), glam::Vec2::from),

@@ -164,7 +164,7 @@ fn build(order: Order, shared: &Mutex<Shared>) -> Result<Ready, String> {
     std::thread::scope(|s| {
         let chart = s.spawn(|| {
             crate::app::set_this_thread_priority(-2);
-            let chart = ui::preview::render(&map, crate::setup::map_config(&map).climate);
+            let chart = ui::preview::render(&map, &crate::setup::map_config(&map).look());
             shared.lock().unwrap().chart = Some(chart.clone());
             chart
         });
@@ -1216,7 +1216,7 @@ pub fn screenshot(
                 crate::hud::MINIMAP_SLOT,
                 ui::preview::SIZE,
                 ui::preview::SIZE,
-                &ui::preview::render(&map, crate::setup::map_config(&map).climate),
+                &ui::preview::render(&map, &crate::setup::map_config(&map).look()),
             );
             curtain.chart_ready();
         }

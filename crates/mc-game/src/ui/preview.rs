@@ -5,8 +5,10 @@
 //! open ground, forest, rock, snow and ice was averaged from whole-map shots of
 //! the real renderer (tropical and temperate maps apart), so a preview shows the
 //! same beaches, shallows, forests and Precursor structures a match opens on.
+//! A map split by a climate divide is drawn in each side's colours, with the
+//! wall's line between them.
 
-use mc_data::weather::Climate;
+use mc_data::weather::{Climate, ClimateDivide, MapLook};
 use mc_map::{MapFile, PropKind};
 
 /// Preview edge in pixels; the overlay's image slots are this big.
@@ -208,27 +210,52 @@ impl Frame {
 
 /// RGBA8 (sRGB), `SIZE` x `SIZE`, north up. Non-square maps are letterboxed
 /// with transparent pixels.
-pub fn render(map: &MapFile, climate: Climate) -> Vec<u8> {
-    render_at(map, climate, SIZE)
+/// `look` is the map's (`MapConfig::look`): its climate, and its climate divide.
+pub fn render(map: &MapFile, look: &MapLook) -> Vec<u8> {
+    render_at(map, look, SIZE)
 }
 
 /// As `render`, `size` x `size` (the map browser's thumbnails).
-pub fn render_at(map: &MapFile, climate: Climate, size: usize) -> Vec<u8> {
+pub fn render_at(map: &MapFile, look: &MapLook, size: usize) -> Vec<u8> {
     let frame = Frame::new(map, size);
-    let palette = match climate {
-        Climate::Temperate => &TEMPERATE,
-        Climate::Tropical => &TROPICAL,
-        Climate::Desert => &DESERT,
-    };
     let mut rgba = vec![0u8; size * size * 4];
-    ground(map, palette, &frame, &mut rgba);
+    ground(map, look, &frame, &mut rgba);
     structures(map, &frame, &mut rgba);
+    if let Some(divide) = &look.divide {
+        divide_line(divide, &frame, &mut rgba);
+    }
     ore(map, &frame, &mut rgba);
     rgba
 }
 
-/// The terrain: sea by depth, beach, open ground, forest, rock, snow and ice.
-fn ground(map: &MapFile, palette: &Palette, frame: &Frame, rgba: &mut [u8]) {
+fn palette_of(climate: Climate) -> &'static Palette {
+    match climate {
+        Climate::Temperate => &TEMPERATE,
+        Climate::Tropical => &TROPICAL,
+        Climate::Desert => &DESERT,
+    }
+}
+
+/// The light along the foot of a climate divide's wall (bindings.wgsl `divide_seam`).
+const DIVIDE_LINE: [f32; 3] = rgb(176, 226, 255);
+
+/// A climate divide's line: a thin pale stroke, about a pixel wide.
+fn divide_line(divide: &ClimateDivide, frame: &Frame, rgba: &mut [u8]) {
+    for py in 0..frame.h {
+        for px in 0..frame.w {
+            let at = frame.world(px as f32, py as f32);
+            let off = divide.east_distance(at[0], at[1]).abs() / frame.metres_per_px;
+            let cover = (1.1 - off).clamp(0.0, 1.0);
+            if cover > 0.0 {
+                frame.blend(rgba, px as i64, py as i64, DIVIDE_LINE, cover * 0.85);
+            }
+        }
+    }
+}
+
+/// The terrain: sea by depth, beach, open ground, forest, rock, snow and ice, in the
+/// colours of the climate each spot lies in.
+fn ground(map: &MapFile, look: &MapLook, frame: &Frame, rgba: &mut [u8]) {
     let info = map.info();
     let (ow, oh) = map.overview_dims();
     let overview = map.overview();
@@ -258,6 +285,7 @@ fn ground(map: &MapFile, palette: &Palette, frame: &Frame, rgba: &mut [u8]) {
     for py in 0..frame.h {
         for px in 0..frame.w {
             let at = frame.world(px as f32, py as f32);
+            let palette = palette_of(look.climate_at(at[0], at[1]));
             let (x, y) = (at[0] / overview_m, at[1] / overview_m);
             let z = height(x, y);
             // Slope over at least one overview spacing, so it does not alias.
@@ -271,7 +299,7 @@ fn ground(map: &MapFile, palette: &Palette, frame: &Frame, rgba: &mut [u8]) {
                 let cover = canopy[py * frame.w + px];
                 let (ice, lying) = snow.as_ref().map_or((0.0, None), |s| s.at(at));
                 let shade = (1.0 + 0.6 * (gy - gx)).clamp(0.75, 1.25);
-                land(palette, z, grade, cover, ice, lying).map(|v| v * shade)
+                land(palette, z, look.strata_lift, grade, cover, ice, lying).map(|v| v * shade)
             };
             frame.blend(rgba, px as i64, py as i64, c, 1.0);
             let i = ((py + frame.pad.1) * frame.size + px + frame.pad.0) * 4;
@@ -283,19 +311,22 @@ fn ground(map: &MapFile, palette: &Palette, frame: &Frame, rgba: &mut [u8]) {
 /// Dry ground `z` metres up with slope `grade` (rise over run), under a canopy
 /// `cover` (0 open to 1 closed), with the map's snow layer's glacier ice and
 /// lying snow there (`lying` is `None` on a map without one: snow then lies by
-/// height, as the terrain shader lays it).
+/// height, as the terrain shader lays it). `strata_lift` is the map's: how far
+/// its desert's rock beds lie below Vermilion Gorge's.
 fn land(
     palette: &Palette,
     z: f32,
+    strata_lift: f32,
     grade: f32,
     cover: f32,
     ice: f32,
     lying: Option<f32>,
 ) -> [f32; 3] {
     if palette.strata {
+        let bed = z + strata_lift;
         let beds = mix(
-            ramp(&DESERT_FLAT, z),
-            ramp(&DESERT_CLIFF, z),
+            ramp(&DESERT_FLAT, bed),
+            ramp(&DESERT_CLIFF, bed),
             smoothstep(0.35, 0.9, grade),
         );
         let sand = 1.0 - smoothstep(palette.sand_to.0, palette.sand_to.1, z);
@@ -567,9 +598,21 @@ mod tests {
     fn beaches_meet_the_sea_without_a_seam() {
         for palette in [&TEMPERATE, &TROPICAL] {
             let sea = glam::Vec3::from(ramp(&palette.sea, 0.0));
-            let beach = glam::Vec3::from(land(palette, 0.01, 0.0, 0.0, 0.0, None));
+            let beach = glam::Vec3::from(land(palette, 0.01, 0.0, 0.0, 0.0, 0.0, None));
             assert!((sea - beach).abs().max_element() < 0.1, "{sea} vs {beach}");
         }
+    }
+
+    #[test]
+    fn a_lowered_desert_takes_the_higher_beds_colours() {
+        // Ground at 20 m with the beds lowered 50 m is the bench's, as at 70 m.
+        assert_eq!(
+            land(&DESERT, 20.0, 50.0, 0.0, 0.0, 0.0, None),
+            land(&DESERT, 70.0, 0.0, 0.0, 0.0, 0.0, None)
+        );
+        // The beach is by the water, whatever the beds.
+        let beach = land(&DESERT, 0.1, 50.0, 0.0, 0.0, 0.0, None);
+        assert_eq!(beach, land(&DESERT, 0.1, 0.0, 0.0, 0.0, 0.0, None));
     }
 
     #[test]
@@ -595,11 +638,11 @@ mod tests {
                 continue;
             }
             let map = MapFile::open(&path).unwrap();
-            let climate = mc_data::weather::MapConfig::for_map(&path)
+            let look = mc_data::weather::MapConfig::for_map(&path)
                 .unwrap_or_default()
-                .climate;
+                .look();
             let started = std::time::Instant::now();
-            let rgba = render(&map, climate);
+            let rgba = render(&map, &look);
             let name = path.file_stem().unwrap().to_string_lossy().into_owned();
             println!("{name}: {:.0} ms", started.elapsed().as_secs_f32() * 1000.0);
             let file = std::fs::File::create(out.join(format!("{name}.png"))).unwrap();

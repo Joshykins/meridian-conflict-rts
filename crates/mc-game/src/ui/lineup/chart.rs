@@ -10,7 +10,7 @@ use crate::setup::TEAM_COLORS;
 use crate::ui::survival::siege::{self, Holder, Siege};
 use crate::ui::{id, ink, palette, preview, rgb, teams, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_data::weather::Climate;
+use mc_data::weather::MapLook;
 use mc_map::MapFile;
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::Arc;
@@ -50,7 +50,7 @@ impl Picture {
         slot: usize,
         key: Key,
         map: &Arc<MapFile>,
-        climate: Climate,
+        look: &MapLook,
     ) -> bool {
         if self.shown == Some(key) {
             return true;
@@ -73,17 +73,17 @@ impl Picture {
         // A picture of another map still being drawn is dropped when it arrives.
         if self.job.as_ref().is_none_or(|(k, _)| *k != key) {
             let (tx, rx) = channel();
-            let worker_map = map.clone();
+            let (worker_map, worker_look) = (map.clone(), look.clone());
             let spawned = std::thread::Builder::new()
                 .name("lineup-chart".into())
                 .spawn(move || {
-                    let _ = tx.send(preview::render(&worker_map, climate));
+                    let _ = tx.send(preview::render(&worker_map, &worker_look));
                 });
             match spawned {
                 Ok(_) => self.job = Some((key, rx)),
                 Err(e) => {
                     log::warn!("no thread for the chart: {e}; drawn here");
-                    self.kept = Some((key, preview::render(map, climate)));
+                    self.kept = Some((key, preview::render(map, look)));
                 }
             }
         }
@@ -157,7 +157,7 @@ fn siege_chart(
             slot,
             (Mode::Survival, lineup.map),
             &theatre.map,
-            theatre.climate,
+            &theatre.look,
         ),
     };
     let picked = siege::chart(ui, &view, &mut lineup.markers, area);
@@ -180,7 +180,7 @@ fn zones(
         slot,
         (Mode::Skirmish, lineup.map),
         &entry.map,
-        entry.climate,
+        &entry.look,
     );
     let map = entry.map.clone();
     let side = area.w.min(area.h - 64.0);
