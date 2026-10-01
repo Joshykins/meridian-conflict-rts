@@ -79,9 +79,18 @@ fn domains() {
     let mut w = World::new(&map, bps, Arc::new(Pool::new(1)), &config).unwrap();
     println!("domain {spec}");
     let mut seen: HashMap<u32, (FxVec2, u32)> = HashMap::new();
+    // Warp jumps each side has started.
+    let mut jumps = vec![0u32; players as usize];
     for minute in 1..=minutes {
         for _ in 0..600 {
             w.tick(&[]).unwrap();
+            for e in &w.events {
+                if let mc_sim::SimEvent::WarpSpooling { unit, .. } = e {
+                    if let Some(r) = w.state.units.row(*unit) {
+                        jumps[w.state.units.owner[r] as usize] += 1;
+                    }
+                }
+            }
             if w.state.winner.is_some() {
                 break;
             }
@@ -150,6 +159,7 @@ fn domains() {
             let mut factories = [0; 5];
             let mut army = [[0u32; 3]; 5];
             let mut army_mass = [0f32; 5];
+            let mut lifts = 0;
             for r in s
                 .units
                 .slots
@@ -159,6 +169,7 @@ fn domains() {
                 let bp = w.bp(r);
                 let live = s.units.is_active(r);
                 let pos = s.units.pos[r];
+                lifts += (bp.transport.is_some() && live) as u32;
                 if bp.mine.is_some() {
                     if !live {
                         mine_sites += 1;
@@ -213,19 +224,16 @@ fn domains() {
                 })
                 .collect();
             println!(
-                "  P{p} t{} mines land {land_mines} sea {sea_mines} (+{mine_sites}) mass {:>5.1}/s tech {} | factories L/H/N/A {:?} | army home/out/enemy half: {} | kills {} lost {}{}",
+                "  P{p} t{} mines land {land_mines} sea {sea_mines} (+{mine_sites}) mass {:>5.1}/s tech {} | factories L/H/N/A {:?} | army home/out/enemy half: {} | lift ships {lifts} jumps {} | kills {} lost {} | {}",
                 (starts[p].x > mid) as u8,
                 pl.mass_income.to_f32(),
                 w.side_tech(p as u8),
                 &factories[..4],
                 armies.join(", "),
+                jumps[p],
                 pl.units_killed,
                 pl.units_lost,
-                if minute == every {
-                    format!(" | {}", s.ai[p].summary())
-                } else {
-                    String::new()
-                },
+                s.ai[p].summary(),
             );
         }
         if done {

@@ -72,7 +72,7 @@ impl AiState {
     /// A compact diagnostic for headless match reports.
     pub fn summary(&self) -> String {
         format!(
-            "stance={} waves={} raids={} contacts={} recovering={} production={} land_route={}",
+            "stance={} waves={} raids={} contacts={} recovering={} production={} land_route={} plans={} landings={} landing={}",
             self.stance,
             self.waves,
             self.raids,
@@ -81,6 +81,9 @@ impl AiState {
             self.production_counter,
             self.land_route
                 .map_or("?".into(), |r| format!("{:b}", r.reaches)),
+            self.strategy.names(),
+            self.landings,
+            self.landing.map_or("-".into(), |l| format!("phase{}", l.phase)),
         )
     }
 }
@@ -277,6 +280,20 @@ impl World {
                 if stance == Stance::Raid {
                     score += bp.motion.map_or(0, |m| m.speed.floor_int() as i64).min(100);
                 }
+                // What the side's plans call for (`strategy.rs`): bombers kept for
+                // a big wing, submarines against an enemy with no sonar.
+                let bomber = domain(bp) == 1
+                    && !bp.has(cat::ANTI_AIR)
+                    && bp
+                        .weapons
+                        .iter()
+                        .any(|w| w.target_mask & (cat::LAND | cat::STRUCTURE) != 0);
+                if bomber && self.holds(player, super::strategy::Gambit::AirFleet) {
+                    score += 150;
+                }
+                if bp.dive.is_some() && self.holds(player, super::strategy::Gambit::Submarines) {
+                    score += 200;
+                }
                 let pl = &self.state.players[player as usize];
                 if bp.cost_energy > (pl.energy + pl.energy_income * 20).max(Fx::from_int(200)) {
                     score /= 3;
@@ -337,11 +354,22 @@ impl World {
             / (1 + count);
         // With no land route to the enemy the land factories make only a home
         // guard, hovers and engineers; the war goes by sea and air (`theatre.rs`).
-        match d {
+        let score = match d {
             _ if self.land_route_to_enemy(player) => score,
             0 => score / 3,
             2 => score * 2,
             _ => score,
+        };
+        // A plan for the air or under the sea wants its factories.
+        let plan = match d {
+            1 => super::strategy::Gambit::AirFleet,
+            2 => super::strategy::Gambit::Submarines,
+            _ => return score,
+        };
+        if self.holds(player, plan) {
+            score * 2
+        } else {
+            score
         }
     }
 
@@ -604,9 +632,17 @@ impl World {
     pub(super) fn route_ai_commands(&self, commands: Vec<Command>) -> Vec<Command> {
         let mut result = Vec::new();
         for command in commands {
-            let (ids, target, attack) = match command {
-                Command::Move { units, target, .. } => (units, target, false),
-                Command::AttackMove { units, target, .. } => (units, target, true),
+            let (ids, target, attack, queue) = match command {
+                Command::Move {
+                    units,
+                    target,
+                    queue,
+                } => (units, target, false, queue),
+                Command::AttackMove {
+                    units,
+                    target,
+                    queue,
+                } => (units, target, true, queue),
                 c => {
                     result.push(c);
                     continue;
@@ -631,13 +667,13 @@ impl World {
                         Command::AttackMove {
                             units: group.to_vec(),
                             target,
-                            queue: false,
+                            queue,
                         }
                     } else {
                         Command::Move {
                             units: group.to_vec(),
                             target,
-                            queue: false,
+                            queue,
                         }
                     });
                 }

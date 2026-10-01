@@ -279,6 +279,56 @@ minutes (`DOMAIN=map:players:minutes[:seed[:difficulty]]`, `DOMAIN_EVERY=N`,
 `DOMAIN_WHY=1` lists what the parked units are doing, `DOMAIN_ROSTER=1` each side's
 units at the end).
 
+## Strategies: plans, warp and landings
+
+Added 2026-10-01 after the user said the AI never used warp, never landed an army
+from a lift ship, and played the same game every time. Each side now holds a few
+plans (`ai/strategy.rs`) and its builders, factories and army serve them. Hard
+holds three at once, Normal two, Easy one (`Skill::gambits`).
+
+| Plan | Picked when | What changes |
+|---|---|---|
+| `landing` | a builder can make a lift ship with a warp drive; far more on an island map, more against a fortified front | a lift ship is built (`lift_job`); land units board it at staging, it jumps beside the target and lets them out, then jumps home (`ai/landing.rs`) |
+| `warp_raid` | an armed spaceship is in the menu, income 12+/s; more when little anti-air has been seen | warships go one at a time at the softest mine, plant or engineer on the enemy's outskirts, by warp; warships are a project kind first |
+| `air_fleet` | an air factory can be had, under 8 enemy anti-air seen; more when little | bombers wait behind the base for twice the usual wing (to 16), then go at the economy least covered by anti-air; air factories and bombers preferred |
+| `hunt` | a land route and a factory; more for engineers and mines seen on the enemy's outskirts | every minute the fastest six at staging go after an engineer seen lately, or an outlying mine with the fewest guns (`ai/hunt.rs`) |
+| `siege` | a map gun in the menu; more for a defensive side, a fortified enemy, 40+ income | map guns first among projects, two at a time, and a shield more per map gun (shields value projects) |
+| `nuke_race` | a silo in the menu, the enemy base seen and no interceptor seen in it | the silo first among projects, two at a time; dropped once an interceptor is seen |
+| `submarines` | a yard of ours makes them, enemy ships or a yard seen, fewer than 3 sonar seen | submarines and shipyards preferred |
+| `scouting` | always open; more while no enemy factory has been seen | four scouts, not two, and the Vigil once income reaches 8/s, not 25 |
+
+The first plans are picked four minutes in, once the scouts have looked; before,
+every side picked the same three from an empty map and kept them. Plans are
+reviewed every two minutes. A held plan gets a bonus for its first three reviews
+and loses score for each review after, so a side commits and a long game sees it
+move on. One draw from the match's random stream makes sides with the same doctrine
+pick differently. A plan whose score falls to zero (its unit no longer buildable, or
+the enemy answered it) is dropped at the next review.
+
+Warp, whatever the plans (`ai/warp_ops.rs`):
+
+- A strike of armed spaceships jumps to `STANDOFF` (260 m) short of its target on
+  the side it came from, then attack-moves in; ships within 1.4 km fly. Every jump
+  comes out 150 m clear of any remembered Undertow's field (`safe_mark`).
+- A spaceship below half health out at the front jumps home.
+- The Vigil sweeps: each time its drive is ready it jumps 900 m short of the next
+  place on a round of enemy starts, remembered enemy mines and far ore, drifts
+  700 m across it, and jumps home when hurt or with anti-air within 1.2 km. It used
+  to be counted as a radar tower (`land_radar` took any Intel unit with radar) and
+  never left the base.
+- A jump waits until the side has the energy for its charge.
+
+Seen enemy silos are answered with an interceptor at once: the answer goes up
+beside any other project, may cost twice as long's income, and an answer the side
+cannot build no longer stops every other project.
+
+On an island map the home guard grows by half of the lift ships' room while
+`landing` is held, so a landing has cargo, and four stay home. A land group put
+ashore where home cannot be walked to keeps fighting instead of falling back.
+
+`tests/zz_ai_domain_probe.rs` prints each side's plans, landings started, lift ships
+and warp jumps every report.
+
 ## Extending the roster
 
 There are no unit blueprint names in production or tactical selection. Add units to
@@ -295,8 +345,8 @@ separate objectives; shoreline attack positions must be navigable and within wea
 range of the target. Movement destinations are projected onto each hull's valid terrain.
 A synthetic ship test exercises these paths before the real navy roster arrives.
 
-The AI knows whether its land army can walk to the enemy (above), but it does not
-plan transports or amphibious landings, and naval roster balance still needs real
+The AI knows whether its land army can walk to the enemy (above) and lands it by
+lift ship while it holds the `landing` plan; naval roster balance still needs real
 games. Unit special abilities beyond the metadata above need their own orders.
 
 ## Verification and diagnostics
@@ -339,5 +389,5 @@ and twin_shoals (2026-09-23), Normal led Hard 7 to 5 and Easy led every game on
 meridian_basin; single games swing a lot, so compare several seeds and both starts.
 
 Evenly matched economic duels can still settle into prolonged fights. Naval
-connectivity, transport strategy, late-game stalemate breaking, and difficulty balance
-need further playtesting with the real navy roster.
+connectivity, late-game stalemate breaking, and difficulty balance need further
+playtesting with the real navy roster.

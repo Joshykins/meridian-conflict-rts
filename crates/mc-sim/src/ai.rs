@@ -16,6 +16,8 @@ mod builders;
 mod danger;
 mod energy;
 mod groups;
+mod hunt;
+mod landing;
 mod layout;
 mod lots;
 mod mine_sites;
@@ -24,8 +26,10 @@ mod projects;
 mod salvage;
 mod sea;
 mod staging;
+mod strategy;
 mod theatre;
 mod upgrades;
+mod warp_ops;
 use crate::command::{Command, PlayerCommand, MAX_COMMAND_UNITS};
 use crate::spatial::kind;
 use crate::tables::*;
@@ -101,6 +105,21 @@ pub struct AiState {
     /// (`theatre.rs`).
     #[serde(default)]
     land_route: Option<theatre::LandRoute>,
+    /// The plans it holds (`strategy.rs`).
+    #[serde(default)]
+    strategy: strategy::Strategy,
+    /// The landing under way, if any (`landing.rs`).
+    #[serde(default)]
+    landing: Option<landing::Landing>,
+    /// Tick before which no engineer hunt leaves (`hunt.rs`).
+    #[serde(default)]
+    next_hunt: u32,
+    /// Sweeps its sensor ships have made (`warp_ops.rs`).
+    #[serde(default)]
+    sweeps: u32,
+    /// Landings started (`landing.rs`).
+    #[serde(default)]
+    pub landings: u32,
 }
 
 impl AiState {
@@ -117,6 +136,13 @@ impl AiState {
         h.write_u64(self.waves as u64 | (self.production_counter as u64) << 32);
         h.write_u64(self.stance as u64 | (self.scouts_sent as u64) << 32);
         h.write_u64(self.land_route.map_or(u64::MAX, |r| r.reaches as u64));
+        self.strategy.hash(h);
+        match &self.landing {
+            Some(l) => l.hash(h),
+            None => h.write_u64(u64::MAX),
+        }
+        h.write_u64(self.next_hunt as u64 | (self.sweeps as u64) << 32);
+        h.write_u64(self.landings as u64);
         match self.firebase {
             Some(p) => {
                 h.write_u64(1);
@@ -167,8 +193,12 @@ struct Census {
     scouts: usize,
     combat_rows: Vec<usize>,
     naval_idle: Vec<usize>,
-    /// Armed spaceships with no orders (`groups.rs`).
+    /// Armed spaceships with no orders (`warp_ops.rs`).
     capital_idle: Vec<usize>,
+    /// Lift ships, busy or not (`landing.rs`).
+    lifts: Vec<usize>,
+    /// Sensor ships with no orders (`warp_ops.rs`).
+    sensor_idle: Vec<usize>,
     /// Land-only combat units with no orders on a map where they cannot walk to
     /// any enemy: they guard home and never go out with a wave (`theatre.rs`).
     home_guard: Vec<usize>,
@@ -253,9 +283,10 @@ fn offset_toward(from: FxVec2, to: FxVec2, dist: Fx) -> FxVec2 {
 }
 
 /// How far a land radar tower sees. A sonar station out on the water is no
-/// radar cover for the base.
+/// radar cover for the base, nor is a sensor ship that flies off.
 fn land_radar(bp: &UnitBlueprint) -> Option<Fx> {
-    (bp.has(cat::INTEL) && !bp.water_only() && bp.radar > Fx::ZERO).then_some(bp.radar)
+    (bp.has(cat::INTEL) && bp.is_structure() && !bp.water_only() && bp.radar > Fx::ZERO)
+        .then_some(bp.radar)
 }
 
 /// Whether `at` is already well inside some tower's radar: within half its
@@ -307,6 +338,7 @@ impl World {
             .map(|e| (e - start).angle())
             .unwrap_or(Angle::ZERO);
         drop(span);
+        self.review_strategy(player, &census, &intel);
         let persona = self.ai_personality(player, &census, &intel);
 
         if self.state.ai[player as usize].firebase.is_none()
@@ -366,6 +398,7 @@ impl World {
         self.direct_focus(player, &census, &mut out);
         self.direct_nukes(player, &mut out);
         self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
+        self.direct_sensor_ships(player, &census, start, &mut out);
         drop(span);
         let span = mc_core::perf_span!("ai.tactics");
         self.react_tactically(player, &mut census, &intel, &mut out);
@@ -495,6 +528,7 @@ impl World {
                 && !bp.weapons.is_empty()
                 && !bp.has(cat::ENGINEER)
                 && !bp.has(cat::COMMANDER)
+                && bp.transport.is_none()
             {
                 c.combat_rows.push(row);
                 let stuck = !land_route && theatre::land_bound(bp);
@@ -557,6 +591,12 @@ impl World {
                 c.scouts += 1;
                 if idle {
                     c.scouts_idle.push(row);
+                }
+            } else if bp.is_mobile() && bp.transport.is_some() {
+                c.lifts.push(row);
+            } else if strategy::sensor_ship(bp) {
+                if idle {
+                    c.sensor_idle.push(row);
                 }
             } else if bp.is_mobile() && bp.weapons.is_empty() {
                 if idle
@@ -931,6 +971,18 @@ impl World {
         }
 
         self.direct_air(player, census, intel, start, staging, out);
+        let wave = self.wave_size(player, persona);
+        // A landing takes its cargo first, the home guard too (`landing.rs`).
+        self.direct_landing(
+            player,
+            census,
+            intel,
+            start,
+            staging,
+            wave,
+            &mut army_idle,
+            out,
+        );
         // The home guard never goes out with a wave: one that went to meet a
         // raid comes back to wait at the staging point.
         let guard_home = staging.distance(start) + Fx::from_int(400);
@@ -953,13 +1005,6 @@ impl World {
         }
         army_idle.retain(|r| !census.home_guard.contains(r));
 
-        let wave = self.wave_size(player, persona);
-        let ids = |rows: &[usize]| -> Vec<UnitId> {
-            rows.iter()
-                .take(MAX_COMMAND_UNITS)
-                .map(|&r| self.state.units.id(r))
-                .collect()
-        };
         // Units only ever leave in one group: from the staging point, or, out
         // in the field after a wave, together with the rest of it.
         // A staging point across a cliff or a river from home is never reached.
@@ -998,6 +1043,13 @@ impl World {
                 gathering.push(row);
             }
         }
+        self.direct_hunt(player, &mut at_stage, staging, out);
+        let ids = |rows: &[usize]| -> Vec<UnitId> {
+            rows.iter()
+                .take(MAX_COMMAND_UNITS)
+                .map(|&r| self.state.units.id(r))
+                .collect()
+        };
         if !forward.is_empty() {
             // A wave that took its target moves on only as a wave: enough of it
             // left presses on to the next, a remnant falls back to join the
@@ -1023,7 +1075,8 @@ impl World {
                 if idle.is_empty() || idle.len() * 3 < members.len() * 2 {
                     continue;
                 }
-                let press = members.len() >= (wave / 2).max(4);
+                // Put ashore where home cannot be walked to, it fights on.
+                let press = members.len() >= (wave / 2).max(4) || !census.land_route;
                 let target = press
                     .then(|| self.attack_target(player, seed, intel, stance))
                     .flatten()

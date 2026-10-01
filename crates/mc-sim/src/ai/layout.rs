@@ -287,8 +287,8 @@ impl World {
             .map(|(_, _, p)| p)
     }
 
-    /// The base's factories, power and storage no shield covers yet, with
-    /// what they cost. The rest is cheap, spread out, or out in front.
+    /// The base's factories, power, storage and strategic projects no shield
+    /// covers yet, with what they cost. The rest is cheap, spread out, or out in front.
     fn unshielded(&self, player: u8, start: FxVec2, claimed: &[Claim]) -> Vec<(FxVec2, Fx)> {
         let units = &self.state.units;
         let mut shields: Vec<(FxVec2, Fx)> = claimed
@@ -310,7 +310,12 @@ impl World {
                 shields.push((pos, s.radius));
                 continue;
             }
-            if !(other.has(cat::FACTORY) || other.has(cat::POWER) || other.has(cat::STORAGE))
+            // Map guns and silos too: a siege is map guns under shields.
+            let project = super::projects::project_kind(other).is_some();
+            if !(other.has(cat::FACTORY)
+                || other.has(cat::POWER)
+                || other.has(cat::STORAGE)
+                || project)
                 || other.has(cat::EXTRACTOR)
                 || pos.distance(start) > Fx::from_int(SHIELDED_BASE)
             {

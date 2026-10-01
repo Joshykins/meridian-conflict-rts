@@ -59,6 +59,9 @@ pub struct Skill {
     pub eager_tech: bool,
     /// Units added to (or taken from) every attack wave.
     pub wave_delta: i32,
+    /// Plans held at once (`ai/strategy.rs`): a landing, a warp raid, a bomber
+    /// fleet, an engineer hunt and so on.
+    pub gambits: usize,
 }
 
 impl Default for AiConfig {
@@ -113,6 +116,7 @@ impl AiConfig {
                 tech_income: 19,
                 eager_tech: false,
                 wave_delta: -2,
+                gambits: 1,
             },
             Difficulty::Normal => Skill {
                 builders_per_think: 5,
@@ -124,6 +128,7 @@ impl AiConfig {
                 tech_income: 14,
                 eager_tech: false,
                 wave_delta: -1,
+                gambits: 2,
             },
             Difficulty::Hard => Skill {
                 builders_per_think: 8,
@@ -135,6 +140,7 @@ impl AiConfig {
                 tech_income: 11,
                 eager_tech: false,
                 wave_delta: 0,
+                gambits: 3,
             },
         }
     }

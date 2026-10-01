@@ -13,6 +13,10 @@ const AIR_HOME: Fx = Fx::from_int(320);
 /// Enemy aircraft this close to the start are hunted at once, with whatever
 /// fighters are ready.
 const AIR_DEFENSE: Fx = Fx::from_int(1500);
+/// How far behind the start a bomber fleet waits.
+const AIR_HIDE: Fx = Fx::from_int(350);
+/// Most bombers a bomber fleet waits for.
+const AIR_FLEET_MAX: usize = 16;
 /// Ships this close to the fleet's anchorage have gathered.
 const FLEET_HOME: Fx = Fx::from_int(360);
 /// A contact this close to the anchorage is fought at once, whatever the
@@ -20,12 +24,6 @@ const FLEET_HOME: Fx = Fx::from_int(360);
 const FLEET_DEFENSE: Fx = Fx::from_int(800);
 /// Ships a fleet waits for before it sails.
 const FLEET_WAVE: usize = 4;
-/// Spaceships this close to the staging point have gathered: their hulls are
-/// up to half a kilometre long.
-const CAPITAL_HOME: Fx = Fx::from_int(600);
-/// Mass of armed spaceships a strike waits for: a lone corvette waits for a
-/// second, a heavy frigate goes on its own.
-const CAPITAL_WAVE_MASS: i32 = 2000;
 
 /// Idle ships of one hull size and the water they reach.
 struct Fleet {
@@ -69,7 +67,7 @@ impl World {
             })
     }
 
-    fn ids_of(&self, rows: &[usize]) -> Vec<UnitId> {
+    pub(super) fn ids_of(&self, rows: &[usize]) -> Vec<UnitId> {
         rows.iter()
             .take(MAX_COMMAND_UNITS)
             .map(|&r| self.state.units.id(r))
@@ -87,14 +85,28 @@ impl World {
     ) {
         let pos = &self.state.units.pos;
         let home = |r: &usize| pos[*r].distance(staging) <= AIR_HOME;
-        let (bombers, bombers_away): (Vec<usize>, Vec<usize>) =
-            census.bombers_idle.iter().partition(|r| home(r));
+        // A bomber fleet as a plan (`strategy.rs`): the bombers wait out of
+        // sight behind the base until a big wing is ready.
+        let fleet = self.holds(player, super::strategy::Gambit::AirFleet);
+        let hangar = if fleet {
+            self.clamp_to_map(offset_toward(start, start + (start - staging), AIR_HIDE))
+        } else {
+            staging
+        };
+        let (bombers, bombers_away): (Vec<usize>, Vec<usize>) = census
+            .bombers_idle
+            .iter()
+            .partition(|r| pos[**r].distance(hangar) <= AIR_HOME);
         // Torpedo bombers strike ships only, as a group of their own.
         let (sea_strike, bombers): (Vec<usize>, Vec<usize>) =
             bombers.iter().partition(|&&r| self.hits_ships_only(r));
         let (mut fighters, fighters_away): (Vec<usize>, Vec<usize>) =
             census.interceptors_idle.iter().partition(|r| home(r));
-        let wave = self.air_wave(player);
+        let wave = if fleet {
+            (2 * self.air_wave(player)).min(AIR_FLEET_MAX)
+        } else {
+            self.air_wave(player)
+        };
 
         // Fighters: enemy aircraft over home are hunted by all that are ready.
         let intruder = self
@@ -121,16 +133,14 @@ impl World {
         if !bombers_away.is_empty() {
             out.push(Command::Move {
                 units: self.ids_of(&bombers_away),
-                target: staging,
+                target: hangar,
                 queue: false,
             });
         }
         if bombers.len() >= wave {
-            let target = intel
-                .enemy_extractors
-                .iter()
-                .min_by_key(|m| (m.distance_sq(staging), m.x, m.y))
-                .copied()
+            // The enemy's mines, power and engineers least covered by anti-air.
+            let target = self
+                .soft_target(player, hangar, false)
                 .or_else(|| self.attack_target(player, staging, intel, Stance::Raid));
             if let Some(target) = target {
                 self.state.ai[player as usize].raids += 1;
@@ -175,84 +185,6 @@ impl World {
             if let Some(target) = self.visible_air_target(player, staging) {
                 out.push(Command::AttackMove {
                     units: self.ids_of(&fighters),
-                    target,
-                    queue: false,
-                });
-            }
-        }
-    }
-
-    /// Armed spaceships gather at the staging point and strike together once
-    /// they carry `CAPITAL_WAVE_MASS`, at the base itself when it is raided.
-    /// They were counted as bombers: a wing of four 1100-mass corvettes was
-    /// waited for, and they went after mines.
-    pub(super) fn direct_capital(
-        &mut self,
-        player: u8,
-        census: &Census,
-        intel: &Intel,
-        start: FxVec2,
-        out: &mut Vec<Command>,
-    ) {
-        if census.capital_idle.is_empty() {
-            return;
-        }
-        let units = &self.state.units;
-        let staging = offset_toward(start, intel.enemy_start.unwrap_or(start), Fx::from_int(400));
-        let mass = |rows: &[usize]| -> i32 {
-            rows.iter().map(|&r| self.bp(r).cost_mass.floor_int()).sum()
-        };
-        // A raid on the base: every idle warship answers it.
-        if let Some(&(_, enemy)) = intel
-            .threats
-            .iter()
-            .find(|(_, e)| e.distance(start) < HOME_RADIUS * 2)
-        {
-            out.push(Command::AttackMove {
-                units: self.ids_of(&census.capital_idle),
-                target: enemy,
-                queue: false,
-            });
-            return;
-        }
-        let (home, away): (Vec<usize>, Vec<usize>) = census
-            .capital_idle
-            .iter()
-            .partition(|&&r| units.pos[r].distance(staging) <= CAPITAL_HOME);
-        // Out at the front: a group strong enough moves on to the next target,
-        // what is left of one comes home to wait for the next.
-        let armed: Vec<usize> = census
-            .combat_rows
-            .iter()
-            .copied()
-            .filter(|&r| {
-                self.bp(r).has(cat::SPACE) && units.pos[r].distance(staging) > CAPITAL_HOME
-            })
-            .collect();
-        for (seed, members) in clusters(&units.pos, &armed, Fx::from_int(900)) {
-            let idle: Vec<usize> = members
-                .iter()
-                .copied()
-                .filter(|r| away.contains(r))
-                .collect();
-            if idle.is_empty() || idle.len() * 3 < members.len() * 2 {
-                continue;
-            }
-            let target = (mass(&members) >= CAPITAL_WAVE_MASS)
-                .then(|| self.attack_target(player, seed, intel, Stance::Expand))
-                .flatten()
-                .unwrap_or(staging);
-            out.push(Command::AttackMove {
-                units: self.ids_of(&idle),
-                target,
-                queue: false,
-            });
-        }
-        if mass(&home) >= CAPITAL_WAVE_MASS {
-            if let Some(target) = self.attack_target(player, staging, intel, Stance::Expand) {
-                self.state.ai[player as usize].raids += 1;
-                out.push(Command::AttackMove {
-                    units: self.ids_of(&home),
                     target,
                     queue: false,
                 });

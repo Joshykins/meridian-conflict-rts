@@ -19,6 +19,12 @@ impl World {
         let mut planned_engineers = 0;
         let mut planned_scouts = 0;
         let mut planned_salvagers = 0;
+        // Scouting as a plan keeps more eyes out (`strategy.rs`).
+        let want_scouts = if self.holds(player, super::strategy::Gambit::Scouting) {
+            4
+        } else {
+            2
+        };
         // No rally point: a finished unit rolls out idle and the army sends it
         // to the staging point with the rest. A rally among the base's buildings
         // jammed: units stuck a few metres short of it in the crowd never
@@ -65,7 +71,7 @@ impl World {
                     })
                     .map(|(_, n)| *n)
                     .sum::<usize>()
-                    >= theatre::HOME_GUARD;
+                    >= self.land_guard_cap(player, census);
             let fighters: Vec<BlueprintId> = builder
                 .builds
                 .iter()
@@ -94,7 +100,10 @@ impl World {
             {
                 planned_engineers += 1;
                 engineer
-            } else if census.scouts + planned_scouts < 2 && scout.is_some() && counter % 5 == 1 {
+            } else if census.scouts + planned_scouts < want_scouts
+                && scout.is_some()
+                && counter % 5 == 1
+            {
                 planned_scouts += 1;
                 scout
             } else if let Some(salvager) = (counter % 3 == 2)

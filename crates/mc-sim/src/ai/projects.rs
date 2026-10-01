@@ -8,6 +8,7 @@
 //! its data: a `strategic` launcher (nuke or interceptor), a structure with
 //! anti-air (an anti-spaceship gun), one with artillery (a map gun), or a
 //! mobile unit.
+use super::strategy::Gambit;
 use super::*;
 use mc_data::strategic::StrategicKind;
 
@@ -66,7 +67,7 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
 
 impl World {
     /// Projects `player` has standing or going up, of each kind.
-    fn projects_held(&self, player: u8, kind: Project) -> usize {
+    pub(super) fn projects_held(&self, player: u8, kind: Project) -> usize {
         let units = &self.state.units;
         units
             .slots
@@ -97,33 +98,29 @@ impl World {
         let player = self.state.units.owner[row];
         let pl = &self.state.players[player as usize];
         let mass_rich = pl.mass > pl.mass_capacity * Fx::ratio(7, 10);
-        if energy_short || planned.projects > mass_rich as usize {
+        if energy_short {
             return None;
         }
         let builder = self.bp(row).builder.as_ref()?;
-        let affordable = |bp: &UnitBlueprint| {
-            let seconds = PROJECT_SECONDS * if bp.tech >= 5 { 2 } else { 1 };
+        // An answer to a threat may take twice as long to pay for.
+        let affordable = |bp: &UnitBlueprint, urgent: bool| {
+            let seconds =
+                PROJECT_SECONDS * if bp.tech >= 5 { 2 } else { 1 } * if urgent { 2 } else { 1 };
             let budget = pl.mass_income * Fx::from_int(seconds) * Fx::ratio(PROJECT_SHARE, 100);
             let energy = pl.energy_income * Fx::from_int(seconds) * Fx::ratio(PROJECT_SHARE, 100);
             bp.cost_mass <= budget && bp.cost_energy <= energy
         };
         // A walker with no land route to the enemy would stand at home all match.
         let land_route = self.land_route_to_enemy(player);
-        let menu: Vec<(Project, BlueprintId)> = builder
-            .builds
-            .iter()
-            .filter_map(|&id| {
-                let bp = self.blueprints.unit(id);
-                let kind = project_kind(bp)?;
-                (affordable(bp) && !bp.water_only() && (land_route || !theatre::land_bound(bp)))
-                    .then_some((kind, id))
-            })
-            .collect();
-        if menu.is_empty() {
-            return None;
-        }
+        let buildable = |id: BlueprintId, urgent: bool| -> Option<(Project, BlueprintId)> {
+            let bp = self.blueprints.unit(id);
+            let kind = project_kind(bp)?;
+            (affordable(bp, urgent) && !bp.water_only() && (land_route || !theatre::land_bound(bp)))
+                .then_some((kind, id))
+        };
         // Answers first: a silo seen gets an interceptor over the base, and
-        // spaceships seen get a gun that reaches them.
+        // spaceships seen get a gun that reaches them. An answer goes up
+        // alongside any other project, not after it.
         let answer = [
             (Project::Interceptor, Project::Nuke),
             (Project::SkyGun, Project::Mobile),
@@ -134,19 +131,52 @@ impl World {
                 Project::Mobile => self.enemy_spaceships(player),
                 _ => self.enemy_projects(player, theirs),
             };
-            seen > 0 && self.projects_held(player, ours) < seen.min(3)
+            seen > 0
+                && self.projects_held(player, ours) < seen.min(3)
+                && builder
+                    .builds
+                    .iter()
+                    .any(|&id| buildable(id, true).is_some_and(|(k, _)| k == ours))
         })
         .map(|(ours, _)| ours);
-        // Otherwise the doctrine's order, the kind it holds fewest of first,
-        // so a long game sees the whole strategic roster.
-        // With no land route, warships that cross the water come first.
+        // A siege or a nuke race keeps two going at once.
+        let plan_room =
+            (self.holds(player, Gambit::Siege) || self.holds(player, Gambit::NukeRace)) as usize;
+        if answer.is_none() && planned.projects > mass_rich as usize + plan_room {
+            return None;
+        }
+        let menu: Vec<(Project, BlueprintId)> = builder
+            .builds
+            .iter()
+            .filter_map(|&id| buildable(id, answer.is_some()))
+            .filter(|(k, _)| answer.is_none_or(|a| a == *k))
+            .collect();
+        if menu.is_empty() {
+            return None;
+        }
+        // Otherwise the plans' kinds first (`strategy.rs`), then the doctrine's
+        // order, the kind it holds fewest of first, so a long game sees the
+        // whole strategic roster. With no land route, warships that cross the
+        // water come first.
+        let planned_kind = [
+            (Gambit::NukeRace, Project::Nuke, 2),
+            (Gambit::Siege, Project::MapGun, 3),
+            (Gambit::WarpRaid, Project::Mobile, 2),
+        ]
+        .into_iter()
+        .find(|&(g, k, most)| {
+            self.holds(player, g)
+                && menu.iter().any(|(m, _)| *m == k)
+                && self.projects_held(player, k) < most
+        })
+        .map(|(_, k, _)| k);
         let order: &[Project] = match persona {
             _ if !land_route => &[Project::Mobile, Project::Nuke, Project::MapGun],
             Personality::Aggressive => &[Project::Mobile, Project::Nuke, Project::MapGun],
             Personality::Expander => &[Project::Nuke, Project::Mobile, Project::MapGun],
             Personality::Turtle => &[Project::MapGun, Project::Nuke, Project::Mobile],
         };
-        let kind = answer.or_else(|| {
+        let kind = answer.or(planned_kind).or_else(|| {
             order
                 .iter()
                 .enumerate()
@@ -187,7 +217,13 @@ impl World {
     /// side has the income to spare (`SPOTTER_INCOME`).
     pub(super) fn spotter_job(&self, row: usize, start: FxVec2, facing: Angle) -> Option<Job> {
         let player = self.state.units.owner[row];
-        if self.state.players[player as usize].mass_income < Fx::from_int(SPOTTER_INCOME) {
+        // Scouting as a plan: the sensor ship comes as soon as there is a little to spare.
+        let income = if self.holds(player, Gambit::Scouting) {
+            SPOTTER_INCOME / 3
+        } else {
+            SPOTTER_INCOME
+        };
+        if self.state.players[player as usize].mass_income < Fx::from_int(income) {
             return None;
         }
         let spotter = |id: BlueprintId| {

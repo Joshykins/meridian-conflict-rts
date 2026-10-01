@@ -370,7 +370,7 @@ impl World {
         Ok(())
     }
 
-    fn cargo_fits(&self, row: usize, ship: usize) -> bool {
+    pub(crate) fn cargo_fits(&self, row: usize, ship: usize) -> bool {
         let t = self.transport(ship).expect("transport");
         let bp = self.bp(row);
         bp.cargo_room().is_some_and(|room| room <= t.capacity)

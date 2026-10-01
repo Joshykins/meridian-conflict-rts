@@ -697,6 +697,12 @@ impl World {
             {
                 return Some(job);
             }
+            if let Some(job) = self
+                .lift_job(row, census, start, facing)
+                .filter(|_| !energy_short)
+            {
+                return Some(job);
+            }
         }
         let mex_range = self.mex_range(is_commander, census, persona, stance, skill);
         let bare = (!energy_short).then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
@@ -779,10 +785,16 @@ impl World {
                 }
             }
         }
+        // A siege puts a shield over each map gun (`strategy.rs`).
+        let siege_guns = if self.holds(owner as u8, super::strategy::Gambit::Siege) {
+            self.projects_held(owner as u8, projects::Project::MapGun)
+        } else {
+            0
+        };
         if tech >= 2
             && !far
             && mass_income >= Fx::from_int(10)
-            && planned.shields < 1 + planned.factories / 3
+            && planned.shields < 1 + planned.factories / 3 + siege_guns
         {
             // Over the part of the base no shield covers yet, and only where
             // that is worth the shield's cost and upkeep.
