@@ -16,6 +16,30 @@
 //! ```
 //!
 //! Skirmish set-up can override the map's choice with another preset.
+//!
+//! A map can also be split in two by a climate divide, a line from its south
+//! edge to its north edge. West of it the map's own `climate` and `weather`
+//! apply; east of it the divide's:
+//!
+//! ```ron
+//! (
+//!     climate: Desert,
+//!     weather: Clear,
+//!     // Metres the desert's rock beds are lowered on this map: ground at height
+//!     // h is coloured as Vermilion Gorge's is at h + strata_lift. Default 0.
+//!     strata_lift: 50,
+//!     divide: (
+//!         // South to north, map metres (x, y), y strictly ascending, 2 to 8
+//!         // points; the first and last sit on (or beyond) the map's edges.
+//!         line: [(6592, 0), (6592, 3400), (8192, 5000), (8192, 16384)],
+//!         climate: Temperate,
+//!         weather: Cloudy,
+//!         tweaks: (rain: 0.7),
+//!     ),
+//! )
+//! ```
+//!
+//! A preset picked in skirmish set-up plays over both sides.
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -228,6 +252,11 @@ impl SkyChoice {
         map.weather(self.preset)
     }
 
+    /// The weather east of the map's climate divide (`MapConfig::east_weather`).
+    pub fn east_weather(&self, map: &MapConfig) -> Option<Weather> {
+        map.east_weather(self.preset)
+    }
+
     pub fn hour(&self, map: &MapConfig) -> f32 {
         map.hour(self.time)
     }
@@ -252,6 +281,200 @@ pub struct MapConfig {
     /// How the map is meant to be played, for the map browser's filter.
     /// Unset: a duel on two starts, teams on more.
     pub style: Option<MapStyle>,
+    /// Metres the desert's rock beds are lowered on this map: ground at height
+    /// `h` above the water is coloured as Vermilion Gorge's is at `h +
+    /// strata_lift` (shaders/desert.wgsl).
+    pub strata_lift: f32,
+    /// A line splitting the map in two: `climate`, `weather` and `tweaks` above
+    /// hold west of it, its own east of it.
+    pub divide: Option<ClimateDivide>,
+}
+
+/// A map split in two climates along a line from its south edge to its north
+/// edge (a Precursor climate wall): the map's own climate and weather west of
+/// the line, these east of it.
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(try_from = "DivideFile")]
+pub struct ClimateDivide {
+    /// The line, south to north, in map metres (x, y): `y` strictly ascending,
+    /// 2 to `MAX_POINTS` points. Past its ends it runs on due south and north.
+    pub line: Vec<(f32, f32)>,
+    pub climate: Climate,
+    pub weather: WeatherPreset,
+    pub tweaks: WeatherTweaks,
+}
+
+/// `ClimateDivide` as a map's file writes it, before the line is checked.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DivideFile {
+    line: Vec<(f32, f32)>,
+    #[serde(default)]
+    climate: Climate,
+    #[serde(default)]
+    weather: WeatherPreset,
+    #[serde(default)]
+    tweaks: WeatherTweaks,
+}
+
+impl TryFrom<DivideFile> for ClimateDivide {
+    type Error = DivideError;
+
+    fn try_from(file: DivideFile) -> Result<ClimateDivide, DivideError> {
+        let divide = ClimateDivide {
+            line: file.line,
+            climate: file.climate,
+            weather: file.weather,
+            tweaks: file.tweaks,
+        };
+        divide.validate()?;
+        Ok(divide)
+    }
+}
+
+/// Why a climate divide's line cannot be used.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DivideError {
+    /// It has this many points: fewer than 2 or more than `ClimateDivide::MAX_POINTS`.
+    Points(usize),
+    /// The point at this index is not north of the one before it.
+    NotAscending(usize),
+    /// The point at this index is not a number.
+    NotFinite(usize),
+}
+
+impl std::fmt::Display for DivideError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DivideError::Points(n) => write!(
+                f,
+                "a divide's line has 2 to {} points, not {n}",
+                ClimateDivide::MAX_POINTS
+            ),
+            DivideError::NotAscending(i) => write!(
+                f,
+                "a divide's line runs south to north: point {i} is not north of point {}",
+                i - 1
+            ),
+            DivideError::NotFinite(i) => write!(f, "a divide's line: point {i} is not a number"),
+        }
+    }
+}
+
+impl std::error::Error for DivideError {}
+
+impl ClimateDivide {
+    /// The most points a line may have (the shaders hold this many:
+    /// mc-models `gpu_consts::divide::POINTS`).
+    pub const MAX_POINTS: usize = 8;
+
+    /// Whether the line can be used: 2 to `MAX_POINTS` points, each north of the last.
+    pub fn validate(&self) -> Result<(), DivideError> {
+        let n = self.line.len();
+        if !(2..=ClimateDivide::MAX_POINTS).contains(&n) {
+            return Err(DivideError::Points(n));
+        }
+        for (i, p) in self.line.iter().enumerate() {
+            if !(p.0.is_finite() && p.1.is_finite()) {
+                return Err(DivideError::NotFinite(i));
+            }
+            if i > 0 && p.1 <= self.line[i - 1].1 {
+                return Err(DivideError::NotAscending(i));
+            }
+        }
+        Ok(())
+    }
+
+    /// The line's x at `y`: straight between its points, and its end points' x
+    /// south of the first and north of the last.
+    pub fn x_at(&self, y: f32) -> f32 {
+        let (Some(first), Some(last)) = (self.line.first(), self.line.last()) else {
+            return 0.0;
+        };
+        if y <= first.1 {
+            return first.0;
+        }
+        for pair in self.line.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            if y <= b.1 {
+                return a.0 + (b.0 - a.0) * (y - a.1) / (b.1 - a.1);
+            }
+        }
+        last.0
+    }
+
+    /// Whether (`x`, `y`) lies east of the line (a point on it does).
+    pub fn east_of(&self, x: f32, y: f32) -> bool {
+        x >= self.x_at(y)
+    }
+
+    /// How far (`x`, `y`) is from the line in metres, positive east of it and
+    /// negative west (shaders/common.wgsl `divide_east_of` is the same).
+    pub fn east_distance(&self, x: f32, y: f32) -> f32 {
+        let (Some(first), Some(last)) = (self.line.first(), self.line.last()) else {
+            return 0.0;
+        };
+        let offset = x - self.x_at(y);
+        // Past its ends the line runs on due south and north.
+        let mut nearest = if y < first.1 || y > last.1 {
+            offset.abs()
+        } else {
+            f32::MAX
+        };
+        for pair in self.line.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            let (ex, ey) = (b.0 - a.0, b.1 - a.1);
+            let (px, py) = (x - a.0, y - a.1);
+            let t = ((px * ex + py * ey) / (ex * ex + ey * ey)).clamp(0.0, 1.0);
+            nearest = nearest.min((px - ex * t).hypot(py - ey * t));
+        }
+        if offset >= 0.0 {
+            nearest
+        } else {
+            -nearest
+        }
+    }
+
+    /// The share of a `width` by `height` metre map that lies east of the line.
+    pub fn east_share(&self, width: f32, height: f32) -> f32 {
+        const ROWS: usize = 64;
+        let east: f32 = (0..ROWS)
+            .map(|i| {
+                let y = (i as f32 + 0.5) / ROWS as f32 * height;
+                (width - self.x_at(y)).clamp(0.0, width)
+            })
+            .sum();
+        east / (ROWS as f32 * width.max(1.0))
+    }
+}
+
+/// How a map's ground and sea are drawn: what the renderer and the map
+/// previews take from its `MapConfig`.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MapLook {
+    /// The map's climate: all of it, or west of `divide`.
+    pub climate: Climate,
+    /// `MapConfig::strata_lift`.
+    pub strata_lift: f32,
+    pub divide: Option<ClimateDivide>,
+}
+
+impl MapLook {
+    /// One climate over the whole map, as `MERIDIAN_CLIMATE` forces it.
+    pub fn single(climate: Climate) -> MapLook {
+        MapLook {
+            climate,
+            ..MapLook::default()
+        }
+    }
+
+    /// The climate at a map position.
+    pub fn climate_at(&self, x: f32, y: f32) -> Climate {
+        match &self.divide {
+            Some(d) if d.east_of(x, y) => d.climate,
+            _ => self.climate,
+        }
+    }
 }
 
 /// The land a map is set in, as the map browser files it.
@@ -371,12 +594,38 @@ impl MapConfig {
     }
 
     /// The weather to play in: the map's preset with its tweaks, or `choice`
-    /// (from skirmish set-up) when the player picked one.
+    /// (from skirmish set-up) when the player picked one. On a map with a
+    /// climate divide this is the weather west of it (`east_weather`).
     pub fn weather(&self, choice: Option<WeatherPreset>) -> Weather {
         if let Some(preset) = choice {
             return Weather::from(preset);
         }
         self.tweaks.apply(Weather::from(self.weather))
+    }
+
+    /// The weather east of the map's climate divide: the divide's preset with
+    /// its tweaks. None on a map without one, and when the player picked a
+    /// preset (`choice`), which plays over both sides.
+    pub fn east_weather(&self, choice: Option<WeatherPreset>) -> Option<Weather> {
+        let divide = self.divide.as_ref()?;
+        if choice.is_some() {
+            return None;
+        }
+        Some(divide.tweaks.apply(Weather::from(divide.weather)))
+    }
+
+    /// How the map's ground and sea are drawn.
+    pub fn look(&self) -> MapLook {
+        MapLook {
+            climate: self.climate,
+            strata_lift: self.strata_lift,
+            divide: self.divide.clone(),
+        }
+    }
+
+    /// The climate at a map position: the divide's east of its line.
+    pub fn climate_at(&self, x: f32, y: f32) -> Climate {
+        self.look().climate_at(x, y)
     }
 }
 
@@ -429,6 +678,142 @@ mod tests {
                 MapConfig::for_map(&e.path()).unwrap();
             }
         }
+    }
+
+    const DIVIDED: &str = "(
+        climate: Desert,
+        weather: Clear,
+        tweaks: (rain: 0.0, wind: 8),
+        strata_lift: 50,
+        divide: (
+            line: [(6592, 0), (6592, 3400), (8192, 5000), (8192, 11384), (9792, 12984), (9792, 16384)],
+            climate: Temperate,
+            weather: Cloudy,
+            tweaks: (rain: 0.7),
+        ),
+    )";
+
+    #[test]
+    fn map_config_reads_a_climate_divide() {
+        let c = MapConfig::parse(DIVIDED).unwrap();
+        assert_eq!(c.strata_lift, 50.0);
+        let d = c.divide.as_ref().unwrap();
+        assert_eq!(d.line.len(), 6);
+        assert_eq!(
+            (d.climate, d.weather),
+            (Climate::Temperate, WeatherPreset::Cloudy)
+        );
+        // West of the line the map's own climate and weather, east the divide's.
+        assert_eq!(c.climate_at(1000.0, 1000.0), Climate::Desert);
+        assert_eq!(c.climate_at(12000.0, 1000.0), Climate::Temperate);
+        assert_eq!(
+            c.weather(None).cover,
+            Weather::from(WeatherPreset::Clear).cover
+        );
+        let east = c.east_weather(None).unwrap();
+        assert_eq!(east.rain, 0.7);
+        assert_eq!(east.cover, Weather::from(WeatherPreset::Cloudy).cover);
+        // A preset picked in skirmish set-up plays over both sides.
+        assert_eq!(c.east_weather(Some(WeatherPreset::Stormy)), None);
+        assert_eq!(
+            c.weather(Some(WeatherPreset::Stormy)),
+            Weather::from(WeatherPreset::Stormy)
+        );
+        let picked = SkyChoice {
+            preset: Some(WeatherPreset::Overcast),
+            time: None,
+        };
+        assert_eq!(picked.east_weather(&c), None);
+        assert_eq!(SkyChoice::default().east_weather(&c), Some(east));
+        // What the renderer and the previews take.
+        let look = c.look();
+        assert_eq!((look.climate, look.strata_lift), (Climate::Desert, 50.0));
+        assert_eq!(look.climate_at(12000.0, 1000.0), Climate::Temperate);
+        assert_eq!(
+            MapLook::single(Climate::Tropical).climate_at(12000.0, 1000.0),
+            Climate::Tropical
+        );
+        // A map without one: the defaults, and no east side.
+        let plain = MapConfig::parse("(climate: Desert)").unwrap();
+        assert_eq!((plain.strata_lift, plain.divide.is_none()), (0.0, true));
+        assert_eq!(plain.east_weather(None), None);
+        assert_eq!(plain.climate_at(1.0e6, 0.0), Climate::Desert);
+    }
+
+    #[test]
+    fn a_divide_follows_its_line() {
+        let d = MapConfig::parse(DIVIDED).unwrap().divide.unwrap();
+        // On a point, between points, and clamped past both ends.
+        assert_eq!(d.x_at(0.0), 6592.0);
+        assert_eq!(d.x_at(-500.0), 6592.0);
+        assert_eq!(d.x_at(3400.0), 6592.0);
+        assert_eq!(d.x_at(4200.0), 7392.0);
+        assert_eq!(d.x_at(8000.0), 8192.0);
+        assert_eq!(d.x_at(12184.0), 8992.0);
+        assert_eq!(d.x_at(20000.0), 9792.0);
+        assert!(!d.east_of(7391.0, 4200.0) && d.east_of(7393.0, 4200.0));
+        assert!(d.east_of(7392.0, 4200.0), "a point on the line is east");
+        // Distance is across the line, not along x: shorter on the diagonal.
+        assert!((d.east_distance(8292.0, 8000.0) - 100.0).abs() < 1e-3);
+        assert!((d.east_distance(8092.0, 8000.0) + 100.0).abs() < 1e-3);
+        let across = d.east_distance(7492.0, 4200.0);
+        assert!(
+            (across - 100.0 * std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-2,
+            "{across}"
+        );
+        // Past an end the line runs straight on.
+        assert!((d.east_distance(6692.0, -300.0) - 100.0).abs() < 1e-3);
+        assert!((d.east_distance(9692.0, 17000.0) + 100.0).abs() < 1e-3);
+        // Its sign is `east_of`'s everywhere, and it is never further than the
+        // line is along x.
+        for i in 0..40 {
+            for j in 0..42 {
+                let (x, y) = (i as f32 * 420.0, j as f32 * 420.0 - 400.0);
+                let across = d.east_distance(x, y);
+                assert_eq!(across >= 0.0, d.east_of(x, y), "{x}, {y}");
+                assert!(across.abs() <= (x - d.x_at(y)).abs() + 1e-2, "{x}, {y}");
+            }
+        }
+        // East of this line: half of a 16384 m square.
+        let share = d.east_share(16384.0, 16384.0);
+        assert!((share - 0.5).abs() < 0.02, "{share}");
+    }
+
+    #[test]
+    fn a_bad_divide_line_is_refused() {
+        let with_line = |line: &str| format!("(divide: (line: {line}, climate: Temperate))");
+        // South to north: y strictly ascending.
+        for line in [
+            "[(100, 0), (100, 0)]",
+            "[(100, 500), (100, 0)]",
+            "[(0, 0), (10, 200), (20, 100), (30, 300)]",
+        ] {
+            let err = MapConfig::parse(&with_line(line)).unwrap_err().to_string();
+            assert!(err.contains("south to north"), "{err}");
+        }
+        // 2 to 8 points.
+        let nine: Vec<String> = (0..9).map(|i| format!("(100, {})", i * 100)).collect();
+        for line in ["[]", "[(100, 0)]", &format!("[{}]", nine.join(", "))] {
+            let err = MapConfig::parse(&with_line(line)).unwrap_err().to_string();
+            assert!(err.contains("2 to 8 points"), "{err}");
+        }
+        let eight = format!("[{}]", nine[..8].join(", "));
+        assert!(MapConfig::parse(&with_line(&eight)).is_ok());
+        // A line is asked for, and nothing else is read into a divide.
+        assert!(MapConfig::parse("(divide: (climate: Temperate))").is_err());
+        assert!(MapConfig::parse("(divide: (line: [(0, 0), (0, 9)], snow: true))").is_err());
+        // Checked the same way when built in code.
+        let mut d = MapConfig::parse(&with_line("[(100, 0), (100, 900)]"))
+            .unwrap()
+            .divide
+            .unwrap();
+        assert_eq!(d.validate(), Ok(()));
+        d.line[1].1 = -5.0;
+        assert_eq!(d.validate(), Err(DivideError::NotAscending(1)));
+        d.line.truncate(1);
+        assert_eq!(d.validate(), Err(DivideError::Points(1)));
+        d.line = vec![(0.0, 0.0), (f32::NAN, 5.0)];
+        assert_eq!(d.validate(), Err(DivideError::NotFinite(1)));
     }
 
     #[test]
