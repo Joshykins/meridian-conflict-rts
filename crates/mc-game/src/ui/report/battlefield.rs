@@ -356,8 +356,8 @@ fn salvage(
         let p = at(cell_centre(a.size, cell as u16));
         ui.dot(
             p,
-            (2.0 + 5.0 * heat) * scale,
-            rgb(super::SALVAGE, 0.12 + 0.3 * heat),
+            (3.0 + 8.0 * heat) * scale,
+            rgb(super::SALVAGE, 0.18 + 0.45 * heat),
         );
     }
     for f in a.frames[first..].iter().take_while(|f| f.tick as f32 <= t) {
