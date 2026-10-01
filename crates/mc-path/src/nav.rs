@@ -334,6 +334,12 @@ impl Nav {
         self.grid.is_passable(layer, size, cell)
     }
 
+    /// See [`NavGrid::open_around`].
+    #[inline]
+    pub fn open_around(&self, layer: MoveLayer, cell: Cell) -> Option<CellRect> {
+        self.grid.open_around(layer, cell)
+    }
+
     #[inline]
     pub fn can_place(&self, rect: CellRect, layer: MoveLayer) -> bool {
         self.grid.can_place(rect, layer)

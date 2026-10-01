@@ -296,14 +296,22 @@ impl Nav {
             return false;
         }
         let steps = (length / 4).ceil_int().max(1);
-        // A step in the cell the last was in has its answer already.
+        // A step in the cell the last was in has its answer already, and so
+        // has one in a stretch of sector found open all through.
         let mut last = None;
+        let mut open: Option<CellRect> = None;
         fractions(steps).all(|t| {
             let at = from.lerp(to, t);
             let cell = Cell::from_pos(at);
-            let same = last == Some(cell);
+            if last == Some(cell) || open.is_some_and(|r| r.contains(cell)) {
+                return true;
+            }
             last = Some(cell);
-            same || self.passable(l, size, at)
+            if !self.passable(l, size, at) {
+                return false;
+            }
+            open = self.inner.open_around(layer(l), cell).or(open);
+            true
         })
     }
 

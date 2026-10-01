@@ -168,6 +168,12 @@ impl CellRect {
     pub const fn new(min: Cell, max: Cell) -> CellRect {
         CellRect { min, max }
     }
+
+    /// Whether `c` lies in the rect, `max` not included.
+    #[inline]
+    pub fn contains(&self, c: Cell) -> bool {
+        (self.min.x..self.max.x).contains(&c.x) && (self.min.y..self.max.y).contains(&c.y)
+    }
 }
 
 /// Every limit and misuse surfaces as one of these; nothing is dropped silently.

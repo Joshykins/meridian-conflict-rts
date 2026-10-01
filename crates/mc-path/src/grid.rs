@@ -385,6 +385,24 @@ impl NavGrid {
         self.clearance(layer, c) >= size.cells()
     }
 
+    /// The cells round `c` every size passes on `layer`, when `c` lies in a
+    /// sector open all through: that sector's cells within the map.
+    pub fn open_around(&self, layer: MoveLayer, c: Cell) -> Option<CellRect> {
+        if !self.contains(c) {
+            return None;
+        }
+        let (sx, sy) = (c.x / SECTOR_CELLS, c.y / SECTOR_CELLS);
+        matches!(self.layer_sector(layer, sx, sy).kind, SectorKind::Open).then(|| {
+            CellRect::new(
+                Cell::new(sx * SECTOR_CELLS, sy * SECTOR_CELLS),
+                Cell::new(
+                    ((sx + 1) * SECTOR_CELLS).min(self.w),
+                    ((sy + 1) * SECTOR_CELLS).min(self.h),
+                ),
+            )
+        })
+    }
+
     pub fn terrain_class(&self, c: Cell) -> u8 {
         if !self.contains(c) {
             return 0;
@@ -912,6 +930,45 @@ mod tests {
             Some(PathError::BadMapSize)
         );
         assert!(NavGrid::from_cells(32, 32, &[LAND; 1024]).is_ok());
+    }
+
+    #[test]
+    fn open_around_passes_every_size() {
+        // Big enough for open sectors clear of the map's edges.
+        let mut g = NavGrid::from_fn(160, 160, |x, y| {
+            if (40..60).contains(&x) && (10..30).contains(&y) {
+                noisy(x, y)
+            } else {
+                LAND
+            }
+        })
+        .unwrap();
+        g.block_rect(rect(70, 40, 74, 44)).unwrap();
+        let mut open = 0;
+        for layer in MoveLayer::ALL {
+            for y in -1..161 {
+                for x in -1..161 {
+                    let c = Cell::new(x, y);
+                    let Some(r) = g.open_around(layer, c) else {
+                        continue;
+                    };
+                    open += 1;
+                    assert!(r.contains(c), "{layer:?} {c:?}");
+                    for ry in r.min.y..r.max.y {
+                        for rx in r.min.x..r.max.x {
+                            for size in 0..crate::SIZE_CLASSES {
+                                let size = SizeClass::new(size).unwrap();
+                                assert!(
+                                    g.is_passable(layer, size, Cell::new(rx, ry)),
+                                    "{layer:?} {c:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(open > 0);
     }
 
     #[test]
