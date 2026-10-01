@@ -155,8 +155,8 @@ pub mod pattern {
     /// over a melt that runs down, hotter with depth below model z = 0 and with the tier
     /// (`gpu_consts::melt`). A Regency mine's bore.
     pub const MOLTEN: u32 = crate::gpu_consts::melt::PATTERN;
-    /// A fusion plant's core (`GLOW` faces): plasma churning over it, the whole of it
-    /// breathing (`gpu_consts::reactor`).
+    /// A fusion plant's star (`GLOW` faces): white-hot, blue at its limb, threads of
+    /// plasma streaming over it, breathing (`gpu_consts::reactor`).
     pub const CORE: u32 = crate::gpu_consts::reactor::PATTERN_CORE;
     /// A band of charge (`GLOW` faces): pulses running round the model's z axis, where the
     /// core stands (`gpu_consts::reactor`).
@@ -164,7 +164,10 @@ pub mod pattern {
     /// A heat sink's hot core (`GLOW_ORANGE` faces): its heat rippling along it in waves
     /// (`gpu_consts::reactor`).
     pub const HEAT: u32 = crate::gpu_consts::reactor::PATTERN_HEAT;
-    pub const LAST: u32 = HEAT;
+    /// A window onto a fusion plant's plasma (`GLOW` faces): blue streaming round the
+    /// model's z axis, bright threads in it (`gpu_consts::reactor`).
+    pub const FUSION: u32 = crate::gpu_consts::reactor::PATTERN_FUSION;
+    pub const LAST: u32 = FUSION;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
@@ -198,9 +201,7 @@ pub mod part {
     pub const AFLOAT: u32 = 12;
     /// Drawn only where the structure stands on land: the pit and the ground it breaks.
     pub const ASHORE: u32 = 13;
-    /// A reactor's pump or injector: rides up and down along z a short stroke, each at
-    /// its own phase round the plant (from where it stands), while the plant runs.
-    pub const PUMP: u32 = 14;
+    // retired: 14 (a reactor's pump, riding up and down)
     /// An airbase's hatch leaves (the parked Roost model): slid apart along y, each away from the middle, by the
     /// pit's radius times how far the hatch is open (`UnitInstance::deploy`).
     pub const HATCH: u32 = 15;
@@ -264,6 +265,11 @@ pub mod part {
     /// turned about the axis while the plant runs (`gpu_consts::reactor`).
     pub const REACTOR_COLLAR_FIRST: u32 = crate::gpu_consts::reactor::PART_COLLAR_FIRST;
     const _: () = assert!(REACTOR_COLLAR_FIRST > ORBIT);
+    /// A reactor's heat sink fins, lifting in a wave while the plant runs
+    /// (`gpu_consts::reactor`).
+    pub const REACTOR_FIN: u32 = crate::gpu_consts::reactor::PART_FIN;
+    const _: () =
+        assert!(REACTOR_FIN >= REACTOR_COLLAR_FIRST + crate::gpu_consts::reactor::COLLARS);
 }
 
 /// How a vertex is rigged beyond its part: which bone of a walking leg it
@@ -673,7 +679,8 @@ pub struct Lift {
 }
 
 /// A reactor's held charge: arcs crackle from the core's skin to the electrode tips round
-/// it while the plant runs (renderer `reactor_fx.rs`). Model space, at the blueprint's size.
+/// it, and across the gaps between its rings, while the plant runs (renderer
+/// `reactor_fx.rs`). Model space, at the blueprint's size.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Discharge {
     /// The core's middle.
@@ -682,6 +689,8 @@ pub struct Discharge {
     pub radius: f32,
     /// The electrode tips.
     pub terminals: Vec<[f32; 3]>,
+    /// Gaps an arc jumps across, one end to the other: between two rings round the core.
+    pub bridges: Vec<([f32; 3], [f32; 3])>,
 }
 
 /// A mine that digs with a beam instead of a hammer (the Regency's, `models::regency::taproot`):

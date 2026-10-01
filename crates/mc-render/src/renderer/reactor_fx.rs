@@ -1,5 +1,6 @@
 //! An ARC reactor's held charge in the world (`models::Discharge`): while the plant runs,
-//! near the eye, arcs crackle from the core's skin out to the electrode tips round it,
+//! near the eye, arcs crackle from the core's skin out to the electrode tips round it
+//! and jump the gaps between its rings,
 //! blue-white and short-lived, a few a tick, now and then a heavier one that lights the
 //! plant for a moment and throws sparks off the tip it strikes; and now and then a wisp
 //! of steam rises off a heat sink (its `Exhaust`). The core's churn, the turning blades
@@ -90,7 +91,7 @@ impl Renderer {
         else {
             return;
         };
-        if d.terminals.is_empty() {
+        if d.terminals.is_empty() && d.bridges.is_empty() {
             return;
         }
         let dt = self.tick_seconds.max(0.02);
@@ -133,16 +134,26 @@ impl Renderer {
             if self.reactor_fx.left < 8 {
                 return;
             }
-            let pick = (self.scatter.unit() * d.terminals.len() as f32) as usize;
-            let tip = world(d.terminals[pick.min(d.terminals.len() - 1)]);
-            let to_tip = (tip - core).normalize_or(Vec3::Z);
-            // Off the core's skin on the near side, wandering a little round it.
-            let off = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed(),
-            ) * 0.45;
-            let from = core + (to_tip + off).normalize_or(to_tip) * r * 0.92;
+            let ends = d.terminals.len() + d.bridges.len();
+            let pick = ((self.scatter.unit() * ends as f32) as usize).min(ends - 1);
+            let (from, tip) = if let Some(&(a, b)) = pick
+                .checked_sub(d.terminals.len())
+                .and_then(|i| d.bridges.get(i))
+            {
+                // Across a gap between rings.
+                (world(a), world(b))
+            } else {
+                let tip = world(d.terminals[pick]);
+                let to_tip = (tip - core).normalize_or(Vec3::Z);
+                // Off the core's skin on the near side, wandering a little round it.
+                let off = Vec3::new(
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                ) * 0.45;
+                (core + (to_tip + off).normalize_or(to_tip) * r * 0.92, tip)
+            };
+            let to_tip = (tip - from).normalize_or(Vec3::Z);
             let side = to_tip.cross(Vec3::Z).normalize_or(Vec3::X);
             let up = side.cross(to_tip).normalize_or(Vec3::Z);
             let len = from.distance(tip);

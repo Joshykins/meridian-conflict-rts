@@ -538,17 +538,22 @@ impl MeshBuilder {
         self.lifts.clone()
     }
 
-    /// Declares the core a reactor holds and the electrode tips its arcs strike (current
-    /// frame; `Model::discharge`, renderer `reactor_fx.rs`).
-    pub fn set_discharge(&mut self, core: Vec3, radius: f32, terminals: &[Vec3]) {
+    /// Declares the core a reactor holds, the electrode tips its arcs strike and the gaps
+    /// they jump across (current frame; `Model::discharge`, renderer `reactor_fx.rs`).
+    pub fn set_discharge(
+        &mut self,
+        core: Vec3,
+        radius: f32,
+        terminals: &[Vec3],
+        bridges: &[(Vec3, Vec3)],
+    ) {
         let scale = self.transform.transform_vector3(Vec3::X).length();
+        let at = |p: Vec3| self.transform.transform_point3(p).to_array();
         self.discharge = Some(super::Discharge {
-            core: self.transform.transform_point3(core).to_array(),
+            core: at(core),
             radius: radius * scale,
-            terminals: terminals
-                .iter()
-                .map(|&t| self.transform.transform_point3(t).to_array())
-                .collect(),
+            terminals: terminals.iter().map(|&t| at(t)).collect(),
+            bridges: bridges.iter().map(|&(a, b)| (at(a), at(b))).collect(),
         });
     }
 

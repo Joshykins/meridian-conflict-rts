@@ -71,7 +71,6 @@ const PART_FEED: u32 = 11u;
 // Pieces drawn only in water (an offshore rig's stilts) or only on land (the pit).
 const PART_AFLOAT: u32 = 12u;
 const PART_ASHORE: u32 = 13u;
-const PART_PUMP: u32 = 14u;
 const PART_HATCH: u32 = 15u;
 // A strategic launcher's blast doors and the rounds it holds (models::part, nuke_fx).
 const PART_SILO_DOOR: u32 = 24u;
@@ -1824,13 +1823,11 @@ fn vs_main(in: VsIn) -> VsOut {
         let turn = way * time * REACTOR_COLLAR_SPIN * (1.0 + k * REACTOR_COLLAR_STEP) + f32(e.unit_id & 255u) * 0.7;
         p = rot_z(p, turn);
         n = rot_z(n, turn);
-    } else if in.part == PART_PUMP && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
-        // A reactor's pumps and injectors: a short stroke, a quick drive down and a slower
-        // draw back, phased by where each stands so they work round the plant in turn.
-        let phase = atan2(p.y, p.x) / 6.2831853 + f32(e.unit_id & 255u) * 0.137;
-        let beat = fract(time * 0.7 + phase);
-        let stroke = clamp(model.height * 0.035, 0.3, 1.1);
-        p.z -= stroke * select(1.0 - (beat - 0.25) / 0.75, beat / 0.25, beat < 0.25);
+    } else if in.part == REACTOR_PART_FIN && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
+        // A reactor's heat sink fins (`gpu_consts::reactor`): lifted and settled in a wave
+        // rolling out along the sinks, the hot core showing between them as they rise.
+        let wave = 0.5 + 0.5 * sin(length(p.xy) * REACTOR_FIN_WAVE - time * REACTOR_FIN_RATE + f32(e.unit_id & 255u) * 0.7);
+        p.z += model.height * REACTOR_FIN_LIFT * wave * wave;
     } else if (in.part & ORBIT_PART_MASK) == ORBIT_PART && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
         // A gyroscope's ring (`gpu_consts::orbit`): about its own axis through the pivot.
         let pivot = model.spinner_pivot.xyz;
@@ -3105,25 +3102,47 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.albedo *= 0.35 + 0.65 * blink;
     }
     let held = (in.model_class >> 16u) & 0xFFu;
-    if in.material == MAT_GLOW && (held == REACTOR_PATTERN_CORE || held == REACTOR_PATTERN_CHARGE)
+    if in.material == MAT_GLOW
+        && (held == REACTOR_PATTERN_CORE || held == REACTOR_PATTERN_CHARGE || held == REACTOR_PATTERN_FUSION)
         && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
         // A fusion plant's held charge (`gpu_consts::reactor`). Banked to an ember while the
         // plant is going up or has no power.
         let live = select(1.0, 0.06, (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) != 0u);
         let seed = in.state.w * 61.0;
         if held == REACTOR_PATTERN_CORE {
-            // The core: plasma churning over it, a white-hot face toward the eye, a blue
-            // limb, and the whole of it breathing with a quicker flicker over the beat.
-            let q = in.local * 0.55 + vec3<f32>(0.0, 0.0, -time * 0.9) + seed;
-            let churn = surf_noise3(q) * 0.6 + surf_noise3(q * 2.3 + vec3<f32>(time * 0.7, 0.0, 0.0)) * 0.4;
+            // The star: white-hot through its middle, going pale and then electric blue to
+            // a bright limb, fine threads of plasma streaming over it, breathing.
             let face = saturate(dot(n, v));
-            let breath = 0.82 + 0.18 * sin(time * 2.2 + seed) + 0.06 * sin(time * 13.0 + seed * 3.0);
-            let hot = saturate(face * face * 0.55 + (churn - 0.5) * 1.6 + 0.1);
-            let deep = vec3<f32>(0.08, 0.32, 1.0);
-            let pale = vec3<f32>(0.62, 0.84, 1.0);
-            let col = mix(deep, pale, hot);
-            m.emissive = mix(col, vec3<f32>(1.0, 0.98, 0.95), hot * hot * hot) * (0.9 + 3.2 * hot * hot) * breath * live;
+            let q = in.local * 1.1 + vec3<f32>(0.0, 0.0, -time * 1.3) + seed;
+            let a = 1.0 - abs(surf_noise3(q) * 2.0 - 1.0);
+            let b = 1.0 - abs(surf_noise3(q * 2.7 + vec3<f32>(time * 0.9, -time * 0.6, 0.0)) * 2.0 - 1.0);
+            let threads = pow(a, 8.0) * 0.7 + pow(b, 10.0) * 0.5;
+            let breath = 0.88 + 0.12 * sin(time * 2.2 + seed) + 0.04 * sin(time * 13.0 + seed * 3.0);
+            let heart = pow(face, 1.6);
+            let blue = vec3<f32>(0.1, 0.42, 1.0);
+            let pale = vec3<f32>(0.7, 0.9, 1.0);
+            let col = mix(mix(blue, pale, heart), vec3<f32>(1.0, 0.99, 0.97), heart * heart);
+            let rim = pow(1.0 - face, 3.0);
+            m.emissive = (col * (0.7 + 2.0 * heart * heart) * (1.0 - threads * 0.5) + blue * rim * 2.6
+                + vec3<f32>(0.9, 0.97, 1.0) * threads * 3.0) * breath * live;
             m.albedo = vec3<f32>(0.6, 0.75, 1.0) * 0.3;
+        } else if held == REACTOR_PATTERN_FUSION {
+            // Fusion behind glass: blue plasma streaming round the plant's axis, bright
+            // threads running through it, the whole of it surging.
+            let around = atan2(in.local.y, in.local.x);
+            let z = in.local.z;
+            let flow = surf_noise3(vec3<f32>(around * 3.0 - time * 0.9, z * 0.35, seed + time * 0.15));
+            let fine = surf_noise3(vec3<f32>(around * 7.0 - time * 1.7, z * 0.8 + time * 0.3, seed * 1.7));
+            let thread = pow(1.0 - abs(sin(z * 1.3 + flow * 4.0 + around * 2.0 - time * 1.1)), 12.0);
+            let surge = 0.8 + 0.2 * sin(time * 1.4 + around * 2.0 + seed);
+            let deep = vec3<f32>(0.02, 0.12, 0.65);
+            let cyan = vec3<f32>(0.25, 0.75, 1.0);
+            let glow = saturate(flow * 0.8 + fine * 0.4 - 0.2);
+            let col = mix(deep, cyan, glow * glow) * (0.35 + 1.1 * glow)
+                + vec3<f32>(0.6, 0.88, 1.0) * thread * 1.8 + cyan * pow(fine, 4.0) * 0.8;
+            m.emissive = col * surge * live;
+            m.albedo = vec3<f32>(0.01, 0.02, 0.05);
+            m.roughness = 0.9;
         } else {
             // A band of charge: pulses chasing round it, white at their heads.
             let around = atan2(in.local.y, in.local.x) / 6.2831853;

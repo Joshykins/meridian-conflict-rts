@@ -589,11 +589,12 @@ shared! {
         pub const SWING: f32 = 1.85;
     }
 
-    /// An ARC fusion plant's held charge (models/aster/fusion.rs, entity.wgsl): the core it
-    /// holds, the charge running round its lit bands, and the blades and turntables that
-    /// turn round it.
+    /// An ARC fusion plant's held charge (models/aster/reactor.rs, entity.wgsl): the star
+    /// it holds, the charge running round its lit bands, the fusion behind its windows,
+    /// and the rings and blades that turn round it.
     pub mod reactor as "REACTOR_" {
-        /// `pattern::CORE` (`GLOW` faces): the core, plasma churning over it and breathing.
+        /// `pattern::CORE` (`GLOW` faces): the star, white-hot through its middle, a blue
+        /// limb, fine threads of plasma streaming over it, breathing.
         pub const PATTERN_CORE: u32 = 32;
         /// `pattern::CHARGE` (`GLOW` faces): pulses of charge running round the model's z
         /// axis, as on a band round the core.
@@ -601,18 +602,27 @@ shared! {
         /// `pattern::HEAT` (`GLOW_ORANGE` faces): a heat sink's hot core, its heat
         /// rippling along it in waves and flickering, banked low while the plant is down.
         pub const PATTERN_HEAT: u32 = 34;
+        /// `pattern::FUSION` (`GLOW` faces): a window onto the fusion inside, blue plasma
+        /// streaming round the model's z axis with bright threads in it, surging.
+        pub const PATTERN_FUSION: u32 = 35;
         /// Pulses of charge round a band, and how many times round a second they run.
         pub const PULSES: f32 = 3.0;
         pub const PULSE_RATE: f32 = 0.9;
-        /// Collar `k` (0 lowest) is part `PART_COLLAR_FIRST + k`, `k` below `COLLARS`:
-        /// machinery round the plant's z axis (a turntable and the blades on it), turned
-        /// about it while the plant runs, neighbours the other way, each a little quicker
-        /// than the one below.
+        /// Collar `k` (0 innermost) is part `PART_COLLAR_FIRST + k`, `k` below `COLLARS`:
+        /// a ring round the plant's z axis and the blades on it, turned about it while the
+        /// plant runs, neighbours the other way, each a little quicker than the one inside.
         pub const PART_COLLAR_FIRST: u32 = 67;
         pub const COLLARS: u32 = 4;
         /// Radians a second the lowest collar turns.
         pub const COLLAR_SPIN: f32 = 0.35;
         pub const COLLAR_STEP: f32 = 0.45;
+        /// A heat sink's fins: lifted and settled again in a wave rolling out from the
+        /// plant's z axis while it runs, by up to `FIN_LIFT` of the model's height, with
+        /// `FIN_WAVE` crests a metre and `FIN_RATE` radians a second.
+        pub const PART_FIN: u32 = 71;
+        pub const FIN_LIFT: f32 = 0.018;
+        pub const FIN_WAVE: f32 = 0.8;
+        pub const FIN_RATE: f32 = 2.6;
     }
 
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
