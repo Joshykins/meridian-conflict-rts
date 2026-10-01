@@ -313,8 +313,18 @@ t47 (killed : lost): warships 5.7, defend 1.1, army 0.65, raids small. The
 Commander loses its army's trades where it gathers, to hover raids, corvettes and
 artillery, and still builds a thinner army than the classic AI at the same income.
 
-Team maps (4v4 and 3v3 on The Axis, Halden's Grip, Serac Sound, Vermilion Gorge):
-RESULTS_TEAM
+Team maps (t48: 4v4 on The Axis, Halden's Grip and Serac Sound, 3v3 on Vermilion
+Gorge, against the classic AI's adaptive and aggressive doctrines, both sides, 30
+minutes): 12 of 16 drawn, score 0.36; the four losses are all on Serac Sound, where
+the Commander's whole team was eliminated. There its operations trade well: army
+1.3, fleet 1.7, defence 1.9, and it warps 20 to 70 times a match.
+
+Commander against Commander (t50: dev16, serac_divide and The Axis, aggressive
+against economic and defensive against adaptive, both ways, 30 minutes): the
+doctrines play different games. Aggressive held its waves all in and raided
+(score 0.62); Defensive fortified and sieged (0.50); Adaptive mixed waves, raids,
+landings and fleets (0.50); Economic went all in on nukes, titans and landings
+(0.38): it has a nuke silo up by minute 30 on serac_divide.
 
 What it does that the classic AI does not:
 
