@@ -33,6 +33,9 @@ const BRACE_AT: f32 = 3.0;
 /// The crest rail: how far out from the middle, and its height.
 const RAIL: (f32, f32) = (0.85, 4.5);
 const THICK: f32 = 0.25;
+/// The owner's colour is a small mark at each section's middle, not a stripe down the
+/// wall: a tab on the crest, a square on a tower's top. Half its length, per quarter.
+const TEAM_TAB: f32 = 0.6;
 
 /// The wall: a dark footing, a bronze waist, dark armour battered up to a narrow crest.
 fn run(b: &MeshBuilder) -> Profile {
@@ -157,7 +160,7 @@ fn run_a(b: &mut MeshBuilder) {
             v3(0.0, w, top),
         ],
     );
-    team_strip(b, v3(0.0, 0.0, top), v3(EDGE, 0.25, top));
+    team_strip(b, v3(0.0, 0.0, top), v3(TEAM_TAB, 0.15, top));
     for x in HUNG {
         hung_plate(b, x);
     }
@@ -195,8 +198,8 @@ fn join(b: &mut MeshBuilder) {
             v3(0.0, EDGE, top),
         ],
     );
-    team_strip(b, v3(0.0, 0.0, top), v3(EDGE, 0.25, top));
-    team_strip(b, v3(0.0, 0.25, top), v3(0.25, EDGE, top));
+    team_strip(b, v3(0.0, 0.0, top), v3(TEAM_TAB, 0.15, top));
+    team_strip(b, v3(0.0, 0.15, top), v3(0.15, TEAM_TAB, top));
     // The plates nearer the turn would cross the mitre; the outer ones hang clear.
     hung_plate(b, HUNG[1]);
     b.with(diagonal(), |b| hung_plate(b, HUNG[1]));
@@ -249,9 +252,9 @@ fn cap(b: &mut MeshBuilder) {
         b,
         vec![
             v3(0.0, 0.0, top + 0.03),
-            v3(1.0, 0.0, top + 0.03),
-            v3(1.0, 1.0, top + 0.03),
-            v3(0.0, 1.0, top + 0.03),
+            v3(TEAM_TAB, 0.0, top + 0.03),
+            v3(TEAM_TAB, TEAM_TAB, top + 0.03),
+            v3(0.0, TEAM_TAB, top + 0.03),
         ],
         Vec3::Z,
     );
@@ -333,7 +336,7 @@ fn deck(b: &mut MeshBuilder, points: Vec<Vec3>) {
     face_out(b, points, Vec3::Z);
 }
 
-/// A strip of team colour along the crest, from corner `a` to corner `c` (on the deck).
+/// A patch of team colour on the deck, from corner `a` to corner `c`.
 fn team_strip(b: &mut MeshBuilder, a: Vec3, c: Vec3) {
     let z = a.z + 0.03;
     b.paint(TEAM);
