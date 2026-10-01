@@ -2937,6 +2937,11 @@ impl World {
             self.finish_order(row);
             return Ok(());
         };
+        // Taken up from an Area Assist ring: paused work is given up (`area_work.rs`).
+        if self.area_assist_yields(row, t) {
+            return Ok(());
+        }
+        let units = &self.state.units;
         // What there is to do, in priority order: finish the target itself,
         // help with whatever it is building, repair it, or feed a live shield.
         let work = if units.has_flag(t, flag::UNDER_CONSTRUCTION) {

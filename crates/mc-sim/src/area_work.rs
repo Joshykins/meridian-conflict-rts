@@ -6,6 +6,8 @@
 //! it with an order put in front of the guard, which carries on when that is done, so
 //! work that turns up later is picked up too. Reclaim is the least of it: a wreck in hand
 //! is dropped as soon as there is raising or mending to do, or the store is full.
+//! Paused units are left alone: nothing paused is raised or mended from the ring (nor a
+//! paused factory's product), and work in hand is given up when it is paused.
 
 use crate::orders::order;
 use crate::reclaim::WIDEST_TARGET;
@@ -87,6 +89,44 @@ impl World {
         }
     }
 
+    /// An engineer helping with `t`, work it took up from its area, gives it up when that
+    /// work is paused: an upgrade or refit on hold, or the product of a paused factory.
+    /// It goes back on guard and looks round for other work. True when it gave it up.
+    pub(crate) fn area_assist_yields(&mut self, row: usize, t: usize) -> bool {
+        let units = &self.state.units;
+        let on_guard = self
+            .state
+            .orders
+            .iter(units, row)
+            .nth(1)
+            .is_some_and(|g| g.kind == OrderKind::Guard);
+        if !on_guard || !self.raising_paused(t) {
+            return false;
+        }
+        self.state.units.build_target[row] = Handle::NONE;
+        self.finish_order(row);
+        true
+    }
+
+    /// Whether the raising of `t` is on hold: `t` itself is paused, or it is a product
+    /// in a factory that is.
+    fn raising_paused(&self, t: usize) -> bool {
+        self.work_paused(t)
+            || (self.state.units.has_flag(t, flag::IN_FACTORY)
+                && self.product_factory(t).is_some_and(|f| self.work_paused(f)))
+    }
+
+    /// The factory printing the product in `p`: it stands on the factory's lot centre.
+    fn product_factory(&self, p: usize) -> Option<usize> {
+        let units = &self.state.units;
+        let id = units.id(p);
+        self.index
+            .nearest(units.pos[p], WIDEST_TARGET, kind::UNIT, |e| {
+                self.unit_entry_is_current(e) && units.build_target[e.row as usize] == id
+            })
+            .map(|e| e.row as usize)
+    }
+
     /// Whether this is one of the ticks an engineer looks round its area.
     fn area_looks(&self, row: usize) -> bool {
         (self.state.tick as usize + row).is_multiple_of(LOOK_TICKS)
@@ -107,6 +147,7 @@ impl World {
             self.index.nearest(pos, span, kind::UNIT, |e| {
                 self.unit_entry_is_current(e)
                     && inside(e)
+                    && !self.work_paused(e.row as usize)
                     && self.can_repair_unit(row, e.row as usize)
             })
         };
@@ -129,7 +170,10 @@ impl World {
     /// commander's refit, or a factory's product).
     fn area_raise(&self, owner: u8, t: usize) -> bool {
         let units = &self.state.units;
-        if self.are_enemies(owner, units.owner[t]) || units.has_flag(t, flag::IN_FACTORY) {
+        if self.are_enemies(owner, units.owner[t])
+            || units.has_flag(t, flag::IN_FACTORY)
+            || self.work_paused(t)
+        {
             return false;
         }
         units.has_flag(t, flag::UNDER_CONSTRUCTION)

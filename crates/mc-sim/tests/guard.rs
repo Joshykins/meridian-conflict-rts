@@ -397,6 +397,78 @@ fn an_area_engineer_helps_a_factory_in_its_ring() {
 }
 
 #[test]
+fn an_area_engineer_leaves_a_paused_factory_alone() {
+    let mut w = field();
+    give(
+        &mut w,
+        0,
+        Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        },
+    );
+    let mason = add(&mut w, 0, "aster_t1_engineer", 500, 500);
+    let factory = add(&mut w, 0, "aster_t1_land_factory", 750, 500);
+    let units = vec![id(&w, mason)];
+    give(
+        &mut w,
+        0,
+        Command::Guard {
+            units,
+            pos: FxVec2::from_ints(500, 500),
+            target: mc_sim::Handle::NONE,
+            radius: Fx::from_int(400),
+            queue: false,
+        },
+    );
+    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
+    let factories = vec![id(&w, factory)];
+    give(
+        &mut w,
+        0,
+        Command::Produce {
+            factories,
+            blueprint: tank,
+            count: 2,
+        },
+    );
+    let helping = until(&mut w, 600, |w| {
+        w.state.units.has_flag(mason, flag::BUILDING)
+    });
+    assert!(
+        helping.is_some(),
+        "it went to help with the factory's product"
+    );
+    let units = vec![id(&w, factory)];
+    give(
+        &mut w,
+        0,
+        Command::SetPaused {
+            units,
+            paused: true,
+        },
+    );
+    let product = w
+        .state
+        .units
+        .row(w.state.units.build_target[factory])
+        .unwrap();
+    let progress = w.state.units.build_progress[product];
+    run(&mut w, 300);
+    let units = &w.state.units;
+    assert_eq!(
+        w.state.orders.front(units, mason).map(|o| o.kind),
+        Some(OrderKind::Guard),
+        "it gave the paused factory up and stayed on guard"
+    );
+    assert!(!units.has_flag(mason, flag::BUILDING));
+    assert_eq!(
+        units.build_progress[product], progress,
+        "the paused factory's product waits where it got to"
+    );
+}
+
+#[test]
 fn an_area_engineer_helps_an_engineer_upgrade_in_its_ring() {
     let mut w = field();
     give(
