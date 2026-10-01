@@ -538,6 +538,17 @@ shared! {
         pub const GLOW_MATERIAL: u32 = 27;
     }
 
+    /// Pinch fusion's light: the Regency's star cores. Plasma
+    /// pinched until it fuses burns white-hot at the heart with a pastel prism round it,
+    /// running pink, violet, blue, cyan and gold (common.wgsl `prism`), like the light of a
+    /// bridge between stars, not the red of the lesser grades.
+    pub mod prism as "PRISM_" {
+        /// `material::GLOW_PRISM`: a star core and its flares, the prism turning over them.
+        pub const GLOW_MATERIAL: u32 = 28;
+        /// How many times a second the prism's colours run once round.
+        pub const RATE: f32 = 0.35;
+    }
+
     /// Rock a beam has melted: the walls of a Regency mine's bore (`pattern::MOLTEN`,
     /// surface.wgsl). A glassy crust over a glowing melt, its cracks lit, the melt running
     /// down; hotter the deeper it goes and the higher the mine's tier.

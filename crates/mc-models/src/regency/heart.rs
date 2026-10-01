@@ -5,8 +5,9 @@
 //!
 //! Gravity pinches plasma into a small star, and the plant is the cage that holds it:
 //!
-//! - The star in the middle: a white-hot core wrapped in red flares (`GLOW_LAMP`,
-//!   `GLOW_LASER`).
+//! - The star in the middle: a white-hot core wrapped in flares, all pinch fusion's
+//!   light (`GLOW_PRISM`): white where it faces you, breaking into a turning pastel
+//!   prism, pink, violet, blue, cyan and gold, toward its rim.
 //! - The gravity cage round it: fixed bronze rings crossed about it, and turning ones
 //!   (`part::SPINNER`) with their weights; tech 1 has two fixed and one turning, tech 2
 //!   three and two, tech 3 four and three.
@@ -148,7 +149,7 @@ fn coarse(b: &mut MeshBuilder, p: &Plant) {
             ]);
         });
     }
-    b.paint(GLOW_LAMP);
+    b.paint(GLOW_PRISM);
     b.cylinder_between(
         STAR - Vec3::Z * CORE_R,
         STAR + Vec3::Z * CORE_R,
@@ -158,14 +159,13 @@ fn coarse(b: &mut MeshBuilder, p: &Plant) {
     );
 }
 
-/// The star: a white-hot core wrapped in red flares, each a ring round it at its own
-/// tilt.
+/// The star: a white-hot core wrapped in flares, each a ring round it at its own tilt,
+/// all in pinch fusion's prism.
 fn star(b: &mut MeshBuilder, p: &Plant) {
     let fine = b.fine();
-    b.paint(GLOW_LAMP);
+    b.paint(GLOW_PRISM);
     let sides = b.sides(12);
     b.spheroid(STAR, Vec3::splat(CORE_R), sides, if fine { 8 } else { 5 });
-    b.paint(GLOW_LASER);
     let flares = if fine { p.flares } else { 1 };
     for k in 0..flares {
         let a = (360.0 / flares as f32 * k as f32).to_radians();
@@ -402,7 +402,7 @@ mod tests {
             let lamp: Vec<_> = model.lods[0]
                 .vertices
                 .iter()
-                .filter(|v| v.material == crate::material::GLOW_LAMP)
+                .filter(|v| v.material == crate::material::GLOW_PRISM)
                 .map(|v| v.pos[0])
                 .collect();
             lamp.iter().fold(f32::MIN, |a, &b| a.max(b))

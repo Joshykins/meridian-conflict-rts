@@ -254,7 +254,8 @@ sci-fi exception is **gravity manipulation**, and their power, weapons and
 guided weapons all come from it. As with ARC, it is not a strict ladder.
 
 - **Power: star cores.** Gravity pinches plasma into a small caged star
-  (pinch fusion under star conditions). A higher tier holds a bigger star. A
+  (pinch fusion under star conditions). A higher tier holds a bigger star. The
+  star burns in pinch fusion's prism (below). A
   breached core collapses inward before it flashes out, never a plain
   explosion.
 - **Weapons are plasma, and it punches.** The plasma is bound by gravity so
@@ -281,6 +282,13 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   | 1 | Cannon | **Plasmeric** | A bound charge: a hard red slug |
   | 2 | Railgun | **Pinched-plasmeric** | Plasma condensed by gravity and driven downrange as a tight, dense stream |
   | 3 | AEB | **Pinch-fusion** | The condensed plasma is pushed until it starts fusing, and the gun fires those fusion events out: bright white bursts strobing along the stream |
+
+- **Pinch fusion's light is the prism.** Where plasma fuses it burns
+  white-hot, and only toward its edge breaks into a turning pastel prism:
+  pink, violet, blue, cyan, gold (the Bifrost; a pink-white beam in space).
+  Mostly white, a little colour. The star cores have it; the Pinch-fusion
+  guns are to follow. The lower grades stay red. One colour source:
+  `gpu_consts::prism` and common.wgsl `prism`.
 
 - **The set**
   - **Direct fire**

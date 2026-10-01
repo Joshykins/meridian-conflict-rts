@@ -37,6 +37,7 @@ pub fn material_color(id: u32) -> ([f32; 3], bool) {
         material::PRECURSOR_INLAY => ([0.05, 0.06, 0.08], false),
         material::VISOR => ([0.62, 0.3, 0.05], false),
         material::GLOW_MATERIALS => ([1.0, 0.42, 0.24], true),
+        material::GLOW_PRISM => ([1.0, 0.72, 0.96], true),
         _ => ([1.0, 0.0, 1.0], false),
     }
 }

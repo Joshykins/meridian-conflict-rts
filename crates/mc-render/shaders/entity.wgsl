@@ -2547,6 +2547,12 @@ fn material_of(id: u32, owner: u32) -> Pbr {
         case 24u: { m.albedo = globals.shield.rgb * 0.25; m.emissive = pow(globals.shield.rgb, vec3<f32>(2.2)) * 2.6; m.roughness = 0.3; }
         default: {}
     }
+    if id == PRISM_GLOW_MATERIAL {
+        // A star core: white-hot (`fs_main` runs the prism over its rim).
+        m.albedo = vec3<f32>(0.5, 0.42, 0.5);
+        m.emissive = vec3<f32>(1.0, 0.94, 0.98) * 5.0;
+        m.roughness = 0.2;
+    }
     if id == MASS_GLOW_MATERIAL {
         // A reclaim emitter: Materials red-orange (`fs_main` banks it while idle).
         let materials = vec3<f32>(MASS_R, MASS_G, MASS_B);
@@ -2961,6 +2967,23 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             m.albedo *= 0.6;
         }
     }
+    if in.material == PRISM_GLOW_MATERIAL && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
+        // Pinch fusion's light (gpu_consts `prism`): white-hot where the star faces the eye,
+        // breaking into the prism only toward its rim, the way light breaks on a bubble,
+        // wisps of colour drifting through it and the whole prism turning round the star.
+        let facing = abs(dot(n, v));
+        let wisp = 0.5 * sin(in.local.x * 1.7 + in.local.z * 1.3 + time * 2.1)
+            + 0.35 * sin(in.local.y * 2.3 - in.local.z * 0.9 - time * 1.4);
+        let around = atan2(in.local.y, in.local.x) / 6.2831853;
+        let hue = prism((1.0 - facing) * 1.3 + around + wisp * 0.3 + time * PRISM_RATE + in.state.w);
+        // Mostly white-hot: the colour lives in a band round the rim. Mostly squared, so it
+        // keeps some colour this bright instead of washing out to white in the tone map.
+        let deep = mix(hue, hue * hue, 0.8);
+        let white = smoothstep(0.5, 0.95, facing) * (0.85 + 0.15 * wisp);
+        let breathe = 0.9 + 0.1 * sin(time * 7.0 + in.state.w * 20.0);
+        m.emissive = mix(deep * 2.8, vec3<f32>(1.0, 0.95, 0.98) * 5.0, white) * breathe;
+        m.albedo = deep * 0.3;
+    }
     if in.material == MAT_GLOW_PRECURSOR && (flags & KIND_WRECK) == 0u {
         // Precursor light breathes, and bands of it rise up the machine: the same pulse
         // as the light in its plate's slots (`precursor_pulse`), so the two run as one.
@@ -3063,7 +3086,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
     }
     if (flags & (KIND_PROP | KIND_GHOST)) == 0u && in.material != MAT_GLOW && in.material != MAT_GLOW_ORANGE && in.material != MAT_GLOW_AMBER && in.material != MAT_GLOW_RED && in.material != MAT_GLOW_VIOLET && in.material != MAT_GLOW_LASER && in.material != MAT_GLOW_PRECURSOR
-        && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR && in.material != MASS_GLOW_MATERIAL {
+        && in.material != MAT_GLOW_NAV_RED && in.material != MAT_GLOW_NAV_GREEN && in.material != MAT_GLOW_LAMP && in.material != MAT_GLOW_SHIELD && in.material != MAT_PRECURSOR_INLAY && in.material != MAT_VISOR && in.material != MASS_GLOW_MATERIAL && in.material != PRISM_GLOW_MATERIAL {
         // Field dirt (`surf_dirt`): mud and spatter thrown up over the running gear and
         // lower hull, runs down the steep faces, dust on the decks, grime in the seams.
         // Plain tech 1 kit is the dirtiest; the higher tiers stay closer to parade white.

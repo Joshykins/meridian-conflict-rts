@@ -283,6 +283,24 @@ fn hash11(n: f32) -> f32 {
     return fract(sin(n * 12.9898) * 43758.5453);
 }
 
+// Pinch fusion's prism (gpu_consts `prism`): a pastel colour that runs pink, violet,
+// blue, cyan, gold, rose and back to pink as `t` goes once round (one per unit of t).
+// Unit brightness; the caller pushes it.
+fn prism(t: f32) -> vec3<f32> {
+    var stops = array<vec3<f32>, 6>(
+        vec3<f32>(1.0, 0.3, 0.72),
+        vec3<f32>(0.62, 0.28, 1.0),
+        vec3<f32>(0.3, 0.52, 1.0),
+        vec3<f32>(0.36, 0.95, 1.0),
+        vec3<f32>(1.0, 0.82, 0.42),
+        vec3<f32>(1.0, 0.45, 0.55),
+    );
+    let x = fract(t) * 6.0;
+    let i = min(u32(x), 5u);
+    let f = smoothstep(0.0, 1.0, x - f32(i));
+    return mix(stops[i], stops[(i + 1u) % 6u], f);
+}
+
 fn hash21(p: vec2<f32>) -> f32 {
     // Stable at large world coordinates. A `sin` hash of the lattice locks
     // into a visible grid once `xy` is tens of kilometres.
