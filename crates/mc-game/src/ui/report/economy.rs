@@ -1,66 +1,71 @@
-//! The economy page: income, spending and stores over the match, what each side's
-//! materials bought, and a ledger of the totals.
+//! The economy page: income, reclaim, spending and stores over the match; where
+//! each side's materials came from (mined against reclaimed) and what they bought;
+//! a ledger of the totals; and where the reclaim was done, with the richest wrecks.
 
 use super::analysis::{clock, short, Metric, SPEND_KINDS};
 use super::chart::{self, Series};
 use super::{block, chips, ease, legend, well, Ctx, Report};
-use crate::ui::{id, ink, palette, rgb, type_scale, Color, Rect, Ui};
+use crate::ui::{id, palette, rgb, type_scale, Color, Rect, Ui};
 
-const METRICS: [Metric; 6] = [
-    Metric::MassIncome,
-    Metric::EnergyIncome,
-    Metric::Collected,
-    Metric::Spending,
-    Metric::Stored,
-    Metric::Efficiency,
+/// The curves to pick from, with the chip each is picked by.
+const METRICS: [(Metric, &str); 8] = [
+    (Metric::MassIncome, "Income"),
+    (Metric::ReclaimRate, "Reclaim"),
+    (Metric::Collected, "Collected"),
+    (Metric::Reclaimed, "Reclaimed"),
+    (Metric::Spending, "Spending"),
+    (Metric::Stored, "Stored"),
+    (Metric::EnergyIncome, "Energy"),
+    (Metric::Efficiency, "Efficiency"),
 ];
 
 /// A colour for each of `SPEND_KINDS`.
 const SPEND_TONES: [u32; 6] = [0xFF5A24, 0xFFB43C, 0xE9D98A, 0x6FD08C, 0x5AA9FF, 0x9A9AA2];
 
 pub fn draw(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
-    let left = Rect::new(r.x, r.y, r.w * 0.66, r.h);
-    let right = Rect::new(
-        left.right() + 28.0,
-        r.y,
-        r.right() - left.right() - 28.0,
-        r.h,
-    );
+    // Three columns: the curves; where the materials came from and went, and the
+    // ledger; where the reclaim was done and the wrecks it took.
+    let gap = 28.0;
+    let a_w = r.w * 0.46;
+    let side_w = (r.w - a_w - 2.0 * gap) * 0.5;
+    let left = Rect::new(r.x, r.y, a_w, r.h);
+    let mid = Rect::new(left.right() + gap, r.y, side_w, r.h);
+    let right = Rect::new(mid.right() + gap, r.y, r.right() - mid.right() - gap, r.h);
     curves(report, ui, ctx, left);
-    // The right column: the spending and the ledger as tall as their rows need,
-    // the share of the economy in what is left.
-    let n = report.a.sides.len().max(1) as f32;
-    let spend_h = 24.0 + 30.0 + n * spend_row(report.a.sides.len());
-    spending(
+
+    let n = report.a.sides.len();
+    let want = |row: f32| 24.0 + 30.0 + n.max(1) as f32 * row;
+    let ledger_h = (24.0 + 34.0 + n.max(1) as f32 * 26.0 + 6.0).min(mid.h * 0.3);
+    let room = mid.h - ledger_h - 2.0 * 18.0;
+    let from_h = want(super::salvage::source_row(n)).min(room * 0.5);
+    let went_h = want(spend_row(n)).min(room - from_h);
+    super::salvage::sources(report, ui, ctx, Rect::new(mid.x, mid.y, mid.w, from_h));
+    let y = mid.y + from_h + 18.0;
+    spending(report, ui, ctx, Rect::new(mid.x, y, mid.w, went_h));
+    let y = y + went_h + 18.0;
+    ledger(report, ui, ctx, Rect::new(mid.x, y, mid.w, ledger_h));
+
+    let map_side = right.w.min(right.h * 0.62);
+    super::salvage::map(
         report,
         ui,
         ctx,
-        Rect::new(right.x, right.y, right.w, spend_h),
+        Rect::new(right.x, right.y, map_side, map_side + 24.0),
     );
-    let ledger_y = right.y + spend_h + 18.0;
-    let ledger_h = 24.0 + 34.0 + n * 26.0 + 6.0;
-    ledger(
+    let y = right.y + map_side + 24.0 + 18.0;
+    super::salvage::hauls(
         report,
         ui,
         ctx,
-        Rect::new(right.x, ledger_y, right.w, ledger_h),
+        Rect::new(right.x, y, right.w, right.bottom() - y),
     );
-    let share_y = ledger_y + ledger_h + 18.0;
-    if right.bottom() - share_y > 110.0 {
-        share(
-            report,
-            ui,
-            ctx,
-            Rect::new(right.x, share_y, right.w, right.bottom() - share_y),
-        );
-    }
 }
 
 /// The height of a side's line in the spending block: room for a breakdown under
 /// the bar when there are few sides.
 fn spend_row(sides: usize) -> f32 {
     if sides <= 4 {
-        52.0
+        54.0
     } else {
         28.0
     }
@@ -68,10 +73,10 @@ fn spend_row(sides: usize) -> f32 {
 
 fn curves(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     let inner = block(ui, r, "Over the Match");
-    let names: Vec<&str> = METRICS.iter().map(|m| m.name()).collect();
+    let names: Vec<&str> = METRICS.iter().map(|m| m.1).collect();
     let chosen = METRICS
         .iter()
-        .position(|&m| m == report.economy)
+        .position(|m| m.0 == report.economy)
         .unwrap_or(0);
     if let Some(i) = chips(
         ui,
@@ -80,7 +85,7 @@ fn curves(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         &names,
         chosen,
     ) {
-        report.economy = METRICS[i];
+        report.economy = METRICS[i].0;
         // The new curves draw in afresh.
         report.tab_age = report.tab_age.min(0.35);
     }
@@ -147,22 +152,29 @@ fn spending(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         .iter()
         .map(|s| s.spend.iter().sum::<f32>())
         .fold(1.0f32, f32::max);
-    let top = inner.y + 30.0;
-    let row_h = spend_row(sides.len());
-    let detailed = row_h > 40.0;
+    let top = inner.y + 26.0;
+    let row_h = spend_row(sides.len()).min((inner.bottom() - top) / sides.len().max(1) as f32);
+    let detailed = row_h > 44.0;
     let mut hover: Option<(usize, usize)> = None;
     for (i, s) in sides.iter().enumerate() {
         let k = ease((report.tab_age - 0.1 - 0.06 * i as f32) / 0.6);
         let y = top + i as f32 * row_h;
-        let mid = y + if detailed { 12.0 } else { row_h * 0.5 };
-        let name_w = 120.0;
-        let (st, name) = ui.fitted(type_scale::CAPTION, &s.name, name_w - 22.0);
+        // The side and its total over its bar, as in the block above it.
+        let head = y + 8.0;
+        let (st, name) = ui.fitted(type_scale::CAPTION, &s.name, inner.w * 0.6);
         let c = report.color(ctx, i);
-        ui.fill(Rect::new(inner.x, mid - 4.0, 8.0, 8.0), c);
-        ui.text(inner.x + 14.0, mid, st, rgb(palette::TEXT, 0.9), &name);
+        ui.fill(Rect::new(inner.x, head - 4.0, 8.0, 8.0), c);
+        ui.text(inner.x + 14.0, head, st, rgb(palette::TEXT, 0.9), &name);
         let total: f32 = s.spend.iter().sum();
-        let full = inner.w - name_w - 54.0;
-        let bar = Rect::new(inner.x + name_w, mid - 7.0, full, 14.0);
+        ui.text_right(
+            inner.right(),
+            head,
+            type_scale::VALUE,
+            rgb(palette::TEXT, k),
+            &short(total * k),
+        );
+        let full = inner.w;
+        let bar = Rect::new(inner.x, y + 17.0, full, if detailed { 10.0 } else { 6.0 });
         // Under the bar, what each kind came to, largest first.
         if detailed {
             let mut kinds: Vec<usize> = (0..SPEND_KINDS.len())
@@ -172,8 +184,8 @@ fn spending(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             let mut x = bar.x;
             for kind in kinds {
                 let text = format!("{} {}", SPEND_KINDS[kind], short(s.spend[kind] * k));
-                let w = ui.text_width(type_scale::MICRO, &text) + 22.0;
-                if x + w > bar.right() + 40.0 {
+                let w = ui.text_width(type_scale::MICRO, &text) + 18.0;
+                if x + w > bar.right() + 10.0 {
                     break;
                 }
                 ui.fill(
@@ -209,13 +221,6 @@ fn spending(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             }
             bx += w;
         }
-        ui.text(
-            bar.right() + 8.0,
-            bar.mid_y(),
-            type_scale::VALUE,
-            rgb(palette::TEXT, k),
-            &short(total * k),
-        );
     }
     if let Some((i, kind)) = hover {
         let s = &sides[i];
@@ -253,10 +258,9 @@ type LedgerColumn = (&'static str, fn(&super::analysis::SideReport) -> String);
 fn ledger(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     let inner = block(ui, r, "Ledger");
     well(ui, inner);
-    let cols: [LedgerColumn; 6] = [
+    let cols: [LedgerColumn; 5] = [
         ("Collected", |s| short(s.collected)),
         ("Reclaimed", |s| short(s.reclaimed)),
-        ("Spent", |s| short(s.spent)),
         ("Energy", |s| short(s.energy_collected)),
         ("Best /s", |s| short(s.peak_income)),
         ("Stalled", |s| {
@@ -282,7 +286,7 @@ fn ledger(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         rgb(palette::LINE, 0.12),
     );
     let sides = &report.a.sides;
-    let row_h = 26.0;
+    let row_h = ((inner.bottom() - head - 16.0) / sides.len().max(1) as f32).min(26.0);
     for (i, s) in sides.iter().enumerate() {
         let y = head + 14.0 + (i as f32 + 0.5) * row_h;
         if i % 2 == 1 {
@@ -305,53 +309,4 @@ fn ledger(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             );
         }
     }
-}
-
-/// Each side's share of all the materials coming in, over the match: bands that
-/// stack to the whole.
-fn share(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
-    let inner = block(ui, r, "Share of the Economy");
-    let plot = Rect::new(inner.x, inner.y + 4.0, inner.w, inner.h - 30.0);
-    ui.fill(plot, ink(0.35));
-    let a = &report.a;
-    let n = a.sides.len();
-    let samples = a.times.len();
-    if samples < 2 || n == 0 {
-        return;
-    }
-    let length = super::analysis::seconds(a.length).max(1.0);
-    let curves: Vec<&[f32]> = (0..n).map(|i| a.curve(Metric::MassIncome, i)).collect();
-    let columns = (plot.w / 3.0).max(1.0) as usize;
-    let shown = report.reveal(0.2);
-    for col in 0..columns {
-        let f = col as f32 / columns as f32;
-        if f > shown {
-            break;
-        }
-        let t = f * length;
-        let k = a.times.partition_point(|&x| x < t).min(samples - 1);
-        let total: f32 = curves
-            .iter()
-            .map(|c| c.get(k).copied().unwrap_or(0.0))
-            .sum();
-        if total <= 0.0 {
-            continue;
-        }
-        let x = plot.x + plot.w * f;
-        let w = plot.w / columns as f32 + 0.5;
-        let mut y = plot.bottom();
-        for (i, c) in curves.iter().enumerate() {
-            let h = plot.h * c.get(k).copied().unwrap_or(0.0) / total;
-            let tone = report.color(ctx, i);
-            ui.fill(Rect::new(x, y - h, w, h), [tone[0], tone[1], tone[2], 0.3]);
-            y -= h;
-        }
-    }
-    ui.hline(
-        plot.x,
-        plot.y + plot.h * 0.5,
-        plot.w,
-        rgb(palette::LINE, 0.25),
-    );
-    chart::time_axis(ui, plot, length);
 }

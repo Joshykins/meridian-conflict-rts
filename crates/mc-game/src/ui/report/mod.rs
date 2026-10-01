@@ -51,17 +51,15 @@ pub enum ReportAction {
 enum Tab {
     Overview,
     Economy,
-    Salvage,
     Military,
     Battlefield,
     Timeline,
 }
 
 impl Tab {
-    const ALL: [Tab; 6] = [
+    const ALL: [Tab; 5] = [
         Tab::Overview,
         Tab::Economy,
-        Tab::Salvage,
         Tab::Military,
         Tab::Battlefield,
         Tab::Timeline,
@@ -71,7 +69,6 @@ impl Tab {
         match self {
             Tab::Overview => "Overview",
             Tab::Economy => "Economy",
-            Tab::Salvage => "Salvage",
             Tab::Military => "Military",
             Tab::Battlefield => "Battlefield",
             Tab::Timeline => "Timeline",
@@ -81,8 +78,7 @@ impl Tab {
     fn blurb(self) -> &'static str {
         match self {
             Tab::Overview => "Scoreboard and honours",
-            Tab::Economy => "Income, spending, stores",
-            Tab::Salvage => "Reclaim and wrecks",
+            Tab::Economy => "Income, reclaim, spending",
             Tab::Military => "Armies, kills, losses",
             Tab::Battlefield => "The match replayed",
             Tab::Timeline => "Every turning point",
@@ -115,7 +111,6 @@ pub struct Report {
     tab_age: f32,
     economy: Metric,
     military: Metric,
-    salvage: Metric,
     /// A side picked out on the charts (the legend under the pointer).
     focus: Option<usize>,
     field: battlefield::Playback,
@@ -145,7 +140,6 @@ impl Report {
             tab_age: 0.0,
             economy: Metric::MassIncome,
             military: Metric::ArmyValue,
-            salvage: Metric::ReclaimRate,
             focus: None,
             field,
             timeline: timeline::State::default(),
@@ -228,7 +222,6 @@ impl Report {
         match self.tab {
             Tab::Overview => overview::draw(self, ui, ctx, body),
             Tab::Economy => economy::draw(self, ui, ctx, body),
-            Tab::Salvage => salvage::draw(self, ui, ctx, body),
             Tab::Military => military::draw(self, ui, ctx, body),
             Tab::Battlefield => battlefield::draw(self, ui, ctx, body),
             Tab::Timeline => {
@@ -427,7 +420,7 @@ impl Report {
         let mut out = None;
         // The keys, as caps.
         let mut x = r.x;
-        for (key, what) in [("Esc", "Back to the battlefield"), ("1-6", "Turn the page")] {
+        for (key, what) in [("Esc", "Back to the battlefield"), ("1-5", "Turn the page")] {
             let w = ui.text_width(type_scale::MICRO, key) + 12.0;
             let cap = Rect::new(x, r.mid_y() - 9.0, w, 18.0);
             ui.frame(cap, rgb(palette::LINE, 0.4));

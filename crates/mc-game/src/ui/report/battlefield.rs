@@ -325,7 +325,7 @@ fn forces(
 }
 
 /// Seconds a patch of reclaim glints on the chart after the work there.
-const GLINT: f32 = 20.0;
+const GLINT: f32 = 45.0;
 
 /// Where each side was reclaiming lately: bright salvage glints in a halo of the
 /// side's colour, fading as the work there gets older.
@@ -341,13 +341,32 @@ fn salvage(
     let from = t - GLINT * tps;
     let first = a.frames.partition_point(|f| (f.tick as f32) < from);
     let scale = (chart.w / 640.0).max(0.6);
+    // Everything salvaged so far, as a teal wash: the fields that were worked.
+    let mut worked = vec![0.0f32; GRID * GRID];
+    for f in a.frames.iter().take_while(|f| f.tick as f32 <= t) {
+        for sf in &f.sides {
+            for &(cell, mass) in &sf.salvage {
+                worked[cell as usize] += mass;
+            }
+        }
+    }
+    let most = worked.iter().copied().fold(1.0f32, f32::max);
+    for (cell, &v) in worked.iter().enumerate().filter(|(_, v)| **v > 0.0) {
+        let heat = (v / most).sqrt();
+        let p = at(cell_centre(a.size, cell as u16));
+        ui.dot(
+            p,
+            (2.0 + 5.0 * heat) * scale,
+            rgb(super::SALVAGE, 0.12 + 0.3 * heat),
+        );
+    }
     for f in a.frames[first..].iter().take_while(|f| f.tick as f32 <= t) {
         let age = ((t - f.tick as f32) / (GLINT * tps)).clamp(0.0, 1.0);
         for (side, sf) in f.sides.iter().enumerate() {
             let c = colors.get(side).copied().unwrap_or([1.0; 4]);
             for &(cell, mass) in &sf.salvage {
                 let p = at(cell_centre(a.size, cell));
-                let rad = (1.5 + mass.sqrt() * 0.35).min(9.0) * scale;
+                let rad = (3.0 + mass.sqrt() * 0.5).min(11.0) * scale;
                 let fade = 1.0 - age;
                 ui.dot(p, rad * 2.2, [c[0], c[1], c[2], 0.12 * fade]);
                 ui.dot(p, rad * 0.8, rgb(super::SALVAGE, 0.9 * fade));
