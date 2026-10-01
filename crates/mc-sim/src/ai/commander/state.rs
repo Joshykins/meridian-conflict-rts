@@ -400,6 +400,9 @@ pub(in crate::ai) struct CommanderState {
     /// Mass the side has lost lately to each kind of killer (`Hurt`), fading.
     #[serde(default)]
     pub hurt: [Fx; HURTS],
+    /// Where the army gathers, held until the front moves (`commander.rs`).
+    #[serde(default)]
+    pub rally: Option<FxVec2>,
     /// Metres the army's rally point stands back from the front line: it grows while
     /// the gathering wave is shelled and creeps back once it is quiet.
     #[serde(default)]
@@ -459,6 +462,13 @@ impl CommanderState {
             h.write_u64(w.0 as u64);
         }
         h.write_i64(self.rally_back.0);
+        match self.rally {
+            Some(r) => {
+                h.write_i64(r.x.0);
+                h.write_i64(r.y.0);
+            }
+            None => h.write_u64(u64::MAX),
+        }
         match self.hit_from_above {
             Some((p, t)) => {
                 h.write_i64(p.x.0);

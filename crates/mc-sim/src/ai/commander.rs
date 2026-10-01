@@ -126,7 +126,20 @@ impl World {
         // The rally point creeps back up to the front while the wave is not shelled.
         let c = &mut self.state.ai[player as usize].commander;
         c.rally_back = (c.rally_back - Fx::from_int(30)).max(Fx::ZERO);
-        let staging = self.front_line(player, start, enemy_start, census, &reach, &wm);
+        // The rally point holds still unless the front moves half a kilometre or
+        // fire reaches it: moving it every think kept the wave walking after it.
+        let front = self.front_line(player, start, enemy_start, census, &reach, &wm);
+        let staging = match self.state.ai[player as usize].commander.rally {
+            Some(r)
+                if r.distance(front) < Fx::from_int(500)
+                    && wm.threat_at(r, profile::Target::Land) == Fx::ZERO
+                    && reach.reaches(r) =>
+            {
+                r
+            }
+            _ => front,
+        };
+        self.state.ai[player as usize].commander.rally = Some(staging);
         let mut arrived = self.arrived_army(player);
         arrived.sort_unstable();
         let ctx = Ctx {

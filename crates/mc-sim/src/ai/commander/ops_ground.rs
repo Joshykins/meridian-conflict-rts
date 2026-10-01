@@ -315,14 +315,16 @@ impl World {
                         .sum::<Fx>()
                         * THREAT_MASS;
                     let covered = our_aa * 2 >= enemy_air;
-                    let strong = matches!(op.kind, OpKind::Defend | OpKind::Landing)
-                        || (gathered >= enemy * bold
-                            && seen
-                            && covered
-                            && target.is_some_and(|t| {
-                                ctx.wm.threat_along(op.rally, t, Target::Land) * THREAT_MASS
-                                    <= gathered * 6 / 5
-                            }));
+                    let strong = matches!(
+                        op.kind,
+                        OpKind::Defend | OpKind::Landing | OpKind::Raid | OpKind::Siege
+                    ) || (gathered >= enemy * bold
+                        && seen
+                        && covered
+                        && target.is_some_and(|t| {
+                            ctx.wm.threat_along(op.rally, t, Target::Land) * THREAT_MASS
+                                <= gathered * 6 / 5
+                        }));
                     if let Some(target) = target.filter(|_| strong) {
                         op.target = target;
                         op.launched = mass;
