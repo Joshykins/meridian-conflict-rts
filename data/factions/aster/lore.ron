@@ -178,6 +178,9 @@
     "aster_t2_reclaim_carrier": (
         lore: "A fan-lift carrier that fields its own Salvage Drones, called the flock. A tech 2 air factory's first answer to a field of wrecks.",
     ),
+    "aster_t1_air_reclaimer": (
+        lore: "A single fan, a single salvage ray. Crews fly them in pairs over the fields the trucks cannot reach, and lose them by the dozen.",
+    ),
     "aster_reclaim_drone": (
         lore: "A small, disposable reclaimer that lives and dies with its parent Osprey.",
     ),

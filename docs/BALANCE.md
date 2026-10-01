@@ -197,6 +197,7 @@ replacing the mines.
   | Scavenger II | 2 | 420 | 40 | 1,100 | 11 s |
   | Scavenger III | 3 | 1,700 | 200 | 1,700 | 9 s |
   | Gleaner (hover: land and water, works while moving) | 1 | 60 | 5 | 550 | 12 s |
+  | Magpie (air, works while flying) | 1 | 55 | 4 | 450 | 14 s |
   | Thresher (land, 3 heads, anti-missile) | 2 | 320 | 30 | 850 | 11 s |
   | Trawler (boat, works while sailing) | 1 | 80 | 6 | 600 | 13 s |
   | Osprey (4 drones, power 5 each) | 2 | 200 | 20 | 800 | 10 s |

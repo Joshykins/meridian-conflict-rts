@@ -39,6 +39,7 @@ pub(crate) use courier::{
 };
 mod gannet;
 mod kestrel;
+mod magpie;
 pub(crate) mod osprey;
 mod peregrine;
 mod petrel;
@@ -359,6 +360,11 @@ pub(crate) fn carrier(b: &mut MeshBuilder, _: u8) {
 /// The Salvage Drone the Osprey fields ([`osprey::drone`]).
 pub(crate) fn drone(b: &mut MeshBuilder, _: u8) {
     osprey::drone(b);
+}
+/// The Magpie: the tech 1 salvage drone, tilting engine pods half way out along a swept
+/// wing and a reclaim head under it ([`magpie`]).
+pub(crate) fn magpie(b: &mut MeshBuilder, _: u8) {
+    magpie::build(b);
 }
 /// The Kestrel: the tech 2 vector-thrust heavy gunship ([`kestrel`]).
 pub(crate) fn gunship(b: &mut MeshBuilder, _: u8) {

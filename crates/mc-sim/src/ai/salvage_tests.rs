@@ -111,7 +111,7 @@ fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_th
     let key = |id: Option<BlueprintId>| id.map(|b| w.blueprints.unit(b).key.clone());
     assert_eq!(
         key(w.salvage_product(air, &census, 0, &fields)).as_deref(),
-        Some("aster_t2_reclaim_carrier")
+        Some("aster_t1_air_reclaimer")
     );
     assert_eq!(
         key(w.salvage_product(land, &census, 0, &fields)).as_deref(),

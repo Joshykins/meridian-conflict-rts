@@ -124,6 +124,22 @@
  drone_sockets: [(0.4, 3.6, 0.25), (0.4, -3.6, 0.25), (0.4, 6.4, 0.25), (0.4, -6.4, 0.25)], drone_approach: -3,
 ),
 (
+ // A small winged tilt-engine drone with one reclaim beam: the Gleaner of the air. It hovers low and works the
+ // wrecks under and round it as it flies, without stopping; quicker than the truck,
+ // shorter in reach and thinner-skinned.
+ key: "aster_t1_air_reclaimer", name: "Magpie", role: "Salvage Drone", title: "Salvage Drone", tech: 1, categories: ["Air"],
+ health: 200, cost: (mass: 55, energy: 650, time: 300),
+ radius: 3.0, height: 1.9, vision: 420,
+ motion: (layer: Air, size: 0, speed: 80, accel: 34, turn: 160, altitude: 30, hover: true),
+ weapons: [], mesh: "magpie", icon: SalvageDrone,
+ sounds: (death: "blast_small", moving: "aster_hover"),
+ // The Cradle head hung under the belly (the Magpie model's `PIVOT`, `HEAD`): it turns
+ // full circle and looks from a little above level to straight down.
+ reclaimer: (power: 4, range: 450, charge: 0.8, mobile: true, heads: [
+  (pivot: (0.7, 0, 0.35), emitter: (1.5525, 0, 0.35), turn: 240, pitch: (-90, 15)),
+ ]),
+),
+(
  key: "aster_reclaim_drone", name: "Salvage Drone", role: "Carrier Reclaim Drone", tech: 1, categories: ["Air"],
  // Cheap: built on its carrier's pylon (or port's pad) under the side's materials
  // priority, like any other build.

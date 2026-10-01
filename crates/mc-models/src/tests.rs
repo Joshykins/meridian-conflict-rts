@@ -1951,7 +1951,7 @@ fn aircraft_have_swept_wings_nozzle_origins_and_bounded_lods() {
 
 #[test]
 fn vtol_pods_carry_their_nozzles() {
-    for key in ["gunship", "reclaim_carrier"] {
+    for key in ["gunship", "reclaim_carrier", "magpie"] {
         let model = build_model(key).unwrap();
         let vtol = model.vtol.expect("VTOL pods");
         // Each pod's nozzle, lying along the hull (the rest pose).

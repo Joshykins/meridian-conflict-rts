@@ -83,6 +83,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("sensor_ship", 36.0, 22.0, air::sensor_ship),
     ModelDef::new("rail_corvette", 58.0, 30.0, air::rail_corvette),
     ModelDef::new("reclaim_drone", 1.8, 1.2, air::drone),
+    ModelDef::new("magpie", 3.0, 1.9, air::magpie),
     ModelDef::new("gunship", 7.5, 3.5, air::gunship),
     ModelDef::new("fire_bomber", 13.0, 5.0, air::fortress),
     ModelDef::new("torpedo_bomber", 7.2, 3.0, air::torpedo_bomber),

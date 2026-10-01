@@ -3289,6 +3289,7 @@ impl World {
                 let units = &self.state.units;
                 if units.drone_parent[row] == Handle::NONE
                     && self.bp(row).drone.is_none()
+                    && !self.bp(row).is_salvager()
                     && !self.bp(row).carried_drone
                     && units.order_head[row] == NO_ORDER
                     && !units.has_flag(row, flag::AIR_RUN)
@@ -3306,7 +3307,8 @@ impl World {
 
     /// An idle aircraft that cannot set down where it stopped (water, cliffs,
     /// buildings, a pad another aircraft took) flies to the nearest clear
-    /// ground instead of hovering there for good. Carriers, drones and capital
+    /// ground instead of hovering there for good. Carriers, drones, salvage aircraft
+    /// (their beams work the wrecks under them while they hang there) and capital
     /// ships (which land only when told to) stay up.
     /// True if it set off.
     fn idle_air_land(&mut self, row: usize) -> Result<bool, SimError> {
@@ -3323,6 +3325,7 @@ impl World {
         // Only once it has stopped at cruise height: a hull on the ground or
         // still settling is left to `stand_z`.
         if bp.drone.is_some()
+            || bp.is_salvager()
             || bp.carried_drone
             || bp.is_capital_ship()
             || units.has_flag(row, flag::IN_FACTORY)

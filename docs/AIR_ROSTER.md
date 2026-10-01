@@ -7,6 +7,7 @@ All units are available through the existing tiered factories and engineer/comma
 | 1 | Swift | Fast, fragile scout with radar; circles on guard |
 | 1 | Shrike | Fighter |
 | 1 | Wasp | Low-altitude helicopter, light machine gun and unguided rockets |
+| 1 | Magpie | Salvage aircraft: swept wing, tilting engine pods, one reclaim beam that works wrecks within 450 m as it flies |
 | 2 | Osprey | Reclaim carrier with four salvage drones |
 | 2 | Kestrel | Four-engine tilt-jet gunship with a chin autocannon and volley rocket pods |
 | 2 | Hellkite | Four-engine flying fortress; 24 scattered incendiaries and three independent AA guns |
@@ -118,7 +119,7 @@ Idle aircraft reserve landing clearance against other descending or parked
 aircraft. An idle aircraft stopped where it cannot set down (water, cliffs,
 structures, a pad another aircraft took) flies to the nearest clear ground
 within 1.5 km, searched in widening rings nose side first, and lands there;
-only the Osprey and its drones stay up. Persistent velocity smooths VTOL movement and terrain-following altitude;
+only the Osprey, its drones and the Magpie (salvage aircraft, whose beams keep working) stay up. Persistent velocity smooths VTOL movement and terrain-following altitude;
 that velocity is serialized and hashed.
 
 Bombing return distances include turn radius, fall time and carpet duration.

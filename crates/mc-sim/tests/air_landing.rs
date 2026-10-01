@@ -1,5 +1,6 @@
 //! Idle aircraft never hover for good: stopped over water or on a taken pad,
-//! they fly to the nearest ground they fit on and set down.
+//! they fly to the nearest ground they fit on and set down. Carriers and salvage
+//! aircraft, whose beams work as they hang there, stay up.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -127,5 +128,20 @@ fn the_reclaim_carrier_still_stays_up_over_the_sea() {
     assert!(
         w.state.units.pos[c].x > Fx::from_int(1300),
         "carrier went looking for land"
+    );
+}
+
+#[test]
+fn a_salvage_aircraft_stays_up_over_land_where_its_beam_can_work() {
+    let mut w = coast();
+    let m = add(&mut w, "aster_t1_air_reclaimer", 600, 900);
+    for _ in 0..900 {
+        w.tick(&[]).unwrap();
+    }
+    assert!(!landed(&w, m), "the Magpie set down idle");
+    assert!(
+        w.state.units.pos[m].distance(FxVec2::from_ints(600, 900)) < Fx::from_int(40),
+        "it wandered off: {:?}",
+        w.state.units.pos[m]
     );
 }

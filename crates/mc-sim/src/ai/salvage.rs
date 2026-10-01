@@ -1,5 +1,5 @@
 //! Salvage: the AI puts reclaim towers by the wreck fields near home, fields a salvage
-//! unit or two early (an Osprey, a Gleaner), and sends idle ones to the richest field
+//! unit or two early (a Magpie, a Gleaner), and sends idle ones to the richest field
 //! that is safe to work. Reclaim is cheap and quick to pay back, so a field is worth a
 //! tower long before it is worth an army.
 
@@ -125,7 +125,7 @@ impl World {
     }
 
     /// What an idle factory makes for salvage, if the side wants another salvage unit:
-    /// its cheapest one (an Osprey from the air, a Gleaner from the land).
+    /// its cheapest one (a Magpie from the air, a Gleaner from the land).
     pub(super) fn salvage_product(
         &self,
         factory: usize,
