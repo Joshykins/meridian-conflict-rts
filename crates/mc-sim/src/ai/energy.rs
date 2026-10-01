@@ -19,6 +19,16 @@ impl World {
     pub(super) fn energy_need(&self, player: u8) -> Fx {
         let units = &self.state.units;
         let mut need = Fx::ZERO;
+        // A Commander counts what builds at the speed its materials pay for: at
+        // full draw, a side building at a fifth of full speed put up 27 plants to
+        // the classic AI's 18 and claimed no mine from minute five to eight.
+        let paid = if self.commander_directives(player).is_some() {
+            self.state.players[player as usize]
+                .build_speed
+                .clamp(Fx::ratio(1, 3), Fx::ONE)
+        } else {
+            Fx::ONE
+        };
         for row in units.slots.iter() {
             if units.owner[row] != player {
                 continue;
@@ -26,15 +36,15 @@ impl World {
             let bp = self.bp(row);
             need += bp.economy.energy_upkeep;
             if let Some(next) = bp.upgrades_to.filter(|_| self.upgrading(row)) {
-                need += self.upgrade_draw(row, self.blueprints.unit(next));
+                need += self.upgrade_draw(row, self.blueprints.unit(next)) * paid;
             }
             let Some(builder) = bp.builder.as_ref().filter(|_| units.is_active(row)) else {
                 continue;
             };
             need += if bp.is_mobile() {
-                builder.power * BUILDER_DRAW
+                builder.power * BUILDER_DRAW * paid
             } else {
-                builder.power * self.product_draw(bp)
+                builder.power * self.product_draw(bp) * paid
             };
         }
         need.max(self.state.players[player as usize].energy_spent)

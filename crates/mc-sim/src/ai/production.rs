@@ -41,6 +41,13 @@ impl World {
                     Personality::Aggressive => n,
                 }
             } + self.commander_directives(player).map_or(0, |d| d.engineers);
+            // A Commander in a materials stall has builders enough: more only wait.
+            let want_engineers = match self.commander_directives(player) {
+                Some(_) if self.state.players[player as usize].build_speed < Fx::ratio(7, 10) => {
+                    want_engineers.min(4)
+                }
+                _ => want_engineers,
+            };
             let engineer = builder
                 .builds
                 .iter()

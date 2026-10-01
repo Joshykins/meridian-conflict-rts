@@ -117,6 +117,19 @@ impl World {
         let reach = self.home_reach(player);
         let wm = self.world_model(player, &profiles);
         let beliefs = self.beliefs(player, &profiles);
+        // Behind, for spending on the next tier: what it fields against the army it
+        // believes in, and never less than two minutes of their income. Under fog
+        // it believed in a 1.2k army that stood at 4.3k.
+        // Its forces are what its operations hold: the world model counts the
+        // commander too, worth more than any army at this point.
+        let ours: Fx = self.state.ai[player as usize]
+            .commander
+            .ops
+            .iter()
+            .map(|o| o.mass())
+            .sum();
+        let theirs = beliefs.army_mass().max(beliefs.income * Fx::from_int(120));
+        self.state.ai[player as usize].commander.behind = ours < theirs;
         self.ops_upkeep(player);
         // What hurt it fades: a minute and a half's losses count most.
         for h in &mut self.state.ai[player as usize].commander.hurt {

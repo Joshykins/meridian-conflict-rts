@@ -407,6 +407,10 @@ pub(in crate::ai) struct CommanderState {
     /// the gathering wave is shelled and creeps back once it is quiet.
     #[serde(default)]
     pub rally_back: Fx,
+    /// Its armed mobile mass is less than the enemy army it believes in: the next
+    /// tier waits (`upgrades.rs`).
+    #[serde(default)]
+    pub behind: bool,
 }
 
 impl CommanderState {
@@ -462,6 +466,7 @@ impl CommanderState {
             h.write_u64(w.0 as u64);
         }
         h.write_i64(self.rally_back.0);
+        h.write_u64(self.behind as u64);
         match self.rally {
             Some(r) => {
                 h.write_i64(r.x.0);

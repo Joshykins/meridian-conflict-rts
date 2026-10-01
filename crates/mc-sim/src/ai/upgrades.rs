@@ -81,8 +81,9 @@ impl World {
             && surplus
             && upgrading < 1 + census.factories.len() / 4
         {
+            let behind = self.state.ai[player as usize].commander.behind;
             for &row in &census.factories_idle {
-                if self.bp(row).upgrades_to.is_some() {
+                if self.bp(row).upgrades_to.is_some() && !(behind && self.bp(row).tech >= 2) {
                     candidates.push((3, row));
                 }
             }
@@ -124,8 +125,12 @@ impl World {
             .max()
             .unwrap_or(0);
         let step = Fx::from_int(skill.tech_income * (2 * best as i32 - 1).max(1));
+        // A Commander behind on army takes tech 3 later: a tech 3 factory begun at
+        // half the enemy's army left it nothing to hold its base with.
+        let held = best >= 2 && self.state.ai[player as usize].commander.behind;
         if !(1..3).contains(&best)
             || income < step
+            || held
             || census.factories.iter().any(|&r| self.upgrading(r))
         {
             return None;

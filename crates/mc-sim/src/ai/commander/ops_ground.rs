@@ -676,29 +676,40 @@ impl World {
                 enemy,
                 Fx::ZERO,
             );
-            // Borrow from land operations that are gathering, nearest first.
+            // Borrow from land operations that are gathering, nearest first; and
+            // when the base itself is hit and that is not enough, from those out
+            // there too. The commander died at home under corvettes while its
+            // army stood at the enemy's front, and with it the match.
             let units = &self.state.units;
             let mut cands: Vec<(usize, usize, crate::tables::UnitId, Fx)> = Vec::new();
             let c = &self.state.ai[ctx.player as usize].commander;
-            for (oi, o) in c.ops.iter().enumerate() {
-                let guard = o.kind == OpKind::Guard || (air && o.kind == OpKind::AirGuard);
-                if !(guard || matches!(o.kind, OpKind::Army | OpKind::Siege | OpKind::Raid))
-                    // An operation already out there is fighting: taking its units
-                    // pulled an army out of a battle and turned it round.
-                    || o.phase != Phase::Gathering
-                {
-                    continue;
+            for recall in [false, true] {
+                if recall && (!base || cands.iter().map(|c| c.3).sum::<Fx>() >= need) {
+                    break;
                 }
-                for (ui, (u, cost)) in o.units.iter().enumerate() {
-                    if let Some(r) = units.row(*u) {
-                        // Against aircraft only what can shoot at them.
-                        let p = ctx.profiles.get(units.blueprint[r]);
-                        if air && !p.hits(Target::Air) && !p.hits(Target::Space) {
-                            continue;
-                        }
-                        if guard || base || far || units.pos[r].distance(enemy) < Fx::from_int(2500)
-                        {
-                            cands.push((oi, ui, *u, *cost));
+                for (oi, o) in c.ops.iter().enumerate() {
+                    let guard = o.kind == OpKind::Guard || (air && o.kind == OpKind::AirGuard);
+                    if !(guard || matches!(o.kind, OpKind::Army | OpKind::Siege | OpKind::Raid))
+                        // An operation already out there is fighting: taking its
+                        // units pulled an army out of a battle and turned it round.
+                        || (o.phase == Phase::Gathering) == recall
+                    {
+                        continue;
+                    }
+                    for (ui, (u, cost)) in o.units.iter().enumerate() {
+                        if let Some(r) = units.row(*u) {
+                            // Against aircraft only what can shoot at them.
+                            let p = ctx.profiles.get(units.blueprint[r]);
+                            if air && !p.hits(Target::Air) && !p.hits(Target::Space) {
+                                continue;
+                            }
+                            if guard
+                                || base
+                                || far
+                                || units.pos[r].distance(enemy) < Fx::from_int(2500)
+                            {
+                                cands.push((oi, ui, *u, *cost));
+                            }
                         }
                     }
                 }

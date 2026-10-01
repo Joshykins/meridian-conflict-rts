@@ -346,6 +346,11 @@ impl World {
 
     /// The nearest engineer of `row`'s side at work on its own upgrade, within reach.
     fn engineer_upgrading_near(&self, row: usize) -> Option<usize> {
+        // The order outlives the upgrade: a commander helping then trailed the
+        // engineer 2.7 km out to its far mines and was shot down there.
+        if self.bp(row).has(cat::COMMANDER) {
+            return None;
+        }
         let units = &self.state.units;
         let pos = units.pos[row];
         units
@@ -687,7 +692,12 @@ impl World {
         }
         // The Commander's plans choose the side's projects (`commander/solver.rs`).
         if !far && !energy_short {
-            if let Some(job) = self.commander_job(row, start, facing) {
+            // Where any other job may go: the commander walked 2.2 km to put up
+            // anti-air where it had been bombed, and died there.
+            if let Some(job) = self
+                .commander_job(row, start, facing)
+                .filter(|j| allow(j.near))
+            {
                 return Some(job);
             }
         }
@@ -711,7 +721,12 @@ impl World {
                 return Some(job);
             }
         }
-        let mex_range = self.mex_range(is_commander, census, persona, stance, skill);
+        // A Commander has no stance: its plans say how far to reach.
+        let reach = match self.commander_directives(owner as u8) {
+            Some(d) if d.expand => Stance::Push,
+            _ => stance,
+        };
+        let mex_range = self.mex_range(is_commander, census, persona, reach, skill);
         let bare = (!energy_short).then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
         if let Some(deposit) = self.free_deposit(start, claimed, mex_range, intel, bare) {
             if allow(deposit) {

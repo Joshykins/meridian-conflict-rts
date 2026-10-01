@@ -19,6 +19,8 @@ const MATCHED_AGAINST: usize = 8;
 pub(in crate::ai) struct Directives {
     /// Engineers kept over the classic count.
     pub engineers: usize,
+    /// Builders go as far for mines as a classic side pushing out.
+    pub expand: bool,
 }
 
 fn s(stake: Stake) -> i64 {
@@ -52,8 +54,15 @@ impl World {
         }
         let c = &ai.commander;
         let boom = c.plan(PlanKind::Boom);
+        // More builders only while the economy pays for the ones it has: building
+        // at a fifth of full speed, twice the classic AI's engineers built no more.
+        let paid = self.state.players[player as usize].build_speed >= Fx::ratio(9, 10);
         Some(Directives {
-            engineers: [0, 1, 3, 6][boom as usize],
+            engineers: if paid { [0, 1, 3, 6][boom as usize] } else { 0 },
+            // Any stake in growing, or an army out to cover far mines: the classic
+            // side reached 800 m further for them and had twice the mines by
+            // minute eight.
+            expand: boom > Stake::Off || c.plan(PlanKind::Pressure) >= Stake::Invest,
         })
     }
 
