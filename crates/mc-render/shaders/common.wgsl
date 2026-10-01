@@ -742,6 +742,7 @@ struct FoundationCell {
     // Render time its plating began to come up.
     start: f32,
     // Bit 0: the slope runs along y (else x). Bit 1: it rises toward the far side.
+    // Bit 2: lapped armour plate (a nanite-built faction's lot), not steel.
     kind: u32,
 }
 

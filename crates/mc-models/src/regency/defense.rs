@@ -1,5 +1,6 @@
 //! The Regency's defences, each on a one-cell lot (12 m square): the Picket
-//! (point defence), the Canopy (flak) and the Palisade (wall section).
+//! (point defence) and the Canopy (flak). The Palisade, the wall, joins its neighbours
+//! and has a module of its own (`palisade`).
 //!
 //! - Picket: a squat armoured drum skirted in plates lapped down into spikes, a bronze race,
 //!   and a low wedge of a turret with its plates lapped back, levelling a heavy repeater:
@@ -8,9 +9,6 @@
 //! - Canopy: a bronze column braced by four plated legs, and on it a flak
 //!   mount: a drum magazine across the back between armoured cheeks, twin barrels raised
 //!   at the sky, a red sensor slit over them. From above it is an X under a cross.
-//! - Palisade: an armoured octagonal block on a bronze waist, a glacis plate on each
-//!   face and a plate at each corner lapped up into a spike. It keeps inside the lot's
-//!   octagon, so sections side by side meet across the middle of their faces.
 //!
 //! The numbers match `data/factions/regency/units/structures.ron`: a turret's pivot is the
 //! weapon's `pivot` and its gun's tip the `muzzle`. Barrels recoil when they fire.
@@ -401,119 +399,6 @@ fn spitter_guns(b: &mut MeshBuilder) {
 
 // ---- Palisade -----------------------------------------------------------------------
 
-/// An octagon about the middle at height `z`: the square of half side `half` with its
-/// corners cut where `|x| + |y|` passes `cut`.
-fn octagon(half: f32, cut: f32, z: f32) -> Vec<Vec3> {
-    let c = cut - half;
-    vec![
-        v3(half, -c, z),
-        v3(half, c, z),
-        v3(c, half, z),
-        v3(-c, half, z),
-        v3(-half, c, z),
-        v3(-half, -c, z),
-        v3(-c, -half, z),
-        v3(c, -half, z),
-    ]
-}
-
-pub(super) fn thornwall(b: &mut MeshBuilder, _tech: u8) {
-    let fine = b.fine();
-    // The block: an octagon cut like the lot, a footing, a bronze waist, the armour.
-    seam(b);
-    b.loft(
-        &[octagon(6.0, 8.6, 0.0), octagon(5.7, 8.2, 1.0)],
-        false,
-        true,
-    );
-    if !b.coarse() {
-        metal(b);
-        b.loft(
-            &[octagon(5.2, 7.5, 1.0), octagon(5.2, 7.5, 1.8)],
-            false,
-            false,
-        );
-    }
-    dark_plate(b);
-    if b.coarse() {
-        b.loft(
-            &[octagon(5.5, 7.9, 1.0), octagon(3.4, 4.8, 4.4)],
-            false,
-            true,
-        );
-    } else {
-        b.loft(
-            &[
-                octagon(5.5, 7.9, 1.8),
-                octagon(4.9, 7.0, 3.6),
-                octagon(3.4, 4.8, 4.4),
-            ],
-            false,
-            true,
-        );
-    }
-    if fine {
-        // Bronze ribs standing in the waist.
-        metal(b);
-        for k in 0..8 {
-            let a = (22.5 + 45.0 * k as f32).to_radians();
-            let d = v3(a.cos(), a.sin(), 0.0);
-            b.beam(
-                d * 5.35 + Vec3::Z * 0.9,
-                d * 5.35 + Vec3::Z * 1.9,
-                Vec2::new(0.5, 0.4),
-                Vec2::new(0.5, 0.4),
-            );
-        }
-    }
-    if !b.coarse() {
-        // A glacis plate on each face, and a plate at each corner lapped up into a spike.
-        for k in 0..4 {
-            let a = (90.0 * k as f32).to_radians();
-            let d = v3(a.cos(), a.sin(), 0.0);
-            let f = Frame::new(
-                d * 5.55 + Vec3::Z * 1.9,
-                d * -1.2 + Vec3::Z * 2.3,
-                d + Vec3::Z * 0.45,
-            );
-            dark_plate(b);
-            armour(
-                b,
-                &f,
-                &[[0.0, -2.6], [0.0, 2.6], [2.3, 2.0], [2.3, -2.0]],
-                THICK,
-            );
-        }
-        for k in 0..if fine { 4 } else { 0 } {
-            let a = (45.0 + 90.0 * k as f32).to_radians();
-            let d = v3(a.cos(), a.sin(), 0.0);
-            let f = Frame::new(
-                d * 5.3 + Vec3::Z * 1.9,
-                d * -0.55 + Vec3::Z * 2.6,
-                d + Vec3::Z * 0.2,
-            );
-            dark_plate(b);
-            Course {
-                count: 1,
-                step: 0.0,
-                len: 2.0,
-                half: 1.1,
-                tip: 0.0,
-                thick: THICK,
-                tail: 1.6,
-            }
-            .lay(b, &f);
-        }
-    }
-    b.paint(TEAM);
-    b.face(&[
-        v3(-1.0, -1.0, 4.42),
-        v3(1.0, -1.0, 4.42),
-        v3(1.0, 1.0, 4.42),
-        v3(-1.0, 1.0, 4.42),
-    ]);
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
@@ -524,10 +409,5 @@ mod tests {
     #[test]
     fn spitter_fits() {
         super::super::check("regency_spitter", 5.5, 8.5, Some(1), &[[4.4, 0.0, 7.4]]);
-    }
-
-    #[test]
-    fn thornwall_fits() {
-        super::super::check("regency_thornwall", 6.0, 5.0, Some(1), &[]);
     }
 }

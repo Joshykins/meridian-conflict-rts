@@ -21,6 +21,7 @@ mod hatchery;
 mod heart;
 mod kit;
 mod machine;
+mod palisade;
 mod pinch_guns;
 mod plating;
 mod scorpion;
@@ -77,10 +78,10 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_heart_2", 18.75, 18.0, heart::heart_2),
     ModelDef::new("regency_heart_3", 42.5, 35.0, heart::heart_3),
     ModelDef::new("regency_cyst", 12.9, 8.0, cyst::cyst),
-    // Defence (`defense`): point defence, anti-air, wall.
+    // Defence: point defence and anti-air (`defense`), the wall (`palisade`).
     ModelDef::new("regency_barb", 5.5, 8.0, defense::barb),
     ModelDef::new("regency_spitter", 5.5, 8.5, defense::spitter),
-    ModelDef::new("regency_thornwall", 6.0, 5.0, defense::thornwall),
+    ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, pinch_guns::pinch_cannon),
     ModelDef::new(
         "regency_fusion_cannon",
@@ -118,7 +119,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
         "regency_engineer" => 3600,
         // Walls come by the dozen.
-        "regency_thornwall" => 1500,
+        "regency_palisade" => 1500,
         "regency_pinch_cannon" => 5000,
         "regency_fusion_cannon" => 7500,
         _ => return None,

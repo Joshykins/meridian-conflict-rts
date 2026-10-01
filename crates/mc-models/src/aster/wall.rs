@@ -10,42 +10,24 @@
 //!   pillars' height, so a block is one thick rampart with a ledge round its foot.
 //!
 //! A lone section is a square pillar; a line is a battered wall with a half pillar at
-//! each end and a pillar's corner outside every turn.
-//!
-//! Every piece is authored in the quarter between +x and +y and turned round for the
-//! other three. A piece draws only its outside faces: where it meets the next quarter
-//! or the next section, that one's own piece carries on.
+//! each end and a pillar's corner outside every turn. The Regency's Palisade joins the
+//! same way in its own armour (`regency::palisade`).
 
-use glam::{Affine3A, Vec3};
+use glam::Vec3;
 
 use super::parts::*;
 use crate::builder::MeshBuilder;
 use crate::gpu_consts::wall;
 use crate::material::*;
-use crate::part;
+use crate::pattern;
+use crate::wall::{diagonal, face_out, pieces, sides, Profile, EDGE};
 
-/// Half the lot: every piece runs from the section's centre out to its edge.
-const EDGE: f32 = 6.0;
 /// A step up from the wall's top to a block's: from a little under it, so no seam shows.
 const STEP_FOOT: f32 = 3.9;
 /// Cut off a pillar's outer corner.
 const CHAMFER: f32 = 1.5;
 /// Buttress ribs down the wall's face, a rib every 3 m along the wall.
 const RIBS: [f32; 2] = [1.5, 4.5];
-
-/// A side profile, bottom to top: how far the face stands out from the wall's middle
-/// (`[w, z]`), and the paint of each band from one point to the next. The top is flat
-/// at the last point.
-struct Profile {
-    points: &'static [[f32; 2]],
-    paint: &'static [u32],
-}
-
-impl Profile {
-    fn top(&self) -> [f32; 2] {
-        self.points[self.points.len() - 1]
-    }
-}
 
 /// The wall: a dark plinth, a battered white face, a dark coping over it.
 fn run(b: &MeshBuilder) -> Profile {
@@ -60,16 +42,19 @@ fn run(b: &MeshBuilder) -> Profile {
                 [2.35, 4.3],
             ],
             paint: &[ACCENT, ACCENT, PLATING, ACCENT, ACCENT],
+            pattern: pattern::GENERIC,
         }
     } else if b.mid() {
         Profile {
             points: &[[3.1, 0.0], [3.1, 0.9], [2.1, 3.8], [2.1, 4.3]],
             paint: &[ACCENT, PLATING, ACCENT],
+            pattern: pattern::GENERIC,
         }
     } else {
         Profile {
             points: &[[3.1, 0.0], [2.2, 4.3]],
             paint: &[PLATING],
+            pattern: pattern::GENERIC,
         }
     }
 }
@@ -87,16 +72,19 @@ fn pillar(b: &MeshBuilder) -> Profile {
                 [4.45, 5.4],
             ],
             paint: &[ACCENT, ACCENT, PLATING, ACCENT, ACCENT],
+            pattern: pattern::GENERIC,
         }
     } else if b.mid() {
         Profile {
             points: &[[5.0, 0.0], [5.0, 0.9], [4.2, 4.9], [4.2, 5.4]],
             paint: &[ACCENT, PLATING, ACCENT],
+            pattern: pattern::GENERIC,
         }
     } else {
         Profile {
             points: &[[5.0, 0.0], [4.3, 5.4]],
             paint: &[PLATING],
+            pattern: pattern::GENERIC,
         }
     }
 }
@@ -108,29 +96,25 @@ fn step(b: &MeshBuilder) -> Profile {
         Profile {
             points: &[[0.0, STEP_FOOT], [0.0, 5.4]],
             paint: &[PLATING],
+            pattern: pattern::GENERIC,
         }
     } else {
         Profile {
             points: &[[0.0, STEP_FOOT], [0.0, 4.9], [0.0, 5.4]],
             paint: &[PLATING, ACCENT],
+            pattern: pattern::GENERIC,
         }
     }
 }
 
 pub(super) fn wall(b: &mut MeshBuilder, _tech: u8) {
-    for q in 0..4 {
-        b.with(quarter(q), |b| {
-            for case in 0..wall::CASES {
-                b.with_part(part::WALL_FIRST + q * wall::CASES + case, |b| match case {
-                    wall::CAP => cap(b),
-                    wall::RUN_A => run_a(b),
-                    wall::RUN_B => b.with(diagonal(), run_a),
-                    wall::JOIN => join(b),
-                    _ => full(b),
-                });
-            }
-        });
-    }
+    pieces(b, |b, case| match case {
+        wall::CAP => cap(b),
+        wall::RUN_A => run_a(b),
+        wall::RUN_B => b.with(diagonal(), run_a),
+        wall::JOIN => join(b),
+        _ => full(b),
+    });
 }
 
 /// The wall running out along +x to the lot's edge, its face toward +y.
@@ -287,70 +271,6 @@ fn full(b: &mut MeshBuilder) {
     } else if b.mid() {
         b.decal(tile + Vec3::Z * 0.04, v2(EDGE - 1.0, EDGE - 1.0));
     }
-}
-
-/// A quarter turn `q` times counter-clockwise, exactly: the pieces meet on the lot's edge.
-fn quarter(q: u32) -> Affine3A {
-    let (c, s) = [(1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), (0.0, -1.0)][q as usize % 4];
-    Affine3A::from_cols(
-        Vec3::new(c, s, 0.0).into(),
-        Vec3::new(-s, c, 0.0).into(),
-        Vec3::Z.into(),
-        Vec3::ZERO.into(),
-    )
-}
-
-/// Mirror across the quarter's diagonal: +x becomes +y and +y becomes +x.
-fn diagonal() -> Affine3A {
-    Affine3A::from_cols(
-        Vec3::Y.into(),
-        Vec3::X.into(),
-        Vec3::Z.into(),
-        Vec3::ZERO.into(),
-    )
-}
-
-/// The outside faces of a piece: band by band up `profile`, along the plan `outline`
-/// the profile's `w` gives. `out` points roughly away from the piece in plan.
-fn sides(b: &mut MeshBuilder, profile: &Profile, outline: impl Fn(f32) -> Vec<Vec3>, out: Vec3) {
-    for (band, pair) in profile.points.windows(2).enumerate() {
-        let ([w0, z0], [w1, z1]) = (pair[0], pair[1]);
-        let (low, high) = (outline(w0), outline(w1));
-        b.paint(profile.paint[band]);
-        for i in 0..low.len() - 1 {
-            // This edge's own outward direction in plan, tilted by the band's slope: up
-            // for a ledge, down for the underside of the coping.
-            let edge = low[i + 1] - low[i];
-            let mut side = Vec3::new(edge.y, -edge.x, 0.0).normalize_or_zero();
-            if side.dot(out) < 0.0 {
-                side = -side;
-            }
-            let normal = side * (z1 - z0) + Vec3::Z * (w0 - w1);
-            face_out(
-                b,
-                vec![
-                    low[i] + Vec3::Z * z0,
-                    low[i + 1] + Vec3::Z * z0,
-                    high[i + 1] + Vec3::Z * z1,
-                    high[i] + Vec3::Z * z1,
-                ],
-                normal,
-            );
-        }
-    }
-}
-
-/// Emits `points` as one flat face, wound so its front faces `out`.
-fn face_out(b: &mut MeshBuilder, mut points: Vec<Vec3>, out: Vec3) {
-    let mut normal = Vec3::ZERO;
-    for (i, p) in points.iter().enumerate() {
-        let q = points[(i + 1) % points.len()];
-        normal += p.cross(q);
-    }
-    if normal.dot(out) < 0.0 {
-        points.reverse();
-    }
-    b.face(&points);
 }
 
 /// A buttress rib `x` along the wall, up the battered face on +y.

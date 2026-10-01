@@ -126,7 +126,7 @@ impl World {
                 if let Some(e) = s.terrain_edits.last() {
                     h.write_u64(e.min.0 as u64 | (e.min.1 as u64) << 32);
                     h.write_u64(e.max.0 as u64 | (e.max.1 as u64) << 32);
-                    h.write_u64(e.sample as u64);
+                    h.write_u64(e.sample as u64 | (e.faction as u64) << 16);
                 }
                 h.write_u64s(&s.props_dead);
             }),

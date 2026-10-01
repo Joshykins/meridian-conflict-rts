@@ -347,7 +347,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("regency_cyst", 12.9, 8.0, 1, 3, &[]),
     structure("regency_barb", 5.5, 8.0, 1, 1, &[[5.2, 0.0, 6.8]]),
     structure("regency_spitter", 5.5, 8.5, 1, 1, &[[4.4, 0.0, 7.4]]),
-    structure("regency_thornwall", 6.0, 5.0, 1, 1, &[]),
+    structure("regency_palisade", 6.0, 5.4, 1, 1, &[]),
     structure("regency_eye", 7.0, 24.0, 1, 2, &[]),
     structure("regency_eye", 7.0, 28.0, 2, 2, &[]),
     structure("regency_eye", 7.0, 32.0, 3, 2, &[]),

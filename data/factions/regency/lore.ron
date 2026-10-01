@@ -129,7 +129,7 @@
         weapons: {},
     ),
     "regency_wall": (
-        lore: "Armoured octagons set shoulder to shoulder, their plates lapped up into spikes. Slow to build, very hard to cut.",
+        lore: "Plated sections that lock into one wall where they stand side by side: armour lapped down over a bronze waist, a spiked tower at every end and corner, a block of them one rampart. Slow to build, very hard to cut.",
         weapons: {},
     ),
 }

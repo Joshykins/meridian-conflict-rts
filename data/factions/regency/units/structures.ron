@@ -11,7 +11,7 @@
 // - Picket: a short-ranged brawler, more damage than a Sentinel inside its reach.
 // - Canopy: bursting flak that hurts a whole flight, not one plane.
 // - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
-// - Palisade: slow to build, very hard to cut.
+// - Palisade: slow to build, very hard to cut; sections join into one wall as ARC's do.
 //
 // Their factories turn out the Regency's own Artificer (its tech 2 and 3 from the factories of
 // that tier) and, until the Regency has fighting units
@@ -399,9 +399,9 @@
         categories: ["Land", "Wall", "Defense"],
         health: 5200,
         cost: (mass: 4, energy: 20, time: 30),
-        radius: 6, height: 5, footprint: (1, 1),
+        radius: 6, height: 5.4, footprint: (1, 1),
         vision: 0,
-        mesh: "regency_thornwall", icon: Wall,
+        mesh: "regency_palisade", icon: Wall,
     ),
     // ---- Intel --------------------------------------------------------------------------
     // A sensor mast crowned with turning rings held floating by gravity: its radar reaches

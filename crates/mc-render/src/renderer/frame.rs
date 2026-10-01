@@ -126,7 +126,12 @@ impl Renderer {
             self.precursor_activity = frame.precursor_activity;
             self.tile_cache
                 .apply_edits(&frame.terrain_edits, input.time, &mut self.upload_scratch);
-            self.foundations.update(&frame.terrain_edits, input.time);
+            self.foundations.update(
+                &frame.terrain_edits,
+                &frame.terrain_edit_factions,
+                &self.blueprints,
+                input.time,
+            );
         }
         let ghosts = &input.ghosts[..input.ghosts.len().min(MAX_GHOSTS)];
         self.dynamic.write(

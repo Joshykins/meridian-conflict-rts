@@ -10,6 +10,10 @@
 //! its high edge. foundations.wgsl lays them on `terrain_height`, so they follow
 //! the ground exactly, settling included.
 //!
+//! A lot levelled for a faction that builds with nanites (the Regency,
+//! `mc_data::Construction::Nanite`) is clad in its own way: courses of dark armour
+//! plate lapped down the slope, their edges cut into backswept points, over bronze.
+//!
 //! A new lot's plating comes up out of the ground as it settles (terrain.rs
 //! `TileCache::settling`, `settle::SECONDS`).
 
@@ -24,9 +28,11 @@ use std::sync::Arc;
 /// Clad cells drawn at most. A cosmetic cap: past it the newest slopes stay
 /// bare. A lot has a few dozen, so this is thousands of structures.
 const MAX_CELLS: usize = 65_536;
-/// Vertices per cell: the plate, three ribs of two segments (top and two sides),
-/// and the cap rail (top and two sides). foundations.wgsl `CELL_VERTICES`.
-const CELL_VERTICES: u32 = 6 + 3 * 2 * 18 + 18;
+/// Vertices per cell, the larger of the two claddings' (foundations.wgsl). Steel:
+/// the plate, three ribs of two segments (top and two sides) and the cap rail (top
+/// and two sides). Armour: three courses of three plates (top, lip, and a point of
+/// three triangles), and the cap rail.
+const CELL_VERTICES: u32 = 3 * 3 * (6 + 6 + 9) + 18;
 /// A levelled slope gentler than this (rise over run, as the sim's
 /// `Heightfield::cell_slope` measures it) is left bare ground: 0.36 is about 20
 /// degrees, a little under where land units stop climbing (mc-sim nav.rs
@@ -36,8 +42,11 @@ const MIN_SLOPE: f32 = 0.36;
 const GROUND_TILES_KEPT: usize = 24;
 /// `FoundationCell::kind`: the slope runs along y (else along x) ...
 const ALONG_Y: u32 = 1;
-/// ... and rises toward the cell's far side (else its near side).
+/// ... and rises toward the cell's far side (else its near side) ...
 const HIGH_FAR: u32 = 2;
+/// ... and is clad in lapped armour plate, not steel: its lot is a nanite-built
+/// faction's.
+const ARMOUR: u32 = 4;
 
 /// One clad cell (foundations.wgsl `FoundationCell`).
 #[repr(C)]
@@ -47,7 +56,7 @@ pub(crate) struct FoundationCell {
     pub(crate) origin: [f32; 2],
     /// Render time the plating began to come up.
     pub(crate) start: f32,
-    /// Which way the slope runs: `ALONG_Y` | `HIGH_FAR`.
+    /// Which way the slope runs, and how it is clad: `ALONG_Y` | `HIGH_FAR` | `ARMOUR`.
     pub(crate) kind: u32,
 }
 
@@ -64,6 +73,8 @@ pub(super) struct Foundations {
     ground: HashMap<(u32, u32), Vec<u16>>,
     /// The edits the walls are built for, in the sim's order.
     edits: Vec<FlattenRecord>,
+    /// Whether each of `edits` is clad in armour (`ARMOUR`).
+    armour: Vec<bool>,
     synced: bool,
     walls: HashMap<(u32, u32), Wall>,
     dirty: bool,
@@ -155,6 +166,7 @@ impl Foundations {
             map,
             ground: HashMap::new(),
             edits: Vec::new(),
+            armour: Vec::new(),
             synced: false,
             walls: HashMap::new(),
             dirty: false,
@@ -170,12 +182,19 @@ impl Foundations {
     }
 
     /// Walls for the edits the renderer has not seen yet (`all` is the sim's whole
-    /// edit table, as `TileCache::apply_edits` takes it), then the cells uploaded
-    /// if any changed.
-    pub(super) fn update(&mut self, all: &[FlattenRecord], time: f32) {
+    /// edit table, as `TileCache::apply_edits` takes it, and `factions` the faction
+    /// each was levelled for), then the cells uploaded if any changed.
+    pub(super) fn update(
+        &mut self,
+        all: &[FlattenRecord],
+        factions: &[u8],
+        blueprints: &mc_data::Blueprints,
+        time: f32,
+    ) {
         let replaced = all.len() < self.edits.len() || all[..self.edits.len()] != self.edits[..];
         if replaced {
             self.edits.clear();
+            self.armour.clear();
             self.walls.clear();
             self.dirty = true;
         }
@@ -188,6 +207,14 @@ impl Foundations {
         self.synced = true;
         if all.len() > self.edits.len() {
             let fresh = all.len() - self.edits.len();
+            let armour = |i: usize| {
+                factions
+                    .get(i)
+                    .and_then(|&f| blueprints.factions.get(f as usize))
+                    .is_some_and(|f| f.construction == mc_data::Construction::Nanite)
+            };
+            self.armour
+                .extend((self.edits.len()..all.len()).map(armour));
             self.edits.extend_from_slice(&all[self.edits.len()..]);
             // A snapshot's whole history is rebuilt a lot at a time, merged where lots touch.
             for i in self.edits.len() - fresh..self.edits.len() {
@@ -225,10 +252,17 @@ impl Foundations {
         for cy in y0..=y1 {
             for cx in x0..=x1 {
                 let key = (cx, cy);
-                let Some(kind) = grid.slope_kind(cx, cy, |s| min_z + s as f32 * step) else {
+                let Some(mut kind) = grid.slope_kind(cx, cy, |s| min_z + s as f32 * step) else {
                     self.dirty |= self.walls.remove(&key).is_some();
                     continue;
                 };
+                // Clad as the newest lot it borders is.
+                if grid
+                    .newest(cx, cy)
+                    .is_some_and(|o| self.armour[o as usize - 1])
+                {
+                    kind |= ARMOUR;
+                }
                 let wall = Wall { kind, start };
                 match self.walls.get(&key) {
                     // Plating that lies as it did stays put: a neighbour's lot does
@@ -415,6 +449,16 @@ impl Window {
         }
     }
 
+    /// The newest edit (`i + 1`) any corner of cell `(cx, cy)` belongs to; `None` if
+    /// they are all the map's own ground.
+    fn newest(&self, cx: u32, cy: u32) -> Option<u32> {
+        [(cx, cy), (cx + 1, cy), (cx, cy + 1), (cx + 1, cy + 1)]
+            .map(|(x, y)| self.at(x, y).0)
+            .into_iter()
+            .max()
+            .filter(|&o| o > 0)
+    }
+
     /// Whether cell `(cx, cy)` is a levelled step to clad, and if so which way its
     /// slope runs (`ALONG_Y`, `HIGH_FAR`): its corners belong to different lots (or a
     /// lot and the map) and one of its triangles is steeper than `MIN_SLOPE`.
@@ -499,6 +543,23 @@ mod tests {
         let w = window(60);
         assert_eq!(w.slope_kind(1, 2, metres), Some(0));
         assert_eq!(w.slope_kind(3, 4, metres), Some(ALONG_Y | HIGH_FAR));
+    }
+
+    #[test]
+    fn a_cell_belongs_to_the_newest_lot_it_borders() {
+        let mut w = window(140);
+        // A second lot east of the first, sharing its edge samples.
+        let next = FlattenRecord {
+            min_x: 4,
+            min_y: 2,
+            max_x: 4,
+            max_y: 3,
+            sample: 120,
+        };
+        w.apply(&next, 2);
+        assert_eq!(w.newest(1, 2), Some(1));
+        assert_eq!(w.newest(4, 3), Some(2));
+        assert_eq!(w.newest(0, 0), None);
     }
 
     #[test]

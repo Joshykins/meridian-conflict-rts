@@ -3,6 +3,7 @@
 //! tail round, and does not lay past the mark while the body comes round; its beam runs
 //! up, then holds on its mark every tick; its claws throw their bombs from between their
 //! fingers as fast streaks that curve in on the mark, each from its own angle.
+//! A lot remembers the faction it was levelled for.
 
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use mc_data::Blueprints;
@@ -322,4 +323,25 @@ fn the_beam_runs_up_before_it_lights_and_down_after() {
     assert!(w.state.units.row(target).is_none(), "the tank still stands");
     // With nothing left to shoot, it ran down again.
     assert_eq!(*levels.last().unwrap(), 0);
+}
+
+/// A lot remembers which faction it was levelled for, so the renderer clads the slopes
+/// round a Regency structure in Regency armour (`TerrainEdit::faction`).
+#[test]
+fn a_lot_records_the_faction_it_was_levelled_for() {
+    let mut w = world();
+    add(&mut w, "regency_t1_power", 0, 600, 600, 0);
+    add(&mut w, "aster_t1_power", 1, 900, 900, 0);
+    let faction = |key: &str| {
+        w.blueprints
+            .unit(w.blueprints.id_of(key).unwrap())
+            .faction
+            .0
+    };
+    let edits: Vec<u8> = w.state.terrain_edits.iter().map(|e| e.faction).collect();
+    assert_eq!(
+        edits,
+        [faction("regency_t1_power"), faction("aster_t1_power")]
+    );
+    assert_ne!(edits[0], edits[1]);
 }

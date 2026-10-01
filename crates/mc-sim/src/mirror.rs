@@ -1228,6 +1228,8 @@ pub struct RenderFrame {
     pub props_dead: Vec<u32>,
     /// The whole terrain edit table, in order (copied again only when it changed).
     pub terrain_edits: Vec<mc_map::FlattenRecord>,
+    /// The faction each of `terrain_edits` was levelled for (`TerrainEdit::faction`).
+    pub terrain_edit_factions: Vec<u8>,
     /// Every weapon's pose for units with gun houses of their own (`Weapon::mount`):
     /// `UnitInstance::status[1]` bits 8.. hold the index here plus one.
     pub houses: Vec<HousePose>,
@@ -2491,6 +2493,10 @@ impl World {
         if !held {
             frame.terrain_edits.clear();
             frame.terrain_edits.extend(edits.iter().map(|e| e.record()));
+            frame.terrain_edit_factions.clear();
+            frame
+                .terrain_edit_factions
+                .extend(edits.iter().map(|e| e.faction));
         }
     }
 

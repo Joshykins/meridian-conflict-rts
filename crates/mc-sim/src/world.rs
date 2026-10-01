@@ -47,6 +47,9 @@ pub struct TerrainEdit {
     /// Inclusive.
     pub max: (u16, u16),
     pub sample: u16,
+    /// The faction (`mc_data::FactionId`) of the structure the lot was levelled for:
+    /// the renderer clads the slopes round it in that faction's foundation walls.
+    pub faction: u8,
 }
 
 impl TerrainEdit {
@@ -504,6 +507,7 @@ impl World {
                 min: (record.min_x, record.min_y),
                 max: (record.max_x, record.max_y),
                 sample: record.sample,
+                faction: bp.faction.0,
             });
             self.occupy_lot(&bp, pos, heading);
             self.events.push(SimEvent::TerrainEdited);
