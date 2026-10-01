@@ -21,12 +21,14 @@ use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
 mod batch;
+mod destruct;
 mod units;
 mod walls;
 mod warp;
 mod wrecks;
 
 pub use batch::{BatchView, UNIT_BATCH};
+pub use destruct::DestructView;
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
 pub use wrecks::WRECK_EXTRA_INSTANCES;
@@ -1248,6 +1250,8 @@ pub struct RenderFrame {
     pub planned_launches: Vec<crate::nukes::PlannedLaunch>,
     /// Capital ships in a jump that the viewer may see (`crate::warp`).
     pub warps: Vec<WarpView>,
+    /// Timed self-destructs counting down that the viewer may see (`crate::destruct`).
+    pub destructs: Vec<DestructView>,
     /// Warp dampeners the viewer knows of, and their fields.
     pub dampers: Vec<DamperView>,
     /// Each side's stores as the storage structures' lamps last judged them.
@@ -2474,6 +2478,7 @@ impl World {
             &mut frame.planned_launches,
         );
         self.write_warps(viewer, &mut frame.warps);
+        self.write_destructs(viewer, &mut frame.destructs);
         self.write_dampers(viewer, &mut frame.dampers);
 
         frame.fog.clear();

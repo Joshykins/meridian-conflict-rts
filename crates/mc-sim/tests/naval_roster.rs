@@ -562,6 +562,7 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
         &mut w,
         0,
         Command::SelfDestruct {
+            timed: false,
             units: vec![frigate],
         },
     );

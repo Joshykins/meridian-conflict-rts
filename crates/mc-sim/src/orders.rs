@@ -390,10 +390,8 @@ impl World {
                 }
                 Ok(())
             }
-            Command::SelfDestruct { units } => {
-                for row in self.owned(player, units, 0) {
-                    self.state.units.health[row] = Fx::ZERO;
-                }
+            Command::SelfDestruct { units, timed } => {
+                self.self_destruct(player, units, *timed);
                 Ok(())
             }
             Command::Resign => {

@@ -664,6 +664,8 @@ impl World {
         self.nav.begin_tick(self.state.tick)?;
         phase(&mut self.timings, "paths");
 
+        // Before the commands, so a countdown armed this tick runs its whole length.
+        self.run_destructs();
         let ai_commands = std::mem::take(&mut self.state.ai_pending);
         for c in ai_commands.iter().chain(commands) {
             self.apply_command(c)?;

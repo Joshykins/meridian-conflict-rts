@@ -309,7 +309,10 @@ impl PendingOrder {
                 target: pos,
                 queue: false,
             }],
-            PendingOrder::Destruct => vec![Command::SelfDestruct { units: who }],
+            PendingOrder::Destruct => vec![Command::SelfDestruct {
+                units: who,
+                timed: false,
+            }],
             PendingOrder::Warp { pos } => vec![Command::Warp {
                 units: who,
                 pos,

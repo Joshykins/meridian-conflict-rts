@@ -3132,8 +3132,10 @@ impl Game {
             KeyCode::Pause => self.toggle_pause(),
             KeyCode::Equal | KeyCode::NumpadAdd => self.step_speed(1),
             KeyCode::Minus | KeyCode::NumpadSubtract => self.step_speed(-1),
-            KeyCode::Delete if self.ctrl => self.send(Command::SelfDestruct {
+            // Delete counts down five seconds (again calls it off); Ctrl+Delete blows up at once.
+            KeyCode::Delete => self.send(Command::SelfDestruct {
                 units: self.selected_ids(),
+                timed: !self.ctrl,
             }),
             KeyCode::Home => {
                 let player = if self.view.observing {
@@ -4764,6 +4766,7 @@ impl Game {
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
+            crate::destruct_marks::draw(&mut ui, &field, alpha);
             if self.pointer == Pointer::Attack {
                 if let Some(target) = self.unit_at(self.cursor) {
                     crate::line_of_fire::draw_hover(&mut ui, &field, target);

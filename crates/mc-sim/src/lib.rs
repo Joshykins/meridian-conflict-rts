@@ -33,6 +33,7 @@ pub mod command;
 mod contacts;
 mod curve;
 mod debug;
+mod destruct;
 pub mod economy;
 mod flak;
 pub mod focus;

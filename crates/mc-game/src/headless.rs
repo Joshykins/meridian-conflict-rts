@@ -896,6 +896,7 @@ pub fn screenshot(
         crate::cover_marks::draw(&mut ui, &field, site);
         crate::titan_marks::draw(&mut ui, &field, 1.0, pointer);
         crate::warp_marks::draw(&mut ui, &field, 1.0, pointer);
+        crate::destruct_marks::draw(&mut ui, &field, 1.0);
         if let (Some(deg), Some(at)) = (formation_aim, pointer) {
             let command = mc_sim::Command::Move {
                 units: view

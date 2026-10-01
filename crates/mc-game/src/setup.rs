@@ -940,6 +940,7 @@ pub fn late_orders(opts: &Options, world: &mc_sim::World, t: u32) -> Vec<PlayerC
         return vec![PlayerCommand {
             player: 0,
             command: Command::SelfDestruct {
+                timed: false,
                 units: u
                     .slots
                     .iter()
@@ -955,6 +956,7 @@ pub fn late_orders(opts: &Options, world: &mc_sim::World, t: u32) -> Vec<PlayerC
     vec![PlayerCommand {
         player: 0,
         command: Command::SelfDestruct {
+            timed: false,
             units: u.slots.iter().map(|r| u.id(r)).collect(),
         },
     }]
@@ -984,6 +986,7 @@ pub fn scene_orders(
         return vec![PlayerCommand {
             player: 0,
             command: Command::SelfDestruct {
+                timed: false,
                 units: u.slots.iter().map(|r| u.id(r)).collect(),
             },
         }];
@@ -993,6 +996,7 @@ pub fn scene_orders(
         return vec![PlayerCommand {
             player: 0,
             command: Command::SelfDestruct {
+                timed: false,
                 units: u
                     .slots
                     .iter()

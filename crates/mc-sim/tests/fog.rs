@@ -192,11 +192,17 @@ fn wrecks_stay_on_the_map_under_explored_fog() {
     w.tick(&[
         PlayerCommand {
             player: 0,
-            command: Command::SelfDestruct { units: tank0 },
+            command: Command::SelfDestruct {
+                units: tank0,
+                timed: false,
+            },
         },
         PlayerCommand {
             player: 1,
-            command: Command::SelfDestruct { units: tanks(1) },
+            command: Command::SelfDestruct {
+                units: tanks(1),
+                timed: false,
+            },
         },
     ])
     .unwrap();
@@ -216,7 +222,10 @@ fn wrecks_stay_on_the_map_under_explored_fog() {
         .collect();
     w.tick(&[PlayerCommand {
         player: 0,
-        command: Command::SelfDestruct { units: own },
+        command: Command::SelfDestruct {
+            units: own,
+            timed: false,
+        },
     }])
     .unwrap();
     for _ in 0..5 {

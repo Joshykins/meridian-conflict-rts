@@ -231,6 +231,8 @@ pub struct Units {
     /// The player paused this unit's work (`Command::SetPaused`): it keeps its queue
     /// but spends nothing on building, assisting, producing, upgrading or repairing.
     pub paused: Vec<bool>,
+    /// Ticks left on a timed self-destruct (`destruct.rs`). Zero: none armed.
+    pub destruct: Vec<u16>,
     /// A land unit in a lift ship's hold: that ship (`transport.rs`). `NONE` otherwise. A stored unit is
     /// also `IN_FACTORY`, so nothing can see, hit or order it.
     pub hangar: Vec<UnitId>,
@@ -353,6 +355,7 @@ impl Units {
             dive_goal: Vec::new(),
             revealed: Vec::new(),
             paused: Vec::new(),
+            destruct: Vec::new(),
             hangar: Vec::new(),
             ground_aim: Vec::new(),
             warp: Vec::new(),
@@ -429,6 +432,7 @@ impl Units {
         put(&mut self.dive_goal, row, false);
         put(&mut self.revealed, row, 0);
         put(&mut self.paused, row, false);
+        put(&mut self.destruct, row, 0);
         put(&mut self.hangar, row, Handle::NONE);
         // Far from any map: the first bombardment picks a point.
         put(
@@ -543,7 +547,8 @@ impl Units {
                 self.fire_state[row] as u64
                     | (self.dive[row] as u64) << 8
                     | (self.dive_goal[row] as u64) << 16
-                    | (self.paused[row] as u64) << 24,
+                    | (self.paused[row] as u64) << 24
+                    | (self.destruct[row] as u64) << 32,
             );
             h.write_u64(self.hangar[row].0 as u64);
             for p in self.ground_aim[row] {

@@ -137,8 +137,12 @@ pub enum Command {
         units: Vec<UnitId>,
         kit: BlueprintId,
     },
+    /// Blows these units up. `timed`: after a countdown (`destruct::COUNTDOWN`) instead
+    /// of at once, and if any of them is already counting down, every countdown among
+    /// them is called off instead.
     SelfDestruct {
         units: Vec<UnitId>,
+        timed: bool,
     },
     Resign,
     /// Moves the `kind` orders (`Move`, `AttackMove`, `Build`, `Patrol`, `AttackGround`,
@@ -412,7 +416,7 @@ impl Command {
             | Command::CancelUpgrade { units }
             | Command::Refit { units, .. }
             | Command::CancelRefit { units, .. }
-            | Command::SelfDestruct { units }
+            | Command::SelfDestruct { units, .. }
             | Command::RelocateOrder { units, .. }
             | Command::DebugDamage { units, .. }
             | Command::DebugRemove { units }

@@ -16,6 +16,7 @@ mod cine;
 mod clipboard;
 mod cover_marks;
 mod crash;
+mod destruct_marks;
 mod formation_drag;
 mod game;
 mod headless;

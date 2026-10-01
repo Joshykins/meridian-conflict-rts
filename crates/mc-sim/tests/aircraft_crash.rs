@@ -66,8 +66,11 @@ fn plane(w: &mut World) -> mc_sim::UnitId {
 }
 
 fn kill(w: &mut World, id: mc_sim::UnitId) {
-    w.tick(&[cmd(Command::SelfDestruct { units: vec![id] })])
-        .unwrap();
+    w.tick(&[cmd(Command::SelfDestruct {
+        units: vec![id],
+        timed: false,
+    })])
+    .unwrap();
 }
 
 fn finish(w: &mut World) -> usize {

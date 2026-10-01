@@ -67,6 +67,7 @@ mod reclaim_heads;
 mod reform;
 mod regency;
 mod repair;
+mod self_destruct;
 mod shield;
 mod site_map;
 mod skyguard;

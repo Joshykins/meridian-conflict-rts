@@ -212,7 +212,7 @@ Linux builds.
 | idle engineers / idle factories chips | select them all and bring the camera |
 | Pause | pause (single player) |
 | + / - | game speed, 0.1x to 12x (single player) |
-| Ctrl+Delete | self-destruct |
+| Delete / Ctrl+Delete | self-destruct the selection after a 5 second countdown, shown as a draining red ring round each unit (Delete again calls it off) / at once |
 | Ctrl+0-9 / 0-9 | set / recall a control group; twice quickly also brings the camera. Groups show as chips over the selection panel |
 | Home | jump to your commander (or, watching, to a living one) |
 | wheel, WASD or arrows, Q/E, PgUp/PgDn, middle drag | zoom to cursor, pan, rotate, tilt, pan |

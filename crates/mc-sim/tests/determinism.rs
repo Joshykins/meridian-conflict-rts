@@ -1,7 +1,8 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
 //! curving charges, a warp into a dampener and the stun it leaves, wrecks worn down by
-//! blasts, two factories' linked batch forming up) must hash identically at every worker count and after a snapshot is
+//! blasts, two factories' linked batch forming up, a self-destruct counting down across
+//! the snapshot) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -300,6 +301,14 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }]
         }
+        // A timed self-destruct still counting down when the snapshot is taken.
+        t if t == SNAPSHOT_AT - 20 => vec![PlayerCommand {
+            player: 1,
+            command: Command::SelfDestruct {
+                units: units_of(w, 1).into_iter().take(1).collect(),
+                timed: true,
+            },
+        }],
         _ => Vec::new(),
     }
 }

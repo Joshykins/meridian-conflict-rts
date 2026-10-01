@@ -371,6 +371,7 @@ fn a_frigate_sinks_slowly_and_leaves_a_wreck_on_the_seabed() {
         &mut w,
         0,
         Command::SelfDestruct {
+            timed: false,
             units: vec![frigate],
         },
     );
