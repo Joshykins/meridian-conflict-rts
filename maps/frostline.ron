@@ -1,0 +1,11 @@
+// Frostline: four against four across a land bridge between two oceans, the
+// Precursors' climate wall down the middle of it. West of the wall, red-rock
+// desert under a clear sky; east of it, Alaska.
+(
+    biome: Desert,
+    style: Teams,
+    weather: Clear,
+    tweaks: (rain: 0.0, wind: 9),
+    time: Afternoon,
+    climate: Desert,
+)

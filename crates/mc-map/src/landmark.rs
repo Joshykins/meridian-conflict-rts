@@ -130,6 +130,24 @@ pub const GORGE_TOWN: Town = Town {
     half: (170.0, 120.0),
 };
 
+/// Frostline's climate wall (`bake/frostline.rs`): the line the Precursors'
+/// towers stand on, south edge to north edge, map metres. Desert west of it,
+/// Alaska east. The map's sidecar (`maps/frostline.ron`) gives the renderer
+/// the same line; `tests/frostline.rs` holds the two together.
+pub const FROSTLINE_WALL: &[(f64, f64)] = &[
+    (6_592.0, 0.0),
+    (6_592.0, 3_400.0),
+    (8_192.0, 5_000.0),
+    (8_192.0, 11_384.0),
+    (9_792.0, 12_984.0),
+    (9_792.0, 16_384.0),
+];
+
+/// Metres Frostline's desert stands below Vermilion Gorge's beds: its low
+/// country, 14 to 50 m over the sea, is the canyon's bench (64 to 100 m), and
+/// its mesas are cut in the beds above. The sidecar's `strata_lift`.
+pub const FROSTLINE_STRATA_LIFT: f64 = 50.0;
+
 #[cfg(test)]
 mod tests {
     use super::*;

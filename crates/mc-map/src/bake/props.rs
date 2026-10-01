@@ -27,6 +27,7 @@ impl Terrain {
                 Layout::TwinBays => self.bays_forest(x, y, height, slope),
                 Layout::Threshold => self.threshold_forest(x, y, height, slope),
                 Layout::Canyon => self.canyon_forest(x, y, height, slope),
+                Layout::Frostline => self.frostline_forest(x, y, height, slope),
                 _ => self.basin_forest(x, y, height, slope),
             }
         };
@@ -156,6 +157,10 @@ impl Terrain {
         if self.layout == Layout::Canyon {
             return self.canyon_tree(conifer, hash);
         }
+        // Frostline's likewise, and its kinds go by the side of the wall.
+        if self.layout == Layout::Frostline {
+            return self.frostline_tree(x, y, conifer, hash);
+        }
         // The alpine map's woods are not mirrored.
         let (px, py) = match self.layout {
             Layout::Alpine | Layout::AlpineTeams => (x, y),
@@ -254,7 +259,9 @@ impl Terrain {
                     && !(self.is_alpine() && self.alpine_ice(x, y) > 0.05)
                     && self.machine_clear(x, y)
                 {
-                    let kind = if self.layout == Layout::Canyon {
+                    let desert = self.layout == Layout::Canyon
+                        || (self.layout == Layout::Frostline && frostline::east_of(x, y) < 0.0);
+                    let kind = if desert {
                         // Blocks of bedded sandstone fallen from the walls.
                         [PropKind::RockSlab, PropKind::RockLarge][(roll > 0.985) as usize]
                     } else if roll > 0.98 {

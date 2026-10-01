@@ -94,12 +94,18 @@ pub enum Layout {
     /// `canyon.rs`). Fair by a mirror across the north-south middle line;
     /// the west side's starts first, each followed by its mirror. Wants 12 km.
     Canyon,
+    /// "Frostline": four against four across a land bridge between two
+    /// oceans, the Precursors' climate wall down the middle: desert west of
+    /// it, Alaska east (see `frostline.rs`). Fair by a half turn wherever
+    /// units can go; the west side first, starts in pairs. Exactly 16 km.
+    Frostline,
 }
 
 mod alpine;
 mod archipelago;
 mod bays;
 mod canyon;
+mod frostline;
 mod machine;
 mod props;
 mod threshold;
@@ -192,6 +198,15 @@ impl BakeParams {
         }
     }
 
+    /// A square eight-player [`Layout::Frostline`] map.
+    pub fn frostline(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 8,
+            layout: Layout::Frostline,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -251,6 +266,15 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     {
         return Err(MapError::Invalid(
             "the Canyon layout is for exactly 6 players on a 12 km map".into(),
+        ));
+    }
+    if params.layout == Layout::Frostline
+        && (params.players != 8
+            || (params.tiles_w as i32 * TILE_SIZE_M) as f64 != frostline::SIZE
+            || params.tiles_h != params.tiles_w)
+    {
+        return Err(MapError::Invalid(
+            "the Frostline layout is for exactly 8 players on a 16 km map".into(),
         ));
     }
     if params.layout == Layout::Threshold && params.players != 4 {
@@ -534,6 +558,8 @@ struct Terrain {
     arch: archipelago::Archipelago,
     /// Canyon layout only: its designed outlines and trails (`canyon.rs`).
     canyon: canyon::Canyon,
+    /// Frostline layout only: what it works out at set-up (`frostline.rs`).
+    frost: frostline::Frostline,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
     /// Empty until the machine is laid, so what is designed before it sees the landscape.
     benches: Vec<machine::Bench>,
@@ -614,6 +640,7 @@ impl Terrain {
             precursor: Vec::new(),
             arch: archipelago::Archipelago::default(),
             canyon: canyon::Canyon::default(),
+            frost: frostline::Frostline::default(),
             benches: Vec::new(),
         };
 
@@ -651,6 +678,10 @@ impl Terrain {
         }
         if params.layout == Layout::Canyon {
             t.setup_canyon();
+            return t;
+        }
+        if params.layout == Layout::Frostline {
+            t.setup_frostline();
             return t;
         }
 
@@ -728,9 +759,12 @@ impl Terrain {
         if self.layout == Layout::Canyon {
             return (-vx.abs(), vy, r);
         }
-        // Halden's Grip and The Axis are fair by a half turn: fold the
-        // north-east half onto the south-west.
-        if matches!(self.layout, Layout::TwinBays | Layout::Archipelago) {
+        // Halden's Grip, The Axis and Frostline are fair by a half turn: fold
+        // the north-east half onto the south-west.
+        if matches!(
+            self.layout,
+            Layout::TwinBays | Layout::Archipelago | Layout::Frostline
+        ) {
             return if vx + vy > 0.0 {
                 (-vx, -vy, r)
             } else {
@@ -775,6 +809,7 @@ impl Terrain {
             Layout::TwinBays => self.natural_bays(x, y),
             Layout::Threshold => self.natural_threshold(x, y),
             Layout::Canyon => self.natural_canyon(x, y),
+            Layout::Frostline => self.natural_frostline(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -785,7 +820,7 @@ impl Terrain {
 
     /// Whether the map carries a snow layer.
     fn has_snow(&self) -> bool {
-        self.is_alpine() || self.layout == Layout::Threshold
+        self.is_alpine() || matches!(self.layout, Layout::Threshold | Layout::Frostline)
     }
 
     /// Whether the map carries a ways layer: the canyon's trails.
@@ -1348,10 +1383,10 @@ impl Terrain {
                 let gx = (z(ir, j) - z(il, j)) / ((ir - il) as f64 * cell);
                 let gy = (z(i, ju) - z(i, jd)) / ((ju - jd) as f64 * cell);
                 let (x, y) = (x0 + i as f64 * cell, y0 + j as f64 * cell);
-                let (ice, snow) = if self.layout == Layout::Threshold {
-                    self.threshold_snow(x, y, z(i, j), gx, gy)
-                } else {
-                    self.alpine_snow(x, y, z(i, j), gx, gy)
+                let (ice, snow) = match self.layout {
+                    Layout::Threshold => self.threshold_snow(x, y, z(i, j), gx, gy),
+                    Layout::Frostline => self.frostline_snow(x, y, z(i, j), gx, gy),
+                    _ => self.alpine_snow(x, y, z(i, j), gx, gy),
                 };
                 // No glacier ice on the machine's benches or their cut faces.
                 let ice = ice * self.machine_ice(x, y);
@@ -1403,4 +1438,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::twin_bays("t", 8, 1)));
     pub(super) static CANYON: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::canyon("t", 6, 11)));
+    pub(super) static FROSTLINE: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::frostline("t", 8, 9)));
 }

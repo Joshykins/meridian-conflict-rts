@@ -486,7 +486,7 @@ pub(super) fn segment(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> (f64, f64)
 }
 
 /// Distance from `p` to a polyline.
-fn polyline(p: (f64, f64), line: &[(f64, f64)]) -> f64 {
+pub(super) fn polyline(p: (f64, f64), line: &[(f64, f64)]) -> f64 {
     polyline_at(p, line).0
 }
 
@@ -506,12 +506,12 @@ fn polyline_at(p: (f64, f64), line: &[(f64, f64)]) -> (f64, f64) {
 }
 
 /// Distance from `p` to a point.
-fn dist(p: (f64, f64), (cx, cy): (f64, f64)) -> f64 {
+pub(super) fn dist(p: (f64, f64), (cx, cy): (f64, f64)) -> f64 {
     ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt()
 }
 
 /// How far `p` is inside the closed polygon (negative outside).
-fn inside(p: (f64, f64), poly: &[(f64, f64)]) -> f64 {
+pub(super) fn inside(p: (f64, f64), poly: &[(f64, f64)]) -> f64 {
     let n = poly.len();
     let mut d = f64::INFINITY;
     let mut odd = false;
@@ -548,7 +548,7 @@ impl Terrain {
     }
 
     /// A point turned half round the centre of the map.
-    fn turned(&self, (x, y): (f64, f64)) -> (f64, f64) {
+    pub(super) fn turned(&self, (x, y): (f64, f64)) -> (f64, f64) {
         (self.size_x - x, self.size_y - y)
     }
 

@@ -490,6 +490,7 @@ impl Terrain {
                 Layout::AlpineTeams => self.machine_sound(),
                 Layout::Threshold => self.machine_threshold(),
                 Layout::Archipelago => self.machine_axis(),
+                Layout::Frostline => self.machine_wall(),
                 _ => return,
             };
             (m.sites, m.benches)

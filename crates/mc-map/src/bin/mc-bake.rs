@@ -9,6 +9,7 @@
 //! mc-bake --layout twin-bays --size-km 16 --seed 7 --name "Halden's Grip" -o maps/haldens_grip.mcmap
 //! mc-bake --layout threshold --size-km 16 --seed 31 --name "The Threshold" -o maps/threshold.mcmap
 //! mc-bake --layout canyon --size-km 12 --seed 11 --name "Vermilion Gorge" -o maps/vermilion_gorge.mcmap
+//! mc-bake --layout frostline --size-km 16 --seed 9 --name "Frostline" -o maps/frostline.mcmap
 //! ```
 //!
 //! Every layout but the survival ones is then stamped with starting wreckage
@@ -46,6 +47,9 @@ usage: mc-bake -o <file.mcmap> [options]
                    canyon: \"Vermilion Gorge\", 3v3 across a desert canyon, a
                    reservoir in its middle, an arch dam at the south;
                    exactly 12 km
+                   frostline: \"Frostline\", 4v4 across a land bridge between
+                   two oceans, a Precursor climate wall down the middle:
+                   desert west of it, Alaska east; exactly 16 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
                    take exactly 8)
@@ -107,9 +111,10 @@ fn parse_args() -> Result<Args, String> {
                     "twin-bays" => Layout::TwinBays,
                     "threshold" => Layout::Threshold,
                     "canyon" => Layout::Canyon,
+                    "frostline" => Layout::Frostline,
                     other => {
                         return Err(format!(
-                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold or canyon)"
+                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon or frostline)"
                         ))
                     }
                 }
@@ -147,6 +152,9 @@ fn parse_args() -> Result<Args, String> {
     }
     if args.layout == Layout::Canyon && args.players.is_some_and(|n| n != 6) {
         return Err("--layout canyon is a six-player layout (--players 6)".into());
+    }
+    if args.layout == Layout::Frostline && args.players.is_some_and(|n| n != 8) {
+        return Err("--layout frostline is an eight-player layout (--players 8)".into());
     }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());
@@ -190,6 +198,7 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         Layout::TwinBays => BakeParams::twin_bays(&name, args.size_km / 2, args.seed),
         Layout::Threshold => BakeParams::threshold(&name, args.size_km / 2, args.seed),
         Layout::Canyon => BakeParams::canyon(&name, args.size_km / 2, args.seed),
+        Layout::Frostline => BakeParams::frostline(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {

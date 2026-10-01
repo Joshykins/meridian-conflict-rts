@@ -478,7 +478,7 @@ fn bicubic(d: &[f32], nx: usize, ny: usize, step: f64, x: f64, y: f64) -> f64 {
 }
 
 /// A closed outline rounded into a curve (Catmull-Rom, `per` points a span).
-fn smooth_closed(poly: &[(f64, f64)], per: usize) -> Vec<(f64, f64)> {
+pub(super) fn smooth_closed(poly: &[(f64, f64)], per: usize) -> Vec<(f64, f64)> {
     let n = poly.len() as isize;
     let at = |i: isize| poly[i.rem_euclid(n) as usize];
     let mut out = Vec::new();
@@ -492,7 +492,7 @@ fn smooth_closed(poly: &[(f64, f64)], per: usize) -> Vec<(f64, f64)> {
 }
 
 /// An open line rounded into a curve through its points.
-fn smooth_open(line: &[(f64, f64)], per: usize) -> Vec<(f64, f64)> {
+pub(super) fn smooth_open(line: &[(f64, f64)], per: usize) -> Vec<(f64, f64)> {
     let n = line.len() as isize;
     let at = |i: isize| line[i.clamp(0, n - 1) as usize];
     let mut out = Vec::new();

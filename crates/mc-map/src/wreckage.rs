@@ -52,7 +52,7 @@ impl Symmetry {
                 base: if players <= 4 { PI / 4.0 } else { PI / 8.0 },
             }),
             Layout::Alpine | Layout::AlpineTeams => Some(Symmetry::Mirror),
-            Layout::TwinBays | Layout::Archipelago => Some(Symmetry::HalfTurn),
+            Layout::TwinBays | Layout::Archipelago | Layout::Frostline => Some(Symmetry::HalfTurn),
             Layout::Canyon => Some(Symmetry::MirrorSides),
             Layout::Threshold => None,
         }
