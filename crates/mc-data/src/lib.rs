@@ -1055,6 +1055,17 @@ impl Blueprints {
                 return Err(DataError::Invalid(format!("duplicate unit key {}", u.key)));
             }
         }
+        // No two units share a name, across every faction: a name is how players tell them
+        // apart. Loadouts and kits, added after, carry their unit's or module's name.
+        let mut by_name = BTreeMap::new();
+        for (_, u) in &all {
+            if let Some(other) = by_name.insert(u.name.as_str(), u.key.as_str()) {
+                return Err(DataError::Invalid(format!(
+                    "units {other} and {} are both named {}",
+                    u.key, u.name
+                )));
+            }
+        }
         // Only authored units can be named in a file; loadouts and kits are added after.
         let authored = by_key.clone();
         let lookup = |key: &str, ctx: &str| {
@@ -1628,19 +1639,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_builder_may_not_put_up_another_factions_structure() {
-        // The shipped data with the Regency commander told to build an ARC reactor.
-        let dir =
-            std::env::temp_dir().join(format!("mc-data-foreign-build-{}", std::process::id()));
-        let copy = |from: &Path, to: &Path| {
-            for entry in walk(from) {
-                let target = to.join(entry.strip_prefix(from).unwrap());
-                std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-                std::fs::copy(&entry, &target).unwrap();
-            }
-        };
-        fn walk(dir: &Path) -> Vec<std::path::PathBuf> {
+    /// A copy of the shipped data in a temporary folder named for `tag`, to break.
+    fn data_copy(tag: &str) -> PathBuf {
+        fn walk(dir: &Path) -> Vec<PathBuf> {
             let mut out = Vec::new();
             for e in std::fs::read_dir(dir).unwrap() {
                 let p = e.unwrap().path();
@@ -1652,7 +1653,40 @@ mod tests {
             }
             out
         }
-        copy(&data_dir().join("factions"), &dir.join("factions"));
+        let dir = std::env::temp_dir().join(format!("mc-data-{tag}-{}", std::process::id()));
+        let from = data_dir().join("factions");
+        for entry in walk(&from) {
+            let target = dir
+                .join("factions")
+                .join(entry.strip_prefix(&from).unwrap());
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::copy(&entry, &target).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn no_two_units_share_a_name() {
+        // The shipped data with the Regency scout given an ARC tank's name.
+        let dir = data_copy("same-name");
+        let land = dir.join("factions/regency/units/land.ron");
+        let text = std::fs::read_to_string(&land).unwrap();
+        assert!(text.contains("\"Outrider\""));
+        std::fs::write(&land, text.replacen("\"Outrider\"", "\"Warden\"", 1)).unwrap();
+        let Err(err) = Blueprints::load(&dir) else {
+            panic!("two units named Warden were allowed")
+        };
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(
+            err.to_string().contains("aster_t1_tank") && err.to_string().contains("Warden"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_builder_may_not_put_up_another_factions_structure() {
+        // The shipped data with the Regency commander told to build an ARC reactor.
+        let dir = data_copy("foreign-build");
         let command = dir.join("factions/regency/units/command.ron");
         let text = std::fs::read_to_string(&command).unwrap();
         let text = text.replacen(

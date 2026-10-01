@@ -1,7 +1,7 @@
 [
     (
         key: "aster_t1_scout",
-        name: "Kestrel",
+        name: "Courser",
         role: "Land Scout", title: "Scout",
         tech: 1,
         categories: ["Land", "Scout", "DirectFire"],

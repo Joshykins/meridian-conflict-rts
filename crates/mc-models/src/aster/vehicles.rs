@@ -393,7 +393,7 @@ pub(super) fn engineer(b: &mut MeshBuilder, tech: u8) {
     }
 }
 
-// ---- Kestrel: scout --------------------------------------------------------
+// ---- Courser: scout --------------------------------------------------------
 
 pub(super) fn scout(b: &mut MeshBuilder, _tech: u8) {
     b.set_turret_pivot(v3(0.0, 0.0, 1.25));
