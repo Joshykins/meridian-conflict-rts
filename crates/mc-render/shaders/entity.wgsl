@@ -1822,6 +1822,16 @@ fn vs_main(in: VsIn) -> VsOut {
         let beat = fract(time * 0.7 + phase);
         let stroke = clamp(model.height * 0.035, 0.3, 1.1);
         p.z -= stroke * select(1.0 - (beat - 0.25) / 0.75, beat / 0.25, beat < 0.25);
+    } else if (in.part & ORBIT_PART_MASK) == ORBIT_PART && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
+        // A gyroscope's ring (`gpu_consts::orbit`): about its own axis through the pivot.
+        let pivot = model.spinner_pivot.xyz;
+        let azimuth = f32((in.part >> ORBIT_AZIMUTH_SHIFT) & 255u) / 256.0 * 6.2831853;
+        let tilt = f32((in.part >> ORBIT_TILT_SHIFT) & 255u) / 255.0 * 1.5707963;
+        let axis = vec3<f32>(sin(tilt) * cos(azimuth), sin(tilt) * sin(azimuth), cos(tilt));
+        let rate = f32(bitcast<i32>(in.part) >> ORBIT_RATE_SHIFT) * ORBIT_RATE_STEP;
+        let spin = time * rate + f32(e.unit_id & 255u) * 0.37;
+        p = rot_about(p - pivot, axis, spin) + pivot;
+        n = rot_about(n, axis, spin);
     } else if (in.part == PART_SPINNER || in.part == 4u) && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
         let pivot = model.spinner_pivot.xyz;
         let rate = select(select(1.6, 0.48, (e.owner_flags & STATE_CHARGING) != 0u), 38.0, in.part == 4u);

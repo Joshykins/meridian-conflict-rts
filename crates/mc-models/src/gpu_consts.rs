@@ -467,6 +467,13 @@ shared! {
         /// colour through deep red to nothing. Also the plasma a strike throws up.
         /// `appearance` as `PLASMA_ORB`'s.
         pub const PLASMA_WAKE: u32 = 55;
+        /// A Regency Star Cage's star, lit while the plant runs (renderer/star_cage_fx.rs,
+        /// plasma_puffs.wgsl): a ball of fusing plasma, its face boiling in cells, white-hot
+        /// at the heart, the prism's pinks (common.wgsl `prism`) drifting over it, a ragged
+        /// corona flickering off its rim and veins crackling across it. Laid once a tick, two
+        /// ticks long; `params.x` the quad's half size (the face is 0.42 of it),
+        /// `appearance.rgb` its brightness, `appearance.w` the star's own seed.
+        pub const STAR_CORE: u32 = 56;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under
@@ -548,6 +555,20 @@ shared! {
         pub const PART_LAMP: u32 = 65;
     }
 
+    /// A gyroscope (entity.wgsl): pieces that turn about an axis of their own through
+    /// `Model::spinner_pivot` while the structure runs (`MeshBuilder::with_orbit`), so
+    /// rings round a core tumble each its own way. The axis and rate ride the part word above its low byte: the
+    /// axis's bearing round z in `AZIMUTH`, its lean from z (0 to a right angle) in `TILT`,
+    /// both in 256ths, and the rate as a signed byte of `RATE_STEP`s (rad/s).
+    pub mod orbit as "ORBIT_" {
+        pub const PART: u32 = 66;
+        pub const PART_MASK: u32 = 0xFF;
+        pub const AZIMUTH_SHIFT: u32 = 8;
+        pub const TILT_SHIFT: u32 = 16;
+        pub const RATE_SHIFT: u32 = 24;
+        pub const RATE_STEP: f32 = 0.03125;
+    }
+
     /// Hatched missile cells (`models::CellBlock`, entity.wgsl): each hatch swings up and
     /// out about its outer edge by how far the hatches are open (`UnitInstance::deploy`,
     /// `mc_sim::launch_cells`); the missile standing in a cell is drawn while its bit is
@@ -599,7 +620,8 @@ shared! {
     /// rose, magenta, lavender and peach-gold (common.wgsl `prism`), like the light of a
     /// bridge between stars, not the red of the lesser grades.
     pub mod prism as "PRISM_" {
-        /// `material::GLOW_PRISM`: a star core and its flares, the prism turning over them.
+        /// `material::GLOW_PRISM`: a star core's white-hot heart in the mesh, under the
+        /// star the renderer draws as light; the prism turning over it.
         pub const GLOW_MATERIAL: u32 = 28;
         /// How many times a second the prism's colours run once round.
         pub const RATE: f32 = 0.35;

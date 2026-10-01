@@ -1319,7 +1319,7 @@ impl Renderer {
 
     /// One puff of light (plasma_puffs.wgsl, warp_puffs.wgsl): `rgb` its colour and
     /// brightness, `w` its `appearance.w` (how far a plasma puff has gone over to fusion).
-    fn push_lit(
+    pub(super) fn push_lit(
         &mut self,
         kind: f32,
         pos: Vec3,

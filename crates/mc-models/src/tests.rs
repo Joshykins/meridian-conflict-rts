@@ -576,7 +576,8 @@ fn meshes_are_valid() {
                             || v.part == part::LAUNCHER_HOIST
                             || v.part == part::CELL_HATCH
                             || v.part == part::CELL_ROUND
-                            || (part::STORE_FILL_FIRST..=part::STORE_LAMP).contains(&v.part)),
+                            || (part::STORE_FILL_FIRST..=part::STORE_LAMP).contains(&v.part)
+                            || v.part & part::ORBIT_MASK == part::ORBIT),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.

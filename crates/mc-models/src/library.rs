@@ -177,6 +177,7 @@ fn build_fitted_made(
     let mut spins = Vec::new();
     let mut pit = None;
     let mut excavation = None;
+    let mut star_core = None;
     let mut scans = false;
     let mut exhausts = Vec::new();
     let mut lifts = Vec::new();
@@ -207,6 +208,7 @@ fn build_fitted_made(
             spins = builder.spins();
             pit = builder.pit();
             excavation = builder.excavation();
+            star_core = builder.star_core();
             exhausts = builder.exhausts();
             lifts = builder.lifts();
             vtol = builder.vtol();
@@ -268,6 +270,7 @@ fn build_fitted_made(
         spins,
         pit,
         excavation,
+        star_core,
         exhausts,
         lifts,
         vtol,
@@ -289,6 +292,10 @@ fn yawed_reach(p: Vec3, part: u32, turret_pivot: Vec3, spinner_pivot: Vec3) -> f
         part::TURRET => turret_pivot.truncate().length() + (p - turret_pivot).truncate().length(),
         part::SPINNER => {
             spinner_pivot.truncate().length() + (p - spinner_pivot).truncate().length()
+        }
+        // A gyroscope's ring may turn anywhere round the pivot.
+        _ if part & part::ORBIT_MASK == part::ORBIT => {
+            return spinner_pivot.length() + (p - spinner_pivot).length();
         }
         _ => p.truncate().length(),
     };

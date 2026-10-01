@@ -245,6 +245,12 @@ pub mod part {
     /// A storage structure's fill piece at `level` (`gpu_consts::store`), and its lamps.
     pub const STORE_FILL_FIRST: u32 = crate::gpu_consts::store::PART_FILL_FIRST;
     pub const STORE_LAMP: u32 = crate::gpu_consts::store::PART_LAMP;
+    /// A gyroscope's piece: turns about its own axis through `Model::spinner_pivot`, the
+    /// axis and rate in the word's high bits (`gpu_consts::orbit`,
+    /// `MeshBuilder::with_orbit`). Compare `word & ORBIT_MASK`.
+    pub const ORBIT: u32 = crate::gpu_consts::orbit::PART;
+    pub const ORBIT_MASK: u32 = crate::gpu_consts::orbit::PART_MASK;
+    const _: () = assert!(ORBIT > STORE_LAMP);
 }
 
 /// How a vertex is rigged beyond its part: which bone of a walking leg it
@@ -562,6 +568,9 @@ pub struct Model {
     pub pit: Option<Pit>,
     /// The beam a Regency mine digs its bore with (`renderer/regency_mine_fx.rs`).
     pub excavation: Option<Excavation>,
+    /// A Regency Star Cage's star (xyz its middle, w its radius): drawn as light by the
+    /// renderer (`renderer/star_cage_fx.rs`) while the plant runs.
+    pub star_core: Option<[f32; 4]>,
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).
     pub exhausts: Vec<Exhaust>,

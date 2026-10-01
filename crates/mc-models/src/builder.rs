@@ -124,6 +124,7 @@ pub struct MeshBuilder {
     spins: Vec<(u32, u32, [f32; 3])>,
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
+    star_core: Option<[f32; 4]>,
     exhausts: Vec<super::Exhaust>,
     lifts: Vec<super::Lift>,
     vtol: Option<super::Vtol>,
@@ -187,6 +188,7 @@ impl MeshBuilder {
             spins: Vec::new(),
             pit: None,
             excavation: None,
+            star_core: None,
             exhausts: Vec::new(),
             lifts: Vec::new(),
             vtol: None,
@@ -286,6 +288,27 @@ impl MeshBuilder {
         let previous = std::mem::replace(&mut self.part, part);
         f(self);
         self.part = previous;
+    }
+
+    /// Runs `f` with its pieces turning about `axis` (in the current frame) through the
+    /// spinner pivot at `rate` rad/s while the structure runs: a gyroscope's ring
+    /// (`part::ORBIT`, `gpu_consts::orbit`). The axis is kept square to what it turns, so
+    /// a ring stays in its own sweep under a stretched frame.
+    pub fn with_orbit(&mut self, axis: Vec3, rate: f32, f: impl FnOnce(&mut Self)) {
+        use crate::gpu_consts::orbit::*;
+        use std::f32::consts::{FRAC_PI_2, TAU};
+        let normal = self.transform.matrix3.inverse().transpose();
+        let mut a = Vec3::from(normal * glam::Vec3A::from(axis)).normalize();
+        let mut rate = rate;
+        if a.z < 0.0 {
+            a = -a;
+            rate = -rate;
+        }
+        let azimuth = (a.y.atan2(a.x).rem_euclid(TAU) / TAU * 256.0).round() as u32 & 0xFF;
+        let tilt = (a.z.clamp(0.0, 1.0).acos() / FRAC_PI_2 * 255.0).round() as u32;
+        let steps = (rate / RATE_STEP).round().clamp(-127.0, 127.0) as i8 as u8 as u32;
+        let word = PART | azimuth << AZIMUTH_SHIFT | tilt << TILT_SHIFT | steps << RATE_SHIFT;
+        self.with_part(word, f);
     }
 
     /// Runs `f` with vertices riding leg bone `limb` (`rig::THIGH`, `SHIN` or `FOOT`).
@@ -792,6 +815,21 @@ impl MeshBuilder {
 
     pub fn excavation(&self) -> Option<super::Excavation> {
         self.excavation.clone()
+    }
+
+    /// Records a Star Cage's star, its middle and radius (given in the current frame),
+    /// which the renderer draws as light (`Model::star_core`).
+    pub fn set_star_core(&mut self, at: Vec3, radius: f32) {
+        let at = self.transform.transform_point3(at);
+        let r = self
+            .transform
+            .transform_vector3(Vec3::new(radius, 0.0, 0.0))
+            .length();
+        self.star_core = Some([at.x, at.y, at.z, r]);
+    }
+
+    pub fn star_core(&self) -> Option<[f32; 4]> {
+        self.star_core
     }
 
     /// Records the spinner axis (given in the current frame).

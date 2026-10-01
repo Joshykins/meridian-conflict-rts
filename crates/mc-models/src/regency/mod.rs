@@ -129,12 +129,15 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 /// The reduced level's largest share of the full level, where it is not the library's 0.45.
 /// The tech 3 land and air factories are mostly armour plates, which keep their sides at
 /// the reduced level, and have no gears or rams for the full level to spend on. The Picket
-/// and the Halberd are the same: plated legs, buttresses and gun shrouds, little else.
+/// and the Halberd are the same: plated legs, buttresses and gun shrouds, little else; so
+/// are the tech 2 and 3 Star Cages.
 #[cfg(test)]
 pub(super) fn reduced_share(key: &str) -> Option<f32> {
     match key.split('~').next().unwrap_or(key) {
         "regency_brood" | "regency_hatchery" => Some(0.57),
         "regency_barb" | "regency_pinch_cannon" => Some(0.52),
+        // Towers and talons: plates that keep their sides when reduced.
+        "regency_heart_2" | "regency_heart_3" => Some(0.5),
         _ => None,
     }
 }

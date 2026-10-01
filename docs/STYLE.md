@@ -255,7 +255,10 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 
 - **Power: star cores.** Gravity pinches plasma into a small caged star
   (pinch fusion under star conditions). A higher tier holds a bigger star. The
-  star burns in pinch fusion's prism (below). A
+  star burns in pinch fusion's prism (below), and it is light, never a solid
+  ball: a boiling, crackling face with a ragged corona (plasma_puffs.wgsl
+  `star_core`). Its gravity rings tumble round it each on its own axis. Each
+  tier is held differently (cradle, yoke, crown), so the three read apart. A
   breached core collapses inward before it flashes out, never a plain
   explosion.
 - **Weapons are plasma, and it is heavy.** Hyper-advanced plasma weaponry:

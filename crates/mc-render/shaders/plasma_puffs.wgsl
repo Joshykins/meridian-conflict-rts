@@ -12,7 +12,7 @@
 
 fn is_plasma_puff(kind: u32) -> bool {
     return kind == PUFF_PLASMA_ORB || kind == PUFF_PLASMA_BURST || kind == PUFF_PLASMA_GLOB
-        || kind == PUFF_PLASMA_WAKE;
+        || kind == PUFF_PLASMA_WAKE || kind == PUFF_STAR_CORE;
 }
 
 // Turned to the eye, where it was born; a burst is drawn a little toward the eye so the
@@ -44,7 +44,8 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, age: f32, o: PuffOut) -> PuffO
     let px = max(size * globals.lod.x / max(center.w, 1.0), 2.5);
     let ndc = center.xy / center.w + corner * px * globals.viewport.zw;
     // A burst on a hull stands in front of it: it is the hit, not something inside it.
-    let lift = select(0.5, 0.9, kind == PUFF_PLASMA_BURST);
+    // A star stands at its face: rings passing in front of it hide it.
+    let lift = select(select(0.5, 0.9, kind == PUFF_PLASMA_BURST), 0.42, kind == PUFF_STAR_CORE);
     out.clip = vec4<f32>(ndc * center.w, front_depth(pos, size * lift) * center.w, center.w);
     out.world = effect_billboard_world(pos, corner, size);
     return out;
@@ -62,6 +63,9 @@ fn plasma_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     }
     if u32(in.state.y) == PUFF_PLASMA_WAKE {
         return plasma_wake(in, d);
+    }
+    if u32(in.state.y) == PUFF_STAR_CORE {
+        return star_core(in, d);
     }
     return plasma_burst(in, d);
 }
@@ -185,4 +189,85 @@ fn plasma_glob(in: PuffOut, d: f32) -> vec4<f32> {
     let c = mix(rgb, ember, smoothstep(0.2, 0.9, age)) * body
         + vec3<f32>(level * 0.8, level * 0.5, level * 0.48) * heart;
     return vec4<f32>(c * (1.0 - age * age), 0.0);
+}
+
+// Value noise in 3D, 0 to 1, one feature a unit: the star's face, which turns.
+fn star_noise3(p: vec3<f32>) -> f32 {
+    let i = floor(p);
+    let f = p - i;
+    let u = f * f * (3.0 - 2.0 * f);
+    let h = dot(i, vec3<f32>(1.0, 57.0, 113.0));
+    let n = mix(
+        mix(mix(hash11(h), hash11(h + 1.0), u.x), mix(hash11(h + 57.0), hash11(h + 58.0), u.x), u.y),
+        mix(mix(hash11(h + 113.0), hash11(h + 114.0), u.x), mix(hash11(h + 170.0), hash11(h + 171.0), u.x), u.y),
+        u.z,
+    );
+    return n;
+}
+
+fn star_fbm3(p: vec3<f32>) -> f32 {
+    return star_noise3(p) * 0.55 + star_noise3(p * 2.03 + 7.1) * 0.28 + star_noise3(p * 4.1 + 13.7) * 0.17;
+}
+
+// A Star Cage's star (renderer/star_cage_fx.rs): a ball of fusing plasma, not a solid. Its
+// face boils in cells that drift and turn, white-hot at the heart and breaking into the
+// prism's pinks toward the rim, its edge soft and never quite still; bright veins crackle
+// across it and flash out; a ragged corona of streamers flickers off it; every few seconds
+// it flares. Laid once a tick, each lasting two, so its light is a tent over its life and
+// the overlapping ones add up to a steady star. `appearance.w` the star's own seed.
+fn star_core(in: PuffOut, d: f32) -> vec4<f32> {
+    let now = globals.camera.w;
+    let seed = in.appearance.w;
+    let tent = 1.0 - abs(in.state.x * 2.0 - 1.0);
+    let face_r = 0.42;
+    let angle = atan2(in.uv.y, in.uv.x);
+    let round = vec2<f32>(cos(angle), sin(angle));
+    // Its beat: a slow swell, and a sharp flare every few seconds that settles back.
+    let beat = fract(now * 0.29 + seed * 0.37);
+    let flare = exp(-beat * 8.0);
+    let swell = 1.0 + 0.04 * sin(now * 1.3 + seed) + 0.06 * flare;
+    // The edge boils: never a clean circle.
+    let edge_noise = star_fbm3(vec3<f32>(round * 2.2, now * 0.9 + seed * 5.0));
+    let rim = face_r * swell * (0.95 + 0.1 * edge_noise);
+    // How far over it is: 0 on the face, 1 at the quad's edge.
+    let out_t = clamp((d - rim) / (1.0 - rim), 0.0, 1.0);
+    // The face, as a turning sphere under the eye.
+    let q = in.uv / rim;
+    let mu = sqrt(max(1.0 - dot(q, q), 0.0));
+    let turn = now * 0.12 + seed;
+    let ct = cos(turn);
+    let st = sin(turn);
+    let n = vec3<f32>(q.x * ct - mu * st, q.y, q.x * st + mu * ct);
+    // Cells: one field warped by another, both drifting, so they boil.
+    let warp = star_fbm3(n * 1.8 + vec3<f32>(0.0, 0.0, now * 0.35));
+    let cells = star_fbm3(n * 3.6 + warp * 1.7 + vec3<f32>(now * 0.22, -now * 0.17, seed));
+    // Veins: thin ridges of the noise, flashing on and off in their own places.
+    let ridge = 1.0 - abs(star_noise3(n * 5.5 + vec3<f32>(seed * 3.0, now * 0.6, 0.0)) * 2.0 - 1.0);
+    let flash = step(0.55, hash11(floor(now * 9.0) + seed * 17.0 + floor(angle * 2.0)));
+    let vein = pow(ridge, 14.0) * (0.35 + 0.65 * flash);
+    // Colour: the prism's pinks, drifting over the face and round the rim.
+    let hue = prism(seed + now * PRISM_RATE * 0.4 + cells * 0.5 + angle / 6.2831853 * 0.5);
+    let deep = mix(hue, hue * hue * hue, 0.75);
+    let white = vec3<f32>(1.0, 0.95, 0.98);
+    let heat = clamp(mu * 0.75 + (cells - 0.5) * 0.9 + 0.2, 0.0, 1.0);
+    var face = mix(deep * 1.3, white * 1.6, smoothstep(0.8, 1.08, heat));
+    // Dark lanes between the cells keep it a body, not a flat disc.
+    face *= 0.55 + 0.75 * smoothstep(0.25, 0.75, cells);
+    // The limb: brighter and more coloured toward the edge, as light through a bubble.
+    face += deep * pow(1.0 - mu, 2.5) * 1.2;
+    face += mix(white, hue, 0.3) * vein * 2.0;
+    let on_face = 1.0 - smoothstep(rim * 0.9, rim * 1.02, d);
+    // The corona: streamers off the rim that drift outward and flicker, the flare
+    // throwing them further.
+    let streams = star_fbm3(vec3<f32>(round * 3.0, out_t * 2.2 - now * 0.7 + seed * 3.0));
+    let licks = star_fbm3(vec3<f32>(round * 7.0 + 3.0, out_t * 4.0 - now * 1.6 + seed));
+    let reach = mix(3.6, 2.2, flare);
+    let corona = exp(-out_t * reach) * (0.1 + 2.6 * pow(streams, 3.0) + 1.4 * pow(licks, 4.0))
+        + exp(-out_t * 14.0) * 1.3;
+    let flicker = 0.88 + 0.12 * sin(now * 11.0 + seed * 7.0 + angle * 3.0);
+    let glow_hue = prism(seed + now * PRISM_RATE * 0.4 + angle / 6.2831853 + out_t * 0.6);
+    let halo = mix(glow_hue, glow_hue * glow_hue * glow_hue, 0.7) * corona * flicker * 0.9
+        * (1.0 - smoothstep(0.7, 1.0, d));
+    let light = (face * on_face + halo * (1.0 - on_face)) * (1.0 + flare * 0.5);
+    return vec4<f32>(light * in.appearance.rgb * tent, 0.0);
 }
