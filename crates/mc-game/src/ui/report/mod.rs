@@ -202,7 +202,7 @@ impl Report {
         ui.scrim(Rect::new(0.0, h - 220.0, w, 220.0), 0.0, 0.45, false);
         ui.shift.y = 16.0 * (1.0 - enter);
 
-        let cw = (w - 96.0).min(1760.0);
+        let cw = (w - 96.0).min(2200.0);
         let x0 = (w - cw) * 0.5;
         self.header(ui, ctx, Rect::new(x0, 34.0, cw, 128.0));
         let tabs = Rect::new(x0, 176.0, cw, 52.0);

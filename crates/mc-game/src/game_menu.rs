@@ -73,9 +73,9 @@ impl Game {
     }
 
     /// The report can be read once the match is decided, and at any time by an
-    /// observer (who sees every side anyway).
+    /// observer or a side already out of the match (who see every side anyway).
     pub(super) fn report_open_to_all(&self) -> bool {
-        self.view.status.winner.is_some() || self.view.observing
+        self.view.status.winner.is_some() || self.view.observing || self.defeated()
     }
 
     /// Once the match is decided: the report, a moment later.
@@ -148,7 +148,8 @@ impl Game {
                     chart: crate::hud::MINIMAP_SLOT,
                     surrender,
                 };
-                let shown = 1.0 - (1.0 - *enter).powi(3);
+                // It goes with the menu when that closes (the result's report does).
+                let shown = (1.0 - (1.0 - *enter).powi(3)) * (1.0 - (1.0 - menu.enter).powi(3));
                 match report.draw(ui, &ctx, shown) {
                     Some(ReportAction::Close) if menu.result => menu.closing = true,
                     Some(ReportAction::Close) => *closing = true,
