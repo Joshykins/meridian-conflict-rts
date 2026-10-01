@@ -27,6 +27,9 @@ pub const SECTIONS: [&str; SECTION_COUNT] = [
 ];
 pub const SECTION_COUNT: usize = 15;
 
+/// What writes one section into its hasher.
+type Section<'a> = &'a (dyn Fn(&mut StateHasher) + Sync);
+
 /// One hash per entry of [`SECTIONS`].
 pub type SectionHashes = [u64; SECTION_COUNT];
 
@@ -42,26 +45,30 @@ impl World {
     }
 
     /// The state hash by section; [`combine`] folds them into [`World::hash`].
+    /// The sections, and the pieces of the units', are hashed side by side.
     pub fn hash_sections(&self) -> SectionHashes {
         let s = &self.state;
-        let section = |write: &dyn Fn(&mut StateHasher)| {
-            let mut h = StateHasher::new();
-            write(&mut h);
-            h.finish()
-        };
-        [
-            section(&|h| {
+        let unit_pieces: Vec<u64> = self.pool.parallel_map_chunks(
+            s.units.slots.rows(),
+            crate::tables::UNIT_HASH_ROWS,
+            |_, rows| s.units.hash_rows(rows),
+        );
+        let sections: [Section; SECTION_COUNT] = [
+            &|h| {
                 h.write_u64(s.tick as u64);
                 h.write_u64(s.rng.state());
                 h.write_u64(s.winner.map_or(u64::MAX, |w| w as u64));
-            }),
-            section(&|h| {
+            },
+            &|h| {
                 for p in &s.players {
                     p.hash(h);
                 }
-            }),
-            section(&|h| s.units.hash(h)),
-            section(&|h| {
+            },
+            &|h| {
+                s.units.slots.hash(h);
+                h.write_u64s(&unit_pieces);
+            },
+            &|h| {
                 s.orders.hash(h);
                 h.write_u64(s.formation_serial);
                 for (&id, g) in &s.formations {
@@ -71,9 +78,9 @@ impl World {
                     h.write_i64(g.speed.0);
                     h.write_u64(g.heading.0 as u64 | (g.phase as u64) << 16);
                 }
-            }),
-            section(&|h| s.projectiles.hash(h)),
-            section(&|h| {
+            },
+            &|h| s.projectiles.hash(h),
+            &|h| {
                 s.wrecks.hash(h);
                 h.write_u64(s.aircraft_crashes.len() as u64);
                 for crash in &s.aircraft_crashes {
@@ -85,14 +92,14 @@ impl World {
                 }
                 s.stains.hash(h);
                 s.fires.hash(h);
-            }),
-            section(&|h| crate::titan::hash_giants(s, h)),
-            section(&|h| {
+            },
+            &|h| crate::titan::hash_giants(s, h),
+            &|h| {
                 s.strategic.hash(h);
                 s.pads.hash(h);
-            }),
-            section(&|h| s.mines.hash(h)),
-            section(&|h| {
+            },
+            &|h| s.mines.hash(h),
+            &|h| {
                 h.write_u64(s.rollouts.len() as u64);
                 for (&id, r) in &s.rollouts {
                     h.write_u64(id.0 as u64);
@@ -115,13 +122,13 @@ impl World {
                         h.write_i64(held.at.y.0);
                     }
                 }
-            }),
-            section(&|h| {
+            },
+            &|h| {
                 if let Some(survival) = &s.survival {
                     survival.hash(h);
                 }
-            }),
-            section(&|h| {
+            },
+            &|h| {
                 h.write_u64(s.terrain_edits.len() as u64);
                 if let Some(e) = s.terrain_edits.last() {
                     h.write_u64(e.min.0 as u64 | (e.min.1 as u64) << 32);
@@ -129,16 +136,22 @@ impl World {
                     h.write_u64(e.sample as u64 | (e.faction as u64) << 16);
                 }
                 h.write_u64s(&s.props_dead);
-            }),
-            section(&|h| {
+            },
+            &|h| {
                 for ai in &s.ai {
                     ai.hash(h);
                 }
                 h.write_u64(s.ai_pending.len() as u64);
-            }),
-            section(&|h| self.nav.hash(h)),
-            section(&|h| self.fog.hash_memory(h)),
-        ]
+            },
+            &|h| self.nav.hash(h),
+            &|h| self.fog.hash_memory(h),
+        ];
+        let hashes = self.pool.parallel_map_chunks(SECTION_COUNT, 1, |_, range| {
+            let mut h = StateHasher::new();
+            sections[range.start](&mut h);
+            h.finish()
+        });
+        std::array::from_fn(|i| hashes[i])
     }
 }
 

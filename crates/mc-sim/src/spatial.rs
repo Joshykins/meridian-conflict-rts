@@ -60,6 +60,12 @@ const WIDE_QUERY: Fx = Fx::from_int(512);
 /// Cell edge shift of the coarse grid.
 const WIDE_SHIFT: u32 = 7;
 
+/// The big-entry grids hold, again, the entries wider than each of these
+/// radii, metres. A search for hulls bigger than the one asking (a tank
+/// looking out for a Fulgur) reads the grids of the widest floor under its
+/// limit instead of walking past every tank of the crowd round it.
+const BIG_FLOORS: [i32; 3] = [4, 6, 9];
+
 /// One grid. Entries are sorted by (cell row, cell column, insertion);
 /// `row_start[y]..row_start[y + 1]` holds grid row `y`, and `cell_x` runs
 /// alongside `sorted` so a query finds its first column by binary search. No
@@ -224,6 +230,26 @@ struct Grids {
     layers: [Layer; LAYERS.len()],
     /// Every entry of the kind again, for wide queries.
     wide: Layer,
+    /// `big[i]`: the layers again with only the entries wider than
+    /// `BIG_FLOORS[i]`, each in the layer and order it has in `layers`.
+    big: [[Layer; LAYERS.len()]; BIG_FLOORS.len()],
+}
+
+impl Grids {
+    fn new(size: FxVec2) -> Grids {
+        Grids {
+            layers: LAYERS.map(|(shift, _)| Layer::new(shift, size)),
+            wide: Layer::new(WIDE_SHIFT, size),
+            big: BIG_FLOORS.map(|_| LAYERS.map(|(shift, _)| Layer::new(shift, size))),
+        }
+    }
+
+    fn all_layers(&mut self) -> impl Iterator<Item = &mut Layer> {
+        self.layers
+            .iter_mut()
+            .chain(std::iter::once(&mut self.wide))
+            .chain(self.big.iter_mut().flatten())
+    }
 }
 
 pub struct SpatialIndex {
@@ -259,10 +285,9 @@ impl SpatialIndex {
 
     pub fn clear(&mut self) {
         for (_, grids) in &mut self.kinds {
-            for layer in &mut grids.layers {
+            for layer in grids.all_layers() {
                 layer.clear();
             }
-            grids.wide.clear();
         }
         self.owners.fill(0);
         self.unit_radius = Fx::ZERO;
@@ -294,12 +319,7 @@ impl SpatialIndex {
         let slot = match self.kinds.binary_search_by_key(&kind, |(k, _)| *k) {
             Ok(i) => i,
             Err(i) => {
-                let size = self.map_size;
-                let grids = Grids {
-                    layers: LAYERS.map(|(shift, _)| Layer::new(shift, size)),
-                    wide: Layer::new(WIDE_SHIFT, size),
-                };
-                self.kinds.insert(i, (kind, grids));
+                self.kinds.insert(i, (kind, Grids::new(self.map_size)));
                 i
             }
         };
@@ -320,7 +340,13 @@ impl SpatialIndex {
             self.unit_radius = self.unit_radius.max(radius);
         }
         let grids = &mut self.kinds[slot].1;
-        for layer in [&mut grids.layers[at], &mut grids.wide] {
+        let wider = BIG_FLOORS
+            .iter()
+            .take_while(|&&floor| radius > Fx::from_int(floor))
+            .count();
+        let (layers, wide, big) = (&mut grids.layers, &mut grids.wide, &mut grids.big);
+        let bigs = big[..wider].iter_mut().map(|layers| &mut layers[at]);
+        for layer in [&mut layers[at], wide].into_iter().chain(bigs) {
             let (cx, cy) = layer.cell(pos);
             layer.max_radius = layer.max_radius.max(radius);
             layer.staged.push((cx, cy, entry));
@@ -330,10 +356,9 @@ impl SpatialIndex {
     /// Sorts staged entries into cells. Stable, so insertion order survives within a cell.
     pub fn build(&mut self) {
         for (_, grids) in &mut self.kinds {
-            for layer in &mut grids.layers {
+            for layer in grids.all_layers() {
                 layer.build();
             }
-            grids.wide.build();
         }
     }
 
@@ -387,6 +412,47 @@ impl SpatialIndex {
                     &mut hits,
                     &mut cells,
                     &mut visit,
+                ) {
+                    break 'kinds;
+                }
+            }
+        }
+        mc_core::perf_count!("spatial.cells", cells);
+        mc_core::perf_count!("spatial.tested", tested);
+        mc_core::perf_count!("spatial.hits", hits);
+    }
+
+    /// [`query`](Self::query) for the entries wider than `wider_than` alone,
+    /// visited in the order `query` visits them.
+    pub fn query_wider(
+        &self,
+        center: FxVec2,
+        radius: Fx,
+        kinds: u8,
+        wider_than: Fx,
+        mut visit: impl FnMut(&Entry) -> bool,
+    ) {
+        let floor = BIG_FLOORS
+            .iter()
+            .rposition(|&floor| Fx::from_int(floor) <= wider_than);
+        let (mut tested, mut hits, mut cells) = (0u64, 0u64, 0i64);
+        mc_core::perf_count!("spatial.queries");
+        let mut keep = |e: &Entry| e.radius <= wider_than || visit(e);
+        'kinds: for (_, grids) in self.kinds.iter().filter(|(k, _)| k & kinds != 0) {
+            let layers = match floor {
+                _ if radius >= WIDE_QUERY => std::slice::from_ref(&grids.wide),
+                Some(floor) => &grids.big[floor][..],
+                None => &grids.layers[..],
+            };
+            for layer in layers {
+                if !layer.scan(
+                    center,
+                    radius,
+                    0,
+                    &mut tested,
+                    &mut hits,
+                    &mut cells,
+                    &mut keep,
                 ) {
                     break 'kinds;
                 }
@@ -479,6 +545,42 @@ mod tests {
                 .map(|(i, _)| i as u32)
                 .collect();
             assert_eq!(got, want);
+        }
+    }
+
+    #[test]
+    fn wider_queries_match_full_queries() {
+        let size = FxVec2::from_ints(4096, 4096);
+        let mut index = SpatialIndex::new(size);
+        let mut rng = Rng::new(9);
+        for row in 0..3000 {
+            let pos = FxVec2::new(rng.range(Fx::ZERO, size.x), rng.range(Fx::ZERO, size.y));
+            let radius = match row % 40 {
+                0 => rng.range(Fx::from_int(65), Fx::from_int(200)),
+                1..=3 => rng.range(Fx::from_int(17), Fx::from_int(64)),
+                _ => rng.range(Fx::ONE, Fx::from_int(16)),
+            };
+            index.insert(kind::UNIT, NO_OWNER, row, pos, radius);
+        }
+        index.build();
+        for q in 0..300 {
+            let c = FxVec2::new(rng.range(Fx::ZERO, size.x), rng.range(Fx::ZERO, size.y));
+            let r = rng.range(Fx::ONE, Fx::from_int(if q % 10 == 0 { 700 } else { 120 }));
+            let wider = rng.range(Fx::ZERO, Fx::from_int(20));
+            let mut want = Vec::new();
+            index.query(c, r, kind::UNIT, |e| {
+                if e.radius > wider {
+                    want.push(e.row);
+                }
+                true
+            });
+            let mut got = Vec::new();
+            index.query_wider(c, r, kind::UNIT, wider, |e| {
+                got.push(e.row);
+                true
+            });
+            // The same entries in the same order: callers may keep the first of a tie.
+            assert_eq!(got, want, "query {q}");
         }
     }
 

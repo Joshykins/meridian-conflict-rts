@@ -97,7 +97,7 @@ impl Fx {
         if self.0 <= 0 {
             return Fx::ZERO;
         }
-        Fx(((self.0 as u128) << Self::FRAC_BITS).isqrt() as i64)
+        Fx(isqrt((self.0 as u128) << Self::FRAC_BITS) as i64)
     }
 
     /// `self + (to - self) * t`.
@@ -122,7 +122,12 @@ impl Fx {
     /// `self * num / den` without losing precision to an intermediate `Fx`.
     #[inline]
     pub fn mul_div(self, num: i64, den: i64) -> Fx {
-        Fx(((self.0 as i128 * num as i128) / den as i128) as i64)
+        // The same quotient in 64 bits when the product fits: a 128-bit division
+        // is a slow library call.
+        match self.0.checked_mul(num).and_then(|p| p.checked_div(den)) {
+            Some(q) => Fx(q),
+            None => Fx(((self.0 as i128 * num as i128) / den as i128) as i64),
+        }
     }
 
     /// Presentation only. Never feed the result back into the simulation.
@@ -189,7 +194,13 @@ impl Div for Fx {
     type Output = Fx;
     #[inline]
     fn div(self, o: Fx) -> Fx {
-        Fx((((self.0 as i128) << Self::FRAC_BITS) / o.0 as i128) as i64)
+        // The same quotient in 64 bits while the shifted dividend fits: a
+        // 128-bit division is a slow library call, and this one is everywhere.
+        if self.0.unsigned_abs() < 1 << (63 - Self::FRAC_BITS) {
+            Fx((self.0 << Self::FRAC_BITS) / o.0)
+        } else {
+            Fx((((self.0 as i128) << Self::FRAC_BITS) / o.0 as i128) as i64)
+        }
     }
 }
 
@@ -247,9 +258,65 @@ impl fmt::Display for Fx {
     }
 }
 
+/// `n.isqrt()`, taken in 64 bits when `n` fits.
+#[inline]
+pub(crate) fn isqrt(n: u128) -> u128 {
+    match u64::try_from(n) {
+        Ok(n) => n.isqrt() as u128,
+        Err(_) => n.isqrt(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The 64-bit short cuts give the 128-bit answers, at their edges too.
+    #[test]
+    fn short_cuts_match_wide_maths() {
+        let edge = 1i64 << (63 - Fx::FRAC_BITS);
+        let mut values = vec![
+            0,
+            1,
+            -1,
+            7,
+            -7,
+            65_535,
+            65_536,
+            -65_536,
+            i64::MAX,
+            i64::MIN + 1,
+        ];
+        values.extend([edge - 1, edge, edge + 1, -edge + 1, -edge, -edge - 1]);
+        let mut x = 0x9E37_79B9_7F4A_7C15u64;
+        for _ in 0..2000 {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            values.push((x as i64) >> (x % 40));
+        }
+        for &a in &values {
+            for &b in &values {
+                if b != 0 {
+                    let wide = (((a as i128) << Fx::FRAC_BITS) / b as i128) as i64;
+                    assert_eq!((Fx(a) / Fx(b)).0, wide, "{a} / {b}");
+                    let wide = ((a as i128 * 3) / b as i128) as i64;
+                    assert_eq!(Fx(a).mul_div(3, b).0, wide, "{a} * 3 / {b}");
+                    let wide = ((a as i128 * b as i128) / -1i128) as i64;
+                    assert_eq!(Fx(a).mul_div(b, -1).0, wide, "{a} * {b} / -1");
+                }
+            }
+            let n = (a as i128 * a as i128) as u128;
+            assert_eq!(isqrt(n), n.isqrt());
+            assert_eq!(isqrt(n + 1), (n + 1).isqrt());
+            assert_eq!(
+                isqrt(a.unsigned_abs() as u128),
+                (a.unsigned_abs() as u128).isqrt()
+            );
+        }
+        assert_eq!(isqrt(u64::MAX as u128), (u64::MAX as u128).isqrt());
+        assert_eq!(isqrt(u64::MAX as u128 + 1), 1 << 32);
+    }
 
     #[test]
     fn arithmetic() {

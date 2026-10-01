@@ -67,7 +67,7 @@ impl FxVec2 {
     #[inline]
     pub fn length(self) -> Fx {
         let (x, y) = (self.x.0 as i128, self.y.0 as i128);
-        Fx(((x * x + y * y) as u128).isqrt() as i64)
+        Fx(crate::fx::isqrt((x * x + y * y) as u128) as i64)
     }
 
     #[inline]
@@ -185,7 +185,7 @@ impl FxVec3 {
     #[inline]
     pub fn length(self) -> Fx {
         let (x, y, z) = (self.x.0 as i128, self.y.0 as i128, self.z.0 as i128);
-        Fx(((x * x + y * y + z * z) as u128).isqrt() as i64)
+        Fx(crate::fx::isqrt((x * x + y * y + z * z) as u128) as i64)
     }
 
     #[inline]

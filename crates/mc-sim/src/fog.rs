@@ -113,8 +113,7 @@ impl Fog {
         radius: Fx,
         mask: PlayerMask,
     ) {
-        let cx = pos.x.floor_int() >> CELL_SHIFT;
-        let cy = pos.y.floor_int() >> CELL_SHIFT;
+        let (cx, cy) = Self::cell_of(pos);
         let r = (radius.ceil_int() >> CELL_SHIFT) + 1;
         let r2 = r * r;
         for dy in -r..=r {
@@ -142,6 +141,15 @@ impl Fog {
                 }
             }
         }
+    }
+
+    /// The fog cell `pos` is in, as the discs `reveal` stamps round it see it.
+    #[inline]
+    pub(crate) fn cell_of(pos: FxVec2) -> (i32, i32) {
+        (
+            pos.x.floor_int() >> CELL_SHIFT,
+            pos.y.floor_int() >> CELL_SHIFT,
+        )
     }
 
     #[inline]

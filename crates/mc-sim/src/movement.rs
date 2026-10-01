@@ -446,10 +446,13 @@ impl World {
         // (distance behind it, course, signed distance off its line, lane half-width).
         let mut lane: Option<(Fx, FxVec2, Fx, Fx)> = None;
         let widest = Fx::from_int(64);
-        self.index.query(
+        // Only a hull over 1.8 times as wide can outweigh this one by the 7 to 1
+        // `give_way` asks below (twice the ground for one on the move: 2 x 1.8^2 < 7).
+        self.index.query_wider(
             pos,
             radius + PERSONAL_SPACE + look.max(widest),
             kind::UNIT,
+            radius * 9 / 5,
             |e| {
                 let other = e.row as usize;
                 if other == row

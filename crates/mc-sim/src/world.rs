@@ -934,29 +934,32 @@ impl World {
     pub(crate) fn update_fog(&mut self) {
         self.fog.begin();
         let rows: Vec<usize> = self.state.units.slots.iter().collect();
-        for &row in &rows {
-            if self.state.units.has_flag(row, flag::IN_FACTORY) {
-                continue;
-            }
-            let bp = self.blueprints.unit(self.state.units.blueprint[row]);
-            // Construction sites see a little so their owner can watch them.
-            // An intel tower that draws energy is dark while the grid cannot pay.
-            let (vision, radar) = if self.state.units.is_active(row) {
-                (bp.vision, self.live_radar(row))
-            } else {
-                (bp.radius * 2, Fx::ZERO)
-            };
-            self.fog.reveal(
-                self.state.units.pos[row],
-                vision,
-                radar,
-                self.team_mask(self.state.units.owner[row]),
-            );
-            self.fog.reveal_sonar(
-                self.state.units.pos[row],
-                self.live_sonar(row),
-                self.team_mask(self.state.units.owner[row]),
-            );
+        // Every unit's discs, once per fog cell: the hundred tanks of a cell
+        // with one sight and one team stamp the same discs, and a stamp is an OR.
+        let mut stamps: Vec<_> = rows
+            .iter()
+            .filter(|&&row| !self.state.units.has_flag(row, flag::IN_FACTORY))
+            .map(|&row| {
+                let bp = self.blueprints.unit(self.state.units.blueprint[row]);
+                // Construction sites see a little so their owner can watch them.
+                // An intel tower that draws energy is dark while the grid cannot pay.
+                let (vision, radar) = if self.state.units.is_active(row) {
+                    (bp.vision, self.live_radar(row))
+                } else {
+                    (bp.radius * 2, Fx::ZERO)
+                };
+                let sight = (vision, radar, self.live_sonar(row));
+                let mask = self.team_mask(self.state.units.owner[row]);
+                (Fog::cell_of(self.state.units.pos[row]), sight, mask, row)
+            })
+            .collect();
+        // The whole tuple orders them, so the sort is total; one of each.
+        stamps.sort_unstable();
+        stamps.dedup_by_key(|&mut (cell, sight, mask, _)| (cell, sight, mask));
+        for (_, (vision, radar, sonar), mask, row) in stamps {
+            let pos = self.state.units.pos[row];
+            self.fog.reveal(pos, vision, radar, mask);
+            self.fog.reveal_sonar(pos, sonar, mask);
         }
         self.survival_reveal();
         for &row in &rows {

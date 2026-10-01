@@ -466,9 +466,12 @@ impl Units {
         self.flags[row] & (flag::UNDER_CONSTRUCTION | flag::IN_FACTORY) == 0
     }
 
-    pub fn hash(&self, h: &mut StateHasher) {
-        self.slots.hash(h);
-        for row in self.slots.iter() {
+    /// Hash of the live rows in `rows`. The state hash takes one per
+    /// [`UNIT_HASH_ROWS`] rows, so the pieces of a big army hash side by side.
+    pub fn hash_rows(&self, rows: std::ops::Range<usize>) -> u64 {
+        let mut hasher = StateHasher::new();
+        let h = &mut hasher;
+        for row in rows.filter(|&row| self.slots.is_alive(row)) {
             h.write_u64(
                 self.blueprint[row].0 as u64
                     | (self.owner[row] as u64) << 16
@@ -581,8 +584,12 @@ impl Units {
                 );
             }
         }
+        hasher.finish()
     }
 }
+
+/// Unit rows per piece of the state hash (`Units::hash_rows`).
+pub const UNIT_HASH_ROWS: usize = 1024;
 
 impl Default for Units {
     fn default() -> Self {

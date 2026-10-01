@@ -295,10 +295,12 @@ fn eight_armies_clash() {
 /// With `MERIDIAN_SCALE_SERIAL=1` the tick runs on this thread alone and the
 /// table ends with its CPU time per tick, which a machine busy with other
 /// work barely moves: the number to compare two versions by.
+/// `MERIDIAN_SCALE_TICKS` plays that many ticks of each case instead of 300.
 #[test]
 #[ignore]
 fn zz_scale_probe() {
     let cases = std::env::var("MERIDIAN_SCALE").unwrap_or_else(|_| "8:2000 8:8000".into());
+    let ticks: u32 = std::env::var("MERIDIAN_SCALE_TICKS").map_or(300, |t| t.parse().unwrap());
     for case in cases.split_whitespace() {
         let parts: Vec<&str> = case.split(':').collect();
         let players: u8 = parts[0].parse().unwrap();
@@ -313,11 +315,11 @@ fn zz_scale_probe() {
         };
         let cpu_before = thread_cpu_ns();
         let report = w
-            .perf_ticks(&format!("scale {case}"), 300, |_, _| Vec::new())
+            .perf_ticks(&format!("scale {case}"), ticks, |_, _| Vec::new())
             .unwrap();
         println!("{}", report.text());
         if serial {
-            let per_tick = (thread_cpu_ns() - cpu_before) as f64 / 300.0 / 1e6;
+            let per_tick = (thread_cpu_ns() - cpu_before) as f64 / ticks as f64 / 1e6;
             println!("   cpu ms per tick (this thread): {per_tick:.2}");
         }
     }
