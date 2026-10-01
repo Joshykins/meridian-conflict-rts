@@ -2596,32 +2596,6 @@ impl World {
         Ok(())
     }
 
-    /// Walks a builder into range of `pos`. True once it is close enough to work.
-    pub(crate) fn approach(
-        &mut self,
-        row: usize,
-        pos: FxVec2,
-        target_radius: Fx,
-    ) -> Result<bool, SimError> {
-        let range = self.work_range(row) + target_radius;
-        if self.state.units.pos[row].distance(pos) <= range {
-            self.state.units.flags[row] |= flag::HOLD;
-            if self.state.units.has_flag(row, flag::HAS_FIELD) {
-                self.stop_moving(row);
-            }
-            return Ok(true);
-        }
-        // A structure cannot walk over: what is out of its reach is given up.
-        if self.bp(row).motion.is_none() {
-            self.state.units.stuck_ticks[row] = u16::MAX;
-        }
-        if self.state.units.stuck_ticks[row] == u16::MAX {
-            return Ok(false);
-        }
-        self.ensure_moving(row, pos, pos)?;
-        Ok(false)
-    }
-
     /// Turns a build arm or a reclaimer turret toward its work at `pos`. True
     /// once it points there, and for a unit with nothing to turn. The arm aims
     /// a little above the ground there.

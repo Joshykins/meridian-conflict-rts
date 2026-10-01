@@ -770,3 +770,102 @@ fn an_assist_with_nothing_queued_waits_by_an_idle_factory() {
         "the assist stays on"
     );
 }
+
+#[test]
+fn engineers_assisting_an_air_factory_all_reach_its_product() {
+    // Replay 20261001-064349 mark 1: a row of buildings close under an air factory
+    // left a strip sealed between them and its hull, the open ground nearest the
+    // factory's middle. Engineers sent toward the middle were routed into the strip,
+    // found no way there, and stood idle on the assist. Walls make the strip here.
+    let mut w = world();
+    w.tick(&[
+        spawn(&w, "aster_t2_air_factory", 600),
+        cmd(Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        }),
+    ])
+    .unwrap();
+    let factory = w.blueprints.id_of("aster_t2_air_factory").unwrap();
+    let fid = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.blueprint[r] == factory)
+        .map(|r| w.state.units.id(r))
+        .expect("the factory spawned");
+    let mut walls = Vec::new();
+    for x in (546..=654).step_by(12) {
+        walls.push((x, 582));
+    }
+    for y in [546, 558, 570] {
+        walls.extend([(546, y), (654, y)]);
+    }
+    for (x, y) in walls {
+        w.tick(&[spawn_at(
+            &w,
+            "aster_wall",
+            FxVec2::from_ints(x, y),
+            Angle::ZERO,
+        )])
+        .unwrap();
+    }
+    let spots = [(490, 512), (492, 490), (494, 534), (476, 500), (478, 524)];
+    let spawns: Vec<_> = spots
+        .iter()
+        .map(|&(x, y)| {
+            spawn_at(
+                &w,
+                "aster_t3_engineer",
+                FxVec2::from_ints(x, y),
+                Angle::ZERO,
+            )
+        })
+        .collect();
+    w.tick(&spawns).unwrap();
+    let engineer = w.blueprints.id_of("aster_t3_engineer").unwrap();
+    let masons: Vec<UnitId> = w
+        .state
+        .units
+        .slots
+        .iter()
+        .filter(|&r| w.state.units.blueprint[r] == engineer)
+        .map(|r| w.state.units.id(r))
+        .collect();
+    assert_eq!(masons.len(), 5);
+    w.tick(&[
+        cmd(Command::Produce {
+            factories: vec![fid],
+            blueprint: w.blueprints.id_of("aster_t2_fire_bomber").unwrap(),
+            count: 5,
+        }),
+        cmd(Command::Assist {
+            units: masons.clone(),
+            target: fid,
+            queue: false,
+        }),
+    ])
+    .unwrap();
+    let building = |w: &World| {
+        masons
+            .iter()
+            .filter(|&&m| {
+                w.state
+                    .units
+                    .row(m)
+                    .is_some_and(|r| w.state.units.has_flag(r, flag::BUILDING))
+            })
+            .count()
+    };
+    let all = (0..600).any(|_| {
+        w.tick(&[]).unwrap();
+        building(&w) == masons.len()
+    });
+    assert!(
+        all,
+        "every engineer puts a beam on the factory's product ({} of {} did)",
+        building(&w),
+        masons.len()
+    );
+}
