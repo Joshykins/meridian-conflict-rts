@@ -16,6 +16,7 @@ use crate::setup::{self, Options, Scene};
 use crate::sim_thread::{self, SimHandle, SimSetup, SimStatus};
 use crate::ui::backdrop::Director;
 use crate::ui::front::{Front, FrontEvent};
+use crate::ui::lineup::ReadAhead;
 use crate::ui::menu::{Telemetry, PREVIEW_SLOT};
 use crate::ui::setup::MatchRequest;
 use crate::ui::{self, Key, Ui};
@@ -112,6 +113,9 @@ struct App {
     curtain: Option<Curtain>,
     /// The front end's map, kept open through matches: going back needs no reading.
     backdrop: Option<Arc<MapFile>>,
+    /// The maps the set-up screens list, read from the start of the run and
+    /// kept through matches, so opening skirmish never waits for them.
+    maps: Option<ReadAhead>,
     /// Fades every new stage up from black.
     reveal: f32,
     /// What the live renderer's swapchain was built with.
@@ -181,6 +185,7 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
         },
         curtain: Some(curtain),
         backdrop: None,
+        maps: Some(ReadAhead::start()),
         reveal: 0.0,
         applied_vsync: true,
         started: now,
@@ -439,12 +444,13 @@ impl FrontStage {
         settings: &Settings,
         viewport: Vec2,
         map: Arc<MapFile>,
+        maps: ReadAhead,
     ) -> Result<FrontStage, String> {
         let sim = Self::stage_battle(args, &map)?;
         let size = Vec2::from(map.info().size_metres().to_f32());
         let director = Director::new(&map, settings.backdrop_auto_advance);
         Ok(FrontStage {
-            front: Front::new(director, args.blueprints.content_hash()),
+            front: Front::new(director, args.blueprints.content_hash(), maps),
             map,
             sim,
             serial: 0,
@@ -818,7 +824,9 @@ impl App {
         match pending {
             Pending::Front => {
                 self.backdrop = Some(map.clone());
-                let stage = FrontStage::new(&self.args, &self.settings, self.viewport(), map)?;
+                let maps = self.maps.take().unwrap_or_else(ReadAhead::start);
+                let stage =
+                    FrontStage::new(&self.args, &self.settings, self.viewport(), map, maps)?;
                 self.overlay
                     .set_image(PREVIEW_SLOT, ui::preview::SIZE, ui::preview::SIZE, &chart);
                 self.stage = Stage::Front(Box::new(stage));
@@ -876,13 +884,19 @@ impl App {
             Stage::Match(game) => Some(game.camera().clone()),
             Stage::Loading { camera, .. } => camera.clone(),
         };
-        self.stage = Stage::Loading {
-            pending: Some(pending),
-            job: None,
-            built: None,
-            eased: false,
-            camera,
-        };
+        let left = std::mem::replace(
+            &mut self.stage,
+            Stage::Loading {
+                pending: Some(pending),
+                job: None,
+                built: None,
+                eased: false,
+                camera,
+            },
+        );
+        if let Stage::Front(stage) = left {
+            self.maps = Some(stage.front.into_maps());
+        }
     }
 
     fn frame(&mut self, event_loop: &ActiveEventLoop) {

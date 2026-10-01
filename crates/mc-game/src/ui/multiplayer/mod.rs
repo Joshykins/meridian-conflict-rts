@@ -105,8 +105,12 @@ fn open(addr: String, config: ClientConfig) -> Receiver<std::io::Result<NetSessi
 }
 
 impl MultiplayerState {
-    pub fn new(settings: &crate::settings::Settings, blueprint_hash: u64) -> MultiplayerState {
-        let catalog = Catalog::load(true);
+    /// The game browser over the maps in `catalog`.
+    pub fn new(
+        settings: &crate::settings::Settings,
+        blueprint_hash: u64,
+        catalog: Catalog,
+    ) -> MultiplayerState {
         let identity = identity();
         let name = settings.player_name.clone();
         let server = Server::new(&settings.server, &name, identity.clone());

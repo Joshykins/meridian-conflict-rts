@@ -389,3 +389,28 @@ fn a_left_lobby_goes_back_to_the_plan_it_had() {
         "the AI defender is still beside you"
     );
 }
+
+#[test]
+fn the_chart_is_drawn_off_the_frame_and_kept_for_coming_back() {
+    let mut state = state();
+    let (mut overlay, mut memory) = (Overlay::default(), Memory::default());
+    frame(&mut state, &mut overlay, &mut memory, &Input::default());
+    assert!(
+        !state.lineup.chart_shown(),
+        "the first frame does not wait for the map's picture"
+    );
+    for _ in 0..1000 {
+        if state.lineup.chart_shown() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        frame(&mut state, &mut overlay, &mut memory, &Input::default());
+    }
+    assert!(state.lineup.chart_shown(), "the picture arrives");
+    state.chart_lost();
+    frame(&mut state, &mut overlay, &mut memory, &Input::default());
+    assert!(
+        state.lineup.chart_shown(),
+        "a picture lost to another screen goes back without being drawn again"
+    );
+}

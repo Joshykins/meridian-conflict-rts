@@ -70,7 +70,8 @@ impl SetupState {
         Self::with_catalog(Catalog::load(true), settings, mode, blueprint_hash)
     }
 
-    fn with_catalog(
+    /// [`Self::new`] over maps already read.
+    pub fn with_catalog(
         catalog: Catalog,
         settings: &Settings,
         mode: Mode,

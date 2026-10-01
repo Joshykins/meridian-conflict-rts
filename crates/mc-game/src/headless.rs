@@ -1232,7 +1232,11 @@ pub fn ui_screenshot(
     }
     // `MERIDIAN_SURVIVAL=...` (see `survival::env_rules`): the survival set-up opens on those rules.
     settings.survival_rules = crate::survival::env_rules();
-    let mut front = Front::new(Director::new(&map, true), blueprint_hash);
+    let mut front = Front::new(
+        Director::new(&map, true),
+        blueprint_hash,
+        ui::lineup::ReadAhead::start(),
+    );
     front.show(screen, &settings);
     let audio = crate::audio::Audio::silent();
     let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());

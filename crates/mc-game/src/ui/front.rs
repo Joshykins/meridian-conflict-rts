@@ -4,7 +4,7 @@
 //! game does.
 
 use super::backdrop::Director;
-use super::lineup::Mode;
+use super::lineup::{Mode, ReadAhead};
 use super::menu::{self, MenuAction, MenuState, Telemetry};
 use super::multiplayer::{self, MultiplayerAction, MultiplayerState};
 use super::options;
@@ -82,6 +82,8 @@ pub struct Front {
     setup: Option<SetupState>,
     replays: Option<ReplaysState>,
     multiplayer: Option<MultiplayerState>,
+    /// The maps the set-up and multiplayer screens list, read before they open.
+    maps: ReadAhead,
     /// This build's unit data, which network matches must share.
     blueprint_hash: u64,
     pub director: Director,
@@ -96,7 +98,8 @@ fn smooth(t: f32) -> f32 {
 }
 
 impl Front {
-    pub fn new(director: Director, blueprint_hash: u64) -> Front {
+    /// Over the backdrop's `director`, listing the maps `maps` is reading.
+    pub fn new(director: Director, blueprint_hash: u64, maps: ReadAhead) -> Front {
         Front {
             screen: Screen::Menu,
             target: Screen::Menu,
@@ -105,6 +108,7 @@ impl Front {
             setup: None,
             replays: None,
             multiplayer: None,
+            maps,
             blueprint_hash,
             director,
             launching: None,
@@ -112,9 +116,15 @@ impl Front {
         }
     }
 
+    /// Leaving for a match: the maps read ahead, for the front end it comes back to.
+    pub fn into_maps(self) -> ReadAhead {
+        self.maps
+    }
+
     /// Jumps straight to a screen, fully arrived (tools and tests).
     pub fn show(&mut self, screen: Screen, settings: &Settings) {
         self.go(screen, settings);
+        self.open(settings, true);
         self.screen = screen;
         self.enter = 1.0;
         // Shots see the map thumbnails; `MERIDIAN_MAP_BROWSER=1` opens the browser.
@@ -139,18 +149,12 @@ impl Front {
     }
 
     fn go(&mut self, screen: Screen, settings: &Settings) {
-        if let Screen::Setup(mode) = screen {
-            match &mut self.setup {
-                Some(s) => s.set_mode(mode),
-                None => self.setup = Some(SetupState::new(settings, mode, self.blueprint_hash)),
-            }
+        if let (Screen::Setup(mode), Some(s)) = (screen, &mut self.setup) {
+            s.set_mode(mode);
         }
         // Read afresh every visit: a match may have been recorded or marked since.
         if screen == Screen::Replays {
             self.replays = Some(ReplaysState::new());
-        }
-        if screen == Screen::Multiplayer && self.multiplayer.is_none() {
-            self.multiplayer = Some(MultiplayerState::new(settings, self.blueprint_hash));
         }
         // Set-up and multiplayer share an image slot for their charts.
         if let Some(s) = &mut self.setup {
@@ -160,6 +164,39 @@ impl Front {
             m.chart_lost();
         }
         self.target = screen;
+        self.open(settings, false);
+    }
+
+    /// Makes the state of the screen being gone to once the maps it lists are
+    /// read; true when it is there. Without `wait`, a screen whose maps are
+    /// still being read is made on a later frame and arrives then: the window
+    /// never stalls on reading them.
+    fn open(&mut self, settings: &Settings, wait: bool) -> bool {
+        let maps = &mut self.maps;
+        let mut catalog = || {
+            if wait {
+                Some(maps.take())
+            } else {
+                maps.try_take()
+            }
+        };
+        match self.target {
+            Screen::Setup(mode) => {
+                if self.setup.is_none() {
+                    self.setup = catalog()
+                        .map(|c| SetupState::with_catalog(c, settings, mode, self.blueprint_hash));
+                }
+                self.setup.is_some()
+            }
+            Screen::Multiplayer => {
+                if self.multiplayer.is_none() {
+                    self.multiplayer =
+                        catalog().map(|c| MultiplayerState::new(settings, self.blueprint_hash, c));
+                }
+                self.multiplayer.is_some()
+            }
+            _ => true,
+        }
     }
 
     /// Swaps to `screen` at once, without leaving and arriving: the set-up and
@@ -195,7 +232,7 @@ impl Front {
                 }
                 self.screen = self.target;
             }
-        } else if !leaving {
+        } else if !leaving && self.open(settings, false) {
             self.enter = (self.enter + ui.dt / ARRIVE).min(1.0);
         }
         ui.interactive = !leaving && self.enter > 0.6;
@@ -272,6 +309,7 @@ impl Front {
                     Some(MultiplayerAction::Host) => {
                         let mode = self.setup.as_ref().map_or(Mode::Skirmish, SetupState::mode);
                         self.go(Screen::Setup(mode), settings);
+                        self.open(settings, true);
                         if let Some(s) = &mut self.setup {
                             s.open_share();
                         }

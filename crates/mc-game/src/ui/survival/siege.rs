@@ -34,8 +34,10 @@ pub struct Siege<'a> {
     pub holders: &'a [Holder],
     /// Clicking a free zone, or its number key, moves your commander there.
     pub can_pick: bool,
-    /// Image slot for the chart, and which theatre is drawn in it now.
+    /// Image slot for the chart.
     pub slot: usize,
+    /// The theatre's picture is in the slot (it is drawn on a worker).
+    pub drawn: bool,
 }
 
 /// Where the chart's zone markers were drawn, in canvas points (tests click them).
@@ -117,30 +119,19 @@ fn dashed(ui: &mut Ui, a: Vec2, b: Vec2, dash: f32, gap: f32, phase: f32, t: f32
 }
 
 /// The chart in `area`; the zone picked (a free one clicked or keyed), if any.
-pub fn chart(
-    ui: &mut Ui,
-    view: &Siege,
-    drawn: &mut Option<usize>,
-    markers: &mut Markers,
-    area: Rect,
-) -> Option<usize> {
+pub fn chart(ui: &mut Ui, view: &Siege, markers: &mut Markers, area: Rect) -> Option<usize> {
     let t = view.theatre;
-    if *drawn != Some(view.key) {
-        ui.o.set_image(
-            view.slot,
-            preview::SIZE,
-            preview::SIZE,
-            &preview::render(&t.map, t.climate),
-        );
-        *drawn = Some(view.key);
-    }
     let map = t.map.clone();
     let layout = t.layout.clone();
     let side = area.w.min(area.h - 84.0);
     let frame = Rect::new(area.x + (area.w - side) * 0.5, area.y, side, side);
     let origin = Vec2::new(frame.x, frame.y);
     let place = |p: (f32, f32)| origin + preview::locate(&map, [p.0, p.1], side);
-    let shown = ui.ease(id("survival-chart-shown", view.key), 1.0, 5.0);
+    let shown = ui.ease(
+        id("survival-chart-shown", view.key),
+        if view.drawn { 1.0 } else { 0.0 },
+        5.0,
+    );
     ui.fill(frame, ink(0.85));
     // A little darker than skirmish's chart: the fronts are what should read.
     let tone = 0.42 * shown;

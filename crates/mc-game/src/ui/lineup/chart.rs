@@ -10,6 +10,86 @@ use crate::setup::TEAM_COLORS;
 use crate::ui::survival::siege::{self, Holder, Siege};
 use crate::ui::{id, ink, palette, preview, rgb, teams, type_scale, Rect, Ui};
 use glam::Vec2;
+use mc_data::weather::Climate;
+use mc_map::MapFile;
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::sync::Arc;
+
+/// Which map a picture is of: the mode and its index in the catalog.
+type Key = (Mode, usize);
+
+/// The chart's picture of the map. It takes tens of milliseconds to draw, so it
+/// is drawn on a worker and the chart fades up when it arrives: opening the
+/// screen or changing the map never stalls a frame. The last one drawn is
+/// kept, so coming back to the screen puts it back without drawing it again.
+#[derive(Default)]
+pub(super) struct Picture {
+    /// The map whose picture is in the image slot.
+    shown: Option<Key>,
+    /// The last picture drawn.
+    kept: Option<(Key, Vec<u8>)>,
+    /// The picture being drawn.
+    job: Option<(Key, Receiver<Vec<u8>>)>,
+}
+
+impl Picture {
+    /// Something else drew in the image slot.
+    pub(super) fn lost(&mut self) {
+        self.shown = None;
+    }
+
+    #[cfg(test)]
+    pub(super) fn is_shown(&self) -> bool {
+        self.shown.is_some()
+    }
+
+    /// Puts the picture of `map` in `slot` once it is drawn; true when it is there.
+    fn show(
+        &mut self,
+        ui: &mut Ui,
+        slot: usize,
+        key: Key,
+        map: &Arc<MapFile>,
+        climate: Climate,
+    ) -> bool {
+        if self.shown == Some(key) {
+            return true;
+        }
+        if let Some((done, rx)) = &self.job {
+            match rx.try_recv() {
+                Ok(rgba) => {
+                    self.kept = Some((*done, rgba));
+                    self.job = None;
+                }
+                Err(TryRecvError::Disconnected) => self.job = None,
+                Err(TryRecvError::Empty) => {}
+            }
+        }
+        if let Some((_, rgba)) = self.kept.as_ref().filter(|(k, _)| *k == key) {
+            ui.o.set_image(slot, preview::SIZE, preview::SIZE, rgba);
+            self.shown = Some(key);
+            return true;
+        }
+        // A picture of another map still being drawn is dropped when it arrives.
+        if self.job.as_ref().is_none_or(|(k, _)| *k != key) {
+            let (tx, rx) = channel();
+            let worker_map = map.clone();
+            let spawned = std::thread::Builder::new()
+                .name("lineup-chart".into())
+                .spawn(move || {
+                    let _ = tx.send(preview::render(&worker_map, climate));
+                });
+            match spawned {
+                Ok(_) => self.job = Some((key, rx)),
+                Err(e) => {
+                    log::warn!("no thread for the chart: {e}; drawn here");
+                    self.kept = Some((key, preview::render(map, climate)));
+                }
+            }
+        }
+        false
+    }
+}
 
 /// The chart in `area`, drawn in image slot `slot`.
 pub fn chart(
@@ -72,10 +152,15 @@ fn siege_chart(
         holders: &holders,
         can_pick: mover.is_some(),
         slot,
+        drawn: lineup.picture.show(
+            ui,
+            slot,
+            (Mode::Survival, lineup.map),
+            &theatre.map,
+            theatre.climate,
+        ),
     };
-    let mut drawn = (lineup.chart_of == Some((Mode::Survival, lineup.map))).then_some(lineup.map);
-    let picked = siege::chart(ui, &view, &mut drawn, &mut lineup.markers, area);
-    lineup.chart_of = drawn.map(|m| (Mode::Survival, m));
+    let picked = siege::chart(ui, &view, &mut lineup.markers, area);
     picked.map(|i| i as u8)
 }
 
@@ -90,20 +175,22 @@ fn zones(
     area: Rect,
 ) -> Option<u8> {
     let entry = catalog.maps.get(lineup.map)?;
-    if lineup.chart_of != Some((Mode::Skirmish, lineup.map)) {
-        ui.o.set_image(
-            slot,
-            preview::SIZE,
-            preview::SIZE,
-            &preview::render(&entry.map, entry.climate),
-        );
-        lineup.chart_of = Some((Mode::Skirmish, lineup.map));
-    }
+    let drawn = lineup.picture.show(
+        ui,
+        slot,
+        (Mode::Skirmish, lineup.map),
+        &entry.map,
+        entry.climate,
+    );
     let map = entry.map.clone();
     let side = area.w.min(area.h - 64.0);
     let frame = Rect::new(area.x + (area.w - side) * 0.5, area.y, side, side);
-    // The chart fades up when the map changes.
-    let shown = ui.ease(id("preview-shown", lineup.map), 1.0, 5.0);
+    // The chart fades up once the map's picture is drawn.
+    let shown = ui.ease(
+        id("preview-shown", lineup.map),
+        if drawn { 1.0 } else { 0.0 },
+        5.0,
+    );
     ui.fill(frame, ink(0.85));
     ui.image(
         slot,

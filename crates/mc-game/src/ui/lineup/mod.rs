@@ -33,6 +33,7 @@ use mc_data::survival::Domain;
 use mc_sim::tables::Controller;
 use mc_sim::{MatchConfig, PlayerSetup, SurvivalRules};
 use roster::{Control, Roster, Seat};
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
 pub use chart::chart;
 pub use seats::commanders;
@@ -166,6 +167,55 @@ impl Catalog {
     }
 }
 
+/// The maps read ahead on a worker, so a screen that lists them opens at
+/// once: reading every map (more so from another file system, as the Windows
+/// build does from WSL) would stall the frame the screen opens on.
+pub struct ReadAhead(Option<Receiver<Catalog>>);
+
+impl ReadAhead {
+    /// Starts reading every map in `maps/`, survival theatres too, and the
+    /// factions the line-up offers.
+    pub fn start() -> ReadAhead {
+        let (tx, rx) = channel();
+        let spawned = std::thread::Builder::new()
+            .name("map-catalog".into())
+            .spawn(move || {
+                faction::races();
+                let _ = tx.send(Catalog::load(true));
+            });
+        match spawned {
+            Ok(_) => ReadAhead(Some(rx)),
+            Err(e) => {
+                log::warn!("no thread to read the maps ahead: {e}");
+                ReadAhead(None)
+            }
+        }
+    }
+
+    /// The maps read ahead, waiting for them if they are still being read.
+    /// Another read starts at once for the next screen that asks (multiplayer
+    /// reads the maps afresh on every visit).
+    pub fn take(&mut self) -> Catalog {
+        let read = self.0.take().and_then(|rx| rx.recv().ok());
+        *self = ReadAhead::start();
+        read.unwrap_or_else(|| Catalog::load(true))
+    }
+
+    /// The maps read ahead if they have been read; `None` while they are still
+    /// being read.
+    pub fn try_take(&mut self) -> Option<Catalog> {
+        match self.0.as_ref().map(Receiver::try_recv) {
+            Some(Ok(catalog)) => {
+                *self = ReadAhead::start();
+                Some(catalog)
+            }
+            Some(Err(TryRecvError::Empty)) => None,
+            // No reader, or it died: read them here.
+            Some(Err(TryRecvError::Disconnected)) | None => Some(self.take()),
+        }
+    }
+}
+
 /// Who sits in a lobby seat, as the line-up shows them.
 #[derive(Clone, Debug, Default)]
 pub struct Occupant {
@@ -248,8 +298,8 @@ pub struct Lineup {
     hover_team: Option<u8>,
     /// A survival fronts chip under the pointer.
     hover_domain: Option<Domain>,
-    /// Which map's chart is in the image slot.
-    chart_of: Option<(Mode, usize)>,
+    /// The chart's picture of the map.
+    picture: chart::Picture,
     /// Where the chart's zone markers were drawn (tests click them).
     pub markers: Vec<Vec2>,
 }
@@ -272,7 +322,7 @@ impl Lineup {
             seat_scroll: 0.0,
             hover_team: None,
             hover_domain: None,
-            chart_of: None,
+            picture: chart::Picture::default(),
             markers: Vec::new(),
         };
         lineup.last_map[mode.index()] = map;
@@ -283,7 +333,13 @@ impl Lineup {
 
     /// Something else drew in the chart's image slot: draw the chart again.
     pub fn chart_lost(&mut self) {
-        self.chart_of = None;
+        self.picture.lost();
+    }
+
+    /// The map's picture is in the chart's image slot.
+    #[cfg(test)]
+    pub fn chart_shown(&self) -> bool {
+        self.picture.is_shown()
     }
 
     /// The same plan (mode, map, seats, rules) with the screen's state fresh:
@@ -304,7 +360,7 @@ impl Lineup {
             seat_scroll: 0.0,
             hover_team: None,
             hover_domain: None,
-            chart_of: None,
+            picture: chart::Picture::default(),
             markers: Vec::new(),
         }
     }
@@ -526,9 +582,6 @@ impl Lineup {
         let Some((mode, map)) = catalog.find(options.map_id) else {
             return false;
         };
-        if (mode, map) != (self.mode, self.map) {
-            self.chart_of = None;
-        }
         self.mode = mode;
         self.map = map;
         self.last_map[mode.index()] = map;
@@ -957,7 +1010,7 @@ pub fn overlays(
     let picked = browser.draw(ui, cards, title, slot);
     // The browser lent the chart's slot to its detail pane: draw ours again.
     if browser.release_slot() {
-        lineup.chart_of = None;
+        lineup.picture.lost();
     }
     if let Some(BrowserAction::Pick(i)) = picked {
         if i != lineup.map && table.host {
