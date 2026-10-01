@@ -11,7 +11,8 @@
 // There is one list per pass that draws models (CULL_LIST_*): the colour pass's,
 // the depth pre-pass's and one per shadow cascade. The pre-pass and cascade lists
 // hold what the colour list holds, less what those passes have no use for, so a
-// tree outside a cascade never reaches the vertex shader in that cascade. Every
+// tree outside a cascade never reaches the vertex shader in that cascade. The
+// rest list is the colour list less the pre-pass's (see gpu_consts.rs). Every
 // list has `counts.z` slots; the icon slot is used in the colour list only.
 //
 // A unit whose model is drawn is listed a second time, in the icon slot: its
@@ -190,9 +191,14 @@ fn other_lists(e: Entity) -> u32 {
     // The depth pre-pass leaves out props only a few pixels across: they cost it a
     // whole alpha-tested draw and hide almost nothing, and the colour pass writes
     // their depth itself. So with units a couple of pixels across: an army seen
-    // from afar is tens of thousands of them.
-    if on_screen >= select(UNIT_PREPASS_PX, 10.0, prop) {
+    // from afar is tens of thousands of them. And what `fs_prepass` throws away
+    // whole (sites, ghosts, a refit under way) is drawn by the rest list, which
+    // writes its depth.
+    let cut = (e.owner_flags & (FLAG_UNDER_CONSTRUCTION | KIND_GHOST)) != 0u || e.upgrade > 0.0;
+    if !cut && on_screen >= select(UNIT_PREPASS_PX, 10.0, prop) {
         lists |= 1u << CULL_LIST_PREPASS;
+    } else {
+        lists |= 1u << CULL_LIST_REST;
     }
     // Props stand on the streamed surface, which can sit well off the height their
     // record carries (see `classify`).

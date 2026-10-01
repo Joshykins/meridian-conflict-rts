@@ -2455,19 +2455,24 @@ fn vapor_edge(in: VsOut) -> f32 {
 
 // Depth pre-pass (renderer.rs): the scene's depth before anything is shaded, so
 // fs_main runs once per pixel and GTAO can read it. It must never write depth
-// where fs_main would discard, or that pixel would show nothing, so anything
-// that might be cut away (sites, holograms, ghosts, wrecks being reclaimed,
-// cut-away props) is left out here and fs_main writes its depth instead. Its
-// draws carry `PASS_PREPASS` (gpu_consts.rs).
+// where fs_main would discard, or that pixel would show nothing. What is cut
+// away by something only fs_main works out (sites, ghosts, a refit under way) is
+// not in its list (cull.wgsl `other_lists`): fs_main writes its depth instead.
+// What is cut away by a cheap test (wrecks, cut-away props) makes the same test
+// here. The colour pass then shades this list over its depth without writing it
+// (`entity_over_prepass`). Its draws carry `PASS_PREPASS` (gpu_consts.rs).
 
 @fragment
 fn fs_prepass(in: VsOut) {
     let flags = in.owner_flags;
-    // A hull still falling or sinking (health 2, see `fs_main`) is the whole unit, solid as
-    // it was alive, so it goes in: left out, GTAO read the ground under it through it, and
-    // a dying capital ship high over a wood wore the trees' occlusion on its plating.
+    // A wreck goes in, cut as `fs_main` cuts it: worn from the top, and a broken hull's
+    // section only its own stretch. Left out, every layer of a capital ship's wreck (its
+    // inside too) ran the whole burnt surface: a hull filling a low view was half the frame.
+    // One still falling or sinking (health 2) is the whole unit, solid as it was alive.
     let hull_down = (flags & KIND_WRECK) != 0u && in.state.y > 1.5;
-    if ((flags & (FLAG_UNDER_CONSTRUCTION | KIND_GHOST | KIND_WRECK)) != 0u && !hull_down) || in.refit.z > 0.0 {
+    if (flags & KIND_WRECK) != 0u && !hull_down
+        && (wreck_worn(in.local, in.state.z, in.state.y, in.weld.z)
+            || (in.wreck.w > 0.5 && !wreck_keeps(in.local, in.wreck.x, in.wreck.y, in.weld.z))) {
         discard;
     }
     if in.material == MAT_FOLIAGE && foliage_missing(in, foliage_sample(in)) { discard; }

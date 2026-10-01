@@ -89,6 +89,9 @@ pub struct Pipelines {
     pub terrain: vk::Pipeline,
     pub terrain_shadow: vk::Pipeline,
     pub entity: vk::Pipeline,
+    /// `entity` over the pre-pass's own depth: tested, not written, so a hidden
+    /// fragment is dropped before `fs_main` runs although it can `discard`.
+    pub entity_over_prepass: vk::Pipeline,
     pub entity_shadow: vk::Pipeline,
     /// The depth pre-pass: the scene's depth before any of it is shaded.
     pub terrain_prepass: vk::Pipeline,
@@ -929,6 +932,15 @@ impl Pipelines {
                 Depth::TestWrite,
                 back,
             )?,
+            entity_over_prepass: scene(
+                entity,
+                c"vs_main",
+                c"fs_main",
+                VertexKind::Mesh,
+                Blend::Opaque,
+                Depth::Test,
+                back,
+            )?,
             entity_shadow: shadow(entity, c"vs_main", c"fs_shadow", VertexKind::Mesh)?,
             terrain_prepass: prepass(terrain, c"vs_main", c"fs_shadow", VertexKind::Vec2)?,
             entity_prepass: prepass(entity, c"vs_main", c"fs_prepass", VertexKind::Mesh)?,
@@ -1194,6 +1206,7 @@ impl Pipelines {
                 self.terrain,
                 self.terrain_shadow,
                 self.entity,
+                self.entity_over_prepass,
                 self.entity_shadow,
                 self.terrain_prepass,
                 self.entity_prepass,

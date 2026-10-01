@@ -108,15 +108,19 @@ shared! {
 
     /// The draw lists the GPU cull builds each frame (cull.wgsl), each a full set of
     /// per-slot indirect commands: the colour pass's, the depth pre-pass's (no props
-    /// too small to hide anything) and one per shadow cascade (only what can cast
-    /// into it). Each pass draws only its own list, so a tree outside a cascade
-    /// never runs the vertex shader there.
+    /// too small to hide anything), the colour pass's less the pre-pass's, and one
+    /// per shadow cascade (only what can cast into it). Each pass draws only its own
+    /// list, so a tree outside a cascade never runs the vertex shader there.
     pub mod cull_list as "CULL_LIST_" {
         pub const MAIN: u32 = 0;
         pub const PREPASS: u32 = 1;
+        /// What the pre-pass left out. With the pre-pass on, the colour pass draws
+        /// `PREPASS` with depth test only (so hidden layers are dropped before they
+        /// are shaded, `discard` or not) and this with depth writes.
+        pub const REST: u32 = 2;
         /// The nearest cascade's list; cascade `c` is `SHADOW + c`.
-        pub const SHADOW: u32 = 2;
-        pub const COUNT: u32 = 5;
+        pub const SHADOW: u32 = 3;
+        pub const COUNT: u32 = 6;
     }
 
     /// Levels of detail past a model's own (`models::LOD_COUNT` of them), as draw slots

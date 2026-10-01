@@ -797,7 +797,18 @@ impl Renderer {
             });
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.entities");
-            draw_entities(self.pipelines.entity, pass::MAIN, cull_list::MAIN);
+            if self.prepass {
+                // What the pre-pass drew is shaded only where it is the nearest; the
+                // rest writes its own depth.
+                draw_entities(
+                    self.pipelines.entity_over_prepass,
+                    pass::MAIN,
+                    cull_list::PREPASS,
+                );
+                draw_entities(self.pipelines.entity, pass::MAIN, cull_list::REST);
+            } else {
+                draw_entities(self.pipelines.entity, pass::MAIN, cull_list::MAIN);
+            }
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.missiles");
             self.timers
