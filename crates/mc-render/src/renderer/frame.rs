@@ -1080,12 +1080,14 @@ impl Renderer {
                 self.shafts.draw_composite(&self.gpu, cmd, self.scene_set);
                 self.timers.end(&device, cmd);
             }
-            // Rain close up, then the clouds over everything in the world; icons and bars stay on top.
-            self.timers.draws(&device, cmd, "scene.rain");
-            self.sky.draw_rain(&self.gpu, cmd, self.scene_set);
-            self.timers.end(&device, cmd);
+            // The clouds over everything in the world, then the rain close up: from under the
+            // deck the drops are nearer than any cloud (fs_rain lets the clouds cover them
+            // only seen from over the deck). Icons and bars stay on top.
             self.timers.draws(&device, cmd, "clouds.composite");
             self.sky.draw_composite(&self.gpu, cmd, self.scene_set);
+            self.timers.end(&device, cmd);
+            self.timers.draws(&device, cmd, "scene.rain");
+            self.sky.draw_rain(&self.gpu, cmd, self.scene_set);
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "nuke.composite");
             // Nuclear blasts over the clouds they tear through, marched at half size

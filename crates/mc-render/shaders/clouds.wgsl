@@ -850,14 +850,18 @@ fn with_rain(cloud: vec4<f32>, eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, pixe
 // wrapping round its tile as the camera moves, so the rain stays put in the
 // world and pans past like everything else. The layer that suits the zoom is
 // drawn; its neighbours fade in and out as the camera goes in and out.
+// Drawn after the clouds: from under the deck every drop is nearer than any
+// cloud, so the clouds only cover the drops when the eye is up at or over
+// the deck's base, looking down through it.
 
 const RAIN_DROPS: u32 = 15000u;
 const RAIN_LAYERS: u32 = 3u;
 
 struct RainOut {
     @builtin(position) clip: vec4<f32>,
-    // x along the streak (0 head, 1 tail), y across it (-1 to 1), z strength.
-    @location(0) streak: vec3<f32>,
+    // x along the streak (0 head, 1 tail), y across it (-1 to 1), z strength,
+    // w how far the clouds on screen lie between the eye and the drop (0 to 1).
+    @location(0) streak: vec4<f32>,
 }
 
 @vertex
@@ -928,7 +932,11 @@ fn vs_rain(@builtin(vertex_index) vertex: u32, @builtin(instance_index) drop: u3
     let c = mix(ch, ct, along);
     let px = vec2<f32>(-dir.y, dir.x) * side * 0.75;
     out.clip = vec4<f32>(c.xy + px * 2.0 * globals.viewport.zw * c.w, c.zw);
-    out.streak = vec3<f32>(along, side, min(rain * 1.6, 1.0) * mix(0.55, 1.0, h.y) * weight * edge);
+    // Under the deck's base the drop is in front of every cloud; up in it or over it,
+    // the eye looks down through the clouds to the drop.
+    let base = cloud_floor(eye.xy) + atmos.layer.x - 60.0;
+    let behind = smoothstep(base - 60.0, base + 120.0, eye.z);
+    out.streak = vec4<f32>(along, side, min(rain * 1.6, 1.0) * mix(0.55, 1.0, h.y) * weight * edge, behind);
     return out;
 }
 
@@ -939,7 +947,12 @@ fn fs_rain(in: RainOut) -> @location(0) vec4<f32> {
     }
     let edge = 1.0 - abs(in.streak.y);
     let fade = smoothstep(0.0, 0.15, in.streak.x) * (1.0 - smoothstep(0.55, 1.0, in.streak.x));
-    let a = edge * fade * in.streak.z * 0.42;
+    var a = edge * fade * in.streak.z * 0.42;
+    if in.streak.w > 0.0 {
+        let uv = in.clip.xy / vec2<f32>(textureDimensions(scene_depth));
+        let cover = cloud_cover(uv, textureSampleLevel(cloud_now, clamp_sampler, uv, 0.0).a);
+        a *= 1.0 - cover * in.streak.w;
+    }
     let color = atmos.sky_color.rgb * 1.8 + atmos.sun_color.rgb * 0.08;
     return vec4<f32>(color * a, a);
 }
@@ -1096,6 +1109,32 @@ fn to_screen(p: vec3<f32>) -> vec3<f32> {
     return vec3<f32>((c.x / w * 0.5 + 0.5) * globals.viewport.x, (0.5 - c.y / w * 0.5) * globals.viewport.y, c.z / w);
 }
 
+// With something selected, the middle of the screen sees through the clouds below the camera: they
+// stay, as a faint hologram of themselves (their outline and contour lines
+// in the interface's cyan), so the battle under them shows.
+fn cloud_holo(uv: vec2<f32>) -> f32 {
+    let aspect = globals.viewport.x / globals.viewport.y;
+    let off_centre = length((uv - 0.5) * vec2<f32>(aspect, 1.0));
+    let down = smoothstep(0.1, 0.4, -view_ray(uv).z) * smoothstep(atmos.frame.w + atmos.layer.x - 400.0, atmos.frame.w + atmos.layer.x + 200.0, globals.camera.z);
+    // Only while the player has something selected: otherwise the sky is left alone.
+    return (1.0 - smoothstep(0.18, 0.5, off_centre)) * down * atmos.frame.z;
+}
+
+// At the zooms the battle is fought at, the clouds are a veil over it;
+// pulled back to the strategic view they are solid. Only over it: cloud
+// overhead, looked up at from low down, is the sky, and veiled it all but
+// vanished (an overcast deck let the sun through).
+fn cloud_veil(uv: vec2<f32>) -> f32 {
+    let over_battle = 1.0 - smoothstep(-0.12, 0.08, view_ray(uv).z);
+    return mix(1.0, mix(0.55, 1.0, smoothstep(3000.0, 10000.0, atmos.view.z)), over_battle);
+}
+
+// How much the composite lets the clouds cover the picture at `uv`, from the
+// clouds' transmittance there: veiled over the battle, thinned by the hologram.
+fn cloud_cover(uv: vec2<f32>, through: f32) -> f32 {
+    return (1.0 - through) * cloud_veil(uv) * mix(1.0, 0.14, cloud_holo(uv));
+}
+
 @fragment
 fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     // From under the sea the sky shows only through the surface (water.wgsl `under_sea`).
@@ -1110,15 +1149,7 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     var light = cloud.rgb;
     var cover = 1.0 - cloud.a;
 
-    // With something selected, the middle of the screen sees through the clouds below the camera: they
-    // stay, as a faint hologram of themselves (their outline and contour lines
-    // in the interface's cyan), so the battle under them shows.
-    let eye = globals.camera.xyz;
-    let aspect = globals.viewport.x / globals.viewport.y;
-    let off_centre = length((in.uv - 0.5) * vec2<f32>(aspect, 1.0));
-    let down = smoothstep(0.1, 0.4, -view_ray(in.uv).z) * smoothstep(atmos.frame.w + atmos.layer.x - 400.0, atmos.frame.w + atmos.layer.x + 200.0, eye.z);
-    // Only while the player has something selected: otherwise the sky is left alone.
-    let holo = (1.0 - smoothstep(0.18, 0.5, off_centre)) * down * atmos.frame.z;
+    let holo = cloud_holo(in.uv);
     let e = texel * 3.0;
     let ax = textureSampleLevel(cloud_now, clamp_sampler, in.uv + vec2<f32>(e.x, 0.0), 0.0).a
         - textureSampleLevel(cloud_now, clamp_sampler, in.uv - vec2<f32>(e.x, 0.0), 0.0).a;
@@ -1130,12 +1161,7 @@ fn fs_composite(in: FullOut) -> @location(0) vec4<f32> {
     // Soft, a few pixels wide: a hairline would crawl as the cloud drifts.
     let px = max(fwidth(level), 1e-4);
     let contour = (1.0 - smoothstep(px * 0.5, px * 3.0, band)) * smoothstep(0.05, 0.2, cover);
-    // At the zooms the battle is fought at, the clouds are a veil over it;
-    // pulled back to the strategic view they are solid. Only over it: cloud
-    // overhead, looked up at from low down, is the sky, and veiled it all but
-    // vanished (an overcast deck let the sun through).
-    let over_battle = 1.0 - smoothstep(-0.12, 0.08, view_ray(in.uv).z);
-    let veil = mix(1.0, mix(0.55, 1.0, smoothstep(3000.0, 10000.0, atmos.view.z)), over_battle);
+    let veil = cloud_veil(in.uv);
     cover *= veil;
     light *= veil;
     if holo > 0.0 {
