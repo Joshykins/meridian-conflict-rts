@@ -1432,20 +1432,61 @@ fn hovering_a_unit_fills_the_info_panel_when_nothing_is_selected() {
     rig.view.selection.clear();
     let info = Vec2::new(INFO_X + 24.0, DECK_Y + 40.0);
     rig.settle();
-    assert!(
-        !rig.hud.covers(info),
-        "an empty selection leaves the info panel off"
-    );
+    let bare = rig.overlay.vertices.len();
     rig.hover = Some(7);
     rig.settle();
     assert!(
-        rig.hud.covers(info),
+        rig.overlay.vertices.len() > bare + 500,
         "hovering a unit should open its dossier"
+    );
+    assert!(
+        !rig.hud.covers(info),
+        "a dossier up for a hover leaves the pointer on the battlefield"
     );
     assert_eq!(
         rig.click(order_slot(0, 0)),
         vec![],
         "a hover inspect has no order card"
+    );
+}
+
+/// The game's hover rule, frame by frame: no unit is hovered while the HUD
+/// covers the pointer. Returns how often the hover came and went.
+fn hover_flips(rig: &mut Rig, unit: u32, pointer: Vec2) -> usize {
+    let mut flips = 0;
+    for _ in 0..90 {
+        let hover = (!rig.hud.covers(pointer)).then_some(unit);
+        flips += usize::from(hover != rig.hover);
+        rig.hover = hover;
+        rig.frame(&Input::default());
+    }
+    flips
+}
+
+#[test]
+fn a_unit_under_the_deck_or_hover_card_stays_hovered() {
+    // Nothing selected (a player just defeated, say): the deck opens for the
+    // unit under the pointer, over that same unit.
+    let mut rig = Rig::new("aster_t1_tank");
+    rig.view.selection.clear();
+    rig.settle();
+    assert_eq!(
+        hover_flips(&mut rig, 7, Vec2::new(INFO_X + 24.0, DECK_Y + 40.0)),
+        1,
+        "the deck raised by a hover must not flicker"
+    );
+    // A selection, and an enemy under where its hover card opens.
+    let mut rig = Rig::new("aster_t1_tank");
+    let mut enemy = rig.view.frame.units[0];
+    enemy.unit_id = 8;
+    enemy.owner_flags = 1;
+    rig.view.frame.units.push(enemy);
+    rig.view.index_of.insert(8, 1);
+    rig.settle();
+    assert_eq!(
+        hover_flips(&mut rig, 8, Vec2::new(INFO_X + 24.0, DECK_Y - 80.0)),
+        1,
+        "the hover card must not flicker"
     );
 }
 
@@ -1475,11 +1516,17 @@ fn hovering_an_enemy_while_selected_opens_a_hover_card() {
     enemy.blueprint = rig.blueprints.id_of("aster_t1_scout").unwrap().0 as u32;
     rig.view.frame.units.push(enemy);
     rig.view.index_of.insert(8, 1);
+    rig.frame(&Input::default());
+    let bare = rig.overlay.vertices.len();
     rig.hover = Some(8);
     rig.frame(&Input::default());
     assert!(
-        rig.hud.covers(Vec2::new(INFO_X + 24.0, DECK_Y - 80.0)),
-        "the hover card sits above the deck"
+        rig.overlay.vertices.len() > bare + 500,
+        "hovering an enemy opens a hover card"
+    );
+    assert!(
+        !rig.hud.covers(Vec2::new(INFO_X + 24.0, DECK_Y - 80.0)),
+        "the hover card leaves the pointer on the battlefield"
     );
     assert_eq!(
         rig.click(order_slot(0, 0)),

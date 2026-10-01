@@ -841,8 +841,7 @@ fn firing_arc(
 
 /// Compact dossier for a unit under the pointer that is not the selection.
 /// `anchor` is the bottom-left of the card; height is chosen to fit.
-/// Returns the rectangle that was drawn.
-pub fn hover_card(hud: &Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, anchor: Rect) -> Rect {
+pub fn hover_card(hud: &Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, anchor: Rect) {
     let bp = s.bp(u);
     let (w, pad) = (anchor.w, 16.0);
     let has_shield = s
@@ -960,7 +959,6 @@ pub fn hover_card(hud: &Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, anchor: R
         ));
     }
     facts_grid(ui, &facts, x, y, cw, r.bottom() - 12.0);
-    r
 }
 
 fn facts_grid(ui: &mut Ui, facts: &[(&str, String, u32)], x: f32, y: f32, cw: f32, floor: f32) {

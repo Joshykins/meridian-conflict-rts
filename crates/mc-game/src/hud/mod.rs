@@ -730,6 +730,14 @@ impl Hud {
         drop(deck_prep);
         // Above where a queue strip would be, so the two never overlap.
         self.reach_key(ui, s, deck_y - 62.0 - GAP - 24.0 - 8.0);
+        // A deck up only for the unit under the pointer (or going away) is not
+        // claimed: covering the pointer, it would end the hover that raised it,
+        // close and uncover the unit, open again, and so on, flickering for as
+        // long as the pointer rested on a unit under the deck. Clicks there
+        // reach the battlefield, so nothing on it takes them.
+        let claimed = self.unclaimed;
+        self.unclaimed |= selected.is_empty();
+        ui.interactive &= !selected.is_empty();
         if !units.is_empty() {
             let info = Rect::new(x, deck_y, 336.0, DECK_H);
             let strip = !view.observing && !inspect_only;
@@ -785,18 +793,13 @@ impl Hud {
             }
         }
         (ui.fade, ui.shift, ui.interactive) = (fade, shift, live);
+        self.unclaimed = claimed;
         drop(part);
         let _part = mc_core::perf_span!("ui.hud.after");
         if let Some(u) = hovered {
             if !selected.iter().any(|s| s.unit_id == u.unit_id) && !selected.is_empty() {
-                let card = selection::hover_card(
-                    self,
-                    ui,
-                    s,
-                    u,
-                    Rect::new(EDGE, deck_y - 40.0, 336.0, 0.0),
-                );
-                self.claim(ui, card);
+                // Not claimed, like the deck shown for a hover (above).
+                selection::hover_card(self, ui, s, u, Rect::new(EDGE, deck_y - 40.0, 336.0, 0.0));
             }
         }
         // A replay's timeline, clear of the selection panel.
