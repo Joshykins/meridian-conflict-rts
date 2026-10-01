@@ -28,3 +28,21 @@ Headless screenshots (`--screenshot`, `scripts/shot.sh run`) can show an order b
 | `MERIDIAN_AIM` | `1`, `ground`, `reclaim`, `warp`, `formation:DEG[:SHAPE]` | The order in hand, aimed at `--cursor`: a warhead launch (`1`, docs/NUKES.md), a titan's strike, Reclaim, a warp jump (the line from each selected ship to its exit in formation, and the energy card), or a move held on the right button (the selection's formation at `--cursor`, turned to face DEG degrees, shown as a hologram of each unit; `formation` alone faces the way it goes; SHAPE is wheel notches wider, negative longer, -6 to 6). |
 | `MERIDIAN_ISSUE_NOTE` | any text | The F1 report card's note, as if typed (the field wraps and grows with a long one). |
 | `MERIDIAN_GROUPS` | `KEY,KEY,...` | Control groups 2, 3, ... hold player 0's units whose blueprint key contains each KEY (group 1 is the selection): the groups card and the numbers by the units. |
+| `MERIDIAN_VISION` | player slot | An `--observe` shot is drawn through that player's eyes, as if its vision chip were picked (and shows its AI Mind card when a Commander plays it, docs/AI_COMMANDER.md). |
+
+## AI probes and tournaments
+
+Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.md).
+
+| Variable | Values | Purpose |
+|---|---|---|
+| `TOURNEY` | `map:players:minutes:seed:A:B[:difficulty]` | One tournament match (`zz_ai_tournament`); A and B are `brain/doctrine`. |
+| `TOURNEY_EVERY` | minutes | Print each side's economy, build speed, mines, worth and plans every N minutes. |
+| `TOURNEY_ROSTER` | any | Print each player's units and where its mass stands at the end. |
+| `TOURNEY_DEATHS` | any | Print every unit that dies: when, how far from home, the nearest enemy. |
+| `TOURNEY_OPS` | player slot | Print that Commander's operations whenever one changes. |
+| `TOURNEY_ARMY` | `key*n,key*n` | Give every side the same army at its start (a mirror of fighting alone). |
+| `TOURNEY_SNAP` | tick | Print each side's armed mobile units at that tick. |
+| `TOURNEY_MAPS`, `TOURNEY_SEEDS`, `TOURNEY_SIDES`, `TOURNEY_MINUTES`, `TOURNEY_DIFF`, `TOURNEY_JOBS` | see `scripts/ai-tournament.sh` | What the tournament script plays. |
+| `MATCHUP` | `SHARD/SHARDS` | The share of unit pairs `zz_matchup_probe` stages. |
+| `MATCHUP_ONLY` | unit key | Only that unit's pairs. |

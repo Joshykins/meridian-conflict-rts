@@ -205,7 +205,7 @@ fn match_up() {
             if first_blood.is_none() && w.state.players.iter().any(|p| p.units_lost > 0) {
                 first_blood = Some(w.state.tick / 60);
             }
-            if let Some(p) = ops_trace.filter(|_| w.state.tick % 100 == 0) {
+            if let Some(p) = ops_trace.filter(|_| w.state.tick.is_multiple_of(100)) {
                 let lines = w.state.ai[p].op_report();
                 for l in &lines {
                     if !last_ops.contains(l) {

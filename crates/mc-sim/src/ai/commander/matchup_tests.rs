@@ -230,7 +230,7 @@ fn zz_matchup_probe() {
                 wrong += 1;
             }
             println!(
-                "{} {:<26} vs {:<26} guess {:>6.2} real {:>6.2} (left {:.2}/{:.2})",
+                "{} {:<26} vs {:<26} guess {} real {} (left {}/{})",
                 if sure && real.abs() >= Fx::ratio(1, 10) && !agree {
                     "MISS"
                 } else {
@@ -238,12 +238,19 @@ fn zz_matchup_probe() {
                 },
                 key(a),
                 key(bp),
-                guess.to_f32(),
-                real.to_f32(),
-                la.to_f32(),
-                lb.to_f32()
+                hundredths(guess),
+                hundredths(real),
+                hundredths(la),
+                hundredths(lb)
             );
         }
     }
     println!("RESULT matchups right {right} wrong {wrong}");
+}
+
+/// `x` to two decimals, for the probe's report (no floats in mc-sim).
+fn hundredths(x: Fx) -> String {
+    let h = (x * 100).round_int();
+    let sign = if h < 0 { "-" } else { "" };
+    format!("{sign}{}.{:02}", h.abs() / 100, h.abs() % 100)
 }

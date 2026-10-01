@@ -1,5 +1,10 @@
 # Configurable skirmish AI
 
+Each AI seat has a **Mind**: **Classic**, the AI this page describes, or
+**Commander**, the planning AI (game plans held at stakes, operations, beliefs, an
+observer overlay of its reasoning), described in `docs/AI_COMMANDER.md`. Classic is
+the default; `--ai-brain classic|commander` sets every AI seat from the command line.
+
 In **Skirmish**, click an AI callsign to edit that opponent. Settings remain attached
 to the slot when its team or landing zone changes, and survive map changes for shared slots. Observer slots have the
 same controls. Each opponent has independent difficulty, doctrine, adaptation,
