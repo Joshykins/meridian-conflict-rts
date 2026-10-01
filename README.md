@@ -263,7 +263,7 @@ Slow motion is the ordinary game speed control: `-` goes down to 0.1x.
 | `crates/mc-server` | `meridian-server`: the public game server (directory, rooms, names) |
 | `crates/mc-render` | Vulkan renderer, WGSL shaders, procedural models and textures, the 2D overlay and its type |
 | `crates/mc-game` | the `meridian` binary: front end (`ui/`), the match (`game.rs`) and its HUD (`hud/`), sound (`audio.rs`), tools |
-| `site/` | the marketing site and unit directory (Next.js), built from `data/factions/`; see `site/README.md` |
+| `site/` | the marketing site and unit directory (Next.js): unit figures from `data/factions/`, unit meshes and portraits from the model code (`mc-site`), all made at build time; see `site/README.md` |
 
 ## Status
 

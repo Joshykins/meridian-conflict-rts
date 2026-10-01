@@ -18,8 +18,8 @@ export default function UnitsPage() {
               Everything on the field
             </h1>
             <p className="rise mt-4 max-w-2xl text-lg text-dim" style={{ ["--i" as string]: 2 }}>
-              Every unit and structure in the game, read straight from its data: what it does, what it costs and what it carries.
-              The drawings are schematics until real captures are in.
+              Every unit and structure in the game, its figures read straight from its data and its picture drawn from its own
+              model: what it does, what it costs and what it carries.
             </p>
           </div>
           <dl className="rise num flex gap-8 font-display" style={{ ["--i" as string]: 3 }}>

@@ -1,16 +1,20 @@
-// The unit directory's data: JSON written by scripts/sync-units.mjs from the
-// game's own unit files. Read at build time only; every page is static.
+// The unit directory's data: JSON written by scripts/generate.mjs from the game's
+// own unit files and models before every dev start and build. Read at build time
+// only; every page is static.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import indexJson from "../../content/units.index.json";
 import factionsJson from "../../content/factions.json";
+import teamsJson from "../../content/teams.json";
 
-import type { Faction, Unit, UnitSummary } from "./shared";
+import type { Faction, Rgb, Unit, UnitSummary } from "./shared";
 
 export * from "./shared";
 
 export const units = indexJson as UnitSummary[];
 export const factions = factionsJson as Faction[];
+/** The game's player colours, linear RGB: what a unit can be shown wearing. */
+export const teams = teamsJson as Rgb[];
 
 export const factionOf = (slug: string) => factions.find((f) => f.slug === slug);
 
@@ -34,10 +38,24 @@ export function allUnits(): Promise<Unit[]> {
   return all;
 }
 
-/** Who can build this unit, and what it was upgraded from. */
+/**
+ * Who can build this unit, each with the build power it brings (a refit module that
+ * adds the unit to what its carrier builds brings its carrier's power and its own),
+ * and what it was upgraded from.
+ */
 export async function lineage(unit: Unit) {
   const everyone = await allUnits();
-  const builtBy = everyone.filter((u) => u.builds.includes(unit.key));
+  const builtBy = everyone.filter(
+    (u) => u.builds.includes(unit.key) || u.refits.some((s) => s.modules.some((m) => m.builds.includes(unit.key))),
+  );
+  const makers = builtBy.flatMap((u) => {
+    const base = u.builder?.power ?? 0;
+    if (u.builds.includes(unit.key)) return base ? [{ name: u.name, power: base }] : [];
+    return u.refits
+      .flatMap((s) => s.modules)
+      .filter((m) => m.builds.includes(unit.key) && base + m.buildPower > 0)
+      .map((m) => ({ name: `${u.name}, ${m.name}`, power: base + m.buildPower }));
+  });
   const from = everyone.find((u) => u.upgradesTo === unit.key) ?? null;
-  return { builtBy, from };
+  return { builtBy, makers, from };
 }

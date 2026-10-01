@@ -105,19 +105,6 @@ body::after {
   }
 }
 
-/* The drafting sheet behind a schematic: a fine grid that fades out to the edges. */
-@utility blueprint {
-  background-image:
-    radial-gradient(closest-side, transparent 55%, rgb(0 0 0 / 0.75)),
-    linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px);
-  background-size:
-    100% 100%,
-    14px 14px,
-    14px 14px;
-  background-position: center;
-}
-
 /* Corner ticks: the small instrument marks the menu uses round a panel. */
 @utility ticks {
   --tick: 10px;
@@ -306,7 +293,7 @@ html:active-view-transition-type(nav-back)::view-transition-new(root) {
     var(--vt-move) var(--ease-snap) both vt-slide;
 }
 
-/* A unit's schematic and name fly from its tile to its page. */
+/* A unit's picture and name fly from its tile to its page. */
 ::view-transition-group(.morph) {
   animation-duration: var(--vt-move);
   animation-timing-function: var(--ease-snap);
@@ -332,4 +319,16 @@ html:active-view-transition-type(nav-back)::view-transition-new(root) {
   .reveal {
     animation: none !important;
   }
+}
+
+/* Where a unit stands: a pool of light behind it, so dark plate reads against the page. */
+.stage {
+  background:
+    radial-gradient(ellipse 62% 46% at 50% 58%, rgb(190 205 230 / 0.13), transparent 72%),
+    radial-gradient(ellipse 90% 80% at 50% 50%, rgb(255 255 255 / 0.03), transparent 75%);
+}
+.stage-regency {
+  background:
+    radial-gradient(ellipse 62% 46% at 50% 58%, rgb(236 150 120 / 0.16), transparent 72%),
+    radial-gradient(ellipse 90% 80% at 50% 50%, rgb(255 255 255 / 0.035), transparent 75%);
 }

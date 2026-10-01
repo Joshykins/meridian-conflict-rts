@@ -2,12 +2,12 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { useState, ViewTransition } from "react";
-import { UnitSchematic } from "./unit-schematic";
+import { UnitArt } from "./unit-art";
 import { DOMAIN_COLOR, TechPips } from "./unit-bits";
 import { fmt, unitHref, unitId, type UnitSummary } from "@/lib/shared";
 
 // A unit in the directory, drawn like an in-game build tile: a stripe in its
-// domain colour down the left, the schematic, name over role.
+// domain colour down the left, its portrait, name over role.
 
 // The morph from tile to page is armed only on the tile being pressed, and on
 // the tile of the unit last opened (so Back flies it home). Naming every tile
@@ -38,15 +38,8 @@ export function UnitTile({ unit, compact = false, morph = true }: { unit: UnitSu
     setPressed(true);
   };
   const art = (
-    <div className="h-full w-full opacity-80 transition-[opacity,scale] duration-500 ease-out group-hover:scale-[1.04] group-hover:opacity-100">
-      <UnitSchematic
-        slug={unit.slug}
-        icon={unit.icon}
-        domain={unit.domain}
-        tech={unit.tech}
-        faction={unit.faction}
-        className="h-full w-full"
-      />
+    <div className="h-full w-full opacity-90 transition-[opacity,scale] duration-500 ease-out group-hover:scale-[1.04] group-hover:opacity-100">
+      <UnitArt portrait={unit.portrait} faction={unit.faction} className="h-full w-full" />
     </div>
   );
   const name = <h3 className="w-fit font-display text-xl font-semibold leading-tight">{unit.name}</h3>;

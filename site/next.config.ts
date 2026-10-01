@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [{ key: "X-Content-Type-Options", value: "nosniff" }],
       },
+      {
+        // Unit meshes and portraits (scripts/models.mjs): each address carries its
+        // content's hash, so a browser may keep one for good.
+        source: "/generated/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
     ];
   },
 };

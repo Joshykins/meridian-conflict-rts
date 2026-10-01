@@ -2,7 +2,7 @@ import Link from "next/link";
 import { HeroMedia } from "@/components/hero-media";
 import { ArcCrest, RegencyCrest } from "@/components/crests";
 import { UnitTile } from "@/components/unit-tile";
-import { UnitSchematic } from "@/components/unit-schematic";
+import { UnitArt } from "@/components/unit-art";
 import { factions, units, type UnitSummary } from "@/lib/units";
 import site from "../../content/site.json";
 
@@ -208,13 +208,10 @@ export default function Home() {
                 <span className="absolute inset-y-0 left-0 w-[3px] bg-white/20 transition-colors duration-300 group-hover:bg-accent" />
                 <div className="relative aspect-[16/10] overflow-hidden border-b border-white/[0.06]">
                   {u && (
-                    <UnitSchematic
-                      slug={u.slug}
-                      icon={u.icon}
-                      domain={u.domain}
-                      tech={u.tech}
+                    <UnitArt
+                      portrait={u.portrait}
                       faction={u.faction}
-                      className="h-full w-full scale-110 opacity-70 transition-[scale,opacity] duration-700 ease-out group-hover:scale-125 group-hover:opacity-100"
+                      className="h-full w-full opacity-85 transition-[scale,opacity] duration-700 ease-out group-hover:scale-110 group-hover:opacity-100"
                     />
                   )}
                   <kbd className="absolute left-4 top-4 grid size-7 place-items-center border border-white/25 bg-black/60 font-display text-sm font-semibold">

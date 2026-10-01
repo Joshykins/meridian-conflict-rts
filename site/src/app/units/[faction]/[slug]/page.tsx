@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ViewTransition } from "react";
-import { UnitSchematic } from "@/components/unit-schematic";
+import { UnitArt } from "@/components/unit-art";
+import { UnitViewer } from "@/components/unit-viewer";
 import { UnitTile } from "@/components/unit-tile";
 import { DOMAIN_COLOR, DomainTag, TechPips } from "@/components/unit-bits";
+import { Firepower, SpecRows, SpecSections } from "@/components/unit-sheet";
+import { WeaponCard } from "@/components/weapon-card";
+import { moduleRows, sheetOf } from "@/lib/sheet";
 import {
   allUnits,
   bar,
@@ -12,14 +16,15 @@ import {
   domainLabel,
   factionOf,
   fmt,
+  fmtDps,
   getUnit,
   lineage,
+  teams,
   unitHref,
   unitId,
   units,
   type Unit,
   type UnitSummary,
-  type Weapon,
 } from "@/lib/units";
 
 export const dynamicParams = false;
@@ -57,7 +62,8 @@ export default async function UnitPage({ params }: Params) {
   const everyone = await allUnits();
   const peers = everyone.filter((u) => u.domain === unit.domain);
   const max = (k: keyof Unit["stats"]) => Math.max(1, ...peers.map((u) => u.stats[k] ?? 0));
-  const { builtBy, from } = await lineage(unit);
+  const { builtBy, makers, from } = await lineage(unit);
+  const sections = sheetOf(unit, makers, (key) => byKey(key)?.name ?? key);
   const id = unitId(unit);
 
   // Neighbours in directory order, for the prev/next stepper.
@@ -87,28 +93,30 @@ export default async function UnitPage({ params }: Params) {
         </nav>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-14">
-          {/* The schematic, flown in from the tile. */}
+          {/* The unit itself, flown in from the tile: its portrait, then the live model over it. */}
           <div className="relative lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:self-start">
-            <div className="ticks relative aspect-square overflow-hidden border border-white/[0.08] bg-[radial-gradient(ellipse_at_center,rgb(255_255_255/0.035),transparent_70%)]">
+            <div className="ticks relative aspect-square overflow-hidden border border-white/[0.08]">
               <ViewTransition name={`art-${id}`} share="morph" default="none">
                 <div className="h-full w-full">
-                  <UnitSchematic
-                    slug={unit.slug}
-                    icon={unit.icon}
-                    domain={unit.domain}
-                    tech={unit.tech}
-                    faction={unit.faction}
-                    className="h-full w-full"
-                    detail
-                  />
+                  {unit.art ? (
+                    <UnitViewer art={unit.art} name={unit.name} faction={unit.faction} team={faction.paint.team} teams={teams} />
+                  ) : (
+                    <UnitArt portrait={null} faction={unit.faction} className="h-full w-full" />
+                  )}
                 </div>
               </ViewTransition>
-              <span className="absolute left-4 top-4 font-display text-xs font-semibold text-faint">
-                Schematic · capture pending
-              </span>
-              <span className="num absolute bottom-4 left-4 font-display text-xs text-faint">{unit.key}</span>
-              <span className="absolute right-4 top-4 size-2" style={{ background: DOMAIN_COLOR[unit.domain] }} />
+              <span className="num pointer-events-none absolute left-4 top-4 font-display text-xs text-faint">{unit.key}</span>
+              <span
+                className="pointer-events-none absolute right-4 top-4 size-2"
+                style={{ background: DOMAIN_COLOR[unit.domain] }}
+              />
             </div>
+            {unit.art && (
+              <p className="mt-2 text-sm text-faint">
+                The game&rsquo;s own model, {fmt(unit.art.triangles)} triangles. Drag to turn it; pinch or Ctrl-scroll to close
+                in.
+              </p>
+            )}
           </div>
 
           <div>
@@ -170,7 +178,7 @@ export default async function UnitPage({ params }: Params) {
                       />
                     </div>
                     <dd className="num text-right font-display text-lg font-semibold">
-                      {fmt(unit.stats[s.key], s.digits)}
+                      {s.key === "dps" ? fmtDps(unit.stats.dps) : fmt(unit.stats[s.key], s.digits)}
                       {s.unit && <span className="ml-1 text-sm font-medium text-faint">{s.unit}</span>}
                     </dd>
                   </div>
@@ -181,13 +189,82 @@ export default async function UnitPage({ params }: Params) {
             {unit.weapons.length > 0 && (
               <section className="mt-10">
                 <h2 className="font-display text-3xl font-light">Armament</h2>
-                <ul className="mt-4 space-y-3">
+                <div className="mt-4">
+                  <Firepower unit={unit} />
+                </div>
+                <ul className="mt-5 space-y-3">
                   {unit.weapons.map((w, i) => (
                     <WeaponCard key={`${w.name}-${i}`} w={w} />
                   ))}
                 </ul>
               </section>
             )}
+
+            {unit.refits.length > 0 && (
+              <section className="mt-10">
+                <h2 className="font-display text-3xl font-light">Refits</h2>
+                <p className="mt-2 text-dim">
+                  Parts fitted where it stands, one to a slot. A higher tier goes on over the one before.
+                </p>
+                <div className="mt-4 space-y-6">
+                  {unit.refits.map((slot) => (
+                    <div key={slot.name}>
+                      <h3 className="border-b border-white/[0.12] pb-2 font-display text-sm font-semibold text-faint">
+                        {slot.name}
+                      </h3>
+                      <ul className="mt-3 space-y-3">
+                        {slot.modules.map((m) => (
+                          <li key={m.name} className="border border-white/[0.08] bg-white/[0.02] p-4">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                              <h4 className="font-display text-xl font-semibold">{m.name}</h4>
+                              <span className="num font-display text-sm text-dim">
+                                {fmt(m.cost.mass)} mass · {fmt(m.cost.energy)} energy · {fmt(m.cost.time)} work
+                              </span>
+                            </div>
+                            {m.after && <p className="text-sm text-faint">Goes on over {m.after}</p>}
+                            {m.summary && <p className="mt-1.5 text-dim">{m.summary}</p>}
+                            <div className="mt-2">
+                              <SpecRows rows={moduleRows(m)} dense />
+                            </div>
+                            {m.weapons.length > 0 && (
+                              <ul className="mt-3 space-y-3">
+                                {m.weapons.map((w) => (
+                                  <WeaponCard key={w.name} w={w} />
+                                ))}
+                              </ul>
+                            )}
+                            {m.builds.length > 0 && (
+                              <p className="mt-3 text-sm text-dim">
+                                <span className="text-faint">Lets it build </span>
+                                {m.builds
+                                  .map(byKey)
+                                  .filter((u): u is UnitSummary => !!u)
+                                  .map((u) => u.name)
+                                  .join(", ")}
+                              </p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="mt-10">
+              <h2 className="font-display text-3xl font-light">Specifications</h2>
+              <div className="mt-4">
+                <SpecSections sections={sections} />
+              </div>
+              <p className="mt-6 flex flex-wrap gap-1.5 font-display text-xs font-semibold text-dim">
+                {unit.categories.map((c) => (
+                  <span key={c} className="border border-white/10 px-2 py-0.5">
+                    {c}
+                  </span>
+                ))}
+              </p>
+            </section>
           </div>
         </div>
 
@@ -256,57 +333,6 @@ function Cost({ label, value, color }: { label: string; value: string; color: st
       <span className="absolute inset-x-0 top-0 h-[2px]" style={{ background: color }} />
       <div className="text-sm text-faint">{label}</div>
       <div className="num font-display text-2xl font-semibold">{value}</div>
-    </div>
-  );
-}
-
-const KIND: Record<string, { label: string; color: string }> = {
-  direct: { label: "Gun", color: "var(--color-accent)" },
-  ballistic: { label: "Artillery", color: "var(--color-accent)" },
-  missile: { label: "Missile", color: "var(--color-accent)" },
-  torpedo: { label: "Torpedo", color: "var(--color-naval)" },
-  flak: { label: "Flak", color: "var(--color-dim)" },
-  rail: { label: "Rail", color: "var(--color-space)" },
-  bore: { label: "Electric bore", color: "var(--color-air)" },
-  beam: { label: "Beam", color: "var(--color-air)" },
-  plasma: { label: "Plasma", color: "var(--color-regency)" },
-  charged: { label: "Charged shell", color: "var(--color-air)" },
-  bolt: { label: "Bolt", color: "var(--color-air)" },
-};
-
-function WeaponCard({ w }: { w: Weapon }) {
-  const k = KIND[w.kind] ?? KIND.direct;
-  return (
-    <li className="group relative border border-white/[0.08] bg-white/[0.02] p-4 transition-colors hover:border-white/20">
-      <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: k.color }} />
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-display text-xl font-semibold">
-          {w.name}
-          {w.count > 1 && <span className="num ml-2 text-base text-faint">×{w.count}</span>}
-        </h3>
-        <span className="font-display text-sm font-semibold" style={{ color: k.color }}>
-          {k.label} · {w.targets.join(", ")}
-        </span>
-      </div>
-      {w.lore && <p className="mt-1.5 text-dim">{w.lore}</p>}
-      <dl className="num mt-3 grid grid-cols-4 gap-3 font-display">
-        <WStat label="Damage" v={fmt(w.damage)} />
-        <WStat label="Range" v={fmt(w.range)} u="m" />
-        <WStat label="Reload" v={fmt(w.reload, 2)} u="s" />
-        <WStat label="DPS" v={fmt(w.dps, 1)} />
-      </dl>
-    </li>
-  );
-}
-
-function WStat({ label, v, u }: { label: string; v: string; u?: string }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium text-faint">{label}</dt>
-      <dd className="text-lg font-semibold">
-        {v}
-        {u && <span className="ml-0.5 text-sm font-medium text-faint">{u}</span>}
-      </dd>
     </div>
   );
 }

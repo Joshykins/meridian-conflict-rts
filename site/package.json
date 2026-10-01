@@ -10,12 +10,12 @@
     "yarn": "please-use-pnpm"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/generate.mjs --watch next dev",
+    "build": "node scripts/generate.mjs && next build",
     "start": "next start",
-    "lint": "eslint",
-    "sync": "node scripts/sync-units.mjs",
-    "typecheck": "tsc --noEmit"
+    "generate": "node scripts/generate.mjs",
+    "lint": "node scripts/generate.mjs --units && eslint",
+    "typecheck": "node scripts/generate.mjs --units && tsc --noEmit"
   },
   "dependencies": {
     "next": "16.3.7",
@@ -29,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.7",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

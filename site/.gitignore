@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# made from the game by scripts/generate.mjs before every dev start and build
+/content/units/
+/content/units.index.json
+/content/factions.json
+/content/teams.json
+/public/generated/
