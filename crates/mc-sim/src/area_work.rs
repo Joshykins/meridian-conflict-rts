@@ -202,7 +202,8 @@ impl World {
         self.state
             .orders
             .push_front(&mut self.state.units, row, work)?;
-        self.state.units.stuck_ticks[row] = 0;
+        // As in `take_area_wreck`: a failed walk must not carry over to the new work.
+        self.stop_moving(row);
         Ok(true)
     }
 }

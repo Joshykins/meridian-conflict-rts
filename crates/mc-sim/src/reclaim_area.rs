@@ -252,7 +252,10 @@ impl World {
         self.state
             .orders
             .push_front(&mut self.state.units, row, take)?;
-        self.state.units.stuck_ticks[row] = 0;
+        // The walk to the circle drops here: if it found no way, steering on along it
+        // this tick would mark the unit stuck again, and the reclaim would give up on
+        // the wreck before asking for a way to it.
+        self.stop_moving(row);
         Ok(())
     }
 }

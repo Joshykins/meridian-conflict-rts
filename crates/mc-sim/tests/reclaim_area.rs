@@ -13,12 +13,16 @@ use std::sync::Arc;
 
 const ENGINEER: &str = "aster_t1_engineer";
 const TANK: &str = "aster_t1_tank";
+const GLEANER: &str = "aster_t1_land_reclaimer";
 
 fn world() -> World {
+    world_on(Heightfield::flat(256, 256, Fx::from_int(20)))
+}
+
+fn world_on(terrain: Heightfield) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
-    let terrain = Heightfield::flat(256, 256, Fx::from_int(20));
     let map = MapData {
         name: "reclaim_area".into(),
         content_id: 1,
@@ -58,7 +62,11 @@ fn cmd(command: Command) -> PlayerCommand {
 }
 
 fn engineers(w: &mut World, at: &[(i32, i32)]) -> Vec<UnitId> {
-    let blueprint = w.blueprints.id_of(ENGINEER).unwrap();
+    spawn(w, ENGINEER, at)
+}
+
+fn spawn(w: &mut World, key: &str, at: &[(i32, i32)]) -> Vec<UnitId> {
+    let blueprint = w.blueprints.id_of(key).unwrap();
     let spawns: Vec<PlayerCommand> = at
         .iter()
         .map(|&(x, y)| {
@@ -166,6 +174,49 @@ fn a_circle_is_cleared_and_what_lies_outside_it_is_left() {
     let left = wrecks_left(&w);
     assert_eq!(left.len(), 1, "every wreck in the circle is gone: {left:?}");
     assert!(left[0].distance(centre) > radius);
+}
+
+/// Replay 20261001-202046 mark 1: a Gleaner given a circle whose middle lies on a
+/// mesa it cannot climb went for the wrecks below it, but was given up on each at
+/// once: the walk to the middle had failed, and the failure stuck to the reclaim that
+/// was put in front of it. It sat still, swapping between two wrecks for ever.
+#[test]
+fn a_circle_whose_middle_cannot_be_reached_is_still_cleared() {
+    // Flat ground at 20 m, and a sheer-sided mesa 180 m above it, 800-1120 m.
+    let mut samples = vec![20u16; 257 * 257];
+    for y in 100..=140 {
+        for x in 100..=140 {
+            samples[y * 257 + x] = 200;
+        }
+    }
+    let terrain = Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::ZERO);
+    let mut w = world_on(terrain);
+    let units = spawn(&mut w, GLEANER, &[(300, 960)]);
+    let centre = FxVec2::from_ints(960, 960);
+    // Inside the circle, past the Gleaner's 550 m reach.
+    wrecks(&mut w, 400, 1650, 3);
+    // It has already found there is no way up.
+    w.tick(&[cmd(Command::Move {
+        units: units.clone(),
+        target: centre,
+        queue: false,
+    })])
+    .unwrap();
+    run_until_idle(&mut w, &units, 1000);
+    w.tick(&[cmd(Command::ReclaimArea {
+        units: units.clone(),
+        pos: centre,
+        radius: Fx::from_int(1000),
+        queue: false,
+    })])
+    .unwrap();
+    run_until_idle(&mut w, &units, 4000);
+
+    let left = wrecks_left(&w);
+    assert!(
+        left.is_empty(),
+        "the wrecks below the mesa are taken: {left:?}"
+    );
 }
 
 #[test]
