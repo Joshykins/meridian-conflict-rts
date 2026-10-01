@@ -38,6 +38,7 @@ pub mod economy;
 mod flak;
 pub mod focus;
 pub mod fog;
+mod formation_destination;
 pub mod formations;
 mod guard;
 mod held;

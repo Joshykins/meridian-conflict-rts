@@ -568,7 +568,12 @@ impl World {
             self.index
                 .query(pos, radius + PERSONAL_SPACE, kind::UNIT, |e| {
                     let other = e.row as usize;
-                    if other == row || !self.unit_entry_is_current(e) || !self.bp(other).is_mobile()
+                    let d = pos - e.pos;
+                    // Out of reach is decided first, on the squared length.
+                    if !d.shorter_than(radius + e.radius + PERSONAL_SPACE)
+                        || other == row
+                        || !self.unit_entry_is_current(e)
+                        || !self.bp(other).is_mobile()
                     {
                         return true;
                     }
@@ -585,35 +590,32 @@ impl World {
                     {
                         return true;
                     }
-                    let d = pos - e.pos;
                     let dist = d.length();
                     let overlap = radius + e.radius + PERSONAL_SPACE - dist;
-                    if overlap > Fx::ZERO {
-                        // Coincident units separate along a direction fixed by their rows.
-                        let away = if dist > Fx::ZERO {
-                            d * (Fx::ONE / dist)
-                        } else {
-                            {
-                                let axis = FxVec2::from_angle(mc_core::Angle(
-                                    (row.min(other) as u16).wrapping_mul(9973),
-                                ));
-                                if row < other {
-                                    axis
-                                } else {
-                                    -axis
-                                }
-                            }
-                        };
-                        // Twice its share, as the push below is halved.
-                        let share = self.give_way(row, other);
-                        push += away
-                            * if share == Fx::HALF {
-                                overlap
+                    // Coincident units separate along a direction fixed by their rows.
+                    let away = if dist > Fx::ZERO {
+                        d * (Fx::ONE / dist)
+                    } else {
+                        {
+                            let axis = FxVec2::from_angle(mc_core::Angle(
+                                (row.min(other) as u16).wrapping_mul(9973),
+                            ));
+                            if row < other {
+                                axis
                             } else {
-                                overlap * share * 2
-                            };
-                        seen += 1;
-                    }
+                                -axis
+                            }
+                        }
+                    };
+                    // Twice its share, as the push below is halved.
+                    let share = self.give_way(row, other);
+                    push += away
+                        * if share == Fx::HALF {
+                            overlap
+                        } else {
+                            overlap * share * 2
+                        };
+                    seen += 1;
                     seen < MAX_NEIGHBOURS
                 });
         }
