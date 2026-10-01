@@ -1,11 +1,23 @@
 // Frostline: four against four across a land bridge between two oceans, the
-// Precursors' climate wall down the middle of it. West of the wall, red-rock
-// desert under a clear sky; east of it, Alaska.
+// Precursors' climate wall down the middle of it all. West of the wall,
+// red-rock desert under a clear, dry sky; east of it, Alaska: cloud piled
+// against the wall, snow in the air. The line is the bake's
+// (`mc_map::landmark::FROSTLINE_WALL`; `tests/frostline.rs` holds the two
+// together), and so is the lift that lays the canyon's beds on this map's
+// lower country. Skirmish set-up can override the weather (over both sides)
+// and the time of day.
 (
     biome: Desert,
     style: Teams,
+    climate: Desert,
     weather: Clear,
     tweaks: (rain: 0.0, wind: 9),
     time: Afternoon,
-    climate: Desert,
+    strata_lift: 50,
+    divide: (
+        line: [(6592, 0), (6592, 3400), (8192, 5000), (8192, 11384), (9792, 12984), (9792, 16384)],
+        climate: Temperate,
+        weather: Cloudy,
+        tweaks: (rain: 0.7),
+    ),
 )

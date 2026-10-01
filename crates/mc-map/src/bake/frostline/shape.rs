@@ -397,8 +397,8 @@ impl Terrain {
         let (u, v) = (x * 0.819 + y * 0.574, y * 0.819 - x * 0.574);
         // Spires and tors: rock standing alone, in scattered groups.
         let group = smoothstep(
-            0.12,
-            0.3,
+            0.02,
+            0.2,
             self.mtn_mask
                 .fbm(x / 900.0 - 30.0, y / 900.0 + 12.0, 2, 0.5),
         );
@@ -410,8 +410,13 @@ impl Terrain {
                 0.2,
                 self.tilt.fbm(x / 1_700.0 + 9.0, y / 1_700.0 - 4.0, 2, 0.5),
             );
-            let dune = self.detail.ridged(u / 150.0, v / 480.0, 2, 0.5);
-            let dunes = 15.0 * (dune - 0.48).max(0.0) * field * low;
+            // Dunes in ranks across the wind, their crests bending and
+            // forking, taller in some reaches than others.
+            let bend = 2.4 * self.detail.fbm(u / 420.0, v / 420.0, 2, 0.5);
+            let rank = 0.5 + 0.5 * (u / 22.0 + 2.6 * bend).sin();
+            let tall =
+                (0.55 + 1.5 * self.detail.fbm(u / 300.0 + 8.0, v / 900.0, 2, 0.5)).clamp(0.0, 1.0);
+            let dunes = 9.0 * rank.powf(1.7) * tall * field * low;
             let swell = 6.0 * self.tilt.fbm(x / 230.0 + 5.0, y / 230.0, 2, 0.5);
             relief +=
                 (1.0 - east) * (dunes + swell * (1.0 - 0.6 * low) + 30.0 * spire * (1.0 - low));

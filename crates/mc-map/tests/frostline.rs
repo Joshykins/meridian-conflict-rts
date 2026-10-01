@@ -18,14 +18,16 @@
 //! * the wall's towers stand on its line, a pair to every turn, and it parts
 //!   the climates: snow only east of it, juniper, pinyon and cottonwood only
 //!   west, spruce, pine and birch only east;
-//! * both sides have the same timber and the same wreckage.
+//! * both sides have the same timber and the same wreckage;
+//! * the map's sidecar gives the renderer the wall's own line, the climates
+//!   either side of it and the lift the mesas were cut to.
 //!
 //! The map is not checked in; without the file the test says so and passes.
 //!
 //! `cargo test --profile gate -p mc-map --test frostline -- --nocapture`
 
 use mc_core::{Fx, FxVec2};
-use mc_map::landmark::FROSTLINE_WALL;
+use mc_map::landmark::{FROSTLINE_STRATA_LIFT, FROSTLINE_WALL};
 use mc_map::{Heightfield, MapFile, PropKind, CELL_SIZE_M};
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -455,6 +457,32 @@ fn frostline_plays_the_same_from_both_sides() {
     println!("{stem}: {} wrecks, {lone} without a twin", wrecks.len());
     if wrecks.is_empty() || lone > 0 {
         problems.push(format!("{lone} of {} wrecks have no twin", wrecks.len()));
+    }
+
+    // The sidecar: what the renderer draws the two climates by.
+    use mc_data::weather::{Climate, MapConfig};
+    let config = MapConfig::for_map(&path).expect("the map's sidecar");
+    match &config.divide {
+        None => problems.push("the sidecar has no divide".into()),
+        Some(divide) => {
+            let line: Vec<(f64, f64)> = divide
+                .line
+                .iter()
+                .map(|p| (p.0 as f64, p.1 as f64))
+                .collect();
+            if line != FROSTLINE_WALL {
+                problems.push(format!("the sidecar's line {line:?} is not the wall"));
+            }
+            if (config.climate, divide.climate) != (Climate::Desert, Climate::Temperate) {
+                problems.push("the sidecar's climates are not desert west, temperate east".into());
+            }
+        }
+    }
+    if config.strata_lift as f64 != FROSTLINE_STRATA_LIFT {
+        problems.push(format!(
+            "the sidecar's strata_lift is {}, the bake's {FROSTLINE_STRATA_LIFT}",
+            config.strata_lift
+        ));
     }
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
