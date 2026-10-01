@@ -171,7 +171,7 @@ fn a_gleaner_on_a_move_order_reclaims_what_it_passes_without_stopping() {
 #[test]
 fn an_argus_looks_straight_down_from_its_cruise_height_at_a_wreck_below() {
     let mut w = world();
-    let argus = add(&mut w, "aster_t2_support", 900, 900);
+    let argus = add(&mut w, "aster_t3_support", 900, 900);
     let reach = w.bp(argus).reclaimer.unwrap().range;
     assert!(reach >= Fx::from_int(1000));
     let under = wreck(&mut w, 960, 900, 300);

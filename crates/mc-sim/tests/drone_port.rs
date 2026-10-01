@@ -175,7 +175,7 @@ fn starved_osprey(w: &mut World, mines: Priority) -> usize {
         },
     }])
     .unwrap();
-    add(w, "aster_t1_reclaim_carrier", 900, 900)
+    add(w, "aster_t2_reclaim_carrier", 900, 900)
 }
 
 fn built(w: &World, drones: &[usize]) -> usize {
@@ -258,7 +258,7 @@ fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
     let storage = w.blueprints.id_of("aster_mass_storage").unwrap();
     w.spawn_unit(storage, 0, FxVec2::from_ints(300, 300), Angle::ZERO, true)
         .unwrap();
-    let key = "aster_t1_reclaim_carrier";
+    let key = "aster_t2_reclaim_carrier";
     let id = w.blueprints.id_of(key).unwrap();
     let osprey = w
         .spawn_unit(id, 0, FxVec2::from_ints(900, 900), Angle::ZERO, true)

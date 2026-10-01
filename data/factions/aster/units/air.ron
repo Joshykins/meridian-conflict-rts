@@ -80,28 +80,31 @@
  sounds: (death: "blast_small", moving: "aster_rotor"), 
 ),
 (
- key: "aster_t2_support", name: "Argus", role: "Radar / Salvage / Anti-Missile Support", tech: 2, categories: ["Air", "Intel"],
- health: 720, cost: (mass: 330, energy: 11000, time: 1800),
- radius: 9.2, height: 4.0, vision: 1200,
- motion: (layer: Air, size: 0, speed: 92, accel: 40, turn: 64, altitude: 220, hover: false),
+ key: "aster_t3_support", name: "Argus", role: "Radar / Salvage / Anti-Missile Support", tech: 3, categories: ["Air", "Intel"],
+ health: 2400, cost: (mass: 1200, energy: 36000, time: 6000),
+ radius: 9.2, height: 4.0, vision: 2000,
+ motion: (layer: Air, size: 0, speed: 165, accel: 70, turn: 64, altitude: 450, hover: false),
  weapons: [], mesh: "support_air", icon: Intel,
- sounds: (death: "blast_small", moving: "aster_jet"), radar: 2800, sonar: 900, anti_missile: 450, anti_missile_lasers: 2,
+ sounds: (death: "blast_small", moving: "aster_jet"), radar: 6000, sonar: 900,
+ // A sphere round the hull: 650 from 450 m up still covers ~470 m of ground below.
+ anti_missile: 650, anti_missile_lasers: 2,
  // It orbits: its guard is an Orbit on the whole ring, and idle it circles where it is.
  orbit: 400,
  // Radar, sonar, the lasers and its own small field draw energy; the salvage ray takes none.
- economy: (energy_upkeep: 100),
- shield: (kind: Hull, health: 1200, regen: 20),
+ economy: (energy_upkeep: 200),
+ shield: (kind: Hull, health: 3000, regen: 45),
  // The laser heads on the wingtip pods (`models/aster/air/argus.rs`).
  anti_missile_mounts: [(-2.53, 9.03, 3.77), (-2.53, -9.03, 3.77)],
  // A salvage ray in a ball turret under the belly that reaches far out and down from its
- // cruise height, clearing wrecks as it flies (`models/aster/air/argus/turret.rs`).
- reclaimer: (power: 12, range: 1200, charge: 1.0, mobile: true, heads: [
+ // cruise height, clearing wrecks as it flies. It pulls and reaches as far as a
+ // Scavenger III tower (`aster_t3_reclaimer`); keep the two in step (`models/aster/air/argus/turret.rs`).
+ reclaimer: (power: 200, range: 1700, charge: 1.0, mobile: true, heads: [
   (pivot: (0.345, 0, 0.805), emitter: (1.495, 0, 0.805), turn: 240, pitch: (-90, 10)),
  ]),
 ),
 (
- key: "aster_t1_reclaim_carrier", name: "Osprey", role: "Reclaim Carrier", title: "Reclaim Carrier", tech: 1, categories: ["Air"],
- health: 460, cost: (mass: 95, energy: 900, time: 560),
+ key: "aster_t2_reclaim_carrier", name: "Osprey", role: "Reclaim Carrier", title: "Reclaim Carrier", tech: 2, categories: ["Air"],
+ health: 1000, cost: (mass: 200, energy: 3800, time: 1100),
  radius: 10, height: 4.5, vision: 480,
  motion: (layer: Air, size: 0, speed: 65, accel: 24, turn: 65, altitude: 22, hover: true, deploy: 0.6),
  weapons: [], mesh: "reclaim_carrier", icon: SalvageCarrier,
@@ -115,7 +118,7 @@
   (kind: Point, at: (1.02, 6.4, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
   (kind: Point, at: (1.02, -6.4, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
  ],
- sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 600,
+ sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 800,
  // Slung under the wing, two a side, each from a pylon's clamp (the model's `PYLONS`).
  // Home, a drone lines up 3 m under its pylon and rises onto it; letting go, it drops 3 m.
  drone_sockets: [(0.4, 3.6, 0.25), (0.4, -3.6, 0.25), (0.4, 6.4, 0.25), (0.4, -6.4, 0.25)], drone_approach: -3,

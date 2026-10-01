@@ -60,7 +60,7 @@
         radius: 46, height: 26, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t1_reclaim_carrier",
+            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
         ]),
         upgrades_to: "aster_t2_air_factory",
         mesh: "factory_air", icon: Factory,
@@ -77,7 +77,7 @@
         radius: 46, height: 34, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t1_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
         ]),
         upgrades_to: "aster_t3_air_factory",
         mesh: "factory_air", icon: Factory,
@@ -94,7 +94,7 @@
         radius: 46, height: 42, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t3_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_support", "aster_t1_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
+            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t3_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_support", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
         ]),
         mesh: "factory_air", icon: Factory,
         sounds: (death: "blast_large"),

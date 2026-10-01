@@ -56,7 +56,7 @@ fn targets(w: &mut World, spots: &[(i32, i32)]) -> Vec<usize> {
     spots
         .iter()
         .map(|&(x, y)| {
-            let t = add(w, "aster_t1_reclaim_carrier", 1, x, y);
+            let t = add(w, "aster_t2_reclaim_carrier", 1, x, y);
             w.state.units.flags[t] |= flag::PASSIVE | flag::INVULNERABLE;
             t
         })

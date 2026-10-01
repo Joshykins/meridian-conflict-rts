@@ -99,7 +99,7 @@ fn a_field_near_home_gets_a_tower_and_a_covered_one_does_not() {
 #[test]
 fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_them() {
     let mut w = world();
-    let air = spawn(&mut w, "aster_t1_air_factory", 400, 300);
+    let air = spawn(&mut w, "aster_t2_air_factory", 400, 300);
     let land = spawn(&mut w, "aster_t1_land_factory", 300, 420);
     let census = w.survey_own(0);
     assert!(
@@ -111,7 +111,7 @@ fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_th
     let key = |id: Option<BlueprintId>| id.map(|b| w.blueprints.unit(b).key.clone());
     assert_eq!(
         key(w.salvage_product(air, &census, 0, &fields)).as_deref(),
-        Some("aster_t1_reclaim_carrier")
+        Some("aster_t2_reclaim_carrier")
     );
     assert_eq!(
         key(w.salvage_product(land, &census, 0, &fields)).as_deref(),

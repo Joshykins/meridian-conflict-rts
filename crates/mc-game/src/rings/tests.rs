@@ -44,11 +44,11 @@ fn rings_follow_the_data() {
         ]
     );
     assert_eq!(
-        of(&b, "aster_t2_support"),
+        of(&b, "aster_t3_support"),
         vec![
-            (Reach::Radar, 0, 0.0, 2800.0),
-            (Reach::Reclaim, 0, 0.0, 1200.0),
-            (Reach::AntiMissile, 0, 0.0, 450.0),
+            (Reach::Radar, 0, 0.0, 6000.0),
+            (Reach::Reclaim, 0, 0.0, 1700.0),
+            (Reach::AntiMissile, 0, 0.0, 650.0),
             (Reach::Sonar, 0, 0.0, 900.0),
         ]
     );

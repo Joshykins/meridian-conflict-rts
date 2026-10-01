@@ -350,7 +350,7 @@ fn raiders_prefer_an_undefended_expansion_and_support_is_bounded() {
     });
     let start = w.state.players[0].start;
     assert!(w.ai_objective_cost(0, near, start) > w.ai_objective_cost(0, far, start));
-    let support = w.blueprints.id_of("aster_t2_support").unwrap();
+    let support = w.blueprints.id_of("aster_t3_support").unwrap();
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     let mut counts = std::collections::BTreeMap::new();
     assert_eq!(

@@ -206,7 +206,7 @@ fn a_queued_area_reclaim_waits_its_turn() {
 
 /// An Osprey at `(x, y)` with its four drones built and docked.
 fn carrier(w: &mut World, x: i32, y: i32) -> UnitId {
-    let blueprint = w.blueprints.id_of("aster_t1_reclaim_carrier").unwrap();
+    let blueprint = w.blueprints.id_of("aster_t2_reclaim_carrier").unwrap();
     let row = w
         .spawn_unit(blueprint, 0, FxVec2::from_ints(x, y), Angle::ZERO, true)
         .unwrap();
@@ -273,8 +273,8 @@ fn a_carrier_given_a_circle_wider_than_its_drones_reach_clears_all_of_it() {
     let mut w = world();
     let osprey = carrier(&mut w, 1000, 200);
     let centre = FxVec2::from_ints(1000, 1000);
-    // Farther apart than the drones' 600 m, and none within reach of the middle.
-    let fields = [(250, 1000), (1750, 1000), (1000, 1750)];
+    // Farther apart than the drones' 800 m, and none within reach of the middle.
+    let fields = [(150, 1000), (1850, 1000), (1000, 1850)];
     for (x, y) in fields {
         wrecks(&mut w, x, y, 2);
     }

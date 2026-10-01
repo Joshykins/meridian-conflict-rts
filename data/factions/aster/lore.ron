@@ -172,11 +172,11 @@
             "Unguided Rockets": "A pair of rocket pods for targets the machine gun cannot crack.",
         },
     ),
-    "aster_t2_support": (
+    "aster_t3_support": (
         lore: "A radar, sonar and anti-missile airframe, built after the losses at Twin Shoals. A salvage ray under its nose strips the wrecks it flies over.",
     ),
-    "aster_t1_reclaim_carrier": (
-        lore: "A cheap fan-lift carrier that fields its own Salvage Drones, called the flock. Often the first thing a new base builds after its mines.",
+    "aster_t2_reclaim_carrier": (
+        lore: "A fan-lift carrier that fields its own Salvage Drones, called the flock. A tech 2 air factory's first answer to a field of wrecks.",
     ),
     "aster_reclaim_drone": (
         lore: "A small, disposable reclaimer that lives and dies with its parent Osprey.",

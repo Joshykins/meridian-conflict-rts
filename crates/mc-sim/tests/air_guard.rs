@@ -99,7 +99,7 @@ fn aircraft_circle_halfway_out() {
 fn the_argus_orbits_on_the_whole_ring_and_circles_where_it_is_left_idle() {
     let mut w = world();
     let centre = FxVec2::from_ints(2000, 2000);
-    let argus = add(&mut w, "aster_t2_support", 0, 2000, 2400);
+    let argus = add(&mut w, "aster_t3_support", 0, 2000, 2400);
     guard(&mut w, &[argus], centre, 500);
     band(&mut w, &[argus], centre, 600);
     let (near, far) = band(&mut w, &[argus], centre, 400);
