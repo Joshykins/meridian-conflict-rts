@@ -157,7 +157,7 @@
  key: "aster_t2_fire_bomber", name: "Hellkite", role: "Flying Fortress Fire Bomber", title: "Fire Bomber", tech: 2, categories: ["Air"],
  health: 3687, cost: (mass: 250, energy: 8750, time: 1560),
  radius: 13, height: 5, vision: 640,
- motion: (layer: Air, size: 0, speed: 130, accel: 50, turn: 55, altitude: 280, hover: false),
+ motion: (layer: Air, size: 0, speed: 130, accel: 45, turn: 55, altitude: 280, hover: false),
  // Big incendiaries: each leaves a patch ~29 m across that burns 20 s at 75 damage a second.
  // Range 800: from 280 m at 130 m/s the bay opens ~720 m out, and a target must be seen first.
  weapons: [(name: "Incendiary Carpet", damage: 84, splash: 45, range: 800, reload: 9, salvo: 24, salvo_batch: 1, salvo_delay: 0.1,
