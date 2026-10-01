@@ -1661,7 +1661,8 @@ impl World {
         // `reach` of its edge), with its distance.
         let within = |inner: Fx, r: Fx| {
             let mut near: Vec<(Fx, usize)> = Vec::new();
-            self.index.query_foes(pos, r, kind::UNIT, friends, |e| {
+            let kinds = crate::combat::target_kinds(mask);
+            self.index.query_foes(pos, r, kinds, friends, |e| {
                 let t = e.row as usize;
                 // In the ring, `inner < distance <= reach + e.radius`, decided
                 // on the squared length: a wider ring reads the inner ones again.

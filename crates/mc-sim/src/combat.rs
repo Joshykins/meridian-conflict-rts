@@ -418,6 +418,17 @@ fn on_torso(weapons: &[Weapon], w: usize) -> bool {
     rides(w) && (0..weapons.len()).filter(|&i| rides(i)).nth(1).is_some()
 }
 
+/// The index kinds a search for what a weapon hitting `mask` can strike reads:
+/// only aircraft keep the air category (`target_categories`), so a search for
+/// air targets alone passes over the armies under them.
+pub(crate) fn target_kinds(mask: u32) -> u8 {
+    if mask & !cat::AIR == 0 {
+        kind::AIRCRAFT
+    } else {
+        kind::UNIT
+    }
+}
+
 impl World {
     /// Whether `row` is wholly under water: no gun aims at it, only torpedoes and blasts
     /// (`blast_reaches`) reach it.
@@ -812,7 +823,12 @@ impl World {
                                 .nearest_foe(
                                     units.pos[row],
                                     weapon.range_max + this.gun_offset(row, weapon),
-                                    kind::UNIT,
+                                    // A torpedo also takes a walker on the seabed.
+                                    if weapon.torpedo {
+                                        kind::UNIT
+                                    } else {
+                                        target_kinds(weapon.target_mask)
+                                    },
                                     this.team_mask(units.owner[row]),
                                     |e| {
                                         this.unit_entry_is_current(e)
