@@ -108,6 +108,16 @@ struct SurfaceCell {
     id: f32,
 }
 
+// Melted rock's light at `t` (0 cold, 1 white-hot), in HDR: deep red, orange, then near
+// white, and far brighter hot than warm, so a red crack is dim beside a white run.
+fn surf_melt_rgb(t: f32) -> vec3<f32> {
+    let k = clamp(t, 0.0, 1.0);
+    var c = mix(vec3<f32>(0.4, 0.015, 0.0), vec3<f32>(1.0, 0.16, 0.02), smoothstep(0.08, 0.45, k));
+    c = mix(c, vec3<f32>(1.0, 0.48, 0.12), smoothstep(0.45, 0.75, k));
+    c = mix(c, vec3<f32>(1.0, 0.84, 0.62), smoothstep(0.78, 1.0, k));
+    return c * (0.4 + k * 1.6 + k * k * k * 4.0);
+}
+
 // How much of a pixel `fw` wide the band |d| < w covers: a line keeps its
 // energy when it gets thinner than a pixel instead of breaking into dots.
 fn surf_band(d: f32, w: f32, fw: f32) -> f32 {
@@ -542,6 +552,8 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
     switch i.pattern {
         case 1u: {}
         case MASS_FLOW_PATTERN: {}
+        // Melted rock is one skin, not plates: no outline where two faces meet.
+        case MELT_PATTERN: { h = 1.0; }
         case 2u: { h = min(h, surf_relief_shutter(i, st)); }
         case 3u: { h *= surf_relief_deck(i, st); }
         case 4u: {}
@@ -1109,6 +1121,35 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 out.paint = vec4<f32>(0.018, 0.017, 0.016, frame * 0.92);
                 out.rough = -0.35 * frame;
                 out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
+            }
+            case MELT_PATTERN: {
+                // Rock a beam has melted (`gpu_consts::melt`): a dark glassy crust broken by
+                // cracks of light over a melt that shows through where it is hot enough, all
+                // of it creeping down the wall. In model space, so the bore's faces share one
+                // field. Hotter the deeper it goes and the higher the tier: a tech 1 bore is
+                // mostly crust and red cracks, a deep core's runs orange to white.
+                let tier = saturate((i.tech - 1.0) / 3.0);
+                let deep = smoothstep(0.0, MELT_DEEP, -i.local.z);
+                let heat = saturate(0.3 + 0.25 * tier + (0.3 + 0.2 * tier) * deep);
+                let q = i.local + vec3<f32>(i.unit * 53.0, i.unit * 19.0, i.time * MELT_RUN_SPEED);
+                // Tongues of melt, drawn out down the wall; gone to their mean under the pixel.
+                let tongue_cell = 2.6;
+                let tongue = mix(0.5, surf_noise3(q * vec3<f32>(1.0, 1.0, 0.4) / tongue_cell), surf_resolved(tongue_cell, fw));
+                let melt = smoothstep(1.05 - heat, 1.25 - heat, tongue + 0.12 * surf_fbm3(q, 1.1, fw));
+                // Cracks in the crust: thin lines where a cell field crosses its middle.
+                let crack_cell = 1.4;
+                let cells = surf_noise3((q + vec3<f32>(7.3, 2.1, 0.0)) / crack_cell);
+                let line = max(fw / crack_cell * 1.5, 0.035);
+                let crack = (1.0 - smoothstep(0.0, line, abs(cells - 0.5))) * surf_resolved(crack_cell * 0.5, fw);
+                let lit = max(melt, crack * (0.35 + 0.65 * heat));
+                // The melt breathes a little as the beam works it.
+                let breath = 0.88 + 0.12 * sin(i.time * 2.1 + q.z * 0.9 + i.unit * 30.0);
+                let t = heat * mix(0.62, 1.0, melt);
+                out.emissive = surf_melt_rgb(t) * lit * breath;
+                // The crust: black glass, a sheen on it.
+                out.paint = vec4<f32>(0.022, 0.018, 0.017, 1.0);
+                out.rough = -0.35 * (1.0 - melt);
+                out.bare = 0.0;
             }
             case 16u: {
                 // Power run: a sunk channel down the long axis carrying the plant's output,

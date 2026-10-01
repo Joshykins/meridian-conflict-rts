@@ -3,13 +3,15 @@
 //!
 //! - **The excavation beam**: a held red-white stream (sprites.wgsl fade beam 7, as the
 //!   Regency's held weapons) from the emitter's lens straight down into the bore's mouth,
-//!   wider at every tier; the model carries its core on down the glowing shaft. From tech
+//!   wider at every tier; the model carries its core on down the molten shaft. From tech
 //!   2 thinner pinch beams run into the mouth from the emitters round it.
-//! - **The ore drawn up**: glowing motes lifted out of the mouth, spiralling in and
+//! - **The ore drawn up**: glowing motes lifted out of the funnel, spiralling in and
 //!   climbing the column to the collector rings, white-hot to red (the reclaim puff, whose
-//!   drift and climb it shares); molten spatter where the beam bites.
+//!   drift and climb it shares), more of them every tier; molten spatter where the beam
+//!   bites.
 //! - **The deep core's surge**: every few seconds the beam flares wide, a flash goes down
-//!   the shaft and a small pressure ring runs out over the ground.
+//!   the shaft and a gout of ore and spatter comes up it. Nothing runs out over the
+//!   ground: no shockwave (user call, 2026-09-30).
 //! - Offshore the beam goes into the sea through the coaming, and steam comes off it.
 //!
 //! Presentation only; the renderer's own clock. A mine under construction, a wreck, a
@@ -91,9 +93,9 @@ impl Renderer {
             let mouth = if afloat {
                 Vec3::new(at.x, at.y, water)
             } else {
-                // A little under the opening: the ground drawn across the hole takes the
-                // rest, and the model's core carries it on down.
-                at + Vec3::Z * (pit.open - 0.4)
+                // Just under the opening, still over the ground drawn across the hole: the
+                // model's core carries it on down the shaft.
+                at + Vec3::Z * (pit.open - 0.2)
             };
             let bp = self
                 .blueprints
@@ -131,23 +133,19 @@ impl Renderer {
         // climbs (the reclaim puff's drag and lift) to the collector as it cools.
         let climb = (d.emitter.z - d.mouth.z).max(1.0);
         let life = (climb / 1.6).sqrt().clamp(1.0, 4.0);
-        let motes = if close { 2 + d.tech as usize } else { 1 };
+        let motes = if close {
+            2 + 2 * d.tech as usize
+        } else {
+            1 + d.tech as usize / 2
+        };
         for _ in 0..motes {
             self.ore_mote(d, time, life);
         }
         if close {
-            // Molten spatter where it bites.
-            let spray =
-                Vec3::new(self.scatter.signed(), self.scatter.signed(), 1.4).normalize_or_zero();
-            let speed = 6.0 + self.scatter.unit() * 8.0;
-            self.push_puff(
-                PUFF_SPARK,
-                d.mouth + Vec3::Z * 0.4,
-                spray * speed,
-                time,
-                0.5,
-                (0.2, 0.08),
-            );
+            // Molten spatter thrown up where it bites, more of it the hotter the bore.
+            for _ in 0..1 + d.tech / 2 {
+                self.spatter(d, time, 1.0);
+            }
         }
         if d.afloat {
             let out_dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0);
@@ -169,23 +167,41 @@ impl Renderer {
             if (t / d.surge).floor() != ((t - tick) / d.surge).floor() {
                 out.push(beam(d.emitter, d.width * 2.4, 0.7));
                 self.push_effect(d.mouth.to_array(), time, 14.0, 0.35, 1.0, 0.0);
-                self.push_shockwave(d.mouth.to_array(), time, 60.0, 0.9, 0.3, 1.0, Vec3::ZERO);
-                for _ in 0..14 {
+                for _ in 0..18 {
                     self.ore_mote(d, time, life * 0.8);
+                }
+                for _ in 0..10 {
+                    self.spatter(d, time, 1.6);
                 }
             }
         }
         self.effect_origin = previous;
     }
 
-    /// One glowing mote of ore leaving the mouth, turning in round the beam as it climbs.
+    /// A fleck of molten rock thrown up out of the funnel, `kick` times the usual speed.
+    fn spatter(&mut self, d: &Dig, time: f32, kick: f32) {
+        let spray =
+            Vec3::new(self.scatter.signed(), self.scatter.signed(), 2.2).normalize_or_zero();
+        let speed = (7.0 + self.scatter.unit() * 8.0) * kick;
+        self.push_puff(
+            PUFF_SPARK,
+            d.mouth + Vec3::Z * 0.3,
+            spray * speed,
+            time,
+            0.6,
+            (0.24, 0.1),
+        );
+    }
+
+    /// One glowing mote of ore leaving the funnel, turning in round the beam as it climbs.
     fn ore_mote(&mut self, d: &Dig, time: f32, life: f32) {
         let a = self.scatter.unit() * std::f32::consts::TAU;
         let out = Vec3::new(a.cos(), a.sin(), 0.0);
         let round = Vec3::new(-a.sin(), a.cos(), 0.0);
-        let r = d.radius * (0.35 + 0.55 * self.scatter.unit());
-        let vel = round * (2.0 + 2.0 * self.scatter.unit()) - out * 0.8 + Vec3::Z * 1.2;
-        let size = 0.28 + 0.07 * d.tech as f32;
+        // From the funnel's lower walls, inside where the eye looks into it.
+        let r = d.radius * (0.2 + 0.4 * self.scatter.unit());
+        let vel = round * (2.0 + 2.0 * self.scatter.unit()) - out * 0.6 + Vec3::Z * 3.0;
+        let size = 0.36 + 0.1 * d.tech as f32;
         let late = self.scatter.unit() * self.tick_seconds;
         let lasts = life * (0.8 + 0.3 * self.scatter.unit());
         self.push_puff(

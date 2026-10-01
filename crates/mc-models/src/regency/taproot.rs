@@ -7,10 +7,12 @@
 //! frees is drawn up the column round it (the beam, the converging pinch beams and the
 //! rising ore are drawn by `renderer/regency_mine_fx.rs` from `Model::excavation`).
 //!
-//! - The bore: an armoured collar round its mouth, and the shaft down from it, its walls
-//!   glassed dark with lit red bands where the beam has cut, white-hot at the bottom where
-//!   it bites, the beam's core running down it (`Model::pit`: the shader shows it through
-//!   the ground).
+//! - The bore: a low armoured collar round a funnel the beam has melted out of the ground,
+//!   and the shaft down from it. Its walls are molten rock (`pattern::MOLTEN`): a black
+//!   glass crust cracked with light at tech 1, running orange to white-hot at the deep
+//!   core, hotter the deeper they go; white-hot at the bottom where the beam bites, its
+//!   core running down the middle (`Model::pit`: the shader shows it through the ground).
+//!   The funnel is wide and the collar low so the eye sees down into it.
 //! - Four outrigger legs on the diagonals brace the rig against the ore field: bronze
 //!   struts under plates lapped down and out into spikes, a foot block, a clawed pad
 //!   gripping the ground (`part::ASHORE`). They
@@ -41,15 +43,19 @@ const LIFT: f32 = 3.5;
 /// The legs' bearings, and how far out their feet stand.
 const LEGS: [f32; 4] = [45.0, 135.0, 225.0, 315.0];
 const REACH: f32 = 12.8;
-/// The bore's opening (`Pit::open`), and by tier: its mouth's radius, the depth of its
-/// floor, and the beam's width.
+/// The bore's opening (`Pit::open`), and by tier: the funnel's radius there, the shaft's
+/// radius where the funnel meets it, the depth of its floor, and the beam's width.
 const OPEN: f32 = 1.6;
+const FUNNEL: [f32; 4] = [4.0, 4.6, 5.2, 5.8];
 const MOUTH: [f32; 4] = [2.4, 3.0, 3.6, 4.2];
 const DEPTH: [f32; 4] = [-40.0, -60.0, -80.0, -120.0];
 const BEAM: [f32; 4] = [0.7, 1.1, 1.6, 2.3];
-/// The collar round the mouth: how far it reaches past the mouth, and its top.
-const COLLAR_W: f32 = 1.6;
-const COLLAR_TOP: f32 = 2.2;
+/// Where the funnel narrows into the shaft.
+const FUNNEL_FOOT: f32 = -4.0;
+/// The collar round the funnel: how far it reaches past it, and its top. Low, so it hides
+/// little of the funnel from the eye.
+const COLLAR_W: f32 = 1.0;
+const COLLAR_TOP: f32 = 2.0;
 /// The yoke the legs carry over the mouth: its height and radius.
 const YOKE: (f32, f32) = (8.2, 3.2);
 /// The emitter head: its lens tip (where the beam leaves), the body's foot and the cap's
@@ -75,7 +81,7 @@ pub(super) fn taproot(b: &mut MeshBuilder, tech: u8) {
     let t = tech as usize - 1;
     b.set_pit(Pit {
         open: OPEN,
-        radius: MOUTH[t] + 0.1,
+        radius: FUNNEL[t] + 0.1,
         stroke: 0.0,
         section: 0.0,
         rack: [0.0, 0.0],
@@ -225,35 +231,35 @@ fn ring(n: usize, r: f32, z: f32) -> Vec<Vec3> {
         .collect()
 }
 
-/// The bore at `tech`: the shaft from the opening down to its floor in short lengths
-/// (the shader decides length by length whether the eye sees it through the opening),
-/// glassed dark walls with a lit red band at every joint, a white-hot floor, and the
-/// beam's core down the middle.
+/// The bore at `tech`: a funnel from the opening down into the shaft, then the shaft to
+/// its floor, in short lengths (the shader decides length by length whether the eye sees
+/// it through the opening), its walls molten rock, a white-hot floor, and the beam's core
+/// down the middle.
 fn bore(b: &mut MeshBuilder, tech: u8) {
     let t = tech as usize - 1;
     // Below full detail only the top of the shaft, which is all the eye can follow.
-    let (mouth, floor) = (MOUTH[t], if b.fine() { DEPTH[t] } else { -24.0 });
+    let (funnel, mouth, floor) = (FUNNEL[t], MOUTH[t], if b.fine() { DEPTH[t] } else { -24.0 });
     let n = if b.fine() { 16 } else { 8 };
-    let mut depths = vec![OPEN, OPEN - 1.0];
-    let mut z = OPEN - 1.0;
+    let mut depths = vec![OPEN, 0.8, -0.2, -1.4, -2.7, FUNNEL_FOOT];
+    let mut z = FUNNEL_FOOT;
     while z > floor {
         z = (z - if z > -20.0 { 4.0 } else { 10.0 }).max(floor);
         depths.push(z);
     }
-    let radius = |z: f32| mouth * (1.0 - 0.18 * (OPEN - z) / (OPEN - DEPTH[t]));
-    let rings: Vec<Vec<Vec3>> = depths.iter().map(|&z| ring(n, radius(z), z)).collect();
-    for (k, pair) in rings.windows(2).enumerate() {
-        let (upper, lower) = (&pair[0], &pair[1]);
-        seam(b);
-        wall(b, upper, lower);
-        if k > 0 && b.fine() && upper[0].z > -30.0 {
-            // A band where the beam glassed the rock, just proud of the wall, as far down
-            // as the eye can follow.
-            let z = upper[0].z;
-            let r = radius(z) - 0.06;
-            b.paint(GLOW_LASER).pattern(pattern::NONE);
-            wall(b, &ring(n, r, z + 0.15), &ring(n, r, z - 0.15));
+    // The funnel flares fastest at the top, so its wall lies back where the eye looks in;
+    // the shaft narrows a little as it goes down.
+    let radius = |z: f32| {
+        if z >= FUNNEL_FOOT {
+            let f = (z - FUNNEL_FOOT) / (OPEN - FUNNEL_FOOT);
+            mouth + (funnel - mouth) * f * f
+        } else {
+            mouth * (1.0 - 0.18 * (FUNNEL_FOOT - z) / (FUNNEL_FOOT - DEPTH[t]))
         }
+    };
+    let rings: Vec<Vec<Vec3>> = depths.iter().map(|&z| ring(n, radius(z), z)).collect();
+    b.paint(ACCENT).pattern(pattern::MOLTEN);
+    for pair in rings.windows(2) {
+        wall(b, &pair[0], &pair[1]);
     }
     b.paint(GLOW_LAMP).pattern(pattern::NONE);
     b.face(rings.last().expect("the bore has a floor"));
@@ -277,18 +283,18 @@ fn wall(b: &mut MeshBuilder, upper: &[Vec3], lower: &[Vec3]) {
     }
 }
 
-/// The armoured collar round the mouth: a plated ring stepped down to the opening, clamp
-/// blocks round it, its inner lip lit red.
+/// The armoured collar round the funnel: a low plated ring stepped down to the opening,
+/// clamp blocks round it, its inner lip lit red.
 fn collar_ring(b: &mut MeshBuilder, tech: u8) {
-    let mouth = MOUTH[tech as usize - 1];
+    let mouth = FUNNEL[tech as usize - 1];
     let n = b.sides(16);
     let out = mouth + COLLAR_W;
     dark_plate(b);
     // Outer face, top and inner face down to the opening, one surface.
     let rings = [
-        ring(n, out + 0.4, 0.0),
+        ring(n, out + 0.3, 0.0),
         ring(n, out, COLLAR_TOP),
-        ring(n, mouth + 0.3, COLLAR_TOP),
+        ring(n, mouth + 0.2, COLLAR_TOP),
         ring(n, mouth, OPEN),
     ];
     for pair in rings.windows(2) {
@@ -304,17 +310,17 @@ fn collar_ring(b: &mut MeshBuilder, tech: u8) {
             let a = (22.5 + 45.0 * k as f32).to_radians();
             let d = v3(a.cos(), a.sin(), 0.0);
             b.beam(
-                d * (mouth + 0.6) + Vec3::Z * COLLAR_TOP,
-                d * (out + 0.4) + Vec3::Z * 0.45,
-                Vec2::new(0.7, 0.5),
-                Vec2::new(0.9, 0.4),
+                d * (mouth + 0.7) + Vec3::Z * (COLLAR_TOP - 0.15),
+                d * (out + 0.3) + Vec3::Z * 0.3,
+                Vec2::new(0.6, 0.35),
+                Vec2::new(0.8, 0.3),
             );
         }
         b.paint(GLOW_LASER).pattern(pattern::NONE);
         wall(
             b,
-            &ring(n, mouth + 0.02, OPEN + 0.25),
-            &ring(n, mouth + 0.02, OPEN + 0.05),
+            &ring(n, mouth + 0.03, OPEN + 0.2),
+            &ring(n, mouth + 0.03, OPEN + 0.05),
         );
     }
 }

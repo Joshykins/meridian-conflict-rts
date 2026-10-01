@@ -542,6 +542,18 @@ shared! {
         pub const GLOW_MATERIAL: u32 = 27;
     }
 
+    /// Rock a beam has melted: the walls of a Regency mine's bore (`pattern::MOLTEN`,
+    /// surface.wgsl). A glassy crust over a glowing melt, its cracks lit, the melt running
+    /// down; hotter the deeper it goes and the higher the mine's tier.
+    pub mod melt as "MELT_" {
+        /// `pattern::MOLTEN`.
+        pub const PATTERN: u32 = 31;
+        /// How fast the melt runs down the walls, metres a second.
+        pub const RUN_SPEED: f32 = 0.6;
+        /// Metres below the opening where the walls reach full heat.
+        pub const DEEP: f32 = 14.0;
+    }
+
     /// Bits of a selection mark's `kind` (renderer `Mark`, icons.wgsl `fs_ring`).
     pub mod mark as "MARK_" {
         /// Hovered; without it the mark is a selection.

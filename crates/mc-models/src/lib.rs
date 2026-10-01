@@ -145,7 +145,11 @@ pub mod pattern {
     /// and while the unit reclaims a stream of glowing clumps falling down it, in model z,
     /// so a spiral or a raked run carries the same fall (`gpu_consts::mass`).
     pub const MASS_FLOW: u32 = crate::gpu_consts::mass::FLOW_PATTERN;
-    pub const LAST: u32 = MASS_FLOW;
+    /// Rock melted by a beam (`ACCENT` faces): a dark glassy crust broken by glowing cracks
+    /// over a melt that runs down, hotter with depth below model z = 0 and with the tier
+    /// (`gpu_consts::melt`). A Regency mine's bore.
+    pub const MOLTEN: u32 = crate::gpu_consts::melt::PATTERN;
+    pub const LAST: u32 = MOLTEN;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
