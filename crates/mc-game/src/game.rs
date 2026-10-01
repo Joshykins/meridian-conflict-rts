@@ -4339,7 +4339,7 @@ impl Game {
             }
         }
         let fresh = self.pull_sim();
-        self.rain_here = renderer.rain_here();
+        self.rain_here = self.rain_heard(renderer);
         self.thunder(renderer.take_thunder(), audio);
         self.ambience_frame(renderer, audio, dt);
         let alpha = ((now - self.published_at).as_secs_f32() / self.interp_span).clamp(0.0, 1.0);

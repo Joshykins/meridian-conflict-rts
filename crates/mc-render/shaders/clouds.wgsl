@@ -869,6 +869,8 @@ struct RainOut {
     // x along the streak (0 head, 1 tail), y across it (-1 to 1), z strength,
     // w how far the clouds on screen lie between the eye and the drop (0 to 1).
     @location(0) streak: vec4<f32>,
+    // 1 for a snowflake (`snowfall_at`): streak.xy then run across a round flake.
+    @location(1) snow: f32,
 }
 
 @vertex
@@ -907,12 +909,24 @@ fn vs_rain(@builtin(vertex_index) vertex: u32, @builtin(instance_index) drop: u3
     // Falls about its column's height in a second and a half, whatever the layer,
     // so on screen close and far rain fall alike: brisk, not drifting.
     let column = span * 0.75;
-    let fall = column / mix(1.2, 1.8, h.w);
-    let slant = atmos.wind.zw * 0.022;
+    var fall = column / mix(1.2, 1.8, h.w);
+    var slant = atmos.wind.zw * 0.022;
+    // Where it is cold enough it falls as snow (`snowfall_at`; where rain and snow
+    // country meet, some of each): a flake comes down a fifth as fast as a drop,
+    // carried further by the wind and wandering as it goes.
+    let snow = snowfall_at(xy) > h.y;
+    if snow {
+        fall *= 0.2;
+        slant *= 3.0;
+    }
     let phase = fract(h.z - atmos.weather.w * fall / column);
     let ground = terrain_height(xy);
     // Phase runs down as the drop falls, so it is carried downwind as it goes.
     xy -= slant * column * (phase - 0.5);
+    if snow {
+        let t = atmos.weather.w;
+        xy += vec2<f32>(sin(t * 0.9 + h.z * 40.0), cos(t * 0.7 + h.w * 40.0)) * span * 0.012;
+    }
     let z = ground + phase * column;
     let rain = weather_at(xy).w;
     // Light rain is fewer drops, not fainter ones.
@@ -944,6 +958,13 @@ fn vs_rain(@builtin(vertex_index) vertex: u32, @builtin(instance_index) drop: u3
     let base = cloud_floor(eye.xy) + atmos.layer.x - 60.0;
     let behind = smoothstep(base - 60.0, base + 120.0, eye.z);
     out.streak = vec4<f32>(along, side, min(rain * 1.6, 1.0) * mix(0.55, 1.0, h.y) * weight * edge, behind);
+    if snow {
+        // A flake: a round dot a few pixels across, not a streak.
+        let size = mix(1.3, 2.4, h.w);
+        let corner_px = vec2<f32>(side, along * 2.0 - 1.0) * size;
+        out.clip = vec4<f32>(ch.xy + corner_px * 2.0 * globals.viewport.zw * ch.w, ch.zw);
+        out.snow = 1.0;
+    }
     return out;
 }
 
@@ -955,12 +976,18 @@ fn fs_rain(in: RainOut) -> @location(0) vec4<f32> {
     let edge = 1.0 - abs(in.streak.y);
     let fade = smoothstep(0.0, 0.15, in.streak.x) * (1.0 - smoothstep(0.55, 1.0, in.streak.x));
     var a = edge * fade * in.streak.z * 0.42;
+    var color = atmos.sky_color.rgb * 1.8 + atmos.sun_color.rgb * 0.08;
+    if in.snow > 0.5 {
+        // Soft, round and whiter than rain's grey streak.
+        let r = length(vec2<f32>(in.streak.x * 2.0 - 1.0, in.streak.y));
+        a = (1.0 - smoothstep(0.3, 1.0, r)) * in.streak.z * 0.7;
+        color = atmos.sky_color.rgb * 2.4 + atmos.sun_color.rgb * 0.3;
+    }
     if in.streak.w > 0.0 {
         let uv = in.clip.xy / vec2<f32>(textureDimensions(scene_depth));
         let cover = cloud_cover(uv, textureSampleLevel(cloud_now, clamp_sampler, uv, 0.0).a);
         a *= 1.0 - cover * in.streak.w;
     }
-    let color = atmos.sky_color.rgb * 1.8 + atmos.sun_color.rgb * 0.08;
     return vec4<f32>(color * a, a);
 }
 

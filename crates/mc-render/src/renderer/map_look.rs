@@ -60,6 +60,11 @@ impl Renderer {
         self.sky.set_divide(self.look.divide.clone());
     }
 
+    /// How the map is drawn now: its look as `set_map_look` took it.
+    pub fn map_look(&self) -> &MapLook {
+        &self.look
+    }
+
     pub(super) fn climate_globals(&self) -> ClimateGlobals {
         let (divide, points) = crate::sky::divide_points(self.look.divide.as_ref());
         let east = self

@@ -475,6 +475,14 @@ impl MapLook {
             _ => self.climate,
         }
     }
+
+    /// Whether what falls from the clouds at a map position is snow, not rain: on
+    /// the temperate side of a climate divide, on a map whose file carries a snow
+    /// layer (`snow_layer`). The alpine side of such a map is cold enough for it;
+    /// any other map keeps its rain. (shaders/bindings.wgsl `snowfall_at`.)
+    pub fn snows_at(&self, x: f32, y: f32, snow_layer: bool) -> bool {
+        snow_layer && self.divide.is_some() && self.climate_at(x, y) == Climate::Temperate
+    }
 }
 
 /// The land a map is set in, as the map browser files it.
@@ -733,6 +741,11 @@ mod tests {
             MapLook::single(Climate::Tropical).climate_at(12000.0, 1000.0),
             Climate::Tropical
         );
+        // Snow falls on the temperate side, if the map's file has a snow layer.
+        assert!(look.snows_at(12000.0, 1000.0, true));
+        assert!(!look.snows_at(12000.0, 1000.0, false));
+        assert!(!look.snows_at(1000.0, 1000.0, true));
+        assert!(!MapLook::default().snows_at(12000.0, 1000.0, true));
         // A map without one: the defaults, and no east side.
         let plain = MapConfig::parse("(climate: Desert)").unwrap();
         assert_eq!((plain.strata_lift, plain.divide.is_none()), (0.0, true));

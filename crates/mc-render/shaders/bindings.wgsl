@@ -66,6 +66,18 @@ fn tropical_at(xy: vec2<f32>, px: f32) -> f32 {
     return climate_at(xy, px).x;
 }
 
+// How much of what falls from the clouds over `xy` is snow rather than rain, 0-1: on
+// the temperate side of a climate divide, on a map that carries a snow layer (the
+// alpine side of such a map); nowhere on any other map. mc_data's `MapLook::snows_at`
+// is the same.
+fn snowfall_at(xy: vec2<f32>) -> f32 {
+    if !divided() {
+        return 0.0;
+    }
+    let climate = climate_within(xy, DIVIDE_SKY_BLEND_M);
+    return (1.0 - climate.x - climate.y) * ground_snow_at(xy).z;
+}
+
 // The foot of the climate wall that stands on a divide's line: a line of Precursor
 // light on the ground and the sea, the cold blue-white of their working parts
 // (entity.wgsl `MAT_GLOW_PRECURSOR`). A bright core a few metres wide, never thinner
