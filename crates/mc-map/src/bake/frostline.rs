@@ -758,11 +758,15 @@ impl Terrain {
         let reach = 0.16 - 0.2 * smoothstep(LOW + 4.0, UPLAND - 4.0, h);
         let low = 0.62 * smoothstep(reach, reach + 0.2, drift) * smoothstep(5.0, 11.0, h);
         let snow = high.max(low) * (1.0 - smoothstep(0.75, 1.5, slope));
+        // Ice where water ran on the heights: the couloirs and gullies it cut
+        // hold glaciers now, and the highest gentle ground a cap.
+        let couloir = smoothstep(-7.0, -18.0, self.erosion.at(x, y)) * smoothstep(150.0, 230.0, h);
         let cap = smoothstep(
-            250.0,
-            340.0,
+            330.0,
+            420.0,
             h + 60.0 * self.mtn_mask.get(x / 900.0 + 5.0, y / 900.0),
-        ) * (1.0 - smoothstep(0.35, 0.7, slope));
+        ) * (1.0 - smoothstep(0.3, 0.6, slope));
+        let cap = cap.max(couloir);
         let floor = self.fl_frozen(x, y);
         (east * cap.max(floor), east * snow * (1.0 - floor))
     }
