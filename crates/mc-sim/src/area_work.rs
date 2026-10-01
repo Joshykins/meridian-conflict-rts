@@ -46,6 +46,7 @@ impl World {
                 && wrecks.pos[w] == e.pos
                 && wrecks.mass[w] > Fx::ZERO
                 && e.pos.distance(centre) <= radius + e.radius
+                && self.wreck_known(w, owner)
         });
         match wreck {
             Some(e) => {

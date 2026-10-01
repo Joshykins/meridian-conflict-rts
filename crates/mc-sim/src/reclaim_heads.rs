@@ -203,6 +203,7 @@ impl World {
                     && wrecks.pos[w] == e.pos
                     && wrecks.mass[w] > Fx::ZERO
                     && e.pos.distance(pos) <= r.range + e.radius
+                    && self.wreck_known(w, units.owner[row])
                 {
                     let turn = if turns {
                         aim.delta_to((e.pos - origin).angle()).unsigned_abs() as i64

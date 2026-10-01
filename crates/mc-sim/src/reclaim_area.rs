@@ -226,6 +226,7 @@ impl World {
                 && wrecks.pos[w] == e.pos
                 && wrecks.mass[w] > Fx::ZERO
                 && given_up != Some(w)
+                && self.wreck_known(w, owner)
                 && (e.pos.distance(pos) <= sweep + e.radius
                     || (circle && e.pos.distance(centre) <= radius + e.radius))
         };

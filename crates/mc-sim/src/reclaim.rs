@@ -56,8 +56,9 @@ pub const BEAM_RELAY: u32 = 3;
 impl World {
     /// Whether `player` knows of wreck `w`: a settled wreck is salvage to plan around, so
     /// it counts anywhere the player's team has explored, not only in sight, and the
-    /// map's own wreckage from the start. What the player is shown (`push_wrecks`) and
-    /// what a drone carrier goes for (`carrier_wants`) follow this one rule.
+    /// map's own wreckage from the start. What the player is shown (`push_wrecks`, the
+    /// Ctrl survey) and every wreck a reclaimer picks for itself (area and guard work,
+    /// idle salvage, reclaim heads, drone carriers) follow this one rule.
     pub(crate) fn wreck_known(&self, w: usize, player: u8) -> bool {
         let s = &self.state;
         !s.fog_enabled
@@ -406,6 +407,7 @@ impl World {
             wrecks.slots.is_alive(w)
                 && wrecks.pos[w] == e.pos
                 && e.pos.distance(pos) <= range + e.radius
+                && self.wreck_known(w, owner)
         };
         let found = if self.aims_to_work(row) {
             // Something that has to turn onto its work takes the wreck it is nearest to
