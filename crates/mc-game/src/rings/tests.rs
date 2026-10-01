@@ -39,7 +39,7 @@ fn rings_follow_the_data() {
     assert_eq!(
         of(&b, "aster_t3_assault_bot"),
         vec![
-            (Reach::Direct, 0, 0.0, 780.0),
+            (Reach::Direct, 0, 0.0, 400.0),
             (Reach::Torpedo, 0, 0.0, 600.0)
         ]
     );
