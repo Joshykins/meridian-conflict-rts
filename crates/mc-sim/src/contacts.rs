@@ -101,18 +101,18 @@ impl World {
             let mut pushed_any = false;
             for (turn, ran) in turns.iter().zip(&mut ran) {
                 step += 1;
-                let live: Vec<usize> = (0..turn.len())
+                let mut live: Vec<usize> = (0..turn.len())
                     .filter(|&t| {
                         let (when, pushed) = ran[t];
                         pushed || turn[t].units.iter().any(|&k| moved[k] > when)
                     })
                     .collect();
                 mc_core::perf_count!("move.tile_runs", live.len());
-                // A few tiles to a worker: one tile is too little work to hand out.
-                let chunk = live
-                    .len()
-                    .div_ceil(self.pool.thread_count().max(1) * 2)
-                    .max(1);
+                // Biggest first, a tile at a time: the workers take them in turn, and
+                // a crowd's dense tile no longer leaves the rest waiting on its chunk.
+                // The tiles of a turn share no hull, so the order changes nothing.
+                live.sort_by_key(|&t| std::cmp::Reverse(turn[t].pairs.len()));
+                let chunk = 1;
                 let done: Vec<Vec<(bool, Vec<FxVec2>)>> =
                     self.pool
                         .parallel_map_chunks(live.len(), chunk, |_, range| {

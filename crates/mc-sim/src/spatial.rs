@@ -60,6 +60,11 @@ const WIDE_QUERY: Fx = Fx::from_int(512);
 /// Cell edge shift of the coarse grid.
 const WIDE_SHIFT: u32 = 7;
 
+/// A nearest search reads this far round its centre first, then four times as
+/// far, and so on out to its reach: in a crowd the nearest is near, and the
+/// rest of a gun's reach need never be read.
+const NEAREST_FIRST: Fx = Fx::from_int(48);
+
 /// The big-entry grids hold, again, the entries wider than each of these
 /// radii, metres. A search for hulls bigger than the one asking (a tank
 /// looking out for a Fulgur) reads the grids of the widest floor under its
@@ -116,6 +121,12 @@ impl Layer {
     /// (row, column, insertion) order.
     fn build(&mut self) {
         let n = self.staged.len();
+        if n == 0 {
+            // Nothing to sort: `scan` reads an empty layer as nothing.
+            self.sorted.clear();
+            self.cell_x.clear();
+            return;
+        }
         self.scratch.clear();
         self.scratch.resize(n, (0, 0, EMPTY));
         stable_scatter(
@@ -265,6 +276,10 @@ pub struct SpatialIndex {
     /// stains), in kind order: a search for units never walks past the scorch
     /// marks of a battle, nor one for aircraft past the army under them.
     kinds: Vec<(u8, Grids)>,
+    /// The unit kinds' grids again, one set per owner: a search for enemies
+    /// reads only the players it is after, never the shooter's own army
+    /// round it. (Their big-entry grids stay empty.)
+    by_owner: Vec<Vec<(u8, Grids)>>,
 }
 
 impl SpatialIndex {
@@ -280,11 +295,16 @@ impl SpatialIndex {
             owners_height: h,
             unit_radius: Fx::ZERO,
             kinds: Vec::new(),
+            by_owner: Vec::new(),
         }
     }
 
     pub fn clear(&mut self) {
-        for (_, grids) in &mut self.kinds {
+        for (_, grids) in self
+            .kinds
+            .iter_mut()
+            .chain(self.by_owner.iter_mut().flatten())
+        {
             for layer in grids.all_layers() {
                 layer.clear();
             }
@@ -301,28 +321,33 @@ impl SpatialIndex {
         )
     }
 
-    /// Whether a unit of a player outside `friends` may touch the circle.
-    fn foe_near(&self, center: FxVec2, radius: Fx, friends: PlayerMask) -> bool {
+    /// The players with a unit that may touch the circle.
+    fn owners_near(&self, center: FxVec2, radius: Fx) -> PlayerMask {
         let reach = radius + self.unit_radius;
         let (x0, y0) = self.owner_cell(FxVec2::new(center.x - reach, center.y - reach));
         let (x1, y1) = self.owner_cell(FxVec2::new(center.x + reach, center.y + reach));
-        (y0..=y1).any(|y| {
+        (y0..=y1).fold(0, |near, y| {
             let row = &self.owners[(y * self.owners_width) as usize..];
             row[x0 as usize..=x1 as usize]
                 .iter()
-                .any(|&m| m & !friends != 0)
+                .fold(near, |near, &m| near | m)
         })
+    }
+
+    /// The grids of `kind`, made the first time one is asked for.
+    fn grids_of(list: &mut Vec<(u8, Grids)>, kind: u8, size: FxVec2) -> &mut Grids {
+        let slot = match list.binary_search_by_key(&kind, |(k, _)| *k) {
+            Ok(i) => i,
+            Err(i) => {
+                list.insert(i, (kind, Grids::new(size)));
+                i
+            }
+        };
+        &mut list[slot].1
     }
 
     #[inline]
     pub fn insert(&mut self, kind: u8, owner: u8, row: usize, pos: FxVec2, radius: Fx) {
-        let slot = match self.kinds.binary_search_by_key(&kind, |(k, _)| *k) {
-            Ok(i) => i,
-            Err(i) => {
-                self.kinds.insert(i, (kind, Grids::new(self.map_size)));
-                i
-            }
-        };
         let at = LAYERS
             .iter()
             .position(|&(_, most)| radius <= Fx::from_int(most))
@@ -334,12 +359,24 @@ impl SpatialIndex {
             pos,
             radius,
         };
-        if kind & UNIT_KINDS != 0 {
+        let stage = |layer: &mut Layer| {
+            let (cx, cy) = layer.cell(pos);
+            layer.max_radius = layer.max_radius.max(radius);
+            layer.staged.push((cx, cy, entry));
+        };
+        if kind & UNIT_KINDS != 0 && owner != NO_OWNER {
             let (x, y) = self.owner_cell(pos);
             self.owners[(y * self.owners_width + x) as usize] |= owner_bit(owner);
             self.unit_radius = self.unit_radius.max(radius);
+            let owner = owner as usize % PlayerMask::BITS as usize;
+            if self.by_owner.len() <= owner {
+                self.by_owner.resize_with(owner + 1, Vec::new);
+            }
+            let grids = Self::grids_of(&mut self.by_owner[owner], kind, self.map_size);
+            stage(&mut grids.layers[at]);
+            stage(&mut grids.wide);
         }
-        let grids = &mut self.kinds[slot].1;
+        let grids = Self::grids_of(&mut self.kinds, kind, self.map_size);
         let wider = BIG_FLOORS
             .iter()
             .take_while(|&&floor| radius > Fx::from_int(floor))
@@ -347,15 +384,17 @@ impl SpatialIndex {
         let (layers, wide, big) = (&mut grids.layers, &mut grids.wide, &mut grids.big);
         let bigs = big[..wider].iter_mut().map(|layers| &mut layers[at]);
         for layer in [&mut layers[at], wide].into_iter().chain(bigs) {
-            let (cx, cy) = layer.cell(pos);
-            layer.max_radius = layer.max_radius.max(radius);
-            layer.staged.push((cx, cy, entry));
+            stage(layer);
         }
     }
 
     /// Sorts staged entries into cells. Stable, so insertion order survives within a cell.
     pub fn build(&mut self) {
-        for (_, grids) in &mut self.kinds {
+        for (_, grids) in self
+            .kinds
+            .iter_mut()
+            .chain(self.by_owner.iter_mut().flatten())
+        {
             for layer in grids.all_layers() {
                 layer.build();
             }
@@ -379,8 +418,10 @@ impl SpatialIndex {
     }
 
     /// [`query`](Self::query) that passes over entries owned by the players in
-    /// `friends` (bit `p` for player `p`) before any test: a gun looking for an
-    /// enemy in the middle of its own army never sees the army.
+    /// `friends` (bit `p` for player `p`): a gun looking for an enemy in the
+    /// middle of its own army never reads the army. A search for units alone
+    /// reads the grids of each other player near, in player order (then kind,
+    /// layer and cell); any other reads the kinds' grids, skipping friends.
     pub fn query_foes(
         &self,
         center: FxVec2,
@@ -391,10 +432,43 @@ impl SpatialIndex {
     ) {
         let (mut tested, mut hits, mut cells) = (0u64, 0u64, 0i64);
         mc_core::perf_count!("spatial.queries");
-        // Only units have owners: a search for them alone can ask the owner
-        // map first whether any enemy is near at all.
-        if friends != 0 && kinds & !UNIT_KINDS == 0 && !self.foe_near(center, radius, friends) {
-            mc_core::perf_count!("spatial.no_foe");
+        // Only units have owners: a search for them alone asks the owner map
+        // which enemies are near at all, and reads only their grids.
+        if friends != 0 && kinds & !UNIT_KINDS == 0 {
+            let mut foes = self.owners_near(center, radius) & !friends;
+            if foes == 0 {
+                mc_core::perf_count!("spatial.no_foe");
+            }
+            'owners: while foes != 0 {
+                let owner = foes.trailing_zeros() as usize;
+                foes &= foes - 1;
+                let Some(list) = self.by_owner.get(owner) else {
+                    continue;
+                };
+                for (_, grids) in list.iter().filter(|(k, _)| k & kinds != 0) {
+                    let layers = if radius >= WIDE_QUERY {
+                        std::slice::from_ref(&grids.wide)
+                    } else {
+                        &grids.layers[..]
+                    };
+                    for layer in layers {
+                        if !layer.scan(
+                            center,
+                            radius,
+                            0,
+                            &mut tested,
+                            &mut hits,
+                            &mut cells,
+                            &mut visit,
+                        ) {
+                            break 'owners;
+                        }
+                    }
+                }
+            }
+            mc_core::perf_count!("spatial.cells", cells);
+            mc_core::perf_count!("spatial.tested", tested);
+            mc_core::perf_count!("spatial.hits", hits);
             return;
         }
         'kinds: for (_, grids) in self.kinds.iter().filter(|(k, _)| k & kinds != 0) {
@@ -473,7 +547,8 @@ impl SpatialIndex {
 
     /// Nearest entry accepted by `accept`, by centre distance. Ties go to the
     /// entry found first: the lower kind, then the smaller layer (a wide
-    /// search has one), then the lower cell, then the lower insertion order.
+    /// search has one), then the lower cell, then the lower insertion order
+    /// (for a foe search, the lower owner before all of those).
     pub fn nearest(
         &self,
         center: FxVec2,
@@ -494,15 +569,32 @@ impl SpatialIndex {
         friends: PlayerMask,
         mut accept: impl FnMut(&Entry) -> bool,
     ) -> Option<Entry> {
-        let mut best: Option<(Fx, Entry)> = None;
-        self.query_foes(center, radius, kinds, friends, |e| {
-            let d = e.pos.distance_sq(center);
-            if best.as_ref().is_none_or(|(bd, _)| d < *bd) && accept(e) {
-                best = Some((d, *e));
+        let mut within = |r: Fx| {
+            let mut best: Option<(Fx, Entry)> = None;
+            self.query_foes(center, r, kinds, friends, |e| {
+                let d = e.pos.distance_sq(center);
+                if best.as_ref().is_none_or(|(bd, _)| d < *bd) && accept(e) {
+                    best = Some((d, *e));
+                }
+                true
+            });
+            best
+        };
+        // Short of a wide search, a smaller circle reads the same layers in the
+        // same order, so the nearest it finds no further out than its own radius
+        // is the answer for the whole reach, ties and all: everything it did not
+        // read lies further out than that. (`accept` is asked again on a wider
+        // ring; it only reads.)
+        let mut r = NEAREST_FIRST;
+        while r < radius && radius < WIDE_QUERY {
+            if let Some((d, e)) = within(r) {
+                if d <= r * r {
+                    return Some(e);
+                }
             }
-            true
-        });
-        best.map(|(_, e)| e)
+            r = r * 4;
+        }
+        within(radius).map(|(_, e)| e)
     }
 }
 
@@ -581,6 +673,55 @@ mod tests {
             });
             // The same entries in the same order: callers may keep the first of a tie.
             assert_eq!(got, want, "query {q}");
+        }
+    }
+
+    /// The ring-by-ring nearest search gives the answer of one search over the
+    /// whole reach, the first found of a tie included.
+    #[test]
+    fn nearest_matches_one_full_search() {
+        let size = FxVec2::from_ints(4096, 4096);
+        let mut index = SpatialIndex::new(size);
+        let mut rng = Rng::new(11);
+        for row in 0..4000 {
+            // On a 4 m lattice in places, so ties in distance are common.
+            let pos = if row % 3 == 0 {
+                FxVec2::from_ints(
+                    rng.below(200) as i32 * 4 + 1000,
+                    rng.below(200) as i32 * 4 + 1000,
+                )
+            } else {
+                FxVec2::new(rng.range(Fx::ZERO, size.x), rng.range(Fx::ZERO, size.y))
+            };
+            let radius = match row % 60 {
+                0 => rng.range(Fx::from_int(17), Fx::from_int(64)),
+                _ => rng.range(Fx::ONE, Fx::from_int(12)),
+            };
+            index.insert(kind::UNIT, (row % 4) as u8, row, pos, radius);
+        }
+        index.build();
+        for q in 0..400 {
+            let c = if q % 2 == 0 {
+                FxVec2::from_ints(
+                    rng.below(200) as i32 * 4 + 1000,
+                    rng.below(200) as i32 * 4 + 1000,
+                )
+            } else {
+                FxVec2::new(rng.range(Fx::ZERO, size.x), rng.range(Fx::ZERO, size.y))
+            };
+            let r = rng.range(Fx::ONE, Fx::from_int(600));
+            let friends: PlayerMask = 1 << (q % 4);
+            let kept = |e: &Entry| !e.row.is_multiple_of(7);
+            let mut best: Option<(Fx, Entry)> = None;
+            index.query_foes(c, r, kind::UNIT, friends, |e| {
+                let d = e.pos.distance_sq(c);
+                if best.as_ref().is_none_or(|(bd, _)| d < *bd) && kept(e) {
+                    best = Some((d, *e));
+                }
+                true
+            });
+            let got = index.nearest_foe(c, r, kind::UNIT, friends, kept);
+            assert_eq!(got.map(|e| e.row), best.map(|(_, e)| e.row), "query {q}");
         }
     }
 

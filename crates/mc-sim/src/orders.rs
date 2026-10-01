@@ -1663,14 +1663,16 @@ impl World {
             let mut near: Vec<(Fx, usize)> = Vec::new();
             self.index.query_foes(pos, r, kind::UNIT, friends, |e| {
                 let t = e.row as usize;
-                let distance = pos.distance(e.pos);
-                if distance > inner
-                    && distance <= reach + e.radius
+                // In the ring, `inner < distance <= reach + e.radius`, decided
+                // on the squared length: a wider ring reads the inner ones again.
+                let d = pos - e.pos;
+                if !d.shorter_than(Fx(inner.0 + 1))
+                    && d.shorter_than(Fx(reach.0 + e.radius.0 + 1))
                     && self.unit_entry_is_current(e)
                     && self.air_can_harass(row, t)
                     && self.hittable(t, mask)
                 {
-                    near.push((distance, t));
+                    near.push((d.length(), t));
                 }
                 true
             });

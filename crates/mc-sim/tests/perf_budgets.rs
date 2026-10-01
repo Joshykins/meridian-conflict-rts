@@ -290,7 +290,10 @@ fn eight_armies_clash() {
 /// crowd there is); `:pairs` sets each army on its neighbour on a 3 km ring,
 /// one battle per two sides as a big match plays; `:idle` spreads the armies
 /// 20 m apart on that ring and gives no orders; `:ai` makes every side an AI
-/// with a commander and the army to run.
+/// with a commander and the army to run; `:clash` is `:pairs` with the ring
+/// drawn in so two armies' front ranks start 200 m apart, in a fight at once. A fourth field sets the metres
+/// between units as they spawn (`2:32000:ai:16`: formation spacing, where the
+/// default packs them overlapping, the worst crowd to untangle).
 ///
 /// With `MERIDIAN_SCALE_SERIAL=1` the tick runs on this thread alone and the
 /// table ends with its CPU time per tick, which a machine busy with other
@@ -307,11 +310,18 @@ fn zz_scale_probe() {
         let total: u32 = parts[1].parse().unwrap();
         let serial = std::env::var("MERIDIAN_SCALE_SERIAL").is_ok_and(|v| v == "1");
         let threads = serial.then_some(0);
+        let gap = |default| parts.get(3).map_or(default, |g| g.parse().unwrap());
         let mut w = match parts.get(2) {
-            Some(&"idle") => armies(players, total, 3000.0, 20, Plan::Idle, threads),
-            Some(&"pairs") => armies(players, total, 3000.0, 6, Plan::Pairs, threads),
-            Some(&"ai") => armies(players, total, 3000.0, 6, Plan::Ai, threads),
-            _ => armies(players, total, 900.0, 6, Plan::Pile, threads),
+            Some(&"idle") => armies(players, total, 3000.0, gap(20), Plan::Idle, threads),
+            Some(&"pairs") => armies(players, total, 3000.0, gap(6), Plan::Pairs, threads),
+            Some(&"ai") => armies(players, total, 3000.0, gap(6), Plan::Ai, threads),
+            Some(&"clash") => {
+                // `armies` lays each army out within this of its point on the ring.
+                let half = ((total / players as u32 / 3) as f32).sqrt() as i32 * gap(6) + 50;
+                let radius = (half + 100) as f32;
+                armies(players, total, radius, gap(6), Plan::Pairs, threads)
+            }
+            _ => armies(players, total, 900.0, gap(6), Plan::Pile, threads),
         };
         let cpu_before = thread_cpu_ns();
         let report = w
