@@ -266,7 +266,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if look == 1u {
         trace = length(stride) * 0.5;
     } else if look == 2u {
-        trace = length(stride) * 1.1;
+        trace = length(stride) * 1.4;
     } else if look == 3u {
         trace = length(stride) * 0.85;
     } else if look == 4u {
@@ -325,8 +325,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if (p.color & 0x800u) != 0u {
         width_px *= 1.45;
     }
-    // Pinched: tight; a thrown charge: its containment is wider than the core it holds.
-    width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.2, look == 4u);
+    // Pinched: tight; fusion: a broad prism sheath round its core; a thrown charge: its
+    // containment is wider than the core it holds.
+    width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.2, look == 4u)
+        * select(1.0, 1.9, look == 2u);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -881,14 +883,20 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
                 return vec4<f32>(rgb * in.color.r, 1.0);
             }
             if in.shape.y > 8.1 {
-                // Pinch-fusion: the squeezed stream carries fusion events, bright white bursts
-                // strobing along it, each swelling the core for an instant.
-                let cell = u * 3.0 - time * 16.0;
-                let burst = exp(-pow(fract(cell) - 0.5, 2.0) * 90.0)
-                    * step(0.35, hash11(floor(cell) + 7.1));
-                let core = pow(across, mix(7.0, 2.2, burst));
-                let rgb = red * pow(across, 1.8) * 3.0 * (0.4 + 0.6 * u)
-                    + white * core * (6.0 + 22.0 * burst) * smoothstep(0.0, 0.25, u);
+                // Pinch-fusion: a white-hot core of fusing plasma in a broad sheath of the
+                // prism's pinks (the Bifrost), patches of colour drifting back along it and
+                // cooling to red toward the tail; fusion events strobe down it, bright white
+                // bursts each swelling the core and flaring the sheath for an instant.
+                let cell = u * 4.0 - time * 22.0;
+                let burst = exp(-pow(fract(cell) - 0.5, 2.0) * 70.0)
+                    * step(0.3, hash11(floor(cell) + 7.1));
+                let core = pow(across, mix(9.0, 2.6, burst));
+                let drift = value_noise2(vec2<f32>(u * 5.0 - time * 9.0, in.uv.y * 2.0), 1.0);
+                let hue = prism(u * 1.3 + drift * 0.8 - time * PRISM_RATE * 4.0);
+                let sheath = mix(red * 1.4, hue, smoothstep(0.1, 0.6, u)) * pow(across, 1.5)
+                    * (3.6 + 4.0 * burst) * (0.3 + 0.7 * u);
+                let rgb = sheath + white * core * (14.0 + 30.0 * burst) * smoothstep(0.0, 0.2, u)
+                    + vec3<f32>(1.0) * pow(across, 14.0) * 20.0 * smoothstep(0.75, 1.0, u);
                 return vec4<f32>(rgb * in.color.r, 1.0);
             }
             // Pinched-plasmeric: a tight dense stream, a white-hot core in a thin red rim,

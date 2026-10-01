@@ -285,11 +285,14 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     rails part, its lens heads slide out, its coils light from the breech
     going white, its gimbal cage spins up; after the shot its radiators vent
     and it cools). It launches with a blinding white flash and a cone of
-    fusion, a great white-hot round arcing a little onto its mark (laid flat,
-    `flat_fire`) with a long wake cooling through pink and red behind it,
-    opens where it lands white with the prism in its fringe and cools back to
-    red, throws a column of plasma up and a lumpy skirt of it out over the
-    ground, melts the ground into a wide glowing pool, and leaves a knot of
+    fusion, pinching out a jet of fusion, long and fast (a white-hot core in a
+    sheath of the prism, the fastest Regency shot), arcing a little onto its
+    mark (laid flat, `flat_fire`) with a long wake taking the prism and
+    cooling through pink and red behind it. Where it lands it is far bigger
+    and brighter than any lower grade: a blinding flash, opening white with
+    the prism in its fringe and billowing out in lumps before it cools back to
+    red; it throws a column of plasma up, streaks and globs out and lightning
+    into the ground, rolls a lumpy skirt of plasma out over the ground, melts the ground into a wide glowing pool, and leaves a knot of
     fusion burning over it for seconds, slowly letting white lightning go
     while red sparkles cool off the edges.
   - **No spirals, no rings:** the plasma boils, churns and billows in cells

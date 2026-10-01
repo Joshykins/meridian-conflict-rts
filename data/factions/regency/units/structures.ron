@@ -377,11 +377,11 @@
         sounds: (death: "blast_large"),
     ),
     // The tech 3 point defence: a Pinch-fusion Cannon. Its charge is squeezed until it
-    // fuses (over two seconds, going white), then launched as one shot that melts the
-    // ground where it lands and leaves a knot of fusion burning there. Near the Citadel's
-    // weight a shot, a little of it splashed. The shot is laid a little up and arcs onto
-    // its mark (`flat_fire`: a direct-fire gun, not artillery), so it reaches over a rise
-    // in the ground; at full reach the gun stands some 8 degrees up. Model:
+    // fuses (over two seconds, going white), then launched as one shot, the fastest of any
+    // Regency gun, that melts the ground where it lands and leaves a knot of fusion burning
+    // there. Near the Citadel's weight a shot, a little of it splashed. The shot is laid a
+    // little up and arcs onto its mark (`flat_fire`: a direct-fire gun, not artillery), so
+    // it reaches over a low rise in the ground; it crosses its full reach in 1.5 s. Model:
     // `regency_fusion_cannon` (`models::regency::turrets::sunspear`), the Citadel's size.
     (
         key: "regency_t3_point_defense",
@@ -395,7 +395,7 @@
         vision: 360,
         weapons: [(
             name: "Pinch-fusion Cannon",
-            damage: 3400, splash: 8, range: 1200, reload: 7.5, speed: 450, trajectory: Ballistic,
+            damage: 3400, splash: 8, range: 1200, reload: 7.5, speed: 1350, trajectory: Ballistic,
             loft: 0.6, flat_fire: true,
             turret_turn: 18, muzzle: (35, 0, 19.04), pivot: (0, 0, 19.04),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,

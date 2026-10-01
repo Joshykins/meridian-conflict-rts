@@ -24,11 +24,13 @@
 //!   white at the heart with the prism's pinks drifting over it, its light white and
 //!   strobing. It launches with a blinding white flash, a cone of plasma thrown out down
 //!   the line of fire, globs thrown off round the bore and arcs snapping forward; heat
-//!   rises off the gun's back. In flight a great white-hot round trails a long wake of
-//!   fusion that cools through pink and red as it hangs, shedding sparks. Where it lands
-//!   it opens white with the prism in its fringe and cools back to red, a column of plasma
-//!   rising out of it, a lumpy skirt of it rolling out over the ground and globs thrown
-//!   wide; the ground melted into a wide glowing pool and a knot of fusion left burning
+//!   rises off the gun's back. The shot is a jet of fusion pinched out, long and fast: a
+//!   white-hot core in a broad sheath of the prism, strobing, and behind it a white thread
+//!   in a long wake that takes the prism and cools through pink and red as it hangs,
+//!   shedding sparks. Where it lands it opens in a blinding flash, white with the prism
+//!   in its fringe, billowing out in lumps and cooling back to red, a column of plasma
+//!   rising out of it, a lumpy skirt of it rolling out over the ground, streaks and globs
+//!   flung wide and lightning thrown into the ground round it; the ground melted into a wide glowing pool and a knot of fusion left burning
 //!   over it for seconds, slowly letting white lightning go into the ground round it while
 //!   red sparkles cool and drift off the edges.
 //!
@@ -83,7 +85,7 @@ const MAX_WAKE_PUFFS: usize = 900;
 /// Pinch-fusion round's.
 /// A Pinched jet's rounds each lay one over the same path, so theirs are far apart.
 const BOLT_WAKE: (f32, f32) = (6.4, 0.9);
-const FUSION_WAKE: (f32, f32) = (2.2, 2.4);
+const FUSION_WAKE: (f32, f32) = (2.5, 2.8);
 
 /// What a direct-fire Regency plasma gun is drawn as.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -326,30 +328,44 @@ impl Renderer {
                 let fat = if fusion { 0.3 } else { 0.7 };
                 let puff = p.size * fat * (1.0 + 0.5 * self.scatter.unit());
                 if fusion {
+                    // A white-hot thread where the round passed, gone in a moment, in a
+                    // broad sheath of fusion that takes the prism and hangs, cooling
+                    // through pink and red.
+                    let roll0 = self.scatter.unit();
+                    self.push_lit(
+                        WAKE,
+                        from.lerp(to, f),
+                        Vec3::ZERO,
+                        when,
+                        0.35 + 0.2 * roll0,
+                        (p.size * 0.22, p.size * 0.4),
+                        WHITE * 7.0,
+                        1.0,
+                    );
                     let roll0 = self.scatter.unit();
                     let roll1 = self.scatter.unit();
                     self.push_lit(
                         WAKE,
                         at,
-                        drift * 1.5,
+                        drift * 2.0,
                         when,
                         life * (0.8 + 0.4 * roll0),
-                        (puff, puff * 2.8),
-                        WHITE.lerp(HOT, 0.2 + 0.4 * roll1) * 2.6,
-                        0.7,
+                        (puff * 1.4, puff * 4.0),
+                        WHITE.lerp(HOT, 0.1 + 0.3 * roll1) * 4.2,
+                        1.0,
                     );
-                    if self.scatter.unit() < 0.35 {
-                        let dot = 0.3 + 0.3 * self.scatter.unit();
+                    if self.scatter.unit() < 0.5 {
+                        let dot = 0.35 + 0.35 * self.scatter.unit();
                         let roll0 = self.scatter.unit();
                         let roll1 = self.scatter.unit();
                         self.push_lit(
                             MOTE,
                             at,
-                            drift * 6.0 - Vec3::Z * 3.0,
+                            drift * 8.0 - Vec3::Z * 3.0,
                             when,
-                            0.7 + 0.6 * roll0,
+                            0.8 + 0.8 * roll0,
                             (dot, dot * 0.4),
-                            RED.lerp(HOT, roll1) * 4.0,
+                            WHITE.lerp(HOT, roll1) * 5.0,
                             0.0,
                         );
                     }
@@ -643,8 +659,8 @@ impl Renderer {
                     Vec3::ZERO,
                     time,
                     0.3,
-                    (s * 2.4, s * 4.0),
-                    WHITE * 7.0,
+                    (s * 2.8, s * 4.8),
+                    WHITE * 12.0,
                     0.0,
                 );
                 self.push_lit(
@@ -1171,15 +1187,20 @@ impl Renderer {
         ground: bool,
         start: f32,
     ) {
-        let s = (size * 1.6).max(splash * 1.3) * impact;
+        // The pool and the knot keep the old strike's size; the blast itself is far bigger.
+        let pool = (size * 1.6).max(splash * 1.3) * impact;
+        let s = pool * 1.8;
+        // A blinding white flash, then the fusion opening white with the prism in its
+        // fringe, then the red body it cools to. The flash stands up off the ground: as wide
+        // as it is, the ground would cut its lower half off flat.
         self.push_lit(
             GLOW,
-            at,
+            at + Vec3::Z * s * 0.45,
             Vec3::ZERO,
             start,
-            0.35,
-            (s * 0.9, s * 1.6),
-            WHITE * 9.0,
+            0.45,
+            (s * 0.9, s * 1.9),
+            WHITE * 16.0,
             0.0,
         );
         self.push_lit(
@@ -1187,45 +1208,68 @@ impl Renderer {
             at,
             Vec3::ZERO,
             start,
-            0.5,
-            (s * 0.4, s * 1.6),
-            WHITE * 3.4,
+            0.7,
+            (s * 0.5, s * 1.7),
+            WHITE * 6.0,
             1.0,
         );
         self.push_lit(
             BURST,
             at + Vec3::Z * s * 0.15,
             Vec3::ZERO,
-            start + 0.12,
-            1.6,
-            (s * 0.5, s * 2.0),
-            RED * 2.8,
+            start + 0.15,
+            2.0,
+            (s * 0.6, s * 2.0),
+            RED * 3.4,
             0.0,
         );
+        // Lumps of fusion bursting out of it at their own places and moments, so the
+        // blast billows rather than opening as one disc.
+        for _ in 0..9 {
+            let off = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                0.2 + 0.8 * self.scatter.unit(),
+            ) * s
+                * 0.45;
+            let lump = s * (0.35 + 0.25 * self.scatter.unit());
+            let when = start + 0.03 + self.scatter.unit() * 0.2;
+            let roll0 = self.scatter.unit();
+            self.push_lit(
+                BURST,
+                at + off,
+                Vec3::ZERO,
+                when,
+                0.8 + 0.6 * roll0,
+                (lump * 0.4, lump * 1.4),
+                WHITE.lerp(HOT, 0.3) * 4.0,
+                1.0,
+            );
+        }
         // A column of plasma rising out of it: white low down and early, cooling to red
         // as it climbs and swells.
-        for k in 0..14 {
-            let f = k as f32 / 14.0;
+        for k in 0..22 {
+            let f = k as f32 / 22.0;
             let lean = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 0.12;
-            let puff = s * (0.32 + 0.16 * self.scatter.unit());
+            let puff = s * (0.3 + 0.16 * self.scatter.unit());
             let roll0 = self.scatter.unit();
             self.push_lit(
                 WAKE,
                 at + Vec3::Z * s * 0.1,
-                (Vec3::Z + lean) * s * (1.0 + 2.6 * f),
-                start + 0.05 + f * 0.25,
-                1.6 + 0.8 * roll0,
-                (puff, puff * (2.2 + f)),
-                WHITE.lerp(RED, 0.25 + 0.6 * f) * (3.2 - f),
-                0.9 - 0.6 * f,
+                (Vec3::Z + lean) * s * (1.2 + 3.0 * f),
+                start + 0.05 + f * 0.3,
+                1.8 + 1.0 * roll0,
+                (puff, puff * (2.4 + f)),
+                WHITE.lerp(RED, 0.2 + 0.6 * f) * (4.0 - 1.4 * f),
+                1.0 - 0.6 * f,
             );
         }
         // A lumpy skirt of plasma rolling out over the ground, not a ring: puffs at their
         // own bearings, speeds and sizes.
-        for _ in 0..16 {
+        for _ in 0..26 {
             let a = self.scatter.unit() * std::f32::consts::TAU;
             let out = Vec3::new(a.cos(), a.sin(), 0.08);
-            let puff = s * (0.2 + 0.15 * self.scatter.unit());
+            let puff = s * (0.18 + 0.15 * self.scatter.unit());
             let roll0 = self.scatter.unit();
             let roll1 = self.scatter.unit();
             let roll2 = self.scatter.unit();
@@ -1233,16 +1277,57 @@ impl Renderer {
             self.push_lit(
                 WAKE,
                 at + out * s * 0.2 + Vec3::Z * s * 0.06,
-                out * s * (1.2 + 1.4 * roll0),
+                out * s * (1.4 + 1.6 * roll0),
                 start + 0.05 + roll1 * 0.12,
-                1.2 + 0.6 * roll2,
-                (puff, puff * 2.4),
-                HOT.lerp(RED, 0.3 + 0.5 * roll3) * 2.6,
-                0.5,
+                1.4 + 0.8 * roll2,
+                (puff, puff * 2.6),
+                WHITE.lerp(RED, 0.2 + 0.6 * roll3) * 3.4,
+                0.8,
+            );
+        }
+        self.fusion_spray(at, s, start);
+        if ground {
+            self.bore_fx.melt(at.truncate(), pool * 0.65, start, 18.0);
+        }
+        self.plasma_fx.guns.light(Glow {
+            pos: at + Vec3::Z * 6.0,
+            color: WHITE * 4000.0 * impact,
+            range: s * 5.0,
+            start,
+            life: 1.1,
+            pulse: 0.0,
+        });
+        self.fusion_knot(at, pool * 0.7, impact, start);
+    }
+
+    /// What a Pinch-fusion strike of size `s` throws out of itself: streaks of fusion
+    /// flung out, globs of it in place of a shock ring, white lightning into the ground
+    /// round it, and sparks.
+    fn fusion_spray(&mut self, at: Vec3, s: f32, start: f32) {
+        // Streaks of fusion flung out of it, each at its own bearing and reach.
+        for _ in 0..10 {
+            let out = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                0.1 + self.scatter.unit() * 0.9,
+            )
+            .normalize_or(Vec3::Z);
+            let reach = s * (0.5 + 0.7 * self.scatter.unit());
+            let when = start + self.scatter.unit() * 0.08;
+            let roll0 = self.scatter.unit();
+            self.push_lit(
+                STREAK,
+                at + Vec3::Z * 0.5,
+                out * reach,
+                when,
+                0.5 + 0.3 * roll0,
+                (s * 0.05, s * 0.05),
+                WHITE.lerp(HOT, roll0) * 6.0,
+                0.0,
             );
         }
         // Globs of fusion thrown out of it, in place of a shock ring.
-        for _ in 0..20 {
+        for _ in 0..32 {
             let out = Vec3::new(
                 self.scatter.signed(),
                 self.scatter.signed(),
@@ -1250,29 +1335,48 @@ impl Renderer {
             )
             .normalize_or(Vec3::Z);
             let speed = s * (1.8 + 2.4 * self.scatter.unit());
-            let blob = s * (0.05 + 0.05 * self.scatter.unit());
-            let tint = HOT.lerp(RED, self.scatter.unit());
+            let blob = s * (0.04 + 0.04 * self.scatter.unit());
+            let tint = WHITE.lerp(RED, self.scatter.unit());
             let when = start + self.scatter.unit() * 0.12;
             self.push_lit(
                 GLOB,
                 at,
                 out * speed,
                 when,
-                1.1,
+                1.3,
                 (blob, blob * 0.4),
-                tint * 4.0,
+                tint * 5.0,
                 0.0,
             );
         }
-        for _ in 0..36 {
+        // White lightning thrown into the ground round it as it opens.
+        for _ in 0..10 {
+            let a = self.scatter.unit() * std::f32::consts::TAU;
+            let r = s * (0.5 + 0.7 * self.scatter.unit());
+            let to = at + Vec3::new(a.cos() * r, a.sin() * r, 0.0);
+            let to = to.with_z(self.ground_height(to.truncate()) + 0.2);
+            let from = at + Vec3::Z * s * 0.2;
+            let when = start + self.scatter.unit() * 0.25;
+            self.push_lit(
+                ARC,
+                from,
+                to - from,
+                when,
+                0.16,
+                (s * 0.06, s * 0.06),
+                WHITE * 8.0,
+                0.0,
+            );
+        }
+        for _ in 0..60 {
             let out = Vec3::new(
                 self.scatter.signed(),
                 self.scatter.signed(),
                 0.2 + self.scatter.unit() * 0.8,
             )
             .normalize_or(Vec3::Z);
-            let speed = 25.0 + self.scatter.unit() * 55.0;
-            let life = 0.7 + self.scatter.unit() * 0.8;
+            let speed = 40.0 + self.scatter.unit() * 80.0;
+            let life = 0.8 + self.scatter.unit() * 1.0;
             let tint = WHITE.lerp(RED, self.scatter.unit());
             self.push_lit(
                 MOTE,
@@ -1280,23 +1384,11 @@ impl Renderer {
                 out * speed,
                 start,
                 life,
-                (0.45, 0.15),
-                tint * 4.0,
+                (0.6, 0.2),
+                tint * 5.0,
                 0.0,
             );
         }
-        if ground {
-            self.bore_fx.melt(at.truncate(), s * 0.55, start, 18.0);
-        }
-        self.plasma_fx.guns.light(Glow {
-            pos: at + Vec3::Z * 4.0,
-            color: WHITE * 1400.0 * impact,
-            range: s * 6.0,
-            start,
-            life: 0.8,
-            pulse: 0.0,
-        });
-        self.fusion_knot(at, s * 0.7, impact, start);
     }
 
     /// The knot of fusion a Pinch-fusion strike leaves burning over its pool (`s` the

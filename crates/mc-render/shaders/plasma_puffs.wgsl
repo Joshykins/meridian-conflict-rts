@@ -154,7 +154,8 @@ fn plasma_burst(in: PuffOut, d: f32) -> vec4<f32> {
 }
 
 // A plasma shot's wake: a soft, lumpy puff of glowing plasma, white-hot at its heart while
-// fresh, its colour in the body, cooling through deep red to nothing as it swells.
+// fresh, its colour in the body, cooling through deep red to nothing as it swells. Gone
+// over to fusion, its body takes the prism's pinks in drifting patches while it is hot.
 fn plasma_wake(in: PuffOut, d: f32) -> vec4<f32> {
     let seed = in.state.z;
     let age = in.state.x;
@@ -170,9 +171,11 @@ fn plasma_wake(in: PuffOut, d: f32) -> vec4<f32> {
     let heat = 1.0 - smoothstep(0.0, 0.65, age);
     let ember = vec3<f32>(level * 0.45, level * 0.025, level * 0.012);
     let churn = value_noise2(in.uv * 5.0 + vec2<f32>(-age * 3.0, seed * 11.0), 1.0);
+    let hue = prism(lumps + churn * 0.4 + seed + age * 0.6);
     var c = mix(ember, rgb * (0.75 + 0.6 * churn), heat);
+    c = mix(c, hue * level * (0.7 + 0.6 * churn), fusion * fusion * heat * 0.75);
     c += vec3<f32>(level * 0.9, level * 0.8, level * 0.8) * pow(field, 4.0) * (1.0 - smoothstep(0.0, 0.3, age));
-    c += prism(lumps + churn * 0.4 + seed) * level * fusion * heat * field * 0.7;
+    c += hue * level * fusion * heat * field * 0.9;
     let fade = pow(1.0 - age, 1.6);
     return vec4<f32>(c * body * fade * (0.55 + 0.6 * lumps), 0.0);
 }
