@@ -437,6 +437,8 @@ fn a_commander_ai_plays_deterministically_and_restores_from_a_snapshot() {
             .is_some_and(|m| m.plans.iter().any(|p| p.level > 0)),
         "the Commander holds plans"
     );
+    // For `scripts/determinism-cross.sh`: the planning AI on Windows and Linux.
+    eprintln!("determinism: commander_ai final {:016x}", a[a.len() - 1]);
 }
 
 /// The AI spreads its yard and guards mass points instead of stacking

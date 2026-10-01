@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Runs the determinism matrix on Linux (WSL) and on Windows and compares the final
+# Runs the determinism matrix, and a match played by the planning AI
+# (battle::a_commander_ai...), on Linux (WSL) and on Windows and compares the final
 # hashes. Lockstep peers on the two platforms must agree bit for bit; the tests
 # alone only prove that each build agrees with itself.
 #
@@ -12,12 +13,12 @@ cd "$(dirname "$0")/.."
 filter() { { grep -aoE 'determinism: [a-z_]+ final [0-9a-f]+' || true; } | sort; }
 
 # A failing build or test shows as missing hashes below, not as a silent exit here.
-linux=$(cargo test -q --release -p mc-sim --test sim -- determinism:: --nocapture 2>&1 | filter) || true
+linux=$(cargo test -q --release -p mc-sim --test sim -- determinism:: battle::a_commander_ai --nocapture 2>&1 | filter) || true
 repo_win=$(wslpath -w "$PWD")
 windows=$(powershell.exe -NoProfile -Command "
     \$env:CARGO_TARGET_DIR = \"\$env:TEMP\\meridian-target-determinism\"
     Set-Location '$repo_win'
-    cargo test -q --release -p mc-sim --test sim -- determinism:: --nocapture 2>&1 | Out-String
+    cargo test -q --release -p mc-sim --test sim -- determinism:: battle::a_commander_ai --nocapture 2>&1 | Out-String
 " | filter) || true  # PowerShell exits 1 whenever cargo wrote to stderr
 
 echo "linux:   ${linux:-<no hashes; did the tests fail?>}"
