@@ -27,6 +27,10 @@ struct Habitat {
     canopy: f32,
     sand_w: f32,
     rock_face: f32,
+    // Canyon country: how trodden the ground is (ground_way_at, its edge made
+    // ragged), 0-1; a trail's floor from about 0.5 (canyon_trail_floor), its
+    // margin below that. 0 off the desert.
+    way: f32,
     // ground_snow_at: glacier ice, lying snow, 1 on a map with a snow layer.
     layer: vec3<f32>,
     lying: f32,
@@ -42,6 +46,12 @@ struct Habitat {
     // 3 mossy litter, 4 needle floor, 5 scree, 6 dry dirt, 7 high rock, 8 sand,
     // 9 mud. 0 unused (the cliff face is `rock_face`).
     w: array<f32, 10>,
+}
+
+// A canyon trail's floor, 0-1, from Habitat::way (its margin is
+// canyon_trail_margin in desert.wgsl).
+fn canyon_trail_floor(way: f32) -> f32 {
+    return smoothstep(0.4, 0.6, way);
 }
 
 // The habitat at `xy`, whose ground stands at `z` with normal `base_n`. `px` is
@@ -109,9 +119,13 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         let wash = smoothstep(0.18, 0.55, concavity + (fine - 0.5) * 0.16 + (patchy - 0.5) * 0.14)
             * smoothstep(3.0, 8.0, alt);
         sand_w = max(beach, wash * 0.8) * (1.0 - smoothstep(0.04, 0.12, slope + (fine - 0.5) * 0.03));
+        // The trails down the walls (the map's ways layer, 16 m samples): the
+        // ground's own patchiness frays their edges.
+        h.way = clamp(ground_way_at(xy) + (fine - 0.5) * 0.35 + (patchy - 0.5) * 0.2, 0.0, 1.0);
+        sand_w *= 1.0 - canyon_trail_floor(h.way);
     }
     h.sand_w = sand_w;
-    let rock_face = smoothstep(0.10, 0.27, slope + (patchy - 0.5) * 0.12);
+    let rock_face = smoothstep(0.10, 0.27, slope + (patchy - 0.5) * 0.12) * (1.0 - canyon_trail_floor(h.way) * 0.8);
     h.rock_face = rock_face;
     // Snow on the heights, and whatever the map's snow layer lays: its 16 m
     // samples get a ragged edge from the ground's own patchiness, and it
@@ -333,7 +347,7 @@ fn grass_share(h: Habitat) -> vec4<f32> {
         // never a field: none in the old lake bed, on sand or on anything steep.
         let benches = smoothstep(58.0, 70.0, h.alt);
         let d = 0.05 * h.open * benches * (1.0 - h.rock_face) * (1.0 - smoothstep(0.05, 0.12, h.slope))
-            * (0.3 + 1.2 * smoothstep(0.35, 0.75, h.tussock));
+            * (0.3 + 1.2 * smoothstep(0.35, 0.75, h.tussock)) * (1.0 - smoothstep(0.1, 0.5, h.way));
         return vec4<f32>(d, 0.0, 1.0, 0.0);
     }
     let lush = ws[1];

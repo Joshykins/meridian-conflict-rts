@@ -226,18 +226,35 @@ const FOLIAGE_BASE: i32 = 20;
 // r: canopy closure overhead, g: how much of it is conifer. Built from the
 // map's trees (ground_cover.rs); one texel covers map size / dimensions.
 // b, a: glacier ice and lying snow from the map's snow layer.
-@group(0) @binding(20) var ground_cover: texture_2d<f32>;
+// Layer 1, from the map's ways layer: r = how trodden the ground is, g, b =
+// the trail's heading as cos 2a, sin 2a (0.5 = 0).
+@group(0) @binding(20) var ground_cover: texture_2d_array<f32>;
 
 fn ground_cover_at(xy: vec2<f32>) -> vec2<f32> {
     let uv = xy / globals.map.xy;
-    return textureSampleLevel(ground_cover, clamp_sampler, uv, 0.0).rg;
+    return textureSampleLevel(ground_cover, clamp_sampler, uv, 0, 0.0).rg;
+}
+
+// How trodden the ground is, 0-1: 1 on a trail's floor (canyon_trail).
+fn ground_way_at(xy: vec2<f32>) -> f32 {
+    let uv = xy / globals.map.xy;
+    return textureSampleLevel(ground_cover, clamp_sampler, uv, 1, 0.0).r;
+}
+
+// Which way the trail at `xy` runs: a unit vector (either way along it).
+fn ground_way_heading(xy: vec2<f32>) -> vec2<f32> {
+    let uv = xy / globals.map.xy;
+    let t = textureSampleLevel(ground_cover, clamp_sampler, uv, 1, 0.0).gb * 2.0 - 1.0;
+    // Halve the doubled angle.
+    let a = 0.5 * atan2(t.y, t.x);
+    return vec2<f32>(cos(a), sin(a));
 }
 
 // x: glacier ice, y: lying snow, from the map's snow layer; z: 1 on a map
 // that has one (the layer's snow is stored from 1/255 up), else 0.
 fn ground_snow_at(xy: vec2<f32>) -> vec3<f32> {
     let uv = xy / globals.map.xy;
-    let t = textureSampleLevel(ground_cover, clamp_sampler, uv, 0.0).ba;
+    let t = textureSampleLevel(ground_cover, clamp_sampler, uv, 0, 0.0).ba;
     let layered = step(0.5 / 255.0, t.y);
     return vec3<f32>(t.x, max(t.y - 1.0 / 255.0, 0.0) * (255.0 / 254.0), layered);
 }

@@ -7,7 +7,7 @@ use super::{
     MAX_MAP_WRECKS, MAX_ORE_CORNERS, MAX_ORE_REGIONS, MAX_WRECK_KEY, TILE_OVERVIEW_SAMPLES,
     WRECK_RECORD_LEN,
 };
-use crate::{MAX_PROPS, MAX_START_POSITIONS};
+use crate::{MapFile, MAX_PROPS, MAX_START_POSITIONS};
 use mc_core::{Fx, FxVec2};
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
@@ -23,6 +23,7 @@ pub struct MapWriter {
     overview: Vec<u16>,
     snow: Vec<u8>,
     wrecks: Vec<MapWreck>,
+    ways: Vec<u8>,
     pos: u64,
 }
 
@@ -41,6 +42,7 @@ impl MapWriter {
             overview: vec![0; (ow * oh) as usize],
             snow: Vec::new(),
             wrecks: Vec::new(),
+            ways: Vec::new(),
             pos: reserved as u64,
             info,
         })
@@ -62,6 +64,32 @@ impl MapWriter {
             )));
         }
         self.snow = layer;
+        Ok(())
+    }
+
+    /// Gives the map a ways layer: `(wear, cos 2a, sin 2a)` byte triples on
+    /// the snow layer's grid ([`MapInfo::snow_dims`]), row-major.
+    pub fn set_ways(&mut self, layer: Vec<u8>) -> Result<(), MapError> {
+        let (w, h) = self.info.snow_dims();
+        if layer.len() != (w * h * 3) as usize {
+            return Err(MapError::Invalid(format!(
+                "a ways layer of {} bytes; this map's is {}",
+                layer.len(),
+                w * h * 3
+            )));
+        }
+        self.ways = layer;
+        Ok(())
+    }
+
+    /// Carries over a map's renderer layers (snow, ways) when rewriting it.
+    pub fn keep_layers(&mut self, file: &MapFile) -> Result<(), MapError> {
+        if let Some(snow) = file.snow() {
+            self.set_snow(snow.to_vec())?;
+        }
+        if let Some(ways) = file.ways() {
+            self.set_ways(ways.to_vec())?;
+        }
         Ok(())
     }
 
@@ -227,19 +255,26 @@ impl MapWriter {
             buf.extend_from_slice(&(r.points.len() as u32).to_le_bytes());
         }
         self.out.write_all(&buf)?;
+        // `buf` holds the props and the markers.
+        let mut at = layout.props_offset + buf.len() as u64;
         if !self.snow.is_empty() {
-            // `buf` holds the props and the markers.
-            layout.snow_offset = layout.props_offset + buf.len() as u64;
+            layout.snow_offset = at;
             self.out.write_all(&self.snow)?;
+            at += self.snow.len() as u64;
         }
         if !self.wrecks.is_empty() {
             let mut bytes = Vec::with_capacity(self.wrecks.len() * WRECK_RECORD_LEN);
             for w in &self.wrecks {
                 write_wreck(w, &mut bytes);
             }
-            layout.wrecks_offset = layout.props_offset + buf.len() as u64 + self.snow.len() as u64;
+            layout.wrecks_offset = at;
             layout.wreck_count = self.wrecks.len() as u32;
             self.out.write_all(&bytes)?;
+            at += bytes.len() as u64;
+        }
+        if !self.ways.is_empty() {
+            layout.ways_offset = at;
+            self.out.write_all(&self.ways)?;
         }
 
         let id = content_id(
@@ -251,6 +286,7 @@ impl MapWriter {
             ore,
             &self.snow,
             &self.wrecks,
+            &self.ways,
         );
         self.out.seek(SeekFrom::Start(0))?;
         self.out.write_all(&write_header(&info, id, &layout))?;

@@ -1,7 +1,8 @@
 //! What grows on the ground, from the map's trees: the terrain shader lays
 //! forest floor and canopy shade where the forests actually stand, instead of
 //! guessing from noise that has nothing to do with where the baker put them.
-//! A map with a snow layer adds its glacier ice and lying snow.
+//! A map with a snow layer adds its glacier ice and lying snow, one with a
+//! ways layer the trails trodden into it.
 
 use crate::keep::{kept, Kept};
 use mc_map::{MapFile, PropKind};
@@ -20,6 +21,10 @@ pub struct GroundCover {
     /// that canopy is conifer, b = glacier ice, a = lying snow (1 to 255 on a
     /// map with a snow layer, 0 on one without).
     pub texels: Vec<u8>,
+    /// The second layer, the same size, RGBA8, from the map's ways layer: r =
+    /// how trodden the ground is (0 everywhere on a map without one), g, b =
+    /// the trail's heading as cos 2a, sin 2a (0.5 = 0).
+    pub ways: Vec<u8>,
 }
 
 /// A tree's crown radius at scale 1 in metres, and how much of it is conifer
@@ -80,34 +85,63 @@ fn ground_cover_made(map: &MapFile) -> GroundCover {
     if let Some(snow) = map.snow() {
         let (sw, sh) = map.info().snow_dims();
         let pitch = (mc_map::CELL_SIZE_M as u32 * mc_map::format::SNOW_STRIDE) as f32;
-        let at = |x: usize, y: usize, c: usize| {
-            snow[(y.min(sh as usize - 1) * sw as usize + x.min(sw as usize - 1)) * 2 + c] as f32
-        };
-        for y in 0..h {
-            for x in 0..w {
-                // Texel centre in snow samples, bilinear between the four round it.
-                let (sx, sy) = (
-                    ((x as f32 + 0.5) * cell / pitch),
-                    ((y as f32 + 0.5) * cell / pitch),
-                );
-                let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
-                let (fx, fy) = (sx.fract(), sy.fract());
-                for c in 0..2 {
-                    let v = (at(x0, y0, c) * (1.0 - fx) + at(x0 + 1, y0, c) * fx) * (1.0 - fy)
-                        + (at(x0, y0 + 1, c) * (1.0 - fx) + at(x0 + 1, y0 + 1, c) * fx) * fy;
-                    // Snow is kept off zero, so the shader can tell a map
-                    // with a snow layer (it lays only the layer's snow) from
-                    // one without (it lays snow by height).
-                    let v = if c == 1 { 1.0 + v * 254.0 / 255.0 } else { v };
-                    texels[(y * w + x) * 4 + 2 + c] = v.round() as u8;
-                }
-            }
+        let ice: Vec<u8> = snow.iter().step_by(2).copied().collect();
+        let lying: Vec<u8> = snow.iter().skip(1).step_by(2).copied().collect();
+        resample(&ice, (sw, sh), pitch, cell, (w, h), |i, v| {
+            texels[i * 4 + 2] = v.round() as u8;
+        });
+        resample(&lying, (sw, sh), pitch, cell, (w, h), |i, v| {
+            // Snow is kept off zero, so the shader can tell a map with a snow
+            // layer (it lays only the layer's snow) from one without (it lays
+            // snow by height).
+            texels[i * 4 + 3] = (1.0 + v * 254.0 / 255.0).round() as u8;
+        });
+    }
+    let mut ways = vec![0u8; w * h * 4];
+    if let Some(layer) = map.ways() {
+        let (sw, sh) = map.info().snow_dims();
+        let pitch = (mc_map::CELL_SIZE_M as u32 * mc_map::format::SNOW_STRIDE) as f32;
+        for c in 0..3 {
+            let channel: Vec<u8> = layer.iter().skip(c).step_by(3).copied().collect();
+            resample(&channel, (sw, sh), pitch, cell, (w, h), |i, v| {
+                ways[i * 4 + c] = v.round() as u8;
+            });
         }
     }
     GroundCover {
         width: w as u32,
         height: h as u32,
         texels,
+        ways,
+    }
+}
+
+/// A layer of `(sw, sh)` byte samples `pitch` metres apart, read bilinearly at
+/// the centre of each of the `(w, h)` texels `cell` metres across; `put` gets
+/// each texel's index and value (0 to 255).
+fn resample(
+    layer: &[u8],
+    (sw, sh): (u32, u32),
+    pitch: f32,
+    cell: f32,
+    (w, h): (usize, usize),
+    mut put: impl FnMut(usize, f32),
+) {
+    let at = |x: usize, y: usize| {
+        layer[y.min(sh as usize - 1) * sw as usize + x.min(sw as usize - 1)] as f32
+    };
+    for y in 0..h {
+        for x in 0..w {
+            let (sx, sy) = (
+                (x as f32 + 0.5) * cell / pitch,
+                (y as f32 + 0.5) * cell / pitch,
+            );
+            let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
+            let (fx, fy) = (sx.fract(), sy.fract());
+            let v = (at(x0, y0) * (1.0 - fx) + at(x0 + 1, y0) * fx) * (1.0 - fy)
+                + (at(x0, y0 + 1) * (1.0 - fx) + at(x0 + 1, y0 + 1) * fx) * fy;
+            put(y * w + x, v);
+        }
     }
 }
 

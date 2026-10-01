@@ -1792,11 +1792,12 @@ impl Renderer {
             height: cover.height,
             format: vk::Format::R8G8B8A8_UNORM,
             usage: sampled,
-            layers: 1,
+            layers: 2,
             mips: 1,
-            array: false,
+            array: true,
         })?;
         gpu.upload_image(&ground_cover, 0, 0, None, &cover.texels, true)?;
+        gpu.upload_image(&ground_cover, 1, 0, None, &cover.ways, false)?;
         let pad_res = models::PAD_FOOTPRINT_RES;
         let pad_footprints = gpu.image(&ImageDesc {
             width: pad_res,

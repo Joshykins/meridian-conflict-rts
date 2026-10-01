@@ -722,9 +722,7 @@ mod tests {
                     .unwrap();
             }
         }
-        if let Some(snow) = file.snow() {
-            writer.set_snow(snow.to_vec()).unwrap();
-        }
+        writer.keep_layers(&file).unwrap();
         writer.set_wrecks(file.wrecks().to_vec()).unwrap();
         writer
             .finish(props, file.start_positions(), file.ore_regions())

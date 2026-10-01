@@ -279,9 +279,7 @@ pub fn stamp(path: &Path, symmetry: Symmetry, seed: u64) -> Result<WreckageRepor
             writer.push_tile(&encode_tile(&file.read_tile(tx, ty)?))?;
         }
     }
-    if let Some(snow) = file.snow() {
-        writer.set_snow(snow.to_vec())?;
-    }
+    writer.keep_layers(&file)?;
     writer.set_wrecks(wrecks.into_iter().map(|(w, _)| w).collect())?;
     let starts = file.start_positions().to_vec();
     let ore = file.ore_regions().to_vec();

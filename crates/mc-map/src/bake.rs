@@ -285,6 +285,11 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     } else {
         Vec::new()
     };
+    let mut ways = if terrain.has_ways() {
+        vec![0u8; (snow_w * snow_h * 3) as usize]
+    } else {
+        Vec::new()
+    };
 
     std::thread::scope(|s| -> Result<(), MapError> {
         // Bounded, so workers stall rather than pile up tiles if the disk is slow.
@@ -320,6 +325,18 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
                 }
                 tile.snow = Vec::new();
             }
+            if !tile.ways.is_empty() {
+                // Likewise the ways layer, three bytes per sample.
+                let n = SNOW_PER_TILE;
+                let (tx, ty) = (index as u32 % params.tiles_w, index as u32 / params.tiles_w);
+                for j in 0..n {
+                    let row = (ty * (n - 1) + j) * snow_w + tx * (n - 1);
+                    let (at, from) = (row as usize * 3, (j * n) as usize * 3);
+                    ways[at..at + n as usize * 3]
+                        .copy_from_slice(&tile.ways[from..from + n as usize * 3]);
+                }
+                tile.ways = Vec::new();
+            }
             early.insert(index, tile);
             while let Some(tile) = early.remove(&writer.tiles_written()) {
                 writer.push_tile(&tile.encoded)?;
@@ -349,6 +366,9 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         .collect();
     if !snow.is_empty() {
         writer.set_snow(snow)?;
+    }
+    if !ways.is_empty() {
+        writer.set_ways(ways)?;
     }
     let content_id = writer.finish(props, &starts, &ore)?;
 
@@ -392,6 +412,9 @@ struct BakedTile {
     land_samples: u64,
     /// `(ice, snow)` pairs, [`SNOW_PER_TILE`] squared; empty on maps without snow.
     snow: Vec<u8>,
+    /// `(wear, cos 2a, sin 2a)` triples, [`SNOW_PER_TILE`] squared; empty on
+    /// maps without trails.
+    ways: Vec<u8>,
 }
 
 /// Snow layer samples along one tile edge, shared edge included.
@@ -763,6 +786,11 @@ impl Terrain {
     /// Whether the map carries a snow layer.
     fn has_snow(&self) -> bool {
         self.is_alpine() || self.layout == Layout::Threshold
+    }
+
+    /// Whether the map carries a ways layer: the canyon's trails.
+    fn has_ways(&self) -> bool {
+        self.layout == Layout::Canyon
     }
 
     fn is_alpine(&self) -> bool {
@@ -1287,11 +1315,17 @@ impl Terrain {
         } else {
             Vec::new()
         };
+        let ways = if self.has_ways() {
+            self.tile_ways(x0, y0)
+        } else {
+            Vec::new()
+        };
         BakedTile {
             encoded: encode_tile(&samples),
             props,
             land_samples,
             snow,
+            ways,
         }
     }
 
@@ -1323,6 +1357,24 @@ impl Terrain {
                 let ice = ice * self.machine_ice(x, y);
                 out.push((ice.clamp(0.0, 1.0) * 255.0).round() as u8);
                 out.push((snow.clamp(0.0, 1.0) * 255.0).round() as u8);
+            }
+        }
+        out
+    }
+
+    /// The ways layer over one tile, on the snow layer's grid.
+    fn tile_ways(&self, x0: f64, y0: f64) -> Vec<u8> {
+        let per = SNOW_PER_TILE as usize;
+        let pitch = SNOW_STRIDE as f64 * CELL_SIZE_M as f64;
+        let byte = |v: f64| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+        let mut out = Vec::with_capacity(per * per * 3);
+        for sj in 0..per {
+            for si in 0..per {
+                let (x, y) = (x0 + si as f64 * pitch, y0 + sj as f64 * pitch);
+                let (wear, (dx, dy)) = self.trail_wear(x, y);
+                // The heading doubled: a trail runs both ways.
+                let (c, s) = (dx * dx - dy * dy, 2.0 * dx * dy);
+                out.extend([byte(wear), byte(0.5 + 0.5 * c), byte(0.5 + 0.5 * s)]);
             }
         }
         out

@@ -558,7 +558,7 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     var shrub: CanyonShrubs;
     if desert() {
         let bushes = canyon_shrub_density(xy, canyon_bed_alt(xy, hab.alt), hab.alt, hab.slope, hab.sand_w,
-            hab.canopy, hab.patchy);
+            hab.canopy, hab.patchy, hab.way);
         shrub = canyon_shrubs(xy, bushes, 0.02);
         if shrub.cover > 0.5 {
             density = push.tune.y;

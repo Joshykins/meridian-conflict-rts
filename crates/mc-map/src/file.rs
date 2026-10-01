@@ -26,6 +26,7 @@ pub struct MapFile {
     starts: Vec<FxVec2>,
     ore: Vec<OreRegion>,
     snow: Vec<u8>,
+    ways: Vec<u8>,
     wrecks: Vec<MapWreck>,
 }
 
@@ -113,6 +114,14 @@ impl MapFile {
             }
         };
 
+        let ways = match layout.ways_offset {
+            0 => Vec::new(),
+            at => {
+                let (w, h) = info.snow_dims();
+                section(at, (w * h * 3) as usize)?
+            }
+        };
+
         let wrecks = match layout.wrecks_offset {
             0 => Vec::new(),
             at => {
@@ -134,6 +143,7 @@ impl MapFile {
             starts: points,
             ore,
             snow,
+            ways,
             wrecks,
         })
     }
@@ -224,6 +234,14 @@ impl MapFile {
         (!self.snow.is_empty()).then_some(&self.snow[..])
     }
 
+    /// The trails: `(wear, cos 2a, sin 2a)` byte triples on the snow layer's
+    /// grid ([`MapInfo::snow_dims`]), row-major: how trodden the ground is (a
+    /// trail's floor 255) and the trail's heading (128 = 0). `None` for a map
+    /// without trails. For the renderer only.
+    pub fn ways(&self) -> Option<&[u8]> {
+        (!self.ways.is_empty()).then_some(&self.ways[..])
+    }
+
     /// Wreckage the map starts with; empty for a map without any.
     pub fn wrecks(&self) -> &[MapWreck] {
         &self.wrecks
@@ -249,6 +267,7 @@ impl MapFile {
             &self.ore,
             &self.snow,
             &self.wrecks,
+            &self.ways,
         );
         if computed == self.content_id {
             Ok(())
@@ -413,6 +432,42 @@ mod tests {
             w.set_snow(vec![0; 10]).is_err(),
             "a layer of the wrong size"
         );
+    }
+
+    #[test]
+    fn ways_layer_round_trips_after_the_other_sections() {
+        let path = temp_path("ways");
+        let mut w = MapWriter::create(&path, info(1, 1)).unwrap();
+        let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT as u32)
+            .map(|i| synthetic(i % TILE_SAMPLES, i / TILE_SAMPLES))
+            .collect();
+        w.push_tile(&encode_tile(&samples)).unwrap();
+        let (sw, sh) = info(1, 1).snow_dims();
+        let snow: Vec<u8> = (0..sw * sh * 2).map(|i| (i * 7 % 251) as u8).collect();
+        let ways: Vec<u8> = (0..sw * sh * 3).map(|i| (i * 11 % 253) as u8).collect();
+        let wreck = crate::MapWreck {
+            blueprint: "aster_t1_tank".into(),
+            pos: FxVec2::from_ints(700, 600),
+            heading: Angle(0),
+            bank: 0,
+            mass_milli: 1000,
+        };
+        w.set_snow(snow.clone()).unwrap();
+        w.set_wrecks(vec![wreck.clone()]).unwrap();
+        w.set_ways(ways.clone()).unwrap();
+        assert!(
+            w.set_ways(vec![0; 10]).is_err(),
+            "a layer of the wrong size"
+        );
+        let id = w
+            .finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[])
+            .unwrap();
+        let file = MapFile::open(&path).unwrap();
+        assert_eq!(file.ways(), Some(&ways[..]));
+        assert_eq!(file.snow(), Some(&snow[..]));
+        assert_eq!(file.wrecks(), &[wreck][..]);
+        assert_eq!(file.content_id(), id);
+        file.verify().unwrap();
     }
 
     #[test]

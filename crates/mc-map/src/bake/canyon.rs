@@ -393,8 +393,25 @@ struct Trail {
     half: f64,
 }
 
+/// A point's place against a trail ([`Terrain::trail_spot`]).
+struct TrailSpot {
+    /// Metres from the line, and along it of its whole length.
+    d: f64,
+    at: f64,
+    total: f64,
+    /// The trail's half width here, and how far its ragged edge pushes the
+    /// point out (metres).
+    half: f64,
+    ragged: f64,
+    /// 1 alongside the trail, falling to 0 just past its ends.
+    capped: f64,
+}
+
 /// Metres between a trail's profile samples.
 const TRAIL_STEP: f64 = 8.0;
+/// A trail's half width at the middle, metres: it swells and narrows by half
+/// along the way.
+const TRAIL_HALF: f64 = 56.0;
 /// The steepest a trail runs, rise over run: the sim's limit is 1/2.
 const TRAIL_GRADE: f64 = 0.36;
 
@@ -532,6 +549,24 @@ fn along(p: (f64, f64), line: &[(f64, f64)]) -> (f64, f64, f64) {
     (best, at, run)
 }
 
+/// The way a line runs `at` metres along it, a unit vector.
+fn heading_at(line: &[(f64, f64)], at: f64) -> (f64, f64) {
+    let mut run = 0.0;
+    let mut dir = (1.0, 0.0);
+    for w in line.windows(2) {
+        let (dx, dy) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+        let len = (dx * dx + dy * dy).sqrt();
+        if len > 0.0 {
+            dir = (dx / len, dy / len);
+        }
+        run += len;
+        if run >= at {
+            break;
+        }
+    }
+    dir
+}
+
 /// A cliff's face: steep at the top, easing into a talus foot.
 fn cliff(t: f64) -> f64 {
     let t = t.clamp(0.0, 1.0);
@@ -630,24 +665,66 @@ impl Terrain {
         self.works_ground(x, y, h)
     }
 
-    /// A trail's surface: its profile along the line, a shallow trough
-    /// across it, ragged edges blending into the ground either side.
-    fn trail_ground(&self, trail: &Trail, x: f64, y: f64, h: f64) -> f64 {
-        let reach = trail.half * 1.5 + 420.0;
+    /// Where `(x, y)` lies against a trail, within `reach` of its line.
+    fn trail_spot(&self, trail: &Trail, x: f64, y: f64, reach: f64) -> Option<TrailSpot> {
         let (d, at, total) = along((x, y), &trail.line);
-        if d > reach {
-            return h;
+        if d > trail.half * 1.5 + reach {
+            return None;
         }
-        let i = (at / TRAIL_STEP).min((trail.profile.len() - 1) as f64);
-        let (i0, f) = (i.floor() as usize, i.fract());
-        let z = trail.profile[i0] * (1.0 - f)
-            + trail.profile[(i0 + 1).min(trail.profile.len() - 1)] * f;
         // Wider on the shelves, narrower through the cliffs, never even.
         let swell = self.ramp.fbm(at / 260.0 + 3.3, x / 900.0, 2, 0.5) * 2.2;
         let half = trail.half * (1.0 + swell).clamp(0.6, 1.5);
         // Ragged at its edges only: the walked middle is always the trail.
         let ragged =
             self.crag.fbm(x / 70.0, y / 70.0, 2, 0.5) * 90.0 * smoothstep(0.5 * half, half, d);
+        // Past its ends it stops short, no wide cap spilling over the ground
+        // beyond: a trail ending on the lake's bank would raise a tongue.
+        let past = if at <= 0.0 || at >= total { d } else { 0.0 };
+        Some(TrailSpot {
+            d,
+            at,
+            total,
+            half,
+            ragged,
+            capped: 1.0 - smoothstep(0.5 * half, 1.5 * half, past),
+        })
+    }
+
+    /// How trodden the ground is, 0-1 (1 on a trail's floor, fading out at
+    /// its ragged edges), and which way that trail runs there (a unit
+    /// vector). The map's ways layer, for the renderer.
+    pub(in crate::bake) fn trail_wear(&self, x: f64, y: f64) -> (f64, (f64, f64)) {
+        let mut best = (0.0, (1.0, 0.0));
+        for t in &self.canyon.trails {
+            let Some(s) = self.trail_spot(t, x, y, 120.0) else {
+                continue;
+            };
+            let wear = (1.0 - smoothstep(0.8 * s.half, 1.05 * s.half, s.d + s.ragged)) * s.capped;
+            if wear > best.0 {
+                best = (wear, heading_at(&t.line, s.at));
+            }
+        }
+        best
+    }
+
+    /// A trail's surface: its profile along the line, a shallow trough
+    /// across it, ragged edges blending into the ground either side.
+    fn trail_ground(&self, trail: &Trail, x: f64, y: f64, h: f64) -> f64 {
+        let Some(TrailSpot {
+            d,
+            at,
+            total,
+            half,
+            ragged,
+            capped,
+        }) = self.trail_spot(trail, x, y, 420.0)
+        else {
+            return h;
+        };
+        let i = (at / TRAIL_STEP).min((trail.profile.len() - 1) as f64);
+        let (i0, f) = (i.floor() as usize, i.fract());
+        let z = trail.profile[i0] * (1.0 - f)
+            + trail.profile[(i0 + 1).min(trail.profile.len() - 1)] * f;
         let blend =
             70.0 + 50.0 * (self.detail.fbm(x / 400.0, y / 400.0, 2, 0.5) * 3.0).clamp(-1.0, 1.0);
         // Ends meet the ground they leave and reach.
@@ -659,11 +736,7 @@ impl Terrain {
             + 1.3
                 * (h - floor).clamp(0.0, 260.0)
                 * smoothstep(BENCH_TOP + 10.0, BENCH_TOP + 60.0, h);
-        let w = 1.0 - smoothstep(half, half + blend, d + ragged);
-        // Past its ends it stops short, no wide cap spilling over the ground
-        // beyond: a trail ending on the lake's bank would raise a tongue.
-        let past = if at <= 0.0 || at >= total { d } else { 0.0 };
-        let w = w * (1.0 - smoothstep(0.5 * half, 1.5 * half, past));
+        let w = (1.0 - smoothstep(half, half + blend, d + ragged)) * capped;
         h + (floor - h) * w
     }
 
@@ -764,7 +837,7 @@ impl Terrain {
                 self.canyon.trails.push(Trail {
                     line: smooth_open(&pts, 12),
                     profile: Vec::new(),
-                    half: 48.0,
+                    half: TRAIL_HALF,
                 });
             }
         }

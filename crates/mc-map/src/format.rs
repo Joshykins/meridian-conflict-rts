@@ -10,6 +10,11 @@
 //!             raw Fx; then one u32 corner count per ore region
 //! snow        optional: (w_cells/2 + 1) * (h_cells/2 + 1) pairs of bytes,
 //!             (glacier ice, lying snow) from 0 to 255, row-major
+//! wrecks      optional: wreck records
+//! ways        optional: three bytes per sample on the snow layer's grid,
+//!             row-major: how trodden the ground is (a trail's floor 255),
+//!             then the trail's heading as cos 2a and sin 2a (128 = 0), which
+//!             blend between samples without a seam where a heading wraps
 //! ```
 //!
 //! Header:
@@ -36,12 +41,14 @@
 //! 188  u64      snow offset, 0 when the map has no snow layer
 //! 196  u64      wrecks offset, 0 when the map starts with none
 //! 204  u32      wreck count
-//! 208           reserved, zero
+//! 208  u64      ways offset, 0 when the map has no ways layer
+//! 216           reserved, zero
 //! ```
 //!
 //! The snow layer came after version 2 was fixed, in bytes that were reserved
 //! and zero, so every older file reads as a map without one. It is only for
-//! the renderer; the simulation never reads it. The wreckage came the same way.
+//! the renderer; the simulation never reads it. The wreckage came the same way,
+//! and the ways layer (also for the renderer only) after it.
 //!
 //! Wreck record (`WRECK_RECORD_LEN`, 72 bytes): `blueprint key [u8; 48]`
 //! (UTF-8, zero padded), `x i64, y i64, heading u16 (Angle), bank i16, mass
@@ -736,6 +743,8 @@ pub(crate) struct Layout {
     /// 0: no wrecks.
     pub wrecks_offset: u64,
     pub wreck_count: u32,
+    /// 0: no ways layer.
+    pub ways_offset: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -814,6 +823,7 @@ pub(crate) fn content_id(
     ore: &[OreRegion],
     snow: &[u8],
     wrecks: &[MapWreck],
+    ways: &[u8],
 ) -> u64 {
     let mut h = StateHasher::new();
     h.write_u32(VERSION);
@@ -865,6 +875,11 @@ pub(crate) fn content_id(
             h.write_i64(w.pos.y.0);
         }
     }
+    // And the ways layer.
+    if !ways.is_empty() {
+        h.write_u64(ways.len() as u64);
+        h.write_u8s(ways);
+    }
     h.finish()
 }
 
@@ -899,6 +914,7 @@ pub(crate) fn write_header(info: &MapInfo, content_id: u64, layout: &Layout) -> 
     put(188, &layout.snow_offset.to_le_bytes());
     put(196, &layout.wrecks_offset.to_le_bytes());
     put(204, &layout.wreck_count.to_le_bytes());
+    put(208, &layout.ways_offset.to_le_bytes());
     h
 }
 
@@ -940,6 +956,7 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     let snow_offset = r.u64()?;
     let wrecks_offset = r.u64()?;
     let wreck_count = r.u32()?;
+    let ways_offset = r.u64()?;
     let info = MapInfo {
         name,
         tiles_w,
@@ -973,6 +990,7 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
         snow_offset,
         wrecks_offset,
         wreck_count,
+        ways_offset,
     };
     Ok((info, content_id, layout))
 }

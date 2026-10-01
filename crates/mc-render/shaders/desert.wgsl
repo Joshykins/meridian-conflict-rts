@@ -400,8 +400,9 @@ fn canyon_shrubs(xy: vec2<f32>, density: f32, px: f32) -> CanyonShrubs {
 }
 
 // How many shrubs grow where: thickest on the bench and the rim, thin on the
-// red beds, few in the old lake bed, none on anything steep.
-fn canyon_shrub_density(xy: vec2<f32>, a: f32, alt: f32, slope: f32, sand: f32, canopy: f32, patchy: f32) -> f32 {
+// red beds, few in the old lake bed, none on anything steep or on a trail
+// (`way`, Habitat::way).
+fn canyon_shrub_density(xy: vec2<f32>, a: f32, alt: f32, slope: f32, sand: f32, canopy: f32, patchy: f32, way: f32) -> f32 {
     var d = 0.08;
     d = mix(d, 0.55, canyon_edge(a, CANYON_BENCH_BASE, 3.0));
     d = mix(d, 0.3, canyon_edge(a, CANYON_BENCH_TOP, 6.0));
@@ -411,5 +412,50 @@ fn canyon_shrub_density(xy: vec2<f32>, a: f32, alt: f32, slope: f32, sand: f32, 
     // Old lake bed: a few only, above the water.
     d *= mix(0.12, 1.0, smoothstep(CANYON_RING_TOP - 1.0, CANYON_RING_TOP + 3.0, alt)) * smoothstep(0.5, 2.0, alt);
     let clumps = smoothstep(0.25, 0.75, grad_noise2(xy + 401.0, 70.0) * 0.7 + patchy * 0.5);
-    return d * (0.25 + 1.1 * clumps) * (1.0 - smoothstep(0.035, 0.1, slope)) * (1.0 - sand * 0.7) * (1.0 - canopy * 0.6);
+    return d * (0.25 + 1.1 * clumps) * (1.0 - smoothstep(0.035, 0.1, slope)) * (1.0 - sand * 0.7) * (1.0 - canopy * 0.6)
+        * (1.0 - smoothstep(0.05, 0.4, way));
+}
+
+// A trail down the canyon (the map's ways layer): the soil of its bed trodden
+// to a pale compacted dust, worn in patches and grooved along its run by wheels
+// and treads, inside a margin of darker gravel and broken rock kicked out to
+// its edges. Paler than the red and khaki ground round it, so the ways down the
+// walls read from a battle camera.
+struct CanyonTrail {
+    rgb: vec3<f32>,
+    // How much of the pixel is the trail's floor, and its gravel margin.
+    cover: f32,
+    margin: f32,
+}
+
+// The gravel margin round a trail's floor, 0-1, from Habitat::way.
+fn canyon_trail_margin(way: f32) -> f32 {
+    return smoothstep(0.03, 0.18, way) * (1.0 - smoothstep(0.38, 0.52, way));
+}
+
+// `way` is Habitat::way.
+fn canyon_trail(xy: vec2<f32>, way: f32, site: CanyonSite, px: f32) -> CanyonTrail {
+    var out: CanyonTrail;
+    // Dust: the bed's own soil, bleached toward caliche by the traffic.
+    var dust = mix(site.soil, CANYON_CALICHE, 0.32);
+    // Worn in patches a few metres across: paler where it is packed, darker
+    // where loose grit gathers.
+    let worn = smoothstep(0.3, 0.7, grad_noise2(xy + 613.0, 8.0) * 0.55 + grad_noise2(xy - 271.0, 27.0) * 0.45);
+    dust *= 0.78 + 0.42 * worn;
+    // Grooves along the run, wheel and tread ruts: noise drawn out along the
+    // trail and fine across it, faded as they near a pixel.
+    let run = ground_way_heading(xy);
+    let along = dot(xy, run);
+    let across = dot(xy, vec2<f32>(-run.y, run.x));
+    let ruts = grad_noise2(vec2<f32>(along / 40.0, across / 2.2) + 41.0, 1.0) * 0.6
+        + grad_noise2(vec2<f32>(along / 15.0, across / 0.8) - 17.0, 1.0) * 0.4;
+    let fade = 1.0 - smoothstep(0.5, 1.6, px);
+    dust *= 1.0 + (smoothstep(0.3, 0.7, ruts) - 0.5) * 0.55 * fade;
+    // Fine scuffs everywhere.
+    let scuff = mix(0.5, grad_noise2(xy + 37.0, 1.4), 1.0 - smoothstep(0.35, 1.2, px));
+    dust *= 0.88 + 0.24 * scuff;
+    out.rgb = dust;
+    out.cover = canyon_trail_floor(way);
+    out.margin = canyon_trail_margin(way);
+    return out;
 }

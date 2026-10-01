@@ -946,7 +946,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // into a streak down a steep face.
     let stony = clamp(w[5] * 0.8 + w[7] * 0.7 + w[6] * 0.3 + w[2] * 0.06
         - sand_w - w[9] * 0.5 - canopy * 0.3, 0.0, 1.0) * (1.0 - max(snow_w, ice_w))
-        * (1.0 - smoothstep(0.08, 0.2, slope));
+        * (1.0 - smoothstep(0.08, 0.2, slope)) * (1.0 - canyon_trail_floor(hab.way)) + canyon_trail_margin(hab.way) * 0.8;
     // Canyon country's flats are mostly soil and shrubs: fewer loose blocks,
     // which lit from behind read as pits.
     let boulders = stones(xy, 7.0, stony * select(0.45, 0.18, desert()), px, 91.0);
@@ -1062,7 +1062,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let runnel = site.streak_wide * 0.6 + site.streak * 0.4;
         albedo *= mix(1.0, 0.74 + 0.48 * smoothstep(0.3, 0.72, runnel), slope_w);
         // Shrubs dotting the flats, each with its shadow.
-        let density = canyon_shrub_density(xy, site.a, alt, slope, sand_w, canopy, patchy);
+        let density = canyon_shrub_density(xy, site.a, alt, slope, sand_w, canopy, patchy, hab.way);
         let shrubs = canyon_shrubs(xy, density, px);
         let sage = smoothstep(CANYON_COCONINO_TOP, CANYON_RIM_BASE + 10.0, site.a);
         let bush = mix(CANYON_BLACKBRUSH, CANYON_SAGE, clamp(sage + (shrubs.tone - 0.5) * 0.6, 0.0, 1.0))
@@ -1090,6 +1090,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         albedo *= 1.0 + ring.lines;
         albedo = mix(albedo, vec3<f32>(0.05, 0.055, 0.04), ring.wet * 0.6);
         canyon_rough = mix(mix(0.9, 0.62, varnish), 0.95, ring.crust);
+        // The trails, over all of it: pale trodden dust inside a dark margin.
+        if hab.way > 0.004 {
+            let trail = canyon_trail(xy, hab.way, site, px);
+            let gravel = mix(CANYON_PAVEMENT, site.talus, 0.3);
+            albedo = mix(albedo, gravel, trail.margin * 0.8);
+            albedo = mix(albedo, trail.rgb, trail.cover * (1.0 - boulder_cover));
+            canyon_rough = mix(canyon_rough, 0.8, trail.cover);
+        }
     }
     // Snow: drifts a little brighter and darker, bluer in its hollows.
     let drift = 0.93 + 0.1 * fine + 0.05 * sward;
