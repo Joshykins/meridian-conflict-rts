@@ -537,6 +537,10 @@ impl Hud {
         self.net_news(ui, s);
         // The mine survey lies on the world, under every panel.
         mine_marks(ui, s, &mut self.survey);
+        // So do wrecks too small to see from up here; a free-camera picture is left clean.
+        if !self.free.on {
+            reclaim::far_pips(ui, s, self.reclaim_vis);
+        }
         self.pause_frame(ui, view.paused && !view.menu_open);
         if !view.observing && !self.free.on {
             groups::badges(ui, s);

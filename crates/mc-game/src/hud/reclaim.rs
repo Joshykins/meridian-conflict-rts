@@ -8,6 +8,9 @@
 //! The salvage units light up with it: each one's icon turns into a mass-coloured
 //! badge, its reach is drawn on the ground, and a reclaimer says how much mass a
 //! second it can pull.
+//!
+//! Without Control, a wreck zoomed out past where its model can be seen is still
+//! a small pip in mass colour (`far_pips`), so wreckage never drops off the map.
 
 use super::{icons, mine_marks::overview_height, Scene, MASS};
 use crate::audio::Sfx;
@@ -150,6 +153,59 @@ fn leader_detail(camera_distance: f32) -> f32 {
 
 /// Overlay vertices the survey may fill up to, leaving the rest to the panels.
 const SURVEY_BUDGET: usize = mc_render::overlay::MAX_OVERLAY_VERTICES / 2;
+
+/// How far a far pip has come in, from a wreck's radius on screen in output
+/// pixels: none while its model reads, all of it once the model is a speck.
+/// The cull (cull.wgsl) stops drawing a wreck under 1.2 pixels.
+fn far_fade(radius_px: f32) -> f32 {
+    let t = ((4.0 - radius_px) / 2.5).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Zoomed out past where a wreck's model can be seen, each settled wreck is a
+/// small rimmed pip in mass colour, so a field of reclaim never vanishes from
+/// the map. Lies on the world under the panels; gives way to the survey while
+/// Control is held (`open`).
+pub(super) fn far_pips(ui: &mut Ui, s: &Scene, open: f32) {
+    let _t = mc_core::perf_span!("ui.reclaim.far");
+    let a = 1.0 - open;
+    if a < 0.02 {
+        return;
+    }
+    let viewport = s.camera.viewport;
+    let eye = s.camera.eye();
+    let scale = s.camera.projection_scale();
+    let mut pips: Vec<(Vec2, f32, f32)> = Vec::new();
+    for u in &s.view.frame.units {
+        let mass = reclaim_mass(s, u);
+        if mass < 0.5 {
+            continue;
+        }
+        let at = Vec3::from(u.pos);
+        let fade = far_fade(u.radius * scale / eye.distance(at).max(1.0));
+        if fade < 0.02 {
+            continue;
+        }
+        let Some(p) = s.camera.project(at) else {
+            continue;
+        };
+        if p.x < -8.0 || p.y < -8.0 || p.x > viewport.x + 8.0 || p.y > viewport.y + 8.0 {
+            continue;
+        }
+        pips.push((p / ui.s, pip_radius(mass) * 0.7, a * fade));
+    }
+    // Deliberate cap, as the survey's: the panels drawn after must have room.
+    // One quad a pip, so only an absurd field loses its last pips.
+    let room = SURVEY_BUDGET.saturating_sub(ui.o.vertices.len()) / 12;
+    let pips = &pips[..pips.len().min(room)];
+    // Every rim before any fill, so a dense field stays a cluster of dots.
+    for &(at, r, fa) in pips {
+        ui.dot(at, r + 1.0, ink(0.7 * fa));
+    }
+    for &(at, r, fa) in pips {
+        ui.dot(at, r, rgb(MASS, 0.85 * fa));
+    }
+}
 
 pub(super) fn draw(ui: &mut Ui, s: &Scene, open: f32) {
     let _t = mc_core::perf_span!("ui.reclaim");
@@ -443,6 +499,13 @@ mod tests {
         assert!(pip_radius(0.0) >= 2.4);
         assert!(pip_radius(1500.0) > pip_radius(100.0));
         assert!(pip_radius(1.0e6) <= 4.8);
+    }
+
+    #[test]
+    fn a_far_pip_takes_over_as_the_model_shrinks() {
+        assert_eq!(far_fade(12.0), 0.0);
+        assert_eq!(far_fade(1.2), 1.0);
+        assert!(far_fade(2.5) > 0.0 && far_fade(2.5) < 1.0);
     }
 
     #[test]
