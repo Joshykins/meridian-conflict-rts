@@ -119,7 +119,7 @@ fn paladins_vs_titan() {
 
 /// The same fight without the giant, as the yardstick for what it adds. Its budget is 16
 /// ms: the Paladin's rifles fire every 0.7 s (twice the shots, each with its lightning
-/// burst), which took it from ~7 to ~10 ms quiet and 14 under load.
+/// burst): about 10.5 ms quiet, and well over on a busy machine.
 #[test]
 fn paladins_vs_paladins() {
     let mut w = world(1024);
