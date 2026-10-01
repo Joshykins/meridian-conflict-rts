@@ -1,7 +1,7 @@
 use super::*;
 use crate::build_model_fitted;
 
-const DESIGNS: [(&str, &SpinalBore); 1] = [("space_dreadnought", &hull::BORE)];
+const DESIGNS: [&str; 1] = ["space_dreadnought"];
 
 /// A vertex on a gun house (it turns with its weapon, not with the hull).
 fn on_house(v: &crate::MeshVertex) -> bool {
@@ -11,20 +11,20 @@ fn on_house(v: &crate::MeshVertex) -> bool {
 
 #[test]
 fn every_design_keeps_its_budgets_rig_and_guns() {
-    for (key, bore) in DESIGNS {
-        let model = build_model_fitted(key, 250.0, 110.0, 4, &[]).unwrap();
+    for key in DESIGNS {
+        let model = build_model_fitted(key, 285.0, 110.0, 4, &[]).unwrap();
         let tris: Vec<_> = model.lods.iter().map(|l| l.indices.len() / 3).collect();
         println!("{key} triangles: {tris:?}");
         assert!(
             tris[0] <= 40000 && tris[1] as f32 <= tris[0] as f32 * 0.45 + 20.0 && tris[2] < 60,
             "{key}: {tris:?}"
         );
-        // Casemates 1..=4, then the rifles 5 and 6, at the unit file's pivots.
+        // Casemates 0..=5, then the rifles 6 and 7, at the unit file's pivots.
         let want: Vec<_> = CASEMATES.iter().chain(RIFLES.iter()).copied().collect();
         assert_eq!(model.houses.len(), want.len(), "{key}");
         for (i, (house, pivot)) in model.houses.iter().zip(want).enumerate() {
             assert_eq!(house.pivot, pivot, "{key}");
-            assert_eq!(house.weapon as usize, i + 1, "{key}");
+            assert_eq!(house.weapon as usize, i, "{key}");
         }
         assert_eq!(model.cells.len(), 2, "{key}");
         let mesh = &model.lods[0];
@@ -36,13 +36,13 @@ fn every_design_keeps_its_budgets_rig_and_guns() {
         };
         let (lo, hi) = span(0);
         assert!(
-            (470.0..=500.0).contains(&(hi - lo)),
+            (550.0..=580.0).contains(&(hi - lo)),
             "{key}: length {}",
             hi - lo
         );
         assert!(
-            (hi - bore.muzzle[0]).abs() < 1.0,
-            "{key}: the bore is foremost: {hi}"
+            (hi - prow::BOW).abs() < 2.0,
+            "{key}: the head's nose is foremost: {hi}"
         );
         let (ylo, yhi) = span(1);
         assert!(yhi <= 108.0 && ylo >= -108.0, "{key}: beam {ylo}..{yhi}");
@@ -67,17 +67,7 @@ fn every_design_keeps_its_budgets_rig_and_guns() {
                 assert!(r.z >= KEEL + 0.2, "{key}: {:?} stows to {r}", v.part);
             }
         }
-        // Every coil stage is lit somewhere.
-        for stage in 0..8 {
-            assert!(
-                mesh.vertices
-                    .iter()
-                    .any(|v| v.material == GLOW && v.surface & 0xFF == pattern::COIL + stage),
-                "{key}: no coil of stage {stage}"
-            );
-        }
         assert!(model.shield_emitter.is_some(), "{key}");
-        assert_eq!(crate::spinal_bore(key).map(|b| b.muzzle), Some(bore.muzzle));
         assert_eq!(crate::capital_rig(key), Some(RIG.gpu()), "{key}");
         assert_eq!(crate::lift_jets(key), &LIFT_JETS[..], "{key}");
         assert_eq!(crate::aircraft_exhausts(key), &NOZZLES[..], "{key}");
@@ -97,8 +87,8 @@ fn to_segment(p: Vec3, a: Vec3, b: Vec3) -> f32 {
 /// (300 degrees round, level, clear of the deck it stands on).
 #[test]
 fn guns_sweep_clear_of_the_hull() {
-    for (key, _) in DESIGNS {
-        let model = build_model_fitted(key, 250.0, 110.0, 4, &[]).unwrap();
+    for key in DESIGNS {
+        let model = build_model_fitted(key, 285.0, 110.0, 4, &[]).unwrap();
         let hull: Vec<Vec3> = model.lods[0]
             .vertices
             .iter()
@@ -145,7 +135,7 @@ fn guns_sweep_clear_of_the_hull() {
                 let bearing = d.y.atan2(d.x).to_degrees() - facing;
                 let off = (bearing + 540.0).rem_euclid(360.0) - 180.0;
                 assert!(
-                    off.abs() > 150.0 || q.z <= RIFLE_DECK + 0.1,
+                    off.abs() > 150.0 || q.z <= p.z - RIFLE_RAISE + 0.1,
                     "{key}: rifle house at {p} sweeps into the hull at {q}"
                 );
             }
@@ -161,8 +151,8 @@ fn dreadnought_previews() {
         std::env::var("MODEL_DUMP_DIR").unwrap_or("/tmp/dreadnought".into()),
     );
     std::fs::create_dir_all(&dir).unwrap();
-    for (key, _) in DESIGNS {
-        let model = build_model_fitted(key, 250.0, 110.0, 4, &[]).unwrap();
+    for key in DESIGNS {
+        let model = build_model_fitted(key, 285.0, 110.0, 4, &[]).unwrap();
         for az in [-38.0f32, 90.0, 142.0] {
             crate::preview::render(&model.lods[0], 900, az)
                 .write_ppm(&dir.join(format!("{key}_{}.ppm", az as i32)))

@@ -897,7 +897,7 @@ impl Renderer {
                 heading: u.heading,
                 house,
                 turret: [u.turret_yaw, u.arm_pitch[1]],
-                pitch: super::spinal_bore_fx::hull_pitch(u, &bp.visual.mesh),
+                pitch: super::hull_frame::hull_pitch(u, &bp.visual.mesh),
             });
         }
     }

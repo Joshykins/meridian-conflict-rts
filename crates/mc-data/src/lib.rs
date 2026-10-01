@@ -857,7 +857,7 @@ impl UnitBlueprint {
 }
 
 /// Most weapons one unit can carry. The sim stores weapon state in fixed slots.
-pub const MAX_WEAPONS: usize = 8;
+pub const MAX_WEAPONS: usize = 10;
 /// Most drones one unit keeps (`drone_sockets`).
 pub const MAX_DRONES: usize = 4;
 /// Weapons that may turn on gun houses of their own (`mount`) and be drawn turning: the

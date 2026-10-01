@@ -16,7 +16,7 @@
 //! gun on a house of its own (the Marlin's), the house's yaw and pitch about it. They are
 //! lightning strokes among the bore's (`BoreFx::lightning`).
 
-use super::spinal_bore_fx::DrawnHull;
+use super::hull_frame::DrawnHull;
 use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_BOLT, PUFF_SPARK};
 use glam::Vec3;

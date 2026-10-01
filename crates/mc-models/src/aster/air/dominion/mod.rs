@@ -1,43 +1,40 @@
 //! Dominion: the ARC's tech 4 dreadnought (`aster_t4_dreadnought`, mesh `space_dreadnought`),
-//! a 490 m capital warship of the upper air laid round a spinal AEB, the heaviest bore the
-//! ARC builds: an arrowhead in plan riding tall on a segmented keel blade ([`hull`]), two
-//! narrower armoured hulls stacked on its deck and wrapped in swept-back vertebrae
-//! ([`stacked`]). Every solid on it is shaded flat, facet by facet (`with_facets`): ARC
-//! warships are hard planes meeting at clear edges. `space.ron` carries the contract's
-//! numbers.
+//! a 570 m capital warship of the upper air that fights broadside: a long hull broken
+//! into an aft block, a pinched waist and a forward block, riding on a keel blade with a
+//! ventral hull hung under its middle ([`hull`]), drawn forward into its prow ([`prow`]),
+//! two narrower armoured hulls stacked on its deck and wrapped in swept-back vertebrae
+//! ([`stacked`]). Its name and the ARC's are painted on its walls ([`lettering`]). Every solid on it is
+//! shaded flat, facet by facet (`with_facets`): ARC warships are hard planes meeting at
+//! clear edges. `space.ron` carries the contract's numbers.
 //!
 //! The contract, all here:
-//! - `CASEMATES`: the four Arc Cannon casemates (weapons 1..=4), each an armoured drum let
-//!   into the flank carrying twin barrels one over the other, authored facing +X with the
-//!   muzzles `CASEMATE_REACH` ahead of the pivot (the unit file rests them turned
-//!   outboard); `RIFLES`: the two low twin bolt rifle houses on the spine (weapons 5, 6).
-//! - `CELL_*`: the two blocks of hatched SAM cells of weapon 7, port block first.
-//! - `hull::BORE` (`models::spinal_bore`): the spinal AEB's mouth, breech and the eight
-//!   coil stages along its axis. Weapon 0's `muzzle` is `BORE.muzzle`. Its coils
-//!   carry `pattern::COIL + stage` (stage 0 at the breech, 7 at the mouth), so the
-//!   renderer climbs the charge along them (`renderer/titan_charge.rs`).
+//! - `CASEMATES`: the six Arc Cannon casemates (weapons 0..=5), three a side, each an
+//!   armoured drum let into the flank carrying twin barrels one over the other, authored
+//!   facing +X with the muzzles `CASEMATE_REACH` ahead of the pivot (the unit file rests
+//!   them turned outboard); `RIFLES`: the two low twin bolt rifle houses (weapons 6, 7)
+//!   on the stacked hull, one forward, one astern.
+//! - `CELL_*`: the two blocks of hatched SAM cells of weapon 8, port block first.
 //! - `NOZZLES`, `LIFT_JETS`, `RIG`: the shared spacecraft rig (`capital.rs`), the same on
 //!   ship's `LAMPS` (`stacked::LAMPS`, its mast's strobe with the hull's).
 //!
-//! ARC hardware: the guns are unlit; the AEB's coils are the one big lit feature.
+//! ARC hardware: the guns are unlit.
 
 use super::capital::{self, CapitalRig, Leg};
 use super::*;
 use crate::aster::bolt_rifle::{bolt_rifle, siege_howitzer};
 use crate::builder::{chamfered_rect, CellGrid};
-use crate::SpinalBore;
 use glam::Vec2;
 
 mod detail;
 mod flanks;
 mod hull;
+mod lettering;
 mod prow;
 mod stacked;
 mod stern;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use hull::BORE as DOMINION_BORE;
 pub(crate) use stacked::LAMPS as DOMINION_LAMPS;
 
 pub(super) fn build(b: &mut MeshBuilder) {
@@ -48,20 +45,21 @@ pub(super) fn build(b: &mut MeshBuilder) {
 
 /// The flat belly under the hull where the legs stow, with the legs down.
 const KEEL: f32 = 27.0;
-/// The spinal AEB's axis height, and its mouth (the foremost point of the ship).
-const AXIS_Z: f32 = 64.0;
-const MUZZLE_X: f32 = 250.0;
 
-/// The Arc Cannon casemates in weapon order 1..=4: fore port, fore starboard, aft port,
-/// aft starboard. Each turns about a vertical axis through its drum and bears from 10
-/// degrees off the nose round its own beam to 10 degrees off the stern; the hull within
-/// reach of its barrels stays inboard of the drum.
-const CASEMATES: [[f32; 3]; 4] = [
-    [90.0, 62.0, 58.0],
-    [90.0, -62.0, 58.0],
+/// The Arc Cannon casemates in weapon order 0..=5: fore port, fore starboard, midships
+/// port, midships starboard, aft port, aft starboard. Each turns about a vertical axis
+/// through its drum and bears from 10 degrees off the nose round its own beam to 10
+/// degrees off the stern; the hull within reach of its barrels stays inboard of the drum.
+const CASEMATES: [[f32; 3]; 6] = [
+    [170.0, 64.0, 58.0],
+    [170.0, -64.0, 58.0],
+    [60.0, 64.0, 58.0],
+    [60.0, -64.0, 58.0],
     [-70.0, 66.0, 58.0],
     [-70.0, -66.0, 58.0],
 ];
+/// The hull face each casemate pair is let into (|y|), fore to aft.
+const CASEMATE_FACES: [f32; 3] = [58.0, 58.0, 60.0];
 /// The twin barrels: one `CASEMATE_STACK` over and one under the pivot, from the pivot to
 /// `CASEMATE_REACH` ahead of it (the unit file's `howitzer` length), their radius.
 const CASEMATE_STACK: f32 = 2.5;
@@ -71,17 +69,16 @@ const CASEMATE_R: f32 = 1.2;
 const DRUM_R: f32 = 7.0;
 const DRUM_H: f32 = 7.5;
 
-/// The low twin bolt rifle houses on the spine (weapons 5 and 6): the forward one rests
-/// facing ahead, the aft one astern; each sweeps 300 degrees, so nothing on the hull stands
-/// above its deck within `RIFLE_REACH` and a little of its pivot. Bores `RIFLE_SPREAD`
-/// either side of the pivot.
-const RIFLES: [[f32; 3]; 2] = [[150.0, 0.0, 118.0], [-150.0, 0.0, 118.0]];
+/// The low twin bolt rifle houses (weapons 6 and 7) on the stacked hull: the forward one
+/// rests facing ahead over the prow, the aft one astern; each sweeps 300 degrees, so
+/// nothing on the hull stands above its deck (`RIFLE_RAISE` under its pivot) within
+/// `RIFLE_REACH` and a little of its pivot. Bores `RIFLE_SPREAD` either side of the pivot.
+const RIFLES: [[f32; 3]; 2] = [[176.0, 0.0, 118.0], [-150.0, 0.0, 118.0]];
 const RIFLE_SPREAD: f32 = 2.5;
 const RIFLE_REACH: f32 = 24.0;
-/// The deck the rifle houses stand on: nothing within their sweep stands above it.
-const RIFLE_DECK: f32 = 114.2;
+const RIFLE_RAISE: f32 = 3.8;
 
-/// The SAM cells (weapon 7): two blocks of 4 x 2 hatched cells either side of the
+/// The SAM cells (weapon 8): two blocks of 4 x 2 hatched cells either side of the
 /// centre line, their hatches lying on `CELL_DECK`. Firing order as the unit file's
 /// muzzles: the port block's eight, then the starboard block's.
 const CELL_DECK: f32 = 130.0;
@@ -426,31 +423,29 @@ fn rifle_house(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
     });
 }
 
-/// A low armoured pedestal under a rifle house at `pivot`, from `foot` up to the rifles'
+/// A low armoured pedestal under a rifle house at `pivot`, from `foot` up to the rifle's
 /// deck, a dark band at its head.
 fn rifle_pedestal(b: &mut MeshBuilder, pivot: [f32; 3], foot: f32) {
     let plan = chamfered_rect(v2(13.0, 11.0), 4.0);
+    let deck = pivot[2] - RIFLE_RAISE;
     b.at(v3(pivot[0], pivot[1], 0.0), |b| {
         b.paint(PLATING).pattern(pattern::AIRFRAME);
         b.loft_z(
             &plan,
-            &[Section::new(foot, 1.1), Section::new(RIFLE_DECK - 0.6, 1.0)],
+            &[Section::new(foot, 1.1), Section::new(deck - 0.6, 1.0)],
         );
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.loft_z(
             &plan,
-            &[
-                Section::new(RIFLE_DECK - 0.6, 0.94),
-                Section::new(RIFLE_DECK, 0.94),
-            ],
+            &[Section::new(deck - 0.6, 0.94), Section::new(deck, 0.94)],
         );
     });
 }
 
-/// Both dorsal rifle houses.
+/// Both rifle houses.
 fn rifles(b: &mut MeshBuilder) {
     for (i, p) in RIFLES.into_iter().enumerate() {
-        rifle_house(b, 5 + i, Vec3::from(p));
+        rifle_house(b, 6 + i, Vec3::from(p));
     }
 }
 
@@ -544,16 +539,9 @@ fn sam_cells(b: &mut MeshBuilder, foot: f32) {
     }
 }
 
-// ---- the spinal AEB ----------------------------------------------------------------------
+// ---- hull tools, round ------------------------------------------------------------------
 
-/// Paints what follows as the AEB's live light for coil stage `stage` (0 at the breech,
-/// 7 at the mouth).
-fn coil_light(b: &mut MeshBuilder, stage: usize) {
-    b.paint(GLOW)
-        .pattern(pattern::COIL + (stage as u32).min(pattern::COIL_STAGES - 1));
-}
-
-/// An octagon of radius `r` round the bore axis (flat on top), as (y, z) about the axis.
+/// An octagon of radius `r` (flat on top), as (y, z) about its centre.
 fn octagon(r: f32) -> Vec<[f32; 2]> {
     (0..8)
         .map(|k| {
@@ -561,181 +549,6 @@ fn octagon(r: f32) -> Vec<[f32; 2]> {
             [a.cos() * r, a.sin() * r]
         })
         .collect()
-}
-
-/// One charge coil round the bore at `x`: a dark octagonal ring `r` out, `width` long,
-/// with its live band of stage `stage` standing round its middle, and a lit inner face.
-fn coil_ring(b: &mut MeshBuilder, x: f32, r: f32, width: f32, stage: usize) {
-    let c = v3(x, 0.0, AXIS_Z);
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    octagon_collar(
-        b,
-        c,
-        [-width * 0.5, width * 0.5],
-        [r, r],
-        [r * 0.72, r * 0.72],
-    );
-    coil_light(b, stage);
-    octagon_collar(
-        b,
-        c,
-        [-width * 0.18, width * 0.18],
-        [r + 0.5, r + 0.5],
-        [r - 0.2, r - 0.2],
-    );
-}
-
-/// A closed octagonal annulus about the x axis through `c`, from `x[0]` to `x[1]`
-/// (relative to `c`), outer and inner radii at each end.
-fn octagon_collar(b: &mut MeshBuilder, c: Vec3, x: [f32; 2], outer: [f32; 2], inner: [f32; 2]) {
-    let ring = |x: f32, r: f32| {
-        octagon(r)
-            .iter()
-            .map(|p| c + v3(x, p[0], p[1]))
-            .collect::<Vec<_>>()
-    };
-    let rings = vec![
-        ring(x[0], inner[0]),
-        ring(x[0], outer[0]),
-        ring(x[1], outer[1]),
-        ring(x[1], inner[1]),
-        ring(x[0], inner[0]),
-    ];
-    b.loft(&rings, false, false);
-}
-
-/// The coils of `bore`'s first `stages` stages: `per` rings to each stage, `pitch` apart
-/// about the stage's centre, `bore.coil_radius` out; and the dark bore tube they ring,
-/// from the breech to `tube_end`.
-fn coils(
-    b: &mut MeshBuilder,
-    bore: &SpinalBore,
-    stages: usize,
-    per: usize,
-    pitch: f32,
-    tube_end: f32,
-) {
-    let r = bore.coil_radius;
-    b.paint(TREAD).pattern(pattern::NONE);
-    let tube = octagon(r * 0.55)
-        .iter()
-        .map(|p| [p[0], p[1] + AXIS_Z])
-        .collect::<Vec<_>>();
-    b.extrude_x(&tube, bore.breech[0], tube_end);
-    let per = if b.fine() { per } else { per.min(2) };
-    for (stage, c) in bore.coils.iter().enumerate().take(stages) {
-        for k in 0..per {
-            let x = c[0] + (k as f32 - (per as f32 - 1.0) * 0.5) * pitch;
-            coil_ring(b, x, r, pitch * 0.55, stage);
-        }
-    }
-}
-
-/// The AEB's mouth let flush into a flat face at `MUZZLE_X`: an octagonal throat `r`
-/// across, a dark frame round it standing a hand proud, the last coil's light ringing the
-/// throat a little way in, and a black throat back to the bore.
-fn bore_mouth(b: &mut MeshBuilder, r: f32, frame: f32) {
-    let at = |x: f32, r: f32| {
-        octagon(r)
-            .iter()
-            .map(|p| v3(x, p[0], p[1] + AXIS_Z))
-            .collect::<Vec<_>>()
-    };
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.loft(
-        &[
-            at(MUZZLE_X, r),
-            at(MUZZLE_X, r + frame),
-            at(MUZZLE_X - 1.6, r + frame),
-            at(MUZZLE_X - 1.6, r),
-            at(MUZZLE_X, r),
-        ],
-        false,
-        false,
-    );
-    b.paint(TREAD).pattern(pattern::NONE);
-    throat(b, MUZZLE_X - 1.0, 29.0, [r, r * 0.7]);
-    coil_light(b, 7);
-    let c = v3(MUZZLE_X, 0.0, AXIS_Z);
-    for x in [-5.0, -11.0] {
-        octagon_collar(
-            b,
-            c,
-            [x - 1.2, x + 1.2],
-            [r + 0.1, r + 0.1],
-            [r - 0.9, r - 0.9],
-        );
-    }
-    if b.fine() {
-        b.paint(METAL).pattern(pattern::PLAIN);
-        for p in octagon(r + frame * 0.5) {
-            b.cuboid(v3(MUZZLE_X - 0.2, p[0], AXIS_Z + p[1]), v3(0.4, 1.2, 1.2));
-        }
-    }
-}
-
-/// A flat bow face open round the mouth: each edge of the hull's last section `outer`
-/// (all on one x) joined to a ring `r` out from the bore's axis, facing forward.
-fn bow_face(b: &mut MeshBuilder, outer: &[Vec3], r: f32) {
-    let inner: Vec<Vec3> = outer
-        .iter()
-        .map(|p| {
-            let d = v2(p.y, p.z - AXIS_Z).normalize_or_zero() * r;
-            v3(p.x, d.x, AXIS_Z + d.y)
-        })
-        .collect();
-    let n = outer.len();
-    for i in 0..n {
-        let j = (i + 1) % n;
-        let mut quad = vec![outer[i], outer[j], inner[j], inner[i]];
-        if (quad[1] - quad[0]).cross(quad[2] - quad[0]).x < 0.0 {
-            quad.reverse();
-        }
-        b.face(&quad);
-    }
-}
-
-/// A black throat going back `depth` from `x` on the bore's axis, `r` across at its mouth
-/// and its floor: a thick-walled shell whose inner wall faces the axis, closed by a floor
-/// facing forward, so it reads as a hole from any side.
-fn throat(b: &mut MeshBuilder, x: f32, depth: f32, r: [f32; 2]) {
-    let c = v3(x, 0.0, AXIS_Z);
-    b.paint(TREAD).pattern(pattern::NONE);
-    octagon_collar(b, c, [-depth, 0.0], [r[1] + 0.6, r[0] + 0.6], [r[1], r[0]]);
-    let floor = octagon(r[1] + 0.3)
-        .iter()
-        .map(|p| [p[0], p[1] + AXIS_Z])
-        .collect::<Vec<_>>();
-    b.extrude_x(&floor, x - depth - 2.0, x - depth + 0.2);
-}
-
-/// A lit grille over coil stage `stage` at `x`, let into a deck at `top`: a dark frame
-/// `half` across either side of `y`, the stage's light in bars under louvres.
-fn grille(b: &mut MeshBuilder, x: f32, y: f32, top: f32, half: f32, stage: usize) {
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.block(
-        v3(x - 7.0, y - half, top - 0.3),
-        v3(x + 7.0, y + half, top + 0.5),
-    );
-    coil_light(b, stage);
-    let bars = if b.fine() { 4 } else { 2 };
-    for k in 0..bars {
-        let bx = x - 5.0 + k as f32 * 10.0 / (bars - 1) as f32;
-        b.block(
-            v3(bx - 0.9, y - half + 1.2, top + 0.5),
-            v3(bx + 0.9, y + half - 1.2, top + 0.8),
-        );
-    }
-    if b.fine() {
-        b.paint(PLATING_DARK).pattern(pattern::PLAIN);
-        for k in 0..3 {
-            let bx = x - 3.3 + k as f32 * 3.3;
-            b.block(
-                v3(bx - 0.5, y - half + 0.8, top + 0.5),
-                v3(bx + 0.5, y + half - 0.8, top + 1.3),
-            );
-        }
-    }
 }
 
 /// A vertebra across the deck at `x`, `length` long: a band between the port half's

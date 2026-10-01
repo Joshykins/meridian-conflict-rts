@@ -803,12 +803,18 @@ pub struct CapitalLamps {
     pub hold: Option<([f32; 3], f32)>,
 }
 
+/// The design a mesh key is a variant of (`<mesh>~<name>`, a design round's extra keys,
+/// share their design's rig and effect anchors).
+fn design_of(mesh: &str) -> &str {
+    mesh.split('~').next().unwrap_or(mesh)
+}
+
 /// The Bastion's lamps sit in fittings the model builds from the same numbers.
 const BASTION_LAMPS: CapitalLamps = aster::air::BASTION_LAMPS;
 
 /// A capital ship's lamp fittings by mesh; `None` for a hull without any.
 pub fn capital_lamps(mesh: &str) -> Option<&'static CapitalLamps> {
-    match mesh {
+    match design_of(mesh) {
         "space_dreadnought" => Some(&aster::air::DOMINION_LAMPS),
         "lift_ship" => Some(&BASTION_LAMPS),
         "light_transport" => Some(&aster::air::COURIER_LAMPS),
@@ -823,7 +829,7 @@ pub fn capital_lamps(mesh: &str) -> Option<&'static CapitalLamps> {
 /// `aster::air::capital::CapitalRig::gpu`): its landing legs and bay doors, drives, lift
 /// jets and ramp. `None` for everything else. A new spacecraft adds its `CapitalRig` here.
 pub fn capital_rig(mesh: &str) -> Option<[[f32; 4]; 7]> {
-    match mesh {
+    match design_of(mesh) {
         "space_dreadnought" => Some(aster::air::DOMINION_RIG.gpu()),
         "lift_ship" => Some(aster::air::BASTION_RIG.gpu()),
         "light_transport" => Some(aster::air::COURIER_RIG.gpu()),
@@ -835,33 +841,6 @@ pub fn capital_rig(mesh: &str) -> Option<[[f32; 4]; 7]> {
 }
 
 pub use aster::air::SpinalRail;
-
-/// Where effects attach to a warship's spinal AEB (model space, metres): a bore, not a
-/// rail (`SpinalRail` is the rail cannon's), charged along coils (`pattern::COIL`).
-pub struct SpinalBore {
-    /// The centre of the bore's mouth, on its axis: the discharge leaves here.
-    pub muzzle: [f32; 3],
-    /// Where the bore begins, on its axis.
-    pub breech: [f32; 3],
-    /// The centre of each coil stage's rings on the axis, stage 0 at the breech to 7 at
-    /// the mouth (the stage in `pattern::COIL + stage`).
-    pub coils: [[f32; 3]; 8],
-    /// The coil rings' outer radius about the axis.
-    pub coil_radius: f32,
-    /// Where the coils' charge shows outside the hull, round every stage but the last
-    /// (which is in the open mouth): the hull's section there, as its half width and how
-    /// far below the axis its flanks show and its belly lies. The charge's arcs crawl
-    /// over it (the Dominion's keel blade, the coils glowing in its gaps).
-    pub skin: [f32; 3],
-}
-
-/// A warship's spinal AEB by mesh (`SpinalBore`), for its charge and discharge effects.
-pub fn spinal_bore(mesh: &str) -> Option<&'static SpinalBore> {
-    match mesh {
-        "space_dreadnought" => Some(&aster::air::DOMINION_BORE),
-        _ => None,
-    }
-}
 
 /// A warship's spinal rail cannon by mesh (model space): its muzzle, breech and the points
 /// along the rails where the charge crawls, for the rail's charge and fire effects.
@@ -906,7 +885,7 @@ pub fn turret_rail(mesh: &str, weapon: usize) -> Option<&'static TurretRail> {
 
 /// Downward lift jet mouths in model space (the Bastion's belly), for the renderer's drive effects.
 pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
-    match mesh {
+    match design_of(mesh) {
         "space_dreadnought" => &aster::air::DOMINION_LIFT_JETS,
         "lift_ship" => &aster::air::BASTION_LIFT_JETS,
         "light_transport" => &aster::air::COURIER_LIFT_JETS,
@@ -919,7 +898,7 @@ pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
 
 /// Jet nozzle origins in model space, shared with the aircraft effect renderer.
 pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
-    match mesh {
+    match design_of(mesh) {
         "space_dreadnought" => &aster::air::DOMINION_NOZZLES,
         "light_transport" => &aster::air::COURIER_NOZZLES,
         "space_frigate" => &aster::air::RESOLUTE_NOZZLES,

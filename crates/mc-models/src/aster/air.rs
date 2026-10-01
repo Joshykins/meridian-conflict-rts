@@ -13,7 +13,7 @@ mod argus;
 mod bastion;
 mod dominion;
 pub(crate) use dominion::{
-    DOMINION_BORE, DOMINION_LAMPS, LIFT_JETS as DOMINION_LIFT_JETS, NOZZLES as DOMINION_NOZZLES,
+    DOMINION_LAMPS, LIFT_JETS as DOMINION_LIFT_JETS, NOZZLES as DOMINION_NOZZLES,
     RIG as DOMINION_RIG,
 };
 mod resolute;
@@ -106,8 +106,8 @@ pub(crate) fn space_frigate(b: &mut MeshBuilder, _tech: u8) {
     resolute::build(b);
 }
 
-/// Dominion: the tech 4 dreadnought laid round a spinal AEB, an arrowhead riding on a
-/// segmented keel blade with two narrower hulls stacked on its deck ([`dominion`]).
+/// Dominion: the tech 4 broadside dreadnought, a long hull in three blocks on a keel
+/// blade, two narrower hulls stacked on its deck ([`dominion`]).
 pub(crate) fn space_dreadnought(b: &mut MeshBuilder, _tech: u8) {
     dominion::build(b);
 }

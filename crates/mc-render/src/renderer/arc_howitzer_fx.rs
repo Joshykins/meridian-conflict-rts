@@ -27,7 +27,7 @@
 //! shares of its length and radii of `HowitzerLook::radius`, is the model's
 //! (models `siege_howitzer`).
 
-use super::spinal_bore_fx::DrawnHull;
+use super::hull_frame::DrawnHull;
 use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_BOLT, PUFF_PLASMA, PUFF_SPARK};
 use glam::Vec3;

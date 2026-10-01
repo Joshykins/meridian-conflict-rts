@@ -382,24 +382,27 @@ What the player sees of them:
 Shots: `MERIDIAN_AIM=warp scripts/shot.sh run --range --unit aster_t1_lift_ship --select
 lift_ship --cursor X,Y ...` aims the order; `--scenario warp` / `warp-dampened` jumps.
 
-## Dominion dreadnought (2026-09-29)
+## Dominion dreadnought (2026-09-29, reworked 2026-09-30)
 
-`aster_t4_dreadnought`, mesh `space_dreadnought`, T4, built on a lot by tech 3
-engineers (the commander's Engineering Suite III, Mason III). The Resolute's rules
-hold (capital ship, lands only when told, never moves unless ordered); on top:
+`aster_t4_dreadnought`, mesh `space_dreadnought`, T4, about 570 m, built on a lot by
+tech 3 engineers (the commander's Engineering Suite III, Mason III). The Resolute's
+rules hold (capital ship, lands only when told, never moves unless ordered); on top it
+fights broadside: engaged and stopped it lays its beam on the mark (`motion.broadside:
+90`, the Leviathan's rule, which any layer may use), since no gun of weight bears dead
+ahead.
 
-- **Spinal AEB** (weapon 0): fixed along the keel, laid by turning and pitching the
-  whole hull (`combat::spinal_gun`). A storm bore (`bore.storm`): a 5 s charge, an
-  argon tracer, the discharge down its channel and a storm round the hit for 5 s. Its
-  2 500 m reach stays under the Zenith's 3 200 (the ship's counter outranges it;
-  `tests/dreadnought.rs` checks it).
-- **Arc Cannon Batteries** (1..=3): the Leviathan's charged shells, laid direct (a
-  `Ballistic` gun on an aircraft is a bomb bay to the sim), 2 400 m.
-- **Twin Bolt Rifles** (4, 5): flank houses, 1 600 m.
-- **Long Range SAM** (6): two hatched blocks of 8 as one launcher, 3 000 m.
+- **Arc Cannon Casemates** (0..=5, three a side, port first, fore to aft): the
+  Leviathan's charged shells, laid direct (a `Ballistic` gun on an aircraft is a bomb
+  bay to the sim), 2 500 m, each bearing from 10 degrees off the nose round its own
+  beam to 10 off the stern. Their reach stays under the Zenith's 3 200
+  (`tests/dreadnought.rs` checks it).
+- **Twin Bolt Rifles** (6, 7): houses on the stacked hull, one forward facing ahead,
+  one aft facing astern, 1 600 m.
+- **Long Range SAM** (8): two hatched blocks of 8 as one launcher, 3 000 m.
 - **Hull field**: 60 000, regen 400; it draws the ship's 800 E/s upkeep and drops on
   a stall like every shield.
 
-Presentation: `renderer/spinal_bore_fx.rs` draws the charge climbing the spine's coil
-rings (models `SpinalBore`, `spinal_bore(mesh)`) and the discharge off the prow; the
-coils' own light is `titan_charge`. Sounds: `data/sounds/dreadnought.ron`.
+Nine weapons: `mc_data::MAX_WEAPONS` is 10 for it. The model (`mc-models
+aster/air/dominion/`) is an aft block, a pinched waist with a lit hangar recess and a
+forward block, a ventral hull, a terraced prow, and "ARC" and "DOMINION" painted on the
+walls (`lettering.rs`, flat stencil glyphs).

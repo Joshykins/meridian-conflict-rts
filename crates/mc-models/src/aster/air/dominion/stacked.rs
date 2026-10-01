@@ -2,21 +2,22 @@
 //! narrower armoured hull lies on the main one, set back from its bow with a raked prow
 //! and a raked stern of its own, and a third, smaller one lies on that carrying the bridge,
 //! set back further, so the ship reads as three stacked masses. Swept-back vertebrae wrap
-//! the upper layers like armour bands; the coils' lit grilles lie along their backs.
+//! the upper layers like armour bands.
 
-use super::hull::{self, deck_edge, DECK};
+use super::hull::{self, layer_edge, DECK};
 use super::*;
 
 /// The second layer: its top, and its plan (x, share of the deck's half width, top).
-/// Raked up from its stern, full over the ship's length, raked down to its prow.
-/// Forward it ends square at x 150, inside the front's own run of it (`fronts`).
+/// Raked up from its stern, full over the ship's length, raked down to the deck forward
+/// over the prow.
 pub(super) const L2_TOP: f32 = 112.0;
-const L2: [[f32; 3]; 5] = [
+const L2: [[f32; 3]; 6] = [
     [-214.0, 0.58, DECK + 6.0],
     [-202.0, 0.66, L2_TOP],
     [-70.0, 0.66, L2_TOP],
     [90.0, 0.66, L2_TOP],
-    [150.0, 0.66, L2_TOP],
+    [200.0, 0.66, L2_TOP],
+    [222.0, 0.4, DECK + 2.0],
 ];
 /// The third layer, as the second: set back from both ends, carrying the bridge.
 pub(super) const L3_TOP: f32 = 134.0;
@@ -28,7 +29,7 @@ const L3: [[f32; 3]; 4] = [
 ];
 /// The vertebrae: over the third layer, and over the second clear of the rifles.
 const RIBS_3: [f32; 4] = [-106.0, -92.0, 14.0, 36.0];
-const RIBS_2: [f32; 4] = [-204.0, -186.0, 84.0, 104.0];
+const RIBS_2: [f32; 5] = [-204.0, -186.0, 84.0, 104.0, 128.0];
 const RIB_H: f32 = 3.5;
 
 const MAST_X: f32 = -62.0;
@@ -47,7 +48,7 @@ pub(crate) const LAMPS: crate::CapitalLamps = hull::lamps_for(&STROBES);
 /// A layer's half width and top at `x`, from its plan table.
 fn layer<const N: usize>(plan: &[[f32; 3]; N], x: f32) -> (f32, f32) {
     let [_, share, top] = lerp_rows(plan, x);
-    (deck_edge(x) * share, top)
+    (layer_edge(x) * share, top)
 }
 
 /// The second layer's half width at `x`.
@@ -79,8 +80,8 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.paint(PLATING);
         b.extrude_z(
             &[
-                [150.0, 32.0],
-                [150.0, -32.0],
+                [200.0, 32.0],
+                [200.0, -32.0],
                 [-214.0, -44.0],
                 [-214.0, 44.0],
             ],
@@ -98,13 +99,6 @@ pub(super) fn build(b: &mut MeshBuilder) {
     }
     for x in RIBS_2 {
         band(b, x, false);
-    }
-    for (stage, &x) in hull::STAGES.iter().enumerate() {
-        match stage {
-            1 | 2 => grille(b, x, 0.0, L3_TOP - 0.2, 8.0, stage),
-            6 => grille(b, x, 0.0, DECK - 0.2, 10.0, stage),
-            _ => {}
-        }
     }
     for p in RIFLES {
         rifle_pedestal(b, p, DECK - 1.0);
@@ -149,10 +143,11 @@ fn layers(b: &mut MeshBuilder) {
                 (-146.0, -100.0),
                 (-40.0, 6.0),
                 (10.0, 60.0),
-                (96.0, 140.0),
+                (96.0, 150.0),
+                (156.0, 198.0),
             ]
         } else {
-            &[(-196.0, -100.0), (-40.0, 140.0)]
+            &[(-196.0, -100.0), (-40.0, 198.0)]
         };
         for &(x0, x1) in belts {
             b.paint(PLATING_DARK).pattern(pattern::GENERIC);
@@ -160,12 +155,12 @@ fn layers(b: &mut MeshBuilder) {
         }
         b.paint(ACCENT).pattern(pattern::PLAIN);
         for (plan, foot, from, to) in [
-            (&L2[..], DECK, -200.0, 150.0),
+            (&L2[..], DECK, -200.0, 200.0),
             (&L3[..], L2_TOP, -108.0, 40.0),
         ] {
             let band = |x: f32| {
                 let [_, share, _] = lerp_rows(plan, x);
-                let w = deck_edge(x) * share;
+                let w = layer_edge(x) * share;
                 vec![
                     v3(x, w - 0.6, foot - 0.4),
                     v3(x, w + 0.8, foot - 0.4),
@@ -184,7 +179,7 @@ fn layers(b: &mut MeshBuilder) {
                 x += 8.0;
             }
             let mut x = -196.0;
-            while x < 146.0 {
+            while x < 196.0 {
                 let clear = RIBS_2
                     .iter()
                     .chain(RIBS_3.iter())

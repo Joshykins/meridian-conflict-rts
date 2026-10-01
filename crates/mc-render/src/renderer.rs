@@ -59,6 +59,7 @@ mod ground_contact;
 mod gtao;
 pub(crate) mod heat_haze;
 mod heavy_rail_fx;
+mod hull_frame;
 mod impact_craters;
 mod impact_fx;
 mod laser_fx;
@@ -75,7 +76,6 @@ mod rail_fx;
 mod regency_mine_fx;
 mod shafts;
 mod shield_upload;
-mod spinal_bore_fx;
 mod stake_fx;
 mod structure_pads;
 mod stun_fx;
@@ -3199,7 +3199,6 @@ impl Renderer {
         let part = mc_core::perf_span!("cpu.upload.unit_fx");
         self.ground_contact(units, time, camera);
         self.storm_beams(time);
-        self.spinal_charges_tick(time);
         self.storms_tick(time);
         self.mine_blows(units, time, camera);
         self.aircraft_trails(units, time, camera);
@@ -4740,10 +4739,6 @@ impl Renderer {
                 // A bore big enough to gut a base lands like one (`titan_fx`); one with a
                 // `blast` of its own raises its fireball (`bore_fx`).
                 let landed = time + after.to_f32() * self.tick_seconds;
-                if self.is_spinal_bore(blueprint.0 as u32, *weapon) {
-                    let (from, to) = (Vec3::from(from.to_f32()), Vec3::from(to.to_f32()));
-                    self.spinal_fire(from, to, blueprint.0 as u32, time);
-                }
                 if let Some(b) = blast {
                     self.bore_blast(Vec3::from(to.to_f32()), b.blast, b.blast_time, landed);
                 }
@@ -4806,11 +4801,7 @@ impl Renderer {
                 let seconds = w.charge_ticks as f32 * self.tick_seconds.max(0.02);
                 if w.bore.is_some() && seconds >= titan_fx::GIANT_CHARGE {
                     let (at, id) = (Vec3::from(pos.to_f32()), blueprint.0 as u32);
-                    if self.is_spinal_bore(id, *weapon) {
-                        self.spinal_charge(at, id, seconds, time);
-                    } else {
-                        self.bore_charge(at, id, seconds, time);
-                    }
+                    self.bore_charge(at, id, seconds, time);
                 }
             }
             SimEvent::MissileLased { from, to, killed } => {

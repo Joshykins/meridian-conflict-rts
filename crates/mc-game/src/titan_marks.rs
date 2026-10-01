@@ -57,8 +57,8 @@ pub fn storm_weapon(bp: &UnitBlueprint) -> Option<(usize, &Weapon)> {
         .find(|(_, w)| w.bore.is_some_and(|b| b.storm.is_some()))
 }
 
-/// The name of the storm bore a strike is from (the Behemoth's AEB-3, the Dominion's
-/// spinal AEB), for its marks and cards.
+/// The name of the storm bore a strike is from (the Behemoth's AEB-3), for its marks and
+/// cards.
 pub fn bore_name(blueprints: &Blueprints, blueprint: BlueprintId, weapon: u8) -> &str {
     blueprints
         .unit(blueprint)

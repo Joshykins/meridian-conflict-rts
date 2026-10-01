@@ -1,7 +1,6 @@
-//! The Dominion dreadnought (`aster_t4_dreadnought`): its spinal AEB is fixed along the
-//! keel like the frigate's rail, so the whole hull lays it, and its discharge leaves a
-//! lightning storm on the mark; its Arc Cannon batteries and bolt rifles fight on their
-//! own; its SAM cells reach aircraft far off; a hull field takes fire before the plates.
+//! The Dominion dreadnought (`aster_t4_dreadnought`): a broadside ship, its six Arc Cannon
+//! casemates (three a side) and two bolt rifles fighting on their own while the hull
+//! holds; its SAM cells reach aircraft far off; a hull field takes fire before the plates.
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::Blueprints;
@@ -102,44 +101,10 @@ fn fired(w: &World, ship: UnitId) -> Vec<u8> {
 }
 
 #[test]
-fn the_spinal_aeb_turns_the_whole_ship_and_leaves_a_storm() {
-    let mut w = world();
-    w.state.players[0].free_build = true;
-    // Nose east; a block of factories due north, inside the spinal's reach.
-    let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
-    settle(&mut w);
-    let factory = "aster_t3_land_factory";
-    let mut base = Vec::new();
-    for dx in [-120, 0, 120] {
-        base.push(add(&mut w, factory, 1, 3000 + dx, 4900, 0));
-    }
-    let mut discharged = false;
-    let mut storm = false;
-    for _ in 0..seconds(90) {
-        w.tick(&[]).unwrap();
-        discharged |= w
-            .events
-            .iter()
-            .any(|e| matches!(e, SimEvent::BoreDischarge { weapon, .. } if *weapon == 0));
-        storm |= !w.state.storms.is_empty();
-        if discharged && storm {
-            break;
-        }
-    }
-    let heading = heading_of(&w, ship);
-    assert!(discharged, "the spinal AEB never fired (heading {heading})");
-    assert!(storm, "the spinal AEB raised no storm");
-    assert!(
-        (heading - 90.0).abs() < 6.0,
-        "the hull did not lay onto the mark: {heading}"
-    );
-}
-
-#[test]
 fn its_casemates_and_bolt_rifles_fight_on_their_own() {
     let mut w = world();
-    // Nose east; tanks off the port beam, 1.2 km out: the batteries and the port rifles
-    // reach them, and the spinal is laid across the hull.
+    // Nose east; tanks off the port beam, 1.2 km out: the port casemates and the fore
+    // rifles reach them, and the hull only squares its beam to them.
     let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
     settle(&mut w);
     let tank = "aster_t4_assault_tank";
@@ -150,24 +115,33 @@ fn its_casemates_and_bolt_rifles_fight_on_their_own() {
     for &m in &marks {
         hold_fire(&mut w, m);
     }
-    let mut seen = [false; 8];
+    let mut seen = [false; 9];
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
         for wi in fired(&w, ship) {
             seen[wi as usize] = true;
         }
     }
-    // The marks are off the port beam: the port casemates bear on them while the hull
-    // comes round for the spinal (after that they are dead ahead, the rifles' and the
-    // spinal's), and the starboard ones never do.
-    for (wi, name) in [(1, "fore port casemate"), (3, "aft port casemate")] {
+    // The marks are off the port beam: every port casemate bears on them, and no
+    // starboard one does.
+    for (wi, name) in [
+        (0, "fore port casemate"),
+        (2, "midships port casemate"),
+        (4, "aft port casemate"),
+    ] {
         assert!(seen[wi], "the {name} never fired: {seen:?}");
     }
     assert!(
-        !seen[2] && !seen[4],
+        !seen[1] && !seen[3] && !seen[5],
         "a starboard casemate fired across the hull: {seen:?}"
     );
-    assert!(seen[5], "the fore rifles never fired: {seen:?}");
+    assert!(seen[6], "the fore rifles never fired: {seen:?}");
+    // It lays its beam on them (`broadside`), it does not wheel its nose round.
+    let heading = heading_of(&w, ship);
+    assert!(
+        heading < 20.0 || heading > 340.0,
+        "the hull swung off its beam: {heading}"
+    );
 }
 
 #[test]
@@ -182,7 +156,7 @@ fn its_sam_cells_reach_aircraft_far_off() {
     let mut cells = false;
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
-        cells |= fired(&w, ship).contains(&7);
+        cells |= fired(&w, ship).contains(&8);
     }
     assert!(cells, "the SAM cells never fired");
     assert!(
@@ -223,46 +197,42 @@ fn its_hull_field_takes_fire_before_the_plates() {
 }
 
 #[test]
-fn the_zenith_still_outranges_its_spinal() {
+fn it_lays_its_beam_on_a_mark_dead_ahead() {
+    let mut w = world();
+    w.state.players[0].free_build = true;
+    // Nose east, a tank dead ahead inside the casemates' reach: none bears until the
+    // hull comes round to put it on a beam.
+    let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
+    settle(&mut w);
+    let tank = add(&mut w, "aster_t4_assault_tank", 1, 5200, 3000, 180);
+    hold_fire(&mut w, tank);
+    let mut casemates = false;
+    for _ in 0..seconds(60) {
+        w.tick(&[]).unwrap();
+        casemates |= fired(&w, ship).iter().any(|&wi| wi <= 5);
+    }
+    let heading = heading_of(&w, ship);
+    assert!(casemates, "no casemate fired (heading {heading})");
+    assert!(
+        (heading - 90.0).abs() < 15.0 || (heading - 270.0).abs() < 15.0,
+        "the beam is not on the mark: {heading}"
+    );
+}
+
+#[test]
+fn the_zenith_outranges_every_gun_on_it() {
     let w = world();
     let bp = w.blueprints.unit(w.blueprints.id_of(DREADNOUGHT).unwrap());
     let zenith = w
         .blueprints
         .unit(w.blueprints.id_of("aster_t4_anti_ship").unwrap());
-    assert!(bp.weapons[0].range_max < zenith.weapons[0].range_max);
-}
-
-#[test]
-fn attack_ground_lays_the_spinal_on_the_point() {
-    let mut w = world();
-    let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
-    settle(&mut w);
-    let cmd = PlayerCommand {
-        player: 0,
-        command: Command::AttackGround {
-            units: vec![ship],
-            pos: FxVec2::from_ints(3000, 1000),
-            queue: false,
-        },
-    };
-    w.tick(&[cmd]).unwrap();
-    let mut discharged = false;
-    for _ in 0..seconds(90) {
-        w.tick(&[]).unwrap();
-        discharged |= w
-            .events
-            .iter()
-            .any(|e| matches!(e, SimEvent::BoreDischarge { weapon, .. } if *weapon == 0));
-        if discharged {
-            break;
-        }
+    for weapon in bp.weapons.iter().filter(|w| !w.missile) {
+        assert!(
+            weapon.range_max < zenith.weapons[0].range_max,
+            "{}",
+            weapon.name
+        );
     }
-    assert!(discharged, "the spinal never fired on the ground");
-    let heading = heading_of(&w, ship);
-    assert!(
-        (heading - 270.0).abs() < 6.0,
-        "the hull did not lay onto the point: {heading}"
-    );
 }
 
 /// One `gun` (owner 1) against one `ship` (owner 0, field powered) `range` metres off,
@@ -329,7 +299,7 @@ fn w_cost(key: &str) -> f32 {
 
 /// Where the entity shader draws the tips of weapon `wi`'s barrels on `u`: each muzzle
 /// pitched and turned in its house about the pivot (`HousePose`), then carried by the
-/// hull's bank, its pitch (a capital ship laying its spinal gun) and its heading.
+/// hull's bank, its pitch and its heading.
 fn drawn_barrel_tips(
     w: &World,
     frame: &mc_sim::RenderFrame,
@@ -376,10 +346,9 @@ fn drawn_barrel_tips(
 }
 
 #[test]
-fn casemate_shots_leave_the_barrels_as_drawn_on_a_pitched_hull() {
+fn casemate_shots_leave_the_barrels_as_drawn() {
     let mut w = world();
-    // Nose east; tanks off the port beam: the casemates fire at them while the hull
-    // pitches and comes round to lay the spinal.
+    // Nose east; tanks off the port beam: the casemates fire at them.
     let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
     settle(&mut w);
     let marks: Vec<_> = [-200, 0, 200]
@@ -390,10 +359,10 @@ fn casemate_shots_leave_the_barrels_as_drawn_on_a_pitched_hull() {
         hold_fire(&mut w, m);
     }
     let mut frame = mc_sim::RenderFrame::default();
-    let (mut shots, mut steepest) = (0, 0.0f32);
+    let mut shots = 0;
     for _ in 0..seconds(40) {
         w.tick(&[]).unwrap();
-        let casemate = |wi: u8| (1..=4).contains(&wi);
+        let casemate = |wi: u8| (0..=5).contains(&wi);
         if !fired(&w, ship).into_iter().any(casemate) {
             continue;
         }
@@ -416,16 +385,10 @@ fn casemate_shots_leave_the_barrels_as_drawn_on_a_pitched_hull() {
                 .fold(f32::MAX, f32::min);
             assert!(
                 off < 0.5,
-                "casemate {weapon}'s shot left {off:.1} m from its drawn barrels (hull pitched {:.1} deg)",
-                u.arm_pitch[1].to_degrees()
+                "casemate {weapon}'s shot left {off:.1} m from its drawn barrels"
             );
             shots += 1;
-            steepest = steepest.max(u.arm_pitch[1].abs().to_degrees());
         }
     }
-    assert!(shots >= 4, "only {shots} casemate shots");
-    assert!(
-        steepest > 5.0,
-        "the hull never pitched while they fired ({steepest:.1} deg)"
-    );
+    assert!(shots >= 6, "only {shots} casemate shots");
 }

@@ -404,9 +404,9 @@ pub(crate) struct RawMotion {
     /// Zero (the default): it fires on the move.
     #[serde(default)]
     pub deploy: f64,
-    /// A warship that fights broadside on: engaged and stopped, it lays its hull so the
-    /// mark lies this many degrees off the bow, on whichever beam is nearer. Zero: it
-    /// only turns to bring its main gun to bear.
+    /// A warship that fights broadside on (at sea or in the air): engaged and stopped, it
+    /// lays its hull so the mark lies this many degrees off the bow, on whichever beam is
+    /// nearer. Zero: it only turns to bring its main gun to bear.
     #[serde(default)]
     pub broadside: f64,
     /// A unit whose main turret reaches only this many degrees across its nose (a

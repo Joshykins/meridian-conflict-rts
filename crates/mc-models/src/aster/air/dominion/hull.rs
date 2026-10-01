@@ -1,76 +1,57 @@
-//! The Dominion's hull: an arrowhead in plan, a little broader astern
-//! and drawn to a point at the bore, riding tall on a segmented keel blade down its centre
-//! line. The upper hull's underside rises from the blade out to a hard chine, its walls
-//! stand tall above it; the spinal AEB runs inside the blade, each coil stage glowing in a
-//! gap between the blade's armoured segments. An angular prow block overhangs the blade's
-//! raked chin with the bore in its face; the casemates stand out of the flanks on stepped
-//! sponsons; an engineering block under the stern carries the drives. The stacked layers
-//! on its deck are [`super::stacked`]'s.
+//! The Dominion's hull, broken into masses along its length rather than one even run:
+//! a broad aft block over the engines, a pinched waist amidships with its wall drawn in
+//! and a lit hangar recess let into it, and a forward block a little narrower than the
+//! aft one, each stepping hard into the next. It rides tall on a keel blade down its
+//! centre line, a deep ventral hull hangs under its middle with raked ends, and the
+//! prow ([`super::prow`]) runs on from the forward block. The upper hull's underside
+//! rises from the blade out to a hard chine, its walls stand tall above it. The
+//! casemates stand out of the flanks on stepped sponsons; an engineering block under the
+//! stern carries the drives. The stacked layers on its deck are [`super::stacked`]'s.
 
 use super::*;
 
 /// The upper hull: its underside at the blade, its chine and wall, its deck.
 pub(super) const HULL_BOTTOM: f32 = 62.0;
-const CHINE_Z: f32 = 72.0;
-const WALL_TOP: f32 = 88.0;
+pub(super) const CHINE_Z: f32 = 72.0;
+pub(super) const WALL_TOP: f32 = 88.0;
 pub(super) const DECK: f32 = 96.0;
+/// How far the wall leans in from its foot at the chine to its head.
+pub(super) const WALL_LEAN: f32 = 1.0;
 /// The keel blade: its half width and its ends (it runs into the engineering block astern
-/// and under the prow block forward).
+/// and rakes up forward under the prow from `BLADE_RAKE`).
 const BLADE: f32 = 22.0;
 const BLADE_AFT: f32 = -150.0;
-const BLADE_FORE: f32 = 212.0;
-/// Each coil stage shows in a gap this long in the blade.
-const GAP: f32 = 8.0;
-/// Where the hull runs into the prow block, and the bow face.
-pub(super) const HULL_FORE: f32 = 204.0;
-pub(super) const BOW: f32 = 248.0;
-/// The coil rings' radius about the bore, and where the bore begins.
-pub(super) const COIL_R: f32 = 14.0;
-pub(super) const BREECH_X: f32 = -46.0;
-/// The coil stages along the bore (x), breech to mouth: clear of the forward legs' bays,
-/// the lift jets and the floods, which need the blade's belly.
-pub(super) const STAGES: [f32; 8] = [-34.0, -4.0, 26.0, 56.0, 132.0, 170.0, 184.0, MUZZLE_X - 8.0];
+const BLADE_RAKE: f32 = 170.0;
+const BLADE_FORE: f32 = 240.0;
+/// Where the blade's armour is broken by a dark seam, aft to fore.
+const SEAMS: [f32; 5] = [-100.0, -30.0, 36.0, 96.0, 140.0];
+/// Where the hull runs into the prow.
+pub(super) const HULL_FORE: f32 = 196.0;
 
-/// The AEB (`models::spinal_bore`), the same under every deck: seven stages of coils in
-/// the blade's gaps, the last in the mouth.
-pub(crate) const BORE: SpinalBore = SpinalBore {
-    muzzle: [MUZZLE_X, 0.0, AXIS_Z],
-    breech: [BREECH_X, 0.0, AXIS_Z],
-    coils: [
-        [STAGES[0], 0.0, AXIS_Z],
-        [STAGES[1], 0.0, AXIS_Z],
-        [STAGES[2], 0.0, AXIS_Z],
-        [STAGES[3], 0.0, AXIS_Z],
-        [STAGES[4], 0.0, AXIS_Z],
-        [STAGES[5], 0.0, AXIS_Z],
-        [STAGES[6], 0.0, AXIS_Z],
-        [STAGES[7], 0.0, AXIS_Z],
-    ],
-    coil_radius: COIL_R,
-    // The blade's flanks below the hull's underside, and its keel.
-    skin: [
-        BLADE + 0.6,
-        AXIS_Z - (HULL_BOTTOM - 6.0),
-        AXIS_Z - KEEL + 0.6,
-    ],
-};
-
-/// The plan: x, the upper hull's half width at its chine. One tapering hull: a little
-/// broader astern than through the casemates, its stern cut square, drawn hard in to the
-/// prow block.
-const PLAN: [[f32; 2]; 7] = [
+/// The aft block's plan (x, half width at the chine): broad over the engines, its stern
+/// cut square, its wall straight forward of x -96 to the waist.
+const AFT: [[f32; 2]; 5] = [
     [STERN, 76.0],
     [-218.0, 76.0],
     [-120.0, 74.0],
-    [-70.0, 70.0],
-    [90.0, 66.0],
-    [170.0, 56.0],
-    [HULL_FORE, 48.0],
+    [-96.0, 72.0],
+    [WAIST[0], 72.0],
 ];
+/// The waist: its run in x and its half width at the chine.
+pub(super) const WAIST: [f32; 2] = [-30.0, 36.0];
+const WAIST_W: f32 = 62.0;
+/// The forward block's half width at the chine, all along it.
+pub(super) const FORE_W: f32 = 68.0;
 
-/// The hull's half width at its chine at `x`.
+/// The hull's half width at its chine at `x`: stepping in at the waist and out again.
 pub(super) fn width(x: f32) -> f32 {
-    lerp_rows(&PLAN, x)[1]
+    if x < WAIST[0] {
+        lerp_rows(&AFT, x)[1]
+    } else if x <= WAIST[1] {
+        WAIST_W
+    } else {
+        FORE_W
+    }
 }
 
 /// The deck's edge (half width) at `x`, inboard of the wall's shoulder.
@@ -78,26 +59,53 @@ pub(super) fn deck_edge(x: f32) -> f32 {
     width(x) - 10.0
 }
 
+/// The edge the stacked layers are laid out from (half width) at `x`: smooth down the
+/// ship, drawing in forward, whatever the walls below do.
+pub(super) fn layer_edge(x: f32) -> f32 {
+    lerp_rows(
+        &[
+            [STERN, 66.0],
+            [-218.0, 66.0],
+            [-120.0, 64.0],
+            [-70.0, 60.0],
+            [90.0, 56.0],
+            [170.0, 50.0],
+            [222.0, 46.0],
+        ],
+        x,
+    )[1]
+}
+
+/// The wall at `x` for painting on: its |y| at the chine, the chine's height, its lean
+/// per metre up.
+pub(super) fn wall(x: f32) -> [f32; 3] {
+    [width(x), CHINE_Z, WALL_LEAN / (WALL_TOP - CHINE_Z)]
+}
+
 /// The upper hull's port half at `x`: 0 underside middle, 1 underside at the blade,
 /// 2 underside out, 3 chine, 4 wall head, 5 shoulder, 6 deck edge, 7 the deck's middle.
 pub(super) fn hull_half(x: f32) -> Vec<[f32; 2]> {
-    let w = width(x);
+    section(width(x))
+}
+
+/// The upper hull's port half with its chine `w` out.
+pub(super) fn section(w: f32) -> Vec<[f32; 2]> {
     vec![
         [0.0, HULL_BOTTOM],
         [BLADE - 2.0, HULL_BOTTOM],
         [w - 12.0, HULL_BOTTOM + 6.0],
         [w, CHINE_Z],
-        [w - 1.0, WALL_TOP],
+        [w - WALL_LEAN, WALL_TOP],
         [w - 6.0, DECK - 2.0],
         [w - 10.0, DECK],
         [0.0, DECK],
     ]
 }
 
-/// The blade's port half at `x`: its keel rakes up into a chin under the prow block.
+/// The blade's port half at `x`: its keel rakes up under the prow.
 fn blade_half(x: f32) -> Vec<[f32; 2]> {
-    let k = if x > 190.0 {
-        KEEL + (x - 190.0) / (BLADE_FORE - 190.0) * 17.0
+    let k = if x > BLADE_RAKE {
+        KEEL + (x - BLADE_RAKE) / (BLADE_FORE - BLADE_RAKE) * 28.0
     } else {
         KEEL
     };
@@ -105,8 +113,29 @@ fn blade_half(x: f32) -> Vec<[f32; 2]> {
         [0.0, k],
         [BLADE - 4.0, k],
         [BLADE, k + 5.0],
-        [BLADE, HULL_BOTTOM - 6.0],
+        [BLADE, (HULL_BOTTOM - 6.0).max(k + 6.0)],
         [BLADE - 2.0, HULL_BOTTOM + 1.0],
+        [0.0, HULL_BOTTOM + 1.0],
+    ]
+}
+
+/// The ventral hull hung under the middle: x, half width, belly. Its ends are raked, the
+/// forward one back from its foot.
+const VENTRAL: [[f32; 3]; 4] = [
+    [-132.0, 18.0, 58.0],
+    [-112.0, 32.0, 40.0],
+    [118.0, 32.0, 40.0],
+    [150.0, 16.0, 58.0],
+];
+
+fn ventral_half(x: f32) -> Vec<[f32; 2]> {
+    let [_, w, bot] = lerp_rows(&VENTRAL, x);
+    vec![
+        [0.0, bot],
+        [w - 7.0, bot],
+        [w, bot + 7.0],
+        [w + 3.0, HULL_BOTTOM - 4.0],
+        [w + 1.0, HULL_BOTTOM + 1.0],
         [0.0, HULL_BOTTOM + 1.0],
     ]
 }
@@ -132,40 +161,39 @@ fn engine_half(x: f32) -> Vec<[f32; 2]> {
     ]
 }
 
-/// Everything under the stacked layers: the hull and its flanks, the blade and its coils,
-/// the front and the mouth, the engineering block and the drives, the casemates on their
-/// sponsons, the rifles, the belly and the lamps.
+/// Everything under the stacked layers: the hull and its flanks, the blade, the prow,
+/// the engineering block and the drives, the casemates on their sponsons, the rifles, the
+/// belly and the lamps, the lettering.
 pub(super) fn build(b: &mut MeshBuilder, lamps_of: &crate::CapitalLamps) {
     hull(b);
     super::flanks::build(b);
     blade(b);
     super::prow::build(b);
     engine(b);
-    coils(b, &BORE, 7, 2, 4.0, BOW - 2.0);
     b.mirror_y(|b| {
-        sponson(b, CASEMATES[0], 56.0);
-        sponson(b, CASEMATES[2], 60.0);
+        for (k, face) in CASEMATE_FACES.into_iter().enumerate() {
+            sponson(b, CASEMATES[2 * k], face);
+        }
     });
     for (i, p) in CASEMATES.into_iter().enumerate() {
-        let face = if i < 2 { 56.0 } else { 60.0 };
-        casemate(b, 1 + i, Vec3::from(p), face);
+        casemate(b, i, Vec3::from(p), CASEMATE_FACES[i / 2]);
     }
     rifles(b);
     belly(b);
     lamps(b, lamps_of);
 }
 
-/// The strategy-zoom hull: the arrowhead and the prow.
+/// The strategy-zoom hull: the long hull and the prow.
 pub(super) fn coarse(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK);
     b.extrude_z(
         &[
-            [HULL_FORE, 48.0],
-            [HULL_FORE, -48.0],
-            [90.0, -66.0],
+            [HULL_FORE, FORE_W],
+            [HULL_FORE, -FORE_W],
+            [-120.0, -74.0],
             [STERN, -76.0],
             [STERN, 76.0],
-            [90.0, 66.0],
+            [-120.0, 74.0],
         ],
         KEEL,
         DECK,
@@ -173,7 +201,8 @@ pub(super) fn coarse(b: &mut MeshBuilder) {
     super::prow::coarse(b);
 }
 
-/// The upper hull, lofted along the arrowhead.
+/// The upper hull in its three blocks, each lofted and capped on its own so the steps
+/// between them stand as faces.
 fn hull(b: &mut MeshBuilder) {
     // The stern is raked: the hull's first section drawn in and down toward its middle.
     let raked = |x: f32| {
@@ -184,49 +213,65 @@ fn hull(b: &mut MeshBuilder) {
             .collect();
         full_ring(x, &h)
     };
-    let mut rings = vec![raked(STERN)];
-    rings.extend(
-        [-214.0, -120.0, -70.0, 90.0, 170.0, HULL_FORE]
-            .iter()
-            .map(|&x| full_ring(x, &hull_half(x))),
-    );
+    let ring = |x: f32, w: f32| full_ring(x, &section(w));
+    let mut aft = vec![raked(STERN)];
+    aft.extend([-214.0, -120.0, -96.0].map(|x| ring(x, width(x))));
+    aft.push(ring(WAIST[0], AFT[4][1]));
     b.paint(PLATING_DARK).pattern(pattern::GENERIC);
-    b.loft(&rings, true, true);
+    b.loft(&aft, true, true);
+    b.loft(
+        &[ring(WAIST[0] - 1.0, WAIST_W), ring(WAIST[1] + 1.0, WAIST_W)],
+        true,
+        true,
+    );
+    b.loft(
+        &[ring(WAIST[1], FORE_W), ring(HULL_FORE, FORE_W)],
+        true,
+        true,
+    );
+    ventral(b);
 }
 
-/// The keel blade: armoured segments down the centre line under the hull, gaps between
-/// them where each coil stage shows; armour slabs on each segment's flanks.
+/// The ventral hull under the middle, armoured in courses, a dark strake at its foot.
+fn ventral(b: &mut MeshBuilder) {
+    let xs: Vec<f32> = VENTRAL.iter().map(|r| r[0]).collect();
+    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    hull_loft(b, &xs, &ventral_half);
+    let half = |x: f32| ventral_half(x);
+    b.mirror_y(|b| {
+        for (k, &(x0, x1)) in [(-104.0, -48.0), (-40.0, 30.0), (40.0, 110.0)]
+            .iter()
+            .enumerate()
+        {
+            b.paint(if k % 2 == 0 { PLATING } else { PLATING_DARK })
+                .pattern(pattern::GENERIC);
+            plate_on(b, &half, [x0, x1], 2, 4, [0.2, 0.7], 1.4);
+        }
+        b.paint(ACCENT).pattern(pattern::PLAIN);
+        plate_on(b, &half, [-110.0, 116.0], 1, 2, [0.1, 0.9], 0.6);
+    });
+}
+
+/// The keel blade: one armoured run down the centre line under the hull, broken into
+/// segments by dark seams, armour slabs on each segment's flanks.
 fn blade(b: &mut MeshBuilder) {
-    let mut edges = vec![BLADE_AFT];
-    for x in STAGES.iter().take(7) {
-        edges.push(x - GAP * 0.5);
-        edges.push(x + GAP * 0.5);
-    }
-    edges.push(BLADE_FORE);
     let half = |x: f32| blade_half(x);
-    for seg in edges.chunks(2) {
+    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    hull_loft(b, &[BLADE_AFT, BLADE_RAKE, BLADE_FORE], &half);
+    let mut edges = vec![BLADE_AFT];
+    edges.extend(SEAMS);
+    edges.push(BLADE_RAKE);
+    for seg in edges.windows(2) {
         let (x0, x1) = (seg[0], seg[1]);
-        let mut xs = vec![x0];
-        if x0 < 190.0 && x1 > 190.0 {
-            xs.push(190.0);
-        }
-        xs.push(x1);
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-        hull_loft(b, &xs, &half);
-        if x1 - x0 > 12.0 {
-            b.mirror_y(|b| {
-                b.paint(PLATING).pattern(pattern::AIRFRAME);
-                plate_on(b, &half, [x0 + 2.0, x1 - 2.0], 2, 4, [0.1, 0.6], 1.4);
-            });
-        }
+        b.mirror_y(|b| {
+            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            plate_on(b, &half, [x0 + 2.5, x1 - 2.5], 2, 4, [0.1, 0.6], 1.4);
+        });
     }
-    // The breech housing in the blade where the bore begins.
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    let ring = octagon(COIL_R + 1.0)
-        .iter()
-        .map(|p| [p[0], p[1] + AXIS_Z])
-        .collect::<Vec<_>>();
-    b.extrude_x(&ring, BREECH_X - 4.0, BREECH_X + 2.0);
+    for x in SEAMS {
+        b.mirror_y(|b| plate_on(b, &half, [x - 1.2, x + 1.2], 2, 4, [0.0, 1.0], 0.5));
+    }
 }
 
 /// The engineering block under the stern, broad over the drives, armoured in two tiers.
@@ -301,10 +346,10 @@ pub(super) const fn lamps_for(strobes: &'static [[f32; 3]]) -> crate::CapitalLam
     }
 }
 
-/// The bow's and the stern's strobes, which the ship carries besides its mast's.
+/// The forward block's and the stern's strobes, which the ship carries besides its mast's.
 pub(super) const BOW_STROBES: [[f32; 3]; 4] = [
-    [200.0, 49.6, 72.0],
-    [200.0, -49.6, 72.0],
+    [190.0, FORE_W - 5.4, DECK - 1.4],
+    [190.0, -(FORE_W - 5.4), DECK - 1.4],
     [-212.0, 64.0, DECK + 0.8],
     [-212.0, -64.0, DECK + 0.8],
 ];

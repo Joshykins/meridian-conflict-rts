@@ -934,8 +934,6 @@ pub(super) struct StormFx {
 pub(super) struct GiantFx {
     beams: Vec<StormBeam>,
     storms: Vec<StormFx>,
-    /// Warships' spinal bores charging (`spinal_bore_fx`).
-    pub(super) spinal: super::spinal_bore_fx::SpinalBores,
 }
 
 impl Renderer {

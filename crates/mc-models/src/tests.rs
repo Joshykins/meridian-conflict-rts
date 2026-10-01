@@ -811,9 +811,9 @@ fn lods_reduce_and_respect_budgets() {
             // bridge and search radar, four rail houses, two nacelles of two deep drives, legs.
             17000
         } else if base_key(&model.key) == "space_dreadnought" {
-            // The tech 4 Dominion: a 490 m hull round an AEB of eight coil stages, four
-            // twin Arc Cannon casemates, two twin bolt rifle houses, sixteen SAM cells, four
-            // deep drives, legs (each design has the one budget).
+            // The tech 4 Dominion: a 570 m hull under a tall armoured head, six twin Arc
+            // Cannon casemates, two twin bolt rifle houses, sixteen SAM cells, its name in
+            // raised letters, six drives, legs (each design has the one budget).
             40000
         } else if model.key == "titan" {
             // The tech 5 Behemoth: a 400 m walker, one a match; two long rigged legs, six

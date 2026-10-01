@@ -20,7 +20,8 @@ pub(super) fn build(b: &mut MeshBuilder) {
             (-176.0, -128.0, 104.5),
             (-30.0, 74.0, 101.0),
             (10.0, 76.0, 104.5),
-            (110.0, 140.0, 101.0),
+            (110.0, 150.0, 101.0),
+            (162.0, 200.0, 104.5),
         ] {
             let at = |x: f32| v3(x, l2_width(x) - 1.2 + (z - 101.0) * -0.25, z);
             b.cylinder_between(at(a), at(f), 0.9, 0.9, if fine { 6 } else { 4 });
@@ -35,7 +36,9 @@ pub(super) fn build(b: &mut MeshBuilder) {
             }
         }
         // Docking clamps and hatch clusters along the hull's deck, outboard of the layer.
-        for &x in &[-200.0, -160.0, -128.0, -24.0, 14.0, 48.0, 104.0, 132.0] {
+        for &x in &[
+            -200.0, -160.0, -128.0, -24.0, 14.0, 48.0, 104.0, 132.0, 164.0, 190.0,
+        ] {
             let (w2, e) = (l2_width(x), deck_edge(x));
             let y = (w2 + e) * 0.5;
             b.paint(PLATING_DARK).pattern(pattern::PLAIN);
@@ -80,7 +83,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         }
         // Vent banks on the second layer's back, clear of the cells and the ribs.
         if fine {
-            for &x in &[-150.0, 64.0, 118.0] {
+            for &x in &[-150.0, 64.0, 118.0, 140.0, 190.0] {
                 let y = (l2_width(x) - 6.0 + l3_width(x).max(10.0)) * 0.5;
                 vent(b, v3(x, y, L2_TOP), v2(10.0, 4.0), 5, METAL);
             }

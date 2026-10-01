@@ -1578,6 +1578,11 @@ impl World {
                 .unit(units.blueprint[row])
                 .motion
                 .map_or(0x8000, |m| m.aim_arc);
+            // A broadside hull (`Motion::broadside`), whatever layer it flies or sails in.
+            let broadside = bp
+                .unit(units.blueprint[row])
+                .motion
+                .is_some_and(|m| m.broadside.0 > 0);
             let half_arc = if w == 0 {
                 weapon.half_arc.min(body_arc)
             } else {
@@ -1596,7 +1601,7 @@ impl World {
                 // A ship that fights broadside on (`Motion::broadside`) lays its beam to the
                 // mark instead, on whichever side is nearer, so every battery bears.
                 // A land unit with an `aim_arc` turns its body the same way.
-                if (naval || body_arc < 0x8000)
+                if (naval || broadside || body_arc < 0x8000)
                     && w == 0
                     && units.flags[row] & flag::MOVING == 0
                     && !spooling
