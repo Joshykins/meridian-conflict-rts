@@ -165,7 +165,8 @@ impl World {
                     return 0;
                 }
                 let ahead = (our_land * 10 > their_land * 13) as i32;
-                let base = if island { 25 } else { 70 };
+                // The land army is the main effort wherever it can walk to the enemy.
+                let base = if island { 25 } else { 80 };
                 // Waves into an artillery park behind turrets lose, however big.
                 base + 40 * ahead - (fortified / 2000).min(50)
             }
@@ -182,7 +183,7 @@ impl World {
                     })
                     .count() as i32;
                 // Early on, raids take the map: engineers and mines on the edges.
-                45 + soft.min(6) * 6
+                60 + soft.min(6) * 6
             }
             PlanKind::Landing => {
                 if !has(&|p| p.has(role::TRANSPORT)) || census.factories.len() < 2 {
@@ -197,21 +198,29 @@ impl World {
                 let heavy_aa = b.anti_air * 5 > Fx::from_int(income.max(5) * 240);
                 // Bombers are the answer to ground that is held but not covered.
                 let entrenched = (fortified / 2000).min(40) * weak_aa as i32;
-                35 + 50 * weak_aa as i32 + 20 * island as i32 - 60 * heavy_aa as i32 + entrenched
+                55 + 50 * weak_aa as i32 + 20 * island as i32 - 60 * heavy_aa as i32 + entrenched
             }
             PlanKind::SeaControl => {
+                // A shipyard its builders can put up will do.
+                let yard = |p: &Profile| {
+                    let bp = self.blueprints.unit(p.id);
+                    bp.has(mc_data::cat::FACTORY) && crate::ai::adaptive::domain(bp) == 2
+                };
                 if !has(&|p| p.domain == Some(Domain::Naval) && p.armed())
                     && census.naval_factories == 0
+                    && !has(&yard)
                 {
                     return 0;
                 }
-                // Their ships seen, or water between us and them.
+                // Their ships seen, water between us and them, or ships killing our
+                // coast: boats shelling sea mines took a side's economy from 26 to 20.
                 let ships =
                     (b.army[Domain::Naval as usize] + b.army[Domain::Sub as usize]).floor_int();
-                if !island && ships == 0 {
+                let by_sea = hurt_by(super::state::Hurt::Sea);
+                if !island && ships == 0 && by_sea == 0 {
                     return 0;
                 }
-                25 + (ships / 100).min(60) + 50 * island as i32
+                25 + (ships / 20).min(70) + 50 * island as i32 + (by_sea / 10).min(80)
             }
             PlanKind::SubWar => {
                 let ships = b.army[Domain::Naval as usize].floor_int();
@@ -225,11 +234,11 @@ impl World {
             PlanKind::Warships => {
                 if !has(&|p| {
                     p.domain == Some(Domain::Space) && p.armed() && !p.has(role::TRANSPORT)
-                }) || income < 30
+                }) || income < 15
                 {
                     return 0;
                 }
-                30 + 40 * weak_aa as i32 + 30 * island as i32
+                50 + 40 * weak_aa as i32 + 30 * island as i32
             }
             PlanKind::Siege => {
                 let map_gun = has(&|p| p.has(role::MAP_GUN));
@@ -243,7 +252,7 @@ impl World {
                     return 0;
                 }
                 let open = b.interceptors.is_empty() && b.base_unseen < 6000;
-                30 + 50 * open as i32 + 25 * (income >= 80) as i32
+                20 + 40 * open as i32 + 25 * (income >= 100) as i32
             }
             PlanKind::Titan => {
                 let big = |p: &Profile| {
@@ -371,6 +380,10 @@ impl World {
             };
             scored.push((k, a, next, why.or(Some(Why::Appeal))));
         }
+        let mut appeals = [0i16; PLANS.len()];
+        for &(k, a, _, _) in &scored {
+            appeals[k as usize] = a.clamp(-999, 999) as i16;
+        }
         // One plan all in at most, and the stakes within the side's budget: the
         // least appealing give way.
         let mut all_in: Vec<usize> = (0..scored.len())
@@ -439,6 +452,7 @@ impl World {
         let excess = c.notes.len().saturating_sub(NOTES);
         c.notes.drain(..excess);
         c.next_review = tick + REVIEW;
+        c.appeal = appeals;
         self.choose_wants(ctx, &menu);
     }
 
@@ -496,7 +510,8 @@ impl World {
                 self.open_op(ctx.player, kind, plan, rally, rally, Fx::ZERO);
             }
         }
-        // The raid guard: fast units held among the mines, sized by income.
+        // The home guard: fighters held among the mines while the army is out,
+        // sized by income.
         let raiders = free.iter().any(|&r| {
             super::ops::fits(
                 OpKind::Guard,
@@ -622,9 +637,9 @@ impl World {
                 // wave waited nine minutes while the enemy took the map.
                 OpKind::Army => match pressure {
                     Stake::Off => Fx::ZERO,
-                    Stake::Probe => Fx::from_int(400 + i * 15),
-                    Stake::Invest => Fx::from_int(600 + i * 25),
-                    Stake::AllIn => Fx::from_int(1000 + i * 50),
+                    Stake::Probe => Fx::from_int(300 + i * 10),
+                    Stake::Invest => Fx::from_int(500 + i * 18),
+                    Stake::AllIn => Fx::from_int(1000 + i * 40),
                 },
                 OpKind::Strike => Fx::from_int(by_stake(air, [600, 2000, 5000]).max(600) as i32),
                 OpKind::Fleet => Fx::from_int(by_stake(sea, [1500, 4000, 9000]).max(1500) as i32),
@@ -642,7 +657,7 @@ impl World {
                 o.rally = ctx.staging;
             }
             if o.kind == OpKind::Guard {
-                o.want = Fx::from_int((i * 12).clamp(300, 1500));
+                o.want = Fx::from_int((i * 8).clamp(300, 1200));
                 o.rally = guard_post;
             }
         }
@@ -755,7 +770,26 @@ impl World {
         if held(&shield) < shields_for {
             want(pick(&shield, 4, false));
         }
+        // Ships killing the coast: a torpedo or coastal gun by the water.
+        let by_sea = self.state.ai[player].commander.hurt[super::state::Hurt::Sea as usize];
+        let coast = |p: &Profile| p.has(role::DEFENSE) && p.has(role::ANTI_SHIP) && !p.mobile();
+        if by_sea > Fx::from_int(300) && held(&coast) < 2 + (by_sea / 1500).floor_int() as usize {
+            want(pick(&coast, 2, by_sea > Fx::from_int(2000)));
+        }
         let aa = |p: &Profile| p.has(role::ANTI_AIR) && p.has(role::DEFENSE);
+        // Bombed lately: anti-air where it hit, one more for each 1500 mass lost.
+        let c = &self.state.ai[player].commander;
+        let above =
+            c.hurt[super::state::Hurt::Air as usize] + c.hurt[super::state::Hurt::Space as usize];
+        let bombed = c
+            .hit_from_above
+            .is_some_and(|(_, t)| self.state.tick < t + 1800);
+        if bombed
+            && above > Fx::from_int(400)
+            && held(&aa) < 2 + (above / 1500).floor_int() as usize
+        {
+            want(pick(&aa, 2, above > Fx::from_int(3000)));
+        }
         let air_def =
             stake(PlanKind::AirDefense).max(if b.air > 60 { Stake::Probe } else { Stake::Off });
         if held(&aa) < [0, 2, 4, 7][air_def as usize] {

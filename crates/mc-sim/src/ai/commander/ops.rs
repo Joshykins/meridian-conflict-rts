@@ -24,7 +24,9 @@ pub(in crate::ai) fn fits(kind: OpKind, p: &Profile, land_route: bool) -> bool {
                     & (role::LINE | role::ARTILLERY | role::ANTI_AIR | role::SHIELD | role::SENSOR)
                     != 0
         }
-        OpKind::Raid | OpKind::Guard => ground && (land_route || crosses) && p.has(role::RAIDER),
+        OpKind::Raid => ground && (land_route || crosses) && p.has(role::RAIDER),
+        // The home force: any ground fighter.
+        OpKind::Guard => ground && p.roles & (role::LINE | role::RAIDER | role::ANTI_AIR) != 0,
         OpKind::Siege => ground && p.has(role::ARTILLERY),
         OpKind::Landing => (ground && p.armed() && p.room > 0) || p.has(role::TRANSPORT),
         OpKind::Strike => p.domain == Some(Domain::Air) && p.has(role::STRIKE),
@@ -88,6 +90,7 @@ impl World {
                 .find(|o| o.has(killer) || o.carrier == killer)
             {
                 op.ledger.killed += mass;
+                c.trades[op.kind as usize].killed += mass;
             }
         }
         for op in &mut c.ops {
@@ -101,6 +104,7 @@ impl World {
                 keep
             });
             op.ledger.lost += lost;
+            c.trades[op.kind as usize].lost += lost;
             if !alive(op.carrier) {
                 op.carrier = Handle::NONE;
             }
@@ -173,8 +177,8 @@ impl World {
             let rank = match c.ops[i].kind {
                 OpKind::Defend => 0,
                 OpKind::Landing => 1,
-                OpKind::Guard => 2,
-                OpKind::Raid => 3,
+                OpKind::Raid => 2,
+                OpKind::Guard => 3,
                 OpKind::Siege => 4,
                 _ => 5,
             };

@@ -81,13 +81,24 @@ impl World {
 
     /// A unit of `player` worth `mass` was killed by a unit of blueprint `by`: what
     /// hurts the side, by the killer's kind (`state::Hurt`), steers production.
-    pub(crate) fn note_loss_for_ai(&mut self, player: u8, by: mc_data::BlueprintId, mass: Fx) {
+    pub(crate) fn note_loss_for_ai(
+        &mut self,
+        player: u8,
+        by: mc_data::BlueprintId,
+        mass: Fx,
+        at: FxVec2,
+    ) {
         let kind = state::Hurt::of(self.blueprints.unit(by));
+        let tick = self.state.tick;
         let Some(ai) = self.state.ai.get_mut(player as usize) else {
             return;
         };
         if ai.config.brain == Brain::Commander {
             ai.commander.hurt[kind as usize] += mass;
+            // Where the bombers keep hitting: anti-air goes there (`plans.rs`).
+            if matches!(kind, state::Hurt::Air | state::Hurt::Space) {
+                ai.commander.hit_from_above = Some((at, tick));
+            }
         }
     }
 

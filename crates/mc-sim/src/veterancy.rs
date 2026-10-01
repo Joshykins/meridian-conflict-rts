@@ -85,7 +85,8 @@ impl World {
                 let mass = self.bp(victim).cost_mass;
                 self.note_kill_for_ai(killer_player, killer, mass);
                 let by = self.state.units.blueprint[row];
-                self.note_loss_for_ai(victim_owner, by, mass);
+                let at = self.state.units.pos[victim];
+                self.note_loss_for_ai(victim_owner, by, mass, at);
             }
         }
         let credits = std::mem::take(&mut self.state.units.damage[victim]);

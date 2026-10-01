@@ -190,6 +190,21 @@ pub(in crate::ai) enum OpKind {
     Guard = 11,
 }
 
+pub(in crate::ai) const OPS: [OpKind; 12] = [
+    OpKind::Army,
+    OpKind::Defend,
+    OpKind::Raid,
+    OpKind::Landing,
+    OpKind::Strike,
+    OpKind::AirGuard,
+    OpKind::Fleet,
+    OpKind::Wolfpack,
+    OpKind::Warships,
+    OpKind::Siege,
+    OpKind::Scout,
+    OpKind::Guard,
+];
+
 impl OpKind {
     pub(in crate::ai) fn name(self) -> &'static str {
         match self {
@@ -371,6 +386,17 @@ pub(in crate::ai) struct CommanderState {
     /// Structures the plans want built, best first (`plans.rs`): the builders take
     /// the first one they can place.
     pub wants: Vec<BlueprintId>,
+    /// Each plan's appeal at the last review, by `PlanKind as usize`: why it holds
+    /// what it holds, for the overlay and reports.
+    #[serde(default)]
+    pub appeal: [i16; 14],
+    /// Every operation's trade over the match, by `OpKind as usize`: which kinds of
+    /// operation work for this side.
+    #[serde(default)]
+    pub trades: [Ledger; 12],
+    /// Where and when the side last lost something to aircraft or a warship.
+    #[serde(default)]
+    pub hit_from_above: Option<(FxVec2, u32)>,
     /// Mass the side has lost lately to each kind of killer (`Hurt`), fading.
     #[serde(default)]
     pub hurt: [Fx; HURTS],
@@ -433,6 +459,20 @@ impl CommanderState {
             h.write_u64(w.0 as u64);
         }
         h.write_i64(self.rally_back.0);
+        match self.hit_from_above {
+            Some((p, t)) => {
+                h.write_i64(p.x.0);
+                h.write_i64(p.y.0);
+                h.write_u64(t as u64);
+            }
+            None => h.write_u64(u64::MAX),
+        }
+        for t in &self.trades {
+            t.hash(h);
+        }
+        for a in &self.appeal {
+            h.write_u64(*a as u16 as u64);
+        }
         for x in &self.hurt {
             h.write_i64(x.0);
         }
@@ -485,9 +525,29 @@ impl CommanderState {
                 )
             })
             .collect();
+        let mut appeal: Vec<(i16, PlanKind)> = PLANS
+            .iter()
+            .map(|&k| (self.appeal[k as usize], k))
+            .collect();
+        appeal.sort_by_key(|&(a, k)| (std::cmp::Reverse(a), k));
+        let appeal: Vec<String> = appeal
+            .iter()
+            .take(6)
+            .map(|(a, k)| format!("{}={a}", k.name()))
+            .collect();
+        let k = |m: Fx| m.floor_int() / 1000;
+        let trades: Vec<String> = self
+            .trades
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.killed + t.lost > Fx::ZERO)
+            .map(|(i, t)| format!("{}:{}k/{}k", OPS[i].name(), k(t.killed), k(t.lost)))
+            .collect();
         format!(
-            "plans [{}] ops [{}] notes [{}] salvos {}",
+            "trades [{}] plans [{}] appeal [{}] ops [{}] notes [{}] salvos {}",
+            trades.join(" "),
             plans.join(" "),
+            appeal.join(" "),
             ops.join(" "),
             notes.join("; "),
             self.salvos

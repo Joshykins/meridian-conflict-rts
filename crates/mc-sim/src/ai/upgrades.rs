@@ -77,22 +77,12 @@ impl World {
             .iter()
             .filter(|&&row| self.upgrading(row))
             .count();
-        // The Commander also brings factories left behind up to its best tier,
-        // surplus or not: five tech 1 factories fed tanks into tech 3 artillery.
-        let lagging = |row: usize| {
-            self.commander_directives(player).is_some() && self.bp(row).tech < census.max_tech
-        };
-        if income >= Fx::from_int(skill.tech_income) && upgrading < 1 + census.factories.len() / 4 {
-            // A lagging factory goes up even busy: the upgrade waits behind its unit.
-            for &row in census
-                .factories
-                .iter()
-                .filter(|&&r| census.factories_idle.contains(&r) || lagging(r))
-            {
-                if self.bp(row).upgrades_to.is_some()
-                    && (surplus || lagging(row))
-                    && !self.upgrading(row)
-                {
+        if income >= Fx::from_int(skill.tech_income)
+            && surplus
+            && upgrading < 1 + census.factories.len() / 4
+        {
+            for &row in &census.factories_idle {
+                if self.bp(row).upgrades_to.is_some() {
                     candidates.push((3, row));
                 }
             }

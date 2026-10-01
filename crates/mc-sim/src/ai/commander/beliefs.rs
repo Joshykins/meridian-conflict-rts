@@ -172,10 +172,12 @@ impl World {
             })
             .unwrap_or(0);
         b.base_unseen = seen_ago(base_seen);
-        // Under fog an army is mostly unseen: never believe in less land army than
-        // a minute and a half of their income (seen, it was a fraction of the real one).
+        // Under fog part of an army is unseen: a fifth more than seen, and never
+        // less than forty seconds of their income. At ninety seconds of income the
+        // believed army outgrew every wave, and the side never attacked.
         let land = Domain::Land as usize;
-        let floor = b.income * Fx::from_int(90);
+        b.army[land] += b.army[land] / 5;
+        let floor = b.income * Fx::from_int(40);
         if b.army[land] + b.army[Domain::Hover as usize] < floor {
             b.army[land] = floor - b.army[Domain::Hover as usize];
         }

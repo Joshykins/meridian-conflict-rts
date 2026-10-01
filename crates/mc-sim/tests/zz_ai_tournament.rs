@@ -7,6 +7,8 @@
 //! `aggressive`, `economic` or `defensive`). With 2 players slot 0 is side A; with
 //! more, the starts west of the middle are side A. `TOURNEY_EVERY=N` prints each
 //! side's state every N minutes, `TOURNEY_ROSTER=1` each player's units at the end,
+//! `TOURNEY_ARMY=key*n,key*n` gives every side the same army at its start,
+//! `TOURNEY_SNAP=tick` each side's armed mobile units at that tick,
 //! `TOURNEY_DEATHS=1` every unit that dies, where and when, `TOURNEY_OPS=N` slot N's
 //! operations whenever one changes (every 10 s).
 //! The `RESULT key=value ...` line sums the match up.
@@ -70,6 +72,9 @@ fn match_up() {
         _ => Difficulty::Hard,
     };
     let deaths = std::env::var("TOURNEY_DEATHS").is_ok();
+    let snap: Option<u32> = std::env::var("TOURNEY_SNAP")
+        .ok()
+        .and_then(|t| t.parse().ok());
     let ops_trace: Option<usize> = std::env::var("TOURNEY_OPS")
         .ok()
         .and_then(|p| p.parse().ok());
@@ -118,6 +123,24 @@ fn match_up() {
         spawn_commanders: true,
     };
     let mut w = World::new(&map, bps, Arc::new(Pool::new(1)), &config).unwrap();
+    // A head start: the same army for every side, beside its start, to judge how
+    // each brain fights apart from how it builds.
+    if let Ok(army) = std::env::var("TOURNEY_ARMY") {
+        for part in army.split(',') {
+            let (key, n) = part.split_once('*').unwrap_or((part, "10"));
+            let id = w.blueprints.id_of(key).expect("TOURNEY_ARMY: no such unit");
+            let n: i32 = n.parse().unwrap_or(10);
+            for p in 0..w.state.players.len() {
+                let start = w.state.players[p].start;
+                for i in 0..n {
+                    let at =
+                        start + mc_core::FxVec2::from_ints(150 + (i % 8) * 18, -60 + (i / 8) * 18);
+                    w.spawn_unit(id, p as u8, at, mc_core::Angle::ZERO, true)
+                        .unwrap();
+                }
+            }
+        }
+    }
     let mut jumps = [0u32; 2];
     let mut nukes = [0u32; 2];
     let mut first_blood: Option<u32> = None;
@@ -191,6 +214,27 @@ fn match_up() {
                 }
                 last_ops = lines;
             }
+            if snap == Some(w.state.tick) {
+                for p in 0..w.state.players.len() {
+                    let mut mass = 0;
+                    let mut n = 0;
+                    for r in w.state.units.slots.iter() {
+                        let bp = w.bp(r);
+                        if w.state.units.owner[r] as usize == p
+                            && bp.is_mobile()
+                            && !bp.weapons.is_empty()
+                            && !bp.has(cat::COMMANDER | cat::ENGINEER)
+                        {
+                            mass += bp.cost_mass.floor_int();
+                            n += 1;
+                        }
+                    }
+                    println!(
+                        "SNAP tick {} P{p} armed {n} units {mass} mass",
+                        w.state.tick
+                    );
+                }
+            }
             if w.state.winner.is_some() {
                 break;
             }
@@ -199,9 +243,12 @@ fn match_up() {
             println!("{minute:>3}m");
             for (p, pl) in w.state.players.iter().enumerate() {
                 println!(
-                    "  P{p} side {} mass {:>5}/s worth {:>7} kills {} lost {} | {}",
+                    "  P{p} side {} mass {:>5}/s energy {:>6}/s eff {:>3}% mines {} worth {:>7} kills {} lost {} | {}",
                     ["A", "B"][pl.team as usize],
                     pl.mass_income.floor_int(),
+                    pl.energy_income.floor_int(),
+                    (pl.upkeep_efficiency * 100).floor_int(),
+                    w.state.units.slots.iter().filter(|&r| w.state.units.owner[r] as usize == p && w.bp(r).mine.is_some() && w.state.units.is_active(r)).count(),
                     worth(&w, pl.team).floor_int(),
                     pl.units_killed,
                     pl.units_lost,
@@ -266,6 +313,33 @@ fn match_up() {
                 }
             }
             println!("ROSTER P{p}: {roster:?}");
+            // Where its mass stands: army, defence, economy, factories, the rest.
+            let mut by: std::collections::BTreeMap<&str, i64> = std::collections::BTreeMap::new();
+            for r in w.state.units.slots.iter() {
+                if w.state.units.owner[r] as usize != p {
+                    continue;
+                }
+                let bp = w.bp(r);
+                let kind = if bp.has(cat::COMMANDER) {
+                    "commander"
+                } else if bp.is_mobile() && bp.has(cat::ENGINEER) {
+                    "engineers"
+                } else if bp.is_mobile() && !bp.weapons.is_empty() {
+                    "army"
+                } else if bp.is_mobile() {
+                    "support"
+                } else if bp.has(cat::FACTORY) {
+                    "factories"
+                } else if bp.mine.is_some() || bp.has(cat::POWER) || bp.has(cat::STORAGE) {
+                    "economy"
+                } else if !bp.weapons.is_empty() || bp.shield.is_some() {
+                    "defence"
+                } else {
+                    "other"
+                };
+                *by.entry(kind).or_insert(0) += bp.cost_mass.floor_int() as i64;
+            }
+            println!("MASS P{p}: {by:?}");
         }
     }
     println!("PLANS A {}", plans(0));

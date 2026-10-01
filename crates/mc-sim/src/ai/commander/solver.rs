@@ -3,7 +3,7 @@
 //! against the enemy the side believes in, per mass; builders put up what the
 //! plans want (`wants`); and the classic economy code is steered by the plans.
 use super::matchup::edge;
-use super::profile::{role, Domain, Profile, Profiles, Target};
+use super::profile::{role, Domain, Profile, Profiles};
 use super::state::{Hurt, PlanKind, Stake};
 use crate::ai::{Job, Place};
 use crate::{Brain, World};
@@ -315,7 +315,32 @@ impl World {
             }
             let p = super::profile::Profile::of(bp);
             let toward = FxVec2::from_angle(facing);
-            let near = if p.has(role::DEFENSE) || p.hits(Target::Air) && !p.mobile() {
+            // A coastal gun by the side's sea mine nearest the enemy; other guns
+            // toward the enemy; the rest behind the factories.
+            let sea_mine = || {
+                units
+                    .slots
+                    .iter()
+                    .filter(|&r| {
+                        units.owner[r] == player
+                            && self.bp(r).mine.is_some()
+                            && self.ore.at_sea(units.pos[r])
+                    })
+                    .map(|r| units.pos[r])
+                    .min_by_key(|m| (m.distance_sq(start + toward * Fx::from_int(4000)), m.x, m.y))
+            };
+            let near = if p.has(role::ANTI_SHIP) && p.has(role::DEFENSE) {
+                match sea_mine() {
+                    Some(m) => m + toward * Fx::from_int(80),
+                    None => continue,
+                }
+            } else if p.has(role::ANTI_AIR) && !p.mobile() {
+                // Where the bombers last hit, else by the factories.
+                match ai.commander.hit_from_above {
+                    Some((at, t)) if self.state.tick < t + 1800 => at + toward * Fx::from_int(40),
+                    _ => start - toward * Fx::from_int(120),
+                }
+            } else if p.has(role::DEFENSE) {
                 start + toward * Fx::from_int(160)
             } else {
                 start - toward * Fx::from_int(260)
