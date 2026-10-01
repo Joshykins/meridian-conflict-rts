@@ -290,14 +290,16 @@ holds three at once, Normal two, Easy one (`Skill::gambits`).
 |---|---|---|
 | `landing` | a builder can make a lift ship with a warp drive; far more on an island map, more against a fortified front | a lift ship is built (`lift_job`); land units board it at staging, it jumps beside the target and lets them out, then jumps home (`ai/landing.rs`) |
 | `warp_raid` | an armed spaceship is in the menu, income 12+/s; more when little anti-air has been seen | warships go one at a time at the softest mine, plant or engineer on the enemy's outskirts, by warp; warships are a project kind first |
-| `air_fleet` | an air factory can be had, under 8 enemy anti-air seen; more when little | bombers wait behind the base for twice the usual wing (to 16), then go at the economy least covered by anti-air; air factories and bombers preferred |
-| `hunt` | a land route and a factory; more for engineers and mines seen on the enemy's outskirts | every minute the fastest six at staging go after an engineer seen lately, or an outlying mine with the fewest guns (`ai/hunt.rs`) |
+| `air_fleet` | an air factory stands, under 8 enemy anti-air seen; far more when their base has been seen with little | bombers wait behind the base for twice the usual wing (to 16), then go at the economy least covered by anti-air; air factories and bombers preferred |
+| `hunt` | a land route, a factory, and engineers or mines seen on the enemy's outskirts (more for each) | every minute the fastest six at staging go after an engineer seen lately, or an outlying mine with the fewest guns (`ai/hunt.rs`) |
 | `siege` | a map gun in the menu; more for a defensive side, a fortified enemy, 40+ income | map guns first among projects, two at a time, and a shield more per map gun (shields value projects) |
 | `nuke_race` | a silo in the menu, the enemy base seen and no interceptor seen in it | the silo first among projects, two at a time; dropped once an interceptor is seen |
 | `submarines` | a yard of ours makes them, enemy ships or a yard seen, fewer than 3 sonar seen | submarines and shipyards preferred |
-| `scouting` | always open; more while no enemy factory has been seen | four scouts, not two, and the Vigil once income reaches 8/s, not 25 |
+| `scouting` | always open; more while no enemy factory has been seen | four scouts, not two, and the Vigil once income reaches 15/s, not 25 |
 
-The first plans are picked four minutes in, once the scouts have looked; before,
+A plan must score at least 40 on what the side has seen to be taken up at all;
+a slot is left empty rather than filled with a weak plan. The lift ship waits for
+the second factory. The first plans are picked four minutes in, once the scouts have looked; before,
 every side picked the same three from an empty map and kept them. Plans are
 reviewed every two minutes. A held plan gets a bonus for its first three reviews
 and loses score for each review after, so a side commits and a long game sees it

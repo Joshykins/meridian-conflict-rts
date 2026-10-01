@@ -219,7 +219,7 @@ impl World {
         let player = self.state.units.owner[row];
         // Scouting as a plan: the sensor ship comes as soon as there is a little to spare.
         let income = if self.holds(player, Gambit::Scouting) {
-            SPOTTER_INCOME / 3
+            SPOTTER_INCOME * 3 / 5
         } else {
             SPOTTER_INCOME
         };

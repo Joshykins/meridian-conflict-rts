@@ -96,6 +96,10 @@ fn a_side_holds_as_many_plans_as_its_skill_allows_commits_then_moves_on() {
     let mut w = world();
     spawn(&mut w, "aster_t3_engineer", 0, 1000, 1000);
     remember(&mut w, 0, "aster_t1_land_factory", 7000, 7000);
+    // A fortified front: a landing round it and a siege both have a case.
+    for i in 0..6 {
+        remember(&mut w, 0, "aster_t1_point_defense", 6000 + i * 60, 6200);
+    }
     let first = review(&mut w, 0);
     assert_eq!(
         first.active.count_ones(),
@@ -120,6 +124,18 @@ fn a_side_holds_as_many_plans_as_its_skill_allows_commits_then_moves_on() {
     assert_ne!(later.active, first.active, "{} all game", first.names());
     w.state.ai[0].config.difficulty = Difficulty::Easy;
     assert_eq!(review(&mut w, 0).active.count_ones(), 1);
+}
+
+#[test]
+fn a_slot_stays_empty_rather_than_hold_a_plan_with_nothing_to_do() {
+    let mut w = world();
+    // A commander and a land factory, nothing of the enemy seen but its
+    // start: no engineers to hunt, no fortified front, no silo in the menu.
+    spawn(&mut w, "aster_commander", 0, 1000, 1000);
+    spawn(&mut w, "aster_t1_land_factory", 0, 1100, 1000);
+    remember(&mut w, 0, "aster_commander", 7000, 7000);
+    let s = review(&mut w, 0);
+    assert_eq!(s.names(), "scouting");
 }
 
 #[test]

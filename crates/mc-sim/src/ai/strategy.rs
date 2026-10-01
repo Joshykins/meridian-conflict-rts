@@ -28,6 +28,10 @@ const HOLD_BONUS: i32 = 60;
 const COMMIT_REVIEWS: u8 = 3;
 /// Score a plan loses for each review it has been held past those.
 const STALE: i32 = 25;
+/// Least a plan must score on what the side has seen, before its hold bonus and
+/// salt, to be taken up: a slot left empty costs nothing, a weak plan held
+/// for want of a better one cost the first air strikes and a factory.
+const MIN_SCORE: i32 = 40;
 /// Most a match's salt adds to a plan's score: enough to break near ties
 /// between sides, not to pick a plan the situation argues against.
 const SALT_SPREAD: u32 = 45;
@@ -245,7 +249,7 @@ impl World {
                     .wrapping_mul(0x85EB_CA6B)
                     .rotate_left(s.reviews / 3 % 32)
                     % SALT_SPREAD;
-                let total = if score > 0 {
+                let total = if score >= MIN_SCORE {
                     score + held + jitter as i32
                 } else {
                     0
@@ -324,7 +328,11 @@ impl World {
                     .filter(|c| self.blueprints.unit(c.blueprint).has(cat::EXTRACTOR))
                     .filter(outskirts)
                     .count();
-                30 + 25 * engineers.min(3) as i32 + 10 * mines.min(4) as i32 + 30 * aggressive
+                // Nothing seen out there: nothing to hunt.
+                if engineers + mines == 0 {
+                    return 0;
+                }
+                20 + 25 * engineers.min(3) as i32 + 10 * mines.min(4) as i32 + 30 * aggressive
             }
             Gambit::Landing => {
                 if !menu.any(self, |bp| bp.transport.is_some() && bp.warp.is_some()) {
@@ -341,12 +349,12 @@ impl World {
                 20 + 50 * open_sky as i32 + 30 * (!census.land_route) as i32
             }
             Gambit::AirFleet => {
-                let can = census.air_factories > 0
-                    || menu.any(self, |bp| bp.has(cat::FACTORY | cat::AIR));
-                if !can || ai.config.domain_weights[1] == 0 || enemy_aa >= 8 {
+                // With an air factory to fill it: holding bombers back before
+                // there is one only slows the first strikes.
+                if census.air_factories == 0 || ai.config.domain_weights[1] == 0 || enemy_aa >= 8 {
                     return 0;
                 }
-                30 + 50 * open_sky as i32 + 20 * (!census.land_route) as i32
+                20 + 60 * open_sky as i32 + 20 * (!census.land_route) as i32
             }
             Gambit::Siege => {
                 let gun = |bp: &UnitBlueprint| {

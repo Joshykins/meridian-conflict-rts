@@ -76,7 +76,12 @@ impl World {
         facing: Angle,
     ) -> Option<Job> {
         let player = self.state.units.owner[row];
-        if !self.holds(player, Gambit::Landing) || census.lifts.len() >= MOST_LIFTS {
+        // After the second factory: one built first cost a factory's worth of
+        // production for a ship with nothing yet to carry.
+        if !self.holds(player, Gambit::Landing)
+            || census.lifts.len() >= MOST_LIFTS
+            || census.factories.len() < 2
+        {
             return None;
         }
         let lift = |bp: &UnitBlueprint| bp.transport.is_some() && bp.warp.is_some();
