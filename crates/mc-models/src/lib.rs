@@ -823,6 +823,7 @@ mod props;
 pub mod remote;
 mod replicator;
 pub mod shell;
+pub mod site;
 pub mod stakes;
 #[cfg(test)]
 mod tests;

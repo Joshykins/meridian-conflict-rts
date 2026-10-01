@@ -5,7 +5,7 @@
 use std::fmt::Write as _;
 use std::path::Path;
 
-use super::thumbnail::{material_color, rasterise};
+use super::thumbnail::{hud_paint, material_color, rasterise, Shot};
 use super::{material, MeshLod, Model};
 
 const MATERIAL_NAMES: [&str; 16] = [
@@ -101,8 +101,11 @@ pub(super) fn render(mesh: &MeshLod, size: usize, azimuth_degrees: f32) -> Image
     let samples = rasterise(
         mesh,
         size,
-        azimuth_degrees,
-        material_color(material::TEAM).0,
+        &Shot {
+            azimuth_degrees,
+            elevation_degrees: 50.0,
+            paint: &hud_paint(material_color(material::TEAM).0),
+        },
     );
     let n = samples.n;
     let ss = n / size;

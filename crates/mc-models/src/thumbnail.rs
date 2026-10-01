@@ -52,8 +52,7 @@ pub fn thumbnail(mesh: &str, size: usize, azimuth_degrees: f32, team: [f32; 3]) 
     Some(rgba(&rasterise(
         &builder.finish(),
         size,
-        azimuth_degrees,
-        team,
+        &Shot::hud(azimuth_degrees, &hud_paint(team)),
     )))
 }
 
@@ -64,7 +63,47 @@ pub fn thumbnail(mesh: &str, size: usize, azimuth_degrees: f32, team: [f32; 3]) 
 /// `team` (linear RGB); upgrade pieces are left off. Takes about a millisecond
 /// at 128 px.
 pub fn thumbnail_of(model: &Model, size: usize, azimuth_degrees: f32, team: [f32; 3]) -> Vec<u8> {
-    rgba(&rasterise(&model.lods[0], size, azimuth_degrees, team))
+    rgba(&rasterise(
+        &model.lods[0],
+        size,
+        &Shot::hud(azimuth_degrees, &hud_paint(team)),
+    ))
+}
+
+/// Where a portrait's camera stands and what each material is painted.
+pub(super) struct Shot<'a> {
+    /// Degrees round the model (0 looks at its nose) and above the horizon.
+    pub azimuth_degrees: f32,
+    pub elevation_degrees: f32,
+    /// A material's flat colour (linear RGB) and whether it gives off light.
+    pub paint: &'a dyn Fn(u32) -> ([f32; 3], bool),
+}
+
+impl<'a> Shot<'a> {
+    /// The interface's portraits: from the RTS camera, 50 degrees above the horizon.
+    fn hud(azimuth_degrees: f32, paint: &'a dyn Fn(u32) -> ([f32; 3], bool)) -> Self {
+        Shot {
+            azimuth_degrees,
+            elevation_degrees: 50.0,
+            paint,
+        }
+    }
+}
+
+/// The flat palette with the owner's colour on the team stripe. Plating is a touch less
+/// white than its flat colour, as the game's lighting leaves it.
+pub(super) fn hud_paint(team: [f32; 3]) -> impl Fn(u32) -> ([f32; 3], bool) {
+    move |id| match id {
+        material::TEAM => (team, false),
+        material::PLATING => (material_color(id).0.map(|c| c * 0.74), false),
+        id => material_color(id),
+    }
+}
+
+/// A portrait of `mesh` as `shot` takes it, for the website's exporter (`crate::site`):
+/// RGBA8 as [`thumbnail_of`] gives it.
+pub(super) fn portrait(mesh: &MeshLod, size: usize, shot: &Shot) -> Vec<u8> {
+    rgba(&rasterise(mesh, size, shot))
 }
 
 /// Samples per pixel each way.
@@ -90,7 +129,7 @@ pub(super) struct Samples {
 }
 
 /// How a material takes light: roughness and how metallic it is.
-fn finish(id: u32) -> (f32, f32) {
+pub(super) fn finish(id: u32) -> (f32, f32) {
     match id {
         material::METAL => (0.34, 0.9),
         material::GLASS => (0.08, 0.0),
@@ -103,7 +142,7 @@ fn finish(id: u32) -> (f32, f32) {
 }
 
 /// Armour the game's shader textures from each face's frame (seams, plates).
-fn framed(id: u32) -> bool {
+pub(super) fn framed(id: u32) -> bool {
     matches!(
         id,
         material::PLATING | material::ACCENT | material::TEAM | material::PLATING_DARK
@@ -161,13 +200,11 @@ fn scan(s: [Vec2; 3], z: [f32; 3], n: usize, mut hit: impl FnMut(usize, [f32; 3]
 /// culled, so a face wound the wrong way shows as a hole. Lit like a studio
 /// shot of the in-game model: a shadowing key light, sky and bounce, ambient
 /// occlusion, the seams between armour panels, reflections on metal and glass.
-pub(super) fn rasterise(
-    mesh: &MeshLod,
-    size: usize,
-    azimuth_degrees: f32,
-    team: [f32; 3],
-) -> Samples {
-    let (elevation, azimuth) = (50f32.to_radians(), azimuth_degrees.to_radians());
+pub(super) fn rasterise(mesh: &MeshLod, size: usize, shot: &Shot) -> Samples {
+    let (elevation, azimuth) = (
+        shot.elevation_degrees.to_radians(),
+        shot.azimuth_degrees.to_radians(),
+    );
     let to_camera = Vec3::new(
         elevation.cos() * azimuth.cos(),
         elevation.cos() * azimuth.sin(),
@@ -362,10 +399,7 @@ pub(super) fn rasterise(
         for x in 0..n {
             let i = y * n + x;
             let Some(h) = &hits[i] else { continue };
-            let (base, emissive) = match h.material {
-                material::TEAM => (team, false),
-                id => material_color(id),
-            };
+            let (base, emissive) = (shot.paint)(h.material);
             let base = Vec3::from(base);
             samples.covered[i] = true;
             if emissive {
@@ -377,12 +411,7 @@ pub(super) fn rasterise(
             let nrm = h.normal;
             let v = to_camera;
             let (mut rough, metal) = finish(h.material);
-            // Plating is a touch less white than its flat colour, as the game's lighting leaves it.
-            let mut albedo = if h.material == material::PLATING {
-                base * 0.74
-            } else {
-                base
-            } * h.tone;
+            let mut albedo = base * h.tone;
             // Seams between armour panels, lit on the edge that faces the light.
             if framed(h.material) {
                 let (st, half) = (
