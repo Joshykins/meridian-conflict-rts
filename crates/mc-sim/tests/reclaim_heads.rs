@@ -13,10 +13,32 @@ use std::path::Path;
 use std::sync::Arc;
 
 fn world() -> World {
+    world_on(Heightfield::flat(256, 256, Fx::from_int(20)))
+}
+
+/// Land at 20 m with a sea channel 40 m deep across the map, x = 800 to 1360 m.
+fn channel() -> World {
+    let stride = 257;
+    let mut samples = vec![20u16; stride * stride];
+    for row in samples.chunks_exact_mut(stride) {
+        for s in &mut row[100..=170] {
+            *s = 0;
+        }
+    }
+    world_on(Heightfield::from_samples(
+        256,
+        256,
+        samples,
+        Fx::from_int(-20),
+        Fx::from_int(2),
+        Fx::from_int(20),
+    ))
+}
+
+fn world_on(terrain: Heightfield) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
-    let terrain = Heightfield::flat(256, 256, Fx::from_int(20));
     let map = MapData {
         name: "heads".into(),
         content_id: 1,
@@ -166,6 +188,46 @@ fn a_gleaner_on_a_move_order_reclaims_what_it_passes_without_stopping() {
     );
     assert_eq!(stopped, 0, "it kept moving");
     assert!(w.state.units.pos[gleaner].x > Fx::from_int(1500));
+}
+
+#[test]
+fn a_gleaner_hovers_out_over_the_sea_to_salvage_a_wreck_lying_there() {
+    let mut w = channel();
+    let gleaner = add(&mut w, "aster_t1_land_reclaimer", 400, 900);
+    let id = w.state.units.id(gleaner);
+    let goal = FxVec2::from_ints(1080, 900);
+    assert!(
+        w.terrain.height_at(goal) < w.terrain.water_level(),
+        "the goal is out over the water"
+    );
+    // A wreck in the middle of the channel, beyond its reach from either shore.
+    let sunk = wreck(&mut w, 1080, 1300, 200);
+    tick(
+        &mut w,
+        &[PlayerCommand {
+            player: 0,
+            command: Command::Move {
+                units: vec![id],
+                target: goal,
+                queue: false,
+            },
+        }],
+    );
+    for _ in 0..1200 {
+        tick(&mut w, &[]);
+        if !w.state.wrecks.slots.is_alive(sunk) {
+            break;
+        }
+    }
+    let at = w.state.units.pos[gleaner];
+    assert!(
+        at.distance(goal) < Fx::from_int(40),
+        "it reached the water: {at:?}"
+    );
+    assert!(
+        !w.state.wrecks.slots.is_alive(sunk),
+        "it salvaged the wreck in the channel"
+    );
 }
 
 #[test]

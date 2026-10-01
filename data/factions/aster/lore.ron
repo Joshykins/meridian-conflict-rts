@@ -47,7 +47,7 @@
         },
     ),
     "aster_t1_land_reclaimer": (
-        lore: "A salvage crawler with one reclaim head. It picks a battlefield clean as it drives across it.",
+        lore: "A salvage hovercraft with one reclaim head. It picks a battlefield clean as it skims across it, shore and shallows included.",
     ),
     "aster_t2_land_reclaimer": (
         lore: "A wheeled salvage carrier with three heads and point-defence lasers, built to work the front before the wrecks stop smoking.",

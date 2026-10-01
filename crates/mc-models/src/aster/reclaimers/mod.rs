@@ -1,4 +1,4 @@
-//! Aster land reclaimers: the Gleaner (tech 1, a salvage truck with a head on an
+//! Aster land reclaimers: the Gleaner (tech 1, a salvage hovercraft with a head on an
 //! A-frame) and the Thresher (tech 2, a wheeled carrier with three reclaim heads and
 //! missile-defence lasers). Wreckage lies on slopes, on ledges and down in gullies, so every head
 //! turns on a gun house of its own (`MeshBuilder::with_house`, weapon slot = head
@@ -347,9 +347,6 @@ pub(super) struct WheeledHull<'a> {
 }
 
 pub(super) fn wheeled_hull(b: &mut MeshBuilder, h: &WheeledHull) -> Roof {
-    let length = h.front - h.rear;
-    let nose = length * 0.12;
-    let (scale, shift) = (v2(0.8, 0.8), -0.045 * length);
     b.mirror_y(|b| {
         for &x in h.axles {
             tyre(b, v3(x, h.track, h.wheel_r), h.wheel_r, h.wheel_w);
@@ -362,26 +359,7 @@ pub(super) fn wheeled_hull(b: &mut MeshBuilder, h: &WheeledHull) -> Roof {
         v3(h.rear + 0.9, -tub, h.wheel_r * 0.55),
         v3(h.front - 1.2, tub, h.belly + 0.1),
     );
-    b.paint(PLATING);
-    let waist = h.belly + (h.deck - h.belly) * 0.4;
-    if b.coarse() {
-        b.frustum_open(
-            v3((h.rear + h.front) * 0.5, 0.0, h.belly),
-            v2(length, h.half_width * 2.0),
-            v2(length * scale.x, h.half_width * 2.0 * scale.y),
-            h.deck - h.belly,
-            v2(shift, 0.0),
-        );
-    } else {
-        b.loft_z(
-            &hull_plan(h.rear, h.front, h.half_width, nose),
-            &[
-                Section::scaled(h.belly, 0.95, 0.74),
-                Section::new(waist, 1.0),
-                Section::scaled(h.deck, scale.x, scale.y).shifted(shift, 0.0),
-            ],
-        );
-    }
+    let roof = shell(b, h.rear, h.front, h.half_width, h.belly, h.deck);
     if !b.coarse() {
         // Fenders: a dark flared arch over each pair of wheels, a white lip on it.
         b.mirror_y(|b| {
@@ -412,11 +390,47 @@ pub(super) fn wheeled_hull(b: &mut MeshBuilder, h: &WheeledHull) -> Roof {
             }
         });
     }
+    roof
+}
+
+/// The faceted white shell of a salvage hull from `belly` to `deck` over a [`hull_plan`]
+/// of `half_width`, drawn in toward the deck. Returns the deck.
+fn shell(
+    b: &mut MeshBuilder,
+    rear: f32,
+    front: f32,
+    half_width: f32,
+    belly: f32,
+    deck: f32,
+) -> Roof {
+    let length = front - rear;
+    let nose = length * 0.12;
+    let (scale, shift) = (v2(0.8, 0.8), -0.045 * length);
+    b.paint(PLATING);
+    let waist = belly + (deck - belly) * 0.4;
+    if b.coarse() {
+        b.frustum_open(
+            v3((rear + front) * 0.5, 0.0, belly),
+            v2(length, half_width * 2.0),
+            v2(length * scale.x, half_width * 2.0 * scale.y),
+            deck - belly,
+            v2(shift, 0.0),
+        );
+    } else {
+        b.loft_z(
+            &hull_plan(rear, front, half_width, nose),
+            &[
+                Section::scaled(belly, 0.95, 0.74),
+                Section::new(waist, 1.0),
+                Section::scaled(deck, scale.x, scale.y).shifted(shift, 0.0),
+            ],
+        );
+    }
     Roof {
-        rear: (h.rear + nose * 0.45) * scale.x + shift,
-        front: (h.front - nose) * scale.x + shift,
-        half_width: h.half_width * scale.y,
-        z: h.deck,
+        rear: (rear + nose * 0.45) * scale.x + shift,
+        front: (front - nose) * scale.x + shift,
+        half_width: half_width * scale.y,
+        z: deck,
     }
 }
 

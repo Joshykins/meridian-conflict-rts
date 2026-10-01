@@ -96,14 +96,15 @@
         cost: (mass: 60, energy: 360, time: 240),
         radius: 4.6, height: 3.4,
         vision: 400,
-        motion: (layer: Land, size: 0, speed: 29, accel: 26, turn: 100),
-        // The head on the A-frame over the truck bed (the Gleaner model's `PIVOT`).
+        // A hovercraft: it salvages along shores and out over the water as well as on land.
+        motion: (layer: Hover, size: 0, speed: 29, accel: 26, turn: 100),
+        // The head on the A-frame over the hull (the Gleaner model's `PIVOT`).
         reclaimer: (power: 5, range: 550, charge: 0.8, mobile: true, heads: [
             (pivot: (-2.1, 0, 4.1), emitter: (0.23, 0, 4.1), turn: 90, pitch: (-70, 80)),
         ]),
         weapons: [],
         mesh: "gleaner", icon: Salvage,
-        sounds: (death: "blast_small", moving: "wheels"),
+        sounds: (death: "blast_small", moving: "aster_hover"),
     ),
     (
         key: "aster_t2_land_reclaimer",
