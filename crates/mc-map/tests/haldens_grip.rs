@@ -10,7 +10,8 @@
 //! * each bay is one sea that ships can cross end to end, and the two bays
 //!   do not meet (the land bridge runs corner to corner);
 //! * each side has one sealed cove in the map edge, deep enough for ships
-//!   and the same size as the other side's, and there is no other deep water;
+//!   and the same size as the other side's, and every other pocket of deep
+//!   water (the lakes' middles) has a twin of the same size;
 //! * both sides have the same timber.
 //!
 //! The map is not checked in; without the file the test says so and passes.
@@ -173,8 +174,8 @@ fn haldens_grip_plays_the_same_from_both_sides() {
         ));
     }
 
-    // Two seas, one in each bay, each crossable end to end, and the two
-    // sealed coves.
+    // Two seas, one in each bay, each crossable end to end, then the
+    // sealed coves and the lakes' deep middles in pairs.
     let mut seen = vec![false; (w * h) as usize];
     let mut seas = Vec::new();
     for cy in 0..h {
@@ -200,10 +201,13 @@ fn haldens_grip_plays_the_same_from_both_sides() {
     );
     if seas.len() < 4 || seas[0] != seas[1] {
         problems.push("the two bays are not two seas of the same size".into());
-    } else if seas[2] != seas[3] || km2(seas[3]) < 0.5 {
-        problems.push("the two sealed coves are not the same size, or too small for ships".into());
-    } else if seas[4..].iter().sum::<usize>() as f64 > 0.002 * seas[0] as f64 {
-        problems.push("deep water cut off from the bays and the coves".into());
+    } else if seas[2..]
+        .chunks(2)
+        .any(|pair| pair.len() < 2 || pair[0] != pair[1])
+    {
+        problems.push("the enclosed waters do not come in pairs of the same size".into());
+    } else if km2(seas[3]) < 0.5 {
+        problems.push("the two sealed coves are too small for ships".into());
     }
 
     // Timber each side of the diagonal.

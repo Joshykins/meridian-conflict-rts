@@ -107,7 +107,7 @@ const ISLAND: &[(f64, f64)] = &[
     (-40.0, 349.0),
 ];
 
-/// The back-country lake, shallower than a ship draws.
+/// The back-country lake, deep in the middle.
 const LAKE: &[(f64, f64)] = &[
     (122.0, 687.0),
     (120.0, 695.0),
@@ -128,8 +128,13 @@ const LAKE: &[(f64, f64)] = &[
     (134.0, 700.0),
 ];
 
-/// The lake's island: centre, radius (px).
-const LAKE_ISLE: (f64, f64, f64) = (137.0, 725.0, 7.0);
+/// The lake's islands: centre, radius (px), height (m). A wooded knoll and
+/// two rocks.
+const LAKE_ISLES: &[(f64, f64, f64, f64)] = &[
+    (137.0, 725.0, 8.0, 24.0),
+    (178.0, 735.0, 3.0, 12.0),
+    (150.0, 750.0, 2.2, 9.0),
+];
 
 /// Rock islets fencing the cove below the cove base: centre, radius (px),
 /// height (m). They stand close enough to the shore to screen ships moored
@@ -319,54 +324,103 @@ const RIDGES: &[Ridge] = &[
     },
 ];
 
-/// Streams, source to mouth (px), the valley floor's half width (px) and the
-/// bed's height at the source and at the mouth (below zero: an estuary).
-type Stream = (&'static [(f64, f64)], f64, f64, f64);
-const STREAMS: &[Stream] = &[
-    // The lake's outlet, down the vale to the sealed cove.
-    (
-        &[
-            (114.0, 700.0),
-            (101.0, 694.0),
-            (93.0, 675.0),
-            (79.0, 664.0),
-            (73.0, 644.0),
-            (60.0, 631.0),
-            (50.0, 615.0),
-        ],
-        4.5,
-        1.0,
-        -3.0,
-    ),
+/// The river draining the lake into the sealed cove, source (inside the
+/// lake) to mouth (inside the cove), px. It winds down a vale cut into the
+/// meadow; shallower than a ship draws, too wet to walk except at its fords.
+const RIVER: &[(f64, f64)] = &[
+    (120.0, 706.0),
+    (110.0, 700.0),
+    (102.0, 692.0),
+    (103.0, 682.0),
+    (96.0, 673.0),
+    (85.0, 671.0),
+    (78.0, 663.0),
+    (81.0, 652.0),
+    (74.0, 642.0),
+    (63.0, 639.0),
+    (57.0, 630.0),
+    (52.0, 620.0),
+    (46.0, 610.0),
 ];
 
-/// The streams' courses rounded into curves (Catmull-Rom, px).
-fn stream_courses() -> &'static [Vec<(f64, f64)>] {
-    static COURSES: std::sync::OnceLock<Vec<Vec<(f64, f64)>>> = std::sync::OnceLock::new();
-    COURSES.get_or_init(|| {
-        STREAMS
-            .iter()
-            .map(|&(line, ..)| {
-                let at = |i: isize| line[i.clamp(0, line.len() as isize - 1) as usize];
-                let mut out = Vec::new();
-                for i in 0..line.len() as isize - 1 {
-                    let (p0, p1, p2, p3) = (at(i - 1), at(i), at(i + 1), at(i + 2));
-                    for k in 0..8 {
-                        let t = k as f64 / 8.0;
-                        let c = |a: f64, b: f64, c: f64, d: f64| {
-                            0.5 * (2.0 * b
-                                + (c - a) * t
-                                + (2.0 * a - 5.0 * b + 4.0 * c - d) * t * t
-                                + (3.0 * b - a - 3.0 * c + d) * t * t * t)
-                        };
-                        out.push((c(p0.0, p1.0, p2.0, p3.0), c(p0.1, p1.1, p2.1, p3.1)));
-                    }
-                }
-                out.push(*line.last().unwrap());
-                out
+/// Where the river can be forded, as a share of the way down it.
+const FORDS: &[f64] = &[0.33, 0.66];
+
+/// The river's course rounded into a curve (Catmull-Rom, px), the distance
+/// down it at each point (px), and how hard it turns there (signed, about
+/// -1..1: positive to the left).
+struct Course {
+    pts: Vec<(f64, f64)>,
+    run: Vec<f64>,
+    turn: Vec<f64>,
+}
+
+fn river_course() -> &'static Course {
+    static COURSE: std::sync::OnceLock<Course> = std::sync::OnceLock::new();
+    COURSE.get_or_init(|| {
+        let line = RIVER;
+        let at = |i: isize| line[i.clamp(0, line.len() as isize - 1) as usize];
+        let mut pts = Vec::new();
+        for i in 0..line.len() as isize - 1 {
+            let (p0, p1, p2, p3) = (at(i - 1), at(i), at(i + 1), at(i + 2));
+            for k in 0..8 {
+                let t = k as f64 / 8.0;
+                let c = |a: f64, b: f64, c: f64, d: f64| {
+                    0.5 * (2.0 * b
+                        + (c - a) * t
+                        + (2.0 * a - 5.0 * b + 4.0 * c - d) * t * t
+                        + (3.0 * b - a - 3.0 * c + d) * t * t * t)
+                };
+                pts.push((c(p0.0, p1.0, p2.0, p3.0), c(p0.1, p1.1, p2.1, p3.1)));
+            }
+        }
+        pts.push(*line.last().unwrap());
+        let mut run = vec![0.0];
+        for w in pts.windows(2) {
+            run.push(run.last().unwrap() + dist(w[0], w[1]));
+        }
+        // The turn at each point, over a few points either side so a bend
+        // reads as one bend.
+        let n = pts.len();
+        let raw: Vec<f64> = (0..n)
+            .map(|i| {
+                let (a, b, c) = (pts[i.saturating_sub(3)], pts[i], pts[(i + 3).min(n - 1)]);
+                let (u, v) = ((b.0 - a.0, b.1 - a.1), (c.0 - b.0, c.1 - b.1));
+                let cross = u.0 * v.1 - u.1 * v.0;
+                let len = (u.0.hypot(u.1) * v.0.hypot(v.1)).max(1e-9);
+                // y runs down in the drawing: flip so positive turns left on the map.
+                -cross / len
             })
-            .collect()
+            .collect();
+        let turn = (0..n)
+            .map(|i| {
+                let lo = i.saturating_sub(4);
+                let hi = (i + 4).min(n - 1);
+                raw[lo..=hi].iter().sum::<f64>() / (hi - lo + 1) as f64 * 2.5
+            })
+            .collect();
+        Course { pts, run, turn }
     })
+}
+
+/// Distance from `p` to the river's course (px), how far down it the nearest
+/// point lies (px), which side `p` is on (+1 left on the map, -1 right) and
+/// how hard the river turns there.
+fn river_at(p: (f64, f64)) -> (f64, f64, f64, f64) {
+    let c = river_course();
+    let (mut best, mut at) = (f64::INFINITY, (0.0, 1.0, 0.0));
+    for (i, w) in c.pts.windows(2).enumerate() {
+        let (d, t) = segment(p, w[0], w[1]);
+        if d < best {
+            let (ux, uy) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+            let cross = ux * (p.1 - w[0].1) - uy * (p.0 - w[0].0);
+            let along = c.run[i] + t * (c.run[i + 1] - c.run[i]);
+            let turn = c.turn[i] * (1.0 - t) + c.turn[i + 1] * t;
+            best = d;
+            at = (along, -cross.signum(), turn);
+        }
+    }
+    (best, at.0, at.1, at.2)
 }
 
 /// Ore away from the bases: centre (px), radius (m).
@@ -718,40 +772,96 @@ impl Terrain {
             -(-2.0 - 30.0 * smoothstep(0.0, 160.0, c.max(0.0)) + wall * (-c).max(0.0))
         }));
 
-        // Streams: each cuts its valley down to a bed that falls to the sea,
-        // sides no steeper than a unit can climb.
-        let meander = 150.0 * n(&|x, y| self.ridge.fbm(x / 800.0 - 40.0, y / 800.0, 3, 0.5));
-        // Some reaches run in a steep-sided cut, some in a broad open vale.
-        let grade = 0.14 + 0.1 * n(&|x, y| self.ramp.fbm(x / 900.0 + 12.0, y / 900.0, 2, 0.5));
-        for (&(_, half, source, mouth), line) in STREAMS.iter().zip(stream_courses()) {
-            let cut = -self.both(x, y, |p| -{
-                let (best, t) = polyline_at(p, line);
-                let best = self.bm(best);
-                let bed = source - (source - mouth) * smoothstep(0.55, 1.0, t);
-                // Negative: this stream wants the ground this much lower.
-                // Past the valley the stream no longer cuts: its walls would
-                // otherwise shave the tops off mountains kilometres away.
-                bed + grade * (best + meander - self.bm(half)).max(0.0)
-                    + 2_000.0 * smoothstep(500.0, 900.0, best)
-            });
-            h = h.min(cut);
-        }
+        h = h.min(self.bays_river(x, y));
 
-        // The lake, shallower than a ship draws. It lies in a hollow the
-        // land slopes into; the shore frays on a finer scale.
-        let fray = n(&|x, y| self.lake_shore.fbm(x / 160.0, y / 160.0, 3, 0.5)) * 70.0;
+        // The lake, in a hollow the land slopes into. Its shore frays on two
+        // scales; it has beaches in some reaches and low bluffs in others, a
+        // sandy shelf and bars under the water.
+        let fray = n(&|x, y| self.lake_shore.fbm(x / 220.0, y / 220.0, 3, 0.5)) * 110.0
+            + n(&|x, y| self.lake_shore.fbm(x / 60.0 + 13.0, y / 60.0 - 7.0, 2, 0.5)) * 30.0;
         let lake = self.bm(self.both(x, y, |p| inside(p, LAKE))) + fray;
-        if lake > -700.0 {
-            let hollow = smoothstep(-700.0, 0.0, lake);
-            let floor = -1.5 - 3.0 * smoothstep(0.0, 220.0, lake);
-            let shore = 5.0 + 0.02 * (-lake).max(0.0);
-            h = h.min(h * (1.0 - hollow) + shore * hollow);
-            h += (floor - h) * smoothstep(-12.0, 12.0, lake);
-            // Its island: a low wooded rise.
-            let isle = self.both(x, y, |p| LAKE_ISLE.2 - dist(p, (LAKE_ISLE.0, LAKE_ISLE.1)));
-            h = h.max(-3.0 + 12.0 * smoothstep(-2.0, 5.0, isle + fray / 30.0));
+        if lake > -900.0 {
+            let bluff = smoothstep(
+                0.05,
+                0.3,
+                n(&|x, y| self.lake_shore.fbm(x / 700.0 + 40.0, y / 700.0, 2, 0.5)),
+            );
+            // Steep enough that the sand is a strip, not a ring.
+            let bank = 80.0 - 60.0 * bluff;
+            let rim = 11.0 * smoothstep(0.0, bank, -lake);
+            h = h.min(0.3 + rim + 0.04 * (-lake - bank).max(0.0));
+            // A sandy shelf, then deep water, dark in the middle.
+            let bars = 1.5 * n(&|x, y| self.lake.fbm(x / 260.0 + 5.0, y / 260.0, 3, 0.5));
+            let floor =
+                (-0.8 - 27.0 * smoothstep(0.0, 420.0, lake).powf(0.8) + bars).clamp(-28.0, -0.4);
+            h += (floor - h) * smoothstep(-6.0, 6.0, lake);
+            // Its islands: a wooded knoll and two rocks.
+            h = h.max(self.both(x, y, |p| {
+                LAKE_ISLES
+                    .iter()
+                    .map(|&(cx, cy, r, tall)| {
+                        let d = self.bm(dist(p, (cx, cy))) + fray / 2.0;
+                        let r = self.bm(r);
+                        let rise = smoothstep(r + 25.0, 0.2 * r, d).powf(0.5);
+                        // Away from it the lake floor keeps its depth.
+                        if rise > 0.0 {
+                            -6.0 + (tall + 6.0) * rise
+                        } else {
+                            f64::MIN
+                        }
+                    })
+                    .fold(f64::MIN, f64::max)
+            }));
         }
         h
+    }
+
+    /// The ground the river leaves: its channel, banks, terraces and vale
+    /// (higher than the land away from it, so the caller takes the lower).
+    /// Cut banks on the outside of each bend, sand bars on the inside, and
+    /// gravel fords where the channel shallows to dry ground.
+    fn bays_river(&self, x: f64, y: f64) -> f64 {
+        let n = |f: &dyn Fn(f64, f64) -> f64| self.even(x, y, f);
+        let wiggle = 14.0 * n(&|x, y| self.ridge.fbm(x / 180.0 - 40.0, y / 180.0, 2, 0.5));
+        let vary = n(&|x, y| self.ramp.fbm(x / 600.0 + 12.0, y / 600.0, 2, 0.5));
+        let grain = n(&|x, y| self.detail.fbm(x / 90.0 - 3.0, y / 90.0 + 6.0, 2, 0.5));
+        let total = self.bm(*river_course().run.last().unwrap());
+        -self.both(x, y, |p| {
+            let (d, along, side, turn) = river_at(p);
+            let d = self.bm(d) + wiggle;
+            if d > 1_200.0 {
+                return -1e6;
+            }
+            let down = self.bm(along) / total;
+            let ford = FORDS
+                .iter()
+                .map(|&f| smoothstep(55.0, 20.0, (self.bm(along) - f * total).abs()))
+                .fold(0.0, f64::max);
+            // Wider toward the mouth, and spread thin over a ford.
+            let wide = (34.0 + 26.0 * smoothstep(0.75, 1.0, down))
+                * (1.0 + 0.25 * vary)
+                * (1.0 + 0.4 * ford);
+            let inner = smoothstep(0.0, 0.6, side * turn);
+            let outer = smoothstep(0.0, 0.6, -side * turn);
+            let bank = (28.0 + 50.0 * inner - 10.0 * outer).max(80.0 * ford);
+            // High enough to be grass, not the sand at the water's edge.
+            let terrace = 10.5 + 1.5 * vary + 0.5 * grain;
+            // The vale's width does not follow the bends: it would crease.
+            let vale = wide + 220.0 + 90.0 * vary;
+            let bed = -0.3 - 5.1 * (1.0 - (d / wide).min(1.0).powi(2));
+            let bed = bed + (0.6 - bed) * ford;
+            let edge = bed.max(-0.2);
+            let ground = if d < wide {
+                bed
+            } else if d < wide + bank {
+                edge + (terrace - edge) * smoothstep(wide, wide + bank, d)
+            } else {
+                // The vale's floor, then its walls up to the meadow, gentle
+                // enough to walk; far off, nothing.
+                terrace + 0.22 * (d - vale).max(0.0) + 2_000.0 * smoothstep(600.0, 1_000.0, d)
+            };
+            -ground
+        })
     }
 
     pub(super) fn natural_bays(&self, x: f64, y: f64) -> f64 {
