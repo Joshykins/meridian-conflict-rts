@@ -85,6 +85,13 @@ fn chronicle(bp: &Blueprints) -> Chronicle {
         tick: 2400,
         owner: 0,
         blueprint: factory,
+        upgrade: false,
+    });
+    c.built.push(Built {
+        tick: 2500,
+        owner: 0,
+        blueprint: id("aster_t1_power"),
+        upgrade: false,
     });
     c.deaths.push(Death {
         tick: 5400,

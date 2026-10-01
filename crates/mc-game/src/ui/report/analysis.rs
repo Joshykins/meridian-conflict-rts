@@ -131,6 +131,12 @@ pub enum MomentKind {
     Start,
     FirstBlood,
     Tier,
+    /// A side's first aircraft or first ship.
+    Domain,
+    /// A side working a round number of mines.
+    Expansion,
+    /// A side taking the lead in army strength or income.
+    Lead,
     Experimental,
     ExperimentalLost,
     Warhead,
@@ -234,6 +240,11 @@ fn experimental(bp: &UnitBlueprint) -> bool {
     bp.has(cat::EXPERIMENTAL) || bp.tech >= 4
 }
 
+/// Has any of `categories` (`UnitBlueprint::has` asks for all of them).
+fn any(bp: &UnitBlueprint, categories: u32) -> bool {
+    bp.categories & categories != 0
+}
+
 fn spend_kind(bp: &UnitBlueprint) -> usize {
     if experimental(bp) {
         1
@@ -243,9 +254,12 @@ fn spend_kind(bp: &UnitBlueprint) -> usize {
         } else {
             0
         }
-    } else if bp.has(cat::EXTRACTOR | cat::POWER | cat::STORAGE | cat::ECONOMY) {
+    } else if any(
+        bp,
+        cat::EXTRACTOR | cat::POWER | cat::STORAGE | cat::ECONOMY,
+    ) {
         3
-    } else if bp.has(cat::DEFENSE | cat::SHIELD | cat::WALL | cat::STRATEGIC) {
+    } else if any(bp, cat::DEFENSE | cat::SHIELD | cat::WALL | cat::STRATEGIC) {
         4
     } else {
         5
@@ -303,6 +317,7 @@ pub fn region(at: Vec2, size: Vec2) -> &'static str {
 impl Analysis {
     pub fn of(c: &Chronicle, blueprints: &Blueprints) -> Analysis {
         let n = c.sides.len();
+        let deaths = fought(c, blueprints);
         let length = c.ended.map_or(c.tick, |e| e.0).max(1);
         let winner = c.ended.map(|e| e.1);
         let mut a = Analysis {
@@ -334,8 +349,7 @@ impl Analysis {
             total_destroyed: 0.0,
             total_deaths: 0,
             frames: c.frames.clone(),
-            fallen: c
-                .deaths
+            fallen: deaths
                 .iter()
                 .map(|d| {
                     let bp = blueprints.unit(d.blueprint);
@@ -355,11 +369,11 @@ impl Analysis {
             }
         }
         a.economy(c);
-        a.combat(c, blueprints);
+        a.combat(c, &deaths, blueprints);
         a.building(c, blueprints);
-        a.curves(c, blueprints);
-        a.battles = battles(c, blueprints, n);
-        a.moments = moments(&a, c, blueprints);
+        a.curves(c, &deaths, blueprints);
+        a.battles = battles(c.size, &deaths, blueprints, n);
+        a.moments = moments(&a, c, &deaths, blueprints);
         a.awards = awards(&a.sides);
         a
     }
@@ -399,7 +413,7 @@ impl Analysis {
     }
 
     /// Kills, losses and who destroyed what.
-    fn combat(&mut self, c: &Chronicle, blueprints: &Blueprints) {
+    fn combat(&mut self, c: &Chronicle, deaths: &[Death], blueprints: &Blueprints) {
         let n = self.sides.len();
         let mut weapons: Vec<Vec<(BlueprintId, u32, f32)>> = vec![Vec::new(); n];
         for k in &c.kills {
@@ -423,7 +437,7 @@ impl Analysis {
             }
         }
         let mut lost: Vec<Vec<(BlueprintId, u32, f32)>> = vec![Vec::new(); n];
-        for d in &c.deaths {
+        for d in deaths {
             let Some(s) = self.sides.get_mut(d.owner as usize) else {
                 continue;
             };
@@ -455,7 +469,8 @@ impl Analysis {
         }
     }
 
-    /// What each side built, and when it reached each tier.
+    /// What each side built (upgrades paid for what they add, and not counted as new
+    /// units), and when it reached each tier.
     fn building(&mut self, c: &Chronicle, blueprints: &Blueprints) {
         let mut counts: Vec<Vec<(BlueprintId, u32)>> = vec![Vec::new(); self.sides.len()];
         for b in &c.built {
@@ -463,12 +478,20 @@ impl Analysis {
                 continue;
             };
             let bp = blueprints.unit(b.blueprint);
-            s.built += 1;
-            s.spend[spend_kind(bp)] += worth(bp);
+            let cost = if b.upgrade {
+                blueprints.upgrade_cost(bp).0.to_f32()
+            } else {
+                worth(bp)
+            };
+            s.spend[spend_kind(bp)] += cost;
             let tier = (bp.tech.clamp(1, 5) - 1) as usize;
             if bp.builder.is_some() || experimental(bp) {
                 s.tier_at[tier].get_or_insert(b.tick);
             }
+            if b.upgrade {
+                continue;
+            }
+            s.built += 1;
             let list = &mut counts[b.owner as usize];
             match list.iter_mut().find(|e| e.0 == b.blueprint) {
                 Some(e) => e.1 += 1,
@@ -482,7 +505,7 @@ impl Analysis {
     }
 
     /// Every metric's curve over the samples.
-    fn curves(&mut self, c: &Chronicle, blueprints: &Blueprints) {
+    fn curves(&mut self, c: &Chronicle, deaths: &[Death], blueprints: &Blueprints) {
         let n = self.sides.len();
         let dt = seconds(SAMPLE_TICKS);
         // Running totals as the samples go by.
@@ -502,7 +525,7 @@ impl Analysis {
                 }
                 ki += 1;
             }
-            while let Some(d) = c.deaths.get(di).filter(|d| d.tick <= sample.tick) {
+            while let Some(d) = deaths.get(di).filter(|d| d.tick <= sample.tick) {
                 if (d.owner as usize) < n && d.complete {
                     lost[d.owner as usize] += worth(blueprints.unit(d.blueprint));
                 }
@@ -564,7 +587,15 @@ impl Analysis {
 }
 
 /// Deaths close in place and time, gathered into fights, the biggest first.
-fn battles(c: &Chronicle, blueprints: &Blueprints, n: usize) -> Vec<Battle> {
+/// Deaths in one stretch of time on one patch of the map.
+struct Bucket {
+    /// (half minute, cell x, cell y).
+    key: (i32, i32, i32),
+    worth: f32,
+    deaths: Vec<usize>,
+}
+
+fn battles(size: Vec2, deaths: &[Death], blueprints: &Blueprints, n: usize) -> Vec<Battle> {
     // Cells a side of the map is cut into, and ticks a bucket covers.
     const CELLS: usize = 10;
     const SPAN: u32 = 30 * TICKS_PER_SECOND;
@@ -576,44 +607,73 @@ fn battles(c: &Chronicle, blueprints: &Blueprints, n: usize) -> Vec<Battle> {
         }
     };
     let cell = |d: &Death| {
-        let k = (d.pos / c.size * CELLS as f32).clamp(Vec2::ZERO, Vec2::splat(CELLS as f32 - 1.0));
+        let k = (d.pos / size * CELLS as f32).clamp(Vec2::ZERO, Vec2::splat(CELLS as f32 - 1.0));
         (k.x as i32, k.y as i32)
     };
-    // (window, x, y) -> worth, in a list kept sorted by key for lookups.
-    let mut buckets: Vec<((i32, i32, i32), f32)> = Vec::new();
-    for d in &c.deaths {
-        let v = worth_of(d);
-        if v <= 0.0 {
-            continue;
-        }
-        let (x, y) = cell(d);
-        let key = ((d.tick / SPAN) as i32, x, y);
-        match buckets.binary_search_by(|b| b.0.cmp(&key)) {
-            Ok(i) => buckets[i].1 += v,
-            Err(i) => buckets.insert(i, (key, v)),
+    // (window, x, y) -> worth and the deaths in it, sorted by key for lookups.
+    let mut keyed: Vec<((i32, i32, i32), usize)> = deaths
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| worth_of(d) > 0.0)
+        .map(|(i, d)| {
+            let (x, y) = cell(d);
+            (((d.tick / SPAN) as i32, x, y), i)
+        })
+        .collect();
+    keyed.sort_unstable();
+    let mut buckets: Vec<Bucket> = Vec::new();
+    for (key, i) in keyed {
+        match buckets.last_mut() {
+            Some(b) if b.key == key => {
+                b.worth += worth_of(&deaths[i]);
+                b.deaths.push(i);
+            }
+            _ => buckets.push(Bucket {
+                key,
+                worth: worth_of(&deaths[i]),
+                deaths: vec![i],
+            }),
         }
     }
-    let total: f32 = buckets.iter().map(|b| b.1).sum();
-    let floor = (total * 0.04).max(400.0);
+    let total: f32 = buckets.iter().map(|b| b.worth).sum();
+    // A fight starts from a bucket worth something to the match, and is kept when it
+    // comes to a share of all that was destroyed.
+    let seed = (total * 0.006).max(250.0);
+    let keep = (total * 0.02).max(800.0);
     let mut claimed = vec![false; buckets.len()];
     let mut order: Vec<usize> = (0..buckets.len()).collect();
-    order.sort_by(|&a, &b| buckets[b].1.total_cmp(&buckets[a].1).then(a.cmp(&b)));
+    order.sort_by(|&a, &b| {
+        buckets[b]
+            .worth
+            .total_cmp(&buckets[a].worth)
+            .then(a.cmp(&b))
+    });
     let mut found = Vec::new();
     for start in order {
-        if claimed[start] || buckets[start].1 < floor {
+        if claimed[start] || buckets[start].worth < seed {
             continue;
         }
-        // Flood out to neighbouring buckets in place and time.
+        // Flood out to neighbouring buckets in place and time, so far from where it
+        // started: fighting that goes on for longer, or moves on, is the next battle.
         let mut members = vec![start];
         claimed[start] = true;
+        let origin = buckets[start].key;
+        let near = |key: (i32, i32, i32)| {
+            (key.0 - origin.0).abs() <= 2
+                && (key.1 - origin.1).abs() <= 2
+                && (key.2 - origin.2).abs() <= 2
+        };
         let mut k = 0;
         while k < members.len() {
-            let (w, x, y) = buckets[members[k]].0;
+            let (w, x, y) = buckets[members[k]].key;
             for dw in -1..=1 {
                 for dx in -1..=1 {
                     for dy in -1..=1 {
                         let key = (w + dw, x + dx, y + dy);
-                        if let Ok(i) = buckets.binary_search_by(|b| b.0.cmp(&key)) {
+                        if !near(key) {
+                            continue;
+                        }
+                        if let Ok(i) = buckets.binary_search_by(|b| b.key.cmp(&key)) {
                             if !claimed[i] {
                                 claimed[i] = true;
                                 members.push(i);
@@ -624,7 +684,6 @@ fn battles(c: &Chronicle, blueprints: &Blueprints, n: usize) -> Vec<Battle> {
             }
             k += 1;
         }
-        let keys: Vec<(i32, i32, i32)> = members.iter().map(|&i| buckets[i].0).collect();
         let mut b = Battle {
             from: u32::MAX,
             to: 0,
@@ -634,13 +693,9 @@ fn battles(c: &Chronicle, blueprints: &Blueprints, n: usize) -> Vec<Battle> {
             losses: vec![0.0; n],
             name: String::new(),
         };
-        let inside: Vec<&Death> = c
-            .deaths
+        let inside: Vec<&Death> = members
             .iter()
-            .filter(|d| {
-                let (x, y) = cell(d);
-                keys.contains(&((d.tick / SPAN) as i32, x, y)) && worth_of(d) > 0.0
-            })
+            .flat_map(|&m| buckets[m].deaths.iter().map(|&i| &deaths[i]))
             .collect();
         for d in &inside {
             let v = worth_of(d);
@@ -653,7 +708,7 @@ fn battles(c: &Chronicle, blueprints: &Blueprints, n: usize) -> Vec<Battle> {
             }
         }
         // A fight takes a few losses: a lone death (a commander sniped) is not a battle.
-        if b.value <= 0.0 || inside.len() < 4 {
+        if b.value < keep || inside.len() < 4 {
             continue;
         }
         b.at /= b.value;
@@ -678,14 +733,14 @@ fn battles(c: &Chronicle, blueprints: &Blueprints, n: usize) -> Vec<Battle> {
                 "A fifth",
                 "A sixth"
             ][i],
-            region(b.at, c.size)
+            region(b.at, size)
         );
     }
     found
 }
 
 /// The match's turning points, in order.
-fn moments(a: &Analysis, c: &Chronicle, blueprints: &Blueprints) -> Vec<Moment> {
+fn moments(a: &Analysis, c: &Chronicle, deaths: &[Death], blueprints: &Blueprints) -> Vec<Moment> {
     let mut out = vec![Moment {
         tick: 0,
         kind: MomentKind::Start,
@@ -730,7 +785,9 @@ fn moments(a: &Analysis, c: &Chronicle, blueprints: &Blueprints) -> Vec<Moment> 
             }
         }
     }
-    arsenal(a, c, blueprints, &mut out);
+    arsenal(a, c, deaths, blueprints, &mut out);
+    firsts(a, c, blueprints, &mut out);
+    leads(a, c, &mut out);
     for b in &a.battles {
         let worst = b
             .losses
@@ -794,7 +851,13 @@ fn moments(a: &Analysis, c: &Chronicle, blueprints: &Blueprints) -> Vec<Moment> 
 }
 
 /// The big machines fielded and lost, and the warheads that landed.
-fn arsenal(a: &Analysis, c: &Chronicle, blueprints: &Blueprints, out: &mut Vec<Moment>) {
+fn arsenal(
+    a: &Analysis,
+    c: &Chronicle,
+    deaths: &[Death],
+    blueprints: &Blueprints,
+    out: &mut Vec<Moment>,
+) {
     // Each side's first of each experimental, and every experimental lost.
     let mut seen: Vec<(u8, BlueprintId)> = Vec::new();
     for b in &c.built {
@@ -819,7 +882,7 @@ fn arsenal(a: &Analysis, c: &Chronicle, blueprints: &Blueprints, out: &mut Vec<M
             });
         }
     }
-    for d in c.deaths.iter().filter(|d| d.complete) {
+    for d in deaths.iter().filter(|d| d.complete) {
         let bp = blueprints.unit(d.blueprint);
         if experimental(bp) {
             let name = a
@@ -852,6 +915,130 @@ fn arsenal(a: &Analysis, c: &Chronicle, blueprints: &Blueprints, out: &mut Vec<M
             detail: format!("{name}'s warhead lands in {}", region(b.pos, c.size)),
             at: Some(b.pos),
         });
+    }
+}
+
+/// The units lost in the fighting: not what a side's defeat takes with it (its
+/// commander falls and everything it had goes at once), which is no one's doing.
+fn fought(c: &Chronicle, blueprints: &Blueprints) -> Vec<Death> {
+    let fell = |side: u8| c.defeats.iter().find(|d| d.1 == side).map(|d| d.0);
+    c.deaths
+        .iter()
+        .filter(|d| {
+            fell(d.owner).is_none_or(|t| d.tick < t)
+                || blueprints.unit(d.blueprint).has(cat::COMMANDER)
+        })
+        .copied()
+        .collect()
+}
+
+/// Each side's first aircraft and first ship, and its mines reaching round numbers.
+fn firsts(a: &Analysis, c: &Chronicle, blueprints: &Blueprints, out: &mut Vec<Moment>) {
+    let mut seen: Vec<(u8, u32)> = Vec::new();
+    for b in &c.built {
+        let bp = blueprints.unit(b.blueprint);
+        if b.upgrade || !bp.is_mobile() || bp.has(cat::ENGINEER) {
+            continue;
+        }
+        let (domain, verb) = if bp.has(cat::AIR) {
+            (cat::AIR, "takes to the air")
+        } else if bp.has(cat::NAVAL) {
+            (cat::NAVAL, "puts to sea")
+        } else {
+            continue;
+        };
+        if seen.contains(&(b.owner, domain)) {
+            continue;
+        }
+        seen.push((b.owner, domain));
+        let name = a
+            .sides
+            .get(b.owner as usize)
+            .map_or("", |s| s.name.as_str());
+        out.push(Moment {
+            tick: b.tick,
+            kind: MomentKind::Domain,
+            side: Some(b.owner),
+            title: format!("{name} {verb}"),
+            detail: format!("Its first {} is finished", bp.name),
+            at: None,
+        });
+    }
+    for (i, s) in a.sides.iter().enumerate() {
+        for mark in [10, 25, 50] {
+            let reached = c
+                .samples
+                .iter()
+                .find(|x| x.sides.get(i).is_some_and(|v| v.mines >= mark));
+            if let Some(x) = reached {
+                out.push(Moment {
+                    tick: x.tick,
+                    kind: MomentKind::Expansion,
+                    side: Some(i as u8),
+                    title: format!("{mark} mines"),
+                    detail: format!("{} works {mark} mines", s.name),
+                    at: None,
+                });
+            }
+        }
+    }
+}
+
+/// When the lead in army strength or in income changed hands: a side that comes to
+/// lead the next by a fifth and holds it for a minute.
+fn leads(a: &Analysis, c: &Chronicle, out: &mut Vec<Moment>) {
+    const HOLD: u32 = 60 * TICKS_PER_SECOND;
+    for (metric, what, floor) in [
+        (Metric::ArmyValue, "army strength", 500.0),
+        (Metric::MassIncome, "income", 15.0),
+    ] {
+        let curves: Vec<&[f32]> = (0..a.sides.len()).map(|i| a.curve(metric, i)).collect();
+        let mut leader: Option<usize> = None;
+        // A side that has pulled ahead, and since when.
+        let mut rising: Option<(usize, u32)> = None;
+        for (k, sample) in c.samples.iter().enumerate() {
+            let mut order: Vec<(usize, f32)> = curves
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (i, v.get(k).copied().unwrap_or(0.0)))
+                .collect();
+            order.sort_by(|x, y| y.1.total_cmp(&x.1).then(x.0.cmp(&y.0)));
+            let (top, v) = order[0];
+            let next = order.get(1).map_or(0.0, |o| o.1);
+            let clear = v >= floor && v >= next * 1.2;
+            if !clear || Some(top) == leader {
+                rising = None;
+                continue;
+            }
+            let since = match rising {
+                Some((i, t)) if i == top => t,
+                _ => {
+                    rising = Some((top, sample.tick));
+                    sample.tick
+                }
+            };
+            if sample.tick - since < HOLD {
+                continue;
+            }
+            // The first lead of the match is not news; a change of hands is.
+            if leader.is_some() {
+                let name = &a.sides[top].name;
+                out.push(Moment {
+                    tick: since,
+                    kind: MomentKind::Lead,
+                    side: Some(top as u8),
+                    title: format!("{name} leads in {what}"),
+                    detail: format!(
+                        "{} to {} and holding",
+                        short(curves[top].get(k).copied().unwrap_or(0.0)),
+                        short(next)
+                    ),
+                    at: None,
+                });
+            }
+            leader = Some(top);
+            rising = None;
+        }
     }
 }
 

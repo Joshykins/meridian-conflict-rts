@@ -20,6 +20,9 @@ fn kind_name(k: MomentKind) -> &'static str {
         MomentKind::Start => "Deployment",
         MomentKind::FirstBlood => "First Blood",
         MomentKind::Tier => "Technology",
+        MomentKind::Domain => "New Front",
+        MomentKind::Expansion => "Expansion",
+        MomentKind::Lead => "Lead Change",
         MomentKind::Experimental => "Experimental",
         MomentKind::ExperimentalLost => "Experimental Lost",
         MomentKind::Warhead => "Warhead",
@@ -31,7 +34,7 @@ fn kind_name(k: MomentKind) -> &'static str {
 
 fn kind_tone(k: MomentKind) -> u32 {
     match k {
-        MomentKind::Battle | MomentKind::End => palette::ACCENT,
+        MomentKind::Battle | MomentKind::End | MomentKind::Lead => palette::ACCENT,
         MomentKind::Warhead | MomentKind::Experimental => palette::WARN,
         MomentKind::Defeat | MomentKind::ExperimentalLost => palette::BAD,
         _ => palette::DIM,
@@ -159,7 +162,7 @@ fn locator(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         ctx.chart,
         [0.0, 0.0, px, px],
         chart,
-        [0.55, 0.55, 0.57, 1.0],
+        [0.16, 0.17, 0.19, 1.0],
     );
     ui.brackets(chart.inset(-4.0), 14.0, rgb(palette::LINE, 0.5));
     let a = &report.a;

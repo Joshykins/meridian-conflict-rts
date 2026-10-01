@@ -22,6 +22,11 @@ supported inside `PERF_ENV`.
 ## Interface shots
 
 Headless screenshots (`--screenshot`, `scripts/shot.sh run`) can show an order being aimed.
+`--report PAGE[@M:SS]` draws the battle report over the match instead (overview, economy,
+military, battlefield, timeline; the battlefield replay stopped at M:SS). It reports on
+the `--ticks` played: an `--observe` match run long enough to be decided (dev16, two AIs:
+about 45 minutes) has its verdict. `scripts/shot.sh run` stops a shot at 3 minutes, so a
+match that long is run with the built exe directly.
 
 | Variable | Values | Purpose |
 |---|---|---|

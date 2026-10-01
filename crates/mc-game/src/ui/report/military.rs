@@ -251,7 +251,8 @@ fn matrix(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             let heat = (v / max).sqrt() * k;
             let c = report.color(ctx, by);
             ui.fill(rr, ink(0.4));
-            ui.fill(rr, [c[0], c[1], c[2], 0.08 + 0.55 * heat]);
+            ui.fill(rr, [c[0], c[1], c[2], 0.06 + 0.42 * heat]);
+            ui.frame(rr, [c[0], c[1], c[2], 0.25 + 0.5 * heat]);
             let res = ui.interact_with(id("report-matrix", by * 16 + victim), rr, true, false);
             if res.glow > 0.0 {
                 ui.frame(rr, rgb(0xFFFFFF, 0.6 * res.glow));
@@ -323,7 +324,11 @@ fn deadliest(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         return;
     }
     let row_h = 46.0;
-    let cols = if inner.w > 520.0 { 2 } else { 1 };
+    let cols = if inner.w > 520.0 && all.len() > ((inner.h / row_h).floor() as usize).max(1) {
+        2
+    } else {
+        1
+    };
     let per_col = ((inner.h / row_h).floor() as usize).max(1);
     let col_w = (inner.w - 12.0 * (cols as f32 - 1.0)) / cols as f32;
     let top = all[0].3.max(1.0);
@@ -359,7 +364,7 @@ fn deadliest(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             row.y + 29.0,
             type_scale::MICRO,
             rgb(palette::FAINT, t),
-            &format!("{kills} kills"),
+            &format!("{kills} {}", if kills == 1 { "kill" } else { "kills" }),
         );
         // How it compares with the deadliest.
         let w = (row.w - 12.0) * v / top * t;

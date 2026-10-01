@@ -154,7 +154,12 @@ fn map(report: &Report, ui: &mut Ui, ctx: &Ctx, chart: Rect) {
     let m = chart.w / size.x.max(size.y);
     ui.fill(chart, ink(0.9));
     let px = preview::SIZE as f32;
-    ui.image(ctx.chart, [0.0, 0.0, px, px], chart, [0.5, 0.5, 0.52, 1.0]);
+    ui.image(
+        ctx.chart,
+        [0.0, 0.0, px, px],
+        chart,
+        [0.13, 0.14, 0.16, 1.0],
+    );
     // A plotting grid with lettered columns and numbered rows.
     for i in 1..8 {
         let f = i as f32 / 8.0;
@@ -290,8 +295,7 @@ fn forces(
                 let centre = at(cell_centre(size, cell));
                 let s = cell_pt * (0.45 + 0.1 * (count as f32).min(5.0));
                 let r = Rect::new(centre.x - s * 0.5, centre.y - s * 0.5, s, s);
-                ui.fill(r, [c[0], c[1], c[2], 0.32]);
-                ui.frame(r, [c[0], c[1], c[2], 0.55]);
+                ui.fill(r, [c[0], c[1], c[2], 0.4]);
             }
         }
     }
@@ -305,7 +309,7 @@ fn forces(
                 let c = colors[side];
                 for &(cell, value) in &sf.army {
                     let centre = at(cell_centre(size, cell));
-                    let rad = (1.6 + value.sqrt() * 0.09).min(10.0) * (chart.w / 640.0).max(0.6);
+                    let rad = (2.4 + value.sqrt() * 0.1).min(11.0) * (chart.w / 640.0).max(0.6);
                     ui.dot(centre, rad * 2.4, [c[0], c[1], c[2], 0.10 * alpha]);
                     ui.dot(centre, rad, [c[0], c[1], c[2], 0.9 * alpha]);
                 }
@@ -539,6 +543,7 @@ fn status(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         .iter()
         .filter(|m| m.tick as f32 <= t && m.kind != MomentKind::Start)
         .collect();
+    let latest_top = y;
     for m in recent.iter().rev().take(4) {
         let fade = (1.0 - (t - m.tick as f32) / (240.0 * TICKS_PER_SECOND as f32)).clamp(0.35, 1.0);
         let tone = m
@@ -567,9 +572,24 @@ fn status(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
         );
         y += 38.0;
     }
-    // The layers, as switches along the foot of the panel.
-    let lw = (inner.w - 10.0) / 3.0;
+    // The tide of the fighting: every side's army over the match, the replay's hour on it.
     let ly = inner.bottom() - 2.0 * 34.0;
+    let top = latest_top + 4.0 * 38.0 + 6.0;
+    if ly - 18.0 - top > 90.0 {
+        tide(
+            report,
+            ui,
+            ctx,
+            Rect::new(inner.x, top, inner.w, ly - 18.0 - top),
+        );
+    }
+    layers(report, ui, Rect::new(inner.x, ly, inner.w, 2.0 * 34.0));
+}
+
+/// The layers of the chart, as switches.
+fn layers(report: &mut Report, ui: &mut Ui, r: Rect) {
+    let (inner, ly) = (r, r.y);
+    let lw = (inner.w - 10.0) / 3.0;
     for (i, layer) in LAYERS.iter().enumerate() {
         let cell = Rect::new(
             inner.x + (i % 3) as f32 * (lw + 5.0),
@@ -578,7 +598,7 @@ fn status(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             28.0,
         );
         let on = report.field.shown[i];
-        let res = ui.tile(id("report-layer", i), cell, on, true);
+        let res = ui.tile(id("report-layer", i), cell, false, true);
         ui.fill(
             Rect::new(cell.x + 10.0, cell.mid_y() - 4.0, 8.0, 8.0),
             rgb(if on { palette::ACCENT } else { palette::FAINT }, 1.0),
@@ -595,6 +615,46 @@ fn status(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
             report.field.shown[i] = !on;
         }
     }
+}
+
+/// Every side's army worth over the match, with the replay's hour marked and what is
+/// still to come dimmed.
+fn tide(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
+    let inner = block(ui, r, "Tide of Battle");
+    let a = &report.a;
+    let colors: Vec<Color> = (0..a.sides.len()).map(|i| report.color(ctx, i)).collect();
+    let series: Vec<super::chart::Series> = (0..a.sides.len())
+        .map(|i| super::chart::Series {
+            values: a.curve(super::analysis::Metric::ArmyValue, i),
+            color: colors[i],
+            label: &a.sides[i].name,
+        })
+        .collect();
+    let plot = Rect::new(
+        inner.x + 40.0,
+        inner.y + 6.0,
+        inner.w - 40.0,
+        inner.h - 30.0,
+    );
+    super::chart::lines(
+        ui,
+        &super::chart::Lines {
+            id: id("report-tide", 0),
+            r: plot,
+            times: &a.times,
+            length: seconds(a.length),
+            series: &series,
+            unit: "",
+            reveal: 1.0,
+            focus: None,
+        },
+    );
+    let x = plot.x + plot.w * (report.field.t / a.length.max(1) as f32).clamp(0.0, 1.0);
+    ui.fill(Rect::new(x, plot.y, plot.right() - x, plot.h), ink(0.55));
+    ui.fill(
+        Rect::new(x - 1.0, plot.y, 2.0, plot.h),
+        rgb(palette::ACCENT, 1.0),
+    );
 }
 
 /// Play and pause, the speed, and the match's length as a track to drag along, with
@@ -696,8 +756,8 @@ fn scrubber(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
     // The played part, and the head.
     let x = track.x + track.w * report.field.t / length;
     ui.fill(
-        Rect::new(track.x, track.y, x - track.x, track.h),
-        rgb(palette::ACCENT, 0.12),
+        Rect::new(track.x, track.y, x - track.x, 2.0),
+        rgb(palette::ACCENT, 0.9),
     );
     ui.fill(
         Rect::new(x - 1.0, track.y - 6.0, 2.0, track.h + 12.0),

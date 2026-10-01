@@ -148,7 +148,7 @@ pub fn lines(ui: &mut Ui, chart: &Lines) -> Option<usize> {
                 let y = w[0].y.min(w[1].y);
                 ui.gradient_v(
                     Rect::new(x0, y, wide, r.bottom() - y),
-                    [c[0], c[1], c[2], 0.16],
+                    [c[0], c[1], c[2], 0.12],
                     [c[0], c[1], c[2], 0.0],
                 );
             }

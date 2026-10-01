@@ -96,6 +96,8 @@ pub struct Built {
     pub tick: u32,
     pub owner: u8,
     pub blueprint: BlueprintId,
+    /// An upgrade of a standing unit into `blueprint`, not a new one.
+    pub upgrade: bool,
 }
 
 /// A nuclear warhead's blast (a commander's reactor is a `Death`, not one of these).
@@ -122,6 +124,9 @@ pub struct Chronicle {
     pub ended: Option<(u32, u8)>,
     /// The last tick recorded.
     pub tick: u32,
+    /// Upgrades finished whose unit has not been handed its new blueprint yet: that
+    /// hand-over is announced as a second completion, which is not a new unit.
+    swaps: Vec<(u8, BlueprintId)>,
 }
 
 impl Chronicle {
@@ -178,6 +183,7 @@ impl Chronicle {
         if self.ended.is_some_and(|e| e.0 > tick) {
             self.ended = None;
         }
+        self.swaps.clear();
         self.tick = tick;
     }
 
@@ -214,13 +220,24 @@ impl Chronicle {
                     complete,
                 }),
                 SimEvent::UnitCompleted { unit, owner } => {
-                    if let Some(row) = units.row(unit) {
-                        self.built.push(Built {
-                            tick,
-                            owner,
-                            blueprint: units.blueprint[row],
-                        });
+                    let Some(row) = units.row(unit) else {
+                        continue;
+                    };
+                    let blueprint = units.blueprint[row];
+                    let upgrade = units.has_flag(row, flag::UPGRADE);
+                    if upgrade {
+                        self.swaps.push((owner, blueprint));
+                    } else if let Some(i) = self.swaps.iter().position(|&s| s == (owner, blueprint))
+                    {
+                        self.swaps.remove(i);
+                        continue;
                     }
+                    self.built.push(Built {
+                        tick,
+                        owner,
+                        blueprint,
+                        upgrade,
+                    });
                 }
                 SimEvent::PlayerDefeated { player } => self.defeats.push((tick, player)),
                 SimEvent::NuclearDetonation {
