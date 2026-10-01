@@ -3666,6 +3666,8 @@ impl Game {
             }
             heard[kind].push((sound, gain * loud, pan, tone, delay));
         }
+        // The shots, hits and deaths as loud as they are played: the ambience ducks under them.
+        let mut din = 0.0;
         for (kind, most) in [(0, 5), (1, 4), (2, 3), (3, 2), (4, 3)] {
             heard[kind].sort_by(|a, b| b.1.total_cmp(&a.1));
             for (i, (sound, gain, pan, pitch, delay)) in heard[kind].iter().take(most).enumerate() {
@@ -3676,8 +3678,12 @@ impl Game {
                     1.0
                 };
                 audio.play_world_after(*sound, gain * crowd, *pan, *pitch, *delay);
+                if kind <= 2 {
+                    din += gain * crowd;
+                }
             }
         }
+        self.ambience.listen(din);
 
         // The intercept laser is its own voice: a low steady hum while any laser holds
         // on a missile (a loop, below, not a sound per tick of burn), and a muffled pop
@@ -4047,6 +4053,10 @@ impl Game {
         let mut bursts = Vec::new();
         let mut small: [Vec<(f32, f32)>; 3] = Default::default();
         for event in &self.view.frame.events {
+            if matches!(event, SimEvent::NuclearDetonation { .. }) {
+                // Warhead or commander's reactor, the whole map hears it: no birdsong after.
+                self.ambience.blast();
+            }
             let (kind, pos, floor) = match event {
                 SimEvent::NuclearDetonation {
                     pos,
@@ -4318,7 +4328,7 @@ impl Game {
         let fresh = self.pull_sim();
         self.rain_here = renderer.rain_here();
         self.thunder(renderer.take_thunder(), audio);
-        self.ambience_frame(renderer, audio, dt, fresh);
+        self.ambience_frame(renderer, audio, dt);
         let alpha = ((now - self.published_at).as_secs_f32() / self.interp_span).clamp(0.0, 1.0);
         self.cine_alpha = alpha;
         if cine {

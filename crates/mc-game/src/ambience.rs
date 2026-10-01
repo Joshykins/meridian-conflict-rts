@@ -9,8 +9,12 @@
 //! frame a ring of points round the focus, as wide as the view, is read from
 //! it: how much forest and water is about, and on which side. Over that come
 //! the sky's cues (how dark it is, the wind, the rain, the climate) and the
-//! battle: birds fall silent where the guns are and come back after a quiet
-//! spell, insects a little sooner, and the whole bed ducks under a fight.
+//! battle. A fight is no place for birdsong: the battle as it is heard (the shots,
+//! hits and deaths the mix plays, at the level it plays them) all but silences
+//! the world. Birds, insects and frogs stop; leaves, surf and waves duck to
+//! nearly nothing; only a low wind is left. A nuclear blast anywhere on the map
+//! hushes it for most of a minute. After the guns stop the world holds its breath
+//! a few seconds and creeps back over twenty or so, the insects before the birds.
 //!
 //! It is detail: everything fades as the camera climbs, and from strategic
 //! zoom only a faint high wind is left. All of it plays on the weather volume.
@@ -26,7 +30,6 @@ use crate::audio::Audio;
 use glam::{Vec2, Vec3};
 use mc_data::{SoundId, SoundLibrary};
 use mc_map::MapFile;
-use mc_sim::SimEvent;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
 
@@ -314,9 +317,11 @@ pub struct Ambience {
     gusts: [Gust; 5],
     /// Eased gain of each bed voice, by its place in `BEDS`.
     beds: [f32; BEDS],
-    /// Seconds since the battle was last loud near the focus, and how loud it is now.
+    /// Seconds since the battle was last heard loudly, and how loud it is now.
     quiet: f32,
     battle: f32,
+    /// Seconds left of the hush after a nuclear blast (`blast`).
+    hush: f32,
     /// Whether the score is playing, checked now and then.
     music: bool,
     music_check: f32,
@@ -336,6 +341,13 @@ pub struct Ambience {
 /// Bed voices: wind open (2), wind high, leaves (2), needles (2), surf, sea (2),
 /// crickets (2), tropical night (2), frogs.
 const BEDS: usize = 15;
+/// The first `WINDS` beds are the wind, which a fight ducks less than the rest.
+const WINDS: usize = 3;
+
+/// Seconds a nuclear blast hushes the world for, and how many of them it is
+/// silent before it starts to come back.
+const HUSH: f32 = 70.0;
+const HUSH_HELD: f32 = 40.0;
 
 impl Ambience {
     /// The beds that should sound now, as `Audio::set_weather_loops` wants them;
@@ -344,30 +356,22 @@ impl Ambience {
         &self.loops
     }
 
-    /// The last tick's battle, heard from the focus: shots, hits and deaths near
-    /// it silence the birds for a while. Call it for each fresh tick.
-    pub fn listen(&mut self, events: &[SimEvent], focus: Vec3, distance: f32) {
-        let view = distance * 0.9 + 80.0;
-        let mut loud = 0.0;
-        for e in events {
-            let (pos, weight) = match e {
-                SimEvent::ShotFired { pos, .. } | SimEvent::MissileIgnited { pos, .. } => {
-                    (pos, 0.35)
-                }
-                SimEvent::Impact { pos, .. } => (pos, 0.5),
-                SimEvent::UnitDied { pos, .. }
-                | SimEvent::AircraftCrashed { pos, .. }
-                | SimEvent::ShieldBroken { pos, .. } => (pos, 1.0),
-                _ => continue,
-            };
-            let at = Vec3::from(pos.to_f32());
-            let offset = (at - focus).truncate().length() / view;
-            loud += weight / (1.0 + offset * offset * 1.5);
-        }
-        if loud > 0.2 {
+    /// The last tick's battle as the player hears it: `din` is the summed gain of
+    /// the shots, hits and deaths the mix played (`Game::battle_sounds`), so a fight
+    /// on screen or a loud one just off it ducks the world, and one too far off to
+    /// hear does not. Call it for each fresh tick.
+    pub fn listen(&mut self, din: f32) {
+        if din > 0.12 {
             self.quiet = 0.0;
         }
-        self.battle = self.battle.max(loud.min(3.0));
+        self.battle = self.battle.max(din.min(4.0));
+    }
+
+    /// A nuclear blast, wherever it was: the world goes still for most of a minute.
+    pub fn blast(&mut self) {
+        self.hush = HUSH;
+        self.quiet = 0.0;
+        self.battle = 4.0;
     }
 
     /// Moves the ambience on by `dt`: eases the beds towards what the place,
@@ -442,7 +446,11 @@ impl Ambience {
         }
         let dice = self.dice.get_or_insert(Dice(0x2545_F491));
         self.quiet += dt;
-        self.battle *= (-dt / 3.0).exp();
+        // The world holds still a few seconds after the last shot before it stirs.
+        if self.quiet > 3.0 {
+            self.battle *= (-dt / 6.0).exp();
+        }
+        self.hush = (self.hush - dt).max(0.0);
 
         // Round the focus, as wide as the view: the middle and two rings.
         let right = Vec2::new(cues.yaw.cos(), -cues.yaw.sin());
@@ -508,9 +516,14 @@ impl Ambience {
         // Shore: water and land both in earshot; sea: little but water.
         let shore = (4.0 * s.water * (1.0 - s.water)).min(1.0);
         let sea = (s.water - 0.5).max(0.0) * 2.0;
-        let calm_birds = smoothstep(6.0, 25.0, self.quiet);
-        let calm_insects = smoothstep(2.0, 10.0, self.quiet);
-        let duck = LEVEL / (1.0 + self.battle * 1.5) * if self.music { 0.8 } else { 1.0 };
+        // After a nuclear blast: still, then easing back over its last stretch.
+        let still = 1.0 - smoothstep(0.0, HUSH - HUSH_HELD, self.hush);
+        let calm_birds = smoothstep(10.0, 35.0, self.quiet) * still;
+        let calm_insects = smoothstep(4.0, 15.0, self.quiet) * still;
+        let level = LEVEL * if self.music { 0.8 } else { 1.0 };
+        // Leaves, surf and waves all but go under a fight; the wind stays, low.
+        let duck = level / (1.0 + self.battle * 6.0) * (0.03 + 0.97 * still);
+        let wind_duck = level / (1.0 + self.battle * 1.5) * (0.3 + 0.7 * still);
         self.surge *= (-dt / 2.5).exp();
 
         let g: [f32; 5] = [
@@ -605,6 +618,7 @@ impl Ambience {
         for i in 0..BEDS {
             let (gain, pan, pitch) = want[i];
             let was = self.beds[i];
+            let duck = if i < WINDS { wind_duck } else { duck };
             self.beds[i] += (gain * duck - self.beds[i]) * ease;
             // A voice that has faded is let go (the mixer fades it to nothing),
             // and one that is only just wanted waits until it is audible.
@@ -977,25 +991,96 @@ mod tests {
     }
 
     #[test]
-    fn birds_go_quiet_near_a_fight_and_come_back_after() {
+    fn birds_go_quiet_in_a_fight_and_come_back_after() {
         let library = library();
         let mut amb = fresh();
         let at = cues(760.0, 150.0, 0.0);
-        let shot = SimEvent::UnitDied {
-            pos: mc_core::FxVec3::new(
-                mc_core::Fx::from_f32(760.0),
-                mc_core::Fx::from_f32(1024.0),
-                mc_core::Fx::ZERO,
-            ),
-            blueprint: mc_data::BlueprintId(0),
-            owner: 0,
-            airborne: false,
-        };
-        amb.listen(std::slice::from_ref(&shot), at.focus, at.distance);
+        amb.listen(1.0);
         let (_, during) = run(&mut amb, &library, &at, 5.0);
         assert!(during.is_empty(), "{during:?}");
         let (_, after) = run(&mut amb, &library, &at, 120.0);
         assert!(!after.is_empty());
+    }
+
+    /// The bed level of everything but the wind, and the loudest call made.
+    fn below_the_wind(beds: &[(String, f32)], calls: &[(String, f32)]) -> f32 {
+        beds.iter()
+            .filter(|b| !b.0.starts_with("amb_wind"))
+            .chain(calls)
+            .map(|b| b.1)
+            .fold(0.0, f32::max)
+    }
+
+    /// Sounds by name and gain.
+    type Named = Vec<(String, f32)>;
+
+    /// Runs `seconds` of a fight heard at `din` on every tick (ten a second): the
+    /// beds sounding at the end and every call made on the way.
+    fn fight(
+        amb: &mut Ambience,
+        library: &SoundLibrary,
+        cues: &Cues,
+        seconds: f32,
+        din: f32,
+    ) -> (Named, Named) {
+        let mut calls = Vec::new();
+        for f in 0..(seconds * 30.0) as usize {
+            if f % 3 == 0 {
+                amb.listen(din);
+            }
+            amb.step(library, 0, cues, &ground, 1.0 / 30.0);
+            calls.extend(
+                amb.calls
+                    .drain(..)
+                    .map(|c| (library.sound(c.0).name.clone(), c.1)),
+            );
+        }
+        let beds = amb
+            .loops()
+            .iter()
+            .map(|l| (library.sound(l.0).name.clone(), l.1))
+            .collect();
+        (beds, calls)
+    }
+
+    #[test]
+    fn a_fight_on_the_shore_leaves_only_the_wind() {
+        let library = library();
+        let mut amb = fresh();
+        let at = cues(1440.0, 150.0, 1.0);
+        let (beds, calls) = fight(&mut amb, &library, &at, 30.0, 0.0);
+        let calm = below_the_wind(&beds, &calls);
+        assert!(calm > 0.05, "{beds:?}");
+        let (beds, calls) = fight(&mut amb, &library, &at, 10.0, 1.5);
+        assert!(
+            below_the_wind(&beds, &calls) < calm / 10.0,
+            "{beds:?} {calls:?}"
+        );
+        assert!(calls.iter().all(|c| c.0.starts_with("wave")), "{calls:?}");
+        assert!(has(&beds, "amb_wind_open"), "{beds:?}");
+        // Thirty seconds after the last shot the shore is back.
+        let (beds, calls) = fight(&mut amb, &library, &at, 30.0, 0.0);
+        assert!(below_the_wind(&beds, &calls) > calm * 0.5, "{beds:?}");
+    }
+
+    #[test]
+    fn a_nuke_anywhere_hushes_the_world_for_most_of_a_minute() {
+        let library = library();
+        let mut amb = fresh();
+        let at = cues(1440.0, 150.0, 1.0);
+        let (beds, calls) = fight(&mut amb, &library, &at, 30.0, 0.0);
+        let calm = below_the_wind(&beds, &calls);
+        amb.blast();
+        let (beds, calls) = fight(&mut amb, &library, &at, 35.0, 0.0);
+        assert!(
+            below_the_wind(&beds, &calls) < calm / 20.0,
+            "{beds:?} {calls:?}"
+        );
+        assert!(calls.iter().all(|c| c.0.starts_with("wave")), "{calls:?}");
+        // Well over a minute on, it has all come back.
+        let (beds, calls) = fight(&mut amb, &library, &at, 60.0, 0.0);
+        assert!(below_the_wind(&beds, &calls) > calm * 0.5, "{beds:?}");
+        assert!(calls.iter().any(|c| c.0.starts_with("frog")), "{calls:?}");
     }
 }
 

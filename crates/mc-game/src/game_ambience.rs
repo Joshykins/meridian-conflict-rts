@@ -7,20 +7,10 @@ use crate::audio::Audio;
 use mc_render::Renderer;
 
 impl Game {
-    /// Moves the living world's sound on by a frame; on a fresh tick it hears the
-    /// battle first, so birds go quiet where the guns are.
-    pub(super) fn ambience_frame(
-        &mut self,
-        renderer: &Renderer,
-        audio: &Audio,
-        dt: f32,
-        fresh: bool,
-    ) {
+    /// Moves the living world's sound on by a frame. The battle it ducks under is
+    /// handed over as it is played (`battle_sounds`, `nuke_sounds`).
+    pub(super) fn ambience_frame(&mut self, renderer: &Renderer, audio: &Audio, dt: f32) {
         let camera = &self.camera;
-        if fresh {
-            self.ambience
-                .listen(&self.view.frame.events, camera.focus, camera.distance);
-        }
         let (darkness, wind, climate) = renderer.ambience_cues();
         let cues = Cues {
             focus: camera.focus,
