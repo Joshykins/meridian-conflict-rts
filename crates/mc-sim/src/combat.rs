@@ -2693,7 +2693,6 @@ impl World {
         // Lobbed shells pass over things on the way up.
         if weapon.trajectory == Trajectory::Direct || vel.z < Fx::ZERO {
             let seg = vel.xy();
-            let len_sq = seg.length_sq().max(Fx::EPSILON);
             let mid = from.xy() + seg * Fx::HALF;
             let reach = seg.length() / 2 + weapon.proximity;
             self.index
@@ -2734,16 +2733,14 @@ impl World {
                     if enter > leave {
                         return true;
                     }
-                    let t = ((e.pos - from.xy()).dot(seg) / len_sq).clamp(enter, leave);
+                    // A long hull is met along its spine, not as a disc (`body.rs`).
+                    let (a, b, girth) = crate::body::spine(self.bp(row), e.pos, units.heading[row]);
+                    let (t, off) = crate::body::closest_pass(from.xy(), seg, enter, leave, a, b);
                     let point = from + vel * t;
-                    let inside = point.xy().distance_sq(e.pos)
-                        <= (e.radius + weapon.proximity) * (e.radius + weapon.proximity);
+                    let inside = off <= (girth + weapon.proximity) * (girth + weapon.proximity);
                     if inside && t < best_t {
                         best_t = t;
-                        let depth = (e.radius * e.radius - point.xy().distance_sq(e.pos))
-                            .max(Fx::ZERO)
-                            .sqrt()
-                            * Fx::ratio(8, 10);
+                        let depth = (girth * girth - off).max(Fx::ZERO).sqrt() * Fx::ratio(8, 10);
                         let back = (depth / vel.length().max(Fx::EPSILON)).min(t);
                         // A hull field is the unit: shots that would land on the
                         // armour land on the wrap instead. A torpedo runs under it.

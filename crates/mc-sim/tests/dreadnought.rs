@@ -103,8 +103,8 @@ fn fired(w: &World, ship: UnitId) -> Vec<u8> {
 #[test]
 fn its_casemates_and_bolt_rifles_fight_on_their_own() {
     let mut w = world();
-    // Nose east; tanks off the port beam, 1.2 km out: the port casemates and the fore
-    // rifles reach them, and the hull only squares its beam to them.
+    // Nose east; tanks off the port beam, 1.2 km out: the port casemates reach them, and
+    // the hull only squares its beam to them.
     let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
     settle(&mut w);
     let tank = "aster_t4_assault_tank";
@@ -135,13 +135,62 @@ fn its_casemates_and_bolt_rifles_fight_on_their_own() {
         !seen[1] && !seen[3] && !seen[5],
         "a starboard casemate fired across the hull: {seen:?}"
     );
-    assert!(seen[6], "the fore rifles never fired: {seen:?}");
+    // The rifles sit on the stacked hull: the tanks are under its edge from there.
+    assert!(
+        !seen[6] && !seen[7],
+        "a rifle fired down through the hull: {seen:?}"
+    );
     // It lays its beam on them (`broadside`), it does not wheel its nose round.
     let heading = heading_of(&w, ship);
     assert!(
         heading < 20.0 || heading > 340.0,
         "the hull swung off its beam: {heading}"
     );
+}
+
+#[test]
+fn its_rifles_take_a_warship_off_its_beam() {
+    let mut w = world();
+    let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
+    settle(&mut w);
+    // A frigate climbing 1.3 km off its beam: it flies lower, but that far out it is
+    // above the rifles' depression.
+    let frigate = add(&mut w, "aster_t3_frigate", 1, 3000, 4300, 0);
+    hold_fire(&mut w, frigate);
+    let mut seen = [false; 9];
+    for _ in 0..seconds(40) {
+        w.tick(&[]).unwrap();
+        for wi in fired(&w, ship) {
+            seen[wi as usize] = true;
+        }
+    }
+    assert!(seen[6], "the fore rifles never fired: {seen:?}");
+}
+
+#[test]
+fn shots_strike_the_hull_not_a_disc_round_it() {
+    let mut w = world();
+    let ship = add(&mut w, DREADNOUGHT, 0, 3000, 3000, 0);
+    hold_fire(&mut w, ship);
+    settle(&mut w);
+    // A Zenith off the port beam: its rails cross the 285 m of the ship's radius, most
+    // of it open air, before they reach the flank 76 m out.
+    let _gun = add(&mut w, "aster_t4_anti_ship", 1, 3000, 4200, 180);
+    let mut struck = Vec::new();
+    for _ in 0..seconds(25) {
+        w.tick(&[]).unwrap();
+        struck.extend(w.events.iter().filter_map(|e| match e {
+            SimEvent::Impact { pos, .. } if pos.z.to_f32() > 300.0 => Some(pos.y.to_f32() - 3000.0),
+            _ => None,
+        }));
+    }
+    assert!(!struck.is_empty(), "the Zenith never struck the ship");
+    for off in struck {
+        assert!(
+            off.abs() < 100.0,
+            "a shot burst {off} m off the keel line, clear of the hull"
+        );
+    }
 }
 
 #[test]

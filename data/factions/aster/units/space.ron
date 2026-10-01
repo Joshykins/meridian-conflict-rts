@@ -174,6 +174,8 @@
         health: 160000,
         cost: (mass: 16000, energy: 220000, time: 70000),
         radius: 285, height: 110, footprint: (48, 18), hull: (290, 110), vision: 2400, radar: 3600,
+        // Shots meet the long hull along its length, stern drives to bow, not a disc of its radius.
+        body: (fore: 285, aft: -255, beam: 76),
         shield: (kind: Hull, health: 60000, regen: 400),
         economy: (energy_upkeep: 800),
         motion: (layer: Air, size: 0, speed: 42, accel: 4, turn: 5, altitude: 700, hover: true, broadside: 90),
@@ -249,11 +251,14 @@
             ),
             // Two low twin bolt rifle houses on the stacked hull, one forward facing ahead and
             // one aft facing astern: the Paladin's gun at a warship's size and
-            // reach, for what the casemates cannot bear on.
+            // reach, for what the casemates cannot bear on. Each dips only as far as its
+            // line clears the hull under it (`depression`): the forward one to the second
+            // layer's edge and the prow, the aft one to that layer's raked stern. Neither
+            // bears on the ground from cruising height; that is the casemates' work.
             (
                 name: "Twin Bolt Rifle",
                 damage: 700, splash: 8, range: 1600, reload: 2.2, speed: 700, trajectory: Direct,
-                turret_turn: 60, arc: 300, facing: 0, mount: true, pivot: (176, 0, 118), muzzle: (200, 0, 118),
+                turret_turn: 60, arc: 300, facing: 0, depression: 12, mount: true, pivot: (176, 0, 118), muzzle: (200, 0, 118),
                 muzzles: [(200, -2.5, 118), (200, 2.5, 118)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 0.9, impact: 2.0, shockwave: 0.8,
                 tracer: 0.35, plasma: 1.0, trail: true, wake: 0.4, bolts: 6, discharge: 20,
@@ -262,7 +267,7 @@
             (
                 name: "Twin Bolt Rifle",
                 damage: 700, splash: 8, range: 1600, reload: 2.2, speed: 700, trajectory: Direct,
-                turret_turn: 60, arc: 300, facing: 180, mount: true, pivot: (-150, 0, 118), muzzle: (-126, 0, 118),
+                turret_turn: 60, arc: 300, facing: 180, depression: 6, mount: true, pivot: (-150, 0, 118), muzzle: (-126, 0, 118),
                 muzzles: [(-126, 2.5, 118), (-126, -2.5, 118)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Blue, flash: 0.9, impact: 2.0, shockwave: 0.8,
                 tracer: 0.35, plasma: 1.0, trail: true, wake: 0.4, bolts: 6, discharge: 20,

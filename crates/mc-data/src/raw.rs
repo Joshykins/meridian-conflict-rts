@@ -2,7 +2,7 @@
 //! converted to the fixed-point blueprint tables by `compile`.
 
 use crate::{
-    cat, BlueprintId, BuildArm, Builder, DataError, Dive, Economy, FactionId, Mine, Motion,
+    cat, BlueprintId, Body, BuildArm, Builder, DataError, Dive, Economy, FactionId, Mine, Motion,
     Reclaimer, Shield, UnitBlueprint, Visual, Weapon, HULL_SHIELD_PAD, MAX_DRONES, MAX_WEAPONS,
 };
 use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
@@ -265,6 +265,9 @@ pub(crate) struct Unit {
     /// frame (x along its heading). Defaults to the radius both ways.
     #[serde(default)]
     pub hull: Option<(f64, f64)>,
+    /// The hull shots strike, for a long one a disc of `radius` misfits (`Body`).
+    #[serde(default)]
+    pub body: Option<RawBody>,
     pub vision: f64,
     #[serde(default)]
     pub radar: f64,
@@ -418,6 +421,16 @@ pub(crate) struct RawMotion {
     /// instead of pathing round them. Land only.
     #[serde(default)]
     pub stride: bool,
+}
+
+/// The hull shots strike (`Body`): metres forward and aft of the origin along the
+/// heading to its ends, and its half width.
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawBody {
+    pub fore: f64,
+    pub aft: f64,
+    pub beam: f64,
 }
 
 /// How a submarine dives: `depth` metres of water over its deck when dived, and
@@ -1504,6 +1517,27 @@ impl Unit {
             hull: match self.hull {
                 Some((x, y)) => (fx(x), fx(y)),
                 None => (fx(self.radius), fx(self.radius)),
+            },
+            body: match &self.body {
+                Some(b) => {
+                    if b.beam <= 0.0 || b.fore - b.aft < b.beam * 2.0 {
+                        return Err(DataError::Invalid(format!(
+                            "{key}: body needs a beam, and fore - aft at least twice it"
+                        )));
+                    }
+                    // Shots look for hulls within their radius.
+                    if b.fore > self.radius || -b.aft > self.radius || b.beam > self.radius {
+                        return Err(DataError::Invalid(format!(
+                            "{key}: body must lie within its radius"
+                        )));
+                    }
+                    Some(Body {
+                        fore: fx(b.fore),
+                        aft: fx(b.aft),
+                        beam: fx(b.beam),
+                    })
+                }
+                None => None,
             },
             vision: fx(self.vision),
             radar: fx(self.radar),

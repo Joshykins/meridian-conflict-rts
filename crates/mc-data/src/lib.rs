@@ -231,6 +231,16 @@ pub struct Storm {
     pub damage: Fx,
 }
 
+/// The hull shots strike on a long unit, in its own frame (x along its heading): a
+/// capsule from `aft` to `fore` metres along x, `beam` metres in half width, its ends
+/// rounded. A 570 m warship tested as a disc of its radius took shots 200 m off its flanks.
+#[derive(Clone, Copy, Debug)]
+pub struct Body {
+    pub fore: Fx,
+    pub aft: Fx,
+    pub beam: Fx,
+}
+
 /// A submarine's dive: how deep its deck goes and how long the trip takes.
 #[derive(Clone, Copy, Debug)]
 pub struct Dive {
@@ -631,6 +641,8 @@ pub struct UnitBlueprint {
     /// Half-extents, metres, of the ground a structure keeps units off, in its own
     /// frame (x along its heading). The rest of the lot is paved apron units walk on.
     pub hull: (Fx, Fx),
+    /// The hull shots strike, when a disc of `radius` misfits it; `None` is that disc.
+    pub body: Option<Body>,
     pub vision: Fx,
     pub radar: Fx,
     /// Sonar reach: finds submerged hulls, which vision and radar cannot.
