@@ -957,6 +957,11 @@ pub struct RawWeapon {
     /// shot is drawn as it is. Direct-fire guns only.
     #[serde(default = "one")]
     pub rounds: u8,
+    /// Seconds a shot's rounds are spread over, when that is not the time to the next
+    /// shot: a gun that pinches one shot out as a jet. Cosmetic. Zero (the default):
+    /// the time to the next shot.
+    #[serde(default)]
+    pub round_span: f64,
     /// Metres behind the muzzle where the gun throws out its spent casings, one per
     /// round. Cosmetic. Zero (the default): it throws none.
     #[serde(default)]
@@ -1303,6 +1308,11 @@ impl Unit {
                     "{ctx}: rounds is only for direct-fire guns"
                 )));
             }
+            if w.round_span > 0.0 && w.rounds < 2 {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: round_span needs rounds above one"
+                )));
+            }
             if w.hitscan && (w.trajectory != Trajectory::Direct || w.missile) {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: hitscan is only for direct-fire guns"
@@ -1447,6 +1457,7 @@ impl Unit {
                     0
                 },
                 rounds: w.rounds.clamp(1, 32),
+                round_span: (w.round_span.clamp(0.0, 10.0) * TICKS_PER_SECOND as f64) as f32,
                 casings: w.casings.clamp(0.0, 40.0) as f32,
                 red: w.red.clamp(0.0, 1.0) as f32,
                 torpedo: w.torpedo,

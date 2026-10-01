@@ -345,9 +345,10 @@
         mesh: "regency_barb", icon: Defense,
     ),
     // The tech 2 point defence: a Pinched-plasmeric Cannon. It gathers its plasma in front
-    // of the bore and squeezes it dense by gravity (a second's charge), then fires it out
-    // three bolts in quick succession; they burst where they hit and sear the ground, all
-    // their weight on the one hull, next to nothing splashed. Reach and weight as a
+    // of the bore and squeezes it dense by gravity (a second's charge), then pinches it out
+    // as one shot: a jet of plasma a quarter of a second long (`rounds` over `round_span`,
+    // drawn; the sim flies the one shot). It bursts where it hits and sears the ground, all
+    // its weight on the one hull, next to nothing splashed. Reach and weight as a
     // Redoubt's. Model: `regency_pinch_cannon` (`models::regency::turrets::halberd`).
     (
         key: "regency_t2_point_defense",
@@ -361,7 +362,7 @@
         vision: 300,
         weapons: [(
             name: "Pinched-plasmeric Cannon",
-            damage: 240, splash: 1, range: 520, reload: 2.4, salvo: 3, salvo_delay: 0.1,
+            damage: 720, splash: 1, range: 520, reload: 2.4, rounds: 8, round_span: 0.25,
             speed: 900, trajectory: Direct,
             turret_turn: 90, muzzle: (11.6, 0, 8.4), pivot: (0, 0, 8.4),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,

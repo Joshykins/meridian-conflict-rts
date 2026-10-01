@@ -3306,7 +3306,7 @@ impl Renderer {
 
     /// The rounds of a stream gun's shot (`Weapon::rounds`) have no sim impact of their
     /// own. Each that lands on what its shot hit bursts there: a small orange pop and a
-    /// few sparks, as its shot does.
+    /// few sparks, as its shot does; a Pinched jet's pours in as plasma (`pinched_pour`).
     fn stream_bursts(&mut self, projectiles: &[ProjectileInstance], time: f32, camera: &Camera) {
         let reach = camera.distance * 2.5 + 300.0;
         let focus = camera.focus.truncate();
@@ -3317,6 +3317,10 @@ impl Renderer {
             }
             let at = Vec3::from(p.pos);
             let start = time + ends * self.tick_seconds;
+            if regency_guns_fx::drawn_look(p) == 1 {
+                self.pinched_pour(at, p.size, start);
+                continue;
+            }
             let size = p.size.max(0.3);
             // Red rounds (`Weapon::red`, `_pad[0]` above one) pop red.
             let kind = if p._pad[0] > 1.5 { 8.0 } else { 1.0 };

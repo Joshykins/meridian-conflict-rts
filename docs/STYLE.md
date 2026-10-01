@@ -272,11 +272,13 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     one lands. **Plasmeric flak** throws the same bolts and bursts as a wide
     red bloom flinging sparkles and streaks of plasma.
   - **Pinched-plasmeric:** plasma gathered and squeezed in front of the bore
-    (a ball, motes drawn in, red lightning snapping into it), then fired out
-    as a quick burst, each bolt with a hard flash and a jet of plasma down the
-    line of fire and a red wake hanging behind it; each bursts in a billowing
+    (a ball, motes drawn in, red lightning snapping into it), then pinched
+    out as one shot: a jet a quarter of a second long, a hard flash as it
+    opens, the ball draining into it, a red wake hanging behind it; its head
+    bursts in a billowing
     red bloom over a white heart, throws a spout of plasma up and molten
-    spatter and globs out low (in place of a shock ring) and sears the ground.
+    spatter and globs out low (in place of a shock ring) and sears the ground,
+    and the rest of the jet pours in after it.
   - **Pinch-fusion:** the same charge far harder: lightning crackles round
     it and is pulled into it, and it goes over to fusion, white at the heart
     with the prism drifting over it. The gun works with it (the Sunspear: its

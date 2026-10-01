@@ -10,13 +10,15 @@
 //!   a wide red bloom that throws sparkles and streaks of plasma out through the air.
 //! - **Pinched-plasmeric** (the Halberd's): over its charge (`SimEvent::WeaponCharging`) a
 //!   ball of red plasma gathers in front of the bore, motes and filaments drawn in to it
-//!   and red lightning snapping into it from round it, its light growing. Each bolt of the
-//!   salvo leaves it with a hard red flash and a jet of plasma thrown down the line of
-//!   fire; the ball collapses after the last. In flight each bolt leaves a red wake hanging
-//!   in the air (`regency_wakes`). Where a bolt lands it bursts in a billowing red bloom
-//!   over a white heart, a spout of plasma thrown up out of it, globs and molten spatter
-//!   thrown out low in place of a shock ring, and the ground seared: a glassed scorch that
-//!   glows and crusts over.
+//!   and red lightning snapping into it from round it, its light growing. It pinches its
+//!   plasma out as one shot, a jet a quarter of a second long (the shot's rounds,
+//!   `Weapon::round_span`): a hard red flash as it opens, a pulse at the mouth for each
+//!   round, the ball draining as the jet leaves it, plasma thrown down the line of fire.
+//!   In flight the jet leaves a red wake hanging in the air (`regency_wakes`). Where its
+//!   head lands it bursts in a billowing red bloom over a white heart, a spout of plasma
+//!   thrown up out of it, globs and molten spatter thrown out low in place of a shock
+//!   ring, and the ground seared: a glassed scorch that glows and crusts over. The rest
+//!   of the jet pours in after it, each round a red splash (`pinched_pour`).
 //! - **Pinch-fusion** (the Sunspear's): the charge goes much further: lightning crackles
 //!   round the ball and is pulled into it, and over the last part it goes over to fusion,
 //!   white at the heart with the prism's pinks drifting over it, its light white and
@@ -42,7 +44,8 @@ use crate::gpu_consts::puff;
 use glam::Vec3;
 use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{
-    ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_MISSILE,
+    ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
+    PROJECTILE_MISSILE, PROJECTILE_STARTS_SHIFT,
 };
 use std::mem::size_of;
 
@@ -78,7 +81,8 @@ const MAX_CHARGES: usize = 48;
 const MAX_WAKE_PUFFS: usize = 900;
 /// Metres apart a shot's wake is laid, and the seconds it hangs: a Pinched bolt's, then a
 /// Pinch-fusion round's.
-const BOLT_WAKE: (f32, f32) = (2.4, 0.9);
+/// A Pinched jet's rounds each lay one over the same path, so theirs are far apart.
+const BOLT_WAKE: (f32, f32) = (6.4, 0.9);
 const FUSION_WAKE: (f32, f32) = (2.2, 2.4);
 
 /// What a direct-fire Regency plasma gun is drawn as.
@@ -294,7 +298,14 @@ impl Renderer {
                 _ => continue,
             };
             let (step, life) = if fusion { FUSION_WAKE } else { BOLT_WAKE };
-            let (from, to) = (Vec3::from(p.prev_pos), Vec3::from(p.pos));
+            // A round of a jet that leaves the muzzle part of the way through the tick
+            // (`PROJECTILE_STARTS_SHIFT`) has `prev_pos` behind the gun: its wake starts
+            // where it leaves, as sprites.wgsl `shot_muzzle` draws it.
+            let ends = ((p.color >> PROJECTILE_ENDS_SHIFT) & 0xFF) as f32 / 255.0;
+            let span = if ends > 0.0 { ends } else { 1.0 };
+            let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
+            let to = Vec3::from(p.pos);
+            let from = Vec3::from(p.prev_pos).lerp(to, (starts / span).min(1.0));
             // A deliberate cosmetic cap on one shot's stretch: a tick's flight is far
             // under this many steps.
             let n = ((from.distance(to) / step).ceil() as usize).clamp(1, 64);
@@ -310,7 +321,7 @@ impl Renderer {
                     self.scatter.signed(),
                 );
                 let at = from.lerp(to, f) + drift * p.size * 0.06;
-                let when = time + tick * f;
+                let when = time + tick * (starts + (span - starts).max(0.0) * f);
                 // A bolt is thin: its wake is fatter than it, or it hangs in dots.
                 let fat = if fusion { 0.3 } else { 0.7 };
                 let puff = p.size * fat * (1.0 + 0.5 * self.scatter.unit());
@@ -571,9 +582,26 @@ impl Renderer {
                 }
             }
             Grade::Pinched => {
-                // The ball gives up a bolt: a hard red flash where it hangs, and a jet of
-                // plasma thrown out down the line of fire after it.
-                self.charge_spent(blueprint, weapon, at, time);
+                // The ball pinches its plasma out as one jet (`Weapon::round_span`): a hard
+                // red flash where it hangs, a pulse at the mouth as each round of the jet
+                // leaves, the ball draining as it goes, and plasma thrown out down the line
+                // of fire after it.
+                let span = rounds as f32 * round_gap;
+                self.charge_spent(blueprint, weapon, at, span.max(0.18), time);
+                for k in 1..rounds {
+                    let fall = 1.0 - k as f32 / rounds as f32;
+                    let s = size * (0.5 + 0.7 * fall);
+                    self.push_lit(
+                        GLOW,
+                        at + dir * size * 0.4,
+                        Vec3::ZERO,
+                        time + k as f32 * round_gap,
+                        round_gap * 1.8,
+                        (s * 0.8, s * 1.2),
+                        HOT * (1.5 + 2.0 * fall),
+                        0.0,
+                    );
+                }
                 self.push_lit(
                     BURST,
                     at,
@@ -600,12 +628,12 @@ impl Renderer {
                     color: RED * 220.0 * size,
                     range: size * 12.0,
                     start: time,
-                    life: 0.2,
+                    life: span.max(0.2),
                     pulse: 0.0,
                 });
             }
             Grade::Fusion => {
-                self.charge_spent(blueprint, weapon, at, time);
+                self.charge_spent(blueprint, weapon, at, 0.18, time);
                 let s = size * 1.5;
                 // Launch: a blinding white flash, a cone of fusion thrown out down the line
                 // of fire, arcs snapping forward along it.
@@ -742,8 +770,9 @@ impl Renderer {
         }
     }
 
-    /// A bolt has left a charge near `at`: when it was the salvo's last, the ball collapses.
-    fn charge_spent(&mut self, blueprint: BlueprintId, weapon: u8, at: Vec3, time: f32) {
+    /// A bolt has left a charge near `at`: when it was the salvo's last, the ball collapses
+    /// over `life` seconds.
+    fn charge_spent(&mut self, blueprint: BlueprintId, weapon: u8, at: Vec3, life: f32, time: f32) {
         let fx = &mut self.plasma_fx.guns;
         let mine = fx
             .charges
@@ -771,7 +800,7 @@ impl Renderer {
             at,
             Vec3::ZERO,
             time,
-            0.18,
+            life,
             (size, size * 0.15),
             rgb,
             if fusion { 1.0 } else { 0.0 },
@@ -1075,6 +1104,60 @@ impl Renderer {
         });
     }
 
+    /// A round of a Pinched jet pouring in after its head struck (`Weapon::round_span`,
+    /// from `stream_bursts`), `size` its drawn width: a red splash over a hot heart and a
+    /// few sparkles thrown off. The strike itself is the head's (`pinched_burst`).
+    pub(super) fn pinched_pour(&mut self, at: Vec3, size: f32, start: f32) {
+        let s = size * 2.2;
+        self.push_lit(
+            BURST,
+            at,
+            Vec3::ZERO,
+            start,
+            0.3,
+            (s * 0.4, s),
+            RED * 3.0,
+            0.0,
+        );
+        self.push_lit(
+            GLOW,
+            at,
+            Vec3::ZERO,
+            start,
+            0.09,
+            (s * 0.4, s * 0.6),
+            HOT * 3.0,
+            0.0,
+        );
+        for _ in 0..3 {
+            let out = Vec3::new(
+                self.scatter.signed(),
+                self.scatter.signed(),
+                0.2 + self.scatter.unit() * 0.6,
+            )
+            .normalize_or(Vec3::Z);
+            let speed = 14.0 + self.scatter.unit() * 22.0;
+            self.push_lit(
+                MOTE,
+                at,
+                out * speed,
+                start,
+                0.5,
+                (0.3, 0.1),
+                RED.lerp(HOT, 0.3) * 4.0,
+                0.0,
+            );
+        }
+        self.plasma_fx.guns.light(Glow {
+            pos: at + Vec3::Z,
+            color: RED * 80.0 * size,
+            range: s * 2.5,
+            start,
+            life: 0.15,
+            pulse: 0.0,
+        });
+    }
+
     /// A Pinch-fusion shot letting go: it opens white with the prism in its fringe and
     /// cools to red, a column of plasma rising out of it and a lumpy skirt of it rolling
     /// out over the ground, globs of it thrown wide, the ground melted into a wide pool,
@@ -1351,7 +1434,7 @@ impl Renderer {
 /// A Regency plasma shot's look as the mirror packs it for the sprite (`mirror::plasma_look`,
 /// twice over in `_pad[0]` past one and its redness; sprites.wgsl `plasma_look`). Zero for
 /// any other shot.
-fn drawn_look(p: &ProjectileInstance) -> u32 {
+pub(super) fn drawn_look(p: &ProjectileInstance) -> u32 {
     if p._pad[0] < 2.5 || p.color & PROJECTILE_MISSILE != 0 {
         return 0;
     }

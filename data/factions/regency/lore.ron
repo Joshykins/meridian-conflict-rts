@@ -109,7 +109,7 @@
     "regency_t2_point_defense": (
         lore: "An armoured keep under a long turret, a ring turning under it and rams working in its skirt. Placeholder text.",
         weapons: {
-            "Pinched-plasmeric Cannon": "Plasma squeezed dense by gravity and driven downrange three slugs a burst; each one stops in what it hits.",
+            "Pinched-plasmeric Cannon": "Plasma squeezed dense by gravity and pinched out downrange in one long jet; all of it stops in what it hits.",
         },
     ),
     "regency_t3_point_defense": (

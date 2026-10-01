@@ -939,14 +939,16 @@ pub const PROJECTILE_ENDS_SHIFT: u32 = 16;
 pub const PROJECTILE_STARTS_SHIFT: u32 = 24;
 
 /// Ticks between the rounds a stream gun's shot is seen as (`Weapon::rounds`): they
-/// fill the time to the next shot.
+/// fill the time to the next shot, or the gun's own `round_span` (a jet pinched out).
 pub fn round_gap(weapon: &mc_data::Weapon) -> f32 {
-    let interval = if weapon.salvo > 1 && weapon.salvo_delay_ticks > 0 {
-        weapon.salvo_delay_ticks as u16
+    let interval = if weapon.round_span > 0.0 {
+        weapon.round_span
+    } else if weapon.salvo > 1 && weapon.salvo_delay_ticks > 0 {
+        weapon.salvo_delay_ticks.max(1) as f32
     } else {
-        weapon.reload_ticks
+        weapon.reload_ticks.max(1) as f32
     };
-    interval.max(1) as f32 / weapon.rounds.max(1) as f32
+    interval / weapon.rounds.max(1) as f32
 }
 
 /// Ticks of flight over which a round eases from the gun's drawn place back onto its line.
@@ -2005,6 +2007,13 @@ impl World {
                     ((lands - start) * 255.0).round().clamp(1.0, 255.0) as u32
                 } else {
                     0
+                };
+                // A jet pinched out (`Weapon::round_span`) thins to its tail as the pinch
+                // lets go.
+                let size = if w.round_span > 0.0 {
+                    size * (1.0 - 0.45 * k as f32 / w.rounds as f32)
+                } else {
+                    size
                 };
                 out.push(ProjectileInstance {
                     prev_pos: at(start),

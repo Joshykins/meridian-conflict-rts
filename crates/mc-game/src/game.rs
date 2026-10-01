@@ -3660,7 +3660,9 @@ impl Game {
             {
                 // A stream gun sounds every tick, shots and hits both; from orbit that
                 // rattle would bury everything else, so it thins out as the camera climbs.
-                if bps.unit(*blueprint).weapons[*weapon as usize].rounds > 1 {
+                // A jet pinched out over a set span (`round_span`) is one shot, not a rattle.
+                let w = &bps.unit(*blueprint).weapons[*weapon as usize];
+                if w.rounds > 1 && w.round_span == 0.0 {
                     loud *= close.sqrt();
                 }
             }
