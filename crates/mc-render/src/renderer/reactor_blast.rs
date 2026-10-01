@@ -1,15 +1,14 @@
-//! A reactor going up (`death_blast`): a plant's held charge breaking loose, then
+//! A reactor going up (`death_blast`): a plant's held charge breaking loose and
 //! bursting. Electric, not nuclear: no fire, no stalk, no mushroom (the user, 2026-10-01).
-//! In three acts, all of it sized by the blast's radius, the commander's 140 m being
-//! the reference:
+//! It bursts on the tick the plant dies, since the sim leaves its wreck there at once: a
+//! build-up first would show the wreck before the blast (the user, 2026-10-01). All of
+//! it is sized by the blast's radius, the commander's 140 m being the reference:
 //!
-//! - **Breach** (a third to half a second): the core's light swells blue, arcs lash
-//!   out of it to the ground all round, and sparks are drawn in to it.
-//! - **Discharge**: a blue-white flash, a ball of ionised air swelling out of the core
-//!   and going dark, lightning breaking out of it every way and up into the sky, a
-//!   blue shock ring across the ground, and the charge earthing: lightning running out
-//!   along the ground in forks to the edge of the blast, each strike lighting the
-//!   ground and spitting sparks.
+//! - **Discharge**: a blue-white flash, arcs lashing out of the core to the ground all
+//!   round, a ball of ionised air swelling out of the core and going dark, lightning
+//!   breaking out of it every way and up into the sky, a blue shock ring across the
+//!   ground, and the charge earthing: lightning running out along the ground in forks
+//!   to the edge of the blast, each strike lighting the ground and spitting sparks.
 //! - **Aftermath**: the crater crackles, arcs snapping across it, fewer and fewer,
 //!   for several seconds (`ReactorFx::aftermath`, laid a tick at a time).
 //!
@@ -34,7 +33,7 @@ const BLAST_REF: f32 = 140.0;
 
 impl Renderer {
     /// A volatile plant of `blueprint` dying at `at` (`h` its height): its charge breaks
-    /// loose and then it goes up, `blast` metres.
+    /// loose and it goes up at once, `blast` metres.
     pub(super) fn reactor_death(
         &mut self,
         blueprint: BlueprintId,
@@ -50,9 +49,8 @@ impl Renderer {
             .core_of(blueprint.0 as u32)
             .unwrap_or((h * 0.5, blast * 0.03));
         let core = at + Vec3::Z * core_z;
-        let breach = 0.18 + 0.3 * s.sqrt();
-        self.reactor_breach(at, core, orb, blast, time, breach);
-        let bang = time + breach;
+        let bang = time;
+        self.reactor_lashes(at, core, orb, blast, bang);
         self.plasma_burst(at, core, blast, bang);
         // A white-hot flash at the heart, and the haze of the charge round it.
         self.push_effect(core.to_array(), bang, 70.0 * s + 8.0, 0.3, 9.0, 0.0);
@@ -73,33 +71,9 @@ impl Renderer {
         });
     }
 
-    /// The breach: the core swells, arcs lash the ground, sparks are drawn in.
-    fn reactor_breach(
-        &mut self,
-        at: Vec3,
-        core: Vec3,
-        orb: f32,
-        blast: f32,
-        time: f32,
-        breach: f32,
-    ) {
+    /// Arcs lashing out of the breaking core to the ground all round, in the first instant.
+    fn reactor_lashes(&mut self, at: Vec3, core: Vec3, orb: f32, blast: f32, bang: f32) {
         let s = blast / BLAST_REF;
-        self.push_effect(
-            core.to_array(),
-            time,
-            orb * 5.0 + 4.0,
-            breach + 0.12,
-            0.0,
-            1.5,
-        );
-        self.emp_fx.flashes.push(Flash {
-            pos: core,
-            start: time,
-            life: breach + 0.1,
-            color: ARC_LIGHT * (30.0 + 120.0 * s),
-            range: blast * 0.8,
-            flicker: 1.0,
-        });
         let lashes = 6 + (34.0 * s) as usize;
         for i in 0..lashes {
             let a = self.scatter.unit() * TAU;
@@ -111,27 +85,14 @@ impl Renderer {
             let from = core + dir * orb;
             let side = dir.cross(Vec3::Z).normalize_or(Vec3::X);
             let up = side.cross(dir).normalize_or(Vec3::Z);
-            // Later in the breach, more of them and fiercer.
+            // Fiercest at the bang, a few more snapping out over the next moment.
             let k = (i as f32 + self.scatter.unit()) / lashes as f32;
-            let start = time + breach * k.sqrt();
+            let start = bang + 0.15 * k * k;
             let life = 0.08 + 0.1 * self.scatter.unit();
             let len = from.distance(to);
-            let width = (0.25 + orb * 0.06) * (0.6 + k);
+            let width = (0.25 + orb * 0.06) * (1.6 - k);
             self.emp_kinks(from, to, len * 0.16, side, up, start, life, width, 7, BOLT);
             self.push_effect(to.to_array(), start, 1.5 + orb * 0.5, 0.2, 9.0, 0.0);
-        }
-        for _ in 0..(10 + (40.0 * s) as usize) {
-            let dir = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.signed(),
-            )
-            .normalize_or(Vec3::Z);
-            let from = core + dir * (orb * 2.5 + blast * 0.06);
-            let life = breach * (0.6 + 0.4 * self.scatter.unit());
-            let vel = -dir * (from.distance(core) - orb) / life;
-            let start = time + (breach - life) * self.scatter.unit();
-            self.push_puff(PUFF_BOLT, from, vel, start, life, (0.3 + orb * 0.05, 0.08));
         }
     }
 
