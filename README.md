@@ -84,6 +84,8 @@ cargo run --release -p mc-map --bin mc-bake -- --layout alpine --size-km 8 --see
 cargo run --release -p mc-map --bin mc-bake -- --layout alpine-teams --size-km 12 --seed 5 --name "Serac Sound" -o maps/serac_sound.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout archipelago --size-km 20 --seed 23 --players 8 --name "The Axis" -o maps/the_axis.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout twin-bays --size-km 16 --seed 7 --players 8 --name "Halden's Grip" -o maps/haldens_grip.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout canyon --size-km 12 --seed 11 --name "Vermilion Gorge" -o maps/vermilion_gorge.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout frostline --size-km 16 --seed 9 --name "Frostline" -o maps/frostline.mcmap
 ```
 
 Every layout but the survival ones comes out with starting wreckage (`mc_map::wreckage`). To lay it on a map already
