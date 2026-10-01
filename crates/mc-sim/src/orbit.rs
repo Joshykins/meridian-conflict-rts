@@ -71,7 +71,7 @@ impl World {
             mean += self.state.units.pos[row];
         }
         let mean = FxVec2::new(mean.x / n as i32, mean.y / n as i32);
-        let offsets = crate::formations::slots(n, spacing * Fx::ratio(5, 4), true);
+        let offsets = crate::formations::slots(n, spacing * Fx::ratio(5, 4), true, 0);
         let extent = offsets.iter().map(|p| p.length()).fold(Fx::ZERO, Fx::max);
         // The area asked for, but never so small the V cannot turn round its circle.
         let radius = radius.max(extent * 3);

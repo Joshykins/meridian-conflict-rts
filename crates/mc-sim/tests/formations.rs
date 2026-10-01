@@ -641,6 +641,7 @@ fn formation_spacing_and_free_move_are_real_commands() {
             facing: None,
             together,
             spacing,
+            shape: 0,
         })
     };
     w.tick(&[command(0, true)]).unwrap();
@@ -688,6 +689,7 @@ fn a_turned_formation_faces_the_way_it_was_turned() {
         facing: Some(north),
         together: true,
         spacing: 1,
+        shape: 0,
     })])
     .unwrap();
     let offsets: Vec<FxVec2> = ids
@@ -704,6 +706,58 @@ fn a_turned_formation_faces_the_way_it_was_turned() {
     };
     // Four wide and three deep: wider across (east-west) than along the facing.
     assert!(span(|p| p.x) > span(|p| p.y), "{offsets:?}");
+}
+
+#[test]
+fn the_shape_stretches_a_block_wider_or_deeper_and_reform_keeps_it() {
+    let mut w = world();
+    let ids = group(&mut w, "aster_t1_tank", 16);
+    let north = Angle::from_degrees(90);
+    // Facing north, across the block is X and its depth is Y.
+    let spans = |w: &World| {
+        let offsets: Vec<FxVec2> = ids
+            .iter()
+            .map(|id| {
+                let r = w.state.units.row(*id).unwrap();
+                w.state.orders.front(&w.state.units, r).unwrap().offset
+            })
+            .collect();
+        let span = |f: fn(&FxVec2) -> Fx| {
+            offsets.iter().map(f).max().unwrap() - offsets.iter().map(f).min().unwrap()
+        };
+        (span(|p| p.x), span(|p| p.y))
+    };
+    let order = |shape| {
+        cmd(Command::FormationMove {
+            units: ids.clone(),
+            target: FxVec2::from_ints(1300, 512),
+            queue: false,
+            attack_move: false,
+            facing: Some(north),
+            together: true,
+            spacing: 1,
+            shape,
+        })
+    };
+    w.tick(&[order(0)]).unwrap();
+    let (across, deep) = spans(&w);
+    assert_eq!(across, deep, "16 is a square block");
+    w.tick(&[order(4)]).unwrap();
+    let (across, deep) = spans(&w);
+    assert!(across > deep * 3, "wider: {across:?} by {deep:?}");
+    w.tick(&[order(-4)]).unwrap();
+    let (across, deep) = spans(&w);
+    assert!(deep > across * 3, "deeper: {across:?} by {deep:?}");
+    // Re-formed wider, the same move now stands as a line.
+    w.tick(&[cmd(Command::Reform {
+        units: ids.clone(),
+        together: true,
+        spacing: 1,
+        shape: 6,
+    })])
+    .unwrap();
+    let (across, deep) = spans(&w);
+    assert!(across > deep * 3, "re-formed wider: {across:?} by {deep:?}");
 }
 
 #[test]

@@ -117,6 +117,8 @@ pub enum HudAction {
     FormationPanel,
     FormationTogether(bool),
     FormationSpacing(u8),
+    /// The formation's width for its depth (`View::formation_shape`).
+    FormationShape(i8),
     FormUp,
     /// Queue the selection's next tier, after any tiers already queued.
     Upgrade,

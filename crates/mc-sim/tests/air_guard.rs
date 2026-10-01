@@ -254,6 +254,7 @@ fn a_queued_order_ends_a_guard_at_once() {
                 facing: None,
                 together: true,
                 spacing: 0,
+                shape: 0,
             },
         ),
     ])

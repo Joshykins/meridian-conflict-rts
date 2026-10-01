@@ -16,6 +16,38 @@ pub struct Group {
     pub speed: Fx,
 }
 
+/// Steps of `shape` either side of square: each doubles (or halves) the block's
+/// width over its depth, so the widest is a line 8 times as wide as it is deep.
+pub const SHAPES: i8 = 6;
+
+/// Width over depth for each `shape` from `-SHAPES` to `SHAPES`, in steps of about the square root of 2.
+const ASPECT: [(i64, i64); 13] = [
+    (1, 8),
+    (3, 17),
+    (1, 4),
+    (6, 17),
+    (1, 2),
+    (12, 17),
+    (1, 1),
+    (17, 12),
+    (2, 1),
+    (17, 6),
+    (4, 1),
+    (17, 3),
+    (8, 1),
+];
+
+/// Columns across a block of `n` places at `shape` (0 square, more wider, less
+/// deeper), at least `least` and no more than fit.
+fn columns(n: i32, shape: i8, least: i32) -> i32 {
+    let (num, den) = ASPECT[(shape.clamp(-SHAPES, SHAPES) + SHAPES) as usize];
+    (Fx::from_int(n) * Fx::ratio(num, den))
+        .sqrt()
+        .ceil_int()
+        .clamp(1, n.max(1))
+        .max(least)
+}
+
 /// One member of a group being laid out.
 #[derive(Clone, Copy, Debug)]
 pub struct Member {
@@ -65,14 +97,15 @@ pub struct Laid {
 }
 
 /// Where each of `members` stands in a group ordered to `target`: independent
-/// blocks for ground layers, repeating Vs for each air altitude. Each layer faces
-/// `facing`, or without it the way it goes. Slot assignment is spatial and stable,
+/// blocks for ground layers, repeating Vs for each air altitude, as wide for their
+/// depth as `shape` asks (`columns`). Each layer faces `facing`, or without it the way it goes. Slot assignment is spatial and stable,
 /// independent of member order but for ties, which go to the earlier member.
 pub fn plan(
     members: &[Member],
     target: FxVec2,
     facing: Option<Angle>,
     spacing_level: u8,
+    shape: i8,
 ) -> Vec<Laid> {
     let mut layers = BTreeMap::<(u8, i64), Vec<usize>>::new();
     for (i, m) in members.iter().enumerate() {
@@ -80,7 +113,7 @@ pub fn plan(
     }
     layers
         .into_values()
-        .map(|group| lay(members, &group, target, facing, spacing_level))
+        .map(|group| lay(members, &group, target, facing, spacing_level, shape))
         .collect()
 }
 
@@ -90,6 +123,7 @@ fn lay(
     target: FxVec2,
     facing: Option<Angle>,
     spacing_level: u8,
+    shape: i8,
 ) -> Laid {
     let n = group.len() as i32;
     let source = |i: usize| all[i].source;
@@ -113,7 +147,7 @@ fn lay(
     // A flight flies its Vs at its widest wing's spacing; a ground
     // block gives each size its own, heavies in the middle.
     let (cell, laid) = if air {
-        let slots = slots(n as usize, widest * scale, true);
+        let slots = slots(n as usize, widest * scale, true, shape);
         (
             widest,
             slots.into_iter().map(|p| (p, 1)).collect::<Vec<_>>(),
@@ -124,7 +158,7 @@ fn lay(
             .iter()
             .map(|&i| (source(i) - centroid).rotate(-facing))
             .collect();
-        block(&widths, &at, scale)
+        block(&widths, &at, scale, shape)
     };
     let spacing = cell * scale;
     let size = |i: usize| if air { 1 } else { cells(width(i), cell) };
@@ -181,14 +215,14 @@ fn lay(
     }
 }
 
-pub(crate) fn slots(count: usize, spacing: Fx, air: bool) -> Vec<FxVec2> {
+pub(crate) fn slots(count: usize, spacing: Fx, air: bool, shape: i8) -> Vec<FxVec2> {
     if count == 0 {
         return Vec::new();
     }
     let n = count as i32;
-    let cols = Fx::from_int(n).sqrt().ceil_int().max(1);
+    let cols = columns(n, shape, 1);
     let flights = (n + 4) / 5;
-    let flight_cols = Fx::from_int(flights).sqrt().ceil_int().max(1);
+    let flight_cols = columns(flights, shape, 1);
     let mut out: Vec<_> = (0..n)
         .map(|i| {
             if air {
@@ -236,8 +270,14 @@ pub(crate) fn cells(width: Fx, cell: Fx) -> u8 {
 /// the way of every tank whose rank lies past it. Returns the cell and one slot per member, as
 /// (offset, cells a side), in no particular member's order: slots are handed
 /// to members of the same size, `cells(width, cell)` a side. All members one
-/// size lays out as `slots`. The cell is before `scale` spreads the block.
-pub(crate) fn block(widths: &[Fx], stands: &[FxVec2], scale: Fx) -> (Fx, Vec<(FxVec2, u8)>) {
+/// size lays out as `slots`. The cell is before `scale` spreads the block, and
+/// `shape` sets its width for its depth.
+pub(crate) fn block(
+    widths: &[Fx],
+    stands: &[FxVec2],
+    scale: Fx,
+    shape: i8,
+) -> (Fx, Vec<(FxVec2, u8)>) {
     if widths.is_empty() {
         return (Fx::ONE, Vec::new());
     }
@@ -264,7 +304,7 @@ pub(crate) fn block(widths: &[Fx], stands: &[FxVec2], scale: Fx) -> (Fx, Vec<(Fx
     if sizes.iter().all(|&k| k == 1) {
         return (
             cell,
-            slots(widths.len(), spacing, false)
+            slots(widths.len(), spacing, false, shape)
                 .into_iter()
                 .map(|p| (p, 1))
                 .collect(),
@@ -272,7 +312,7 @@ pub(crate) fn block(widths: &[Fx], stands: &[FxVec2], scale: Fx) -> (Fx, Vec<(Fx
     }
     let total: i32 = sizes.iter().map(|&k| (k as i32) * (k as i32)).sum();
     let widest = *sizes.iter().max().unwrap() as i32;
-    let cols = Fx::from_int(total).sqrt().ceil_int().max(widest);
+    let cols = columns(total, shape, widest);
     let ranks = (total + cols - 1) / cols;
     let depth = ranks
         + sizes

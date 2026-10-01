@@ -17,10 +17,12 @@ use mc_sim::tables::{flag, OrderKind};
 use mc_sim::{veterancy_health, FireState, VETERANCY_MAX};
 
 mod details;
+mod formation;
 mod pause_order;
 mod status;
 
 use details::details_card;
+use formation::formation_panel;
 use status::status_page;
 
 pub const ORDER_W: f32 = 104.0;
@@ -1344,95 +1346,4 @@ pub(in crate::hud) fn shift_mark(ui: &mut Ui, c: Vec2, color: crate::ui::Color) 
         c + Vec2::new(-w, -0.5),
     ];
     ui.polyline(&points, 1.1, color, true);
-}
-
-fn formation_panel(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect) {
-    let cw = r.w - 24.0;
-    let panel = Rect::new(r.x, r.y - 154.0, r.w, 144.0);
-    hud.glass(ui, panel);
-    ui.section(
-        panel.x + 12.0,
-        panel.y + 18.0,
-        panel.w - 24.0,
-        "Formation \u{b7} Selection",
-    );
-    let choices = [
-        (
-            "Together",
-            HudAction::FormationTogether(true),
-            s.view.formation_together,
-        ),
-        (
-            "Free Move",
-            HudAction::FormationTogether(false),
-            !s.view.formation_together,
-        ),
-    ];
-    for (i, (label, action, lit)) in choices.into_iter().enumerate() {
-        let button = Rect::new(
-            panel.x + 12.0 + i as f32 * (cw + 4.0) / 2.0,
-            panel.y + 29.0,
-            (cw - 4.0) / 2.0,
-            27.0,
-        );
-        let t = hud.tile(ui, id("formation-mode", i), button, lit, true);
-        let _ = t.glow;
-        ui.text_centred(
-            button.x + button.w * 0.5,
-            button.mid_y(),
-            type_scale::MICRO,
-            rgb(palette::TEXT, 1.0),
-            label,
-        );
-        if t.clicked {
-            hud.actions.push(action);
-            ui.audio.play(Sfx::Select);
-        }
-    }
-    for (i, label) in ["Compact", "Standard", "Wide"].into_iter().enumerate() {
-        let button = Rect::new(
-            panel.x + 12.0 + i as f32 * (cw + 4.0) / 3.0,
-            panel.y + 62.0,
-            (cw - 8.0) / 3.0,
-            25.0,
-        );
-        let t = hud.tile(
-            ui,
-            id("formation-spacing", i),
-            button,
-            s.view.formation_spacing == i as u8,
-            true,
-        );
-        ui.text_centred(
-            button.x + button.w * 0.5,
-            button.mid_y(),
-            type_scale::MICRO,
-            rgb(palette::TEXT, 1.0),
-            label,
-        );
-        if t.clicked {
-            hud.actions.push(HudAction::FormationSpacing(i as u8));
-            ui.audio.play(Sfx::Select);
-        }
-    }
-    let button = Rect::new(panel.x + 12.0, panel.y + 94.0, cw, 26.0);
-    let t = hud.tile(ui, id("form-up", 0), button, false, true);
-    ui.text_centred(
-        button.x + button.w * 0.5,
-        button.mid_y(),
-        type_scale::MICRO,
-        rgb(palette::TEXT, 1.0),
-        "Form UP Here",
-    );
-    if t.clicked {
-        hud.actions.push(HudAction::FormUp);
-        ui.audio.play(Sfx::Select);
-    }
-    ui.text(
-        panel.x + 12.0,
-        panel.y + 132.0,
-        type_scale::MICRO,
-        rgb(palette::DIM, 1.0),
-        "AIR: REPEATING Vs    LAND: BLOCKS",
-    );
 }

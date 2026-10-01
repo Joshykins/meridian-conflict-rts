@@ -603,13 +603,21 @@ pub fn screenshot(
     // MERIDIAN_AIM=ground: fire on the ground being aimed instead (a titan's strike preview).
     // MERIDIAN_AIM=reclaim: the Reclaim order being given, what is under `--cursor` ringed.
     // MERIDIAN_AIM=warp: the selection's warp order being aimed at `--cursor` (`warp_marks.rs`).
-    // MERIDIAN_AIM=formation:DEG: a move held on the right button at `--cursor`, the
-    // selection's formation showing, turned to face DEG degrees (`formation_drag.rs`).
+    // MERIDIAN_AIM=formation:DEG[:SHAPE]: a move held on the right button at `--cursor`,
+    // the selection's formation showing, turned to face DEG degrees and shaped SHAPE
+    // wheel notches wider (negative: longer) (`formation_drag.rs`).
     let aim = std::env::var("MERIDIAN_AIM").ok();
     let formation_aim = aim
         .as_deref()
         .and_then(|a| a.strip_prefix("formation"))
-        .map(|deg| deg.trim_start_matches(':').parse::<i32>().ok());
+        .map(|rest| {
+            let mut parts = rest.trim_start_matches(':').split(':');
+            let deg = parts.next().and_then(|d| d.parse::<i32>().ok());
+            if let Some(shape) = parts.next().and_then(|s| s.parse::<i8>().ok()) {
+                view.formation_shape = crate::formation_drag::step_shape(shape, 0);
+            }
+            deg
+        });
     if let Some(aim) = aim.as_ref().filter(|_| formation_aim.is_none()) {
         view.mode = crate::game::Mode::Target(match aim.as_str() {
             "ground" => crate::game::Targeting::Strike,
@@ -902,7 +910,9 @@ pub fn screenshot(
                 queue: false,
             };
             if let Ok(drag) = crate::formation_drag::FormationDrag::new(command, input.cursor) {
-                drag.draw(&mut ui, &field, deg.map(mc_core::Angle::from_degrees));
+                let facing = deg.map(mc_core::Angle::from_degrees);
+                drag.ghosts(&field, facing, &mut ghosts);
+                drag.draw(&mut ui, &field, facing);
             }
         }
         crate::orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);

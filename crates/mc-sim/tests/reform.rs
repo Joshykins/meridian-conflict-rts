@@ -97,6 +97,7 @@ fn a_circling_flight_takes_new_settings_at_once() {
             units: ids.clone(),
             together: true,
             spacing: 2,
+            shape: 0,
         },
     );
     let wide = fronts(&w, &rows);
@@ -123,6 +124,7 @@ fn a_circling_flight_takes_new_settings_at_once() {
             units: ids.clone(),
             together: false,
             spacing: 2,
+            shape: 0,
         },
     );
     let free = fronts(&w, &rows);
@@ -136,6 +138,7 @@ fn a_circling_flight_takes_new_settings_at_once() {
             units: ids,
             together: true,
             spacing: 0,
+            shape: 0,
         },
     );
     let compact = fronts(&w, &rows);
@@ -188,6 +191,7 @@ fn a_move_keeps_its_destination_and_queue() {
             units: ids,
             together: false,
             spacing: 2,
+            shape: 0,
         },
     );
     for (&r, b) in rows.iter().zip(&before) {
@@ -235,6 +239,7 @@ fn a_patrol_keeps_each_unit_in_one_slot_round_the_loop() {
             units: ids,
             together: true,
             spacing: 2,
+            shape: 0,
         },
     );
     let legs =

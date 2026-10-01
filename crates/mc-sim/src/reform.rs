@@ -27,6 +27,7 @@ impl World {
         ids: &[crate::tables::UnitId],
         together: bool,
         spacing_level: u8,
+        shape: i8,
     ) -> Result<(), SimError> {
         let mut queues: BTreeMap<usize, Vec<Order>> = self
             .owned(player, ids, cat::MOBILE)
@@ -102,7 +103,10 @@ impl World {
                 let s = widest * spacing_scale(spacing_level);
                 (
                     widest,
-                    slots(n, s, air).into_iter().map(|p| (p, 1)).collect(),
+                    slots(n, s, air, shape)
+                        .into_iter()
+                        .map(|p| (p, 1))
+                        .collect(),
                 )
             } else {
                 let widths: Vec<_> = rows.iter().map(|&row| width(row)).collect();
@@ -118,7 +122,7 @@ impl World {
                         }
                     })
                     .collect();
-                block(&widths, &at, spacing_scale(spacing_level))
+                block(&widths, &at, spacing_scale(spacing_level), shape)
             };
             let spacing = cell * spacing_scale(spacing_level);
             let size = |row: usize| {

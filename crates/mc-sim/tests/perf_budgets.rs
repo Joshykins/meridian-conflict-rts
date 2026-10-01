@@ -354,6 +354,7 @@ fn one_order_for_an_army() {
             facing: None,
             together: true,
             spacing: 1,
+            shape: 0,
         },
     };
     let encoded = order.command.encode();

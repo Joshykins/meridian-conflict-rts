@@ -182,6 +182,8 @@ pub struct View {
     pub formation_panel: bool,
     pub formation_together: bool,
     pub formation_spacing: u8,
+    /// How wide a block stands for its depth (`Command::FormationMove::shape`).
+    pub formation_shape: i8,
     pub fps: f32,
     pub cpu_ms: f32,
     pub show_profiler: bool,
@@ -237,6 +239,7 @@ impl View {
             formation_panel: false,
             formation_together: true,
             formation_spacing: 1,
+            formation_shape: 0,
             fps: 0.0,
             cpu_ms: 0.0,
             show_profiler,
@@ -771,6 +774,16 @@ impl Game {
                 self.cursor = p;
             }
             _ if self.menu.is_some() => {}
+            // A move held on the right button: the wheel shapes its formation.
+            WindowEvent::MouseWheel { delta, .. } if self.formation_drag.is_some() => {
+                let lines = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => *y,
+                    MouseScrollDelta::PixelDelta(p) => p.y as f32 / 40.0,
+                };
+                if let Some(drag) = self.formation_drag.as_mut() {
+                    drag.wheel(lines, &mut self.view);
+                }
+            }
             // Over the HUD the wheel scrolls the HUD, which reads it from the interface's input.
             WindowEvent::MouseWheel { .. } if self.hud.covers(self.cursor) => {}
             WindowEvent::MouseWheel { delta, .. } if self.hud.free.on => {
@@ -872,6 +885,7 @@ impl Game {
                 facing: None,
                 together: self.view.formation_together,
                 spacing: self.view.formation_spacing,
+                shape: self.view.formation_shape,
             },
             Command::AttackMove {
                 units,
@@ -885,6 +899,7 @@ impl Game {
                 facing: None,
                 together: self.view.formation_together,
                 spacing: self.view.formation_spacing,
+                shape: self.view.formation_shape,
             },
             other => other,
         };
@@ -892,12 +907,15 @@ impl Game {
         // spacing; other settings are applied to them straight after.
         let reform = match &command {
             Command::Guard { units, .. } | Command::Patrol { units, .. }
-                if !self.view.formation_together || self.view.formation_spacing != 1 =>
+                if !self.view.formation_together
+                    || self.view.formation_spacing != 1
+                    || self.view.formation_shape != 0 =>
             {
                 Some(Command::Reform {
                     units: units.clone(),
                     together: self.view.formation_together,
                     spacing: self.view.formation_spacing,
+                    shape: self.view.formation_shape,
                 })
             }
             _ => None,
@@ -2152,6 +2170,7 @@ impl Game {
                 units,
                 together: self.view.formation_together,
                 spacing: self.view.formation_spacing,
+                shape: self.view.formation_shape,
             });
         }
     }
@@ -2163,6 +2182,7 @@ impl Game {
             HudAction::FormationPanel
                 | HudAction::FormationTogether(_)
                 | HudAction::FormationSpacing(_)
+                | HudAction::FormationShape(_)
                 | HudAction::FormUp
         ) {
             self.view.formation_panel = false;
@@ -2175,6 +2195,10 @@ impl Game {
             }
             HudAction::FormationSpacing(spacing) => {
                 self.view.formation_spacing = spacing.min(2);
+                self.reform_selection();
+            }
+            HudAction::FormationShape(shape) => {
+                self.view.formation_shape = crate::formation_drag::step_shape(shape, 0);
                 self.reform_selection();
             }
             HudAction::FormUp => {
@@ -2199,6 +2223,7 @@ impl Game {
                         facing: None,
                         together: true,
                         spacing: self.view.formation_spacing,
+                        shape: self.view.formation_shape,
                     });
                     self.hud
                         .toast("FORMING UP · AIR Vs / LAND BLOCKS", hud::HEALTHY);
@@ -4619,6 +4644,17 @@ impl Game {
         let outlined = self.orders.ghosts(&field, &mut ghosts);
         // Walls in the preview join each other and the walls already standing.
         mc_sim::mirror::join_walls(&self.blueprints, &mut ghosts, &self.view.frame.units);
+        // A held move: a hologram of each member where it would stand.
+        let formation_facing = self
+            .formation_drag
+            .as_ref()
+            .filter(|d| d.showing(self.cursor, DRAG_THRESHOLD))
+            .map(|d| {
+                let ground = self.ground_under_cursor(renderer).map(|g| g.truncate());
+                let facing = d.facing(self.cursor, ground, DRAG_THRESHOLD);
+                d.ghosts(&field, facing, &mut ghosts);
+                facing
+            });
         self.pointer = if self.hud.free.on {
             self.free_camera_pointer()
         } else {
@@ -4735,17 +4771,8 @@ impl Game {
             }
             orders::ghost_footprints(&mut ui, &field, &ghosts[..outlined]);
             self.orders.draw_pending(&mut ui, &field, self.cursor);
-            if let Some(drag) = self
-                .formation_drag
-                .as_ref()
-                .filter(|d| d.showing(self.cursor, DRAG_THRESHOLD))
-            {
-                let ground = self.ground_under_cursor(renderer).map(|g| g.truncate());
-                drag.draw(
-                    &mut ui,
-                    &field,
-                    drag.facing(self.cursor, ground, DRAG_THRESHOLD),
-                );
+            if let (Some(drag), Some(facing)) = (self.formation_drag.as_ref(), formation_facing) {
+                drag.draw(&mut ui, &field, facing);
             }
             if let Some(from) = self.left_down {
                 if self.view.mode == Mode::Normal && from.distance(self.cursor) >= DRAG_THRESHOLD {

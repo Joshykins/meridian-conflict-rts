@@ -38,6 +38,9 @@ pub enum Command {
         facing: Option<Angle>,
         together: bool,
         spacing: u8,
+        /// How wide the block stands for its depth: 0 square, up to
+        /// `formations::SHAPES` wider, down to `-SHAPES` deeper.
+        shape: i8,
     },
     Move {
         units: Vec<UnitId>,
@@ -234,11 +237,13 @@ pub enum Command {
         pos: FxVec2,
     },
     /// Lays these units' moves, patrols and orbits out again, together or free and
-    /// at `spacing` (0 compact, 1 standard, 2 wide), keeping where they go.
+    /// at `spacing` (0 compact, 1 standard, 2 wide) and `shape` (as `FormationMove`'s),
+    /// keeping where they go.
     Reform {
         units: Vec<UnitId>,
         together: bool,
         spacing: u8,
+        shape: i8,
     },
     /// Submarines among these units dive (`dive`) or surface. Others ignore it.
     SetDive {
@@ -525,6 +530,7 @@ mod tests {
             facing: None,
             together: true,
             spacing: 1,
+            shape: -3,
         };
         assert_eq!(Command::decode(&army.encode()), Some(army));
         let crowd = Command::Patrol {

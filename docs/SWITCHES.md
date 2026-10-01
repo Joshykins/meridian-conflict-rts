@@ -25,6 +25,6 @@ Headless screenshots (`--screenshot`, `scripts/shot.sh run`) can show an order b
 
 | Variable | Values | Purpose |
 |---|---|---|
-| `MERIDIAN_AIM` | `1`, `ground`, `reclaim`, `warp`, `formation:DEG` | The order in hand, aimed at `--cursor`: a warhead launch (`1`, docs/NUKES.md), a titan's strike, Reclaim, a warp jump (the line from each selected ship to its exit in formation, and the energy card), or a move held on the right button (the selection's formation at `--cursor`, turned to face DEG degrees; `formation` alone faces the way it goes). |
+| `MERIDIAN_AIM` | `1`, `ground`, `reclaim`, `warp`, `formation:DEG[:SHAPE]` | The order in hand, aimed at `--cursor`: a warhead launch (`1`, docs/NUKES.md), a titan's strike, Reclaim, a warp jump (the line from each selected ship to its exit in formation, and the energy card), or a move held on the right button (the selection's formation at `--cursor`, turned to face DEG degrees, shown as a hologram of each unit; `formation` alone faces the way it goes; SHAPE is wheel notches wider, negative longer, -6 to 6). |
 | `MERIDIAN_ISSUE_NOTE` | any text | The F1 report card's note, as if typed (the field wraps and grows with a long one). |
 | `MERIDIAN_GROUPS` | `KEY,KEY,...` | Control groups 2, 3, ... hold player 0's units whose blueprint key contains each KEY (group 1 is the selection): the groups card and the numbers by the units. |

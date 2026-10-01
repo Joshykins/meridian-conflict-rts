@@ -50,7 +50,7 @@ impl World {
             .into_iter()
             .filter(|&row| self.bp(row).sends_reclaimers())
             .collect();
-        for layout in self.formation_layouts(rows, pos, queue, None, 1) {
+        for layout in self.formation_layouts(rows, pos, queue, None, 1, 0) {
             for (row, offset) in layout.rows.into_iter().zip(layout.offsets) {
                 let mut o = order(OrderKind::ReclaimArea, pos, Handle::NONE);
                 o.offset = layout.center + offset - pos;

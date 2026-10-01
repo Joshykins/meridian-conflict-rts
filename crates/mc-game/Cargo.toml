@@ -18,6 +18,7 @@ mc-net = { workspace = true }
 mc-music = { workspace = true }
 mc-sim = { workspace = true }
 mc-render = { workspace = true }
+bytemuck = { workspace = true }
 winit = { workspace = true }
 glam = { workspace = true }
 png = { workspace = true }
@@ -45,7 +46,6 @@ alsa = ["dep:cpal"]
 embed-resource = { workspace = true }
 
 [dev-dependencies]
-bytemuck = { workspace = true }
 # The lobby test plays host and guest through a real server.
 mc-server = { workspace = true }
 

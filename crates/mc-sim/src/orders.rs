@@ -102,6 +102,7 @@ impl World {
                 facing,
                 together,
                 spacing,
+                shape,
             } => self.order_formation(
                 player,
                 units,
@@ -115,6 +116,7 @@ impl World {
                 *facing,
                 *together,
                 *spacing,
+                *shape,
             ),
             Command::Move {
                 units,
@@ -465,7 +467,8 @@ impl World {
                 units,
                 together,
                 spacing,
-            } => self.reform(player, units, *together, *spacing),
+                shape,
+            } => self.reform(player, units, *together, *spacing, *shape),
             Command::SetDive { units, dive } => {
                 self.set_dive(player, units, *dive);
                 Ok(())
@@ -746,7 +749,7 @@ impl World {
             return Ok(());
         }
         let points: Vec<FxVec2> = points.iter().map(|&p| self.clamp_to_map(p)).collect();
-        for layout in self.formation_layouts(rows, points[0], queue, None, 1) {
+        for layout in self.formation_layouts(rows, points[0], queue, None, 1, 0) {
             let mut route = points.clone();
             if route.len() == 1 {
                 route.push(layout.centroid);
@@ -922,7 +925,7 @@ impl World {
         target: FxVec2,
         queue: bool,
     ) -> Result<(), SimError> {
-        self.order_formation(player, ids, kind, target, queue, None, true, 1)
+        self.order_formation(player, ids, kind, target, queue, None, true, 1, 0)
     }
 
     fn order_formation(
@@ -935,11 +938,12 @@ impl World {
         facing: Option<Angle>,
         together: bool,
         spacing_level: u8,
+        shape: i8,
     ) -> Result<(), SimError> {
         let rows = self.owned(player, ids, cat::MOBILE);
         let target = self.clamp_to_map(target);
         let span = mc_core::perf_span!("cmd.layouts");
-        let layouts = self.formation_layouts(rows, target, queue, facing, spacing_level);
+        let layouts = self.formation_layouts(rows, target, queue, facing, spacing_level, shape);
         drop(span);
         let _span = mc_core::perf_span!("cmd.give");
         for layout in layouts {
@@ -986,6 +990,7 @@ impl World {
         queue: bool,
         facing: Option<Angle>,
         spacing_level: u8,
+        shape: i8,
     ) -> Vec<FormationLayout> {
         rows.sort_unstable();
         rows.dedup();
@@ -1008,7 +1013,7 @@ impl World {
             .collect();
         let mut out = Vec::new();
         let span = mc_core::perf_span!("cmd.plan");
-        let plans = crate::formations::plan(&members, target, facing, spacing_level);
+        let plans = crate::formations::plan(&members, target, facing, spacing_level, shape);
         drop(span);
         for laid in plans {
             let rows: Vec<usize> = laid.members.iter().map(|&i| rows[i]).collect();

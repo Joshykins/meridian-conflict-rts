@@ -693,7 +693,7 @@ fn formation_controls_emit_actions_and_capture_their_clicks() {
     assert_eq!(rig.click(order_slot(0, 2)), vec![HudAction::FormationPanel]);
     rig.view.formation_panel = true;
     let w = selection::orders_width(TANK_FAMILIES);
-    let (px, py) = (ORDERS_X, DECK_Y - 154.0);
+    let (px, py) = (ORDERS_X, DECK_Y - 186.0);
     let cw = w - 24.0;
     assert_eq!(
         rig.click(Vec2::new(px + 12.0 + cw * 0.75, py + 42.0)),
@@ -707,7 +707,15 @@ fn formation_controls_emit_actions_and_capture_their_clicks() {
         rig.click(Vec2::new(px + 12.0 + cw * 0.85, py + 74.0)),
         vec![HudAction::FormationSpacing(2)]
     );
-    let up = Vec2::new(px + w * 0.5, py + 107.0);
+    assert_eq!(
+        rig.click(Vec2::new(px + 12.0 + cw * 0.1, py + 105.0)),
+        vec![HudAction::FormationShape(-1)]
+    );
+    assert_eq!(
+        rig.click(Vec2::new(px + 12.0 + cw * 0.9, py + 105.0)),
+        vec![HudAction::FormationShape(1)]
+    );
+    let up = Vec2::new(px + w * 0.5, py + 137.0);
     assert_eq!(rig.click(up), vec![HudAction::FormUp]);
     assert!(
         rig.hud.covers(up),

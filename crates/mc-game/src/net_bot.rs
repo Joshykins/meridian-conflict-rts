@@ -261,6 +261,7 @@ fn chaos(
                 facing: (rng.below(2) == 0).then(|| Angle(rng.below(65536) as u16)),
                 together: rng.below(2) == 0,
                 spacing: rng.below(4) as u8,
+                shape: rng.below(17) as i8 - 8,
             },
             9 | 10 => Command::Attack {
                 units: group,
@@ -345,6 +346,7 @@ fn chaos(
                 units: group,
                 together: rng.below(2) == 0,
                 spacing: rng.below(3) as u8,
+                shape: rng.below(17) as i8 - 8,
             },
             25 => Command::SetDive {
                 units: group,
