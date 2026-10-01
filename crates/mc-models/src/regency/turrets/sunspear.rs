@@ -1,31 +1,56 @@
-//! The Sunspear (tech 3 point defence, a 4 x 4 lot): a Pinch-fusion Cannon. Like the
-//! Halberd it gathers its charge in front of the bore, but squeezes it until it fuses,
-//! white before it goes, one great shot. The `muzzle` is the middle of the charge.
+//! The Sunspear (tech 3 point defence, a 4 x 4 lot, the Citadel's size): a Pinch-fusion
+//! Cannon. Like the Halberd it gathers its charge in front of the bore, but squeezes it
+//! until it fuses, white before it goes, one great shot. The `muzzle` is the middle of
+//! the charge.
 //!
 //! Two tall plated rails either side of a short bore reach past its mouth, gravity lenses
-//! at their tips aimed into the charge, and a stack of wound pinch coils narrows down the
-//! bore between them. On the turret's back the fusion core stands caged: a red star on a
-//! bronze post, held in three gimbal rings and a plated band, conduits running to
-//! the trunnions. It stands on a round platform ringed by eight pylons.
+//! in heads at their tips aimed into the charge, and a stack of wound pinch coils narrows
+//! down the bore between them. On the turret's back the fusion core stands caged: a red
+//! star on a bronze post, held in three gimbal rings and a plated band, conduits running
+//! to the trunnions; a radiator pack on either flank. It stands on a round platform
+//! ringed by eight pylons.
 //!
-//! Its pivot and muzzle are the unit file's (`data/factions/regency/units/structures.ron`).
+//! It works with its charge (`rig::CHARGE_GEAR_MASK`, entity.wgsl `charge_gear_pose`):
+//! through the charge the rails part, the lens heads slide out along them into the
+//! charge, the pinch coils light one after another from the breech, red going white, and
+//! the gimbal cage spins up round the core, which lights first. The shot blinds every
+//! light and kicks the bore back; the radiator lids stand up off glowing grilles, and as
+//! the gun cools the coils fade through orange to an ember, the rails close and the lids
+//! settle.
+//!
+//! Drawn at [`SCALE`] times the authored metres below. Its pivot and muzzle ([`LINE`]) are
+//! the unit file's (`data/factions/regency/units/structures.ron`).
 
 use std::f32::consts::FRAC_PI_4;
 
-use glam::{Vec2, Vec3};
+use glam::{Affine3A, Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
+use crate::gpu_consts::charge_gear::{HEAT_STAGE, REACH, SPIN, SPREAD, VENT};
 use crate::material::*;
-use crate::{part, rig};
+use crate::{part, pattern, rig};
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::*;
 use super::*;
 
-pub(super) const LINE: Line = Line::new(Vec3::new(0.0, 0.0, 13.6), Vec3::new(25.0, 0.0, 13.6));
-/// How far round the charge its projectors stand: none closer than 0.4 of it.
+/// The model's size over the metres it is authored in.
+const SCALE: f32 = 1.4;
+/// The gun's line as authored.
+const AUTHORED: Line = Line::new(Vec3::new(0.0, 0.0, 13.6), Vec3::new(25.0, 0.0, 13.6));
+/// The gun's line as drawn: the unit file's pivot and muzzle (tests hold them equal).
 #[cfg(test)]
-const HOLD: f32 = 4.0;
+pub(super) const LINE: Line = Line::new(
+    Vec3::new(0.0, 0.0, 13.6 * SCALE),
+    Vec3::new(25.0 * SCALE, 0.0, 13.6 * SCALE),
+);
+/// How far round the charge its projectors stand (drawn): none closer than 0.4 of it.
+#[cfg(test)]
+const HOLD: f32 = 4.0 * SCALE;
+/// The foot of the core's cradle, authored.
+const CORE: Vec3 = Vec3::new(-6.2, 0.0, 11.4);
+/// The core above it.
+const CORE_MID: Vec3 = Vec3::new(-6.2, 0.0, 15.8);
 
 fn coarse_fusion(b: &mut MeshBuilder, line: &Line, base_r: f32, base_h: f32, mouth: f32) {
     coarse(
@@ -55,27 +80,37 @@ fn race(b: &mut MeshBuilder, z: f32, r: f32) {
 }
 
 pub(crate) fn sunspear(b: &mut MeshBuilder, _tech: u8) {
-    LINE.rig(b, 1.4);
-    if b.coarse() {
-        coarse_fusion(b, &LINE, 20.0, 7.0, 18.5);
-        return;
-    }
-    ringed(b);
-    b.with_part(part::TURRET, |b| {
-        plan_hull(
-            b,
-            &[[4.0, 6.0], [-3.0, 7.0], [-9.0, 5.4], [-11.0, 2.0]],
-            &[(7.6, 1.0), (9.2, 1.0), (11.0, 0.8), (11.6, 0.6)],
-        );
-        cheeks(b, [-3.0, 3.0], 4.6, [11.0, 15.6], 0.8);
-        caged_core(b, v3(-6.2, 0.0, 11.4));
-        b.with_limb(rig::ARM_GUN, |b| {
-            gun_frame(b, &LINE, |b| {
-                rails(b, LINE.len());
-                pinch_coils(b);
-            })
+    b.with(Affine3A::from_scale(Vec3::splat(SCALE)), |b| {
+        AUTHORED.rig(b, 1.8);
+        if b.coarse() {
+            coarse_fusion(b, &AUTHORED, 16.0, 7.0, 18.5);
+            return;
+        }
+        b.set_charge_gear(CORE_MID, 1.0);
+        ringed(b);
+        b.with_part(part::TURRET, |b| {
+            plan_hull(
+                b,
+                &[[4.0, 6.0], [-3.0, 7.0], [-9.0, 5.4], [-11.0, 2.0]],
+                &[(7.6, 1.0), (9.2, 1.0), (11.0, 0.8), (11.6, 0.6)],
+            );
+            cheeks(b, [-3.0, 3.0], 4.6, [11.0, 15.6], 0.8);
+            caged_core(b, CORE);
+            radiators(b);
+            b.with_limb(rig::ARM_GUN, |b| {
+                gun_frame(b, &AUTHORED, |b| {
+                    rails(b, AUTHORED.len());
+                    pinch_coils(b);
+                })
+            });
         });
     });
+}
+
+/// A `GLOW_LASER` brush lit with the charge at `stage` (0 first, 6 last; `HEAT_STAGE` lit
+/// by the shot instead): the Regency's plasma coil light.
+fn coil_light(b: &mut MeshBuilder, stage: u32) {
+    b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
 }
 
 /// A round platform stepped up to a hub, ringed by eight plated pylons, each tied to the
@@ -114,8 +149,10 @@ fn ringed(b: &mut MeshBuilder) {
 
 /// The rails gun in its own frame: a wide breech, a short bronze bore through plated
 /// sleeves, and either side a tall plated rail out past its mouth, plates lapped back
-/// along its outer face, two gravity lenses on its inner face at the tip, tied to the
-/// bore in bronze. The bore recoils; the rails hold.
+/// along its outer face, tied across the bore in bronze. At each rail's tip a plated head
+/// sleeved over it carries two gravity lenses on its inner face. The bore recoils; the
+/// rails part through the charge (`SPREAD`, the ties telescoping), and the heads slide
+/// out along them into the charge (`REACH`).
 fn rails(b: &mut MeshBuilder, len: f32) {
     let fine = b.fine();
     collar(b, Vec3::ZERO, Vec3::Y, 1.6, 10.6);
@@ -125,47 +162,61 @@ fn rails(b: &mut MeshBuilder, len: f32) {
         &[[-3.0, 7.0, 4.4, 0.0], [2.5, 7.0, 4.0, 0.0]],
         &CHAMFERED,
     );
+    let ties: &[f32] = if fine { &[8.0, 15.0] } else { &[] };
     b.mirror_y(|b| {
-        dark_plate(b);
-        bar_through(
-            b,
-            &[
-                (v3(1.0, 3.2, 0.0), Vec2::new(1.4, 3.4)),
-                (v3(14.0, 3.6, 0.0), Vec2::new(1.2, 3.0)),
-                (v3(22.0, 4.0, 0.0), Vec2::new(1.0, 2.6)),
-                (v3(len + 0.2, 3.9, 0.0), Vec2::new(0.8, 2.0)),
-            ],
-            Vec3::Y,
-        );
-        Course {
-            count: if fine { 3 } else { 1 },
-            step: 6.0,
-            len: 7.0,
-            half: 1.2,
-            tip: 0.0,
-            thick: 0.3,
-            tail: 1.5,
-        }
-        .lay(
-            b,
-            &Frame::new(v3(len - 1.0, 4.35, 0.0), v3(-1.0, 0.05, 0.0), Vec3::Y),
-        );
-        for z in [-0.8f32, 0.8] {
-            lens(b, v3(len - 0.6, 3.45, z), v3(len, 0.0, 0.0), 0.62);
-        }
-        if fine {
-            slit(b, v3(19.0, 3.42, 0.0), -Vec3::Y, Vec3::X, 4.0, 0.3);
-        }
+        b.with_charge_gear(SPREAD, |b| {
+            dark_plate(b);
+            bar_through(
+                b,
+                &[
+                    (v3(1.0, 3.2, 0.0), Vec2::new(1.4, 3.4)),
+                    (v3(14.0, 3.6, 0.0), Vec2::new(1.2, 3.0)),
+                    (v3(22.0, 4.0, 0.0), Vec2::new(1.0, 2.6)),
+                    (v3(len + 0.2, 3.9, 0.0), Vec2::new(0.8, 2.0)),
+                ],
+                Vec3::Y,
+            );
+            Course {
+                count: if fine { 3 } else { 1 },
+                step: 6.0,
+                len: 7.0,
+                half: 1.2,
+                tip: 0.0,
+                thick: 0.3,
+                tail: 1.5,
+            }
+            .lay(
+                b,
+                &Frame::new(v3(len - 4.0, 4.35, 0.0), v3(-1.0, 0.05, 0.0), Vec3::Y),
+            );
+            if fine {
+                slit(b, v3(17.0, 3.04, 0.0), -Vec3::Y, Vec3::X, 4.0, 0.3);
+            }
+            // The ties' outer sleeves, riding out with the rail over their fixed middles.
+            metal(b);
+            for &x in ties {
+                for z in [-1.3f32, 1.3] {
+                    bar_through(
+                        b,
+                        &[
+                            (v3(x, 1.6, z), Vec2::new(0.62, 0.62)),
+                            (v3(x, 3.3, z), Vec2::new(0.62, 0.62)),
+                        ],
+                        Vec3::X,
+                    );
+                }
+            }
+        });
+        b.with_charge_gear(REACH, |b| lens_head(b, len));
     });
     metal(b);
-    let ties: &[f32] = if fine { &[8.0, 15.0] } else { &[] };
     for &x in ties {
         for z in [-1.3f32, 1.3] {
             bar_through(
                 b,
                 &[
-                    (v3(x, -3.0, z), Vec2::new(0.5, 0.5)),
-                    (v3(x, 3.0, z), Vec2::new(0.5, 0.5)),
+                    (v3(x, -2.5, z), Vec2::new(0.5, 0.5)),
+                    (v3(x, 2.5, z), Vec2::new(0.5, 0.5)),
                 ],
                 Vec3::X,
             );
@@ -192,9 +243,28 @@ fn rails(b: &mut MeshBuilder, len: f32) {
             1.5,
             b.sides(10),
         );
-        b.paint(GLOW_LASER);
+        coil_light(b, 6);
         hoop_on(b, v3(18.45, 0.0, 0.0), Vec3::X, 1.1, 0.3, 0.12, b.sides(10));
     });
+}
+
+/// A rail's head (+y side): a plated sleeve over the rail's tip, overlapping it far enough
+/// to stay on it when it slides out, its nose swept in toward the charge, two gravity
+/// lenses on its inner face.
+fn lens_head(b: &mut MeshBuilder, len: f32) {
+    dark_plate(b);
+    bar_through(
+        b,
+        &[
+            (v3(len - 3.4, 3.95, 0.0), Vec2::new(1.3, 2.5)),
+            (v3(len - 0.4, 3.9, 0.0), Vec2::new(1.3, 2.6)),
+            (v3(len + 0.1, 3.75, 0.0), Vec2::new(0.9, 1.8)),
+        ],
+        Vec3::Y,
+    );
+    for z in [-0.8f32, 0.8] {
+        lens(b, v3(len - 0.6, 3.2, z), v3(len, 0.0, 0.0), 0.62);
+    }
 }
 
 /// A gravity lens at `at`, turned to `toward`: a bronze housing ringed in plate, a red
@@ -206,7 +276,7 @@ fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f32) {
     b.cylinder_between(at - d * r * 0.9, at, r * 1.15, r, sides);
     dark_plate(b);
     hoop_on(b, at - d * r * 0.35, d, r * 1.2, r * 0.35, r * 0.4, sides);
-    b.paint(GLOW_LASER);
+    coil_light(b, 6);
     b.cylinder_between(at, at + d * 0.1, r * 0.72, r * 0.6, sides);
     if b.fine() {
         let side = d.cross(Vec3::Z).normalize();
@@ -223,29 +293,28 @@ fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f32) {
 }
 
 /// The pinch coils in the gun's frame: a magnetic bottle down the bore, coils narrowing
-/// toward the mouth, each wound in bronze, a red line inside the last.
+/// toward the mouth, each wound in bronze, a red light inside each that comes on with
+/// the charge, the coil nearest the breech first.
 fn pinch_coils(b: &mut MeshBuilder) {
     let fine = b.fine();
-    let coils: &[(f32, f32)] = if fine {
+    let coils: &[(f32, f32, u32)] = if fine {
         &[
-            (7.4, 2.3),
-            (9.2, 2.15),
-            (11.9, 2.0),
-            (13.7, 1.85),
-            (16.0, 1.7),
+            (7.4, 2.3, 1),
+            (9.2, 2.15, 2),
+            (11.9, 2.0, 3),
+            (13.7, 1.85, 4),
+            (16.0, 1.7, 5),
         ]
     } else {
-        &[(9.2, 2.15), (13.7, 1.85)]
+        &[(9.2, 2.15, 2), (13.7, 1.85, 4)]
     };
-    for (i, &(x, r)) in coils.iter().enumerate() {
+    for &(x, r, stage) in coils {
         dark_plate(b);
         hoop_on(b, v3(x, 0.0, 0.0), Vec3::X, r, 0.7, 0.8, b.sides(16));
         metal(b);
         hoop_on(b, v3(x, 0.0, 0.0), Vec3::X, r + 0.4, 0.2, 0.55, b.sides(16));
-        if fine && i + 1 == coils.len() {
-            b.paint(GLOW_LASER);
-            hoop_on(b, v3(x, 0.0, 0.0), Vec3::X, r - 0.38, 0.05, 0.3, 16);
-        }
+        coil_light(b, stage);
+        hoop_on(b, v3(x, 0.0, 0.0), Vec3::X, r - 0.4, 0.12, 0.5, b.sides(16));
     }
 }
 
@@ -258,20 +327,23 @@ fn caged_core(b: &mut MeshBuilder, c: Vec3) {
     dark_plate(b);
     b.cylinder_between(c - Vec3::Z * 0.4, c + Vec3::Z * 0.5, 3.0, 2.7, b.sides(12));
     shaft(b, c, mid - Vec3::Z * 1.2, 0.9);
-    b.paint(GLOW_LASER);
+    coil_light(b, 0);
     b.spheroid(
         mid,
-        Vec3::splat(1.2),
+        Vec3::splat(1.35),
         if fine { 12 } else { 8 },
         if fine { 8 } else { 5 },
     );
-    metal(b);
-    let segs = b.sides(18);
-    for axis in [Vec3::Z, v3(1.0, 0.0, 0.9), v3(-1.0, 0.0, 0.9)] {
-        hoop_on(b, mid, axis, 2.4, 0.35, 0.45, segs);
-    }
-    dark_plate(b);
-    hoop_on(b, mid, Vec3::Y, 2.95, 0.45, 0.8, segs);
+    // The gimbal cage spins up round the core through the charge.
+    b.with_charge_gear(SPIN, |b| {
+        metal(b);
+        let segs = b.sides(18);
+        for axis in [Vec3::Z, v3(1.0, 0.0, 0.9), v3(-1.0, 0.0, 0.9)] {
+            hoop_on(b, mid, axis, 2.4, 0.35, 0.45, segs);
+        }
+        dark_plate(b);
+        hoop_on(b, mid, Vec3::Y, 2.95, 0.45, 0.8, segs);
+    });
     for k in 0..4 {
         let a = FRAC_PI_4 + std::f32::consts::FRAC_PI_2 * k as f32;
         let d = v3(a.cos(), a.sin(), 0.0);
@@ -302,6 +374,74 @@ fn caged_core(b: &mut MeshBuilder, c: Vec3) {
     }
 }
 
+/// A radiator pack on either flank of the turret's back: a plated box, a grille of bars
+/// over a red-lit floor (`HEAT_STAGE`: dark until the shot) and three lids over it that
+/// stand up off it with the heat after the shot (`VENT`) and settle as it cools.
+fn radiators(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let (x0, x1, y0, y1, z0, z1) = (-9.6, -3.8, 3.4, 5.8, 8.6, 11.9);
+    b.mirror_y(|b| {
+        dark_plate(b);
+        b.block(v3(x0, y0, z0), v3(x1, y1, z1 - 0.5));
+        // The walls round the grille.
+        for (a, c) in [
+            (v3(x0, y0, z1 - 0.5), v3(x1, y0 + 0.3, z1)),
+            (v3(x0, y1 - 0.3, z1 - 0.5), v3(x1, y1, z1)),
+            (v3(x0, y0, z1 - 0.5), v3(x0 + 0.3, y1, z1)),
+            (v3(x1 - 0.3, y0, z1 - 0.5), v3(x1, y1, z1)),
+        ] {
+            b.block(a, c);
+        }
+        coil_light(b, HEAT_STAGE);
+        b.face(&[
+            v3(x0 + 0.3, y0 + 0.3, z1 - 0.35),
+            v3(x1 - 0.3, y0 + 0.3, z1 - 0.35),
+            v3(x1 - 0.3, y1 - 0.3, z1 - 0.35),
+            v3(x0 + 0.3, y1 - 0.3, z1 - 0.35),
+        ]);
+        if fine {
+            metal(b);
+            let bars = 7;
+            for k in 0..bars {
+                let x = x0 + 0.6 + (x1 - x0 - 1.2) * k as f32 / (bars - 1) as f32;
+                b.block(
+                    v3(x - 0.08, y0 + 0.3, z1 - 0.3),
+                    v3(x + 0.08, y1 - 0.3, z1 - 0.12),
+                );
+            }
+        }
+        b.with_charge_gear(VENT, |b| {
+            let lids = 3;
+            let w = (x1 - x0) / lids as f32;
+            for k in 0..lids {
+                let a = x0 + w * k as f32;
+                dark_plate(b);
+                armour(
+                    b,
+                    &Frame::new(v3(a + 0.1, (y0 + y1) * 0.5, z1), Vec3::X, Vec3::Z),
+                    &[
+                        [0.0, -(y1 - y0) * 0.5],
+                        [0.0, (y1 - y0) * 0.5],
+                        [w - 0.2, (y1 - y0) * 0.5],
+                        [w - 0.2, -(y1 - y0) * 0.5],
+                    ],
+                    0.25,
+                );
+            }
+        });
+        if fine {
+            slit(
+                b,
+                v3((x0 + x1) * 0.5, y1 + 0.02, z0 + 1.0),
+                Vec3::Y,
+                Vec3::X,
+                4.0,
+                0.3,
+            );
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -310,11 +450,18 @@ mod tests {
     fn sunspear_holds_its_charge() {
         super::super::super::check_charge(
             "regency_fusion_cannon",
-            20.0,
-            17.0,
+            24.0,
+            24.0,
             Some(4),
             &[LINE.muzzle.to_array()],
             HOLD,
         );
+    }
+
+    /// The line as drawn is the authored one at the model's scale.
+    #[test]
+    fn sunspear_line_is_drawn_at_scale() {
+        assert!(LINE.pivot.distance(AUTHORED.pivot * SCALE) < 1e-4);
+        assert!(LINE.muzzle.distance(AUTHORED.muzzle * SCALE) < 1e-4);
     }
 }

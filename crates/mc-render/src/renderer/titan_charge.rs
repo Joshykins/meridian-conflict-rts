@@ -1,16 +1,20 @@
 //! The Behemoth's AEB light (`models::pattern::COIL`, `COIL_TURN`): the shader breathes
 //! the coils idle, climbs them stage by stage through the charge, blinds them at the shot
 //! and cools them after, and turns the capacitor rings' lugs faster as the charge builds.
+//! The Sunspear's plasma coils light the same way, and its working gear
+//! (`rig::CHARGE_GEAR_MASK`) opens through the charge and vents after the shot.
 //! It needs each unit's charge on the clock, which the sim does not mirror: this keeps it
-//! from the events (`SimEvent::StormCharging` starts a charge, the weapon's `ShotFired`
-//! ends it) and hands it to the shader in `UnitInstance::mount`, which a model with charge
-//! coils has no other use for (its weapons turn on gun houses, never a `rig::MOUNT`):
+//! from the events (`SimEvent::StormCharging` or `WeaponCharging` starts a charge, the
+//! weapon's `ShotFired` ends it) and hands it to the shader in `UnitInstance::mount`,
+//! which a model with charge coils has no other use for (its weapons turn on gun houses
+//! or on the turret's own arm, never a `rig::MOUNT`):
 //! `[charge start, charge due, last shot, CHARGE_RECORD]`, seconds on the renderer's clock
 //! (`FrameInput::time`, the shader's `globals.camera.w`).
 
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use mc_data::Blueprints;
 use mc_sim::mirror::{SimEvent, UnitInstance};
 
 /// `UnitInstance::mount.w` on a unit whose mount carries its charge (`entity.wgsl`).
@@ -53,11 +57,30 @@ impl TitanCharge {
     }
 
     /// Hears the events that start and end a charge.
-    pub(super) fn note(&mut self, event: &SimEvent, tick_seconds: f32) {
+    pub(super) fn note(&mut self, event: &SimEvent, tick_seconds: f32, blueprints: &Blueprints) {
         if !self.any() {
             return;
         }
         match event {
+            SimEvent::WeaponCharging {
+                unit,
+                blueprint,
+                weapon,
+                ..
+            } if self
+                .coils
+                .get(blueprint.0 as usize)
+                .copied()
+                .unwrap_or(false) =>
+            {
+                let w = &blueprints.unit(*blueprint).weapons[*weapon as usize];
+                self.charges.push((
+                    unit.0,
+                    w.charge_ticks as f32 * tick_seconds,
+                    blueprint.0 as u32,
+                    *weapon,
+                ));
+            }
             SimEvent::StormCharging {
                 unit,
                 ticks,

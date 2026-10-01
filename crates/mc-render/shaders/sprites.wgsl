@@ -266,7 +266,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if look == 1u {
         trace = length(stride) * 0.5;
     } else if look == 2u {
-        trace = length(stride) * 0.6;
+        trace = length(stride) * 1.1;
     } else if look == 3u {
         trace = length(stride) * 0.85;
     } else if look == 4u {

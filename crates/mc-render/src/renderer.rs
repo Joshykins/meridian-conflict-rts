@@ -413,9 +413,11 @@ pub(crate) struct ModelInfo {
     pub(crate) cells: [[f32; 4]; 4],
     /// Per block its grid word, then per block its missile order word.
     pub(crate) cell_grid: [u32; 4],
+    /// A charge gun's working gear (`Model::charge_gear`): hub and travel scale. Zero for none.
+    pub(crate) charge_gear: [f32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1024);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1040);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -1056,6 +1058,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         recoil: None,
         fold: None,
         breech: None,
+        charge_gear: None,
         fold_wrist: None,
         neck: None,
         shield_emitter: None,
@@ -1411,6 +1414,7 @@ impl Renderer {
                     .and_then(|l| l.hock)
                     .map_or([0.0; 4], |(h, follow)| [h[0], h[1], h[2], follow]),
                 breech: model.breech.unwrap_or([0.0; 4]),
+                charge_gear: model.charge_gear.unwrap_or([0.0; 4]),
                 plan_box,
                 vtol: model.vtol.map_or([[0.0; 4]; 2], |v| v.gpu()),
                 cells: models::CellBlock::gpu(&model.cells).0,
@@ -3260,6 +3264,7 @@ impl Renderer {
         self.write_fade_beams(time);
         self.write_plasma_fx(units, time);
         self.regency_guns_tick(units, time);
+        self.regency_wakes(projectiles, time);
         self.excavation_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
         self.arc_howitzer_tick(units, &frame.houses, time);
@@ -4714,7 +4719,8 @@ impl Renderer {
             return;
         }
         self.giant_event(event, time);
-        self.titan_charge.note(event, self.tick_seconds);
+        self.titan_charge
+            .note(event, self.tick_seconds, &self.blueprints);
         match event {
             SimEvent::BoreDischarge {
                 from,

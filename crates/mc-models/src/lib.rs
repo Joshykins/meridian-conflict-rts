@@ -131,10 +131,12 @@ pub mod pattern {
     /// Precursor plate: incised angular panel lines and inlaid seams of light.
     /// Every precursor-material face gets it unless it asks for another.
     pub const PRECURSOR: u32 = 18;
-    /// A charge coil's light (`GLOW` faces only), stage 0 at the breech to 7 at the muzzle:
-    /// `COIL + stage`. The shader breathes it idle, climbs it stage by stage through the
-    /// weapon's charge, blinds at the shot and lets it cool (the Behemoth's AEB-3; the
-    /// renderer feeds the charge through `UnitInstance::mount`, `renderer/titan_charge.rs`).
+    /// A charge coil's light, stage 0 at the breech to 7 at the muzzle: `COIL + stage`.
+    /// The shader breathes it idle, climbs it stage by stage through the weapon's charge,
+    /// blinds at the shot and lets it cool (the renderer feeds the charge through
+    /// `UnitInstance::mount`, `renderer/titan_charge.rs`). On `GLOW` faces the Behemoth's
+    /// AEB-3 blue; on `GLOW_LASER` faces the Regency's red-white plasma coil (the
+    /// Sunspear's), where stage `gpu_consts::charge_gear::HEAT_STAGE` is a vent's heat.
     pub const COIL: u32 = 19;
     pub const COIL_STAGES: u32 = 8;
     /// A capacitor ring's lugs on such a weapon (`METAL` faces only): turned about the
@@ -269,6 +271,10 @@ pub mod rig {
     /// A breech door on the `ARM_GUN` limb: swings open about `Model::breech` as the gun
     /// fires and shuts as it runs out (`gpu_consts::breech`).
     pub const BREECH: u32 = crate::gpu_consts::breech::RIG;
+    /// A charge gun's working gear (`Model::charge_gear`, `gpu_consts::charge_gear`): which
+    /// motion the vertex makes with the charge and the heat after the shot.
+    pub const CHARGE_GEAR_SHIFT: u32 = crate::gpu_consts::charge_gear::SHIFT;
+    pub const CHARGE_GEAR_MASK: u32 = crate::gpu_consts::charge_gear::MASK << CHARGE_GEAR_SHIFT;
     /// Hover skirt: the shader drops it on water and tucks it up on land.
     pub const FLOAT: u32 = 1 << 5;
     /// Factory build deck: up while a unit is printing, then lowers to release it.
@@ -532,6 +538,9 @@ pub struct Model {
     /// Hinge (xyz, rest pose; the hinge runs along y) of the `rig::BREECH` door and how far
     /// it swings open (w, radians about y: negative swings the bottom back and up).
     pub breech: Option<[f32; 4]>,
+    /// A charge gun's working gear (`rig::CHARGE_GEAR_MASK`, `gpu_consts::charge_gear`): the
+    /// hub its `SPIN` gear turns about (xyz, rest pose) and the scale of its travels (w).
+    pub charge_gear: Option<[f32; 4]>,
     /// Wrist (xyz) of the head on the `rig::FOLD` gear and how far it folds back when
     /// stowed (w, radians).
     pub fold_wrist: Option<[f32; 4]>,

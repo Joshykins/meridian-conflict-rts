@@ -87,10 +87,11 @@ impl PlasmaFx {
 }
 
 /// A thrown plasma charge (`Weapon::plasma_grade` on a lobbed or curving gun): it charges at
-/// its muzzle, and lands the way the cage letting go does.
+/// its muzzle, and lands the way the cage letting go does. A gun laid flat
+/// (`Weapon::flat_fire`) is a direct-fire gun whose shot arcs (`regency_guns_fx`).
 fn thrown_plasma(weapon: &Weapon) -> bool {
     weapon.plasma_grade.is_some()
-        && (weapon.trajectory == Trajectory::Ballistic || weapon.curve.0 > 0)
+        && ((weapon.trajectory == Trajectory::Ballistic && !weapon.flat_fire) || weapon.curve.0 > 0)
         && !weapon.missile
 }
 

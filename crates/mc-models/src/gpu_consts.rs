@@ -236,6 +236,38 @@ shared! {
         pub const RIG: u32 = 0x10000;
     }
 
+    /// A charge gun's working gear (`rig::CHARGE_GEAR`, `Model::charge_gear`), posed by
+    /// entity.wgsl `charge_gear_pose` from the unit's charge (`renderer/titan_charge.rs`):
+    /// through the charge the gear opens, after the shot it holds open a moment and closes
+    /// as the gun cools; vents lift with the heat after the shot. Travels are metres at
+    /// the model's authored size, times `ModelInfo::charge_gear.w`. The Sunspear's.
+    pub mod charge_gear as "CHARGE_GEAR_" {
+        /// Where a vertex's gear sits in its rig word, and the mask after the shift. It
+        /// borrows `UPGRADE_AT` bits 19..22, which only mean anything on refit pieces (and
+        /// a tail's segment, on tails); charge gear is never either.
+        pub const SHIFT: u32 = 19;
+        pub const MASK: u32 = 0x7;
+        /// Moves out from the bore along +-y (by the sign of its y): rails parting.
+        pub const SPREAD: u32 = 1;
+        /// Runs out along +x, the bore: projector heads reaching into the charge.
+        pub const EXTEND: u32 = 2;
+        /// Lifts along +z with the heat after a shot: vent flaps standing open.
+        pub const VENT: u32 = 3;
+        /// Turns about the upright through `ModelInfo::charge_gear.xyz`, slowly at rest and
+        /// hard through the charge, running down as it cools: gimbal rings round a core.
+        pub const SPIN: u32 = 4;
+        /// `SPREAD` and `EXTEND` at once: a projector head riding a parting rail's tip,
+        /// sliding out along it into the charge.
+        pub const REACH: u32 = 5;
+        pub const SPREAD_M: f32 = 0.7;
+        pub const EXTEND_M: f32 = 1.1;
+        pub const VENT_M: f32 = 0.9;
+        /// A `pattern::COIL` stage on a `GLOW_LASER` face (the Regency's red-white plasma
+        /// coil): the light that this stage means a vent's heat, lit by the shot and
+        /// cooling after it, not climbing through the charge.
+        pub const HEAT_STAGE: u32 = 7;
+    }
+
     /// The Trebuchet's ground stakes (`models::aster::trebuchet`, `mc_models::stakes`): a
     /// launcher tube on each corner of the carriage, authored planted, posed by
     /// `entity.wgsl` `stake_pose` from the unit's deploy. Planting, one stake after another
@@ -417,18 +449,24 @@ shared! {
         pub const PLUME: u32 = 51;
         /// A Regency Pinched or Pinch-fusion gun's charge, held in front of its bore
         /// (renderer/regency_guns_fx.rs, plasma_puffs.wgsl): a ball of plasma whose skin
-        /// boils, filaments wound in to a white heart. Laid once a tick, two ticks long.
+        /// boils in churning cells round a white heart. Laid once a tick, two ticks long.
         /// `appearance.rgb` its colour and brightness, `appearance.w` how far it has gone
-        /// over to fusion (white at the heart, every colour round the rim).
+        /// over to fusion (white at the heart, the prism's colours drifting over it).
         pub const PLASMA_ORB: u32 = 52;
-        /// Where a Regency plasma shot lets go (plasma_puffs.wgsl): a ragged bloom of
-        /// plasma in licking fronds from a white-hot heart that tears into shreds and goes
-        /// out; no ring, no dust. `appearance` as `PLASMA_ORB`'s.
+        /// Where a Regency plasma shot lets go (plasma_puffs.wgsl): a lumpy, billowing
+        /// bloom of plasma from a white-hot heart that tears into shreds and goes out; no
+        /// ring, no dust. `appearance` as `PLASMA_ORB`'s.
         pub const PLASMA_BURST: u32 = 53;
         /// A glob of plasma thrown out of a Regency strike (plasma_puffs.wgsl): a soft red
         /// blob with a hot heart, carried off at `vel`, slowed by the air and pulled down a
         /// little, shrinking and cooling as it goes. `appearance` as `PLASMA_ORB`'s.
         pub const PLASMA_GLOB: u32 = 54;
+        /// A Regency plasma shot's wake (plasma_puffs.wgsl): a puff of glowing plasma left
+        /// hanging where the shot passed, drifting off at `vel` and rising a little,
+        /// swelling from `params.x` to `params.y` across and churning as it cools from its
+        /// colour through deep red to nothing. Also the plasma a strike throws up.
+        /// `appearance` as `PLASMA_ORB`'s.
+        pub const PLASMA_WAKE: u32 = 55;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under

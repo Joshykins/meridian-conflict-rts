@@ -269,17 +269,26 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     one lands. **Plasmeric flak** throws the same bolts and bursts as a wide
     red bloom flinging sparkles and streaks of plasma.
   - **Pinched-plasmeric:** plasma gathered and squeezed in front of the bore
-    (a ball, motes and filaments drawn in, the air shimmering round it), then
-    fired out as a quick burst; each bolt bursts in ragged red fronds over a
-    white heart, throws molten spatter and globs of plasma out low (in place of
-    a shock ring) and sears the ground a little.
+    (a ball, motes drawn in, red lightning snapping into it), then fired out
+    as a quick burst, each bolt with a hard flash and a jet of plasma down the
+    line of fire and a red wake hanging behind it; each bursts in a billowing
+    red bloom over a white heart, throws a spout of plasma up and molten
+    spatter and globs out low (in place of a shock ring) and sears the ground.
   - **Pinch-fusion:** the same charge far harder: lightning crackles round
-    it and it goes over to fusion, white at the heart with every colour round
-    the rim. It launches with a blinding white flash, opens where it lands
-    white with every colour in its fringe and cools back to red, melts the
-    ground into a wide glowing pool, and leaves a knot of fusion burning over
-    it for seconds, slowly letting white lightning go while red sparkles cool
-    off the edges.
+    it and is pulled into it, and it goes over to fusion, white at the heart
+    with the prism drifting over it. The gun works with it (the Sunspear: its
+    rails part, its lens heads slide out, its coils light from the breech
+    going white, its gimbal cage spins up; after the shot its radiators vent
+    and it cools). It launches with a blinding white flash and a cone of
+    fusion, a great white-hot round arcing a little onto its mark (laid flat,
+    `flat_fire`) with a long wake cooling through pink and red behind it,
+    opens where it lands white with the prism in its fringe and cools back to
+    red, throws a column of plasma up and a lumpy skirt of it out over the
+    ground, melts the ground into a wide glowing pool, and leaves a knot of
+    fusion burning over it for seconds, slowly letting white lightning go
+    while red sparkles cool off the edges.
+  - **No spirals, no rings:** the plasma boils, churns and billows in cells
+    and lumps; nothing is wound round a middle in arms (user, 2026-09-30).
   - **Sound:** plasmatic and heavy: compression, sizzle and roar, never a pew,
     a zap or a cannon crack.
 - **Weapon names are grounded engineering:** a grade that says how the shot
@@ -298,8 +307,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   white-hot, and only toward its edge breaks into a turning pastel prism:
   rose, magenta, lavender, peach-gold (the Bifrost; a pink-white beam in
   space). No blues or greens. Mostly white, a little colour. The star cores
-  have it; the Pinch-fusion guns' charge and strike draw their own rim
-  (plasma_puffs.wgsl), which the user signed off as it is. The lower grades
+  have it; the Pinch-fusion guns' charge, wake and strike take it in drifting
+  patches (plasma_puffs.wgsl), not turned round their middle. The lower grades
   stay red. One colour source:
   `gpu_consts::prism` and common.wgsl `prism`.
 

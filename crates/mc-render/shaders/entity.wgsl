@@ -369,6 +369,66 @@ fn coil_state(e: Entity, time: f32) -> vec2<f32> {
     return vec2<f32>(charge, since);
 }
 
+// A charge gun's working gear (`CHARGE_GEAR_*`): x how far it stands open (through the
+// charge, held a moment after the shot, closing as the gun cools), y how hot it is (lit
+// by the shot, cooling over some seconds).
+fn charge_gear_state(e: Entity, time: f32) -> vec2<f32> {
+    let c = coil_state(e, time);
+    let opening = smoothstep(0.0, 0.8, c.x);
+    let after = 1.0 - smoothstep(0.4, 3.4, c.y);
+    let heat = smoothstep(0.0, 0.15, c.y) * (1.0 - smoothstep(1.4, 5.2, c.y));
+    return vec2<f32>(max(opening, after), heat);
+}
+
+// How far a charge gun's SPIN gear has turned: slowly at rest, a spin that climbs through
+// the charge and runs down quickly after the shot (or when the charge is due and nothing
+// fired). A run-down always adds a whole number of half turns (the gimbal cage looks the
+// same half a turn round), so the next charge takes up from where it left off.
+fn charge_gear_turn(e: Entity, time: f32) -> f32 {
+    let idle = time * 0.15;
+    let start = e.mount.x;
+    let due = e.mount.y;
+    let shot = e.mount.z;
+    if start < -9000.0 {
+        return idle;
+    }
+    let span = max(due - start, 0.5);
+    let tau = 0.9;
+    let rate = round(8.0 * (span / 3.0 + tau) / PI) * PI / (span / 3.0 + tau);
+    let u = clamp((time - start) / span, 0.0, 1.0);
+    var extra = rate * span / 3.0 * u * u * u;
+    let ended = select(due, shot, shot >= start);
+    if time > ended {
+        extra = rate * span / 3.0 + rate * tau * (1.0 - exp(-(time - ended) / tau));
+    }
+    return idle + extra;
+}
+
+// A vertex of a charge gun's working gear (`gear`, a `CHARGE_GEAR_*` kind) posed in its
+// rest frame, before the gun pitches and the turret turns: rails part and projector heads
+// reach into the charge as it fills, vents lift with the heat after the shot, the gimbal
+// cage spins about `rig.xyz`. Travels are `rig.w` times their authored metres.
+fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, e: Entity, time: f32) -> array<vec3<f32>, 2> {
+    var p = p0;
+    var n = n0;
+    let s = charge_gear_state(e, time);
+    if gear == CHARGE_GEAR_SPREAD || gear == CHARGE_GEAR_REACH {
+        p.y += sign(p.y) * CHARGE_GEAR_SPREAD_M * rig.w * s.x;
+    }
+    if gear == CHARGE_GEAR_EXTEND || gear == CHARGE_GEAR_REACH {
+        p.x += CHARGE_GEAR_EXTEND_M * rig.w * s.x;
+    }
+    if gear == CHARGE_GEAR_VENT {
+        p.z += CHARGE_GEAR_VENT_M * rig.w * s.y;
+    }
+    if gear == CHARGE_GEAR_SPIN {
+        let turn = charge_gear_turn(e, time);
+        p = rot_z(p - rig.xyz, turn) + rig.xyz;
+        n = rot_z(n, turn);
+    }
+    return array<vec3<f32>, 2>(p, n);
+}
+
 // How far the capacitor rings have turned: slowly at rest, and a spin that climbs through
 // the charge and runs down after the shot. The spin is always a whole number of 1/24 turns
 // by the time it has run down, so the next charge starts from where it left off.
@@ -1374,6 +1434,13 @@ fn vs_main(in: VsIn) -> VsOut {
             p = q + neck;
             n = rot_z(rot_xz(rot_x(n, -idle.x * 0.15), idle.y), idle.x);
         }
+        // A charge gun's working gear moves with its charge, before the gun pitches.
+        let gear = (in.rig >> CHARGE_GEAR_SHIFT) & CHARGE_GEAR_MASK;
+        if gear != 0u && model.charge_gear.w > 0.0 && e.mount.w == CHARGE_RECORD {
+            let posed = charge_gear_pose(p, n, gear, model.charge_gear, e, time);
+            p = posed[0];
+            n = posed[1];
+        }
         // A shoulder gun: the tube kicks back, pitches about its trunnion, and turns off the torso.
         if limb == LIMB_MOUNT && model.mount.w >= 0.0 && any(model.mount.xyz != vec3<f32>(0.0)) {
             let pivot = model.mount.xyz;
@@ -2193,7 +2260,8 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     // A charge coil's light knows its stage and the unit's charge (`coil_state`).
     let coil_pat = in.surface & 0xFFu;
-    if coil_pat >= PAT_COIL && coil_pat < PAT_COIL_TURN && in.material == MAT_GLOW && e.mount.w == CHARGE_RECORD {
+    if coil_pat >= PAT_COIL && coil_pat < PAT_COIL_TURN && (in.material == MAT_GLOW || in.material == MAT_GLOW_LASER)
+        && e.mount.w == CHARGE_RECORD {
         let c = coil_state(e, time);
         out.drive = vec4<f32>(c.x, c.y, 0.0, 0.0);
         out.drive_at = vec4<f32>(f32(coil_pat - PAT_COIL), 0.0, 0.0, 3.0);
@@ -3017,7 +3085,47 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.emissive *= blink;
         m.albedo *= 0.35 + 0.65 * blink;
     }
-    if in.drive_at.w > 2.5 && in.material == MAT_GLOW
+    if in.drive_at.w > 2.5 && in.material == MAT_GLOW_LASER
+        && (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
+        // A Regency plasma coil (`charge_gear`): at rest a low red ember, breathing; through
+        // the charge each stage lights in turn from the breech, red going pink and then
+        // white as the charge fills, restless near full; the shot blinds white, then it
+        // holds a hot orange-red that cools back to the ember. A vent's glow
+        // (`CHARGE_GEAR_HEAT_STAGE`) stays dark until the shot, then burns and cools.
+        let stage_i = u32(in.drive_at.x + 0.5);
+        let charge = in.drive.x;
+        let since = in.drive.y;
+        let l = in.local;
+        let blaze = 1.0 - smoothstep(0.04, 0.5, since);
+        let flicker = 0.85 + 0.15 * sin(time * 31.0 + l.x * 0.7 + l.z * 1.3 + in.state.w * 9.0);
+        var level = 0.0;
+        var colour = vec3<f32>(1.0, 0.08, 0.04);
+        if stage_i == CHARGE_GEAR_HEAT_STAGE {
+            let heat = smoothstep(0.0, 0.2, since) * (1.0 - smoothstep(0.8, 5.2, since));
+            level = 0.04 + heat * heat * 11.0 * flicker;
+            colour = mix(vec3<f32>(1.0, 0.07, 0.03), vec3<f32>(1.0, 0.45, 0.16), heat * heat);
+        } else {
+            let stage = f32(stage_i) / 7.0;
+            let breath = 0.5 + 0.5 * sin(time * 1.3 - stage * 3.0 + in.state.w * 6.0);
+            level = 0.35 + 0.35 * breath;
+            let reached = smoothstep(stage * 0.85, stage * 0.85 + 0.1, charge);
+            let race = pow(0.5 + 0.5 * sin(time * (6.0 + 18.0 * charge) - stage * 9.0), 5.0);
+            level += reached * (1.6 + 8.0 * charge * charge + race * 3.0 * charge);
+            let restless = step(0.25, hash11(floor(time * 24.0) + f32(stage_i) * 7.13 + in.state.w * 91.0));
+            level *= mix(1.0, 0.55 + 0.45 * restless, charge * charge * reached);
+            // After the shot: hot, cooling through orange-red back to the ember.
+            let cool = (1.0 - blaze) * (1.0 - smoothstep(0.4, 4.5, since));
+            level += cool * cool * 4.5 * flicker;
+            colour = mix(colour, vec3<f32>(1.0, 0.42, 0.5), smoothstep(2.0, 7.0, level) * charge);
+            colour = mix(colour, vec3<f32>(1.0, 0.92, 0.9), smoothstep(6.0, 10.0, level) * charge);
+            colour = mix(colour, vec3<f32>(1.0, 0.3, 0.08), cool * 0.6);
+        }
+        level = mix(level, 30.0, blaze);
+        colour = mix(colour, vec3<f32>(1.0, 0.96, 0.95), blaze);
+        m.emissive = colour * level;
+        m.albedo = mix(vec3<f32>(0.05, 0.02, 0.02), colour * 0.3, clamp(level * 0.25, 0.0, 1.0));
+        m.roughness = 0.3;
+    } else if in.drive_at.w > 2.5 && in.material == MAT_GLOW
         && (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
         // A charge coil (`coil_state`): at rest a slow breath runs up the arm with a faint
         // shimmer; charging, the light climbs from the breech stage by stage, pulses racing

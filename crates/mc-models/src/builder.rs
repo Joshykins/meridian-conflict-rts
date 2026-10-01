@@ -114,6 +114,7 @@ pub struct MeshBuilder {
     recoil: Option<[f32; 4]>,
     fold: Option<[f32; 4]>,
     breech: Option<[f32; 4]>,
+    charge_gear: Option<[f32; 4]>,
     fold_wrist: Option<[f32; 4]>,
     neck: Option<[f32; 2]>,
     shield_emitter: Option<[f32; 3]>,
@@ -176,6 +177,7 @@ impl MeshBuilder {
             recoil: None,
             fold: None,
             breech: None,
+            charge_gear: None,
             fold_wrist: None,
             neck: None,
             shield_emitter: None,
@@ -415,6 +417,29 @@ impl MeshBuilder {
 
     pub fn breech(&self) -> Option<[f32; 4]> {
         self.breech
+    }
+
+    /// Records a charge gun's working gear (`Model::charge_gear`): the hub its `SPIN` gear
+    /// turns about (current frame), and the travels at `scale` times their authored metres
+    /// (`gpu_consts::charge_gear`), scaled with the current frame.
+    pub fn set_charge_gear(&mut self, hub: Vec3, scale: f32) {
+        let at = self.transform.transform_point3(hub);
+        let size = self.transform.transform_vector3(Vec3::X).length();
+        self.charge_gear = Some([at.x, at.y, at.z, scale * size]);
+    }
+
+    /// Runs `f` as charge gear of kind `gear` (`gpu_consts::charge_gear`: `SPREAD`,
+    /// `EXTEND`, `VENT` or `SPIN`). Needs `set_charge_gear`.
+    pub fn with_charge_gear(&mut self, gear: u32, f: impl FnOnce(&mut Self)) {
+        let previous = self.rig;
+        self.rig = (previous & !rig::CHARGE_GEAR_MASK)
+            | ((gear & crate::gpu_consts::charge_gear::MASK) << rig::CHARGE_GEAR_SHIFT);
+        f(self);
+        self.rig = previous;
+    }
+
+    pub fn charge_gear(&self) -> Option<[f32; 4]> {
+        self.charge_gear
     }
 
     /// Runs `f` as the head on the end of the `with_fold` gear, pitching about `wrist`

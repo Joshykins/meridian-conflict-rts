@@ -86,7 +86,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_barb", 5.5, 8.0, turrets::picket),
     ModelDef::new("regency_spitter", 5.5, 8.5, turrets::canopy),
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
-    ModelDef::new("regency_fusion_cannon", 20.0, 17.0, turrets::sunspear),
+    ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
     // Radar (`eye`).
     ModelDef::tiered(

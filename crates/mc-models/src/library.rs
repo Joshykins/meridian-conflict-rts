@@ -167,6 +167,7 @@ fn build_fitted_made(
     let mut recoil = None;
     let mut fold = None;
     let mut breech = None;
+    let mut charge_gear = None;
     let mut fold_wrist = None;
     let mut neck = None;
     let mut shield_emitter = None;
@@ -196,6 +197,7 @@ fn build_fitted_made(
             recoil = builder.recoil();
             fold = builder.fold();
             breech = builder.breech();
+            charge_gear = builder.charge_gear();
             fold_wrist = builder.fold_wrist();
             neck = builder.neck();
             shield_emitter = builder.shield_emitter();
@@ -256,6 +258,7 @@ fn build_fitted_made(
         recoil,
         fold,
         breech,
+        charge_gear,
         fold_wrist,
         neck,
         shield_emitter,

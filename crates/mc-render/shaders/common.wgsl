@@ -235,6 +235,9 @@ struct ModelInfo {
     // Per block its grid in x, y (nx | ny << 4 | 1 << 8 when the hatches hinge along y);
     // then in z, w per block the missile bit of each grid cell c (i * ny + j) in nibble c.
     cell_grid: vec4<u32>,
+    // A charge gun's working gear (`Model::charge_gear`, `CHARGE_GEAR_*`): the hub its SPIN
+    // gear turns about (xyz) and the scale of its travels (w). Zero for none.
+    charge_gear: vec4<f32>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and
