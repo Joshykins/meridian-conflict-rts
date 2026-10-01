@@ -13,7 +13,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { gzipSync } from "node:zlib";
-import sharp from "sharp";
 import { repo } from "./units.mjs";
 
 const site = join(repo, "site");
@@ -180,6 +179,8 @@ export async function buildModels(read) {
   writeFileSync(requestPath, request.text);
   const triangles = runExporter(requestPath);
 
+  // Loaded only now: nothing above needs it, and most runs never get here.
+  const { default: sharp } = await import("sharp");
   const art = {};
   let packed = 0;
   await Promise.all(
