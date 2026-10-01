@@ -256,23 +256,24 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     // swallow a gunship, some sit over the jets), and where the
     // air is lifting (a field drifting with the wind) cumulus grows into tall
     // towers, most of all in towering weather (`shape.x`).
-    let tall = atmos.shape.x;
+    let sky = sky_at(p.xy);
+    let tall = sky.towering;
     let air = p.xy - atmos.wind.xy;
-    let lift = grad_noise2(air + 1711.0, 2600.0 * max(atmos.shape.y, 0.5));
+    let lift = grad_noise2(air + 1711.0, 2600.0 * max(sky.scale, 0.5));
     // Every cloud its own: a field drifting with the wind decides whether this
     // one is a thin shred the sun shines through or a dense heap with a grey
     // belly, and storms and thick cover lean to the heavy kind. With one
     // density and one brightness everywhere every cloud was the same white
     // cotton ball.
-    let kind = grad_noise2(air + vec2<f32>(2917.0, -811.0), 1700.0 * max(atmos.shape.y, 0.5));
+    let kind = grad_noise2(air + vec2<f32>(2917.0, -811.0), 1700.0 * max(sky.scale, 0.5));
     // Under a full deck the thin patches and the sheet's holes close up:
     // overcast has few breaks.
     // (The weather's own cover: the map's is never over 1.)
-    let deck_closed = smoothstep(1.5, 1.85, atmos.layer.w);
+    let deck_closed = smoothstep(1.5, 1.85, sky.cover);
     let firm = max(smoothstep(0.42, 0.58, kind + storm * 0.5), deck_closed * 0.8);
     // And in wide stretches of fair weather the heaps give way to a flat,
     // broken sheet (stratocumulus): shallow, lumpy underneath, full of holes.
-    let sheet = smoothstep(0.5, 0.6, grad_noise2(air + vec2<f32>(-5113.0, 3301.0), 5600.0 * max(atmos.shape.y, 0.5))) * (1.0 - storm);
+    let sheet = smoothstep(0.5, 0.6, grad_noise2(air + vec2<f32>(-5113.0, 3301.0), 5600.0 * max(sky.scale, 0.5))) * (1.0 - storm);
     let floor = cloud_floor(p.xy);
     let base = floor + atmos.layer.x - storm * 80.0 + (grad_noise2(air - 377.0, 4300.0) - 0.5) * (240.0 + 120.0 * tall);
     let deck = atmos.layer.y - atmos.layer.x;
@@ -281,7 +282,7 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
     let fill = mix(0.55, 1.0, min(cover, 1.0));
     // Shreds are shallow as well as thin.
     let fair_depth = (fair_top - base) * fill * mix(0.7, 1.0, firm) * mix(1.0, 0.3, sheet * (1.0 - deck_closed));
-    let storm_depth = (floor + atmos.layer.z - base) * fill;
+    let storm_depth = (floor + sky.storm_top - base) * fill;
     // The billows below decide how tall a storm grows here and lift or drop
     // every top: tested against the highest it could reach before looking
     // them up.
@@ -331,7 +332,7 @@ fn cloud_at(at: vec3<f32>, w: vec4<f32>, detail: f32) -> CloudSample {
         streak *= smoothstep(0.3, 0.75, grad_noise2(q.xy + vec2<f32>(q.z * 0.7, 0.0), 140.0));
     }
     // Bigger weather, bigger billows.
-    let period = SHAPE_PERIOD * mix(1.0, max(atmos.shape.y, 0.5), 0.6);
+    let period = SHAPE_PERIOD * mix(1.0, max(sky.scale, 0.5), 0.6);
     // Two lookups of the billows at unrelated sizes and angles. One alone
     // repeated every period across the map, the same lumps over and over, and
     // where cover was thin (the tops) only its cells' ridges were left: the
@@ -449,7 +450,7 @@ fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>) {
     let s = globals.sun.xyz;
     let d = normalize(vec3<f32>(s.xy, max(s.z, 0.2)));
     let deck = atmos.layer.y - atmos.layer.x;
-    let fair_top = floor + atmos.layer.y + deck * 2.6 * atmos.shape.x + deck * (1.0 + TOP_LUMP) + 200.0;
+    let fair_top = floor + atmos.layer.y + deck * 2.6 * max(atmos.shape.x, atmos.east.y) + deck * (1.0 + TOP_LUMP) + 200.0;
     let storm_top = floor + atmos.layer.z + (atmos.layer.z - atmos.layer.x) * TOP_LUMP * 0.5;
     let fair_len = (fair_top - start.z) / d.z;
     let storm_len = max(storm_top - fair_top, 0.0) / d.z;
@@ -648,7 +649,7 @@ fn march(in: FullOut) -> vec4<f32> {
     // the tallest lift, the top's lumps). Above it only a storm has cloud, so
     // the long climb down from storm height to a deck is open air elsewhere.
     let deck = atmos.layer.y - atmos.layer.x;
-    let tall = atmos.shape.x;
+    let tall = max(atmos.shape.x, atmos.east.y);
     let fair_ceiling = atmos.shape.w + (1.0 + TOP_LUMP * 0.5) * (atmos.layer.y + deck * 2.6 * tall)
         - TOP_LUMP * 0.5 * (atmos.layer.x - 120.0 - 60.0 * tall) + 50.0;
     let jitter = ign(in.clip.xy);
@@ -794,7 +795,7 @@ fn march(in: FullOut) -> vec4<f32> {
 // march found above; the rain goes behind it seen from above, in front of it
 // seen from beneath.
 fn with_rain(cloud: vec4<f32>, eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, pixel: vec2<f32>) -> vec4<f32> {
-    if atmos.shape.z <= 0.0 {
+    if max(atmos.shape.z, atmos.east.w) <= 0.0 {
         return cloud;
     }
     // The highest the rain can hang from; each sample checks its own floor.
@@ -874,7 +875,7 @@ struct RainOut {
 fn vs_rain(@builtin(vertex_index) vertex: u32, @builtin(instance_index) drop: u32) -> RainOut {
     var out: RainOut;
     out.clip = vec4<f32>(0.0, 0.0, -1.0, 1.0);
-    if atmos.shape.z <= 0.0 {
+    if max(atmos.shape.z, atmos.east.w) <= 0.0 {
         return out;
     }
     let eye = globals.camera.xyz;

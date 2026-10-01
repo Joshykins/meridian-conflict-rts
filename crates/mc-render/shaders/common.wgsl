@@ -628,6 +628,61 @@ struct Atmosphere {
     // xy of the eye, radius, how far round the eye has turned (radians); then x 1 in use,
     // y how far into clearing the air about it once it has rained out.
     vortex: array<vec4<f32>, 4>,
+    // The weather east of the map's climate divide (sky.rs `set_weather_sides`): x how
+    // much of the sky the air fills (as `layer.w`), y how towering (`shape.x`), z how big
+    // the cloud masses (`shape.y`), w how readily it rains (`shape.z`). `layer` and
+    // `shape` hold the weather west of the line; with no divide these repeat them.
+    east: vec4<f32>,
+    // The divide's line, as `Globals::divide`.
+    divide: array<vec4<f32>, DIVIDE_POINTS>,
+    // x how many points `divide` holds: 0 with one weather over the whole map.
+    divide_info: vec4<f32>,
+}
+
+// The weather's set values at a point of a map whose climate divide parts two
+// weathers (`sky_sides`).
+struct SkyValues {
+    // How much of the sky the air fills (`Atmosphere::layer.w`).
+    cover: f32,
+    // How towering the clouds are (`shape.x`), and how readily they rain (`shape.z`).
+    towering: f32,
+    rain: f32,
+    // How big the cloud masses are (`shape.y`): one side's or the other's, never
+    // between (noise whose size varies from place to place smears).
+    scale: f32,
+    // A storm's top above the cloud floor (`layer.z`).
+    storm_top: f32,
+    // 0 west of the divide to 1 east of it.
+    east: f32,
+}
+
+// The weather's values `across` metres east of a divide's line (`divide_east_of`):
+// `west` the map's own (cover, towering, cloud mass size, rain), `east` the weather
+// east of the line, `base` the cloud base above the floor (`layer.x`).
+fn sky_sides(west: vec4<f32>, east: vec4<f32>, base: f32, across: f32) -> SkyValues {
+    let k = smoothstep(-DIVIDE_SKY_BLEND_M, DIVIDE_SKY_BLEND_M, across);
+    var out: SkyValues;
+    out.east = k;
+    out.cover = mix(west.x, east.x, k);
+    out.towering = mix(west.y, east.y, k);
+    out.rain = mix(west.w, east.w, k);
+    out.scale = select(west.z, east.z, across > 0.0);
+    // As sky.rs sets `layer.z`.
+    out.storm_top = base + 2600.0 + 4200.0 * out.towering;
+    return out;
+}
+
+// The air mass's weather (`cloud_climate`) on a map with two: each side's own field,
+// mixed across the line.
+fn cloud_climate_sides(xy: vec2<f32>, drift: vec2<f32>, west: vec4<f32>, east: vec4<f32>, k: f32) -> vec2<f32> {
+    var w = vec2<f32>(0.0);
+    if k < 1.0 {
+        w += cloud_climate(xy, drift, west.x, west.z) * (1.0 - k);
+    }
+    if k > 0.0 {
+        w += cloud_climate(xy, drift, east.x, east.z) * k;
+    }
+    return w;
 }
 
 // How much faster a wheeling storm's eye turns than its rim (sky.rs `VORTEX_SHEAR`).

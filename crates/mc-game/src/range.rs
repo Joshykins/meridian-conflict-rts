@@ -354,7 +354,10 @@ impl RangeSky {
     /// Puts this weather over the range on `map`.
     pub fn show(&self, renderer: &mut mc_render::Renderer, map: &mc_map::MapFile) {
         let config = crate::setup::map_config(map);
-        renderer.set_weather(self.choice.weather(&config));
+        renderer.set_weather_sides(
+            self.choice.weather(&config),
+            self.choice.east_weather(&config),
+        );
         renderer.set_hour(self.choice.hour(&config));
         let pad = crate::setup::range_pad(map).to_f32();
         renderer.park_storm(self.storm_overhead.then(|| glam::Vec2::from(pad)));

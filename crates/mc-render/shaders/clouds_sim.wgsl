@@ -50,10 +50,40 @@ fn texel_world(id: vec2<u32>) -> vec2<f32> {
     return (vec2<f32>(id) + 0.5) / size * atmos.weather.yz;
 }
 
+// Whether the map's climate divide parts two weathers (`Atmosphere::divide`).
+fn sky_divided() -> bool {
+    return atmos.divide_info.x > 1.5;
+}
+
+// Metres east of the divide's line. Only where `sky_divided()`.
+fn sky_east(xy: vec2<f32>) -> f32 {
+    return divide_east_of(atmos.divide, u32(atmos.divide_info.x), xy);
+}
+
+// The weather's set values over `xy`, as bindings.wgsl `sky_at` (this pass binds
+// `atmos` by itself): the map's own, or the side's it is on.
+fn sky_at(xy: vec2<f32>) -> SkyValues {
+    if !sky_divided() {
+        return SkyValues(atmos.layer.w, atmos.shape.x, atmos.shape.z, atmos.shape.y, atmos.layer.z, 0.0);
+    }
+    let west = vec4<f32>(atmos.layer.w, atmos.shape.x, atmos.shape.y, atmos.shape.z);
+    return sky_sides(west, atmos.east, atmos.layer.x, sky_east(xy));
+}
+
 // The weather the air would have by itself: the air mass plus the storms
 // sky.rs is running (xy centre, radius, strength).
 fn rest_state(xy: vec2<f32>) -> vec2<f32> {
-    var w = cloud_climate(xy, atmos.wind.xy, atmos.layer.w, atmos.shape.y);
+    var w = vec2<f32>(0.0);
+    // How far east across a climate divide, 0-1: each side has its own air mass,
+    // and a storm stays on the side it formed on.
+    var east = 0.0;
+    if sky_divided() {
+        east = sky_at(xy).east;
+        let west = vec4<f32>(atmos.layer.w, atmos.shape.x, atmos.shape.y, atmos.shape.z);
+        w = cloud_climate_sides(xy, atmos.wind.xy, west, atmos.east, east);
+    } else {
+        w = cloud_climate(xy, atmos.wind.xy, atmos.layer.w, atmos.shape.y);
+    }
     // A wheeling storm twists the cloud round it in (`vortex_warp_in`) while it rages;
     // once it has rained out, the air about it clears before it lets go of it.
     for (var i = 0u; i < 2u; i++) {
@@ -87,11 +117,16 @@ fn rest_state(xy: vec2<f32>) -> vec2<f32> {
         }
         // A storm is a mass of cloud, ragged at its rim, with a cluster of
         // towering cells inside it rather than one smooth column.
+        // Its strength here: none of it past a climate divide's line.
+        var strength = s.w;
+        if sky_divided() {
+            strength *= select(1.0 - east, east, sky_east(s.xy) > 0.0);
+        }
         let local = xy - atmos.wind.xy + s.xy * 0.37;
         let rim = grad_noise2(local, s.z * 0.35);
-        let body = (1.0 - smoothstep(0.35, 1.25, d + (rim - 0.5) * 0.7)) * s.w;
+        let body = (1.0 - smoothstep(0.35, 1.25, d + (rim - 0.5) * 0.7)) * strength;
         let cells = smoothstep(0.35, 0.72, grad_noise2(local + 311.0, s.z * 0.22) * 0.7 + grad_noise2(local - 97.0, s.z * 0.09) * 0.3);
-        let core = (1.0 - smoothstep(0.0, 0.85, d + (rim - 0.5) * 0.4)) * s.w * mix(0.35, 1.0, cells);
+        let core = (1.0 - smoothstep(0.0, 0.85, d + (rim - 0.5) * 0.4)) * strength * mix(0.35, 1.0, cells);
         w.x = max(w.x, body);
         w.y = max(w.y, core);
     }
@@ -113,13 +148,14 @@ fn wheeling(xy: vec2<f32>) -> bool {
     return false;
 }
 
-// How hard cloud this thick rains, before it has had time to start.
-fn rain_from(cover: f32, storm: f32) -> f32 {
+// How hard cloud this thick rains over `xy`, before it has had time to start.
+fn rain_from(xy: vec2<f32>, cover: f32, storm: f32) -> f32 {
+    let sky = sky_at(xy);
     // Cover tops out at 1: a full deck rains only in heavy (overcast) weather.
-    let heavy = smoothstep(0.35, 0.8, storm) + 0.6 * smoothstep(0.9, 1.0, cover) * smoothstep(1.3, 1.8, atmos.layer.w)
+    let heavy = smoothstep(0.35, 0.8, storm) + 0.6 * smoothstep(0.9, 1.0, cover) * smoothstep(1.3, 1.8, sky.cover)
         // Wet weather (rain set past 0.6) lets any thick cloud shower, not just storms.
-        + 0.8 * smoothstep(0.6, 1.0, atmos.shape.z) * smoothstep(0.55, 0.95, cover);
-    return clamp(heavy * atmos.shape.z * 1.2, 0.0, 1.0);
+        + 0.8 * smoothstep(0.6, 1.0, sky.rain) * smoothstep(0.55, 0.95, cover);
+    return clamp(heavy * sky.rain * 1.2, 0.0, 1.0);
 }
 
 @compute @workgroup_size(8, 8)
@@ -150,7 +186,7 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
     let xy = texel_world(id.xy);
     let rest = rest_state(xy);
     if push.reset != 0u {
-        textureStore(state_out, vec2<i32>(id.xy), vec4<f32>(rest, 0.0, rain_from(rest.x, rest.y)));
+        textureStore(state_out, vec2<i32>(id.xy), vec4<f32>(rest, 0.0, rain_from(xy, rest.x, rest.y)));
         textureStore(flow_out, vec2<i32>(id.xy), vec4<f32>(0.0));
         return;
     }
@@ -162,9 +198,18 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
     // where it was churned, so a wake lingers and then heals over.
     // Round a wheeling storm the cloud keeps up with it within seconds.
     let wheel = vortex_reach_in(atmos.vortex, xy);
-    let heal = mix(mix(1.0 / 25.0, 1.0 / 90.0, clamp(state.z, 0.0, 1.0)), 1.0 / 3.0, wheel);
+    var heal = mix(mix(1.0 / 25.0, 1.0 / 90.0, clamp(state.z, 0.0, 1.0)), 1.0 / 3.0, wheel);
+    var heal_storm = mix(1.0 / 30.0, 1.0 / 3.0, wheel);
+    if sky_divided() {
+        // By a climate divide the wind carries one side's cloud into the other's
+        // air: there it takes up the weather it is now in within seconds, so the
+        // clouds stop at the wall instead of trailing a few kilometres past it.
+        let near = 1.0 - smoothstep(DIVIDE_SKY_HEAL_NEAR_M, DIVIDE_SKY_HEAL_FAR_M, abs(sky_east(xy)));
+        heal = mix(heal, max(heal, 1.0 / 4.0), near);
+        heal_storm = mix(heal_storm, max(heal_storm, 1.0 / 4.0), near);
+    }
     state.x += (rest.x - state.x) * (1.0 - exp(-dt * heal));
-    state.y += (rest.y - state.y) * (1.0 - exp(-dt * mix(1.0 / 30.0, 1.0 / 3.0, wheel)));
+    state.y += (rest.y - state.y) * (1.0 - exp(-dt * heal_storm));
 
     // Pushed-away air spreads the cloud it carries thin: divergence of the
     // stirred flow, from its neighbours.
@@ -253,7 +298,7 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
 
     // Rain falls from storm cores and heavy decks, building and easing off over
     // a quarter of a minute; a wake cut through the cloud stops it there too.
-    state.w += (rain_from(state.x, state.y) - state.w) * (1.0 - exp(-dt / 15.0));
+    state.w += (rain_from(xy, state.x, state.y) - state.w) * (1.0 - exp(-dt / 15.0));
 
     // Stirred air slows back to the prevailing wind; churn dies away.
     // Streaks fade over half a minute.

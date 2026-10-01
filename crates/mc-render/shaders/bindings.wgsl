@@ -572,8 +572,31 @@ fn weather_at(at: vec2<f32>) -> vec4<f32> {
     if edge >= 0.02 {
         return inside;
     }
-    let outside = vec4<f32>(cloud_climate(xy, atmos.wind.xy, atmos.layer.w, atmos.shape.y), 0.0, 0.0);
+    var air = vec2<f32>(0.0);
+    if atmos.divide_info.x < 1.5 {
+        air = cloud_climate(xy, atmos.wind.xy, atmos.layer.w, atmos.shape.y);
+    } else {
+        air = cloud_climate_sides(xy, atmos.wind.xy, sky_west(), atmos.east, sky_at(xy).east);
+    }
+    let outside = vec4<f32>(air, 0.0, 0.0);
     return mix(outside, inside, smoothstep(0.0, 0.02, edge));
+}
+
+// The map's own weather as `Atmosphere::east` holds the other side's: cover, how
+// towering, cloud mass size, rain.
+fn sky_west() -> vec4<f32> {
+    return vec4<f32>(atmos.layer.w, atmos.shape.x, atmos.shape.y, atmos.shape.z);
+}
+
+// The weather's set values over `xy`: the map's own, or on a map whose climate divide
+// parts two weathers (`Atmosphere::divide`) the side's it is on, handing over across
+// the line. (clouds_sim.wgsl has its own copy: it binds `atmos` elsewhere.)
+fn sky_at(xy: vec2<f32>) -> SkyValues {
+    if atmos.divide_info.x < 1.5 {
+        return SkyValues(atmos.layer.w, atmos.shape.x, atmos.shape.z, atmos.shape.y, atmos.layer.z, 0.0);
+    }
+    let across = divide_east_of(atmos.divide, u32(atmos.divide_info.x), xy);
+    return sky_sides(sky_west(), atmos.east, atmos.layer.x, across);
 }
 
 // The clouds' shade (clouds.wgsl `cs_shade`): r the sunlight they let through

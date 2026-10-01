@@ -411,8 +411,16 @@ pub fn screenshot(
         scene,
     )
     .map_err(|e| e.to_string())?;
-    // The map's own palette (`MERIDIAN_CLIMATE` overrides it).
-    renderer.set_map_look(&setup::map_config(&map).look());
+    // The map's own palette (`MERIDIAN_CLIMATE` overrides it), and on a map with a
+    // climate divide the weather either side of it (`MERIDIAN_WEATHER` plays one preset
+    // over both). Any other map is shot in the sky's own default weather.
+    let config = setup::map_config(&map);
+    renderer.set_map_look(&config.look());
+    if let Some(east) = config.east_weather(None) {
+        if std::env::var_os("MERIDIAN_WEATHER").is_none() {
+            renderer.set_weather_sides(config.weather(None), Some(east));
+        }
+    }
     // A recorded test range: the weather it showed at this tick.
     if let Some(sky) = opts
         .replay

@@ -379,7 +379,7 @@ shared! {
     }
 
     /// A map's climate divide (`mc_data::weather::ClimateDivide`): the line that splits
-    /// its ground and sea in two (`Globals::divide`;
+    /// its ground, sea and weather in two (`Globals::divide`, `Atmosphere::divide`;
     /// common.wgsl `divide_east_of`).
     pub mod divide as "DIVIDE_" {
         /// Points the line may have (`ClimateDivide::MAX_POINTS`), one vec4 each.
@@ -387,9 +387,16 @@ shared! {
         /// The ground and the sea hand over from one climate to the other within this
         /// many metres either side of the line (wider only where a pixel is).
         pub const BLEND_M: f32 = 6.0;
-        /// The air, the sea's waves and the surf hand over within this many metres
-        /// either side of it: a stretch of coast, not a ruled line.
+        /// The weather hands over within this many metres either side of it, and with it
+        /// the air's haze, the sea's waves and the surf: a stretch of coast, not a ruled line.
         pub const SKY_BLEND_M: f32 = 160.0;
+        /// Cloud the wind carries across the line is drawn back to the weather of the
+        /// side it is now over within seconds: fully so this close to the line, easing
+        /// off to the weather's usual slow healing by `SKY_HEAL_FAR_M`.
+        pub const SKY_HEAL_NEAR_M: f32 = 250.0;
+        pub const SKY_HEAL_FAR_M: f32 = 900.0;
+        /// A storm cell dies away over its last metres to the line (sky.rs).
+        pub const STORM_FADE_M: f32 = 600.0;
     }
 
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).

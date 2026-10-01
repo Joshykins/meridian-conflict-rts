@@ -57,6 +57,7 @@ impl Renderer {
             log::warn!("climate divide left out: {e}");
             self.look.divide = None;
         }
+        self.sky.set_divide(self.look.divide.clone());
     }
 
     pub(super) fn climate_globals(&self) -> ClimateGlobals {

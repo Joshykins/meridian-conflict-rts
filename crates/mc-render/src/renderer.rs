@@ -3003,6 +3003,17 @@ impl Renderer {
         self.sky.set_hour(hour);
     }
 
+    /// The weather on a map whose climate divide parts two: `west` west of its line
+    /// (the map's own), `east` east of it. No `east`: `west` over the whole map, as
+    /// `set_weather`. The line is the map look's (`set_map_look`).
+    pub fn set_weather_sides(
+        &mut self,
+        west: mc_data::weather::Weather,
+        east: Option<mc_data::weather::Weather>,
+    ) {
+        self.sky.set_weather_sides(west, east);
+    }
+
     /// Parks a raging storm over `at` (the test range's "storm overhead"),
     /// or lets the weather run by itself again.
     pub fn park_storm(&mut self, at: Option<glam::Vec2>) {

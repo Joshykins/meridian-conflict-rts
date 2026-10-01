@@ -840,7 +840,9 @@ impl App {
                     self.settings.skirmish_sky
                 };
                 if let Some(r) = &mut self.renderer {
-                    r.set_weather(sky.weather(&config));
+                    // (A map with a climate divide has a weather of its own east of
+                    // it, unless set-up picked one for the whole map.)
+                    r.set_weather_sides(sky.weather(&config), sky.east_weather(&config));
                     r.set_hour(sky.hour(&config));
                     r.set_map_look(&config.look());
                 }
