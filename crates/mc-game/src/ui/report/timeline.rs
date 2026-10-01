@@ -23,6 +23,7 @@ fn kind_name(k: MomentKind) -> &'static str {
         MomentKind::Domain => "New Front",
         MomentKind::Expansion => "Expansion",
         MomentKind::Lead => "Lead Change",
+        MomentKind::Salvage => "Salvage",
         MomentKind::Experimental => "Experimental",
         MomentKind::ExperimentalLost => "Experimental Lost",
         MomentKind::Warhead => "Warhead",
@@ -37,6 +38,7 @@ fn kind_tone(k: MomentKind) -> u32 {
         MomentKind::Battle | MomentKind::End | MomentKind::Lead => palette::ACCENT,
         MomentKind::Warhead | MomentKind::Experimental => palette::WARN,
         MomentKind::Defeat | MomentKind::ExperimentalLost => palette::BAD,
+        MomentKind::Salvage => super::SALVAGE,
         _ => palette::DIM,
     }
 }

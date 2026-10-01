@@ -13,56 +13,73 @@ struct Column {
     text: fn(f32) -> String,
     /// Lower is better (losses).
     low_wins: bool,
+    /// Drawn in reclaim's colour.
+    salvage: bool,
 }
 
-const COLUMNS: [Column; 8] = [
+const COLUMNS: [Column; 9] = [
     Column {
         title: "Collected",
         value: |s| s.collected,
         text: short,
         low_wins: false,
+        salvage: false,
+    },
+    Column {
+        title: "Reclaimed",
+        value: |s| s.reclaimed,
+        text: short,
+        low_wins: false,
+        salvage: true,
     },
     Column {
         title: "Peak Army",
         value: |s| s.peak_army,
         text: short,
         low_wins: false,
+        salvage: false,
     },
     Column {
         title: "Built",
         value: |s| s.built as f32,
         text: |v| format!("{v:.0}"),
         low_wins: false,
+        salvage: false,
     },
     Column {
         title: "Kills",
         value: |s| s.kills as f32,
         text: |v| format!("{v:.0}"),
         low_wins: false,
+        salvage: false,
     },
     Column {
         title: "Losses",
         value: |s| s.losses as f32,
         text: |v| format!("{v:.0}"),
         low_wins: true,
+        salvage: false,
     },
     Column {
         title: "Destroyed",
         value: |s| s.destroyed,
         text: short,
         low_wins: false,
+        salvage: false,
     },
     Column {
         title: "Lost",
         value: |s| s.lost,
         text: short,
         low_wins: true,
+        salvage: false,
     },
     Column {
         title: "Efficiency",
         value: |s| s.efficiency * 100.0,
         text: |v| format!("{v:.0}%"),
         low_wins: false,
+        salvage: false,
     },
 ];
 
@@ -123,7 +140,14 @@ fn scoreboard(report: &Report, ui: &mut Ui, ctx: &Ctx, r: Rect, row_h: f32, grou
             col_x0 + (c + 1) as f32 * col_w - 12.0,
             hy,
             type_scale::MICRO,
-            rgb(palette::DIM, 1.0),
+            rgb(
+                if col.salvage {
+                    super::SALVAGE
+                } else {
+                    palette::DIM
+                },
+                1.0,
+            ),
             col.title,
         );
     }
@@ -273,7 +297,11 @@ fn side_row(
             right,
             mid - 4.0,
             type_scale::VALUE,
-            rgb(if top { palette::TEXT } else { palette::DIM }, k),
+            match (col.salvage, top) {
+                (true, _) => rgb(super::SALVAGE, if top { k } else { 0.75 * k }),
+                (false, true) => rgb(palette::TEXT, k),
+                (false, false) => rgb(palette::DIM, k),
+            },
             &(col.text)(shown),
         );
         // A bar under each figure against the column's largest.
@@ -285,7 +313,11 @@ fn side_row(
         );
         ui.fill(
             Rect::new(right - bw * frac, mid + 10.0, bw * frac, 2.0),
-            [c[0], c[1], c[2], (if top { 1.0 } else { 0.55 }) * k],
+            if col.salvage {
+                rgb(super::SALVAGE, (if top { 1.0 } else { 0.55 }) * k)
+            } else {
+                [c[0], c[1], c[2], (if top { 1.0 } else { 0.55 }) * k]
+            },
         );
         if top {
             ui.fill(

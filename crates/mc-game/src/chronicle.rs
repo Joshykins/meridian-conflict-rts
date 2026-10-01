@@ -37,6 +37,8 @@ pub struct SideSample {
     pub energy_spent: f32,
     /// Materials in store.
     pub mass: f32,
+    /// Materials taken from wrecks and units by reclaim, over the match so far.
+    pub reclaimed: f32,
     /// Share of the asked-for spending that was paid, zero to one.
     pub efficiency: f32,
     /// Mobile fighters (not engineers or the commander), and their worth in materials.
@@ -64,6 +66,10 @@ pub struct SideFrame {
     /// Each cell with a finished structure, and how many.
     pub bases: Vec<(u16, u16)>,
     pub commander: Option<Vec2>,
+    /// Each cell where the side reclaimed since the last snapshot, and how much.
+    pub salvage: Vec<(u16, f32)>,
+    /// All the side had reclaimed by this snapshot.
+    pub reclaimed: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -100,6 +106,17 @@ pub struct Built {
     pub upgrade: bool,
 }
 
+/// A wreck reclaimed to the last plate.
+#[derive(Clone, Copy, Debug)]
+pub struct Salvage {
+    pub tick: u32,
+    pub pos: Vec2,
+    /// The wreck's unit.
+    pub blueprint: BlueprintId,
+    /// The side whose beam took the last of it, when one was on it.
+    pub by: Option<u8>,
+}
+
 /// A nuclear warhead's blast (a commander's reactor is a `Death`, not one of these).
 #[derive(Clone, Copy, Debug)]
 pub struct Blast {
@@ -120,6 +137,7 @@ pub struct Chronicle {
     pub built: Vec<Built>,
     pub defeats: Vec<(u32, u8)>,
     pub blasts: Vec<Blast>,
+    pub salvages: Vec<Salvage>,
     /// The tick the match was decided, and the winning team. Nothing after it is kept.
     pub ended: Option<(u32, u8)>,
     /// The last tick recorded.
@@ -127,6 +145,9 @@ pub struct Chronicle {
     /// Upgrades finished whose unit has not been handed its new blueprint yet: that
     /// hand-over is announced as a second completion, which is not a new unit.
     swaps: Vec<(u8, BlueprintId)>,
+    /// Ticks each side's reclaim beams spent on each cell since the last snapshot: how
+    /// the materials it reclaimed in that time are shared out over the map.
+    beams: Vec<Vec<u32>>,
 }
 
 impl Chronicle {
@@ -163,6 +184,7 @@ impl Chronicle {
         let fresh = tick != self.tick || self.samples.is_empty();
         self.tick = tick;
         self.take_events(world, tick);
+        self.take_beams(world);
         if (fresh && tick.is_multiple_of(SAMPLE_TICKS)) || self.ended.is_some() {
             self.sample(world, tick);
         }
@@ -180,6 +202,8 @@ impl Chronicle {
         self.built.retain(|b| b.tick <= tick);
         self.defeats.retain(|d| d.0 <= tick);
         self.blasts.retain(|b| b.tick <= tick);
+        self.salvages.retain(|b| b.tick <= tick);
+        self.beams.clear();
         if self.ended.is_some_and(|e| e.0 > tick) {
             self.ended = None;
         }
@@ -250,8 +274,45 @@ impl Chronicle {
                     pos: xy(pos),
                     owner,
                 }),
+                SimEvent::Reclaimed {
+                    pos,
+                    blueprint,
+                    wreck: true,
+                } => {
+                    // The beam that took the last of it ends on the wreck this tick.
+                    let by = world
+                        .reclaims
+                        .iter()
+                        .find(|w| !w.relay && w.at == pos)
+                        .and_then(|w| units.row(w.source))
+                        .map(|row| units.owner[row]);
+                    self.salvages.push(Salvage {
+                        tick,
+                        pos: xy(pos),
+                        blueprint,
+                        by,
+                    });
+                }
                 SimEvent::MatchOver { winner_team } => self.ended = Some((tick, winner_team)),
                 _ => {}
+            }
+        }
+    }
+
+    /// Where each side's reclaim beams are working this tick.
+    fn take_beams(&mut self, world: &World) {
+        if self.beams.len() != self.sides.len() {
+            self.beams = vec![vec![0; GRID * GRID]; self.sides.len()];
+        }
+        let units = &world.state.units;
+        for w in world.reclaims.iter().filter(|w| !w.relay) {
+            let Some(row) = units.row(w.source) else {
+                continue;
+            };
+            let at = Vec2::new(w.at.x.to_f32(), w.at.y.to_f32());
+            let c = self.cell(at);
+            if let Some(side) = self.beams.get_mut(units.owner[row] as usize) {
+                side[c] += 1;
             }
         }
     }
@@ -269,6 +330,7 @@ impl Chronicle {
                 mass_spent: f(p.mass_spent),
                 energy_spent: f(p.energy_spent),
                 mass: f(p.mass),
+                reclaimed: f(p.reclaimed_mass),
                 efficiency: f(p.efficiency),
                 ..Default::default()
             })
@@ -332,6 +394,27 @@ impl Chronicle {
                 .filter(|&c| bases[c] > 0)
                 .map(|c| (c as u16, bases[c]))
                 .collect();
+            // What was reclaimed since the last snapshot, shared out over where the
+            // beams worked.
+            side.reclaimed = world.state.players[i].reclaimed_mass.to_f32();
+            let before = self
+                .frames
+                .iter()
+                .rev()
+                .find(|f| f.tick < tick)
+                .and_then(|f| f.sides.get(i))
+                .map_or(0.0, |s| s.reclaimed);
+            let gained = side.reclaimed - before;
+            if let Some(beams) = self.beams.get_mut(i) {
+                let total: u32 = beams.iter().sum();
+                if gained > 0.0 && total > 0 {
+                    side.salvage = (0..GRID * GRID)
+                        .filter(|&c| beams[c] > 0)
+                        .map(|c| (c as u16, gained * beams[c] as f32 / total as f32))
+                        .collect();
+                }
+                beams.fill(0);
+            }
         }
         if self.frames.last().is_some_and(|f| f.tick == tick) {
             self.frames.pop();

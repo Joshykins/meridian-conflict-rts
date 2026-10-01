@@ -1,6 +1,8 @@
 use super::analysis::{region, Analysis, MomentKind};
 use super::*;
-use crate::chronicle::{Built, Death, Frame, Kill, Sample, SideFrame, SideInfo, SideSample};
+use crate::chronicle::{
+    Built, Death, Frame, Kill, Salvage, Sample, SideFrame, SideInfo, SideSample,
+};
 use crate::ui::{Input, Memory};
 use mc_render::Overlay;
 
@@ -9,7 +11,17 @@ fn blueprints() -> Blueprints {
 }
 
 /// A ten-minute match on a 10 km map: two sides build up, fight one big battle in
-/// the north-east at six minutes, and side 1's commander falls at nine.
+/// the north-east at six minutes, side 0 reclaims the field after it (a materials a
+/// tick from 6:40), and side 1's commander falls at nine.
+/// Side 0's reclaim by `tick`: one material a tick from 6:40.
+fn reclaimed(side: u32, tick: u32) -> f32 {
+    if side == 0 {
+        tick.saturating_sub(4000) as f32
+    } else {
+        0.0
+    }
+}
+
 fn chronicle(bp: &Blueprints) -> Chronicle {
     let id = |k: &str| bp.id_of(k).expect("blueprint exists");
     let (tank, factory, commander) = (
@@ -39,6 +51,8 @@ fn chronicle(bp: &Blueprints) -> Chronicle {
                     efficiency: 0.95,
                     army: (40.0 * k) as u32,
                     army_value: 4000.0 * k * (1.0 - i as f32 * 0.3),
+                    reclaim_income: if i == 0 && tick > 4000 { 10.0 } else { 0.0 },
+                    reclaimed: reclaimed(i, tick),
                     ..Default::default()
                 })
                 .collect(),
@@ -53,6 +67,13 @@ fn chronicle(bp: &Blueprints) -> Chronicle {
                     army: vec![((10 + i * 40) as u16 + (k * 20.0) as u16, 300.0)],
                     bases: vec![(i as u16 * 4000, 3)],
                     commander: Some(Vec2::new(1000.0 + 8000.0 * i as f32, 1000.0 + 500.0 * k)),
+                    // On the battlefield: cell (51, 51) is (8000, 8000) on a 10 km map.
+                    salvage: if reclaimed(i, tick) > 0.0 {
+                        vec![(51 * 64 + 51, 50.0)]
+                    } else {
+                        Vec::new()
+                    },
+                    reclaimed: reclaimed(i, tick),
                 })
                 .collect(),
         });
@@ -100,6 +121,18 @@ fn chronicle(bp: &Blueprints) -> Chronicle {
         blueprint: commander,
         complete: true,
     });
+    c.salvages.push(Salvage {
+        tick: 4500,
+        pos: Vec2::splat(8010.0),
+        blueprint: tank,
+        by: Some(0),
+    });
+    c.salvages.push(Salvage {
+        tick: 4600,
+        pos: Vec2::splat(8020.0),
+        blueprint: commander,
+        by: None,
+    });
     c.defeats.push((5400, 1));
     c.ended = Some((5400, 0));
     c.tick = end;
@@ -146,6 +179,40 @@ fn analysis_tells_the_match() {
     // The curves run over every sample; the totals stop at the side's defeat.
     assert_eq!(a.curve(Metric::ArmyValue, 0).len(), a.times.len());
     assert!(a.curve(Metric::ArmyValue, 1).last() == Some(&0.0));
+}
+
+#[test]
+fn reclaim_is_told() {
+    let bp = blueprints();
+    let a = Analysis::of(&chronicle(&bp), &bp);
+    let s = &a.sides[0];
+    assert_eq!(
+        s.reclaimed, 1400.0,
+        "the record's running total, to the decision"
+    );
+    assert!((s.collected - (s.mined + s.reclaimed)).abs() < 0.01);
+    assert_eq!(a.sides[1].reclaimed, 0.0);
+    assert_eq!(a.total_reclaimed, 1400.0);
+    // One a tick is ten a second, over any half minute of it.
+    assert!((s.peak_reclaim - 10.0).abs() < 0.01, "{}", s.peak_reclaim);
+    assert_eq!(
+        s.wrecks_cleared, 1,
+        "the wreck no one's beam finished is no one's"
+    );
+    // Salvaged on the battlefield, the richest wreck first.
+    let (at, _) = a.salvage_points(0).next().expect("salvage on the map");
+    assert!(at.distance(Vec2::splat(8000.0)) < 200.0, "{at}");
+    assert_eq!(a.hauls.len(), 2);
+    assert!(a.hauls[0].value >= a.hauls[1].value);
+    assert!(a.moments.iter().any(|m| m.kind == MomentKind::Salvage
+        && m.side == Some(0)
+        && m.title == "1.0k reclaimed"));
+    assert!(a
+        .awards
+        .iter()
+        .any(|w| w.title == "Salvager" && w.side == 0));
+    let rate = a.curve(Metric::ReclaimRate, 0);
+    assert!(rate.iter().any(|v| (v - 10.0).abs() < 0.01));
 }
 
 #[test]

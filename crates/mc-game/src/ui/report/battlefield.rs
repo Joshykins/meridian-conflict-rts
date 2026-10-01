@@ -27,15 +27,17 @@ enum Layer {
     Losses,
     Battles,
     Warheads,
+    Salvage,
 }
 
-const LAYERS: [Layer; 6] = [
+const LAYERS: [Layer; 7] = [
     Layer::Armies,
     Layer::Bases,
     Layer::Commanders,
     Layer::Losses,
     Layer::Battles,
     Layer::Warheads,
+    Layer::Salvage,
 ];
 
 impl Layer {
@@ -47,6 +49,7 @@ impl Layer {
             Layer::Losses => "Losses",
             Layer::Battles => "Battles",
             Layer::Warheads => "Warheads",
+            Layer::Salvage => "Salvage",
         }
     }
 }
@@ -259,6 +262,9 @@ fn map(report: &Report, ui: &mut Ui, ctx: &Ctx, chart: Rect) {
             );
         }
     }
+    if p.on(Layer::Salvage) {
+        salvage(ui, a, t, &at, &colors, chart);
+    }
     if p.on(Layer::Battles) {
         battles(ui, a, t, &at, m, chart);
     }
@@ -313,6 +319,41 @@ fn forces(
                     ui.dot(centre, rad * 2.4, [c[0], c[1], c[2], 0.10 * alpha]);
                     ui.dot(centre, rad, [c[0], c[1], c[2], 0.9 * alpha]);
                 }
+            }
+        }
+    }
+}
+
+/// Seconds a patch of reclaim glints on the chart after the work there.
+const GLINT: f32 = 20.0;
+
+/// Where each side was reclaiming lately: bright salvage glints in a halo of the
+/// side's colour, fading as the work there gets older.
+fn salvage(
+    ui: &mut Ui,
+    a: &Analysis,
+    t: f32,
+    at: &dyn Fn(Vec2) -> Vec2,
+    colors: &[Color],
+    chart: Rect,
+) {
+    let tps = TICKS_PER_SECOND as f32;
+    let from = t - GLINT * tps;
+    let first = a.frames.partition_point(|f| (f.tick as f32) < from);
+    let scale = (chart.w / 640.0).max(0.6);
+    for f in a.frames[first..].iter().take_while(|f| f.tick as f32 <= t) {
+        let age = ((t - f.tick as f32) / (GLINT * tps)).clamp(0.0, 1.0);
+        for (side, sf) in f.sides.iter().enumerate() {
+            let c = colors.get(side).copied().unwrap_or([1.0; 4]);
+            for &(cell, mass) in &sf.salvage {
+                let p = at(cell_centre(a.size, cell));
+                let rad = (1.5 + mass.sqrt() * 0.35).min(9.0) * scale;
+                let fade = 1.0 - age;
+                ui.dot(p, rad * 2.2, [c[0], c[1], c[2], 0.12 * fade]);
+                ui.dot(p, rad * 0.8, rgb(super::SALVAGE, 0.9 * fade));
+                // A glint that turns as it fades.
+                let spin = Vec2::from_angle(ui.time * 1.5 + cell as f32) * rad * 1.6 * fade;
+                ui.stroke(p - spin, p + spin, 1.0, rgb(0xFFFFFF, 0.6 * fade));
             }
         }
     }
@@ -589,11 +630,11 @@ fn status(report: &mut Report, ui: &mut Ui, ctx: &Ctx, r: Rect) {
 /// The layers of the chart, as switches.
 fn layers(report: &mut Report, ui: &mut Ui, r: Rect) {
     let (inner, ly) = (r, r.y);
-    let lw = (inner.w - 10.0) / 3.0;
+    let lw = (inner.w - 15.0) / 4.0;
     for (i, layer) in LAYERS.iter().enumerate() {
         let cell = Rect::new(
-            inner.x + (i % 3) as f32 * (lw + 5.0),
-            ly + (i / 3) as f32 * 34.0,
+            inner.x + (i % 4) as f32 * (lw + 5.0),
+            ly + (i / 4) as f32 * 34.0,
             lw,
             28.0,
         );

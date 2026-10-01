@@ -10,6 +10,7 @@ mod chart;
 mod economy;
 mod military;
 mod overview;
+mod salvage;
 #[cfg(test)]
 mod tests;
 mod timeline;
@@ -50,15 +51,17 @@ pub enum ReportAction {
 enum Tab {
     Overview,
     Economy,
+    Salvage,
     Military,
     Battlefield,
     Timeline,
 }
 
 impl Tab {
-    const ALL: [Tab; 5] = [
+    const ALL: [Tab; 6] = [
         Tab::Overview,
         Tab::Economy,
+        Tab::Salvage,
         Tab::Military,
         Tab::Battlefield,
         Tab::Timeline,
@@ -68,6 +71,7 @@ impl Tab {
         match self {
             Tab::Overview => "Overview",
             Tab::Economy => "Economy",
+            Tab::Salvage => "Salvage",
             Tab::Military => "Military",
             Tab::Battlefield => "Battlefield",
             Tab::Timeline => "Timeline",
@@ -78,6 +82,7 @@ impl Tab {
         match self {
             Tab::Overview => "Scoreboard and honours",
             Tab::Economy => "Income, spending, stores",
+            Tab::Salvage => "Reclaim and wrecks",
             Tab::Military => "Armies, kills, losses",
             Tab::Battlefield => "The match replayed",
             Tab::Timeline => "Every turning point",
@@ -110,6 +115,7 @@ pub struct Report {
     tab_age: f32,
     economy: Metric,
     military: Metric,
+    salvage: Metric,
     /// A side picked out on the charts (the legend under the pointer).
     focus: Option<usize>,
     field: battlefield::Playback,
@@ -139,6 +145,7 @@ impl Report {
             tab_age: 0.0,
             economy: Metric::MassIncome,
             military: Metric::ArmyValue,
+            salvage: Metric::ReclaimRate,
             focus: None,
             field,
             timeline: timeline::State::default(),
@@ -221,6 +228,7 @@ impl Report {
         match self.tab {
             Tab::Overview => overview::draw(self, ui, ctx, body),
             Tab::Economy => economy::draw(self, ui, ctx, body),
+            Tab::Salvage => salvage::draw(self, ui, ctx, body),
             Tab::Military => military::draw(self, ui, ctx, body),
             Tab::Battlefield => battlefield::draw(self, ui, ctx, body),
             Tab::Timeline => {
@@ -346,9 +354,13 @@ impl Report {
                 "Units Lost",
                 format!("{:.0}", self.count(self.a.total_deaths as f32, 0.4)),
             ),
+            (
+                "Materials Reclaimed",
+                short(self.count(self.a.total_reclaimed, 0.5)),
+            ),
             ("Battles", format!("{}", self.a.battles.len())),
         ];
-        let fw = 170.0;
+        let fw = 168.0;
         let mut x = r.right() - fw * figures.len() as f32;
         for (i, (label, value)) in figures.iter().enumerate() {
             let k = ease((self.age - 0.15 * i as f32) / 0.5);
@@ -359,7 +371,8 @@ impl Report {
                 x + 16.0,
                 y + 34.0,
                 style(Face::Light, 34.0, 0.5),
-                rgb(palette::TEXT, k),
+                // Reclaim in its own colour wherever it shows.
+                rgb(if i == 3 { SALVAGE } else { palette::TEXT }, k),
                 value,
             );
             x += fw;
@@ -414,7 +427,7 @@ impl Report {
         let mut out = None;
         // The keys, as caps.
         let mut x = r.x;
-        for (key, what) in [("Esc", "Back to the battlefield"), ("1-5", "Turn the page")] {
+        for (key, what) in [("Esc", "Back to the battlefield"), ("1-6", "Turn the page")] {
             let w = ui.text_width(type_scale::MICRO, key) + 12.0;
             let cap = Rect::new(x, r.mid_y() - 9.0, w, 18.0);
             ui.frame(cap, rgb(palette::LINE, 0.4));
@@ -505,6 +518,10 @@ pub(super) fn side_color(colors: &[[f32; 3]], side: usize) -> Color {
         1.0,
     ]
 }
+
+/// Reclaim's colour throughout the report, and the mined materials it is set against.
+const SALVAGE: u32 = 0x3FE0C5;
+const MINED: u32 = 0xFFB43C;
 
 /// A labelled block on a page: a section heading over it. Returns the space under it.
 fn block(ui: &mut Ui, r: Rect, title: &str) -> Rect {

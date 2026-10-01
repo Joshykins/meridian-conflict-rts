@@ -2,7 +2,7 @@
 //! (`chronicle.rs`) when the report opens: each side's totals, the curves the
 //! charts draw, the battles, the moments of the match and the honours.
 
-use crate::chronicle::{Blast, Chronicle, Death, Frame, SAMPLE_TICKS};
+use crate::chronicle::{cell_centre, Blast, Chronicle, Death, Frame, GRID, SAMPLE_TICKS};
 use glam::Vec2;
 use mc_core::TICKS_PER_SECOND;
 use mc_data::{cat, BlueprintId, Blueprints, UnitBlueprint};
@@ -20,10 +20,12 @@ pub enum Metric {
     ArmySize,
     Destroyed,
     Lost,
+    ReclaimRate,
+    Reclaimed,
 }
 
 impl Metric {
-    pub const ALL: [Metric; 10] = [
+    pub const ALL: [Metric; 12] = [
         Metric::MassIncome,
         Metric::EnergyIncome,
         Metric::Collected,
@@ -34,6 +36,8 @@ impl Metric {
         Metric::ArmySize,
         Metric::Destroyed,
         Metric::Lost,
+        Metric::ReclaimRate,
+        Metric::Reclaimed,
     ];
 
     pub fn name(self) -> &'static str {
@@ -48,13 +52,15 @@ impl Metric {
             Metric::ArmySize => "Army Size",
             Metric::Destroyed => "Value Destroyed",
             Metric::Lost => "Value Lost",
+            Metric::ReclaimRate => "Reclaim Rate",
+            Metric::Reclaimed => "Total Reclaimed",
         }
     }
 
     /// What a value is counted in, after the figure.
     pub fn unit(self) -> &'static str {
         match self {
-            Metric::MassIncome | Metric::Spending => "/s",
+            Metric::MassIncome | Metric::Spending | Metric::ReclaimRate => "/s",
             Metric::EnergyIncome => "e/s",
             Metric::Efficiency => "%",
             Metric::ArmySize => "units",
@@ -86,7 +92,13 @@ pub struct SideReport {
     pub defeated_at: Option<u32>,
     /// Materials made by mines and generators plus reclaim, over the match.
     pub collected: f32,
+    /// Of `collected`: what the mines and generators made, and what was reclaimed.
+    pub mined: f32,
     pub reclaimed: f32,
+    /// The fastest the side reclaimed, materials a second.
+    pub peak_reclaim: f32,
+    /// Wrecks the side took to the last plate.
+    pub wrecks_cleared: u32,
     pub energy_collected: f32,
     pub spent: f32,
     pub peak_income: f32,
@@ -137,6 +149,8 @@ pub enum MomentKind {
     Expansion,
     /// A side taking the lead in army strength or income.
     Lead,
+    /// Reclaim: a side's running total reaching a round number, or a great wreck cleared.
+    Salvage,
     Experimental,
     ExperimentalLost,
     Warhead,
@@ -187,6 +201,22 @@ pub struct Analysis {
     /// Every unit lost, in order, for the battlefield replay.
     pub fallen: Vec<Fallen>,
     pub blasts: Vec<Blast>,
+    pub total_reclaimed: f32,
+    /// Materials each side reclaimed on each `GRID` cell over the match.
+    pub salvage: Vec<Vec<f32>>,
+    /// The wrecks cleared, the richest first.
+    pub hauls: Vec<Haul>,
+}
+
+/// A wreck reclaimed to the last plate.
+#[derive(Clone, Copy, Debug)]
+pub struct Haul {
+    pub tick: u32,
+    pub pos: Vec2,
+    pub blueprint: BlueprintId,
+    pub by: Option<u8>,
+    /// What the wreck held when it fell.
+    pub value: f32,
 }
 
 /// A unit lost, as the battlefield replay draws it.
@@ -362,6 +392,9 @@ impl Analysis {
                 })
                 .collect(),
             blasts: c.blasts.clone(),
+            total_reclaimed: 0.0,
+            salvage: vec![vec![0.0; GRID * GRID]; n],
+            hauls: Vec::new(),
         };
         for &(tick, side) in &c.defeats {
             if let Some(s) = a.sides.get_mut(side as usize) {
@@ -369,9 +402,18 @@ impl Analysis {
             }
         }
         a.economy(c);
+        a.salvage(c, blueprints);
         a.combat(c, &deaths, blueprints);
         a.building(c, blueprints);
         a.curves(c, &deaths, blueprints);
+        for i in 0..n {
+            let best = a
+                .curve(Metric::ReclaimRate, i)
+                .iter()
+                .copied()
+                .fold(0.0, f32::max);
+            a.sides[i].peak_reclaim = best;
+        }
         a.battles = battles(c.size, &deaths, blueprints, n);
         a.moments = moments(&a, c, &deaths, blueprints);
         a.awards = awards(&a.sides);
@@ -381,13 +423,14 @@ impl Analysis {
     /// Totals of the economy, integrated over the samples.
     fn economy(&mut self, c: &Chronicle) {
         let dt = seconds(SAMPLE_TICKS);
-        for sample in &c.samples {
+        for sample in c.samples.iter().filter(|x| x.tick <= self.length) {
             for (s, v) in self.sides.iter_mut().zip(&sample.sides) {
                 if s.defeated_at.is_some_and(|t| sample.tick > t) {
                     continue;
                 }
-                s.collected += (v.mass_income + v.reclaim_income) * dt;
-                s.reclaimed += v.reclaim_income * dt;
+                s.mined += v.mass_income * dt;
+                // The record keeps the exact running total.
+                s.reclaimed = v.reclaimed;
                 s.energy_collected += v.energy_income * dt;
                 s.spent += v.mass_spent * dt;
                 s.peak_income = s.peak_income.max(v.mass_income + v.reclaim_income);
@@ -409,7 +452,57 @@ impl Analysis {
                 .filter(|x| x.sides.get(i).is_some())
                 .count();
             s.efficiency /= alive.max(1) as f32;
+            s.collected = s.mined + s.reclaimed;
         }
+        self.total_reclaimed = self.sides.iter().map(|s| s.reclaimed).sum();
+    }
+
+    /// Where each side reclaimed, and the wrecks it cleared.
+    fn salvage(&mut self, c: &Chronicle, blueprints: &Blueprints) {
+        for f in &c.frames {
+            for (side, sf) in f.sides.iter().enumerate() {
+                for &(cell, mass) in &sf.salvage {
+                    if let Some(v) = self
+                        .salvage
+                        .get_mut(side)
+                        .and_then(|m| m.get_mut(cell as usize))
+                    {
+                        *v += mass;
+                    }
+                }
+            }
+        }
+        self.hauls = c
+            .salvages
+            .iter()
+            .map(|w| {
+                let bp = blueprints.unit(w.blueprint);
+                Haul {
+                    tick: w.tick,
+                    pos: w.pos,
+                    blueprint: w.blueprint,
+                    by: w.by,
+                    value: (bp.cost_mass * bp.wreck_fraction).to_f32(),
+                }
+            })
+            .collect();
+        for h in &self.hauls {
+            if let Some(s) = h.by.and_then(|b| self.sides.get_mut(b as usize)) {
+                s.wrecks_cleared += 1;
+            }
+        }
+        self.hauls
+            .sort_by(|a, b| b.value.total_cmp(&a.value).then(a.tick.cmp(&b.tick)));
+    }
+
+    /// The materials a side reclaimed on the map, cell by cell (`GRID`), as points.
+    pub fn salvage_points(&self, side: usize) -> impl Iterator<Item = (Vec2, f32)> + '_ {
+        self.salvage
+            .get(side)
+            .into_iter()
+            .flat_map(|m| m.iter().enumerate())
+            .filter(|(_, v)| **v > 0.0)
+            .map(|(c, v)| (cell_centre(self.size, c as u16), *v))
     }
 
     /// Kills, losses and who destroyed what.
@@ -513,7 +606,7 @@ impl Analysis {
         let (mut destroyed, mut lost) = (vec![0.0f32; n], vec![0.0f32; n]);
         let (mut ki, mut di) = (0, 0);
         self.curves = vec![vec![Vec::with_capacity(c.samples.len()); n]; Metric::ALL.len()];
-        for sample in &c.samples {
+        for (k, sample) in c.samples.iter().enumerate() {
             while let Some(k) = c.kills.get(ki).filter(|k| k.tick <= sample.tick) {
                 let (by, victim) = (k.by as usize, k.victim as usize);
                 if by < n
@@ -535,13 +628,13 @@ impl Analysis {
                 let v = sample.sides.get(i).copied().unwrap_or_default();
                 let gone = self.sides[i].defeated_at.is_some_and(|t| sample.tick > t);
                 if !gone {
-                    collected[i] += (v.mass_income + v.reclaim_income) * dt;
+                    collected[i] += v.mass_income * dt;
                 }
                 let live = |x: f32| if gone { 0.0 } else { x };
                 let values = [
                     live(v.mass_income + v.reclaim_income),
                     live(v.energy_income),
-                    collected[i],
+                    collected[i] + v.reclaimed,
                     live(v.mass_spent),
                     live(v.mass),
                     live(v.efficiency.clamp(0.0, 1.0) * 100.0),
@@ -549,6 +642,8 @@ impl Analysis {
                     live(v.army as f32),
                     destroyed[i],
                     lost[i],
+                    live(reclaim_rate(c, k, i)),
+                    v.reclaimed,
                 ];
                 for (m, value) in values.into_iter().enumerate() {
                     self.curves[m][i].push(value);
@@ -787,6 +882,7 @@ fn moments(a: &Analysis, c: &Chronicle, deaths: &[Death], blueprints: &Blueprint
     }
     arsenal(a, c, deaths, blueprints, &mut out);
     firsts(a, c, blueprints, &mut out);
+    salvage_moments(a, c, blueprints, &mut out);
     leads(a, c, &mut out);
     for b in &a.battles {
         let worst = b
@@ -984,6 +1080,45 @@ fn firsts(a: &Analysis, c: &Chronicle, blueprints: &Blueprints, out: &mut Vec<Mo
     }
 }
 
+/// Each side's reclaim reaching round numbers, and the experimental wrecks cleared.
+fn salvage_moments(a: &Analysis, c: &Chronicle, blueprints: &Blueprints, out: &mut Vec<Moment>) {
+    for (i, s) in a.sides.iter().enumerate() {
+        for mark in [1_000.0, 5_000.0, 10_000.0, 25_000.0, 50_000.0, 100_000.0] {
+            let reached = c
+                .samples
+                .iter()
+                .find(|x| x.sides.get(i).is_some_and(|v| v.reclaimed >= mark));
+            if let Some(x) = reached {
+                out.push(Moment {
+                    tick: x.tick,
+                    kind: MomentKind::Salvage,
+                    side: Some(i as u8),
+                    title: format!("{} reclaimed", short(mark)),
+                    detail: format!("{} has taken {} materials from wrecks", s.name, short(mark)),
+                    at: None,
+                });
+            }
+        }
+    }
+    for h in &a.hauls {
+        let bp = blueprints.unit(h.blueprint);
+        if !experimental(bp) {
+            continue;
+        }
+        let by =
+            h.by.and_then(|b| a.sides.get(b as usize))
+                .map_or("A reclaimer", |s| s.name.as_str());
+        out.push(Moment {
+            tick: h.tick,
+            kind: MomentKind::Salvage,
+            side: h.by,
+            title: format!("{} wreck reclaimed", bp.name),
+            detail: format!("{by} takes {} materials from it", short(h.value)),
+            at: Some(h.pos),
+        });
+    }
+}
+
 /// When the lead in army strength or in income changed hands: a side that comes to
 /// lead the next by a fifth and holds it for a minute.
 fn leads(a: &Analysis, c: &Chronicle, out: &mut Vec<Moment>) {
@@ -1039,6 +1174,23 @@ fn leads(a: &Analysis, c: &Chronicle, out: &mut Vec<Moment>) {
             leader = Some(top);
             rising = None;
         }
+    }
+}
+
+/// Materials a second side `side` reclaimed over the half minute up to sample `k`,
+/// from the record's running total: reclaim comes in bursts as wrecks are reached,
+/// and the rate of a moment says little.
+fn reclaim_rate(c: &Chronicle, k: usize, side: usize) -> f32 {
+    const WINDOW: u32 = 30 * TICKS_PER_SECOND;
+    let now = &c.samples[k];
+    let first = c.samples[..=k].partition_point(|x| x.tick + WINDOW < now.tick);
+    let then = &c.samples[first];
+    let got = |x: &crate::chronicle::Sample| x.sides.get(side).map_or(0.0, |v| v.reclaimed);
+    let span = seconds(now.tick - then.tick);
+    if span <= 0.0 {
+        0.0
+    } else {
+        ((got(now) - got(then)) / span).max(0.0)
     }
 }
 
