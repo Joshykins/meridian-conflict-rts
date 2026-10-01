@@ -891,7 +891,7 @@ impl World {
                 s.stains.radius[row],
             );
         }
-        self.index.build();
+        self.index.build_on(&self.pool);
         self.list_shielded();
     }
 

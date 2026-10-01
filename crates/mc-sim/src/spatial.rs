@@ -390,15 +390,31 @@ impl SpatialIndex {
 
     /// Sorts staged entries into cells. Stable, so insertion order survives within a cell.
     pub fn build(&mut self) {
-        for (_, grids) in self
-            .kinds
-            .iter_mut()
-            .chain(self.by_owner.iter_mut().flatten())
-        {
-            for layer in grids.all_layers() {
+        for layer in self.all_layers() {
+            layer.build();
+        }
+    }
+
+    /// [`build`](Self::build), the layers side by side on `pool`.
+    pub(crate) fn build_on(&mut self, pool: &mc_jobs::Pool) {
+        let (mut full, empty): (Vec<&mut Layer>, Vec<&mut Layer>) = self
+            .all_layers()
+            .partition(|layer| !layer.staged.is_empty());
+        for layer in empty {
+            layer.build();
+        }
+        pool.parallel_chunks_mut(&mut full, 1, |_, layers| {
+            for layer in layers {
                 layer.build();
             }
-        }
+        });
+    }
+
+    fn all_layers(&mut self) -> impl Iterator<Item = &mut Layer> {
+        self.kinds
+            .iter_mut()
+            .chain(self.by_owner.iter_mut().flatten())
+            .flat_map(|(_, grids)| grids.all_layers())
     }
 
     #[inline]

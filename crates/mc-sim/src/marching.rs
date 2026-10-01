@@ -26,6 +26,8 @@ const WHEELING: u16 = 0x0400;
 /// seconds, and a member far off costs no more than forming up does. A member
 /// with speed of its own to spare makes up its ground itself.
 const LAG_GAIN: Fx = Fx::ONE;
+/// Members a worker takes at a time in a big block's own loops.
+const ROWS_CHUNK: usize = 256;
 
 /// A block's heading and way this tick (`block_head`), for its anchor to move on by.
 struct Head {
@@ -242,20 +244,17 @@ impl World {
                 .nav
                 .clear_segment(m.layer, m.size_class, group.anchor, probe)
                 && {
-                    let shut = rows
-                        .iter()
-                        .filter(|&&row| {
-                            let o = self.state.orders.front(&self.state.units, row).unwrap();
-                            let slot = group.anchor + o.offset.rotate(group.heading - o.heading);
-                            let mo = self.bp(row).motion.unwrap();
-                            !self.nav.clear_segment(
-                                mo.layer,
-                                mo.size_class,
-                                slot,
-                                slot + (probe - group.anchor),
-                            )
-                        })
-                        .count();
+                    let shut = self.count_rows(&rows, |row| {
+                        let o = self.state.orders.front(&self.state.units, row).unwrap();
+                        let slot = group.anchor + o.offset.rotate(group.heading - o.heading);
+                        let mo = self.bp(row).motion.unwrap();
+                        !self.nav.clear_segment(
+                            mo.layer,
+                            mo.size_class,
+                            slot,
+                            slot + (probe - group.anchor),
+                        )
+                    });
                     shut * 3 <= rows.len()
                 };
         let mut on_field = false;
@@ -399,28 +398,34 @@ impl World {
         // their own and the block marches on. It files through only where
         // most of its ranks cannot pass.
         let crowded = |cut: usize| cut * 3 > n;
-        let mut worst = Fx::ZERO;
         // Members off their ranks (reachable ones): out of rank at all, and far out.
-        let (mut off_rank, mut far_off) = (0, 0);
         let cut_off_rank = radius.max(Fx::from_int(5));
         let far_off_rank = radius * 2 + Fx::from_int(14);
-        let mut cut = 0;
-        let mut astray = 0;
-        for &row in &rows {
-            let o = self.state.orders.front(&self.state.units, row).unwrap();
-            let slot = group.anchor + offset(o);
-            let pos = self.state.units.pos[row];
-            astray += (pos.distance(slot) > pace * 2) as usize;
-            if cut_off(row, pos, slot) {
-                cut += 1;
-            } else {
-                // The march paces itself on the members that can reach their ranks.
-                let d = pos.distance(slot);
-                worst = worst.max(d);
-                off_rank += (d > cut_off_rank) as usize;
-                far_off += (d >= far_off_rank) as usize;
-            }
-        }
+        // (astray, cut off, worst, off rank, far off)
+        let (astray, cut, worst, off_rank, far_off) = self.fold_rows(
+            &rows,
+            (0usize, 0usize, Fx::ZERO, 0usize, 0usize),
+            |(astray, cut, worst, off_rank, far_off), row| {
+                let o = self.state.orders.front(&self.state.units, row).unwrap();
+                let slot = group.anchor + offset(o);
+                let pos = self.state.units.pos[row];
+                let astray = astray + (pos.distance(slot) > pace * 2) as usize;
+                if cut_off(row, pos, slot) {
+                    (astray, cut + 1, worst, off_rank, far_off)
+                } else {
+                    // The march paces itself on the members that can reach their ranks.
+                    let d = pos.distance(slot);
+                    (
+                        astray,
+                        cut,
+                        worst.max(d),
+                        off_rank + (d > cut_off_rank) as usize,
+                        far_off + (d >= far_off_rank) as usize,
+                    )
+                }
+            },
+            |a, b| (a.0 + b.0, a.1 + b.1, a.2.max(b.2), a.3 + b.3, a.4 + b.4),
+        );
         // Clear of a pass once the ranks fit again and the way on is open,
         // straight at the goal or along the route the next stretch.
         let reopened = || {
@@ -486,11 +491,11 @@ impl World {
                     .clamp(Fx::from_int(96), Fx::from_int(256))
                     .min(delta.length());
             let ground_ahead = || {
-                rows.iter().any(|&row| {
+                self.count_rows(&rows, |row| {
                     let o = self.state.orders.front(&self.state.units, row).unwrap();
                     let slot = group.anchor + offset(o);
                     cut_off(row, slot, slot + warn)
-                })
+                }) > 0
             };
             let forming = group.phase != 2;
             let full = if forming || wheeling || ground_ahead() {
@@ -502,25 +507,30 @@ impl World {
             // its own speed: a member with speed to spare makes up its ground
             // itself. Forming up it may wait longer than on the march.
             let most = pace - pace * if forming { FORMING } else { RESERVE };
-            let mut keep_up = full;
-            for &row in &rows {
-                let o = self.state.orders.front(&self.state.units, row).unwrap();
-                let slot = group.anchor + offset(o);
-                let pos = self.state.units.pos[row];
-                if cut_off(row, pos, slot) {
-                    continue;
-                }
-                // Ahead of its rank a member eases off by itself; behind or
-                // beside it, it needs speed in hand.
-                let error = slot - pos;
-                let lag = error.dot(route);
-                let off = (error - route * lag).length().max(lag);
-                if off > Fx::ZERO {
-                    let own = self.bp(row).motion.unwrap().speed;
-                    keep_up = keep_up.min(own - (off * LAG_GAIN).min(most));
-                }
-            }
-            keep_up
+            self.fold_rows(
+                &rows,
+                full,
+                |keep_up, row| {
+                    let o = self.state.orders.front(&self.state.units, row).unwrap();
+                    let slot = group.anchor + offset(o);
+                    let pos = self.state.units.pos[row];
+                    if cut_off(row, pos, slot) {
+                        return keep_up;
+                    }
+                    // Ahead of its rank a member eases off by itself; behind or
+                    // beside it, it needs speed in hand.
+                    let error = slot - pos;
+                    let lag = error.dot(route);
+                    let off = (error - route * lag).length().max(lag);
+                    if off > Fx::ZERO {
+                        let own = self.bp(row).motion.unwrap().speed;
+                        keep_up.min(own - (off * LAG_GAIN).min(most))
+                    } else {
+                        keep_up
+                    }
+                },
+                Fx::min,
+            )
         };
         let speed = if sweep {
             speed
@@ -536,12 +546,10 @@ impl World {
         let mut candidate = group.anchor + advance;
         let side = route.perp();
         let blocked_by = |to: FxVec2| {
-            rows.iter()
-                .filter(|&&row| {
-                    let o = self.state.orders.front(&self.state.units, row).unwrap();
-                    cut_off(row, group.anchor + offset(o), to + offset(o))
-                })
-                .count()
+            self.count_rows(&rows, |row| {
+                let o = self.state.orders.front(&self.state.units, row).unwrap();
+                cut_off(row, group.anchor + offset(o), to + offset(o))
+            })
         };
         let mut cut = blocked_by(candidate);
         if !air {
@@ -783,5 +791,33 @@ impl World {
             return true;
         }
         dist <= patrol_lead(group.heading, post, next, turn_radius).max(Fx::from_int(4))
+    }
+}
+
+impl World {
+    /// `rows` folded by `step` from `zero`. A big block's members are taken in
+    /// pieces on the pool and the pieces' results joined by `join`: every use
+    /// is a count, a sum, a least or a most, which no order changes.
+    fn fold_rows<T: Copy + Send + Sync>(
+        &self,
+        rows: &[usize],
+        zero: T,
+        step: impl Fn(T, usize) -> T + Sync,
+        join: impl Fn(T, T) -> T,
+    ) -> T {
+        if rows.len() <= ROWS_CHUNK {
+            return rows.iter().fold(zero, |acc, &row| step(acc, row));
+        }
+        self.pool
+            .parallel_map_chunks(rows.len(), ROWS_CHUNK, |_, range| {
+                rows[range].iter().fold(zero, |acc, &row| step(acc, row))
+            })
+            .into_iter()
+            .fold(zero, join)
+    }
+
+    /// How many of `rows` `test` holds for, as [`fold_rows`](Self::fold_rows).
+    fn count_rows(&self, rows: &[usize], test: impl Fn(usize) -> bool + Sync) -> usize {
+        self.fold_rows(rows, 0, |n, row| n + test(row) as usize, |a, b| a + b)
     }
 }

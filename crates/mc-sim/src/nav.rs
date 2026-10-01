@@ -296,8 +296,15 @@ impl Nav {
             return false;
         }
         let steps = (length / 4).ceil_int().max(1);
-        (0..=steps)
-            .all(|i| self.passable(l, size, from.lerp(to, Fx::ratio(i as i64, steps as i64))))
+        // A step in the cell the last was in has its answer already.
+        let mut last = None;
+        fractions(steps).all(|t| {
+            let at = from.lerp(to, t);
+            let cell = Cell::from_pos(at);
+            let same = last == Some(cell);
+            last = Some(cell);
+            same || self.passable(l, size, at)
+        })
     }
 
     pub fn nearest_passable(
@@ -391,5 +398,38 @@ impl Nav {
         self.inner.hash(h);
         h.write_u32s(&self.free);
         h.write_u64(self.handles.len() as u64);
+    }
+}
+
+/// `Fx::ratio(i, steps)` for `i` in `0..=steps`, the ratio carried as quotient
+/// and remainder instead of divided out at every step.
+fn fractions(steps: i32) -> impl Iterator<Item = Fx> {
+    let steps = steps.max(1) as i64;
+    let one = 1i64 << Fx::FRAC_BITS;
+    let (whole, part) = (one / steps, one % steps);
+    (0..=steps).scan((0i64, 0i64), move |(t, rest), _| {
+        let at = Fx(*t);
+        *t += whole;
+        *rest += part;
+        if *rest >= steps {
+            *t += 1;
+            *rest -= steps;
+        }
+        Some(at)
+    })
+}
+
+#[cfg(test)]
+mod fraction_tests {
+    use super::*;
+
+    #[test]
+    fn fractions_are_the_ratios() {
+        for steps in 1..300 {
+            let want: Vec<Fx> = (0..=steps as i64)
+                .map(|i| Fx::ratio(i, steps as i64))
+                .collect();
+            assert_eq!(fractions(steps).collect::<Vec<_>>(), want, "{steps} steps");
+        }
     }
 }

@@ -187,7 +187,7 @@ impl World {
                 spots.insert(kind::UNIT, NO_OWNER, i, at[i], radius);
             }
         }
-        spots.build();
+        spots.build_on(&self.pool);
         let chunks: Vec<Vec<(usize, usize)>> =
             self.pool
                 .parallel_map_chunks(rows.len(), CHUNK, |_, range| {
