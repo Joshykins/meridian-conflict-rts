@@ -12,6 +12,9 @@ use std::collections::HashMap;
 pub(super) const MAX_BEAMS: usize = 1024;
 /// A beam that has shut off is kept this long, so what was already on its way up it arrives.
 const LINGER: f32 = 3.0;
+/// The same for a Regency site's splashes: one born just before the work stopped rises
+/// and thins out for up to `SPLASH_PERIOD_MAX` (beams.wgsl) more.
+const NANITE_SITE_LINGER: f32 = 8.0;
 /// A beam whose far end jumps farther than this (plus the target's size) between ticks is on something new.
 const JUMP: f32 = 6.0;
 /// How long a beam found already on is taken to have been on: long enough for its
@@ -148,7 +151,14 @@ impl WorkBeams {
         for (_, old) in was {
             shut_off(old, &mut self.ended);
         }
-        self.ended.retain(|b| time - b.end < LINGER);
+        self.ended.retain(|b| {
+            let linger = if b.beam.kind == mc_sim::reclaim::BEAM_NANITE_SITE {
+                NANITE_SITE_LINGER
+            } else {
+                LINGER
+            };
+            time - b.end < linger
+        });
         // Deliberate cap: the GPU buffer holds `MAX_BEAMS`; past it, the rest go undrawn
         // this tick (they are cosmetic, and a thousand beams already fill any view).
         let all: Vec<GpuBeam> = self

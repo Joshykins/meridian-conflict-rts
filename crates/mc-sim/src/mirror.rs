@@ -2229,20 +2229,26 @@ impl World {
             }
         }
         // Round each Regency site at work, its rings and rising filaments: one record a site,
-        // timed by the site's id with bits 27..31 set (no stream's source has them all).
+        // timed by the site's id with bits 27..31 set (no stream's source has them all). A
+        // Regency refit gets the same, fed or not: it goes up the way a new hull does.
         nanite_sites.sort_unstable();
         nanite_sites.dedup();
         for u in frame.units.iter() {
             let printing = (crate::tables::flag::UNDER_CONSTRUCTION as u32) << 8;
-            if u.owner_flags & printing == 0 || nanite_sites.binary_search(&u.unit_id).is_err() {
+            let fed =
+                u.owner_flags & printing != 0 && nanite_sites.binary_search(&u.unit_id).is_ok();
+            let refit = u.upgrade > 0.0 && u.upgrade < 1.0 && u.status[1] & UNIT_NANITE != 0;
+            if !fed && !refit {
                 continue;
             }
             let Some(bp) = self.blueprints.units.get(u.blueprint as usize) else {
                 continue;
             };
             let height = bp.height.to_f32();
-            // Where the hull has condensed to: `nanite_grow` in entity.wgsl.
-            let front = u.pos[2] + height * (u.build / 0.8).clamp(0.0, 1.0);
+            // Where the hull has condensed to (`nanite_grow` in entity.wgsl); a refit's
+            // work climbs it as the refit goes.
+            let done = if fed { u.build / 0.8 } else { u.upgrade };
+            let front = u.pos[2] + height * done.clamp(0.0, 1.0);
             let to = [u.pos[0], u.pos[1], front];
             frame.beam_sources.push(u.unit_id | 0xF800_0000);
             frame.beams.push(BeamInstance {

@@ -4348,6 +4348,9 @@ impl Renderer {
             .units
             .iter()
             .filter(|u| u.upgrade > 0.0 && u.owner_flags & KIND_WRECK == 0)
+            // A Regency refit has no welding: its nanites are drawn round it as a site's
+            // are (beams.wgsl `BEAM_NANITE_SITE`).
+            .filter(|u| u.status[1] & mc_sim::mirror::UNIT_NANITE == 0)
         {
             let at = Vec3::from(u.pos);
             if at.truncate().distance(focus) > reach {

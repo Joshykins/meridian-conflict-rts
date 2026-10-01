@@ -521,7 +521,8 @@ shared! {
         /// Quads drawn per beam (renderer `work_beams`, beams.wgsl `vs_beam`). A reclaim or
         /// repair beam uses as many of them for its bits as its length asks for.
         pub const QUADS: u32 = 64;
-        /// Quads the replication and nanite kinds use; the rest are hidden for them.
+        /// Quads the replication kinds and the nanite stream use; the rest are hidden for
+        /// them. A nanite site's splashes take all `QUADS`.
         pub const FIXED_QUADS: u32 = 32;
     }
 

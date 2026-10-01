@@ -36,7 +36,7 @@ struct Beam {
 @group(1) @binding(1) var<storage, read> beams: array<Beam>;
 
 // Quads per beam (`BEAM_QUADS`): the ribbon, the two glows, and the bits. The other kinds
-// use the first `BEAM_FIXED_QUADS` of them.
+// use the first `BEAM_FIXED_QUADS` of them, but for a nanite site, which takes them all.
 // Bits on a work beam: this many at least, and one per this many metres on a long one.
 const MIN_BITS: f32 = 29.0;
 const BIT_SPACING: f32 = 22.0;
@@ -93,7 +93,7 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let b = beams[instance / BEAM_QUADS];
     let slot = instance % BEAM_QUADS;
     let time = globals.camera.w;
-    if b.kind != 0u && b.kind != 2u && b.kind != 3u && slot >= BEAM_FIXED_QUADS {
+    if b.kind != 0u && b.kind != 2u && b.kind != 3u && b.kind != BEAM_NANITE_SITE && slot >= BEAM_FIXED_QUADS {
         return hidden();
     }
     if b.kind == BEAM_NANITE_SITE {
@@ -717,12 +717,15 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
 // writhes like liquid, beaded with motes drifting along it, violet as it leaves and red by
 // the time it arrives. The strands bow apart a little and turn slowly round the line
 // between the ends, meeting at both; their heads creep out when the work starts, and when
-// it stops their tails drain into the site. A knot of light where they pour in throws off
-// a few motes.
-// `BEAM_NANITE_SITE`: round the site itself while it is fed. Thin violet rings of many
-// sizes come and go up its height (most near the build front), each turning red as it
-// fades; and filaments of red particles are blasted slowly up out of the lot, leaning
-// outward, higher than the hull will stand.
+// it stops their tails drain into the site. The moment the work starts both ends flash and
+// a lead (a faint hairline with motes racing down it) snaps across the gap, holding it
+// until the strands arrive. A knot of light where they pour in throws off motes, each let
+// finish its flight when the work stops.
+// `BEAM_NANITE_SITE`: round a site while it is fed, or round a refit. Splashes in slow
+// motion with no gravity: a thin violet ring appears round the hull (most near the build
+// front), its rim lifts into a crown, the light drains from the ring into the crown's
+// peaks, and each peak is drawn up into a filament of red particles that leans outward,
+// tears free of the ring, keeps drifting up and out past the hull's top and thins away.
 // Colours: the violet of Regency construction, red where it has cooled toward plate.
 
 const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
@@ -732,8 +735,9 @@ const NANITE_HOT: vec3<f32> = vec3<f32>(1.0, 0.62, 0.72);
 const SHAPE_STRAND: f32 = 9.0;
 const SHAPE_NANITE_GLOW: f32 = 10.0;
 const SHAPE_NANITE_MOTE: f32 = 11.0;
-const SHAPE_RING: f32 = 12.0;
+const SHAPE_CROWN: f32 = 12.0;
 const SHAPE_FILAMENT: f32 = 13.0;
+const SHAPE_LEAD: f32 = 14.0;
 
 // The stream: strands, each in segments, then the two glows, then the motes at the weld.
 const STRANDS: u32 = 6u;
@@ -741,8 +745,18 @@ const STRAND_SEGS: u32 = 4u;
 // Metres a second a strand's head creeps out at, and its motes drift along it.
 const STRAND_SPEED: f32 = 8.0;
 const STRAND_FLOW: f32 = 3.5;
-// Round a site: rings, then filaments (the rest of the slots).
-const SITE_RINGS: u32 = 12u;
+// The stream's slots after its strands: the two glows, the lead, then motes.
+const STREAM_LEAD: u32 = 2u;
+// How fast the lead snaps across, metres a second.
+const LEAD_SPEED: f32 = 140.0;
+// Round a site: splashes, each a ring in segments (every other corner a crown peak) and
+// a filament drawn up out of each peak.
+const SPLASHES: u32 = 4u;
+const CROWN_SEGS: u32 = 10u;
+const CROWN_JETS: u32 = 5u;
+const SPLASH_SLOTS: u32 = 15u;
+const SPLASH_PERIOD_MIN: f32 = 4.5;
+const SPLASH_PERIOD_MAX: f32 = 6.5;
 // Metres either side of a strand's thread its ribbon adds for motes off the line.
 const STRAND_PAD: f32 = 0.22;
 // How far a filament's threads fan apart by its top, a share of its length either side.
@@ -817,42 +831,95 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
         drained = clamp((time - b.end) * max(STRAND_SPEED * 0.8, len / 2.2) / len, 0.0, 1.0);
     }
     let on = smoothstep(0.85, 1.0, first) * (1.0 - smoothstep(0.7, 1.0, drained));
+    // The flash the work starts with (none on a beam that was on before we looked: its
+    // start is set seconds back).
+    let flash = exp(-max(time - b.start, 0.0) * 4.0);
     let slot2 = slot - STRANDS * STRAND_SEGS;
     if slot2 < 2u {
-        // The knot where the strands pour into the site, and a spark at the emitter.
+        // The knot where the strands pour into the site, and a spark at the emitter: both
+        // lit at once when the work starts, flaring as they come on.
         let at_site = slot2 == 0u;
         let world = select(b.emitter, b.to, at_site);
         if (globals.view_proj * vec4<f32>(world, 1.0)).w < RAY_NEAR {
             return hidden();
         }
         let throb = 0.8 + 0.2 * sin(time * 2.3 + site) * sin(time * 3.7);
-        let size = select(0.45, clamp(b.radius * 0.1, 0.7, 2.2), at_site) * throb;
+        let size = select(0.45, clamp(b.radius * 0.1, 0.7, 2.2), at_site) * throb * (1.0 + 1.4 * flash);
         out.clip = rep_billboard(world, corner, size, select(2.0, 3.0, at_site), size * 0.8);
-        out.state = vec3<f32>(SHAPE_NANITE_GLOW, select(0.3, 1.0, at_site), 0.0);
-        out.level = select(1.0 - drained, on, at_site);
+        out.state = vec3<f32>(SHAPE_NANITE_GLOW, select(max(0.3, flash), 1.0, at_site), 0.0);
+        // Until the strands arrive the knot is held lit by the lead, dimmer.
+        let held = 0.45 * (1.0 - drained);
+        out.level = select(1.0 - drained, max(max(on, held), flash), at_site);
         return out;
     }
-    // A mote thrown off where the strands pour in, drifting out and up as it dies.
-    let m = f32(slot2 - 2u);
+    if slot2 == STREAM_LEAD {
+        // The lead: snaps across in a moment, then holds the gap faintly until the strands
+        // are in; gone quickly once the work stops.
+        var level = (1.0 - 0.75 * smoothstep(0.6, 1.0, first)) * (0.45 + 0.55 * flash);
+        if b.end >= 0.0 {
+            level *= 1.0 - smoothstep(0.0, 0.35, time - b.end);
+        }
+        let reach = clamp((time - b.start) * LEAD_SPEED, 0.0, len);
+        if level <= 0.002 || reach < 0.05 {
+            return hidden();
+        }
+        var o = strand_ribbon(
+            b.emitter, b.to, b.emitter, corner, 0.07, SHAPE_LEAD,
+            vec4<f32>(reach, 0.0, len, hash(site + 2.7))
+        );
+        o.kind = f32(BEAM_NANITE);
+        o.level = level;
+        return o;
+    }
+    // A mote thrown off where the strands pour in, drifting out and up as it dies: from the
+    // moment the work starts, and each one let finish when it stops.
+    let m = f32(slot2 - STREAM_LEAD - 1u);
     let period = 1.4 + 0.8 * hash(m * 2.3 + site);
     let t = time / period + hash(m * 4.1 + site);
     let ph = fract(t);
+    let born = time - ph * period;
     let k = floor(t) * 1.618 + m * 3.3 + site;
     let dir = normalize(vec3<f32>(hash(k) - 0.5, hash(k + 1.0) - 0.5, 0.25 + hash(k + 2.0)));
     let world = b.to + dir * (0.3 + 1.6 * ph) * (0.6 + 0.6 * hash(k + 3.0));
     let c = globals.view_proj * vec4<f32>(world, 1.0);
-    if c.w < RAY_NEAR || on <= 0.001 {
+    if c.w < RAY_NEAR || born < b.start || (b.end >= 0.0 && born > b.end) {
         return hidden();
     }
     let half_px = max(0.09 * globals.lod.x / max(c.w, 1.0), 1.0);
     out.clip = billboard(world, corner, half_px, vec2<f32>(1.0, 0.0), 1.0);
     out.state = vec3<f32>(SHAPE_NANITE_MOTE, ph, hash(k + 4.0));
-    out.level = on * smoothstep(0.0, 0.1, ph) * (1.0 - smoothstep(0.5, 1.0, ph));
+    out.level = smoothstep(0.0, 0.1, ph) * (1.0 - smoothstep(0.5, 1.0, ph));
     return out;
 }
 
-// Round a Regency site while it is fed (`BEAM_NANITE_SITE`): `emitter` is the site's foot,
-// `to` the middle of its build front, `radius` and `height` the hull's.
+// One splash round a site: a ring, centred `centre`, in the plane of `e1`/`e2`, of
+// `radius`, its peaks lifted `lift` along `n`; `k` its seed.
+struct Splash {
+    centre: vec3<f32>,
+    e1: vec3<f32>,
+    e2: vec3<f32>,
+    n: vec3<f32>,
+    radius: f32,
+    lift: f32,
+    k: f32,
+}
+
+// Corner `v` of a splash's ring (`v` and `v + CROWN_SEGS` are the same corner). Even
+// corners are crown peaks: lifted and flared out; odd ones sag a little between them.
+fn crown_corner(sp: Splash, v: u32) -> vec3<f32> {
+    let c = v % CROWN_SEGS;
+    let fc = f32(c);
+    let peak = c % 2u == 0u;
+    let jit = (hash(sp.k + 11.0 + fc * 1.3) - 0.5) * 0.5;
+    let a = (fc + jit) * 6.2832 / f32(CROWN_SEGS) + hash(sp.k + 9.0) * 6.2832;
+    let radial = sp.e1 * cos(a) + sp.e2 * sin(a);
+    let up = select(-0.15, 0.6 + 0.8 * hash(sp.k + 20.0 + fc), peak) * sp.lift;
+    let flare = select(0.0, 0.18 * up, peak);
+    return sp.centre + radial * (sp.radius + flare) + sp.n * up;
+}
+
+// Round a Regency site at work (`BEAM_NANITE_SITE`): `emitter` is the site's foot, `to`
+// the middle of its build front, `radius` and `height` the hull's.
 fn nanite_site_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     let time = globals.camera.w;
     let foot = b.emitter;
@@ -860,85 +927,111 @@ fn nanite_site_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     let r = max(b.radius, 1.0);
     let front = clamp(mix(b.to_prev, b.to, globals.sun.w).z - foot.z, 0.0, h);
     let site = hash(foot.x * 0.37 + foot.y * 0.73);
-    var out: BeamOut;
-    out.kind = f32(BEAM_NANITE_SITE);
-    out.uv = corner;
-    // What is already on its way when the work stops is let finish, but all of it is
-    // gone before the renderer drops the beam.
-    var level = 1.0;
-    if b.end >= 0.0 {
-        level = 1.0 - smoothstep(1.2, 2.7, time - b.end);
+    if slot >= SPLASHES * SPLASH_SLOTS {
+        return hidden();
     }
-    if slot < SITE_RINGS {
-        // A ring: each slot shows one ring after another, each at a new height and size.
-        let i = f32(slot);
-        let period = 2.0 + 1.6 * hash(i * 3.7 + site);
-        let t = time / period + hash(i * 1.3 + site);
-        let ph = fract(t);
-        let born = time - ph * period;
-        if born < b.start || (b.end >= 0.0 && born > b.end) {
-            return hidden();
-        }
-        let k = floor(t) * 7.13 + i * 1.7 + site * 31.0;
-        // Half of them gather at the build front; the rest anywhere up the hull.
-        var z = hash(k + 2.0) * h * 1.05;
-        if hash(k + 1.0) < 0.5 {
-            z = front + (hash(k + 2.0) - 0.5) * 0.3 * h;
-        }
-        z = clamp(z, 0.2, h * 1.05) + h * 0.05 * ph;
-        // Mostly inside the hull, the odd one reaching a little past it.
-        let pick = hash(k + 3.0);
-        let size = r * (0.3 + 0.75 * pick * pick) * (0.95 + 0.08 * ph);
-        // Laid nearly flat, a little askew.
-        let n = normalize(vec3<f32>((hash(k + 5.0) - 0.5) * 0.2, (hash(k + 6.0) - 0.5) * 0.2, 1.0));
-        let e1 = normalize(cross(vec3<f32>(0.0, 1.0, 0.0), n));
-        let e2 = cross(n, e1);
-        // The quad reaches a little past the ring for its halo.
-        let world = foot + vec3<f32>(0.0, 0.0, z) + (e1 * corner.x + e2 * corner.y) * size * 1.12;
-        let c = globals.view_proj * vec4<f32>(world, 1.0);
-        if c.w < RAY_NEAR {
-            return hidden();
-        }
-        out.clip = c;
-        out.uv = corner * 1.12;
-        out.state = vec3<f32>(SHAPE_RING, ph, hash(k + 4.0));
-        // x the ring's radius, y metres a pixel covers here.
-        out.extra = vec4<f32>(size, max(c.w, 1.0) / globals.lod.x, 0.0, 0.0);
-        out.level = level;
-        return out;
-    }
-    // A filament blasted up out of the lot: its head rises slowly, its tail follows.
-    let i = f32(slot - SITE_RINGS);
-    let period = 3.0 + 2.2 * hash(i * 5.31 + site);
-    let t = time / period + hash(i * 2.9 + site);
+    // Each slot shows one splash after another. The first starts with the work and the
+    // others follow a share of a period apart; one born before the work stopped is let
+    // run its course, the lot thinning out over the seconds after.
+    let i = f32(slot / SPLASH_SLOTS);
+    let part = slot % SPLASH_SLOTS;
+    let period = mix(SPLASH_PERIOD_MIN, SPLASH_PERIOD_MAX, hash(i * 3.7 + site));
+    let t = (time - b.start) / period + i / f32(SPLASHES);
     let ph = fract(t);
     let born = time - ph * period;
     if born < b.start || (b.end >= 0.0 && born > b.end) {
         return hidden();
     }
-    let k = floor(t) * 3.7 + i * 5.31 + site * 17.0;
-    let turn = hash(k + 2.0) * 6.2832;
-    let out_dir = vec3<f32>(cos(turn), sin(turn), 0.0);
-    let off = sqrt(hash(k + 3.0)) * r * 0.85;
-    let base = foot + out_dir * off + vec3<f32>(0.0, 0.0, 0.2);
-    // Higher than the hull will stand; a low, wide hull still throws them well up.
-    let rise = max(h, r * 0.6) * (1.1 + 0.9 * hash(k + 4.0));
-    // Leaning out, the more the farther from the middle it starts.
-    let lean = (0.1 + 0.25 * off / r) * rise * 0.5;
-    let top = base + out_dir * lean + vec3<f32>(0.0, 0.0, rise);
-    let head = clamp(ph / 0.6, 0.0, 1.0);
-    let tail = clamp((ph - 0.3) / 0.7, 0.0, 1.0);
-    if head - tail < 0.002 {
+    var level = 1.0;
+    if b.end >= 0.0 {
+        level = 1.0 - smoothstep(2.0, 7.5, time - b.end);
+    }
+    let k = floor(t) * 7.13 + i * 1.7 + site * 31.0;
+    // Half of them at the build front; the rest anywhere up the hull.
+    var z = hash(k + 2.0) * h * 0.95;
+    if hash(k + 1.0) < 0.5 {
+        z = front + (hash(k + 2.0) - 0.5) * 0.3 * h;
+    }
+    z = clamp(z, 0.2, h);
+    // Round the hull, the odd one reaching a little past it; spreading slowly.
+    let pick = hash(k + 3.0);
+    var sp: Splash;
+    sp.radius = r * (0.55 + 0.55 * pick * pick) * (1.0 + 0.12 * ph);
+    // Laid nearly flat, a little askew.
+    sp.n = normalize(vec3<f32>((hash(k + 5.0) - 0.5) * 0.2, (hash(k + 6.0) - 0.5) * 0.2, 1.0));
+    sp.e1 = normalize(cross(vec3<f32>(0.0, 1.0, 0.0), sp.n));
+    sp.e2 = cross(sp.n, sp.e1);
+    sp.centre = foot + vec3<f32>(0.0, 0.0, z);
+    // The crown rises, then holds while its peaks are drawn off.
+    sp.lift = clamp(sp.radius * 0.45, 0.8, h * 0.6) * smoothstep(0.06, 0.5, ph);
+    sp.k = k;
+    if part < CROWN_SEGS {
+        // A stretch of ring from a sag to a peak (so the fragment knows which end is which).
+        let peak_first = part % 2u == 0u;
+        let pa = crown_corner(sp, select(part, part + 1u, peak_first));
+        let pb = crown_corner(sp, select(part + 1u, part, peak_first));
+        let life = smoothstep(0.0, 0.1, ph) * (1.0 - smoothstep(0.4, 0.78, ph));
+        if life <= 0.002 {
+            return hidden();
+        }
+        // The ring bows out between its corners, and dips toward the trough so the crown's
+        // troughs are round and its peaks pointed: how far, across the drawn ribbon, in metres.
+        let chord = distance(pa, pb);
+        let mid = (pa + pb) * 0.5;
+        var rad = mid - sp.centre;
+        rad = normalize(rad - sp.n * dot(rad, sp.n) + vec3<f32>(1e-4, 0.0, 0.0));
+        let bulge = rad * sp.radius * (1.0 - cos(3.14159 / f32(CROWN_SEGS)))
+            - sp.n * 0.25 * max(dot(pb - pa, sp.n), 0.0);
+        let ca = globals.view_proj * vec4<f32>(pa, 1.0);
+        let cb = globals.view_proj * vec4<f32>(pb, 1.0);
+        let cm = globals.view_proj * vec4<f32>(mid, 1.0);
+        let co = globals.view_proj * vec4<f32>(mid + bulge, 1.0);
+        var bow = 0.0;
+        if ca.w > RAY_NEAR && cb.w > RAY_NEAR && cm.w > RAY_NEAR && co.w > RAY_NEAR {
+            var dir = (cb.xy / cb.w - ca.xy / ca.w) * globals.viewport.xy;
+            dir = dir / max(length(dir), 1e-4);
+            let d = (co.xy / co.w - cm.xy / cm.w) * globals.viewport.xy;
+            bow = dot(d, vec2<f32>(-dir.y, dir.x)) * cm.w / globals.lod.x;
+        }
+        let amp = clamp(sp.radius * 0.012, 0.06, 0.2);
+        var o = strand_ribbon(
+            pa, pb, pa, corner, amp + abs(bow), SHAPE_CROWN,
+            vec4<f32>(chord, 0.0, chord, hash(k + 30.0 + f32(part)))
+        );
+        o.extra.x = amp + STRAND_PAD;
+        // z how far it bows out mid-way, w how much of its light has drained to the peak.
+        o.extra.z = bow;
+        o.extra.w = smoothstep(0.22, 0.6, ph);
+        o.kind = f32(BEAM_NANITE_SITE);
+        o.level = level * life;
+        return o;
+    }
+    // A filament drawn up out of a peak: its head rises on from the crown, slowing as if
+    // through thick air, never falling; then it tears free and drifts on up, thinning out.
+    let j = part - CROWN_SEGS;
+    let base = crown_corner(sp, j * 2u);
+    var out_dir = base - sp.centre;
+    out_dir = normalize(out_dir - sp.n * dot(out_dir, sp.n) + vec3<f32>(1e-4, 0.0, 0.0));
+    let fj = f32(j);
+    let swirl = cross(sp.n, out_dir) * (hash(k + 40.0 + fj) - 0.5) * 0.3;
+    let dir = normalize(sp.n + out_dir * (0.2 + 0.35 * hash(k + 41.0 + fj)) + swirl);
+    // Up past the hull's top; a low, wide hull still throws them well up.
+    let reach = (h - z) * 0.5 + max(h, r * 0.6) * (0.6 + 0.6 * hash(k + 42.0 + fj));
+    let rise = clamp((ph - 0.14) / 0.86, 0.0, 1.0);
+    let head = reach * (1.0 - (1.0 - rise) * (1.0 - rise));
+    let free = clamp((ph - 0.5) / 0.5, 0.0, 1.0);
+    let tail = reach * 0.72 * pow(free, 1.3);
+    if head - tail < 0.05 {
         return hidden();
     }
-    let len = distance(base, top);
-    let amp = clamp(h * 0.04, 0.25, 0.9);
+    let len = head;
+    let amp = clamp(h * 0.035, 0.2, 0.8);
     var o = strand_ribbon(
-        mix(base, top, tail), mix(base, top, head), base, corner, amp + len * FILAMENT_FAN, SHAPE_FILAMENT,
-        vec4<f32>(head * len, tail * len, len, hash(k + 7.0))
+        base + dir * tail, base + dir * head, base, corner, amp + len * FILAMENT_FAN, SHAPE_FILAMENT,
+        vec4<f32>(head, tail, len, hash(k + 7.0 + fj))
     );
     o.kind = f32(BEAM_NANITE_SITE);
-    o.level = level * (1.0 - smoothstep(0.85, 1.0, ph));
+    o.level = level * smoothstep(0.12, 0.24, ph) * (1.0 - smoothstep(0.55, 1.0, ph));
     return o;
 }
 
@@ -967,70 +1060,83 @@ fn particle_thread(m: f32, u: f32, y: f32, px: f32, amp: f32, seed: f32, flow: f
 fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
     let time = globals.camera.w;
     let shape = in.state.x;
-    if shape < 9.5 || shape > 12.5 {
-        // A strand of the stream, or a filament rising round a site.
-        let filament = shape > 12.5;
+    if shape < 9.5 || shape > 11.5 {
+        // A strand of the stream, its lead, a stretch of a splash's ring, or a filament.
+        let filament = shape > 12.5 && shape < 13.5;
+        let crown = shape > 11.5 && shape < 12.5;
+        let lead = shape > 13.5;
         let m = in.state.y;
         let head = in.strand.x;
         let tail = in.strand.y;
-        let s = clamp(m / max(in.strand.z, 0.01), 0.0, 1.0);
-        let ends = smoothstep(tail, tail + 0.5, m) * (1.0 - smoothstep(head - 0.25, head + 0.05, m));
+        let total = max(in.strand.z, 0.01);
+        let s = clamp(m / total, 0.0, 1.0);
+        // A filament's torn end frays over a good part of it; a ring has no ends.
+        let fray = select(0.5, max(0.5, 0.3 * (head - tail)), filament);
+        var ends = smoothstep(tail, tail + fray, m) * (1.0 - smoothstep(head - 0.25, head + 0.05, m));
+        if crown {
+            ends = 1.0;
+        }
         if ends <= 0.001 {
             discard;
         }
         let y = in.uv.y * in.state.z;
         let px = in.extra.y;
-        let total = max(in.strand.z, 0.01);
         let fan = select(0.0, total * FILAMENT_FAN, filament);
-        // A stream is tight at both ends; a filament loosens as it rises.
-        let env = select(0.25 + 0.75 * sin(3.14159 * s), 0.35 + 0.65 * s, filament);
+        // A stream is tight at both ends; a filament loosens as it rises; a ring is even.
+        var env = select(0.25 + 0.75 * sin(3.14159 * s), 0.35 + 0.65 * s, filament);
+        if crown {
+            env = 1.0;
+        }
         let amp = max(in.extra.x - STRAND_PAD - fan, 0.05) * env;
-        let flow = select(STRAND_FLOW, 2.6, filament);
+        // A ring bows out between its corners.
+        let bow = select(0.0, in.extra.z * 4.0 * s * (1.0 - s), crown);
+        var flow = select(STRAND_FLOW, 2.6, filament);
+        if crown {
+            flow = 1.2;
+        } else if lead {
+            flow = 30.0;
+        }
         let seed = in.strand.w;
         // A bundle of threads, each writhing on its own, a wave or two a strand; a
         // filament's threads fan apart as they rise, a sheaf thrown upward.
         var bright = 0.0;
         var hot = 0.0;
-        let threads = select(3, 6, filament);
+        var threads = select(3, 6, filament);
+        if crown {
+            threads = 2;
+        } else if lead {
+            threads = 1;
+        }
         for (var j = 0; j < threads; j++) {
             let fj = f32(j);
             let sj = seed + fj * 0.173;
             let lane = (hash(sj * 31.0) * 2.0 - 1.0) * fan * s;
             let waves = select(1.2, 1.8, filament) * (0.8 + 0.4 * hash(sj * 17.0));
-            let t = particle_thread(m, s * waves, y - lane, px, amp * (0.6 + 0.4 * hash(sj * 7.0)), sj, flow * (0.8 + 0.4 * hash(sj * 3.0)), time);
+            let t = particle_thread(m, s * waves, y - lane - bow, px, amp * (0.6 + 0.4 * hash(sj * 7.0)), sj, flow * (0.8 + 0.4 * hash(sj * 3.0)), time);
             let weight = select(1.0, 0.65, j > 0);
             bright += t.x * weight;
             hot += t.y * weight;
         }
-        // The head glows as it creeps on.
+        if crown {
+            // The light drains out of the ring into its peaks (s = 1), which run hot.
+            let drain = in.extra.w;
+            let gather = mix(1.0, pow(s, 3.0) * 1.6, drain);
+            // Kept deep: a bright violet line blooms out to near white.
+            let tint = mix(NANITE_VIOLET, NANITE_RED, 0.15 + 0.5 * drain * s);
+            let color = tint * bright * 0.9 * gather + NANITE_HOT * (hot * 0.5 + bright * drain * pow(s, 6.0) * 0.6);
+            return vec4<f32>(color * in.level, clamp(bright * 0.2 * gather, 0.0, 0.35) * in.level);
+        }
+        // The head glows as it creeps on (the lead's as it snaps across).
         let tip = exp(-pow((head - m) / 0.5, 2.0)) * (0.5 + 0.5 * n);
+        if lead {
+            let color = NANITE_VIOLET * bright * 1.6 + NANITE_HOT * (tip * 2.0 + hot * 1.5);
+            return vec4<f32>(color * ends * in.level, 0.0);
+        }
         // Violet as it leaves (a filament at its root), red for the rest of the way.
         let tint = mix(NANITE_VIOLET, NANITE_RED, smoothstep(0.04, select(0.4, 0.3, filament), s));
         let color = tint * bright * 2.6 + NANITE_HOT * (hot * 2.4 + tip * 1.2 * bright);
         let cover = clamp(bright * 0.3, 0.0, 0.45);
         return vec4<f32>(color * ends * in.level, cover * ends * in.level);
-    }
-    if shape > 11.5 {
-        // A ring: a hairline with a faint halo, brighter along some arcs than others,
-        // sparkling; violet, then red as it fades.
-        let d = length(in.uv);
-        let thin = max(0.04, in.extra.y * 0.8) / max(in.extra.x, 0.1);
-        let off = (d - 1.0) / thin;
-        let line = exp(-off * off);
-        let halo = exp(-off * off / 36.0) * 0.18;
-        if line + halo < 0.004 {
-            discard;
-        }
-        let ang = atan2(in.uv.y, in.uv.x);
-        let seed = in.state.z;
-        let arcs = 0.35 + 0.65 * smoothstep(-0.3, 0.8, sin(ang * 2.0 + seed * 6.28 + time * 0.6) * sin(ang * 3.0 - seed * 4.0));
-        let cell = floor((ang + 3.14159) * 30.0);
-        let sparkle = step(0.86, hash(cell + seed * 97.0)) * (0.5 + 0.5 * sin(time * 9.0 + cell));
-        let ph = in.state.y;
-        let life = smoothstep(0.0, 0.12, ph) * (1.0 - smoothstep(0.55, 1.0, ph));
-        let tint = mix(NANITE_VIOLET, NANITE_RED, smoothstep(0.3, 0.7, ph));
-        let color = tint * (line * (2.2 * arcs + 2.0 * sparkle) + halo) + NANITE_HOT * line * sparkle * 0.8;
-        return vec4<f32>(color * life * in.level, 0.0);
     }
     let d = length(in.uv);
     if d > 1.0 {
