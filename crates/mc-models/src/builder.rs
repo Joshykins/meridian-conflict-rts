@@ -127,6 +127,7 @@ pub struct MeshBuilder {
     star_core: Option<[f32; 4]>,
     exhausts: Vec<super::Exhaust>,
     lifts: Vec<super::Lift>,
+    discharge: Option<super::Discharge>,
     vtol: Option<super::Vtol>,
     dust_line: Option<f32>,
     /// The pattern byte leaf cards carry: which leaf atlas the shader samples
@@ -191,6 +192,7 @@ impl MeshBuilder {
             star_core: None,
             exhausts: Vec::new(),
             lifts: Vec::new(),
+            discharge: None,
             vtol: None,
             dust_line: None,
             leaf_atlas: pattern::NONE,
@@ -534,6 +536,25 @@ impl MeshBuilder {
     /// The lift bells marked so far (`add_lift`).
     pub fn lifts(&self) -> Vec<super::Lift> {
         self.lifts.clone()
+    }
+
+    /// Declares the core a reactor holds and the electrode tips its arcs strike (current
+    /// frame; `Model::discharge`, renderer `reactor_fx.rs`).
+    pub fn set_discharge(&mut self, core: Vec3, radius: f32, terminals: &[Vec3]) {
+        let scale = self.transform.transform_vector3(Vec3::X).length();
+        self.discharge = Some(super::Discharge {
+            core: self.transform.transform_point3(core).to_array(),
+            radius: radius * scale,
+            terminals: terminals
+                .iter()
+                .map(|&t| self.transform.transform_point3(t).to_array())
+                .collect(),
+        });
+    }
+
+    /// The core and electrodes declared (`set_discharge`).
+    pub fn discharge(&self) -> Option<super::Discharge> {
+        self.discharge.clone()
     }
 
     /// Declares the model's tilting VTOL pods (`Model::vtol`), in the current frame.

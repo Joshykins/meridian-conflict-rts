@@ -291,9 +291,9 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("core_mine", 12.8, 20.8, 2, 3, &[]),
     structure("core_mine", 12.8, 22.3, 3, 3, &[]),
     structure("core_mine", 12.8, 22.3, 4, 3, &[]),
-    structure("power", 6.9, 7.0, 1, 2, &[]),
-    structure("power", 18.75, 18.0, 2, 4, &[]),
-    structure("power", 42.5, 35.0, 3, 8, &[]),
+    structure("power", 6.9, 10.0, 1, 2, &[]),
+    structure("power", 18.75, 26.0, 2, 4, &[]),
+    structure("power", 42.5, 52.0, 3, 8, &[]),
     structure("storage_mass", 12.9, 6.3, 1, 3, &[]),
     structure("storage_mass", 12.9, 10.2, 2, 3, &[]),
     structure("storage_mass", 12.9, 14.9, 3, 3, &[]),
@@ -577,7 +577,11 @@ fn meshes_are_valid() {
                             || v.part == part::CELL_HATCH
                             || v.part == part::CELL_ROUND
                             || (part::STORE_FILL_FIRST..=part::STORE_LAMP).contains(&v.part)
-                            || v.part & part::ORBIT_MASK == part::ORBIT),
+                            || v.part & part::ORBIT_MASK == part::ORBIT
+                            || (part::REACTOR_COLLAR_FIRST
+                                ..part::REACTOR_COLLAR_FIRST
+                                    + crate::gpu_consts::reactor::COLLARS)
+                                .contains(&v.part)),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
@@ -707,6 +711,9 @@ const FACTORY_TRIANGLES: usize = 6000;
 /// and nine Arc Cannons (the Trebuchet's howitzer tube, about 700 triangles each).
 const BATTLESHIP_TRIANGLES: usize = 15000;
 const CORE_MINE_TRIANGLES: usize = 9000;
+/// A fusion plant: the tech 3 one stands on a factory's 96 m lot, a heavy foundation of
+/// heat sinks and capacitor bastions round a star in its blades.
+pub(crate) const REACTOR_TRIANGLES: usize = 8000;
 /// The tech 4 Megalodon: a 110 m experimental submarine, under the Leviathan's budget.
 const SUBMARINE_TITAN_TRIANGLES: usize = 8000;
 /// The tech 4 assault tank runs on four open track units (road wheels, toothed
@@ -810,8 +817,9 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "replication_engine" {
             // One 240 m landmark per match (Survival).
             super::replicator::ENGINE_TRIANGLES
+        } else if model.key == "power" {
+            REACTOR_TRIANGLES
         } else if model.key.starts_with("factory_")
-            || model.key == "power"
             || model.key == "airbase"
             || model.key == "nuke_silo"
             || model.key == "nuke_defense"

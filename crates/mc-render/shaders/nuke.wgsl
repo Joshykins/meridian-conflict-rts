@@ -57,6 +57,8 @@ struct Blast {
     fuel: f32,
     churn: f32,
     thick: f32,
+    // 1 for a reactor's blast (nuke_fx.rs `QUICK_FLASH`): its flash is over in moments.
+    quick: f32,
 }
 
 fn blast_of(i: u32) -> Blast {
@@ -75,6 +77,7 @@ fn blast_of(i: u32) -> Blast {
     n.bolt_z = c.z;
     n.front = c.w;
     n.fuel = d.x;
+    n.quick = d.y;
     n.churn = d.z;
     n.thick = d.w;
     return n;
@@ -117,7 +120,8 @@ fn slow(n: Blast) -> f32 {
 // Heat left, 0..1: the flash, then the long red fade under the cap.
 fn heat_left(n: Blast) -> f32 {
     let k = slow(n);
-    return max(exp(-n.age / (2.5 * k)) * 0.5 + exp(-n.age / (16.0 * k)) * 0.5, n.fuel);
+    let flash = select(2.5 * k, 0.4, n.quick > 0.5);
+    return max(exp(-n.age / flash) * 0.5 + exp(-n.age / (16.0 * k)) * 0.5, n.fuel);
 }
 
 // How far the fireball's skin has gone to smoke: at first it is all fire, and it rises
@@ -139,9 +143,11 @@ fn fade_left(n: Blast) -> f32 {
 }
 
 // How much of the Wilson cloud there is: it blooms a moment behind the shock and is
-// gone in a few seconds.
+// gone in a few seconds. A reactor's blast (`quick`) throws none: its shell would run out
+// past an eye close enough to see the plant and white the view out.
 fn wilson_left(n: Blast) -> f32 {
-    return smoothstep(0.12, 0.5, n.age) * (1.0 - smoothstep(1.3, 3.8, n.age));
+    let none = select(1.0, 0.0, n.quick > 0.5);
+    return none * smoothstep(0.12, 0.5, n.age) * (1.0 - smoothstep(1.3, 3.8, n.age));
 }
 
 // ---- noise -------------------------------------------------------------------------------
@@ -610,9 +616,10 @@ fn cloud_veil(t: f32) -> f32 {
 
 // The ignition's glow in the air round the fireball: a white-hot core of light hugging
 // the ball and a wide warm halo kilometres across, held for the first several seconds and
-// sinking away over about fifteen. It is light only (no cover), added before the bloom takes it.
+// sinking away over about fifteen (a reactor's: a moment, and a faint halo). It is light only (no cover), added before the bloom takes it.
 fn ignition_glow(n: Blast, eye: vec3<f32>, rd: vec3<f32>, scene_t: f32) -> vec3<f32> {
-    let k = slow(n);
+    // A reactor's blast (`quick`) flashes and is gone: no halo hanging kilometres across.
+    let k = select(slow(n), 0.12, n.quick > 0.5);
     let env = smoothstep(0.0, 0.08, n.age) * (0.65 * exp(-n.age / (3.0 * k)) + 0.35 * exp(-n.age / (6.0 * k)))
         + n.fuel * n.fuel * n.fuel * 0.3;
     if env < 0.004 {
@@ -633,7 +640,8 @@ fn ignition_glow(n: Blast, eye: vec3<f32>, rd: vec3<f32>, scene_t: f32) -> vec3<
     let color = fire_color(0.6 + 0.4 * smoothstep(0.1, 0.6, env));
     // Both go faster than `env` once it sinks, the core first, so the ball shows its own
     // fire and the land its colour again instead of a cream veil over both.
-    return color * (28.0 * env * env * core + 5.0 * pow(env, 1.6) * halo) * seen * cloud_veil(t);
+    let wide = select(5.0, 0.8, n.quick > 0.5);
+    return color * (28.0 * env * env * core + wide * pow(env, 1.6) * halo) * seen * cloud_veil(t);
 }
 
 fn march_seg(seg: Seg, eye: vec3<f32>, rd: vec3<f32>, jitter: f32, m_in: Marched, share: f32) -> Marched {

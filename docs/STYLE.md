@@ -364,6 +364,21 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   and drop when upkeep goes unpaid).
 - **Radar is radar,** the same as ARC's.
 
+## The fusion plants
+
+ARC's power plants (`models/aster/reactor.rs`) are built round their core and read
+four-fold, after the old UEF generator: a foundation that builds up to the middle (a
+chamfered square plinth, heat sinks on its corners or on heavy feet splayed out on the
+diagonals, power trunks out along the axes, a tapered buttressed body), the core held up
+over it on suspension panels that arc to it, and armoured blades turning round it on a
+turntable. Tech 1 has two blades, tech 2 four great ones on a stepped foundation, tech 3
+a star in taller blades on the heaviest foundation, capacitor bastions on its feet. Not
+wanted (the user turned each down): orbs on sticks, tumbling rings round the core, towers,
+arches, doors and windows, cooling towers, a cup the core sits in, plain stacked
+cylinders. The heat sinks breathe (heat rippling between the fins, hot air shimmering off
+them, steam); a plant going up breaks its charge loose before the fireball
+(`renderer/reactor_blast.rs`).
+
 ## The electric bore
 
 The Argon Electric Bore (AEB) is Aster's lightning gun: the Arbalest (tech 3

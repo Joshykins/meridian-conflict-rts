@@ -1815,6 +1815,15 @@ fn vs_main(in: VsIn) -> VsOut {
         if !(live && held) {
             p = vec3<f32>(0.0, 0.0, -50.0);
         }
+    } else if in.part >= REACTOR_PART_COLLAR_FIRST && in.part < REACTOR_PART_COLLAR_FIRST + REACTOR_COLLARS
+        && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
+        // A reactor's collar (`gpu_consts::reactor`): turned about the plant's z axis,
+        // neighbours the other way, each quicker than the one below.
+        let k = f32(in.part - REACTOR_PART_COLLAR_FIRST);
+        let way = select(1.0, -1.0, (in.part & 1u) != 0u);
+        let turn = way * time * REACTOR_COLLAR_SPIN * (1.0 + k * REACTOR_COLLAR_STEP) + f32(e.unit_id & 255u) * 0.7;
+        p = rot_z(p, turn);
+        n = rot_z(n, turn);
     } else if in.part == PART_PUMP && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
         // A reactor's pumps and injectors: a short stroke, a quick drive down and a slower
         // draw back, phased by where each stands so they work round the plant in turn.
@@ -3094,6 +3103,49 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let blink = select(0.06, 1.0, fract(time * 0.85 + in.state.w) < 0.32);
         m.emissive *= blink;
         m.albedo *= 0.35 + 0.65 * blink;
+    }
+    let held = (in.model_class >> 16u) & 0xFFu;
+    if in.material == MAT_GLOW && (held == REACTOR_PATTERN_CORE || held == REACTOR_PATTERN_CHARGE)
+        && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
+        // A fusion plant's held charge (`gpu_consts::reactor`). Banked to an ember while the
+        // plant is going up or has no power.
+        let live = select(1.0, 0.06, (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) != 0u);
+        let seed = in.state.w * 61.0;
+        if held == REACTOR_PATTERN_CORE {
+            // The core: plasma churning over it, a white-hot face toward the eye, a blue
+            // limb, and the whole of it breathing with a quicker flicker over the beat.
+            let q = in.local * 0.55 + vec3<f32>(0.0, 0.0, -time * 0.9) + seed;
+            let churn = surf_noise3(q) * 0.6 + surf_noise3(q * 2.3 + vec3<f32>(time * 0.7, 0.0, 0.0)) * 0.4;
+            let face = saturate(dot(n, v));
+            let breath = 0.82 + 0.18 * sin(time * 2.2 + seed) + 0.06 * sin(time * 13.0 + seed * 3.0);
+            let hot = saturate(face * face * 0.55 + (churn - 0.5) * 1.6 + 0.1);
+            let deep = vec3<f32>(0.08, 0.32, 1.0);
+            let pale = vec3<f32>(0.62, 0.84, 1.0);
+            let col = mix(deep, pale, hot);
+            m.emissive = mix(col, vec3<f32>(1.0, 0.98, 0.95), hot * hot * hot) * (0.9 + 3.2 * hot * hot) * breath * live;
+            m.albedo = vec3<f32>(0.6, 0.75, 1.0) * 0.3;
+        } else {
+            // A band of charge: pulses chasing round it, white at their heads.
+            let around = atan2(in.local.y, in.local.x) / 6.2831853;
+            let chase = fract(around * REACTOR_PULSES - time * REACTOR_PULSE_RATE + seed);
+            let pulse = pow(chase, 5.0);
+            let spark = step(0.985, fract(around * 23.0 + floor(time * 9.0 + seed) * 0.37));
+            m.emissive = mix(globals.glow.rgb * 0.5, vec3<f32>(0.95, 0.97, 1.0) * 1.6, pulse)
+                * (0.9 + 9.0 * pulse + 3.0 * spark) * live;
+        }
+    }
+    if in.material == MAT_GLOW_ORANGE && held == REACTOR_PATTERN_HEAT
+        && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
+        // A heat sink's hot core (`gpu_consts::reactor`): heat rolling along it in slow
+        // waves, a quicker shimmer over them, white-hot at the crests; cold while the
+        // plant is going up or down.
+        let live = select(1.0, 0.04, (flags & (FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) != 0u);
+        let seed = in.state.w * 37.0;
+        let along = dot(in.local.xy, vec2<f32>(0.71, 0.71));
+        let wave = 0.5 + 0.5 * sin(along * 1.7 - time * 2.1 + seed);
+        let shimmer = 0.5 + 0.5 * sin(along * 6.3 + in.local.x * 2.9 - time * 7.0 + seed * 2.0);
+        let heat = saturate(0.35 + 0.5 * wave * wave + 0.15 * shimmer);
+        m.emissive = mix(vec3<f32>(1.0, 0.18, 0.02), vec3<f32>(1.0, 0.72, 0.3), heat * heat) * (1.2 + 5.5 * heat * heat) * live;
     }
     if in.drive_at.w > 2.5 && in.material == MAT_GLOW_LASER
         && (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {

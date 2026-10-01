@@ -154,11 +154,7 @@ pub(super) const MODELS: &[ModelDef] = &[
         mine::core_mine,
     )
     .with_tier_4(),
-    ModelDef::tiered(
-        "power",
-        [(10.5, 10.0), (22.5, 22.0), (46.0, 38.0)],
-        reactor::power,
-    ),
+    ModelDef::tiered("power", reactor::SIZES, reactor::power),
     ModelDef::tiered(
         "storage_mass",
         [(16.5, 8.0), (16.5, 13.0), (16.5, 19.0)],

@@ -1,12 +1,13 @@
 //! What units do to the ground they cross: the track marks and dust of tracked vehicles,
 //! a walker's footprints (`footfalls.rs`), the downwash a hovercraft keeps under itself,
-//! the red plasma under a craft on gravity lift (`lift_fx.rs`), and the wash of a hovering
+//! the red plasma under a craft on gravity lift (`lift_fx.rs`), the arcs on a running
+//! reactor (`reactor_fx.rs`), and the wash of a hovering
 //! aircraft's lift.
 
 use super::{water_fx, Renderer, TrackMark, PUFF_DUST, STATE_RADAR, TRACK_MARK_LIFE};
 use crate::camera::Camera;
 use glam::Vec3;
-use mc_sim::mirror::{UnitInstance, KIND_WRECK};
+use mc_sim::mirror::{UnitInstance, KIND_WRECK, STATE_UNPOWERED};
 
 impl Renderer {
     /// Track marks and dust for the tracked vehicles that moved this tick,
@@ -15,6 +16,8 @@ impl Renderer {
     /// them to be seen.
     pub(super) fn ground_contact(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
         const FLAG_MOVING: u32 = (mc_sim::tables::flag::MOVING as u32) << 8;
+        // Plants going up are drawn from however far away.
+        self.reactor_aftermath(time);
         if camera.distance > 2500.0 {
             return;
         }
@@ -28,6 +31,7 @@ impl Renderer {
                 << 8;
         let previous = (self.effect_origin, self.effect_settings);
         self.lift_fx.new_tick();
+        self.reactor_fx.new_tick();
         for u in units {
             self.effect_origin = Some(Vec3::from(u.pos));
             self.effect_settings = self
@@ -58,6 +62,13 @@ impl Renderer {
                 && self.lift_fx.lifts(u.blueprint)
             {
                 self.plasma_lift(u, time, moving);
+            }
+            if close
+                && u.build >= 1.0
+                && u.owner_flags & (STATE_UNPOWERED | hidden_aircraft) == 0
+                && self.reactor_fx.holds(u.blueprint)
+            {
+                self.reactor_arcs(u, time);
             }
             if dust && close && u.build >= 1.0 && u.owner_flags & hidden_aircraft == 0 {
                 let bp = self

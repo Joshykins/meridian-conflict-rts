@@ -422,11 +422,15 @@ fn animate(
         .map_err(|e| e.to_string())?;
     let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
     let tick_s = 1.0 / mc_core::TICKS_PER_SECOND as f32;
+    // The range's own clock: what it still has to do goes in on its tick.
+    let mut t = world.state.tick;
     for i in 0..spec.frames {
         // A new tick every other frame; the one between is drawn half way through it.
         let half = i % 2 == 0;
         if half && i > 0 {
-            world.tick(&[]).map_err(|e| e.to_string())?;
+            let late = crate::setup::late_orders(opts, world, t);
+            world.tick(&late).map_err(|e| e.to_string())?;
+            t += 1;
             world.write_render_frame(None, frame);
         }
         let alpha = if half { 0.5 } else { 1.0 };

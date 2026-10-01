@@ -930,10 +930,28 @@ pub const WRECKAGE_LATE_KILL: u32 = 450;
 /// Orders later in a headless run (`headless.rs`), at tick `t`: the wreckage scene shoots
 /// down what took off from its lot, so it breaks up in the sky.
 pub fn late_orders(opts: &Options, world: &mc_sim::World, t: u32) -> Vec<PlayerCommand> {
+    let u = &world.state.units;
+    if opts.scene == Scene::Range
+        && opts.scenario == Some(crate::range::Scenario::Destruct)
+        && t == 1 + crate::range::DESTRUCT_WAIT
+    {
+        // The subject stands a moment before it goes, so a film sees it go.
+        let subject = world.blueprints.id_of(&opts.subject);
+        return vec![PlayerCommand {
+            player: 0,
+            command: Command::SelfDestruct {
+                units: u
+                    .slots
+                    .iter()
+                    .filter(|&r| u.owner[r] == 0 && Some(u.blueprint[r]) == subject)
+                    .map(|r| u.id(r))
+                    .collect(),
+            },
+        }];
+    }
     if opts.scene != Scene::Wreckage || t != WRECKAGE_LATE_KILL {
         return Vec::new();
     }
-    let u = &world.state.units;
     vec![PlayerCommand {
         player: 0,
         command: Command::SelfDestruct {

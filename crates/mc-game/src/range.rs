@@ -219,7 +219,13 @@ struct Pending {
     /// Units that were already there, so the new one can be told apart.
     known: HashSet<u32>,
     order: PendingOrder,
+    /// Ticks still to wait once it is there: a unit set to destruct stands a moment
+    /// first, so its end can be watched (and filmed: `--unit-shot --frames`).
+    wait: u32,
 }
+
+/// Ticks a subject stands before it destructs.
+pub(crate) const DESTRUCT_WAIT: u32 = 10;
 
 /// A scenario's commands, and the order it still owes to the builder it spawned.
 type Staged = (Vec<Command>, Option<(BlueprintId, PendingOrder)>);
@@ -573,10 +579,16 @@ impl Range {
             } else {
                 units.iter().map(|u| u.unit_id).collect()
             };
+            let wait = if matches!(order, PendingOrder::Destruct) {
+                DESTRUCT_WAIT
+            } else {
+                0
+            };
             Pending {
                 builder,
                 known,
                 order,
+                wait,
             }
         });
         Ok(commands)
@@ -584,7 +596,7 @@ impl Range {
 
     /// Once the builder a scenario spawned is on the map, the order it was spawned for.
     pub fn resolve_pending(&mut self, units: &[UnitInstance]) -> Vec<Command> {
-        let Some(p) = &self.pending else {
+        let Some(p) = &mut self.pending else {
             return Vec::new();
         };
         let found = units.iter().find(|u| {
@@ -595,6 +607,10 @@ impl Range {
                 && !p.known.contains(&u.unit_id)
         });
         let Some(unit) = found else { return Vec::new() };
+        if p.wait > 0 {
+            p.wait -= 1;
+            return Vec::new();
+        }
         let blue: Vec<(BlueprintId, mc_sim::UnitId)> = units
             .iter()
             .filter(|u| u.owner_flags & (KIND_WRECK | 0xFF) == BLUE as u32 && u.build >= 1.0)
@@ -681,6 +697,10 @@ pub fn owed_commands(
     let Some((builder, order)) = opening(blueprints, pad, subject, 1, true, scenario).1 else {
         return Vec::new();
     };
+    if matches!(order, PendingOrder::Destruct) {
+        // Given later, after `DESTRUCT_WAIT` (`setup::late_orders`).
+        return Vec::new();
+    }
     if let Some(board) = order.board(builder, blue_units) {
         return board;
     }

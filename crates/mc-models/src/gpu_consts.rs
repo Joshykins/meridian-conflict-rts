@@ -583,6 +583,32 @@ shared! {
         pub const SWING: f32 = 1.85;
     }
 
+    /// An ARC fusion plant's held charge (models/aster/fusion.rs, entity.wgsl): the core it
+    /// holds, the charge running round its lit bands, and the blades and turntables that
+    /// turn round it.
+    pub mod reactor as "REACTOR_" {
+        /// `pattern::CORE` (`GLOW` faces): the core, plasma churning over it and breathing.
+        pub const PATTERN_CORE: u32 = 32;
+        /// `pattern::CHARGE` (`GLOW` faces): pulses of charge running round the model's z
+        /// axis, as on a band round the core.
+        pub const PATTERN_CHARGE: u32 = 33;
+        /// `pattern::HEAT` (`GLOW_ORANGE` faces): a heat sink's hot core, its heat
+        /// rippling along it in waves and flickering, banked low while the plant is down.
+        pub const PATTERN_HEAT: u32 = 34;
+        /// Pulses of charge round a band, and how many times round a second they run.
+        pub const PULSES: f32 = 3.0;
+        pub const PULSE_RATE: f32 = 0.9;
+        /// Collar `k` (0 lowest) is part `PART_COLLAR_FIRST + k`, `k` below `COLLARS`:
+        /// machinery round the plant's z axis (a turntable and the blades on it), turned
+        /// about it while the plant runs, neighbours the other way, each a little quicker
+        /// than the one below.
+        pub const PART_COLLAR_FIRST: u32 = 67;
+        pub const COLLARS: u32 = 4;
+        /// Radians a second the lowest collar turns.
+        pub const COLLAR_SPIN: f32 = 0.35;
+        pub const COLLAR_STEP: f32 = 0.45;
+    }
+
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
     /// (`mc_sim::reclaim`). The older kinds are still spelled out in the shader.
     pub mod beam as "BEAM_" {

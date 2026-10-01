@@ -74,6 +74,9 @@ const MOST_GROWTH: f32 = 1.6;
 const GROW_SECONDS: f32 = 4.0;
 /// Burst and feed records a blast keeps; older ones are banked (`Blast::churn_bank`).
 const RECORDS: usize = 8;
+/// Blasts drawn smaller than this share of a warhead's (a reactor's, not a commander's)
+/// flash quickly (`nuke_frame`).
+const QUICK_FLASH: f32 = 0.3;
 
 #[derive(Clone, Copy)]
 struct Blast {
@@ -230,7 +233,13 @@ impl Blast {
         let t = self.age(time);
         // nuke.wgsl `slow`: a bigger ball burns longer.
         let k = self.scale.max(0.3).sqrt();
-        (-t / (2.5 * k)).exp() * 0.5 + (-t / (16.0 * k)).exp() * 0.5
+        let flash = if self.quick() { 0.4 } else { 2.5 * k };
+        (-t / flash).exp() * 0.5 + (-t / (16.0 * k)).exp() * 0.5
+    }
+
+    /// A reactor's blast: its flash is over in moments (nuke.wgsl `Blast::quick`).
+    fn quick(&self) -> bool {
+        self.scale < QUICK_FLASH
     }
 
     /// Seconds the front takes to reach the damage radius.
@@ -333,9 +342,13 @@ impl Renderer {
                 radius,
                 commander,
                 ..
-            } => {
-                self.nuclear_detonation(Vec3::from(pos.to_f32()), radius.to_f32(), *commander, time)
-            }
+            } => self.nuclear_detonation(
+                Vec3::from(pos.to_f32()),
+                radius.to_f32(),
+                *commander,
+                0.2,
+                time,
+            ),
             SimEvent::NuclearLaunch { from, .. } => {
                 self.silo_launch(Vec3::from(from.to_f32()), time)
             }
@@ -351,7 +364,16 @@ impl Renderer {
         }
     }
 
-    fn nuclear_detonation(&mut self, at: Vec3, radius: f32, commander: bool, time: f32) {
+    /// A blast `radius` metres at `at`, drawn at least `smallest` of a warhead's size; a
+    /// `commander`'s (or a reactor's) crater is smaller and cools sooner.
+    pub(super) fn nuclear_detonation(
+        &mut self,
+        at: Vec3,
+        radius: f32,
+        commander: bool,
+        smallest: f32,
+        time: f32,
+    ) {
         // The same tick's events can be handed over more than once (a burst folded into
         // another leaves no blast of its own to recognise it by).
         self.nuke_fx.heard.retain(|h| (h.1 - time).abs() < 0.5);
@@ -359,7 +381,7 @@ impl Renderer {
             return;
         }
         self.nuke_fx.heard.push((at, time));
-        let base = (radius / WARHEAD_RADIUS).max(0.2);
+        let base = (radius / WARHEAD_RADIUS).max(smallest);
         // A reactor's pool is smaller and cools sooner than a warhead's; a pool already
         // glowing here is heated again (`craters.rs`).
         self.add_crater(
@@ -817,7 +839,13 @@ impl Renderer {
             let fuel = b.fuel(time);
             let heat = b.heat(time).max(fuel);
             if heat > 0.02 {
-                let flash = (-age / (2.5 * b.scale.max(0.3).sqrt())).exp();
+                // A plant going up (drawn under `QUICK_FLASH` of a warhead) flashes and
+                // is gone, not the long blinding light of a warhead.
+                let flash = if b.quick() {
+                    (-age / 0.45).exp() * 0.5
+                } else {
+                    (-age / (2.5 * b.scale.max(0.3).sqrt())).exp()
+                };
                 let color = Vec3::new(1.0, 0.55 + 0.35 * heat, 0.22 + 0.5 * heat * heat);
                 let power = (9.0e6 * heat * heat + 4.0e7 * flash) * b.scale * b.scale;
                 self.lights.lamp(
@@ -836,7 +864,8 @@ impl Renderer {
                 nukes[shown * 4] = [b.at.x, b.at.y, b.at.z, b.start];
                 nukes[shown * 4 + 1] = [b.scale, b.seed, bolt, b.ground];
                 nukes[shown * 4 + 2] = [drift.x, drift.y, bolt_z, b.front(time)];
-                nukes[shown * 4 + 3] = [fuel, 0.0, b.churn(time), b.thick(time)];
+                let quick = if b.quick() { 1.0 } else { 0.0 };
+                nukes[shown * 4 + 3] = [fuel, quick, b.churn(time), b.thick(time)];
                 shown += 1;
             }
         }

@@ -181,6 +181,7 @@ fn build_fitted_made(
     let mut scans = false;
     let mut exhausts = Vec::new();
     let mut lifts = Vec::new();
+    let mut discharge = None;
     let mut vtol = None;
     let lods: [MeshLod; LOD_COUNT] = std::array::from_fn(|lod| {
         let mut builder = MeshBuilder::new(lod, root);
@@ -211,6 +212,7 @@ fn build_fitted_made(
             star_core = builder.star_core();
             exhausts = builder.exhausts();
             lifts = builder.lifts();
+            discharge = builder.discharge();
             vtol = builder.vtol();
         }
         builder.finish()
@@ -273,6 +275,7 @@ fn build_fitted_made(
         star_core,
         exhausts,
         lifts,
+        discharge,
         vtol,
     })
 }

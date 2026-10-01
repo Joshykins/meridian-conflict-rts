@@ -72,6 +72,8 @@ mod plasma_fx;
 mod post;
 mod quality;
 mod rail_fx;
+mod reactor_blast;
+mod reactor_fx;
 mod regency_guns_fx;
 mod regency_mine_fx;
 mod shafts;
@@ -856,6 +858,8 @@ pub struct Renderer {
     heat_haze: heat_haze::HeatHaze,
     /// Red plasma under the bells of craft on gravity lift (renderer/lift_fx.rs).
     lift_fx: lift_fx::LiftFx,
+    /// Arcs on running reactors, and reactors going up (renderer/reactor_fx.rs).
+    reactor_fx: reactor_fx::ReactorFx,
     /// Capital ships' drives, lift jets and lamps (renderer/capital_fx.rs).
     capital_fx: capital_fx::CapitalFx,
     /// Capital ships' warp jumps: charge, flash, streak, rift (renderer/warp_fx.rs).
@@ -1075,6 +1079,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         star_core: None,
         exhausts: Vec::new(),
         lifts: Vec::new(),
+        discharge: None,
         vtol: None,
     }
 }
@@ -1287,6 +1292,8 @@ impl Renderer {
         let mut exhaust_models: Vec<Vec<models::Exhaust>> = Vec::new();
         // Each model slot's plasma lift bells (`lift_fx`).
         let mut lift_models: Vec<Vec<models::Lift>> = Vec::new();
+        // Each model slot's held charge (`reactor_fx`).
+        let mut discharge_models: Vec<Option<models::Discharge>> = Vec::new();
         // Per blueprint: its ground stakes' scale, if it plants any (`stake_fx`).
         let mut stake_scales: Vec<Option<f32>> = Vec::new();
         let mut model_draws: Vec<[u32; 2]> = Vec::new();
@@ -1315,6 +1322,7 @@ impl Renderer {
             model_draws.push([first_slot[at], model.lods.len() as u32]);
             exhaust_models.push(model.exhausts.clone());
             lift_models.push(model.lifts.clone());
+            discharge_models.push(model.discharge.clone());
             stake_scales.push(models::stakes::stake_scale(model));
             coil_models.push(model.lods[0].vertices.iter().any(|v| {
                 (models::pattern::COIL..=models::pattern::COIL_TURN_BACK)
@@ -2150,6 +2158,12 @@ impl Renderer {
             &[&houses],
         );
         let craters = craters::Craters::new(&gpu)?;
+        // A plant's heat sinks vent steam as well as shimmering (`reactor_fx`).
+        let plant_vents: Vec<Vec<models::Exhaust>> = exhaust_models
+            .iter()
+            .zip(&discharge_models)
+            .map(|(e, d)| if d.is_some() { e.clone() } else { Vec::new() })
+            .collect();
         let heat_haze = heat_haze::HeatHaze::new(&gpu, exhaust_models)?;
         write_buffers(
             scene_set,
@@ -2375,6 +2389,7 @@ impl Renderer {
             craters,
             heat_haze,
             lift_fx: lift_fx::LiftFx::new(lift_models),
+            reactor_fx: reactor_fx::ReactorFx::new(discharge_models, plant_vents),
             capital_fx: capital_fx::CapitalFx::default(),
             warp_fx: warp_fx::WarpFx::default(),
             nodes,
@@ -4233,160 +4248,6 @@ impl Renderer {
         }
     }
 
-    /// A reactor going up, a commander's or a power plant's: a flash that whites the
-    /// screen out, a fireball that climbs into a cloud on a stalk, a shock front across
-    /// the ground out to the edge of the blast (`blast` metres), and a column of smoke
-    /// that stands for a long time. `r` is the size of the fireball's puffs; everything
-    /// else scales with the blast, the commander's 140 m being the reference.
-    fn reactor_death(&mut self, at: Vec3, r: f32, h: f32, blast: f32, time: f32) {
-        let core = at + Vec3::Z * h * 0.5;
-        const BLAST_REF: f32 = 140.0;
-        let s = blast / BLAST_REF;
-        // Fewer, not only smaller, puffs for a small plant: a row of them going up
-        // must not eat the puff budget.
-        let n = |count: u32| ((count as f32 * s.sqrt().clamp(0.35, 1.0)).ceil()) as u32;
-        // The flash: twice, the second broader and slower, so it blinds and then lingers.
-        self.push_effect(core.to_array(), time, 420.0 * s, 0.55, 4.0, 0.0);
-        self.push_effect(core.to_array(), time + 0.05, 260.0 * s, 1.9, 4.0, 1.0);
-        // The shock front along the ground, and a second behind it.
-        self.push_effect(
-            (at + Vec3::Z * 2.0).to_array(),
-            time + 0.05,
-            blast * 1.25,
-            1.1,
-            2.0,
-            1.0,
-        );
-        self.push_effect(
-            (at + Vec3::Z * 2.0).to_array(),
-            time + 0.35,
-            blast * 0.9,
-            1.4,
-            2.0,
-            1.0,
-        );
-        // The fireball, rolling upward.
-        for i in 0..7 {
-            let rise = i as f32 * 7.0 * s;
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 1.2
-                + Vec3::Z * rise;
-            self.push_effect(
-                (core + off).to_array(),
-                time + 0.12 + 0.16 * i as f32,
-                r * (7.0 - i as f32 * 0.5),
-                1.6 + 0.2 * i as f32,
-                2.0,
-                0.0,
-            );
-        }
-        for i in 0..n(26) {
-            let off = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                self.scatter.unit(),
-            ) * r
-                * 2.2;
-            let vel = self.scatter.upward(0.3) * (14.0 + self.scatter.unit() * 22.0) * s.sqrt();
-            let life = 2.2 + self.scatter.unit() * 1.6;
-            self.push_puff(
-                PUFF_FIREBALL,
-                core + off,
-                vel,
-                time + 0.04 * i as f32,
-                life,
-                (r * 1.6, r * 4.5),
-            );
-        }
-        // The stalk, growing at forty metres a second, and the cloud it carries up.
-        let stalk = n(22);
-        for i in 0..stalk {
-            let z = (4.0 + i as f32 * 3.2 * 22.0 / stalk as f32) * s;
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 0.7
-                + Vec3::Z * z;
-            let kind = if i % 3 == 0 {
-                PUFF_FIREBALL
-            } else {
-                PUFF_SMOKE
-            };
-            let life = 5.0 + self.scatter.unit() * 3.0;
-            let climb = Vec3::Z * (6.0 + self.scatter.unit() * 5.0) * s;
-            self.push_puff(
-                kind,
-                at + off,
-                climb,
-                time + 0.3 + z / 40.0,
-                life,
-                (r * 1.4, r * 3.2),
-            );
-        }
-        let cap = n(28);
-        for i in 0..cap {
-            let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / cap as f32;
-            let ring = Vec3::new(a.cos(), a.sin(), 0.0) * r * (2.0 + self.scatter.unit() * 2.4);
-            let top = at + ring + Vec3::Z * (72.0 + self.scatter.signed() * 7.0) * s;
-            let roll = (ring.normalize_or_zero() * (5.0 + self.scatter.unit() * 5.0)
-                + Vec3::Z * (2.0 + self.scatter.unit() * 3.0))
-                * s;
-            let kind = if i % 4 == 0 {
-                PUFF_FIREBALL
-            } else {
-                PUFF_SMOKE
-            };
-            let life = 6.0 + self.scatter.unit() * 3.5;
-            let start = time + 2.0 * s.sqrt() + self.scatter.unit() * 0.5;
-            self.push_puff(kind, top, roll, start, life, (r * 2.4, r * 6.0));
-        }
-        // Dust driven out flat ahead of the shock, all the way to the edge of the blast.
-        for ring in 0..3 {
-            let around = n(30);
-            for i in 0..around {
-                let a = (i as f32 + self.scatter.unit()) * std::f32::consts::TAU / around as f32;
-                let out = Vec3::new(a.cos(), a.sin(), 0.03);
-                let from = blast * (0.12 + 0.3 * ring as f32);
-                let life = 2.2 + self.scatter.unit() * 1.6;
-                let push = out * (60.0 + self.scatter.unit() * 30.0) * s.sqrt();
-                self.push_puff(
-                    PUFF_DUST,
-                    at + out * from + Vec3::Z * 0.6,
-                    push,
-                    time + 0.05 + from / 170.0,
-                    life,
-                    (r * 1.2, r * 4.2),
-                );
-            }
-        }
-        // Burning fragments thrown a long way, and earth with them.
-        for _ in 0..n(110) {
-            let vel = self.scatter.upward(0.1) * (25.0 + self.scatter.unit() * 70.0) * s.sqrt();
-            let life = 1.0 + self.scatter.unit() * 2.2;
-            let (start, size) = (
-                time + self.scatter.unit() * 0.1,
-                0.5 + self.scatter.unit() * 0.5,
-            );
-            self.push_puff(PUFF_SPARK, core, vel, start, life, (size, 0.1));
-        }
-        for _ in 0..n(40) {
-            let vel = self.scatter.upward(0.3) * (18.0 + self.scatter.unit() * 35.0) * s.sqrt();
-            let life = 1.6 + self.scatter.unit() * 1.4;
-            let size = 0.5 + self.scatter.unit() * 0.6;
-            self.push_puff(PUFF_CLOD, core, vel, time + 0.05, life, (size, 0.3));
-        }
-        // Fire in the crater and smoke over it, for a long while after.
-        for i in 0..30 {
-            let off = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * r * 2.5
-                + Vec3::Z * 1.5;
-            let vel = Vec3::new(
-                self.scatter.signed(),
-                self.scatter.signed(),
-                3.0 + self.scatter.unit() * 2.5,
-            );
-            let start = time + 1.2 + i as f32 * 0.35 + self.scatter.unit() * 0.2;
-            let kind = if i % 2 == 0 { PUFF_FIRE } else { PUFF_SMOKE };
-            let life = 2.5 + self.scatter.unit() * 2.0;
-            self.push_puff(kind, at + off, vel, start, life, (r * 0.8, r * 2.6));
-        }
-    }
-
     /// Crackle at the slug's head so the sheath reads around it, not only behind it.
     fn emit_plasma_head(&mut self, at: Vec3, dir: Vec3, start: f32, plasma: f32) {
         for _ in 0..4 {
@@ -5404,7 +5265,7 @@ impl Renderer {
                     // fireball's puffs keep the commander's proportion to the blast,
                     // not the building's footprint.
                     let blast = db.radius.to_f32();
-                    self.reactor_death(at, blast * 0.046, h, blast, time);
+                    self.reactor_death(*blueprint, at, h, blast, time);
                     return;
                 }
                 self.unit_blast(at, r, h, time);

@@ -155,7 +155,16 @@ pub mod pattern {
     /// over a melt that runs down, hotter with depth below model z = 0 and with the tier
     /// (`gpu_consts::melt`). A Regency mine's bore.
     pub const MOLTEN: u32 = crate::gpu_consts::melt::PATTERN;
-    pub const LAST: u32 = MOLTEN;
+    /// A fusion plant's core (`GLOW` faces): plasma churning over it, the whole of it
+    /// breathing (`gpu_consts::reactor`).
+    pub const CORE: u32 = crate::gpu_consts::reactor::PATTERN_CORE;
+    /// A band of charge (`GLOW` faces): pulses running round the model's z axis, where the
+    /// core stands (`gpu_consts::reactor`).
+    pub const CHARGE: u32 = crate::gpu_consts::reactor::PATTERN_CHARGE;
+    /// A heat sink's hot core (`GLOW_ORANGE` faces): its heat rippling along it in waves
+    /// (`gpu_consts::reactor`).
+    pub const HEAT: u32 = crate::gpu_consts::reactor::PATTERN_HEAT;
+    pub const LAST: u32 = HEAT;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
@@ -251,6 +260,10 @@ pub mod part {
     pub const ORBIT: u32 = crate::gpu_consts::orbit::PART;
     pub const ORBIT_MASK: u32 = crate::gpu_consts::orbit::PART_MASK;
     const _: () = assert!(ORBIT > STORE_LAMP);
+    /// A reactor's collars round its z axis: collar `k` is `REACTOR_COLLAR_FIRST + k`,
+    /// turned about the axis while the plant runs (`gpu_consts::reactor`).
+    pub const REACTOR_COLLAR_FIRST: u32 = crate::gpu_consts::reactor::PART_COLLAR_FIRST;
+    const _: () = assert!(REACTOR_COLLAR_FIRST > ORBIT);
 }
 
 /// How a vertex is rigged beyond its part: which bone of a walking leg it
@@ -577,6 +590,9 @@ pub struct Model {
     /// Plasma lift bells that cast red plasma under the craft (`MeshBuilder::add_lift`,
     /// renderer `lift_fx.rs`).
     pub lifts: Vec<Lift>,
+    /// The core a reactor holds and the electrodes round it that arcs strike from it
+    /// (`MeshBuilder::set_discharge`, renderer `reactor_fx.rs`).
+    pub discharge: Option<Discharge>,
     /// A VTOL's tilting engine pods (`part::VTOL_FRONT`, `VTOL_REAR`).
     pub vtol: Option<Vtol>,
 }
@@ -654,6 +670,18 @@ pub struct Lift {
     pub at: [f32; 3],
     /// The mouth's radius.
     pub radius: f32,
+}
+
+/// A reactor's held charge: arcs crackle from the core's skin to the electrode tips round
+/// it while the plant runs (renderer `reactor_fx.rs`). Model space, at the blueprint's size.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Discharge {
+    /// The core's middle.
+    pub core: [f32; 3],
+    /// The core's radius.
+    pub radius: f32,
+    /// The electrode tips.
+    pub terminals: Vec<[f32; 3]>,
 }
 
 /// A mine that digs with a beam instead of a hammer (the Regency's, `models::regency::taproot`):
