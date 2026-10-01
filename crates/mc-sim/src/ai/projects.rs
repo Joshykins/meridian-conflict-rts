@@ -215,10 +215,18 @@ impl World {
 
     /// One unarmed radar ship of the upper air to go with the army, once the
     /// side has the income to spare (`SPOTTER_INCOME`).
-    pub(super) fn spotter_job(&self, row: usize, start: FxVec2, facing: Angle) -> Option<Job> {
+    pub(super) fn spotter_job(
+        &self,
+        row: usize,
+        factories: usize,
+        start: FxVec2,
+        facing: Angle,
+    ) -> Option<Job> {
         let player = self.state.units.owner[row];
         // Scouting as a plan: the sensor ship comes as soon as there is a little to spare.
-        let income = if self.holds(player, Gambit::Scouting) {
+        // Not before the second factory: built first, it held that factory back
+        // five minutes.
+        let income = if self.holds(player, Gambit::Scouting) && factories >= 2 {
             SPOTTER_INCOME * 3 / 5
         } else {
             SPOTTER_INCOME

@@ -298,8 +298,8 @@ holds three at once, Normal two, Easy one (`Skill::gambits`).
 | `scouting` | always open; more while no enemy factory has been seen | four scouts, not two, and the Vigil once income reaches 15/s, not 25 |
 
 A plan must score at least 40 on what the side has seen to be taken up at all;
-a slot is left empty rather than filled with a weak plan. The lift ship waits for
-the second factory. The first plans are picked four minutes in, once the scouts have looked; before,
+a slot is left empty rather than filled with a weak plan. The lift ship and the
+scouting Vigil wait for the second factory. The first plans are picked four minutes in, once the scouts have looked; before,
 every side picked the same three from an empty map and kept them. Plans are
 reviewed every two minutes. A held plan gets a bonus for its first three reviews
 and loses score for each review after, so a side commits and a long game sees it

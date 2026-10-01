@@ -234,9 +234,9 @@ fn an_unarmed_radar_ship_is_no_project_and_a_side_wants_only_one() {
     w.state.players[0].mass_income = Fx::from_int(30);
     let start = w.state.players[0].start;
     let job = w
-        .spotter_job(mason, start, Angle::ZERO)
+        .spotter_job(mason, 2, start, Angle::ZERO)
         .expect("one radar ship");
     assert_eq!(job.blueprint, vigil);
     spawn(&mut w, "aster_t1_sensor_ship", 600, 600);
-    assert!(w.spotter_job(mason, start, Angle::ZERO).is_none());
+    assert!(w.spotter_job(mason, 2, start, Angle::ZERO).is_none());
 }

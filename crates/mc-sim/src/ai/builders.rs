@@ -692,7 +692,7 @@ impl World {
                 return Some(job);
             }
             if let Some(job) = self
-                .spotter_job(row, start, facing)
+                .spotter_job(row, census.factories.len(), start, facing)
                 .filter(|_| !energy_short)
             {
                 return Some(job);
