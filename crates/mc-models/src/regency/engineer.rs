@@ -526,8 +526,8 @@ mod tests {
     #[test]
     fn fits_the_librarys_checks() {
         super::super::check("regency_engineer", 3.6, 2.8, None, &[]);
-        super::super::check_at("regency_engineer", 2, 4.2, 3.267, None, &[]);
-        super::super::check_at("regency_engineer", 3, 4.8, 3.733, None, &[]);
+        super::super::check_at("regency_engineer", 2, 5.0, 3.889, None, &[]);
+        super::super::check_at("regency_engineer", 3, 6.0, 4.667, None, &[]);
     }
 
     #[test]

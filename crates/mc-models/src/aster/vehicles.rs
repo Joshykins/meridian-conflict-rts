@@ -19,7 +19,8 @@ use crate::{part, rig};
 // level (pitch 0); the sim folds it up at rest, then unfolds and aims the
 // forearm at whatever it builds.
 
-/// Where the build beam leaves, as the tech-1 unit file has it.
+/// Where the build beam leaves, in model space (3.6 m by 3.4 m); each unit file scales it
+/// by its radius and height.
 const ENGINEER_EMITTER: Vec3 = Vec3::new(2.20, 0.0, 1.92);
 const ENGINEER_ELBOW: Vec3 = Vec3::new(0.95, 0.0, 1.92);
 
