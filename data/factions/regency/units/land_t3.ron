@@ -84,13 +84,14 @@
     ),
     // The wake tank: a heavy armoured hover tank on four lift bells, built round one wide
     // projector in a low turret. It gathers plasma across the projector's mouth and pinches
-    // it out as a wake: a tall arched front of red plasma that curls over and rolls out
-    // along the ground at a walking pace for a gun (90 m a second), and strikes everything
-    // it rolls over (`cone`, `mc-sim` `wake.rs`), in a narrow fan 8 degrees either side of
+    // it out as a wake: a shell of red light, a cone from the projector swelling into a tall
+    // dome at its front, that rolls out along the ground at a walking pace for a gun (90 m
+    // a second), and strikes everything it rolls over (`cone`, `mc-sim` `wake.rs`; drawn by
+    // `wake_fx.rs` and wake_shell.wgsl), in a narrow fan 8 degrees either side of
     // the projector's line, full weight close in and two fifths of it at the end of its
     // reach. Once let go it rolls on by itself: what outruns it, or leaves the fan before it
     // arrives, is missed. A crest between the projector and a unit shields it, and the wake
-    // never reaches aircraft or what is under the water. It glasses the ground it rolls over.
+    // never reaches aircraft or what is under the water. It scorches the ground it rolls over.
     //
     // Balance: a line breaker that reaches out. HP and cost about 2.6 Bulwarks (the
     // Arbalest's class); its reach is nearly a Bulwark's (340 m to 360), but the front takes

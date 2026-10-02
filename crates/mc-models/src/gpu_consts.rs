@@ -857,6 +857,22 @@ shared! {
         pub const MAX_PX: f32 = 4.0;
     }
 
+    /// A cone weapon's wake drawn as a shell of light (renderer/wake_shell.rs,
+    /// wake_shell.wgsl): one instance a wake rolling out, a mesh of `ALONG` by `AROUND`
+    /// quads bent into the shell in the vertex shader.
+    pub mod wake_shell as "WAKE_SHELL_" {
+        /// Wakes drawn at once; the oldest goes first past it (`wake_fx::MAX_WAKES`).
+        pub const MAX_SHELLS: u32 = 24;
+        /// Quads from the muzzle out to the front, and from one side over the top to
+        /// the other.
+        pub const ALONG: u32 = 48;
+        pub const AROUND: u32 = 24;
+        /// Of the way out where the cone gives way to the dome closing it, and how far it
+        /// swells past the fan's own width before it closes.
+        pub const CAP: f32 = 0.8;
+        pub const SWELL: f32 = 0.4;
+    }
+
     /// A twin gun on a walker's arm that kicks on its own shots (`mc_sim::mirror::UNIT_TWIN_*`
     /// in `UnitInstance::status[1]`; a test holds them equal): one more than its weapon, read
     /// from the unit's `HousePose`, and whether it sits on the right (-y).

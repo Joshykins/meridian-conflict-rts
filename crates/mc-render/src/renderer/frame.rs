@@ -356,6 +356,7 @@ impl Renderer {
             self.ground_melt.upload();
             self.heat_haze
                 .upload(input.time, input.alpha.clamp(0.0, 1.0), camera);
+            self.upload_wake_shells(input.time);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
         }
         // Recording, submitting and presenting, to the end of the frame.
@@ -1009,6 +1010,11 @@ impl Renderer {
                 0,
                 0,
             );
+            self.timers.end(&device, cmd);
+
+            // Cone weapons' wakes, shells of light added onto the scene (wake_shell.wgsl).
+            self.timers.draws(&device, cmd, "scene.wake_shells");
+            self.wake_shells.draw(&device, cmd, self.layouts.scene);
             self.timers.end(&device, cmd);
 
             // The climate walls' curtain (curtain.wgsl): a quad a segment of wall.

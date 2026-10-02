@@ -1,65 +1,37 @@
 //! A cone weapon's wake as it is drawn (`Weapon::cone`, the Regency Wake's projector;
 //! docs/STYLE.md "The Regency suite"): the plasma the projector gathered across its mouth
-//! (drawn as a Pinched charge, `regency_guns_fx`) is pinched out and rolls out over the
-//! ground ahead as one tall front, as wide as the cone the sim strikes and as long as its
-//! reach, at the pace the sim's front rolls (`Cone::speed`).
+//! (drawn as a Pinched charge, `regency_guns_fx`) is let go as a shell of red light that
+//! opens from the muzzle across the fan and rolls out over the ground, at the pace the
+//! sim's front rolls (`Cone::speed`), to the end of its reach.
 //!
 //! - **The mouth:** a hard red flash where the charge hung, the charge collapsing into it.
-//! - **The front:** a wall of plasma that arches up off the ground and curls over forward,
-//!   like a breaking wave: ribs of hot filament laid across the fan, each rising from the
-//!   ground behind the front, cresting and leaning out over it, lit only as the front
-//!   passes so the curl reads as one wall rolling out. Across the fan it arches too:
-//!   tallest down the middle, low at the flanks. It builds as it leaves the mouth and sags
-//!   a little toward the end of its reach. Sparks are flung forward off its crest.
-//! - **Behind it:** hot red filaments laid radially along the ground, cooling and breaking
-//!   up (sprites.wgsl's plasma trail), clumps of plasma rolled along at its foot.
-//! - **The ground:** glassed where it passed: a few big ragged molten pools down the fan,
-//!   glowing and crusting over (`BoreFx::melt`); the trees bow as it goes by.
-//! - **Its light** runs out with the crest and goes out behind it.
-//! - **Where it runs out** the curl breaks: its crest flung forward in sparks.
+//! - **The shell** (`wake_shell.rs`, wake_shell.wgsl): from the muzzle a cone across the
+//!   fan, swelling and closing in a tall rounded dome at the front, half of it standing
+//!   over the ground. Faint seen square on, bright at its edges, threaded with thin streaks,
+//!   white-hot where it meets the ground; faint back at the muzzle, brightest at the front.
+//! - **Where it meets the ground** the dome's foot kicks up clods, a little low dust and
+//!   sparks as it passes; its light runs with it, and the trees bow as it goes by.
+//! - **Where it runs out** it fades where it stands.
 //!
-//! No mist, no rings, nothing wound round a middle: everything is hard-edged and short-lived.
-//! Laid a tick at a time as the front gets there (`roll_wakes`, from `regency_trails`), so
-//! only the stretch alive now is held. Presentation only; the renderer's own clock.
+//! Its ground effects are laid a tick at a time as the front gets there (`roll_wakes`,
+//! from `regency_trails`); the shell itself is drawn where the front stands each frame
+//! (`upload_wake_shells`). Presentation only; the renderer's own clock.
 
-use super::regency_guns_fx::{BURST, GLOB, GLOW, HOT, MOTE, RED};
-use super::Renderer;
+use super::regency_guns_fx::{BURST, GLOW, HOT, MOTE, RED};
+use super::wake_shell::GpuWakeShell;
+use super::{Renderer, PUFF_CLOD, PUFF_DUST};
+use crate::gpu_consts::wake_shell::{CAP, MAX_SHELLS, SWELL};
 use glam::{Vec2, Vec3};
 use mc_data::BlueprintId;
 
-/// Metres between the rings the wake is laid in.
-const RING: f32 = 4.0;
-/// Metres apart across the fan the ribs of the front are laid, the filaments behind it,
-/// the clumps rolled along its foot and the pools glassed into the ground.
-const RIB_GAP: f32 = 2.0;
-const FILAMENT_GAP: f32 = 8.0;
-const CLUMP_GAP: f32 = 14.0;
-const POOL_GAP: f32 = 45.0;
-/// Most ribs a ring of the front is laid with, and filaments behind it: deliberate
-/// cosmetic caps, so a wide cone costs no more than this many a ring.
-const MAX_RIBS: usize = 40;
-const MAX_ACROSS: usize = 14;
-/// Most glassed pools a ring of them is laid with: a deliberate cosmetic cap.
-const MAX_POOLS: usize = 3;
-/// Wakes rolling at once that are drawn: a deliberate cosmetic cap, the oldest goes first.
-const MAX_WAKES: usize = 24;
-/// How far up from the ground the wake is laid, metres.
-const SKIM: f32 = 0.6;
-/// The crest's height over the ground, metres, for each unit of the weapon's `impact`.
-const CREST: f32 = 11.0;
-/// Metres out from the mouth the front takes to rise to its full height.
-const BUILD: f32 = 30.0;
-/// The curl in profile, through the front: (ahead of it, up), in crest heights. It rises
-/// from the ground behind the front, crests and leans out over it.
-const CURL: [(f32, f32); 5] = [
-    (-0.9, 0.0),
-    (-0.45, 0.45),
-    (0.0, 0.85),
-    (0.35, 1.0),
-    (0.65, 0.8),
-];
+/// Metres between the stretches of the front's foot laid at once.
+const RING: f32 = 6.0;
+/// Seconds the shell takes to fade where it stands once it has run out.
+const FADE: f32 = 0.45;
+/// The shell's height over its half-width.
+const RISE: f32 = 0.85;
 
-/// A wake rolling out, laid ring by ring as its front gets there.
+/// A wake rolling out.
 #[derive(Clone, Copy)]
 pub(super) struct RollingWake {
     blueprint: BlueprintId,
@@ -68,13 +40,23 @@ pub(super) struct RollingWake {
     at: Vec3,
     ahead: Vec2,
     start: f32,
-    /// Rings laid so far.
+    /// Stretches of its foot laid so far.
     laid: usize,
+}
+
+/// What a wake's weapon says of how it is drawn.
+#[derive(Clone, Copy)]
+struct Reach {
+    range: f32,
+    speed: f32,
+    /// The tangent of the fan's half-angle.
+    spread: f32,
+    impact: f32,
 }
 
 impl Renderer {
     /// A cone weapon fired (`ShotFired` of a `cone` weapon): `at` its muzzle as drawn, `dir`
-    /// down the bore. The mouth flashes, and the wake starts rolling (`roll_wakes`).
+    /// down the bore. The mouth flashes, and the wake starts rolling.
     pub(super) fn wake_fired(
         &mut self,
         blueprint: BlueprintId,
@@ -116,8 +98,9 @@ impl Renderer {
             .guns
             .flare(at, RED * 260.0 * flash, s * 14.0, time, 0.3);
 
+        // A deliberate cosmetic cap, as many as the shells drawn: the oldest goes first.
         let wakes = &mut self.plasma_fx.wakes;
-        if wakes.len() >= MAX_WAKES {
+        if wakes.len() >= MAX_SHELLS as usize {
             wakes.remove(0);
         }
         wakes.push(RollingWake {
@@ -130,229 +113,162 @@ impl Renderer {
         });
     }
 
-    /// Every rolling wake laid out as far as its front gets by the next tick; one that
-    /// has run out to its reach breaks and is let go.
+    fn wake_reach(&self, wake: &RollingWake) -> Option<Reach> {
+        let w = &self.blueprints.unit(wake.blueprint).weapons[wake.weapon as usize];
+        let cone = w.cone?;
+        let half = cone.half.0 as f32 / 65536.0 * std::f32::consts::TAU;
+        Some(Reach {
+            range: w.range_max.to_f32().max(1.0),
+            speed: cone.speed.to_f32().max(1.0),
+            spread: half.tan(),
+            impact: w.impact.max(0.3),
+        })
+    }
+
+    /// Every rolling wake's foot laid out as far as its front gets by the next tick; one
+    /// that has run out and faded is let go.
     pub(super) fn roll_wakes(&mut self, time: f32) {
         let until = time + self.tick_seconds.max(0.02);
         let mut i = 0;
         while i < self.plasma_fx.wakes.len() {
             let mut wake = self.plasma_fx.wakes[i];
-            let w = &self.blueprints.unit(wake.blueprint).weapons[wake.weapon as usize];
-            let Some(cone) = w.cone else {
+            let Some(reach) = self.wake_reach(&wake) else {
                 self.plasma_fx.wakes.remove(i);
                 continue;
             };
-            let range = w.range_max.to_f32();
-            let speed = cone.speed.to_f32().max(1.0);
-            let half = cone.half.0 as f32 / 65536.0 * std::f32::consts::TAU;
-            let impact = w.impact.max(0.3);
-            let front = ((until - wake.start) * speed).min(range);
-            while ring_at(wake.laid) <= front {
-                self.lay_ring(&wake, wake.laid, range, speed, half, impact);
-                wake.laid += 1;
-            }
-            if ring_at(wake.laid) > range {
-                self.wake_breaks(&wake, range, speed, half, impact);
+            let end = wake.start + reach.range / reach.speed;
+            if time > end + FADE {
                 self.plasma_fx.wakes.remove(i);
                 continue;
+            }
+            let front = ((until - wake.start) * reach.speed).min(reach.range);
+            while ring_at(wake.laid) <= front {
+                self.lay_foot(&wake, wake.laid, reach);
+                wake.laid += 1;
             }
             self.plasma_fx.wakes[i] = wake;
             i += 1;
         }
     }
 
-    /// Where on the fan a point `r` out at `a` radians off its middle stands, on the ground
-    /// (or the water) under it; close to the mouth it leaves the projector's height.
-    fn wake_ground(&self, wake: &RollingWake, r: f32, a: f32) -> Vec3 {
-        let xy = wake.at.truncate() + turned(wake.ahead, a) * r;
+    /// The shells of the rolling wakes, where their fronts stand at `time`.
+    pub(super) fn upload_wake_shells(&mut self, time: f32) {
         let water = self.map_info.water_level.to_f32();
-        let floor = self.ground_height(xy).max(water) + SKIM;
-        let lift = (1.0 - r / 14.0).clamp(0.0, 1.0);
-        xy.extend(floor + (wake.at.z - floor).max(0.0) * lift * lift)
+        let mut shells = Vec::with_capacity(self.plasma_fx.wakes.len());
+        for wake in &self.plasma_fx.wakes {
+            let Some(reach) = self.wake_reach(wake) else {
+                continue;
+            };
+            let age = time - wake.start;
+            let end = reach.range / reach.speed;
+            let front = (age * reach.speed).clamp(0.0, reach.range);
+            let fade = (age / 0.05).clamp(0.0, 1.0) * (1.0 - ((age - end) / FADE).clamp(0.0, 1.0));
+            let ground = |xy: Vec2| self.ground_height(xy).max(water);
+            let tip = wake.at.truncate() + wake.ahead * front;
+            shells.push(GpuWakeShell {
+                apex: wake.at.to_array(),
+                start: wake.start,
+                ahead: wake.ahead.to_array(),
+                spread: reach.spread,
+                front,
+                base: [ground(wake.at.truncate()), ground(tip)],
+                rise: RISE,
+                fade,
+            });
+        }
+        self.wake_shells.upload(&shells);
     }
 
-    /// The crest's height `r` out, `a` radians off the fan's middle: it builds as it leaves
-    /// the mouth, arches across the fan and sags a little toward the end of its reach.
-    fn crest(r: f32, range: f32, a: f32, half: f32, impact: f32) -> f32 {
-        let build = (r / BUILD).clamp(0.0, 1.0).sqrt();
-        let arch = 0.3 + 0.7 * (a / half.max(1e-3) * std::f32::consts::FRAC_PI_2).cos();
-        CREST * impact * build * arch * (1.0 - 0.3 * r / range)
-    }
-
-    /// Ring `k` of `wake`: its front, the filaments behind it and the ground it passes.
-    fn lay_ring(
-        &mut self,
-        wake: &RollingWake,
-        k: usize,
-        range: f32,
-        speed: f32,
-        half: f32,
-        impact: f32,
-    ) {
+    /// Stretch `k` of `wake`'s foot, as the front reaches it: clods, a little low dust and
+    /// sparks kicked up along the dome's foot, its light, the trees bowing.
+    fn lay_foot(&mut self, wake: &RollingWake, k: usize, reach: Reach) {
         let r = ring_at(k);
-        let out = r / range;
-        let when = wake.start + r / speed;
-        let width = 2.0 * r * half.tan();
+        let when = wake.start + r / reach.speed;
         let water = self.map_info.water_level.to_f32();
-
-        // The front: a curtain of strands across the fan, each a curl rising off the
-        // ground behind it, cresting and leaning out over it, under one hot lip run along
-        // the crest. Each strand its own height and a little ahead of or behind the line,
-        // so they never line up into a lattice. Short-lived, so only the front's own
-        // stretch stands at once.
-        let ribs = ((width / RIB_GAP).ceil() as usize).clamp(4, MAX_RIBS);
-        let mut lip: Option<Vec3> = None;
-        for i in 0..=ribs {
-            let a = -half + 2.0 * half * (i as f32 + 0.45 * self.scatter.signed()) / ribs as f32;
-            let a = a.clamp(-half, half);
-            let crest = Self::crest(r, range, a, half, impact);
-            let h = crest * (0.75 + 0.3 * self.scatter.unit());
-            let shift = self.scatter.signed() * RING * 0.5;
-            let mut curl = [Vec3::ZERO; CURL.len()];
-            for (p, &(fore, up)) in curl.iter_mut().zip(&CURL) {
-                let foot = self.wake_ground(wake, (r + shift + fore * h * 0.6).max(1.0), a);
-                *p = foot + Vec3::Z * up * h;
+        let side = Vec2::new(-wake.ahead.y, wake.ahead.x);
+        // The dome's foot then: round its front from one side to the other.
+        let foot = |me: &mut Renderer| -> (Vec3, Vec2) {
+            let u = 0.55 + 0.45 * me.scatter.unit();
+            let across = r * reach.spread * shell_width(u) * me.scatter.signed().signum();
+            let xy = wake.at.truncate() + wake.ahead * (r * u) + side * across;
+            let out = (wake.ahead * (1.0 - u + 0.15) + side * across.signum() * 0.6)
+                .normalize_or(wake.ahead);
+            (xy.extend(me.ground_height(xy).max(water)), out)
+        };
+        let width = r * reach.spread * (1.0 + SWELL);
+        let kicks = ((width / 6.0).ceil() as usize).clamp(2, 10);
+        for _ in 0..kicks {
+            let (p, out) = foot(self);
+            let wet = p.z <= water + 0.05;
+            let speed = 6.0 + 9.0 * self.scatter.unit();
+            let vel = (out * speed).extend(5.0 + 9.0 * self.scatter.unit()) * reach.impact.sqrt();
+            let life = 0.9 + 0.6 * self.scatter.unit();
+            if !wet {
+                let size = 0.25 + 0.3 * self.scatter.unit();
+                self.push_puff(PUFF_CLOD, p + Vec3::Z * 0.4, vel, when, life, (size, 0.3));
             }
-            for j in 1..CURL.len() {
-                let rise = j as f32 / (CURL.len() - 1) as f32;
-                let life = (0.1 + 0.05 * rise) * (1.0 + 0.4 * self.scatter.unit());
-                let w = (0.45 + 0.25 * self.scatter.unit()) * (1.0 - 0.3 * out) * impact;
-                self.plasma_fx
-                    .guns
-                    .filament(curl[j - 1], curl[j], when, life, w);
-            }
-            // The lip: the crest's own height, not the strand's, so it runs unbroken.
-            let mut top = self.wake_ground(wake, r + CURL[3].0 * crest * 0.6, a);
-            top.z += crest * CURL[3].1;
-            if let Some(prev) = lip {
-                let w = (1.3 + 0.4 * self.scatter.unit()) * (1.0 - 0.3 * out) * impact;
-                self.plasma_fx.guns.filament(prev, top, when, 0.12, w);
-            }
-            lip = Some(top);
-            // Now and then a spark flung forward off the crest.
-            if self.scatter.unit() < 0.08 {
-                let v = (turned(wake.ahead, a) * speed * (0.5 + 0.4 * self.scatter.unit()))
-                    .extend(4.0 + 6.0 * self.scatter.unit());
-                let life = 0.35 + 0.3 * self.scatter.unit();
+            if self.scatter.unit() < 0.5 {
+                let spark = (out * speed * 1.5).extend(4.0 + 8.0 * self.scatter.unit());
+                let life = 0.3 + 0.3 * self.scatter.unit();
                 self.push_lit(
                     MOTE,
-                    top,
-                    v,
+                    p + Vec3::Z * 0.3,
+                    spark,
                     when,
                     life,
-                    (0.35, 0.12),
-                    RED.lerp(HOT, 0.4) * 4.0,
+                    (0.3, 0.1),
+                    RED.lerp(HOT, 0.5) * 4.0,
                     0.0,
                 );
             }
         }
-
-        // Filaments laid radially along the ground behind the front, cooling and breaking up.
-        let across = ((width / FILAMENT_GAP).ceil() as usize).clamp(2, MAX_ACROSS);
-        for i in 0..across {
-            let a = -half + 2.0 * half * (i as f32 + self.scatter.unit()) / across as f32;
-            // Started anywhere in the ring and torn to its own length and slant, so the
-            // rings never line up into a lattice.
-            let r0 = r - RING * (0.5 + self.scatter.unit());
-            let len = RING * (0.8 + 1.4 * self.scatter.unit());
-            let from = self.wake_ground(wake, r0.max(1.0), a);
-            let bend = self.scatter.signed() * 0.05;
-            let to = self.wake_ground(wake, (r0 + len).min(range), a + bend);
-            let life = (0.35 + 0.35 * self.scatter.unit()) * (1.0 - 0.35 * out);
-            let w = (0.3 + 0.35 * self.scatter.unit()) * (1.2 - 0.5 * out) * impact;
-            self.plasma_fx.guns.filament(from, to, when, life, w);
-        }
-
-        // Clumps rolled along the front's foot, cooling as they go.
-        if k.is_multiple_of(3) {
-            let clumps = ((width / CLUMP_GAP).ceil() as usize).clamp(1, 8);
-            for i in 0..clumps {
-                let a = -half + 2.0 * half * (i as f32 + self.scatter.unit()) / clumps as f32;
-                let p = self.wake_ground(wake, r, a);
-                let v =
-                    (turned(wake.ahead, a) * speed * 0.6).extend(1.0 + 2.0 * self.scatter.unit());
-                let blob = (0.7 + 0.5 * self.scatter.unit()) * impact;
-                let tint = RED.lerp(HOT, self.scatter.unit() * 0.2) * 1.8;
-                self.push_lit(GLOB, p, v, when, 0.45, (blob, blob * 0.35), tint, 0.0);
+        // A little low dust thrown off its foot, every other stretch.
+        if k % 2 == 1 {
+            let (p, out) = foot(self);
+            if p.z > water + 0.05 {
+                let vel = (out * 4.0).extend(1.5);
+                let size = 2.0 + 1.5 * self.scatter.unit();
+                self.push_puff(
+                    PUFF_DUST,
+                    p + Vec3::Z * 0.8,
+                    vel,
+                    when,
+                    1.4,
+                    (size, size * 2.2),
+                );
             }
         }
-
-        // Its light runs with the crest; the trees bow as it goes by.
-        if k % 3 == 1 {
-            let h = Self::crest(r, range, 0.0, half, impact);
-            let mid = self.wake_ground(wake, r, 0.0) + Vec3::Z * h * 0.7;
+        // Its light runs with the front; the trees bow as it goes by.
+        let mid = wake.at.truncate() + wake.ahead * r;
+        let mid = mid.extend(self.ground_height(mid).max(water));
+        if k.is_multiple_of(2) {
             self.plasma_fx.guns.flare(
-                mid,
-                RED * 120.0 * impact,
-                width * 0.6 + h * 2.0 + 8.0,
+                mid + Vec3::Z * width * RISE * 0.5,
+                RED * 140.0 * reach.impact,
+                width * 1.4 + 10.0,
                 when,
-                0.2,
+                0.25,
             );
         }
-        if k % 6 == 2 {
-            let mid = self.wake_ground(wake, r, 0.0);
-            self.tree_blasts
-                .record(mid, when, width * 0.5 + 12.0, 0.8, true);
-        }
-
-        // The ground glassed where it passed: a few big pools, each a cluster of
-        // overlapping ones of different sizes so its edge is ragged, not a ring.
-        if k % 8 == 3 {
-            let pools = ((width / POOL_GAP).ceil() as usize).clamp(1, MAX_POOLS);
-            for i in 0..pools {
-                let a = -half + 2.0 * half * (i as f32 + self.scatter.unit()) / pools as f32;
-                let shift = self.scatter.signed() * RING * 1.5;
-                let p = self.wake_ground(wake, r + shift, a);
-                if p.z - SKIM <= water + 0.1 {
-                    continue;
-                }
-                let size = (4.0 + 4.0 * self.scatter.unit()) * (1.1 - 0.3 * out);
-                for _ in 0..3 {
-                    let lobe = Vec2::new(self.scatter.signed(), self.scatter.signed()) * size * 0.6;
-                    let radius = size * (0.45 + 0.4 * self.scatter.unit());
-                    self.ground_melt
-                        .melt(p.truncate() + lobe, radius, when, 8.0);
-                }
-            }
-        }
-    }
-
-    /// Where it runs out: the curl breaks, its crest flung forward in sparks.
-    fn wake_breaks(&mut self, wake: &RollingWake, range: f32, speed: f32, half: f32, impact: f32) {
-        let end = wake.start + range / speed;
-        for _ in 0..18 {
-            let a = self.scatter.signed() * half;
-            let h = Self::crest(range, range, a, half, impact);
-            let p =
-                self.wake_ground(wake, range, a) + Vec3::Z * h * (0.4 + 0.6 * self.scatter.unit());
-            let fling = (turned(wake.ahead, a) * (0.6 + 0.4 * self.scatter.unit()))
-                .extend(0.2 + 0.6 * self.scatter.unit())
-                .normalize_or(Vec3::Z);
-            let (pace, life) = (
-                14.0 + 16.0 * self.scatter.unit(),
-                0.4 + 0.4 * self.scatter.unit(),
-            );
-            self.push_lit(
-                MOTE,
-                p,
-                fling * pace,
-                end,
-                life,
-                (0.4, 0.14),
-                RED.lerp(HOT, 0.3) * 4.0,
-                0.0,
-            );
+        if k % 4 == 1 {
+            self.tree_blasts.record(mid, when, width + 12.0, 0.8, true);
         }
     }
 }
 
-/// How far out ring `k` of a wake is laid, metres.
+/// How far out stretch `k` of a wake's foot is laid, metres.
 fn ring_at(k: usize) -> f32 {
-    2.0 + k as f32 * RING
+    4.0 + k as f32 * RING
 }
 
-/// `v` turned `a` radians about the upright.
-fn turned(v: Vec2, a: f32) -> Vec2 {
-    let (sin, cos) = a.sin_cos();
-    Vec2::new(v.x * cos - v.y * sin, v.x * sin + v.y * cos)
+/// The shell's half-width `u` of the way out, in fan half-widths at the front
+/// (wake_shell.wgsl `shell_width`).
+fn shell_width(u: f32) -> f32 {
+    let close = if u > CAP {
+        (1.0 - ((u - CAP) / (1.0 - CAP)).powi(2)).max(0.0).sqrt()
+    } else {
+        1.0
+    };
+    let swell = ((u - 0.45) / 0.4).clamp(0.0, 1.0);
+    u * (1.0 + SWELL * swell * swell * (3.0 - 2.0 * swell)) * close
 }

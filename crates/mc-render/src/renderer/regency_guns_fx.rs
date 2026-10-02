@@ -179,8 +179,6 @@ struct Trail {
     life: f32,
     width: f32,
     fusion: bool,
-    /// A cone weapon's wake's (`filament`): kept pink-hot.
-    wake: bool,
 }
 
 #[derive(Default)]
@@ -202,20 +200,6 @@ impl RegencyGunFx {
         self.glows.push(glow);
     }
 
-    /// A red filament of a cone weapon's wake (`wake_fx`) from `from` to `to`, lit at
-    /// `start` and cooling and breaking up over `life` seconds; never past pink-hot.
-    pub(super) fn filament(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
-        self.trail(Trail {
-            from,
-            to,
-            start,
-            life,
-            width,
-            fusion: false,
-            wake: true,
-        });
-    }
-
     /// A white-hot streak from `from` to `to`, the Sunspear round's trail (it takes the
     /// prism's pinks, cools to red and breaks up over `life` seconds): behind a Regency
     /// strategic missile (`nuke_fx::nova`).
@@ -227,7 +211,6 @@ impl RegencyGunFx {
             life,
             width,
             fusion: true,
-            wake: false,
         });
     }
 
@@ -246,9 +229,7 @@ impl RegencyGunFx {
 
 /// What a trail piece is drawn as (sprites.wgsl, `aim.w`).
 fn trail_kind(t: &Trail) -> f32 {
-    if t.wake {
-        fade_beam::PLASMA_TRAIL_PINK
-    } else if t.fusion {
+    if t.fusion {
         fade_beam::PLASMA_TRAIL_FUSION
     } else {
         0.0
@@ -442,7 +423,6 @@ impl Renderer {
                     life,
                     width: p.size * if fusion { 0.32 } else { 0.22 },
                     fusion,
-                    wake: false,
                 });
                 fx.trail(Trail {
                     from: a,
@@ -451,7 +431,6 @@ impl Renderer {
                     life: life * 0.35,
                     width: p.size * if fusion { 0.9 } else { 0.5 },
                     fusion,
-                    wake: false,
                 });
                 // A fusion round sheds sparks that fall away from its trail. A deliberate
                 // cosmetic cap on them a tick.

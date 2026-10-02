@@ -92,6 +92,7 @@ mod survival_fx;
 mod trail_fx;
 mod tree_wind;
 mod wake_fx;
+pub(crate) mod wake_shell;
 mod warp_fx;
 mod water_fx;
 mod work_beams;
@@ -908,6 +909,8 @@ pub struct Renderer {
     sky: crate::sky::Sky,
     /// The nuclear blasts' half-size march and its composite (nuke_volume.rs).
     nuke_volume: nuke_volume::NukeVolume,
+    /// Cone weapons' wakes as shells of light (wake_shell.rs, wake_fx.rs).
+    wake_shells: wake_shell::WakeShells,
     pad_footprints: Image,
     hull_plans: Image,
     font: Image,
@@ -1892,6 +1895,7 @@ impl Renderer {
         )?;
 
         let nuke_volume = nuke_volume::NukeVolume::new(&gpu, &layouts, &passes, sky.noise_view())?;
+        let wake_shells = wake_shell::WakeShells::new(&gpu, &layouts, &passes)?;
         let post = post::Post::new(&gpu, passes.present, layouts.screen)?;
         let shafts = shafts::Shafts::new(&gpu, &layouts, &passes)?;
 
@@ -2434,6 +2438,7 @@ impl Renderer {
             ground_cover,
             sky,
             nuke_volume,
+            wake_shells,
             pad_footprints,
             hull_plans,
             font,
@@ -5518,6 +5523,7 @@ impl Drop for Renderer {
         }
         self.sky.destroy(&self.gpu);
         self.nuke_volume.destroy(&self.gpu);
+        self.wake_shells.destroy(&self.gpu);
         self.post.destroy(&self.gpu);
         self.gtao.destroy(&self.gpu);
         self.fog.destroy(&self.gpu);
