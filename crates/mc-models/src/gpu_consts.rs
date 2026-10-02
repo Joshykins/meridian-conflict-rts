@@ -557,11 +557,15 @@ shared! {
     /// `ProjectileInstance::_pad[0]`; sprites.wgsl `plasma_look`). The older looks (1 to 4)
     /// are still spelled out in the shader; new ones are declared here.
     pub mod plasma_look as "PLASMA_LOOK_" {
-        /// A Gravitic Seeker (renderer/gravitic_fx.rs): a hard-edged plasma charge, a
-        /// pink-white heart in a red body, held in a faint shimmering gravity lens; no
-        /// motor, plume or body. `mc_sim::mirror::PLASMA_LOOK_GRAVITIC_SEEKER`; a test
-        /// holds them equal.
+        /// A Regency seeker, any plasma `missile` (renderer/gravitic_fx.rs): a hard-edged
+        /// plasma charge, a lavender-white heart in a violet body, held in a faint shimmering
+        /// gravity lens, a black smoke tube behind it. Violet and black read as a missile
+        /// defence can take it. No motor, plume or body.
+        /// `mc_sim::mirror::PLASMA_LOOK_GRAVITIC_SEEKER`; a test holds them equal.
         pub const GRAVITIC_SEEKER: u32 = 5;
+        /// A counter-seeker (renderer/gravitic_fx.rs), the Regency's missile defence: the
+        /// seeker's charge in red, never the seeker's violet. Only the renderer writes it.
+        pub const COUNTER_SEEKER: u32 = 6;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

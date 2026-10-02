@@ -3691,10 +3691,13 @@ impl Renderer {
             return;
         }
         // A blast or flak puff's x is its heat (blast_fx.rs, flak_fx.rs); a blast's y above
-        // a half burns red (laser_fx.rs).
+        // a half burns red (laser_fx.rs). A smoke tube's x, when given, is its strength,
+        // below zero for black smoke (gravitic_fx.rs `seeker_smoke`).
         let appearance =
             if kind == PUFF_ION || kind == blast_fx::PUFF_BLAST || kind == flak_fx::PUFF_FLAK {
                 [motion.x, motion.y, motion.z, 1.0]
+            } else if kind == nuke_fx::PUFF_STRATEGIC_TRAIL && motion.x != 0.0 {
+                [-1.0, -1.0, -1.0, motion.x]
             } else if dusty {
                 let rgb = self.effect_settings.dust_color.unwrap_or([-1.0; 3]);
                 [rgb[0], rgb[1], rgb[2], self.effect_settings.dust_brightness]

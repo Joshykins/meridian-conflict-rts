@@ -366,12 +366,15 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   - **Guided: the Gravitic Seeker.** The Regency's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
     exhaust plume. Drawn as its charge, not a rocket (renderer/gravitic_fx.rs,
-    sprites.wgsl `gravitic_seeker`; any missile with `plasma_grade: Gravitic`):
-    no body, motor flame or smoke. It leaves its cell with a hard red flash
-    and filaments snapping in on it; in flight it is a hard-edged pink-white
-    heart in a red body, drawn out a little behind, held in a faint gravity
-    lens that shimmers at its edge, and it leaves a thin hot filament that
-    cools to red and breaks up. Where it strikes the lens snaps in and lets
+    sprites.wgsl `gravitic_seeker`; any missile with a `plasma_grade`): no
+    body or motor flame. It leaves its cell with a hard red flash and
+    filaments snapping in on it; in flight it is a hard-edged lavender-white
+    heart in a violet body, drawn out a little behind, held in a faint gravity
+    lens that shimmers at its edge, and it leaves a black smoke tube that
+    glows violet just behind the charge, spreads and goes grey as it hangs.
+    Violet and black smoke are the sign of a Regency missile a defence can
+    take, set apart from ARC's white smoke; only the missiles are violet, so
+    the counter-seekers that hunt them stay red. Where it strikes the lens snaps in and lets
     go: a hard red burst over a white heart, filaments torn out, globs and
     sparks thrown out low, the ground glassed under it; sized by its damage
     and `impact`, so a heavy seeker's is many times a battery seeker's, and

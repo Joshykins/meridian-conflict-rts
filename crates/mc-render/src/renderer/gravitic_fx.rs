@@ -6,14 +6,16 @@
 //! - **The seeker** (the Pavise's battery and heavy seeker): a heavy one gathers its charge
 //!   over its cell first (`SimEvent::WeaponCharging`), a ball of red plasma swelling, motes
 //!   drawn in to it. Each leaves its cell with a hard red flash and a snap of filaments, no
-//!   motor flame and no smoke. In flight it is its charge (sprites.wgsl `gravitic_seeker`,
-//!   `PLASMA_LOOK_GRAVITIC_SEEKER`): a pink-white heart in a red body in a faint shimmering
-//!   lens, and behind it a thin hot filament that cools to red and breaks up
-//!   (`FADE_BEAM_PLASMA_TRAIL`). Where it strikes the lens lets go: it snaps in, then a hard
+//!   motor flame. In flight every Regency missile is its charge (sprites.wgsl
+//!   `gravitic_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`, any plasma `missile`): a
+//!   lavender-white heart in a violet body in a faint shimmering lens, and behind it a black
+//!   smoke tube (`seeker_smoke`). Violet and black are how a Regency missile reads as one a
+//!   missile defence can take, apart from ARC's white smoke. Where it strikes the lens lets
+//!   go: it snaps in, then a hard
 //!   red burst over a white heart, filaments torn out, globs and spatter thrown out low, the
 //!   ground glassed under it; a heavy one's many times bigger, by its damage and `impact`.
 //! - **The counter-seeker** (missile defence, `SimEvent::MissileLased` from a faction that
-//!   throws them): a small red charge off the mount that runs the missile down along a
+//!   throws them): a small red charge (`PLASMA_LOOK_COUNTER_SEEKER`) off the mount that runs the missile down along a
 //!   cooling filament and bursts on it, hard and short, the tick the sim kills it. A burn the
 //!   sim lets go of without a kill fizzles where the counter-seeker had got to. Only the
 //!   look: what dies, and when, is the sim's.
@@ -21,6 +23,7 @@
 //! Nothing is wound round a middle (no spiral arms, no rings), and nothing hangs as a mist.
 //! Presentation only; the renderer's own clock.
 
+use super::nuke_fx::PUFF_STRATEGIC_TRAIL;
 use super::regency_guns_fx::drawn_look;
 use super::Renderer;
 use crate::gpu_consts::{fade_beam, plasma_look, puff};
@@ -44,8 +47,10 @@ const MOTE: f32 = puff::WARP_MOTE as f32;
 const RED: Vec3 = Vec3::new(1.0, 0.07, 0.04);
 const HOT: Vec3 = Vec3::new(1.0, 0.55, 0.5);
 const WHITE: Vec3 = Vec3::new(1.0, 0.96, 1.0);
-/// Metres a piece of a seeker's filament runs.
+/// Metres a piece of a counter-seeker's filament runs.
 const TRAIL_STEP: f32 = 12.0;
+/// Metres of a seeker's path between two puffs of its smoke tube.
+const SMOKE_STEP: f32 = 9.0;
 /// Trail pieces held at most. A deliberate cosmetic cap: the oldest goes first.
 const MAX_TRAILS: usize = 1600;
 /// Timed lights held at most. A deliberate cosmetic cap: the oldest goes first.
@@ -534,7 +539,7 @@ impl Renderer {
         }
     }
 
-    /// The filament each seeker in flight lays down the stretch it flies this tick, each
+    /// The black smoke each seeker in flight lays down the stretch it flies this tick, each
     /// piece lit as the charge passes it.
     fn seeker_trails(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         for p in projectiles {
@@ -547,8 +552,40 @@ impl Renderer {
             let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
             let to = Vec3::from(p.pos);
             let from = Vec3::from(p.prev_pos).lerp(to, (starts / span).min(1.0));
-            let life = (0.45 + p.size * 0.12).min(1.2);
-            self.lay_filament(from, to, time, starts, span, p.size, life);
+            self.seeker_smoke(from, to, time, starts, span, p.size);
+        }
+    }
+
+    /// A seeker's smoke down `from` to `to`, flown from `starts` to `span` of the tick: the
+    /// missile's smoke tube (puffs.wgsl `strategic_trail`) in black, a little violet glow
+    /// where the charge has just passed, spreading and going grey as it hangs. Puffs a step
+    /// apart, each a tent a step either side, add up to an unbroken column.
+    fn seeker_smoke(&mut self, from: Vec3, to: Vec3, time: f32, starts: f32, span: f32, size: f32) {
+        let tick = self.tick_seconds.max(0.02);
+        let dir = (to - from).normalize_or_zero();
+        let width = (0.8 + size * 0.35).min(2.6);
+        let life = (2.2 + size * 0.6).min(5.0);
+        // The tube's radius is 0.28 of a puff's size; a negative end size cools the glow
+        // fast, over a few tens of metres.
+        let tube = (width * 1.8, -width * 4.5 * 1.8);
+        // A deliberate cosmetic cap on one stretch: a tick's flight is far under this many.
+        let n = (from.distance(to) / SMOKE_STEP).ceil().clamp(1.0, 8.0) as u32;
+        let step = from.distance(to) / n as f32;
+        let behind = dir * size * 0.5;
+        for k in 0..n {
+            let at = from.lerp(to, k as f32 / n as f32) - behind;
+            let f1 = (k + 1) as f32 / n as f32;
+            let start = time + tick * (starts + (span - starts).max(0.0) * f1);
+            // Strength one, below zero for black smoke (`push_puff_with_motion`).
+            self.push_puff_with_motion(
+                PUFF_STRATEGIC_TRAIL,
+                at,
+                dir * step,
+                start,
+                life,
+                tube,
+                Vec3::new(-1.0, 0.0, 0.0),
+            );
         }
     }
 
@@ -619,7 +656,7 @@ impl Renderer {
             }
             !c.killed
         });
-        let hot = 1.0 + 1.0 + 2.0 * plasma_look::GRAVITIC_SEEKER as f32;
+        let hot = 1.0 + 1.0 + 2.0 * plasma_look::COUNTER_SEEKER as f32;
         let out: Vec<ProjectileInstance> = shots
             .into_iter()
             .map(|(from, to, ends, fresh)| ProjectileInstance {
@@ -739,7 +776,7 @@ impl Renderer {
                 wake: t.start,
                 plasma: t.life,
                 _pad: [0.0; 2],
-                // A seeker's filament: pink-hot to red, never white (sprites.wgsl).
+                // A counter-seeker's filament: pink-hot to red, never white (sprites.wgsl).
                 aim: [0.0, 0.0, 0.0, fade_beam::PLASMA_TRAIL_PINK],
                 prev_aim: [0.0; 4],
             })

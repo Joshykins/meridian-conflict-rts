@@ -936,7 +936,8 @@ pub struct PlannedBuild {
 /// Set in `ProjectileInstance::color` for a missile. Not for a Gravitic Seeker, which has
 /// no motor or body to draw: it is its plasma charge (`plasma_look`).
 pub const PROJECTILE_MISSILE: u32 = 1 << 8;
-/// `plasma_look` of a Gravitic Seeker. `mc_models::gpu_consts::plasma_look::GRAVITIC_SEEKER`
+/// `plasma_look` of a Regency seeker: a Gravitic Seeker, or any other plasma `missile`.
+/// `mc_models::gpu_consts::plasma_look::GRAVITIC_SEEKER`
 /// is the shader's copy; a test holds them equal.
 pub const PLASMA_LOOK_GRAVITIC_SEEKER: u32 = 5;
 /// Set in `ProjectileInstance::color` for a torpedo running under the water: no
@@ -1114,16 +1115,16 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 
 /// How a Regency plasma shot is drawn in flight (sprites.wgsl, `ProjectileInstance::_pad[0]`
 /// above 2): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug strobing with fusion
-/// bursts, 3 a gravitic charge carried onto its mark, thrown curving (`Weapon::curve`) or
-/// steered (a plasmeric seeker, a plasma `missile` of another grade than Gravitic), 4 a
-/// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws), 5 a Gravitic
-/// Seeker (`Weapon::gravitic_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`): its contained charge
-/// in its lens. Zero for anything else.
+/// bursts, 3 a gravitic charge thrown curving onto its mark (`Weapon::curve`), 4 a
+/// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws), 5 a seeker, any
+/// plasma `missile` (`plasma_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`): its contained charge
+/// in its lens, violet, so every Regency missile reads as one a missile defence can take.
+/// Zero for anything else.
 pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
     use mc_data::PlasmaGrade;
     match weapon.plasma_shot() {
-        _ if weapon.gravitic_seeker() => PLASMA_LOOK_GRAVITIC_SEEKER,
-        Some(_) if weapon.missile || weapon.curve.0 > 0 => 3,
+        _ if plasma_seeker(weapon) => PLASMA_LOOK_GRAVITIC_SEEKER,
+        Some(_) if weapon.curve.0 > 0 => 3,
         Some(PlasmaGrade::Pinched) => 1,
         Some(PlasmaGrade::PinchFusion) => 2,
         Some(PlasmaGrade::Plasmeric) => 4,

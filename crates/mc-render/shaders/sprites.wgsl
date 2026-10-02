@@ -262,9 +262,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // A Regency plasma shot (`mirror::plasma_look`, twice over in extras.z): 1 a
     // Pinched-plasmeric stream slug, 2 a Pinch-fusion slug, 3 a thrown gravitic charge,
     // each a longer streak than a shell's trace; 4 a Plasmeric bolt, a short fat teardrop;
-    // a Gravitic Seeker, its charge in its lens, little longer than it is wide.
+    // a seeker (or a counter-seeker), its charge in its lens, little longer than it is wide.
     let look = plasma_look(p);
-    let seeker = look == PLASMA_LOOK_GRAVITIC_SEEKER;
+    let seeker = look == PLASMA_LOOK_GRAVITIC_SEEKER || look == PLASMA_LOOK_COUNTER_SEEKER;
     if look == 1u {
         trace = length(stride) * 0.5;
     } else if look == 2u {
@@ -427,7 +427,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
-            // 7.6, 8.6, 9.6, 10.6, 11.6: the Regency plasma shots (`fs_sprite`).
+            // 7.6, 8.6, 9.6, 10.6, 11.6, 12.6: the Regency plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
         }
@@ -680,8 +680,8 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         out.color = mix(vec3<f32>(1.0, 0.38, 0.1), vec3<f32>(1.0, 0.06, 0.03), clamp(p.extras.z - 1.0, 0.0, 1.0));
     }
     let look = plasma_look(p);
-    if look == PLASMA_LOOK_GRAVITIC_SEEKER {
-        // A Gravitic Seeker's heart is its streak's (`gravitic_seeker`): no bead over it.
+    if look == PLASMA_LOOK_GRAVITIC_SEEKER || look == PLASMA_LOOK_COUNTER_SEEKER {
+        // A seeker's heart is its streak's (`gravitic_seeker`): no bead over it.
         out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
     }
     if look == 1u || look == 2u {
@@ -694,7 +694,10 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         // A Plasmeric bolt's heart: pink-white.
         out.color = vec3<f32>(1.2, 0.55, 0.55);
     } else if look == PLASMA_LOOK_GRAVITIC_SEEKER {
-        // A Gravitic Seeker: red, its pink heart is the streak's (`gravitic_seeker`).
+        // A seeker: violet, its heart is the streak's (`gravitic_seeker`).
+        out.color = vec3<f32>(0.62, 0.12, 1.1);
+    } else if look == PLASMA_LOOK_COUNTER_SEEKER {
+        // A counter-seeker: red.
         out.color = vec3<f32>(1.1, 0.1, 0.07);
     }
     if (p.color & 0x100u) != 0u {
@@ -859,12 +862,13 @@ fn vs_effect(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: 
     return out;
 }
 
-// A Gravitic Seeker in flight (`PLASMA_LOOK_GRAVITIC_SEEKER`), on its streak's quad: `u` 0 at
-// the tail to 1 at the head, `y` across (-1 to 1), `aspect` the quad's length over its width.
-// A hard-edged plasma charge: a pink-white heart in a red body drawn out a little behind,
-// held in a faint gravity lens that shimmers at its edge. No motor, no plume; nothing wound
-// round it.
-fn gravitic_seeker(u: f32, y: f32, aspect: f32, time: f32) -> vec3<f32> {
+// A seeker in flight (`PLASMA_LOOK_GRAVITIC_SEEKER`), on its streak's quad: `u` 0 at the tail
+// to 1 at the head, `y` across (-1 to 1), `aspect` the quad's length over its width.
+// A hard-edged plasma charge: a lavender-white heart in a violet body drawn out a little
+// behind, held in a faint gravity lens that shimmers at its edge; violet so it reads as a
+// missile a defence can take. A counter-seeker (`PLASMA_LOOK_COUNTER_SEEKER`, `counter`) is
+// the same charge in red with a pink heart. No motor, no plume; nothing wound round it.
+fn gravitic_seeker(u: f32, y: f32, aspect: f32, time: f32, counter: bool) -> vec3<f32> {
     // Half-widths along the quad from its tail, and the charge's middle one in from the head.
     let s = u * 2.0 * max(aspect, 1.0);
     let middle = 2.0 * max(aspect, 1.0) - 1.0;
@@ -884,12 +888,13 @@ fn gravitic_seeker(u: f32, y: f32, aspect: f32, time: f32) -> vec3<f32> {
     let ripple = value_noise2(around * 2.2 + vec2<f32>(time * 6.0, time * 3.1), 1.0);
     let skin = smoothstep(0.5, 0.82, d) * (1.0 - smoothstep(0.82, 0.98, d));
     let lens = skin * (0.15 + 0.45 * smoothstep(0.3, 0.9, ripple));
-    let red = vec3<f32>(1.0, 0.06, 0.04);
-    let pink = vec3<f32>(1.0, 0.62, 0.66);
+    let tint = select(vec3<f32>(0.55, 0.06, 1.0), vec3<f32>(1.0, 0.06, 0.04), counter);
+    let heart_tint = select(vec3<f32>(0.82, 0.66, 1.0), vec3<f32>(1.0, 0.62, 0.66), counter);
+    let lens_tint = select(vec3<f32>(0.6, 0.25, 1.0), vec3<f32>(1.0, 0.2, 0.25), counter);
     let glow = mix(0.7, 1.0, 1.0 - clamp(body_d, 0.0, 1.0));
-    return red * body * 3.2 * glow * (1.0 - heart)
-        + pink * heart * 6.0
-        + vec3<f32>(1.0, 0.2, 0.25) * lens * 1.2 * (1.0 - body);
+    return tint * body * 3.2 * glow * (1.0 - heart)
+        + heart_tint * heart * 6.0
+        + lens_tint * lens * 1.2 * (1.0 - body);
 }
 
 fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
@@ -921,7 +926,8 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
             if in.shape.y > 11.1 {
-                return vec4<f32>(gravitic_seeker(u, in.uv.y, in.color.g / max(in.color.r, 0.0001), time) * in.color.r, 1.0);
+                let counter = in.shape.y > 12.1;
+                return vec4<f32>(gravitic_seeker(u, in.uv.y, in.color.g / max(in.color.r, 0.0001), time, counter) * in.color.r, 1.0);
             }
             if in.shape.y > 10.1 {
                 // A Plasmeric bolt: a fat teardrop of plasma, a round head and a short tail

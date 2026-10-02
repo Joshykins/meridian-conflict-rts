@@ -737,8 +737,12 @@ fn tube_ray(world: vec3<f32>, pos: vec3<f32>, tangent: vec3<f32>) -> TubeRay {
     return TubeRay(s0, w0 + ray * t - tangent * s0, b, sqrt(max(sin2, 1e-4)));
 }
 
+// `appearance.w` is the tube's strength; below zero, black smoke (a Regency seeker's,
+// renderer/gravitic_fx.rs `seeker_smoke`) with a violet glow where the charge has just passed.
 fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let age = in.state.x;
+    let soot = in.appearance.w < 0.0;
+    let strength = abs(in.appearance.w);
     let pos = in.roll;
     let half = max(length(in.appearance.xyz), 0.5);
     let tangent = in.appearance.xyz / half;
@@ -758,7 +762,7 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let r = in.cloud_size * (1.0 + (n - 0.5) * 0.7 * ragged + (n2 - 0.5) * 0.25 * ragged);
     // Dense and white where the motor has just passed, going grey and thin as it spreads.
     let fade = smoothstep(0.0, 0.01, age) * pow(max(1.0 - age, 0.0), 1.2);
-    let column = mix(0.55, 0.12, ragged) * in.appearance.w * fade * (1.0 + (n2 - 0.5) * 0.6 * ragged);
+    let column = mix(select(0.55, 0.85, soot), select(0.12, 0.25, soot), ragged) * strength * fade * (1.0 + (n2 - 0.5) * 0.6 * ragged);
     // Optical depth straight through the middle, side on.
     let through = -log(1.0 - clamp(column, 0.0, 0.95));
     // The ray's Gaussian window along the axis, and the tent seen through it.
@@ -770,13 +774,17 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     }
     // Lit on the sun's side of the tube.
     let lit = 0.82 + 0.3 * clamp(dot(off / max(r, 0.01), globals.sun.xyz), -1.0, 1.0);
-    var color = mix(vec3<f32>(0.86, 0.86, 0.85), vec3<f32>(0.6, 0.61, 0.63), smoothstep(0.0, 0.7, age))
+    // Soot is near black fresh, going a dark grey as it thins.
+    let white = mix(vec3<f32>(0.86, 0.86, 0.85), vec3<f32>(0.6, 0.61, 0.63), smoothstep(0.0, 0.7, age));
+    let black = mix(vec3<f32>(0.004, 0.0035, 0.005), vec3<f32>(0.03, 0.029, 0.032), smoothstep(0.0, 0.8, age));
+    var color = select(white, black, soot)
         * (atmos.sun_color.rgb * 0.8 + atmos.sky_color.rgb * 0.9) * lit;
     let lamp = in.lamp / (1.0 + in.lamp * 0.08);
     color += color * lamp * 0.1;
-    color *= in.appearance.w;
-    // The newest stretch still glows from the exhaust.
-    color += vec3<f32>(1.0, 0.55, 0.2) * exp(-in.state.z) * 5.0;
+    color *= strength;
+    // The newest stretch still glows from the exhaust, or a seeker's violet charge.
+    color += select(vec3<f32>(1.0, 0.55, 0.2) * 5.0, vec3<f32>(0.5, 0.12, 1.0) * 0.8, soot)
+        * exp(-in.state.z * select(1.0, 3.0, soot));
     color = apply_haze(apply_fog_of_war(color, axis_p.xy), axis_p, eye);
     return vec4<f32>(color * alpha, alpha);
 }
