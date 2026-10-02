@@ -4655,12 +4655,12 @@ impl Game {
 
         // The in-match menu, over everything; the settings screen over that.
         let mut event = None;
-        // A match that is already over for this machine (out of step, link lost) is left, not given up.
+        // A match that is already over for this machine (decided, out of step, link lost) is
+        // left, not given up.
         let surrender = link
             .as_ref()
             .is_some_and(|l| l.desync.is_none() && l.rejoining.is_none())
-            && !self.view.observing
-            && !self.defeated();
+            && !self.report_open_to_all();
         if let Some(e) = self.menu_frame(
             &mut ui,
             settings,
