@@ -137,7 +137,7 @@ pub struct Rest {
 fn shown(v: &MeshVertex) -> bool {
     v.rig & rig::UPGRADE == 0
         && v.rig & rig::MODULE_MASK == 0
-        && v.part != part::AFLOAT
+        && !part::afloat_only(v.part)
         && wall::shown(v.part, wall::PORTRAIT)
 }
 

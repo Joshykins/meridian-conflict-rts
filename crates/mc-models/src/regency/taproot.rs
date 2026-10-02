@@ -25,8 +25,9 @@
 //!   Tech 3: four emitter posts on the lot's axes, a third ring, an armoured stage on the
 //!   hub. Tech 4 (the deep core): plates lapped down over the crown, capacitor drums at
 //!   every foot, a wider lens; its bore goes deepest and the beam surges.
-//! - On open water the whole rig rides `LIFT` higher on four piles, a coaming round the
-//!   beam down into the water (`part::AFLOAT`), no bore.
+//! - On open water the whole rig rides `LIFT` higher on four piles down to the seabed
+//!   (`part::PILE`), a coaming round the beam down into the water (`part::AFLOAT`), no
+//!   bore.
 
 use glam::{Vec2, Vec3};
 
@@ -366,8 +367,8 @@ fn leg(b: &mut MeshBuilder) {
             }
         }
     });
-    b.with_part(part::AFLOAT, |b| {
-        // A pile down from the foot block into the water.
+    b.with_part(part::PILE, |b| {
+        // A pile down from the foot block to the seabed.
         metal(b);
         let sides = b.sides(8);
         b.cylinder_between(
@@ -735,7 +736,12 @@ mod tests {
                 "no afloat lift"
             );
             for lod in 0..2 {
-                for kind in [part::AFLOAT, part::ASHORE] {
+                let kinds: &[u32] = if lod == 0 {
+                    &[part::AFLOAT, part::PILE, part::ASHORE]
+                } else {
+                    &[part::AFLOAT, part::ASHORE]
+                };
+                for &kind in kinds {
                     assert!(
                         model.lods[lod].vertices.iter().any(|v| v.part == kind),
                         "tech {tech} lod {lod}: no part {kind}"

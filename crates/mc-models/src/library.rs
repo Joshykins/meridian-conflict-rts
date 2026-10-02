@@ -331,7 +331,7 @@ fn bounds_radius(
             if let Some(pit) = pit {
                 // Raised onto its stilts on water, the driver hauled up, the next section
                 // waiting raised at the rack.
-                if v.part != part::AFLOAT {
+                if !part::afloat_only(v.part) {
                     p.z += pit.afloat_lift;
                 }
                 if v.part == part::RAM {
@@ -339,7 +339,9 @@ fn bounds_radius(
                 }
                 // Down the bore is seen only through the opening, which the rest holds;
                 // a stilt under the sea is hidden by it.
-                if p.truncate().length() <= pit.radius && p.z < pit.open || v.part == part::AFLOAT {
+                if p.truncate().length() <= pit.radius && p.z < pit.open
+                    || part::afloat_only(v.part)
+                {
                     p.z = p.z.max(pit.open);
                 }
             }

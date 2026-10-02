@@ -94,8 +94,14 @@ repeats every section, so the loop is seamless) and the next section (`part::FEE
 of the magazine at `Pit::rack` and swinging in). `renderer/mine_fx.rs` puts dust, sparks, spray
 and the tech 4 shockwave on the same beat, and the game plays the unit's `step` sound on it the
 way it does footfalls. Standing in water (the terrain under it below the sea), the shader
-raises the rig by `Pit::afloat_lift`, shows `part::AFLOAT` (stilts, moon pool) and hides
-`part::ASHORE` (the pit, the broken ground). `--scene offshore-mine --map twin_shoals` stages two.
+raises the rig by `Pit::afloat_lift`, shows `part::AFLOAT` (bracing, moon pool) and
+`part::PILE` (the stilts) and hides `part::ASHORE` (the pit, the broken ground).
+
+Any structure standing in water shows its `part::AFLOAT` pieces (an anti-air
+emplacement's floats) and its `part::PILE` legs, and hides them on land. A pile is
+authored down to model z = 0 and the shader lets what is at or below that down onto the
+seabed under each vertex, so every leg stands on the bottom however deep the water.
+`--scene offshore --map twin_shoals --ticks 2` stages the structures that can stand on water.
 
 **Refits** (`mc_data::refit`). A unit file's `refits` lists slots, each holding one module;
 a module with `after` is the next tier of another and replaces it, the rest of a slot are

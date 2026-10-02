@@ -604,7 +604,8 @@ fn meshes_are_valid() {
                                 ..part::REACTOR_COLLAR_FIRST
                                     + crate::gpu_consts::reactor::COLLARS)
                                 .contains(&v.part)
-                            || v.part == part::REACTOR_FIN),
+                            || v.part == part::REACTOR_FIN
+                            || v.part == part::PILE),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
@@ -612,7 +613,10 @@ fn meshes_are_valid() {
                     .iter()
                     .any(|family| model.key.starts_with(family));
                 // The naval yard stands in water on piles driven into the seabed.
-                let floor = if v.rig & rig::DEPLOY != 0 && v.rig & rig::STAKE_SPIKE != 0 {
+                let floor = if v.part == part::AFLOAT {
+                    // Floats and bracing in the sea, drawn only there.
+                    -12.0
+                } else if v.rig & rig::DEPLOY != 0 && v.rig & rig::STAKE_SPIKE != 0 {
                     // A planted ground stake's point, driven into the ground.
                     -1.0
                 } else if model.key == "landmark_dam" {
@@ -631,7 +635,9 @@ fn meshes_are_valid() {
                 } else if is_prop {
                     -3.0
                 } else if model.key == "factory_naval" {
-                    -91.0
+                    // The quay's cross-bracing, half in the water (its piles are let down
+                    // onto the seabed by the shader, `part::PILE`).
+                    -9.0
                 } else if CAPITAL_SHIPS.contains(&model.key.as_str())
                     || model.key == "submarine_strategic"
                     || base_key(&model.key) == "submarine_titan"
@@ -655,8 +661,7 @@ fn meshes_are_valid() {
                     // The bore the beam cuts, down to the deep core's floor (`Model::pit`).
                     -121.0
                 } else if model.key == "core_mine" {
-                    // The pit, the bore and the pipe down it (`Model::pit`), and the stilts
-                    // an offshore one stands on.
+                    // The pit, the bore and the pipe down it (`Model::pit`).
                     -170.0
                 } else {
                     -1e-3
@@ -924,7 +929,7 @@ fn lods_reduce_and_respect_budgets() {
                     .filter(|t| mesh.vertices[t[0] as usize].part == kind)
                     .count()
             };
-            full - of(part::AFLOAT).min(of(part::ASHORE))
+            full - (of(part::AFLOAT) + of(part::PILE)).min(of(part::ASHORE))
         } else {
             full
         };
@@ -965,7 +970,7 @@ fn bounds_hold_every_lod() {
         let hidden_below = |v: &super::MeshVertex| {
             model.pit.is_some_and(|pit| {
                 v.pos[2] < pit.open
-                    && (v.part == part::AFLOAT
+                    && (part::afloat_only(v.part)
                         || Vec3::from(v.pos).truncate().length() <= pit.radius)
             })
         };
@@ -1777,13 +1782,15 @@ fn naval_yard_is_one_sided_on_piles() {
                 reach < -4.0,
                 "T{tech} lod{lod}: yard reaches y {reach} into the berth"
             );
-            // It stands on piles down past any seabed.
+            // It stands on piles from the waterline, which the shader lets down onto the
+            // seabed however deep it is (`part::PILE`).
             let foot = mesh
                 .vertices
                 .iter()
+                .filter(|v| v.part == part::PILE)
                 .map(|v| v.pos[2])
                 .fold(f32::MAX, f32::min);
-            assert!(foot < -60.0, "T{tech} lod{lod}: piles stop at {foot}");
+            assert!(foot <= 0.0, "T{tech} lod{lod}: no piles down to the water");
         }
         let amber = model.lods[0]
             .vertices

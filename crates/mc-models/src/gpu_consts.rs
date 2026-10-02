@@ -190,6 +190,14 @@ shared! {
         pub const TOP: f32 = 30.0;
     }
 
+    /// A structure's legs into the sea (models/aster/mine.rs, models/regency/taproot.rs):
+    /// drawn only where it stands in water, like `part::AFLOAT`, and `entity.wgsl` lets
+    /// each vertex authored at or below model z = 0 down onto the seabed under it, so a
+    /// leg stands on the bottom however deep the water is.
+    pub mod pile as "PILE_" {
+        pub const PART: u32 = 72;
+    }
+
     /// The selection mark (icons.wgsl `vs_ring`).
     pub mod ring as "RING_" {
         /// Cells along each side of a mark's ground grid: a mark is drawn as

@@ -491,7 +491,7 @@ pub fn screenshot(
     if shot.camera.is_none()
         && matches!(
             opts.scene,
-            setup::Scene::AircraftDitch | setup::Scene::OffshoreMine
+            setup::Scene::AircraftDitch | setup::Scene::Offshore
         )
     {
         let at = setup::ditch_point(&map).to_f32();

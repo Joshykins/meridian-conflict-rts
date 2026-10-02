@@ -86,9 +86,6 @@ const COILS_LOW: f32 = 14.5;
 const STRUT_Z: f32 = 20.0;
 /// How high the rig stands on its stilts over the water.
 const LIFT: f32 = 9.0;
-/// How deep the stilts go: they stand on the seabed, which hides the rest (about
-/// 60 m down at game scale).
-const PILE_FOOT: f32 = -140.0;
 
 pub(super) fn core_mine(b: &mut MeshBuilder, tech: u8) {
     let tech = tech.min(4);
@@ -108,7 +105,7 @@ pub(super) fn core_mine(b: &mut MeshBuilder, tech: u8) {
     }
 
     foundation(b, tech);
-    b.with_part(part::AFLOAT, stilts);
+    stilts(b);
     derrick(b);
     pipe(b, tech);
     ore_line(b);
@@ -362,21 +359,46 @@ fn foundation(b: &mut MeshBuilder, tech: u8) {
     b.radial(4, |b| team_panel(b, v3(38.0, 0.0, DECK), v2(1.8, 12.0)));
 }
 
-/// The offshore rig's legs: eight stilts from the seabed up under the deck,
-/// bracing between them just over the water, and caps under the deck. Authored
-/// as they stand, raised (`LIFT`).
+/// The offshore rig's legs: eight stilts from the seabed up under the deck
+/// (`part::PILE`, authored from the waterline), bracing between them just over the
+/// water, and caps under the deck (`part::AFLOAT`). Authored as they stand, raised
+/// (`LIFT`).
 fn stilts(b: &mut MeshBuilder) {
-    let feet: Vec<Vec2> = (0..8)
+    b.with_part(part::PILE, |b| {
+        for at in stilt_feet() {
+            let r = stilt_radius(at);
+            b.paint(PLATING_DARK).pattern(pattern::PILE);
+            b.cylinder_between(at.extend(0.0), at.extend(LIFT), r, r, b.sides(10));
+        }
+    });
+    b.with_part(part::AFLOAT, stilt_bracing);
+}
+
+/// Where the eight stilts stand: the corners further out than the sides.
+fn stilt_feet() -> Vec<Vec2> {
+    (0..8)
         .map(|i| {
             let angle = i as f32 * TAU / 8.0;
             Vec2::from_angle(angle) * if i % 2 == 0 { 34.0 } else { 46.0 }
         })
-        .collect();
+        .collect()
+}
+
+/// A corner stilt is the thicker.
+fn stilt_radius(at: Vec2) -> f32 {
+    if at.length() > 40.0 {
+        3.0
+    } else {
+        2.2
+    }
+}
+
+/// The stilts' caps under the deck, the bracing between them, and the magazine down to
+/// the water.
+fn stilt_bracing(b: &mut MeshBuilder) {
+    let feet = stilt_feet();
     for (i, &at) in feet.iter().enumerate() {
-        let corner = i % 2 == 1;
-        let r = if corner { 3.0 } else { 2.2 };
-        b.paint(PLATING_DARK).pattern(pattern::PILE);
-        b.cylinder_between(at.extend(PILE_FOOT), at.extend(LIFT), r, r, b.sides(10));
+        let r = stilt_radius(at);
         if b.fine() {
             b.paint(ACCENT);
             b.prism(at.extend(LIFT - 1.4), 8, r * 1.5, r * 1.2, 1.4);
@@ -1082,7 +1104,7 @@ mod tests {
             // Underground, only the pit's own pieces (pulled up by the shader) and the stilts.
             for v in &full.vertices {
                 let p = Vec3::from(v.pos);
-                if p.z < -0.01 && v.part != part::AFLOAT {
+                if p.z < -0.01 && !part::afloat_only(v.part) {
                     assert!(
                         p.truncate().length() < pit.radius,
                         "tech {tech}: {p} underground outside the pit"
@@ -1095,6 +1117,7 @@ mod tests {
                     part::STRING,
                     part::FEED,
                     part::AFLOAT,
+                    part::PILE,
                     part::ASHORE,
                 ] {
                     assert!(
@@ -1112,7 +1135,7 @@ mod tests {
                     .filter(|t| full.vertices[t[0] as usize].part == kind)
                     .count()
             };
-            let drawn = counts[0] - of(part::AFLOAT).min(of(part::ASHORE));
+            let drawn = counts[0] - (of(part::AFLOAT) + of(part::PILE)).min(of(part::ASHORE));
             assert!(drawn <= 9000, "tech {tech}: {drawn} drawn of {counts:?}");
             assert!(
                 counts[1] as f32 <= counts[0] as f32 * 0.45 + 20.0,

@@ -197,7 +197,8 @@ pub mod part {
     /// A core mine's next pipe section: authored waiting at `Pit::rack`, it rises out of
     /// the magazine there, swings over the bore onto the string, and is driven down with it.
     pub const FEED: u32 = 11;
-    /// Drawn only where the structure stands in water: an offshore rig's stilts.
+    /// Drawn only where the structure stands in water: an emplacement's floats, an
+    /// offshore rig's bracing. Not raised with the rest (`Pit::afloat_lift`).
     pub const AFLOAT: u32 = 12;
     /// Drawn only where the structure stands on land: the pit and the ground it breaks.
     pub const ASHORE: u32 = 13;
@@ -270,6 +271,15 @@ pub mod part {
     pub const REACTOR_FIN: u32 = crate::gpu_consts::reactor::PART_FIN;
     const _: () =
         assert!(REACTOR_FIN >= REACTOR_COLLAR_FIRST + crate::gpu_consts::reactor::COLLARS);
+    /// A leg into the sea, drawn only afloat like `AFLOAT`: what is authored at or below
+    /// z = 0 stands on the seabed under it (`gpu_consts::pile`).
+    pub const PILE: u32 = crate::gpu_consts::pile::PART;
+    const _: () = assert!(PILE > REACTOR_FIN);
+
+    /// Drawn only where the structure stands in water (`AFLOAT` or `PILE`).
+    pub(crate) fn afloat_only(part: u32) -> bool {
+        part == AFLOAT || part == PILE
+    }
 }
 
 /// How a vertex is rigged beyond its part: which bone of a walking leg it
@@ -786,7 +796,7 @@ impl CellBlock {
 /// A hole a model digs into the ground (a core mine's). The vertex shader pulls what is
 /// inside and below the opening up in depth so the terrain does not hide it, drives the
 /// `part::RAM`, `STRING` and `FEED` pieces on the mine's beat, and on water raises the rig
-/// onto its `part::AFLOAT` stilts and leaves the `part::ASHORE` ground out.
+/// onto its `part::PILE` stilts and leaves the `part::ASHORE` ground out.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Pit {
     /// Height of the opening, and its radius there.
@@ -798,7 +808,8 @@ pub struct Pit {
     pub section: f32,
     /// Where the next section waits, raised, before it swings over the bore.
     pub rack: [f32; 2],
-    /// How far everything but the stilts rises when the structure stands in water.
+    /// How far everything but the stilts and the bracing (`part::afloat_only`) rises when
+    /// the structure stands in water.
     pub afloat_lift: f32,
 }
 

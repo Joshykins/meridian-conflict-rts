@@ -79,8 +79,10 @@ pub enum Scene {
     /// A yard of wrecks, one of each kind, all destroyed on the second tick: vehicles and
     /// structures where they stand, aircraft and spacecraft out of the sky, ships at sea.
     Wreckage,
-    /// Core mines built out on open sea, a tier 1 and a deep core: the offshore rig.
-    OffshoreMine,
+    /// Structures built out on open sea: the core mines' offshore rigs (a tier 1 and a deep
+    /// core), the anti-air emplacements on their floats, the Regency extractor and flak
+    /// cannon, and the Wharf on its piles.
+    Offshore,
     /// A tank block and a flight on patrol loops, a post added to each after the start.
     Patrol,
     /// Hovercraft, waders and a drowned tank off the coast west of the first
@@ -115,7 +117,7 @@ impl Scene {
             "aircraft-crash" => Scene::AircraftCrash,
             "aircraft-ditch" => Scene::AircraftDitch,
             "wreckage" => Scene::Wreckage,
-            "offshore-mine" => Scene::OffshoreMine,
+            "offshore" => Scene::Offshore,
             "patrol" => Scene::Patrol,
             "sea" => Scene::Sea,
             "naval" => Scene::Naval,
@@ -145,6 +147,9 @@ pub struct Options {
     /// Range shots: take this much (permille of full health) off the subject as it opens,
     /// so a damaged look can be staged without a fight.
     pub hurt: i16,
+    /// The range's subject stands out on open water near the pad, as a structure built
+    /// either way does at sea (its floats, its legs to the seabed).
+    pub afloat: bool,
     /// Split the players into this many sides by where their zones lie; 0: everyone alone.
     pub teams: usize,
     /// The matchup scene's armies: side (0 blue, 1 red), blueprint key, count.
@@ -167,6 +172,7 @@ impl Default for Options {
             subject: crate::range::DEFAULT_SUBJECT.into(),
             scenario: None,
             hurt: 0,
+            afloat: false,
             teams: 0,
             matchup: Vec::new(),
             replay: None,
@@ -184,10 +190,16 @@ pub fn range_pad(map: &MapFile) -> FxVec2 {
 
 /// Where a headless range stands `subject`: on the pad, or out on open water near it for
 /// a hull or a structure that is built only on water (as the windowed range lines them
-/// up), so a ship is shot afloat, not sunk into the pad.
-fn subject_pad(map: &MapFile, blueprints: &Blueprints, subject: BlueprintId) -> FxVec2 {
+/// up), so a ship is shot afloat, not sunk into the pad, or for anything when `afloat`.
+fn subject_pad(
+    map: &MapFile,
+    blueprints: &Blueprints,
+    subject: BlueprintId,
+    afloat: bool,
+) -> FxVec2 {
     let bp = blueprints.unit(subject);
-    let wet = bp.water_only()
+    let wet = afloat
+        || bp.water_only()
         || bp
             .motion
             .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval);
@@ -464,22 +476,26 @@ pub fn opening_commands(
                 ));
             }
         }
-        Scene::OffshoreMine => {
+        Scene::Offshore => {
             let at = ditch_point(map);
-            out.push(spawn(
-                0,
-                "aster_core_mine",
-                at - FxVec2::from_ints(90, 0),
-                Angle::ZERO,
-                1,
-            ));
-            out.push(spawn(
-                0,
-                "aster_core_mine_t4",
-                at + FxVec2::from_ints(90, 0),
-                Angle::ZERO,
-                1,
-            ));
+            for (key, dx, dy) in [
+                ("aster_core_mine", -90, 0),
+                ("aster_core_mine_t4", 90, 0),
+                ("aster_t1_aa", -60, 80),
+                ("aster_t2_aa", 0, 80),
+                ("aster_t3_sam", 60, 80),
+                ("regency_t1_extractor", -60, -80),
+                ("regency_t1_aa", 0, -80),
+                ("aster_t1_naval_factory", 40, -200),
+            ] {
+                out.push(spawn(
+                    0,
+                    key,
+                    at + FxVec2::from_ints(dx, dy),
+                    Angle::ZERO,
+                    1,
+                ));
+            }
         }
         Scene::Patrol => {
             let base = range_pad(map);
@@ -663,7 +679,7 @@ pub fn opening_commands(
             out.extend(
                 crate::range::opening_commands(
                     blueprints,
-                    subject_pad(map, blueprints, subject),
+                    subject_pad(map, blueprints, subject, opts.afloat),
                     subject,
                     opts.scenario,
                 )
@@ -1148,7 +1164,7 @@ pub fn scene_orders(
             .collect();
         let mut owed = crate::range::owed_commands(
             blueprints,
-            subject_pad(map, blueprints, subject),
+            subject_pad(map, blueprints, subject, opts.afloat),
             subject,
             opts.scenario,
             &blue,

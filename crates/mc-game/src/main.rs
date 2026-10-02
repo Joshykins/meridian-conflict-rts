@@ -78,12 +78,14 @@ With no match options the game opens its front end: main menu, match set-up
 straight into a match instead.
 
   --map NAME|PATH        map to play (default: maps/dev16.mcmap, else maps/meridian_basin.mcmap)
-  --scene NAME           skirmish (default) | battle | stress | showcase | range | reclaim | repair | formations | aircraft | aircraft-crash | aircraft-ditch | offshore-mine | wreckage
+  --scene NAME           skirmish (default) | battle | stress | showcase | range | reclaim | repair | formations | aircraft | aircraft-crash | aircraft-ditch | offshore | wreckage
   --range                the test range (same as --scene range): one unit on a pad and a
                          panel to attack it, destroy it, scrub its build state, have it
                          built, give it targets, and reset
   --unit KEY             the range's subject, a blueprint key (default aster_t1_tank)
   --hurt PERCENT         the range's subject opens with this much of its health gone
+  --afloat               the range's subject stands on open water near the pad (a structure
+                         that can be built at sea shows its floats and its legs to the seabed)
   --scenario NAME        open the range with a scenario staged: under-fire | close | targets
                          | build | work | salvage | upgrade | march | turn | destruct | lift | warp
                          | warp-dampened (a jump into a red warp dampener's field)
@@ -301,6 +303,7 @@ fn run() -> Result<(), String> {
             "--unit-shot" => unit_shot_key = Some(value("--unit-shot")?),
             "--shot-server" => shot_server = Some(value("--shot-server")?.into()),
             a if unit_shot::flag(&mut unit_shot, a, &mut value)? => {}
+            "--afloat" => opts.afloat = true,
             "--hurt" => opts.hurt = value("--hurt")?.parse::<i16>().ok().filter(|p| (0..100).contains(p)).ok_or("--hurt takes a percentage under 100")? * 10,
             "--scenario" => opts.scenario = Some(range::Scenario::parse(&value("--scenario")?).ok_or("--scenario takes under-fire, close, targets, build, work, salvage, upgrade, march, turn, destruct, lift, warp or warp-dampened")?),
             "--players" => opts.players = value("--players")?.parse().map_err(|_| "--players takes a number")?,

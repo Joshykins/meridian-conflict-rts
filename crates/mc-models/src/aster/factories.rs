@@ -20,6 +20,7 @@ use super::parts::*;
 use super::structures::kit;
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
+use crate::part;
 use crate::pattern;
 
 /// Authored land heights per tech: 28, 34, 42 m.
@@ -1056,8 +1057,6 @@ const QUAY_BACK: f32 = -46.0;
 const QUAY_X: f32 = 44.0;
 /// Deck level over the water (a naval structure's origin is on the water).
 const DECK: f32 = 5.0;
-/// How far the piles run down: past the seabed of any water the Wharf stands in.
-const PILE_FOOT: f32 = -90.0;
 const CRANE_X: [f32; 2] = [-24.0, 20.0];
 const CRANE_Y: f32 = -31.0;
 const CRANE_Z: f32 = 21.0;
@@ -1078,11 +1077,14 @@ pub(super) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
     let hall_top = DECK + 11.0;
 
     if b.coarse() {
-        b.paint(PLATING_DARK);
-        b.cuboid_open(
-            v3(0.0, quay_mid, (DECK + PILE_FOOT) * 0.5),
-            v3(QUAY_X * 2.0, quay_w, DECK - PILE_FOOT),
-        );
+        // The quay down to the seabed (`part::PILE`: its foot is let down onto the bottom).
+        b.with_part(part::PILE, |b| {
+            b.paint(PLATING_DARK);
+            b.cuboid_open(
+                v3(0.0, quay_mid, DECK * 0.5),
+                v3(QUAY_X * 2.0, quay_w, DECK),
+            );
+        });
         b.paint(PLATING);
         b.cuboid_open(
             v3((hx0 + hx1) * 0.5, (back + front) * 0.5, DECK + 5.5),
@@ -1120,28 +1122,30 @@ pub(super) fn factory_naval(b: &mut MeshBuilder, tech: u8) {
         return;
     }
 
-    // Piles, down past the seabed: a row standing proud of the berth face, capped at
-    // the coping, and a row under the back of the deck. A wale ties each row at the
-    // waterline, and cross-bracing runs between them, half in the water.
+    // Piles, down to the seabed (`part::PILE`): a row standing proud of the berth face,
+    // capped at the coping, and a row under the back of the deck. A wale ties each row at
+    // the waterline, and cross-bracing runs between them, half in the water.
     let piles = [-40.0, -24.0, -8.0, 8.0, 24.0, 40.0];
     let (front_row, back_row) = (QUAY_FACE + 1.3, QUAY_BACK + 3.0);
     for x in piles {
-        b.paint(PLATING_DARK).pattern(pattern::PILE);
-        b.cylinder_between(
-            v3(x, front_row, PILE_FOOT),
-            v3(x, front_row, DECK + 0.5),
-            1.2,
-            1.2,
-            b.sides(8),
-        );
-        b.paint(PLATING_DARK).pattern(pattern::PILE);
-        b.cylinder_between(
-            v3(x, back_row, PILE_FOOT),
-            v3(x, back_row, DECK - 1.6),
-            1.1,
-            1.1,
-            b.sides(8),
-        );
+        b.with_part(part::PILE, |b| {
+            b.paint(PLATING_DARK).pattern(pattern::PILE);
+            b.cylinder_between(
+                v3(x, front_row, 0.0),
+                v3(x, front_row, DECK + 0.5),
+                1.2,
+                1.2,
+                b.sides(8),
+            );
+            b.paint(PLATING_DARK).pattern(pattern::PILE);
+            b.cylinder_between(
+                v3(x, back_row, 0.0),
+                v3(x, back_row, DECK - 1.6),
+                1.1,
+                1.1,
+                b.sides(8),
+            );
+        });
         b.paint(ACCENT);
         b.cuboid(v3(x, front_row, DECK + 0.7), v3(3.0, 3.0, 0.5));
         if b.fine() {

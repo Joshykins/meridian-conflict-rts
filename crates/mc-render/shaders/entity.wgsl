@@ -1297,10 +1297,12 @@ fn vs_main(in: VsIn) -> VsOut {
         n.y = -n.y;
     }
     let unwarped = p;
-    // A core mine stands in the sea on stilts, raised clear of the water, with no pit; on
-    // land it has its pit and no stilts (`models::Pit`).
-    let rig_afloat = model.pit.y > 0.0 && terrain_height(e.pos.xy) < globals.map.z - 0.5;
-    if (in.part == PART_AFLOAT && !rig_afloat) || (in.part == PART_ASHORE && rig_afloat) {
+    // A structure in the sea shows its floats and legs (`part::AFLOAT`, `PILE_PART`); a core
+    // mine there is raised clear of the water on its stilts, with no pit; on land it has
+    // its pit and no stilts (`models::Pit`).
+    let rig_afloat = terrain_height(e.pos.xy) < globals.map.z - 0.5;
+    let afloat_only = in.part == PART_AFLOAT || in.part == PILE_PART;
+    if (afloat_only && !rig_afloat) || (in.part == PART_ASHORE && rig_afloat) {
         var hidden: VsOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
@@ -1311,7 +1313,7 @@ fn vs_main(in: VsIn) -> VsOut {
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
     }
-    if rig_afloat && in.part != PART_AFLOAT {
+    if rig_afloat && !afloat_only {
         p.z += model.pit_feed.w;
     }
     // A hull field poses the shared shell direction instead, so a corner's faces stay joined.
@@ -1974,6 +1976,12 @@ fn vs_main(in: VsIn) -> VsOut {
         } else {
             p.z += surface - SPIRE_TOP;
         }
+    }
+    // A leg's foot stands on the seabed under it, however deep the water (`gpu_consts::pile`).
+    if in.part == PILE_PART && p.z <= 0.0 {
+        let along = vec2<f32>(cos(heading), sin(heading));
+        let at = origin.xy + (along * p.x + vec2<f32>(-along.y, along.x) * p.y) * scale;
+        p.z = min(terrain_height(at) - 1.0 - origin.z, 0.0) / scale;
     }
     var local = vec3<f32>(p.xy, p.z * stretch) * scale;
     // Stretched up, a trunk's sides lean less.

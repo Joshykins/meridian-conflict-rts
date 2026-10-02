@@ -277,6 +277,7 @@ fn parse(base: &Options, args: &[String]) -> Result<(Options, u32, Spec), String
             "--scenario" => {
                 opts.scenario = Some(Scenario::parse(&value(arg)?).ok_or("unknown --scenario")?);
             }
+            "--afloat" => opts.afloat = true,
             "--hurt" => {
                 opts.hurt = value(arg)?
                     .parse::<i16>()
