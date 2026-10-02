@@ -25,6 +25,14 @@ impl World {
             .commander
             .plan(super::state::PlanKind::Strategic)
             >= super::state::Stake::Invest;
+        // Shelled lately: their artillery and map guns are a mark, and the first one.
+        let shelled = self.state.ai[ctx.player as usize].commander.hurt
+            [super::state::Hurt::Artillery as usize]
+            > Fx::from_int(1000);
+        let guns = |c: &crate::ai::adaptive::Contact| {
+            let p = ctx.profiles.get(c.blueprint);
+            p.has(role::ARTILLERY) || p.has(role::MAP_GUN)
+        };
         self.state.ai[ctx.player as usize]
             .contacts
             .iter()
@@ -39,14 +47,15 @@ impl World {
                         .get(c.blueprint)
                         .has(role::STRATEGIC | role::PROJECT)
                     || (bp.has(cat::ENGINEER) && tick.saturating_sub(c.seen) <= 300)
+                    || (guns(c) && tick.saturating_sub(c.seen) <= 600)
             })
             .filter_map(|c| {
                 let aa = ctx.wm.threat_along(from, c.pos, Target::Air) * THREAT_MASS;
                 (aa <= wing).then(|| {
                     // While our warheads wait on their interceptors, those are the mark.
                     let strip = strip && ctx.profiles.get(c.blueprint).has(role::INTERCEPTOR);
-                    let worth =
-                        self.blueprints.unit(c.blueprint).cost_mass * if strip { 6 } else { 1 };
+                    let worth = self.blueprints.unit(c.blueprint).cost_mass
+                        * if strip || (shelled && guns(c)) { 6 } else { 1 };
                     let score = (worth * 4 - aa).floor_int() as i64 * 1000
                         / (c.pos.distance(from).floor_int() as i64 + 2000);
                     (score, c.pos)

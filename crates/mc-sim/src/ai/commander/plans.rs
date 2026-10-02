@@ -205,7 +205,13 @@ impl World {
                 let heavy_aa = b.anti_air * 5 > Fx::from_int(income.max(5) * 240);
                 // Bombers are the answer to ground that is held but not covered.
                 let entrenched = (fortified / 2000).min(40) * weak_aa as i32;
-                55 + 50 * weak_aa as i32 + 20 * island as i32 - 60 * heavy_aa as i32 + entrenched
+                // Shelled by guns that outreach the army: bombers reach them. A T3
+                // artillery park killed 26 000 of a side's army while its strikes
+                // traded five to one.
+                let shelled = (by_guns / 1500).min(40) * !heavy_aa as i32;
+                55 + 50 * weak_aa as i32 + 20 * island as i32 - 60 * heavy_aa as i32
+                    + entrenched
+                    + shelled
             }
             PlanKind::SeaControl => {
                 // A shipyard its builders can put up will do.
