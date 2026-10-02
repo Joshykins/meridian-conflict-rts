@@ -243,12 +243,10 @@ impl Blast {
         self.scale.min(self.scale.powf(0.6))
     }
 
-    /// Mirrors nuke.wgsl `head_height` (a nova's: nova.wgsl `nova_height`).
+    /// Mirrors nuke.wgsl `head_height` (a nova's star stays on the burst).
     fn head_height(&self, time: f32) -> f32 {
         if self.plasma() {
-            let t = self.age(time);
-            return self.rise()
-                * (300.0 * (1.0 - (-t / 3.0).exp()).sqrt() + 260.0 * (1.0 - (-t / 20.0).exp()));
+            return 0.0;
         }
         let x = (self.age(time) / 30.0).powf(1.35);
         self.rise() * 1700.0 * (1.0 - (-x).exp())

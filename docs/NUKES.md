@@ -171,15 +171,16 @@ mc-data; presentation only, never hashed). It rides on the events (`NuclearLaunc
 (`gpu_consts::missile::PLASMA`). An Exarch's death goes up the same way, smaller.
 
 - **The blast** (`shaders/nova.wgsl`; the same volume as an ARC blast, its own shapes over
-  time in `nova_radius`/`nova_height`, which `nuke_fx::Blast` mirrors). Not a mushroom: it
+  time in `nova_radius`, which `nuke_fx::Blast` mirrors). Not a mushroom: it
   has no stem and no cap. A white-hot star with a rose limb in granulation cells for its
   first second or two; the nova's shell, a dome thrown out to about 640 m, white with the
   prism running over its leading edge, tearing into red threads that hang for most of a
-  minute; the star lifting off the ground to hang about 550 m up, held in its own field,
+  minute; the star staying where the warhead went off, held there in its own field (it
+  neither climbs nor leans downwind),
   cooled to a dark, blackened crimson laced with a web of hard glowing threads, turning,
-  a slow pulse running through it, drawing in on itself as it dies; round it an
-  hourglass of thin bright rings, as round SN 1987A (a wide one round its equator, a
-  narrower one over each pole, all tilted together its own way); a sheet of red plasma
+  a slow pulse running through it, drawing in on itself as it dies; round it thin
+  bright rings, as round SN 1987A, level about the burst (a wide one round its equator,
+  a narrower one over its pole); a sheet of red plasma
   skimming out along the ground with the front, following the ground in view up hills
   and into hollows, and a dark surge of glassy dust. Every part fades out over its last
   stretch before the scene in front of it (`nova_soft`), and the shell thins away toward

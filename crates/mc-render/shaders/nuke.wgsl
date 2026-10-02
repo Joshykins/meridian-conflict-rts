@@ -104,7 +104,8 @@ fn head_radius(n: Blast) -> f32 {
 // takes about a minute to reach its height.
 fn head_height(n: Blast) -> f32 {
     if is_nova(n) {
-        return nova_height(n);
+        // A nova's star stays on the burst.
+        return 0.0;
     }
     let x = pow(n.age / 30.0, 1.35);
     return rise(n) * 1700.0 * (1.0 - exp(-x));
@@ -203,9 +204,9 @@ fn empty_sample() -> Sample {
     return s;
 }
 
-// The column leans off downwind as it climbs.
+// The column leans off downwind as it climbs; a nova's star, held in its field, does not.
 fn lean(n: Blast, up: f32) -> vec2<f32> {
-    return n.drift * clamp(up / (1600.0 * rise(n)), 0.0, 1.0);
+    return select(1.0, 0.0, is_nova(n)) * n.drift * clamp(up / (1600.0 * rise(n)), 0.0, 1.0);
 }
 
 // The head's shape without its billows: < 1 inside. `p` is from the burst, leaned.
@@ -487,7 +488,7 @@ fn column_box(n: Blast) -> Box {
     var reach = max(rc * 1.9, n.scale * 1100.0 * smoothstep(8.0, 30.0, n.age)) + length(n.drift) + 60.0;
     var top = hc + rc * 1.1;
     if is_nova(n) {
-        // The star and its hourglass of rings, tilted.
+        // The star and its rings.
         let rings = nova_ring_reach(n);
         reach = max(rc * 1.5, rings) + length(n.drift) + 60.0;
         top = hc + rc * 1.7 + rings * 0.4;

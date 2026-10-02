@@ -3,9 +3,9 @@
 // (nuke.wgsl, which owns `Blast`, `Sample`, the billows and the shapes over time used
 // here; WGSL does not mind the order).
 //
-// Not a mushroom: the ball lifts off the ground and hangs there held in its own field, a
-// dying star with no stem under it and no cap, ringed like a supernova's remnant
-// (`nova_radius`, `nova_height`; `nuke_fx::Blast` mirrors both). Made of plasma instead of
+// Not a mushroom: the ball stays where the warhead went off, held there in its own field,
+// never climbing or leaning off downwind, a dying star with no stem and no cap, ringed
+// like a supernova's remnant (`nova_radius`; `nuke_fx::Blast` mirrors it). Made of plasma instead of
 // fire and smoke:
 //
 //   the star      a white-hot ball with a rose limb, its surface in granulation cells,
@@ -14,13 +14,13 @@
 //                 white with prism at its leading edge, tearing into red threads that
 //                 hang for most of a minute (part 2, in place of the Wilson cloud)
 //   the star      the ball cools to a dark, blackened crimson laced with a web of hard
-//                 glowing threads and hangs a few hundred metres up, turning; a slow pulse
+//                 glowing threads and sits on the burst, turning; a slow pulse
 //                 runs through it. It holds together far longer than smoke would: it
 //                 thins only to a third over a minute, draws in on itself as it dies and
 //                 is gone by NOVA_LIFE
-//   the rings     an hourglass of thin bright rings, as round SN 1987A: a wide one round
-//                 its equator and a narrower one over each pole, all tilted together its
-//                 own way, standing as long as the star does
+//   the rings     thin bright rings, as round SN 1987A, level about the burst: a wide one
+//                 round its equator and a narrower one over its pole (the other pole's
+//                 would be under the ground), standing as long as the star does
 //   the ground    the shock's front is a sheet of red plasma skimming the ground (the
 //                 ground in view, so it follows hills), and the surge a low, dark ring of
 //                 glassy dust
@@ -92,14 +92,11 @@ fn nova_radius(n: Blast) -> f32 {
     return n.scale * grow * (1.0 - 0.45 * smoothstep(50.0, NOVA_LIFE, t));
 }
 
-// Height of its middle: it lifts off the ground in its first seconds and hangs there,
-// never climbing. Mirrored by nuke_fx::Blast::head_height.
-fn nova_height(n: Blast) -> f32 {
-    return rise(n) * (300.0 * sqrt(1.0 - exp(-n.age / 3.0)) + 260.0 * (1.0 - exp(-n.age / 20.0)));
-}
+// How many rings stand round the star (`nova_ring`).
+const NOVA_RINGS: u32 = 2u;
 
-// Ring `k` of the hourglass (0 the equator's, 1 and 2 over the poles), in the star's tilted
-// frame: height off its middle, radius, thickness, brightness.
+// Ring `k` (0 the equator's, 1 the one over its pole): height off its middle, radius,
+// thickness, brightness.
 fn nova_ring(n: Blast, k: u32) -> vec4<f32> {
     let t = max(n.age - 1.2, 0.0);
     let rc = nova_radius(n);
@@ -108,8 +105,7 @@ fn nova_ring(n: Blast, k: u32) -> vec4<f32> {
     if k == 0u {
         return vec4<f32>(0.0, rc * (1.15 + 0.85 * out) + 2.0 * n.scale * t, thick * 1.3, 1.0);
     }
-    let side = select(-1.0, 1.0, k == 1u);
-    return vec4<f32>(side * rc * (0.75 + 0.4 * out), rc * (0.75 + 0.45 * out) + 1.2 * n.scale * t, thick, 0.6);
+    return vec4<f32>(rc * (0.75 + 0.4 * out), rc * (0.75 + 0.45 * out) + 1.2 * n.scale * t, thick, 0.6);
 }
 
 fn nova_ring_left(n: Blast) -> f32 {
@@ -120,17 +116,6 @@ fn nova_ring_left(n: Blast) -> f32 {
 fn nova_ring_reach(n: Blast) -> f32 {
     let r = nova_ring(n, 0u);
     return r.y + r.z * 3.0;
-}
-
-// The hourglass's frame: the star's axis tilted off the vertical its own way.
-fn nova_tilted(n: Blast, q: vec3<f32>) -> vec3<f32> {
-    let yaw = n.seed * TAU * 3.0;
-    let tilt = 0.18 + 0.2 * fract(n.seed * 7.31);
-    let c = vec2<f32>(cos(yaw), sin(yaw));
-    // Into a frame whose x runs along the tilt's axis, tilt about it, and back.
-    let a = vec3<f32>(dot(q.xy, c), dot(q.xy, vec2<f32>(-c.y, c.x)), q.z);
-    let b = vec3<f32>(a.x, a.y * cos(tilt) - a.z * sin(tilt), a.y * sin(tilt) + a.z * cos(tilt));
-    return b;
 }
 
 // Fades a part out over the last stretch before the scene in front of it, so nothing is cut
@@ -194,10 +179,10 @@ fn nova_column(n: Blast, world: vec3<f32>) -> Sample {
     // The rings.
     let left = nova_ring_left(n);
     if left > 0.0 {
-        let q = nova_tilted(n, p - vec3<f32>(0.0, 0.0, hc));
+        let q = p - vec3<f32>(0.0, 0.0, hc);
         let rr = length(q.xy);
         let ang = atan2(q.y, q.x);
-        for (var k = 0u; k < 3u; k++) {
+        for (var k = 0u; k < NOVA_RINGS; k++) {
             let ring = nova_ring(n, k);
             let z = q.z - ring.x;
             if abs(z) > ring.z * 2.5 {

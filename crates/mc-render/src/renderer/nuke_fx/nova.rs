@@ -74,17 +74,15 @@ impl Renderer {
             range: 2600.0 * s,
             flicker: 0.25,
         });
-        // Streamers round its waist, the ring tilted a little its own way, none past the
-        // shell (nova.wgsl `nova_shell_radius`, about 640 m).
+        // Streamers round its waist, level like its rings, none past the shell (nova.wgsl
+        // `nova_shell_radius`, about 640 m).
         let reach = 560.0 * s;
-        let tilt = 0.25 * self.scatter.signed();
-        let (ts, tc) = tilt.sin_cos();
         let yaw = self.scatter.unit() * TAU;
         for i in 0..72 {
             let a = (i as f32 + 0.5 * self.scatter.unit()) * TAU / 72.0;
             let flat = Vec2::from_angle(a + yaw);
             let off = 0.25 * self.scatter.signed();
-            let dir = Vec3::new(flat.x, flat.y * tc, flat.y * ts + off + 0.12).normalize();
+            let dir = Vec3::new(flat.x, flat.y, off + 0.12).normalize();
             let go = reach * (0.55 + 0.35 * self.scatter.unit());
             let size = s * (16.0 + 14.0 * self.scatter.unit());
             let (r0, r1) = (self.scatter.unit(), self.scatter.unit());
