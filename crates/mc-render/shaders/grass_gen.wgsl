@@ -585,10 +585,10 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     // Nothing grows on molten ground or glass (renderer/ground_melt.rs), and what grows
     // round it is burnt black.
     let melt = melt_sample(xy);
-    if melt.y > 0.25 || melt.x > MELT_FIELD_MELT {
+    if melt.y > 0.03 || melt.x > MELT_FIELD_MELT {
         return;
     }
-    charred = max(charred, smoothstep(0.1, 0.5, melt.z));
+    charred = max(charred, smoothstep(0.05, 0.45, melt.z));
 
     // The kind: picked at random in proportion to each kind's ground, so the
     // edge between two is a mix, not a line.

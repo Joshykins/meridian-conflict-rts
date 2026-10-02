@@ -25,8 +25,8 @@ const SLOTS: usize = mf::SLOTS as usize;
 /// steady fire heats up past what one hit gives it.
 const STACK: f32 = 0.2;
 /// How far past its radius a source reaches, in radii: its heat falls off to nothing
-/// by its radius, its scorch by this.
-const REACH: f32 = 1.3;
+/// by its radius, its scorch by this (charred near, only seared far out).
+const REACH: f32 = 1.9;
 /// How far a source's edge wanders in and out, as a share of its radius.
 const RAGGED: f32 = 0.25;
 /// Share of its heating time a slow source shows nothing (the ground only warming).
@@ -260,7 +260,7 @@ impl GroundMelt {
                             continue;
                         }
                         let target = peak * (1.0 - smoothstep(0.4, 1.0, d));
-                        let scorch = sear * (1.0 - smoothstep(0.8, REACH, d));
+                        let scorch = sear * (1.0 - smoothstep(0.6, REACH, d));
                         if target < 0.002 && scorch < 0.004 {
                             continue;
                         }
@@ -279,7 +279,9 @@ impl GroundMelt {
                             c.heat = heat;
                             tile.hot = true;
                         }
-                        c.glass = c.glass.max(smoothstep(mf::MELT, mf::MELT + 0.15, c.heat));
+                        // How far it melted: barely fused crust just past the melt point,
+                        // smooth glass where it ran white-hot.
+                        c.glass = c.glass.max(smoothstep(mf::MELT, 1.0, c.heat));
                         c.scorch = c.scorch.max(scorch);
                         tile.dirty = true;
                         tile.touched = time;

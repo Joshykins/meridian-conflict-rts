@@ -442,10 +442,11 @@ fn craters_at(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
 
 // ---- Melted ground (renderer/ground_melt.rs) ----------------------------------------
 // The melt field shaded over whatever ground it lies on: a heat, glass and scorch per
-// square metre, so overlapping burns run together as one surface. Scorch blackens the
-// ground; past the melt point it is molten, white-yellow, then orange, with darker skins
-// drifting on it that thicken and join as it cools; then it is black-green glass, its
-// glow lingering longest in a wandering web of veins, and the glass stays. The field is
+// square metre, so overlapping burns run together as one surface. Scorch sears, browns
+// and chars the ground; past the melt point it is molten, white-yellow, then orange, with
+// darker skins drifting on it that thicken and join as it cools; then it sets, crust at
+// its edge and glass where it ran hottest, its glow lingering longest in a wandering web
+// of veins, and the scar stays. The field is
 // read a metre or two off true so its square cells never show, and every detail that
 // would shrink under a pixel is swapped for its average.
 
@@ -472,24 +473,78 @@ fn melt_shade(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
     // The ground's own light and dark carries on through the burn.
     let grain = clamp(sqrt(lum / 0.06), 0.75, 1.3);
 
-    // Scorch: charcoal, ragged and patchy along its edge.
-    let burnt = smoothstep(0.1, 0.55, m.z + (broad - 0.5) * 0.5 + (fine - 0.5) * 0.2);
-    var a = mix(albedo_in, vec3<f32>(0.014, 0.012, 0.011) * grain, burnt * 0.92);
-    var rough = mix(rough_in, 0.95, burnt);
+    // ---- The scar, from the edge in ----
+    // Ground only seared: dried, yellowed and paled. Then umber soil, then charcoal in
+    // ragged fingers with pale ash drifted over it. Where it melted at all, a rough
+    // sintered crust spotted with rust, pushed up into a lumpy rind along its shore; and
+    // where it ran white-hot, glass: black-green or bottle-brown by the ground it was,
+    // sunk a little, crazed with fine cracks and pitted with burst bubbles.
+    let mid = mix(grad_noise2(xy + warp * 1.5, 0.9), 0.5, smoothstep(0.2, 0.6, px));
+    let patchy = broad * 0.6 + mid * 0.4;
+    let dried = vec3<f32>(min(lum, 0.09)) * vec3<f32>(1.15, 0.95, 0.68);
+    let sear = smoothstep(0.02, 0.22, m.z + (patchy - 0.5) * 0.16);
+    var a = mix(albedo_in, dried, sear * 0.65);
+    let seared = smoothstep(0.22, 0.5, m.z + (patchy - 0.5) * 0.35 + (fine - 0.5) * 0.15);
+    a = mix(a, vec3<f32>(0.042, 0.03, 0.021) * grain, seared * 0.85);
+    let charred = smoothstep(0.5, 0.8, m.z + (patchy - 0.5) * 0.45 + (fine - 0.5) * 0.2);
+    // Charcoal, with blotches of burnt grey-brown soil left in it.
+    let soil = smoothstep(0.55, 0.75, broad * 0.7 + mid * 0.3);
+    a = mix(a, mix(vec3<f32>(0.013, 0.012, 0.011), vec3<f32>(0.038, 0.03, 0.024), soil * 0.8) * grain, charred * 0.95);
+    var rough = mix(rough_in, 0.95, max(seared, charred));
 
-    // Glass where it melted, its edge fraying where the melt ran thin; glossy, rolling
-    // in low swells so the sun glints off it in broken patches.
-    let glass = smoothstep(0.3, 0.55, m.y + (broad - 0.5) * 0.3 + (fine - 0.5) * 0.25);
-    if glass > 0.002 {
+    let fused = smoothstep(0.015, 0.08, m.y + (patchy - 0.5) * 0.05 + (fine - 0.5) * 0.03);
+    let ash = smoothstep(0.6, 0.78, mid * 0.6 + fine * 0.4 + (1.0 - broad) * 0.15 - 0.05)
+        * charred * (1.0 - fused);
+    a = mix(a, vec3<f32>(0.16, 0.155, 0.145) * grain, ash * 0.7);
+    if fused > 0.002 {
+        let glassy = smoothstep(0.4, 0.85, m.y + (broad - 0.5) * 0.4 + (fine - 0.5) * 0.2);
+        // Relief, from how the glass field slopes: the rind where the melt shored up,
+        // the pool sunk behind it, both lumpy.
+        let e = 0.8;
+        let at = xy + warp * 1.8;
+        let grad = vec2<f32>(
+            melt_sample(at + vec2<f32>(e, 0.0)).y - melt_sample(at - vec2<f32>(e, 0.0)).y,
+            melt_sample(at + vec2<f32>(0.0, e)).y - melt_sample(at - vec2<f32>(0.0, e)).y) / (2.0 * e);
+        let f = m.y;
+        let k = (f - 0.08) / 0.07;
+        // Broken: in places the rind is a heap, in places there is none.
+        let lump = smoothstep(0.35, 0.75, grad_noise2(xy + warp * 2.0, 3.5)) * (0.6 + mid * 0.8);
+        let dh = 0.16 * lump * exp(-k * k) * (-2.0 * k / 0.07)
+            - 0.1 * smoothstep(0.1, 0.6, f) * (1.0 - smoothstep(0.1, 0.6, f)) * 6.0;
+        s.slope = grad * dh * 0.6;
+        // Glass rolling in low swells, so the sun glints off it in broken patches.
         let swell = grad_noise2_d(xy + warp * 4.0, 2.2).yz * 2.2
             + grad_noise2_d(xy - warp * 2.0, 0.8).yz * 0.8 * (1.0 - fine_aa);
-        s.slope = swell * 0.06 * glass;
-        let glass_rgb = mix(vec3<f32>(0.009, 0.013, 0.011), vec3<f32>(0.013, 0.022, 0.017), broad);
-        a = mix(a, glass_rgb, glass);
-        rough = mix(rough, 0.32 + 0.14 * fine, glass);
-        s.fused = glass;
-        s.sky = 1.0 - 0.45 * glass;
-        s.metal = 0.85 * glass;
+        s.slope += swell * 0.05 * glassy;
+
+        // Sintered crust: dark grey-brown, rust where iron in it burnt.
+        let rust = smoothstep(0.55, 0.75, patchy + (fine - 0.5) * 0.3);
+        let crust = mix(vec3<f32>(0.032, 0.026, 0.021), vec3<f32>(0.075, 0.034, 0.014), rust * 0.7) * grain;
+        // Glass: what the ground was, darkened nearly to black and shifted green or brown.
+        let hue = grad_noise2(xy - warp * 5.0, 6.0);
+        let tinge = mix(mix(vec3<f32>(0.016, 0.012, 0.008), vec3<f32>(0.007, 0.017, 0.012), hue),
+            vec3<f32>(0.006, 0.006, 0.006), smoothstep(0.4, 0.8, broad));
+        var glass_rgb = mix(albedo_in * 0.1, tinge, 0.7);
+        // Crazing: a few fine cracks where the glass shrank as it set, in some patches only.
+        let craze_cell = 1.4;
+        let craze_w = 0.035;
+        let craze_soft = max(craze_w * 0.5, px / craze_cell);
+        let ridge = 1.0 - abs(grad_noise2(xy + warp * 0.8, craze_cell) * 2.0 - 1.0);
+        let crazed_here = smoothstep(0.5, 0.7, grad_noise2(xy + vec2<f32>(-13.0, 29.0), 5.0));
+        let craze = mix(smoothstep(1.0 - craze_w - craze_soft, 1.0 - craze_w * 0.3, ridge), craze_w * 1.2,
+            smoothstep(0.3, 0.9, px / craze_cell)) * smoothstep(0.3, 0.8, glassy) * crazed_here;
+        // Burst bubbles: small dull pits, most near the crust.
+        let pit = smoothstep(0.8, 0.88, grad_noise2(xy + vec2<f32>(7.3, 2.1), 0.3))
+            * (1.0 - fine_aa) * (1.0 - 0.6 * glassy);
+        // Thicker and thinner glass: broad lighter and darker reaches across it.
+        glass_rgb *= (0.65 + 0.9 * grad_noise2(xy + warp * 3.0, 7.0)) * (1.0 - 0.6 * craze - 0.5 * pit);
+        let melt_rgb = mix(crust, glass_rgb, glassy);
+        a = mix(a, melt_rgb, fused);
+        let melt_rough = mix(0.88 - 0.1 * rust, 0.1 + 0.14 * fine, glassy) + 0.45 * craze + 0.5 * pit;
+        rough = mix(rough, clamp(melt_rough, 0.1, 0.97), fused);
+        s.fused = fused * (0.5 + 0.5 * glassy);
+        s.sky = 1.0 - 0.45 * glassy * fused;
+        s.metal = 0.85 * glassy * fused * (1.0 - craze) * (1.0 - pit);
     }
 
     if heat > 0.004 {
