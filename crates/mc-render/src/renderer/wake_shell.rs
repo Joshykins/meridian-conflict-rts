@@ -1,6 +1,6 @@
 //! Cone weapons' wakes drawn in light (wake_shell.wgsl): the buffer of live wakes, its
 //! descriptor set and the two pipelines that lay them over the scene after the water, the
-//! trail each leaves and the rolling front ahead of it. What each wake is, frame by frame,
+//! trail each leaves and the wall of plasma at its front. What each wake is, frame by frame,
 //! comes from `wake_fx`.
 
 use std::mem::size_of;
@@ -26,8 +26,8 @@ pub(crate) struct GpuWakeShell {
     /// Metres out the front stands now, and metres a second it rolls.
     pub(crate) front: f32,
     pub(crate) speed: f32,
-    /// The shell's height over its half-width.
-    pub(crate) rise: f32,
+    /// The wall's height over the middle of the fan, metres.
+    pub(crate) height: f32,
     /// 0 gone, 1 full.
     pub(crate) fade: f32,
     /// Seconds since the front ran out; below 0 while it rolls.

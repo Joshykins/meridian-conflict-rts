@@ -127,11 +127,11 @@ fn the_wake_rolls_out_over_its_fan() {
     let mut w = world(None);
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
     // Bulwarks: dead ahead at 88 m, 5 degrees off at 300 m, out of the fan (30 degrees
-    // off, in reach) and past its reach (400 m dead ahead).
+    // off, in reach) and past its reach (460 m dead ahead).
     let near = add(&mut w, "aster_t2_tank", 1, 600, 512, 180);
     let far = add(&mut w, "aster_t2_tank", 1, 811, 538, 180);
     let beside = add(&mut w, "aster_t2_tank", 1, 642, 587, 180);
-    let beyond = add(&mut w, "aster_t2_tank", 1, 912, 512, 180);
+    let beyond = add(&mut w, "aster_t2_tank", 1, 972, 512, 180);
     let struck = first_wake(&mut w, &[near, far, beside, beyond]);
     let weapon = w
         .blueprints
@@ -146,7 +146,7 @@ fn the_wake_rolls_out_over_its_fan() {
         "nearer should take more: {near_lost} near, {far_lost} far"
     );
     assert!(near_lost <= weapon.damage && far_lost >= weapon.damage * cone.edge);
-    // The front rolls out at its own pace: 212 m further on is over two seconds later.
+    // The front rolls out at its own pace: 212 m further on is nearly two seconds later.
     let gap = (Fx::from_int(212) / cone.speed * mc_core::TICKS_PER_SECOND as i32).floor_int();
     assert!(
         far_at >= near_at + gap as u32 - 2,

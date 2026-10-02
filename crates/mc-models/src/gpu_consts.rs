@@ -870,23 +870,20 @@ shared! {
     pub mod wake_shell as "WAKE_SHELL_" {
         /// Wakes drawn at once; the oldest goes first past it (`wake_fx`).
         pub const MAX_SHELLS: u32 = 24;
-        /// The trail's quads from the muzzle out to the front, and from one side over the
-        /// top to the other.
+        /// The trail's quads from the muzzle out to the wall, and across the fan.
         pub const ALONG: u32 = 40;
         pub const AROUND: u32 = 24;
-        /// The front's quads round its arch, and round its crest.
+        /// The front's quads along its arc, and round its section.
         pub const ARCH: u32 = 32;
         pub const TUBE: u32 = 12;
-        /// The front's half-width over the fan's own, and how far its feet trail its top
-        /// in those half-widths.
+        /// The fan drawn over the sim's own: the tangent of its half-angle times this.
         pub const WIDTH: f32 = 1.15;
-        pub const LAG: f32 = 0.3;
         /// Seconds a stretch of the trail stays hot (heat falls to a third), and seconds
         /// it lasts after the front has passed it.
         pub const COOL: f32 = 0.45;
         pub const LINGER: f32 = 1.5;
-        /// Seconds the front takes to break up once it has run out.
-        pub const BREAK: f32 = 0.5;
+        /// Seconds the front takes to break up once it has run out, rolling on as it slows.
+        pub const BREAK: f32 = 0.6;
     }
 
     /// A twin gun on a walker's arm that kicks on its own shots (`mc_sim::mirror::UNIT_TWIN_*`
