@@ -131,9 +131,14 @@ impl Block {
         self.faces = kept;
     }
 
-    fn emit(&self, b: &mut MeshBuilder) {
+    /// Draws the block's faces; with `buried`, also the back and the underside,
+    /// which lie in the wall and are only seen from close by at a rim or a foot.
+    fn emit(&self, b: &mut MeshBuilder, buried: bool) {
         for face in &self.faces {
-            b.face(face);
+            let n = (face[1] - face[0]).cross(face[2] - face[0]);
+            if buried || (n.x > -0.5 * n.length() && n.z > -0.5 * n.length()) {
+                b.face(face);
+            }
         }
     }
 }
@@ -171,7 +176,7 @@ fn piece(b: &mut MeshBuilder, seed: u32, lean: f32) {
     let (least, cuts) = match b.lod() {
         0 => (0.0, 2),
         1 => (5.0, 1),
-        _ => (12.0, 0),
+        _ => (24.0, 0),
     };
     let columns = split(&mut roll, -HALF_WIDTH, HALF_WIDTH, 2.5, 11.0);
     b.with_facets(|b| {
@@ -249,7 +254,7 @@ fn piece(b: &mut MeshBuilder, seed: u32, lean: f32) {
                 let frame = Affine3A::from_translation(middle)
                     * Affine3A::from_quat(turn)
                     * Affine3A::from_translation(-middle);
-                b.with(frame, |b| block.emit(b));
+                b.with(frame, |b| block.emit(b, cuts > 0));
             }
         }
     });

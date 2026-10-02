@@ -660,6 +660,9 @@ fn meshes_are_valid() {
                 } else if model.key == "regency_taproot" {
                     // The bore the beam cuts, down to the deep core's floor (`Model::pit`).
                     -121.0
+                } else if model.key.starts_with("cliff_rock") {
+                    // A cliff piece's origin is the middle of the wall it covers (`cliffs.rs`).
+                    -super::cliffs::HALF_HEIGHT - 1.0
                 } else if model.key == "core_mine" {
                     // The pit, the bore and the pipe down it (`Model::pit`).
                     -170.0
