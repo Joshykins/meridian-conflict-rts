@@ -22,6 +22,7 @@ use std::collections::HashMap;
 
 mod batch;
 mod destruct;
+mod fog;
 mod units;
 mod walls;
 mod warp;
@@ -29,6 +30,7 @@ mod wrecks;
 
 pub use batch::{BatchView, UNIT_BATCH};
 pub use destruct::DestructView;
+pub use fog::VisionDisc;
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
 pub use wrecks::WRECK_EXTRA_INSTANCES;
@@ -1294,6 +1296,10 @@ pub struct RenderFrame {
     /// Fog for the viewer, two bytes per 64 m cell: visible now, explored. Empty when fog is off.
     pub fog: Vec<u8>,
     pub fog_dims: (u32, u32),
+    /// Whose eyes `fog` is: the viewer's side as a player mask, 0 with fog off.
+    pub fog_mask: u32,
+    /// The vision discs that side sees through this tick, to draw round.
+    pub vision: Vec<VisionDisc>,
     /// One bit per map prop, set when destroyed.
     pub props_dead: Vec<u32>,
     /// The whole terrain edit table, in order (copied again only when it changed).
@@ -2551,20 +2557,7 @@ impl World {
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_dampers(viewer, &mut frame.dampers);
 
-        frame.fog.clear();
-        frame.fog_dims = self.fog.dims();
-        if let (Some(v), true) = (viewer, s.fog_enabled) {
-            let mask = self.team_mask(v);
-            let (visible, explored) = (self.fog.visible_cells(), self.fog.explored_cells());
-            frame.fog.reserve(visible.len() * 2);
-            for i in 0..visible.len() {
-                // Radar paints blips, not the ground: only vision lights a cell.
-                frame.fog.push(if visible[i] & mask != 0 { 255 } else { 0 });
-                frame
-                    .fog
-                    .push(if explored[i] & mask != 0 { 255 } else { 0 });
-            }
-        }
+        self.write_fog(viewer, frame);
 
         frame.props_dead.clear();
         frame.props_dead.extend(

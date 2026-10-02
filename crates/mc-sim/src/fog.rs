@@ -14,6 +14,16 @@ use serde::{Deserialize, Serialize};
 /// Fog cell edge: 64 m.
 const CELL_SHIFT: u32 = 6;
 
+/// One vision disc, as the rebuild stamped it.
+#[derive(Clone, Copy)]
+pub(crate) struct Sight {
+    /// The unit seeing, whose travel the drawn disc follows; `None` for a fixed reveal.
+    pub(crate) row: Option<usize>,
+    pub(crate) pos: FxVec2,
+    pub(crate) vision: Fx,
+    pub(crate) mask: PlayerMask,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Fog {
     width: i32,
@@ -29,6 +39,10 @@ pub struct Fog {
     /// stamp keeps a reused row from staying known.
     identified: Vec<PlayerMask>,
     identified_gen: Vec<u16>,
+    /// Every vision disc of the last rebuild, as stamped and before any are merged,
+    /// for the renderer to draw round (`mirror/fog.rs`). Never read by the simulation.
+    #[serde(skip)]
+    sights: Vec<Sight>,
     /// Bumped on every rebuild so the renderer knows when to re-upload.
     #[serde(skip)]
     pub version: u32,
@@ -48,6 +62,7 @@ impl Fog {
             explored: vec![0; n],
             identified: Vec::new(),
             identified_gen: Vec::new(),
+            sights: Vec::new(),
             version: 0,
         }
     }
@@ -60,11 +75,41 @@ impl Fog {
         self.visible.fill(0);
         self.radar.fill(0);
         self.sonar.fill(0);
+        self.sights.clear();
         self.version = self.version.wrapping_add(1);
     }
 
     /// Marks the disc around `pos` for the players in `mask`.
     pub fn reveal(&mut self, pos: FxVec2, vision: Fx, radar: Fx, mask: PlayerMask) {
+        self.note_sight(None, pos, vision, mask);
+        self.stamp_discs(pos, vision, radar, mask);
+    }
+
+    /// Keeps a vision disc for the renderer; `stamp_discs` marks the grid.
+    pub(crate) fn note_sight(
+        &mut self,
+        row: Option<usize>,
+        pos: FxVec2,
+        vision: Fx,
+        mask: PlayerMask,
+    ) {
+        if vision > Fx::ZERO {
+            self.sights.push(Sight {
+                row,
+                pos,
+                vision,
+                mask,
+            });
+        }
+    }
+
+    /// The vision discs of the last rebuild (`note_sight`).
+    pub(crate) fn sights(&self) -> &[Sight] {
+        &self.sights
+    }
+
+    /// `reveal` without keeping the disc for the renderer: for discs already noted.
+    pub(crate) fn stamp_discs(&mut self, pos: FxVec2, vision: Fx, radar: Fx, mask: PlayerMask) {
         if vision > Fx::ZERO {
             Self::stamp(
                 &mut self.visible,

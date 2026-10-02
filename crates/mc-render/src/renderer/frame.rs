@@ -123,6 +123,7 @@ impl Renderer {
                 .draws
                 .set_units(&frame.units[..self.sim_units as usize]);
             self.fog_enabled = !frame.fog.is_empty();
+            self.fog.set_frame(&self.gpu, frame)?;
             self.precursor_activity = frame.precursor_activity;
             self.tile_cache
                 .apply_edits(&frame.terrain_edits, input.time, &mut self.upload_scratch);
@@ -377,7 +378,7 @@ impl Renderer {
         self.timers.end(&device, cmd);
         self.timers.scope(&device, cmd, "fog");
         self.fog
-            .record(&self.gpu, cmd, self.fog_enabled, input.time);
+            .record(&self.gpu, cmd, self.fog_enabled, input.time, input.alpha);
         self.timers.end(&device, cmd);
         self.timers.draws(&device, cmd, "clouds.sim");
         self.sky.record_sim(&self.gpu, cmd);

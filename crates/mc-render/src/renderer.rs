@@ -51,7 +51,7 @@ mod cull_lists;
 mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
-mod fog_field;
+pub(crate) mod fog_field;
 mod footfalls;
 pub(crate) mod foundations;
 mod frame;

@@ -953,12 +953,17 @@ impl World {
                 (Fog::cell_of(self.state.units.pos[row]), sight, mask, row)
             })
             .collect();
+        // The renderer draws every unit's own disc, round and following it.
+        for &(_, (vision, _, _), mask, row) in &stamps {
+            self.fog
+                .note_sight(Some(row), self.state.units.pos[row], vision, mask);
+        }
         // The whole tuple orders them, so the sort is total; one of each.
         stamps.sort_unstable();
         stamps.dedup_by_key(|&mut (cell, sight, mask, _)| (cell, sight, mask));
         for (_, (vision, radar, sonar), mask, row) in stamps {
             let pos = self.state.units.pos[row];
-            self.fog.reveal(pos, vision, radar, mask);
+            self.fog.stamp_discs(pos, vision, radar, mask);
             self.fog.reveal_sonar(pos, sonar, mask);
         }
         self.survival_reveal();
