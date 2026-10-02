@@ -108,6 +108,8 @@ pub struct Pipelines {
     pub ring: vk::Pipeline,
     pub range: vk::Pipeline,
     pub shockwave: vk::Pipeline,
+    /// The climate wall's curtain of light (curtain.wgsl).
+    pub curtain: vk::Pipeline,
     pub bar: vk::Pipeline,
     pub projectile: vk::Pipeline,
     pub shot: vk::Pipeline,
@@ -819,6 +821,7 @@ impl Pipelines {
         let icons = gpu.shader(spirv!("icons"))?;
         let ranges = gpu.shader(spirv!("ranges"))?;
         let shockwaves = gpu.shader(spirv!("shockwaves"))?;
+        let curtain = gpu.shader(spirv!("curtain"))?;
         let sprites = gpu.shader(spirv!("sprites"))?;
         let puffs = gpu.shader(spirv!("puffs"))?;
         let beams = gpu.shader(spirv!("beams"))?;
@@ -1061,6 +1064,15 @@ impl Pipelines {
                 Depth::Test,
                 none,
             )?,
+            curtain: scene(
+                curtain,
+                c"vs_curtain",
+                c"fs_curtain",
+                VertexKind::None,
+                Blend::Additive,
+                Depth::Test,
+                none,
+            )?,
             bar: scene(
                 icons,
                 c"vs_bar",
@@ -1191,8 +1203,8 @@ impl Pipelines {
             cull_prefix: compute_pipeline(gpu, cull, c"cs_prefix", layouts.cull)?,
             cull_scatter: compute_pipeline(gpu, cull, c"cs_scatter", layouts.cull)?,
             modules: vec![
-                terrain, entity, ground, sea, icons, ranges, shockwaves, sprites, puffs, beams,
-                shields, screen, cull, nuke,
+                terrain, entity, ground, sea, icons, ranges, shockwaves, curtain, sprites, puffs,
+                beams, shields, screen, cull, nuke,
             ],
         })
     }
@@ -1221,6 +1233,7 @@ impl Pipelines {
                 self.ring,
                 self.range,
                 self.shockwave,
+                self.curtain,
                 self.bar,
                 self.projectile,
                 self.shot,

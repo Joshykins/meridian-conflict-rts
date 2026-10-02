@@ -990,6 +990,23 @@ impl Renderer {
             );
             self.timers.end(&device, cmd);
 
+            // The climate wall's curtain (curtain.wgsl): a quad a stretch of the wall.
+            let stretches = self
+                .look
+                .divide
+                .as_ref()
+                .map_or(0, |d| d.line.len().saturating_sub(1)) as u32;
+            if stretches > 0 {
+                self.timers.draws(&device, cmd, "scene.curtain");
+                device.cmd_bind_pipeline(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipelines.curtain,
+                );
+                device.cmd_draw(cmd, stretches * 6, 1, 0, 0);
+                self.timers.end(&device, cmd);
+            }
+
             self.timers.draws(&device, cmd, "scene.rings");
             if ranges_long + ranges_short > 0 {
                 device.cmd_bind_pipeline(
