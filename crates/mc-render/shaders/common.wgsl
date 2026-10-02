@@ -637,6 +637,9 @@ struct Atmosphere {
     // regions; z how towering the most towering region's weather is, w how readily
     // the rainiest's rains (`shape.x` and `shape.z` on a map without regions).
     regions: vec4<f32>,
+    // The sunlight the sky dome is lit by: less reddened than `sun_color`, which
+    // is what reaches the ground, so overhead stays blue at sunset.
+    sky_sun: vec4<f32>,
 }
 
 // How much faster a wheeling storm's eye turns than its rim (sky.rs `VORTEX_SHEAR`).

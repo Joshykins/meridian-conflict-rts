@@ -648,13 +648,18 @@ fn sky_radiance(d: vec3<f32>) -> vec3<f32> {
 // the sky along a ray, or (at the horizon's mass) enough of the low air that
 // nothing shows through it.
 fn air_light(mu: f32, mass: f32) -> vec3<f32> {
+    return air_light_g(mu, mass, 0.78);
+}
+
+// `air_light` with the Mie forward glow's sharpness `g`.
+fn air_light_g(mu: f32, mass: f32, g: f32) -> vec3<f32> {
     let r = RAYLEIGH * RAYLEIGH_H * mass;
     let m = vec3<f32>(MIE * MIE_H * mass);
     let ext = r + m * 1.1;
-    let scatter = r * phase_rayleigh(mu) + m * phase_hg(mu, 0.78);
+    let scatter = r * phase_rayleigh(mu) + m * phase_hg(mu, g);
     // At night the scene's key light is a day-for-night moon, far brighter
     // than the real one; the dome it lights stays near black (`sun_color.w`).
-    var sky = atmos.sun_color.rgb * scatter / max(ext, vec3<f32>(1e-6)) * (1.0 - exp(-ext)) * SKY_GAIN * atmos.sun_color.w;
+    var sky = atmos.sky_sun.rgb * scatter / max(ext, vec3<f32>(1e-6)) * (1.0 - exp(-ext)) * SKY_GAIN * atmos.sun_color.w;
     // Light scattered more than once fills the shadowed side a little.
     sky += atmos.sky_color.rgb * 0.18 * (1.0 - exp(-ext * 2.0));
     return sky;
@@ -676,7 +681,9 @@ fn env_reflection(p: vec3<f32>, r: vec3<f32>, rough: f32, sky_vis: f32) -> vec3<
         let shade = textureSampleLevel(cloud_shade, clamp_sampler, uv, 0.0).r;
         let cover = 1.0 - smoothstep(0.35, 0.95, shade);
         // A cloud's underside: sunlit white where it is thin, grey where it is thick.
-        let under = atmos.sun_color.rgb * mix(0.55, 0.2, cover) * atmos.sun_color.w + atmos.sky_color.rgb * 0.6;
+        // A low sun lights the clouds' sides and tops, not their bellies.
+        let belly = smoothstep(0.1, 0.6, globals.sun.z);
+        let under = atmos.sun_color.rgb * mix(0.55, 0.2, cover) * atmos.sun_color.w * belly + atmos.sky_color.rgb * 0.6;
         // Far along the ray the clouds blur into the haze at the horizon.
         sky = mix(sky, under, cover * (1.0 - smoothstep(4000.0, 20000.0, t)));
     }
@@ -694,6 +701,10 @@ const AERIAL_H: f32 = 500.0;
 const AERIAL: f32 = 1.0;
 // The haze's glow against the drawn sky at the horizon.
 const HAZE_SKY: f32 = 0.5;
+// The haze toward a sun near the horizon: how sharply it glows forward (the sky's
+// own Mie phase is 0.78), and how bright it is against `HAZE_SKY`.
+const LOW_SUN_HAZE_G: f32 = 0.55;
+const LOW_SUN_HAZE: f32 = 0.6;
 // Damp air under a closed deck or in rain (`atmos.view.w` 1): grey haze per
 // metre of that low air, on top.
 const DAMP_MIE: f32 = 3.5e-5;
@@ -724,7 +735,11 @@ fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
     // normalize(): a point at the eye (the clouds' march, down among them,
     // finds cloud right at it) made a NaN that drew as a white texel.
     let d = (world - eye) / max(length(world - eye), 1e-3);
-    let clear = air_light(dot(d, globals.sun.xyz), 38.0) * HAZE_SKY;
+    // Toward a low sun the haze's forward glow is softened, or near land
+    // vanishes under a white veil at golden hour.
+    let low_sun = 1.0 - smoothstep(0.12, 0.55, globals.sun.z);
+    let g = mix(0.78, LOW_SUN_HAZE_G, low_sun);
+    let clear = air_light_g(dot(d, globals.sun.xyz), 38.0, g) * HAZE_SKY * mix(1.0, LOW_SUN_HAZE, low_sun);
     // Under a closed deck the air is lit by the cloud's grey light from all
     // round instead: dimmer and greyer, but still cool, not slate.
     let deck = vec3<f32>(dot(clear, vec3<f32>(0.3, 0.5, 0.2))) * vec3<f32>(0.76, 0.9, 1.04) * 0.75;

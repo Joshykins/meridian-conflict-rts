@@ -118,6 +118,9 @@ pub(crate) struct Atmosphere {
     /// x how many of `walls` are in use (0: the map has no regions), y how many
     /// regions, z the most towering of their weathers, w the rainiest's rain.
     pub(crate) regions: [f32; 4],
+    /// The sunlight the sky dome is lit by (`sun_for_sky`): less reddened than
+    /// `sun_color`, which is what reaches the ground.
+    pub(crate) sky_sun: [f32; 4],
 }
 
 /// A storm as clouds_sim.wgsl reads it.
@@ -142,7 +145,7 @@ const _: () = assert!(
             + MAX_VORTICES * 32
             + crate::gpu_consts::regions::MAX as usize * 32
             + crate::gpu_consts::regions::WALL_SEGMENTS as usize * 32
-            + 16
+            + 32
 );
 
 /// Something stirring the weather this frame. Mirrors clouds_sim.wgsl.
@@ -187,15 +190,29 @@ fn phase_hg(mu: f32, g: f32) -> f32 {
     0.0795775 * (1.0 - g * g) / (d * d.sqrt())
 }
 
-/// The sun's light at the ground.
-fn sun_at_ground(sun: Vec3) -> Vec3 {
+/// The sun's light after `redden` of the air column it crosses to reach the
+/// ground (1 the whole column). High, it is reddened less than the column would
+/// (0.6): the eye adapts, and a midday sun should read white. Low, it takes the
+/// whole column (`LOW_SUN_REDDEN`), so a golden-hour sun lights the land gold.
+fn sun_through(sun: Vec3, redden: f32) -> Vec3 {
     let m = air_mass(sun.z);
     let tau = (RAYLEIGH * RAYLEIGH_H + Vec3::splat(MIE * MIE_H * 1.1)) * m;
-    // A little less reddening than the whole column would give: the eye
-    // adapts, and a low sun should read warm, not orange.
-    let t = Vec3::new((-tau.x).exp(), (-tau.y).exp(), (-tau.z).exp()).powf(0.6);
+    let t = Vec3::new((-tau.x).exp(), (-tau.y).exp(), (-tau.z).exp()).powf(redden);
     t * SUN_POWER
 }
+
+/// The sunlight the sky's air scatters: most of the sky is lit high up, through
+/// less air than reaches the ground, so overhead stays blue at sunset.
+fn sun_for_sky(sun: Vec3) -> Vec3 {
+    sun_through(sun, 0.6)
+}
+
+/// How much of its air column a sun near the horizon is reddened by.
+const LOW_SUN_REDDEN: f32 = 1.0;
+/// How much brighter a sun near the horizon is made, and the sky with it: a little,
+/// so dawn and dusk stay readable without washing the low light out to white.
+const LOW_SUN_LIFT: f32 = 0.2;
+const LOW_SKY_LIFT: f32 = 0.3;
 
 /// `sky_radiance` from bindings.wgsl without the multiple-scattering fill.
 fn sky_single(d: Vec3, sun: Vec3, sun_rgb: Vec3) -> Vec3 {
@@ -211,6 +228,8 @@ fn sky_single(d: Vec3, sun: Vec3, sun_rgb: Vec3) -> Vec3 {
 
 struct Lighting {
     sun: Vec3,
+    /// The sunlight the sky dome is lit by (`sun_for_sky`).
+    sky_sun: Vec3,
     sky: Vec3,
     horizon: Vec3,
     ground: Vec3,
@@ -226,18 +245,21 @@ fn lighting_at_hour(hour: f32) -> (Lighting, f32) {
     // The sun's disk slips below the horizon: its direct light goes first.
     let up = smoothstep(-0.04, 0.06, sun.z);
     // A low sun lights flat ground at a glancing angle and through a lot of
-    // air; lift it (and the sky) so dawn and dusk stay warm and readable
+    // air; lift it (and the sky) a little so dawn and dusk stay readable
     // instead of murky.
     let low = 1.0 - smoothstep(0.12, 0.55, sun.z);
-    day.sun *= up * (1.0 + 0.9 * low);
-    day.sky *= 1.0 + 0.6 * low;
-    day.ground *= 1.0 + 0.6 * low;
+    let lift = up * (1.0 + LOW_SUN_LIFT * low);
+    day.sun *= lift;
+    day.sky_sun *= lift;
+    day.sky *= 1.0 + LOW_SKY_LIFT * low;
+    day.ground *= 1.0 + LOW_SKY_LIFT * low;
     let moon = MOON.normalize();
     // Day-for-night: a strong cool moon and a blue sky glow, so a night
     // battle stays readable.
     let moonlight = Vec3::new(0.34, 0.45, 0.72) * 2.4;
     let night_light = Lighting {
         sun: moonlight,
+        sky_sun: moonlight,
         sky: Vec3::new(0.09, 0.12, 0.21),
         horizon: Vec3::new(0.045, 0.06, 0.11),
         ground: Vec3::new(0.012, 0.015, 0.02) + moonlight * moon.z * 0.02,
@@ -246,6 +268,7 @@ fn lighting_at_hour(hour: f32) -> (Lighting, f32) {
     (
         Lighting {
             sun: mix(day.sun, night_light.sun),
+            sky_sun: mix(day.sky_sun, night_light.sky_sun),
             sky: mix(day.sky, night_light.sky),
             horizon: mix(day.horizon, night_light.horizon),
             ground: mix(day.ground, night_light.ground),
@@ -256,7 +279,9 @@ fn lighting_at_hour(hour: f32) -> (Lighting, f32) {
 
 /// The whole scene's light for one sun.
 fn lighting(sun: Vec3) -> Lighting {
-    let sun_rgb = sun_at_ground(sun);
+    let low = 1.0 - smoothstep(0.12, 0.55, sun.z);
+    let sun_rgb = sun_through(sun, 0.6 + (LOW_SUN_REDDEN - 0.6) * low);
+    let sky_sun = sun_for_sky(sun);
     // Cosine-weighted mean of the sky over the upper hemisphere: what a face
     // looking straight up is lit by, over pi.
     let mut sum = Vec3::ZERO;
@@ -267,7 +292,7 @@ fn lighting(sun: Vec3) -> Lighting {
             let el = j as f32 / 12.0 * std::f32::consts::FRAC_PI_2;
             let d = Vec3::new(az.cos() * el.cos(), az.sin() * el.cos(), el.sin());
             let w = el.sin() * el.cos();
-            sum += sky_single(d, sun, sun_rgb) * w;
+            sum += sky_single(d, sun, sky_sun) * w;
             weight += w;
         }
     }
@@ -275,12 +300,13 @@ fn lighting(sun: Vec3) -> Lighting {
     // Light scattered more than once, which the single-scatter sky leaves out.
     let sky = sky_single_mean * (AMBIENT_GAIN / SKY_GAIN) * 1.3;
     let away = Vec3::new(-sun.x, -sun.y, 0.0).normalize_or_zero();
-    let horizon = sky_single(Vec3::new(away.x, away.y, 0.03).normalize(), sun, sun_rgb);
+    let horizon = sky_single(Vec3::new(away.x, away.y, 0.03).normalize(), sun, sky_sun);
     // Grass and soil bounce about a fifth of what lands on them, green-brown.
     let land = Vec3::new(0.16, 0.17, 0.11);
     let ground = land * (sun_rgb * sun.z / std::f32::consts::PI + sky);
     Lighting {
         sun: sun_rgb,
+        sky_sun,
         sky,
         horizon,
         ground,
@@ -1477,6 +1503,7 @@ impl Sky {
         // w: how brightly the sky dome and clouds take that light. The
         // moonlight is day-for-night, too strong to light a believable night sky.
         atmos.sun_color = light.sun.extend(1.0 - 0.96 * dark).to_array();
+        atmos.sky_sun = light.sky_sun.extend(0.0).to_array();
         // w: brightness of the disk (the sun's, or a dimmer moon's).
         atmos.sky_color = light.sky.extend(24.0 - 16.0 * dark).to_array();
         // w: how dark it is, for the stars.

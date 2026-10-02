@@ -1396,7 +1396,9 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let ggx = a2 / (PI * dd * dd);
     let f_sun = 0.02 + 0.98 * pow(1.0 - max(dot(h, v), 0.0), 5.0);
     let spec = min(ggx * f_sun * n_dot_l / (4.0 * n_dot_v * max(n_dot_l, 0.05) + 0.001), 60.0);
-    let sun_color = vec3<f32>(1.0, 0.95, 0.85) * 2.7;
+    // The scene's sun, so a golden-hour glint is gold; scaled to the white
+    // highlight a midday sun gave before.
+    let sun_color = atmos.sun_color.rgb * 0.68;
 
     var color = optics.scatter * (vec3<f32>(1.0) - through) * (1.0 - fresnel)
         + reflected * fresnel + sun_color * spec * shadow;
