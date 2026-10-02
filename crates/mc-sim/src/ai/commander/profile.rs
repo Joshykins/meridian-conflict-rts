@@ -349,7 +349,11 @@ fn roles(bp: &UnitBlueprint, p: &Profile) -> u32 {
     {
         r |= role::SIEGE;
     }
-    if mobile && ground && !bp.has(cat::ARTILLERY) && !bp.has(cat::ENGINEER) {
+    // A gun that can only shoot up at spacecraft (the Regency's Spire) is no line unit: it
+    // never marches with the army, and stays where it was made, guarding the sky over it.
+    let fights_the_ground =
+        !p.armed() || p.hits(Target::Land) || p.hits(Target::Structure) || p.hits(Target::Surface);
+    if mobile && ground && fights_the_ground && !bp.has(cat::ARTILLERY) && !bp.has(cat::ENGINEER) {
         if matches!(p.domain, Some(Domain::Land | Domain::Hover)) {
             r |= role::LINE;
         }

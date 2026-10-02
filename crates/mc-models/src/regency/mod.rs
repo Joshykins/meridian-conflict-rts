@@ -18,6 +18,7 @@ mod commander;
 mod cyst;
 mod engineer;
 mod eye;
+mod fusion_guns;
 mod guns;
 mod hatchery;
 mod heart;
@@ -72,6 +73,20 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 2 mobile anti-air: a craft on lift, a Gravitic Seeker Battery on its back
     // (`seeker_hover`).
     ModelDef::new("regency_seeker_hover", 5.0, 5.6, seeker_hover::seeker_hover),
+    // The tech 3 mobile fusion guns (`fusion_guns`): the anti-spaceship gun raised to the sky, and the
+    // howitzer.
+    ModelDef::new(
+        "regency_skyspear",
+        fusion_guns::SKYSPEAR_RADIUS,
+        fusion_guns::SKYSPEAR_HEIGHT,
+        fusion_guns::skyspear,
+    ),
+    ModelDef::new(
+        "regency_fusion_howitzer",
+        fusion_guns::HOWITZER_RADIUS,
+        fusion_guns::HOWITZER_HEIGHT,
+        fusion_guns::howitzer,
+    ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
     // the land one's lifted ring and the air one's crown standing taller.
@@ -156,6 +171,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_fusion_cannon" => 7500,
         // Its tech 3 kit waiting on it.
         "regency_ward" => 6000,
+        // A skirted tracked body, a turret, the gun and its caged core.
+        "regency_skyspear" | "regency_fusion_howitzer" => 8000,
         _ => return None,
     })
 }
@@ -174,6 +191,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_heart_2" | "regency_heart_3" => Some(0.5),
         // The tech 1 line: faceted plates and lift bells that keep their shape when reduced.
         "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" => Some(0.5),
+        // Faceted plates and skirts that keep their sides when reduced.
+        "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
         _ => None,
     }
 }

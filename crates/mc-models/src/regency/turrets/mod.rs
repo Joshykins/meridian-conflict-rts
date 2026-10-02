@@ -15,7 +15,9 @@
 mod canopy;
 mod halberd;
 mod picket;
-mod sunspear;
+/// The Sunspear's gun pieces are shared by the tech 3 mobile fusion guns
+/// (`fusion_guns`), the same gun drawn smaller.
+pub(super) mod sunspear;
 
 pub(super) use canopy::canopy;
 pub(super) use halberd::halberd;

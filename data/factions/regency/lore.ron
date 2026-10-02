@@ -14,6 +14,18 @@
             "Gravitic Bomb": "A charge of plasma held in a gravity cage between the claws, thrown, and let go all at once where it comes down.",
         },
     ),
+    "regency_t3_mobile_aa": (
+        lore: "A fusion gun lifted off the Sunspear's keep and raised to the sky, carried to wherever warships hang over the field.",
+        weapons: {
+            "Pinch-fusion Cannon": "Plasma squeezed until it fuses and pinched out in one fast shot up at a hull in the upper air, where it opens like a small sun.",
+        },
+    ),
+    "regency_t3_artillery": (
+        lore: "A long pinch bore that charges coil by coil and lobs a single shot of fusion over the horizon; where it lands the ground runs like glass.",
+        weapons: {
+            "Pinch-fusion Howitzer": "One great charge of fusion thrown high, landing as a blinding strike that melts a pool into the ground and leaves a knot of fusion burning over it.",
+        },
+    ),
     "regency_t1_engineer": (
         lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},

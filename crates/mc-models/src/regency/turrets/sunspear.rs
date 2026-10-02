@@ -47,8 +47,8 @@ pub(super) const LINE: Line = Line::new(
 /// How far round the charge its projectors stand (drawn): none closer than 0.4 of it.
 #[cfg(test)]
 const HOLD: f32 = 4.0 * SCALE;
-/// The foot of the core's cradle, authored.
-const CORE: Vec3 = Vec3::new(-6.2, 0.0, 11.4);
+/// The foot of the core's cradle, authored (the cable runs from it to the trunnions).
+pub(in crate::regency) const CORE: Vec3 = Vec3::new(-6.2, 0.0, 11.4);
 /// The core above it.
 const CORE_MID: Vec3 = Vec3::new(-6.2, 0.0, 15.8);
 
@@ -109,7 +109,7 @@ pub(crate) fn sunspear(b: &mut MeshBuilder, _tech: u8) {
 
 /// A `GLOW_LASER` brush lit with the charge at `stage` (0 first, 6 last; `HEAT_STAGE` lit
 /// by the shot instead): the Regency's plasma coil light.
-fn coil_light(b: &mut MeshBuilder, stage: u32) {
+pub(in crate::regency) fn coil_light(b: &mut MeshBuilder, stage: u32) {
     b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
 }
 
@@ -153,7 +153,7 @@ fn ringed(b: &mut MeshBuilder) {
 /// sleeved over it carries two gravity lenses on its inner face. The bore recoils; the
 /// rails part through the charge (`SPREAD`, the ties telescoping), and the heads slide
 /// out along them into the charge (`REACH`).
-fn rails(b: &mut MeshBuilder, len: f32) {
+pub(in crate::regency) fn rails(b: &mut MeshBuilder, len: f32) {
     let fine = b.fine();
     collar(b, Vec3::ZERO, Vec3::Y, 1.6, 10.6);
     dark_plate(b);
@@ -269,7 +269,7 @@ fn lens_head(b: &mut MeshBuilder, len: f32) {
 
 /// A gravity lens at `at`, turned to `toward`: a bronze housing ringed in plate, a red
 /// lens in its face, four bronze vanes round it.
-fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f32) {
+pub(in crate::regency) fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f32) {
     let d = (toward - at).normalize();
     let sides = b.sides(10);
     metal(b);
@@ -295,7 +295,7 @@ fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f32) {
 /// The pinch coils in the gun's frame: a magnetic bottle down the bore, coils narrowing
 /// toward the mouth, each wound in bronze, a red light inside each that comes on with
 /// the charge, the coil nearest the breech first.
-fn pinch_coils(b: &mut MeshBuilder) {
+pub(in crate::regency) fn pinch_coils(b: &mut MeshBuilder) {
     let fine = b.fine();
     let coils: &[(f32, f32, u32)] = if fine {
         &[
@@ -321,7 +321,7 @@ fn pinch_coils(b: &mut MeshBuilder) {
 /// The caged core over the turret's back at `c` (the cradle's foot): a red core held in
 /// three bronze gimbal rings and a plated band, on a plated cradle in four bronze fingers,
 /// conduits running forward to the trunnions either side.
-fn caged_core(b: &mut MeshBuilder, c: Vec3) {
+pub(in crate::regency) fn caged_core(b: &mut MeshBuilder, c: Vec3) {
     let fine = b.fine();
     let mid = c + Vec3::Z * 4.4;
     dark_plate(b);

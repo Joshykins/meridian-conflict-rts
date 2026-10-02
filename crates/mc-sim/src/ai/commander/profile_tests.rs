@@ -24,6 +24,12 @@ fn roles_come_from_what_a_unit_can_do() {
     assert!(has("aster_t1_submarine", role::HUNTER | role::ANTI_SHIP));
     assert!(has("aster_t1_bomber", role::STRIKE));
     assert!(has("aster_t4_anti_ship", role::ANTI_SPACE));
+    // A mobile gun that shoots only at spacecraft is not marched with the line.
+    assert!(has("regency_t3_mobile_aa", role::ANTI_SPACE));
+    for r in [role::LINE, role::RAIDER, role::ANTI_AIR] {
+        assert!(!has("regency_t3_mobile_aa", r));
+    }
+    assert!(has("regency_t3_artillery", role::ARTILLERY | role::SIEGE));
     assert!(!has("aster_t1_tank", role::ANTI_AIR));
     let sub = profile(&b, "aster_t1_submarine");
     assert_eq!(sub.is, Some(Target::Submerged));

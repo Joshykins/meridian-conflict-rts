@@ -1,0 +1,85 @@
+// The Regency's tech 3 land units, made by the Anvil III. Models: `models::regency::*`; a model
+// authored at another size says so, and its tests tie these numbers to it.
+[
+    // Mobile anti-spaceship gun: a Pinch-fusion gun raised to the sky, the Sunspear's gun drawn
+    // small on a moving body, the Regency's answer to warships in the upper air that ARC
+    // meets with the Zenith and the Narwhal. It charges for a long beat, then pinches out one
+    // fast shot of fusion up at the hull, and shoots at nothing else: escorts keep it alive.
+    //
+    // Balance: anchored on ARC's tech 3 anti-ship gun, the Narwhal (3800 mass, 40000 HP, 12000
+    // every 6 s at 3000 m), and the Zenith (tech 4, 40000 every 7 s at 3200 m), scaled down to
+    // a tech 3 unit a factory makes. Bent the Regency way: it hits harder for its mass (7000
+    // every 6 s, 0.65 DPS a mass point against the Narwhal's 0.53) from a shorter reach
+    // (2400 m), and is light (9000 HP), a gun that needs escorts. Three of them
+    // bring down an ARC frigate (55000 HP) in about 16 s.
+    //
+    // Model: `regency_skyspear` (`models::regency::fusion_guns::skyspear`), authored at this
+    // size; `pivot`/`muzzle` are its trunnion and the middle of its charge.
+    (
+        key: "regency_t3_mobile_aa",
+        name: "Spire",
+        role: "Mobile Anti-Ship Gun", title: "Anti-Ship",
+        tech: 3,
+        categories: ["Land", "AntiAir"],
+        health: 9000,
+        cost: (mass: 1800, energy: 18000, time: 6000),
+        radius: 7.0, height: 10.0,
+        vision: 600,
+        motion: (layer: Land, size: 1, speed: 24, accel: 18, turn: 70),
+        weapons: [(
+            name: "Pinch-fusion Cannon",
+            damage: 7000, splash: 12, range: 2400, reload: 6.0, speed: 1350, trajectory: Direct,
+            turret_turn: 40, muzzle: (4.821, 0, 11.145), pivot: (0, 0, 5.4),
+            targets: ["Space"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion),
+            flash: 0.6, impact: 2.0, tracer: 2.0,
+            sounds: (
+                fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.2,
+                charge_volume: 1.6,
+                impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+            ),
+        )],
+        mesh: "regency_skyspear", icon: AntiAir,
+        sounds: (death: "blast_large", moving: "tracks_heavy"),
+    ),
+    // Heavy artillery: a Pinch-fusion Howitzer. It charges for a long beat, the coils down its
+    // bore lighting one after another, then lobs one great shot of fusion high over the
+    // field that lands with the Sunspear's strike: the ground melted into a glowing pool and a
+    // knot of fusion left burning over it.
+    //
+    // Balance: the Trebuchet's (800 mass, 4715 HP, 4467 damage every 10 s at 1800 m, 48 m
+    // splash, 4.6 degrees of spread). Bent the Regency way: it hits harder (5200) in a tighter
+    // blast (40 m), laid truer (2.5 degrees) from a shorter reach (1600 m), and charges longer
+    // (2.8 s against 2.4 s).
+    //
+    // Model: `regency_fusion_howitzer` (`models::regency::fusion_guns::howitzer`), authored at
+    // this size; `pivot`/`muzzle` are its trunnion and the middle of its charge.
+    (
+        key: "regency_t3_artillery",
+        name: "Kiln",
+        role: "Mobile Fusion Artillery", title: "Heavy Artillery",
+        tech: 3,
+        categories: ["Land", "Artillery"],
+        health: 4900,
+        cost: (mass: 820, energy: 6600, time: 4800),
+        radius: 11.0, height: 9.5,
+        vision: 220,
+        motion: (layer: Land, size: 2, speed: 22, accel: 16, turn: 70),
+        weapons: [(
+            name: "Pinch-fusion Howitzer",
+            damage: 5200, splash: 40, range_min: 150, range: 1600, reload: 10.0, speed: 240,
+            trajectory: Ballistic, loft: 6, spread: 2.5,
+            turret_turn: 45, muzzle: (12.066, 0, 10.435), pivot: (-2.2, 0, 5.8),
+            targets: ["Structure", "Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion),
+            flash: 1.0, impact: 3.0, tracer: 2.4,
+            sounds: (
+                fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.8,
+                charge_volume: 1.6,
+                impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+            ),
+        )],
+        mesh: "regency_fusion_howitzer", icon: Artillery,
+        sounds: (death: "blast_large", moving: "tracks_heavy"),
+    ),
+]

@@ -200,6 +200,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Battle scorpion (T4) | Harrow |
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |
 | Battle tank / mobile anti-air (T2) | Glaive / Vane |
+| Anti-spaceship gun, heavy artillery (T3) | Spire, Kiln |
 | Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |

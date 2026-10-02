@@ -50,7 +50,7 @@
 use super::{Puff, Renderer, PUFF_RING};
 use crate::gpu_consts::{fade_beam, puff};
 use glam::Vec3;
-use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
+use mc_data::{BlueprintId, PlasmaGrade, Weapon};
 use mc_sim::mirror::{
     ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
     PROJECTILE_FADE_BEAM, PROJECTILE_MISSILE, PROJECTILE_STARTS_SHIFT,
@@ -105,13 +105,13 @@ pub(super) enum Grade {
     Fusion,
 }
 
-/// The grade a weapon is drawn as: a direct-fire plasma gun, or one laid flat whose shot
-/// arcs a little (`Weapon::flat_fire`, the Sunspear's), or a Gravitic Seeker (a guided
-/// plasma `missile`) with a proximity fuse, which leaves its cradle and bursts as flak
-/// does. None for a beam, a thrown charge, any other missile, or anything not plasma.
+/// The grade a weapon is drawn as: a plasma gun firing straight, laid flat with its shot
+/// arcing a little (`Weapon::flat_fire`, the Sunspear's), or lobbing it high (the
+/// Pinch-fusion Howitzer's), or a Gravitic Seeker (a guided plasma `missile`) with a
+/// proximity fuse, which leaves its cradle and bursts as flak does. None for a beam, a
+/// thrown charge, any other missile, or anything not plasma.
 pub(super) fn grade(w: &Weapon) -> Option<Grade> {
-    let lobbed = w.trajectory == Trajectory::Ballistic && !w.flat_fire;
-    if w.beam || w.curve.0 > 0 || lobbed {
+    if w.beam || w.curve.0 > 0 {
         return None;
     }
     let grade = match w.plasma_grade? {
