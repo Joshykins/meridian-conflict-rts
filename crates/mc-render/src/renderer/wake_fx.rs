@@ -1,35 +1,39 @@
 //! A cone weapon's wake as it is drawn (`Weapon::cone`, the Regency Wake's projector;
 //! docs/STYLE.md "The Regency suite"): the plasma the projector gathered across its mouth
-//! (drawn as a Pinched charge, `regency_guns_fx`) is let go as a shell of red light that
-//! opens from the muzzle across the fan and rolls out over the ground, at the pace the
-//! sim's front rolls (`Cone::speed`), to the end of its reach.
+//! (drawn as a Pinched charge, `regency_guns_fx`) is let go as a wave of red plasma that
+//! rolls out over the ground across the fan, at the pace the sim's front rolls
+//! (`Cone::speed`), to the end of its reach, and leaves a trail of cooling light behind it.
 //!
-//! - **The mouth:** a hard red flash where the charge hung, the charge collapsing into it.
-//! - **The shell** (`wake_shell.rs`, wake_shell.wgsl): from the muzzle a cone across the
-//!   fan, swelling and closing in a tall rounded dome at the front, half of it standing
-//!   over the ground. Faint seen square on, bright at its edges, threaded with thin streaks,
-//!   white-hot where it meets the ground; faint back at the muzzle, brightest at the front.
-//! - **Where it meets the ground** the dome's foot kicks up clods, a little low dust and
-//!   sparks as it passes; its light runs with it, and the trees bow as it goes by.
-//! - **Where it runs out** it fades where it stands.
+//! - **The mouth:** a white-hot flash where the charge hung, the charge collapsing into
+//!   it, and plasma thrown out down the bore.
+//! - **The front** (`wake_shell.rs`, wake_shell.wgsl): a rolling crest arched over the
+//!   fan, white-hot on its leading face, pink-hot over the top, red down its back. Its
+//!   feet throw up clods, dust and sparks of every heat as it passes; its light runs with
+//!   it, and the trees bow as it goes by. Run out, it swells, cools and breaks up, throwing
+//!   off the last of its plasma.
+//! - **The trail:** a shell from the muzzle out to the crest, hot where the front has just
+//!   passed and cooling behind it to red, a deep ember and a violet rim, eaten away from
+//!   the muzzle out. Its feet leave clumps of plasma burning on the ground and embers
+//!   rising off it.
 //!
 //! Its ground effects are laid a tick at a time as the front gets there (`roll_wakes`,
-//! from `regency_trails`); the shell itself is drawn where the front stands each frame
-//! (`upload_wake_shells`). Presentation only; the renderer's own clock.
+//! from `regency_trails`); the front and trail themselves are drawn where the front stands
+//! each frame (`upload_wake_shells`). Presentation only; the renderer's own clock.
 
-use super::regency_guns_fx::{BURST, GLOW, HOT, MOTE, RED};
+use super::regency_guns_fx::{BURST, GLOW, HOT, MOTE, RED, WAKE, WHITE};
 use super::wake_shell::GpuWakeShell;
 use super::{Renderer, PUFF_CLOD, PUFF_DUST};
-use crate::gpu_consts::wake_shell::{CAP, MAX_SHELLS, SWELL};
+use crate::gpu_consts::wake_shell::{BREAK, LAG, LINGER, MAX_SHELLS, WIDTH};
 use glam::{Vec2, Vec3};
 use mc_data::BlueprintId;
 
 /// Metres between the stretches of the front's foot laid at once.
 const RING: f32 = 6.0;
-/// Seconds the shell takes to fade where it stands once it has run out.
-const FADE: f32 = 0.45;
 /// The shell's height over its half-width.
 const RISE: f32 = 0.85;
+/// The wake's plasma between red and white-hot (wake_shell.wgsl `HOT`): more orange
+/// than the rest of the suite's pink-hot, so a wake runs red, orange and white.
+const FIRE: Vec3 = Vec3::new(1.0, 0.42, 0.16);
 
 /// A wake rolling out.
 #[derive(Clone, Copy)]
@@ -40,8 +44,9 @@ pub(super) struct RollingWake {
     at: Vec3,
     ahead: Vec2,
     start: f32,
-    /// Stretches of its foot laid so far.
+    /// Stretches of its foot laid so far, and whether its front has broken up.
     laid: usize,
+    broken: bool,
 }
 
 /// What a wake's weapon says of how it is drawn.
@@ -71,7 +76,7 @@ impl Renderer {
         }
         let flash = w.flash.max(0.3);
 
-        // The mouth: the charge collapses into a hard red flash as the plasma goes out.
+        // The mouth: the charge collapses into a white-hot flash as the plasma goes out.
         self.charge_spent(blueprint, weapon, at, 0.16, time);
         let s = 2.2 * flash;
         self.push_lit(
@@ -81,7 +86,7 @@ impl Renderer {
             time,
             0.22,
             (s * 0.6, s * 2.4),
-            RED * 4.0,
+            RED.lerp(HOT, 0.4) * 4.0,
             0.0,
         );
         self.push_lit(
@@ -91,12 +96,13 @@ impl Renderer {
             time,
             0.12,
             (s * 0.8, s * 1.2),
-            HOT * 3.0,
+            WHITE * 3.0,
             0.0,
         );
+        self.plasma_jet(at, dir, s, false, time);
         self.plasma_fx
             .guns
-            .flare(at, RED * 260.0 * flash, s * 14.0, time, 0.3);
+            .flare(at, HOT * 260.0 * flash, s * 14.0, time, 0.3);
 
         // A deliberate cosmetic cap, as many as the shells drawn: the oldest goes first.
         let wakes = &mut self.plasma_fx.wakes;
@@ -110,6 +116,7 @@ impl Renderer {
             ahead: dir.truncate().normalize_or(Vec2::X),
             start: time,
             laid: 0,
+            broken: false,
         });
     }
 
@@ -125,8 +132,8 @@ impl Renderer {
         })
     }
 
-    /// Every rolling wake's foot laid out as far as its front gets by the next tick; one
-    /// that has run out and faded is let go.
+    /// Every rolling wake's foot laid out as far as its front gets by the next tick, and
+    /// its front broken up once it has run out; one whose trail has gone out is let go.
     pub(super) fn roll_wakes(&mut self, time: f32) {
         let until = time + self.tick_seconds.max(0.02);
         let mut i = 0;
@@ -137,7 +144,7 @@ impl Renderer {
                 continue;
             };
             let end = wake.start + reach.range / reach.speed;
-            if time > end + FADE {
+            if time > end + LINGER {
                 self.plasma_fx.wakes.remove(i);
                 continue;
             }
@@ -146,14 +153,17 @@ impl Renderer {
                 self.lay_foot(&wake, wake.laid, reach);
                 wake.laid += 1;
             }
+            if !wake.broken && until >= end {
+                self.break_front(&wake, reach, end);
+                wake.broken = true;
+            }
             self.plasma_fx.wakes[i] = wake;
             i += 1;
         }
     }
 
-    /// The shells of the rolling wakes, where their fronts stand at `time`.
+    /// The fronts and trails of the rolling wakes, where their fronts stand at `time`.
     pub(super) fn upload_wake_shells(&mut self, time: f32) {
-        let water = self.map_info.water_level.to_f32();
         let mut shells = Vec::with_capacity(self.plasma_fx.wakes.len());
         for wake in &self.plasma_fx.wakes {
             let Some(reach) = self.wake_reach(wake) else {
@@ -161,44 +171,47 @@ impl Renderer {
             };
             let age = time - wake.start;
             let end = reach.range / reach.speed;
-            let front = (age * reach.speed).clamp(0.0, reach.range);
-            let fade = (age / 0.05).clamp(0.0, 1.0) * (1.0 - ((age - end) / FADE).clamp(0.0, 1.0));
-            let ground = |xy: Vec2| self.ground_height(xy).max(water);
-            let tip = wake.at.truncate() + wake.ahead * front;
             shells.push(GpuWakeShell {
                 apex: wake.at.to_array(),
                 start: wake.start,
                 ahead: wake.ahead.to_array(),
                 spread: reach.spread,
-                front,
-                base: [ground(wake.at.truncate()), ground(tip)],
+                front: (age * reach.speed).clamp(0.0, reach.range),
+                speed: reach.speed,
                 rise: RISE,
-                fade,
+                fade: (age / 0.05).clamp(0.0, 1.0),
+                spent: age - end,
             });
         }
         self.wake_shells.upload(&shells);
     }
 
+    /// A point on the ground along the front's feet when it stands `r` out: `across` of
+    /// the way from its middle (0) to one foot (±1), and which way it throws things off.
+    fn front_foot(&self, wake: &RollingWake, reach: Reach, r: f32, across: f32) -> (Vec3, Vec2) {
+        let water = self.map_info.water_level.to_f32();
+        let side = Vec2::new(-wake.ahead.y, wake.ahead.x);
+        let half = r * reach.spread * WIDTH;
+        // The crest's feet trail its top (wake_shell.wgsl `vs_wake_front`).
+        let back = LAG * half * (1.0 - (1.0 - across * across).max(0.0).sqrt());
+        let xy = wake.at.truncate() + wake.ahead * (r - back) + side * (half * across);
+        let out = (wake.ahead + side * across * 0.8).normalize_or(wake.ahead);
+        (xy.extend(self.ground_height(xy).max(water)), out)
+    }
+
     /// Stretch `k` of `wake`'s foot, as the front reaches it: clods, a little low dust and
-    /// sparks kicked up along the dome's foot, its light, the trees bowing.
+    /// sparks of every heat kicked up along the front's feet, plasma left burning at the
+    /// trail's feet and embers rising off it, its light, the trees bowing.
     fn lay_foot(&mut self, wake: &RollingWake, k: usize, reach: Reach) {
         let r = ring_at(k);
         let when = wake.start + r / reach.speed;
         let water = self.map_info.water_level.to_f32();
-        let side = Vec2::new(-wake.ahead.y, wake.ahead.x);
-        // The dome's foot then: round its front from one side to the other.
-        let foot = |me: &mut Renderer| -> (Vec3, Vec2) {
-            let u = 0.55 + 0.45 * me.scatter.unit();
-            let across = r * reach.spread * shell_width(u) * me.scatter.signed().signum();
-            let xy = wake.at.truncate() + wake.ahead * (r * u) + side * across;
-            let out = (wake.ahead * (1.0 - u + 0.15) + side * across.signum() * 0.6)
-                .normalize_or(wake.ahead);
-            (xy.extend(me.ground_height(xy).max(water)), out)
-        };
-        let width = r * reach.spread * (1.0 + SWELL);
+        let width = r * reach.spread * WIDTH;
         let kicks = ((width / 6.0).ceil() as usize).clamp(2, 10);
         for _ in 0..kicks {
-            let (p, out) = foot(self);
+            // Most where its feet come down, fewer under its arch between them.
+            let across = self.scatter.unit().sqrt() * self.scatter.signed().signum();
+            let (p, out) = self.front_foot(wake, reach, r, across);
             let wet = p.z <= water + 0.05;
             let speed = 6.0 + 9.0 * self.scatter.unit();
             let vel = (out * speed).extend(5.0 + 9.0 * self.scatter.unit()) * reach.impact.sqrt();
@@ -207,9 +220,10 @@ impl Renderer {
                 let size = 0.25 + 0.3 * self.scatter.unit();
                 self.push_puff(PUFF_CLOD, p + Vec3::Z * 0.4, vel, when, life, (size, 0.3));
             }
-            if self.scatter.unit() < 0.5 {
+            if self.scatter.unit() < 0.6 {
                 let spark = (out * speed * 1.5).extend(4.0 + 8.0 * self.scatter.unit());
-                let life = 0.3 + 0.3 * self.scatter.unit();
+                let life = 0.3 + 0.4 * self.scatter.unit();
+                let heat = self.scatter.unit();
                 self.push_lit(
                     MOTE,
                     p + Vec3::Z * 0.3,
@@ -217,14 +231,15 @@ impl Renderer {
                     when,
                     life,
                     (0.3, 0.1),
-                    RED.lerp(HOT, 0.5) * 4.0,
+                    plasma_heat(heat) * 4.0,
                     0.0,
                 );
             }
         }
-        // A little low dust thrown off its foot, every other stretch.
+        // A little low dust thrown off its feet, every other stretch.
         if k % 2 == 1 {
-            let (p, out) = foot(self);
+            let across = self.scatter.signed().signum();
+            let (p, out) = self.front_foot(wake, reach, r, across);
             if p.z > water + 0.05 {
                 let vel = (out * 4.0).extend(1.5);
                 let size = 2.0 + 1.5 * self.scatter.unit();
@@ -238,13 +253,52 @@ impl Renderer {
                 );
             }
         }
+        // Behind it, a clump of plasma left burning at the trail's feet, and embers rising
+        // slowly off the trail as it cools.
+        if k.is_multiple_of(2) && r > 20.0 {
+            let across = self.scatter.signed().signum() * (0.8 + 0.2 * self.scatter.unit());
+            let (p, _) = self.front_foot(wake, reach, r, across);
+            let size = 0.6 + 0.05 * width.min(30.0) * (0.5 + self.scatter.unit());
+            let heat = 0.1 + 0.3 * self.scatter.unit();
+            let life = 1.2 + 0.5 * self.scatter.unit();
+            self.push_lit(
+                WAKE,
+                p + Vec3::Z * size * 0.3,
+                Vec3::Z * 0.6,
+                when + 0.05,
+                life,
+                (size, size * 1.4),
+                plasma_heat(heat) * 1.2,
+                0.0,
+            );
+        }
+        for _ in 0..2 {
+            let across = self.scatter.signed();
+            let (p, _) = self.front_foot(wake, reach, r, across);
+            let up = width * RISE * (1.0 - across * across).max(0.0).sqrt() * self.scatter.unit();
+            let drift = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 1.5;
+            let heat = 0.2 + 0.6 * self.scatter.unit();
+            let vel = drift + Vec3::Z * (2.0 + 3.0 * self.scatter.unit());
+            let start = when + 0.1 + 0.3 * self.scatter.unit();
+            let life = 0.8 + 0.8 * self.scatter.unit();
+            self.push_lit(
+                MOTE,
+                p + Vec3::Z * up,
+                vel,
+                start,
+                life,
+                (0.22, 0.08),
+                plasma_heat(heat) * 3.0,
+                0.0,
+            );
+        }
         // Its light runs with the front; the trees bow as it goes by.
         let mid = wake.at.truncate() + wake.ahead * r;
         let mid = mid.extend(self.ground_height(mid).max(water));
         if k.is_multiple_of(2) {
             self.plasma_fx.guns.flare(
                 mid + Vec3::Z * width * RISE * 0.5,
-                RED * 140.0 * reach.impact,
+                RED.lerp(HOT, 0.35) * 140.0 * reach.impact,
                 width * 1.4 + 10.0,
                 when,
                 0.25,
@@ -254,6 +308,43 @@ impl Renderer {
             self.tree_blasts.record(mid, when, width + 12.0, 0.8, true);
         }
     }
+
+    /// The front run out at `when`: it breaks up where it stands, throwing off the last of
+    /// its plasma round its arch.
+    fn break_front(&mut self, wake: &RollingWake, reach: Reach, when: f32) {
+        let r = reach.range;
+        let width = r * reach.spread * WIDTH;
+        let pieces = ((width / 4.0).ceil() as usize).clamp(4, 16);
+        for n in 0..pieces {
+            let phi = std::f32::consts::PI * (n as f32 + self.scatter.unit()) / pieces as f32;
+            let (p, out) = self.front_foot(wake, reach, r, phi.cos());
+            let up = width * RISE * phi.sin();
+            let size = 1.2 + 0.06 * width.min(40.0) * (0.6 + 0.6 * self.scatter.unit());
+            let vel = (out * (3.0 + 4.0 * self.scatter.unit())).extend(2.0 + 2.0 * phi.sin());
+            let heat = 0.5 + 0.4 * self.scatter.unit();
+            let start = when + 0.06 * self.scatter.unit();
+            let life = 0.6 + 0.4 * self.scatter.unit();
+            self.push_lit(
+                WAKE,
+                p + Vec3::Z * up,
+                vel,
+                start,
+                life,
+                (size, size * 1.6),
+                plasma_heat(heat) * 2.0,
+                0.0,
+            );
+        }
+        let mid = wake.at.truncate() + wake.ahead * r;
+        let mid = mid.extend(self.ground_height(mid) + width * RISE * 0.5);
+        self.plasma_fx.guns.flare(
+            mid,
+            HOT * 120.0 * reach.impact,
+            width * 1.6 + 10.0,
+            when,
+            BREAK,
+        );
+    }
 }
 
 /// How far out stretch `k` of a wake's foot is laid, metres.
@@ -261,14 +352,12 @@ fn ring_at(k: usize) -> f32 {
     4.0 + k as f32 * RING
 }
 
-/// The shell's half-width `u` of the way out, in fan half-widths at the front
-/// (wake_shell.wgsl `shell_width`).
-fn shell_width(u: f32) -> f32 {
-    let close = if u > CAP {
-        (1.0 - ((u - CAP) / (1.0 - CAP)).powi(2)).max(0.0).sqrt()
+/// The Regency's plasma by heat, 0 a deep red to 1 white-hot (wake_shell.wgsl
+/// `wake_heat`, without its ember end: a spark or clump cools in its own shader).
+fn plasma_heat(h: f32) -> Vec3 {
+    if h < 0.5 {
+        RED.lerp(FIRE, h * 2.0)
     } else {
-        1.0
-    };
-    let swell = ((u - 0.45) / 0.4).clamp(0.0, 1.0);
-    u * (1.0 + SWELL * swell * swell * (3.0 - 2.0 * swell)) * close
+        FIRE.lerp(WHITE, (h - 0.5) * 2.0)
+    }
 }

@@ -68,7 +68,7 @@ mod strike;
 const ORB: f32 = puff::PLASMA_ORB as f32;
 pub(super) const BURST: f32 = puff::PLASMA_BURST as f32;
 pub(super) const GLOB: f32 = puff::PLASMA_GLOB as f32;
-const WAKE: f32 = puff::PLASMA_WAKE as f32;
+pub(super) const WAKE: f32 = puff::PLASMA_WAKE as f32;
 pub(super) const GLOW: f32 = puff::WARP_GLOW as f32;
 const STREAK: f32 = puff::WARP_STREAK as f32;
 const ARC: f32 = puff::WARP_ARC as f32;
@@ -78,7 +78,7 @@ pub(super) const MOTE: f32 = puff::WARP_MOTE as f32;
 /// and the white of fusion.
 pub(super) const RED: Vec3 = Vec3::new(1.0, 0.07, 0.04);
 pub(super) const HOT: Vec3 = Vec3::new(1.0, 0.55, 0.5);
-const WHITE: Vec3 = Vec3::new(1.0, 0.96, 1.0);
+pub(super) const WHITE: Vec3 = Vec3::new(1.0, 0.96, 1.0);
 /// Share of its birth speed a mote covers in its life of `MOTE_LIFE` seconds
 /// (warp_puffs.wgsl: drag 1.8), so one aimed at the ball arrives as it dies.
 const MOTE_LIFE: f32 = 0.5;
@@ -820,7 +820,7 @@ impl Renderer {
     /// The plasma a squeezed charge throws out down the line of fire `dir` as it lets a
     /// shot go: a cone of wake puffs driven forward, slowing and spreading, red for a
     /// Pinched bolt, white going pink for fusion.
-    fn plasma_jet(&mut self, at: Vec3, dir: Vec3, size: f32, fusion: bool, time: f32) {
+    pub(super) fn plasma_jet(&mut self, at: Vec3, dir: Vec3, size: f32, fusion: bool, time: f32) {
         let (count, speed, life) = if fusion {
             (14, size * 9.0, 0.6)
         } else {

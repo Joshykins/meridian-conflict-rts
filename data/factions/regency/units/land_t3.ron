@@ -84,8 +84,9 @@
     ),
     // The wake tank: a heavy armoured hover tank on four lift bells, built round one wide
     // projector in a low turret. It gathers plasma across the projector's mouth and pinches
-    // it out as a wake: a shell of red light, a cone from the projector swelling into a tall
-    // dome at its front, that rolls out along the ground at a walking pace for a gun (90 m
+    // it out as a wake: a rolling crest of plasma arched over the fan, white-hot, orange and
+    // red, leaving a trail of cooling red light back to the projector, that rolls out along
+    // the ground at a walking pace for a gun (90 m
     // a second), and strikes everything it rolls over (`cone`, `mc-sim` `wake.rs`; drawn by
     // `wake_fx.rs` and wake_shell.wgsl), in a narrow fan 8 degrees either side of
     // the projector's line, full weight close in and two fifths of it at the end of its

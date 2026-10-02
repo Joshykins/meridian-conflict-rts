@@ -1,6 +1,7 @@
-//! Cone weapons' wakes drawn as shells of light (wake_shell.wgsl): the buffer of live
-//! shells, its descriptor set and the pipeline that lays them over the scene after the
-//! water. What each shell is, frame by frame, comes from `wake_fx`.
+//! Cone weapons' wakes drawn in light (wake_shell.wgsl): the buffer of live wakes, its
+//! descriptor set and the two pipelines that lay them over the scene after the water, the
+//! trail each leaves and the rolling front ahead of it. What each wake is, frame by frame,
+//! comes from `wake_fx`.
 
 use std::mem::size_of;
 
@@ -8,7 +9,7 @@ use ash::vk;
 use bytemuck::{Pod, Zeroable};
 
 use crate::gpu::{Buffer, Gpu, GpuError};
-use crate::gpu_consts::wake_shell::{ALONG, AROUND, MAX_SHELLS};
+use crate::gpu_consts::wake_shell::{ALONG, ARCH, AROUND, MAX_SHELLS, TUBE};
 use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind};
 use crate::shader_reload::spirv;
 
@@ -22,14 +23,15 @@ pub(crate) struct GpuWakeShell {
     /// Which way it rolls (unit length), and the tangent of the fan's half-angle.
     pub(crate) ahead: [f32; 2],
     pub(crate) spread: f32,
-    /// Metres out the front stands now.
+    /// Metres out the front stands now, and metres a second it rolls.
     pub(crate) front: f32,
-    /// The ground's height under the muzzle and under the front.
-    pub(crate) base: [f32; 2],
+    pub(crate) speed: f32,
     /// The shell's height over its half-width.
     pub(crate) rise: f32,
     /// 0 gone, 1 full.
     pub(crate) fade: f32,
+    /// Seconds since the front ran out; below 0 while it rolls.
+    pub(crate) spent: f32,
 }
 
 pub(super) struct WakeShells {
@@ -37,8 +39,10 @@ pub(super) struct WakeShells {
     pool: vk::DescriptorPool,
     set: vk::DescriptorSet,
     module: vk::ShaderModule,
-    pipeline: vk::Pipeline,
-    /// Shells written this frame.
+    /// The trail, and the front over it.
+    trail: vk::Pipeline,
+    front: vk::Pipeline,
+    /// Wakes written this frame.
     count: u32,
 }
 
@@ -89,26 +93,31 @@ impl WakeShells {
         // live storage buffer of this device, and `writes`/`infos` live to the end of the call.
         unsafe { dev.update_descriptor_sets(&writes, &[]) };
         let module = gpu.shader(spirv!("wake_shell"))?;
-        let pipeline = pipelines::graphics_pipeline(
-            gpu,
-            &PipelineDesc {
-                module,
-                vs: c"vs_wake_shell",
-                fs: c"fs_wake_shell",
-                layout: layouts.scene,
-                pass: passes.scene_over,
-                vertex: VertexKind::None,
-                blend: Blend::Premultiplied,
-                depth: Depth::Test,
-                cull: vk::CullModeFlags::NONE,
-            },
-        )?;
+        let pipeline = |vs, fs| {
+            pipelines::graphics_pipeline(
+                gpu,
+                &PipelineDesc {
+                    module,
+                    vs,
+                    fs,
+                    layout: layouts.scene,
+                    pass: passes.scene_over,
+                    vertex: VertexKind::None,
+                    blend: Blend::Premultiplied,
+                    depth: Depth::Test,
+                    cull: vk::CullModeFlags::NONE,
+                },
+            )
+        };
+        let trail = pipeline(c"vs_wake_trail", c"fs_wake_trail")?;
+        let front = pipeline(c"vs_wake_front", c"fs_wake_front")?;
         Ok(Self {
             buffer,
             pool,
             set,
             module,
-            pipeline,
+            trail,
+            front,
             count: 0,
         })
     }
@@ -121,7 +130,8 @@ impl WakeShells {
         self.count = shells.len() as u32;
     }
 
-    /// Inside `scene_over` with the scene's set 0 bound: lays the shells over the scene.
+    /// Inside `scene_over` with the scene's set 0 bound: lays the wakes over the scene,
+    /// their trails and then their fronts.
     pub(super) fn draw(
         &self,
         device: &ash::Device,
@@ -132,10 +142,10 @@ impl WakeShells {
             return;
         }
         // SAFETY: the renderer calls this inside `scene_over` while `cmd` is recording;
-        // `pipeline` was made for that pass with the scene layout `layout`, and `set` holds
-        // the live shell buffer.
+        // both pipelines were made for that pass with the scene layout `layout`, and `set`
+        // holds the live shell buffer.
         unsafe {
-            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.trail);
             device.cmd_bind_descriptor_sets(
                 cmd,
                 vk::PipelineBindPoint::GRAPHICS,
@@ -145,15 +155,18 @@ impl WakeShells {
                 &[],
             );
             device.cmd_draw(cmd, ALONG * AROUND * 6, self.count, 0, 0);
+            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.front);
+            device.cmd_draw(cmd, ARCH * TUBE * 6, self.count, 0, 0);
         }
     }
 
     pub(super) fn destroy(&mut self, gpu: &Gpu) {
         gpu.destroy_buffer(std::mem::replace(&mut self.buffer, Buffer::null()));
         // SAFETY: these were made by `new` on this device; this runs once, from the
-        // renderer's `Drop` after the device has gone idle, the pipeline before its module.
+        // renderer's `Drop` after the device has gone idle, the pipelines before their module.
         unsafe {
-            gpu.device.destroy_pipeline(self.pipeline, None);
+            gpu.device.destroy_pipeline(self.trail, None);
+            gpu.device.destroy_pipeline(self.front, None);
             gpu.device.destroy_shader_module(self.module, None);
             gpu.device.destroy_descriptor_pool(self.pool, None);
         }

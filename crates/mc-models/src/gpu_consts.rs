@@ -863,20 +863,30 @@ shared! {
         pub const MAX_PX: f32 = 4.0;
     }
 
-    /// A cone weapon's wake drawn as a shell of light (renderer/wake_shell.rs,
-    /// wake_shell.wgsl): one instance a wake rolling out, a mesh of `ALONG` by `AROUND`
-    /// quads bent into the shell in the vertex shader.
+    /// A cone weapon's wake (renderer/wake_shell.rs, wake_shell.wgsl), drawn as two meshes
+    /// bent in the vertex shader, one instance of each a wake rolling out: the front, a
+    /// rolling crest arched over the fan, and the trail it leaves, a shell from the muzzle
+    /// out to the crest that cools and is eaten away where the front has passed.
     pub mod wake_shell as "WAKE_SHELL_" {
-        /// Wakes drawn at once; the oldest goes first past it (`wake_fx::MAX_WAKES`).
+        /// Wakes drawn at once; the oldest goes first past it (`wake_fx`).
         pub const MAX_SHELLS: u32 = 24;
-        /// Quads from the muzzle out to the front, and from one side over the top to
-        /// the other.
-        pub const ALONG: u32 = 48;
+        /// The trail's quads from the muzzle out to the front, and from one side over the
+        /// top to the other.
+        pub const ALONG: u32 = 40;
         pub const AROUND: u32 = 24;
-        /// Of the way out where the cone gives way to the dome closing it, and how far it
-        /// swells past the fan's own width before it closes.
-        pub const CAP: f32 = 0.8;
-        pub const SWELL: f32 = 0.4;
+        /// The front's quads round its arch, and round its crest.
+        pub const ARCH: u32 = 32;
+        pub const TUBE: u32 = 12;
+        /// The front's half-width over the fan's own, and how far its feet trail its top
+        /// in those half-widths.
+        pub const WIDTH: f32 = 1.15;
+        pub const LAG: f32 = 0.3;
+        /// Seconds a stretch of the trail stays hot (heat falls to a third), and seconds
+        /// it lasts after the front has passed it.
+        pub const COOL: f32 = 0.45;
+        pub const LINGER: f32 = 1.5;
+        /// Seconds the front takes to break up once it has run out.
+        pub const BREAK: f32 = 0.5;
     }
 
     /// A twin gun on a walker's arm that kicks on its own shots (`mc_sim::mirror::UNIT_TWIN_*`
