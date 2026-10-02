@@ -1009,6 +1009,9 @@ pub struct Projectiles {
     pub mark: Vec<FxVec3>,
     /// Where the shot was fired from.
     pub origin: Vec<FxVec2>,
+    /// Which of a cluster shot's sub-shots this is (`Weapon::cluster`, `cluster.rs`), from
+    /// one; zero for a whole shot.
+    pub sub: Vec<u8>,
     /// The last `serial` handed out.
     pub next_serial: u32,
 }
@@ -1059,6 +1062,7 @@ impl Projectiles {
         self.quarry.push(0);
         self.mark.push(pos);
         self.origin.push(pos.xy());
+        self.sub.push(0);
         Ok(())
     }
 
@@ -1086,6 +1090,7 @@ impl Projectiles {
         self.quarry.swap_remove(row);
         self.mark.swap_remove(row);
         self.origin.swap_remove(row);
+        self.sub.swap_remove(row);
     }
 
     pub fn hash(&self, h: &mut StateHasher) {
@@ -1106,7 +1111,8 @@ impl Projectiles {
                 self.owner[i] as u64
                     | (self.weapon[i] as u64) << 8
                     | (self.blueprint[i].0 as u64) << 16
-                    | (self.ticks_left[i] as u64) << 32,
+                    | (self.ticks_left[i] as u64) << 32
+                    | (self.sub[i] as u64) << 48,
             );
             h.write_u64(self.source[i].0 as u64);
             h.write_u32(self.target[i].0);

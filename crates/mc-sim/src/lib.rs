@@ -28,6 +28,7 @@ mod area_work;
 mod assist_follow;
 pub mod batch;
 mod body;
+mod cluster;
 pub mod combat;
 pub mod command;
 mod contacts;

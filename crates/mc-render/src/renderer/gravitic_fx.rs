@@ -126,7 +126,13 @@ impl GraviticFx {
 
 /// A seeker's charge across in metres, as its strike scales: by its damage.
 fn charge_size(w: &Weapon) -> f32 {
-    (1.0 + w.damage.to_f32().max(1.0).sqrt() * 0.1) * w.flash.max(0.5)
+    charge_size_of(w, w.damage)
+}
+
+/// `charge_size` for a charge carrying `damage`: a cluster's piece (`Weapon::cluster`)
+/// carries its share.
+fn charge_size_of(w: &Weapon, damage: mc_core::Fx) -> f32 {
+    (1.0 + damage.to_f32().max(1.0).sqrt() * 0.1) * w.flash.max(0.5)
 }
 
 /// `v` turned `a` radians about the upright.
@@ -247,6 +253,7 @@ impl Renderer {
         blueprint: BlueprintId,
         weapon: u8,
         at: Vec3,
+        splash: mc_core::Fx,
         on_unit: bool,
         start: f32,
     ) -> bool {
@@ -254,7 +261,8 @@ impl Renderer {
         if !w.gravitic_seeker() {
             return false;
         }
-        let s = charge_size(w) * 1.4 * w.impact.max(0.5);
+        // A cluster's piece bursts at its share's size (`Weapon::landed_damage`).
+        let s = charge_size_of(w, w.landed_damage(splash)) * 1.4 * w.impact.max(0.5);
         let height = at.z - self.ground_height(at.truncate());
         let ground = height < s * 0.5 && !on_unit;
         self.gravitic_burst(at, s, ground, start);

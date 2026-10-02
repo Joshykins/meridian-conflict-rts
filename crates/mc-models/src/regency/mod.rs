@@ -12,6 +12,7 @@
 //! one built at another size says so.
 
 mod battle_tank;
+mod bombard;
 mod breaker;
 mod brood;
 mod chassis;
@@ -63,6 +64,14 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The engineer: a craft on gravity lift, its fabricator arm on a turning housing, more
     // kit on it at each tier (`engineer`).
     ModelDef::new("regency_engineer", 3.6, 2.8, engineer::engineer),
+    // The tech 2 bombardment walker: two tall legs, a launcher pod hinged on a ring on its
+    // back, raised to lob its seekers (`bombard`).
+    ModelDef::new(
+        "regency_bombard",
+        bombard::RADIUS,
+        bombard::HEIGHT,
+        bombard::bombard,
+    ),
     // The land scout: a six-legged walker, a radar array on a mast over its back
     // (`scout`).
     ModelDef::new("regency_scout", 3.8, 4.0, scout::scout),
@@ -192,6 +201,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Three long walking legs and a plated head with two cannons.
         "regency_strider" => 7000,
         "regency_wake_tank" => 5000,
+        "regency_bombard" => 4500,
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
         "regency_engineer" => 3600,
         // Walls come by the dozen.

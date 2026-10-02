@@ -107,6 +107,9 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("regency_t2_destroyer", 1, 3200, 600),
     // The Regency wake tank: every wake strikes the whole fan ahead of it at once (`wake.rs`).
     ("regency_t3_wake_tank", 1, 1200, 760),
+    // Regency bombardment walkers: seekers lobbed high that split into sub-seekers on the
+    // way down (`cluster.rs`).
+    ("regency_t2_bombard", 2, 1000, 1500),
 ];
 
 fn setup(w: &mut World) {
@@ -339,6 +342,7 @@ fn reference() -> Vec<u64> {
     setup(&mut w);
     let mut intercepted = 0;
     let mut struck = 0;
+    let mut split = 0;
     let titan_sub = w.blueprints.id_of("aster_t4_submarine").unwrap();
     let fid = factories(&w)[0];
     let (mut last_held, mut batches_sent, mut held_at_snapshot) = (0, 0, 0);
@@ -374,6 +378,11 @@ fn reference() -> Vec<u64> {
                 .iter()
                 .filter(|e| matches!(e, mc_sim::SimEvent::TorpedoIntercepted { .. }))
                 .count();
+            split += w
+                .events
+                .iter()
+                .filter(|e| matches!(e, mc_sim::SimEvent::ClusterSplit { .. }))
+                .count();
             hash
         })
         .collect();
@@ -384,6 +393,8 @@ fn reference() -> Vec<u64> {
     assert!(intercepted > 0, "no torpedo was intercepted in the match");
     // The experimental submarine's strike missiles went up on their high arc.
     assert!(struck > 0, "no strike missile was launched in the match");
+    // The bombardment walkers' seekers broke into their sub-seekers.
+    assert!(split > 0, "no cluster shot split in the match");
     // The salvage carriers' heads were at work in it, on the move.
     let reclaimed = w.state.players.iter().map(|p| p.reclaimed_mass).max();
     assert!(

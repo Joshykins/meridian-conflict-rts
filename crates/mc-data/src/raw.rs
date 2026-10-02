@@ -1071,8 +1071,26 @@ pub struct RawWeapon {
     /// A giant gun's spent sabot, thrown clear with every shot (`RawSabot`).
     #[serde(default)]
     pub sabot: Option<RawSabot>,
+    /// A shot that breaks into sub-shots on its way down (`RawCluster`).
+    #[serde(default)]
+    pub cluster: Option<RawCluster>,
     #[serde(default)]
     pub sounds: WeaponSounds,
+}
+
+/// A cluster shot (the Regency's Heavy Gravitic Seeker): an unguided missile on a high arc
+/// that breaks into `count` sub-shots once it is coming down within `height` metres of its
+/// mark (at the top of its arc, when that is lower). The sub-shots fall on their own
+/// points, spread over a disc `radius` metres across the parent's landing point, each with
+/// an even share of the weapon's `damage` and a blast `splash` metres round. Each sub-shot
+/// can be shot down on its own, with its share of the casing (`intercept`).
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawCluster {
+    pub count: u8,
+    pub radius: f64,
+    pub height: f64,
+    pub splash: f64,
 }
 
 /// A weapon's sounds, by name from the sound library (`data/sounds`, and the
@@ -1098,6 +1116,8 @@ pub struct WeaponSounds {
     pub casing: Option<String>,
     /// A loop heard from each shot while it flies: a cruise missile's motor.
     pub flight: Option<String>,
+    /// A cluster shot (`cluster`) breaking into its sub-shots, heard where it splits.
+    pub split: Option<String>,
     /// Multiplies how loud the shot is heard. Zero (the default) is as loud as its damage implies.
     pub volume: f64,
     /// Multiplies how loud the charge is heard, at any zoom: a wind-up meant to carry over
@@ -1400,6 +1420,21 @@ impl Unit {
                     "{ctx}: a rail gun fires a direct slug, not a beam, missile or torpedo"
                 )));
             }
+            if w.cluster.is_some()
+                && (w.trajectory != Trajectory::Ballistic || !w.missile || w.guided || w.hitscan)
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a cluster shot is an unguided ballistic missile"
+                )));
+            }
+            if let Some(c) = w.cluster {
+                if !(2..=crate::weapon::MAX_CLUSTER).contains(&c.count) {
+                    return Err(DataError::Invalid(format!(
+                        "{ctx}: a cluster breaks into 2 to {} sub-shots",
+                        crate::weapon::MAX_CLUSTER
+                    )));
+                }
+            }
             if w.curve > 0.0
                 && (w.trajectory != Trajectory::Direct || w.missile || w.hitscan || w.torpedo)
             {
@@ -1582,6 +1617,12 @@ impl Unit {
                     }
                     None => None,
                 },
+                cluster: w.cluster.map(|c| crate::Cluster {
+                    count: c.count,
+                    radius: fx(c.radius.clamp(0.0, 400.0)),
+                    height: fx(c.height.clamp(0.0, 4000.0)),
+                    splash: fx(c.splash.clamp(0.0, 500.0)),
+                }),
                 sounds: w.sounds.clone(),
 
                 charge_ticks: if w.sounds.charge.is_some() {

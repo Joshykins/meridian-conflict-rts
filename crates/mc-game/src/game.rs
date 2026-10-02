@@ -349,6 +349,8 @@ struct WeaponSoundIds {
     charge: Option<mc_data::SoundId>,
     impact: Option<mc_data::SoundId>,
     ground: Option<mc_data::SoundId>,
+    /// A cluster shot breaking into its sub-shots (`WeaponSounds::split`).
+    split: Option<mc_data::SoundId>,
 }
 
 pub struct Game {
@@ -3315,6 +3317,7 @@ impl Game {
                                 &d.ground
                             },
                         ),
+                        split: id(&w.sounds.split, &None),
                     })
                     .collect(),
             })
@@ -3488,6 +3491,20 @@ impl Game {
                 } if bps.unit(*blueprint).weapons[*weapon as usize].cold_launch_ticks > 0 => {
                     (0, table.cold_eject, pos.to_f32(), 36.0, 0.0)
                 }
+                mc_sim::SimEvent::ClusterSplit {
+                    pos,
+                    blueprint,
+                    weapon,
+                    ..
+                } => (
+                    0,
+                    table.units[blueprint.index()].weapons[*weapon as usize].split,
+                    pos.to_f32(),
+                    bps.unit(*blueprint).weapons[*weapon as usize]
+                        .damage
+                        .to_f32(),
+                    0.0,
+                ),
                 mc_sim::SimEvent::MissileIgnited {
                     pos,
                     blueprint,
@@ -3539,6 +3556,7 @@ impl Game {
                     on_unit,
                     on_shield,
                     after,
+                    splash,
                     blueprint,
                     weapon,
                     ..
@@ -3557,13 +3575,12 @@ impl Game {
                     } else {
                         ids.ground
                     };
+                    // A cluster's piece is heard at its share of the damage.
                     (
                         1,
                         sound,
                         pos.to_f32(),
-                        bps.unit(*blueprint).weapons[*weapon as usize]
-                            .damage
-                            .to_f32(),
+                        w.landed_damage(*splash).to_f32(),
                         after.to_f32() * TICK_SECONDS,
                     )
                 }

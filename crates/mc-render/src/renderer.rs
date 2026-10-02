@@ -45,6 +45,7 @@ mod dive_fx;
 mod drive_swing;
 pub use capture::Shot;
 mod clearing;
+mod cluster_fx;
 mod craters;
 mod cull_lists;
 mod effect_barriers;
@@ -4727,6 +4728,12 @@ impl Renderer {
                     self.missile_lased(from, to, *killed, time);
                 }
             }
+            SimEvent::ClusterSplit {
+                pos, vel, count, ..
+            } => {
+                let vel = Vec3::from(vel.to_f32()) / self.tick_seconds.max(0.02);
+                self.cluster_split(Vec3::from(pos.to_f32()), vel, *count, time);
+            }
             SimEvent::MissileIgnited {
                 pos,
                 vel,
@@ -5104,7 +5111,7 @@ impl Renderer {
                 if !*on_shield {
                     let start = time + after.to_f32() * self.tick_seconds;
                     let at = Vec3::from(pos.to_f32());
-                    if self.seeker_struck(*blueprint, *weapon, at, *on_unit, start) {
+                    if self.seeker_struck(*blueprint, *weapon, at, *splash, *on_unit, start) {
                         return;
                     }
                 }

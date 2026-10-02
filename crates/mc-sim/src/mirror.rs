@@ -170,6 +170,16 @@ pub enum SimEvent {
         blueprint: BlueprintId,
         weapon: u8,
     },
+    /// A cluster shot (`Weapon::cluster`) broke into `count` sub-shots at `pos`, flying on
+    /// at `vel` (metres per tick) before they part (`cluster.rs`).
+    ClusterSplit {
+        pos: FxVec3,
+        vel: FxVec3,
+        count: u8,
+        owner: u8,
+        blueprint: BlueprintId,
+        weapon: u8,
+    },
     /// An anti-missile laser from `from` to a hostile missile at `to`.
     /// `killed` is the tick the casing fails. `blueprint` is the defender's: its faction
     /// says how the kill is drawn (`mc_data::AntiMissileLook`).
@@ -1058,6 +1068,8 @@ impl StreamTail {
 #[derive(Clone, Copy, Debug)]
 pub struct SpentShot {
     pub cold: bool,
+    /// A cluster's sub-shot (`Projectiles::sub`): drawn smaller than the whole shot.
+    pub sub: bool,
     pub from: FxVec3,
     pub to: FxVec3,
     /// Share of the tick the last stretch took, zero to one.
@@ -1125,6 +1137,15 @@ fn cruise_wings(weapon: &mc_data::Weapon, age: u16) -> f32 {
         return 0.0;
     }
     (age.saturating_sub(crate::naval_arms::POP_BOOST) as f32 / 5.0).min(1.0)
+}
+
+/// How a cluster's sub-shot is drawn against its whole shot.
+fn sub_scale(sub: bool) -> f32 {
+    if sub {
+        0.55
+    } else {
+        1.0
+    }
 }
 
 /// `ProjectileInstance::_pad[1]`: a missile's wings (`cruise_wings`), or, for one coasting
@@ -1904,6 +1925,7 @@ impl World {
             }
             let (color, size, wake, plasma, hot) =
                 look(s.projectiles.blueprint[i], s.projectiles.weapon[i]);
+            let size = size * sub_scale(s.projectiles.sub[i] > 0);
             let weapon = &self.blueprints.unit(s.projectiles.blueprint[i]).weapons
                 [s.projectiles.weapon[i] as usize];
             let wake = if weapon.torpedo {
@@ -1954,6 +1976,7 @@ impl World {
                 continue;
             }
             let (color, size, wake, plasma, hot) = look(shot.blueprint, shot.weapon);
+            let size = size * sub_scale(shot.sub);
             let shot_weapon = &self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize];
             let wake = if shot_weapon.torpedo {
                 self.torpedo_look(shot_weapon, shot.owner)

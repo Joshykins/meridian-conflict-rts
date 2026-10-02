@@ -227,7 +227,12 @@ fn cold_lob_speed(age: u16, cold: u16) -> Fx {
 
 /// Extra rack pitch from a flat rest pose up to a steep loft.
 fn missile_rack_pitch(weapon: &Weapon) -> Angle {
-    let loft = Angle::from_degrees(50);
+    // Raised to its launch angle (`rake`) where the data gives one.
+    let loft = if weapon.rake.0 > 0 {
+        weapon.rake
+    } else {
+        Angle::from_degrees(50)
+    };
     let Some(pivot) = weapon.pivot else {
         return loft;
     };
@@ -2323,6 +2328,7 @@ impl World {
         self.steer_torpedoes();
         self.steer_interceptors();
         self.steer_curving_shots();
+        self.split_cluster_shots()?;
         drop(span);
         let span = mc_core::perf_span!("shots.sweep");
         let count = self.state.projectiles.len();
@@ -2380,6 +2386,7 @@ impl World {
                 let back = travel.map(|t| -t);
                 self.spent.push(crate::mirror::SpentShot {
                     cold: weapon.motor_out(p.age[i]),
+                    sub: p.sub[i] > 0,
                     from: p.prev_pos[i],
                     to: hit.seen,
                     after: hit.after,
@@ -2849,8 +2856,11 @@ impl World {
         let p = &self.state.projectiles;
         let (owner, source) = (p.owner[projectile], p.source[projectile]);
         let blueprints = self.blueprints.clone();
-        let weapon =
+        let whole =
             &blueprints.unit(p.blueprint[projectile]).weapons[p.weapon[projectile] as usize];
+        // A cluster's sub-shot lands with its share of the damage and its own splash.
+        let sub_shot = (p.sub[projectile] > 0).then(|| whole.sub_shot()).flatten();
+        let weapon = sub_shot.as_ref().unwrap_or(whole);
         let target_motion = hit.unit.map_or(FxVec3::ZERO, |row| {
             let u = &self.state.units;
             (u.pos[row] - u.prev_pos[row]).extend(u.z[row] - u.prev_z[row])

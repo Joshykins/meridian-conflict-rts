@@ -753,6 +753,45 @@
                 Roll(at: 0.02, from: 500, to: 110, glide: 0.9, attack: 0.02, decay: 0.6, gain: 0.5, swell: 6, depth: 0.5),
             ],
         ),
+        // ---- the Sower's Heavy Gravitic Seekers ----
+        // A seeker lobbed out of the pod: the containment lets go with a dry crack over a
+        // deep compression thump, and the charge's growl climbs away up the arc, rising as
+        // it goes (a thing thrown up, not a shell falling away), with a low sizzle under it.
+        "regency_seeker_launch": (
+            length: 1.4, peak: 0.55, room: 0.25,
+            layers: [
+                Burst(low: 300, high: 1600, attack: 0.0003, decay: 0.006, gain: 5),
+                Burst(low: 70, high: 500, attack: 0.0008, decay: 0.04, gain: 7),
+                Tone(from: 95, to: 46, glide: 0.12, attack: 0.001, decay: 0.16, gain: 0.9),
+                Fm(at: 0.02, from: 62, to: 118, glide: 0.9, ratio: 0.5, index: 1.4, fade: 0.5, attack: 0.05, decay: 0.45, gain: 0.45),
+                Stack(at: 0.03, from: 70, to: 150, glide: 0.95, attack: 0.06, decay: 0.4, gain: 0.35, detune: 1.008, width: 0.4, partials: [(1, 1), (1.5, 0.45), (2, 0.4), (3, 0.15)]),
+                Drive(1.4),
+                Sweep(at: 0.05, from: 260, to: 620, glide: 0.8, q: 1.4, attack: 0.1, decay: 0.35, gain: 0.12),
+            ],
+        ),
+        // A seeker breaking apart high over the mark: a hard crack and a deep whump as the
+        // containment parts, then the pieces' growls tearing away from each other, one
+        // after another, each falling off low, and a short sizzle as the cage dies.
+        "regency_seeker_split": (
+            length: 1.6, peak: 0.6, room: 0.4,
+            layers: [
+                Burst(low: 280, high: 1700, attack: 0.0003, decay: 0.007, gain: 6),
+                Burst(low: 60, high: 420, attack: 0.001, decay: 0.05, gain: 7),
+                Tone(from: 120, to: 52, glide: 0.18, attack: 0.002, decay: 0.22, gain: 0.9),
+                Fm(at: 0.03, from: 135, to: 74, glide: 0.35, ratio: 0.5, index: 1.3, fade: 0.2, attack: 0.004, decay: 0.2, gain: 0.3),
+                Fm(at: 0.08, from: 150, to: 82, glide: 0.35, ratio: 0.5, index: 1.3, fade: 0.2, attack: 0.004, decay: 0.2, gain: 0.26),
+                Fm(at: 0.13, from: 128, to: 68, glide: 0.35, ratio: 0.5, index: 1.3, fade: 0.2, attack: 0.004, decay: 0.2, gain: 0.24),
+                Fm(at: 0.19, from: 142, to: 78, glide: 0.35, ratio: 0.5, index: 1.3, fade: 0.2, attack: 0.004, decay: 0.2, gain: 0.2),
+                Drive(1.4),
+                Sweep(at: 0.02, from: 800, to: 240, glide: 0.5, q: 1.0, attack: 0.02, decay: 0.22, gain: 0.18),
+            ],
+        ),
+        // A sub-seeker coming down: the bomb's hit a size down, so a volley's twelve land
+        // as a ripple of heavy whumps rather than one blast.
+        "regency_seeker_hit": (like: "regency_gravitic_hit", size: 0.8, peak: 0.6),
+        // The Sower's walk and feet: the battle scorpion's, a size down.
+        "regency_bombard_walk": (like: "regency_crawl", size: 0.75, peak: 0.2),
+        "regency_bombard_step": (like: "regency_footfall", size: 0.7, peak: 0.26),
         // ---- the Regency power generators' supernova ----
         // A Regency power generator's star going supernova (renderer supernova_fx.rs), written for the
         // crown's star: its sizes keep time with the picture, so the smaller stars are

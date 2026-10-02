@@ -28,7 +28,7 @@ pub use raw::{
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
-pub use weapon::{HowitzerLook, Weapon, BOMBARD_RADIUS};
+pub use weapon::{HowitzerLook, Weapon, BOMBARD_RADIUS, MAX_CLUSTER};
 
 #[derive(
     Clone,
@@ -234,6 +234,16 @@ pub struct Sabot {
     pub splash: Fx,
     /// The hidden blueprint it is drawn as.
     pub casing: BlueprintId,
+}
+
+/// A cluster shot's split (`RawCluster`): how many sub-shots, over how wide a disc, how
+/// high over its mark it breaks, and each sub-shot's blast.
+#[derive(Clone, Copy, Debug)]
+pub struct Cluster {
+    pub count: u8,
+    pub radius: Fx,
+    pub height: Fx,
+    pub splash: Fx,
 }
 
 /// A giant bore's lightning storm (`RawStorm`): grows over `ticks` to `radius`, `damage`
@@ -1529,6 +1539,12 @@ impl Blueprints {
                 if let Some(c) = w.cone {
                     h.write_u64(c.half.0 as u64);
                     h.write_i64(c.edge.0);
+                }
+                if let Some(c) = w.cluster {
+                    h.write_u64(c.count as u64);
+                    h.write_i64(c.radius.0);
+                    h.write_i64(c.height.0);
+                    h.write_i64(c.splash.0);
                 }
                 if let Some(b) = w.bore {
                     h.write_i64(b.width.0);

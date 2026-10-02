@@ -463,7 +463,7 @@ impl SoundLibrary {
                 let s = &w.sounds;
                 for name in [
                     &s.fire, &s.charge, &s.impact, &s.ground, &s.spin, &s.far, &s.casing, &s.hold,
-                    &s.flight,
+                    &s.flight, &s.split,
                 ]
                 .into_iter()
                 .flatten()

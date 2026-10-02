@@ -89,4 +89,51 @@
         // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
         sounds: (death: "blast", moving: "aster_hover"),
     ),
+    // The bombardment walker: a long-range siege walker, the Regency's answer to the Javelin.
+    // It strides on two tall forward-kneed legs in armoured boots. A launcher pod rides on
+    // its back on a turning ring; it raises the pod to its launch angle and lobs a pair
+    // of Heavy Gravitic Seekers on a high arc. Coming down over the target, each seeker
+    // breaks into six sub-seekers (`cluster`) that fall over a disc round the mark, each
+    // with its own blast: a rain of plasma over a building, poor against anything that
+    // keeps moving.
+    //
+    // Balance against the Javelin (same cost, about the same health and damage a second):
+    // the Regency way, plasma hits harder at shorter reach, so it reaches 1250 m, not
+    // 1400, and lands 1200 a volley over 9 s (the Javelin 1044 over 8 s). Two seekers to
+    // shoot down before they split, each with three Javelin rockets' casing; after the
+    // split, twelve pieces to take one by one. It walks, a little slower than the
+    // Javelin's tracks.
+    //
+    // Model: `regency_bombard` (`models::regency::bombard`), authored at this size.
+    (
+        key: "regency_t2_bombard",
+        name: "Sower",
+        role: "Bombardment Walker", title: "Bombard Walker",
+        tech: 2,
+        categories: ["Land", "Artillery"],
+        health: 620,
+        cost: (mass: 200, energy: 1200, time: 1400),
+        radius: 5.0, height: 7.0,
+        vision: 200,
+        motion: (layer: Land, size: 1, speed: 23, accel: 18, turn: 80),
+        weapons: [(
+            name: "Heavy Gravitic Seeker",
+            // Lobbed on a high arc (`rake` 62 degrees) out of the raised pod, unguided; at
+            // 260 m over the mark on the way down (`cluster`), each breaks into six that
+            // fall over a disc 28 m round where it was going, 100 damage and a 10 m blast
+            // each. Anti-building, like the Javelin: it takes structures first (`prefer`).
+            damage: 600, splash: 14, range_min: 140, range: 1250, reload: 9.0, salvo: 2, salvo_delay: 0.5,
+            speed: 160, trajectory: Ballistic, rake: 62, loft: 3,
+            cluster: (count: 6, radius: 28, height: 260, splash: 10),
+            turret_turn: 20, arc: 360, muzzle: (2.0, 0, 6.2), pivot: (-1.0, 0, 5.9),
+            muzzles: [(2.0, -0.62, 6.2), (2.0, 0.62, 6.2)],
+            spread: 1,
+            targets: ["Structure", "Land", "Naval"], prefer: ["Structure"], color: Orange, red: 1.0,
+            missile: true, intercept: 240, plasma_grade: Some(Gravitic),
+            flash: 1.0, impact: 1.6, shockwave: 0.0,
+            sounds: (fire: "regency_seeker_launch", split: "regency_seeker_split", impact: "regency_seeker_hit", ground: "regency_seeker_hit"),
+        )],
+        mesh: "regency_bombard", icon: Artillery,
+        sounds: (death: "blast", moving: "regency_bombard_walk", step: "regency_bombard_step"),
+    ),
 ]

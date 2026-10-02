@@ -206,6 +206,8 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway (II) |
 | Attack boat, submarine, frigate | Dirk, Stiletto, Falchion |
 | Heavy destroyer, cruiser | Claymore, Pavise |
+| Bombardment walker (T2) | Sower |
+| Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
 | Storage | Reliquary |
@@ -379,6 +381,10 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     - **Gravitic Seeker Battery:** AA.
     - **Heavy Gravitic Seeker:** tactical and cruise strikes. Its charge
       gathers over the cell first, a red ball swelling as motes are drawn in.
+      The Sower's are lobbed high and part over the mark into six sub-seekers
+      that rain round it (`Weapon::cluster`): a hard white heart in a red flash
+      and sparks where the cage parts, each piece a smaller seeker that strikes
+      at the size of its share.
     - **Gravitic Counter-seeker:** missile defence (a faction's
       `anti_missile_look: CounterSeeker`; ARC's is the laser). A small red
       charge thrown off the mount runs the missile down along a cooling

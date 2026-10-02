@@ -84,6 +84,12 @@
             "Plasmeric Mortar": "A charge of plasma held in gravity and thrown high; it comes down, lets go and sears the ground where it lands.",
         },
     ),
+    "regency_t2_bombard": (
+        lore: "A siege walker that raises the pod on its back and lobs seekers high over the field; ARC crews hear them break apart overhead before they see them.",
+        weapons: {
+            "Heavy Gravitic Seeker": "A plasma charge in a gravity cage, thrown on a high arc, that parts over its mark into six smaller charges and rains them down round it.",
+        },
+    ),
     "regency_t1_land_factory": (
         lore: "A press works under swept armour: fabricators hung round a turning ring pour nanites onto the bay floor, and the machine walks out finished.",
         weapons: {},

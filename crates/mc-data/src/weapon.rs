@@ -2,11 +2,15 @@
 
 use mc_core::{Angle, Fx, FxVec3};
 
-use crate::{Bore, Cone, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
+use crate::{Bore, Cluster, Cone, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
 
 /// The widest circle, metres, a `Bombard` order may spread a gun's shots over unless
 /// its data gives it more (`RawWeapon::bombard`).
 pub const BOMBARD_RADIUS: f64 = 250.0;
+
+/// The most sub-shots a cluster shot (`Weapon::cluster`) may break into: a data limit,
+/// refused at load, so one split never floods the projectile table.
+pub const MAX_CLUSTER: u8 = 16;
 
 #[derive(Clone, Debug)]
 pub struct Weapon {
@@ -163,6 +167,8 @@ pub struct Weapon {
     pub casings: f32,
     /// A giant gun's spent sabot (`RawSabot`).
     pub sabot: Option<Sabot>,
+    /// A shot that breaks into sub-shots on its way down (`RawCluster`).
+    pub cluster: Option<Cluster>,
     /// How far a stream gun's tracers lean from deep orange to red, zero to one.
     /// Cosmetic: not in the content hash.
     pub red: f32,
@@ -215,6 +221,32 @@ impl Weapon {
     /// cell, or coasting after its booster while it turns over, before the motor lights.
     pub fn motor_out(&self, age: u16) -> bool {
         self.cold_launch_ticks > 0 && age <= self.cold_launch_ticks && age > self.boost_ticks
+    }
+
+    /// What one of this cluster shot's sub-shots does where it lands (`Weapon::cluster`): an
+    /// even share of the damage, its own splash, and no further split. `None` for any other
+    /// weapon.
+    pub fn sub_shot(&self) -> Option<Weapon> {
+        let c = self.cluster?;
+        Some(Weapon {
+            damage: self.damage / c.count.max(1) as i32,
+            splash: c.splash,
+            intercept_hp: self.casing_hp() / c.count.max(1) as i32,
+            cluster: None,
+            ..self.clone()
+        })
+    }
+
+    /// The damage behind an impact of this weapon's that blasted `splash` metres round: a
+    /// cluster's piece (`sub_shot`) when that is its pieces' splash and not the whole
+    /// shot's, else the whole damage. For what is drawn and heard, not for the sim.
+    pub fn landed_damage(&self, splash: Fx) -> Fx {
+        match self.cluster {
+            Some(c) if splash == c.splash && splash != self.splash => {
+                self.damage / c.count.max(1) as i32
+            }
+            _ => self.damage,
+        }
     }
 
     /// Casing hit points an intercept laser has to burn through; zero for a round the
