@@ -4212,11 +4212,11 @@ impl Game {
             self.ease_orbit(dt);
         }
 
-        // The range's weather: read from the settings once, then applied and
-        // remembered whenever the panel changes it, and kept in the recording.
-        // A recorded range being watched shows the weather it was recorded with.
+        // The range's weather: the default on every visit, applied whenever the
+        // panel changes it, and kept in the recording. A recorded range being
+        // watched shows the weather it was recorded with.
         let sky = match self.view.range.as_mut() {
-            Some(range) => Some(*range.sky.get_or_insert(settings.range_sky)),
+            Some(range) => Some(*range.sky.get_or_insert_with(Default::default)),
             None => self.view.status.replay.and_then(|r| r.range_sky),
         };
         if let Some(sky) = sky.filter(|&s| self.view.sky_shown != Some(s)) {
@@ -4225,10 +4225,6 @@ impl Game {
             if self.view.range.is_some() {
                 // The sim thread is gone only after a fatal error, which the HUD already shows.
                 let _ = self.sim.notes.send(crate::recorder::Note::RangeSky(sky));
-                if settings.range_sky != sky {
-                    settings.range_sky = sky;
-                    *settings_changed = true;
-                }
             }
         }
         let fresh = self.pull_sim();

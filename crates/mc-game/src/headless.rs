@@ -1276,8 +1276,6 @@ pub fn ui_screenshot(
     if let Ok(addr) = std::env::var("MERIDIAN_MP_SERVER") {
         settings.server = addr;
     }
-    // `MERIDIAN_SURVIVAL=...` (see `survival::env_rules`): the survival set-up opens on those rules.
-    settings.survival_rules = crate::survival::env_rules();
     let mut front = Front::new(
         Director::new(&map, true),
         blueprints,

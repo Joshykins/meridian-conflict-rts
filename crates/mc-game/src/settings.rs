@@ -1,4 +1,6 @@
 //! Player preferences, kept between runs in the user's config directory.
+//! A match's own choices (sky, fog, survival rules, landing zone) are not
+//! kept: every new skirmish, survival or range visit starts on the defaults.
 //! A missing, unreadable or outdated file is never an error: unknown fields
 //! are ignored and missing ones take their defaults.
 
@@ -37,22 +39,10 @@ pub struct Settings {
     pub backdrop_auto_advance: bool,
     /// File stem of the map last chosen for a skirmish.
     pub skirmish_map: String,
-    pub skirmish_fog: bool,
-    /// Weather and time of day picked in skirmish set-up; left alone, the map's own.
-    pub skirmish_sky: mc_data::weather::SkyChoice,
-    /// The test range's weather.
-    pub range_sky: crate::range::RangeSky,
     /// File stem of the map last chosen for the test range; empty is the default map.
     pub range_map: String,
     /// File stem of the map last chosen for survival.
     pub survival_map: String,
-    /// The engine's rules last set up for survival.
-    pub survival_rules: mc_sim::SurvivalRules,
-    /// Index into that map's survival landing zones.
-    pub survival_spawn: usize,
-    pub survival_fog: bool,
-    /// Weather and time of day picked in survival set-up.
-    pub survival_sky: mc_data::weather::SkyChoice,
     /// The multiplayer server last connected to, as typed.
     pub server: String,
 }
@@ -75,15 +65,8 @@ impl Default for Settings {
             show_profiler: false,
             backdrop_auto_advance: true,
             skirmish_map: String::new(),
-            skirmish_fog: true,
-            skirmish_sky: Default::default(),
-            range_sky: Default::default(),
             range_map: String::new(),
             survival_map: String::new(),
-            survival_rules: Default::default(),
-            survival_spawn: 0,
-            survival_fog: true,
-            survival_sky: Default::default(),
             server: String::new(),
         }
     }

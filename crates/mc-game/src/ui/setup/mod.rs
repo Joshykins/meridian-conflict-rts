@@ -71,7 +71,7 @@ fn slot(mode: Mode) -> usize {
 
 impl SetupState {
     /// Opens every map in `maps/` (skirmish maps and survival theatres) on
-    /// what was set up last time, in `mode`.
+    /// the map picked last time, in `mode`.
     pub fn new(settings: &Settings, mode: Mode, blueprint_hash: u64) -> SetupState {
         Self::with_catalog(Catalog::load(true), settings, mode, blueprint_hash)
     }
@@ -102,17 +102,12 @@ impl SetupState {
         };
         let mut lineup = Lineup::new(&catalog, mode, last[slot(mode)], people, ai);
         lineup.last_map = last;
-        lineup.rules = settings.survival_rules;
-        let fogs = [settings.skirmish_fog, settings.survival_fog];
+        // Rules, fog and sky start on the defaults every time; only the map is remembered.
+        lineup.rules = crate::survival::env_rules();
+        let fogs = [true; 2];
         lineup.fog = fogs[slot(mode)];
-        let skies = [settings.skirmish_sky, settings.survival_sky];
+        let skies = [SkyChoice::default(); 2];
         lineup.sky = skies[slot(mode)];
-        if mode == Mode::Survival {
-            let spawns = lineup.zones(&catalog);
-            if settings.survival_spawn < spawns {
-                lineup.roster.take_zone(0, settings.survival_spawn as u8);
-            }
-        }
         let mut state = SetupState {
             catalog,
             lineup,
@@ -193,27 +188,18 @@ impl SetupState {
         self.lineup.roster.teams_by_ground(&at, groups, 0);
     }
 
-    /// Writes what was set up back to the settings, so the screen opens on it
-    /// next time; true when anything changed. The callsign is taken only while
-    /// it is not being typed.
+    /// Writes the maps picked and the callsign back to the settings, so the
+    /// screen opens on them next time; true when anything changed. The match's
+    /// own choices (rules, fog, sky, landing zone) are not kept. The callsign
+    /// is taken only while it is not being typed.
     pub fn store(&mut self, settings: &mut Settings, typing: bool) -> bool {
         let before = settings.clone();
-        self.fogs[slot(self.lineup.mode)] = self.lineup.fog;
-        [settings.skirmish_fog, settings.survival_fog] = self.fogs;
-        self.skies[slot(self.lineup.mode)] = self.lineup.sky;
-        [settings.skirmish_sky, settings.survival_sky] = self.skies;
         let stem = |cards: &[super::maps::MapCard], i: usize| cards.get(i).map(|m| m.stem.clone());
         if let Some(s) = stem(&self.catalog.maps, self.lineup.last_map[0]) {
             settings.skirmish_map = s;
         }
         if let Some(s) = stem(&self.catalog.theatre_cards, self.lineup.last_map[1]) {
             settings.survival_map = s;
-        }
-        settings.survival_rules = self.lineup.rules;
-        if self.lineup.mode == Mode::Survival {
-            if let Some(first) = self.lineup.roster.seats.first() {
-                settings.survival_spawn = first.start as usize;
-            }
         }
         let name = crate::settings::clean_name(&self.name);
         if !typing && settings.player_name != name {

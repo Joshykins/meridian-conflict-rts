@@ -337,14 +337,14 @@ pub struct Range {
     pub storage: [usize; 2],
     pending: Option<Pending>,
     /// The range's weather and whether a storm is parked over the pad; none
-    /// until the game has read them from the settings.
+    /// until the game has first put the default up.
     pub sky: Option<RangeSky>,
     /// The range map's own settings file, once the game has read it: the regions
     /// the Sky tab picks a weather for.
     pub map_config: mc_data::weather::MapConfig,
 }
 
-/// The range's own weather, kept in the settings between runs.
+/// The range's own weather; each visit starts on the default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct RangeSky {

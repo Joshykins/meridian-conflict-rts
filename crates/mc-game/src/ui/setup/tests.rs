@@ -348,9 +348,30 @@ fn each_mode_keeps_its_own_map_fog_and_sky() {
     let mut settings = Settings::default();
     assert!(state.store(&mut settings, false));
     assert_eq!(settings.skirmish_map, state.catalog.maps[other].stem);
-    assert!(!settings.skirmish_fog && settings.survival_fog);
-    assert_eq!(settings.survival_sky, state.skies[1]);
     assert!(!state.store(&mut settings, false), "nothing changed since");
+}
+
+#[test]
+fn a_new_set_up_starts_on_the_default_fog_and_sky_but_the_last_map() {
+    let mut state = state();
+    let other = (state.lineup.map + 1) % state.catalog.maps.len();
+    state
+        .lineup
+        .set_map(&state.catalog, other, |_| false)
+        .unwrap();
+    state.lineup.fog = false;
+    state.lineup.sky.time = Some(mc_data::weather::TimeOfDay::Dusk);
+    let mut settings = Settings::default();
+    state.store(&mut settings, false);
+
+    let again = SetupState::with_catalog(state.catalog, &settings, Mode::Skirmish, 0);
+    assert_eq!(again.lineup.map, other, "the map picked last is remembered");
+    assert!(again.lineup.fog, "fog starts on");
+    assert_eq!(
+        again.sky(),
+        SkyChoice::default(),
+        "the sky starts on the map's own"
+    );
 }
 
 #[test]
