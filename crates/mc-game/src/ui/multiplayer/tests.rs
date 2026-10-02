@@ -10,6 +10,7 @@ use crate::ui::lineup::{Catalog, Lineup, Mode};
 use crate::ui::maps::MapCard;
 use crate::ui::survival::Theatre;
 use mc_data::survival::{Domain, FrontLayout, SpawnZone, SurvivalLayout};
+use mc_data::weather::{TimeOfDay, WeatherPreset};
 use mc_net::{Identity, Role};
 use mc_sim::tables::Controller;
 use std::sync::Arc;
@@ -189,10 +190,15 @@ fn meet(catalog: &Catalog, plan: Lineup, room: &str) -> (Launch, Launch) {
 #[test]
 fn a_host_and_a_guest_meet_in_a_lobby_and_start_the_same_match() {
     let catalog = Catalog::new(vec![map_card("lobby_test", 2)], Vec::new(), Vec::new());
-    let plan = Lineup::new(&catalog, Mode::Skirmish, 0, 2, 0);
+    let mut plan = Lineup::new(&catalog, Mode::Skirmish, 0, 2, 0);
+    // The host's sky is everyone's: the guest sees the match under it too.
+    plan.sky.preset = Some(WeatherPreset::Cloudy);
+    plan.sky.time = Some(TimeOfDay::Dawn);
+    let sky = plan.sky;
     let (a, b) = meet(&catalog, plan, "Friday");
     assert_eq!((a.local, b.local), (0, 1));
     assert_eq!(a.options.config.seed, b.options.config.seed);
+    assert_eq!((a.options.sky, b.options.sky), (sky, sky));
     assert_eq!(a.options.map_id, catalog.maps[0].map.content_id());
     for launch in [&a, &b] {
         let seats = &launch.options.config.players;

@@ -126,8 +126,6 @@ struct App {
     /// Smoke test: stage changes made so far, and when the current stage began.
     smoke_step: u32,
     stage_since: Instant,
-    /// The match being loaded is survival: its sky is the survival screen's.
-    survival_launch: bool,
     /// What the window is doing with the pointer for the free camera, and where
     /// the pointer was when it was taken, to give it back there.
     cursor_mode: crate::game::CursorMode,
@@ -193,7 +191,6 @@ pub fn run(mut args: AppArgs) -> Result<(), String> {
         fatal: None,
         smoke_step: 0,
         stage_since: now,
-        survival_launch: false,
     };
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
@@ -260,6 +257,7 @@ pub fn local_start(
         config,
         colors,
         survival,
+        sky,
     } = request;
     let content = mc_net::ContentId {
         map_id: map.content_id(),
@@ -291,6 +289,7 @@ pub fn local_start(
             colors,
             map: map.name().to_owned(),
             map_id: map.content_id(),
+            sky,
         }
         .encode()?,
     };
@@ -329,6 +328,7 @@ pub fn local_start(
     Ok(GameStart {
         map,
         colors,
+        sky,
         session: Box::new(session),
         prefetched: Vec::new(),
         local: local as u8,
@@ -366,6 +366,7 @@ fn net_start(launch: crate::ui::multiplayer::lobby::Launch) -> GameStart {
     let mut start = GameStart {
         map: launch.map,
         colors: launch.options.colors,
+        sky: launch.options.sky,
         session: Box::new(launch.session),
         prefetched: launch.prefetched,
         local: launch.local,
@@ -413,6 +414,7 @@ pub fn range_start(
         config: setup::match_config(&opts, map),
         colors: setup::TEAM_COLORS,
         survival: None,
+        sky: Default::default(),
     };
     let mut start = local_start(request, blueprints, false)?;
     start.scene = Some(scene_scripts(&opts, map, blueprints));
@@ -476,6 +478,7 @@ impl FrontStage {
             config: setup::match_config(&opts, map),
             colors: setup::TEAM_COLORS,
             survival: None,
+            sky: Default::default(),
         };
         let start = local_start(request, &args.blueprints, false)?;
         let scene = Some(scene_scripts(&opts, map, &args.blueprints));
@@ -832,13 +835,10 @@ impl App {
                 self.stage = Stage::Front(Box::new(stage));
             }
             Pending::Match(start) => {
-                // The map's own weather and time of day, unless skirmish set-up picked others.
+                // The map's own weather and time of day, unless the match's set-up
+                // (this machine's, or a lobby's host) picked others.
                 let config = setup::map_config(&start.map);
-                let sky = if std::mem::take(&mut self.survival_launch) {
-                    self.settings.survival_sky
-                } else {
-                    self.settings.skirmish_sky
-                };
+                let sky = start.sky;
                 if let Some(r) = &mut self.renderer {
                     // (On a map with regions, each region's own or the one set-up
                     // picked for it.)
@@ -1111,7 +1111,6 @@ impl App {
                 settings_changed = (out.settings_changed, out.display_changed);
                 match out.event {
                     Some(FrontEvent::Launch(request)) => {
-                        self.survival_launch = request.survival.is_some();
                         let detail = match &request.survival {
                             Some(s) if s.rules.rounds == 0 => {
                                 "Survival   \u{b7}   Endless".to_owned()
@@ -1134,7 +1133,6 @@ impl App {
                     }
                     Some(FrontEvent::LaunchNet(launch)) => {
                         let options = &launch.options;
-                        self.survival_launch = options.survival.is_some();
                         let detail = match &options.survival {
                             Some(s) => format!(
                                 "{}   \u{b7}   Co-op Survival   \u{b7}   {}",

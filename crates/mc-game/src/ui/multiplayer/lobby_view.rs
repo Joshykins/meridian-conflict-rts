@@ -63,8 +63,7 @@ pub(super) fn draw(
             &mut state.catalog,
             &table,
             !over,
-            0.0,
-            |_, _, _| {},
+            |_, _, y| y + 20.0,
         ));
         asks.extend(lineup::overlays(
             ui,
@@ -74,7 +73,8 @@ pub(super) fn draw(
             enter,
             CHART_SLOT,
         ));
-        let facts = Facts::of(&plan, &state.catalog, &table);
+        let facts =
+            Facts::of(&plan, &state.catalog, &table).with_sky(&plan.sky, &map_config(&plan, state));
         lobby.lineup = Some(plan);
         lobby.chat.watch(facts);
         for ask in asks {
@@ -93,6 +93,16 @@ pub(super) fn draw(
     None
 }
 
+/// The plan's map's own settings: the regions its sky picks a weather for.
+fn map_config(
+    plan: &Lineup,
+    state: &MultiplayerState,
+) -> std::sync::Arc<mc_data::weather::MapConfig> {
+    plan.card(&state.catalog)
+        .map(|m| m.config.clone())
+        .unwrap_or_default()
+}
+
 /// The line-up, the chat and the footer.
 fn screen(
     ui: &mut Ui,
@@ -105,7 +115,10 @@ fn screen(
     // Escape puts down a commander being moved before it leaves the lobby.
     let placing = plan.placing();
     let (left, centre, right) = lineup::columns(ui);
-    let chips = [lineup::settings::fog_chip(plan.fog)];
+    let chips = [
+        lineup::settings::fog_chip(plan.fog),
+        crate::ui::sky::summary(&plan.sky, &map_config(plan, state)),
+    ];
     let below = lineup::match_card(ui, plan, &mut state.catalog, table.host, &chips, left);
     let room = Rect::new(left.x, below + 22.0, left.w, left.bottom() - below - 22.0);
     if let Some(Reply::Send(text)) = chat::draw(ui, &mut lobby.chat, room, Input::Live) {

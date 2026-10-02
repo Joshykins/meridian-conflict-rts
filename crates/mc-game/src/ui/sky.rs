@@ -1,4 +1,4 @@
-//! The weather rows shared by skirmish set-up and the test range: a preset
+//! The weather rows shared by the match settings sheet and the test range: a preset
 //! and the time of day, each a list whose "Map Default" leaves it to the map.
 //! On a map with regions every region has a weather row of its own.
 
@@ -13,6 +13,8 @@ pub struct Look {
     pub pitch: f32,
     pub value_w: f32,
     pub compact: bool,
+    /// False shows the picks without letting them change (a lobby's guests).
+    pub enabled: bool,
 }
 
 /// How many rows `rows` draws for `map`: its weather (one for each region of a map
@@ -118,7 +120,13 @@ pub fn rows(
                 times.iter().position(|t| *t == sky.time).unwrap_or(0),
             )
         };
-        let Some(i) = ui.dropdown(id("sky-row", tag * 16 + k), at, &options, selected, true) else {
+        let Some(i) = ui.dropdown(
+            id("sky-row", tag * 16 + k),
+            at,
+            &options,
+            selected,
+            look.enabled,
+        ) else {
             continue;
         };
         if k == weathers {
@@ -180,6 +188,7 @@ mod tests {
         pitch: 46.0,
         value_w: 220.0,
         compact: false,
+        enabled: true,
     };
 
     fn regions() -> MapConfig {

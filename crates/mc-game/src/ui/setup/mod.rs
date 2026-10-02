@@ -29,6 +29,8 @@ pub struct MatchRequest {
     pub colors: crate::setup::Palette,
     /// Set for a survival match: the engine, its fronts and the rules.
     pub survival: Option<mc_sim::SurvivalConfig>,
+    /// The weather and time of day the match is shown under.
+    pub sky: SkyChoice,
 }
 
 pub enum SetupAction {
@@ -43,7 +45,8 @@ pub struct SetupState {
     pub lineup: Lineup,
     /// This machine watches: every open seat, yours too, is an AI commander.
     observe: bool,
-    /// Weather and time of day for each mode's match; left alone, the map's own.
+    /// Weather and time of day as last set in each mode (the line-up holds the
+    /// shown mode's); left alone, the map's own.
     skies: [SkyChoice; 2],
     /// Fog of war as last set in each mode.
     fogs: [bool; 2],
@@ -102,6 +105,8 @@ impl SetupState {
         lineup.rules = settings.survival_rules;
         let fogs = [settings.skirmish_fog, settings.survival_fog];
         lineup.fog = fogs[slot(mode)];
+        let skies = [settings.skirmish_sky, settings.survival_sky];
+        lineup.sky = skies[slot(mode)];
         if mode == Mode::Survival {
             let spawns = lineup.zones(&catalog);
             if settings.survival_spawn < spawns {
@@ -112,7 +117,7 @@ impl SetupState {
             catalog,
             lineup,
             observe: false,
-            skies: [settings.skirmish_sky, settings.survival_sky],
+            skies,
             fogs,
             shown: mode,
             name: settings.player_name.clone(),
@@ -149,6 +154,8 @@ impl SetupState {
         if mode != self.shown {
             self.fogs[slot(self.shown)] = self.lineup.fog;
             self.lineup.fog = self.fogs[slot(mode)];
+            self.skies[slot(self.shown)] = self.lineup.sky;
+            self.lineup.sky = self.skies[slot(mode)];
             self.shown = mode;
         }
     }
@@ -158,7 +165,7 @@ impl SetupState {
     }
 
     pub fn sky(&self) -> SkyChoice {
-        self.skies[slot(self.lineup.mode)]
+        self.lineup.sky
     }
 
     /// The chosen map's own settings: the regions the sky's rows pick a weather for.
@@ -193,6 +200,7 @@ impl SetupState {
         let before = settings.clone();
         self.fogs[slot(self.lineup.mode)] = self.lineup.fog;
         [settings.skirmish_fog, settings.survival_fog] = self.fogs;
+        self.skies[slot(self.lineup.mode)] = self.lineup.sky;
         [settings.skirmish_sky, settings.survival_sky] = self.skies;
         let stem = |cards: &[super::maps::MapCard], i: usize| cards.get(i).map(|m| m.stem.clone());
         if let Some(s) = stem(&self.catalog.maps, self.lineup.last_map[0]) {
@@ -242,6 +250,7 @@ impl SetupState {
             config: options.config,
             colors: options.colors,
             survival: options.survival,
+            sky: options.sky,
         }
     }
 
@@ -312,19 +321,14 @@ pub fn draw(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupActi
     // The table reads the callsign as it was when the sheet opened this frame.
     let callsign = state.name.clone();
     let table = table_of(state.observe, &callsign);
-    let map = state.map_config();
-    let sky = &mut state.skies[slot(state.lineup.mode)];
     let name = &mut state.name;
-    // A map with regions has a weather row for each: the sheet grows by them.
-    let taller = (super::sky::row_count(&map) as f32 - 2.0) * RULE_PITCH;
     let mut asks: Vec<Ask> = lineup::sheet(
         ui,
         &mut state.lineup,
         &mut state.catalog,
         &table,
         !over,
-        taller,
-        |ui, area, y| callsign_and_sky(ui, name, sky, &map, area, y),
+        |ui, area, y| callsign_row(ui, name, area, y),
     )
     .into_iter()
     .collect();
@@ -478,16 +482,8 @@ fn refused(chat: &mut Chat, asks: Vec<Ask>) {
     }
 }
 
-/// Your callsign under the shared rules, then the sky: the map's own weather
-/// (each region's, on a map with regions) and time of day, or what is picked here.
-fn callsign_and_sky(
-    ui: &mut Ui,
-    name: &mut String,
-    sky: &mut SkyChoice,
-    map: &MapConfig,
-    area: Rect,
-    y: f32,
-) {
+/// Your callsign under the shared rules; returns the y under it.
+fn callsign_row(ui: &mut Ui, name: &mut String, area: Rect, y: f32) -> f32 {
     let r = Rect::new(area.x, y, area.w, RULE_PITCH - 4.0);
     lineup::rule_label(ui, r, "Callsign");
     ui.text_field(
@@ -496,20 +492,7 @@ fn callsign_and_sky(
         name,
         16,
     );
-    let y = y + RULE_PITCH + 20.0;
-    ui.section(area.x, y, area.w, "Sky");
-    // The rows at the rules' pitch; closer together only where the screen is too
-    // short for the sheet to grow by all of them. (The last row has always run a
-    // little into the foot's margin.)
-    let room = area.bottom() + 14.0 - (y + 20.0);
-    let pitch = (room / super::sky::row_count(map) as f32).clamp(30.0, RULE_PITCH);
-    let look = super::sky::Look {
-        row_h: pitch - 4.0,
-        pitch,
-        value_w: 220.0,
-        compact: false,
-    };
-    super::sky::rows(ui, 0, area.x, y + 20.0, area.w, look, map, sky);
+    y + RULE_PITCH + 20.0
 }
 
 #[cfg(test)]

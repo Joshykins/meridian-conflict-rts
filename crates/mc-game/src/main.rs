@@ -544,6 +544,7 @@ fn run() -> Result<(), String> {
             colors: setup::TEAM_COLORS,
             map: map.name().to_owned(),
             map_id: map.content_id(),
+            sky: Default::default(),
         }
         .encode()
     };
@@ -575,21 +576,19 @@ fn run() -> Result<(), String> {
                 config: again,
             };
             // The host's settings, not our template: they say who starts where.
-            let roster = prefetched
-                .iter()
-                .find_map(|e| match e {
-                    mc_net::SessionEvent::Started(s) => match_options::MatchOptions::from_start(s)
-                        .ok()
-                        .map(|o| o.config),
-                    _ => None,
-                })
-                .map_or(Vec::new(), |c| c.players);
+            let options = prefetched.iter().find_map(|e| match e {
+                mc_net::SessionEvent::Started(s) => match_options::MatchOptions::from_start(s).ok(),
+                _ => None,
+            });
+            let sky = options.as_ref().map(|o| o.sky).unwrap_or_default();
+            let roster = options.map_or(Vec::new(), |o| o.config.players);
             let start_index = roster
                 .get(local as usize)
                 .map_or(local as usize, |p| p.start as usize);
             let mut start = game::GameStart {
                 map,
                 colors: setup::TEAM_COLORS,
+                sky,
                 session: Box::new(session),
                 prefetched,
                 local,
@@ -630,6 +629,7 @@ fn run() -> Result<(), String> {
                 config,
                 colors,
                 survival,
+                sky: Default::default(),
             };
             let mut start = app::local_start(request, &blueprints, skirmish)?;
             // Test scenes script their armies locally; that only works on one machine.

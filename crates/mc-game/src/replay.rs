@@ -22,6 +22,8 @@ pub struct Playback {
     path: PathBuf,
     pub config: MatchConfig,
     pub survival: Option<mc_sim::SurvivalConfig>,
+    /// The weather and time of day the match was played under.
+    pub sky: mc_data::weather::SkyChoice,
     /// `replay.held` carried out so far.
     held: usize,
 }
@@ -40,6 +42,7 @@ impl Playback {
         Ok(Playback {
             config: options.config,
             survival: options.survival,
+            sky: options.sky,
             replay,
             path: path.to_owned(),
             held: 0,
@@ -180,6 +183,7 @@ pub fn game_start(
 ) -> crate::game::GameStart {
     let colors = colors(playback.survival.is_some());
     let roster = playback.config.players.clone();
+    let sky = playback.sky;
     // Marks made while watching go on this match's id.
     let record = playback
         .path
@@ -194,6 +198,7 @@ pub fn game_start(
     crate::game::GameStart {
         map,
         colors,
+        sky,
         session: Box::new(session),
         prefetched: Vec::new(),
         local: 0,

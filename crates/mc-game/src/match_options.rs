@@ -5,6 +5,7 @@
 //! person in a network match adds their own seat's choices (`SeatChoice`, in
 //! their lobby setup) and those win over the host's template for that seat.
 
+use mc_data::weather::SkyChoice;
 use mc_sim::tables::Controller;
 use mc_sim::{MatchConfig, SurvivalConfig};
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,9 @@ pub struct MatchOptions {
     /// The map as the lobby shows it; `map_id` is what every machine loads.
     pub map: String,
     pub map_id: u64,
+    /// The weather and time of day the host picked; every machine (and a replay)
+    /// shows the match under it. Presentation only: the sim never reads it.
+    pub sky: SkyChoice,
 }
 
 /// One person's own choices for their seat, sent as their lobby setup.
@@ -119,6 +123,7 @@ mod tests {
             colors: crate::setup::TEAM_COLORS,
             map: "twin_shoals".into(),
             map_id: 9,
+            sky: SkyChoice::default(),
         };
         let start = mc_net::MatchStart {
             content: Default::default(),

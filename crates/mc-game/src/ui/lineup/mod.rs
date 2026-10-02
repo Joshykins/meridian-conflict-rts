@@ -33,6 +33,7 @@ use crate::match_options::MatchOptions;
 use crate::setup::TEAM_COLORS;
 use glam::Vec2;
 use mc_data::survival::Domain;
+use mc_data::weather::{MapConfig, SkyChoice};
 use mc_sim::tables::Controller;
 use mc_sim::{MatchConfig, PlayerSetup, SurvivalRules};
 use roster::{Control, Roster, Seat};
@@ -282,6 +283,8 @@ pub struct Lineup {
     pub map: usize,
     pub roster: Roster,
     pub fog: bool,
+    /// The weather and time of day the match is shown under; left alone, the map's own.
+    pub sky: SkyChoice,
     pub seed: u64,
     /// Survival's rules (ignored in skirmish).
     pub rules: SurvivalRules,
@@ -324,6 +327,7 @@ impl Lineup {
             map,
             roster: Roster::default(),
             fog: true,
+            sky: SkyChoice::default(),
             seed: fresh_seed(),
             rules: SurvivalRules::default(),
             last_map: [0; 2],
@@ -404,6 +408,7 @@ impl Lineup {
             map: self.map,
             roster: self.roster.clone(),
             fog: self.fog,
+            sky: self.sky,
             seed: self.seed,
             rules: self.rules,
             last_map: self.last_map,
@@ -629,6 +634,7 @@ impl Lineup {
             colors,
             map: card.name.clone(),
             map_id: card.map.content_id(),
+            sky: self.sky,
         })
     }
 
@@ -643,6 +649,7 @@ impl Lineup {
         self.map = map;
         self.last_map[mode.index()] = map;
         self.fog = options.config.fog;
+        self.sky = options.sky;
         self.seed = options.config.seed;
         let engine = options.survival.as_ref().map(|s| s.engine_player as usize);
         if let Some(s) = &options.survival {
@@ -713,29 +720,55 @@ pub fn match_card(
 
 /// The settings sheet over the screen, when open: the theatre on the left, the
 /// shared rules on the right with whatever `more` draws under them (from the
-/// y it is given). The sheet is `taller` than usual by what `more` needs beyond
-/// its usual room. `live` is false while an overlay lies over the sheet.
+/// y it is given, returning the y under it), then the sky. A map with regions
+/// has a weather row for each, and the sheet grows by them. `live` is false
+/// while an overlay lies over the sheet.
 pub fn sheet(
     ui: &mut Ui,
     lineup: &mut Lineup,
     catalog: &mut Catalog,
     table: &Table,
     live: bool,
-    taller: f32,
-    more: impl FnOnce(&mut Ui, Rect, f32),
+    more: impl FnOnce(&mut Ui, Rect, f32) -> f32,
 ) -> Option<Ask> {
     let mut sheet = std::mem::take(&mut lineup.sheet);
     let mut ask = None;
+    let map = lineup
+        .card(catalog)
+        .map(|m| m.config.clone())
+        .unwrap_or_default();
+    let taller = (super::sky::row_count(&map) as f32 - 2.0) * RULE_PITCH;
     let size = settings::SHEET + Vec2::new(0.0, taller);
     sheet.draw(ui, "Match Settings", size, live, |ui, body| {
         let (left, right) = settings::sheet_columns(body);
         theatre(ui, lineup, catalog, table.host, left);
         let (y, a) = rules(ui, lineup, catalog, table, right);
         ask = a;
-        more(ui, right, y);
+        let y = more(ui, right, y);
+        sky(ui, &mut lineup.sky, &map, table.host, right, y);
     });
     lineup.sheet = sheet;
     ask
+}
+
+/// The sky, from `y`: the map's own weather (each region's, on a map with
+/// regions) and time of day, or what the host picks here. Everyone sees it;
+/// only the host changes it.
+fn sky(ui: &mut Ui, sky: &mut SkyChoice, map: &MapConfig, host: bool, area: Rect, y: f32) {
+    ui.section(area.x, y, area.w, "Sky");
+    // The rows at the rules' pitch; closer together only where the screen is too
+    // short for the sheet to grow by all of them. (The last row has always run a
+    // little into the foot's margin.)
+    let room = area.bottom() + 14.0 - (y + 20.0);
+    let pitch = (room / super::sky::row_count(map) as f32).clamp(30.0, RULE_PITCH);
+    let look = super::sky::Look {
+        row_h: pitch - 4.0,
+        pitch,
+        value_w: 220.0,
+        compact: false,
+        enabled: host,
+    };
+    super::sky::rows(ui, 0, area.x, y + 20.0, area.w, look, map, sky);
 }
 
 /// The chosen map as a card; the host clicks it to open the browser.

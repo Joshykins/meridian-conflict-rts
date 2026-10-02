@@ -338,7 +338,7 @@ fn each_mode_keeps_its_own_map_fog_and_sky() {
     assert_eq!(state.mode(), Mode::Survival);
     assert!(state.lineup.fog, "survival keeps its own fog");
     assert!(state.request().survival.is_some());
-    state.skies[1].time = Some(mc_data::weather::TimeOfDay::Dusk);
+    state.lineup.sky.time = Some(mc_data::weather::TimeOfDay::Dusk);
     state.set_mode(Mode::Skirmish);
     assert_eq!(state.lineup.map, other, "skirmish finds its map again");
     assert!(!state.lineup.fog);

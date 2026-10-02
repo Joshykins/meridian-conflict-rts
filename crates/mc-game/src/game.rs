@@ -85,6 +85,8 @@ pub struct GameStart {
     pub map: Arc<MapFile>,
     /// Player colours by player index, linear RGB.
     pub colors: crate::setup::Palette,
+    /// The weather and time of day the match is shown under (the match options').
+    pub sky: mc_data::weather::SkyChoice,
     pub session: Box<dyn mc_net::Session + Send>,
     /// Session events already polled while waiting in a lobby, `Started` included.
     pub prefetched: Vec<mc_net::SessionEvent>,

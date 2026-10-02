@@ -761,6 +761,7 @@ fn sky_page(hud: &mut Hud, ui: &mut Ui, range: &Range, r: Rect, asked: &mut Vec<
         // A region's name wants more room beside its list than "Weather" does.
         value_w: w - if map.has_regions() { 132.0 } else { 96.0 },
         compact: true,
+        enabled: true,
     };
     crate::ui::sky::rows(ui, 1, x, r.y, w, look, map, &mut sky.choice);
     let y = r.y + crate::ui::sky::row_count(map) as f32 * (ROW + 4.0);

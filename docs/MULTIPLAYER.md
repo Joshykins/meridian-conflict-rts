@@ -109,8 +109,8 @@ Games hosted from the client (LAN, direct IP) do not check names.
 3. **Lobby.** Every player (and observer) opens a match connection to the room
    with `Hello { room, ticket }`, the creator first. Whoever opens the room
    hosts (then the lowest occupied seat, if they leave): the host's match
-   options (mode, map, rules, the seat template with AI commanders) define the
-   match, and the host opens the seats others may take. The lobby is the same
+   options (mode, map, rules, sky, the seat template with AI commanders) define
+   the match, and the host opens the seats others may take. The lobby is the same
    set-up screen as skirmish and survival (`ui/lineup`), with the plan the host
    set up before opening it. Opening is one way: the host leaving closes the
    lobby, and there is no going back to the set-up on one machine. The host sets every seat's control,
@@ -121,6 +121,8 @@ Games hosted from the client (LAN, direct IP) do not check names.
    map) or co-op survival (every seat a defender on its own landing zone,
    against the Progenitor on a survival map). Seats in play come first and
    match the relay's seats, so the host's changes never move a seated player.
+   The sky (weather and time of day) is the host's too: everyone plays under it,
+   and a replay shows it. It is presentation only; the sim never reads it.
 4. **Load.** Every machine builds tick-0 state from `MatchStart` and reports
    `Loaded`. The hub starts the clock when everyone has loaded (or after a
    timeout, leaving the slow loader to catch up from the log).
