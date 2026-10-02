@@ -11,19 +11,19 @@ use super::super::plating::piston;
 /// One cross-section of a sleeve: centred on `c`, `w` either side across and `h` either
 /// side along `out` (the way its profile's `t` points; across is `along x out`).
 #[derive(Clone, Copy)]
-pub(super) struct Ring {
+pub(in crate::regency) struct Ring {
     c: Vec3,
     out: Vec3,
     w: f32,
     h: f32,
 }
 
-pub(super) fn ring(c: Vec3, out: Vec3, w: f32, h: f32) -> Ring {
+pub(in crate::regency) fn ring(c: Vec3, out: Vec3, w: f32, h: f32) -> Ring {
     Ring { c, out, w, h }
 }
 
 /// An octagon with long flat faces: the plain armoured section.
-pub(super) const OCT: [[f32; 2]; 8] = [
+pub(in crate::regency) const OCT: [[f32; 2]; 8] = [
     [1.0, 0.42],
     [0.58, 1.0],
     [-0.58, 1.0],
@@ -35,7 +35,7 @@ pub(super) const OCT: [[f32; 2]; 8] = [
 ];
 
 /// A section with a ridge down its `out` face and a flat back: a keeled plate or talon.
-pub(super) const KEEL: [[f32; 2]; 7] = [
+pub(in crate::regency) const KEEL: [[f32; 2]; 7] = [
     [1.0, 0.1],
     [0.55, 0.72],
     [0.0, 1.0],
@@ -46,7 +46,7 @@ pub(super) const KEEL: [[f32; 2]; 7] = [
 ];
 
 /// A thick arch over the top of `out`, open underneath: a pauldron or a helmet.
-pub(super) const ARCH: [[f32; 2]; 10] = [
+pub(in crate::regency) const ARCH: [[f32; 2]; 10] = [
     [1.0, -0.35],
     [0.95, 0.35],
     [0.55, 0.9],
@@ -62,7 +62,7 @@ pub(super) const ARCH: [[f32; 2]; 10] = [
 /// A solid lofted through `rings` in order, each cut to `profile`, capped both ends.
 /// Below full detail an octagon or an arch is cut with every other point, a keel with
 /// five.
-pub(super) fn sleeve(b: &mut MeshBuilder, rings: &[Ring], profile: &[[f32; 2]]) {
+pub(in crate::regency) fn sleeve(b: &mut MeshBuilder, rings: &[Ring], profile: &[[f32; 2]]) {
     let coarse: Vec<[f32; 2]>;
     let profile = if !b.fine() && profile.len() >= 8 {
         coarse = profile.iter().copied().step_by(2).collect();
@@ -97,7 +97,7 @@ pub(super) fn sleeve(b: &mut MeshBuilder, rings: &[Ring], profile: &[[f32; 2]]) 
     clippy::too_many_arguments,
     reason = "a blade is placed by all of these"
 )]
-pub(super) fn blade(
+pub(in crate::regency) fn blade(
     b: &mut MeshBuilder,
     o: Vec3,
     u: Vec3,
@@ -115,13 +115,13 @@ pub(super) fn blade(
 }
 
 /// A bronze ball joint of radius `r` at `at`, coarser below full detail.
-pub(super) fn ball(b: &mut MeshBuilder, at: Vec3, r: f32) {
+pub(in crate::regency) fn ball(b: &mut MeshBuilder, at: Vec3, r: f32) {
     let (sides, rings) = if b.fine() { (10, 5) } else { (6, 3) };
     b.spheroid(at, Vec3::splat(r), sides, rings);
 }
 
 /// A ram from `a` to `c` (`plating::piston`), at full detail only: it lives in the gaps.
-pub(super) fn ram(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32) {
+pub(in crate::regency) fn ram(b: &mut MeshBuilder, a: Vec3, c: Vec3, r: f32) {
     if b.fine() {
         piston(b, a, c, r);
     }

@@ -32,6 +32,24 @@
             "Light Plasmeric Repeater": "A small plasmeric gun that fires single light slugs.",
         },
     ),
+    "regency_t1_raider": (
+        lore: "A low, fast four-legged walker with a repeater slung either side of the turret on its back; it comes in quick and close.",
+        weapons: {
+            "Twin Plasmeric Repeater": "Two plasmeric guns that take turns, a steady stream of red bolts.",
+        },
+    ),
+    "regency_t1_tank": (
+        lore: "A plated tank that rides a gravity lift instead of tracks, so a river or a strait is no obstacle to it.",
+        weapons: {
+            "Light Pinched-plasmeric Cannon": "Plasma drawn in and squeezed by gravity in front of the bore, then let out as one short jet that bursts on what it hits.",
+        },
+    ),
+    "regency_t1_mobile_aa": (
+        lore: "A six-legged gun carriage whose flak organ is always held up at the sky.",
+        weapons: {
+            "Plasmeric Flak Cannon": "Plasma bolts that burst among aircraft in a spray of burning plasma.",
+        },
+    ),
     "regency_t1_land_factory": (
         lore: "A press works under swept armour: fabricators hung round a turning ring pour nanites onto the bay floor, and the machine walks out finished.",
         weapons: {},

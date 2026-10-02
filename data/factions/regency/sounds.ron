@@ -332,6 +332,11 @@
             ],
         ),
 
+        // The raider's Twin Plasmeric Repeater: the Picket's bolt from a smaller gun,
+        // a little tighter and lighter, four a second from each raider.
+        "regency_repeater_light": (like: "regency_picket_bolt", size: 0.82, peak: 0.32),
+        "regency_repeater_light_hit": (like: "regency_picket_hit", size: 0.82, peak: 0.3),
+
         // The Halberd's Pinched-plasmeric Cannon, heard 1.0 s before its salvo: plasma
         // drawn in and squeezed into a ball by gravity. A field closing with a clunk, a
         // deep rough hum filling up and only leaning upward, the air rushing in (a noise
@@ -561,6 +566,17 @@
                 Roll(at: 0.01, from: 700, to: 150, glide: 0.5, attack: 0.015, decay: 0.2, gain: 0.25, swell: 7, depth: 0.5),
             ],
         ),
+
+        // The Sledge's light Pinched-plasmeric Cannon: the Halberd's charge, jet and burst
+        // from a smaller gun, quicker and a little higher (0.6 s of charge to its 1.0).
+        "regency_pinch_light_charge": (like: "regency_halberd_charge", size: 0.6, peak: 0.34),
+        "regency_pinch_light_fire": (like: "regency_halberd_fire", size: 0.72, peak: 0.4),
+        "regency_pinch_light_hit": (like: "regency_halberd_hit", size: 0.72, peak: 0.4),
+
+        // The Brazier's Plasmeric Flak Cannon: the Canopy's launch and burst from a
+        // smaller organ.
+        "regency_flak_light_fire": (like: "regency_canopy_fire", size: 0.85, peak: 0.34),
+        "regency_flak_light_burst": (like: "regency_canopy_burst", size: 0.85, peak: 0.38),
 
         // ---- movement ------------------------------------------------------------------
         // The Outrider walking: a small six-legged crawler scuttling on alternate tripods,

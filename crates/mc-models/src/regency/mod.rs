@@ -12,16 +12,21 @@
 //! one built at another size says so.
 
 mod brood;
+mod chassis;
 mod commander;
 mod cyst;
 mod engineer;
 mod eye;
+mod guns;
 mod hatchery;
 mod heart;
+mod hover_tank;
 mod kit;
 mod machine;
+mod mobile_aa;
 mod palisade;
 mod plating;
+mod raider;
 mod scorpion;
 mod scout;
 mod taproot;
@@ -51,6 +56,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The land scout: a six-legged walker, a radar array on a mast over its back
     // (`scout`).
     ModelDef::new("regency_scout", 3.8, 4.0, scout::scout),
+    // The tech 1 raider: a twin repeater on a four-legged walker (`raider`).
+    ModelDef::new("regency_raider", 2.6, 4.0, raider::raider),
+    // The tech 1 tank: a light pinch cannon on a hull on gravity lift (`hover_tank`).
+    ModelDef::new("regency_hover_tank", 4.6, 3.4, hover_tank::hover_tank),
+    // The tech 1 mobile anti-air: a flak organ on a six-legged walker (`mobile_aa`).
+    ModelDef::new("regency_mobile_aa", 4.0, 4.5, mobile_aa::mobile_aa),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
     // the land one's lifted ring and the air one's crown standing taller.
@@ -116,6 +127,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_heart_3" => 9000,
         "regency_eye" => 7000,
         "regency_scout" => 3000,
+        // The tech 1 line: a few hundred of each in a battle.
+        "regency_raider" => 2600,
+        "regency_hover_tank" | "regency_mobile_aa" => 3200,
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
         "regency_engineer" => 3600,
         // Walls come by the dozen.
@@ -138,6 +152,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_barb" | "regency_pinch_cannon" => Some(0.52),
         // Towers and talons: plates that keep their sides when reduced.
         "regency_heart_2" | "regency_heart_3" => Some(0.5),
+        // The tech 1 line: faceted plates and lift bells that keep their shape when reduced.
+        "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" => Some(0.5),
         _ => None,
     }
 }

@@ -24,7 +24,7 @@
 mod arms;
 mod body;
 mod chest;
-mod form;
+pub(super) mod form;
 mod head;
 mod legs;
 #[cfg(test)]
