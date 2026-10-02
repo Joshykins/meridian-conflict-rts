@@ -2327,7 +2327,8 @@ fn vs_main(in: VsIn) -> VsOut {
     }
     // A charge coil's light knows its stage and the unit's charge (`coil_state`).
     let coil_pat = in.surface & 0xFFu;
-    if coil_pat >= PAT_COIL && coil_pat < PAT_COIL_TURN && (in.material == MAT_GLOW || in.material == MAT_GLOW_LASER)
+    if coil_pat >= PAT_COIL && coil_pat < PAT_COIL_TURN
+        && (in.material == MAT_GLOW || in.material == MAT_GLOW_LASER || in.material == PRISM_GLOW_MATERIAL)
         && e.mount.w == CHARGE_RECORD {
         let c = coil_state(e, time);
         out.drive = vec4<f32>(c.x, c.y, 0.0, 0.0);
@@ -3255,13 +3256,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let heat = saturate(0.35 + 0.5 * wave * wave + 0.15 * shimmer);
         m.emissive = mix(vec3<f32>(1.0, 0.18, 0.02), vec3<f32>(1.0, 0.72, 0.3), heat * heat) * (1.2 + 5.5 * heat * heat) * live;
     }
-    if in.drive_at.w > 2.5 && in.material == MAT_GLOW_LASER
+    if in.drive_at.w > 2.5 && (in.material == MAT_GLOW_LASER || in.material == PRISM_GLOW_MATERIAL)
         && (flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
         // A Regency plasma coil (`charge_gear`): at rest a low red ember, breathing; through
         // the charge each stage lights in turn from the breech, red going pink and then
         // white as the charge fills, restless near full; the shot blinds white, then it
         // holds a hot orange-red that cools back to the ember. A vent's glow
         // (`CHARGE_GEAR_HEAT_STAGE`) stays dark until the shot, then burns and cools.
+        // A Pinch-fusion gun's (`GLOW_PRISM`) burns as a power generator's star does: the
+        // prism's pinks at rest, white as it fills, cooling through lavender to violet,
+        // never red.
+        let fusion = in.material == PRISM_GLOW_MATERIAL;
+        let hue = prism(in.local.z * 0.12 + time * PRISM_RATE + in.state.w);
+        let ember = select(vec3<f32>(1.0, 0.08, 0.04), mix(hue * hue * hue, hue, 0.3), fusion);
         let stage_i = u32(in.drive_at.x + 0.5);
         let charge = in.drive.x;
         let since = in.drive.y;
@@ -3269,11 +3276,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let blaze = 1.0 - smoothstep(0.04, 0.5, since);
         let flicker = 0.85 + 0.15 * sin(time * 31.0 + l.x * 0.7 + l.z * 1.3 + in.state.w * 9.0);
         var level = 0.0;
-        var colour = vec3<f32>(1.0, 0.08, 0.04);
+        var colour = ember;
         if stage_i == CHARGE_GEAR_HEAT_STAGE {
             let heat = smoothstep(0.0, 0.2, since) * (1.0 - smoothstep(0.8, 5.2, since));
             level = 0.04 + heat * heat * 11.0 * flicker;
-            colour = mix(vec3<f32>(1.0, 0.07, 0.03), vec3<f32>(1.0, 0.45, 0.16), heat * heat);
+            colour = select(
+                mix(vec3<f32>(1.0, 0.07, 0.03), vec3<f32>(1.0, 0.45, 0.16), heat * heat),
+                mix(vec3<f32>(0.45, 0.25, 1.0), vec3<f32>(1.0, 0.62, 0.9), heat * heat),
+                fusion);
         } else {
             let stage = f32(stage_i) / 7.0;
             let breath = 0.5 + 0.5 * sin(time * 1.3 - stage * 3.0 + in.state.w * 6.0);
@@ -3286,12 +3296,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // After the shot: hot, cooling through orange-red back to the ember.
             let cool = (1.0 - blaze) * (1.0 - smoothstep(0.4, 4.5, since));
             level += cool * cool * 4.5 * flicker;
-            colour = mix(colour, vec3<f32>(1.0, 0.42, 0.5), smoothstep(2.0, 7.0, level) * charge);
+            colour = mix(colour, select(vec3<f32>(1.0, 0.42, 0.5), hue, fusion), smoothstep(2.0, 7.0, level) * charge);
             colour = mix(colour, vec3<f32>(1.0, 0.92, 0.9), smoothstep(6.0, 10.0, level) * charge);
-            colour = mix(colour, vec3<f32>(1.0, 0.3, 0.08), cool * 0.6);
+            colour = mix(colour, select(vec3<f32>(1.0, 0.3, 0.08), vec3<f32>(0.62, 0.45, 1.0), fusion), cool * 0.6);
         }
         level = mix(level, 30.0, blaze);
         colour = mix(colour, vec3<f32>(1.0, 0.96, 0.95), blaze);
+        if fusion {
+            // As a star: white only where it faces the eye, the prism's pinks round its rim,
+            // and held lower than red plasma's light, or the bloom washes it to a white blob.
+            let rim = 1.0 - smoothstep(0.35, 0.9, abs(dot(n, v)));
+            colour = mix(colour, mix(hue, hue * hue, 0.8), rim * 0.9 * (1.0 - blaze));
+            level *= 0.55;
+        }
         m.emissive = colour * level;
         m.albedo = mix(vec3<f32>(0.05, 0.02, 0.02), colour * 0.3, clamp(level * 0.25, 0.0, 1.0));
         m.roughness = 0.3;

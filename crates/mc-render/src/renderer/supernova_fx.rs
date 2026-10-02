@@ -198,7 +198,7 @@ impl Renderer {
 
     /// One shell of plasma `radius` metres out from `centre` (from, to), as its two halves
     /// (plasma_puffs.wgsl `supernova_vertex`: `vel.x` 1 is the far half).
-    fn nova_shell(
+    pub(super) fn nova_shell(
         &mut self,
         centre: Vec3,
         start: f32,

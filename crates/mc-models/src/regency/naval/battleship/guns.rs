@@ -114,7 +114,7 @@ fn roof_colour(b: &mut MeshBuilder, i: usize, z: f32) {
 
 // ---- The main houses ---------------------------------------------------------------
 
-/// A stepped platform on a bronze race, and let into its back a gimballed core: a red
+/// A stepped platform on a bronze race, and let into its back a gimballed core: a
 /// star flattened in a plated well, two bronze rings tilted across it.
 fn platform(b: &mut MeshBuilder, i: usize) {
     let p = MAIN[i];
@@ -153,7 +153,7 @@ fn platform(b: &mut MeshBuilder, i: usize) {
     let core = v3(p.x - 4.4, 0.0, p.z + 1.15);
     dark_plate(b);
     hoop(b, core, 1.55, 0.45, 0.5, facets(b, 14));
-    b.paint(GLOW_LASER);
+    b.paint(GLOW_PRISM);
     b.spheroid(
         core,
         v3(0.7, 0.7, 0.35),
@@ -207,9 +207,9 @@ fn rails(b: &mut MeshBuilder, i: usize) {
         b.cylinder_between(v3(x + 4.0, y, z), v3(mouth, y, z), 0.6, 0.55, sides);
         dark_plate(b);
         b.cylinder_between(v3(mouth - 0.6, y, z), v3(mouth, y, z), 0.7, 0.66, sides);
-        b.paint(GLOW_LASER);
+        b.paint(GLOW_PRISM);
         hoop_on(b, v3(mouth + 0.02, y, z), Vec3::X, 0.45, 0.14, 0.06, sides);
-        // Each coil two plated discs round the bore, a red-lit groove between them.
+        // Each coil two plated discs round the bore, a groove lit with fusion between them.
         for &(dx, r) in coils {
             let at = v3(x + dx, y, z);
             dark_plate(b);
@@ -222,7 +222,7 @@ fn rails(b: &mut MeshBuilder, i: usize) {
                     sides,
                 );
             }
-            b.paint(GLOW_LASER);
+            b.paint(GLOW_PRISM);
             b.cylinder_between(
                 at - Vec3::X * 0.09,
                 at + Vec3::X * 0.09,
@@ -316,14 +316,14 @@ fn lens_head(b: &mut MeshBuilder, c: Vec3, y: f32, w: f32, h: f32) {
     }
 }
 
-/// A gravity lens at `at`, turned to `toward`: a bronze housing ringed in plate, a red
-/// lens in its face.
+/// A gravity lens at `at`, turned to `toward`: a bronze housing ringed in plate, a lens
+/// of fusion light in its face.
 fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f32) {
     let d = (toward - at).normalize();
     let sides = facets(b, 8);
     metal(b);
     b.cylinder_between(at - d * r * 0.9, at, r * 1.15, r, sides);
-    b.paint(GLOW_LASER);
+    b.paint(GLOW_PRISM);
     b.cylinder_between(at, at + d * 0.1, r * 0.72, r * 0.6, sides);
 }
 

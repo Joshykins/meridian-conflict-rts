@@ -315,22 +315,25 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     red bloom over a white heart, throws a spout of plasma up and molten
     spatter and globs out low (in place of a shock ring) and sears the ground,
     and the rest of the jet pours in after it.
-  - **Pinch-fusion:** the same charge far harder: lightning crackles round
-    it and is pulled into it, and it goes over to fusion, white at the heart
-    with the prism drifting over it. The gun works with it (the Sunspear: its
-    rails part, its lens heads slide out, its coils light from the breech
-    going white, its gimbal cage spins up; after the shot its radiators vent
-    and it cools). It launches with a blinding white flash and a cone of
-    fusion, pinching out a jet of fusion, long and fast (a white-hot core in a
-    sheath of the prism, the fastest Regency shot), arcing a little onto its
-    mark (laid flat, `flat_fire`) with a long hot trail taking the prism and
-    cooling through pink and red behind it. Where it lands it is far bigger
-    and brighter than any lower grade: a blinding flash, a hard white heart
-    with filaments torn out of it, the prism in them, cooling back to red; it
-    throws a column of plasma up, streaks and globs out and lightning
-    into the ground, rolls a lumpy skirt of plasma out over the ground, melts the ground into a wide glowing pool, and leaves a knot of
-    fusion burning over it for seconds, slowly letting white lightning go
-    while red sparkles cool off the edges.
+  - **Pinch-fusion:** the same charge far harder: the ball is a star, as a
+    power generator's (white-hot, the prism drifting over it), lightning
+    crackling round it and pulled into it. The gun works with it (the
+    Sunspear: its rails part, its lens heads slide out, its coils light from
+    the breech in the prism going white, its gimbal cage spins up round its
+    star core; after the shot its radiators vent and it cools through lavender
+    to violet). Every light on a Pinch-fusion gun is the star's
+    (`GLOW_PRISM`), not the red of the lower grades. It launches with a
+    blinding white flash and a cone of the star's streamers, pinching out a
+    jet of fusion, long and fast (a white-hot core in a sheath of the prism,
+    the fastest Regency shot), arcing a little onto its mark (laid flat,
+    `flat_fire`) with a long hot trail taking the prism and cooling to violet
+    behind it. Where it lands it goes off as a small supernova, drawn with
+    the dying power generator's own pieces: a blinding flash, a hollow shell
+    tearing outward, white, then the prism, cooling to lavender and violet,
+    streamers round its waist, up from it and every way, lightning into the
+    ground; it melts the ground into a wide glowing pool and leaves a small
+    star burning over it for seconds, slowly letting white lightning go while
+    lavender sparkles drift off it. No reds or oranges anywhere in it.
   - **No spirals, no rings:** the plasma boils, churns and billows in cells
     and lumps; nothing is wound round a middle in arms (user, 2026-09-30).
   - **No mist:** plasma is hard-edged and goes out fast. A trail is a hot
@@ -356,8 +359,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   white-hot, and only toward its edge breaks into a turning pastel prism:
   rose, magenta, lavender, peach-gold (the Bifrost; a pink-white beam in
   space). No blues or greens. Mostly white, a little colour. The star cores
-  have it; the Pinch-fusion guns' charge, wake and strike take it in drifting
-  patches (plasma_puffs.wgsl), not turned round their middle. The lower grades
+  have it, and the Pinch-fusion guns are drawn with them: their charge is a
+  star, their strike a supernova, their lights the star's. The lower grades
   stay red. One colour source:
   `gpu_consts::prism` and common.wgsl `prism`.
 

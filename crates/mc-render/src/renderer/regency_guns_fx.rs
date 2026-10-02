@@ -27,31 +27,27 @@
 //!   glassed scorch that glows and crusts over, embers rising off it for a couple of
 //!   seconds. The rest of the jet pours in after it, each round a red splash
 //!   (`pinched_pour`). The strikes are drawn in `strike.rs`.
-//! - **Pinch-fusion** (the Sunspear's): the charge goes much further: lightning crackles
-//!   round the ball and is pulled into it, and over the last part it goes over to fusion,
-//!   white at the heart with the prism's pinks drifting over it, its light white and
-//!   strobing. It launches with a blinding white flash, a cone of plasma thrown out down
-//!   the line of fire, globs thrown off round the bore and arcs snapping forward; heat
-//!   rises off the gun's back. The shot is a jet of fusion pinched out, long and fast: a
+//! - **Pinch-fusion** (the Sunspear's, and every `PinchFusion` gun's): drawn as a power
+//!   generator's star is (`star_core_fx.rs`, `supernova_fx.rs`), never red. The charge
+//!   is a star gathered in front of the bore (plasma_puffs.wgsl `star_core`), growing and
+//!   burning whiter, lightning crackling round it and pulled into it, motes of lavender
+//!   drawn in, its light rose going white and strobing. It launches with a blinding white
+//!   flash, a cone of the star's streamers thrown out down the line of fire, streamers
+//!   thrown off round the bore and arcs snapping forward; heat rises off the gun's back in
+//!   faint lavender streamers. The shot is a jet of fusion pinched out, long and fast: a
 //!   white-hot core in a broad sheath of the prism, strobing, and behind it a white-hot
-//!   trail that takes the prism and cools through pink and red, breaking up, shedding
-//!   sparks. Where it lands it opens in a blinding flash, a hard white heart with
-//!   filaments torn out of it, the prism in them, cooling back to red, a column of plasma
-//!   rising out of it, a lumpy skirt of it rolling out over the ground, streaks and globs
-//!   flung wide and lightning thrown into the ground round it. As it cools it slows: its
-//!   red body, column, skirt and globs open at full pace and then linger, cooling slower
-//!   and slower as what was thrown out drifts to a stop (`push_lingering`). The ground is
-//!   melted into a wide glowing pool
-//!   and a knot of fusion left burning over it for seconds, slowly letting white lightning go into the ground round it while
-//!   red sparkles cool and drift off the edges.
+//!   trail that takes the prism and cools to violet, breaking up, shedding sparks. Where
+//!   it lands it goes off as a small supernova (`fusion.rs`).
 //!
-//! Nothing is wound round a middle (no spiral arms, no rings), and nothing hangs as a
-//! mist: the plasma is hard-edged and goes out fast (plasma_puffs.wgsl).
+//! Nothing is wound round a middle (no spiral arms, no rings; a fusion strike's streamers
+//! are thrown out in a loose band round its waist, as a supernova's), and nothing hangs as
+//! a mist: the plasma is hard-edged and goes out fast (plasma_puffs.wgsl).
 //!
 //! Presentation only; the renderer's own clock. The light is plasma_puffs.wgsl's (the
 //! ball, the bursts, the globs, the thrown clumps), warp_puffs.wgsl's (motes, filaments,
 //! arcs, flash), which take any colour, and sprites.wgsl's (the trails).
 
+use super::star_core_fx::{LAVENDER, ROSE, STAR};
 use super::{Puff, Renderer, PUFF_RING};
 use crate::gpu_consts::{fade_beam, puff};
 use glam::Vec3;
@@ -62,6 +58,7 @@ use mc_sim::mirror::{
 };
 use std::mem::size_of;
 
+mod fusion;
 mod plasmeric;
 mod strike;
 
@@ -73,6 +70,11 @@ pub(super) const GLOW: f32 = puff::WARP_GLOW as f32;
 const STREAK: f32 = puff::WARP_STREAK as f32;
 const ARC: f32 = puff::WARP_ARC as f32;
 pub(super) const MOTE: f32 = puff::WARP_MOTE as f32;
+/// Pinch fusion is drawn as a power generator's star is (`star_core_fx.rs`,
+/// `supernova_fx.rs`): its streamers.
+const WISP: f32 = puff::NOVA_WISP as f32;
+/// What fusion's light cools to: violet, never red (plasma_puffs.wgsl `nova_wisp`).
+const VIOLET: Vec3 = Vec3::new(0.6, 0.4, 1.0);
 
 /// The plasma's colours, brightness in their size: red plasma, its hot pink-white heart,
 /// and the white of fusion.
@@ -366,7 +368,7 @@ impl Renderer {
     /// `upload_sim`, once a tick, after this tick's shots are written): a hot filament laid
     /// down the stretch each shot flies this tick, each piece lit as the shot passes it,
     /// cooling and breaking up as it hangs (sprites.wgsl `FADE_BEAM_PLASMA_TRAIL`). A
-    /// fusion round's is white-hot, takes the prism and cools through pink and red,
+    /// fusion round's is white-hot, takes the prism and cools through pink to violet,
     /// shedding sparks; a bolt's is a thin red one. No puffs: a wake of them reads as mist.
     /// A Plasmeric bolt leaves no trail (at its speed even a short-lived one is a beam):
     /// it lights the ground and hulls red down its flight as it passes.
@@ -452,7 +454,7 @@ impl Renderer {
                         when,
                         0.6 + 0.6 * roll0,
                         (dot, dot * 0.4),
-                        WHITE.lerp(HOT, roll1) * 5.0,
+                        WHITE.lerp(ROSE, roll1).lerp(LAVENDER, roll1 * roll1) * 5.0,
                         0.0,
                     );
                 }
@@ -502,21 +504,39 @@ impl Renderer {
     ) {
         let size = ball(w) * if fusion { 1.5 } else { 1.0 };
         let life = span * 2.0;
-        // Fusion takes over the last part of it: white at the heart, colour round the rim.
+        // Fusion takes over the last part of it, burning whiter and harder.
         let over = if fusion { smooth(0.35, 0.92, f) } else { 0.0 };
         let across = size * 1.8 * (0.25 + 0.75 * f.sqrt());
-        let rgb =
-            RED.lerp(WHITE, over * 0.7) * (1.6 + 4.5 * f * f) * if fusion { 1.4 } else { 1.0 };
-        self.push_lit(
-            ORB,
-            at,
-            Vec3::ZERO,
-            when,
-            life,
-            (across, across * 1.04),
-            rgb,
-            over,
-        );
+        // Its own colour: red plasma, or fusion's rose going white.
+        let tint = if fusion { ROSE.lerp(WHITE, over) } else { RED };
+        if fusion {
+            // A star gathered in front of the bore, as a power generator's burns
+            // (plasma_puffs.wgsl `star_core`): laid each step, lasting two, so their tents
+            // add up to one steady star. The quad holds the corona; the face is 0.42 of it.
+            let face = across * 0.5;
+            let seed = (w.damage.to_f32() * 0.013).fract() * 40.0;
+            self.push_lit(
+                STAR,
+                at,
+                Vec3::ZERO,
+                when,
+                life,
+                (face / 0.42, face / 0.42),
+                Vec3::splat(0.5 + 1.4 * f + 1.4 * over * over),
+                seed,
+            );
+        } else {
+            self.push_lit(
+                ORB,
+                at,
+                Vec3::ZERO,
+                when,
+                life,
+                (across, across * 1.04),
+                RED * (1.6 + 4.5 * f * f),
+                0.0,
+            );
+        }
         // Motes of plasma drawn in from round the bore.
         let motes = (1.0 + f * if fusion { 4.0 } else { 2.5 } + self.scatter.unit()) as usize;
         for _ in 0..motes {
@@ -527,7 +547,11 @@ impl Renderer {
             )
             .normalize_or(Vec3::Z);
             let from = at + (out + dir * 0.6) * size * (1.6 + self.scatter.unit() * 1.4);
-            let rgb = RED.lerp(HOT, self.scatter.unit() * 0.5 + over * 0.5) * (3.0 + 4.0 * f);
+            let rgb = if fusion {
+                LAVENDER.lerp(WHITE, self.scatter.unit() * 0.5 + over * 0.5)
+            } else {
+                RED.lerp(HOT, self.scatter.unit() * 0.5)
+            } * (3.0 + 4.0 * f);
             let dot = size * 0.08 * (1.0 + over);
             let late = self.scatter.unit() * span;
             self.push_lit(
@@ -557,7 +581,7 @@ impl Renderer {
                 when,
                 0.22,
                 (size * 0.04, size * 0.03),
-                RED.lerp(WHITE, over) * (2.0 + 3.0 * f),
+                tint * (2.0 + 3.0 * f),
                 0.0,
             );
         }
@@ -571,7 +595,7 @@ impl Renderer {
                 when,
                 life,
                 (s, s),
-                RED.lerp(WHITE, over * 0.5) * 0.5 * f,
+                tint * 0.5 * f,
                 0.0,
             );
         }
@@ -590,10 +614,7 @@ impl Renderer {
                 .normalize_or(side);
             let from = at + out * size * (1.4 + 0.8 * self.scatter.unit());
             let tint = if fusion {
-                WHITE.lerp(
-                    Vec3::new(1.0, 0.55, 0.8),
-                    self.scatter.unit() * (1.0 - over),
-                )
+                WHITE.lerp(LAVENDER, self.scatter.unit() * (1.0 - over))
             } else {
                 RED.lerp(HOT, 0.4 + 0.4 * self.scatter.unit())
             };
@@ -619,7 +640,7 @@ impl Renderer {
             .normalize_or(Vec3::Z);
             let reach = size * (0.9 + 1.4 * self.scatter.unit()) * (0.5 + f);
             let life = 0.08 + 0.06 * self.scatter.unit();
-            let tint = WHITE.lerp(Vec3::new(1.0, 0.6, 0.85), self.scatter.unit());
+            let tint = WHITE.lerp(LAVENDER, self.scatter.unit());
             self.push_lit(
                 ARC,
                 at + out * size * 0.35,
@@ -631,7 +652,7 @@ impl Renderer {
                 0.0,
             );
         }
-        let color = RED.lerp(WHITE, over) * (5.0 + 70.0 * f * f) * size;
+        let color = tint * (5.0 + 70.0 * f * f) * size;
         self.plasma_fx.guns.light(Glow {
             pos: at,
             color,
@@ -732,34 +753,23 @@ impl Renderer {
                     WHITE * 12.0,
                     0.0,
                 );
-                self.push_lit(
-                    BURST,
-                    at,
-                    Vec3::ZERO,
-                    time,
-                    0.35,
-                    (s * 0.8, s * 3.0),
-                    WHITE * 3.0,
-                    1.0,
-                );
                 self.plasma_jet(at, dir, s, true, time);
-                // What was left of the cage thrown off round the bore as globs of plasma.
+                // What was left of the star thrown off round the bore as streamers.
                 let side = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
                 let up = side.cross(dir);
                 for k in 0..14 {
                     let a = std::f32::consts::TAU * (k as f32 + self.scatter.unit() * 0.8) / 14.0;
                     let out = (side * a.cos() + up * a.sin() + dir * 0.4).normalize_or(dir);
-                    let blob = s * (0.1 + 0.06 * self.scatter.unit());
-                    let tint = WHITE.lerp(RED, self.scatter.unit() * 0.7);
+                    let thick = s * (0.1 + 0.06 * self.scatter.unit());
                     let roll0 = self.scatter.unit();
                     self.push_lit(
-                        GLOB,
+                        WISP,
                         at,
-                        out * s * (4.0 + 3.0 * roll0),
+                        out * s * (2.0 + 2.0 * roll0) * puff::NOVA_WISP_DRAG,
                         time,
                         0.7,
-                        (blob, blob * 0.3),
-                        tint * 4.0,
+                        (thick, thick * 3.0),
+                        Vec3::splat(2.2),
                         0.0,
                     );
                 }
@@ -792,16 +802,16 @@ impl Renderer {
                         + across * side * reach * 0.19
                         + flat * self.scatter.signed() * reach * 0.1;
                     let when = time + 0.1 + k as f32 * 0.16 + self.scatter.unit() * 0.1;
-                    let puff = reach * (0.05 + 0.03 * self.scatter.unit());
+                    let thick = reach * (0.04 + 0.02 * self.scatter.unit());
                     let roll0 = self.scatter.unit();
                     self.push_lit(
-                        WAKE,
+                        WISP,
                         from,
-                        Vec3::Z * (3.0 + 3.0 * roll0) + across * side * 1.5,
+                        (Vec3::Z * (2.0 + 2.0 * roll0) + across * side) * puff::NOVA_WISP_DRAG,
                         when,
                         0.9,
-                        (puff, puff * 1.6),
-                        RED.lerp(HOT, 0.3) * 1.6 * (1.0 - k as f32 / 20.0),
+                        (thick, thick * 2.5),
+                        Vec3::splat(0.7 * (1.0 - k as f32 / 20.0)),
                         0.0,
                     );
                 }
@@ -819,8 +829,8 @@ impl Renderer {
     }
 
     /// The plasma a squeezed charge throws out down the line of fire `dir` as it lets a
-    /// shot go: a cone of wake puffs driven forward, slowing and spreading, red for a
-    /// Pinched bolt, white going pink for fusion.
+    /// shot go: a cone of it driven forward, slowing and spreading: red wake puffs for a
+    /// Pinched bolt, the star's streamers for fusion.
     pub(super) fn plasma_jet(&mut self, at: Vec3, dir: Vec3, size: f32, fusion: bool, time: f32) {
         let (count, speed, life) = if fusion {
             (14, size * 9.0, 0.6)
@@ -835,13 +845,23 @@ impl Renderer {
             ) * 0.28;
             let v = (dir + spread).normalize_or(dir) * speed * (0.4 + 0.8 * self.scatter.unit());
             let puff = size * (0.25 + 0.2 * self.scatter.unit());
-            let rgb = if fusion {
-                WHITE.lerp(HOT, self.scatter.unit() * 0.6) * 3.0
-            } else {
-                RED.lerp(HOT, self.scatter.unit() * 0.4) * 3.0
-            };
             let roll0 = self.scatter.unit();
             let roll1 = self.scatter.unit();
+            let roll2 = self.scatter.unit();
+            if fusion {
+                // Streamers of the star, white going through the prism to violet.
+                self.push_lit(
+                    WISP,
+                    at + dir * size * 0.5,
+                    v * puff::NOVA_WISP_DRAG * 0.3,
+                    time + roll0 * 0.05,
+                    life * (0.7 + 0.6 * roll1),
+                    (puff * 0.6, puff * 2.4),
+                    Vec3::splat(2.0 + roll2),
+                    0.0,
+                );
+                continue;
+            }
             self.push_lit(
                 WAKE,
                 at + dir * size * 0.5,
@@ -849,8 +869,8 @@ impl Renderer {
                 time + roll0 * 0.05,
                 life * (0.7 + 0.6 * roll1),
                 (puff, puff * 1.5),
-                rgb,
-                if fusion { 0.8 } else { 0.0 },
+                RED.lerp(HOT, roll2 * 0.4) * 3.0,
+                0.0,
             );
         }
     }
@@ -886,7 +906,20 @@ impl Renderer {
         fx.charges.swap_remove(i);
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let size = ball(w) * if fusion { 1.5 } else { 1.0 };
-        let rgb = if fusion { WHITE * 4.0 } else { RED * 4.0 };
+        if fusion {
+            // The star let go: a white flash where it hung.
+            self.push_lit(
+                GLOW,
+                at,
+                Vec3::ZERO,
+                time,
+                life,
+                (size, size * 1.4),
+                WHITE * 6.0,
+                0.0,
+            );
+            return;
+        }
         self.push_lit(
             ORB,
             at,
@@ -894,8 +927,8 @@ impl Renderer {
             time,
             life,
             (size, size * 0.15),
-            rgb,
-            if fusion { 1.0 } else { 0.0 },
+            RED * 4.0,
+            0.0,
         );
     }
 

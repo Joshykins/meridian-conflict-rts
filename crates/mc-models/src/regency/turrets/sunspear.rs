@@ -5,17 +5,17 @@
 //!
 //! Two tall plated rails either side of a short bore reach past its mouth, gravity lenses
 //! in heads at their tips aimed into the charge, and a stack of wound pinch coils narrows
-//! down the bore between them. On the turret's back the fusion core stands caged: a red
+//! down the bore between them. On the turret's back the fusion core stands caged: a
 //! star on a bronze post, held in three gimbal rings and a plated band, conduits running
 //! to the trunnions; a radiator pack on either flank. It stands on a round platform
 //! ringed by eight pylons.
 //!
 //! It works with its charge (`rig::CHARGE_GEAR_MASK`, entity.wgsl `charge_gear_pose`):
 //! through the charge the rails part, the lens heads slide out along them into the
-//! charge, the pinch coils light one after another from the breech, red going white, and
-//! the gimbal cage spins up round the core, which lights first. The shot blinds every
+//! charge, the pinch coils light one after another from the breech, the prism's pinks
+//! going white, as a power generator's star burns, and the gimbal cage spins up round the core, which lights first. The shot blinds every
 //! light and kicks the bore back; the radiator lids stand up off glowing grilles, and as
-//! the gun cools the coils fade through orange to an ember, the rails close and the lids
+//! the gun cools the coils fade through lavender to violet, the rails close and the lids
 //! settle.
 //!
 //! Drawn at [`SCALE`] times the authored metres below. Its pivot and muzzle ([`LINE`]) are
@@ -107,10 +107,11 @@ pub(crate) fn sunspear(b: &mut MeshBuilder, _tech: u8) {
     });
 }
 
-/// A `GLOW_LASER` brush lit with the charge at `stage` (0 first, 6 last; `HEAT_STAGE` lit
-/// by the shot instead): the Regency's plasma coil light.
+/// A `GLOW_PRISM` brush lit with the charge at `stage` (0 first, 6 last; `HEAT_STAGE` lit
+/// by the shot instead): pinch fusion's coil light in a power generator's star's colours
+/// (entity.wgsl), not the red of the Regency's plasma guns.
 pub(in crate::regency) fn coil_light(b: &mut MeshBuilder, stage: u32) {
-    b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
+    b.paint(GLOW_PRISM).pattern(pattern::COIL + stage);
 }
 
 /// A round platform stepped up to a hub, ringed by eight plated pylons, each tied to the
@@ -267,8 +268,8 @@ fn lens_head(b: &mut MeshBuilder, len: f32) {
     }
 }
 
-/// A gravity lens at `at`, turned to `toward`: a bronze housing ringed in plate, a red
-/// lens in its face, four bronze vanes round it.
+/// A gravity lens at `at`, turned to `toward`: a bronze housing ringed in plate, a lens
+/// of fusion light in its face, four bronze vanes round it.
 pub(in crate::regency) fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f32) {
     let d = (toward - at).normalize();
     let sides = b.sides(10);
@@ -293,7 +294,7 @@ pub(in crate::regency) fn lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3, r: f
 }
 
 /// The pinch coils in the gun's frame: a magnetic bottle down the bore, coils narrowing
-/// toward the mouth, each wound in bronze, a red light inside each that comes on with
+/// toward the mouth, each wound in bronze, a fusion light inside each that comes on with
 /// the charge, the coil nearest the breech first.
 pub(in crate::regency) fn pinch_coils(b: &mut MeshBuilder) {
     let fine = b.fine();
@@ -318,7 +319,7 @@ pub(in crate::regency) fn pinch_coils(b: &mut MeshBuilder) {
     }
 }
 
-/// The caged core over the turret's back at `c` (the cradle's foot): a red core held in
+/// The caged core over the turret's back at `c` (the cradle's foot): a star core held in
 /// three bronze gimbal rings and a plated band, on a plated cradle in four bronze fingers,
 /// conduits running forward to the trunnions either side.
 pub(in crate::regency) fn caged_core(b: &mut MeshBuilder, c: Vec3) {
@@ -375,7 +376,7 @@ pub(in crate::regency) fn caged_core(b: &mut MeshBuilder, c: Vec3) {
 }
 
 /// A radiator pack on either flank of the turret's back: a plated box, a grille of bars
-/// over a red-lit floor (`HEAT_STAGE`: dark until the shot) and three lids over it that
+/// over a fusion-lit floor (`HEAT_STAGE`: dark until the shot) and three lids over it that
 /// stand up off it with the heat after the shot (`VENT`) and settle as it cools.
 fn radiators(b: &mut MeshBuilder) {
     let fine = b.fine();

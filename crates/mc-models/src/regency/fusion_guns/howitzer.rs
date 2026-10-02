@@ -3,7 +3,7 @@
 //! on the turret's back behind them.
 //!
 //! The bore is split down its length into two plated halves that part through the
-//! charge, red light let into their inner faces lighting from the breech, a gravity lens
+//! charge, fusion light let into their inner faces lighting from the breech, a gravity lens
 //! at each half's tip. It rides the tracked, skirted body (`chassis`).
 //!
 //! The unit file's pivot and muzzle are [`LINE`]'s (`regency_t3_artillery`,
@@ -95,13 +95,14 @@ fn breech(b: &mut MeshBuilder) {
     });
 }
 
-/// A `GLOW_LASER` brush lit with the charge at `stage` (0 first, 6 last).
+/// A `GLOW_PRISM` brush lit with the charge at `stage` (0 first, 6 last): pinch fusion's
+/// coil light.
 fn coil_light(b: &mut MeshBuilder, stage: u32) {
-    b.paint(GLOW_LASER).pattern(pattern::COIL + stage);
+    b.paint(GLOW_PRISM).pattern(pattern::COIL + stage);
 }
 
 /// A bore split down its length into two plated halves that part through the charge, a
-/// red-lit strip down each inner face lighting from the breech, a plate course along each
+/// fusion-lit strip down each inner face lighting from the breech, a plate course along each
 /// half's top and a gravity lens at each tip.
 fn split(b: &mut MeshBuilder) {
     let len = LINE.len;
