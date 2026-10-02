@@ -38,7 +38,7 @@ pub(super) const COMMANDER_TRIANGLES: usize = 9000;
 pub(super) const MODELS: &[ModelDef] = &[
     // The commander: a tall walker, fusion cannon forearm and taloned hand (`commander`).
     ModelDef::new("regency_commander", 10.4, 25.0, commander::commander),
-    // The tech 3 battle scorpion: the old commander's scorpion, built bigger (`scorpion`).
+    // The tech 4 battle scorpion: the old commander's scorpion, built bigger (`scorpion`).
     ModelDef::new(
         "regency_scorpion",
         scorpion::RADIUS,

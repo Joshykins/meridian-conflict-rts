@@ -63,7 +63,7 @@ fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32, heading: i32) -> Uni
 fn the_scorpion_turns_its_body_onto_a_mark_behind_it() {
     let mut w = world();
     // Facing east, with an ARC tank 150 m to its west: dead astern.
-    let scorpion = add(&mut w, "regency_t3_scorpion", 0, 512, 512, 0);
+    let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let tank = add(&mut w, "aster_t1_tank", 1, 362, 512, 0);
     let hp = |w: &World| {
         w.state
@@ -98,9 +98,9 @@ fn the_scorpion_turns_its_body_onto_a_mark_behind_it() {
 #[test]
 fn the_beam_holds_on_its_mark_every_tick() {
     let mut w = world();
-    let scorpion = add(&mut w, "regency_t3_scorpion", 0, 512, 512, 0);
+    let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let target = add(&mut w, "aster_t3_assault_bot", 1, 712, 512, 180);
-    let beam = w.blueprints.id_of("regency_t3_scorpion").unwrap();
+    let beam = w.blueprints.id_of("regency_t4_scorpion").unwrap();
     let mut first = None;
     let mut fed = 0;
     for t in 0..(12 * TICKS_PER_SECOND) {
@@ -129,9 +129,9 @@ fn the_beam_holds_on_its_mark_every_tick() {
 #[test]
 fn the_claws_throw_bombs_that_land_around_the_mark() {
     let mut w = world();
-    let scorpion = add(&mut w, "regency_t3_scorpion", 0, 512, 512, 0);
+    let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let target = add(&mut w, "aster_t3_assault_bot", 1, 772, 512, 180);
-    let id = w.blueprints.id_of("regency_t3_scorpion").unwrap();
+    let id = w.blueprints.id_of("regency_t4_scorpion").unwrap();
     let bomb = w.blueprints.unit(id).weapons[1].clone();
     let mut charged = 0;
     let mut throws = Vec::new();
@@ -197,9 +197,9 @@ fn bearing_gap(a: FxVec3, b: FxVec3) -> f32 {
 #[test]
 fn the_bombs_streak_out_and_curve_in_from_around_the_mark() {
     let mut w = world();
-    add(&mut w, "regency_t3_scorpion", 0, 512, 512, 0);
+    add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let target = add(&mut w, "aster_t3_assault_bot", 1, 800, 512, 180);
-    let id = w.blueprints.id_of("regency_t3_scorpion").unwrap();
+    let id = w.blueprints.id_of("regency_t4_scorpion").unwrap();
     // Per shot (by serial): how it left, the line to the mark then, and how it arrived.
     let mut shots: Vec<(u32, FxVec3, FxVec3, Option<FxVec3>)> = Vec::new();
     let mut hits = 0;
@@ -272,7 +272,7 @@ fn the_tail_does_not_lay_past_its_mark_while_the_body_turns() {
     let mut w = world();
     // A tank off the scorpion's left quarter, 100 degrees off the nose: past the tail's
     // reach, so the body comes round while the tail lays on it.
-    let scorpion = add(&mut w, "regency_t3_scorpion", 0, 512, 512, 0);
+    let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let tank = add(&mut w, "aster_t1_tank", 1, 512 - 35, 512 + 197, 0);
     let mut worst = 0i32;
     for _ in 0..(3 * TICKS_PER_SECOND) {
@@ -297,9 +297,9 @@ fn the_tail_does_not_lay_past_its_mark_while_the_body_turns() {
 #[test]
 fn the_beam_runs_up_before_it_lights_and_down_after() {
     let mut w = world();
-    let scorpion = add(&mut w, "regency_t3_scorpion", 0, 512, 512, 0);
+    let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let target = add(&mut w, "aster_t1_tank", 1, 712, 512, 180);
-    let id = w.blueprints.id_of("regency_t3_scorpion").unwrap();
+    let id = w.blueprints.id_of("regency_t4_scorpion").unwrap();
     let run = w.blueprints.unit(id).weapons[0].spin_ticks;
     assert!(run > 0);
     let mut levels = Vec::new();

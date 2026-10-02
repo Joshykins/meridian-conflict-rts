@@ -197,7 +197,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Job | Name |
 |---|---|
 | Commander, engineer, scout | Exarch, Artificer, Outrider |
-| Battle scorpion (T3) | Harrow |
+| Battle scorpion (T4) | Harrow |
 | Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
@@ -343,7 +343,7 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     top defences).
     - **Plasmeric Beam:** a dense red beam.
     - **Pinched-plasmeric Beam:** the middle grade, a tight dense stream
-      held on the target (the T3 battle scorpion).
+      held on the target (the T4 battle scorpion).
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
   - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**.
@@ -351,7 +351,7 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     plasma.
   - **Air-dropped:** **Plasmeric Bomb**.
   - **Thrown:** the **Gravitic Bomb**, a plasma charge in gravity containment,
-    charged in the hands and launched to land around its target (the T3
+    charged in the hands and launched to land around its target (the T4
     battle scorpion's claws).
   - **Guided: the Gravitic Seeker.** The Regency's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No

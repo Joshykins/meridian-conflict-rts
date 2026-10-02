@@ -17,8 +17,7 @@
 // that tier) and, until the Regency has fighting units
 // of their own, the stand-in roster's (ARC) units of their tier, poured by nanite streams
 // from fabricator heads whose mounts are in `mc_sim::print_heads`. The land and air
-// factories upgrade in place to tech 3, like ARC's; the tech 3 land factory also makes the
-// battle scorpion. Models: `models::regency::*`,
+// factories upgrade in place to tech 3, like ARC's. Models: `models::regency::*`,
 // authored at the sizes here, so every muzzle and pivot below is the model's own number.
 [
     // ---- Factories ----------------------------------------------------------------------
@@ -58,8 +57,7 @@
         mesh: "regency_brood", icon: Factory,
         sounds: (death: "blast_large"),
     ),
-    // Tech 3 lifts the fabrication ring on four pylons, high enough for the battle scorpion
-    // to be made under it, and hangs six heads from it; blade plates over the outboard
+    // Tech 3 lifts the fabrication ring on four pylons and hangs six heads from it; blade plates over the outboard
     // banks, a flywheel drum behind the press.
     (
         key: "regency_t3_land_factory",
@@ -72,7 +70,7 @@
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "regency_t3_scorpion",
+            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
         ]),
         mesh: "regency_brood", icon: Factory,
         sounds: (death: "blast_large"),

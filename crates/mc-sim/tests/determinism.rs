@@ -95,7 +95,7 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("aster_t2_land_reclaimer", 2, 850, 450),
     // The Regency battle scorpion: a held beam that runs up (`spin`), claws whose charges
     // curve onto their marks (`curve.rs`).
-    ("regency_t3_scorpion", 1, 1100, 700),
+    ("regency_t4_scorpion", 1, 1100, 700),
 ];
 
 fn setup(w: &mut World) {

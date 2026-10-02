@@ -7,7 +7,7 @@
             "Plasmeric Repeater": "The cannon that is its right forearm fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
         },
     ),
-    "regency_t3_scorpion": (
+    "regency_t4_scorpion": (
         lore: "A walking siege engine in the shape of a scorpion; ARC crews learned to fear the red line it draws before they learned its name.",
         weapons: {
             "Pinched-plasmeric Beam": "Plasma squeezed by gravity into a dense stream and held on the target; it leaves glass wherever it lands.",

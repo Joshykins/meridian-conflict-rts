@@ -1,4 +1,4 @@
-//! The Harrow, the Regency's tech 3 battle scorpion: a heavy armoured scorpion on eight
+//! The Harrow, the Regency's tech 4 battle scorpion: a heavy armoured scorpion on eight
 //! plated legs, a pair of great claws forward and a long jointed tail curled high over
 //! its back, ending in a Pinched-plasmeric Beam projector (docs/STYLE.md "The Regency
 //! look" and "The Regency suite"). Its claws charge Gravitic Bombs between their fingers
