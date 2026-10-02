@@ -1,4 +1,5 @@
-//! Aircraft engines: contrails and haze behind jets along the flown path, and a VTOL's
+//! Aircraft engines: contrails and haze behind jets along the flown path (from the mesh's
+//! nozzles in `models::aircraft_exhausts`, or else the exhausts its model records), and a VTOL's
 //! pods (`models::Vtol`) burning where they point, tilted as the entity shader tilts them
 //! (`models::vtol_tilt`). A pod jet is a blue drive plume out of each nozzle (`PUFF_THRUST`),
 //! longer and hotter the harder the aircraft is being driven, with a glow at the mouth; a lift fan is
@@ -43,7 +44,6 @@ impl Renderer {
                 .blueprints
                 .unit(mc_data::BlueprintId(u.blueprint as u16));
             let vtol = self.vtol.0.get(u.blueprint as usize).copied().flatten();
-            let ports = models::aircraft_exhausts(&bp.visual.mesh);
             let fans = vtol.map_or(bp.visual.mesh == "reclaim_drone", |v| v.fans);
             let hover_flight = bp.motion.is_some_and(|m| m.hover);
             let assault = bp.visual.mesh == "assault_air";
@@ -57,6 +57,23 @@ impl Renderer {
                 bp.radius.to_f32() / authored_radius,
                 bp.height.to_f32() / authored_height,
             );
+            // A jet's ports: the mesh's table where it has one, otherwise the exhausts its
+            // model records (`MeshBuilder::add_exhaust`), already at the unit's size.
+            let table = models::aircraft_exhausts(&bp.visual.mesh);
+            let ports: Vec<Vec3> = if !table.is_empty() {
+                table.iter().map(|p| Vec3::from(*p) * fit).collect()
+            } else if bp
+                .motion
+                .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
+            {
+                self.heat_haze
+                    .ports(u.blueprint)
+                    .iter()
+                    .map(|e| Vec3::from(e.at))
+                    .collect()
+            } else {
+                Vec::new()
+            };
             let transport_flight = bp.transport.is_some();
             if ports.is_empty() && vtol.is_none() {
                 continue;
@@ -109,8 +126,7 @@ impl Renderer {
                 let left = Vec3::new(-yaw.sin(), yaw.cos(), 0.0);
                 let rolled_left = left * bank.cos() + up * bank.sin();
                 let rolled_up = up * bank.cos() - left * bank.sin();
-                for port in ports {
-                    let port = Vec3::from(*port) * fit;
+                for &port in &ports {
                     let nozzle = -forward;
                     let at = from.lerp(to, t)
                         + forward * port.x

@@ -1978,6 +1978,29 @@ fn aircraft_have_swept_wings_nozzle_origins_and_bounded_lods() {
     }
 }
 
+/// Every jet leaves a trail: its mesh has nozzles in `aircraft_exhausts`, or its model
+/// records its exhausts (`MeshBuilder::add_exhaust`), which the renderer's trails fall back
+/// on. Hover craft, VTOLs and capital ships burn other ways.
+#[test]
+fn every_jet_has_exhaust_ports() {
+    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let bps = mc_data::Blueprints::load(&data).unwrap();
+    for u in &bps.units {
+        let Some(m) = u.motion else { continue };
+        if m.layer != mc_data::MoveLayer::Air || m.hover || u.is_capital_ship() {
+            continue;
+        }
+        let model =
+            super::build_model_scaled(&u.visual.mesh, u.radius.to_f32(), u.height.to_f32(), u.tech)
+                .unwrap_or_else(|| panic!("{} builds", u.visual.mesh));
+        assert!(
+            !super::aircraft_exhausts(&u.visual.mesh).is_empty() || !model.exhausts.is_empty(),
+            "{}: a jet with no exhaust ports",
+            u.key
+        );
+    }
+}
+
 #[test]
 fn vtol_pods_carry_their_nozzles() {
     for key in ["gunship", "reclaim_carrier", "magpie"] {

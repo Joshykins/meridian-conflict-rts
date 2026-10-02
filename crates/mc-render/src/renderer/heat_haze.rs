@@ -86,6 +86,12 @@ impl HeatHaze {
         })
     }
 
+    /// The exhaust ports of model slot `model` (`UnitInstance::blueprint`), in the unit's
+    /// frame at its drawn size.
+    pub(super) fn ports(&self, model: u32) -> &[Exhaust] {
+        self.ports.get(model as usize).map_or(&[], Vec::as_slice)
+    }
+
     pub(super) fn buffer(&self) -> &Buffer {
         &self.buffer
     }
