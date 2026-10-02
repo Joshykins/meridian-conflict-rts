@@ -27,8 +27,11 @@ struct RegencyIn {
     // Model space, metres, and the face's normal there (unit).
     local: vec3<f32>,
     n: vec3<f32>,
-    // Metres of surface under one pixel.
+    // Metres of surface under one pixel, and the model-space step to the next pixel
+    // right and down.
     px: f32,
+    dl1: vec3<f32>,
+    dl2: vec3<f32>,
     // Length of a typical plate on this model (`SurfaceIn::scale`).
     scale: f32,
     // `MeshVertex::face`: a rectangle frame, a tube's (negative z), the edge form
@@ -205,60 +208,55 @@ fn reg_seams(i: RegencyIn, o: RegOutline) -> RegSeams {
     return out;
 }
 
-// Fine scratches: short straight hairlines. Each cell of space holds one, a thin
-// slab at a random angle cut short at both ends: where a face crosses it, a straight
-// line on any face. Two offset grids so they cross and overlap; gathered in patches
-// where the plate is handled most, lighter metal showing; gone when finer than a few
-// pixels.
-fn reg_scratch_cell(p: vec3<f32>, cell: f32, w: f32, fw: f32) -> f32 {
-    let c = floor(p / cell);
-    let r = vec3<f32>(surf_hash3(c * 1.13 + 0.7), surf_hash3(c * 2.71 + 3.1), surf_hash3(c * 0.37 + 9.9));
-    if r.x < 0.2 {
-        return 0.0;
-    }
-    let centre = (c + 0.25 + 0.5 * r) * cell;
-    let a = r.y * 6.2832;
-    let b = (r.z - 0.5) * 3.1416;
-    let along = vec3<f32>(cos(a) * cos(b), sin(a) * cos(b), sin(b));
-    let side = normalize(cross(along, select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(1.0, 0.0, 0.0), abs(along.z) > 0.9)));
-    let d = p - centre;
-    let len = cell * mix(0.18, 0.45, fract(r.x * 7.7));
-    let t = abs(dot(d, along));
-    let ends = 1.0 - smoothstep(len * 0.6, len, t);
-    let out = abs(dot(d, cross(along, side)));
-    return surf_band(abs(dot(d, side)), w, fw) * step(out, cell * 0.25) * ends;
+// The steel scan (`metal_scan`, data/textures/metal): its grain, scratches and sheen,
+// as variation about its own mean, never its colour. Mapped in model space by three
+// planar projections blended by the face's normal, shifted per face (`seed`) so
+// neighbouring plates never show the same patch; the GPU's mips take it to its mean
+// with distance.
+struct RegScan {
+    // Multiplies the colour; added to roughness; slope of its relief (model space);
+    // how deep a scratch is here (0 none).
+    tone: f32,
+    rough: f32,
+    slope: vec3<f32>,
+    scratch: f32,
 }
 
-fn reg_scratches(p: vec3<f32>, scale: f32, fw: f32) -> f32 {
-    let w = scale * 0.008;
-    let seen = surf_resolved(w * 4.0, fw);
-    if seen <= 0.0 {
-        return 0.0;
-    }
-    // Three lays of different lengths, offset so their cells never line up.
-    var lines = reg_scratch_cell(p, scale * 0.45, w, fw);
-    lines = max(lines, reg_scratch_cell(p + vec3<f32>(0.37, 0.71, 0.13) * scale, scale * 0.3, w * 0.8, fw));
-    lines = max(lines, 0.6 * reg_scratch_cell(p + vec3<f32>(0.91, 0.23, 0.57) * scale, scale * 0.19, w * 0.7, fw));
-    // Thicker where the plate is handled most, never quite gone.
-    let handled = 0.5 + 0.5 * smoothstep(0.25, 0.55, surf_noise3(p / (scale * 1.3) + vec3<f32>(9.3, 1.7, 5.5)));
-    return lines * handled * seen;
+// The scan's means (scripts/import-metal.py prints them): what reads as "no change".
+const REG_SCAN_LUM: f32 = 0.548;
+const REG_SCAN_ROUGH: f32 = 0.16;
+
+fn reg_scan_axis(uv: vec2<f32>, d1: vec2<f32>, d2: vec2<f32>, u: vec3<f32>, v: vec3<f32>) -> RegScan {
+    let c = textureSampleGrad(terrain_materials, repeat_sampler, uv, METAL_SCAN_LAYER, d1, d2);
+    let nm = textureSampleGrad(terrain_materials, repeat_sampler, uv, METAL_SCAN_LAYER + 1, d1, d2);
+    let lum = dot(c.rgb, vec3<f32>(0.3, 0.59, 0.11));
+    let t = nm.xy * 2.0 - 1.0;
+    // A tangent normal leaning +u means the surface falls toward +u.
+    return RegScan(lum / REG_SCAN_LUM - 1.0, c.a - REG_SCAN_ROUGH, -(t.x * u + t.y * v), nm.z);
 }
 
-// The fine grain of the plate: brushed hairlines running level across each face,
-// darker and lighter, varying its sheen. Out to its mean once finer than a few pixels.
-fn reg_grain(p: vec3<f32>, n: vec3<f32>, scale: f32, fw: f32) -> f32 {
-    let across_m = scale * 0.012;
-    let seen = surf_resolved(across_m * 3.0, fw);
-    if seen <= 0.0 {
-        return 0.0;
+fn reg_scan(i: RegencyIn) -> RegScan {
+    var w = pow(abs(i.n), vec3<f32>(4.0));
+    w /= max(w.x + w.y + w.z, 1e-6);
+    let k = 1.0 / METAL_SCAN_TILE_M;
+    let shift = vec2<f32>(fract(i.seed * 7.91), fract(i.seed * 3.37));
+    let p = i.local * k;
+    let a = i.dl1 * k;
+    let b = i.dl2 * k;
+    var out = RegScan(0.0, 0.0, vec3<f32>(0.0), 0.0);
+    if w.x > 0.01 {
+        let s = reg_scan_axis(p.yz + shift, a.yz, b.yz, vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0));
+        out = RegScan(out.tone + s.tone * w.x, out.rough + s.rough * w.x, out.slope + s.slope * w.x, out.scratch + s.scratch * w.x);
     }
-    let up = select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.z) > 0.9);
-    let along = normalize(cross(n, up));
-    let t = dot(p, along);
-    let rest = p - along * t;
-    let g = surf_noise3(rest / across_m + along * (t / (scale * 0.7)));
-    let g2 = surf_noise3(rest / (across_m * 2.7) + along * (t / (scale * 1.9)) + vec3<f32>(3.3));
-    return ((g - 0.5) + 0.6 * (g2 - 0.5)) * seen;
+    if w.y > 0.01 {
+        let s = reg_scan_axis(p.xz + shift, a.xz, b.xz, vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 0.0, 1.0));
+        out = RegScan(out.tone + s.tone * w.y, out.rough + s.rough * w.y, out.slope + s.slope * w.y, out.scratch + s.scratch * w.y);
+    }
+    if w.z > 0.01 {
+        let s = reg_scan_axis(p.xy + shift, a.xy, b.xy, vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0));
+        out = RegScan(out.tone + s.tone * w.z, out.rough + s.rough * w.z, out.slope + s.slope * w.z, out.scratch + s.scratch * w.z);
+    }
+    return out;
 }
 
 fn regency_plate(i: RegencyIn) -> RegencyLook {
@@ -298,19 +296,18 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
     out.tone *= 1.0 - 0.7 * groove;
     out.lift += 0.4 * surf_band(line.x - w * 2.2, w, fw) * seen;
     slope += line.yzw * (1.0 - smoothstep(w * 0.4, w * 1.6, line.x)) * 0.5 * seen;
-    out.slope = slope * (1.0 - smoothstep(bevel * 3.0, bevel * 9.0, fw));
-    // Use: fine scratches, a little grime in broad soft patches, brushing in the sheen.
-    let scratches = reg_scratches(i.local, i.scale, fw);
-    out.lift += 1.1 * scratches;
-    out.rough -= 0.25 * scratches;
-    // The brushed grain, in colour and sheen both.
-    let grain = reg_grain(i.local, i.n, i.scale, fw);
-    out.tone *= 1.0 + 0.12 * grain;
-    out.rough += 0.14 * grain;
-    out.tone *= 1.0 + 0.2 * surf_fbm3(i.local + vec3<f32>(21.0, 4.0, 13.0), i.scale * 1.6, fw);
-    out.rough += 0.06 * surf_fbm3(i.local * vec3<f32>(0.3, 1.0, 1.0), i.scale * 0.8, fw);
-    // Handling marks: the sheen a little duller in places.
-    out.rough += 0.1 * surf_fbm3(i.local + vec3<f32>(13.0, 2.0, 8.0), i.scale * 0.45, fw);
+    // The steel itself: grain, scratches and sheen from the scan.
+    let steel = reg_scan(i);
+    out.tone *= 1.0 + 0.7 * steel.tone;
+    out.rough += 1.2 * steel.rough;
+    // Its scratches: bright, polished metal down each, the deepest most.
+    let scratch = smoothstep(0.3, 0.85, steel.scratch);
+    out.lift += 0.55 * scratch;
+    out.rough -= 0.2 * scratch;
+    // The seams' relief fades once finer than a pixel; the scan's is filtered by its mips.
+    out.slope = slope * (1.0 - smoothstep(bevel * 3.0, bevel * 9.0, fw)) + steel.slope * 0.6;
+    // Broad, faint unevenness, so a big plate never shows the scan's repeat.
+    out.tone *= 1.0 + 0.15 * surf_fbm3(i.local + vec3<f32>(21.0, 4.0, 13.0), i.scale * 1.6, fw);
     // Grime in the seams dulls them.
     out.rough += 0.3 * (1.0 - smoothstep(w, w * 5.0, min(seams.d.x, line.x))) * seen;
     return out;
@@ -341,15 +338,12 @@ fn regency_bronze(i: RegencyIn) -> RegencyLook {
         let lip = i.scale * 0.04;
         out.lift = 0.5 * (1.0 - smoothstep(0.0, lip, o.e)) * smoothstep(lip * 2.0, lip * 4.0, o.small) * surf_resolved(lip, fw);
     }
-    // Brushed along a column; the brushing and a little wear show as lighter metal.
-    if o.tube {
-        let g = i.grads[1] * inverseSqrt(max(dot(i.grads[1], i.grads[1]), 1e-12));
-        let across = i.local - g * dot(i.local, g);
-        let brush = surf_noise3(across / (i.scale * 0.03) + g * (i.face.y / (i.scale * 1.5)));
-        out.lift += 0.18 * (brush - 0.5) * surf_resolved(i.scale * 0.03, fw);
-    }
-    out.lift += 0.3 * reg_scratches(i.local, i.scale, fw);
-    out.rough = 0.06 * surf_fbm3(i.local, i.scale * 0.8, fw);
+    // The same scan's grain and scratches in the bronze.
+    let worked = reg_scan(i);
+    out.tone *= 1.0 + 0.5 * worked.tone;
+    out.lift += 0.35 * smoothstep(0.3, 0.85, worked.scratch);
+    out.slope += worked.slope * 0.6;
+    out.rough = 0.06 * surf_fbm3(i.local, i.scale * 0.8, fw) + 0.8 * worked.rough;
     return out;
 }
 

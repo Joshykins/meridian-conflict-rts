@@ -2900,6 +2900,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         ri.local = in.local;
         ri.n = normalize(cross(dl1, dl2) + vec3<f32>(0.0, 0.0, 1e-9));
         ri.px = local_px;
+        ri.dl1 = dl1;
+        ri.dl2 = dl2;
         ri.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
         ri.face = in.face;
         ri.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;

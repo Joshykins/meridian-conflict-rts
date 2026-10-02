@@ -177,6 +177,13 @@ fn terrain_materials_made() -> Vec<(Vec<u8>, bool)> {
     );
     let mut layers: Vec<(Vec<u8>, bool)> = ground.iter().map(|l| (l.to_vec(), false)).collect();
     layers.extend(crate::foliage::layers());
+    // The steel scan (data/textures/metal/README.md), at `metal_scan::LAYER`.
+    for layer in [
+        include_bytes!("../../../data/textures/metal/steel_color.rgba").as_slice(),
+        include_bytes!("../../../data/textures/metal/steel_normal.rgba").as_slice(),
+    ] {
+        layers.push((layer.to_vec(), false));
+    }
     layers
 }
 
@@ -287,7 +294,10 @@ mod tests {
     #[test]
     fn scanned_materials_have_valid_normals_and_surface_variation() {
         let layers = terrain_materials();
-        assert_eq!(layers.len(), FOLIAGE_BASE + crate::foliage::LAYERS);
+        // Ground, foliage, then the steel scan's two layers where the shaders look.
+        let metal = mc_models::gpu_consts::metal_scan::LAYER as usize;
+        assert_eq!(metal, FOLIAGE_BASE + crate::foliage::LAYERS);
+        assert_eq!(layers.len(), metal + 2);
         for (layer, _) in &layers {
             assert_eq!(layer.len(), SIZE * SIZE * 4);
         }
