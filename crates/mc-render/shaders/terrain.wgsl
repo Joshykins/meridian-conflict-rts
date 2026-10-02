@@ -850,7 +850,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     bw /= max(bw.x + bw.y + bw.z, 1e-4);
     var ground_color = ground_albedo(ga, a) * bw.x + ground_albedo(gb, b) * bw.y + ground_albedo(gc, c) * bw.z;
     // Each climate's look where the ground takes any of it (`Habitat::tropical`,
-    // `desert`: all or nothing but for the few metres where a climate divide's two
+    // `desert`: all or nothing but for the few metres where a climate wall's two
     // sides meet, where both are worked out and mixed).
     let tropic = hab.tropical;
     let arid = hab.desert;
@@ -1017,7 +1017,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     var canyon_grad = vec2<f32>(0.0);
     var canyon_rough = -1.0;
     if arid > 0.0 {
-        // What the ground is without any of it, for where a divide's two sides meet.
+        // What the ground is without any of it, for where two regions meet.
         let plain = albedo;
         let steep = smoothstep(0.07, 0.2, slope + (fine - 0.5) * 0.04);
         // Desert varnish: dark streaks down the faces, longest on the great cliffs.
@@ -1234,10 +1234,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let dry = 1.0 - smoothstep(0.015, 0.12, water - z);
         color = mix(color, build_grid_overlay(color, xy, dist), dry);
     }
-    if divided() {
-        // The climate wall's foot. Under the sea it lies on the water's surface
+    if has_regions() {
+        // The climate walls' foot. Under the sea it lies on the water's surface
         // instead (water.wgsl), handed over as the grid is.
-        color += divide_seam(xy, px) * (1.0 - smoothstep(0.015, 0.12, water - z));
+        color += wall_seam(xy, px) * (1.0 - smoothstep(0.015, 0.12, water - z));
     }
 
     color = apply_fog_of_war(color, xy);

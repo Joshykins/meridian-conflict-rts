@@ -5,10 +5,11 @@
 //! open ground, forest, rock, snow and ice was averaged from whole-map shots of
 //! the real renderer (tropical and temperate maps apart), so a preview shows the
 //! same beaches, shallows, forests and Precursor structures a match opens on.
-//! A map split by a climate divide is drawn in each side's colours, with the
-//! wall's line between them.
+//! A map with regions is drawn in each region's colours, with the climate walls'
+//! lines between them.
 
-use mc_data::weather::{Climate, ClimateDivide, MapLook};
+use mc_data::regions::Walls;
+use mc_data::weather::{Climate, MapLook};
 use mc_map::{MapFile, PropKind};
 
 /// Preview edge in pixels; the overlay's image slots are this big.
@@ -210,7 +211,7 @@ impl Frame {
 
 /// RGBA8 (sRGB), `SIZE` x `SIZE`, north up. Non-square maps are letterboxed
 /// with transparent pixels.
-/// `look` is the map's (`MapConfig::look`): its climate, and its climate divide.
+/// `look` is the map's (`MapConfig::look`): its climate, or its regions' and their walls.
 pub fn render(map: &MapFile, look: &MapLook) -> Vec<u8> {
     render_at(map, look, SIZE)
 }
@@ -221,8 +222,8 @@ pub fn render_at(map: &MapFile, look: &MapLook, size: usize) -> Vec<u8> {
     let mut rgba = vec![0u8; size * size * 4];
     ground(map, look, &frame, &mut rgba);
     structures(map, &frame, &mut rgba);
-    if let Some(divide) = &look.divide {
-        divide_line(divide, &frame, &mut rgba);
+    if !look.walls().is_empty() {
+        wall_lines(look.walls(), &frame, &mut rgba);
     }
     ore(map, &frame, &mut rgba);
     rgba
@@ -236,18 +237,18 @@ fn palette_of(climate: Climate) -> &'static Palette {
     }
 }
 
-/// The light along the foot of a climate divide's wall (bindings.wgsl `divide_seam`).
-const DIVIDE_LINE: [f32; 3] = rgb(176, 226, 255);
+/// The light along the foot of a climate wall (bindings.wgsl `wall_seam`).
+const WALL_LINE: [f32; 3] = rgb(176, 226, 255);
 
-/// A climate divide's line: a thin pale stroke, about a pixel wide.
-fn divide_line(divide: &ClimateDivide, frame: &Frame, rgba: &mut [u8]) {
+/// The climate walls' lines: thin pale strokes, about a pixel wide.
+fn wall_lines(walls: &Walls, frame: &Frame, rgba: &mut [u8]) {
     for py in 0..frame.h {
         for px in 0..frame.w {
             let at = frame.world(px as f32, py as f32);
-            let off = divide.east_distance(at[0], at[1]).abs() / frame.metres_per_px;
+            let off = walls.wall_distance(at[0], at[1]) / frame.metres_per_px;
             let cover = (1.1 - off).clamp(0.0, 1.0);
             if cover > 0.0 {
-                frame.blend(rgba, px as i64, py as i64, DIVIDE_LINE, cover * 0.85);
+                frame.blend(rgba, px as i64, py as i64, WALL_LINE, cover * 0.85);
             }
         }
     }

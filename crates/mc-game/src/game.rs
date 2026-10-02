@@ -528,7 +528,9 @@ impl Game {
             camera.focus =
                 Vec2::from(pad.to_f32()).extend(0.0) + Vec3::new(RANGE_LOOK_AHEAD, 0.0, 0.0);
             camera.distance = range::ZOOMS[1];
-            view.range = Some(Range::new(pad, subject));
+            let mut range = Range::new(pad, subject);
+            range.map_config = crate::setup::map_config(&start.map);
+            view.range = Some(range);
         }
         *sim.seek.lock().unwrap() = start.seek;
         let mut hud = Hud::default();

@@ -215,8 +215,8 @@ fn sea_state(xy: vec2<f32>) -> SeaState {
     out.storm = clamp(w.y, 0.0, 1.0);
     out.rain = clamp(w.w, 0.0, 1.0);
     // A canyon lake is sheltered: the wind has no fetch to raise a sea. (Either side
-    // of a climate divide the sea changes over a stretch of water, not on the line.)
-    out.open = side_mix(1.0, 0.55, climate_within(xy, DIVIDE_SKY_BLEND_M).y);
+    // of a climate wall the sea changes over a stretch of water, not on the line.)
+    out.open = side_mix(1.0, 0.55, climate_within(xy, REGIONS_SKY_BLEND_M).y);
     out.wind = length(atmos.wind.zw) / 12.0 * (1.0 + out.storm * 0.9) * out.open;
     return out;
 }
@@ -1024,7 +1024,7 @@ struct Optics {
 }
 
 // `climate` is `climate_at` where the water is: how much of the tropical (x) and the
-// desert's (y) water it is, all or nothing but where a climate divide's two meet.
+// desert's (y) water it is, all or nothing but where two regions meet at a climate wall.
 fn water_optics(column: f32, lit: f32, climate: vec2<f32>) -> Optics {
     var o: Optics;
     o.absorb = sea_absorb(climate);
@@ -1314,9 +1314,9 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
         // The build grid while a structure is being placed, on the surface where it would stand.
         color = build_grid_overlay(color, xy, dist);
     }
-    if divided() {
-        // The climate wall's foot on the water, shimmering with the waves.
-        color += divide_seam(xy + n.xy * 5.0, pixel) * (1.0 - white * 0.6);
+    if has_regions() {
+        // The climate walls' foot on the water, shimmering with the waves.
+        color += wall_seam(xy + n.xy * 5.0, pixel) * (1.0 - white * 0.6);
     }
     color = apply_fog_of_war(color, xy) + seen_through * (1.0 - white * 0.92) * (1.0 - aerate);
     color = apply_haze(color, world, eye);

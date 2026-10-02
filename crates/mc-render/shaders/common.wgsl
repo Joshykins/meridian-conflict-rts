@@ -72,8 +72,8 @@ struct Globals {
     // Strategic missiles: nose xyz and kind | owner << 4 | plume metres << 8, then axis
     // xyz and nose heat. Size mirrors nuke_fx::MISSILE_SLOTS * 2.
     strategic: array<vec4<f32>, 128>,
-    // x the map's climate (mc_data::weather::Climate), or the one west of its climate
-    // divide: 0 temperate, 1 tropical, 2 desert (`tropical()`, `desert()` and `climate_at`
+    // x the map's climate (mc_data::weather::Climate), region 0's on a map with
+    // regions: 0 temperate, 1 tropical, 2 desert (`tropical()`, `desert()` and `climate_at`
     // in bindings.wgsl); y 1 while grass is grown (renderer/grass.rs);
     // z how far from the eye it grows (`grass::reach`); w how many sim ticks this frame
     // covers (the treads' motion blur, entity.wgsl).
@@ -88,42 +88,16 @@ struct Globals {
     settling: array<vec4<f32>, SETTLE_SLOTS * 2u>,
     // x how many of `settling`'s pairs are in use.
     settle: vec4<f32>,
-    // The map's climate divide (mc_data::weather::ClimateDivide): its line's points,
-    // south to north, xy in map metres (`divide_east_of`).
-    divide: array<vec4<f32>, DIVIDE_POINTS>,
-    // x how many points `divide` holds (0: one climate over the whole map, `climate.x`);
-    // y the climate east of the line, as `climate.x`; z metres the desert's rock beds
-    // are lowered (`MapConfig::strata_lift`, desert.wgsl).
-    divide_info: vec4<f32>,
-}
-
-// Metres from `xy` to a climate divide's line (the first `count` points of `line`,
-// south to north): positive east of it, negative west. Past its ends the line runs on
-// due south and north. mc_data's `ClimateDivide::east_distance` is the same.
-fn divide_east_of(line: array<vec4<f32>, DIVIDE_POINTS>, count: u32, xy: vec2<f32>) -> f32 {
-    let first = line[0].xy;
-    let last = line[count - 1u].xy;
-    // How far east of the line along x.
-    var offset = xy.x - select(first.x, last.x, xy.y > last.y);
-    var nearest = 1.0e9;
-    if xy.y < first.y || xy.y > last.y {
-        nearest = abs(offset);
-    }
-    for (var i = 1u; i < count; i++) {
-        let a = line[i - 1u].xy;
-        let e = line[i].xy - a;
-        let p = xy - a;
-        let t = clamp(dot(p, e) / dot(e, e), 0.0, 1.0);
-        nearest = min(nearest, length(p - e * t));
-        if p.y > 0.0 && p.y <= e.y {
-            offset = p.x - e.x * p.y / e.y;
-        }
-    }
-    return select(-nearest, nearest, offset >= 0.0);
+    // Each region's climate (mc_data::regions; the walls between them are in
+    // `Atmosphere`): x 1 where it is tropical, y 1 where it is desert, as `climate_within`
+    // (bindings.wgsl) mixes them. Region 0 repeats `climate.x`.
+    region_climate: array<vec4<f32>, REGIONS_MAX>,
+    // x metres the desert's rock beds are lowered (`MapConfig::strata_lift`, desert.wgsl).
+    map_look: vec4<f32>,
 }
 
 // `a` where `w` is 0 and `b` where it is 1, exactly (so a map of one climate is drawn
-// as it always was), and a mix between: how the two sides of a climate divide meet.
+// as it always was), and a mix between: how two regions' looks meet at a climate wall.
 fn side_mix(a: f32, b: f32, w: f32) -> f32 {
     if w <= 0.0 {
         return a;
@@ -628,61 +602,20 @@ struct Atmosphere {
     // xy of the eye, radius, how far round the eye has turned (radians); then x 1 in use,
     // y how far into clearing the air about it once it has rained out.
     vortex: array<vec4<f32>, 4>,
-    // The weather east of the map's climate divide (sky.rs `set_weather_sides`): x how
+    // The map's regions (sky/regions.rs; regions.wgsl). Each region's weather: x how
     // much of the sky the air fills (as `layer.w`), y how towering (`shape.x`), z how big
     // the cloud masses (`shape.y`), w how readily it rains (`shape.z`). `layer` and
-    // `shape` hold the weather west of the line; with no divide these repeat them.
-    east: vec4<f32>,
-    // The divide's line, as `Globals::divide`.
-    divide: array<vec4<f32>, DIVIDE_POINTS>,
-    // x how many points `divide` holds: 0 with one weather over the whole map.
-    divide_info: vec4<f32>,
-}
-
-// The weather's set values at a point of a map whose climate divide parts two
-// weathers (`sky_sides`).
-struct SkyValues {
-    // How much of the sky the air fills (`Atmosphere::layer.w`).
-    cover: f32,
-    // How towering the clouds are (`shape.x`), and how readily they rain (`shape.z`).
-    towering: f32,
-    rain: f32,
-    // How big the cloud masses are (`shape.y`): one side's or the other's, never
-    // between (noise whose size varies from place to place smears).
-    scale: f32,
-    // A storm's top above the cloud floor (`layer.z`).
-    storm_top: f32,
-    // 0 west of the divide to 1 east of it.
-    east: f32,
-}
-
-// The weather's values `across` metres east of a divide's line (`divide_east_of`):
-// `west` the map's own (cover, towering, cloud mass size, rain), `east` the weather
-// east of the line, `base` the cloud base above the floor (`layer.x`).
-fn sky_sides(west: vec4<f32>, east: vec4<f32>, base: f32, across: f32) -> SkyValues {
-    let k = smoothstep(-DIVIDE_SKY_BLEND_M, DIVIDE_SKY_BLEND_M, across);
-    var out: SkyValues;
-    out.east = k;
-    out.cover = mix(west.x, east.x, k);
-    out.towering = mix(west.y, east.y, k);
-    out.rain = mix(west.w, east.w, k);
-    out.scale = select(west.z, east.z, across > 0.0);
-    // As sky.rs sets `layer.z`.
-    out.storm_top = base + 2600.0 + 4200.0 * out.towering;
-    return out;
-}
-
-// The air mass's weather (`cloud_climate`) on a map with two: each side's own field,
-// mixed across the line.
-fn cloud_climate_sides(xy: vec2<f32>, drift: vec2<f32>, west: vec4<f32>, east: vec4<f32>, k: f32) -> vec2<f32> {
-    var w = vec2<f32>(0.0);
-    if k < 1.0 {
-        w += cloud_climate(xy, drift, west.x, west.z) * (1.0 - k);
-    }
-    if k > 0.0 {
-        w += cloud_climate(xy, drift, east.x, east.z) * k;
-    }
-    return w;
+    // `shape` hold region 0's.
+    region_sky: array<vec4<f32>, REGIONS_MAX>,
+    // The climate walls' segments: xy one end, zw the other, map metres.
+    walls: array<vec4<f32>, REGIONS_WALL_SEGMENTS>,
+    // Per segment: x the region on its left hand walking from its xy to its zw, y the
+    // one on its right, z metres along its wall at xy, w one over its length.
+    wall_sides: array<vec4<f32>, REGIONS_WALL_SEGMENTS>,
+    // x how many of `walls` are in use (0: the map has no regions), y how many
+    // regions; z how towering the most towering region's weather is, w how readily
+    // the rainiest's rains (`shape.x` and `shape.z` on a map without regions).
+    regions: vec4<f32>,
 }
 
 // How much faster a wheeling storm's eye turns than its rim (sky.rs `VORTEX_SHEAR`).

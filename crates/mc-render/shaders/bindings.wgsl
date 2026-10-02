@@ -5,8 +5,8 @@
 
 // The map's climate is tropical (`Globals::climate`): bright coral sand, lush green,
 // turquoise shallows. Temperate when neither this nor desert(). What is drawn at a
-// place asks `climate_at` instead: a map with a climate divide has this climate only
-// west of its line.
+// place asks `climate_at` instead: on a map with regions this is region 0's climate
+// only.
 fn tropical() -> bool {
     return globals.climate.x > 0.5 && globals.climate.x < 1.5;
 }
@@ -18,42 +18,33 @@ fn desert() -> bool {
     return globals.climate.x > 1.5;
 }
 
-// The map is split in two climates along a line (`Globals::divide`): `tropical()` and
-// `desert()` hold west of it, `Globals::divide_info.y` east of it. Anything drawn at a
-// place asks `climate_at` (or `desert_at`, `tropical_at`) instead of those two.
-fn divided() -> bool {
-    return globals.divide_info.x > 1.5;
-}
-
-// Metres east of the climate divide's line (negative west of it). Only on a `divided()` map.
-fn divide_east(xy: vec2<f32>) -> f32 {
-    return divide_east_of(globals.divide, u32(globals.divide_info.x), xy);
-}
-
 // How much of each climate's look the ground or sea at `xy` takes, 0-1: x tropical,
 // y desert (temperate what is left). On a map of one climate, exactly `tropical()`
-// and `desert()`. Across a divide's line the two sides hand over within `half` metres
+// and `desert()`. On a map with regions (regions.wgsl) each region has its own
+// (`Globals::region_climate`), and across a wall they hand over within `half` metres
 // either side of it: a ruled line from any height, so `half` is at least a pixel or
-// two (`px`, the metres a pixel covers there).
+// two (`px`, the metres a pixel covers there). Anything drawn at a place asks this
+// (or `climate_at`, `desert_at`, `tropical_at`) instead of `tropical()` and `desert()`.
 fn climate_within(xy: vec2<f32>, half: f32) -> vec2<f32> {
-    let west = vec2<f32>(select(0.0, 1.0, tropical()), select(0.0, 1.0, desert()));
-    if !divided() {
-        return west;
+    if !has_regions() {
+        return vec2<f32>(select(0.0, 1.0, tropical()), select(0.0, 1.0, desert()));
     }
-    let c = globals.divide_info.y;
-    let east = vec2<f32>(select(0.0, 1.0, c > 0.5 && c < 1.5), select(0.0, 1.0, c > 1.5));
-    let k = smoothstep(-half, half, divide_east(xy));
-    if k <= 0.0 {
-        return west;
+    let shares = region_shares(xy, half);
+    if !shares.mixed {
+        return globals.region_climate[shares.region].xy;
     }
-    if k >= 1.0 {
-        return east;
+    var climate = vec2<f32>(0.0);
+    let regions = u32(atmos.regions.y);
+    for (var r = 0u; r < regions; r++) {
+        if shares.w[r] > 0.0 {
+            climate += globals.region_climate[r].xy * shares.w[r];
+        }
     }
-    return mix(west, east, k);
+    return climate;
 }
 
 fn climate_at(xy: vec2<f32>, px: f32) -> vec2<f32> {
-    return climate_within(xy, max(DIVIDE_BLEND_M, px * 1.5));
+    return climate_within(xy, max(REGIONS_BLEND_M, px * 1.5));
 }
 
 // How much of the desert's look `xy` takes: `f32(desert())` on a map of one climate.
@@ -66,26 +57,28 @@ fn tropical_at(xy: vec2<f32>, px: f32) -> f32 {
     return climate_at(xy, px).x;
 }
 
-// How much of what falls from the clouds over `xy` is snow rather than rain, 0-1: on
-// the temperate side of a climate divide, on a map that carries a snow layer (the
-// alpine side of such a map); nowhere on any other map. mc_data's `MapLook::snows_at`
+// How much of what falls from the clouds over `xy` is snow rather than rain, 0-1: in
+// a temperate region of a map with regions, if the map carries a snow layer (the
+// alpine part of such a map); nowhere on any other map. mc_data's `MapLook::snows_at`
 // is the same.
 fn snowfall_at(xy: vec2<f32>) -> f32 {
-    if !divided() {
+    if !has_regions() {
         return 0.0;
     }
-    let climate = climate_within(xy, DIVIDE_SKY_BLEND_M);
+    let climate = climate_within(xy, REGIONS_SKY_BLEND_M);
     return (1.0 - climate.x - climate.y) * ground_snow_at(xy).z;
 }
 
-// The foot of the climate wall that stands on a divide's line: a line of Precursor
-// light on the ground and the sea, the cold blue-white of their working parts
+// The foot of a climate wall: a line of Precursor light on the ground and the sea
+// along every wall between regions, the cold blue-white of their working parts
 // (entity.wgsl `MAT_GLOW_PRECURSOR`). A bright core a few metres wide, never thinner
 // than a pixel or so, so it reads as a ruled line from the strategic view; a soft
-// glow some 35 m either side; slow pulses of brighter light running north along it.
-// Light to add at `xy`, where a pixel covers `px` metres. Only on a `divided()` map.
-fn divide_seam(xy: vec2<f32>, px: f32) -> vec3<f32> {
-    let d = abs(divide_east(xy));
+// glow some 35 m either side; slow pulses of brighter light running along the wall
+// from its first point to its last.
+// Light to add at `xy`, where a pixel covers `px` metres. Only where `has_regions()`.
+fn wall_seam(xy: vec2<f32>, px: f32) -> vec3<f32> {
+    let probe = region_probe(xy);
+    let d = probe.wall;
     if d > 40.0 + px {
         return vec3<f32>(0.0);
     }
@@ -99,7 +92,7 @@ fn divide_seam(xy: vec2<f32>, px: f32) -> vec3<f32> {
     // As `precursor_pulse` (surface.wgsl): the light breathes, and bands of it travel.
     let breath = 0.85 + 0.15 * sin(time * 0.75);
     // (A band's leading edge eased over a few metres: cut off, it flickered as it moved.)
-    let f = fract(xy.y / 520.0 - time * 0.07);
+    let f = fract(probe.along / 520.0 - time * 0.07);
     let band = pow(f, 8.0) * (1.0 - smoothstep(0.975, 1.0, f));
     let light = vec3<f32>(0.45, 0.78, 1.0);
     return light * breath * (core * (0.8 + 1.4 * heart * heart + 1.6 * band) + halo * halo * (0.16 + 0.2 * band));
@@ -110,7 +103,7 @@ fn divide_seam(xy: vec2<f32>, px: f32) -> vec3<f32> {
 // bed, its soil, its shrubs or the reservoir's ring (desert.wgsl), never where the
 // water itself matters (the beach, the wet line).
 fn strata_lift() -> f32 {
-    return globals.divide_info.z;
+    return globals.map_look.x;
 }
 @group(0) @binding(1) var<storage, read> dynamic_entities: array<Entity>;
 @group(0) @binding(2) var<storage, read> static_entities: array<Entity>;
@@ -584,31 +577,8 @@ fn weather_at(at: vec2<f32>) -> vec4<f32> {
     if edge >= 0.02 {
         return inside;
     }
-    var air = vec2<f32>(0.0);
-    if atmos.divide_info.x < 1.5 {
-        air = cloud_climate(xy, atmos.wind.xy, atmos.layer.w, atmos.shape.y);
-    } else {
-        air = cloud_climate_sides(xy, atmos.wind.xy, sky_west(), atmos.east, sky_at(xy).east);
-    }
-    let outside = vec4<f32>(air, 0.0, 0.0);
+    let outside = vec4<f32>(air_mass_at(xy), 0.0, 0.0);
     return mix(outside, inside, smoothstep(0.0, 0.02, edge));
-}
-
-// The map's own weather as `Atmosphere::east` holds the other side's: cover, how
-// towering, cloud mass size, rain.
-fn sky_west() -> vec4<f32> {
-    return vec4<f32>(atmos.layer.w, atmos.shape.x, atmos.shape.y, atmos.shape.z);
-}
-
-// The weather's set values over `xy`: the map's own, or on a map whose climate divide
-// parts two weathers (`Atmosphere::divide`) the side's it is on, handing over across
-// the line. (clouds_sim.wgsl has its own copy: it binds `atmos` elsewhere.)
-fn sky_at(xy: vec2<f32>) -> SkyValues {
-    if atmos.divide_info.x < 1.5 {
-        return SkyValues(atmos.layer.w, atmos.shape.x, atmos.shape.z, atmos.shape.y, atmos.layer.z, 0.0);
-    }
-    let across = divide_east_of(atmos.divide, u32(atmos.divide_info.x), xy);
-    return sky_sides(sky_west(), atmos.east, atmos.layer.x, across);
 }
 
 // The clouds' shade (clouds.wgsl `cs_shade`): r the sunlight they let through
@@ -732,8 +702,8 @@ const DAMP_MIE: f32 = 3.5e-5;
 fn apply_haze(color: vec3<f32>, world: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
     // Desert air is dry and clear: far less haze, so what is left is mostly
     // the air's own blue, the blue-violet that fills a canyon's depths.
-    // (Over a climate divide the air changes over a few hundred metres, not on the line.)
-    let dry = climate_within(world.xy, DIVIDE_SKY_BLEND_M).y;
+    // (Across a climate wall the air changes over a few hundred metres, not on the line.)
+    let dry = climate_within(world.xy, REGIONS_SKY_BLEND_M).y;
     var dry_air = vec2<f32>(1.0);
     if dry >= 1.0 {
         dry_air = vec2<f32>(0.7, 0.4);

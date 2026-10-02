@@ -40,8 +40,10 @@ pub struct MapCard {
     pub ores: usize,
     pub biome: Biome,
     pub style: MapStyle,
-    /// What its preview is drawn in: its climate, and its climate divide if it has one.
+    /// What its preview is drawn in: its climate, or its regions' and their walls.
     pub look: MapLook,
+    /// Its own settings file: the regions set-up picks a weather for.
+    pub config: Arc<MapConfig>,
 }
 
 impl MapCard {
@@ -58,6 +60,7 @@ impl MapCard {
             biome: config.biome(),
             style: config.style(starts),
             look: config.look(),
+            config: Arc::new(config.clone()),
             map,
         }
     }

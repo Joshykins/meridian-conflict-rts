@@ -26,8 +26,8 @@ For shots and tests; a match takes both from the map's `maps/<stem>.ron` and ski
 
 | Variable | Values | Purpose |
 |---|---|---|
-| `MERIDIAN_CLIMATE` | `temperate`, `tropical`, `desert` | Draws the whole map in that climate, whatever its file says. A map with a climate divide loses it: one climate, one weather, no light along the wall's foot. |
-| `MERIDIAN_WEATHER` | `clear`, `fair`, `cloudy`, `stormy`, `overcast`, `storm` | The weather preset a renderer starts in (`storm` also parks a storm over the middle). A headless shot of a map with a climate divide shows the map's two weathers unless this is set, which plays the one preset over both sides. |
+| `MERIDIAN_CLIMATE` | `temperate`, `tropical`, `desert` | Draws the whole map in that climate, whatever its file says. A map with regions loses them: one climate, region 0's weather over all of it, no light along the walls' foot. |
+| `MERIDIAN_WEATHER` | `clear`, `fair`, `cloudy`, `stormy`, `overcast`, `storm` | The weather preset a renderer starts in (`storm` also parks a storm over the middle). A headless shot of a map with regions shows each region in its own weather unless this is set, which plays the one preset in every region. |
 
 ## Interface shots
 

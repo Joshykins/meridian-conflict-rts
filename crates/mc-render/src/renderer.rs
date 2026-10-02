@@ -317,7 +317,7 @@ pub(crate) struct Globals {
     pub(crate) nuke_view: [f32; 4],
     /// Strategic missiles in flight: nose and kind, then axis and heat (nuke_fx.rs).
     pub(crate) strategic: [[f32; 4]; nuke_fx::MISSILE_SLOTS * 2],
-    /// x the map's climate, or west of its climate divide: 0 temperate, 1 tropical,
+    /// x the map's climate, region 0's on a map with regions: 0 temperate, 1 tropical,
     /// 2 desert (map_look.rs; `climate_at` in bindings.wgsl);
     /// y 1 while grass is grown (grass.rs), so the ground under it is shaded for it;
     /// z how far from the eye it grows (`grass::reach`);
@@ -330,11 +330,10 @@ pub(crate) struct Globals {
     pub(crate) settling: [[f32; 4]; settle::SLOTS as usize * 2],
     /// x how many of `settling` are in use.
     pub(crate) settle: [f32; 4],
-    /// The map's climate divide (map_look.rs): its line's points, xy in map metres.
-    pub(crate) divide: [[f32; 4]; crate::gpu_consts::divide::POINTS as usize],
-    /// x how many points of `divide` are in use (0: no divide), y the climate east of
-    /// the line (as `climate.x`), z the map's `strata_lift` in metres.
-    pub(crate) divide_info: [f32; 4],
+    /// Each region's climate (map_look.rs): x 1 where it is tropical, y 1 where desert.
+    pub(crate) region_climate: [[f32; 4]; crate::gpu_consts::regions::MAX as usize],
+    /// x the map's `strata_lift` in metres.
+    pub(crate) map_look: [f32; 4],
 }
 
 /// Lots the build grid shows as taken, at most.
@@ -994,7 +993,7 @@ pub struct Renderer {
     fog_enabled: bool,
     /// Survival: how awake the Precursor facility is (`RenderFrame::precursor_activity`).
     precursor_activity: f32,
-    /// How the ground and sea are drawn: the map's climate and its divide (`set_map_look`).
+    /// How the ground and sea are drawn: the map's climate, or its regions' (`set_map_look`).
     look: mc_data::weather::MapLook,
     /// Where the build grid is drawn around: pointer xy, radius, taken lot count.
     build_cursor: [f32; 4],
@@ -3011,15 +3010,12 @@ impl Renderer {
         self.sky.set_hour(hour);
     }
 
-    /// The weather on a map whose climate divide parts two: `west` west of its line
-    /// (the map's own), `east` east of it. No `east`: `west` over the whole map, as
-    /// `set_weather`. The line is the map look's (`set_map_look`).
-    pub fn set_weather_sides(
-        &mut self,
-        west: mc_data::weather::Weather,
-        east: Option<mc_data::weather::Weather>,
-    ) {
-        self.sky.set_weather_sides(west, east);
+    /// The weather of each of the map's regions, region 0 first (a map's
+    /// `MapConfig::weathers`): one weather on a map without regions, as `set_weather`.
+    /// The wind is the first's over the whole map. The regions are the map look's
+    /// (`set_map_look`); a region given no weather plays the first.
+    pub fn set_weathers(&mut self, weathers: &[mc_data::weather::Weather]) {
+        self.sky.set_weathers(weathers);
     }
 
     /// Parks a raging storm over `at` (the test range's "storm overhead"),

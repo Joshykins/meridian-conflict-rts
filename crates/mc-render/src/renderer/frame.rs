@@ -343,8 +343,8 @@ impl Renderer {
             ],
             settling,
             settle: [settling_count as f32, 0.0, 0.0, 0.0],
-            divide: climate.divide,
-            divide_info: climate.divide_info,
+            region_climate: climate.region_climate,
+            map_look: climate.map_look,
         };
         self.globals.write(0, bytemuck::bytes_of(&globals));
         self.last_time = input.time;
@@ -990,20 +990,16 @@ impl Renderer {
             );
             self.timers.end(&device, cmd);
 
-            // The climate wall's curtain (curtain.wgsl): a quad a stretch of the wall.
-            let stretches = self
-                .look
-                .divide
-                .as_ref()
-                .map_or(0, |d| d.line.len().saturating_sub(1)) as u32;
-            if stretches > 0 {
+            // The climate walls' curtain (curtain.wgsl): a quad a segment of wall.
+            let segments = self.look.walls().segments().len() as u32;
+            if segments > 0 {
                 self.timers.draws(&device, cmd, "scene.curtain");
                 device.cmd_bind_pipeline(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
                     self.pipelines.curtain,
                 );
-                device.cmd_draw(cmd, stretches * 6, 1, 0, 0);
+                device.cmd_draw(cmd, segments * 6, 1, 0, 0);
                 self.timers.end(&device, cmd);
             }
 

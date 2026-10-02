@@ -63,6 +63,7 @@ pub(super) fn draw(
             &mut state.catalog,
             &table,
             !over,
+            0.0,
             |_, _, _| {},
         ));
         asks.extend(lineup::overlays(

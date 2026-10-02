@@ -5,7 +5,9 @@
 //! WGSL has no include mechanism, so `shaders/common.wgsl` is prepended to
 //! every shader, and `shaders/bindings.wgsl` to those containing the line
 //! `//!use bindings`. GPU structs and set 0 then match across all passes.
-//! `shaders/surface.wgsl` (what is drawn on a unit's faces) follows for those
+//! `shaders/regions.wgsl` (a map's regions and the climate walls between them)
+//! goes with bindings, and alone into a shader with an atmosphere of its own
+//! that says `//!use regions`. `shaders/surface.wgsl` (what is drawn on a unit's faces) follows for those
 //! containing `//!use surface` (then `shaders/regency.wgsl`, Regency plate and
 //! bronze, for `//!use regency`), and `shaders/habitat.wgsl` (where things grow,
 //! the air near the ground) to those containing `//!use habitat`, and

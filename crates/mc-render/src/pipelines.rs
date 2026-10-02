@@ -108,7 +108,7 @@ pub struct Pipelines {
     pub ring: vk::Pipeline,
     pub range: vk::Pipeline,
     pub shockwave: vk::Pipeline,
-    /// The climate wall's curtain of light (curtain.wgsl).
+    /// The climate walls' curtain of light (curtain.wgsl).
     pub curtain: vk::Pipeline,
     pub bar: vk::Pipeline,
     pub projectile: vk::Pipeline,

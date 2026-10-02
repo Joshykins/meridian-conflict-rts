@@ -1,23 +1,24 @@
 //!use bindings
-// The climate wall's curtain: a sheet of Precursor light standing on the wall's line
-// between its towers, from the ground and the sea up into the cloud. It is light
+// A climate wall's curtain: a sheet of Precursor light standing on every wall between
+// a map's regions (regions.wgsl), from the ground and the sea up into the cloud. It is light
 // and nothing else: armies, fleets and aircraft pass through it, and so does the
 // eye. Seen square on it is a breath of cold blue with threads of brighter light
 // hanging in it and faint rungs climbing it; seen along its length the threads
-// stack up into a shimmering wall. One quad a stretch of the wall, drawn over the
-// finished scene and the sea, adding light.
+// stack up into a shimmering wall. One quad a segment of a wall (`Atmosphere::walls`),
+// drawn over the finished scene and the sea, adding light.
 
 // Where the curtain ends, metres above the water, and how far down its light
 // has faded to nothing by then.
 const CURTAIN_TOP: f32 = 760.0;
 // The light's colour: the cold blue-white of the Precursors' working parts
-// (bindings.wgsl `divide_seam`).
+// (bindings.wgsl `wall_seam`).
 const CURTAIN_LIGHT: vec3<f32> = vec3<f32>(0.45, 0.78, 1.0);
 
 struct CurtainOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) world: vec3<f32>,
-    // Metres along the wall from its first point.
+    // Metres along its wall from the wall's first point, so the threads run on
+    // round a wall's corners.
     @location(1) along: f32,
     // The wall's direction here.
     @location(2) @interpolate(flat) dir: vec2<f32>,
@@ -25,21 +26,17 @@ struct CurtainOut {
 
 @vertex
 fn vs_curtain(@builtin(vertex_index) v: u32) -> CurtainOut {
-    let stretch = v / 6u;
+    let segment = v / 6u;
     let corner = v % 6u;
     var out: CurtainOut;
-    let count = u32(globals.divide_info.x);
-    if stretch + 1u >= count {
+    if segment >= u32(atmos.regions.x) {
         out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return out;
     }
-    let a = globals.divide[stretch].xy;
-    let b = globals.divide[stretch + 1u].xy;
-    // Metres of wall before this stretch.
-    var before = 0.0;
-    for (var i = 0u; i < stretch; i++) {
-        before += distance(globals.divide[i].xy, globals.divide[i + 1u].xy);
-    }
+    let a = atmos.walls[segment].xy;
+    let b = atmos.walls[segment].zw;
+    // Metres of its wall before this segment.
+    let before = atmos.wall_sides[segment].z;
     var t = 0.0;
     var up = 0.0;
     switch corner {

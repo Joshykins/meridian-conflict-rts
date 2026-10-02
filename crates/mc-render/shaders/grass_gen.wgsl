@@ -602,7 +602,7 @@ fn cs_tufts(@builtin(global_invocation_id) id: vec3<u32>) {
     } else if pick < lush + meadow {
         kind = GRASS_MEADOW;
     }
-    // (Where a climate divide's two sides meet, each tuft is of one side or the other.)
+    // (Where two regions meet at a climate wall, each tuft is of one or the other.)
     let side = veg_rand(seed ^ 0x9E3779B1u);
     if hab.tropical > side && kind != GRASS_MOSS {
         kind = GRASS_TROPICAL;

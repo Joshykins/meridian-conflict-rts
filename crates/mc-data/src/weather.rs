@@ -17,30 +17,37 @@
 //!
 //! Skirmish set-up can override the map's choice with another preset.
 //!
-//! A map can also be split in two by a climate divide, a line from its south
-//! edge to its north edge. West of it the map's own `climate` and `weather`
-//! apply; east of it the divide's:
+//! A map can also be parted into regions (`crate::regions`), each with a climate and a
+//! weather of its own, by climate walls. Such a map lists its regions in place of a
+//! `climate`, `weather` and `tweaks` of its own:
 //!
 //! ```ron
 //! (
-//!     climate: Desert,
-//!     weather: Clear,
 //!     // Metres the desert's rock beds are lowered on this map: ground at height
 //!     // h is coloured as Vermilion Gorge's is at h + strata_lift. Default 0.
 //!     strata_lift: 50,
-//!     divide: (
-//!         // South to north, map metres (x, y), y strictly ascending, 2 to 8
-//!         // points; the first and last sit on (or beyond) the map's edges.
-//!         line: [(6592, 0), (6592, 3400), (8192, 5000), (8192, 16384)],
-//!         climate: Temperate,
-//!         weather: Cloudy,
-//!         tweaks: (rain: 0.7),
-//!     ),
+//!     // 2 to 8 regions. The first is region 0: its wind blows over the whole map,
+//!     // and its climate files the map in the browser unless `biome` says.
+//!     regions: [
+//!         (name: "Desert", climate: Desert, weather: Clear, tweaks: (rain: 0.0, wind: 9)),
+//!         (name: "Alaska", climate: Temperate, weather: Cloudy, tweaks: (rain: 0.7)),
+//!     ],
+//!     // Climate walls: each a line of two or more points in map metres (x, y; y
+//!     // north) with the index of the region on its left and on its right hand,
+//!     // walking from its first point to its last (for a line that runs south to
+//!     // north the left hand is west). A wall ends on or beyond the map's edge, or
+//!     // on another wall; where three regions meet, the walls end on one point.
+//!     // At most 32 segments between them all.
+//!     walls: [
+//!         (line: [(6592, 0), (6592, 3400), (8192, 5000), (8192, 16384)], left: 0, right: 1),
+//!     ],
 //! )
 //! ```
 //!
-//! A preset picked in skirmish set-up plays over both sides.
+//! Skirmish set-up picks a weather for each region by its name, or leaves it the
+//! region's own (`SkyChoice`).
 
+use crate::regions::{Region, RegionError, Wall, Walls, MAX_REGIONS};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -243,40 +250,75 @@ impl WeatherTweaks {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SkyChoice {
+    /// The weather on a map without regions.
     pub preset: Option<WeatherPreset>,
     pub time: Option<TimeOfDay>,
+    /// The weather of each region, on a map with regions.
+    regions: RegionPicks,
+}
+
+/// A weather picked for each region of one map (`SkyChoice::set_region`). The picks
+/// go by the regions' names: on a map whose regions are called anything else they
+/// are not used, so a pick made for one map's "Alaska" never lands on another
+/// map's second region.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+struct RegionPicks {
+    /// The regions they were picked for (`MapConfig::regions_key`).
+    key: u64,
+    picks: [Option<WeatherPreset>; MAX_REGIONS],
 }
 
 impl SkyChoice {
-    pub fn weather(&self, map: &MapConfig) -> Weather {
-        map.weather(self.preset)
-    }
-
-    /// The weather east of the map's climate divide (`MapConfig::east_weather`).
-    pub fn east_weather(&self, map: &MapConfig) -> Option<Weather> {
-        map.east_weather(self.preset)
+    /// The weather of each of `map`'s regions (`MapConfig::weathers`).
+    pub fn weathers(&self, map: &MapConfig) -> Vec<Weather> {
+        map.weathers(self)
     }
 
     pub fn hour(&self, map: &MapConfig) -> f32 {
         map.hour(self.time)
     }
+
+    /// The weather picked for region `region` of `map`; none plays the region's own.
+    pub fn region(&self, map: &MapConfig, region: usize) -> Option<WeatherPreset> {
+        if self.regions.key != map.regions_key() {
+            return None;
+        }
+        self.regions.picks.get(region).copied().flatten()
+    }
+
+    /// Picks the weather of region `region` of `map` (none: the region's own).
+    /// Picks made for another map's regions are dropped.
+    pub fn set_region(&mut self, map: &MapConfig, region: usize, pick: Option<WeatherPreset>) {
+        let key = map.regions_key();
+        if self.regions.key != key {
+            self.regions = RegionPicks {
+                key,
+                picks: [None; MAX_REGIONS],
+            };
+        }
+        if let Some(slot) = self.regions.picks.get_mut(region) {
+            *slot = pick;
+        }
+    }
 }
 
 /// A map's own settings file, `maps/<stem>.ron`.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[serde(try_from = "MapConfigFile")]
 pub struct MapConfig {
-    pub weather: WeatherPreset,
-    pub tweaks: WeatherTweaks,
+    /// The map's regions: one, the map's own climate and weather, on a map without
+    /// regions; two or more on a map that lists them.
+    regions: Vec<Region>,
+    /// The climate walls between the regions; none with one region.
+    walls: Walls,
     /// When in the day the map is played, unless skirmish set-up picks another.
     pub time: TimeOfDay,
     /// An exact hour instead of `time` (24-hour clock), for a map that wants one.
     pub hour: Option<f32>,
     /// Present on maps made for survival (`crate::survival`).
     pub survival: Option<crate::survival::SurvivalLayout>,
-    /// How the map's ground and sea are coloured (`Climate`).
-    pub climate: Climate,
-    /// What the land is like, for the map browser's filter. Unset: from `climate`.
+    /// What the land is like, for the map browser's filter. Unset: from the climate.
     pub biome: Option<Biome>,
     /// How the map is meant to be played, for the map browser's filter.
     /// Unset: a duel on two starts, teams on more.
@@ -285,203 +327,135 @@ pub struct MapConfig {
     /// `h` above the water is coloured as Vermilion Gorge's is at `h +
     /// strata_lift` (shaders/desert.wgsl).
     pub strata_lift: f32,
-    /// A line splitting the map in two: `climate`, `weather` and `tweaks` above
-    /// hold west of it, its own east of it.
-    pub divide: Option<ClimateDivide>,
 }
 
-/// A map split in two climates along a line from its south edge to its north
-/// edge (a Precursor climate wall): the map's own climate and weather west of
-/// the line, these east of it.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
-#[serde(try_from = "DivideFile")]
-pub struct ClimateDivide {
-    /// The line, south to north, in map metres (x, y): `y` strictly ascending,
-    /// 2 to `MAX_POINTS` points. Past its ends it runs on due south and north.
-    pub line: Vec<(f32, f32)>,
-    pub climate: Climate,
-    pub weather: WeatherPreset,
-    pub tweaks: WeatherTweaks,
-}
-
-/// `ClimateDivide` as a map's file writes it, before the line is checked.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct DivideFile {
-    line: Vec<(f32, f32)>,
-    #[serde(default)]
-    climate: Climate,
-    #[serde(default)]
-    weather: WeatherPreset,
-    #[serde(default)]
-    tweaks: WeatherTweaks,
-}
-
-impl TryFrom<DivideFile> for ClimateDivide {
-    type Error = DivideError;
-
-    fn try_from(file: DivideFile) -> Result<ClimateDivide, DivideError> {
-        let divide = ClimateDivide {
-            line: file.line,
-            climate: file.climate,
-            weather: file.weather,
-            tweaks: file.tweaks,
-        };
-        divide.validate()?;
-        Ok(divide)
-    }
-}
-
-/// Why a climate divide's line cannot be used.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DivideError {
-    /// It has this many points: fewer than 2 or more than `ClimateDivide::MAX_POINTS`.
-    Points(usize),
-    /// The point at this index is not north of the one before it.
-    NotAscending(usize),
-    /// The point at this index is not a number.
-    NotFinite(usize),
-}
-
-impl std::fmt::Display for DivideError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DivideError::Points(n) => write!(
-                f,
-                "a divide's line has 2 to {} points, not {n}",
-                ClimateDivide::MAX_POINTS
-            ),
-            DivideError::NotAscending(i) => write!(
-                f,
-                "a divide's line runs south to north: point {i} is not north of point {}",
-                i - 1
-            ),
-            DivideError::NotFinite(i) => write!(f, "a divide's line: point {i} is not a number"),
+impl Default for MapConfig {
+    fn default() -> MapConfig {
+        MapConfig {
+            regions: vec![Region::default()],
+            walls: Walls::default(),
+            time: TimeOfDay::default(),
+            hour: None,
+            survival: None,
+            biome: None,
+            style: None,
+            strata_lift: 0.0,
         }
     }
 }
 
-impl std::error::Error for DivideError {}
+/// `MapConfig` as a map's file writes it, before its regions and walls are checked.
+#[derive(Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+struct MapConfigFile {
+    /// The map's own weather, tweaks to it and climate: on a map without regions.
+    weather: Option<WeatherPreset>,
+    tweaks: Option<WeatherTweaks>,
+    climate: Option<Climate>,
+    /// The map's regions, each with its own, and the walls between them.
+    regions: Option<Vec<Region>>,
+    walls: Vec<Wall>,
+    time: TimeOfDay,
+    hour: Option<f32>,
+    survival: Option<crate::survival::SurvivalLayout>,
+    biome: Option<Biome>,
+    style: Option<MapStyle>,
+    strata_lift: f32,
+}
 
-impl ClimateDivide {
-    /// The most points a line may have (the shaders hold this many:
-    /// mc-models `gpu_consts::divide::POINTS`).
-    pub const MAX_POINTS: usize = 8;
+impl TryFrom<MapConfigFile> for MapConfig {
+    type Error = RegionError;
 
-    /// Whether the line can be used: 2 to `MAX_POINTS` points, each north of the last.
-    pub fn validate(&self) -> Result<(), DivideError> {
-        let n = self.line.len();
-        if !(2..=ClimateDivide::MAX_POINTS).contains(&n) {
-            return Err(DivideError::Points(n));
-        }
-        for (i, p) in self.line.iter().enumerate() {
-            if !(p.0.is_finite() && p.1.is_finite()) {
-                return Err(DivideError::NotFinite(i));
+    fn try_from(file: MapConfigFile) -> Result<MapConfig, RegionError> {
+        let regions = match file.regions {
+            Some(regions) => {
+                if !(2..=MAX_REGIONS).contains(&regions.len()) {
+                    return Err(RegionError::Regions(regions.len()));
+                }
+                let own = [
+                    ("climate", file.climate.is_some()),
+                    ("weather", file.weather.is_some()),
+                    ("tweaks", file.tweaks.is_some()),
+                ];
+                if let Some((field, _)) = own.into_iter().find(|(_, given)| *given) {
+                    return Err(RegionError::OwnAndRegions(field));
+                }
+                regions
             }
-            if i > 0 && p.1 <= self.line[i - 1].1 {
-                return Err(DivideError::NotAscending(i));
+            None => {
+                if !file.walls.is_empty() {
+                    return Err(RegionError::WallsWithoutRegions);
+                }
+                vec![Region {
+                    name: String::new(),
+                    climate: file.climate.unwrap_or_default(),
+                    weather: file.weather.unwrap_or_default(),
+                    tweaks: file.tweaks.unwrap_or_default(),
+                }]
             }
-        }
-        Ok(())
-    }
-
-    /// The line's x at `y`: straight between its points, and its end points' x
-    /// south of the first and north of the last.
-    pub fn x_at(&self, y: f32) -> f32 {
-        let (Some(first), Some(last)) = (self.line.first(), self.line.last()) else {
-            return 0.0;
         };
-        if y <= first.1 {
-            return first.0;
-        }
-        for pair in self.line.windows(2) {
-            let (a, b) = (pair[0], pair[1]);
-            if y <= b.1 {
-                return a.0 + (b.0 - a.0) * (y - a.1) / (b.1 - a.1);
-            }
-        }
-        last.0
-    }
-
-    /// Whether (`x`, `y`) lies east of the line (a point on it does).
-    pub fn east_of(&self, x: f32, y: f32) -> bool {
-        x >= self.x_at(y)
-    }
-
-    /// How far (`x`, `y`) is from the line in metres, positive east of it and
-    /// negative west (shaders/common.wgsl `divide_east_of` is the same).
-    pub fn east_distance(&self, x: f32, y: f32) -> f32 {
-        let (Some(first), Some(last)) = (self.line.first(), self.line.last()) else {
-            return 0.0;
-        };
-        let offset = x - self.x_at(y);
-        // Past its ends the line runs on due south and north.
-        let mut nearest = if y < first.1 || y > last.1 {
-            offset.abs()
-        } else {
-            f32::MAX
-        };
-        for pair in self.line.windows(2) {
-            let (a, b) = (pair[0], pair[1]);
-            let (ex, ey) = (b.0 - a.0, b.1 - a.1);
-            let (px, py) = (x - a.0, y - a.1);
-            let t = ((px * ex + py * ey) / (ex * ex + ey * ey)).clamp(0.0, 1.0);
-            nearest = nearest.min((px - ex * t).hypot(py - ey * t));
-        }
-        if offset >= 0.0 {
-            nearest
-        } else {
-            -nearest
-        }
-    }
-
-    /// The share of a `width` by `height` metre map that lies east of the line.
-    pub fn east_share(&self, width: f32, height: f32) -> f32 {
-        const ROWS: usize = 64;
-        let east: f32 = (0..ROWS)
-            .map(|i| {
-                let y = (i as f32 + 0.5) / ROWS as f32 * height;
-                (width - self.x_at(y)).clamp(0.0, width)
-            })
-            .sum();
-        east / (ROWS as f32 * width.max(1.0))
+        Ok(MapConfig {
+            walls: Walls::new(file.walls, regions.len())?,
+            regions,
+            time: file.time,
+            hour: file.hour,
+            survival: file.survival,
+            biome: file.biome,
+            style: file.style,
+            strata_lift: file.strata_lift,
+        })
     }
 }
 
 /// How a map's ground and sea are drawn: what the renderer and the map
 /// previews take from its `MapConfig`.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MapLook {
-    /// The map's climate: all of it, or west of `divide`.
-    pub climate: Climate,
+    /// Each region's climate: one, the map's own, on a map without regions.
+    climates: Vec<Climate>,
     /// `MapConfig::strata_lift`.
     pub strata_lift: f32,
-    pub divide: Option<ClimateDivide>,
+    /// The climate walls between the regions.
+    walls: Walls,
+}
+
+impl Default for MapLook {
+    fn default() -> MapLook {
+        MapLook::single(Climate::default())
+    }
 }
 
 impl MapLook {
     /// One climate over the whole map, as `MERIDIAN_CLIMATE` forces it.
     pub fn single(climate: Climate) -> MapLook {
         MapLook {
-            climate,
-            ..MapLook::default()
+            climates: vec![climate],
+            strata_lift: 0.0,
+            walls: Walls::default(),
         }
     }
 
-    /// The climate at a map position.
+    /// Each region's climate, region 0's (the map's own) first.
+    pub fn climates(&self) -> &[Climate] {
+        &self.climates
+    }
+
+    /// The climate walls between the regions: none on a map without regions.
+    pub fn walls(&self) -> &Walls {
+        &self.walls
+    }
+
+    /// The climate at a map position: its region's.
     pub fn climate_at(&self, x: f32, y: f32) -> Climate {
-        match &self.divide {
-            Some(d) if d.east_of(x, y) => d.climate,
-            _ => self.climate,
-        }
+        self.climates[self.walls.region_at(x, y)]
     }
 
-    /// Whether what falls from the clouds at a map position is snow, not rain: on
-    /// the temperate side of a climate divide, on a map whose file carries a snow
-    /// layer (`snow_layer`). The alpine side of such a map is cold enough for it;
-    /// any other map keeps its rain. (shaders/bindings.wgsl `snowfall_at`.)
+    /// Whether what falls from the clouds at a map position is snow, not rain: in a
+    /// temperate region of a map with regions, if the map's file carries a snow layer
+    /// (`snow_layer`). The alpine part of such a map is cold enough for it; any
+    /// other map keeps its rain. (shaders/bindings.wgsl `snowfall_at`.)
     pub fn snows_at(&self, x: f32, y: f32, snow_layer: bool) -> bool {
-        snow_layer && self.divide.is_some() && self.climate_at(x, y) == Climate::Temperate
+        snow_layer && self.climates.len() > 1 && self.climate_at(x, y) == Climate::Temperate
     }
 }
 
@@ -568,9 +542,48 @@ impl MapConfig {
         MapConfig::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
     }
 
+    /// The map's regions: one, without a name, on a map without regions.
+    pub fn regions(&self) -> &[Region] {
+        &self.regions
+    }
+
+    /// Whether the map is parted into regions, each with a weather to pick.
+    pub fn has_regions(&self) -> bool {
+        self.regions.len() > 1
+    }
+
+    /// The climate walls between the regions.
+    pub fn walls(&self) -> &Walls {
+        &self.walls
+    }
+
+    /// The map's climate: region 0's, on a map with regions.
+    pub fn climate(&self) -> Climate {
+        self.regions[0].climate
+    }
+
+    /// What the map's regions are called, as one number: what a `SkyChoice` keeps
+    /// its picks by. 0 on a map without regions.
+    fn regions_key(&self) -> u64 {
+        if !self.has_regions() {
+            return 0;
+        }
+        // FNV-1a over the names, each closed by a byte no name holds. (Not the
+        // standard library's hasher: the number is kept in the settings file.)
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for byte in self
+            .regions
+            .iter()
+            .flat_map(|r| r.name.bytes().chain(std::iter::once(0xff)))
+        {
+            hash = (hash ^ byte as u64).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        hash.max(1)
+    }
+
     /// The map's biome: its own, or the one its climate suggests.
     pub fn biome(&self) -> Biome {
-        self.biome.unwrap_or(match self.climate {
+        self.biome.unwrap_or(match self.climate() {
             Climate::Tropical => Biome::Tropical,
             Climate::Desert => Biome::Desert,
             Climate::Temperate => Biome::Temperate,
@@ -601,39 +614,39 @@ impl MapConfig {
         }
     }
 
-    /// The weather to play in: the map's preset with its tweaks, or `choice`
-    /// (from skirmish set-up) when the player picked one. On a map with a
-    /// climate divide this is the weather west of it (`east_weather`).
-    pub fn weather(&self, choice: Option<WeatherPreset>) -> Weather {
-        if let Some(preset) = choice {
-            return Weather::from(preset);
+    /// The weather to play each region in, region 0 first: the region's preset with
+    /// its tweaks, or the preset `choice` (from skirmish set-up) picked for it. On a
+    /// map without regions that is one weather, the map's own or `choice.preset`.
+    /// The wind is the first weather's over the whole map.
+    pub fn weathers(&self, choice: &SkyChoice) -> Vec<Weather> {
+        if !self.has_regions() {
+            return vec![choice
+                .preset
+                .map_or_else(|| self.regions[0].weather(), Weather::from)];
         }
-        self.tweaks.apply(Weather::from(self.weather))
-    }
-
-    /// The weather east of the map's climate divide: the divide's preset with
-    /// its tweaks. None on a map without one, and when the player picked a
-    /// preset (`choice`), which plays over both sides.
-    pub fn east_weather(&self, choice: Option<WeatherPreset>) -> Option<Weather> {
-        let divide = self.divide.as_ref()?;
-        if choice.is_some() {
-            return None;
-        }
-        Some(divide.tweaks.apply(Weather::from(divide.weather)))
+        self.regions
+            .iter()
+            .enumerate()
+            .map(|(i, region)| {
+                choice
+                    .region(self, i)
+                    .map_or_else(|| region.weather(), Weather::from)
+            })
+            .collect()
     }
 
     /// How the map's ground and sea are drawn.
     pub fn look(&self) -> MapLook {
         MapLook {
-            climate: self.climate,
+            climates: self.regions.iter().map(|r| r.climate).collect(),
             strata_lift: self.strata_lift,
-            divide: self.divide.clone(),
+            walls: self.walls.clone(),
         }
     }
 
-    /// The climate at a map position: the divide's east of its line.
+    /// The climate at a map position: its region's.
     pub fn climate_at(&self, x: f32, y: f32) -> Climate {
-        self.look().climate_at(x, y)
+        self.regions[self.walls.region_at(x, y)].climate
     }
 }
 
@@ -641,28 +654,38 @@ impl MapConfig {
 mod tests {
     use super::*;
 
+    /// The one weather of a map without regions, as set-up left alone plays it.
+    fn own_weather(c: &MapConfig) -> Weather {
+        let weathers = c.weathers(&SkyChoice::default());
+        assert_eq!(weathers.len(), 1);
+        weathers[0]
+    }
+
     #[test]
     fn map_config_reads_a_preset_and_tweaks() {
         let c = MapConfig::parse("(weather: Stormy, tweaks: (rain: 0.3))").unwrap();
-        let w = c.weather(None);
+        let w = own_weather(&c);
         assert_eq!(w.rain, 0.3);
         assert_eq!(w.storms, Weather::from(WeatherPreset::Stormy).storms);
-        assert_eq!(
-            c.weather(Some(WeatherPreset::Clear)),
-            Weather::from(WeatherPreset::Clear)
-        );
+        let clear = SkyChoice {
+            preset: Some(WeatherPreset::Clear),
+            ..SkyChoice::default()
+        };
+        assert_eq!(c.weathers(&clear), [Weather::from(WeatherPreset::Clear)]);
         let empty = MapConfig::parse("()").unwrap();
-        assert_eq!(empty.weather(None), Weather::default());
-        assert_eq!(empty.climate, Climate::Temperate);
+        assert_eq!(empty, MapConfig::default());
+        assert_eq!(own_weather(&empty), Weather::default());
+        assert_eq!(empty.climate(), Climate::Temperate);
+        assert!(!empty.has_regions() && empty.walls().is_empty());
     }
 
     #[test]
     fn map_config_reads_a_climate() {
         let c = MapConfig::parse("(weather: Fair, climate: Tropical)").unwrap();
-        assert_eq!(c.climate, Climate::Tropical);
+        assert_eq!(c.climate(), Climate::Tropical);
         assert_eq!(Climate::from_name("TROPICAL"), Some(Climate::Tropical));
         let c = MapConfig::parse("(climate: Desert)").unwrap();
-        assert_eq!((c.climate, c.biome()), (Climate::Desert, Biome::Desert));
+        assert_eq!((c.climate(), c.biome()), (Climate::Desert, Biome::Desert));
         assert_eq!(Climate::from_name("arid"), Some(Climate::Desert));
     }
 
@@ -688,145 +711,153 @@ mod tests {
         }
     }
 
-    const DIVIDED: &str = "(
-        climate: Desert,
-        weather: Clear,
-        tweaks: (rain: 0.0, wind: 8),
+    const REGIONS: &str = "(
         strata_lift: 50,
-        divide: (
-            line: [(6592, 0), (6592, 3400), (8192, 5000), (8192, 11384), (9792, 12984), (9792, 16384)],
-            climate: Temperate,
-            weather: Cloudy,
-            tweaks: (rain: 0.7),
-        ),
+        regions: [
+            (name: \"Desert\", climate: Desert, weather: Clear, tweaks: (rain: 0.0, wind: 8)),
+            (name: \"Alaska\", climate: Temperate, weather: Cloudy, tweaks: (rain: 0.7)),
+        ],
+        walls: [
+            (line: [(6592, 0), (6592, 3400), (8192, 5000), (8192, 11384), (9792, 12984), (9792, 16384)], left: 0, right: 1),
+        ],
     )";
 
     #[test]
-    fn map_config_reads_a_climate_divide() {
-        let c = MapConfig::parse(DIVIDED).unwrap();
+    fn map_config_reads_regions_and_walls() {
+        let c = MapConfig::parse(REGIONS).unwrap();
         assert_eq!(c.strata_lift, 50.0);
-        let d = c.divide.as_ref().unwrap();
-        assert_eq!(d.line.len(), 6);
-        assert_eq!(
-            (d.climate, d.weather),
-            (Climate::Temperate, WeatherPreset::Cloudy)
-        );
-        // West of the line the map's own climate and weather, east the divide's.
+        assert!(c.has_regions());
+        let names: Vec<&str> = c.regions().iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, ["Desert", "Alaska"]);
+        assert_eq!(c.walls().walls()[0].line.len(), 6);
+        assert_eq!((c.walls().regions(), c.walls().segments().len()), (2, 5));
+        // Each region its own climate and weather; region 0's files the map.
+        assert_eq!((c.climate(), c.biome()), (Climate::Desert, Biome::Desert));
         assert_eq!(c.climate_at(1000.0, 1000.0), Climate::Desert);
         assert_eq!(c.climate_at(12000.0, 1000.0), Climate::Temperate);
+        let weathers = c.weathers(&SkyChoice::default());
+        assert_eq!(weathers.len(), 2);
         assert_eq!(
-            c.weather(None).cover,
-            Weather::from(WeatherPreset::Clear).cover
+            (weathers[0].cover, weathers[0].wind),
+            (Weather::from(WeatherPreset::Clear).cover, 8.0)
         );
-        let east = c.east_weather(None).unwrap();
-        assert_eq!(east.rain, 0.7);
-        assert_eq!(east.cover, Weather::from(WeatherPreset::Cloudy).cover);
-        // A preset picked in skirmish set-up plays over both sides.
-        assert_eq!(c.east_weather(Some(WeatherPreset::Stormy)), None);
         assert_eq!(
-            c.weather(Some(WeatherPreset::Stormy)),
-            Weather::from(WeatherPreset::Stormy)
+            (weathers[1].cover, weathers[1].rain),
+            (Weather::from(WeatherPreset::Cloudy).cover, 0.7)
         );
-        let picked = SkyChoice {
-            preset: Some(WeatherPreset::Overcast),
-            time: None,
-        };
-        assert_eq!(picked.east_weather(&c), None);
-        assert_eq!(SkyChoice::default().east_weather(&c), Some(east));
         // What the renderer and the previews take.
         let look = c.look();
-        assert_eq!((look.climate, look.strata_lift), (Climate::Desert, 50.0));
+        assert_eq!(look.climates(), [Climate::Desert, Climate::Temperate]);
+        assert_eq!((look.strata_lift, look.walls()), (50.0, c.walls()));
         assert_eq!(look.climate_at(12000.0, 1000.0), Climate::Temperate);
         assert_eq!(
             MapLook::single(Climate::Tropical).climate_at(12000.0, 1000.0),
             Climate::Tropical
         );
-        // Snow falls on the temperate side, if the map's file has a snow layer.
+        // Snow falls in the temperate region, if the map's file has a snow layer.
         assert!(look.snows_at(12000.0, 1000.0, true));
         assert!(!look.snows_at(12000.0, 1000.0, false));
         assert!(!look.snows_at(1000.0, 1000.0, true));
         assert!(!MapLook::default().snows_at(12000.0, 1000.0, true));
-        // A map without one: the defaults, and no east side.
+        // A map without regions: one climate everywhere, and no snow from the sky.
         let plain = MapConfig::parse("(climate: Desert)").unwrap();
-        assert_eq!((plain.strata_lift, plain.divide.is_none()), (0.0, true));
-        assert_eq!(plain.east_weather(None), None);
+        assert_eq!((plain.strata_lift, plain.regions().len()), (0.0, 1));
         assert_eq!(plain.climate_at(1.0e6, 0.0), Climate::Desert);
+        assert_eq!(plain.look(), MapLook::single(Climate::Desert));
     }
 
     #[test]
-    fn a_divide_follows_its_line() {
-        let d = MapConfig::parse(DIVIDED).unwrap().divide.unwrap();
-        // On a point, between points, and clamped past both ends.
-        assert_eq!(d.x_at(0.0), 6592.0);
-        assert_eq!(d.x_at(-500.0), 6592.0);
-        assert_eq!(d.x_at(3400.0), 6592.0);
-        assert_eq!(d.x_at(4200.0), 7392.0);
-        assert_eq!(d.x_at(8000.0), 8192.0);
-        assert_eq!(d.x_at(12184.0), 8992.0);
-        assert_eq!(d.x_at(20000.0), 9792.0);
-        assert!(!d.east_of(7391.0, 4200.0) && d.east_of(7393.0, 4200.0));
-        assert!(d.east_of(7392.0, 4200.0), "a point on the line is east");
-        // Distance is across the line, not along x: shorter on the diagonal.
-        assert!((d.east_distance(8292.0, 8000.0) - 100.0).abs() < 1e-3);
-        assert!((d.east_distance(8092.0, 8000.0) + 100.0).abs() < 1e-3);
-        let across = d.east_distance(7492.0, 4200.0);
-        assert!(
-            (across - 100.0 * std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-2,
-            "{across}"
+    fn each_region_plays_the_weather_picked_for_it() {
+        let c = MapConfig::parse(REGIONS).unwrap();
+        let own = c.weathers(&SkyChoice::default());
+        let mut sky = SkyChoice::default();
+        assert_eq!((sky.region(&c, 0), sky.region(&c, 1)), (None, None));
+        sky.set_region(&c, 1, Some(WeatherPreset::Stormy));
+        assert_eq!(sky.region(&c, 1), Some(WeatherPreset::Stormy));
+        assert_eq!(
+            sky.weathers(&c),
+            [own[0], Weather::from(WeatherPreset::Stormy)]
         );
-        // Past an end the line runs straight on.
-        assert!((d.east_distance(6692.0, -300.0) - 100.0).abs() < 1e-3);
-        assert!((d.east_distance(9692.0, 17000.0) + 100.0).abs() < 1e-3);
-        // Its sign is `east_of`'s everywhere, and it is never further than the
-        // line is along x.
-        for i in 0..40 {
-            for j in 0..42 {
-                let (x, y) = (i as f32 * 420.0, j as f32 * 420.0 - 400.0);
-                let across = d.east_distance(x, y);
-                assert_eq!(across >= 0.0, d.east_of(x, y), "{x}, {y}");
-                assert!(across.abs() <= (x - d.x_at(y)).abs() + 1e-2, "{x}, {y}");
-            }
-        }
-        // East of this line: half of a 16384 m square.
-        let share = d.east_share(16384.0, 16384.0);
-        assert!((share - 0.5).abs() < 0.02, "{share}");
+        sky.set_region(&c, 0, Some(WeatherPreset::Overcast));
+        sky.set_region(&c, 1, None);
+        assert_eq!(
+            sky.weathers(&c),
+            [Weather::from(WeatherPreset::Overcast), own[1]]
+        );
+        // The preset for a map without regions is not a region's pick, and the
+        // regions' picks are nothing to a map without regions.
+        sky.preset = Some(WeatherPreset::Fair);
+        assert_eq!(sky.weathers(&c)[1], own[1]);
+        let plain = MapConfig::parse("(weather: Stormy)").unwrap();
+        assert_eq!(sky.weathers(&plain), [Weather::from(WeatherPreset::Fair)]);
+        assert_eq!(sky.region(&plain, 0), None);
+        // Picks go by the regions' names: another map's regions do not take them,
+        // and a pick made there starts that map's picks afresh.
+        let other = MapConfig::parse(
+            "(regions: [(name: \"Reef\", climate: Tropical), (name: \"Alaska\")],
+              walls: [(line: [(0, 500), (900, 500)], left: 0, right: 1)])",
+        )
+        .unwrap();
+        assert_eq!(sky.region(&other, 0), None);
+        assert_eq!(other.weathers(&sky), other.weathers(&SkyChoice::default()));
+        sky.set_region(&other, 1, Some(WeatherPreset::Clear));
+        assert_eq!(
+            (sky.region(&other, 0), sky.region(&other, 1)),
+            (None, Some(WeatherPreset::Clear))
+        );
+        assert_eq!(sky.region(&c, 0), None);
+        // It survives the settings file.
+        let saved = ron::to_string(&sky).unwrap();
+        assert_eq!(ron::from_str::<SkyChoice>(&saved).unwrap(), sky);
+        // A region past the last a map may have is no pick.
+        sky.set_region(&other, MAX_REGIONS, Some(WeatherPreset::Stormy));
+        assert_eq!(sky.region(&other, MAX_REGIONS), None);
     }
 
     #[test]
-    fn a_bad_divide_line_is_refused() {
-        let with_line = |line: &str| format!("(divide: (line: {line}, climate: Temperate))");
-        // South to north: y strictly ascending.
-        for line in [
-            "[(100, 0), (100, 0)]",
-            "[(100, 500), (100, 0)]",
-            "[(0, 0), (10, 200), (20, 100), (30, 300)]",
+    fn bad_regions_are_refused() {
+        let error = |text: &str| MapConfig::parse(text).unwrap_err().to_string();
+        let wall = "(line: [(100, 0), (100, 900)], left: 0, right: 1)";
+        let region = |i: usize| format!("(name: \"R{i}\")");
+        let regions = |n: usize| (0..n).map(region).collect::<Vec<_>>().join(", ");
+        // 2 to 8 regions.
+        for n in [0, 1, 9] {
+            let err = error(&format!("(regions: [{}])", regions(n)));
+            assert!(err.contains("2 to 8 regions"), "{err}");
+        }
+        assert!(MapConfig::parse(&format!("(regions: [{}], walls: [{wall}])", regions(8))).is_ok());
+        // With regions the map has no climate, weather or tweaks of its own.
+        for own in ["climate: Desert", "weather: Clear", "tweaks: (rain: 0.2)"] {
+            let err = error(&format!(
+                "({own}, regions: [{}], walls: [{wall}])",
+                regions(2)
+            ));
+            assert!(err.contains("each region says its own"), "{err}");
+        }
+        // Walls part regions.
+        let err = error(&format!("(climate: Desert, walls: [{wall}])"));
+        assert!(err.contains("no regions"), "{err}");
+        // A wall's line and its two hands (`regions::tests` has the rest).
+        let with_wall = |wall: &str| format!("(regions: [{}], walls: [{wall}])", regions(2));
+        for (wall, why) in [
+            ("(line: [(100, 0)], left: 0, right: 1)", "2 points or more"),
+            (
+                "(line: [(1, 0), (1, 0)], left: 0, right: 1)",
+                "is where point 0 is",
+            ),
+            ("(line: [(1, 0), (1, 9)], left: 1, right: 1)", "same region"),
+            ("(line: [(1, 0), (1, 9)], left: 0, right: 2)", "no region 2"),
         ] {
-            let err = MapConfig::parse(&with_line(line)).unwrap_err().to_string();
-            assert!(err.contains("south to north"), "{err}");
+            let err = error(&with_wall(wall));
+            assert!(err.contains(why), "{err}");
         }
-        // 2 to 8 points.
-        let nine: Vec<String> = (0..9).map(|i| format!("(100, {})", i * 100)).collect();
-        for line in ["[]", "[(100, 0)]", &format!("[{}]", nine.join(", "))] {
-            let err = MapConfig::parse(&with_line(line)).unwrap_err().to_string();
-            assert!(err.contains("2 to 8 points"), "{err}");
-        }
-        let eight = format!("[{}]", nine[..8].join(", "));
-        assert!(MapConfig::parse(&with_line(&eight)).is_ok());
-        // A line is asked for, and nothing else is read into a divide.
-        assert!(MapConfig::parse("(divide: (climate: Temperate))").is_err());
-        assert!(MapConfig::parse("(divide: (line: [(0, 0), (0, 9)], snow: true))").is_err());
-        // Checked the same way when built in code.
-        let mut d = MapConfig::parse(&with_line("[(100, 0), (100, 900)]"))
-            .unwrap()
-            .divide
-            .unwrap();
-        assert_eq!(d.validate(), Ok(()));
-        d.line[1].1 = -5.0;
-        assert_eq!(d.validate(), Err(DivideError::NotAscending(1)));
-        d.line.truncate(1);
-        assert_eq!(d.validate(), Err(DivideError::Points(1)));
-        d.line = vec![(0.0, 0.0), (f32::NAN, 5.0)];
-        assert_eq!(d.validate(), Err(DivideError::NotFinite(1)));
+        // Both hands are asked for, and nothing else is read into a wall or a region.
+        assert!(MapConfig::parse(&with_wall("(line: [(1, 0), (1, 9)], left: 0)")).is_err());
+        assert!(MapConfig::parse(&with_wall(
+            "(line: [(1, 0), (1, 9)], left: 0, right: 1, snow: true)"
+        ))
+        .is_err());
+        assert!(MapConfig::parse("(regions: [(name: \"A\", snow: true), (name: \"B\")])").is_err());
     }
 
     #[test]
@@ -835,8 +866,8 @@ mod tests {
             ron::from_str("(preset: Some(Stormy), tweaks: (rain: Some(0.0)), time: None)").unwrap();
         assert_eq!(c.preset, Some(WeatherPreset::Stormy));
         assert_eq!(
-            c.weather(&MapConfig::default()),
-            Weather::from(WeatherPreset::Stormy)
+            c.weathers(&MapConfig::default()),
+            [Weather::from(WeatherPreset::Stormy)]
         );
     }
 }

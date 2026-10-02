@@ -5,15 +5,17 @@
 //!
 //! WGSL has no include mechanism, so `common.wgsl` goes in front of every
 //! shader (after the numbers the CPU shares with the shaders, generated from
-//! `gpu_consts.rs`), and `bindings.wgsl` with `lights.wgsl` in front of those
-//! containing the line `//!use bindings`; then `shore`, `habitat`, `desert`, `surface`,
+//! `gpu_consts.rs`), and `bindings.wgsl` with `regions.wgsl` and `lights.wgsl` in
+//! front of those containing the line `//!use bindings` (`regions` alone for a
+//! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `desert`, `surface`,
 //! `regency`, `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 14] = [
+pub(crate) const PRELUDES: [&str; 15] = [
     "common",
     "bindings",
+    "regions",
     "shore",
     "surface",
     "regency",
@@ -32,6 +34,7 @@ pub(crate) const PRELUDES: [&str; 14] = [
 pub(crate) struct Preludes {
     common: String,
     bindings: String,
+    regions: String,
     shore: String,
     surface: String,
     regency: String,
@@ -50,8 +53,15 @@ impl Preludes {
     pub(crate) fn new(consts: &str, read: &dyn Fn(&str) -> String) -> Preludes {
         Preludes {
             common: format!("{consts}\n{}", read("common")),
-            // Local lights (lights.rs) ride along with set 0.
-            bindings: format!("{}\n{}", read("bindings"), read("lights")),
+            // A map's regions (they read set 0's atmosphere) and the local lights
+            // (lights.rs) ride along with set 0.
+            bindings: format!(
+                "{}\n{}\n{}",
+                read("bindings"),
+                read("regions"),
+                read("lights")
+            ),
+            regions: read("regions"),
             shore: read("shore"),
             surface: read("surface"),
             regency: read("regency"),
@@ -72,6 +82,9 @@ impl Preludes {
         let uses = |what: &str| body.lines().any(|l| l.trim() == format!("//!use {what}"));
         let mut prelude = if uses("bindings") {
             format!("{}\n{}", self.common, self.bindings)
+        } else if uses("regions") {
+            // A map's regions for a shader with an atmosphere of its own (clouds_sim.wgsl).
+            format!("{}\n{}", self.common, self.regions)
         } else {
             self.common.clone()
         };

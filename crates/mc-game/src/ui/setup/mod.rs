@@ -12,7 +12,7 @@ use super::multiplayer::share::{self, Hosted, Share, ShareAsk};
 use super::{id, palette, teams, ButtonKind, Key, Rect, Ui};
 use crate::audio::Sfx;
 use crate::settings::Settings;
-use mc_data::weather::SkyChoice;
+use mc_data::weather::{MapConfig, SkyChoice};
 use mc_map::MapFile;
 use mc_sim::tables::Controller;
 use mc_sim::MatchConfig;
@@ -161,6 +161,14 @@ impl SetupState {
         self.skies[slot(self.lineup.mode)]
     }
 
+    /// The chosen map's own settings: the regions the sky's rows pick a weather for.
+    fn map_config(&self) -> Arc<MapConfig> {
+        self.lineup
+            .card(&self.catalog)
+            .map(|m| m.config.clone())
+            .unwrap_or_default()
+    }
+
     pub fn observing(&self) -> bool {
         self.observe
     }
@@ -304,15 +312,19 @@ pub fn draw(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupActi
     // The table reads the callsign as it was when the sheet opened this frame.
     let callsign = state.name.clone();
     let table = table_of(state.observe, &callsign);
+    let map = state.map_config();
     let sky = &mut state.skies[slot(state.lineup.mode)];
     let name = &mut state.name;
+    // A map with regions has a weather row for each: the sheet grows by them.
+    let taller = (super::sky::row_count(&map) as f32 - 2.0) * RULE_PITCH;
     let mut asks: Vec<Ask> = lineup::sheet(
         ui,
         &mut state.lineup,
         &mut state.catalog,
         &table,
         !over,
-        |ui, area, y| callsign_and_sky(ui, name, sky, area, y),
+        taller,
+        |ui, area, y| callsign_and_sky(ui, name, sky, &map, area, y),
     )
     .into_iter()
     .collect();
@@ -331,7 +343,8 @@ pub fn draw(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupActi
         enter,
         PREVIEW_SLOT,
     ));
-    let facts = Facts::of(&state.lineup, &state.catalog, &table).with_sky(&state.sky());
+    let facts = Facts::of(&state.lineup, &state.catalog, &table)
+        .with_sky(&state.sky(), &state.map_config());
     state.chat.watch(facts);
     refused(&mut state.chat, asks);
     if let Some(hosted) = hosted {
@@ -360,7 +373,7 @@ fn screen(ui: &mut Ui, state: &mut SetupState, enter: f32) -> Option<SetupAction
     let chips = [
         lineup::settings::fog_chip(state.lineup.fog),
         lineup::settings::seed_chip(state.lineup.seed),
-        lineup::settings::sky_chip(&state.sky()),
+        super::sky::summary(&state.sky(), &state.map_config()),
     ];
     let below = lineup::match_card(
         ui,
@@ -466,8 +479,15 @@ fn refused(chat: &mut Chat, asks: Vec<Ask>) {
 }
 
 /// Your callsign under the shared rules, then the sky: the map's own weather
-/// and time of day, or what is picked here.
-fn callsign_and_sky(ui: &mut Ui, name: &mut String, sky: &mut SkyChoice, area: Rect, y: f32) {
+/// (each region's, on a map with regions) and time of day, or what is picked here.
+fn callsign_and_sky(
+    ui: &mut Ui,
+    name: &mut String,
+    sky: &mut SkyChoice,
+    map: &MapConfig,
+    area: Rect,
+    y: f32,
+) {
     let r = Rect::new(area.x, y, area.w, RULE_PITCH - 4.0);
     lineup::rule_label(ui, r, "Callsign");
     ui.text_field(
@@ -478,13 +498,18 @@ fn callsign_and_sky(ui: &mut Ui, name: &mut String, sky: &mut SkyChoice, area: R
     );
     let y = y + RULE_PITCH + 20.0;
     ui.section(area.x, y, area.w, "Sky");
+    // The rows at the rules' pitch; closer together only where the screen is too
+    // short for the sheet to grow by all of them. (The last row has always run a
+    // little into the foot's margin.)
+    let room = area.bottom() + 14.0 - (y + 20.0);
+    let pitch = (room / super::sky::row_count(map) as f32).clamp(30.0, RULE_PITCH);
     let look = super::sky::Look {
-        row_h: RULE_PITCH - 4.0,
-        pitch: RULE_PITCH,
+        row_h: pitch - 4.0,
+        pitch,
         value_w: 220.0,
         compact: false,
     };
-    super::sky::rows(ui, 0, area.x, y + 20.0, area.w, look, sky);
+    super::sky::rows(ui, 0, area.x, y + 20.0, area.w, look, map, sky);
 }
 
 #[cfg(test)]

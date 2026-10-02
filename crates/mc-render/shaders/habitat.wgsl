@@ -47,7 +47,7 @@ struct Habitat {
     // 9 mud. 0 unused (the cliff face is `rock_face`).
     w: array<f32, 10>,
     // How much of the tropical and the desert look this ground takes, 0-1
-    // (`climate_at`): 0 or 1 but for the few metres where a climate divide's two
+    // (`climate_at`): 0 or 1 but for the few metres where a climate wall's two
     // sides meet. Everything above is already mixed by them.
     tropical: f32,
     desert: f32,
@@ -380,7 +380,7 @@ fn grass_share(h: Habitat) -> vec4<f32> {
         * (1.0 - h.sand_w);
     let green = vec4<f32>(density, lush, meadow, moss);
     if h.desert > 0.0 {
-        // Where a climate divide's two sides meet.
+        // Where two regions meet at a climate wall.
         return mix(green, arid, h.desert);
     }
     return green;

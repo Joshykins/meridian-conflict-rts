@@ -713,18 +713,21 @@ pub fn match_card(
 
 /// The settings sheet over the screen, when open: the theatre on the left, the
 /// shared rules on the right with whatever `more` draws under them (from the
-/// y it is given). `live` is false while an overlay lies over the sheet.
+/// y it is given). The sheet is `taller` than usual by what `more` needs beyond
+/// its usual room. `live` is false while an overlay lies over the sheet.
 pub fn sheet(
     ui: &mut Ui,
     lineup: &mut Lineup,
     catalog: &mut Catalog,
     table: &Table,
     live: bool,
+    taller: f32,
     more: impl FnOnce(&mut Ui, Rect, f32),
 ) -> Option<Ask> {
     let mut sheet = std::mem::take(&mut lineup.sheet);
     let mut ask = None;
-    sheet.draw(ui, "Match Settings", settings::SHEET, live, |ui, body| {
+    let size = settings::SHEET + Vec2::new(0.0, taller);
+    sheet.draw(ui, "Match Settings", size, live, |ui, body| {
         let (left, right) = settings::sheet_columns(body);
         theatre(ui, lineup, catalog, table.host, left);
         let (y, a) = rules(ui, lineup, catalog, table, right);

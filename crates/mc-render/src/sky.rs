@@ -16,11 +16,9 @@
 //!
 //! Everything here is cosmetic and client-side: nothing feeds back into the sim.
 
+mod regions;
 mod shade;
-mod sides;
 mod targets;
-
-pub(crate) use sides::divide_points;
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
@@ -106,14 +104,27 @@ pub(crate) struct Atmosphere {
     /// per vortex xy of the eye, radius, how far round the eye has turned (radians), then
     /// x 1 in use, y how far into clearing the air about it once it has rained out.
     pub(crate) vortex: [[f32; 4]; MAX_VORTICES * 2],
-    /// The weather east of the map's climate divide (sides.rs): cover, how towering,
-    /// cloud mass size, rain. With one weather over the map it repeats `layer.w` and
-    /// `shape`'s.
-    pub(crate) east: [f32; 4],
-    /// The divide's line, and in `divide_info` x how many points of it are in use
-    /// (0: one weather over the whole map).
-    pub(crate) divide: [[f32; 4]; crate::gpu_consts::divide::POINTS as usize],
-    pub(crate) divide_info: [f32; 4],
+    /// Each region's weather (regions.rs): cover, how towering, cloud mass size, rain.
+    /// Region 0's repeats `layer.w` and `shape`'s.
+    pub(crate) region_sky: [[f32; 4]; crate::gpu_consts::regions::MAX as usize],
+    /// The climate walls' segments: one end's xy, the other's.
+    pub(crate) walls: [[f32; 4]; crate::gpu_consts::regions::WALL_SEGMENTS as usize],
+    /// Per segment: the region on its left hand and on its right, metres along its
+    /// wall at its first end, one over its length.
+    pub(crate) wall_sides: [[f32; 4]; crate::gpu_consts::regions::WALL_SEGMENTS as usize],
+    /// x how many of `walls` are in use (0: the map has no regions), y how many
+    /// regions, z the most towering of their weathers, w the rainiest's rain.
+    pub(crate) regions: [f32; 4],
+}
+
+/// A storm as clouds_sim.wgsl reads it.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct StormCell {
+    /// xy its centre, z its radius (m), w its strength.
+    pub(crate) at: [f32; 4],
+    /// x the region its centre is in (0 on a map without regions).
+    pub(crate) home: [f32; 4],
 }
 
 /// Wheeling storms the clouds turn round at once (common.wgsl `vortex_warp`).
@@ -126,8 +137,9 @@ const _: () = assert!(
         == 496
             + MAX_GLOWS * 32
             + MAX_VORTICES * 32
-            + 32
-            + crate::gpu_consts::divide::POINTS as usize * 16
+            + crate::gpu_consts::regions::MAX as usize * 16
+            + crate::gpu_consts::regions::WALL_SEGMENTS as usize * 32
+            + 16
 );
 
 /// Something stirring the weather this frame. Mirrors clouds_sim.wgsl.
@@ -301,9 +313,9 @@ struct Storm {
     spin: f32,
     turned: f32,
     linger: f32,
-    /// On a map with two weathers (sides.rs), the side of the climate divide a natural
-    /// storm formed on, east (true) or west: it dies at the line. None for any other.
-    side: Option<bool>,
+    /// On a map with regions (regions.rs), the region a natural storm formed in: it
+    /// dies at the region's walls. None for any other.
+    region: Option<usize>,
 }
 
 impl Storm {
@@ -459,10 +471,11 @@ pub struct Sky {
     /// Where a raging storm is parked and never moves on (the test range's
     /// "storm overhead"; `MERIDIAN_WEATHER=storm` parks one by the map's middle).
     parked_storm: Option<Vec2>,
+    /// The map's own weather: region 0's, on a map with regions.
     weather: Weather,
-    /// The map's climate divide and the weather east of it, if the map has them:
-    /// `weather` is then the weather west of the line.
-    sides: sides::Sides,
+    /// The map's regions, if it has them: the climate walls between them and each
+    /// one's weather.
+    regions: regions::Regions,
     /// When in the day it is (24-hour clock).
     hour: f32,
     /// Weather map texels round the camera's focus, copied back each frame for
@@ -628,7 +641,7 @@ impl Sky {
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
         let storms_buf = gpu.host_buffer(
-            (MAX_STORMS * 16) as u64,
+            (MAX_STORMS * std::mem::size_of::<StormCell>()) as u64,
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
         let sampler = gpu.sampler(
@@ -971,7 +984,7 @@ impl Sky {
             usual_storms,
             parked_storm,
             weather: Weather::default(),
-            sides: sides::Sides::default(),
+            regions: regions::Regions::default(),
             hour: mc_data::weather::TimeOfDay::default().hour(),
             readback,
             readback_pending: false,
@@ -1004,10 +1017,10 @@ impl Sky {
         Ok(sky)
     }
 
-    /// Plays the match in `weather`, all over the map: new storms for it, and the sky
-    /// started over.
+    /// Plays the match in `weather`, all over the map (in every region of a map with
+    /// regions): new storms for it, and the sky started over.
     pub fn set_weather(&mut self, weather: Weather) {
-        self.set_weather_sides(weather, None);
+        self.set_weathers(&[weather]);
     }
 
     /// Parks a raging storm over `at` until told otherwise (none: lets the
@@ -1044,7 +1057,7 @@ impl Sky {
         s.life = life;
         s.spin = spin;
         s.linger = if spin > 0.0 { 20.0 } else { 0.0 };
-        s.side = None;
+        s.region = None;
         // Already built up: it forms in seconds, not minutes.
         s.age = life * 0.18;
         // No lightning of its own: what calls it up strikes it (`strike`), so the cloud
@@ -1062,7 +1075,7 @@ impl Sky {
             s.life = 1.0e9;
             s.age = s.life * 0.5;
             s.vel = Vec2::ZERO;
-            s.side = None;
+            s.region = None;
             self.storms.push(s);
         }
     }
@@ -1084,7 +1097,7 @@ impl Sky {
     }
 
     fn target_storms(&self) -> usize {
-        let storms = self.sides.storms(&self.weather, self.map_size);
+        let storms = self.regions.storms(&self.weather);
         ((self.usual_storms * storms).round() as usize).min(MAX_STORMS - 1)
     }
 
@@ -1159,8 +1172,8 @@ impl Sky {
 
     fn new_storm(&mut self) -> Storm {
         let pos = self.storm_site();
-        // The weather it forms in: its side's, on a map with two.
-        let weather = self.sides.weather_at(pos, self.weather);
+        // The weather it forms in: its region's, on a map with regions.
+        let weather = self.regions.weather_at(pos, self.weather);
         let drift = Vec2::new(self.rng.range(-3.0, 3.0), self.rng.range(-3.0, 3.0));
         Storm {
             pos,
@@ -1180,7 +1193,7 @@ impl Sky {
             spin: 0.0,
             turned: 0.0,
             linger: 0.0,
-            side: self.sides.side_of(pos),
+            region: self.regions.region_of(pos),
         }
     }
 
@@ -1346,10 +1359,10 @@ impl Sky {
             s.turned += s.spin * dt * s.strength().min(1.0);
         }
         let size = self.map_size;
-        let sides = &self.sides;
+        let regions = &self.regions;
         self.storms.retain(|s| {
             s.age < s.life + s.linger
-                && sides.storm_fade(s.side, s.pos) > 0.0
+                && regions.storm_fade(s.region, s.pos) > 0.0
                 && s.pos.x > -s.radius * 2.0
                 && s.pos.y > -s.radius * 2.0
                 && s.pos.x < size.x + s.radius * 2.0
@@ -1366,11 +1379,11 @@ impl Sky {
         for i in 0..self.storms.len() {
             let strength = self.storms[i].strength()
                 * self
-                    .sides
-                    .storm_fade(self.storms[i].side, self.storms[i].pos);
-            // Its side's weather sets how often it flashes, on a map with two.
+                    .regions
+                    .storm_fade(self.storms[i].region, self.storms[i].pos);
+            // Its region's weather sets how often it flashes, on a map with regions.
             let lightning = self
-                .sides
+                .regions
                 .weather_at(self.storms[i].pos, self.weather)
                 .lightning;
             self.storms[i].next_flash -= dt * smoothstep(0.6, 0.9, strength);
@@ -1391,9 +1404,9 @@ impl Sky {
             let (pos, radius) = (self.storms[i].pos, self.storms[i].radius);
             let angle = self.rng.range(0.0, std::f32::consts::TAU);
             let at = pos + Vec2::from_angle(angle) * radius * self.rng.range(0.0, 0.55);
-            // Its cloud stops at a climate divide's line, and so does its lightning.
-            let side = self.storms[i].side;
-            if side.is_some() && self.sides.side_of(at) != side {
+            // Its cloud stops at its region's walls, and so does its lightning.
+            let region = self.storms[i].region;
+            if region.is_some() && self.regions.region_of(at) != region {
                 continue;
             }
             let height = self.floor_at(at) + self.base + self.rng.range(500.0, 2200.0);
@@ -1472,19 +1485,20 @@ impl Sky {
             .to_array();
         atmos.wind = [self.drift.x, self.drift.y, self.wind.x, self.wind.y];
         let w = self.weather;
-        let sides = self.sides.uniforms(&w);
+        let regions = self.regions.uniforms(&w);
         // Heights above the cloud floor; the floor's range rides in frame.w and shape.w.
-        // (The storm top is the higher of the two sides', on a map with two weathers:
-        // it bounds the layer, and `sky_at` in the shaders gives each side its own.)
+        // (The storm top is the highest of the regions', on a map with regions: it
+        // bounds the layer, and `sky_at` in the shaders gives each region its own.)
         atmos.layer = [
             self.base,
             self.base + CLOUD_DECK,
-            self.base + 2600.0 + 4200.0 * sides.towering,
+            self.base + 2600.0 + 4200.0 * regions.towering,
             w.cover,
         ];
-        atmos.east = sides.east;
-        atmos.divide = sides.divide;
-        atmos.divide_info = sides.divide_info;
+        atmos.region_sky = regions.region_sky;
+        atmos.walls = regions.walls;
+        atmos.wall_sides = regions.wall_sides;
+        atmos.regions = regions.regions;
         atmos.shape = [w.towering, w.scale, w.rain, self.floor_range.1];
         atmos.weather = [
             self.map_size.x / WEATHER_RES as f32,
@@ -1606,13 +1620,18 @@ impl Sky {
             let lingering = ((s.age - s.life) / 4.0).clamp(0.0, 1.0);
             atmos.vortex[k * 2 + 1] = [1.0, lingering, 0.0, 0.0];
         }
-        let storms: Vec<[f32; 4]> = self
+        let storms: Vec<StormCell> = self
             .storms
             .iter()
             .take(MAX_STORMS)
             .map(|s| {
-                let strength = s.strength() * self.sides.storm_fade(s.side, s.pos);
-                [s.pos.x, s.pos.y, s.radius, strength]
+                let strength = s.strength() * self.regions.storm_fade(s.region, s.pos);
+                // Its cloud stays in the region its centre is in (clouds_sim.wgsl).
+                let home = self.regions.region_of(s.pos).unwrap_or(0);
+                StormCell {
+                    at: [s.pos.x, s.pos.y, s.radius, strength],
+                    home: [home as f32, 0.0, 0.0, 0.0],
+                }
             })
             .collect();
         atmos.counts = [
@@ -1843,7 +1862,7 @@ impl Sky {
 
     /// Rain falling round the camera when zoomed in: inside `scene_over`, depth-tested.
     pub fn draw_rain(&self, gpu: &Gpu, cmd: vk::CommandBuffer, scene_set: vk::DescriptorSet) {
-        if self.targets.is_empty() || self.sides.rain(&self.weather) <= 0.0 {
+        if self.targets.is_empty() || self.regions.rain(&self.weather) <= 0.0 {
             return;
         }
         // SAFETY: the renderer calls `draw_rain` inside `scene_over` while `cmd` is recording;
@@ -2100,9 +2119,9 @@ mod shots {
             Some(climate) => mc_data::weather::MapLook::single(climate),
             None => config.look(),
         });
-        // A map with a climate divide: its two weathers, unless a preset below is asked for.
-        if let Some(east) = config.east_weather(None) {
-            renderer.set_weather_sides(config.weather(None), Some(east));
+        // A map with regions: each one's own weather, unless a preset below is asked for.
+        if config.has_regions() {
+            renderer.set_weathers(&config.weathers(&Default::default()));
         }
         // SKY_NORAIN: the overcast preset without its rain.
         if std::env::var("SKY_NORAIN").is_ok() {

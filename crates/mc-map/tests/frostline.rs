@@ -480,21 +480,24 @@ fn frostline_plays_the_same_from_both_sides() {
     // The sidecar: what the renderer draws the two climates by.
     use mc_data::weather::{Climate, MapConfig};
     let config = MapConfig::for_map(&path).expect("the map's sidecar");
-    match &config.divide {
-        None => problems.push("the sidecar has no divide".into()),
-        Some(divide) => {
-            let line: Vec<(f64, f64)> = divide
-                .line
-                .iter()
-                .map(|p| (p.0 as f64, p.1 as f64))
-                .collect();
+    match config.walls().walls() {
+        [wall] => {
+            let line: Vec<(f64, f64)> =
+                wall.line.iter().map(|p| (p.0 as f64, p.1 as f64)).collect();
             if line != FROSTLINE_WALL {
                 problems.push(format!("the sidecar's line {line:?} is not the wall"));
             }
-            if (config.climate, divide.climate) != (Climate::Desert, Climate::Temperate) {
+            let climates: Vec<Climate> = config.regions().iter().map(|r| r.climate).collect();
+            if (wall.left, wall.right) != (0, 1)
+                || climates != [Climate::Desert, Climate::Temperate]
+            {
                 problems.push("the sidecar's climates are not desert west, temperate east".into());
             }
         }
+        walls => problems.push(format!(
+            "the sidecar has {} walls, not the one",
+            walls.len()
+        )),
     }
     if config.strata_lift as f64 != FROSTLINE_STRATA_LIFT {
         problems.push(format!(

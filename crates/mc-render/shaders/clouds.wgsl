@@ -450,7 +450,7 @@ fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>) {
     let s = globals.sun.xyz;
     let d = normalize(vec3<f32>(s.xy, max(s.z, 0.2)));
     let deck = atmos.layer.y - atmos.layer.x;
-    let fair_top = floor + atmos.layer.y + deck * 2.6 * max(atmos.shape.x, atmos.east.y) + deck * (1.0 + TOP_LUMP) + 200.0;
+    let fair_top = floor + atmos.layer.y + deck * 2.6 * atmos.regions.z + deck * (1.0 + TOP_LUMP) + 200.0;
     let storm_top = floor + atmos.layer.z + (atmos.layer.z - atmos.layer.x) * TOP_LUMP * 0.5;
     let fair_len = (fair_top - start.z) / d.z;
     let storm_len = max(storm_top - fair_top, 0.0) / d.z;
@@ -649,7 +649,7 @@ fn march(in: FullOut) -> vec4<f32> {
     // the tallest lift, the top's lumps). Above it only a storm has cloud, so
     // the long climb down from storm height to a deck is open air elsewhere.
     let deck = atmos.layer.y - atmos.layer.x;
-    let tall = max(atmos.shape.x, atmos.east.y);
+    let tall = atmos.regions.z;
     let fair_ceiling = atmos.shape.w + (1.0 + TOP_LUMP * 0.5) * (atmos.layer.y + deck * 2.6 * tall)
         - TOP_LUMP * 0.5 * (atmos.layer.x - 120.0 - 60.0 * tall) + 50.0;
     let jitter = ign(in.clip.xy);
@@ -795,7 +795,7 @@ fn march(in: FullOut) -> vec4<f32> {
 // march found above; the rain goes behind it seen from above, in front of it
 // seen from beneath.
 fn with_rain(cloud: vec4<f32>, eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, pixel: vec2<f32>) -> vec4<f32> {
-    if max(atmos.shape.z, atmos.east.w) <= 0.0 {
+    if atmos.regions.w <= 0.0 {
         return cloud;
     }
     // The highest the rain can hang from; each sample checks its own floor.
@@ -877,7 +877,7 @@ struct RainOut {
 fn vs_rain(@builtin(vertex_index) vertex: u32, @builtin(instance_index) drop: u32) -> RainOut {
     var out: RainOut;
     out.clip = vec4<f32>(0.0, 0.0, -1.0, 1.0);
-    if max(atmos.shape.z, atmos.east.w) <= 0.0 {
+    if atmos.regions.w <= 0.0 {
         return out;
     }
     let eye = globals.camera.xyz;

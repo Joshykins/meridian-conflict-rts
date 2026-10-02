@@ -201,9 +201,13 @@ impl Facts {
         }
     }
 
-    /// With this machine's sky.
-    pub fn with_sky(mut self, sky: &mc_data::weather::SkyChoice) -> Facts {
-        self.sky = Some(settings::sky_chip(sky));
+    /// With this machine's sky, as picked for `map`.
+    pub fn with_sky(
+        mut self,
+        sky: &mc_data::weather::SkyChoice,
+        map: &mc_data::weather::MapConfig,
+    ) -> Facts {
+        self.sky = Some(crate::ui::sky::summary(sky, map));
         self
     }
 }

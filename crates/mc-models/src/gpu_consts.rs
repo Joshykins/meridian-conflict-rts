@@ -378,24 +378,29 @@ shared! {
         pub const SECONDS: f32 = 5.0;
     }
 
-    /// A map's climate divide (`mc_data::weather::ClimateDivide`): the line that splits
-    /// its ground, sea and weather in two (`Globals::divide`, `Atmosphere::divide`;
-    /// common.wgsl `divide_east_of`).
-    pub mod divide as "DIVIDE_" {
-        /// Points the line may have (`ClimateDivide::MAX_POINTS`), one vec4 each.
-        pub const POINTS: u32 = 8;
-        /// The ground and the sea hand over from one climate to the other within this
-        /// many metres either side of the line (wider only where a pixel is).
+    /// A map's regions (`mc_data::regions`): stretches of it with a climate and a weather
+    /// of their own, parted by climate walls (`Atmosphere::walls`, `region_sky`,
+    /// `Globals::region_climate`; regions.wgsl).
+    pub mod regions as "REGIONS_" {
+        /// Regions a map may have (`mc_data::regions::MAX_REGIONS`).
+        pub const MAX: u32 = 8;
+        /// Segments its walls may have between them (`Walls::MAX_SEGMENTS`), two vec4 each.
+        pub const WALL_SEGMENTS: u32 = 32;
+        /// A segment a point lies beside is taken as nearer than another segment's end
+        /// that is nearer by less than this many metres (`Walls::TIE_M`).
+        pub const TIE_M: f32 = 0.05;
+        /// The ground and the sea hand over from one region to the next within this
+        /// many metres either side of a wall (wider only where a pixel is).
         pub const BLEND_M: f32 = 6.0;
         /// The weather hands over within this many metres either side of it, and with it
-        /// the air's haze, the sea's waves and the surf: a stretch of coast, not a ruled line.
+        /// the air's haze: a stretch of sky, not a ruled line.
         pub const SKY_BLEND_M: f32 = 160.0;
-        /// Cloud the wind carries across the line is drawn back to the weather of the
-        /// side it is now over within seconds: fully so this close to the line, easing
+        /// Cloud the wind carries across a wall is drawn back to the weather of the
+        /// region it is now over within seconds: fully so this close to the wall, easing
         /// off to the weather's usual slow healing by `SKY_HEAL_FAR_M`.
         pub const SKY_HEAL_NEAR_M: f32 = 250.0;
         pub const SKY_HEAL_FAR_M: f32 = 900.0;
-        /// A storm cell dies away over its last metres to the line (sky.rs).
+        /// A storm cell dies away over its last metres to a wall (sky/regions.rs).
         pub const STORM_FADE_M: f32 = 600.0;
     }
 

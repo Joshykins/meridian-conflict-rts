@@ -9,6 +9,7 @@
 
 mod raw;
 pub mod refit;
+pub mod regions;
 pub mod sounds;
 pub mod strategic;
 pub mod survival;

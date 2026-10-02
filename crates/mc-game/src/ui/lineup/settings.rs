@@ -293,16 +293,6 @@ pub fn card(
     (ask, y + bh - r.y)
 }
 
-/// The card's chip for the sky.
-pub fn sky_chip(sky: &mc_data::weather::SkyChoice) -> String {
-    match (sky.preset, sky.time) {
-        (None, None) => "Map's Own Sky".to_owned(),
-        (Some(p), None) => p.label().to_owned(),
-        (None, Some(t)) => t.label().to_owned(),
-        (Some(p), Some(t)) => format!("{}  \u{b7}  {}", p.label(), t.label()),
-    }
-}
-
 /// The card's chip for fog of war.
 pub fn fog_chip(fog: bool) -> String {
     if fog { "Fog of War" } else { "No Fog" }.to_owned()

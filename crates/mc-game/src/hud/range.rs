@@ -45,21 +45,21 @@ impl Tab {
         }
     }
 
-    /// How tall the tab's page is.
-    fn body_h(self) -> f32 {
+    /// How tall the tab's page is; the Sky tab's has `sky_rows` rows (`ui::sky::row_count`).
+    fn body_h(self, sky_rows: usize) -> f32 {
         match self {
             Tab::Unit => 16.0 + ROW + 4.0 + ROW + 8.0 + ROW,
             Tab::Stage => 3.0 * (ROW + 4.0) + 2.0 * 4.0,
             Tab::Economy => 26.0 + 2.0 * (22.0 + ROW + 10.0) + ROW + 6.0 + ROW,
-            Tab::Sky => crate::ui::sky::ROWS as f32 * (ROW + 4.0) + ROW,
+            Tab::Sky => sky_rows as f32 * (ROW + 4.0) + ROW,
             Tab::Range => 16.0 + ROW + 8.0 + 16.0 + ROW + 8.0 + ROW,
         }
     }
 }
 
-/// How tall the panel is on `tab`.
-pub fn height(tab: Tab) -> f32 {
-    HEAD_H + TAB_H + 14.0 + tab.body_h() + FOOT_H
+/// How tall the panel is on `tab`, with `sky_rows` rows on its Sky tab.
+pub fn height(tab: Tab, sky_rows: usize) -> f32 {
+    HEAD_H + TAB_H + 14.0 + tab.body_h(sky_rows) + FOOT_H
 }
 
 /// A HUD tile with a word on it. `tone` colours the word while it is lit.
@@ -103,7 +103,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
     let tab = hud.range_tab;
 
     // The glass eases to the height of the tab that is open; it opens at full height.
-    let goal = height(tab);
+    let sky_rows = crate::ui::sky::row_count(&range.map_config);
+    let goal = height(tab, sky_rows);
     if hud.range_tall <= 0.0 {
         hud.range_tall = goal;
     }
@@ -265,7 +266,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, range: &Range, top: f32) {
     hud.range_page += (1.0 - hud.range_page) * (1.0 - (-12.0 * ui.dt).exp());
     let fade = ui.fade;
     ui.fade *= hud.range_page;
-    let body = Rect::new(x, y, w, hud.range_tab.body_h());
+    let body = Rect::new(x, y, w, hud.range_tab.body_h(sky_rows));
     match hud.range_tab {
         Tab::Unit => unit_page(hud, ui, s, range, body, &mut asked),
         Tab::Stage => stage_page(hud, ui, body, &mut asked),
@@ -753,14 +754,16 @@ fn sky_page(hud: &mut Hud, ui: &mut Ui, range: &Range, r: Rect, asked: &mut Vec<
     // jump at every click on the way to what is wanted.
     let applied = range.sky.unwrap_or_default();
     let mut sky = hud.range_sky.unwrap_or(applied);
+    let map = &range.map_config;
     let look = crate::ui::sky::Look {
         row_h: ROW,
         pitch: ROW + 4.0,
-        value_w: w - 96.0,
+        // A region's name wants more room beside its list than "Weather" does.
+        value_w: w - if map.has_regions() { 132.0 } else { 96.0 },
         compact: true,
     };
-    crate::ui::sky::rows(ui, 1, x, r.y, w, look, &mut sky.choice);
-    let y = r.y + crate::ui::sky::ROWS as f32 * (ROW + 4.0);
+    crate::ui::sky::rows(ui, 1, x, r.y, w, look, map, &mut sky.choice);
+    let y = r.y + crate::ui::sky::row_count(map) as f32 * (ROW + 4.0);
     let mut row = split(Rect::new(x, y, w, ROW), 2, 4.0);
     if word_tile(
         hud,
