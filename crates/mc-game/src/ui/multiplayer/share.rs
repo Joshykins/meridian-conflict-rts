@@ -203,6 +203,12 @@ impl Share {
             Some((Status::NoAddress, _)) | None => {
                 "No server yet: set one in Multiplayer".to_owned()
             }
+            Some((Status::NeedsName, _)) => {
+                "Choose a callsign in Multiplayer to go online".to_owned()
+            }
+            Some((Status::Refused { reason, .. }, target)) => {
+                format!("{target} turned you away: {}", reason.describe())
+            }
             Some((_, target)) => format!("{target} is not answering"),
         };
         if choice(

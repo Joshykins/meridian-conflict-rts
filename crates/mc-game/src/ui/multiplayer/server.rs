@@ -118,6 +118,9 @@ pub enum Status {
         retry_at: Instant,
         attempts: u32,
     },
+    /// No callsign of the player's own yet, or one the server could never take:
+    /// nothing is asked of the server until one is typed.
+    NeedsName,
     /// The server turned us away; trying again will not help until something changes.
     Refused {
         reason: DirRefuseReason,
@@ -191,6 +194,24 @@ impl Server {
         matches!(self.status, Status::Online { .. })
     }
 
+    /// The name the link was last made with.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Whether what stops the link is the callsign: none yet, or one another
+    /// player owns on this server. A new one fixes it.
+    pub fn name_problem(&self) -> bool {
+        matches!(
+            self.status,
+            Status::NeedsName
+                | Status::Refused {
+                    reason: DirRefuseReason::NameTaken | DirRefuseReason::BadName,
+                    ..
+                }
+        )
+    }
+
     /// Drops any link and connects afresh to `address` as `name`.
     pub fn reconnect(&mut self, address: &str, name: &str) {
         self.address = address.trim().to_owned();
@@ -213,11 +234,8 @@ impl Server {
             return;
         }
         // The server would refuse a name it cannot take; say so without asking it.
-        if let Err(why) = mc_net::check_name(&self.name) {
-            self.status = Status::Refused {
-                reason: DirRefuseReason::BadName,
-                detail: why.to_owned(),
-            };
+        if mc_net::check_name(&self.name).is_err() {
+            self.status = Status::NeedsName;
             return;
         }
         let Some(identity) = self.identity.clone() else {

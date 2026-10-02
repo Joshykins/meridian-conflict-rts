@@ -103,7 +103,12 @@ impl MultiplayerState {
         catalog: Catalog,
     ) -> MultiplayerState {
         let identity = identity();
-        let name = settings.player_name.clone();
+        // The default name is everyone's: the field starts empty, asking for one.
+        let name = if settings.player_name == mc_net::DEFAULT_PLAYER_NAME {
+            String::new()
+        } else {
+            settings.player_name.clone()
+        };
         let server = Server::new(&settings.server, &name, identity.clone());
         let scanner = match LanScanner::start() {
             Ok(s) => Some(s),
@@ -219,6 +224,9 @@ impl MultiplayerState {
 
     /// Joins a game hosted on another computer, by its address.
     fn join_direct(&mut self, addr: &str, title: &str) {
+        if mc_net::check_name(&self.name).is_err() {
+            return self.say("Choose a callsign first, at the top left.");
+        }
         let addr = server::with_port(addr);
         let config = crate::app::net_config(&self.name, Role::Player, self.content(0));
         let rx = open(addr.clone(), config.clone());

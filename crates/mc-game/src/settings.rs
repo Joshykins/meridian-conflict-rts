@@ -50,7 +50,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Settings {
         Settings {
-            player_name: "Commander".into(),
+            player_name: mc_net::DEFAULT_PLAYER_NAME.into(),
             master_volume: 0.8,
             interface_volume: 0.8,
             effects_volume: 0.8,
@@ -207,7 +207,7 @@ pub fn clean_name(name: &str) -> String {
         .collect();
     let trimmed = cleaned.trim();
     if trimmed.is_empty() {
-        "Commander".into()
+        mc_net::DEFAULT_PLAYER_NAME.into()
     } else {
         trimmed.to_owned()
     }

@@ -105,7 +105,7 @@ pub use client::{ClientConfig, NetSession};
 pub use directory::{
     check_name, fingerprint, read_first, BadRoomCode, DirHello, DirMessage, DirRefuseReason,
     DirectoryClient, DirectoryEvent, FirstFrame, Identity, NewRoom, RoomCode, RoomListing,
-    DIRECTORY_VERSION, IDENTITY_FILE, MAX_PLAYER_NAME,
+    DEFAULT_PLAYER_NAME, DIRECTORY_VERSION, IDENTITY_FILE, MAX_PLAYER_NAME,
 };
 pub use lan::{LanBeacon, LanGame, LanInfo, LanScanner, LAN_PORT};
 pub use protocol::{

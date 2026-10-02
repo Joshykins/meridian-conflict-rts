@@ -255,6 +255,8 @@ fn names_follow_the_rules() {
         "Adä",
         "Ada!",
         "\u{202E}Ada",
+        "Commander",
+        "commander",
     ] {
         assert!(check_name(bad).is_err(), "{bad:?}");
     }

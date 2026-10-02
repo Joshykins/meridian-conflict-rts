@@ -52,6 +52,10 @@ use crate::wire::{Dec, Enc, NetError, Result};
 pub const DIRECTORY_VERSION: u32 = 1;
 /// The longest player name, in characters (names are ASCII, so also in bytes).
 pub const MAX_PLAYER_NAME: usize = 24;
+/// Every new player's name until they choose one. A server gives a name to the
+/// first computer that signs in with it, so this one is never given out: each
+/// player picks a callsign of their own before going online.
+pub const DEFAULT_PLAYER_NAME: &str = "Commander";
 pub const MAX_MOTD_LEN: usize = 1024;
 /// Rooms one `Rooms` message may list; the server's room cap stays at or below it.
 pub const MAX_LISTED_ROOMS: usize = 512;
@@ -63,11 +67,15 @@ const MAX_DETAIL_LEN: usize = 256;
 
 /// Whether `name` may be a player's name: 1 to [`MAX_PLAYER_NAME`] characters of
 /// ASCII letters, digits, space, `_`, `-` and `.`, with no space at either end
-/// and no two in a row. ASCII only, so no two names look alike but differ in
-/// their letters. `Err` says what is wrong, for the player.
+/// and no two in a row, and not [`DEFAULT_PLAYER_NAME`]. ASCII only, so no two
+/// names look alike but differ in their letters. `Err` says what is wrong, for
+/// the player.
 pub fn check_name(name: &str) -> std::result::Result<(), &'static str> {
     if name.is_empty() {
         return Err("a name is needed");
+    }
+    if name.eq_ignore_ascii_case(DEFAULT_PLAYER_NAME) {
+        return Err("everyone starts as Commander, so choose a callsign of your own");
     }
     if name.len() > MAX_PLAYER_NAME {
         return Err("names are at most 24 characters");

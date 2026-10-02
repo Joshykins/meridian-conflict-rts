@@ -102,6 +102,15 @@ pub(super) fn draw(
         ButtonKind::Primary,
         name_ok,
     );
+    if !name_ok && state.notice.is_none() {
+        ui.text_right(
+            host_rect.x - 24.0,
+            host_rect.mid_y(),
+            type_scale::CAPTION,
+            rgb(palette::ACCENT, 1.0),
+            "Choose a callsign to host",
+        );
+    }
     if let Some((text, at)) = &state.notice {
         let k = (1.0 - (at.elapsed().as_secs_f32() - 6.0).max(0.0)).clamp(0.0, 1.0);
         ui.text_right(
@@ -126,19 +135,49 @@ pub(super) fn draw(
     action
 }
 
-/// Callsign and device key. Returns the y under it.
+/// Callsign and device key. Returns the y under it. Until there is a callsign
+/// the server will take, the field pulses and says what to do; Enter, or
+/// leaving the field, connects with the new one.
 fn commander(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) -> f32 {
-    ui.section(r.x, r.y + 6.0, r.w, "Commander");
+    ui.section(r.x, r.y + 6.0, r.w, "Your Callsign");
     let field = Rect::new(r.x, r.y + 30.0, r.w, 40.0);
-    ui.text_field(id("mp-name", 0), field, &mut state.name, 24);
+    let name_id = id("mp-name", 0);
+    let editing = ui.mem.editing == Some(name_id);
+    ui.text_field(name_id, field, &mut state.name, mc_net::MAX_PLAYER_NAME);
     let valid = mc_net::check_name(&state.name);
-    match valid {
-        Err(why) => caption(
-            ui,
-            r.x,
-            r.y + 84.0,
-            r.w,
-            &format!("That name will not do: {why}"),
+    let taken = matches!(
+        state.server.status,
+        Status::Refused {
+            reason: mc_net::DirRefuseReason::NameTaken,
+            ..
+        }
+    ) && state.name == state.server.name();
+    if state.name.is_empty() && !editing {
+        ui.text(
+            field.x + 12.0,
+            field.mid_y(),
+            type_scale::BODY,
+            rgb(palette::FAINT, 1.0),
+            "type the name other players will see",
+        );
+    }
+    if (valid.is_err() || taken) && !editing {
+        let pulse = 0.35 + 0.65 * (ui.time * 3.0).sin().abs();
+        let tone = if state.name.is_empty() {
+            palette::ACCENT
+        } else {
+            palette::WARN
+        };
+        ui.frame(field, rgb(tone, pulse));
+    }
+    let (text, tone) = match valid {
+        Err(_) if state.name.is_empty() => (
+            "Choose a callsign to play online".to_owned(),
+            palette::ACCENT,
+        ),
+        Err(why) => (format!("That name will not do: {why}"), palette::WARN),
+        Ok(()) if taken => (
+            "Another player owns this callsign on the server: choose another".to_owned(),
             palette::WARN,
         ),
         Ok(()) => {
@@ -146,15 +185,24 @@ fn commander(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) -> f32 {
                 .identity
                 .as_ref()
                 .map_or_else(|| "none".to_owned(), |i| i.fingerprint());
-            caption(
-                ui,
-                r.x,
-                r.y + 84.0,
-                r.w,
-                &format!("Device key {key}  \u{b7}  keeps this name yours on a server"),
+            (
+                format!("Device key {key}  \u{b7}  keeps this name yours on a server"),
                 palette::FAINT,
-            );
+            )
         }
+    };
+    caption(ui, r.x, r.y + 84.0, r.w, &text, tone);
+    // A new callsign connects at once: on Enter, or on leaving the field when
+    // the callsign was what stopped the link.
+    let entered = editing && ui.input.key(Key::Enter);
+    let left = !editing && state.server.name_problem() && state.name != state.server.name();
+    if (entered || left) && valid.is_ok() && !state.address.trim().is_empty() {
+        if entered {
+            ui.audio.play(Sfx::Select);
+        }
+        let (address, name) = (state.address.clone(), state.name.clone());
+        state.server.reconnect(&address, &name);
+        state.tab = Tab::Online;
     }
     r.y + 108.0
 }
@@ -241,6 +289,23 @@ fn server_panel(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) -> f32 {
             let (title, body, _) = problem.explain(state.server.target());
             (palette::WARN, title.to_owned(), body)
         }
+        Status::NeedsName => (
+            palette::ACCENT,
+            "Choose a Callsign".to_owned(),
+            "Type the name other players will see under Your Callsign, then press Enter to connect."
+                .to_owned(),
+        ),
+        Status::Refused {
+            reason: mc_net::DirRefuseReason::NameTaken,
+            ..
+        } => (
+            palette::WARN,
+            "Callsign Taken".to_owned(),
+            format!(
+                "Another player owns \u{201c}{}\u{201d} on this server. Choose another callsign above and press Enter.",
+                state.server.name()
+            ),
+        ),
         Status::Refused { reason, detail } => (
             palette::BAD,
             "Turned Away".to_owned(),
@@ -485,7 +550,8 @@ fn online_rows(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) {
         other => Some(other),
     };
     if let Some(status) = problem {
-        return offline_card(ui, state, status_card(status, state.server.target()), r);
+        let card = status_card(status, state.server.target(), state.server.name());
+        return offline_card(ui, state, card, r);
     }
     if state.server.rooms.is_empty() {
         return empty(
@@ -506,8 +572,27 @@ fn online_rows(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) {
 }
 
 /// What the offline list says, by what went wrong.
-fn status_card(status: &Status, target: &str) -> (String, String, Vec<String>) {
+fn status_card(status: &Status, target: &str, name: &str) -> (String, String, Vec<String>) {
     match status {
+        Status::NeedsName => (
+            "Choose a Callsign".into(),
+            "Games on a server are played under a callsign of your own. Type one under Your Callsign at the top left and press Enter: it connects straight away.".into(),
+            vec![
+                "Letters, digits, spaces, _ - and . up to 24 characters".into(),
+                "A server keeps a callsign for the computer that first used it".into(),
+            ],
+        ),
+        Status::Refused {
+            reason: mc_net::DirRefuseReason::NameTaken,
+            ..
+        } => (
+            "Callsign Taken".into(),
+            format!("Another player already owns \u{201c}{name}\u{201d} on this server."),
+            vec![
+                "Choose another callsign at the top left and press Enter".into(),
+                "A server keeps a callsign for the computer that first used it".into(),
+            ],
+        ),
         Status::NoAddress => (
             "Connect to a Server".into(),
             "Games over the internet go through a Meridian server. Whoever runs one gives you its address; enter it on the left.".into(),
@@ -537,10 +622,6 @@ fn status_card(status: &Status, target: &str) -> (String, String, Vec<String>) {
                 format!("{}: {detail}", capitalise(reason.describe()))
             },
             match reason {
-                mc_net::DirRefuseReason::NameTaken => vec![
-                    "Pick another callsign on the left and connect again".into(),
-                    "Names on a server belong to the computer that first used them".into(),
-                ],
                 mc_net::DirRefuseReason::VersionMismatch => vec![
                     "The server and this game must be the same build".into(),
                 ],
