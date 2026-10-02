@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 /// Edge of one picture, pixels. Small enough that every listed blueprint gets a
 /// cell (`every_listed_blueprint_fits`); a unit past the last cell shows no picture.
-pub const CELL: usize = 73;
+pub const CELL: usize = 64;
 const PER_ROW: usize = IMAGE_SLOT / CELL;
 const PER_SLOT: usize = PER_ROW * PER_ROW;
 
