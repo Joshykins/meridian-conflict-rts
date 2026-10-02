@@ -324,6 +324,52 @@ fn what_is_in_the_hold_dies_with_the_ship() {
 }
 
 #[test]
+fn a_commander_in_a_downed_hold_goes_up_and_loses_the_match() {
+    let mut w = world();
+    let ship = add(&mut w, "aster_t1_lift_ship", 0, 1600, 1600);
+    let ship_id = w.state.units.id(ship);
+    let commander = add(&mut w, "aster_commander", 0, 1500, 1600);
+    let cid = w.state.units.id(commander);
+    w.state.players[0].commander = cid;
+    w.tick(&[cmd(Command::Board {
+        units: vec![cid],
+        carrier: ship_id,
+        queue: false,
+    })])
+    .unwrap();
+    assert!(run_until(&mut w, 2000, |w| w.state.units.hangar[commander] == ship_id).is_some());
+    w.tick(&[cmd(Command::DebugDamage {
+        units: vec![ship_id],
+        permille: 1000,
+    })])
+    .unwrap();
+    let (mut died, mut blast) = (false, false);
+    for _ in 0..5 {
+        w.tick(&[]).unwrap();
+        for e in &w.events {
+            match e {
+                mc_sim::SimEvent::UnitDied { blueprint, .. }
+                    if w.blueprints.unit(*blueprint).has(mc_data::cat::COMMANDER) =>
+                {
+                    died = true;
+                }
+                mc_sim::SimEvent::NuclearDetonation {
+                    commander: true, ..
+                } => blast = true,
+                _ => {}
+            }
+        }
+    }
+    assert!(
+        w.state.units.row(cid).is_none(),
+        "the commander outlived its ship"
+    );
+    assert!(died, "the commander's death was not reported");
+    assert!(blast, "the commander's reactor did not go up");
+    assert!(w.state.players[0].defeated, "its side was not defeated");
+}
+
+#[test]
 fn a_dead_lift_ship_comes_down_slowly_without_tumbling() {
     let mut w = world();
     let ship = add(&mut w, SHIP, 0, 1500, 1500);

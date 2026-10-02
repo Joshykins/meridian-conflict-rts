@@ -3245,7 +3245,11 @@ impl World {
             units.owner[row],
             units.weapon_yaw[row][0],
         );
-        let visible = !units.has_flag(row, flag::IN_FACTORY);
+        // A unit stowed in a hold is hidden like one still in its factory, but a
+        // commander there dies in the open when its ship goes down: its reactor
+        // goes up and its side is lost.
+        let stowed_commander = units.hangar[row] != Handle::NONE && bp.has(cat::COMMANDER);
+        let visible = !units.has_flag(row, flag::IN_FACTORY) || stowed_commander;
         let complete = !units.has_flag(row, flag::UNDER_CONSTRUCTION);
         // A lift ship's wreck holds what its hold did: the cargo dies unseen with it
         // (`lose_orphaned_cargo`), so its salvage goes into the ship's.
