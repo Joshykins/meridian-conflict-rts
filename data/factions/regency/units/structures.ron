@@ -52,7 +52,7 @@
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "aster_t1_scout", "regency_t1_raider", "regency_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "regency_t1_mobile_aa", "aster_t2_mobile_aa",
+            "regency_t1_engineer", "regency_t2_engineer", "aster_t1_scout", "regency_t1_raider", "regency_t1_tank", "aster_t1_artillery", "regency_t2_tank", "aster_t2_missile", "regency_t1_mobile_aa", "regency_t2_mobile_aa",
         ]),
         upgrades_to: "regency_t3_land_factory",
         mesh: "regency_brood", icon: Factory,
@@ -71,7 +71,7 @@
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "aster_t1_scout", "regency_t1_raider", "regency_t1_tank", "aster_t1_artillery", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "regency_t1_mobile_aa", "aster_t2_mobile_aa",
+            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "aster_t1_scout", "regency_t1_raider", "regency_t1_tank", "aster_t1_artillery", "regency_t2_tank", "aster_t2_missile", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "regency_t1_mobile_aa", "regency_t2_mobile_aa",
         ]),
         mesh: "regency_brood", icon: Factory,
         sounds: (death: "blast_large"),

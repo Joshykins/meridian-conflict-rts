@@ -106,19 +106,21 @@ pub(super) enum Grade {
 }
 
 /// The grade a weapon is drawn as: a direct-fire plasma gun, or one laid flat whose shot
-/// arcs a little (`Weapon::flat_fire`, the Sunspear's). None for a beam, a thrown charge,
-/// a missile, or anything not plasma.
+/// arcs a little (`Weapon::flat_fire`, the Sunspear's), or a Gravitic Seeker (a guided
+/// plasma `missile`) with a proximity fuse, which leaves its cradle and bursts as flak
+/// does. None for a beam, a thrown charge, any other missile, or anything not plasma.
 pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     let lobbed = w.trajectory == Trajectory::Ballistic && !w.flat_fire;
-    if w.beam || w.missile || w.curve.0 > 0 || lobbed {
+    if w.beam || w.curve.0 > 0 || lobbed {
         return None;
     }
-    Some(match w.plasma_grade? {
+    let grade = match w.plasma_grade? {
         PlasmaGrade::Plasmeric if w.proximity.0 > 0 => Grade::Flak,
         PlasmaGrade::Plasmeric => Grade::Bolt,
         PlasmaGrade::Pinched => Grade::Pinched,
         PlasmaGrade::PinchFusion => Grade::Fusion,
-    })
+    };
+    (!w.missile || grade == Grade::Flak).then_some(grade)
 }
 
 /// A squeezed gun's ball, `0..1` of its size: across, in metres, at full charge.

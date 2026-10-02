@@ -158,4 +158,16 @@
         lore: "Plated sections that lock into one wall where they stand side by side: armour lapped down over a bronze waist, a spiked tower at every end and corner, a block of them one rampart. Slow to build, very hard to cut.",
         weapons: {},
     ),
+    "regency_t2_tank": (
+        lore: "A battle tank that rides a gravity lift where an ARC tank would roll on tracks, over ground and water alike; its one gun is the Halberd's, built small enough to carry.",
+        weapons: {
+            "Pinched-plasmeric Cannon": "Plasma gathered between three projectors in front of the bore, squeezed dense by gravity and pinched out as one short jet that bursts and sears what it hits.",
+        },
+    ),
+    "regency_t2_mobile_aa": (
+        lore: "An armoured craft on a gravity lift that runs with the army over land and water and keeps the sky over it.",
+        weapons: {
+            "Gravitic Seeker Battery": "Charges of plasma held in gravity cradles and let go one after another; each steers itself onto an aircraft without motor or exhaust and bursts beside it.",
+        },
+    ),
 }

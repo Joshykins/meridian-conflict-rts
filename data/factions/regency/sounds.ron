@@ -809,5 +809,16 @@
         ),
         "regency_supernova_mid": (like: "regency_supernova", size: 0.693, peak: 0.75),
         "regency_supernova_small": (like: "regency_supernova", size: 0.585, peak: 0.6),
+        // ---- tech 2 land units (land_t2.ron) ----
+        // The Glaive's Pinched-plasmeric Cannon: the Halberd's charge, shot and strike on a
+        // smaller gun, so a little higher and shorter and not as loud.
+        "regency_glaive_charge": (like: "regency_halberd_charge", size: 0.8, length: 1.3, peak: 0.3),
+        "regency_glaive_fire": (like: "regency_halberd_fire", size: 0.8, peak: 0.52),
+        "regency_glaive_hit": (like: "regency_halberd_hit", size: 0.8, peak: 0.7),
+        // The Vane's Gravitic Seekers: each let out of its cradle as a bomb is let out of the
+        // claw (a crack over a compression thump, its buzz tearing away), but lighter, six
+        // in a salvo; each bursts beside its aircraft as a Canopy bolt does, heavier.
+        "regency_seeker_launch": (like: "regency_gravitic_throw", size: 0.7, peak: 0.4),
+        "regency_seeker_burst": (like: "regency_canopy_burst", size: 1.25, peak: 0.5),
     },
 )

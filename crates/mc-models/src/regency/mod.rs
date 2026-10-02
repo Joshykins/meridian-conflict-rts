@@ -11,6 +11,7 @@
 //! its blueprint's size has its muzzles, pivots and emitters as the unit file's numbers;
 //! one built at another size says so.
 
+mod battle_tank;
 mod brood;
 mod chassis;
 mod commander;
@@ -22,6 +23,7 @@ mod hatchery;
 mod heart;
 mod hover_tank;
 mod kit;
+mod lift;
 mod machine;
 mod mobile_aa;
 mod palisade;
@@ -29,6 +31,7 @@ mod plating;
 mod raider;
 mod scorpion;
 mod scout;
+mod seeker_hover;
 mod taproot;
 mod tidebrood;
 mod turrets;
@@ -63,6 +66,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_hover_tank", 4.6, 3.4, hover_tank::hover_tank),
     // The tech 1 mobile anti-air: a flak organ on a six-legged walker (`mobile_aa`).
     ModelDef::new("regency_mobile_aa", 4.0, 4.5, mobile_aa::mobile_aa),
+    // The tech 2 battle tank: a lift hull, its turret's gun a Pinched-plasmeric Cannon
+    // (`battle_tank`).
+    ModelDef::new("regency_battle_tank", 6.2, 4.4, battle_tank::battle_tank),
+    // The tech 2 mobile anti-air: a craft on lift, a Gravitic Seeker Battery on its back
+    // (`seeker_hover`).
+    ModelDef::new("regency_seeker_hover", 5.0, 5.6, seeker_hover::seeker_hover),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
     // the land one's lifted ring and the air one's crown standing taller.
@@ -137,6 +146,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The tech 1 line: a few hundred of each in a battle.
         "regency_raider" => 2600,
         "regency_hover_tank" | "regency_mobile_aa" => 3200,
+        "regency_battle_tank" => 5000,
+        "regency_seeker_hover" => 4500,
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
         "regency_engineer" => 3600,
         // Walls come by the dozen.

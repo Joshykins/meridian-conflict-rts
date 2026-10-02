@@ -1094,14 +1094,13 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 
 /// How a Regency plasma shot is drawn in flight (sprites.wgsl, `ProjectileInstance::_pad[0]`
 /// above 2): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug strobing with fusion
-/// bursts, 3 a thrown gravitic charge curving onto its mark (`Weapon::curve`), 4 a
-/// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws). Zero for anything
-/// else.
+/// bursts, 3 a gravitic charge carried onto its mark, thrown curving (`Weapon::curve`) or
+/// steered (a Gravitic Seeker, a plasma `missile`), 4 a Plasmeric bolt (a fat glowing
+/// teardrop, as a plasma repeater throws). Zero for anything else.
 pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
     use mc_data::PlasmaGrade;
     match weapon.plasma_grade {
-        _ if weapon.missile => 0,
-        Some(_) if weapon.curve.0 > 0 => 3,
+        Some(_) if weapon.missile || weapon.curve.0 > 0 => 3,
         Some(PlasmaGrade::Pinched) => 1,
         Some(PlasmaGrade::PinchFusion) => 2,
         Some(PlasmaGrade::Plasmeric) => 4,
@@ -1133,10 +1132,17 @@ fn wings_or_turn(weapon: &mc_data::Weapon, age: u16) -> f32 {
     -((age - weapon.boost_ticks) as f32 / span as f32).clamp(0.01, 1.0)
 }
 
+/// A Gravitic Seeker: a plasma `missile`, a charge held in gravity containment and steered
+/// onto its mark. It has no body and no motor, so it is not drawn as a missile
+/// (`PROJECTILE_MISSILE`) but as the gravitic charge it is (`plasma_look`).
+fn gravitic_seeker(weapon: &mc_data::Weapon) -> bool {
+    weapon.missile && weapon.plasma_grade.is_some()
+}
+
 /// A shot's `aim.w`: a missile's body across (`Weapon::caliber`), any other shot's
 /// tail-length multiplier (`Weapon::streak`).
 fn aim_w(weapon: &mc_data::Weapon) -> f32 {
-    if weapon.missile {
+    if !gravitic_seeker(weapon) && weapon.missile {
         weapon.caliber
     } else {
         weapon.streak
@@ -1827,7 +1833,7 @@ impl World {
             };
             (
                 weapon.color as u32
-                    | if weapon.missile {
+                    | if !gravitic_seeker(weapon) && weapon.missile {
                         PROJECTILE_MISSILE
                     } else {
                         0

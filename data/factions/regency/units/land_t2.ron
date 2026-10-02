@@ -1,0 +1,92 @@
+// The Regency's tech 2 fighting units on land. Models: `models::regency::*`, each authored at its
+// blueprint's size; their tests tie these numbers to them.
+[
+    // The battle tank: a low armoured hull on gravity lift, a sponson either side where an
+    // ARC tank has its tracks, a lift bell under each end of each sponson and red plasma
+    // under every bell; it crosses water as it crosses land. Its turret carries a
+    // Pinched-plasmeric Cannon, the Halberd's shot built for a tank: it gathers its plasma
+    // between three projector prongs in front of the bore and squeezes it dense (0.8 s), then
+    // pinches it out as one jet a fifth of a second long (`rounds` over `round_span`,
+    // drawn; the sim flies the one shot) that bursts where it lands and sears the ground.
+    // Model: `regency_battle_tank` (`models::regency::battle_tank`).
+    //
+    // Against the Bulwark (ARC's tech 2 tank): about the same weight of hull and cost, a
+    // sixth more damage a second, all of it in one hit, at 330 m against 360 (plasma hits
+    // harder at shorter reach). A little slower and lighter for its lift, which takes it
+    // over water, so the Regency need no separate hover tank (the Skimmer's place).
+    (
+        key: "regency_t2_tank",
+        name: "Glaive",
+        role: "Battle Tank", title: "Battle Tank",
+        tech: 2,
+        categories: ["Land", "DirectFire"],
+        health: 1600,
+        cost: (mass: 210, energy: 1260, time: 1380),
+        radius: 6.2, height: 4.4,
+        vision: 380,
+        motion: (layer: Hover, size: 1, speed: 26, accel: 20, turn: 90),
+        weapons: [(
+            name: "Pinched-plasmeric Cannon",
+            damage: 230, splash: 1, range: 330, reload: 2.6, rounds: 6, round_span: 0.2,
+            speed: 800, trajectory: Direct,
+            turret_turn: 90, muzzle: (8.2, 0, 3.4), pivot: (1.4, 0, 3.4),
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(Pinched),
+            flash: 0.9, impact: 1.5, tracer: 1.1,
+            sounds: (
+                fire: "regency_glaive_fire", charge: "regency_glaive_charge", charge_time: 0.8,
+                impact: "regency_glaive_hit", ground: "regency_glaive_hit",
+            ),
+        )],
+        mesh: "regency_battle_tank", icon: Tank,
+        lights: [(kind: Point, at: (0, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 80, range: 14, night_only: false)],
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast", moving: "aster_hover"),
+    ),
+    // The mobile anti-air: a craft on gravity lift, no legs, so it crosses water as it
+    // crosses land (red plasma under its five lift bells). On its back a Gravitic Seeker
+    // Battery: six cradles in two banks, each holding a charge of plasma in gravity
+    // containment. It lets them go one after another; each steers itself onto its aircraft,
+    // with no motor and no exhaust, and bursts in a spray of plasma beside it (a proximity
+    // fuse). Model: `regency_seeker_hover` (`models::regency::seeker_hover`).
+    //
+    // Against the Squall (ARC's tech 2 mobile flak): the same cost and about the same weight
+    // of fire a second, but guided: every seeker finds its plane, so it does far more to one
+    // aircraft and far less to a packed formation (a small burst, not flak's wide one), at
+    // 440 m against 480. Lighter, for the lift that takes it over water.
+    (
+        key: "regency_t2_mobile_aa",
+        name: "Vane",
+        role: "Mobile Anti-Air", title: "Mobile Anti-Air",
+        tech: 2,
+        categories: ["Land", "AntiAir"],
+        health: 2100,
+        cost: (mass: 300, energy: 1800, time: 1200),
+        radius: 5.0, height: 5.6,
+        vision: 400,
+        motion: (layer: Hover, size: 1, speed: 28, accel: 26, turn: 110),
+        weapons: [(
+            name: "Gravitic Seeker Battery",
+            // Six seekers a salvo, 0.15 s apart, every 2.5 s: 300 a second if every one finds
+            // its mark. Its containment is light: an intercept laser takes one in a moment.
+            damage: 125, splash: 8, proximity: 6, range: 440, reload: 2.5,
+            salvo: 6, salvo_delay: 0.15, speed: 340, trajectory: Direct,
+            missile: true, guided: true, intercept: 20,
+            turret_turn: 240, pivot: (0.3, 0, 4.3),
+            muzzle: (2.1, 1.35, 4.85),
+            muzzles: [
+                (2.1, 1.35, 4.85), (2.1, -1.35, 4.85),
+                (2.1, 1.35, 4.3), (2.1, -1.35, 4.3),
+                (2.1, 1.35, 3.75), (2.1, -1.35, 3.75),
+            ],
+            targets: ["Air"], color: Orange, red: 1.0,
+            plasma_grade: Some(Plasmeric),
+            flash: 0.8, impact: 1.2, tracer: 1.0,
+            sounds: (fire: "regency_seeker_launch", impact: "regency_seeker_burst"),
+        )],
+        mesh: "regency_seeker_hover", icon: AntiAir,
+        lights: [(kind: Point, at: (0, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 70, range: 11, night_only: false)],
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast", moving: "aster_hover"),
+    ),
+]
