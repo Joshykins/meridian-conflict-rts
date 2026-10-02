@@ -1,15 +1,21 @@
-//! The Regency's air force (`data/factions/regency/units/air.ron`, docs/AIR_ROSTER.md "The
-//! Regency's air force"). Their jets are drones in the Cybertronian-jet manner (docs/STYLE.md
+//! The Regency's air force (`data/factions/regency/units/air.ron`, `air_t3.ron`,
+//! docs/AIR_ROSTER.md "The Regency's air force"). Their jets are drones in the Cybertronian-jet manner (docs/STYLE.md
 //! "The Regency look"): a nose blade, down-turned fins, dark plates lapped back over bronze
 //! workings, red optics, and red heat in the exhausts where ARC's burn orange. What hovers
 //! hangs on lift bells (`super::lift`), red plasma under them: no rotors, no jet plumes.
 //! One file per airframe, each with its own catalogue entries (`MODELS`) and its own
-//! planform; the pieces here are only the small parts they share.
+//! planform; the pieces here are only the small parts they share (the tech 3 jets share
+//! theirs in `blade_jet`).
 
+pub(crate) mod augur;
+mod blade_jet;
 pub(crate) mod coffer;
 pub(crate) mod flechette;
+pub(crate) mod maul;
+pub(crate) mod partisan;
 pub(crate) mod petard;
 pub(crate) mod quarrel;
+pub(crate) mod scythe;
 pub(crate) mod sickle;
 
 use glam::{Affine3A, Vec3};

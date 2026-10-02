@@ -457,3 +457,37 @@ plasma crackling under them.
 
 Check: `cargo test -p mc-sim --test sim -- regency_gunships::`; both are in the
 determinism match.
+
+## The Regency's tech 3 air (2026-10-02)
+
+Data `data/factions/regency/units/air_t3.ron`, models `crates/mc-models/src/regency/air/`
+(`partisan.rs`, `maul.rs`, `augur.rs`, `scythe.rs`, jet pieces in `blade_jet.rs`), tests
+`crates/mc-sim/tests/regency_air_t3.rs` and `crates/mc-sim/src/ai/escorts_tests.rs`. All
+four are built by the Skyforge III.
+
+- **Partisan** (`regency_t3_air_superiority`): a long blade jet, one Pinch-fusion Rifle
+  down its keel with the muzzle under the nose blade. At par with the Raptor: 660 a
+  second against air at 350 m, as one shot a second.
+- **Maul** (`regency_t3_strategic_bomber`): a heavy jet under a hammer of a nose blade,
+  one Pinch-fusion Bomb (a caged star in gravity rings, `GLOW_PRISM`) cradled between its
+  nacelles. At par with the Eclipse, a little harder (5600) in a tighter blast (55 m).
+- **Augur** (`regency_t3_spy_plane`): an unarmed glider that takes the Argus's place. It
+  cruises at 900 m, over the fair-weather cloud deck (150-530 m), at 340 m/s, with vision
+  2400 and radar 6000, and circles where it is when idle (`orbit`).
+  - **Above the weather.** `motion: (..., above_weather: true)` (air only): a gun or
+    launcher takes such an aircraft only when its reach covers the line of sight, its
+    height included (`World::slant_reaches`, integer maths), not only the distance
+    across the map. A fighter cruising at 300 m and short-range flak cannot reach it; SAM
+    sites, heavy flak and seeker batteries can.
+  - The Commander gives it the scout and sensor roles from its data (unarmed, radar), so
+    it joins scout operations.
+- **Scythe** (`regency_t3_scavenger`): a heavy salvage craft on six lift bells, two nanite
+  heads on plated arms (`reclaimer` power 240, range 260, no limit on what it takes apart:
+  an experimental's wreck goes in seconds).
+  - **It follows the army.** Guarding a friendly unit (Ctrl+G on it), any salvager whose
+    reclaimer works on the move goes to the wrecks anywhere in the guard ring, not only
+    those under its heads, then picks up the guard again (`area_work.rs`); an aircraft
+    does this between circles.
+  - `reclaimer: (..., follows_army: true)` marks it for the AI (`ai/escorts.rs`): it is
+    not a field salvager; each ground operation of 2000 mass or more (two at most) gets
+    one, put on guard round the operation's lead unit.

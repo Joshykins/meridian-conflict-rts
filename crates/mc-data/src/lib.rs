@@ -190,6 +190,9 @@ pub struct Motion {
     pub stride: bool,
     /// Hangs still near what it fights instead of circling it (`RawMotion::hangs`).
     pub hangs: bool,
+    /// Cruises above the weather: reached only along the line of sight
+    /// (`RawMotion::above_weather`).
+    pub above_weather: bool,
 }
 
 /// A giant walker's crushing footfall (`RawStomp`).
@@ -404,6 +407,10 @@ pub struct Reclaimer {
     /// It keeps clearing the wrecks within reach while it moves or patrols, without
     /// stopping for them (a salvage vehicle, boat or aircraft). A tower never moves.
     pub mobile: bool,
+    /// It goes with the army: guarding a unit of it, it takes apart the wrecks that fall
+    /// round it as the fight moves, and the AI keeps it on its main army instead of
+    /// sending it to wreck fields (a heavy scavenger, the Scythe).
+    pub follows_army: bool,
     heads: [ReclaimHead; MAX_RECLAIM_HEADS],
     head_count: u8,
 }
@@ -441,6 +448,7 @@ impl Reclaimer {
             range,
             charge_ticks,
             mobile,
+            follows_army: false,
             heads: all,
             head_count: heads.len() as u8,
         }
@@ -1289,6 +1297,7 @@ impl Blueprints {
                     h.write_u64(m.broadside.0 as u64);
                     h.write_u64(m.aim_arc as u64);
                     h.write_u64(m.stride as u64 | (m.hangs as u64) << 1);
+                    h.write_u64(m.above_weather as u64);
                 }
                 None => h.write_u64(0),
             }
@@ -1407,7 +1416,8 @@ impl Blueprints {
                     h.write_u64(
                         r.charge_ticks as u64
                             | (r.mobile as u64) << 16
-                            | (r.heads().len() as u64) << 24,
+                            | (r.heads().len() as u64) << 24
+                            | (r.follows_army as u64) << 32,
                     );
                     for head in r.heads() {
                         h.write_u64(

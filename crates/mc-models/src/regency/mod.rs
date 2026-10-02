@@ -209,6 +209,11 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_destroyer" | "regency_cruiser" => 7000,
         // Tech 3: the capital ships, and a big submarine.
         "regency_battleship" | "regency_carrier" => 14000,
+        // The tech 3 jets: hull, blade, wings and the plates lapped over them.
+        "regency_partisan" | "regency_augur" => 4000,
+        "regency_maul" => 6000,
+        // A broad craft on six bells with two nanite heads, a vault and hoppers.
+        "regency_scythe" => 6000,
         "regency_assault_submarine" => 8000,
         // Three tiers, and the next one's pieces waiting on each.
         "regency_cyst" => 6000,

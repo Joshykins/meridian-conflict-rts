@@ -225,6 +225,10 @@ impl World {
     /// was on another, and never opened.
     fn air_guard(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
         let Some(t) = self.guard_intruder(row, o, true) else {
+            // A salvager goes to the wrecks in the area (`area_work.rs`).
+            if self.area_work(row, o)? {
+                return Ok(());
+            }
             return self.fly_circle(row, o);
         };
         // The pass carries it out past the area's edge and round again; one still

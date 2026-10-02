@@ -466,6 +466,11 @@ pub(crate) struct RawMotion {
     /// on it, instead of circling it as a gunship does. Air hover only.
     #[serde(default)]
     pub hangs: bool,
+    /// An aircraft that cruises above the weather (a spy plane): a gun or launcher that
+    /// would take it must reach it along the line of sight, its height included, not only
+    /// across the map (`World::slant_reaches`). Air only.
+    #[serde(default)]
+    pub above_weather: bool,
 }
 
 /// The hull shots strike (`Body`): metres forward and aft of the origin along the
@@ -664,6 +669,10 @@ pub(crate) struct RawReclaimer {
     /// Keeps reclaiming what it passes while it moves (`Reclaimer::mobile`).
     #[serde(default)]
     pub mobile: bool,
+    /// Goes with the army and takes apart what falls round it (`Reclaimer::follows_army`).
+    /// Needs `mobile`.
+    #[serde(default)]
+    pub follows_army: bool,
     pub heads: Vec<RawReclaimHead>,
 }
 
@@ -1232,13 +1241,20 @@ fn compile_reclaimer(key: &str, r: &RawReclaimer, weapons: usize) -> Result<Recl
             pitch_max: Angle(steps(up).round().min(16383.0) as u16),
         });
     }
-    Ok(Reclaimer::new(
+    if r.follows_army && !r.mobile {
+        return Err(DataError::Invalid(format!(
+            "{key}: a reclaimer that follows the army works on the move (`mobile`)"
+        )));
+    }
+    let mut reclaimer = Reclaimer::new(
         fx(r.power),
         fx(r.range),
         ticks(r.charge).clamp(0, 600) as u16,
         r.mobile,
         &out,
-    ))
+    );
+    reclaimer.follows_army = r.follows_army;
+    Ok(reclaimer)
 }
 
 fn mask(names: &[String], ctx: &str) -> Result<u32, DataError> {
@@ -1336,6 +1352,11 @@ impl Unit {
                         "{key}: altitude and orbit are only for air units"
                     )));
                 }
+                if m.above_weather && m.layer != MoveLayer::Air {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: only an aircraft flies above the weather"
+                    )));
+                }
                 if m.stride && m.layer != MoveLayer::Land {
                     return Err(DataError::Invalid(format!(
                         "{key}: only a land walker strides"
@@ -1374,6 +1395,7 @@ impl Unit {
                     },
                     stride: m.stride,
                     hangs: m.hangs,
+                    above_weather: m.above_weather,
                 })
             }
             None => None,

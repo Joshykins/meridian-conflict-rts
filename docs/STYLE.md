@@ -218,6 +218,8 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Anti-air, radar, wall | Canopy, Orrery (II, III), Palisade |
 | Shield generator (T2, T3) | Ward (II) |
 | Nuke silo, nuke defence (T4) | Mangonel, Barbican |
+| Air superiority fighter, strategic bomber (T3) | Partisan, Maul |
+| Spy plane, heavy scavenger (T3) | Augur, Scythe |
 
 ### Construction
 

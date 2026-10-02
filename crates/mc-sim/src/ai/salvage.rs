@@ -151,7 +151,7 @@ impl World {
             .copied()
             .filter(|b| {
                 let bp = self.blueprints.unit(*b);
-                bp.is_salvager() && !bp.has(cat::NAVAL)
+                bp.is_salvager() && !bp.has(cat::NAVAL) && !super::escorts::follows_army(bp)
             })
             .min_by_key(|b| (self.blueprints.unit(*b).cost_mass, b.0))
     }

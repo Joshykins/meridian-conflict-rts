@@ -18,6 +18,7 @@ mod commander;
 pub use commander::mind::{AiMind, MindEconomy, MindNote, MindOp, MindPlan};
 mod danger;
 mod energy;
+mod escorts;
 mod groups;
 mod layout;
 mod lots;
@@ -146,6 +147,8 @@ struct Census {
     /// Salvage units (`UnitBlueprint::is_salvager`), and those with no orders.
     salvagers: usize,
     salvagers_idle: Vec<usize>,
+    /// Salvage units that go with the army (`escorts.rs`), not counted above.
+    escorts: Vec<usize>,
     storage: usize,
     sites: Vec<usize>,
     damaged: Vec<usize>,
@@ -364,6 +367,7 @@ impl World {
         let span = mc_core::perf_span!("ai.rest");
         self.direct_factories(player, &census, &planned.salvage, &mut out);
         self.direct_salvagers(&census, &planned.salvage, &mut out);
+        self.direct_escorts(player, &census, &mut out);
         self.direct_upgrades(player, &census, &mut out);
         self.direct_focus(player, &mut out);
         drop(span);
@@ -530,6 +534,8 @@ impl World {
                 c.storage += 1;
             } else if let Some(r) = bp.reclaimer.filter(|_| bp.is_structure()) {
                 c.towers.push((pos, r.range));
+            } else if escorts::follows_army(bp) {
+                c.escorts.push(row);
             } else if bp.is_salvager() {
                 if units.drone_parent[row] == crate::Handle::NONE {
                     c.salvagers += 1;

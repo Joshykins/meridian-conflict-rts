@@ -1,0 +1,118 @@
+// The Regency's tech 3 aircraft, made by the Skyforge III. Jets after Megatron's Cybertronian
+// jet (a nose blade, fins turned down, swept plates lapped over bronze workings, red optics,
+// red heat in their plasma jets); craft that hover float on gravity lift bells, with no
+// rotors and no plumes. Models: `models::regency::air::*`, authored at the sizes here, so
+// every muzzle, pivot and emitter below is the model's own number.
+//
+// Balance is anchored on ARC's tech 3 air (`aster/units/air.ron`); each unit says what it
+// is anchored on and where it is bent the Regency way.
+[
+    // Air superiority fighter: a long blade of a jet round one Pinch-fusion Rifle laid
+    // down its keel, the muzzle under the nose blade. Anchored on the Raptor (620 mass,
+    // 3200 HP, 660 DPS against air at 350 m); the same DPS as one harder, slower shot
+    // (660 every second, not 330 every half).
+    (
+        key: "regency_t3_air_superiority",
+        name: "Partisan",
+        role: "Air Superiority Fighter", title: "Air Superiority",
+        tech: 3,
+        categories: ["Air", "AntiAir"],
+        health: 3200,
+        cost: (mass: 620, energy: 23500, time: 3800),
+        radius: 9.8, height: 3.0,
+        vision: 1000,
+        motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 200, altitude: 300, hover: false),
+        weapons: [(
+            name: "Pinch-fusion Rifle",
+            damage: 660, splash: 5, range: 350, reload: 1.0, speed: 1500, trajectory: Direct,
+            turret_turn: 240, arc: 60, muzzle: (9.3, 0, 1.0),
+            targets: ["Air"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion),
+            flash: 0.6, impact: 1.6, tracer: 1.2,
+            sounds: (
+                fire: "regency_glaive_fire",
+                impact: "regency_glaive_hit", ground: "regency_glaive_hit",
+            ),
+        )],
+        mesh: "regency_partisan", icon: Fighter,
+        // A stand-in: ARC's jet until the Regency has a jet sound of their own.
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    // Strategic bomber: one Pinch-fusion Bomb, a small caged star hung in a cradle under its
+    // belly, let go over its mark, where it flashes like a star on the ground. Anchored on
+    // the Eclipse (1150 mass, 6000 HP, 5000 damage in 65 m every 10 s); bent the Regency
+    // way: harder (5600) in a tighter blast (55 m).
+    (
+        key: "regency_t3_strategic_bomber",
+        name: "Maul",
+        role: "Strategic Bomber", title: "Strategic Bomber",
+        tech: 3,
+        categories: ["Air"],
+        health: 6000,
+        cost: (mass: 1150, energy: 45000, time: 7200),
+        radius: 16, height: 3.6,
+        vision: 1000,
+        motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
+        weapons: [(
+            name: "Pinch-fusion Bomb",
+            damage: 5600, splash: 55, range: 950, reload: 10, speed: 100, trajectory: Ballistic, loft: 0.4,
+            muzzle: (0, 0, 0.85),
+            targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion),
+            impact: 3.5,
+            sounds: (fire: "bomb_release", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+        )],
+        mesh: "regency_maul", icon: Bomber,
+        sounds: (death: "blast_small", moving: "aster_heavy_jet"),
+    ),
+    // Spy plane: unarmed, it cruises far above the cloud deck, faster than any fighter, and
+    // looks down with a wide eye and radar. The Regency's counterpart to ARC's Argus, which
+    // it replaces in the Skyforge III: no salvage ray, shield or anti-missile lasers; it
+    // sees further, is cheaper and is caught by speed and height, not armour.
+    (
+        key: "regency_t3_spy_plane",
+        name: "Augur",
+        role: "Spy Plane", title: "Spy Plane",
+        tech: 3,
+        categories: ["Air", "Scout", "Intel"],
+        health: 2000,
+        cost: (mass: 700, energy: 24000, time: 4000),
+        radius: 12, height: 2.8,
+        vision: 2400,
+        // Above the weather (`above_weather`): a gun reaches it only along the line of sight,
+        // so a fighter cruising at 300 m and flak are short of it; SAMs and heavy flak
+        // are not.
+        motion: (layer: Air, size: 0, speed: 340, accel: 110, turn: 48, altitude: 900, hover: false, above_weather: true),
+        weapons: [],
+        mesh: "regency_augur", icon: Intel,
+        sounds: (death: "blast_small", moving: "aster_jet"),
+        radar: 6000,
+        economy: (energy_upkeep: 120),
+        // Idle, it circles where it is, as the Argus does, never landing to wait.
+        orbit: 600,
+    ),
+    // Heavy scavenger: a long keeled craft on six gravity lift bells that follows the army and
+    // takes whole wrecks apart, the biggest included, with two nanite heads. Anchored on
+    // the Argus's salvage ray (200 mass a second); it pulls more (240) from close in (260 m)
+    // and works on the move.
+    (
+        key: "regency_t3_scavenger",
+        name: "Scythe",
+        role: "Heavy Scavenger", title: "Heavy Scavenger",
+        tech: 3,
+        categories: ["Air"],
+        health: 5000,
+        cost: (mass: 900, energy: 14000, time: 3600),
+        radius: 12, height: 5.6,
+        vision: 700,
+        motion: (layer: Air, size: 0, speed: 60, accel: 22, turn: 50, altitude: 28, hover: true),
+        reclaimer: (power: 240, range: 260, charge: 1.0, mobile: true, follows_army: true, heads: [
+            (pivot: (8.6, 5.2, 2.9), emitter: (10.6, 5.2, 2.9), turn: 120, pitch: (-80, 20)),
+            (pivot: (8.6, -5.2, 2.9), emitter: (10.6, -5.2, 2.9), turn: 120, pitch: (-80, 20)),
+        ]),
+        weapons: [],
+        mesh: "regency_scythe", icon: SalvageCarrier,
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast_large", moving: "aster_hover"),
+    ),
+]

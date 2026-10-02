@@ -8,6 +8,10 @@
 //! is dropped as soon as there is raising or mending to do, or the store is full.
 //! Paused units are left alone: nothing paused is raised or mended from the ring (nor a
 //! paused factory's product), and work in hand is given up when it is paused.
+//!
+//! A salvager on guard (a unit whose reclaimer works on the move) works its ring the same
+//! way, wrecks only: guarding a friendly unit it follows it and takes apart what falls
+//! round it as the fight moves (the Scythe). An aircraft does this between circles.
 
 use crate::orders::order;
 use crate::reclaim::WIDEST_TARGET;
@@ -23,14 +27,16 @@ impl World {
     /// A builder on guard with nothing to do at hand takes up the next work in its
     /// area. True when it has: an order now stands in front of the guard.
     pub(crate) fn area_work(&mut self, row: usize, o: &Order) -> Result<bool, SimError> {
-        if self.bp(row).builder.is_none()
+        let bp = self.bp(row);
+        let builds = bp.builder.is_some();
+        if !(builds || self.salvages_on_guard(row))
             || !self.area_looks(row)
             || self.state.units.has_flag(row, flag::PASSIVE)
             || self.work_paused(row)
         {
             return Ok(false);
         }
-        if let Some(help) = self.area_help(row, o) {
+        if let Some(help) = builds.then(|| self.area_help(row, o)).flatten() {
             return self.area_take(row, help);
         }
         let owner = self.state.units.owner[row];
@@ -81,7 +87,13 @@ impl World {
             self.finish_order(row);
             return Ok(true);
         }
-        match self.area_help(row, &guard) {
+        let help = self
+            .bp(row)
+            .builder
+            .is_some()
+            .then(|| self.area_help(row, &guard))
+            .flatten();
+        match help {
             Some(help) => {
                 self.finish_order(row);
                 self.area_take(row, help)
@@ -126,6 +138,12 @@ impl World {
                 self.unit_entry_is_current(e) && units.build_target[e.row as usize] == id
             })
             .map(|e| e.row as usize)
+    }
+
+    /// Whether `row` works its guard area as a salvager: it has a reclaimer that works on
+    /// the move (the Scythe that follows an army, a salvage drone), not a builder's.
+    fn salvages_on_guard(&self, row: usize) -> bool {
+        self.bp(row).reclaimer.is_some_and(|r| r.mobile)
     }
 
     /// Whether this is one of the ticks an engineer looks round its area.

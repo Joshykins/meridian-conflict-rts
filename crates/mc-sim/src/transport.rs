@@ -129,7 +129,9 @@ impl World {
 
     /// Whether weapon `weapon` of `shooter` reaches `target`, `gap` metres away across
     /// the map (hull to hull): a `slant` gun reaches what is not in the air along the
-    /// line of sight, so it cannot reach down to the ground from high up.
+    /// line of sight, so it cannot reach down to the ground from high up; and anything
+    /// reaches an aircraft that cruises above the weather (`Motion::above_weather`) only
+    /// along the line of sight, so most guns cannot reach up to it.
     pub(crate) fn slant_reaches(
         &self,
         shooter: usize,
@@ -137,12 +139,10 @@ impl World {
         weapon: &Weapon,
         gap: Fx,
     ) -> bool {
-        if !weapon.slant {
-            return true;
-        }
         let units = &self.state.units;
         let aloft = self.is_air(target) && !(self.lands_on_order(target) && self.set_down(target));
-        if aloft {
+        let high = aloft && self.bp(target).motion.is_some_and(|m| m.above_weather);
+        if !high && (!weapon.slant || aloft) {
             return true;
         }
         let drop =

@@ -16,6 +16,7 @@ impl World {
         let mut planned_engineers = 0;
         let mut planned_scouts = 0;
         let mut planned_salvagers = 0;
+        let mut planned_escorts = 0;
         let want_scouts = 2;
         // No rally point: a finished unit rolls out idle and the army sends it
         // to the staging point with the rest. A rally among the base's buildings
@@ -86,6 +87,10 @@ impl World {
             {
                 planned_engineers += 1;
                 engineer
+            } else if let Some(escort) = self.escort_product(player, row, census, planned_escorts) {
+                // A heavy salvager to go with an army that has none.
+                planned_escorts += 1;
+                Some(escort)
             } else if let Some(salvager) =
                 self.salvage_product(row, census, planned_salvagers, salvage)
             {

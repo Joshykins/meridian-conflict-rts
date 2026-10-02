@@ -78,6 +78,26 @@
         lore: "A salvage craft on a gravity lift; its nanite head unpicks wrecks as it glides past and carries the matter home down the strands.",
         weapons: {},
     ),
+    "regency_t3_air_superiority": (
+        lore: "A long blade of a jet built round one rifle laid down its keel; it hunts other aircraft and seldom has to fire twice.",
+        weapons: {
+            "Pinch-fusion Rifle": "Plasma pinched until it fuses and fired out from under the nose blade as one white-hot shot.",
+        },
+    ),
+    "regency_t3_strategic_bomber": (
+        lore: "A heavy jet under a hammer of a nose blade that carries one small caged star slung between its engines, and lets it go over whatever must stop existing.",
+        weapons: {
+            "Pinch-fusion Bomb": "A small star held in gravity rings until it is dropped; it flashes on the ground like a sun coming up and melts what it lands on.",
+        },
+    ),
+    "regency_t3_spy_plane": (
+        lore: "An unarmed glider on long straight wings that flies far above the weather, too high for most guns and too fast for the fighters that try; it looks down and the empire sees.",
+        weapons: {},
+    ),
+    "regency_t3_scavenger": (
+        lore: "A heavy salvage craft on six lift bells that keeps with the army, its two nanite heads unpicking even the greatest wrecks while the fight moves on ahead of it.",
+        weapons: {},
+    ),
     "regency_t1_artillery": (
         lore: "A low four-legged walker that crouches behind the line and lobs plasma over it.",
         weapons: {
