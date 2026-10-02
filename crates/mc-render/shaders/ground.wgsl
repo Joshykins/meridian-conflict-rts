@@ -42,17 +42,14 @@ fn vs_stain(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32
 }
 
 // No stain ever discards (SPIR-V OpKill), nor does a giant's footprint: a friend's RX 7900
-// XTX hung in the stains draw, the device lost, the moment molten ground (a Fulgur, a
-// Sunspear, the Behemoth's storm) or a crater (aircraft shot down) was drawn, and those two
-// kinds were the ones discarding inside a helper (2026-10-01). Blended, no depth written:
+// XTX hung in the stains draw, the device lost, the moment molten ground (then a stain) or
+// a crater (aircraft shot down) was drawn, and those two kinds were the ones discarding
+// inside a helper (2026-10-01). Blended, no depth written:
 // a clear colour draws nothing, as a discard did.
 @fragment
 fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     if (in.strength_seed & STAIN_CRATER) != 0u {
         return crater(in);
-    }
-    if (in.strength_seed & STAIN_MOLTEN) != 0u {
-        return molten(in);
     }
     let strength = f32(in.strength_seed & 0xFFu) / 255.0;
     let seed = f32(in.strength_seed >> 8u);
@@ -85,97 +82,6 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     lit += local_lights(m, in.world, nrm, normalize(eye - in.world));
     lit = mix(lit, vec3<f32>(0.01, 0.009, 0.008), 0.55 + lobe * 0.2);
     return vec4<f32>(apply_haze(lit, in.world, eye), alpha);
-}
-
-// Molten ground: a pool that glows white-yellow when fresh, then orange, then a dull red,
-// while a dark glassy crust freezes over it in plates, from the shore in. Late on the glow
-// shows only in the cracks between the plates; then the cold crust fades away over the
-// sim's charcoal scorch, which stays. A ring of burnt ground lies round the shore, and
-// no grass grows in the pool (grass_gen.wgsl `PRESS_MOLTEN`).
-//
-// It takes its derivative first, ahead of any early return (see fs_stain on discard).
-fn molten(in: StainOut) -> vec4<f32> {
-    let px = max(length(fwidth(in.world.xy)), 1e-3);
-    let heat = f32(in.strength_seed & 0xFFu) / 255.0;
-    let seed = f32((in.strength_seed >> 8u) & 0x7FFFu);
-    let spun = rot_z(vec3<f32>(in.uv, 0.0), seed * 0.37).xy;
-    let eye = globals.camera.xyz;
-    let dist = distance(eye, in.world);
-    let o = vec2<f32>(seed * 0.37, seed * -0.23);
-    // Radius in pool radii (the patch reaches 1.35 of them): a few broad lobes, a ragged
-    // shore at 0.85, never reaching the patch's square edge.
-    let dir = spun / max(length(spun), 1e-4);
-    let lobe = value_noise2(dir * 1.8 + o, 1.0);
-    let rag = grad_noise2(in.world.xy + o * 40.0, max(in.radius * 0.18, 0.5));
-    let r = length(spun) * 1.35 + (lobe - 0.5) * 0.3 + (rag - 0.5) * 0.12;
-    let shore = 0.85;
-    let halo = 1.0 - smoothstep(shore, 1.1, r);
-    if halo < 0.02 {
-        return vec4<f32>(0.0);
-    }
-    let in_pool = 1.0 - smoothstep(shore - 0.02, shore + 0.01, r);
-    let rp = clamp(r / shore, 0.0, 1.0);
-
-    // Cooling cracks: the crust breaks into plates a fraction of the pool across, warped
-    // so no edge runs straight; under a pixel they become their average.
-    let cell = clamp(in.radius * 0.16, 0.7, 7.0);
-    let warp = vec2<f32>(grad_noise2(in.world.xy + o * 9.0, cell * 1.7), grad_noise2(in.world.xy - o * 9.0, cell * 1.7)) - 0.5;
-    let q = in.world.xy / cell + o + warp * 1.2;
-    let cells = crater_cells(q);
-    let small = crater_cells(q * 2.7 + 17.0);
-    let pc = px / cell;
-    // Some cracks gape, some are hairlines.
-    let gape = grad_noise2(in.world.xy * 1.3 + o * 4.0, cell * 0.9);
-    let crack = crater_crack(cells.x, 0.03 + 0.07 * gape * gape, pc);
-    let fine = crater_crack(small.x, 0.05, pc * 2.7) * smoothstep(0.35, 0.8, gape) * 0.6;
-    let open = clamp(crack + fine, 0.0, 1.0);
-    // Heat bleeding out of a crack into the crust beside it.
-    let bleed = mix(exp(-cells.x / 0.12), 0.25, smoothstep(0.25, 0.7, pc));
-    let plate = cells.y;
-
-    // The open melt with darker skins drifting on it; the plates freeze one by one, the
-    // shore's first; the cracks keep their heat longest.
-    let u = 1.0 - heat;
-    let skin = smoothstep(0.45, 0.8, grad_noise2(in.world.xy + warp * cell * 1.5 + o * 5.0
-        + vec2<f32>(globals.camera.w * 0.12, 0.0), cell * 0.6));
-    let core = 1.0 - rp * rp;
-    let body_t = heat * mix(0.62, 1.0, core) * (1.0 - 0.3 * skin);
-    let crust = smoothstep(0.0, 0.05, u * 1.4 + 0.3 * rp - 0.25 - 0.35 * plate);
-    let crack_t = pow(heat, 0.7) * mix(0.5, 0.85, core) * (0.75 + 0.25 * gape);
-    var glow = crater_heat_rgb(body_t) * (1.0 - crust);
-    glow += (crater_heat_rgb(crack_t) * open + crater_heat_rgb(crack_t * 0.6) * bleed * 0.35 * (1.0 - open)) * crust;
-    // A touch dimmer than a blast's glassed pool (terrain.wgsl craters_at): these are many
-    // and small.
-    glow *= 0.6 * in_pool;
-
-    // Black slag with a dull sheen, each plate tipped a little its own way so the light
-    // breaks up over it; a dull rind along the shore, and burnt ground round it.
-    let base_n = terrain_normal(in.world.xy, clamp(dist * 0.004, 4.0, 24.0));
-    let tip = (vec2<f32>(fract(plate * 13.17), fract(plate * 7.31)) - 0.5) * 0.08
-        * (1.0 - smoothstep(0.3, 0.9, pc)) * crust * in_pool;
-    let nrm = normalize(base_n + vec3<f32>(tip, 0.0));
-    let rind = (1.0 - smoothstep(0.0, 0.06, shore - r)) * in_pool;
-    let slag = mix(vec3<f32>(0.011, 0.012, 0.012) * (0.85 + 0.3 * plate) * (1.0 - 0.5 * open),
-        vec3<f32>(0.014, 0.012, 0.011), rind);
-    let char_rgb = vec3<f32>(0.016, 0.014, 0.012);
-    var albedo = mix(char_rgb, slag, in_pool);
-    albedo = apply_fog_of_war(albedo, in.world.xy);
-    var m: Pbr;
-    m.albedo = albedo;
-    m.metallic = 0.0;
-    m.roughness = mix(0.95, mix(0.62 + 0.1 * plate + 0.15 * open, 0.9, rind), in_pool);
-    m.emissive = vec3<f32>(0.0);
-    let v = normalize(eye - in.world);
-    var lit = shade_pbr_vis(m, nrm, v, globals.sun.xyz, sun_shadow(in.world, base_n), screen_ao(in.clip.xy));
-    lit += local_lights(m, in.world, nrm, v);
-    // The pool covers the ground; the burnt ring round it thins out. Both fade away once
-    // the crust is cold.
-    let gone = smoothstep(0.0, 0.12, heat);
-    let alpha = max(in_pool * 0.98, (halo - in_pool) * 0.7) * gone;
-    if alpha < 0.01 {
-        return vec4<f32>(0.0);
-    }
-    return vec4<f32>(apply_haze(lit + glow, in.world, eye), alpha);
 }
 
 // A crater: still a decal, but lit as a bowl. The ground slopes down into a

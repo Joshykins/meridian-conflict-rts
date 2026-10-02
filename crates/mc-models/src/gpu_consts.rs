@@ -780,9 +780,34 @@ shared! {
     pub mod stain as "STAIN_" {
         /// A crater where a blast struck the ground (renderer/impact_craters.rs).
         pub const CRATER: u32 = 1 << 31;
-        /// Ground left molten (renderer/bore_fx.rs): the low byte is the heat left, 255
-        /// fresh to 0 cold, rewritten every frame. No grass grows in the pool.
-        pub const MOLTEN: u32 = 1 << 30;
+        // retired: 1 << 30 (molten ground as stains; now the melt field, `melt_field`)
+    }
+
+    /// The melt field (renderer/ground_melt.rs, bindings.wgsl `melt_sample`): a heat per
+    /// cell of ground, kept only in tiles something has heated, found through a hash
+    /// table. Scene set binding 32 is one `array<u32>`: a header of `TABLE` words (x the
+    /// tiles in use), then `SLOTS` table entries of two words (the tile's key, its slot
+    /// plus one; zero is empty), then from `ATLAS` the tiles' cells, `TILE` x `TILE` words
+    /// each, packed as unorm8 x4: heat over `HEAT_MAX`, glass, scorch, unused.
+    pub mod melt_field as "MELT_FIELD_" {
+        /// Metres a cell is across.
+        pub const CELL: f32 = 1.0;
+        /// Cells a tile is across.
+        pub const TILE: u32 = 32;
+        /// Tiles kept, at most.
+        pub const TILES: u32 = 1024;
+        /// The table has `1 << SLOT_BITS` entries.
+        pub const SLOT_BITS: u32 = 12;
+        pub const SLOTS: u32 = 1 << SLOT_BITS;
+        /// Entries a lookup tries before it gives up on a tile.
+        pub const PROBES: u32 = 16;
+        /// Words before the table, and where the cells start.
+        pub const TABLE: u32 = 4;
+        pub const ATLAS: u32 = TABLE + SLOTS * 2;
+        /// Heat a cell's byte holds at 255. 1 is white-hot.
+        pub const HEAT_MAX: f32 = 1.25;
+        /// Heat at which the ground melts: past it, it shows molten and leaves glass.
+        pub const MELT: f32 = 0.42;
     }
 
     /// Bits of a selection mark's `kind` (renderer `Mark`, icons.wgsl `fs_ring`).

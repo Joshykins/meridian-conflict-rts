@@ -518,6 +518,8 @@ pub(crate) const SCENE_SET: &[(u32, vk::DescriptorType)] = &[
     (30, vk::DescriptorType::SAMPLED_IMAGE),
     // Each standing tree's push from the blasts, from the cull (renderer/cull_lists.rs).
     (31, vk::DescriptorType::STORAGE_BUFFER),
+    // Heat in the ground (renderer/ground_melt.rs).
+    (32, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 impl Layouts {

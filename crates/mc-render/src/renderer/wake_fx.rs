@@ -195,7 +195,8 @@ impl Renderer {
                         let lobe =
                             Vec2::new(self.scatter.signed(), self.scatter.signed()) * size * 0.6;
                         let radius = size * (0.45 + 0.4 * self.scatter.unit());
-                        self.bore_fx.melt(p.truncate() + lobe, radius, when, 8.0);
+                        self.ground_melt
+                            .melt(p.truncate() + lobe, radius, when, 8.0);
                     }
                 }
             }

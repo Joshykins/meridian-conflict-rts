@@ -9,18 +9,15 @@
 //! The ground takes time to melt by how high the channel ran over it (`heat_up`): at
 //! once under a shot laid along the ground, seconds under one struck down from the air.
 //!
-//! Presentation only. The molten track is ground stains with `stain::MOLTEN` set, whose
-//! low byte is the heat left (0 to 255), rewritten every frame as the track cools, and
-//! uploaded after the impact craters.
+//! Presentation only. The molten track is heat put into the ground (ground_melt.rs),
+//! which melts it, cools and leaves glass.
 
+use super::ground_melt::Burn;
 use super::{Renderer, PUFF_BOLT, PUFF_CLOD, PUFF_SPARK, PUFF_TREE_SMOKE};
-use crate::gpu_consts::stain;
-use glam::{Vec2, Vec3};
-use mc_sim::mirror::{ProjectileInstance, StainInstance, PROJECTILE_FADE_BEAM};
+use glam::Vec3;
+use mc_sim::mirror::{ProjectileInstance, PROJECTILE_FADE_BEAM};
 use std::mem::size_of;
 
-/// Molten patches kept, at most; the oldest go first.
-const MAX_MOLTEN: usize = 8192;
 /// Colour byte of a lightning stroke among the fading beams (sprites.wgsl).
 const BOLT: u32 = 3;
 /// Straight plasma column inside the surrounding electrical arcs.
@@ -34,11 +31,6 @@ const SHELL_MELT_COOL: f32 = 10.0;
 /// through (`heat_up`), and the longest it takes.
 const HEAT_RATE: f32 = 120.0;
 const MOST_HEAT_UP: f32 = 8.0;
-/// Share of its heating time a pool shows nothing (the ground is only warming).
-const LATENT: f32 = 0.4;
-/// Heat a pool shows at once it starts to glow: below about this the shader draws the
-/// crust of a pool gone cold, and a warming track would look burnt before it melted.
-const WARMING: f32 = 0.62;
 /// Bolt strokes kept, at most.
 const MAX_STROKES: usize = 12288;
 /// Overlapping return strokes keep the channel alive while its branching shape changes.
@@ -50,19 +42,6 @@ const DISCHARGE_STROKES: [(f32, f32, f32); 5] = [
     (0.55, 0.46, 0.85),
     (0.80, 0.48, 0.65),
 ];
-
-struct Molten {
-    pos: Vec2,
-    radius: f32,
-    /// How hot it starts, 0 to 1: a pool the channel only grazed starts dull and crusted.
-    peak: f32,
-    seed: u32,
-    start: f32,
-    /// Seconds from `start` it takes to heat up to `peak` (spreading out to its radius as
-    /// it does); it cools across `cool` seconds after that.
-    rise: f32,
-    cool: f32,
-}
 
 /// Seconds the ground under a bore's channel takes to melt, where the channel runs
 /// `height` metres over it on a shot that came down `drop` metres from the muzzle: a
@@ -83,12 +62,7 @@ struct Stroke {
 
 #[derive(Default)]
 pub(super) struct BoreFx {
-    molten: Vec<Molten>,
-    next: usize,
     strokes: Vec<Stroke>,
-    /// This frame's molten stains, heat filled in.
-    stains: Vec<StainInstance>,
-    seed: u32,
     /// Bolt rifles charging and firing (renderer/bolt_rifle_fx.rs), their arcs among these strokes.
     pub(super) rifles: super::bolt_rifle_fx::BoltRifleFx,
     /// Arc Howitzers charging and firing (renderer/arc_howitzer_fx.rs), their arcs among these strokes.
@@ -96,7 +70,7 @@ pub(super) struct BoreFx {
 }
 
 impl BoreFx {
-    /// A new world: no molten ground, no lightning. The rifles' and howitzers' sequences
+    /// A new world: no lightning. The rifles' and howitzers' sequences
     /// are kept: this runs every tick while a world is young, and they reset themselves
     /// when the clock goes back.
     pub(super) fn clear(&mut self) {
@@ -107,30 +81,6 @@ impl BoreFx {
             howitzers,
             ..BoreFx::default()
         };
-    }
-
-    fn push_molten(&mut self, m: Molten) {
-        if self.molten.len() < MAX_MOLTEN {
-            self.molten.push(m);
-        } else {
-            self.molten[self.next] = m;
-            self.next = (self.next + 1) % MAX_MOLTEN;
-        }
-    }
-
-    /// Ground melted by something else (a nuclear blast): a pool at `pos` of `radius`
-    /// metres that glows, crusts over and cools across `cool` seconds from `start`.
-    pub(super) fn melt(&mut self, pos: Vec2, radius: f32, start: f32, cool: f32) {
-        let seed = self.bump();
-        self.push_molten(Molten {
-            pos,
-            radius,
-            peak: 1.0,
-            seed,
-            start,
-            rise: 0.0,
-            cool,
-        });
     }
 
     /// A lightning stroke from `from` to `to`, drawn as the bore's are: `width` metres,
@@ -165,44 +115,6 @@ impl BoreFx {
         if self.strokes.len() > MAX_STROKES {
             self.strokes.remove(0);
         }
-    }
-
-    /// The molten stains as they stand at `time`: heat in the low byte.
-    pub(super) fn molten_stains(&mut self, time: f32) -> &[StainInstance] {
-        self.stains.clear();
-        for m in &self.molten {
-            let since = time - m.start;
-            let age = (since - m.rise) / m.cool.max(0.01);
-            if since < 0.0 || age >= 1.0 {
-                continue;
-            }
-            // Heating up: nothing shows for the first part of it, then it glows up out of
-            // a small dull spot, spreading to its full size and heat.
-            let warm = if m.rise > 0.0 {
-                let k = ((since / m.rise - LATENT) / (1.0 - LATENT)).min(1.0);
-                if k < 0.0 {
-                    continue;
-                }
-                k * k * (3.0 - 2.0 * k)
-            } else {
-                1.0
-            };
-            // Heating, a spot glows dull orange (lower is drawn as crust, as if burnt and cooled).
-            let glow = if m.rise > 0.0 {
-                WARMING + (m.peak - WARMING) * warm
-            } else {
-                m.peak
-            };
-            let heat = glow * (1.0 - age.max(0.0));
-            self.stains.push(StainInstance {
-                pos: m.pos.to_array(),
-                radius: m.radius * (0.35 + 0.65 * warm),
-                strength_seed: stain::MOLTEN
-                    | ((heat * 255.0).round() as u32).min(255)
-                    | (m.seed & 0x7FFF) << 8,
-            });
-        }
-        &self.stains
     }
 }
 
@@ -358,12 +270,10 @@ impl Renderer {
         if to.z - self.ground_height(to.truncate()) < pool
             && self.ground_height(to.truncate()) >= water
         {
-            let seed = self.bore_fx.bump();
-            self.bore_fx.push_molten(Molten {
+            self.ground_melt.burn(Burn {
                 pos: to.truncate(),
                 radius: pool,
                 peak: 1.0,
-                seed,
                 start,
                 rise: heat_up(drop, 0.0),
                 cool,
@@ -383,8 +293,8 @@ impl Renderer {
         let muzzle = from.z - self.ground_height(from.truncate());
         let reach = (width * 2.0).max(muzzle + width * 1.5);
         let wind = self.sky.wind_heading();
-        // Pools close enough to run together into one gouge: spaced by their own size,
-        // so the thin end stays joined too. At most 1200 of them (a deliberate cap on a
+        // Burns close enough to run together into one gouge: spaced by their own size,
+        // so the thin end stays joined too, the heat stacking where they overlap. At most 1200 of them (a deliberate cap on a
         // cosmetic: a long shot spaces them wider).
         let least = (length / 1200.0).max(0.8);
         let mut walked = 0.0;
@@ -399,14 +309,11 @@ impl Renderer {
             if ground < water || close <= 0.0 {
                 continue;
             }
-            let seed = self.bore_fx.bump();
-            let wobble = 0.75 + (seed % 97) as f32 / 97.0 * 0.5;
             let rise = heat_up(drop, at.z - ground);
-            self.bore_fx.push_molten(Molten {
+            self.ground_melt.burn(Burn {
                 pos: at.truncate(),
-                radius: radius * wobble,
+                radius,
                 peak: 0.45 + 0.55 * close,
-                seed,
                 start,
                 rise,
                 cool: cool * (0.35 + 0.65 * close),
@@ -703,7 +610,7 @@ impl Renderer {
         }
         let start = time + after * self.tick_seconds;
         let cool = SHELL_MELT_COOL * (radius / 20.0).clamp(0.8, 1.5);
-        self.bore_fx.melt(to.truncate(), radius, start, cool);
+        self.ground_melt.melt(to.truncate(), radius, start, cool);
     }
 
     /// The charge earthing: forks crawling out over the ground from the hit at `to`,
@@ -824,12 +731,5 @@ impl Renderer {
                 .write((i * size) as u64, bytemuck::bytes_of(&inst));
             self.projectile_count += 1;
         }
-    }
-}
-
-impl BoreFx {
-    fn bump(&mut self) -> u32 {
-        self.seed = self.seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
-        self.seed >> 8
     }
 }

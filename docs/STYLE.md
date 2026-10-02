@@ -518,10 +518,13 @@ and a report that holds and rolls back as thunder.
   the ground under it. Low channels melt the ground; a shot high over a valley
   leaves the floor alone. Every bore, including the Arbalest and compact AEBs,
   burns trees along the entire projected channel (4 m half-width minimum).
-- **The ground it runs over goes molten, then cools** (`bore.cool` seconds): a
-  pool that glows white-yellow when fresh, orange, then dull red, while a dark
-  glassy crust closes over it from the rim in, last glowing only in its
-  cracks. The charcoal scorch under it stays. The Arbalest leaves only a small
+- **The ground it runs over goes molten, then cools** (`bore.cool` seconds): the
+  ground holds heat per square metre (renderer/ground_melt.rs), so burns that
+  overlap run together into one surface and ground under steady fire heats past
+  what one hit gives it. Past the melt point it glows white-yellow, orange, then
+  dull red, darker skins drifting on it and joining up as it cools, the last
+  glow in a wandering web of veins (no plates, no polygon cracks). Where it
+  melted it is left black-green glass for the match, charcoal scorch round it. The Arbalest leaves only a small
   pool where it strikes. It melts as fast as the channel is low: a ground gun's
   track melts at once, while under a shot struck down from high up the ground
   takes seconds to heat, glowing up from the strike outward and slowest under

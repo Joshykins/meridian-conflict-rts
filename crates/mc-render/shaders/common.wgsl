@@ -403,7 +403,7 @@ fn grad_noise2(xy: vec2<f32>, cell: f32) -> f32 {
 }
 
 // ---- Molten rock and cooling cracks: blast craters' glassed pools (terrain.wgsl
-// craters_at), molten ground (ground.wgsl molten), rock and ice faces. ----
+// craters_at), molten ground (terrain.wgsl melt_shade), rock and ice faces. ----
 
 // Molten rock's glow at `t` (0 cold, 1 white-hot), in HDR: the brightness climbs
 // steeply with the heat, so a red crack is dim beside a yellow pool.
@@ -928,8 +928,8 @@ struct Shockwave {
     tint: vec4<f32>,
 }
 
-// A mark on the ground (the renderer's stains buffer): the sim's scorch marks,
-// wreck craters and molten ground, then the structures' lots (ground.wgsl draws
+// A mark on the ground (the renderer's stains buffer): the sim's scorch marks and
+// wreck craters, then the structures' lots (ground.wgsl draws
 // them; grass_gen.wgsl keeps grass off lots and chars it on scorches).
 // One clad 8 m cell of slope round a levelled lot (renderer/foundations.rs;
 // foundations.wgsl draws it, grass_gen.wgsl keeps grass off it).

@@ -352,6 +352,8 @@ impl Renderer {
         {
             let _t = mc_core::perf_span!("cpu.craters_lights");
             self.upload_craters(input.time, camera);
+            self.ground_melt.step(input.time);
+            self.ground_melt.upload();
             self.heat_haze
                 .upload(input.time, input.alpha.clamp(0.0, 1.0), camera);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
@@ -774,11 +776,7 @@ impl Renderer {
                         self.pipelines.stain,
                     );
                     let mut first = 0;
-                    for (count, kind) in self
-                        .stain_runs
-                        .into_iter()
-                        .zip(["scorch", "craters", "molten"])
-                    {
+                    for (count, kind) in self.stain_runs.into_iter().zip(["scorch", "craters"]) {
                         if count > 0 {
                             self.timers
                                 .crumb(cmd, || format!("stains: {kind} x{count}"));

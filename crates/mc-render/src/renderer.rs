@@ -59,6 +59,7 @@ pub(crate) mod grass;
 mod gravitic_fx;
 mod great_gun_fx;
 mod ground_contact;
+mod ground_melt;
 mod gtao;
 pub(crate) mod heat_haze;
 mod heavy_rail_fx;
@@ -854,6 +855,8 @@ pub struct Renderer {
     nuke_fx: nuke_fx::NukeFx,
     /// Craters big blasts leave in the ground (renderer/craters.rs, scene set 29).
     craters: craters::Craters,
+    /// Heat in the ground, molten then glass (renderer/ground_melt.rs, scene set 32).
+    ground_melt: ground_melt::GroundMelt,
     /// Hot air shimmering over running engines' exhausts (renderer/heat_haze.rs, screen set 8).
     heat_haze: heat_haze::HeatHaze,
     /// Red plasma under the bells of craft on gravity lift (renderer/lift_fx.rs).
@@ -936,9 +939,9 @@ pub struct Renderer {
     stake_fx: stake_fx::StakeFx,
     projectile_count: u32,
     /// Ground stains in the buffer, in the order written: the sim's scorch, blast craters
-    /// (impact_craters.rs), molten ground (bore_fx.rs). Drawn a run at a time, so a lost
+    /// (impact_craters.rs). Drawn a run at a time, so a lost
     /// device's breadcrumbs say which kind was on the GPU.
-    stain_runs: [u32; 3],
+    stain_runs: [u32; 2],
     pad_count: u32,
     /// Ore fields as ground splats, written after stains and pads: every
     /// field's corners first, then the tiles that cover the fields.
@@ -1901,7 +1904,7 @@ impl Renderer {
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: 120,
+                descriptor_count: 124,
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::SAMPLED_IMAGE,
@@ -2154,6 +2157,13 @@ impl Renderer {
             vk::DescriptorType::STORAGE_BUFFER,
             &[craters.buffer()],
         );
+        let ground_melt = ground_melt::GroundMelt::new(&gpu)?;
+        write_buffers(
+            scene_set,
+            32,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[ground_melt.buffer()],
+        );
         write_buffers(
             scene_set,
             25,
@@ -2371,6 +2381,7 @@ impl Renderer {
             great_gun: great_gun_fx::GreatGunFx::default(),
             nuke_fx: nuke_fx::NukeFx::default(),
             craters,
+            ground_melt,
             heat_haze,
             lift_fx: lift_fx::LiftFx::new(lift_models),
             reactor_fx: reactor_fx::ReactorFx::new(discharge_models, plant_vents),
@@ -2453,7 +2464,7 @@ impl Renderer {
             titan_charge: titan_charge::TitanCharge::new(coil_models),
             stake_fx: stake_fx::StakeFx::new(stake_scales),
             projectile_count: 0,
-            stain_runs: [0; 3],
+            stain_runs: [0; 2],
             pad_count: 0,
             deposit_splats,
             ore_corners,
@@ -3137,6 +3148,7 @@ impl Renderer {
             self.plasma_fx.clear();
             self.nuke_fx.clear();
             self.craters.clear();
+            self.ground_melt.clear();
         }
         self.impact_craters.land(time);
         let craters = self.impact_craters.craters();
@@ -3148,21 +3160,8 @@ impl Renderer {
             );
         }
         let crater_count = craters.len();
-        // Molten ground left by electric bores (bore_fx.rs), cooling frame by frame.
-        let molten = self.bore_fx.molten_stains(time);
-        let molten = &molten[..molten.len().min(MAX_STAINS - stains.len() - crater_count)];
-        if !molten.is_empty() {
-            self.stains.write(
-                ((stains.len() + crater_count) * size_of::<StainInstance>()) as u64,
-                bytemuck::cast_slice(molten),
-            );
-        }
-        let stained = stains.len() + crater_count + molten.len();
-        self.stain_runs = [
-            stains.len() as u32,
-            crater_count as u32,
-            molten.len() as u32,
-        ];
+        let stained = stains.len() + crater_count;
+        self.stain_runs = [stains.len() as u32, crater_count as u32];
         let pads = self.structure_pads(units, &frame.pads, MAX_STAINS.saturating_sub(stained));
         if !pads.is_empty() {
             self.stains.write(
@@ -5523,6 +5522,7 @@ impl Drop for Renderer {
         self.foundations.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
+        self.ground_melt.destroy(&self.gpu);
         self.heat_haze.destroy(&self.gpu);
         self.cull.destroy(&self.gpu);
         self.pipelines.destroy(&self.gpu);

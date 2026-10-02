@@ -389,7 +389,7 @@ impl Renderer {
             }
         }
         if ground {
-            self.bore_fx.melt(at.truncate(), s * 0.45, go, 3.0);
+            self.ground_melt.melt(at.truncate(), s * 0.45, go, 3.0);
         }
         self.plasma_fx.seekers.light(Glow {
             pos: at + Vec3::Z,

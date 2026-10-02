@@ -212,7 +212,7 @@ impl Renderer {
             h.glassed = Some(at.truncate());
         }
         if glass {
-            self.bore_fx
+            self.ground_melt
                 .melt(at.truncate(), width * 2.2, time, GLASS_COOL);
             self.push_puff(
                 PUFF_TREE_SMOKE,
@@ -342,7 +342,7 @@ impl Renderer {
             self.push_puff(PUFF_SPARK, at, spray * speed, start, 0.8, (0.3, 0.1));
         }
         if !on_unit {
-            self.bore_fx
+            self.ground_melt
                 .melt(at.truncate(), splash * 0.55, start, GLASS_COOL);
         }
     }

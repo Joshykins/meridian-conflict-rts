@@ -84,7 +84,8 @@ impl Renderer {
             );
         }
         if ground {
-            self.bore_fx.melt(at.truncate(), 0.7 * impact, start, 2.5);
+            self.ground_melt
+                .melt(at.truncate(), 0.7 * impact, start, 2.5);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at + Vec3::Z,
@@ -160,7 +161,7 @@ impl Renderer {
             );
         }
         if ground {
-            self.bore_fx.melt(at.truncate(), 0.25 * s, start, 2.5);
+            self.ground_melt.melt(at.truncate(), 0.25 * s, start, 2.5);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at,
@@ -359,7 +360,7 @@ impl Renderer {
         if ground {
             // The ground seared: a glassed scorch that glows red and crusts over, embers
             // rising off it a while.
-            self.bore_fx.melt(at.truncate(), s * 0.5, start, 12.0);
+            self.ground_melt.melt(at.truncate(), s * 0.5, start, 12.0);
             for _ in 0..20 {
                 let a = self.scatter.unit() * std::f32::consts::TAU;
                 let r = s * 0.45 * self.scatter.unit().sqrt();
@@ -583,7 +584,8 @@ impl Renderer {
         }
         self.fusion_spray(at, s, start);
         if ground {
-            self.bore_fx.melt(at.truncate(), pool * 0.65, start, 18.0);
+            self.ground_melt
+                .melt(at.truncate(), pool * 0.65, start, 18.0);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at + Vec3::Z * 6.0,

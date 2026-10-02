@@ -436,6 +436,89 @@ fn craters_at(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
     return s;
 }
 
+// ---- Melted ground (renderer/ground_melt.rs) ----------------------------------------
+// The melt field shaded over whatever ground it lies on: a heat, glass and scorch per
+// square metre, so overlapping burns run together as one surface. Scorch blackens the
+// ground; past the melt point it is molten, white-yellow, then orange, with darker skins
+// drifting on it that thicken and join as it cools; then it is black-green glass, its
+// glow lingering longest in a wandering web of veins, and the glass stays. The field is
+// read a metre or two off true so its square cells never show, and every detail that
+// would shrink under a pixel is swapped for its average.
+
+fn melt_shade(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: f32) -> CraterShade {
+    var s: CraterShade;
+    s.albedo = albedo_in;
+    s.rough = rough_in;
+    s.slope = vec2<f32>(0.0);
+    s.fused = 0.0;
+    s.glow = vec3<f32>(0.0);
+    s.sky = 1.0;
+    s.metal = 0.0;
+    let warp = vec2<f32>(grad_noise2(xy, 3.1), grad_noise2(xy + vec2<f32>(41.3, -17.9), 3.1)) - 0.5;
+    let m = melt_sample(xy + warp * 1.8);
+    if m.x + m.y + m.z < 0.004 {
+        return s;
+    }
+    let heat = m.x;
+    let dry = smoothstep(-0.6, 0.4, alt);
+    let fine_aa = smoothstep(0.12, 0.45, px);
+    let fine = mix(grad_noise2(xy + warp * 2.0, 0.7), 0.5, fine_aa);
+    let broad = grad_noise2(xy - warp * 3.0, 2.4);
+    let lum = dot(albedo_in, vec3<f32>(0.2126, 0.7152, 0.0722));
+    // The ground's own light and dark carries on through the burn.
+    let grain = clamp(sqrt(lum / 0.06), 0.75, 1.3);
+
+    // Scorch: charcoal, ragged and patchy along its edge.
+    let burnt = smoothstep(0.1, 0.55, m.z + (broad - 0.5) * 0.5 + (fine - 0.5) * 0.2);
+    var a = mix(albedo_in, vec3<f32>(0.014, 0.012, 0.011) * grain, burnt * 0.92);
+    var rough = mix(rough_in, 0.95, burnt);
+
+    // Glass where it melted, its edge fraying where the melt ran thin; glossy, rolling
+    // in low swells so the sun glints off it in broken patches.
+    let glass = smoothstep(0.3, 0.55, m.y + (broad - 0.5) * 0.3 + (fine - 0.5) * 0.25);
+    if glass > 0.002 {
+        let swell = grad_noise2_d(xy + warp * 4.0, 2.2).yz * 2.2
+            + grad_noise2_d(xy - warp * 2.0, 0.8).yz * 0.8 * (1.0 - fine_aa);
+        s.slope = swell * 0.06 * glass;
+        let glass_rgb = mix(vec3<f32>(0.009, 0.013, 0.011), vec3<f32>(0.013, 0.022, 0.017), broad);
+        a = mix(a, glass_rgb, glass);
+        rough = mix(rough, 0.32 + 0.14 * fine, glass);
+        s.fused = glass;
+        s.sky = 1.0 - 0.45 * glass;
+        s.metal = 0.85 * glass;
+    }
+
+    if heat > 0.004 {
+        let time = globals.camera.w;
+        let liquid = smoothstep(MELT_FIELD_MELT - 0.04, MELT_FIELD_MELT + 0.12, heat);
+        // 0 white-hot, 1 at the melt point.
+        let cooling = clamp((1.0 - heat) / (1.0 - MELT_FIELD_MELT), 0.0, 1.0);
+        // Skins drifting slowly on the melt, more of them and joining up as it cools.
+        let drift = vec2<f32>(time * 0.11, time * -0.07);
+        let raft = grad_noise2(xy + warp * 3.0 + drift, 1.6) * 0.65
+            + mix(grad_noise2(xy - drift * 1.6 + vec2<f32>(9.1, 3.7), 0.6), 0.5, fine_aa) * 0.35;
+        let skin = smoothstep(0.78 - 0.5 * cooling, 0.9 - 0.42 * cooling, raft) * liquid;
+        // Veins: a web of thin lines wandering through the skins and, once it has set,
+        // the glass. Ridged noise, so no two meshes alike and no straight edges.
+        let ridge = 1.0 - abs(grad_noise2(xy + warp * 2.5, 1.9) * 2.0 - 1.0);
+        let width = 0.07 + 0.06 * heat;
+        let soft = max(width * 0.5, px / 1.9);
+        let line = smoothstep(1.0 - width - soft, 1.0 - width * 0.3, ridge);
+        let vein = mix(line, width * 1.6, smoothstep(0.35, 0.9, px / 1.9));
+        var glow = crater_heat_rgb(heat * (1.0 - 0.6 * skin)) * liquid;
+        glow += crater_heat_rgb(heat * 0.85) * vein * skin;
+        // Set but still hot: dull red going out, the veins last.
+        glow += crater_heat_rgb(heat * 0.8) * (0.2 + 0.8 * vein) * (1.0 - liquid);
+        a = mix(a, vec3<f32>(0.012, 0.011, 0.01), liquid);
+        rough = mix(rough, mix(0.4, 0.75, skin), liquid);
+        // A touch dimmer than a blast's glassed pool (craters_at): these are many.
+        s.glow = glow * 0.6 * dry;
+    }
+    s.albedo = a;
+    s.rough = rough;
+    return s;
+}
+
 // ---- Glacier ice -------------------------------------------------------------------
 
 struct IceShade {
@@ -1126,6 +1209,16 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         crater_sky = cs.sky;
         crater_metal = cs.metal;
         n = normalize(mix(n, base_n, cs.fused * 0.9) - vec3<f32>(cs.slope, 0.0));
+    }
+    // Ground melted and glassed (renderer/ground_melt.rs).
+    if ground_melt[0] != 0u {
+        let ms = melt_shade(xy, alt, albedo, rough, px);
+        albedo = ms.albedo;
+        rough = ms.rough;
+        crater_glow += ms.glow;
+        crater_sky = min(crater_sky, ms.sky);
+        crater_metal = max(crater_metal, ms.metal);
+        n = normalize(mix(n, base_n, ms.fused * 0.9) - vec3<f32>(ms.slope, 0.0));
     }
 
     // The breakers' wash running up the beach and draining back (shore.wgsl):

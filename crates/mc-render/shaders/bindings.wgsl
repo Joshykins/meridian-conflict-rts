@@ -770,6 +770,71 @@ struct CraterList {
 }
 @group(0) @binding(29) var<storage, read> ground_craters: CraterList;
 
+// Heat in the ground (renderer/ground_melt.rs): the layout is `MELT_FIELD_*`.
+@group(0) @binding(32) var<storage, read> ground_melt: array<u32>;
+
+// The slot (plus one) of the melt field's tile at `tile`, 0 if it has none. The
+// renderer's `first_entry` hashes the same way.
+fn melt_slot(tile: vec2<i32>) -> u32 {
+    let key = ((u32(tile.x) & 0xFFFFu) << 16u) | (u32(tile.y) & 0xFFFFu);
+    var e = (key * 0x9E3779B1u) >> (32u - MELT_FIELD_SLOT_BITS);
+    for (var i = 0u; i < MELT_FIELD_PROBES; i++) {
+        let at = MELT_FIELD_TABLE + e * 2u;
+        let slot = ground_melt[at + 1u];
+        if slot == 0u || ground_melt[at] == key {
+            return slot;
+        }
+        e = (e + 1u) & (MELT_FIELD_SLOTS - 1u);
+    }
+    return 0u;
+}
+
+// One cell of the melt field, given the slot (plus one) of its tile: x heat (1
+// white-hot), y glass, z scorch.
+fn melt_cell(slot: u32, local: vec2<i32>) -> vec3<f32> {
+    if slot == 0u {
+        return vec3<f32>(0.0);
+    }
+    let i = MELT_FIELD_ATLAS + (slot - 1u) * MELT_FIELD_TILE * MELT_FIELD_TILE
+        + u32(local.y) * MELT_FIELD_TILE + u32(local.x);
+    let v = unpack4x8unorm(ground_melt[i]).xyz;
+    return vec3<f32>(v.x * MELT_FIELD_HEAT_MAX, v.y, v.z);
+}
+
+// The melt field at `xy`, blended between the four nearest cells: x heat, y glass,
+// z scorch. Zero wherever nothing has heated the ground.
+fn melt_sample(xy: vec2<f32>) -> vec3<f32> {
+    if ground_melt[0] == 0u {
+        return vec3<f32>(0.0);
+    }
+    let p = xy / MELT_FIELD_CELL - 0.5;
+    let c = vec2<i32>(floor(p));
+    let f = p - floor(p);
+    let size = i32(MELT_FIELD_TILE);
+    let t0 = vec2<i32>(floor(vec2<f32>(c) / f32(size)));
+    let t1 = vec2<i32>(floor(vec2<f32>(c + 1) / f32(size)));
+    var v = array<vec3<f32>, 4>();
+    if all(t0 == t1) {
+        // All four in one tile, the usual case: one lookup.
+        let slot = melt_slot(t0);
+        if slot == 0u {
+            return vec3<f32>(0.0);
+        }
+        let l = c - t0 * size;
+        v[0] = melt_cell(slot, l);
+        v[1] = melt_cell(slot, l + vec2<i32>(1, 0));
+        v[2] = melt_cell(slot, l + vec2<i32>(0, 1));
+        v[3] = melt_cell(slot, l + vec2<i32>(1, 1));
+    } else {
+        for (var k = 0; k < 4; k++) {
+            let cell = c + vec2<i32>(k & 1, k >> 1u);
+            let tile = vec2<i32>(floor(vec2<f32>(cell) / f32(size)));
+            v[k] = melt_cell(melt_slot(tile), cell - tile * size);
+        }
+    }
+    return mix(mix(v[0], v[1], f.x), mix(v[2], v[3], f.x), f.y);
+}
+
 // ---------------------------------------------------------------- under the sea
 
 // Light lost per metre of the water, red first (water.wgsl `water_optics`): clear

@@ -689,7 +689,7 @@ impl Renderer {
             }
             if self.scatter.unit() < 0.12 {
                 let size = 10.0 + self.scatter.unit() * 14.0;
-                self.bore_fx.melt(ground.truncate(), size, now, 90.0);
+                self.ground_melt.melt(ground.truncate(), size, now, 90.0);
             }
             if self.scatter.unit() < 0.5 {
                 let rise = Vec3::Z * (10.0 + self.scatter.unit() * 10.0);
