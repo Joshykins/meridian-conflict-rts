@@ -39,6 +39,46 @@ fn roles_come_from_what_a_unit_can_do() {
     assert_eq!(sub.domain, Some(Domain::Sub));
 }
 
+/// The Regency's tech 2 aircraft take the same places in the plans as ARC's: the Pilum
+/// hunts aircraft, the Trident ships under and on the water, the Voulge strikes the
+/// ground, the Winnow salvages, and Skyforge II builds each of them.
+#[test]
+fn regency_tech_2_aircraft_take_arc_places() {
+    let b = roster();
+    let has = |key: &str, r: u32| profile(&b, key).has(r);
+    for (regency, arc, r) in [
+        (
+            "regency_t2_interceptor",
+            "aster_t2_interceptor",
+            role::ANTI_AIR,
+        ),
+        (
+            "regency_t2_torpedo_bomber",
+            "aster_t2_torpedo_bomber",
+            role::HUNTER | role::ANTI_SHIP,
+        ),
+        ("regency_t2_strike_drone", "aster_t1_bomber", role::STRIKE),
+    ] {
+        assert!(has(arc, r), "{arc}");
+        assert!(has(regency, r), "{regency}");
+    }
+    let winnow = b.unit(b.id_of("regency_t2_reclaim_carrier").unwrap());
+    assert!(winnow.is_salvager(), "the Winnow salvages");
+    let skyforge = b.unit(b.id_of("regency_t2_air_factory").unwrap());
+    let builds = &skyforge.builder.as_ref().unwrap().builds;
+    for key in [
+        "regency_t2_interceptor",
+        "regency_t2_strike_drone",
+        "regency_t2_torpedo_bomber",
+        "regency_t2_reclaim_carrier",
+    ] {
+        assert!(
+            builds.contains(&b.id_of(key).unwrap()),
+            "Skyforge II builds {key}"
+        );
+    }
+}
+
 /// Every armed unit any race can field has a place in the Commander's plans: it
 /// fights on the ground, in the air, at sea, under it, or shells from afar. A unit
 /// that fits none would never be built. Run with `--nocapture` for the whole table.

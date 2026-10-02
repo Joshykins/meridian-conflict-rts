@@ -211,6 +211,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Battleship, carrier, assault submarine | Flamberge, Mantlet, Rapier |
 | Air scout, fighter, bomber (T1) | Flechette, Quarrel, Petard |
 | Light transport, salvage drone (T1) | Coffer, Sickle |
+| Interceptor, strike drone, torpedo bomber, reclaim carrier (T2) | Pilum, Voulge, Trident, Winnow |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
 | Storage | Reliquary |

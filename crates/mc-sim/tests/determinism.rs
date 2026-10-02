@@ -115,6 +115,9 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     // walking its beam across it (`Motion::hangs`, `Weapon::walk`).
     ("regency_t2_drone_carrier", 2, 900, 2900),
     ("regency_t3_assault_aircraft", 1, 1000, 450),
+    // Regency strike drones: they circle what they fight near their reach instead of making
+    // runs over it (`stand_off.rs`).
+    ("regency_t2_strike_drone", 2, 1300, 350),
 ];
 
 fn setup(w: &mut World) {

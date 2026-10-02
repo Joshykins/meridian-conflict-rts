@@ -491,3 +491,33 @@ four are built by the Skyforge III.
   - `reclaimer: (..., follows_army: true)` marks it for the AI (`ai/escorts.rs`): it is
     not a field salvager; each ground operation of 2000 mass or more (two at most) gets
     one, put on guard round the operation's lead unit.
+
+## The Regency's air force: tech 2 (2026-10-02)
+
+Data `data/factions/regency/units/air_t2.ron`, models `crates/mc-models/src/regency/air_t2/`
+(one file per airframe on the shared jet kit `jet.rs`), tests
+`crates/mc-sim/tests/regency_air_t2.rs`. Skyforge II and III build all four; the Regency have
+no fire bomber.
+
+| Unit (key) | Job | ARC counterpart | How it differs |
+| --- | --- | --- | --- |
+| Pilum (`regency_t2_interceptor`) | Interceptor: Gravitic Seeker Battery, aircraft only | Peregrine | At par; a crescent wing falling into spikes, two seeker cradles under the chin |
+| Voulge (`regency_t2_strike_drone`) | Long-range strike drone: Gravitic Seeker Pod, 900 m, ground and ships | none | Slow (70 m/s) and thin-skinned (650); circles its mark out of reach of short-range anti-air; fighters are its answer. A sawtooth flying wing, four seeker cages on its back |
+| Trident (`regency_t2_torpedo_bomber`) | Torpedo bomber with sonar: Gravitic Torpedo Cradles | Gannet | At par; twin booms, a cradle under each |
+| Winnow (`regency_t2_reclaim_carrier`) | Reclaim carrier on lift bells: four nanite heads, each on a wreck of its own | Osprey | No drones to build or lose: the Osprey's 20 power in four heads, 500 m reach to the drones' 800. A manta wing |
+
+**Standing off.** A jet with `motion.stand_off: true` (only the Voulge) never makes a run over
+what it fights: attacking a unit or the ground (`air_fight`, `run_attack_ground`), it flies a
+circle round the mark at 17/20 of its reach, steering for a point 40 degrees ahead of itself on
+the circle (`mc-sim/src/stand_off.rs`). Its seekers launch upward and turn onto the mark, so it
+fires from anywhere on the circle. At 900 m reach that keeps it out of every ARC mobile gun
+(360-640 m). Tests: `cargo test -p mc-sim --test sim -- regency_air_t2::`; it is in the
+determinism match.
+
+**The Winnow's cloud** is the reclaim heads' own work (`reclaim_heads.rs`): left alone, each head
+takes the wreck nearest its aim, so four strands of nanites run to four wrecks at once
+(beams.wgsl `BEAM_NANITE_RECLAIM`). The Commander's salvage plan fields it like any salvager.
+
+**Contrails.** A jet trails from its mesh's nozzles in `aircraft_exhausts`, or else from the
+exhausts its model records (`MeshBuilder::add_exhaust`); every Regency jet uses the latter
+(`models::tests::every_jet_has_exhaust_ports`). Sounds are still ARC stand-ins.

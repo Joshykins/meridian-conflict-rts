@@ -471,6 +471,10 @@ pub(crate) struct RawMotion {
     /// across the map (`World::slant_reaches`). Air only.
     #[serde(default)]
     pub above_weather: bool,
+    /// A jet that fights from a circle near the reach of its guns (the Voulge) rather than
+    /// making runs over its mark. Air, not hover, only.
+    #[serde(default)]
+    pub stand_off: bool,
 }
 
 /// The hull shots strike (`Body`): metres forward and aft of the origin along the
@@ -1367,6 +1371,11 @@ impl Unit {
                         "{key}: only a hover aircraft hangs over its mark"
                     )));
                 }
+                if m.stand_off && (m.layer != MoveLayer::Air || m.hover) {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: only a jet (air, not hover) stands off"
+                    )));
+                }
                 if self.stomp.is_some() && !m.stride {
                     return Err(DataError::Invalid(format!(
                         "{key}: a stomp needs a striding walker"
@@ -1396,6 +1405,7 @@ impl Unit {
                     stride: m.stride,
                     hangs: m.hangs,
                     above_weather: m.above_weather,
+                    stand_off: m.stand_off,
                 })
             }
             None => None,

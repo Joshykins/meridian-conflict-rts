@@ -53,12 +53,12 @@
         cost: (mass: 200, energy: 6400, time: 1200),
         radius: 7.5, height: 2.2,
         vision: 900,
-        motion: (layer: Air, size: 0, speed: 70, accel: 26, turn: 50, altitude: 220, hover: false),
+        motion: (layer: Air, size: 0, speed: 70, accel: 26, turn: 50, altitude: 220, hover: false, stand_off: true),
         weapons: [(
             name: "Gravitic Seeker Pod",
             // Four seekers a salvo every 6 s: 120 a second on what it reaches.
             damage: 180, splash: 6, range: 900, reload: 6, speed: 240, trajectory: Direct,
-            salvo: 4, salvo_delay: 0.35, turret_turn: 0, arc: 360,
+            salvo: 4, salvo_delay: 0.35, turret_turn: 240, arc: 360,
             muzzle: (-0.9, 0.55, 1.95),
             muzzles: [(-0.9, 0.55, 1.95), (-0.9, -0.55, 1.95), (-2.0, 0.55, 1.85), (-2.0, -0.55, 1.85)],
             targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,

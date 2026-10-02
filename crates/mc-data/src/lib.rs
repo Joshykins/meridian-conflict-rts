@@ -193,6 +193,8 @@ pub struct Motion {
     /// Cruises above the weather: reached only along the line of sight
     /// (`RawMotion::above_weather`).
     pub above_weather: bool,
+    /// Fights from a circle near its reach instead of making runs (`RawMotion::stand_off`).
+    pub stand_off: bool,
 }
 
 /// A giant walker's crushing footfall (`RawStomp`).
@@ -1296,7 +1298,9 @@ impl Blueprints {
                     h.write_u64(m.deploy_ticks as u64);
                     h.write_u64(m.broadside.0 as u64);
                     h.write_u64(m.aim_arc as u64);
-                    h.write_u64(m.stride as u64 | (m.hangs as u64) << 1);
+                    h.write_u64(
+                        m.stride as u64 | (m.hangs as u64) << 1 | (m.stand_off as u64) << 2,
+                    );
                     h.write_u64(m.above_weather as u64);
                 }
                 None => h.write_u64(0),

@@ -1790,6 +1790,8 @@ impl World {
             self.capital_engage(row, target)
         } else if self.bp(row).motion.is_some_and(|m| m.hover) {
             self.air_hover_standoff(row, self.state.units.pos[target])
+        } else if self.bp(row).motion.is_some_and(|m| m.stand_off) {
+            self.air_stand_off(row, self.state.units.pos[target])
         } else if self.bp(row).has(cat::ANTI_AIR) {
             self.air_dogfight(row, target)
         } else {
@@ -2325,6 +2327,9 @@ impl World {
             }
             if self.bp(row).motion.is_some_and(|m| m.hover) {
                 return self.air_hover_standoff(row, o.pos);
+            }
+            if self.bp(row).motion.is_some_and(|m| m.stand_off) {
+                return self.air_stand_off(row, o.pos);
             }
             // Bombarding: each run goes at its own point in the circle, picked
             // once the last run's bombs are away.
