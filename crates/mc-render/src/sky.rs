@@ -121,6 +121,9 @@ pub(crate) struct Atmosphere {
     /// The sunlight the sky dome is lit by (`sun_for_sky`): less reddened than
     /// `sun_color`, which is what reaches the ground.
     pub(crate) sky_sun: [f32; 4],
+    /// Low cloud banks in the hollows (clouds.wgsl `mist_at`): x how thick
+    /// (`mist_amount`), y how deep a bank lies over the smoothed land, metres.
+    pub(crate) mist: [f32; 4],
 }
 
 /// A storm as clouds_sim.wgsl reads it.
@@ -145,7 +148,7 @@ const _: () = assert!(
             + MAX_VORTICES * 32
             + crate::gpu_consts::regions::MAX as usize * 32
             + crate::gpu_consts::regions::WALL_SEGMENTS as usize * 32
-            + 32
+            + 48
 );
 
 /// Something stirring the weather this frame. Mirrors clouds_sim.wgsl.
@@ -213,6 +216,17 @@ const LOW_SUN_REDDEN: f32 = 1.0;
 /// so dawn and dusk stay readable without washing the low light out to white.
 const LOW_SUN_LIFT: f32 = 0.2;
 const LOW_SKY_LIFT: f32 = 0.3;
+
+/// How deep the mist lies over the smoothed land (`cloud_floor`), metres: a
+/// hollow below it fills deeper, a rise above it stands out.
+const MIST_DEPTH: f32 = 55.0;
+
+/// How thick the low cloud banks are at `hour` in weather `mist`: thickest from
+/// dusk through the night to dawn, burning off as the sun climbs.
+fn mist_amount(mist: f32, hour: f32) -> f32 {
+    let low = 1.0 - smoothstep(0.2, 0.7, sun_at_hour(hour).z);
+    mist * (0.15 + 0.85 * low)
+}
 
 /// `sky_radiance` from bindings.wgsl without the multiple-scattering fill.
 fn sky_single(d: Vec3, sun: Vec3, sun_rgb: Vec3) -> Vec3 {
@@ -1504,6 +1518,12 @@ impl Sky {
         // moonlight is day-for-night, too strong to light a believable night sky.
         atmos.sun_color = light.sun.extend(1.0 - 0.96 * dark).to_array();
         atmos.sky_sun = light.sky_sun.extend(0.0).to_array();
+        atmos.mist = [
+            mist_amount(self.weather.mist, self.hour),
+            MIST_DEPTH,
+            0.0,
+            0.0,
+        ];
         // w: brightness of the disk (the sun's, or a dimmer moon's).
         atmos.sky_color = light.sky.extend(24.0 - 16.0 * dark).to_array();
         // w: how dark it is, for the stars.

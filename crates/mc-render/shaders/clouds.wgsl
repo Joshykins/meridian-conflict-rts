@@ -2,8 +2,9 @@
 // The sky and its clouds (sky.rs).
 //
 //   fs_sky        end of the scene pass: the sky and sun wherever nothing was drawn
-//   fs_march      half size: rays through the cloud layer, stopped by the scene's
-//                 depth. rgb light scattered toward the eye, a what gets through
+//   fs_march      half size: rays through the cloud layer and the mist banks
+//                 under it, stopped by the scene's depth. rgb light scattered
+//                 toward the eye, a what gets through
 //   fs_resolve    the march folded into last frame's clouds, carried to where
 //                 they are now on screen: a new start offset every frame averages
 //                 out instead of shimmering or showing its pattern
@@ -504,6 +505,7 @@ fn fs_march(in: FullOut) -> @location(0) vec4<u32> {
     march_depth = 0.0;
     march_reach = 1.0e9;
     var c = march(in);
+    c = with_mist(c, in);
     // A NaN or inf let through here is carried by the resolve into its
     // neighbours every frame, until the screen is white: a bad texel is clear sky.
     if !finite4(c) || !finite4(vec4<f32>(march_depth)) {
@@ -523,6 +525,150 @@ fn finite4(v: vec4<f32>) -> bool {
 fn march_texel(px: vec2<i32>) -> vec4<f32> {
     let v = textureLoad(cloud_march, px, 0);
     return vec4<f32>(unpack2x16float(v.x), unpack2x16float(v.y));
+}
+
+// ---- Mist ----------------------------------------------------------------------
+// Low cloud banks (sky.rs `mist_amount`): mist lying in the hollows and over the
+// water, deepest where the land dips below its surroundings (the smoothed
+// `cloud_floor`), so a valley fills while the ridges either side stand out of it.
+// Torn into banks by the billow texture drifting slowly on the wind, thickest
+// from dusk to dawn. Thin: looking down from the strategic view through its few
+// tens of metres the battle shows through it; a low eye looking along it sees banks.
+
+// Extinction in the thickest bank, per metre.
+const MIST_SIGMA: f32 = 0.003;
+// Size of the banks: the billow texture's repeat, metres.
+const MIST_PERIOD: f32 = 2300.0;
+// How much deeper than `atmos.mist.y` a hollow's mist may pool, metres.
+const MIST_POOL: f32 = 90.0;
+// Steps along a ray through the mist's slab, at most.
+const MIST_STEPS: i32 = 40;
+
+// The mist's extinction at `p`, per metre.
+fn mist_at(p: vec3<f32>) -> f32 {
+    let amount = atmos.mist.x;
+    let land = cloud_floor(p.xy);
+    // Above the highest a bank can stand here: nothing more to look up.
+    if p.z >= max(land, globals.map.z) + atmos.mist.y * 1.5 {
+        return 0.0;
+    }
+    // A hollow fills to the land round it, but no deeper than this over its floor:
+    // a narrow gorge under a high smoothed floor is not hundreds of metres of fog.
+    let floor = min(max(land, globals.map.z), max(terrain_height(p.xy), globals.map.z) + MIST_POOL);
+    let q = p.xy - atmos.wind.xy * 0.35;
+    let n = textureSampleLevel(cloud_noise, repeat_sampler, vec3<f32>(turn(q, TURN_OCTAVE) / MIST_PERIOD, 0.37 + p.z / 900.0), 0.0);
+    let bank = n.x * 0.75 + n.y * 0.25;
+    // The bank's top rides up and down with it, so the banks are lumpy on top.
+    let inside = floor + atmos.mist.y * (0.5 + bank) - p.z;
+    if inside <= 0.0 {
+        return 0.0;
+    }
+    // Banks with clear air between them: at the thickest a bank covers a third or
+    // so of the low ground, not all of it.
+    let dens = clamp((bank - (1.0 - 0.6 * amount)) / 0.25, 0.0, 1.0);
+    // Over open sea, away from the land, it lies thinner, or the sea reads as fog.
+    let sea = 1.0 - 0.6 * smoothstep(0.0, 20.0, globals.map.z - land);
+    // Desert air is too dry for it.
+    let dry = climate_within(p.xy, REGIONS_SKY_BLEND_M).y;
+    // Soft on top, thickest low down.
+    return dens * sea * smoothstep(0.0, 30.0, inside) * (1.0 - dry) * MIST_SIGMA;
+}
+
+struct Mist {
+    light: vec3<f32>,
+    through: f32,
+    // How far along the ray the mist the march saw lies (0 for none).
+    depth: f32,
+}
+
+// The mist along the ray from `eye`, as far as `t_scene`.
+fn mist_march(eye: vec3<f32>, rd: vec3<f32>, t_scene: f32, jitter: f32) -> Mist {
+    var out: Mist;
+    out.through = 1.0;
+    if atmos.mist.x <= 0.01 {
+        return out;
+    }
+    // The slab the banks can lie in: from the sea or the lowest land to the
+    // deepest a bank can stand over the highest of the cloud floor.
+    let z0 = min(globals.map.z, atmos.frame.w) - 2.0;
+    let z1 = max(globals.map.z, atmos.shape.w) + atmos.mist.y * 1.5;
+    var t0 = 0.0;
+    var t1 = t_scene;
+    if abs(rd.z) > 1e-5 {
+        let a = (z0 - eye.z) / rd.z;
+        let b = (z1 - eye.z) / rd.z;
+        t0 = max(min(a, b), 0.0);
+        t1 = min(max(a, b), t1);
+    } else if eye.z > z1 || eye.z < z0 {
+        return out;
+    }
+    // Banks further off than this are the haze's.
+    t1 = min(t1, t0 + 12000.0);
+    if t1 <= t0 {
+        return out;
+    }
+    let steps = clamp((t1 - t0) / 40.0, 6.0, f32(MIST_STEPS));
+    let dt = (t1 - t0) / steps;
+    let sun = globals.sun.xyz;
+    let mu = dot(rd, sun);
+    // Light scattered many times in it: white, lit as the land under it is, by
+    // the sun on its top and the sky. Then a glow looking toward the sun.
+    let sun_light = atmos.sun_color.rgb * atmos.sun_color.w;
+    let diffuse = (sun_light * max(sun.z, 0.0) / PI + atmos.sky_color.rgb) * 0.9;
+    let glow = sun_light * phase_hg(mu, 0.6) * 1.5;
+    var t = t0 + dt * jitter;
+    var light = vec3<f32>(0.0);
+    var through = 1.0;
+    var depth_sum = 0.0;
+    var weight_sum = 0.0;
+    for (var i = 0; i < MIST_STEPS; i++) {
+        if t >= t1 || through < 0.02 {
+            break;
+        }
+        let p = eye + rd * t;
+        // Where the player looks through, thinned like the clouds.
+        let sigma = mist_at(p) * mix(0.15, 1.0, clearing(p));
+        if sigma > 0.0 {
+            // The sun's share is shaded by the clouds above.
+            let shade = cloud_shadow(p);
+            let lit = diffuse * mix(0.6, 1.0, shade) + glow * shade;
+            let absorb = exp(-sigma * dt);
+            let w = through * (1.0 - absorb);
+            light += lit * w;
+            depth_sum += t * w;
+            weight_sum += w;
+            through *= absorb;
+        }
+        t += dt;
+    }
+    if weight_sum > 0.0 {
+        out.depth = depth_sum / weight_sum;
+        let covered = 1.0 - through;
+        light = apply_haze(light / max(covered, 1e-3), eye + rd * out.depth, eye) * covered;
+    }
+    out.light = light;
+    out.through = through;
+    return out;
+}
+
+// The march's clouds `cloud` with the mist laid in front of or behind them,
+// whichever the ray meets first; `march_depth` becomes the two's mean depth.
+fn with_mist(cloud: vec4<f32>, in: FullOut) -> vec4<f32> {
+    let eye = globals.camera.xyz;
+    let m = mist_march(eye, view_ray(in.uv), march_reach, ign(in.clip.xy + vec2<f32>(17.0, 31.0)));
+    if m.through >= 1.0 {
+        return cloud;
+    }
+    var out: vec4<f32>;
+    if march_depth <= 0.0 || m.depth < march_depth {
+        out = vec4<f32>(m.light + m.through * cloud.rgb, m.through * cloud.a);
+    } else {
+        out = vec4<f32>(cloud.rgb + cloud.a * m.light, cloud.a * m.through);
+    }
+    let cw = 1.0 - cloud.a;
+    let mw = 1.0 - m.through;
+    march_depth = (march_depth * cw + m.depth * mw) / max(cw + mw, 1e-4);
+    return out;
 }
 
 // Nuclear fireballs light the cloud round them in their own colour: white-hot in the

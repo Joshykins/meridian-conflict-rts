@@ -105,6 +105,9 @@ pub struct Weather {
     pub wind: f32,
     /// Lightning, against the usual rate: 0 none.
     pub lightning: f32,
+    /// Banks of low cloud lying in the hollows and over the water, 0 none to 1
+    /// thick; most at dawn, dusk and night, burning off toward midday.
+    pub mist: f32,
 }
 
 impl Default for Weather {
@@ -124,6 +127,7 @@ impl From<WeatherPreset> for Weather {
                 scale: 0.8,
                 wind: 8.0,
                 lightning: 0.0,
+                mist: 0.6,
             },
             WeatherPreset::Fair => Weather {
                 cover: 1.2,
@@ -133,6 +137,7 @@ impl From<WeatherPreset> for Weather {
                 scale: 1.0,
                 wind: 12.0,
                 lightning: 1.0,
+                mist: 0.7,
             },
             WeatherPreset::Cloudy => Weather {
                 cover: 1.32,
@@ -142,6 +147,7 @@ impl From<WeatherPreset> for Weather {
                 scale: 1.5,
                 wind: 14.0,
                 lightning: 0.7,
+                mist: 0.5,
             },
             WeatherPreset::Stormy => Weather {
                 cover: 1.5,
@@ -151,6 +157,7 @@ impl From<WeatherPreset> for Weather {
                 scale: 1.5,
                 wind: 18.0,
                 lightning: 2.0,
+                mist: 0.15,
             },
             WeatherPreset::Overcast => Weather {
                 cover: 1.9,
@@ -160,6 +167,7 @@ impl From<WeatherPreset> for Weather {
                 scale: 2.2,
                 wind: 10.0,
                 lightning: 0.4,
+                mist: 0.4,
             },
         }
     }
@@ -223,6 +231,7 @@ pub struct WeatherTweaks {
     pub scale: Option<f32>,
     pub wind: Option<f32>,
     pub lightning: Option<f32>,
+    pub mist: Option<f32>,
 }
 
 impl WeatherTweaks {
@@ -240,6 +249,7 @@ impl WeatherTweaks {
         set(&mut w.scale, self.scale);
         set(&mut w.wind, self.wind);
         set(&mut w.lightning, self.lightning);
+        set(&mut w.mist, self.mist);
         w
     }
 }

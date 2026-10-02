@@ -640,6 +640,9 @@ struct Atmosphere {
     // The sunlight the sky dome is lit by: less reddened than `sun_color`, which
     // is what reaches the ground, so overhead stays blue at sunset.
     sky_sun: vec4<f32>,
+    // Low cloud banks in the hollows (clouds.wgsl `mist_at`): x how thick, 0 none,
+    // y how deep a bank lies over the smoothed land, metres.
+    mist: vec4<f32>,
 }
 
 // How much faster a wheeling storm's eye turns than its rim (sky.rs `VORTEX_SHEAR`).
