@@ -203,7 +203,9 @@ impl TimeOfDay {
             TimeOfDay::Morning => 9.0,
             TimeOfDay::Noon => 12.5,
             TimeOfDay::Afternoon => 15.3,
-            TimeOfDay::Dusk => 17.6,
+            // Golden hour: the sun some 14 degrees up. Later (17.6) it lit the
+            // land from 6 degrees and the scene went a murky green.
+            TimeOfDay::Dusk => 17.0,
             TimeOfDay::Night => 23.0,
         }
     }

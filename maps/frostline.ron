@@ -4,12 +4,13 @@
 // against the wall, snow in the air. The wall's line is the bake's
 // (`mc_map::landmark::FROSTLINE_WALL`; `tests/frostline.rs` holds the two
 // together), and so is the lift that lays the canyon's beds on this map's
-// lower country. Skirmish set-up can pick each region's weather, and the time
-// of day.
+// lower country. Played at dusk: the low sun gilds the red rock and the
+// wall's curtain, and mist lies in Alaska's hollows. Skirmish set-up can pick
+// each region's weather, and the time of day.
 (
     biome: Desert,
     style: Teams,
-    time: Afternoon,
+    time: Dusk,
     strata_lift: 50,
     regions: [
         (name: "Desert", climate: Desert, weather: Clear, tweaks: (rain: 0.0, wind: 9)),
