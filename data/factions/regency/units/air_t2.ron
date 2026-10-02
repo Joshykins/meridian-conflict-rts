@@ -12,7 +12,7 @@
 // counterpart in `data/factions/aster/units/air.ron`, named on each.
 [
     // The interceptor: a fast jet that runs fliers down with Gravitic Seekers, a charge
-    // held between two bronze tines along each flank until it is let go. At par with the
+    // held between two bronze tines either side under its chin until it is let go. At par with the
     // Peregrine: the same cost, speed and weight of fire.
     (
         key: "regency_t2_interceptor",
@@ -29,7 +29,7 @@
             name: "Gravitic Seeker Battery",
             damage: 130, proximity: 5, range: 310, reload: 1.3, speed: 420, trajectory: Direct,
             salvo: 2, salvo_delay: 0.2, turret_turn: 240, arc: 90,
-            muzzle: (1.7, 1.0, 0.7), muzzles: [(1.7, -1.0, 0.7), (1.7, 1.0, 0.7)],
+            muzzle: (2.6, 0.55, 0.42), muzzles: [(2.6, -0.55, 0.42), (2.6, 0.55, 0.42)],
             targets: ["Air"], color: Orange, red: 1.0, missile: true, guided: true, intercept: 50,
             plasma_grade: Some(Gravitic),
             sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
@@ -70,7 +70,7 @@
         sounds: (death: "blast_small", moving: "aster_jet"),
     ),
     // The torpedo bomber: down to the wave tops on its run and lets two Gravitic Torpedoes
-    // go from cradles under its prongs; they fall in and steer onto the hull its sonar
+    // go from cradles under its twin booms; they fall in and steer onto the hull its sonar
     // hears. At par with the Gannet.
     (
         key: "regency_t2_torpedo_bomber",
@@ -95,8 +95,8 @@
         mesh: "regency_torpedo_bomber", icon: TorpedoBomber,
         sounds: (death: "blast_small", moving: "aster_jet"),
     ),
-    // The reclaim carrier: a broad craft on gravity lift that strips a wreck field as it
-    // passes over, four nanite heads under it each taking a wreck of its own, their strands
+    // The reclaim carrier: a broad winged craft on gravity lift that strips a wreck field as
+    // it passes over, four nanite heads under its wings each taking a wreck of its own, their strands
     // a cloud of motes between it and the field (beams.wgsl `BEAM_NANITE_RECLAIM`). At par
     // with the Osprey: its four drones' 20 of power, here in the heads, over a shorter
     // reach (500 m against drones that go 800) but nothing to build or lose.

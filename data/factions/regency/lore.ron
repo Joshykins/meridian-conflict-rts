@@ -357,7 +357,7 @@
     "regency_t2_interceptor": (
         lore: "A jet drawn out to a needle behind a blade of a nose, built to run down whatever flies over Regency ground.",
         weapons: {
-            "Gravitic Seeker Battery": "A charge of plasma held between two bronze tines on each flank, let go and steered onto an aircraft by its own gravity cage.",
+            "Gravitic Seeker Battery": "A charge of plasma held between two bronze tines either side under the chin, let go and steered onto an aircraft by its own gravity cage.",
         },
     ),
     "regency_t2_strike_drone": (
@@ -367,7 +367,7 @@
         },
     ),
     "regency_t2_torpedo_bomber": (
-        lore: "A three-pronged jet that comes down to the wave tops on its run and leaves a gravity-held torpedo in the water under each outer prong.",
+        lore: "A twin-boomed jet that comes down to the wave tops on its run and leaves a gravity-held torpedo in the water under each boom.",
         weapons: {
             "Gravitic Torpedo Cradles": "Each torpedo is a charge of plasma in a gravity cage; it falls in, steers onto the hull below and boils the sea round it.",
         },

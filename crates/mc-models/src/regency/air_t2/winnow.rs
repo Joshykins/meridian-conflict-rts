@@ -10,30 +10,29 @@
 //! a keeled cowl, a bronze nozzle and a violet lens whose tip is the unit file's emitter.
 //! Authored at blueprint scale (radius 10, height 4.5).
 //!
-//! Variants: base the censer (a plated drum on a great bell, ringed by a rim of lapped
-//! plates whose spikes fan out, the heads under the rim), `~b` the manta (a body in a
-//! wide swept wing, the Breaker grown up, the heads under the wings), `~c` the cross (four
-//! armoured arms swept out from a drum, a head under each arm).
+//! From above, a manta: a plated body in a wide swept wing (the Breaker grown up), the
+//! heads under the wings, a bell under each wing and two under the body.
 
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 
-use crate::builder::{MeshBuilder, Section};
+use crate::builder::MeshBuilder;
 use crate::library::ModelDef;
 use crate::material::*;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::lift::bell;
-use super::super::machine::{armour, hoop, red_slot, swept, Course, Frame};
+use super::super::machine::{red_slot, Course};
 use super::jet::{body, plates, st, team_mark, tip, wing, workings, Station};
 
 pub(super) const RADIUS: f32 = 10.0;
 pub(super) const HEIGHT: f32 = 4.5;
 
-pub(crate) const MODELS: &[ModelDef] = &[
-    ModelDef::new("regency_reclaim_carrier", RADIUS, HEIGHT, censer),
-    ModelDef::new("regency_reclaim_carrier~b", RADIUS, HEIGHT, manta),
-    ModelDef::new("regency_reclaim_carrier~c", RADIUS, HEIGHT, cross),
-];
+pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new(
+    "regency_reclaim_carrier",
+    RADIUS,
+    HEIGHT,
+    winnow,
+)];
 
 /// Each head's trunnion and its lens's tip: the unit file's head `pivot` and `emitter`.
 pub(super) const HEADS: [(Vec3, Vec3); 4] = [
@@ -160,115 +159,8 @@ fn lift(b: &mut MeshBuilder, mouth: Vec3, r: f32, depth: f32) {
     bell(b, mouth, r, depth);
 }
 
-/// A plated drum about the middle from `z0` to its crown, `r` across, red optics forward;
-/// the team's mark on the crown.
-fn drum(b: &mut MeshBuilder, z0: f32, r: f32) {
-    dark_plate(b);
-    let oct: Vec<[f32; 2]> = (0..8)
-        .map(|i| {
-            let a = std::f32::consts::TAU * (i as f32 + 0.5) / 8.0;
-            [a.cos(), a.sin()]
-        })
-        .collect();
-    if b.coarse() {
-        b.loft_z(
-            &oct,
-            &[Section::new(z0, r), Section::new(HEIGHT - 0.35, r * 0.7)],
-        );
-    } else {
-        b.with_facets(|b| {
-            b.loft_z(
-                &oct,
-                &[
-                    Section::new(z0, r * 0.82),
-                    Section::new(z0 + 0.6, r),
-                    Section::new(HEIGHT - 1.0, r * 0.92),
-                    Section::new(HEIGHT - 0.35, r * 0.55),
-                ],
-            )
-        });
-    }
-    if !b.coarse() {
-        metal(b);
-        hoop(b, v3(0.0, 0.0, z0 + 0.05), r * 0.8, 0.3, 0.3, 12);
-        if b.fine() {
-            for s in [1.0, -1.0] {
-                red_slot(
-                    b,
-                    v3(r * 0.86, s * r * 0.24, HEIGHT - 1.25),
-                    v3(1.0, s * 0.4, 0.2),
-                    v3(0.0, -s, 0.0),
-                    r * 0.32,
-                    0.1,
-                );
-            }
-        }
-    }
-    team_mark(
-        b,
-        v3(-r * 0.3, 0.0, HEIGHT - 0.38),
-        Vec3::X,
-        Vec3::Z,
-        r * 0.75,
-        r * 0.28,
-    );
-}
-
-/// Base: the censer.
-fn censer(b: &mut MeshBuilder, _tech: u8) {
-    drum(b, 1.6, 2.5);
-    lift(b, v3(0.0, 0.0, 0.9), 1.6, 0.9);
-    // The rim: an eight-sided band of plate round the drum, braced to it, a bell under
-    // each quarter, and a plate on each eighth swept out past it into a spike (longer aft,
-    // so the craft reads which way it goes).
-    let rim = 4.3;
-    if b.coarse() {
-        dark_plate(b);
-        let ring: Vec<Vec3> = (0..8)
-            .map(|i| {
-                let a = std::f32::consts::TAU * i as f32 / 8.0;
-                let r = if a.cos() < -0.1 { 8.6 } else { 7.6 };
-                v3(a.cos() * r, a.sin() * r, 2.2)
-            })
-            .collect();
-        b.face(&ring);
-    } else {
-        dark_plate(b);
-        hoop(b, v3(0.0, 0.0, 2.1), rim, 1.2, 0.5, 8);
-        for i in 0..8 {
-            let a = std::f32::consts::TAU * i as f32 / 8.0;
-            let d = v3(a.cos(), a.sin(), 0.0);
-            let len = if d.x < -0.1 { 4.6 } else { 3.6 };
-            dark_plate(b);
-            armour(
-                b,
-                &Frame::new(d * 3.6 + Vec3::Z * 2.3, d - Vec3::Z * 0.08, Vec3::Z),
-                &swept(len, 0.85, 0.0, 0.35),
-                0.14,
-            );
-            if i % 2 == 0 {
-                metal(b);
-                b.beam(
-                    d * 2.3 + Vec3::Z * 2.0,
-                    d * (rim - 0.5) + Vec3::Z * 2.0,
-                    Vec2::new(0.4, 0.3),
-                    Vec2::new(0.35, 0.3),
-                );
-                lift(b, d * rim + Vec3::Z * 1.1, 0.75, 0.75);
-            }
-        }
-    }
-    if b.coarse() {
-        for i in 0..4 {
-            let a = std::f32::consts::TAU * i as f32 / 4.0;
-            b.add_lift(v3(a.cos() * rim, a.sin() * rim, 1.1), 0.5);
-        }
-    }
-    heads(b, 1.85);
-}
-
-/// B: the manta.
-fn manta(b: &mut MeshBuilder, _tech: u8) {
+/// The Winnow.
+fn winnow(b: &mut MeshBuilder, _tech: u8) {
     const BODY: [Station; 5] = [
         st(-6.6, 0.8, 2.6, 2.0, 1.6),
         st(-4.0, 1.6, 3.7, 2.1, 1.3),
@@ -344,48 +236,6 @@ fn manta(b: &mut MeshBuilder, _tech: u8) {
     heads(b, 1.6);
 }
 
-/// C: the cross.
-fn cross(b: &mut MeshBuilder, _tech: u8) {
-    drum(b, 1.5, 2.3);
-    lift(b, v3(0.0, 0.0, 0.85), 1.4, 0.9);
-    b.mirror_y(|b| {
-        for (deg, len) in [(45.0f32, 8.3), (135.0, 9.0)] {
-            let a = deg.to_radians();
-            let d = v3(a.cos(), a.sin(), 0.0);
-            // The arm: a long armoured blade out from the drum, raked back at its point,
-            // a second plate lapped over its root, and a bell under it.
-            let f = Frame::new(d * 1.6 + Vec3::Z * 2.0, d - Vec3::Z * 0.05, Vec3::Z);
-            dark_plate(b);
-            if b.coarse() {
-                b.face(&[
-                    f.at(0.0, -1.0, 0.2),
-                    f.at(len - 1.6, -0.2, 0.2),
-                    f.at(len - 1.0, 0.6, 0.2),
-                    f.at(0.0, 1.0, 0.2),
-                ]);
-                continue;
-            }
-            armour(
-                b,
-                &f,
-                &[
-                    [0.0, -1.1],
-                    [len - 2.6, -0.8],
-                    [len - 1.6, 0.0],
-                    [len - 2.0, 0.7],
-                    [0.0, 1.1],
-                ],
-                0.5,
-            );
-            let g = Frame::new(d * 1.8 + Vec3::Z * 2.5, d - Vec3::Z * 0.12, Vec3::Z);
-            armour(b, &g, &swept(len * 0.55, 0.75, 0.3, 0.4), 0.14);
-            workings(b, d * 2.4 + Vec3::Z * 1.8, d * 6.0 + Vec3::Z * 1.8, 0.16, 3);
-            lift(b, d * 6.2 + Vec3::Z * 0.95, 0.8, 0.85);
-        }
-    });
-    heads(b, 1.8);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -394,11 +244,8 @@ mod tests {
     #[test]
     fn fits_the_airframe_checks() {
         let lenses: Vec<Vec3> = HEADS.iter().map(|h| h.1).collect();
-        for key in [
-            "regency_reclaim_carrier",
-            "regency_reclaim_carrier~b",
-            "regency_reclaim_carrier~c",
-        ] {
+        {
+            let key = "regency_reclaim_carrier";
             super::super::jet::check::airframe(key, RADIUS, HEIGHT, &lenses, GLOW_VIOLET);
             let model = crate::build_model(key).unwrap();
             assert!(

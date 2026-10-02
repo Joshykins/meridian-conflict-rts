@@ -1,16 +1,13 @@
 //! The Trident, the Regency's tech 2 torpedo bomber (`regency_t2_torpedo_bomber` in
 //! `data/factions/regency/units/air_t2.ron`): it comes down to the wave tops on its run
-//! and lets a Gravitic Torpedo go from a cradle under each outer prong, a charge of plasma
+//! and lets a Gravitic Torpedo go from a cradle under each boom, a charge of plasma
 //! held between two bronze tines; the charge's middle is the unit file's muzzle. A sonar
 //! blister under its chin hears the dived hulls it hunts.
 //!
 //! Authored at blueprint scale (radius 7.2, height 3.0).
 //!
-//! Variants: base the trident (a long middle body and two shorter prongs reaching ahead
-//! off the wing roots, a cradle under each prong's head: three points forward from
-//! above), `~b` the manta (one wide lifting body, two horn blades forward, the cradles
-//! under its leading edge), `~c` the twin boom (two long booms with a nose blade each, a
-//! short pod between them on a straight blade of a wing, the cradles under the booms).
+//! From above, three points forward: two long booms with a nose blade each, and a short
+//! middle pod between them on a blade of a wing; the cradles hang under the booms' heads.
 
 use glam::Vec3;
 
@@ -27,31 +24,16 @@ use super::jet::{
 pub(super) const RADIUS: f32 = 7.2;
 pub(super) const HEIGHT: f32 = 3.0;
 
-pub(crate) const MODELS: &[ModelDef] = &[
-    ModelDef::new("regency_torpedo_bomber", RADIUS, HEIGHT, trident),
-    ModelDef::new("regency_torpedo_bomber~b", RADIUS, HEIGHT, manta),
-    ModelDef::new("regency_torpedo_bomber~c", RADIUS, HEIGHT, twin_boom),
-];
+pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new(
+    "regency_torpedo_bomber",
+    RADIUS,
+    HEIGHT,
+    trident,
+)];
 
 /// The port cradle's charge: the unit file's muzzle (the starboard one mirrors it).
 pub(super) const TORPEDO: Vec3 = Vec3::new(3.4, 1.9, 0.55);
 
-const BODY: [Station; 6] = [
-    st(-5.4, 0.5, 1.9, 1.4, 1.0),
-    st(-4.0, 0.95, 2.3, 1.45, 0.75),
-    st(-1.0, 1.1, 2.5, 1.45, 0.62),
-    st(2.0, 0.85, 2.4, 1.45, 0.66),
-    st(4.4, 0.45, 2.0, 1.45, 0.95),
-    tip(5.8, 1.45),
-];
-/// A prong (or boom) about its own axis, tail to head.
-const PRONG: [Station; 5] = [
-    st(-2.6, 0.3, 1.25, 0.95, 0.75),
-    st(-1.2, 0.48, 1.45, 0.95, 0.6),
-    st(1.2, 0.5, 1.45, 0.95, 0.6),
-    st(3.0, 0.32, 1.3, 0.95, 0.72),
-    tip(4.4, 0.98),
-];
 const BOOM: [Station; 6] = [
     st(-5.2, 0.32, 1.35, 1.05, 0.8),
     st(-3.8, 0.55, 1.6, 1.05, 0.65),
@@ -81,50 +63,7 @@ fn sonar(b: &mut MeshBuilder, at: Vec3) {
     }
 }
 
-/// The middle body's dress: nose blade, optics, spine plates over bronze, sonar, the
-/// team's mark.
-fn middle(b: &mut MeshBuilder, stations: &[Station], nose: &[[f32; 2]]) {
-    body(b, stations);
-    nose_blade(b, nose, 0.08);
-    optics(b, v3(4.6, 0.38, 1.85), Vec3::Y, v3(1.0, 0.0, -0.2), 0.6);
-    plates(
-        b,
-        v3(1.8, 0.0, 2.42),
-        v3(-1.0, 0.0, -0.06),
-        Vec3::Z,
-        Course {
-            count: 4,
-            step: 1.3,
-            len: 1.8,
-            half: 0.6,
-            tip: 0.0,
-            thick: 0.12,
-            tail: 0.9,
-        },
-    );
-    b.mirror_y(|b| workings(b, v3(1.2, 0.8, 2.15), v3(-3.6, 0.85, 1.95), 0.13, 3));
-    sonar(b, v3(2.6, 0.0, 0.6));
-    team_mark(b, v3(2.8, 0.0, 2.38), Vec3::X, Vec3::Z, 1.3, 0.4);
-}
-
-/// A prong (port) about `y`, its head reaching to `PRONG`'s tip, a blade under its head and
-/// the cradle hung below it.
-fn prong(b: &mut MeshBuilder, stations: &[Station], y: f32, z: f32, drive_x: f32) {
-    pod(b, stations, y, z);
-    let head = stations[stations.len() - 1].x;
-    if !b.coarse() {
-        dark_blade_tip(b, head, y, z);
-    }
-    drive(b, v3(drive_x, y, z + 0.95), 0.32, 0.45);
-    cradle(
-        b,
-        v3(TORPEDO.x - 2.0, y, TORPEDO.z),
-        TORPEDO.with_y(y),
-        0.26,
-    );
-}
-
-/// A prong or boom about `y`, lifted `z`: far off, a flat plan of it seen from above.
+/// A boom about `y`, lifted `z`: far off, a flat plan of it seen from above.
 fn pod(b: &mut MeshBuilder, stations: &[Station], y: f32, z: f32) {
     if b.coarse() {
         super::super::kit::dark_plate(b);
@@ -143,7 +82,7 @@ fn pod(b: &mut MeshBuilder, stations: &[Station], y: f32, z: f32) {
     b.at(v3(0.0, y, z), |b| body(b, stations));
 }
 
-/// A short keel blade reaching ahead of a prong's head.
+/// A short keel blade reaching ahead of a boom's head.
 fn dark_blade_tip(b: &mut MeshBuilder, head: f32, y: f32, z: f32) {
     super::super::kit::dark_plate(b);
     blade(
@@ -164,147 +103,8 @@ fn dark_blade_tip(b: &mut MeshBuilder, head: f32, y: f32, z: f32) {
     );
 }
 
-/// Base: the trident.
+/// The Trident.
 fn trident(b: &mut MeshBuilder, _tech: u8) {
-    middle(
-        b,
-        &BODY,
-        &[[7.6, 1.35], [5.6, 1.8], [4.0, 1.6], [4.2, 0.95], [5.8, 1.0]],
-    );
-    drive(b, v3(-5.45, 0.0, 1.45), 0.4, 0.5);
-    b.mirror_y(|b| {
-        // The root wing joining the middle to the prong, then the outer wing.
-        wing(
-            b,
-            &[[1.0, 0.9], [0.4, 1.9], [-3.2, 1.9], [-4.4, 0.9]],
-            1.5,
-            0.0,
-            0.1,
-        );
-        prong(b, &PRONG, 1.9, 0.0, -2.75);
-        let droop = 0.06;
-        wing(
-            b,
-            &[[0.4, 2.3], [-3.2, 6.2], [-4.3, 6.2], [-2.8, 2.3]],
-            1.5,
-            droop,
-            0.08,
-        );
-        if !b.coarse() {
-            down_fin(
-                b,
-                &[[-3.2, 0.0], [-4.3, 0.0], [-4.7, -0.8], [-3.9, -0.8]],
-                6.15,
-                1.5 - 6.15 * droop,
-                -0.3,
-            );
-        }
-        plates(
-            b,
-            v3(-0.4, 3.0, 1.38),
-            v3(-1.0, 0.75, -0.06),
-            Vec3::Z,
-            Course {
-                count: 3,
-                step: 1.0,
-                len: 1.6,
-                half: 0.45,
-                tip: 0.35,
-                thick: 0.08,
-                tail: 0.6,
-            },
-        );
-    });
-}
-
-/// B: the manta.
-fn manta(b: &mut MeshBuilder, _tech: u8) {
-    body(b, &BODY);
-    optics(b, v3(4.6, 0.38, 1.85), Vec3::Y, v3(1.0, 0.0, -0.2), 0.6);
-    plates(
-        b,
-        v3(1.8, 0.0, 2.42),
-        v3(-1.0, 0.0, -0.06),
-        Vec3::Z,
-        Course {
-            count: 4,
-            step: 1.3,
-            len: 1.8,
-            half: 0.6,
-            tip: 0.0,
-            thick: 0.12,
-            tail: 0.9,
-        },
-    );
-    sonar(b, v3(2.6, 0.0, 0.6));
-    team_mark(b, v3(2.8, 0.0, 2.38), Vec3::X, Vec3::Z, 1.3, 0.4);
-    drive(b, v3(-5.45, 0.0, 1.45), 0.4, 0.5);
-    b.mirror_y(|b| {
-        let droop = 0.1;
-        wing(
-            b,
-            &[
-                [4.2, 0.8],
-                [1.2, 4.2],
-                [-1.6, 6.0],
-                [-3.0, 5.7],
-                [-3.6, 2.0],
-                [-5.0, 0.8],
-            ],
-            1.5,
-            droop,
-            0.14,
-        );
-        // A horn blade forward off each side of the head.
-        nose_blade_at(
-            b,
-            0.95,
-            &[
-                [7.0, 1.3],
-                [5.0, 1.72],
-                [3.4, 1.55],
-                [3.6, 0.95],
-                [5.2, 1.0],
-            ],
-        );
-        workings(b, v3(1.2, 0.8, 2.15), v3(-3.6, 0.85, 1.95), 0.13, 3);
-        plates(
-            b,
-            v3(1.8, 1.4, 1.48),
-            v3(-1.0, 0.7, -0.1),
-            Vec3::Z,
-            Course {
-                count: 4,
-                step: 1.0,
-                len: 1.6,
-                half: 0.5,
-                tip: 0.35,
-                thick: 0.09,
-                tail: 0.6,
-            },
-        );
-        if !b.coarse() {
-            down_fin(
-                b,
-                &[[-3.1, 0.0], [-3.6, 0.0], [-4.2, -0.75], [-3.6, -0.75]],
-                5.6,
-                1.5 - 5.6 * droop + 0.05,
-                -0.3,
-            );
-        }
-        cradle(b, v3(TORPEDO.x - 2.2, TORPEDO.y, TORPEDO.z), TORPEDO, 0.26);
-        drive(b, v3(-3.65, 2.6, 1.25), 0.3, 0.4);
-    });
-}
-
-/// A keel blade like the nose's, stood at `y` off the centreline.
-fn nose_blade_at(b: &mut MeshBuilder, y: f32, outline: &[[f32; 2]]) {
-    super::super::kit::dark_plate(b);
-    blade(b, &side(outline, y, 0.0), Vec3::Y, 0.07, 0.7);
-}
-
-/// C: the twin boom.
-fn twin_boom(b: &mut MeshBuilder, _tech: u8) {
     // The short middle pod: sonar, optics, the team's mark.
     let middle_pod = [
         st(-2.8, 0.4, 1.9, 1.45, 1.05),
@@ -404,31 +204,25 @@ fn twin_boom(b: &mut MeshBuilder, _tech: u8) {
 
 #[cfg(test)]
 mod tests {
+    use super::super::jet::check;
     use super::*;
 
     #[test]
     fn fits_the_airframe_checks() {
         let muzzles = [TORPEDO, TORPEDO * v3(1.0, -1.0, 1.0)];
-        for key in [
-            "regency_torpedo_bomber",
-            "regency_torpedo_bomber~b",
-            "regency_torpedo_bomber~c",
-        ] {
-            let glow = crate::material::GLOW_LASER;
-            super::super::jet::check::airframe(key, RADIUS, HEIGHT, &muzzles, glow);
-        }
+        let glow = crate::material::GLOW_LASER;
+        check::airframe("regency_torpedo_bomber", RADIUS, HEIGHT, &muzzles, glow);
     }
 
     #[test]
     fn the_unit_files_cradles_are_the_models() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
-        let blueprints = mc_data::Blueprints::load(&dir).unwrap();
-        let bp = blueprints.unit(blueprints.id_of("regency_t2_torpedo_bomber").unwrap());
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
-        assert_eq!(bp.visual.mesh, "regency_torpedo_bomber");
-        assert!((bp.radius.to_f32() - RADIUS).abs() < 1e-3);
-        assert!((bp.height.to_f32() - HEIGHT).abs() < 1e-3);
-        let drawn: Vec<Vec3> = bp.weapons[0].muzzles.iter().map(|&p| v(p)).collect();
+        let bp = check::blueprint(
+            "regency_t2_torpedo_bomber",
+            "regency_torpedo_bomber",
+            RADIUS,
+            HEIGHT,
+        );
+        let drawn = check::muzzles(&bp);
         for m in [TORPEDO, TORPEDO * v3(1.0, -1.0, 1.0)] {
             assert!(
                 drawn.iter().any(|d| d.distance(m) < 1e-3),

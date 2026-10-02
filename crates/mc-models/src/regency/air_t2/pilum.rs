@@ -4,13 +4,10 @@
 //!
 //! A needle of a chined body behind a nose blade, swept plates lapped back down its spine
 //! and over its wings, bronze workings in the gaps, red optics either side of the nose and
-//! two drives burning red in bronze rings. Authored at blueprint scale (radius 5.5, height
-//! 2.2): the cradles' charges are the unit file's muzzles.
-//!
-//! Variants (docs: CLAUDE.md section 9): `~a` the javelin (a cropped delta far aft, canards,
-//! fins turned down at the tips, cradles along the flanks), `~b` the arrowhead (one broad
-//! delta from the nose back, cradles under mid-wing), `~c` the crescent (wings swept harder
-//! outboard and falling into spikes, long canards, cradles under the chin).
+//! two drives burning red in bronze rings. From above, a crescent: the wings sweep harder
+//! outboard and fall away into spikes, long canards ahead of them, fins turned down under
+//! the tail, and a seeker cradle either side under the chin. Authored at blueprint scale
+//! (radius 5.5, height 2.2): the cradles' charges are the unit file's muzzles.
 
 use glam::Vec3;
 
@@ -27,16 +24,11 @@ use super::jet::{
 pub(super) const RADIUS: f32 = 5.5;
 pub(super) const HEIGHT: f32 = 2.2;
 
-pub(crate) const MODELS: &[ModelDef] = &[
-    ModelDef::new("regency_interceptor", RADIUS, HEIGHT, javelin),
-    ModelDef::new("regency_interceptor~b", RADIUS, HEIGHT, arrowhead),
-    ModelDef::new("regency_interceptor~c", RADIUS, HEIGHT, crescent),
-];
+pub(crate) const MODELS: &[ModelDef] =
+    &[ModelDef::new("regency_interceptor", RADIUS, HEIGHT, pilum)];
 
-/// The javelin's port cradle charge: the unit file's muzzle (the starboard one mirrors it).
-pub(super) const SEEKER: Vec3 = Vec3::new(1.7, 1.0, 0.7);
-const SEEKER_B: Vec3 = Vec3::new(0.9, 2.1, 0.72);
-const SEEKER_C: Vec3 = Vec3::new(2.6, 0.55, 0.42);
+/// The port cradle's charge: the unit file's muzzle (the starboard one mirrors it).
+const SEEKER: Vec3 = Vec3::new(2.6, 0.55, 0.42);
 
 /// The body, tail to the needle nose.
 const BODY: [Station; 6] = [
@@ -57,8 +49,8 @@ const NOSE: [[f32; 2]; 5] = [
     [5.0, 0.58],
 ];
 
-/// What every Pilum shares: the body, the nose blade and optics, the spine's plates over
-/// its bronze workings, two drives and the team's mark.
+/// The body, the nose blade and optics, the spine's plates over its bronze workings, two
+/// drives and the team's mark.
 fn common(b: &mut MeshBuilder) {
     body(b, &BODY);
     nose_blade(b, &NOSE, 0.07);
@@ -85,100 +77,8 @@ fn common(b: &mut MeshBuilder) {
     team_mark(b, v3(2.2, 0.0, 1.77), Vec3::X, Vec3::Z, 1.1, 0.32);
 }
 
-/// A: the javelin.
-fn javelin(b: &mut MeshBuilder, _tech: u8) {
-    common(b);
-    b.mirror_y(|b| {
-        let w = [[0.8, 0.6], [-2.9, 3.9], [-3.95, 3.9], [-4.05, 0.6]];
-        wing(b, &w, 1.02, 0.06, 0.07);
-        down_fin(
-            b,
-            &[[-2.95, 0.0], [-3.95, 0.0], [-4.3, -0.68], [-3.7, -0.68]],
-            3.9,
-            1.02 - 3.9 * 0.06,
-            -0.3,
-        );
-        if !b.coarse() {
-            blade(
-                b,
-                &plan(
-                    &[[3.1, 0.4], [2.1, 1.55], [1.7, 1.55], [2.0, 0.4]],
-                    1.26,
-                    0.1,
-                ),
-                Vec3::Z,
-                0.05,
-                0.8,
-            );
-        }
-        plates(
-            b,
-            v3(0.0, 1.0, 1.06),
-            v3(-1.0, 0.75, -0.05),
-            Vec3::Z,
-            Course {
-                count: 3,
-                step: 1.0,
-                len: 1.6,
-                half: 0.4,
-                tip: 0.3,
-                thick: 0.08,
-                tail: 0.6,
-            },
-        );
-        cradle(b, v3(-0.4, SEEKER.y, SEEKER.z), SEEKER, 0.22);
-    });
-}
-
-/// B: the arrowhead.
-fn arrowhead(b: &mut MeshBuilder, _tech: u8) {
-    common(b);
-    b.mirror_y(|b| {
-        let w = [[3.2, 0.5], [-3.2, 4.2], [-4.0, 3.9], [-4.2, 0.5]];
-        wing(b, &w, 1.02, 0.04, 0.08);
-        down_fin(
-            b,
-            &[[-3.0, 0.0], [-3.9, 0.0], [-4.3, -0.62], [-3.5, -0.62]],
-            3.95,
-            1.02 - 3.95 * 0.04,
-            -0.3,
-        );
-        plates(
-            b,
-            v3(1.6, 1.0, 1.08),
-            v3(-1.0, 0.5, -0.03),
-            Vec3::Z,
-            Course {
-                count: 3,
-                step: 1.1,
-                len: 1.7,
-                half: 0.45,
-                tip: 0.3,
-                thick: 0.08,
-                tail: 0.5,
-            },
-        );
-        plates(
-            b,
-            v3(-0.6, 2.6, 0.99),
-            v3(-1.0, 0.6, -0.03),
-            Vec3::Z,
-            Course {
-                count: 2,
-                step: 1.0,
-                len: 1.4,
-                half: 0.35,
-                tip: 0.4,
-                thick: 0.07,
-                tail: 0.5,
-            },
-        );
-        cradle(b, v3(-1.2, SEEKER_B.y, SEEKER_B.z), SEEKER_B, 0.22);
-    });
-}
-
-/// C: the crescent.
-fn crescent(b: &mut MeshBuilder, _tech: u8) {
+/// The Pilum.
+fn pilum(b: &mut MeshBuilder, _tech: u8) {
     common(b);
     b.mirror_y(|b| {
         let inner = [[1.0, 0.55], [-0.6, 2.5], [-2.4, 2.5], [-3.4, 0.55]];
@@ -227,7 +127,7 @@ fn crescent(b: &mut MeshBuilder, _tech: u8) {
                 tail: 0.6,
             },
         );
-        cradle(b, v3(0.4, SEEKER_C.y, SEEKER_C.z), SEEKER_C, 0.2);
+        cradle(b, v3(0.4, SEEKER.y, SEEKER.z), SEEKER, 0.2);
     });
 }
 
@@ -241,13 +141,30 @@ mod tests {
 
     #[test]
     fn fits_the_airframe_checks() {
-        use crate::material::GLOW_LASER;
-        for (key, m) in [
-            ("regency_interceptor", SEEKER),
-            ("regency_interceptor~b", SEEKER_B),
-            ("regency_interceptor~c", SEEKER_C),
-        ] {
-            super::super::jet::check::airframe(key, RADIUS, HEIGHT, &pair(m), GLOW_LASER);
+        let glow = crate::material::GLOW_LASER;
+        super::super::jet::check::airframe(
+            "regency_interceptor",
+            RADIUS,
+            HEIGHT,
+            &pair(SEEKER),
+            glow,
+        );
+    }
+
+    #[test]
+    fn the_unit_files_cradles_are_the_models() {
+        let bp = super::super::jet::check::blueprint(
+            "regency_t2_interceptor",
+            "regency_interceptor",
+            RADIUS,
+            HEIGHT,
+        );
+        let drawn = super::super::jet::check::muzzles(&bp);
+        for m in pair(SEEKER) {
+            assert!(
+                drawn.iter().any(|d| d.distance(m) < 1e-3),
+                "no muzzle at {m}"
+            );
         }
     }
 }
