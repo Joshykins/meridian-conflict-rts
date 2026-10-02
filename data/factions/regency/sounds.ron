@@ -794,65 +794,59 @@
         "regency_bombard_step": (like: "regency_footfall", size: 0.7, peak: 0.26),
         // ---- the Regency power generators' supernova ----
         // A Regency power generator's star going supernova (renderer supernova_fx.rs), written for the
-        // crown's star: its sizes keep time with the picture, so the smaller stars are
-        // `like` it at their own size (structures.ron). The cage snaps, the freed star flares
-        // for 0.3 s and goes in one bang. Three takes to choose from (the `~` ones are the
-        // others; the one chosen becomes `regency_supernova` and the rest are deleted).
+        // crown's star; the smaller stars are `like` it at their own size (structures.ron).
+        // The bang is the first sample, on the tick the plant dies: nothing leads up to it.
+        // Three takes to choose from (the `~` ones are the others; the one chosen becomes
+        // `regency_supernova` and the rest are deleted).
         //
-        // A, the blast: the air drawn in under the flare, then a hard crack over a deep boom
-        // that holds, and a low roar rolling out past you in both ears. No chord, no whine.
+        // A, the star tearing open: a glassy snap and a deep drop that sinks for over a
+        // second, the plasma's growl falling under it, the shell tearing out past you in
+        // both ears as a rush, a thin sizzle on it, and a low roll left behind. No chord,
+        // no whine, no build-up.
         "regency_supernova": (
-            length: 5.0, peak: 0.85, room: 0.7,
+            length: 5.0, peak: 0.85, room: 0.75,
             layers: [
-                // The cage giving way: a crack and a short clank of its armour.
-                Burst(low: 500, high: 3200, attack: 0.0003, decay: 0.01, gain: 5),
-                Fm(from: 180, to: 150, glide: 0.15, ratio: 1.41, index: 0.9, fade: 0.08, attack: 0.002, decay: 0.12, gain: 0.25),
-                // The flare drawing the air in: dark noise swelling up into the bang, not a rising tone.
-                Roll(at: 0.02, from: 300, to: 900, glide: 0.28, attack: 0.27, decay: 0.02, gain: 0.45, swell: 14, depth: 0.5, seed: 8821),
-                Tone(at: 0.02, from: 52, to: 46, glide: 0.28, attack: 0.26, decay: 0.03, gain: 0.5),
-                // The bang: a hard crack over a deep boom that holds.
-                Burst(at: 0.3, low: 300, high: 5000, attack: 0.0004, decay: 0.045, gain: 7),
-                Burst(at: 0.3, low: 40, high: 450, attack: 0.004, decay: 0.4, gain: 13),
-                Tone(at: 0.3, from: 105, to: 36, glide: 0.9, attack: 0.006, decay: 1.0, gain: 1.9),
-                Fm(at: 0.3, from: 150, to: 48, glide: 0.8, ratio: 0.5, index: 2.0, fade: 0.5, attack: 0.004, decay: 0.75, gain: 0.85),
-                Drive(1.6),
-                // The roar rolling out past you, one in each ear, and the ground under it.
-                Roll(at: 0.31, from: 2400, to: 220, glide: 2.4, attack: 0.03, decay: 1.4, gain: 0.85, swell: 5, depth: 0.6, pan: -0.5, seed: 8822),
-                Roll(at: 0.34, from: 2200, to: 200, glide: 2.6, attack: 0.04, decay: 1.5, gain: 0.85, swell: 4.5, depth: 0.6, pan: 0.5, seed: 8823),
-                Roll(at: 0.36, from: 500, to: 70, glide: 3.0, attack: 0.1, decay: 1.8, gain: 0.7, swell: 2, depth: 0.5, seed: 8824),
-                // Debris of the cage landing round you.
-                Burst(at: 0.9, low: 800, high: 3500, attack: 0.0004, decay: 0.01, gain: 1.0, pan: 0.4),
-                Burst(at: 1.25, low: 700, high: 3000, attack: 0.0004, decay: 0.01, gain: 0.7, pan: -0.45),
+                // The snap: a bright, glassy edge over a hard crack.
+                Burst(low: 2200, high: 9000, attack: 0.0002, decay: 0.012, gain: 4),
+                Burst(low: 350, high: 3200, attack: 0.0003, decay: 0.035, gain: 8),
+                // The drop: a deep body that sinks for over a second.
+                Burst(at: 0.002, low: 40, high: 480, attack: 0.003, decay: 0.45, gain: 12),
+                Tone(from: 115, to: 30, glide: 1.4, attack: 0.004, decay: 1.4, gain: 1.9),
+                // The plasma's growl, falling under the drop: heard on small speakers.
+                Fm(from: 240, to: 62, glide: 1.6, ratio: 0.5, index: 2.2, fade: 1.0, attack: 0.004, decay: 1.1, gain: 0.8),
+                Drive(1.5),
+                // The shell tearing out past you, one in each ear: a rush falling as it goes.
+                Sweep(at: 0.01, from: 6000, to: 420, glide: 2.0, q: 0.6, attack: 0.015, decay: 1.4, gain: 1.3, pan: -0.55, seed: 8851),
+                Sweep(at: 0.05, from: 5400, to: 380, glide: 2.2, q: 0.6, attack: 0.02, decay: 1.5, gain: 1.3, pan: 0.55, seed: 8852),
+                // A thin sizzle riding the shell, thinning out.
+                Roll(at: 0.02, from: 3800, to: 1500, glide: 1.4, attack: 0.02, decay: 0.8, gain: 0.25, swell: 100, depth: 0.9, seed: 8853),
+                // What is left: a low roll going away.
+                Roll(at: 0.1, from: 420, to: 70, glide: 3.5, attack: 0.15, decay: 1.9, gain: 0.7, swell: 1.5, depth: 0.5, seed: 8854),
             ],
         ),
-        // B, the discharge: the freed star buzzing up rough and loud, a huge electric snap, its
-        // roar falling away under a sizzle that crackles out with stray snaps. The ARC
-        // reactor's death is electric too; this one is the star's.
+        // B, the discharge: a huge electric snap, its roar falling away under a sizzle that
+        // crackles out with stray snaps. The ARC reactor's death is electric too; this one
+        // is the star's.
         "regency_supernova~discharge": (
             length: 4.5, peak: 0.85, room: 0.6,
             layers: [
-                // The cage giving way.
-                Burst(low: 500, high: 3200, attack: 0.0003, decay: 0.01, gain: 5),
-                // The freed star: a held rough buzz leaning only a little up, and its sizzle coming in.
-                Fm(at: 0.01, from: 62, to: 74, glide: 0.29, ratio: 0.5, index: 2.6, fade: 1000, attack: 0.25, decay: 0.03, gain: 0.55),
-                Roll(at: 0.02, from: 2600, to: 3400, glide: 0.28, attack: 0.26, decay: 0.03, gain: 0.3, swell: 100, depth: 0.9, seed: 8831),
                 // The snap: a bright electric crack over a deep whump.
-                Burst(at: 0.3, low: 1400, high: 8000, attack: 0.0003, decay: 0.02, gain: 7),
-                Burst(at: 0.3, low: 50, high: 600, attack: 0.004, decay: 0.28, gain: 11),
-                Tone(at: 0.3, from: 95, to: 32, glide: 0.8, attack: 0.006, decay: 0.9, gain: 1.6),
+                Burst(low: 1400, high: 8000, attack: 0.0003, decay: 0.02, gain: 7),
+                Burst(low: 50, high: 600, attack: 0.004, decay: 0.28, gain: 11),
+                Tone(from: 95, to: 32, glide: 0.8, attack: 0.006, decay: 0.9, gain: 1.6),
                 // Its roar: rough, falling away.
-                Fm(at: 0.3, from: 210, to: 52, glide: 1.0, ratio: 0.5, index: 2.8, fade: 0.8, attack: 0.004, decay: 0.8, gain: 0.9),
+                Fm(from: 210, to: 52, glide: 1.0, ratio: 0.5, index: 2.8, fade: 0.8, attack: 0.004, decay: 0.8, gain: 0.9),
                 Drive(1.5),
                 // The sizzle all round, crackling out.
-                Roll(at: 0.31, from: 4200, to: 1800, glide: 1.6, attack: 0.02, decay: 0.9, gain: 0.4, swell: 110, depth: 0.95, pan: -0.4, seed: 8832),
-                Roll(at: 0.33, from: 3800, to: 1600, glide: 1.7, attack: 0.02, decay: 1.0, gain: 0.4, swell: 100, depth: 0.95, pan: 0.4, seed: 8833),
-                Sweep(at: 0.31, from: 5000, to: 700, glide: 1.4, q: 0.6, attack: 0.02, decay: 0.8, gain: 0.5, seed: 8834),
-                Roll(at: 0.34, from: 400, to: 80, glide: 2.5, attack: 0.08, decay: 1.4, gain: 0.55, swell: 3, depth: 0.5, seed: 8835),
+                Roll(at: 0.01, from: 4200, to: 1800, glide: 1.6, attack: 0.02, decay: 0.9, gain: 0.4, swell: 110, depth: 0.95, pan: -0.4, seed: 8832),
+                Roll(at: 0.03, from: 3800, to: 1600, glide: 1.7, attack: 0.02, decay: 1.0, gain: 0.4, swell: 100, depth: 0.95, pan: 0.4, seed: 8833),
+                Sweep(at: 0.01, from: 5000, to: 700, glide: 1.4, q: 0.6, attack: 0.02, decay: 0.8, gain: 0.5, seed: 8834),
+                Roll(at: 0.04, from: 400, to: 80, glide: 2.5, attack: 0.08, decay: 1.4, gain: 0.55, swell: 3, depth: 0.5, seed: 8835),
                 // Stray snaps as the arcs let go.
-                Burst(at: 0.58, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 2.0, pan: 0.5),
-                Burst(at: 0.81, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 1.6, pan: -0.5),
-                Burst(at: 1.15, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 1.1, pan: 0.2),
-                Burst(at: 1.6, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 0.7, pan: -0.3),
+                Burst(at: 0.28, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 2.0, pan: 0.5),
+                Burst(at: 0.51, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 1.6, pan: -0.5),
+                Burst(at: 0.85, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 1.1, pan: 0.2),
+                Burst(at: 1.3, low: 1500, high: 7000, attack: 0.0003, decay: 0.008, gain: 0.7, pan: -0.3),
             ],
         ),
         // C, the pressure wave: no crack to speak of. A deep soft whoomph you feel more than hear,
@@ -860,23 +854,18 @@
         "regency_supernova~whoomph": (
             length: 5.0, peak: 0.85, room: 0.8,
             layers: [
-                // The cage giving way.
-                Burst(low: 500, high: 3000, attack: 0.0003, decay: 0.01, gain: 4),
-                // The flare: a low pressure building.
-                Tone(at: 0.02, from: 48, to: 44, glide: 0.28, attack: 0.26, decay: 0.03, gain: 0.3),
-                Roll(at: 0.02, from: 250, to: 600, glide: 0.28, attack: 0.27, decay: 0.02, gain: 0.35, swell: 6, depth: 0.4, seed: 8841),
                 // The whoomph: a soft, deep push of air.
-                Burst(at: 0.3, low: 700, high: 2600, attack: 0.002, decay: 0.03, gain: 2.5),
-                Burst(at: 0.3, low: 40, high: 400, attack: 0.012, decay: 0.55, gain: 8),
-                Tone(at: 0.3, from: 80, to: 30, glide: 1.3, attack: 0.02, decay: 1.2, gain: 1.5),
-                Fm(at: 0.3, from: 110, to: 40, glide: 1.0, ratio: 0.5, index: 1.4, fade: 0.6, attack: 0.01, decay: 0.9, gain: 0.6),
+                Burst(low: 700, high: 2600, attack: 0.002, decay: 0.03, gain: 2.5),
+                Burst(low: 40, high: 400, attack: 0.012, decay: 0.55, gain: 8),
+                Tone(from: 80, to: 30, glide: 1.3, attack: 0.02, decay: 1.2, gain: 1.5),
+                Fm(from: 110, to: 40, glide: 1.0, ratio: 0.5, index: 1.4, fade: 0.6, attack: 0.01, decay: 0.9, gain: 0.6),
                 Drive(1.4),
                 // The rush of air going out past you, one in each ear, sinking.
-                Sweep(at: 0.31, from: 3200, to: 260, glide: 2.2, q: 0.5, attack: 0.05, decay: 1.5, gain: 1.5, pan: -0.6, seed: 8842),
-                Sweep(at: 0.36, from: 2900, to: 240, glide: 2.4, q: 0.5, attack: 0.06, decay: 1.6, gain: 1.5, pan: 0.6, seed: 8843),
-                Roll(at: 0.4, from: 900, to: 90, glide: 3.0, attack: 0.15, decay: 2.0, gain: 0.7, swell: 1.5, depth: 0.4, seed: 8844),
+                Sweep(at: 0.01, from: 3200, to: 260, glide: 2.2, q: 0.5, attack: 0.05, decay: 1.5, gain: 1.5, pan: -0.6, seed: 8842),
+                Sweep(at: 0.06, from: 2900, to: 240, glide: 2.4, q: 0.5, attack: 0.06, decay: 1.6, gain: 1.5, pan: 0.6, seed: 8843),
+                Roll(at: 0.1, from: 900, to: 90, glide: 3.0, attack: 0.15, decay: 2.0, gain: 0.7, swell: 1.5, depth: 0.4, seed: 8844),
                 // The light: a faint glitter high up, thinning out.
-                Hiss(at: 0.32, freq: 7000, q: 1.2, attack: 0.05, decay: 0.8, gain: 0.12, seed: 8845),
+                Hiss(at: 0.02, freq: 7000, q: 1.2, attack: 0.05, decay: 0.8, gain: 0.12, seed: 8845),
             ],
         ),
         "regency_supernova_mid": (like: "regency_supernova", size: 0.693, peak: 0.75),

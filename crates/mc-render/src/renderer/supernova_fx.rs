@@ -3,9 +3,8 @@
 //! power), but it is the biggest light a plant makes. One explosion, all of it sized by
 //! the star, the tech 3 crown's being the reference:
 //!
-//! - **Break**: the cage gives way (sparks and plates, no fireball: nothing in it burns)
-//!   and the freed star flares, swelling and whitening for a moment.
-//! - **Supernova**: straight out of the flare, a white flash and dust driven out across the
+//! - **Break**: the cage gives way (sparks and plates, no fireball: nothing in it burns).
+//! - **Supernova**: on the same tick, a white flash and dust driven out across the
 //!   ground, a hollow shell of plasma tearing outward from the star's face (plasma_puffs.wgsl
 //!   `supernova`), a second inside it, streamers flung out round its waist, up from its
 //!   pole and every way (`nova_wisp`), and a spray of sparks; the light floods the ground
@@ -13,24 +12,23 @@
 //! - **Nebula**: what lingers is a slow, faint shell torn into violet strands and a small
 //!   hot core, both fading.
 //!
-//! The break lasts `BREAK * scale` seconds, and the death sound (`regency_supernova`,
-//! data/factions/regency/sounds.ron) is written for the same beat: tech 3 at size 1,
-//! tech 1 and 2 `like` it at their scale. Change one and change the other.
+//! The bang lands on the death tick, as the sim leaves the wreck: no flare or swell
+//! before it, which played over the wreck and read as the plant warping before it went.
+//! The death sound (`regency_supernova`, data/factions/regency/sounds.ron) bangs at its
+//! first sample: tech 3 at size 1, tech 1 and 2 `like` it at their scale.
 //!
 //! Presentation only; the renderer's own clock.
 
 use glam::{Vec2, Vec3};
 use std::f32::consts::TAU;
 
-use super::star_core_fx::{ARC, GLARE, LAVENDER, ROSE, STAR, WHITE};
+use super::star_core_fx::{ARC, GLARE, LAVENDER, STAR, WHITE};
 use super::stun_fx::Flash;
 use super::{Renderer, PUFF_DUST, PUFF_SHARD, PUFF_SPARK};
 use crate::gpu_consts::puff;
 
 const SHELL: f32 = puff::SUPERNOVA as f32;
 const WISP: f32 = puff::NOVA_WISP as f32;
-/// Seconds the tech 3 star flares between its cage breaking and the supernova.
-const BREAK: f32 = 0.3;
 /// How long the flare outlasts the bang, as the shell takes its light over.
 const HANDOVER: f32 = 0.4;
 /// The farthest any shell gets (metres): the tech 3 crown's.
@@ -44,7 +42,6 @@ pub(super) struct Nova {
     seed: f32,
     /// The star's size against the tech 3 crown's (`scale`).
     s: f32,
-    start: f32,
     bang: f32,
     /// When the remnant has gone out.
     until: f32,
@@ -73,13 +70,12 @@ impl Renderer {
             return false;
         };
         let s = scale(b.r);
-        let bang = time + BREAK * s;
+        let bang = time;
         let nova = Nova {
             centre: b.centre,
             r: b.r,
             seed: b.seed,
             s,
-            start: time,
             bang,
             until: bang + 4.0 + 5.0 * s,
             now_r: b.r,
@@ -118,28 +114,20 @@ impl Renderer {
         }
     }
 
-    /// Once a sim tick: the swelling stars and the remnants.
+    /// Once a sim tick: the flare handing over to the shell, and the remnants.
     pub(super) fn novae_tick(&mut self, time: f32) {
         self.star_core_fx.novae.retain(|n| time < n.until);
         let life = self.tick_seconds.clamp(0.03, 0.25) * 2.0;
         for i in 0..self.star_core_fx.novae.len() {
             let mut n = self.star_core_fx.novae[i];
-            let (r, glow, lash) = if time < n.bang {
-                // Freed: flaring, swelling and whitening, shuddering, lashing out.
-                let u = (time - n.start) / (n.bang - n.start);
-                let shudder = 1.0 + 0.06 * u * (time * 47.0 + n.seed).sin();
-                let r = n.r * (1.0 + 0.6 * u * u) * shudder;
-                (r, GLARE + 6.0 * u * u, 0.5 + 0.5 * u)
-            } else {
-                // The flare handing its light to the shell, and under it the hot core left
-                // behind, fading with the nebula.
-                let e = time - n.bang;
-                let flare = (1.0 - e / HANDOVER).max(0.0);
-                let fade = (1.0 - e / (n.until - n.bang)).max(0.0).powf(1.5);
-                let r = n.r * (0.4 + 1.4 * flare);
-                let glow = (GLARE + 6.0) * flare * flare + 2.4 * fade * (1.0 - flare);
-                (r, glow, 0.15 * fade)
-            };
+            // The flare handing its light to the shell, and under it the hot core left
+            // behind, fading with the nebula.
+            let e = time - n.bang;
+            let flare = (1.0 - e / HANDOVER).max(0.0);
+            let fade = (1.0 - e / (n.until - n.bang)).max(0.0).powf(1.5);
+            let r = n.r * (0.4 + 1.4 * flare);
+            let glow = (GLARE + 6.0) * flare * flare + 2.4 * fade * (1.0 - flare);
+            let lash = 0.5 * flare + 0.15 * fade;
             n.now_r = r;
             n.now_glow = glow;
             self.star_core_fx.novae[i] = n;
@@ -157,7 +145,7 @@ impl Renderer {
                 Vec3::splat(glow),
                 n.seed,
             );
-            // Lightning lashing off it, more and more as it swells.
+            // Lightning lashing off it, most in the flare.
             let mut lashes = lash * (1.0 + 3.0 * n.s);
             while lashes > 0.0 {
                 if self.scatter.unit() < lashes.min(1.0) {
@@ -190,22 +178,17 @@ impl Renderer {
         );
     }
 
-    /// Every frame: the swelling star and the remnant light the ground round them.
+    /// Every frame: the remnant lights the ground round it.
     pub(super) fn novae_lights(&mut self, time: f32) {
         for n in &self.star_core_fx.novae {
-            if time >= n.bang && time < n.bang + 0.4 {
+            if time < n.bang + 0.4 {
                 // The flash carries the light of the bang itself.
                 continue;
             }
-            let colour = if time < n.bang {
-                WHITE.lerp(ROSE, 0.5)
-            } else {
-                LAVENDER
-            };
             self.lights.lamp(
                 n.centre,
                 Vec3::NEG_Z,
-                colour * (6.0 * n.now_r * n.now_glow),
+                LAVENDER * (6.0 * n.now_r * n.now_glow),
                 n.now_r * 8.0 + 10.0,
                 180.0,
                 1.0,
@@ -253,7 +236,7 @@ impl Renderer {
         // How far the shell gets: the crown's held to 75 m, so it stays a plant's death and does
         // not swallow the base round it.
         let reach = (r * (6.0 + 8.0 * s)).min(REACH_MAX);
-        // The flare's size at the bang: the shell starts at the star's face.
+        // The flare's size at the bang (`novae_tick`): the shell starts at the star's face.
         let face = r * 1.6;
         // The flash: white beyond the screen, then a broader, slower one.
         self.push_effect(centre.to_array(), bang, r * 5.0, 0.35, 9.0, 0.0);
