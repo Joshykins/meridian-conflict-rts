@@ -179,16 +179,19 @@ without toes.
   dark, so from above a unit reads as dark armour over bronze workings.
 - **Red highlights:** lit slots, optics and weapon heat, built into the model.
   Nothing on the plate's texture is lit.
-- **Clean, and true to the form** (`shaders/regency.wgsl`, reference: the
-  2026-10-02 factory mock-up). Broad satin plates, each facet a shade apart so a
-  faceted solid reads on black; a lit edge where a face ends; on about half the
-  broad faces one panel line let in round the face's own outline, corners cut.
-  Every line follows the face it is on: a face no rectangle fits (a triangle, a
-  slanted facet) carries the distances to its own edges (`MeshVertex::face`, edge
-  form), so its edge and line follow its true shape. No panels laid across the
-  model regardless of its shape, no vents, bolts, machine plate or engraving, no
-  noise in the colour. The bronze is plain and smooth, a turned collar near each
-  end of a column, polished along a block's edges.
+- **Real worn steel, true to the form** (`shaders/regency.wgsl`, references: the
+  2026-10-02 factory mock-ups). The plate is metal (metallic, reflecting the sky),
+  finished with scanned steel (CC0, `data/textures/metal`): its grain, wear,
+  scratches and uneven sheen, never its colour. The scan never repeats on a grid
+  and is laid coarser on big models so it still reads at their viewing distance.
+  Over it, everything follows the face it is on: each facet a shade apart, a worn
+  bright edge where a face ends, the face laid in big plates by seams parallel to
+  its longest edge (staggered like brickwork, grime in them), and on about half
+  the broad faces one panel line round the face's own outline. A face no
+  rectangle fits carries the distances to its own edges (`MeshVertex::face`, edge
+  form), so all of this follows its true shape. No procedural scratches or
+  noise patterns, no vents, bolts or engraving, nothing lit on the plate. The
+  bronze takes the same scan's scratches, a turned collar near each column end.
 
 ### Names
 
