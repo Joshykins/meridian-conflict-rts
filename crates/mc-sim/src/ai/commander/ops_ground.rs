@@ -437,8 +437,18 @@ impl World {
                     });
                     orders += 1;
                 }
-                if !self.mostly_idle(&rows, &ctx.arrived) {
+                // Done there once mostly idle, or once the group's middle stands at the
+                // target with nothing to fight, or five minutes out with nothing in
+                // front of it: a wave of 340 never counted as mostly idle (a few of
+                // so many always have somewhere to walk) and stood 1.4 km from home
+                // for ten minutes while the side earned 2000 a second.
+                let there = centre.distance(op.target) < Fx::from_int(600) && facing == Fx::ZERO;
+                let stalled = facing == Fx::ZERO && tick > op.phase_since + 3000;
+                if !(self.mostly_idle(&rows, &ctx.arrived) || there || stalled) {
                     return orders;
+                }
+                if stalled {
+                    op.phase_since = tick;
                 }
                 // Done there: on to the next, or back to gather. A wave takes on only
                 // groups nearby it beats; anything more is decided again at the rally

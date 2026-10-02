@@ -299,16 +299,18 @@ impl World {
                         .slots
                         .iter()
                         .filter(|&r| {
-                            units.owner[r] == ctx.player
-                                && ctx.profiles.get(units.blueprint[r]).has(role::ANTI_AIR)
+                            let p = ctx.profiles.get(units.blueprint[r]);
+                            units.owner[r] == ctx.player && p.has(role::ANTI_AIR) && p.mobile()
                         })
                         .map(|r| ctx.profiles.get(units.blueprint[r]).mass.floor_int())
                         .sum()
                 };
                 // Aircraft that outreach its ground anti-air are not covered by it.
                 let outranging = self.outranging_air(ctx.player, ctx.profiles).floor_int();
-                let covered =
-                    outranging < 1000 && our_aa * 2 >= (air - outranging).max(0) * 3 + 1500;
+                // Nor is it covered while aircraft are still killing it.
+                let covered = outranging < 1000
+                    && from_above < 300
+                    && our_aa * 2 >= (air - outranging).max(0) * 3 + 1500;
                 (b.air.max(b.space) * 2 / 3 + (air / 100).min(90) + (from_above / 50).min(80)
                     - 70 * covered as i32)
                     .max(0)
@@ -661,6 +663,31 @@ impl World {
             let special = matches!(o.kind, OpKind::Raid | OpKind::Landing | OpKind::Siege);
             if special && off(o.plan) && o.phase == Phase::Gathering {
                 o.phase = Phase::Done;
+            }
+        }
+        // One army, not a trickle: while a wave is out fighting, what gathers behind
+        // it joins it once it is worth a thousand mass, instead of setting out alone
+        // later. Waves of two and three thousand each met a five-thousand enemy
+        // army one after another and traded 1:3.
+        if let Some(out) = c
+            .ops
+            .iter()
+            .position(|o| o.kind == OpKind::Army && o.phase == Phase::Executing)
+        {
+            let joining: Vec<usize> = (0..c.ops.len())
+                .filter(|&i| {
+                    let o = &c.ops[i];
+                    o.kind == OpKind::Army
+                        && o.phase == Phase::Gathering
+                        && o.mass() >= Fx::from_int(1000)
+                })
+                .collect();
+            for i in joining {
+                let units = std::mem::take(&mut c.ops[i].units);
+                let mass: Fx = units.iter().map(|&(_, m)| m).sum();
+                let o = &mut c.ops[out];
+                o.units.extend(units);
+                o.launched += mass;
             }
         }
         // How much each waits for before it goes.

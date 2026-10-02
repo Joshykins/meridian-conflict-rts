@@ -236,8 +236,14 @@ impl World {
                 .min(free.div_ceil(2))
                 .min(MOST_EXPANDERS)
         };
+        // A force the plans want with no factory to make it gets one even while
+        // stalling: its plans were held all in for twenty minutes with no shipyard
+        // while boats shelled its coast, since a stalling side builds no factory.
+        let shares = self.force_shares(player);
+        let missing = (shares[1] > 0 && census.air_factories == 0)
+            || (shares[2] + shares[3] > 0 && census.naval_factories == 0);
         let factories_wanted = census.factories.len()
-            + (room(factory_draw, army_share)
+            + ((room(factory_draw, army_share) || missing)
                 && census.factories.len() < skill.factory_cap as usize) as usize;
         // Engineers by what is waiting for them: one more while every builder is
         // busy and power, ore or a factory waits, never more while stalling, and

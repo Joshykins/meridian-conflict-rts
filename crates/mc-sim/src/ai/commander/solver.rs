@@ -189,13 +189,23 @@ impl World {
             }
         }
         let share = |m: Fx| (m * 1000 / all.max(Fx::ONE)).floor_int() as i64;
-        let (air_share, fort_share) = (share(air), share(forts));
+        // Aircraft and warships that outreach its anti-air are for fighters and
+        // turrets (`outranging_air`), not for anti-air in the army: corvettes over
+        // a coast made a third of a side's army anti-air tanks they outranged.
+        let outranging = self.outranging_air(player, &profiles);
+        let reachable = (air - outranging).max(Fx::ZERO);
+        let (air_share, fort_share) = (share(reachable), share(forts));
         // What has been killing it, in thousandths of its recent losses: the side
         // answers what hurts it, not only what it has seen.
         let hurt = c.hurt;
         let lost: Fx = hurt.iter().copied().sum::<Fx>().max(Fx::from_int(300));
         let hurt_by = |k: Hurt| (hurt[k as usize] * 1000 / lost).floor_int() as i64;
-        let from_above = hurt_by(Hurt::Air) + hurt_by(Hurt::Space);
+        let from_above = hurt_by(Hurt::Air)
+            + if outranging > Fx::ZERO {
+                0
+            } else {
+                hurt_by(Hurt::Space)
+            };
         let air_share = air_share.max(from_above);
         let fort_share = fort_share.max(hurt_by(Hurt::Artillery) + hurt_by(Hurt::Static));
         // Roles within each force and the share (per mille) of its mass each
@@ -211,13 +221,16 @@ impl World {
                 .slots
                 .iter()
                 .filter(|&r| {
-                    units.owner[r] == player && profiles.get(units.blueprint[r]).has(role::ANTI_AIR)
+                    let p = profiles.get(units.blueprint[r]);
+                    units.owner[r] == player && p.has(role::ANTI_AIR) && p.mobile()
                 })
                 .map(|r| profiles.get(units.blueprint[r]).mass)
                 .sum()
         };
-        let outranging = self.outranging_air(player, &profiles);
-        let aa_enough = our_aa * 2 >= (air - outranging).max(Fx::ZERO) * 3 + Fx::from_int(1500);
+        // Only what goes with the army covers it (turrets at home did not), and
+        // never while aircraft do a fifth of the killing: T1 bombers and gunships
+        // light for their mass killed a wave of tanks at its rally point.
+        let aa_enough = from_above < 200 && our_aa * 2 >= reachable * 3 + Fx::from_int(1500);
         let aa_land = if aa_enough {
             if air_seen {
                 60
@@ -225,9 +238,16 @@ impl World {
                 0
             }
         } else {
+            // The anti-air plan held against warships out of its reach is the air
+            // force's to answer, not the army's.
+            let mostly_out_of_reach = outranging > reachable;
             (air_share * 7 / 10).min(400)
                 + if air_seen { 80 } else { 0 }
-                + 60 * stake(PlanKind::AirDefense)
+                + if mostly_out_of_reach {
+                    0
+                } else {
+                    60 * stake(PlanKind::AirDefense)
+                }
         };
         let roles: [Vec<(Fits, i64)>; FORCES] = [
             vec![
