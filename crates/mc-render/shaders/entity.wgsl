@@ -2807,9 +2807,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if ((in.material < MAT_METAL && in.material != MAT_GLOW) || in.material == MAT_PLATING_DARK || precursor)
         && (flags & KIND_GHOST) == 0u && !wreck {
         var si: SurfaceIn;
-        si.st = in.face.xy;
-        si.half = abs(in.face.zw);
-        si.wraps = in.face.z < 0.0;
+        // The edge form of a face (negative w, Regency faces no rectangle fits) is
+        // regency.wgsl's: here it is a face with no frame.
+        let framed = in.face.w >= 0.0;
+        si.st = select(vec2<f32>(0.0), in.face.xy, framed);
+        si.half = select(vec2<f32>(0.0), abs(in.face.zw), framed);
+        si.wraps = in.face.z < 0.0 && framed;
         si.dark = in.material == MAT_ACCENT || in.material == MAT_PRECURSOR_DARK;
         si.pattern = (in.model_class >> 16u) & 0xFFu;
         // Precursor alloy is always precursor plate unless the model asks for something else.
@@ -2885,8 +2888,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             m.metallic = clamp(m.metallic + 0.3 * broad, 0.0, 1.0);
         }
     }
-    // Regency plate and bronze (regency.wgsl): panels, bolts, vents and red lines cut in
-    // the model's own space, turned and engraved bronze.
+    // Regency plate and bronze (regency.wgsl): each facet its own sheen, lit edges, a
+    // panel line that follows the face, collared bronze.
     var regency = regency_none();
     let bronze = in.material == MAT_METAL;
     if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER && (bronze || in.material == MAT_PLATING_DARK)
@@ -2895,20 +2898,18 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let dl2 = dpdy(in.local);
         var ri: RegencyIn;
         ri.local = in.local;
-        ri.n = normalize(cross(dl1, dl2) + vec3<f32>(0.0, 0.0, 1e-9));
         ri.px = local_px;
         ri.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);
-        ri.time = time;
-        ri.health = select(in.state.y, 1.0, (flags & FLAG_UNDER_CONSTRUCTION) != 0u);
-        ri.along = in.face.y;
-        ri.along_dir = vec3<f32>(0.0);
-        if in.face.z < 0.0 {
-            let grad = reg_face_grad(dpdx(in.face.y), dpdy(in.face.y), dl1, dl2);
-            ri.along_dir = grad * inverseSqrt(max(dot(grad, grad), 1e-12));
+        ri.face = in.face;
+        ri.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
+        // How each of the face's coordinates grows in model space.
+        let df1 = dpdx(in.face);
+        let df2 = dpdy(in.face);
+        for (var k = 0u; k < 4u; k++) {
+            ri.grads[k] = reg_face_grad(df1[k], df2[k], dl1, dl2);
         }
         regency = regency_look(ri, bronze);
         n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));
-        lights += regency.emissive;
     }
     // Mineral props share the terrain's rock texture and correctly oriented normals.
     if in.material == 10u {
@@ -3374,9 +3375,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // on from the paint it sank in.
         let painted = m;
         var si: SurfaceIn;
-        si.st = in.face.xy;
-        si.half = abs(in.face.zw);
-        si.wraps = in.face.z < 0.0;
+        // The edge form of a face (negative w, Regency faces no rectangle fits) is
+        // regency.wgsl's: here it is a face with no frame.
+        let framed = in.face.w >= 0.0;
+        si.st = select(vec2<f32>(0.0), in.face.xy, framed);
+        si.half = select(vec2<f32>(0.0), abs(in.face.zw), framed);
+        si.wraps = in.face.z < 0.0 && framed;
         si.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
         si.unit = in.state.w;
         si.scale = clamp(0.55 * pow(in.weld.z, 0.6), 0.7, 6.0);

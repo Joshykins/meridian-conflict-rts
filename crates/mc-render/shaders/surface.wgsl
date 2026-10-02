@@ -29,7 +29,7 @@ const PAT_PLASMA: u32 = 15u;
 const PAT_FLUX: u32 = 16u;
 const PAT_VEINED: u32 = 17u;
 const PAT_PRECURSOR: u32 = 18u;
-// Regency hide (`pattern::EMBER`, 29): Aster's dark plating, its level lights the Regency's red.
+// Regency plate (`pattern::EMBER`, 29): plain satin plate, coloured in regency.wgsl.
 const PAT_EMBER: u32 = 29u;
 
 // The lights let into dark plating, and the hot end of a furnace.
@@ -45,8 +45,6 @@ const SURF_PRECURSOR_HOT: vec3<f32> = vec3<f32>(0.8, 0.9, 1.0);
 // A reactor's burning core: deep blue where it is thin, near white where it is hot.
 const SURF_PLASMA_DEEP: vec3<f32> = vec3<f32>(0.10, 0.34, 1.0);
 const SURF_PLASMA_HOT: vec3<f32> = vec3<f32>(0.72, 0.90, 1.0);
-// The Regency's light in their hide: a deep blood red, kept off orange (the tonemap lifts green first).
-const SURF_EMBER: vec3<f32> = vec3<f32>(1.0, 0.04, 0.05);
 
 struct SurfaceIn {
     // Metres from the middle of the face, and the face's half size.
@@ -584,6 +582,8 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
             let d = abs(select(st.y, st.x, i.half.y > i.half.x));
             h = min(h, 0.5 + 0.5 * surf_rise(d, i.scale * 0.05, bevel));
         }
+        // Regency plate: its outline only; its panel line is regency.wgsl's.
+        case PAT_EMBER: {}
         case 18u: {
             // Deep incised grooves; panels either side stand at slightly different heights,
             // and a light sits down in its slot.
@@ -602,8 +602,7 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
                 let dash = surf_dashes(i, st, cell);
                 let slot = surf_band(dash.d, i.scale * 0.022, 0.0) * step(0.0, dash.along) * dash.on;
                 h -= 0.6 * slot * outlined;
-            } else if small > i.scale * 0.3 && i.pattern != PAT_EMBER {
-                // Regency plate is cut into panels of its own (regency.wgsl).
+            } else if small > i.scale * 0.3 {
                 h = min(h, surf_relief_plates(i, st, bevel, gap));
             }
         }
@@ -1194,6 +1193,8 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 out.paint = vec4<f32>(0.03, 0.05, 0.07, lips * 0.85);
                 out.rough -= 0.3 * lips;
             }
+            // Regency plate: plain, coloured and lined in regency.wgsl.
+            case PAT_EMBER: {}
             default: {
                 if i.dark {
                     // Little level lights let into the black.
@@ -1207,10 +1208,7 @@ fn surface_at(i: SurfaceIn) -> Surface {
                         out.bare = max(out.bare, 0.3 * surf_band(d_cell - gap * 1.6, gap * 0.9, fw));
                     }
                     // Only the Precursors' veins are lit: Aster's black carries no orange lines.
-                    let ember = i.pattern == PAT_EMBER;
-                    let veined = select(0.0, 1.0, i.pattern == PAT_VEINED || ember);
-                    // A Regency unit's hide is lit at every tier: it is alive, not painted.
-                    let hide_lit = select(i.lit, 1.0, ember);
+                    let veined = select(0.0, 1.0, i.pattern == PAT_VEINED);
                     let lit = surf_band(dash.d, w, fw) * surf_step(dash.along, 0.0, fw) * dash.on * outlined * veined;
                     // A slow shimmer along the line; a hurt unit's lights falter and go out.
                     let shimmer = 0.78 + 0.22 * sin(i.time * 1.3 + st.x / i.scale * 1.9 + dash.id * 40.0);
@@ -1218,13 +1216,13 @@ fn surface_at(i: SurfaceIn) -> Surface {
                     var alive = 1.0 - smoothstep(failing * 0.9, failing * 0.9 + 0.12, hurt * 1.05);
                     let sputter = step(0.35, hash11(floor(i.time * 9.0 + dash.id * 90.0) * 0.173 + dash.id));
                     alive = max(alive, (1.0 - smoothstep(failing * 0.9 + 0.12, failing * 0.9 + 0.3, hurt)) * sputter);
-                    let tone = select(select(SURF_ORANGE, SURF_PRECURSOR, i.pattern == PAT_VEINED), SURF_EMBER * 1.6, ember);
-                    out.emissive = tone * lit * shimmer * alive * lamp * hide_lit;
-                    out.paint = vec4<f32>(SURF_SAFETY, lit * (1.0 - hide_lit));
+                    let tone = select(SURF_ORANGE, SURF_PRECURSOR, i.pattern == PAT_VEINED);
+                    out.emissive = tone * lit * shimmer * alive * lamp * i.lit;
+                    out.paint = vec4<f32>(SURF_SAFETY, lit * (1.0 - i.lit));
                     out.cavity = 1.0 - 0.5 * surf_band(dash.d, w * 1.9, fw) * surf_step(dash.along, -w, fw) * dash.on * outlined * veined;
                     // Scuffed edges read lighter on black, which is what draws its forms.
                     out.bare = max(out.bare, 0.55 * (1.0 - smoothstep(0.0, bevel * 0.9, d_face)) * outlined);
-                } else if small > i.scale * 0.3 && i.pattern != PAT_EMBER {
+                } else if small > i.scale * 0.3 {
                     let cell = surf_courses(i, st, vec2<f32>(i.scale * 1.5, i.scale));
                     let d_cell = surf_edge(cell.p, cell.half);
                     out.cavity = 1.0 - 0.62 * surf_band(d_cell, gap, fw);

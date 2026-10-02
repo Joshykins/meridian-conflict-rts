@@ -891,6 +891,14 @@ shared! {
         pub const RIDING: u32 = 0x400;
     }
 
+    /// A face's outline as distances to its own edges (`MeshVertex::face`, edge form): a
+    /// Regency face no rectangle fits, so its lit edge and panel line follow the polygon
+    /// (regency.wgsl). The fourth distance is stored negated and pushed this many metres
+    /// further below zero, so a negative w marks the form and survives rounding.
+    pub mod face_edges as "FACE_EDGES_" {
+        pub const BIAS: f32 = 0.05;
+    }
+
     /// Waves breaking on the shore (shore.wgsl), heard where they break
     /// (`mc_render::shore`, the ambience's wave sounds).
     pub mod surf as "SURF_" {

@@ -290,7 +290,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     // Gunmetal steel: the plate darker, ribs and rail a lighter worn edge.
     var albedo = vec3<f32>(0.2, 0.215, 0.23) * (0.85 + 0.25 * grain.r);
-    var emissive = vec3<f32>(0.0);
     var metal = 0.75;
     var rough = 0.5 + 0.2 * grain.g;
     if in.part == PART_PLATE {
@@ -323,7 +322,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             let foot = fract(in.slope.x / PLATE_M) * PLATE_M;
             let fv = fract(in.slope.y / PLATE_M) * PLATE_M;
             let side = min(fv, PLATE_M - fv);
-            let fine = 1.0 - smoothstep(0.03, 0.1, px);
             // A sunk seam between plates with a bright steel lip beside it, and the
             // foot's edge lit where it breaks over the step.
             let groove = 1.0 - smoothstep(0.03, 0.03 + px, side);
@@ -331,25 +329,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             let edge = 1.0 - smoothstep(0.1, 0.1 + px, foot);
             albedo = mix(albedo, REG_STEEL_LIT, 0.5 * max(lip, edge));
             albedo *= 1.0 - 0.7 * groove;
-            // Two bolt heads up by the plate's head.
-            let bolt = vec2<f32>(foot - PLATE_M * 0.84, abs(fv - PLATE_M * 0.5) - PLATE_M * 0.3);
-            let head = 1.0 - smoothstep(0.07, 0.07 + px, length(bolt));
-            albedo = mix(albedo, REG_STEEL_LIT * 0.8, head * fine);
-            // On some plates, a red line let in across it near the foot, breathing.
-            let pin = (1.0 - smoothstep(0.025, 0.025 + px, abs(foot - 0.42)))
-                * (1.0 - smoothstep(PLATE_M * 0.3, PLATE_M * 0.3 + px, abs(fv - PLATE_M * 0.5)));
-            let breath = 0.75 + 0.25 * sin(globals.camera.w * 1.3 + in.plate * 40.0);
-            emissive = SURF_EMBER * pin * step(in.plate, 0.3) * breath * 1.5 * (1.0 - smoothstep(0.05, 0.2, px));
-            albedo *= 1.0 - 0.8 * pin;
         } else {
             albedo = mix(albedo, REG_STEEL_LIT, 0.2);
         }
     } else {
         // Bronze: the machinery the plates lie over, showing at each step, and the
-        // rail along the top; turned in collars and grooves.
-        let rings = reg_bronze_rings(in.slope.y, select(1.6, 2.0, in.part == PART_LIP));
-        albedo = mix(REG_BRONZE_DEEP, REG_BRONZE, 0.75 + 0.25 * grain.r) * rings;
-        albedo = mix(albedo, REG_GOLD, 0.35 * saturate(rings - 1.0));
+        // rail along the top; plain, a little polished.
+        albedo = mix(REG_BRONZE_DEEP, REG_BRONZE, 0.8 + 0.2 * grain.r);
         metal = 0.88;
         rough = 0.42 + 0.1 * grain.g;
     }
@@ -362,13 +348,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     m.albedo = albedo;
     m.metallic = metal;
     m.roughness = rough;
-    m.emissive = emissive;
+    m.emissive = vec3<f32>(0.0);
     let shadow = sun_shadow(p, n);
     let sky_vis = 0.85 * screen_ao(in.clip.xy);
     var color = shade_pbr_vis(m, n, v, globals.sun.xyz, shadow, sky_vis);
     color += albedo * lightning_light(p, n) * 0.35;
     color += local_lights(m, p, n, v);
-    color += emissive;
     color = apply_fog_of_war(color, p.xy);
     color = apply_haze(color, p, eye);
     return vec4<f32>(color, 1.0);

@@ -19,6 +19,9 @@ use glam::{Affine3A, Vec2, Vec3};
 
 use super::{material, part, pattern, rig, Legs, MeshLod, MeshVertex, Treads, LOD_COUNT};
 
+mod frames;
+use frames::{FaceEdges, FaceFrame, Framing, Tube};
+
 /// Triangles smaller than this (m²) are dropped instead of emitted.
 const MIN_TRIANGLE_AREA: f32 = 2.0e-5;
 /// Points closer than this (m) are merged when a face is emitted.
@@ -1684,7 +1687,17 @@ impl MeshBuilder {
             Framing::Tube(tube) => Some(tube.frame(points)),
             Framing::Bare => None,
         };
-        let seed = frame.as_ref().map_or(0, FaceFrame::seed);
+        // A Regency face no rectangle fits still gets its outline: its own edges.
+        let edges = (frame.is_none()
+            && self.pattern == pattern::EMBER
+            && matches!(self.framing, Framing::Flat))
+        .then(|| FaceEdges::of(points, normal))
+        .flatten();
+        let seed = match (&frame, &edges) {
+            (Some(f), _) => f.seed(),
+            (None, Some(e)) => e.seed,
+            (None, None) => 0,
+        };
         let surface = self.pattern | seed << 8;
         for (k, &p) in points.iter().enumerate() {
             let uv = if abs.x >= abs.y && abs.x >= abs.z {
@@ -1709,7 +1722,11 @@ impl MeshBuilder {
                 material: self.material,
                 part: self.part,
                 rig: self.rig,
-                face: frame.as_ref().map_or([0.0; 4], |f| f.at(p)),
+                face: match (&frame, &edges) {
+                    (Some(f), _) => f.at(p),
+                    (None, Some(e)) => e.at(p),
+                    (None, None) => [0.0; 4],
+                },
                 surface,
             });
         }
@@ -2129,189 +2146,6 @@ fn ring_is_round(rings: &[Vec<Vec3>]) -> bool {
         let area = newell_normal(ring).length() * 0.5;
         perimeter > 1e-3 && 4.0 * PI * area / (perimeter * perimeter) >= 0.93
     })
-}
-
-// ---- face frames -----------------------------------------------------------
-
-/// How a face's vertices get their [`MeshVertex::face`] frame.
-#[derive(Clone, Copy)]
-enum Framing {
-    /// From the face's own outline.
-    Flat,
-    /// From the tube the face is a facet of.
-    Tube(Tube),
-    /// None: the shader draws no fitted detail on it.
-    Bare,
-}
-
-/// A face's own coordinate system: the smallest rectangle round its outline.
-struct FaceFrame {
-    s: Vec3,
-    t: Vec3,
-    /// Middle of the rectangle, in (s, t).
-    centre: Vec2,
-    half: Vec2,
-    /// A tube: s is the way round, and `centre.x` the face's own angle.
-    tube: Option<Tube>,
-}
-
-impl FaceFrame {
-    /// The frame of a planar polygon, or none for one that fills too little of
-    /// its rectangle for an outline along the rectangle to mean anything.
-    fn flat(points: &[Vec3], normal: Vec3) -> Option<FaceFrame> {
-        let extent = |u: Vec3, v: Vec3| {
-            points.iter().fold(
-                (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)),
-                |(lo, hi), p| {
-                    let q = Vec2::new(p.dot(u), p.dot(v));
-                    (lo.min(q), hi.max(q))
-                },
-            )
-        };
-        // Level first: on a wall the frame that runs level, on a deck the one square to
-        // the model. Lines drawn "horizontal" then are, even on a gable whose longest
-        // edge slopes. A tilted frame has to be a much better fit to win (a raked beam).
-        let level = if normal.z.abs() < 0.9 {
-            Vec3::Z.cross(normal).normalize()
-        } else {
-            normal.cross(Vec3::X.cross(normal)).normalize()
-        };
-        let (lo, hi) = extent(level, normal.cross(level));
-        let level_area = (hi.x - lo.x) * (hi.y - lo.y);
-        let mut best: Option<(f32, Vec3, Vec3)> =
-            Some((level_area * 0.7, level, normal.cross(level)));
-        // The smallest bounding rectangle of a convex outline lies along one of its edges.
-        for (i, &p) in points.iter().enumerate() {
-            let Some(u) = (points[(i + 1) % points.len()] - p).try_normalize() else {
-                continue;
-            };
-            let v = normal.cross(u);
-            let (lo, hi) = extent(u, v);
-            let area = (hi.x - lo.x) * (hi.y - lo.y);
-            // Strictly smaller by a margin, so a rectangle keeps its first edge and mirrored halves agree.
-            if best.is_none_or(|(a, ..)| area < a * 0.999) {
-                best = Some((area, u, v));
-            }
-        }
-        let (_, a, b) = best?;
-        let (lo, hi) = extent(a, b);
-        let area = (hi.x - lo.x) * (hi.y - lo.y);
-        let covered = newell_normal(points).length() * 0.5;
-        if area <= 1e-8 || covered < area * 0.62 {
-            return None;
-        }
-        // On a wall t runs up it, so "horizontal" means the same thing on every
-        // face; on a deck s runs the way the model faces.
-        let (s, t) = if normal.z.abs() < 0.9 {
-            let t = if a.z.abs() >= b.z.abs() { a } else { b };
-            let t = if t.z < 0.0 { -t } else { t };
-            (t.cross(normal), t)
-        } else {
-            let s = if a.x.abs() >= b.x.abs() { a } else { b };
-            let s = if s.x < 0.0 { -s } else { s };
-            (s, normal.cross(s))
-        };
-        let (lo, hi) = extent(s, t);
-        Some(FaceFrame {
-            s,
-            t,
-            centre: (lo + hi) * 0.5,
-            half: (hi - lo) * 0.5,
-            tube: None,
-        })
-    }
-
-    fn at(&self, p: Vec3) -> [f32; 4] {
-        if let Some(tube) = self.tube {
-            let around = tube.angle(p) - self.centre.x;
-            let around = self.centre.x + (around + PI).rem_euclid(TAU) - PI;
-            return [
-                around * tube.radius,
-                (p - tube.origin).dot(tube.axis) - tube.length * 0.5,
-                -self.half.x,
-                self.half.y,
-            ];
-        }
-        [
-            p.dot(self.s) - self.centre.x,
-            p.dot(self.t) - self.centre.y,
-            self.half.x,
-            self.half.y,
-        ]
-    }
-
-    /// A byte of randomness that a face keeps across levels of detail and
-    /// shares with its mirror image.
-    fn seed(&self) -> u32 {
-        let q = |v: f32| (v * 8.0).round() as i32 as u32;
-        let middle = match self.tube {
-            Some(tube) => tube.origin,
-            None => self.s * self.centre.x + self.t * self.centre.y,
-        };
-        let mut h = 0x9E37_79B9u32;
-        for v in [
-            q(middle.x),
-            q(middle.y.abs()),
-            q(self.half.x),
-            q(self.half.y),
-        ] {
-            h = (h ^ v).wrapping_mul(0x85EB_CA6B);
-            h ^= h >> 13;
-        }
-        (h >> 8) & 0xFF
-    }
-}
-
-/// The shared frame of a tube's side facets.
-#[derive(Clone, Copy)]
-struct Tube {
-    origin: Vec3,
-    axis: Vec3,
-    /// Where the angle round the axis is zero.
-    zero: Vec3,
-    radius: f32,
-    length: f32,
-}
-
-impl Tube {
-    /// From a loft's rings (already in final space), or none for one with no length.
-    fn around(rings: &[Vec<Vec3>]) -> Option<Tube> {
-        let middle = |ring: &Vec<Vec3>| ring.iter().copied().sum::<Vec3>() / ring.len() as f32;
-        let (origin, end) = (middle(&rings[0]), middle(&rings[rings.len() - 1]));
-        let length = origin.distance(end);
-        let axis = (end - origin).try_normalize()?;
-        let mut radius = 0.0;
-        for ring in rings {
-            let c = middle(ring);
-            radius += ring.iter().map(|p| p.distance(c)).sum::<f32>() / ring.len() as f32;
-        }
-        let radius = radius / rings.len() as f32;
-        let reference = if axis.z.abs() < 0.9 { Vec3::Z } else { Vec3::X };
-        let zero = (reference - axis * reference.dot(axis)).try_normalize()?;
-        (radius > 1e-4).then_some(Tube {
-            origin,
-            axis,
-            zero,
-            radius,
-            length,
-        })
-    }
-
-    fn angle(&self, p: Vec3) -> f32 {
-        let r = p - self.origin;
-        r.dot(self.axis.cross(self.zero)).atan2(r.dot(self.zero))
-    }
-
-    fn frame(self, points: &[Vec3]) -> FaceFrame {
-        let middle = points.iter().copied().sum::<Vec3>() / points.len() as f32;
-        FaceFrame {
-            s: Vec3::ZERO,
-            t: self.axis,
-            centre: Vec2::new(self.angle(middle), 0.0),
-            half: Vec2::new(PI * self.radius, self.length * 0.5),
-            tube: Some(self),
-        }
-    }
 }
 
 // ---- profile helpers -------------------------------------------------------

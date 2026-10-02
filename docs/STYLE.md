@@ -177,15 +177,18 @@ without toes.
 - **Dark bronze**, a little off true bronze (Scorponok), on the exposed
   machinery under the plates: shafts, joints, cables, rings. The plates stay
   dark, so from above a unit reads as dark armour over bronze workings.
-- **Red highlights:** lit lines, optics and weapon heat.
-- **Detail is cut, not painted** (`shaders/regency.wgsl`). The plate is cut into
-  panels in the model's own space, so a seam runs on round a faceted solid from
-  facet to facet, with chamfered corners, and on black the panels are drawn by
-  light: a sunk seam with a bright steel lip, each panel its own sheen, small
-  bolt heads, chevron vents, machine plate of hairline hatches and slots, and a
-  red line let into a few pin lines. The bronze is turned (collars and lathe
-  grooves on rams and cables) or engraved (inset lines and keys on blocks),
-  dark in its grooves and worn to gold on its high metal.
+- **Red highlights:** lit slots, optics and weapon heat, built into the model.
+  Nothing on the plate's texture is lit.
+- **Clean, and true to the form** (`shaders/regency.wgsl`, reference: the
+  2026-10-02 factory mock-up). Broad satin plates, each facet a shade apart so a
+  faceted solid reads on black; a lit edge where a face ends; on about half the
+  broad faces one panel line let in round the face's own outline, corners cut.
+  Every line follows the face it is on: a face no rectangle fits (a triangle, a
+  slanted facet) carries the distances to its own edges (`MeshVertex::face`, edge
+  form), so its edge and line follow its true shape. No panels laid across the
+  model regardless of its shape, no vents, bolts, machine plate or engraving, no
+  noise in the colour. The bronze is plain and smooth, a turned collar near each
+  end of a column, polished along a block's edges.
 
 ### Names
 

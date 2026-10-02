@@ -404,7 +404,9 @@ pub struct MeshVertex {
     /// Where the vertex sits on its own face, so the shader can fit detail to the face's
     /// shape: xy metres from the middle of the face's bounding rectangle, along the face's
     /// own axes (y runs up a wall), zw that rectangle's half size. A negative half width
-    /// marks x as going right round a tube: no outline there. All zero: no frame.
+    /// marks x as going right round a tube: no outline there. All zero: no frame. A
+    /// negative w marks the edge form instead (Regency faces no rectangle fits): metres
+    /// to up to four of the face's own edges, the fourth as `-(d + face_edges::BIAS)`.
     pub face: [f32; 4],
     /// [`pattern`] in the low byte, then a byte of per-face randomness.
     pub surface: u32,

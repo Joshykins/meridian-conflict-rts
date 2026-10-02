@@ -347,11 +347,14 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, shot: &Shot) -> Samples {
             let lerp3 = |x: [Vec3; 3]| x[0] * w[0] + x[1] * w[1] + x[2] * w[2];
             let normal = lerp3(normals).try_normalize().unwrap_or(Vec3::Z);
             let fa = [a.face, b.face, c.face];
+            // The edge form's four numbers all vary over the face; a frame's size does not.
+            let edge_form = a.face[3] < 0.0;
+            let lerp = |k: usize| fa[0][k] * w[0] + fa[1][k] * w[1] + fa[2][k] * w[2];
             let face = [
-                fa[0][0] * w[0] + fa[1][0] * w[1] + fa[2][0] * w[2],
-                fa[0][1] * w[0] + fa[1][1] * w[1] + fa[2][1] * w[2],
-                a.face[2],
-                a.face[3],
+                lerp(0),
+                lerp(1),
+                if edge_form { lerp(2) } else { a.face[2] },
+                if edge_form { lerp(3) } else { a.face[3] },
             ];
             hits[i] = Some(Hit {
                 pos: lerp3(p),
@@ -413,7 +416,18 @@ pub(super) fn rasterise(mesh: &MeshLod, size: usize, shot: &Shot) -> Samples {
             let (mut rough, metal) = finish(h.material);
             let mut albedo = base * h.tone;
             // Seams between armour panels, lit on the edge that faces the light.
-            if framed(h.material) {
+            if framed(h.material) && h.face[3] < 0.0 {
+                // The edge form: metres to the face's own edges.
+                let bias = crate::gpu_consts::face_edges::BIAS;
+                let e = h.face[0]
+                    .min(h.face[1])
+                    .min(h.face[2])
+                    .min(-h.face[3] - bias);
+                let w = pixel * 0.75;
+                if e < w * 2.2 {
+                    albedo *= 1.12;
+                }
+            } else if framed(h.material) {
                 let (st, half) = (
                     Vec2::new(h.face[0], h.face[1]),
                     Vec2::new(h.face[2].abs(), h.face[3].abs()),
