@@ -50,13 +50,22 @@ pub(super) struct GpuBeam {
     pad: f32,
 }
 
+/// A beam that has shut off, emptying out.
+struct Ended {
+    beam: GpuBeam,
+    /// The unit a moving kind's emitter rides on, and where on it the emitter sits (its
+    /// offset from the unit, turned back to heading zero), so the stream draining home
+    /// stays on the unit as it moves off. None for a beam drawn where it stands.
+    rides: Option<(u32, Vec3)>,
+}
+
 /// The beams on and the beams emptying out.
 #[derive(Default)]
 pub(super) struct WorkBeams {
     /// On, by the unit they come from and which of its beams (one per head).
     live: HashMap<(u32, u32), GpuBeam>,
     /// Shut off, with what was already on its way still arriving.
-    ended: Vec<GpuBeam>,
+    ended: Vec<Ended>,
     /// How many were written last.
     pub(super) count: u32,
     /// The sim tick last seen.
@@ -77,10 +86,6 @@ impl WorkBeams {
         }
         let on_since = if joined { time - ALREADY_ON } else { time };
         let mut was = std::mem::take(&mut self.live);
-        let shut_off = |mut old: GpuBeam, ended: &mut Vec<GpuBeam>| {
-            (old.end, old.beam.to_prev, old.from_prev) = (time, old.beam.to, old.beam.from);
-            ended.push(old);
-        };
         // Each source unit's pose this tick and last, to move its emitters back a tick.
         // Only live units: wrecks, props and ghosts share their ids' numbers with them.
         let not_units = KIND_WRECK | KIND_PROP | KIND_GHOST;
@@ -100,6 +105,14 @@ impl WorkBeams {
                 )
             })
             .collect();
+        let shut_off = |(source, _): (u32, u32), mut old: GpuBeam, ended: &mut Vec<Ended>| {
+            (old.end, old.beam.to_prev, old.from_prev) = (time, old.beam.to, old.beam.from);
+            let rides = poses
+                .get(&source)
+                .filter(|_| rides_its_unit(old.beam.kind, source))
+                .map(|pose| (source, pose.local_then(Vec3::from(old.beam.from))));
+            ended.push(Ended { beam: old, rides });
+        };
         // A reclaimer with several heads lists a beam per head under the same source, in
         // the same order every tick: the n-th of them carries on the n-th of last tick's.
         let mut heads: HashMap<u32, u32> = HashMap::new();
@@ -117,12 +130,12 @@ impl WorkBeams {
                     from_prev = old.beam.from;
                     trip_len = old.trip_len;
                 } else {
-                    shut_off(old, &mut self.ended);
+                    shut_off(key, old, &mut self.ended);
                 }
             }
             // A relay's emitter is its carrier's belly, not on the drone that is its source:
             // it keeps last tick's emitter. Every other emitter rides its own unit.
-            if MOVING_KINDS.contains(&beam.kind) && source & (1 << 31) == 0 {
+            if rides_its_unit(beam.kind, source) {
                 if let Some(pose) = poses.get(&source) {
                     from_prev = pose.back(Vec3::from(beam.from)).to_array();
                 }
@@ -140,23 +153,34 @@ impl WorkBeams {
                 },
             );
         }
-        for (_, old) in was {
-            shut_off(old, &mut self.ended);
+        for (key, old) in was {
+            shut_off(key, old, &mut self.ended);
         }
-        self.ended.retain(|b| {
-            let linger = if b.beam.kind == mc_sim::reclaim::BEAM_NANITE_SITE {
+        self.ended.retain(|e| {
+            let linger = if e.beam.beam.kind == mc_sim::reclaim::BEAM_NANITE_SITE {
                 NANITE_SITE_LINGER
             } else {
                 LINGER
             };
-            time - b.end < linger
+            time - e.beam.end < linger
         });
+        // What is still draining home keeps to its emitter while the unit lives.
+        for e in &mut self.ended {
+            let Some((pose, local)) = e
+                .rides
+                .and_then(|(source, local)| Some((poses.get(&source)?, local)))
+            else {
+                continue;
+            };
+            e.beam.beam.from = pose.world(local).to_array();
+            e.beam.from_prev = pose.back(Vec3::from(e.beam.beam.from)).to_array();
+        }
         // Deliberate cap: the GPU buffer holds `MAX_BEAMS`; past it, the rest go undrawn
         // this tick (they are cosmetic, and a thousand beams already fill any view).
         let all: Vec<GpuBeam> = self
             .live
             .values()
-            .chain(&self.ended)
+            .chain(self.ended.iter().map(|e| &e.beam))
             .copied()
             .take(MAX_BEAMS)
             .collect();
@@ -174,6 +198,25 @@ struct Pose {
 }
 
 impl Pose {
+    /// Where a point the unit carried a tick ago sits on it: its offset from where the unit
+    /// was then, turned back to heading zero.
+    fn local_then(&self, at: Vec3) -> Vec3 {
+        let off = at - self.prev;
+        let (s, c) = (-self.prev_heading).sin_cos();
+        Vec3::new(off.x * c - off.y * s, off.x * s + off.y * c, off.z)
+    }
+
+    /// Where a point on the unit (as `local_then` gives it) is now.
+    fn world(&self, local: Vec3) -> Vec3 {
+        let (s, c) = self.heading.sin_cos();
+        self.now
+            + Vec3::new(
+                local.x * c - local.y * s,
+                local.x * s + local.y * c,
+                local.z,
+            )
+    }
+
     /// Where a point carried on the unit was a tick ago: turned back and moved back with it.
     fn back(&self, at: Vec3) -> Vec3 {
         let turn = self.prev_heading - self.heading;
@@ -186,6 +229,12 @@ impl Pose {
         );
         self.prev + turned
     }
+}
+
+/// Whether a beam's emitter rides on its source unit. A relay's emitter is its carrier's
+/// belly, not on the drone that is its source; the kinds drawn where they stand ride on nothing.
+fn rides_its_unit(kind: u32, source: u32) -> bool {
+    MOVING_KINDS.contains(&kind) && source & (1 << 31) == 0
 }
 
 /// Emitter to where the beam grips its target (beams.wgsl `vs_beam`: `grip`).
@@ -219,6 +268,29 @@ mod tests {
         };
         let back = pose.back(Vec3::new(10.0, 2.0, 6.0));
         assert!(back.distance(Vec3::new(2.0, 0.0, 6.0)) < 1e-4, "{back}");
+    }
+
+    #[test]
+    fn a_point_on_a_unit_moves_with_it() {
+        // The point was 2 m ahead (east) of the unit a tick ago, heading 0.
+        let then = Pose {
+            prev: Vec3::new(4.0, -3.0, 1.0),
+            now: Vec3::new(9.0, -3.0, 1.0),
+            prev_heading: 0.0,
+            heading: 0.0,
+        };
+        let at = Vec3::new(6.0, -3.0, 3.0);
+        let local = then.local_then(at);
+        assert!(then.world(local).distance(Vec3::new(11.0, -3.0, 3.0)) < 1e-4);
+        // Later, turned a quarter left: the point is 2 m north of the unit.
+        let later = Pose {
+            prev: then.now,
+            now: Vec3::new(14.0, -3.0, 1.0),
+            prev_heading: 0.0,
+            heading: std::f32::consts::FRAC_PI_2,
+        };
+        let moved = later.world(local);
+        assert!(moved.distance(Vec3::new(14.0, -1.0, 3.0)) < 1e-4, "{moved}");
     }
 
     #[test]

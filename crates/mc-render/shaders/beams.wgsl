@@ -717,15 +717,17 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
 // bundle of strands of particles shot slowly across the gap: each a hairline thread that
 // writhes like liquid, beaded with motes drifting along it, violet as it leaves and red by
 // the time it arrives. The strands bow apart a little and turn slowly round the line
-// between the ends, meeting at both; their heads creep out when the work starts, and when
-// it stops their tails drain into the site. The moment the work starts both ends flash and
+// between the ends, meeting at both; their heads creep out when the work starts (never
+// taking longer than `STRAND_REACH` to arrive, however long the stream), and when it stops
+// their tails drain into the site. The moment the work starts both ends flash and
 // a lead (a faint hairline with motes racing down it) snaps across the gap, holding it
 // until the strands arrive. A knot of light where they pour in throws off motes, each let
 // finish its flight when the work stops.
 // `BEAM_NANITE_RECLAIM`: the Regency's reclaim (docs/STYLE.md "The Regency suite": nanites
 // build and take apart). The same stream from the emitter to where it grips its target,
 // red there and violet into the emitter, but its motes drift home along the strands: the
-// matter riding back.
+// matter riding back. When it stops the grip lets go first and the strands drain home into
+// the emitter.
 // `BEAM_NANITE_SITE`: round a site while it is fed, or round a refit. Splashes in slow
 // motion with no gravity: a thin violet ring appears round the hull (most near the build
 // front), its rim lifts into a crown, the light drains from the ring into the crown's
@@ -750,6 +752,12 @@ const STRAND_SEGS: u32 = 4u;
 // Metres a second a strand's head creeps out at, and its motes drift along it.
 const STRAND_SPEED: f32 = 8.0;
 const STRAND_FLOW: f32 = 3.5;
+// Seconds at most for a strand's head to cross the gap, and for its tail to drain away: a
+// reclaimer's stream can be hundreds of metres long and its wreck gone in a second.
+const STRAND_REACH: f32 = 0.9;
+const STRAND_DRAIN: f32 = 0.6;
+// Seconds between one strand setting out and the next.
+const STRAND_STAGGER: f32 = 0.06;
 // The stream's slots after its strands: the two glows, the lead, then motes.
 const STREAM_LEAD: u32 = 2u;
 // How fast the lead snaps across, metres a second.
@@ -811,13 +819,19 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     if slot < STRANDS * STRAND_SEGS {
         let i = f32(slot / STRAND_SEGS);
         let j = f32(slot % STRAND_SEGS);
-        // Heads creep out one after another; when the work stops the tails follow them
-        // in (quick enough on a long stream to be gone before the beam is dropped).
+        // Heads creep out one after another. When the work stops a stream that builds
+        // drains into the site, tails following heads in; one that takes apart lets go of
+        // its grip first, heads drawn back home into the emitter.
         let speed = STRAND_SPEED * (0.8 + 0.4 * hash(i * 5.3 + site));
-        let head = clamp((time - b.start - i * 0.14) * speed / len, 0.0, 1.0);
+        var head = clamp((time - b.start - i * STRAND_STAGGER) * max(speed, len / STRAND_REACH) / len, 0.0, 1.0);
         var tail = 0.0;
         if b.end >= 0.0 {
-            tail = clamp((time - b.end) * max(speed, len / 2.2) / len, 0.0, 1.0);
+            let drain = clamp((time - b.end) * max(speed, len / STRAND_DRAIN) / len, 0.0, 1.0);
+            if b.kind == BEAM_NANITE_RECLAIM {
+                head = min(head, 1.0 - drain);
+            } else {
+                tail = drain;
+            }
         }
         if head - tail < 0.002 {
             return hidden();
@@ -834,10 +848,10 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
         return o;
     }
     // All the strands in, and all drained away: what the glows follow.
-    let first = clamp((time - b.start) * STRAND_SPEED * 0.8 / len, 0.0, 1.0);
+    let first = clamp((time - b.start) * max(STRAND_SPEED * 0.8, len / STRAND_REACH) / len, 0.0, 1.0);
     var drained = 0.0;
     if b.end >= 0.0 {
-        drained = clamp((time - b.end) * max(STRAND_SPEED * 0.8, len / 2.2) / len, 0.0, 1.0);
+        drained = clamp((time - b.end) * max(STRAND_SPEED * 0.8, len / STRAND_DRAIN) / len, 0.0, 1.0);
     }
     let on = smoothstep(0.85, 1.0, first) * (1.0 - smoothstep(0.7, 1.0, drained));
     // The flash the work starts with (none on a beam that was on before we looked: its
