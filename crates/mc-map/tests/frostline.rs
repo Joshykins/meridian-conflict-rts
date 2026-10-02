@@ -15,9 +15,10 @@
 //!   a strand close by, the cliff base's only way down to the water is its
 //!   cove well away along the coast, the front has to go out onto the
 //!   bridge, the rear is furthest of all from the middle and from the sea;
-//! * the wall's towers stand on its line, a pair to every turn, and it parts
-//!   the climates: snow only east of it, juniper, pinyon and cottonwood only
-//!   west, spruce, pine and birch only east;
+//! * the wall's towers stand on its line in open sea, a pair to every turn,
+//!   none on the land bridge, and it parts the climates: snow only east of
+//!   it, juniper, pinyon and cottonwood only west, spruce, pine and birch
+//!   only east;
 //! * both sides have the same timber and the same wreckage;
 //! * the map's sidecar gives the renderer the wall's own line, the climates
 //!   either side of it and the lift the mesas were cut to.
@@ -27,7 +28,7 @@
 //! `cargo test --profile gate -p mc-map --test frostline -- --nocapture`
 
 use mc_core::{Fx, FxVec2};
-use mc_map::landmark::{FROSTLINE_STRATA_LIFT, FROSTLINE_WALL};
+use mc_map::landmark::{frostline_on_map, FROSTLINE_STRATA_LIFT, FROSTLINE_WALL};
 use mc_map::{Heightfield, MapFile, PropKind, CELL_SIZE_M};
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -36,7 +37,8 @@ fn fx(p: (f64, f64)) -> FxVec2 {
     FxVec2::new(Fx((p.0 * 65536.0) as i64), Fx((p.1 * 65536.0) as i64))
 }
 
-/// The head of the west's cove, where its canyon comes out (`bake/frostline.rs`).
+/// The head of the west's cove, where its canyon comes out, in the design's
+/// frame (`bake/frostline.rs`).
 const COVE_HEAD: (f64, f64) = (3_784.0, 1_434.0);
 
 /// Metres east of the wall.
@@ -239,30 +241,39 @@ fn frostline_plays_the_same_from_both_sides() {
                         n += 1;
                     }
                 }
-                seas.push(n);
+                seas.push((n, (cx as f64 * cell, cy as f64 * cell)));
             }
         }
     }
-    seas.sort_unstable_by(|a, b| b.cmp(a));
+    // (Largest first; no two start at one place.)
+    seas.sort_by(|a, b| b.partial_cmp(a).unwrap());
     println!(
         "{stem}: seas {:?} km²",
-        seas.iter().map(|&n| km2(n).round()).collect::<Vec<_>>()
+        seas.iter()
+            .map(|&(n, _)| km2(n).round())
+            .collect::<Vec<_>>()
     );
-    // (A rock pool under a cliff may be a ship's draught deep; it is no sea.)
-    if seas.len() < 2
-        || apart(seas[0] as f64, seas[1] as f64) > 0.06
-        || seas[2..].iter().any(|&n| km2(n) > 0.02)
-    {
+    if seas.len() < 2 || apart(seas[0].0 as f64, seas[1].0 as f64) > 0.06 {
         problems.push(format!(
-            "the two oceans are not the map's only two seas, of about one size: {:?} km²",
-            seas.iter().map(|&n| km2(n)).collect::<Vec<_>>()
+            "the two oceans are not of about one size: {:?} km²",
+            seas.iter()
+                .take(2)
+                .map(|&(n, _)| km2(n))
+                .collect::<Vec<_>>()
         ));
     }
-    let north = map.flood(map.cell_of((7_000.0, 12_000.0)), |x, y| map.sea_cell(x, y));
-    if at(&north, (10_600.0, 12_000.0)) < 0 {
+    // (A rock pool under a cliff may be a ship's draught deep; it is no sea.)
+    for &(n, at) in seas.iter().skip(2).filter(|s| km2(s.0) > 0.02) {
+        problems.push(format!("a third sea, {:.3} km², at {at:?}", km2(n)));
+    }
+    // (Two points of the north ocean, one either side of the wall.)
+    let (desert_side, alaska_side) = ((10_300.0, 14_800.0), (13_000.0, 14_800.0));
+    debug_assert!(east_of(desert_side) < 0.0 && east_of(alaska_side) > 0.0);
+    let north = map.flood(map.cell_of(desert_side), |x, y| map.sea_cell(x, y));
+    if at(&north, alaska_side) < 0 {
         problems.push("no ship can cross the wall in the north ocean".into());
     }
-    if at(&north, turn((7_000.0, 12_000.0))) >= 0 {
+    if at(&north, turn(desert_side)) >= 0 {
         problems.push("the two oceans meet".into());
     }
     let mut sea = [0usize; 2];
@@ -328,7 +339,7 @@ fn frostline_plays_the_same_from_both_sides() {
                 "the {name}'s cliff base is only {cliff:.0} m from a way down to the water"
             ));
         }
-        let cove = turn_if(side == 1, COVE_HEAD);
+        let cove = turn_if(side == 1, frostline_on_map(COVE_HEAD));
         let landing = to_sea[6 + side].1;
         if (landing.0 - cove.0).hypot(landing.1 - cove.1) > 700.0 {
             problems.push(format!(
@@ -359,7 +370,8 @@ fn frostline_plays_the_same_from_both_sides() {
         problems.push("the rear base is not the furthest from the middle".into());
     }
 
-    // The wall: its towers on the line, a pair to every turn.
+    // The wall: its towers on the line in open sea, a pair to every turn,
+    // none on the land bridge.
     let towers: Vec<(f64, f64)> = map
         .file
         .props()
@@ -367,13 +379,19 @@ fn frostline_plays_the_same_from_both_sides() {
         .filter(|p| p.kind == PropKind::PrecursorTower)
         .map(|p| (p.pos.x.to_f64(), p.pos.y.to_f64()))
         .collect();
-    if towers.len() < 13 || towers.iter().any(|&t| east_of(t).abs() > 1.0) {
+    if towers.len() < 8 || towers.iter().any(|&t| east_of(t).abs() > 1.0) {
         problems.push(format!("{} towers, or one off the wall", towers.len()));
     }
     for &t in &towers {
         let q = turn(t);
         if !towers.iter().any(|&o| (o.0 - q.0).hypot(o.1 - q.1) < 1.0) {
             problems.push(format!("the tower at {t:?} has no turned twin"));
+        }
+        let (cx, cy) = map.cell_of(t);
+        if !map.sea_cell(cx, cy) || from_mid(t) < 1_400.0 {
+            problems.push(format!(
+                "the tower at {t:?} stands on land or on the bridge"
+            ));
         }
     }
 

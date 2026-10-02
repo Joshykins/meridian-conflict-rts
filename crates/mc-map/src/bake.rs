@@ -96,8 +96,10 @@ pub enum Layout {
     Canyon,
     /// "Frostline": four against four across a land bridge between two
     /// oceans, the Precursors' climate wall down the middle: desert west of
-    /// it, Alaska east (see `frostline.rs`). Fair by a half turn wherever
-    /// units can go; the west side first, starts in pairs. Exactly 16 km.
+    /// it, Alaska east (see `frostline.rs`). The country lies turned a little
+    /// on the map, the oceans opening into two of its corners. Fair by a half
+    /// turn wherever units can go; the west side first, starts in pairs.
+    /// Exactly 16 km.
     Frostline,
 }
 

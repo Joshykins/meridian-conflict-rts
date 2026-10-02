@@ -48,26 +48,58 @@ fn the_bases_stand_level_and_the_coves_come_down_to_the_water() {
             );
         }
     }
-    for head in [COVE_HEAD, t.turned(COVE_HEAD)] {
+    for head in [on_map(COVE_HEAD), t.turned(on_map(COVE_HEAD))] {
         // A little way up the canyon from the head: its floor, just over the water.
         let h = t.height(head.0, head.1);
         assert!((-4.0..8.0).contains(&h), "a cove's head stands at {h}");
     }
 }
 
+/// The design's frame and the map's are one turn apart about the middle.
 #[test]
-fn the_wall_stands_on_its_footings_and_blocks_little() {
+fn the_design_is_laid_on_the_map_turned() {
+    let mid = (SIZE / 2.0, SIZE / 2.0);
+    assert_eq!(on_map(mid), mid);
+    for p in [(1_500.0, 8_192.0), (3_784.0, 1_434.0), (-2_000.0, 13_000.0)] {
+        let m = on_map(p);
+        let back = design(m);
+        assert!(dist(back, p) < 1e-6, "{p:?} comes back as {back:?}");
+        assert!((dist(m, mid) - dist(p, mid)).abs() < 1e-6);
+    }
+    // Clockwise: the design's west lies north of west on the map.
+    let rear = on_map(STARTS[0]);
+    assert!(rear.0 < mid.0 && rear.1 > mid.1, "{rear:?}");
+    // Every base and every ore field lies well inside the map.
+    for &(x, y) in STARTS {
+        let (mx, my) = on_map((x, y));
+        let inside = mx.min(my).min(SIZE - mx).min(SIZE - my);
+        assert!(inside > 1_500.0, "the base at {x}, {y} is {inside:.0} m in");
+    }
+    for &(x, y, _) in ORE.iter().chain(ISLE_ORE) {
+        let (mx, my) = on_map((x, y));
+        let inside = mx.min(my).min(SIZE - mx).min(SIZE - my);
+        assert!(inside > 600.0, "the ore at {x}, {y} is {inside:.0} m in");
+    }
+}
+
+#[test]
+fn the_wall_stands_in_the_sea_and_blocks_little() {
     let t = map();
     let towers: Vec<_> = t
         .precursor
         .iter()
         .filter(|s| s.kind == PropKind::PrecursorTower)
         .collect();
-    assert!(towers.len() >= 13, "{} towers", towers.len());
+    assert!(towers.len() >= 8, "{} towers", towers.len());
+    // No ground is made for the wall: the towers stand on the sea floor.
+    assert!(t.benches.is_empty());
+    let mid = (SIZE / 2.0, SIZE / 2.0);
     for s in &towers {
-        // On the line, and on a footing that stands out of the water.
+        // On the line, in open sea, off the land bridge.
         assert!(east_of(s.x, s.y).abs() < 1.0, "a tower off the wall");
-        assert!(t.natural(s.x, s.y) >= FOOTING - 0.5);
+        let h = t.natural(s.x, s.y);
+        assert!(h < -TOWER_DEPTH, "a tower stands in {:.0} m of water", -h);
+        assert!(dist((s.x, s.y), mid) > 1_400.0, "a tower on the bridge");
         // Its twin is there too.
         let q = t.turned((s.x, s.y));
         assert!(towers.iter().any(|o| dist((o.x, o.y), q) < 1.0));
@@ -79,8 +111,15 @@ fn the_wall_stands_on_its_footings_and_blocks_little() {
             .filter(|b| dist((a.x, a.y), (b.x, b.y)) > 1.0)
             .map(|b| dist((a.x, a.y), (b.x, b.y)))
             .fold(f64::INFINITY, f64::min);
-        assert!(nearest > 800.0, "towers {nearest:.0} m apart");
+        assert!(nearest > 790.0, "towers {nearest:.0} m apart");
     }
+    // Over the bridge the wall is light in the ground.
+    let lit = t
+        .precursor
+        .iter()
+        .filter(|s| s.kind == PropKind::PrecursorConduit && dist((s.x, s.y), mid) < 900.0)
+        .count();
+    assert!(lit >= 12, "{lit} conduits across the bridge");
 }
 
 /// `FROSTLINE_RELIEF=x0,y0,span,px,out.ppm cargo test --profile gate -p mc-map --lib frostline_relief -- --ignored`:

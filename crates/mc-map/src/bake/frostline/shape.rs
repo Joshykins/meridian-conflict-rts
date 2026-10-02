@@ -24,6 +24,11 @@ const CLIFF_RUN: f64 = 22.0;
 const CROSSING_GRADE: f64 = 0.27;
 /// The dry lake's floor: low enough that the desert paints it pale silt.
 const PLAYA_FLOOR: f64 = 4.2;
+/// Water the coasts' noise cuts off from the oceans in a piece smaller than
+/// this many square metres is a pool, and is filled to [`POOL_FLOOR`]: too
+/// shallow for a ship, so nothing takes it for a sea to build a yard on.
+const POOL_AREA: f64 = 500_000.0;
+const POOL_FLOOR: f32 = -3.0;
 
 /// A desert mountain's height at `run` metres in from where the big cliff
 /// begins: the canyon's beds stacked as they are in Vermilion Gorge, lowered
@@ -94,7 +99,7 @@ impl Terrain {
         f(q).max(f(self.turned(q)))
     }
 
-    /// Metres to the nearest start.
+    /// Metres to the nearest start, from a point of the design.
     fn fl_start_dist(&self, p: (f64, f64)) -> f64 {
         let t = self.turned(p);
         STARTS
@@ -103,28 +108,28 @@ impl Terrain {
             .fold(f64::INFINITY, f64::min)
     }
 
-    /// Where the designed lines are read for a point: bent out of true by a
-    /// slow warp that is not the same turned, so the two sides' escarpments,
-    /// canyons and mountains lie differently. Still round the bases.
+    /// Where the designed lines are read for a point of the map: its place
+    /// in the design, bent out of true by a slow warp that is not the same
+    /// turned, so the two sides' escarpments, canyons and mountains lie
+    /// differently. Still round the bases.
     fn fl_warp(&self, x: f64, y: f64) -> (f64, f64) {
-        let k = WARP * smoothstep(650.0, 1_600.0, self.fl_start_dist((x, y)));
+        let p = design((x, y));
+        let k = WARP * smoothstep(650.0, 1_600.0, self.fl_start_dist(p));
         (
-            x + k * self.warp_x.fbm(x / 2_600.0, y / 2_600.0, 2, 0.5),
-            y + k * self.warp_y.fbm(x / 2_600.0, y / 2_600.0, 2, 0.5),
+            p.0 + k * self.warp_x.fbm(x / 2_600.0, y / 2_600.0, 2, 0.5),
+            p.1 + k * self.warp_y.fbm(x / 2_600.0, y / 2_600.0, 2, 0.5),
         )
     }
 
     /// 1 in open country, falling to 0 round the bases and the ore: the
     /// small relief keeps off what must be built on.
     fn fl_keep(&self, x: f64, y: f64) -> f64 {
-        let (p, t) = ((x, y), self.turned((x, y)));
+        let p = design((x, y));
+        let t = self.turned(p);
         let mut k = smoothstep(560.0, 900.0, self.fl_start_dist(p));
-        for &(ox, oy, r) in ORE {
+        for &(ox, oy, r) in ORE.iter().chain(ISLE_ORE) {
             let d = dist(p, (ox, oy)).min(dist(t, (ox, oy)));
             k = k.min(smoothstep(r + 30.0, r + 220.0, d));
-        }
-        for &(ox, oy, r) in ISLE_ORE {
-            k = k.min(smoothstep(r + 30.0, r + 220.0, dist(p, (ox, oy))));
         }
         k
     }
@@ -134,15 +139,15 @@ impl Terrain {
     /// each climate's noise (broad bights in the desert; in Alaska, narrow
     /// inlets as well).
     fn fl_land(&self, x: f64, y: f64) -> f64 {
-        let p = (x, y);
+        let p = design((x, y));
         let fr = &self.frost;
         // (Further than 3 km from an ocean, it is not looked at.)
-        let north = if y > 5_850.0 {
+        let north = if p.1 > 5_850.0 {
             inside(p, &fr.north)
         } else {
             f64::MIN
         };
-        let south = if y < 10_550.0 {
+        let south = if p.1 < 10_550.0 {
             inside(p, &fr.south)
         } else {
             f64::MIN
@@ -150,7 +155,7 @@ impl Terrain {
         let east = self.fl_eastness(x, y);
         // The coves keep their drawn shape, and the bases their shores.
         let cove = dist(p, COVE_HEAD).min(dist(self.turned(p), COVE_HEAD));
-        let calm = (0.3 + 0.7 * smoothstep(700.0, 1_300.0, self.fl_start_dist(p)))
+        let calm = (0.3 + 0.7 * smoothstep(1_100.0, 2_200.0, self.fl_start_dist(p)))
             * (0.08 + 0.92 * smoothstep(500.0, 1_100.0, cove));
         let mut wobble = 0.0;
         if east < 1.0 {
@@ -167,16 +172,14 @@ impl Terrain {
                     + (0.55 - self.coast_warp.ridged(x / 700.0, y / 700.0, 3, 0.5)) * 420.0);
         }
         let lobes = self.coast.fbm(x / 420.0 + 31.0, y / 420.0 - 17.0, 3, 0.5);
-        let isle = ISLES
-            .iter()
-            .map(|&(cx, cy, r)| r * (1.0 + 0.7 * lobes) - dist(p, (cx, cy)))
-            .fold(f64::MIN, f64::max);
+        let (cx, cy, r) = ISLE;
+        let isle = r * (1.0 + 0.7 * lobes) - dist(p, (cx, cy)).min(dist(self.turned(p), (cx, cy)));
         (-north.max(south) + calm * wobble).max(isle).min(3_000.0)
     }
 
     /// How much of a cliff the coast near a point is (0 a beach, 1 a cliff).
     fn fl_cliffy(&self, x: f64, y: f64) -> f64 {
-        let p = (x, y);
+        let p = design((x, y));
         let d = CLIFFS
             .iter()
             .map(|line| polyline(p, line))
@@ -539,8 +542,9 @@ impl Terrain {
         for r in RIDGES {
             m = join(m, mount(q, r, pass).max(mount(tq, r, pass)));
         }
-        for r in OWN_RANGES {
-            m = join(m, mount((x, y), r, f64::MIN));
+        let (p, tp) = ((x, y), self.turned((x, y)));
+        for r in EDGE_RANGES {
+            m = join(m, mount(p, r, f64::MIN).max(mount(tp, r, f64::MIN)));
         }
         m
     }
@@ -611,13 +615,14 @@ impl Terrain {
             // A gully digs no pond: it stops above the water.
             h = (h + self.frost.gullies.at(x, y) * g.open).max(h.min(2.5));
         }
-        h
+        h + self.frost.pools.at(x, y)
     }
 
     /// Water erosion. Over the mountains above the shared wall: couloirs and
     /// fans on the ranges, gullies down the mesas' slopes. Over the open
     /// country: the drainage, shallow valleys gathering into washes and
-    /// streams, no steeper anywhere than a unit can walk.
+    /// streams, no steeper anywhere than a unit can walk. And the pools the
+    /// coasts' noise cut off from the oceans, filled.
     pub(super) fn erode_frostline(&mut self) {
         const STEP: f64 = 16.0;
         /// Metres per unit of height while the droplets run: the mountains
@@ -626,12 +631,12 @@ impl Terrain {
         const VERTICAL: f32 = 48.0;
         const GENTLE: f32 = 5.0;
         let n = (self.size_x / STEP) as usize + 1;
-        let mut h = vec![0f32; n * n];
+        let mut raw = vec![0f32; n * n];
         let mut rise = vec![0f32; n * n];
         let threads = std::thread::available_parallelism().map_or(4, |t| t.get());
         let rows = n.div_ceil(threads);
         std::thread::scope(|s| {
-            for (k, (hs, rs)) in h
+            for (k, (hs, rs)) in raw
                 .chunks_mut(rows * n)
                 .zip(rise.chunks_mut(rows * n))
                 .enumerate()
@@ -642,13 +647,20 @@ impl Terrain {
                         let y = (k * rows + r) as f64 * STEP;
                         for (i, (v, rv)) in row.iter_mut().zip(rrow.iter_mut()).enumerate() {
                             let g = t.fl_shape(i as f64 * STEP, y);
-                            *v = g.h.max(-2.0) as f32;
+                            *v = g.h as f32;
                             *rv = g.rise as f32;
                         }
                     }
                 });
             }
         });
+        self.frost.pools = crate::bake::alpine::Erosion {
+            n,
+            step: STEP,
+            delta: pool_fill(&raw, n, (POOL_AREA / (STEP * STEP)) as usize),
+        };
+        // The droplets run over the land: the sea is a level floor to them.
+        let h: Vec<f32> = raw.iter().map(|v| v.max(-2.0)).collect();
         let soften = |delta: &mut Vec<f32>, passes: usize| {
             for _ in 0..passes {
                 let from = delta.clone();
@@ -720,4 +732,54 @@ impl Terrain {
             delta: gullies,
         };
     }
+}
+
+/// How far to raise each sample of `raw` (heights, row-major, `n` per edge)
+/// to fill the pools: every piece of water under a ship's keel that is
+/// joined to fewer than `least` samples of the same, raised to
+/// [`POOL_FLOOR`], and its rim with it.
+fn pool_fill(raw: &[f32], n: usize, least: usize) -> Vec<f32> {
+    // (A ship floats in 6 m; a little shallower counts, so no deep cell is
+    // left between the samples of a pool's rim.)
+    let deep = |at: usize| raw[at] < -4.5;
+    let around = |at: usize| {
+        let (i, j) = (at % n, at / n);
+        [
+            (i > 0).then(|| at - 1),
+            (i + 1 < n).then(|| at + 1),
+            (j > 0).then(|| at - n),
+            (j + 1 < n).then(|| at + n),
+        ]
+        .into_iter()
+        .flatten()
+    };
+    let mut fill = vec![0f32; n * n];
+    let mut seen = vec![false; n * n];
+    for from in 0..n * n {
+        if seen[from] || !deep(from) {
+            continue;
+        }
+        seen[from] = true;
+        let mut piece = vec![from];
+        let mut next = 0;
+        while next < piece.len() {
+            for nb in around(piece[next]) {
+                if !seen[nb] && deep(nb) {
+                    seen[nb] = true;
+                    piece.push(nb);
+                }
+            }
+            next += 1;
+        }
+        if piece.len() >= least {
+            continue;
+        }
+        for &at in &piece {
+            fill[at] = POOL_FLOOR - raw[at];
+            for nb in around(at) {
+                fill[nb] = (POOL_FLOOR - raw[nb]).max(0.0);
+            }
+        }
+    }
+    fill
 }

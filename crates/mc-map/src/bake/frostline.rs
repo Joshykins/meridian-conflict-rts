@@ -1,14 +1,23 @@
 //! "Frostline": four against four across a land bridge between two oceans,
 //! the Precursors' climate wall down the middle of it all.
 //!
-//! [`Layout::Frostline`], 16 km. Two landmasses fill the west and the east; a
-//! land bridge joins them across the middle and parts the sea into a north
-//! ocean and a south one. The wall ([`FROSTLINE_WALL`]) runs south to north
-//! through both oceans and over the bridge, straight but for one diagonal
-//! slash in each ocean: west of it the country is red-rock desert, east of it
-//! Alaska. It is a line of towers standing a kilometre apart with light in
-//! the ground between them, so armies and fleets pass through it almost
-//! anywhere.
+//! [`Layout::Frostline`], 16 km. Two landmasses, one in the west and one in
+//! the east; a land bridge joins them across the middle and parts the sea
+//! into a north ocean and a south one. The wall ([`FROSTLINE_WALL`]) runs
+//! south to north through both oceans and over the bridge, straight but for
+//! one diagonal slash in each ocean: west of it the country is red-rock
+//! desert, east of it Alaska. Where it runs through open sea it is a line of
+//! towers a kilometre apart, each standing on the sea floor; over the bridge
+//! and the islands it is only light in the ground. Armies and fleets pass
+//! through it almost anywhere.
+//!
+//! The country is designed with the landmasses due west and east of each
+//! other and laid on the map turned [`FROSTLINE_TURN_DEG`] clockwise about
+//! its middle ([`design`], [`on_map`]): the bridge runs from the west-north-
+//! west to the east-south-east, the north ocean opens into the map's
+//! north-east corner and the south ocean into its south-west, and each
+//! landmass runs on into the corner behind it. Everything below is in the
+//! design's frame unless it says otherwise.
 //!
 //! Each side's four bases, after Seton's Clutch: the rear guard at the far
 //! edge inside a ring of mountains with two passes; the front on the high
@@ -16,9 +25,9 @@
 //! beach base in a low basin on a long strand of one ocean; and a cliff base
 //! on the upland over the other ocean, whose only way down to the water is
 //! the canyon that comes out at a cove well along the coast. So in each
-//! ocean one side's beach base faces the other's cliff base. Two islands
-//! stand in each ocean, one either side of the wall. The bridge has beaches
-//! on both oceans.
+//! ocean one side's beach base faces the other's cliff base. One island
+//! stands in the middle of each ocean, the wall across it: half red rock,
+//! half snow. The bridge has beaches on both oceans.
 //!
 //! The land is benches: the upland, a low basin behind the beach base's
 //! strand and the low bridge cut into it by an escarpment, and a high
@@ -36,8 +45,7 @@
 //! the small relief is the climate's (dunes, swells and washes in the
 //! desert; drumlins, hummocks and streams in Alaska). What stands above the
 //! mountains' walls is the climate's too: mesas cut in the canyon's beds in
-//! the west, peaks, arêtes and ice in the east, and the ranges along the
-//! map's edges are each side's own. The canyon is dry sand in the west; in
+//! the west, peaks, arêtes and ice in the east. The canyon is dry sand in the west; in
 //! the east it is a gorge with a frozen river, the dry lake a frozen one.
 //! `tests/frostline.rs` holds the baked map to the same walks, the same
 //! ground, shore and timber for both sides, within a few percent.
@@ -49,7 +57,7 @@ use super::canyon::{smooth_closed, smooth_open};
 use super::machine::Machine;
 use super::{Pad, Terrain};
 use crate::format::PropKind;
-use crate::landmark::FROSTLINE_WALL as WALL;
+use crate::landmark::{frostline_on_map as on_map, FROSTLINE_TURN_DEG, FROSTLINE_WALL as WALL};
 use crate::noise::{smoothstep, unit};
 use crate::BUILD_CELL_M;
 use std::f64::consts::PI;
@@ -61,17 +69,27 @@ mod tests;
 /// The map's edge, metres: the design is for exactly this.
 pub(super) const SIZE: f64 = 16_384.0;
 
-/// The north ocean's coast: the desert's shore from beyond the north edge
-/// south to the bridge (a cape, then the beach base's bight, then the
+/// Where a point of the map lies in the design's frame ([`on_map`] undone).
+/// The map's corners lie outside the design's own square, by 2.3 km at most:
+/// the coasts, the benches and the mountains are drawn on past its edges.
+fn design((x, y): (f64, f64)) -> (f64, f64) {
+    let mid = SIZE / 2.0;
+    let (s, c) = FROSTLINE_TURN_DEG.to_radians().sin_cos();
+    let (dx, dy) = (x - mid, y - mid);
+    (mid + dx * c - dy * s, mid + dx * s + dy * c)
+}
+
+/// The north ocean's coast: the desert's shore from beyond the map's north
+/// edge south to the bridge (a cape, then the beach base's bight, then the
 /// headland the front's cliffs stand on), east along the bridge, and
-/// Alaska's shore north again (the cliff base's coast and its fjord).
+/// Alaska's shore north again (the cliff base's coast and its fjord) to
+/// beyond the map's corner.
 const NORTH: &[(f64, f64)] = &[
-    (3_300.0, 17_200.0),
-    (3_400.0, 16_384.0),
-    (3_700.0, 15_700.0),
-    (4_400.0, 15_300.0),
-    (5_300.0, 15_350.0),
-    (6_000.0, 15_000.0),
+    (6_650.0, 19_800.0),
+    (6_550.0, 17_600.0),
+    (6_300.0, 16_750.0),
+    (6_420.0, 16_000.0),
+    (6_300.0, 15_300.0),
     (6_250.0, 14_500.0),
     (5_800.0, 14_050.0),
     (5_450.0, 13_500.0),
@@ -110,20 +128,22 @@ const NORTH: &[(f64, f64)] = &[
     (11_900.0, 15_700.0),
     (12_500.0, 16_100.0),
     (13_000.0, 16_384.0),
-    (13_100.0, 17_200.0),
+    (13_050.0, 17_600.0),
+    (13_250.0, 18_900.0),
+    (13_200.0, 19_800.0),
 ];
 
-/// The south ocean's coast: Alaska's shore from beyond the south edge north
-/// to the bridge (a cape, the beach base's bight, the front's headland),
-/// west along the bridge, and the desert's shore south again (the cliff
-/// base's coast and the cove its canyon comes out at).
+/// The south ocean's coast: Alaska's shore from beyond the map's south edge
+/// north to the bridge (a cape, the beach base's bight, the front's
+/// headland), west along the bridge, and the desert's shore south again
+/// (the cliff base's coast and the cove its canyon comes out at) to beyond
+/// the map's corner.
 const SOUTH: &[(f64, f64)] = &[
-    (13_000.0, -800.0),
-    (12_900.0, 0.0),
-    (12_550.0, 650.0),
-    (11_900.0, 1_050.0),
-    (11_000.0, 1_000.0),
-    (10_350.0, 1_300.0),
+    (9_750.0, -3_400.0),
+    (9_900.0, -1_200.0),
+    (10_050.0, -380.0),
+    (9_930.0, 400.0),
+    (10_100.0, 1_100.0),
     (10_150.0, 1_850.0),
     (10_550.0, 2_350.0),
     (10_950.0, 2_850.0),
@@ -162,13 +182,15 @@ const SOUTH: &[(f64, f64)] = &[
     (4_500.0, 700.0),
     (3_900.0, 300.0),
     (3_400.0, 0.0),
-    (3_300.0, -800.0),
+    (3_350.0, -1_200.0),
+    (3_150.0, -2_500.0),
+    (3_200.0, -3_400.0),
 ];
 
 /// Coasts that meet the sea in a cliff: the cliff bases' shores, and the
 /// headlands either side of each neck of the bridge.
 const CLIFFS: &[&[(f64, f64)]] = &[
-    // The desert's, on the south ocean, from the neck to the south edge.
+    // The desert's, on the south ocean, from the neck to the map's corner.
     &[
         (6_300.0, 7_100.0),
         (5_950.0, 7_050.0),
@@ -186,6 +208,8 @@ const CLIFFS: &[&[(f64, f64)]] = &[
         (4_500.0, 700.0),
         (3_900.0, 300.0),
         (3_400.0, 0.0),
+        (3_350.0, -1_200.0),
+        (3_150.0, -2_500.0),
     ],
     // The front's north headland.
     &[
@@ -195,7 +219,7 @@ const CLIFFS: &[&[(f64, f64)]] = &[
         (5_950.0, 9_300.0),
         (6_300.0, 9_200.0),
     ],
-    // Alaska's, on the north ocean, from the neck to the north edge.
+    // Alaska's, on the north ocean, from the neck to the map's corner.
     &[
         (10_100.0, 9_280.0),
         (10_450.0, 9_350.0),
@@ -213,6 +237,8 @@ const CLIFFS: &[&[(f64, f64)]] = &[
         (11_900.0, 15_700.0),
         (12_500.0, 16_100.0),
         (13_000.0, 16_384.0),
+        (13_050.0, 17_600.0),
+        (13_250.0, 18_900.0),
     ],
     // Its front's south headland.
     &[
@@ -228,15 +254,9 @@ const CLIFFS: &[&[(f64, f64)]] = &[
 /// The east's fjord ends at this turned.
 const COVE_HEAD: (f64, f64) = (3_784.0, 1_434.0);
 
-/// The islands: centre, radius. In the north ocean one far out west of the
-/// wall and one close off the bridge east of it; in the south, about the
-/// other way round, each its own shape.
-const ISLES: &[(f64, f64, f64)] = &[
-    (7_500.0, 13_500.0, 540.0),
-    (9_550.0, 10_750.0, 400.0),
-    (8_950.0, 2_750.0, 520.0),
-    (6_850.0, 5_750.0, 410.0),
-];
+/// The north ocean's island, in the middle of it on the wall's line: centre,
+/// radius. The south ocean's is this turned, its shape its own.
+const ISLE: (f64, f64, f64) = (8_400.0, 12_900.0, 620.0);
 
 /// Starts, west side: the rear guard, the front, the beach base, the cliff
 /// base. Each is followed on the map by its turned twin.
@@ -257,10 +277,10 @@ const UPLAND: f64 = 60.0;
 const HIGH: f64 = 104.0;
 
 /// The beach base's basin: low ground behind its strand, shut in by the
-/// upland's escarpment from the north edge round to the front's headland.
-/// West side; closed out at sea.
+/// upland's escarpment from the map's north edge round to the front's
+/// headland. West side; closed out at sea.
 const BASIN: &[(f64, f64)] = &[
-    (3_550.0, 17_000.0),
+    (3_650.0, 18_000.0),
     (3_350.0, 15_300.0),
     (2_950.0, 14_200.0),
     (3_050.0, 13_100.0),
@@ -270,7 +290,7 @@ const BASIN: &[(f64, f64)] = &[
     (5_000.0, 10_150.0),
     (5_800.0, 10_250.0),
     (7_600.0, 10_400.0),
-    (7_600.0, 17_000.0),
+    (7_600.0, 18_000.0),
 ];
 
 /// The bridge's low ground, from the west neck to the middle.
@@ -281,24 +301,31 @@ const BRIDGE: &[(f64, f64)] = &[
     (8_400.0, 10_300.0),
 ];
 
-/// The high plateau in the north-west back country.
+/// The high plateau in the north-west back country, out to the map's corner.
 const PLATEAU: &[(f64, f64)] = &[
+    (-3_000.0, 11_700.0),
+    (-1_700.0, 11_450.0),
+    (-1_050.0, 11_000.0),
+    (-350.0, 11_420.0),
     (350.0, 11_250.0),
+    (1_300.0, 11_180.0),
     (2_400.0, 11_050.0),
     (2_950.0, 11_800.0),
     (2_780.0, 13_300.0),
     (1_950.0, 14_450.0),
-    (450.0, 14_350.0),
+    (450.0, 14_700.0),
+    (-3_000.0, 14_900.0),
 ];
 
 /// Ramps: where an escarpment is laid back into a slope, as the line it is
 /// laid back along and how far either side of it. The basin's three (west to
-/// the back country, south toward the front, north-west), the neck's whole
-/// width down onto the bridge, and the plateau's two.
+/// the back country, south toward the front, north-west onto the plateau's
+/// shoulder), the neck's whole width down onto the bridge, and the plateau's
+/// two.
 const RAMPS: &[Capsule] = &[
     ((3_020.0, 13_250.0), (3_090.0, 12_950.0), 170.0),
     ((4_100.0, 10_400.0), (4_400.0, 10_300.0), 170.0),
-    ((3_300.0, 15_150.0), (3_390.0, 15_450.0), 160.0),
+    ((3_030.0, 14_300.0), (3_110.0, 14_580.0), 160.0),
     ((6_250.0, 7_150.0), (6_250.0, 9_250.0), 260.0),
     ((2_890.0, 12_400.0), (2_850.0, 12_700.0), 160.0),
     ((1_250.0, 11_165.0), (1_550.0, 11_135.0), 160.0),
@@ -320,21 +347,11 @@ const CANYON: &[(f64, f64)] = &[
 const CROSSINGS: &[f64] = &[0.2, 0.56];
 /// Its side canyons, each from a point of the course up to its head.
 const SIDE_CANYONS: &[&[(f64, f64)]] = &[
-    &[
-        (3_100.0, 2_700.0),
-        (2_650.0, 2_480.0),
-        (2_150.0, 2_600.0),
-        (1_750.0, 2_950.0),
-    ],
-    &[
-        (2_700.0, 3_300.0),
-        (2_250.0, 3_550.0),
-        (1_800.0, 3_500.0),
-        (1_450.0, 3_750.0),
-    ],
+    &[(3_100.0, 2_700.0), (2_650.0, 2_480.0), (2_250.0, 2_620.0)],
+    &[(2_700.0, 3_300.0), (2_250.0, 3_550.0), (1_850.0, 3_480.0)],
     &[(2_500.0, 4_700.0), (2_850.0, 4_880.0), (2_980.0, 5_150.0)],
     &[(2_800.0, 4_000.0), (2_350.0, 4_150.0), (2_000.0, 3_950.0)],
-    &[(1_900.0, 5_100.0), (1_700.0, 4_650.0), (1_300.0, 4_500.0)],
+    &[(1_900.0, 5_100.0), (1_700.0, 4_650.0), (1_420.0, 4_560.0)],
 ];
 /// The main canyon's floor at the cove, metres over the sea, and its rise
 /// per metre up the course; a side canyon's rise from where it joins.
@@ -371,9 +388,10 @@ const RIDGES: &[Ridge] = &[
         half: 500.0,
         tall: 600.0,
     },
-    // North, from the edge round to the north-east pass.
+    // North, from the map's edge round to the north-east pass.
     Ridge {
         line: &[
+            (-1_500.0, 9_330.0),
             (-300.0, 9_500.0),
             (450.0, 9_650.0),
             (1_000.0, 9_800.0),
@@ -384,7 +402,7 @@ const RIDGES: &[Ridge] = &[
         half: 290.0,
         tall: 440.0,
     },
-    // Along the west edge behind it.
+    // Behind it; the map's edge runs off north-westward beyond.
     Ridge {
         line: &[(60.0, 10_100.0), (-60.0, 8_192.0), (60.0, 6_300.0)],
         half: 320.0,
@@ -425,7 +443,7 @@ const RIDGES: &[Ridge] = &[
     },
     // Buttes and knolls standing alone in the open country.
     Ridge {
-        line: &[(4_650.0, 11_250.0), (4_760.0, 11_330.0)],
+        line: &[(5_000.0, 11_500.0), (5_110.0, 11_580.0)],
         half: 150.0,
         tall: 190.0,
     },
@@ -445,11 +463,6 @@ const RIDGES: &[Ridge] = &[
         tall: 180.0,
     },
     Ridge {
-        line: &[(1_200.0, 3_000.0), (1_330.0, 3_080.0)],
-        half: 170.0,
-        tall: 210.0,
-    },
-    Ridge {
         line: &[(3_650.0, 9_350.0), (3_720.0, 9_250.0)],
         half: 150.0,
         tall: 190.0,
@@ -459,131 +472,64 @@ const RIDGES: &[Ridge] = &[
         half: 140.0,
         tall: 180.0,
     },
+    // On the plateau in the corner behind the rear guard: a long mesa and
+    // two buttes.
     Ridge {
-        line: &[(2_050.0, 15_250.0), (2_180.0, 15_200.0)],
-        half: 160.0,
-        tall: 200.0,
+        line: &[(-350.0, 11_950.0), (250.0, 12_180.0), (700.0, 12_700.0)],
+        half: 230.0,
+        tall: 420.0,
+    },
+    Ridge {
+        line: &[(900.0, 13_500.0), (1_040.0, 13_560.0)],
+        half: 170.0,
+        tall: 220.0,
+    },
+    Ridge {
+        line: &[(-250.0, 13_150.0), (-130.0, 13_230.0)],
+        half: 150.0,
+        tall: 190.0,
     },
 ];
 
-/// Each side's own mountains, as they lie on the map: a range along every
-/// edge of the map the land runs off, so the country ends in mountains and
-/// not on a ruled line (the desert's mesas, Alaska's peaks), and the
-/// islands' hills.
-const OWN_RANGES: &[Ridge] = &[
-    // The desert: the west edge north of the rear's ring, and south of it;
-    // the north edge; the south edge.
+/// The ranges along the map's edges, so the country ends in mountains and
+/// not on a ruled line. Map metres, not the design's: the desert's along the
+/// west edge and the north edge as far as its coast, and Alaska's the same
+/// turned. Where the coast comes to the map's corner they fall into the sea.
+const EDGE_RANGES: &[Ridge] = &[
+    // The west edge: behind the cliff base's country from the corner's sea
+    // cliffs up, then behind the rear guard's ring and the plateau.
     Ridge {
         line: &[
-            (150.0, 16_200.0),
-            (250.0, 15_000.0),
-            (100.0, 13_700.0),
-            (200.0, 12_400.0),
-            (80.0, 11_200.0),
-            (60.0, 10_300.0),
-        ],
-        half: 300.0,
-        tall: 0.0,
-    },
-    Ridge {
-        line: &[
-            (60.0, 6_200.0),
-            (120.0, 5_300.0),
-            (200.0, 4_400.0),
-            (500.0, 3_300.0),
-            (550.0, 2_300.0),
-            (250.0, 1_250.0),
-            (150.0, 300.0),
-        ],
-        half: 320.0,
-        tall: 0.0,
-    },
-    Ridge {
-        line: &[
-            (150.0, 16_250.0),
-            (1_500.0, 15_950.0),
-            (2_700.0, 16_150.0),
-            (3_350.0, 16_330.0),
+            (140.0, 700.0),
+            (260.0, 1_900.0),
+            (120.0, 3_300.0),
+            (240.0, 4_700.0),
+            (90.0, 6_100.0),
+            (200.0, 7_500.0),
+            (60.0, 8_900.0),
+            (180.0, 10_300.0),
+            (90.0, 11_700.0),
+            (230.0, 13_100.0),
+            (110.0, 14_600.0),
+            (190.0, 16_250.0),
         ],
         half: 330.0,
-        tall: 0.0,
-    },
-    Ridge {
-        line: &[
-            (150.0, 250.0),
-            (1_400.0, 330.0),
-            (2_800.0, 280.0),
-            (3_300.0, 150.0),
-        ],
-        half: 300.0,
-        tall: 0.0,
-    },
-    // Alaska: the east edge north of the rear's ring, and south of it; the
-    // north edge; the south edge.
-    Ridge {
-        line: &[
-            (16_300.0, 16_300.0),
-            (16_150.0, 15_000.0),
-            (15_900.0, 13_800.0),
-            (16_100.0, 12_600.0),
-            (16_250.0, 11_500.0),
-            (16_330.0, 10_200.0),
-        ],
-        half: 350.0,
         tall: 640.0,
     },
+    // The north edge: over the plateau, then behind the beach base's basin
+    // to the coast.
     Ridge {
         line: &[
-            (16_330.0, 6_200.0),
-            (16_250.0, 5_200.0),
-            (15_800.0, 4_200.0),
-            (16_050.0, 2_900.0),
-            (15_850.0, 1_500.0),
-            (16_200.0, 300.0),
+            (190.0, 16_250.0),
+            (1_700.0, 16_120.0),
+            (3_300.0, 16_260.0),
+            (4_900.0, 16_150.0),
+            (6_500.0, 16_280.0),
+            (8_000.0, 16_200.0),
+            (9_300.0, 16_330.0),
         ],
-        half: 350.0,
-        tall: 620.0,
-    },
-    Ridge {
-        line: &[
-            (13_100.0, 16_300.0),
-            (13_700.0, 16_150.0),
-            (14_900.0, 15_950.0),
-            (16_200.0, 16_250.0),
-        ],
-        half: 300.0,
-        tall: 520.0,
-    },
-    Ridge {
-        line: &[
-            (13_000.0, 150.0),
-            (13_600.0, 250.0),
-            (14_800.0, 380.0),
-            (16_200.0, 200.0),
-        ],
-        half: 300.0,
-        tall: 500.0,
-    },
-    // The islands' hills.
-    Ridge {
-        line: &[(7_540.0, 13_700.0), (7_640.0, 13_740.0)],
-        half: 150.0,
-        tall: 0.0,
-    },
-    Ridge {
-        line: &[(9_610.0, 10_880.0), (9_670.0, 10_910.0)],
-        half: 110.0,
-        tall: 150.0,
-    },
-    Ridge {
-        line: &[(8_850.0, 2_560.0), (8_760.0, 2_600.0)],
-        half: 150.0,
-        tall: 200.0,
-    },
-    Ridge {
-        line: &[(6_770.0, 5_620.0), (6_720.0, 5_570.0)],
-        half: 110.0,
-        tall: 0.0,
+        half: 310.0,
+        tall: 540.0,
     },
 ];
 
@@ -614,29 +560,29 @@ const ORE: &[(f64, f64, f64)] = &[
     // Inside the rear guard's ring.
     (1_000.0, 8_900.0, 65.0),
     (1_900.0, 7_450.0, 65.0),
-    // The back country: on the plateau, under it, toward the canyon's head, the
-    // south-west corner, and the upland either side of the front.
+    // The back country: on the plateau, under it, toward the canyon's head,
+    // south of the canyon, and the upland either side of the front.
     (1_500.0, 12_400.0, 80.0),
     (2_150.0, 13_500.0, 75.0),
     (1_750.0, 10_520.0, 70.0),
     (2_600.0, 6_000.0, 70.0),
-    (1_500.0, 2_000.0, 75.0),
+    (2_700.0, 1_750.0, 75.0),
     (4_150.0, 9_450.0, 70.0),
     (4_150.0, 6_900.0, 70.0),
+    // The corner behind the rear guard: on the upland, and out on the plateau.
+    (-350.0, 10_450.0, 70.0),
+    (-700.0, 12_500.0, 75.0),
 ];
 
-/// Ore on the islands, each island's own.
-const ISLE_ORE: &[(f64, f64, f64)] = &[
-    (7_400.0, 13_330.0, 85.0),
-    (9_500.0, 10_650.0, 70.0),
-    (9_050.0, 2_900.0, 85.0),
-    (6_900.0, 5_850.0, 70.0),
-];
+/// Ore on the north ocean's island, one field either side of the wall; the
+/// south's has the same turned.
+const ISLE_ORE: &[(f64, f64, f64)] = &[(8_610.0, 12_800.0, 70.0), (8_190.0, 13_000.0, 70.0)];
 
 /// Towers stand this far apart along the wall, about.
 const TOWER_PITCH: f64 = 1_100.0;
-/// A sea tower's footing stands this high out of the water.
-const FOOTING: f64 = 7.0;
+/// A tower stands only in sea at least this deep, some 400 m off a beach, so
+/// the land bridge and the islands keep the wall as light in the ground alone.
+const TOWER_DEPTH: f64 = 45.0;
 
 /// A canyon's course as laid: rounded, the metres along it to each point,
 /// its floor's height at its first point and rise per metre from there, and
@@ -715,6 +661,8 @@ pub(super) struct Frostline {
     canyons: Vec<Course>,
     /// What water did to the open country: gullies and fans (`erode_frostline`).
     gullies: super::alpine::Erosion,
+    /// Pools cut off from the oceans, filled (`shape::pool_fill`).
+    pools: super::alpine::Erosion,
     /// How far each side's woods are drawn in (west, east), as a rise of the
     /// field value they begin at, so both have the same timber.
     thin: [f64; 2],
@@ -881,17 +829,17 @@ impl Terrain {
         }
     }
 
-    /// The wall as built: a hub tower where it crosses the middle of the
-    /// bridge, a tower at every corner of its line and others between them
-    /// about [`TOWER_PITCH`] apart, each on a footing of its own (in the sea,
-    /// a plinth standing out of the water), and light in the ground along
-    /// the line wherever it crosses land. Laid from the middle outward, the
-    /// south the north turned.
+    /// The wall as built: a tower at every corner of its line and others
+    /// between them about [`TOWER_PITCH`] apart, wherever the line runs
+    /// through open sea, each standing on the sea floor as it is (no ground
+    /// is made for it: its foot goes down into the water); and light in the
+    /// ground along the line wherever it crosses land, which is all the wall
+    /// is over the bridge and the islands. Laid from the middle outward, the
+    /// south the north turned. Map metres.
     pub(super) fn machine_wall(&self) -> Machine<'_> {
         let mut m = Machine::new(self, 44.0);
         let mid = (self.size_x / 2.0, self.size_y / 2.0);
-        let level = |t: &Terrain, p: (f64, f64)| t.natural(p.0, p.1).round().max(FOOTING);
-        m.tower(mid, PI / 2.0, 1.3, level(self, mid));
+        let deep = |p: (f64, f64)| self.natural(p.0, p.1) < -TOWER_DEPTH;
         // The line north of the middle, corner to corner.
         let first = WALL.iter().position(|p| p.1 > mid.1).unwrap();
         let mut from = mid;
@@ -905,8 +853,11 @@ impl Terrain {
             for i in 1..=count {
                 let t = i as f64 / parts as f64;
                 let at = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
-                for p in [at, self.turned(at)] {
-                    m.tower(p, heading, 1.0, level(self, p));
+                // Both of a pair or neither.
+                if deep(at) && deep(self.turned(at)) {
+                    for p in [at, self.turned(at)] {
+                        m.put(PropKind::PrecursorTower, p, heading, 1.0);
+                    }
                 }
             }
             // Light in the ground along the line, where it is land.
@@ -915,11 +866,7 @@ impl Terrain {
                 let t = along / len;
                 let at = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
                 for p in [at, self.turned(at)] {
-                    let clear = m
-                        .benches
-                        .iter()
-                        .all(|b| b.outside(p.0, p.1) > b.blend + 12.0);
-                    if clear && self.natural(p.0, p.1) > 2.5 {
+                    if self.natural(p.0, p.1) > 2.5 {
                         m.conduit(p, heading);
                     }
                 }
@@ -952,11 +899,12 @@ impl Terrain {
             plateau: smooth_closed(PLATEAU, 5),
             canyons,
             gullies: super::alpine::Erosion::default(),
+            pools: super::alpine::Erosion::default(),
             thin: [0.0, 0.0],
         };
         self.erode_frostline();
 
-        let west: Vec<(f64, f64)> = STARTS.iter().map(|&s| self.snap(s)).collect();
+        let west: Vec<(f64, f64)> = STARTS.iter().map(|&s| self.snap(on_map(s))).collect();
         let mut pads = Vec::new();
         for &at in &west {
             // Both of a pair at one height: the west's.
@@ -992,7 +940,11 @@ impl Terrain {
                 sites.push(((a.0 + c * d, a.1 + s * d), (0.2 * start_core).max(55.0)));
             }
         }
-        sites.extend(ORE.iter().map(|&(x, y, r)| ((x, y), r)));
+        sites.extend(
+            ORE.iter()
+                .chain(ISLE_ORE)
+                .map(|&(x, y, r)| (on_map((x, y)), r)),
+        );
         let g = BUILD_CELL_M as f64;
         let snap = |p: (f64, f64)| ((p.0 / g).round() * g, (p.1 / g).round() * g);
         let mut fields = Vec::new();
@@ -1001,10 +953,6 @@ impl Terrain {
             for q in [self.turned(p), p] {
                 fields.push(self.ore_field(q.0, q.1, r));
             }
-        }
-        for &(x, y, r) in ISLE_ORE {
-            let p = snap((x, y));
-            fields.push(self.ore_field(p.0, p.1, r));
         }
         self.ore = fields;
         self.lay_machine();

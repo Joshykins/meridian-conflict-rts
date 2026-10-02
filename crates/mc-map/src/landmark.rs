@@ -135,13 +135,26 @@ pub const GORGE_TOWN: Town = Town {
 /// Alaska east. The map's sidecar (`maps/frostline.ron`) gives the renderer
 /// the same line; `tests/frostline.rs` holds the two together.
 pub const FROSTLINE_WALL: &[(f64, f64)] = &[
-    (6_592.0, 0.0),
-    (6_592.0, 3_400.0),
-    (8_192.0, 5_000.0),
-    (8_192.0, 11_384.0),
-    (9_792.0, 12_984.0),
-    (9_792.0, 16_384.0),
+    (4_992.0, 0.0),
+    (4_992.0, 2_400.0),
+    (8_192.0, 5_600.0),
+    (8_192.0, 10_784.0),
+    (11_392.0, 13_984.0),
+    (11_392.0, 16_384.0),
 ];
+
+/// Degrees Frostline's country is turned clockwise about the map's middle
+/// from the frame it is designed in (`bake/frostline.rs`), where the two
+/// landmasses lie due west and east of each other.
+pub const FROSTLINE_TURN_DEG: f64 = 20.0;
+
+/// A point of Frostline's design, as it lies on the 16 384 m map.
+pub fn frostline_on_map((x, y): (f64, f64)) -> (f64, f64) {
+    let mid = 8_192.0;
+    let (s, c) = FROSTLINE_TURN_DEG.to_radians().sin_cos();
+    let (dx, dy) = (x - mid, y - mid);
+    (mid + dx * c + dy * s, mid - dx * s + dy * c)
+}
 
 /// Metres Frostline's desert stands below Vermilion Gorge's beds: its low
 /// country, 14 to 50 m over the sea, is the canyon's bench (64 to 100 m), and
