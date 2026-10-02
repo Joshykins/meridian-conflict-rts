@@ -90,6 +90,46 @@
         lore: "A floating dock of two armoured arms and a gantry; the hull is poured in the slip between them and sails straight out.",
         weapons: {},
     ),
+    "regency_t2_naval_factory": (
+        lore: "The floating dock refitted for warships: more machinery on its arms and fabricators enough to pour a destroyer whole in the slip.",
+        weapons: {},
+    ),
+    "regency_t1_attack_boat": (
+        lore: "A blade of a boat that lies just under the surface where no gun can find it, and comes up only to fire.",
+        weapons: {
+            "Twin Plasmeric Repeater": "Two light plasmeric guns in a low turret that fire bolts of plasma held tight by gravity; they work only with the hull up.",
+        },
+    ),
+    "regency_t1_submarine": (
+        lore: "An attack submarine that hunts by ear and kills with gravitic torpedoes.",
+        weapons: {
+            "Gravitic Torpedo Tubes": "Each torpedo is a charge of plasma held and steered in a gravity cage; it boils the sea round the hull it finds.",
+        },
+    ),
+    "regency_t1_frigate": (
+        lore: "The one small hull of the Regency's that stays on the surface: the eyes and the umbrella of a squadron.",
+        weapons: {
+            "Heavy Plasmeric Repeater": "A heavy plasmeric gun forward that fires slow, hard bolts of plasma.",
+            "Plasmeric Flak Cannon": "Bolts of plasma that burst into a spray among aircraft.",
+        },
+    ),
+    "regency_t2_destroyer": (
+        lore: "A heavy destroyer that dives: it fights from under the sea with torpedoes behind its shield, and comes up to bring its cannon to bear.",
+        weapons: {
+            "Pinched-plasmeric Cannon": "Plasma gathered and squeezed by gravity in front of the bore, then pinched out as one dense jet; it works only with the hull up.",
+            "Gravitic Torpedo Tubes": "Four bow tubes of gravitic torpedoes, fired dived or surfaced.",
+            "Plasmeric Flak Cannon": "Light flak aft that works only with the hull up.",
+            "Interceptor Tubes": "Short gravitic torpedoes that run at torpedoes coming in and burst them under the water.",
+        },
+    ),
+    "regency_t2_cruiser": (
+        lore: "A cruiser that holds the sky over a fleet, and reaches far inland with one heavy seeker at a time.",
+        weapons: {
+            "Gravitic Seeker Battery": "Twelve cells of gravitic seekers rippled off at the aircraft in reach, spread over them.",
+            "Heavy Gravitic Seeker": "One great plasma charge held and steered in gravity containment, thrown high and brought down on a structure far over the coast.",
+            "Plasmeric Repeater": "A light plasmeric gun for what comes close.",
+        },
+    ),
     "regency_t1_extractor": (
         lore: "A beam run straight down into the ground cuts the bore, and the ore it frees is drawn up the column round it. It draws nothing from the grid.",
         weapons: {},

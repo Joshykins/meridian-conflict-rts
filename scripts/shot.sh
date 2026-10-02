@@ -408,13 +408,15 @@ if [[ $mode != run ]]; then
             for _ in $(seq 300); do cp -p "$built" "$exe" 2>/dev/null && exit 0; sleep 0.2; done
             exit 1
         ) 9>"$lock" || { echo "shot.sh: the old server did not let go of $exe within a minute" >&2; exit 1; }
-        # Started through a launcher file (no redirection on Start-Process, which would
-        # hand the server this pipe and keep the call from returning). pushd maps the
-        # \\wsl.localhost repo to a drive, since cmd cannot start in a UNC directory.
+        # Started through a launcher file (no redirection on the outer Start-Process,
+        # which would hand the server this pipe and keep the call from returning). The
+        # server runs in the \\wsl.localhost repo itself, as `run` shots do: a drive
+        # mapped onto it with pushd went bad under a long-lived server ("map i/o: An
+        # unexpected network error occurred. (os error 59)"). Its stderr goes to a file.
         # Backgrounded too, so a launcher that lingers cannot hold anyone up.
         server_win=$(wslpath -w "$server_dir")
-        printf '@echo off\r\n%s\r\nset RUST_LOG=info,mc_render::renderer=debug,mc_render::warm=debug\r\npushd "%s"\r\n"%s" --shot-server "%s" 2> "%s\\server.log"\r\n' \
-            "${cmd_env%$'\r'}" "$repo_win" "$(wslpath -w "$exe")" "$server_win" "$server_win" > "$server_dir/start.cmd"
+        printf '@echo off\r\n%s\r\nset RUST_LOG=info,mc_render::renderer=debug,mc_render::warm=debug\r\npowershell -NoProfile -Command "Start-Process -NoNewWindow -Wait -FilePath \x27%s\x27 -ArgumentList \x27--shot-server\x27,\x27%s\x27 -WorkingDirectory \x27%s\x27 -RedirectStandardError \x27%s\\server.log\x27"\r\n' \
+            "${cmd_env%$'\r'}" "$(wslpath -w "$exe")" "$server_win" "$repo_win" "$server_win" > "$server_dir/start.cmd"
         # The lock descriptors are closed for it: a launcher holding the server lock
         # would block every session's shots.
         powershell.exe -NoProfile -Command "Start-Process -WindowStyle Hidden -FilePath '$server_win\\start.cmd'" \

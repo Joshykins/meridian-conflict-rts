@@ -114,11 +114,12 @@ pub(super) fn grade(w: &Weapon) -> Option<Grade> {
     if w.beam || w.curve.0 > 0 {
         return None;
     }
-    let grade = match w.plasma_grade? {
+    let grade = match w.plasma_shot()? {
         PlasmaGrade::Plasmeric if w.proximity.0 > 0 => Grade::Flak,
         PlasmaGrade::Plasmeric => Grade::Bolt,
         PlasmaGrade::Pinched => Grade::Pinched,
         PlasmaGrade::PinchFusion => Grade::Fusion,
+        PlasmaGrade::Gravitic => return None,
     };
     (!w.missile || grade == Grade::Flak).then_some(grade)
 }

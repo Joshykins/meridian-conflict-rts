@@ -118,6 +118,7 @@ fn kind(w: &Weapon) -> &'static str {
             PlasmaGrade::Plasmeric => "Plasmeric",
             PlasmaGrade::Pinched => "Pinched-plasmeric",
             PlasmaGrade::PinchFusion => "Pinch-fusion",
+            PlasmaGrade::Gravitic => "Gravitic",
         }
     } else if w.hitscan {
         "Beam"

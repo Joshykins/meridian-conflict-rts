@@ -125,6 +125,40 @@ sea after a battle pays for the battle.
 | Megalodon | 4 | Experimental submarine | Built by engineers on the water. AEB strike missiles to 6 km (volleys of four over four marks), its own nuclear warheads (assembled aboard, four at most, launched dived), long-range torpedoes, interceptors, two deck rail turrets that work only surfaced, a hull shield that holds dived too. |
 | Narwhal | 3 | Anti-ship trimaran | A Zenith rail down the keel: the hull turns to aim, the barrel elevates. Shoots only spaceships; nothing else aboard. |
 
+## The Regency's navy
+
+`data/factions/regency/units/naval.ron`, models `models::regency::naval`. Where ARC's
+fleet is a set of surface specialists, the Regency's goes under: nearly every hull
+dives, so a Regency fleet picks when the fight starts. What it pays: a gun that needs the
+surface (`surfaced`) does nothing dived, and only torpedoes work from under the water.
+Their guns fire plasma; their torpedoes and seekers are Gravitic (`plasma_grade:
+Gravitic`), a plasma charge steered in gravity containment.
+
+- The **Dirk** (attack boat) lies in ambush (`dive.ambush`): ordered down, it still
+  marks targets for its surfaced-only gun as if it were up, comes up while that gun has
+  a mark, and goes down again when it has none. It carries nothing that works under the
+  water and no sonar, so it finds its marks by eye.
+- The **Falchion** (frigate) is the one tech 1 hull that stays up: radar and flak for a
+  squadron that is otherwise dived.
+- The **Claymore** (heavy destroyer) dives with a hull shield that holds under the water
+  too. Dived it fights with gravitic torpedoes and meets torpedoes with interceptors; its
+  pinched-plasmeric cannon and its flak need it surfaced, and it comes up only on order
+  (it does not lie in ambush).
+- The **Pavise** (cruiser) holds the sky (a seeker battery, two counter-seekers that burn
+  down missiles over the ships round it) and has one long arm the Manta lacks: a heavy
+  gravitic seeker, one at a time, at structures and nothing else.
+
+| Unit | Tier | Role | Notes |
+|---|---|---|---|
+| Dirk | 1 | Attack boat | Dives; surfaces to fire its twin plasmeric repeater; no sonar. |
+| Stiletto | 1 | Attack submarine | Gravitic torpedoes, sonar. |
+| Falchion | 1 | Frigate | Heavy plasmeric repeater, plasmeric flak, radar. Stays up. |
+| Claymore | 2 | Heavy destroyer | Dives; hull shield; gravitic torpedoes and interceptors dived; pinched-plasmeric cannon and light flak surfaced; radar, sonar. |
+| Pavise | 2 | Cruiser | Gravitic seeker battery (AA, 1,800 m), two counter-seekers (600 m), a light repeater, radar; a heavy gravitic seeker at structures to 2,600 m. |
+
+The Slipway builds the tech 1 hulls and is refitted in place to the Slipway II for the
+tech 2 ones. Tech 3 (battleship, carrier, assault submarine) is to come.
+
 ## The Leviathan
 
 The unit the naval design language is nailed on:
@@ -172,6 +206,7 @@ cargo test -p mc-sim --test sim -- naval::
 cargo test -p mc-sim --test sim -- naval_roster::
 cargo test -p mc-sim --test sim -- torpedo_launchers::
 cargo test -p mc-sim --test sim -- megalodon::
+cargo test -p mc-sim --test sim -- regency_navy::
 cargo test -p mc-sim --test sim -- broadside::
 cargo test -p mc-path --test big_hulls
 cargo test -p mc-models --lib tests::

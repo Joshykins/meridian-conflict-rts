@@ -163,11 +163,27 @@ impl World {
     /// Whether any of `shooter`'s weapons can strike `target`. Interceptor tubes
     /// strike no unit, and a surfaced-only gun nothing while its hull is under.
     pub(crate) fn can_strike(&self, shooter: usize, target: usize) -> bool {
-        let dived = self.submerged(shooter);
-        self.bp(shooter)
+        self.bp(shooter).weapons.iter().any(|w| {
+            !w.intercepts && !self.held_dived(shooter, w) && self.weapon_reaches(target, w)
+        })
+    }
+
+    /// Whether `weapon` on `row` is out of the fight while the hull is under: a gun that
+    /// works only surfaced, on a hull dived that does not lie in ambush (`Dive::ambush`:
+    /// that one marks its target dived and comes up to fire).
+    pub(crate) fn held_dived(&self, row: usize, weapon: &Weapon) -> bool {
+        weapon.surfaced && !self.bp(row).dive.is_some_and(|d| d.ambush) && self.submerged(row)
+    }
+
+    /// Whether an ambushing boat (`Dive::ambush`) has a mark for a gun that works only
+    /// surfaced, so it comes up, or stays up, to fire.
+    fn springs(&self, row: usize) -> bool {
+        let units = &self.state.units;
+        self.bp(row)
             .weapons
             .iter()
-            .any(|w| !w.intercepts && !(w.surfaced && dived) && self.weapon_reaches(target, w))
+            .zip(units.weapon_target[row])
+            .any(|(w, t)| w.surfaced && t != Handle::NONE)
     }
 
     /// Whether hulls `a` and `b` pass one over the other instead of bumping: both ride
@@ -218,8 +234,8 @@ impl World {
     /// Submarines go down or come up toward their ordered depth, a full dive
     /// taking `Dive::ticks`. Movement then sets the hull's height (`dive_z`).
     pub(crate) fn run_dive(&mut self) {
-        let units = &mut self.state.units;
-        for row in 0..units.slots.rows() {
+        for row in 0..self.state.units.slots.rows() {
+            let units = &mut self.state.units;
             if !units.slots.is_alive(row) || !units.is_active(row) {
                 continue;
             }
@@ -229,7 +245,10 @@ impl World {
                 continue;
             };
             let step = 255u16.div_ceil(dive.ticks.max(1)).min(255) as u8;
-            units.dive[row] = if units.dive_goal[row] {
+            // Lying in ambush, it surfaces while it has a mark and goes down without one.
+            let down = units.dive_goal[row] && !(dive.ambush && self.springs(row));
+            let units = &mut self.state.units;
+            units.dive[row] = if down {
                 units.dive[row].saturating_add(step)
             } else {
                 units.dive[row].saturating_sub(step)

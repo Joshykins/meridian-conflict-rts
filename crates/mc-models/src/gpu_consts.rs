@@ -525,8 +525,20 @@ shared! {
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;
         /// A Regency plasma shot's trail (renderer/regency_guns_fx.rs): a hot filament that
-        /// cools to red and breaks up along its length. `aim.w` 1 for a fusion round's.
+        /// cools to red and breaks up along its length. `aim.w` 1 for a fusion round's, 2
+        /// for a Gravitic Seeker's (renderer/gravitic_fx.rs: pink-hot to red, never white).
         pub const PLASMA_TRAIL: u32 = 11;
+    }
+
+    /// How a Regency plasma shot is drawn in flight (`mc_sim::mirror::plasma_look`, carried in
+    /// `ProjectileInstance::_pad[0]`; sprites.wgsl `plasma_look`). The older looks (1 to 4)
+    /// are still spelled out in the shader; new ones are declared here.
+    pub mod plasma_look as "PLASMA_LOOK_" {
+        /// A Gravitic Seeker (renderer/gravitic_fx.rs): a hard-edged plasma charge, a
+        /// pink-white heart in a red body, held in a faint shimmering gravity lens; no
+        /// motor, plume or body. `mc_sim::mirror::PLASMA_LOOK_GRAVITIC_SEEKER`; a test
+        /// holds them equal.
+        pub const GRAVITIC_SEEKER: u32 = 5;
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

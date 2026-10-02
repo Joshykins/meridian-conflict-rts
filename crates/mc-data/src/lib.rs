@@ -22,8 +22,9 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 pub use raw::{
-    BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade, ShieldKind,
-    ShieldLook, StructureLamps, TorpedoLook, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
+    AntiMissileLook, BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade,
+    ShieldKind, ShieldLook, StructureLamps, TorpedoLook, Trajectory, UnitSounds, WeaponColor,
+    WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -157,6 +158,8 @@ pub struct Faction {
     pub structure_lamps: StructureLamps,
     /// How its shield fields look. Presentation only.
     pub shield_look: ShieldLook,
+    /// How its missile defence is seen killing a missile. Presentation only.
+    pub anti_missile_look: AntiMissileLook,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -251,6 +254,10 @@ pub struct Dive {
     pub depth: Fx,
     /// Ticks to dive or to surface.
     pub ticks: u16,
+    /// Ordered down, it still comes up while a gun that works only surfaced has a mark,
+    /// and goes back down when none has (`naval.rs` `run_dive`): it hides dived and
+    /// surfaces to fight. Its marks are picked dived, as if it were up.
+    pub ambush: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -1139,6 +1146,7 @@ impl Blueprints {
                 torpedo_look: f.torpedo_look,
                 structure_lamps: f.structure_lamps,
                 shield_look: f.shield_look,
+                anti_missile_look: f.anti_missile_look,
             });
         }
         // A builder puts up only its own faction's structures. Mobile units may also come
@@ -1322,6 +1330,7 @@ impl Blueprints {
                 Some(d) => {
                     h.write_i64(d.depth.0);
                     h.write_u64(d.ticks as u64);
+                    h.write_u64(d.ambush as u64);
                 }
                 None => h.write_u64(u64::MAX),
             }
@@ -1639,6 +1648,8 @@ mod tests {
         assert_eq!(aster.structure_lamps, StructureLamps::Sodium);
         assert_eq!(regency.shield_look, ShieldLook::Prism);
         assert_eq!(aster.shield_look, ShieldLook::Honeycomb);
+        assert_eq!(regency.anti_missile_look, AntiMissileLook::CounterSeeker);
+        assert_eq!(aster.anti_missile_look, AntiMissileLook::Laser);
         assert!(
             regency.sounds.select.contains_key(&IconKind::Factory)
                 && regency.sounds.build.is_some()

@@ -27,6 +27,7 @@ mod kit;
 mod lift;
 mod machine;
 mod mobile_aa;
+pub(crate) mod naval;
 mod palisade;
 mod plating;
 mod raider;
@@ -100,7 +101,11 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(46.0, 30.0), (46.0, 30.0), (46.0, 38.0)],
         hatchery::hatchery,
     ),
-    ModelDef::new("regency_tidebrood", 46.0, 20.0, tidebrood::tidebrood),
+    ModelDef::tiered(
+        "regency_tidebrood",
+        [(46.0, 20.0), (46.0, 24.0), (46.0, 24.0)],
+        tidebrood::tidebrood,
+    ),
     // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
     // (`cyst`).
     ModelDef::tiered(
@@ -149,6 +154,11 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The land and air factories' tech 3, with their tech 2 kit and more.
         "regency_brood" | "regency_hatchery" => 15000,
         "regency_tidebrood" => 9000,
+        // The tech 1 hulls; the tech 2 warships have a capital ship's detail, lighter.
+        "regency_attack_boat" => 2400,
+        "regency_submarine" => 2800,
+        "regency_frigate" => 4500,
+        "regency_destroyer" | "regency_cruiser" => 7000,
         // Three tiers, and the next one's pieces waiting on each.
         "regency_cyst" => 6000,
         // Four tiers, and the next one's pieces waiting on each.
@@ -375,17 +385,13 @@ fn check_shots(
 }
 
 /// A factory's violet fabricator tips are where the sim pours its nanite streams from
-/// (`mc_core::print_heads`), and it has one at every head.
-#[cfg(test)]
-pub(super) fn check_heads(key: &str, radius: f32, height: f32) {
-    check_heads_at(key, 1, radius, height);
-}
-
-/// [`check_heads`] for the model at tech `tech`, with the heads that tech has fitted.
+/// (`mc_core::print_heads`), and the model at tech `tech` has one at every head that tech
+/// has fitted. A design variant (`mesh~name`) has its mesh's heads.
 #[cfg(test)]
 pub(super) fn check_heads_at(key: &str, tech: u8, radius: f32, height: f32) {
     use super::material;
-    let factory = mc_core::print_heads::factory_heads(key).expect(key);
+    let design = key.split('~').next().unwrap_or(key);
+    let factory = mc_core::print_heads::factory_heads(design).expect(key);
     assert!(
         factory.heads.iter().any(|h| h.fitted(tech)),
         "{key}: no heads at tech {tech}"

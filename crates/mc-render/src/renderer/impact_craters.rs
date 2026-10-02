@@ -106,7 +106,7 @@ impl Renderer {
                 }
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                 if w.beam
-                    || w.plasma_grade.is_some()
+                    || w.plasma_shot().is_some()
                     || w.heavy_rail > 0.0
                     || w.great_gun > 0.0
                     || w.burn_ticks > 0

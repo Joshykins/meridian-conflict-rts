@@ -171,11 +171,13 @@ pub enum SimEvent {
         weapon: u8,
     },
     /// An anti-missile laser from `from` to a hostile missile at `to`.
-    /// `killed` is the tick the casing fails.
+    /// `killed` is the tick the casing fails. `blueprint` is the defender's: its faction
+    /// says how the kill is drawn (`mc_data::AntiMissileLook`).
     MissileLased {
         from: FxVec3,
         to: FxVec3,
         killed: bool,
+        blueprint: BlueprintId,
     },
     /// An interceptor torpedo met the torpedo it was fired at, at `pos` under the water:
     /// both burst there.
@@ -919,8 +921,12 @@ pub struct PlannedBuild {
     pub heading: f32,
 }
 
-/// Set in `ProjectileInstance::color` for a missile.
+/// Set in `ProjectileInstance::color` for a missile. Not for a Gravitic Seeker, which has
+/// no motor or body to draw: it is its plasma charge (`plasma_look`).
 pub const PROJECTILE_MISSILE: u32 = 1 << 8;
+/// `plasma_look` of a Gravitic Seeker. `mc_models::gpu_consts::plasma_look::GRAVITIC_SEEKER`
+/// is the shader's copy; a test holds them equal.
+pub const PLASMA_LOOK_GRAVITIC_SEEKER: u32 = 5;
 /// Set in `ProjectileInstance::color` for a torpedo running under the water: no
 /// tracer, flame or casing in the air; a dark body, bubbles and a wake instead.
 pub const PROJECTILE_TORPEDO: u32 = 1 << 4;
@@ -1095,16 +1101,19 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 /// How a Regency plasma shot is drawn in flight (sprites.wgsl, `ProjectileInstance::_pad[0]`
 /// above 2): 1 a Pinched-plasmeric stream slug, 2 a Pinch-fusion slug strobing with fusion
 /// bursts, 3 a gravitic charge carried onto its mark, thrown curving (`Weapon::curve`) or
-/// steered (a Gravitic Seeker, a plasma `missile`), 4 a Plasmeric bolt (a fat glowing
-/// teardrop, as a plasma repeater throws). Zero for anything else.
+/// steered (a plasmeric seeker, a plasma `missile` of another grade than Gravitic), 4 a
+/// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws), 5 a Gravitic
+/// Seeker (`Weapon::gravitic_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`): its contained charge
+/// in its lens. Zero for anything else.
 pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
     use mc_data::PlasmaGrade;
-    match weapon.plasma_grade {
+    match weapon.plasma_shot() {
+        _ if weapon.gravitic_seeker() => PLASMA_LOOK_GRAVITIC_SEEKER,
         Some(_) if weapon.missile || weapon.curve.0 > 0 => 3,
         Some(PlasmaGrade::Pinched) => 1,
         Some(PlasmaGrade::PinchFusion) => 2,
         Some(PlasmaGrade::Plasmeric) => 4,
-        None => 0,
+        Some(PlasmaGrade::Gravitic) | None => 0,
     }
 }
 
@@ -1132,17 +1141,17 @@ fn wings_or_turn(weapon: &mc_data::Weapon, age: u16) -> f32 {
     -((age - weapon.boost_ticks) as f32 / span as f32).clamp(0.01, 1.0)
 }
 
-/// A Gravitic Seeker: a plasma `missile`, a charge held in gravity containment and steered
-/// onto its mark. It has no body and no motor, so it is not drawn as a missile
-/// (`PROJECTILE_MISSILE`) but as the gravitic charge it is (`plasma_look`).
-fn gravitic_seeker(weapon: &mc_data::Weapon) -> bool {
+/// A Regency seeker: a plasma `missile` of any grade, a charge held in gravity
+/// containment and steered onto its mark. It has no body and no motor, so it is not drawn
+/// as a missile (`PROJECTILE_MISSILE`) but as the charge it is (`plasma_look`).
+fn plasma_seeker(weapon: &mc_data::Weapon) -> bool {
     weapon.missile && weapon.plasma_grade.is_some()
 }
 
 /// A shot's `aim.w`: a missile's body across (`Weapon::caliber`), any other shot's
 /// tail-length multiplier (`Weapon::streak`).
 fn aim_w(weapon: &mc_data::Weapon) -> f32 {
-    if !gravitic_seeker(weapon) && weapon.missile {
+    if !plasma_seeker(weapon) && weapon.missile {
         weapon.caliber
     } else {
         weapon.streak
@@ -1831,13 +1840,11 @@ impl World {
             } else {
                 0.0
             };
+            // A Regency seeker is drawn as its charge, not as a missile (`plasma_look`).
+            let missile = weapon.missile && !plasma_seeker(weapon);
             (
                 weapon.color as u32
-                    | if !gravitic_seeker(weapon) && weapon.missile {
-                        PROJECTILE_MISSILE
-                    } else {
-                        0
-                    }
+                    | if missile { PROJECTILE_MISSILE } else { 0 }
                     | if trail { PROJECTILE_TRAIL } else { 0 }
                     | if smoke { PROJECTILE_SMOKE } else { 0 }
                     | if bomb { PROJECTILE_BOMB } else { 0 }
@@ -1846,12 +1853,12 @@ impl World {
                     } else {
                         0
                     }
-                    | if weapon.missile && weapon.skim > Fx::ZERO {
+                    | if missile && weapon.skim > Fx::ZERO {
                         PROJECTILE_SKIM
                     } else {
                         0
                     }
-                    | if weapon.missile && weapon.apogee > Fx::ZERO {
+                    | if missile && weapon.apogee > Fx::ZERO {
                         PROJECTILE_APOGEE
                     } else {
                         0
@@ -1868,7 +1875,7 @@ impl World {
                 // the white-hot of a shell. Above one, it leans on to red (`Weapon::red`).
                 // A Regency plasma shot (`plasma_grade`) is drawn that way too, whatever its size,
                 // and plus twice its look (`plasma_look`).
-                if (weapon.rounds > 1 || weapon.plasma_grade.is_some())
+                if (weapon.rounds > 1 || weapon.plasma_shot().is_some() || weapon.gravitic_seeker())
                     && weapon.color == WeaponColor::Orange
                 {
                     1.0 + weapon.red + 2.0 * plasma_look(weapon) as f32

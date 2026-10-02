@@ -1,7 +1,7 @@
 //! Match set-up shared by the windowed game, the headless tools and the test scenes.
 
 use mc_core::{Angle, FxVec2};
-use mc_data::Blueprints;
+use mc_data::{BlueprintId, Blueprints};
 use mc_map::MapFile;
 use mc_sim::tables::Controller;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup};
@@ -180,6 +180,23 @@ pub fn range_pad(map: &MapFile) -> FxVec2 {
         .first()
         .copied()
         .unwrap_or(map.info().size_metres() * mc_core::Fx::HALF)
+}
+
+/// Where a headless range stands `subject`: on the pad, or out on open water near it for
+/// a hull or a structure that is built only on water (as the windowed range lines them
+/// up), so a ship is shot afloat, not sunk into the pad.
+fn subject_pad(map: &MapFile, blueprints: &Blueprints, subject: BlueprintId) -> FxVec2 {
+    let bp = blueprints.unit(subject);
+    let wet = bp.water_only()
+        || bp
+            .motion
+            .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval);
+    let pad = range_pad(map);
+    if wet {
+        sea_near(map, pad).unwrap_or(pad)
+    } else {
+        pad
+    }
 }
 
 /// Open sea near the first start position, where the aircraft-ditch scene drops its bomber.
@@ -644,9 +661,14 @@ pub fn opening_commands(
                 .id_of(&opts.subject)
                 .unwrap_or_else(|| id(crate::range::DEFAULT_SUBJECT));
             out.extend(
-                crate::range::opening_commands(blueprints, range_pad(map), subject, opts.scenario)
-                    .into_iter()
-                    .map(|command| PlayerCommand { player: 0, command }),
+                crate::range::opening_commands(
+                    blueprints,
+                    subject_pad(map, blueprints, subject),
+                    subject,
+                    opts.scenario,
+                )
+                .into_iter()
+                .map(|command| PlayerCommand { player: 0, command }),
             );
         }
         Scene::Battle => {
@@ -1124,8 +1146,13 @@ pub fn scene_orders(
             .filter(|&r| u.owner[r] == 0)
             .map(|r| (u.blueprint[r], u.id(r)))
             .collect();
-        let mut owed =
-            crate::range::owed_commands(blueprints, range_pad(map), subject, opts.scenario, &blue);
+        let mut owed = crate::range::owed_commands(
+            blueprints,
+            subject_pad(map, blueprints, subject),
+            subject,
+            opts.scenario,
+            &blue,
+        );
         if opts.hurt > 0 {
             owed.push(Command::DebugDamage {
                 units: blue

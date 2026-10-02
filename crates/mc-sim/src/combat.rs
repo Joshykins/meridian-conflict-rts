@@ -537,8 +537,9 @@ impl World {
 
     pub(crate) fn is_valid_target(&self, shooter: usize, target: usize, weapon: &Weapon) -> bool {
         // Interceptor tubes never take a unit (`naval_arms.rs`); a deck gun that only
-        // works surfaced holds nothing while its hull is under.
-        if weapon.intercepts || (weapon.surfaced && self.submerged(shooter)) {
+        // works surfaced holds nothing while its hull is under, unless the boat lies in
+        // ambush (it comes up for the mark).
+        if weapon.intercepts || self.held_dived(shooter, weapon) {
             return false;
         }
         let units = &self.state.units;
@@ -2526,6 +2527,7 @@ impl World {
                     from,
                     to,
                     killed: dead,
+                    blueprint: self.state.units.blueprint[r],
                 });
                 if dead {
                     killed.push(i);

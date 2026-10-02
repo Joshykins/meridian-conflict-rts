@@ -17,7 +17,7 @@
 use std::f32::consts::TAU;
 
 use glam::{Vec2, Vec3};
-use mc_core::print_heads::{factory_heads, PrintHead, TUBE};
+use mc_core::print_heads::{factory_heads, TUBE};
 
 use crate::builder::MeshBuilder;
 use crate::material::*;
@@ -273,27 +273,16 @@ pub(super) fn fabricator(b: &mut MeshBuilder, mount: Vec3, aim: Vec3, s: f32) {
     b.cylinder_between(along(3.0), tip, 0.34 * s, 0.12 * s, sides);
 }
 
-/// The fabricator heads of the factory drawn with `mesh` (`mc_core::print_heads`): its
-/// mounts, their scale, and the point they aim at, so mesh and stream cannot drift apart.
-pub(super) fn print_heads(mesh: &str) -> impl Iterator<Item = (Vec3, f32, Vec3)> {
-    heads_where(mesh, |_| true)
-}
-
-/// [`print_heads`] for the heads that tier `tier`'s kit fits.
+/// The fabricator heads that tier `tier`'s kit fits on the factory drawn with `mesh`
+/// (`mc_core::print_heads`): their mounts, their scale, and the point they aim at, so
+/// mesh and stream cannot drift apart.
 pub(super) fn tier_heads(mesh: &str, tier: u8) -> impl Iterator<Item = (Vec3, f32, Vec3)> {
-    heads_where(mesh, move |h| h.tier == tier)
-}
-
-fn heads_where(
-    mesh: &str,
-    keep: impl Fn(&PrintHead) -> bool,
-) -> impl Iterator<Item = (Vec3, f32, Vec3)> {
     let factory = factory_heads(mesh).expect("a Regency factory mesh");
     let aim = Vec3::from(factory.aim);
     factory
         .heads
         .iter()
-        .filter(move |h| keep(h))
+        .filter(move |h| h.tier == tier)
         .map(move |h| (Vec3::from(h.mount), h.scale, aim))
 }
 

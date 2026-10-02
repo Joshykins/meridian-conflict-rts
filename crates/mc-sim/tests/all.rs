@@ -66,6 +66,7 @@ mod reclaim_area;
 mod reclaim_heads;
 mod reform;
 mod regency;
+mod regency_navy;
 mod regency_t3_guns;
 mod repair;
 mod self_destruct;

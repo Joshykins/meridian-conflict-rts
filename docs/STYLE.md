@@ -201,7 +201,9 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |
 | Battle tank / mobile anti-air (T2) | Glaive / Vane |
 | Anti-spaceship gun, heavy artillery (T3) | Spire, Kiln |
-| Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway |
+| Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway (II) |
+| Attack boat, submarine, frigate | Dirk, Stiletto, Falchion |
+| Heavy destroyer, cruiser | Claymore, Pavise |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
 | Storage | Reliquary |
@@ -359,11 +361,27 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     battle scorpion's claws).
   - **Guided: the Gravitic Seeker.** The Regency's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
-    exhaust plume. The family covers every role ARC's missiles do:
+    exhaust plume. Drawn as its charge, not a rocket (renderer/gravitic_fx.rs,
+    sprites.wgsl `gravitic_seeker`; any missile with `plasma_grade: Gravitic`):
+    no body, motor flame or smoke. It leaves its cell with a hard red flash
+    and filaments snapping in on it; in flight it is a hard-edged pink-white
+    heart in a red body, drawn out a little behind, held in a faint gravity
+    lens that shimmers at its edge, and it leaves a thin hot filament that
+    cools to red and breaks up. Where it strikes the lens snaps in and lets
+    go: a hard red burst over a white heart, filaments torn out, globs and
+    sparks thrown out low, the ground glassed under it; sized by its damage
+    and `impact`, so a heavy seeker's is many times a battery seeker's, and
+    it throws red lightning into the ground. The family covers every role
+    ARC's missiles do:
     - **Gravitic Seeker Pod:** salvos.
     - **Gravitic Seeker Battery:** AA.
-    - **Heavy Gravitic Seeker:** tactical and cruise strikes.
-    - **Gravitic Counter-seeker:** missile defence.
+    - **Heavy Gravitic Seeker:** tactical and cruise strikes. Its charge
+      gathers over the cell first, a red ball swelling as motes are drawn in.
+    - **Gravitic Counter-seeker:** missile defence (a faction's
+      `anti_missile_look: CounterSeeker`; ARC's is the laser). A small red
+      charge thrown off the mount runs the missile down along a cooling
+      filament and bursts on it, small, hard and short, the tick the
+      defence kills it; a burn let go without a kill fizzles where it got to.
     - **Gravitic Interceptor:** anti-nuke.
     - **Gravitic Torpedo:** the same containment steering under water (also
       air-dropped); it boils the sea around a hull, and its hit is a steam

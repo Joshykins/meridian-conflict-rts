@@ -27,6 +27,9 @@
     // curtain, on a lattice of red-tinged triangles. Their generators' cores, and the
     // Exarch's back projector, burn the same prism.
     shield_look: Prism,
+    // Their missile defence throws Gravitic Counter-seekers: a small red charge off the
+    // mount that runs the missile down and bursts on it, where ARC holds a laser on it.
+    anti_missile_look: CounterSeeker,
     // Their own voices (data/factions/regency/sounds.ron): heavy machines, bronze struck and
     // rings spinning up, not ARC's servos and chimes.
     sounds: (

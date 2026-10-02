@@ -100,6 +100,11 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     // that shoots only spacecraft (none here: it must hold through the whole battle).
     ("regency_t3_artillery", 1, 600, 350),
     ("regency_t3_mobile_aa", 1, 1500, 300),
+    // Regency boats lying dived in ambush (`Dive::ambush`): they surface for a mark and
+    // go back down without one. A diving heavy destroyer with a hull shield and torpedoes
+    // dived, guns only up.
+    ("regency_t1_attack_boat", 4, 2800, 500),
+    ("regency_t2_destroyer", 1, 3200, 600),
 ];
 
 fn setup(w: &mut World) {

@@ -73,6 +73,11 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
     aster::MODELS
         .iter()
         .chain(regency::MODELS.iter())
+        .chain(regency::naval::attack_boat::MODELS.iter())
+        .chain(regency::naval::submarine::MODELS.iter())
+        .chain(regency::naval::frigate::MODELS.iter())
+        .chain(regency::naval::destroyer::MODELS.iter())
+        .chain(regency::naval::cruiser::MODELS.iter())
         .chain(props::MODELS.iter())
         .chain(super::desert::MODELS.iter())
         .chain(super::dam::MODELS.iter())

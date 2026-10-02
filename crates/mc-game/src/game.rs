@@ -3713,7 +3713,10 @@ impl Game {
         let mut lasers = (0.0f32, 0.0f32);
         let mut snaps: Vec<(f32, f32, f32)> = Vec::new();
         for event in &self.view.frame.events {
-            let mc_sim::SimEvent::MissileLased { from, to, killed } = event else {
+            let mc_sim::SimEvent::MissileLased {
+                from, to, killed, ..
+            } = event
+            else {
                 continue;
             };
             let (gain, pan) = self.hear(Vec3::from(from.to_f32()));

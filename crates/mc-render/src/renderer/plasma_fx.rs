@@ -78,6 +78,8 @@ pub(super) struct PlasmaFx {
     charges: Vec<Charge>,
     /// The direct-fire guns' charges and lights (`regency_guns_fx`).
     pub(super) guns: super::regency_guns_fx::RegencyGunFx,
+    /// The Gravitic Seekers and Counter-seekers (`gravitic_fx`).
+    pub(super) seekers: super::gravitic_fx::GraviticFx,
 }
 
 impl PlasmaFx {
@@ -90,7 +92,7 @@ impl PlasmaFx {
 /// its muzzle, and lands the way the cage letting go does. A gun laid flat
 /// (`Weapon::flat_fire`) is a direct-fire gun whose shot arcs (`regency_guns_fx`).
 fn thrown_plasma(weapon: &Weapon) -> bool {
-    weapon.plasma_grade.is_some()
+    weapon.plasma_shot().is_some()
         && ((weapon.trajectory == Trajectory::Ballistic && !weapon.flat_fire) || weapon.curve.0 > 0)
         && !weapon.missile
 }

@@ -1088,6 +1088,19 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
             line: false,
         });
     }
+    // A Gravitic Seeker's charge (`mirror::plasma_look`, twice over in `_pad[0]` past one
+    // and its redness): a red light round it, a heavy one's wide.
+    let look = ((p._pad[0] - 1.0) * 0.5).floor();
+    if p._pad[0] > 2.5 && look == crate::gpu_consts::plasma_look::GRAVITIC_SEEKER as f32 {
+        let size = p.size.clamp(0.3, 4.0);
+        return Some(Glow {
+            from,
+            to,
+            color: Vec3::new(1.0, 0.1, 0.06) * 40.0 * size,
+            range: 8.0 + 5.0 * size,
+            line: false,
+        });
+    }
     // Tracers: small, but a stream of them lights a night battle.
     let color = match flags & 0xF {
         0 => Vec3::new(0.35, 0.66, 1.0),

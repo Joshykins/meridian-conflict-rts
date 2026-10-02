@@ -143,7 +143,24 @@
         vision: 200, water_build: true,
         // No salvage boat: the Regency reclaim nothing.
         builder: (power: 20, range: 0, builds: [
-            "regency_t1_engineer", "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine",
+            "regency_t1_engineer", "regency_t1_attack_boat", "regency_t1_submarine", "regency_t1_frigate",
+        ]),
+        upgrades_to: "regency_t2_naval_factory",
+        mesh: "regency_tidebrood", icon: Factory,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "regency_t2_naval_factory",
+        name: "Slipway II",
+        role: "Naval Factory",
+        tech: 2,
+        categories: ["Naval", "Factory"],
+        health: 9200,
+        cost: (mass: 1580, energy: 12900, time: 1950),
+        radius: 46, height: 24, footprint: (8, 8),
+        vision: 200, water_build: true,
+        builder: (power: 120, range: 0, builds: [
+            "regency_t1_engineer", "regency_t2_engineer", "regency_t1_attack_boat", "regency_t1_submarine", "regency_t1_frigate", "regency_t2_destroyer", "regency_t2_cruiser",
         ]),
         mesh: "regency_tidebrood", icon: Factory,
         sounds: (death: "blast_large"),

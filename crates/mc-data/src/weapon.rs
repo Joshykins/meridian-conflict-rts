@@ -194,6 +194,20 @@ pub struct Weapon {
 }
 
 impl Weapon {
+    /// The grade of a Regency gun's plasma shot, drawn and struck as a gun's
+    /// (`renderer::regency_guns_fx`): None for anything else, a gravitic munition
+    /// (seeker or torpedo) included.
+    pub fn plasma_shot(&self) -> Option<PlasmaGrade> {
+        self.plasma_grade.filter(|g| *g != PlasmaGrade::Gravitic)
+    }
+
+    /// A Gravitic Seeker: a missile whose plasma charge is held and steered in gravity
+    /// containment. Drawn as its charge (`renderer::gravitic_fx`), never as a rocket: no
+    /// motor, plume or smoke.
+    pub fn gravitic_seeker(&self) -> bool {
+        self.missile && self.plasma_grade == Some(PlasmaGrade::Gravitic)
+    }
+
     /// Whether a missile `age` ticks out flies with no motor burning: tossed out of its
     /// cell, or coasting after its booster while it turns over, before the motor lights.
     pub fn motor_out(&self, age: u16) -> bool {

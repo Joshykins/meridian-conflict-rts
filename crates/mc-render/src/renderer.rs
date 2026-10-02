@@ -54,6 +54,7 @@ mod footfalls;
 pub(crate) mod foundations;
 mod frame;
 pub(crate) mod grass;
+mod gravitic_fx;
 mod great_gun_fx;
 mod ground_contact;
 mod gtao;
@@ -3301,6 +3302,7 @@ impl Renderer {
         self.write_plasma_fx(units, time);
         self.regency_guns_tick(units, time);
         self.regency_trails(projectiles, time);
+        self.gravitic_tick(units, projectiles, time);
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
@@ -3413,6 +3415,7 @@ impl Renderer {
         self.capital_lights(time, alpha);
         self.warp_lights(time);
         self.regency_guns_lights(time);
+        self.gravitic_lights(time);
         self.star_core_lights(time);
         self.heavy_rail_lights(time);
         self.emp_lights(time);
@@ -4694,13 +4697,15 @@ impl Renderer {
                 );
                 // A squeezed plasma gun gathers its charge in front of the bore
                 // (`regency_guns_fx`), not as an ordinary gun's glow.
+                // A Gravitic Seeker gathers its charge over its cell (`gravitic_fx`).
                 if !self.regency_charging(
                     unit.0,
                     *blueprint,
                     *weapon,
                     Vec3::from(pos.to_f32()),
                     time,
-                ) {
+                ) && !self.seeker_charging(unit.0, *blueprint, *weapon, time)
+                {
                     self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
                 }
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
@@ -4710,8 +4715,16 @@ impl Renderer {
                     self.bore_charge(at, id, seconds, time);
                 }
             }
-            SimEvent::MissileLased { from, to, killed } => {
-                self.missile_lased(from, to, *killed, time);
+            SimEvent::MissileLased {
+                from,
+                to,
+                killed,
+                blueprint,
+            } => {
+                // A faction that throws counter-seekers draws them (`gravitic_fx`), not a laser.
+                if !self.counter_seeker(*blueprint, from, to, *killed, time) {
+                    self.missile_lased(from, to, *killed, time);
+                }
             }
             SimEvent::MissileIgnited {
                 pos,
@@ -4797,6 +4810,10 @@ impl Renderer {
                     let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
                     let gap = mc_sim::mirror::round_gap(w) * self.tick_seconds;
                     if self.regency_fired(*blueprint, *weapon, at, dir, gap, time) {
+                        return;
+                    }
+                    // A Gravitic Seeker leaves its cell with no flame or smoke (`gravitic_fx`).
+                    if self.seeker_fired(*blueprint, *weapon, at, dir, time) {
                         return;
                     }
                 }
@@ -5069,8 +5086,17 @@ impl Renderer {
             } => {
                 let (beam, plasma) = {
                     let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];
-                    (w.beam, w.plasma_grade.is_some())
+                    (w.beam, w.plasma_shot().is_some())
                 };
+                // A Gravitic Seeker's strike is all its own (`gravitic_fx`); on a shield it is
+                // the shield's hit, as any shot's (below).
+                if !*on_shield {
+                    let start = time + after.to_f32() * self.tick_seconds;
+                    let at = Vec3::from(pos.to_f32());
+                    if self.seeker_struck(*blueprint, *weapon, at, *on_unit, start) {
+                        return;
+                    }
+                }
                 if beam {
                     // A held beam's strike: it glasses the ground, no shell's blast (`plasma_fx`).
                     let at = Vec3::from(pos.to_f32());

@@ -261,8 +261,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     }
     // A Regency plasma shot (`mirror::plasma_look`, twice over in extras.z): 1 a
     // Pinched-plasmeric stream slug, 2 a Pinch-fusion slug, 3 a thrown gravitic charge,
-    // each a longer streak than a shell's trace; 4 a Plasmeric bolt, a short fat teardrop.
+    // each a longer streak than a shell's trace; 4 a Plasmeric bolt, a short fat teardrop;
+    // a Gravitic Seeker, its charge in its lens, little longer than it is wide.
     let look = plasma_look(p);
+    let seeker = look == PLASMA_LOOK_GRAVITIC_SEEKER;
     if look == 1u {
         trace = length(stride) * 0.5;
     } else if look == 2u {
@@ -271,6 +273,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         trace = length(stride) * 0.85;
     } else if look == 4u {
         trace = min(length(stride) * 0.4, max(p.size, 0.5) * 5.5);
+    } else if seeker {
+        trace = min(length(stride) * 0.5, max(p.size, 0.3) * 1.6);
     }
     if (p.color & 0x200u) != 0u {
         trace = min(trace, distance(head, shot_muzzle(p)));
@@ -328,7 +332,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // Pinched: tight; fusion: a broad prism sheath round its core; a thrown charge: its
     // containment is wider than the core it holds.
     width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.2, look == 4u)
-        * select(1.0, 1.9, look == 2u);
+        * select(1.0, 1.9, look == 2u) * select(1.0, 3.6, seeker);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
     if plasma_m > 0.0 && !beam && !fade_beam {
@@ -423,9 +427,14 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         // 1.25: a tracer with an orange-hot core; 1.4: a red round, red-hot right through.
         out.shape.y = select(1.25, 1.4, red > 0.5);
         if look > 0u {
-            // 7.6, 8.6, 9.6, 10.6: the Regency plasma shots (`fs_sprite`).
+            // 7.6, 8.6, 9.6, 10.6, 11.6: the Regency plasma shots (`fs_sprite`).
             out.color = vec3<f32>(1.0);
             out.shape.y = 6.6 + f32(look);
+        }
+        if seeker {
+            // The seeker's lens is round: `fs_sprite` needs the quad's length over its
+            // width, carried in green over red (both dimmed alike).
+            out.color = vec3<f32>(1.0, (len + 2.0 * width_px) / max(2.0 * width_px, 0.001), 0.0);
         }
     }
     if fade_beam {
@@ -462,12 +471,16 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             // white, takes the prism's pinks and cools through them to red. The age goes to
             // `fs_sprite` in the shape, for the breaking up.
             let heat = max(1.0 - age, 0.0);
-            let fusion = p.aim.w > 0.5;
+            let fusion = p.aim.w > 0.5 && p.aim.w < 1.5;
+            // A Gravitic Seeker's filament (aim.w 2, renderer/gravitic_fx.rs) never goes white:
+            // pink-hot where the charge has just passed, then red.
+            let seeker = p.aim.w > 1.5;
             let red = mix(vec3<f32>(0.45, 0.012, 0.008), vec3<f32>(1.0, 0.06, 0.035), smoothstep(0.0, 0.45, heat));
             let hue = prism(f32(instance) * 0.137 + globals.camera.w * PRISM_RATE * 3.0);
-            var warm = mix(red, mix(vec3<f32>(1.0, 0.45, 0.42), hue, select(0.0, 0.8, fusion)), smoothstep(0.45, 0.8, heat));
-            warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat));
-            out.color = warm * select(7.0, 9.0, fusion) * pow(heat, 0.8);
+            let pink = select(vec3<f32>(1.0, 0.45, 0.42), vec3<f32>(1.0, 0.22, 0.2), seeker);
+            var warm = mix(red, mix(pink, hue, select(0.0, 0.8, fusion)), smoothstep(0.45, 0.8, heat));
+            warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat) * select(1.0, 0.0, seeker));
+            out.color = warm * select(select(7.0, 9.0, fusion), 4.5, seeker) * pow(heat, 0.8);
             out.shape = vec2<f32>(-distance(head, tail), 6.6 + 0.4 * clamp(age, 0.0, 1.0));
         } else if (p.color & 0xFu) == 6u {
             // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
@@ -666,6 +679,10 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         out.color = mix(vec3<f32>(1.0, 0.38, 0.1), vec3<f32>(1.0, 0.06, 0.03), clamp(p.extras.z - 1.0, 0.0, 1.0));
     }
     let look = plasma_look(p);
+    if look == PLASMA_LOOK_GRAVITIC_SEEKER {
+        // A Gravitic Seeker's heart is its streak's (`gravitic_seeker`): no bead over it.
+        out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+    }
     if look == 1u || look == 2u {
         // The squeezed plasma's head: white-hot, a little pink.
         out.color = select(vec3<f32>(1.0, 0.8, 0.74), vec3<f32>(1.25, 1.18, 1.1), look == 2u);
@@ -675,6 +692,9 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     } else if look == 4u {
         // A Plasmeric bolt's heart: pink-white.
         out.color = vec3<f32>(1.2, 0.55, 0.55);
+    } else if look == PLASMA_LOOK_GRAVITIC_SEEKER {
+        // A Gravitic Seeker: red, its pink heart is the streak's (`gravitic_seeker`).
+        out.color = vec3<f32>(1.1, 0.1, 0.07);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -838,6 +858,39 @@ fn vs_effect(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: 
     return out;
 }
 
+// A Gravitic Seeker in flight (`PLASMA_LOOK_GRAVITIC_SEEKER`), on its streak's quad: `u` 0 at
+// the tail to 1 at the head, `y` across (-1 to 1), `aspect` the quad's length over its width.
+// A hard-edged plasma charge: a pink-white heart in a red body drawn out a little behind,
+// held in a faint gravity lens that shimmers at its edge. No motor, no plume; nothing wound
+// round it.
+fn gravitic_seeker(u: f32, y: f32, aspect: f32, time: f32) -> vec3<f32> {
+    // Half-widths along the quad from its tail, and the charge's middle one in from the head.
+    let s = u * 2.0 * max(aspect, 1.0);
+    let middle = 2.0 * max(aspect, 1.0) - 1.0;
+    let dx = s - middle;
+    let d = length(vec2<f32>(dx, y));
+    let angle = atan2(y, dx);
+    // The containment squeezes it: the body's edge shivers a little, never a smooth ball.
+    let shiver = 1.0 + 0.07 * sin(time * 47.0 + angle * 3.0) + 0.05 * sin(time * 29.0 - angle * 5.0);
+    // Drawn out behind, as the lens drags it.
+    let body_d = length(vec2<f32>(select(dx, dx * 0.55, dx < 0.0), y)) / (0.5 * shiver);
+    let body = 1.0 - smoothstep(0.86, 1.0, body_d);
+    let heart_d = length(vec2<f32>(select(dx, dx * 0.7, dx < 0.0), y)) / 0.17;
+    let heart = 1.0 - smoothstep(0.75, 1.0, heart_d);
+    // The lens: a faint bright skin a little out from the body, shimmering where the
+    // containment bends the light, broken up, never a ring of its own.
+    let around = vec2<f32>(dx, y) / max(d, 0.001);
+    let ripple = value_noise2(around * 2.2 + vec2<f32>(time * 6.0, time * 3.1), 1.0);
+    let skin = smoothstep(0.5, 0.82, d) * (1.0 - smoothstep(0.82, 0.98, d));
+    let lens = skin * (0.15 + 0.45 * smoothstep(0.3, 0.9, ripple));
+    let red = vec3<f32>(1.0, 0.06, 0.04);
+    let pink = vec3<f32>(1.0, 0.62, 0.66);
+    let glow = mix(0.7, 1.0, 1.0 - clamp(body_d, 0.0, 1.0));
+    return red * body * 3.2 * glow * (1.0 - heart)
+        + pink * heart * 6.0
+        + vec3<f32>(1.0, 0.2, 0.25) * lens * 1.2 * (1.0 - body);
+}
+
 fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
     if in.origin.w > 0.5 && effect_blocked(in.origin.xyz, in.world) { discard; }
     var glow: f32;
@@ -866,6 +919,9 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let time = globals.camera.w;
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
+            if in.shape.y > 11.1 {
+                return vec4<f32>(gravitic_seeker(u, in.uv.y, in.color.g / max(in.color.r, 0.0001), time) * in.color.r, 1.0);
+            }
             if in.shape.y > 10.1 {
                 // A Plasmeric bolt: a fat teardrop of plasma, a round head and a short tail
                 // that narrows behind it; a pink-white heart in a red body, wobbling.

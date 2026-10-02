@@ -29,6 +29,10 @@ pub enum PlasmaGrade {
     Pinched,
     /// Pushed until it fuses; the gun fires the fusion events out.
     PinchFusion,
+    /// A plasma charge held and steered in gravity containment: the Gravitic Seeker
+    /// (missiles) and the Gravitic Torpedo. Drawn as a guided munition, never as a gun's
+    /// plasma shot (`Weapon::plasma_shot`).
+    Gravitic,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
@@ -167,6 +171,9 @@ pub(crate) struct Faction {
     /// How its shield fields look, domes and personal fields alike. Presentation only.
     #[serde(default)]
     pub shield_look: ShieldLook,
+    /// How its missile defence is seen killing a missile. Presentation only.
+    #[serde(default)]
+    pub anti_missile_look: AntiMissileLook,
 }
 
 /// How a faction's shield fields are drawn (shields.wgsl, entity.wgsl `fs_hull`). The
@@ -182,6 +189,19 @@ pub enum ShieldLook {
     /// A veil in pinch fusion's prism: white-hot glass with pastel colour drifting over
     /// it like a curtain, on a lattice of red-tinged triangles (the Regency).
     Prism = 1,
+}
+
+/// How a faction's missile defence (`anti_missile`) is drawn taking a missile down
+/// (mc-render `laser_fx`, `gravitic_fx`). Only the look: what it kills, and when, is the
+/// sim's either way.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
+pub enum AntiMissileLook {
+    /// A steady red laser held on the casing from the emitter until it fails (ARC).
+    #[default]
+    Laser,
+    /// The Gravitic Counter-seeker: a small red charge thrown off the mount that runs the
+    /// missile down and bursts on it, hard and short (the Regency).
+    CounterSeeker,
 }
 
 /// The lamps a faction's structures carry at night when their data names none
@@ -452,12 +472,16 @@ pub(crate) struct RawBody {
 }
 
 /// How a submarine dives: `depth` metres of water over its deck when dived, and
-/// `time` seconds to go down or come up.
+/// `time` seconds to go down or come up. `ambush`: a boat whose guns all need the surface
+/// marks its target dived, comes up to fire and goes down again when it has nothing to
+/// fire at (`Dive::ambush`).
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawDive {
     pub depth: f64,
     pub time: f64,
+    #[serde(default)]
+    pub ambush: bool,
 }
 
 /// An Argon Electric Bore: the shot is an argon tracer, and when it lands the charge is
@@ -1597,6 +1621,7 @@ impl Unit {
                     Some(Dive {
                         depth: fx(d.depth),
                         ticks: ticks(d.time).clamp(1, 600) as u16,
+                        ambush: d.ambush,
                     })
                 }
                 None => None,

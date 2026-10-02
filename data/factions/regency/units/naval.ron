@@ -1,0 +1,246 @@
+// The Regency's navy (docs/NAVY.md "The Regency's navy"). Hulls ride the water as ARC's
+// do (`layer: Naval`): the origin is the waterline, `height` stands above it.
+//
+// Where ARC's navy is a fleet of specialists on the surface, the Regency's goes under:
+// nearly every hull dives, and its guns come up with it. What dives cannot be shot at
+// by guns, only found by sonar and hit by torpedoes, so a Regency fleet picks when the
+// fight starts. What it pays: a gun that needs the surface does nothing dived.
+//
+// Every weapon names its grade (`plasma_grade`): their guns fire plasma; their
+// torpedoes and seekers are Gravitic, a plasma charge steered in gravity containment.
+// Models: `models::regency::naval::*`, authored at the sizes here, so every muzzle and
+// pivot below is the model's own number.
+[
+    // ---- Tech 1 -------------------------------------------------------------------------
+    // The attack boat: fast, light, and it dives. It carries nothing that works under the
+    // water and hears nothing there (no sonar): it lies dived out of sight of guns, comes
+    // up when its repeater has a mark in reach, and goes down again when it has none
+    // (`dive.ambush`). Dearer than a Skiff, a little lighter, a little more bite.
+    (
+        key: "regency_t1_attack_boat",
+        name: "Dirk",
+        role: "Attack Boat", title: "Attack Boat",
+        tech: 1,
+        categories: ["Naval", "DirectFire"],
+        health: 330,
+        cost: (mass: 70, energy: 390, time: 250),
+        radius: 6.5, height: 3.2,
+        vision: 360,
+        dive: (depth: 1.5, time: 1.5, ambush: true),
+        motion: (layer: Naval, size: 0, speed: 58, accel: 36, turn: 120),
+        weapons: [(
+            name: "Twin Plasmeric Repeater",
+            damage: 15, splash: 1, range: 320, reload: 0.45, speed: 480, trajectory: Direct,
+            turret_turn: 220, mount: true, surfaced: true,
+            pivot: (2.0, 0, 2.2), muzzle: (4.4, 0, 2.45),
+            muzzles: [(4.4, -0.3, 2.45), (4.4, 0.3, 2.45)],
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(Plasmeric),
+            flash: 0.8, impact: 0.9, tracer: 1.0,
+            sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+        )],
+        mesh: "regency_attack_boat", icon: Ship,
+        sounds: (death: "blast_small", moving: "boat_engine"),
+    ),
+    // The attack submarine: gravitic torpedoes and sonar, as a Barracuda.
+    (
+        key: "regency_t1_submarine",
+        name: "Stiletto",
+        role: "Attack Submarine", title: "Submarine",
+        tech: 1,
+        categories: ["Naval", "DirectFire"],
+        health: 850,
+        cost: (mass: 160, energy: 1070, time: 540),
+        radius: 10.5, height: 3.4,
+        vision: 450, sonar: 700,
+        dive: (depth: 2, time: 2.5),
+        motion: (layer: Naval, size: 1, speed: 42, accel: 20, turn: 60),
+        weapons: [(
+            name: "Gravitic Torpedo Tubes",
+            damage: 185, splash: 3, range: 560, reload: 5, speed: 54, trajectory: Direct,
+            salvo: 2, salvo_delay: 0.6,
+            muzzle: (10.0, 0, -0.9), muzzles: [(10.0, -0.7, -0.9), (10.0, 0.7, -0.9)],
+            targets: ["Naval"], color: Orange, torpedo: true, impact: 2.2, shockwave: 0.6,
+            plasma_grade: Some(Gravitic),
+            sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
+        )],
+        mesh: "regency_submarine", icon: Submarine,
+        sounds: (death: "blast", moving: "sub_motor"),
+    ),
+    // The frigate: the one tech 1 hull that stays up. A heavy repeater forward, plasmeric
+    // flak aft that reaches past it, and radar: the eyes and the umbrella of a tech 1
+    // fleet, as a Pike.
+    (
+        key: "regency_t1_frigate",
+        name: "Falchion",
+        role: "Frigate", title: "Frigate",
+        tech: 1,
+        categories: ["Naval", "DirectFire", "AntiAir"],
+        health: 2500,
+        cost: (mass: 240, energy: 1560, time: 780),
+        radius: 15.5, height: 9,
+        vision: 650, radar: 1300,
+        motion: (layer: Naval, size: 2, speed: 38, accel: 14, turn: 36),
+        weapons: [
+            // Forward: a heavy repeater in a turret. It cannot bear straight aft; the
+            // hull turns to bring it round.
+            (
+                name: "Heavy Plasmeric Repeater",
+                damage: 34, splash: 2, range: 600, reload: 1.1, speed: 460, trajectory: Direct,
+                turret_turn: 60, arc: 270, pivot: (8.0, 0, 4.0), muzzle: (12.6, 0, 4.2),
+                targets: ["Land", "Naval"], color: Orange, red: 1.0,
+                plasma_grade: Some(Plasmeric),
+                flash: 1.2, impact: 1.4, tracer: 1.4,
+                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+            ),
+            // Aft: plasmeric flak in a house of its own, reaching further than the repeater.
+            (
+                name: "Plasmeric Flak Cannon",
+                damage: 20, splash: 8, range: 640, reload: 0.5, speed: 650, trajectory: Direct,
+                turret_turn: 220, mount: true, pivot: (-6.0, 0, 7.0), muzzle: (-4.0, 0, 8.9),
+                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                plasma_grade: Some(Plasmeric),
+                flash: 1.0, impact: 1.2, tracer: 0.7,
+                sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
+            ),
+        ],
+        mesh: "regency_frigate", icon: Ship,
+        sounds: (death: "blast_large", moving: "ship_engine"),
+    ),
+    // ---- Tech 2 -------------------------------------------------------------------------
+    // The heavy destroyer: the Marlin's place, a little stronger, and it dives. Dived it
+    // fights with its gravitic torpedoes and meets torpedoes with interceptors; its hull
+    // shield holds under the water too. The pinched-plasmeric cannon and the flak need it
+    // up (`surfaced`): the player brings it up to fight on the surface.
+    (
+        key: "regency_t2_destroyer",
+        name: "Claymore",
+        role: "Heavy Destroyer", title: "Heavy Destroyer",
+        tech: 2,
+        categories: ["Naval", "DirectFire", "AntiAir"],
+        health: 12500,
+        cost: (mass: 1050, energy: 7350, time: 3400),
+        radius: 27, height: 11,
+        vision: 800, radar: 1400, sonar: 900,
+        dive: (depth: 3, time: 4),
+        shield: (kind: Hull, health: 5000, regen: 50),
+        economy: (energy_upkeep: 80),
+        motion: (layer: Naval, size: 3, speed: 40, accel: 14, turn: 34),
+        weapons: [
+            // Forward, in a house of its own: plasma gathered and squeezed in front of the
+            // bore for a second, then pinched out as one jet (as the Halberd's, a size up).
+            // It cannot bear astern.
+            (
+                name: "Pinched-plasmeric Cannon",
+                damage: 440, splash: 2, range: 1300, reload: 2.2, rounds: 8, round_span: 0.25,
+                speed: 900, trajectory: Direct,
+                turret_turn: 50, arc: 300, mount: true, surfaced: true,
+                pivot: (14.0, 0, 4.6), muzzle: (22.0, 0, 4.6),
+                targets: ["Land", "Naval"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched),
+                flash: 1.4, impact: 2.4, tracer: 1.6,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+            // Four bow tubes: gravitic torpedoes, dived or up.
+            (
+                name: "Gravitic Torpedo Tubes",
+                damage: 340, splash: 3, range: 700, reload: 6, speed: 52, trajectory: Direct,
+                salvo: 2, salvo_delay: 0.6,
+                muzzle: (25.3, 0, -1.55), muzzles: [(25.3, -0.7, -1.55), (25.3, 0.7, -1.55), (25.3, -0.7, -2.35), (25.3, 0.7, -2.35)],
+                targets: ["Naval"], color: Orange, torpedo: true, impact: 2.4, shockwave: 0.7,
+                plasma_grade: Some(Gravitic),
+                sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
+            ),
+            // Light flak aft, up only.
+            (
+                name: "Plasmeric Flak Cannon",
+                damage: 22, splash: 8, range: 650, reload: 0.5, speed: 650, trajectory: Direct,
+                turret_turn: 220, mount: true, surfaced: true, pivot: (-13.0, 0, 5.0), muzzle: (-11.4, 0, 6.35),
+                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                plasma_grade: Some(Plasmeric),
+                flash: 1.0, impact: 1.2, tracer: 0.7,
+                sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
+            ),
+            // Interceptor tubes astern, dived or up: short gravitic torpedoes that meet
+            // torpedoes coming in and burst them under the water.
+            (
+                name: "Interceptor Tubes",
+                damage: 1, range: 280, reload: 1.5, speed: 80, trajectory: Direct,
+                muzzle: (-25.15, 0, -0.5), muzzles: [(-25.15, -1.4, -0.5), (-25.15, 1.4, -0.5)],
+                targets: ["Naval"], color: Orange, torpedo: true, intercepts: true,
+                plasma_grade: Some(Gravitic),
+                sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
+            ),
+        ],
+        mesh: "regency_destroyer", icon: Ship,
+        sounds: (death: "blast_large", moving: "ship_engine"),
+    ),
+    // The cruiser: the Manta's place. A gravitic seeker battery for the air, two
+    // counter-seeker heads that burn down missiles over the ships round it, a light
+    // repeater for what comes close, radar, and one long arm the Manta lacks: a heavy
+    // gravitic seeker, fired one at a time far over the coast at structures, and at
+    // nothing else.
+    (
+        key: "regency_t2_cruiser",
+        name: "Pavise",
+        role: "Cruiser", title: "Cruiser",
+        tech: 2,
+        categories: ["Naval", "AntiAir", "Artillery", "Intel"],
+        health: 9000,
+        cost: (mass: 980, energy: 6860, time: 3200),
+        radius: 27, height: 15,
+        vision: 1000, radar: 2600,
+        anti_missile: 600, anti_missile_lasers: 2,
+        anti_missile_mounts: [(-1.2, 0, 9.9), (-12.0, 0, 6.6)],
+        economy: (energy_upkeep: 60),
+        motion: (layer: Naval, size: 3, speed: 38, accel: 14, turn: 34),
+        weapons: [
+            // Twelve hatched cells in two blocks of six in line on the spine (the model's
+            // `CellBlock`s, fore block first): a ripple of gravitic seekers spread over the
+            // fliers in reach.
+            (
+                name: "Gravitic Seeker Battery",
+                damage: 120, splash: 5, range: 1800, reload: 4, speed: 360, trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (7.6, -0.8, 4.8),
+                muzzles: [
+                    (7.6, -0.8, 4.8), (10.8, 0.8, 4.8), (9.2, -0.8, 4.8),
+                    (7.6, 0.8, 4.8), (10.8, -0.8, 4.8), (9.2, 0.8, 4.8),
+                    (2.0, -0.8, 4.8), (5.2, 0.8, 4.8), (3.6, -0.8, 4.8),
+                    (2.0, 0.8, 4.8), (5.2, -0.8, 4.8), (3.6, 0.8, 4.8),
+                ],
+                targets: ["Air"], color: Orange, red: 1.0, missile: true, guided: true, vertical_launch: true,
+                intercept: 20, proximity: 7, salvo: 12, salvo_delay: 0.12, split: true,
+                hatch: 0.5, cold_launch: 1.0, boost: 0.5, caliber: 0.4,
+                plasma_grade: Some(Gravitic),
+                sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
+            ),
+            // The heavy seeker aft, in its silo: one at a time, climbing high and falling on a structure
+            // far inland. Slow, on radar the whole way, and easy for missile defence to
+            // see coming; the counter is a shield or a laser, not speed.
+            (
+                name: "Heavy Gravitic Seeker",
+                damage: 2200, splash: 10, range_min: 300, range: 2600, reload: 16, speed: 220, trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (-19.2, 0, 7.6),
+                targets: ["Structure"], color: Orange, red: 1.0, missile: true, guided: true, vertical_launch: true,
+                apogee: 500, intercept: 80, flash: 1.6, impact: 3.0, shockwave: 1.2,
+                plasma_grade: Some(Gravitic),
+                sounds: (fire: "regency_gravitic_throw", charge: "regency_gravitic_charge", charge_time: 1.2, impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
+            ),
+            // A light repeater forward, for what comes close.
+            (
+                name: "Plasmeric Repeater",
+                damage: 18, splash: 1, range: 600, reload: 0.3, speed: 460, trajectory: Direct,
+                turret_turn: 160, arc: 300, mount: true, pivot: (18.0, 0, 4.6), muzzle: (21.6, 0, 4.75),
+                targets: ["Land", "Naval"], color: Orange, red: 1.0,
+                plasma_grade: Some(Plasmeric),
+                flash: 1.0, impact: 1.0, tracer: 1.2,
+                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+            ),
+        ],
+        mesh: "regency_cruiser", icon: Ship,
+        sounds: (death: "blast_large", moving: "ship_engine"),
+    ),
+]
