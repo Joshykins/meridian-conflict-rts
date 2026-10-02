@@ -84,7 +84,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 1 tank: a Plasmeric Repeater on a hull on gravity lift (`hover_tank`).
     ModelDef::new("regency_hover_tank", 4.6, 3.4, hover_tank::hover_tank),
     // The tech 1 mobile anti-air: a flak organ on a six-legged walker (`mobile_aa`).
-    ModelDef::new("regency_mobile_aa", 4.0, 4.5, mobile_aa::mobile_aa),
+    ModelDef::new("regency_mobile_aa", 4.0, 4.0, mobile_aa::mobile_aa),
     // The tech 2 battle tank: a lift hull, its turret's gun a Pinched-plasmeric Cannon
     // (`battle_tank`).
     ModelDef::new("regency_battle_tank", 6.2, 4.4, battle_tank::battle_tank),
@@ -153,7 +153,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     // Gun emplacements (`turrets`): point defence at three tiers, anti-air. The wall
     // (`palisade`).
     ModelDef::new("regency_barb", 5.5, 8.0, turrets::picket),
-    ModelDef::new("regency_spitter", 5.5, 8.5, turrets::canopy),
+    ModelDef::new("regency_spitter", 5.5, 7.5, turrets::canopy),
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
     ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),

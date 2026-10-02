@@ -6,7 +6,7 @@
 //! What it carries (weapon numbers as in the unit file):
 //! - 0: twelve heavy gravitic seeker cells in two hatched blocks of six (`CellBlock`), dark
 //!   lids over red rims, a round in each with its plasma head lit.
-//! - 1, 2: a Plasmeric Flak Cannon on a gun house of its own each side, port first: the
+//! - 1, 2: a Plasmeric AA Repeater on a gun house of its own each side, port first: the
 //!   Canopy's organ of four short tubes held up at the sky.
 //! - 3: two interceptor doors in the transom under the water.
 //! - Four counter-seeker heads (`anti_missile_mounts`): faceted heads on bronze posts, a
@@ -29,7 +29,7 @@ use crate::part;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::{
-    armour, collar, hoop, hoop_on, red_slot, shaft, strut, swept, Course, Frame,
+    armour, collar, hoop, mouth_rim, red_slot, shaft, strut, swept, Course, Frame,
 };
 
 pub(crate) const MODELS: &[ModelDef] =
@@ -54,8 +54,9 @@ struct Layout {
     tubes: [Vec3; 2],
 }
 
-/// The flak organ's muzzle from its pivot: raised 45 degrees.
-const FLAK_REACH: Vec3 = Vec3::new(2.4, 0.0, 2.4);
+/// The AA organ's muzzle from its pivot, the bore level (the sim holds it up at the sky
+/// at rest).
+const FLAK_REACH: Vec3 = Vec3::new(3.4, 0.0, 0.0);
 
 const fn flak(x: f32, y: f32, z: f32) -> [(Vec3, Vec3); 2] {
     [
@@ -659,7 +660,6 @@ fn flak_house(b: &mut MeshBuilder, weapon: usize, (pivot, muzzle): (Vec3, Vec3))
         hoop(b, pivot.with_z(base - 0.05), 2.0, 0.5, 0.16, sides);
     }
     let d = muzzle - pivot;
-    let pitch = d.z.atan2(d.x);
     let len = d.length();
     b.with_house(weapon, pivot, 0.35, |b| {
         dark_plate(b);
@@ -678,7 +678,7 @@ fn flak_house(b: &mut MeshBuilder, weapon: usize, (pivot, muzzle): (Vec3, Vec3))
             );
         });
         b.with_recoil(|b| {
-            b.pitched(pivot, pitch, |b| organ(b, len));
+            b.at(pivot, |b| organ(b, len));
         });
     });
 }
@@ -714,8 +714,7 @@ fn organ(b: &mut MeshBuilder, len: f32) {
         dark_plate(b);
         b.cylinder_between(p(len - 0.45, y, 0.0), p(len, y, 0.0), 0.27, 0.3, sides);
         if fine {
-            b.paint(GLOW_LASER);
-            hoop_on(b, p(len - 0.03, y, 0.0), Vec3::X, 0.22, 0.09, 0.06, sides);
+            mouth_rim(b, p(len, y, 0.0), 0.3, sides);
         }
     }
     if fine {

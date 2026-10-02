@@ -1291,9 +1291,10 @@ impl World {
                 || (w == 0 && bp.unit(units.blueprint[row]).visual.mesh != "assault_air")
             {
                 let slot = pitch_slot(weapon, w);
-                // A land AA gun waits pointed at the sky, not at the horizon: on its turret,
-                // or in a house of its own on the hull (the Fulgur's rotary gun), not on a
-                // shoulder.
+                // An AA gun on the ground or afloat waits pointed at the sky, not at the
+                // horizon: on its turret, on a structure, or in a house of its own on a hull
+                // (the Fulgur's rotary gun, a frigate's AA mount), not on a shoulder. Its
+                // model is drawn level; this is what holds it up.
                 let sky_gun = (!weapon.mount || naval)
                     && !weapon.missile
                     && weapon.pivot.is_some()
@@ -1301,7 +1302,7 @@ impl World {
                     && bp
                         .unit(units.blueprint[row])
                         .motion
-                        .is_some_and(|m| m.layer == mc_data::MoveLayer::Land);
+                        .is_none_or(|m| m.layer != mc_data::MoveLayer::Air);
                 let rest = if sky_gun { IDLE_SKY_PITCH } else { Angle::ZERO };
                 let rate = hull_pitch_rate(bp.unit(units.blueprint[row]), w, weapon);
                 units.arm_pitch[row][slot] = units.arm_pitch[row][slot].turn_toward(rest, rate);

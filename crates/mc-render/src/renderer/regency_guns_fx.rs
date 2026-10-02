@@ -10,8 +10,9 @@
 //!   (sprites.wgsl, `plasma_look` 4), lighting what it passes; no trail.
 //!   Where it lands it dumps its heat at once: a white flash in a ragged red bloom, a knot
 //!   of plasma left frying, droplets spattered out, sparks, a seared glowing spot.
-//! - **Plasmeric flak** (the Canopy's, a proximity-fused bolt): the same bolt; it bursts as
-//!   a wide red bloom that throws sparkles and streaks of plasma out through the air.
+//! - **Plasmeric AA repeater** (the Canopy's, a proximity-fused bolt): the same bolt; it
+//!   bursts as a wide red bloom that throws sparkles and streaks of plasma out through the
+//!   air.
 //! - **Pinched-plasmeric** (the Halberd's): over its charge (`SimEvent::WeaponCharging`) a
 //!   ball of red plasma gathers in front of the bore, motes and filaments drawn in to it
 //!   and red lightning snapping into it from round it, its light growing. It pinches its

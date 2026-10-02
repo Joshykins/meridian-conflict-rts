@@ -294,8 +294,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     heat at once: a white flash in a ragged red bloom, a knot of plasma left
     frying, droplets spattered out, sparks, a seared glowing spot. Heard as a
     snap, a heavy spit with a kick under it and a fizz riding off; it lands as
-    a wet splat, a thud and plasma frying. **Plasmeric flak** throws the same bolts and bursts as a wide
-    red bloom flinging sparkles and streaks of plasma.
+    a wet splat, a thud and plasma frying. **Plasmeric AA repeater** ripples the same bolts out of each tube in
+    turn, and each bursts as a wide red bloom flinging sparkles and streaks of plasma.
   - **Pinched-plasmeric:** plasma gathered and squeezed in front of the bore
     (a ball, motes drawn in, red lightning snapping into it), then pinched
     out as one shot: a jet a quarter of a second long, a hard flash as it
@@ -373,8 +373,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
   - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**.
-  - **AA:** **Plasmeric Flak Cannon**, bolts that burst into a spray of
-    plasma.
+  - **AA:** **Plasmeric AA Repeater**, bolts out of each tube in turn that
+    burst into a spray of plasma.
   - **Air-dropped:** **Plasmeric Bomb**.
   - **Thrown:** the **Gravitic Bomb**, a plasma charge in gravity containment,
     charged in the hands and launched to land around its target (the T4

@@ -1,11 +1,11 @@
-//! The Canopy (anti-air, a one-cell lot): a Plasmeric Flak Cannon throwing proximity
-//! rounds at aircraft, two a shot: the organ. Four short flak tubes side by side in one
-//! clamped block, held up at the sky even at rest so it reads as anti-air from any angle,
-//! on a tripod of plated struts round a bronze column. Built at sea it stands on a
-//! triangular raft.
+//! The Canopy (anti-air, a one-cell lot): a Plasmeric AA Repeater rippling proximity-fused
+//! bolts at aircraft, one out of each barrel in turn: the organ. Four short tubes side by
+//! side in one clamped block on a tripod of plated struts round a bronze column. The organ
+//! is drawn level; the sim holds it up at the sky at rest, so it reads as anti-air from
+//! any angle. Built at sea it stands on a triangular raft.
 //!
-//! Its pivot and muzzle are the unit file's (`data/factions/regency/units/structures.ron`):
-//! one muzzle, the middle of the row of tube mouths.
+//! Its pivot and muzzles are the unit file's (`data/factions/regency/units/structures.ron`):
+//! `muzzle` is the middle of the row of tube mouths, `muzzles` the four mouths.
 
 use glam::{Vec2, Vec3};
 
@@ -17,10 +17,9 @@ use super::super::kit::{dark_plate, metal, seam, segment, v3};
 use super::super::machine::*;
 use super::*;
 
-/// The organ's trunnion and its middle muzzle: the bore raised about 55 degrees. Its
-/// four tubes stand side by side across it (`TUBES`), their mouths in a row through the
-/// muzzle.
-pub(super) const LINE: Line = Line::new(Vec3::new(0.0, 0.0, 5.8), Vec3::new(2.18, 0.0, 8.91));
+/// The organ's trunnion and its middle muzzle, the bore level. Its four tubes stand side
+/// by side across it (`TUBES`), their mouths in a row through the muzzle.
+pub(super) const LINE: Line = Line::new(Vec3::new(0.0, 0.0, 5.8), Vec3::new(3.8, 0.0, 5.8));
 /// The tubes across the bore.
 const TUBES: [f32; 4] = [-1.35, -0.45, 0.45, 1.35];
 const THICK: f32 = 0.3;
@@ -151,7 +150,7 @@ fn cradle(b: &mut MeshBuilder, z: f32, half: f32) {
     });
 }
 
-/// The organ in its own frame: four flak tubes in a row through a plated breech and two
+/// The organ in its own frame: four tubes in a row through a plated breech and two
 /// clamps, a red sight on the breech; the inner tubes and their hot-rimmed sleeves recoil.
 fn organ(b: &mut MeshBuilder, len: f32) {
     let fine = b.fine();
@@ -186,8 +185,7 @@ fn organ(b: &mut MeshBuilder, len: f32) {
             dark_plate(b);
             b.cylinder_between(v3(3.2, y, 0.0), v3(len, y, 0.0), 0.36, 0.4, sides);
             if fine {
-                b.paint(GLOW_LASER);
-                hoop_on(b, v3(len - 0.05, y, 0.0), Vec3::X, 0.3, 0.12, 0.1, sides);
+                mouth_rim(b, v3(len, y, 0.0), 0.4, sides);
             }
         });
     }
@@ -202,9 +200,35 @@ mod tests {
         super::super::super::check(
             "regency_spitter",
             5.5,
-            8.5,
+            7.5,
             Some(1),
             &[LINE.muzzle.to_array()],
         );
+    }
+
+    /// The unit file's muzzles are the four tube mouths, in a row through its muzzle.
+    #[test]
+    fn the_unit_files_muzzles_are_the_tubes() {
+        let bp = mc_data::Blueprints::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
+        )
+        .unwrap();
+        let unit = bp
+            .units
+            .iter()
+            .find(|u| u.visual.mesh == "regency_spitter")
+            .unwrap();
+        let mouths: Vec<Vec3> = unit.weapons[0]
+            .muzzles
+            .iter()
+            .map(|p| Vec3::from(p.to_f32()))
+            .collect();
+        assert_eq!(mouths.len(), TUBES.len());
+        for (m, y) in mouths.iter().zip(TUBES) {
+            assert!(
+                m.distance(LINE.muzzle + Vec3::Y * y) < 0.02,
+                "tube {y}: {m}"
+            );
+        }
     }
 }

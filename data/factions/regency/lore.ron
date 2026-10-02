@@ -69,9 +69,9 @@
         },
     ),
     "regency_t1_mobile_aa": (
-        lore: "A six-legged gun carriage whose flak organ is always held up at the sky.",
+        lore: "A six-legged gun carriage whose repeater organ is always held up at the sky.",
         weapons: {
-            "Plasmeric Flak Cannon": "Plasma bolts that burst among aircraft in a spray of burning plasma.",
+            "Plasmeric AA Repeater": "Plasma bolts out of each tube in turn, bursting among aircraft in a spray of burning plasma.",
         },
     ),
     "regency_t1_land_reclaimer": (
@@ -153,7 +153,7 @@
             "Second Pinch-fusion Cannon": "The second pair of pinch-fusion guns, raised over the first.",
             "Aft Pinch-fusion Cannon": "The aft pair, covering the stern.",
             "Gravitic Torpedo Tubes": "Four bow tubes of heavy gravitic torpedoes, fired dived or up.",
-            "Plasmeric Flak Cannon": "Light flak that works only with the hull up.",
+            "Plasmeric AA Repeater": "A light AA repeater that works only with the hull up.",
             "Port Fore Secondary": "A twin heavy repeater on the beam.",
             "Port Aft Secondary": "A twin heavy repeater on the beam.",
             "Starboard Fore Secondary": "A twin heavy repeater on the beam.",
@@ -164,8 +164,8 @@
         lore: "A carrier that holds the sky over a fleet: heavy seekers rising from its deck reach aircraft far past any gun.",
         weapons: {
             "Heavy Gravitic Seeker Battery": "Twelve cells of heavy gravitic seekers, rippled off and spread over the fliers in reach.",
-            "Port Plasmeric Flak Cannon": "Flak for what gets close on the port side.",
-            "Starboard Plasmeric Flak Cannon": "Flak for what gets close on the starboard side.",
+            "Port Plasmeric AA Repeater": "Bursting bolts for what gets close on the port side.",
+            "Starboard Plasmeric AA Repeater": "Bursting bolts for what gets close on the starboard side.",
             "Interceptor Tubes": "Short gravitic torpedoes that meet torpedoes coming in.",
         },
     ),
@@ -176,7 +176,7 @@
             "Interceptor Tubes": "Short gravitic torpedoes that meet torpedoes coming in.",
             "Fore Twin Plasmeric Repeater": "A twin repeater forward, up only.",
             "Aft Twin Plasmeric Repeater": "A twin repeater aft, up only.",
-            "Plasmeric Flak Cannon": "Flak that works only with the hull up.",
+            "Plasmeric AA Repeater": "An AA repeater that works only with the hull up.",
             "Gravitic Seeker Pod": "Six gravitic seekers for aircraft, launched with the hull up.",
         },
     ),
@@ -220,7 +220,7 @@
         lore: "The one small hull of the Regency's that stays on the surface: the eyes and the umbrella of a squadron.",
         weapons: {
             "Heavy Plasmeric Repeater": "A heavy plasmeric gun forward that fires slow, hard bolts of plasma.",
-            "Plasmeric Flak Cannon": "Bolts of plasma that burst into a spray among aircraft.",
+            "Plasmeric AA Repeater": "Bolts of plasma out of each tube in turn, bursting into a spray among aircraft.",
         },
     ),
     "regency_t2_destroyer": (
@@ -228,7 +228,7 @@
         weapons: {
             "Pinched-plasmeric Cannon": "Plasma gathered and squeezed by gravity in front of the bore, then pinched out as one dense jet; it works only with the hull up.",
             "Gravitic Torpedo Tubes": "Four bow tubes of gravitic torpedoes, fired dived or surfaced.",
-            "Plasmeric Flak Cannon": "Light flak aft that works only with the hull up.",
+            "Plasmeric AA Repeater": "A light AA repeater aft that works only with the hull up.",
             "Interceptor Tubes": "Short gravitic torpedoes that run at torpedoes coming in and burst them under the water.",
         },
     ),
@@ -301,7 +301,7 @@
     "regency_t1_aa": (
         lore: "Twin raised barrels on a braced column, fed from a drum magazine, filling the sky with bursting plasma.",
         weapons: {
-            "Plasmeric Flak Cannon": "Each shell bursts among aircraft into a spray of hot fragments that burns every one it reaches.",
+            "Plasmeric AA Repeater": "Each bolt bursts among aircraft into a spray of hot plasma that burns every one it reaches.",
         },
     ),
     "regency_t1_radar": (

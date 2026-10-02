@@ -48,10 +48,11 @@
                 sounds: (fire: "cannon_heavy", impact: "shell_on_armour", ground: "shell_heavy"),
             ),
             // A twin flak mount on the deckhouse aft, turning on its own. It reaches
-            // further than the deck gun, so the escort covers the ships around it.
+            // further than the deck gun, so the escort covers the ships around it. Both
+            // barrels fire together.
             (
                 name: "Twin AA Gun",
-                damage: 11, range: 630, reload: 0.3, speed: 900, trajectory: Direct,
+                damage: 11, range: 630, reload: 0.6, salvo: 2, speed: 900, trajectory: Direct,
                 turret_turn: 200, muzzle: (-4.2, 0, 8.1), pivot: (-6.4, 0, 8.1), mount: true,
                 muzzles: [(-4.2, -0.35, 8.1), (-4.2, 0.35, 8.1)],
                 targets: ["Air"], color: Orange, tracer: 0.7, casings: 2.0,

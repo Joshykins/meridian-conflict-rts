@@ -2,7 +2,7 @@
 //! machine on a base of its own:
 //!
 //! - `regency_barb`: the Picket, a Plasmeric Repeater (`picket`).
-//! - `regency_spitter`: the Canopy, a Plasmeric Flak Cannon (`canopy`).
+//! - `regency_spitter`: the Canopy, a Plasmeric AA Repeater (`canopy`).
 //! - `regency_pinch_cannon`: the Halberd, a Pinched-plasmeric Cannon (`halberd`).
 //! - `regency_fusion_cannon`: the Sunspear, a Pinch-fusion Cannon (`sunspear`).
 //!

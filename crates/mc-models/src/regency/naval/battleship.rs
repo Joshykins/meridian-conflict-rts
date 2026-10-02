@@ -11,7 +11,7 @@
 //! - Houses 0, 1, 2: three twin Pinch-fusion Cannon ([`MAIN`]): fore, a second raised over
 //!   it, and aft (`rear`, authored facing forward like every house). Each gathers two
 //!   charges side by side ahead of its bores ([`charges`]), held between projectors.
-//! - House 3: the Plasmeric Flak Cannon on the superstructure's crown ([`FLAK`]).
+//! - House 3: the Plasmeric AA Repeater on the superstructure's crown ([`FLAK`]).
 //! - Houses 4 to 7: four twin plasmeric repeaters on the beam ([`SECONDARY`]), resting
 //!   trained outboard.
 //! - 8: four gravitic torpedo doors in the bow's blunt face under the water ([`TUBES`]).
@@ -61,9 +61,10 @@ fn charges(i: usize) -> [Vec3; 2] {
     [c - Vec3::Y * TWIN, c + Vec3::Y * TWIN]
 }
 
-/// The flak house's pivot and the middle of its tube mouths, held up at the sky.
+/// The AA house's pivot and the middle of its tube mouths, the bore level (the sim holds
+/// it up at the sky at rest).
 const FLAK: Vec3 = Vec3::new(-6.0, 0.0, 15.0);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-3.4, 0.0, 16.0);
+const FLAK_MUZZLE: Vec3 = Vec3::new(-3.2, 0.0, 15.0);
 
 /// The beam secondaries' pivots, in weapon order (4 to 7): port fore, port aft, starboard
 /// fore, starboard aft. Each holds two muzzles [`SECONDARY_REACH`] ahead, `SECONDARY_TWIN`

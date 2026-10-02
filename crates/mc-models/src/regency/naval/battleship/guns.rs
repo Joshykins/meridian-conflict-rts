@@ -14,7 +14,7 @@ use crate::material::*;
 
 use super::super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::super::machine::{
-    armour, collar, hoop, hoop_on, red_slot, shaft, swept, Course, Frame,
+    armour, collar, hoop, hoop_on, mouth_rim, red_slot, shaft, swept, Course, Frame,
 };
 use super::hull::{body_x, mirrored, pointed, team_patch, tier, CHAMFERED};
 use super::{charge, FLAK, FLAK_MUZZLE, MAIN, SECONDARY, SECONDARY_REACH, SECONDARY_TWIN, TWIN};
@@ -433,7 +433,6 @@ pub(super) fn flak(b: &mut MeshBuilder, deck: f32) {
         }
     }
     let d = FLAK_MUZZLE - FLAK;
-    let pitch = d.z.atan2(d.x);
     let len = d.length();
     b.with_house(3, FLAK, 0.3, |b| {
         if b.coarse() {
@@ -459,7 +458,7 @@ pub(super) fn flak(b: &mut MeshBuilder, deck: f32) {
             );
         });
         b.with_recoil(|b| {
-            b.pitched(FLAK, pitch, |b| organ(b, len));
+            b.at(FLAK, |b| organ(b, len));
         });
     });
 }
@@ -492,8 +491,7 @@ fn organ(b: &mut MeshBuilder, len: f32) {
         dark_plate(b);
         b.cylinder_between(v3(len - 0.45, y, 0.0), v3(len, y, 0.0), 0.36, 0.4, sides);
         if fine {
-            b.paint(GLOW_LASER);
-            hoop_on(b, v3(len - 0.03, y, 0.0), Vec3::X, 0.3, 0.12, 0.06, sides);
+            mouth_rim(b, v3(len, y, 0.0), 0.4, sides);
         }
     }
     if fine {

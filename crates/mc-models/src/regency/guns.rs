@@ -3,7 +3,7 @@
 //!
 //! - [`repeater`]: a Plasmeric Repeater pod, chunky and hunched to shed heat, a wide red
 //!   emitter mouth rather than a rifle's bore (the Picket's gun, small).
-//! - [`flak_organ`]: a Plasmeric Flak Cannon, short flak tubes side by side in one clamped
+//! - [`flak_organ`]: a Plasmeric AA Repeater, short tubes side by side in one clamped
 //!   block (the Canopy's organ, small).
 
 use glam::Vec3;
@@ -13,7 +13,7 @@ use crate::material::*;
 
 use super::commander::form::{blade, ring, sleeve, OCT};
 use super::kit::{dark_plate, metal, seam, v3};
-use super::machine::{hoop_on, red_slot};
+use super::machine::{mouth_rim, red_slot};
 
 /// A Plasmeric Repeater pod from `breech` forward along +x to `muzzle` (level, at the
 /// same y and z), `r` its housing's half width: a faceted plated housing, open heat
@@ -70,9 +70,9 @@ pub(super) fn repeater(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) 
     }
 }
 
-/// A Plasmeric Flak Cannon drawn in its own frame (the origin at the trunnion, +x up the
+/// A Plasmeric AA Repeater drawn in its own frame (the origin at the trunnion, +x up the
 /// bore): a bronze trunnion `trunnion` across, a plated breech block and a clamp, and a
-/// flak tube at each of `tubes` (y) running out to `len`, each `r` round, a red lip on its
+/// tube at each of `tubes` (y) running out to `len`, each `r` round, a red lip on its
 /// mouth. The tubes' mouths are in a row through `(len, 0, 0)`.
 pub(super) fn flak_organ(b: &mut MeshBuilder, len: f32, tubes: &[f32], r: f32, trunnion: f32) {
     let fine = b.fine();
@@ -131,16 +131,7 @@ pub(super) fn flak_organ(b: &mut MeshBuilder, len: f32, tubes: &[f32], r: f32, t
             sides,
         );
         if fine {
-            b.paint(GLOW_LASER);
-            hoop_on(
-                b,
-                v3(len - 0.03, y, 0.0),
-                Vec3::X,
-                r * 0.82,
-                r * 0.3,
-                0.06,
-                sides,
-            );
+            mouth_rim(b, v3(len, y, 0.0), r * 1.08, sides);
         }
     }
 }

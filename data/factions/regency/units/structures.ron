@@ -9,7 +9,7 @@
 //   explodes, so generators can be packed tight where ARC reactors cannot.
 // - Reliquary: one building holds mass and energy both, in three tiers.
 // - Picket: a short-ranged brawler, more damage than a Sentinel inside its reach.
-// - Canopy: bursting flak that hurts a whole flight, not one plane.
+// - Canopy: a repeater of bursting bolts that hurts a whole flight, not one plane.
 // - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
 // - Palisade: slow to build, very hard to cut; sections join into one wall as ARC's do.
 // - Ward: a tighter shield than the Aegis, but denser; a prism veil.
@@ -489,23 +489,27 @@
         mesh: "regency_fusion_cannon", icon: Defense,
         sounds: (death: "blast_large"),
     ),
-    // Plasmeric flak: bolts that burst among aircraft in a spray of plasma. Less on one
-    // plane than a Sparrow's rotary, but every plane in the burst takes it.
+    // A plasmeric AA repeater: an organ of four tubes rippling bolts that burst among
+    // aircraft in a spray of plasma, one out of each tube in turn. Less on one plane than a
+    // Sparrow's rotary, but every plane in a burst takes it.
     (
         key: "regency_t1_aa",
         name: "Canopy",
-        role: "AA Flak",
+        role: "AA Repeater",
         tech: 1,
         categories: ["Land", "Naval", "Defense", "AntiAir"],
         health: 800,
         cost: (mass: 140, energy: 1100, time: 400),
-        radius: 5.5, height: 8.5, footprint: (1, 1),
+        radius: 5.5, height: 7.5, footprint: (1, 1),
         vision: 450, water_build: true,
         weapons: [(
-            name: "Plasmeric Flak Cannon",
-            damage: 30, splash: 9, range: 300, reload: 0.5, speed: 650, trajectory: Direct,
-            turret_turn: 240, muzzle: (2.18, 0, 8.91), pivot: (0, 0, 5.8),
-            targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+            name: "Plasmeric AA Repeater",
+            // 4 bolts of 15 a second: 60 a second on one plane.
+            damage: 15, splash: 9, range: 300, reload: 0.7, speed: 650, trajectory: Direct,
+            salvo: 4, salvo_delay: 0.1,
+            turret_turn: 240, muzzle: (3.8, 0, 5.8), pivot: (0, 0, 5.8),
+            muzzles: [(3.8, -1.35, 5.8), (3.8, -0.45, 5.8), (3.8, 0.45, 5.8), (3.8, 1.35, 5.8)],
+            targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
             plasma_grade: Some(Plasmeric),
             flash: 1.2, impact: 1.4, tracer: 0.7,
             sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),

@@ -67,8 +67,8 @@
         mesh: "regency_submarine", icon: Submarine,
         sounds: (death: "blast", moving: "sub_motor"),
     ),
-    // The frigate: the one tech 1 hull that stays up. A heavy repeater forward, plasmeric
-    // flak aft that reaches past it, and radar: the eyes and the umbrella of a tech 1
+    // The frigate: the one tech 1 hull that stays up. A heavy repeater forward, a plasmeric
+    // AA repeater aft that reaches past it, and radar: the eyes and the umbrella of a tech 1
     // fleet, as a Pike.
     (
         key: "regency_t1_frigate",
@@ -93,12 +93,15 @@
                 flash: 1.2, impact: 1.4, tracer: 1.4,
                 sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
-            // Aft: plasmeric flak in a house of its own, reaching further than the repeater.
+            // Aft: a plasmeric AA repeater in a house of its own, reaching further than the
+            // heavy repeater: four tubes, a bolt out of each in turn.
             (
-                name: "Plasmeric Flak Cannon",
-                damage: 20, splash: 8, range: 640, reload: 0.5, speed: 650, trajectory: Direct,
-                turret_turn: 220, mount: true, pivot: (-6.0, 0, 7.0), muzzle: (-4.0, 0, 8.9),
-                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                name: "Plasmeric AA Repeater",
+                damage: 10, splash: 8, range: 640, reload: 0.7, speed: 650, trajectory: Direct,
+                salvo: 4, salvo_delay: 0.1,
+                turret_turn: 220, mount: true, pivot: (-6.0, 0, 7.0), muzzle: (-3.25, 0, 7.0),
+                muzzles: [(-3.25, -1.05, 7.0), (-3.25, -0.35, 7.0), (-3.25, 0.35, 7.0), (-3.25, 1.05, 7.0)],
+                targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.2, tracer: 0.7,
                 sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
@@ -110,7 +113,7 @@
     // ---- Tech 2 -------------------------------------------------------------------------
     // The heavy destroyer: the Marlin's place, a little stronger, and it dives. Dived it
     // fights with its gravitic torpedoes and meets torpedoes with interceptors; its hull
-    // shield holds under the water too. The pinched-plasmeric cannon and the flak need it
+    // shield holds under the water too. The pinched-plasmeric cannon and the AA repeater need it
     // up (`surfaced`): the player brings it up to fight on the surface.
     (
         key: "regency_t2_destroyer",
@@ -154,12 +157,14 @@
                 plasma_grade: Some(Gravitic),
                 sounds: (fire: "torpedo_launch", impact: "torpedo_hit", ground: "torpedo_hit"),
             ),
-            // Light flak aft, up only.
+            // A light AA repeater aft, up only: two tubes, a bolt out of each in turn.
             (
-                name: "Plasmeric Flak Cannon",
-                damage: 22, splash: 8, range: 650, reload: 0.5, speed: 650, trajectory: Direct,
-                turret_turn: 220, mount: true, surfaced: true, pivot: (-13.0, 0, 5.0), muzzle: (-11.4, 0, 6.35),
-                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                name: "Plasmeric AA Repeater",
+                damage: 22, splash: 8, range: 650, reload: 0.9, speed: 650, trajectory: Direct,
+                salvo: 2, salvo_delay: 0.1,
+                turret_turn: 220, mount: true, surfaced: true, pivot: (-13.0, 0, 5.0), muzzle: (-10.9, 0, 5.0),
+                muzzles: [(-10.9, -0.42, 5.0), (-10.9, 0.42, 5.0)],
+                targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.2, tracer: 0.7,
                 sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
@@ -245,7 +250,7 @@
     ),
     // ---- Tech 3 -------------------------------------------------------------------------
     // The battleship: the Leviathan's place, and it dives. Three twin Pinch-fusion Cannon
-    // houses, four twin heavy repeaters on the beams, light flak, counter-seekers, and bow
+    // houses, four twin heavy repeaters on the beams, a light AA repeater, counter-seekers, and bow
     // torpedoes. Its guns all need the surface; dived it fights with torpedoes alone and
     // comes up on order. A hull its size needs deep water to go under: about 30 m.
     // No sonar and no torpedo defence: its gaps are the point, as the Leviathan's are.
@@ -307,10 +312,12 @@
                 ),
             ),
             (
-                name: "Plasmeric Flak Cannon",
-                damage: 26, splash: 9, range: 720, reload: 0.4, speed: 650, trajectory: Direct,
-                turret_turn: 220, mount: true, surfaced: true, pivot: (-6.0, 0, 15.0), muzzle: (-3.4, 0, 16.0),
-                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                name: "Plasmeric AA Repeater",
+                damage: 26, splash: 9, range: 720, reload: 0.7, speed: 650, trajectory: Direct,
+                salvo: 2, salvo_delay: 0.1,
+                turret_turn: 220, mount: true, surfaced: true, pivot: (-6.0, 0, 15.0), muzzle: (-3.2, 0, 15.0),
+                muzzles: [(-3.2, -0.55, 15.0), (-3.2, 0.55, 15.0)],
+                targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.2, tracer: 0.7,
                 sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
@@ -374,7 +381,7 @@
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),
     // The carrier: the Atoll's place. A battery of heavy gravitic seekers that reaches far
-    // past any flak, plasmeric flak on both beams for what gets close, counter-seekers,
+    // past any flak, plasmeric AA repeaters on both beams for what gets close, counter-seekers,
     // interceptor tubes, and the longest radar at sea. No gun.
     (
         key: "regency_t3_carrier",
@@ -409,19 +416,23 @@
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
             ),
             (
-                name: "Port Plasmeric Flak Cannon",
-                damage: 26, splash: 9, range: 720, reload: 0.4, speed: 650, trajectory: Direct,
-                turret_turn: 220, mount: true, pivot: (21.0, 16.4, 10.6), muzzle: (23.4, 16.4, 13.0),
-                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                name: "Port Plasmeric AA Repeater",
+                damage: 13, splash: 9, range: 720, reload: 0.5, speed: 650, trajectory: Direct,
+                salvo: 4, salvo_delay: 0.1,
+                turret_turn: 220, mount: true, pivot: (21.0, 16.4, 10.6), muzzle: (24.4, 16.4, 10.6),
+                muzzles: [(24.4, 15.47, 10.6), (24.4, 16.09, 10.6), (24.4, 16.71, 10.6), (24.4, 17.33, 10.6)],
+                targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.2, tracer: 0.7,
                 sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
             ),
             (
-                name: "Starboard Plasmeric Flak Cannon",
-                damage: 26, splash: 9, range: 720, reload: 0.4, speed: 650, trajectory: Direct,
-                turret_turn: 220, mount: true, pivot: (21.0, -16.4, 10.6), muzzle: (23.4, -16.4, 13.0),
-                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                name: "Starboard Plasmeric AA Repeater",
+                damage: 13, splash: 9, range: 720, reload: 0.5, speed: 650, trajectory: Direct,
+                salvo: 4, salvo_delay: 0.1,
+                turret_turn: 220, mount: true, pivot: (21.0, -16.4, 10.6), muzzle: (24.4, -16.4, 10.6),
+                muzzles: [(24.4, -17.33, 10.6), (24.4, -16.71, 10.6), (24.4, -16.09, 10.6), (24.4, -15.47, 10.6)],
+                targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.2, tracer: 0.7,
                 sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
@@ -440,7 +451,7 @@
     ),
     // The assault submarine: the fastest hull under the sea. Dived it hunts with a six-tube
     // gravitic torpedo launcher and meets torpedoes with interceptors; brought up (on
-    // order) it opens two twin repeaters, flak and a gravitic seeker pod, a raider's guns.
+    // order) it opens two twin repeaters, an AA repeater and a gravitic seeker pod, a raider's guns.
     (
         key: "regency_t3_submarine",
         name: "Rapier",
@@ -492,10 +503,12 @@
                 sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             (
-                name: "Plasmeric Flak Cannon",
-                damage: 26, splash: 9, range: 720, reload: 0.4, speed: 650, trajectory: Direct,
-                turret_turn: 220, mount: true, surfaced: true, pivot: (-2.5, 0, 4.6), muzzle: (-0.6, 0, 5.7),
-                targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+                name: "Plasmeric AA Repeater",
+                damage: 26, splash: 9, range: 720, reload: 0.7, speed: 650, trajectory: Direct,
+                salvo: 2, salvo_delay: 0.1,
+                turret_turn: 220, mount: true, surfaced: true, pivot: (-2.5, 0, 4.6), muzzle: (-0.3, 0, 4.6),
+                muzzles: [(-0.3, -0.3, 4.6), (-0.3, 0.3, 4.6)],
+                targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.2, tracer: 0.7,
                 sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),

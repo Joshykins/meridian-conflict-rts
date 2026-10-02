@@ -92,28 +92,30 @@
         // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
         sounds: (death: "blast", moving: "aster_hover"),
     ),
-    // The mobile anti-air: a stocky six-legged walker carrying a Plasmeric Flak Cannon,
-    // the Canopy's organ made small: proximity rounds that burst among aircraft in a spray of
-    // plasma, two drawn a shot. Bent from the Gnat: about its damage a second on one plane
+    // The mobile anti-air: a stocky six-legged walker carrying a Plasmeric AA Repeater,
+    // the Canopy's organ made small: proximity bolts that burst among aircraft in a spray of
+    // plasma, one out of each tube in turn. Bent from the Gnat: about its damage a second on one plane
     // but splashed over every plane in the burst, at a ninth less reach. Model:
     // `regency_mobile_aa` (`models::regency::mobile_aa`), at this size.
     (
         key: "regency_t1_mobile_aa",
         name: "Brazier",
-        role: "Mobile AA Flak", title: "Mobile AA",
+        role: "Mobile AA Repeater", title: "Mobile AA",
         tech: 1,
         categories: ["Land", "AntiAir"],
         health: 290,
         cost: (mass: 56, energy: 550, time: 225),
-        radius: 4.0, height: 4.5,
+        radius: 4.0, height: 4.0,
         vision: 360,
         motion: (layer: Land, size: 0, speed: 33, accel: 30, turn: 110),
         weapons: [(
-            name: "Plasmeric Flak Cannon",
-            // 18 a shot every 0.4 s: 45 a second on one plane, to the Gnat's 46.
-            damage: 18, splash: 8, range: 320, reload: 0.4, speed: 650, trajectory: Direct,
-            turret_turn: 240, muzzle: (1.3, 0, 5.0), pivot: (0, 0, 3.2),
-            targets: ["Air"], color: Orange, red: 1.0, rounds: 2, proximity: 6,
+            name: "Plasmeric AA Repeater",
+            // 3 bolts of 12 every 0.8 s: 45 a second on one plane, to the Gnat's 46.
+            damage: 12, splash: 8, range: 320, reload: 0.6, speed: 650, trajectory: Direct,
+            salvo: 3, salvo_delay: 0.1,
+            turret_turn: 240, muzzle: (2.2, 0, 3.2), pivot: (0, 0, 3.2),
+            muzzles: [(2.2, -0.48, 3.2), (2.2, 0.0, 3.2), (2.2, 0.48, 3.2)],
+            targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
             plasma_grade: Some(Plasmeric),
             flash: 1.0, impact: 1.2, tracer: 0.6,
             sounds: (fire: "regency_flak_light_fire", impact: "regency_flak_light_burst", ground: "regency_flak_light_burst"),

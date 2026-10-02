@@ -23,7 +23,9 @@ use crate::library::ModelDef;
 use crate::material::*;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::machine::{armour, collar, hoop, hoop_on, red_slot, swept, Course, Frame};
+use super::super::machine::{
+    armour, collar, hoop, hoop_on, mouth_rim, red_slot, swept, Course, Frame,
+};
 
 const RADIUS: f32 = 26.0;
 const HEIGHT: f32 = 5.0;
@@ -56,7 +58,7 @@ const BORE_Y: f32 = 0.35;
 const BORE_RISE: f32 = 0.3;
 /// The flak organ's trunnion on the sail's back, and the middle of its two tube mouths.
 const FLAK: Vec3 = Vec3::new(-2.5, 0.0, 4.6);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-0.6, 0.0, 5.7);
+const FLAK_MUZZLE: Vec3 = Vec3::new(-0.3, 0.0, 4.6);
 /// The seeker hatches, in the unit file's order: the muzzles are their doors.
 const SEEKERS: [[f32; 3]; 6] = [
     [4.0, -0.8, 4.5],
@@ -439,7 +441,7 @@ fn flak(b: &mut MeshBuilder) {
         hoop(b, v3(FLAK.x, 0.0, base), 1.2, 0.3, 0.12, 12);
     }
     let d = FLAK_MUZZLE - FLAK;
-    let (pitch, len) = (d.z.atan2(d.x), d.length());
+    let len = d.length();
     b.with_house(4, FLAK, 0.2, |b| {
         if b.coarse() {
             return;
@@ -460,7 +462,7 @@ fn flak(b: &mut MeshBuilder) {
             armour(b, &f, &swept(2.5, 0.45, 0.3, 0.45), 0.14);
         });
         b.with_recoil(|b| {
-            b.pitched(FLAK, pitch, |b| organ(b, len));
+            b.at(FLAK, |b| organ(b, len));
         });
     });
 }
@@ -485,8 +487,7 @@ fn organ(b: &mut MeshBuilder, len: f32) {
         dark_plate(b);
         b.cylinder_between(v3(len - 0.32, y, 0.0), v3(len, y, 0.0), 0.21, 0.24, sides);
         if b.fine() {
-            b.paint(GLOW_LASER);
-            hoop_on(b, v3(len - 0.02, y, 0.0), Vec3::X, 0.17, 0.07, 0.05, sides);
+            mouth_rim(b, v3(len, y, 0.0), 0.24, sides);
         }
     }
 }

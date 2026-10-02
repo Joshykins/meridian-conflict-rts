@@ -142,7 +142,7 @@ Gravitic`), a plasma charge steered in gravity containment.
   squadron that is otherwise dived.
 - The **Claymore** (heavy destroyer) dives with a hull shield that holds under the water
   too. Dived it fights with gravitic torpedoes and meets torpedoes with interceptors; its
-  pinched-plasmeric cannon and its flak need it surfaced, and it comes up only on order
+  pinched-plasmeric cannon and its AA repeater need it surfaced, and it comes up only on order
   (it does not lie in ambush).
 - The **Pavise** (cruiser) holds the sky (a seeker battery, two counter-seekers that burn
   down missiles over the ships round it) and has one long arm the Manta lacks: a heavy
@@ -152,8 +152,8 @@ Gravitic`), a plasma charge steered in gravity containment.
 |---|---|---|---|
 | Dirk | 1 | Attack boat | Dives; surfaces to fire its twin plasmeric repeater; no sonar. |
 | Stiletto | 1 | Attack submarine | Gravitic torpedoes, sonar. |
-| Falchion | 1 | Frigate | Heavy plasmeric repeater, plasmeric flak, radar. Stays up. |
-| Claymore | 2 | Heavy destroyer | Dives; hull shield; gravitic torpedoes and interceptors dived; pinched-plasmeric cannon and light flak surfaced; radar, sonar. |
+| Falchion | 1 | Frigate | Heavy plasmeric repeater, plasmeric AA repeater, radar. Stays up. |
+| Claymore | 2 | Heavy destroyer | Dives; hull shield; gravitic torpedoes and interceptors dived; pinched-plasmeric cannon and light AA repeater surfaced; radar, sonar. |
 | Pavise | 2 | Cruiser | Gravitic seeker battery (AA, 1,800 m), two counter-seekers (600 m), a light repeater, radar; a heavy gravitic seeker at structures to 2,600 m. |
 | Flamberge | 3 | Battleship | Dives (needs about 30 m of water to go under); three twin Pinch-fusion Cannon houses, four twin heavy repeaters on the beams, light flak, counter-seekers, all surfaced only; bow gravitic torpedoes dived or up. No sonar, no torpedo defence. |
 | Mantlet | 3 | Air-defence carrier | Twelve heavy gravitic seeker cells (2,700 m), flak on both beams, counter-seekers, interceptor tubes, radar 3,800 m. No gun. |

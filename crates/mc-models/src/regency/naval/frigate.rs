@@ -1,6 +1,6 @@
 //! The Falchion, the Regency's tech 1 frigate: the one tech 1 Regency hull that stays on the
-//! surface. A heavy plasmeric repeater forward on the unit's turret, a plasmeric flak organ
-//! aft in a gun house of its own, and a search radar between them.
+//! surface. A heavy plasmeric repeater forward on the unit's turret, a plasmeric AA repeater
+//! organ aft in a gun house of its own, and a search radar between them.
 //!
 //! The stepped tower: a long pointed hull whose flanks are clad in lapped plates swept
 //! back into twin points past the stern, three tiers stepped up amidships over bronze
@@ -17,18 +17,18 @@ use crate::material::*;
 use crate::{part, rig};
 
 use super::super::kit::{cable, dark_plate, metal, v3};
-use super::super::machine::{armour, collar, hoop_on, red_slot, shaft, swept, Frame};
+use super::super::machine::{armour, collar, hoop_on, mouth_rim, red_slot, shaft, swept, Frame};
 
 pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new("regency_frigate", 15.5, 9.0, tower)];
 
 /// The repeater's trunnion and muzzle (weapon 0, on the unit's turret).
 const GUN: Vec3 = Vec3::new(8.0, 0.0, 4.0);
 const MUZZLE: Vec3 = Vec3::new(12.6, 0.0, 4.2);
-/// The flak organ's trunnion and the middle of its row of tube mouths (weapon 1, its own
-/// gun house).
+/// The AA organ's trunnion and the middle of its row of tube mouths, the bore level
+/// (weapon 1, its own gun house; the sim holds it up at the sky at rest).
 const FLAK: Vec3 = Vec3::new(-6.0, 0.0, 7.0);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-4.0, 0.0, 8.9);
-/// The flak organ's tubes across its bore.
+const FLAK_MUZZLE: Vec3 = Vec3::new(-3.25, 0.0, 7.0);
+/// The AA organ's tubes across its bore.
 const TUBES: [f32; 4] = [-1.05, -0.35, 0.35, 1.05];
 
 // ---- the hull -----------------------------------------------------------------------
@@ -390,12 +390,12 @@ fn fin(b: &mut MeshBuilder, root: Vec3, out: Vec3, face: Vec3, len: f32, w0: f32
     );
 }
 
-/// The flak organ in its gun house (weapon 1): a hexagonal drum, a cheek either side swept
-/// back and up into a spike, and four short flak tubes in one clamped block held up at the
-/// sky, their hot rims red. The block pitches and kicks back as one.
+/// The AA organ in its gun house (weapon 1): a hexagonal drum, a cheek either side swept
+/// back and up into a spike, and four short tubes in one clamped block, their hot rims
+/// red. The block pitches and kicks back as one.
 fn flak_house(b: &mut MeshBuilder) {
     let d = FLAK_MUZZLE - FLAK;
-    let (pitch, len) = (d.z.atan2(d.x), d.length());
+    let len = d.length();
     b.with_house(1, FLAK, 0.25, |b| {
         if b.coarse() {
             b.with_recoil(|b| {
@@ -433,7 +433,7 @@ fn flak_house(b: &mut MeshBuilder) {
             }
         });
         b.with_recoil(|b| {
-            b.pitched(FLAK, pitch, |b| {
+            b.at(FLAK, |b| {
                 collar(b, Vec3::ZERO, Vec3::Y, 0.42, 3.1);
                 dark_plate(b);
                 loft_x(
@@ -462,8 +462,7 @@ fn flak_house(b: &mut MeshBuilder) {
                     dark_plate(b);
                     b.cylinder_between(v3(-0.2, y, 0.0), v3(len, y, 0.0), 0.32, 0.35, sides);
                     if fine {
-                        b.paint(GLOW_LASER);
-                        hoop_on(b, v3(len - 0.04, y, 0.0), Vec3::X, 0.26, 0.1, 0.08, sides);
+                        mouth_rim(b, v3(len, y, 0.0), 0.35, sides);
                     }
                 }
             });

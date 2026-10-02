@@ -162,6 +162,22 @@ pub(super) fn hoop(b: &mut MeshBuilder, c: Vec3, r: f32, w: f32, h: f32, segs: u
     hoop_on(b, c, Vec3::Z, r, w, h, segs);
 }
 
+/// A hot red rim on the face of a tube that ends at `mouth` (+x), `r` the tube's radius
+/// there. It stands a little proud of the tube's end cap and inside its flats, so neither
+/// face fights the tube's in depth.
+pub(super) fn mouth_rim(b: &mut MeshBuilder, mouth: Vec3, r: f32, sides: usize) {
+    b.paint(GLOW_LASER);
+    hoop_on(
+        b,
+        mouth + Vec3::X * 0.015,
+        Vec3::X,
+        r * 0.68,
+        r * 0.3,
+        0.05,
+        sides,
+    );
+}
+
 /// [`hoop`] about `axis` instead of z.
 pub(super) fn hoop_on(
     b: &mut MeshBuilder,

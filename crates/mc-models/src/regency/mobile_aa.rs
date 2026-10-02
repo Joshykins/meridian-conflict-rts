@@ -1,7 +1,8 @@
 //! The Regency's tech 1 mobile anti-air, the Brazier, the counterpart of ARC's Gnat: a
-//! stocky six-legged walker with the Outrider's gait, carrying a Plasmeric Flak Cannon on a
-//! turret over its back: the Canopy's organ made small (three short flak tubes in one
-//! clamped block), held up at the sky even at rest so it reads as anti-air from any angle,
+//! stocky six-legged walker with the Outrider's gait, carrying a Plasmeric AA Repeater on a
+//! turret over its back: the Canopy's organ made small (three short tubes in one
+//! clamped block), drawn level and held up at the sky by the sim at rest so it reads as
+//! anti-air from any angle,
 //! between two plated cheeks swept back into spikes.
 //!
 //! Finish (docs/STYLE.md "The Regency look"): dark plate over dark bronze, red optics and
@@ -36,11 +37,6 @@ impl Line {
         self.pivot.distance(self.muzzle)
     }
 
-    fn pitch(&self) -> f32 {
-        let d = self.muzzle - self.pivot;
-        d.z.atan2(d.x)
-    }
-
     fn rig(&self, b: &mut MeshBuilder) {
         b.set_turret_pivot(self.pivot);
         b.set_arm_pivot(self.pivot);
@@ -50,7 +46,7 @@ impl Line {
 /// The organ's trunnion and middle mouth: the unit file's `pivot` and `muzzle`.
 pub(super) const LINE: Line = Line {
     pivot: Vec3::new(0.0, 0.0, 3.2),
-    muzzle: Vec3::new(1.3, 0.0, 5.0),
+    muzzle: Vec3::new(2.2, 0.0, 3.2),
 };
 /// The tubes across the bore, and each one's radius.
 const TUBES: [f32; 3] = [-0.48, 0.0, 0.48];
@@ -211,7 +207,7 @@ fn turret(b: &mut MeshBuilder, line: &Line, z0: f32) {
         );
     });
     b.with_limb(rig::ARM_GUN, |b| {
-        b.pitched(p, line.pitch(), |b| {
+        b.at(p, |b| {
             flak_organ(b, line.len(), &TUBES, TUBE_R, CHEEK + 0.05);
         });
     });
@@ -238,7 +234,7 @@ fn coarse_turret(b: &mut MeshBuilder, line: &Line, z0: f32) {
             v3(-1.3, -0.5, roof + 0.01),
         ]);
         b.with_limb(rig::ARM_GUN, |b| {
-            b.pitched(line.pivot, line.pitch(), |b| {
+            b.at(line.pivot, |b| {
                 dark_plate(b);
                 b.beam(
                     v3(-0.4, 0.0, 0.0),
@@ -261,9 +257,9 @@ mod tests {
         super::super::check(
             "regency_mobile_aa",
             4.0,
-            4.5,
+            4.0,
             None,
-            &[LINE.muzzle.to_array()],
+            &TUBES.map(|y| (LINE.muzzle + Vec3::Y * y).to_array()),
         );
     }
 

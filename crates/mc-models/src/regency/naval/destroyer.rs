@@ -9,7 +9,7 @@
 //! - House 0, the Pinched-plasmeric Cannon forward ([`GUN`]): a fork whose projectors
 //!   reach past the bore and hold the charge between them ([`CHARGE`], the `muzzle`).
 //! - 1, four torpedo doors in the bow's blunt face under the water ([`TUBES`]).
-//! - House 2, the Plasmeric Flak Cannon aft ([`FLAK`]): two short tubes held up at the sky.
+//! - House 2, the Plasmeric AA Repeater aft ([`FLAK`]): two short tubes held up at the sky.
 //! - 3, two interceptor doors in the transom under the water ([`INTERCEPT`]).
 //!
 //! The hull shield's projector is set with `set_shield_emitter`, the search radar turns on
@@ -23,7 +23,7 @@ use crate::material::*;
 use crate::part;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::super::machine::{armour, collar, hoop, hoop_on, red_slot, swept, Frame};
+use super::super::machine::{armour, collar, hoop, hoop_on, mouth_rim, red_slot, swept, Frame};
 
 pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new("regency_destroyer", RADIUS, HEIGHT, build)];
 
@@ -42,7 +42,7 @@ const HOLD: f32 = 2.2;
 /// The flak house's trunnion, and the middle of its row of tube mouths: the tubes are
 /// held raised at the sky.
 const FLAK: Vec3 = Vec3::new(-13.0, 0.0, 5.0);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-11.4, 0.0, 6.35);
+const FLAK_MUZZLE: Vec3 = Vec3::new(-10.9, 0.0, 5.0);
 /// The torpedo doors in the bow's face, as in the unit file.
 const TUBES: [[f32; 3]; 4] = [
     [25.3, -0.7, -1.55],
@@ -490,7 +490,6 @@ fn flak(b: &mut MeshBuilder, deck: f32) {
         }
     }
     let d = FLAK_MUZZLE - FLAK;
-    let pitch = d.z.atan2(d.x);
     let len = d.length();
     b.with_house(2, FLAK, 0.25, |b| {
         if b.coarse() {
@@ -512,7 +511,7 @@ fn flak(b: &mut MeshBuilder, deck: f32) {
             armour(b, &f, &swept(2.8, 0.55, 0.3, 0.45), 0.2);
         });
         b.with_recoil(|b| {
-            b.pitched(FLAK, pitch, |b| organ(b, len));
+            b.at(FLAK, |b| organ(b, len));
         });
     });
 }
@@ -544,8 +543,7 @@ fn organ(b: &mut MeshBuilder, len: f32) {
         dark_plate(b);
         b.cylinder_between(v3(len - 0.4, y, 0.0), v3(len, y, 0.0), 0.29, 0.32, sides);
         if fine {
-            b.paint(GLOW_LASER);
-            hoop_on(b, v3(len - 0.03, y, 0.0), Vec3::X, 0.24, 0.1, 0.06, sides);
+            mouth_rim(b, v3(len, y, 0.0), 0.32, sides);
         }
     }
     if fine {
