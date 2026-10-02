@@ -147,6 +147,15 @@ fn coarse(b: &mut MeshBuilder) {
                 b.face(&[v3(2.4, y - 0.3, z), v3(4.4, y, z), v3(2.4, y + 0.3, z)])
             });
         });
+        // The Personal Shield's star on the back, a lit point far off.
+        b.module("shield", 0.0, |b| {
+            b.paint(GLOW_PRISM);
+            b.face(&[
+                v3(-3.3, -0.5, 20.8),
+                v3(-3.6, 0.0, 22.2),
+                v3(-3.3, 0.5, 20.8),
+            ]);
+        });
     });
 }
 

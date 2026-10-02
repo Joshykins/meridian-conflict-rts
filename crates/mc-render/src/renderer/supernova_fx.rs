@@ -392,8 +392,8 @@ impl Renderer {
 mod tests {
     use super::scale;
 
-    /// Each Regency power generator's death sound is written at its star's scale, so the bang in the
-    /// sound lands when the star goes.
+    /// Each Regency star's death sound (the power generators', the Wards') is written at its
+    /// star's scale, so the bang in the sound lands when the star goes.
     #[test]
     fn each_power_generator_sounds_at_its_stars_scale() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -421,6 +421,7 @@ mod tests {
                 scale(star[3])
             );
         }
-        assert_eq!(seen, 3);
+        // Three power generators and the two Wards.
+        assert_eq!(seen, 5);
     }
 }

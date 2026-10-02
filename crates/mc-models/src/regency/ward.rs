@@ -23,7 +23,8 @@ use super::machine::*;
 /// The star: where every dome's shaft leaves from (`mc_data::SHIELD_PROJECTOR_HEIGHT`).
 const CORE: Vec3 = Vec3::new(0.0, 0.0, 16.0);
 /// The star's face, and Ward II's.
-const CORE_R: [f32; 2] = [1.5, 1.8];
+/// (Both small, so a breached Ward's nova keeps time with `regency_supernova_small`.)
+const CORE_R: [f32; 2] = [1.5, 1.6];
 /// The plinth: its foot's radius and its top.
 const PLINTH_R: f32 = 12.6;
 const PLINTH_TOP: f32 = 3.0;
