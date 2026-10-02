@@ -112,6 +112,7 @@ fn strata_lift() -> f32 {
 @group(0) @binding(5) var height_overview: texture_2d<f32>;
 @group(0) @binding(6) var height_tiles: texture_2d_array<f32>;
 @group(0) @binding(7) var tile_index: texture_2d<u32>;
+// The fog of war, smoothed from the sim's grid (fog_field.wgsl); read through `fog_at`.
 @group(0) @binding(8) var fog_map: texture_2d<f32>;
 @group(0) @binding(9) var noise_map: texture_2d<f32>;
 // retired: 10 (the tiled plate map)
@@ -286,7 +287,7 @@ fn fog_at(xy: vec2<f32>) -> vec2<f32> {
     if (globals.counts.w & 1u) == 0u {
         return vec2<f32>(1.0);
     }
-    let uv = xy / (vec2<f32>(textureDimensions(fog_map)) * 64.0);
+    let uv = xy / (vec2<f32>(textureDimensions(fog_map)) * (FOG_CELL_M / f32(FOG_FIELD_SCALE)));
     return textureSampleLevel(fog_map, clamp_sampler, uv, 0.0).rg;
 }
 

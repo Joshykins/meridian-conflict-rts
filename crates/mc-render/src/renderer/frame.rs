@@ -375,6 +375,10 @@ impl Renderer {
         self.record_uploads(cmd, input.sim)?;
         self.record_light_copy(cmd);
         self.timers.end(&device, cmd);
+        self.timers.scope(&device, cmd, "fog");
+        self.fog
+            .record(&self.gpu, cmd, self.fog_enabled, input.time);
+        self.timers.end(&device, cmd);
         self.timers.draws(&device, cmd, "clouds.sim");
         self.sky.record_sim(&self.gpu, cmd);
         self.sky

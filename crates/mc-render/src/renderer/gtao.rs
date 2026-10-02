@@ -31,7 +31,8 @@ pub(super) struct Gtao {
     pub(super) enabled: bool,
 }
 
-fn storage_image(
+/// A one-mip image compute writes and shaders sample, left in GENERAL.
+pub(super) fn storage_image(
     gpu: &Gpu,
     width: u32,
     height: u32,

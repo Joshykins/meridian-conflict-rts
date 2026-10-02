@@ -412,6 +412,15 @@ shared! {
         pub const STORM_FADE_M: f32 = 600.0;
     }
 
+    /// Fog of war as drawn (renderer/fog_field.rs, fog_field.wgsl, `fog_at`): the sim's
+    /// coarse on/off grid (`mc_sim::Fog`), smoothed on the GPU into a finer field.
+    pub mod fog as "FOG_" {
+        /// Edge of one of the sim's fog cells, in metres.
+        pub const CELL_M: f32 = 64.0;
+        /// Field texels per sim cell each way.
+        pub const FIELD_SCALE: u32 = 4;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.

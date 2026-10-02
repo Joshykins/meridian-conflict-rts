@@ -51,6 +51,7 @@ mod cull_lists;
 mod effect_barriers;
 mod fallen_trees;
 mod flak_fx;
+mod fog_field;
 mod footfalls;
 pub(crate) mod foundations;
 mod frame;
@@ -895,8 +896,8 @@ pub struct Renderer {
     overview: Image,
     tiles: Image,
     tile_index: Image,
-    fog: Image,
-    fog_dims: (u32, u32),
+    /// The fog of war, from the sim's grid to the field the shaders read (fog_field.rs).
+    fog: fog_field::FogField,
     noise: Image,
     terrain_materials: Image,
     ground_cover: Image,
@@ -1723,27 +1724,7 @@ impl Renderer {
             true,
         )?;
         let size = info.size_metres().to_f32();
-        let fog_dims = (
-            (size[0] as u32 >> 6).max(1) + 1,
-            (size[1] as u32 >> 6).max(1) + 1,
-        );
-        let fog = gpu.image(&ImageDesc {
-            width: fog_dims.0,
-            height: fog_dims.1,
-            format: vk::Format::R8G8_UNORM,
-            usage: sampled,
-            layers: 1,
-            mips: 1,
-            array: false,
-        })?;
-        gpu.upload_image(
-            &fog,
-            0,
-            0,
-            None,
-            &vec![255u8; (fog_dims.0 * fog_dims.1 * 2) as usize],
-            true,
-        )?;
+        let fog = fog_field::FogField::new(&gpu, size)?;
         let noise = {
             let data = textures::noise_map();
             let n = textures::SIZE as u32;
@@ -2047,7 +2028,6 @@ impl Renderer {
             (5, &overview),
             (6, &tiles),
             (7, &tile_index),
-            (8, &fog),
             (9, &noise),
             (16, &pad_footprints),
             (17, &hull_plans),
@@ -2066,6 +2046,7 @@ impl Renderer {
         write_image(scene_set, 23, sky.flow_view(), vk::ImageLayout::GENERAL);
         write_image(scene_set, 24, sky.floor_view(), read);
         write_image(scene_set, 27, sky.shade_view(), vk::ImageLayout::GENERAL);
+        write_image(scene_set, 8, fog.view(), vk::ImageLayout::GENERAL);
         let gtao = gtao::Gtao::new(&gpu, &globals)?;
         let foundations =
             foundations::Foundations::new(&gpu, &layouts, &passes, scene.map.clone())?;
@@ -2437,7 +2418,6 @@ impl Renderer {
             tiles,
             tile_index,
             fog,
-            fog_dims,
             noise,
             terrain_materials,
             ground_cover,
@@ -5359,7 +5339,7 @@ impl Renderer {
         let uploads = std::mem::take(&mut self.upload_scratch);
         let fog = sim
             .map(|f| &f.fog)
-            .filter(|f| f.len() == (self.fog_dims.0 * self.fog_dims.1 * 2) as usize);
+            .filter(|f| f.len() == self.fog.grid_len());
         let mut bytes: Vec<u8> = Vec::new();
         let mut copies: Vec<(u64, &Image, u32, Option<vk::Rect2D>)> = Vec::new();
         let rect = |x: u32, y: u32, w: u32, h: u32| {
@@ -5415,7 +5395,7 @@ impl Renderer {
             while !bytes.len().is_multiple_of(4) {
                 bytes.push(0);
             }
-            copies.push((bytes.len() as u64, &self.fog, 0, None));
+            copies.push((bytes.len() as u64, self.fog.grid(), 0, None));
             bytes.extend_from_slice(fog);
         }
         if !copies.is_empty() {
@@ -5538,6 +5518,7 @@ impl Drop for Renderer {
         self.nuke_volume.destroy(&self.gpu);
         self.post.destroy(&self.gpu);
         self.gtao.destroy(&self.gpu);
+        self.fog.destroy(&self.gpu);
         self.grass.destroy(&self.gpu);
         self.foundations.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
@@ -5602,7 +5583,6 @@ impl Drop for Renderer {
             &self.overview,
             &self.tiles,
             &self.tile_index,
-            &self.fog,
             &self.noise,
             &self.terrain_materials,
             &self.ground_cover,
