@@ -28,6 +28,7 @@ For shots and tests; a match takes both from the map's `maps/<stem>.ron` and ski
 |---|---|---|
 | `MERIDIAN_CLIMATE` | `temperate`, `tropical`, `desert` | Draws the whole map in that climate, whatever its file says. A map with regions loses them: one climate, region 0's weather over all of it, no light along the walls' foot. |
 | `MERIDIAN_WEATHER` | `clear`, `fair`, `cloudy`, `stormy`, `overcast`, `storm` | The weather preset a renderer starts in (`storm` also parks a storm over the middle). A headless shot of a map with regions shows each region in its own weather unless this is set, which plays the one preset in every region. |
+| `MERIDIAN_HOUR` | `0`–`24` | The time of day a renderer starts at (24-hour clock; the sun's height and colour follow it). Headless shots keep it; a match in a window then takes its map's hour. |
 
 ## Interface shots
 

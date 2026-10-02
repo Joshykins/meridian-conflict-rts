@@ -1,10 +1,12 @@
 // Halden's Grip: four against four across a land bridge between two bays,
 // after Seton's Clutch. Mild coastal weather, fair-weather cloud off the
-// water. Skirmish set-up can override the weather and the time of day.
+// water, in morning light: the sun high in the west-north-west, so the sea
+// reads deep blue rather than mirroring a pale sky. Skirmish set-up can
+// override the weather and the time of day.
 (
     biome: Coastal,
     style: Teams,
     weather: Fair,
     tweaks: (rain: 0.4, wind: 12),
-    time: Afternoon,
+    time: Morning,
 )
