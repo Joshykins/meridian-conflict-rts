@@ -429,3 +429,31 @@ tech 1 gunship. The Sickle's stream is drawn as the Regency's nanite strands, as
 Breaker's is. The Commander AI fields them by role like any other unit
 (`ai::commander::profile` test `the_regency_builds_its_own_air_force`). Sounds are still
 ARC stand-ins (`aster_jet`, `aster_hover`).
+
+## The Regency's gunships: Quiver and Reaper (2026-10-02)
+
+The Regency's hovering combat craft (`data/factions/regency/units/air_gunships.ron`,
+models `crates/mc-models/src/regency/gunships/`) take the Kestrel's and Thunderhead's
+places at the Skyforge. Neither has rotors or jets: each floats on gravity lift bells, red
+plasma crackling under them.
+
+- **Quiver** (`regency_t2_drone_carrier`, tech 2): a manta-shaped hull with six bays down
+  its back, a **Wick** (`regency_wick`) in each. Its one weapon `launches` the Wicks: on a
+  mark in reach it lets the first Wick home in its bay go, a salvo of six 0.35 s apart every
+  9 s. Each flies at the mark, diving onto it over its last ~200 m, and bursts there: the
+  burst is a shot of the Quiver's weapon fired from the Wick over its last metres, so it
+  hits, splashes and meets shields like any shot (mc-sim `strike_drones.rs`). A Wick whose
+  mark dies first takes the nearest enemy within 160 m or comes home unspent. The bays are
+  the magazine: with none home the launcher waits, and the racked Wicks on the hull show
+  it. Spent Wicks are built again in their bays, one at a time (2 mass, 20 energy, 1.5 s
+  each), as the Osprey's drones are (`air_support.rs`). Wicks are aircraft: flak and
+  fighters shoot them down on the way in, and they die with their carrier.
+- **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged craft on six bells
+  that does not strafe. It `hangs`: it flies in to two fifths of its reach from its mark
+  and holds still there, moving again only when the mark drifts out of that band
+  (`orders.rs` `air_hang`). Its Pinch-fusion Beam (a `beam`, like the Harrow's) `walk`s
+  14 m either side of the mark across the line of fire, back and forth every 4 s, so the
+  stream glasses a swath and splashes everything standing in it.
+
+Check: `cargo test -p mc-sim --test sim -- regency_gunships::`; both are in the
+determinism match.

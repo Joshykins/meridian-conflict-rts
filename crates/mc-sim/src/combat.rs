@@ -150,6 +150,27 @@ const LASER_GAP: u16 = 3;
 /// A shot's aim error, angle steps across and along (or up): a point drawn evenly from a
 /// disc of radius `spread`, so the misses scatter in a circle round the aim point rather
 /// than along a line or over a square.
+/// Ticks a walking beam (`Weapon::walk`) takes to cross its swath and back.
+const WALK_TICKS: u32 = 2 * WALK_HALF;
+const WALK_HALF: u32 = 2 * TICKS_PER_SECOND;
+
+/// Where a walking beam lays off its mark this tick: across the line of fire from `from`,
+/// out to `walk` either side and back, at a steady pace. Each unit walks from its own
+/// place in the swing.
+fn walk_offset(from: FxVec2, mark: FxVec2, walk: Fx, tick: u32, row: usize) -> FxVec2 {
+    let line = mark - from;
+    if line.length() < Fx::ONE {
+        return FxVec2::ZERO;
+    }
+    let phase = ((tick as u64 + row as u64 * 7) % WALK_TICKS as u64) as i32;
+    // -1 to 1 and back, in straight runs.
+    let swing = Fx::ratio(
+        (phase - WALK_HALF as i32).abs() as i64 * 2,
+        WALK_HALF as i64,
+    ) - Fx::ONE;
+    line.normalize().perp() * (walk * swing)
+}
+
 fn aim_error(rng: &mut mc_core::Rng, spread: u16) -> (i32, i32) {
     let s = spread as i32;
     loop {
@@ -1142,6 +1163,11 @@ impl World {
                 dips_to(weapon, elevation)
             });
         }
+        // A drone launcher lays nothing: it lets a drone go at the mark (`strike_drones.rs`).
+        if weapon.launches {
+            let mark = mark.map(|m| (m.unit, m.pos, m.radius));
+            return self.step_launcher(row, w, mark);
+        }
         let on_body = on_torso(&bp.unit(self.state.units.blueprint[row]).weapons, w);
         let lead = if on_body { self.torso_lead(row) } else { None };
         // Whether this gun turns the torso and pitches the arm, or rides where they point.
@@ -1425,6 +1451,13 @@ impl World {
                 Trajectory::Ballistic => Fx::from_int(ballistic_ticks(pos.distance(t.pos), weapon)),
             };
             t.pos + t.lead * flight_ticks
+        };
+        // A walking beam (`Weapon::walk`) lays back and forth across the mark: the gun
+        // swings through it and the stream walks a swath over the ground.
+        let aim = if weapon.walk > Fx::ZERO {
+            aim + walk_offset(pos, aim, weapon.walk, self.state.tick, row)
+        } else {
+            aim
         };
         // A gun house on a pitched hull turns and elevates in the deck's frame.
         let deck = (weapon.mount && hull_pitched(bp.unit(units.blueprint[row]))).then(|| {

@@ -318,4 +318,20 @@
     "regency_t4_nuke_defense": (
         lore: "Gravity lenses that see a warhead coming over the horizon, and cells that throw a seeker up to break its containment before it falls.",
     ),
+    "regency_t2_drone_carrier": (
+        lore: "A hull on gravity lift that carries no gun, only a rack of Wicks down its back; it lets them go a salvo at a time and its nanites build them again in their bays.",
+        weapons: {
+            "Pinched-plasmeric Wick": "A small drone carrying one charge of plasma held tight by gravity; it flies into what it is sent at and lets go, and nothing of it comes back.",
+        },
+    ),
+    "regency_wick": (
+        lore: "One charge of pinched plasma on a lift bell no bigger than a man, built in the Quiver's hull to be spent.",
+        weapons: {},
+    ),
+    "regency_t3_assault_aircraft": (
+        lore: "A heavy craft that comes in over a battle and stops there, hanging on six lift bells while its beam walks back and forth below it and the ground turns to glass.",
+        weapons: {
+            "Pinch-fusion Beam": "Plasma pinched until it fuses and held as a beam, white at its heart with bursts of fusion strobing along it; it sweeps across its mark and melts the ground it crosses.",
+        },
+    ),
 }

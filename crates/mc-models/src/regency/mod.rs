@@ -23,6 +23,7 @@ mod engineer;
 mod eye;
 mod fusion_guns;
 mod guns;
+pub(crate) mod gunships;
 mod hatchery;
 mod heart;
 mod hover_tank;
@@ -187,6 +188,9 @@ pub(super) const MODELS: &[ModelDef] = &[
 /// model gets more than the library's default. `None` for a key that is not theirs.
 #[cfg(test)]
 pub(super) fn triangles(key: &str) -> Option<usize> {
+    if let Some(budget) = gunships::triangles(key) {
+        return Some(budget);
+    }
     // A design variant (`mesh~name`) has its mesh's budget.
     Some(match key.split('~').next().unwrap_or(key) {
         "regency_commander" => COMMANDER_TRIANGLES,
@@ -249,6 +253,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 /// are the tech 2 and 3 power generators.
 #[cfg(test)]
 pub(super) fn reduced_share(key: &str) -> Option<f32> {
+    if let Some(share) = gunships::reduced_share(key) {
+        return Some(share);
+    }
     match key.split('~').next().unwrap_or(key) {
         "regency_brood" | "regency_hatchery" => Some(0.57),
         // The quay's tech 3: plated booms, pylons and crabs that keep their sides reduced.

@@ -78,6 +78,7 @@ mod standing;
 pub mod state_hash;
 pub mod store_lights;
 mod stranded;
+mod strike_drones;
 pub mod survival;
 pub mod tables;
 mod target_pick;

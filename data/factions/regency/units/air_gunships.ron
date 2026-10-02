@@ -1,0 +1,104 @@
+// The Regency's two hovering combat craft (docs/STYLE.md "The Regency suite"): no rotors and
+// no jets, each held up on gravity lift bells with red plasma crackling under their mouths
+// (`models::regency::lift`). They take the ARC gunships' places at the Skyforge.
+//
+// Models: `models::regency::air::{quiver, wick, reaper}`, authored at the sizes here, so
+// every muzzle, socket and pivot below is the model's own number.
+[
+    // The drone carrier: the Kestrel's place, at about its cost and bite. It carries no gun.
+    // Six Wicks ride in bays down its back; it lets them go at what it fights, a salvo of
+    // six, and each flies into the mark and bursts there with a pinched-plasmeric charge:
+    // the drone is the shell (`launches`, mc-sim `strike_drones.rs`). Its nanites build
+    // the spent ones again in their bays, one at a time, paid for like any build. A Wick
+    // let go at a mark that dies first finds another near it or comes home to its bay.
+    // Flak and fighters can shoot Wicks down on the way in.
+    (
+        key: "regency_t2_drone_carrier",
+        name: "Quiver",
+        role: "Drone Carrier", title: "Drone Carrier",
+        tech: 2,
+        categories: ["Air"],
+        health: 1250,
+        cost: (mass: 220, energy: 7600, time: 1360),
+        radius: 8, height: 3.6,
+        vision: 560,
+        motion: (layer: Air, size: 0, speed: 82, accel: 30, turn: 120, altitude: 65, hover: true),
+        weapons: [
+            (
+                // A salvo of six, 0.35 s apart, every 9 s: about 150 a second while the bays
+                // keep up, the Kestrel's rate, from twice its reach.
+                name: "Pinched-plasmeric Wick",
+                damage: 240, splash: 5, range: 520, reload: 9, speed: 300, trajectory: Direct,
+                salvo: 6, salvo_delay: 0.35, launches: true,
+                muzzle: (0, 0, 2.2),
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched),
+                flash: 1.0, impact: 1.5,
+                sounds: (impact: "regency_glaive_hit", ground: "regency_glaive_hit"),
+            ),
+        ],
+        mesh: "regency_drone_carrier", icon: Gunship,
+        sounds: (death: "blast_small", moving: "aster_hover"),
+        drone: "regency_wick",
+        // The six bays down its back, fore to aft, port first (the model's `BAYS`). A Wick
+        // coming home lines up 2.5 m over its bay and settles into it; let go, it rises
+        // clear the same way.
+        drone_sockets: [
+            (2.3, 1.45, 2.05), (2.3, -1.45, 2.05),
+            (-0.3, 1.6, 2.05), (-0.3, -1.6, 2.05),
+            (-2.9, 1.45, 2.05), (-2.9, -1.45, 2.05),
+        ],
+        drone_approach: 2.5,
+    ),
+    // The Wick: the Quiver's drone, a pinched-plasmeric charge on a small lift bell. It is
+    // never built on its own and never picked; it lives in its bay until it is let go.
+    (
+        key: "regency_wick",
+        name: "Wick",
+        role: "Plasma Drone", title: "Plasma Drone",
+        tech: 2,
+        categories: ["Air"],
+        // Cheap: built in its bay as the Quiver's salvo is spent.
+        health: 90,
+        cost: (mass: 2, energy: 20, time: 15),
+        radius: 1.3, height: 0.8,
+        vision: 300,
+        motion: (layer: Air, size: 0, speed: 150, accel: 90, turn: 300, altitude: 65, hover: true),
+        weapons: [],
+        mesh: "regency_wick", icon: SalvageDrone,
+        sounds: (death: "blast_small", moving: "aster_hover"),
+        wreck_fraction: 0,
+    ),
+    // The assault craft: the Thunderhead's place. It does not strafe: it comes in over its
+    // mark, hangs there on six lift bells (`hangs`) and holds a Pinch-fusion Beam on it,
+    // walking the beam back and forth across it (`walk`) so it glasses a swath of ground
+    // and everything standing in it.
+    (
+        key: "regency_t3_assault_aircraft",
+        name: "Reaper",
+        role: "Beam Assault Craft", title: "Assault Aircraft",
+        tech: 3,
+        categories: ["Air"],
+        health: 7600,
+        cost: (mass: 1350, energy: 52000, time: 8400),
+        radius: 14, height: 6,
+        vision: 1000,
+        motion: (layer: Air, size: 0, speed: 110, accel: 40, turn: 70, altitude: 90, hover: true, hangs: true),
+        weapons: [
+            (
+                // Fires every tick it bears (`beam`), 550 a second, the stream a few metres
+                // wide where it lands. It runs up its pinch for 0.6 s before it lights.
+                name: "Pinch-fusion Beam",
+                damage: 55, splash: 6, range: 420, reload: 0.1, hitscan: true, beam: true,
+                trajectory: Direct, spin_up: 0.6, walk: 14,
+                turret_turn: 60, pivot: (4.2, 0, 0.6), muzzle: (6.4, 0, 0.2), sweep: 8,
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                flash: 1.3, impact: 1.4, plasma_grade: Some(PinchFusion),
+                sounds: (hold: "regency_pinched_beam"),
+            ),
+        ],
+        mesh: "regency_assault_aircraft", icon: Gunship,
+        sounds: (death: "blast", moving: "aster_hover"),
+        shield: (kind: Hull, health: 3000, regen: 45), economy: (energy_upkeep: 70),
+    ),
+]

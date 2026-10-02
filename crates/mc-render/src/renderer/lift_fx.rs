@@ -27,6 +27,9 @@ const PUFF_MOTE: f32 = puff::WARP_MOTE as f32;
 /// The lift's deep red, and the pink-white of its hottest arcs.
 const RED: Vec3 = Vec3::new(1.0, 0.1, 0.04);
 const HOT: Vec3 = Vec3::new(1.0, 0.42, 0.32);
+/// Mouth radius (m) from which a bell throws its motes at full speed; smaller ones throw
+/// them in proportion.
+const FULL_THROW: f32 = 0.5;
 /// Speed (m/s) at which the plasma rakes back at its longest.
 const FULL_TRAIL: f32 = 24.0;
 /// Puffs every lift together may lay in one tick: a deliberate cosmetic cap, so a crowd
@@ -88,6 +91,9 @@ impl Renderer {
                 local.z,
             );
             let r = bell.radius;
+            // A small bell (a drone's) throws its motes in proportion, so its crackle stays
+            // about its own size rather than a full bell's.
+            let throw = (r / FULL_THROW).min(1.0);
             let mut laid = 0;
 
             // The glow under the mouth, smeared out behind when it moves.
@@ -137,8 +143,9 @@ impl Renderer {
                 let start =
                     from.lerp(to, k) + off + out * (r * 0.6 * self.scatter.unit()) - Vec3::Z * 0.05;
                 let vel = -fwd * speed * (0.15 + 0.2 * self.scatter.unit())
-                    + out * (0.6 + 1.6 * self.scatter.unit())
-                    + Vec3::Z * (0.4 + 1.2 * self.scatter.unit());
+                    + (out * (0.6 + 1.6 * self.scatter.unit())
+                        + Vec3::Z * (0.4 + 1.2 * self.scatter.unit()))
+                        * throw;
                 let color = RED.lerp(HOT, self.scatter.unit() * 0.5) * 3.0;
                 let life = 0.35 + 0.3 * self.scatter.unit();
                 self.push_warp(

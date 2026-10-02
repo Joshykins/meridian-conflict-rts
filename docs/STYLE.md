@@ -207,6 +207,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Attack boat, submarine, frigate | Dirk, Stiletto, Falchion |
 | Heavy destroyer, cruiser | Claymore, Pavise |
 | Bombardment walker (T2) | Sower |
+| Drone carrier and its drone (T2), beam assault craft (T3) | Quiver and Wick, Reaper |
 | Battleship, carrier, assault submarine | Flamberge, Mantlet, Rapier |
 | Air scout, fighter, bomber (T1) | Flechette, Quarrel, Petard |
 | Light transport, salvage drone (T1) | Coffer, Sickle |

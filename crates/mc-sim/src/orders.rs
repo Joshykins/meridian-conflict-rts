@@ -72,6 +72,9 @@ fn leg_heading(from: FxVec2, to: FxVec2, fallback: Angle) -> Angle {
     }
 }
 
+/// Of its reach, how far from its mark a hanging aircraft (`Motion::hangs`) holds.
+const HANG_SHARE: Fx = Fx::ratio(2, 5);
+
 impl World {
     pub(crate) fn apply_command(&mut self, pc: &PlayerCommand) -> Result<(), SimError> {
         if pc.player as usize >= self.state.players.len() || self.apply_debug(pc)? {
@@ -1854,8 +1857,12 @@ impl World {
         self.ensure_moving(row, goal, goal)
     }
 
-    /// A gunship circles `center` at three fifths of its reach, guns on it.
+    /// A gunship circles `center` at three fifths of its reach, guns on it. One that
+    /// hangs (`Motion::hangs`) comes in to two fifths of its reach and holds there.
     fn air_hover_standoff(&mut self, row: usize, center: FxVec2) -> Result<(), SimError> {
+        if self.bp(row).motion.is_some_and(|m| m.hangs) {
+            return self.air_hang(row, center);
+        }
         self.state.units.flags[row] |= flag::AIR_RUN;
         let delta = self.state.units.pos[row] - center;
         let standoff = self.bp(row).max_weapon_range() * Fx::ratio(3, 5);
@@ -1871,6 +1878,30 @@ impl World {
         self.ensure_moving(row, goal, goal)?;
         self.state.units.air_aim[row] = center;
         self.state.units.flags[row] |= flag::AIR_RUN;
+        Ok(())
+    }
+
+    /// Hangs still near `center`, guns on it: it flies in to `HANG_SHARE` of its reach and
+    /// stops there, and moves again only once the mark has drifted out of the band round
+    /// that (or under it), so it holds steady over a slow fight.
+    fn air_hang(&mut self, row: usize, center: FxVec2) -> Result<(), SimError> {
+        let pos = self.state.units.pos[row];
+        let standoff = self.bp(row).max_weapon_range() * HANG_SHARE;
+        let off = pos.distance(center);
+        if off > standoff * Fx::ratio(3, 2) || off < standoff / 3 {
+            let back = if off > Fx::ONE {
+                (pos - center).normalize()
+            } else {
+                FxVec2::from_angle(self.state.units.heading[row] + Angle::from_degrees(180))
+            };
+            let goal = self.clamp_to_map(center + back * standoff);
+            self.ensure_moving(row, goal, goal)?;
+        } else if self.state.units.has_flag(row, flag::HAS_FIELD) {
+            self.stop_moving(row);
+        }
+        let units = &mut self.state.units;
+        units.air_aim[row] = center;
+        units.flags[row] |= flag::AIR_RUN;
         Ok(())
     }
 

@@ -110,6 +110,11 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     // Regency bombardment walkers: seekers lobbed high that split into sub-seekers on the
     // way down (`cluster.rs`).
     ("regency_t2_bombard", 2, 1000, 1500),
+    // Regency drone carriers: Wicks built in their bays, let go at a mark, diving onto it
+    // and bursting (`strike_drones.rs`), sent in over the far side's base; and the beam craft that hangs over its mark,
+    // walking its beam across it (`Motion::hangs`, `Weapon::walk`).
+    ("regency_t2_drone_carrier", 2, 900, 2900),
+    ("regency_t3_assault_aircraft", 1, 1000, 450),
 ];
 
 fn setup(w: &mut World) {
@@ -344,6 +349,8 @@ fn reference() -> Vec<u64> {
     let mut struck = 0;
     let mut split = 0;
     let titan_sub = w.blueprints.id_of("aster_t4_submarine").unwrap();
+    let quiver = w.blueprints.id_of("regency_t2_drone_carrier").unwrap();
+    let mut burst = 0;
     let fid = factories(&w)[0];
     let (mut last_held, mut batches_sent, mut held_at_snapshot) = (0, 0, 0);
     let hashes = (1..TICKS)
@@ -378,6 +385,11 @@ fn reference() -> Vec<u64> {
                 .iter()
                 .filter(|e| matches!(e, mc_sim::SimEvent::TorpedoIntercepted { .. }))
                 .count();
+            burst += w
+                .events
+                .iter()
+                .filter(|e| matches!(e, mc_sim::SimEvent::Impact { blueprint, .. } if *blueprint == quiver))
+                .count();
             split += w
                 .events
                 .iter()
@@ -395,6 +407,8 @@ fn reference() -> Vec<u64> {
     assert!(struck > 0, "no strike missile was launched in the match");
     // The bombardment walkers' seekers broke into their sub-seekers.
     assert!(split > 0, "no cluster shot split in the match");
+    // The drone carriers' Wicks went off on their marks.
+    assert!(burst > 0, "no Wick burst in the match");
     // The salvage carriers' heads were at work in it, on the move.
     let reclaimed = w.state.players.iter().map(|p| p.reclaimed_mass).max();
     assert!(

@@ -462,6 +462,10 @@ pub(crate) struct RawMotion {
     /// instead of pathing round them. Land only.
     #[serde(default)]
     pub stride: bool,
+    /// A hover aircraft that hangs still near what it fights (the Reaper), its guns laid
+    /// on it, instead of circling it as a gunship does. Air hover only.
+    #[serde(default)]
+    pub hangs: bool,
 }
 
 /// The hull shots strike (`Body`): metres forward and aft of the origin along the
@@ -1057,6 +1061,18 @@ pub struct RawWeapon {
     /// Zero (the default): it flies the usual way.
     #[serde(default)]
     pub curve: f64,
+    /// Fires the unit's drones (`drone`) instead of shots (the Regency's Wick): each launch
+    /// lets one drone go from its socket at the mark, and it flies into it and bursts there
+    /// with this weapon's charge (`damage`, `splash` and its look); the drone is the shell.
+    /// A launch waits for a drone on its socket, so the sockets are the magazine, and the
+    /// drones spent are built again on them. `speed` is the burst's, over its last metres.
+    #[serde(default)]
+    pub launches: bool,
+    /// A held beam (`beam`) that walks back and forth across its mark as it holds, this
+    /// many metres either side of it across the line of fire, glassing a swath. Zero (the
+    /// default): it holds on the mark.
+    #[serde(default)]
+    pub walk: f64,
     /// Only fires with the hull on the surface: a submarine's deck gun.
     #[serde(default)]
     pub surfaced: bool,
@@ -1283,6 +1299,11 @@ impl Unit {
                 "{key}: a unit with a drone has 1 to {MAX_DRONES} drone_sockets, and only it has any"
             )));
         }
+        if self.weapons.iter().filter(|w| w.launches).count() > 1 {
+            return Err(DataError::Invalid(format!(
+                "{key}: one weapon at most launches the unit's drones"
+            )));
+        }
         if !(1..=crate::MAX_TECH).contains(&self.tech) {
             return Err(DataError::Invalid(format!(
                 "{key}: tech must be 1..={}",
@@ -1320,6 +1341,11 @@ impl Unit {
                         "{key}: only a land walker strides"
                     )));
                 }
+                if m.hangs && !(m.layer == MoveLayer::Air && m.hover) {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: only a hover aircraft hangs over its mark"
+                    )));
+                }
                 if self.stomp.is_some() && !m.stride {
                     return Err(DataError::Invalid(format!(
                         "{key}: a stomp needs a striding walker"
@@ -1347,6 +1373,7 @@ impl Unit {
                         0x8000
                     },
                     stride: m.stride,
+                    hangs: m.hangs,
                 })
             }
             None => None,
@@ -1443,6 +1470,23 @@ impl Unit {
             {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: a curving charge is a direct, non-missile, non-hitscan weapon"
+                )));
+            }
+            if w.launches
+                && (self.drone.is_none()
+                    || w.trajectory != Trajectory::Direct
+                    || w.missile
+                    || w.hitscan
+                    || w.torpedo
+                    || w.curve > 0.0)
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a drone launcher is a direct weapon on a unit with a `drone`"
+                )));
+            }
+            if w.walk > 0.0 && !w.beam {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: only a held beam walks across its mark"
                 )));
             }
             if !w.hitscan && w.speed <= 0.0 {
@@ -1582,6 +1626,8 @@ impl Unit {
                 skim: fx(w.skim),
                 apogee: fx(w.apogee),
                 curve: Angle(steps(w.curve.clamp(0.0, 80.0)).round() as i64 as u16),
+                launches: w.launches,
+                walk: fx(w.walk.clamp(0.0, 200.0)),
                 surfaced: w.surfaced,
                 intercepts: w.intercepts,
                 bore: w.bore.map(|b| crate::Bore {

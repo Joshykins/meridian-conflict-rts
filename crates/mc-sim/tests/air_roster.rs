@@ -86,7 +86,7 @@ fn roster_is_tier_gated_and_every_aircraft_has_a_factory() {
         if bp
             .motion
             .is_some_and(|m| m.layer == mc_data::MoveLayer::Air)
-            && bp.key != "aster_reclaim_drone"
+            && !bp.carried_drone
             // Lift ships are raised by engineers on a lot of their own.
             && !bp.built_on_site()
         {

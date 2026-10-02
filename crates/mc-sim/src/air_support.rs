@@ -71,6 +71,11 @@ impl World {
         }
         let mut claimed = std::collections::BTreeSet::new();
         for (parent, children) in self.drone_flocks() {
+            // A launcher's drones are its shells (`strike_drones.rs`).
+            if self.bp(parent).launches_drones() {
+                self.fly_strike_drones(parent, children)?;
+                continue;
+            }
             let carrier = self.bp(parent).drone_carrier();
             // A carrier's drones work the wreck it is told to; a port's only salvage round it.
             let task = self
@@ -241,7 +246,7 @@ impl World {
 
     /// Where drone `slot` of `parent` sits when home (`drone_sockets`): on a pylon, a
     /// pad or a clamp. On a unit with a torso the sockets turn with it.
-    fn drone_socket(&self, parent: usize, slot: usize) -> Socket {
+    pub(crate) fn drone_socket(&self, parent: usize, slot: usize) -> Socket {
         let bp = self.bp(parent);
         let units = &self.state.units;
         let at = bp.drone_sockets[slot % bp.drone_sockets.len()];
@@ -549,25 +554,29 @@ pub(crate) struct DroneJob {
     pub tier: usize,
 }
 
-struct Socket {
-    xy: FxVec2,
+pub(crate) struct Socket {
+    pub(crate) xy: FxVec2,
     z: Fx,
     heading: Angle,
 }
 
 /// A drone's `deploy` word: where it is between its socket and free flight.
-mod dock {
+pub(crate) mod dock {
+    use mc_core::Fx;
+
     /// On its socket, riding the carrier.
-    pub(super) const DOCKED: u16 = 0;
-    pub(super) const FLYING: u16 = 1;
+    pub(crate) const DOCKED: u16 = 0;
+    pub(crate) const FLYING: u16 = 1;
     /// Dropping clear of the socket to its line-up point.
-    pub(super) const RELEASING: u16 = 2;
+    pub(crate) const RELEASING: u16 = 2;
     /// Gliding in to the line-up point, then onto the socket.
-    pub(super) const DOCKING: u16 = 3;
+    pub(crate) const DOCKING: u16 = 3;
+
+    /// How near its socket (across the ground) a drone coming home starts its glide in.
+    pub(crate) const DOCK_CAPTURE: Fx = Fx::from_int(12);
 }
 
-/// How near its socket (across the ground) a drone coming home starts its glide in.
-const DOCK_CAPTURE: Fx = Fx::from_int(12);
+use dock::DOCK_CAPTURE;
 /// How near under (or over) its socket a docking drone is before it rises onto it.
 const DOCK_ALIGNED: Fx = Fx::ratio(1, 5);
 /// The slowest a glide moves in a tick, so it never crawls to a stop short of the socket.

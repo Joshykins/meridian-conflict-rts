@@ -188,6 +188,8 @@ pub struct Motion {
     pub aim_arc: u16,
     /// Strides straight over structures, slopes and shallow water (`RawMotion::stride`).
     pub stride: bool,
+    /// Hangs still near what it fights instead of circling it (`RawMotion::hangs`).
+    pub hangs: bool,
 }
 
 /// A giant walker's crushing footfall (`RawStomp`).
@@ -864,7 +866,13 @@ impl UnitBlueprint {
 
     /// This unit reclaims, or it commands drones that do.
     pub fn sends_reclaimers(&self) -> bool {
-        self.reclaims().is_some() || self.drone.is_some()
+        self.reclaims().is_some() || (self.drone.is_some() && !self.launches_drones())
+    }
+
+    /// Its drones are its shells (`Weapon::launches`, the Quiver's Wicks): it fires them,
+    /// and they reclaim nothing.
+    pub fn launches_drones(&self) -> bool {
+        self.weapons.iter().any(|w| w.launches)
     }
 
     /// A salvage unit the factories make: mobile, unarmed, and it reclaims on its own
@@ -881,7 +889,7 @@ impl UnitBlueprint {
     /// and come home when it moves off. A unit that reclaims with its own tools (a
     /// commander's drone port) leaves its drones to salvage round it on their own.
     pub fn drone_carrier(&self) -> bool {
-        self.drone.is_some() && self.reclaims().is_none()
+        self.drone.is_some() && self.reclaims().is_none() && !self.launches_drones()
     }
 
     pub fn max_weapon_range(&self) -> Fx {
@@ -896,7 +904,7 @@ impl UnitBlueprint {
 /// Most weapons one unit can carry. The sim stores weapon state in fixed slots.
 pub const MAX_WEAPONS: usize = 10;
 /// Most drones one unit keeps (`drone_sockets`).
-pub const MAX_DRONES: usize = 4;
+pub const MAX_DRONES: usize = 6;
 /// Weapons that may turn on gun houses of their own (`mount`) and be drawn turning: the
 /// renderer's rig has this many house limbs (`mirror::HousePose`).
 pub const MAX_HOUSES: usize = 8;
@@ -1280,7 +1288,7 @@ impl Blueprints {
                     h.write_u64(m.deploy_ticks as u64);
                     h.write_u64(m.broadside.0 as u64);
                     h.write_u64(m.aim_arc as u64);
-                    h.write_u64(m.stride as u64);
+                    h.write_u64(m.stride as u64 | (m.hangs as u64) << 1);
                 }
                 None => h.write_u64(0),
             }
@@ -1529,7 +1537,13 @@ impl Blueprints {
                         | (w.spin_ramp as u64) << 32
                         | (w.barrels as u64) << 48,
                 );
-                h.write_u64(w.sway.0 as u64 | (w.rake.0 as u64) << 16 | (w.curve.0 as u64) << 32);
+                h.write_u64(
+                    w.sway.0 as u64
+                        | (w.rake.0 as u64) << 16
+                        | (w.curve.0 as u64) << 32
+                        | (w.launches as u64) << 48,
+                );
+                h.write_i64(w.walk.0);
                 if let Some(s) = w.sabot {
                     for v in [
                         s.port.x, s.port.y, s.port.z, s.throw.x, s.throw.y, s.throw.z, s.kick,

@@ -23,6 +23,9 @@ fn roles_come_from_what_a_unit_can_do() {
     assert!(has("aster_t3_nuke_defense", role::INTERCEPTOR));
     assert!(has("aster_t1_submarine", role::HUNTER | role::ANTI_SHIP));
     assert!(has("aster_t1_bomber", role::STRIKE));
+    // The Regency's gunships: a drone carrier whose Wicks are its shells, and a beam craft.
+    assert!(has("regency_t2_drone_carrier", role::STRIKE));
+    assert!(has("regency_t3_assault_aircraft", role::STRIKE));
     assert!(has("aster_t4_anti_ship", role::ANTI_SPACE));
     // A mobile gun that shoots only at spacecraft is not marched with the line.
     assert!(has("regency_t3_mobile_aa", role::ANTI_SPACE));

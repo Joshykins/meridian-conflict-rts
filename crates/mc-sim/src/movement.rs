@@ -222,6 +222,11 @@ impl World {
                     want_z = (surface + pass_height).min(want_z.max(surface + TORPEDO_RUN_HEIGHT));
                 }
             }
+            // A drone let go at a mark dives onto it (`strike_drones.rs`).
+            let strike = self.drone_striking(row);
+            if strike {
+                want_z = self.strike_height(row, m.pos, want_z);
+            }
             let vertical_delta = match self.bp(row).motion {
                 // A lift ship eases up and down at its own rate (`transport.rs`).
                 Some(mo) if mo.layer == MoveLayer::Air && self.lands_on_order(row) => {
@@ -251,6 +256,7 @@ impl World {
                             || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
                             || torpedo_run
                             || bomb_run
+                            || strike
                         {
                             mo.speed * Fx::ratio(7, 20) / DT
                         } else {
@@ -268,6 +274,7 @@ impl World {
                         // A strafing run at speed has to tip into its dive quickly, or the
                         // fixed nose gun comes down on the target too shallow to bear.
                         let ease = if torpedo_run
+                            || strike
                             || (assault && self.state.units.has_flag(row, flag::AIR_RUN))
                         {
                             Fx::ratio(3, 10)
