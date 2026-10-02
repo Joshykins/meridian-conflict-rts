@@ -712,7 +712,9 @@ impl World {
 
     /// Paid out of `run_economy`: what every launcher still assembling a round wants this
     /// tick at full supply (mass, energy per tick), by row, with its build-time rate: its
-    /// own power and that of every engineer assisting it.
+    /// own power and that of every engineer assisting it. The rate is not cut to what is
+    /// left of the round, so a stall slows the round down but never its last bit
+    /// (`advance_launchers` stops at the end).
     pub(crate) fn launcher_jobs(&mut self) -> Vec<(usize, Fx, [Fx; 2])> {
         let mut jobs = Vec::new();
         // Engineers on an assist whose work is a launcher's round (`run_assist`).
@@ -742,13 +744,14 @@ impl World {
             let l = self.state.strategic.launchers.get(&id);
             let done = l.map_or(Fx::ZERO, |l| l.progress);
             let power = spec.power + helpers.get(&id).copied().unwrap_or(Fx::ZERO);
-            let rate = (power / mc_core::TICKS_PER_SECOND as i32).min(spec.round_time - done);
-            if rate <= Fx::ZERO {
+            let rate = power / mc_core::TICKS_PER_SECOND as i32;
+            let left = rate.min(spec.round_time - done);
+            if left <= Fx::ZERO {
                 continue;
             }
             let want = [
-                spec.round_mass * rate / spec.round_time,
-                spec.round_energy * rate / spec.round_time,
+                spec.round_mass * left / spec.round_time,
+                spec.round_energy * left / spec.round_time,
             ];
             jobs.push((row, rate, want));
         }
@@ -760,7 +763,9 @@ impl World {
         let spec = self.launcher_spec(row).cloned().unwrap();
         let id = self.state.units.id(row);
         let l = self.state.strategic.launchers.entry(id).or_default();
-        l.progress += step;
+        // A remainder scaled by a stall shrinks for ever and then rounds to nothing: the
+        // round would sit one step short of done (as for builders and drones).
+        l.progress = (l.progress + step).min(spec.round_time);
         if l.progress >= spec.round_time {
             l.progress = Fx::ZERO;
             l.stock = (l.stock + 1).min(spec.stock);

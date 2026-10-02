@@ -752,3 +752,55 @@ fn a_salvo_is_met_one_interceptor_a_warhead_without_doubling_back() {
     assert_eq!(runs.iter().filter(|r| r.0).count(), marks.len(), "{runs:?}");
     assert!(runs.iter().all(|r| r.2 <= 120.0), "doubling back: {runs:?}");
 }
+
+#[test]
+fn a_round_finishes_through_a_mass_stall() {
+    // A stall used to scale the round's last bit as well, which then shrank every tick
+    // until it rounded to nothing: the array sat at 100% and never got its interceptor.
+    let mut w = world();
+    let array = spawn(&mut w, 0, "aster_t3_nuke_defense", 600, 600);
+    let spec = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_t3_nuke_defense").unwrap())
+        .strategic
+        .clone()
+        .unwrap();
+    w.state
+        .strategic
+        .launchers
+        .entry(array)
+        .or_default()
+        .progress = spec.round_time * Fx::ratio(99, 100);
+    // A silo beside it keeps the side stalled however little the array still asks for.
+    spawn(&mut w, 0, "aster_t4_nuke_silo", 700, 600);
+    let silo = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_t4_nuke_silo").unwrap())
+        .strategic
+        .clone()
+        .unwrap();
+    // About a third of the mass both ask for, every tick; energy to spare.
+    let per_tick = |s: &mc_data::strategic::Strategic| s.round_mass * s.power / s.round_time;
+    let trickle = (per_tick(&spec) + per_tick(&silo)) / 30;
+    let mut ready = None;
+    for t in 0..600 {
+        w.state.players[0].mass = trickle;
+        w.state.players[0].energy = Fx::from_int(1_000_000);
+        w.tick(&[]).unwrap();
+        if w.events
+            .iter()
+            .any(|e| matches!(e, SimEvent::RoundReady { .. }))
+        {
+            ready = Some(t);
+            break;
+        }
+    }
+    let l = &w.state.strategic.launchers[&array];
+    assert!(
+        ready.is_some(),
+        "the round is finished while mass stalls (stuck at {} of {})",
+        l.progress,
+        spec.round_time
+    );
+    assert_eq!(l.stock, 1);
+}
