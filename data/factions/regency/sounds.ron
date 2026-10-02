@@ -568,8 +568,23 @@
         ),
 
         // The Sledge's light Pinched-plasmeric Cannon: the Halberd's charge, jet and burst
-        // from a smaller gun, quicker and a little higher (0.6 s of charge to its 1.0).
-        "regency_pinch_light_charge": (like: "regency_halberd_charge", size: 0.6, peak: 0.34),
+        // from a smaller gun. Its charge is the Halberd's squeeze retimed to the gun's 0.6 s
+        // and pitched a little higher, with room after the pinch to die away (a `like` at
+        // that size would end still sounding).
+        "regency_pinch_light_charge": (
+            length: 0.8, peak: 0.34, room: 0.2,
+            layers: [
+                Burst(low: 100, high: 700, attack: 0.0008, decay: 0.012, gain: 3),
+                Tone(from: 88, to: 62, glide: 0.04, attack: 0.002, decay: 0.06, gain: 0.4),
+                Fm(at: 0.01, from: 64, to: 78, glide: 0.52, ratio: 0.5, index: 2.2, fade: 3.0, attack: 0.51, decay: 0.03, gain: 0.5),
+                Fm(at: 0.07, from: 185, to: 210, glide: 0.47, ratio: 0.5, index: 1.4, fade: 3.0, attack: 0.45, decay: 0.03, gain: 0.6),
+                Drive(1.4),
+                Sweep(at: 0.03, from: 2600, to: 700, glide: 0.5, q: 1.1, attack: 0.48, decay: 0.03, gain: 0.7, seed: 11),
+                Roll(at: 0.08, from: 360, to: 560, glide: 0.44, attack: 0.44, decay: 0.03, gain: 0.8, swell: 9, depth: 0.85, seed: 12),
+                Foam(at: 0.17, from: 1800, to: 2400, glide: 0.38, q: 1.0, attack: 0.36, decay: 0.03, gain: 1.0, swell: 34, depth: 0.9, seed: 13),
+                Burst(at: 0.525, low: 170, high: 1100, attack: 0.02, decay: 0.01, gain: 3, seed: 14),
+            ],
+        ),
         "regency_pinch_light_fire": (like: "regency_halberd_fire", size: 0.72, peak: 0.4),
         "regency_pinch_light_hit": (like: "regency_halberd_hit", size: 0.72, peak: 0.4),
 
