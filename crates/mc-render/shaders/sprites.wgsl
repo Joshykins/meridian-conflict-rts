@@ -272,7 +272,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     } else if look == 3u {
         trace = length(stride) * 0.85;
     } else if look == 4u {
-        trace = min(length(stride) * 0.4, max(p.size, 0.5) * 5.5);
+        trace = min(length(stride) * 0.45, max(p.size, 0.5) * 6.5);
     } else if seeker {
         trace = min(length(stride) * 0.5, max(p.size, 0.3) * 1.6);
     }
@@ -331,7 +331,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     }
     // Pinched: tight; fusion: a broad prism sheath round its core; a thrown charge: its
     // containment is wider than the core it holds.
-    width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.2, look == 4u)
+    width_px *= select(1.0, 0.8, look == 1u) * select(1.0, 1.35, look == 3u) * select(1.0, 2.6, look == 4u)
         * select(1.0, 1.9, look == 2u) * select(1.0, 3.6, seeker);
     let plasma_m = p.extras.y;
     var core_frac = 0.0;
@@ -691,8 +691,8 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         // A thrown charge: red-white in its cage.
         out.color = vec3<f32>(1.2, 0.3, 0.2);
     } else if look == 4u {
-        // A Plasmeric bolt's heart: pink-white.
-        out.color = vec3<f32>(1.2, 0.55, 0.55);
+        // A Plasmeric bolt's heart: white-hot going red.
+        out.color = vec3<f32>(1.3, 0.26, 0.22);
     } else if look == PLASMA_LOOK_GRAVITIC_SEEKER {
         // A seeker: violet, its heart is the streak's (`gravitic_seeker`).
         out.color = vec3<f32>(0.62, 0.12, 1.1);
@@ -930,24 +930,31 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
                 return vec4<f32>(gravitic_seeker(u, in.uv.y, in.color.g / max(in.color.r, 0.0001), time, counter) * in.color.r, 1.0);
             }
             if in.shape.y > 10.1 {
-                // A Plasmeric bolt: a fat teardrop of plasma, a round head and a short tail
-                // that narrows behind it; a pink-white heart in a red body, wobbling.
-                let head = 0.68;
+                // A Plasmeric bolt: a fat bolt of red plasma, a round head and a short tail
+                // that narrows behind it, round a white-hot heart. Its skin boils, ragged in
+                // lumps that run back along it, and licks off its tail in tongues; deep red at
+                // the skin, hot pink inside, white at the heart near the head.
+                let head = 0.7;
                 let prof = select(
-                    mix(0.1, 1.0, pow(u / head, 1.4)),
+                    mix(0.08, 1.0, pow(u / head, 1.3)),
                     sqrt(max(1.0 - pow((u - head) / (1.0 - head), 2.0), 0.0)),
                     u > head,
                 );
-                let y = abs(in.uv.y) / max(prof, 0.01);
+                let boil = value_noise2(vec2<f32>(u * 7.0 - time * 34.0, in.uv.y * 2.6 + time * 5.0), 1.0);
+                let tongue = value_noise2(vec2<f32>(u * 3.2 - time * 22.0, sign(in.uv.y) * 4.0 + 1.3), 1.0);
+                let ragged = mix(0.8 + 0.2 * boil, 0.45 + 0.55 * tongue, 1.0 - smoothstep(0.15, head, u));
+                let y = abs(in.uv.y) / max(prof * ragged, 0.01);
                 if y >= 1.0 {
                     discard;
                 }
-                let body = pow(1.0 - y, 1.3);
-                let heart = pow(max(1.0 - y * 1.7, 0.0), 2.0) * smoothstep(0.3, 0.75, u);
-                let wobble = 0.82 + 0.18 * sin(time * 41.0 + u * 11.0 + in.uv.y * 3.0);
-                let rgb = vec3<f32>(1.0, 0.07, 0.07) * body * 4.6 * wobble
-                    + vec3<f32>(1.0, 0.62, 0.66) * heart * 6.5;
-                return vec4<f32>(rgb * in.color.r, 1.0);
+                let body = pow(1.0 - y, 0.9);
+                let inner = pow(max(1.0 - y * 2.0, 0.0), 2.0) * smoothstep(0.3, 0.8, u);
+                let heart = pow(max(1.0 - y * 4.0, 0.0), 2.0) * smoothstep(0.55, 0.85, u);
+                let flicker = 0.85 + 0.15 * sin(time * 53.0 + u * 13.0 + in.uv.y * 3.0);
+                let rgb = vec3<f32>(1.0, 0.035, 0.03) * body * 4.5 * flicker
+                    + vec3<f32>(1.0, 0.25, 0.22) * inner * 2.2
+                    + vec3<f32>(1.0, 0.62, 0.56) * heart * 3.6;
+                return vec4<f32>(rgb * smoothstep(0.0, 0.2, u) * in.color.r, 1.0);
             }
             if in.shape.y > 9.1 {
                 // A thrown gravitic charge: a red plasma streak held in a cage, dark bands of

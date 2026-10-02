@@ -277,9 +277,14 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
   "plasma that behaves like a slug of metal"). Each grade has its own charge,
   shot and strike (`renderer/regency_guns_fx.rs`, `plasma_puffs.wgsl`):
   - **Plasmeric bolt** (a plasma repeater, as Halo's): a steady stream of fat
-    glowing teardrops, a pink-white heart in a red body; a small red bloom at
-    the mouth for each; a small ragged splash, sparkles and a seared spot where
-    one lands. **Plasmeric flak** throws the same bolts and bursts as a wide
+    red bolts round a white-hot heart, their skin boiling and licking back off
+    them, lighting the ground red as they pass.
+    Each is spat out hard: a white-hot snap at the mouth, a red bloom thrown
+    forward, droplets and sparks flung after it. Where one lands it dumps its
+    heat at once: a white flash in a ragged red bloom, a knot of plasma left
+    frying, droplets spattered out, sparks, a seared glowing spot. Heard as a
+    snap, a heavy spit with a kick under it and a fizz riding off; it lands as
+    a wet splat, a thud and plasma frying. **Plasmeric flak** throws the same bolts and bursts as a wide
     red bloom flinging sparkles and streaks of plasma.
   - **Pinched-plasmeric:** plasma gathered and squeezed in front of the bore
     (a ball, motes drawn in, red lightning snapping into it), then pinched
@@ -342,7 +347,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
       defence and vehicle mounts. Size shows in the mount (Light, Twin,
       Heavy), not in a new name.
     - **Pinched-plasmeric Rifle / Pinched-plasmeric Cannon:** snipers / tanks
-      and heavy defences. The Regency's answer to an ARC rail; it stops in what
+      from tech 2 and heavy defences (the tech 1 Sledge carries a Plasmeric
+      Repeater, user call 2026-10-02). The Regency's answer to an ARC rail; it stops in what
       it hits.
     - **Pinch-fusion Rifle / Pinch-fusion Cannon:** the same roles on the top
       rung, the Regency's counterpart to the AEB.

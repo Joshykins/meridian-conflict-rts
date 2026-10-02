@@ -2,7 +2,8 @@
 //! lowest rung of the Regency's plasma, for `regency_guns_fx`, and the mortar's strike (the
 //! bolts' and flak's strikes are in `strike.rs`):
 //!
-//! - **A bolt or a flak bolt leaving** the mouth: a small red bloom for each.
+//! - **A bolt or a flak bolt leaving** the mouth: spat out hard, a white-hot snap, a red
+//!   bloom thrown forward, droplets of plasma and sparks flung after it, a flash of red light.
 //! - **A Plasmeric Mortar** (a lobbed Plasmeric shot, `Weapon::trajectory` Ballistic):
 //!   it leaves the bore with a heavy red bloom and a few globs of plasma thrown up out
 //!   of the mouth after it; it flies as the bolt's fat teardrop on its high arc
@@ -18,7 +19,10 @@ use super::{Glow, BURST, GLOB, GLOW, HOT, MOTE, RED, WHITE};
 
 impl Renderer {
     /// Plasmeric bolts leaving the mouth at `at` down `dir`: `rounds` of them
-    /// `round_gap` seconds apart, each a small red bloom.
+    /// `round_gap` seconds apart. Each is spat out hard: a white-hot snap at the mouth,
+    /// a red bloom thrown forward off it, a few droplets of plasma flung out after the
+    /// bolt and sparks, the ground and hull lit red for an instant. All of it gone in a
+    /// fifth of a second, so a moving gun leaves nothing hanging behind it.
     pub(super) fn bolt_fired(
         &mut self,
         at: Vec3,
@@ -28,36 +32,73 @@ impl Renderer {
         round_gap: f32,
         time: f32,
     ) {
+        let side = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
+        let up = side.cross(dir);
         for k in 0..rounds {
             let when = time + k as f32 * round_gap;
-            let mouth = at + dir * 0.4;
-            let s = 1.6 * flash;
-            self.push_lit(
-                BURST,
-                mouth,
-                Vec3::ZERO,
-                when,
-                0.11,
-                (s * 0.4, s),
-                RED * 3.5,
-                0.0,
-            );
+            let mouth = at + dir * 0.3;
+            let s = 1.8 * flash;
+            // The snap: the field letting go, white-hot and gone in a blink.
             self.push_lit(
                 GLOW,
                 mouth,
                 Vec3::ZERO,
                 when,
-                0.08,
-                (s * 0.5, s * 0.7),
-                HOT * 2.0,
+                0.06,
+                (s * 0.3, s * 0.55),
+                HOT * 3.2,
                 0.0,
             );
+            // The bloom thrown forward off the mouth with the bolt.
+            self.push_lit(
+                BURST,
+                mouth + dir * s * 0.45,
+                dir * s * 6.0,
+                when,
+                0.13,
+                (s * 0.35, s * 1.25),
+                RED * 3.0,
+                0.0,
+            );
+            // Droplets of plasma flung out down the line of fire after it.
+            for _ in 0..3 {
+                let spread = side * self.scatter.signed() + up * self.scatter.signed();
+                let out = (dir + spread * 0.3).normalize_or(dir);
+                let blob = s * (0.07 + 0.05 * self.scatter.unit());
+                let speed = s * (12.0 + 10.0 * self.scatter.unit());
+                self.push_lit(
+                    GLOB,
+                    mouth,
+                    out * speed,
+                    when,
+                    0.16,
+                    (blob, blob * 0.4),
+                    RED.lerp(HOT, 0.35) * 4.0,
+                    0.0,
+                );
+            }
+            for _ in 0..3 {
+                let spread = side * self.scatter.signed() + up * self.scatter.signed();
+                let out = (dir + spread * 0.6).normalize_or(dir);
+                let dot = 0.12 + 0.08 * self.scatter.unit();
+                let speed = s * (10.0 + 12.0 * self.scatter.unit());
+                self.push_lit(
+                    MOTE,
+                    mouth,
+                    out * speed,
+                    when,
+                    0.2,
+                    (dot, dot * 0.4),
+                    HOT * 4.0,
+                    0.0,
+                );
+            }
             self.plasma_fx.guns.light(Glow {
                 pos: mouth,
-                color: RED * 60.0 * flash,
-                range: 12.0,
+                color: RED.lerp(HOT, 0.2) * 95.0 * flash,
+                range: 16.0 * flash.max(0.6),
                 start: when,
-                life: 0.1,
+                life: 0.12,
                 pulse: 0.0,
             });
         }

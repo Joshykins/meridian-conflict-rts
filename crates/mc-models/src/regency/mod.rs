@@ -77,7 +77,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_scout", 3.8, 4.0, scout::scout),
     // The tech 1 raider: a twin repeater on a four-legged walker (`raider`).
     ModelDef::new("regency_raider", 2.6, 4.0, raider::raider),
-    // The tech 1 tank: a light pinch cannon on a hull on gravity lift (`hover_tank`).
+    // The tech 1 tank: a Plasmeric Repeater on a hull on gravity lift (`hover_tank`).
     ModelDef::new("regency_hover_tank", 4.6, 3.4, hover_tank::hover_tank),
     // The tech 1 mobile anti-air: a flak organ on a six-legged walker (`mobile_aa`).
     ModelDef::new("regency_mobile_aa", 4.0, 4.5, mobile_aa::mobile_aa),

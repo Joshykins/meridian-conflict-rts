@@ -419,7 +419,7 @@
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Plasmeric),
             flash: 1.0, impact: 1.0, tracer: 1.2,
-            sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+            sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
         )],
         mesh: "regency_barb", icon: Defense,
     ),

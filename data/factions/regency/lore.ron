@@ -65,7 +65,7 @@
     "regency_t1_tank": (
         lore: "A plated tank that rides a gravity lift instead of tracks, so a river or a strait is no obstacle to it.",
         weapons: {
-            "Light Pinched-plasmeric Cannon": "Plasma drawn in and squeezed by gravity in front of the bore, then let out as one short jet that bursts on what it hits.",
+            "Plasmeric Repeater": "A steady stream of fat red bolts of gravity-bound plasma that splash and sear what they hit.",
         },
     ),
     "regency_t1_mobile_aa": (

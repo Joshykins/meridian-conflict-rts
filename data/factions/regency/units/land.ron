@@ -59,13 +59,11 @@
         sounds: (death: "blast_small", moving: "regency_skitter"),
     ),
     // The tank: a plated hull on gravity lift, no legs, so it crosses water as it crosses
-    // land. Its light Pinched-plasmeric Cannon is the Halberd's gun made small: it gathers
-    // its plasma in front of the bore for 0.6 s and pinches it out as one short jet
-    // (`rounds` over `round_span`, drawn; the sim flies the one shot), all its weight on the
-    // one hull. The tank rung of the suite is the pinched grade (docs/STYLE.md), so a
-    // plasmeric gun would read as a raider's. Bent from the Warden the Regency way: a fifth
-    // more damage a second at an eighth less reach; a little less armour and a little more
-    // cost for the lift that takes it over water. Model: `regency_hover_tank`
+    // land. Its turret carries a Plasmeric Repeater, the Picket's gun on a hull: a steady
+    // stream of fat red bolts, each spat with a hard bloom and splashing where it lands
+    // (renderer/regency_guns_fx). Bent from the Warden the Regency way: a quarter more
+    // damage a second at an eighth less reach; a little less armour and a little more cost
+    // for the lift that takes it over water. Model: `regency_hover_tank`
     // (`models::regency::hover_tank`), at this size.
     (
         key: "regency_t1_tank",
@@ -79,18 +77,15 @@
         vision: 320,
         motion: (layer: Hover, size: 0, speed: 32, accel: 28, turn: 115),
         weapons: [(
-            name: "Light Pinched-plasmeric Cannon",
-            // 58 a shot every 2.4 s: 24 a second, to the Warden's 20.
-            damage: 58, splash: 1, range: 265, reload: 2.4, rounds: 4, round_span: 0.15,
-            speed: 750, trajectory: Direct,
-            turret_turn: 130, muzzle: (4.9, 0, 2.5), pivot: (0.9, 0, 2.5),
+            name: "Plasmeric Repeater",
+            // 10 a bolt, two and a half a second: 25 a second, to the Warden's 20.
+            damage: 10, splash: 1, range: 265, reload: 0.4, speed: 480, trajectory: Direct,
+            turret_turn: 130, muzzle: (4.6, 0, 2.5), pivot: (0.9, 0, 2.5),
+            spread: 1.0,
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
-            plasma_grade: Some(Pinched),
-            flash: 0.8, impact: 1.3, tracer: 1.0,
-            sounds: (
-                fire: "regency_pinch_light_fire", charge: "regency_pinch_light_charge", charge_time: 0.6,
-                impact: "regency_pinch_light_hit", ground: "regency_pinch_light_hit",
-            ),
+            plasma_grade: Some(Plasmeric),
+            flash: 1.0, impact: 1.0, tracer: 1.3,
+            sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
         )],
         mesh: "regency_hover_tank", icon: Tank,
         lights: [(kind: Point, at: (0, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 60, range: 12, night_only: false)],

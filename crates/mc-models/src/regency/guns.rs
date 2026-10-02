@@ -3,9 +3,6 @@
 //!
 //! - [`repeater`]: a Plasmeric Repeater pod, chunky and hunched to shed heat, a wide red
 //!   emitter mouth rather than a rifle's bore (the Picket's gun, small).
-//! - [`pinch_cannon`]: a light Pinched-plasmeric Cannon: a short bore and two projector
-//!   prongs reaching past its mouth either side of where the charge is gathered (the
-//!   Halberd's fork, small). Its muzzle is the middle of the charge.
 //! - [`flak_organ`]: a Plasmeric Flak Cannon, short flak tubes side by side in one clamped
 //!   block (the Canopy's organ, small).
 
@@ -14,7 +11,7 @@ use glam::Vec3;
 use crate::builder::MeshBuilder;
 use crate::material::*;
 
-use super::commander::form::{blade, ring, sleeve, KEEL, OCT};
+use super::commander::form::{blade, ring, sleeve, OCT};
 use super::kit::{dark_plate, metal, seam, v3};
 use super::machine::{hoop_on, red_slot};
 
@@ -70,69 +67,6 @@ pub(super) fn repeater(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) 
                 r * 0.08,
             );
         }
-    }
-}
-
-/// A light Pinched-plasmeric Cannon from `breech` forward along +x to `charge` (level),
-/// `r` its housing's half width: a keeled plated housing, a seam-dark collar, a short
-/// bronze bore whose mouth stands well back of the charge, and two plated prongs out of
-/// the housing's flanks running forward either side of the charge, a red emitter on each
-/// tip turned in to it. The prongs stand `hold` either side of the charge.
-pub(super) fn pinch_cannon(b: &mut MeshBuilder, breech: Vec3, charge: Vec3, r: f32, hold: f32) {
-    let len = charge.x - breech.x;
-    let at = |t: f32| breech.lerp(charge, t);
-    let mouth = 0.74;
-    dark_plate(b);
-    sleeve(
-        b,
-        &[
-            ring(at(0.0), Vec3::Z, r * 0.75, r * 0.7),
-            ring(at(0.1), Vec3::Z, r, r * 0.95),
-            ring(at(0.42), Vec3::Z, r * 0.95, r * 0.9),
-            ring(at(0.52), Vec3::Z, r * 0.6, r * 0.6),
-        ],
-        &KEEL,
-    );
-    let sides = b.sides(10);
-    seam(b);
-    b.cylinder_between(at(0.5), at(0.56), r * 0.52, r * 0.52, sides);
-    metal(b);
-    b.cylinder_between(at(0.56), at(mouth), r * 0.36, r * 0.32, sides);
-    // The bore's mouth: a red lip.
-    b.paint(GLOW_LASER);
-    b.cylinder_between(at(mouth), at(mouth + 0.02), r * 0.36, r * 0.36, sides);
-    if b.fine() {
-        red_slot(
-            b,
-            at(0.25) + Vec3::Z * (r * 0.95),
-            Vec3::Z,
-            Vec3::X,
-            len * 0.18,
-            r * 0.07,
-        );
-    }
-    for side in [1.0f32, -1.0] {
-        let y = Vec3::Y * side;
-        let root = at(0.3) + y * (r * 0.85);
-        let knee = at(0.6) + y * hold;
-        let tip = charge + Vec3::X * 0.25 + y * hold;
-        dark_plate(b);
-        sleeve(
-            b,
-            &[
-                ring(root, Vec3::Z, r * 0.22, r * 0.4),
-                ring(knee, Vec3::Z, r * 0.2, r * 0.34),
-                ring(tip - Vec3::X * (r * 0.3), Vec3::Z, r * 0.17, r * 0.26),
-                ring(tip, Vec3::Z, r * 0.08, r * 0.14),
-            ],
-            &KEEL,
-        );
-        // The emitter on the tip, turned in to the charge.
-        let e = charge + y * (hold - r * 0.12);
-        metal(b);
-        b.cylinder_between(e + y * (r * 0.14), e, r * 0.16, r * 0.14, b.sides(6));
-        b.paint(GLOW_LASER);
-        b.cylinder_between(e, e - y * (r * 0.05), r * 0.12, r * 0.09, b.sides(6));
     }
 }
 

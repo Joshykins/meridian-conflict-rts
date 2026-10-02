@@ -40,59 +40,97 @@ impl Renderer {
         true
     }
 
-    /// A Plasmeric bolt splashing: a small ragged bloom, a few sparkles, a seared spot.
+    /// A Plasmeric bolt splashing: it dumps its heat in one go. A white-hot flash, a
+    /// ragged red bloom over it, a knot of plasma left clinging and frying where it hit,
+    /// droplets of it spattered out (up off the ground, every way off a hull) and sparks
+    /// thrown, the ground seared to a glowing spot. Hard-edged and short, no mist: a stream
+    /// of them lands.
     fn bolt_splash(&mut self, at: Vec3, impact: f32, ground: bool, start: f32) {
-        let s = 2.6 * impact;
-        self.push_lit(
-            BURST,
-            at,
-            Vec3::ZERO,
-            start,
-            0.32,
-            (s * 0.3, s),
-            RED * 2.6,
-            0.0,
-        );
+        let s = 2.8 * impact;
         self.push_lit(
             GLOW,
             at,
             Vec3::ZERO,
             start,
-            0.1,
-            (s * 0.4, s * 0.6),
-            HOT * 2.5,
+            0.07,
+            (s * 0.4, s * 0.7),
+            HOT * 3.4,
             0.0,
         );
-        for _ in 0..4 {
+        self.push_lit(
+            BURST,
+            at,
+            Vec3::ZERO,
+            start,
+            0.3,
+            (s * 0.35, s * 1.15),
+            RED * 3.4,
+            0.0,
+        );
+        // What clings: a small hot knot that fries a while after the bloom is gone.
+        self.push_lit(
+            BURST,
+            at,
+            Vec3::ZERO,
+            start + 0.04,
+            0.55,
+            (s * 0.15, s * 0.42),
+            RED.lerp(HOT, 0.45) * 2.6,
+            0.0,
+        );
+        for _ in 0..6 {
+            let rise = if ground {
+                0.45 + self.scatter.unit()
+            } else {
+                self.scatter.signed()
+            };
+            let out =
+                Vec3::new(self.scatter.signed(), self.scatter.signed(), rise).normalize_or(Vec3::Z);
+            let blob = s * (0.05 + 0.04 * self.scatter.unit());
+            let speed = s * (2.5 + 3.5 * self.scatter.unit());
+            let life = 0.4 + 0.25 * self.scatter.unit();
+            self.push_lit(
+                GLOB,
+                at,
+                out * speed,
+                start,
+                life,
+                (blob, blob * 0.35),
+                RED.lerp(HOT, 0.3) * 4.0,
+                0.0,
+            );
+        }
+        for _ in 0..6 {
             let out = Vec3::new(
                 self.scatter.signed(),
                 self.scatter.signed(),
                 0.3 + self.scatter.unit(),
             )
             .normalize_or(Vec3::Z);
-            let dot = 0.18 + 0.12 * self.scatter.unit();
-            let speed = 8.0 + 10.0 * self.scatter.unit();
+            let dot = 0.15 + 0.12 * self.scatter.unit();
+            let speed = 10.0 + 14.0 * self.scatter.unit();
+            let life = 0.35 + 0.25 * self.scatter.unit();
             self.push_lit(
                 MOTE,
                 at,
                 out * speed,
                 start,
-                0.45,
+                life,
                 (dot, dot * 0.4),
-                RED * 4.0,
+                HOT.lerp(RED, 0.5) * 4.5,
                 0.0,
             );
         }
         if ground {
             self.ground_melt
-                .melt(at.truncate(), 0.7 * impact, start, 2.5);
+                .melt(at.truncate(), 0.9 * impact, start, 3.0);
         }
         self.plasma_fx.guns.light(Glow {
             pos: at + Vec3::Z,
-            color: RED * 60.0 * impact,
-            range: 10.0 * impact,
+            color: RED.lerp(HOT, 0.15) * 110.0 * impact,
+            range: 13.0 * impact,
             start,
-            life: 0.25,
+            life: 0.35,
             pulse: 0.0,
         });
     }

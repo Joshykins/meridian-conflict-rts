@@ -296,46 +296,60 @@
         // the air in until it goes critical and roars. Every sizzle is noise (`Foam`,
         // `Roll`), and no tone above the low mids ever falls: that is the pew.
         //
-        // The Picket's Plasmeric Repeater: one bolt a play, 5.5 a second from one turret
-        // and several turrets at once, so it is short and finished. A rough low-mid
-        // "thoom" as the bolt is spat, a little wet throat noise, and a hot fizz riding
-        // off with it.
-        "regency_picket_bolt": (
-            length: 0.32, peak: 0.42, room: 0.1,
+        // The Plasmeric Repeater (the Picket's, the Sledge's, the navy's): one bolt a
+        // play, up to five a second from one gun and several guns at once, so it is
+        // finished inside half a second. Three stages, none of them a tone that falls
+        // above the low mids: the containment snapping open (a hard bright snap and a
+        // crackle of discharge), the bolt spat out (a heavy push of air and a deep growl
+        // with a kick under it, all body), and the hot plasma riding off with it (a fizz
+        // and a throat of air that settle into a short rolling report).
+        "regency_repeater": (
+            length: 0.5, peak: 0.46, room: 0.12,
             layers: [
-                // The spit: a soft-edged push of air, all body, almost no crack.
-                Burst(low: 140, high: 1100, attack: 0.0012, decay: 0.022, gain: 5),
-                // The thoom: a growl that starts rough and settles low within 60 ms.
-                Fm(from: 215, to: 112, glide: 0.05, ratio: 0.5, index: 2.2, fade: 0.03, attack: 0.002, decay: 0.05, gain: 0.85),
-                Tone(from: 120, to: 70, glide: 0.04, attack: 0.002, decay: 0.045, gain: 0.35),
-                Drive(1.45),
-                // The plasma's throat: a wide noise band settling, wet rather than whistling.
-                Sweep(at: 0.004, from: 900, to: 420, glide: 0.06, q: 1.1, attack: 0.004, decay: 0.045, gain: 0.6),
-                // A wet gurgle in the throat as the bolt leaves.
-                Roll(at: 0.003, from: 1100, to: 350, glide: 0.08, attack: 0.004, decay: 0.05, gain: 0.45, swell: 28, depth: 0.7),
+                // The snap of the field letting go: bright, a few milliseconds.
+                Burst(low: 700, high: 4800, attack: 0.0003, decay: 0.004, gain: 4, seed: 41),
+                // The spit: a soft-edged push of air.
+                Burst(low: 120, high: 1300, attack: 0.001, decay: 0.03, gain: 5.5, seed: 42),
+                // The kick under it, and the growl settling low within 80 ms.
+                Tone(from: 115, to: 52, glide: 0.06, attack: 0.001, decay: 0.08, gain: 0.75),
+                Fm(from: 250, to: 118, glide: 0.07, ratio: 0.5, index: 2.4, fade: 0.05, attack: 0.002, decay: 0.09, gain: 0.95),
+                Drive(1.6),
+                // The discharge crackling as the bolt tears out of the mouth.
+                Roll(at: 0.002, from: 3600, to: 1500, glide: 0.1, attack: 0.002, decay: 0.05, gain: 0.55, swell: 95, depth: 1.0, seed: 43),
+                // The plasma's throat: a wide band of air dropping as the bolt leaves.
+                Sweep(at: 0.004, from: 1500, to: 480, glide: 0.12, q: 1.2, attack: 0.005, decay: 0.08, gain: 0.75, seed: 44),
                 // The fizz riding off with the bolt.
-                Foam(at: 0.006, from: 2300, to: 1500, glide: 0.12, q: 1.0, attack: 0.006, decay: 0.07, gain: 2.4, swell: 40, depth: 0.6),
+                Foam(at: 0.01, from: 2600, to: 1700, glide: 0.2, q: 1.0, attack: 0.008, decay: 0.11, gain: 2.3, swell: 45, depth: 0.8, seed: 45),
+                // A short rolling report behind it.
+                Roll(at: 0.02, from: 520, to: 160, glide: 0.3, attack: 0.02, decay: 0.12, gain: 0.4, swell: 8, depth: 0.5, seed: 46),
             ],
         ),
-        // A Picket bolt splashing: a soft wet pop, a small low slap, and the plasma
-        // sizzling off whatever it hit. Short: a stream of them lands.
-        "regency_picket_hit": (
-            length: 0.5, peak: 0.4, room: 0.15,
+        // A repeater bolt splashing: a wet hard splat and a low thud as it dumps its heat
+        // into what it hit, then the plasma frying on it, crackling and searing, under a
+        // short low rumble of air. A stream of them lands, so it is gone inside 0.7 s.
+        "regency_repeater_hit": (
+            length: 0.7, peak: 0.44, room: 0.16,
             layers: [
-                Burst(low: 220, high: 1600, attack: 0.0005, decay: 0.007, gain: 5),
-                Burst(low: 80, high: 700, attack: 0.001, decay: 0.026, gain: 6),
-                Fm(from: 175, to: 88, glide: 0.06, ratio: 0.5, index: 2.0, fade: 0.04, attack: 0.002, decay: 0.06, gain: 0.6),
-                Drive(1.4),
-                // The plasma spattering and frying.
-                Foam(at: 0.004, from: 2200, to: 1200, glide: 0.3, q: 0.9, attack: 0.004, decay: 0.1, gain: 1.4, swell: 36, depth: 0.9),
-                Hiss(at: 0.01, freq: 1000, q: 0.8, attack: 0.01, decay: 0.08, gain: 0.2),
+                Burst(low: 250, high: 2600, attack: 0.0004, decay: 0.006, gain: 5, seed: 51),
+                Burst(low: 70, high: 650, attack: 0.001, decay: 0.035, gain: 6.5, seed: 52),
+                Tone(from: 96, to: 48, glide: 0.07, attack: 0.001, decay: 0.1, gain: 0.65),
+                Fm(from: 185, to: 84, glide: 0.07, ratio: 0.5, index: 2.2, fade: 0.05, attack: 0.002, decay: 0.08, gain: 0.7),
+                Drive(1.5),
+                // The plasma spattering and frying on what it hit.
+                Foam(at: 0.004, from: 2600, to: 1400, glide: 0.4, q: 0.9, attack: 0.005, decay: 0.17, gain: 1.7, swell: 50, depth: 0.9, seed: 53),
+                // Its crackle, quick and fierce.
+                Roll(at: 0.01, from: 4200, to: 2000, glide: 0.3, attack: 0.003, decay: 0.1, gain: 0.45, swell: 100, depth: 1.0, seed: 54),
+                // Searing.
+                Hiss(at: 0.03, freq: 1800, q: 0.7, attack: 0.03, decay: 0.16, gain: 0.25, seed: 55),
+                // A short low rumble of the air it heated.
+                Roll(at: 0.01, from: 420, to: 120, glide: 0.4, attack: 0.02, decay: 0.15, gain: 0.45, swell: 6, depth: 0.5, seed: 56),
             ],
         ),
 
-        // The raider's Twin Plasmeric Repeater: the Picket's bolt from a smaller gun,
+        // The raider's Twin Plasmeric Repeater: the repeater's bolt from a smaller gun,
         // a little tighter and lighter, four a second from each raider.
-        "regency_repeater_light": (like: "regency_picket_bolt", size: 0.82, peak: 0.32),
-        "regency_repeater_light_hit": (like: "regency_picket_hit", size: 0.82, peak: 0.3),
+        "regency_repeater_light": (like: "regency_repeater", size: 0.82, peak: 0.34),
+        "regency_repeater_light_hit": (like: "regency_repeater_hit", size: 0.82, peak: 0.32),
 
         // The Halberd's Pinched-plasmeric Cannon, heard 1.0 s before its salvo: plasma
         // drawn in and squeezed into a ball by gravity. A field closing with a clunk, a
@@ -599,27 +613,6 @@
                 Roll(at: 0.01, from: 700, to: 150, glide: 0.5, attack: 0.015, decay: 0.2, gain: 0.25, swell: 7, depth: 0.5),
             ],
         ),
-
-        // The Sledge's light Pinched-plasmeric Cannon: the Halberd's charge, jet and burst
-        // from a smaller gun. Its charge is the Halberd's squeeze retimed to the gun's 0.6 s
-        // and pitched a little higher, with room after the pinch to die away (a `like` at
-        // that size would end still sounding).
-        "regency_pinch_light_charge": (
-            length: 0.8, peak: 0.34, room: 0.2,
-            layers: [
-                Burst(low: 100, high: 700, attack: 0.0008, decay: 0.012, gain: 3),
-                Tone(from: 88, to: 62, glide: 0.04, attack: 0.002, decay: 0.06, gain: 0.4),
-                Fm(at: 0.01, from: 64, to: 78, glide: 0.52, ratio: 0.5, index: 2.2, fade: 3.0, attack: 0.51, decay: 0.03, gain: 0.5),
-                Fm(at: 0.07, from: 185, to: 210, glide: 0.47, ratio: 0.5, index: 1.4, fade: 3.0, attack: 0.45, decay: 0.03, gain: 0.6),
-                Drive(1.4),
-                Sweep(at: 0.03, from: 2600, to: 700, glide: 0.5, q: 1.1, attack: 0.48, decay: 0.03, gain: 0.7, seed: 11),
-                Roll(at: 0.08, from: 360, to: 560, glide: 0.44, attack: 0.44, decay: 0.03, gain: 0.8, swell: 9, depth: 0.85, seed: 12),
-                Foam(at: 0.17, from: 1800, to: 2400, glide: 0.38, q: 1.0, attack: 0.36, decay: 0.03, gain: 1.0, swell: 34, depth: 0.9, seed: 13),
-                Burst(at: 0.525, low: 170, high: 1100, attack: 0.02, decay: 0.01, gain: 3, seed: 14),
-            ],
-        ),
-        "regency_pinch_light_fire": (like: "regency_halberd_fire", size: 0.72, peak: 0.4),
-        "regency_pinch_light_hit": (like: "regency_halberd_hit", size: 0.72, peak: 0.4),
 
         // The Brazier's Plasmeric Flak Cannon: the Canopy's launch and burst from a
         // smaller organ.

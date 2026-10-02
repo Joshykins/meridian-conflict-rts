@@ -37,7 +37,7 @@
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Plasmeric),
             flash: 0.8, impact: 0.9, tracer: 1.0,
-            sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+            sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
         )],
         mesh: "regency_attack_boat", icon: Ship,
         sounds: (death: "blast_small", moving: "boat_engine"),
@@ -91,7 +91,7 @@
                 targets: ["Land", "Naval"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.2, impact: 1.4, tracer: 1.4,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             // Aft: plasmeric flak in a house of its own, reaching further than the repeater.
             (
@@ -237,7 +237,7 @@
                 targets: ["Land", "Naval"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.0, impact: 1.0, tracer: 1.2,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
         ],
         mesh: "regency_cruiser", icon: Ship,
@@ -324,7 +324,7 @@
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.2, impact: 1.4, tracer: 1.4,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             (
                 name: "Port Aft Secondary",
@@ -335,7 +335,7 @@
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.2, impact: 1.4, tracer: 1.4,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             (
                 name: "Starboard Fore Secondary",
@@ -346,7 +346,7 @@
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.2, impact: 1.4, tracer: 1.4,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             (
                 name: "Starboard Aft Secondary",
@@ -357,7 +357,7 @@
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 1.2, impact: 1.4, tracer: 1.4,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             // Four bow tubes: gravitic torpedoes, dived or up.
             (
@@ -479,7 +479,7 @@
                 targets: ["Land", "Naval"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 0.9, impact: 1.0, tracer: 1.0,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             (
                 name: "Aft Twin Plasmeric Repeater",
@@ -489,7 +489,7 @@
                 targets: ["Land", "Naval"], color: Orange, red: 1.0,
                 plasma_grade: Some(Plasmeric),
                 flash: 0.9, impact: 1.0, tracer: 1.0,
-                sounds: (fire: "regency_picket_bolt", impact: "regency_picket_hit", ground: "regency_picket_hit"),
+                sounds: (fire: "regency_repeater", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
             ),
             (
                 name: "Plasmeric Flak Cannon",

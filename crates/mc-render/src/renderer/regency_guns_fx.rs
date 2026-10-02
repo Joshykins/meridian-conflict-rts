@@ -3,9 +3,13 @@
 //! no dust or clods, no powder smoke). Picked by the weapon's data (`Weapon::plasma_grade`,
 //! and a proximity fuse for flak), never by a unit:
 //!
-//! - **Plasmeric bolt** (the Picket's repeater): no charge. A small red bloom at the mouth
-//!   for each bolt; in flight a fat glowing teardrop (sprites.wgsl, `plasma_look` 4); where
-//!   it lands a small ragged splash of plasma, a few sparkles and a seared spot.
+//! - **Plasmeric bolt** (the Plasmeric Repeater: the Picket's, the Sledge's, the navy's):
+//!   no charge. Each bolt is spat out hard (`plasmeric`): a white-hot snap at the mouth, a
+//!   red bloom thrown forward, droplets and sparks flung after it. In flight a fat bolt of
+//!   red plasma round a white-hot heart, its skin boiling and licking back off it
+//!   (sprites.wgsl, `plasma_look` 4), lighting what it passes; no trail.
+//!   Where it lands it dumps its heat at once: a white flash in a ragged red bloom, a knot
+//!   of plasma left frying, droplets spattered out, sparks, a seared glowing spot.
 //! - **Plasmeric flak** (the Canopy's, a proximity-fused bolt): the same bolt; it bursts as
 //!   a wide red bloom that throws sparkles and streaks of plasma out through the air.
 //! - **Pinched-plasmeric** (the Halberd's): over its charge (`SimEvent::WeaponCharging`) a
@@ -83,7 +87,7 @@ const STEP: f32 = 0.05;
 /// Seconds a knot of fusion burns over its pool after a Pinch-fusion strike.
 const KNOT: f32 = 4.0;
 /// Timed lights held at most. A deliberate cosmetic cap: the oldest goes first.
-const MAX_GLOWS: usize = 96;
+const MAX_GLOWS: usize = 256;
 /// Guns charging at once that are drawn. A deliberate cosmetic cap: a charge past it is
 /// not drawn (its shot still is), so a wall of guns charging costs no more than this.
 const MAX_CHARGES: usize = 48;
@@ -96,6 +100,8 @@ const MAX_TRAILS: usize = 2400;
 /// a Pinch-fusion round's.
 const BOLT_TRAIL: (f32, f32) = (12.0, 0.7);
 const FUSION_TRAIL: (f32, f32) = (10.0, 1.8);
+/// Metres between the lights a Plasmeric bolt throws down its flight.
+const PLASMERIC_LIGHT_STEP: f32 = 8.0;
 
 /// What a direct-fire Regency plasma gun is drawn as.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -365,13 +371,17 @@ impl Renderer {
     /// cooling and breaking up as it hangs (sprites.wgsl `FADE_BEAM_PLASMA_TRAIL`). A
     /// fusion round's is white-hot, takes the prism and cools through pink and red,
     /// shedding sparks; a bolt's is a thin red one. No puffs: a wake of them reads as mist.
+    /// A Plasmeric bolt leaves no trail (at its speed even a short-lived one is a beam):
+    /// it lights the ground and hulls red down its flight as it passes.
     pub(super) fn regency_trails(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         let tick = self.tick_seconds.max(0.02);
         let mut sparks = 0;
         for p in projectiles {
-            let fusion = match drawn_look(p) {
-                1 => false,
-                2 => true,
+            let look = drawn_look(p);
+            let (fusion, plasmeric) = match look {
+                1 => (false, false),
+                2 => (true, false),
+                4 => (false, true),
                 _ => continue,
             };
             // A round of a jet that leaves the muzzle part of the way through the tick
@@ -382,6 +392,23 @@ impl Renderer {
             let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
             let to = Vec3::from(p.pos);
             let from = Vec3::from(p.prev_pos).lerp(to, (starts / span).min(1.0));
+            if plasmeric {
+                // A deliberate cosmetic cap on one bolt's lights a tick: a tick's flight
+                // is far under this many.
+                let n = ((from.distance(to) / PLASMERIC_LIGHT_STEP).ceil() as usize).clamp(1, 16);
+                for k in 1..=n {
+                    let f = k as f32 / n as f32;
+                    self.plasma_fx.guns.light(Glow {
+                        pos: from.lerp(to, f),
+                        color: RED * 45.0 * p.size,
+                        range: 9.0,
+                        start: time + tick * (starts + (span - starts).max(0.0) * f),
+                        life: tick * 0.4,
+                        pulse: 0.0,
+                    });
+                }
+                continue;
+            }
             let (step, life) = if fusion { FUSION_TRAIL } else { BOLT_TRAIL };
             // A deliberate cosmetic cap on one shot's stretch: a tick's flight is far
             // under this many pieces.

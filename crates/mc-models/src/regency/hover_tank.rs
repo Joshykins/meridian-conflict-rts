@@ -2,15 +2,15 @@
 //! gravity lift, no legs, crossing water as it crosses land. It is low and wide, a swept
 //! sponson either side laid in a course of plates like the Artificer's, four lift bells
 //! under them, a glacis on its nose with red optics under its brow, and a low wedge turret
-//! carrying a light Pinched-plasmeric Cannon (the Halberd's fork, small: a short bore and
-//! two prongs either side of where the charge is gathered).
+//! carrying a Plasmeric Repeater pod (the Picket's gun on a hull: louvred housing, bronze
+//! nozzle, a flared emitter shroud with a red lens in its mouth).
 //!
 //! Finish (docs/STYLE.md "The Regency look"): dark plate over dark bronze, red optics, red
-//! in the bells' mouths and on the prongs' emitters. No violet: it does not build.
+//! in the bells' mouths and in the repeater's lens. No violet: it does not build.
 //!
 //! Rig: a hovercraft (`set_hover`), every bell's mouth marked for its plasma (`add_lift`).
 //! The turret turns about the unit's middle at `TURRET`; the cannon pitches about `PIVOT`
-//! (`rig::ARM_GUN`) and gathers its charge at `CHARGE`, the unit file's `muzzle`
+//! (`rig::ARM_GUN`) and its mouth is at `MUZZLE`, the unit file's `muzzle`
 //! (`regency_t1_tank` in `data/factions/regency/units/land.ron`).
 
 use glam::{Vec2, Vec3};
@@ -21,18 +21,16 @@ use crate::{part, rig};
 
 use super::chassis::{coarse_lift, hull, lift_bell, Hull};
 use super::commander::form::blade;
-use super::guns::pinch_cannon;
+use super::guns::repeater;
 use super::kit::{dark_plate, metal, v3};
 use super::machine::{armour, red_slot, Course, Frame};
 
-/// Where the turret turns, the cannon's trunnion and the middle of its charge (the unit
-/// file's `pivot` and `muzzle`).
+/// Where the turret turns, the gun's trunnion and its mouth (the unit file's `pivot` and
+/// `muzzle`).
 pub(super) const TURRET: Vec3 = Vec3::new(0.0, 0.0, 1.9);
 pub(super) const PIVOT: Vec3 = Vec3::new(0.9, 0.0, 2.5);
-pub(super) const CHARGE: Vec3 = Vec3::new(4.9, 0.0, 2.5);
-/// How far either side of the charge the prongs stand.
-pub(super) const HOLD: f32 = 0.75;
-/// The cannon's breech and its housing's half width.
+pub(super) const MUZZLE: Vec3 = Vec3::new(4.6, 0.0, 2.5);
+/// The gun's breech and its housing's half width.
 const BREECH: f32 = 0.4;
 const GUN_R: f32 = 0.42;
 
@@ -229,8 +227,8 @@ fn turret(b: &mut MeshBuilder, half: &[[f32; 2]], z: (f32, f32), top: f32) {
     });
 }
 
-/// The cannon on its trunnion, pitching (`rig::ARM_GUN`): a bronze trunnion across the
-/// turret's front and the light Pinched-plasmeric Cannon out to its charge.
+/// The gun on its trunnion, pitching (`rig::ARM_GUN`): a bronze trunnion across the
+/// turret's front and the Plasmeric Repeater pod out to its mouth.
 fn gun(b: &mut MeshBuilder) {
     b.with_limb(rig::ARM_GUN, |b| {
         metal(b);
@@ -241,13 +239,12 @@ fn gun(b: &mut MeshBuilder) {
             0.3,
             b.sides(10),
         );
-        pinch_cannon(b, v3(BREECH, 0.0, PIVOT.z), CHARGE, GUN_R, HOLD);
+        repeater(b, v3(BREECH, 0.0, PIVOT.z), MUZZLE, GUN_R);
     });
 }
 
 /// Far off: a six-sided slab with the lift under it, a wedge of a turret with
-/// the owner's colour on it, the bore as a bar and the two prongs as thin bars either
-/// side of the charge, still pitching.
+/// the owner's colour on it, and the repeater as a tapered bar, still pitching.
 fn coarse(b: &mut MeshBuilder) {
     dark_plate(b);
     b.loft_z(
@@ -284,23 +281,13 @@ fn coarse(b: &mut MeshBuilder) {
         ]);
         b.with_limb(rig::ARM_GUN, |b| {
             dark_plate(b);
-            let mouth = BREECH + (CHARGE.x - BREECH) * 0.74;
             b.cylinder_between(
-                v3(1.0, 0.0, CHARGE.z),
-                v3(mouth, 0.0, CHARGE.z),
-                0.4,
-                0.25,
+                v3(1.0, 0.0, MUZZLE.z),
+                v3(MUZZLE.x, 0.0, MUZZLE.z),
+                0.42,
+                0.3,
                 3,
             );
-            for y in [-HOLD, HOLD] {
-                b.cylinder_between(
-                    v3(2.4, y, CHARGE.z),
-                    v3(CHARGE.x + 0.25, y, CHARGE.z),
-                    0.2,
-                    0.12,
-                    3,
-                );
-            }
         });
     });
 }
@@ -315,7 +302,7 @@ mod tests {
     #[test]
     fn fits_the_librarys_checks() {
         for key in KEYS {
-            super::super::check_charge(key, 4.6, 3.4, None, &[CHARGE.to_array()], HOLD);
+            super::super::check(key, 4.6, 3.4, None, &[MUZZLE.to_array()]);
         }
     }
 
@@ -346,7 +333,7 @@ mod tests {
         assert_eq!(bp.visual.mesh, "regency_hover_tank");
         let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
         let w = &bp.weapons[0];
-        assert!(v(w.muzzle).distance(CHARGE) < 1e-3);
+        assert!(v(w.muzzle).distance(MUZZLE) < 1e-3);
         assert!(v(w.pivot.unwrap()).distance(PIVOT) < 1e-3);
         assert!(bp.turret_at.is_none(), "the turret turns about the middle");
         assert_eq!(bp.motion.map(|m| m.layer), Some(mc_data::MoveLayer::Hover));
