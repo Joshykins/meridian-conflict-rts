@@ -45,6 +45,7 @@ pub(crate) fn serve(
     remote::keep_meshes();
     let mut server = Server {
         base: base.clone(),
+        home: base.map.clone(),
         map,
         data_dir: data_dir.to_owned(),
         pool,
@@ -99,6 +100,8 @@ pub(crate) fn serve(
 /// What the server holds between requests.
 struct Server {
     base: Options,
+    /// The map the server was started on: a request that names none is shot there.
+    home: PathBuf,
     map: Arc<MapFile>,
     data_dir: PathBuf,
     pool: Arc<Pool>,
@@ -160,6 +163,19 @@ impl Server {
             return self
                 .write_calls(&key, Path::new(&calls_file?))
                 .map(|n| said + &format!("{n} mesh calls\n"));
+        }
+        // A request may name its map (`--map`, a sea for ships); one that names none is
+        // shot on the server's own. Changing map rebuilds the renderer.
+        let path = match value("--map") {
+            Some(name) => crate::setup::find_map(Some(&name))?,
+            None => self.home.clone(),
+        };
+        if path != self.base.map {
+            let map = MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            said += &format!("map {:?}\n", map.name());
+            self.map = Arc::new(map);
+            self.base.map = path;
+            self.studio = None;
         }
         let (opts, ticks, spec) = parse(&self.base, args)?;
         if self.blueprints.id_of(&opts.subject).is_none() {
@@ -252,7 +268,7 @@ fn parse(base: &Options, args: &[String]) -> Result<(Options, u32, Spec), String
         let mut value = |name: &str| it.next().cloned().ok_or(format!("{name} needs a value"));
         match arg.as_str() {
             "--reload" | "--shaders" => {}
-            "--models" | "--calls-for" | "--calls" => {
+            "--models" | "--calls-for" | "--calls" | "--map" => {
                 value(arg)?;
             }
             "--unit-shot" => opts.subject = value(arg)?,

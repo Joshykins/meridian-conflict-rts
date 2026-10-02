@@ -122,6 +122,44 @@
         lore: "The floating dock refitted for warships: more machinery on its arms and fabricators enough to pour a destroyer whole in the slip.",
         weapons: {},
     ),
+    "regency_t3_naval_factory": (
+        lore: "The dock at its greatest: a capital ship is poured whole alongside its quay, longer than the yard that makes it.",
+        weapons: {},
+    ),
+    "regency_t3_battleship": (
+        lore: "A battleship that can go under: three houses of pinch-fusion guns that come up out of the sea to fire, and go down again.",
+        weapons: {
+            "Fore Pinch-fusion Cannon": "Twin guns that squeeze their plasma until it fuses and launch it white-hot; it melts what it lands on.",
+            "Second Pinch-fusion Cannon": "The second pair of pinch-fusion guns, raised over the first.",
+            "Aft Pinch-fusion Cannon": "The aft pair, covering the stern.",
+            "Gravitic Torpedo Tubes": "Four bow tubes of heavy gravitic torpedoes, fired dived or up.",
+            "Plasmeric Flak Cannon": "Light flak that works only with the hull up.",
+            "Port Fore Secondary": "A twin heavy repeater on the beam.",
+            "Port Aft Secondary": "A twin heavy repeater on the beam.",
+            "Starboard Fore Secondary": "A twin heavy repeater on the beam.",
+            "Starboard Aft Secondary": "A twin heavy repeater on the beam.",
+        },
+    ),
+    "regency_t3_carrier": (
+        lore: "A carrier that holds the sky over a fleet: heavy seekers rising from its deck reach aircraft far past any gun.",
+        weapons: {
+            "Heavy Gravitic Seeker Battery": "Twelve cells of heavy gravitic seekers, rippled off and spread over the fliers in reach.",
+            "Port Plasmeric Flak Cannon": "Flak for what gets close on the port side.",
+            "Starboard Plasmeric Flak Cannon": "Flak for what gets close on the starboard side.",
+            "Interceptor Tubes": "Short gravitic torpedoes that meet torpedoes coming in.",
+        },
+    ),
+    "regency_t3_submarine": (
+        lore: "The fastest hull under the sea: it hunts with torpedoes, and surfaces bristling with lighter guns to finish what it caught.",
+        weapons: {
+            "Gravitic Torpedo Launcher": "Six tubes of gravitic torpedoes, fired three at a time.",
+            "Interceptor Tubes": "Short gravitic torpedoes that meet torpedoes coming in.",
+            "Fore Twin Plasmeric Repeater": "A twin repeater forward, up only.",
+            "Aft Twin Plasmeric Repeater": "A twin repeater aft, up only.",
+            "Plasmeric Flak Cannon": "Flak that works only with the hull up.",
+            "Gravitic Seeker Pod": "Six gravitic seekers for aircraft, launched with the hull up.",
+        },
+    ),
     "regency_t1_attack_boat": (
         lore: "A blade of a boat that lies just under the surface where no gun can find it, and comes up only to fire.",
         weapons: {

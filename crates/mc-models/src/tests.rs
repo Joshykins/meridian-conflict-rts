@@ -348,6 +348,7 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("regency_hatchery", 46.0, 38.0, 3, 8, &[]),
     structure("regency_tidebrood", 46.0, 20.0, 1, 8, &[]),
     structure("regency_tidebrood", 46.0, 24.0, 2, 8, &[]),
+    structure("regency_tidebrood", 46.0, 32.0, 3, 8, &[]),
     structure("regency_taproot", 12.8, 11.0, 1, 3, &[]),
     structure("regency_taproot", 12.8, 15.0, 2, 3, &[]),
     structure("regency_taproot", 12.8, 19.0, 3, 3, &[]),
@@ -405,6 +406,9 @@ const NAVAL_HULLS: &[&str] = &[
     "regency_frigate",
     "regency_destroyer",
     "regency_cruiser",
+    "regency_battleship",
+    "regency_carrier",
+    "regency_assault_submarine",
 ];
 /// The capital ships: 120 m hulls with the triangle budget of a factory.
 const CAPITAL_SHIPS: &[&str] = &["battleship", "carrier", "rail_trimaran"];

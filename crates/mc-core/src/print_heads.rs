@@ -128,18 +128,20 @@ const REGENCY_AIR: FactoryHeads = FactoryHeads {
     ],
 };
 
-/// The Regency naval factory (`models::regency::tidebrood`): four heads in a row under the
-/// gantry's bridge across the slip; tech 2 adds two aft of it, over the longer hull's
-/// after half.
+/// The Regency naval factory (`models::regency::tidebrood`): a one-sided quay, all its heads
+/// on the quay side (-y), the berth open water. Tech 1 hangs two from arms reaching out
+/// over the berth, tech 2 two more from taller arms at the quay's ends, and tech 3 three
+/// from a high boom over the middle of the berth, above the capital ships.
 const REGENCY_NAVAL: FactoryHeads = FactoryHeads {
     aim: [0.0, 0.0, 2.5],
     heads: &[
-        head(1, 2.0, 11.0, 13.6, 1.5),
-        head(1, 2.0, 4.5, 13.6, 1.5),
-        head(1, 2.0, -4.5, 13.6, 1.5),
-        head(1, 2.0, -11.0, 13.6, 1.5),
-        head(2, -18.0, 8.0, 15.0, 1.4),
-        head(2, -18.0, -8.0, 15.0, 1.4),
+        head(1, -14.0, -9.5, 15.0, 1.5),
+        head(1, 14.0, -9.5, 15.0, 1.5),
+        head(2, -32.0, -9.0, 19.0, 1.45),
+        head(2, 32.0, -9.0, 19.0, 1.45),
+        head(3, -17.0, -3.5, 27.0, 1.4),
+        head(3, 0.0, -3.5, 27.0, 1.4),
+        head(3, 17.0, -3.5, 27.0, 1.4),
     ],
 };
 

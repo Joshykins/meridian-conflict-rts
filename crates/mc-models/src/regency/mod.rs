@@ -113,8 +113,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 3 assault tripod: a keeled head high on three legs (`strider`).
     ModelDef::new("regency_strider", 12.0, 32.0, strider::strider),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
-    // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
-    // the land one's lifted ring and the air one's crown standing taller.
+    // one-sided quay (`tidebrood`). All three upgrade in place to tech 3, the land one's
+    // lifted ring, the air one's crown and the quay's high boom standing taller.
     ModelDef::tiered(
         "regency_brood",
         [(46.0, 22.0), (46.0, 22.0), (46.0, 35.0)],
@@ -127,7 +127,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ),
     ModelDef::tiered(
         "regency_tidebrood",
-        [(46.0, 20.0), (46.0, 24.0), (46.0, 24.0)],
+        [(46.0, 20.0), (46.0, 24.0), (46.0, 32.0)],
         tidebrood::tidebrood,
     ),
     // Economy: the sealed bore (`taproot`), the star core (`heart`), the vault and cells
@@ -183,6 +183,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,
+        // Tech 3: the capital ships, and a big submarine.
+        "regency_battleship" | "regency_carrier" => 14000,
+        "regency_assault_submarine" => 8000,
         // Three tiers, and the next one's pieces waiting on each.
         "regency_cyst" => 6000,
         // Four tiers, and the next one's pieces waiting on each.
@@ -225,6 +228,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
 pub(super) fn reduced_share(key: &str) -> Option<f32> {
     match key.split('~').next().unwrap_or(key) {
         "regency_brood" | "regency_hatchery" => Some(0.57),
+        // The quay's tech 3: plated booms, pylons and crabs that keep their sides reduced.
+        "regency_tidebrood" => Some(0.52),
         "regency_barb" | "regency_pinch_cannon" => Some(0.52),
         // Towers and talons: plates that keep their sides when reduced.
         "regency_heart_2" | "regency_heart_3" => Some(0.5),

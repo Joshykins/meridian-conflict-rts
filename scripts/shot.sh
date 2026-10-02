@@ -28,6 +28,7 @@
 #   scripts/shot.sh run --range --unit aster_commander --scenario work --ticks 120 --follow 5
 #   scripts/shot.sh variants aster_t1_tank base tank_light~slim tank_light~twin
 #   scripts/shot.sh variants aster_t1_tank=base,tank_light~slim aster_t1_scout=base,scout~b
+#   scripts/shot.sh variants aster_t1_frigate=base,frigate~b --map twin_shoals   (ships at sea)
 #
 # Design variants live in the model catalogue as extra keys, `<mesh>~<name>`,
 # built like any model (ModelDef::new("tank_light~slim", ...)). Each is drawn as
@@ -121,7 +122,14 @@ tree_hash() {
                     | grep -v '/gpu_consts\.rs$') ;;
     esac
     list=$(sort -u <<< "$list" | while read -r f; do [[ -f $repo/$f ]] && echo "$f"; done)
-    paste -d' ' <(echo "$list") <(cd "$repo" && git hash-object --stdin-paths <<< "$list") | sha1sum | cut -c1-16
+    {
+        paste -d' ' <(echo "$list") <(cd "$repo" && git hash-object --stdin-paths <<< "$list")
+        # The game only makes meshes for the catalogue keys it was built with: a new
+        # model key (not a `~` design variant of one) needs a build, though model code
+        # does not otherwise count as engine.
+        [[ $1 != engine ]] || find "$repo/crates/mc-models/src" -name '*.rs' -exec \
+            perl -0777 -ne 'print "$1\n" while /ModelDef::(?:new|tiered)\(\s*"([a-z0-9_]+)"/g' {} + | sort -u
+    } | sha1sum | cut -c1-16
 }
 
 # Overlays (Overwolf, Steam, Epic) hook every Vulkan program on this machine as

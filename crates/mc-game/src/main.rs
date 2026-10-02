@@ -152,7 +152,8 @@ straight into a match instead.
   --turn DEG             with --frames: the camera turns this many degrees about the unit
   --shot-server DIR      stay up with a warm renderer and answer --unit-shot requests dropped in
                          DIR as NAME.req files (one argument per line; --reload re-reads data/,
-                         --shaders recompiles the WGSL); writes NAME.done; scripts/shot.sh drives it
+                         --shaders recompiles the WGSL, --map NAME shoots on that map, a sea for
+                         ships; none, its own); writes NAME.done; scripts/shot.sh drives it
   --ui SCREEN            with --screenshot: draw a front-end screen instead of a match:
                          menu | skirmish | survival (the set-up screen in that mode) |
                          multiplayer | history | settings

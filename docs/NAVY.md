@@ -155,9 +155,15 @@ Gravitic`), a plasma charge steered in gravity containment.
 | Falchion | 1 | Frigate | Heavy plasmeric repeater, plasmeric flak, radar. Stays up. |
 | Claymore | 2 | Heavy destroyer | Dives; hull shield; gravitic torpedoes and interceptors dived; pinched-plasmeric cannon and light flak surfaced; radar, sonar. |
 | Pavise | 2 | Cruiser | Gravitic seeker battery (AA, 1,800 m), two counter-seekers (600 m), a light repeater, radar; a heavy gravitic seeker at structures to 2,600 m. |
+| Flamberge | 3 | Battleship | Dives (needs about 30 m of water to go under); three twin Pinch-fusion Cannon houses, four twin heavy repeaters on the beams, light flak, counter-seekers, all surfaced only; bow gravitic torpedoes dived or up. No sonar, no torpedo defence. |
+| Mantlet | 3 | Air-defence carrier | Twelve heavy gravitic seeker cells (2,700 m), flak on both beams, counter-seekers, interceptor tubes, radar 3,800 m. No gun. |
+| Rapier | 3 | Assault submarine | The fastest hull under the sea; six-tube gravitic torpedo launcher and interceptors dived; surfaced, two twin repeaters, flak and a gravitic seeker pod. |
 
-The Slipway builds the tech 1 hulls and is refitted in place to the Slipway II for the
-tech 2 ones. Tech 3 (battleship, carrier, assault submarine) is to come.
+The Slipway builds the tech 1 hulls and is refitted in place to the Slipway II and the
+Slipway III for the tech 2 and tech 3 ones. Like ARC's Wharf it is a one-sided quay: the
+berth is open water, so a capital ship longer than the yard still fits. Every Regency
+hull that dives and carries guns brings them up only on order (the Dirk excepted, which
+lies in ambush).
 
 ## The Leviathan
 

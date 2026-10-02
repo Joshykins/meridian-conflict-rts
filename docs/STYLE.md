@@ -203,11 +203,11 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Salvage craft, light artillery (T1) | Breaker, Mattock |
 | Battle tank / mobile anti-air (T2) | Glaive / Vane |
 | Anti-spaceship gun, heavy artillery (T3) | Spire, Kiln |
-| Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway (II) |
+| Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway (II, III) |
 | Attack boat, submarine, frigate | Dirk, Stiletto, Falchion |
 | Heavy destroyer, cruiser | Claymore, Pavise |
 | Bombardment walker (T2) | Sower |
-| Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway |
+| Battleship, carrier, assault submarine | Flamberge, Mantlet, Rapier |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
 | Storage | Reliquary |
