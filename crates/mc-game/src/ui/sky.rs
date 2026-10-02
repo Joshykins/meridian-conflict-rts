@@ -169,15 +169,121 @@ pub fn summary(sky: &SkyChoice, map: &MapConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::{Input, Memory};
+    use glam::Vec2;
+    use mc_render::Overlay;
+
+    const CANVAS: Vec2 = Vec2::new(1920.0, 1080.0);
+    /// Set-up's rows, 600 wide from (100, 100).
+    const LOOK: Look = Look {
+        row_h: 42.0,
+        pitch: 46.0,
+        value_w: 220.0,
+        compact: false,
+    };
+
+    fn regions() -> MapConfig {
+        MapConfig::parse(
+            "(regions: [(name: \"Desert\", climate: Desert), (name: \"Alaska\")],
+              walls: [(line: [(0, 500), (900, 500)], left: 0, right: 1)])",
+        )
+        .unwrap()
+    }
+
+    /// The rows for `map` drawn alone, for one frame of `input`.
+    fn frame(map: &MapConfig, sky: &mut SkyChoice, memory: &mut Memory, input: &Input) -> bool {
+        let audio = crate::audio::Audio::silent();
+        let mut overlay = Overlay::default();
+        memory.begin_frame();
+        let mut ui = Ui::new(
+            &mut overlay,
+            input,
+            memory,
+            &audio,
+            CANVAS,
+            1.0,
+            1.0,
+            1.0 / 30.0,
+        );
+        let changed = rows(&mut ui, 0, 100.0, 100.0, 600.0, LOOK, map, sky);
+        ui.popups();
+        memory.end_frame(input);
+        changed
+    }
+
+    /// A click at `at`, then a frame at rest; true if any frame changed the choice.
+    fn click(map: &MapConfig, sky: &mut SkyChoice, memory: &mut Memory, at: Vec2) -> bool {
+        let input = |down: bool, released: bool| Input {
+            cursor: at,
+            down,
+            pressed: down,
+            released,
+            ..Default::default()
+        };
+        let mut changed = false;
+        for input in [
+            input(false, false),
+            input(true, false),
+            input(false, true),
+            input(false, false),
+        ] {
+            changed |= frame(map, sky, memory, &input);
+        }
+        changed
+    }
+
+    /// Opens row `row`'s list by the middle of its value and picks the list's row `pick`.
+    fn pick(map: &MapConfig, sky: &mut SkyChoice, row: usize, pick: usize) -> bool {
+        let mut memory = Memory::default();
+        let value = Vec2::new(100.0 + 600.0 - 110.0, 100.0 + row as f32 * 46.0 + 21.0);
+        assert!(
+            !click(map, sky, &mut memory, value),
+            "opening a list picks nothing"
+        );
+        let at = memory
+            .popup
+            .as_ref()
+            .expect("the row's list is open")
+            .row_centre(pick, CANVAS);
+        click(map, sky, &mut memory, at)
+    }
+
+    #[test]
+    fn each_region_has_a_weather_row_of_its_own() {
+        let map = regions();
+        let mut sky = SkyChoice::default();
+        // The second row is Alaska's: Map Default, Clear, Fair, Cloudy, Stormy...
+        assert!(pick(&map, &mut sky, 1, 4));
+        assert_eq!(
+            (sky.region(&map, 0), sky.region(&map, 1)),
+            (None, Some(WeatherPreset::Stormy))
+        );
+        assert!(pick(&map, &mut sky, 0, 1));
+        assert_eq!(sky.region(&map, 0), Some(WeatherPreset::Clear));
+        // ...and neither is the preset a map without regions plays.
+        assert_eq!(sky.preset, None);
+        // The time of day comes after the regions.
+        assert!(pick(&map, &mut sky, 2, 1));
+        assert_eq!(sky.time, Some(TimeOfDay::Dawn));
+        // Map Default hands a region back to the map.
+        assert!(pick(&map, &mut sky, 1, 0));
+        assert_eq!(sky.region(&map, 1), None);
+        // On a map without regions the first row is the whole map's weather and the
+        // second the time of day; the regions' picks are left as they were.
+        let plain = MapConfig::default();
+        assert!(pick(&plain, &mut sky, 0, 5));
+        assert!(pick(&plain, &mut sky, 1, 3));
+        assert_eq!(
+            (sky.preset, sky.time),
+            (Some(WeatherPreset::Overcast), Some(TimeOfDay::Noon))
+        );
+        assert_eq!(sky.region(&map, 0), Some(WeatherPreset::Clear));
+    }
 
     #[test]
     fn the_summary_says_when_regions_differ() {
         let plain = MapConfig::default();
-        let regions = MapConfig::parse(
-            "(regions: [(name: \"Desert\", climate: Desert), (name: \"Alaska\")],
-              walls: [(line: [(0, 500), (900, 500)], left: 0, right: 1)])",
-        )
-        .unwrap();
+        let regions = regions();
         assert_eq!((row_count(&plain), row_count(&regions)), (2, 3));
         assert_eq!(weather_label(&plain, 0), "Weather");
         assert_eq!(weather_label(&regions, 1), "Weather: Alaska");

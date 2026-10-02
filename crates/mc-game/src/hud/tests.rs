@@ -287,6 +287,53 @@ fn range_weather_is_picked_from_a_list_and_waits_for_apply() {
 }
 
 #[test]
+fn range_weather_has_a_row_for_each_region_of_the_map() {
+    use crate::range::{Range, RangeAction};
+    use mc_data::weather::{MapConfig, WeatherPreset};
+    let mut rig = Rig::new("aster_t1_tank");
+    let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
+    let map = MapConfig::parse(
+        "(regions: [(name: \"Desert\", climate: Desert), (name: \"Alaska\")],
+          walls: [(line: [(4000, 0), (4000, 8000)], left: 0, right: 1)])",
+    )
+    .unwrap();
+    let mut range = Range::new(mc_core::FxVec2::from_ints(4000, 4000), tank);
+    range.sky = Some(Default::default());
+    range.map_config = map.clone();
+    rig.view.range = Some(range);
+    // The Sky tab, then the second row: Alaska's weather, under the desert's.
+    assert!(rig
+        .click(Vec2::new(253.0, 279.0 + focus::FOCUS_H))
+        .is_empty());
+    assert!(rig
+        .click(Vec2::new(258.0, 320.0 + 32.0 + focus::FOCUS_H))
+        .is_empty());
+    let popup = rig
+        .memory
+        .popup
+        .as_ref()
+        .expect("the region's weather list is open");
+    let anchor = popup.anchor();
+    let stormy = popup.row_centre(4, VIEWPORT);
+    assert!(rig.click(stormy).is_empty());
+    rig.frame(&Input::default());
+    let draft = rig.hud.range_sky.expect("a draft waits for Apply");
+    assert_eq!(
+        (draft.choice.region(&map, 0), draft.choice.region(&map, 1)),
+        (None, Some(WeatherPreset::Stormy))
+    );
+    assert_eq!(draft.choice.preset, None);
+    // Apply sits a row lower than on a map without regions: under the two
+    // regions' rows and the time of day.
+    let apply = Vec2::new(anchor.right() - 40.0, anchor.mid_y() + 2.0 * 32.0);
+    let asked = rig.click(apply);
+    let Some(HudAction::Range(RangeAction::Sky(sky))) = asked.first() else {
+        panic!("Apply asked for {asked:?}");
+    };
+    assert_eq!(sky.choice.region(&map, 1), Some(WeatherPreset::Stormy));
+}
+
+#[test]
 fn range_browser_search_pick_cancel_and_background_capture() {
     use crate::range::{Range, RangeAction};
     use crate::ui::Key;
