@@ -13,7 +13,7 @@ use crate::ui::{self, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_data::strategic::StrategicKind;
 use mc_data::BlueprintId;
-use mc_sim::mirror::KIND_WRECK;
+use mc_sim::mirror::{KIND_WRECK, STATE_UNIDENTIFIED};
 
 /// Construction amber, for arrays still being built.
 const BUILDING: u32 = 0xFFA928;
@@ -39,14 +39,18 @@ impl Array {
     }
 }
 
-/// Every array of `team`'s, built or being built.
+/// Every array of `team`'s, built or being built, that we know is one: an enemy's grey
+/// radar blip is left out.
 fn arrays(field: &Field, team: u8) -> Vec<Array> {
     let view = field.view;
     let team_of = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
     view.frame
         .units
         .iter()
-        .filter(|u| u.owner_flags & KIND_WRECK == 0 && team_of(owner_of(u)) == Some(team))
+        .filter(|u| {
+            u.owner_flags & (KIND_WRECK | STATE_UNIDENTIFIED) == 0
+                && team_of(owner_of(u)) == Some(team)
+        })
         .filter_map(|u| {
             let bp = field.blueprints.unit(BlueprintId(u.blueprint as u16));
             let s = bp
@@ -345,7 +349,9 @@ pub(super) fn draw(ui: &mut Ui, field: &Field, placing: Option<(BlueprintId, Vec
         view.frame
             .units
             .iter()
-            .filter(|u| view.selection.contains(&u.unit_id))
+            .filter(|u| {
+                view.selection.contains(&u.unit_id) && u.owner_flags & STATE_UNIDENTIFIED == 0
+            })
             .find(|u| {
                 field
                     .blueprints

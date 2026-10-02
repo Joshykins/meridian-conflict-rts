@@ -12,7 +12,8 @@
 //! - While a launch is being aimed: the blast's rings under the pointer (the core, the
 //!   damage, the country set alight), the flight from the silo that would fire it, how
 //!   long it takes, how many warheads are left to give out, and every enemy interceptor
-//!   array known, its cover drawn, with a warning when the mark lies under it.
+//!   array known (in vision or radar, and identified: not a grey blip), its cover drawn,
+//!   with a warning when the mark lies under it.
 //! - An interceptor array selected, or being placed: the whole side's network, its
 //!   cover merged into one outline, each array's rounds, and what a new site adds.
 
@@ -23,7 +24,7 @@ use crate::ui::{self, palette, rgb, type_scale, Ui};
 use glam::{Vec2, Vec3};
 use mc_data::strategic::StrategicKind;
 use mc_data::BlueprintId;
-use mc_sim::mirror::{UnitInstance, KIND_WRECK, STRATEGIC_WARHEAD};
+use mc_sim::mirror::{UnitInstance, KIND_WRECK, STATE_UNIDENTIFIED, STRATEGIC_WARHEAD};
 use mc_sim::nukes::WarheadPath;
 
 mod cover;
@@ -374,7 +375,9 @@ pub fn draw(
     let mut covered = false;
     if aiming {
         for u in &view.frame.units {
-            if u.owner_flags & KIND_WRECK != 0 || u.build < 1.0 {
+            // Only arrays we know of: in vision or radar (the frame holds no others) and
+            // named by vision once. A grey blip does not give away what it is.
+            if u.owner_flags & (KIND_WRECK | STATE_UNIDENTIFIED) != 0 || u.build < 1.0 {
                 continue;
             }
             let Some(cover) = array_cover(u) else {
