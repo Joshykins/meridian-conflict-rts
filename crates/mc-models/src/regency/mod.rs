@@ -12,6 +12,7 @@
 //! one built at another size says so.
 
 pub(crate) mod air;
+pub(crate) mod air_t2;
 mod battle_tank;
 mod bombard;
 mod breaker;
@@ -198,6 +199,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The land and air factories' tech 3, with their tech 2 kit and more.
         "regency_brood" | "regency_hatchery" => 15000,
         "regency_tidebrood" => 9000,
+        // A drum, a rim or wings of lapped plates, five lift bells and four nanite heads.
+        "regency_reclaim_carrier" => 6000,
         // The tech 1 hulls; the tech 2 warships have a capital ship's detail, lighter.
         "regency_attack_boat" => 2400,
         // The tech 1 air force: jets by the dozen, a transport the size of a frigate.

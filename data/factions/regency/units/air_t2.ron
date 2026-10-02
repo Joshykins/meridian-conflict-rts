@@ -1,0 +1,125 @@
+// The Regency's tech 2 aircraft, built at Skyforge II and III (docs/STYLE.md "The Regency
+// look", "The Regency suite"). Their jets are Cybertronian-jet airframes, symmetrical, a
+// blade for a nose and fins turned down, their drives burning red; what floats rides
+// gravity lift bells with red plasma crackling under them, never rotors or jets.
+//
+// Every weapon names its grade (`plasma_grade`): their seekers and torpedoes are Gravitic,
+// a charge of plasma held and steered in a gravity cage, drawn as the charge alone (no
+// body, no motor, no smoke). Nanites only build and take apart.
+//
+// Models: `models::regency::air_t2::*`, authored at the sizes here, so every muzzle,
+// pivot and emitter below is the model's own number. Balance is anchored on ARC's
+// counterpart in `data/factions/aster/units/air.ron`, named on each.
+[
+    // The interceptor: a fast jet that runs fliers down with Gravitic Seekers, a charge
+    // held between two bronze tines along each flank until it is let go. At par with the
+    // Peregrine: the same cost, speed and weight of fire.
+    (
+        key: "regency_t2_interceptor",
+        name: "Pilum",
+        role: "Interceptor", title: "Interceptor",
+        tech: 2,
+        categories: ["Air", "AntiAir"],
+        health: 1000,
+        cost: (mass: 170, energy: 5800, time: 1040),
+        radius: 5.5, height: 2.2,
+        vision: 700,
+        motion: (layer: Air, size: 0, speed: 160, accel: 72, turn: 122, altitude: 260, hover: false),
+        weapons: [(
+            name: "Gravitic Seeker Battery",
+            damage: 130, proximity: 5, range: 310, reload: 1.3, speed: 420, trajectory: Direct,
+            salvo: 2, salvo_delay: 0.2, turret_turn: 240, arc: 90,
+            muzzle: (1.7, 1.0, 0.7), muzzles: [(1.7, -1.0, 0.7), (1.7, 1.0, 0.7)],
+            targets: ["Air"], color: Orange, red: 1.0, missile: true, guided: true, intercept: 50,
+            plasma_grade: Some(Gravitic),
+            sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
+        )],
+        mesh: "regency_interceptor", icon: Fighter,
+        // A stand-in: ARC's jet until the Regency has a drive sound of their own.
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    // The long-range drone: slow and thin-skinned, it circles its mark far out and lets
+    // Gravitic Seekers go from open cages along its back, from beyond the reach of
+    // short-range anti-air (ARC's mobile AA reaches 360-480 m, its flak 640 m). Fighters
+    // are its answer. No ARC counterpart; costed between the Kestrel and the Gannet, with
+    // half the Kestrel's health.
+    (
+        key: "regency_t2_strike_drone",
+        name: "Voulge",
+        role: "Long-range Strike Drone", title: "Strike Drone",
+        tech: 2,
+        categories: ["Air"],
+        health: 650,
+        cost: (mass: 200, energy: 6400, time: 1200),
+        radius: 7.5, height: 2.2,
+        vision: 900,
+        motion: (layer: Air, size: 0, speed: 70, accel: 26, turn: 50, altitude: 220, hover: false),
+        weapons: [(
+            name: "Gravitic Seeker Pod",
+            // Four seekers a salvo every 6 s: 120 a second on what it reaches.
+            damage: 180, splash: 6, range: 900, reload: 6, speed: 240, trajectory: Direct,
+            salvo: 4, salvo_delay: 0.35, turret_turn: 0, arc: 360,
+            muzzle: (-0.9, 0.55, 1.95),
+            muzzles: [(-0.9, 0.55, 1.95), (-0.9, -0.55, 1.95), (-2.0, 0.55, 1.85), (-2.0, -0.55, 1.85)],
+            targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+            missile: true, guided: true, vertical_launch: true, intercept: 30,
+            plasma_grade: Some(Gravitic),
+            sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
+        )],
+        mesh: "regency_strike_drone", icon: Gunship,
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    // The torpedo bomber: down to the wave tops on its run and lets two Gravitic Torpedoes
+    // go from cradles under its prongs; they fall in and steer onto the hull its sonar
+    // hears. At par with the Gannet.
+    (
+        key: "regency_t2_torpedo_bomber",
+        name: "Trident",
+        role: "Torpedo Bomber", title: "Torpedo Bomber",
+        tech: 2,
+        categories: ["Air"],
+        health: 1050,
+        cost: (mass: 180, energy: 6100, time: 1150),
+        radius: 7.2, height: 3.0,
+        vision: 600, sonar: 900,
+        motion: (layer: Air, size: 0, speed: 86, accel: 36, turn: 48, altitude: 120, hover: false),
+        weapons: [(
+            name: "Gravitic Torpedo Cradles",
+            damage: 450, splash: 3, range: 300, reload: 10, speed: 58, trajectory: Direct,
+            salvo: 2, salvo_delay: 0.4, turret_turn: 0, arc: 60,
+            muzzle: (3.4, 1.9, 0.55), muzzles: [(3.4, -1.9, 0.55), (3.4, 1.9, 0.55)],
+            targets: ["Naval"], color: Orange, red: 1.0, torpedo: true, flash: 0.0, impact: 2.2, shockwave: 0.6,
+            plasma_grade: Some(Gravitic),
+            sounds: (fire: "regency_gravitic_throw", impact: "torpedo_hit", ground: "torpedo_hit"),
+        )],
+        mesh: "regency_torpedo_bomber", icon: TorpedoBomber,
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    // The reclaim carrier: a broad craft on gravity lift that strips a wreck field as it
+    // passes over, four nanite heads under it each taking a wreck of its own, their strands
+    // a cloud of motes between it and the field (beams.wgsl `BEAM_NANITE_RECLAIM`). At par
+    // with the Osprey: its four drones' 20 of power, here in the heads, over a shorter
+    // reach (500 m against drones that go 800) but nothing to build or lose.
+    (
+        key: "regency_t2_reclaim_carrier",
+        name: "Winnow",
+        role: "Reclaim Carrier", title: "Reclaim Carrier",
+        tech: 2,
+        categories: ["Air"],
+        health: 1000,
+        cost: (mass: 200, energy: 3800, time: 1100),
+        radius: 10, height: 4.5,
+        vision: 480,
+        motion: (layer: Air, size: 0, speed: 65, accel: 24, turn: 65, altitude: 26, hover: true),
+        reclaimer: (power: 20, range: 500, charge: 0.8, mobile: true, heads: [
+            (pivot: (3.0, 3.0, 1.1), emitter: (4.4, 3.0, 1.1), turn: 240, pitch: (-90, 15)),
+            (pivot: (3.0, -3.0, 1.1), emitter: (4.4, -3.0, 1.1), turn: 240, pitch: (-90, 15)),
+            (pivot: (-3.0, 3.0, 1.1), emitter: (-1.6, 3.0, 1.1), turn: 240, pitch: (-90, 15)),
+            (pivot: (-3.0, -3.0, 1.1), emitter: (-1.6, -3.0, 1.1), turn: 240, pitch: (-90, 15)),
+        ]),
+        weapons: [],
+        mesh: "regency_reclaim_carrier", icon: SalvageCarrier,
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast_small", moving: "aster_hover"),
+    ),
+]

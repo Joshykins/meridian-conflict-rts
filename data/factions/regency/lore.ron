@@ -354,4 +354,25 @@
             "Pinch-fusion Beam": "Plasma pinched until it fuses and held as a beam, white at its heart with bursts of fusion strobing along it; it sweeps across its mark and melts the ground it crosses.",
         },
     ),
+    "regency_t2_interceptor": (
+        lore: "A jet drawn out to a needle behind a blade of a nose, built to run down whatever flies over Regency ground.",
+        weapons: {
+            "Gravitic Seeker Battery": "A charge of plasma held between two bronze tines on each flank, let go and steered onto an aircraft by its own gravity cage.",
+        },
+    ),
+    "regency_t2_strike_drone": (
+        lore: "A slow, thin-skinned drone that circles its mark far out and never comes in close; ARC crews learned to send fighters for it rather than guns.",
+        weapons: {
+            "Gravitic Seeker Pod": "Four charges of plasma thrown up out of open cages on its back, each steering itself down onto the mark from further out than a gun can answer.",
+        },
+    ),
+    "regency_t2_torpedo_bomber": (
+        lore: "A three-pronged jet that comes down to the wave tops on its run and leaves a gravity-held torpedo in the water under each outer prong.",
+        weapons: {
+            "Gravitic Torpedo Cradles": "Each torpedo is a charge of plasma in a gravity cage; it falls in, steers onto the hull below and boils the sea round it.",
+        },
+    ),
+    "regency_t2_reclaim_carrier": (
+        lore: "A broad craft on gravity lift that passes over a wreck field and leaves it bare, its nanite heads taking four wrecks apart at once.",
+    ),
 }

@@ -105,9 +105,9 @@
         cost: (mass: 1580, energy: 12100, time: 2030),
         radius: 46, height: 30, footprint: (8, 8),
         vision: 200,
-        // No reclaim carrier: the Regency reclaim nothing.
+        // The Regency have no fire bomber; their reclaim carrier is the Winnow.
         builder: (power: 120, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t1_air_reclaimer", "regency_t2_drone_carrier", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+            "regency_t1_engineer", "regency_t2_engineer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t1_air_reclaimer", "regency_t2_drone_carrier", "regency_t2_interceptor", "regency_t2_strike_drone", "regency_t2_torpedo_bomber", "regency_t2_reclaim_carrier",
         ]),
         upgrades_to: "regency_t3_air_factory",
         mesh: "regency_hatchery", icon: Factory,
@@ -126,7 +126,7 @@
         radius: 46, height: 38, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t1_air_reclaimer", "regency_t2_drone_carrier", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "regency_t3_air_superiority", "regency_t3_spy_plane", "regency_t3_strategic_bomber", "regency_t3_scavenger", "regency_t3_assault_aircraft",
+            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t1_air_reclaimer", "regency_t2_drone_carrier", "regency_t2_interceptor", "regency_t2_strike_drone", "regency_t2_torpedo_bomber", "regency_t2_reclaim_carrier", "regency_t3_air_superiority", "regency_t3_spy_plane", "regency_t3_strategic_bomber", "regency_t3_scavenger", "regency_t3_assault_aircraft",
         ]),
         mesh: "regency_hatchery", icon: Factory,
         sounds: (death: "blast_large"),
