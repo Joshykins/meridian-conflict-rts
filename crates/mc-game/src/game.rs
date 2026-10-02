@@ -3361,7 +3361,7 @@ impl Game {
             .iter()
             .copied()
             .zip(self.view.frame.beams.iter())
-            .filter(|(_, b)| b.kind == mc_sim::reclaim::BEAM_RECLAIM)
+            .filter(|(_, b)| mc_sim::reclaim::is_reclaim(b.kind))
             .map(|(id, b)| (id, b.from))
             .collect();
         let mending: std::collections::HashMap<u32, [f32; 3]> = self
@@ -3821,7 +3821,7 @@ impl Game {
         if let Some(sound) = table.reclaim[0] {
             let mut beams = (0.0, 0.0);
             for b in &self.view.frame.beams {
-                if b.kind != mc_sim::reclaim::BEAM_RECLAIM {
+                if !mc_sim::reclaim::is_reclaim(b.kind) {
                     continue;
                 }
                 let (gain, pan) = self.hear(Vec3::from(b.to));

@@ -338,6 +338,8 @@ const BLUEPRINTS: &[Blueprint] = &[
         3,
         &[[12.066, 0.0, 10.435]],
     ),
+    unit("regency_breaker", 4.6, 3.4, 1, &[]),
+    unit("regency_mattock", 4.2, 3.2, 1, &[[1.13, 0.0, 3.45]]),
     structure("regency_brood", 46.0, 22.0, 1, 8, &[]),
     structure("regency_brood", 46.0, 22.0, 2, 8, &[]),
     structure("regency_brood", 46.0, 35.0, 3, 8, &[]),

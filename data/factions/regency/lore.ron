@@ -62,6 +62,16 @@
             "Plasmeric Flak Cannon": "Plasma bolts that burst among aircraft in a spray of burning plasma.",
         },
     ),
+    "regency_t1_land_reclaimer": (
+        lore: "A salvage craft on a gravity lift; its nanite head unpicks wrecks as it glides past and carries the matter home down the strands.",
+        weapons: {},
+    ),
+    "regency_t1_artillery": (
+        lore: "A low four-legged walker that crouches behind the line and lobs plasma over it.",
+        weapons: {
+            "Plasmeric Mortar": "A charge of plasma held in gravity and thrown high; it comes down, lets go and sears the ground where it lands.",
+        },
+    ),
     "regency_t1_land_factory": (
         lore: "A press works under swept armour: fabricators hung round a turning ring pour nanites onto the bay floor, and the machine walks out finished.",
         weapons: {},

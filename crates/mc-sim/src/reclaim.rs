@@ -52,6 +52,15 @@ pub const BEAM_NANITE_SITE: u32 = 6;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;
 // retired: 7 (a scavenger tower's dim sweep beam)
+/// A reclaim beam of a faction that builds with nanites (`mc_data::Construction::Nanite`):
+/// drawn as their nanite stream, its strands reaching out to the target and the matter
+/// riding home down them. Laid out as `BEAM_RECLAIM`.
+pub const BEAM_NANITE_RECLAIM: u32 = 8;
+
+/// Whether a beam of `kind` takes something apart: a reclaim beam of either look.
+pub fn is_reclaim(kind: u32) -> bool {
+    kind == BEAM_RECLAIM || kind == BEAM_NANITE_RECLAIM
+}
 
 impl World {
     /// Whether `player` knows of wreck `w`: a settled wreck is salvage to plan around, so
@@ -121,7 +130,12 @@ impl World {
                 }
                 (None, None) => s.units.pos[row].extend(s.units.z[row] + bp.height),
             };
-            let mut kind = BEAM_RECLAIM;
+            // Nanite factions take things apart as they build: with a nanite stream.
+            let mut kind = if self.uses_nanites(row) {
+                BEAM_NANITE_RECLAIM
+            } else {
+                BEAM_RECLAIM
+            };
             let (mut to_prev, mut to, mut height) = (to_prev, to, work.height);
             // Bits travel from the grip into the emitter. A relay parks the emitter
             // on the carrier's belly so the stream arrives underneath it.

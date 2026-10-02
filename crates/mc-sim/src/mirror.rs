@@ -1531,8 +1531,8 @@ impl World {
     }
 
     /// Whether builder `row` is of a faction that builds with nanites: it feeds its work
-    /// with a nanite stream, not a print beam.
-    fn uses_nanites(&self, row: usize) -> bool {
+    /// with a nanite stream, not a print beam (and takes things apart with one).
+    pub(crate) fn uses_nanites(&self, row: usize) -> bool {
         self.faction_uses_nanites(self.bp(row).faction)
     }
 

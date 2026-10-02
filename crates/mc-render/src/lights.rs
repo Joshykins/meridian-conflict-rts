@@ -540,22 +540,26 @@ impl Lights {
                 });
                 continue;
             }
-            if b.kind >= 4 {
+            if (4..=5).contains(&b.kind) {
                 self.replication_light(b);
                 continue;
             }
-            if b.kind == mc_sim::reclaim::BEAM_NANITE {
-                // A nanite stream: a violet line, and a hot knot where it pours into the site.
+            if b.kind == mc_sim::reclaim::BEAM_NANITE
+                || b.kind == mc_sim::reclaim::BEAM_NANITE_RECLAIM
+            {
+                // A nanite stream: a violet line, and a hot knot where it pours into the site
+                // (or, taking something apart, where it grips it).
+                let to = Vec3::from(b.to) + Vec3::Z * b.height * 0.55;
                 self.glows.push(Glow {
                     from: Vec3::from(b.from),
-                    to: Vec3::from(b.to),
+                    to,
                     color: Vec3::new(0.9, 0.1, 0.5) * 6.0,
                     range: 8.0,
                     line: true,
                 });
                 self.glows.push(Glow {
-                    from: Vec3::from(b.to),
-                    to: Vec3::from(b.to),
+                    from: to,
+                    to,
                     color: Vec3::new(0.8, 0.14, 1.0) * 15.0,
                     range: 12.0,
                     line: false,

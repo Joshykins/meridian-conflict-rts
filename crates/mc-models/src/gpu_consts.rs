@@ -683,6 +683,9 @@ shared! {
         /// A Regency site being fed: its rings and rising filaments (`reclaim::BEAM_NANITE_SITE`).
         pub const NANITE_SITE: u32 = 6;
         // retired: 7 (a scavenger tower's dim sweep beam)
+        /// A nanite faction's reclaim: their stream reaching out to what it takes apart,
+        /// the matter riding home down its strands (`reclaim::BEAM_NANITE_RECLAIM`).
+        pub const NANITE_RECLAIM: u32 = 8;
         /// Quads drawn per beam (renderer `work_beams`, beams.wgsl `vs_beam`). A reclaim or
         /// repair beam uses as many of them for its bits as its length asks for.
         pub const QUADS: u32 = 64;

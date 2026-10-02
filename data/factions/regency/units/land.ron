@@ -126,4 +126,68 @@
         mesh: "regency_mobile_aa", icon: AntiAir,
         sounds: (death: "blast", moving: "regency_skitter"),
     ),
+    // The salvage craft: a hover hull on gravity lift, so it works shores and shallows as it
+    // works land, with one nanite head on a turning house over its stern that takes apart
+    // what it passes without stopping (`mobile`). Regency reclaim is nanite work: the head
+    // shoots the faction's nanite strands at the wreck and the matter rides home down them
+    // (beams.wgsl `BEAM_NANITE_RECLAIM`). Anchored on ARC's Gleaner; bent the Regency way:
+    // its nanites take apart a fifth faster (power 6 to 5) but reach shorter (450 to 550),
+    // and the lighter craft is a little quicker with less armour. Model: `regency_breaker`
+    // (`models::regency::breaker`), at this size; the head's pivot and lens are its numbers.
+    //
+    // Each lift bell casts red plasma under it (the model's `lifts`), lighting the ground.
+    (
+        key: "regency_t1_land_reclaimer",
+        name: "Breaker",
+        role: "Salvage Craft", title: "Salvager",
+        tech: 1,
+        categories: ["Land"],
+        health: 300,
+        cost: (mass: 60, energy: 360, time: 240),
+        radius: 4.6, height: 3.4,
+        vision: 400,
+        motion: (layer: Hover, size: 0, speed: 31, accel: 28, turn: 110),
+        reclaimer: (power: 6, range: 450, charge: 0.8, mobile: true, heads: [
+            (pivot: (-1.5, 0, 2.9), emitter: (0.75, 0, 2.9), turn: 90, pitch: (-70, 80)),
+        ]),
+        weapons: [],
+        mesh: "regency_breaker", icon: Salvage,
+        lights: [(kind: Point, at: (-0.4, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 50, range: 10, night_only: false)],
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast_small", moving: "aster_hover"),
+    ),
+    // The light artillery: a low four-legged walker with a Plasmeric Mortar in a turning
+    // house on its back. It lobs a charge of plasma held in gravity high onto its mark,
+    // where it bursts and sears the ground (renderer `regency_guns_fx/plasmeric.rs`). Anchored
+    // on ARC's Ballista; bent the Regency way: harder (150 to 120) and a little wider (7 to
+    // 6 m) at shorter reach (400 to 440), laid higher and slower (loft 4, a slow charge a
+    // missile-defence laser can burn down), the walker a touch slower and tougher. Model:
+    // `regency_mattock` (`models::regency::mattock`), at this size; muzzle and trunnion are
+    // its numbers.
+    (
+        key: "regency_t1_artillery",
+        name: "Mattock",
+        role: "Mobile Light Artillery", title: "Artillery",
+        tech: 1,
+        categories: ["Land", "Artillery"],
+        health: 150,
+        cost: (mass: 56, energy: 280, time: 270),
+        radius: 4.2, height: 3.2,
+        vision: 340,
+        motion: (layer: Land, size: 0, speed: 25, accel: 24, turn: 100),
+        weapons: [(
+            name: "Plasmeric Mortar",
+            damage: 150, splash: 7, range_min: 60, range: 400, reload: 5.0, speed: 125,
+            trajectory: Ballistic, loft: 4,
+            turret_turn: 70, muzzle: (1.13, 0, 3.45), pivot: (-0.3, 0, 2.45), spread: 1.4,
+            // A slow lobbed charge: missile-defence lasers can burn it down.
+            intercept: 150,
+            targets: ["Land", "Naval"], color: Orange, red: 1.0,
+            plasma_grade: Some(Plasmeric),
+            flash: 1.0, impact: 1.3,
+            sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
+        )],
+        mesh: "regency_mattock", icon: Artillery,
+        sounds: (death: "blast_small", moving: "regency_crawl"),
+    ),
 ]

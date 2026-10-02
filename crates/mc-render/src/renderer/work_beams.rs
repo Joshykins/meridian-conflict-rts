@@ -22,10 +22,11 @@ const JUMP: f32 = 6.0;
 const ALREADY_ON: f32 = 5.0;
 /// The beam kinds drawn as a work beam between two moving ends (beams.wgsl `vs_beam`);
 /// the others are drawn from where they stand.
-const MOVING_KINDS: [u32; 3] = [
+const MOVING_KINDS: [u32; 4] = [
     mc_sim::reclaim::BEAM_RECLAIM,
     mc_sim::repair::BEAM_REPAIR,
     mc_sim::reclaim::BEAM_RELAY,
+    mc_sim::reclaim::BEAM_NANITE_RECLAIM,
 ];
 
 /// Mirrors `Beam` in shaders/beams.wgsl: the sim's record, where its emitter was a tick

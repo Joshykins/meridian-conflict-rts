@@ -3045,7 +3045,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     // Construction emitters: ARC's amber, the Regency's violet.
     let builds = in.material == MAT_GLOW_AMBER || in.material == MAT_GLOW_VIOLET;
-    if builds && (flags & FLAG_BUILDING) != 0u && in.refit.z <= 0.0 {
+    // The Regency's nanites take apart as they build: violet runs hot reclaiming too.
+    let working = (flags & FLAG_BUILDING) != 0u
+        || (in.material == MAT_GLOW_VIOLET && (flags & UNIT_FLAG_RECLAIMING) != 0u);
+    if builds && working && in.refit.z <= 0.0 {
         // Construction emitters run hot while the unit builds, not during a refit.
         m.emissive *= 1.6 + 0.7 * sin(time * 11.0 + in.state.w * 40.0);
     } else if builds && (in.model_class & 0x100u) != 0u {

@@ -4,7 +4,8 @@
 // and narrows into the emitter, torn-off bits streaming back up it, heating
 // from red through the Materials red-orange to white. Repair (kind 2): the inverse — mint-green
 // patches leave the emitter and settle onto the hull. `BEAM_NANITE`, a Regency builder's
-// nanite stream, and `BEAM_NANITE_SITE`, the site it feeds: below. Premultiplied:
+// nanite stream, `BEAM_NANITE_RECLAIM`, the same stream taking something apart, and
+// `BEAM_NANITE_SITE`, the site it feeds: below. Premultiplied:
 // hot cores only add light; the coloured body also covers what is behind it, or
 // over grass it would wash out.
 
@@ -13,7 +14,7 @@
 struct Beam {
     emitter: vec3<f32>,
     // 0 reclaim. 1 nanite stream. 2 repair. 3 relay. 4 replication ray, 5 print beam,
-    // 6 nanite site. 7 retired.
+    // 6 nanite site. 7 retired. 8 nanite reclaim.
     kind: u32,
     to_prev: vec3<f32>,
     radius: f32,
@@ -99,11 +100,19 @@ fn vs_beam(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if b.kind == BEAM_NANITE_SITE {
         return nanite_site_vertex(b, slot, corner);
     }
-    if b.kind >= 4u {
-        return replicator_vertex(b, slot, corner, instance);
-    }
     if b.kind == BEAM_NANITE {
         return nanite_vertex(b, slot, corner);
+    }
+    if b.kind == BEAM_NANITE_RECLAIM {
+        // Taking something apart: the stream runs from the emitter (moving with its unit
+        // over the tick) to where it grips the target, as a reclaim beam does.
+        var s = b;
+        s.emitter = mix(b.from_prev, b.emitter, globals.sun.w);
+        s.to = mix(b.to_prev, b.to, globals.sun.w) + vec3<f32>(0.0, 0.0, b.height * 0.55);
+        return nanite_vertex(s, slot, corner);
+    }
+    if b.kind == 4u || b.kind == 5u {
+        return replicator_vertex(b, slot, corner, instance);
     }
     // Both ends move with their units over the tick, at the alpha the units are drawn at.
     let foot = mix(b.to_prev, b.to, globals.sun.w);
@@ -713,6 +722,10 @@ fn replicator_fragment(in: BeamOut, n: f32) -> vec4<f32> {
 // a lead (a faint hairline with motes racing down it) snaps across the gap, holding it
 // until the strands arrive. A knot of light where they pour in throws off motes, each let
 // finish its flight when the work stops.
+// `BEAM_NANITE_RECLAIM`: the Regency's reclaim (docs/STYLE.md "The Regency suite": nanites
+// build and take apart). The same stream from the emitter to where it grips its target,
+// red there and violet into the emitter, but its motes drift home along the strands: the
+// matter riding back.
 // `BEAM_NANITE_SITE`: round a site while it is fed, or round a refit. Splashes in slow
 // motion with no gravity: a thin violet ring appears round the hull (most near the build
 // front), its rim lifts into a crown, the light drains from the ring into the crown's
@@ -789,7 +802,9 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
     let time = globals.camera.w;
     let len = max(distance(b.emitter, b.to), 0.01);
     var out: BeamOut;
-    out.kind = f32(BEAM_NANITE);
+    // The stream's kind, building or (`BEAM_NANITE_RECLAIM`) taking apart: the fragment
+    // runs the motes along its strands the other way for the second.
+    out.kind = f32(b.kind);
     out.uv = corner;
     out.level = 1.0;
     let site = b.emitter.x * 0.37 + b.emitter.y * 0.73;
@@ -811,10 +826,12 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
         let s1 = tail + (head - tail) * (j + 1.0) / f32(STRAND_SEGS);
         let amp = clamp(len * 0.012, 0.12, 0.42);
         let seed = hash(i * 7.7 + site);
-        return strand_ribbon(
+        var o = strand_ribbon(
             strand_at(b, i, s0, time), strand_at(b, i, s1, time), b.emitter, corner, amp, SHAPE_STRAND,
             vec4<f32>(head * len, tail * len, len, seed)
         );
+        o.kind = out.kind;
+        return o;
     }
     // All the strands in, and all drained away: what the glows follow.
     let first = clamp((time - b.start) * STRAND_SPEED * 0.8 / len, 0.0, 1.0);
@@ -859,7 +876,7 @@ fn nanite_vertex(b: Beam, slot: u32, corner: vec2<f32>) -> BeamOut {
             b.emitter, b.to, b.emitter, corner, 0.07, SHAPE_LEAD,
             vec4<f32>(reach, 0.0, len, hash(site + 2.7))
         );
-        o.kind = f32(BEAM_NANITE);
+        o.kind = out.kind;
         o.level = level;
         return o;
     }
@@ -1087,6 +1104,9 @@ fn nanite_fragment(in: BeamOut, n: f32) -> vec4<f32> {
             flow = 1.2;
         } else if lead {
             flow = 30.0;
+        } else if in.kind > f32(BEAM_NANITE_RECLAIM) - 0.5 && !filament {
+            // Taking something apart: what the strands carry rides home to the emitter.
+            flow = -flow;
         }
         let seed = in.strand.w;
         // A bundle of threads, each writhing on its own, a wave or two a strand; a

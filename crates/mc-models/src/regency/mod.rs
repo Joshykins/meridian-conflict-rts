@@ -12,6 +12,7 @@
 //! one built at another size says so.
 
 mod battle_tank;
+mod breaker;
 mod brood;
 mod chassis;
 mod commander;
@@ -26,6 +27,7 @@ mod hover_tank;
 mod kit;
 mod lift;
 mod machine;
+mod mattock;
 mod mobile_aa;
 pub(crate) mod naval;
 mod palisade;
@@ -88,6 +90,12 @@ pub(super) const MODELS: &[ModelDef] = &[
         fusion_guns::HOWITZER_HEIGHT,
         fusion_guns::howitzer,
     ),
+    // The tech 1 salvage craft: a hover hull with a nanite head on a turning house over its
+    // stern (`breaker`).
+    ModelDef::new("regency_breaker", 4.6, 3.4, breaker::breaker),
+    // The tech 1 artillery: a four-legged walker, a Plasmeric Mortar in the house on its
+    // back (`mattock`).
+    ModelDef::new("regency_mattock", 4.2, 3.2, mattock::mattock),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
     // the land one's lifted ring and the air one's crown standing taller.
@@ -173,6 +181,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_hover_tank" | "regency_mobile_aa" => 3200,
         "regency_battle_tank" => 5000,
         "regency_seeker_hover" => 4500,
+        "regency_breaker" | "regency_mattock" => 3400,
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
         "regency_engineer" => 3600,
         // Walls come by the dozen.
@@ -440,5 +449,6 @@ mod tests {
         use crate::gpu_consts::beam;
         assert_eq!(beam::NANITE, mc_sim::reclaim::BEAM_NANITE);
         assert_eq!(beam::NANITE_SITE, mc_sim::reclaim::BEAM_NANITE_SITE);
+        assert_eq!(beam::NANITE_RECLAIM, mc_sim::reclaim::BEAM_NANITE_RECLAIM);
     }
 }

@@ -47,7 +47,7 @@ const LIFTS: [(f32, f32); 2] = [(0.8, 1.55), (-1.45, 2.05)];
 /// Tech 2's third collar under each sponson's trailing point (x, y, radius).
 const TAIL_LIFT: (f32, f32, f32) = (-2.35, 2.35, 0.4);
 /// Where each lift bell's mouth opens, and the lift leaves it.
-const MOUTH: f32 = 0.2;
+pub(super) const MOUTH: f32 = 0.2;
 
 pub(super) fn engineer(b: &mut MeshBuilder, tech: u8) {
     b.set_hover();
@@ -338,21 +338,7 @@ fn skirt(b: &mut MeshBuilder) {
 /// under each sponson's trailing point; tech 3 two under the body in place of the one.
 /// Each bell's mouth is marked for its plasma (`add_lift`).
 fn lifts(b: &mut MeshBuilder, tech: u8) {
-    let drum = |b: &mut MeshBuilder, x: f32, y: f32, r: f32| {
-        b.add_lift(v3(x, y, MOUTH), r * 0.7);
-        metal(b);
-        let sides = b.sides(10);
-        b.prism(v3(x, y, 0.5), sides, r, r * 0.95, 0.28);
-        b.with_part(part::LOCOMOTION, |b| {
-            seam(b);
-            b.prism(v3(x, y, 0.28), sides, r * 0.86, r * 0.84, 0.46);
-            b.prism(v3(x, y, MOUTH), sides, r * 0.55, r * 0.7, 0.08);
-            if b.fine() {
-                b.paint(GLOW_LASER);
-                hoop(b, v3(x, y, 0.3), r * 0.7, 0.08, 0.05, 12);
-            }
-        });
-    };
+    let drum = |b: &mut MeshBuilder, x: f32, y: f32, r: f32| lift_drum(b, x, y, r);
     b.mirror_y(|b| {
         for (x, y) in LIFTS {
             drum(b, x, y, 0.48);
@@ -367,6 +353,26 @@ fn lifts(b: &mut MeshBuilder, tech: u8) {
     } else {
         drum(b, -0.3, 0.0, 0.7);
     }
+}
+
+/// One lift: a bronze collar of radius `r` at (`x`, `y`), its top 0.78 m up, and in it a
+/// lift bell (`part::LOCOMOTION`), a dark core ringed in red, its mouth `MOUTH` off the
+/// ground and marked for its plasma (`add_lift`). Any Regency craft on gravity lift hangs
+/// on these; whatever it carries must come down onto the collars' tops.
+pub(super) fn lift_drum(b: &mut MeshBuilder, x: f32, y: f32, r: f32) {
+    b.add_lift(v3(x, y, MOUTH), r * 0.7);
+    metal(b);
+    let sides = b.sides(10);
+    b.prism(v3(x, y, 0.5), sides, r, r * 0.95, 0.28);
+    b.with_part(part::LOCOMOTION, |b| {
+        seam(b);
+        b.prism(v3(x, y, 0.28), sides, r * 0.86, r * 0.84, 0.46);
+        b.prism(v3(x, y, MOUTH), sides, r * 0.55, r * 0.7, 0.08);
+        if b.fine() {
+            b.paint(GLOW_LASER);
+            hoop(b, v3(x, y, 0.3), r * 0.7, 0.08, 0.05, 12);
+        }
+    });
 }
 
 /// The housing (turret): a bronze turntable, a dark armoured block swept back to a point

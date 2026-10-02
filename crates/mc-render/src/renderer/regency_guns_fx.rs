@@ -50,13 +50,14 @@
 use super::{Puff, Renderer, PUFF_RING};
 use crate::gpu_consts::{fade_beam, puff};
 use glam::Vec3;
-use mc_data::{BlueprintId, PlasmaGrade, Weapon};
+use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{
     ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
     PROJECTILE_FADE_BEAM, PROJECTILE_MISSILE, PROJECTILE_STARTS_SHIFT,
 };
 use std::mem::size_of;
 
+mod plasmeric;
 mod strike;
 
 const ORB: f32 = puff::PLASMA_ORB as f32;
@@ -101,20 +102,25 @@ const FUSION_TRAIL: (f32, f32) = (10.0, 1.8);
 pub(super) enum Grade {
     Bolt,
     Flak,
+    /// A lobbed Plasmeric shot: the Plasmeric Mortar (`plasmeric`).
+    Mortar,
     Pinched,
     Fusion,
 }
 
 /// The grade a weapon is drawn as: a plasma gun firing straight, laid flat with its shot
 /// arcing a little (`Weapon::flat_fire`, the Sunspear's), or lobbing it high (the
-/// Pinch-fusion Howitzer's), or a Gravitic Seeker (a guided plasma `missile`) with a
-/// proximity fuse, which leaves its cradle and bursts as flak does. None for a beam, a
-/// thrown charge, any other missile, or anything not plasma.
+/// Pinch-fusion Howitzer's; a lobbed Plasmeric shot is a Plasmeric Mortar), or a Gravitic
+/// Seeker (a guided plasma `missile`) with a proximity fuse, which leaves its cradle and
+/// bursts as flak does. None for a beam, a thrown charge, any other missile, or anything
+/// not plasma.
 pub(super) fn grade(w: &Weapon) -> Option<Grade> {
+    let lobbed = w.trajectory == Trajectory::Ballistic && !w.flat_fire;
     if w.beam || w.curve.0 > 0 {
         return None;
     }
     let grade = match w.plasma_shot()? {
+        PlasmaGrade::Plasmeric if lobbed && !w.missile => Grade::Mortar,
         PlasmaGrade::Plasmeric if w.proximity.0 > 0 => Grade::Flak,
         PlasmaGrade::Plasmeric => Grade::Bolt,
         PlasmaGrade::Pinched => Grade::Pinched,
@@ -593,41 +599,8 @@ impl Renderer {
             - w.pivot.map_or(Vec3::ZERO, |p| Vec3::from(p.to_f32())))
         .length();
         match grade {
-            Grade::Bolt | Grade::Flak => {
-                for k in 0..rounds {
-                    let when = time + k as f32 * round_gap;
-                    let mouth = at + dir * 0.4;
-                    let s = 1.6 * flash;
-                    self.push_lit(
-                        BURST,
-                        mouth,
-                        Vec3::ZERO,
-                        when,
-                        0.11,
-                        (s * 0.4, s),
-                        RED * 3.5,
-                        0.0,
-                    );
-                    self.push_lit(
-                        GLOW,
-                        mouth,
-                        Vec3::ZERO,
-                        when,
-                        0.08,
-                        (s * 0.5, s * 0.7),
-                        HOT * 2.0,
-                        0.0,
-                    );
-                    self.plasma_fx.guns.light(Glow {
-                        pos: mouth,
-                        color: RED * 60.0 * flash,
-                        range: 12.0,
-                        start: when,
-                        life: 0.1,
-                        pulse: 0.0,
-                    });
-                }
-            }
+            Grade::Bolt | Grade::Flak => self.bolt_fired(at, dir, rounds, flash, round_gap, time),
+            Grade::Mortar => self.mortar_fired(at, dir, flash, time),
             Grade::Pinched => {
                 // The ball pinches its plasma out as one jet (`Weapon::round_span`): a hard
                 // red flash where it hangs, a pulse at the mouth as each round of the jet
