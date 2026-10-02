@@ -45,23 +45,40 @@ fn the_unit_files_launcher_is_the_models() {
 #[test]
 fn strides_on_two_long_legs_in_boots() {
     let model = build_model("regency_bombard").unwrap();
-    let crawl = model.legs.and_then(|l| l.crawl).expect("a walker");
-    assert_eq!(crawl.pairs, 1);
-    let (hip, knee, foot, _) = LEG;
+    let legs = model.legs.expect("a walker");
+    assert!(legs.crawl.is_none(), "it walks as a biped");
     // Tall and lean: the leg is longer than the hull is high off it, the knee forward.
-    assert!(hip.z > HEIGHT * 0.55, "hip at {}", hip.z);
-    assert!(knee.x > hip.x + 0.5 && knee.x > foot.x + 0.5);
+    const { assert!(HIP.z > HEIGHT * 0.55) };
+    const { assert!(KNEE.x > HIP.x + 0.5 && KNEE.x > ANKLE.x + 0.5) };
+    // The stride's ends are in reach with the knees bent.
+    let reach = HIP.distance(KNEE) + KNEE.distance(ANKLE);
+    let half = STANCE * STRIDE * 0.5 + (ANKLE.x - HIP.x).abs();
+    let drop = HIP.z - CROUCH - ANKLE.z;
+    assert!(
+        half.hypot(drop) < reach - 0.2,
+        "{half} by {drop} out of {reach}"
+    );
     for lod in &model.lods[..2] {
-        let shin = |side: f32| {
+        let bone = |limb: u32, side: f32| {
             lod.vertices.iter().filter(move |v| {
                 v.part == part::LOCOMOTION
-                    && v.rig & rig::LIMB_MASK == rig::SHIN
+                    && v.rig & rig::LIMB_MASK == limb
                     && v.pos[1] * side > 0.0
             })
         };
         for side in [1.0, -1.0] {
-            let low = shin(side).map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            // The boot turns on the ankle, its sole on the ground; the shin stops above it.
+            let low = bone(rig::FOOT, side)
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
             assert!(low < 0.1, "boot sole at {low}");
+            let shin = bone(rig::SHIN, side)
+                .map(|v| v.pos[2])
+                .fold(f32::MAX, f32::min);
+            assert!(shin > ANKLE.z - 0.3, "shin down to {shin}");
+            for limb in [rig::THIGH, rig::SHIN] {
+                assert!(bone(limb, side).next().is_some());
+            }
         }
     }
 }

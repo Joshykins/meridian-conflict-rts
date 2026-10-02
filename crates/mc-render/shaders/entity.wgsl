@@ -544,6 +544,8 @@ struct Stance {
     raise: vec2<f32>,
     pitch: vec2<f32>,
     body: vec3<f32>,
+    // The hull's pitch about the hips, nose up (`stride_sway`).
+    nod: f32,
 }
 
 // One foot's share of a weight shift: how free the leg is (0 loaded .. 1 eased), and how
@@ -587,6 +589,24 @@ fn idle_stance(e: Entity, model: ModelInfo, walk: vec2<f32>, time: f32) -> Stanc
     s.raise = (free * 0.016 + vec2<f32>(l.y, r.y) * 0.04) * leg * still;
     let breath = 0.004 * leg * sin(time * 1.15 + seed * 60.0);
     s.body = vec3<f32>(0.025 * side, 0.02 * leg * side, -0.008 * leg + breath) * still;
+    return s;
+}
+
+// A heavy walker's hull in its stride (`Legs::sway`, `model.leg_sway`), added to how it
+// stands: it rolls up over the planted leg as the other side lets down, and as each foot
+// comes down it takes the weight, the nose dipping and the hull settling onto its knees,
+// then rising off them through the step. The hips ride with it (`walk_leg`).
+fn stride_sway(at_ease: Stance, model: ModelInfo, walk: vec2<f32>) -> Stance {
+    var s = at_ease;
+    // +1 with the left foot planted under the hull, -1 with the right.
+    let load = cos((walk.y - model.leg_ankle.w * 0.5) * 2.0 * PI);
+    // Each foot lands at the start of its half of the cycle; the weight comes onto it
+    // over the first 40% of that half.
+    let h = fract(walk.y * 2.0);
+    let land = select(0.0, sin(PI * h / 0.4), h < 0.4) * walk.x;
+    s.body.x += model.leg_sway.x * load * walk.x;
+    s.body.z -= model.leg_sway.z * land;
+    s.nod -= model.leg_sway.y * land;
     return s;
 }
 
@@ -1400,6 +1420,10 @@ fn vs_main(in: VsIn) -> VsOut {
         && (e.owner_flags & (KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
         stance = idle_stance(e, model, walk, time);
     }
+    if walks && !crawls && any(model.leg_sway.xyz != vec3<f32>(0.0))
+        && (e.owner_flags & (KIND_GHOST | FLAG_UNDER_CONSTRUCTION | FLAG_IN_FACTORY)) == 0u {
+        stance = stride_sway(stance, model, walk);
+    }
     // A hull going down (`WRECK_SINKING`, 2) is posed like a falling wreck: whole, pitched and
     // rolled by the sim as it sinks, not crumpled. It settles into an ordinary wreck on the seabed.
     let falling = (e.owner_flags & KIND_WRECK) != 0u && (e.packed == 1u || e.packed == 2u);
@@ -1911,10 +1935,11 @@ fn vs_main(in: VsIn) -> VsOut {
         }
     }
     if walks && in.part != PART_LOCOMOTION {
-        // Standing, the body rolls over its hips toward the loaded leg and shifts its way.
+        // Standing, the body rolls over its hips toward the loaded leg and shifts its way;
+        // a heavy walker's hull also rolls and nods with its stride (`stride_sway`).
         let hips = vec3<f32>(0.0, 0.0, model.leg_hip.z);
-        p = rot_x(p - hips, stance.body.x) + hips + vec3<f32>(0.0, stance.body.y, stance.body.z);
-        n = rot_x(n, stance.body.x);
+        p = rot_x(rot_xz(p - hips, stance.nod), stance.body.x) + hips + vec3<f32>(0.0, stance.body.y, stance.body.z);
+        n = rot_x(rot_xz(n, stance.nod), stance.body.x);
         p += walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z);
         if crawls {
             p.z += crawl_set(e, model, t);

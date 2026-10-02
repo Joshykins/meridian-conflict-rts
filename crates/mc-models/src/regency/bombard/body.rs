@@ -6,17 +6,18 @@ use glam::{Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
 use crate::material::*;
-use crate::part;
+use crate::{part, rig};
 
 use super::super::commander::form::{blade, ring, sleeve, KEEL, OCT};
 use super::super::kit::{dark_plate, metal, seam, v3};
-use super::{lifted, RING};
+use super::{lifted, ANKLE, HIP, KNEE, RING, SOLE};
 
-pub(super) fn hull(b: &mut MeshBuilder, hip: Vec3, foot: Vec3) {
+pub(super) fn hull(b: &mut MeshBuilder) {
     lifted(b, body);
     // The hip drums the legs turn in, bronze.
     b.mirror_y(|b| {
-        let out = (foot - hip).truncate().extend(0.0).normalize_or(Vec3::Y);
+        let hip = HIP;
+        let out = (ANKLE - hip).truncate().extend(0.0).normalize_or(Vec3::Y);
         metal(b);
         let sides = b.sides(8);
         b.cylinder_between(hip - out * 0.35, hip + out * 0.2, 0.42, 0.36, sides);
@@ -144,7 +145,7 @@ fn head(b: &mut MeshBuilder) {
 }
 
 /// Far off: a wedge of a body, flat legs that do not walk, the pod a box on the ring.
-pub(super) fn coarse(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
+pub(super) fn coarse(b: &mut MeshBuilder) {
     lifted(b, |b| {
         dark_plate(b);
         b.frustum(
@@ -161,11 +162,25 @@ pub(super) fn coarse(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
             v3(1.0, -0.45, 3.71),
         ]);
     });
+    // Each leg bone a fin still posed by the rig, the boot a wedge, so it walks from afar.
     b.with_part(part::LOCOMOTION, |b| {
         b.paint(PLATING_DARK);
         b.mirror_y(|b| {
-            b.face(&[hip, foot, knee]);
-            b.face(&[hip, knee, foot]);
+            let fin = |b: &mut MeshBuilder, a: Vec3, c: Vec3, w: f32| {
+                let (a0, a1) = (a - Vec3::X * w, a + Vec3::X * w);
+                b.face(&[a0, a1, c]);
+                b.face(&[a1, a0, c]);
+            };
+            b.with_limb(rig::THIGH, |b| fin(b, HIP, KNEE, 0.4));
+            b.with_limb(rig::SHIN, |b| fin(b, ANKLE, KNEE, 0.3));
+            b.with_limb(rig::FOOT, |b| {
+                let w = SOLE.2 * 0.5;
+                b.face(&[
+                    v3(ANKLE.x + SOLE.1, ANKLE.y, 0.02),
+                    v3(ANKLE.x + SOLE.0, ANKLE.y + w, 0.7),
+                    v3(ANKLE.x + SOLE.0, ANKLE.y - w, 0.7),
+                ]);
+            });
         });
     });
     super::pod::coarse(b);

@@ -8,8 +8,11 @@
 //! `form::blade`), dark bronze in the gaps (hip drums, the hinge, the ring), red optics and
 //! the red-lit tube mouths. No violet: it does not build.
 //!
-//! Rig: the hull is `HULL`. The legs are one pair of two bones posed by `entity.wgsl`
-//! `crawl_leg` (`MeshBuilder::set_crawl_legs`), the right half a cycle behind the left. The ring turns about the unit's middle (`part::TURRET`);
+//! Rig: the hull is `HULL`. The legs walk as a biped's (`MeshBuilder::set_legs`, posed by
+//! `entity.wgsl` `walk_leg`): thigh and shin solved to put the ankle where the boot has to
+//! be, the boot (`rig::FOOT`) flat on the ground under it while planted, rolling off its
+//! toe and reaching heel first for the next step, the hull settling onto bent knees and
+//! riding over the planted leg. The ring turns about the unit's middle (`part::TURRET`);
 //! the pod pitches about the hinge (`rig::ARM_GUN` about `PIVOT`). The numbers match
 //! `regency_t2_bombard` in `data/factions/regency/units/land_t2.ron`.
 
@@ -39,27 +42,37 @@ const MUZZLES: [Vec3; 2] = [
 /// Where the ring on the back turns.
 const RING: Vec3 = Vec3::new(0.0, 0.0, 3.85 + LIFT);
 
-/// The left leg at rest: hip, knee, the boot's sole under the ankle, and where in the
-/// cycle it lifts. Long and lean, the knee thrust forward.
-const LEG: (Vec3, Vec3, Vec3, f32) = (
-    Vec3::new(-0.2, 1.15, 2.7 + LIFT),
-    Vec3::new(0.9, 1.45, 2.05),
-    Vec3::new(-0.15, 1.6, 0.0),
-    0.0,
-);
+/// The left leg at rest: hip, knee and ankle. Long and lean, the knee thrust forward.
+const HIP: Vec3 = Vec3::new(-0.2, 1.15, 2.7 + LIFT);
+const KNEE: Vec3 = Vec3::new(0.9, 1.45, 2.05);
+const ANKLE: Vec3 = Vec3::new(-0.15, 1.6, 0.6);
+/// The gait: ground to a full cycle, the share of it each boot is planted, how high a
+/// boot is lifted on its way forward, and how far the hull settles onto its knees in
+/// stride. The legs reach about 4 m, so a stride of 8 needs the knees bent.
+const STRIDE: f32 = 8.0;
+const STANCE: f32 = 0.5;
+const STEP: f32 = 0.55;
+const CROUCH: f32 = 0.2;
+/// The hull's heft in its stride (`Legs::sway`): roll over the planted leg, the nose's
+/// dip and the settle onto the knees as each boot comes down.
+const SWAY: (f32, f32, f32) = (0.04, 0.035, 0.14);
+/// The boot's sole: behind the ankle (the heel), ahead of it (the toe), across.
+const SOLE: (f32, f32, f32) = (-0.9, 1.1, 0.8);
 
 pub(super) fn bombard(b: &mut MeshBuilder, _tech: u8) {
-    b.set_crawl_legs(&[LEG], 4.0, 0.6, 0.7);
+    b.set_legs(HIP, KNEE, ANKLE, STRIDE, STANCE, STEP);
+    b.set_walk_crouch(CROUCH);
+    b.set_walk_sway(SWAY.0, SWAY.1, SWAY.2);
+    b.set_foot(SOLE.0, SOLE.1, SOLE.2);
     b.set_turret_pivot(RING);
     b.set_arm_pivot(PIVOT);
     b.set_dust_line(1.0);
-    let (hip, knee, foot, _) = LEG;
     if b.coarse() {
-        body::coarse(b, hip, knee, foot);
+        body::coarse(b);
         return;
     }
-    body::hull(b, hip, foot);
-    b.mirror_y(|b| b.with_pair(0, |b| legs::leg(b, hip, knee, foot)));
+    body::hull(b);
+    b.mirror_y(legs::leg);
     pod::mount(b);
 }
 

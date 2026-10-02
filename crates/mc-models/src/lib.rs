@@ -449,6 +449,10 @@ pub struct Legs {
     /// How far the hips sink in full stride: bent knees give the legs the reach a
     /// long walking stride needs. Zero walks stood up.
     pub crouch: f32,
+    /// How a heavy walker's hull rides its stride (`MeshBuilder::set_walk_sway`): the roll
+    /// up over the planted leg (radians), the nose's dip as each foot comes down (radians)
+    /// and how far the hull settles onto its knees with it (metres). Zero rides level.
+    pub sway: [f32; 3],
     /// Sole in model space: metres behind the ankle, ahead of it, and the
     /// sole's width. Zero if this walker does not stamp the ground.
     pub foot: [f32; 3],

@@ -485,6 +485,15 @@ impl MeshBuilder {
         legs.crouch = self.transform.transform_vector3(Vec3::Z * crouch).z;
     }
 
+    /// Gives a walker's hull the heft of its stride (`Legs::sway`): it rolls `roll` radians
+    /// up over the planted leg, and as each foot comes down it dips its nose `nod` radians
+    /// and settles `settle` metres onto its knees, then rises off them. After `set_legs`.
+    pub fn set_walk_sway(&mut self, roll: f32, nod: f32, settle: f32) {
+        let settle = self.transform.transform_vector3(Vec3::Z * settle).z;
+        let legs = self.legs.as_mut().expect("set_legs first");
+        legs.sway = [roll, nod, settle];
+    }
+
     /// Runs `f` as a walker's head, turning about a neck at `neck` (current frame; its y
     /// is taken as the centreline) while the unit stands idle.
     pub fn with_head(&mut self, neck: Vec3, f: impl FnOnce(&mut Self)) {
@@ -911,6 +920,7 @@ impl MeshBuilder {
             stance,
             lift: self.transform.transform_vector3(Vec3::Z * lift).z,
             crouch: 0.0,
+            sway: [0.0; 3],
             foot: [0.0; 3],
             sole_chamfer: 0.0,
             hock: None,

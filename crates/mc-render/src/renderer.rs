@@ -419,9 +419,11 @@ pub(crate) struct ModelInfo {
     pub(crate) cell_grid: [u32; 4],
     /// A charge gun's working gear (`Model::charge_gear`): hub and travel scale. Zero for none.
     pub(crate) charge_gear: [f32; 4],
+    /// How a walker's hull rides its stride (`Legs::sway`): roll, nod and settle; w 0.
+    pub(crate) leg_sway: [f32; 4],
 }
 
-const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1040);
+const _: () = assert!(std::mem::size_of::<ModelInfo>() == 1056);
 
 // A prop's far level is the draw slot after its own levels.
 const _: () = assert!(models::LOD_COUNT as u32 == lod::FAR);
@@ -1449,6 +1451,9 @@ impl Renderer {
                     .map_or([0.0; 4], |(h, follow)| [h[0], h[1], h[2], follow]),
                 breech: model.breech.unwrap_or([0.0; 4]),
                 charge_gear: model.charge_gear.unwrap_or([0.0; 4]),
+                leg_sway: model
+                    .legs
+                    .map_or([0.0; 4], |l| [l.sway[0], l.sway[1], l.sway[2], 0.0]),
                 plan_box,
                 vtol: model.vtol.map_or([[0.0; 4]; 2], |v| v.gpu()),
                 cells: models::CellBlock::gpu(&model.cells).0,

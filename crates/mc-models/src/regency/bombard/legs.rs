@@ -1,7 +1,8 @@
 //! One left leg: a long keeled thigh from the hip drum down to a forward bronze knee, a
 //! faceted shin tapering back to the ankle with a greave swept up off its outside, and an
-//! armoured boot, its toe a keel. Thigh and shin ride their bones
-//! (`rig::THIGH`, `rig::SHIN`); nothing reaches across the knee.
+//! armoured boot, its toe a keel. Thigh, shin and boot ride their bones (`rig::THIGH`,
+//! `rig::SHIN`, `rig::FOOT`, the boot turning about the ankle); nothing reaches across a
+//! joint.
 
 use glam::Vec3;
 
@@ -10,13 +11,17 @@ use crate::{part, rig};
 
 use super::super::commander::form::{ball, blade, ring, sleeve, KEEL, OCT};
 use super::super::kit::{dark_plate, metal};
+use super::{ANKLE, HIP, KNEE};
 
-pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
+pub(super) fn leg(b: &mut MeshBuilder) {
+    let (hip, knee, ankle) = (HIP, KNEE, ANKLE);
+    // The sole, under the ankle.
+    let foot = Vec3::new(ankle.x, ankle.y, 0.0);
     let out = (foot - hip).truncate().extend(0.0).normalize_or(Vec3::Y);
     // Toward the outside of the leg's bend, for the keels.
     let outside = (Vec3::Z + out * 0.5).normalize();
     let thigh = knee - hip;
-    let shin = foot - knee;
+    let shin = ankle - knee;
     b.with_part(part::LOCOMOTION, |b| {
         b.with_limb(rig::THIGH, |b| {
             dark_plate(b);
@@ -46,7 +51,7 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
             metal(b);
             ball(b, knee, 0.3);
             dark_plate(b);
-            let end = foot + Vec3::Z * 0.55;
+            let end = ankle - Vec3::Z * 0.05;
             sleeve(
                 b,
                 &[
@@ -68,21 +73,21 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3) {
                 0.7,
                 0.12,
             );
-            {
-                // The boot: a faceted block, its toe a keel, under the ankle.
-                metal(b);
-                ball(b, foot + Vec3::Z * 0.6, 0.24);
-                dark_plate(b);
-                sleeve(
-                    b,
-                    &[
-                        ring(foot + Vec3::new(-0.75, 0.0, 0.3), Vec3::Z, 0.34, 0.28),
-                        ring(foot + Vec3::new(0.0, 0.0, 0.34), Vec3::Z, 0.42, 0.34),
-                        ring(foot + Vec3::new(0.95, 0.0, 0.24), Vec3::Z, 0.32, 0.22),
-                    ],
-                    &KEEL,
-                );
-            }
+        });
+        // The boot: a faceted block, its toe a keel, turning on the ankle.
+        b.with_limb(rig::FOOT, |b| {
+            metal(b);
+            ball(b, ankle, 0.24);
+            dark_plate(b);
+            sleeve(
+                b,
+                &[
+                    ring(foot + Vec3::new(-0.75, 0.0, 0.3), Vec3::Z, 0.34, 0.28),
+                    ring(foot + Vec3::new(0.0, 0.0, 0.34), Vec3::Z, 0.42, 0.34),
+                    ring(foot + Vec3::new(0.95, 0.0, 0.24), Vec3::Z, 0.32, 0.22),
+                ],
+                &KEEL,
+            );
         });
     });
 }

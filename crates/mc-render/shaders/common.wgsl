@@ -267,6 +267,10 @@ struct ModelInfo {
     // A charge gun's working gear (`Model::charge_gear`, `CHARGE_GEAR_*`): the hub its SPIN
     // gear turns about (xyz) and the scale of its travels (w). Zero for none.
     charge_gear: vec4<f32>,
+    // How a walker's hull rides its stride (`Legs::sway`, entity.wgsl `stride_sway`): x the
+    // roll up over the planted leg, y the nose's dip as a foot comes down (radians), z how
+    // far the hull settles onto its knees with it (metres); w 0. Zero rides level.
+    leg_sway: vec4<f32>,
 }
 
 // Mirrors mc_sim::mirror::HousePose (192 bytes): per weapon yaw off the hull last tick and
