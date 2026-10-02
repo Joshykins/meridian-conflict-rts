@@ -11,6 +11,7 @@
 //! its blueprint's size has its muzzles, pivots and emitters as the unit file's numbers;
 //! one built at another size says so.
 
+pub(crate) mod air;
 mod battle_tank;
 mod bombard;
 mod breaker;
@@ -195,6 +196,10 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_tidebrood" => 9000,
         // The tech 1 hulls; the tech 2 warships have a capital ship's detail, lighter.
         "regency_attack_boat" => 2400,
+        // The tech 1 air force: jets by the dozen, a transport the size of a frigate.
+        "regency_flechette" => 2200,
+        "regency_quarrel" | "regency_petard" | "regency_sickle" => 3200,
+        "regency_coffer" => 6000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,

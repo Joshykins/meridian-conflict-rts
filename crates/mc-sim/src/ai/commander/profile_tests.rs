@@ -79,3 +79,59 @@ fn every_armed_unit_of_every_race_has_a_role() {
         "armed units no plan can use: {missing:?}"
     );
 }
+
+/// A Commander playing the Regency fields its own air force: its Skyforge makes a
+/// fighter for the air guard, a bomber for strikes, an air scout and a salvage drone, and
+/// its Exarch raises a transport for landings, all of them the Regency's own.
+#[test]
+fn the_regency_builds_its_own_air_force() {
+    let b = roster();
+    let made_by = |key: &str| -> Vec<BlueprintId> {
+        b.unit(b.id_of(key).unwrap())
+            .builder
+            .as_ref()
+            .unwrap()
+            .builds
+            .clone()
+    };
+    for factory in [
+        "regency_t1_air_factory",
+        "regency_t2_air_factory",
+        "regency_t3_air_factory",
+    ] {
+        let made = made_by(factory);
+        let regency_air = |want: &dyn Fn(&Profile) -> bool| {
+            made.iter().any(|&id| {
+                let bp = b.unit(id);
+                let p = Profile::of(bp);
+                bp.key.starts_with("regency_") && p.domain == Some(Domain::Air) && want(&p)
+            })
+        };
+        assert!(
+            regency_air(&|p| p.has(role::ANTI_AIR)),
+            "{factory}: fighter"
+        );
+        assert!(regency_air(&|p| p.has(role::STRIKE)), "{factory}: bomber");
+        assert!(regency_air(&|p| p.has(role::SCOUT)), "{factory}: scout");
+        assert!(
+            made.iter()
+                .any(|&id| b.unit(id).key == "regency_t1_air_reclaimer"),
+            "{factory}: salvage drone"
+        );
+        assert!(
+            !made
+                .iter()
+                .any(|&id| b.unit(id).key == "aster_t1_rotor_gunship"),
+            "{factory}: no tech 1 gunship"
+        );
+    }
+    for builder in ["regency_commander", "regency_t1_engineer"] {
+        assert!(
+            made_by(builder).iter().any(|&id| {
+                b.unit(id).key.starts_with("regency_")
+                    && profile(&b, &b.unit(id).key).has(role::TRANSPORT)
+            }),
+            "{builder}: transport"
+        );
+    }
+}

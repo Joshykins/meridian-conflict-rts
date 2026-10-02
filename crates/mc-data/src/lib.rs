@@ -1633,7 +1633,8 @@ mod tests {
         assert_eq!(aster.id, FactionId(0));
         assert_eq!(aster.stand_in, None);
         assert_eq!(regency.stand_in, Some(aster.id));
-        // Their own commander, which builds only their own structures.
+        // Their own commander, which builds only their own structures and the craft raised
+        // on a lot (the Coffer).
         let commander = bp.unit(regency.commander);
         assert_eq!(commander.key, "regency_commander");
         assert_eq!(commander.faction, regency.id);
@@ -1648,9 +1649,8 @@ mod tests {
         assert_eq!(suites, ["eng_2", "eng_3", "shield"]);
         let builds = &commander.builder.as_ref().unwrap().builds;
         assert!(builds.len() >= 8);
-        assert!(builds
-            .iter()
-            .all(|&b| bp.unit(b).faction == regency.id && bp.unit(b).is_structure()));
+        assert!(builds.iter().all(|&b| bp.unit(b).faction == regency.id
+            && (bp.unit(b).is_structure() || bp.unit(b).is_site_built_unit())));
         // Their factories make their own engineer and, for now, the stand-in's fighters.
         for factory in bp
             .units

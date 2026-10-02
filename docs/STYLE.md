@@ -208,6 +208,8 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Heavy destroyer, cruiser | Claymore, Pavise |
 | Bombardment walker (T2) | Sower |
 | Battleship, carrier, assault submarine | Flamberge, Mantlet, Rapier |
+| Air scout, fighter, bomber (T1) | Flechette, Quarrel, Petard |
+| Light transport, salvage drone (T1) | Coffer, Sickle |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
 | Storage | Reliquary |

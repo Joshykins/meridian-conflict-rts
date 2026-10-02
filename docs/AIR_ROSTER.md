@@ -407,3 +407,25 @@ Nine weapons: `mc_data::MAX_WEAPONS` is 10 for it. The model (`mc-models
 aster/air/dominion/`) is an aft block, a pinched waist with a lit hangar recess and a
 forward block, a ventral hull, a terraced prow, and "ARC" and "DOMINION" painted on the
 walls (`lettering.rs`, flat stencil glyphs).
+
+## The Regency's air force: tech 1 (2026-10-02)
+
+The Regency build their own aircraft (`data/factions/regency/units/air.ron`, models
+`crates/mc-models/src/regency/air/`). Their jets are drones in the Cybertronian-jet manner:
+a nose blade, down-turned fins, dark plates lapped back over bronze workings, red optics and
+red heat in the exhausts. What hovers hangs on lift bells with red plasma under them: no
+rotors, no jet plumes. Each is anchored on ARC's unit of the same job.
+
+| Unit (key) | Job | ARC counterpart | How it differs |
+| --- | --- | --- | --- |
+| Flechette (`regency_t1_air_scout`) | Air scout, unarmed | Swift | The fastest thing in the air (270 m/s), a wider turn, thinner skin |
+| Quarrel (`regency_t1_fighter`) | Fighter: Twin Plasmeric Repeater, aircraft only | Shrike | About the same damage a second in heavier bolts, a little less reach; crescent wing |
+| Petard (`regency_t1_bomber`) | Light bomber: a stick of three Plasmeric Bombs | Petrel | 270 a pass in three lighter bombs strung along the run; a cleaver of a flying wing |
+| Coffer (`regency_t1_transport`) | Light transport, eight slots, raised on a 7x5 lot by the Exarch and Artificers | Courier | No warp drive, a little quicker; an open-sterned box hold between two sponsons on six lift bells |
+| Sickle (`regency_t1_air_reclaimer`) | Salvage drone: one nanite head under it, works wrecks as it flies | Magpie | Takes apart faster (power 5 to 4) at a shorter reach (380 m to 450 m); a pod with two hooked blades on three lift bells |
+
+The Skyforge (all three tiers) makes the Quarrel, Petard, Flechette and Sickle; there is no
+tech 1 gunship. The Sickle's stream is drawn as the Regency's nanite strands, as the
+Breaker's is. The Commander AI fields them by role like any other unit
+(`ai::commander::profile` test `the_regency_builds_its_own_air_force`). Sounds are still
+ARC stand-ins (`aster_jet`, `aster_hover`).

@@ -1,0 +1,134 @@
+// The Regency's tech 1 air force (docs/AIR_ROSTER.md "The Regency's air force"). Their jets
+// are drones in the Cybertronian-jet manner: a nose blade, down-turned fins, dark plates
+// lapped back over bronze workings, red optics, red heat in the exhausts. What hovers hangs
+// on gravity lift bells, red plasma crackling under them: no rotors, no jet plumes.
+//
+// Every weapon names its grade (`plasma_grade`): their guns and bombs are plasma. Each is
+// anchored on ARC's unit of the same job and bent the Regency way. Models:
+// `models::regency::air::*`, authored at the sizes here, so every muzzle, pivot and lens
+// below is the model's own number.
+[
+    // The air scout: a dart, the fastest thing in the air, unarmed. Where ARC's Swift
+    // circles over what it finds, the Flechette is through and gone: well over twice its
+    // speed, a wider turn, a little thinner skin. Model: `regency_flechette`.
+    (
+        key: "regency_t1_air_scout",
+        name: "Flechette",
+        role: "Air Scout", title: "Air Scout",
+        tech: 1,
+        categories: ["Air", "Scout", "Intel"],
+        health: 45,
+        cost: (mass: 20, energy: 350, time: 120),
+        radius: 3.5, height: 1.4,
+        vision: 1100, radar: 3600,
+        motion: (layer: Air, size: 0, speed: 270, accel: 110, turn: 95, altitude: 260),
+        weapons: [],
+        mesh: "regency_flechette", icon: Scout,
+        // A stand-in: ARC's jet until the Regency has a drive sound of their own.
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    // The fighter: a Twin Plasmeric Repeater in a pod either side of the nose, bolts every
+    // 0.35 s at aircraft only. Anchored on the Shrike: about its damage a second (46 to 47)
+    // in heavier bolts at a little less reach, a touch quicker, a touch less armour. Model:
+    // `regency_quarrel`; the muzzles are its pods' lenses.
+    (
+        key: "regency_t1_fighter",
+        name: "Quarrel",
+        role: "Fighter", title: "Fighter",
+        tech: 1,
+        categories: ["Air", "AntiAir", "DirectFire"],
+        health: 240,
+        cost: (mass: 45, energy: 770, time: 360),
+        radius: 3.6, height: 1.6,
+        vision: 480,
+        motion: (layer: Air, size: 0, speed: 125, accel: 34, turn: 74, altitude: 200),
+        weapons: [(
+            name: "Twin Plasmeric Repeater",
+            damage: 16, range: 210, reload: 0.35, speed: 480, trajectory: Direct,
+            turret_turn: 180, arc: 40, muzzle: (3.3, 0, 0.62),
+            muzzles: [(3.3, -0.55, 0.62), (3.3, 0.55, 0.62)],
+            targets: ["Air"], color: Orange, red: 1.0,
+            plasma_grade: Some(Plasmeric),
+            flash: 0.6, impact: 0.6, tracer: 0.8,
+            sounds: (fire: "regency_repeater_light", impact: "regency_repeater_light_hit"),
+        )],
+        mesh: "regency_quarrel", icon: Fighter,
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    // The bomber: a blade of a wing that lays a short stick of three Plasmeric Bombs along
+    // its run, each a charge of plasma held in gravity until it lands. Anchored on the
+    // Petrel's pair (260 a pass): 270 a pass in three lighter bombs strung out along the
+    // ground, so a column under it takes more of them. Model: `regency_petard`; the bombs
+    // leave its bay.
+    (
+        key: "regency_t1_bomber",
+        name: "Petard",
+        role: "Light Bomber", title: "Bomber",
+        tech: 1,
+        categories: ["Air"],
+        health: 250,
+        cost: (mass: 60, energy: 980, time: 420),
+        radius: 5.6, height: 2.2,
+        vision: 520,
+        motion: (layer: Air, size: 0, speed: 86, accel: 22, turn: 44, altitude: 200),
+        weapons: [(
+            name: "Plasmeric Bomb",
+            damage: 90, splash: 18, range: 320, reload: 5.0, salvo: 3, salvo_delay: 0.2,
+            speed: 90, trajectory: Ballistic, loft: 0.4,
+            muzzle: (0.4, 0, 0.5),
+            spread: 6,
+            targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+            plasma_grade: Some(Plasmeric),
+            flash: 0.0, impact: 1.4, tracer: 0.6,
+            sounds: (fire: "bomb_release", impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
+        )],
+        mesh: "regency_petard", icon: Bomber,
+        sounds: (death: "blast_small", moving: "aster_jet"),
+    ),
+    // The light transport: an open-ended box of a hold slung between lift bells, raised on
+    // a lot by the Exarch and the Artificers as ARC's Courier is by its builders. It sets
+    // the hold down flat on the ground and units drive in at the stern. No warp drive (the
+    // Regency's one exception is gravity, not jumps), so it cruises a little quicker than
+    // the Courier and carries as much. Model: `regency_coffer`; the hold's numbers are its.
+    (
+        key: "regency_t1_transport",
+        name: "Coffer",
+        role: "Light Transport", title: "Transport",
+        tech: 1,
+        categories: ["Air"],
+        health: 420,
+        cost: (mass: 160, energy: 2400, time: 800),
+        radius: 40, height: 22, footprint: (7, 5), hull: (40, 28), vision: 320,
+        motion: (layer: Air, size: 0, speed: 165, accel: 42, turn: 90, altitude: 140, hover: true, deploy: 0.6),
+        transport: (capacity: 8, descent: 120, hold: (-4, 0), ramp: (-30, -34), width: 18, floor: 0, clearance: 13, unload: 0.25),
+        weapons: [],
+        mesh: "regency_coffer", icon: Transport,
+        lights: [(kind: Point, at: (0, 0, 0.5), color: (1.0, 0.14, 0.06), intensity: 260, range: 46, night_only: false)],
+        sounds: (death: "blast", moving: "aster_hover"),
+    ),
+    // The salvage drone: a small craft on lift bells that works wrecks from the air as it
+    // flies, with a nanite head hung under it that turns full circle and looks straight
+    // down. Regency reclaim is nanite work, drawn as the faction's strands. Anchored on the
+    // Magpie; bent as the Breaker is from the Gleaner: its nanites take apart a quarter
+    // faster (power 5 to 4) at a shorter reach (380 to 450), a little quicker, a little
+    // thinner. Model: `regency_sickle`; the head's pivot and lens are its numbers.
+    (
+        key: "regency_t1_air_reclaimer",
+        name: "Sickle",
+        role: "Salvage Drone", title: "Salvage Drone",
+        tech: 1,
+        categories: ["Air"],
+        health: 180,
+        cost: (mass: 55, energy: 650, time: 300),
+        radius: 3.0, height: 1.6,
+        vision: 420,
+        motion: (layer: Air, size: 0, speed: 84, accel: 34, turn: 160, altitude: 30, hover: true),
+        weapons: [],
+        mesh: "regency_sickle", icon: SalvageDrone,
+        lights: [(kind: Point, at: (0, 0, 0.2), color: (1.0, 0.14, 0.06), intensity: 40, range: 9, night_only: false)],
+        sounds: (death: "blast_small", moving: "aster_hover"),
+        reclaimer: (power: 5, range: 380, charge: 0.8, mobile: true, heads: [
+            (pivot: (0.6, 0, 0.45), emitter: (1.4, 0, 0.45), turn: 240, pitch: (-90, 15)),
+        ]),
+    ),
+]

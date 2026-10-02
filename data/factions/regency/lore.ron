@@ -160,6 +160,30 @@
             "Gravitic Seeker Pod": "Six gravitic seekers for aircraft, launched with the hull up.",
         },
     ),
+    "regency_t1_air_scout": (
+        lore: "A dart of a drone and the fastest thing in the sky; it carries nothing but its eyes, and is gone before a gun can turn.",
+        weapons: {},
+    ),
+    "regency_t1_fighter": (
+        lore: "A small jet drone with a plasmeric gun either side of its nose, built to hunt other aircraft.",
+        weapons: {
+            "Twin Plasmeric Repeater": "Two light plasmeric guns that throw bolts of plasma held tight by gravity, fast enough to catch a plane.",
+        },
+    ),
+    "regency_t1_bomber": (
+        lore: "A blade of a wing that runs in over the line and lays a short stick of plasma along it.",
+        weapons: {
+            "Plasmeric Bomb": "A charge of plasma held in gravity until it lands, then let go all at once.",
+        },
+    ),
+    "regency_t1_transport": (
+        lore: "A plated hold slung between lift bells; it sets down flat, takes a company aboard at the stern and lifts it across anything.",
+        weapons: {},
+    ),
+    "regency_t1_air_reclaimer": (
+        lore: "A small craft that hangs over a wreck field on its lift bells, unpicking what lies under it with a nanite head as it drifts on.",
+        weapons: {},
+    ),
     "regency_t1_attack_boat": (
         lore: "A blade of a boat that lies just under the surface where no gun can find it, and comes up only to fire.",
         weapons: {
