@@ -324,7 +324,7 @@ fn check_shots(
         assert!(
             mesh.vertices
                 .iter()
-                .all(|v| v.pos[2] >= -1e-3 || down_the_pit(v)),
+                .all(|v| v.pos[2] >= -1e-3 || down_the_pit(v) || part::afloat_only(v.part)),
             "{name}: below ground"
         );
         let barrel = muzzles.iter().map(|m| m[0].hypot(m[1])).fold(0.0, f32::max);

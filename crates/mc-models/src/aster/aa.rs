@@ -1,6 +1,7 @@
 //! Amphibious emplacements and tracked AA share recognisable weapon assemblies.
 use super::parts::*;
 mod flak_battery;
+mod floats;
 mod gnat;
 mod skyguard;
 mod squall;
@@ -87,7 +88,9 @@ fn platform(b: &mut MeshBuilder, radius: f32) {
         }
     });
 }
+/// Sparrow: the tech 1 AA gun, on a pontoon at sea (`floats`).
 pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
+    floats::pontoon(b, SPARROW_PAD);
     if !b.fine() {
         reduced_aa(b, 6.0, 6.0);
         return;
@@ -97,14 +100,19 @@ pub(super) fn gun(b: &mut MeshBuilder, _: u8) {
     b.prism(v3(0.0, 0.0, 1.0), b.sides(8), 1.5, 1.2, 4.3);
     mount(b, 6.0);
 }
-/// Barrage: the tech 2 flak battery.
+/// Barrage: the tech 2 flak battery, on a pontoon at sea.
 pub(super) fn flak_battery(b: &mut MeshBuilder, _: u8) {
     flak_battery::build(b);
+    floats::pontoon(b, BARRAGE_PAD);
 }
-/// Skyguard: the tech 3 SAM site (`skyguard.rs`).
+/// Skyguard: the tech 3 SAM site (`skyguard.rs`), on a pontoon at sea.
 pub(super) fn sam(b: &mut MeshBuilder, _: u8) {
     skyguard::build(b);
+    floats::pontoon(b, skyguard::PAD);
 }
+/// Half the Sparrow's pad and the Barrage's (`platform`).
+const SPARROW_PAD: f32 = 5.5 * 0.85;
+const BARRAGE_PAD: f32 = 9.5 * 0.85;
 /// Tracked AA by tier: the Gnat, then the Squall.
 pub(super) fn mobile(b: &mut MeshBuilder, tech: u8) {
     if tech == 1 {

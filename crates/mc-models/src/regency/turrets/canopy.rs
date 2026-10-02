@@ -1,14 +1,15 @@
 //! The Canopy (anti-air, a one-cell lot): a Plasmeric Flak Cannon throwing proximity
 //! rounds at aircraft, two a shot: the organ. Four short flak tubes side by side in one
 //! clamped block, held up at the sky even at rest so it reads as anti-air from any angle,
-//! on a tripod of plated struts round a bronze column.
+//! on a tripod of plated struts round a bronze column. Built at sea it stands on a
+//! triangular raft.
 //!
 //! Its pivot and muzzle are the unit file's (`data/factions/regency/units/structures.ron`):
 //! one muzzle, the middle of the row of tube mouths.
 
 use glam::{Vec2, Vec3};
 
-use crate::builder::MeshBuilder;
+use crate::builder::{MeshBuilder, Section};
 use crate::material::*;
 use crate::{part, rig};
 
@@ -45,11 +46,47 @@ pub(crate) fn canopy(b: &mut MeshBuilder, _tech: u8) {
         return;
     }
     tripod(b);
+    raft(b);
     b.with_part(part::TURRET, |b| {
         cradle(b, 5.3, 2.05);
         b.with_limb(rig::ARM_GUN, |b| {
             gun_frame(b, &LINE, |b| organ(b, LINE.len()))
         });
+    });
+}
+
+/// Built at sea, the tripod stands on one triangular raft (`part::AFLOAT`, drawn only in
+/// water): a plated pontoon under all three feet with a bronze rim round its deck.
+fn raft(b: &mut MeshBuilder) {
+    b.with_part(part::AFLOAT, |b| {
+        let plan: Vec<[f32; 2]> = (0..3)
+            .flat_map(|k| {
+                let a = (120.0 * k as f32).to_radians();
+                [a - 0.3, a + 0.3].map(|t| [t.cos() * 6.0, t.sin() * 6.0])
+            })
+            .collect();
+        dark_plate(b);
+        if !b.fine() {
+            b.loft_z(&plan, &[Section::new(-1.1, 0.9), Section::new(0.38, 1.0)]);
+            return;
+        }
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(-1.1, 0.86),
+                Section::new(-0.4, 0.98),
+                Section::new(0.0, 1.0),
+            ],
+        );
+        metal(b);
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(0.0, 1.0),
+                Section::new(0.3, 1.0),
+                Section::new(0.38, 0.97),
+            ],
+        );
     });
 }
 

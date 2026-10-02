@@ -23,7 +23,7 @@ const BLOCK: f32 = OFFSET + HALF + 0.75;
 /// Where the block stands, on the pad's top.
 const FOOT: f32 = 0.9;
 /// Half the pad's width.
-const PAD: f32 = 10.2;
+pub(super) const PAD: f32 = 10.2;
 /// The deckhouse's middle, behind the block.
 const TOWER: f32 = -5.7;
 /// The deckhouse's plan at its foot, one quarter: a side across x, a diagonal facet
