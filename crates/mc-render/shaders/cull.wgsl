@@ -76,8 +76,10 @@ fn has_icon(flags: u32) -> bool {
     return (flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | FLAG_IN_FACTORY)) == 0u;
 }
 
-fn radar_only(flags: u32) -> bool {
-    return (flags & STATE_RADAR) != 0u;
+// A radar contact vision has never named: a blip, never the hull sitting in the fog.
+// Once scouted, the contact is drawn as its model, darkened by the fog like the ground.
+fn blip_only(flags: u32) -> bool {
+    return (flags & STATE_UNIDENTIFIED) != 0u;
 }
 
 // The icon slot as well, for an entity `classify` gave a model slot.
@@ -130,8 +132,7 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     if (flags & KIND_GHOST) != 0u {
         return model.slot;
     }
-    if radar_only(flags) {
-        // A radar contact is a blip, never the hull sitting in the fog.
+    if blip_only(flags) {
         if has_icon(flags) {
             return globals.counts.z - 1u;
         }
