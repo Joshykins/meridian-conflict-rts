@@ -15,8 +15,9 @@
 
 // Regency plate: dark gunmetal with a cool cast, grey enough for its seams and wear to read.
 const REG_GUNMETAL: vec3<f32> = vec3<f32>(0.042, 0.044, 0.049);
-// What catches the light on a plate's edge.
-const REG_STEEL_LIT: vec3<f32> = vec3<f32>(0.2, 0.205, 0.225);
+// The plate as metal (its reflectance), and where it is worn bright.
+const REG_STEEL: vec3<f32> = vec3<f32>(0.11, 0.11, 0.115);
+const REG_STEEL_LIT: vec3<f32> = vec3<f32>(0.34, 0.34, 0.35);
 // The machinery: a dark bronze a little off true bronze, and the gold it polishes to.
 const REG_BRONZE: vec3<f32> = vec3<f32>(0.3, 0.19, 0.095);
 const REG_BRONZE_DEEP: vec3<f32> = vec3<f32>(0.075, 0.045, 0.025);
@@ -283,6 +284,10 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
     out.tone *= 1.0 + 0.2 * surf_fbm3(i.local + vec3<f32>(21.0, 4.0, 13.0), i.scale * 1.6, fw);
     out.tone *= 1.0 + 0.12 * surf_fbm3(i.local + vec3<f32>(5.0, 11.0, 2.0), i.scale * 0.4, fw);
     out.rough += 0.06 * surf_fbm3(i.local * vec3<f32>(0.3, 1.0, 1.0), i.scale * 0.8, fw);
+    // Smudges and handling marks: the sheen goes dull and bright in soft patches.
+    out.rough += 0.3 * surf_fbm3(i.local + vec3<f32>(13.0, 2.0, 8.0), i.scale * 0.45, fw);
+    // Grime in the seams dulls them.
+    out.rough += 0.3 * (1.0 - smoothstep(w, w * 5.0, min(seams.d.x, line.x))) * seen;
     return out;
 }
 
@@ -342,14 +347,13 @@ fn regency_paint(m_in: Pbr, bronze: bool, look: RegencyLook) -> Pbr {
         m.metallic = 0.88;
         m.roughness = clamp(0.4 + look.rough - 0.18 * look.lift, 0.22, 0.6);
     } else {
-        m.albedo = REG_GUNMETAL * clamp(0.6 + lum * 3.5, 0.6, 2.8) * look.tone;
-        m.albedo = mix(m.albedo, REG_STEEL_LIT, saturate(look.lift) * 0.5);
-        // A satin gunmetal: it catches the light, but a broad flat plate at the sun's
-        // mirror angle must not glint white across its whole face.
-        // Lit edges are brighter metal, not glossier: a glossy lip only picks up the
-        // reflections' noise.
-        m.roughness = clamp(clamp(m.roughness * 0.8, 0.56, 0.68) + look.rough, 0.45, 0.8);
-        m.metallic = min(m.metallic, 0.25);
+        // Bare dark steel, not paint: a metal, so its colour is what it reflects, and
+        // what makes it read as real is its sheen varying, smudged here, polished bright
+        // where it is worn, dull with grime in its seams.
+        let tone = look.tone * clamp(0.8 + lum, 0.8, 1.2);
+        m.albedo = mix(REG_STEEL * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
+        m.metallic = 0.65;
+        m.roughness = clamp(0.55 + look.rough - 0.08 * saturate(look.lift), 0.36, 0.88);
     }
     return m;
 }

@@ -327,10 +327,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             let groove = 1.0 - smoothstep(0.03, 0.03 + px, side);
             let lip = (1.0 - smoothstep(0.12, 0.12 + px, side)) * (1.0 - groove);
             let edge = 1.0 - smoothstep(0.1, 0.1 + px, foot);
-            albedo = mix(albedo, REG_STEEL_LIT, 0.5 * max(lip, edge));
+            albedo = mix(albedo, REG_STEEL_LIT, 0.35 * max(lip, edge));
             albedo *= 1.0 - 0.7 * groove;
         } else {
-            albedo = mix(albedo, REG_STEEL_LIT, 0.2);
+            albedo = mix(albedo, REG_STEEL_LIT, 0.12);
         }
     } else {
         // Bronze: the machinery the plates lie over, showing at each step, and the
