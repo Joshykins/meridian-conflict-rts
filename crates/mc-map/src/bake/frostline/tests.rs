@@ -113,13 +113,12 @@ fn the_wall_stands_in_the_sea_and_blocks_little() {
             .fold(f64::INFINITY, f64::min);
         assert!(nearest > 790.0, "towers {nearest:.0} m apart");
     }
-    // Over the bridge the wall is light in the ground.
-    let lit = t
+    // Over land the wall is the shader's line of light alone: no conduit
+    // pieces, which stepped in and out of the slopes they crossed.
+    assert!(!t
         .precursor
         .iter()
-        .filter(|s| s.kind == PropKind::PrecursorConduit && dist((s.x, s.y), mid) < 900.0)
-        .count();
-    assert!(lit >= 12, "{lit} conduits across the bridge");
+        .any(|s| s.kind == PropKind::PrecursorConduit));
 }
 
 /// `FROSTLINE_RELIEF=x0,y0,span,px,out.ppm cargo test --profile gate -p mc-map --lib frostline_relief -- --ignored`:

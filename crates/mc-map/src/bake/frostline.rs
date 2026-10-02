@@ -832,10 +832,10 @@ impl Terrain {
     /// The wall as built: a tower at every corner of its line and others
     /// between them about [`TOWER_PITCH`] apart, wherever the line runs
     /// through open sea, each standing on the sea floor as it is (no ground
-    /// is made for it: its foot goes down into the water); and light in the
-    /// ground along the line wherever it crosses land, which is all the wall
-    /// is over the bridge and the islands. Laid from the middle outward, the
-    /// south the north turned. Map metres.
+    /// is made for it: its foot goes down into the water). Over the bridge and
+    /// the islands nothing is built: the wall there is the line of light the
+    /// terrain shader draws on it (`wall_seam`). Laid from the middle outward,
+    /// the south the north turned. Map metres.
     pub(super) fn machine_wall(&self) -> Machine<'_> {
         let mut m = Machine::new(self, 44.0);
         let mid = (self.size_x / 2.0, self.size_y / 2.0);
@@ -859,18 +859,6 @@ impl Terrain {
                         m.put(PropKind::PrecursorTower, p, heading, 1.0);
                     }
                 }
-            }
-            // Light in the ground along the line, where it is land.
-            let mut along = 30.0;
-            while along < len {
-                let t = along / len;
-                let at = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
-                for p in [at, self.turned(at)] {
-                    if self.natural(p.0, p.1) > 2.5 {
-                        m.conduit(p, heading);
-                    }
-                }
-                along += 61.0;
             }
             from = to;
         }
