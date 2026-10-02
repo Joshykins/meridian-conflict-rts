@@ -850,7 +850,8 @@ impl Renderer {
             bind_pass_set(self.sprites_set);
             // Eight-sided casing, nose, rear cap, four fins, and a cruise missile's wings.
             device.cmd_draw(cmd, 132, self.projectile_count, 0, 0);
-            // Strategic missiles: a lathed body and four fins each (nuke.wgsl `MISSILE_VERTS`).
+            // Strategic missiles: a lathed body and four fins each, or a Regency body and its
+            // collars (nuke.wgsl `MISSILE_VERTS`, nova.wgsl).
             let (nuke_count, strategic_count) = (nuke_view[2] as u32, nuke_view[3] as u32);
             if strategic_count > 0 {
                 self.timers

@@ -228,9 +228,13 @@ impl Blast {
         time - self.start < self.life() || time - self.fed() < self.life()
     }
 
-    /// Mirrors nuke.wgsl `head_radius`.
+    /// Mirrors nuke.wgsl `head_radius` (a nova's: nova.wgsl `nova_radius`).
     fn head_radius(&self, time: f32) -> f32 {
         let t = self.age(time);
+        if self.plasma() {
+            let grow = 200.0 * (1.0 - (-t * 3.0).exp()).sqrt() + 120.0 * (1.0 - (-t / 14.0).exp());
+            return self.scale * grow * (1.0 - 0.45 * smoothstep(50.0, NOVA_LIFE, t));
+        }
         self.scale * (240.0 * (1.0 - (-t * 3.0).exp()).sqrt() + 430.0 * (1.0 - (-t / 26.0).exp()))
     }
 
@@ -239,8 +243,13 @@ impl Blast {
         self.scale.min(self.scale.powf(0.6))
     }
 
-    /// Mirrors nuke.wgsl `head_height`.
+    /// Mirrors nuke.wgsl `head_height` (a nova's: nova.wgsl `nova_height`).
     fn head_height(&self, time: f32) -> f32 {
+        if self.plasma() {
+            let t = self.age(time);
+            return self.rise()
+                * (300.0 * (1.0 - (-t / 3.0).exp()).sqrt() + 260.0 * (1.0 - (-t / 20.0).exp()));
+        }
         let x = (self.age(time) / 30.0).powf(1.35);
         self.rise() * 1700.0 * (1.0 - (-x).exp())
     }
@@ -1049,7 +1058,8 @@ mod shots {
     /// by default), `NUKE_CAM` = `dist,yaw,tilt` (radians), `NUKE_TIMES` = seconds after the
     /// burst to write (`0.05,1,3,...`), `NUKE_OUT` the folder, `NUKE_SIZE` = `w,h`,
     /// `NUKE_RADIUS` the damage radius (520 a warhead, 300 a commander). `NUKE_MISSILE=1`
-    /// flies a warhead and an interceptor across the view first instead. `NUKE_LOOK=plasma`
+    /// flies a warhead and an interceptor across the view first instead (`NUKE_FOLLOW=dist`
+    /// keeps the eye that far off the warhead). `NUKE_LOOK=plasma`
     /// draws all of it as the Regency's (a nova, their missiles).
     #[test]
     #[ignore = "requires Vulkan and maps/dev16.mcmap"]
@@ -1143,6 +1153,9 @@ mod shots {
         // `NUKE_MISSILES=n`: n warheads come down on the mark from all round (a salvo in flight).
         let flights = nums("NUKE_MISSILES", "1")[0].max(1.0) as usize;
         let missile = std::env::var("NUKE_MISSILE").is_ok() || flights > 1;
+        let follow = std::env::var("NUKE_FOLLOW")
+            .ok()
+            .map(|v| v.trim().parse::<f32>().unwrap());
         let start = 100.0;
         let burst = if missile { start + 12.0 } else { start };
         let last = times.iter().copied().fold(0.0, f32::max);
@@ -1227,6 +1240,12 @@ mod shots {
                         look: look as u32,
                     });
                 }
+            }
+            // `NUKE_FOLLOW=dist`: the eye rides that far off the first warhead in flight.
+            if let (Some(d), Some(m)) = (follow, frame.strategic.first()) {
+                let alpha = ((t - start) / 0.1).fract();
+                camera.focus = Vec3::from(m.prev_pos).lerp(Vec3::from(m.pos), alpha);
+                camera.distance = d;
             }
             let clock = std::time::Instant::now();
             renderer

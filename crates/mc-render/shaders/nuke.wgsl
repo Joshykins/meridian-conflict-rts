@@ -93,6 +93,9 @@ fn blast_of(i: u32) -> Blast {
 // Radius of the fireball, which becomes the cap: out in a second, then growing slowly as
 // it climbs and draws air in.
 fn head_radius(n: Blast) -> f32 {
+    if is_nova(n) {
+        return nova_radius(n);
+    }
     let t = n.age;
     return n.scale * (240.0 * sqrt(1.0 - exp(-t * 3.0)) + 430.0 * (1.0 - exp(-t / 26.0)));
 }
@@ -100,6 +103,9 @@ fn head_radius(n: Blast) -> f32 {
 // Height of the head's middle over the burst: it hangs a few seconds, then climbs, and
 // takes about a minute to reach its height.
 fn head_height(n: Blast) -> f32 {
+    if is_nova(n) {
+        return nova_height(n);
+    }
     let x = pow(n.age / 30.0, 1.35);
     return rise(n) * 1700.0 * (1.0 - exp(-x));
 }
@@ -113,7 +119,7 @@ fn rise(n: Blast) -> f32 {
 
 // How far the ball has rolled over into a cap on a ring: 0 a ball, 1 a mushroom's cap.
 fn roll(n: Blast) -> f32 {
-    return smoothstep(4.0, 24.0, n.age);
+    return select(smoothstep(4.0, 24.0, n.age), 0.0, is_nova(n));
 }
 
 // How much slower a bigger blast's fire runs: a megaton ball burns for many seconds.
@@ -479,13 +485,16 @@ fn column_box(n: Blast) -> Box {
     let rc = head_radius(n);
     let hc = head_height(n);
     var reach = max(rc * 1.9, n.scale * 1100.0 * smoothstep(8.0, 30.0, n.age)) + length(n.drift) + 60.0;
+    var top = hc + rc * 1.1;
     if is_nova(n) {
-        let ring = nova_ring(n);
-        reach = max(reach, ring.y + ring.z * 3.0 + length(n.drift) + 60.0);
+        // The star and its hourglass of rings, tilted.
+        let rings = nova_ring_reach(n);
+        reach = max(rc * 1.5, rings) + length(n.drift) + 60.0;
+        top = hc + rc * 1.7 + rings * 0.4;
     }
     var b: Box;
     b.lo = vec3<f32>(n.at.xy - vec2<f32>(reach), n.ground - 20.0);
-    b.hi = vec3<f32>(n.at.xy + vec2<f32>(reach), n.at.z + hc + rc * 1.1 + 60.0);
+    b.hi = vec3<f32>(n.at.xy + vec2<f32>(reach), n.at.z + top + 60.0);
     return b;
 }
 
@@ -499,6 +508,12 @@ fn surge_box(n: Blast) -> Box {
     let reach = max(curtain, n.scale * 1500.0) + 150.0;
     b.lo = vec3<f32>(n.at.xy - vec2<f32>(reach), n.ground - 10.0);
     b.hi = vec3<f32>(n.at.xy + vec2<f32>(reach), n.ground + 200.0 * n.scale + 20.0);
+    if is_nova(n) {
+        // A nova's sheet follows the ground in view up hills and down into hollows
+        // (`nova_surge`, which lets it go before these bounds).
+        b.lo.z = n.ground - 150.0 * n.scale - 10.0;
+        b.hi.z = n.ground + 400.0 * n.scale + 20.0;
+    }
     return b;
 }
 
@@ -598,13 +613,19 @@ fn shade_sample(n: Blast, part: u32, world: vec3<f32>, s: Sample, rc: f32, hc: f
 
 fn sample_part(n: Blast, part: u32, world: vec3<f32>) -> Sample {
     if is_nova(n) {
+        // How far short of the scene in view this sample is, and the ground there.
+        let gap = march_scene_t - distance(world, globals.camera.xyz);
+        var s: Sample;
         if part == 0u {
-            return nova_column(n, world);
+            s = nova_column(n, world);
+        } else if part == 1u {
+            let ground = mix(n.ground, march_scene_z, smoothstep(400.0, 150.0, gap));
+            s = nova_surge(n, world, ground);
+        } else {
+            s = nova_shell(n, world);
         }
-        if part == 1u {
-            return nova_surge(n, world);
-        }
-        return nova_shell(n, world);
+        s.density *= nova_soft(n, gap);
+        return s;
     }
     if part == 0u {
         return column(n, world);
@@ -614,6 +635,11 @@ fn sample_part(n: Blast, part: u32, world: vec3<f32>) -> Sample {
     }
     return wilson(n, world);
 }
+
+// The scene in view on this ray (fs_nuke_march): how far to it, and its height (only
+// meaningful while that distance is finite).
+var<private> march_scene_t: f32;
+var<private> march_scene_z: f32;
 
 // The cloud deck on this ray: how far to it, how much light gets through it, and how
 // deep it is along the ray.
@@ -761,6 +787,8 @@ fn fs_nuke_march(in: FullOut) -> @location(0) vec4<f32> {
         let h = globals.inv_view_proj * vec4<f32>(ndc, depth, 1.0);
         scene_t = dot(h.xyz / h.w - eye, rd);
     }
+    march_scene_t = scene_t;
+    march_scene_z = eye.z + rd.z * min(scene_t, 1.0e6);
 
     find_clouds(uv, rd);
 
@@ -966,6 +994,9 @@ struct MissileOut {
     @location(2) along: f32,
     @location(3) world: vec3<f32>,
     @location(4) @interpolate(flat) slot: u32,
+    // A Regency body's (nova.wgsl `NovaMissileVertex`): round it, and which piece.
+    @location(5) around: f32,
+    @location(6) @interpolate(flat) piece: u32,
 }
 
 // Lathe profile, tail (0) to nose (1): position along, radius as a share of the body's.
@@ -1017,7 +1048,20 @@ fn vs_strategic(@builtin(vertex_index) vertex: u32, @builtin(instance_index) ins
     var local = vec3<f32>(0.0);
     var normal = vec3<f32>(1.0, 0.0, 0.0);
     let quad = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
-    if vertex < BODY_VERTS {
+    out.around = 0.0;
+    out.piece = 0u;
+    if (u32(a.w) & MISSILE_PLASMA) != 0u {
+        let v = nova_missile_vertex(vertex, warhead, length, radius);
+        if v.gone {
+            out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+            return out;
+        }
+        local = v.local;
+        normal = v.normal;
+        out.along = v.along;
+        out.around = v.around;
+        out.piece = v.piece;
+    } else if vertex < BODY_VERTS {
         let band = vertex / (SIDES * 6u);
         let side = (vertex / 6u) % SIDES;
         let corner = quad[vertex % 6u];
@@ -1070,22 +1114,13 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     let plasma = (u32(a.w) & MISSILE_PLASMA) != 0u;
     // Light metal, dark bands at the stage joint and the re-entry vehicle, a team ring.
     var base = vec3<f32>(0.62, 0.64, 0.66);
-    // A Regency missile's own light: thin red seams round its containment.
+    // A Regency missile's own light (nova.wgsl `nova_missile_color`).
     var seam = 0.0;
     let x = in.along;
     if plasma {
-        // Dark plate with dark bronze bands, a team ring, and red seams that glow.
-        base = vec3<f32>(0.035, 0.037, 0.045);
-        let bronze = vec3<f32>(0.3, 0.19, 0.095);
-        if warhead {
-            if (x > 0.42 && x < 0.47) || (x > 0.7 && x < 0.745) || x < 0.04 { base = bronze; }
-            if x > 0.58 && x < 0.62 { base = globals.team_colors[owner].rgb * 0.8; }
-            seam = select(0.0, 1.0, (x > 0.47 && x < 0.478) || (x > 0.692 && x < 0.7) || (x > 0.2 && x < 0.208));
-        } else {
-            if x > 0.28 && x < 0.36 { base = bronze; }
-            if x > 0.6 && x < 0.64 { base = globals.team_colors[owner].rgb * 0.8; }
-            seam = select(0.0, 1.0, x > 0.36 && x < 0.38);
-        }
+        let look = nova_missile_color(in.piece, warhead, x, in.around, globals.team_colors[owner].rgb * 0.8);
+        base = look.rgb;
+        seam = look.a;
     } else if warhead {
         if (x > 0.435 && x < 0.48) || x > 0.74 { base = vec3<f32>(0.07, 0.075, 0.08); }
         if x > 0.58 && x < 0.62 { base = globals.team_colors[owner].rgb * 0.8; }
@@ -1101,7 +1136,7 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     let h = normalize(sun + v);
     let spec = pow(max(dot(n, h), 0.0), 48.0) * 0.35;
     var c = base * (atmos.sun_color.rgb * lambert * 1.1 + atmos.sky_color.rgb * 0.6) + atmos.sun_color.rgb * spec;
-    c += plasma_color(0.45) * seam * 6.0;
+    c += NOVA_VIOLET * seam;
     // Coming down, the nose burns: orange going white at the tip (a Regency body's field
     // burns red going rose).
     if heat > 0.0 {

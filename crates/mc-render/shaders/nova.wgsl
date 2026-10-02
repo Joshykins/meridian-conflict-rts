@@ -3,24 +3,30 @@
 // (nuke.wgsl, which owns `Blast`, `Sample`, the billows and the shapes over time used
 // here; WGSL does not mind the order).
 //
-// The same body as an ARC blast (the head grows, climbs on its stem and rolls into a cap
-// on the same curves, so `nuke_fx::Blast` mirrors both), made of plasma instead of fire
-// and smoke:
+// Not a mushroom: the ball lifts off the ground and hangs there held in its own field, a
+// dying star with no stem under it and no cap, ringed like a supernova's remnant
+// (`nova_radius`, `nova_height`; `nuke_fx::Blast` mirrors both). Made of plasma instead of
+// fire and smoke:
 //
 //   the star      a white-hot ball with a rose limb, its surface in granulation cells,
 //                 too bright to look at, for the first second or two
 //   the shell     the nova itself: a hollow shell thrown out past the damage radius,
 //                 white with prism at its leading edge, tearing into red threads that
 //                 hang for most of a minute (part 2, in place of the Wilson cloud)
-//   the cloud     the ball cools to a dark, blackened crimson laced with a web of hard
-//                 glowing threads, rolls into its cap and stands on a twisted column of
-//                 plasma streamers; a slow pulse runs up through it. It holds together far
-//                 longer than smoke would: it thins only to a third over a minute and is
-//                 gone by NOVA_LIFE
-//   the ring      a thin bright ring of plasma thrown out round the fireball's waist that
-//                 spreads and rises slowly, like a nebula's
-//   the ground    the shock's front is a sheet of red plasma skimming the ground, and the
-//                 surge a low, dark ring of glassy dust
+//   the star      the ball cools to a dark, blackened crimson laced with a web of hard
+//                 glowing threads and hangs a few hundred metres up, turning; a slow pulse
+//                 runs through it. It holds together far longer than smoke would: it
+//                 thins only to a third over a minute, draws in on itself as it dies and
+//                 is gone by NOVA_LIFE
+//   the rings     an hourglass of thin bright rings, as round SN 1987A: a wide one round
+//                 its equator and a narrower one over each pole, all tilted together its
+//                 own way, standing as long as the star does
+//   the ground    the shock's front is a sheet of red plasma skimming the ground (the
+//                 ground in view, so it follows hills), and the surge a low, dark ring of
+//                 glassy dust
+//
+// Every part fades out against the scene in front of it rather than being cut off where
+// it meets the ground (`nova_soft`).
 //
 // Hard-edged throughout (docs/STYLE.md "No mist"): surfaces are firm, light lies in
 // threads and cells, never in a soft glow swelling out of it.
@@ -78,17 +84,59 @@ fn nova_threads(p: vec3<f32>, seed: f32, phase: f32, sharp: f32) -> f32 {
     return pow(r1, sharp) * 0.7 + pow(r2, sharp * 1.5) * 0.5;
 }
 
-// The ring round the fireball's waist: where it is, how far out, how thick.
-fn nova_ring(n: Blast) -> vec3<f32> {
+// The star's radius: out in a second, swelling for half a minute, then drawn back in on
+// itself as it dies. Mirrored by nuke_fx::Blast::head_radius.
+fn nova_radius(n: Blast) -> f32 {
+    let t = n.age;
+    let grow = 200.0 * sqrt(1.0 - exp(-t * 3.0)) + 120.0 * (1.0 - exp(-t / 14.0));
+    return n.scale * grow * (1.0 - 0.45 * smoothstep(50.0, NOVA_LIFE, t));
+}
+
+// Height of its middle: it lifts off the ground in its first seconds and hangs there,
+// never climbing. Mirrored by nuke_fx::Blast::head_height.
+fn nova_height(n: Blast) -> f32 {
+    return rise(n) * (300.0 * sqrt(1.0 - exp(-n.age / 3.0)) + 260.0 * (1.0 - exp(-n.age / 20.0)));
+}
+
+// Ring `k` of the hourglass (0 the equator's, 1 and 2 over the poles), in the star's tilted
+// frame: height off its middle, radius, thickness, brightness.
+fn nova_ring(n: Blast, k: u32) -> vec4<f32> {
     let t = max(n.age - 1.2, 0.0);
-    let z = rise(n) * (90.0 + 240.0 * (1.0 - exp(-t / 25.0)));
-    let out = n.scale * (300.0 + 520.0 * (1.0 - exp(-t / 9.0)) + 3.0 * t);
-    let thick = n.scale * (9.0 + 12.0 * (1.0 - exp(-t / 20.0)));
-    return vec3<f32>(z, out, thick);
+    let rc = nova_radius(n);
+    let out = 1.0 - exp(-t / 10.0);
+    let thick = n.scale * (10.0 + 10.0 * (1.0 - exp(-t / 20.0)));
+    if k == 0u {
+        return vec4<f32>(0.0, rc * (1.15 + 0.85 * out) + 2.0 * n.scale * t, thick * 1.3, 1.0);
+    }
+    let side = select(-1.0, 1.0, k == 1u);
+    return vec4<f32>(side * rc * (0.75 + 0.4 * out), rc * (0.75 + 0.45 * out) + 1.2 * n.scale * t, thick, 0.6);
 }
 
 fn nova_ring_left(n: Blast) -> f32 {
-    return smoothstep(1.2, 3.0, n.age) * (1.0 - smoothstep(30.0, 60.0, n.age));
+    return smoothstep(1.2, 3.0, n.age) * (1.0 - smoothstep(NOVA_LIFE - 60.0, NOVA_LIFE - 10.0, n.age));
+}
+
+// How far past the star's middle its rings can reach, out and up.
+fn nova_ring_reach(n: Blast) -> f32 {
+    let r = nova_ring(n, 0u);
+    return r.y + r.z * 3.0;
+}
+
+// The hourglass's frame: the star's axis tilted off the vertical its own way.
+fn nova_tilted(n: Blast, q: vec3<f32>) -> vec3<f32> {
+    let yaw = n.seed * TAU * 3.0;
+    let tilt = 0.18 + 0.2 * fract(n.seed * 7.31);
+    let c = vec2<f32>(cos(yaw), sin(yaw));
+    // Into a frame whose x runs along the tilt's axis, tilt about it, and back.
+    let a = vec3<f32>(dot(q.xy, c), dot(q.xy, vec2<f32>(-c.y, c.x)), q.z);
+    let b = vec3<f32>(a.x, a.y * cos(tilt) - a.z * sin(tilt), a.y * sin(tilt) + a.z * cos(tilt));
+    return b;
+}
+
+// Fades a part out over the last stretch before the scene in front of it, so nothing is cut
+// off with a hard line where it meets the ground. `gap` metres from the scene along the ray.
+fn nova_soft(n: Blast, gap: f32) -> f32 {
+    return smoothstep(0.0, 25.0 + 35.0 * n.scale, gap);
 }
 
 fn nova_column(n: Blast, world: vec3<f32>) -> Sample {
@@ -120,12 +168,12 @@ fn nova_column(n: Blast, world: vec3<f32>) -> Sample {
         let b = boiling(np, seed, phase);
         let fine = billow_at(np * 2.9 + vec3<f32>(seed * 0.3, 0.0, phase * 2.6)).g;
         // A smooth star at first; it breaks up into lobes as it cools, less than smoke.
-        let lumps = mix(0.12, 0.8, smoothstep(0.3, 3.0 * k, t));
-        let edge = body - (b - 0.5) * 0.9 * lumps - (fine - 0.5) * 0.12 * lumps;
+        let lumps = mix(0.12, 0.5, smoothstep(0.3, 3.0 * k, t));
+        let edge = body - (b - 0.5) * 0.9 * lumps - (fine - 0.5) * 0.04 * lumps;
         // Always a firm surface.
         let d = smoothstep(1.0, 0.93, edge);
         if d > 0.0 {
-            s.density = d * 0.06 / max(n.scale, 0.3);
+            s.density = d * 0.15 / max(n.scale, 0.3);
             let b_sun = boiling(np + globals.sun.xyz * 0.07, seed, phase);
             s.open = clamp(0.5 + (b - b_sun) * 8.0, 0.0, 1.0) * smoothstep(0.2, 0.6, b) * 0.75 + 0.25 * smoothstep(0.3, 0.75, b);
             // The star: granulation, bright cells with darker lanes between.
@@ -133,74 +181,47 @@ fn nova_column(n: Blast, world: vec3<f32>) -> Sample {
             let star_heat = 0.72 + 0.28 * cells;
             // Then a web of threads over a dark body, hot deep inside and under the cap,
             // with a slow pulse running up through it.
-            let threads = nova_threads(np * 1.1, seed, phase * 1.5, mix(4.0, 10.0, smoothstep(1.0, 12.0 * k, t)));
+            let threads = nova_threads(np * 0.6, seed, phase * 1.5, mix(4.0, 16.0, smoothstep(1.0, 12.0 * k, t)));
             let deep = smoothstep(0.95, 0.3, body - (b - 0.5) * 0.4);
             let under = smoothstep(0.1, -0.8, q.z / rc) * r;
             let pulse = 0.7 + 0.3 * sin(t * 0.8 - q.z / rc * 3.0 + n.seed * TAU);
-            let lace = min(threads, 1.0) * pulse;
-            let late = max(lace, max(deep * deep * mix(0.9, 0.18, smoothstep(2.0, 20.0 * k, t)), under * 0.3));
+            let lace = smoothstep(0.35, 0.9, threads) * pulse;
+            let late = max(lace, max(deep * deep * mix(0.9, 0.12, smoothstep(2.0, 20.0 * k, t)), under * 0.3));
             s.heat = clamp(mix(late, star_heat, star), 0.0, 1.0);
         }
     }
 
-    // The stem: a column of plasma drawn up into the cap, its streamers winding round it
-    // as they climb. Narrower than the ARC's dusty stem; it stands as long as the cap.
-    let stem_on = smoothstep(2.0, 8.0, t)
-        * max(1.0 - smoothstep(NOVA_LIFE - 50.0, NOVA_LIFE - 15.0, t), smoothstep(0.02, 0.25, n.thick));
-    let bottom = n.ground - n.at.z;
-    if stem_on > 0.0 && up > bottom - 10.0 && up < hc {
-        let h = clamp((up - bottom) / max(hc - bottom, 1.0), 0.0, 1.0);
-        let skirt = exp(-(up - bottom) / (70.0 * n.scale));
-        let flare = smoothstep(0.7, 1.0, h);
-        let widen = smoothstep(0.2, 1.0, h);
-        let rr = length(p.xy);
-        let rs = n.scale * 32.0 + rc * (0.08 + 0.24 * widen * sqrt(widen) + 0.38 * flare * flare) + skirt * rc * 0.4;
-        if rr < rs * 1.6 {
-            let rise_speed = 40.0 * n.scale;
-            // Winding as it climbs.
-            let ang = atan2(p.y, p.x) + up / (rc * 1.1) + t * 0.06;
-            let sp = vec3<f32>(cos(ang) * rr, sin(ang) * rr, 0.0) / (rc * 0.7)
-                + vec3<f32>(0.0, 0.0, (up - t * rise_speed) / (rc * 2.2));
-            let b = boiling(sp, seed + 3.0, phase);
-            let dd = rr / rs - (b - 0.5) * 0.8;
-            let sd = smoothstep(1.0, 0.86, dd) * stem_on * 0.06 / max(n.scale, 0.3)
-                * pow(max(nova_fade(n), 1e-3), -0.35);
-            if sd > s.density * 0.5 {
-                s.open = b;
-                // Streamers: threads stretched up the column, brightest near its core.
-                let streak = nova_threads(sp * vec3<f32>(1.6, 1.6, 0.4), seed + 5.0, phase * 2.0, 10.0);
-                let core = smoothstep(1.0, 0.2, rr / rs);
-                let foot = exp(-(up - bottom) / (50.0 * n.scale)) * exp(-t / 8.0);
-                s.heat = max(s.heat, max(streak * (0.3 + 0.7 * core), max(flare * 0.25, foot * 0.8)));
-                s.dust = 0.25 * skirt;
-            }
-            s.density = max(s.density, sd);
-        }
-    }
-
-    // The ring round its waist.
+    // The rings.
     let left = nova_ring_left(n);
     if left > 0.0 {
-        let ring = nova_ring(n);
-        let z = up - ring.x;
-        if abs(z) < ring.z * 2.5 {
-            let rr = length(p.xy);
-            let tube = length(vec2<f32>((rr - ring.y) * 0.55, z)) / ring.z;
-            if tube < 1.3 {
-                let ang = atan2(p.y, p.x);
-                let thr = nova_threads(vec3<f32>(cos(ang) * 3.0, sin(ang) * 3.0, z / (ring.z * 3.0) + t * 0.01), seed + 9.0, t * 0.01, 4.0);
-                // Broken into lengths of thread, never a whole ruled circle.
-                let breaks = smoothstep(0.35, 0.6, billow_at(vec3<f32>(cos(ang) * 1.3, sin(ang) * 1.3, n.seed * 3.0 + t * 0.004)).r);
-                let rd = smoothstep(1.0, 0.7, tube) * smoothstep(0.15, 0.5, thr) * breaks * left * 0.004 / max(n.scale, 0.3);
-                if rd > s.density {
-                    s.heat = 0.6 + 0.4 * thr;
-                    s.dust = 0.0;
-                    s.open = thr;
-                    // Marks the ring for the shading (bright, never sooty).
-                    s.wet = 1.0;
-                }
-                s.density = max(s.density, rd);
+        let q = nova_tilted(n, p - vec3<f32>(0.0, 0.0, hc));
+        let rr = length(q.xy);
+        let ang = atan2(q.y, q.x);
+        for (var k = 0u; k < 3u; k++) {
+            let ring = nova_ring(n, k);
+            let z = q.z - ring.x;
+            if abs(z) > ring.z * 2.5 {
+                continue;
             }
+            let tube = length(vec2<f32>((rr - ring.y) * 0.55, z)) / ring.z;
+            if tube >= 1.3 {
+                continue;
+            }
+            let rs = seed + 9.0 + f32(k) * 4.0;
+            let thr = nova_threads(vec3<f32>(cos(ang) * 3.0, sin(ang) * 3.0, z / (ring.z * 3.0) + t * 0.01), rs, t * 0.01, 4.0);
+            // Broken into lengths of thread, never a whole ruled circle; the slow turn
+            // carries the breaks round.
+            let turn = ang + t * 0.01 * (1.0 + f32(k));
+            let breaks = smoothstep(0.3, 0.55, billow_at(vec3<f32>(cos(turn) * 1.3, sin(turn) * 1.3, n.seed * 3.0 + f32(k) * 0.37)).r);
+            let rd = smoothstep(1.0, 0.7, tube) * smoothstep(0.15, 0.5, thr) * breaks * left * ring.w * 0.012 / max(n.scale, 0.3);
+            if rd > s.density {
+                s.heat = (0.6 + 0.4 * thr) * ring.w;
+                s.dust = 0.0;
+                s.open = thr;
+                // Marks the ring for the shading (bright, never sooty).
+                s.wet = 1.0;
+            }
+            s.density = max(s.density, rd);
         }
     }
     s.density *= nova_fade(n);
@@ -209,14 +230,18 @@ fn nova_column(n: Blast, world: vec3<f32>) -> Sample {
 
 // The shock's front, a sheet of plasma skimming the ground, and the surge: a low dark ring
 // of glassy dust that boils out and settles.
-fn nova_surge(n: Blast, world: vec3<f32>) -> Sample {
+fn nova_surge(n: Blast, world: vec3<f32>, ground: f32) -> Sample {
     var s = empty_sample();
     s.dust = 1.0;
     let xy = world.xy - n.at.xy;
     let d = length(xy);
-    let up = world.z - n.ground;
+    let up = world.z - ground;
     let t = n.age;
-    if up < -8.0 {
+    // Where the ground climbs or falls far from the burst's, the front has gone over or
+    // past it (and surge_box ends).
+    let rel = (ground - n.ground) / max(n.scale, 0.3);
+    let held = smoothstep(-140.0, -90.0, rel) * (1.0 - smoothstep(220.0, 330.0, rel));
+    if up < -8.0 || held <= 0.0 {
         return s;
     }
     let dir = xy / max(d, 1.0);
@@ -235,7 +260,7 @@ fn nova_surge(n: Blast, world: vec3<f32>) -> Sample {
     let ring = exp(-dr * dr) + smoothstep(rr, rr * 0.2, d) * 0.1;
     let surge_d = ring * smoothstep(hh, hh * 0.4, up) * smoothstep(0.3, 0.6, b * 0.7 + thr * 0.4)
         * smoothstep(0.6, 3.0, t) * (1.0 - smoothstep(25.0, 60.0, t));
-    s.density = (sheet * 1.6 + surge_d) * 0.0032 / max(n.scale, 0.3);
+    s.density = (sheet * 1.6 + surge_d) * held * 0.0032 / max(n.scale, 0.3);
     if sheet > surge_d {
         s.heat = 1.0;
         s.dust = 0.0;
@@ -266,7 +291,10 @@ fn nova_shell(n: Blast, world: vec3<f32>) -> Sample {
     let d = length(v);
     let rs = nova_shell_radius(n);
     let th = nova_shell_thick(n);
-    let shell = smoothstep(1.0, 0.45, abs(d - rs) / th);
+    // A dome: it thins away toward the ground, where the sheet takes the front on, and is
+    // never drawn under it.
+    let over = smoothstep(0.0, 60.0 * n.scale + th * 2.0, world.z - n.ground);
+    let shell = smoothstep(1.0, 0.45, abs(d - rs) / th) * over;
     if shell <= 0.0 {
         return s;
     }
@@ -317,7 +345,7 @@ fn nova_shade(n: Blast, part: u32, world: vec3<f32>, s: Sample, rc: f32, hc: f32
     c += albedo * plasma_color(0.35 + 0.6 * star) * (star * 10.0 + glow * 1.6) * exp(-distance(world, glow_at) / (rc * 0.9));
     if s.wet > 0.5 {
         // The ring: a bright line of plasma, rose at first, red as it cools.
-        return c + plasma_color(0.3 + 0.3 * s.heat * glow + 0.3 * star) * s.heat * (2.5 * glow + 30.0 * star + 0.4);
+        return c + plasma_color(0.3 + 0.3 * s.heat * glow + 0.3 * star) * s.heat * (5.0 * glow + 30.0 * star + 1.2);
     }
     // Its own light: the star far past white at first (the bloom takes it), then threads
     // that glow red for minutes.
@@ -354,4 +382,182 @@ fn nova_ignition(n: Blast, eye: vec3<f32>, rd: vec3<f32>, scene_t: f32) -> vec3<
     let core_col = plasma_color(0.75 + 0.25 * smoothstep(0.2, 0.7, env));
     let halo_col = plasma_color(0.42 + 0.2 * env);
     return (core_col * 28.0 * env * env * core + halo_col * 5.5 * pow(env, 1.6) * halo) * seen * cloud_veil(t);
+}
+
+// ---- the Regency's missiles in flight (vs_strategic / fs_strategic, MISSILE_PLASMA) -------
+//
+// The round in the Mangonel's vault (mc-models regency/strategic `warhead`) flying: an
+// eight-faceted body under a faceted prow, graphite plate with steel courses and violet
+// light in its seams. No fins: two containment collars float free round it, held off the
+// body by their field (its light shows in the gap, on their inner faces), turning slowly
+// against each other. An interceptor is the same, slimmer, with one collar.
+
+const NOVA_FACETS: u32 = 8u;
+// 11 bands of NOVA_FACETS flat quads, then each collar's outer, inner, fore and aft faces.
+const NOVA_BODY_VERTS: u32 = 11u * 8u * 6u;
+const NOVA_COLLAR_VERTS: u32 = 4u * 8u * 6u;
+const NOVA_GRAPHITE: vec3<f32> = vec3<f32>(0.03, 0.03, 0.034);
+const NOVA_STEEL: vec3<f32> = vec3<f32>(0.2, 0.205, 0.225);
+const NOVA_VIOLET: vec3<f32> = vec3<f32>(0.62, 0.12, 1.0);
+
+// Facet profile, tail (0) to nose (1): position along, radius as a share of the body's.
+fn nova_warhead_ring(k: u32) -> vec2<f32> {
+    let p = array<vec2<f32>, 12>(
+        vec2<f32>(0.0, 0.0), vec2<f32>(0.0, 0.8), vec2<f32>(0.03, 1.0), vec2<f32>(0.3, 1.0),
+        vec2<f32>(0.31, 0.93), vec2<f32>(0.33, 1.0), vec2<f32>(0.8, 1.0), vec2<f32>(0.88, 0.86),
+        vec2<f32>(0.935, 0.62), vec2<f32>(0.98, 0.32), vec2<f32>(0.992, 0.14), vec2<f32>(1.0, 0.03));
+    return p[min(k, 11u)];
+}
+
+fn nova_interceptor_ring(k: u32) -> vec2<f32> {
+    let p = array<vec2<f32>, 12>(
+        vec2<f32>(0.0, 0.0), vec2<f32>(0.0, 0.8), vec2<f32>(0.04, 1.0), vec2<f32>(0.4, 1.0),
+        vec2<f32>(0.42, 0.9), vec2<f32>(0.44, 1.0), vec2<f32>(0.72, 1.0), vec2<f32>(0.82, 0.82),
+        vec2<f32>(0.9, 0.56), vec2<f32>(0.96, 0.28), vec2<f32>(0.99, 0.1), vec2<f32>(1.0, 0.02));
+    return p[min(k, 11u)];
+}
+
+fn nova_missile_ring(k: u32, warhead: bool) -> vec2<f32> {
+    return select(nova_interceptor_ring(k), nova_warhead_ring(k), warhead);
+}
+
+// Collar `c`: its span along the body (0 tail .. 1 nose), its inner and outer radius as a
+// share of the body's, and how fast it turns (radians a second). An interceptor has one.
+fn nova_collar(c: u32, warhead: bool) -> vec4<f32> {
+    if !warhead {
+        return vec4<f32>(0.1, 0.15, 1.35, 1.55);
+    }
+    if c == 0u {
+        return vec4<f32>(0.08, 0.125, 1.38, 1.56);
+    }
+    return vec4<f32>(0.52, 0.555, 1.28, 1.43);
+}
+
+struct NovaMissileVertex {
+    // Along the body (metres), then across it.
+    local: vec3<f32>,
+    normal: vec3<f32>,
+    along: f32,
+    // Round the body, 0..1 from facet 0.
+    around: f32,
+    // 0 the body, 1 a collar's plate, 2 a collar's inner face (lit by its field), 3 its
+    // rims.
+    piece: u32,
+    // Off the end of the mesh: not drawn.
+    gone: bool,
+}
+
+fn nova_missile_vertex(vertex: u32, warhead: bool, length: f32, radius: f32) -> NovaMissileVertex {
+    var v: NovaMissileVertex;
+    v.gone = false;
+    let quad = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
+    let corner = quad[vertex % 6u];
+    let half = 0.5 / f32(NOVA_FACETS);
+    if vertex < NOVA_BODY_VERTS {
+        let band = vertex / (NOVA_FACETS * 6u);
+        let side = (vertex / 6u) % NOVA_FACETS;
+        let ring = band + select(0u, 1u, corner >= 2u);
+        let around = side + select(0u, 1u, corner == 1u || corner == 2u);
+        let pr = nova_missile_ring(ring, warhead);
+        let ang = f32(around) / f32(NOVA_FACETS) * TAU;
+        v.local = vec3<f32>(pr.x * length, cos(ang) * pr.y * radius, sin(ang) * pr.y * radius);
+        // Flat facets: every corner of a quad takes its middle's normal.
+        let mid = (f32(side) + 0.5) / f32(NOVA_FACETS) * TAU;
+        let p0 = nova_missile_ring(band, warhead);
+        let p1 = nova_missile_ring(band + 1u, warhead);
+        let slope = (p0.y - p1.y) * radius * cos(half * TAU) / max((p1.x - p0.x) * length, 0.01);
+        v.normal = normalize(vec3<f32>(slope, cos(mid), sin(mid)));
+        v.along = pr.x;
+        v.around = f32(around) / f32(NOVA_FACETS);
+        v.piece = 0u;
+        return v;
+    }
+    let w = vertex - NOVA_BODY_VERTS;
+    let c = w / NOVA_COLLAR_VERTS;
+    let collars = select(1u, 2u, warhead);
+    if c >= collars {
+        v.gone = true;
+        return v;
+    }
+    let col = nova_collar(c, warhead);
+    let face = (w % NOVA_COLLAR_VERTS) / (NOVA_FACETS * 6u);
+    let side = (w / 6u) % NOVA_FACETS;
+    let around = side + select(0u, 1u, corner == 1u || corner == 2u);
+    let far = corner >= 2u;
+    // Turned half a facet off the body's, and turning, the two against each other.
+    let spin = globals.camera.w * select(-0.5, 0.7, c == 0u);
+    let ang = (f32(around) + 0.5) / f32(NOVA_FACETS) * TAU + spin;
+    let mid = (f32(side) + 1.0) / f32(NOVA_FACETS) * TAU + spin;
+    let radial = vec2<f32>(cos(ang), sin(ang));
+    var x: f32;
+    var r: f32;
+    var n = vec3<f32>(0.0, cos(mid), sin(mid));
+    v.piece = 1u;
+    if face == 0u {
+        // Outer, sloped in a little at each end.
+        x = select(col.x, col.y, far);
+        r = col.w;
+    } else if face == 1u {
+        x = select(col.y, col.x, far);
+        r = col.z;
+        n = -n;
+        v.piece = 2u;
+    } else {
+        // Fore (2) and aft (3) rims.
+        x = select(col.y, col.x, face == 3u);
+        r = select(col.w, col.z, far);
+        n = vec3<f32>(select(1.0, -1.0, face == 3u), 0.0, 0.0);
+        v.piece = 3u;
+    }
+    v.local = vec3<f32>(x * length, radial * r * radius);
+    v.normal = n;
+    v.along = x;
+    v.around = f32(around) / f32(NOVA_FACETS);
+    return v;
+}
+
+// A Regency missile's surface: graphite plate in steel courses, a team band, violet light
+// in its seams, down four facets, and on its collars' inner faces; the collars graphite
+// with steel rims.
+fn nova_missile_color(piece: u32, warhead: bool, x: f32, around: f32, team: vec3<f32>) -> vec4<f32> {
+    let pulse = 0.75 + 0.25 * sin(globals.camera.w * 5.0 + x * 9.0);
+    if piece == 2u {
+        return vec4<f32>(NOVA_GRAPHITE, 5.0 * pulse);
+    }
+    if piece == 1u {
+        return vec4<f32>(NOVA_GRAPHITE * 1.4, 0.0);
+    }
+    if piece == 3u {
+        return vec4<f32>(NOVA_STEEL, 0.0);
+    }
+    var base = NOVA_GRAPHITE;
+    var lit = 0.0;
+    let facet = fract(around * f32(NOVA_FACETS) + 1e-3);
+    let even = (u32(floor(around * f32(NOVA_FACETS) + 1e-3)) & 1u) == 0u;
+    if warhead {
+        // The vault round's courses (mc-models regency/strategic `warhead`).
+        if x < 0.028 || (x > 0.582 && x < 0.604) || (x > 0.754 && x < 0.794) || x > 0.975 {
+            base = NOVA_STEEL;
+        }
+        if x > 0.42 && x < 0.46 {
+            base = team;
+        }
+        if (x > 0.794 && x < 0.8) || (x > 0.749 && x < 0.754) || (x > 0.3 && x < 0.33) {
+            lit = 1.0;
+        }
+        if even && x > 0.61 && x < 0.73 && abs(facet - 0.5) < 0.05 {
+            lit = 1.0;
+        }
+    } else {
+        if x < 0.04 || (x > 0.66 && x < 0.72) || x > 0.97 {
+            base = NOVA_STEEL;
+        }
+        if x > 0.55 && x < 0.6 {
+            base = team;
+        }
+        if x > 0.4 && x < 0.44 {
+            lit = 1.0;
+        }
+    }
+    return vec4<f32>(base, lit * 3.0 * pulse);
 }

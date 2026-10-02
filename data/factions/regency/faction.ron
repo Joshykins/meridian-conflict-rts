@@ -30,9 +30,10 @@
     // Their missile defence throws Gravitic Counter-seekers: a small red charge off the
     // mount that runs the missile down and bursts on it, where ARC holds a laser on it.
     anti_missile_look: CounterSeeker,
-    // Their warheads are pinch fusion: a red plasma nova that leaves a glowing cloud of
-    // plasma standing over the ground for minutes, where ARC's roll into a mushroom of
-    // smoke. Their missiles leave dark trails with a white-hot streak at the tail, and
+    // Their warheads are pinch fusion: a red plasma nova that leaves a dying star hanging
+    // over the ground for minutes in an hourglass of rings, where ARC's roll into a
+    // mushroom of smoke on a stem. Their missiles are faceted, finless, ringed by floating
+    // containment collars, and leave dark trails with a white-hot streak at the tail, and
     // the Exarch's core goes up the same way, smaller (docs/NUKES.md).
     nuke_look: Plasma,
     // Their own voices (data/factions/regency/sounds.ron): heavy machines, bronze struck and
