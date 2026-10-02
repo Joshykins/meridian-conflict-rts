@@ -87,7 +87,13 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
 // shows only in the cracks between the plates; then the cold crust fades away over the
 // sim's charcoal scorch, which stays. A ring of burnt ground lies round the shore, and
 // no grass grows in the pool (grass_gen.wgsl `PRESS_MOLTEN`).
+//
+// It never discards, and takes its derivative first: a `discard` (SPIR-V OpKill) ahead of
+// the `fwidth` and the crack loops hung AMD's RDNA3 driver, the device lost the moment a
+// Fulgur, a Sunspear or the Behemoth's storm melted the ground (a friend's RX 7900 XTX,
+// 2026-10-01). Blended, no depth written: a clear return draws nothing, as a discard did.
 fn molten(in: StainOut) -> vec4<f32> {
+    let px = max(length(fwidth(in.world.xy)), 1e-3);
     let heat = f32(in.strength_seed & 0xFFu) / 255.0;
     let seed = f32((in.strength_seed >> 8u) & 0x7FFFu);
     let spun = rot_z(vec3<f32>(in.uv, 0.0), seed * 0.37).xy;
@@ -103,14 +109,13 @@ fn molten(in: StainOut) -> vec4<f32> {
     let shore = 0.85;
     let halo = 1.0 - smoothstep(shore, 1.1, r);
     if halo < 0.02 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let in_pool = 1.0 - smoothstep(shore - 0.02, shore + 0.01, r);
     let rp = clamp(r / shore, 0.0, 1.0);
 
     // Cooling cracks: the crust breaks into plates a fraction of the pool across, warped
     // so no edge runs straight; under a pixel they become their average.
-    let px = max(length(fwidth(in.world.xy)), 1e-3);
     let cell = clamp(in.radius * 0.16, 0.7, 7.0);
     let warp = vec2<f32>(grad_noise2(in.world.xy + o * 9.0, cell * 1.7), grad_noise2(in.world.xy - o * 9.0, cell * 1.7)) - 0.5;
     let q = in.world.xy / cell + o + warp * 1.2;
@@ -166,7 +171,7 @@ fn molten(in: StainOut) -> vec4<f32> {
     let gone = smoothstep(0.0, 0.12, heat);
     let alpha = max(in_pool * 0.98, (halo - in_pool) * 0.7) * gone;
     if alpha < 0.01 {
-        discard;
+        return vec4<f32>(0.0);
     }
     return vec4<f32>(apply_haze(lit + glow, in.world, eye), alpha);
 }
