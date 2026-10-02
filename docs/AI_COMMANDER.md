@@ -2,7 +2,8 @@
 
 Status (2026-10-01): built and playable beside the classic AI (`docs/AI.md`). Pick it
 per seat with **Mind** in the skirmish set-up, or `--ai-brain commander`. The classic
-AI is still the default and still the stronger of the two (see "Where it stands").
+AI is still the default; since the long-game round on 2026-10-01 the Commander is
+the stronger of the two on Hard (see "Where it stands").
 This document is the contract between the layers; code that disagrees with it is a
 bug in one or the other.
 
@@ -374,6 +375,30 @@ games a run.
 | t47 | plans committed for three minutes | 0.43 | -0.32 |
 | t51 | the economy controller (`economy.rs`) | 0.48 | -0.24 |
 
+**Long games** (2026-10-01, after a user's 88-minute match the Commander lost:
+it out-earned the classic AI 2:1 and built no project, held anti-air all in for
+forty minutes and kept three interceptors against five silos). The same pairings
+played to the end: 40 games of 60 minutes on five maps (adding Frostline), then
+64 games of 45 minutes on eight (adding Meridian Crown, Vermilion Gorge and
+Halden's Grip). A side eliminated counts 0, so the mean log worth ratio swings
+far more than over 25-minute games.
+
+| Run | Change | Games | Score | Mean log worth ratio |
+|---|---|---|---|---|
+| base | as t51, played long | 40 | 0.43 | -1.24 |
+| r1 | upgrades never last, `can_fund` by spend; live plan records; anti-air by the air seen; interceptors by silos; projects by income | 40 | 0.50 | +0.27 |
+| r2 | the commander's own retreat; aircraft that outreach its anti-air | 40 | 0.56 | +0.85 |
+| r4 | one army, not a trickle; a missing shipyard or airfield; anti-air only against what it reaches | 64 | 0.60 | +1.03 |
+| r6 | waves move on; urgent wants pull a builder; escorted artillery; raid turrets | 64 | 0.66 | +1.82 |
+| r7 | bombers go for the artillery shelling it | 64 | 0.66 | +1.70 |
+
+By map at r7: Frostline 0.97, Halden's Grip 0.84, Vermilion Gorge 0.81, Meridian
+Basin 0.75, Meridian Crown 0.56, dev16 0.53, Serac Divide 0.44, Twin Shoals 0.38.
+Operation trades at r7 (killed : lost): strike 5.2, air guard 3.4, warships 2.5,
+defend 2.5, army 0.62, siege 0.23. One run to the next swings a map by up to 0.4
+with no change near it: outcomes turn on eliminations, so judge a change by the
+whole run and its trades.
+
 The economy against the classic AI's (adaptive both, 8 games of 20 minutes on the
 same four maps, means; "dry" is an energy store under 10% with building slowed):
 
@@ -415,8 +440,14 @@ What it does that the classic AI does not:
 
 Open (the next things to build):
 
-- **army trades**: gather nearer cover (turrets, shields) without giving up the
-  front; meet raids on the gathering wave with the wave;
+- **army trades** (0.6 over a whole tournament): it loses its land fights to
+  artillery parks that outreach it (T2 missile trucks at 1400 m, T3 artillery at
+  1800 m), to cheap bombers and gunships at its rally, and to corvette raids;
+  gather nearer cover (turrets, shields) without giving up the front;
+- **siege** trades 0.2: falling back at a third (not twice) of what it faces made
+  no difference (r8), so the loss is elsewhere, likely in where it stands;
+- **Twin Shoals and Serac Divide**: small sea maps where corvette and boat raids
+  decide early games;
 - **energy**: still short more often than the classic AI (which keeps its store
   full by overbuilding), early while expanders outrun the plants and late when
   tech 2 and 3 mines raise upkeep sixfold;
