@@ -25,10 +25,13 @@
 
 use super::{Puff, Renderer, PUFF_FIREBALL, PUFF_SMOKE, PUFF_SPARK, PUFF_TREE_SMOKE};
 use crate::camera::Camera;
+use crate::gpu_consts::nuke_look;
 use bytemuck::Zeroable;
 use glam::{Vec2, Vec3};
 use mc_sim::mirror::{RenderFrame, SimEvent, StrategicInstance, STRATEGIC_WARHEAD};
 use std::mem::size_of;
+
+mod nova;
 
 /// Blasts drawn as volumes at once, the nearest (`Globals::nukes`, four vec4 each;
 /// nuke.wgsl). A carpet of warheads over a base has dozens of clouds up at once, and
@@ -46,8 +49,10 @@ pub(super) const PUFF_STRATEGIC_TRAIL: f32 = 34.0;
 const WARHEAD_RADIUS: f32 = 520.0;
 /// A warhead's body at scale 1, nose to nozzle (shared with nuke.wgsl).
 const WARHEAD_LENGTH: f32 = crate::gpu_consts::missile::WARHEAD_LENGTH;
-/// Seconds a blast is drawn for (nuke.wgsl `fade_left`).
+/// Seconds a blast is drawn for (nuke.wgsl `fade_left`); a Regency nova's cloud stands
+/// far longer (nova.wgsl `NOVA_LIFE`).
 const BLAST_LIFE: f32 = 75.0;
+const NOVA_LIFE: f32 = 160.0;
 /// How fast the shock runs on past the damage radius, m/s; the trees bend at it.
 const SHOCK_SPEED: f32 = 330.0;
 /// Seconds the sim's front takes to reach a warhead's damage radius (strategic.ron).
@@ -105,6 +110,8 @@ struct Blast {
     /// Trees it has thrown flat, and set alight (`tree_fate`).
     felled: u32,
     lit: u32,
+    /// `gpu_consts::nuke_look`: ARC's fire and smoke, or the Regency's plasma.
+    look: u32,
 }
 
 impl Blast {
@@ -203,9 +210,22 @@ impl Blast {
             .fold(0.0, f32::max)
     }
 
+    fn plasma(&self) -> bool {
+        self.look == nuke_look::PLASMA
+    }
+
+    /// Seconds it is drawn for.
+    fn life(&self) -> f32 {
+        if self.plasma() {
+            NOVA_LIFE
+        } else {
+            BLAST_LIFE
+        }
+    }
+
     /// Still drawn: its own cloud or fire folded into it has not thinned away.
     fn alive(&self, time: f32) -> bool {
-        time - self.start < BLAST_LIFE || time - self.fed() < BLAST_LIFE
+        time - self.start < self.life() || time - self.fed() < self.life()
     }
 
     /// Mirrors nuke.wgsl `head_radius`.
@@ -332,37 +352,56 @@ impl Renderer {
                 pos,
                 radius,
                 commander,
+                look,
                 ..
             } => self.nuclear_detonation(
                 Vec3::from(pos.to_f32()),
                 radius.to_f32(),
                 *commander,
                 0.2,
+                *look as u32,
                 time,
             ),
-            SimEvent::NuclearLaunch { from, .. } => {
-                self.silo_launch(Vec3::from(from.to_f32()), time)
-            }
-            SimEvent::InterceptorLaunch { from, .. } => {
+            SimEvent::NuclearLaunch { from, look, .. } => {
                 let at = Vec3::from(from.to_f32());
-                self.cell_launch(at, Vec3::Z, 40.0, time);
-                self.push_effect(at.to_array(), time, 9.0, 0.35, 1.0, 0.0);
+                if *look as u32 == nuke_look::PLASMA {
+                    self.nova_launch(at, time)
+                } else {
+                    self.silo_launch(at, time)
+                }
             }
-            SimEvent::WarheadIntercepted { pos, killed, .. } => {
-                self.intercept_burst(Vec3::from(pos.to_f32()), *killed, time)
+            SimEvent::InterceptorLaunch { from, look, .. } => {
+                let at = Vec3::from(from.to_f32());
+                if *look as u32 == nuke_look::PLASMA {
+                    self.nova_cell_launch(at, time);
+                } else {
+                    self.cell_launch(at, Vec3::Z, 40.0, time);
+                    self.push_effect(at.to_array(), time, 9.0, 0.35, 1.0, 0.0);
+                }
+            }
+            SimEvent::WarheadIntercepted {
+                pos, killed, look, ..
+            } => {
+                let at = Vec3::from(pos.to_f32());
+                if *look as u32 == nuke_look::PLASMA {
+                    self.nova_intercept_burst(at, *killed, time)
+                } else {
+                    self.intercept_burst(at, *killed, time)
+                }
             }
             _ => {}
         }
     }
 
-    /// A blast `radius` metres at `at`, drawn at least `smallest` of a warhead's size; a
-    /// `commander`'s crater is smaller and cools sooner.
+    /// A blast `radius` metres at `at`, drawn at least `smallest` of a warhead's size in
+    /// `look` (`gpu_consts::nuke_look`); a `commander`'s crater is smaller and cools sooner.
     pub(super) fn nuclear_detonation(
         &mut self,
         at: Vec3,
         radius: f32,
         commander: bool,
         smallest: f32,
+        look: u32,
         time: f32,
     ) {
         // The same tick's events can be handed over more than once (a burst folded into
@@ -375,18 +414,26 @@ impl Renderer {
         let base = (radius / WARHEAD_RADIUS).max(smallest);
         // A commander's pool is smaller and cools sooner than a warhead's; a pool already
         // glowing here is heated again (`craters.rs`).
-        self.add_crater(
+        let style = if look == nuke_look::PLASMA {
+            super::craters::CraterStyle::Plasma
+        } else {
+            super::craters::CraterStyle::Glassed
+        };
+        self.add_crater_styled(
             at.truncate(),
             radius,
             if commander { 0.6 } else { 1.0 },
             time,
+            style,
         );
         let flat = |b: &Blast| b.at.truncate().distance(at.truncate());
         // Into a fireball still on the ground right here: it flares and grows, and burns on.
         if let Some(i) = (0..self.nuke_fx.blasts.len())
             .filter(|&i| {
                 let b = &self.nuke_fx.blasts[i];
-                b.age(time) < FOLD_AGE && flat(b) < FOLD_REACH * radius.max(b.radius)
+                b.look == look
+                    && b.age(time) < FOLD_AGE
+                    && flat(b) < FOLD_REACH * radius.max(b.radius)
             })
             .min_by(|&a, &b| {
                 flat(&self.nuke_fx.blasts[a]).total_cmp(&flat(&self.nuke_fx.blasts[b]))
@@ -439,8 +486,12 @@ impl Renderer {
             parted: false,
             felled: 0,
             lit: 0,
+            look,
         };
         self.nuke_fx.blasts.push(blast);
+        if blast.plasma() {
+            self.nova_burst(&blast, time);
+        }
         // The shock bends the trees as it passes, at the pace it is drawn going out.
         let reach = 3200.0 * base;
         let lag = blast.first() - radius / SHOCK_SPEED;
@@ -590,6 +641,7 @@ impl Renderer {
         let spread = (missiles.len() as f32 / 6.0).sqrt().clamp(1.0, 3.0);
         for m in &missiles {
             let warhead = m.kind == STRATEGIC_WARHEAD;
+            let plasma = m.look == nuke_look::PLASMA;
             let now = Vec3::from(m.pos);
             let last = self
                 .nuke_fx
@@ -627,6 +679,8 @@ impl Renderer {
                 }
                 // Laid when the missile passed it, so the oldest end fades first.
                 let born = time - tick * (1.0 - k as f32 / count.max(1) as f32);
+                let strength =
+                    (if warhead { 1.0 } else { 0.7 }) * (if plasma { -1.0 } else { 1.0 });
                 let puff = Puff {
                     origin: p.to_array(),
                     opacity: 1.0,
@@ -637,7 +691,9 @@ impl Renderer {
                     vel: (dir * step).to_array(),
                     life,
                     params: [size.0, size.1, PUFF_STRATEGIC_TRAIL, self.scatter.unit()],
-                    appearance: [-1.0, -1.0, -1.0, if warhead { 1.0 } else { 0.7 }],
+                    // A Regency drive leaves dark smoke (puffs.wgsl reads a strength below
+                    // zero as soot).
+                    appearance: [-1.0, -1.0, -1.0, strength],
                 };
                 self.nuke_fx.trail.push(puff);
             }
@@ -648,6 +704,9 @@ impl Renderer {
             match self.nuke_fx.laid.iter_mut().find(|(s, _)| *s == m.serial) {
                 Some(l) => l.1 = laid,
                 None => self.nuke_fx.laid.push((m.serial, laid)),
+            }
+            if plasma {
+                self.nova_streak(m, time);
             }
             // A warhead on its boost: the tube pours smoke and fire round it.
             if warhead && m.boost > 0.5 {
@@ -741,7 +800,7 @@ impl Renderer {
                         hc + self.scatter.signed() * rc * 0.3,
                     )
                 };
-                self.nuke_bolt(cap, end, time, b.scale);
+                self.nuke_bolt(cap, end, time, b.scale, b.plasma());
                 let brightness = 0.6 + self.scatter.unit() * 0.6;
                 self.nuke_fx.blasts[i].bolt = (time, (cap.z - b.at.z).max(0.0), brightness);
                 // A third of the light on the clouds of a storm's stroke, so the cloud round the cap
@@ -754,7 +813,13 @@ impl Renderer {
     }
 
     /// One lightning stroke from `from` to `to`, jagged, with forks off it.
-    fn nuke_bolt(&mut self, from: Vec3, to: Vec3, time: f32, scale: f32) {
+    /// A Regency nova's (`plasma`) are crimson arcs with a white-pink core.
+    fn nuke_bolt(&mut self, from: Vec3, to: Vec3, time: f32, scale: f32, plasma: bool) {
+        let color = if plasma {
+            crate::gpu_consts::fade_beam::TETHER
+        } else {
+            0
+        };
         let length = from.distance(to);
         if length < 1.0 {
             return;
@@ -778,20 +843,20 @@ impl Renderer {
                         * taper
                 };
                 let next = from + (to - from) * t + jitter;
-                self.bore_fx
-                    .lightning(last, next, time + delay, life, width * thick);
+                self.bolt_stroke(last, next, time + delay, life, width * thick, color);
                 // Now and then a fork off it.
                 if self.scatter.unit() < 0.18 {
                     let fork = next
                         + (side * self.scatter.signed() + up * self.scatter.signed() - along * 0.3)
                             * wander
                             * 2.0;
-                    self.bore_fx.lightning(
+                    self.bolt_stroke(
                         next,
                         fork,
                         time + delay,
                         life * 0.7,
                         width * thick * 0.5,
+                        color,
                     );
                 }
                 last = next;
@@ -831,7 +896,12 @@ impl Renderer {
             let heat = b.heat(time).max(fuel);
             if heat > 0.02 {
                 let flash = (-age / (2.5 * b.scale.max(0.3).sqrt())).exp();
-                let color = Vec3::new(1.0, 0.55 + 0.35 * heat, 0.22 + 0.5 * heat * heat);
+                // A nova's light is rose-white in the flash and red after it.
+                let color = if b.plasma() {
+                    Vec3::new(1.0, 0.18 + 0.6 * flash, 0.16 + 0.6 * flash)
+                } else {
+                    Vec3::new(1.0, 0.55 + 0.35 * heat, 0.22 + 0.5 * heat * heat)
+                };
                 let power = (9.0e6 * heat * heat + 4.0e7 * flash) * b.scale * b.scale;
                 self.lights.lamp(
                     fire,
@@ -849,8 +919,7 @@ impl Renderer {
                 nukes[shown * 4] = [b.at.x, b.at.y, b.at.z, b.start];
                 nukes[shown * 4 + 1] = [b.scale, b.seed, bolt, b.ground];
                 nukes[shown * 4 + 2] = [drift.x, drift.y, bolt_z, b.front(time)];
-                // y is spare.
-                nukes[shown * 4 + 3] = [fuel, 0.0, b.churn(time), b.thick(time)];
+                nukes[shown * 4 + 3] = [fuel, b.look as f32, b.churn(time), b.thick(time)];
                 shown += 1;
             }
         }
@@ -898,6 +967,11 @@ impl Renderer {
                 use crate::gpu_consts::missile::*;
                 let size = ((scale * SCALE_STEPS).round() as u32).clamp(1, SCALE_MASK);
                 (m.kind & KIND_MASK
+                    | if m.look == nuke_look::PLASMA {
+                        PLASMA
+                    } else {
+                        0
+                    }
                     | (m.owner & crate::gpu_consts::owner::MASK) << OWNER_SHIFT
                     | (plume as u32).min(PLUME_MASK) << PLUME_SHIFT
                     | size << SCALE_SHIFT) as f32
@@ -913,10 +987,15 @@ impl Renderer {
                 } else {
                     3.0e4
                 };
+                let tint = if m.look == nuke_look::PLASMA {
+                    Vec3::new(1.0, 0.22, 0.2)
+                } else {
+                    Vec3::new(1.0, 0.62, 0.3)
+                };
                 self.lights.lamp(
                     nozzle,
                     -axis,
-                    Vec3::new(1.0, 0.62, 0.3) * power,
+                    tint * power,
                     if warhead { 420.0 * scale } else { 160.0 },
                     180.0,
                     1.0,
@@ -970,7 +1049,8 @@ mod shots {
     /// by default), `NUKE_CAM` = `dist,yaw,tilt` (radians), `NUKE_TIMES` = seconds after the
     /// burst to write (`0.05,1,3,...`), `NUKE_OUT` the folder, `NUKE_SIZE` = `w,h`,
     /// `NUKE_RADIUS` the damage radius (520 a warhead, 300 a commander). `NUKE_MISSILE=1`
-    /// flies a warhead and an interceptor across the view first instead.
+    /// flies a warhead and an interceptor across the view first instead. `NUKE_LOOK=plasma`
+    /// draws all of it as the Regency's (a nova, their missiles).
     #[test]
     #[ignore = "requires Vulkan and maps/dev16.mcmap"]
     fn nuke_shots() {
@@ -1023,6 +1103,10 @@ mod shots {
         let cam = nums("NUKE_CAM", "5200,0.6,0.35");
         let times = nums("NUKE_TIMES", "0.05,0.6,2,5,10,20,40,90");
         let radius = nums("NUKE_RADIUS", "520")[0];
+        let look = match std::env::var("NUKE_LOOK").as_deref() {
+            Ok("plasma") => mc_data::strategic::StrategicLook::Plasma,
+            _ => mc_data::strategic::StrategicLook::Fission,
+        };
         let out = std::path::PathBuf::from(
             std::env::var("NUKE_OUT")
                 .unwrap_or_else(|_| root.join("artifacts/nuke").display().to_string()),
@@ -1086,6 +1170,7 @@ mod shots {
                             radius: Fx::from_f32(radius),
                             owner: 0,
                             commander: false,
+                            look,
                         });
                     }
                 }
@@ -1122,6 +1207,7 @@ mod shots {
                             boost: 0.0,
                             quarry: 0,
                             scale: 1.0,
+                            look: look as u32,
                         });
                     }
                     let up = at + Vec2::new(900.0, 400.0);
@@ -1138,6 +1224,7 @@ mod shots {
                         boost: 0.0,
                         quarry: 1,
                         scale: 1.0,
+                        look: look as u32,
                     });
                 }
             }
@@ -1273,6 +1360,7 @@ mod salvo {
             parted: false,
             felled: 0,
             lit: 0,
+            look: nuke_look::FISSION,
         }
     }
 

@@ -651,7 +651,7 @@ fn meshes_are_valid() {
                     // The sonar buoy's hydrophone arrays hang under it, and the Breakwater's
                     // tube mouths, listening dome and lowered arrays under that float.
                     -15.0
-                } else if model.key == "nuke_silo" {
+                } else if model.key == "nuke_silo" || base_key(&model.key) == "regency_nuke_silo" {
                     // The launch tube, dug in below its mouth (`Model::pit`).
                     -18.0
                 } else if model.key == "airbase" {

@@ -367,18 +367,24 @@ pub enum SimEvent {
         to: FxVec3,
         owner: u8,
         serial: u32,
+        /// How its missiles and blast are drawn and heard (presentation only).
+        look: mc_data::strategic::StrategicLook,
     },
     /// An interceptor out of its cell at `from`.
     InterceptorLaunch {
         from: FxVec3,
         owner: u8,
         serial: u32,
+        /// How its missiles and blast are drawn and heard (presentation only).
+        look: mc_data::strategic::StrategicLook,
     },
     /// An interceptor burst at `pos`: `killed` a warhead, or burnt out with nothing to hit.
     WarheadIntercepted {
         pos: FxVec3,
         owner: u8,
         killed: bool,
+        /// The warhead's look when `killed` (its containment breaking), else the interceptor's.
+        look: mc_data::strategic::StrategicLook,
     },
     /// A nuclear blast: `radius` is how far it does damage; its front runs out over
     /// seconds after this. `commander`: a commander's reactor, not a warhead.
@@ -387,6 +393,7 @@ pub enum SimEvent {
         radius: mc_core::Fx,
         owner: u8,
         commander: bool,
+        look: mc_data::strategic::StrategicLook,
     },
     /// A launcher finished assembling a round (`warhead`: a silo's; else an interceptor).
     RoundReady {
@@ -1409,9 +1416,11 @@ pub struct StrategicInstance {
     pub quarry: u32,
     /// How big the missile is drawn against the Sunfall's (`Strategic::missile_scale`).
     pub scale: f32,
+    /// `StrategicLook` as its number: how the missile and its trail are drawn.
+    pub look: u32,
 }
 
-const _: () = assert!(std::mem::size_of::<StrategicInstance>() == 68);
+const _: () = assert!(std::mem::size_of::<StrategicInstance>() == 72);
 
 pub const STRATEGIC_WARHEAD: u32 = 0;
 pub const STRATEGIC_INTERCEPTOR: u32 = 1;

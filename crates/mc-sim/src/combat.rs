@@ -3395,6 +3395,7 @@ impl World {
                 owner,
                 Handle::NONE,
                 true,
+                self.strategic_look(bp.id),
             )?;
             if self.state.players[owner as usize].commander.index() == row {
                 self.defeat_player(owner);

@@ -602,7 +602,11 @@ shared! {
     /// metres and drawn size (`scale * SCALE_STEPS`), each a whole number, 24 bits in all, so
     /// the float holds it exactly.
     pub mod missile as "MISSILE_" {
-        pub const KIND_MASK: u32 = 0x3;
+        /// 0 a warhead, 1 an interceptor (`mc_sim::mirror::STRATEGIC_*`).
+        pub const KIND_MASK: u32 = 0x1;
+        /// Drawn in the Regency's plasma look (`nuke_look::PLASMA`): a dark body with bronze
+        /// bands, a red plasma plume.
+        pub const PLASMA: u32 = 0x2;
         pub const OWNER_SHIFT: u32 = 2;
         pub const PLUME_SHIFT: u32 = 8;
         pub const PLUME_MASK: u32 = 0xFF;
@@ -753,6 +757,16 @@ shared! {
     /// `mirror::SHIELD_LOOK_SHIFT`, set from its faction's `mc_data::ShieldLook`, whose
     /// numbers these are; tests hold both equal). shields.wgsl draws domes by it,
     /// entity.wgsl `fs_hull` personal fields.
+    /// How a strategic missile and a nuclear blast are drawn (`mc_data::strategic::StrategicLook`,
+    /// nuke.wgsl, clouds.wgsl `gather_fires`): the blast's in the spare lane of its fourth
+    /// vec4 in `Globals::nukes`. Never renumber one.
+    pub mod nuke_look as "NUKE_LOOK_" {
+        /// ARC's: a fireball that rolls into a mushroom of smoke.
+        pub const FISSION: u32 = 0;
+        /// The Regency's: a red plasma nova that leaves a glowing plasma cloud standing.
+        pub const PLASMA: u32 = 1;
+    }
+
     pub mod shield_look as "SHIELD_LOOK_" {
         pub const SHIFT: u32 = 28;
         pub const MASK: u32 = 3;

@@ -24,7 +24,7 @@
 use std::collections::BTreeMap;
 
 use mc_core::{Fx, FxVec2, FxVec3, StateHasher};
-use mc_data::strategic::{NuclearBlast, StrategicKind};
+use mc_data::strategic::{NuclearBlast, StrategicKind, StrategicLook};
 use mc_data::BlueprintId;
 use serde::{Deserialize, Serialize};
 
@@ -690,6 +690,7 @@ impl World {
                 to,
                 owner,
                 serial,
+                look: self.strategic_look(bp),
             });
         }
     }
@@ -882,8 +883,18 @@ impl World {
                 from: start,
                 owner,
                 serial: own,
+                look: self.strategic_look(bp),
             });
         }
+    }
+
+    /// How blueprint `bp`'s strategic missiles and blasts look: its faction's (presentation
+    /// only).
+    pub(crate) fn strategic_look(&self, bp: BlueprintId) -> StrategicLook {
+        self.blueprints
+            .factions
+            .get(self.blueprints.unit(bp).faction.0 as usize)
+            .map_or(StrategicLook::Fission, |f| f.nuke_look)
     }
 
     /// A warhead's path and its cruise, metres a tick.
@@ -914,14 +925,10 @@ impl World {
         }
         for &i in burst.iter().rev() {
             let m = self.state.strategic.missiles.swap_remove(i);
-            let blast = self
-                .blueprints
-                .unit(m.blueprint)
-                .strategic
-                .as_ref()
-                .and_then(|s| s.blast)
-                .unwrap_or(COMMANDER_BLAST);
-            self.detonate(m.mark, blast, m.owner, m.source, false)?;
+            let spec = self.blueprints.unit(m.blueprint).strategic.as_ref();
+            let blast = spec.and_then(|s| s.blast).unwrap_or(COMMANDER_BLAST);
+            let look = self.strategic_look(m.blueprint);
+            self.detonate(m.mark, blast, m.owner, m.source, false, look)?;
         }
         Ok(())
     }
@@ -933,9 +940,9 @@ impl World {
             if self.state.strategic.missiles[i].kind != MissileKind::Interceptor {
                 continue;
             }
-            let (quarry, owner) = {
+            let (quarry, owner, own_look) = {
                 let m = &self.state.strategic.missiles[i];
-                (m.quarry, m.owner)
+                (m.quarry, m.owner, self.strategic_look(m.blueprint))
             };
             // Its warhead, or failing that another nobody is after.
             let mut prey = self.state.strategic.missiles.iter().position(|w| {
@@ -981,7 +988,12 @@ impl World {
             };
             let target = prey.map(|j| {
                 let w = &self.state.strategic.missiles[j];
-                (w.pos, w.prev_pos, w.serial)
+                (
+                    w.pos,
+                    w.prev_pos,
+                    w.serial,
+                    self.strategic_look(w.blueprint),
+                )
             });
             // Where to meet it: the first point of its path this can reach by the time the
             // warhead gets there, or failing that the farthest ahead it looks, flown flat
@@ -1010,6 +1022,7 @@ impl World {
                     pos: m.pos,
                     owner,
                     killed: false,
+                    look: own_look,
                 });
                 continue;
             }
@@ -1032,7 +1045,7 @@ impl World {
                 m.vel = dir * pace;
             }
             m.pos += m.vel;
-            if let Some((p, pp, serial)) = target {
+            if let Some((p, pp, serial, look)) = target {
                 let (gap, at) = closest_over_tick(m.prev_pos, m.pos, pp, p);
                 if gap <= KILL_REACH {
                     m.pos = at;
@@ -1042,6 +1055,7 @@ impl World {
                         pos: at,
                         owner,
                         killed: true,
+                        look,
                     });
                 }
             }
@@ -1074,12 +1088,14 @@ impl World {
         owner: u8,
         source: UnitId,
         commander: bool,
+        look: StrategicLook,
     ) -> Result<(), SimError> {
         self.events.push(SimEvent::NuclearDetonation {
             pos,
             radius: blast.radius,
             owner,
             commander,
+            look,
         });
         self.state.strategic.detonations.push(Detonation {
             pos,
@@ -1300,6 +1316,7 @@ impl World {
                     .strategic
                     .as_ref()
                     .map_or(1.0, |s| s.missile_scale.to_f32()),
+                look: self.strategic_look(m.blueprint) as u32,
             });
         }
     }

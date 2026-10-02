@@ -1,0 +1,60 @@
+// Regency strategic weapons: the silo that throws a Pinch-fusion Warhead and the array of
+// Gravitic Interceptors that answers one. They assemble and fire by the same rules as
+// ARC's Sunfall and Parhelion (`docs/NUKES.md`), with a yield to match; only the look and
+// the sound are the Regency's (`nuke_look: Plasma` in faction.ron): the warhead goes up
+// as a red plasma nova and leaves a glowing cloud of plasma standing over the ground for
+// minutes, and the missiles leave dark trails with a white-hot streak at the tail.
+[
+    (
+        // A low plated vault over one deep launch tube ringed by leaning lens pylons; the
+        // warhead store beside it is a well loaded by a gravity lift, a floating collar
+        // held by low emitter posts (no crane: `models::regency::strategic`).
+        key: "regency_t4_nuke_silo",
+        name: "Mangonel",
+        role: "Pinch-fusion Warhead Silo", title: "Nuke Silo",
+        tech: 4,
+        categories: ["Land", "Strategic", "Experimental"],
+        health: 42000,
+        cost: (mass: 9000, energy: 90000, time: 36000),
+        radius: 42.5, height: 26, footprint: (8, 8),
+        vision: 300,
+        strategic: (
+            kind: Nuke,
+            // One warhead: about five minutes on the silo's own assembly line, as a Sunfall's.
+            missile: (mass: 6000, energy: 120000, time: 18000),
+            power: 60,
+            stock: 2,
+            speed: 320,
+            apogee: 4200,
+            // The Sunfall's yield: every race's warhead does about the same (user, 2026-09-25).
+            blast: (radius: 520, core: 200, damage: 80000, edge: 2500, front: 1.0),
+        ),
+        mesh: "regency_nuke_silo", icon: Silo,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        // A launch block of four cells beside a mast of turning sensor rings, and the
+        // magazine that loads them by a gravity lift.
+        key: "regency_t4_nuke_defense",
+        name: "Barbican",
+        role: "Gravitic Interceptor Array", title: "Nuke Defense",
+        tech: 4,
+        categories: ["Land", "Strategic", "Experimental"],
+        health: 16000,
+        cost: (mass: 3200, energy: 32000, time: 8000),
+        radius: 18.75, height: 20, footprint: (4, 4),
+        vision: 300, radar: 2400,
+        economy: (energy_upkeep: 25),
+        strategic: (
+            kind: Interceptor,
+            missile: (mass: 1500, energy: 30000, time: 4500),
+            power: 45,
+            stock: 4,
+            speed: 900,
+            apogee: 0,
+            coverage: 2400,
+        ),
+        mesh: "regency_nuke_defense", icon: AntiNuke,
+        sounds: (death: "blast_large"),
+    ),
+]

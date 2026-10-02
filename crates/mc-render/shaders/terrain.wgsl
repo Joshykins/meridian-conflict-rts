@@ -301,7 +301,9 @@ fn craters_at(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
         let heat = c.look.x;
         let cool = max(c.look.y, 1.0);
         let pool = c.look.z;
-        let seed = c.look.w;
+        // A Regency nova's crater carries its seed negated (craters.rs `CraterStyle::Plasma`).
+        let plasma = c.look.w < 0.0;
+        let seed = abs(c.look.w);
         let dl = sqrt(d2);
         let r = dl / big;
         let dir = d / max(dl, 1e-3);
@@ -371,7 +373,7 @@ fn craters_at(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
         if pool > 0.0 {
             let streak = smoothstep(0.55, 0.85, blotch2 * 0.5 + ray2 * 0.7);
             let wall = heat * exp(-age / 18.0) * (1.0 - smoothstep(pool_r, rim * 1.1, rw)) * streak;
-            glow += crater_heat_rgb(wall * 0.55) * charred;
+            glow += crater_glow_rgb(wall * 0.55, plasma) * charred;
         }
 
         // ---- The glassed pool ----
@@ -408,8 +410,8 @@ fn craters_at(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
             let body_t = hot * pow(clamp(1.0 - u * (2.0 + rp), 0.0, 1.0), 1.4) * (1.0 - 0.3 * skin);
             let crust = smoothstep(0.0, 0.035, u * (1.0 + 0.7 * rp) - 0.05 - 0.13 * plate);
             let crack_t = hot * pow(clamp(1.0 - u * (0.8 + 0.25 * rp), 0.0, 1.0), 1.8) * (0.7 + 0.3 * gape);
-            var g = crater_heat_rgb(body_t) * (1.0 - crust);
-            g += (crater_heat_rgb(crack_t) * open + crater_heat_rgb(crack_t * 0.6) * bleed * 0.35 * (1.0 - open)) * crust;
+            var g = crater_glow_rgb(body_t, plasma) * (1.0 - crust);
+            g += (crater_glow_rgb(crack_t, plasma) * open + crater_glow_rgb(crack_t * 0.6, plasma) * bleed * 0.35 * (1.0 - open)) * crust;
             glow = mix(glow, g, glass);
 
             // Black-green glass, glossy, rolling in broad swells; cracks dull and darker.
@@ -420,7 +422,9 @@ fn craters_at(xy: vec2<f32>, alt: f32, albedo_in: vec3<f32>, rough_in: f32, px: 
             s.slope += swell * 0.05 * glass;
             // A dark rind of slag along the shore and on the splashes.
             let rind = max(1.0 - smoothstep(0.004, 0.02, abs(r - shore)), 1.0 - in_pool);
-            let glass_rgb = mix(vec3<f32>(0.011, 0.02, 0.016) * (0.9 + 0.2 * plate) * (1.0 - 0.6 * open),
+            // A nova's glass is black with a crimson depth to it.
+            let glass_tint = select(vec3<f32>(0.011, 0.02, 0.016), vec3<f32>(0.022, 0.006, 0.009), plasma);
+            let glass_rgb = mix(glass_tint * (0.9 + 0.2 * plate) * (1.0 - 0.6 * open),
                 vec3<f32>(0.012, 0.011, 0.01), rind);
             let g_rough = mix(0.38 + 0.12 * open, 0.95, rind);
             a = mix(a, glass_rgb, glass);

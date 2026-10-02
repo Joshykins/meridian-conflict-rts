@@ -38,6 +38,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 mod ambience_notes;
 #[path = "game_cine.rs"]
 mod cine_input;
+#[path = "game_nuke_sounds.rs"]
+mod game_nuke_sounds;
 #[path = "game_groups.rs"]
 pub(crate) mod groups;
 #[path = "game_menu.rs"]
@@ -4032,139 +4034,6 @@ impl Game {
                 pitch,
                 (distance / 343.0).min(12.0),
             );
-        }
-    }
-
-    /// Warheads in flight (`docs/NUKES.md`): the motor's roar while it climbs, the rush
-    /// of air as it comes down, louder the nearer it is to landing. Heard a little from
-    /// anywhere, like the launch. A salvo is at most three voices (audio/salvo.rs): one
-    /// climbing, the warhead nearest to landing, and the rest of the fall merged.
-    fn warhead_loops(&self, audio: &Audio) -> Vec<(mc_data::SoundId, f32, f32, f32)> {
-        use crate::audio::salvo;
-        let (library, _) = audio.library();
-        let (Some(flight), Some(fall)) = (
-            library.id_of("warhead_flight"),
-            library.id_of("warhead_fall"),
-        ) else {
-            return Vec::new();
-        };
-        let mut climbing = Vec::new();
-        let mut falling = Vec::new();
-        for m in &self.view.frame.strategic {
-            if m.kind != mc_sim::mirror::STRATEGIC_WARHEAD {
-                continue;
-            }
-            let (gain, pan) = self.hear(Vec3::from(m.pos));
-            if m.pos[2] < m.prev_pos[2] - 0.05 {
-                let near = (1.0 - m.eta / 15.0).clamp(0.0, 1.0);
-                falling.push((gain.max(0.12 + 0.45 * near * near).min(1.0), pan, m.eta));
-            } else {
-                // Coming up to full roar as it clears the tube.
-                let lit = (m.age / 1.2).clamp(0.0, 1.0);
-                climbing.push((gain.max(0.18) * lit, pan));
-            }
-        }
-        let mut out = Vec::new();
-        if let Some((gain, pan)) = salvo::merge(climbing, 1.0) {
-            out.push((flight, gain, pan, 1.0));
-        }
-        out.extend(
-            salvo::falls(falling)
-                .into_iter()
-                .map(|(gain, pan)| (fall, gain, pan, 1.0)),
-        );
-        out
-    }
-
-    /// Strategic missiles (`docs/NUKES.md`): a warhead's launch is heard by everyone the
-    /// same way, whoever fired it, and its detonation from anywhere on the map, at once (no
-    /// delay for the sound's travel). Looked up by name: these are rare. A salvo of dozens
-    /// coalesces (audio/salvo.rs): one alarm, one deeper roar, a budget of detonations,
-    /// the small sounds rate-limited.
-    fn nuke_sounds(&mut self, audio: &Audio) {
-        use crate::audio::salvo::Small;
-        use mc_sim::SimEvent;
-        let (library, _) = audio.library();
-        let local = self.view.local;
-        let mut launches = 0u32;
-        let mut bursts = Vec::new();
-        let mut small: [Vec<(f32, f32)>; 3] = Default::default();
-        for event in &self.view.frame.events {
-            if matches!(event, SimEvent::NuclearDetonation { .. }) {
-                // Warhead or commander's reactor, the whole map hears it: no birdsong after.
-                self.ambience.blast();
-            }
-            let (kind, pos, floor) = match event {
-                SimEvent::NuclearDetonation {
-                    pos,
-                    commander: false,
-                    ..
-                } => {
-                    bursts.push(self.hear(Vec3::from(pos.to_f32())));
-                    continue;
-                }
-                SimEvent::NuclearLaunch { .. } => {
-                    launches += 1;
-                    continue;
-                }
-                SimEvent::InterceptorLaunch { from, .. } => (Small::InterceptorLaunch, from, 0.0),
-                SimEvent::WarheadIntercepted {
-                    pos, killed: true, ..
-                } => (Small::Intercepted, pos, 0.5),
-                SimEvent::SiloOpening { pos, .. } => (Small::SiloDoors, pos, 0.0),
-                SimEvent::RoundReady {
-                    owner,
-                    warhead: true,
-                    ..
-                } if *owner == local && !self.view.observing => {
-                    if let Some(ready) = library.id_of("warhead_ready") {
-                        audio.play_response(ready, 0.6);
-                    }
-                    continue;
-                }
-                _ => continue,
-            };
-            let (gain, pan) = self.hear(Vec3::from(pos.to_f32()));
-            small[kind as usize].push((gain.max(floor), pan));
-        }
-        if launches == 0 && bursts.is_empty() && small.iter().all(Vec::is_empty) {
-            return;
-        }
-        let salvo = &mut self.salvo_sounds;
-        let t = salvo.now();
-        // The same alarm and roar for everyone, the launcher included, at one level and
-        // from nowhere in particular: the sound never tells whose warhead it is, so
-        // players have to look.
-        if let Some(alarm) = library.id_of("nuke_alarm") {
-            let length = library.sound(alarm).length;
-            if salvo.alarm(t, launches, length) {
-                audio.play_response(alarm, 0.8);
-            }
-        }
-        if let Some(roar) = library.id_of("nuke_launch") {
-            for p in salvo.roar(t, launches) {
-                audio.play_world_after(roar, p.gain, p.pan, p.pitch, p.delay);
-            }
-        }
-        // Heard the moment it happens, however far: the user wants the blast and its
-        // sound together, not the real lag of sound through the air.
-        if let (Some(sound), Some(p)) = (
-            library.id_of("nuke_detonation"),
-            salvo.detonation(t, &bursts),
-        ) {
-            audio.play_world_after(sound, p.gain, p.pan, p.pitch, 0.0);
-        }
-        for (kind, name) in [
-            (Small::InterceptorLaunch, "interceptor_launch"),
-            (Small::Intercepted, "warhead_intercepted"),
-            (Small::SiloDoors, "silo_doors"),
-        ] {
-            if let (Some(sound), Some(p)) = (
-                library.id_of(name),
-                salvo.small(t, kind, &small[kind as usize]),
-            ) {
-                audio.play_world_after(sound, p.gain, p.pan, p.pitch, 0.0);
-            }
         }
     }
 

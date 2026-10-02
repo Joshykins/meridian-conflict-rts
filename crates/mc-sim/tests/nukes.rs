@@ -804,3 +804,50 @@ fn a_round_finishes_through_a_mass_stall() {
     );
     assert_eq!(l.stock, 1);
 }
+
+/// The Regency's pair fire by the same rules; their events carry their faction's look
+/// (`nuke_look: Plasma`), so their warheads are drawn and heard as theirs, and a kill is
+/// drawn in the look of the warhead that broke.
+#[test]
+fn regency_launches_and_blasts_carry_the_plasma_look() {
+    use mc_data::strategic::StrategicLook::{Fission, Plasma};
+    let mut w = world();
+    let silo = spawn(&mut w, 0, "regency_t4_nuke_silo", 600, 600);
+    stock(&mut w, silo, 1);
+    spawn(&mut w, 1, "aster_t1_power", 7000, 7000);
+    launch(&mut w, silo, 3600, 3600);
+    until(&mut w, 80, |e| {
+        matches!(e, SimEvent::NuclearLaunch { look: Plasma, .. })
+    })
+    .expect("the Mangonel launches, in its look");
+    until(&mut w, 1500, |e| {
+        matches!(e, SimEvent::NuclearDetonation { look: Plasma, .. })
+    })
+    .expect("and its warhead goes off as a nova");
+
+    // An ARC warhead into a Barbican's cover: the interceptor is the Regency's, the
+    // warhead it breaks is ARC's.
+    let mut w = world();
+    let silo = spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
+    stock(&mut w, silo, 1);
+    let array = spawn(&mut w, 1, "regency_t4_nuke_defense", 3400, 3400);
+    stock(&mut w, array, 4);
+    // Its upkeep paid.
+    spawn(&mut w, 1, "aster_t3_power", 3600, 3500);
+    launch(&mut w, silo, 3600, 3600);
+    until(&mut w, 1500, |e| {
+        matches!(e, SimEvent::InterceptorLaunch { look: Plasma, .. })
+    })
+    .expect("the Barbican throws a Gravitic Interceptor");
+    until(&mut w, 600, |e| {
+        matches!(
+            e,
+            SimEvent::WarheadIntercepted {
+                killed: true,
+                look: Fission,
+                ..
+            }
+        )
+    })
+    .expect("which breaks the ARC warhead");
+}

@@ -12,7 +12,7 @@
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 15] = [
+pub(crate) const PRELUDES: [&str; 16] = [
     "common",
     "bindings",
     "regions",
@@ -28,6 +28,7 @@ pub(crate) const PRELUDES: [&str; 15] = [
     "plasma_puffs",
     "emp",
     "wreck",
+    "nova",
 ];
 
 /// The prelude files' text.
@@ -46,6 +47,7 @@ pub(crate) struct Preludes {
     plasma_puffs: String,
     emp: String,
     wreck: String,
+    nova: String,
 }
 
 impl Preludes {
@@ -73,6 +75,7 @@ impl Preludes {
             plasma_puffs: read("plasma_puffs"),
             emp: read("emp"),
             wreck: read("wreck"),
+            nova: read("nova"),
         }
     }
 
@@ -130,6 +133,10 @@ impl Preludes {
         // How a wreck lies, breaks up and burns out (entity.wgsl; needs bindings).
         if uses("wreck") {
             prelude = format!("{prelude}\n{}", self.wreck);
+        }
+        // A Regency warhead's plasma nova (nuke.wgsl; uses its types and billows).
+        if uses("nova") {
+            prelude = format!("{prelude}\n{}", self.nova);
         }
         let lines = prelude.lines().count() + 1;
         (format!("{prelude}\n{body}"), lines)

@@ -19,6 +19,20 @@ pub enum StrategicKind {
     Interceptor,
 }
 
+/// How a faction's strategic missiles and nuclear blasts (its commander's too) are drawn
+/// and heard (`Faction::nuke_look`). Presentation only, never
+/// hashed: the sim fires both alike. Its number crosses into the shaders (nuke_fx.rs packs
+/// it), so the discriminants are fixed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+pub enum StrategicLook {
+    /// ARC's: a nuclear fireball that rolls into a mushroom cloud of smoke; white trails.
+    #[default]
+    Fission = 0,
+    /// The Regency's pinch-fusion warhead: a red plasma nova that leaves a glowing plasma
+    /// cloud standing over the ground; dark trails with a hot streak at the missile.
+    Plasma = 1,
+}
+
 /// What one round costs to assemble, like a unit's `cost`.
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -1,4 +1,5 @@
 //!use bindings
+//!use nova
 // Nuclear blasts and strategic missiles (renderer/nuke_fx.rs, docs/NUKES.md).
 //
 // A blast is a volume, marched at half size into a target of its own and laid over the
@@ -18,6 +19,10 @@
 // the base surge, a low ring of dust rolling outward. The cap drifts downwind and thins
 // over minutes. The billows are the clouds' Perlin-Worley texture (sky.rs), warped, so
 // no two blasts, and no two sides of one, are alike.
+//
+// A Regency warhead (`look` NUKE_LOOK_PLASMA) is the same body made of plasma: a star, a
+// nova's shell, and a cloud of dark plasma laced with glowing threads that stands for
+// minutes (nova.wgsl).
 //
 // Missiles are drawn here too: a lathed body a strategic missile long, and the plume
 // of its motor, from `globals.strategic`.
@@ -57,6 +62,8 @@ struct Blast {
     fuel: f32,
     churn: f32,
     thick: f32,
+    // NUKE_LOOK_*: ARC's fire and smoke, or the Regency's plasma (nova.wgsl).
+    look: u32,
 }
 
 fn blast_of(i: u32) -> Blast {
@@ -77,6 +84,7 @@ fn blast_of(i: u32) -> Blast {
     n.fuel = d.x;
     n.churn = d.z;
     n.thick = d.w;
+    n.look = u32(d.y + 0.5);
     return n;
 }
 
@@ -431,6 +439,22 @@ fn wilson(n: Blast, world: vec3<f32>) -> Sample {
     return s;
 }
 
+// The shell round the burst (part 2): the Wilson cloud, or a Regency nova's shell.
+fn shell_left(n: Blast) -> f32 {
+    return select(wilson_left(n), nova_shell_left(n), is_nova(n));
+}
+
+fn shell_radius(n: Blast) -> f32 {
+    if is_nova(n) {
+        return nova_shell_radius(n);
+    }
+    return n.front * 0.96;
+}
+
+fn shell_thick(n: Blast) -> f32 {
+    return select(shell_radius(n) * 0.05 + 10.0, nova_shell_thick(n), is_nova(n));
+}
+
 // ---- light --------------------------------------------------------------------------------
 
 // The fireball's colour at `heat`: white, yellow, orange, deep red.
@@ -454,7 +478,11 @@ struct Box {
 fn column_box(n: Blast) -> Box {
     let rc = head_radius(n);
     let hc = head_height(n);
-    let reach = max(rc * 1.9, n.scale * 1100.0 * smoothstep(8.0, 30.0, n.age)) + length(n.drift) + 60.0;
+    var reach = max(rc * 1.9, n.scale * 1100.0 * smoothstep(8.0, 30.0, n.age)) + length(n.drift) + 60.0;
+    if is_nova(n) {
+        let ring = nova_ring(n);
+        reach = max(reach, ring.y + ring.z * 3.0 + length(n.drift) + 60.0);
+    }
     var b: Box;
     b.lo = vec3<f32>(n.at.xy - vec2<f32>(reach), n.ground - 20.0);
     b.hi = vec3<f32>(n.at.xy + vec2<f32>(reach), n.at.z + hc + rc * 1.1 + 60.0);
@@ -514,6 +542,9 @@ struct Marched {
 }
 
 fn shade_sample(n: Blast, part: u32, world: vec3<f32>, s: Sample, rc: f32, hc: f32, r: f32, heat0: f32) -> vec3<f32> {
+    if is_nova(n) {
+        return nova_shade(n, part, world, s, rc, hc, r);
+    }
     let sun = globals.sun.xyz;
     let sun_col = atmos.sun_color.rgb * max(atmos.sun_color.w, 0.25);
     let sky = atmos.sky_color.rgb;
@@ -566,6 +597,15 @@ fn shade_sample(n: Blast, part: u32, world: vec3<f32>, s: Sample, rc: f32, hc: f
 }
 
 fn sample_part(n: Blast, part: u32, world: vec3<f32>) -> Sample {
+    if is_nova(n) {
+        if part == 0u {
+            return nova_column(n, world);
+        }
+        if part == 1u {
+            return nova_surge(n, world);
+        }
+        return nova_shell(n, world);
+    }
     if part == 0u {
         return column(n, world);
     }
@@ -641,7 +681,9 @@ fn march_seg(seg: Seg, eye: vec3<f32>, rd: vec3<f32>, jitter: f32, m_in: Marched
     let n = blast_of(seg.blast);
     // The ground's dust is a thin layer along a long ray: too few steps and the dither
     // decides which pixels find it at all, which is grain.
-    let steps = max(i32(f32(select(select(10, 36, seg.part == 1u), 56, seg.part == 0u)) * share), 8);
+    // A nova's shell is thin and bright: it takes more steps than the Wilson cloud's haze.
+    let shell_steps = select(10, 24, is_nova(n));
+    let steps = max(i32(f32(select(select(shell_steps, 36, seg.part == 1u), 56, seg.part == 0u)) * share), 8);
     let dt = (seg.t1 - seg.t0) / f32(steps);
     let rc = head_radius(n);
     let hc = head_height(n);
@@ -736,15 +778,15 @@ fn fs_nuke_march(in: FullOut) -> @location(0) vec4<f32> {
             count_s++;
         }
         let gr = slab(eye, rd, surge_box(n));
-        if min(gr.y, scene_t) > gr.x && n.age < 55.0 {
+        if min(gr.y, scene_t) > gr.x && n.age < select(55.0, 60.0, is_nova(n)) {
             segs[count_s] = Seg(gr.x, min(gr.y, scene_t), i, 1u);
             count_s++;
         }
         // The shell: its near and far sides as stretches of their own, so the fireball
         // inside is seen between them.
-        if wilson_left(n) > 0.0 {
-            let rw = n.front * 0.96;
-            let th = rw * 0.05 + 10.0;
+        if shell_left(n) > 0.0 {
+            let rw = shell_radius(n);
+            let th = shell_thick(n);
             let outer = sphere(eye, rd, n.at, rw + th * 2.0);
             if outer.y > outer.x {
                 let inner = sphere(eye, rd, n.at, max(rw - th * 2.0, 1.0));
@@ -766,7 +808,12 @@ fn fs_nuke_march(in: FullOut) -> @location(0) vec4<f32> {
     }
     var glow = vec3<f32>(0.0);
     for (var i = 0u; i < count; i++) {
-        glow += ignition_glow(blast_of(i), eye, rd, scene_t);
+        let n = blast_of(i);
+        if is_nova(n) {
+            glow += nova_ignition(n, eye, rd, scene_t);
+        } else {
+            glow += ignition_glow(n, eye, rd, scene_t);
+        }
     }
     if count_s == 0u {
         return vec4<f32>(glow, 0.0);
@@ -1020,10 +1067,26 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     let heat = b.w;
     let owner = (u32(a.w) >> MISSILE_OWNER_SHIFT) & OWNER_MASK;
     let warhead = in.kind == 0u;
+    let plasma = (u32(a.w) & MISSILE_PLASMA) != 0u;
     // Light metal, dark bands at the stage joint and the re-entry vehicle, a team ring.
     var base = vec3<f32>(0.62, 0.64, 0.66);
+    // A Regency missile's own light: thin red seams round its containment.
+    var seam = 0.0;
     let x = in.along;
-    if warhead {
+    if plasma {
+        // Dark plate with dark bronze bands, a team ring, and red seams that glow.
+        base = vec3<f32>(0.035, 0.037, 0.045);
+        let bronze = vec3<f32>(0.3, 0.19, 0.095);
+        if warhead {
+            if (x > 0.42 && x < 0.47) || (x > 0.7 && x < 0.745) || x < 0.04 { base = bronze; }
+            if x > 0.58 && x < 0.62 { base = globals.team_colors[owner].rgb * 0.8; }
+            seam = select(0.0, 1.0, (x > 0.47 && x < 0.478) || (x > 0.692 && x < 0.7) || (x > 0.2 && x < 0.208));
+        } else {
+            if x > 0.28 && x < 0.36 { base = bronze; }
+            if x > 0.6 && x < 0.64 { base = globals.team_colors[owner].rgb * 0.8; }
+            seam = select(0.0, 1.0, x > 0.36 && x < 0.38);
+        }
+    } else if warhead {
         if (x > 0.435 && x < 0.48) || x > 0.74 { base = vec3<f32>(0.07, 0.075, 0.08); }
         if x > 0.58 && x < 0.62 { base = globals.team_colors[owner].rgb * 0.8; }
         if x < 0.03 { base = vec3<f32>(0.12, 0.11, 0.1); }
@@ -1038,10 +1101,12 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     let h = normalize(sun + v);
     let spec = pow(max(dot(n, h), 0.0), 48.0) * 0.35;
     var c = base * (atmos.sun_color.rgb * lambert * 1.1 + atmos.sky_color.rgb * 0.6) + atmos.sun_color.rgb * spec;
-    // Coming down, the nose burns: orange going white at the tip.
+    c += plasma_color(0.45) * seam * 6.0;
+    // Coming down, the nose burns: orange going white at the tip (a Regency body's field
+    // burns red going rose).
     if heat > 0.0 {
         let tip = smoothstep(0.7, 1.0, x);
-        c += fire_color(tip * heat) * tip * heat * 30.0;
+        c += select(fire_color(tip * heat), plasma_color(tip * heat), plasma) * tip * heat * 30.0;
     }
     return vec4<f32>(c, 1.0);
 }
@@ -1080,6 +1145,8 @@ struct PlumeFrame {
     length: f32,
     mouth: f32,
     power: f32,
+    // A Regency drive: red plasma, rose-white at the nozzle.
+    plasma: bool,
 }
 
 // Where a missile's nozzle is: the tail of the body vs_strategic lathes.
@@ -1101,6 +1168,7 @@ fn plume_frame(slot: u32) -> PlumeFrame {
     // The tail ring's radius (warhead_ring / interceptor_ring).
     f.mouth = radius * select(0.9, 0.88, warhead);
     f.power = select(0.7, 1.0, warhead);
+    f.plasma = (u32(a.w) & MISSILE_PLASMA) != 0u;
     return f;
 }
 
@@ -1226,7 +1294,9 @@ fn fs_plume(in: PlumeOut) -> @location(0) vec4<f32> {
             vec2<f32>(s / (f.mouth * 9.0) - time * 4.0, sqrt(rho2) / (r * 3.0) + f32(in.slot) * 0.37), 0.0).b;
         let flame = (1.0 - x) * (1.0 - x) * (0.55 + 0.45 * exp(-x * 6.0))
             * exp(-rho2 / (r * r)) / r * (0.6 + 0.8 * tear);
-        glow += (vec3<f32>(1.0, 0.95, 0.88) * core * 16.0 + fire_color(0.78 - x * 1.3) * flame * 0.8) * dt;
+        let hot = select(vec3<f32>(1.0, 0.95, 0.88), vec3<f32>(1.0, 0.86, 0.9), f.plasma);
+        let flame_col = select(fire_color(0.78 - x * 1.3), plasma_color(0.7 - x * 1.1), f.plasma);
+        glow += (hot * core * 16.0 + flame_col * flame * 0.8) * dt;
     }
     let flicker = 0.88 + 0.12 * sin(time * 61.0 + f32(in.slot) * 1.7);
     glow *= f.power * flicker;

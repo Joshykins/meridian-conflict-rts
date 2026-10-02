@@ -30,13 +30,16 @@ pub(super) enum CraterStyle {
     Glassed,
     /// A big conventional blast: bowl, lip and scorch, no glass.
     Blast,
+    /// A Regency nova: glassed as a nuclear blast, its melt glowing red and its glass
+    /// black-crimson (the seed goes to the shader negated).
+    Plasma,
 }
 
 impl CraterStyle {
     /// The share of the radius that melts into a pool.
     fn pool(self) -> f32 {
         match self {
-            CraterStyle::Glassed => 0.19,
+            CraterStyle::Glassed | CraterStyle::Plasma => 0.19,
             CraterStyle::Blast => 0.0,
         }
     }
@@ -116,7 +119,7 @@ impl Craters {
         let seed = (self.seed >> 9) as f32 / (1u32 << 23) as f32;
         let heat = heat.clamp(0.0, 1.0);
         // A warhead's pool takes about six minutes to go black; a commander's four.
-        let cool = if style == CraterStyle::Glassed {
+        let cool = if style != CraterStyle::Blast {
             120.0 + 240.0 * heat
         } else {
             60.0 + 60.0 * heat
@@ -124,8 +127,14 @@ impl Craters {
         // Another burst on one already here (a salvo on one mark): the pool is heated
         // again and widens a little, instead of a copy laid over it that crowds older
         // craters out of the list.
+        let sign = if style == CraterStyle::Plasma {
+            -1.0
+        } else {
+            1.0
+        };
         if let Some(c) = self.list.iter_mut().find(|c| {
             c.gpu.look[2] == style.pool()
+                && c.gpu.look[3].signum() == sign
                 && Vec2::new(c.gpu.at[0], c.gpu.at[1]).distance(at) < 0.35 * radius.max(c.gpu.at[2])
         }) {
             let r = c.gpu.at[2].max(radius);
@@ -139,7 +148,8 @@ impl Craters {
         let crater = Crater {
             gpu: GpuCrater {
                 at: [at.x, at.y, radius, time],
-                look: [heat, cool, style.pool(), seed * 997.0],
+                // Never zero, so the sign always says the style.
+                look: [heat, cool, style.pool(), (seed * 997.0 + 0.5) * sign],
             },
         };
         if self.list.len() >= MAX_CRATERS {
@@ -195,15 +205,10 @@ impl Craters {
 }
 
 impl Renderer {
-    /// Leaves a crater: the glassed kind a nuclear blast leaves. `at` its middle,
-    /// `radius` the blast's damage radius (about 520 m for a warhead, 300 for a
-    /// commander's reactor), `heat` how hot it burned (0-1: how bright the pool glows
-    /// and how long it takes to cool), `time` when it went off (the renderer's clock).
-    pub(super) fn add_crater(&mut self, at: Vec2, radius: f32, heat: f32, time: f32) {
-        self.add_crater_styled(at, radius, heat, time, CraterStyle::Glassed);
-    }
-
-    /// `add_crater` with a style of its own.
+    /// Leaves a crater in `style`: `at` its middle, `radius` the blast's damage radius
+    /// (about 520 m for a warhead, 300 for a commander's reactor), `heat` how hot it burned
+    /// (0-1: how bright the pool glows and how long it takes to cool), `time` when it went
+    /// off (the renderer's clock).
     pub(super) fn add_crater_styled(
         &mut self,
         at: Vec2,
@@ -236,7 +241,12 @@ impl Renderer {
             let t = heat * (1.0 - age / cool).clamp(0.0, 1.0).powf(2.2);
             let r = c.at[2];
             let scale = (r / 520.0).powi(2);
-            let color = Vec3::new(1.0, 0.3 + 0.3 * t, 0.06 + 0.1 * t) * 1.2e5 * t * t * scale;
+            let tint = if c.look[3] < 0.0 {
+                Vec3::new(1.0, 0.08 + 0.3 * t, 0.07 + 0.25 * t)
+            } else {
+                Vec3::new(1.0, 0.3 + 0.3 * t, 0.06 + 0.1 * t)
+            };
+            let color = tint * 1.2e5 * t * t * scale;
             self.lights.lamp(
                 Vec3::new(at.x, at.y, ground + r * 0.3),
                 Vec3::NEG_Z,
@@ -401,7 +411,7 @@ mod shots {
         camera.tilt = cams[0][2];
         let bare = median(&mut renderer, &camera, start - 2.0, &mut first, &mut render);
         for &spot in &spots {
-            renderer.add_crater(spot, radius, heat, start);
+            renderer.add_crater_styled(spot, radius, heat, start, super::CraterStyle::Glassed);
         }
         let with = median(
             &mut renderer,

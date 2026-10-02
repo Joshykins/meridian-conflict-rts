@@ -37,6 +37,7 @@ mod raider;
 mod scorpion;
 mod scout;
 mod seeker_hover;
+mod strategic;
 mod strider;
 mod taproot;
 mod tidebrood;
@@ -165,6 +166,20 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(7.0, 24.0), (7.0, 28.0), (7.0, 32.0)],
         eye::eye,
     ),
+    // Strategic launchers (`strategic`): the Mangonel silo and the Barbican array.
+    ModelDef::new(
+        "regency_nuke_silo",
+        strategic::SILO_SIZE.0,
+        strategic::SILO_SIZE.1,
+        strategic::silo_vault,
+    )
+    .with_tier_4(),
+    ModelDef::new(
+        "regency_nuke_defense",
+        strategic::ARRAY_SIZE.0,
+        strategic::ARRAY_SIZE.1,
+        strategic::array_mast,
+    ),
 ];
 
 /// Full-detail triangle budgets: the Regency's models are built from many separate parts, so each
@@ -215,6 +230,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_ward" => 6000,
         // A skirted tracked body, a turret, the gun and its caged core.
         "regency_skyspear" | "regency_fusion_howitzer" => 8000,
+        // Strategic: an 8 x 8 launch complex, and a 4 x 4 array; a few a match.
+        "regency_nuke_silo" => 9000,
+        "regency_nuke_defense" => 6000,
         _ => return None,
     })
 }
@@ -239,6 +257,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
         // Plated hulls, heads and legs: faceted solids that keep their sides when reduced.
         "regency_strider" | "regency_wake_tank" => Some(0.5),
+        // Bunkers, pylons and casemates of faceted plate that keep their sides reduced.
+        "regency_nuke_silo" | "regency_nuke_defense" => Some(0.58),
         _ => None,
     }
 }
@@ -469,6 +489,14 @@ mod tests {
         );
         assert_eq!(shield_look::PRISM, mc_data::ShieldLook::Prism as u32);
         assert!(mc_data::ShieldLook::Prism as u32 <= shield_look::MASK);
+    }
+
+    #[test]
+    fn the_nuke_look_numbers_are_the_datas() {
+        use crate::gpu_consts::nuke_look;
+        use mc_data::strategic::StrategicLook;
+        assert_eq!(nuke_look::FISSION, StrategicLook::Fission as u32);
+        assert_eq!(nuke_look::PLASMA, StrategicLook::Plasma as u32);
     }
 
     #[test]

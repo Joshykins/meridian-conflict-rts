@@ -215,6 +215,21 @@ impl RegencyGunFx {
         });
     }
 
+    /// A white-hot streak from `from` to `to`, the Sunspear round's trail (it takes the
+    /// prism's pinks, cools to red and breaks up over `life` seconds): behind a Regency
+    /// strategic missile (`nuke_fx::nova`).
+    pub(super) fn streak(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
+        self.trail(Trail {
+            from,
+            to,
+            start,
+            life,
+            width,
+            fusion: true,
+            wake: false,
+        });
+    }
+
     /// A steady red light at `pos` from `start` for `life` seconds, fading out.
     pub(super) fn flare(&mut self, pos: Vec3, color: Vec3, range: f32, start: f32, life: f32) {
         self.light(Glow {

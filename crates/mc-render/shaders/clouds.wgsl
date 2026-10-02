@@ -541,6 +541,15 @@ fn fire_tint(heat: f32) -> vec3<f32> {
     return mix(c, vec3<f32>(1.0, 0.96, 0.9), smoothstep(0.75, 1.0, h));
 }
 
+// A Regency nova's light on the clouds (nova.wgsl `plasma_color`): white, rose, red,
+// crimson.
+fn plasma_tint(heat: f32) -> vec3<f32> {
+    let h = clamp(heat, 0.0, 1.0);
+    var c = mix(vec3<f32>(0.85, 0.035, 0.05), vec3<f32>(1.0, 0.19, 0.09), smoothstep(0.0, 0.4, h));
+    c = mix(c, vec3<f32>(1.0, 0.6, 0.64), smoothstep(0.4, 0.75, h));
+    return mix(c, vec3<f32>(1.0, 0.95, 0.97), smoothstep(0.75, 1.0, h));
+}
+
 fn gather_fires() {
     fire_count = 0u;
     let count = min(u32(globals.nuke_view.z), FIRE_SLOTS);
@@ -566,7 +575,13 @@ fn gather_fires() {
         let temp = 0.3 * exp(-age * 2.0) + 0.75 * heat + 0.1;
         let lean = c.xy * clamp(hc / (1600.0 * min(scale, pow(scale, 0.6))), 0.0, 1.0);
         fire_at[fire_count] = vec4<f32>(a.xyz + vec3<f32>(lean, hc), rc);
-        fire_light[fire_count] = fire_tint(temp) * power;
+        // A Regency nova's threads glow on for minutes (nova.wgsl `nova_glow`).
+        if u32(d.y + 0.5) == NUKE_LOOK_PLASMA {
+            let threads = 0.35 * exp(-age / (18.0 * k)) + 0.65 * exp(-age / (75.0 * k));
+            fire_light[fire_count] = plasma_tint(temp) * (power + 0.8 * threads);
+        } else {
+            fire_light[fire_count] = fire_tint(temp) * power;
+        }
         fire_count++;
     }
 }

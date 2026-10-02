@@ -174,6 +174,9 @@ pub(crate) struct Faction {
     /// How its missile defence is seen killing a missile. Presentation only.
     #[serde(default)]
     pub anti_missile_look: AntiMissileLook,
+    /// How its strategic missiles and nuclear blasts look and sound. Presentation only.
+    #[serde(default)]
+    pub nuke_look: crate::strategic::StrategicLook,
 }
 
 /// How a faction's shield fields are drawn (shields.wgsl, entity.wgsl `fs_hull`). The

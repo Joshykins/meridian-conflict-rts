@@ -104,13 +104,27 @@ impl BoreFx {
     }
 
     pub(super) fn lightning(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
+        self.arc(from, to, start, life, width, BOLT);
+    }
+
+    /// A stroke like `lightning` in another of the fading beams' colours (sprites.wgsl):
+    /// `gpu_consts::fade_beam::TETHER` is crimson with a white-pink core.
+    pub(super) fn arc(
+        &mut self,
+        from: Vec3,
+        to: Vec3,
+        start: f32,
+        life: f32,
+        width: f32,
+        color: u32,
+    ) {
         self.strokes.push(Stroke {
             from,
             to,
             start,
             life,
             width,
-            color: BOLT,
+            color,
         });
         if self.strokes.len() > MAX_STROKES {
             self.strokes.remove(0);

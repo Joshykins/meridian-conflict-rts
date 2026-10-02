@@ -57,7 +57,7 @@
                         // The lance runs out of the palm while it builds: the beam leaves its tip.
                         arm_emitter: (8.18, 5.2, 14.6),
                         // It takes Suite II's place, so it builds the tech 2 structures too.
-                        builds: ["regency_t2_power", "regency_t2_point_defense", "regency_t2_shield", "regency_t3_power", "regency_t3_point_defense", "regency_t3_shield", "regency_t4_scorpion"],
+                        builds: ["regency_t2_power", "regency_t2_point_defense", "regency_t2_shield", "regency_t3_power", "regency_t3_point_defense", "regency_t3_shield", "regency_t4_scorpion", "regency_t4_nuke_defense", "regency_t4_nuke_silo"],
                     ),
                 ],
             ),
@@ -144,7 +144,7 @@
         vision: 220,
         motion: (layer: Hover, size: 1, speed: 26, accel: 26, turn: 150),
         builder: (power: 150, range: 70, arm: (turn: 200, emitter: (3.583, 0, 3.417), pivot: (0.583, 0, 3.417)), builds: [
-            "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_wall", "regency_t2_power", "regency_t2_point_defense", "regency_t2_shield", "regency_t3_power", "regency_t3_point_defense", "regency_t3_shield", "regency_t4_scorpion",
+            "regency_t1_land_factory", "regency_t1_air_factory", "regency_t1_naval_factory", "regency_t1_extractor", "regency_t1_power", "regency_storage", "regency_t1_point_defense", "regency_t1_aa", "regency_t1_radar", "regency_wall", "regency_t2_power", "regency_t2_point_defense", "regency_t2_shield", "regency_t3_power", "regency_t3_point_defense", "regency_t3_shield", "regency_t4_scorpion", "regency_t4_nuke_defense", "regency_t4_nuke_silo",
         ]),
         mesh: "regency_engineer", icon: Engineer,
         lights: [(kind: Point, at: (-0.4, 0, 0.4), color: (1.0, 0.14, 0.06), intensity: 90, range: 13, night_only: false)],

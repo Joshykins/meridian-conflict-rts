@@ -157,6 +157,46 @@ under the player's control; and the commander's death a nuke too.
   warhead stands in the tube while one is held (`part::SILO_ROUND`, `_pad3[2]`), smoke pours
   out of the tube and flame trenches. The array's cells show the rounds it holds.
 
+## The Regency's warhead
+
+The Regency have their own pair, built by the Exarch's Engineering Suite III and the
+Artificer III (`data/factions/regency/units/strategic.ron`): the **Mangonel** silo, which
+throws a Pinch-fusion Warhead, and the **Barbican** array of Gravitic Interceptors. They
+assemble, launch, fly and intercept by every rule above, with the Sunfall's and the
+Parhelion's numbers (every race's warhead does about the same). Only the look and the sound
+are theirs, chosen by the faction (`nuke_look: Plasma` in faction.ron, `StrategicLook` in
+mc-data; presentation only, never hashed). It rides on the events (`NuclearLaunch`,
+`NuclearDetonation`, `InterceptorLaunch`, `WarheadIntercepted`), on
+`StrategicInstance::look`, in the blast's fourth vec4 (`.y`) and in the missile word
+(`gpu_consts::missile::PLASMA`). An Exarch's death goes up the same way, smaller.
+
+- **The blast** (`shaders/nova.wgsl`, the same volume and the same shapes over time as an
+  ARC blast, so `nuke_fx::Blast` mirrors both): a white-hot star with a rose limb in
+  granulation cells for its first second or two; the nova's shell, hollow, thrown out to
+  about 640 m, white with the prism running over its leading edge, tearing into red
+  threads that hang for most of a minute; the ball cooling to a dark, blackened crimson
+  laced with a web of hard glowing threads, rolling into its cap on a column of winding
+  plasma streamers, a slow pulse running up through it; a thin bright ring of plasma round
+  its waist that spreads and rises; a sheet of red plasma skimming out along the ground
+  with the front, and a dark surge of glassy dust. It holds together far longer than smoke:
+  it thins only to a third over a minute, its threads glow red for minutes, and it is gone
+  by 160 s (`NOVA_LIFE`). Hard-edged throughout (docs/STYLE.md "No mist"). Its lightning
+  is crimson arcs with a white-pink core (`fade_beam::TETHER`); its light on the country
+  and the clouds is rose-white, then red; the power generators' nova streamers
+  (`NOVA_WISP`) and globs of plasma are flung out of it (`renderer/nuke_fx/nova.rs`).
+- **The crater** glows red and cools to black glass with a crimson depth
+  (`CraterStyle::Plasma`; the shader reads the negated seed).
+- **Missiles**: dark plate with dark bronze bands and red seams that glow, a red plasma
+  plume, a trail of dark smoke, and at the tail the white-hot streak of a Sunspear round
+  that takes the prism's pinks and cools to red (`RegencyGunFx::streak`).
+- **Sounds** (data/factions/regency/sounds.ron, `regency_` + the ARC name, picked in
+  `game_nuke_sounds.rs`): the detonation opens with a gravity pinch (air sucked in) before
+  the crack, slam and a seething plasma roar; the launch spins its containment up in
+  quickening throbs before the drive's buzz-roar; the flight and fall loops, the
+  interceptor and the kill are their own. The alarm and the silo doors are shared. A salvo
+  keeps one budget across both sides; each voice plays the look of its loudest source.
+- Shots: `nuke_shots` with `NUKE_LOOK=plasma`.
+
 ## Interface
 
 - **The launcher panel**, right of the order card (`hud/silo.rs`): rounds as missile

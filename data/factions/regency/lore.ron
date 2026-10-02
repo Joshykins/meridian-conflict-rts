@@ -288,4 +288,10 @@
             "Gravitic Seeker Battery": "Charges of plasma held in gravity cradles and let go one after another; each steers itself onto an aircraft without motor or exhaust and bursts beside it.",
         },
     ),
+    "regency_t4_nuke_silo": (
+        lore: "The Regency kept the warhead from the war that made them an empire, and built the silo round the memory of it.",
+    ),
+    "regency_t4_nuke_defense": (
+        lore: "Gravity lenses that see a warhead coming over the horizon, and cells that throw a seeker up to break its containment before it falls.",
+    ),
 }

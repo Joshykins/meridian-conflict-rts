@@ -415,6 +415,23 @@ fn crater_heat_rgb(t: f32) -> vec3<f32> {
     return c * (k * 1.5 + k * k * k * 6.0);
 }
 
+// A Regency nova's melt (`crater_heat_rgb` in plasma's colours): rose-white, red, a dark
+// violet-red at the last.
+fn crater_plasma_rgb(t: f32) -> vec3<f32> {
+    let k = clamp(t, 0.0, 1.0);
+    var c = mix(vec3<f32>(0.26, 0.0, 0.05), vec3<f32>(0.95, 0.035, 0.05), smoothstep(0.08, 0.42, k));
+    c = mix(c, vec3<f32>(1.0, 0.25, 0.16), smoothstep(0.42, 0.72, k));
+    c = mix(c, vec3<f32>(1.0, 0.78, 0.82), smoothstep(0.75, 1.0, k));
+    return c * (k * 1.5 + k * k * k * 6.0);
+}
+
+fn crater_glow_rgb(t: f32, plasma: bool) -> vec3<f32> {
+    if plasma {
+        return crater_plasma_rgb(t);
+    }
+    return crater_heat_rgb(t);
+}
+
 // Cooling cracks: cells one unit across. x how far from the nearest crack (F2 - F1, in
 // cells), y the nearest cell's own random number.
 fn crater_cells(p: vec2<f32>) -> vec2<f32> {

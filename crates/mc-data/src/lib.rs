@@ -160,6 +160,8 @@ pub struct Faction {
     pub shield_look: ShieldLook,
     /// How its missile defence is seen killing a missile. Presentation only.
     pub anti_missile_look: AntiMissileLook,
+    /// How its strategic missiles and nuclear blasts look and sound. Presentation only.
+    pub nuke_look: strategic::StrategicLook,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1164,6 +1166,7 @@ impl Blueprints {
                 torpedo_look: f.torpedo_look,
                 structure_lamps: f.structure_lamps,
                 shield_look: f.shield_look,
+                nuke_look: f.nuke_look,
                 anti_missile_look: f.anti_missile_look,
             });
         }
