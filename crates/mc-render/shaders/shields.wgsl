@@ -1096,22 +1096,28 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
             let shaft_rgb = color;
             let shaft_a = alpha;
             let shaft_t = depth_t;
-            color = rim_c * (fres * 0.58 * live + stress * 0.18 + skin * 0.55 * live);
-            color += seam_c * (seam * 1.05 * live + stress * seam * 0.4);
-            color += energy * (plate * 0.14 + skin * plate * 0.8);
+            // The veil is thin where it faces the eye and bright at its edge: the face-on
+            // fill fades to `mid`, and a hot line rides the silhouette.
+            let mid = select(1.0, mix(0.4, 1.0, pow(1.0 - facing, 0.9)), prismatic);
+            let edge = select(0.0, pow(1.0 - facing, 6.0), prismatic);
+            color = rim_c * (fres * select(0.58, 0.95, prismatic) * live + stress * 0.18 + skin * 0.55 * live);
+            color += mix(PRISM_VEIL_WHITE, rim_c, 0.35) * edge * 3.2 * live;
+            color += seam_c * (seam * 1.05 * live * mid + stress * seam * 0.4);
+            color += energy * (plate * 0.14 + skin * plate * 0.8) * mid;
             // The veil: its folds hang in the glass, and a few triangles hold more of the
             // prism than the rest, turning as the light runs.
             let pane = select(0.0, step(0.82, hx.y) * plate * (0.5 + 0.5 * sin(time * 0.9 + hx.y * 37.0)), prismatic);
-            color += energy * (folds * 1.8 + pane * 0.6);
+            color += energy * (folds * 1.8 + pane * 0.6) * mid;
             color += mix(energy, ice, dying) * born * mix(1.3, 3.4, dying);
             color += blow.rgb;
             color += fuse_c * fuse * 0.45;
             color += paint.rgb * (1.0 + dying * 1.6);
             color += touch_c * touch * 2.4;
 
-            alpha = 0.008 + fres * 0.07 * live + stress * 0.045 + skin * 0.07;
-            alpha += seam * 0.16 * live + plate * 0.03 + stress * seam * 0.06;
-            alpha += folds * 0.16 + pane * 0.05;
+            alpha = 0.008 * mid + fres * select(0.07, 0.1, prismatic) * live + stress * 0.045 + skin * 0.07;
+            alpha += edge * 0.18 * live;
+            alpha += (seam * 0.16 * live + plate * 0.03) * mid + stress * seam * 0.06;
+            alpha += (folds * 0.16 + pane * 0.05) * mid;
             alpha += born * mix(0.28, 0.72, dying) + blow.a + fuse * 0.1 + paint.a;
             alpha += touch * 0.28;
             alpha *= smoothstep(0.0, 0.1, open) * mix(0.75 + 0.25 * health, 1.25, dying);
