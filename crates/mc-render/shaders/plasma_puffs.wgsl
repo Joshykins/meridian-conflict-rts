@@ -18,9 +18,16 @@ fn is_plasma_puff(kind: u32) -> bool {
 
 // Turned to the eye, where it was born; a burst is drawn a little toward the eye so the
 // ground it stands on does not cut it in half.
-fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, age: f32, o: PuffOut) -> PuffOut {
+//
+// `params.w` is the seed in its fraction and how long it lingers in its whole part
+// (renderer `push_lingering`): a puff that lingers `n` lives `1 + n` times as long and is
+// drawn at an age that runs at the old pace at first and slows toward its end, so it opens
+// as it would have and then cools slowly. Where it is carried still goes by the clock, but
+// a lingering wake is braked harder by the air (a thrown clump comes to a stop and hangs).
+fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, life_age: f32, o: PuffOut) -> PuffOut {
     var out = o;
     let kind = u32(p.params.z);
+    let age = 1.0 - pow(1.0 - life_age, 1.0 + floor(p.params.w));
     // A charge grows steadily; a burst throws itself out fast and slows; a wake swells.
     var grow = select(age, 1.0 - pow(1.0 - age, 3.0), kind == PUFF_PLASMA_BURST);
     if kind == PUFF_PLASMA_WAKE {
@@ -34,23 +41,25 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, age: f32, o: PuffOut) -> PuffO
         grow = (1.0 - pow(1.0 - age, 4.0)) * 0.85 + 0.15 * age;
     }
     let size = mix(p.params.x, p.params.y, grow);
-    out.state = vec3<f32>(age, p.params.z, p.params.w);
+    out.state = vec3<f32>(age, p.params.z, fract(p.params.w));
     out.uv = corner;
     let to_eye = normalize(globals.camera.xyz - p.pos);
     var pos = p.pos + to_eye * select(0.0, size * 0.35, kind == PUFF_PLASMA_BURST);
     if kind == PUFF_PLASMA_GLOB {
         // Thrown: the air takes its speed off, and it sags.
-        let t = age * p.life;
+        let t = life_age * p.life;
         pos = p.pos + p.vel * ((1.0 - exp(-3.0 * t)) / 3.0) - vec3<f32>(0.0, 0.0, 2.5 * t * t);
     }
     if kind == PUFF_PLASMA_WAKE {
         // Left hanging: it drifts off on what it was given, slowing, and rises as it cools.
-        let t = age * p.life;
-        pos = p.pos + p.vel * ((1.0 - exp(-1.6 * t)) / 1.6) + vec3<f32>(0.0, 0.0, 1.2 * t);
+        // One that lingers is braked harder, so it comes to a stop and hangs as it cools.
+        let t = life_age * p.life;
+        let drag = 1.6 + 1.2 * floor(p.params.w);
+        pos = p.pos + p.vel * ((1.0 - exp(-drag * t)) / drag) + vec3<f32>(0.0, 0.0, 1.2 * t);
     }
     if kind == PUFF_NOVA_WISP {
         // Flung out of a supernova: it coasts on what it was given, slowing, and rises a little.
-        let t = age * p.life;
+        let t = life_age * p.life;
         pos = p.pos + p.vel * ((1.0 - exp(-PUFF_NOVA_WISP_DRAG * t)) / PUFF_NOVA_WISP_DRAG) + vec3<f32>(0.0, 0.0, 0.8 * t);
     }
     let center = globals.view_proj * vec4<f32>(pos, 1.0);
@@ -59,7 +68,7 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, age: f32, o: PuffOut) -> PuffO
     if kind == PUFF_NOVA_WISP {
         // Drawn out along the way it flies while it is fast, so it reads as a streamer: `uv.x`
         // runs along its flight.
-        let t = age * p.life;
+        let t = life_age * p.life;
         let ahead = globals.view_proj * vec4<f32>(pos + p.vel * (exp(-PUFF_NOVA_WISP_DRAG * t) * 0.05), 1.0);
         let along = (ahead.xy / ahead.w - center.xy / center.w) / globals.viewport.zw;
         let dir = select(vec2<f32>(1.0, 0.0), normalize(along), length(along) > 1e-3);
