@@ -116,7 +116,13 @@ impl Renderer {
         );
         for i in 0..crawl.pairs {
             let [_, _, ankle] = crawl.joints[i];
-            for side in [1.0f32, -1.0] {
+            // A lone leg on the centreline (`Crawl::lone`) is one foot.
+            let sides: &[f32] = if crawl.lone == Some(i) {
+                &[1.0]
+            } else {
+                &[1.0, -1.0]
+            };
+            for &side in sides {
                 // A foot lands when its cycle passes the stance's start (`crawl_leg`: phase 0).
                 let offset = crawl.phase[i] + if side < 0.0 { 0.5 } else { 0.0 };
                 if (now - offset).floor() == (before - offset).floor() {

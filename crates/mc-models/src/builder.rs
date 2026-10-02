@@ -949,12 +949,31 @@ impl MeshBuilder {
             tail_count: 0,
             claw: None,
             throws: None,
+            lone: None,
         };
         for (i, &(hip, knee, ankle, phase)) in pairs.iter().enumerate() {
             crawl.joints[i] = [at(hip), at(knee), at(ankle)];
             crawl.phase[i] = phase.rem_euclid(1.0);
         }
         self.legs.as_mut().unwrap().crawl = Some(crawl);
+    }
+
+    /// Makes leg pair `pair` (`set_crawl_legs`) one leg on the centreline: its joints lie
+    /// in y = 0, and both halves of it walk in step at the pair's own phase rather than half
+    /// a cycle apart (a tripod's third leg). Its vertices still split by the side they lie
+    /// on, so it must be symmetrical about y = 0.
+    pub fn set_lone_leg(&mut self, pair: usize) {
+        let crawl = self
+            .legs
+            .as_mut()
+            .and_then(|l| l.crawl.as_mut())
+            .expect("set_crawl_legs first");
+        assert!(pair < crawl.pairs);
+        assert!(
+            crawl.joints[pair].iter().all(|j| j[1].abs() < 1e-4),
+            "a lone leg stands on the centreline"
+        );
+        crawl.lone = Some(pair);
     }
 
     /// Runs `f` as leg pair `pair` of a many-legged walker (`set_crawl_legs`).

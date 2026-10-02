@@ -468,13 +468,14 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         } else if (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL {
             // A Regency plasma shot's trail (renderer/regency_guns_fx.rs): hot where the shot
             // has just passed, cooling to a deep red as it goes out. A fusion round's starts
-            // white, takes the prism's pinks and cools through them to red. The age goes to
+            // white, takes the prism's pinks and cools through them to red; a wake's never goes
+            // past pink-hot. The age goes to
             // `fs_sprite` in the shape, for the breaking up.
             let heat = max(1.0 - age, 0.0);
-            let fusion = p.aim.w > 0.5 && p.aim.w < 1.5;
-            // A Gravitic Seeker's filament (aim.w 2, renderer/gravitic_fx.rs) never goes white:
-            // pink-hot where the charge has just passed, then red.
-            let seeker = p.aim.w > 1.5;
+            let fusion = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_FUSION) < 0.5;
+            // A Gravitic Seeker's filament and a wake's (renderer/gravitic_fx.rs, wake_fx.rs)
+            // never go white: pink-hot where the charge has just passed, then red.
+            let seeker = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_PINK) < 0.5;
             let red = mix(vec3<f32>(0.45, 0.012, 0.008), vec3<f32>(1.0, 0.06, 0.035), smoothstep(0.0, 0.45, heat));
             let hue = prism(f32(instance) * 0.137 + globals.camera.w * PRISM_RATE * 3.0);
             let pink = select(vec3<f32>(1.0, 0.45, 0.42), vec3<f32>(1.0, 0.22, 0.2), seeker);

@@ -85,6 +85,7 @@ pub mod transport;
 pub mod trees;
 mod validate;
 pub mod veterancy;
+mod wake;
 pub mod warp;
 pub mod world;
 mod wreck_damage;

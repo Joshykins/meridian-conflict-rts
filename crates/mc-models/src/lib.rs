@@ -483,11 +483,15 @@ pub struct Crawl {
     /// The weapon slot each pincer throws with, left then right (`set_claw_throws`), so
     /// it snaps and kicks on its own weapon's shots. None: they throw nothing.
     pub throws: Option<[u8; 2]>,
+    /// The pair that is one leg on the centreline, not two (`MeshBuilder::set_lone_leg`):
+    /// both halves of it walk in step, at its own phase (a tripod's third leg).
+    #[serde(default)]
+    pub lone: Option<usize>,
 }
 
 impl Crawl {
     /// As `entity.wgsl` reads `ModelInfo::crawl`: [0] pair count, tail root z, tail top z,
-    /// tail joint count; then per pair hip (w: phase), knee, ankle; then the tail's joints,
+    /// tail joint count; then per pair hip (w: phase), knee (w: 1 for a lone leg), ankle; then the tail's joints,
     /// two to a vec4 (x, z, x, z); then the pincer's shoulder (w: 1 when there are pincers)
     /// and its jaw hinge (w: the left pincer's weapon slot plus one, and the right's plus
     /// one times 16; zero for none).
@@ -502,7 +506,8 @@ impl Crawl {
         for i in 0..self.pairs {
             let [h, k, a] = self.joints[i];
             out[1 + 3 * i] = [h[0], h[1], h[2], self.phase[i]];
-            out[2 + 3 * i] = [k[0], k[1], k[2], 0.0];
+            let lone = if self.lone == Some(i) { 1.0 } else { 0.0 };
+            out[2 + 3 * i] = [k[0], k[1], k[2], lone];
             out[3 + 3 * i] = [a[0], a[1], a[2], 0.0];
         }
         let base = 1 + 3 * MAX_CRAWL_PAIRS;

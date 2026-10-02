@@ -484,6 +484,27 @@ pub(crate) struct RawDive {
     pub ambush: bool,
 }
 
+/// A cone weapon (the Regency Wake Tank's wake): each shot strikes everything it may shoot
+/// within its range and `angle` degrees either side of the gun's facing, all at once, rather
+/// than one target. What stands nearer takes more: full `damage` at the muzzle, falling in
+/// a straight line to `edge` of it at full range. Ground between the muzzle and a unit
+/// shields it (the wake rolls over the ground; a crest stops it), and so does a shield
+/// dome it is under. It never reaches what is under the water, nor aircraft unless its
+/// `targets` say so. The shot is `hitscan`: nothing flies.
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawCone {
+    pub angle: f64,
+    #[serde(default = "RawCone::default_edge")]
+    pub edge: f64,
+}
+
+impl RawCone {
+    fn default_edge() -> f64 {
+        0.4
+    }
+}
+
 /// An Argon Electric Bore: the shot is an argon tracer, and when it lands the charge is
 /// dumped down the ionised channel it left. `width`: how far either side of that channel
 /// the discharge sears (zero: only the bolt, the blast is the weapon's splash). `damage`:
@@ -1044,6 +1065,9 @@ pub struct RawWeapon {
     /// An Argon Electric Bore (`RawBore`).
     #[serde(default)]
     pub bore: Option<RawBore>,
+    /// A cone weapon: every shot strikes all it may shoot in a fan ahead (`RawCone`).
+    #[serde(default)]
+    pub cone: Option<RawCone>,
     /// A giant gun's spent sabot, thrown clear with every shot (`RawSabot`).
     #[serde(default)]
     pub sabot: Option<RawSabot>,
@@ -1388,6 +1412,19 @@ impl Unit {
                     "{ctx}: needs a speed, or hitscan"
                 )));
             }
+            if w.cone.is_some()
+                && (!w.hitscan
+                    || w.trajectory != Trajectory::Direct
+                    || w.missile
+                    || w.beam
+                    || w.torpedo
+                    || w.bore.is_some()
+                    || w.splash > 0.0)
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a cone is a hitscan direct shot with no splash, beam or bore"
+                )));
+            }
             if w.bore.is_some()
                 && (w.trajectory != Trajectory::Direct || w.missile || w.beam || w.torpedo)
             {
@@ -1520,6 +1557,10 @@ impl Unit {
                         ticks: ticks(s.seconds).clamp(1, 1200) as u16,
                         damage: fx(s.damage.max(0.0)),
                     }),
+                }),
+                cone: w.cone.map(|c| crate::Cone {
+                    half: Angle(steps(c.angle.clamp(1.0, 89.0)).round() as i64 as u16),
+                    edge: fx(c.edge.clamp(0.0, 1.0)),
                 }),
                 sabot: match &w.sabot {
                     Some(s) => {

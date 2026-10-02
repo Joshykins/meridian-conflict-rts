@@ -732,7 +732,7 @@ impl Renderer {
                 plasma: t.life,
                 _pad: [0.0; 2],
                 // A seeker's filament: pink-hot to red, never white (sprites.wgsl).
-                aim: [0.0, 0.0, 0.0, 2.0],
+                aim: [0.0, 0.0, 0.0, fade_beam::PLASMA_TRAIL_PINK],
                 prev_aim: [0.0; 4],
             })
             .collect();

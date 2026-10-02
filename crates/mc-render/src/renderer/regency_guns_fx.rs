@@ -61,18 +61,18 @@ mod plasmeric;
 mod strike;
 
 const ORB: f32 = puff::PLASMA_ORB as f32;
-const BURST: f32 = puff::PLASMA_BURST as f32;
-const GLOB: f32 = puff::PLASMA_GLOB as f32;
+pub(super) const BURST: f32 = puff::PLASMA_BURST as f32;
+pub(super) const GLOB: f32 = puff::PLASMA_GLOB as f32;
 const WAKE: f32 = puff::PLASMA_WAKE as f32;
-const GLOW: f32 = puff::WARP_GLOW as f32;
+pub(super) const GLOW: f32 = puff::WARP_GLOW as f32;
 const STREAK: f32 = puff::WARP_STREAK as f32;
 const ARC: f32 = puff::WARP_ARC as f32;
-const MOTE: f32 = puff::WARP_MOTE as f32;
+pub(super) const MOTE: f32 = puff::WARP_MOTE as f32;
 
 /// The plasma's colours, brightness in their size: red plasma, its hot pink-white heart,
 /// and the white of fusion.
-const RED: Vec3 = Vec3::new(1.0, 0.07, 0.04);
-const HOT: Vec3 = Vec3::new(1.0, 0.55, 0.5);
+pub(super) const RED: Vec3 = Vec3::new(1.0, 0.07, 0.04);
+pub(super) const HOT: Vec3 = Vec3::new(1.0, 0.55, 0.5);
 const WHITE: Vec3 = Vec3::new(1.0, 0.96, 1.0);
 /// Share of its birth speed a mote covers in its life of `MOTE_LIFE` seconds
 /// (warp_puffs.wgsl: drag 1.8), so one aimed at the ball arrives as it dies.
@@ -172,6 +172,8 @@ struct Trail {
     life: f32,
     width: f32,
     fusion: bool,
+    /// A cone weapon's wake's (`filament`): kept pink-hot.
+    wake: bool,
 }
 
 #[derive(Default)]
@@ -191,6 +193,43 @@ impl RegencyGunFx {
             self.glows.remove(0);
         }
         self.glows.push(glow);
+    }
+
+    /// A red filament of a cone weapon's wake (`wake_fx`) from `from` to `to`, lit at
+    /// `start` and cooling and breaking up over `life` seconds; never past pink-hot.
+    pub(super) fn filament(&mut self, from: Vec3, to: Vec3, start: f32, life: f32, width: f32) {
+        self.trail(Trail {
+            from,
+            to,
+            start,
+            life,
+            width,
+            fusion: false,
+            wake: true,
+        });
+    }
+
+    /// A steady red light at `pos` from `start` for `life` seconds, fading out.
+    pub(super) fn flare(&mut self, pos: Vec3, color: Vec3, range: f32, start: f32, life: f32) {
+        self.light(Glow {
+            pos,
+            color,
+            range,
+            start,
+            life,
+            pulse: 0.0,
+        });
+    }
+}
+
+/// What a trail piece is drawn as (sprites.wgsl, `aim.w`).
+fn trail_kind(t: &Trail) -> f32 {
+    if t.wake {
+        fade_beam::PLASMA_TRAIL_PINK
+    } else if t.fusion {
+        fade_beam::PLASMA_TRAIL_FUSION
+    } else {
+        0.0
     }
 }
 
@@ -360,6 +399,7 @@ impl Renderer {
                     life,
                     width: p.size * if fusion { 0.32 } else { 0.22 },
                     fusion,
+                    wake: false,
                 });
                 fx.trail(Trail {
                     from: a,
@@ -368,6 +408,7 @@ impl Renderer {
                     life: life * 0.35,
                     width: p.size * if fusion { 0.9 } else { 0.5 },
                     fusion,
+                    wake: false,
                 });
                 // A fusion round sheds sparks that fall away from its trail. A deliberate
                 // cosmetic cap on them a tick.
@@ -417,7 +458,7 @@ impl Renderer {
                 wake: t.start,
                 plasma: t.life,
                 _pad: [0.0; 2],
-                aim: [0.0, 0.0, 0.0, if t.fusion { 1.0 } else { 0.0 }],
+                aim: [0.0, 0.0, 0.0, trail_kind(t)],
                 prev_aim: [0.0; 4],
             })
             .collect();
@@ -792,7 +833,14 @@ impl Renderer {
 
     /// A bolt has left a charge near `at`: when it was the salvo's last, the ball collapses
     /// over `life` seconds.
-    fn charge_spent(&mut self, blueprint: BlueprintId, weapon: u8, at: Vec3, life: f32, time: f32) {
+    pub(super) fn charge_spent(
+        &mut self,
+        blueprint: BlueprintId,
+        weapon: u8,
+        at: Vec3,
+        life: f32,
+        time: f32,
+    ) {
         let fx = &mut self.plasma_fx.guns;
         let mine = fx
             .charges

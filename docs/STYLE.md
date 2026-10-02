@@ -197,6 +197,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Job | Name |
 |---|---|
 | Commander, engineer, scout | Exarch, Artificer, Outrider |
+| Wake tank, assault tripod (T3) | Wake, Strider |
 | Battle scorpion (T4) | Harrow |
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |
 | Salvage craft, light artillery (T1) | Breaker, Mattock |

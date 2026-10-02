@@ -1921,6 +1921,7 @@ impl World {
             .pivot
             .filter(|p| w == 0 || weapon.mount || Some(*p) == arm);
 
+        let mut wakes = Vec::new();
         for i in 0..volley {
             let tube = first_tube + i as usize;
             // A salvo longer than the rack goes round its tubes again.
@@ -2177,29 +2178,36 @@ impl World {
             } else {
                 (muzzle, vel, ticks)
             };
-            self.state.projectiles.spawn(
-                muzzle,
-                vel,
-                owner,
-                id,
-                blueprint,
-                w as u8,
-                ticks.clamp(1, u16::MAX as i32) as u16,
-            )?;
-            let shot = self.state.projectiles.len() - 1;
-            self.state.projectiles.target[shot] = t.unit.map_or(Handle::NONE, |t| units.id(t));
-            self.state.projectiles.mark[shot] = aim.extend(aim_z);
-            if weapon.missile {
-                self.state.projectiles.hp[shot] = weapon.casing_hp();
-            }
-            // A missile out of a dived hull boils the surface and paints the boat.
-            if weapon.missile && unit_z + bp.unit(blueprint).height < self.terrain.water_level() {
-                units.revealed[row] = crate::naval_arms::LAUNCH_REVEAL;
-                self.events.push(SimEvent::DivedLaunch {
-                    pos: muzzle,
+            if weapon.cone.is_some() {
+                // A cone weapon's shot flies nowhere: it strikes the whole fan at once,
+                // once the loop lets go of the unit tables (`wake.rs`).
+                wakes.push((muzzle, facing));
+            } else {
+                self.state.projectiles.spawn(
+                    muzzle,
+                    vel,
+                    owner,
+                    id,
                     blueprint,
-                    weapon: w as u8,
-                });
+                    w as u8,
+                    ticks.clamp(1, u16::MAX as i32) as u16,
+                )?;
+                let shot = self.state.projectiles.len() - 1;
+                self.state.projectiles.target[shot] = t.unit.map_or(Handle::NONE, |t| units.id(t));
+                self.state.projectiles.mark[shot] = aim.extend(aim_z);
+                if weapon.missile {
+                    self.state.projectiles.hp[shot] = weapon.casing_hp();
+                }
+                // A missile out of a dived hull boils the surface and paints the boat.
+                if weapon.missile && unit_z + bp.unit(blueprint).height < self.terrain.water_level()
+                {
+                    units.revealed[row] = crate::naval_arms::LAUNCH_REVEAL;
+                    self.events.push(SimEvent::DivedLaunch {
+                        pos: muzzle,
+                        blueprint,
+                        weapon: w as u8,
+                    });
+                }
             }
             self.muzzles.push(muzzle);
             self.events.push(SimEvent::ShotFired {
@@ -2249,6 +2257,9 @@ impl World {
                 });
                 self.state.sabots.push(thrown);
             }
+        }
+        for (muzzle, facing) in wakes {
+            self.wake(row, weapon, muzzle, facing);
         }
         if weapon.split && t.unit.is_some() {
             self.split_target(row, w);

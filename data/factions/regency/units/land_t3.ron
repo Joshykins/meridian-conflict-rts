@@ -82,4 +82,105 @@
         mesh: "regency_fusion_howitzer", icon: Artillery,
         sounds: (death: "blast_large", moving: "tracks_heavy"),
     ),
+    // The wake tank: a heavy armoured hover tank on four lift bells, built round one wide
+    // projector in a low turret. It gathers plasma across the projector's mouth and pinches
+    // it out as a wake: a fan of red plasma that rolls out over the ground ahead and strikes
+    // everything in it at once (`cone`, `mc-sim` `wake.rs`), 20 degrees either side of the
+    // projector's line, full weight close in and two fifths of it at the end of its reach.
+    // A crest between the projector and a unit shields it, and the wake never reaches
+    // aircraft or what is under the water. It glasses the ground it rolls over.
+    //
+    // Balance: a crowd breaker that has to close in. HP and cost about 2.6 Bulwarks (the
+    // Arbalest's class); its reach is less than half a Bulwark's (160 m to 360). Against
+    // one target it does three and a half Bulwarks' damage a second close in, falling to
+    // under one and a half at its edge; against a column it strikes every hull in the fan.
+    // Hover, so it crosses water (the Regency's lift; ARC's heavy tanks cannot), and slower
+    // than a Bulwark to pay for it.
+    //
+    // Model: `regency_wake_tank` (`models::regency::wake_tank`), authored at this size.
+    (
+        key: "regency_t3_wake_tank",
+        name: "Wake",
+        role: "Wake Tank",
+        tech: 3,
+        categories: ["Land", "DirectFire"],
+        health: 4400,
+        cost: (mass: 520, energy: 4700, time: 3200),
+        radius: 7.6, height: 4.6,
+        vision: 380,
+        motion: (layer: Hover, size: 1, speed: 25, accel: 18, turn: 75),
+        weapons: [(
+            name: "Pinched-plasmeric Wake Projector",
+            // Charged a second across the projector's mouth, then let go as one wake.
+            damage: 680, range: 160, reload: 2.6, hitscan: true, trajectory: Direct,
+            cone: (angle: 20, edge: 0.4),
+            turret_turn: 70, muzzle: (8.2, 0, 3.4), pivot: (1.4, 0, 3.4),
+            targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+            plasma_grade: Some(Pinched),
+            flash: 1.4, impact: 1.6,
+            sounds: (fire: "regency_wake_fire", charge: "regency_halberd_charge", charge_time: 1.0),
+        )],
+        mesh: "regency_wake_tank", icon: Tank,
+        sounds: (death: "blast_large", moving: "aster_hover"),
+    ),
+    // The strider: a fighting machine on three long legs (a tripod), its tall keeled head
+    // carried high over the field. The head is the turret: it turns on the legs' crown and carries a
+    // Pinched-plasmeric Cannon slung under a plated outrigger either side. Each gathers plasma in
+    // front of its bore and pinches it out as a short dense jet; the two take turns.
+    //
+    // It walks one leg at a time, the third swinging while two stand (`set_crawl_legs` with
+    // a lone leg on the centreline). It wades: it walks the seabed like the Paladin, its
+    // head high enough over the water to fire on anything ashore or afloat.
+    //
+    // Balance: the Paladin's class. The Regency way: shorter reach (340 m to 400), heavier
+    // shots (a fifth more damage a second), no shield (more armour instead: its HP is near
+    // the Paladin's HP and shield together) and no torpedoes, so a dived submarine is safe
+    // from it. A little slower.
+    //
+    // Model: `regency_strider` (`models::regency::strider`), authored at this size.
+    (
+        key: "regency_t3_strider",
+        name: "Strider",
+        role: "Assault Tripod",
+        tech: 3,
+        categories: ["Land", "DirectFire"],
+        health: 10200,
+        cost: (mass: 860, energy: 6900, time: 4900),
+        radius: 12.0, height: 32.0,
+        vision: 800,
+        motion: (layer: Amphibious, size: 2, speed: 27, accel: 22, turn: 110),
+        weapons: [
+            (
+                name: "Pinched-plasmeric Cannon",
+                // The left cannon. A second's charge before the first shot; its jet is
+                // drawn as six rounds over a fifth of a second.
+                damage: 520, splash: 2, range: 340, reload: 1.8, rounds: 6, round_span: 0.2,
+                speed: 900, trajectory: Direct,
+                turret_turn: 120, muzzle: (9.0, 3.8, 24.4), pivot: (1.2, 0, 24.4),
+                targets: ["Land", "Naval"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched),
+                flash: 1.1, impact: 2.0, tracer: 1.4,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+            (
+                name: "Pinched-plasmeric Cannon",
+                // The right cannon: half a reload behind the left.
+                damage: 520, splash: 2, range: 340, reload: 1.8, rounds: 6, round_span: 0.2,
+                speed: 900, trajectory: Direct,
+                turret_turn: 120, muzzle: (9.0, -3.8, 24.4), pivot: (1.2, 0, 24.4),
+                targets: ["Land", "Naval"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched),
+                flash: 1.1, impact: 2.0, tracer: 1.4,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+        ],
+        mesh: "regency_strider", icon: Bot,
+        sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
+    ),
 ]

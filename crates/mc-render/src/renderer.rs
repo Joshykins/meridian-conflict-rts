@@ -88,6 +88,7 @@ mod supernova_fx;
 mod survival_fx;
 mod trail_fx;
 mod tree_wind;
+mod wake_fx;
 mod warp_fx;
 mod water_fx;
 mod work_beams;
@@ -4799,6 +4800,16 @@ impl Renderer {
                         Vec3::from(vel.to_f32()).normalize_or_zero(),
                         time,
                     );
+                    return;
+                }
+                if self.blueprints.unit(*blueprint).weapons[*weapon as usize]
+                    .cone
+                    .is_some()
+                {
+                    // A cone weapon's wake rolls out over the ground (`wake_fx`).
+                    let at = Vec3::from(pos.to_f32()) - Vec3::from(travel.to_f32());
+                    let dir = Vec3::from(vel.to_f32()).normalize_or(Vec3::X);
+                    self.wake_fired(*blueprint, *weapon, at, dir, time);
                     return;
                 }
                 // A Regency plasma gun's own firing: a thrown charge leaving the claw

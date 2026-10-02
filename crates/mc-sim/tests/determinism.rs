@@ -1,6 +1,6 @@
 //! The determinism matrix: one match with every domain in it (land, sea, under
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
-//! curving charges, a warp into a dampener and the stun it leaves, wrecks worn down by
+//! curving charges, a wake tank's cone, a warp into a dampener and the stun it leaves, wrecks worn down by
 //! blasts, two factories' linked batch forming up, a self-destruct counting down across
 //! the snapshot) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
@@ -105,6 +105,8 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     // dived, guns only up.
     ("regency_t1_attack_boat", 4, 2800, 500),
     ("regency_t2_destroyer", 1, 3200, 600),
+    // The Regency wake tank: every wake strikes the whole fan ahead of it at once (`wake.rs`).
+    ("regency_t3_wake_tank", 1, 1200, 760),
 ];
 
 fn setup(w: &mut World) {

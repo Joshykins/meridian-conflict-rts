@@ -1,5 +1,5 @@
-//! The Exarch's forms: faceted solids lofted through cross-sections (`sleeve`), thick
-//! bevelled blades (`blade`), and the profiles they are cut to.
+//! The Exarch's forms, shared by the Regency's walkers: faceted solids lofted through
+//! cross-sections (`sleeve`), thick bevelled blades (`blade`), and the profiles they are cut to.
 
 use glam::Vec3;
 

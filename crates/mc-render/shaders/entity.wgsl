@@ -846,8 +846,9 @@ fn crawl_body_ground(e: Entity, model: ModelInfo, t: f32) -> f32 {
 // A leg vertex of a many-legged walker, posed for this moment of the stride. Each leg has
 // two bones, hip to knee and knee to the foot's tip, in the vertical plane through its
 // hip and foot; the foot is planted and passes back under the body, or lifts and swings
-// forward, each pair at its own phase (the right leg half a cycle after the left). The
-// plane turns about the hip to follow the foot, and the bones are solved in it. `body` is
+// forward, each pair at its own phase (the right leg half a cycle after the left, or with
+// it for a lone leg on the centreline). The plane turns about the hip to follow the foot,
+// and the bones are solved in it. `body` is
 // how far the hips ride off their rest (the body's bob and the ground under it).
 fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: ModelInfo,
              walk: vec2<f32>, e: Entity, t: f32, body: vec3<f32>) -> array<vec3<f32>, 2> {
@@ -856,7 +857,10 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
     let hip0 = model.crawl[1u + 3u * pair].xyz * flip;
     let knee0 = model.crawl[2u + 3u * pair].xyz * flip;
     let foot0 = model.crawl[3u + 3u * pair].xyz * flip;
-    let phase = fract(walk.y - model.crawl[1u + 3u * pair].w + select(0.5, 0.0, left));
+    // A lone leg on the centreline (a tripod's third, `Crawl::lone`) walks both its halves
+    // in step; a pair's right leg is half a cycle after its left.
+    let lone = model.crawl[2u + 3u * pair].w > 0.5;
+    let phase = fract(walk.y - model.crawl[1u + 3u * pair].w + select(select(0.5, 0.0, left), 0.0, lone));
     let stride = model.leg_hip.w;
     let lift = model.leg_knee.w;
     let stance = model.leg_ankle.w;

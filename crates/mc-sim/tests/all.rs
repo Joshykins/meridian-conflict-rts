@@ -86,6 +86,7 @@ mod torpedo_launchers;
 mod trees;
 mod untrusted_input;
 mod volatile;
+mod wake;
 mod warp;
 mod wrecks;
 mod zz_aa_probe;

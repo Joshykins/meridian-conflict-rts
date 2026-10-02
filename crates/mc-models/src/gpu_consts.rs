@@ -525,9 +525,15 @@ shared! {
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;
         /// A Regency plasma shot's trail (renderer/regency_guns_fx.rs): a hot filament that
-        /// cools to red and breaks up along its length. `aim.w` 1 for a fusion round's, 2
-        /// for a Gravitic Seeker's (renderer/gravitic_fx.rs: pink-hot to red, never white).
+        /// cools to red and breaks up along its length. `aim.w` names its kind: zero for a
+        /// Pinched bolt's, these for the others.
         pub const PLASMA_TRAIL: u32 = 11;
+        /// A Pinch-fusion round's: starts white and takes the prism's pinks.
+        pub const PLASMA_TRAIL_FUSION: f32 = 1.0;
+        /// Pink-hot to red, never white: a Gravitic Seeker's filament (renderer/gravitic_fx.rs)
+        /// and a cone weapon's wake (renderer/wake_fx.rs), so a fan of them reads red, not as
+        /// white sticks.
+        pub const PLASMA_TRAIL_PINK: f32 = 2.0;
     }
 
     /// How a Regency plasma shot is drawn in flight (`mc_sim::mirror::plasma_look`, carried in

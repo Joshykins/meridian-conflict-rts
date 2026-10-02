@@ -26,6 +26,18 @@
             "Pinch-fusion Howitzer": "One great charge of fusion thrown high, landing as a blinding strike that melts a pool into the ground and leaves a knot of fusion burning over it.",
         },
     ),
+    "regency_t3_wake_tank": (
+        lore: "A heavy hover tank built round one wide projector; when it lets go, a fan of plasma rolls out over the ground ahead and nothing standing in it is spared.",
+        weapons: {
+            "Pinched-plasmeric Wake Projector": "Plasma gathered across a wide mouth and pinched out flat, so it spreads as it goes: a wake that sears everything in front of the tank and glasses the ground under it.",
+        },
+    ),
+    "regency_t3_strider": (
+        lore: "A fighting machine on three long legs that walks one leg at a time; its keeled head stands so high that it wades out into the sea and keeps firing.",
+        weapons: {
+            "Pinched-plasmeric Cannon": "Plasma squeezed by gravity into a ball in front of the bore and pinched out as one dense jet; the strider's two take turns.",
+        },
+    ),
     "regency_t1_engineer": (
         lore: "A construction craft that rides a gravity lift over land and sea alike and builds with the nanite emitter on its arm.",
         weapons: {},

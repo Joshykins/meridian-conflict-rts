@@ -36,9 +36,11 @@ mod raider;
 mod scorpion;
 mod scout;
 mod seeker_hover;
+mod strider;
 mod taproot;
 mod tidebrood;
 mod turrets;
+mod wake_tank;
 mod ward;
 
 use super::library::ModelDef;
@@ -96,6 +98,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 1 artillery: a four-legged walker, a Plasmeric Mortar in the house on its
     // back (`mattock`).
     ModelDef::new("regency_mattock", 4.2, 3.2, mattock::mattock),
+    // The tech 3 wake tank: a hover hull, a wide flat projector in front of its turret
+    // (`wake_tank`).
+    ModelDef::new("regency_wake_tank", 7.6, 4.6, wake_tank::wake_tank),
+    // The tech 3 assault tripod: a keeled head high on three legs (`strider`).
+    ModelDef::new("regency_strider", 12.0, 32.0, strider::strider),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // floating dock (`tidebrood`). The land and air factories upgrade in place to tech 3,
     // the land one's lifted ring and the air one's crown standing taller.
@@ -182,6 +189,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_battle_tank" => 5000,
         "regency_seeker_hover" => 4500,
         "regency_breaker" | "regency_mattock" => 3400,
+        // Three long walking legs and a plated head with two cannons.
+        "regency_strider" => 7000,
+        "regency_wake_tank" => 5000,
         // Tech 3's kit: the ram, skirts, fin ring and two more lifts.
         "regency_engineer" => 3600,
         // Walls come by the dozen.
@@ -212,6 +222,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" => Some(0.5),
         // Faceted plates and skirts that keep their sides when reduced.
         "regency_skyspear" | "regency_fusion_howitzer" => Some(0.52),
+        // Plated hulls, heads and legs: faceted solids that keep their sides when reduced.
+        "regency_strider" | "regency_wake_tank" => Some(0.5),
         _ => None,
     }
 }

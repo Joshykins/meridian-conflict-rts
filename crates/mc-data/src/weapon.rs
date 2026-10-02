@@ -2,7 +2,7 @@
 
 use mc_core::{Angle, Fx, FxVec3};
 
-use crate::{Bore, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
+use crate::{Bore, Cone, PlasmaGrade, Sabot, Trajectory, WeaponColor, WeaponSounds};
 
 /// The widest circle, metres, a `Bombard` order may spread a gun's shots over unless
 /// its data gives it more (`RawWeapon::bombard`).
@@ -184,6 +184,9 @@ pub struct Weapon {
     pub intercepts: bool,
     /// An Argon Electric Bore: the charge follows the tracer's channel when it lands.
     pub bore: Option<Bore>,
+    /// A cone weapon (`RawWeapon::cone`): each shot strikes everything it may shoot in the
+    /// fan ahead of the gun at once (`combat::wake`), and nothing flies.
+    pub cone: Option<Cone>,
     /// Names from the sound library; what is `None` falls back to the library's defaults.
     pub sounds: WeaponSounds,
     /// Ticks before a salvo at which the weapon is heard charging. Zero: it does not charge.
