@@ -72,7 +72,7 @@
             turret_turn: 45, muzzle: (12.066, 0, 10.435), pivot: (-2.2, 0, 5.8),
             targets: ["Structure", "Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion),
-            flash: 1.0, impact: 3.0, tracer: 2.4,
+            flash: 1.0, impact: 1.0, tracer: 2.4,
             sounds: (
                 fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 2.8,
                 charge_volume: 1.6,
