@@ -135,10 +135,6 @@ fn the_voulge_circles_its_mark_out_of_reach_of_flak_and_kills_it() {
         "the Voulge came within {nearest:?} m of a flak gun that reaches {flak:?}"
     );
     let v = row(&w, voulge).unwrap();
-    let max = w
-        .blueprints
-        .unit(w.blueprints.id_of(VOULGE).unwrap())
-        .health;
     // Its kill's veterancy may have raised it; nothing took any off.
     assert!(
         w.state.units.health[v] >= whole,
