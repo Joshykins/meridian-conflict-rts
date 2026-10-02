@@ -174,19 +174,19 @@ mc-data; presentation only, never hashed). It rides on the events (`NuclearLaunc
   time in `nova_radius`, which `nuke_fx::Blast` mirrors). Not a mushroom: it
   has no stem and no cap. A white-hot star with a rose limb in granulation cells for its
   first second or two; the nova's shell, a dome thrown out to about 640 m, white with the
-  prism running over its leading edge, tearing into red threads that hang for most of a
+  prism running over its leading edge, tearing into red threads that hang for half a
   minute; the star staying where the warhead went off, held there in its own field (it
   neither climbs nor leans downwind),
   cooled to a dark, blackened crimson laced with a web of hard glowing threads, turning,
   a slow pulse running through it, drawing in on itself as it dies; round it thin
   bright rings, as round SN 1987A, level about the burst (a wide one round its equator,
-  a narrower one over its pole); a sheet of red plasma
+  a narrower one over its pole), gone within half a minute; a sheet of red plasma
   skimming out along the ground with the front, following the ground in view up hills
   and into hollows, and a dark surge of glassy dust. Every part fades out over its last
   stretch before the scene in front of it (`nova_soft`), and the shell thins away toward
-  the ground, so nothing is cut off where it meets the terrain. It holds together far
-  longer than smoke: it thins only to a third over a minute, its threads glow red for
-  minutes, and it is gone by 160 s (`NOVA_LIFE`). Hard-edged throughout (docs/STYLE.md
+  the ground, so nothing is cut off where it meets the terrain. It comes apart into
+  lobes and clears between about 20 and 40 s, its threads glow red for half a minute,
+  and it is gone by 50 s (`NOVA_LIFE`). Hard-edged throughout (docs/STYLE.md
   "No mist"). Its lightning is crimson arcs with a white-pink core (`fade_beam::TETHER`);
   its light on the country and the clouds is rose-white, then red; the power generators'
   nova streamers (`NOVA_WISP`) and globs of plasma are flung out of it

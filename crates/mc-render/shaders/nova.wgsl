@@ -12,15 +12,14 @@
 //                 too bright to look at, for the first second or two
 //   the shell     the nova itself: a hollow shell thrown out past the damage radius,
 //                 white with prism at its leading edge, tearing into red threads that
-//                 hang for most of a minute (part 2, in place of the Wilson cloud)
+//                 hang for half a minute (part 2, in place of the Wilson cloud)
 //   the star      the ball cools to a dark, blackened crimson laced with a web of hard
 //                 glowing threads and sits on the burst, turning; a slow pulse
-//                 runs through it. It holds together far longer than smoke would: it
-//                 thins only to a third over a minute, draws in on itself as it dies and
-//                 is gone by NOVA_LIFE
+//                 runs through it. It comes apart into lobes and clears between about
+//                 20 and 40 s, and is gone by NOVA_LIFE
 //   the rings     thin bright rings, as round SN 1987A, level about the burst: a wide one
 //                 round its equator and a narrower one over its pole (the other pole's
-//                 would be under the ground), standing as long as the star does
+//                 would be under the ground), gone within half a minute
 //   the ground    the shock's front is a sheet of red plasma skimming the ground (the
 //                 ground in view, so it follows hills), and the surge a low, dark ring of
 //                 glassy dust
@@ -32,7 +31,7 @@
 // threads and cells, never in a soft glow swelling out of it.
 
 // Seconds a Regency blast is drawn for. Mirrored by nuke_fx::NOVA_LIFE.
-const NOVA_LIFE: f32 = 160.0;
+const NOVA_LIFE: f32 = 50.0;
 
 fn is_nova(n: Blast) -> bool {
     return n.look == NUKE_LOOK_PLASMA;
@@ -53,19 +52,26 @@ fn plasma_color(temp: f32) -> vec3<f32> {
     return c;
 }
 
-// Solid for its first seconds; then it thins only slowly, to a third over a minute, and is
-// gone by NOVA_LIFE. Fire folded in by a salvo keeps it thick.
+// Solid for its first seconds; then it thins, clearing between about 20 and 40 s (the
+// body is so deep that it stays opaque until only a tenth is left), and is gone by
+// NOVA_LIFE. Fire folded in by a salvo keeps it thick.
 fn nova_fade(n: Blast) -> f32 {
     let k = slow(n);
-    let thin = mix(1.0, 0.3, smoothstep(6.0 * k, 60.0 * k, n.age));
-    return max(thin * (1.0 - smoothstep(NOVA_LIFE - 50.0, NOVA_LIFE, n.age)), n.thick);
+    let left = 1.0 - smoothstep(4.0 * k, 45.0 * k, n.age);
+    return max(left * left * (1.0 - smoothstep(NOVA_LIFE - 20.0, NOVA_LIFE, n.age)), n.thick);
 }
 
-// How much its threads still glow, 0..1: they cool over minutes, not seconds.
+// How far the star has come apart, 0..1: it breaks into lobes and holes as it clears.
+fn nova_breakup(n: Blast) -> f32 {
+    let k = slow(n);
+    return smoothstep(12.0 * k, 40.0 * k, n.age) * (1.0 - n.thick);
+}
+
+// How much its threads still glow, 0..1: they cool over half a minute.
 fn nova_glow(n: Blast) -> f32 {
     let k = slow(n);
-    let own = 0.35 * exp(-n.age / (18.0 * k)) + 0.65 * exp(-n.age / (75.0 * k));
-    return max(own, n.fuel) * (1.0 - smoothstep(NOVA_LIFE - 60.0, NOVA_LIFE, n.age));
+    let own = 0.4 * exp(-n.age / (8.0 * k)) + 0.6 * exp(-n.age / (28.0 * k));
+    return max(own, n.fuel) * (1.0 - smoothstep(NOVA_LIFE - 30.0, NOVA_LIFE, n.age));
 }
 
 // The white-hot star: everything at first, gone in a couple of seconds.
@@ -84,12 +90,12 @@ fn nova_threads(p: vec3<f32>, seed: f32, phase: f32, sharp: f32) -> f32 {
     return pow(r1, sharp) * 0.7 + pow(r2, sharp * 1.5) * 0.5;
 }
 
-// The star's radius: out in a second, swelling for half a minute, then drawn back in on
+// The star's radius: out in a second, swelling for 25 s, then drawn back in on
 // itself as it dies. Mirrored by nuke_fx::Blast::head_radius.
 fn nova_radius(n: Blast) -> f32 {
     let t = n.age;
     let grow = 200.0 * sqrt(1.0 - exp(-t * 3.0)) + 120.0 * (1.0 - exp(-t / 14.0));
-    return n.scale * grow * (1.0 - 0.45 * smoothstep(50.0, NOVA_LIFE, t));
+    return n.scale * grow * (1.0 - 0.45 * smoothstep(25.0, NOVA_LIFE, t));
 }
 
 // How many rings stand round the star (`nova_ring`).
@@ -109,7 +115,7 @@ fn nova_ring(n: Blast, k: u32) -> vec4<f32> {
 }
 
 fn nova_ring_left(n: Blast) -> f32 {
-    return smoothstep(1.2, 3.0, n.age) * (1.0 - smoothstep(NOVA_LIFE - 60.0, NOVA_LIFE - 10.0, n.age));
+    return smoothstep(1.2, 3.0, n.age) * (1.0 - smoothstep(12.0, 30.0, n.age));
 }
 
 // How far past the star's middle its rings can reach, out and up.
@@ -155,8 +161,8 @@ fn nova_column(n: Blast, world: vec3<f32>) -> Sample {
         // A smooth star at first; it breaks up into lobes as it cools, less than smoke.
         let lumps = mix(0.12, 0.5, smoothstep(0.3, 3.0 * k, t));
         let edge = body - (b - 0.5) * 0.9 * lumps - (fine - 0.5) * 0.04 * lumps;
-        // Always a firm surface.
-        let d = smoothstep(1.0, 0.93, edge);
+        // Always a firm surface, eaten into from its billows as it comes apart.
+        let d = smoothstep(1.0, 0.93, edge + 0.45 * nova_breakup(n) * (1.2 - b));
         if d > 0.0 {
             s.density = d * 0.15 / max(n.scale, 0.3);
             let b_sun = boiling(np + globals.sun.xyz * 0.07, seed, phase);
@@ -267,7 +273,7 @@ fn nova_shell_thick(n: Blast) -> f32 {
 }
 
 fn nova_shell_left(n: Blast) -> f32 {
-    return smoothstep(0.0, 0.12, n.age) * (1.0 - smoothstep(22.0, 55.0, n.age));
+    return smoothstep(0.0, 0.12, n.age) * (1.0 - smoothstep(14.0, 36.0, n.age));
 }
 
 fn nova_shell(n: Blast, world: vec3<f32>) -> Sample {
@@ -333,7 +339,7 @@ fn nova_shade(n: Blast, part: u32, world: vec3<f32>, s: Sample, rc: f32, hc: f32
         return c + plasma_color(0.3 + 0.3 * s.heat * glow + 0.3 * star) * s.heat * (5.0 * glow + 30.0 * star + 1.2);
     }
     // Its own light: the star far past white at first (the bloom takes it), then threads
-    // that glow red for minutes.
+    // that glow red for half a minute.
     let temp = s.heat * (0.25 + 0.5 * glow) + 0.75 * star;
     c += plasma_color(temp) * pow(s.heat, 2.4) * (7.0 * glow + 14.0 * exp(-n.age / (6.0 * k)) + 70.0 * glare + 260.0 * star);
     // Arcs in the cloud: a violet-white flare round where one struck.

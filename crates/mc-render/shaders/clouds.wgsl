@@ -721,9 +721,9 @@ fn gather_fires() {
         let temp = 0.3 * exp(-age * 2.0) + 0.75 * heat + 0.1;
         let lean = c.xy * clamp(hc / (1600.0 * min(scale, pow(scale, 0.6))), 0.0, 1.0);
         fire_at[fire_count] = vec4<f32>(a.xyz + vec3<f32>(lean, hc), rc);
-        // A Regency nova's threads glow on for minutes (nova.wgsl `nova_glow`).
+        // A Regency nova's threads glow on for half a minute (nova.wgsl `nova_glow`).
         if u32(d.y + 0.5) == NUKE_LOOK_PLASMA {
-            let threads = 0.35 * exp(-age / (18.0 * k)) + 0.65 * exp(-age / (75.0 * k));
+            let threads = 0.4 * exp(-age / (8.0 * k)) + 0.6 * exp(-age / (28.0 * k));
             fire_light[fire_count] = plasma_tint(temp) * (power + 0.8 * threads);
         } else {
             fire_light[fire_count] = fire_tint(temp) * power;

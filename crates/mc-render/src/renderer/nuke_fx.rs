@@ -52,7 +52,7 @@ const WARHEAD_LENGTH: f32 = crate::gpu_consts::missile::WARHEAD_LENGTH;
 /// Seconds a blast is drawn for (nuke.wgsl `fade_left`); a Regency nova's cloud stands
 /// far longer (nova.wgsl `NOVA_LIFE`).
 const BLAST_LIFE: f32 = 75.0;
-const NOVA_LIFE: f32 = 160.0;
+const NOVA_LIFE: f32 = 50.0;
 /// How fast the shock runs on past the damage radius, m/s; the trees bend at it.
 const SHOCK_SPEED: f32 = 330.0;
 /// Seconds the sim's front takes to reach a warhead's damage radius (strategic.ron).
@@ -233,7 +233,7 @@ impl Blast {
         let t = self.age(time);
         if self.plasma() {
             let grow = 200.0 * (1.0 - (-t * 3.0).exp()).sqrt() + 120.0 * (1.0 - (-t / 14.0).exp());
-            return self.scale * grow * (1.0 - 0.45 * smoothstep(50.0, NOVA_LIFE, t));
+            return self.scale * grow * (1.0 - 0.45 * smoothstep(25.0, NOVA_LIFE, t));
         }
         self.scale * (240.0 * (1.0 - (-t * 3.0).exp()).sqrt() + 430.0 * (1.0 - (-t / 26.0).exp()))
     }
