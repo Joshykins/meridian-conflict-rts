@@ -765,6 +765,12 @@ impl World {
             }
         };
         let mut wants: Vec<BlueprintId> = Vec::new();
+        // Answers to a threat the side is under now (warheads seen, warships out of
+        // its anti-air's reach, raids on its mines): builders take these before
+        // power and everything else (`commander_urgent_job`). Left behind the
+        // rest, a SAM wanted against corvettes waited four minutes and the
+        // commander died to them.
+        let mut urgent: Vec<BlueprintId> = Vec::new();
         let mut want = |id: Option<BlueprintId>| {
             if let Some(id) = id {
                 if !wants.contains(&id) {
@@ -785,7 +791,11 @@ impl World {
             _ => 0,
         };
         if held(&interceptor) < need_int {
-            want(pick(&interceptor, 8, false));
+            let id = pick(&interceptor, 8, false);
+            if b.nukes >= 100 {
+                urgent.extend(id);
+            }
+            want(id);
         }
         let landing = stake(PlanKind::Landing);
         if landing > Stake::Off {
@@ -850,6 +860,28 @@ impl World {
         if by_sea > Fx::from_int(300) && held(&coast) < 2 + (by_sea / 1500).floor_int() as usize {
             want(pick(&coast, 2, by_sea > Fx::from_int(2000)));
         }
+        // A mine or plant raided from the ground lately: a turret there, unless
+        // one already stands by it. Raiders took a side's outlying mines from
+        // nineteen to ten while nothing ever stood guard over them.
+        let c = &self.state.ai[player].commander;
+        if let Some((at, _)) = c.raided.filter(|&(_, t)| self.state.tick < t + 1800) {
+            let turret = |p: &Profile| {
+                p.has(role::DEFENSE)
+                    && p.hits(super::profile::Target::Land)
+                    && !p.has(role::ANTI_AIR)
+            };
+            let units = &self.state.units;
+            let guarded = units.slots.iter().any(|r| {
+                units.owner[r] == ctx.player
+                    && turret(ctx.profiles.get(units.blueprint[r]))
+                    && units.pos[r].distance(at) < Fx::from_int(400)
+            });
+            if !guarded {
+                let id = pick(&turret, 2, false);
+                urgent.extend(id);
+                want(id);
+            }
+        }
         let aa = |p: &Profile| p.has(role::ANTI_AIR) && p.has(role::DEFENSE);
         // Bombed lately: anti-air where it hit, one more for each 1500 mass lost.
         let c = &self.state.ai[player].commander;
@@ -868,6 +900,10 @@ impl World {
         // it can afford, one for each three thousand mass of them. The cheapest
         // turret reached 640 m; corvettes shot from 1500.
         let outranging = self.outranging_air(ctx.player, ctx.profiles);
+        // Warships that warp in, strike and jump out are seldom on the map at a
+        // review: what they have killed lately counts as well.
+        let by_space = self.state.ai[player].commander.hurt[super::state::Hurt::Space as usize];
+        let outranging = outranging.max(if b.space >= 60 { by_space } else { Fx::ZERO });
         if outranging >= Fx::from_int(1000) {
             let budget = (income * Fx::from_int(240)).max(Fx::from_int(1500));
             let longest = menu
@@ -885,6 +921,7 @@ impl World {
             if let Some(id) = longest {
                 let have = held(&|p: &Profile| p.id == id);
                 if have < 1 + (outranging / 3000).floor_int() as usize {
+                    urgent.push(id);
                     want(Some(id));
                 }
             }
@@ -900,6 +937,8 @@ impl World {
                 want(pick(&sensor, 2, false));
             }
         }
-        self.state.ai[player].commander.wants = wants;
+        let c = &mut self.state.ai[player].commander;
+        c.wants = wants;
+        c.urgent = urgent;
     }
 }

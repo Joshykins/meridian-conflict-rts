@@ -105,6 +105,7 @@ impl World {
         &mut self,
         ctx: &Ctx,
         op: &mut Operation,
+        army_out: Option<FxVec2>,
         out: &mut Vec<Command>,
     ) -> u32 {
         let rows = self.op_rows(op);
@@ -318,16 +319,26 @@ impl World {
                         .sum::<Fx>()
                         * THREAT_MASS;
                     let covered = our_aa * 2 >= enemy_air;
-                    let strong = matches!(
-                        op.kind,
-                        OpKind::Defend | OpKind::Landing | OpKind::Raid | OpKind::Siege
-                    ) || (gathered >= enemy * bold
-                        && seen
-                        && covered
+                    // Artillery goes out behind a wave already out near its spot, or
+                    // where little of the enemy stands: alone it walked up to the
+                    // guns and was run down, trading 1:6.
+                    let siege_covered = op.kind == OpKind::Siege
                         && target.is_some_and(|t| {
-                            ctx.wm.threat_along(op.rally, t, Target::Land) * THREAT_MASS
-                                <= gathered * 6 / 5
-                        }));
+                            army_out.is_some_and(|a| a.distance(t) < Fx::from_int(2500))
+                                || self.enemy_strength_at(ctx, t, Fx::from_int(1500), Target::Land)
+                                    * 3
+                                    <= gathered
+                        });
+                    let strong = matches!(op.kind, OpKind::Defend | OpKind::Landing | OpKind::Raid)
+                        || siege_covered
+                        || (op.kind != OpKind::Siege
+                            && gathered >= enemy * bold
+                            && seen
+                            && covered
+                            && target.is_some_and(|t| {
+                                ctx.wm.threat_along(op.rally, t, Target::Land) * THREAT_MASS
+                                    <= gathered * 6 / 5
+                            }));
                     if let Some(target) = target.filter(|_| strong) {
                         op.target = target;
                         op.launched = mass;

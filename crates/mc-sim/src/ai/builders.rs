@@ -45,6 +45,12 @@ impl World {
         // The best builders choose first, so they take the big plants.
         let mut idle = census.builders_idle.clone();
         idle.sort_by_key(|&r| (std::cmp::Reverse(self.builder_tech(r)), r));
+        // A Commander's urgent want no idle builder can make takes a busy one that
+        // can: the engineers that could raise a SAM were never idle, and the
+        // commander died to the corvettes it was wanted against.
+        if let Some(row) = self.urgent_builder(player, &idle) {
+            idle.insert(0, row);
+        }
         let best = self.best_builder_tech(player);
         let power_wanted = match self.commander_directives(player) {
             Some(d) => d.power != super::commander::economy::Power::Enough,
@@ -638,6 +644,15 @@ impl World {
                     Fx::ZERO,
                     false,
                 );
+            }
+        }
+        // The Commander's answers to a threat it is under now (`plans.rs`).
+        if directives.is_some() && !far {
+            if let Some(job) = self
+                .commander_urgent_job(row, start, facing)
+                .filter(|j| allow(j.near))
+            {
+                return Some(job);
             }
         }
         // No land route to the enemy: the war goes by sea, and the first

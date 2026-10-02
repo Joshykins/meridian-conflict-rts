@@ -418,6 +418,12 @@ pub(in crate::ai) struct CommanderState {
     pub king_health: Fx,
     #[serde(default)]
     pub king_fled: u32,
+    /// Where and when a ground raid last took one of its mines or plants.
+    #[serde(default)]
+    pub raided: Option<(FxVec2, u32)>,
+    /// The wants that answer a threat it is under now: builders take them first.
+    #[serde(default)]
+    pub urgent: Vec<BlueprintId>,
 }
 
 impl CommanderState {
@@ -477,6 +483,17 @@ impl CommanderState {
         self.eco.hash(h);
         h.write_i64(self.king_health.0);
         h.write_u64(self.king_fled as u64);
+        for w in &self.urgent {
+            h.write_u64(w.0 as u64 | 1 << 32);
+        }
+        match self.raided {
+            Some((p, t)) => {
+                h.write_i64(p.x.0);
+                h.write_i64(p.y.0);
+                h.write_u64(t as u64);
+            }
+            None => h.write_u64(u64::MAX),
+        }
         match self.rally {
             Some(r) => {
                 h.write_i64(r.x.0);

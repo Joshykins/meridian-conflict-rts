@@ -406,6 +406,71 @@ impl World {
         start: FxVec2,
         facing: Angle,
     ) -> Option<Job> {
+        self.commander_job_from(row, start, facing, false)
+    }
+
+    /// The first of the plans' urgent wants (answers to a threat it is under now)
+    /// this builder can make: taken before power and everything else.
+    pub(in crate::ai) fn commander_urgent_job(
+        &self,
+        row: usize,
+        start: FxVec2,
+        facing: Angle,
+    ) -> Option<Job> {
+        self.commander_job_from(row, start, facing, true)
+    }
+
+    /// A busy engineer to take the first urgent want that no idle builder can make,
+    /// when none is going up or planned: the best tier first, then nearest home.
+    pub(in crate::ai) fn urgent_builder(&self, player: u8, idle: &[usize]) -> Option<usize> {
+        let ai = &self.state.ai[player as usize];
+        let &id = ai.commander.urgent.first()?;
+        let units = &self.state.units;
+        let can = |r: usize| {
+            self.bp(r)
+                .builder
+                .as_ref()
+                .is_some_and(|b| b.builds.contains(&id))
+        };
+        if idle.iter().any(|&r| can(r)) {
+            return None;
+        }
+        let rising =
+            units.slots.iter().any(|r| {
+                units.owner[r] == player && units.blueprint[r] == id && !units.is_active(r)
+            }) || self.planned_sites(player).any(|(_, o)| o.blueprint == id);
+        if rising {
+            return None;
+        }
+        let start = self.state.players[player as usize].start;
+        units
+            .slots
+            .iter()
+            .filter(|&r| {
+                units.owner[r] == player
+                    && units.is_active(r)
+                    && self.bp(r).is_mobile()
+                    && self.bp(r).has(mc_data::cat::ENGINEER)
+                    && !self.bp(r).has(mc_data::cat::COMMANDER)
+                    && !self.is_expander(r)
+                    && can(r)
+            })
+            .min_by_key(|&r| {
+                (
+                    std::cmp::Reverse(self.bp(r).tech),
+                    units.pos[r].distance_sq(start),
+                    r,
+                )
+            })
+    }
+
+    fn commander_job_from(
+        &self,
+        row: usize,
+        start: FxVec2,
+        facing: Angle,
+        urgent: bool,
+    ) -> Option<Job> {
         let player = self.state.units.owner[row];
         let ai = &self.state.ai[player as usize];
         if ai.config.brain != Brain::Commander {
@@ -414,7 +479,12 @@ impl World {
         let builds = &self.bp(row).builder.as_ref()?.builds;
         let pl = &self.state.players[player as usize];
         let units = &self.state.units;
-        for &id in &ai.commander.wants {
+        let list = if urgent {
+            &ai.commander.urgent
+        } else {
+            &ai.commander.wants
+        };
+        for &id in list {
             if !builds.contains(&id) {
                 continue;
             }
@@ -465,7 +535,13 @@ impl World {
                 self.uncovered_value(player, bp)
                     .unwrap_or(start - toward * Fx::from_int(260))
             } else if p.has(role::DEFENSE) {
-                start + toward * Fx::from_int(160)
+                // By the mine raiders took lately, else toward the enemy.
+                match ai.commander.raided {
+                    Some((at, t)) if self.state.tick < t + 1800 && !p.has(role::ANTI_AIR) => {
+                        at + toward * Fx::from_int(30)
+                    }
+                    _ => start + toward * Fx::from_int(160),
+                }
             } else {
                 start - toward * Fx::from_int(260)
             };

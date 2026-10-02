@@ -82,16 +82,23 @@ impl World {
         }
     }
 
-    /// A unit of `player` worth `mass` was killed by a unit of blueprint `by`: what
-    /// hurts the side, by the killer's kind (`state::Hurt`), steers production.
+    /// A unit of `player` of blueprint `lost`, worth `mass`, was killed by a unit of
+    /// blueprint `by`: what hurts the side, by the killer's kind (`state::Hurt`),
+    /// steers production; a mine or plant lost to a ground raid calls for a turret
+    /// there (`plans.rs`).
     pub(crate) fn note_loss_for_ai(
         &mut self,
         player: u8,
         by: mc_data::BlueprintId,
+        lost: mc_data::BlueprintId,
         mass: Fx,
         at: FxVec2,
     ) {
         let kind = state::Hurt::of(self.blueprints.unit(by));
+        let economy = {
+            let bp = self.blueprints.unit(lost);
+            bp.is_structure() && (bp.mine.is_some() || bp.has(mc_data::cat::POWER))
+        };
         let tick = self.state.tick;
         let Some(ai) = self.state.ai.get_mut(player as usize) else {
             return;
@@ -101,6 +108,9 @@ impl World {
             // Where the bombers keep hitting: anti-air goes there (`plans.rs`).
             if matches!(kind, state::Hurt::Air | state::Hurt::Space) {
                 ai.commander.hit_from_above = Some((at, tick));
+            }
+            if economy && matches!(kind, state::Hurt::Land | state::Hurt::Artillery) {
+                ai.commander.raided = Some((at, tick));
             }
         }
     }
@@ -253,11 +263,16 @@ impl World {
             .filter(|o| o.kind == OpKind::Army)
             .min_by_key(|o| o.phase != Phase::Executing)
             .and_then(|o| self.centre_of(&self.op_rows(o)));
+        // The wave out in the field, which a siege may go out behind.
+        let army_out: Option<FxVec2> = ops
+            .iter()
+            .find(|o| o.kind == OpKind::Army && o.phase == Phase::Executing)
+            .and_then(|o| self.centre_of(&self.op_rows(o)));
         for op in &mut ops {
             if self.state.ai[player].commander.attention < Fx::ONE {
                 break;
             }
-            let given = self.run_op(ctx, op, escort, army, out);
+            let given = self.run_op(ctx, op, escort, army, army_out, out);
             self.state.ai[player].commander.attention -= Fx::from_int(given as i32);
             if given > 0 {
                 op.ordered = self.state.tick;
@@ -276,11 +291,12 @@ impl World {
         op: &mut Operation,
         escort: Option<FxVec2>,
         army: Option<FxVec2>,
+        army_out: Option<FxVec2>,
         out: &mut Vec<Command>,
     ) -> u32 {
         match op.kind {
             OpKind::Army | OpKind::Defend | OpKind::Raid | OpKind::Siege | OpKind::Guard => {
-                self.run_land_op(ctx, op, out)
+                self.run_land_op(ctx, op, army_out, out)
             }
             OpKind::Landing => self.run_landing(ctx, op, out),
             OpKind::Strike => self.run_strike(ctx, op, out),
