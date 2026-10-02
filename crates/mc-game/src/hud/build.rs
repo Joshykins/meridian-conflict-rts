@@ -1117,9 +1117,8 @@ fn upgrade_card(
         );
     }
     rows.push(("Vision", from.vision.to_f32(), next.vision.to_f32(), " m"));
-    let payback = mine
-        .filter(|_| from.id == current.id)
-        .and_then(|v| super::mine::upgrade_gain(s.blueprints, from, &v));
+    // From the tier the mine is at now, so a later tier shows the whole climb.
+    let payback = mine.and_then(|v| super::mine::climb_gain(current, next, &v));
     let rows: Vec<_> = rows.into_iter().take(8).collect();
 
     let w = 380.0;
@@ -1199,7 +1198,11 @@ fn upgrade_card(
             y,
             type_scale::MICRO,
             rgb(palette::DIM, 1.0),
-            "Pays Back In",
+            if i == 0 {
+                "Pays Back In"
+            } else {
+                "Whole Climb Pays Back In"
+            },
         );
         ui.text_right(
             x + cw,

@@ -29,16 +29,24 @@ pub fn rate_on(bp: &UnitBlueprint, land: &mc_sim::mines::Share) -> f32 {
     bp.mine.map_or(0.0, |m| land.rate(&m).to_f32())
 }
 
-/// What upgrading to the next tier adds per second, and the seconds its
-/// materials cost takes to earn back from that gain.
+/// What upgrading to the next tier adds per second, and the seconds the
+/// materials it costs take to earn back from that gain.
 pub fn upgrade_gain(
     blueprints: &Blueprints,
     bp: &UnitBlueprint,
     view: &MineView,
 ) -> Option<(f32, f32)> {
-    let next = blueprints.unit(bp.upgrades_to?);
-    let gain = rate_on(next, &view.land) - rate_on(bp, &view.land);
-    (gain > 0.0).then(|| (gain, next.cost_mass.to_f32() / gain))
+    climb_gain(bp, blueprints.unit(bp.upgrades_to?), view)
+}
+
+/// What climbing from `bp` to `to` (one tier or several) adds per second, and
+/// the seconds the materials paid on the way take to earn back from that gain.
+/// Each upgrade costs the difference between the tiers, so the climb costs the
+/// difference between its ends.
+pub fn climb_gain(bp: &UnitBlueprint, to: &UnitBlueprint, view: &MineView) -> Option<(f32, f32)> {
+    let gain = rate_on(to, &view.land) - rate_on(bp, &view.land);
+    let cost = (to.cost_mass - bp.cost_mass).to_f32().max(0.0);
+    (gain > 0.0).then(|| (gain, cost / gain))
 }
 
 /// `93` as `1m 33s`, `40` as `40s`.
