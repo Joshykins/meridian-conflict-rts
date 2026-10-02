@@ -2890,11 +2890,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             m.metallic = clamp(m.metallic + 0.3 * broad, 0.0, 1.0);
         }
     }
-    // Regency plate and bronze (regency.wgsl): each facet its own sheen, lit edges, a
-    // panel line that follows the face, collared bronze.
+    // Regency plate and machinery (regency.wgsl): scanned steel, lit edges, seams and a
+    // panel line that follow the face, collared graphite machinery.
     var regency = regency_none();
-    let bronze = in.material == MAT_METAL;
-    if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER && (bronze || in.material == MAT_PLATING_DARK)
+    let works = in.material == MAT_METAL;
+    if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER && (works || in.material == MAT_PLATING_DARK)
         && (flags & (KIND_GHOST | KIND_PROP)) == 0u && !wreck {
         let dl1 = dpdx(in.local);
         let dl2 = dpdy(in.local);
@@ -2913,7 +2913,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         for (var k = 0u; k < 4u; k++) {
             ri.grads[k] = reg_face_grad(df1[k], df2[k], dl1, dl2);
         }
-        regency = regency_look(ri, bronze);
+        regency = regency_look(ri, works);
         n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));
     }
     // Mineral props share the terrain's rock texture and correctly oriented normals.
@@ -3346,7 +3346,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
             grit = 0.0;
             kick = select(0.0, kick, (in.model_class & 0x100u) != 0u);
-            // Dark gunmetal plate, darker seams, dark bronze machinery (regency.wgsl).
+            // Warm graphite plate, darker seams, dark graphite machinery (regency.wgsl).
             m = regency_paint(m, in.material == MAT_METAL, regency);
         }
         let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);

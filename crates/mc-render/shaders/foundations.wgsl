@@ -5,7 +5,7 @@
 // Per 8 m cell of the slope, one of two claddings:
 // - steel (ARC): a plate laid on the ground, three ribs running down it;
 // - armour (`ARMOUR`, a nanite-built faction's lot, the Regency): three courses of
-//   dark plate lapped down the slope, each standing proud at its foot over a bronze
+//   dark plate lapped down the slope, each standing proud at its foot over a graphite
 //   lip, its foot cut into backswept points over the course below;
 // and a cap rail along the high edge. Everything sits on `terrain_height`, so it
 // follows the slope exactly, settling included, and it comes up out of the ground
@@ -53,7 +53,7 @@ const PART_CAP: u32 = 2u;
 const PART_ARMOUR: u32 = 3u;
 const PART_LIP: u32 = 4u;
 const PART_POINT: u32 = 5u;
-const PART_BRONZE_CAP: u32 = 6u;
+const PART_WORKS_CAP: u32 = 6u;
 
 struct VsOut {
     @builtin(position) @invariant clip: vec4<f32>,
@@ -250,7 +250,7 @@ fn vs_main(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let world = piece.world;
     out.part = piece.part;
     if armour {
-        out.part = select(piece.part, PART_BRONZE_CAP, piece.part == PART_CAP);
+        out.part = select(piece.part, PART_WORKS_CAP, piece.part == PART_CAP);
         out.plate = hash21(c.origin * 0.131 + f32(vi / ARMOUR_PLATE_VERTICES) * 1.73);
     }
     // Where the point is in the slope's frame, for the plating's seams.
@@ -333,9 +333,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             albedo = mix(albedo, REG_STEEL_LIT, 0.12);
         }
     } else {
-        // Bronze: the machinery the plates lie over, showing at each step, and the
+        // Graphite: the machinery the plates lie over, showing at each step, and the
         // rail along the top; plain, a little polished.
-        albedo = mix(REG_BRONZE_DEEP, REG_BRONZE, 0.8 + 0.2 * grain.r);
+        albedo = mix(REG_WORKS_DEEP, REG_WORKS, 0.8 + 0.2 * grain.r);
         metal = 0.88;
         rough = 0.42 + 0.1 * grain.g;
     }

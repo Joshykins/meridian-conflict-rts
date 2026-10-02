@@ -1,4 +1,4 @@
-// Regency plate and bronze (`pattern::EMBER`): their colour and sheen. Prepended
+// Regency plate and machinery (`pattern::EMBER`): their colour and sheen. Prepended
 // after surface.wgsl (it uses its noise and bands) to shaders that contain the line
 // `//!use regency` (entity.wgsl).
 //
@@ -7,21 +7,22 @@
 // that follows the face's own outline (`surf_ember_line`, cut by surface.wgsl's
 // relief). Nothing is laid across the model regardless of its shape, and nothing on
 // the plate is lit: a Regency model's red is in the slots it is built with. The
-// bronze under the plates is plain and smooth, a turned collar near each end of a
+// dark graphite machinery under the plates is plain and smooth, a turned collar near each end of a
 // column, polished where it is worked.
 //
 // Relief comes out as a slope in model space (`RegencyLook::slope`), which
 // entity.wgsl carries into the world with `reg_to_world`.
 
-// Regency plate: dark gunmetal with a cool cast, grey enough for its seams and wear to read.
-const REG_GUNMETAL: vec3<f32> = vec3<f32>(0.042, 0.044, 0.049);
+// The foundation strips' plate (foundations.wgsl): a dark warm graphite.
+const REG_GUNMETAL: vec3<f32> = vec3<f32>(0.047, 0.043, 0.038);
 // The plate as metal (its reflectance), and where it is worn bright.
-const REG_STEEL: vec3<f32> = vec3<f32>(0.11, 0.11, 0.115);
-const REG_STEEL_LIT: vec3<f32> = vec3<f32>(0.34, 0.34, 0.35);
-// The machinery: a dark bronze a little off true bronze, and the gold it polishes to.
-const REG_BRONZE: vec3<f32> = vec3<f32>(0.3, 0.19, 0.095);
-const REG_BRONZE_DEEP: vec3<f32> = vec3<f32>(0.075, 0.045, 0.025);
-const REG_GOLD: vec3<f32> = vec3<f32>(0.8, 0.56, 0.25);
+const REG_STEEL: vec3<f32> = vec3<f32>(0.12, 0.11, 0.097);
+const REG_STEEL_LIT: vec3<f32> = vec3<f32>(0.36, 0.34, 0.315);
+// The machinery under the plates: a darker graphite than the plate, darker still in
+// its grooves, and the lighter steel it polishes to where it is worked.
+const REG_WORKS: vec3<f32> = vec3<f32>(0.055, 0.051, 0.046);
+const REG_WORKS_DEEP: vec3<f32> = vec3<f32>(0.02, 0.019, 0.017);
+const REG_WORKS_POLISH: vec3<f32> = vec3<f32>(0.24, 0.225, 0.205);
 
 struct RegencyIn {
     // Model space, metres, and the face's normal there (unit).
@@ -48,7 +49,7 @@ struct RegencyLook {
     slope: vec3<f32>,
     // Multiplies the colour: each plate its own sheen, a panel line dark.
     tone: f32,
-    // Lit metal: a plate's edge (steel), bronze polished to gold.
+    // Lit metal: a plate's edge, machinery polished where it is worked.
     lift: f32,
     // Added to roughness.
     rough: f32,
@@ -333,14 +334,14 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
     return out;
 }
 
-// Height along a bronze column: a turned collar a little in from each end.
+// Height along a machinery column: a turned collar a little in from each end.
 fn reg_collar_h(d: f32, scale: f32) -> f32 {
     let at = scale * 0.22;
     let width = scale * 0.07;
     return 1.0 + 0.5 * (1.0 - smoothstep(width * 0.6, width, abs(d - at)));
 }
 
-fn regency_bronze(i: RegencyIn) -> RegencyLook {
+fn regency_works(i: RegencyIn) -> RegencyLook {
     var out = regency_none();
     let fw = max(i.px, 1e-4);
     let o = reg_outline(i);
@@ -358,7 +359,7 @@ fn regency_bronze(i: RegencyIn) -> RegencyLook {
         let lip = i.scale * 0.04;
         out.lift = 0.5 * (1.0 - smoothstep(0.0, lip, o.e)) * smoothstep(lip * 2.0, lip * 4.0, o.small) * surf_resolved(lip, fw);
     }
-    // The same scan's grain and scratches in the bronze.
+    // The same scan's grain and scratches in the machinery.
     let worked = reg_scan(i);
     out.tone *= 1.0 + 0.5 * worked.tone;
     out.lift += 0.35 * smoothstep(0.3, 0.85, worked.scratch);
@@ -367,22 +368,22 @@ fn regency_bronze(i: RegencyIn) -> RegencyLook {
     return out;
 }
 
-// Plate or bronze, by the material the model painted.
-fn regency_look(i: RegencyIn, bronze: bool) -> RegencyLook {
-    if bronze {
-        return regency_bronze(i);
+// Plate or machinery, by the material the model painted.
+fn regency_look(i: RegencyIn, works: bool) -> RegencyLook {
+    if works {
+        return regency_works(i);
     }
     return regency_plate(i);
 }
 
 // Regency colours over the shared palette's (`lum` keeps the model's own light and
-// shade): plate, the darker trim (`ACCENT`) and the bronze machinery (`METAL`).
-fn regency_paint(m_in: Pbr, bronze: bool, look: RegencyLook) -> Pbr {
+// shade): plate, the darker trim (`ACCENT`) and the dark graphite machinery (`METAL`).
+fn regency_paint(m_in: Pbr, works: bool, look: RegencyLook) -> Pbr {
     var m = m_in;
     let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
-    if bronze {
-        let base = mix(REG_BRONZE_DEEP, REG_BRONZE, saturate(look.tone)) * clamp(0.75 + lum, 0.75, 1.3);
-        m.albedo = mix(base, REG_GOLD, saturate(look.lift));
+    if works {
+        let base = mix(REG_WORKS_DEEP, REG_WORKS, saturate(look.tone)) * clamp(0.75 + lum, 0.75, 1.3);
+        m.albedo = mix(base, REG_WORKS_POLISH, saturate(look.lift));
         m.metallic = 0.88;
         m.roughness = clamp(0.4 + look.rough - 0.18 * look.lift, 0.22, 0.6);
     } else {

@@ -81,7 +81,7 @@ Target: 60 fps on a mid-range PC. 8-player matches.
 **The second faction: the Regency (Build later not now)**
 
 - Ultra-mechanical: layered armour over exposed machinery. Very advanced.
-- Dark plating, dark bronze, red highlights; construction is violet (docs/STYLE.md "The Regency look").
+- Warm graphite plating, darker graphite machinery, red highlights; construction is violet (docs/STYLE.md "The Regency look").
 - "Regency" is the name used in code, in asset names and for short labels.
 - In feel, somewhere between Aeon, Cybran and Seraphim.
 

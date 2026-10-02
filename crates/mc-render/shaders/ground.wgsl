@@ -260,7 +260,7 @@ fn pad_mesh_sd(uv: vec2<f32>, layer: u32) -> f32 {
 // Metres the pad runs past its lot: the grit that spills off the kerb.
 const PAD_SPILL_M: f32 = 1.2;
 // The lot of a faction that builds with nanites (`PAD_NANITE`): not paved, but
-// black discs ringed in bronze and joined by bronze lines, violet light in their grooves
+// black discs ringed in graphite and joined by graphite lines, violet light in their grooves
 // while it builds.
 const LOT_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const LOT_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.1);
@@ -314,7 +314,7 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     let ragged = textureSample(noise_map, repeat_sampler, wp / 5.0).b;
     var edge_in = in.half_m + 0.3 - max(abs(local.x), abs(local.y));
     // A Regency lot is no square slab: a black hub under the building, smaller discs spread out
-    // round it on bronze lines (`lot_plate`), bare ground between.
+    // round it on graphite lines (`lot_plate`), bare ground between.
     var plate = vec4<f32>(in.half_m, 0.0, 0.0, 0.0);
     let sd = pad_mesh_sd(in.uv, blueprint);
     if nanite {
@@ -760,12 +760,12 @@ fn fs_vein(in: VeinOut) -> @location(0) vec4<f32> {
 }
 
 // ---- A Regency lot (`PAD_NANITE`) --------------------------------------------------------
-// Not a paved slab: black machined discs set in bronze. A big hub lies under the building,
-// a bronze thread runs round it with beads strung on it, each smaller than the one before,
-// and bronze lines run out to smaller discs spread out towards the lot's corners (one or two
-// of those never laid). Every disc is ringed in bronze inside, circle within circle.
+// Not a paved slab: black machined discs set in graphite. A big hub lies under the building,
+// a graphite thread runs round it with beads strung on it, each smaller than the one before,
+// and graphite lines run out to smaller discs spread out towards the lot's corners (one or two
+// of those never laid). Every disc is ringed in graphite inside, circle within circle.
 
-// A disc's inlay `t` metres from its middle, radius `r`: x 1 on its bronze rings (the rim,
+// A disc's inlay `t` metres from its middle, radius `r`: x 1 on its graphite rings (the rim,
 // one half way in, and on a small disc a boss in the middle), y the dark cut beside them.
 fn lot_rings(t: f32, r: f32, boss: bool, px: f32) -> vec2<f32> {
     let rim_w = clamp(0.09 * r, 0.2, 0.9);
@@ -774,9 +774,9 @@ fn lot_rings(t: f32, r: f32, boss: bool, px: f32) -> vec2<f32> {
     if boss {
         d = min(d, min(t - r * 0.2, abs(t - r * 0.36) - max(0.025 * r, 0.05)));
     }
-    let bronze = 1.0 - smoothstep(-px * 0.5, px * 0.5, d);
+    let inlay = 1.0 - smoothstep(-px * 0.5, px * 0.5, d);
     let cut = 1.0 - smoothstep(0.0, max(0.03 * r, 0.05) + px, d);
-    return vec2<f32>(bronze, cut * (1.0 - bronze));
+    return vec2<f32>(inlay, cut * (1.0 - inlay));
 }
 
 // Metres inside a line `w` wide from `a` to `b` (negative outside).
@@ -787,7 +787,11 @@ fn lot_line(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>, w: f32) -> f32 {
 }
 
 // The piece of the lot under `local`: x metres inside it (negative on bare ground), y its id
-// (0..1), z how much of it is bronze there, w the dark cut beside a bronze ring.
+// (0..1), z how much of it is graphite inlay there, w the dark cut beside a ring.
+// The graphite inlay: the Regency machinery's (regency.wgsl `REG_WORKS`), polished a
+// little lighter so it still reads against the black discs.
+const REG_LOT_WORKS: vec3<f32> = vec3<f32>(0.13, 0.12, 0.107);
+
 fn lot_plate(local: vec2<f32>, half_m: f32, seed: f32, px: f32) -> vec4<f32> {
     let h = max(half_m, 1.0);
     let spin = (hash11(seed * 7.0) - 0.5) * 0.6;
@@ -877,14 +881,14 @@ fn lot_plate(local: vec2<f32>, half_m: f32, seed: f32, px: f32) -> vec4<f32> {
 }
 
 // A piece's look: black with its own shade and a worn, lighter arris; its rings and the
-// lines between are bronze. Albedo in xyz, roughness in w.
+// lines between are graphite. Albedo in xyz, roughness in w.
 fn nanite_lot(plate: vec4<f32>, px: f32, grain: f32, contact: f32) -> vec4<f32> {
     let tone = 0.85 + 0.3 * hash11(plate.y * 53.0);
     var albedo = vec3<f32>(0.022, 0.023, 0.026) * tone * (0.85 + 0.3 * grain);
     let arris = 1.0 - smoothstep(0.05, 0.3 + px, plate.x);
     albedo = mix(albedo, vec3<f32>(0.07, 0.072, 0.078), arris * 0.7);
-    let bronze = vec3<f32>(0.3, 0.19, 0.095) * (0.8 + 0.3 * grain);
-    albedo = mix(albedo, bronze, plate.z) * (1.0 - 0.7 * plate.w);
+    let works = REG_LOT_WORKS * (0.8 + 0.3 * grain);
+    albedo = mix(albedo, works, plate.z) * (1.0 - 0.7 * plate.w);
     return vec4<f32>(albedo * contact, mix(0.55, 0.4, plate.z));
 }
 

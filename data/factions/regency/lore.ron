@@ -317,7 +317,7 @@
         weapons: {},
     ),
     "regency_wall": (
-        lore: "Plated sections that lock into one wall where they stand side by side: armour lapped down over a bronze waist, a spiked tower at every end and corner, a block of them one rampart. Slow to build, very hard to cut.",
+        lore: "Plated sections that lock into one wall where they stand side by side: armour lapped down over a graphite waist, a spiked tower at every end and corner, a block of them one rampart. Slow to build, very hard to cut.",
         weapons: {},
     ),
     "regency_t2_tank": (
@@ -357,7 +357,7 @@
     "regency_t2_interceptor": (
         lore: "A jet drawn out to a needle behind a blade of a nose, built to run down whatever flies over Regency ground.",
         weapons: {
-            "Gravitic Seeker Battery": "A charge of plasma held between two bronze tines either side under the chin, let go and steered onto an aircraft by its own gravity cage.",
+            "Gravitic Seeker Battery": "A charge of plasma held between two graphite tines either side under the chin, let go and steered onto an aircraft by its own gravity cage.",
         },
     ),
     "regency_t2_strike_drone": (

@@ -173,10 +173,12 @@ without toes.
 
 ### Finish
 
-- **Dark plating**, a little brighter than the old lacquer black.
-- **Dark bronze**, a little off true bronze (Scorponok), on the exposed
-  machinery under the plates: shafts, joints, cables, rings. The plates stay
-  dark, so from above a unit reads as dark armour over bronze workings.
+- **Warm graphite plating** (2026-10-02): steel a little warm of neutral, so the
+  blue sky it reflects never turns it blue.
+- **Darker graphite machinery** (no bronze or gold since 2026-10-02) on the exposed
+  workings under the plates: shafts, joints, cables, rings, polished lighter
+  where they are worked. From above a unit reads as graphite armour over darker
+  workings.
 - **Red highlights:** lit slots, optics and weapon heat, built into the model.
   Nothing on the plate's texture is lit.
 - **Real worn steel, true to the form** (`shaders/regency.wgsl`, references: the
@@ -191,7 +193,7 @@ without toes.
   rectangle fits carries the distances to its own edges (`MeshVertex::face`, edge
   form), so all of this follows its true shape. No procedural scratches or
   noise patterns, no vents, bolts or engraving, nothing lit on the plate. The
-  bronze takes the same scan's scratches, a turned collar near each column end.
+  machinery takes the same scan's scratches, a turned collar near each column end.
 
 ### Names
 
@@ -261,11 +263,11 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
     rush climbs. Stopping, everything sinks away below the loop's note and a
     last deep thud settles it (`regency_nanite`, `_start`, `_end`).
 - **The foundation is no flat square and no brick paving.** A Regency lot is black
-  and bronze and round: a black machined hub under the building, a bronze thread
+  and graphite and round: a black machined hub under the building, a graphite thread
   running round it with beads strung on it (three a quarter, each smaller than
-  the one before), and bronze lines out to smaller discs spread towards the
+  the one before), and graphite lines out to smaller discs spread towards the
   lot's corners (one or two of those never laid), with bare ground between.
-  Every disc is ringed in bronze inside, circle within circle. While the
+  Every disc is ringed in graphite inside, circle within circle. While the
   building goes up, faint violet runs out along the edges and ring cuts
   (`ground.wgsl` `lot_plate`, `nanite_lot`). Not overbuilt, not formal.
 
