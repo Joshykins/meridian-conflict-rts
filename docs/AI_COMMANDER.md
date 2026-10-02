@@ -209,7 +209,15 @@ Ground rules learnt in the tournaments (each is a comment at its code):
   a group; near the rally it turns and fights instead;
 - a raid on the base takes the guard first, then gathering groups, then, if that is
   not enough, groups out in the field: the commander dying at home loses the game;
-- a raid far from home is answered only by enough to win, or let go.
+- a raid far from home is answered only by enough to win, or let go;
+- one army, not a trickle: while a wave is out fighting, what gathers behind it
+  joins it once it is worth a thousand mass (waves of two and three thousand met a
+  five-thousand army one after another);
+- a wave in the field moves on once its middle stands at the target with nothing
+  to fight, or after five minutes with nothing in front of it: a wave of 340 never
+  read as "mostly idle" and stood by home for ten minutes;
+- artillery (`Siege`) sets out only behind a wave already out near its spot, or
+  where little of the enemy stands: alone it walked up to the guns and traded 1:6.
 
 ### 7. Production and economy (`solver.rs`, `economy.rs`, `builders.rs`, `energy.rs`)
 
@@ -234,7 +242,19 @@ belief (seen: one for each of their silos and one over, up to eight, each sited
 over the richest ground none covers), lift ships, silos, map guns, titans,
 warships, shields, coastal guns where ships hurt it, anti-air where it was bombed,
 by the `AirDefense` stake and against outranging aircraft, a sensor ship once
-income allows. The commander unit takes only wants at home.
+income allows, and a turret by a mine or plant a ground raid took. The commander
+unit takes only wants at home.
+
+**Urgent wants** answer a threat the side is under now: interceptors once warheads
+are seen, the long-reaching anti-air turret against warships out of its anti-air's
+reach (counted by what they killed lately too, since warships that warp in and
+out are seldom on the map at a review), and the raid turret. Builders take them
+before power and everything else, and when no idle builder can make one, a busy
+engineer that can is pulled onto it (`urgent_builder`).
+
+A force the plans want with no factory to make it (a shipyard for a sea plan, an
+airfield for the air force) gets one even while the side is stalling, when no
+other factory would be started.
 
 **Economy** (`economy.rs`): a controller run at the top of every think, before the
 builders, factories and upgrades it steers. It balances three things all game:
