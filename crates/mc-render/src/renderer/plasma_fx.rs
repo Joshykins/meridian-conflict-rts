@@ -80,6 +80,8 @@ pub(super) struct PlasmaFx {
     pub(super) guns: super::regency_guns_fx::RegencyGunFx,
     /// The Gravitic Seekers and Counter-seekers (`gravitic_fx`).
     pub(super) seekers: super::gravitic_fx::GraviticFx,
+    /// Cone weapons' wakes rolling out (`wake_fx`).
+    pub(super) wakes: Vec<super::wake_fx::RollingWake>,
 }
 
 impl PlasmaFx {

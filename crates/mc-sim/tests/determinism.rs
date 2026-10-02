@@ -105,7 +105,8 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     // dived, guns only up.
     ("regency_t1_attack_boat", 4, 2800, 500),
     ("regency_t2_destroyer", 1, 3200, 600),
-    // The Regency wake tank: every wake strikes the whole fan ahead of it at once (`wake.rs`).
+    // The Regency wake tank: every wake rolls out over the fan ahead of it, striking what
+    // its front reaches (`wake.rs`), and is often still rolling at the mid-match snapshot.
     ("regency_t3_wake_tank", 1, 1200, 760),
     // Regency bombardment walkers: seekers lobbed high that split into sub-seekers on the
     // way down (`cluster.rs`).

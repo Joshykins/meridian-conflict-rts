@@ -1,6 +1,7 @@
-//! Cone weapons (`Weapon::cone`, `wake.rs`): the Regency Wake's wake strikes every enemy
-//! in the fan ahead of its projector on the tick it fires, the nearer harder, and nothing
-//! outside the fan or past its reach; ground between the projector and a hull shields it.
+//! Cone weapons (`Weapon::cone`, `wake.rs`): the Regency Wake's wake rolls out over the fan
+//! ahead of its projector and strikes every enemy in it as the front arrives, the nearer
+//! sooner and harder, and nothing outside the fan or past its reach; ground between the
+//! projector and a hull shields it.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -78,78 +79,100 @@ fn health(w: &World, unit: UnitId) -> Fx {
         .map_or(Fx::ZERO, |r| w.state.units.health[r])
 }
 
-/// Ticks the world until the Wake's first wake, and returns what each of `marks` lost
-/// on that tick.
-fn first_wake(w: &mut World, marks: &[UnitId]) -> Vec<Fx> {
+/// What each of `marks` lost to the Wake's first wake, and the tick (counted from the one
+/// it fired on) its front reached each; `None` for one it never reached. Each unit is
+/// struck once a wake, so the first loss each takes is the first wake's.
+fn first_wake(w: &mut World, marks: &[UnitId]) -> Vec<Option<(u32, Fx)>> {
     let breaker = w.blueprints.id_of("regency_t3_wake_tank").unwrap();
-    for _ in 0..(12 * mc_core::TICKS_PER_SECOND) {
+    let mut fired = None;
+    let mut struck = vec![None; marks.len()];
+    for tick in 0..(20 * mc_core::TICKS_PER_SECOND) {
         let before: Vec<Fx> = marks.iter().map(|&m| health(w, m)).collect();
         w.tick(&[]).unwrap();
-        let fired = w
-            .events
-            .iter()
-            .any(|e| matches!(e, SimEvent::ShotFired { blueprint, .. } if *blueprint == breaker));
-        if fired {
-            // Nothing flies: the wake struck on the tick it fired.
+        if fired.is_none()
+            && w.events.iter().any(
+                |e| matches!(e, SimEvent::ShotFired { blueprint, .. } if *blueprint == breaker),
+            )
+        {
+            // Nothing flies but the front.
             let p = &w.state.projectiles;
             assert!(
                 (0..p.len()).all(|i| p.blueprint[i] != breaker),
                 "a wake left a projectile"
             );
-            return marks
-                .iter()
-                .zip(before)
-                .map(|(&m, hp)| hp - health(w, m))
-                .collect();
+            fired = Some(tick);
+        }
+        let Some(start) = fired else {
+            continue;
+        };
+        for (i, (&m, hp)) in marks.iter().zip(before).enumerate() {
+            let lost = hp - health(w, m);
+            if struck[i].is_none() && lost > Fx::ZERO {
+                struck[i] = Some((tick - start, lost));
+            }
+        }
+        // The first wake has rolled out to its full reach and gone.
+        let weapon = &w.blueprints.unit(breaker).weapons[0];
+        let cone = weapon.cone.unwrap();
+        let out = weapon.range_max / cone.speed * mc_core::TICKS_PER_SECOND as i32;
+        if tick - start > out.ceil_int() as u32 + 1 {
+            return struck;
         }
     }
     panic!("the Wake never fired");
 }
 
 #[test]
-fn the_wake_strikes_everything_in_its_fan_at_once() {
+fn the_wake_rolls_out_over_its_fan() {
     let mut w = world(None);
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
-    // Bulwarks: dead ahead at 88 m, 11 degrees off at 141 m, out of the fan (69 degrees
-    // off, in reach) and past its reach (188 m dead ahead).
+    // Bulwarks: dead ahead at 88 m, 5 degrees off at 300 m, out of the fan (30 degrees
+    // off, in reach) and past its reach (400 m dead ahead).
     let near = add(&mut w, "aster_t2_tank", 1, 600, 512, 180);
-    let far = add(&mut w, "aster_t2_tank", 1, 650, 540, 180);
-    let beside = add(&mut w, "aster_t2_tank", 1, 560, 640, 180);
-    let beyond = add(&mut w, "aster_t2_tank", 1, 700, 512, 180);
-    let lost = first_wake(&mut w, &[near, far, beside, beyond]);
+    let far = add(&mut w, "aster_t2_tank", 1, 811, 538, 180);
+    let beside = add(&mut w, "aster_t2_tank", 1, 642, 587, 180);
+    let beyond = add(&mut w, "aster_t2_tank", 1, 912, 512, 180);
+    let struck = first_wake(&mut w, &[near, far, beside, beyond]);
     let weapon = w
         .blueprints
         .unit(w.blueprints.id_of("regency_t3_wake_tank").unwrap())
         .weapons[0]
         .clone();
     let cone = weapon.cone.expect("the Wake's projector is a cone");
-    assert!(lost[0] > Fx::ZERO, "the near Bulwark was not struck");
-    assert!(lost[1] > Fx::ZERO, "the far Bulwark was not struck");
+    let (near_at, near_lost) = struck[0].expect("the near Bulwark was not struck");
+    let (far_at, far_lost) = struck[1].expect("the far Bulwark was not struck");
     assert!(
-        lost[0] > lost[1],
-        "nearer should take more: {} near, {} far",
-        lost[0],
-        lost[1]
+        near_lost > far_lost,
+        "nearer should take more: {near_lost} near, {far_lost} far"
     );
-    assert!(lost[0] <= weapon.damage && lost[1] >= weapon.damage * cone.edge);
-    assert_eq!(lost[2], Fx::ZERO, "struck outside its fan");
-    assert_eq!(lost[3], Fx::ZERO, "struck past its reach");
+    assert!(near_lost <= weapon.damage && far_lost >= weapon.damage * cone.edge);
+    // The front rolls out at its own pace: 212 m further on is over two seconds later.
+    let gap = (Fx::from_int(212) / cone.speed * mc_core::TICKS_PER_SECOND as i32).floor_int();
+    assert!(
+        far_at >= near_at + gap as u32 - 2,
+        "the far Bulwark was struck at tick {far_at}, the near at {near_at}: the front \
+         should take about {gap} ticks between them"
+    );
+    assert_eq!(struck[2], None, "struck outside its fan");
+    assert_eq!(struck[3], None, "struck past its reach");
 }
 
 #[test]
 fn ground_between_shields_a_unit_from_the_wake() {
-    // A 20 m wall across the line to the hidden Bulwark (cells are 8 m): x 584-592, y 520-536.
-    let mut w = world(Some(((73, 74), (65, 67))));
+    // A 20 m wall beside the line to the open Bulwark (cells are 8 m): x 584-592, y 520-528.
+    let mut w = world(Some(((73, 74), (65, 66))));
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
-    // In the open, 148 m off a little south of east; behind the wall, 101 m off 13 degrees
-    // north of east (17 degrees off the open one's line: inside the fan).
-    let open = add(&mut w, "aster_t2_tank", 1, 660, 500, 180);
-    let hidden = add(&mut w, "aster_t2_tank", 1, 610, 535, 180);
-    let lost = first_wake(&mut w, &[open, hidden]);
-    assert!(lost[0] > Fx::ZERO, "the Bulwark in the open was not struck");
+    // In the open, 200 m dead east; behind the wall, 109 m off 6 degrees north of east
+    // (inside the fan).
+    let open = add(&mut w, "aster_t2_tank", 1, 712, 512, 180);
+    let hidden = add(&mut w, "aster_t2_tank", 1, 620, 524, 180);
+    let struck = first_wake(&mut w, &[open, hidden]);
+    assert!(
+        struck[0].is_some(),
+        "the Bulwark in the open was not struck"
+    );
     assert_eq!(
-        lost[1],
-        Fx::ZERO,
+        struck[1], None,
         "the wall did not shield the hidden Bulwark"
     );
 }

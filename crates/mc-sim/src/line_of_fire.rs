@@ -60,11 +60,19 @@ impl World {
                 || self.torpedo_run_clear(from, from + (to - from) * ((len - short) / len));
         }
         let muzzle_z = units.z[row] + weapon.pivot.unwrap_or(weapon.muzzle).z;
-        let from =
-            units.pos[row].extend(muzzle_z.max(self.terrain.height_at(units.pos[row]) + Fx::HALF));
+        self.clear_from(units.pos[row].extend(muzzle_z), target)
+    }
+
+    /// Whether the ground leaves a clear line from `from` to `target`, as `clear_shot`
+    /// reads it: `from` is never taken lower than just over the ground under it.
+    pub(crate) fn clear_from(&self, from: FxVec3, target: usize) -> bool {
+        let units = &self.state.units;
+        let from = from
+            .xy()
+            .extend(from.z.max(self.terrain.height_at(from.xy()) + Fx::HALF));
         let bp = self.bp(target);
         let to = units.pos[target];
-        let across = to - units.pos[row];
+        let across = to - from.xy();
         let len = across.length();
         if len <= bp.radius * 2 {
             return true;

@@ -93,7 +93,10 @@ impl World {
                 s.stains.hash(h);
                 s.fires.hash(h);
             },
-            &|h| crate::titan::hash_giants(s, h),
+            &|h| {
+                crate::titan::hash_giants(s, h);
+                crate::wake::hash_wakes(s, h);
+            },
             &|h| {
                 s.strategic.hash(h);
                 s.pads.hash(h);

@@ -224,11 +224,13 @@ pub struct Bore {
 }
 
 /// A cone weapon's fan (`RawCone`): `half` either side of the gun's facing; a unit at full
-/// range takes `edge` of the damage, one at the muzzle all of it.
+/// range takes `edge` of the damage, one at the muzzle all of it. Its front rolls out
+/// `speed` metres a second.
 #[derive(Clone, Copy, Debug)]
 pub struct Cone {
     pub half: Angle,
     pub edge: Fx,
+    pub speed: Fx,
 }
 
 /// A gun's spent casing (`RawSabot`).
@@ -1570,6 +1572,7 @@ impl Blueprints {
                 if let Some(c) = w.cone {
                     h.write_u64(c.half.0 as u64);
                     h.write_i64(c.edge.0);
+                    h.write_i64(c.speed.0);
                 }
                 if let Some(c) = w.cluster {
                     h.write_u64(c.count as u64);

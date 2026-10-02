@@ -479,6 +479,7 @@ impl Renderer {
                 }
             }
         }
+        self.roll_wakes(time);
         self.write_regency_trails(time);
     }
 

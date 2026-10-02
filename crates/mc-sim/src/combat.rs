@@ -2218,8 +2218,8 @@ impl World {
                 (muzzle, vel, ticks)
             };
             if weapon.cone.is_some() {
-                // A cone weapon's shot flies nowhere: it strikes the whole fan at once,
-                // once the loop lets go of the unit tables (`wake.rs`).
+                // A cone weapon's shot flies nowhere: its wake rolls out over the fan,
+                // let go once the loop lets go of the unit tables (`wake.rs`).
                 wakes.push((muzzle, facing));
             } else {
                 self.state.projectiles.spawn(
@@ -2298,7 +2298,7 @@ impl World {
             }
         }
         for (muzzle, facing) in wakes {
-            self.wake(row, weapon, muzzle, facing);
+            self.wake(row, w, muzzle, facing);
         }
         if weapon.split && t.unit.is_some() {
             self.split_target(row, w);

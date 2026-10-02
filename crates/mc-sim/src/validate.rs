@@ -69,7 +69,15 @@ impl State {
             .or_else(|| bad_bp("projectiles", &self.projectiles.blueprint))
             .or_else(|| bad_owner("units", &self.units.owner))
             .or_else(|| bad_owner("projectiles", &self.projectiles.owner))
-            .or_else(|| bad_owner("fires", &self.fires.owner));
+            .or_else(|| bad_owner("fires", &self.fires.owner))
+            .or_else(|| {
+                let wakes: Vec<_> = self.wakes.iter().map(|w| w.blueprint).collect();
+                bad_bp("wakes", &wakes)
+            })
+            .or_else(|| {
+                let owners: Vec<_> = self.wakes.iter().map(|w| w.owner).collect();
+                bad_owner("wakes", &owners)
+            });
         problem.map_or(Ok(()), Err)
     }
 }
