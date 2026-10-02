@@ -31,13 +31,13 @@ use mc_data::BlueprintId;
 const RING: f32 = 4.0;
 /// Metres apart across the fan the ribs of the front are laid, the filaments behind it,
 /// the clumps rolled along its foot and the pools glassed into the ground.
-const RIB_GAP: f32 = 5.0;
+const RIB_GAP: f32 = 2.0;
 const FILAMENT_GAP: f32 = 8.0;
 const CLUMP_GAP: f32 = 14.0;
 const POOL_GAP: f32 = 45.0;
 /// Most ribs a ring of the front is laid with, and filaments behind it: deliberate
 /// cosmetic caps, so a wide cone costs no more than this many a ring.
-const MAX_RIBS: usize = 16;
+const MAX_RIBS: usize = 40;
 const MAX_ACROSS: usize = 14;
 /// Most glassed pools a ring of them is laid with: a deliberate cosmetic cap.
 const MAX_POOLS: usize = 3;
@@ -46,7 +46,7 @@ const MAX_WAKES: usize = 24;
 /// How far up from the ground the wake is laid, metres.
 const SKIM: f32 = 0.6;
 /// The crest's height over the ground, metres, for each unit of the weapon's `impact`.
-const CREST: f32 = 9.0;
+const CREST: f32 = 11.0;
 /// Metres out from the mouth the front takes to rise to its full height.
 const BUILD: f32 = 30.0;
 /// The curl in profile, through the front: (ahead of it, up), in crest heights. It rises
@@ -195,42 +195,48 @@ impl Renderer {
         let width = 2.0 * r * half.tan();
         let water = self.map_info.water_level.to_f32();
 
-        // The front: ribs across the fan, each a curl rising off the ground behind it,
-        // cresting and leaning out over it. Ragged: each rib a little ahead of or behind
-        // the line, here and there one missing.
-        let ribs = ((width / RIB_GAP).ceil() as usize).clamp(2, MAX_RIBS);
-        for i in 0..ribs {
-            if self.scatter.unit() < 0.12 {
-                continue;
+        // The front: a curtain of strands across the fan, each a curl rising off the
+        // ground behind it, cresting and leaning out over it, under one hot lip run along
+        // the crest. Each strand its own height and a little ahead of or behind the line,
+        // so they never line up into a lattice. Short-lived, so only the front's own
+        // stretch stands at once.
+        let ribs = ((width / RIB_GAP).ceil() as usize).clamp(4, MAX_RIBS);
+        let mut lip: Option<Vec3> = None;
+        for i in 0..=ribs {
+            let a = -half + 2.0 * half * (i as f32 + 0.45 * self.scatter.signed()) / ribs as f32;
+            let a = a.clamp(-half, half);
+            let crest = Self::crest(r, range, a, half, impact);
+            let h = crest * (0.75 + 0.3 * self.scatter.unit());
+            let shift = self.scatter.signed() * RING * 0.5;
+            let mut curl = [Vec3::ZERO; CURL.len()];
+            for (p, &(fore, up)) in curl.iter_mut().zip(&CURL) {
+                let foot = self.wake_ground(wake, (r + shift + fore * h * 0.6).max(1.0), a);
+                *p = foot + Vec3::Z * up * h;
             }
-            let a =
-                -half + 2.0 * half * (i as f32 + 0.5 + 0.4 * self.scatter.signed()) / ribs as f32;
-            let h = Self::crest(r, range, a, half, impact) * (0.85 + 0.3 * self.scatter.unit());
-            let shift = self.scatter.signed() * RING * 0.4;
-            let lean = self.scatter.signed() * 0.06;
-            let mut prev = None;
-            for (j, &(fore, up)) in CURL.iter().enumerate() {
-                let foot =
-                    self.wake_ground(wake, (r + shift + fore * h * 0.6).max(1.0), a + lean * up);
-                let p = foot + Vec3::Z * up * h;
-                if let Some(from) = prev {
-                    // Thick and lasting at its foot, thin and quick at the crest.
-                    let rise = j as f32 / (CURL.len() - 1) as f32;
-                    let life = (0.24 - 0.12 * rise) * (1.0 + 0.3 * self.scatter.unit());
-                    let w = (1.0 - 0.55 * rise) * (1.0 - 0.35 * out) * 0.8 * impact;
-                    self.plasma_fx.guns.filament(from, p, when, life, w);
-                }
-                prev = Some(p);
+            for j in 1..CURL.len() {
+                let rise = j as f32 / (CURL.len() - 1) as f32;
+                let life = (0.1 + 0.05 * rise) * (1.0 + 0.4 * self.scatter.unit());
+                let w = (0.45 + 0.25 * self.scatter.unit()) * (1.0 - 0.3 * out) * impact;
+                self.plasma_fx
+                    .guns
+                    .filament(curl[j - 1], curl[j], when, life, w);
             }
+            // The lip: the crest's own height, not the strand's, so it runs unbroken.
+            let mut top = self.wake_ground(wake, r + CURL[3].0 * crest * 0.6, a);
+            top.z += crest * CURL[3].1;
+            if let Some(prev) = lip {
+                let w = (1.3 + 0.4 * self.scatter.unit()) * (1.0 - 0.3 * out) * impact;
+                self.plasma_fx.guns.filament(prev, top, when, 0.12, w);
+            }
+            lip = Some(top);
             // Now and then a spark flung forward off the crest.
-            if self.scatter.unit() < 0.15 {
-                let tip = prev.unwrap_or(wake.at);
+            if self.scatter.unit() < 0.08 {
                 let v = (turned(wake.ahead, a) * speed * (0.5 + 0.4 * self.scatter.unit()))
                     .extend(4.0 + 6.0 * self.scatter.unit());
                 let life = 0.35 + 0.3 * self.scatter.unit();
                 self.push_lit(
                     MOTE,
-                    tip,
+                    top,
                     v,
                     when,
                     life,
