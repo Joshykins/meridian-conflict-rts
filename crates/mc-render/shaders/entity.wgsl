@@ -3685,7 +3685,13 @@ fn hull_hits(p: vec3<f32>, time: f32, edge: f32, s: Shield) -> vec4<f32> {
         let wave = dist - age * (12.0 + h.strength * 6.0);
         let ring = exp(-abs(wave) * 1.8) * fade * h.strength;
         let seam = pow(saturate((edge - 0.58) / 0.30), 1.25);
-        rgb += col * (fill * 2.4 + ring * (0.25 + 0.75 * seam) * 4.6);
+        if shield_prism(s.packed) {
+            // The veil flashes white-hot where it is struck; the ring runs out red.
+            rgb += mix(PRISM_VEIL_WHITE, prism(h.start * 0.37 + age * PRISM_RATE), 0.4) * fill * 2.6
+                + PRISM_VEIL_RED * ring * (0.25 + 0.75 * seam) * 4.6;
+        } else {
+            rgb += col * (fill * 2.4 + ring * (0.25 + 0.75 * seam) * 4.6);
+        }
         a += fill * 0.14 + ring * 0.14;
     }
     return vec4<f32>(rgb, a);
@@ -3732,9 +3738,15 @@ fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
     let facing = saturate(dot(nrm, -dir));
     // Painted on the plates so the honeycomb walks and turns with the hull.
     // Domes keep a world lattice so merged fields share one grid; a wrap does not.
-    let hx = hull_hex_triplanar(in.local, skin_n / max(length(skin_n), 1e-5));
+    // The Regency's prism veil (`shield_look::PRISM`) lays triangles where ARC's glass has hexes.
+    let prismatic = shield_prism(s.packed);
+    var hx = hull_hex_triplanar(in.local, skin_n / max(length(skin_n), 1e-5));
+    if prismatic {
+        let tri = tri_triplanar(in.local, skin_n / max(length(skin_n), 1e-5), SHIELD_LOOK_HULL_CELL);
+        hx = vec2<f32>(tri.x * 0.94, tri.y);
+    }
     let eye_dist = length(in.world - eye);
-    let cell_px = HULL_HEX * globals.lod.x / max(eye_dist, 1.0);
+    let cell_px = select(HULL_HEX, SHIELD_LOOK_HULL_CELL * 0.6, prismatic) * globals.lod.x / max(eye_dist, 1.0);
     let hex_see = smoothstep(0.9, 4.5, cell_px);
     let seam = pow(saturate((hx.x - 0.66) / 0.22), 1.45) * hex_see;
     let plate = (1.0 - smoothstep(0.70, 0.90, hx.x)) * hex_see;
@@ -3756,11 +3768,22 @@ fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
     let stress = (1.0 - health) * (1.0 - health);
     // The faction's shield colour (faction.ron `shield_color`), as shields.wgsl draws it:
     // a denser version for the knot and contact, a paler one toward white for the rings.
-    let energy = globals.shield.rgb;
+    var energy = globals.shield.rgb;
+    var deep = pow(energy, vec3<f32>(2.2));
+    var seam_c = energy;
+    var folds = 0.0;
+    if prismatic {
+        // The prism veil: white-hot with the prism drifting over it, folds of colour hanging
+        // from the emitter, red-tinged triangles, a red knot.
+        let q = in.local - vec3<f32>(in.weld.y, 0.0, 0.0);
+        energy = prism_sheen(q * 4.0, nrm, facing, time);
+        deep = PRISM_VEIL_RED;
+        seam_c = mix(PRISM_VEIL_RED, energy, 0.22 + 0.2 * hx.y);
+        folds = prism_curtain(q, saturate(in.local.z / max(in.weld.w, 1.0)), time);
+    }
     let team_c = globals.team_colors[s.packed & OWNER_MASK].rgb;
-    let rim_c = mix(energy, team_c, 0.16);
+    let rim_c = mix(energy, team_c, select(0.16, 0.06, prismatic));
     let ice = mix(energy, mix(energy, vec3<f32>(1.0), 0.45), 0.45);
-    let deep = pow(energy, vec3<f32>(2.2));
 
     // The Aegis language on a skin: a tight knot at the emitter, rings
     // born there that run out over the plates, packets riding the seams on the
@@ -3787,17 +3810,22 @@ fn fs_hull(in: VsOut) -> @location(0) vec4<f32> {
     // plates — hits, the unfold and the peel carry it at full strength.
     let quiet = HULL_IDLE;
     var color = rim_c * (fres * 0.62 * live + stress * 0.18 + 0.08 * live) * quiet;
-    color += energy * (seam * 0.55 * live + current * 1.25 + plate * 0.1 * breathe + stress * seam * 0.4 + flow * 0.18) * quiet;
+    color += seam_c * (seam * 0.55 * live + current * 1.25 + stress * seam * 0.4) * quiet;
+    color += energy * (plate * 0.1 * breathe + flow * 0.18 + folds * 0.9) * quiet;
     color += ice * wave * 2.4 * quiet;
     // Deep and fairly opaque, so the knot still reads over light plating.
-    color += pow(deep, vec3<f32>(1.3)) * (knot * 12.0 + corona * 3.0) * quiet;
+    // The veil's knot is a small white-hot point with a little red round it, so the
+    // projector it sits on still shows.
+    let knot_c = select(pow(deep, vec3<f32>(1.3)) * (knot * 12.0 + corona * 3.0),
+        PRISM_VEIL_WHITE * knot * 2.2 + PRISM_VEIL_RED * corona * 0.5, prismatic);
+    color += knot_c * quiet;
     color += mix(energy, ice, dying) * born * mix(1.3, 3.4, dying);
     color += blow.rgb;
     color += deep * touch * 2.2 * quiet;
 
     var alpha = (0.018 + fres * 0.09 * live + stress * 0.045) * quiet;
-    alpha += (seam * 0.08 * live + current * 0.15 + plate * 0.014 * breathe + stress * seam * 0.06 + flow * 0.02) * quiet;
-    alpha += (wave * 0.15 + knot * 0.7 + corona * 0.2) * quiet;
+    alpha += (seam * 0.08 * live + current * 0.15 + plate * 0.014 * breathe + stress * seam * 0.06 + flow * 0.02 + folds * 0.06) * quiet;
+    alpha += (wave * 0.15 + select(knot * 0.7 + corona * 0.2, knot * 0.3 + corona * 0.05, prismatic)) * quiet;
     alpha += born * mix(0.28, 0.72, dying) + blow.a + touch * 0.26 * quiet;
     alpha *= smoothstep(0.0, 0.1, open) * mix(0.8 + 0.2 * health, 1.25, dying);
 

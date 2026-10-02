@@ -17,6 +17,11 @@
 // the rim, dumps the remaining charge, and sheds the plates — it does not
 // pop off. A collapsing dome gets out of the way of the bubbles it was
 // covering, so they are not hidden until it is gone.
+//
+// That is ARC's glass. The Regency's (`shield_look::PRISM`) is a veil drawn the same
+// way in pinch fusion's light: white-hot glass with the prism drifting over it and folds
+// of colour hanging in it like a curtain, on a lattice of red-tinged triangles; a
+// white-hot jet for the shaft, and hits that flash white and ring out red.
 
 struct ShieldPush {
     count: u32,
@@ -98,6 +103,11 @@ fn collapsing(s: Shield) -> bool {
 
 fn is_hull(s: Shield) -> bool {
     return ((s.packed >> 25u) & 1u) == 1u;
+}
+
+// The Regency's prism veil (`shield_look::PRISM`), not ARC's honeycomb glass.
+fn is_prism(s: Shield) -> bool {
+    return shield_prism(s.packed);
 }
 
 // Dry grid: the projector is dark. A closing bubble still has its glass.
@@ -575,12 +585,18 @@ fn hit_reaches(p: vec3<f32>, owner: u32) -> bool {
 // plates bloom and crackle; the hex ripple is what travels.
 fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
     // Below the rim the wall is vertical: plates there are apart in height too.
-    let rim = shield_at(owner).pos.z;
+    let home = shield_at(owner);
+    let rim = home.pos.z;
+    let prismatic = is_prism(home);
     var rgb = vec3<f32>(0.0);
     var a = 0.0;
-    let qr = hex_qr(p.xy);
-    let here = hex_center(qr);
-    let cell_h = hash21(qr + vec2<f32>(13.1, 7.7));
+    // The plates that light are the field's own: hexes, or the veil's triangles.
+    var here = hex_center(hex_qr(p.xy));
+    var cell_h = hash21(hex_qr(p.xy) + vec2<f32>(13.1, 7.7));
+    if prismatic {
+        here = tri_middle(p.xy, SHIELD_LOOK_CELL);
+        cell_h = tri_lattice(p.xy, SHIELD_LOOK_CELL).y;
+    }
     for (var i = 0u; i < HIT_COUNT; i++) {
         let h = shield_hits[i];
         let age = time - h.start;
@@ -598,9 +614,12 @@ fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
         let envelope = 1.0 - smoothstep(0.02, 0.38, age);
         let fade = 1.0 - smoothstep(0.2, 1.65, age);
         let cool = saturate((h.strength - 0.45) / 3.4);
-        let col = mix(shield_deep(), shield_pale(), cool * 0.5);
+        var col = mix(shield_deep(home), shield_pale(home), cool * 0.5);
         let hot = mix(1.05, 1.7, cool);
-        let there = hex_center(hex_qr(h.pos.xy));
+        var there = hex_center(hex_qr(h.pos.xy));
+        if prismatic {
+            there = tri_middle(h.pos.xy, SHIELD_LOOK_CELL);
+        }
         let cell_d = length(vec3<f32>(here - there, min(p.z - rim, 0.0) - min(h.pos.z - rim, 0.0)));
         let dist = length(p - h.pos);
         let reach = HEX * 1.15 + h.strength * 1.6;
@@ -620,7 +639,14 @@ fn hits_at(p: vec3<f32>, time: f32, edge: f32, owner: u32) -> vec4<f32> {
         let ring_hex = ring * (0.22 + 0.78 * seam);
         let knot = exp(-(dist * dist) / 4.8) * envelope * strobe * h.strength * saturate(1.0 - edge * 1.05);
         let punch = (fill * 2.8 + crackle_fill * 5.6 + ring_hex * 5.2 + knot * 3.4) * hot;
-        rgb += col * punch;
+        if prismatic {
+            // The veil flashes white-hot where it is struck, the struck triangles burn
+            // through the prism, and the ring it sends out runs red along the lattice.
+            let flash = mix(PRISM_VEIL_WHITE, prism(cell_h + time * PRISM_RATE), 0.45);
+            rgb += flash * (fill * 2.8 + crackle_fill * 5.6 + knot * 4.2) * hot + PRISM_VEIL_RED * ring_hex * 5.2 * hot;
+        } else {
+            rgb += col * punch;
+        }
         a += (fill * 0.16 + crackle_fill * 0.22 + ring_hex * 0.16 + knot * 0.24) * hot;
     }
     return vec4<f32>(rgb, a);
@@ -645,24 +671,31 @@ fn projector_of(s: Shield) -> vec3<f32> {
     return vec3<f32>(s.pos.xy, s.pos.z + h);
 }
 
-// The faction's shield colour (faction.ron `shield_color`, ARC's is pale gold), and
-// what the field draws from it: a denser, saturated version for the shaft, contact
-// and hits, and a paler one, toward white, for flares and seams.
-fn shield_base() -> vec3<f32> {
+// The field's colour, and what it draws from it: a denser, saturated version for the
+// shaft, contact and hits, and a paler one, toward white, for flares and seams. ARC's
+// glass takes the faction's shield colour (faction.ron `shield_color`, blue-white); the
+// Regency's prism veil is white-hot over the prism, its dense shade the veil's red.
+fn shield_base(s: Shield) -> vec3<f32> {
+    if is_prism(s) {
+        return mix(PRISM_VEIL_WHITE, prism(0.1), 0.3);
+    }
     return globals.shield.rgb;
 }
 
-fn shield_deep() -> vec3<f32> {
-    return pow(shield_base(), vec3<f32>(2.2));
+fn shield_deep(s: Shield) -> vec3<f32> {
+    if is_prism(s) {
+        return PRISM_VEIL_RED;
+    }
+    return pow(shield_base(s), vec3<f32>(2.2));
 }
 
-fn shield_pale() -> vec3<f32> {
-    return mix(shield_base(), vec3<f32>(1.0), 0.45);
+fn shield_pale(s: Shield) -> vec3<f32> {
+    return mix(shield_base(s), vec3<f32>(1.0), 0.45);
 }
 
 fn energy_of(s: Shield) -> vec3<f32> {
     // Idle field: the pale faction colour. Hits keep their own denser shade.
-    return shield_base();
+    return shield_base(s);
 }
 
 fn column_radius(s: Shield) -> f32 {
@@ -759,9 +792,17 @@ fn column_shade(p: vec3<f32>, s: Shield, time: f32) -> vec4<f32> {
     // Six streams from the wreath pods, climbing with the shaft.
     let lobe = pow(0.5 + 0.5 * cos(ang * 6.0 - climb * 10.0 - time * 3.2), 2.8);
     // Shaft runs deep; the knot on the glass is the arrival, not a cap here.
-    let core = mix(energy, shield_deep(), 0.42 + packet * 0.28 + climb * 0.35);
+    var core = mix(energy, shield_deep(s), 0.42 + packet * 0.28 + climb * 0.35);
+    if is_prism(s) {
+        // A pinch-fusion jet: a white-hot thread with the prism climbing it.
+        core = mix(PRISM_VEIL_WHITE, prism(climb * 0.8 - time * PRISM_RATE), 0.55 + packet * 0.25) * 0.5;
+    }
     let rgb = core * (1.25 + pulse * 0.55 + packet * 1.7 + climb * 0.85 + lobe * 0.7) * helix * fade;
-    let a = (0.15 + pulse * 0.06 + packet * 0.22 + lobe * 0.05) * fade;
+    var a = (0.15 + pulse * 0.06 + packet * 0.22 + lobe * 0.05) * fade;
+    if is_prism(s) {
+        // A thread, not a pipe: thin it so the star shows through.
+        a *= 0.45;
+    }
     return vec4<f32>(rgb, a);
 }
 
@@ -777,7 +818,11 @@ fn sheath_shade(p: vec3<f32>, s: Shield, time: f32) -> vec4<f32> {
     let ang = atan2(radial.y, radial.x);
     let helix = pow(0.5 + 0.5 * sin(ang * 6.0 + climb * 18.0 - time * 7.4), 3.4);
     let packet = exp(-pow(abs(fract(climb * 4.4 - time * 1.15) - 0.5), 2.0) * 48.0);
-    let core = mix(energy_of(s), shield_deep(), 0.55 + climb * 0.25);
+    var core = mix(energy_of(s), shield_deep(s), 0.55 + climb * 0.25);
+    if is_prism(s) {
+        // The jet's sheath runs through the prism, its hem red.
+        core = mix(prism(climb * 1.3 + ang * 0.159 - time * PRISM_RATE), PRISM_VEIL_RED, 0.3 * (1.0 - climb));
+    }
     let rgb = core * (0.55 + helix * 1.4 + packet * 1.1) * fade;
     let a = (0.05 + helix * 0.08 + packet * 0.07) * fade;
     return vec4<f32>(rgb, a);
@@ -790,7 +835,7 @@ fn projector_paint(p: vec3<f32>, s: Shield, hx: vec2<f32>, seam: f32, time: f32)
     let polar = length(d.xy) / max(s.radius, 0.001);
     let elev = saturate(d.z / max(select(dome_height(s.radius), s.height * 0.5, is_hull(s)), 0.001));
     let energy = energy_of(s);
-    let ice = mix(energy, shield_pale(), 0.22);
+    let ice = mix(energy, shield_pale(s), 0.22);
     let open = shield_open(s);
     let breathe = 0.38 + 0.62 * (0.5 + 0.5 * sin(time * 2.55 + hx.y * 6.2831855));
     // Tight join in metres, matching the shaft — not a dome-scale blob.
@@ -812,7 +857,9 @@ fn projector_paint(p: vec3<f32>, s: Shield, hx: vec2<f32>, seam: f32, time: f32)
     let packet = exp(-pow(abs(run - 0.5), 2.0) * 40.0);
     let current = seam * (0.28 + 0.72 * packet) * breathe;
     let flow = pow(1.0 - saturate(polar), 1.85) * (0.1 + 0.45 * elev) * breathe;
-    let rgb = shield_deep() * contact * 3.6 + ice * splash * 0.72 + energy * (current * 1.35 + flow * 0.2);
+    // The current runs the lattice: on the veil it runs red.
+    let current_c = select(energy, PRISM_VEIL_RED * 0.9, is_prism(s));
+    let rgb = shield_deep(s) * contact * 3.6 + ice * splash * 0.72 + current_c * current * 1.35 + energy * flow * 0.2;
     let a = contact * 0.32 + corona * 0.028 + ring0 * 0.048 + ring1 * 0.03 + current * 0.14 + flow * 0.02;
     return vec4<f32>(rgb * open, a * open);
 }
@@ -998,10 +1045,17 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
             if dot(nrm, -dir) < 0.0 {
                 nrm = -nrm;
             }
+            let prismatic = is_prism(s);
             let cell = select(HEX, 2.8, is_hull(s));
-            let hx = hex_triplanar(p * (HEX / cell), outward);
+            var hx = hex_triplanar(p * (HEX / cell), outward);
+            if prismatic {
+                // The veil's lattice: triangles, on the world like the honeycomb so merged
+                // fields share it. Edge 0..1 as the hex's runs 0..0.87.
+                let tri = tri_triplanar(p, outward, SHIELD_LOOK_CELL);
+                hx = vec2<f32>(tri.x * 0.94, tri.y);
+            }
             let eye_dist = length(p - eye);
-            let cell_px = cell * globals.lod.x / max(eye_dist, 1.0);
+            let cell_px = select(cell, SHIELD_LOOK_CELL * 0.6, prismatic) * globals.lod.x / max(eye_dist, 1.0);
             let facing = saturate(dot(nrm, -dir));
             // Honeycomb is strongest on the rim. A hull wrap is seen face-on
             // from the play camera, so its plates have to read without a graze.
@@ -1018,11 +1072,22 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
             let paint = projector_paint(p, s, hx, seam, time);
 
             let team_c = globals.team_colors[s.packed & OWNER_MASK].rgb;
-            let energy = energy_of(s);
-            let rim_c = mix(energy, team_c, 0.16);
-            let fuse_c = mix(mix(shield_deep(), shield_base(), 0.6), team_c, 0.1);
-            let ice = mix(energy, shield_pale(), 0.45);
-            let touch_c = mix(shield_deep(), energy, 0.18);
+            var energy = energy_of(s);
+            // The lattice's light, and the veil's folds (none on ARC's glass).
+            var seam_c = energy;
+            var folds = 0.0;
+            if prismatic {
+                let q = dome_q(p, s);
+                let up = saturate(q.z / max(s.radius, 1.0));
+                energy = prism_sheen(q, outward, facing, time);
+                // Red-tinged struts, the prism glinting through where the light runs.
+                seam_c = mix(PRISM_VEIL_RED, energy, 0.1 + 0.14 * hx.y) * 0.85;
+                folds = prism_curtain(q, up, time);
+            }
+            let rim_c = mix(energy, team_c, select(0.16, 0.06, prismatic));
+            let fuse_c = mix(mix(shield_deep(s), shield_base(s), 0.6), team_c, 0.1);
+            let ice = mix(energy, shield_pale(s), 0.45);
+            let touch_c = mix(shield_deep(s), energy, 0.18);
 
             // Idle: grazing glass that breathes, a contact stroke, and a live honeycomb.
             // Hull wraps add a face-on skin so they read on the unit, not only at the rim.
@@ -1032,7 +1097,12 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
             let shaft_a = alpha;
             let shaft_t = depth_t;
             color = rim_c * (fres * 0.58 * live + stress * 0.18 + skin * 0.55 * live);
-            color += energy * (seam * 1.05 * live + plate * 0.14 + stress * seam * 0.4 + skin * plate * 0.8);
+            color += seam_c * (seam * 1.05 * live + stress * seam * 0.4);
+            color += energy * (plate * 0.14 + skin * plate * 0.8);
+            // The veil: its folds hang in the glass, and a few triangles hold more of the
+            // prism than the rest, turning as the light runs.
+            let pane = select(0.0, step(0.82, hx.y) * plate * (0.5 + 0.5 * sin(time * 0.9 + hx.y * 37.0)), prismatic);
+            color += energy * (folds * 1.8 + pane * 0.6);
             color += mix(energy, ice, dying) * born * mix(1.3, 3.4, dying);
             color += blow.rgb;
             color += fuse_c * fuse * 0.45;
@@ -1041,6 +1111,7 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
 
             alpha = 0.008 + fres * 0.07 * live + stress * 0.045 + skin * 0.07;
             alpha += seam * 0.16 * live + plate * 0.03 + stress * seam * 0.06;
+            alpha += folds * 0.16 + pane * 0.05;
             alpha += born * mix(0.28, 0.72, dying) + blow.a + fuse * 0.1 + paint.a;
             alpha += touch * 0.28;
             alpha *= smoothstep(0.0, 0.1, open) * mix(0.75 + 0.25 * health, 1.25, dying);

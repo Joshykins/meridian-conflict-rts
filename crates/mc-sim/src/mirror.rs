@@ -1163,7 +1163,8 @@ pub struct ShieldInstance {
     pub open: f32,
     /// Hit-point share, zero to one.
     pub health: f32,
-    /// `owner | team << 8 | tech << 16 | collapsing << 24 | hull << 25 | stalling << 26`.
+    /// `owner | team << 8 | tech << 16 | collapsing << 24 | hull << 25 | stalling << 26 |
+    /// veil << 27 | look << 28` (`SHIELD_VEIL`, `SHIELD_LOOK_SHIFT`).
     /// Collapsing is a shattered dome filling while it peels — not low health.
     /// Stalling is a dry grid: the projector goes dark with the bubble.
     pub packed: u32,
@@ -1185,6 +1186,10 @@ const _: () = assert!(std::mem::size_of::<ShieldInstance>() == 48);
 /// (the unit is `flag::INVULNERABLE`). Drawn apart from every other shield: its own
 /// lattice, hits that slide off, never a break, and it fuses with nothing.
 pub const SHIELD_VEIL: u32 = 1 << 27;
+
+/// `ShieldInstance::packed`: the field's look (`mc_data::ShieldLook` of the unit's faction)
+/// sits in the two bits from here (`mc_models::gpu_consts::shield_look`).
+pub const SHIELD_LOOK_SHIFT: u32 = 28;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable, Debug)]
@@ -1491,6 +1496,14 @@ impl World {
             }
         });
         f32::from(look as u8)
+    }
+
+    /// How unit `row`'s shield field is drawn: its faction's look.
+    fn shield_look(&self, row: usize) -> mc_data::ShieldLook {
+        self.blueprints
+            .factions
+            .get(self.bp(row).faction.0 as usize)
+            .map_or(mc_data::ShieldLook::Honeycomb, |f| f.shield_look)
     }
 
     /// Where a construction beam leaves this builder.
@@ -2446,7 +2459,8 @@ impl World {
                         SHIELD_VEIL
                     } else {
                         0
-                    },
+                    }
+                    | (self.shield_look(row) as u32) << SHIELD_LOOK_SHIFT,
                 unit_id: s.units.id(row).0,
                 projector: if spec.is_hull() {
                     0.0

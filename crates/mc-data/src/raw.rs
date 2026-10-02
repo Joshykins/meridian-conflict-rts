@@ -164,6 +164,24 @@ pub(crate) struct Faction {
     /// How its structures light themselves after dusk. Presentation only.
     #[serde(default)]
     pub structure_lamps: StructureLamps,
+    /// How its shield fields look, domes and personal fields alike. Presentation only.
+    #[serde(default)]
+    pub shield_look: ShieldLook,
+}
+
+/// How a faction's shield fields are drawn (shields.wgsl, entity.wgsl `fs_hull`). The
+/// number reaches the shaders in the shield's `packed` word (`mc_sim::mirror`,
+/// `gpu_consts::shield_look`): never renumber one.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
+#[repr(u8)]
+pub enum ShieldLook {
+    /// Glass in the faction's `shield_color` over a honeycomb, a launch beam climbing to
+    /// the pole (ARC).
+    #[default]
+    Honeycomb = 0,
+    /// A veil in pinch fusion's prism: white-hot glass with pastel colour drifting over
+    /// it like a curtain, on a lattice of red-tinged triangles (the Regency).
+    Prism = 1,
 }
 
 /// The lamps a faction's structures carry at night when their data names none

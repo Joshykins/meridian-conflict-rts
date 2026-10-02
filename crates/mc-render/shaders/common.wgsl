@@ -824,6 +824,87 @@ struct Shield {
     contacts: array<u32, 16>,
 }
 
+// ---- Shield looks (gpu_consts `shield_look`, the faction's `shield_look`) -------------
+// The look sits in a shield's `packed` word. ARC's honeycomb glass is drawn by shields.wgsl
+// and entity.wgsl `fs_hull` themselves; the Regency's prism veil shares these.
+
+fn shield_prism(packed: u32) -> bool {
+    return ((packed >> SHIELD_LOOK_SHIFT) & SHIELD_LOOK_MASK) == SHIELD_LOOK_PRISM;
+}
+
+// The prism veil's red: the tinge on its lattice, its contact line and the rings a hit
+// sends out. The Regency red, held a little warm so it sits with the prism's pinks.
+const PRISM_VEIL_RED: vec3<f32> = vec3<f32>(1.0, 0.15, 0.07);
+// Its white-hot: pinch fusion is mostly white (gpu_consts `prism`).
+const PRISM_VEIL_WHITE: vec3<f32> = vec3<f32>(1.0, 0.95, 0.93);
+
+// A triangle lattice of side `side` metres in a plane: x 0 at a triangle's middle, 1 on
+// its sides; y a stable hash of the triangle; z how near a corner (1 on it).
+fn tri_lattice(st: vec2<f32>, side: f32) -> vec3<f32> {
+    let h = side * 0.8660254;
+    let d0 = st.y / h;
+    let d1 = (st.x * 0.8660254 + st.y * 0.5) / h;
+    let d2 = d0 - d1;
+    let e = abs(fract(vec3<f32>(d0, d1, d2) + 0.5) - 0.5);
+    let edge = 1.0 - 3.0 * min(e.x, min(e.y, e.z));
+    let node = exp(-dot(e, e) * 40.0);
+    let id = hash21(vec2<f32>(floor(d0) * 1.37 + floor(d1) * 7.1, floor(d2) * 3.3 + 0.5));
+    return vec3<f32>(edge, id, node);
+}
+
+// The middle of the lattice triangle `st` lies in, metres.
+fn tri_middle(st: vec2<f32>, side: f32) -> vec2<f32> {
+    let h = side * 0.8660254;
+    let d0 = st.y / h;
+    let d1 = (st.x * 0.8660254 + st.y * 0.5) / h;
+    let f = fract(vec2<f32>(d0, d1));
+    let c = floor(vec2<f32>(d0, d1)) + select(vec2<f32>(1.0 / 3.0, 2.0 / 3.0), vec2<f32>(2.0 / 3.0, 1.0 / 3.0), f.x >= f.y);
+    let y = c.x * h;
+    return vec2<f32>((c.y * h - y * 0.5) / 0.8660254, y);
+}
+
+// `tri_lattice` laid on a surface from three sides (normal `n`), so it does not stretch
+// where the surface stands up; the plane facing most owns the triangle's hash.
+fn tri_triplanar(p: vec3<f32>, n: vec3<f32>, side: f32) -> vec3<f32> {
+    let an = abs(n);
+    let w = an * an * an * an;
+    let tx = tri_lattice(p.yz, side);
+    let ty = tri_lattice(p.xz, side);
+    let tz = tri_lattice(p.xy, side);
+    let sum = max(w.x + w.y + w.z, 1e-5);
+    let edge = (tx.x * w.x + ty.x * w.y + tz.x * w.z) / sum;
+    let node = (tx.z * w.x + ty.z * w.y + tz.z * w.z) / sum;
+    var id = tz.y;
+    if w.x > w.y && w.x > w.z {
+        id = tx.y;
+    } else if w.y > w.z {
+        id = ty.y;
+    }
+    return vec3<f32>(edge, id, node);
+}
+
+// The veil's own light at `p` (metres from the field's middle, `n` its outward normal):
+// white-hot glass with the prism drifting over it, the colour turning with the angle it
+// is seen at like a film of oil, and folds of brighter colour hanging in it like a
+// curtain (`prism_curtain`). `facing`: 1 face-on.
+fn prism_sheen(q: vec3<f32>, n: vec3<f32>, facing: f32, time: f32) -> vec3<f32> {
+    let drift = sin(q.x * 0.043 + time * 0.21) + sin(q.y * 0.037 - time * 0.17) + sin(q.z * 0.051 + q.x * 0.02 + time * 0.13);
+    let hue = facing * 0.85 + dot(n, vec3<f32>(0.21, 0.13, 0.34)) + drift * 0.11 + time * PRISM_RATE * 0.25;
+    return mix(PRISM_VEIL_WHITE, prism(hue), 0.62 + 0.3 * (1.0 - facing));
+}
+
+// Folds of the veil: bright pleats of colour hanging round the field, slowly swaying and
+// drifting round it, strongest at the hem and thinning to the crown. 0 to about 1.
+// `q`: metres from the field's middle; `reach` its radius; `up` 0 at the hem, 1 at the top.
+fn prism_curtain(q: vec3<f32>, up: f32, time: f32) -> f32 {
+    let az = atan2(q.y, q.x);
+    let sway = sin(az * 3.0 + time * 0.31) * 1.4 + up * 2.2;
+    let fold = 0.5 + 0.5 * sin(az * 7.0 + sway - time * 0.27);
+    let fine = 0.5 + 0.5 * sin(az * 17.0 - sway * 0.6 + time * 0.43 + 1.7);
+    let c = pow(fold, 5.0) * 0.75 + pow(fine, 8.0) * 0.35;
+    return c * (0.35 + 0.65 * (1.0 - saturate(up)));
+}
+
 //!rust crate::renderer::ShieldHit
 struct ShieldHit {
     pos: vec3<f32>,

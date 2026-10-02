@@ -22,6 +22,11 @@
     // Their structures are lit from below at night: low red embers round the foot of the
     // plating, not floodlights over the yard.
     structure_lamps: Ember,
+    // Their shields are a veil in pinch fusion's prism, the light of their star cores and the
+    // Sunspear: white-hot glass with soft rose, magenta and peach running over it like a
+    // curtain, on a lattice of red-tinged triangles. Their generators' cores, and the
+    // Exarch's back projector, burn the same prism.
+    shield_look: Prism,
     // Their own voices (data/factions/regency/sounds.ron): heavy machines, bronze struck and
     // rings spinning up, not ARC's servos and chimes.
     sounds: (

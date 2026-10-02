@@ -32,6 +32,7 @@ mod scout;
 mod taproot;
 mod tidebrood;
 mod turrets;
+mod ward;
 
 use super::library::ModelDef;
 
@@ -99,6 +100,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
     ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
+    // The shield generator (`ward`): tech 2, upgrading in place to tech 3.
+    ModelDef::tiered(
+        "regency_ward",
+        [(13.9, 26.0), (13.9, 26.0), (13.9, 32.0)],
+        ward::ward,
+    ),
     // Radar (`eye`).
     ModelDef::tiered(
         "regency_eye",
@@ -136,6 +143,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_palisade" => 1500,
         "regency_pinch_cannon" => 5000,
         "regency_fusion_cannon" => 7500,
+        // Its tech 3 kit waiting on it.
+        "regency_ward" => 6000,
         _ => return None,
     })
 }
@@ -376,6 +385,18 @@ mod tests {
         let src = include_str!("../../../mc-render/shaders/entity.wgsl");
         let line = format!("const UNIT_NANITE: u32 = {}u;", mc_sim::mirror::UNIT_NANITE);
         assert!(src.contains(&line), "entity.wgsl should say {line}");
+    }
+
+    #[test]
+    fn the_shield_look_bits_are_the_mirrors_and_the_datas() {
+        use crate::gpu_consts::shield_look;
+        assert_eq!(shield_look::SHIFT, mc_sim::mirror::SHIELD_LOOK_SHIFT);
+        assert_eq!(
+            shield_look::HONEYCOMB,
+            mc_data::ShieldLook::Honeycomb as u32
+        );
+        assert_eq!(shield_look::PRISM, mc_data::ShieldLook::Prism as u32);
+        assert!(mc_data::ShieldLook::Prism as u32 <= shield_look::MASK);
     }
 
     #[test]

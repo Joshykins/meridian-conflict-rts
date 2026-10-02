@@ -205,6 +205,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Storage | Reliquary |
 | Point defence T1 / T2 / T3 | Picket / Halberd / Sunspear |
 | Anti-air, radar, wall | Canopy, Orrery (II, III), Palisade |
+| Shield generator (T2, T3) | Ward (II) |
 
 ### Construction
 
@@ -372,7 +373,15 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 - **Nanites** build and take apart (the Regency reclaim). They are never a
   weapon.
 - **Shields:** bubble shields under the same rules as ARC's (they draw energy
-  and drop when upkeep goes unpaid).
+  and drop in any stall). The Ward (tech 2, upgrading to Ward II) and the
+  Exarch's Personal Shield. A Regency field is a **prism veil**
+  (faction.ron `shield_look: Prism`): white-hot glass with pinch fusion's
+  prism drifting over it, the colour turning with the angle it is seen at,
+  folds of brighter colour hanging in it like a curtain, on a lattice of
+  red-tinged triangles where ARC's glass has hexes. The shaft that climbs to the
+  crown is a white-hot jet in a prism sheath, born in the Ward's small caged
+  star; a hit flashes white and rings out red along the lattice. A Ward's
+  breached cage frees its star, which goes nova like a power generator's.
 - **Radar is radar,** the same as ARC's.
 
 ## The fusion plants

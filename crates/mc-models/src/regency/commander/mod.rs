@@ -19,9 +19,11 @@
 //! - Refits (`b.module`): the engineering suites go on the hand's forearm. Suite II adds
 //!   twin emitters rocking on it and bronze feed canisters; Suite III a lance that runs
 //!   out of the palm while it builds (`LANCE_TIP`, the unit file's `arm_emitter` when run
-//!   out), a ring of emitters round the wrist and a feed drum over the elbow.
+//!   out), a ring of emitters round the wrist and a feed drum over the elbow. The back
+//!   carries the Personal Shield (`back`).
 
 mod arms;
+mod back;
 mod body;
 mod chest;
 pub(super) mod form;
@@ -84,6 +86,7 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
         head::head(b);
         arms::cannon(b);
         arms::claw(b);
+        back::shield(b);
     });
 }
 

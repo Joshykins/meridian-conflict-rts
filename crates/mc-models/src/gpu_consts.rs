@@ -707,6 +707,24 @@ shared! {
         pub const RATE: f32 = 0.35;
     }
 
+    /// How a shield field is drawn: the look bits of a shield's `packed` word (mc-sim
+    /// `mirror::SHIELD_LOOK_SHIFT`, set from its faction's `mc_data::ShieldLook`, whose
+    /// numbers these are; tests hold both equal). shields.wgsl draws domes by it,
+    /// entity.wgsl `fs_hull` personal fields.
+    pub mod shield_look as "SHIELD_LOOK_" {
+        pub const SHIFT: u32 = 28;
+        pub const MASK: u32 = 3;
+        /// ARC's: glass in the faction's shield colour over a honeycomb.
+        pub const HONEYCOMB: u32 = 0;
+        /// The Regency's: a veil in pinch fusion's prism (`prism`) over a lattice of
+        /// red-tinged triangles.
+        pub const PRISM: u32 = 1;
+        /// Metres along a side of one triangle of a dome's lattice, and of a personal
+        /// field's (drawn on the hull, so much finer).
+        pub const CELL: f32 = 9.0;
+        pub const HULL_CELL: f32 = 2.4;
+    }
+
     /// Rock a beam has melted: the walls of a Regency mine's bore (`pattern::MOLTEN`,
     /// surface.wgsl). A glassy crust over a glowing melt, its cracks lit, the melt running
     /// down; hotter the deeper it goes and the higher the mine's tier.

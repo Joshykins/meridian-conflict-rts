@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 
 pub use raw::{
     BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade, ShieldKind,
-    StructureLamps, TorpedoLook, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
+    ShieldLook, StructureLamps, TorpedoLook, Trajectory, UnitSounds, WeaponColor, WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -155,6 +155,8 @@ pub struct Faction {
     pub torpedo_look: TorpedoLook,
     /// How its structures are lit at night. Presentation only.
     pub structure_lamps: StructureLamps,
+    /// How its shield fields look. Presentation only.
+    pub shield_look: ShieldLook,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1136,6 +1138,7 @@ impl Blueprints {
                 sounds: f.sounds.clone(),
                 torpedo_look: f.torpedo_look,
                 structure_lamps: f.structure_lamps,
+                shield_look: f.shield_look,
             });
         }
         // A builder puts up only its own faction's structures. Mobile units may also come
@@ -1602,7 +1605,7 @@ mod tests {
             .flat_map(|s| &s.modules)
             .map(|m| m.key.as_str())
             .collect();
-        assert_eq!(suites, ["eng_2", "eng_3"]);
+        assert_eq!(suites, ["eng_2", "eng_3", "shield"]);
         let builds = &commander.builder.as_ref().unwrap().builds;
         assert!(builds.len() >= 8);
         assert!(builds
@@ -1634,6 +1637,8 @@ mod tests {
         assert_eq!(aster.torpedo_look, TorpedoLook::Bubbles);
         assert_eq!(regency.structure_lamps, StructureLamps::Ember);
         assert_eq!(aster.structure_lamps, StructureLamps::Sodium);
+        assert_eq!(regency.shield_look, ShieldLook::Prism);
+        assert_eq!(aster.shield_look, ShieldLook::Honeycomb);
         assert!(
             regency.sounds.select.contains_key(&IconKind::Factory)
                 && regency.sounds.build.is_some()

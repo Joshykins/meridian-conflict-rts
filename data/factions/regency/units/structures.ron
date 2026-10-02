@@ -12,6 +12,7 @@
 // - Canopy: bursting flak that hurts a whole flight, not one plane.
 // - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
 // - Palisade: slow to build, very hard to cut; sections join into one wall as ARC's do.
+// - Ward: a tighter shield than the Aegis, but denser; a prism veil.
 //
 // Their factories turn out the Regency's own Artificer (its tech 2 and 3 from the factories of
 // that tier) and, until the Regency has fighting units
@@ -320,6 +321,45 @@
         economy: (mass_storage: 16000, energy_storage: 48000),
         mesh: "regency_cyst", icon: Storage,
         sounds: (death: "blast_large"),
+    ),
+    // ---- Shields ------------------------------------------------------------------------
+    // The Ward: a veil thrown from a small caged star (`models::regency::ward`), drawn in
+    // pinch fusion's prism over a lattice of red-tinged triangles (faction.ron
+    // `shield_look`). It bends ARC's Aegis the Regency way: a tighter field, but denser,
+    // taking more and filling faster, for a little more of everything. Tech 2, and it
+    // upgrades in place to Ward II, whose field swells out once the refit is done. Like every
+    // shield it draws energy, and drops in any stall.
+    (
+        key: "regency_t2_shield",
+        name: "Ward",
+        role: "Shield Generator", title: "Shield",
+        tech: 2,
+        categories: ["Land", "Defense", "Shield"],
+        health: 2400,
+        cost: (mass: 960, energy: 12800, time: 1700),
+        radius: 13.9, height: 26, footprint: (3, 3), hull: (6.9, 6.9),
+        vision: 140,
+        economy: (energy_upkeep: 220),
+        shield: (radius: 90, health: 11000, regen: 110),
+        upgrades_to: "regency_t3_shield",
+        mesh: "regency_ward", icon: Shield,
+        // A breached cage frees its star, which goes nova like a power generator's.
+        sounds: (death: "regency_supernova_small"),
+    ),
+    (
+        key: "regency_t3_shield",
+        name: "Ward II",
+        role: "Heavy Shield Generator", title: "Heavy Shield",
+        tech: 3,
+        categories: ["Land", "Defense", "Shield"],
+        health: 6000,
+        cost: (mass: 3000, energy: 38400, time: 4300),
+        radius: 13.9, height: 32, footprint: (3, 3), hull: (6.9, 6.9),
+        vision: 160,
+        economy: (energy_upkeep: 540),
+        shield: (radius: 160, health: 44000, regen: 440),
+        mesh: "regency_ward", icon: Shield,
+        sounds: (death: "regency_supernova_small"),
     ),
     // ---- Defence ------------------------------------------------------------------------
     // A plasmeric repeater: a steady stream of plasma bolts, five a second. Shorter reach
