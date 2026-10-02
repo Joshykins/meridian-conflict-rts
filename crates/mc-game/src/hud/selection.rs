@@ -1094,21 +1094,11 @@ fn families(s: &Scene, units: &[&UnitInstance]) -> Vec<(Family, Vec<Order>)> {
         combat.push(Order {
             glyph: Glyph::Attack,
             label: "Attack",
-            key: "",
-            hint: "Click an enemy: go after it and fire on it until it dies, whatever the stance.",
+            key: "F",
+            hint: "Click an enemy: go after it and fire on it until it dies, whatever the stance. Click the ground: move there, stopping to fight whatever comes in range.",
             action: HudAction::Target(Targeting::Attack),
             lit: targeting(Targeting::Attack),
         });
-        if mobile {
-            combat.push(Order {
-                glyph: Glyph::AttackMove,
-                label: "Atk-Move",
-                key: "F",
-                hint: "Click a point: move there, stopping to fight whatever comes in range.",
-                action: HudAction::Target(Targeting::AttackMove),
-                lit: targeting(Targeting::AttackMove),
-            });
-        }
     }
     if hits_ground {
         combat.push(Order {

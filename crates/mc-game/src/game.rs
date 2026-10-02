@@ -117,8 +117,9 @@ pub struct GameStart {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Targeting {
     Move,
+    /// An enemy clicked: go after it. Open ground: move there, fighting what
+    /// comes in range on the way (`Command::AttackMove`).
     Attack,
-    AttackMove,
     Assist,
     Reclaim,
     /// The first click sets the group patrolling out to it and back; with shift
@@ -147,7 +148,6 @@ impl Targeting {
         match self {
             Targeting::Move => "Move",
             Targeting::Attack => "Attack",
-            Targeting::AttackMove => "Attack-Move",
             Targeting::Assist => "Assist",
             Targeting::Reclaim => "Reclaim",
             Targeting::Patrol => "Patrol",
@@ -1750,11 +1750,6 @@ impl Game {
                 target,
                 queue,
             }),
-            Targeting::AttackMove => point.map(|target| Command::AttackMove {
-                units,
-                target,
-                queue,
-            }),
             Targeting::Attack => match target.filter(|u| {
                 !is_wreck(u)
                     && self.is_enemy((u.owner_flags & 0xFF) as u8)
@@ -2833,9 +2828,7 @@ impl Game {
             .selection_takers()
             .any(|b| b.is_mobile() && b.builder.is_some());
         let able = match targeting {
-            Targeting::Move | Targeting::Attack | Targeting::AttackMove | Targeting::Patrol => {
-                self.selection_goes()
-            }
+            Targeting::Move | Targeting::Attack | Targeting::Patrol => self.selection_goes(),
             Targeting::Assist => builders,
             Targeting::Strike => self.selection_takers().any(|b| {
                 b.weapons
@@ -3034,7 +3027,7 @@ impl Game {
             KeyCode::KeyG => self.toggle_formation_panel(audio),
             KeyCode::KeyM => self.arm(Targeting::Move),
             KeyCode::KeyT => self.start_track(),
-            KeyCode::KeyF => self.arm(Targeting::AttackMove),
+            KeyCode::KeyF => self.arm(Targeting::Attack),
             KeyCode::KeyC => self.arm(Targeting::Assist),
             KeyCode::KeyR => self.arm(Targeting::Reclaim),
             KeyCode::KeyP => self.arm(Targeting::Patrol),

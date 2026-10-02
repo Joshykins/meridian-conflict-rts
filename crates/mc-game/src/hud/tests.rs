@@ -981,10 +981,6 @@ fn the_order_card_offers_what_the_selection_can_do_by_family() {
     );
     assert_eq!(
         rig.click(order_slot(1, 1)),
-        vec![HudAction::Target(Targeting::AttackMove)]
-    );
-    assert_eq!(
-        rig.click(order_slot(1, 2)),
         vec![HudAction::Target(Targeting::Bombard)]
     );
     assert_eq!(

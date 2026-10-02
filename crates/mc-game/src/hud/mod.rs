@@ -920,10 +920,9 @@ pub fn cursor_hint(
         Mode::Target(t) => (
             t.label().to_owned(),
             match t {
-                Targeting::Attack
-                | Targeting::AttackMove
-                | Targeting::Strike
-                | Targeting::Bombard => style::Family::Combat.tone(),
+                Targeting::Attack | Targeting::Strike | Targeting::Bombard => {
+                    style::Family::Combat.tone()
+                }
                 Targeting::Move | Targeting::Patrol => style::Family::Movement.tone(),
                 Targeting::Assist => style::Family::Engineering.tone(),
                 Targeting::Reclaim => MASS,
