@@ -8,11 +8,12 @@
 //!   turns away, and a unit that outruns it, or leaves the fan before it arrives, is
 //!   missed.
 //! - **What it reaches:** every enemy the gun may shoot (`targets`, never under the water)
-//!   whose hull the front passes over this tick: within the cone's half-angle of the
-//!   facing, its radius counted, so a big hull at the edge is caught by its flank. Each
-//!   unit is struck once a wake.
+//!   whose hull the front passes over this tick: the front is an arc round the muzzle, and
+//!   a hull is reached within the cone's half-angle of the facing, its radius counted, so
+//!   a big hull at the edge is caught by its flank. The half-angle may be anything up to
+//!   a half turn, a full circle round the gun. Each unit is struck once a wake.
 //! - **Falloff:** full damage at the muzzle, falling in a straight line with the distance
-//!   along the facing to `Cone::edge` of it at full range.
+//!   from it to `Cone::edge` of it at full range.
 //! - **Cover:** the wake rolls over the ground, so ground between the muzzle and a unit
 //!   shields it (`clear_from`, the line every direct-fire gun needs). A shield dome
 //!   between takes the hit for all it covers, once a wake, as a blast's is
@@ -108,14 +109,23 @@ impl World {
         let ahead = (cone.speed * wake.age as i32 / per_second).min(range);
 
         let dir = FxVec2::from_angle(wake.facing);
+        // The fan's edge, in a frame along the facing (x) and out to one side (y).
         let edge = FxVec2::from_angle(cone.half);
-        let tan = edge.y / edge.x.max(Fx::EPSILON);
         let from = wake.from.xy();
 
-        // Everything within reach of the band the front sweeps this tick: no further from
-        // its middle than half its depth along plus the fan's half-width across.
-        let middle = from + dir * ((behind + ahead) / 2);
-        let reach = (ahead - behind) / 2 + ahead * tan + Fx::from_int(HULL_MARGIN);
+        // Everything within reach of the band the front sweeps this tick. A fan up to 45
+        // degrees either side: no further from the band's middle than half its depth along
+        // plus the fan's half-width across. A wider one: anything round the muzzle.
+        let margin = Fx::from_int(HULL_MARGIN);
+        let (middle, reach) = if edge.x >= edge.y {
+            let across = ahead * edge.y / edge.x.max(Fx::EPSILON);
+            (
+                from + dir * ((behind + ahead) / 2),
+                (ahead - behind) / 2 + across + margin,
+            )
+        } else {
+            (from, ahead + margin)
+        };
         let mut near = Vec::new();
         self.index
             .query_foes(middle, reach, kind::UNIT, self.team_mask(wake.owner), |e| {
@@ -141,17 +151,27 @@ impl World {
             }
             let bp = self.bp(t);
             let d = units.pos[t] - from;
-            let along = d.dot(dir);
-            let across = (d.x * dir.y - d.y * dir.x).abs();
+            let out = d.length();
+            // In the facing's frame, folded onto the edge's side.
+            let p = FxVec2::new(d.dot(dir), d.cross(dir).abs());
+            // How far its middle stands outside the fan: at most 0 inside it (short of the
+            // edge's line), else past the edge's line while that is the nearest of the fan,
+            // else from the muzzle.
+            let past = edge.cross(p);
+            let outside = if past <= Fx::ZERO || p.dot(edge) >= Fx::ZERO {
+                past
+            } else {
+                out
+            };
             // The front passed over its hull this tick, and its hull reaches into the fan.
-            if along + bp.radius < behind
-                || along - bp.radius > ahead
-                || across > along.max(Fx::ZERO) * tan + bp.radius
+            if out + bp.radius < behind
+                || out - bp.radius > ahead
+                || outside > bp.radius
                 || !self.clear_from(wake.from, t)
             {
                 continue;
             }
-            let out = along.clamp(Fx::ZERO, range) / range;
+            let out = out.clamp(Fx::ZERO, range) / range;
             let damage = weapon.damage * (Fx::ONE - (Fx::ONE - cone.edge) * out);
             let target = units.pos[t].extend(units.z[t] + bp.height / 2);
             // Every shield is read before any takes a hit: one the wake breaks still
@@ -185,7 +205,12 @@ impl World {
             }
             let at = from + dir * along;
             if self.terrain.height_at(at) > self.terrain.water_level() {
-                self.add_stain(at, (along * tan).max(Fx::from_int(3)), 64);
+                let wide = if edge.x >= edge.y {
+                    along * edge.y
+                } else {
+                    along
+                };
+                self.add_stain(at, wide.clamp(Fx::from_int(3), Fx::from_int(30)), 64);
             }
         }
         ahead < range

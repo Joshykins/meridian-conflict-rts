@@ -55,7 +55,13 @@ fn world(wall: Option<((usize, usize), (usize, usize))>) -> World {
         fog: false,
         spawn_commanders: false,
     };
-    World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap()
+    let mut w =
+        World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
+    // One wake a test: the second would come before the first has rolled out, after the
+    // marks have moved.
+    let breaker = w.blueprints.id_of("regency_t3_wake_tank").unwrap();
+    Arc::make_mut(&mut w.blueprints).units[breaker.index()].weapons[0].reload_ticks = 600;
+    w
 }
 
 fn add(w: &mut World, key: &str, owner: u8, x: i32, y: i32, heading: i32) -> UnitId {
@@ -174,5 +180,27 @@ fn ground_between_shields_a_unit_from_the_wake() {
     assert_eq!(
         struck[1], None,
         "the wall did not shield the hidden Bulwark"
+    );
+}
+
+#[test]
+fn a_half_turn_either_side_rolls_out_all_round() {
+    let mut w = world(None);
+    add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
+    // The projector opened to a full circle (`angle: 180`).
+    let bp = w.blueprints.id_of("regency_t3_wake_tank").unwrap();
+    let cone = Arc::make_mut(&mut w.blueprints).units[bp.index()].weapons[0]
+        .cone
+        .as_mut()
+        .unwrap();
+    cone.half = Angle(32768);
+    // Bulwarks ahead, off to one side and behind it.
+    let ahead = add(&mut w, "aster_t2_tank", 1, 662, 512, 180);
+    let beside = add(&mut w, "aster_t2_tank", 1, 512, 632, 180);
+    let behind = add(&mut w, "aster_t2_tank", 1, 402, 512, 180);
+    let struck = first_wake(&mut w, &[ahead, beside, behind]);
+    assert!(
+        struck.iter().all(Option::is_some),
+        "a full circle missed some: {struck:?}"
     );
 }

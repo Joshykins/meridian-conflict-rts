@@ -20,9 +20,9 @@ pub(crate) struct GpuWakeShell {
     /// The muzzle, and the renderer time the wake left it.
     pub(crate) apex: [f32; 3],
     pub(crate) start: f32,
-    /// Which way it rolls (unit length), and the tangent of the fan's half-angle.
+    /// Which way it rolls (unit length), and the fan's half-angle, radians.
     pub(crate) ahead: [f32; 2],
-    pub(crate) spread: f32,
+    pub(crate) half: f32,
     /// Metres out the front stands now, and metres a second it rolls.
     pub(crate) front: f32,
     pub(crate) speed: f32,

@@ -502,7 +502,7 @@ pub(crate) struct RawDive {
 
 /// A cone weapon (the Regency Wake Tank's wake): each shot rolls out from the muzzle as one
 /// front, `speed` metres a second, across `angle` degrees either side of the gun's facing
-/// and out to its range, and strikes everything it may shoot as the front reaches it,
+/// (up to 180, a full circle) and out to its range, and strikes everything it may shoot as the front reaches it,
 /// rather than one target. What stands nearer takes more: full `damage` at the muzzle,
 /// falling in a straight line to `edge` of it at full range. Ground between the muzzle and
 /// a unit shields it (the wake rolls over the ground; a crest stops it), and so does a
@@ -1677,7 +1677,7 @@ impl Unit {
                     }),
                 }),
                 cone: w.cone.map(|c| crate::Cone {
-                    half: Angle(steps(c.angle.clamp(1.0, 89.0)).round() as i64 as u16),
+                    half: Angle(steps(c.angle.clamp(1.0, 180.0)).round() as i64 as u16),
                     edge: fx(c.edge.clamp(0.0, 1.0)),
                     speed: fx(c.speed.clamp(10.0, 2000.0)),
                 }),

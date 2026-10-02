@@ -876,7 +876,7 @@ shared! {
         /// The front's quads along its arc, and round its section.
         pub const ARCH: u32 = 32;
         pub const TUBE: u32 = 12;
-        /// The fan drawn over the sim's own: the tangent of its half-angle times this.
+        /// The fan drawn over the sim's own: its half-angle times this, at most a half turn.
         pub const WIDTH: f32 = 1.15;
         /// Seconds a stretch of the trail stays hot (heat falls to a third), and seconds
         /// it lasts after the front has passed it.

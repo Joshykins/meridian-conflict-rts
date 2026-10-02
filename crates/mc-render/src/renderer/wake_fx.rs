@@ -27,6 +27,7 @@ use super::{Renderer, PUFF_CLOD, PUFF_DUST};
 use crate::gpu_consts::wake_shell::{BREAK, LINGER, MAX_SHELLS, WIDTH};
 use glam::{Vec2, Vec3};
 use mc_data::BlueprintId;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 /// Metres between the stretches of the front's foot laid at once.
 const RING: f32 = 6.0;
@@ -53,8 +54,10 @@ pub(super) struct RollingWake {
 struct Reach {
     range: f32,
     speed: f32,
-    /// The tangent of the fan's half-angle.
-    spread: f32,
+    /// The fan's half-angle, radians, and the drawn arc's (wider by `WIDTH`, at most a
+    /// half turn: a full circle round the gun).
+    half: f32,
+    arc: f32,
     impact: f32,
 }
 
@@ -126,7 +129,8 @@ impl Renderer {
         Some(Reach {
             range: w.range_max.to_f32().max(1.0),
             speed: cone.speed.to_f32().max(1.0),
-            spread: half.tan(),
+            half,
+            arc: (half * WIDTH).min(PI),
             impact: w.impact.max(0.3),
         })
     }
@@ -178,10 +182,10 @@ impl Renderer {
                 apex: wake.at.to_array(),
                 start: wake.start,
                 ahead: wake.ahead.to_array(),
-                spread: reach.spread,
+                half: reach.half,
                 front,
                 speed: reach.speed,
-                height: wall_height(reach.range.min(age * reach.speed) * reach.spread * WIDTH),
+                height: wall_height(reach.half_width(reach.range.min(age * reach.speed))),
                 fade: (age / 0.05).clamp(0.0, 1.0),
                 spent: age - end,
             });
@@ -194,7 +198,7 @@ impl Renderer {
     /// things off (wake_shell.wgsl `radial`).
     fn front_foot(&self, wake: &RollingWake, reach: Reach, r: f32, across: f32) -> (Vec3, Vec2) {
         let water = self.map_info.water_level.to_f32();
-        let out = Vec2::from_angle(across * (reach.spread * WIDTH).atan()).rotate(wake.ahead);
+        let out = Vec2::from_angle(across * reach.arc).rotate(wake.ahead);
         let xy = wake.at.truncate() + out * r;
         (xy.extend(self.ground_height(xy).max(water)), out)
     }
@@ -206,8 +210,8 @@ impl Renderer {
         let r = ring_at(k);
         let when = wake.start + r / reach.speed;
         let water = self.map_info.water_level.to_f32();
-        let width = r * reach.spread * WIDTH;
-        let kicks = ((width / 6.0).ceil() as usize).clamp(2, 10);
+        let width = reach.half_width(r);
+        let kicks = ((r * reach.arc / 6.0).ceil() as usize).clamp(2, 24);
         for _ in 0..kicks {
             let across = self.scatter.signed();
             let (p, out) = self.front_foot(wake, reach, r, across);
@@ -274,7 +278,7 @@ impl Renderer {
         for _ in 0..2 {
             let across = self.scatter.signed();
             let (p, _) = self.front_foot(wake, reach, r, across);
-            let up = wall_height(width) * wall_taper(across) * self.scatter.unit();
+            let up = wall_height(width) * reach.taper(across) * self.scatter.unit();
             let drift = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0) * 1.5;
             let heat = 0.2 + 0.6 * self.scatter.unit();
             let vel = drift + Vec3::Z * (2.0 + 3.0 * self.scatter.unit());
@@ -298,13 +302,20 @@ impl Renderer {
             self.plasma_fx.guns.flare(
                 mid + Vec3::Z * wall_height(width) * 0.5,
                 RED.lerp(HOT, 0.35) * 140.0 * reach.impact,
-                width * 1.4 + 10.0,
+                (width * 1.4 + 10.0).min(90.0),
                 when,
                 0.25,
             );
         }
         if k % 4 == 1 {
-            self.tree_blasts.record(mid, when, width + 12.0, 0.8, true);
+            // Bowed all along the arc, a stretch of it at a time.
+            let bends = ((r * reach.arc / 30.0).ceil() as usize).clamp(1, 12);
+            let reach_out = (r * reach.arc / bends as f32 + 12.0).min(width + 12.0);
+            for n in 0..bends {
+                let across = 2.0 * (n as f32 + 0.5) / bends as f32 - 1.0;
+                let (p, _) = self.front_foot(wake, reach, r, across);
+                self.tree_blasts.record(p, when, reach_out, 0.8, true);
+            }
         }
     }
 
@@ -312,12 +323,12 @@ impl Renderer {
     /// plasma off its crest and on ahead.
     fn break_front(&mut self, wake: &RollingWake, reach: Reach, when: f32) {
         let r = reach.range;
-        let width = r * reach.spread * WIDTH;
-        let pieces = ((width / 4.0).ceil() as usize).clamp(4, 16);
+        let width = reach.half_width(r);
+        let pieces = ((r * reach.arc / 4.0).ceil() as usize).clamp(4, 32);
         for n in 0..pieces {
             let across = 2.0 * (n as f32 + self.scatter.unit()) / pieces as f32 - 1.0;
             let (p, out) = self.front_foot(wake, reach, r, across);
-            let up = wall_height(width) * wall_taper(across) * (0.4 + 0.6 * self.scatter.unit());
+            let up = wall_height(width) * reach.taper(across) * (0.4 + 0.6 * self.scatter.unit());
             let size = 1.2 + 0.06 * width.min(40.0) * (0.6 + 0.6 * self.scatter.unit());
             let pace = reach.speed * (0.3 + 0.3 * self.scatter.unit());
             let vel = (out * pace).extend(1.0 + 3.0 * self.scatter.unit());
@@ -340,22 +351,36 @@ impl Renderer {
         self.plasma_fx.guns.flare(
             mid,
             HOT * 120.0 * reach.impact,
-            width * 1.6 + 10.0,
+            (width * 1.6 + 10.0).min(90.0),
             when,
             BREAK,
         );
     }
 }
 
-/// The wall's height over the middle of the fan when the fan is `half` metres wide each
-/// side of its middle (wake_shell.wgsl `wall_tall`, before it breaks up).
-fn wall_height(half: f32) -> f32 {
-    2.5 + 0.22 * half
+impl Reach {
+    /// Metres the drawn fan reaches out to one side of its middle line `r` out (the
+    /// whole of `r` for a fan of a quarter turn or more).
+    fn half_width(self, r: f32) -> f32 {
+        r * self.arc.min(FRAC_PI_2).sin()
+    }
+
+    /// How much of the wall's height stands `across` of the way along its arc to one end:
+    /// it falls away to nothing at its ends, and has none round a full circle.
+    fn taper(self, across: f32) -> f32 {
+        if self.arc >= PI {
+            1.0
+        } else {
+            (1.0 - across.powi(4)).max(0.0).sqrt()
+        }
+    }
 }
 
-/// How much of that height stands `across` of the way along the wall's arc to one end.
-fn wall_taper(across: f32) -> f32 {
-    (1.0 - across.powi(4)).max(0.0).sqrt()
+/// The wall's height over the middle of the fan when the fan is `half` metres wide each
+/// side of its middle line (wake_shell.wgsl `wall_tall`, before it breaks up): it grows
+/// with the fan up to a point.
+fn wall_height(half: f32) -> f32 {
+    2.5 + 0.22 * half.min(40.0)
 }
 
 /// How far out stretch `k` of a wake's foot is laid, metres.

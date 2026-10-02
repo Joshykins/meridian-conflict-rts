@@ -21,10 +21,10 @@ struct WakeShell {
     // The muzzle, and the renderer time the wake left it.
     apex: vec3<f32>,
     start: f32,
-    // Which way it rolls over the ground (unit length), and the tangent of the fan's
-    // half-angle.
+    // Which way it rolls over the ground (unit length), and the fan's half-angle,
+    // radians.
     ahead: vec2<f32>,
-    spread: f32,
+    half: f32,
     // Metres out the front stands now, and metres a second it rolls.
     front: f32,
     speed: f32,
@@ -86,10 +86,20 @@ fn grid_corner(quad: u32, corner: u32, around: u32) -> vec2<u32> {
     return vec2<u32>(quad / around + di, quad % around + dj);
 }
 
+// The drawn arc's half-angle: the fan's, a little wider, at most a half turn.
+fn arc_half(s: WakeShell) -> f32 {
+    return min(s.half * WAKE_SHELL_WIDTH, PI);
+}
+
+// Whether the arc closes into a ring round the gun, with no ends.
+fn closed(s: WakeShell) -> bool {
+    return s.half * WAKE_SHELL_WIDTH >= PI;
+}
+
 // Out over the ground from the muzzle, `c` of the way from the fan's middle (0) to one
 // edge (±1).
 fn radial(s: WakeShell, c: f32) -> vec2<f32> {
-    let psi = c * atan(s.spread * WAKE_SHELL_WIDTH);
+    let psi = c * arc_half(s);
     let cs = cos(psi);
     let sn = sin(psi);
     return vec2<f32>(s.ahead.x * cs - s.ahead.y * sn, s.ahead.x * sn + s.ahead.y * cs);
@@ -111,9 +121,9 @@ fn broken(s: WakeShell) -> f32 {
 }
 
 // The wall's height `c` along its arc: full over the middle, falling away to nothing at
-// its two ends, slumping as it breaks up.
+// its two ends (a ring has none), slumping as it breaks up.
 fn wall_tall(s: WakeShell, c: f32) -> f32 {
-    let taper = sqrt(max(1.0 - pow(abs(c), 4.0), 0.0));
+    let taper = select(sqrt(max(1.0 - pow(abs(c), 4.0), 0.0)), 1.0, closed(s));
     return s.height * taper * (1.0 - 0.75 * broken(s)) + 0.3;
 }
 
@@ -218,7 +228,7 @@ fn fs_wake_front_lit(in: ShellOut) -> vec4<f32> {
     let up = in.passed.x;
     // Plasma rolling up its face and over its crest: lumps of it, drawn out the way it
     // turns, and fine flow lines through them, finer the wider the arc.
-    let span = 6.0 + 0.4 * s.front * s.spread;
+    let span = 6.0 + 0.4 * s.front * arc_half(s);
     let roll = in.at.y * 6.0 - age * 2.4;
     let warp = value_noise2(vec2<f32>(a * span * 0.5, roll * 0.5) + seed, 1.0);
     let lumps = value_noise2(vec2<f32>(a * span + warp * 1.5, roll * 0.6 + warp) + seed * 1.3, 1.0);
@@ -257,18 +267,20 @@ fn fs_wake_trail_lit(in: ShellOut) -> vec4<f32> {
     // Long threads of light running out to the wall, streaming out after it: fine ones
     // close across the fan, and broader ones between them.
     let out_flow = along * 0.025 - age * s.speed * 0.02;
-    let q1 = vec2<f32>(c * 26.0 + sin(along * 0.03 + seed) * 0.6, out_flow) + seed;
-    let q2 = vec2<f32>(c * 11.0 - along * 0.004, out_flow * 1.6) + seed * 1.7;
+    // As many threads across as the arc is wide, round a ring as well.
+    let across = max(1.0, arc_half(s) / 0.45);
+    let q1 = vec2<f32>(c * 26.0 * across + sin(along * 0.03 + seed) * 0.6, out_flow) + seed;
+    let q2 = vec2<f32>(c * 11.0 * across - along * 0.004, out_flow * 1.6) + seed * 1.7;
     let threads = streaks(q1, 14.0) + 0.6 * streaks(q2, 6.0);
     // Eaten through in hard-edged holes, long ones down the threads, as it cools, from the
     // muzzle out behind the front.
-    let grain = value_noise2(vec2<f32>(c * 9.0, along * 0.04) + seed * 3.1, 1.0) * 0.6
-        + value_noise2(vec2<f32>(c * 30.0, along * 0.12) + seed * 1.9, 1.0) * 0.4;
+    let grain = value_noise2(vec2<f32>(c * 9.0 * across, along * 0.04) + seed * 3.1, 1.0) * 0.6
+        + value_noise2(vec2<f32>(c * 30.0 * across, along * 0.12) + seed * 1.9, 1.0) * 0.4;
     let alive = smoothstep(-0.03, 0.03, grain * 0.75 + 0.3 - passed / WAKE_SHELL_LINGER);
     // A breath back at the muzzle, building out to the wall, and thinning at the fan's
     // edges.
     let near_wall = smoothstep(0.0, 1.0, u);
-    let sides = 1.0 - smoothstep(0.75, 1.0, abs(c));
+    let sides = select(1.0 - smoothstep(0.75, 1.0, abs(c)), 1.0, closed(s));
     let fill = smoothstep(0.0, 0.3, u) * sides;
     let lit = (0.015 + threads * (0.12 + 0.7 * heat)) * (0.4 + 0.6 * near_wall)
         + 0.12 * heat * near_wall * near_wall;
