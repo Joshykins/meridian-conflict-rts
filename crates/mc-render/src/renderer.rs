@@ -931,7 +931,10 @@ pub struct Renderer {
     /// Which units plant ground stakes, for the ground punched where each strikes.
     stake_fx: stake_fx::StakeFx,
     projectile_count: u32,
-    stain_count: u32,
+    /// Ground stains in the buffer, in the order written: the sim's scorch, blast craters
+    /// (impact_craters.rs), molten ground (bore_fx.rs). Drawn a run at a time, so a lost
+    /// device's breadcrumbs say which kind was on the GPU.
+    stain_runs: [u32; 3],
     pad_count: u32,
     /// Ore fields as ground splats, written after stains and pads: every
     /// field's corners first, then the tiles that cover the fields.
@@ -2467,7 +2470,7 @@ impl Renderer {
             titan_charge: titan_charge::TitanCharge::new(coil_models),
             stake_fx: stake_fx::StakeFx::new(stake_scales),
             projectile_count: 0,
-            stain_count: 0,
+            stain_runs: [0; 3],
             pad_count: 0,
             deposit_splats,
             ore_corners,
@@ -2595,6 +2598,11 @@ impl Renderer {
     /// Cursor ray against the terrain (overview resolution).
     pub fn pick_ground(&self, origin: Vec3, dir: Vec3) -> Option<Vec3> {
         self.tile_cache.pick(origin, dir)
+    }
+
+    /// Ground stains of every kind in the buffer, ahead of the pads.
+    fn stain_count(&self) -> u32 {
+        self.stain_runs.iter().sum()
     }
 
     pub fn ground_height(&self, xy: glam::Vec2) -> f32 {
@@ -3167,7 +3175,11 @@ impl Renderer {
             );
         }
         let stained = stains.len() + crater_count + molten.len();
-        self.stain_count = stained as u32;
+        self.stain_runs = [
+            stains.len() as u32,
+            crater_count as u32,
+            molten.len() as u32,
+        ];
         let pads = self.structure_pads(units, &frame.pads, MAX_STAINS.saturating_sub(stained));
         if !pads.is_empty() {
             self.stains.write(

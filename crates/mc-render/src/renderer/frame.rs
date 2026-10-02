@@ -38,7 +38,7 @@ impl Renderer {
             self.dynamic_count,
             self.static_count,
             self.slot_count,
-            self.stain_count,
+            self.stain_count(),
             self.pad_count,
             self.deposit_count,
             self.track_count,
@@ -405,7 +405,7 @@ impl Renderer {
             ground: self.ground_height(eye.truncate()),
             dynamic_count: self.dynamic_count,
             static_count: self.static_count,
-            scorch_count: self.stain_count,
+            scorch_count: self.stain_count(),
             lot_count: self.pad_count,
             track_count: self.prints.gather_count(self.track_count),
             clad_count: self.foundations.count(),
@@ -723,7 +723,7 @@ impl Renderer {
             self.timers.end(&device, cmd);
 
             self.timers.draws(&device, cmd, "scene.decals");
-            if self.stain_count + self.pad_count + self.deposit_count > 0 {
+            if self.stain_count() + self.pad_count + self.deposit_count > 0 {
                 bind_pass_set(self.stains_set);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.patch_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.patch_ib.buffer, 0, vk::IndexType::UINT32);
@@ -759,18 +759,35 @@ impl Renderer {
                         self.pad_count,
                         0,
                         0,
-                        self.stain_count,
+                        self.stain_count(),
                     );
                 }
-                if self.stain_count > 0 {
-                    self.timers
-                        .crumb(cmd, || format!("stains x{}", self.stain_count));
+                if self.stain_count() > 0 {
                     device.cmd_bind_pipeline(
                         cmd,
                         vk::PipelineBindPoint::GRAPHICS,
                         self.pipelines.stain,
                     );
-                    device.cmd_draw_indexed(cmd, self.patch_index_count, self.stain_count, 0, 0, 0);
+                    let mut first = 0;
+                    for (count, kind) in self
+                        .stain_runs
+                        .into_iter()
+                        .zip(["scorch", "craters", "molten"])
+                    {
+                        if count > 0 {
+                            self.timers
+                                .crumb(cmd, || format!("stains: {kind} x{count}"));
+                            device.cmd_draw_indexed(
+                                cmd,
+                                self.patch_index_count,
+                                count,
+                                0,
+                                0,
+                                first,
+                            );
+                        }
+                        first += count;
+                    }
                 }
             }
             if self.track_count > 0 {

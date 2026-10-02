@@ -41,6 +41,11 @@ fn vs_stain(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32
     return out;
 }
 
+// No stain ever discards (SPIR-V OpKill), nor does a giant's footprint: a friend's RX 7900
+// XTX hung in the stains draw, the device lost, the moment molten ground (a Fulgur, a
+// Sunspear, the Behemoth's storm) or a crater (aircraft shot down) was drawn, and those two
+// kinds were the ones discarding inside a helper (2026-10-01). Blended, no depth written:
+// a clear colour draws nothing, as a discard did.
 @fragment
 fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     if (in.strength_seed & STAIN_CRATER) != 0u {
@@ -61,7 +66,7 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
     let mask = (1.0 - smoothstep(0.25, 0.95, edge)) * (0.45 + n.y * 0.7);
     let alpha = clamp(mask * (0.22 + strength * 0.45), 0.0, 0.62);
     if alpha < 0.02 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let eye = globals.camera.xyz;
     let dist = distance(eye, in.world);
@@ -88,10 +93,7 @@ fn fs_stain(in: StainOut) -> @location(0) vec4<f32> {
 // sim's charcoal scorch, which stays. A ring of burnt ground lies round the shore, and
 // no grass grows in the pool (grass_gen.wgsl `PRESS_MOLTEN`).
 //
-// It never discards, and takes its derivative first: a `discard` (SPIR-V OpKill) ahead of
-// the `fwidth` and the crack loops hung AMD's RDNA3 driver, the device lost the moment a
-// Fulgur, a Sunspear or the Behemoth's storm melted the ground (a friend's RX 7900 XTX,
-// 2026-10-01). Blended, no depth written: a clear return draws nothing, as a discard did.
+// It takes its derivative first, ahead of any early return (see fs_stain on discard).
 fn molten(in: StainOut) -> vec4<f32> {
     let px = max(length(fwidth(in.world.xy)), 1e-3);
     let heat = f32(in.strength_seed & 0xFFu) / 255.0;
@@ -223,7 +225,7 @@ fn crater(in: StainOut) -> vec4<f32> {
     lit *= mix(1.0, 0.55, (1.0 - smoothstep(0.0, 0.85, r)) * inside);
     let alpha = clamp(max(inside * 0.92, ejecta * 0.75), 0.0, 0.92);
     if alpha < 0.02 {
-        discard;
+        return vec4<f32>(0.0);
     }
     return vec4<f32>(apply_haze(lit, in.world, eye), alpha);
 }
@@ -765,7 +767,7 @@ fn footprint(in: TrackOut) -> vec4<f32> {
     let edge = 1.0 - smoothstep(0.8, 1.0, max(abs(p.x) / (g.half.x + spill), abs(p.y) / (g.half.y + spill)));
     let alpha = col.a * in.shape.z * edge;
     if alpha < 0.01 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let shade = apply_fog_of_war(col.rgb, in.world.xy);
     return vec4<f32>(apply_haze(shade, in.world, globals.camera.xyz), clamp(alpha, 0.0, 0.92));
@@ -774,7 +776,7 @@ fn footprint(in: TrackOut) -> vec4<f32> {
 @fragment
 fn fs_print(in: TrackOut) -> @location(0) vec4<f32> {
     if in.world.z < globals.map.z {
-        discard;
+        return vec4<f32>(0.0);
     }
     return footprint(in);
 }
