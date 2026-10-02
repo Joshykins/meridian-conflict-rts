@@ -191,7 +191,12 @@ impl Renderer {
         );
         // The ground's real extent: a map may reach far above or below the default range.
         let z_used = self.tile_cache.height_span;
-        if !terrain::select_nodes(camera, z_used, &mut self.node_scratch) {
+        if !terrain::select_nodes(
+            camera,
+            z_used,
+            &self.tile_cache.cliffs,
+            &mut self.node_scratch,
+        ) {
             log::error!("terrain node budget of {MAX_NODES} exceeded; distant terrain is missing this frame");
         }
         self.nodes

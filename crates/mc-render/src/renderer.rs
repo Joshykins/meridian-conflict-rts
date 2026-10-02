@@ -1480,7 +1480,12 @@ impl Renderer {
         step("Scattering the map's props", 0.6);
         // Static entities: the map's props.
         let info = scene.map.info().clone();
-        let tile_cache = TileCache::new(scene.map.clone());
+        let cover = ground_cover::ground_cover(&scene.map);
+        let map_size = glam::Vec2::from(scene.map.info().size_metres().to_f32());
+        let tile_cache = TileCache::new(
+            scene.map.clone(),
+            crate::cliff_blocks::CliffBlocks::new(&cover, map_size),
+        );
         let kinds: Vec<u16> = PropKind::ALL.iter().map(|k| k.raw()).collect();
         let statics_data: Vec<UnitInstance> = scene
             .map
@@ -1803,7 +1808,6 @@ impl Renderer {
             }
         }
         step("Laying ground cover", 0.8);
-        let cover = ground_cover::ground_cover(&scene.map);
         let ground_cover = gpu.image(&ImageDesc {
             width: cover.width,
             height: cover.height,

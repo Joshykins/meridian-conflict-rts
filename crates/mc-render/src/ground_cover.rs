@@ -23,7 +23,8 @@ pub struct GroundCover {
     pub texels: Vec<u8>,
     /// The second layer, the same size, RGBA8, from the map's ways layer: r =
     /// how trodden the ground is (0 everywhere on a map without one), g, b =
-    /// the trail's heading as cos 2a, sin 2a (0.5 = 0).
+    /// the trail's heading as cos 2a, sin 2a (0.5 = 0); a = how much of a crag
+    /// the ground is (`cliff_blocks::crag_field`).
     pub ways: Vec<u8>,
 }
 
@@ -108,6 +109,12 @@ fn ground_cover_made(map: &MapFile) -> GroundCover {
             });
         }
     }
+    for (i, crag) in crate::cliff_blocks::crag_field(map, cell, (w, h))
+        .into_iter()
+        .enumerate()
+    {
+        ways[i * 4 + 3] = (crag * 255.0).round() as u8;
+    }
     GroundCover {
         width: w as u32,
         height: h as u32,
@@ -146,7 +153,7 @@ fn resample(
 }
 
 /// Two box passes each way: close enough to a Gaussian for a ground mask.
-fn blur(v: &mut [f32], w: usize, h: usize, r: usize) {
+pub(crate) fn blur(v: &mut [f32], w: usize, h: usize, r: usize) {
     let mut tmp = vec![0f32; v.len()];
     for _ in 0..2 {
         for y in 0..h {

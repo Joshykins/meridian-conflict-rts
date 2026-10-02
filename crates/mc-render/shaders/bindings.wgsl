@@ -332,6 +332,13 @@ fn ground_way_at(xy: vec2<f32>) -> f32 {
     return textureSampleLevel(ground_cover, clamp_sampler, uv, 1, 0.0).r;
 }
 
+// How much of a crag the ground at `xy` is, 0-1: steep ground, softened
+// (`cliff_blocks::crag_field`; rock.wgsl `crag_relief`).
+fn ground_crag_at(xy: vec2<f32>) -> f32 {
+    let uv = xy / globals.map.xy;
+    return textureSampleLevel(ground_cover, clamp_sampler, uv, 1, 0.0).a;
+}
+
 // Which way the trail at `xy` runs: a unit vector (either way along it).
 fn ground_way_heading(xy: vec2<f32>) -> vec2<f32> {
     let uv = xy / globals.map.xy;

@@ -5,6 +5,7 @@
 #![expect(unsafe_code, reason = "raw Vulkan through ash")]
 
 pub mod camera;
+mod cliff_blocks;
 pub mod foliage;
 pub mod gpu;
 pub use mc_models::gpu_consts;

@@ -32,6 +32,9 @@ struct VsOut {
     // Invariant: the depth pre-pass and the colour pass must land on the same depth.
     @builtin(position) @invariant clip: vec4<f32>,
     @location(0) world: vec3<f32>,
+    // On a crag (`crag_relief`): how much of one it is, how far the rock stands
+    // out of the wall there (metres), and how much of its fine facets it carries.
+    @location(1) crag: vec3<f32>,
 }
 
 @vertex
@@ -50,8 +53,12 @@ fn vs_main(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32)
     xy = xy - odd * (size / GRID) * k;
     xy = clamp(xy, vec2<f32>(0.0), globals.map.xy);
 
-    let world = vec3<f32>(xy, terrain_height(xy));
+    var world = vec3<f32>(xy, terrain_height(xy));
     var out: VsOut;
+    // Crags finer than the samples: the wall broken into rock (rock.wgsl).
+    let crag = crag_relief(world, distance(world, eye), node.morph.z);
+    world.z += crag.lift;
+    out.crag = vec3<f32>(crag.weight, crag.depth, crag.fine);
     if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
         out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
     } else {
@@ -1026,11 +1033,30 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Cliffs are shaded from a wider normal: the 8 m heightfield steps down a
     // cliff in facets, and the fine normal fluted them into organ pipes.
     var cliff_n = base_n;
-    if rock_face > 0.004 {
+    // On a crag the drawn surface is the rock (`crag_relief`): its facets are lit as
+    // they lie, and it is all rock.
+    let crag_w = in.crag.x;
+    var facet = base_n;
+    if crag_w > 0.004 {
+        // A sliver seen edge on has no area on screen: keep the wall's normal
+        // there, never normalize nothing (NaN draws black).
+        let across = cross(dpx, dpy);
+        if dot(across, across) > 1e-10 {
+            // The terrain is a heightfield, so every face of it looks up: a step
+            // facing sideways off the wall's lean still does.
+            facet = normalize(across);
+            facet = select(facet, -facet, facet.z < 0.0);
+        }
+    }
+    if rock_face > 0.004 || crag_w > 0.004 {
         cliff_n = normalize(mix(base_n, terrain_normal(xy, max(step * 3.0, 20.0)), 0.8));
+        // Mostly the facet as it lies, a little of the wall's own lean: a sliver
+        // standing on end still catches the sky.
+        cliff_n = normalize(mix(cliff_n, facet, crag_w * 0.75));
         cliff = terrain_surface_grad(in.world, cliff_n, 17.0, MAT_ROCK_FACE, 1.25, dpx, dpy);
     }
-    let rock_w = clamp(rock_face + (cliff.height - ground_h) * 0.35 * rock_face * (1.0 - rock_face) * 4.0, 0.0, 1.0);
+    let rock_w = max(clamp(rock_face + (cliff.height - ground_h) * 0.35 * rock_face * (1.0 - rock_face) * 4.0, 0.0, 1.0),
+        crag_w);
 
     // ---- Relief below the 8 m heightfield -----------------------------------
     // Hummocks, ruts and small rises, rougher on stony ground, smoother in
@@ -1137,6 +1163,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         faced = side_mix3(faced, mix(albedo, canyon_cliff_stone(site, cliff.color, slope), rock_w), arid);
     }
     albedo = faced;
+    // A crag's clefts are in their own shade; the rock standing out of the wall
+    // catches the light.
+    albedo *= mix(1.0, 0.5 + 0.55 * smoothstep(-7.0, 5.0, in.crag.y), crag_w);
     var canyon_grad = vec2<f32>(0.0);
     var canyon_rough = -1.0;
     if arid > 0.0 {
@@ -1193,7 +1222,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Snow: drifts a little brighter and darker, bluer in its hollows.
     let drift = 0.93 + 0.1 * fine + 0.05 * sward;
     let snow_rgb = vec3<f32>(0.65, 0.69, 0.74) * drift * mix(vec3<f32>(1.0), vec3<f32>(0.9, 0.95, 1.05), concavity * 1.5);
-    albedo = mix(albedo, snow_rgb, snow_w);
+    // On a crag, snow lies where the rock holds it, wherever the ground round it
+    // has snow: on ledges, and down the gullies between the ribs.
+    let ledge = smoothstep(0.6, 0.85, facet.z);
+    let gully = 1.0 - smoothstep(-8.0, 1.0, in.crag.y + (fine - 0.5) * 4.0);
+    let lying_here = max(mix(smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0),
+        smoothstep(0.3, 0.7, layer.y + (patchy - 0.5) * 0.55), layer.z), snow_w);
+    let crag_snow = lying_here * max(ledge, gully * 0.9) * (1.0 - arid);
+    let snow_here = mix(snow_w, crag_snow, crag_w);
+    albedo = mix(albedo, snow_rgb, snow_here);
 
     // Glacier ice (`glacier_shade`).
     var ice_bend = vec3<f32>(0.0);
@@ -1213,7 +1250,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let grad = vec3<f32>(g * 1.1 - relief - boulders.grad * boulder_cover - canyon_grad, 0.0);
     let ground_normal = normalize(base_n + (grad - base_n * dot(grad, base_n)));
     var n = normalize(mix(ground_normal, cliff.normal, rock_w));
-    n = normalize(mix(n, base_n, max(snow_w, ice_w) * 0.7));
+    n = normalize(mix(n, base_n, max(snow_here * (1.0 - crag_w * 0.6), ice_w) * 0.7));
     n = normalize(n + ice_bend * ice_w);
     let ground_rough = ga.color.a * bw.x + gb.color.a * bw.y + gc.color.a * bw.z;
     var rough = mix(clamp(ground_rough, 0.75, 1.0), clamp(cliff.roughness, 0.7, 0.95), rock_w);
@@ -1222,7 +1259,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     n = normalize(mix(n, base_n, sward_look * 0.8));
     rough = mix(rough, 0.52, sward_look);
     rough = mix(rough, 0.8, boulder_cover * 0.5);
-    rough = mix(rough, 0.7, snow_w);
+    rough = mix(rough, 0.7, snow_here);
     rough = mix(rough, ice_rough, ice_w);
     if canyon_rough >= 0.0 {
         rough = mix(rough, canyon_rough, rock_w * arid);

@@ -55,6 +55,7 @@ impl Renderer {
         };
         self.sky.set_walls(self.look.walls().clone());
         self.cliff_rocks.set_look(&self.look);
+        self.tile_cache.cliffs.set_look(&self.look);
     }
 
     /// How the map is drawn now: its look as `set_map_look` took it.

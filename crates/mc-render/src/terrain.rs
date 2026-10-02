@@ -4,6 +4,7 @@
 //! hundred), never with the number of entities.
 
 use crate::camera::Camera;
+use crate::cliff_blocks::CliffBlocks;
 use crate::gpu_consts::settle;
 use glam::{Vec2, Vec3, Vec4};
 use mc_jobs::{Pool, TaskHandle};
@@ -27,9 +28,10 @@ const MAX_LOADS_IN_FLIGHT: usize = 4;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct TerrainNode {
-    /// Origin x, y; edge length; level.
+    /// Origin x, y; edge length; level (below zero: finer than the 8 m samples).
     pub rect: [f32; 4],
-    /// Morph start and end distance.
+    /// Morph start and end distance; the distance by which the crags' relief
+    /// has faded out (zero: none on this node).
     pub morph: [f32; 4],
 }
 
@@ -48,11 +50,25 @@ fn aabb_distance(min: Vec3, max: Vec3, p: Vec3) -> f32 {
     (p.clamp(min, max) - p).length()
 }
 
+/// Levels below the leaf, over crags only (`CliffBlocks`): 4 m and 2 m cells.
+const FINE_LEVELS: i32 = 2;
+/// Finer cells over crags are kept to about this many pixels: they are there for
+/// the rock's relief, not for the 8 m samples, which they cannot add to.
+const FINE_QUAD_PIXELS: f32 = 6.0;
+/// The crags' relief is gone by this share of the 4 m level's range, well before
+/// its nodes give way to plain 8 m ones (`TerrainNode::morph`).
+const RELIEF_FADE: f32 = 0.6;
+
 /// Picks the quadtree nodes to draw. Returns false if `MAX_NODES` was hit.
-pub fn select_nodes(camera: &Camera, z_range: (f32, f32), out: &mut Vec<TerrainNode>) -> bool {
+pub fn select_nodes(
+    camera: &Camera,
+    z_range: (f32, f32),
+    cliffs: &CliffBlocks,
+    out: &mut Vec<TerrainNode>,
+) -> bool {
     out.clear();
     let map = camera.map_size;
-    let mut levels = 0u32;
+    let mut levels = 0i32;
     while LEAF_SIZE * (1u32 << levels) as f32 <= map.x.max(map.y) - 1.0 {
         levels += 1;
     }
@@ -60,6 +76,15 @@ pub fn select_nodes(camera: &Camera, z_range: (f32, f32), out: &mut Vec<TerrainN
     let planes = camera.frustum();
     let eye = camera.eye();
     let leaf_range = (LEAF_SIZE / 64.0 * camera.projection_scale() / QUAD_PIXELS).max(600.0);
+    // Below the leaf, each level's cells are kept to FINE_QUAD_PIXELS.
+    let range = |level: i32| {
+        if level >= 0 {
+            leaf_range * (1u32 << level) as f32
+        } else {
+            LEAF_SIZE / 64.0 * 0.5f32.powi(-level) * camera.projection_scale() / FINE_QUAD_PIXELS
+        }
+    };
+    let fade = range(-1) * RELIEF_FADE;
     let mut complete = true;
     let mut stack = vec![(Vec2::ZERO, root, levels)];
     while let Some((origin, size, level)) = stack.pop() {
@@ -71,16 +96,18 @@ pub fn select_nodes(camera: &Camera, z_range: (f32, f32), out: &mut Vec<TerrainN
         if aabb_outside(&planes, min, max) {
             continue;
         }
-        let finer_range = leaf_range * (1u32 << level.saturating_sub(1)) as f32;
-        if level == 0 || aabb_distance(min, max, eye) > finer_range {
+        let splits = level > 0 || (level > -FINE_LEVELS && cliffs.any_fine(origin, size));
+        if !splits || aabb_distance(min, max, eye) > range(level - 1) {
             if out.len() >= MAX_NODES {
                 complete = false;
                 break;
             }
-            let range = leaf_range * (1u32 << level) as f32;
+            let range = range(level);
+            // Only nodes finer than the leaf carry the crags' relief.
+            let relief = if level < 0 { fade } else { 0.0 };
             out.push(TerrainNode {
                 rect: [origin.x, origin.y, size, level as f32],
-                morph: [range * 0.7, range * 0.97, 0.0, 0.0],
+                morph: [range * 0.7, range * 0.97, relief, 0.0],
             });
         } else {
             let half = size * 0.5;
@@ -178,11 +205,13 @@ pub struct TileCache {
     /// margin for what lies between its samples: the height of the boxes terrain
     /// patches are culled by.
     pub height_span: (f32, f32),
+    /// Where the terrain is drawn finer than its samples (`select_nodes`).
+    pub cliffs: CliffBlocks,
     frame: u64,
 }
 
 impl TileCache {
-    pub fn new(map: Arc<MapFile>) -> TileCache {
+    pub fn new(map: Arc<MapFile>, cliffs: CliffBlocks) -> TileCache {
         let (tiles_w, tiles_h) = map.size_tiles();
         let info = map.info();
         let (lo, hi) = map
@@ -193,6 +222,7 @@ impl TileCache {
         let height_span = (z(lo) - 60.0, z(hi) + 60.0);
         TileCache {
             height_span,
+            cliffs,
             overview: map.overview().to_vec(),
             overview_dims: map.overview_dims(),
             map,
@@ -511,7 +541,7 @@ mod tests {
         for distance in [30.0, 400.0, 5_000.0, 40_000.0, cam.max_distance()] {
             cam.distance = distance;
             assert!(
-                select_nodes(&cam, (-256.0, 768.0), &mut nodes),
+                select_nodes(&cam, (-256.0, 768.0), &CliffBlocks::none(), &mut nodes),
                 "node budget at {distance}"
             );
             assert!(
@@ -544,9 +574,14 @@ mod tests {
             let mut nodes = Vec::new();
             for distance in [5_000.0, 12_000.0, 40_000.0, cam.max_distance()] {
                 cam.distance = distance.min(cam.max_distance());
-                assert!(select_nodes(&cam, (-256.0, 768.0), &mut nodes));
+                assert!(select_nodes(
+                    &cam,
+                    (-256.0, 768.0),
+                    &CliffBlocks::none(),
+                    &mut nodes
+                ));
                 for node in &nodes {
-                    if node.rect[3] == 0.0 {
+                    if node.rect[3] <= 0.0 {
                         continue; // The native 8 m map samples cannot subdivide further.
                     }
                     let origin = Vec2::new(node.rect[0], node.rect[1]);
@@ -566,6 +601,55 @@ mod tests {
             }
         }
     }
+    /// Over crags, nodes split below the 8 m leaf only near the eye: 2 m cells
+    /// under the focus, none of them far off, within the node budget, and only
+    /// those finer nodes carry the crags' relief.
+    #[test]
+    fn crags_split_finer_only_near_the_eye() {
+        let mut cam = Camera::new(Vec2::splat(12_288.0), Vec2::new(2560.0, 1440.0));
+        let crags = CliffBlocks::all(cam.map_size);
+        let mut nodes = Vec::new();
+        for distance in [150.0, 600.0, 3_000.0] {
+            cam.distance = distance;
+            assert!(
+                select_nodes(&cam, (-256.0, 768.0), &crags, &mut nodes),
+                "budget at {distance}"
+            );
+            let f = cam.focus.truncate();
+            let under = nodes
+                .iter()
+                .find(|n| {
+                    f.x >= n.rect[0]
+                        && f.x < n.rect[0] + n.rect[2]
+                        && f.y >= n.rect[1]
+                        && f.y < n.rect[1] + n.rect[2]
+                })
+                .expect("the focus is covered");
+            if distance < 1_000.0 {
+                assert_eq!(
+                    under.rect[2], 128.0,
+                    "2 m cells under the focus at {distance}"
+                );
+            }
+            for n in &nodes {
+                assert_eq!(
+                    n.rect[3] < 0.0,
+                    n.morph[2] > 0.0,
+                    "relief only on finer nodes"
+                );
+                if n.rect[3] < 0.0 {
+                    let mid = Vec2::new(n.rect[0], n.rect[1]) + n.rect[2] * 0.5;
+                    let eye = cam.eye();
+                    assert!(
+                        mid.extend(0.0).distance(eye.with_z(0.0)) < 4_000.0,
+                        "a finer node {} m off at {distance}",
+                        mid.distance(eye.truncate())
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn grid_matches_the_sim_triangulation() {
         let (v, i) = grid_mesh();

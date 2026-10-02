@@ -82,3 +82,120 @@ fn cliff_rock(p: vec3<f32>, n: vec3<f32>, px: f32, dz: f32, dpx: vec3<f32>, dpy:
     out.albedo = rgb;
     return out;
 }
+
+// ---- Crags: the mountains' walls broken into fractured rock ------------------
+// Terrain nodes finer than the 8 m samples (terrain.rs `select_nodes`, over the
+// blocks `CliffBlocks` marks) move each vertex of a steep wall out of it or back
+// into it by `crag_relief`: the wall's surface becomes granite split along joints.
+
+// Three random numbers in 0..1 for a lattice point.
+fn crag_hash3(i: vec3<f32>) -> vec3<f32> {
+    var q = vec3<f32>(dot(i, vec3<f32>(127.1, 311.7, 74.7)), dot(i, vec3<f32>(269.5, 183.3, 246.1)),
+        dot(i, vec3<f32>(113.5, 271.9, 124.6)));
+    return fract(sin(q) * 43758.5453);
+}
+
+// Smooth value noise in 3D, 0..1, one lattice cell a unit.
+fn crag_noise3(p: vec3<f32>) -> f32 {
+    let i = floor(p);
+    let f = p - i;
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(mix(crag_hash3(i).x, crag_hash3(i + vec3<f32>(1.0, 0.0, 0.0)).x, u.x),
+        mix(crag_hash3(i + vec3<f32>(0.0, 1.0, 0.0)).x, crag_hash3(i + vec3<f32>(1.0, 1.0, 0.0)).x, u.x), u.y);
+    let b = mix(mix(crag_hash3(i + vec3<f32>(0.0, 0.0, 1.0)).x, crag_hash3(i + vec3<f32>(1.0, 0.0, 1.0)).x, u.x),
+        mix(crag_hash3(i + vec3<f32>(0.0, 1.0, 1.0)).x, crag_hash3(i + vec3<f32>(1.0, 1.0, 1.0)).x, u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+// How far granite stands out of a wall at `p`, metres, before weighting. Joint
+// blocks: space is cut into cells (taller than wide, as joints in granite run
+// down a face), each cell's rock a plane tilted its own way, and the rock is the
+// smooth least of them: flat facets that meet in creases at the joints, never a
+// step. Over them, ribs and gullies running down the face, and a rough skin.
+fn crag_depth(p: vec3<f32>) -> f32 {
+    let scale = vec3<f32>(1.0 / 10.0, 1.0 / 10.0, 1.0 / 16.0);
+    // The eight cells round the point: the corner it is nearest.
+    let cell = floor(p * scale - 0.5);
+    // Smooth minimum (exponential) over their planes, each rising away from its
+    // own site so it only rules near it.
+    var sum = 0.0;
+    let k = 1.2;
+    for (var z = 0; z <= 1; z++) {
+        for (var y = 0; y <= 1; y++) {
+            for (var x = 0; x <= 1; x++) {
+                let c = cell + vec3<f32>(f32(x), f32(y), f32(z));
+                let h = crag_hash3(c);
+                let site = (c + 0.15 + 0.7 * h) / scale;
+                let tilt = (crag_hash3(c + 17.0) - 0.5) * vec3<f32>(0.6, 0.6, 0.45);
+                let off = p - site;
+                let v = dot(off, tilt) + (h.z - 0.5) * 2.5 + 0.035 * dot(off * scale * 10.0, off * scale * 10.0);
+                sum += exp(-v / k);
+            }
+        }
+    }
+    let facets = 2.5 + k * log(max(sum, 1e-6));
+    let ribs = crag_noise3(p / vec3<f32>(7.0, 7.0, 34.0)) - 0.5;
+    let skin = crag_noise3(p / 2.6) - 0.5;
+    return clamp(facets, -3.0, 3.0) + ribs * 2.5 + skin * 0.6;
+}
+
+// A ridged field, 0-1: sharp crests where the noise crosses its middle, broad
+// troughs between.
+fn crag_ridged(p: vec3<f32>) -> f32 {
+    let v = 1.0 - abs(crag_noise3(p) * 2.0 - 1.0);
+    return v * v;
+}
+
+// The crag's mass, metres out of the wall: aretes and ribs with gullies between
+// them running down the face (ridged, so the crests are sharp and the gullies
+// creased), from tens of metres across down to a few. Smooth enough for 8 m
+// cells at its coarsest, so it is drawn wherever the crag is.
+fn crag_mass(p: vec3<f32>) -> f32 {
+    let arete = crag_ridged(p / vec3<f32>(26.0, 26.0, 90.0));
+    let rib = crag_ridged(p / vec3<f32>(9.0, 9.0, 30.0) + 7.0);
+    let bulge = crag_noise3(p / 55.0 + 31.0) - 0.5;
+    return (arete - 0.35) * 16.0 + (rib - 0.35) * 5.0 + bulge * 6.0;
+}
+
+struct Crag {
+    // How far the vertex moves up or down, metres.
+    lift: f32,
+    // How much of a crag it is, 0-1; how far the rock stands out of the wall
+    // there, metres (the fragment shader darkens the clefts by it); and how much
+    // of the fine facets it carries.
+    weight: f32,
+    depth: f32,
+    fine: f32,
+}
+
+// The relief at a vertex at `p` on the 8 m surface, `dist` metres from the eye.
+// The crag's mass everywhere the crag field (`ground_crag_at`) has it outside the
+// desert, faded out by 4 km; the fractured facets (`crag_depth`) only on terrain
+// drawn finer than its samples, faded out by `fade` metres (`TerrainNode::morph.z`,
+// zero elsewhere). The vertex moves up or down, never sideways, so the terrain
+// stays a heightfield and no triangle can fold over: rock standing `depth` out of
+// a wall rising `grade` is the wall raised by `depth * grade`.
+fn crag_relief(p: vec3<f32>, dist: f32, fade: f32) -> Crag {
+    var c: Crag;
+    c.weight = ground_crag_at(p.xy) * (1.0 - desert_at(p.xy, 0.0)) * (1.0 - smoothstep(2500.0, 4000.0, dist));
+    if c.weight <= 0.004 {
+        c.weight = 0.0;
+        return c;
+    }
+    let n = terrain_normal(p.xy, 12.0);
+    let grade = length(n.xy) / max(n.z, 0.05);
+    c.weight *= smoothstep(0.5, 1.0, grade);
+    c.depth = crag_mass(p);
+    var facets = 0.0;
+    if fade > 0.0 {
+        c.fine = c.weight * (1.0 - smoothstep(fade * 0.65, fade, dist));
+        if c.fine > 0.0 {
+            facets = crag_depth(p) * c.fine / c.weight;
+        }
+    }
+    c.depth += facets;
+    // The facets are a few metres across: on the steepest walls their lift is
+    // held down, or a 2 m cell would stand on end and face nothing but shade.
+    c.lift = (c.depth - facets) * min(grade, 3.0) * c.weight + facets * min(grade, 1.8) * c.weight;
+    return c;
+}
