@@ -107,6 +107,9 @@ pub(crate) struct Atmosphere {
     /// Each region's weather (regions.rs): cover, how towering, cloud mass size, rain.
     /// Region 0's repeats `layer.w` and `shape`'s.
     pub(crate) region_sky: [[f32; 4]; crate::gpu_consts::regions::MAX as usize],
+    /// Each region's sea (regions.rs `sea_of`): its wave field's turn and scale, and
+    /// how rough its weather makes its water.
+    pub(crate) region_sea: [[f32; 4]; crate::gpu_consts::regions::MAX as usize],
     /// The climate walls' segments: one end's xy, the other's.
     pub(crate) walls: [[f32; 4]; crate::gpu_consts::regions::WALL_SEGMENTS as usize],
     /// Per segment: the region on its left hand and on its right, metres along its
@@ -137,7 +140,7 @@ const _: () = assert!(
         == 496
             + MAX_GLOWS * 32
             + MAX_VORTICES * 32
-            + crate::gpu_consts::regions::MAX as usize * 16
+            + crate::gpu_consts::regions::MAX as usize * 32
             + crate::gpu_consts::regions::WALL_SEGMENTS as usize * 32
             + 16
 );
@@ -1496,6 +1499,7 @@ impl Sky {
             w.cover,
         ];
         atmos.region_sky = regions.region_sky;
+        atmos.region_sea = regions.region_sea;
         atmos.walls = regions.walls;
         atmos.wall_sides = regions.wall_sides;
         atmos.regions = regions.regions;

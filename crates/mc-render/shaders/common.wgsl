@@ -607,6 +607,10 @@ struct Atmosphere {
     // the cloud masses (`shape.y`), w how readily it rains (`shape.z`). `layer` and
     // `shape` hold region 0's.
     region_sky: array<vec4<f32>, REGIONS_MAX>,
+    // Each region's sea (water.wgsl `sea_frame`): xy its wave field's turn against the
+    // map's, a cosine and a sine times the field's scale; z how rough its weather
+    // makes its water against a fair day's.
+    region_sea: array<vec4<f32>, REGIONS_MAX>,
     // The climate walls' segments: xy one end, zw the other, map metres.
     walls: array<vec4<f32>, REGIONS_WALL_SEGMENTS>,
     // Per segment: x the region on its left hand walking from its xy to its zw, y the

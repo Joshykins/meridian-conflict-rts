@@ -196,6 +196,61 @@ fn sea_waves(xy: vec2<f32>, time: f32, pixel: f32, across: f32, long: f32, wind:
     return out;
 }
 
+// ---------------------------------------------------------------- a region's own sea
+
+// On a map with regions (regions.wgsl) each region's sea is its own: its waves, its
+// gusts and its whitecaps are the one field every sea has, read in a frame of the
+// region's own (turned, scaled by its weather, and a long way off), so no crest,
+// lane or line of foam carries on from one sea into the next across a climate
+// wall. The seas hand over within the few metres either side of the wall that the
+// ground does (`REGIONS_BLEND_M`).
+struct SeaFrame {
+    // A map point in the field: turned and scaled by `turn` (a cosine and a sine,
+    // times `scale`), then moved by `shift`.
+    turn: vec2<f32>,
+    shift: vec2<f32>,
+    // Field metres to a map metre: past 1 the waves are shorter on the map.
+    scale: f32,
+    // How rough the region's weather makes its water against a fair day's.
+    rough: f32,
+    // How open the water is to the wind: 1 the open sea, 0.55 a canyon lake, which
+    // is sheltered (the wind has no fetch to raise a sea).
+    open: f32,
+}
+
+// How far apart the regions' frames lie in the field.
+const SEA_REGION_STEP: vec2<f32> = vec2<f32>(3301.0, -2713.0);
+
+// The sea of a map without regions: the field as it lies.
+fn sea_frame_plain() -> SeaFrame {
+    return SeaFrame(vec2<f32>(1.0, 0.0), vec2<f32>(0.0), 1.0, 1.0, select(1.0, 0.55, desert()));
+}
+
+// Region `r`'s sea (`Atmosphere::region_sea`).
+fn sea_frame(r: u32) -> SeaFrame {
+    let sea = atmos.region_sea[r];
+    return SeaFrame(sea.xy, f32(r) * SEA_REGION_STEP, length(sea.xy), sea.z, select(1.0, 0.55, globals.region_climate[r].y > 0.5));
+}
+
+// The sea `xy` is part of, all one region's: for what need not hand over at a wall.
+fn sea_frame_at(xy: vec2<f32>) -> SeaFrame {
+    if !has_regions() {
+        return sea_frame_plain();
+    }
+    return sea_frame(region_probe(xy).region);
+}
+
+// `xy` in the frame's field.
+fn sea_point(frame: SeaFrame, xy: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(xy.x * frame.turn.x - xy.y * frame.turn.y, xy.x * frame.turn.y + xy.y * frame.turn.x) + frame.shift;
+}
+
+// A slope of the field's waves as the map has it: turned back, and as steep as the
+// field made it (a finer field's waves are lower, not steeper).
+fn sea_slope(frame: SeaFrame, slope: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(slope.x * frame.turn.x + slope.y * frame.turn.y, slope.y * frame.turn.x - slope.x * frame.turn.y) / frame.scale;
+}
+
 // The weather on the water here, from the sky's weather map.
 struct SeaState {
     // The wind over the water against a fair day's 12 m/s, squalls under a storm
@@ -209,15 +264,14 @@ struct SeaState {
     open: f32,
 }
 
-fn sea_state(xy: vec2<f32>) -> SeaState {
-    let w = weather_at(xy);
+// `weather` is the sky's weather over the water (`weather_at`), `frame` the sea it
+// is part of.
+fn sea_state(weather: vec4<f32>, frame: SeaFrame) -> SeaState {
     var out: SeaState;
-    out.storm = clamp(w.y, 0.0, 1.0);
-    out.rain = clamp(w.w, 0.0, 1.0);
-    // A canyon lake is sheltered: the wind has no fetch to raise a sea. (Either side
-    // of a climate wall the sea changes over a stretch of water, not on the line.)
-    out.open = side_mix(1.0, 0.55, climate_within(xy, REGIONS_SKY_BLEND_M).y);
-    out.wind = length(atmos.wind.zw) / 12.0 * (1.0 + out.storm * 0.9) * out.open;
+    out.storm = clamp(weather.y, 0.0, 1.0);
+    out.rain = clamp(weather.w, 0.0, 1.0);
+    out.open = frame.open;
+    out.wind = length(atmos.wind.zw) / 12.0 * (1.0 + out.storm * 0.9) * out.open * frame.rough;
     return out;
 }
 
@@ -954,8 +1008,6 @@ fn sea_flash(world: vec3<f32>, n: vec3<f32>, v: vec3<f32>, rough: f32, fresnel: 
     return light;
 }
 
-// ---------------------------------------------------------------- the surface
-
 // ---------------------------------------------------------------- the sea from far off
 
 struct FarSea {
@@ -1015,6 +1067,157 @@ fn far_sea(xy: vec2<f32>, time: f32, pixel: f32, sea: SeaState) -> FarSea {
     out.tone -= sea.storm * 0.15;
     return out;
 }
+
+// ---------------------------------------------------------------- the open sea
+
+// A point of the water's surface, as `open_sea` is asked about it.
+struct SeaSpot {
+    xy: vec2<f32>,
+    // The sky's weather over it (`weather_at`).
+    weather: vec4<f32>,
+    time: f32,
+    // The pixel's footprint on the water, metres: its long side, which filters the
+    // slope, and its mean width, for what reads as a shape rather than a glint.
+    pixel: f32,
+    across: f32,
+    // How much of the swell the depth lets stand (it calms toward the shore, where
+    // the breakers take over), and how far the shallows calm the short waves.
+    amp: f32,
+    calm: f32,
+    // 1 where the pixel is metres across over open water: the view from a strategic
+    // height, where the far sea's lanes, gusts and swell take over.
+    far: f32,
+}
+
+// What one sea makes of a point of its surface: its weather there, its waves, and
+// the whitecaps they break into.
+struct OpenSea {
+    // As `SeaState`.
+    wind: f32,
+    storm: f32,
+    rain: f32,
+    open: f32,
+    // As `SeaWaves`: the surface's slope, the slope variance of the trains the pixel
+    // is too coarse to show, and the long swell's height (-1 to 1).
+    slope: vec2<f32>,
+    lost: f32,
+    swell: f32,
+    // As `FarSea`, where the spot is `far`.
+    far_tone: f32,
+    far_rough: f32,
+    far_foam: f32,
+    // Whitecaps: the churned white water of a crest as it breaks, and the cover of
+    // the foam it drops and the spume a gale blows from it, for the lace.
+    cap: f32,
+    lace: f32,
+}
+
+// The open sea at `spot` as the sea `frame` has it.
+fn open_sea(spot: SeaSpot, frame: SeaFrame) -> OpenSea {
+    var out: OpenSea;
+    // The weather on the water: the wind raises the sea, a storm whips it up and
+    // the rain pocks it.
+    let sea = sea_state(spot.weather, frame);
+    out.wind = sea.wind;
+    out.storm = sea.storm;
+    out.rain = sea.rain;
+    out.open = sea.open;
+    // The point and the pixel's footprint in the sea's own field.
+    let xy = sea_point(frame, spot.xy);
+    let pixel = spot.pixel * frame.scale;
+    let across = spot.across * frame.scale;
+    let time = spot.time;
+    // The short waves come and go in gusts running downwind.
+    let gust = grad_noise2(xy - SEA_WIND * time * 5.0 + vec2<f32>(37.0, 11.0), 120.0);
+    let chop = mix(0.45, 1.35, smoothstep(0.3, 0.72, gust)) * mix(0.85, 1.1, smoothstep(0.6, 2.0, sea.wind));
+    let long = spot.amp * mix(1.0, 2.0, smoothstep(0.8, 2.4, sea.wind));
+    let wind_sea = mix(0.8, 1.9, smoothstep(0.5, 2.4, sea.wind));
+    let waves = sea_waves(xy, time, pixel, across, long, wind_sea, chop);
+    out.slope = sea_slope(frame, waves.slope);
+    out.lost = waves.lost;
+    out.swell = waves.swell;
+    if spot.far > 0.0 {
+        let far_fx = far_sea(xy, time, pixel, sea);
+        out.far_tone = far_fx.tone;
+        out.far_rough = far_fx.rough;
+        out.far_foam = far_fx.foam;
+    }
+    // Whitecaps where the waves pile up steepest, more of them the harder the wind
+    // blows and most in the gusts; out in open water only. A crest breaks solid
+    // white, and the foam it drops lies where it broke, thinning into lace, while
+    // the wave runs on. Under a few pixels a cap is only its average (`far_sea`).
+    let open_water = spot.amp * (1.0 - spot.calm);
+    let th = cap_threshold(sea.wind);
+    let gusty = mix(0.4, 1.0, max(smoothstep(0.35, 0.75, gust), sea.storm)) * open_water;
+    // (By the footprint's width: seen low across the water a cap is still metres
+    // wide on screen though the pixel runs a long way into the distance.)
+    let caps_shown = smoothstep(1.2, 3.5, 8.0 / max(across, 0.001));
+    // A cap has a soft, broken rim: its own mask, not the lace's hard-edged one,
+    // which cut caps out like paper.
+    let tumble = soft_noise(xy + SEA_WIND * time * 0.8, 1.6, across) * 0.6
+        + soft_noise(xy + vec2<f32>(31.0, -17.0) - SEA_WIND * time * 0.5, 0.6, across) * 0.4;
+    // Only some crests go over: groups of breakers drift downwind with the waves,
+    // come and go, and leave the water between them unbroken.
+    let groups = smoothstep(0.42, 0.7, mix(
+        grad_noise2(xy - SEA_WIND * time * 6.0, 34.0),
+        grad_noise2(xy.yx + vec2<f32>(77.0, -41.0) - SEA_WIND.yx * time * 5.0, 21.0),
+        0.5 + 0.5 * sin(time * 0.21)));
+    let breaking = smoothstep(th - 0.3, th + 0.8, waves.crest) * (0.55 + 0.9 * tumble) * mix(0.25, 1.15, groups);
+    out.cap = smoothstep(0.3, 0.95, breaking) * gusty * caps_shown;
+    // The foam a crest dropped is drawn out in threads down the wind as it thins.
+    let wind_a = dot(xy, SEA_WIND);
+    let wind_c = dot(xy, vec2<f32>(-SEA_WIND.y, SEA_WIND.x));
+    let threads = soft_noise(vec2<f32>(wind_a * 0.25, wind_c), 1.1, across);
+    let dropped = max(smoothstep(th - 0.2, th + 0.6, waves.crest_then.x) * 0.55, smoothstep(th - 0.1, th + 0.6, waves.crest_then.y) * 0.4)
+        * mix(0.35, 1.25, threads);
+    // A gale blows the spume from the crests out in streaks down the wind.
+    let spume = smoothstep(0.6, 0.8, soft_noise(vec2<f32>((wind_a - time * 4.0) * 0.08, wind_c), 2.5, pixel))
+        * smoothstep(1.3, 2.3, sea.wind) * open_water;
+    // What a crest drops lies as lace.
+    out.lace = max(max(breaking * 0.4, dropped) * gusty * caps_shown, spume * 0.65);
+    return out;
+}
+
+// `sum` with `share` of `sea` added: how the seas either side of a climate wall are mixed.
+fn open_sea_add(sum: OpenSea, sea: OpenSea, share: f32) -> OpenSea {
+    var out = sum;
+    out.wind += sea.wind * share;
+    out.storm += sea.storm * share;
+    out.rain += sea.rain * share;
+    out.open += sea.open * share;
+    out.slope += sea.slope * share;
+    out.lost += sea.lost * share;
+    out.swell += sea.swell * share;
+    out.far_tone += sea.far_tone * share;
+    out.far_rough += sea.far_rough * share;
+    out.far_foam += sea.far_foam * share;
+    out.cap += sea.cap * share;
+    out.lace += sea.lace * share;
+    return out;
+}
+
+// The open sea at `spot`: the one sea of a map without regions; on a map with them
+// the sea of the region the spot is in, handing over to the next region's within a
+// few metres of a climate wall (never less than a pixel or two).
+fn open_sea_at(spot: SeaSpot) -> OpenSea {
+    if !has_regions() {
+        return open_sea(spot, sea_frame_plain());
+    }
+    let shares = region_shares(spot.xy, max(REGIONS_BLEND_M, spot.pixel * 1.5));
+    if !shares.mixed {
+        return open_sea(spot, sea_frame(shares.region));
+    }
+    var out: OpenSea;
+    let regions = u32(atmos.regions.y);
+    for (var r = 0u; r < regions; r++) {
+        if shares.w[r] > 0.0 {
+            out = open_sea_add(out, open_sea(spot, sea_frame(r)), shares.w[r]);
+        }
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------- the surface
 
 // How light goes through this map's water: absorbed per metre, red first, and
 // the colour it scatters back from a column `column` metres deep, lit by `lit`.
@@ -1080,27 +1283,16 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let behind = sea_world(uv, behind_d);
 
     // ---- the surface
-    // The weather on the water: the wind raises the sea, a storm whips it up and
-    // the rain pocks it.
-    let sea = sea_state(xy);
-    // The swell calms toward the shore, where the breakers take over; the
-    // short waves come and go in gusts running downwind.
+    // The open sea here (`open_sea`): its weather, its waves and its whitecaps.
+    // The swell calms toward the shore, where the breakers take over.
     let amp = smoothstep(0.2, 5.0, depth);
     let calm = 1.0 - smoothstep(1.0, 12.0, depth);
     // 1 where this pixel is metres across over open water: the view from a
     // strategic height, where the far sea's lanes, gusts and swell take over.
     let far = smoothstep(1.5, 6.0, pixel) * smoothstep(4.0, 16.0, depth);
-    let gust = grad_noise2(xy - SEA_WIND * time * 5.0 + vec2<f32>(37.0, 11.0), 120.0);
-    let chop = mix(0.45, 1.35, smoothstep(0.3, 0.72, gust)) * mix(0.85, 1.1, smoothstep(0.6, 2.0, sea.wind));
-    let long = amp * mix(1.0, 2.0, smoothstep(0.8, 2.4, sea.wind));
-    let wind_sea = mix(0.8, 1.9, smoothstep(0.5, 2.4, sea.wind));
     // The footprint's mean width, for what reads as a shape rather than a glint.
     let across = sqrt(length(dpdx(xy)) * length(dpdy(xy)));
-    let waves = sea_waves(xy, time, pixel, across, long, wind_sea, chop);
-    var far_fx: FarSea;
-    if far > 0.0 {
-        far_fx = far_sea(xy, time, pixel, sea);
-    }
+    let sea = open_sea_at(SeaSpot(xy, weather_at(xy), time, pixel, across, amp, calm, far));
     let drops = rain_rings(xy, time, pixel, sea.rain);
     // Rings, wakes and foam from what is happening on the water.
     var stir: SeaStir;
@@ -1114,7 +1306,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     }
     // A muzzle blast presses the waves flat for a moment.
     let unpressed = 1.0 - stir.flat;
-    let n = normalize(vec3<f32>(-(waves.slope * unpressed + stir.slope + breakers.slope + drops), 1.0));
+    let n = normalize(vec3<f32>(-(sea.slope * unpressed + stir.slope + breakers.slope + drops), 1.0));
     let n_dot_v = clamp(dot(n, v), 0.0001, 1.0);
 
     // Schlick with the water's 2% at normal incidence.
@@ -1197,7 +1389,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let h = normalize(v + l);
     let n_dot_l = max(dot(n, l), 0.0);
     // Rain too fine to draw roughens the water, dulling the sun's glitter.
-    let rough = sqrt(0.003 + waves.lost * unpressed + stir.rough + far_fx.rough * far + sea.rain * 0.012);
+    let rough = sqrt(0.003 + sea.lost * unpressed + stir.rough + sea.far_rough * far + sea.rain * 0.012);
     let a2 = rough * rough;
     let n_dot_h = max(dot(n, h), 0.0);
     let dd = n_dot_h * n_dot_h * (a2 - 1.0) + 1.0;
@@ -1218,7 +1410,7 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     // Rain dulls it: the pocked surface scatters the sky's reflection.
     color *= 1.0 - 0.12 * sea.rain;
     // From far off the lanes and gusts, and the long swell's crests catching the light.
-    color *= 1.0 + (far_fx.tone * sea.open + waves.swell * 0.06) * far;
+    color *= 1.0 + (sea.far_tone * sea.open + sea.swell * 0.06) * far;
 
     // ---- foam
     var cover = breakers.foam;
@@ -1248,41 +1440,10 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
         cover = max(cover, ring * 0.9);
     }
     cover = max(cover, stir.foam);
-    // Whitecaps where the waves pile up steepest, more of them the harder the wind
-    // blows and most in the gusts; out in open water only. A crest breaks solid
-    // white, and the foam it drops lies where it broke, thinning into lace, while
-    // the wave runs on. Under a few pixels a cap is only its average (`far_sea`).
-    let open_sea = amp * (1.0 - calm);
-    let th = cap_threshold(sea.wind);
-    let gusty = mix(0.4, 1.0, max(smoothstep(0.35, 0.75, gust), sea.storm)) * open_sea;
-    // (By the footprint's width: seen low across the water a cap is still metres
-    // wide on screen though the pixel runs a long way into the distance.)
-    let caps_shown = smoothstep(1.2, 3.5, 8.0 / max(across, 0.001));
-    // A cap has a soft, broken rim: its own mask, not the lace's hard-edged one,
-    // which cut caps out like paper.
-    let tumble = soft_noise(xy + SEA_WIND * time * 0.8, 1.6, across) * 0.6
-        + soft_noise(xy + vec2<f32>(31.0, -17.0) - SEA_WIND * time * 0.5, 0.6, across) * 0.4;
-    // Only some crests go over: groups of breakers drift downwind with the waves,
-    // come and go, and leave the water between them unbroken.
-    let groups = smoothstep(0.42, 0.7, mix(
-        grad_noise2(xy - SEA_WIND * time * 6.0, 34.0),
-        grad_noise2(xy.yx + vec2<f32>(77.0, -41.0) - SEA_WIND.yx * time * 5.0, 21.0),
-        0.5 + 0.5 * sin(time * 0.21)));
-    let breaking = smoothstep(th - 0.3, th + 0.8, waves.crest) * (0.55 + 0.9 * tumble) * mix(0.25, 1.15, groups);
-    let cap = smoothstep(0.3, 0.95, breaking) * gusty * caps_shown;
-    // The foam a crest dropped is drawn out in threads down the wind as it thins.
-    let wind_a = dot(xy, SEA_WIND);
-    let wind_c = dot(xy, vec2<f32>(-SEA_WIND.y, SEA_WIND.x));
-    let threads = soft_noise(vec2<f32>(wind_a * 0.25, wind_c), 1.1, across);
-    let dropped = max(smoothstep(th - 0.2, th + 0.6, waves.crest_then.x) * 0.55, smoothstep(th - 0.1, th + 0.6, waves.crest_then.y) * 0.4)
-        * mix(0.35, 1.25, threads);
-    // What it drops lies as lace.
-    cover = max(cover, max(breaking * 0.4, dropped) * gusty * caps_shown);
-    // A gale blows the spume from the crests out in streaks down the wind.
-    let spume = smoothstep(0.6, 0.8, soft_noise(vec2<f32>((wind_a - time * 4.0) * 0.08, wind_c), 2.5, pixel))
-        * smoothstep(1.3, 2.3, sea.wind) * open_sea;
-    cover = max(cover, spume * 0.65);
-    let far_caps = far_fx.foam * far;
+    // The open sea's whitecaps (`open_sea`): what its crests drop lies as lace.
+    cover = max(cover, sea.lace);
+    let cap = sea.cap;
+    let far_caps = sea.far_foam * far;
     let foam = foam_lace(xy, time, pixel, cover * 0.85);
     let foam_color = vec3<f32>(0.80, 0.86, 0.88) * (0.35 + 0.65 * shadow) * (0.55 + 0.45 * sun_in);
     // Water a hull has churned full of air: paler and greener, lit from within,
@@ -1424,13 +1585,17 @@ fn under_sea(clip: vec4<f32>) -> vec4<f32> {
     if t_top < t_scene {
         // ---- the surface from below
         let p = eye + dir * t_top;
-        let sea = sea_state(p.xy);
-        let waves = sea_waves(p.xy, time, pixel, pixel, 1.0, mix(0.8, 1.9, smoothstep(0.5, 2.4, sea.wind)), 1.0);
+        // (The waves of the sea overhead, all one region's: seen from below, a wall's
+        // few metres of hand-over do not show.)
+        let frame = sea_frame_at(p.xy);
+        let sea = sea_state(weather_at(p.xy), frame);
+        let waves = sea_waves(sea_point(frame, p.xy), time, pixel * frame.scale, pixel * frame.scale, 1.0,
+            mix(0.8, 1.9, smoothstep(0.5, 2.4, sea.wind)), 1.0);
         var stir: SeaStir;
         if t_top < 600.0 {
             stir = sea_stir(p.xy, time, pixel);
         }
-        let n = normalize(vec3<f32>(-(waves.slope + stir.slope), 1.0));
+        let n = normalize(vec3<f32>(-(sea_slope(frame, waves.slope) + stir.slope), 1.0));
         // From water into air: past about 48.6 degrees from overhead the light
         // cannot leave, and the surface is a mirror of the water under it.
         let out = refract(dir, -n, 1.33);

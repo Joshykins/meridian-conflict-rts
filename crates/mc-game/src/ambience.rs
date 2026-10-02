@@ -376,12 +376,14 @@ impl Ambience {
 
     /// Moves the ambience on by `dt`: eases the beds towards what the place,
     /// the sky and the battle call for, and scatters the calls. `ground` is the
-    /// terrain's height at a point (`Renderer::ground_height`), for the shore.
+    /// terrain's height at a point (`Renderer::ground_height`), for the shore, and
+    /// `surf_at` the point its breakers are worked out for (`Renderer::surf_point`).
     pub fn frame(
         &mut self,
         map: &Arc<MapFile>,
         cues: &Cues,
         ground: &dyn Fn(Vec2) -> f32,
+        surf_at: &dyn Fn(Vec2) -> Vec2,
         audio: &Audio,
         dt: f32,
     ) {
@@ -394,7 +396,7 @@ impl Ambience {
             self.music = audio.music_status().is_some();
         }
         let (library, generation) = audio.library();
-        self.step(&library, generation, cues, ground, dt);
+        self.step(&library, generation, cues, ground, surf_at, dt);
         if *self
             .log
             .get_or_insert_with(|| std::env::var_os("MERIDIAN_AMBIENCE_LOG").is_some())
@@ -434,6 +436,7 @@ impl Ambience {
         generation: u32,
         cues: &Cues,
         ground: &dyn Fn(Vec2) -> f32,
+        surf_at: &dyn Fn(Vec2) -> Vec2,
         dt: f32,
     ) {
         let dt = dt.clamp(0.0, 0.25);
@@ -721,7 +724,7 @@ impl Ambience {
                 0.0,
             ));
         }
-        self.waves(cues, ground, dt, detail, (windy, duck));
+        self.waves(cues, (ground, surf_at), dt, detail, (windy, duck));
     }
 
     /// The breakers along the shore near the focus: each crash played so it lands as
@@ -731,7 +734,7 @@ impl Ambience {
     fn waves(
         &mut self,
         cues: &Cues,
-        ground: &dyn Fn(Vec2) -> f32,
+        (ground, surf_at): (&dyn Fn(Vec2) -> f32, &dyn Fn(Vec2) -> Vec2),
         dt: f32,
         detail: f32,
         (windy, duck): (f32, f32),
@@ -746,7 +749,14 @@ impl Ambience {
         let climate = mc_render::shore::climate_scale(cues.desert, cues.tropical, cues.wind);
         let mut hits = Vec::new();
         self.surf.step(
-            ground, cues.sea, focus, reach, cues.clock, climate, dt, &mut hits,
+            (ground, surf_at),
+            cues.sea,
+            focus,
+            reach,
+            cues.clock,
+            climate,
+            dt,
+            &mut hits,
         );
         let right = Vec2::new(cues.yaw.cos(), -cues.yaw.sin());
         // How far along the shore a breaker is still heard well.
@@ -880,7 +890,7 @@ mod tests {
         let mut now = *cues;
         for f in 0..(seconds * 30.0) as usize {
             now.clock = cues.clock + f as f32 / 30.0;
-            amb.step(library, 0, &now, &ground, 1.0 / 30.0);
+            amb.step(library, 0, &now, &ground, &|xy| xy, 1.0 / 30.0);
             heard.extend(amb.calls.drain(..).map(|c| library.sound(c.0).name.clone()));
         }
         let beds = amb
@@ -960,7 +970,7 @@ mod tests {
                 clock: f as f32 / 30.0,
                 ..at
             };
-            amb.step(&library, 0, &now, &ground, 1.0 / 30.0);
+            amb.step(&library, 0, &now, &ground, &|xy| xy, 1.0 / 30.0);
             for (sound, gain, _, _, delay) in amb.calls.drain(..) {
                 let name = &library.sound(sound).name;
                 crashes += (name == "wave_break") as u32;
@@ -1028,7 +1038,7 @@ mod tests {
             if f % 3 == 0 {
                 amb.listen(din);
             }
-            amb.step(library, 0, cues, &ground, 1.0 / 30.0);
+            amb.step(library, 0, cues, &ground, &|xy| xy, 1.0 / 30.0);
             calls.extend(
                 amb.calls
                     .drain(..)

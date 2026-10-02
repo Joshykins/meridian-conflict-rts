@@ -58,8 +58,9 @@ fn shore_at(xy: vec2<f32>, depth: f32) -> Shore {
 // The breakers' size on the water at `xy`: open coast, a reef-sheltered tropical
 // shore, or a canyon lake, and bigger the harder the wind blows (`surf_wind`).
 fn surf_climate(xy: vec2<f32>) -> f32 {
-    // (Either side of a climate wall the surf changes over a stretch of shore.)
-    let climate = climate_within(xy, REGIONS_SKY_BLEND_M);
+    // (At a climate wall one region's surf ends and the next one's begins, as their
+    // seas do: within a few metres.)
+    let climate = climate_within(xy, REGIONS_BLEND_M);
     var base = side_mix(1.0, SURF_TROPICAL, climate.x);
     if climate.y > 0.0 {
         base = side_mix(base, SURF_DESERT, climate.y);
@@ -85,8 +86,19 @@ fn surf_travel(depth: f32, slope: f32) -> f32 {
     return 2.0 * sqrt(max(depth, 0.0) / 9.81) / max(slope, SURF_MIN_SLOPE);
 }
 
-// Seconds by which the breakers here run ahead of the ones further along: slow
-// sines only, so the CPU gets the very same number. The long terms bend the
+// The point the breakers at `xy` are worked out for (`surf_lag`, `surf_size`): `xy`
+// itself, but on a map with regions each region's surf is its own, read a long way
+// off per region, so a line of breakers does not run on through a climate wall.
+// (shore.rs `surf_point`.)
+fn surf_point(xy: vec2<f32>) -> vec2<f32> {
+    if !has_regions() {
+        return xy;
+    }
+    return xy + f32(region_probe(xy).region) * vec2<f32>(SURF_REGION_STEP_X, SURF_REGION_STEP_Y);
+}
+
+// Seconds by which the breakers at `xy` (a `surf_point`) run ahead of the ones
+// further along: slow sines only, so the CPU gets the very same number. The long terms bend the
 // crests along the shore, the short ones kink them, and the terms in time let
 // the gap between one wave and the next come and go by a second or so.
 fn surf_lag(xy: vec2<f32>, time: f32) -> f32 {
@@ -98,7 +110,7 @@ fn surf_lag(xy: vec2<f32>, time: f32) -> f32 {
         + 0.9 * sin(dot(xy, vec2<f32>(0.0009, 0.0013)) + time * 0.11);
 }
 
-// The size of breaker `m` at `xy`, about 1 at its biggest: the swell comes in
+// The size of breaker `m` at `xy` (a `surf_point`), about 1 at its biggest: the swell comes in
 // uneven sets, and each wave stands up in sections along the shore, big in one
 // stretch and too small to break in the next.
 fn surf_size(m: f32, xy: vec2<f32>) -> f32 {
@@ -113,11 +125,6 @@ fn surf_size(m: f32, xy: vec2<f32>) -> f32 {
 // its water rolls in as a plain swell, a gap in the line of white.
 fn surf_breaking(m: f32, xy: vec2<f32>) -> f32 {
     return smoothstep(0.22, 0.42, surf_size(m, xy));
-}
-
-// Its height in metres on this map.
-fn surf_height(m: f32, xy: vec2<f32>) -> f32 {
-    return SURF_HEIGHT * surf_size(m, xy) * surf_climate(xy);
 }
 
 // The waves at `xy` on the water.
@@ -144,11 +151,14 @@ fn surf(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Surf {
         return out;
     }
     let travel = surf_travel(depth, bed.y);
-    let p = (time + travel + surf_lag(xy, time)) / SURF_PERIOD;
+    // Where the breakers here are worked out for: `xy`, or its region's own.
+    let at = surf_point(xy);
+    let p = (time + travel + surf_lag(at, time)) / SURF_PERIOD;
     let m = round(p);
     // < 0: the crest is still to come, seaward of here; > 0: it has passed.
     let d = p - m;
-    let height = surf_height(m, xy);
+    // Its height in metres on this map.
+    let height = SURF_HEIGHT * surf_size(m, at) * surf_climate(xy);
     let breaks = height * SURF_BREAK_RATIO;
     // Metres between crests here: they bunch up as the water shoals.
     let spacing = sqrt(9.81 * max(depth, 0.15)) * SURF_PERIOD;
@@ -205,7 +215,7 @@ fn surf(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Surf {
     }
     // How much of this wave breaks here: whole sections of it roll in unbroken,
     // and over a rip it hardly breaks at all.
-    let white = surf_breaking(m, xy) * (1.0 - rip * 0.75);
+    let white = surf_breaking(m, at) * (1.0 - rip * 0.75);
     // The broken crest's line is ragged: it goes over sooner in one spot than the
     // next, and each wave's ragged edge is its own.
     let ragged = (soft_ripple(xy * 0.37 + vec2<f32>(m * 31.0, m * 17.0), pixel * 0.37) - 0.5) * (3.0 + height * 3.0)
@@ -218,7 +228,7 @@ fn surf(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Surf {
     let lip_w = max(0.8 + height * 1.2, pixel);
     let at_break = 1.0 - smoothstep(0.0, 0.5, broken);
     let lip = exp(-(xr + lip_w * 0.3) * (xr + lip_w * 0.3) / (lip_w * lip_w)) * smoothstep(breaks * 1.15, breaks * 0.9, depth);
-    out.lip = lip * mix(0.55, 1.0, at_break) * mix(0.6, 1.0, surf_size(m, xy) - 0.3) * shown * white * heaps;
+    out.lip = lip * mix(0.55, 1.0, at_break) * mix(0.6, 1.0, surf_size(m, at) - 0.3) * shown * white * heaps;
     // White water left behind the broken crest as it runs in, thinning out, torn
     // into streaks and holes as it goes.
     let age = max(d, 0.0) * SURF_PERIOD;
@@ -255,10 +265,11 @@ fn wash(xy: vec2<f32>, s: Shore, time: f32, pixel: f32) -> Wash {
     let slope = max(s.slope, SURF_MIN_SLOPE);
     // Metres up the beach from the waterline (negative out on the water).
     let up = -s.depth / slope;
-    let p = (time + surf_lag(xy, time)) / SURF_PERIOD;
+    let at = surf_point(xy);
+    let p = (time + surf_lag(at, time)) / SURF_PERIOD;
     let m = floor(p);
     let since = (p - m) * SURF_PERIOD;
-    let size = surf_size(m, xy) * surf_climate(xy);
+    let size = surf_size(m, at) * surf_climate(xy);
     // Each wash runs up in lobes of its own, further here and less there, so its
     // front and the wet it leaves are never one clean line along the shore.
     // Over longer stretches, too: one wave runs far up one part of the beach and

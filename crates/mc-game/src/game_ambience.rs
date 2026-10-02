@@ -38,6 +38,8 @@ impl Game {
             clock: renderer.time(),
         };
         let ground = |xy| renderer.ground_height(xy);
-        self.ambience.frame(&self.map, &cues, &ground, audio, dt);
+        let surf_at = |xy| renderer.surf_point(xy);
+        self.ambience
+            .frame(&self.map, &cues, &ground, &surf_at, audio, dt);
     }
 }

@@ -59,6 +59,14 @@ pub fn travel(depth: f32, slope: f32) -> f32 {
     2.0 * (depth.max(0.0) / 9.81).sqrt() / slope.max(surf::MIN_SLOPE)
 }
 
+/// The point the breakers at `xy` are worked out for (`lag`, `size`, `crest_time`,
+/// `next_breaker` and `breaking` take it): `xy` itself in region 0, and on a map with
+/// regions a long way off per region, so each region's surf is its own (shore.wgsl
+/// `surf_point`; `Renderer::surf_point` knows the region).
+pub fn surf_point(region: usize, xy: Vec2) -> Vec2 {
+    xy + region as f32 * Vec2::new(surf::REGION_STEP_X, surf::REGION_STEP_Y)
+}
+
 /// Seconds by which the breakers at `xy` run ahead of the ones further along the shore.
 pub fn lag(xy: Vec2, time: f32) -> f32 {
     1.4 * (xy.dot(Vec2::new(0.0061, 0.0023)) + time * 0.021).sin()
@@ -139,6 +147,30 @@ pub fn next_breaker(xy: Vec2, slope: f32, time: f32, climate: f32) -> Breaker {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_regions_surf_is_its_own() {
+        let xy = Vec2::new(1472.0, 1024.0);
+        // Region 0's is the map's own: a map without regions is all region 0.
+        assert_eq!(surf_point(0, xy), xy);
+        // Along a kilometre of shore every other region's waves come in at other
+        // moments and in other sizes than region 0's, nearly everywhere.
+        let shore = |i: usize| xy + Vec2::new(13.0, 61.0) * i as f32;
+        for region in 1..8 {
+            let (mut moments, mut sizes) = (0, 0);
+            for i in 0..16 {
+                let (here, there) = (shore(i), surf_point(region, shore(i)));
+                let apart = (crest_time(here, 70.0, 0.0) - crest_time(there, 70.0, 0.0)).abs();
+                moments += (apart > 0.25) as usize;
+                sizes += (0..6).any(|m| (size(m as f32, here) - size(m as f32, there)).abs() > 0.1)
+                    as usize;
+            }
+            assert!(
+                moments >= 12 && sizes >= 12,
+                "region {region}'s breakers are region 0's: {moments} moments and {sizes} sizes of 16 differ"
+            );
+        }
+    }
 
     #[test]
     fn a_breaker_breaks_before_it_lands_and_the_next_one_is_a_period_on() {

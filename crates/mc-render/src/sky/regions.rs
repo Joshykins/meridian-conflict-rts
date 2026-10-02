@@ -4,7 +4,9 @@
 //! regions.wgsl `sky_at`), the weather simulation keeps each region's cloud in its
 //! region (clouds_sim.wgsl), and here storm cells form in a region as often as its
 //! weather is stormy and die against its walls. The wind is region 0's over the
-//! whole map.
+//! whole map. Each region's sea is its own too (`sea_of`; water.wgsl `sea_frame`):
+//! the one wave field turned and scaled by region, calmer under a clear sky and
+//! rougher under a stormy one, so no crest carries on through a wall.
 //!
 //! The walls are here for every shader that asks where a region ends, the ground's
 //! and the sea's too (bindings.wgsl `climate_at`): they read them from `Atmosphere`.
@@ -34,9 +36,25 @@ impl Default for Regions {
     }
 }
 
+/// Region `region`'s sea in weather `w`, as `Atmosphere::region_sea` holds it: its
+/// wave field's turn against the map's (a cosine and a sine, times the field's
+/// scale), and how rough the weather makes its water against a fair day's.
+fn sea_of(region: usize, w: &Weather) -> [f32; 4] {
+    // Tall cloud and rain come with a rougher sea: 0.67 under a clear sky, 1 on a
+    // fair day, 1.45 in a storm.
+    let rough = 1.0 + 0.6 * (w.towering - 0.5) + 0.3 * (w.rain - 0.5);
+    // A rougher sea runs longer waves: the field is read a fifth finer in a calm
+    // and a fifth coarser in a storm.
+    let scale = 1.0 / (0.8 + 0.45 * smoothstep(0.6, 1.5, rough));
+    // Each region's swell runs its own way, up to some 34 degrees off the map's.
+    let turn = 0.6 * (region as f32 * 2.4).sin();
+    [turn.cos() * scale, turn.sin() * scale, rough, 0.0]
+}
+
 /// What `Atmosphere` carries of the regions.
 pub(super) struct RegionUniforms {
     pub(super) region_sky: [[f32; 4]; consts::MAX as usize],
+    pub(super) region_sea: [[f32; 4]; consts::MAX as usize],
     pub(super) walls: [[f32; 4]; consts::WALL_SEGMENTS as usize],
     pub(super) wall_sides: [[f32; 4]; consts::WALL_SEGMENTS as usize],
     pub(super) regions: [f32; 4],
@@ -133,14 +151,16 @@ impl Regions {
         let regions = self.walls.regions();
         let mut out = RegionUniforms {
             region_sky: [[0.0; 4]; consts::MAX as usize],
+            region_sea: [[0.0; 4]; consts::MAX as usize],
             walls: [[0.0; 4]; consts::WALL_SEGMENTS as usize],
             wall_sides: [[0.0; 4]; consts::WALL_SEGMENTS as usize],
             regions: [0.0; 4],
             towering: 0.0,
         };
-        for (r, slot) in out.region_sky.iter_mut().enumerate().take(regions) {
+        for r in 0..regions {
             let w = self.weather(r, *own);
-            *slot = [w.cover, w.towering, w.scale, w.rain];
+            out.region_sky[r] = [w.cover, w.towering, w.scale, w.rain];
+            out.region_sea[r] = sea_of(r, &w);
             out.towering = out.towering.max(w.towering);
         }
         let segments = self.walls.segments();
@@ -258,6 +278,17 @@ mod tests {
             ]
         );
         assert_eq!(u.region_sky[2], [0.0; 4]);
+        // Each region's sea is its own: the clear west's calmer and finer than the
+        // stormy east's, which runs another way.
+        let [west, east] = [u.region_sea[0], u.region_sea[1]];
+        assert!(west[2] < 0.8 && east[2] > 1.3, "{west:?} {east:?}");
+        let scale = |sea: [f32; 4]| sea[0].hypot(sea[1]);
+        assert!(
+            scale(west) > 1.15 && scale(east) < 0.85,
+            "{west:?} {east:?}"
+        );
+        assert_eq!(west[1], 0.0);
+        assert!((east[1] / east[0]).atan().abs() > 0.3, "{east:?}");
         assert_eq!(u.walls[0], [4000.0, 0.0, 4000.0, 8000.0]);
         assert_eq!(u.wall_sides[0], [0.0, 1.0, 0.0, 1.0 / 8000.0]);
         // One wall segment between two regions; the tallest cloud and the most rain

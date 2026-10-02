@@ -3035,6 +3035,12 @@ impl Renderer {
         self.last_time
     }
 
+    /// The point the breakers at `xy` are worked out for (`shore::surf_point`): its
+    /// region's own, on a map with regions.
+    pub fn surf_point(&self, xy: glam::Vec2) -> glam::Vec2 {
+        crate::shore::surf_point(self.look.walls().region_at(xy.x, xy.y), xy)
+    }
+
     /// Lightning since the last call, for thunder.
     pub fn take_thunder(&mut self) -> Vec<crate::sky::Thunder> {
         self.sky.take_thunder()

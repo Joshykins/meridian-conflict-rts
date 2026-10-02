@@ -37,6 +37,8 @@ const MOST_AHEAD: f32 = 10.0;
 struct Spot {
     /// At the waterline.
     xy: Vec2,
+    /// The point its breakers are worked out for (`shore::surf_point`).
+    at: Vec2,
     /// Rise per metre of the bed the breakers roll in over there (`shore::bed`: the
     /// real bed's, but never steeper than `SURF_MAX_SLOPE`).
     slope: f32,
@@ -69,15 +71,17 @@ pub(super) struct Surf {
 impl Surf {
     /// Finds the shore round `focus` now and then, and puts into `out` every breaker
     /// (and every wash) whose sound starts from the last call up to `AHEAD` past
-    /// `clock`, the crash that much before the wave breaks. `reach` is how far out to look, `ground` the terrain's height, `sea`
-    /// the water level, `climate` `shore::climate_scale`.
+    /// `clock`, the crash that much before the wave breaks. `reach` is how far out to
+    /// look, `ground` the terrain's height and `surf_at` the point a shore point's
+    /// breakers are worked out for (`Renderer::surf_point`), `sea` the water level,
+    /// `climate` `shore::climate_scale`.
     #[expect(
         clippy::too_many_arguments,
         reason = "presentation: the ambience's inputs, read once a frame"
     )]
     pub(super) fn step(
         &mut self,
-        ground: &dyn Fn(Vec2) -> f32,
+        (ground, surf_at): (&dyn Fn(Vec2) -> f32, &dyn Fn(Vec2) -> Vec2),
         sea: f32,
         focus: Vec2,
         reach: f32,
@@ -89,7 +93,7 @@ impl Surf {
         self.refresh_in -= dt;
         if self.refresh_in <= 0.0 {
             self.refresh_in = REFRESH;
-            self.spots = find(ground, sea, focus, reach);
+            self.spots = find(ground, surf_at, sea, focus, reach);
         }
         let to = clock + AHEAD;
         // The first call, or the clock jumped (a new match, a reset): nothing is owed.
@@ -106,7 +110,7 @@ impl Surf {
 
 /// The crashes and washes at `spot` whose moment falls in `(from, to]`.
 fn breakers(spot: &Spot, clock: f32, climate: f32, from: f32, to: f32, out: &mut Vec<Hit>) {
-    let next = shore::next_breaker(spot.xy, spot.slope, clock, climate);
+    let next = shore::next_breaker(spot.at, spot.slope, clock, climate);
     // A wave's crash may come several waves before it lands on a flat shelf, and
     // a bigger one breaks further out, so each wave in reach is looked at.
     let deepest = surf::HEIGHT * climate * surf::BREAK_RATIO;
@@ -116,18 +120,18 @@ fn breakers(spot: &Spot, clock: f32, climate: f32, from: f32, to: f32, out: &mut
         + 1;
     for k in -1..=ahead {
         let wave = next.wave + k as f32;
-        let size = shore::size(wave, spot.xy) * climate;
+        let size = shore::size(wave, spot.at) * climate;
         // As `shore::next_breaker` has it: it lands when its crest reaches the
         // waterline, and breaks in water as deep as it is high times the ratio, the
         // swell's travel time from there before.
-        let lands = shore::crest_time(spot.xy, wave, 0.0);
+        let lands = shore::crest_time(spot.at, wave, 0.0);
         let breaks = shore::crest_time(
-            spot.xy,
+            spot.at,
             wave,
             shore::travel(surf::HEIGHT * size * surf::BREAK_RATIO, spot.slope),
         );
         // A section that rolls in unbroken (`shore::breaking`) is heard only washing up.
-        let crashes = shore::breaking(wave, spot.xy) > 0.3;
+        let crashes = shore::breaking(wave, spot.at) > 0.3;
         for (at, wash, lead) in [(breaks, false, CRASH_AT), (lands, true, WASH_AT)] {
             if !wash && !crashes {
                 continue;
@@ -150,7 +154,13 @@ fn breakers(spot: &Spot, clock: f32, climate: f32, from: f32, to: f32, out: &mut
 /// The nearest few points of the waterline round `focus`, each at least a quarter of
 /// `reach` (and 60 m) from the others: walks out along `RAYS` directions and takes
 /// the first place each crosses the water level, then measures the bed there.
-fn find(ground: &dyn Fn(Vec2) -> f32, sea: f32, focus: Vec2, reach: f32) -> Vec<Spot> {
+fn find(
+    ground: &dyn Fn(Vec2) -> f32,
+    surf_at: &dyn Fn(Vec2) -> Vec2,
+    sea: f32,
+    focus: Vec2,
+    reach: f32,
+) -> Vec<Spot> {
     let depth = |xy: Vec2| sea - ground(xy);
     let centre = depth(focus);
     let mut found: Vec<(f32, Vec2)> = Vec::new();
@@ -187,6 +197,7 @@ fn find(ground: &dyn Fn(Vec2) -> f32, sea: f32, focus: Vec2, reach: f32) -> Vec<
             let bed = shore::shore_at(ground, sea, xy);
             spots.push(Spot {
                 xy,
+                at: surf_at(xy),
                 slope: shore::bed(0.0, bed.slope).1,
             });
         }
@@ -203,14 +214,37 @@ mod tests {
         (1472.0 - xy.x) * 0.03
     }
 
+    /// A region's own surf, as `shore::surf_point` has it for region 2.
+    fn far_off(xy: Vec2) -> Vec2 {
+        shore::surf_point(2, xy)
+    }
+
     fn listen(ground: &dyn Fn(Vec2) -> f32, focus: Vec2, seconds: f32) -> Vec<(f32, Hit)> {
+        listen_in(ground, &|xy| xy, focus, seconds)
+    }
+
+    fn listen_in(
+        ground: &dyn Fn(Vec2) -> f32,
+        surf_at: &dyn Fn(Vec2) -> Vec2,
+        focus: Vec2,
+        seconds: f32,
+    ) -> Vec<(f32, Hit)> {
         let mut surf = Surf::default();
         let mut hits = Vec::new();
         let dt = 1.0 / 30.0;
         for f in 0..(seconds / dt) as usize {
             let clock = 500.0 + f as f32 * dt;
             let mut out = Vec::new();
-            surf.step(ground, 0.0, focus, 300.0, clock, 1.0, dt, &mut out);
+            surf.step(
+                (ground, surf_at),
+                0.0,
+                focus,
+                300.0,
+                clock,
+                1.0,
+                dt,
+                &mut out,
+            );
             hits.extend(out.into_iter().map(|h| (clock, h)));
         }
         hits
@@ -264,11 +298,21 @@ mod tests {
     /// breaker breaks at the depth its height times the ratio. Every crash heard is at
     /// such a moment, and every wash at the moment its crest reaches the waterline, on
     /// a beach and under a cliff alike.
+    /// On a map with regions each region's breakers are worked out for a point of its
+    /// own (shore.wgsl `surf_point`): the crashes heard there are that point's.
     #[test]
     fn the_crash_is_heard_when_the_shader_breaks_the_wave() {
         let cliff = |xy: Vec2| (1472.0 - xy.x) * 0.6;
-        for ground in [&beach as &dyn Fn(Vec2) -> f32, &cliff] {
-            let hits = listen(ground, Vec2::new(1440.0, 1024.0), 60.0);
+        let here = |xy: Vec2| xy;
+        for (ground, surf_at) in [
+            (
+                &beach as &dyn Fn(Vec2) -> f32,
+                &here as &dyn Fn(Vec2) -> Vec2,
+            ),
+            (&cliff, &here),
+            (&beach, &far_off),
+        ] {
+            let hits = listen_in(ground, surf_at, Vec2::new(1440.0, 1024.0), 60.0);
             assert!(hits.iter().any(|h| h.1.wash) && hits.iter().any(|h| !h.1.wash));
             for (_, h) in hits {
                 let slope = shore::bed(0.0, shore::shore_at(ground, 0.0, h.xy).slope).1;
@@ -278,16 +322,14 @@ mod tests {
                 } else {
                     surf::HEIGHT * h.size * surf::BREAK_RATIO
                 };
-                let p = (h.at + shore::travel(deep, slope) + shore::lag(h.xy, h.at)) / surf::PERIOD;
+                let at = surf_at(h.xy);
+                let p = (h.at + shore::travel(deep, slope) + shore::lag(at, h.at)) / surf::PERIOD;
                 assert!(
                     (p - p.round()).abs() * surf::PERIOD < 1.0 / 30.0,
                     "{h:?} is {:.3} s off its crest",
                     (p - p.round()) * surf::PERIOD
                 );
-                assert!(
-                    (shore::size(p.round(), h.xy) - h.size).abs() < 1e-4,
-                    "{h:?}"
-                );
+                assert!((shore::size(p.round(), at) - h.size).abs() < 1e-4, "{h:?}");
             }
         }
     }

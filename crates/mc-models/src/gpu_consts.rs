@@ -822,6 +822,11 @@ shared! {
         /// Breakers grow by this share per m/s of wind: size 0.4 + WIND_GAIN * wind,
         /// 1 on a fair day's 12 m/s, clamped to 0.6..1.5 (shore.wgsl `surf_wind`).
         pub const WIND_GAIN: f32 = 0.05;
+        /// On a map with regions each region's breakers are worked out this many
+        /// metres off per region (shore.wgsl `surf_point`), so a line of them does
+        /// not run on through a climate wall.
+        pub const REGION_STEP_X: f32 = 7919.0;
+        pub const REGION_STEP_Y: f32 = -5347.0;
     }
 
     /// Lengths of the water's effect list (`renderer/water_fx.rs`, water.wgsl `SeaFxList`):
