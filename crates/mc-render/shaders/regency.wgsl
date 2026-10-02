@@ -213,7 +213,7 @@ fn reg_seams(i: RegencyIn, o: RegOutline) -> RegSeams {
 fn reg_scratch_cell(p: vec3<f32>, cell: f32, w: f32, fw: f32) -> f32 {
     let c = floor(p / cell);
     let r = vec3<f32>(surf_hash3(c * 1.13 + 0.7), surf_hash3(c * 2.71 + 3.1), surf_hash3(c * 0.37 + 9.9));
-    if r.x < 0.4 {
+    if r.x < 0.2 {
         return 0.0;
     }
     let centre = (c + 0.25 + 0.5 * r) * cell;
@@ -222,7 +222,7 @@ fn reg_scratch_cell(p: vec3<f32>, cell: f32, w: f32, fw: f32) -> f32 {
     let along = vec3<f32>(cos(a) * cos(b), sin(a) * cos(b), sin(b));
     let side = normalize(cross(along, select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(1.0, 0.0, 0.0), abs(along.z) > 0.9)));
     let d = p - centre;
-    let len = cell * mix(0.15, 0.35, fract(r.x * 7.7));
+    let len = cell * mix(0.18, 0.45, fract(r.x * 7.7));
     let t = abs(dot(d, along));
     let ends = 1.0 - smoothstep(len * 0.6, len, t);
     let out = abs(dot(d, cross(along, side)));
@@ -230,15 +230,35 @@ fn reg_scratch_cell(p: vec3<f32>, cell: f32, w: f32, fw: f32) -> f32 {
 }
 
 fn reg_scratches(p: vec3<f32>, scale: f32, fw: f32) -> f32 {
-    let w = scale * 0.007;
-    let seen = surf_resolved(w * 5.0, fw);
+    let w = scale * 0.008;
+    let seen = surf_resolved(w * 4.0, fw);
     if seen <= 0.0 {
         return 0.0;
     }
-    let cell = scale * 0.7;
-    let lines = max(reg_scratch_cell(p, cell, w, fw), reg_scratch_cell(p + vec3<f32>(0.37, 0.71, 0.13) * cell, cell * 0.8, w, fw));
-    let handled = smoothstep(0.3, 0.6, surf_noise3(p / (scale * 1.3) + vec3<f32>(9.3, 1.7, 5.5)));
+    // Three lays of different lengths, offset so their cells never line up.
+    var lines = reg_scratch_cell(p, scale * 0.45, w, fw);
+    lines = max(lines, reg_scratch_cell(p + vec3<f32>(0.37, 0.71, 0.13) * scale, scale * 0.3, w * 0.8, fw));
+    lines = max(lines, 0.6 * reg_scratch_cell(p + vec3<f32>(0.91, 0.23, 0.57) * scale, scale * 0.19, w * 0.7, fw));
+    // Thicker where the plate is handled most, never quite gone.
+    let handled = 0.5 + 0.5 * smoothstep(0.25, 0.55, surf_noise3(p / (scale * 1.3) + vec3<f32>(9.3, 1.7, 5.5)));
     return lines * handled * seen;
+}
+
+// The fine grain of the plate: brushed hairlines running level across each face,
+// darker and lighter, varying its sheen. Out to its mean once finer than a few pixels.
+fn reg_grain(p: vec3<f32>, n: vec3<f32>, scale: f32, fw: f32) -> f32 {
+    let across_m = scale * 0.012;
+    let seen = surf_resolved(across_m * 3.0, fw);
+    if seen <= 0.0 {
+        return 0.0;
+    }
+    let up = select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.z) > 0.9);
+    let along = normalize(cross(n, up));
+    let t = dot(p, along);
+    let rest = p - along * t;
+    let g = surf_noise3(rest / across_m + along * (t / (scale * 0.7)));
+    let g2 = surf_noise3(rest / (across_m * 2.7) + along * (t / (scale * 1.9)) + vec3<f32>(3.3));
+    return ((g - 0.5) + 0.6 * (g2 - 0.5)) * seen;
 }
 
 fn regency_plate(i: RegencyIn) -> RegencyLook {
@@ -280,12 +300,17 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
     slope += line.yzw * (1.0 - smoothstep(w * 0.4, w * 1.6, line.x)) * 0.5 * seen;
     out.slope = slope * (1.0 - smoothstep(bevel * 3.0, bevel * 9.0, fw));
     // Use: fine scratches, a little grime in broad soft patches, brushing in the sheen.
-    out.lift += 0.7 * reg_scratches(i.local, i.scale, fw);
+    let scratches = reg_scratches(i.local, i.scale, fw);
+    out.lift += 1.1 * scratches;
+    out.rough -= 0.25 * scratches;
+    // The brushed grain, in colour and sheen both.
+    let grain = reg_grain(i.local, i.n, i.scale, fw);
+    out.tone *= 1.0 + 0.12 * grain;
+    out.rough += 0.14 * grain;
     out.tone *= 1.0 + 0.2 * surf_fbm3(i.local + vec3<f32>(21.0, 4.0, 13.0), i.scale * 1.6, fw);
-    out.tone *= 1.0 + 0.12 * surf_fbm3(i.local + vec3<f32>(5.0, 11.0, 2.0), i.scale * 0.4, fw);
     out.rough += 0.06 * surf_fbm3(i.local * vec3<f32>(0.3, 1.0, 1.0), i.scale * 0.8, fw);
-    // Smudges and handling marks: the sheen goes dull and bright in soft patches.
-    out.rough += 0.3 * surf_fbm3(i.local + vec3<f32>(13.0, 2.0, 8.0), i.scale * 0.45, fw);
+    // Handling marks: the sheen a little duller in places.
+    out.rough += 0.1 * surf_fbm3(i.local + vec3<f32>(13.0, 2.0, 8.0), i.scale * 0.45, fw);
     // Grime in the seams dulls them.
     out.rough += 0.3 * (1.0 - smoothstep(w, w * 5.0, min(seams.d.x, line.x))) * seen;
     return out;
@@ -351,9 +376,9 @@ fn regency_paint(m_in: Pbr, bronze: bool, look: RegencyLook) -> Pbr {
         // what makes it read as real is its sheen varying, smudged here, polished bright
         // where it is worn, dull with grime in its seams.
         let tone = look.tone * clamp(0.8 + lum, 0.8, 1.2);
-        m.albedo = mix(REG_STEEL * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
+        m.albedo = mix(REG_STEEL * tone, REG_STEEL_LIT, saturate(look.lift) * 0.65);
         m.metallic = 0.65;
-        m.roughness = clamp(0.55 + look.rough - 0.08 * saturate(look.lift), 0.36, 0.88);
+        m.roughness = clamp(0.55 + look.rough - 0.1 * saturate(look.lift), 0.3, 0.88);
     }
     return m;
 }
