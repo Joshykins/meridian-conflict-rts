@@ -3321,6 +3321,7 @@ impl Renderer {
         self.great_gun_tick(projectiles, time);
         self.missile_trails(projectiles, time, camera);
         self.nuke_tick(frame, time, camera);
+        self.write_regency_trails(time);
         self.stream_bursts(projectiles, time, camera);
         self.sea_tick(units, projectiles, time, camera);
         self.warp_tick(frame, time, camera);

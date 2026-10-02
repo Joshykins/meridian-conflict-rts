@@ -459,11 +459,12 @@ impl Renderer {
             }
         }
         self.roll_wakes(time);
-        self.write_regency_trails(time);
     }
 
-    /// This tick's trails among the fading beams.
-    fn write_regency_trails(&mut self, time: f32) {
+    /// This tick's trails among the fading beams: after everything that lays one this tick
+    /// (`upload_sim`), the nova streak (`nuke_fx::nova`) last. A streak laid after the write
+    /// went up a tick late, behind the missile and then leaping to it every tick.
+    pub(super) fn write_regency_trails(&mut self, time: f32) {
         let fx = &mut self.plasma_fx.guns;
         fx.trails.retain(|t| time < t.start + t.life);
         if fx.trails.len() > MAX_TRAILS {

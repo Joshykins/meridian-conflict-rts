@@ -679,13 +679,19 @@ impl Renderer {
             // tube, there is none.
             let axis = (now - Vec3::from(m.prev_pos)).normalize_or(dir);
             let behind = axis * (if warhead { WARHEAD_LENGTH * scale } else { 9.0 } + step);
+            let from = Vec3::from(m.prev_pos);
+            let flown = (now - from).length().max(0.001);
             for k in 1..=count.min(96) {
-                let p = last + dir * step * k as f32 - behind;
+                let q = last + dir * step * k as f32;
+                let p = q - behind;
                 if p.z < self.ground_height(p.truncate()) + 1.0 {
                     continue;
                 }
-                // Laid when the missile passed it, so the oldest end fades first.
-                let born = time - tick * (1.0 - k as f32 / count.max(1) as f32);
+                // Born when the drawn nose (between last tick's place and this one's,
+                // `alpha`) passes it, so the oldest end fades first and the smoke never
+                // runs out ahead of the missile, waiting for it to catch up.
+                let passed = ((q - from).dot(axis) / flown).clamp(0.0, 1.0);
+                let born = time + tick * passed;
                 let strength =
                     (if warhead { 1.0 } else { 0.7 }) * (if plasma { -1.0 } else { 1.0 });
                 let puff = Puff {

@@ -25,9 +25,10 @@ use std::f32::consts::TAU;
 const WISP: f32 = puff::NOVA_WISP as f32;
 const WHITE: Vec3 = Vec3::new(1.0, 0.95, 1.0);
 const ROSE: Vec3 = Vec3::new(1.0, 0.45, 0.5);
-/// Metres of streak between two of its pieces, and the seconds it glows behind a warhead
-/// and behind an interceptor.
-const STREAK_STEP: f32 = 30.0;
+/// Metres of streak between two of its pieces (each lights as the drawn tail reaches its
+/// end, so this is how far the streak's front can lag the tail), and the seconds it glows
+/// behind a warhead and behind an interceptor.
+const STREAK_STEP: f32 = 6.0;
 const WARHEAD_STREAK: f32 = 0.9;
 const INTERCEPTOR_STREAK: f32 = 0.5;
 
@@ -306,8 +307,10 @@ impl Renderer {
         self.effect_origin = origin;
     }
 
-    /// The white-hot streak behind a Regency missile's tail, laid over the stretch it flew
-    /// this tick.
+    /// The white-hot streak behind a Regency missile's tail, laid over the stretch it flies
+    /// this tick. The missile is drawn between last tick's place and this one's
+    /// (`alpha`), so each piece lights as the drawn tail passes it, not all at once: a
+    /// streak laid ahead of the tail jumped out a tick's flight and waited for the missile.
     pub(super) fn nova_streak(&mut self, m: &StrategicInstance, time: f32) {
         let warhead = m.kind == STRATEGIC_WARHEAD;
         let to = Vec3::from(m.pos);
@@ -330,8 +333,9 @@ impl Renderer {
             (INTERCEPTOR_STREAK, 1.0)
         };
         let tick = self.tick_seconds.max(0.02);
-        // A deliberate cosmetic cap on one tick's pieces: far over a tick's flight.
-        let n = ((len / STREAK_STEP).ceil() as usize).clamp(1, 24);
+        // A deliberate cosmetic cap on one tick's pieces: over an interceptor's tick of
+        // flight.
+        let n = ((len / STREAK_STEP).ceil() as usize).clamp(1, 32);
         for k in 0..n {
             let (f0, f1) = (k as f32 / n as f32, (k + 1) as f32 / n as f32);
             let a = from.lerp(to, f0) - behind;
@@ -339,7 +343,7 @@ impl Renderer {
             if b.z < self.ground_height(b.truncate()) + 1.0 {
                 continue;
             }
-            let when = time - tick * (1.0 - f1);
+            let when = time + tick * f1;
             let fx = &mut self.plasma_fx.guns;
             // The thread where it passed, and the sheath round it that goes out sooner.
             fx.streak(a, b, when, life, width);
