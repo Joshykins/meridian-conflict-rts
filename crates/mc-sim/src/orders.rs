@@ -6,6 +6,7 @@
 //! product out of its blocked bay: they set a destination and flags, and the
 //! movement, economy and combat phases do the work.
 
+use crate::assist_work::AssistWork;
 use crate::command::{Command, PlayerCommand, MAX_PATROL_POINTS};
 use crate::mirror::{Refusal, SimEvent};
 use crate::nav::Route;
@@ -2835,25 +2836,12 @@ impl World {
             return Ok(());
         }
         let units = &self.state.units;
-        // What there is to do, in priority order: finish the target itself,
-        // help with whatever it is building, repair it, or feed a live shield.
-        let work = if units.has_flag(t, flag::UNDER_CONSTRUCTION) {
-            Some((t, false))
-        } else if let Some(product) = units
-            .row(units.build_target[t])
-            .filter(|p| units.has_flag(*p, flag::UNDER_CONSTRUCTION))
-        {
-            Some((product, false))
-        } else if units.health[t] < self.unit_max_health(t) {
-            Some((t, true))
-        } else if self.launcher_wants_round(t) {
-            // A silo's or an interceptor array's next round (`nukes.rs`).
-            Some((t, false))
-        } else if self.shield_assistable(t) {
-            Some((t, false))
-        } else {
-            None
-        };
+        // What there is to do: the unit (or the work) and whether it is a repair.
+        let work = self.assist_work(t).map(|w| match w {
+            AssistWork::Product(p) => (p, false),
+            AssistWork::Mend => (t, true),
+            AssistWork::Raise | AssistWork::Round | AssistWork::Shield => (t, false),
+        });
         // Nothing to build or mend, and the target is reclaiming: take the same thing
         // apart with it, then come back to the assist.
         if work.is_none() && self.bp(row).sends_reclaimers() {

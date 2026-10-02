@@ -1,7 +1,7 @@
 //! Area assist: an engineer on guard works its whole ring, not only what is in reach of
 //! its spot. A few times a second it looks for work inside the area, nearest first by
-//! kind: a structure going up (or a unit upgrading or refitting, or a factory's product) to help
-//! raise, then a friend to mend,
+//! kind: work to help with (a structure going up, a unit upgrading or refitting, a
+//! factory's product, a launcher's next round, a dome missing charge), then a friend to mend,
 //! then, only while there is room to store the mass, a wreck to reclaim. It goes and does
 //! it with an order put in front of the guard, which carries on when that is done, so
 //! work that turns up later is picked up too. Reclaim is the least of it: a wreck in hand
@@ -13,6 +13,7 @@
 //! way, wrecks only: guarding a friendly unit it follows it and takes apart what falls
 //! round it as the fight moves (the Scythe). An aircraft does this between circles.
 
+use crate::assist_work::AssistWork;
 use crate::orders::order;
 use crate::reclaim::WIDEST_TARGET;
 use crate::spatial::kind;
@@ -184,9 +185,9 @@ impl World {
         Some(help)
     }
 
-    /// Whether a builder of `owner` helps raise `t` from its area: a friendly site going
-    /// up, or a friendly unit putting its next tier on (a structure's upgrade, or a
-    /// commander's refit, or a factory's product).
+    /// Whether a builder of `owner` takes up work on `t` from its area: whatever an
+    /// assist would do for it (`assist_work`) bar mending, which is looked for after,
+    /// and bar a builder's site, which is helped where it stands if that is in the ring.
     fn area_raise(&self, owner: u8, t: usize) -> bool {
         let units = &self.state.units;
         if self.are_enemies(owner, units.owner[t])
@@ -195,11 +196,13 @@ impl World {
         {
             return false;
         }
-        units.has_flag(t, flag::UNDER_CONSTRUCTION)
-            || units
-                .row(units.build_target[t])
-                .is_some_and(|u| units.has_flag(u, flag::UPGRADE))
-            || self.factory_product(t).is_some()
+        match self.assist_work(t) {
+            Some(AssistWork::Raise | AssistWork::Round | AssistWork::Shield) => true,
+            Some(AssistWork::Product(p)) => {
+                units.has_flag(p, flag::IN_FACTORY) || units.has_flag(p, flag::UPGRADE)
+            }
+            Some(AssistWork::Mend) | None => false,
+        }
     }
 
     /// The product a factory in `t` is building, while it is not paused. An upgrade's or

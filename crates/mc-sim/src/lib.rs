@@ -26,6 +26,7 @@ pub mod aircraft_crash;
 mod approach;
 mod area_work;
 mod assist_follow;
+mod assist_work;
 pub mod batch;
 mod body;
 mod cluster;

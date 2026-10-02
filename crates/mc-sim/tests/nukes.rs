@@ -79,6 +79,41 @@ fn alive(w: &World, id: UnitId) -> bool {
     w.state.units.row(id).is_some()
 }
 
+/// Engineers on Area Assist take up a silo's warhead in their ring as they would a site:
+/// the ring and an Assist order read one list of work (`assist_work.rs`).
+#[test]
+fn engineers_on_area_assist_speed_up_a_silo_in_their_ring() {
+    let alone = {
+        let mut w = world();
+        free(&mut w, 0);
+        spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
+        until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
+    };
+    let helped = {
+        let mut w = world();
+        free(&mut w, 0);
+        spawn(&mut w, 0, "aster_t4_nuke_silo", 600, 600);
+        let masons: Vec<_> = (0..3)
+            .map(|i| spawn(&mut w, 0, "aster_t3_engineer", 500 + i * 12, 760))
+            .collect();
+        cmd(
+            &mut w,
+            Command::Guard {
+                units: masons,
+                pos: FxVec2::from_ints(510, 760),
+                target: mc_sim::Handle::NONE,
+                radius: Fx::from_int(300),
+                queue: false,
+            },
+        );
+        until(&mut w, 5000, |e| matches!(e, SimEvent::RoundReady { .. })).unwrap()
+    };
+    assert!(
+        helped * 2 < alone,
+        "three Mason IIIs guarding a ring round the silo at least halve it: {helped} vs {alone}"
+    );
+}
+
 fn stock(w: &mut World, silo: UnitId, n: u8) {
     w.state.strategic.launchers.entry(silo).or_default().stock = n;
 }
