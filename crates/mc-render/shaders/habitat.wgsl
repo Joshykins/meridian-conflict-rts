@@ -62,6 +62,14 @@ fn canyon_trail_floor(way: f32) -> f32 {
 // The habitat at `xy`, whose ground stands at `z` with normal `base_n`. `px` is
 // the metres a pixel covers there: the tropical beach's tufts fade out as they
 // shrink to a pixel.
+// The warp under the habitat's fields at `xy` (xy), then its patchy (z, tens of
+// metres) and broad (w, hundreds) fields: what `habitat` lays, for those that need
+// only these (rock.wgsl).
+fn habitat_fields(xy: vec2<f32>) -> vec4<f32> {
+    let warp = vec2<f32>(grad_noise2(xy, 117.0), grad_noise2(xy + 79.0, 103.0)) * 58.0;
+    return vec4<f32>(warp, grad_noise2(xy + warp, 46.0), grad_noise2(xy + warp * 2.0, 310.0));
+}
+
 fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     var h: Habitat;
     let water = globals.map.z;
@@ -76,11 +84,12 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
 
     // Warped, non-periodic fields: soil patches (tens of metres), habitats
     // (hundreds) and moisture (the better part of a kilometre).
-    let warp = vec2<f32>(grad_noise2(xy, 117.0), grad_noise2(xy + 79.0, 103.0)) * 58.0;
+    let fields = habitat_fields(xy);
+    let warp = fields.xy;
     h.warp = warp;
-    let patchy = grad_noise2(xy + warp, 46.0);
+    let patchy = fields.z;
     let fine = grad_noise2(xy + warp * 0.25, 13.0);
-    let broad = grad_noise2(xy + warp * 2.0, 310.0);
+    let broad = fields.w;
     h.patchy = patchy;
     h.fine = fine;
     h.broad = broad;

@@ -1,5 +1,7 @@
 //!use bindings
 //!use habitat
+//!use desert
+//!use rock
 //!use surface
 //!use regency
 //!use scenery
@@ -2915,7 +2917,16 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));
     }
     // Mineral props share the terrain's rock texture and correctly oriented normals.
-    if in.material == 10u {
+    if in.material == 10u && ((in.model_class >> 16u) & 0xFFu) == SCENERY_ROCK_CLIFF {
+        // A cliff's rock is the stone of the wall it stands on (rock.wgsl).
+        let dpx = dpdx(in.world);
+        let dpy = dpdy(in.world);
+        let px = max(length(dpx), length(dpy));
+        let cliff = cliff_rock(in.world, n, px, max(abs(dpx.z), abs(dpy.z)), dpx, dpy);
+        n = cliff.normal;
+        m.albedo = cliff.albedo;
+        m.roughness = cliff.roughness;
+    } else if in.material == 10u {
         let rock = terrain_surface(in.world, n, 7.3, 0, 0.8);
         n = rock.normal;
         m.albedo = rock.color * (0.75 + rock.ao * 0.25);

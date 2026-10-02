@@ -7,12 +7,12 @@
 //! shader (after the numbers the CPU shares with the shaders, generated from
 //! `gpu_consts.rs`), and `bindings.wgsl` with `regions.wgsl` and `lights.wgsl` in
 //! front of those containing the line `//!use bindings` (`regions` alone for a
-//! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `desert`, `surface`,
+//! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `desert`, `rock`, `surface`,
 //! `regency`, `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 16] = [
+pub(crate) const PRELUDES: [&str; 17] = [
     "common",
     "bindings",
     "regions",
@@ -23,6 +23,7 @@ pub(crate) const PRELUDES: [&str; 16] = [
     "habitat",
     "scenery",
     "desert",
+    "rock",
     "warp_hull",
     "warp_puffs",
     "plasma_puffs",
@@ -42,6 +43,7 @@ pub(crate) struct Preludes {
     habitat: String,
     scenery: String,
     desert: String,
+    rock: String,
     warp_hull: String,
     warp_puffs: String,
     plasma_puffs: String,
@@ -70,6 +72,7 @@ impl Preludes {
             habitat: read("habitat"),
             scenery: read("scenery"),
             desert: read("desert"),
+            rock: read("rock"),
             warp_hull: read("warp_hull"),
             warp_puffs: read("warp_puffs"),
             plasma_puffs: read("plasma_puffs"),
@@ -102,6 +105,10 @@ impl Preludes {
         // Canyon-country desert colours (needs habitat).
         if uses("desert") {
             prelude = format!("{prelude}\n{}", self.desert);
+        }
+        // Cliff stone, for the walls and the rock on them (needs desert).
+        if uses("rock") {
+            prelude = format!("{prelude}\n{}", self.rock);
         }
         if uses("surface") {
             prelude = format!("{prelude}\n{}", self.surface);

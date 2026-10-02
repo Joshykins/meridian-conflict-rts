@@ -45,6 +45,7 @@ mod dive_fx;
 mod drive_swing;
 pub use capture::Shot;
 mod clearing;
+mod cliff_rocks;
 mod cluster_fx;
 mod craters;
 mod cull_lists;
@@ -824,6 +825,7 @@ pub struct Renderer {
     cull: cull_lists::CullLists,
     props_dead: Buffer,
     prop_instances: Vec<UnitInstance>,
+    cliff_rocks: cliff_rocks::CliffRocks,
     tree_model_base: u32,
     previous_dead: Vec<u32>,
     burning_trees: Vec<BurningTree>,
@@ -1291,6 +1293,14 @@ impl Renderer {
             drawn_as.push((model_list.len(), 13, 0));
             model_list.push((model, 13));
         }
+        // Then the rock pieces dressing the cliffs (`cliff_rocks`), drawn as props.
+        let cliff_base = drawn_as.len() as u32;
+        for key in models::cliffs::KEYS {
+            let model = models::build_model(key).unwrap_or_else(|| fallback_model(key, 16.0, 24.0));
+            let icon = 13 | crate::gpu_consts::icon::CLIFF;
+            drawn_as.push((model_list.len(), icon, 0));
+            model_list.push((model, icon));
+        }
         let mut vertices: Vec<MeshVertex> = Vec::new();
         let mut indices: Vec<u32> = Vec::new();
         let mut slots: Vec<DrawSlot> = Vec::new();
@@ -1540,6 +1550,16 @@ impl Renderer {
                 }
             })
             .collect();
+        let mut statics_data = statics_data;
+        let cliff_rocks = {
+            use crate::keep::{kept, Kept};
+            static KEPT: Kept<Vec<UnitInstance>> = std::sync::Mutex::new(Vec::new());
+            let first = statics_data.len();
+            statics_data.extend(kept(&KEPT, scene.map.content_id(), || {
+                cliff_rocks::cliff_rocks(&scene.map, cliff_base, first as u32)
+            }));
+            cliff_rocks::CliffRocks::new(&statics_data, first)
+        };
         let rounded: Vec<mc_map::OreRegion> =
             scene.map.ore_regions().iter().map(rounded_ore).collect();
         let (deposit_splats, ore_corners) = ore_splats(&rounded);
@@ -2365,6 +2385,7 @@ impl Renderer {
             cull,
             props_dead,
             prop_instances: statics_data,
+            cliff_rocks,
             tree_model_base: prop_base,
             previous_dead: Vec::new(),
             burning_trees: Vec::new(),
@@ -3207,7 +3228,8 @@ impl Renderer {
         self.deposit_first = (used + self.ore_corners) as u32;
         self.deposit_count = n.saturating_sub(self.ore_corners) as u32;
 
-        let dead_bytes: &[u8] = bytemuck::cast_slice(&frame.props_dead);
+        let dead_bytes: &[u8] =
+            bytemuck::cast_slice(self.cliff_rocks.dead_props(&frame.props_dead));
         self.props_dead.write(
             0,
             &dead_bytes[..dead_bytes.len().min(self.props_dead.size as usize)],

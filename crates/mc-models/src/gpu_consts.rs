@@ -161,6 +161,10 @@ shared! {
         /// `ModelInfo::icon` bit: it stands on the seabed (`UnitBlueprint::seabed`) and its
         /// spire reaches up to the surface (`spire`).
         pub const SEABED: u32 = 0x1000_0000;
+        /// `ModelInfo::icon` bit: cliff rock (`cliffs.rs`). Walls carry tens of thousands
+        /// of pieces, and the terrain under them casts the wall's shadow already: a piece
+        /// casts only into the nearest cascade, where its ledges' shadows show.
+        pub const CLIFF: u32 = 0x2000_0000;
     }
 
     /// How a settled wreck lies (`mc_sim::mirror::WRECK_*`, which a test holds equal;
@@ -218,6 +222,8 @@ shared! {
         pub const BARK_SHAGGY: u32 = 4;
         /// Rock: bedded red sandstone, its laminae level in the model.
         pub const ROCK_BEDDED: u32 = 1;
+        /// Rock: a cliff's jointed face (`cliffs.rs`), coloured as the wall it stands on.
+        pub const ROCK_CLIFF: u32 = 2;
         /// Concrete: cast mass concrete, its lifts and block joints showing.
         pub const CONCRETE_CAST: u32 = 1;
         /// Concrete: the white mineral ring a drawn-down reservoir leaves.

@@ -99,6 +99,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .chain(regency::air_t2::winnow::MODELS.iter())
         .chain(props::MODELS.iter())
         .chain(super::desert::MODELS.iter())
+        .chain(super::cliffs::MODELS.iter())
         .chain(super::dam::MODELS.iter())
         .chain(super::dam_works::MODELS.iter())
         .chain(super::replicator::MODELS.iter())

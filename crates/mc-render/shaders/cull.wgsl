@@ -156,6 +156,10 @@ fn classify(e: Entity, index: u32, dynamic: bool) -> u32 {
     if px > globals.lod.w * select(1.0, globals.detail.y, (flags & KIND_PROP) != 0u) {
         return model.slot + 1u;
     }
+    // Cliff rock a few pixels across is lost in the wall's own stone (rock.wgsl).
+    if (model.icon & ICON_CLIFF) != 0u && px < LOD_FAR_PX {
+        return NOT_VISIBLE;
+    }
     // Props by the hundred thousand, a few pixels across: their far level.
     if (flags & KIND_PROP) != 0u && px < LOD_FAR_PX {
         return model.slot + LOD_FAR;
@@ -210,6 +214,10 @@ fn other_lists(e: Entity) -> u32 {
         // shadows are specks on screen. Big props (the Precursor works) keep theirs.
         // None either from props too small on screen (Globals::detail.z pixels).
         if prop && ((c >= 2u && r < 30.0) || r < 2.5 * globals.shadow_info[c].x || on_screen < globals.detail.z) {
+            continue;
+        }
+        // Cliff rock casts only into the nearest: the wall's own shadow is the terrain's.
+        if (model.icon & ICON_CLIFF) != 0u && c >= 1u {
             continue;
         }
         // Nor from a unit less than a couple of the cascade's texels across: its shadow

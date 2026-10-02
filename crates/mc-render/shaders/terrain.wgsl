@@ -2,6 +2,7 @@
 //!use shore
 //!use habitat
 //!use desert
+//!use rock
 // Terrain: CDLOD quadtree patches over a streamed heightmap.
 //
 // Every node draws the same 64x64 grid. At the finest level the grid vertices
@@ -1126,34 +1127,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // A closed canopy keeps the floor in shade even where the sun's shadow
     // map has faded out at a distance.
     albedo *= 1.0 - canopy * 0.35;
-    // Cliffs as before: the scan's grain, greyed toward weathered stone.
+    // Cliffs: the stone of the wall (rock.wgsl), as the rock pieces on it are.
     let mineral = dot(cliff.color, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let stone = mix(vec3<f32>(mineral) * vec3<f32>(0.95, 0.96, 0.98), cliff.color, 0.3)
-        * (1.05 + broad * 0.5 + patchy * 0.25);
     var faced = albedo;
-    if arid < 1.0 {
-        // Maps with a snow layer are mountain maps: their cliffs show strata,
-        // ledges catching light over darker bands, broken by cracks.
-        if layer.z > 0.5 && rock_w > 0.004 {
-            // Only some outcrops are bedded, and only their steep faces show it.
-            let bedded = smoothstep(0.5, 0.72, grad_noise2(xy + 211.0, 320.0)) * smoothstep(0.7, 1.2, slope);
-            let bend = grad_noise2(xy + 7.0, 90.0) * 14.0 + grad_noise2(xy - 31.0, 23.0) * 3.0;
-            let band = sin(z * (0.22 + 0.2 * grad_noise2(xy - 5.0, 400.0)) + bend);
-            let ledge = smoothstep(0.6, 0.95, band) * bedded;
-            let seam = (1.0 - smoothstep(0.0, 0.1, abs(band + 0.3))) * bedded;
-            let crack = smoothstep(0.8, 0.92, grad_noise2(vec2<f32>(xy.x + xy.y, z * 3.0), 6.0));
-            let s = stone * (0.95 + 0.25 * ledge) * (1.0 - 0.3 * seam) * (1.0 - 0.3 * crack);
-            faced = mix(albedo, s, rock_w);
-        } else {
-            faced = mix(albedo, stone, rock_w);
-        }
+    if arid < 1.0 && rock_w > 0.004 {
+        faced = mix(albedo, cliff_stone(xy, z, slope, cliff.color, broad, patchy, layer.z > 0.5), rock_w);
     }
     if arid > 0.0 {
-        // The bed the cliff was cut from, the scan giving only its grain; its
-        // thin beds stand out as ledges.
-        let grain = clamp(pow(mineral / 0.07, 0.45), 0.6, 1.4);
-        let s = site.rock.rgb * grain * (1.0 + site.rock.ledge * smoothstep(0.12, 0.3, slope));
-        faced = side_mix3(faced, mix(albedo, s, rock_w), arid);
+        faced = side_mix3(faced, mix(albedo, canyon_cliff_stone(site, cliff.color, slope), rock_w), arid);
     }
     albedo = faced;
     var canyon_grad = vec2<f32>(0.0);
