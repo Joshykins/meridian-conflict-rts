@@ -2,7 +2,7 @@ use super::state::{OpKind, PlanKind, Stake};
 use crate::command::PlayerCommand;
 use crate::tables::Controller;
 use crate::world::MapData;
-use crate::{AiConfig, Brain, Difficulty, MatchConfig, PlayerSetup, World};
+use crate::{AiConfig, Difficulty, MatchConfig, PlayerSetup, World};
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
@@ -29,7 +29,6 @@ fn world() -> World {
                 },
                 start: i,
                 ai: AiConfig {
-                    brain: Brain::Commander,
                     difficulty: Difficulty::Hard,
                     ..AiConfig::default()
                 },
@@ -108,7 +107,8 @@ fn an_army_that_has_gathered_goes_for_the_enemy_and_trades_are_kept() {
     let mine = w.blueprints.id_of("aster_core_mine").unwrap();
     w.spawn_unit(mine, 1, FxVec2::from_ints(4000, 4000), Angle::ZERO, true)
         .unwrap();
-    run(&mut w, 6000);
+    // Its scouts look first; the wave goes once it knows where to.
+    run(&mut w, 9000);
     let c = &w.state.ai[0].commander;
     let army = c
         .ops

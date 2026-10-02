@@ -5,13 +5,13 @@
 //! next tick. It gets no information a player would not have except the enemy
 //! start positions, and no resource bonus.
 //!
-//! Doctrine: spread the base into yards and farms instead of a blob, hold every
-//! mass point with turrets, gather the army on a front, and push firebases
-//! toward the enemy. Configurable doctrine and observed threats choose between expanding,
-//! raiding extractors, sitting on a firebase, or committing to a wave.
+//! The Commander (`commander/`, `docs/AI_COMMANDER.md`) decides: it holds game
+//! plans at a stake, runs operations of grouped units, and runs the economy.
+//! The rest of this module carries out what it decides about the base: builders
+//! (spread into yards and farms, turrets over the mass points), factories,
+//! upgrades and salvage, steered through its `Directives`.
 
 mod adaptive;
-mod army;
 mod arrival;
 mod builders;
 mod commander;
@@ -19,17 +19,15 @@ pub use commander::mind::{AiMind, MindEconomy, MindNote, MindOp, MindPlan};
 mod danger;
 mod energy;
 mod groups;
-mod hunt;
-mod landing;
 mod layout;
 mod lots;
+mod menu;
 mod mine_sites;
 mod production;
 mod projects;
 mod salvage;
 mod sea;
 mod staging;
-mod strategy;
 mod theatre;
 mod upgrades;
 mod warp_ops;
@@ -37,11 +35,10 @@ use crate::command::{Command, PlayerCommand, MAX_COMMAND_UNITS};
 use crate::spatial::kind;
 use crate::tables::*;
 use crate::world::snap_to_build_grid;
-use crate::{AiConfig, Difficulty, Doctrine, Skill};
+use crate::{AiConfig, Doctrine, Skill};
 use crate::{SimError, World};
-use adaptive::{Contact, Recovery};
+use adaptive::Contact;
 use danger::{Danger, Loss};
-use groups::clusters;
 use layout::Place;
 use mc_core::{Angle, Fx, FxVec2, StateHasher};
 use mc_data::{cat, BlueprintId, UnitBlueprint};
@@ -64,8 +61,6 @@ const RAID_RADIUS: Fx = Fx::from_int(550);
 const HOME_RADIUS: Fx = Fx::from_int(640);
 /// Point defense this close to a mass point is covering it.
 const GUARD_COVER: Fx = Fx::from_int(210);
-/// Army waiting this close to the staging point is gathered.
-const STAGING_RADIUS: Fx = Fx::from_int(160);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -89,18 +84,10 @@ enum Personality {
 pub struct AiState {
     pub config: AiConfig,
     contacts: Vec<Contact>,
-    recovering: Vec<Recovery>,
-    next_tactical_tick: u32,
-    /// Attack waves sent so far; later waves wait for more units.
-    pub waves: u32,
-    /// Air/economic raids dispatched separately from the main ground wave.
-    pub raids: u32,
     /// Rotates through the factory roster.
     pub production_counter: u32,
-    stance: u8,
     /// Forward gun line, chosen once and held.
     firebase: Option<FxVec2>,
-    scouts_sent: u32,
     /// Where its buildings were destroyed lately (`danger.rs`).
     #[serde(default)]
     losses: Vec<Loss>,
@@ -108,22 +95,7 @@ pub struct AiState {
     /// (`theatre.rs`).
     #[serde(default)]
     land_route: Option<theatre::LandRoute>,
-    /// The plans it holds (`strategy.rs`).
-    #[serde(default)]
-    strategy: strategy::Strategy,
-    /// The landing under way, if any (`landing.rs`).
-    #[serde(default)]
-    landing: Option<landing::Landing>,
-    /// Tick before which no engineer hunt leaves (`hunt.rs`).
-    #[serde(default)]
-    next_hunt: u32,
-    /// Sweeps its sensor ships have made (`warp_ops.rs`).
-    #[serde(default)]
-    sweeps: u32,
-    /// Landings started (`landing.rs`).
-    #[serde(default)]
-    pub landings: u32,
-    /// The Commander's plans and operations (`commander/`), when it plays this side.
+    /// The Commander's plans and operations (`commander/`).
     #[serde(default)]
     commander: commander::state::CommanderState,
 }
@@ -138,17 +110,8 @@ impl AiState {
     pub fn hash(&self, h: &mut StateHasher) {
         self.hash_adaptation(h);
         self.hash_losses(h);
-        h.write_u64(self.raids as u64);
-        h.write_u64(self.waves as u64 | (self.production_counter as u64) << 32);
-        h.write_u64(self.stance as u64 | (self.scouts_sent as u64) << 32);
+        h.write_u64(self.production_counter as u64);
         h.write_u64(self.land_route.map_or(u64::MAX, |r| r.reaches as u64));
-        self.strategy.hash(h);
-        match &self.landing {
-            Some(l) => l.hash(h),
-            None => h.write_u64(u64::MAX),
-        }
-        h.write_u64(self.next_hunt as u64 | (self.sweeps as u64) << 32);
-        h.write_u64(self.landings as u64);
         self.commander.hash(h);
         match self.firebase {
             Some(p) => {
@@ -158,10 +121,6 @@ impl AiState {
             }
             None => h.write_u64(0),
         }
-    }
-
-    fn set_stance(&mut self, s: Stance) {
-        self.stance = s as u8;
     }
 }
 
@@ -339,7 +298,7 @@ impl World {
         drop(span);
         self.find_land_route_once(player);
         let span = mc_core::perf_span!("ai.survey");
-        let mut census = self.survey_own(player);
+        let census = self.survey_own(player);
         let intel = self.survey_intel(player, &census);
         let start = self.state.players[player as usize].start;
         let facing = intel
@@ -347,10 +306,6 @@ impl World {
             .map(|e| (e - start).angle())
             .unwrap_or(Angle::ZERO);
         drop(span);
-        let commander = self.state.ai[player as usize].config.brain == crate::Brain::Commander;
-        if !commander {
-            self.review_strategy(player, &census, &intel);
-        }
         let persona = self.ai_personality(player, &census, &intel);
 
         if self.state.ai[player as usize].firebase.is_none()
@@ -363,7 +318,6 @@ impl World {
         }
         let firebase = self.state.ai[player as usize].firebase;
         let stance = self.decide_stance(&census, &intel, firebase, persona, player);
-        self.state.ai[player as usize].set_stance(stance);
 
         let span = mc_core::perf_span!("ai.claimed");
         let mut out: Vec<Command> = Vec::new();
@@ -381,10 +335,8 @@ impl World {
                 }
             })
             .collect();
-        // A Commander skips deposits it lately failed to place a mine by.
-        if commander {
-            claimed.extend(self.blocked_claims(player));
-        }
+        // Deposits it lately failed to place a mine by are skipped.
+        claimed.extend(self.blocked_claims(player));
         drop(span);
         let span = mc_core::perf_span!("ai.plan");
         let mut planned = self.plan_counts(player, &census);
@@ -392,9 +344,7 @@ impl World {
         let span = mc_core::perf_span!("ai.wrecks");
         planned.salvage = self.wreck_fields(start, &intel);
         drop(span);
-        if commander {
-            self.plan_economy(player, &census, &intel);
-        }
+        self.plan_economy(player, &census, &intel);
         let span = mc_core::perf_span!("ai.builders");
         self.direct_builders(
             player,
@@ -409,30 +359,17 @@ impl World {
             &mut planned,
             &mut out,
         );
-        if commander {
-            self.note_failed_mines(player, &planned.failed_mines);
-        }
+        self.note_failed_mines(player, &planned.failed_mines);
         drop(span);
         let span = mc_core::perf_span!("ai.rest");
-        self.direct_factories(player, &census, &planned.salvage, stance, persona, &mut out);
+        self.direct_factories(player, &census, &planned.salvage, &mut out);
         self.direct_salvagers(&census, &planned.salvage, &mut out);
         self.direct_upgrades(player, &census, &mut out);
-        self.direct_focus(player, &census, &mut out);
+        self.direct_focus(player, &mut out);
         drop(span);
-        if commander {
-            let _span = mc_core::perf_span!("ai.commander");
-            self.command(player, &census, &intel, &mut out);
-        } else {
-            let span = mc_core::perf_span!("ai.classic");
-            self.direct_nukes(player, &mut out);
-            self.direct_scouts(player, &census, &intel, start, firebase, &mut out);
-            self.direct_sensor_ships(player, &census, start, &mut out);
-            self.react_tactically(player, &mut census, &intel, &mut out);
-            self.direct_army(
-                player, &census, &intel, stance, persona, start, facing, firebase, &mut out,
-            );
-            drop(span);
-        }
+        let span = mc_core::perf_span!("ai.commander");
+        self.command(player, &census, &intel, &mut out);
+        drop(span);
         let _span = mc_core::perf_span!("ai.route");
         let out = self.route_ai_commands(out);
         self.state.ai_pending.extend(
@@ -526,10 +463,6 @@ impl World {
                 }
                 continue;
             }
-            let recovering = self.state.ai[player as usize]
-                .recovering
-                .iter()
-                .any(|r| r.id == units.id(row));
             let head = units.order_head[row];
             let finished_assist = bp.builder.is_some()
                 && bp.is_mobile()
@@ -547,8 +480,7 @@ impl World {
                     });
             // One with an upgrade queued behind its job is spoken for: a new
             // job would replace the upgrade.
-            let idle =
-                (head == NO_ORDER || (finished_assist && !self.upgrading(row))) && !recovering;
+            let idle = head == NO_ORDER || (finished_assist && !self.upgrading(row));
             if bp.is_mobile()
                 && !bp.weapons.is_empty()
                 && !bp.has(cat::ENGINEER)
@@ -558,7 +490,7 @@ impl World {
                 c.combat_rows.push(row);
                 let stuck = !land_route && theatre::land_bound(bp);
                 c.land_bound += theatre::land_bound(bp) as usize;
-                if !recovering && !stuck {
+                if !stuck {
                     c.army += 1;
                 }
             }
@@ -619,7 +551,7 @@ impl World {
                 }
             } else if bp.is_mobile() && bp.transport.is_some() {
                 c.lifts.push(row);
-            } else if strategy::sensor_ship(bp) {
+            } else if menu::sensor_ship(bp) {
                 if idle {
                     c.sensor_idle.push(row);
                 }
@@ -636,7 +568,7 @@ impl World {
                 .motion
                 .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
             {
-                let idle = idle || (!recovering && arrived.binary_search(&row).is_ok());
+                let idle = idle || arrived.binary_search(&row).is_ok();
                 if idle && !bp.weapons.is_empty() {
                     c.naval_idle.push(row);
                 }
@@ -653,7 +585,7 @@ impl World {
                     }
                 }
             } else if bp.is_mobile() && !bp.weapons.is_empty() {
-                let idle = idle || (!recovering && arrived.binary_search(&row).is_ok());
+                let idle = idle || arrived.binary_search(&row).is_ok();
                 if !land_route && theatre::land_bound(bp) {
                     if idle {
                         c.home_guard.push(row);
@@ -676,7 +608,7 @@ impl World {
         // up to what the side draws now left none for them, and they waited on
         // it for twenty minutes.
         let mine = self
-            .mine_to_upgrade(player, &c, false)
+            .mine_to_upgrade(player, &c)
             .map_or(Fx::ZERO, |(row, next)| self.upgrade_draw(row, next));
         let tech = self.tech_step(player, &c).map_or(Fx::ZERO, |row| {
             let next = self.bp(row).upgrades_to.map(|n| self.blueprints.unit(n));
@@ -807,7 +739,14 @@ impl World {
         if base_raid || (mex_raid && army < intel.enemy_army.saturating_add(4)) {
             return Stance::Defend;
         }
-        let wave = self.wave_size(player, persona);
+        // An army big enough to push: the first wave's size by personality.
+        let base = match persona {
+            Personality::Aggressive => 6,
+            Personality::Expander => 8,
+            Personality::Turtle => 10,
+        };
+        let delta = self.state.ai[player as usize].config.skill().wave_delta;
+        let wave = (base + delta).clamp(4, 40) as usize;
         let own_strength: i64 = census
             .combat_rows
             .iter()
@@ -838,62 +777,6 @@ impl World {
             }
             _ => Stance::Expand,
         }
-    }
-
-    fn wave_size(&self, player: u8, persona: Personality) -> usize {
-        let waves = self.state.ai[player as usize].waves;
-        let size = match persona {
-            Personality::Aggressive => 6 + waves * 2,
-            Personality::Expander => 8 + waves * 3,
-            Personality::Turtle => 10 + waves * 4,
-        };
-        let delta = self.state.ai[player as usize].config.skill().wave_delta;
-        (size as i32 + delta).clamp(4, 40) as usize
-    }
-
-    fn direct_scouts(
-        &mut self,
-        player: u8,
-        census: &Census,
-        intel: &Intel,
-        start: FxVec2,
-        firebase: Option<FxVec2>,
-        out: &mut Vec<Command>,
-    ) {
-        if census.scouts_idle.is_empty() {
-            return;
-        }
-        let mut sent = self.state.ai[player as usize].scouts_sent;
-        let enemy = intel.enemy_start.unwrap_or(start);
-        for &row in &census.scouts_idle {
-            let dest = match sent % 4 {
-                0 => enemy,
-                1 => intel
-                    .enemy_extractors
-                    .first()
-                    .copied()
-                    .or_else(|| {
-                        self.ore_centres()
-                            .into_iter()
-                            .max_by_key(|d| (d.distance_sq(start), d.x, d.y))
-                    })
-                    .unwrap_or(enemy),
-                2 => firebase.unwrap_or_else(|| start.lerp(enemy, Fx::ratio(1, 2))),
-                _ => {
-                    let ore = self.ore_centres();
-                    ore.get((sent as usize / 4) % ore.len().max(1))
-                        .copied()
-                        .unwrap_or(enemy)
-                }
-            };
-            sent = sent.wrapping_add(1);
-            out.push(Command::AttackMove {
-                units: vec![self.state.units.id(row)],
-                target: dest,
-                queue: false,
-            });
-        }
-        self.state.ai[player as usize].scouts_sent = sent;
     }
 
     /// The most advanced structure with all of `categories` this builder can make,

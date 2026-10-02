@@ -90,10 +90,8 @@ straight into a match instead.
   --players N            player slots, 1-32 (default 2; slot 0 is you, the rest are AI)
   --teams N              split the players into N sides by where their zones lie (default: all alone)
   --observe              watch an all-AI match (no human slot; the camera opens on the whole map)
-  --ai-difficulty NAME  easy | normal | hard (how well it spends: builders, mines, factories, waves)
+  --ai-difficulty NAME  easy | normal | hard (how well it spends and how many orders it gives)
   --ai-doctrine NAME    adaptive | aggressive | economic | defensive
-  --ai-brain NAME       classic | commander (the planning AI, docs/AI_COMMANDER.md)
-  --ai-adaptation N     counter-production strength, 0-100 (default 75)
   --ai-domains L,A,N    land, air, naval production preferences, 0-200 each
   --army N               units per player in the stress scene (default 500)
   --seed N               match seed
@@ -272,8 +270,6 @@ fn run() -> Result<(), String> {
                 | "--observe"
                 | "--ai-difficulty"
                 | "--ai-doctrine"
-                | "--ai-brain"
-                | "--ai-adaptation"
                 | "--ai-domains"
         );
         match arg.as_str() {
@@ -290,15 +286,6 @@ fn run() -> Result<(), String> {
                 "adaptive" => mc_sim::Doctrine::Adaptive, "aggressive" => mc_sim::Doctrine::Aggressive,
                 "economic" => mc_sim::Doctrine::Economic, "defensive" => mc_sim::Doctrine::Defensive,
                 _ => return Err("--ai-doctrine takes adaptive, aggressive, economic or defensive".into()),
-            },
-            "--ai-brain" => opts.ai.brain = match value("--ai-brain")?.as_str() {
-                "classic" => mc_sim::Brain::Classic, "commander" => mc_sim::Brain::Commander,
-                _ => return Err("--ai-brain takes classic or commander".into()),
-            },
-            "--ai-adaptation" => {
-                let n: u8 = value("--ai-adaptation")?.parse().map_err(|_| "--ai-adaptation takes 0-100")?;
-                if n > 100 { return Err("--ai-adaptation takes 0-100".into()); }
-                opts.ai.adaptation = n;
             },
             "--ai-domains" => {
                 let v = value("--ai-domains")?;

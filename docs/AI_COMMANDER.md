@@ -1,18 +1,18 @@
 # The Commander: a planning skirmish AI
 
-Status (2026-10-01): built and playable beside the classic AI (`docs/AI.md`). Pick it
-per seat with **Mind** in the skirmish set-up, or `--ai-brain commander`. The classic
-AI is still the default; since the long-game round on 2026-10-01 the Commander is
-the stronger of the two on Hard (see "Where it stands").
+Status (2026-10-01): the skirmish AI. It plays every AI seat; its settings and the
+base code it steers are in `docs/AI.md`. It was built beside the rule-driven
+"classic" AI and replaced it once it beat it on Hard in long games (see "Where it
+stands"); the classic AI is in the git history.
 This document is the contract between the layers; code that disagrees with it is a
 bug in one or the other.
 
 ## Why
 
-The classic AI is one pass every second or two: count everything, pick a build job
-per idle builder, send idle units at a target. It has no idea what it is trying to
-do or whether it works, so every behaviour is a rule bolted onto the loop, and it
-plays much the same game every time. What was asked for:
+The classic AI it replaced was one pass every second or two: count everything,
+pick a build job per idle builder, send idle units at a target. It had no idea what it was trying
+to do or whether it worked, so every behaviour was a rule bolted onto the loop, and
+it played much the same game every time. What was asked for:
 
 - commit to game plans, give up on them, push one harder, or run several at once:
   "a small courier raid with some things in the backline is different than a full
@@ -66,8 +66,8 @@ Every AI think (about once a second) a Commander side runs, in order:
 6. **Operations run** (`ops_*.rs`), most urgent first, within the order budget;
    then strategic launches.
 
-Builders and factories stay the classic executors (`builders.rs`,
-`production.rs`): the Commander tells them what to make through `Directives`
+Builders and factories are executors (`builders.rs`, `production.rs`,
+`upgrades.rs`; `docs/AI.md`): the Commander tells them what to make through `Directives`
 (`solver.rs`), its **wants** (structures and projects for builders,
 `commander_job`) and **production** (`solve_production`).
 
@@ -202,7 +202,11 @@ Ground rules learnt in the tournaments (each is a comment at its code):
 
 - a wave goes only at a third more than the land army it believes in, with the
   anti-air the enemy's air calls for, and never blind: their army seen, or their
-  base seen lately with none in it;
+  base seen lately with none in it; three times the army it believes in, gathered
+  three minutes with nothing seen, goes all the same, at their start;
+- scouts belong to the scouting operation only: the army and raids, filled first,
+  used to take every one of them, and a side with 25 scouts saw nothing for
+  twenty minutes;
 - never into a turret belt it cannot take; a probe goes only at soft targets;
 - shelled while gathering: helpless against aircraft, it goes home; against
   ground guns it charges them or steps the rally back;
@@ -327,22 +331,17 @@ shows
 
 The data comes from `World::ai_mind` (`mind.rs`), sent to the HUD with each side's
 status. Headless: `MERIDIAN_VISION=N scripts/shot.sh run --map dev16 --players 2
---observe --ai-brain commander --ticks 9000` (from WSL, pass the variable through
+--observe --ticks 9000` (from WSL, pass the variable through
 with `WSLENV=MERIDIAN_VISION`).
-
-## Selecting the brain
-
-`AiConfig::brain` (`Classic` default, or `Commander`) is in match setup, snapshots,
-replays and the hash. In game: **Mind** on each AI seat of the skirmish set-up. On
-the command line: `--ai-brain classic|commander` for every AI seat.
 
 ## Tournament (`scripts/ai-tournament.sh`, `tests/zz_ai_tournament.rs`)
 
-Many headless matches in parallel, then wins, Elo and the plans each side held:
+Many headless matches in parallel, doctrine against doctrine, then wins, Elo and the
+plans each side held:
 
 ```bash
 TOURNEY_MAPS="serac_divide:2 twin_shoals:2" TOURNEY_SEEDS=7 TOURNEY_MINUTES=25 scripts/ai-tournament.sh /tmp/t1
-TOURNEY=serac_divide:2:25:7:commander/adaptive:classic/aggressive:hard cargo test --profile gate -p mc-sim --test sim -- zz_ai_tournament:: --ignored --nocapture
+TOURNEY=serac_divide:2:25:7:adaptive:aggressive:hard cargo test --profile gate -p mc-sim --test sim -- zz_ai_tournament:: --ignored --nocapture
 ```
 
 The switches (`TOURNEY_EVERY`, `TOURNEY_ROSTER`, `TOURNEY_DEATHS`, `TOURNEY_OPS`,
@@ -357,12 +356,12 @@ own in its header. Notes on reading the results:
   as much is a lead. The mean log of the worth ratio (`log((c+1k)/(o+1k))`) shows
   smaller shifts than wins do; an eliminated side counts as worth 0.
 - `TOURNEY_ARMY=key*n,...` gives both sides the same army at the start: a mirror that
-  isolates how each brain handles a fight from how it builds.
+  isolates how each side handles a fight from how it builds.
 
 ## Where it stands
 
-Tournament runs during the build, Hard, the Commander (adaptive) against the
-classic AI on four 2-player maps (dev16, meridian_basin, serac_divide,
+Tournament runs while the classic AI still stood, Hard, the Commander (adaptive)
+against the classic AI on four 2-player maps (dev16, meridian_basin, serac_divide,
 twin_shoals), each of the classic AI's four doctrines, both seats, 25 minutes: 32
 games a run.
 
@@ -454,5 +453,5 @@ Open (the next things to build):
 - **Easy and Normal** have not been tuned; the order budget is the dial;
 - **the Regency**: plays through the same profiles, not yet tournament-tested on its
   own roster;
-- once the Commander beats the classic AI across the tournament, the classic
-  decision code and the `brain` switch are deleted (no parked code).
+- the tournament now plays doctrine against doctrine; a fixed earlier build as the
+  yardstick (run from its own worktree) is how to tell whether a change helps.

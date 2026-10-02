@@ -1,12 +1,12 @@
 //! What the Commander has built (`docs/AI_COMMANDER.md`, "Production"): factories
 //! make what the plans need, picked from the menu by how well each unit fares
 //! against the enemy the side believes in, per mass; builders put up what the
-//! plans want (`wants`); and the classic economy code is steered by the plans.
+//! plans want (`wants`); and the economy code is steered by the plans.
 use super::matchup::edge;
 use super::profile::{role, Domain, Profile, Profiles};
 use super::state::{Hurt, PlanKind, Stake};
 use crate::ai::{Job, Place};
-use crate::{Brain, World};
+use crate::World;
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::BlueprintId;
 use std::collections::BTreeMap;
@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 /// Enemy types, the heaviest by mass seen, a unit is judged against.
 const MATCHED_AGAINST: usize = 8;
 
-/// How the Commander steers the classic builders, factories and upgrades: its
+/// How the Commander steers the builders, factories and upgrades: its
 /// economy's reading (`economy.rs`).
 #[derive(Clone, Copy)]
 pub(in crate::ai) struct Directives {
@@ -58,14 +58,10 @@ pub(in crate::ai) fn force(p: &Profile) -> Option<usize> {
 }
 
 impl World {
-    /// `player`'s plans as directives for the classic code; nothing for a classic AI.
-    pub(in crate::ai) fn commander_directives(&self, player: u8) -> Option<Directives> {
-        let ai = &self.state.ai[player as usize];
-        if ai.config.brain != Brain::Commander {
-            return None;
-        }
-        let e = &ai.commander.eco;
-        Some(Directives {
+    /// `player`'s plans as directives for the builders, factories and upgrades.
+    pub(in crate::ai) fn commander_directives(&self, player: u8) -> Directives {
+        let e = &self.state.ai[player as usize].commander.eco;
+        Directives {
             engineers: e.engineers as usize,
             factories: e.factories as usize,
             power: e.power,
@@ -75,7 +71,7 @@ impl World {
             roam: e.roam,
             reach: e.reach,
             floating: e.floating,
-        })
+        }
     }
 
     /// Mass of the enemy's aircraft and warships seen whose guns outreach the side's
@@ -130,7 +126,7 @@ impl World {
         let outranging = self
             .outranging_air(player, &Profiles::build(&self.blueprints))
             .floor_int() as i64;
-        [
+        let shares = [
             p(PlanKind::Pressure)
                 + p(PlanKind::Raid)
                 + p(PlanKind::Landing)
@@ -147,7 +143,12 @@ impl World {
                 + (outranging / 1000).min(6),
             p(PlanKind::SeaControl) + if land_route { 0 } else { 2 },
             p(PlanKind::SubWar),
-        ]
+        ];
+        // The set-up's force preference (`AiConfig::domain_weights`: land, air,
+        // naval at 0..=200, 100 even) weighs each share; 0 makes none.
+        let w = self.state.ai[player as usize].config.domain_weights;
+        let weight = [w[0], w[1], w[2], w[2]];
+        std::array::from_fn(|f| shares[f] * weight[f] as i64 / 100)
     }
 
     /// The combat unit an idle factory of `player` should make, from `menu`: first
@@ -473,9 +474,6 @@ impl World {
     ) -> Option<Job> {
         let player = self.state.units.owner[row];
         let ai = &self.state.ai[player as usize];
-        if ai.config.brain != Brain::Commander {
-            return None;
-        }
         let builds = &self.bp(row).builder.as_ref()?.builds;
         let pl = &self.state.players[player as usize];
         let units = &self.state.units;
@@ -608,7 +606,7 @@ impl World {
             .map(|(_, at)| at)
     }
 
-    /// Warheads: the classic launch rule already salvoes past interceptors it can
+    /// Warheads: the launch rule (`projects.rs`) salvoes past interceptors it can
     /// outnumber and goes round those it cannot (`projects.rs`); the plans decide
     /// whether silos are built, and strikes go for interceptors while warheads wait.
     pub(in crate::ai) fn direct_strategic(

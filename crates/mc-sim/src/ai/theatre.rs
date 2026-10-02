@@ -127,6 +127,25 @@ impl World {
                 .min_by_key(|p| (p.distance_sq(start), p.x, p.y))
         })
     }
+
+    /// Land units of the home guard a side with no land route keeps back, plus
+    /// what its lift ships could carry, so landings have cargo (`theatre.rs`).
+    pub(super) fn land_guard_cap(&self, player: u8, census: &Census) -> usize {
+        let commander_lands = self.state.ai[player as usize]
+            .commander
+            .plan(super::commander::state::PlanKind::Landing)
+            > super::commander::state::Stake::Off;
+        if !commander_lands {
+            return HOME_GUARD;
+        }
+        let room: usize = census
+            .lifts
+            .iter()
+            .filter_map(|&r| self.bp(r).transport)
+            .map(|t| t.capacity as usize / 2)
+            .sum();
+        HOME_GUARD + room.max(4)
+    }
 }
 
 #[cfg(test)]

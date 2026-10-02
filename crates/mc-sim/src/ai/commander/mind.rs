@@ -4,7 +4,8 @@
 //! last decisions with why. Read-only: nothing here goes back into the sim.
 use super::economy::Power;
 use super::state::{OpKind, Phase, PLANS};
-use crate::{Brain, World};
+use crate::tables::Controller;
+use crate::World;
 use mc_core::Fx;
 use mc_data::cat;
 
@@ -92,10 +93,12 @@ pub struct AiMind {
 const HURT_NAMES: [&str; 6] = ["land", "artillery", "air", "space", "sea", "turrets"];
 
 impl World {
-    /// What player `player`'s AI is thinking, when it is a Commander.
+    /// What player `player`'s AI is thinking, when an AI plays the side.
     pub fn ai_mind(&self, player: u8) -> Option<AiMind> {
         let ai = self.state.ai.get(player as usize)?;
-        if ai.config.brain != Brain::Commander || ai.commander.plans.is_empty() {
+        if self.state.players.get(player as usize)?.controller != Controller::Ai
+            || ai.commander.plans.is_empty()
+        {
             return None;
         }
         let c = &ai.commander;

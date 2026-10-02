@@ -1,10 +1,9 @@
 //! One tournament match between two AI sides on a real map (`docs/AI_COMMANDER.md`,
-//! "Tournament"): side A's brain and doctrine against side B's, the same difficulty.
+//! "Tournament"): side A's doctrine against side B's, the same difficulty.
 //! `scripts/ai-tournament.sh` plays many of these in parallel and adds them up.
 //!
-//! `TOURNEY=map:players:minutes:seed:A:B[:difficulty]`, where A and B are
-//! `brain/doctrine` (brain `commander` or `classic`; doctrine `adaptive`,
-//! `aggressive`, `economic` or `defensive`). With 2 players slot 0 is side A; with
+//! `TOURNEY=map:players:minutes:seed:A:B[:difficulty]`, where A and B are doctrines
+//! (`adaptive`, `aggressive`, `economic` or `defensive`). With 2 players slot 0 is side A; with
 //! more, the starts west of the middle are side A. `TOURNEY_EVERY=N` prints each
 //! side's state every N minutes, `TOURNEY_ROSTER=1` each player's units at the end,
 //! `TOURNEY_ARMY=key*n,key*n` gives every side the same army at its start,
@@ -13,28 +12,22 @@
 //! operations whenever one changes (every 10 s).
 //! The `RESULT key=value ...` line sums the match up.
 //!
-//! `TOURNEY=serac_divide:2:40:7:commander/adaptive:classic/adaptive cargo test --profile gate -p mc-sim --test sim -- zz_ai_tournament:: --ignored --nocapture`
+//! `TOURNEY=serac_divide:2:40:7:adaptive:aggressive cargo test --profile gate -p mc-sim --test sim -- zz_ai_tournament:: --ignored --nocapture`
 use mc_core::Fx;
 use mc_data::{cat, Blueprints};
 use mc_jobs::Pool;
 use mc_sim::tables::Controller;
-use mc_sim::{AiConfig, Brain, Difficulty, Doctrine, MatchConfig, PlayerSetup, SimEvent, World};
+use mc_sim::{AiConfig, Difficulty, Doctrine, MatchConfig, PlayerSetup, SimEvent, World};
 use std::path::Path;
 use std::sync::Arc;
 
-fn side(spec: &str) -> (Brain, Doctrine) {
-    let (b, d) = spec.split_once('/').unwrap_or((spec, "adaptive"));
-    let brain = match b {
-        "classic" => Brain::Classic,
-        _ => Brain::Commander,
-    };
-    let doctrine = match d {
+fn side(spec: &str) -> Doctrine {
+    match spec {
         "aggressive" => Doctrine::Aggressive,
         "economic" => Doctrine::Economic,
         "defensive" => Doctrine::Defensive,
         _ => Doctrine::Adaptive,
-    };
-    (brain, doctrine)
+    }
 }
 
 /// Mass of everything a side has standing, finished or not.
@@ -59,13 +52,13 @@ fn worth(w: &World, team: u8) -> Fx {
 #[ignore]
 fn match_up() {
     let spec = std::env::var("TOURNEY")
-        .unwrap_or_else(|_| "serac_divide:2:30:7:commander/adaptive:classic/adaptive".into());
+        .unwrap_or_else(|_| "serac_divide:2:30:7:adaptive:aggressive".into());
     let parts: Vec<&str> = spec.split(':').collect();
     let players: u8 = parts.get(1).and_then(|m| m.parse().ok()).unwrap_or(2);
     let minutes: u32 = parts.get(2).and_then(|m| m.parse().ok()).unwrap_or(30);
     let seed: u64 = parts.get(3).and_then(|m| m.parse().ok()).unwrap_or(7);
-    let a = side(parts.get(4).copied().unwrap_or("commander/adaptive"));
-    let b = side(parts.get(5).copied().unwrap_or("classic/adaptive"));
+    let a = side(parts.get(4).copied().unwrap_or("adaptive"));
+    let b = side(parts.get(5).copied().unwrap_or("aggressive"));
     let difficulty = match parts.get(6).copied() {
         Some("easy") => Difficulty::Easy,
         Some("normal") => Difficulty::Normal,
@@ -102,12 +95,11 @@ fn match_up() {
         seed,
         players: (0..players as usize)
             .map(|i| {
-                let (brain, doctrine) = if team_of(i) == 0 { a } else { b };
+                let doctrine = if team_of(i) == 0 { a } else { b };
                 PlayerSetup {
                     name: format!("AI {i}"),
                     faction: "Aster".into(),
                     ai: AiConfig {
-                        brain,
                         doctrine,
                         difficulty,
                         ..AiConfig::default()
@@ -124,7 +116,7 @@ fn match_up() {
     };
     let mut w = World::new(&map, bps, Arc::new(Pool::new(1)), &config).unwrap();
     // A head start: the same army for every side, beside its start, to judge how
-    // each brain fights apart from how it builds.
+    // each doctrine fights apart from how it builds.
     if let Ok(army) = std::env::var("TOURNEY_ARMY") {
         for part in army.split(',') {
             let (key, n) = part.split_once('*').unwrap_or((part, "10"));
@@ -292,8 +284,8 @@ fn match_up() {
         parts[0],
         players,
         seed,
-        parts.get(4).unwrap_or(&"commander"),
-        parts.get(5).unwrap_or(&"classic"),
+        parts.get(4).unwrap_or(&"adaptive"),
+        parts.get(5).unwrap_or(&"aggressive"),
         difficulty,
         verdict,
         minute,

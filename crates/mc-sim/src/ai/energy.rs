@@ -19,15 +19,15 @@ impl World {
     pub(super) fn energy_need(&self, player: u8) -> Fx {
         let units = &self.state.units;
         let mut need = Fx::ZERO;
-        // A Commander counts what builds at the speed its materials pay for: at
-        // full draw, a side building at a fifth of full speed put up 27 plants to
-        // the classic AI's 18 and claimed no mine from minute five to eight.
+        // What builds counts at the speed its materials pay for: at full draw, a
+        // side building at a fifth of full speed put up 27 plants to its
+        // opponent's 18 and claimed no mine from minute five to eight.
         // Only a materials stall with energy to spare: in an energy stall the slow
         // build speed is the want of power itself, and counting it so asked for no
         // plants at all.
         let pl = &self.state.players[player as usize];
         let energy_stalled = pl.energy < pl.energy_capacity / 2;
-        let paid = if self.commander_directives(player).is_some() && !energy_stalled {
+        let paid = if !energy_stalled {
             pl.build_speed.clamp(Fx::ratio(1, 3), Fx::ONE)
         } else {
             Fx::ONE
@@ -126,11 +126,9 @@ impl World {
     }
 
     /// Puts first (`focus.rs`) whatever the side is running out of: new power while
-    /// energy stalls, new mines while mass does. Energy first, since a side out of
-    /// energy digs less mass too. Mines go last while more upgrades run than the
-    /// budget (`mine_upgrade_budget`): the extra ones were started from spare
-    /// materials and take only what the factories leave, energy too.
-    pub(super) fn direct_focus(&self, player: u8, census: &Census, out: &mut Vec<Command>) {
+    /// energy stalls, new mines and mine upgrades while mass does. Energy first,
+    /// since a side out of energy digs less mass too.
+    pub(super) fn direct_focus(&self, player: u8, out: &mut Vec<Command>) {
         let pl = &self.state.players[player as usize];
         let short = |have: Fx, capacity: Fx, income: Fx, demand: Fx| {
             income < demand && have < capacity * Fx::ratio(1, 4)
@@ -146,15 +144,11 @@ impl World {
             focus.power = Priority::First;
         }
         let mass_short = short(pl.mass, pl.mass_capacity, pl.mass_income, pl.mass_demand);
-        // A Commander starts its upgrades as the sink for a filling store and never
-        // puts them last: once the store stopped filling its budget fell under the
-        // four it had begun, they went last behind factories asking ten times its
-        // income, and none of them finished in thirteen minutes while its income
-        // stood still at 50 a second.
-        let commander = self.commander_directives(player).is_some();
-        if !commander && self.mine_upgrades_running(census) > self.mine_upgrade_budget(player) {
-            focus.mines = Priority::Last;
-        } else if !energy_short && mass_short {
+        // Mine upgrades are begun as the sink for a filling store and never put
+        // last: once the store stopped filling the budget fell under the four
+        // begun, they went last behind factories asking ten times the income, and
+        // none of them finished in thirteen minutes while income stood at 50.
+        if !energy_short && mass_short {
             focus.mines = Priority::First;
         }
         if focus != pl.focus {

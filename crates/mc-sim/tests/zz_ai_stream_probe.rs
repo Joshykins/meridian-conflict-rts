@@ -163,10 +163,7 @@ fn stream() {
                         alive[domain(&w, r)] += 1;
                     }
                 }
-                let mut line = format!(
-                    "  {minute:>2}m P{p} waves {:>2} raids {:>3} alive {alive:?} |",
-                    w.state.ai[p].waves, w.state.ai[p].raids
-                );
+                let mut line = format!("  {minute:>2}m P{p} alive {alive:?} |");
                 for (d, &t) in tally.iter().enumerate() {
                     let alone = if t.samples > 0 {
                         100.0 * t.alone as f32 / t.samples as f32

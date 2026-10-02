@@ -5,29 +5,12 @@ use std::collections::BTreeMap;
 
 const MAX_CONTACTS: usize = 256;
 
-/// Where hurt or outmatched units at `pos` fall back to: short of the start on
-/// their own side. The start itself stands among the base's buildings; units
-/// sent there crowded short of it with a move they never finished, so they were
-/// never idle again and never rejoined the army.
-fn fall_back_to(start: FxVec2, pos: FxVec2) -> FxVec2 {
-    offset_toward(start, pos, Fx::from_int(220))
-}
-
-/// Units this close to their start have fallen back already.
-const FALL_BACK_NEAR: Fx = Fx::from_int(260);
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct Contact {
     pub id: UnitId,
     pub blueprint: BlueprintId,
     pub pos: FxVec2,
     pub seen: u32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct Recovery {
-    pub id: UnitId,
-    pub until: u32,
 }
 
 /// Physical movement domain for units; production domain for structures.
@@ -55,17 +38,12 @@ pub(super) fn strength(bp: &UnitBlueprint) -> i64 {
 impl AiState {
     pub(super) fn hash_adaptation(&self, h: &mut StateHasher) {
         self.config.hash(h);
-        h.write_u64(self.next_tactical_tick as u64);
         h.write_u64(self.contacts.len() as u64);
         for c in &self.contacts {
             h.write_u64(c.id.0 as u64 | (c.blueprint.0 as u64) << 32);
             h.write_i64(c.pos.x.0);
             h.write_i64(c.pos.y.0);
             h.write_u64(c.seen as u64);
-        }
-        h.write_u64(self.recovering.len() as u64);
-        for r in &self.recovering {
-            h.write_u64(r.id.0 as u64 | (r.until as u64) << 32);
         }
     }
 
@@ -76,27 +54,10 @@ impl AiState {
 
     /// A compact diagnostic for headless match reports.
     pub fn summary(&self) -> String {
-        if self.config.brain == crate::Brain::Commander {
-            return format!(
-                "commander waves={} contacts={} {}",
-                self.waves,
-                self.contacts.len(),
-                self.commander.summary()
-            );
-        }
         format!(
-            "stance={} waves={} raids={} contacts={} recovering={} production={} land_route={} plans={} landings={} landing={}",
-            self.stance,
-            self.waves,
-            self.raids,
+            "commander contacts={} {}",
             self.contacts.len(),
-            self.recovering.len(),
-            self.production_counter,
-            self.land_route
-                .map_or("?".into(), |r| format!("{:b}", r.reaches)),
-            self.strategy.names(),
-            self.landings,
-            self.landing.map_or("-".into(), |l| format!("phase{}", l.phase)),
+            self.commander.summary()
         )
     }
 }
@@ -143,18 +104,6 @@ impl World {
         contacts.sort_by_key(|c| (std::cmp::Reverse(c.seen), c.id));
         contacts.truncate(MAX_CONTACTS);
         self.state.ai[player as usize].contacts = contacts;
-        let recovered: Vec<_> = self.state.ai[player as usize]
-            .recovering
-            .iter()
-            .filter(|r| {
-                self.state.units.row(r.id).is_some_and(|row| {
-                    tick < r.until
-                        && self.state.units.health[row] < self.bp(row).health * Fx::ratio(7, 10)
-                })
-            })
-            .cloned()
-            .collect();
-        self.state.ai[player as usize].recovering = recovered;
     }
 
     pub(super) fn ai_personality(&self, player: u8, census: &Census, intel: &Intel) -> Personality {
@@ -188,147 +137,8 @@ impl World {
         counts
     }
 
-    /// Rank every legal combat blueprint; no roster keys, tank/ship lists, or tier cycles.
-    pub(super) fn choose_combat_unit(
-        &self,
-        player: u8,
-        candidates: &[BlueprintId],
-        counts: &BTreeMap<BlueprintId, usize>,
-        stance: Stance,
-        serial: u32,
-    ) -> Option<BlueprintId> {
-        let ai = &self.state.ai[player as usize];
-        let mut targets = BTreeMap::from([(cat::LAND, 10i64), (cat::LAND | cat::STRUCTURE, 4)]);
-        let mut fortifications = 0;
-        for c in &ai.contacts {
-            let bp = self.blueprints.unit(c.blueprint);
-            let age = self.state.tick.saturating_sub(c.seen);
-            let confidence = (ai.config.memory_ticks().saturating_sub(age) * 100
-                / ai.config.memory_ticks())
-            .max(10) as i64;
-            let weight = strength(bp).min(2000) * confidence / 100;
-            *targets.entry(bp.target_categories()).or_insert(0) += weight;
-            if bp.has(cat::DEFENSE) {
-                fortifications += 1;
-            }
-        }
-        let total: i64 = targets.values().sum();
-        candidates
-            .iter()
-            .copied()
-            .filter_map(|id| {
-                let bp = self.blueprints.unit(id);
-                let bias = ai.config.domain_weights[domain(bp)] as i64;
-                if bias == 0 || bp.motion.is_none() || bp.has(cat::SCOUT) {
-                    return None;
-                }
-                if bp.weapons.is_empty() {
-                    let armed: usize = counts
-                        .iter()
-                        .filter(|(id, _)| {
-                            !self.blueprints.unit(**id).weapons.is_empty()
-                                && self.blueprints.unit(**id).is_mobile()
-                        })
-                        .map(|(_, n)| *n)
-                        .sum();
-                    let support: usize = counts
-                        .iter()
-                        .filter(|(id, _)| {
-                            let u = self.blueprints.unit(**id);
-                            u.is_mobile()
-                                && u.weapons.is_empty()
-                                && !u.has(cat::ENGINEER)
-                                && !u.is_salvager()
-                                && !u.has(cat::SCOUT)
-                        })
-                        .map(|(_, n)| *n)
-                        .sum();
-                    if armed < 8 || support >= (armed / 10).max(1) {
-                        return None;
-                    }
-                    return Some((id, 180 * bias / 100));
-                }
-                let mut effectiveness = 0i64;
-                for weapon in &bp.weapons {
-                    let covered: i64 = targets
-                        .iter()
-                        .filter(|(mask, _)| weapon.target_mask & **mask != 0)
-                        .map(|(_, weight)| *weight)
-                        .sum();
-                    let dps = weapon.damage.floor_int() as i64
-                        * weapon.salvo.max(1) as i64
-                        * weapon.salvo_batch.max(1) as i64
-                        * 10
-                        / weapon.reload_ticks.max(1) as i64;
-                    effectiveness += dps * covered * 100 / total.max(1);
-                }
-                // A torpedo bomber is no use until there are hulls on the water to hunt.
-                if effectiveness == 0
-                    && domain(bp) == 1
-                    && bp.weapons.iter().all(|w| w.target_mask & !cat::NAVAL == 0)
-                {
-                    return None;
-                }
-                let adaptation = ai.config.adaptation as i64;
-                let cost = bp.cost_mass.floor_int().max(20) as i64;
-                let mut score = 100 + (effectiveness * 100 / cost).min(800) * adaptation / 100;
-                // Preserve a useful combined-arms force; duplicate types have diminishing utility.
-                let existing = counts.get(&id).copied().unwrap_or(0) as i64;
-                score = score * 6 / (6 + existing);
-                if bp.has(cat::ARTILLERY) && matches!(stance, Stance::Firebase | Stance::Push) {
-                    score += 55;
-                }
-                if bp.has(cat::ARTILLERY) {
-                    let range = bp
-                        .weapons
-                        .iter()
-                        .map(|w| w.range_max.floor_int())
-                        .max()
-                        .unwrap_or(0) as i64;
-                    score += fortifications.min(6) * range.min(800) * adaptation / 1000;
-                }
-                if bp.has(cat::SCOUT) {
-                    score /= 3;
-                }
-                if stance == Stance::Raid {
-                    score += bp.motion.map_or(0, |m| m.speed.floor_int() as i64).min(100);
-                }
-                // What the side's plans call for (`strategy.rs`): bombers kept for
-                // a big wing, submarines against an enemy with no sonar.
-                let bomber = domain(bp) == 1
-                    && !bp.has(cat::ANTI_AIR)
-                    && bp
-                        .weapons
-                        .iter()
-                        .any(|w| w.target_mask & (cat::LAND | cat::STRUCTURE) != 0);
-                if bomber && self.holds(player, super::strategy::Gambit::AirFleet) {
-                    score += 150;
-                }
-                if bp.dive.is_some() && self.holds(player, super::strategy::Gambit::Submarines) {
-                    score += 200;
-                }
-                let pl = &self.state.players[player as usize];
-                if bp.cost_energy > (pl.energy + pl.energy_income * 20).max(Fx::from_int(200)) {
-                    score /= 3;
-                }
-                if bp.cost_mass > (pl.mass + pl.mass_income * 20).max(Fx::from_int(100)) {
-                    score /= 3;
-                }
-                score = score * bias / 100;
-                // Small stable variation, not random noise that can override a needed counter.
-                let tie = (id.0 as u32)
-                    .wrapping_mul(1664525)
-                    .wrapping_add(serial.wrapping_mul(1013904223))
-                    .wrapping_add(player as u32 * 97)
-                    % 17;
-                Some((id, score + tie as i64))
-            })
-            .max_by_key(|(id, score)| (*score, std::cmp::Reverse(id.0)))
-            .map(|(id, _)| id)
-    }
-
-    /// Distance plus the defensive investment actually scouted around an objective.
-    /// This gives raiders a reason to change targets when an expansion is fortified.
+    /// Distance plus three metres for each unit of defensive strength scouted
+    /// around an objective: raiders change targets when an expansion is fortified.
     pub(super) fn ai_objective_cost(&self, player: u8, target: FxVec2, from: FxVec2) -> i64 {
         let ai = &self.state.ai[player as usize];
         let risk: i64 = ai
@@ -340,34 +150,20 @@ impl World {
             })
             .map(|c| strength(self.blueprints.unit(c.blueprint)))
             .sum();
-        from.distance(target).floor_int() as i64 + risk * ai.config.adaptation as i64 / 25
+        from.distance(target).floor_int() as i64 + risk * 3
     }
 
+    /// How much the side wants a factory of `bp`'s domain: the forces its plans
+    /// want, less for each factory of that domain it holds.
     pub(super) fn factory_domain_score(&self, player: u8, bp: &UnitBlueprint) -> i64 {
         let d = domain(bp);
-        // The Commander builds factories for the forces its plans want.
-        if self.commander_directives(player).is_some() {
-            let shares = self.force_shares(player);
-            let want = match d {
-                0 => shares[0],
-                1 => shares[1],
-                _ => shares[2] + shares[3],
-            };
-            let held = self
-                .state
-                .units
-                .slots
-                .iter()
-                .filter(|&r| {
-                    self.state.units.owner[r] == player
-                        && self.bp(r).has(cat::FACTORY)
-                        && domain(self.bp(r)) == d
-                })
-                .count() as i64;
-            return want * 100 / (1 + held);
-        }
-        let ai = &self.state.ai[player as usize];
-        let count = self
+        let shares = self.force_shares(player);
+        let want = match d {
+            0 => shares[0],
+            1 => shares[1],
+            _ => shares[2] + shares[3],
+        };
+        let held = self
             .state
             .units
             .slots
@@ -378,33 +174,7 @@ impl World {
                     && domain(self.bp(r)) == d
             })
             .count() as i64;
-        let demand = ai
-            .contacts
-            .iter()
-            .filter(|c| domain(self.blueprints.unit(c.blueprint)) == d)
-            .count() as i64;
-        let score = (ai.config.domain_weights[d] as i64
-            + demand.min(20) * ai.config.adaptation as i64 / 10)
-            / (1 + count);
-        // With no land route to the enemy the land factories make only a home
-        // guard, hovers and engineers; the war goes by sea and air (`theatre.rs`).
-        let score = match d {
-            _ if self.land_route_to_enemy(player) => score,
-            0 => score / 3,
-            2 => score * 2,
-            _ => score,
-        };
-        // A plan for the air or under the sea wants its factories.
-        let plan = match d {
-            1 => super::strategy::Gambit::AirFleet,
-            2 => super::strategy::Gambit::Submarines,
-            _ => return score,
-        };
-        if self.holds(player, plan) {
-            score * 2
-        } else {
-            score
-        }
+        want * 100 / (1 + held)
     }
 
     pub(super) fn visible_air_target(&self, player: u8, from: FxVec2) -> Option<FxVec2> {
@@ -419,246 +189,6 @@ impl World {
             })
             .map(|r| self.state.units.pos[r])
             .min_by_key(|p| (p.distance_sq(from), p.x, p.y))
-    }
-
-    pub(super) fn react_tactically(
-        &mut self,
-        player: u8,
-        census: &mut Census,
-        intel: &Intel,
-        out: &mut Vec<Command>,
-    ) {
-        let ai = &self.state.ai[player as usize];
-        if self.state.tick < ai.next_tactical_tick {
-            return;
-        }
-        let config = ai.config;
-        let start = self.state.players[player as usize].start;
-        let contacts = ai.contacts.clone();
-        if let Some(row) = self
-            .state
-            .units
-            .row(self.state.players[player as usize].commander)
-        {
-            let bp = self.bp(row);
-            let pos = self.state.units.pos[row];
-            let danger = contacts.iter().any(|c| {
-                c.seen == self.state.tick
-                    && c.pos.distance(pos) < Fx::from_int(450)
-                    && !self.blueprints.unit(c.blueprint).weapons.is_empty()
-            });
-            if danger
-                && self.state.units.health[row] * 100
-                    < bp.health * config.retreat_health.max(40) as i32
-            {
-                let repair = census
-                    .builders_idle
-                    .iter()
-                    .copied()
-                    .filter(|&r| r != row)
-                    .map(|r| self.state.units.pos[r])
-                    .min_by_key(|p| p.distance_sq(start))
-                    .unwrap_or(start);
-                out.push(Command::Move {
-                    units: vec![self.state.units.id(row)],
-                    target: repair,
-                    queue: false,
-                });
-            }
-        }
-        let mut withdrawn = Vec::new();
-        let mut outmatched_rows = Vec::new();
-        let mut defenders = Vec::new();
-        // Bounded reaction cadence avoids cancelling movement/volleys on every think.
-        let offset = (self.state.tick as usize / config.think_period().max(40) as usize * 128)
-            % census.combat_rows.len().max(1);
-        let span = mc_core::perf_span!("ai.tactics.rows");
-        // What the enemy has at the worst threat, found the first time a unit asks.
-        let mut threat_kinds: Option<u32> = None;
-        for &row in census
-            .combat_rows
-            .iter()
-            .cycle()
-            .skip(offset)
-            .take(census.combat_rows.len().min(128))
-        {
-            let bp = self.bp(row);
-            let pos = self.state.units.pos[row];
-            if self.state.ai[player as usize]
-                .recovering
-                .iter()
-                .any(|r| r.id == self.state.units.id(row))
-            {
-                continue;
-            }
-            let hostile: Vec<_> = contacts
-                .iter()
-                .filter(|c| {
-                    c.seen == self.state.tick
-                        && c.pos.distance(pos) < Fx::from_int(440)
-                        && self
-                            .blueprints
-                            .unit(c.blueprint)
-                            .weapons
-                            .iter()
-                            .any(|w| w.target_mask & bp.target_categories() != 0)
-                })
-                .collect();
-            let hurt =
-                self.state.units.health[row] * 100 < bp.health * config.retreat_health as i32;
-            let enemy_power: i64 = hostile
-                .iter()
-                .map(|c| strength(self.blueprints.unit(c.blueprint)))
-                .sum();
-            let friendly_power: i64 = if hostile.is_empty() {
-                0
-            } else {
-                census
-                    .combat_rows
-                    .iter()
-                    .copied()
-                    .filter(|&r| self.state.units.pos[r].distance(pos) < Fx::from_int(440))
-                    .map(|r| strength(self.bp(r)))
-                    .sum()
-            };
-            let outmatched = config.difficulty != Difficulty::Easy
-                && enemy_power > friendly_power * 2
-                && pos.distance(start) > HOME_RADIUS;
-            if !hostile.is_empty() && outmatched && !hurt {
-                // Fall back with the others, below, not one by one.
-                outmatched_rows.push(row);
-                withdrawn.push(row);
-            } else if !hostile.is_empty() && hurt && pos.distance(start) > FALL_BACK_NEAR {
-                // Already home, it stays and fights: there is nowhere to fall back to.
-                let target = self.nav.nearest_passable(
-                    bp.motion.unwrap().layer,
-                    bp.motion.unwrap().size_class,
-                    fall_back_to(start, pos),
-                );
-                if let Some(target) = target {
-                    out.push(Command::Move {
-                        units: vec![self.state.units.id(row)],
-                        target,
-                        queue: false,
-                    });
-                    withdrawn.push(row);
-                }
-            } else if let Some(&(_, enemy)) = intel.threats.first() {
-                // Recall nearby fighting units as well as idle ones; air-only weapons stay on air defense.
-                let near_threat = *threat_kinds.get_or_insert_with(|| self.kinds_at(player, enemy));
-                if pos.distance(start) < Fx::from_int(1100)
-                    && bp.weapons.iter().any(|w| w.target_mask & near_threat != 0)
-                    && self.can_shoot_from_its_ground(bp, enemy)
-                {
-                    defenders.push(row);
-                }
-            }
-        }
-        // An outmatched group falls back as a group: units that break off one
-        // at a time are caught and shot in the back.
-        let mut groups: Vec<(FxVec2, Vec<usize>)> = Vec::new();
-        for &row in &outmatched_rows {
-            let pos = self.state.units.pos[row];
-            match groups
-                .iter_mut()
-                .find(|(seed, _)| seed.distance(pos) < Fx::from_int(600))
-            {
-                Some((_, rows)) => rows.push(row),
-                None => groups.push((pos, vec![row])),
-            }
-        }
-        for (seed, rows) in groups {
-            let bp = self.bp(rows[0]);
-            let Some(target) = self.nav.nearest_passable(
-                bp.motion.unwrap().layer,
-                bp.motion.unwrap().size_class,
-                fall_back_to(start, seed),
-            ) else {
-                continue;
-            };
-            for chunk in rows.chunks(MAX_COMMAND_UNITS) {
-                out.push(Command::Move {
-                    units: chunk.iter().map(|&r| self.state.units.id(r)).collect(),
-                    target,
-                    queue: false,
-                });
-            }
-        }
-        for &r in &withdrawn {
-            self.state.ai[player as usize].recovering.push(Recovery {
-                id: self.state.units.id(r),
-                until: self.state.tick + 450,
-            });
-        }
-        if let Some(&(_, enemy)) = intel.threats.first() {
-            defenders.sort_by_key(|&r| (self.state.units.pos[r].distance_sq(enemy), r));
-            let reserve = if enemy.distance(start) < Fx::from_int(420) {
-                defenders.len()
-            } else {
-                (census.combat_rows.len() / 3).clamp(3, 12)
-            };
-            defenders.truncate(reserve);
-            // Units already fighting near the incursion retain their orders and volleys.
-            defenders.retain(|&r| {
-                self.state.units.order_head[r] == NO_ORDER
-                    || self.state.units.pos[r].distance(enemy) > Fx::from_int(300)
-            });
-            for group in defenders.chunks(MAX_COMMAND_UNITS) {
-                out.push(Command::AttackMove {
-                    units: group.iter().map(|&r| self.state.units.id(r)).collect(),
-                    target: enemy,
-                    queue: false,
-                });
-            }
-        }
-        drop(span);
-        let available = |r: &usize| !withdrawn.contains(r) && !defenders.contains(r);
-        census.army_idle.retain(available);
-        census.artillery_idle.retain(available);
-        census.bombers_idle.retain(available);
-        census.interceptors_idle.retain(available);
-        census.naval_idle.retain(available);
-        self.state.ai[player as usize].next_tactical_tick =
-            self.state.tick + config.think_period().max(40);
-    }
-
-    /// Whether a unit of `bp` can stand somewhere within weapon range of `at`.
-    /// A ship sent at a raider inland was given no order (its target projected
-    /// onto the water missed), stood idle off home for as long as the raid
-    /// lasted, and was kept from the fleet all that time as a defender.
-    fn can_shoot_from_its_ground(&self, bp: &UnitBlueprint, at: FxVec2) -> bool {
-        let Some(m) = bp.motion.filter(|m| m.layer == MoveLayer::Naval) else {
-            return true;
-        };
-        let range = bp
-            .weapons
-            .iter()
-            .map(|w| w.range_max)
-            .max()
-            .unwrap_or(Fx::ZERO);
-        self.nav
-            .nearest_passable(m.layer, m.size_class, at)
-            .is_some_and(|p| p.distance(at) <= range)
-    }
-
-    /// The target categories of the enemies `player` detects within 80 m of `pos`:
-    /// a unit whose weapons take none of them cannot engage there.
-    fn kinds_at(&self, player: u8, pos: FxVec2) -> u32 {
-        let units = &self.state.units;
-        let mut kinds = 0;
-        let reach = Fx::from_int(80);
-        self.index
-            .query_foes(pos, reach, kind::UNIT, self.team_mask(player), |e| {
-                let enemy = e.row as usize;
-                if self.unit_entry_is_current(e)
-                    && units.pos[enemy].distance(pos) < reach
-                    && self.detects(player, enemy)
-                {
-                    kinds |= self.bp(enemy).target_categories();
-                }
-                true
-            });
-        kinds
     }
 
     /// Split movement by hull and project destinations onto valid terrain. A future ship

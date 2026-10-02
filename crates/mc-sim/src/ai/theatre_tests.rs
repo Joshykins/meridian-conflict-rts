@@ -98,14 +98,7 @@ fn with_no_land_route_a_factory_makes_only_a_home_guard_of_land_units() {
     assert!(census.factories_idle.contains(&factory));
     let mut out = Vec::new();
     for _ in 0..6 {
-        w.direct_factories(
-            0,
-            &census,
-            &[],
-            Stance::Expand,
-            Personality::Expander,
-            &mut out,
-        );
+        w.direct_factories(0, &census, &[], &mut out);
     }
     let made: Vec<&UnitBlueprint> = out
         .iter()
@@ -184,59 +177,8 @@ fn a_sea_mine_is_not_kept_off_by_the_islands_own_land_mines() {
 }
 
 #[test]
-fn a_heavy_warship_strikes_alone_but_a_corvette_waits_for_another() {
-    let mut w = islands(false);
-    let start = w.state.players[0].start;
-    let intel = Intel {
-        enemy_start: Some(w.state.players[1].start),
-        ..Intel::default()
-    };
-    let staging = offset_toward(start, w.state.players[1].start, Fx::from_int(400));
-    let corvette = spawn(
-        &mut w,
-        "aster_t2_corvette",
-        staging.x.floor_int(),
-        staging.y.floor_int(),
-    );
-    w.rebuild_index();
-    let mut out = Vec::new();
-    w.direct_capital(0, &w.survey_own(0), &intel, start, &mut out);
-    assert!(out.is_empty(), "{out:?}");
-
-    let frigate = spawn(
-        &mut w,
-        "aster_t3_frigate",
-        staging.x.floor_int(),
-        staging.y.floor_int() + 200,
-    );
-    w.rebuild_index();
-    w.direct_capital(0, &w.survey_own(0), &intel, start, &mut out);
-    let sent: Vec<UnitId> = out
-        .iter()
-        .flat_map(|c| match c {
-            Command::AttackMove { units, .. } => units.clone(),
-            _ => Vec::new(),
-        })
-        .collect();
-    assert!(sent.contains(&w.state.units.id(frigate)), "{out:?}");
-    assert!(
-        sent.contains(&w.state.units.id(corvette)),
-        "they go together"
-    );
-}
-
-#[test]
-fn an_unarmed_radar_ship_is_no_project_and_a_side_wants_only_one() {
-    let mut w = islands(false);
+fn an_unarmed_radar_ship_is_no_project() {
+    let w = islands(false);
     let vigil = w.blueprints.id_of("aster_t1_sensor_ship").unwrap();
     assert_eq!(projects::project_kind(w.blueprints.unit(vigil)), None);
-    let mason = spawn(&mut w, "aster_t1_engineer", 300, 400);
-    w.state.players[0].mass_income = Fx::from_int(30);
-    let start = w.state.players[0].start;
-    let job = w
-        .spotter_job(mason, 2, start, Angle::ZERO)
-        .expect("one radar ship");
-    assert_eq!(job.blueprint, vigil);
-    spawn(&mut w, "aster_t1_sensor_ship", 600, 600);
-    assert!(w.spotter_job(mason, 2, start, Angle::ZERO).is_none());
 }

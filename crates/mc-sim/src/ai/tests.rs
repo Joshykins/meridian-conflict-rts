@@ -1,8 +1,8 @@
 use super::*;
-use crate::focus::Priority;
+
 use crate::world::MapData;
-use crate::{MatchConfig, PlayerSetup};
-use mc_data::{Blueprints, MoveLayer};
+use crate::{Difficulty, MatchConfig, PlayerSetup};
+use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
 use std::{path::Path, sync::Arc};
@@ -70,48 +70,18 @@ fn contact(w: &mut World, key: &str, count: u32) {
 }
 
 #[test]
-fn production_counters_air_then_returns_to_ground() {
+fn a_force_weighted_to_zero_is_never_produced() {
     let mut w = world();
-    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let aa = w.blueprints.id_of("aster_t1_mobile_aa").unwrap();
-    let choose = |w: &World| {
-        w.choose_combat_unit(0, &[tank, aa], &Default::default(), Stance::Defend, 0)
-            .unwrap()
-    };
-    assert_eq!(choose(&w), tank);
-    contact(&mut w, "aster_t1_bomber", 12);
-    assert_eq!(
-        choose(&w),
-        aa,
-        "observed bomber mass should prompt AA production"
-    );
-    w.state.tick += w.state.ai[0].config.memory_ticks() + 1;
-    w.remember_enemies(0);
-    assert_eq!(
-        choose(&w),
-        tank,
-        "expired air intel should stop dominating production"
-    );
-}
-
-#[test]
-fn adaptation_off_and_domain_weights_are_respected() {
-    let mut w = world();
-    contact(&mut w, "aster_t1_bomber", 12);
     let choices = [
         w.blueprints.id_of("aster_t1_tank").unwrap(),
         w.blueprints.id_of("aster_t1_mobile_aa").unwrap(),
     ];
-    w.state.ai[0].config.adaptation = 0;
-    let known = w.choose_combat_unit(0, &choices, &Default::default(), Stance::Expand, 3);
-    w.state.ai[0].contacts.clear();
-    assert_eq!(
-        known,
-        w.choose_combat_unit(0, &choices, &Default::default(), Stance::Expand, 3)
-    );
+    assert!(w
+        .solve_production(0, &choices, &Default::default(), 3)
+        .is_some());
     w.state.ai[0].config.domain_weights = [0, 100, 100];
     assert_eq!(
-        w.choose_combat_unit(0, &choices, &Default::default(), Stance::Expand, 3),
+        w.solve_production(0, &choices, &Default::default(), 3),
         None
     );
 }
@@ -200,81 +170,6 @@ fn doctrine_is_independent_of_player_slot_and_difficulty_has_no_income_bonus() {
 }
 
 #[test]
-fn wounded_busy_units_retreat_and_are_not_reassigned_to_attack() {
-    let mut w = world();
-    w.state.fog_enabled = false;
-    let own = spawn(&mut w, "aster_t1_tank", 0, 850, 850);
-    spawn(&mut w, "aster_t1_tank", 1, 1000, 850);
-    w.state.units.health[own] = Fx::from_int(40);
-    let id = w.state.units.id(own);
-    w.apply_command(&PlayerCommand {
-        player: 0,
-        command: Command::AttackMove {
-            units: vec![id],
-            target: FxVec2::from_ints(1600, 1600),
-            queue: false,
-        },
-    })
-    .unwrap();
-    w.remember_enemies(0);
-    let mut c = w.survey_own(0);
-    assert!(!c.army_idle.contains(&own));
-    let intel = w.survey_intel(0, &c);
-    let mut out = vec![];
-    w.react_tactically(0, &mut c, &intel, &mut out);
-    assert!(out
-        .iter()
-        .any(|o| matches!(o,Command::Move { units,.. } if units.contains(&id))));
-    assert!(w.state.ai[0].recovering.iter().any(|r| r.id == id));
-    assert!(!w.survey_own(0).army_idle.contains(&own));
-}
-
-#[test]
-fn new_naval_blueprint_is_selected_and_ships_only_receive_water_destinations() {
-    let mut w = world();
-    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let aa = w.blueprints.id_of("aster_t1_mobile_aa").unwrap();
-    let mut data = (*w.blueprints).clone();
-    let ship = &mut data.units[tank.index()];
-    ship.key = "future_ship_not_known_to_ai".into();
-    ship.categories = cat::NAVAL | cat::MOBILE | cat::DIRECT_FIRE;
-    ship.motion.as_mut().unwrap().layer = MoveLayer::Naval;
-    ship.weapons[0].target_mask = cat::NAVAL | cat::LAND;
-    let mut samples = vec![40u16; 257 * 257];
-    for y in 0..257 {
-        for x in 110..257 {
-            samples[y * 257 + x] = 0;
-        }
-    }
-    w.terrain = Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(20));
-    w.nav = crate::nav::Nav::new(&w.terrain, w.pool.clone()).unwrap();
-    w.blueprints = Arc::new(data);
-    let row = w
-        .spawn_unit(tank, 0, FxVec2::from_ints(1200, 800), Angle::ZERO, true)
-        .unwrap();
-    w.state.ai[0].contacts.push(Contact {
-        id: UnitId::new(99, 0),
-        blueprint: tank,
-        pos: FxVec2::from_ints(1500, 800),
-        seen: 0,
-    });
-    assert_eq!(
-        w.choose_combat_unit(0, &[tank, aa], &Default::default(), Stance::Push, 0),
-        Some(tank)
-    );
-    let census = w.survey_own(0);
-    assert!(census.naval_idle.contains(&row));
-    let mut out = vec![];
-    w.direct_fleet(0, &census, &mut out);
-    assert!(!out.is_empty());
-    for c in w.route_ai_commands(out) {
-        if let Command::AttackMove { target, .. } = c {
-            assert!(w.nav.passable(MoveLayer::Naval, 0, target));
-        }
-    }
-}
-
-#[test]
 fn air_army_and_busy_scouts_count_and_config_memory_survive_snapshot() {
     let mut w = world();
     spawn(&mut w, "aster_t1_bomber", 0, 500, 500);
@@ -294,7 +189,7 @@ fn air_army_and_busy_scouts_count_and_config_memory_survive_snapshot() {
     w.state.ai[0].config.doctrine = Doctrine::Economic;
     contact(&mut w, "aster_t1_bomber", 3);
     let hash = w.hash();
-    w.state.ai[0].config.adaptation = 12;
+    w.state.ai[0].config.domain_weights = [100, 50, 100];
     assert_ne!(
         hash,
         w.hash(),
@@ -328,52 +223,6 @@ fn static_enemy_fortifications_do_not_pin_the_army_in_raid_defense() {
     w.rebuild_index();
     let c = w.survey_own(0);
     assert!(w.survey_intel(0, &c).threats.is_empty());
-}
-
-#[test]
-fn raiders_prefer_an_undefended_expansion_and_support_is_bounded() {
-    let mut w = world();
-    let near = FxVec2::from_ints(1000, 300);
-    let far = FxVec2::from_ints(1000, 1000);
-    let defense = w
-        .blueprints
-        .units
-        .iter()
-        .find(|bp| bp.has(cat::DEFENSE | cat::DIRECT_FIRE))
-        .unwrap()
-        .id;
-    w.state.ai[0].contacts.push(Contact {
-        id: UnitId::new(10, 0),
-        blueprint: defense,
-        pos: near,
-        seen: 0,
-    });
-    let start = w.state.players[0].start;
-    assert!(w.ai_objective_cost(0, near, start) > w.ai_objective_cost(0, far, start));
-    let support = w.blueprints.id_of("aster_t3_support").unwrap();
-    let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let mut counts = std::collections::BTreeMap::new();
-    assert_eq!(
-        w.choose_combat_unit(0, &[support], &counts, Stance::Expand, 0),
-        None
-    );
-    counts.insert(tank, 10);
-    let scout = w.blueprints.id_of("aster_t1_air_scout").unwrap();
-    assert_eq!(
-        w.choose_combat_unit(0, &[scout], &counts, Stance::Expand, 0),
-        None,
-        "scouts use their own quota, not support production"
-    );
-
-    assert_eq!(
-        w.choose_combat_unit(0, &[support], &counts, Stance::Expand, 0),
-        Some(support)
-    );
-    counts.insert(support, 1);
-    assert_eq!(
-        w.choose_combat_unit(0, &[support], &counts, Stance::Expand, 0),
-        None
-    );
 }
 
 #[test]
@@ -421,10 +270,6 @@ fn configured_economy_duel_launches_attacks_and_sustains_combat() {
         w.state.players[1].units_killed
     );
     assert!(
-        w.state.ai.iter().any(|ai| ai.waves > 0 || ai.raids > 0),
-        "AI must launch an offensive wave or economic raid"
-    );
-    assert!(
         w.state.players.iter().any(|p| p.units_killed > 3),
         "opponents must actually fight"
     );
@@ -462,7 +307,6 @@ fn ai_converts_a_decisive_army_advantage_into_a_win() {
             break;
         }
     }
-    assert!(w.state.ai[0].waves > 0);
     assert_eq!(
         w.state.winner,
         Some(0),
@@ -514,14 +358,7 @@ fn upgraded_factory_trains_a_tech_builder_even_with_many_old_engineers() {
     }
     let census = w.survey_own(0);
     let mut out = vec![];
-    w.direct_factories(
-        0,
-        &census,
-        &[],
-        Stance::Expand,
-        Personality::Aggressive,
-        &mut out,
-    );
+    w.direct_factories(0, &census, &[], &mut out);
     let engineer = w.blueprints.id_of("aster_t2_engineer").unwrap();
     assert!(
         out.iter()
@@ -579,25 +416,20 @@ fn mine_upgrades_go_to_the_mine_that_pays_back_soonest() {
     w.tick(&[]).unwrap();
     w.state.players[0].mass = Fx::from_int(800);
     w.state.players[0].mass_income = Fx::from_int(20);
+    // The economy allows two at once, each paying back within its horizon
+    // (`commander/economy.rs`).
+    let eco = &mut w.state.ai[0].commander.eco;
+    eco.upgrades = 2;
+    eco.payback = 1100;
     let mut census = w.survey_own(0);
-    assert_eq!(
-        w.mine_to_upgrade(0, &census, false).map(|(r, _)| r),
-        Some(alone)
-    );
+    assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), Some(alone));
 
-    // With the lone mine taken, a crowded one pays back too slowly for Normal,
-    // unless materials go spare with nothing better to spend them on. Hard
-    // waits longer for its payback.
+    // With the lone mine taken, a crowded one pays back too slowly for that
+    // horizon, and in time for one twice as long (a filling store's).
     census.extractors.retain(|&r| r != alone);
-    w.state.ai[0].config.difficulty = Difficulty::Normal;
-    assert_eq!(w.mine_to_upgrade(0, &census, false).map(|(r, _)| r), None);
-    assert!(crowded.contains(&w.mine_to_upgrade(0, &census, true).map(|(r, _)| r).unwrap()));
-    w.state.ai[0].config.difficulty = Difficulty::Hard;
-    assert!(crowded.contains(
-        &w.mine_to_upgrade(0, &census, false)
-            .map(|(r, _)| r)
-            .unwrap()
-    ));
+    assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), None);
+    w.state.ai[0].commander.eco.payback = 2200;
+    assert!(crowded.contains(&w.mine_to_upgrade(0, &census).map(|(r, _)| r).unwrap()));
 }
 
 #[test]
@@ -762,99 +594,6 @@ fn buildings_keep_a_factorys_exit_and_a_lane_clear() {
     );
 }
 
-/// Attack orders in `out`, as (units, target).
-fn attacks(out: &[Command]) -> Vec<(usize, FxVec2)> {
-    out.iter()
-        .filter_map(|c| match c {
-            Command::AttackMove { units, target, .. } => Some((units.len(), *target)),
-            _ => None,
-        })
-        .collect()
-}
-
-#[test]
-fn a_lone_bomber_waits_for_its_wing_and_the_wing_strikes_together() {
-    let mut w = world();
-    let (start, staging) = (FxVec2::from_ints(300, 300), FxVec2::from_ints(500, 500));
-    let intel = Intel {
-        enemy_extractors: vec![FxVec2::from_ints(1600, 1500)],
-        ..Intel::default()
-    };
-    spawn(&mut w, "aster_t1_bomber", 0, 500, 500);
-    let mut out = vec![];
-    w.direct_air(0, &w.survey_own(0), &intel, start, staging, &mut out);
-    assert!(attacks(&out).is_empty(), "one bomber alone is not a strike");
-    for i in 1..4 {
-        spawn(&mut w, "aster_t1_bomber", 0, 500 + i * 20, 500);
-    }
-    w.direct_air(0, &w.survey_own(0), &intel, start, staging, &mut out);
-    assert_eq!(attacks(&out), vec![(4, FxVec2::from_ints(1600, 1500))]);
-}
-
-#[test]
-fn torpedo_bombers_are_not_sent_at_mines() {
-    let mut w = world();
-    let intel = Intel {
-        enemy_extractors: vec![FxVec2::from_ints(1600, 1500)],
-        ..Intel::default()
-    };
-    for i in 0..4 {
-        spawn(&mut w, "aster_t2_torpedo_bomber", 0, 500 + i * 20, 500);
-    }
-    let mut out = vec![];
-    let (start, staging) = (FxVec2::from_ints(300, 300), FxVec2::from_ints(500, 500));
-    w.direct_air(0, &w.survey_own(0), &intel, start, staging, &mut out);
-    assert!(
-        attacks(&out).is_empty(),
-        "no ship seen, nothing a torpedo can hit"
-    );
-}
-
-#[test]
-fn units_out_in_the_field_wait_for_the_rest_of_their_wave() {
-    let mut w = world();
-    let rows: Vec<usize> = (0..6)
-        .map(|i| spawn(&mut w, "aster_t1_tank", 0, 1300 + i * 20, 1300))
-        .collect();
-    // Half of the wave is still busy: those done wait for it.
-    let busy: Vec<UnitId> = rows[..3].iter().map(|&r| w.state.units.id(r)).collect();
-    w.apply_command(&PlayerCommand {
-        player: 0,
-        command: Command::Move {
-            units: busy,
-            target: FxVec2::from_ints(1300, 1000),
-            queue: false,
-        },
-    })
-    .unwrap();
-    let army = |w: &mut World| {
-        let census = w.survey_own(0);
-        let intel = Intel {
-            enemy_start: Some(FxVec2::from_ints(1700, 1700)),
-            ..Intel::default()
-        };
-        let mut out = vec![];
-        w.direct_army(
-            0,
-            &census,
-            &intel,
-            Stance::Push,
-            Personality::Aggressive,
-            FxVec2::from_ints(300, 300),
-            Angle::ZERO,
-            None,
-            &mut out,
-        );
-        attacks(&out)
-    };
-    assert!(army(&mut w).is_empty(), "three of six idle: they wait");
-    for &r in &rows {
-        w.state.units.order_head[r] = NO_ORDER;
-    }
-    assert_eq!(army(&mut w).len(), 1, "all done: they go on as one group");
-    assert_eq!(army(&mut w)[0].0, 6);
-}
-
 #[test]
 fn builders_keep_off_ground_where_their_buildings_were_just_shot_down() {
     let mut w = world();
@@ -990,76 +729,6 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
         !out.iter()
             .any(|c| matches!(c, Command::Assist { target: t, .. } if *t == target)),
         "{out:?}"
-    );
-}
-
-/// A flat map with a lake east of player 0's start.
-fn lake_world() -> World {
-    let mut w = world();
-    let mut samples = vec![40u16; 257 * 257];
-    for y in 0..257 {
-        for x in 0..257 {
-            // 8 m cells: x 480..1100 m, y 0..700 m is under water.
-            if (60..137).contains(&x) && y < 88 {
-                samples[y * 257 + x] = 0;
-            }
-        }
-    }
-    w.terrain = Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::from_int(20));
-    w.nav = crate::nav::Nav::new(&w.terrain, w.pool.clone()).unwrap();
-    w
-}
-
-#[test]
-fn a_raider_the_army_cannot_reach_does_not_hold_it_at_home() {
-    let mut w = lake_world();
-    w.state.fog_enabled = false;
-    w.state.players[0].controller = Controller::Ai;
-    let tanks: Vec<usize> = (0..16)
-        .map(|i| {
-            spawn(
-                &mut w,
-                "aster_t1_tank",
-                0,
-                200 + (i % 4) * 16,
-                260 + (i / 4) * 16,
-            )
-        })
-        .collect();
-    // A hover raider out on the lake, well within the base's raid radius
-    // but out of the tanks' reach from the shore.
-    let hover = w.blueprints.id_of("aster_t2_hover").unwrap();
-    let raider = w
-        .spawn_unit(hover, 1, FxVec2::from_ints(700, 300), Angle::ZERO, true)
-        .unwrap();
-    let hold = PlayerCommand {
-        player: 1,
-        command: Command::SetFireState {
-            units: vec![w.state.units.id(raider)],
-            state: FireState::HoldFire,
-        },
-    };
-    w.apply_command(&hold).unwrap();
-    for _ in 0..1800 {
-        // It sits there all game, out of reach and never worn down.
-        w.state.units.health[raider] = w.bp(raider).health;
-        w.tick(&[]).unwrap();
-    }
-    let s = &w.state;
-    let far = tanks
-        .iter()
-        .filter(|&&r| {
-            s.units.slots.is_alive(r)
-                && s.units.pos[r].distance(s.players[0].start) > Fx::from_int(700)
-        })
-        .count();
-    let at = |r: usize| s.units.pos[r];
-    // Pinned, none left. A full first wave leaves now as soon as it has
-    // gathered; the six sent at the raider wait at home for the next one.
-    assert!(
-        far >= 8,
-        "{far} of 16 left home; {:?}",
-        tanks.iter().map(|&r| at(r)).collect::<Vec<_>>()
     );
 }
 
@@ -1323,59 +992,6 @@ fn a_watchtower_or_scavenger_a_builder_walks_to_counts_as_planned() {
     let planned = w.plan_counts(0, &census);
     assert_eq!(planned.radars.len(), 1);
     assert_eq!(planned.towers.len(), 1);
-}
-
-#[test]
-fn spare_materials_go_into_extra_mine_upgrades_put_last() {
-    let mut w = world_of(1024);
-    spawn(&mut w, "aster_t2_land_factory", 0, 400, 400);
-    spawn(&mut w, "aster_t1_power", 0, 600, 400);
-    spawn(&mut w, "aster_t1_power", 0, 600, 460);
-    let mines: Vec<usize> = [(1500, 300), (300, 1500), (3000, 3000), (4000, 800)]
-        .into_iter()
-        .map(|(x, y)| spawn(&mut w, "aster_core_mine", 0, x, y))
-        .collect();
-    w.tick(&[]).unwrap();
-    // Two upgrades already running: one past the budget at 20 a second.
-    w.apply_command(&PlayerCommand {
-        player: 0,
-        command: Command::Upgrade {
-            units: mines[..2].iter().map(|&r| w.state.units.id(r)).collect(),
-        },
-    })
-    .unwrap();
-    let pl = &mut w.state.players[0];
-    pl.mass_income = Fx::from_int(20);
-    pl.mass_capacity = Fx::from_int(3000);
-    pl.mass = Fx::from_int(2000);
-    // No energy to spare for another upgrade's draw.
-    pl.energy_income = Fx::from_int(100);
-    pl.energy_demand = Fx::from_int(100);
-    pl.energy_capacity = Fx::from_int(5000);
-    pl.energy = Fx::from_int(4000);
-    pl.upkeep_efficiency = Fx::ONE;
-    let census = w.survey_own(0);
-    assert_eq!(w.mine_upgrade_budget(0), 1);
-
-    let mut out = vec![];
-    w.direct_focus(0, &census, &mut out);
-    assert!(
-        matches!(out.as_slice(), [Command::SetFocus { focus }] if focus.mines == Priority::Last),
-        "upgrades past the budget take only what is left: {out:?}"
-    );
-    // With materials going spare another one starts, energy or not: it is put last too.
-    out.clear();
-    w.direct_upgrades(0, &census, &mut out);
-    assert!(
-        matches!(out.as_slice(), [Command::Upgrade { units }]
-            if mines[2..].iter().any(|&r| units == &vec![w.state.units.id(r)])),
-        "{out:?}"
-    );
-    // Without them, none past the budget.
-    w.state.players[0].mass = Fx::from_int(100);
-    out.clear();
-    w.direct_upgrades(0, &census, &mut out);
-    assert!(out.is_empty(), "{out:?}");
 }
 
 #[test]

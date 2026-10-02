@@ -1,6 +1,5 @@
 //! The Commander: the planning AI (`docs/AI_COMMANDER.md`). It holds game plans at a
 //! stake, runs operations of grouped units, and reads the roster from its data.
-//! Chosen per side by `AiConfig::brain`.
 //!
 //! One think: profiles from the data, the world model and beliefs from what the
 //! side has seen, plans reviewed, operations kept and given units, then each
@@ -23,8 +22,9 @@ mod world_model;
 
 use super::{offset_toward, Census, Intel};
 use crate::command::Command;
+use crate::tables::Controller;
 use crate::tables::UnitId;
-use crate::{Brain, Difficulty, World};
+use crate::{Difficulty, World};
 use beliefs::Beliefs;
 use mc_core::{Fx, FxVec2};
 use profile::Profiles;
@@ -73,11 +73,20 @@ impl World {
     /// A unit of `player` killed `mass` of the enemy: credited to its operation at the
     /// side's next think.
     pub(crate) fn note_kill_for_ai(&mut self, player: u8, killer: UnitId, mass: Fx) {
+        if self
+            .state
+            .players
+            .get(player as usize)
+            .map(|p| p.controller)
+            != Some(Controller::Ai)
+        {
+            return;
+        }
         let Some(ai) = self.state.ai.get_mut(player as usize) else {
             return;
         };
         // A deliberate cap: the oldest kills are lost if a side somehow never thinks.
-        if ai.config.brain == Brain::Commander && ai.commander.kills.len() < MOST_KILLS {
+        if ai.commander.kills.len() < MOST_KILLS {
             ai.commander.kills.push((killer, mass));
         }
     }
@@ -100,10 +109,19 @@ impl World {
             bp.is_structure() && (bp.mine.is_some() || bp.has(mc_data::cat::POWER))
         };
         let tick = self.state.tick;
+        if self
+            .state
+            .players
+            .get(player as usize)
+            .map(|p| p.controller)
+            != Some(Controller::Ai)
+        {
+            return;
+        }
         let Some(ai) = self.state.ai.get_mut(player as usize) else {
             return;
         };
-        if ai.config.brain == Brain::Commander {
+        {
             ai.commander.hurt[kind as usize] += mass;
             // Where the bombers keep hitting: anti-air goes there (`plans.rs`).
             if matches!(kind, state::Hurt::Air | state::Hurt::Space) {
@@ -116,7 +134,7 @@ impl World {
     }
 
     /// One think of the Commander for `player`: everything but the builders, which
-    /// it steers (`plans.rs`, `solver.rs`) and the classic code places.
+    /// it steers (`plans.rs`, `solver.rs`) and `builders.rs` places.
     pub(super) fn command(
         &mut self,
         player: u8,

@@ -136,13 +136,11 @@ impl World {
         let lying = salvage.iter().fold(Fx::ZERO, |m, f| m + f.mass);
         let mut want = (1 + (lying / Fx::from_int(MASS_PER_SALVAGER)).floor_int() as usize)
             .min(MOST_SALVAGERS);
-        // A Commander fields one early and more as its income grows: three in the
+        // One early and more as its income grows: three in the
         // first hundred seconds held back its engineers and its power.
         let owner = self.state.units.owner[factory];
-        if self.commander_directives(owner).is_some() {
-            let income = self.state.players[owner as usize].mass_income;
-            want = want.min(1 + (income / Fx::from_int(15)).floor_int().max(0) as usize);
-        }
+        let income = self.state.players[owner as usize].mass_income;
+        want = want.min(1 + (income / Fx::from_int(15)).floor_int().max(0) as usize);
         if salvage.is_empty() || census.salvagers + planned_salvagers >= want {
             return None;
         }

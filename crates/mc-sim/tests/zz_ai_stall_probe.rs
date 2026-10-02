@@ -164,8 +164,7 @@ fn stall() {
                 }
             }
             println!(
-                "  {minute:>2}m P{p}: waves {} army {army} idle {idle} parked>=3m {stuck} mean dist from start {:.0} | mines {} pairs<400m {close} nearest {:.0}",
-                s.ai[p].waves,
+                "  {minute:>2}m P{p}: army {army} idle {idle} parked>=3m {stuck} mean dist from start {:.0} | mines {} pairs<400m {close} nearest {:.0}",
                 if army > 0 { far_sum / army as f32 } else { 0.0 },
                 mines.len(),
                 nearest,

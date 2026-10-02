@@ -27,7 +27,6 @@ impl World {
         let energy_short = pl.energy_spent > pl.energy_income || pl.energy < pl.energy_capacity / 5;
         let mass_rich = pl.mass > pl.mass_capacity * Fx::ratio(7, 10);
         let mass_income = pl.mass_income;
-        let energy_income = pl.energy_income;
 
         let skill = self.state.ai[player as usize].config.skill();
         let home = (!census.builders_idle.is_empty())
@@ -52,10 +51,8 @@ impl World {
             idle.insert(0, row);
         }
         let best = self.best_builder_tech(player);
-        let power_wanted = match self.commander_directives(player) {
-            Some(d) => d.power != super::commander::economy::Power::Enough,
-            None => energy_short || pl.energy_income < census.energy_need,
-        };
+        let power_wanted =
+            self.commander_directives(player).power != super::commander::economy::Power::Enough;
         // Builds ordered this think: a second builder choosing the same one joins it.
         let mut ordered: Vec<(BlueprintId, FxVec2, Angle)> = Vec::new();
         for &row in idle.iter().take(skill.builders_per_think) {
@@ -129,7 +126,6 @@ impl World {
                 energy_short,
                 mass_rich,
                 mass_income,
-                energy_income,
                 home.as_ref(),
             );
             match job {
@@ -431,24 +427,22 @@ impl World {
         energy_short: bool,
         mass_rich: bool,
         mass_income: Fx,
-        energy_income: Fx,
         home_ground: Option<&staging::HomeGround>,
     ) -> Option<Job> {
         let front = intel
             .enemy_start
             .unwrap_or(start + FxVec2::from_angle(facing) * Fx::from_int(400));
         let home = |p: FxVec2| p.distance(start) <= HOME_RADIUS;
-        // A Commander's economy (`commander/economy.rs`) steers what follows.
+        // The economy (`commander/economy.rs`) steers what follows.
         let directives = self.commander_directives(self.state.units.owner[row]);
         // Early, with no enemy near, its commander works out in its half.
-        let roam = directives.map_or(Fx::ZERO, |d| d.roam);
+        let roam = directives.roam;
         // Never under an enemy's guns, nor where the last one was just shot down.
         let allow = |p: FxVec2| {
             (!is_commander || home(p) || p.distance(start) <= roam) && !intel.danger.hot(p)
         };
         // An expander claims mines, unless the power is out: then it helps that first.
-        let urgent_power =
-            directives.is_some_and(|d| d.power == super::commander::economy::Power::Urgent);
+        let urgent_power = directives.power == super::commander::economy::Power::Urgent;
         if self.is_expander(row) && !urgent_power {
             if let Some(job) = self.expander_job(row, start, facing, claimed, intel) {
                 return Some(job);
@@ -457,17 +451,7 @@ impl World {
         let skill = self.state.ai[self.state.units.owner[row] as usize]
             .config
             .skill();
-        let want_factories = if let Some(d) = directives {
-            d.factories.max(1)
-        } else {
-            let extra = match persona {
-                Personality::Expander => 1,
-                Personality::Aggressive if matches!(stance, Stance::Push | Stance::Firebase) => 1,
-                _ => 0,
-            };
-            1 + extra + (mass_income / Fx::from_int(7)).floor_int().clamp(0, 5) as usize
-        };
-        let want_power = 2 + planned.factories * 3 + (energy_short as usize) * 3;
+        let want_factories = directives.factories.max(1).min(skill.factory_cap as usize);
         let tech = self.builder_tech(row);
         // Once the side has a builder of a higher tier and some power, a tech 1 builder
         // leaves new power to it (a bigger plant is far cheaper per unit of energy) and
@@ -475,23 +459,7 @@ impl World {
         let owner = self.state.units.owner[row];
         // Materials going unspent: the factories cannot use what comes in. Another
         // factory, not another reactor or turret, is what the side lacks.
-        let piling = match directives {
-            Some(d) => d.floating,
-            None => {
-                let pl = &self.state.players[owner as usize];
-                pl.mass > pl.mass_capacity * Fx::ratio(2, 5) && pl.mass_demand < mass_income
-            }
-        };
-        // Or the factories standing could not spend the income if all were
-        // busy: with 100 mass a second coming in, two factories sat on a full
-        // store for twenty minutes.
-        let underspent = self.factory_mass_draw(owner) < mass_income * Fx::ratio(7, 10);
-        let want_factories = if directives.is_none() && (piling || underspent) {
-            want_factories.max(planned.factories + 1)
-        } else {
-            want_factories
-        }
-        .min(skill.factory_cap as usize);
+        let piling = directives.floating;
         // A plant from a lesser builder is a poor one: a Reactor II gives 250 a
         // second for 700 materials, a Reactor 20 for 75. Once the side has a
         // better builder, a lesser one helps raise its plants (`direct_builders`)
@@ -621,12 +589,9 @@ impl World {
         // Power before anything else in a stall. A lesser builder leaves new
         // plants to a better one unless the energy is gone and none is going up.
         let power_rising = census.sites.iter().any(|&s| self.bp(s).has(cat::POWER));
-        // A Commander starts plants only for what it lacks beyond those going up.
-        let power_call = directives.map(|d| (d.power, self.power_rising(census) < d.power_short));
-        let urgent = match power_call {
-            Some((call, short)) => call == super::commander::economy::Power::Urgent && short,
-            None => energy_short,
-        };
+        // Plants are started only for what it lacks beyond those going up.
+        let short = self.power_rising(census) < directives.power_short;
+        let urgent = directives.power == super::commander::economy::Power::Urgent && short;
         if urgent && (!leave_power || (energy_gone && !power_rising)) {
             if let Some(job) = power_job(plant_tech) {
                 return Some(job);
@@ -647,7 +612,7 @@ impl World {
             }
         }
         // The Commander's answers to a threat it is under now (`plans.rs`).
-        if directives.is_some() && !far {
+        if !far {
             if let Some(job) = self
                 .commander_urgent_job(row, start, facing)
                 .filter(|j| allow(j.near))
@@ -668,12 +633,6 @@ impl World {
                 .map(|blueprint| self.factory_at(blueprint, start, start, facing))
                 .filter(|job| allow(job.near))
             {
-                return Some(job);
-            }
-        }
-        if directives.is_none() && energy_short && !leave_power && planned.power < want_power.min(6)
-        {
-            if let Some(job) = power_job(plant_tech) {
                 return Some(job);
             }
         }
@@ -701,14 +660,7 @@ impl World {
         // builder would draw at work, not only for what they ask for now,
         // and before far mines and turrets: behind them, the side
         // ran out of energy a tenth of the game.
-        let wanted = match power_call {
-            Some((call, short)) => call != super::commander::economy::Power::Enough && short,
-            None => {
-                planned.power < want_power
-                    || energy_income < mass_income * skill.power_ratio
-                    || energy_income < census.energy_need
-            }
-        };
+        let wanted = directives.power != super::commander::economy::Power::Enough && short;
         if !leave_power && wanted {
             // The AI pays power first in a stall (`direct_focus`), so a short side
             // still builds the biggest plant it can.
@@ -734,11 +686,7 @@ impl World {
                     && !enemy.weapons.is_empty()
             })
             .count();
-        if self.state.ai[owner].config.adaptation > 0
-            && !far
-            && air_threats > 0
-            && planned.anti_air < (1 + air_threats / 4).min(4)
-        {
+        if !far && air_threats > 0 && planned.anti_air < (1 + air_threats / 4).min(4) {
             let near = offset_toward(start, front, Fx::from_int(100));
             if let Some(job) = self.job_structure(
                 row,
@@ -761,7 +709,7 @@ impl World {
         // A Commander's factory, when its economy wants one, comes before far mines:
         // its engineers took every free deposit first and one factory had to spend
         // 57 a second.
-        if directives.is_some() && !far {
+        if !far {
             if let Some(job) = factory_job() {
                 return Some(job);
             }
@@ -777,31 +725,11 @@ impl World {
                 return Some(job);
             }
         }
-        // An experimental or a strategic weapon, once the economy carries one.
-        let classic = self.commander_directives(owner as u8).is_none();
-        if !far && classic {
-            if let Some(job) = self.project_job(row, persona, start, facing, planned, energy_short)
-            {
-                return Some(job);
-            }
-            if let Some(job) = self
-                .spotter_job(row, census.factories.len(), start, facing)
-                .filter(|_| !energy_short)
-            {
-                return Some(job);
-            }
-            if let Some(job) = self
-                .lift_job(row, census, start, facing)
-                .filter(|_| !energy_short)
-            {
-                return Some(job);
-            }
-        }
         // A Commander's economy says how far out to claim mines (its half).
-        let mex_range = match directives {
-            Some(_) if is_commander => HOME_RADIUS.max(roam),
-            Some(d) => d.reach,
-            None => self.mex_range(is_commander, census, persona, stance, skill),
+        let mex_range = if is_commander {
+            HOME_RADIUS.max(roam)
+        } else {
+            directives.reach
         };
         let bare = (!energy_short).then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
         if let Some(deposit) = self.free_deposit(start, claimed, mex_range, intel, bare) {
@@ -883,16 +811,10 @@ impl World {
                 }
             }
         }
-        // A siege puts a shield over each map gun (`strategy.rs`).
-        let siege_guns = if self.holds(owner as u8, super::strategy::Gambit::Siege) {
-            self.projects_held(owner as u8, projects::Project::MapGun)
-        } else {
-            0
-        };
         if tech >= 2
             && !far
             && mass_income >= Fx::from_int(10)
-            && planned.shields < 1 + planned.factories / 3 + siege_guns
+            && planned.shields < 1 + planned.factories / 3
         {
             // Over the part of the base no shield covers yet, and only where
             // that is worth the shield's cost and upkeep.

@@ -183,7 +183,7 @@ impl Facts {
                     Some(r) => format!("the {}", r.name),
                     None => "a random race".to_owned(),
                 },
-                tuning: (s.control == Control::Ai).then(|| super::ai::tuning_label(&s.ai)),
+                tuning: (s.control == Control::Ai).then(|| super::ai::summary(&s.ai)),
             })
             .collect();
         Facts {

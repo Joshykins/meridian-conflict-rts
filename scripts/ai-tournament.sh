@@ -8,8 +8,9 @@
 #   TOURNEY_MAPS     maps:players, space separated
 #                    (default "serac_divide:2 twin_shoals:2 meridian_basin:2 dev16:2 the_axis:8 haldens_grip:8")
 #   TOURNEY_SEEDS    seeds (default "3 7 11")
-#   TOURNEY_SIDES    pairs A,B of brain/doctrine (default: the Commander against the
-#                    classic AI, both doctrines adaptive, each way round)
+#   TOURNEY_SIDES    pairs A,B of doctrines (adaptive, aggressive, economic,
+#                    defensive; default: adaptive against each of the others, each
+#                    way round)
 #   TOURNEY_MINUTES  match length (default 35)
 #   TOURNEY_DIFF     easy | normal | hard (default hard)
 #   TOURNEY_JOBS     matches at once (default: the number of cores less two)
@@ -22,7 +23,7 @@ out=${1:-$root/artifacts/tournament/$(date +%Y%m%d-%H%M%S)}
 mkdir -p "$out"
 maps=${TOURNEY_MAPS:-"serac_divide:2 twin_shoals:2 meridian_basin:2 dev16:2 the_axis:8 haldens_grip:8"}
 seeds=${TOURNEY_SEEDS:-"3 7 11"}
-sides=${TOURNEY_SIDES:-"commander/adaptive,classic/adaptive classic/adaptive,commander/adaptive"}
+sides=${TOURNEY_SIDES:-"adaptive,aggressive aggressive,adaptive adaptive,economic economic,adaptive adaptive,defensive defensive,adaptive"}
 minutes=${TOURNEY_MINUTES:-35}
 diff=${TOURNEY_DIFF:-hard}
 jobs=${TOURNEY_JOBS:-$(( $(nproc) > 3 ? $(nproc) - 2 : 1 ))}

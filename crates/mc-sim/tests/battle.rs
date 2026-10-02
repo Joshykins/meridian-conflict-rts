@@ -399,16 +399,12 @@ fn ai_players_fight_a_whole_match_deterministically() {
     }
 }
 
-/// The planning AI (`docs/AI_COMMANDER.md`) against the classic one: the same
-/// at any worker count, and a snapshot mid-match restores its plans, operations
-/// and memory to the same future.
+/// The AI (`docs/AI_COMMANDER.md`) against itself: the same at any worker count,
+/// and a snapshot mid-match restores its plans, operations and memory to the
+/// same future.
 #[test]
 fn a_commander_ai_plays_deterministically_and_restores_from_a_snapshot() {
-    let commander = |threads| {
-        let mut w = flat_world(threads, true, true);
-        w.state.ai[1].config.brain = mc_sim::Brain::Commander;
-        w
-    };
+    let commander = |threads| flat_world(threads, true, true);
     let run = |threads| {
         let mut w = commander(threads);
         let hashes: Vec<u64> = (0..4000).map(|_| w.tick(&[]).unwrap()).collect();

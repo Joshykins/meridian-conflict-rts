@@ -14,7 +14,7 @@
 //!   another while there is safe ore on the side's half; reclaim is fetched early;
 //!   the commander itself works out in its half while no enemy army is near.
 //!
-//! The classic builders, factories and upgrades carry it out (`Directives`).
+//! The builders, factories and upgrades carry it out (`Directives`).
 use super::state::{PlanKind, Stake};
 use crate::ai::salvage::Field;
 use crate::ai::{Census, Claim, Intel, Job, ENERGY_PER_MASS, HOME_RADIUS};
@@ -403,9 +403,11 @@ impl World {
     /// Whether `row` is one of its side's expanders.
     pub(in crate::ai) fn is_expander(&self, row: usize) -> bool {
         let units = &self.state.units;
-        let ai = &self.state.ai[units.owner[row] as usize];
-        ai.config.brain == crate::Brain::Commander
-            && ai.commander.eco.expanders.contains(&units.id(row))
+        self.state.ai[units.owner[row] as usize]
+            .commander
+            .eco
+            .expanders
+            .contains(&units.id(row))
     }
 
     /// An expander's next mine: the free ore on its side's half nearest to it, else
@@ -439,7 +441,7 @@ impl World {
             return None;
         }
         let pl = &self.state.players[units.owner[row] as usize];
-        let roam = self.commander_directives(units.owner[row])?.roam;
+        let roam = self.commander_directives(units.owner[row]).roam;
         let field = fields
             .iter()
             .filter(|f| {

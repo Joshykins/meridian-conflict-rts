@@ -1,9 +1,6 @@
 //! Upgrades the AI starts: mines by payback, then its commander, radar and factories.
 use super::*;
 
-/// Mine upgrades past the budget run at once while materials go spare.
-const SPARE_MINE_UPGRADES: i32 = 4;
-
 impl World {
     pub(super) fn direct_upgrades(&self, player: u8, census: &Census, out: &mut Vec<Command>) {
         let pl = &self.state.players[player as usize];
@@ -30,19 +27,16 @@ impl World {
                 out.push(Command::Upgrade { units });
             }
         }
-        let spare = self.spare_mass(player);
-        if let Some((row, next)) = self.mine_to_upgrade(player, census, spare) {
-            let extra = self.mine_upgrades_running(census) >= self.mine_upgrade_budget(player);
-            // A Commander whose store fills upgrades while its energy holds: the
+        if let Some((row, next)) = self.mine_to_upgrade(player, census) {
+            // A side whose store fills upgrades while its energy holds: the
             // upgrade is the sink that pays, and its power follows (`economy.rs`).
             // Only while its energy holds: three begun at once on a draining store
             // left the mines unpaid.
             let pl = &self.state.players[player as usize];
-            let floating = self.state.ai[player as usize].config.brain == crate::Brain::Commander
-                && self.state.ai[player as usize].commander.eco.floating
+            let floating = self.state.ai[player as usize].commander.eco.floating
                 && pl.energy > pl.energy_capacity / 2
                 && pl.energy_income >= pl.energy_spent;
-            if extra || floating || self.can_fund(player, self.upgrade_draw(row, next)) {
+            if floating || self.can_fund(player, self.upgrade_draw(row, next)) {
                 out.push(Command::Upgrade {
                     units: vec![self.state.units.id(row)],
                 });
@@ -203,15 +197,11 @@ impl World {
             .any(|o| matches!(o.kind, OrderKind::Upgrade))
     }
 
-    /// Mine upgrades the side runs at once at the usual priority: one while it
-    /// is small, one more for every 30 a second it makes. A mine upgrade is the
-    /// side's best spend, and one at a time kept the income flat for twenty minutes.
-    /// A Commander's economy sets it (`commander/economy.rs`): more while its store fills.
+    /// Mine upgrades the side runs at once, as its economy sets them
+    /// (`commander/economy.rs`): one more for every 30 a second, more while its
+    /// store fills. One at a time kept the income flat for twenty minutes.
     pub(super) fn mine_upgrade_budget(&self, player: u8) -> i32 {
-        if let Some(d) = self.commander_directives(player) {
-            return d.upgrades;
-        }
-        1 + (self.state.players[player as usize].mass_income / Fx::from_int(30)).floor_int()
+        self.commander_directives(player).upgrades
     }
 
     pub(super) fn mine_upgrades_running(&self, census: &Census) -> i32 {
@@ -222,39 +212,25 @@ impl World {
             .count() as i32
     }
 
-    /// Materials going spare: the store filling up faster than it is spent.
-    pub(super) fn spare_mass(&self, player: u8) -> bool {
-        let pl = &self.state.players[player as usize];
-        pl.mass > pl.mass_capacity * Fx::ratio(2, 5)
-    }
-
     /// The mine whose next tier pays back its cost soonest, if soon enough for
     /// this AI: twice as long with materials to `spare`.
     pub(super) fn mine_to_upgrade(
         &self,
         player: u8,
         census: &Census,
-        spare: bool,
     ) -> Option<(usize, &UnitBlueprint)> {
         let pl = &self.state.players[player as usize];
-        let skill = self.state.ai[player as usize].config.skill();
         let units = &self.state.units;
         if pl.mass_income < Fx::from_int(8) {
             return None;
         }
-        // More at once with materials to spare: those past the budget are put
-        // last and soak up only what the factories leave.
         let directives = self.commander_directives(player);
-        let spare = spare && directives.is_none();
-        // A Commander short of power raises plants before mines that draw more: a
-        // tech 2 mine's upkeep is six times a tech 1's.
-        if directives
-            .is_some_and(|d| d.power != super::commander::economy::Power::Enough && !d.floating)
-        {
+        // Short of power, plants come before mines that draw more: a tech 2
+        // mine's upkeep is six times a tech 1's.
+        if directives.power != super::commander::economy::Power::Enough && !directives.floating {
             return None;
         }
-        let cap = self.mine_upgrade_budget(player) + if spare { SPARE_MINE_UPGRADES } else { 0 };
-        if self.mine_upgrades_running(census) >= cap {
+        if self.mine_upgrades_running(census) >= self.mine_upgrade_budget(player) {
             return None;
         }
         let side_tech = self.side_tech(player);
@@ -263,10 +239,7 @@ impl World {
             (self.blueprints.upgrade_needs(next) <= side_tech && units.order_head[row] == NO_ORDER)
                 .then_some((row, next))
         });
-        let horizon = match directives {
-            Some(d) => Fx::from_int(d.payback as i32),
-            None => Fx::from_int(skill.upgrade_payback * if spare { 2 } else { 1 }),
-        };
+        let horizon = Fx::from_int(directives.payback as i32);
         // No saving up first: a mine upgrade is paid before the factories in a
         // stall, and a good one is the best thing the side can spend on.
         // Energy counts at what a tech 1 mine costs in it for each unit of mass.

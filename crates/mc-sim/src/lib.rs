@@ -20,7 +20,7 @@
 
 pub mod ai;
 pub mod ai_config;
-pub use ai_config::{AiConfig, Brain, Difficulty, Doctrine, Skill};
+pub use ai_config::{AiConfig, Difficulty, Doctrine, Skill};
 mod air_support;
 pub mod aircraft_crash;
 mod approach;

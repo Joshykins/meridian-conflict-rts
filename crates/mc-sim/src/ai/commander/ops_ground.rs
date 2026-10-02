@@ -303,8 +303,15 @@ impl World {
                     };
                     // Not blind: their army has been seen, or their base lately with
                     // none there to see.
-                    let seen =
-                        ctx.beliefs.army_at.is_some() || ctx.beliefs.base_unseen < 1200 || probe;
+                    // Three times the army it believes in, gathered three minutes with
+                    // the scouts finding nothing, goes all the same: it knows where
+                    // their start is, and ten heavy bots sat at home all game waiting
+                    // to see an enemy that had nothing.
+                    let overwhelming = gathered >= enemy * 3 && tick > op.phase_since + 1800;
+                    let seen = ctx.beliefs.army_at.is_some()
+                        || ctx.beliefs.base_unseen < 1200
+                        || probe
+                        || overwhelming;
                     // And enough anti-air for the enemy's air and warships it believes
                     // in: a wave of tanks marched 22 km under corvettes and bombers
                     // and died without a shot.
@@ -597,7 +604,7 @@ impl World {
     /// Armed enemies on the ground the side holds: within `NEAR_HOLD` of its
     /// structures or its rally point, seen in the last ten seconds, gathered into
     /// 600 m clusters: (what they are near, where they are). Artillery shelling the
-    /// rally point from beyond the classic raid radius counts.
+    /// rally point from beyond the base's raid radius counts.
     pub(in crate::ai) fn incursions(&self, ctx: &Ctx) -> Vec<(FxVec2, FxVec2, bool)> {
         let tick = self.state.tick;
         let units = &self.state.units;

@@ -23,10 +23,19 @@ pub(in crate::ai) fn fits(kind: OpKind, p: &Profile, land_route: bool) -> bool {
                 && p.roles
                     & (role::LINE | role::ARTILLERY | role::ANTI_AIR | role::SHIELD | role::SENSOR)
                     != 0
+                && !p.has(role::SCOUT)
         }
-        OpKind::Raid => ground && (land_route || crosses) && p.has(role::RAIDER),
-        // The home force: any ground fighter.
-        OpKind::Guard => ground && p.roles & (role::LINE | role::RAIDER | role::ANTI_AIR) != 0,
+        // Scouts are the scouts' own: the army and raids, filled first, took every
+        // one of them, and a side with 25 scouts saw nothing for twenty minutes.
+        OpKind::Raid => {
+            ground && (land_route || crosses) && p.has(role::RAIDER) && !p.has(role::SCOUT)
+        }
+        // The home force: any ground fighter but a scout.
+        OpKind::Guard => {
+            ground
+                && p.roles & (role::LINE | role::RAIDER | role::ANTI_AIR) != 0
+                && !p.has(role::SCOUT)
+        }
         OpKind::Siege => ground && p.has(role::ARTILLERY),
         OpKind::Landing => (ground && p.armed() && p.room > 0) || p.has(role::TRANSPORT),
         OpKind::Strike => p.domain == Some(Domain::Air) && p.has(role::STRIKE),

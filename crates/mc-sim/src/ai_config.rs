@@ -21,27 +21,11 @@ pub enum Doctrine {
     Defensive,
 }
 
-/// Which AI plays the side: the rule-driven one (`docs/AI.md`) or the Commander
-/// (`docs/AI_COMMANDER.md`), which plans, runs operations and reads the roster
-/// from its data. Both play in one match for the tournament.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum Brain {
-    #[default]
-    Classic,
-    Commander,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AiConfig {
-    pub brain: Brain,
     pub difficulty: Difficulty,
     pub doctrine: Doctrine,
-    /// How strongly observed enemies affect production (0..=100).
-    pub adaptation: u8,
-    /// Retreat below this percentage of maximum health (0..=80).
-    pub retreat_health: u8,
     /// Production preferences for land, air, and naval units (0..=200).
     /// Zero disables combat production in that domain.
     pub domain_weights: [u8; 3],
@@ -71,19 +55,13 @@ pub struct Skill {
     pub eager_tech: bool,
     /// Units added to (or taken from) every attack wave.
     pub wave_delta: i32,
-    /// Plans held at once (`ai/strategy.rs`): a landing, a warp raid, a bomber
-    /// fleet, an engineer hunt and so on.
-    pub gambits: usize,
 }
 
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
-            brain: Brain::Classic,
             difficulty: Difficulty::Normal,
             doctrine: Doctrine::Adaptive,
-            adaptation: 75,
-            retreat_health: 30,
             domain_weights: [100, 100, 100],
         }
     }
@@ -91,8 +69,6 @@ impl Default for AiConfig {
 
 impl AiConfig {
     pub fn normalized(mut self) -> Self {
-        self.adaptation = self.adaptation.min(100);
-        self.retreat_health = self.retreat_health.min(80);
         self.domain_weights = self.domain_weights.map(|w| w.min(200));
         self
     }
@@ -129,7 +105,6 @@ impl AiConfig {
                 tech_income: 19,
                 eager_tech: false,
                 wave_delta: -2,
-                gambits: 1,
             },
             Difficulty::Normal => Skill {
                 builders_per_think: 5,
@@ -141,7 +116,6 @@ impl AiConfig {
                 tech_income: 14,
                 eager_tech: false,
                 wave_delta: -1,
-                gambits: 2,
             },
             Difficulty::Hard => Skill {
                 builders_per_think: 8,
@@ -153,19 +127,12 @@ impl AiConfig {
                 tech_income: 11,
                 eager_tech: false,
                 wave_delta: 0,
-                gambits: 3,
             },
         }
     }
 
     pub(crate) fn hash(self, h: &mut StateHasher) {
-        h.write_u64(
-            self.difficulty as u64
-                | (self.doctrine as u64) << 8
-                | (self.adaptation as u64) << 16
-                | (self.retreat_health as u64) << 24
-                | (self.brain as u64) << 32,
-        );
+        h.write_u64(self.difficulty as u64 | (self.doctrine as u64) << 8);
         for w in self.domain_weights {
             h.write_u64(w as u64);
         }

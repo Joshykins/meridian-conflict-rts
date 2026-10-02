@@ -1,7 +1,6 @@
 //! What the AI's factories make: engineers while the side is short of them,
-//! a couple of scouts, salvagers where wrecks lie, and otherwise the combat
-//! unit `choose_combat_unit` ranks best, never a land unit past the home guard
-//! where the land army cannot walk to the enemy (`theatre.rs`).
+//! salvagers where wrecks lie, a couple of scouts, and otherwise the combat unit
+//! its plans want (`commander/solver.rs`).
 use super::*;
 
 impl World {
@@ -10,8 +9,6 @@ impl World {
         player: u8,
         census: &Census,
         salvage: &[salvage::Field],
-        stance: Stance,
-        persona: Personality,
         out: &mut Vec<Command>,
     ) {
         let mut counter = self.state.ai[player as usize].production_counter;
@@ -19,12 +16,7 @@ impl World {
         let mut planned_engineers = 0;
         let mut planned_scouts = 0;
         let mut planned_salvagers = 0;
-        // Scouting as a plan keeps more eyes out (`strategy.rs`).
-        let want_scouts = if self.holds(player, super::strategy::Gambit::Scouting) {
-            4
-        } else {
-            2
-        };
+        let want_scouts = 2;
         // No rally point: a finished unit rolls out idle and the army sends it
         // to the staging point with the rest. A rally among the base's buildings
         // jammed: units stuck a few metres short of it in the crowd never
@@ -34,18 +26,7 @@ impl World {
                 continue;
             };
             // A Commander's economy says how many (`commander/economy.rs`).
-            let want_engineers = match self.commander_directives(player) {
-                Some(d) => d.engineers,
-                None => {
-                    let n = 2 + census.factories.len() * 2;
-                    match persona {
-                        Personality::Expander => n + 2,
-                        Personality::Turtle => n + 1,
-                        Personality::Aggressive => n,
-                    }
-                }
-            };
-            let commander = self.commander_directives(player).is_some();
+            let want_engineers = self.commander_directives(player).engineers;
             let engineer = builder
                 .builds
                 .iter()
@@ -98,41 +79,30 @@ impl World {
             // The best tier missing comes at once, not on every fourth product: the
             // count runs over all factories, and a tech 2 factory that always fell
             // on the wrong turn made one Mason II in five minutes.
-            // A Commander makes an engineer whenever it is short of them: the
-            // first one out claims mines, the rest follow as the income allows.
+            // An engineer whenever the side is short of them: the first one out
+            // claims mines, the rest follow as the income allows.
             let blueprint = if engineer.is_some()
-                && (missing_tech_builder
-                    || (census.engineers + planned_engineers < want_engineers
-                        && (commander || counter.is_multiple_of(4) || stance == Stance::Firebase)))
+                && (missing_tech_builder || census.engineers + planned_engineers < want_engineers)
             {
                 planned_engineers += 1;
                 engineer
-            } else if let Some(salvager) = commander
-                .then(|| self.salvage_product(row, census, planned_salvagers, salvage))
-                .flatten()
+            } else if let Some(salvager) =
+                self.salvage_product(row, census, planned_salvagers, salvage)
             {
                 // Then something to fetch the reclaim lying about, before scouts.
                 planned_salvagers += 1;
                 Some(salvager)
+            // The first scout at once, the second in its turn: on the fifth
+            // product's turn only, a side went twenty minutes with no eyes and its
+            // army, which never goes out blind, never went out.
             } else if census.scouts + planned_scouts < want_scouts
                 && scout.is_some()
-                && counter % 5 == 1
+                && (census.scouts + planned_scouts == 0 || counter % 5 == 1)
             {
                 planned_scouts += 1;
                 scout
-            } else if let Some(salvager) = (counter % 3 == 2)
-                .then(|| self.salvage_product(row, census, planned_salvagers, salvage))
-                .flatten()
-            {
-                planned_salvagers += 1;
-                Some(salvager)
             } else {
-                match self.commander_directives(player) {
-                    Some(_) => self.solve_production(player, &fighters, &composition, counter),
-                    None => {
-                        self.choose_combat_unit(player, &fighters, &composition, stance, counter)
-                    }
-                }
+                self.solve_production(player, &fighters, &composition, counter)
             };
             if let Some(id) = blueprint {
                 *composition.entry(id).or_insert(0) += 1;
