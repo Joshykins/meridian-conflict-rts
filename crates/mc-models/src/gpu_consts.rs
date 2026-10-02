@@ -501,10 +501,11 @@ shared! {
         /// `appearance.rgb` its brightness, `appearance.w` the star's own seed.
         pub const STAR_CORE: u32 = 56;
         /// A Regency power generator's star gone supernova (renderer/supernova_fx.rs, plasma_puffs.wgsl):
-        /// a hollow shell of plasma tearing outward, brightest at its limb, ragged and
-        /// knotted, opening into holes as it thins; white-hot at first, then the prism's
-        /// pinks, cooling to lavender and violet. It grows from `params.x` to `params.y`
-        /// (the quad's half size; the shell is 0.78 of it), fast and then slowing;
+        /// a hollow ball of plasma tearing outward, marched through as a volume so it is
+        /// brightest at its limb and cut by the ground; ragged and knotted, opening into
+        /// holes as it thins; white-hot at first, then the prism's pinks, cooling to
+        /// lavender and violet. Its radius grows from `params.x` to `params.y` metres, fast
+        /// and then slowing; `vel.x` 0 draws its near half, 1 its far half (one puff each);
         /// `appearance.rgb` its brightness, `appearance.w` its seed.
         pub const SUPERNOVA: u32 = 57;
         /// A streamer of plasma flung out of a supernova (renderer/supernova_fx.rs,

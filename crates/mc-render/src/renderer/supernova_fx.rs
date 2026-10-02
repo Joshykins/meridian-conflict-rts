@@ -33,6 +33,8 @@ const WISP: f32 = puff::NOVA_WISP as f32;
 const BREAK: f32 = 0.3;
 /// How long the flare outlasts the bang, as the shell takes its light over.
 const HANDOVER: f32 = 0.4;
+/// The farthest any shell gets (metres): the tech 3 crown's.
+const REACH_MAX: f32 = 75.0;
 
 /// A star going supernova.
 #[derive(Clone, Copy)]
@@ -211,6 +213,31 @@ impl Renderer {
         }
     }
 
+    /// One shell of plasma `radius` metres out from `centre` (from, to), as its two halves
+    /// (plasma_puffs.wgsl `supernova_vertex`: `vel.x` 1 is the far half).
+    fn nova_shell(
+        &mut self,
+        centre: Vec3,
+        start: f32,
+        life: f32,
+        radius: (f32, f32),
+        glow: f32,
+        seed: f32,
+    ) {
+        for half in [Vec3::ZERO, Vec3::X] {
+            self.push_lit(
+                SHELL,
+                centre,
+                half,
+                start,
+                life,
+                radius,
+                Vec3::splat(glow),
+                seed,
+            );
+        }
+    }
+
     /// The supernova itself, laid at once to go off at `nova.bang`.
     fn supernova(&mut self, nova: &Nova) {
         let Nova {
@@ -223,13 +250,14 @@ impl Renderer {
         } = *nova;
         let ground_xy = centre.truncate();
         let ground = ground_xy.extend(self.ground_height(ground_xy));
-        // How far the shell gets: the crown's about 130 m.
-        let reach = r * (6.0 + 8.0 * s);
+        // How far the shell gets: the crown's held to 75 m, so it stays a plant's death and does
+        // not swallow the base round it.
+        let reach = (r * (6.0 + 8.0 * s)).min(REACH_MAX);
         // The flare's size at the bang: the shell starts at the star's face.
         let face = r * 1.6;
         // The flash: white beyond the screen, then a broader, slower one.
-        self.push_effect(centre.to_array(), bang, r * 10.0, 0.4, 9.0, 0.0);
-        self.push_effect(centre.to_array(), bang + 0.04, r * 6.0, 0.8, 9.0, 0.0);
+        self.push_effect(centre.to_array(), bang, r * 5.0, 0.35, 9.0, 0.0);
+        self.push_effect(centre.to_array(), bang + 0.04, r * 3.5, 0.7, 9.0, 0.0);
         // How fast the shock drives the dust out across the ground.
         let shock = 40.0 + 200.0 * s * s;
         // The light of it on everything round: white, then lavender as the shell spreads.
@@ -251,47 +279,36 @@ impl Renderer {
         });
         // The shell, a slower one inside it, and the nebula: a faint one that lingers.
         let life = 2.8 + 3.6 * s;
-        self.push_lit(
-            SHELL,
+        self.nova_shell(centre, bang, life, (face, reach), 1.6, seed);
+        self.nova_shell(
             centre,
-            Vec3::ZERO,
-            bang,
-            life,
-            (face / 0.78, reach / 0.78),
-            Vec3::splat(1.6),
-            seed,
-        );
-        self.push_lit(
-            SHELL,
-            centre,
-            Vec3::ZERO,
             bang + 0.1,
             life * 1.3,
-            (face * 0.8 / 0.78, reach * 0.62 / 0.78),
-            Vec3::splat(1.0),
+            (face * 0.8, reach * 0.62),
+            1.0,
             seed + 3.7,
         );
-        self.push_lit(
-            SHELL,
+        self.nova_shell(
             centre,
-            Vec3::ZERO,
             bang + 0.3,
             life * 2.0,
-            (face / 0.78, reach * 0.85 / 0.78),
-            Vec3::splat(0.6),
+            (face, reach * 0.85),
+            0.6,
             seed + 6.1,
         );
         // Streamers thrown out round its waist, the ring tilted a little its own way.
         let tilt = 0.45 * self.scatter.signed();
         let (ts, tc) = tilt.sin_cos();
         let yaw = self.scatter.unit() * TAU;
-        let around = (36.0 + 72.0 * s) as usize;
+        // A loose band, not a flat disc: each thrown a little off it, none past the shell.
+        let around = (20.0 + 36.0 * s) as usize;
         for i in 0..around {
             let a = (i as f32 + 0.5 * self.scatter.unit()) * TAU / around as f32;
             let flat = Vec2::from_angle(a + yaw);
-            let dir = Vec3::new(flat.x, flat.y * tc, flat.y * ts);
-            let go = reach * (0.75 + 0.25 * self.scatter.unit());
-            let size = r * (0.9 + 0.5 * self.scatter.unit());
+            let off = 0.35 * self.scatter.signed();
+            let dir = Vec3::new(flat.x, flat.y * tc, flat.y * ts + off).normalize();
+            let go = reach * (0.5 + 0.3 * self.scatter.unit());
+            let size = r * (0.5 + 0.4 * self.scatter.unit());
             let (roll0, roll1) = (self.scatter.unit(), self.scatter.unit());
             self.push_lit(
                 WISP,
@@ -357,15 +374,15 @@ impl Renderer {
             let a = (i as f32 + self.scatter.unit()) * TAU / dust as f32;
             let out = Vec3::new(a.cos(), a.sin(), 0.04);
             let from = r * 2.0;
-            let size = r * (0.8 + 0.6 * self.scatter.unit());
-            let push = out * shock * (0.5 + 0.2 * self.scatter.unit());
+            let size = r * (0.4 + 0.3 * self.scatter.unit());
+            let push = out * shock * (0.35 + 0.15 * self.scatter.unit());
             self.push_puff(
                 PUFF_DUST,
                 ground + out * from + Vec3::Z * 0.6,
                 push,
                 bang + 0.08,
-                1.8 + 1.4 * s,
-                (size, size * 4.0),
+                1.4 + 1.0 * s,
+                (size, size * 2.5),
             );
         }
     }

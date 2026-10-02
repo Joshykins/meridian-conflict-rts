@@ -43,6 +43,9 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, life_age: f32, o: PuffOut) -> 
     let size = mix(p.params.x, p.params.y, grow);
     out.state = vec3<f32>(age, p.params.z, fract(p.params.w));
     out.uv = corner;
+    if kind == PUFF_SUPERNOVA {
+        return supernova_vertex(p, corner, size, out);
+    }
     let to_eye = normalize(globals.camera.xyz - p.pos);
     var pos = p.pos + to_eye * select(0.0, size * 0.35, kind == PUFF_PLASMA_BURST);
     if kind == PUFF_PLASMA_GLOB {
@@ -79,13 +82,7 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, life_age: f32, o: PuffOut) -> 
     // A burst on a hull stands in front of it: it is the hit, not something inside it.
     // A star stands at its face: rings passing in front of it hide it.
     let lift = select(select(0.5, 0.9, kind == PUFF_PLASMA_BURST), 0.42, kind == PUFF_STAR_CORE);
-    var depth = front_depth(pos, size * lift);
-    if kind == PUFF_SUPERNOVA {
-        // A shell this big cannot be pulled in front of the ground under it, and light
-        // this bright is not hidden by it: drawn in front of everything, as the brightest
-        // flash is (sprites.wgsl).
-        depth = 0.9999;
-    }
+    let depth = front_depth(pos, size * lift);
     out.clip = vec4<f32>(ndc * center.w, depth * center.w, center.w);
     out.world = effect_billboard_world(pos, corner, size);
     return out;
@@ -335,43 +332,126 @@ fn star_core(in: PuffOut, d: f32) -> vec4<f32> {
     return vec4<f32>(light * in.appearance.rgb * tent, 0.0);
 }
 
-// A Regency power generator's star gone supernova: a shell of plasma tearing outward. Light through a thin
-// shell is brightest where the eye looks along it, so it reads as a ring with a lit face and a
-// hollow middle; it tears into knots and strands as it goes and opens into holes as it
-// thins, its edge ragged. White-hot at first, then the prism's pinks drifting over it, cooling
-// to lavender and violet as it goes out: no reds, nothing in it burns. The hot flash fills it
-// for a moment at the start. `appearance.w` its seed.
+// A supernova's shell is a real ball of plasma `size` metres across its outer face, drawn in
+// two halves so what stands in it hides what it should (renderer/supernova_fx.rs): the near
+// half (`vel.x` 0) on a quad at the ball's front, so whatever stands in front of the ball
+// hides it; the far half (`vel.x` 1) through its middle, so a hull or hill inside the shell
+// hides the wall behind it. Either quad covers the ball's outline as the eye sees it. The
+// shell's centre goes to the fragment in `roll`, its radius in `cloud_size` (negative for the
+// far half).
+fn supernova_vertex(p: Puff, corner: vec2<f32>, r: f32, o: PuffOut) -> PuffOut {
+    var out = o;
+    let eye = globals.camera.xyz;
+    let to_eye = eye - p.pos;
+    let dist = max(length(to_eye), 0.001);
+    let toward = to_eye / dist;
+    let far = p.vel.x > 0.5;
+    var right = cross(vec3<f32>(0.0, 0.0, 1.0), toward);
+    if length(right) < 0.05 {
+        right = vec3<f32>(globals.view_proj[0].x, globals.view_proj[1].x, globals.view_proj[2].x);
+    }
+    right = normalize(right);
+    let up = cross(toward, right);
+    // The outline seen from `dist`, at the plane through the middle; at the front it is
+    // no wider than the ball.
+    let outline = r * dist / sqrt(max(dist * dist - r * r, 0.09 * dist * dist));
+    let half = select(r, outline, far) * 1.08;
+    let plane = p.pos + toward * select(min(r, dist * 0.5), 0.0, far);
+    let world = plane + (right * corner.x + up * corner.y) * half;
+    out.world = world;
+    out.clip = globals.view_proj * vec4<f32>(world, 1.0);
+    out.roll = p.pos;
+    out.cloud_size = select(r, -r, far);
+    return out;
+}
+
+// A Regency power generator's star gone supernova: a hollow shell of plasma tearing outward,
+// marched through as a volume, so it is brightest at its limb where the eye looks along it,
+// its face lit and its middle hollow; the ground cuts it where it goes under. It tears into
+// knots and strands as it goes and opens into holes as it thins, its edge ragged. White-hot
+// at first, then the prism's pinks drifting over it, cooling to lavender and violet as it goes
+// out: no reds, nothing in it burns. The hot flash fills it for a moment at the start.
+// `appearance.w` its seed.
 fn supernova(in: PuffOut, d: f32) -> vec4<f32> {
     let age = in.state.x;
     let seed = fract(in.appearance.w * 0.137) * 10.0;
-    let round = in.uv / max(d, 1e-4);
-    let rag = star_fbm3(vec3<f32>(round * 2.5 + seed, age * 1.5 + seed));
-    let rim = 0.78 * (0.93 + 0.12 * rag);
-    let q = d / rim;
-    // The path the eye takes through the shell, 1 at its inner edge; it thickens as it goes.
-    let inner = 1.0 - mix(0.08, 0.26, age);
-    let path = sqrt(max(1.0 - q * q, 0.0)) - sqrt(max(inner * inner - q * q, 0.0));
-    let limb = path / sqrt(1.0 - inner * inner);
-    // Knots and strands across it, seen on a ball.
-    let face = in.uv / rim;
-    let mu = sqrt(max(1.0 - dot(face, face), 0.0));
-    let n = vec3<f32>(face, mu);
-    let knots = star_fbm3(n * 4.0 + vec3<f32>(seed * 3.0, age * 2.0, 0.0));
-    let strands = pow(1.0 - abs(star_noise3(n * 7.0 + vec3<f32>(0.0, seed * 5.0, age * 3.0)) * 2.0 - 1.0), 6.0);
-    // Torn open as it thins: the weaker knots go out first.
-    let torn = smoothstep(0.25 * age, 0.25 * age + 0.3, knots);
-    let body = pow(limb, 2.2) * (0.1 + 1.6 * knots * knots + 1.1 * strands) * mix(1.0, torn, age);
-    // A soft glow off its outer edge.
-    let halo = exp(-abs(q - 1.0) * 12.0) * 0.4;
+    let centre = in.roll;
+    let r = abs(in.cloud_size);
+    let far = in.cloud_size < 0.0;
+    let eye = globals.camera.xyz;
+    let ray = normalize(in.world - eye);
+    let oc = eye - centre;
+    let along = dot(oc, ray);
+    let miss = dot(oc, oc) - along * along;
+    // The ragged outer face reaches past `r` a little.
+    let outer = r * 1.06;
+    if miss >= outer * outer {
+        discard;
+    }
+    let reach = sqrt(outer * outer - miss);
+    let t_out = vec2<f32>(max(-along - reach, 0.0), -along + reach);
+    // The hollow inside it; the shell thickens as it goes.
+    let inner = 1.0 - mix(0.1, 0.28, age);
+    let ri = r * inner * 0.93;
+    var seg = t_out;
+    if miss < ri * ri {
+        let hollow = sqrt(ri * ri - miss);
+        seg = select(vec2<f32>(t_out.x, max(-along - hollow, t_out.x)), vec2<f32>(-along + hollow, t_out.y), far);
+        if far {
+            // The ground across the hollow hides the far wall.
+            for (var k = 1; k <= 3; k++) {
+                let q = eye + ray * mix(-along - hollow, seg.x, f32(k) * 0.25);
+                if q.z < max(terrain_height(q.xy), globals.map.z) {
+                    discard;
+                }
+            }
+        }
+    } else if far {
+        discard;
+    }
+    let steps = 8;
+    let dt = (seg.y - seg.x) / f32(steps);
+    if dt <= 0.0 {
+        discard;
+    }
+    let jitter = hash21(floor(in.clip.xy) + vec2<f32>(seed * 17.0, 3.0));
     let white = vec3<f32>(1.0, 0.95, 0.98);
-    let hue = prism(seed + knots * 0.6 + round.x * 0.2 + round.y * 0.12 + age * 0.4);
-    let violet = mix(vec3<f32>(0.62, 0.42, 1.0), vec3<f32>(0.85, 0.5, 1.0), strands);
-    var colour = mix(white * 1.5, hue * 1.2, smoothstep(0.02, 0.2, age));
-    colour = mix(colour, violet, smoothstep(0.35, 0.9, age));
-    let fill = exp(-q * q * 3.0) * pow(1.0 - age, 14.0) * 2.5;
+    var light = vec3<f32>(0.0);
+    for (var i = 0; i < steps; i++) {
+        let p = eye + ray * (seg.x + (f32(i) + jitter) * dt);
+        // The ground and the sea hide what is under them.
+        if p.z < max(terrain_height(p.xy), globals.map.z) {
+            break;
+        }
+        let rel = (p - centre) / r;
+        let q = length(rel);
+        let n = rel / max(q, 1e-4);
+        let rag = star_noise3(n * 2.5 + vec3<f32>(seed, 0.0, age * 1.5));
+        let rr = q / (0.93 + 0.12 * rag);
+        let shell = smoothstep(inner - 0.04, inner + 0.06, rr) * (1.0 - smoothstep(0.9, 1.0, rr));
+        if shell <= 0.0 {
+            continue;
+        }
+        // Knots and strands through it.
+        let knots = star_fbm3(n * 4.0 + vec3<f32>(seed * 3.0, age * 2.0, 0.0));
+        let strands = pow(1.0 - abs(star_noise3(n * 7.0 + vec3<f32>(0.0, seed * 5.0, age * 3.0)) * 2.0 - 1.0), 6.0);
+        // Torn open as it thins: the weaker knots go out first.
+        let torn = smoothstep(0.25 * age, 0.25 * age + 0.3, knots);
+        let body = shell * (0.1 + 1.6 * knots * knots + 1.1 * strands) * mix(1.0, torn, age);
+        let hue = prism(seed + knots * 0.6 + n.x * 0.2 + n.y * 0.12 + age * 0.4);
+        let violet = mix(vec3<f32>(0.62, 0.42, 1.0), vec3<f32>(0.85, 0.5, 1.0), strands);
+        var colour = mix(white * 1.5, hue * 1.2, smoothstep(0.02, 0.2, age));
+        colour = mix(colour, violet, smoothstep(0.35, 0.9, age));
+        light += colour * body * dt;
+    }
+    // A path along the limb is about 0.9 of the radius long: there it is as bright as its body.
+    light /= r * 0.9;
+    if !far {
+        // The flash filling it, seen through the whole ball.
+        light += white * exp(-3.0 * miss / (r * r)) * pow(1.0 - age, 14.0) * 2.5;
+    }
     let fade = pow(1.0 - age, 1.3) * smoothstep(0.0, 0.02, age);
-    let light = (colour * (body + halo) + white * fill) * in.appearance.rgb * fade;
-    return vec4<f32>(light * (1.0 - smoothstep(0.85, 1.0, d)), 0.0);
+    return vec4<f32>(light * in.appearance.rgb * fade, 0.0);
 }
 
 // A streamer of a supernova's plasma (renderer/supernova_fx.rs), drawn out along its flight
