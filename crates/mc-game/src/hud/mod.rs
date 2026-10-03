@@ -291,6 +291,8 @@ pub struct Hud {
     /// headed, and where it is on screen (easing after it).
     build_scroll: f32,
     build_shown: f32,
+    /// The whole queue, open over the queue strip when it is too long for it.
+    queue_tray: build::tray::Tray,
     /// The lore-and-weapons card over the unit panel is open.
     pub details_open: bool,
     /// The rings (bits by `rings::projections` index) whose weapon card or Reach row the

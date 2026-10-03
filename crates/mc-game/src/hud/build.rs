@@ -21,6 +21,7 @@ pub(super) mod batch;
 mod data_card;
 pub(super) mod queue;
 mod strip;
+pub(super) mod tray;
 pub(super) use data_card::data_card;
 pub(super) use queue::Split;
 use strip::{Slot, ARROW_W};
@@ -364,7 +365,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     let queue_rect = Rect::new(r.x, r.y - GAP - QUEUE_H, r.w, QUEUE_H);
     // A factory always shows its strip: REPEAT lives there.
     let has_queue = !stacks.is_empty() || (is_factory && builder_unit.is_some());
-    if has_queue {
+    let floor = if has_queue {
         // The switches speak for the whole selection, which may be split on them.
         let strip = queue::Queue {
             stacks: &stacks,
@@ -403,11 +404,14 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                 .and_then(|q| q.orders.first())
                 .map(|o| o.kind)
                 .filter(|&k| k == wanted || k == OrderKind::Upgrade),
+            unit: unit.unit_id,
+            panel: r,
         };
-        queue::draw(hud, ui, s, queue_rect, &strip);
-    }
-    super::refit::prompt(hud, ui, if has_queue { queue_rect.y } else { r.y });
-    let floor = if has_queue { queue_rect.y } else { r.y };
+        queue::draw(hud, ui, s, queue_rect, &strip)
+    } else {
+        r.y
+    };
+    super::refit::prompt(hud, ui, floor);
     match hovered {
         Some(Hover::Unit(item, tile, locked)) => {
             let power = bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32());

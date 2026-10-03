@@ -1,7 +1,8 @@
 //! The queue strip over the construction panel: what the builder has queued, and the
 //! Repeat, Pause and Batch switches (`batch.rs`). A selection of several builders can be
 //! split on any switch; the buttons show how it is split and what a click will do. On a
-//! narrow screen the switches fold to their glyphs, so the strip always fits.
+//! narrow screen the switches fold to their glyphs, so the strip always fits. A queue too
+//! long for the strip opens whole over it (`tray.rs`).
 
 use super::{pause_mark, tip, Stack, BUILDING};
 use crate::audio::Sfx;
@@ -66,6 +67,10 @@ pub(super) struct Queue<'a> {
     pub(super) paused: bool,
     /// What the front entry is (producing, building, upgrading), when it heads the queue.
     pub(super) front: Option<OrderKind>,
+    /// The builder whose queue it is: another one closes the whole-queue tray.
+    pub(super) unit: u32,
+    /// The construction panel under the strip: a press there leaves the tray open.
+    pub(super) panel: Rect,
 }
 
 /// The strip's measures: full, or folded to fit a narrow screen.
@@ -101,8 +106,9 @@ const FOLDED: Layout = Layout {
 };
 
 /// A queued tile, and the gap after it.
-const STACK_W: f32 = 48.0;
-const STACK_GAP: f32 = 5.0;
+pub(super) const STACK_W: f32 = 48.0;
+pub(super) const STACK_H: f32 = 46.0;
+pub(super) const STACK_GAP: f32 = 5.0;
 
 /// The measures that fit `w`: full while the head, the switches and a queued tile or two
 /// fit at full size.
@@ -121,8 +127,13 @@ fn layout(w: f32, queue: &Queue) -> &'static Layout {
     }
 }
 
-pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) {
+/// Draws the strip, and over it the whole queue while that is open. Returns the top of
+/// what it drew, for the cards that stand over it.
+pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue) -> f32 {
     hud.glass(ui, r);
+    // The whole queue goes over the strip, so the strip's hints go over that.
+    let tray = super::tray::rect(hud, r, queue);
+    let tip_y = tray.map_or(r.y, |t| t.y) - 32.0;
     let l = layout(r.w, queue);
     let end = head(ui, s, r, queue, l.head);
     let pause = queue.pause;
@@ -215,7 +226,8 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
     if let Some(at) = batch_right {
         right = super::batch::control(hud, ui, s, r, queue, l, at) - l.gap;
     }
-    stack_tiles(hud, ui, s, r, queue, end + 18.0, right);
+    let overflow = stack_tiles(hud, ui, s, r, queue, end + 18.0, right, tip_y);
+    super::tray::draw(hud, ui, s, r, queue, overflow)
 }
 
 /// The strip's head. While something is under way: what the builder is doing, to what,
@@ -545,141 +557,164 @@ fn dashed_frame(ui: &mut Ui, r: Rect, color: crate::ui::Color) {
     }
 }
 
-/// The queued stacks, from `x` up to `right`, and a count of those that do not fit.
-fn stack_tiles(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, x: f32, right: f32) {
+/// The queued stacks, from `x` up to `right`. When they do not all fit, the last slot is
+/// the tile that opens the whole queue over the strip (`tray.rs`). `tip_y` is where the
+/// tiles' hints go: over the tray while it is open.
+fn stack_tiles(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    s: &Scene,
+    r: Rect,
+    queue: &Queue,
+    x: f32,
+    right: f32,
+    tip_y: f32,
+) -> bool {
+    let stacks = queue.stacks;
+    let (w, h, gap) = (STACK_W, STACK_H, STACK_GAP);
+    let mut x = x;
+    // Room for every tile, or for as many as fit with the more tile after them.
+    let fits = ((right - x + gap) / (w + gap)).max(0.0) as usize;
+    let overflow = fits < stacks.len();
+    let room = if overflow {
+        fits.saturating_sub(1)
+    } else {
+        stacks.len()
+    };
+    for (i, k) in stacks.iter().take(room).enumerate() {
+        let tr = Rect::new(x, r.y + (r.h - h) * 0.5, w, h);
+        stack_tile(hud, ui, s, queue, i, k, tr, id("queue", i), tip_y);
+        x += w + gap;
+    }
+    if overflow && fits > 0 {
+        let hidden: usize = stacks[room..].iter().map(|k| k.count).sum();
+        let tr = Rect::new(x, r.y + (r.h - h) * 0.5, w, h);
+        super::tray::more(hud, ui, tr, queue.unit, hidden, tip_y);
+    }
+    overflow
+}
+
+/// One queued stack's tile: its picture, how many, and the front entry's progress. A
+/// click adds one more (a factory), a right-click takes one out.
+pub(super) fn stack_tile(
+    hud: &mut Hud,
+    ui: &mut Ui,
+    s: &Scene,
+    queue: &Queue,
+    i: usize,
+    k: &Stack,
+    tr: Rect,
+    tile: crate::ui::Id,
+    tip_y: f32,
+) {
     let Queue {
-        stacks,
         progress,
         is_factory,
         paused,
         ..
     } = *queue;
-    let (w, h, gap) = (STACK_W, 46.0, STACK_GAP);
-    let mut x = x;
-    // Room for every tile, or for as many as fit with the count of the rest after them.
-    let fits = |room: f32| ((room + gap) / (w + gap)).max(0.0) as usize;
-    let room = if fits(right - x) >= stacks.len() {
-        stacks.len()
+    let item = s.blueprints.unit(k.blueprint);
+    let t = hud.tile(ui, tile, tr, false, true);
+    // What is being built is lit in the construction amber alone; the rest wait in their domain's colour.
+    if i == 0 && paused {
+        held(ui, tr, progress);
+    } else if i == 0 {
+        building(ui, tr, progress);
     } else {
-        fits(right - 30.0 - x)
-    };
-    for (i, k) in stacks.iter().take(room).enumerate() {
-        let item = s.blueprints.unit(k.blueprint);
-        let tr = Rect::new(x, r.y + (r.h - h) * 0.5, w, h);
-        let t = hud.tile(ui, id("queue", i), tr, false, true);
-        // What is being built is lit in the construction amber alone; the rest wait in their domain's colour.
-        if i == 0 && paused {
-            held(ui, tr, progress);
-        } else if i == 0 {
-            building(ui, tr, progress);
-        } else {
-            domain_wash(
-                ui,
-                Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0),
-                Domain::of(item),
-                t.glow * 0.5,
-            );
-        }
-        if !hud.thumbs.draw(
+        domain_wash(
             ui,
-            item.id,
-            Rect::new(tr.x + 3.0, tr.y + 2.0, 36.0, 36.0),
-            1.0,
-        ) {
-            icons::strategic(
-                ui,
-                item.visual.icon,
-                item.tech,
-                Vec2::new(tr.x + 18.0, tr.y + 18.0),
-                9.5,
-                rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
-                ink(0.9),
-            );
-        }
-        if i == 0 && paused {
-            pause_mark(ui, Vec2::new(tr.x + 18.0, tr.y + 18.0), 18.0);
-        }
-        let refit_name = crate::hud::refit::queued_name(s.blueprints, k.blueprint);
-        if let Some(name) = refit_name {
-            // A refit: the module's name across the foot of the tile.
-
-            ui.fill(
-                Rect::new(tr.x + 3.0, tr.bottom() - 17.0, tr.w - 6.0, 13.0),
-                ink(0.75),
-            );
-            ui.text_fit(
-                tr.x + tr.w * 0.5,
-                tr.bottom() - 10.5,
-                tr.w - 8.0,
-                type_scale::MICRO,
-                rgb(0xFFFFFF, 1.0),
-                name,
-            );
-        }
-        let count = if k.upgrade {
-            "UP".to_owned()
-        } else {
-            format!("{}", k.count)
-        };
-        ui.text_right(
-            tr.right() - 5.0,
-            tr.y + 12.0,
-            type_scale::VALUE,
-            rgb(0xFFFFFF, 1.0),
-            &count,
+            Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0),
+            Domain::of(item),
+            t.glow * 0.5,
         );
-        if i == 0 {
-            front_track(ui, tr, progress, paused);
-        }
-        if k.upgrade {
-            if t.right_clicked {
-                ui.audio.play(Sfx::Back);
-                // A tier is cancelled by its own blueprint too, with the tiers after it.
-                hud.actions.push(HudAction::CancelRefit(k.blueprint));
-            }
-        } else if is_factory {
-            if t.clicked {
-                ui.audio.play(Sfx::Select);
-                hud.actions.push(HudAction::Build(k.blueprint));
-            }
-            if t.right_clicked {
-                ui.audio.play(Sfx::Back);
-                hud.actions.push(HudAction::Cancel(k.blueprint));
-            }
-        } else if t.right_clicked {
-            // An engineer's site: the last one of the stack comes out.
-            ui.audio.play(Sfx::Back);
-            hud.actions.push(HudAction::CancelOrder {
-                kind: OrderKind::Build,
-                pos: k.last,
-            });
-        }
-        if t.hovered {
-            let hint = if let Some(hint) = crate::hud::refit::queue_hint(s.blueprints, k.blueprint)
-            {
-                hint
-            } else if k.upgrade {
-                format!("Upgrade to {}  \u{b7}  Right-Click Cancels", item.name)
-            } else if is_factory {
-                format!(
-                    "{}  \u{b7}  Click Adds  \u{b7}  Right-Click Removes",
-                    item.name
-                )
-            } else {
-                format!("{}  \u{b7}  Right-Click Removes the Last", item.name)
-            };
-            tip(ui, tr.x, r.y - 32.0, &hint);
-        }
-        x += w + gap;
     }
-    if stacks.len() > room && right - x >= 24.0 {
-        ui.text(
-            x + 4.0,
-            r.mid_y(),
-            type_scale::VALUE,
-            rgb(palette::DIM, 1.0),
-            &format!("+{}", stacks.len() - room),
+    if !hud.thumbs.draw(
+        ui,
+        item.id,
+        Rect::new(tr.x + 3.0, tr.y + 2.0, 36.0, 36.0),
+        1.0,
+    ) {
+        icons::strategic(
+            ui,
+            item.visual.icon,
+            item.tech,
+            Vec2::new(tr.x + 18.0, tr.y + 18.0),
+            9.5,
+            rgb(palette::TEXT, 0.8 + 0.2 * t.glow),
+            ink(0.9),
         );
+    }
+    if i == 0 && paused {
+        pause_mark(ui, Vec2::new(tr.x + 18.0, tr.y + 18.0), 18.0);
+    }
+    let refit_name = crate::hud::refit::queued_name(s.blueprints, k.blueprint);
+    if let Some(name) = refit_name {
+        // A refit: the module's name across the foot of the tile.
+        ui.fill(
+            Rect::new(tr.x + 3.0, tr.bottom() - 17.0, tr.w - 6.0, 13.0),
+            ink(0.75),
+        );
+        ui.text_fit(
+            tr.x + tr.w * 0.5,
+            tr.bottom() - 10.5,
+            tr.w - 8.0,
+            type_scale::MICRO,
+            rgb(0xFFFFFF, 1.0),
+            name,
+        );
+    }
+    let count = if k.upgrade {
+        "UP".to_owned()
+    } else {
+        format!("{}", k.count)
+    };
+    ui.text_right(
+        tr.right() - 5.0,
+        tr.y + 12.0,
+        type_scale::VALUE,
+        rgb(0xFFFFFF, 1.0),
+        &count,
+    );
+    if i == 0 {
+        front_track(ui, tr, progress, paused);
+    }
+    if k.upgrade {
+        if t.right_clicked {
+            ui.audio.play(Sfx::Back);
+            // A tier is cancelled by its own blueprint too, with the tiers after it.
+            hud.actions.push(HudAction::CancelRefit(k.blueprint));
+        }
+    } else if is_factory {
+        if t.clicked {
+            ui.audio.play(Sfx::Select);
+            hud.actions.push(HudAction::Build(k.blueprint));
+        }
+        if t.right_clicked {
+            ui.audio.play(Sfx::Back);
+            hud.actions.push(HudAction::Cancel(k.blueprint));
+        }
+    } else if t.right_clicked {
+        // An engineer's site: the last one of the stack comes out.
+        ui.audio.play(Sfx::Back);
+        hud.actions.push(HudAction::CancelOrder {
+            kind: OrderKind::Build,
+            pos: k.last,
+        });
+    }
+    if t.hovered {
+        let hint = if let Some(hint) = crate::hud::refit::queue_hint(s.blueprints, k.blueprint) {
+            hint
+        } else if k.upgrade {
+            format!("Upgrade to {}  \u{b7}  Right-Click Cancels", item.name)
+        } else if is_factory {
+            format!(
+                "{}  \u{b7}  Click Adds  \u{b7}  Right-Click Removes",
+                item.name
+            )
+        } else {
+            format!("{}  \u{b7}  Right-Click Removes the Last", item.name)
+        };
+        tip(ui, tr.x, tip_y, &hint);
     }
 }
 
