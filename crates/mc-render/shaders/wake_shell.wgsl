@@ -7,11 +7,12 @@
 //   plasma turning over on itself: white-hot along its leading face and its crest, orange
 //   over its body, red down its back, in hot cells that roll up and over the crest. Run
 //   out, it rolls on a little way, slowing, slumps and is eaten through.
-// - **The trail** leading up to it: the fan laid low over the ground from the muzzle out
-//   to the wall, rising up the wall's back, in long threads of light running out to the
-//   wall. Each stretch is hot when the front has just passed it and cools after, orange to
-//   red to a deep ember, and is eaten through in hard-edged holes (no mist,
-//   docs/STYLE.md), so it dies back from the muzzle behind the front.
+// - **The trail** leading up to it: streamed off the whole wall from its crest down, it
+//   sinks behind the wall to lie low over the fan back to the muzzle, in long threads of
+//   light running out to the wall. Just behind the wall it is the front's own colour;
+//   each stretch cools after the front has passed it, through orange to a tame red, and
+//   is eaten through in hard-edged holes (no mist, docs/STYLE.md), so it dies back from
+//   the muzzle behind the front.
 //
 // Both are light laid over the scene premultiplied: mostly light added, a little of what
 // is behind dimmed so it reads red over green grass and not orange.
@@ -48,6 +49,10 @@ const ICE: vec3<f32> = vec3<f32>(0.72, 0.86, 1.0);
 const PALE: vec3<f32> = vec3<f32>(1.0, 0.62, 0.55);
 // The trail once it has cooled: a tame red, not an angry one.
 const TAME: vec3<f32> = vec3<f32>(0.8, 0.04, 0.03);
+// Seconds the plasma streamed off the wall takes to sink to a third of the height it
+// left at, and the share of the wall's height it leaves from.
+const TRAIL_SINK: f32 = 0.6;
+const TRAIL_CREST: f32 = 0.85;
 // Seconds the trail just behind the front keeps the front's own colour (falling to a
 // third).
 const FRESH: f32 = 0.3;
@@ -185,20 +190,23 @@ fn vs_wake_trail(@builtin(vertex_index) v: u32, @builtin(instance_index) instanc
     let a = f32(g.y) / f32(WAKE_SHELL_AROUND);
     let c = 2.0 * a - 1.0;
     let out_xy = radial(s, c);
-    // Laid low over the fan out to the wall, rising up the last of the way to meet its
-    // back; the rows bunch toward the wall, where it is busiest.
+    // Streamed off the whole wall, from its crest down: the plasma leaves it at the
+    // crest's height and sinks to the ground behind as it cools, so the trail falls from
+    // the top of the wall to lie low over the fan back to the muzzle. The rows bunch
+    // toward the wall, where it is busiest and bends most.
     let along = (1.0 - (1.0 - u) * (1.0 - u)) * s.front;
     let tall = wall_tall(s, c);
-    let ramp = smoothstep(s.front - 2.5 * wall_back(tall), s.front, along);
+    let sink = TRAIL_SINK * s.speed;
+    let high = TRAIL_CREST * tall * exp(-max(s.front - along, 0.0) / sink);
     let age = globals.camera.w - s.start;
     let passed = max(age - along / s.speed, 0.0);
     let xy = s.apex.xy + out_xy * along;
     // Its heat lifts it a little off the ground as it cools.
     let floor = mix(s.apex.z, ground_at(xy), smoothstep(0.0, 20.0, along)) + 0.3 + 0.4 * passed;
-    let p = vec3<f32>(xy, floor + 0.3 * tall * ramp * ramp);
+    let p = vec3<f32>(xy, floor + high);
     var out: ShellOut;
     out.shell = instance;
-    out.normal = normalize(vec3<f32>(-out_xy * 0.6 * ramp, 1.0));
+    out.normal = normalize(vec3<f32>(-out_xy * (high / sink), 1.0));
     out.world = p;
     out.at = vec2<f32>(u, a);
     out.passed = vec2<f32>(along, passed);
