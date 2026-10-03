@@ -159,3 +159,79 @@ impl CullLists {
         }
     }
 }
+
+impl super::Renderer {
+    /// A draw slot's model, for a breadcrumb: the blueprint's key, or a prop kind.
+    fn slot_label(&self, slot: u32) -> String {
+        match self.cull.draws.owner(slot) {
+            Some(b) => match self.blueprints.units.get(b) {
+                Some(bp) => format!("slot {slot}: {}", bp.key),
+                None => format!("slot {slot}: prop kind {}", b - self.blueprints.units.len()),
+            },
+            None => format!("slot {slot}: strategic icons"),
+        }
+    }
+
+    /// The models of cull list `list`, inside a render pass with set 0 bound:
+    /// `pipelines` are units and the rest, then trees and rocks (entity.wgsl `vs_prop`).
+    pub(super) fn draw_entities(
+        &self,
+        cmd: vk::CommandBuffer,
+        pipelines: [vk::Pipeline; 2],
+        pass_kind: u32,
+        list: u32,
+    ) {
+        let device = &self.gpu.device;
+        let gfx = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
+        let first = self.cull.first_command(list);
+        let draws = &self.cull.draws;
+        // SAFETY: called only inside a render pass of `render` while `cmd` is recording, after
+        // set 0 is bound; `shields_set` is a pass set, the 8 pushed bytes fit the layout's
+        // 16-byte push range; `commands` has INDIRECT_BUFFER usage and holds `slot_count`
+        // 20-byte commands for each of the `cull_list::COUNT` lists, `list` is below it and
+        // each occupied range is bounded by the model slots, so all command reads lie inside it.
+        unsafe {
+            device.cmd_bind_descriptor_sets(
+                cmd,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.layouts.scene,
+                1,
+                &[self.shields_set],
+                &[],
+            );
+            let pushed = [pass_kind, self.shield_count];
+            device.cmd_push_constants(cmd, self.layouts.scene, gfx, 0, bytemuck::bytes_of(&pushed));
+            device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
+            device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
+            for (pipeline, ranges) in pipelines
+                .into_iter()
+                .zip([&draws.ranges, &draws.prop_ranges])
+            {
+                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
+                for range in ranges {
+                    if self.timers.fine() {
+                        // One slot at a time, each named, to find a draw that hangs the GPU.
+                        for slot in range.clone() {
+                            self.timers.crumb(cmd, || self.slot_label(slot));
+                            device.cmd_draw_indexed_indirect(
+                                cmd,
+                                self.cull.commands.buffer,
+                                first + slot as u64 * COMMAND_BYTES,
+                                1,
+                                COMMAND_BYTES as u32,
+                            );
+                        }
+                        continue;
+                    }
+                    device.cmd_draw_indexed_indirect(
+                        cmd,
+                        self.cull.commands.buffer,
+                        first + range.start as u64 * COMMAND_BYTES,
+                        range.end - range.start,
+                        COMMAND_BYTES as u32,
+                    );
+                }
+            }
+        }
+    }
+}

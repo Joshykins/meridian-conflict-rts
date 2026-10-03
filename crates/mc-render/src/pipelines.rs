@@ -97,6 +97,9 @@ pub struct Pipelines {
     /// fragment is dropped before `fs_main` runs although it can `discard`.
     pub entity_over_prepass: vk::Pipeline,
     pub entity_shadow: vk::Pipeline,
+    /// The same four for trees and rocks, with their own vertex stage (entity.wgsl
+    /// `vs_prop`): main, over the pre-pass, shadow, pre-pass.
+    pub prop: [vk::Pipeline; 4],
     /// The depth pre-pass: the scene's depth before any of it is shaded.
     pub terrain_prepass: vk::Pipeline,
     pub entity_prepass: vk::Pipeline,
@@ -980,6 +983,28 @@ impl Pipelines {
                 back,
             )?,
             entity_shadow: shadow(entity, c"vs_main", c"fs_shadow", VertexKind::Mesh)?,
+            prop: [
+                scene(
+                    entity,
+                    c"vs_prop",
+                    c"fs_main",
+                    VertexKind::Mesh,
+                    Blend::Opaque,
+                    Depth::TestWrite,
+                    back,
+                )?,
+                scene(
+                    entity,
+                    c"vs_prop",
+                    c"fs_main",
+                    VertexKind::Mesh,
+                    Blend::Opaque,
+                    Depth::Test,
+                    back,
+                )?,
+                shadow(entity, c"vs_prop", c"fs_shadow", VertexKind::Mesh)?,
+                prepass(entity, c"vs_prop", c"fs_prepass", VertexKind::Mesh)?,
+            ],
             terrain_prepass: prepass(terrain, c"vs_main", c"fs_shadow", VertexKind::Vec2)?,
             entity_prepass: prepass(entity, c"vs_main", c"fs_prepass", VertexKind::Mesh)?,
             // Set 2 carries the fields' own outermost depth (`hull_shield_depth`).
@@ -1257,6 +1282,10 @@ impl Pipelines {
                 self.entity,
                 self.entity_over_prepass,
                 self.entity_shadow,
+                self.prop[0],
+                self.prop[1],
+                self.prop[2],
+                self.prop[3],
                 self.terrain_prepass,
                 self.entity_prepass,
                 self.hull_shield,

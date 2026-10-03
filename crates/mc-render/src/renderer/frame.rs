@@ -50,17 +50,6 @@ impl Renderer {
         )
     }
 
-    /// A draw slot's model, for a breadcrumb: the blueprint's key, or a prop kind.
-    fn slot_label(&self, slot: u32) -> String {
-        match self.cull.draws.owner(slot) {
-            Some(b) => match self.blueprints.units.get(b) {
-                Some(bp) => format!("slot {slot}: {}", bp.key),
-                None => format!("slot {slot}: prop kind {}", b - self.blueprints.units.len()),
-            },
-            None => format!("slot {slot}: strategic icons"),
-        }
-    }
-
     fn render_frame(&mut self, input: &FrameInput) -> Result<bool, GpuError> {
         let device = self.gpu.device.clone();
         {
@@ -443,6 +432,7 @@ impl Renderer {
                 .draws
                 .ranges
                 .iter()
+                .chain(&self.cull.draws.prop_ranges)
                 .map(|r| r.end - r.start)
                 .sum::<u32>()
         );
@@ -503,41 +493,8 @@ impl Renderer {
         };
         let draw_terrain =
             |pipeline, pass_kind| terrain.draw(pipeline, self.layouts.scene, pass_kind, None);
-        // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
-        // recording, after set 0 is bound; `commands` has INDIRECT_BUFFER usage and holds
-        // `slot_count` 20-byte commands for each of the `cull_list::COUNT` lists, and
-        // `list` is below it and each occupied range is bounded by `model_slots`,
-        // so all command reads lie inside it.
-        let draw_entities = |pipeline: vk::Pipeline, pass_kind: u32, list: u32| unsafe {
-            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
-            bind_pass_set(self.shields_set);
-            push(pass_kind, self.shield_count);
-            device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
-            device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
-            let first = self.cull.first_command(list);
-            for range in &self.cull.draws.ranges {
-                if self.timers.fine() {
-                    // One slot at a time, each named, to find a draw that hangs the GPU.
-                    for slot in range.clone() {
-                        self.timers.crumb(cmd, || self.slot_label(slot));
-                        device.cmd_draw_indexed_indirect(
-                            cmd,
-                            self.cull.commands.buffer,
-                            first + slot as u64 * 20,
-                            1,
-                            20,
-                        );
-                    }
-                    continue;
-                }
-                device.cmd_draw_indexed_indirect(
-                    cmd,
-                    self.cull.commands.buffer,
-                    first + range.start as u64 * 20,
-                    range.end - range.start,
-                    20,
-                );
-            }
+        let draw_entities = |pipelines, pass_kind, list| {
+            self.draw_entities(cmd, pipelines, pass_kind, list);
         };
         // The hull passes: only the draw slots of models wearing a hull field.
         // SAFETY: the closure is called only inside a hull render pass of `render` while `cmd`
@@ -627,7 +584,7 @@ impl Renderer {
                 self.foundations
                     .record(&self.gpu, cmd, self.layouts.scene, kind);
                 draw_entities(
-                    self.pipelines.entity_shadow,
+                    [self.pipelines.entity_shadow, self.pipelines.prop[2]],
                     kind,
                     cull_list::SHADOW + cascade as u32,
                 );
@@ -682,7 +639,7 @@ impl Renderer {
                 self.foundations
                     .record(&self.gpu, cmd, self.layouts.scene, pass::PREPASS);
                 draw_entities(
-                    self.pipelines.entity_prepass,
+                    [self.pipelines.entity_prepass, self.pipelines.prop[3]],
                     pass::PREPASS,
                     cull_list::PREPASS,
                 );
@@ -847,13 +804,21 @@ impl Renderer {
                 // What the pre-pass drew is shaded only where it is the nearest; the
                 // rest writes its own depth.
                 draw_entities(
-                    self.pipelines.entity_over_prepass,
+                    [self.pipelines.entity_over_prepass, self.pipelines.prop[1]],
                     pass::MAIN,
                     cull_list::PREPASS,
                 );
-                draw_entities(self.pipelines.entity, pass::MAIN, cull_list::REST);
+                draw_entities(
+                    [self.pipelines.entity, self.pipelines.prop[0]],
+                    pass::MAIN,
+                    cull_list::REST,
+                );
             } else {
-                draw_entities(self.pipelines.entity, pass::MAIN, cull_list::MAIN);
+                draw_entities(
+                    [self.pipelines.entity, self.pipelines.prop[0]],
+                    pass::MAIN,
+                    cull_list::MAIN,
+                );
             }
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.missiles");

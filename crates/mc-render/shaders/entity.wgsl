@@ -2372,6 +2372,124 @@ fn vs_main(in: VsIn) -> VsOut {
     return out;
 }
 
+// Trees and rocks (the leading prop kinds, renderer `ActiveDraws::props`): `vs_main`
+// for what a prop can be. Standing on the ground, scaled and stretched, a tree's
+// leaves fluttering and its stem bent by the wind and blasts, a trampled one tipped
+// over its foot; nothing a unit, wreck or ship needs. A forest is hundreds of
+// thousands of these, and `vs_main`'s every other branch and its registers made
+// the entity pass vertex-bound. Drawn by this in every pass, so its depth agrees
+// with itself between the pre-pass and the colour pass.
+@vertex
+fn vs_prop(in: VsIn) -> VsOut {
+    let entity_index = visible[in.instance];
+    let e = load_entity(entity_index);
+    let model = models[e.blueprint];
+    let t = globals.sun.w;
+    let time = globals.camera.w;
+    let scale = select(1.0, f32(e.packed) * 0.001, e.packed != 0u);
+    let stretch = select(1.0, e.arm_pitch.w, e.arm_pitch.w > 0.0);
+    var p = in.pos;
+    var n = in.normal;
+    // A trampled tree tips over from its foot (renderer/fallen_trees.rs).
+    let toppled = e.arm_pitch.x != 0.0;
+    var tree = vec3<f32>(0.0);
+    let is_tree = !toppled && (in.material == MAT_FOLIAGE || in.material == MAT_BARK);
+    let tall = max(model.height * scale * stretch, 1.0);
+    if is_tree {
+        // As `vs_main`: no wind on a tree a few pixels tall.
+        if tall * globals.lod.x < TREE_STILL_PX * distance(e.pos, globals.camera.xyz) {
+            tree = blast_sway(entity_index);
+        } else {
+            tree = tree_air(e.pos, tall, e.unit_id, blast_sway(entity_index));
+        }
+    }
+    if in.material == MAT_FOLIAGE {
+        n = select(normalize(vec3<f32>(in.pos.xy * 0.18, 0.7)), in.face.xyz, dot(in.face.xyz, in.face.xyz) > 0.25);
+        let flex = clamp(in.pos.z / max(model.height, 1.0), 0.0, 1.0);
+        let card = f32((in.surface >> 8u) & 0x7Fu);
+        let phase = time * 1.5 + (in.pos.x + in.pos.y * 0.7) * 0.35 + card * 0.37 + f32(e.unit_id % 31u);
+        let shiver = time * 6.3 + card * 1.71 + in.pos.z * 0.3;
+        p += (vec3<f32>(sin(phase), cos(phase * 0.83), 0.0) * 0.04
+            + vec3<f32>(sin(shiver), cos(shiver * 1.13), sin(shiver * 0.71) * 0.5) * 0.07 * tree.z) * flex;
+    }
+    let heading = lerp_angle(e.prev_heading, e.heading, t);
+    var origin = mix(e.prev_pos, e.pos, t);
+    // Props carry an approximate height; stand them on the real surface.
+    origin.z = terrain_height(origin.xy) - e.arm_pitch.z;
+    let local = vec3<f32>(p.xy, p.z * stretch) * scale;
+    if stretch != 1.0 {
+        n = normalize(vec3<f32>(n.xy, n.z / stretch));
+    }
+    var up = vec3<f32>(0.0, 0.0, 1.0);
+    let fwd0 = vec3<f32>(cos(heading), sin(heading), 0.0);
+    var left = normalize(cross(up, fwd0));
+    var fwd = cross(left, up);
+    if toppled {
+        let pitch = mix(e.arm_pitch.x, e.arm_pitch.y, t);
+        let pitch_fwd = fwd * cos(pitch) + up * sin(pitch);
+        up = up * cos(pitch) - fwd * sin(pitch);
+        fwd = pitch_fwd;
+    }
+    let bank = mix(e._pad2.x, e._pad2.y, t);
+    let bank_left = left * cos(bank) + up * sin(bank);
+    up = up * cos(bank) - left * sin(bank);
+    left = bank_left;
+    var world = origin + fwd * local.x + left * local.y + up * local.z;
+    var world_n = normalize(fwd * n.x + left * n.y + up * n.z);
+    // The stem bends as a pole over its foot (`vs_main`).
+    let reach = length(tree.xy);
+    if is_tree && reach > 0.001 {
+        let dir = tree.xy / reach;
+        let bend = min(asin(min(reach / tall, 0.8)) * 1.5, 0.95);
+        let h = world.z - origin.z;
+        let r = max(h, 0.0) / tall;
+        let f = select(1.0, r * (2.0 - r), r < 1.0);
+        let mean = select((r - 1.0 / 3.0) / max(r, 0.001), r - r * r / 3.0, r < 1.0);
+        let a = bend * mean;
+        let turn = bend * f;
+        let rel = world.xy - origin.xy;
+        let along = dot(rel, dir);
+        let stem_h = max(h, 0.0);
+        world = vec3<f32>(
+            origin.xy + rel + dir * (stem_h * sin(a) + along * (cos(turn) - 1.0)),
+            origin.z + h + stem_h * (cos(a) - 1.0) - along * sin(turn),
+        );
+        let n_along = dot(world_n.xy, dir);
+        world_n = normalize(vec3<f32>(
+            world_n.xy + dir * (n_along * (cos(turn) - 1.0) + world_n.z * sin(turn)),
+            world_n.z * cos(turn) - n_along * sin(turn),
+        ));
+    }
+    var out: VsOut;
+    if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
+        out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
+    } else {
+        out.clip = globals.view_proj * vec4<f32>(world, 1.0);
+    }
+    out.world = world;
+    out.normal = world_n;
+    // What `vs_main` hands on for a prop: no warp, wreck, drive, crackle or refit.
+    let warp_reach = max(model.bounds_radius * scale, 1.0);
+    out.warp = vec4<f32>(0.0, 0.0, 0.0, clamp(0.5 + 0.5 * local.x / warp_reach, 0.0, 1.0));
+    out.uv = in.uv;
+    out.material = in.material;
+    out.owner_flags = e.owner_flags;
+    out.state = vec4<f32>(e.build, e.health, in.pos.z / max(model.height, 0.1), hash11(f32(e.unit_id & 0xFFFFu)));
+    out.local = in.pos;
+    out.wreck = vec4<f32>(-1e6, 1e6, 0.0, 0.0);
+    out.model_class = ((model.icon >> 8u) & 0xFFu) | ((in.surface & 0xFFFFu) << 16u);
+    out.face = in.face;
+    out.unit_id = e.unit_id;
+    out.drive = vec4<f32>(-1.0, 0.0, 0.0, 0.0);
+    out.drive_at = vec4<f32>(0.0);
+    out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
+    out.crackle = vec2<f32>(0.0);
+    out.refit = vec3<f32>(0.0, 0.0, e.upgrade);
+    let body = max(select(model.bounds_radius, model.surface.x, model.surface.x > 0.0), 1.0);
+    out.weld = vec4<f32>(f32(e.weld_first), f32(e.weld_count), body, max(model.height, 1.0));
+    return out;
+}
+
 // `ModelInfo::icon` bit: the spinner looks about (renderer `Model::spinner_scans`).
 const ICON_SPINNER_SCANS: u32 = 0x8000000u;
 

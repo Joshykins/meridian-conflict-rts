@@ -1301,6 +1301,12 @@ impl Renderer {
             drawn_as.push((model_list.len(), 13, 0));
             model_list.push((model, 13));
         }
+        // Trees and rocks lead the prop kinds; their slots get a vertex stage of their
+        // own (entity.wgsl `vs_prop`).
+        let plain_props = PropKind::ALL
+            .iter()
+            .take_while(|k| k.is_tree() || k.is_rock())
+            .count();
         // Then the rock pieces dressing the cliffs (`cliff_rocks`), drawn as props.
         let cliff_base = drawn_as.len() as u32;
         for key in models::cliffs::KEYS {
@@ -1344,6 +1350,7 @@ impl Renderer {
                 slots.push(slots[slots.len() - 1]);
             }
         }
+        let prop_slots = first_slot[first_prop_model]..first_slot[first_prop_model + plain_props];
         for &(at, icon, look) in &drawn_as {
             let (model, _) = &model_list[at];
             model_draws.push([first_slot[at], model.lods.len() as u32]);
@@ -1599,6 +1606,7 @@ impl Renderer {
             active_draws::ActiveDraws::new(
                 model_draws.clone(),
                 prop_base,
+                prop_slots,
                 slot_count - 1,
                 &statics_data,
             ),
