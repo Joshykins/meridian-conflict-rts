@@ -462,7 +462,7 @@ const STRIP_DROP: f32 = SHELF_H + 12.0;
 /// panel stands no taller than it needs.
 pub(super) const STRIP_H: f32 = 106.0;
 /// The panel's height: the tabs, the shelf buttons, the strip and its track.
-const PANEL_H: f32 = 44.0 + STRIP_DROP + STRIP_H + 22.0;
+pub(super) const PANEL_H: f32 = 44.0 + STRIP_DROP + STRIP_H + 22.0;
 /// How far past the strip's edge a tile takes to fade out.
 const FADE: f32 = 34.0;
 

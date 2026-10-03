@@ -7,7 +7,7 @@ use mc_sim::mirror::{BatchView, UNIT_BATCH};
 
 /// The strip's Repeat switch, and each switch a step left of it.
 fn strip(step: f32) -> Vec2 {
-    let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
+    let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, BUILD_Y - GAP - 31.0);
     Vec2::new(repeat.x - step * (48.0 + 10.0 + 48.0), repeat.y)
 }
 
@@ -66,7 +66,7 @@ fn on_a_narrow_screen_the_switches_fold_to_their_glyphs() {
     let mut rig = Rig::sized("aster_t1_land_factory", Vec2::new(1440.0, 1080.0));
     batching(&mut rig, 3, 10);
     // Folded switches are 40 wide, 6 apart, from the strip's right end.
-    let repeat = Vec2::new(1440.0 - EDGE - 12.0 - 20.0, DECK_Y - GAP - 31.0);
+    let repeat = Vec2::new(1440.0 - EDGE - 12.0 - 20.0, BUILD_Y - GAP - 31.0);
     assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
     let pause = repeat - Vec2::X * 46.0;
     assert_eq!(rig.click(pause), vec![HudAction::PauseWork(true)]);

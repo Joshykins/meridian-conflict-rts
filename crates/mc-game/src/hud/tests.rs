@@ -173,6 +173,8 @@ impl Rig {
 
 // Where things are at 1920x1080 and interface scale 1: see `Hud::draw`.
 const DECK_Y: f32 = 1080.0 - EDGE - DECK_H;
+/// The construction panel's top: it stands only as tall as its strip, on the deck's floor.
+const BUILD_Y: f32 = 1080.0 - EDGE - build::PANEL_H;
 const INFO_X: f32 = EDGE;
 const ORDERS_X: f32 = INFO_X + 336.0 + GAP;
 /// The construction panel's left edge, after an order card of `families` columns.
@@ -183,7 +185,7 @@ fn first_tile(families: usize) -> Vec2 {
     // Inside the first tile whether or not the strip has its end arrows.
     Vec2::new(
         build_x(families) + 14.0 + 30.0 + 40.0,
-        DECK_Y + 44.0 + 32.0 + 40.0,
+        BUILD_Y + 44.0 + 32.0 + 40.0,
     )
 }
 /// The middle of order `row` in family column `col`.
@@ -807,7 +809,7 @@ fn tech_tabs_switch_what_is_offered() {
     // A tech 2 engineer opens on its own tier; the T1 tab brings the basics back.
     assert_eq!(rig.click(tile), vec![HudAction::Build(tier(&rig, 2))]);
     assert_eq!(
-        rig.click(Vec2::new(build_x(families) + 14.0 + 29.0, DECK_Y + 23.0)),
+        rig.click(Vec2::new(build_x(families) + 14.0 + 29.0, BUILD_Y + 23.0)),
         vec![]
     );
     assert_eq!(rig.click(tile), vec![HudAction::Build(tier(&rig, 1))]);
@@ -842,13 +844,13 @@ fn the_queue_strip_lists_production_and_cancels_from_it() {
         ..Default::default()
     }];
     rig.frame(&Input::default());
-    let strip = Vec2::new(build_x(FACTORY_FAMILIES) + 200.0, DECK_Y - GAP - 30.0);
+    let strip = Vec2::new(build_x(FACTORY_FAMILIES) + 200.0, BUILD_Y - GAP - 30.0);
     assert!(
         rig.hud.covers(strip),
         "the queue strip appears above the construction panel"
     );
     // Two stacks: 2 of the first product, then 1 of the second. The second stack starts one tile along.
-    let second = Vec2::new(build_x(FACTORY_FAMILIES) + 14.0, DECK_Y - GAP - 31.0);
+    let second = Vec2::new(build_x(FACTORY_FAMILIES) + 14.0, BUILD_Y - GAP - 31.0);
     let hits: Vec<HudAction> = (0..40)
         .flat_map(|i| rig.right_click(second + Vec2::X * (150.0 + i as f32 * 6.0)))
         .collect();
@@ -1023,7 +1025,7 @@ fn a_factory_card_orders_its_units_and_its_queue_holds_repeat() {
         vec![HudAction::PauseWork(true)]
     );
     assert_eq!(rig.click(order_slot(3, 2)), vec![HudAction::Stop]);
-    let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
+    let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, BUILD_Y - GAP - 31.0);
     assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
     // Pause sits beside it on the strip, and Batch beside that.
     let pause = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
@@ -1072,7 +1074,7 @@ fn paused_work_offers_resume_on_the_card() {
         rig.click(order_slot(3, 1)),
         vec![HudAction::PauseWork(false)]
     );
-    let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, DECK_Y - GAP - 31.0);
+    let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, BUILD_Y - GAP - 31.0);
     let resume = Vec2::new(repeat.x - (48.0 + 10.0 + 48.0), repeat.y);
     assert_eq!(rig.click(resume), vec![HudAction::PauseWork(false)]);
     // A tank has no work to pause: its card has no such order.
@@ -1115,7 +1117,7 @@ fn an_engineers_queue_takes_a_right_click() {
         .flat_map(|i| {
             rig.right_click(Vec2::new(
                 build_x(families) + 150.0 + i as f32 * 6.0,
-                DECK_Y - GAP - 31.0,
+                BUILD_Y - GAP - 31.0,
             ))
         })
         .collect();
@@ -1311,12 +1313,12 @@ fn a_factory_queues_its_upgrade_and_the_units_it_opens_on_the_tier_tab() {
     );
     // The factory's card has four order families; its T2 tab is the second.
     let families = 4;
-    let t2_tab = Vec2::new(build_x(families) + 14.0 + 62.0 + 29.0, DECK_Y + 23.0);
+    let t2_tab = Vec2::new(build_x(families) + 14.0 + 62.0 + 29.0, BUILD_Y + 23.0);
     let hits = rig.click(t2_tab);
     assert!(hits.is_empty(), "{hits:?}");
     let upgrade = first_tile(families);
     // The upgrade tile, then the gap before the first shelf.
-    let unit = upgrade + Vec2::new(96.0 + 22.0, 0.0);
+    let unit = upgrade + Vec2::new(build::TILE_W + 22.0, 0.0);
     assert_eq!(rig.click(upgrade), vec![HudAction::Upgrade]);
     // A T2 unit is locked until the upgrade is queued...
     assert_eq!(rig.click(unit), vec![]);
@@ -1350,7 +1352,7 @@ fn a_factory_queues_its_upgrade_and_the_units_it_opens_on_the_tier_tab() {
 /// A commander's refit tab: row `row` (slot), tile `n` along it counting `or`
 /// gaps after `ors` alternatives and `arrows` tier arrows.
 fn refit_tile(row: usize, n: usize, ors: usize, arrows: usize) -> Vec2 {
-    let row_h = ((DECK_H - 52.0 - 12.0) / 4.0).clamp(26.0, 44.0);
+    let row_h = ((build::PANEL_H - 52.0 - 12.0) / 4.0).clamp(26.0, 44.0);
     Vec2::new(
         build_x(4)
             + 14.0
@@ -1359,7 +1361,7 @@ fn refit_tile(row: usize, n: usize, ors: usize, arrows: usize) -> Vec2 {
             + ors as f32 * 34.0
             + arrows as f32 * 26.0
             + 86.0,
-        DECK_Y + 44.0 + row as f32 * (row_h + 4.0) + row_h * 0.5,
+        BUILD_Y + 44.0 + row as f32 * (row_h + 4.0) + row_h * 0.5,
     )
 }
 
@@ -1397,7 +1399,7 @@ fn refits_queue_their_earlier_tiers_and_ask_before_replacing() {
     // The card stands over the panel: its buttons along its foot.
     let yes = Vec2::new(
         (shield.x - 210.0).clamp(14.0, 1920.0 - 420.0 - 14.0) + 93.0,
-        DECK_Y - GAP - 27.0,
+        BUILD_Y - GAP - 27.0,
     );
     assert_eq!(
         rig.click(yes),

@@ -4,7 +4,7 @@
 use super::*;
 
 /// The queue strip's top edge, and a point just inside the tray's foot over it.
-const STRIP_Y: f32 = DECK_Y - GAP - 62.0;
+const STRIP_Y: f32 = BUILD_Y - GAP - 62.0;
 const TRAY_FOOT: f32 = STRIP_Y - GAP - 8.0;
 
 /// A right-click at `at` on a still HUD.
