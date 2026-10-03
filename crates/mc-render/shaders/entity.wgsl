@@ -1352,7 +1352,16 @@ fn vs_main(in: VsIn) -> VsOut {
     let is_tree = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x == 0.0
         && (in.material == MAT_FOLIAGE || in.material == MAT_BARK);
     if is_tree {
-        tree = tree_air(e.pos, max(model.height * scale * stretch, 1.0), e.unit_id, blast_sway(entity_index));
+        // The wind leans a tree by a few percent of its height, so on one a few pixels
+        // tall it moves nothing: only the blasts' push (worked out by the cull) is kept.
+        // Far off a forest is hundreds of thousands of trees, and the wind's look-ups
+        // for every vertex of each were a quarter of the entity pass.
+        let tall = max(model.height * scale * stretch, 1.0);
+        if tall * globals.lod.x < TREE_STILL_PX * distance(e.pos, globals.camera.xyz) {
+            tree = blast_sway(entity_index);
+        } else {
+            tree = tree_air(e.pos, tall, e.unit_id, blast_sway(entity_index));
+        }
     }
     if in.material == MAT_FOLIAGE {
         // Leaf cards are lit as the crown they belong to: the mesh carries the
@@ -2485,6 +2494,9 @@ fn site_waves(local: vec3<f32>, weld: vec4<f32>, time: f32, seed: f32) -> vec2<f
 @group(0) @binding(31) var<storage, read> tree_sway: array<vec4<f32>>;
 
 // What the blasts do to the tree `index` (a `visible` entry): see `tree_air`.
+// A tree less than this many pixels tall on screen does not sway in the wind (`vs_main`).
+const TREE_STILL_PX: f32 = 6.0;
+
 fn blast_sway(index: u32) -> vec3<f32> {
     let dynamic = (index & DYNAMIC_BIT) != 0u;
     return tree_sway[select(index, globals.counts.y + (index & ~DYNAMIC_BIT), dynamic)].xyz;
