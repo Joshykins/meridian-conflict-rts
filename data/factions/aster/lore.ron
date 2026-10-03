@@ -270,6 +270,15 @@
     "aster_t3_power": (
         lore: "The largest fusion plant in the Reach inventory, tall enough to see for miles.",
     ),
+    "aster_t1_fabricator": (
+        lore: "Pours a reactor's worth of current through a sealed chamber to condense a trickle of usable matter. Wasteful by any measure, and a bomb if the containment fails.",
+    ),
+    "aster_t2_fabricator": (
+        lore: "A larger formation chamber under more coils and capacitor banks: more material, for a draw that would light a city.",
+    ),
+    "aster_t3_fabricator": (
+        lore: "The heaviest fabrication plant in the Reach inventory, cooled and banked round a chamber big enough to level the block it stands in.",
+    ),
     "aster_mass_storage": (
         lore: "A squat bunker buffering refined ore between the mines and the factory floor.",
     ),

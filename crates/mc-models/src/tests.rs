@@ -294,6 +294,15 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("power", 6.9, 10.0, 1, 2, &[]),
     structure("power", 18.75, 26.0, 2, 4, &[]),
     structure("power", 42.5, 52.0, 3, 8, &[]),
+    structure("fabricator", 23.0, 14.0, 1, 4, &[]),
+    structure("fabricator", 23.0, 22.0, 2, 4, &[]),
+    structure("fabricator", 23.0, 30.0, 3, 4, &[]),
+    structure("fabricator~ring", 23.0, 14.0, 1, 4, &[]),
+    structure("fabricator~ring", 23.0, 22.0, 2, 4, &[]),
+    structure("fabricator~ring", 23.0, 30.0, 3, 4, &[]),
+    structure("fabricator~line", 23.0, 14.0, 1, 4, &[]),
+    structure("fabricator~line", 23.0, 22.0, 2, 4, &[]),
+    structure("fabricator~line", 23.0, 30.0, 3, 4, &[]),
     structure("storage_mass", 12.9, 6.3, 1, 3, &[]),
     structure("storage_mass", 12.9, 10.2, 2, 3, &[]),
     structure("storage_mass", 12.9, 14.9, 3, 3, &[]),
@@ -745,6 +754,8 @@ const CORE_MINE_TRIANGLES: usize = 9000;
 /// A fusion plant: the tech 3 one stands on a factory's 96 m lot, a heavy foundation of
 /// heat sinks and capacitor bastions round a star in its blades.
 pub(crate) const REACTOR_TRIANGLES: usize = 8000;
+/// A Material Fabricator: a 4x4 lot of banks, coils, a stacked vessel and radiators.
+const FABRICATOR_TRIANGLES: usize = 6000;
 /// The tech 4 Megalodon: a 110 m experimental submarine, under the Leviathan's budget.
 const SUBMARINE_TITAN_TRIANGLES: usize = 8000;
 /// The tech 4 assault tank runs on four open track units (road wheels, toothed
@@ -850,6 +861,9 @@ fn lods_reduce_and_respect_budgets() {
             super::replicator::ENGINE_TRIANGLES
         } else if model.key == "power" {
             REACTOR_TRIANGLES
+        } else if base_key(&model.key) == "fabricator" {
+            // A 4x4 plant of a few per side: its tech 3 vessel, coils, banks and cooling.
+            FABRICATOR_TRIANGLES
         } else if model.key.starts_with("factory_")
             || model.key == "airbase"
             || model.key == "nuke_silo"

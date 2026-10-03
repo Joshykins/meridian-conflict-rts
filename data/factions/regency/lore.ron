@@ -268,6 +268,18 @@
         lore: "The largest star core, held under a crown of six talons. Its supernova lights the whole field.",
         weapons: {},
     ),
+    "regency_t1_fabricator": (
+        lore: "Gravity squeezes raw energy in a sealed vessel until matter condenses out of it, a little at a time. A breached vessel lets it all go at once.",
+        weapons: {},
+    ),
+    "regency_t2_fabricator": (
+        lore: "A bigger vessel held under more field plates, drinking the output of whole generators.",
+        weapons: {},
+    ),
+    "regency_t3_fabricator": (
+        lore: "The largest condenser, its vessel braced under a cage of plate; what forms in it is worth the grid it starves.",
+        weapons: {},
+    ),
     "regency_storage": (
         lore: "An armoured mass vault between two long energy cells: one building holds both.",
         weapons: {},

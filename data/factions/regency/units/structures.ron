@@ -300,6 +300,61 @@
         mesh: "regency_heart_3", icon: Power,
         sounds: (death: "regency_supernova"),
     ),
+    // Condensers: the Regency's material fabricators, at the same price and the same trade
+    // as ARC's (see the Material Fabricator): a lot of energy squeezed into a little
+    // material, about ten times a mine's payback with the power it needs counted in. A
+    // breached one does not burn out as light like a Power Generator: the matter half
+    // formed in it goes up like a reactor.
+    (
+        key: "regency_t1_fabricator",
+        name: "Condenser",
+        role: "Material Fabricator", title: "Fabricator",
+        tech: 1,
+        categories: ["Land", "Economy"],
+        health: 700,
+        cost: (mass: 75, energy: 450, time: 120),
+        radius: 23, height: 14, footprint: (4, 4),
+        vision: 120,
+        economy: (energy_upkeep: 30),
+        fabricator: (mass: 0.5),
+        death_blast: (radius: 60, damage: 3000),
+        upgrades_to: "regency_t2_fabricator",
+        mesh: "regency_fabricator", icon: Extractor,
+        sounds: (death: "reactor_blast"),
+    ),
+    (
+        key: "regency_t2_fabricator",
+        name: "Condenser II",
+        role: "Material Fabricator", title: "Fabricator",
+        tech: 2,
+        categories: ["Land", "Economy"],
+        health: 2400,
+        cost: (mass: 1200, energy: 7200, time: 1900),
+        radius: 23, height: 22, footprint: (4, 4),
+        vision: 140,
+        economy: (energy_upkeep: 1200),
+        fabricator: (mass: 2),
+        death_blast: (radius: 110, damage: 9000),
+        upgrades_to: "regency_t3_fabricator",
+        mesh: "regency_fabricator", icon: Extractor,
+        sounds: (death: "reactor_blast"),
+    ),
+    (
+        key: "regency_t3_fabricator",
+        name: "Condenser III",
+        role: "Material Fabricator", title: "Fabricator",
+        tech: 3,
+        categories: ["Land", "Economy"],
+        health: 9000,
+        cost: (mass: 5000, energy: 30000, time: 8000),
+        radius: 23, height: 30, footprint: (4, 4),
+        vision: 160,
+        economy: (energy_upkeep: 13500),
+        fabricator: (mass: 5),
+        death_blast: (radius: 180, damage: 20000),
+        mesh: "regency_fabricator", icon: Extractor,
+        sounds: (death: "reactor_blast"),
+    ),
     // A mass vault between two energy cells: less mass than a Vault, less energy than a
     // Capacitor Bank, in one lot and one build. It upgrades in place, each tier holding four
     // times the one below as ARC's stores do, for about two thirds of the mass and half the
