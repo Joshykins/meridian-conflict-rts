@@ -14,10 +14,6 @@
 //! section, so all that is seen is pipe going on down into the hole. The shader
 //! draws what is down the pit over the terrain (`Model::pit`).
 //!
-//! On open water the same mine is an offshore rig: raised onto stilts
-//! (`part::AFLOAT`), the pit and the broken ground left out (`part::ASHORE`), and
-//! the pipe going down through a moon pool into the sea.
-//!
 //! Every piece does a job that can be read off it: nothing is there for menace.
 //! The tiers start plain and grow into better machinery, each adding to the last:
 //! - Tech 1, the pile rig (40 m): an open four-legged headframe with the winch in
@@ -48,8 +44,7 @@ const SLAB: f32 = 41.0;
 const DECK: f32 = 2.4;
 /// Radius of the pit where it breaks through the slab.
 const MOUTH: f32 = 17.0;
-/// Outer edge of the spoil lip thrown up round the mouth, and its crest. On
-/// water, the edge of the moon pool.
+/// Outer edge of the spoil lip thrown up round the mouth, and its crest.
 const LIP: f32 = 22.0;
 const LIP_CREST: f32 = 3.3;
 /// The bottom of the bore, far below anything the eye can make out down it.
@@ -84,8 +79,6 @@ const COIL_OUT: f32 = 5.9;
 const COILS_LOW: f32 = 14.5;
 /// The struts that brace the coils to the headframe's legs.
 const STRUT_Z: f32 = 20.0;
-/// How high the rig stands on its stilts over the water.
-const LIFT: f32 = 9.0;
 
 pub(super) fn core_mine(b: &mut MeshBuilder, tech: u8) {
     let tech = tech.min(4);
@@ -96,7 +89,6 @@ pub(super) fn core_mine(b: &mut MeshBuilder, tech: u8) {
         stroke: SECTION + if tech >= 4 { 3.0 } else { 1.5 },
         section: SECTION,
         rack: rack().to_array(),
-        afloat_lift: LIFT,
     });
 
     if b.coarse() {
@@ -105,7 +97,6 @@ pub(super) fn core_mine(b: &mut MeshBuilder, tech: u8) {
     }
 
     foundation(b, tech);
-    stilts(b);
     derrick(b);
     pipe(b, tech);
     ore_line(b);
@@ -170,25 +161,12 @@ fn pit_profile(tech: u8) -> Vec<(f32, f32)> {
     turns
 }
 
-/// A block per tier: slab, headframe and tower stage, the pit's glow on land,
-/// the stilts' bulk on water.
+/// A block per tier: slab, headframe and tower stage, and the pit's glow.
 fn coarse(b: &mut MeshBuilder, tech: u8) {
     b.paint(PLATING);
     b.cuboid_open(v3(0.0, 0.0, DECK * 0.5), v3(80.0, 80.0, DECK));
-    b.with_part(part::ASHORE, |b| {
-        b.paint(ROCK);
-        b.decal(v3(0.0, 0.0, DECK + 0.05), v2(36.0, 36.0));
-    });
-    b.with_part(part::AFLOAT, |b| {
-        b.paint(PLATING_DARK).pattern(pattern::PILE);
-        b.frustum_open(
-            v3(0.0, 0.0, -8.0),
-            v2(70.0, 70.0),
-            v2(62.0, 62.0),
-            LIFT + 8.0,
-            Vec2::ZERO,
-        );
-    });
+    b.paint(ROCK);
+    b.decal(v3(0.0, 0.0, DECK + 0.05), v2(36.0, 36.0));
     team_panel(b, v3(36.0, 0.0, DECK), v2(5.0, 24.0));
     b.paint(PLATING_DARK);
     b.frustum_open(
@@ -227,8 +205,7 @@ struct Turn {
 /// The ground from the slab's edge in to the bottom of the bore, one surface:
 /// the slab's bevelled sides and deck, the spoil lip round the mouth, the pit's
 /// faces and benches with ore seams in the faces and rubble on the benches, the
-/// floor, and the bore down from it. Everything past the deck is `part::ASHORE`;
-/// on water the deck rings a moon pool instead.
+/// floor, and the bore down from it.
 fn foundation(b: &mut MeshBuilder, tech: u8) {
     let slab = |z: f32| Turn {
         z,
@@ -310,129 +287,27 @@ fn foundation(b: &mut MeshBuilder, tech: u8) {
         b.paint(turns[k].material);
         band(b, &rings[k - 1], &rings[k]);
     }
-    b.with_part(part::ASHORE, |b| {
-        for k in deck + 1..rings.len() {
-            b.paint(turns[k].material);
-            band(b, &rings[k - 1], &rings[k]);
-        }
-        if b.fine() {
-            // Seams in the faces and rubble on the benches, the pit's own turns only.
-            for k in deck + 3..rings.len() - 3 {
-                let (upper, lower) = (&rings[k - 1], &rings[k]);
-                if upper[0].z > lower[0].z + 1.0 {
-                    seams(b, upper, lower, k as u32);
-                } else {
-                    rubble(b, upper, lower, k as u32);
-                }
+    for k in deck + 1..rings.len() {
+        b.paint(turns[k].material);
+        band(b, &rings[k - 1], &rings[k]);
+    }
+    if b.fine() {
+        // Seams in the faces and rubble on the benches, the pit's own turns only.
+        for k in deck + 3..rings.len() - 3 {
+            let (upper, lower) = (&rings[k - 1], &rings[k]);
+            if upper[0].z > lower[0].z + 1.0 {
+                seams(b, upper, lower, k as u32);
+            } else {
+                rubble(b, upper, lower, k as u32);
             }
         }
-        // The bottom, where the last of the light gives out.
-        let bottom = rings.last().expect("the bore has a bottom");
-        b.paint(GLOW_RED).pattern(pattern::NONE);
-        b.face(bottom);
-    });
-
-    // On water: the moon pool's coaming, and the deck's underside.
-    b.with_part(part::AFLOAT, |b| {
-        let lifted = |ring: &Vec<Vec3>, dz: f32| -> Vec<Vec3> {
-            ring.iter().map(|p| *p + Vec3::Z * dz).collect()
-        };
-        let pool_top = lifted(&rings[deck], LIFT);
-        let pool_foot = lifted(&rings[deck], LIFT - DECK - 1.2);
-        b.paint(PLATING_DARK);
-        band(b, &pool_top, &pool_foot);
-        let under_edge = lifted(&rings[0], LIFT);
-        let under_pool = lifted(&rings[deck], LIFT - DECK);
-        b.paint(PLATING_DARK).pattern(pattern::PILE);
-        band(b, &under_pool, &under_edge);
-        if b.fine() {
-            b.paint(PLATING).pattern(pattern::HAZARD);
-            let rim_in = lifted(&rings[deck], LIFT + 0.05);
-            let rim_out: Vec<Vec3> = rim_in
-                .iter()
-                .map(|p| (p.truncate() * 1.08).extend(p.z))
-                .collect();
-            band(b, &rim_out, &rim_in);
-        }
-    });
+    }
+    // The bottom, where the last of the light gives out.
+    let bottom = rings.last().expect("the bore has a bottom");
+    b.paint(GLOW_RED).pattern(pattern::NONE);
+    b.face(bottom);
 
     b.radial(4, |b| team_panel(b, v3(38.0, 0.0, DECK), v2(1.8, 12.0)));
-}
-
-/// The offshore rig's legs: eight stilts from the seabed up under the deck
-/// (`part::PILE`, authored from the waterline), bracing between them just over the
-/// water, and caps under the deck (`part::AFLOAT`). Authored as they stand, raised
-/// (`LIFT`).
-fn stilts(b: &mut MeshBuilder) {
-    b.with_part(part::PILE, |b| {
-        for at in stilt_feet() {
-            let r = stilt_radius(at);
-            b.paint(PLATING_DARK).pattern(pattern::PILE);
-            b.cylinder_between(at.extend(0.0), at.extend(LIFT), r, r, b.sides(10));
-        }
-    });
-    b.with_part(part::AFLOAT, stilt_bracing);
-}
-
-/// Where the eight stilts stand: the corners further out than the sides.
-fn stilt_feet() -> Vec<Vec2> {
-    (0..8)
-        .map(|i| {
-            let angle = i as f32 * TAU / 8.0;
-            Vec2::from_angle(angle) * if i % 2 == 0 { 34.0 } else { 46.0 }
-        })
-        .collect()
-}
-
-/// A corner stilt is the thicker.
-fn stilt_radius(at: Vec2) -> f32 {
-    if at.length() > 40.0 {
-        3.0
-    } else {
-        2.2
-    }
-}
-
-/// The stilts' caps under the deck, the bracing between them, and the magazine down to
-/// the water.
-fn stilt_bracing(b: &mut MeshBuilder) {
-    let feet = stilt_feet();
-    for (i, &at) in feet.iter().enumerate() {
-        let r = stilt_radius(at);
-        if b.fine() {
-            b.paint(ACCENT);
-            b.prism(at.extend(LIFT - 1.4), 8, r * 1.5, r * 1.2, 1.4);
-        }
-        let next = feet[(i + 1) % feet.len()];
-        b.paint(PLATING_DARK).pattern(pattern::PILE);
-        b.beam(at.extend(1.6), next.extend(1.6), v2(1.0, 1.3), v2(1.0, 1.3));
-        if b.fine() {
-            // Cross-bracing down into the water.
-            b.paint(METAL);
-            b.beam(
-                at.extend(1.2),
-                next.extend(-9.0),
-                v2(0.6, 0.6),
-                v2(0.6, 0.6),
-            );
-            b.beam(
-                next.extend(1.2),
-                at.extend(-9.0),
-                v2(0.6, 0.6),
-                v2(0.6, 0.6),
-            );
-        }
-    }
-    // The magazine the pipe comes up through, down to the water.
-    let rack = rack();
-    b.paint(PLATING_DARK);
-    b.cylinder_between(
-        rack.extend(LIFT - SECTION - 1.5),
-        rack.extend(LIFT),
-        2.9,
-        2.9,
-        b.sides(10),
-    );
 }
 
 /// Distance from the middle to the slab's chamfered edge along `angle`.
@@ -571,14 +446,12 @@ fn ore_line(b: &mut MeshBuilder) {
                 b.sides(8),
             );
         }
-        b.with_part(part::ASHORE, |b| {
-            b.beam(
-                v3(14.4, 0.0, -5.0),
-                v3(14.4, 0.0, 1.3),
-                v2(1.2, 1.2),
-                v2(1.0, 1.0),
-            );
-        });
+        b.beam(
+            v3(14.4, 0.0, -5.0),
+            v3(14.4, 0.0, 1.3),
+            v2(1.2, 1.2),
+            v2(1.0, 1.0),
+        );
         b.beam(
             v3(23.5, 0.0, DECK),
             v3(23.5, 0.0, 9.8),
@@ -1076,7 +949,7 @@ mod tests {
     }
 
     /// Every tier has its driver, its string and the next section, a bore far down,
-    /// stilts for the sea, the pit recorded for the shader, and stays in its budget.
+    /// the pit recorded for the shader, and stays in its budget.
     #[test]
     fn every_tier_drives_pipe_down_a_deep_bore_and_keeps_its_budget() {
         for tech in 1..=4 {
@@ -1085,10 +958,7 @@ mod tests {
             let pit = model.pit.expect("the mine records its pit");
             assert!(pit.open > 0.0 && pit.radius > 15.0, "tech {tech}: {pit:?}");
             // The driver clears the next section when hauled up, so it can swing in under it.
-            assert!(
-                pit.stroke > pit.section && pit.afloat_lift > 0.0,
-                "tech {tech}: {pit:?}"
-            );
+            assert!(pit.stroke > pit.section, "tech {tech}: {pit:?}");
             assert!(
                 Vec3::new(pit.rack[0], pit.rack[1], 0.0).length() > pit.radius,
                 "tech {tech}: rack in the pit"
@@ -1097,14 +967,13 @@ mod tests {
             let deepest = full
                 .vertices
                 .iter()
-                .filter(|v| v.part == part::ASHORE)
                 .map(|v| v.pos[2])
                 .fold(f32::MAX, f32::min);
             assert!(deepest < -140.0, "tech {tech}: bore only down to {deepest}");
-            // Underground, only the pit's own pieces (pulled up by the shader) and the stilts.
+            // Underground, only the pit's own pieces (pulled up by the shader).
             for v in &full.vertices {
                 let p = Vec3::from(v.pos);
-                if p.z < -0.01 && !part::afloat_only(v.part) {
+                if p.z < -0.01 {
                     assert!(
                         p.truncate().length() < pit.radius,
                         "tech {tech}: {p} underground outside the pit"
@@ -1112,14 +981,7 @@ mod tests {
                 }
             }
             for lod in 0..2 {
-                for kind in [
-                    part::RAM,
-                    part::STRING,
-                    part::FEED,
-                    part::AFLOAT,
-                    part::PILE,
-                    part::ASHORE,
-                ] {
+                for kind in [part::RAM, part::STRING, part::FEED] {
                     assert!(
                         model.lods[lod].vertices.iter().any(|v| v.part == kind),
                         "tech {tech} lod {lod}: no part {kind}"
@@ -1127,16 +989,7 @@ mod tests {
                 }
             }
             let counts: Vec<usize> = (0..LOD_COUNT).map(|lod| triangles(&model, lod)).collect();
-            // A mine draws either its stilts or its pit, never both: the budget is for the
-            // bigger of the two.
-            let of = |kind| {
-                full.indices
-                    .chunks(3)
-                    .filter(|t| full.vertices[t[0] as usize].part == kind)
-                    .count()
-            };
-            let drawn = counts[0] - (of(part::AFLOAT) + of(part::PILE)).min(of(part::ASHORE));
-            assert!(drawn <= 9000, "tech {tech}: {drawn} drawn of {counts:?}");
+            assert!(counts[0] <= 9000, "tech {tech}: {counts:?}");
             assert!(
                 counts[1] as f32 <= counts[0] as f32 * 0.45 + 20.0,
                 "tech {tech}: {counts:?}"

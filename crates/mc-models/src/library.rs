@@ -344,21 +344,13 @@ fn bounds_radius(
         .iter()
         .map(|v| {
             let mut p = Vec3::from(v.pos);
-            // What is down a pit is only ever seen through its opening, which the rest holds.
             if let Some(pit) = pit {
-                // Raised onto its stilts on water, the driver hauled up, the next section
-                // waiting raised at the rack.
-                if !part::afloat_only(v.part) {
-                    p.z += pit.afloat_lift;
-                }
+                // The driver hauled up.
                 if v.part == part::RAM {
                     p.z += pit.stroke;
                 }
-                // Down the bore is seen only through the opening, which the rest holds;
-                // a stilt under the sea is hidden by it.
-                if p.truncate().length() <= pit.radius && p.z < pit.open
-                    || part::afloat_only(v.part)
-                {
+                // Down the bore is seen only through the opening, which the rest holds.
+                if p.truncate().length() <= pit.radius && p.z < pit.open {
                     p.z = p.z.max(pit.open);
                 }
             }

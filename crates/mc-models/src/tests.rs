@@ -934,22 +934,9 @@ fn lods_reduce_and_respect_budgets() {
         } else {
             2600
         };
-        // A core mine draws either its stilts or its pit, never both.
-        let drawn = if model.key == "core_mine" {
-            let of = |kind| {
-                let mesh = &model.lods[0];
-                mesh.indices
-                    .chunks(3)
-                    .filter(|t| mesh.vertices[t[0] as usize].part == kind)
-                    .count()
-            };
-            full - (of(part::AFLOAT) + of(part::PILE)).min(of(part::ASHORE))
-        } else {
-            full
-        };
         assert!(
-            drawn <= budget,
-            "{}: full LOD draws {drawn} triangles",
+            full <= budget,
+            "{}: full LOD draws {full} triangles",
             model.key
         );
         let share = over
@@ -980,12 +967,10 @@ fn bounds_hold_every_lod() {
             "{}",
             model.key
         );
-        // Down a pit, and under the sea on stilts, is only ever seen through what the bounds hold.
+        // Down a pit is only ever seen through what the bounds hold.
         let hidden_below = |v: &super::MeshVertex| {
             model.pit.is_some_and(|pit| {
-                v.pos[2] < pit.open
-                    && (part::afloat_only(v.part)
-                        || Vec3::from(v.pos).truncate().length() <= pit.radius)
+                v.pos[2] < pit.open && Vec3::from(v.pos).truncate().length() <= pit.radius
             })
         };
         for mesh in &model.lods {

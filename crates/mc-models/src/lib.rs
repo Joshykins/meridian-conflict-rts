@@ -201,11 +201,9 @@ pub mod part {
     /// A core mine's next pipe section: authored waiting at `Pit::rack`, it rises out of
     /// the magazine there, swings over the bore onto the string, and is driven down with it.
     pub const FEED: u32 = 11;
-    /// Drawn only where the structure stands in water: an emplacement's floats, an
-    /// offshore rig's bracing. Not raised with the rest (`Pit::afloat_lift`).
+    /// Drawn only where the structure stands in water: an emplacement's floats.
     pub const AFLOAT: u32 = 12;
-    /// Drawn only where the structure stands on land: the pit and the ground it breaks.
-    pub const ASHORE: u32 = 13;
+    // retired: 13 (a core mine's pit, drawn only on land)
     // retired: 14 (a reactor's pump, riding up and down)
     /// An airbase's hatch leaves (the parked Roost model): slid apart along y, each away from the middle, by the
     /// pit's radius times how far the hatch is open (`UnitInstance::deploy`).
@@ -805,8 +803,7 @@ impl CellBlock {
 
 /// A hole a model digs into the ground (a core mine's). The vertex shader pulls what is
 /// inside and below the opening up in depth so the terrain does not hide it, drives the
-/// `part::RAM`, `STRING` and `FEED` pieces on the mine's beat, and on water raises the rig
-/// onto its `part::PILE` stilts and leaves the `part::ASHORE` ground out.
+/// `part::RAM`, `STRING` and `FEED` pieces on the mine's beat.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Pit {
     /// Height of the opening, and its radius there.
@@ -818,9 +815,6 @@ pub struct Pit {
     pub section: f32,
     /// Where the next section waits, raised, before it swings over the bore.
     pub rack: [f32; 2],
-    /// How far everything but the stilts and the bracing (`part::afloat_only`) rises when
-    /// the structure stands in water.
-    pub afloat_lift: f32,
 }
 
 mod aster;

@@ -12,7 +12,6 @@
 //! - **The deep core's surge**: every few seconds the beam flares wide, a flash goes down
 //!   the shaft and a gout of ore and spatter comes up it. Nothing runs out over the
 //!   ground: no shockwave (user call, 2026-09-30).
-//! - Offshore the beam goes into the sea through the coaming, and steam comes off it.
 //!
 //! Presentation only; the renderer's own clock. A mine under construction, a wreck, a
 //! ghost or a radar blip does nothing.
@@ -22,7 +21,6 @@ use mc_sim::mirror::{ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, S
 
 use super::clearing::PUFF_RECLAIM;
 use super::plasma_fx::{held_instance, HELD_BEAM};
-use super::water_fx::PUFF_STEAM;
 use super::{Renderer, PUFF_SPARK};
 use crate::camera::Camera;
 use crate::models::{Excavation, Pit};
@@ -52,7 +50,6 @@ struct Dig {
     width: f32,
     radius: f32,
     tech: u8,
-    afloat: bool,
     surge: f32,
     seed: f32,
 }
@@ -71,7 +68,6 @@ impl Renderer {
         let reach = camera.distance * 2.5 + 400.0;
         let focus = camera.focus.truncate();
         let close = camera.distance < 1400.0;
-        let water = self.map_info.water_level.to_f32();
         let mut digs = Vec::new();
         for u in units {
             if u.owner_flags & hidden != 0 {
@@ -85,18 +81,12 @@ impl Renderer {
             if at.truncate().distance(focus) > reach {
                 continue;
             }
-            let afloat = self.ground_height(at.truncate()) < water - 0.5;
-            let lift = if afloat { pit.afloat_lift } else { 0.0 };
             let (s, c) = u.heading.sin_cos();
             let world =
-                |p: [f32; 3]| at + Vec3::new(p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2] + lift);
-            let mouth = if afloat {
-                Vec3::new(at.x, at.y, water)
-            } else {
-                // Just under the opening, still over the ground drawn across the hole: the
-                // model's core carries it on down the shaft.
-                at + Vec3::Z * (pit.open - 0.2)
-            };
+                |p: [f32; 3]| at + Vec3::new(p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]);
+            // Just under the opening, still over the ground drawn across the hole: the
+            // model's core carries it on down the shaft.
+            let mouth = at + Vec3::Z * (pit.open - 0.2);
             let bp = self
                 .blueprints
                 .unit(mc_data::BlueprintId(u.blueprint as u16));
@@ -107,7 +97,6 @@ impl Renderer {
                 width: beam.width,
                 radius: pit.radius,
                 tech: bp.tech,
-                afloat,
                 surge: beam.surge,
                 seed: (u.unit_id % 97) as f32 * 0.613,
             });
@@ -146,18 +135,6 @@ impl Renderer {
             for _ in 0..1 + d.tech / 2 {
                 self.spatter(d, time, 1.0);
             }
-        }
-        if d.afloat {
-            let out_dir = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.0);
-            let steam = 2.0 + self.scatter.unit();
-            self.push_puff(
-                PUFF_STEAM,
-                d.mouth + out_dir * d.radius + Vec3::Z * 0.5,
-                Vec3::Z * 2.5,
-                time,
-                steam,
-                (1.5, 5.0 + d.tech as f32),
-            );
         }
         if d.surge > 0.0 {
             // The deep core surges on its own beat: the beam flares wide, a flash goes down

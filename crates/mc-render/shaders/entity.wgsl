@@ -71,9 +71,8 @@ const PART_LOCOMOTION: u32 = 3u;
 const PART_RAM: u32 = 9u;
 const PART_STRING: u32 = 10u;
 const PART_FEED: u32 = 11u;
-// Pieces drawn only in water (an offshore rig's stilts) or only on land (the pit).
+// Pieces drawn only in water (an emplacement's floats).
 const PART_AFLOAT: u32 = 12u;
-const PART_ASHORE: u32 = 13u;
 const PART_HATCH: u32 = 15u;
 // A strategic launcher's blast doors and the rounds it holds (models::part, nuke_fx).
 const PART_SILO_DOOR: u32 = 24u;
@@ -1320,12 +1319,10 @@ fn vs_main(in: VsIn) -> VsOut {
         n.y = -n.y;
     }
     let unwarped = p;
-    // A structure in the sea shows its floats and legs (`part::AFLOAT`, `PILE_PART`); a core
-    // mine there is raised clear of the water on its stilts, with no pit; on land it has
-    // its pit and no stilts (`models::Pit`).
-    let rig_afloat = terrain_height(e.pos.xy) < globals.map.z - 0.5;
+    // A structure in the sea shows its floats and legs (`part::AFLOAT`, `PILE_PART`); on
+    // land they are left out.
     let afloat_only = in.part == PART_AFLOAT || in.part == PILE_PART;
-    if (afloat_only && !rig_afloat) || (in.part == PART_ASHORE && rig_afloat) {
+    if afloat_only && terrain_height(e.pos.xy) >= globals.map.z - 0.5 {
         var hidden: VsOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
@@ -1335,9 +1332,6 @@ fn vs_main(in: VsIn) -> VsOut {
         var hidden: VsOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
-    }
-    if rig_afloat && !afloat_only {
-        p.z += model.pit_feed.w;
     }
     // A hull field poses the shared shell direction instead, so a corner's faces stay joined.
     var shell_stretch = 1.0;
@@ -2237,7 +2231,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // depth and the terrain hides it. The change-over lies under the lip and the slab, which
     // stand over the opening's plane and hide either depth, and the pit's pieces are short
     // enough that no triangle spans much of it.
-    if (push.pass_kind & PASS_KIND_MASK) == PASS_MAIN && model.pit.y > 0.0 && !rig_afloat && p.z < model.pit.x && dot(p.xy, p.xy) < model.pit.y * model.pit.y {
+    if (push.pass_kind & PASS_KIND_MASK) == PASS_MAIN && model.pit.y > 0.0 && p.z < model.pit.x && dot(p.xy, p.xy) < model.pit.y * model.pit.y {
         let eye = globals.camera.xyz;
         let open = origin.z + model.pit.x * scale;
         let k = (open - eye.z) / (world.z - eye.z);

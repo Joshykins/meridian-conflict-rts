@@ -62,7 +62,6 @@ pub(super) fn airbase(b: &mut MeshBuilder, tech: u8) {
         stroke: 0.0,
         section: 0.0,
         rack: [0.0, 0.0],
-        afloat_lift: 0.0,
     });
     b.set_spinner_pivot(v3(29.0, 0.0, DECK + 6.2));
     // Tier 1 has the north-east and south-west tunnels; tier 2 the other two.

@@ -15,8 +15,7 @@
 //!   The funnel is wide and the collar low so the eye sees down into it.
 //! - Four outrigger legs on the diagonals brace the rig against the ore field: bronze
 //!   struts under plates lapped down and out into spikes, a foot block, a clawed pad
-//!   gripping the ground (`part::ASHORE`). They
-//!   carry a plated yoke over the mouth, and the emitter head hangs in it: a plated body,
+//!   gripping the ground. They carry a plated yoke over the mouth, and the emitter head hangs in it: a plated body,
 //!   the owner's colour on its cap, a bronze lens barrel aimed down, its tip lit red.
 //! - A collector ring floats round the beam over the mouth, turning (`part::SPINNER`),
 //!   where the ore comes up.
@@ -25,9 +24,6 @@
 //!   Tech 3: four emitter posts on the lot's axes, a third ring, an armoured stage on the
 //!   hub. Tech 4 (the deep core): plates lapped down over the crown, capacitor drums at
 //!   every foot, a wider lens; its bore goes deepest and the beam surges.
-//! - On open water the whole rig rides `LIFT` higher on four piles down to the seabed
-//!   (`part::PILE`), a coaming round the beam down into the water (`part::AFLOAT`), no
-//!   bore.
 
 use glam::{Vec2, Vec3};
 
@@ -39,8 +35,6 @@ use super::kit::{dark_plate, metal, seam, v3};
 use super::machine::tier;
 use super::machine::*;
 
-/// How much higher the rig stands on open water, on its piles.
-const LIFT: f32 = 3.5;
 /// The legs' bearings, and how far out their feet stand.
 const LEGS: [f32; 4] = [45.0, 135.0, 225.0, 315.0];
 const REACH: f32 = 12.8;
@@ -86,7 +80,6 @@ pub(super) fn taproot(b: &mut MeshBuilder, tech: u8) {
         stroke: 0.0,
         section: 0.0,
         rack: [0.0, 0.0],
-        afloat_lift: LIFT,
     });
     b.set_excavation(Excavation {
         emitter: [0.0, 0.0, EMIT],
@@ -99,7 +92,7 @@ pub(super) fn taproot(b: &mut MeshBuilder, tech: u8) {
         coarse(b, tech);
         return;
     }
-    b.with_part(part::ASHORE, |b| bore(b, tech));
+    bore(b, tech);
     collar_ring(b, tech);
     for deg in LEGS {
         b.yawed(Vec3::ZERO, deg.to_radians(), leg);
@@ -129,12 +122,6 @@ pub(super) fn taproot(b: &mut MeshBuilder, tech: u8) {
         }
         shroud(b);
         lens_ring(b);
-    });
-    b.with_part(part::AFLOAT, |b| {
-        // The coaming round the beam, down into the water.
-        dark_plate(b);
-        let sides = b.sides(12);
-        hoop(b, Vec3::Z * (LIFT * 0.5), MOUTH[t] + 0.9, 1.2, LIFT, sides);
     });
 }
 
@@ -184,10 +171,8 @@ fn post_tip() -> Vec3 {
 /// owner's colour on top.
 fn coarse(b: &mut MeshBuilder, tech: u8) {
     let mouth = MOUTH[tech as usize - 1];
-    b.with_part(part::ASHORE, |b| {
-        b.paint(GLOW_LASER).pattern(pattern::NONE);
-        b.face(&ring(6, mouth, COLLAR_TOP + 0.02));
-    });
+    b.paint(GLOW_LASER).pattern(pattern::NONE);
+    b.face(&ring(6, mouth, COLLAR_TOP + 0.02));
     dark_plate(b);
     b.prism(Vec3::Z * BODY, 4, 1.9, 1.3, CAP_TOP - BODY);
     for deg in LEGS {
@@ -210,16 +195,6 @@ fn coarse(b: &mut MeshBuilder, tech: u8) {
     }
     b.paint(TEAM);
     b.prism(Vec3::Z * top, 3, 1.2, 0.9, 0.3);
-    b.with_part(part::AFLOAT, |b| {
-        dark_plate(b);
-        b.frustum_open(
-            Vec3::ZERO,
-            Vec2::splat(mouth * 2.0 + 3.0),
-            Vec2::splat(mouth * 2.0 + 2.0),
-            LIFT + 0.8,
-            Vec2::ZERO,
-        );
-    });
 }
 
 /// `n` points round a level circle of radius `r` at height `z`, anticlockwise from above.
@@ -328,7 +303,7 @@ fn collar_ring(b: &mut MeshBuilder, tech: u8) {
 
 /// One outrigger leg, standing out along +x (turned into place by the caller): a bronze
 /// strut from the yoke down to its foot, plates lapped down it into spikes, a foot
-/// block and a clawed pad on the ground (a pile down into the water afloat).
+/// block and a clawed pad on the ground.
 fn leg(b: &mut MeshBuilder) {
     let (root, foot) = leg_line();
     shaft(b, root, foot, 0.55);
@@ -351,34 +326,20 @@ fn leg(b: &mut MeshBuilder) {
     dark_plate(b);
     b.block(v3(REACH - 3.0, -1.3, 1.2), v3(REACH, 1.3, 4.4));
     red_slot(b, v3(REACH + 0.02, 0.0, 3.2), Vec3::X, Vec3::Y, 1.6, 0.2);
-    b.with_part(part::ASHORE, |b| {
-        // The pad, its claws bitten into the ore.
-        seam(b);
-        b.block(v3(REACH - 3.4, -1.8, 0.0), v3(REACH + 0.4, 1.8, 1.2));
-        if b.fine() {
-            metal(b);
-            for y in [-1.4f32, 0.0, 1.4] {
-                b.beam(
-                    v3(REACH + 0.2, y, 0.9),
-                    v3(REACH + 1.3, y * 1.2, 0.12),
-                    Vec2::new(0.45, 0.35),
-                    Vec2::new(0.15, 0.15),
-                );
-            }
-        }
-    });
-    b.with_part(part::PILE, |b| {
-        // A pile down from the foot block to the seabed.
+    // The pad, its claws bitten into the ore.
+    seam(b);
+    b.block(v3(REACH - 3.4, -1.8, 0.0), v3(REACH + 0.4, 1.8, 1.2));
+    if b.fine() {
         metal(b);
-        let sides = b.sides(8);
-        b.cylinder_between(
-            v3(REACH - 1.5, 0.0, 0.0),
-            v3(REACH - 1.5, 0.0, LIFT + 1.4),
-            0.8,
-            0.8,
-            sides,
-        );
-    });
+        for y in [-1.4f32, 0.0, 1.4] {
+            b.beam(
+                v3(REACH + 0.2, y, 0.9),
+                v3(REACH + 1.3, y * 1.2, 0.12),
+                Vec2::new(0.45, 0.35),
+                Vec2::new(0.15, 0.15),
+            );
+        }
+    }
 }
 
 /// The yoke over the mouth and the emitter head hung in it: a plated body on four bronze
@@ -728,26 +689,7 @@ mod tests {
         for tech in 1..=4u8 {
             let h = HEIGHTS[tech as usize - 1];
             super::super::check_at("regency_taproot", tech, 12.8, h, Some(3), &[]);
-            // Built on water it stands on piles, its grip on the ground and its bore left
-            // out.
             let model = built(tech);
-            assert!(
-                model.pit.is_some_and(|p| p.afloat_lift > 0.0),
-                "no afloat lift"
-            );
-            for lod in 0..2 {
-                let kinds: &[u32] = if lod == 0 {
-                    &[part::AFLOAT, part::PILE, part::ASHORE]
-                } else {
-                    &[part::AFLOAT, part::ASHORE]
-                };
-                for &kind in kinds {
-                    assert!(
-                        model.lods[lod].vertices.iter().any(|v| v.part == kind),
-                        "tech {tech} lod {lod}: no part {kind}"
-                    );
-                }
-            }
             assert!(
                 model.lods[0]
                     .vertices

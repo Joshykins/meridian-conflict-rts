@@ -382,8 +382,8 @@ pub(crate) struct ModelInfo {
     pub(crate) spin: [f32; 4],
     /// Wrist of the head on the folding gear and its stowed angle; zero if there is none.
     pub(crate) fold_wrist: [f32; 4],
-    /// A pit's pipe feed (`models::Pit`): where the next section waits (xy), the section's
-    /// length, and how far the rig rises onto stilts in water. Zero for none.
+    /// A pit's pipe feed (`models::Pit`): where the next section waits (xy) and the
+    /// section's length; w is unused. Zero for none.
     pub(crate) pit_feed: [f32; 4],
     /// How the surface shader sizes the model (`Model::surface_reach`), the height
     /// its field dust reaches (`Model::dust_line`), how far a walker's hips sink in
@@ -1384,9 +1384,9 @@ impl Renderer {
                 plan_half,
                 modules: look,
                 pit: model.pit.map_or([0.0; 2], |p| [p.open, p.radius]),
-                pit_feed: model.pit.map_or([0.0; 4], |p| {
-                    [p.rack[0], p.rack[1], p.section, p.afloat_lift]
-                }),
+                pit_feed: model
+                    .pit
+                    .map_or([0.0; 4], |p| [p.rack[0], p.rack[1], p.section, 0.0]),
                 shield_emitter: model
                     .shield_emitter
                     .map_or([0.0; 4], |e| [e[0], e[1], e[2], 1.0]),

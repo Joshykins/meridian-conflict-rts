@@ -53,7 +53,6 @@ pub(in crate::regency) fn silo_vault(b: &mut MeshBuilder, _tech: u8) {
         stroke: 0.0,
         section: 0.0,
         rack: [0.0, 0.0],
-        afloat_lift: 0.0,
     });
     platform(b);
     bunker(b);

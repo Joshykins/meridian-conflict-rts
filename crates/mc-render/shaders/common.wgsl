@@ -212,8 +212,8 @@ struct ModelInfo {
     // Wrist (xyz) of the head on the folding gear (`rig::FOLD_HEAD`) and how far it folds
     // back stowed (w, radians). Zero if none.
     fold_wrist: vec4<f32>,
-    // A pit's pipe feed (`models::Pit`): where the next section waits (xy), the section's
-    // length (z), and how far the rig rises onto its stilts in water (w).
+    // A pit's pipe feed (`models::Pit`): where the next section waits (xy) and the section's
+    // length (z); w is unused (0).
     pit_feed: vec4<f32>,
     // x: the model's size for its surface, guns and arms at rest (`Model::surface_reach`);
     // y: the height its running gear's dust reaches (`Model::dust_line`);

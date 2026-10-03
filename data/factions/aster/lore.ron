@@ -409,7 +409,7 @@
         },
     ),
     "aster_t2_submarine": (
-        lore: "An angular hunter-killer with six tubes and ears that reach further than the Barracuda's. Surfaced, its deck gun raids buoys, offshore mines and shorelines; dived, only sonar finds it.",
+        lore: "An angular hunter-killer with six tubes and ears that reach further than the Barracuda's. Surfaced, its deck gun raids buoys, wharfs and shorelines; dived, only sonar finds it.",
         weapons: {
             "Torpedo Tubes": "Six bow tubes in two banks, fired three at a time.",
             "Deck Gun": "A gun forward of the sail that only works with the boat on the surface.",

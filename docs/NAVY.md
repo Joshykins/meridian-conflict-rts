@@ -15,7 +15,7 @@ What ships pay for it is that they cannot hide, cannot leave the water, and shor
 ## Every unit hurts something other than ships
 
 Torpedoes hit anything with a hull in the water: ships, dived hulls, and every structure
-built on water (wharfs, buoys, offshore mines, water AA), because water-built structures
+built on water (wharfs, buoys, water AA), because water-built structures
 carry the Naval category. Cruise missiles and guns hit land and structures. A submarine
 surfaces to use its deck gun. Nothing in the roster is useless on a map with a coast.
 

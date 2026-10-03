@@ -88,7 +88,6 @@ pub(super) fn nuke_silo(b: &mut MeshBuilder, _tech: u8) {
         stroke: 0.0,
         section: 0.0,
         rack: [0.0, 0.0],
-        afloat_lift: 0.0,
     });
     slab(b, 42.0, 6.0, 0.5, S_DECK);
     bunker(b);

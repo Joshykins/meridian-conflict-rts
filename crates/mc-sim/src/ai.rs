@@ -695,7 +695,7 @@ impl World {
                     && self.bp(e.row as usize).is_mobile()
                     && !self.bp(e.row as usize).weapons.is_empty()
                     // The land army answers threats it can reach. A gunship over a
-                    // mine or a boat off an offshore one used to hold the whole army
+                    // mine or a boat off the coast used to hold the whole army
                     // at home, sending a few units at it every think, for as long
                     // as it stayed; anti-air and the navy deal with those.
                     && self.bp(e.row as usize).motion.is_some_and(|m| {

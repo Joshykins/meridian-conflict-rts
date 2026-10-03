@@ -290,7 +290,7 @@ fn vs_pad(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32) 
 
 @fragment
 fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
-    // Nothing is paved on the seabed: an offshore rig stands on its piles.
+    // Nothing is paved on the seabed: a structure in the sea stands on its piles or floats.
     let above = in.world.z - globals.map.z;
     if above < 0.0 {
         discard;

@@ -194,7 +194,7 @@ shared! {
         pub const TOP: f32 = 30.0;
     }
 
-    /// A structure's legs into the sea (models/aster/mine.rs, models/regency/taproot.rs):
+    /// A structure's legs into the sea (the Wharf's quay and piles, models/aster/factories.rs):
     /// drawn only where it stands in water, like `part::AFLOAT`, and `entity.wgsl` lets
     /// each vertex authored at or below model z = 0 down onto the seabed under it, so a
     /// leg stands on the bottom however deep the water is.

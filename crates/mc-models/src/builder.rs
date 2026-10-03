@@ -829,7 +829,6 @@ impl MeshBuilder {
             stroke: up(pit.stroke),
             section: up(pit.section),
             rack: [rack.x, rack.y],
-            afloat_lift: up(pit.afloat_lift),
         });
     }
 

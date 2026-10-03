@@ -88,11 +88,9 @@ publishes blows struck in `UnitInstance::gait` (`mines::hammer_gait`, from the m
 blow every `hammer_ticks(tech)`), and `pipe_offset` in entity.wgsl poses the driver
 (`part::RAM`), the pipe string (`part::STRING`, driven down one `Pit::section` a blow; it
 repeats every section, so the loop is seamless) and the next section (`part::FEED`, rising out
-of the magazine at `Pit::rack` and swinging in). `renderer/mine_fx.rs` puts dust, sparks, spray
+of the magazine at `Pit::rack` and swinging in). `renderer/mine_fx.rs` puts dust, sparks
 and the tech 4 shockwave on the same beat, and the game plays the unit's `step` sound on it the
-way it does footfalls. Standing in water (the terrain under it below the sea), the shader
-raises the rig by `Pit::afloat_lift`, shows `part::AFLOAT` (bracing, moon pool) and
-`part::PILE` (the stilts) and hides `part::ASHORE` (the pit, the broken ground).
+way it does footfalls. Mines are built on land only.
 
 Any structure standing in water shows its `part::AFLOAT` pieces (an anti-air
 emplacement's floats) and its `part::PILE` legs, and hides them on land. A pile is

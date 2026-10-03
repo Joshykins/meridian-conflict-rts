@@ -607,7 +607,7 @@ over about a minute. Both are drawn only near the camera.
   outlines a single lot; the only per-lot marks are a worn team L in each
   corner and a contact shadow where the building meets the slab.
 - **Never under water.** The pad stops at the waterline, a little wet near it;
-  an offshore rig stands on its piles.
+  a structure in the sea stands on its piles or floats.
 
 ## Ore fields and materials
 
@@ -644,9 +644,7 @@ over about a minute. Both are drawn only near the camera.
   in plate and glowing induction coils round the rails, fed by capacitor
   banks; tier 4 (the deep core) a heavier driver on a longer stroke, fatter
   pipe, twice the coils and capacitors, and a small shockwave with each blow. Every tier strikes with the
-  same sound (`mine_blow`). Built out at sea it is the same unit as an
-  offshore rig: raised on stilts, no pit, the pipe going down through a moon
-  pool into the water.
+  same sound (`mine_blow`). Mines are built on land only.
 ## Light
 
 Bloom is a soft halo around things that emit light (emitters, flashes, hot
