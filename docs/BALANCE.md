@@ -149,11 +149,16 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   All pay back slower than the mine upgrades, so they come after the mines; they need no
   ground, so a side whose mines are done grows on them. They share the Mines priority
   switch. The Regency Condensers are the same.
-- **Adjacency** (`adjacency: (energy | mass)`, mc-sim `adjacency.rs`): a provider saves each
+- **Adjacency** (`adjacency: Energy | Mass`, mc-sim `adjacency.rs`): a provider saves each
   finished building of its owner's whose lot shares an edge with its own (a corner is not
   enough). Power plants save energy: upkeep (fabricators, mines, shields, radar) and what a
-  factory builds; T1 5%, T2 10%, T3 20% each. Fabricators save a factory's materials: T2 5%,
-  T3 10% each. Savings add up to a cap: energy 50%, materials 33%. A fabricator and a power
+  factory builds. Fabricators save a factory's materials. A provider's saving is what it
+  would save a building it rings all the way round, times the share of that building's
+  perimeter the two share, so every side covered adds more until the building is ringed;
+  there is no other cap. The full-ring saving scales with the fourth root of what the
+  provider makes (`mc_data::Adjacency::ring`): energy 60% at 2000/s, so T1 (15/s) 18%,
+  T2 (350/s) 39%, T3 60%; materials 40% at 5/s, so T2 (1.5/s) 30%, T3 40%. Mixed rings add
+  up side by side. A fabricator and a power
   plant of its tech that touch are bound: when one is destroyed (not reclaimed) the other
   goes with it. The interface shows each link: a conduit on the ground, the unit panel's
   Adjacency band, tags on the selection's links, and the placing site's would-be links.

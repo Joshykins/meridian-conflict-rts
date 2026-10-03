@@ -32,7 +32,7 @@ mod wrecks;
 pub use batch::{BatchView, UNIT_BATCH};
 pub use destruct::DestructView;
 pub use fog::VisionDisc;
-pub use links::{link_saving, LinkView};
+pub use links::LinkView;
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
 pub use wrecks::WRECK_EXTRA_INSTANCES;

@@ -334,14 +334,32 @@ pub struct Fabricator {
 /// A provider's adjacency bonus: what it saves each finished building of its owner's
 /// whose lot shares an edge with its own (`mc_sim::adjacency`). A reactor saves the
 /// energy its neighbours use (upkeep, and what a factory builds), a fabricator the
-/// materials a neighbouring factory builds with. Each is a share of the whole cost,
-/// summed over every provider touching it up to a cap.
+/// materials a neighbouring factory builds with.
+///
+/// Each figure is what the provider would save a building it rings all the way round:
+/// a neighbour gets it in proportion to how much of its perimeter the two share, so
+/// the saving grows with every side covered until the building is ringed. It scales
+/// with what the provider makes a second (`ring`): the data says only which resource.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Adjacency {
-    /// Share of a neighbour's energy use it saves.
+    /// Share of a ringed neighbour's energy use it saves.
     pub energy: Fx,
-    /// Share of a neighbouring factory's materials it saves.
+    /// Share of a ringed neighbouring factory's materials it saves.
     pub mass: Fx,
+}
+
+impl Adjacency {
+    /// Energy: a ring of 2000/s reactors (Reactor III) saves 60%.
+    pub const ENERGY_RING: (Fx, Fx) = (Fx::ratio(3, 5), Fx::from_int(2000));
+    /// Materials: a ring of 5/s fabricators (Fabricator III) saves 40%.
+    pub const MASS_RING: (Fx, Fx) = (Fx::ratio(2, 5), Fx::from_int(5));
+
+    /// What a ring of providers making `made` a second saves, against the `(share, made)`
+    /// reference: by the fourth root of the output, so a bigger plant saves more but
+    /// a small one is still worth building against (energy 15/s 18%, 350/s 39%).
+    pub fn ring((top, reference): (Fx, Fx), made: Fx) -> Fx {
+        top * (made / reference).sqrt().sqrt()
+    }
 }
 
 /// What a volatile unit does when it is destroyed: a blast that hurts every unit

@@ -95,6 +95,36 @@ fn destroy(w: &mut World, id: UnitId) {
     }
 }
 
+/// What a ring of `key`s would save of `r`.
+fn ring(w: &World, key: &str, r: Resource) -> f32 {
+    let a = w
+        .blueprints
+        .unit(w.blueprints.id_of(key).unwrap())
+        .adjacency
+        .unwrap();
+    match r {
+        Resource::Mass => a.mass,
+        Resource::Energy => a.energy,
+    }
+    .to_f32()
+}
+
+#[test]
+fn a_full_ring_saves_more_the_more_a_provider_makes() {
+    let w = world();
+    for (key, r, want) in [
+        ("aster_t1_power", Resource::Energy, 0.177),
+        ("aster_t2_power", Resource::Energy, 0.388),
+        ("aster_t3_power", Resource::Energy, 0.6),
+        ("regency_t1_power", Resource::Energy, 0.177),
+        ("aster_t2_fabricator", Resource::Mass, 0.296),
+        ("aster_t3_fabricator", Resource::Mass, 0.4),
+    ] {
+        let got = ring(&w, key, r);
+        assert!((got - want).abs() < 2e-3, "{key}: {got}");
+    }
+}
+
 #[test]
 fn a_reactor_against_a_fabricator_cuts_its_upkeep() {
     let mut w = world();
@@ -103,25 +133,48 @@ fn a_reactor_against_a_fabricator_cuts_its_upkeep() {
     let alone = w.flows[row(&w, fab)].wanted[1].to_f32();
     spawn(&mut w, 0, "aster_t3_power", 852, 792, 1000);
     w.tick(&[]).unwrap();
-    assert!((saving(&w, fab, Resource::Energy) - 0.2).abs() < 1e-3);
+    // One side of four: a quarter of a ring's 60%.
+    assert!((saving(&w, fab, Resource::Energy) - 0.15).abs() < 1e-3);
     let next_door = w.flows[row(&w, fab)].wanted[1].to_f32();
     assert!(
-        (next_door / alone - 0.8).abs() < 1e-3,
+        (next_door / alone - 0.85).abs() < 1e-3,
         "upkeep {alone} -> {next_door}"
     );
     assert!(w.adjacency.links.iter().any(|l| l.consumer == fab));
 }
 
 #[test]
-fn savings_add_up_to_a_cap() {
+fn savings_grow_with_every_side_until_the_building_is_ringed() {
     let mut w = world();
     let fab = spawn(&mut w, 0, "aster_t3_fabricator", 792, 792, 1000);
-    // East and west, set south so their lots clear the north one's.
-    spawn(&mut w, 0, "aster_t3_power", 852, 756, 1000);
-    spawn(&mut w, 0, "aster_t3_power", 732, 756, 1000);
-    spawn(&mut w, 0, "aster_t3_power", 792, 852, 1000);
+    // Four Reactor IIIs pinwheeled round its lot (780..804 both ways), each lot covering
+    // one whole side and clear of the others'.
+    let sides = [(852, 756), (732, 828), (828, 852), (756, 732)];
+    for (n, (x, y)) in sides.into_iter().enumerate() {
+        spawn(&mut w, 0, "aster_t3_power", x, y, 1000);
+        w.tick(&[]).unwrap();
+        let want = 0.15 * (n + 1) as f32;
+        let got = saving(&w, fab, Resource::Energy);
+        assert!((got - want).abs() < 1e-3, "{} sides: {got}", n + 1);
+    }
+}
+
+#[test]
+fn a_ring_of_small_and_big_plants_adds_up_side_by_side() {
+    let mut w = world();
+    let fab = spawn(&mut w, 0, "aster_t2_fabricator", 792, 792, 1000);
+    // A Reactor III along the east side and a Reactor I (24 m, a whole side of a 2x2)
+    // against each of the other three.
+    spawn(&mut w, 0, "aster_t3_power", 852, 792, 1000);
+    spawn(&mut w, 0, "aster_t1_power", 768, 792, 1000);
+    spawn(&mut w, 0, "aster_t1_power", 792, 816, 1000);
+    spawn(&mut w, 0, "aster_t1_power", 792, 768, 1000);
     w.tick(&[]).unwrap();
-    assert!((saving(&w, fab, Resource::Energy) - 0.5).abs() < 1e-3);
+    let want = (ring(&w, "aster_t3_power", Resource::Energy)
+        + 3.0 * ring(&w, "aster_t1_power", Resource::Energy))
+        / 4.0;
+    let got = saving(&w, fab, Resource::Energy);
+    assert!((got - want).abs() < 1e-3, "{got} against {want}");
 }
 
 #[test]
@@ -146,8 +199,14 @@ fn fabricators_against_a_factory_save_its_materials_and_reactors_its_energy() {
     spawn(&mut w, 0, "aster_t2_fabricator", 792, 768, 1000);
     spawn(&mut w, 0, "aster_t2_power", 804, 828, 1000);
     w.tick(&[]).unwrap();
-    assert!((saving(&w, factory, Resource::Mass) - 0.15).abs() < 1e-3);
-    assert!((saving(&w, factory, Resource::Energy) - 0.10).abs() < 1e-3);
+    // The factory's lot is 96 m square: 384 m round. The fabricators each cover 24 m
+    // of its east side, the reactor 36 m (804..840).
+    let share = |key, r, m: f32| ring(&w, key, r) * m / 384.0;
+    let mass = share("aster_t3_fabricator", Resource::Mass, 24.0)
+        + share("aster_t2_fabricator", Resource::Mass, 24.0);
+    assert!((saving(&w, factory, Resource::Mass) - mass).abs() < 1e-3);
+    let energy = share("aster_t2_power", Resource::Energy, 36.0);
+    assert!((saving(&w, factory, Resource::Energy) - energy).abs() < 1e-3);
 }
 
 #[test]

@@ -663,13 +663,13 @@ pub(crate) struct RawFabricator {
 }
 
 /// A provider's saving for its neighbours; see [`crate::Adjacency`].
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Copy)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct RawAdjacency {
-    #[serde(default)]
-    pub energy: f64,
-    #[serde(default)]
-    pub mass: f64,
+pub(crate) enum RawAdjacency {
+    /// Saves energy, by the energy it makes.
+    Energy,
+    /// Saves materials, by the materials it makes.
+    Mass,
 }
 
 fn yes() -> bool {
@@ -1270,6 +1270,36 @@ fn ticks(seconds: f64) -> u32 {
 
 /// A reclaimer and its heads, checked: 1 to `MAX_RECLAIM_HEADS` heads, and no weapons
 /// beside them, since head `i` takes weapon slot `i` (`mc_data::Reclaimer`).
+/// A provider's full-ring savings, from what it makes a second ([`crate::Adjacency::ring`]).
+fn compile_adjacency(
+    key: &str,
+    kind: RawAdjacency,
+    e: &RawEconomy,
+    fabricator: Option<&RawFabricator>,
+) -> Result<crate::Adjacency, DataError> {
+    let invalid = |why: &str| DataError::Invalid(format!("{key}: adjacency {why}"));
+    let a = match kind {
+        RawAdjacency::Energy if e.energy_income > 0.0 => crate::Adjacency {
+            energy: crate::Adjacency::ring(crate::Adjacency::ENERGY_RING, fx(e.energy_income)),
+            mass: Fx::ZERO,
+        },
+        RawAdjacency::Mass if fabricator.is_some_and(|f| f.mass > 0.0) || e.mass_income > 0.0 => {
+            let made = e.mass_income + fabricator.map_or(0.0, |f| f.mass);
+            crate::Adjacency {
+                energy: Fx::ZERO,
+                mass: crate::Adjacency::ring(crate::Adjacency::MASS_RING, fx(made)),
+            }
+        }
+        _ => return Err(invalid("saves what it makes, and it makes none of it")),
+    };
+    if a.energy >= Fx::ONE || a.mass >= Fx::ONE {
+        return Err(invalid(
+            "of a full ring comes to all of a neighbour's use: it makes too much",
+        ));
+    }
+    Ok(a)
+}
+
 fn compile_reclaimer(key: &str, r: &RawReclaimer, weapons: usize) -> Result<Reclaimer, DataError> {
     let heads = r.heads.len();
     if !(1..=crate::MAX_RECLAIM_HEADS
@@ -1910,20 +1940,8 @@ impl Unit {
                 }),
                 None => None,
             },
-            adjacency: match &self.adjacency {
-                Some(a)
-                    if !(0.0..1.0).contains(&a.energy)
-                        || !(0.0..1.0).contains(&a.mass)
-                        || a.energy + a.mass <= 0.0 =>
-                {
-                    return Err(DataError::Invalid(format!(
-                        "{key}: an adjacency saving is a share above 0 and below 1"
-                    )));
-                }
-                Some(a) => Some(crate::Adjacency {
-                    energy: fx(a.energy),
-                    mass: fx(a.mass),
-                }),
+            adjacency: match self.adjacency {
+                Some(kind) => Some(compile_adjacency(key, kind, e, self.fabricator.as_ref())?),
                 None => None,
             },
             strategic: match &self.strategic {

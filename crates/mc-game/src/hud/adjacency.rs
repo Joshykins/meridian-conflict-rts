@@ -16,7 +16,7 @@ use crate::ui::{id, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
 use mc_core::{Fx, FxVec2};
 use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
-use mc_sim::adjacency::{self, Resource, MAX_SAVING};
+use mc_sim::adjacency::{self, Resource};
 use mc_sim::mirror::{LinkView, UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK};
 
 /// A warning, not a selection: the warning amber (as the Volatile chip).
@@ -118,21 +118,22 @@ pub fn prospective(
             continue;
         }
         let pos = FxVec2::new(Fx::from_f32(u.pos[0]), Fx::from_f32(u.pos[1]));
-        let Some(edge) = adjacency::shared_edge(own, adjacency::lot(other, pos)) else {
+        let theirs = adjacency::lot(other, pos);
+        let Some(shared) = adjacency::shared_edge(own, theirs) else {
             continue;
         };
-        let edge = [edge.0.to_f32(), edge.1.to_f32()];
+        let edge = [shared.0.to_f32(), shared.1.to_f32()];
         let bound = adjacency::bound(bp, other);
-        for (incoming, offered) in [
-            (true, adjacency::offers(other, bp)),
-            (false, adjacency::offers(bp, other)),
+        for (incoming, offered, consumer) in [
+            (true, adjacency::offers(other, bp), own),
+            (false, adjacency::offers(bp, other), theirs),
         ] {
-            for (resource, share) in offered.into_iter().flatten() {
+            for (resource, full) in offered.into_iter().flatten() {
                 out.push(Tie {
                     partner: u.unit_id,
                     partner_blueprint: other.id,
                     resource,
-                    share: share.to_f32(),
+                    share: adjacency::edge_share(full, shared, consumer).to_f32(),
                     incoming,
                     bound,
                     edge,
@@ -190,25 +191,30 @@ pub fn planned_links(
         .collect()
 }
 
-/// What the incoming ties save, capped: `[mass, energy]`.
+/// What the incoming ties save: `[mass, energy]`.
 pub fn totals(ties: &[Tie]) -> [f32; 2] {
     let mut t = [0.0f32; 2];
     for tie in ties.iter().filter(|t| t.incoming) {
         t[tie.resource as usize] += tie.share;
     }
-    [
-        t[0].min(MAX_SAVING[0].to_f32()),
-        t[1].min(MAX_SAVING[1].to_f32()),
-    ]
+    t
 }
 
-/// Whether any incoming saving is held at the cap.
-fn capped(ties: &[Tie]) -> bool {
-    let mut t = [0.0f32; 2];
-    for tie in ties.iter().filter(|t| t.incoming) {
-        t[tie.resource as usize] += tie.share;
-    }
-    t[0] > MAX_SAVING[0].to_f32() + 1e-4 || t[1] > MAX_SAVING[1].to_f32() + 1e-4
+/// How much of the perimeter of a building of `bp` its providers cover, zero to one:
+/// its savings grow until this is one.
+pub fn ringed(bp: &UnitBlueprint, ties: &[Tie]) -> f32 {
+    let mut partners: Vec<(u32, f32)> = ties
+        .iter()
+        .filter(|t| t.incoming)
+        .map(|t| {
+            let [a, b] = t.edge;
+            (t.partner, (b[0] - a[0]).abs() + (b[1] - a[1]).abs())
+        })
+        .collect();
+    partners.sort_by_key(|p| p.0);
+    partners.dedup_by_key(|p| p.0);
+    let around = adjacency::perimeter(adjacency::lot(bp, FxVec2::ZERO)) as f32;
+    (partners.iter().map(|p| p.1).sum::<f32>() / around).min(1.0)
 }
 
 /// The share as "-20%".
@@ -269,7 +275,7 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
                 (Resource::Mass, _) => "materials per build",
             };
             rows.push((
-                format!("{name} Alongside"),
+                format!("Ringed by {name}"),
                 format!("{} {what}", range(lo, hi)),
                 tone(r),
             ));
@@ -283,7 +289,7 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
                     Resource::Mass => "a factory's builds",
                 };
                 rows.push((
-                    "Saves Neighbours".into(),
+                    "Saves a Ringed Neighbour".into(),
                     format!("{} {} on {whom}", percent(share.to_f32()), word(r)),
                     tone(r),
                 ));
@@ -325,7 +331,7 @@ pub fn hint(blueprints: &Blueprints, bp: &UnitBlueprint, ties: &[Tie]) -> Option
     match wants.as_slice() {
         [] => None,
         [(r, hi, name)] => Some(format!(
-            "Build {} against it: up to {} {} each",
+            "Ring it with {}: up to {} {}",
             name.to_lowercase(),
             percent(*hi),
             word(*r).to_lowercase()
@@ -427,15 +433,15 @@ pub fn band(
         ui.text_right(right, y, type_scale::VALUE, rgb(tone(r), 1.0), &text);
         right -= ui.text_width(type_scale::VALUE, &text) + 14.0;
     }
-    if capped(&ties) {
-        ui.text_right(
-            right,
-            y,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            "Capped",
-        );
-    } else if saved == [0.0, 0.0] {
+    if saved != [0.0, 0.0] {
+        let ring = ringed(bp, &ties);
+        let text = if ring >= 0.999 {
+            "Ringed".to_string()
+        } else {
+            format!("{:.0}% ringed", ring * 100.0)
+        };
+        ui.text_right(right, y, type_scale::MICRO, rgb(palette::FAINT, 1.0), &text);
+    } else {
         let n = ties.iter().filter(|t| !t.incoming).count();
         let text = format!("Saves {n} neighbour{}", if n == 1 { "" } else { "s" });
         ui.text_right(x + cw, y, type_scale::MICRO, rgb(palette::TEXT, 1.0), &text);
@@ -550,8 +556,10 @@ mod tests {
         ];
         let fab = b.unit(b.id_of("aster_t3_fabricator").unwrap());
         let ties = prospective(&b, &units, 0, fab, FxVec2::from_ints(792, 792));
+        // The reactor covers the site's east side: a quarter of a full ring's 60%.
         let gets = totals(&ties);
-        assert!((gets[Resource::Energy as usize] - 0.2).abs() < 1e-3);
+        assert!((gets[Resource::Energy as usize] - 0.15).abs() < 1e-3);
+        assert!((ringed(fab, &ties) - 0.25).abs() < 1e-3);
         assert!(ties
             .iter()
             .any(|t| !t.incoming && t.partner == 2 && t.resource == Resource::Mass));
@@ -564,8 +572,8 @@ mod tests {
         let fab = b.unit(b.id_of("aster_t2_fabricator").unwrap());
         let rows = card_rows(&b, fab);
         let labels: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
-        assert!(labels.contains(&"Power Plants Alongside"));
-        assert!(labels.contains(&"Saves Neighbours"));
+        assert!(labels.contains(&"Ringed by Power Plants"));
+        assert!(labels.contains(&"Saves a Ringed Neighbour"));
         assert!(rows
             .iter()
             .any(|r| r.0 == "Bound" && r.1.contains("Reactor II")));

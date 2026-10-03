@@ -207,6 +207,15 @@ fn card(ui: &mut Ui, field: &Field, bp: &mc_data::UnitBlueprint, ties: &[Tie], a
             ));
         }
     }
+    if gains != [0.0, 0.0] {
+        let ring = adj::ringed(bp, ties);
+        let text = if ring >= 0.999 {
+            "Ringed: the most its neighbours can save".to_string()
+        } else {
+            format!("{:.0}% ringed: each side covered saves more", ring * 100.0)
+        };
+        lines.push((text, palette::DIM));
+    }
     for t in ties.iter().filter(|t| !t.incoming) {
         lines.push((
             format!(

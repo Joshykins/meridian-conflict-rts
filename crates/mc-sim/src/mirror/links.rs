@@ -14,7 +14,7 @@ pub struct LinkView {
     pub consumer_blueprint: BlueprintId,
     pub owner: u8,
     pub resource: Resource,
-    /// Share of the neighbour's use this provider saves on its own, before the cap.
+    /// Share of the neighbour's use this provider saves across their shared edge.
     pub share: f32,
     /// The stretch of lot edge the two share, end to end, metres.
     pub edge: [[f32; 2]; 2],
@@ -76,14 +76,4 @@ impl World {
             });
         }
     }
-}
-
-/// What all the links into `consumer` save it of `resource`, capped (`adjacency::MAX_SAVING`).
-pub fn link_saving(links: &[LinkView], consumer: u32, resource: Resource) -> f32 {
-    let sum: f32 = links
-        .iter()
-        .filter(|l| l.consumer == consumer && l.resource == resource)
-        .map(|l| l.share)
-        .sum();
-    sum.min(adjacency::MAX_SAVING[resource as usize].to_f32())
 }

@@ -10,8 +10,11 @@
 //!   a factory spends on what it builds;
 //! - materials: the materials a factory spends on what it builds.
 //!
-//! Savings from every provider touching a building add up, to a cap per resource
-//! (`MAX_SAVING`). A fabricator and a power plant of its tech that touch are bound
+//! A provider's `mc_data::Adjacency` figure is what it saves a building it rings all the
+//! way round, and it scales with what the provider makes. A neighbour gets that in
+//! proportion to how much of its perimeter the two share (`edge_share`), and the savings
+//! from every provider touching it add up, so each side covered saves more until the
+//! building is ringed: a ring is the most there is, with no other cap. A fabricator and a power plant of its tech that touch are bound
 //! (`World::bound_partners`): when one is destroyed the other goes up with it.
 //!
 //! Nothing here is state. The links are worked out from the units table each economy
@@ -22,9 +25,6 @@ use crate::tables::{flag, UnitId};
 use crate::World;
 use mc_core::{Fx, FxVec2};
 use mc_data::UnitBlueprint;
-
-/// Most of a building's use of each resource its neighbours can save: `[mass, energy]`.
-pub const MAX_SAVING: [Fx; 2] = [Fx::ratio(1, 3), Fx::ratio(1, 2)];
 
 /// What a provider saves its neighbour.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,7 +39,8 @@ pub struct Link {
     pub provider: UnitId,
     pub consumer: UnitId,
     pub resource: Resource,
-    /// Share of the neighbour's use this provider saves on its own (before the cap).
+    /// Share of the neighbour's use this provider saves: its full-ring saving times the
+    /// share of the neighbour's perimeter along `edge`.
     pub share: Fx,
     /// The stretch of lot edge the two share, end to end, in metres.
     pub edge: (FxVec2, FxVec2),
@@ -49,7 +50,7 @@ pub struct Link {
 #[derive(Default)]
 pub struct Links {
     pub links: Vec<Link>,
-    /// Share of its use each unit is saved, capped, by row: `[mass, energy]`.
+    /// Share of its use each unit is saved, by row: `[mass, energy]`.
     saving: Vec<[Fx; 2]>,
 }
 
@@ -91,6 +92,23 @@ pub fn shared_edge(a: Lot, b: Lot) -> Option<(FxVec2, FxVec2)> {
     }
 }
 
+/// The length of a lot's sides all the way round, in metres.
+pub fn perimeter(l: Lot) -> i32 {
+    2 * ((l.2 - l.0) + (l.3 - l.1))
+}
+
+/// The length of a shared edge, in metres.
+pub fn edge_len(edge: (FxVec2, FxVec2)) -> Fx {
+    (edge.1.x - edge.0.x).abs() + (edge.1.y - edge.0.y).abs()
+}
+
+/// What a provider whose full-ring saving is `full` saves the building on `consumer`
+/// across `edge`: the share of the consumer's perimeter the edge is. The shares of a
+/// ring of providers add up to the full saving.
+pub fn edge_share(full: Fx, edge: (FxVec2, FxVec2), consumer: Lot) -> Fx {
+    full * edge_len(edge) / Fx::from_int(perimeter(consumer))
+}
+
 /// Whether a building of `bp` spends `resource` in a way a neighbour can save:
 /// energy upkeep, or a factory's building.
 pub fn uses(bp: &UnitBlueprint, resource: Resource) -> bool {
@@ -101,7 +119,8 @@ pub fn uses(bp: &UnitBlueprint, resource: Resource) -> bool {
     }
 }
 
-/// What a `provider` saves a `consumer` standing against it: one link per resource.
+/// What a `provider` would save a `consumer` it rings: one link per resource
+/// (`edge_share` makes that the saving across one shared edge).
 pub fn offers(provider: &UnitBlueprint, consumer: &UnitBlueprint) -> [Option<(Resource, Fx)>; 2] {
     let Some(a) = provider.adjacency else {
         return [None, None];
@@ -169,9 +188,9 @@ impl World {
                     let Some(edge) = shared_edge(p_lot, c_lot) else {
                         continue;
                     };
-                    for (resource, share) in offered.into_iter().flatten() {
-                        let s = &mut links.saving[c][resource as usize];
-                        *s = (*s + share).min(MAX_SAVING[resource as usize]);
+                    for (resource, full) in offered.into_iter().flatten() {
+                        let share = edge_share(full, edge, c_lot);
+                        links.saving[c][resource as usize] += share;
                         links.links.push(Link {
                             provider: units.id(p),
                             consumer: units.id(c),
@@ -251,5 +270,23 @@ mod tests {
         assert!(shared_edge(a, (0, -48, 24, 0)).is_some());
         assert_eq!(shared_edge(a, (24, 24, 48, 48)), None, "a corner only");
         assert_eq!(shared_edge(a, (36, 0, 60, 24)), None, "a gap");
+    }
+
+    #[test]
+    fn a_ring_of_sides_adds_up_to_the_full_saving() {
+        let a = (0, 0, 24, 24);
+        let full = Fx::ratio(3, 5);
+        let sides = [
+            (24, -12, 48, 36),
+            (-24, -12, 0, 36),
+            (0, 24, 24, 48),
+            (0, -24, 24, 0),
+        ];
+        let total = sides.iter().fold(Fx::ZERO, |t, &b| {
+            t + edge_share(full, shared_edge(b, a).unwrap(), a)
+        });
+        assert!((total - full).abs() <= Fx(4), "{total:?}");
+        let one = edge_share(full, shared_edge(sides[0], a).unwrap(), a);
+        assert!((one * 4 - full).abs() <= Fx(4), "one side is a quarter");
     }
 }
