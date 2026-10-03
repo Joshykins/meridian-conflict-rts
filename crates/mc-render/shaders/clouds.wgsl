@@ -802,8 +802,11 @@ fn march(in: FullOut) -> vec4<f32> {
     // Inside cloud a finer stride, but never much finer than a march texel is
     // wide where the ray enters: from the strategic view a texel spans some
     // 170 m, and a quarter stride (25 m) spent dozens of fully lit samples a
-    // texel crossing a deck's soft top, detail no one could see.
-    let fine_dt = clamp(t0 * texel_angle, dt * 0.25, dt);
+    // texel crossing a deck's soft top, detail no one could see. Half the coarse
+    // stride at the finest: with the frame's jitter folded into the history
+    // (`fs_resolve`) it converges on the same picture as a quarter did, and a
+    // whole-map view through an overcast deck marched in 10 ms, not 12.
+    let fine_dt = clamp(t0 * texel_angle, dt * 0.5, dt);
     storm_reuse = min(t0 * texel_angle * 0.5, 150.0);
     let light_lod = smoothstep(25.0, 45.0, t0 * texel_angle);
     // The highest a fair-weather top can reach (`cloud_at`: the lowest base,
