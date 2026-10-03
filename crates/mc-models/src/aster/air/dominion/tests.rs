@@ -1,12 +1,7 @@
 use super::*;
 use crate::build_model_fitted;
 
-const DESIGNS: [&str; 4] = [
-    "space_dreadnought",
-    "space_dreadnought~citadel",
-    "space_dreadnought~fork",
-    "space_dreadnought~chisel",
-];
+const DESIGNS: [&str; 1] = ["space_dreadnought"];
 
 /// A vertex on a gun house (it turns with its weapon, not with the hull).
 fn on_house(v: &crate::MeshVertex) -> bool {

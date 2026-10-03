@@ -398,8 +398,10 @@ ahead.
 
 Nine weapons: `mc_data::MAX_WEAPONS` is 10 for it. The model (`mc-models
 aster/air/dominion/`) is an aft block, a pinched waist with a lit hangar recess and a
-forward block, a ventral hull, a terraced prow, and "ARC" and "DOMINION" painted on the
-walls (`lettering.rs`, flat stencil glyphs).
+forward block, a ventral hull, a chisel bow, and "ARC" and "DOMINION" painted on the
+walls (`lettering.rs`, flat stencil glyphs). The prow (2026-10-03) has a broad, flat-ended
+chisel shape with clipped corners, swept cheek armour and a wide upper deck plate.
+Its coarse model keeps the flat nose visible at strategy zoom.
 
 ## The Regency's air force: tech 1 (2026-10-02)
 

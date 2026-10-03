@@ -164,11 +164,11 @@ fn engine_half(x: f32) -> Vec<[f32; 2]> {
 /// Everything under the stacked layers: the hull and its flanks, the blade, the prow,
 /// the engineering block and the drives, the casemates on their sponsons, the rifles, the
 /// belly and the lamps, the lettering.
-pub(super) fn build(b: &mut MeshBuilder, lamps_of: &crate::CapitalLamps, bow: super::prow::Bow) {
+pub(super) fn build(b: &mut MeshBuilder, lamps_of: &crate::CapitalLamps) {
     hull(b);
     super::flanks::build(b);
     blade(b);
-    super::prow::build(b, bow);
+    super::prow::build(b);
     engine(b);
     b.mirror_y(|b| {
         for (k, face) in CASEMATE_FACES.into_iter().enumerate() {
@@ -184,7 +184,7 @@ pub(super) fn build(b: &mut MeshBuilder, lamps_of: &crate::CapitalLamps, bow: su
 }
 
 /// The strategy-zoom hull: the long hull and the prow.
-pub(super) fn coarse(b: &mut MeshBuilder, bow: super::prow::Bow) {
+pub(super) fn coarse(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK);
     b.extrude_z(
         &[
@@ -198,7 +198,7 @@ pub(super) fn coarse(b: &mut MeshBuilder, bow: super::prow::Bow) {
         KEEL,
         DECK,
     );
-    super::prow::coarse(b, bow);
+    super::prow::coarse(b);
 }
 
 /// The upper hull in its three blocks, each lofted and capped on its own so the steps
