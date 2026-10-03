@@ -822,7 +822,8 @@ impl Hud {
         if let Some(u) = hovered {
             if !selected.iter().any(|s| s.unit_id == u.unit_id) && !selected.is_empty() {
                 // Not claimed, like the deck shown for a hover (above).
-                selection::hover_card(self, ui, s, u, Rect::new(EDGE, deck_y - 40.0, 336.0, 0.0));
+                let top = deck_y - 40.0 - DECK_H;
+                selection::hover_card(self, ui, s, u, Rect::new(EDGE, top, 336.0, DECK_H));
             }
         }
         // A replay's timeline, clear of the selection panel.

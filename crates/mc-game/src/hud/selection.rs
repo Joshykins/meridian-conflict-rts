@@ -550,11 +550,13 @@ pub(super) fn gauge(
     );
 }
 
-fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, strip: bool) {
+/// The unit's title: its picture on its domain's colour with its strategic icon in
+/// the corner, its name, and under it tier and role, then what a refitted unit has
+/// fitted (the list opens under the pointer) or the volatile chip. `right` is where
+/// the name stops.
+fn title(hud: &Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, right: f32) {
     let bp = s.bp(u);
-    let (x, cw) = (r.x + 16.0, r.w - 32.0);
-    // The unit's picture on its domain's colour, its strategic icon in the corner.
-    let badge = Rect::new(x, r.y + 14.0, 50.0, 50.0);
+    let badge = Rect::new(r.x + 16.0, r.y + 14.0, 50.0, 50.0);
     domain_wash(ui, badge, Domain::of(bp), 0.3);
     let owner = s.team_color((u.owner_flags & 0xFF) as u8);
     let drew = hud.thumbs.draw(ui, bp.id, badge, 1.0);
@@ -572,17 +574,14 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
         ink(0.9),
     );
     let tx = badge.right() + 12.0;
-    let details = Rect::new(r.right() - 16.0 - 26.0, r.y + 14.0, 26.0, 24.0);
     ui.text_fit_left(
         tx,
         r.y + 24.0,
-        details.x - tx - 8.0,
+        right - tx,
         type_scale::ITEM,
         rgb(0xFFFFFF, 1.0),
         &bp.name,
     );
-    // Tier and role; after them what a refitted unit has fitted (the list opens under
-    // the pointer), or the volatile chip.
     let sub = format!("T{}  \u{b7}  {}", bp.tech, bp.role);
     let room = r.right() - 16.0 - tx;
     let end = tx + ui.text_width(type_scale::MICRO, &sub).min(room);
@@ -598,6 +597,22 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
     if refits <= 0.0 && bp.volatile() {
         super::volatile::chip(ui, bp, end + 8.0, r.y + 46.0);
     }
+}
+
+/// Where the status bands go under the title.
+fn body(r: Rect) -> Rect {
+    Rect::new(
+        r.x + 16.0,
+        r.y + 82.0,
+        r.w - 32.0,
+        r.bottom() - 10.0 - r.y - 82.0,
+    )
+}
+
+fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, strip: bool) {
+    let bp = s.bp(u);
+    let details = Rect::new(r.right() - 16.0 - 26.0, r.y + 14.0, 26.0, 24.0);
+    title(hud, ui, s, u, r, details.x - 8.0);
     // Details (I) opens lore, figures and every weapon in a card of their own.
     let t = hud.tile(ui, id("unit-details", 0), details, hud.details_open, true);
     let c = Vec2::new(details.x + details.w * 0.5, details.mid_y());
@@ -619,7 +634,7 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
         s,
         u,
         bp,
-        Rect::new(x, r.y + 82.0, cw, r.bottom() - 10.0 - r.y - 82.0),
+        body(r),
         strip && super::build::has_strip(s, bp),
         &mut hud.adjacency,
     );
@@ -842,144 +857,19 @@ fn firing_arc(
     );
 }
 
-/// Compact dossier for a unit under the pointer that is not the selection.
-/// `anchor` is the bottom-left of the card; height is chosen to fit.
-pub fn hover_card(hud: &Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, anchor: Rect) {
-    let bp = s.bp(u);
-    let (w, pad) = (anchor.w, 16.0);
-    let has_shield = s
-        .view
-        .frame
-        .shields
-        .iter()
-        .any(|sh| sh.unit_id == u.unit_id);
-    let lore = wrap_text(ui, type_scale::BODY, &bp.lore, w - pad * 2.0);
-    let rows = 3 + usize::from(has_shield);
-    let h = 78.0
-        + rows as f32 * 28.0
-        + if lore.is_empty() {
-            0.0
-        } else {
-            lore.len() as f32 * 19.0 + 8.0
-        };
-    let r = Rect::new(anchor.x, anchor.y - h, w, h);
+/// The card for a unit under the pointer while something else is selected: the
+/// same title and bands as the deck's own card for one unit, so a unit reads the
+/// same hovered as selected. Nothing on it takes the pointer, and its Details and
+/// adjacency rows belong to the deck's card.
+pub fn hover_card(hud: &Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect) {
+    let live = ui.interactive;
+    ui.interactive = false;
     ui.panel(r);
-    let (x, cw) = (r.x + pad, r.w - pad * 2.0);
-    hud.thumbs.draw(
-        ui,
-        bp.id,
-        Rect::new(r.right() - 64.0, r.y + 6.0, 56.0, 56.0),
-        1.0,
-    );
-    let owner = s.team_color((u.owner_flags & 0xFF) as u8);
-    ui.text(x, r.y + 22.0, type_scale::ITEM, owner, &bp.name);
-    let tier = format!("T{}", bp.tech);
-    let at = x + ui.text_width(type_scale::MICRO, &tier) + 8.0;
-    let refits = super::refit::icon_row(ui, s.blueprints, bp.id, at, r.y + 44.0, 16.0);
-    let end = ui.text(
-        x,
-        r.y + 44.0,
-        type_scale::MICRO,
-        rgb(palette::TEXT, 1.0),
-        &if refits > 0.0 {
-            tier
-        } else {
-            format!("T{}  \u{b7}  {}", bp.tech, bp.role)
-        },
-    );
-    if refits <= 0.0 {
-        super::volatile::chip(ui, bp, end + 8.0, r.y + 44.0);
-    }
-
-    let level = u.veterancy_level();
-    let hp = veterancy_health(bp.health, level).to_f32();
-    let mut y = r.y + 68.0;
-    for line in &lore {
-        ui.text(x, y, type_scale::BODY, rgb(palette::DIM, 1.0), line);
-        y += 19.0;
-    }
-    if !lore.is_empty() {
-        y += 8.0;
-    }
-    ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Integrity");
-    if level > 0 {
-        chevrons(ui, Vec2::new(x + 92.0, y), level);
-    }
-    ui.text_right(
-        x + cw,
-        y,
-        type_scale::VALUE,
-        rgb(palette::TEXT, 1.0),
-        &format!("{} / {}", whole(u.health * hp), whole(hp)),
-    );
-    bar(
-        ui,
-        Rect::new(x, y + 10.0, cw, 5.0),
-        u.health,
-        health_tone(u.health),
-    );
-    y += 28.0;
-
-    if let Some(sh) = s
-        .view
-        .frame
-        .shields
-        .iter()
-        .find(|sh| sh.unit_id == u.unit_id)
-    {
-        let max = bp.shield.map(|sp| sp.health.to_f32()).unwrap_or(0.0);
-        ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), "Shield");
-        ui.text_right(
-            x + cw,
-            y,
-            type_scale::VALUE,
-            rgb(palette::TEXT, 1.0),
-            &format!("{} / {}", whole(sh.health * max), whole(max)),
-        );
-        bar(
-            ui,
-            Rect::new(x, y + 10.0, cw, 5.0),
-            sh.health,
-            super::style::AIR,
-        );
-        y += 28.0;
-    }
-
-    let mut facts: Vec<(&str, String, u32)> = Vec::new();
-    if !bp.weapons.is_empty() {
-        facts.push(("Damage / s", format!("{:.0}", dps(bp)), palette::TEXT));
-        facts.push((
-            "Range",
-            format!("{:.0} m", bp.max_weapon_range().to_f32()),
-            palette::TEXT,
-        ));
-    }
-    if let Some(m) = &bp.motion {
-        facts.push((
-            "Speed",
-            format!("{:.0} m/s", m.speed.to_f32()),
-            palette::TEXT,
-        ));
-    }
-    facts_grid(ui, &facts, x, y, cw, r.bottom() - 12.0);
-}
-
-fn facts_grid(ui: &mut Ui, facts: &[(&str, String, u32)], x: f32, y: f32, cw: f32, floor: f32) {
-    let col = cw * 0.5;
-    for (i, (label, value, tone)) in facts.iter().enumerate() {
-        let (fx, fy) = (x + (i % 2) as f32 * (col + 6.0), y + (i / 2) as f32 * 18.0);
-        if fy > floor {
-            break;
-        }
-        ui.text(fx, fy, type_scale::MICRO, rgb(palette::FAINT, 1.0), label);
-        ui.text_right(
-            fx + col - 8.0,
-            fy,
-            type_scale::VALUE,
-            rgb(*tone, 1.0),
-            value,
-        );
-    }
+    title(hud, ui, s, u, r, r.right() - 16.0);
+    let bp = s.bp(u);
+    let mut focus = super::adjacency::Focus::default();
+    status_page(ui, s, u, bp, body(r), false, &mut focus);
+    ui.interactive = live;
 }
 
 struct Order {
