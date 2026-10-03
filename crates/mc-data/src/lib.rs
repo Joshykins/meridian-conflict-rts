@@ -638,6 +638,9 @@ pub struct EffectSettings {
     pub dust_lifetime: f32,
     /// Linear RGB, 0..1; None preserves the weapon's natural pressure-wave tint.
     pub shockwave_color: Option<[f32; 3]>,
+    /// Metres above the unit's feet where its dome's shaft is born, inside its
+    /// crystal. `None`: an Aegis pad's (`SHIELD_PROJECTOR_HEIGHT`).
+    pub shield_projector: Option<f32>,
 }
 impl Default for EffectSettings {
     fn default() -> Self {
@@ -647,6 +650,7 @@ impl Default for EffectSettings {
             dust_brightness: 1.0,
             dust_lifetime: 1.0,
             shockwave_color: None,
+            shield_projector: None,
         }
     }
 }

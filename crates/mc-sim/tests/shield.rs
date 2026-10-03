@@ -355,3 +355,75 @@ fn a_dome_drops_when_construction_stalls_the_grid() {
         "a stalled grid should drop the dome even when upkeep is paid"
     );
 }
+
+/// The Testudo's dome goes with it: driving beside a tank, the shells meant for
+/// the tank break on the glass and the tank is untouched.
+#[test]
+fn a_mobile_shield_covers_the_tank_it_drives_with() {
+    let mut w = world();
+    let spawn = |w: &mut World, key: &str, owner: u8, x: i32, y: i32| {
+        let bp = w.blueprints.id_of(key).unwrap();
+        let row = w
+            .spawn_unit(bp, owner, FxVec2::from_ints(x, y), Angle::ZERO, true)
+            .unwrap();
+        w.state.units.id(row)
+    };
+    w.state.players[0].free_build = true;
+    let shield = spawn(&mut w, "aster_t2_mobile_shield", 0, 500, 500);
+    let tank = spawn(&mut w, "aster_t2_tank", 0, 512, 500);
+    for _ in 0..80 {
+        w.tick(&[]).unwrap();
+    }
+    let shield_row = w.state.units.row(shield).unwrap();
+    assert!(
+        w.state.units.shield_hp[shield_row] > mc_core::Fx::ZERO,
+        "the dome is not up"
+    );
+    let full = w.state.units.health[w.state.units.row(tank).unwrap()];
+    let gun = spawn(&mut w, "aster_t2_tank", 1, 650, 800);
+    w.tick(&[
+        cmd(Command::Move {
+            units: vec![shield, tank],
+            target: FxVec2::from_ints(800, 500),
+            queue: false,
+        }),
+        PlayerCommand {
+            player: 1,
+            command: Command::Attack {
+                units: vec![gun],
+                target: tank,
+                queue: false,
+            },
+        },
+    ])
+    .unwrap();
+    let start = w.state.units.pos[shield_row];
+    let mut on_dome = 0;
+    for _ in 0..150 {
+        w.tick(&[]).unwrap();
+        on_dome += w
+            .events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    mc_sim::SimEvent::Impact {
+                        on_shield: true,
+                        ..
+                    }
+                )
+            })
+            .count();
+    }
+    let shield_row = w.state.units.row(shield).unwrap();
+    assert!(
+        (w.state.units.pos[shield_row] - start).length() > mc_core::Fx::from_int(60),
+        "the Testudo did not drive"
+    );
+    assert!(on_dome >= 3, "only {on_dome} shells broke on the dome");
+    assert_eq!(
+        w.state.units.health[w.state.units.row(tank).unwrap()],
+        full,
+        "a shell got under the moving dome"
+    );
+}

@@ -1507,7 +1507,7 @@ pub(super) fn shield(b: &mut MeshBuilder, tech: u8) {
 
 /// Projector wreath: a metal ring of emitter pods around the spire. Tagged
 /// `SPINNER` by the caller so the ring orbits without the cage turning with it.
-fn projector_wreath(b: &mut MeshBuilder, z: f32, ring: f32, scale: f32) {
+pub(super) fn projector_wreath(b: &mut MeshBuilder, z: f32, ring: f32, scale: f32) {
     b.paint(METAL);
     b.prism(
         v3(0.0, 0.0, z - 0.22 * scale),

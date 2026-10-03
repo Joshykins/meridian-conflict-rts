@@ -207,6 +207,27 @@
         sounds: (moving: "tracks_heavy"),
     ),
     (
+        key: "aster_t2_mobile_shield",
+        name: "Testudo",
+        role: "Mobile Shield Generator", title: "Mobile Shield",
+        tech: 2,
+        categories: ["Land", "Shield"],
+        health: 700,
+        cost: (mass: 260, energy: 2600, time: 1800),
+        radius: 5.4, height: 6.4,
+        vision: 300,
+        motion: (layer: Land, size: 1, speed: 27, accel: 20, turn: 90),
+        // A dome over the tanks round it, kept up while it drives. It draws energy
+        // like every shield, and drops with the rest in a stall.
+        economy: (energy_upkeep: 80),
+        shield: (radius: 55, health: 3600, regen: 36),
+        weapons: [],
+        mesh: "mobile_shield", icon: Shield,
+        // The shaft leaves from the crystal's crown, not an Aegis's 16 m.
+        effects: (shield_projector: 6.0),
+        sounds: (moving: "tracks_heavy"),
+    ),
+    (
         key: "aster_t3_assault_bot",
         name: "Paladin",
         role: "Siege Assault Bot", title: "Siege Bot",

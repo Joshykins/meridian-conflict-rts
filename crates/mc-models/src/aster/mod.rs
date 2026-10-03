@@ -22,6 +22,7 @@ mod mechs;
 pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
 mod missile_defense;
+mod mobile_shield;
 mod naval;
 pub(crate) use naval::{MEGALODON_RAIL, NARWHAL_RAIL};
 #[cfg(test)]
@@ -61,6 +62,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("tank_heavy", 6.2, 4.4, vehicles::tank_heavy),
     ModelDef::new("hover_tank", 5.4, 3.2, vehicles::hover_tank),
     ModelDef::new("missile_launcher", 5.2, 4.0, vehicles::missile_launcher),
+    ModelDef::new("mobile_shield", 5.4, 6.4, mobile_shield::mobile_shield),
     ModelDef::new("assault_bot", 6.8, 12.0, mechs::assault_bot),
     ModelDef::new("artillery_heavy", 7.333, 5.333, trebuchet::artillery_heavy),
     ModelDef::new("bore_tank", 8.2, 4.2, bore_tank::bore_tank),

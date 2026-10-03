@@ -2525,7 +2525,11 @@ impl World {
                 projector: if spec.is_hull() {
                     0.0
                 } else {
-                    mc_data::SHIELD_PROJECTOR_HEIGHT
+                    self.bp(row)
+                        .visual
+                        .effects
+                        .shield_projector
+                        .unwrap_or(mc_data::SHIELD_PROJECTOR_HEIGHT)
                 },
                 height: self.bp(row).height.to_f32() + mc_data::HULL_SHIELD_PAD as f32,
                 prev_radius,

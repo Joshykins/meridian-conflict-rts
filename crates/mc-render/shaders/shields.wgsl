@@ -698,8 +698,14 @@ fn energy_of(s: Shield) -> vec3<f32> {
     return shield_base(s);
 }
 
+// The shaft is sized for an Aegis's 16 m projector; a field thrown from lower down
+// (a vehicle's crystal, `shield_projector` in the unit file) gets a thinner one.
+fn column_scale(s: Shield) -> f32 {
+    return clamp((projector_of(s).z - s.pos.z) / 16.0, 0.25, 1.0);
+}
+
 fn column_radius(s: Shield) -> f32 {
-    return 1.35 + f32(tech_of(s)) * 0.18;
+    return (1.35 + f32(tech_of(s)) * 0.18) * column_scale(s);
 }
 
 fn sheath_radius(s: Shield) -> f32 {
@@ -748,7 +754,7 @@ fn column_hit_r(ro: vec3<f32>, rd: vec3<f32>, s: Shield, cr: f32) -> f32 {
     }
     let p = ro + rd * t;
     // Sink into the crystal so the shaft is born inside the column.
-    let lo = projector_of(s).z - 3.2;
+    let lo = projector_of(s).z - 3.2 * column_scale(s);
     let hi = column_hi(s);
     if p.z < lo || p.z > hi {
         return -1.0;

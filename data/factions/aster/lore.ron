@@ -144,6 +144,9 @@
             "Single Barrel AA Gun": "A single rapid barrel bolted onto a Warden-pattern tracked chassis.",
         },
     ),
+    "aster_t2_mobile_shield": (
+        lore: "An Aegis crystal on treads. It keeps a small dome over the column it drives with, so the tanks reach the line with their armour whole.",
+    ),
     "aster_t2_mobile_aa": (
         lore: "Meridian Arms' answer to faster tech-two aircraft, mounted on treads.",
         weapons: {

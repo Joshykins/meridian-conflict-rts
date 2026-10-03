@@ -5922,6 +5922,7 @@ mod shockwave_tests {
                 shockwave_color: Some(tint),
                 dust_color,
                 dust_brightness: brightness,
+                shield_projector: None,
             };
             renderer.push_shockwave(center.to_array(), 10.0, 112.0, 1.25, 1.0, 0.0, Vec3::ZERO);
             for (step, age) in [0.12, 0.28, 0.48, 0.72, 1.15, 2.2, 4.5]
