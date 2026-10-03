@@ -79,14 +79,32 @@ says it can do (`commander/profile.rs`).
   current unit.
 - Builders more than 1.5 km from home build no power, help only with sites near them,
   and leave the base's factories and yard buildings to builders at home.
-- Base layout (`ai/layout.rs`): power and storage go in farms. Farm centres come from
-  the ground alone (the widest open home ground 240-420 m behind the base, or out to
-  its flanks, never toward the enemy and clear of the factory yard), so a farm keeps
-  its place all match. Each farm fills from its middle out on a grid one plant apart:
-  2x2 plants stand flush in a block, bigger plants and storage start on the next farm
-  and keep their lanes. A shield goes only where it covers at least 1.5 times its own
-  mass cost in factories, power and storage that no other shield covers, on the free
-  lot near there that covers the most.
+- Adjacency (`ai/adjacent.rs`, the rules in `mc-sim/src/adjacency.rs`): a power plant
+  or a fabricator takes the free lot flush against the side's buildings where it saves
+  the most a second: what it saves the neighbours that use what it provides (a
+  factory's build energy and materials at full speed, upkeep) and what they save it,
+  materials counted at 6 energy. From the corners of a side in, so a side takes as
+  many as fit. Only where it would save nothing does it go to a farm. A fabricator and
+  a plant of its tech (which go down together) are never set against each other, and
+  a fabricator is not upgraded into a tier that would bind it.
+- Fabricators are built when the side has energy to spare (power not wanted, the store
+  three-quarters full), its materials are not piling up, its income is at least three
+  times the skill's `tech_income`, their upkeep stays under half the energy income,
+  and the one it can build that pays back soonest (cost, energy at 6 per mass, and the
+  best plant's price for its upkeep) does so within the economy's payback. One at a
+  time; a builder takes it before helping the sites going up, since a materials stall
+  is when it pays and it is paid first with the mines (`focus.rs`). Upgrades follow
+  the same test. All of them are paused while the power is out and resumed once the
+  store is half full and the income carries them.
+- Base layout (`ai/layout.rs`): storage, and power with nothing to save, go in
+  farms. Farm centres come from the ground alone (the widest open home ground
+  240-420 m behind the base, or out to its flanks, never toward the enemy and clear
+  of the factory yard), so a farm keeps its place all match. Each farm fills from its
+  middle out on a grid one plant apart: 2x2 plants stand flush in a block, bigger
+  plants and storage start on the next farm and keep their lanes. A shield goes only
+  where it covers at least 1.5 times its own mass cost in factories, power and
+  storage that no other shield covers, on the free lot near there that covers the
+  most.
 - Turrets: one per raid spot while defending, a few at the base's front (2 + half the
   factories), and one per mine; a mine or plant a ground raid took gets one at once
   (`docs/AI_COMMANDER.md`, "Urgent wants").
@@ -94,7 +112,9 @@ says it can do (`commander/profile.rs`).
   within its reach.
 - Buildings keep lanes (`ai/lots.rs`): 24 m between buildings (2x2s such as power may
   pack together), and a 48 m apron in front of every factory's exit kept clear with a
-  lane around it.
+  lane around it. A provider may touch a building it saves or is saved by, and
+  providers up to 4x4 may touch each other, so they can ring a factory; aprons still
+  stay clear.
 - Base buildings go only on ground the army can walk to from the start (`ai/staging.rs`
   floods the terrain around it, stopped by cliffs and water, not by buildings).
 - Factories set no rally point: finished units roll out idle and the operations take

@@ -12,6 +12,7 @@
 //! upgrades and salvage, steered through its `Directives`.
 
 mod adaptive;
+mod adjacent;
 mod arrival;
 mod builders;
 mod commander;
@@ -147,6 +148,8 @@ struct Census {
     salvagers: usize,
     salvagers_idle: Vec<usize>,
     storage: usize,
+    /// Material fabricators standing.
+    fabricators: Vec<usize>,
     sites: Vec<usize>,
     damaged: Vec<usize>,
     engineers: usize,
@@ -204,6 +207,8 @@ struct Planned {
     artillery: usize,
     shields: usize,
     storage: usize,
+    /// Material fabricators going up or queued.
+    fabricators_rising: usize,
     /// Reclaim towers standing, going up or queued, with their reach.
     towers: Vec<(FxVec2, Fx)>,
     /// The wreck fields near home that are safe to work (`salvage.rs`).
@@ -365,6 +370,7 @@ impl World {
         self.direct_factories(player, &census, &planned.salvage, &mut out);
         self.direct_salvagers(&census, &planned.salvage, &mut out);
         self.direct_upgrades(player, &census, &mut out);
+        self.direct_fabricators(player, &census, &mut out);
         self.direct_focus(player, &mut out);
         drop(span);
         let span = mc_core::perf_span!("ai.commander");
@@ -393,6 +399,7 @@ impl World {
             artillery: census.artillery.len(),
             shields: census.shields.len(),
             storage: census.storage,
+            fabricators_rising: 0,
             towers: census.towers.clone(),
             salvage: Vec::new(),
             projects: 0,
@@ -419,6 +426,7 @@ impl World {
             // ordered beside it while the first was still a frame.
             planned.shields += bp.has(cat::SHIELD) as usize;
             planned.projects += projects::project_kind(bp).is_some() as usize;
+            planned.fabricators_rising += bp.fabricator.is_some() as usize;
             if let Some(range) = land_radar(bp) {
                 planned.radars.push((self.state.units.pos[row], range));
             }
@@ -430,6 +438,7 @@ impl World {
         // builder of the next think ordered another radar and Scavenger.
         for (_, order) in self.planned_sites(player) {
             let bp = self.blueprints.unit(order.blueprint);
+            planned.fabricators_rising += bp.fabricator.is_some() as usize;
             if let Some(range) = land_radar(bp) {
                 planned.radars.push((order.pos, range));
             }
@@ -518,6 +527,8 @@ impl World {
                 c.extractor_pos.push(pos);
             } else if bp.has(cat::POWER) {
                 c.power.push(pos);
+            } else if bp.fabricator.is_some() && bp.is_structure() {
+                c.fabricators.push(row);
             } else if let Some(range) = land_radar(bp) {
                 c.radar.push((pos, range));
             } else if bp.has(cat::SHIELD) {

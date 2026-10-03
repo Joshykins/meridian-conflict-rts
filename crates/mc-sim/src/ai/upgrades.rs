@@ -72,6 +72,9 @@ impl World {
                 }
             }
         }
+        if let Some(row) = self.fabricator_to_upgrade(player, census) {
+            candidates.push((2, row));
+        }
         let surplus = mass_rich || (skill.eager_tech && pl.mass > Fx::from_int(400));
         // A factory being upgraded builds nothing: a few at a time, however
         // often this AI thinks, so the army keeps coming.

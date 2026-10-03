@@ -15,6 +15,9 @@ const APRON_CELLS: i32 = 4;
 /// Buildings this small (2x2 and less) may stand shoulder to shoulder with
 /// each other, as power farms do: a block of them is small enough to go around.
 pub(super) const SMALL_FOOT: i32 = 2;
+/// Providers (`adjacent.rs`) this small may stand shoulder to shoulder with each
+/// other: a ring of them round a factory leaves no room for lanes between them.
+const RING_FOOT: i32 = 4;
 
 /// A lot in whole metres: `(x0, y0, x1, y1)`.
 type Rect = (i32, i32, i32, i32);
@@ -77,15 +80,18 @@ impl World {
         // An apron keeps a lane around it as well: buildings just clear of it
         // on three sides would still pen in what rolls out onto it.
         let full = LANE_CELLS * mc_map::BUILD_CELL_M;
-        let clear = |other: Rect, other_size: i32, other_apron: Option<Rect>| {
-            gap(me, other) >= lane(size, other_size)
+        // A provider may stand flush against a building it trades with
+        // (`adjacent.rs`): that is where it saves anything. Touching, it leaves
+        // no pocket to be penned in. Aprons stay clear.
+        let clear = |other: Rect, other_size: i32, other_apron: Option<Rect>, feeds: bool| {
+            (gap(me, other) >= lane(size, other_size) || feeds && gap(me, other) == 0)
                 && other_apron.is_none_or(|a| gap(me, a) >= full)
                 && own_apron.is_none_or(|a| gap(a, other) >= full)
         };
         for c in claimed {
             let other = (c.foot, c.foot);
             let other_apron = c.factory.then(|| apron(other, c.pos, AI_BUILD_HEADING));
-            if !clear(lot(other, c.pos), c.foot, other_apron) {
+            if !clear(lot(other, c.pos), c.foot, other_apron, false) {
                 return false;
             }
         }
@@ -105,7 +111,9 @@ impl World {
             let other_apron = other
                 .has(cat::FACTORY)
                 .then(|| apron(of, pos, self.state.units.heading[row]));
-            ok = clear(lot(of, pos), of.0.max(of.1), other_apron);
+            let ring = other.adjacency.is_some() && size.max(of.0.max(of.1)) <= RING_FOOT;
+            let feeds = bp.adjacency.is_some() && (ring || adjacent::feeds(bp, other));
+            ok = clear(lot(of, pos), of.0.max(of.1), other_apron, feeds);
             ok
         });
         ok

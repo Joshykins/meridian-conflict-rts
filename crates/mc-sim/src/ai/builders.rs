@@ -85,12 +85,20 @@ impl World {
                     continue;
                 }
             }
+            // A fabricator, when the economy has room for one, before helping with
+            // the sites going up: in a materials stall with energy to spare it is
+            // the answer, and it is paid first with the mines (`focus.rs`). Held
+            // back by the stall, the side built none.
+            let fabricator = (!expander)
+                .then(|| self.fabricator_job(row, planned))
+                .flatten();
             if let Some(site) = census
                 .sites
                 .iter()
                 .copied()
                 .filter(|&s| {
                     !expander
+                        && fabricator.is_none()
                         && ((energy_short && self.bp(s).has(cat::POWER))
                             || census.sites.len() >= site_cap)
                         && self.within_reach(row, self.state.units.pos[s])
@@ -111,23 +119,25 @@ impl World {
                 continue;
             }
             let is_commander = self.bp(row).has(cat::COMMANDER);
-            let job = self.choose_job(
-                row,
-                is_commander,
-                census,
-                intel,
-                stance,
-                persona,
-                start,
-                facing,
-                firebase,
-                claimed,
-                planned,
-                energy_short,
-                mass_rich,
-                mass_income,
-                home.as_ref(),
-            );
+            let job = fabricator.or_else(|| {
+                self.choose_job(
+                    row,
+                    is_commander,
+                    census,
+                    intel,
+                    stance,
+                    persona,
+                    start,
+                    facing,
+                    firebase,
+                    claimed,
+                    planned,
+                    energy_short,
+                    mass_rich,
+                    mass_income,
+                    home.as_ref(),
+                )
+            });
             match job {
                 Some(job) => {
                     if let Some(join) =
@@ -157,6 +167,9 @@ impl World {
                             home.as_ref(),
                         ),
                         Place::Farm => self.farm_site(&bp, start, facing, claimed, home.as_ref()),
+                        Place::Adjacent => self
+                            .adjacent_site(&bp, player, start, claimed, home.as_ref())
+                            .or_else(|| self.farm_site(&bp, start, facing, claimed, home.as_ref())),
                     };
                     if let Some(site) =
                         site.filter(|s| self.can_place(&bp, *s) && !intel.danger.hot(*s))
@@ -189,6 +202,7 @@ impl World {
                             (bp.has(cat::DEFENSE) && bp.has(cat::ARTILLERY)) as usize;
                         planned.shields += bp.has(cat::SHIELD) as usize;
                         planned.storage += bp.has(cat::STORAGE) as usize;
+                        planned.fabricators_rising += bp.fabricator.is_some() as usize;
                         planned.projects += projects::project_kind(&bp).is_some() as usize;
                         if bp.has(cat::DEFENSE) && bp.has(cat::DIRECT_FIRE) {
                             planned.pd += 1;
@@ -483,16 +497,17 @@ impl World {
         // A builder far out works where it is; the base is left to those at home,
         // or it spends minutes walking back for every job.
         let far = self.state.units.pos[row].distance(start) > FAR_FROM_HOME;
-        // Power goes in the base's farms (`layout`). A builder far out leaves it
-        // to those at home: energy is the whole side's wherever it is made, and
-        // plants dropped wherever a builder stood littered the map.
+        // Power goes against what it saves the most (`adjacent.rs`), else in the
+        // base's farms (`layout`). A builder far out leaves it to those at home:
+        // energy is the whole side's wherever it is made, and plants dropped
+        // wherever a builder stood littered the map.
         let power_job = |ptech: u8| {
             if far {
                 return None;
             }
             self.job_structure(row, cat::POWER, ptech, start, facing, Fx::ZERO, true)
                 .map(|job| Job {
-                    place: Place::Farm,
+                    place: Place::Adjacent,
                     ..job
                 })
         };

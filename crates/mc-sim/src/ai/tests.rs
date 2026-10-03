@@ -718,6 +718,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
             artillery: 0,
             shields: 0,
             storage: 0,
+            fabricators_rising: 0,
             towers: vec![],
             salvage: vec![],
             projects: 0,

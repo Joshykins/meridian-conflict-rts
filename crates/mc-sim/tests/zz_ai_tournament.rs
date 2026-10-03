@@ -5,7 +5,8 @@
 //! `TOURNEY=map:players:minutes:seed:A:B[:difficulty]`, where A and B are doctrines
 //! (`adaptive`, `aggressive`, `economic` or `defensive`). With 2 players slot 0 is side A; with
 //! more, the starts west of the middle are side A. `TOURNEY_EVERY=N` prints each
-//! side's state every N minutes, `TOURNEY_ROSTER=1` each player's units at the end,
+//! side's state every N minutes (fabricators and adjacency links among it),
+//! `TOURNEY_ROSTER=1` each player's units at the end,
 //! `TOURNEY_ARMY=key*n,key*n` gives every side the same army at its start,
 //! `TOURNEY_SNAP=tick` each side's armed mobile units at that tick,
 //! `TOURNEY_DEATHS=1` every unit that dies, where and when, `TOURNEY_OPS=N` slot N's
@@ -235,7 +236,7 @@ fn match_up() {
             println!("{minute:>3}m");
             for (p, pl) in w.state.players.iter().enumerate() {
                 println!(
-                    "  P{p} side {} mass {:>5}/s energy {:>6}/s eff {:>3}% build {:>3}% store {:>3}%/{:>3}% mines {} worth {:>7} kills {} lost {} | {}",
+                    "  P{p} side {} mass {:>5}/s energy {:>6}/s eff {:>3}% build {:>3}% store {:>3}%/{:>3}% mines {} fabs {} links {} worth {:>7} kills {} lost {} | {}",
                     ["A", "B"][pl.team as usize],
                     pl.mass_income.floor_int(),
                     pl.energy_income.floor_int(),
@@ -244,6 +245,8 @@ fn match_up() {
                     (pl.mass * 100 / pl.mass_capacity.max(mc_core::Fx::ONE)).floor_int(),
                     (pl.energy * 100 / pl.energy_capacity.max(mc_core::Fx::ONE)).floor_int(),
                     w.state.units.slots.iter().filter(|&r| w.state.units.owner[r] as usize == p && w.bp(r).mine.is_some() && w.state.units.is_active(r)).count(),
+                    w.state.units.slots.iter().filter(|&r| w.state.units.owner[r] as usize == p && w.bp(r).fabricator.is_some()).count(),
+                    w.adjacency.links.iter().filter(|l| w.state.units.row(l.provider).is_some_and(|r| w.state.units.owner[r] as usize == p)).count(),
                     worth(&w, pl.team).floor_int(),
                     pl.units_killed,
                     pl.units_lost,

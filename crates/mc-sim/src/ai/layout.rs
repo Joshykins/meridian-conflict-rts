@@ -39,6 +39,9 @@ pub(super) enum Place {
     Packed(i32),
     /// A lot in the base's power farms (`farm_site`).
     Farm,
+    /// The lot flush against the side's buildings where a provider saves the
+    /// most (`adjacent_site`), else a farm lot.
+    Adjacent,
 }
 
 impl World {
