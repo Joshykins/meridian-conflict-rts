@@ -147,6 +147,6 @@ fn a_structure_upgrade_costs_only_the_difference_too() {
         .unit(w.blueprints.id_of("aster_core_mine_t2").unwrap());
     assert_eq!(
         w.blueprints.upgrade_cost(t2),
-        (Fx::from_int(560 - 45), Fx::from_int(3360 - 270))
+        (Fx::from_int(750 - 45), Fx::from_int(4500 - 270))
     );
 }

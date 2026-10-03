@@ -224,18 +224,19 @@ fn packing_mines_together_pays_no_more_than_the_ground_they_share() {
 }
 
 #[test]
-fn an_upgraded_mine_keeps_its_reach_but_yields_more_once_the_side_has_the_tech() {
+fn an_upgraded_mine_keeps_its_reach_but_yields_more_and_climbs_one_tier_past_the_tech() {
     let mut w = world(Vec::new());
     let id = mine(&mut w, 0, 5002, 5002);
     let t1 = spec(&w);
     let t2 = w.blueprints.id_of("aster_core_mine_t2").unwrap();
-    // Not before the side has tech 2: nothing is queued. (Free building would skip this.)
+    // A mine climbs one tier past its side's tech: tier 2 is open at tech 1.
+    assert_eq!(w.side_tech(0), 1);
     w.tick(&[cmd(0, Command::Upgrade { units: vec![id] })])
         .unwrap();
     let row = w.state.units.row(id).unwrap();
     assert!(
-        w.state.orders.front(&w.state.units, row).is_none(),
-        "upgraded without tech 2"
+        w.state.orders.front(&w.state.units, row).is_some(),
+        "tier 2 not open at tech 1"
     );
     w.tick(&[cmd(
         0,
@@ -246,24 +247,6 @@ fn an_upgraded_mine_keeps_its_reach_but_yields_more_once_the_side_has_the_tech()
     )])
     .unwrap();
     let before = w.state.mines.by_unit[&id].clone();
-    // A tech 2 engineer brings the side there.
-    let engineer = w.blueprints.id_of("aster_t2_engineer").unwrap();
-    w.tick(&[cmd(
-        0,
-        Command::DebugSpawn {
-            owner: 0,
-            blueprint: engineer,
-            pos: FxVec2::from_ints(5400, 5002),
-            heading: Angle::ZERO,
-            count: 1,
-            flags: 0,
-            build: 1000,
-        },
-    )])
-    .unwrap();
-    assert_eq!(w.side_tech(0), 2);
-    w.tick(&[cmd(0, Command::Upgrade { units: vec![id] })])
-        .unwrap();
     for _ in 0..3000 {
         w.tick(&[]).unwrap();
         if w.state
@@ -287,6 +270,21 @@ fn an_upgraded_mine_keeps_its_reach_but_yields_more_once_the_side_has_the_tech()
     assert_eq!(s.land, before.land, "the same territory");
     assert!(s.full_rate(&spec2) > before.full_rate(&t1) * 2);
     assert!(s.age > before.age, "digging carries on through the upgrade");
+}
+
+#[test]
+fn mines_climb_one_tier_past_the_side_tech_and_the_deep_core_waits_for_tech_3() {
+    let w = world(Vec::new());
+    let needs = |key: &str| {
+        let bp = &w.blueprints;
+        bp.upgrade_needs(bp.unit(bp.id_of(key).unwrap()))
+    };
+    assert_eq!(needs("aster_core_mine_t2"), 1);
+    assert_eq!(needs("aster_core_mine_t3"), 2);
+    assert_eq!(needs("aster_core_mine_t4"), 3);
+    assert_eq!(needs("regency_t2_extractor"), 1);
+    // Everything else still waits for its own tier.
+    assert_eq!(needs("aster_mass_storage_t2"), 2);
 }
 
 #[test]

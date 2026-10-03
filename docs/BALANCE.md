@@ -74,7 +74,7 @@ Measure in the sim with `zz_aa_probe` (what each AA lands on each aircraft) and
 | kind | T1 | T2 | T3 |
 |---|---|---|---|
 | land units, engineers | 5 | 6 | 8 |
-| aircraft | 15 | 18 | 20 |
+| aircraft (the energy-hungry branch) | 15 | 35 | 38 |
 | warships (docs/NAVY.md: one tier ahead of the land) | 6 | 7 | 9 |
 | defences | 8 | 9 | 10 |
 | economy structures (mines, reactors) | 6 | 6 | 6 |
@@ -84,20 +84,25 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 
 ## Economy
 
-- Mines (2026-10-02, the user: "patches worth more, land worth less", no mines at sea, and
-  numbers like 1 / 4 / 12 / 24 a second paying back in under a minute, 3, 8 and 12 minutes):
-  reach 1000 m. Ore is what a mine is for: a hectare of ore pays `per_hectare` 0.25 a second
-  at tier 1, a hectare of bare land `ground` 0.00015 (a whole circle of it about 0.05), and
-  the shaft `base` 0.1 from the moment the mine is finished. Every tier multiplies all three:
-  4x, 12x, 24x a tier 1. `zz_mine_yield_probe` puts 3-6 ha of ore in a lone mine's reach on
-  the duel and team maps (12-13 on the 80 km maps), so a tier 1 mine on a field makes about
-  0.9-1.6 a second, one on bare land about 0.15. Land spreads out at 10 m/s (full in about
-  100 s); shafts sink at 8 m/s and drifts run at 24 m/s, so the ore pays within a minute or so.
-  Each mine stores 100 / 200 / 400 / 800.
-- Prices (mass / energy): 45 / 270, 560 / 3,360, 4,210 / 25,260, Deep Core 12,400 / 74,400.
+- Mines (2026-10-03 rebalance; the first numbers, 2026-10-02, left a tier 1 side on 5 a
+  second for twenty minutes against unit prices set at Forged Alliance's): reach 1000 m. Ore
+  is what a mine is for: a hectare of ore pays `per_hectare` 0.6 a second at tier 1, a hectare
+  of bare land `ground` 0.00036 (a whole circle of it about 0.1), and the shaft `base` 0.2 from
+  the moment the mine is finished. Each tier multiplies all three: 3x, 7x, 12x a tier 1, so
+  each step up gains less than the one before. `zz_mine_yield_probe` puts a median 3-4 ha of
+  ore in a lone mine's reach on the duel maps (Serac Divide 2.9, about 13 on the 80 km maps),
+  so a tier 1 mine on a duel field makes about 2 a second (FAF's tier 1 mine), one on bare
+  land about 0.3. Land spreads out at 10 m/s (full in about 100 s); shafts sink at 8 m/s and
+  drifts run at 24 m/s, so the ore pays within a minute or so. Each mine stores 100 / 200 /
+  400 / 800.
+- Prices (mass / energy): 45 / 270, 750 / 4,500, 4,000 / 24,000, Deep Core 11,000 / 66,000.
   A new mine on a field pays back in under a minute; an upgrade pays only the difference
-  between the tiers, about 3, 8 and 12 minutes on a typical field. The Regency Excavators dig
-  as much for a little more mass and no upkeep (55 / 580 / 4,300 / 12,600).
+  between the tiers, about 3, 7 and 11 minutes on a duel field. The Regency Excavators dig
+  as much for a little more mass, less energy and no upkeep (55 / 770 / 4,080 / 11,200).
+- **A mine climbs one tier past its side's tech** (`Blueprints::upgrade_needs`): tier 2 at
+  tech 1, tier 3 at tech 2, the Deep Core at tech 3. Growing the economy, building the army
+  and buying the next tier are three choices, not one: a side can raise its mines before it
+  pays a tier path, and an upgraded mine (2000 health) is a target worth raiding.
 - A mine's `base` is shared with the mines next to it the way its land is: it gets the part of
   the base that matches the part of its circle it holds, land or sea. Before this, every shaft
   paid its full base however close the mines stood, so a packed block of mines made several
@@ -105,12 +110,8 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 - Mines are easy to hurt: 600 / 2000 / 5000 / 10000 health (T1-T4). Three Wardens kill a tier 1
   mine in about 10 s, and three Petrels in one pass. A raid on the mines is meant to pay: the
   mine that goes up again digs its land out from nothing.
-- Measured with the duel probe on Serac Divide (small fields, about 3 ha), Hard against Hard:
-  4-6 materials a second at tier 1 from 6-9 mines over the first 20 minutes, tier 2 factories
-  at 21-27 minutes, 10-14 a second at 30. The AI stalls badly on this income (it orders far
-  more than it makes); its economy has not been tuned to it yet.
 - The Deep Core (T4, `aster_core_mine_t4`) is built by Mason IIIs and Engineering Suite III
-  commanders, or upgraded from a tier 3 mine. It opens with tech 3.
+  commanders, or upgraded from a tier 3 mine. It opens with tech 3, the poorest buy of the line.
 - Mines stand on land only (the user's call, 2026-10-02): each territory stops at the shore,
   and the sea in its circle is worth nothing, though it counts in its shaft's share.
 - Mines run on energy: upkeep 2 / 8 / 30 / 60 a second (T1-T4). A mine digs at the share of
@@ -123,9 +124,9 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   "t1 pgens are too good of a deal"; they were 20 / 250 / 1500, only a third dearer than tier 2).
 - Every tier upgrade, structure or engineer, pays only what the new tier costs over the old
   one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy, core mine tier 1
-  to 2 515 / 3,090). A refit kit is paid in full.
-- Commander's Material Formation Engine: +1.5 mass, +100 energy a second for 1,200 mass (it was
-  +6 / +250 for 1,600 before the 2026-10-02 mine rebalance, six of the new tier 1 mines).
+  to 2 705 / 4,230). A refit kit is paid in full.
+- Commander's Material Formation Engine: +3 mass, +100 energy a second for 1,200 mass, about
+  a tier 1 mine and a half on a field, carried on the unit that ends the game if it dies.
 - **Tier paths are the commitment** (the user, 2026-10-02: "tiering more expensive, more of a
   commitment", units cheaper against it). Only the ways to a new tier cost more; unit prices
   stay. Land and air factories 240 / 3,000 / 9,000 mass (Forge to II 2,760, II to III 6,000;
@@ -134,13 +135,21 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 - **Engineers climb in the field**: an engineer puts its own next tier on at that tier's build
   power (`Blueprints::upgrade_power`), so Mason to Mason II takes 30 s and II to III about
   21 s (180 s and 107 s at its own power before). It still waits for the side's tech.
-- **Material fabricators** (`fabricator: (mass)`) turn a lot of energy into a little material,
-  as far as their upkeep is paid (nothing in a full stall), and go up like reactors. One of
-  them and the same-tier power it needs pays back about ten times slower than a same-tier
-  mine (the user's rule). Each tier is a building of its own on its power plant's lot, not
-  an upgrade: T1 (2x2) +0.5/s for 30 energy/s, 75 mass, ~450 s; T2 (4x4) +2/s for 1,200,
-  1,200 mass, ~30 min; T3 (8x8) +5/s for 13,500, 5,000 mass, ~80 min. They share the Mines
-  priority switch. The Regency Condensers are the same.
+- **Material fabricators** (`fabricator: (mass)`) turn energy into material, as far as their
+  upkeep is paid (nothing in a full stall), and go up like reactors. Each eats a whole power
+  plant of its tier, and each tier is the better buy, even run on the cheapest (tier 3)
+  power, so spamming a lower tier never pays:
+
+  | Tier | Makes | Draws | Mass | Payback, own-tier power | Payback, T3 power |
+  | --- | --- | --- | --- | --- | --- |
+  | T1 (2x2) | 0.25/s | 30 E/s (two T1 reactors) | 180 | ~22 min | ~15 min |
+  | T2 (4x4) | 3/s | 350 E/s (one T2 reactor) | 1,650 | ~13 min | ~12 min |
+  | T3 (8x8) | 20/s | 2,000 E/s (one T3 reactor) | 9,000 | ~10 min | ~10 min |
+
+  All pay back slower than the mine upgrades, so they come after the mines; they need no
+  ground, so a side whose mines are done grows on them. Each tier is a building of its own
+  on its power plant's lot, not an upgrade. They share the Mines priority switch. The
+  Regency Condensers are the same.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus
   (`focus.rs`), the Mines and Power priorities in one row under the economy panel: each of
@@ -156,17 +165,24 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   Culverin and Corona lost theirs).
 - **Build time follows mass.** Every build takes about as long per material as others of its
   kind, economy included: a mine upgrade takes about 1.6 build-power seconds per material it
-  pays (core mine times 72 / 820 / 5840 / 13100), reactors about 1.7 (Reactor III 4800).
+  pays (core mine times 72 / 1100 / 6000 / 15000), reactors about 1.7 (Reactor III 4800).
   Growing income now competes for build power with spending it.
 - **Build power gets cheaper by tier.** Factories 20 / 120 / 360, so each tier's factory rolls
   out its line tank in 11-14 s (Warden 14, Bulwark 11, Paladin 13). Engineers 5 / 30 / 150
   (0.10 / 0.15 / 0.19 build power per material); the commander's Engineering Suite II 30,
   Suite III 150, Auxiliary Engineering Suite 60. A late-game side buys the build power to spend
   its income with a few tier 3 engineers, not dozens of Masons.
+- **Every factory of a tier spends at the same rate**, whatever it builds: about 4 / 20 / 60
+  materials a second (tier 1 / 2 / 3, at its own power). Land and air come out there; ships
+  took half the time per material and are now 5 build-power seconds per material at tier 1
+  and 6 at tiers 2 and 3 (Frigate 1,150, Destroyer 5,520, Battleship 25,200). Tier 1
+  aircraft stay a little slower (about 3 a second) on purpose.
 
-Measured on 8 AI duels (40 min, Hard): mass mined over a game fell by a third to a half (dev16
-317k to 202k, Meridian Crown 309k to 145k), and income at 24 minutes to 46-108/s (was 108-226). Army standing at 30
-minutes rose against economy standing (about 1:2 to 1:3, was 1:4 to 1:9).
+Measured 2026-10-03 with `zz_eco_ledger_probe` (36 min, Hard against Hard, Serac Divide,
+dev16 and Twin Shoals), before -> after: income at 6 minutes 5 -> 13-17 a second and at 12
+minutes 5 -> 19-32; tech 2 at 21-30 -> about 12 minutes; mass mined over the game 14-20k ->
+51-78k; tech 3 and the first experimentals by minute 36. The AI's own tech timing is
+untuned; its tier 3 comes late.
 
 ## Reclaim
 

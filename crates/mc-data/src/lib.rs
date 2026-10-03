@@ -1019,6 +1019,14 @@ impl Blueprints {
     pub fn upgrade_needs(&self, to: &UnitBlueprint) -> u8 {
         if to.has(cat::FACTORY) {
             1
+        } else if to.has(cat::EXTRACTOR) {
+            // A mine climbs one tier past the side's tech, so the economy can grow
+            // before the army's tier is bought; the deep core still opens with tech 3.
+            if to.tech >= 4 {
+                3
+            } else {
+                (to.tech - 1).max(1)
+            }
         } else {
             // Nothing builds at tech 4 yet: a tier 4 upgrade (the deep core) opens with tech 3.
             to.tech.min(3)
@@ -1978,7 +1986,7 @@ mod tests {
         let (mfe, shield) = (module("back", "mfe"), module("back", "shield"));
         let with_mfe = bp.refit_result(with_rail, mfe).unwrap();
         let e = &bp.unit(with_mfe).economy;
-        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::ratio(3, 2));
+        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::from_int(3));
         assert_eq!(
             e.energy_income,
             acu.economy.energy_income + Fx::from_int(100)

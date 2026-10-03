@@ -29,23 +29,25 @@ the money.** Paybacks, energy counted at 6 to 1:
 
 | Investment | Pays back in |
 |---|---|
-| T1 mine (on a field) | ~45 s |
+| T1 mine (on a field) | ~25 s |
 | Engineer (build power turning a full store into mines) | as soon as it has work |
-| Commander MFE (+1.5 materials, +100 energy) | ~10 min |
-| Mine T1→T2 | ~3 min |
-| Mine T2→T3 | ~8 min |
-| Mine T3→T4 (the Deep Core) | ~12 min |
-| Material fabricator and the power it needs | ~10x a same-tier mine (T1 ~450 s, T2 ~30 min, T3 ~80 min) |
+| Commander MFE (+3 materials, +100 energy) | ~6 min |
+| Mine T1→T2 (open at tech 1) | ~3 min |
+| Mine T2→T3 (open at tech 2) | ~7 min |
+| Mine T3→T4 (the Deep Core, tech 3) | ~11 min |
+| Material fabricator and the reactor it eats | T1 ~22 min, T2 ~13, T3 ~10 (the best one) |
 
 So: mines first, and enough build power to raise them. The tier upgrades come only when
 the time you have left is longer than their payback. In a race that ends at minute 12, a
-side mine's T1→T2 upgrade (165 s plus the time to build it) does not pay. Over a longer
-game it does.
+side mine's T1→T2 upgrade (about 3 minutes plus the time to build it) barely pays. Over a
+longer game it does. Mines climb one tier past your tech, so the mines can grow before you
+buy a tier path.
 
 ## The race
 
-**Stale since the 2026-10-02 mine rebalance** (ore worth far more, bare land far less, about
-1 / 4 / 12 / 24 a second by tier, tier paths dearer): rerun the search before leaning on any
+**Stale since the 2026-10-02/03 mine rebalances** (ore worth far more, about 2 / 6 / 14 / 23
+a second by tier on a duel field, mines one tier past the tech, fabricators by tier, tier
+paths dearer): rerun the search before leaning on any
 of the plan below. The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
 mass, build power by tier, reactors 15 / 350 / 2000): rerun the search before leaning on them.
 Searched again on the new numbers (4 maps x 2 starts): the best plan is the same but with
