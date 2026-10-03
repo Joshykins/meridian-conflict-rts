@@ -57,6 +57,10 @@ pub enum Scene {
     Stress,
     /// One of every unit in a row, for looking at models.
     Showcase,
+    /// Buildings standing against each other at the first start position, for their
+    /// adjacency conduits: a Reactor III between a factory and a Fabricator III (bound to
+    /// it), a Reactor I powering the fabricator, and the fabricator against the factory.
+    Adjacency,
     /// The battle staged behind the front end's menus.
     Backdrop,
     /// Two armies named on the command line (`--blue KEY:N`, `--red KEY:N`) meet at the
@@ -107,6 +111,7 @@ impl Scene {
             "stress" => Scene::Stress,
             "matchup" => Scene::Matchup,
             "showcase" => Scene::Showcase,
+            "adjacency" => Scene::Adjacency,
             "backdrop" => Scene::Backdrop,
             "range" => Scene::Range,
             "reclaim" => Scene::Reclaim,
@@ -922,6 +927,26 @@ pub fn opening_commands(
                 friend("aster_t1_bot", (-8, 40)),
                 friend("aster_t2_tank", (80, 8)),
             ]);
+        }
+        Scene::Adjacency => {
+            // Lots are 12 m build cells (`mc_map::BUILD_CELL_M`): a reactor III and a
+            // factory 96 m across, fabricators and a reactor I 24 m.
+            let base = map.start_positions().first().copied().unwrap_or(centre);
+            for (key, x, y) in [
+                ("aster_t3_power", 0, 0),
+                ("aster_t3_land_factory", 96, 0),
+                ("aster_t3_fabricator", -60, 12),
+                ("aster_t1_power", -84, 12),
+                ("aster_t3_fabricator", 72, 60),
+            ] {
+                out.push(spawn(
+                    0,
+                    key,
+                    base + FxVec2::from_ints(x, y),
+                    Angle::from_degrees(270),
+                    1,
+                ));
+            }
         }
         Scene::Showcase => {
             // Laid out on the flat ground of the first start position: mobile units in

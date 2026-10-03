@@ -1006,6 +1006,31 @@ shared! {
         pub const WAKE_POINTS: u32 = 12;
     }
 
+    /// The economy's two resources as the interface colours them (mc-game `hud::MASS`,
+    /// `hud::ENERGY`) and the world's adjacency conduits light them (links.wgsl), as
+    /// sRGB `0xRRGGBB`.
+    pub mod tone as "TONE_" {
+        /// Materials (the sim's `mass`): red-orange.
+        pub const MASS: u32 = 0xFF6B3D;
+        pub const ENERGY: u32 = 0xF4C25E;
+    }
+
+    /// An adjacency conduit (`renderer/adjacency_links.rs` `LinkInstance::flags`, links.wgsl).
+    pub mod link as "LINK_" {
+        /// It carries energy (else materials).
+        pub const ENERGY: u32 = 1;
+        /// The two buildings go down together (`mc_sim::adjacency::bound`).
+        pub const BOUND: u32 = 2;
+        /// One of its two buildings is selected or under the pointer: drawn brighter.
+        pub const HIGHLIGHT: u32 = 4;
+        /// A would-be link of a placement ghost: drawn see-through, after the scene.
+        pub const PLANNED: u32 = 8;
+        /// Couplers across the seam at most, however long it is.
+        pub const MAX_COUPLERS: u32 = 8;
+        /// Stretches of the seam's tray at most, each laid on the ground on its own.
+        pub const MAX_TRAY_SEGMENTS: u32 = 16;
+    }
+
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the
     /// older hand-written `FLAG_*` list in common.wgsl does not hold.
     pub mod unit_flag as "UNIT_FLAG_" {

@@ -79,7 +79,7 @@ With no match options the game opens its front end: main menu, match set-up
 straight into a match instead.
 
   --map NAME|PATH        map to play (default: maps/dev16.mcmap, else maps/meridian_basin.mcmap)
-  --scene NAME           skirmish (default) | battle | stress | showcase | range | reclaim | repair | formations | aircraft | aircraft-crash | aircraft-ditch | offshore | wreckage
+  --scene NAME           skirmish (default) | battle | stress | showcase | adjacency | range | reclaim | repair | formations | aircraft | aircraft-crash | aircraft-ditch | offshore | wreckage
   --range                the test range (same as --scene range): one unit on a pad and a
                          panel to attack it, destroy it, scrub its build state, have it
                          built, give it targets, and reset

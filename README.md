@@ -113,6 +113,7 @@ cargo run --release -p mc-game -- --map meridian_crown --players 32 --teams 8 --
 cargo run --release -p mc-game -- --scene battle                 # two pre-built armies (test scene)
 cargo run --release -p mc-game -- --scene stress --map meridian_basin --players 8 --army 500   # full load
 cargo run --release -p mc-game -- --scene showcase               # one of every unit
+cargo run --release -p mc-game -- --scene adjacency              # buildings against each other: adjacency conduits
 cargo run --release -p mc-game -- --range                        # the test range, a Warden on the pad
 cargo run --release -p mc-game -- --range --unit aster_t1_artillery --scenario targets
 cargo run --release -p mc-game -- --map twin_shoals --observe     # watch two AIs fight

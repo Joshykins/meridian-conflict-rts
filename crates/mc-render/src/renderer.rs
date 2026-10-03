@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 mod active_draws;
+pub(crate) mod adjacency_links;
 mod aircraft_trails;
 mod arc_howitzer_fx;
 mod blast_fx;
@@ -808,6 +809,8 @@ pub struct Renderer {
     grass: grass::Grass,
     /// Walls where a structure's lot was levelled into the ground.
     foundations: foundations::Foundations,
+    /// Conduits across the seams of buildings that save each other upkeep (adjacency_links.rs).
+    adjacency_links: adjacency_links::AdjacencyLinks,
     hull_set: vk::DescriptorSet,
     scene_fb: vk::Framebuffer,
     /// One view and framebuffer per cascade layer of `shadow`.
@@ -2096,6 +2099,7 @@ impl Renderer {
             &track_marks,
             foundations.cells(),
         )?;
+        let adjacency_links = adjacency_links::AdjacencyLinks::new(&gpu, &layouts, &passes)?;
         write_image(scene_set, 30, gtao.ao_view(), vk::ImageLayout::GENERAL);
         write_buffers(
             scene_set,
@@ -2359,6 +2363,7 @@ impl Renderer {
             terrain_lit,
             grass,
             foundations,
+            adjacency_links,
             hull_set,
             present_format,
             width,
@@ -5527,6 +5532,7 @@ impl Drop for Renderer {
         self.fog.destroy(&self.gpu);
         self.grass.destroy(&self.gpu);
         self.foundations.destroy(&self.gpu);
+        self.adjacency_links.destroy(&self.gpu);
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
         self.ground_melt.destroy(&self.gpu);
