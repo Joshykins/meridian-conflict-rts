@@ -146,22 +146,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_heart", 6.9, 7.5, heart::heart),
     ModelDef::new("regency_heart_2", 18.75, 18.0, heart::heart_2),
     ModelDef::new("regency_heart_3", 42.5, 35.0, heart::heart_3),
-    // The Condenser, the material fabricator: three designs for the user to pick from
-    // (`condenser`).
+    // The Condenser, the material fabricator: a building of its own per tier (`condenser`).
     ModelDef::tiered(
         "regency_fabricator",
         condenser::SIZES,
         condenser::vessel::vessel_plant,
-    ),
-    ModelDef::tiered(
-        "regency_fabricator~orbit",
-        condenser::SIZES,
-        condenser::orbit::orbit_plant,
-    ),
-    ModelDef::tiered(
-        "regency_fabricator~press",
-        condenser::SIZES,
-        condenser::press::press_plant,
     ),
     ModelDef::tiered(
         "regency_cyst",

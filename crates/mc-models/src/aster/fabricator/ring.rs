@@ -1,11 +1,13 @@
-//! Design B (`fabricator~ring`): a square accelerator ring round the lot, its coils driving
-//! the charge round and four injectors firing it into a squat vessel in the middle; the
-//! banks outside the ring on the grid side (-x), the hopper inside it.
-//! - Tech 1: the ring with a coil on each side, the injectors, the vessel, one bank.
-//! - Tech 2: coils all round the ring, an upper stage, a gantry over the ring's corners
+//! The ring plant of the tech 1 and tech 3 Material Fabricators: a square accelerator ring
+//! round a squat vessel, its coils driving the charge round and four injectors firing it
+//! in; the banks outside the ring on the grid side (-x), the hopper inside it. Authored on
+//! the 4×4 lot and drawn to each building's own lot (`super::fabricator`).
+//! - Its first stage (the tech 1 building): the ring with a coil on each side, the
+//!   injectors, the vessel, one bank.
+//! - Its second: coils all round the ring, an upper stage, a gantry over the ring's corners
 //!   holding the stage's collar, banks on the flanks, radiators.
-//! - Tech 3: a third stage under a crown on the gantry raised higher, a second bank row and
-//!   more cooling.
+//! - Its third (with the second, the tech 3 building): a third stage under a crown on the
+//!   gantry raised higher, a second bank row and more cooling.
 
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
@@ -29,12 +31,8 @@ fn hatch(stage: usize) -> f32 {
     z1 + r * 0.35 + 0.7
 }
 
-pub(in crate::aster) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
-    standalone(b, tech, plant);
-}
-
-/// The plant drawn with every tier's machinery up to `tech`, at the 4x4 lot's scale.
-fn plant(b: &mut MeshBuilder, tech: u8) {
+/// The plant drawn with every stage of its machinery up to `tech` (1 or 3).
+pub(super) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
     if b.coarse() {
         coarse(b, tech);
         return;

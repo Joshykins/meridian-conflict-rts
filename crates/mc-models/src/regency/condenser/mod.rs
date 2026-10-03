@@ -5,11 +5,8 @@
 //! working machinery the higher it goes (more cells, a taller vessel, more field gear), in
 //! the Regency's dark lapped plate over graphite machinery, red where it runs hot.
 //!
-//! Three designs are on the table (`regency_fabricator`, `~orbit`, `~press`), all built
-//! from the kit here.
+//! The plant is in `vessel`, built from the kit here.
 
-pub(super) mod orbit;
-pub(super) mod press;
 pub(super) mod vessel;
 
 use glam::{Affine3A, Vec2, Vec3};
@@ -325,11 +322,7 @@ mod tests {
     use super::{LOTS, SIZES};
     use crate::{build_model_scaled, rig};
 
-    const DESIGNS: [&str; 3] = [
-        "regency_fabricator",
-        "regency_fabricator~orbit",
-        "regency_fabricator~press",
-    ];
+    const DESIGNS: [&str; 1] = ["regency_fabricator"];
 
     /// Each tier is a building of its own: nothing waits on it for a refit, it fills its
     /// own lot (and no more), and each tier carries more machinery than the one below.
@@ -359,21 +352,6 @@ mod tests {
                 let full = model.lods[0].indices.len();
                 assert!(full > last, "{key} T{tech} has more machinery");
                 last = full;
-            }
-        }
-    }
-
-    /// Prints each design's triangles per level of detail and tier, and the reduced
-    /// level's share of the full one:
-    /// `cargo test --profile gate -p mc-models --lib zz_condenser_counts -- --ignored --nocapture`.
-    #[test]
-    #[ignore = "a probe: prints triangle counts"]
-    fn zz_condenser_counts() {
-        for key in DESIGNS {
-            for (i, (r, h)) in SIZES.into_iter().enumerate() {
-                let m = build_model_scaled(key, r, h, i as u8 + 1).unwrap();
-                let n: Vec<usize> = m.lods.iter().map(|l| l.indices.len() / 3).collect();
-                println!("{key} T{}: {n:?} {:.2}", i + 1, n[1] as f32 / n[0] as f32);
             }
         }
     }

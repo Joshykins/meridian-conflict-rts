@@ -6,12 +6,11 @@
 //! its power plant's lot (2x2, 4x4, 8x8), with more working machinery the higher it goes
 //! (coils, banks, cooling), never spikes or glow for menace.
 //!
-//! Three designs are on the table (`fabricator`, `fabricator~ring`, `fabricator~line`), all
-//! built from the kit here.
+//! Tech 1 and 3 are the accelerator ring plant (`ring`), tech 2 the stacked vessel
+//! (`vessel`), both built from the kit here.
 
-pub(super) mod line;
-pub(super) mod ring;
-pub(super) mod vessel;
+mod ring;
+mod vessel;
 
 use glam::{Affine3A, Vec2, Vec3};
 
@@ -26,25 +25,31 @@ pub(super) const SIZES: [(f32, f32); 3] = [(11.0, 7.0), (23.0, 22.0), (42.5, 34.
 /// Each tier's lot, in build cells a side.
 #[cfg(test)]
 const LOTS: [u32; 3] = [2, 4, 8];
-/// The plant is authored on the 4x4 lot: the tech 1 building is that plant's first tier
-/// drawn down to a 2x2 lot, and the tech 3 one its full plant drawn up in the middle of
-/// an 8x8 lot, with the yard round it.
+/// The plants are authored on the 4x4 lot: the tech 1 building is the ring plant's first
+/// stage drawn down to a 2x2 lot, and the tech 3 one the whole ring plant drawn up in the
+/// middle of an 8x8 lot, with the yard round it.
 const T1_SCALE: f32 = 0.52;
 const T3_SCALE: f32 = 1.3;
 
-/// Draws `plant`'s building for `tech`: each tier a building of its own (see `T1_SCALE`).
-pub(super) fn standalone(b: &mut MeshBuilder, tech: u8, plant: fn(&mut MeshBuilder, u8)) {
+/// The Material Fabricator at `tech`, each tier a building of its own: tech 1 the ring
+/// plant's first stage on a 2x2 lot, tech 2 the vessel plant on a 4x4, tech 3 the whole
+/// ring plant in its yard on an 8x8.
+pub(super) fn fabricator(b: &mut MeshBuilder, tech: u8) {
     match tech.clamp(1, 3) {
-        1 => b.with(Affine3A::from_scale(Vec3::splat(T1_SCALE)), |b| plant(b, 1)),
-        2 => plant(b, 2),
+        1 => b.with(Affine3A::from_scale(Vec3::splat(T1_SCALE)), |b| {
+            ring::ring_plant(b, 1)
+        }),
+        2 => vessel::vessel_plant(b),
         _ => {
             yard(b);
-            b.with(Affine3A::from_scale(Vec3::splat(T3_SCALE)), |b| plant(b, 3));
+            b.with(Affine3A::from_scale(Vec3::splat(T3_SCALE)), |b| {
+                ring::ring_plant(b, 3)
+            });
         }
     }
 }
 
-/// A tier's machinery in a plant drawn at `tech`: there when the building has that tier.
+/// A stage of the ring plant's machinery drawn at `tech`: there when the building has it.
 pub(super) fn fitted(b: &mut MeshBuilder, tech: u8, tier: u8, f: impl FnOnce(&mut MeshBuilder)) {
     if tier <= tech {
         f(b);
@@ -443,7 +448,7 @@ mod tests {
     use super::{LOTS, SIZES};
     use crate::{build_model_scaled, rig};
 
-    const DESIGNS: [&str; 3] = ["fabricator", "fabricator~ring", "fabricator~line"];
+    const DESIGNS: [&str; 1] = ["fabricator"];
 
     /// Each tier is a building of its own: nothing waits on it for a refit, it fills its
     /// own lot (and no more), and each tier carries more machinery than the one below.
@@ -473,21 +478,6 @@ mod tests {
                 let full = model.lods[0].indices.len();
                 assert!(full > last, "{key} T{tech} has more machinery");
                 last = full;
-            }
-        }
-    }
-
-    /// Prints each design's triangles per level of detail and tier, and the reduced
-    /// level's share of the full one:
-    /// `cargo test --profile gate -p mc-models --lib zz_fabricator_counts -- --ignored --nocapture`.
-    #[test]
-    #[ignore = "a probe: prints triangle counts"]
-    fn zz_fabricator_counts() {
-        for key in DESIGNS {
-            for (i, (r, h)) in SIZES.into_iter().enumerate() {
-                let m = build_model_scaled(key, r, h, i as u8 + 1).unwrap();
-                let n: Vec<usize> = m.lods.iter().map(|l| l.indices.len() / 3).collect();
-                println!("{key} T{}: {n:?} {:.2}", i + 1, n[1] as f32 / n[0] as f32);
             }
         }
     }

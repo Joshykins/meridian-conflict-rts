@@ -157,22 +157,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     )
     .with_tier_4(),
     ModelDef::tiered("power", reactor::SIZES, reactor::power),
-    // The Material Fabricator: three designs for the user to pick from (`fabricator`).
-    ModelDef::tiered(
-        "fabricator",
-        fabricator::SIZES,
-        fabricator::vessel::vessel_plant,
-    ),
-    ModelDef::tiered(
-        "fabricator~ring",
-        fabricator::SIZES,
-        fabricator::ring::ring_plant,
-    ),
-    ModelDef::tiered(
-        "fabricator~line",
-        fabricator::SIZES,
-        fabricator::line::line_plant,
-    ),
+    // The Material Fabricator: a building of its own per tier (`fabricator`).
+    ModelDef::tiered("fabricator", fabricator::SIZES, fabricator::fabricator),
     ModelDef::tiered(
         "storage_mass",
         [(16.5, 8.0), (16.5, 13.0), (16.5, 19.0)],
