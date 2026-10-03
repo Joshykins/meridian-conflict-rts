@@ -120,7 +120,7 @@ fn strata_lift() -> f32 {
 @group(0) @binding(12) var repeat_sampler: sampler;
 @group(0) @binding(13) var clamp_sampler: sampler;
 @group(0) @binding(14) var shadow_sampler: sampler_comparison;
-// One R8 SDF layer per unit blueprint: the structure's ground plan.
+// One RG8 SDF layer per unit blueprint: the structure's ground plan (`pad_mesh_sd`).
 @group(0) @binding(16) var pad_footprints: texture_2d_array<f32>;
 // One RGBA8 layer per unit blueprint: mesh plan SDF + local-Z span.
 @group(0) @binding(17) var hull_plans: texture_2d_array<f32>;
@@ -914,4 +914,15 @@ fn under_sea_veil(clip: vec4<f32>) -> vec4<f32> {
 fn under_sea_seen(color: vec4<f32>, clip: vec4<f32>) -> vec4<f32> {
     let veil = under_sea_veil(clip);
     return vec4<f32>(color.rgb * veil.xyz * veil.w, color.a * veil.w * dot(veil.xyz, vec3<f32>(0.2, 0.5, 0.3)));
+}
+
+// The structure's ground plan from the mesh-baked SDF atlas (`models::bake_pad_footprint`),
+// metres, positive outside: x the pour under the building, y the paved apron round it.
+// Layer is the unit blueprint index.
+fn pad_mesh_sd(uv: vec2<f32>, layer: u32) -> vec2<f32> {
+    let n = textureNumLayers(pad_footprints);
+    let i = i32(min(layer, n - 1u));
+    let tex = uv / PAD_FOOTPRINT_REACH * 0.5 + 0.5;
+    let raw = textureSampleLevel(pad_footprints, clamp_sampler, tex, i, 0.0).rg;
+    return (0.5 - raw) * 2.0 * PAD_SDF_RANGE;
 }

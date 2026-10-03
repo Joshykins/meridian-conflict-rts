@@ -1252,7 +1252,7 @@ impl Renderer {
                 let half = bp.footprint.0.max(bp.footprint.1) as f32 * (BUILD_CELL_M as f32 * 0.5);
                 models::bake_pad_footprint(&model.lods[0], half)
             } else {
-                vec![0u8; (models::PAD_FOOTPRINT_RES * models::PAD_FOOTPRINT_RES) as usize]
+                vec![0u8; (models::PAD_FOOTPRINT_RES * models::PAD_FOOTPRINT_RES * 2) as usize]
             };
             pad_layers.push(pad);
             let plan_h = model.lods[0]
@@ -1831,7 +1831,7 @@ impl Renderer {
         let pad_footprints = gpu.image(&ImageDesc {
             width: pad_res,
             height: pad_res,
-            format: vk::Format::R8_UNORM,
+            format: vk::Format::R8G8_UNORM,
             usage: sampled,
             layers: pad_layers.len().max(1) as u32,
             mips: 1,
@@ -1843,7 +1843,7 @@ impl Renderer {
                 0,
                 0,
                 None,
-                &vec![0u8; (pad_res * pad_res) as usize],
+                &vec![0u8; (pad_res * pad_res * 2) as usize],
                 true,
             )?;
         } else {

@@ -263,15 +263,11 @@ struct PadOut {
     @location(3) @interpolate(flat) half_m: f32,
 }
 
-// The structure's ground plan, from the mesh-baked SDF atlas. Positive is
-// outside the pour. Layer is the unit blueprint index.
-fn pad_mesh_sd(uv: vec2<f32>, layer: u32) -> f32 {
-    let n = textureNumLayers(pad_footprints);
-    let i = i32(min(layer, n - 1u));
-    let tex = uv / PAD_FOOTPRINT_REACH * 0.5 + 0.5;
-    let raw = textureSampleLevel(pad_footprints, clamp_sampler, tex, i, 0.0).r;
-    return (0.5 - raw) * 2.0 * PAD_SDF_RANGE;
-}
+// The apron's kerb: precast blocks this wide inside its edge, metres, and this long.
+const KERB_W: f32 = 0.6;
+const KERB_BLOCK_M: f32 = 1.5;
+// The steel angle that caps the kerb's outer arris, metres.
+const KERB_NOSING_M: f32 = 0.09;
 
 // Metres the pad runs past its lot: the grit that spills off the kerb.
 const PAD_SPILL_M: f32 = 1.2;
@@ -324,16 +320,26 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     let far = smoothstep(0.06, 0.35, px);
     let nanite = (in.packed & PAD_NANITE) != 0u;
 
-    // Metres inside the kerb; negative out on the dirt. The slab runs a hand's
-    // breadth past the lot so two lots side by side overlap rather than meet
-    // at half cover each, which let the ground show through as a dark seam.
+    // Metres inside the kerb; negative out on the dirt. The apron is the building's
+    // plan grown a few metres, corners cut (`models::bake_pad_footprint`); where it
+    // reaches the lot it runs a hand's breadth past, so two lots side by side overlap
+    // rather than meet at half cover each.
     let ragged = textureSample(noise_map, repeat_sampler, wp / 5.0).b;
-    var edge_in = in.half_m + 0.3 - max(abs(local.x), abs(local.y));
+    let plan = pad_mesh_sd(in.uv, blueprint);
+    let sd = plan.x;
+    var edge_in = -plan.y;
+    // Out of the apron, across the kerb: the apron's gradient, from one texel over each way.
+    let step_uv = 2.0 * PAD_FOOTPRINT_REACH / f32(textureDimensions(pad_footprints).x);
+    let grad = vec2<f32>(
+        pad_mesh_sd(in.uv + vec2<f32>(step_uv, 0.0), blueprint).y - plan.y,
+        pad_mesh_sd(in.uv + vec2<f32>(0.0, step_uv), blueprint).y - plan.y,
+    );
+    let outward = select(sign(local) * step(abs(local.yx), abs(local.xy)), normalize(grad), dot(grad, grad) > 1e-8);
     // A Regency lot is no square slab: a black hub under the building, smaller discs spread out
     // round it on graphite lines (`lot_plate`), bare ground between.
     var plate = vec4<f32>(in.half_m, 0.0, 0.0, 0.0);
-    let sd = pad_mesh_sd(in.uv, blueprint);
     if nanite {
+        edge_in = in.half_m + 0.3 - max(abs(local.x), abs(local.y));
         let lot_seed = hash21(floor(wp - local + vec2<f32>(0.5)) * 0.0173);
         plate = lot_plate(local, in.half_m, lot_seed, px);
         // Wherever the building stands past the hub, the hub's black runs under it, still round.
@@ -341,7 +347,8 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
         edge_in = min(edge_in, max(plate.x, under));
     }
     let paved = smoothstep(-px * 0.5, px * 0.5, edge_in);
-    let spill_reach = PAD_SPILL_M * (0.35 + 0.65 * ragged);
+    // Off a kerb only a thin line of grit; off a Regency disc the old dust.
+    let spill_reach = select(0.45, PAD_SPILL_M, nanite) * (0.35 + 0.65 * ragged);
     let spill = (1.0 - paved) * (1.0 - smoothstep(0.0, spill_reach, -edge_in));
     if paved + spill < 0.01 {
         discard;
@@ -387,18 +394,25 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     albedo *= 1.0 - joint * 0.45 - (far * 0.04);
     albedo *= 1.0 - cell_joint * 0.3;
 
-    // The kerb is only a worn arris: lots side by side pave as one yard, not tiles.
-    let kerb = paved * (1.0 - smoothstep(0.25, 0.25 + px, edge_in));
+    // The kerb: precast blocks round the apron's edge, paler and smoother than the slabs,
+    // a dark joint between them and the paving, the outer arris capped in steel angle.
+    let kerb = paved * (1.0 - smoothstep(KERB_W, KERB_W + px, edge_in)) * (1.0 - far * 0.6);
+    let along = dot(wp, vec2<f32>(-outward.y, outward.x)) / KERB_BLOCK_M;
+    let block = floor(along);
+    let block_joint = 1.0 - smoothstep(0.02, 0.02 + px / KERB_BLOCK_M, 0.5 - abs(fract(along) - 0.5));
+    let inner_joint = 1.0 - smoothstep(0.04, 0.04 + px, abs(edge_in - KERB_W));
+    let nosing = kerb * (1.0 - smoothstep(KERB_NOSING_M, KERB_NOSING_M + px, edge_in));
+    var kerb_col = vec3<f32>(0.29, 0.282, 0.262) * (0.9 + 0.2 * hash21(vec2<f32>(block, 7.0) + floor(wp / 40.0))) * (0.94 + 0.12 * grain);
+    kerb_col *= 1.0 - 0.15 * smoothstep(0.35, 0.75, broad);
+    kerb_col *= 1.0 - 0.5 * block_joint * (1.0 - far);
+    albedo = mix(albedo, kerb_col, kerb);
+    albedo *= 1.0 - 0.5 * inner_joint * paved * (1.0 - far);
 
-    // Team marks: an L painted in each corner of the lot, worn by traffic.
-    let corner = in.half_m - abs(local);
-    let arm = min(3.0, in.half_m * 0.3);
-    let inset = 0.7;
-    let stroke = 0.28;
-    let along = step(inset, min(corner.x, corner.y)) * step(max(corner.x, corner.y), inset + arm);
-    let across = (1.0 - smoothstep(inset + stroke, inset + stroke + px, min(corner.x, corner.y)));
-    let paint = along * across * smoothstep(0.25, 0.55, grain + 0.3) * (1.0 - far * 0.5);
-    albedo = mix(albedo, team * 0.4 + 0.03, paint * 0.55);
+    // Team colour: a worn painted line just inside the kerb, all the way round.
+    let line_in = KERB_W + 0.35;
+    let line = (1.0 - smoothstep(0.09, 0.09 + px, abs(edge_in - line_in - 0.09)))
+        * smoothstep(0.25, 0.55, grain + 0.3) * (1.0 - far * 0.5);
+    albedo = mix(albedo, team * 0.4 + 0.03, line * 0.55);
 
     // Grit spilled off the kerb: concrete dust, so where it falls on the next lot
     // it does not draw a seam.
@@ -417,12 +431,13 @@ fn fs_pad(in: PadOut) -> @location(0) vec4<f32> {
     let base_n = terrain_normal(in.world.xy, clamp(dist * 0.004, 4.0, 24.0));
     // Each slab sits a hair off level; the kerb's arris catches the light.
     let tilt = (vec2<f32>(tone, warm) - 0.5) * 0.035 * (1.0 - far);
-    let bevel = sign(local) * step(abs(local.yx), abs(local.xy)) * kerb * 0.15;
-    let nrm = normalize(base_n + vec3<f32>(tilt + bevel, 0.0));
+    let arris = 1.0 - smoothstep(0.0, 0.14, edge_in);
+    let bevel = outward * kerb * (0.06 + 0.5 * arris);
+    let nrm = normalize(base_n + vec3<f32>(tilt * (1.0 - kerb) + bevel, 0.0));
     var m: Pbr;
-    m.albedo = albedo;
-    m.metallic = 0.0;
-    m.roughness = mix(0.9, 0.35, wet);
+    m.albedo = mix(albedo, vec3<f32>(0.3, 0.3, 0.31) * (0.8 + 0.3 * grain), nosing);
+    m.metallic = nosing * 0.9;
+    m.roughness = mix(mix(0.9, 0.35, wet), 0.45, nosing);
     m.emissive = vec3<f32>(0.0);
     if nanite {
         let lot = nanite_lot(plate, px, grain, contact);

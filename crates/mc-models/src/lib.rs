@@ -868,7 +868,7 @@ pub use aster::zenith::{ZenithRail, ZENITH_RAIL};
 pub use desert::{COTTONWOOD_REACH, JUNIPER_REACH, PINYON_REACH};
 pub use footprint::hull_plan_box;
 pub use footprint::{
-    bake_hull_plan, bake_pad_footprint, hull_plan_at, hull_plan_half, hull_plan_sd, pad_sdf_at,
+    bake_hull_plan, bake_pad_footprint, hull_plan_at, hull_plan_half, hull_plan_sd,
     PAD_FOOTPRINT_REACH, PAD_FOOTPRINT_RES, PAD_SDF_RANGE,
 };
 pub use library::authored_size;

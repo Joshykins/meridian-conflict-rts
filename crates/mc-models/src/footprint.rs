@@ -12,6 +12,13 @@ pub const PAD_SDF_RANGE: f32 = 8.0;
 pub const PAD_FOOTPRINT_REACH: f32 = 1.12;
 /// How far past the hull the pour runs, metres.
 const POUR_MARGIN_M: f32 = 0.55;
+/// How far the paved apron runs past the box round the pour, metres.
+const APRON_M: f32 = 3.0;
+/// The apron's corners are cut at 45 degrees, this far along each side, metres.
+const APRON_CHAMFER_M: f32 = 2.0;
+/// How far the apron may run past the lot, metres: two lots side by side
+/// overlap rather than meet at half cover each.
+const APRON_PAST_LOT_M: f32 = 0.3;
 /// Hull triangles that never dip below this are roofs, cranes and masts.
 /// Turrets sit higher and are included anyway.
 const GROUND_Z: f32 = 3.5;
@@ -24,13 +31,104 @@ enum Band {
     Turret,
 }
 
-/// R8 UNORM SDF of `mesh` in lot UV. `half_m` is the pad quad's half-extent
-/// (the build-grid lot). `0.5` is the form edge, higher is inside.
+/// RG8 UNORM pad layer of `mesh` in lot UV. `half_m` is the pad quad's half-extent
+/// (the build-grid lot). R is the SDF of the pour under the building, G the SDF of
+/// the paved apron: the pour grown `APRON_M` with straight sides and corners cut at 45
+/// degrees, kept to the lot (the whole lot when nothing is poured). Both encode `0.5`
+/// at the edge, higher inside.
 pub fn bake_pad_footprint(mesh: &MeshLod, half_m: f32) -> Vec<u8> {
     let n = PAD_FOOTPRINT_RES as usize;
-    let mut out = vec![0u8; n * n];
-    if half_m.is_nan() || half_m <= 0.5 || mesh.indices.len() < 3 {
+    let mut out = vec![0u8; n * n * 2];
+    if half_m.is_nan() || half_m <= 0.5 {
         return out;
+    }
+    let texel_m = (2.0 * half_m * PAD_FOOTPRINT_REACH) / n as f32;
+    let lot = half_m + APRON_PAST_LOT_M;
+    let in_lot = |i: usize| {
+        let centre = |t: usize| texel_origin(t, half_m) + 0.5 * texel_m;
+        centre(i % n).abs() < lot && centre(i / n).abs() < lot
+    };
+    let pour = pour_occupancy(mesh, half_m);
+    let apron: Vec<bool> = match &pour {
+        Some(occ) => {
+            // An octagon round each poured texel: `reach` texels out square, its corners
+            // cut `cut` texels along each side.
+            let reach = (APRON_M / texel_m).round() as u32;
+            let cut = (APRON_CHAMFER_M / texel_m).round() as u32;
+            let square = grid_steps(occ, n, true);
+            let diamond = grid_steps(occ, n, false);
+            (0..n * n)
+                .map(|i| {
+                    square[i] <= reach && diamond[i] <= 2 * reach - cut.min(reach) && in_lot(i)
+                })
+                .collect()
+        }
+        None => (0..n * n).map(in_lot).collect(),
+    };
+    let pour_sd = pour.map(|occ| signed_distance(&occ, n, true));
+    let apron_sd = signed_distance(&apron, n, false);
+    let encode =
+        |metres: f32| ((0.5 - metres / (2.0 * PAD_SDF_RANGE)).clamp(0.0, 1.0) * 255.0) as u8;
+    for (i, px) in out.as_chunks_mut::<2>().0.iter_mut().enumerate() {
+        px[0] = pour_sd
+            .as_ref()
+            .map_or(0, |sd| encode(sd[i] * texel_m - POUR_MARGIN_M));
+        px[1] = encode(apron_sd[i] * texel_m);
+    }
+    out
+}
+
+/// Metres from the lot centre to the low edge of texel `t` along one axis.
+fn texel_origin(t: usize, half_m: f32) -> f32 {
+    let n = PAD_FOOTPRINT_RES as f32;
+    (t as f32 / n * 2.0 - 1.0) * PAD_FOOTPRINT_REACH * half_m
+}
+
+/// Steps from each texel to the nearest set one in `occ`: diagonal steps allowed (a
+/// square's reach) or not (a diamond's). `u32::MAX` when nothing is set.
+fn grid_steps(occ: &[bool], n: usize, diagonal: bool) -> Vec<u32> {
+    let mut steps = vec![u32::MAX; n * n];
+    let mut queue = std::collections::VecDeque::new();
+    for i in (0..n * n).filter(|&i| occ[i]) {
+        steps[i] = 0;
+        queue.push_back(i);
+    }
+    let reach: &[[i32; 2]] = if diagonal {
+        &[
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+            [1, 1],
+            [1, -1],
+            [-1, 1],
+            [-1, -1],
+        ]
+    } else {
+        &[[1, 0], [-1, 0], [0, 1], [0, -1]]
+    };
+    while let Some(i) = queue.pop_front() {
+        let (x, y) = ((i % n) as i32, (i / n) as i32);
+        for s in reach {
+            let (nx, ny) = (x + s[0], y + s[1]);
+            if nx < 0 || ny < 0 || nx >= n as i32 || ny >= n as i32 {
+                continue;
+            }
+            let j = ny as usize * n + nx as usize;
+            if steps[j] == u32::MAX {
+                steps[j] = steps[i] + 1;
+                queue.push_back(j);
+            }
+        }
+    }
+    steps
+}
+
+/// The texels the pour covers, or `None` for a mesh that pours nothing.
+fn pour_occupancy(mesh: &MeshLod, half_m: f32) -> Option<Vec<bool>> {
+    let n = PAD_FOOTPRINT_RES as usize;
+    if mesh.indices.len() < 3 {
+        return None;
     }
     let hull = rasterize(mesh, half_m, Band::Hull);
     let turret = rasterize(mesh, half_m, Band::Turret);
@@ -43,16 +141,9 @@ pub fn bake_pad_footprint(mesh: &MeshLod, half_m: f32) -> Vec<u8> {
         union(&hull, &turret)
     };
     if !occ.iter().any(|&p| p) {
-        return out;
+        return None;
     }
-    let sd = signed_distance(&occ, n, true);
-    let texel_m = (2.0 * half_m * PAD_FOOTPRINT_REACH) / n as f32;
-    for i in 0..n * n {
-        let metres = sd[i] * texel_m - POUR_MARGIN_M;
-        let enc = 0.5 - metres / (2.0 * PAD_SDF_RANGE);
-        out[i] = (enc.clamp(0.0, 1.0) * 255.0) as u8;
-    }
-    out
+    Some(occ)
 }
 
 /// Half-extent, metres, of a hull-plan atlas layer. [-1, 1] in plan UV is
@@ -333,17 +424,18 @@ fn edge_near(p: [f32; 2], a: [f32; 2], b: [f32; 2], slop: f32) -> bool {
     dx * dx + dy * dy <= slop * slop
 }
 
-/// Signed distance in metres at lot UV `uv` ([-1, 1] is the lot). Negative
-/// is inside the pour.
-pub fn pad_sdf_at(tex: &[u8], uv: [f32; 2]) -> f32 {
+/// Signed distance in metres at lot UV `uv` ([-1, 1] is the lot) in pad channel
+/// `channel` (0 the pour, 1 the apron). Negative is inside.
+#[cfg(test)]
+fn pad_sdf_at(tex: &[u8], uv: [f32; 2], channel: usize) -> f32 {
     let n = PAD_FOOTPRINT_RES as usize;
-    if tex.len() != n * n {
+    if tex.len() != n * n * 2 {
         return PAD_SDF_RANGE;
     }
     let to_texel = |u: f32| ((u / PAD_FOOTPRINT_REACH) * 0.5 + 0.5) * n as f32;
     let x = to_texel(uv[0]).clamp(0.0, (n - 1) as f32);
     let y = to_texel(uv[1]).clamp(0.0, (n - 1) as f32);
-    let raw = tex[y as usize * n + x as usize] as f32 / 255.0;
+    let raw = tex[(y as usize * n + x as usize) * 2 + channel] as f32 / 255.0;
     (0.5 - raw) * 2.0 * PAD_SDF_RANGE
 }
 
@@ -610,7 +702,11 @@ mod tests {
     }
 
     fn inside(tex: &[u8], uv: [f32; 2]) -> bool {
-        pad_sdf_at(tex, uv) < 0.0
+        pad_sdf_at(tex, uv, 0) < 0.0
+    }
+
+    fn paved(tex: &[u8], uv: [f32; 2]) -> bool {
+        pad_sdf_at(tex, uv, 1) < 0.0
     }
 
     #[test]
@@ -623,6 +719,22 @@ mod tests {
             !inside(&tex, [0.97, 0.97]),
             "lot corner is dirt, not a hashed slab"
         );
+    }
+
+    #[test]
+    fn factory_apron_is_smaller_than_its_lot() {
+        let (tex, _) = baked("factory_land", 46.0, 28.0, 1, 8);
+        assert!(paved(&tex, [0.0, 0.0]), "under the deck");
+        assert!(paved(&tex, [0.0, 0.54]), "round the side hall");
+        assert!(
+            !paved(&tex, [0.0, 0.95]),
+            "the lot's edge past the halls is ground"
+        );
+        assert!(
+            !paved(&tex, [0.8, 0.8]),
+            "the lot's corner beside the halls is ground"
+        );
+        assert!(!paved(&tex, [-0.97, 0.97]), "the corners are cut");
     }
 
     #[test]
@@ -659,8 +771,12 @@ mod tests {
     #[test]
     fn empty_mesh_is_all_outside() {
         let tex = bake_pad_footprint(&MeshLod::default(), 12.0);
-        assert!(tex.iter().all(|&p| p == 0));
-        assert!(pad_sdf_at(&tex, [0.0, 0.0]) > 0.0);
+        assert!(tex.as_chunks::<2>().0.iter().all(|p| p[0] == 0));
+        assert!(pad_sdf_at(&tex, [0.0, 0.0], 0) > 0.0);
+        assert!(
+            paved(&tex, [0.98, 0.5]),
+            "with no plan the whole lot is paved"
+        );
     }
 
     fn hull(key: &str, radius: f32, height: f32, tech: u8) -> (Vec<u8>, f32, f32) {

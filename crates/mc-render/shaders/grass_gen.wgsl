@@ -22,7 +22,8 @@ struct Press {
     a: vec2<f32>,
     b: vec2<f32>,
     // Mover: half length, half width. Track: half gauge, one track's width.
-    // Scorch: radius, strength. Lot: unused.
+    // Scorch: radius, strength. Lot: half size, its blueprint plus one when the lot is
+    // paved only on its apron (`pad_mesh_sd`), zero for the whole square.
     r: vec2<f32>,
     // Mover: travel direction (cos/sin packed as f16), weight. Track: how fresh.
     s: f32,
@@ -189,7 +190,8 @@ fn cs_gather_stains(@builtin(global_invocation_id) id: vec3<u32>) {
         if !in_reach(s.pos, s.radius * 1.5) {
             return;
         }
-        p.r = vec2<f32>(s.radius, 0.0);
+        let apron = (s.strength_seed & PAD_NANITE) == 0u;
+        p.r = vec2<f32>(s.radius, select(0.0, f32((s.strength_seed >> PAD_BLUEPRINT_SHIFT) + 1u), apron));
         p.kind = PRESS_LOT;
     }
     p.s = 0.0;
@@ -352,7 +354,11 @@ fn cs_trample(
             }
             case PRESS_LOT: {
                 let d = abs(xy - p.a) - vec2<f32>(p.r.x);
-                stands = max(stands, 1.0 - smoothstep(-0.6, 0.6, max(d.x, d.y)));
+                var edge = max(d.x, d.y);
+                if p.r.y > 0.0 {
+                    edge = pad_mesh_sd((xy - p.a) / p.r.x, u32(p.r.y) - 1u).y;
+                }
+                stands = max(stands, 1.0 - smoothstep(-0.6, 0.6, edge));
             }
             case PRESS_STONE: {
                 let d = distance(xy, p.a) / max(p.r.x, 0.3);
