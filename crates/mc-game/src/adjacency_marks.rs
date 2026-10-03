@@ -5,11 +5,12 @@
 //!   building it saves; a bound pair's tag says so. The neighbour lit from the unit
 //!   panel's band stands out.
 //! - Placing a building: every link it would make with the side's finished buildings,
-//!   drawn along the seam and tagged, and a card at the site with what it would gain,
-//!   what it would give, and whether it would be bound to a neighbour.
+//!   tagged on its seam (the renderer draws its planned conduit), and a card at the
+//!   site with what it would gain, what it would give, and whether it would be bound
+//!   to a neighbour.
 
 use crate::hud::adjacency::{self as adj, Tie, BOUND};
-use crate::nuke_marks::{dashed, project, surface, tag};
+use crate::nuke_marks::{project, surface, tag};
 use crate::orders::Field;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
@@ -93,9 +94,10 @@ fn seam(
     ) else {
         return;
     };
+    // A site's links: the renderer draws the planned conduit; the seam is underlined.
     let alpha = if hot { 1.0 } else { 0.8 };
     if planned {
-        dashed(ui, pa, pb, 2.0, rgb(tone, alpha), 18.0);
+        ui.stroke(pa, pb, 1.0, rgb(tone, 0.5));
     }
     // The arrow: from the provider's side of the seam into the other.
     let along = (b - a).normalize_or_zero();

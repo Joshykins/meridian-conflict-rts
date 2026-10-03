@@ -4727,6 +4727,27 @@ impl Game {
             && (placing_mine || mine_selected || (self.ctrl && !self.alt && self.menu.is_none()));
         renderer.set_ore_highlight(if survey { 1.0 } else { 0.0 });
         renderer.set_ore_claims(&hud::ore_claims(&self.blueprints, &self.view.frame.units));
+        // Adjacency conduits: the selection's and the pointer's lit, and the placing
+        // site's would-be links drawn as planned (`hud::adjacency`).
+        let lit: Vec<u32> = self
+            .view
+            .selection
+            .iter()
+            .copied()
+            .chain(hover_unit.map(|i| self.view.frame.units[i].unit_id))
+            .chain(self.hud.adjacency.partner)
+            .collect();
+        let planned = match (self.view.mode, sites.last()) {
+            (Mode::Place(bp), Some(site)) => hud::adjacency::planned_links(
+                &self.blueprints,
+                &self.view.frame.units,
+                self.view.local,
+                self.blueprints.unit(bp),
+                site.0,
+            ),
+            _ => Vec::new(),
+        };
+        renderer.set_link_focus(&lit, &planned);
         let build_grid = matches!(self.view.mode, Mode::Place(_)) || self.orders.dragging_plan();
         if build_grid {
             let field = Field {

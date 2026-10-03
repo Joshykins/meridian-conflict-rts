@@ -131,6 +131,52 @@ pub fn prospective(
     out
 }
 
+/// The links a building of `bp` placed at `at` would make, for the renderer's
+/// planned conduits (`Renderer::set_link_focus`): the site is unit 0.
+pub fn planned_links(
+    blueprints: &Blueprints,
+    units: &[UnitInstance],
+    local: u8,
+    bp: &UnitBlueprint,
+    at: FxVec2,
+) -> Vec<LinkView> {
+    let site = at.to_f32();
+    prospective(blueprints, units, local, bp, at)
+        .into_iter()
+        .map(|t| {
+            let partner = units
+                .iter()
+                .find(|u| u.unit_id == t.partner)
+                .map_or(site, |u| [u.pos[0], u.pos[1]]);
+            let (provider, consumer, from) = if t.incoming {
+                (t.partner, 0, partner)
+            } else {
+                (0, t.partner, site)
+            };
+            LinkView {
+                provider,
+                consumer,
+                provider_blueprint: if t.incoming {
+                    t.partner_blueprint
+                } else {
+                    bp.id
+                },
+                consumer_blueprint: if t.incoming {
+                    bp.id
+                } else {
+                    t.partner_blueprint
+                },
+                owner: local,
+                resource: t.resource,
+                share: t.share,
+                edge: t.edge,
+                from,
+                bound: t.bound,
+            }
+        })
+        .collect()
+}
+
 /// What the incoming ties save, capped: `[mass, energy]`.
 pub fn totals(ties: &[Tie]) -> [f32; 2] {
     let mut t = [0.0f32; 2];
