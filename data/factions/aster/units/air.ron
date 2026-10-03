@@ -96,9 +96,10 @@
  // The laser heads on the wingtip pods (`models/aster/air/argus.rs`).
  anti_missile_mounts: [(-2.53, 9.03, 3.77), (-2.53, -9.03, 3.77)],
  // A salvage ray in a ball turret under the belly that reaches far out and down from its
- // cruise height, clearing wrecks as it flies. It pulls and reaches as far as a
- // Scavenger III tower (`aster_t3_reclaimer`); keep the two in step (`models/aster/air/argus/turret.rs`).
- reclaimer: (power: 200, range: 1700, charge: 1.0, mobile: true, heads: [
+ // cruise height, clearing wrecks as it flies. It reaches as far as a Scavenger III tower
+ // (`aster_t3_reclaimer`) but pulls a fifth as hard (40 against 200): it sweeps a field the
+ // tower would strip.
+ reclaimer: (power: 40, range: 1700, charge: 1.0, mobile: true, heads: [
   (pivot: (0.345, 0, 0.805), emitter: (1.495, 0, 0.805), turn: 240, pitch: (-90, 10)),
  ]),
 ),

@@ -92,9 +92,9 @@
         orbit: 600,
     ),
     // Heavy scavenger: a long keeled craft on six gravity lift bells that follows the army and
-    // takes whole wrecks apart, the biggest included, with two nanite heads. Anchored on
-    // the Argus's salvage ray (200 mass a second); it pulls more (240) from close in (260 m)
-    // and works on the move.
+    // takes whole wrecks apart, the biggest included, with two nanite heads. It pulls 240
+    // mass a second from close in (260 m), six times the Argus's long salvage ray (40), and
+    // works on the move.
     (
         key: "regency_t3_scavenger",
         name: "Scythe",

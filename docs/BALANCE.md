@@ -201,7 +201,7 @@ replacing the mines.
   | Thresher (land, 3 heads, anti-missile) | 2 | 320 | 30 | 850 | 11 s |
   | Trawler (boat, works while sailing) | 1 | 80 | 6 | 600 | 13 s |
   | Osprey (4 drones, power 5 each) | 2 | 200 | 20 | 800 | 10 s |
-  | Argus salvage ray (radar/sonar plane, as a Scavenger III) | 3 | 1,200 | 200 | 1,700 | 6 s |
+  | Argus salvage ray (radar/sonar plane, a Scavenger III's reach) | 3 | 1,200 | 40 | 1,700 | 30 s |
   | Commander drone port (2 drones) | 2 | 450 | 10 | 1,400 | 45 s |
 - Materials Vault tiers hold 1,500 / 6,000 / 24,000 for 150 / 400 / 1,000 mass: storage gets cheaper per
   unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 mass.
