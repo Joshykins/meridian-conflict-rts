@@ -8,16 +8,17 @@
 //! `gpu_consts.rs`), and `bindings.wgsl` with `regions.wgsl` and `lights.wgsl` in
 //! front of those containing the line `//!use bindings` (`regions` alone for a
 //! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `desert`, `rock`, `surface`,
-//! `regency`, `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
+//! `metal`, `regency`, `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 17] = [
+pub(crate) const PRELUDES: [&str; 18] = [
     "common",
     "bindings",
     "regions",
     "shore",
     "surface",
+    "metal",
     "regency",
     "lights",
     "habitat",
@@ -39,6 +40,7 @@ pub(crate) struct Preludes {
     regions: String,
     shore: String,
     surface: String,
+    metal: String,
     regency: String,
     habitat: String,
     scenery: String,
@@ -68,6 +70,7 @@ impl Preludes {
             regions: read("regions"),
             shore: read("shore"),
             surface: read("surface"),
+            metal: read("metal"),
             regency: read("regency"),
             habitat: read("habitat"),
             scenery: read("scenery"),
@@ -113,7 +116,11 @@ impl Preludes {
         if uses("surface") {
             prelude = format!("{prelude}\n{}", self.surface);
         }
-        // Regency plate and bronze (needs surface).
+        // Scanned metal on the models, ARC's own finish (needs surface).
+        if uses("metal") {
+            prelude = format!("{prelude}\n{}", self.metal);
+        }
+        // Regency plate and machinery (needs metal).
         if uses("regency") {
             prelude = format!("{prelude}\n{}", self.regency);
         }

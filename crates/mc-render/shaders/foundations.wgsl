@@ -1,5 +1,6 @@
 //!use bindings
 //!use surface
+//!use metal
 //!use regency
 // Retaining walls on the slopes round a levelled lot (renderer/foundations.rs).
 // Per 8 m cell of the slope, one of two claddings:

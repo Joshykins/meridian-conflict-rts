@@ -40,6 +40,12 @@ far away. Meshes give the forms; `shaders/surface.wgsl` draws what is on them.
 - **White plating** is courses of plates with seams, and some plates carry a
   rivet ring, an access hatch or a bank of louvres. No two plates have quite
   the same paint or polish.
+- **Scratched steel under ARC's paint** (2026-10-02, `arc_metal` in
+  `shaders/metal.wgsl`): a CC0 scan of brushed steel (`data/textures/metal`)
+  gives the plating its grain and uneven sheen, and long scratches cut through
+  the paint to bright metal, fuller on the dark trim. The Regency's steel is a
+  different scan (worn iron, scattered scratches): the two factions never share
+  a pattern.
 - **Black has little orange lines**: level, short, one to a plate, let into a
   slot. Black cannot go darker at a seam, so its plates differ in sheen and
   their edges are scuffed lighter, which is what draws its forms. The lines

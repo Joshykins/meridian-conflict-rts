@@ -3,6 +3,7 @@
 //!use desert
 //!use rock
 //!use surface
+//!use metal
 //!use regency
 //!use scenery
 //!use warp_hull
@@ -2890,6 +2891,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         m.albedo = mix(m.albedo, vec3<f32>(0.2, 0.19, 0.185), sf.bare);
         m.metallic = mix(m.metallic, 0.85, sf.bare);
         m.roughness = clamp(mix(m.roughness + sf.rough, 0.5, sf.bare), 0.05, 1.0);
+        // ARC plate (metal.wgsl): steel grain under the paint, scratched through to bright
+        // metal. The Regency's plate has its own scan (regency.wgsl); props are not armour.
+        if (in.material == MAT_PLATING || in.material == MAT_ACCENT || in.material == MAT_PLATING_DARK)
+            && si.pattern != PAT_EMBER && (flags & KIND_PROP) == 0u {
+            let dl1 = dpdx(in.local);
+            let dl2 = dpdy(in.local);
+            let at = arc_scan_at(in.local, normalize(face_n + vec3<f32>(0.0, 0.0, 1e-9)), dl1, dl2, si.scale, si.seed);
+            let arc = arc_metal(m, at, in.material != MAT_PLATING);
+            m = arc.m;
+            n = normalize(n - reg_to_world(arc.slope, dl1, dl2, dp1, dp2));
+        }
         lights = sf.emissive;
         soot = sf.soot;
         if precursor && (flags & KIND_PROP) != 0u {

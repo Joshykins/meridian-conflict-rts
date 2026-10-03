@@ -928,14 +928,19 @@ shared! {
         pub const RIDING: u32 = 0x400;
     }
 
-    /// The steel scan the Regency plate is finished with (regency.wgsl): its two
-    /// layers in the terrain material array, after the ground and foliage layers
-    /// (`mc_render::textures::terrain_materials`, a test holds the index).
+    /// The metal scans the plate is finished with (metal.wgsl): two layers each in
+    /// the terrain material array, after the ground and foliage layers
+    /// (`mc_render::textures::terrain_materials`, a test holds the indices).
     pub mod metal_scan as "METAL_SCAN_" {
-        /// Linear albedo, roughness in A; the next layer is its normal XY and height.
+        /// The Regency's worn steel (regency.wgsl): linear albedo, roughness in A; the
+        /// next layer is its normal XY and scratches.
         pub const LAYER: i32 = 28;
-        /// Metres one repeat of the scan covers on a model.
+        /// Metres one repeat of the Regency's scan covers on a model.
         pub const TILE_M: f32 = 2.5;
+        /// ARC's scratched steel under the paint (`arc_metal`), laid out the same way.
+        pub const ARC_LAYER: i32 = 30;
+        /// Metres one repeat of ARC's scan covers on a model.
+        pub const ARC_TILE_M: f32 = 2.0;
     }
 
     /// A face's outline as distances to its own edges (`MeshVertex::face`, edge form): a

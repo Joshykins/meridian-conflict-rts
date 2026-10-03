@@ -1,5 +1,5 @@
 // Regency plate and machinery (`pattern::EMBER`): their colour and sheen. Prepended
-// after surface.wgsl (it uses its noise and bands) to shaders that contain the line
+// after surface.wgsl and metal.wgsl (it uses their noise, bands and scan) to shaders that contain the line
 // `//!use regency` (entity.wgsl).
 //
 // The Regency look is clean: broad satin plates whose facets each catch the light a
@@ -209,75 +209,13 @@ fn reg_seams(i: RegencyIn, o: RegOutline) -> RegSeams {
     return out;
 }
 
-// The steel scan (`metal_scan`, data/textures/metal): its grain, scratches and sheen,
-// as variation about its own mean, never its colour. Mapped in model space by three
-// planar projections blended by the face's normal, shifted per face (`seed`) so
-// neighbouring plates never show the same patch; the GPU's mips take it to its mean
-// with distance.
-struct RegScan {
-    // Multiplies the colour; added to roughness; slope of its relief (model space);
-    // how deep a scratch is here (0 none).
-    tone: f32,
-    rough: f32,
-    slope: vec3<f32>,
-    scratch: f32,
-}
-
-// The scan's means (scripts/import-metal.py prints them): what reads as "no change".
+// The steel scan (`metal_scan::LAYER`, metal.wgsl): worn iron, its grain, scratches
+// and sheen. Its means (scripts/import-metal.py prints them).
 const REG_SCAN_LUM: f32 = 0.548;
 const REG_SCAN_ROUGH: f32 = 0.16;
 
-fn reg_scan_sample(uv: vec2<f32>, d1: vec2<f32>, d2: vec2<f32>, u: vec3<f32>, v: vec3<f32>) -> RegScan {
-    let c = textureSampleGrad(terrain_materials, repeat_sampler, uv, METAL_SCAN_LAYER, d1, d2);
-    let nm = textureSampleGrad(terrain_materials, repeat_sampler, uv, METAL_SCAN_LAYER + 1, d1, d2);
-    let lum = dot(c.rgb, vec3<f32>(0.3, 0.59, 0.11));
-    let t = nm.xy * 2.0 - 1.0;
-    // A tangent normal leaning +u means the surface falls toward +u.
-    return RegScan(lum / REG_SCAN_LUM - 1.0, c.a - REG_SCAN_ROUGH, -(t.x * u + t.y * v), nm.z);
-}
-
-fn reg_scan_mix(a: RegScan, b: RegScan, t: f32) -> RegScan {
-    return RegScan(mix(a.tone, b.tone, t), mix(a.rough, b.rough, t), mix(a.slope, b.slope, t), mix(a.scratch, b.scratch, t));
-}
-
-fn reg_scan_add(a: RegScan, b: RegScan, w: f32) -> RegScan {
-    return RegScan(a.tone + b.tone * w, a.rough + b.rough * w, a.slope + b.slope * w, a.scratch + b.scratch * w);
-}
-
-// One projection of the scan, never repeating on a grid: a slow noise picks, place
-// to place, which of eight offsets of the scan shows, and blends across from one to
-// the next (Quilez, "texture repetition").
-fn reg_scan_axis(uv: vec2<f32>, d1: vec2<f32>, d2: vec2<f32>, u: vec3<f32>, v: vec3<f32>, axis: f32) -> RegScan {
-    let pick = surf_noise3(vec3<f32>(uv * 0.45, axis * 17.0)) * 8.0;
-    let i = floor(pick);
-    let f = fract(pick);
-    let o0 = vec2<f32>(hash11(i * 13.7 + axis), hash11(i * 7.1 + axis + 0.5));
-    let o1 = vec2<f32>(hash11((i + 1.0) * 13.7 + axis), hash11((i + 1.0) * 7.1 + axis + 0.5));
-    let a = reg_scan_sample(uv + o0, d1, d2, u, v);
-    let b = reg_scan_sample(uv + o1, d1, d2, u, v);
-    return reg_scan_mix(a, b, smoothstep(0.25, 0.75, f));
-}
-
-fn reg_scan(i: RegencyIn) -> RegScan {
-    var w = pow(abs(i.n), vec3<f32>(4.0));
-    w /= max(w.x + w.y + w.z, 1e-6);
-    // A big model is seen from further off: its scan is laid coarser, so it still reads.
-    let k = 1.0 / (METAL_SCAN_TILE_M * clamp(i.scale * 0.7, 1.0, 3.5));
-    let shift = vec2<f32>(fract(i.seed * 7.91), fract(i.seed * 3.37));
-    let p = i.local * k;
-    let a = i.dl1 * k;
-    let b = i.dl2 * k;
-    var out = RegScan(0.0, 0.0, vec3<f32>(0.0), 0.0);
-    if w.x > 0.01 {
-        out = reg_scan_add(out, reg_scan_axis(p.yz + shift, a.yz, b.yz, vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0), 1.0), w.x);
-    }
-    if w.y > 0.01 {
-        out = reg_scan_add(out, reg_scan_axis(p.xz + shift, a.xz, b.xz, vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 0.0, 1.0), 2.0), w.y);
-    }
-    if w.z > 0.01 {
-        out = reg_scan_add(out, reg_scan_axis(p.xy + shift, a.xy, b.xy, vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), 3.0), w.z);
-    }
-    return out;
+fn reg_scan(i: RegencyIn) -> MetalScan {
+    return metal_scan(ScanAt(i.local, i.n, i.dl1, i.dl2, i.scale, i.seed, METAL_SCAN_LAYER, REG_SCAN_LUM, REG_SCAN_ROUGH, METAL_SCAN_TILE_M));
 }
 
 fn regency_plate(i: RegencyIn) -> RegencyLook {
