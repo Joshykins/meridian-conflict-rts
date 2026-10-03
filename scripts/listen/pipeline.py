@@ -981,7 +981,8 @@ def main():
         song = build_song(meta["title"] or name, tempo, key, bar_times, locate, bass_mono, events["other"], hits, secs, n_bars)
 
     js = os.path.join(out, "reference.json")
-    json.dump(song, open(js, "w"))
+    # numpy integers can reach the song (a tempo span's bar count): write them as ints.
+    json.dump(song, open(js, "w"), default=int)
     subprocess.check_call([mc_music(), "ron", js, os.path.join(out, "reference.ron")])
     print(open(os.path.join(out, "report.md")).read())
     print(f"files in {out}")
