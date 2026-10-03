@@ -863,7 +863,7 @@ fn lods_reduce_and_respect_budgets() {
             // 300 m capital hull: full ventral bay, four drive bells, four gun houses, articulated gear.
             14000
         } else if model.key == "space_frigate" {
-            // 325 m tech 3 heavy frigate in sections: trenched spine with the rail's collars,
+            // 325 m tech 4 heavy frigate in sections: trenched spine with the rail's collars,
             // bridge and search radar, four rail houses, two nacelles of two deep drives, legs.
             17000
         } else if base_key(&model.key) == "space_dreadnought" {

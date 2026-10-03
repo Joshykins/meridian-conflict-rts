@@ -1,9 +1,9 @@
 [
     // Enclosed stern bay: sliding doors, ground-level loading, no ramp.
     (
-        key: "aster_t1_lift_ship", name: "Courier", role: "Light Transport", title: "Transport",
-        tech: 1, categories: ["Air"],
-        health: 400, cost: (mass: 160, energy: 2400, time: 800),
+        key: "aster_t2_lift_ship", name: "Courier", role: "Light Transport", title: "Transport",
+        tech: 2, categories: ["Air"],
+        health: 400, cost: (mass: 280, energy: 4200, time: 1400),
         radius: 58, height: 38, footprint: (10, 6), hull: (59, 36), vision: 320,
         motion: (layer: Air, size: 0, speed: 150, accel: 42, turn: 90, altitude: 140, hover: true, deploy: 0.9),
         transport: (capacity: 8, descent: 120, hold: (-16, 0), ramp: (-36, -42), width: 28, floor: 0, clearance: 26, unload: 0.25),
@@ -259,8 +259,8 @@ trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "shell_heavy"))],
  // nose. They shoot aircraft at any height, but reach the ground only along the line of
  // sight (`slant`): from the clouds they cannot, and they start to sweep the landing site
  // as it comes down.
- key: "aster_t2_lift_ship", name: "Bastion", role: "Assault Transport", title: "Heavy Transport", tech: 2, categories: ["Air", "Space"],
- health: 16000, cost: (mass: 2400, energy: 36000, time: 14400),
+ key: "aster_t3_lift_ship", name: "Bastion", role: "Assault Transport", title: "Heavy Transport", tech: 3, categories: ["Air", "Space"],
+ health: 16000, cost: (mass: 4200, energy: 63000, time: 25200),
  radius: 160, height: 95, footprint: (28, 13), hull: (166, 76), vision: 520,
  motion: (layer: Air, size: 0, speed: 78, accel: 14, turn: 16, altitude: 560, hover: true, deploy: 2.2),
  transport: (capacity: 96, descent: 80, hold: (20, 0), ramp: (-16, -84), width: 40, floor: 34, clearance: 34, unload: 0.4),

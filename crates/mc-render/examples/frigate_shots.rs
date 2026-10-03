@@ -1,4 +1,4 @@
-//! Resolute heavy frigate visual check: native GPU shots of the `aster_t3_frigate` model from the
+//! Resolute heavy frigate visual check: native GPU shots of the `aster_t4_frigate` model from the
 //! RTS camera and close up, aloft (gear stowed) and on its lot (gear down), with the
 //! Bastion alongside for scale in one of them, and nose down laying its spinal gun (`dive`).
 //! cargo run --release -p mc-render --example frigate_shots -- maps/dev16.mcmap OUT [only-shot-names...]
@@ -135,7 +135,7 @@ fn main() {
             props_dead: vec![u32::MAX; map.props().len().div_ceil(32)],
             ..Default::default()
         };
-        let mut ship = make("aster_t3_frigate", base, 0.0, 1);
+        let mut ship = make("aster_t4_frigate", base, 0.0, 1);
         if name == "dive" {
             // The hull pitched 20 degrees nose down (slot 0 of `arm_pitch`: previous, now).
             ship.arm_pitch = [-0.35, -0.35, 0.0, 0.0];
@@ -145,7 +145,7 @@ fn main() {
         frame.units.push(ship);
         if bastion {
             frame.units.push(make(
-                "aster_t2_lift_ship",
+                "aster_t3_lift_ship",
                 base + Vec3::new(0.0, 330.0, -60.0),
                 0.0,
                 2,

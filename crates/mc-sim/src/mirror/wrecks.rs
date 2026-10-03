@@ -408,15 +408,15 @@ mod tests {
         assert_eq!(count("aster_t1_frigate", Landing::Sank), 1);
         assert_eq!(count("aster_t3_battleship", Landing::Sank), 2);
         // Out of the sky a spacecraft breaks into more pieces than where it stood.
-        let sky = count("aster_t2_lift_ship", Landing::Crashed);
-        assert!(sky > count("aster_t2_lift_ship", Landing::InPlace));
+        let sky = count("aster_t3_lift_ship", Landing::Crashed);
+        assert!(sky > count("aster_t3_lift_ship", Landing::InPlace));
         assert!(sky <= MOST_SECTIONS);
     }
 
     #[test]
     fn sections_cover_the_hull_once() {
         let b = blueprints();
-        let bp = b.unit(b.id_of("aster_t3_frigate").expect("frigate"));
+        let bp = b.unit(b.id_of("aster_t4_frigate").expect("frigate"));
         let mut out = [Section {
             lo: 0.0,
             hi: 0.0,

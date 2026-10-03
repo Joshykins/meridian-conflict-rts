@@ -85,7 +85,7 @@ fn the_spire_shoots_down_at_a_warship_and_leaves_the_ground_alone() {
     // A tank and a gunship close by, which it cannot touch, and a frigate 1.6 km off.
     let tank = add(&mut w, "aster_t1_tank", 1, 1200, 1000, 180);
     let gunship = add(&mut w, "aster_t1_rotor_gunship", 1, 1000, 1250, 180);
-    let frigate = add(&mut w, "aster_t3_frigate", 1, 2600, 1000, 180);
+    let frigate = add(&mut w, "aster_t4_frigate", 1, 2600, 1000, 180);
     let (tank_hp, gunship_hp, frigate_hp) =
         (health(&w, tank), health(&w, gunship), health(&w, frigate));
     let mut fired = 0;

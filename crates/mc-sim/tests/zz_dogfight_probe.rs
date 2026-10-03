@@ -89,7 +89,7 @@ fn zz_dogfight_probe() {
 
 fn strike(key: &str) {
     let mut w = world(7);
-    let t = add(&mut w, "aster_t2_corvette", 1, 3000, 3072, Angle::ZERO);
+    let t = add(&mut w, "aster_t3_corvette", 1, 3000, 3072, Angle::ZERO);
     w.state.units.flags[t] |= flag::PASSIVE | flag::INVULNERABLE;
     let fighters: Vec<usize> = (0..5)
         .map(|k| add(&mut w, key, 0, 2300, 2972 + 50 * k, Angle::ZERO))

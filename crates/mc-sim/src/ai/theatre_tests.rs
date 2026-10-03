@@ -130,6 +130,6 @@ fn a_shipyard_goes_on_the_water_nearest_home() {
 #[test]
 fn an_unarmed_radar_ship_is_no_project() {
     let w = islands(false);
-    let vigil = w.blueprints.id_of("aster_t1_sensor_ship").unwrap();
+    let vigil = w.blueprints.id_of("aster_t2_sensor_ship").unwrap();
     assert_eq!(projects::project_kind(w.blueprints.unit(vigil)), None);
 }

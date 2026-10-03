@@ -12,8 +12,8 @@ All units are available through the existing tiered factories and engineer/comma
 | 2 | Kestrel | Four-engine tilt-jet gunship with a chin autocannon and volley rocket pods |
 | 2 | Hellkite | Four-engine flying fortress; 24 scattered incendiaries and three independent AA guns |
 | 2 | Peregrine | Fast guided-missile interceptor |
-| 1 | Courier | Fast unarmed transport; eight cargo slots; built on site |
-| 2 | Bastion | Capital assault transport; carries the T1-T3 land roster; built on site |
+| 2 | Courier | Fast unarmed transport; eight cargo slots; built on site |
+| 3 | Bastion | Capital assault transport; carries the T1-T3 land roster; built on site |
 | 3 | Raptor | Fast, highly maneuverable air-superiority fighter |
 | 3 | Eclipse | Fast strategic bomber with a large blast |
 | 3 | Thunderhead | Armored, shielded assault aircraft; forward rotary cannon and forward AA |
@@ -164,10 +164,9 @@ Tests: `crates/mc-sim/tests/guard.rs`, `crates/mc-sim/tests/air_guard.rs`.
 ## Bastion assault transport (2026-09-24)
 
 A 300 m spacecraft that keeps station in the cloud deck (560 m) and comes down to put an
-army on the ground. It is not made in a factory: Mason II and III place it like a
-structure on a 26 x 10 lot and build it there (2400 mass, 36000 energy, 14400 build
-time: twelve minutes for one Mason II). A finished ship stays on its lot with the
-ramp down, ready to load.
+army on the ground. It is tech 3 and not made in a factory: the Mason III and the
+commander's Engineering Suite III place it like a structure on a 26 x 10 lot and build
+it there (4200 mass, 63000 energy, 25200 build time). A finished ship stays on its lot with the ramp down, ready to load.
 
 - **Orders.** Right-click the ship with land units selected: they board (`Command::Board`;
   the pointer turns to a boarding glyph and a note says how much room they take and what
@@ -239,7 +238,7 @@ ramp down, ready to load.
 Inspect:
 
 ```sh
-./play.sh --range --unit aster_t2_lift_ship --scenario lift
+./play.sh --range --unit aster_t3_lift_ship --scenario lift
 cargo test -p mc-sim --test sim -- lift_ship::
 cargo test -p mc-models --lib the_lift_ship
 ```
@@ -249,10 +248,10 @@ it themselves, but other traffic still walks under it); the AI neither builds no
 
 ## Courier light transport
 
-The T1 Courier (`aster_t1_lift_ship`) is built on a 10 x 6 lot by the commander or T1-T3 engineers. It carries
+The T2 Courier (`aster_t2_lift_ship`) is built on a 10 x 6 lot by the Mason II and III or the commander's Engineering Suite II and III. It carries
 8 weighted cargo slots (one commander or eight T1 light tanks), cruises at 150 m/s at 140 m altitude,
 accelerates at 42 m/s squared, and climbs/descends at 60 m/s. It has 400 health,
-no weapons, no shield, and costs 160 mass / 2400 energy / 800 build time.
+no weapons, no shield, and costs 280 mass / 4200 energy / 1400 build time.
 
 It is built in the Bastion's language at a third of the size (`models/aster/air/courier.rs`):
 a dark gunmetal hull of two chined shoulders with pale armour brows (hatch runs, team
@@ -273,7 +272,7 @@ before it spreads out or resumes orders issued in transit. Right-click to board;
 L lands and U lands/unloads, with one unit released every 0.25 s when clear.
 Cargo uses the same weighted capacity, fit checks and loss-on-destruction as Bastion.
 
-Preview: `./play.sh --range --unit aster_t1_lift_ship --scenario lift`.
+Preview: `./play.sh --range --unit aster_t2_lift_ship --scenario lift`.
 Close-ups (GPU, doors open, loading/unloading frames):
 `cargo run --release -p mc-render --example courier_shots -- maps/dev16.mcmap artifacts/courier`.
 
@@ -348,7 +347,7 @@ it left, stretching into a streak, and comes out of a streak on its first tick b
 
 Check: `cargo test --profile gate -p mc-sim --test sim -- warp::` (and the determinism
 matrix, which plays a Courier's jump into an Undertow). Headless:
-`scripts/shot.sh run --range --unit aster_t1_lift_ship --scenario warp` or
+`scripts/shot.sh run --range --unit aster_t2_lift_ship --scenario warp` or
 `--scenario warp-dampened` (a red Undertow beside the exit).
 
 ## Warp: the interface (2026-09-29)
@@ -380,7 +379,7 @@ What the player sees of them:
 - **A jump of ours an enemy Undertow snags** shows nothing of it: no red, no **Dampened**,
   the countdown of a clean transit (it sits at 0 s while the drag holds it).
 
-Shots: `MERIDIAN_AIM=warp scripts/shot.sh run --range --unit aster_t1_lift_ship --select
+Shots: `MERIDIAN_AIM=warp scripts/shot.sh run --range --unit aster_t2_lift_ship --select
 lift_ship --cursor X,Y ...` aims the order; `--scenario warp` / `warp-dampened` jumps.
 
 ## Dominion dreadnought (2026-09-29, reworked 2026-09-30)
@@ -421,7 +420,7 @@ rotors, no jet plumes. Each is anchored on ARC's unit of the same job.
 | Flechette (`regency_t1_air_scout`) | Air scout, unarmed | Swift | The fastest thing in the air (270 m/s), a wider turn, thinner skin |
 | Quarrel (`regency_t1_fighter`) | Fighter: Twin Plasmeric Repeater, aircraft only | Shrike | About the same damage a second in heavier bolts, a little less reach; crescent wing |
 | Petard (`regency_t1_bomber`) | Light bomber: a stick of three Plasmeric Bombs | Petrel | 270 a pass in three lighter bombs strung along the run; a cleaver of a flying wing |
-| Coffer (`regency_t1_transport`) | Light transport, eight slots, raised on a 7x5 lot by the Exarch and Artificers | Courier | No warp drive, a little quicker; an open-sterned box hold between two sponsons on six lift bells |
+| Coffer (`regency_t2_transport`, tech 2) | Light transport, eight slots, raised on a 7x5 lot by the Artificer II and III and the Exarch's Engineering Suites | Courier | No warp drive, a little quicker; an open-sterned box hold between two sponsons on six lift bells |
 | Sickle (`regency_t1_air_reclaimer`) | Salvage drone: one nanite head under it, works wrecks as it flies | Magpie | Takes apart faster (power 5 to 4) at a shorter reach (380 m to 450 m); a pod with two hooked blades on three lift bells |
 
 The Skyforge (all three tiers) makes the Quarrel, Petard, Flechette and Sickle; there is no

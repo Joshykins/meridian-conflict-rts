@@ -106,17 +106,17 @@
             "Heavy Twin Flak": "A twin flak turret beside each pod. Enough for a few gunships; against a real air wing the Behemoth wants escorts.",
         },
     ),
-    "aster_t1_sensor_ship": (
+    "aster_t2_sensor_ship": (
         lore: "A light hull built round one great search radar, so the Reach's picture of the field travels with its army. It carries no guns; its crews say the dome is the weapon.",
     ),
-    "aster_t2_corvette": (
+    "aster_t3_corvette": (
         lore: "A light warship for the upper air, little more than a hull, a drive and one long rail gun. The yards turn them out faster than frigates, and send them out in threes.",
         weapons: {
-            "Long Rail Cannon": "The Resolute's turret gun drawn out to twice its length: it charges, then fires a slug no other tech 2 gun can match for reach.",
+            "Long Rail Cannon": "The Resolute's turret gun drawn out to twice its length: it charges, then fires a slug no other tech 3 gun can match for reach.",
             "AA Rotary Cannon": "A six-barrel rotary gun astern, for the fighters that come for the ship. It needs a moment to spin up.",
         },
     ),
-    "aster_t3_frigate": (
+    "aster_t4_frigate": (
         lore: "The Reach's first heavy warship of the upper air: an armoured hull laid round a single gun, with its own search radar.",
         weapons: {
             "Spinal Rail Cannon": "Rails the length of the keel; the whole ship turns and dips its nose to lay it.",

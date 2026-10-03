@@ -148,7 +148,7 @@ fn setup(w: &mut World) {
                 add("aster_t5_titan", 1, 1000, 900);
                 add("aster_t4_nuke_silo", 1, 300, 250);
                 // A Courier that warps into the north's dampener (`warp.rs`), on its own power.
-                add("aster_t1_lift_ship", 1, 2000, 100);
+                add("aster_t2_lift_ship", 1, 2000, 100);
                 add("aster_t3_power", 1, 400, 150);
                 // Two factories linked in one batch: their scouts form up by them and join the attack
                 // together (`batch.rs`), one of them waiting across the snapshot.
@@ -307,7 +307,7 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
         // Charged on a strained grid by tick ~150, dragged through the dampener's field, and stunned across
         // the snapshot at `SNAPSHOT_AT`.
         60 => {
-            let courier = w.blueprints.id_of("aster_t1_lift_ship").unwrap();
+            let courier = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
             let u = &w.state.units;
             let ship = u
                 .slots

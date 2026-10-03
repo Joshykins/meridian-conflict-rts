@@ -1,4 +1,4 @@
-// The Vigil (`aster_t1_sensor_ship`): the Courier's size of spacecraft carrying one great
+// The Vigil (`aster_t2_sensor_ship`): the Courier's size of spacecraft carrying one great
 // search radar. Its hum is its own `moving` sound; the drives, lift jets and landing are
 // the shared capital recipes (`audio/capital.rs` falls back to `capital_<part>`), made
 // lighter here as the Courier's are.

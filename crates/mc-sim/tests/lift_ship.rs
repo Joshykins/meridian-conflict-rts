@@ -12,7 +12,7 @@ use mc_sim::{Command, Handle, MatchConfig, PlayerCommand, PlayerSetup, World};
 use std::path::Path;
 use std::sync::Arc;
 
-const SHIP: &str = "aster_t2_lift_ship";
+const SHIP: &str = "aster_t3_lift_ship";
 
 fn world() -> World {
     let blueprints = Arc::new(
@@ -80,7 +80,8 @@ fn engineers_raise_it_on_a_lot_and_it_stays_down_with_the_ramp_open() {
     let mut w = world();
     let bp = w.blueprints.id_of(SHIP).unwrap();
     assert!(w.blueprints.unit(bp).is_site_built_unit());
-    let engineer = add(&mut w, "aster_t2_engineer", 0, 1000, 1000);
+    // Tech 3: a Mason III raises it.
+    let engineer = add(&mut w, "aster_t3_engineer", 0, 1000, 1000);
     let id = w.state.units.id(engineer);
     w.tick(&[cmd(Command::Build {
         units: vec![id],
@@ -326,7 +327,7 @@ fn what_is_in_the_hold_dies_with_the_ship() {
 #[test]
 fn a_commander_in_a_downed_hold_goes_up_and_loses_the_match() {
     let mut w = world();
-    let ship = add(&mut w, "aster_t1_lift_ship", 0, 1600, 1600);
+    let ship = add(&mut w, "aster_t2_lift_ship", 0, 1600, 1600);
     let ship_id = w.state.units.id(ship);
     let commander = add(&mut w, "aster_commander", 0, 1500, 1600);
     let cid = w.state.units.id(commander);
@@ -530,12 +531,12 @@ fn capital_ship_accelerates_climbs_with_pitch_and_levels_for_touchdown() {
 }
 
 #[test]
-fn courier_is_an_unarmed_t1_site_built_transport_with_eight_slots() {
+fn courier_is_an_unarmed_t2_site_built_transport_with_eight_slots() {
     let w = world();
-    let id = w.blueprints.id_of("aster_t1_lift_ship").unwrap();
+    let id = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
     let bp = w.blueprints.unit(id);
     let t = bp.transport.unwrap();
-    assert_eq!(bp.tech, 1);
+    assert_eq!(bp.tech, 2);
     assert_eq!(t.capacity, 8);
     assert!(bp.weapons.is_empty());
     assert!(bp.shield.is_none());
@@ -561,14 +562,19 @@ fn courier_is_an_unarmed_t1_site_built_transport_with_eight_slots() {
                 .id_of(&format!("aster_t{tier}_engineer"))
                 .unwrap(),
         );
-        assert!(engineer.builder.as_ref().unwrap().builds.contains(&id));
+        // Tech 2: the Mason II and III raise it, the tech 1 Mason does not.
+        assert_eq!(
+            engineer.builder.as_ref().unwrap().builds.contains(&id),
+            tier >= 2,
+            "Mason tier {tier}"
+        );
     }
 }
 
 #[test]
 fn courier_loads_exactly_eight_slots_flies_fast_and_unloads_without_a_ramp() {
     let mut w = world();
-    let ship = add(&mut w, "aster_t1_lift_ship", 0, 1600, 1600);
+    let ship = add(&mut w, "aster_t2_lift_ship", 0, 1600, 1600);
     let id = w.state.units.id(ship);
     // Eight light tanks fill eight slots; the ninth must stay behind.
     let cargo: Vec<_> = (0..9)
@@ -674,7 +680,7 @@ fn courier_loads_exactly_eight_slots_flies_fast_and_unloads_without_a_ramp() {
 #[test]
 fn courier_carries_a_commander_as_its_full_eight_slot_load() {
     let mut w = world();
-    let ship = add(&mut w, "aster_t1_lift_ship", 0, 1600, 1600);
+    let ship = add(&mut w, "aster_t2_lift_ship", 0, 1600, 1600);
     let id = w.state.units.id(ship);
     let commander = add(&mut w, "aster_commander", 0, 1500, 1600);
     let cid = w.state.units.id(commander);
@@ -721,11 +727,11 @@ fn courier_carries_a_commander_as_its_full_eight_slot_load() {
 }
 
 #[test]
-fn t1_engineer_builds_courier_on_site_ready_to_load() {
+fn t2_engineer_builds_courier_on_site_ready_to_load() {
     let mut w = world();
-    let bp = w.blueprints.id_of("aster_t1_lift_ship").unwrap();
+    let bp = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
     assert!(w.blueprints.unit(bp).is_site_built_unit());
-    let engineer = add(&mut w, "aster_t1_engineer", 0, 1000, 1000);
+    let engineer = add(&mut w, "aster_t2_engineer", 0, 1000, 1000);
     let id = w.state.units.id(engineer);
     w.tick(&[cmd(Command::Build {
         units: vec![id],
@@ -783,7 +789,7 @@ fn t1_engineer_builds_courier_on_site_ready_to_load() {
 #[test]
 fn courier_routes_commander_around_hull_and_preserves_orders_after_unloading() {
     let mut w = world();
-    let ship = add(&mut w, "aster_t1_lift_ship", 0, 1600, 1600);
+    let ship = add(&mut w, "aster_t2_lift_ship", 0, 1600, 1600);
     let sid = w.state.units.id(ship);
     let passenger = add(&mut w, "aster_commander", 0, 1740, 1600);
     let cid = w.state.units.id(passenger);
@@ -1287,7 +1293,7 @@ fn it_does_not_turn_its_hull_toward_what_it_shoots() {
 #[test]
 fn a_stored_unit_is_listed_idle_out_of_sight_naming_its_ship() {
     let mut w = world();
-    let ship = add(&mut w, "aster_t1_lift_ship", 0, 1600, 1600);
+    let ship = add(&mut w, "aster_t2_lift_ship", 0, 1600, 1600);
     let id = w.state.units.id(ship);
     let engineer = add(&mut w, "aster_t1_engineer", 0, 1500, 1600);
     let eid = w.state.units.id(engineer);

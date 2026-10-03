@@ -454,8 +454,8 @@ pub fn opening_commands(
                 ("aster_t1_interceptor", at(-40, 40)),
                 ("aster_t1_bomber", at(0, 40)),
                 ("aster_t3_strategic_bomber", at(50, 40)),
-                ("aster_t2_corvette", at(-150, 260)),
-                ("aster_t2_lift_ship", at(200, 300)),
+                ("aster_t3_corvette", at(-150, 260)),
+                ("aster_t3_lift_ship", at(200, 300)),
             ];
             for (key, pos) in yard {
                 out.push(spawn(0, key, pos, Angle::ZERO, 1));

@@ -1,4 +1,4 @@
-//! Resolute: the ARC's tech 3 heavy frigate (`aster_t3_frigate`, mesh `space_frigate`), the
+//! Resolute: the ARC's tech 4 heavy frigate (`aster_t4_frigate`, mesh `space_frigate`), the
 //! first warship of the upper air, built up of armoured sections: a narrow gun spine on top
 //! running out past a flared keel hull below, and a tall engineering hull aft carrying the
 //! bridge. The spinal rail cannon runs down a trench in the spine from the engineering hull's

@@ -597,7 +597,7 @@ fn thunderhead_looses_its_talons_on_an_attack_ground_run() {
 #[test]
 fn fighters_keep_passing_a_big_air_target_without_long_gaps() {
     let mut w = world();
-    let t = add(&mut w, "aster_t2_corvette", 1, 1000, 1000);
+    let t = add(&mut w, "aster_t3_corvette", 1, 1000, 1000);
     w.state.units.flags[t] |= flag::PASSIVE | flag::INVULNERABLE;
     let fighters: Vec<usize> = (0..3)
         .map(|k| add(&mut w, "aster_t2_interceptor", 0, 600, 950 + 50 * k))

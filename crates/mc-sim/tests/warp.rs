@@ -13,8 +13,8 @@ use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
 use std::sync::Arc;
 
-const COURIER: &str = "aster_t1_lift_ship";
-const FRIGATE: &str = "aster_t3_frigate";
+const COURIER: &str = "aster_t2_lift_ship";
+const FRIGATE: &str = "aster_t4_frigate";
 const DAMPER: &str = "aster_t2_warp_damper";
 
 fn world() -> World {
@@ -263,8 +263,8 @@ fn a_larger_ship_draws_more_for_its_jump() {
         let bp = blueprints.unit(blueprints.id_of(key).unwrap());
         bp.warp.expect("a drive").energy
     };
-    assert!(energy(COURIER) < energy("aster_t2_lift_ship"));
-    assert!(energy("aster_t2_lift_ship") < energy(FRIGATE));
+    assert!(energy(COURIER) < energy("aster_t3_lift_ship"));
+    assert!(energy("aster_t3_lift_ship") < energy(FRIGATE));
 }
 
 #[test]
@@ -303,7 +303,7 @@ fn a_jump_into_an_enemy_dampener_drags_and_throws_the_ship_out_hurt_and_stunned(
     );
     assert!(snagged.state.units.stun[r][0] > 0, "it was not stunned");
     // Stunned: it lists, holds fire and ignores orders.
-    let foe = add(&mut snagged, "aster_t2_lift_ship", 1, 9300, 3000);
+    let foe = add(&mut snagged, "aster_t3_lift_ship", 1, 9300, 3000);
     let foe_health = snagged.state.units.health[row(&snagged, foe)];
     let z = snagged.state.units.z[r];
     warp(&mut snagged, b, 3000, 3000);

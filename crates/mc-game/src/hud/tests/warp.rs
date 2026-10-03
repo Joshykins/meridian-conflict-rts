@@ -44,7 +44,7 @@ fn spooling(charge: f32) -> WarpView {
 
 #[test]
 fn a_ship_with_a_drive_is_offered_warp_on_its_card() {
-    let mut rig = Rig::new("aster_t1_lift_ship");
+    let mut rig = Rig::new("aster_t2_lift_ship");
     let warp = HudAction::Target(Targeting::Warp);
     let found = (0..6).any(|col| {
         (0..4).any(|row| {
@@ -67,10 +67,10 @@ fn a_ship_with_a_drive_is_offered_warp_on_its_card() {
 #[test]
 fn the_card_tells_a_jump_a_stun_and_the_drives_recharge() {
     let stats = FrameStats::default();
-    let mut rig = Rig::new("aster_t1_lift_ship");
+    let mut rig = Rig::new("aster_t2_lift_ship");
     let bp = rig
         .blueprints
-        .unit(rig.blueprints.id_of("aster_t1_lift_ship").unwrap());
+        .unit(rig.blueprints.id_of("aster_t2_lift_ship").unwrap());
     // Ready: its charge and the key.
     let s = scene(&rig, &stats);
     let u = s.view.frame.units[0];

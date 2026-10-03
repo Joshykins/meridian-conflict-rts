@@ -184,7 +184,7 @@ fn unit_at(x: f32, y: f32) -> UnitInstance {
 fn a_spinal_gun_shows_the_dead_zone_under_its_hull() {
     let b = blueprints();
     let mut rings = Rings::new(&b);
-    let key = "aster_t3_frigate";
+    let key = "aster_t4_frigate";
     let bp = b.unit(b.id_of(key).unwrap());
     let (range, bore) = (
         bp.weapons[0].range_max.to_f32(),

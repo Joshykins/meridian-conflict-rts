@@ -142,7 +142,7 @@ fn main() {
         }
         let mut gun = unit(&blueprints, "aster_t4_anti_ship", at, heading, 1);
         gun.arm_pitch = [pitch, pitch, 0.0, 0.0];
-        let target = unit(&blueprints, "aster_t3_frigate", ship, heading + 2.2, 2);
+        let target = unit(&blueprints, "aster_t4_frigate", ship, heading + 2.2, 2);
         // It strikes the hull's side, not its middle.
         let hit = ship + Vec3::Z * 25.0 - (ship - muzzle).normalize() * 100.0;
         let mid = (muzzle + hit) * 0.5;
@@ -303,7 +303,7 @@ fn main() {
 
     // A Resolute at 560 m firing down on a structure a kilometre off.
     {
-        let fid = blueprints.id_of("aster_t3_frigate").unwrap();
+        let fid = blueprints.id_of("aster_t4_frigate").unwrap();
         let w = &blueprints.unit(fid).weapons[0];
         let base = spot + Vec2::new(-400.0, -2600.0);
         let ship = base.extend(ground(&renderer, base) + 560.0);
@@ -311,7 +311,7 @@ fn main() {
         let heading = (mark_xy - base).to_angle();
         let muzzle = ship + rot_z(Vec3::from(w.muzzle.to_f32()), heading);
         let mark = mark_xy.extend(ground(&renderer, mark_xy) + 4.0);
-        let gun = unit(&blueprints, "aster_t3_frigate", ship, heading, 3);
+        let gun = unit(&blueprints, "aster_t4_frigate", ship, heading, 3);
         let target = unit(&blueprints, "aster_t2_power", mark - Vec3::Z * 4.0, 0.0, 4);
         let mid = (muzzle + mark) * 0.5;
         stages.push(Stage {
@@ -472,7 +472,7 @@ fn main() {
 
     // A Resolute at 560 m, its port flank turret (weapon 3) laid on the ground below.
     {
-        let fid = blueprints.id_of("aster_t3_frigate").unwrap();
+        let fid = blueprints.id_of("aster_t4_frigate").unwrap();
         let weapon = 3u8;
         let w = &blueprints.unit(fid).weapons[weapon as usize];
         let base = spot + Vec2::new(900.0, -1800.0);
@@ -493,7 +493,7 @@ fn main() {
         }
         let mut house = HousePose::default();
         house.pose[weapon as usize] = [yaw, yaw, pitch, pitch];
-        let mut gun = unit(&blueprints, "aster_t3_frigate", ship, heading, 5);
+        let mut gun = unit(&blueprints, "aster_t4_frigate", ship, heading, 5);
         gun.status[1] |= 1 << UNIT_HOUSE_SHIFT;
         let target = unit(&blueprints, "aster_t1_tank", mark - Vec3::Z * 4.0, 0.0, 6);
         let g = heading + yaw;

@@ -90,19 +90,19 @@ pub(crate) fn light_transport(b: &mut MeshBuilder, _tech: u8) {
     courier::build(b);
 }
 
-/// Vigil: the tech 1 sensor ship, a small single-drive spacecraft with two sensor booms
+/// Vigil: the tech 2 sensor ship, a small single-drive spacecraft with two sensor booms
 /// reaching out from its prow ([`vigil`]).
 pub(crate) fn sensor_ship(b: &mut MeshBuilder, _tech: u8) {
     vigil::build(b);
 }
 
-/// Valiant: the tech 2 rail corvette, a small warship with a long rail cannon slung under
+/// Valiant: the tech 3 rail corvette, a small warship with a long rail cannon slung under
 /// its belly and a rotary AA cannon on its back ([`corvette`]).
 pub(crate) fn rail_corvette(b: &mut MeshBuilder, _tech: u8) {
     corvette::build(b);
 }
 
-/// Resolute: the tech 3 frigate, a warship of the upper air laid round a spinal rail cannon.
+/// Resolute: the tech 4 frigate, a warship of the upper air laid round a spinal rail cannon.
 pub(crate) fn space_frigate(b: &mut MeshBuilder, _tech: u8) {
     resolute::build(b);
 }

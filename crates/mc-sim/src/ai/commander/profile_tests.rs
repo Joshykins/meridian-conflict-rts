@@ -15,9 +15,9 @@ fn roles_come_from_what_a_unit_can_do() {
     let has = |key: &str, r: u32| profile(&b, key).has(r);
     assert!(has("aster_t1_tank", role::LINE));
     assert!(has("aster_t1_mobile_aa", role::ANTI_AIR));
-    assert!(has("aster_t1_lift_ship", role::TRANSPORT | role::WARP));
-    assert!(has("aster_t2_lift_ship", role::TRANSPORT | role::PROJECT));
-    assert!(has("aster_t1_sensor_ship", role::SENSOR | role::WARP));
+    assert!(has("aster_t2_lift_ship", role::TRANSPORT | role::WARP));
+    assert!(has("aster_t3_lift_ship", role::TRANSPORT | role::PROJECT));
+    assert!(has("aster_t2_sensor_ship", role::SENSOR | role::WARP));
     assert!(has("aster_t4_artillery", role::MAP_GUN | role::PROJECT));
     assert!(has("aster_t4_nuke_silo", role::STRATEGIC));
     assert!(has("aster_t3_nuke_defense", role::INTERCEPTOR));
@@ -168,13 +168,21 @@ fn the_regency_builds_its_own_air_force() {
             "{factory}: no tech 1 gunship"
         );
     }
-    for builder in ["regency_commander", "regency_t1_engineer"] {
+    // The Coffer is tech 2: the Artificer II and up raise it, never the tech 1 builders.
+    for builder in ["regency_t2_engineer", "regency_t3_engineer"] {
         assert!(
             made_by(builder).iter().any(|&id| {
                 b.unit(id).key.starts_with("regency_")
                     && profile(&b, &b.unit(id).key).has(role::TRANSPORT)
             }),
             "{builder}: transport"
+        );
+    }
+    let coffer = b.id_of("regency_t2_transport").unwrap();
+    for builder in ["regency_commander", "regency_t1_engineer"] {
+        assert!(
+            !made_by(builder).contains(&coffer),
+            "{builder}: no tech 2 transport"
         );
     }
 }

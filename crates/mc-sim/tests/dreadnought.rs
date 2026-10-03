@@ -155,7 +155,7 @@ fn its_rifles_take_a_warship_off_its_beam() {
     settle(&mut w);
     // A frigate climbing 1.3 km off its beam: it flies lower, but that far out it is
     // above the rifles' depression.
-    let frigate = add(&mut w, "aster_t3_frigate", 1, 3000, 4300, 0);
+    let frigate = add(&mut w, "aster_t4_frigate", 1, 3000, 4300, 0);
     hold_fire(&mut w, frigate);
     let mut seen = [false; 9];
     for _ in 0..seconds(40) {

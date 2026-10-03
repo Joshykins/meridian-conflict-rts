@@ -51,7 +51,7 @@ fn main() {
         props_dead: vec![u32::MAX; map.props().len().div_ceil(32)],
         ..Default::default()
     };
-    frame.units.push(make("aster_t1_lift_ship", base, 1));
+    frame.units.push(make("aster_t2_lift_ship", base, 1));
     frame.units.push(make(
         "aster_commander",
         base + Vec3::new(-82.0, -6.0, 0.0),
@@ -131,7 +131,7 @@ fn main() {
     let pos = map.start_positions()[0];
     let ship = world
         .spawn_unit(
-            blueprints.id_of("aster_t1_lift_ship").unwrap(),
+            blueprints.id_of("aster_t2_lift_ship").unwrap(),
             0,
             pos,
             Angle::ZERO,

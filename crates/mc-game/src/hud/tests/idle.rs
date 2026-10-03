@@ -91,7 +91,7 @@ fn a_reclaimer_with_a_wreck_in_reach_is_not_idle() {
 
 /// Puts unit 7 in the hold of a Courier, unit 9, which joins the frame.
 fn stow(rig: &mut Rig) {
-    let ship = rig.blueprints.id_of("aster_t1_lift_ship").expect("courier");
+    let ship = rig.blueprints.id_of("aster_t2_lift_ship").expect("courier");
     let mut carrier = rig.view.frame.units[0];
     carrier.unit_id = 9;
     carrier.blueprint = ship.0 as u32;

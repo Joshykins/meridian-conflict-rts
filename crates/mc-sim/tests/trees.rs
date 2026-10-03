@@ -227,7 +227,7 @@ fn a_capital_ship_setting_down_presses_flat_the_trees_under_its_hull() {
     props.push(tree(1000, 1200));
     let clear = props.len() - 1;
     let mut w = world(props);
-    let ship = spawn(&mut w, "aster_t2_lift_ship", 1000, 1000);
+    let ship = spawn(&mut w, "aster_t3_lift_ship", 1000, 1000);
     for _ in 0..40 {
         w.tick(&[]).unwrap();
     }

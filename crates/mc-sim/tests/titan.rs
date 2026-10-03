@@ -381,7 +381,7 @@ fn it_brings_down_a_starship() {
     let mut w = world();
     w.state.players[0].free_build = true;
     let _titan = add(&mut w, TITAN, 0, 1000, 3000, 0);
-    let frigate = add(&mut w, "aster_t3_frigate", 1, 3200, 3000, 180);
+    let frigate = add(&mut w, "aster_t4_frigate", 1, 3200, 3000, 180);
     let r = row(&w, frigate);
     w.state.units.fire_state[r] = FireState::HoldFire;
     let full = health(&w, frigate);

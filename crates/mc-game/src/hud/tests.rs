@@ -1683,7 +1683,7 @@ fn the_construction_strip_scrolls_sideways() {
 #[test]
 fn a_lift_ship_hold_lets_out_what_is_clicked_and_its_card_lands_and_takes_off() {
     use mc_sim::mirror::{CargoUnit, CargoView, LiftPhase};
-    let mut rig = Rig::new("aster_t2_lift_ship");
+    let mut rig = Rig::new("aster_t3_lift_ship");
     let tank = rig.blueprints.id_of("aster_t1_tank").unwrap();
     let bot = rig.blueprints.id_of("aster_t1_engineer").unwrap();
     let rider = |unit_id, blueprint| CargoUnit {

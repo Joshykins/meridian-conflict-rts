@@ -6329,7 +6329,7 @@ mod capital_cloud_tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"),
         )
         .unwrap();
-        let bp = data.unit(data.id_of("aster_t2_lift_ship").unwrap());
+        let bp = data.unit(data.id_of("aster_t3_lift_ship").unwrap());
         let mut unit: UnitInstance = bytemuck::Zeroable::zeroed();
         unit.pos = [1000.0, 1000.0, 420.0];
         unit.prev_pos = unit.pos;

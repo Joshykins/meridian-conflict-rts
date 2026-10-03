@@ -1,4 +1,4 @@
-// The two capital rail cannons: the Resolute's spinal rail (`aster_t3_frigate`, fired
+// The two capital rail cannons: the Resolute's spinal rail (`aster_t4_frigate`, fired
 // down out of the cloud layer) and the Zenith (`aster_t4_anti_ship`, a ground gun
 // firing up at warships). Nothing else in the game is this big, and they must never be
 // mistaken for the rail family (`aster_rail_cannon` and its `like`s).

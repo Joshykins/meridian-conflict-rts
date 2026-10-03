@@ -1,4 +1,4 @@
-//! Valiant: the ARC's tech 2 rail corvette (`aster_t2_corvette`, mesh `rail_corvette`), a
+//! Valiant: the ARC's tech 3 rail corvette (`aster_t3_corvette`, mesh `rail_corvette`), a
 //! small warship of the upper air. Its long rail cannon hangs under the belly on a post,
 //! the Resolute's turret house with its rails drawn out, free to turn right round and
 //! lay onto the ground below; a rotary AA cannon stands on a raised barbette on its back

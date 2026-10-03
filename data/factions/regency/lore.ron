@@ -196,7 +196,7 @@
             "Plasmeric Bomb": "A charge of plasma held in gravity until it lands, then let go all at once.",
         },
     ),
-    "regency_t1_transport": (
+    "regency_t2_transport": (
         lore: "A plated hold slung between lift bells; it sets down flat, takes a company aboard at the stern and lifts it across anything.",
         weapons: {},
     ),

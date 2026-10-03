@@ -1,4 +1,4 @@
-//! The Resolute heavy frigate (`aster_t3_frigate`) and the Zenith anti-ship rail cannon
+//! The Resolute heavy frigate (`aster_t4_frigate`) and the Zenith anti-ship rail cannon
 //! (`aster_t4_anti_ship`): the frigate's spinal rail is fixed along the keel, so the
 //! whole hull turns and pitches onto its mark; the Zenith reaches warships far beyond any other gun;
 //! and a wing of air superiority fighters is the frigate's answer.
@@ -13,7 +13,7 @@ use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
 use std::sync::Arc;
 
-const FRIGATE: &str = "aster_t3_frigate";
+const FRIGATE: &str = "aster_t4_frigate";
 const ZENITH: &str = "aster_t4_anti_ship";
 const RAPTOR: &str = "aster_t3_air_superiority";
 

@@ -1,4 +1,4 @@
-// The Valiant (`aster_t2_corvette`): a light warship between the Courier and the Bastion
+// The Valiant (`aster_t3_corvette`): a light warship between the Courier and the Bastion
 // in size. Its hum is its own `moving` sound; the drives, lift jets and landing are the
 // shared capital recipes (`audio/capital.rs` falls back to `capital_<part>`), sized here
 // between the Courier's and the Bastion's.

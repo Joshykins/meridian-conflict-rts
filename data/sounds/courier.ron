@@ -1,4 +1,4 @@
-// The Courier (`aster_t1_lift_ship`): a light, fast spacecraft. Its hum is its own
+// The Courier (`aster_t2_lift_ship`): a light, fast spacecraft. Its hum is its own
 // `moving` sound; the rest are the parts `audio/capital.rs` looks up as
 // `aster_courier_<part>`. It is the Bastion's family made smaller: the capital
 // recipes an octave-ish up and shorter (`size` under 1), so it is heard as the same

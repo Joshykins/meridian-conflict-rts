@@ -1,4 +1,4 @@
-//! The Coffer, the Regency's tech 1 light transport: a box of a hold, open at the stern,
+//! The Coffer, the Regency's tech 2 light transport: a box of a hold, open at the stern,
 //! slung between lift bells. It sets the hold down flat on the ground and the cargo drives
 //! in and out at the stern. Raised on a lot by the Exarch and the Artificers, as ARC's
 //! Courier is by its builders. A long plated sponson either side of the hold, three lift
@@ -8,7 +8,7 @@
 //! Finish (docs/STYLE.md "The Regency look"): dark plates lapped over bronze, red optics
 //! across the cab's brow, red under the bells. No jets, no rotors: the lift bells carry it
 //! (`super::super::lift`). Authored at blueprint scale (radius 40, height 22): `HALF`,
-//! `CLEAR`, `FRONT` and `HINGE` are `regency_t1_transport`'s `transport` numbers.
+//! `CLEAR`, `FRONT` and `HINGE` are `regency_t2_transport`'s `transport` numbers.
 
 use glam::Vec3;
 
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn the_unit_files_hold_is_the_models() {
-        let (b, id) = super::super::tests::blueprint("regency_t1_transport");
+        let (b, id) = super::super::tests::blueprint("regency_t2_transport");
         let bp = b.unit(id);
         assert_eq!(bp.visual.mesh, "regency_coffer");
         assert!(

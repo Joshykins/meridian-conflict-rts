@@ -1,4 +1,4 @@
-//! Vigil: the tech 1 sensor ship, a small single-drive spacecraft. A faceted armoured
+//! Vigil: the tech 2 sensor ship, a small single-drive spacecraft. A faceted armoured
 //! hull, dark below and plated pale above, runs from a blunt prow back to the drive;
 //! sponsons either side carry the lift jets; a spine of radiators runs down its back.
 //! Its sensors take after the Watchtower: two booms reach out ahead of the prow from

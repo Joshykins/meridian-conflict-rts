@@ -13,7 +13,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 const NARWHAL: &str = "aster_t3_rail_trimaran";
-const FRIGATE: &str = "aster_t3_frigate";
+const FRIGATE: &str = "aster_t4_frigate";
 
 /// Open sea, 30 m deep, about 4 km square.
 fn sea() -> World {
@@ -204,7 +204,7 @@ fn duel(ship: &str, range: i32, attack: bool) -> (u32, f32, f32) {
     (240, health(&w, s) / ship_full, health(&w, g) / gun_full)
 }
 
-/// One Narwhal costs about three quarters of a Resolute and brings it down however the
+/// One Narwhal costs under half a Resolute and brings it down however the
 /// frigate comes at it; it is no match for a Dominion on its own.
 #[test]
 fn one_narwhal_brings_down_a_resolute_but_not_a_dominion() {

@@ -1,4 +1,4 @@
-//! The Valiant rail corvette (`aster_t2_corvette`): its long rail cannon hangs under the
+//! The Valiant rail corvette (`aster_t3_corvette`): its long rail cannon hangs under the
 //! belly and lays onto the ground, even close under the ship; its rotary cannon on the
 //! back cuts down aircraft round it.
 
@@ -12,7 +12,7 @@ use mc_sim::{MatchConfig, PlayerSetup, World};
 use std::path::Path;
 use std::sync::Arc;
 
-const CORVETTE: &str = "aster_t2_corvette";
+const CORVETTE: &str = "aster_t3_corvette";
 
 fn world() -> World {
     let blueprints = Arc::new(

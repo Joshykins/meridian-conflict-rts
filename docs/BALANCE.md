@@ -213,6 +213,23 @@ replacing the mines.
 Warships (the Valiant, Resolute and Dominion) fly in the air layer with everything else: there is
 no separate space layer, and any anti-air weapon can hit them.
 
+- Every spaceship sits a tier above the land and air units of its cost band, and pays 1.75x what
+  it did as a tier lower (2026-10-02); only the Dominion kept its tier and price:
+
+  | Ship | Tier | Mass | Energy | Build time |
+  | --- | --- | --- | --- | --- |
+  | Courier (light transport) | 2 | 280 | 4,200 | 1,400 |
+  | Coffer (Regency light transport) | 2 | 280 | 4,200 | 1,400 |
+  | Vigil (sensor ship) | 2 | 490 | 7,350 | 2,450 |
+  | Valiant (rail corvette) | 3 | 1,925 | 31,500 | 11,550 |
+  | Bastion (assault transport) | 3 | 4,200 | 63,000 | 25,200 |
+  | Resolute (heavy frigate) | 4 | 8,750 | 105,000 | 35,000 |
+  | Dominion (dreadnought) | 4 | 16,000 | 220,000 | 70,000 |
+
+  Tech 2 ships are raised by the Mason II and III and the commander's Engineering Suite II and
+  III (the Regency's Artificer II and III and the Exarch's suites); tech 3 and 4 ships by the
+  Mason III and Engineering Suite III only.
+
 - Warships are expensive, and they are countered by:
   - anti-space guns;
   - other warships;
@@ -220,7 +237,7 @@ no separate space layer, and any anti-air weapon can hit them.
 - A ground anti-space gun outranges the warship it answers and beats it for less mass:
   - one Zenith (T4, 11,200 mass, 3,200 m) reliably kills one Dominion (16,000 mass, 2,500 m) at
     about 70% of its mass;
-  - the Narwhal (T3, 3,800 mass, 3,000 m) does the same to a Resolute at about three quarters
-    of its mass, but on its own it loses to a Dominion.
+  - the Narwhal (T3, 3,800 mass, 3,000 m) does the same to a Resolute (T4, 8,750 mass) at
+    under half its mass, but on its own it loses to a Dominion.
 - `tests/dreadnought.rs` and `tests/narwhal.rs` fight each of these duels three ways: parked
   close, parked at the ship's own reach, and with the ship ordered in from out of range.
