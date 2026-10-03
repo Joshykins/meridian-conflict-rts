@@ -1044,6 +1044,7 @@ pub fn screenshot(
             ranges_drawn,
             overlay: &overlay,
             build_grid,
+            icons: !hud.free.on,
         };
         renderer.render(&input).map_err(|e| e.to_string())?;
         std::thread::sleep(std::time::Duration::from_millis(5));
@@ -1086,6 +1087,7 @@ pub fn screenshot(
                 ranges_drawn,
                 overlay: &overlay,
                 build_grid: shot.build_grid,
+                icons: !hud.free.on,
             };
             let scope = mc_core::perf::Scope::begin();
             let cpu = Instant::now();
@@ -1367,6 +1369,7 @@ pub fn ui_screenshot(
             ranges_drawn: 0,
             overlay: &overlay,
             build_grid: false,
+            icons: true,
         };
         if !quick || i == 0 || i >= 88 {
             renderer.render(&input).map_err(|e| e.to_string())?;

@@ -88,6 +88,7 @@ fn main() {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
         }
@@ -106,6 +107,7 @@ fn main() {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             save(&mut renderer, out, &format!("{name}-{pose}"));
@@ -137,6 +139,7 @@ fn main() {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             save(&mut renderer, out, &format!("{name}-{pose}"));
@@ -207,6 +210,7 @@ fn main() {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             save(&mut renderer, out, &format!("{name}-{i:02}"));

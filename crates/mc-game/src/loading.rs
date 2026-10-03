@@ -1272,6 +1272,7 @@ fn shoot(
             ranges_drawn: 0,
             overlay,
             build_grid: false,
+            icons: true,
         })
         .map_err(|e| e.to_string())?;
     let pixels = renderer

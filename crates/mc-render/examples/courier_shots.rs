@@ -100,6 +100,7 @@ fn main() {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
         }
@@ -180,6 +181,7 @@ fn main() {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             let pixels = renderer.read_pixels().unwrap();
@@ -222,6 +224,7 @@ fn main() {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             let pixels = renderer.read_pixels().unwrap();

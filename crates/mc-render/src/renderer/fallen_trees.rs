@@ -335,6 +335,7 @@ mod tests {
                             ranges_drawn: 0,
                             overlay: &overlay,
                             build_grid: false,
+                            icons: true,
                         })
                         .unwrap();
                     // A few frames a stage: enough for the tile cache and effects to settle.

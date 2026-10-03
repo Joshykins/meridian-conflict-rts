@@ -262,6 +262,7 @@ impl Studio {
                 ranges_drawn: 0,
                 overlay: &self.overlay,
                 build_grid: false,
+                icons: true,
             };
             self.renderer.render(&input).map_err(|e| e.to_string())?;
         }

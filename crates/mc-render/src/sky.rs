@@ -2337,6 +2337,7 @@ mod shots {
                         ranges_drawn: 0,
                         overlay: &overlay,
                         build_grid: false,
+                        icons: true,
                     })
                     .unwrap();
                 t += step;

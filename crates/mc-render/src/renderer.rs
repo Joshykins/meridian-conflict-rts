@@ -266,6 +266,9 @@ pub struct FrameInput<'a> {
     pub ranges_drawn: usize,
     pub overlay: &'a Overlay,
     pub build_grid: bool,
+    /// Strategic icons drawn. Off (the free camera), every unit keeps its model
+    /// at any distance and radar blips are not shown.
+    pub icons: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -5724,6 +5727,7 @@ mod environment_tests {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
         }
@@ -5776,6 +5780,7 @@ mod environment_tests {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
         }
@@ -5849,6 +5854,7 @@ mod environment_tests {
                         ranges_drawn: 0,
                         overlay: &overlay,
                         build_grid: false,
+                        icons: true,
                     })
                     .unwrap();
             }
@@ -5915,6 +5921,7 @@ mod shockwave_tests {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
         };
@@ -6127,6 +6134,7 @@ mod glass_tests {
                     ranges_drawn: 0,
                     overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             renderer.read_pixels().unwrap()

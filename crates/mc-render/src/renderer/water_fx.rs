@@ -2460,6 +2460,7 @@ mod sea_shots {
                         ranges_drawn: 0,
                         overlay: &overlay,
                         build_grid: false,
+                        icons: true,
                     })
                     .unwrap();
                 if t + 20.0 * 0.05 > end {

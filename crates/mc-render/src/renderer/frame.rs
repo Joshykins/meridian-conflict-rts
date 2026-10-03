@@ -269,8 +269,13 @@ impl Renderer {
         let eye = camera.eye();
         let size = self.map_info.size_metres().to_f32();
         let (tw, th) = self.tile_cache.tiles();
-        // Below this projected radius a unit is drawn as its strategic icon.
-        let icon_px = self.height as f32 * 0.0055;
+        // Below this projected radius a unit is drawn as its strategic icon;
+        // with icons off, never.
+        let icon_px = if input.icons {
+            self.height as f32 * 0.0055
+        } else {
+            0.0
+        };
         let (tree_blast_count, tree_blasts) =
             self.tree_blasts.upload(input.time, &camera.frustum());
         let (nukes, strategic, nuke_view) =
@@ -1196,16 +1201,18 @@ impl Renderer {
 
             // Strategic icons: the cull pass's last draw slot, as quads.
             self.timers.draws(&device, cmd, "scene.icons");
-            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.icon);
-            device.cmd_bind_vertex_buffers(cmd, 0, &[self.quad_vb.buffer], &[0]);
-            device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
-            device.cmd_draw_indexed_indirect(
-                cmd,
-                self.cull.commands.buffer,
-                model_slots as u64 * 20,
-                1,
-                20,
-            );
+            if input.icons {
+                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.icon);
+                device.cmd_bind_vertex_buffers(cmd, 0, &[self.quad_vb.buffer], &[0]);
+                device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
+                device.cmd_draw_indexed_indirect(
+                    cmd,
+                    self.cull.commands.buffer,
+                    model_slots as u64 * 20,
+                    1,
+                    20,
+                );
+            }
             draw_quads(self.pipelines.bar, self.marks_set, marks.len() as u32);
             self.timers.end(&device, cmd);
             device.cmd_end_render_pass(cmd);

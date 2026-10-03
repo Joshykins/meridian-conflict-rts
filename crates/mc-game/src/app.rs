@@ -1027,6 +1027,7 @@ impl App {
                             ranges_drawn: 0,
                             overlay: &self.overlay,
                             build_grid: false,
+                            icons: true,
                         })
                         .map_err(|e| e.to_string())?;
                     } else if let Some(s) = &mut self.splash {
@@ -1212,6 +1213,7 @@ impl App {
                         ranges_drawn: 0,
                         overlay: &self.overlay,
                         build_grid: false,
+                        icons: true,
                     })
                     .map_err(|e| format!("rendering failed: {e}"))?;
             }

@@ -1264,6 +1264,7 @@ mod shots {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             let cpu_ms = clock.elapsed().as_secs_f32() * 1000.0;
@@ -1293,6 +1294,7 @@ mod shots {
                             ranges_drawn: 0,
                             overlay: &overlay,
                             build_grid: false,
+                            icons: true,
                         })
                         .unwrap();
                     renderer.read_pixels();
@@ -1320,6 +1322,7 @@ mod shots {
                             ranges_drawn: 0,
                             overlay: &overlay,
                             build_grid: false,
+                            icons: true,
                         })
                         .unwrap();
                     renderer.read_pixels();

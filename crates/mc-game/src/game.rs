@@ -4736,6 +4736,7 @@ impl Game {
             ranges_drawn: if clean { 0 } else { ranges_drawn },
             overlay,
             build_grid,
+            icons: !clean,
         };
         self.hud.issues.pump_capture(renderer);
         renderer

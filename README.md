@@ -220,7 +220,7 @@ Linux builds.
 | Home | jump to your commander (or, watching, to a living one) |
 | wheel, WASD or arrows, Q/E, PgUp/PgDn, middle drag | zoom to cursor, pan, rotate, tilt, pan |
 | hold Alt, move the mouse | orbit around the unit under the pointer (or the tracked unit, or the ground); release to put the camera back |
-| Ctrl+Alt | free camera for pictures and recordings: the interface folds away (Ctrl+Alt or Esc brings it back). Pressed during an Alt-orbit it keeps the angle and stays on the unit. Right-drag looks, WASD flies where you look, E/Q rise and sink, Shift faster, wheel dollies (right button + wheel: flight speed), Alt orbits the aim, Z/X lens, click locks on, F frames, T follows, Ctrl+1-9 saves a shot, 1-9 glides to it (Shift cuts), P plays the shots in order, L locks the camera, N smoothing, G thirds grid, B cinema bars, H keys |
+| Ctrl+Alt | free camera for pictures and recordings: the interface folds away and strategic icons are hidden, units keeping their models at any distance (Ctrl+Alt or Esc brings it back). Pressed during an Alt-orbit it keeps the angle and stays on the unit. Right-drag looks, WASD flies where you look, E/Q rise and sink, Shift faster, wheel dollies (right button + wheel: flight speed), Alt orbits the aim, Z/X lens, click locks on, F frames, T follows, Ctrl+1-9 saves a shot, 1-9 glides to it (Shift cuts), P plays the shots in order, L locks the camera, N smoothing, G thirds grid, B cinema bars, H keys |
 | T | track the unit under the pointer, or the selection; pan to stop |
 | F1 | profiler: every sim phase and GPU pass, table sizes |
 | Esc (nothing selected) / F10 / MENU | the command menu: resume, settings, volume, leave the match, exit. A single-player match pauses while it is open |

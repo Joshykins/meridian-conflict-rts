@@ -356,6 +356,7 @@ mod tests {
                     ranges_drawn: 0,
                     overlay: &overlay,
                     build_grid: false,
+                    icons: true,
                 })
                 .unwrap();
             if let Some((_, name)) = shots.pop_if(|s| time >= s.0) {
