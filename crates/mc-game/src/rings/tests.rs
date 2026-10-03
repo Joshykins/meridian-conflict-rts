@@ -66,11 +66,11 @@ fn rings_follow_the_data() {
     );
     assert_eq!(
         of(&b, "aster_t2_shield"),
-        vec![(Reach::Shield, 0, 0.0, 100.0)]
+        vec![(Reach::Shield, 0, 0.0, 115.0)]
     );
     assert_eq!(
         of(&b, "aster_t3_shield"),
-        vec![(Reach::Shield, 0, 0.0, 180.0)]
+        vec![(Reach::Shield, 0, 0.0, 205.0)]
     );
     // The Undertow's field, where an enemy jump is snagged.
     assert_eq!(

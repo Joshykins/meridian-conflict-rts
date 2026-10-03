@@ -66,7 +66,7 @@ there comes from `air_velocity` (last tick's displacement, kept for every hull).
 Regressions are in `crates/mc-sim/tests/air_bombing.rs`.
 
 Height stays in the unit blueprint's motion.altitude, above the local land/water
-surface. Both T1 interceptors and bombers cruise at 200 m, above the 180 m heavy dome. Future fighter tiers
+surface. Both T1 interceptors and bombers cruise at 200 m, above the tallest dome (about 108 m). Future fighter tiers
 and recon can each specify their own altitude. Aircraft can overlap in plan view
 without changing one another's flight path.
 Idle aircraft land on clear dry ground and lift clear before departing. Water,

@@ -475,7 +475,7 @@
         // A dome over the ships around it. Shells and missiles break on it; torpedoes run
         // under its skirt. It draws energy like every shield.
         economy: (energy_upkeep: 180),
-        shield: (radius: 220, health: 9000, regen: 120),
+        shield: (radius: 250, health: 9000, regen: 120),
         weapons: [],
         mesh: "shield_boat", icon: Shield,
         sounds: (death: "blast_large", moving: "ship_engine"),

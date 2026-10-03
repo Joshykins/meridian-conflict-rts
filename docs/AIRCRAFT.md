@@ -35,7 +35,7 @@ return leg does not cancel the attack or reveal hidden target movement.
 
 These values fit Meridian's scale. The altitude specifically implements the
 request to clear shields; it is not copied from FA's coordinate scale. The
-largest current dome has a 180 m radius. Both T1 aircraft share the lower 200 m
+tallest current dome (the Nautilus, 250 m radius) stands about 108 m high. Both T1 aircraft share the lower 200 m
 cruise band. Idle aircraft brake, level, and descend onto clear dry ground at up to 12 m/s,
 easing to 2 m/s through the final 24 m before touchdown.
 They remain aloft over water, steep ground, buildings or occupied landing sites.

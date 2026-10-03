@@ -420,7 +420,7 @@
         radius: 13.9, height: 26, footprint: (3, 3), hull: (6.9, 6.9),
         vision: 140,
         economy: (energy_upkeep: 220),
-        shield: (radius: 90, health: 11000, regen: 110),
+        shield: (radius: 105, health: 11000, regen: 110),
         upgrades_to: "regency_t3_shield",
         mesh: "regency_ward", icon: Shield,
         // A breached cage frees its star, which goes nova like a power generator's.
@@ -437,7 +437,7 @@
         radius: 13.9, height: 32, footprint: (3, 3), hull: (6.9, 6.9),
         vision: 160,
         economy: (energy_upkeep: 540),
-        shield: (radius: 160, health: 44000, regen: 440),
+        shield: (radius: 185, health: 44000, regen: 440),
         mesh: "regency_ward", icon: Shield,
         sounds: (death: "regency_supernova_small"),
     ),

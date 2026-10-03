@@ -565,8 +565,8 @@ pub const HULL_SHIELD_PAD: f64 = 1.6;
 pub const SHIELD_PROJECTOR_HEIGHT: f32 = 16.0;
 
 /// A dome is a flattened spheroid, not a hemisphere: a small one is round, a big one
-/// spreads wide at about the same height (Aegis 100 m -> 70 m tall, Aegis II 180 m ->
-/// 90 m). Its vertical semi-axis for a dome of `radius`. shields.wgsl `dome_height`
+/// spreads wide at about the same height (Aegis 115 m -> 74 m tall, Aegis II 205 m ->
+/// 96 m). Its vertical semi-axis for a dome of `radius`. shields.wgsl `dome_height`
 /// must match.
 pub fn dome_height(radius: Fx) -> Fx {
     radius.min(Fx::from_int(DOME_HEIGHT_BASE) + radius / DOME_HEIGHT_DIV)
