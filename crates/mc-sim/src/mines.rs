@@ -585,10 +585,11 @@ impl World {
     }
 
     /// Material fabricators' output for this tick, into `income` and each one's flow:
-    /// all of it with `powered` (its side's energy share) whole, none with no energy.
+    /// all of it with `powered` (its side's energy share) whole, none with no energy
+    /// or while it is paused.
     pub(crate) fn fabricator_income(&mut self, income: &mut [(Fx, Fx)], powered: &[Fx]) {
         for row in self.state.units.slots.iter() {
-            if !self.state.units.is_active(row) {
+            if !self.state.units.is_active(row) || self.powered_down(row) {
                 continue;
             }
             let Some(f) = self.bp(row).fabricator else {

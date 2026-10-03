@@ -101,15 +101,14 @@ impl World {
             self.flows.resize(rows, UnitFlow::default());
         }
 
+        self.refresh_adjacency();
         // Production, upkeep and storage from every active unit.
         for row in self.state.units.slots.iter() {
             if !self.state.units.is_active(row) {
                 continue;
             }
             let mut e = self.bp(row).economy;
-            if self.powered_down(row) {
-                e.energy_upkeep = Fx::ZERO;
-            }
+            e.energy_upkeep = self.upkeep(row);
             let p = self.state.units.owner[row] as usize;
             income[p].0 += e.mass_income / DT;
             income[p].1 += e.energy_income / DT;
@@ -181,7 +180,7 @@ impl World {
                 [Fx::ZERO, tbp.cost_energy * progress / tbp.build_time]
             } else {
                 let scale = repair_scale(repair);
-                let (mass, energy) = self.work_cost(target, repair);
+                let (mass, energy) = self.builder_pays(row, target, self.work_cost(target, repair));
                 [
                     mass * progress / tbp.build_time * scale,
                     energy * progress / tbp.build_time * scale,
@@ -311,7 +310,11 @@ impl World {
             } else {
                 tbp.health
             };
-            let (cost_mass, cost_energy) = self.work_cost(job.target, job.repair);
+            let (cost_mass, cost_energy) = self.builder_pays(
+                job.builder,
+                job.target,
+                self.work_cost(job.target, job.repair),
+            );
             let build_time = tbp.build_time;
             let shield_max = tbp.shield.map(|s| s.health);
             if job.shield {
@@ -398,9 +401,9 @@ impl World {
 
         // Upkeep is paid with the rest, as far as its energy goes.
         for row in self.state.units.slots.iter() {
-            if self.state.units.is_active(row) && !self.powered_down(row) {
+            if self.state.units.is_active(row) {
                 let e = paid_energy[self.state.units.owner[row] as usize][REST];
-                let upkeep = self.bp(row).economy.energy_upkeep / DT;
+                let upkeep = self.upkeep(row) / DT;
                 self.flows[row].used[1] += upkeep * e;
             }
         }

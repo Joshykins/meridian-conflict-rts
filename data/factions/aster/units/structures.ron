@@ -264,6 +264,7 @@
         radius: 11, height: 10, footprint: (2, 2), hull: (7.0, 7.0),
         vision: 120,
         economy: (energy_income: 15),
+        adjacency: (energy: 0.05),
         death_blast: (radius: 24, damage: 400),
         mesh: "power", icon: Power,
         sounds: (death: "reactor_blast"),
@@ -279,6 +280,7 @@
         radius: 23, height: 26, footprint: (4, 4), hull: (18.75, 18.75),
         vision: 160,
         economy: (energy_income: 350),
+        adjacency: (energy: 0.10),
         death_blast: (radius: 60, damage: 2000),
         mesh: "power", icon: Power,
         sounds: (death: "reactor_blast"),
@@ -294,47 +296,34 @@
         radius: 42.5, height: 47, footprint: (8, 8),
         vision: 200,
         economy: (energy_income: 2000),
+        adjacency: (energy: 0.20),
         death_blast: (radius: 130, damage: 6000),
         mesh: "power", icon: Power,
         sounds: (death: "reactor_blast"),
     ),
-    // Material fabricators: they turn energy into material, as far as their upkeep is
-    // paid (mc-sim mines.rs `fabricator_income`). Each eats a whole power plant of its
-    // tier (two T1 reactors, one T2, one T3), and each tier is the better buy even run on
-    // the cheapest power, so spamming low tiers never pays: with their power, T1 0.25/s
-    // pays back in ~22 min, T2 3/s in ~13, T3 20/s in ~10. All are slower than the mine
-    // upgrades (3 / 7 / 11 min), so they come after the mines, but need no ground. Each
-    // tier is a building of its own on its power plant's lot (2x2, 4x4, 8x8), not an
-    // upgrade, and a full containment going up takes the block with it, like a reactor.
-    (
-        key: "aster_t1_fabricator",
-        name: "Material Fabricator",
-        role: "Material Fabricator", title: "Fabricator",
-        tech: 1,
-        categories: ["Land", "Economy"],
-        health: 400,
-        cost: (mass: 180, energy: 1080, time: 290),
-        radius: 11, height: 7, footprint: (2, 2),
-        vision: 120,
-        economy: (energy_upkeep: 30),
-        fabricator: (mass: 0.25),
-        death_blast: (radius: 40, damage: 1500),
-        mesh: "fabricator", icon: Extractor,
-        sounds: (death: "reactor_blast"),
-    ),
+    // The Material Fabricator turns energy into material, as far as its upkeep is paid
+    // (mc-sim mines.rs `fabricator_income`). One 2x2 building from tech 2, upgraded in
+    // place to tech 3; each tier eats a whole reactor of its tier, and is still worth
+    // it after the mine upgrades (3 / 7 / 11 min): T2 3/s pays back in ~13 min, T3 20/s
+    // in ~10, with their power. Adjacency (mc-sim adjacency.rs): a reactor against it
+    // cuts its upkeep, and it cuts the materials of what a factory against it builds.
+    // A fabricator and a reactor of its tier that touch go down together: kill one and
+    // the other goes up with it.
     (
         key: "aster_t2_fabricator",
         name: "Material Fabricator II",
         role: "Material Fabricator", title: "Fabricator",
         tech: 2,
         categories: ["Land", "Economy"],
-        health: 2400,
+        health: 2000,
         cost: (mass: 1650, energy: 9900, time: 2600),
-        radius: 23, height: 22, footprint: (4, 4),
-        vision: 140,
+        radius: 11, height: 16, footprint: (2, 2), hull: (7.0, 7.0),
+        vision: 120,
         economy: (energy_upkeep: 350),
         fabricator: (mass: 3),
-        death_blast: (radius: 110, damage: 9000),
+        adjacency: (mass: 0.05),
+        death_blast: (radius: 60, damage: 2500),
+        upgrades_to: "aster_t3_fabricator",
         mesh: "fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
     ),
@@ -344,13 +333,14 @@
         role: "Material Fabricator", title: "Fabricator",
         tech: 3,
         categories: ["Land", "Economy"],
-        health: 9000,
+        health: 6000,
         cost: (mass: 9000, energy: 54000, time: 14400),
-        radius: 42.5, height: 34, footprint: (8, 8),
-        vision: 160,
+        radius: 11, height: 22, footprint: (2, 2), hull: (7.0, 7.0),
+        vision: 140,
         economy: (energy_upkeep: 2000),
         fabricator: (mass: 20),
-        death_blast: (radius: 220, damage: 24000),
+        adjacency: (mass: 0.10),
+        death_blast: (radius: 100, damage: 7000),
         mesh: "fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
     ),

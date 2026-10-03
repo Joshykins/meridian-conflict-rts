@@ -6,6 +6,7 @@
 //!
 //! One file's tests: `cargo test --release -p mc-sim --test sim -- <file>::`.
 
+mod adjacency;
 mod air_bombing;
 mod air_guard;
 mod air_landing;

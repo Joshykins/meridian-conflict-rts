@@ -328,6 +328,19 @@ pub struct Fabricator {
     pub mass: Fx,
 }
 
+/// A provider's adjacency bonus: what it saves each finished building of its owner's
+/// whose lot shares an edge with its own (`mc_sim::adjacency`). A reactor saves the
+/// energy its neighbours use (upkeep, and what a factory builds), a fabricator the
+/// materials a neighbouring factory builds with. Each is a share of the whole cost,
+/// summed over every provider touching it up to a cap.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Adjacency {
+    /// Share of a neighbour's energy use it saves.
+    pub energy: Fx,
+    /// Share of a neighbouring factory's materials it saves.
+    pub mass: Fx,
+}
+
 /// What a volatile unit does when it is destroyed: a blast that hurts every unit
 /// near it, its owner's too, so a row of them can go up one after another.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -745,6 +758,8 @@ pub struct UnitBlueprint {
     pub fabricator: Option<Fabricator>,
     /// A volatile unit: the blast it makes when it is destroyed.
     pub death_blast: Option<DeathBlast>,
+    /// A provider: what it saves the buildings it stands against.
+    pub adjacency: Option<Adjacency>,
     /// A strategic launcher: assembles and holds nuclear warheads or interceptors.
     pub strategic: Option<strategic::Strategic>,
     pub builder: Option<Builder>,
@@ -1375,6 +1390,13 @@ impl Blueprints {
                 Some(d) => {
                     h.write_i64(d.radius.0);
                     h.write_i64(d.damage.0);
+                }
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.adjacency {
+                Some(a) => {
+                    h.write_i64(a.energy.0);
+                    h.write_i64(a.mass.0);
                 }
                 None => h.write_u64(u64::MAX),
             }

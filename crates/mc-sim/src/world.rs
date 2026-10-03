@@ -166,6 +166,8 @@ pub struct World {
     pub reclaims: Vec<crate::reclaim::ReclaimWork>,
     /// Each unit's resource flows this tick, by row. Not state.
     pub flows: Vec<crate::economy::UnitFlow>,
+    /// Which buildings save which this tick (`adjacency.rs`). Not state.
+    pub adjacency: crate::adjacency::Links,
     pub timings: TickTimings,
     /// Everything `mc_core::perf` recorded during the last tick, with the
     /// phases as `sim.<phase>` spans and table sizes as counters. Not state.
@@ -443,6 +445,7 @@ impl World {
             muzzles: Vec::new(),
             reclaims: Vec::new(),
             flows: Vec::new(),
+            adjacency: Default::default(),
             timings: TickTimings::default(),
             perf: mc_core::perf::Frame::default(),
             perf_nav: mc_path::NavStats::default(),

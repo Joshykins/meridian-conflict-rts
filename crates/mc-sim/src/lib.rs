@@ -18,6 +18,7 @@
               because the lockstep hash must never depend on a std Hasher impl"
 )]
 
+pub mod adjacency;
 pub mod ai;
 pub mod ai_config;
 pub use ai_config::{AiConfig, Difficulty, Doctrine, Skill};

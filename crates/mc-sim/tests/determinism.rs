@@ -150,6 +150,10 @@ fn setup(w: &mut World) {
                 // A Courier that warps into the north's dampener (`warp.rs`), on its own power.
                 add("aster_t2_lift_ship", 1, 2000, 100);
                 add("aster_t3_power", 1, 400, 150);
+                // Adjacency (`adjacency.rs`): a fabricator against the reactor, saving its
+                // upkeep, and one against a factory, saving its scouts' materials.
+                add("aster_t2_fabricator", 1, 460, 150);
+                add("aster_t2_fabricator", 1, 260, 450);
                 // Two factories linked in one batch: their scouts form up by them and join the attack
                 // together (`batch.rs`), one of them waiting across the snapshot.
                 add("aster_t1_land_factory", 1, 200, 450);

@@ -376,6 +376,9 @@ pub(crate) struct Unit {
     /// Volatile: a blast when it is destroyed ([`crate::DeathBlast`]).
     #[serde(default)]
     pub death_blast: Option<RawDeathBlast>,
+    /// What it saves the buildings it stands against ([`crate::Adjacency`]).
+    #[serde(default)]
+    pub adjacency: Option<RawAdjacency>,
     /// A strategic launcher ([`crate::strategic::Strategic`]).
     #[serde(default)]
     pub strategic: Option<crate::strategic::RawStrategic>,
@@ -619,6 +622,16 @@ pub(crate) struct RawMine {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawFabricator {
     /// Materials a second, with its energy upkeep paid in full.
+    pub mass: f64,
+}
+
+/// A provider's saving for its neighbours; see [`crate::Adjacency`].
+#[derive(Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawAdjacency {
+    #[serde(default)]
+    pub energy: f64,
+    #[serde(default)]
     pub mass: f64,
 }
 
@@ -1857,6 +1870,22 @@ impl Unit {
                 Some(d) => Some(crate::DeathBlast {
                     radius: fx(d.radius),
                     damage: fx(d.damage),
+                }),
+                None => None,
+            },
+            adjacency: match &self.adjacency {
+                Some(a)
+                    if !(0.0..1.0).contains(&a.energy)
+                        || !(0.0..1.0).contains(&a.mass)
+                        || a.energy + a.mass <= 0.0 =>
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: an adjacency saving is a share above 0 and below 1"
+                    )));
+                }
+                Some(a) => Some(crate::Adjacency {
+                    energy: fx(a.energy),
+                    mass: fx(a.mass),
                 }),
                 None => None,
             },
