@@ -422,7 +422,7 @@ impl Reach {
 /// side of its middle line (wake_shell.wgsl `wall_tall`, before it breaks up): it grows
 /// with the fan up to a point.
 fn wall_height(half: f32) -> f32 {
-    2.5 + 0.22 * half.min(40.0)
+    3.5 + 0.33 * half.min(40.0)
 }
 
 /// How far out stretch `k` of a wake's foot is laid, metres.

@@ -258,15 +258,22 @@ fn fs_wake_front_lit(in: ShellOut) -> vec4<f32> {
     let hot_spot = smoothstep(0.62, 0.85, lumps);
     let heat = clamp(0.2 + 0.4 * face + 0.3 * crest + 0.3 * hot_spot * (0.4 + face)
         + 0.12 * flow - 0.4 * back + 0.25 * touch - 0.9 * b, 0.0, 1.0);
-    // Its back thins away into the trail; its body is lumpy, not even.
-    let body = (1.0 - 0.85 * back * back) * (0.35 + 0.65 * smoothstep(0.25, 0.75, lumps));
+    // Its back thins away into the trail; its body is lumps of light with thin gaps
+    // between them, seen through, not a solid sheet.
+    let thick = smoothstep(0.35, 0.72, lumps);
+    let body = (1.0 - 0.85 * back * back) * (0.22 + 0.78 * thick);
     // Broken up, it is eaten through from its crest and back down.
     let grain = value_noise2(vec2<f32>(a * span * 1.3, in.at.y * 9.0) + seed * 2.1, 1.0);
-    let alive = smoothstep(-0.03, 0.03, grain * 0.6 + 0.5 + 0.2 * lead - 0.3 * up - 1.1 * b);
-    let glow = 0.25 + 0.5 * pow(edge, 3.0) + 0.5 * flow + 0.4 * face * face + 0.4 * crest;
-    let light = front_heat(heat) * glow * body * (1.0 + 0.8 * touch)
+    // Its crest is ragged, tongues of plasma licking up off it and falling back.
+    let tongues = value_noise2(vec2<f32>(a * span * 1.1 + 0.3 * warp, age * 2.4) + seed * 5.3, 1.0);
+    let ragged = smoothstep(-0.12, 0.12, 0.74 + 0.3 * tongues - up);
+    let alive = smoothstep(-0.03, 0.03, grain * 0.6 + 0.5 + 0.2 * lead - 0.3 * up - 1.1 * b)
+        * ragged;
+    let glow = 0.1 + 0.65 * pow(edge, 2.5) + 0.75 * flow + 0.3 * face * face + 0.3 * crest;
+    // The gaps between the lumps glow a cooler pink-red, the lumps white-hot.
+    let light = front_heat(heat * (0.45 + 0.55 * thick)) * glow * body * (1.0 + 0.8 * touch)
         + VIOLET * pow(edge, 6.0) * back * 0.5;
-    let cover = clamp((0.06 + 0.22 * pow(edge, 3.0)) * body, 0.0, 0.4);
+    let cover = clamp((0.03 + 0.18 * pow(edge, 3.0)) * body, 0.0, 0.3);
     return vec4<f32>(light * 0.95, cover) * alive * s.fade;
 }
 
