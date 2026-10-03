@@ -15,6 +15,8 @@ pub struct Gpu {
     pub memory: vk::PhysicalDeviceMemoryProperties,
     pub limits: vk::PhysicalDeviceLimits,
     pub device_name: String,
+    /// The PCI vendor id (`AMD_VENDOR` for AMD).
+    pub(crate) vendor_id: u32,
     pub surface_fn: ash::khr::surface::Instance,
     pub swapchain_fn: Option<ash::khr::swapchain::Device>,
     pub command_pool: vk::CommandPool,
@@ -255,6 +257,7 @@ impl Gpu {
             queue,
             queue_family,
             device_name,
+            vendor_id: props.vendor_id,
             surface_fn,
             swapchain_fn,
             command_pool,

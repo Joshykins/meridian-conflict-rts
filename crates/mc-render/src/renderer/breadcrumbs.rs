@@ -7,14 +7,19 @@
 //! and finished or not, so the work that hung is the stretch between the last
 //! finished point and the first unfinished one.
 //!
-//! On a GPU with the extension (AMD) crumbs before single draws are on, models
-//! drawn one draw slot at a time so a crumb can name the model; `MERIDIAN_GPU_CRUMBS=0`
-//! turns that off (scope edges stay marked).
+//! On an AMD GPU crumbs before single draws are on, models drawn one draw slot at a
+//! time so a crumb can name the model; `MERIDIAN_GPU_CRUMBS=0` turns that off (scope
+//! edges stay marked). Other GPUs whose driver has the extension too (NVIDIA's does)
+//! mark only the scope edges unless `MERIDIAN_GPU_CRUMBS=1`: splitting the model draws
+//! cost a 3080 Ti 2 ms of GPU and 4 ms of recording a frame over a large map.
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 
 use ash::vk;
+
+/// The PCI vendor id of AMD, the GPUs that mark every draw by default.
+const AMD_VENDOR: u32 = 0x1002;
 
 /// Points a frame may record; past that they are counted but not marked.
 const MAX_POINTS: usize = 4096;
@@ -33,7 +38,7 @@ pub(super) struct Breadcrumbs {
     points: RefCell<Vec<Cow<'static, str>>>,
     /// The frame before's points, in case the GPU never got to this one.
     previous: RefCell<Vec<Cow<'static, str>>>,
-    /// Crumbs before single draws (on unless `MERIDIAN_GPU_CRUMBS=0`).
+    /// Crumbs before single draws (`MERIDIAN_GPU_CRUMBS`, else on AMD only).
     pub(super) fine: bool,
 }
 
@@ -46,13 +51,20 @@ impl Breadcrumbs {
         let size = (MAX_POINTS * 8) as u64;
         let buffer = gpu.host_buffer(size, vk::BufferUsageFlags::TRANSFER_DST)?;
         buffer.write(0, &vec![0u8; size as usize]);
-        let fine = std::env::var("MERIDIAN_GPU_CRUMBS").map_or(true, |v| v.trim() != "0");
+        let fine = match std::env::var("MERIDIAN_GPU_CRUMBS")
+            .as_deref()
+            .map(str::trim)
+        {
+            Ok("0") => false,
+            Ok("1") => true,
+            _ => gpu.vendor_id == AMD_VENDOR,
+        };
         log::info!(
             "GPU breadcrumbs on ({})",
             if fine {
                 "every draw"
             } else {
-                "scopes only: MERIDIAN_GPU_CRUMBS=0"
+                "scopes only; MERIDIAN_GPU_CRUMBS=1 marks every draw"
             }
         );
         Ok(Some(Breadcrumbs {
