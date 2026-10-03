@@ -201,7 +201,8 @@ pub enum ShieldLook {
 /// sim's either way.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
 pub enum AntiMissileLook {
-    /// A steady red laser held on the casing from the emitter until it fails (ARC).
+    /// A red laser that strikes the casing at full brightness and fades fast, once a tick
+    /// until it fails (ARC).
     #[default]
     Laser,
     /// The Gravitic Counter-seeker: a small red charge thrown off the mount that runs the

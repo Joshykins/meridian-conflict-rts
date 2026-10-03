@@ -323,8 +323,10 @@ struct SoundTable {
     build: Vec<[Option<mc_data::SoundId>; 3]>,
     shield_hit: Option<mc_data::SoundId>,
     shield_break: Option<mc_data::SoundId>,
-    /// The intercept laser, and the snap when a missile casing fails.
+    /// The intercept laser's zap, the counter-seekers' hum, and the snap when a missile
+    /// casing fails (audio/intercept.rs).
     intercept_laser: Option<mc_data::SoundId>,
+    intercept_hum: Option<mc_data::SoundId>,
     intercept_break: Option<mc_data::SoundId>,
     /// Pneumatic toss of a cold-launched missile, before the motor lights.
     cold_eject: Option<mc_data::SoundId>,
@@ -3341,6 +3343,7 @@ impl Game {
             shield_hit: library.id_of("shield_hit"),
             shield_break: library.id_of("shield_break"),
             intercept_laser: library.id_of("intercept_laser"),
+            intercept_hum: library.id_of("intercept_hum"),
             intercept_break: library.id_of("intercept_break"),
             cold_eject: library.id_of("cold_eject"),
             water: ["shell_in_water", "shell_in_water_heavy"].map(|name| library.id_of(name)),
@@ -3724,32 +3727,20 @@ impl Game {
         }
         self.ambience.listen(din);
 
-        // The intercept laser is its own voice: a low steady hum while any laser holds
-        // on a missile (a loop, below, not a sound per tick of burn), and a muffled pop
-        // at the missile when the casing fails.
-        let mut lasers = (0.0f32, 0.0f32);
-        let mut snaps: Vec<(f32, f32, f32)> = Vec::new();
-        for event in &self.view.frame.events {
-            let mc_sim::SimEvent::MissileLased {
-                from, to, killed, ..
-            } = event
-            else {
-                continue;
-            };
-            let (gain, pan) = self.hear(Vec3::from(from.to_f32()));
-            lasers = (lasers.0 + gain * gain, lasers.1 + gain * gain * pan);
-            if *killed {
-                let jitter = ((to.x.to_f32() * 12.9898 + to.y.to_f32() * 78.233).sin()
-                    * 43_758.547)
-                    .fract()
-                    .abs();
-                let (gain, pan) = self.hear(Vec3::from(to.to_f32()));
-                snaps.push((gain * 0.8, pan, 0.92 + jitter * 0.12));
+        // Missile defence: a zap per laser shot, the counter-seekers' hum (a loop, below),
+        // and a pop at the missile when the casing fails. Deliberately capped: past the
+        // loudest few, more zaps in one tick only smear into noise.
+        let intercepts =
+            crate::audio::intercept::heard(&self.view.frame.events, &self.blueprints, |p| {
+                self.hear(p)
+            });
+        if let Some(sound) = table.intercept_laser {
+            for &(gain, pan, pitch) in intercepts.zaps.iter().take(3) {
+                audio.play_world(sound, gain, pan, pitch);
             }
         }
-        snaps.sort_by(|a, b| b.0.total_cmp(&a.0));
         if let Some(sound) = table.intercept_break {
-            for (gain, pan, pitch) in snaps.into_iter().take(2) {
+            for &(gain, pan, pitch) in intercepts.breaks.iter().take(2) {
                 audio.play_world(sound, gain, pan, pitch);
             }
         }
@@ -3916,12 +3907,13 @@ impl Game {
                 ));
             }
         }
-        // Lasers holding on missiles: one hum, from where they are.
-        if let (Some(sound), true) = (table.intercept_laser, lasers.0 > 0.0) {
+        // Counter-seekers on missiles: one hum, from where they are.
+        let hum = intercepts.hum;
+        if let (Some(sound), true) = (table.intercept_hum, hum.0 > 0.0) {
             loops.push((
                 sound,
-                (lasers.0.sqrt() * 0.35).min(0.5),
-                lasers.1 / lasers.0.max(1e-9),
+                (hum.0.sqrt() * 0.35).min(0.5),
+                hum.1 / hum.0.max(1e-9),
                 1.0,
             ));
         }

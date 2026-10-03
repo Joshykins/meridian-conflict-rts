@@ -24,6 +24,7 @@
 pub(crate) mod beams;
 pub mod capital;
 pub(crate) mod flight;
+pub(crate) mod intercept;
 pub(crate) mod listener;
 pub mod music;
 pub mod salvo;

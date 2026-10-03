@@ -507,7 +507,7 @@ struct FadeBeam {
     start: f32,
     life: f32,
     width: f32,
-    /// Orange intercept laser.
+    /// A red intercept laser shot: struck at full brightness, fading fast (sprites.wgsl).
     laser: bool,
     /// A rail slug's path: white-hot, cooling to orange (sprites.wgsl beam colour 5).
     rail: bool,
@@ -987,7 +987,6 @@ pub struct Renderer {
     trail_paths: HashMap<[u32; 3], TrailPath>,
     /// Hitscan and rail paths that are still fading.
     fade_beams: Vec<FadeBeam>,
-    held_lasers: Vec<laser_fx::HeldLaser>,
     /// Hitscan shots fired this tick whose impact has not been seen yet.
     pending_rail: Vec<PendingRail>,
     track_cursor: usize,
@@ -2478,7 +2477,6 @@ impl Renderer {
             work_beams: Default::default(),
             trail_paths: HashMap::new(),
             fade_beams: Vec::new(),
-            held_lasers: Vec::new(),
             pending_rail: Vec::new(),
             track_cursor: 0,
             track_count: 0,
@@ -3348,8 +3346,7 @@ impl Renderer {
             let at = Vec3::from(tree.instance.pos) + Vec3::Z * tree.height * 0.3;
             self.lights.tree_fire(at, time - tree.start);
         }
-        let held = self.held_laser_beams(time);
-        for b in self.fade_beams.iter().chain(held.iter()) {
+        for b in &self.fade_beams {
             let k = 1.0 - ((time - b.start) / b.life.max(0.01)).clamp(0.0, 1.0);
             // A rail slug's path is white-hot and thin: a faint white light, never blue.
             let color = if b.laser {
@@ -4251,9 +4248,8 @@ impl Renderer {
     /// after the tick that spawned them.
     fn write_fade_beams(&mut self, time: f32) {
         self.fade_beams.retain(|b| time < b.start + b.life);
-        let held = self.held_laser_beams(time);
         let size = size_of::<ProjectileInstance>();
-        for beam in self.fade_beams.iter().chain(held.iter()) {
+        for beam in &self.fade_beams {
             let i = self.projectile_count as usize;
             if i >= MAX_PROJECTILES {
                 break;

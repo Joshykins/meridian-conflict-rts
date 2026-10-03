@@ -359,9 +359,8 @@ fn haze_bend(uv: vec2<f32>) -> vec3<f32> {
 
 // Lens flares on bright points (renderer/lens_flare.rs): what a small, very bright light
 // does in the camera's glass. A soft core, a star of thin spikes (one lens, so every
-// star turns the same way), a long flat streak across it, and faint ghosts strung on
-// the line from the light through the middle of the picture. Hidden, softly, where
-// the scene stands nearer than the light.
+// star turns the same way) and a long flat streak across it. Hidden, softly, where the
+// scene stands nearer than the light.
 //!rust crate::renderer::lens_flare::GpuLensFlare
 struct LensFlare {
     // 0..1 across and down.
@@ -372,11 +371,7 @@ struct LensFlare {
     distance: f32,
     // Colour times brightness.
     color: vec3<f32>,
-    ghosts: f32,
     _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
-    _pad3: f32,
 }
 struct LensFlares {
     // x: flares in use.
@@ -411,7 +406,6 @@ fn lens_flare(uv: vec2<f32>) -> vec3<f32> {
     let count = min(flares.header.x, LENS_MAX_FLARES);
     var light = vec3<f32>(0.0);
     let px = wave_globals.viewport.xy;
-    let middle = vec2<f32>(0.5);
     // The star's turn, the same for every flare: it is the lens's.
     let a = vec2<f32>(0.966, 0.259);
     let b = vec2<f32>(-a.y, a.x);
@@ -422,46 +416,21 @@ fn lens_flare(uv: vec2<f32>) -> vec3<f32> {
         let p = (uv - f.at) * px;
         let r = length(p);
         let reach = f.radius;
-        // Ghosts: soft discs on the line from the light through the middle, in the
-        // lens's own tints, bigger the further they are thrown.
-        var ghost = vec3<f32>(0.0);
-        if f.ghosts > 0.0 {
-            let axis = middle - f.at;
-            for (var g = 0; g < 3; g++) {
-                let t = array<f32, 3>(0.55, 1.25, 1.7)[g];
-                let size = reach * array<f32, 3>(0.06, 0.12, 0.08)[g];
-                let tint = array<vec3<f32>, 3>(
-                    vec3<f32>(0.5, 0.8, 1.0),
-                    vec3<f32>(0.7, 1.0, 0.6),
-                    vec3<f32>(1.0, 0.6, 0.9),
-                )[g];
-                let q = length((uv - (f.at + axis * t)) * px) / max(size, 1.0);
-                if q < 1.0 {
-                    // A disc with a slightly brighter rim, as a lens element throws it.
-                    ghost += tint * (smoothstep(1.0, 0.85, q) * (0.35 + 0.65 * q * q));
-                }
-            }
-        }
-        let near = r < reach * 1.6;
-        if !near && dot(ghost, ghost) == 0.0 {
+        if r >= reach * 1.6 {
             continue;
         }
         let seen = flare_seen(f);
         if seen <= 0.0 {
             continue;
         }
-        var shape = 0.0;
-        if near {
-            let core = exp(-r * r / (reach * reach * 0.004));
-            let halo = exp(-r / (reach * 0.12)) * 0.25;
-            let spikes = flare_spike(p, a, reach, 0.7) + flare_spike(p, b, reach, 0.7)
-                + 0.45 * (flare_spike(p, c, reach * 0.55, 0.6) + flare_spike(p, d, reach * 0.55, 0.6));
-            // The flat streak: twice the spikes' reach, thin, tinted cool.
-            let streak = flare_spike(p, vec2<f32>(1.0, 0.0), reach * 1.6, 0.9) * 0.35;
-            shape = core * 3.0 + halo + spikes;
-            light += f.color * seen * shape + mix(f.color, vec3<f32>(0.6, 0.75, 1.0) * max(f.color.r, max(f.color.g, f.color.b)), 0.5) * seen * streak;
-        }
-        light += ghost * f.ghosts * seen * 0.018 * max(f.color.r, max(f.color.g, f.color.b));
+        let core = exp(-r * r / (reach * reach * 0.004));
+        let halo = exp(-r / (reach * 0.12)) * 0.25;
+        let spikes = flare_spike(p, a, reach, 0.7) + flare_spike(p, b, reach, 0.7)
+            + 0.45 * (flare_spike(p, c, reach * 0.55, 0.6) + flare_spike(p, d, reach * 0.55, 0.6));
+        // The flat streak: longer than the spikes, thin, tinted cool.
+        let streak = flare_spike(p, vec2<f32>(1.0, 0.0), reach * 1.6, 0.9) * 0.35;
+        let cool = vec3<f32>(0.6, 0.75, 1.0) * max(f.color.r, max(f.color.g, f.color.b));
+        light += (f.color * (core * 3.0 + halo + spikes) + mix(f.color, cool, 0.5) * streak) * seen;
     }
     return light;
 }
