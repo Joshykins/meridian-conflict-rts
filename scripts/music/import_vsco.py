@@ -119,6 +119,13 @@ SETS = {
         held=True,
         length=4.0,
     ),
+    "trumpets": dict(
+        title="Trumpet (held)",
+        dir="Brass/Trumpet/sus",
+        layers=["v1", "v3"],
+        held=True,
+        length=4.0,
+    ),
     "tuba": dict(
         title="Tuba (held)",
         dir="Brass/Tuba/sus",

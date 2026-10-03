@@ -1,0 +1,17 @@
+Synth((
+    oscs: [
+        (wave: Saw, gain: 0.5, unison: 7, detune: 16, width: 1.0),
+        (wave: Saw, gain: 0.18, octave: -1, unison: 3, detune: 10, width: 0.6),
+        (wave: Noise, gain: 0.03),
+    ],
+    filter: (mode: Formant, cutoff: 1000.0, resonance: 0.5, env: 0.0, keytrack: 0.0, velocity: 0.0, drive: 0.0, vowel: 0.12),
+    amp: (a: 0.6, d: 0.8, s: 0.9, r: 1.6),
+    mod_env: (a: 0.6, d: 1.0, s: 0.8, r: 1.5),
+    lfos: [
+        (shape: Sine, to: Pitch, rate: 4.8, amount: 0.07, delay: 0.5),
+        (shape: Triangle, to: Amp, rate: 0.23, amount: 0.08),
+    ],
+    voices: 24,
+    velocity: 0.5,
+    gain: 1.0,
+))

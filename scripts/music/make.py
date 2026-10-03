@@ -20,9 +20,9 @@ from ron import dump  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "data", "music")
-# One song for now, iterated with the user in the studio before any others are written.
 SONGS = {
     "reach_command": "song_reach_command",
+    "meridian": "song_meridian",
 }
 
 
