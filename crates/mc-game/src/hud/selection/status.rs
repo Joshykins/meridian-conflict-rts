@@ -17,6 +17,7 @@ pub(super) fn status_page(
     bp: &UnitBlueprint,
     r: Rect,
     on_strip: bool,
+    focus: &mut crate::hud::adjacency::Focus,
 ) {
     let (x, cw) = (r.x, r.w);
     let mut y = vitals(ui, s, u, bp, x, r.y, cw);
@@ -31,6 +32,7 @@ pub(super) fn status_page(
     ) {
         y += economy::STRIP_H + 4.0;
     }
+    y = crate::hud::adjacency::band(ui, s, u, bp, x, y, cw, focus);
     let mines = mine::views(s, &[u]);
     if !mines.is_empty() {
         mine::panel(ui, s, &mines, Rect::new(x, y, cw, mine::HEIGHT));

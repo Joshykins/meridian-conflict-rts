@@ -4600,6 +4600,13 @@ impl Game {
                 placing,
             );
             crate::cover_marks::draw(&mut ui, &field, placing);
+            crate::adjacency_marks::draw(
+                &mut ui,
+                &field,
+                hover_unit.map(|i| self.view.frame.units[i].unit_id),
+                self.hud.adjacency.partner,
+                placing,
+            );
             work::draw_tags(&mut ui, &field, alpha, |o| !self.is_enemy(o));
             crate::titan_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));
             crate::warp_marks::draw(&mut ui, &field, alpha, self.ground_under_cursor(renderer));

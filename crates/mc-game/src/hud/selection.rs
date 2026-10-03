@@ -621,6 +621,7 @@ fn single(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, stri
         bp,
         Rect::new(x, r.y + 82.0, cw, r.bottom() - 10.0 - r.y - 82.0),
         strip && super::build::has_strip(s, bp),
+        &mut hud.adjacency,
     );
     // The card rises and fades in over the panel, and sinks away when closed.
     let k = ui.ease(

@@ -9,6 +9,7 @@
     reason = "a binary crate exports nothing; rustc already reports unused items"
 )]
 
+mod adjacency_marks;
 mod ambience;
 mod app;
 mod audio;

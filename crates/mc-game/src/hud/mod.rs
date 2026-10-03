@@ -7,6 +7,7 @@
 //! battlefield) and returns what the player asked for as `HudAction`s. The HUD
 //! never sends commands itself.
 
+pub(crate) mod adjacency;
 mod ai_mind;
 mod armament;
 mod build;
@@ -294,6 +295,8 @@ pub struct Hud {
     /// The rings (bits by `rings::projections` index) whose weapon card or Reach row the
     /// pointer was on last frame: the details card lights them and dims the rest.
     pub details_focus: u64,
+    /// The neighbour whose adjacency link is lit, from the unit panel's band.
+    pub adjacency: adjacency::Focus,
     /// The same rings for the ground, with their blueprint: taken each frame into
     /// `Rings::focus`, so they go out when the card is not drawn.
     pub reach_focus: Option<(u32, u64)>,

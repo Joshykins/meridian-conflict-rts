@@ -12,14 +12,16 @@ use crate::audio::Sfx;
 use crate::game::Mode;
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
-use mc_core::{Fx, FxVec2, TICKS_PER_SECOND};
+use mc_core::{Fx, FxVec2};
 use mc_data::{cat, BlueprintId, UnitBlueprint};
 use mc_sim::mirror::UnitInstance;
 use mc_sim::tables::{flag, OrderKind};
 
 pub(super) mod batch;
+mod data_card;
 pub(super) mod queue;
 mod strip;
+pub(super) use data_card::data_card;
 pub(super) use queue::Split;
 use strip::{Slot, ARROW_W};
 
@@ -419,7 +421,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                         .to_owned()
                 }
             };
-            data_card(hud, ui, item, power, &hint, tile, floor - GAP);
+            data_card(hud, ui, s.blueprints, item, power, &hint, tile, floor - GAP);
         }
         Some(Hover::Climb(i, tile)) => {
             upgrade_card(hud, ui, s, unit, bp, &line, i, reached, tile, floor - GAP)
@@ -1116,9 +1118,21 @@ fn upgrade_card(
             ),
         );
     }
+    // A fabricator: what it makes now and at the next tier.
+    let made = |bp: &UnitBlueprint| bp.fabricator.map(|f| f.mass.to_f32());
+    if let (Some(a), Some(b)) = (made(from), made(next)) {
+        rows.insert(0, ("Materials / s", a, b, ""));
+    }
     rows.push(("Vision", from.vision.to_f32(), next.vision.to_f32(), " m"));
-    // From the tier the mine is at now, so a later tier shows the whole climb.
-    let payback = mine.and_then(|v| super::mine::climb_gain(current, next, &v));
+    // From the tier the mine or fabricator is at now, so a later tier shows the whole
+    // climb.
+    let payback = mine
+        .and_then(|v| super::mine::climb_gain(current, next, &v))
+        .or_else(|| {
+            let gain = made(next)? - made(current)?;
+            let cost = (next.cost_mass - current.cost_mass).to_f32().max(0.0);
+            (gain > 0.0).then(|| (gain, cost / gain))
+        });
     let rows: Vec<_> = rows.into_iter().take(8).collect();
 
     let w = 380.0;
@@ -1295,7 +1309,7 @@ fn caption(ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f32, price: f32) {
 }
 
 /// Cuts a caption short, with a full stop for the missing part, until it fits.
-fn shorten(ui: &mut Ui, text: &str, width: f32) -> String {
+pub(super) fn shorten(ui: &mut Ui, text: &str, width: f32) -> String {
     if ui.text_width(type_scale::MICRO, text) <= width {
         return text.to_owned();
     }
@@ -1338,220 +1352,5 @@ pub fn tip(ui: &mut Ui, x: f32, y: f32, text: &str) {
         type_scale::MICRO,
         rgb(palette::TEXT, 0.95),
         text,
-    );
-}
-
-/// Everything about a blueprint, over the tile the pointer is on.
-pub(super) fn data_card(
-    hud: &Hud,
-    ui: &mut Ui,
-    item: &UnitBlueprint,
-    build_power: f32,
-    hint: &str,
-    tile: Rect,
-    bottom: f32,
-) {
-    let mut rows: Vec<(String, String, u32)> = vec![(
-        "Integrity".into(),
-        whole(item.health.to_f32()),
-        palette::TEXT,
-    )];
-    if let Some(m) = &item.motion {
-        rows.push((
-            "Speed".into(),
-            format!("{:.0} m/s", m.speed.to_f32()),
-            palette::TEXT,
-        ));
-    }
-    let e = &item.economy;
-    for (label, v, tone, sign) in [
-        ("Materials Income", e.mass_income, MASS, "+"),
-        ("Energy Income", e.energy_income, ENERGY, "+"),
-        ("Energy Upkeep", e.energy_upkeep, ENERGY, "-"),
-        ("Materials Storage", e.mass_storage, MASS, "+"),
-        ("Energy Storage", e.energy_storage, ENERGY, "+"),
-    ] {
-        if v.to_f32() > 0.0 {
-            rows.push((label.into(), format!("{sign}{}", whole(v.to_f32())), tone));
-        }
-    }
-    if let Some(r) = &item.reclaimer {
-        let charge = if r.charge_ticks > 0 {
-            format!(
-                "  \u{b7}  {:.1} s charge",
-                r.charge_ticks as f32 / TICKS_PER_SECOND as f32
-            )
-        } else {
-            String::new()
-        };
-        rows.push((
-            "Reclaim Beam".into(),
-            format!(
-                "{:.0}/s  \u{b7}  {:.0} m{charge}",
-                r.power.to_f32(),
-                r.range.to_f32()
-            ),
-            MASS,
-        ));
-    }
-    if let Some(b) = &item.builder {
-        rows.push((
-            "Build Power".into(),
-            format!("{:.0}", b.power.to_f32()),
-            palette::TEXT,
-        ));
-    }
-    if let Some(sh) = item.shield {
-        let line = if sh.is_hull() {
-            format!(
-                "{}  \u{b7}  +{:.0}/s",
-                whole(sh.health.to_f32()),
-                sh.regen.to_f32()
-            )
-        } else {
-            format!(
-                "{}  \u{b7}  {:.0} m  \u{b7}  +{:.0}/s",
-                whole(sh.health.to_f32()),
-                sh.radius.to_f32(),
-                sh.regen.to_f32()
-            )
-        };
-        rows.push(("Shield".into(), line, palette::TEXT));
-    }
-    if item.radar.to_f32() > 0.0 {
-        rows.push((
-            "Radar".into(),
-            format!("{:.0} m", item.radar.to_f32()),
-            palette::TEXT,
-        ));
-    }
-    if item.sonar.to_f32() > 0.0 {
-        rows.push((
-            "Sonar".into(),
-            format!("{:.0} m", item.sonar.to_f32()),
-            palette::TEXT,
-        ));
-    }
-
-    let w = 404.0;
-    let (x, cw) = (18.0, w - 36.0);
-    // Lore, wrapped to the card.
-    let lore = super::selection::wrap_text(ui, type_scale::BODY, &item.lore, cw);
-    let guns = super::armament::groups(&item.weapons);
-    // Short figures sit two to a line; one too long for half the card has a line of its own.
-    let half = cw * 0.5 - 12.0;
-    let (short, long): (Vec<_>, Vec<_>) = rows.into_iter().partition(|(label, value, _)| {
-        ui.text_width(type_scale::MICRO, label) + ui.text_width(type_scale::VALUE, value) + 12.0
-            <= half
-    });
-    let row_h = 19.0;
-    let lines = short.len().div_ceil(2) + long.len();
-    let h = 112.0
-        + if lore.is_empty() {
-            0.0
-        } else {
-            lore.len() as f32 * 19.0 + 10.0
-        }
-        + lines as f32 * row_h
-        + super::armament::height(&guns)
-        + 34.0;
-    let r = Rect::new(
-        (tile.x + tile.w * 0.5 - w * 0.5).clamp(14.0, ui.size.x - w - 14.0),
-        (bottom - h).max(14.0),
-        w,
-        h,
-    );
-    ui.panel(r);
-    let x = r.x + x;
-    let pic = Rect::new(r.right() - 76.0, r.y + 8.0, 64.0, 64.0);
-    hud.thumbs.draw(ui, item.id, pic, 1.0);
-    ui.text(
-        x,
-        r.y + 26.0,
-        type_scale::ITEM,
-        rgb(0xFFFFFF, 1.0),
-        &item.name,
-    );
-    let end = ui.text(
-        x,
-        r.y + 48.0,
-        type_scale::MICRO,
-        rgb(palette::TEXT, 1.0),
-        &format!(
-            "Tech {}  \u{b7}  {}  \u{b7}  {}",
-            item.tech,
-            item.role,
-            Domain::of(item).label()
-        ),
-    );
-    super::volatile::chip(ui, item, end + 8.0, r.y + 48.0);
-
-    // The price: mass, energy, and how long this builder takes over it.
-    let seconds = item.build_time.to_f32() / build_power.max(0.1);
-    let costs = [
-        ("Materials", whole(item.cost_mass.to_f32()), MASS),
-        ("Energy", whole(item.cost_energy.to_f32()), ENERGY),
-        ("Time", super::clock(seconds), palette::TEXT),
-    ];
-    for (i, (label, value, tone)) in costs.iter().enumerate() {
-        let cx = x + i as f32 * (cw - 70.0) / 3.0;
-        ui.fill(Rect::new(cx, r.y + 66.0, 2.0, 28.0), rgb(*tone, 0.9));
-        ui.text(
-            cx + 10.0,
-            r.y + 72.0,
-            type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            label,
-        );
-        ui.text(
-            cx + 10.0,
-            r.y + 88.0,
-            type_scale::VALUE,
-            rgb(*tone, 1.0),
-            value,
-        );
-    }
-    ui.hline(x, r.y + 104.0, cw, rgb(palette::LINE, 0.16));
-    let mut y = r.y + 120.0;
-    for line in &lore {
-        ui.text(x, y, type_scale::BODY, rgb(palette::DIM, 1.0), line);
-        y += 19.0;
-    }
-    if !lore.is_empty() {
-        y += 10.0;
-    }
-    let col = cw * 0.5 + 12.0;
-    for pair in short.chunks(2) {
-        for (i, (label, value, tone)) in pair.iter().enumerate() {
-            let fx = x + i as f32 * col;
-            ui.text(fx, y, type_scale::MICRO, rgb(palette::DIM, 1.0), label);
-            ui.text_right(
-                fx + cw * 0.5 - 12.0,
-                y,
-                type_scale::VALUE,
-                rgb(*tone, 1.0),
-                value,
-            );
-        }
-        if pair.len() == 2 {
-            ui.vline(x + cw * 0.5 + 1.0, y - 7.0, 14.0, rgb(palette::LINE, 0.12));
-        }
-        y += row_h;
-    }
-    for (label, value, tone) in &long {
-        // A long label gives way to its figures, never runs into them.
-        let room = cw - ui.text_width(type_scale::VALUE, value) - 14.0;
-        let label = shorten(ui, label, room);
-        ui.text(x, y, type_scale::MICRO, rgb(palette::DIM, 1.0), &label);
-        ui.text_right(x + cw, y, type_scale::VALUE, rgb(*tone, 1.0), value);
-        y += row_h;
-    }
-    super::armament::draw(ui, &guns, x, y, cw);
-    ui.text(
-        x,
-        r.bottom() - 16.0,
-        type_scale::MICRO,
-        rgb(palette::FAINT, 1.0),
-        hint,
     );
 }
