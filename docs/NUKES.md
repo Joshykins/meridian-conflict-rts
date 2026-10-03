@@ -194,9 +194,11 @@ mc-data; presentation only, never hashed). It rides on the events (`NuclearLaunc
 - **The crater** glows red and cools to black glass with a crimson depth
   (`CraterStyle::Plasma`; the shader reads the negated seed).
 - **Missiles** (`nova_missile_vertex`): the Mangonel's vault round flying, an eight-faceted
-  body under a faceted prow, graphite plate in steel courses with violet light in its
-  seams, and no fins: two containment collars (one on an interceptor) float free round it,
-  their inner faces lit by the field that holds them, turning against each other. A red
+  graphite body in steel courses under a faceted prow, chines down its sides and four
+  wings swept forward at its tail (stowed narrower in the silo's well). Violet line work is
+  cut into the prow, chevrons on its facets, seams up every other edge and a ring at its
+  foot, and burns brighter as the round heats coming down; no team band. An interceptor is
+  the same round, smaller. A red
   plasma plume, a trail of dark smoke, and at the tail the white-hot streak of a Sunspear
   round that takes the prism's pinks and cools to red (`RegencyGunFx::streak`).
 - **Sounds** (data/factions/regency/sounds.ron, `regency_` + the ARC name, picked in

@@ -622,6 +622,9 @@ shared! {
         /// A warhead's body at scale 1 (the Sunfall's round), nose to nozzle, and its radius.
         pub const WARHEAD_LENGTH: f32 = 36.0;
         pub const WARHEAD_RADIUS: f32 = 2.5;
+        /// Vertices drawn per strategic missile (nuke.wgsl `vs_strategic`): the ARC body and
+        /// its fins; a Regency round (nova.wgsl) uses fewer and drops the rest.
+        pub const VERTS: u32 = 11 * 14 * 6 + 4 * 12;
     }
 
     /// A storage structure's fill gauge and status lamps (entity.wgsl `store_material`):

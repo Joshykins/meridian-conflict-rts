@@ -18,8 +18,9 @@
 //!   shuts. Nothing hangs the lift (no frame, beam or cable, unlike ARC's cranes): low
 //!   emitter posts round the well hold it ([`gravity_lift`]).
 //!
-//! The Regency warhead is theirs, not ARC's white one: a faceted dark-plate body banded
-//! in bronze, a containment collar under its nose and thin red seams.
+//! The Regency warhead is theirs, not ARC's white one: a faceted dark-plate round with
+//! chines, wings swept forward at its tail and a violet ring under its prow, the round
+//! nova.wgsl flies ([`round`]).
 //!
 //! The silo is a low armoured vault ringed by lens pylons (`silo_vault`); the array a
 //! launch block beside a ringed sensor mast (`array_mast`). Picked by the user from three
@@ -186,79 +187,21 @@ fn bore(b: &mut MeshBuilder, top: f32, floor: f32) {
 }
 
 /// The Regency warhead standing in its tube (`part::SILO_ROUND`, set by the caller), its
-/// nose's tip at `nose` and its foot at `base`: a faceted dark-plate nose with a bronze
-/// tip, under it the bronze containment collar between two thin red seams, the body in
-/// dark plate banded in bronze, red seam lines down four of its facets, bronze launch
-/// shoes out to the tube's rails.
+/// nose's tip at `nose` and its foot at `base`: the [`round`], its wings stowed to clear the
+/// bore, and launch shoes on its chines out to the tube's rails.
 fn warhead(b: &mut MeshBuilder, nose: f32, base: f32) {
     let r = WARHEAD_R;
-    let fine = b.fine();
-    let plan = ngon(8, 1.0);
-    let shoulder = nose - r * 2.9;
-    b.with_facets(|b| {
-        dark_plate(b);
-        let tip = nose - 0.7;
-        let ogive: &[(f32, f32)] = if fine {
-            &[
-                (tip, 0.32),
-                (nose - 1.6, 0.62),
-                (nose - 3.0, 0.88),
-                (shoulder, 1.0),
-            ]
-        } else {
-            &[(tip, 0.32), (nose - 2.2, 0.76), (shoulder, 1.0)]
-        };
-        let sections: Vec<Section> = ogive.iter().map(|&(z, s)| Section::new(z, r * s)).collect();
-        b.loft_z(&plan, &sections);
-        metal(b);
-        b.loft_z(
-            &plan,
-            &[Section::new(tip, r * 0.32), Section::new(nose, 0.06)],
-        );
-        // The body in courses of one radius (a band proud of it would fight it down the
-        // pit, where depth is squeezed); the red seams a little sunk.
-        let courses: &[(f32, f32, u32)] = &[
-            (shoulder - 0.2, shoulder, GLOW_LASER),
-            (shoulder - 1.6, shoulder - 0.2, METAL),
-            (shoulder - 1.8, shoulder - 1.6, GLOW_LASER),
-            (shoulder - 7.0, shoulder - 1.8, PLATING_DARK),
-            (shoulder - 7.8, shoulder - 7.0, METAL),
-            (base + 1.0, shoulder - 7.8, PLATING_DARK),
-            (base, base + 1.0, METAL),
-        ];
-        for &(z0, z1, m) in courses {
-            if m == GLOW_LASER {
-                b.paint(m);
-            } else if m == METAL {
-                metal(b);
-            } else {
-                dark_plate(b);
-            }
-            let k = if m == GLOW_LASER { 0.96 } else { 1.0 };
-            b.loft_z(&plan, &[Section::new(z0, r * k), Section::new(z1, r * k)]);
-        }
-    });
-    if fine {
-        // Red seam lines down four of the facets, under the collar.
+    // Wing tips held this far out (shares of the radius) in the well, 2.8 in flight.
+    let stowed = (BORE * (TAU / 16.0).cos() - 0.3) / r;
+    round(b, Vec2::ZERO, nose, base, r, stowed);
+    if b.fine() {
         let apothem = r * (TAU / 16.0).cos();
-        for i in 0..4 {
-            let a = TAU * i as f32 / 4.0;
-            let d = out(a);
-            red_slot(
-                b,
-                d * apothem + Vec3::Z * (shoulder - 4.2),
-                d,
-                Vec3::Z,
-                3.6,
-                0.1,
-            );
-        }
-        // Launch shoes out to the rails, on the diagonals' facets.
         let rail = BORE * (TAU / 16.0).cos() - 0.4;
         metal(b);
         for i in 0..4 {
             b.yawed(Vec3::ZERO, TAU * i as f32 / 4.0, |b| {
-                for z in [shoulder - 3.0, base + 3.0] {
+                for x in [0.3, 0.7] {
+                    let z = base + x * (nose - base);
                     b.block(v3(apothem - 0.05, -0.22, z), v3(rail - 0.04, 0.22, z + 0.5));
                 }
             });
@@ -267,29 +210,82 @@ fn warhead(b: &mut MeshBuilder, nose: f32, base: f32) {
 }
 
 /// A Gravitic Interceptor in its cell at `at` (`part::SILO_ROUND`, set by the caller), its
-/// nose's tip at `nose`: a slim faceted dark body from the cell's floor, a bronze band and
-/// a thin red seam under a dark nose with a bronze tip.
+/// nose's tip at `nose`: the [`round`] at its size, from the cell's floor.
 fn interceptor(b: &mut MeshBuilder, at: Vec2, nose: f32) {
-    let r = INTERCEPTOR_R;
-    let fine = b.fine();
-    let plan = ngon(if fine { 8 } else { 6 }, 1.0);
-    let shoulder = nose - 2.3;
-    let s = |z: f32, k: f32| Section::new(z, r * k).shifted(at.x, at.y);
+    round(b, at, nose, CELL_FLOOR + 0.05, INTERCEPTOR_R, 2.8);
+}
+
+/// A Regency round standing at `at`, nose up, as nova.wgsl flies it
+/// (`nova_missile_vertex`, every length a share of the round's): an eight-faceted
+/// dark-plate body in graphite courses under a faceted prow, a violet ring at the prow's
+/// foot, chines down its sides and, at the tail, four wings swept forward, their tips
+/// `wing` radii out.
+fn round(b: &mut MeshBuilder, at: Vec2, nose: f32, base: f32, r: f32, wing: f32) {
+    let plan = ngon(8, 1.0);
+    let z = |x: f32| base + x * (nose - base);
+    let s = |x: f32, k: f32| Section::new(z(x), r * k).shifted(at.x, at.y);
     b.with_facets(|b| {
-        metal(b);
-        b.loft_z(&plan, &[s(nose - 0.35, 0.3), s(nose, 0.05)]);
+        // An interceptor is too small to show the steel courses up its body.
+        let courses: &[(f32, f32, u32)] = if r > 1.0 {
+            &[
+                (0.0, 0.03, METAL),
+                (0.03, 0.6, PLATING_DARK),
+                (0.6, 0.62, METAL),
+                (0.62, 0.78, PLATING_DARK),
+                (0.78, 0.8, METAL),
+            ]
+        } else {
+            &[(0.0, 0.03, METAL), (0.03, 0.8, PLATING_DARK)]
+        };
+        for &(x0, x1, m) in courses {
+            if m == METAL {
+                metal(b);
+            } else {
+                dark_plate(b);
+            }
+            b.loft_z(&plan, &[s(x0, 1.0), s(x1, 1.0)]);
+        }
+        b.paint(GLOW_VIOLET);
+        b.loft_z(&plan, &[s(0.8, 0.97), s(0.81, 0.94)]);
         dark_plate(b);
         b.loft_z(
             &plan,
-            &[s(shoulder, 1.0), s(nose - 1.1, 0.72), s(nose - 0.35, 0.3)],
+            &[s(0.81, 0.95), s(0.86, 0.86), s(0.93, 0.6), s(0.975, 0.31)],
         );
-        b.paint(GLOW_LASER);
-        b.loft_z(&plan, &[s(shoulder - 0.12, 0.95), s(shoulder, 0.95)]);
         metal(b);
-        b.loft_z(&plan, &[s(shoulder - 0.6, 1.0), s(shoulder - 0.12, 1.0)]);
-        dark_plate(b);
-        b.loft_z(&plan, &[s(CELL_FLOOR + 0.05, 1.0), s(shoulder - 0.6, 1.0)]);
+        b.loft_z(&plan, &[s(0.975, 0.31), s(1.0, 0.02)]);
     });
+    // Chines on the axes, wings on the diagonals; each a plate in the (radial, up) plane.
+    let tip = (wing - 1.0) / 1.8;
+    let fins: [(&[[f32; 2]], f32, f32); 2] = [
+        (
+            &[[0.95, 0.2], [1.4, 0.3], [1.4, 0.72], [0.95, 0.82]],
+            0.0,
+            0.08,
+        ),
+        (
+            &[
+                [0.95, 0.0],
+                [1.0 + 1.1 * tip, 0.14],
+                [1.0 + 1.8 * tip, 0.22],
+                [1.0 + 1.8 * tip, 0.28],
+                [1.0 + 0.8 * tip, 0.22],
+                [0.95, 0.14],
+            ],
+            TAU / 8.0,
+            0.09,
+        ),
+    ];
+    for (outline, turn, thick) in fins {
+        let profile: Vec<[f32; 2]> = outline.iter().map(|p| [p[0] * r, z(p[1])]).collect();
+        let half = thick * r * 0.5;
+        dark_plate(b);
+        for i in 0..4 {
+            b.yawed(at.extend(0.0), turn + TAU * i as f32 / 4.0, |b| {
+                b.extrude_y(&profile, -half, half);
+            });
+        }
+    }
 }
 
 /// The array's four cells sunk in a roof at `top`: square wells round (±`CELL`, ±`CELL`)

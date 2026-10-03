@@ -862,7 +862,7 @@ impl Renderer {
             // Eight-sided casing, nose, rear cap, four fins, and a cruise missile's wings.
             device.cmd_draw(cmd, 132, self.projectile_count, 0, 0);
             // Strategic missiles: a lathed body and four fins each, or a Regency body and its
-            // collars (nuke.wgsl `MISSILE_VERTS`, nova.wgsl).
+            // pieces (nuke.wgsl `vs_strategic`, nova.wgsl).
             let (nuke_count, strategic_count) = (nuke_view[2] as u32, nuke_view[3] as u32);
             if strategic_count > 0 {
                 self.timers
@@ -872,7 +872,13 @@ impl Renderer {
                     vk::PipelineBindPoint::GRAPHICS,
                     self.pipelines.nuke_missile,
                 );
-                device.cmd_draw(cmd, 11 * 14 * 6 + 4 * 12, strategic_count, 0, 0);
+                device.cmd_draw(
+                    cmd,
+                    crate::gpu_consts::missile::VERTS,
+                    strategic_count,
+                    0,
+                    0,
+                );
             }
 
             self.timers.end(&device, cmd);

@@ -1023,9 +1023,8 @@ fn missile_scale(word: f32) -> f32 {
 }
 
 const SIDES: u32 = 14u;
-// 11 bands of SIDES quads, then 4 fins (two faces each).
+// 11 bands of SIDES quads, then 4 fins (two faces each): MISSILE_VERTS.
 const BODY_VERTS: u32 = 11u * 14u * 6u;
-const MISSILE_VERTS: u32 = 11u * 14u * 6u + 4u * 12u;
 
 @vertex
 fn vs_strategic(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32) -> MissileOut {
@@ -1052,7 +1051,7 @@ fn vs_strategic(@builtin(vertex_index) vertex: u32, @builtin(instance_index) ins
     out.around = 0.0;
     out.piece = 0u;
     if (u32(a.w) & MISSILE_PLASMA) != 0u {
-        let v = nova_missile_vertex(vertex, warhead, length, radius);
+        let v = nova_missile_vertex(vertex, length, radius);
         if v.gone {
             out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
             return out;
@@ -1106,7 +1105,7 @@ fn vs_strategic(@builtin(vertex_index) vertex: u32, @builtin(instance_index) ins
 
 @fragment
 fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
-    let n = normalize(in.normal);
+    var n = normalize(in.normal);
     let b = globals.strategic[in.slot * 2u + 1u];
     let a = globals.strategic[in.slot * 2u];
     let heat = b.w;
@@ -1116,12 +1115,14 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     // Light metal, dark bands at the stage joint and the re-entry vehicle, a team ring.
     var base = vec3<f32>(0.62, 0.64, 0.66);
     // A Regency missile's own light (nova.wgsl `nova_missile_color`).
-    var seam = 0.0;
+    var shine = vec3<f32>(0.0);
     let x = in.along;
     if plasma {
-        let look = nova_missile_color(in.piece, warhead, x, in.around, globals.team_colors[owner].rgb * 0.8);
-        base = look.rgb;
-        seam = look.a;
+        // Its wings are thin plates, seen from both sides.
+        n = select(n, -n, dot(n, globals.camera.xyz - in.world) < 0.0);
+        let look = nova_missile_color(in.piece, x, in.around, heat);
+        base = look[0];
+        shine = look[1];
     } else if warhead {
         if (x > 0.435 && x < 0.48) || x > 0.74 { base = vec3<f32>(0.07, 0.075, 0.08); }
         if x > 0.58 && x < 0.62 { base = globals.team_colors[owner].rgb * 0.8; }
@@ -1137,12 +1138,12 @@ fn fs_strategic(in: MissileOut) -> @location(0) vec4<f32> {
     let h = normalize(sun + v);
     let spec = pow(max(dot(n, h), 0.0), 48.0) * 0.35;
     var c = base * (atmos.sun_color.rgb * lambert * 1.1 + atmos.sky_color.rgb * 0.6) + atmos.sun_color.rgb * spec;
-    c += NOVA_VIOLET * seam;
-    // Coming down, the nose burns: orange going white at the tip (a Regency body's field
-    // burns red going rose).
-    if heat > 0.0 {
+    c += shine;
+    // Coming down, the nose burns: orange going white at the tip (a Regency round's line
+    // work burns brighter instead, `nova_missile_color`).
+    if heat > 0.0 && !plasma {
         let tip = smoothstep(0.7, 1.0, x);
-        c += select(fire_color(tip * heat), plasma_color(tip * heat), plasma) * tip * heat * 30.0;
+        c += fire_color(tip * heat) * tip * heat * 30.0;
     }
     return vec4<f32>(c, 1.0);
 }

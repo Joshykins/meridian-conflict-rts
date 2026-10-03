@@ -378,50 +378,64 @@ fn nova_ignition(n: Blast, eye: vec3<f32>, rd: vec3<f32>, scene_t: f32) -> vec3<
 // ---- the Regency's missiles in flight (vs_strategic / fs_strategic, MISSILE_PLASMA) -------
 //
 // The round in the Mangonel's vault (mc-models regency/strategic `warhead`) flying: an
-// eight-faceted body under a faceted prow, graphite plate with steel courses and violet
-// light in its seams. No fins: two containment collars float free round it, held off the
-// body by their field (its light shows in the gap, on their inner faces), turning slowly
-// against each other. An interceptor is the same, slimmer, with one collar.
+// eight-faceted graphite body in steel courses under a faceted prow, chines down its
+// sides and, at the tail, four wings swept forward. Violet line work is cut into the prow,
+// chevrons on its facets and seams down every other edge, and burns brighter as the round
+// heats coming down. An interceptor is the same round, smaller.
+//
+// The round is lofted pieces: each a profile of rings (along the body 0 tail .. 1 nose, a
+// half-width and a centre, shares of the body's radius) drawn with `facets` flat sides. A
+// plate's cross-section is a thin lozenge of a fixed thickness.
 
-const NOVA_FACETS: u32 = 8u;
-// 11 bands of NOVA_FACETS flat quads, then each collar's outer, inner, fore and aft faces.
-const NOVA_BODY_VERTS: u32 = 11u * 8u * 6u;
-const NOVA_COLLAR_VERTS: u32 = 4u * 8u * 6u;
 const NOVA_GRAPHITE: vec3<f32> = vec3<f32>(0.03, 0.03, 0.034);
 const NOVA_STEEL: vec3<f32> = vec3<f32>(0.2, 0.205, 0.225);
 const NOVA_VIOLET: vec3<f32> = vec3<f32>(0.62, 0.12, 1.0);
+// The body, then four chines, then four wings: 7 * 8 * 6 + 8 * 3 * 4 * 6 vertices.
+const NOVA_PIECES: u32 = 9u;
 
-// Facet profile, tail (0) to nose (1): position along, radius as a share of the body's.
-fn nova_warhead_ring(k: u32) -> vec2<f32> {
-    let p = array<vec2<f32>, 12>(
-        vec2<f32>(0.0, 0.0), vec2<f32>(0.0, 0.8), vec2<f32>(0.03, 1.0), vec2<f32>(0.3, 1.0),
-        vec2<f32>(0.31, 0.93), vec2<f32>(0.33, 1.0), vec2<f32>(0.8, 1.0), vec2<f32>(0.88, 0.86),
-        vec2<f32>(0.935, 0.62), vec2<f32>(0.98, 0.32), vec2<f32>(0.992, 0.14), vec2<f32>(1.0, 0.03));
-    return p[min(k, 11u)];
+struct NovaPiece {
+    first: u32,
+    bands: u32,
+    facets: u32,
+    rot: f32,
+    // A plate's thickness (shares of the body's radius); 0 for the body.
+    thick: f32,
 }
 
-fn nova_interceptor_ring(k: u32) -> vec2<f32> {
-    let p = array<vec2<f32>, 12>(
-        vec2<f32>(0.0, 0.0), vec2<f32>(0.0, 0.8), vec2<f32>(0.04, 1.0), vec2<f32>(0.4, 1.0),
-        vec2<f32>(0.42, 0.9), vec2<f32>(0.44, 1.0), vec2<f32>(0.72, 1.0), vec2<f32>(0.82, 0.82),
-        vec2<f32>(0.9, 0.56), vec2<f32>(0.96, 0.28), vec2<f32>(0.99, 0.1), vec2<f32>(1.0, 0.02));
-    return p[min(k, 11u)];
+fn nova_round_ring(i: u32) -> vec3<f32> {
+    let p = array<vec3<f32>, 16>(
+        // 0: the body.
+        vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(0.0, 0.8, 0.0), vec3<f32>(0.03, 1.0, 0.0),
+        vec3<f32>(0.78, 1.0, 0.0), vec3<f32>(0.86, 0.86, 0.0), vec3<f32>(0.93, 0.6, 0.0),
+        vec3<f32>(0.98, 0.28, 0.0), vec3<f32>(1.0, 0.0, 0.0),
+        // 8: a chine.
+        vec3<f32>(0.2, 0.0, 1.0), vec3<f32>(0.3, 0.2, 1.2), vec3<f32>(0.72, 0.2, 1.2),
+        vec3<f32>(0.82, 0.0, 1.0),
+        // 12: a wing, its tip forward of its root.
+        vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(0.14, 0.55, 1.55), vec3<f32>(0.22, 0.5, 2.3),
+        vec3<f32>(0.28, 0.0, 2.8));
+    return p[min(i, 15u)];
 }
 
-fn nova_missile_ring(k: u32, warhead: bool) -> vec2<f32> {
-    return select(nova_interceptor_ring(k), nova_warhead_ring(k), warhead);
-}
-
-// Collar `c`: its span along the body (0 tail .. 1 nose), its inner and outer radius as a
-// share of the body's, and how fast it turns (radians a second). An interceptor has one.
-fn nova_collar(c: u32, warhead: bool) -> vec4<f32> {
-    if !warhead {
-        return vec4<f32>(0.1, 0.15, 1.35, 1.55);
+fn nova_piece(i: u32) -> NovaPiece {
+    if i == 0u {
+        return NovaPiece(0u, 7u, 8u, 0.0, 0.0);
     }
-    if c == 0u {
-        return vec4<f32>(0.08, 0.125, 1.38, 1.56);
+    let k = f32((i - 1u) % 4u) * TAU * 0.25;
+    if i <= 4u {
+        return NovaPiece(8u, 3u, 4u, k, 0.08);
     }
-    return vec4<f32>(0.52, 0.555, 1.28, 1.43);
+    return NovaPiece(12u, 3u, 4u, k + TAU * 0.125, 0.09);
+}
+
+// A corner of piece `p`: ring `k` of its profile, `side` round it.
+fn nova_piece_point(p: NovaPiece, k: u32, side: f32, length: f32, radius: f32) -> vec3<f32> {
+    let pr = nova_round_ring(p.first + k);
+    let a = side / f32(p.facets) * TAU;
+    let thick = select(pr.y, p.thick, p.thick > 0.0);
+    let cs = vec2<f32>(cos(a) * pr.y + pr.z, sin(a) * thick);
+    let r = vec2<f32>(cs.x * cos(p.rot) - cs.y * sin(p.rot), cs.x * sin(p.rot) + cs.y * cos(p.rot));
+    return vec3<f32>(pr.x * length, r * radius);
 }
 
 struct NovaMissileVertex {
@@ -429,126 +443,78 @@ struct NovaMissileVertex {
     local: vec3<f32>,
     normal: vec3<f32>,
     along: f32,
-    // Round the body, 0..1 from facet 0.
+    // Round the piece, 0..1 from facet 0.
     around: f32,
-    // 0 the body, 1 a collar's plate, 2 a collar's inner face (lit by its field), 3 its
-    // rims.
+    // 0 the body, 1 a chine or wing.
     piece: u32,
     // Off the end of the mesh: not drawn.
     gone: bool,
 }
 
-fn nova_missile_vertex(vertex: u32, warhead: bool, length: f32, radius: f32) -> NovaMissileVertex {
+fn nova_missile_vertex(vertex: u32, length: f32, radius: f32) -> NovaMissileVertex {
     var v: NovaMissileVertex;
-    v.gone = false;
-    let quad = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
-    let corner = quad[vertex % 6u];
-    let half = 0.5 / f32(NOVA_FACETS);
-    if vertex < NOVA_BODY_VERTS {
-        let band = vertex / (NOVA_FACETS * 6u);
-        let side = (vertex / 6u) % NOVA_FACETS;
-        let ring = band + select(0u, 1u, corner >= 2u);
-        let around = side + select(0u, 1u, corner == 1u || corner == 2u);
-        let pr = nova_missile_ring(ring, warhead);
-        let ang = f32(around) / f32(NOVA_FACETS) * TAU;
-        v.local = vec3<f32>(pr.x * length, cos(ang) * pr.y * radius, sin(ang) * pr.y * radius);
-        // Flat facets: every corner of a quad takes its middle's normal.
-        let mid = (f32(side) + 0.5) / f32(NOVA_FACETS) * TAU;
-        let p0 = nova_missile_ring(band, warhead);
-        let p1 = nova_missile_ring(band + 1u, warhead);
-        let slope = (p0.y - p1.y) * radius * cos(half * TAU) / max((p1.x - p0.x) * length, 0.01);
-        v.normal = normalize(vec3<f32>(slope, cos(mid), sin(mid)));
-        v.along = pr.x;
-        v.around = f32(around) / f32(NOVA_FACETS);
-        v.piece = 0u;
-        return v;
+    v.gone = true;
+    var start = 0u;
+    for (var i = 0u; i < NOVA_PIECES; i++) {
+        let p = nova_piece(i);
+        let count = p.bands * p.facets * 6u;
+        if vertex < start + count {
+            let w = vertex - start;
+            let quad = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
+            let corner = quad[w % 6u];
+            let band = w / (p.facets * 6u);
+            let side = (w / 6u) % p.facets;
+            let ring = band + select(0u, 1u, corner >= 2u);
+            let around = side + select(0u, 1u, corner == 1u || corner == 2u);
+            let p00 = nova_piece_point(p, band, f32(side), length, radius);
+            let p01 = nova_piece_point(p, band, f32(side + 1u), length, radius);
+            let p10 = nova_piece_point(p, band + 1u, f32(side), length, radius);
+            let p11 = nova_piece_point(p, band + 1u, f32(side + 1u), length, radius);
+            // Flat: the quad's own normal, from its diagonals (sound where one edge closes
+            // to a point), turned outward from the piece's axis.
+            var n = cross(p11 - p00, p10 - p01);
+            let mid = (p00 + p01 + p10 + p11) * 0.25;
+            let c = nova_round_ring(p.first + band).z * radius;
+            let axis = vec2<f32>(cos(p.rot), sin(p.rot)) * c;
+            n = n * select(1.0, -1.0, dot(n.yz, mid.yz - axis) < 0.0);
+            v.gone = false;
+            v.local = nova_piece_point(p, ring, f32(around), length, radius);
+            v.normal = normalize(n + vec3<f32>(1e-6, 0.0, 0.0));
+            v.along = nova_round_ring(p.first + ring).x;
+            v.around = f32(around) / f32(p.facets);
+            v.piece = min(i, 1u);
+            return v;
+        }
+        start += count;
     }
-    let w = vertex - NOVA_BODY_VERTS;
-    let c = w / NOVA_COLLAR_VERTS;
-    let collars = select(1u, 2u, warhead);
-    if c >= collars {
-        v.gone = true;
-        return v;
-    }
-    let col = nova_collar(c, warhead);
-    let face = (w % NOVA_COLLAR_VERTS) / (NOVA_FACETS * 6u);
-    let side = (w / 6u) % NOVA_FACETS;
-    let around = side + select(0u, 1u, corner == 1u || corner == 2u);
-    let far = corner >= 2u;
-    // Turned half a facet off the body's, and turning, the two against each other.
-    let spin = globals.camera.w * select(-0.5, 0.7, c == 0u);
-    let ang = (f32(around) + 0.5) / f32(NOVA_FACETS) * TAU + spin;
-    let mid = (f32(side) + 1.0) / f32(NOVA_FACETS) * TAU + spin;
-    let radial = vec2<f32>(cos(ang), sin(ang));
-    var x: f32;
-    var r: f32;
-    var n = vec3<f32>(0.0, cos(mid), sin(mid));
-    v.piece = 1u;
-    if face == 0u {
-        // Outer, sloped in a little at each end.
-        x = select(col.x, col.y, far);
-        r = col.w;
-    } else if face == 1u {
-        x = select(col.y, col.x, far);
-        r = col.z;
-        n = -n;
-        v.piece = 2u;
-    } else {
-        // Fore (2) and aft (3) rims.
-        x = select(col.y, col.x, face == 3u);
-        r = select(col.w, col.z, far);
-        n = vec3<f32>(select(1.0, -1.0, face == 3u), 0.0, 0.0);
-        v.piece = 3u;
-    }
-    v.local = vec3<f32>(x * length, radial * r * radius);
-    v.normal = n;
-    v.along = x;
-    v.around = f32(around) / f32(NOVA_FACETS);
     return v;
 }
 
-// A Regency missile's surface: graphite plate in steel courses, a team band, violet light
-// in its seams, down four facets, and on its collars' inner faces; the collars graphite
-// with steel rims.
-fn nova_missile_color(piece: u32, warhead: bool, x: f32, around: f32, team: vec3<f32>) -> vec4<f32> {
-    let pulse = 0.75 + 0.25 * sin(globals.camera.w * 5.0 + x * 9.0);
-    if piece == 2u {
-        return vec4<f32>(NOVA_GRAPHITE, 5.0 * pulse);
-    }
+// A Regency missile's surface: its base colour and the violet light of its line work
+// (added unlit), brighter with `heat`.
+fn nova_missile_color(piece: u32, x: f32, around: f32, heat: f32) -> array<vec3<f32>, 2> {
     if piece == 1u {
-        return vec4<f32>(NOVA_GRAPHITE * 1.4, 0.0);
-    }
-    if piece == 3u {
-        return vec4<f32>(NOVA_STEEL, 0.0);
+        // Chines and wings: plate, a steel leading edge on the outer side.
+        let edge = around < 0.12 || around > 0.88;
+        return array<vec3<f32>, 2>(select(NOVA_GRAPHITE * 1.3, NOVA_STEEL * 0.8, edge), vec3<f32>(0.0));
     }
     var base = NOVA_GRAPHITE;
-    var lit = 0.0;
-    let facet = fract(around * f32(NOVA_FACETS) + 1e-3);
-    let even = (u32(floor(around * f32(NOVA_FACETS) + 1e-3)) & 1u) == 0u;
-    if warhead {
-        // The vault round's courses (mc-models regency/strategic `warhead`).
-        if x < 0.028 || (x > 0.582 && x < 0.604) || (x > 0.754 && x < 0.794) || x > 0.975 {
-            base = NOVA_STEEL;
-        }
-        if x > 0.42 && x < 0.46 {
-            base = team;
-        }
-        if (x > 0.794 && x < 0.8) || (x > 0.749 && x < 0.754) || (x > 0.3 && x < 0.33) {
-            lit = 1.0;
-        }
-        if even && x > 0.61 && x < 0.73 && abs(facet - 0.5) < 0.05 {
-            lit = 1.0;
-        }
-    } else {
-        if x < 0.04 || (x > 0.66 && x < 0.72) || x > 0.97 {
-            base = NOVA_STEEL;
-        }
-        if x > 0.55 && x < 0.6 {
-            base = team;
-        }
-        if x > 0.4 && x < 0.44 {
-            lit = 1.0;
-        }
+    if x < 0.03 || x > 0.975 || (x > 0.6 && x < 0.62) || (x > 0.78 && x < 0.8) {
+        base = NOVA_STEEL;
     }
-    return vec4<f32>(base, lit * 3.0 * pulse);
+    // Across one facet, 0 at its middle, 0.5 at its edges.
+    let f = fract(around * 8.0 + 1e-3);
+    let d = abs(f - 0.5);
+    let w = 0.0045;
+    var line = 0.0;
+    // A ring at the prow's foot.
+    line = max(line, 1.0 - step(w * 1.4, abs(x - 0.806)));
+    // A chevron on every facet, its point forward, and a smaller one ahead of it.
+    line = max(line, 1.0 - step(w, abs(x - (0.9 - 0.14 * d))));
+    line = max(line, (1.0 - step(w, abs(x - (0.945 - 0.08 * d)))) * step(d, 0.3));
+    // Seams down every other edge, from the ring to the first chevron.
+    let edge = (u32(floor(around * 8.0 + 0.5)) & 1u) == 0u;
+    line = max(line, step(0.47, d) * step(0.806, x) * step(x, 0.83) * select(0.0, 1.0, edge));
+    let pulse = 0.85 + 0.15 * sin(globals.camera.w * 4.0 + x * 9.0);
+    return array<vec3<f32>, 2>(base, NOVA_VIOLET * line * (2.2 + 10.0 * heat) * pulse);
 }
