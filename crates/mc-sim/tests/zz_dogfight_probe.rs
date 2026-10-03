@@ -9,7 +9,7 @@
 //!
 //! `cargo test --profile gate -p mc-sim --test sim -- zz_dogfight_probe:: --ignored --nocapture`
 //! Knobs: DOGFIGHT_SIDES=<seed><flip 0|1> prints the named swarm fight second by
-//! second (speed, height and order census per side), DOGFIGHT_IDLE_B leaves player b's swarm without orders, DOGFIGHT_TRACE prints the first strike fighter tick by tick; DOGFIGHT_KEY=<fighter key> for the first part (default the Peregrine),
+//! second (speed, height and order census per side), DOGFIGHT_IDLE_B leaves player b's swarm without orders, DOGFIGHT_TRACE prints the first strike fighter tick by tick; DOGFIGHT_KEY=<fighter key> and DOGFIGHT_TARGET=<target key> for the first part (default the Peregrine on a Valiant),
 //! DOGFIGHT_SWARM=<key> and DOGFIGHT_N=<per side> for the second (default 25 Raptors).
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
@@ -89,7 +89,8 @@ fn zz_dogfight_probe() {
 
 fn strike(key: &str) {
     let mut w = world(7);
-    let t = add(&mut w, "aster_t3_corvette", 1, 3000, 3072, Angle::ZERO);
+    let target = std::env::var("DOGFIGHT_TARGET").unwrap_or("aster_t3_corvette".into());
+    let t = add(&mut w, &target, 1, 3000, 3072, Angle::ZERO);
     w.state.units.flags[t] |= flag::PASSIVE | flag::INVULNERABLE;
     let fighters: Vec<usize> = (0..5)
         .map(|k| add(&mut w, key, 0, 2300, 2972 + 50 * k, Angle::ZERO))

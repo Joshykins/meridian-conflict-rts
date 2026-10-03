@@ -91,7 +91,7 @@ impl World {
                     return None;
                 }
                 self.air_engage_target(row)
-                    .map(|target| units.prev_z[target])
+                    .map(|target| self.air_attack_height(row, target))
             })
             .collect();
         let this = &*self;

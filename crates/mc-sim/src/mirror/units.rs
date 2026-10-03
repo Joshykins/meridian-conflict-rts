@@ -95,6 +95,14 @@ impl World {
         }
         let (warp_fx, warp_marks) = self.warp_fx(viewer, row);
         let bp = self.bp(row);
+        // The sim banks every jet to 45 degrees at its hardest turn (its roll is its
+        // steering state). A fighter is drawn rolled to 75: a hard turn reads as one
+        // flown wings near vertical, not as a skid.
+        let fighter = bp.has(mc_data::cat::ANTI_AIR)
+            && bp
+                .motion
+                .is_some_and(|m| m.layer == mc_data::MoveLayer::Air && !m.hover);
+        let roll_scale = std::f32::consts::TAU / 65536.0 * if fighter { 75.0 / 45.0 } else { 1.0 };
         // A refit is shown on the unit being refitted, not as a second unit inside it.
         if s.units.has_flag(row, crate::tables::flag::UPGRADE) {
             return None;
@@ -303,8 +311,8 @@ impl World {
                 }
             },
             _pad2: [
-                s.units.prev_bank[row] as f32 * (std::f32::consts::TAU / 65536.0),
-                s.units.bank[row] as f32 * (std::f32::consts::TAU / 65536.0),
+                s.units.prev_bank[row] as f32 * roll_scale,
+                s.units.bank[row] as f32 * roll_scale,
             ],
             refit_modules: refit
                 .and_then(|o| self.blueprints.refit_result(bp.id, o.blueprint).ok())

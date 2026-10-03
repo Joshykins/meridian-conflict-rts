@@ -220,7 +220,7 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
  // model's `LANCE`. Two bolt rifles fire in turn: a fast blue bolt that bursts in
  // lightning round what it hits (`discharge`).
  radius: 9.8, height: 4.48, vision: 1000,
- motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 200, altitude: 300, hover: false),
+ motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 100, altitude: 300, hover: false),
  weapons: [(name: "Bolt Rifle", damage: 330, splash: 5, range: 350, reload: 0.5, speed: 700, trajectory: Direct,
  turret_turn: 240, muzzle: (7.84, 1.82, 1.12), muzzles: [(7.84, -1.82, 1.12), (7.84, 1.82, 1.12)], targets: ["Air"], color: Blue, flash: 0.6, impact: 1.6, shockwave: 0.7,
  tracer: 0.35, plasma: 0.8, trail: true, wake: 0.35, bolts: 6, discharge: 14,

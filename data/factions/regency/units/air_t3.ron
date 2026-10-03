@@ -21,7 +21,7 @@
         cost: (mass: 620, energy: 23500, time: 3800),
         radius: 9.8, height: 3.0,
         vision: 1000,
-        motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 200, altitude: 300, hover: false),
+        motion: (layer: Air, size: 0, speed: 255, accel: 114, turn: 100, altitude: 300, hover: false),
         weapons: [(
             name: "Pinch-fusion Rifle",
             damage: 660, splash: 5, range: 350, reload: 1.0, speed: 1500, trajectory: Direct,

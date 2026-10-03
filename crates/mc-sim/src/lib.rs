@@ -37,6 +37,7 @@ mod contacts;
 mod curve;
 mod debug;
 mod destruct;
+mod dogfight;
 pub mod economy;
 mod flak;
 pub mod focus;
