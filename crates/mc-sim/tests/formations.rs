@@ -1390,7 +1390,8 @@ fn t1_fighters_and_bombers_share_the_lower_cruise_band() {
             .unit(w.blueprints.id_of("aster_t3_shield").unwrap())
             .shield
             .unwrap();
-        assert!(m.altitude > shield.radius);
+        // Domes are flattened: the cruise band clears the dome's top, not its radius.
+        assert!(m.altitude > mc_data::dome_height(shield.radius));
     }
 }
 
