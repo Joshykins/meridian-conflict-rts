@@ -495,7 +495,8 @@ pub struct UnitInstance {
     /// Range into `RenderFrame::welds`: every origin still lighting this site.
     pub weld_first: u32,
     pub weld_count: u32,
-    /// How far a siege gun is planted: 0 packed, 1 ready to fire.
+    /// How far a siege gun is planted: 0 packed, 1 ready to fire. A material
+    /// fabricator: how hard it works, 0 (paused or unpowered) to 1 (full output).
     pub deploy: f32,
     /// `deploy` last tick, so the outriggers glide between ticks.
     pub prev_deploy: f32,

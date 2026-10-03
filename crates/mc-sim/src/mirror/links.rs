@@ -1,4 +1,5 @@
-//! Adjacency links for the interface and the ground conduits (`crate::adjacency`).
+//! Adjacency links for the interface and the ground conduits (`crate::adjacency`), and
+//! how hard a fabricator works, for its animation.
 
 use super::World;
 use crate::adjacency::{self, Resource};
@@ -24,6 +25,27 @@ pub struct LinkView {
 }
 
 impl World {
+    /// A finished material fabricator's work this tick, for its animation: 1 at full
+    /// output, between when its side is short of energy, 0 paused or with none.
+    /// Anyone who sees it may see this (a stalled plant visibly falters); only its own
+    /// side sees the pause mark that tells a pause from a blackout.
+    pub(super) fn fabricator_work(&self, row: usize) -> Option<f32> {
+        let f = self.bp(row).fabricator?;
+        if !self.state.units.is_active(row) {
+            return Some(0.0);
+        }
+        let full = f.mass / mc_core::TICKS_PER_SECOND as i32;
+        let made = self
+            .flows
+            .get(row)
+            .map_or(mc_core::Fx::ZERO, |fl| fl.made[0]);
+        Some(if full > mc_core::Fx::ZERO {
+            (made / full).to_f32().clamp(0.0, 1.0)
+        } else {
+            0.0
+        })
+    }
+
     /// This tick's links that `viewer` may see: its own side's and its allies'. An
     /// enemy's are left out, as its economy is.
     pub(super) fn write_links(&self, viewer: Option<u8>, out: &mut Vec<LinkView>) {

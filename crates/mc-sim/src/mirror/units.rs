@@ -281,7 +281,10 @@ impl World {
             weld_first,
             weld_count,
             // A siege gun's spade, or a builder's folding gear (`Builder::unfold_ticks`).
-            deploy: {
+            // A material fabricator: how hard it works this tick, in both (`fabricator_work`).
+            deploy: if let Some(work) = self.fabricator_work(row) {
+                work
+            } else {
                 let need = self.deploy_span(row);
                 if need == 0 {
                     0.0
@@ -289,7 +292,9 @@ impl World {
                     s.units.deploy[row] as f32 / need as f32
                 }
             },
-            prev_deploy: {
+            prev_deploy: if let Some(work) = self.fabricator_work(row) {
+                work
+            } else {
                 let need = self.deploy_span(row);
                 if need == 0 {
                     0.0

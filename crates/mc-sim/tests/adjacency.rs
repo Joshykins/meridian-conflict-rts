@@ -217,3 +217,34 @@ fn the_tech_2_fabricator_upgrades_in_place_to_tech_3() {
     assert!(b.id_of("aster_t1_fabricator").is_none());
     assert!(b.id_of("regency_t1_fabricator").is_none());
 }
+
+#[test]
+fn the_mirror_shows_how_hard_a_fabricator_works() {
+    let mut w = world();
+    let fab = spawn(&mut w, 0, "aster_t2_fabricator", 792, 792, 1000);
+    let work = |w: &World| {
+        let mut frame = mc_sim::mirror::RenderFrame::default();
+        w.write_render_frame(Some(0), &mut frame);
+        frame
+            .units
+            .iter()
+            .find(|u| u.unit_id == fab.0)
+            .expect("drawn")
+            .deploy
+    };
+    w.tick(&[]).unwrap();
+    assert_eq!(work(&w), 0.0, "no power, no work");
+    spawn(&mut w, 0, "aster_t3_power", 552, 552, 1000);
+    w.tick(&[]).unwrap();
+    assert!((work(&w) - 1.0).abs() < 1e-3, "full power, full work");
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::SetPaused {
+            units: vec![fab],
+            paused: true,
+        },
+    }])
+    .unwrap();
+    w.tick(&[]).unwrap();
+    assert_eq!(work(&w), 0.0, "paused");
+}
