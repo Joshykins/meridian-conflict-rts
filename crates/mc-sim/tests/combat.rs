@@ -217,8 +217,10 @@ fn paladin_projectors_take_turns_after_sitting_idle() {
     }
 }
 
+/// One rocket at a time, evenly spaced, with no longer pause once the six tubes are
+/// spent: the rack reloads in the gap between two rockets.
 #[test]
-fn javelin_ripples_a_volley_out_the_tubes() {
+fn javelin_fires_one_rocket_at_a_time_round_the_tubes() {
     let mut w = world();
     let javelin = w.blueprints.id_of("aster_t2_missile").unwrap();
     let weapon = &w.blueprints.unit(javelin).weapons[0];
@@ -226,6 +228,8 @@ fn javelin_ripples_a_volley_out_the_tubes() {
     assert!(weapon.missile);
     assert_eq!(weapon.muzzles.len(), 6);
     assert!(weapon.salvo_delay_ticks > 0);
+    assert_eq!(weapon.salvo_batch, 1);
+    assert_eq!(weapon.reload_ticks, u16::from(weapon.salvo_delay_ticks));
 
     // In front of the rack, so the hull is already on the tubes' bearing.
     w.tick(&[
@@ -253,14 +257,16 @@ fn javelin_ripples_a_volley_out_the_tubes() {
         }
     };
     record(&w);
-    for _ in 0..80 {
+    for _ in 0..140 {
         w.tick(&[]).unwrap();
         record(&w);
     }
-    assert_eq!(fire_ticks.len(), 6, "the volley was {fire_ticks:?}");
+    assert!(fire_ticks.len() >= 7, "the rockets were {fire_ticks:?}");
+    let gap = fire_ticks[1] - fire_ticks[0];
+    assert!(gap > 1, "the tubes dumped together: {fire_ticks:?}");
     assert!(
-        fire_ticks.windows(2).all(|w| w[1] > w[0]),
-        "the tubes dumped together: {fire_ticks:?}"
+        fire_ticks.windows(2).all(|w| w[1] - w[0] == gap),
+        "the rockets were not evenly spaced: {fire_ticks:?}"
     );
     let vel = first_vel.expect("a missile left a tube");
     assert!(

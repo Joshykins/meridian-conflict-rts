@@ -113,15 +113,15 @@ fn barrage_on(
 
 #[test]
 fn corona_burns_javelin_rockets_out_of_the_air() {
-    // Four salvos (reload 8 s).
+    // About 22 rockets, one every 1.5 s.
     let ticks = 340;
     let none = barrage(JAVELIN, 1060, 1, 0, ticks);
     let one = barrage(JAVELIN, 1060, 1, 1, ticks);
     let two = barrage(JAVELIN, 1060, 1, 2, ticks);
     println!("javelin rockets (killed, through): 0 Coronas {none:?}, 1 {one:?}, 2 {two:?}");
     assert_eq!(none.0, 0);
-    assert!(none.1 >= 18, "the Javelin landed only {} rockets", none.1);
-    // One Corona stops most of a salvo; a pair stops nearly all of it.
+    assert!(none.1 >= 15, "the Javelin landed only {} rockets", none.1);
+    // One Corona stops most of the stream; a pair stops nearly all of it.
     assert!(
         one.0 >= one.1 * 2,
         "one Corona let {} of {} through",
