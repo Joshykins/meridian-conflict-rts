@@ -160,12 +160,13 @@ fn crag_mass(p: vec3<f32>) -> f32 {
 struct Crag {
     // How far the vertex moves up or down, metres.
     lift: f32,
-    // How much of a crag it is, 0-1; how far the rock stands out of the wall
-    // there, metres (the fragment shader darkens the clefts by it); and how much
-    // of the fine facets it carries.
+    // How much of a crag it is, 0-1, and how much of the fine facets it carries.
     weight: f32,
-    depth: f32,
     fine: f32,
+    // The lift is `mass_lift * crag_mass + facet_lift * crag_depth`: the fragment
+    // shader lights the rock from these, not from the triangles they are drawn on.
+    mass_lift: f32,
+    facet_lift: f32,
 }
 
 // The relief at a vertex at `p` on the 8 m surface, `dist` metres from the eye.
@@ -185,17 +186,55 @@ fn crag_relief(p: vec3<f32>, dist: f32, fade: f32) -> Crag {
     let n = terrain_normal(p.xy, 12.0);
     let grade = length(n.xy) / max(n.z, 0.05);
     c.weight *= smoothstep(0.5, 1.0, grade);
-    c.depth = crag_mass(p);
-    var facets = 0.0;
     if fade > 0.0 {
         c.fine = c.weight * (1.0 - smoothstep(fade * 0.65, fade, dist));
-        if c.fine > 0.0 {
-            facets = crag_depth(p) * c.fine / c.weight;
-        }
     }
-    c.depth += facets;
     // The facets are a few metres across: on the steepest walls their lift is
     // held down, or a 2 m cell would stand on end and face nothing but shade.
-    c.lift = (c.depth - facets) * min(grade, 3.0) * c.weight + facets * min(grade, 1.8) * c.weight;
+    c.mass_lift = min(grade, 3.0) * c.weight;
+    c.facet_lift = min(grade, 1.8) * c.fine;
+    c.lift = c.mass_lift * crag_mass(p);
+    if c.fine > 0.0 {
+        c.lift += c.facet_lift * crag_depth(p);
+    }
     return c;
+}
+
+// The crag's mass and facets (`crag_mass`, `crag_depth`) at `p`; the facets only
+// when `fine`.
+fn crag_fields(p: vec3<f32>, fine: bool) -> vec2<f32> {
+    var f = vec2<f32>(crag_mass(p), 0.0);
+    if fine {
+        f.y = crag_depth(p);
+    }
+    return f;
+}
+
+struct CragShade {
+    // How far the rock stands out of the wall, metres.
+    depth: f32,
+    // The rock's own normal.
+    normal: vec3<f32>,
+}
+
+// The crag under a pixel, from the relief itself rather than the triangles it is
+// drawn with: the same rock is lit the same however finely the terrain is cut
+// there, so no triangle shows and nothing jumps as finer nodes come in. `wall`
+// is the heightfield's normal, `px` the pixel's width in metres (the relief is
+// differenced over a pixel and a half, so creases blur a little instead of
+// sparkling or drawing black hairlines),
+// `c` the vertex's `crag_relief`, interpolated.
+fn crag_shade(xy: vec2<f32>, wall: vec3<f32>, px: f32, c: Crag) -> CragShade {
+    var out: CragShade;
+    let z = terrain_height(xy);
+    let rise = -wall.xy / max(wall.z, 0.05);
+    let e = clamp(px * 1.5, 0.5, 4.0);
+    let fine = c.fine > 0.001;
+    let f0 = crag_fields(vec3<f32>(xy, z), fine);
+    let fx = crag_fields(vec3<f32>(xy + vec2<f32>(e, 0.0), z + rise.x * e), fine);
+    let fy = crag_fields(vec3<f32>(xy + vec2<f32>(0.0, e), z + rise.y * e), fine);
+    let lift = (vec2<f32>(fx.x, fy.x) - f0.x) * c.mass_lift + (vec2<f32>(fx.y, fy.y) - f0.y) * c.facet_lift;
+    out.normal = normalize(vec3<f32>(-(rise + lift / e), 1.0));
+    out.depth = f0.x + f0.y * c.fine / max(c.weight, 0.004);
+    return out;
 }

@@ -32,9 +32,9 @@ struct VsOut {
     // Invariant: the depth pre-pass and the colour pass must land on the same depth.
     @builtin(position) @invariant clip: vec4<f32>,
     @location(0) world: vec3<f32>,
-    // On a crag (`crag_relief`): how much of one it is, how far the rock stands
-    // out of the wall there (metres), and how much of its fine facets it carries.
-    @location(1) crag: vec3<f32>,
+    // On a crag (`crag_relief`): how much of one it is, how much of its fine
+    // facets it carries, and how far its mass and its facets lift the wall.
+    @location(1) crag: vec4<f32>,
 }
 
 @vertex
@@ -58,7 +58,7 @@ fn vs_main(@location(0) grid: vec2<f32>, @builtin(instance_index) instance: u32)
     // Crags finer than the samples: the wall broken into rock (rock.wgsl).
     let crag = crag_relief(world, distance(world, eye), node.morph.z);
     world.z += crag.lift;
-    out.crag = vec3<f32>(crag.weight, crag.depth, crag.fine);
+    out.crag = vec4<f32>(crag.weight, crag.fine, crag.mass_lift, crag.facet_lift);
     if (push.pass_kind & PASS_KIND_MASK) == PASS_SHADOW {
         out.clip = globals.shadow_cascades[push.pass_kind >> PASS_CASCADE_SHIFT] * vec4<f32>(world, 1.0);
     } else {
@@ -1034,19 +1034,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // cliff in facets, and the fine normal fluted them into organ pipes.
     var cliff_n = base_n;
     // On a crag the drawn surface is the rock (`crag_relief`): its facets are lit as
-    // they lie, and it is all rock.
+    // they lie, worked out per pixel (`crag_shade`), and it is all rock.
     let crag_w = in.crag.x;
     var facet = base_n;
+    var crag_depth_here = 0.0;
     if crag_w > 0.004 {
-        // A sliver seen edge on has no area on screen: keep the wall's normal
-        // there, never normalize nothing (NaN draws black).
-        let across = cross(dpx, dpy);
-        if dot(across, across) > 1e-10 {
-            // The terrain is a heightfield, so every face of it looks up: a step
-            // facing sideways off the wall's lean still does.
-            facet = normalize(across);
-            facet = select(facet, -facet, facet.z < 0.0);
-        }
+        var c: Crag;
+        c.weight = crag_w;
+        c.fine = in.crag.y;
+        c.mass_lift = in.crag.z;
+        c.facet_lift = in.crag.w;
+        let shade = crag_shade(xy, base_n, px, c);
+        facet = shade.normal;
+        crag_depth_here = shade.depth;
     }
     if rock_face > 0.004 || crag_w > 0.004 {
         cliff_n = normalize(mix(base_n, terrain_normal(xy, max(step * 3.0, 20.0)), 0.8));
@@ -1165,7 +1165,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     albedo = faced;
     // A crag's clefts are in their own shade; the rock standing out of the wall
     // catches the light.
-    albedo *= mix(1.0, 0.5 + 0.55 * smoothstep(-7.0, 5.0, in.crag.y), crag_w);
+    albedo *= mix(1.0, 0.5 + 0.55 * smoothstep(-7.0, 5.0, crag_depth_here), crag_w);
     var canyon_grad = vec2<f32>(0.0);
     var canyon_rough = -1.0;
     if arid > 0.0 {
@@ -1225,7 +1225,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // On a crag, snow lies where the rock holds it, wherever the ground round it
     // has snow: on ledges, and down the gullies between the ribs.
     let ledge = smoothstep(0.6, 0.85, facet.z);
-    let gully = 1.0 - smoothstep(-8.0, 1.0, in.crag.y + (fine - 0.5) * 4.0);
+    let gully = 1.0 - smoothstep(-8.0, 1.0, crag_depth_here + (fine - 0.5) * 4.0);
     let lying_here = max(mix(smoothstep(350.0, 450.0, alt + (broad - 0.5) * 95.0),
         smoothstep(0.3, 0.7, layer.y + (patchy - 0.5) * 0.55), layer.z), snow_w);
     let crag_snow = lying_here * max(ledge, gully * 0.9) * (1.0 - arid);
