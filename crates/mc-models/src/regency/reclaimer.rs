@@ -1,4 +1,4 @@
-//! The Regency's tech 1 land reclaimer, the Breaker: a salvage craft on gravity lift, so it
+//! The Regency's Reclaimer (every tier, drawn bigger at 2 and 3): a salvage craft on gravity lift, so it
 //! works shores and shallows as it works land, with a nanite head on a turning house that
 //! takes wrecks apart while the craft drives on (the unit file's `reclaimer`, one head).
 //!
@@ -24,8 +24,8 @@
 //! Rig: a hovercraft (`MeshBuilder::set_hover`). The head is a gun house of its own bound to
 //! head 0 (`with_house`): it turns about its pivot and what is inside `with_recoil` pitches
 //! about the trunnion. Authored at blueprint scale (radius 4.6, height 3.4): model metres are
-//! unit metres, and `PIVOT`/`EMITTER` are `regency_t1_land_reclaimer`'s head in
-//! `data/factions/regency/units/land.ron`.
+//! unit metres, and `PIVOT`/`EMITTER` are `regency_t1_mobile_reclaimer`'s head in
+//! `data/factions/regency/units/command.ron` (the higher tiers' are these times their scale).
 
 use glam::{Vec2, Vec3};
 
@@ -46,7 +46,7 @@ pub(super) const EMITTER: Vec3 = Vec3::new(0.75, 0.0, 2.9);
 /// The top of the wing's deck, where the hoppers and the pedestal stand.
 const DECK: f32 = 1.3;
 
-pub(super) fn breaker(b: &mut MeshBuilder, _tech: u8) {
+pub(super) fn reclaimer(b: &mut MeshBuilder, _tech: u8) {
     b.set_hover();
     b.set_dust_line(0.7);
     if b.coarse() {
@@ -353,15 +353,15 @@ mod tests {
 
     #[test]
     fn fits_the_librarys_checks() {
-        super::super::check("regency_breaker", 4.6, 3.4, None, &[]);
+        super::super::check("regency_reclaimer", 4.6, 3.4, None, &[]);
     }
 
     #[test]
     fn the_unit_files_head_is_the_models() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
         let blueprints = mc_data::Blueprints::load(&dir).unwrap();
-        let bp = blueprints.unit(blueprints.id_of("regency_t1_land_reclaimer").unwrap());
-        assert_eq!(bp.visual.mesh, "regency_breaker");
+        let bp = blueprints.unit(blueprints.id_of("regency_t1_mobile_reclaimer").unwrap());
+        assert_eq!(bp.visual.mesh, "regency_reclaimer");
         assert!((bp.radius.to_f32() - 4.6).abs() < 1e-3 && (bp.height.to_f32() - 3.4).abs() < 1e-3);
         assert_eq!(bp.motion.map(|m| m.layer), Some(mc_data::MoveLayer::Hover));
         let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
@@ -371,7 +371,7 @@ mod tests {
         assert!(v(head.pivot.expect("a head turns about its pivot")).distance(PIVOT) < 1e-3);
         assert!(v(head.emitter).distance(EMITTER) < 1e-3);
 
-        let model = build_model("regency_breaker").unwrap();
+        let model = build_model("regency_reclaimer").unwrap();
         assert!(model.hover && model.legs.is_none() && model.treads.is_none());
         assert_eq!(model.houses.len(), 1);
         assert_eq!(Vec3::from(model.houses[0].pivot), PIVOT);
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn every_bell_is_marked_for_its_plasma_and_hangs_clear() {
-        let model = build_model("regency_breaker").unwrap();
+        let model = build_model("regency_reclaimer").unwrap();
         assert_eq!(model.lifts.len(), 5);
         let left = model.lifts.iter().filter(|l| l.at[1] > 0.5).count();
         let right = model.lifts.iter().filter(|l| l.at[1] < -0.5).count();

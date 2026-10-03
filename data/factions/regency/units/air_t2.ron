@@ -95,31 +95,4 @@
         mesh: "regency_torpedo_bomber", icon: TorpedoBomber,
         sounds: (death: "blast_small", moving: "aster_jet"),
     ),
-    // The reclaim carrier: a broad winged craft on gravity lift that strips a wreck field as
-    // it passes over, four nanite heads under its wings each taking a wreck of its own, their strands
-    // a cloud of motes between it and the field (beams.wgsl `BEAM_NANITE_RECLAIM`). At par
-    // with the Osprey: its four drones' 20 of power, here in the heads, over a shorter
-    // reach (500 m against drones that go 800) but nothing to build or lose.
-    (
-        key: "regency_t2_reclaim_carrier",
-        name: "Winnow",
-        role: "Reclaim Carrier", title: "Reclaim Carrier",
-        tech: 2,
-        categories: ["Air"],
-        health: 1000,
-        cost: (mass: 200, energy: 3800, time: 1100),
-        radius: 10, height: 4.5,
-        vision: 480,
-        motion: (layer: Air, size: 0, speed: 65, accel: 24, turn: 65, altitude: 26, hover: true),
-        reclaimer: (power: 20, range: 500, charge: 0.8, mobile: true, heads: [
-            (pivot: (3.0, 3.0, 1.1), emitter: (4.4, 3.0, 1.1), turn: 240, pitch: (-90, 15)),
-            (pivot: (3.0, -3.0, 1.1), emitter: (4.4, -3.0, 1.1), turn: 240, pitch: (-90, 15)),
-            (pivot: (-3.0, 3.0, 1.1), emitter: (-1.6, 3.0, 1.1), turn: 240, pitch: (-90, 15)),
-            (pivot: (-3.0, -3.0, 1.1), emitter: (-1.6, -3.0, 1.1), turn: 240, pitch: (-90, 15)),
-        ]),
-        weapons: [],
-        mesh: "regency_reclaim_carrier", icon: SalvageCarrier,
-        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
-        sounds: (death: "blast_small", moving: "aster_hover"),
-    ),
 ]

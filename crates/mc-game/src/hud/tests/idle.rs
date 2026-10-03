@@ -46,7 +46,7 @@ fn an_idle_engineer_tile_steps_through_them_and_shift_takes_them_all() {
 
 /// A salvage unit's tile, the first on the card right under the economy.
 fn reclaimer_rig() -> (Rig, Vec2) {
-    let mut rig = Rig::new("aster_t1_land_reclaimer");
+    let mut rig = Rig::new("aster_t1_mobile_reclaimer");
     rig.view.selection.clear();
     rig.view.frame.units[0].owner_flags |= STATE_IDLE;
     let card_y = EDGE + ECONOMY_H + GAP;

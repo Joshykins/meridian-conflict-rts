@@ -11,10 +11,6 @@
 //!
 //! On a point, the order ends once the unit stands there. On a circle, it ends once
 //! the unit is inside and nothing is left in it to take.
-//!
-//! A drone carrier takes nothing itself: it hovers over the wrecks it comes to while
-//! its drones clear them, and on a circle goes from wreck to wreck inside it, its
-//! drones taking only what is inside the circle.
 
 use crate::orders::order;
 use crate::reclaim::WIDEST_TARGET;
@@ -27,10 +23,6 @@ use mc_core::{Fx, FxVec2};
 const LOOK_TICKS: usize = 5;
 /// How far aside from its way, past its reach, a reclaimer steps for a wreck, metres.
 const SWEEP_MARGIN: i32 = 40;
-/// A carrier hovers while a wreck it is after lies within this share of its drones'
-/// reach (a quarter: 150 m on the Osprey), so they work close to it. Farther ones its
-/// drones still take as it flies.
-const CARRIER_HOLD_SHARE: i32 = 4;
 
 impl World {
     /// `Command::ReclaimArea`: mobile reclaimers head for `pos` in a group's spread.
@@ -69,9 +61,6 @@ impl World {
     /// `OrderKind::ReclaimArea`: see the module notes.
     pub(crate) fn run_reclaim_area(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
         let looks = (self.state.tick as usize + row).is_multiple_of(LOOK_TICKS);
-        if self.bp(row).drone_carrier() {
-            return self.run_carrier_area(row, o, looks);
-        }
         if looks {
             if let Some(w) = self.next_area_wreck(row, o) {
                 return self.take_area_wreck(row, w);
@@ -100,83 +89,6 @@ impl World {
         self.ensure_moving(row, spot, spot)?;
         // Anything in reach is taken without stopping, as on an ordered reclaim.
         self.reclaim_on_the_way(row)
-    }
-
-    /// A carrier on an area order hovers over the wrecks it comes to while its drones
-    /// take them (`run_air_support`, which keeps them inside a circle), then goes on: to
-    /// its spot on a point, or to the nearest wreck left on a circle. A circle is done
-    /// once nothing is left in it to take.
-    fn run_carrier_area(&mut self, row: usize, o: &Order, looks: bool) -> Result<(), SimError> {
-        let pos = self.state.units.pos[row];
-        let stuck = self.state.units.stuck_ticks[row] == u16::MAX;
-        let hold = self.bp(row).drone_radius / CARRIER_HOLD_SHARE;
-        let wanted: Vec<FxVec2> = self
-            .state
-            .wrecks
-            .slots
-            .iter()
-            .filter(|&w| self.carrier_wants(row, w))
-            .map(|w| self.state.wrecks.pos[w])
-            .collect();
-        if wanted.iter().any(|at| at.distance(pos) <= hold) {
-            self.carrier_hold(row);
-            return Ok(());
-        }
-        let spot = if o.radius > Fx::ZERO {
-            match wanted.into_iter().min_by_key(|at| at.distance_sq(pos)) {
-                Some(at) if !stuck => at,
-                _ => {
-                    if looks || stuck {
-                        self.finish_order(row);
-                    }
-                    return Ok(());
-                }
-            }
-        } else {
-            let spot = self.clamp_to_map(o.pos + o.offset);
-            if pos.distance(spot) <= self.bp(row).radius / 2 + Fx::from_int(3) || stuck {
-                self.finish_order(row);
-                return Ok(());
-            }
-            spot
-        };
-        self.ensure_moving(row, spot, spot)
-    }
-
-    /// `Reclaim`/`ReclaimUnit` on a carrier: it flies in over the target and hovers there
-    /// while its drones take it apart; they end the order once it is gone
-    /// (`run_air_support`).
-    pub(crate) fn run_carrier_reclaim(&mut self, row: usize, o: &Order) -> Result<(), SimError> {
-        let at = if o.kind == OrderKind::Reclaim {
-            self.state
-                .wrecks
-                .slots
-                .resolve(o.target)
-                .map(|w| self.state.wrecks.pos[w])
-        } else {
-            self.state
-                .units
-                .row(o.target)
-                .map(|t| self.state.units.pos[t])
-        };
-        let Some(at) = at else {
-            self.finish_order(row);
-            return Ok(());
-        };
-        let hold = self.bp(row).drone_radius / CARRIER_HOLD_SHARE;
-        if self.state.units.pos[row].distance(at) <= hold {
-            self.carrier_hold(row);
-            Ok(())
-        } else {
-            self.ensure_moving(row, at, at)
-        }
-    }
-
-    /// A carrier stops where it is and hovers while its drones work.
-    fn carrier_hold(&mut self, row: usize) {
-        if self.state.units.has_flag(row, flag::HAS_FIELD) {
-            self.stop_moving(row);
-        }
     }
 
     /// The wreck this reclaimer should take next, nearest first: in the circle, or a

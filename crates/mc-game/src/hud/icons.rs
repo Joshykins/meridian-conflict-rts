@@ -465,10 +465,9 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             );
         }
         IconKind::Titan => titan(ui, c, r, color),
-        IconKind::Salvage
-        | IconKind::SalvageBoat
-        | IconKind::SalvageCarrier
-        | IconKind::SalvageDrone => salvage(ui, kind, c, r, color, cut),
+        IconKind::Salvage | IconKind::SalvageCarrier | IconKind::SalvageDrone => {
+            salvage(ui, kind, c, r, color, cut)
+        }
         IconKind::Submarine => {
             // A long hull low in the water and its sail.
             let hull = Rect::new(c.x - r * 0.9, c.y + r * 0.0, r * 1.8, r * 0.36);
@@ -523,16 +522,6 @@ fn salvage(ui: &mut Ui, kind: IconKind, c: Vec2, r: f32, color: Color, cut: Colo
         IconKind::Salvage => {
             ui.arc(c, 0.8 * k, 0.0, TAU, 0.14 * k, color);
             disc(ui, 0.0, 0.5);
-        }
-        IconKind::SalvageBoat => {
-            let hull = [
-                (-0.894, -0.39),
-                (0.894, -0.39),
-                (0.66, -0.65),
-                (-0.66, -0.65),
-            ];
-            fill_outline(ui, &hull.map(|(x, y)| at(x, y)), color);
-            disc(ui, 0.2, 0.5);
         }
         IconKind::SalvageCarrier => {
             for side in [-1.0, 1.0] {

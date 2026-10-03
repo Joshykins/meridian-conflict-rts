@@ -6,17 +6,14 @@
 //! carry black conformal arrays, a sensor ball hangs under the chin and a radar
 //! canoe runs along the belly. Its missile defence is a big red laser head on each
 //! wingtip pod, where the beams leave (`anti_missile_mounts` in air.ron). It hunts
-//! dived hulls with a hydrophone boom out of the tail, throws a small field from a
-//! gold lens on its spine, and salvages wrecks from cruise height with a reclaim
-//! turret hung under the belly ([`turret`]).
+//! dived hulls with a hydrophone boom out of the tail and throws a small field from a
+//! gold lens on its spine.
 //!
 //! The airframe is authored at its old size and drawn [`SCALE`] times bigger, [`LIFT`]
 //! up, so what hangs under the belly stays above the model's origin.
 use super::super::naval::pd_laser;
 use super::*;
 use crate::builder::ngon;
-
-mod turret;
 
 /// The airframe is drawn this much bigger than it is authored (`support_air` is 9.2 m).
 const SCALE: f32 = 1.15;
@@ -86,7 +83,7 @@ fn section(s: (f32, f32, f32, f32, f32)) -> Vec<Vec3> {
     ]
 }
 
-/// The Argus, its Cradle reclaim turret under the belly.
+/// The Argus, drawn at [`SCALE`] and [`LIFT`].
 pub(super) fn build(b: &mut MeshBuilder) {
     let frame =
         Affine3A::from_scale(Vec3::splat(SCALE)) * Affine3A::from_translation(Vec3::Z * LIFT);
@@ -122,10 +119,9 @@ fn body(b: &mut MeshBuilder) {
     );
     if fine {
         b.paint(PLATING_DARK);
-        // The canoe stops short of the reclaim turret.
         b.beam(
             v3(3.2, 0.0, 0.4),
-            v3(1.25, 0.0, 0.42),
+            v3(-0.9, 0.0, 0.42),
             v2(0.52, 0.26),
             v2(0.46, 0.22),
         );
@@ -151,7 +147,6 @@ fn body(b: &mut MeshBuilder) {
 
     rotodome(b);
     detail(b);
-    turret::build(b);
     sonar(b);
     shield(b);
 

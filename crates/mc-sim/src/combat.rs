@@ -1071,21 +1071,6 @@ impl World {
                 }
                 continue;
             }
-            if self.bp(row).drone.is_some() {
-                // A carrier's drones work while it flies (`run_air_support`), so it never
-                // waits for them: the pylons open while there is salvage in reach and
-                // close once every drone is home.
-                let need = motion.deploy_ticks;
-                let home = self.carrier_drones_home(row);
-                let working = self.carrier_has_work(row) || self.carrier_reclaim_ordered(row);
-                let units = &mut self.state.units;
-                if working && units.deploy[row] < need {
-                    units.deploy[row] += 1;
-                } else if !working && home && units.deploy[row] > 0 {
-                    units.deploy[row] -= 1;
-                }
-                continue;
-            }
             let shelling = self.ground_mark(row).is_some();
             let units = &mut self.state.units;
             let wants_move =

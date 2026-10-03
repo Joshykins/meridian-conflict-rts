@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 const ENGINEER: &str = "aster_t1_engineer";
 const TANK: &str = "aster_t1_tank";
-const GLEANER: &str = "aster_t1_land_reclaimer";
+const RECLAIMER: &str = "aster_t1_mobile_reclaimer";
 
 fn world() -> World {
     world_on(Heightfield::flat(256, 256, Fx::from_int(20)))
@@ -176,7 +176,7 @@ fn a_circle_is_cleared_and_what_lies_outside_it_is_left() {
     assert!(left[0].distance(centre) > radius);
 }
 
-/// Replay 20261001-202046 mark 1: a Gleaner given a circle whose middle lies on a
+/// Replay 20261001-202046 mark 1: a mobile reclaimer given a circle whose middle lies on a
 /// mesa it cannot climb went for the wrecks below it, but was given up on each at
 /// once: the walk to the middle had failed, and the failure stuck to the reclaim that
 /// was put in front of it. It sat still, swapping between two wrecks for ever.
@@ -191,7 +191,7 @@ fn a_circle_whose_middle_cannot_be_reached_is_still_cleared() {
     }
     let terrain = Heightfield::from_samples(256, 256, samples, Fx::ZERO, Fx::ONE, Fx::ZERO);
     let mut w = world_on(terrain);
-    let units = spawn(&mut w, GLEANER, &[(300, 960)]);
+    let units = spawn(&mut w, RECLAIMER, &[(300, 960)]);
     let centre = FxVec2::from_ints(960, 960);
     // Inside the circle, past the Gleaner's 550 m reach.
     wrecks(&mut w, 400, 1650, 3);
@@ -255,26 +255,9 @@ fn a_queued_area_reclaim_waits_its_turn() {
     assert!(wrecks_left(&w).is_empty());
 }
 
-/// An Osprey at `(x, y)` with its four drones built and docked.
-fn carrier(w: &mut World, x: i32, y: i32) -> UnitId {
-    let blueprint = w.blueprints.id_of("aster_t2_reclaim_carrier").unwrap();
-    let row = w
-        .spawn_unit(blueprint, 0, FxVec2::from_ints(x, y), Angle::ZERO, true)
-        .unwrap();
-    let commander = w.blueprints.id_of("aster_commander").unwrap();
-    w.spawn_unit(commander, 0, FxVec2::from_ints(150, 150), Angle::ZERO, true)
-        .unwrap();
-    w.state.players[0].mass = Fx::from_int(1000);
-    w.state.players[0].energy = Fx::from_int(100_000);
-    w.state.players[0].energy_capacity = Fx::from_int(200_000);
-    for _ in 0..450 {
-        w.tick(&[]).unwrap();
-    }
-    let id = w.state.units.id(row);
-    let u = &w.state.units;
-    let drones = u.slots.iter().filter(|&r| u.drone_parent[r] == id).count();
-    assert_eq!(drones, 4, "the carrier's drones are built");
-    id
+/// A Gleaner at `(x, y)`: the ARC mobile reclaimer, whose beam reaches 550 m.
+fn reclaimer(w: &mut World, x: i32, y: i32) -> UnitId {
+    spawn(w, RECLAIMER, &[(x, y)])[0]
 }
 
 /// The mass left in the wreck nearest `(x, y)`, zero once it is gone.
@@ -289,61 +272,30 @@ fn mass_near(w: &World, x: i32, y: i32) -> Fx {
 }
 
 #[test]
-fn a_carrier_given_a_circle_sends_its_drones_only_into_the_circle() {
+fn a_reclaimer_given_a_circle_wider_than_its_reach_clears_all_of_it() {
     let mut w = world();
-    let osprey = carrier(&mut w, 300, 1000);
+    let reclaimer = reclaimer(&mut w, 1000, 200);
     let centre = FxVec2::from_ints(1000, 1000);
-    let radius = Fx::from_int(100);
-    wrecks(&mut w, 1000, 1000, 3);
-    // Well inside the carrier's drone reach, well outside the circle.
-    wrecks(&mut w, 1000, 1400, 1);
-    wrecks(&mut w, 650, 1250, 1);
-    let outside = [mass_near(&w, 1000, 1400), mass_near(&w, 650, 1250)];
-    w.tick(&[cmd(Command::ReclaimArea {
-        units: vec![osprey],
-        pos: centre,
-        radius,
-        queue: false,
-    })])
-    .unwrap();
-    run_until_idle(&mut w, &[osprey], 3000);
-    let inside = wrecks_left(&w)
-        .iter()
-        .filter(|p| p.distance(centre) <= radius)
-        .count();
-    assert_eq!(inside, 0, "the circle is cleared");
-    assert_eq!(
-        [mass_near(&w, 1000, 1400), mass_near(&w, 650, 1250)],
-        outside,
-        "drones took wrecks outside the circle"
-    );
-}
-
-#[test]
-fn a_carrier_given_a_circle_wider_than_its_drones_reach_clears_all_of_it() {
-    let mut w = world();
-    let osprey = carrier(&mut w, 1000, 200);
-    let centre = FxVec2::from_ints(1000, 1000);
-    // Farther apart than the drones' 800 m, and none within reach of the middle.
+    // Farther apart than its beam's 550 m, and none within reach of the middle.
     let fields = [(150, 1000), (1850, 1000), (1000, 1850)];
     for (x, y) in fields {
         wrecks(&mut w, x, y, 2);
     }
     w.tick(&[cmd(Command::ReclaimArea {
-        units: vec![osprey],
+        units: vec![reclaimer],
         pos: centre,
         radius: Fx::from_int(900),
         queue: false,
     })])
     .unwrap();
-    run_until_idle(&mut w, &[osprey], 6000);
+    run_until_idle(&mut w, &[reclaimer], 6000);
     assert!(wrecks_left(&w).is_empty(), "left: {:?}", wrecks_left(&w));
 }
 
 #[test]
-fn a_carrier_sent_to_a_point_stops_for_the_wrecks_on_its_way() {
+fn a_reclaimer_sent_to_a_point_stops_for_the_wrecks_on_its_way() {
     let mut w = world();
-    let osprey = carrier(&mut w, 300, 1000);
+    let reclaimer = reclaimer(&mut w, 300, 1000);
     // On the way, and a little off it.
     let fields = [(700, 1000), (1100, 1100)];
     for (x, y) in fields {
@@ -351,18 +303,18 @@ fn a_carrier_sent_to_a_point_stops_for_the_wrecks_on_its_way() {
     }
     let goal = FxVec2::from_ints(1700, 1000);
     w.tick(&[cmd(Command::ReclaimArea {
-        units: vec![osprey],
+        units: vec![reclaimer],
         pos: goal,
         radius: Fx::ZERO,
         queue: false,
     })])
     .unwrap();
-    run_until_idle(&mut w, &[osprey], 4000);
-    let row = w.state.units.row(osprey).unwrap();
+    run_until_idle(&mut w, &[reclaimer], 4000);
+    let row = w.state.units.row(reclaimer).unwrap();
     let at = w.state.units.pos[row];
     assert!(
         at.distance(goal) < Fx::from_int(30),
-        "carrier went on: at {at:?}"
+        "it did not go on to the point: at {at:?}"
     );
     for (x, y) in fields {
         assert_eq!(
@@ -374,11 +326,11 @@ fn a_carrier_sent_to_a_point_stops_for_the_wrecks_on_its_way() {
 }
 
 #[test]
-fn a_carrier_told_to_reclaim_a_wreck_stops_over_it() {
+fn a_reclaimer_told_to_reclaim_a_wreck_drops_its_move_and_stops_in_reach() {
     let mut w = world();
-    let osprey = carrier(&mut w, 300, 1000);
+    let reclaimer = reclaimer(&mut w, 300, 1000);
     w.tick(&[cmd(Command::Move {
-        units: vec![osprey],
+        units: vec![reclaimer],
         target: FxVec2::from_ints(1800, 1000),
         queue: false,
     })])
@@ -393,29 +345,39 @@ fn a_carrier_told_to_reclaim_a_wreck_stops_over_it() {
         wr.slots.handle(r)
     };
     w.tick(&[cmd(Command::ReclaimWreck {
-        units: vec![osprey],
+        units: vec![reclaimer],
         wreck,
         queue: false,
     })])
     .unwrap();
-    run_until_idle(&mut w, &[osprey], 3000);
+    run_until_idle(&mut w, &[reclaimer], 3000);
     assert!(wrecks_left(&w).is_empty());
-    let row = w.state.units.row(osprey).unwrap();
+    let row = w.state.units.row(reclaimer).unwrap();
     let at = w.state.units.pos[row];
+    let reach = w
+        .blueprints
+        .unit(w.state.units.blueprint[row])
+        .reclaimer
+        .unwrap()
+        .range;
     assert!(
-        at.distance(FxVec2::from_ints(1000, 1600)) < Fx::from_int(200),
-        "carrier flew on instead of stopping over the wreck: at {at:?}"
+        at.distance(FxVec2::from_ints(1000, 1600)) <= reach,
+        "it went on instead of stopping in reach of the wreck: at {at:?}"
+    );
+    assert!(
+        at.x < Fx::from_int(1300),
+        "it kept on to where it was first sent: at {at:?}"
     );
 }
 
-/// Replay 20261001-172856 mark 1: an Osprey given a circle of wrecks its side had seen
+/// Replay 20261001-172856 mark 1: a reclaimer given a circle of wrecks its side had seen
 /// but had no eyes on any more ended the order where it stood. The player is shown
-/// wrecks anywhere explored, so the carrier goes for those too.
+/// wrecks anywhere explored, so the reclaimer goes for those too.
 #[test]
-fn a_carrier_given_a_circle_out_of_sight_flies_to_the_wrecks_it_knows_of() {
+fn a_reclaimer_given_a_circle_out_of_sight_goes_to_the_wrecks_it_knows_of() {
     let mut w = world();
     w.state.fog_enabled = true;
-    let osprey = carrier(&mut w, 300, 300);
+    let reclaimer = reclaimer(&mut w, 300, 300);
     let centre = FxVec2::from_ints(1700, 1700);
     wrecks(&mut w, 1700, 1700, 3);
     // Seen once, then left behind under the fog.
@@ -424,12 +386,12 @@ fn a_carrier_given_a_circle_out_of_sight_flies_to_the_wrecks_it_knows_of() {
     w.tick(&[]).unwrap();
     assert!(w.fog.is_explored(centre, mask) && !w.fog.is_detected(centre, mask));
     w.tick(&[cmd(Command::ReclaimArea {
-        units: vec![osprey],
+        units: vec![reclaimer],
         pos: centre,
         radius: Fx::from_int(200),
         queue: false,
     })])
     .unwrap();
-    run_until_idle(&mut w, &[osprey], 6000);
+    run_until_idle(&mut w, &[reclaimer], 6000);
     assert!(wrecks_left(&w).is_empty(), "left: {:?}", wrecks_left(&w));
 }

@@ -11,7 +11,7 @@
 //!
 //! A salvager on guard (a unit whose reclaimer works on the move) works its ring the same
 //! way, wrecks only: guarding a friendly unit it follows it and takes apart what falls
-//! round it as the fight moves (the Scythe). An aircraft does this between circles.
+//! round it as the fight moves. An aircraft does this between circles.
 
 use crate::assist_work::AssistWork;
 use crate::orders::order;
@@ -142,7 +142,7 @@ impl World {
     }
 
     /// Whether `row` works its guard area as a salvager: it has a reclaimer that works on
-    /// the move (the Scythe that follows an army, a salvage drone), not a builder's.
+    /// the move (the Reclaimer, a salvage drone), not a builder's.
     fn salvages_on_guard(&self, row: usize) -> bool {
         self.bp(row).reclaimer.is_some_and(|r| r.mobile)
     }

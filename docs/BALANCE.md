@@ -167,8 +167,8 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   (`focus.rs`), the Mines and Power priorities in one row under the economy panel: each of
   new mines and new power (and their upgrades) is paid Last, Even or First. First is paid in
   full before the rest; Last only out of what the rest leaves over, so it is built from
-  excess. Mines First also puts reclaimers (scavenger towers, salvage units, drones and
-  their carriers) first; Mines Last does not hold them back. A kind put first or last shows its own build speed on the row; the stall chip gives
+  excess. Mines First also puts reclaimers (scavenger towers, Reclaimers, the commander's drones and
+  their port) first; Mines Last does not hold them back. A kind put first or last shows its own build speed on the row; the stall chip gives
   the rest's. A stalling resource's First pulses as the fix, and a note says what to build.
   The AI puts first whatever it is running out of and never puts anything last.
 - Standing energy draw (`energy_upkeep`) is only for powered systems: shields, radar, sonar
@@ -210,9 +210,10 @@ replacing the mines.
   itself in well under a minute of beam time on a wreck field, so it is a real income next to the
   mines. Its reach is far past an engineer's walk. A reclaimer's `power` is the whole unit's,
   split across the heads working that tick.
+- A Reclaimer on guard (Ctrl+G on a friendly unit) follows it and takes the wrecks anywhere in
+  the guard ring, not only those in reach, then picks up the guard again (`area_work.rs`).
 - Reclaiming takes no energy, not even a tower's: no reclaimer draws upkeep for it, and an
-  energy stall never stops or slows it (checked on load; the Argus's upkeep is for its radar,
-  sonar and field). Only a full mass store holds reclaim back, and never on a side
+  energy stall never stops or slows it (checked on load). Only a full mass store holds reclaim back, and never on a side
   that builds for free (the test range).
 
   | Unit | Tier | Mass | Power | Reach | Payback (beam) |
@@ -220,12 +221,10 @@ replacing the mines.
   | Scavenger (tower, upgrades in place) | 1 | 120 | 6 | 640 | 20 s |
   | Scavenger II | 2 | 420 | 40 | 1,100 | 11 s |
   | Scavenger III | 3 | 1,700 | 200 | 1,700 | 9 s |
-  | Gleaner (hover: land and water, works while moving) | 1 | 60 | 5 | 550 | 12 s |
-  | Magpie (air, works while flying) | 1 | 55 | 4 | 450 | 14 s |
-  | Thresher (land, 3 heads, anti-missile) | 2 | 320 | 30 | 850 | 11 s |
-  | Trawler (boat, works while sailing) | 1 | 80 | 6 | 600 | 13 s |
-  | Osprey (4 drones, power 5 each) | 2 | 200 | 20 | 800 | 10 s |
-  | Argus salvage ray (radar/sonar plane, a Scavenger III's reach) | 3 | 1,200 | 40 | 1,700 | 30 s |
+  | Gleaner, the ARC Reclaimer (hover: land and shallows, works while moving; upgrades in place) | 1 | 60 | 5 | 550 | 12 s |
+  | Gleaner II | 2 | 240 | 20 | 800 | 12 s |
+  | Gleaner III | 3 | 840 | 70 | 1,100 | 12 s |
+  | Breaker, the Regency Reclaimer (I / II / III) | 1-3 | 60 / 240 / 840 | 6 / 24 / 84 | 450 / 650 / 900 | 10 s |
   | Commander drone port (2 drones) | 2 | 450 | 10 | 1,400 | 45 s |
 - Materials Vault tiers hold 1,500 / 6,000 / 24,000 for 150 / 400 / 1,000 mass: storage gets cheaper per
   unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 mass.

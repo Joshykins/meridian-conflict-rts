@@ -211,10 +211,11 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Job | Name |
 |---|---|
 | Commander, engineer, scout | Exarch, Artificer, Outrider |
+| Reclaimer (T1 to T3, upgrades in place) | Breaker (II, III) |
 | Wake tank, assault tripod (T3) | Wake, Strider |
 | Battle scorpion (T4) | Harrow |
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |
-| Salvage craft, light artillery (T1) | Breaker, Mattock |
+| Light artillery (T1) | Mattock |
 | Battle tank / mobile anti-air (T2) | Glaive / Vane |
 | Anti-spaceship gun, heavy artillery (T3) | Spire, Kiln |
 | Land / air / naval factory | Anvil (II, III) / Skyforge (II, III) / Slipway (II, III) |
@@ -224,8 +225,8 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Drone carrier and its drone (T2), beam assault craft (T3) | Quiver and Wick, Reaper |
 | Battleship, carrier, assault submarine | Flamberge, Mantlet, Rapier |
 | Air scout, fighter, bomber (T1) | Flechette, Quarrel, Petard |
-| Light transport (T2), salvage drone (T1) | Coffer, Sickle |
-| Interceptor, strike drone, torpedo bomber, reclaim carrier (T2) | Pilum, Voulge, Trident, Winnow |
+| Light transport (T2) | Coffer |
+| Interceptor, strike drone, torpedo bomber (T2) | Pilum, Voulge, Trident |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
 | Material fabricator | Condenser (II, III) |
@@ -235,7 +236,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Shield generator (T2, T3) | Ward (II) |
 | Nuke silo, nuke defence (T4) | Mangonel, Barbican |
 | Air superiority fighter, strategic bomber (T3) | Partisan, Maul |
-| Spy plane, heavy scavenger (T3) | Augur, Scythe |
+| Spy plane (T3) | Augur |
 
 ### Construction
 

@@ -608,15 +608,15 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
         },
     );
 
-    // The Trawler reaches it from where it floats, 250 m off, and looks down at the bed:
-    // no mast to raise, no stop to make.
-    let trawler = spawn(&mut w, "aster_t1_salvage_boat", 0, 1250, 1000, 0);
-    assert_eq!(w.bp(row(&w, trawler)).motion.unwrap().deploy_ticks, 0);
+    // The Gleaner reaches it from where it hovers on the water, 250 m off, and looks
+    // down at the bed: no mast to raise, no stop to make.
+    let reclaimer = spawn(&mut w, "aster_t1_mobile_reclaimer", 0, 1250, 1000, 0);
+    assert_eq!(w.bp(row(&w, reclaimer)).motion.unwrap().deploy_ticks, 0);
     order(
         &mut w,
         0,
         Command::ReclaimWreck {
-            units: vec![trawler],
+            units: vec![reclaimer],
             wreck,
             queue: false,
         },
@@ -624,7 +624,7 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
     let mut started = None;
     for t in 0..600 {
         w.tick(&[]).unwrap();
-        let r = row(&w, trawler);
+        let r = row(&w, reclaimer);
         let left = if w.state.wrecks.slots.is_alive(at) {
             w.state.wrecks.mass[at]
         } else {
@@ -641,7 +641,7 @@ fn any_reclaimer_reaches_a_wreck_in_deep_water() {
             break;
         }
     }
-    assert!(started.is_some(), "the Trawler never reclaimed the wreck");
+    assert!(started.is_some(), "the Gleaner never reclaimed the wreck");
     assert!(
         !w.state.wrecks.slots.is_alive(at),
         "the wreck was not cleared"

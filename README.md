@@ -281,7 +281,8 @@ with queues and standing orders (move, attack-move, patrol, attack, assist, guar
 made takes them, and a factory still going up takes both its queue and its orders), in-place upgrades, reclaim (wrecks, your own units, enemies; idle engineers
 clear the wrecks within their reach while there is room for the mass, and so does the Scavenger reclaim
 tower (tech 1 to 3) over a much wider one, though its head is slow to aim and has to charge before the beam comes on;
-salvage vehicles, the Trawler boat and the Argus clear what they pass while they move;
+the Reclaimer (the Gleaner and the Regency Breaker, a hover salvager on land and shallows, tech 1 to 3, upgraded in place like the engineer and
+built by every factory up to its tier) clears what it passes while it moves;
 nothing reclaims a live unit without an order, and a builder that carries weapons
 leaves wrecks alone while an enemy is near; a builder raises a reclaim field over a lot before it lays a
 structure down, and four waves running out from the middle vaporize the trees on it (3 s, for nothing), and walkers as big as a commander knock over the trees they walk through), persistent scorch marks,
@@ -343,4 +344,4 @@ requires matching protocol/replay version 3; older replays are rejected.
 
 ## Complete air and AA roster
 
-The tiered air roster, aircraft circling on guard, shielded reclaim carrier and drones, amphibious AA defenses, mobile AA, and redesigned Aerie factory are described in [Air roster and anti-air defenses](docs/AIR_ROSTER.md).
+The tiered air roster, aircraft circling on guard, amphibious AA defenses, mobile AA, and redesigned Aerie factory are described in [Air roster and anti-air defenses](docs/AIR_ROSTER.md).

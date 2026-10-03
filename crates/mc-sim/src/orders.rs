@@ -272,9 +272,7 @@ impl World {
                 let pos = self.state.units.pos[t];
                 for row in self.owned(player, units, 0) {
                     let bp = self.bp(row);
-                    if bp.sends_reclaimers()
-                        && (bp.drone_carrier() || self.can_reclaim_unit(row, t))
-                    {
+                    if bp.sends_reclaimers() && self.can_reclaim_unit(row, t) {
                         self.give(row, order(OrderKind::ReclaimUnit, pos, *target), *queue)?;
                     }
                 }
@@ -1421,9 +1419,6 @@ impl World {
                 }
                 OrderKind::Build => self.run_build(row, &o)?,
                 OrderKind::Assist => self.run_assist(row, &o)?,
-                OrderKind::Reclaim | OrderKind::ReclaimUnit if self.bp(row).drone_carrier() => {
-                    self.run_carrier_reclaim(row, &o)?
-                }
                 OrderKind::Reclaim => self.run_reclaim(row, &o)?,
                 OrderKind::ReclaimUnit => self.run_reclaim_unit(row, &o)?,
                 OrderKind::Produce => self.run_produce(row, &o)?,
@@ -3145,7 +3140,6 @@ impl World {
                 let units = &self.state.units;
                 if units.drone_parent[row] == Handle::NONE
                     && self.bp(row).drone.is_none()
-                    && !self.bp(row).is_salvager()
                     && !self.bp(row).carried_drone
                     && units.order_head[row] == NO_ORDER
                     && !units.has_flag(row, flag::AIR_RUN)
@@ -3163,9 +3157,8 @@ impl World {
 
     /// An idle aircraft that cannot set down where it stopped (water, cliffs,
     /// buildings, a pad another aircraft took) flies to the nearest clear
-    /// ground instead of hovering there for good. Carriers, drones, salvage aircraft
-    /// (their beams work the wrecks under them while they hang there) and capital
-    /// ships (which land only when told to) stay up.
+    /// ground instead of hovering there for good. Carriers, drones and capital ships
+    /// (which land only when told to) stay up.
     /// True if it set off.
     fn idle_air_land(&mut self, row: usize) -> Result<bool, SimError> {
         // Looked at twice a second, spread over the rows.
@@ -3181,7 +3174,6 @@ impl World {
         // Only once it has stopped at cruise height: a hull on the ground or
         // still settling is left to `stand_z`.
         if bp.drone.is_some()
-            || bp.is_salvager()
             || bp.carried_drone
             || bp.is_capital_ship()
             || units.has_flag(row, flag::IN_FACTORY)

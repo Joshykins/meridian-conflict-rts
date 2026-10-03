@@ -15,7 +15,6 @@ pub(crate) mod air;
 pub(crate) mod air_t2;
 mod battle_tank;
 mod bombard;
-mod breaker;
 mod brood;
 mod chassis;
 mod commander;
@@ -38,6 +37,7 @@ pub(crate) mod naval;
 mod palisade;
 mod plating;
 mod raider;
+mod reclaimer;
 mod scorpion;
 mod scout;
 mod seeker_hover;
@@ -106,9 +106,9 @@ pub(super) const MODELS: &[ModelDef] = &[
         fusion_guns::HOWITZER_HEIGHT,
         fusion_guns::howitzer,
     ),
-    // The tech 1 salvage craft: a hover hull with a nanite head on a turning house over its
-    // stern (`breaker`).
-    ModelDef::new("regency_breaker", 4.6, 3.4, breaker::breaker),
+    // The Reclaimer, every tier: a hover hull with a nanite head on a turning house over its
+    // stern, drawn bigger at tech 2 and 3 (`reclaimer`).
+    ModelDef::new("regency_reclaimer", 4.6, 3.4, reclaimer::reclaimer),
     // The tech 1 artillery: a four-legged walker, a Plasmeric Mortar in the house on its
     // back (`mattock`).
     ModelDef::new("regency_mattock", 4.2, 3.2, mattock::mattock),
@@ -207,13 +207,11 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The land and air factories' tech 3, with their tech 2 kit and more.
         "regency_brood" | "regency_hatchery" => 15000,
         "regency_tidebrood" => 9000,
-        // A drum, a rim or wings of lapped plates, five lift bells and four nanite heads.
-        "regency_reclaim_carrier" => 6000,
         // The tech 1 hulls; the tech 2 warships have a capital ship's detail, lighter.
         "regency_attack_boat" => 2400,
         // The tech 1 air force: jets by the dozen, a transport the size of a frigate.
         "regency_flechette" => 2200,
-        "regency_quarrel" | "regency_petard" | "regency_sickle" => 3200,
+        "regency_quarrel" | "regency_petard" => 3200,
         "regency_coffer" => 6000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
@@ -223,8 +221,6 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The tech 3 jets: hull, blade, wings and the plates lapped over them.
         "regency_partisan" | "regency_augur" => 4000,
         "regency_maul" => 6000,
-        // A broad craft on six bells with two nanite heads, a vault and hoppers.
-        "regency_scythe" => 6000,
         "regency_assault_submarine" => 8000,
         // Three tiers, and the next one's pieces waiting on each.
         "regency_cyst" => 6000,
@@ -242,7 +238,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_hover_tank" | "regency_mobile_aa" => 3200,
         "regency_battle_tank" => 5000,
         "regency_seeker_hover" => 4500,
-        "regency_breaker" | "regency_mattock" => 3400,
+        "regency_reclaimer" | "regency_mattock" => 3400,
         // Three long walking legs and a plated head with two cannons.
         "regency_strider" => 7000,
         "regency_wake_tank" => 5000,

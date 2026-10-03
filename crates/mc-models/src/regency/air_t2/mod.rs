@@ -6,4 +6,3 @@ mod jet;
 pub(crate) mod pilum;
 pub(crate) mod trident;
 pub(crate) mod voulge;
-pub(crate) mod winnow;

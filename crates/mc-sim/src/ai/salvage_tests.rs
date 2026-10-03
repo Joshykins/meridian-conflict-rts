@@ -101,6 +101,7 @@ fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_th
     let mut w = world();
     let air = spawn(&mut w, "aster_t2_air_factory", 400, 300);
     let land = spawn(&mut w, "aster_t1_land_factory", 300, 420);
+    let naval = spawn(&mut w, "aster_t3_naval_factory", 500, 500);
     let census = w.survey_own(0);
     assert!(
         w.salvage_product(air, &census, 0, &[]).is_none(),
@@ -109,22 +110,21 @@ fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_th
     field(&mut w, 900, 900, 6);
     let fields = w.wreck_fields(w.state.players[0].start, &Intel::default());
     let key = |id: Option<BlueprintId>| id.map(|b| w.blueprints.unit(b).key.clone());
-    assert_eq!(
-        key(w.salvage_product(air, &census, 0, &fields)).as_deref(),
-        Some("aster_t1_air_reclaimer")
-    );
-    assert_eq!(
-        key(w.salvage_product(land, &census, 0, &fields)).as_deref(),
-        Some("aster_t1_land_reclaimer")
-    );
+    // Every factory, of any tier, makes the cheapest: the Gleaner (Reclaimer I).
+    for factory in [air, land, naval] {
+        assert_eq!(
+            key(w.salvage_product(factory, &census, 0, &fields)).as_deref(),
+            Some("aster_t1_mobile_reclaimer")
+        );
+    }
     assert!(
         w.salvage_product(land, &census, 1, &fields).is_none(),
         "one is enough for 600 mass"
     );
     // A Gleaner idle at home, out of reach of the field, is sent to it.
-    let gleaner = spawn(&mut w, "aster_t1_land_reclaimer", 320, 320);
+    let reclaimer = spawn(&mut w, "aster_t1_mobile_reclaimer", 320, 320);
     let census = w.survey_own(0);
-    assert_eq!(census.salvagers_idle, vec![gleaner]);
+    assert_eq!(census.salvagers_idle, vec![reclaimer]);
     let mut out = Vec::new();
     w.direct_salvagers(&census, &fields, &mut out);
     assert!(matches!(

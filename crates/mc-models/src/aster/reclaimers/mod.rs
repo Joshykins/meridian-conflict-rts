@@ -1,16 +1,11 @@
-//! Aster land reclaimers: the Gleaner (tech 1, a salvage hovercraft with a head on an
-//! A-frame) and the Thresher (tech 2, a wheeled carrier with three reclaim heads and
-//! missile-defence lasers). Wreckage lies on slopes, on ledges and down in gullies, so every head
-//! turns on a gun house of its own (`MeshBuilder::with_house`, weapon slot = head
-//! index) and pitches through a wide arc: each head is built round its trunnion,
-//! with open air above and below it.
+//! The ARC Reclaimer: a salvage hovercraft with a reclaim head on an A-frame. Wreckage
+//! lies on slopes, on ledges and down in gullies, so the head turns on a gun house of its
+//! own (`MeshBuilder::with_house`, weapon slot 0) and pitches through a wide arc: it is
+//! built round its trunnion, with open air above and below it.
 //!
 //! Reclaim is plant, not a weapon: dark processors, intake mouths, hoppers. The
 //! light is the Materials red-orange: the intakes (`GLOW_MATERIALS`) and the glazing
 //! that shows the haul (`pattern::MASS_FLOW`).
-//!
-//! The Cradle head is the ARC reclaim turret other models build theirs from:
-//! [`cradle_turret`] (a whole house) and [`cradle_head`] (the pitching head alone).
 
 use glam::Vec3;
 
@@ -19,111 +14,50 @@ use crate::builder::{MeshBuilder, Section};
 use crate::material::*;
 use crate::{part, pattern};
 
-mod gleaner;
-mod thresher;
+mod reclaimer;
 
-pub(super) use gleaner::gleaner;
-pub(super) use thresher::thresher;
+pub(super) use reclaimer::reclaimer;
 
 /// The light on a working intake.
 const INTAKE: u32 = GLOW_MATERIALS;
 
-/// The look of a reclaim head. Each is built facing +x round its trunnion.
-#[derive(Clone, Copy)]
-enum Head {
-    /// A boxy processor slung between two yoke cheeks, a short intake snout.
-    Cradle,
-    /// The reclaim tower's processor tube, shortened: long, lean, plant on its back.
-    Lance,
-}
-
-/// One reclaim head as a gun house bound to `weapon`: a yaw collar at `base` height
-/// under the trunnion `pivot`, the pitching head on it, `s` its scale (about 1 for a
-/// 2 m head). Returns where the reclaim beam leaves (the intake mouth at rest).
-fn reclaim_head(
-    b: &mut MeshBuilder,
-    weapon: usize,
-    pivot: Vec3,
-    base: f32,
-    s: f32,
-    head: Head,
-) -> Vec3 {
+/// The reclaim head as a gun house bound to `weapon`: a yaw collar at `base` height
+/// under the trunnion `pivot`, the pitching lance on it (the reclaim tower's processor
+/// tube, shortened: long, lean, plant on its back), `s` its scale (about 1 for a 2 m
+/// head). Returns where the reclaim beam leaves (the intake mouth at rest).
+fn reclaim_head(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, base: f32, s: f32) -> Vec3 {
     let mut mouth = pivot;
     // Hull part, not `part::TURRET`: the shader carries a turret-part house round the unit's
     // turret pivot as well, which swung the head about the hull's origin.
     b.with_house(weapon, pivot, 0.0, |b| {
-        collar(b, pivot, base, s, head);
-        b.with_recoil(|b| {
-            mouth = match head {
-                Head::Cradle => cradle_head(b, pivot, s),
-                Head::Lance => lance(b, pivot, s),
-            };
-        });
+        collar(b, pivot, base, s);
+        b.with_recoil(|b| mouth = lance(b, pivot, s));
     });
     mouth
 }
 
-/// What turns but does not pitch: a slewing ring, and a yoke or a cup to carry the head.
-fn collar(b: &mut MeshBuilder, pivot: Vec3, base: f32, s: f32, head: Head) {
+/// What turns but does not pitch: a slewing ring and a saddle to carry the head.
+fn collar(b: &mut MeshBuilder, pivot: Vec3, base: f32, s: f32) {
     let foot = v3(pivot.x, pivot.y, base);
     b.paint(ACCENT);
     b.prism(foot, b.sides(10), 0.78 * s, 0.72 * s, 0.22 * s);
-    match head {
-        Head::Cradle => {
-            // Two cheeks rising past the trunnion, a bridge between them low down.
-            let top = pivot.z + 0.42 * s;
-            b.paint(PLATING);
-            b.block(
-                v3(pivot.x - 0.55 * s, pivot.y - 0.36 * s, base + 0.2 * s),
-                v3(pivot.x + 0.3 * s, pivot.y + 0.36 * s, base + 0.42 * s),
-            );
-            mirror_about(b, pivot.y, |b| {
-                let pivot = v3(pivot.x, 0.0, pivot.z);
-                b.paint(PLATING);
-                b.extrude_y(
-                    &[
-                        [pivot.x - 0.5 * s, base + 0.2 * s],
-                        [pivot.x + 0.34 * s, base + 0.2 * s],
-                        [pivot.x + 0.3 * s, top - 0.1 * s],
-                        [pivot.x + 0.08 * s, top],
-                        [pivot.x - 0.3 * s, top],
-                        [pivot.x - 0.5 * s, pivot.z - 0.1 * s],
-                    ],
-                    pivot.y + 0.62 * s,
-                    pivot.y + 0.8 * s,
-                );
-                if b.fine() {
-                    b.paint(METAL);
-                    b.cylinder_between(
-                        v3(pivot.x, pivot.y + 0.56 * s, pivot.z),
-                        v3(pivot.x, pivot.y + 0.9 * s, pivot.z),
-                        0.2 * s,
-                        0.16 * s,
-                        b.sides(8),
-                    );
-                }
-            });
-        }
-        Head::Lance => {
-            // A low saddle under the tube with a trunnion block each side.
-            b.paint(PLATING);
-            b.frustum(
-                foot + Vec3::Z * 0.2 * s,
-                v2(1.3 * s, 1.1 * s),
-                v2(0.8 * s, 0.9 * s),
-                (pivot.z - base - 0.4 * s).max(0.1),
-                v2(-0.1 * s, 0.0),
-            );
-            mirror_about(b, pivot.y, |b| {
-                let pivot = v3(pivot.x, 0.0, pivot.z);
-                b.paint(ACCENT);
-                b.block(
-                    v3(pivot.x - 0.3 * s, pivot.y + 0.42 * s, pivot.z - 0.5 * s),
-                    v3(pivot.x + 0.3 * s, pivot.y + 0.62 * s, pivot.z + 0.2 * s),
-                );
-            });
-        }
-    }
+    // A low saddle under the tube with a trunnion block each side.
+    b.paint(PLATING);
+    b.frustum(
+        foot + Vec3::Z * 0.2 * s,
+        v2(1.3 * s, 1.1 * s),
+        v2(0.8 * s, 0.9 * s),
+        (pivot.z - base - 0.4 * s).max(0.1),
+        v2(-0.1 * s, 0.0),
+    );
+    mirror_about(b, pivot.y, |b| {
+        let pivot = v3(pivot.x, 0.0, pivot.z);
+        b.paint(ACCENT);
+        b.block(
+            v3(pivot.x - 0.3 * s, pivot.y + 0.42 * s, pivot.z - 0.5 * s),
+            v3(pivot.x + 0.3 * s, pivot.y + 0.62 * s, pivot.z + 0.2 * s),
+        );
+    });
 }
 
 /// The intake mouth facing +x at `at`: a dark ring, collector vanes, the lit throat.
@@ -152,109 +86,6 @@ fn mouth(b: &mut MeshBuilder, at: Vec3, radius: f32) {
             b.cuboid(c, size);
         }
     }
-}
-
-/// The Cradle reclaim turret, whole: a gun house bound to `weapon` with its slewing ring
-/// at `base` height, yoke cheeks up to the trunnion `pivot`, and the processor head pitching
-/// on them, `s` its scale (1 for a 2 m head). Returns the intake mouth at rest (the beam's
-/// emitter). The reclaim turret other models build theirs from (the user's pick, 2026-09-28).
-pub(crate) fn cradle_turret(
-    b: &mut MeshBuilder,
-    weapon: usize,
-    pivot: Vec3,
-    base: f32,
-    s: f32,
-) -> Vec3 {
-    reclaim_head(b, weapon, pivot, base, s, Head::Cradle)
-}
-
-/// The Cradle's pitching head alone, facing +x round its trunnion `p`: a boxy processor
-/// on side trunnions, a snout forward and a charge pack aft, `s` its scale. For a model
-/// that builds its own house and mount, called inside `with_recoil`. Returns the intake
-/// mouth.
-pub(crate) fn cradle_head(b: &mut MeshBuilder, p: Vec3, s: f32) -> Vec3 {
-    let tip = p + Vec3::X * 1.55 * s;
-    if !b.fine() {
-        b.paint(PLATING);
-        b.cuboid(p + Vec3::X * 0.1 * s, v3(1.5 * s, 1.1 * s, 0.9 * s));
-        b.paint(METAL);
-        b.beam(
-            p + Vec3::X * 0.8 * s,
-            tip,
-            v2(0.6 * s, 0.6 * s),
-            v2(0.5 * s, 0.5 * s),
-        );
-        b.paint(INTAKE);
-        b.cuboid(tip, v3(0.1, 0.35 * s, 0.35 * s));
-        return tip;
-    }
-    b.paint(PLATING);
-    b.chamfered_box(
-        p + Vec3::X * 0.1 * s,
-        v3(1.5 * s, 1.1 * s, 0.86 * s),
-        0.22 * s,
-    );
-    b.paint(ACCENT);
-    b.chamfered_box(
-        p + v3(0.1 * s, 0.0, -0.1 * s),
-        v3(1.56 * s, 1.16 * s, 0.22 * s),
-        0.24 * s,
-    );
-    // Roof: a white lid with the intake's warning strip.
-    b.paint(PLATING);
-    b.plate(
-        p + v3(-0.05 * s, 0.0, 0.43 * s),
-        v2(1.1 * s, 0.8 * s),
-        0.08 * s,
-        0.03 * s,
-    );
-    if b.fine() {
-        glow_strip(
-            b,
-            p + v3(0.45 * s, 0.0, 0.43 * s),
-            v2(0.1 * s, 0.6 * s),
-            INTAKE,
-        );
-    }
-    // Charge pack behind the trunnion balances the snout.
-    b.paint(ACCENT);
-    b.block(
-        p + v3(-1.05 * s, -0.38 * s, -0.3 * s),
-        p + v3(-0.6 * s, 0.38 * s, 0.32 * s),
-    );
-    // Snout: a tapering tube out of the box, two collars, then the mouth.
-    b.paint(METAL);
-    b.cylinder_between(
-        p + Vec3::X * 0.8 * s,
-        tip - Vec3::X * 0.1 * s,
-        0.34 * s,
-        0.28 * s,
-        b.sides(8),
-    );
-    if b.fine() {
-        b.paint(ACCENT);
-        b.cylinder_between(
-            p + Vec3::X * 1.0 * s,
-            p + Vec3::X * 1.1 * s,
-            0.37 * s,
-            0.37 * s,
-            8,
-        );
-        // Feed pipes from the pack along the flanks into the snout.
-        b.paint(METAL);
-        mirror_about(b, p.y, |b| {
-            let p = v3(p.x, 0.0, p.z);
-            b.cylinder_between(
-                p + v3(-0.8 * s, 0.5 * s, 0.1 * s),
-                p + v3(0.85 * s, 0.5 * s, 0.1 * s),
-                0.07 * s,
-                0.07 * s,
-                5,
-            );
-        });
-    }
-    mouth(b, tip, 0.4 * s);
-    tip
 }
 
 /// The tower's processor tube, short and lean on a trunnion near its back third.
@@ -310,88 +141,6 @@ fn mirror_about(b: &mut MeshBuilder, y: f32, f: impl Fn(&mut MeshBuilder)) {
 }
 
 // ---- running gear and hulls ------------------------------------------------
-
-/// An off-road tyre on the +y side, axis across the body: eight-sided like the other
-/// running gear's round parts at this size, a hub cap at full detail.
-fn tyre(b: &mut MeshBuilder, center: Vec3, radius: f32, width: f32) {
-    b.with_part(part::LOCOMOTION, |b| {
-        let half = Vec3::Y * (width * 0.5);
-        b.paint(TREAD);
-        b.cylinder_between(center - half, center + half, radius, radius, b.sides(8));
-        if b.fine() {
-            b.paint(PLATING);
-            b.cylinder_between(
-                center + half,
-                center + half + Vec3::Y * 0.08,
-                radius * 0.55,
-                radius * 0.4,
-                6,
-            );
-        }
-    });
-}
-
-/// A wheeled hull: `axles` (x of each) with wheels of `wheel_r` at `track` half-gauge,
-/// a dark belly tub between them, a faceted white shell from `belly` to `deck` over
-/// a [`hull_plan`] of `half_width`, fenders over the wheels. Returns the deck.
-pub(super) struct WheeledHull<'a> {
-    pub rear: f32,
-    pub front: f32,
-    pub half_width: f32,
-    pub belly: f32,
-    pub deck: f32,
-    pub axles: &'a [f32],
-    pub wheel_r: f32,
-    pub wheel_w: f32,
-    pub track: f32,
-}
-
-pub(super) fn wheeled_hull(b: &mut MeshBuilder, h: &WheeledHull) -> Roof {
-    b.mirror_y(|b| {
-        for &x in h.axles {
-            tyre(b, v3(x, h.track, h.wheel_r), h.wheel_r, h.wheel_w);
-        }
-    });
-    b.paint(ACCENT);
-    // Axle tub between the wheels, kept inside the belly's V.
-    let tub = (h.half_width * 0.7).min(h.track - h.wheel_w * 0.5);
-    b.block(
-        v3(h.rear + 0.9, -tub, h.wheel_r * 0.55),
-        v3(h.front - 1.2, tub, h.belly + 0.1),
-    );
-    let roof = shell(b, h.rear, h.front, h.half_width, h.belly, h.deck);
-    if !b.coarse() {
-        // Fenders: a dark flared arch over each pair of wheels, a white lip on it.
-        b.mirror_y(|b| {
-            let axles = h.axles;
-            let mut i = 0;
-            while i < axles.len() {
-                let j = if i + 1 < axles.len() && (axles[i + 1] - axles[i]).abs() < h.wheel_r * 2.6
-                {
-                    i + 1
-                } else {
-                    i
-                };
-                let (x0, x1) = (axles[i].min(axles[j]), axles[i].max(axles[j]));
-                let z = h.wheel_r * 2.0 + 0.12;
-                b.paint(ACCENT);
-                b.block(
-                    v3(x0 - h.wheel_r * 1.1, h.half_width * 0.9, z - 0.1),
-                    v3(x1 + h.wheel_r * 1.1, h.track + h.wheel_w * 0.55, z + 0.08),
-                );
-                if b.fine() {
-                    b.paint(PLATING);
-                    b.block(
-                        v3(x0 - h.wheel_r * 1.15, h.track + h.wheel_w * 0.45, z - 0.3),
-                        v3(x1 + h.wheel_r * 1.15, h.track + h.wheel_w * 0.6, z + 0.1),
-                    );
-                }
-                i = j + 1;
-            }
-        });
-    }
-    roof
-}
 
 /// The faceted white shell of a salvage hull from `belly` to `deck` over a [`hull_plan`]
 /// of `half_width`, drawn in toward the deck. Returns the deck.

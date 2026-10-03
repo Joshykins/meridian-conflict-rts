@@ -25,10 +25,10 @@ use crate::builder::{MeshBuilder, Section};
 use crate::material::*;
 use crate::{part, rig};
 
-use super::breaker::sensor_head;
 use super::commander::form::{blade, ring, sleeve, Ring, KEEL, OCT};
 use super::kit::{dark_plate, metal, seam, v3};
 use super::machine::red_slot;
+use super::reclaimer::sensor_head;
 
 /// The mortar's mouth and its trunnion: the unit file's weapon `muzzle` and `pivot`.
 pub(super) const MUZZLE: Vec3 = Vec3::new(1.13, 0.0, 3.45);

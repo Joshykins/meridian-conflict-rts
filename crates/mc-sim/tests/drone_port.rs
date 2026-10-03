@@ -42,7 +42,7 @@ fn world() -> World {
 }
 
 /// A commander with the drone port on, at (x, y).
-fn ported_commander(w: &mut World, x: i32, y: i32) -> usize {
+pub(super) fn ported_commander(w: &mut World, x: i32, y: i32) -> usize {
     let acu = w.blueprints.id_of("aster_commander").unwrap();
     let set = w.blueprints.refit_set(acu).unwrap();
     let kit = set
@@ -143,16 +143,16 @@ fn a_lost_drone_is_rebuilt_and_the_drones_go_with_the_commander() {
         .all(|&r| !w.state.units.slots.is_alive(r)));
 }
 
-/// A side whose every bit of income goes into a factory going up, with an Osprey whose
-/// drones are paid for under materials priority `mines`: the Osprey's row.
-fn starved_osprey(w: &mut World, mines: Priority) -> usize {
+/// A side whose every bit of income goes into a factory going up, with a commander whose
+/// port's drones are paid for under materials priority `mines`: the commander's row.
+fn starved_port(w: &mut World, mines: Priority) -> usize {
     let add = |w: &mut World, key: &str, x: i32, y: i32| {
         let id = w.blueprints.id_of(key).unwrap();
         w.spawn_unit(id, 0, FxVec2::from_ints(x, y), Angle::ZERO, true)
             .unwrap()
     };
     // The commander's trickle of mass is all the side makes.
-    add(w, "aster_commander", 250, 250);
+    let acu = ported_commander(w, 900, 900);
     add(w, "aster_mass_storage", 300, 300);
     add(w, "aster_t1_power", 360, 300);
     let engineer = add(w, "aster_t1_engineer", 400, 400);
@@ -175,7 +175,7 @@ fn starved_osprey(w: &mut World, mines: Priority) -> usize {
         },
     }])
     .unwrap();
-    add(w, "aster_t2_reclaim_carrier", 900, 900)
+    acu
 }
 
 fn built(w: &World, drones: &[usize]) -> usize {
@@ -185,13 +185,13 @@ fn built(w: &World, drones: &[usize]) -> usize {
         .count()
 }
 
-/// The Osprey is what a side short of mass builds to get some. Its drones cost a little,
-/// so with materials put first they come out of it while every other bit of income goes
-/// to building and nothing is left in store, and they salvage.
+/// The drones cost a little, so with materials put first they come out of a starved
+/// side's income while every other bit of it goes to building and nothing is left in
+/// store, and they salvage.
 #[test]
-fn an_osprey_on_a_starved_economy_fields_its_drones_with_materials_first() {
+fn a_port_on_a_starved_economy_fields_its_drones_with_materials_first() {
     let mut w = world();
-    let osprey = starved_osprey(&mut w, Priority::First);
+    let acu = starved_port(&mut w, Priority::First);
     let mut most_in_store = Fx::ZERO;
     for _ in 0..200 {
         w.tick(&[]).unwrap();
@@ -202,9 +202,9 @@ fn an_osprey_on_a_starved_economy_fields_its_drones_with_materials_first() {
         "the economy was starved: {most_in_store:?} in store"
     );
     assert_eq!(
-        built(&w, &drones_of(&w, osprey)),
-        4,
-        "a full flock with nothing in store"
+        built(&w, &drones_of(&w, acu)),
+        2,
+        "both drones with nothing in store"
     );
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     let wreck = w
@@ -224,22 +224,22 @@ fn an_osprey_on_a_starved_economy_fields_its_drones_with_materials_first() {
     }
     assert!(
         !w.state.wrecks.slots.is_alive(wreck) || w.state.wrecks.mass[wreck] < Fx::from_int(200),
-        "the flock salvaged the wreck"
+        "the drones salvaged the wreck"
     );
 }
 
 /// With materials put last, a starved side's drones wait for what the rest leaves: the
-/// first one stands half-built on its pylon.
+/// first one stands half-built on its pad.
 #[test]
-fn materials_last_leaves_a_starved_ospreys_drones_waiting() {
+fn materials_last_leaves_a_starved_ports_drones_waiting() {
     let mut w = world();
-    let osprey = starved_osprey(&mut w, Priority::Last);
+    let acu = starved_port(&mut w, Priority::Last);
     for _ in 0..200 {
         w.tick(&[]).unwrap();
     }
-    let drones = drones_of(&w, osprey);
+    let drones = drones_of(&w, acu);
     assert_eq!(built(&w, &drones), 0, "none finished");
-    assert_eq!(drones.len(), 1, "one going up on its pylon");
+    assert_eq!(drones.len(), 1, "one going up on its pad");
     let time = w
         .blueprints
         .unit(w.state.units.blueprint[drones[0]])
@@ -247,50 +247,46 @@ fn materials_last_leaves_a_starved_ospreys_drones_waiting() {
     assert!(w.state.units.build_progress[drones[0]] < time / 2);
 }
 
-/// An Osprey's drones hang from pylons under its wings. Letting go they drop clear;
-/// coming home they glide in and rise onto their pylons with no jump; docked, they
-/// keep their place on the wing while it flies.
+/// The port's drones sit on pads on the commander's back. Letting go they rise clear;
+/// coming home they glide in and settle onto their pads with no jump; docked, they
+/// keep their place on its back while it walks.
 #[test]
-fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
+fn port_drones_glide_on_and_off_their_pads_and_ride_the_back() {
     let mut w = world();
     w.state.players[0].free_build = true;
     // Room in store for what they bring home.
     let storage = w.blueprints.id_of("aster_mass_storage").unwrap();
     w.spawn_unit(storage, 0, FxVec2::from_ints(300, 300), Angle::ZERO, true)
         .unwrap();
-    let key = "aster_t2_reclaim_carrier";
-    let id = w.blueprints.id_of(key).unwrap();
-    let osprey = w
-        .spawn_unit(id, 0, FxVec2::from_ints(900, 900), Angle::ZERO, true)
-        .unwrap();
+    let acu = ported_commander(&mut w, 900, 900);
     for _ in 0..200 {
         w.tick(&[]).unwrap();
     }
-    let drones = drones_of(&w, osprey);
-    assert_eq!(drones.len(), 4);
+    let drones = drones_of(&w, acu);
+    assert_eq!(drones.len(), 2);
     let offsets = |w: &World| -> Vec<(Fx, Fx)> {
-        drones_of(w, osprey)
+        drones_of(w, acu)
             .iter()
             .map(|&r| {
                 (
-                    w.state.units.pos[r].distance(w.state.units.pos[osprey]),
-                    w.state.units.z[osprey] - w.state.units.z[r],
+                    w.state.units.pos[r].distance(w.state.units.pos[acu]),
+                    w.state.units.z[r] - w.state.units.z[acu],
                 )
             })
             .collect()
     };
     let docked = offsets(&w);
-    for &(across, below) in &docked {
-        assert!(across > Fx::from_int(3), "out on the wing: {across:?}");
-        // Its feet hang level with the Osprey's belly, under the wing.
-        assert!(below > -Fx::ONE, "under the wing: {below:?}");
+    for &(across, above) in &docked {
+        assert!(across > Fx::from_int(3), "out on its pad: {across:?}");
+        // The pads are over the back, behind the head.
+        assert!(above > Fx::from_int(15), "up on the back: {above:?}");
     }
-    // Flown somewhere, the flock stays on the wing, not a tick behind.
-    let osprey_id = w.state.units.id(osprey);
+    // Walked somewhere, the drones stay on their pads, not a tick behind.
+    let acu_id = w.state.units.id(acu);
     w.tick(&[mc_sim::PlayerCommand {
         player: 0,
         command: mc_sim::Command::Move {
-            units: vec![osprey_id],
+            units: vec![acu_id],
             target: FxVec2::from_ints(1300, 900),
             queue: false,
         },
@@ -302,36 +298,30 @@ fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
             assert!(
                 (now.0 - then.0).abs() < Fx::ratio(1, 10)
                     && (now.1 - then.1).abs() < Fx::ratio(1, 10),
-                "a docked drone slipped off its pylon: {now:?} (was {then:?})"
+                "a docked drone slipped off its pad: {now:?} (was {then:?})"
             );
         }
     }
-    // A wreck turns up: they go out and come home, and no step on or off the pylon is a jump.
+    // A wreck turns up: they go out and come home, and no step on or off the pad is a jump.
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
-    let at = w.state.units.pos[osprey] + FxVec2::from_ints(120, 0);
+    let at = w.state.units.pos[acu] + FxVec2::from_ints(120, 0);
     w.state
         .wrecks
         .spawn(tank, at, Fx::from_int(20), Angle::ZERO, Fx::from_int(40), 0)
         .unwrap();
     let mut went_out = false;
-    let (mut reclaimed, mut busy) = (false, true);
-    // Where each drone is from the Osprey, which may still be flying.
+    let mut reclaimed = false;
+    // Where each drone is from the commander, which may still be walking.
     let rel = |w: &World, r: usize| {
-        (w.state.units.pos[r] - w.state.units.pos[osprey])
-            .extend(w.state.units.z[r] - w.state.units.z[osprey])
+        (w.state.units.pos[r] - w.state.units.pos[acu])
+            .extend(w.state.units.z[r] - w.state.units.z[acu])
     };
     let mut last: Vec<_> = drones.iter().map(|&r| rel(&w, r)).collect();
     for _ in 0..1500 {
         w.tick(&[]).unwrap();
-        // A drone reclaiming keeps the Osprey off the idle Reclaimers card.
-        use mc_sim::tables::flag::{RECLAIMING, WORKING};
-        if drones
+        reclaimed |= drones
             .iter()
-            .any(|&r| w.state.units.has_flag(r, RECLAIMING))
-        {
-            reclaimed = true;
-            busy &= w.state.units.has_flag(osprey, WORKING);
-        }
+            .any(|&r| w.state.units.has_flag(r, mc_sim::tables::flag::RECLAIMING));
         for (k, &r) in drones.iter().enumerate() {
             let now = rel(&w, r);
             went_out |= now.xy().length() > Fx::from_int(30);
@@ -339,27 +329,18 @@ fn osprey_drones_glide_on_and_off_their_pylons_and_ride_the_wing() {
                 let step = (now - last[k]).length();
                 assert!(
                     step < Fx::from_int(5),
-                    "a drone jumped {step:?} m on or off its pylon"
+                    "a drone jumped {step:?} m on or off its pad"
                 );
             }
             last[k] = now;
         }
     }
     assert!(went_out, "the drones went out to the wreck");
-    assert!(
-        reclaimed && busy,
-        "the Osprey is working while its drones reclaim"
-    );
-    assert!(
-        !w.state
-            .units
-            .has_flag(osprey, mc_sim::tables::flag::WORKING),
-        "the wreck gone, it is idle again"
-    );
+    assert!(reclaimed, "the drones reclaimed the wreck");
     for (now, then) in offsets(&w).iter().zip(&docked) {
         assert!(
             (now.0 - then.0).abs() < Fx::ratio(1, 10) && (now.1 - then.1).abs() < Fx::ratio(1, 10),
-            "home on its pylon: {now:?} (was {then:?})"
+            "home on its pad: {now:?} (was {then:?})"
         );
     }
 }

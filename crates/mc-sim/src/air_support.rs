@@ -76,30 +76,8 @@ impl World {
                 self.fly_strike_drones(parent, children)?;
                 continue;
             }
-            let carrier = self.bp(parent).drone_carrier();
-            // A carrier's drones work the wreck it is told to; a port's only salvage round it.
-            let task = self
-                .state
-                .orders
-                .front(&self.state.units, parent)
-                .filter(|o| {
-                    carrier && matches!(o.kind, OrderKind::Reclaim | OrderKind::ReclaimUnit)
-                })
-                .map(|o| (o.kind, o.target));
-            let recalling = if carrier {
-                task.is_none() && !self.carrier_has_work(parent)
-            } else {
-                !self.carrier_has_work(parent)
-            };
-            if carrier && !recalling {
-                // Its drones are its tools: while they have work it is busy, not idle
-                // (the HUD's idle Reclaimers card).
-                self.state.units.flags[parent] |= flag::WORKING;
-            }
-            let need = self.bp(parent).motion.map(|m| m.deploy_ticks).unwrap_or(0);
-            // A carrier lets its drones go once it has settled into a hover; a port
-            // has nothing to wait for.
-            let open = need == 0 || self.state.units.deploy[parent] >= need;
+            // A port's drones salvage round it on their own; home when there is nothing.
+            let recalling = !self.port_has_work(parent);
             let center = self.state.units.pos[parent];
             let reach = self.bp(parent).drone_radius;
             let owner = self.state.units.owner[parent];
@@ -113,13 +91,11 @@ impl World {
                 let dock = self.drone_socket(parent, slot);
                 let pos = self.state.units.pos[row];
                 let state = self.state.units.deploy[row];
-                // A drone left outside its carrier's reach (the carrier flew on while it
-                // worked) is called home; back inside, it picks up work again. A drone
-                // sent to an ordered wreck goes however far that is.
-                let astray = task.is_none()
-                    && state == dock::FLYING
-                    && pos.distance(center) > reach + self.work_range(row);
-                if recalling || !open || astray {
+                // A drone left outside its port's reach (the commander walked on while it
+                // worked) is called home; back inside, it picks up work again.
+                let astray =
+                    state == dock::FLYING && pos.distance(center) > reach + self.work_range(row);
+                if recalling || astray {
                     match state {
                         dock::FLYING if pos.distance(dock.xy) <= DOCK_CAPTURE => {
                             // Close enough to line up under (or over) its socket: the
@@ -134,19 +110,9 @@ impl World {
                     self.state.units.flags[row] &= !flag::AIR_RUN;
                     continue;
                 }
-                if let Some((kind, target)) = task {
-                    if !self.carrier_target_live(row, kind, target) {
-                        self.finish_order(parent);
-                        continue;
-                    }
-                }
                 if state != dock::FLYING {
                     // Work to do: let go of the socket and drop clear before flying.
                     self.state.units.deploy[row] = dock::RELEASING;
-                    continue;
-                }
-                if let Some((kind, target)) = task {
-                    self.drone_reclaim_ordered(row, kind, target)?;
                     continue;
                 }
                 let target = self
@@ -190,28 +156,7 @@ impl World {
         Ok(())
     }
 
-    pub(crate) fn carrier_reclaim_ordered(&self, row: usize) -> bool {
-        self.state
-            .orders
-            .front(&self.state.units, row)
-            .is_some_and(|o| matches!(o.kind, OrderKind::Reclaim | OrderKind::ReclaimUnit))
-    }
-
-    pub(crate) fn carrier_drones_home(&self, row: usize) -> bool {
-        let parent = self.state.units.id(row);
-        let center = self.state.units.pos[row];
-        self.state
-            .units
-            .slots
-            .iter()
-            .filter(|&r| self.state.units.drone_parent[r] == parent)
-            .all(|r| {
-                self.state.units.deploy[r] == 0
-                    && self.state.units.pos[r].distance(center) <= Fx::from_int(14)
-            })
-    }
-
-    pub(crate) fn carrier_has_work(&self, row: usize) -> bool {
+    fn port_has_work(&self, row: usize) -> bool {
         !self.no_room_for_salvage(self.state.units.owner[row])
             && self
                 .state
@@ -221,16 +166,16 @@ impl World {
                 .any(|w| self.drones_may_take(row, w))
     }
 
-    /// Whether the drones of carrier `row` may go for wreck `w` unordered: one it is
-    /// after (`carrier_wants`) within the drones' reach of the carrier.
+    /// Whether the drones of port `row` may go for wreck `w`: one it is
+    /// after (`port_wants`) within the drones' reach of the carrier.
     fn drones_may_take(&self, row: usize, w: usize) -> bool {
         self.state.wrecks.pos[w].distance(self.state.units.pos[row]) <= self.bp(row).drone_radius
-            && self.carrier_wants(row, w)
+            && self.port_wants(row, w)
     }
 
-    /// Whether carrier `row` is after wreck `w` at all: one with mass left that its side
+    /// Whether port `row` is after wreck `w` at all: one with mass left that its side
     /// knows of (`wreck_known`, as the player is shown it) and, while it is clearing a circle (`ReclaimArea`), inside that circle.
-    pub(crate) fn carrier_wants(&self, row: usize, w: usize) -> bool {
+    fn port_wants(&self, row: usize, w: usize) -> bool {
         let units = &self.state.units;
         let wrecks = &self.state.wrecks;
         let at = wrecks.pos[w];
@@ -398,80 +343,6 @@ impl World {
                 units.speed[row] = Fx::ZERO;
             }
         }
-    }
-
-    fn carrier_target_live(&self, drone: usize, kind: OrderKind, target: Handle) -> bool {
-        match kind {
-            OrderKind::Reclaim => self
-                .state
-                .wrecks
-                .slots
-                .resolve(target)
-                .is_some_and(|w| self.state.wrecks.mass[w] > Fx::ZERO),
-            OrderKind::ReclaimUnit => self
-                .state
-                .units
-                .row(target)
-                .is_some_and(|t| self.can_reclaim_unit(drone, t)),
-            _ => false,
-        }
-    }
-
-    /// Every drone on the carrier works the ordered wreck or unit, however far it is.
-    fn drone_reclaim_ordered(
-        &mut self,
-        row: usize,
-        kind: OrderKind,
-        target: Handle,
-    ) -> Result<(), SimError> {
-        let (at, radius) = match kind {
-            OrderKind::Reclaim => {
-                let Some(w) = self.state.wrecks.slots.resolve(target) else {
-                    return Ok(());
-                };
-                let bp = self.blueprints.unit(self.state.wrecks.blueprint[w]);
-                (self.state.wrecks.pos[w], bp.radius)
-            }
-            OrderKind::ReclaimUnit => {
-                let Some(t) = self.state.units.row(target) else {
-                    return Ok(());
-                };
-                (self.state.units.pos[t], self.bp(t).radius)
-            }
-            _ => return Ok(()),
-        };
-        let pos = self.state.units.pos[row];
-        let radial = pos - at;
-        let hold = self.work_range(row) * Fx::ratio(3, 5);
-        let bearing = if radial.length() > Fx::ONE {
-            radial.angle()
-        } else {
-            self.state.units.heading[row]
-        };
-        let goal =
-            self.clamp_to_map(at + FxVec2::from_angle(bearing + Angle::from_degrees(45)) * hold);
-        self.ensure_moving(row, goal, goal)?;
-        self.state.units.air_aim[row] = at;
-        self.state.units.flags[row] |= flag::AIR_RUN;
-        if pos.distance(at) > self.work_range(row) + radius {
-            return Ok(());
-        }
-        match kind {
-            OrderKind::Reclaim => {
-                if let Some(w) = self.state.wrecks.slots.resolve(target) {
-                    let power = self.tool_power(row);
-                    self.drain_wreck(row, w, power, 0);
-                }
-            }
-            OrderKind::ReclaimUnit => {
-                if let Some(t) = self.state.units.row(target) {
-                    let power = self.tool_power(row);
-                    self.drain_unit(row, t, power, 0);
-                }
-            }
-            _ => {}
-        }
-        Ok(())
     }
 
     /// Each live patch deals its weapon's `burn_dps` to enemies standing in it.

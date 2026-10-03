@@ -266,31 +266,6 @@
         mesh: "seabed_defense", icon: Defense,
         sounds: (death: "blast_large"),
     ),
-    // ---- The rest of the roster (docs/NAVY.md) --------------------------------
-    // The navy runs one tier ahead of the land: a tech 2 warship is priced and powered
-    // like tech 3 land. Guns on houses of their own are `mount: true`, one house per
-    // weapon; a house astern is `rear: true` and rests turned round.
-    (
-        key: "aster_t1_salvage_boat",
-        name: "Trawler",
-        role: "Salvage Boat", title: "Salvage Boat",
-        tech: 1,
-        categories: ["Naval"],
-        health: 600,
-        cost: (mass: 80, energy: 480, time: 300),
-        radius: 8, height: 6,
-        vision: 400,
-        motion: (layer: Naval, size: 1, speed: 46, accel: 22, turn: 70),
-        // A reclaim head on a house of its own atop the lattice tower amidships: it works
-        // what it passes while it sails, and looks straight down at wrecks on the seabed
-        // between the hulls or up at a cliff-top shore.
-        reclaimer: (power: 6, range: 600, charge: 0.8, mobile: true, heads: [
-            (pivot: (-1.0, 0, 6.1), emitter: (0.705, 0, 6.1), turn: 90, pitch: (-85, 80)),
-        ]),
-        weapons: [],
-        mesh: "reclaim_boat", icon: SalvageBoat,
-        sounds: (death: "blast_small", moving: "boat_engine"),
-    ),
     (
         key: "aster_t2_destroyer",
         name: "Marlin",

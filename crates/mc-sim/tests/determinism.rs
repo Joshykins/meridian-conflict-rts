@@ -91,8 +91,8 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     ("aster_t1_rotor_gunship", 4, 1200, 300),
     ("aster_t1_interceptor", 4, 1400, 250),
     ("aster_t2_torpedo_bomber", 2, 1800, 200),
-    // Salvage carriers: three reclaim heads each, clearing wrecks on the attack-move.
-    ("aster_t2_land_reclaimer", 2, 850, 450),
+    // Reclaimers: hover salvagers, clearing wrecks on the attack-move.
+    ("aster_t2_mobile_reclaimer", 2, 850, 450),
     // The Regency battle scorpion: a held beam that runs up (`spin`), claws whose charges
     // curve onto their marks (`curve.rs`).
     ("regency_t4_scorpion", 1, 1100, 700),
@@ -141,7 +141,7 @@ fn setup(w: &mut World) {
         for &(key, count, x, y) in ARMY {
             add(key, count, x, y);
         }
-        // Room for what the salvage carriers bring in.
+        // Room for what the Reclaimers bring in.
         add("aster_mass_storage", 1, 500, 150);
         match player {
             0 => {
@@ -270,14 +270,14 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }])
             .collect(),
-        // The north's salvage carriers clear the wreck field in a circle (`reclaim_area.rs`).
+        // The north's Reclaimers clear the wreck field in a circle (`reclaim_area.rs`).
         2 => {
-            let carrier = w.blueprints.id_of("aster_t2_land_reclaimer").unwrap();
+            let reclaimer = w.blueprints.id_of("aster_t2_mobile_reclaimer").unwrap();
             let u = &w.state.units;
             let units = u
                 .slots
                 .iter()
-                .filter(|&r| u.owner[r] == 1 && u.blueprint[r] == carrier)
+                .filter(|&r| u.owner[r] == 1 && u.blueprint[r] == reclaimer)
                 .map(|r| u.id(r))
                 .collect();
             vec![PlayerCommand {
@@ -429,7 +429,7 @@ fn reference() -> Vec<u64> {
     assert!(split > 0, "no cluster shot split in the match");
     // The drone carriers' Wicks went off on their marks.
     assert!(burst > 0, "no Wick burst in the match");
-    // The salvage carriers' heads were at work in it, on the move.
+    // The Reclaimers' heads were at work in it, on the move.
     let reclaimed = w.state.players.iter().map(|p| p.reclaimed_mass).max();
     assert!(
         reclaimed.is_some_and(|m| m > mc_core::Fx::ZERO),

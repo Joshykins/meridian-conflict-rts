@@ -1,12 +1,12 @@
 //! Salvage: the AI puts reclaim towers by the wreck fields near home, fields a salvage
-//! unit or two early (a Magpie, a Gleaner), and sends idle ones to the richest field
+//! unit or two early (the Reclaimer), and sends idle ones to the richest field
 //! that is safe to work. Reclaim is cheap and quick to pay back, so a field is worth a
 //! tower long before it is worth an army.
 
 use super::{Census, Intel, Job, Place, Planned};
 use crate::World;
 use mc_core::{Fx, FxVec2};
-use mc_data::{cat, BlueprintId};
+use mc_data::BlueprintId;
 
 /// How far from home the AI looks for wrecks to salvage.
 const SALVAGE_RADIUS: i32 = 2600;
@@ -125,7 +125,7 @@ impl World {
     }
 
     /// What an idle factory makes for salvage, if the side wants another salvage unit:
-    /// its cheapest one (a Magpie from the air, a Gleaner from the land).
+    /// its cheapest one (the tech 1 Reclaimer, which every factory makes).
     pub(super) fn salvage_product(
         &self,
         factory: usize,
@@ -151,7 +151,7 @@ impl World {
             .copied()
             .filter(|b| {
                 let bp = self.blueprints.unit(*b);
-                bp.is_salvager() && !bp.has(cat::NAVAL) && !super::escorts::follows_army(bp)
+                bp.is_salvager()
             })
             .min_by_key(|b| (self.blueprints.unit(*b).cost_mass, b.0))
     }

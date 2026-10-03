@@ -71,9 +71,7 @@ fn report(w: &World, minute: u32) {
                 .slots
                 .iter()
                 .filter(|&r| {
-                    mine(r)
-                        && w.bp(r).is_mobile()
-                        && (w.bp(r).reclaimer.is_some_and(|c| c.mobile) || w.bp(r).drone_carrier())
+                    mine(r) && w.bp(r).is_mobile() && w.bp(r).reclaimer.is_some_and(|c| c.mobile)
                 })
                 .count();
             let lying: f32 = s

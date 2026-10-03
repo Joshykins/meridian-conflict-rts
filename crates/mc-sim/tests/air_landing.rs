@@ -1,6 +1,6 @@
 //! Idle aircraft never hover for good: stopped over water or on a taken pad,
-//! they fly to the nearest ground they fit on and set down. Carriers and salvage
-//! aircraft, whose beams work as they hang there, stay up.
+//! they fly to the nearest ground they fit on and set down. Drone carriers, whose
+//! drones dock on them as they hang there, stay up.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -118,9 +118,9 @@ fn a_second_aircraft_on_a_taken_pad_lands_beside_it() {
 }
 
 #[test]
-fn the_reclaim_carrier_still_stays_up_over_the_sea() {
+fn a_drone_carrier_still_stays_up_over_the_sea() {
     let mut w = coast();
-    let c = add(&mut w, "aster_t2_reclaim_carrier", 1400, 900);
+    let c = add(&mut w, "regency_t2_drone_carrier", 1400, 900);
     for _ in 0..600 {
         w.tick(&[]).unwrap();
     }
@@ -128,20 +128,5 @@ fn the_reclaim_carrier_still_stays_up_over_the_sea() {
     assert!(
         w.state.units.pos[c].x > Fx::from_int(1300),
         "carrier went looking for land"
-    );
-}
-
-#[test]
-fn a_salvage_aircraft_stays_up_over_land_where_its_beam_can_work() {
-    let mut w = coast();
-    let m = add(&mut w, "aster_t1_air_reclaimer", 600, 900);
-    for _ in 0..900 {
-        w.tick(&[]).unwrap();
-    }
-    assert!(!landed(&w, m), "the Magpie set down idle");
-    assert!(
-        w.state.units.pos[m].distance(FxVec2::from_ints(600, 900)) < Fx::from_int(40),
-        "it wandered off: {:?}",
-        w.state.units.pos[m]
     );
 }

@@ -3,7 +3,7 @@
 //! slow reclaim head at the top of an armoured tower ([`body`]), and sends what it takes
 //! down the tower to the processing works at its foot ([`works`]).
 //!
-//! The head is the Thresher's Cradle at tower scale with a long, slim barrel ([`turret`]).
+//! The head is the Cradle at tower scale with a long, slim barrel ([`turret`]).
 //! Its rig:
 //! - The head is gun house 0 ([`crate::builder::MeshBuilder::with_house`]): it turns about
 //!   the tower's axis by weapon 0's yaw, and the processor in it pitches about the
@@ -38,7 +38,7 @@ pub(super) const HEIGHT: f32 = 38.0;
 /// The head's pivot height: the yaw axis is the tower's (x = y = 0), and the processor
 /// pitches about a y axis through (0, 0, PIVOT_Z). The blueprint's head pivot.
 pub(crate) const PIVOT_Z: f32 = 34.2;
-/// The head's scale: metres per unit of the Thresher's Cradle, which is authored with
+/// The head's scale: metres per unit of the Cradle, which is authored with
 /// its processor box 1.5 units long.
 const K: f32 = 4.8;
 /// Trunnion to the barrel's mouth, in units of [`K`].

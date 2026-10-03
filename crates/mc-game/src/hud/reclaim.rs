@@ -310,7 +310,7 @@ fn salvage_badges(ui: &mut Ui, s: &Scene, rise: f32) {
         let bp = s.bp(u);
         // The pixel size icons.wgsl `vs_icon` draws the kind at.
         let px = match bp.visual.icon {
-            IconKind::Salvage | IconKind::SalvageBoat | IconKind::SalvageCarrier => 20.0,
+            IconKind::Salvage | IconKind::SalvageCarrier => 20.0,
             IconKind::SalvageDrone => 14.0,
             _ => continue,
         };

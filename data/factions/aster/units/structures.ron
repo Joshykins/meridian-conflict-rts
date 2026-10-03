@@ -10,7 +10,7 @@
         radius: 46, height: 28, footprint: (8, 8), hull: (6.9, 6.9),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa", "aster_t1_land_reclaimer",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
         ]),
         upgrades_to: "aster_t2_land_factory",
         mesh: "factory_land", icon: Factory,
@@ -27,7 +27,7 @@
         radius: 46, height: 34, footprint: (8, 8), hull: (6.9, 6.9),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t2_mobile_shield", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "aster_t1_land_reclaimer", "aster_t2_land_reclaimer",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_mobile_reclaimer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t2_mobile_shield", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
         ]),
         upgrades_to: "aster_t3_land_factory",
         mesh: "factory_land", icon: Factory,
@@ -44,7 +44,7 @@
         radius: 46, height: 42, footprint: (8, 8), hull: (6.9, 6.9),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t2_mobile_shield", "aster_t3_engineer", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa", "aster_t1_land_reclaimer", "aster_t2_land_reclaimer",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t2_engineer", "aster_t2_mobile_reclaimer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t2_mobile_shield", "aster_t3_engineer", "aster_t3_mobile_reclaimer", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper", "aster_t1_mobile_aa", "aster_t2_mobile_aa",
         ]),
         mesh: "factory_land", icon: Factory,
         sounds: (death: "blast_large"),
@@ -60,7 +60,7 @@
         radius: 46, height: 26, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t1_air_reclaimer",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
         ]),
         upgrades_to: "aster_t2_air_factory",
         mesh: "factory_air", icon: Factory,
@@ -77,7 +77,7 @@
         radius: 46, height: 34, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t1_air_reclaimer", "aster_t2_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t2_mobile_reclaimer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
         ]),
         upgrades_to: "aster_t3_air_factory",
         mesh: "factory_air", icon: Factory,
@@ -94,7 +94,7 @@
         radius: 46, height: 42, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "aster_t1_engineer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t3_engineer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t1_air_reclaimer", "aster_t2_reclaim_carrier", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_support", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_interceptor", "aster_t1_bomber", "aster_t2_engineer", "aster_t2_mobile_reclaimer", "aster_t3_engineer", "aster_t3_mobile_reclaimer", "aster_t1_air_scout", "aster_t1_rotor_gunship", "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor", "aster_t3_air_superiority", "aster_t3_support", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
         ]),
         mesh: "factory_air", icon: Factory,
         sounds: (death: "blast_large"),
@@ -112,8 +112,8 @@
         // A one-sided quay on piles, built out on open water: warships and
         // hovering engineers are turned out onto the water from its berth.
         builder: (power: 20, range: 0, builds: [
-            "aster_t1_engineer",
-            "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine", "aster_t1_salvage_boat",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer",
+            "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine",
         ]),
         upgrades_to: "aster_t2_naval_factory",
         mesh: "factory_naval", icon: Factory,
@@ -132,8 +132,8 @@
         // A one-sided quay on piles, built out on open water: warships and
         // hovering engineers are turned out onto the water from its berth.
         builder: (power: 120, range: 0, builds: [
-            "aster_t1_engineer", "aster_t2_engineer",
-            "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine", "aster_t1_salvage_boat",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t2_engineer", "aster_t2_mobile_reclaimer",
+            "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine",
             "aster_t2_destroyer", "aster_t2_aa_cruiser", "aster_t2_missile_ship", "aster_t2_submarine", "aster_t2_shield_boat",
         ]),
         upgrades_to: "aster_t3_naval_factory",
@@ -153,8 +153,8 @@
         // A one-sided quay on piles, built out on open water: warships and
         // hovering engineers are turned out onto the water from its berth.
         builder: (power: 360, range: 0, builds: [
-            "aster_t1_engineer", "aster_t2_engineer", "aster_t3_engineer",
-            "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine", "aster_t1_salvage_boat",
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t2_engineer", "aster_t2_mobile_reclaimer", "aster_t3_engineer", "aster_t3_mobile_reclaimer",
+            "aster_t1_attack_boat", "aster_t1_frigate", "aster_t1_submarine",
             "aster_t2_destroyer", "aster_t2_aa_cruiser", "aster_t2_missile_ship", "aster_t2_submarine", "aster_t2_shield_boat",
             "aster_t3_battleship", "aster_t3_carrier", "aster_t3_submarine", "aster_t3_rail_trimaran",
         ]),

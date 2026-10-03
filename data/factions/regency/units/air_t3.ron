@@ -67,7 +67,7 @@
     ),
     // Spy plane: unarmed, it cruises far above the cloud deck, faster than any fighter, and
     // looks down with a wide eye and radar. The Regency's counterpart to ARC's Argus, which
-    // it replaces in the Skyforge III: no salvage ray, shield or anti-missile lasers; it
+    // it replaces in the Skyforge III: no shield or anti-missile lasers; it
     // sees further, is cheaper and is caught by speed and height, not armour.
     (
         key: "regency_t3_spy_plane",
@@ -90,29 +90,5 @@
         economy: (energy_upkeep: 120),
         // Idle, it circles where it is, as the Argus does, never landing to wait.
         orbit: 600,
-    ),
-    // Heavy scavenger: a long keeled craft on six gravity lift bells that follows the army and
-    // takes whole wrecks apart, the biggest included, with two nanite heads. It pulls 240
-    // mass a second from close in (260 m), six times the Argus's long salvage ray (40), and
-    // works on the move.
-    (
-        key: "regency_t3_scavenger",
-        name: "Scythe",
-        role: "Heavy Scavenger", title: "Heavy Scavenger",
-        tech: 3,
-        categories: ["Air"],
-        health: 5000,
-        cost: (mass: 900, energy: 14000, time: 3600),
-        radius: 12, height: 5.6,
-        vision: 700,
-        motion: (layer: Air, size: 0, speed: 60, accel: 22, turn: 50, altitude: 28, hover: true),
-        reclaimer: (power: 240, range: 260, charge: 1.0, mobile: true, follows_army: true, heads: [
-            (pivot: (8.6, 5.2, 2.9), emitter: (10.6, 5.2, 2.9), turn: 120, pitch: (-80, 20)),
-            (pivot: (8.6, -5.2, 2.9), emitter: (10.6, -5.2, 2.9), turn: 120, pitch: (-80, 20)),
-        ]),
-        weapons: [],
-        mesh: "regency_scythe", icon: SalvageCarrier,
-        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
-        sounds: (death: "blast_large", moving: "aster_hover"),
     ),
 ]

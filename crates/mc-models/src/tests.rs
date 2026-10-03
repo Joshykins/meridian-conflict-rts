@@ -177,7 +177,6 @@ const BLUEPRINTS: &[Blueprint] = &[
     // The rest of the roster (docs/NAVY.md): guns on houses of their own (`rig::HOUSE_*`),
     // no `part::TURRET`, so `hull_unit`. Muzzles are weapon 0's, as authored on the model
     // (a `rear` weapon's muzzles are given to the sim mirrored; here they are as drawn).
-    hull_unit("reclaim_boat", 8.0, 6.0, 1, &[]),
     // The Marlin and the Manta are drawn 1.2 times their authored size.
     hull_unit("destroyer", 26.4, 14.4, 2, &[[23.28, 0.0, 6.24]]),
     hull_unit(
@@ -340,7 +339,7 @@ const BLUEPRINTS: &[Blueprint] = &[
         3,
         &[[12.066, 0.0, 10.435]],
     ),
-    unit("regency_breaker", 4.6, 3.4, 1, &[]),
+    unit("regency_reclaimer", 4.6, 3.4, 1, &[]),
     unit("regency_mattock", 4.2, 3.2, 1, &[[1.13, 0.0, 3.45]]),
     structure("regency_brood", 46.0, 22.0, 1, 8, &[]),
     structure("regency_brood", 46.0, 22.0, 2, 8, &[]),
@@ -394,7 +393,6 @@ const NAVAL_HULLS: &[&str] = &[
     "attack_boat",
     "frigate",
     "submarine",
-    "reclaim_boat",
     "destroyer",
     "aa_cruiser",
     "missile_ship",
@@ -2005,7 +2003,7 @@ fn every_jet_has_exhaust_ports() {
 
 #[test]
 fn vtol_pods_carry_their_nozzles() {
-    for key in ["gunship", "reclaim_carrier", "magpie"] {
+    for key in ["gunship"] {
         let model = build_model(key).unwrap();
         let vtol = model.vtol.expect("VTOL pods");
         // Each pod's nozzle, lying along the hull (the rest pose).
@@ -2062,75 +2060,14 @@ fn vtol_pods_carry_their_nozzles() {
     }
 }
 
-/// The Osprey grips a docked drone's lugs with a jaw over
-/// each, and the drones slung under the wing clear the hull, the nacelles and each other.
+/// A drone riding its port is drawn with the bit the mirror sets.
 #[test]
-fn osprey_pylons_grip_the_drones_lugs_and_the_flock_clears_the_airframe() {
+fn riding_bit_matches_the_mirror() {
     assert_eq!(
         crate::gpu_consts::dock::RIDING,
         mc_sim::mirror::UNIT_RIDING,
         "the riding bit the shader reads is the one the mirror sets"
     );
-    use super::aster::air::osprey::{DOCK_Z, DRONE_HALF_WIDTH, LUG_TOP, LUG_X, PYLONS};
-    for key in ["reclaim_drone"] {
-        let drone = build_model(key).unwrap();
-        let mesh = &drone.lods[0];
-        let wide = mesh
-            .vertices
-            .iter()
-            .map(|v| v.pos[1].abs())
-            .fold(0.0, f32::max);
-        let top = mesh.vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
-        assert!(wide <= DRONE_HALF_WIDTH, "{key}: {wide} m wide a side");
-        assert!(
-            (top - LUG_TOP).abs() < 0.01,
-            "{key}: its lugs are its top, not {top}"
-        );
-        for lx in LUG_X {
-            assert!(
-                mesh.vertices
-                    .iter()
-                    .any(|v| (v.pos[0] - lx).abs() < 0.1 && (v.pos[2] - LUG_TOP).abs() < 0.01),
-                "{key}: no lug at {lx}"
-            );
-        }
-    }
-    // Everything of the airframe below the grip, where a drone hangs.
-    for key in ["reclaim_carrier"] {
-        let model = build_model(key).unwrap();
-        let mesh = &model.lods[0];
-        for p in PYLONS {
-            for side in [1.0, -1.0] {
-                let y = p[1] * side;
-                for lx in LUG_X {
-                    assert!(
-                        mesh.vertices
-                            .iter()
-                            .any(|v| (v.pos[0] - p[0] - lx).abs() < 0.15
-                                && (v.pos[1] - y).abs() < 0.2
-                                && (v.pos[2] - (DOCK_Z + LUG_TOP)).abs() < 0.1),
-                        "{key}: no jaw over the lug at ({}, {y})",
-                        p[0] + lx
-                    );
-                }
-                // The space a docked drone fills is empty of the airframe.
-                let clash = mesh.vertices.iter().find(|v| {
-                    (v.pos[0] - p[0]).abs() < 1.2
-                        && (v.pos[1] - y).abs() < DRONE_HALF_WIDTH
-                        && v.pos[2] < DOCK_Z + LUG_TOP - 0.2
-                });
-                assert!(
-                    clash.is_none(),
-                    "{key}: {clash:?} is where a drone hangs at {y}"
-                );
-            }
-        }
-        assert!(
-            PYLONS[1][1] - PYLONS[0][1] > DRONE_HALF_WIDTH * 2.0
-                && PYLONS[0][1] > DRONE_HALF_WIDTH + 1.0,
-            "drones side by side overlap"
-        );
-    }
 }
 
 #[test]
@@ -2178,7 +2115,6 @@ fn complete_air_roster_models_meet_lod_budgets() {
         "air_scout",
         "rotor_gunship",
         "support_air",
-        "reclaim_carrier",
         "reclaim_drone",
         "gunship",
         "fire_bomber",
@@ -3459,67 +3395,6 @@ fn titan_houses_muzzles_and_rig() {
         .iter()
         .all(|m| m.vertices.iter().all(|v| Vec3::from(v.pos).is_finite())));
     println!("titan sabot: {full}/{mid}/{coarse} triangles");
-}
-
-/// The reclaim boat's head pitches from straight down (the seabed) to steeply up (a
-/// cliff-top shore) and turns all the way round, so nothing that does not pitch with it
-/// may stand in its sweep: the hull and tower anywhere it could turn to, and its own
-/// yoke across the head's width (bar the trunnion axle itself).
-#[test]
-fn reclaim_boat_head_sweep_is_clear() {
-    use super::aster::{
-        RECLAIM_BOAT_PIVOT as PIVOT, RECLAIM_BOAT_REACH as REACH, RECLAIM_BOAT_SWEEP as SWEEP,
-    };
-    let key = "reclaim_boat";
-    let model = build_model(key).unwrap();
-    assert_eq!(model.houses.len(), 1, "{key}: one head");
-    assert_eq!(model.houses[0].weapon, 0, "{key}: head on weapon 0");
-    assert!(
-        (Vec3::from(model.houses[0].pivot) - PIVOT).length() < 1e-3,
-        "{key}: head pivot"
-    );
-    let mesh = &model.lods[0];
-    let house = |v: &super::MeshVertex| v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST;
-    let pitches = |v: &super::MeshVertex| house(v) && v.rig & rig::RECOIL != 0;
-    let radius = |q: Vec3| (q.x - PIVOT.x).hypot(q.z - PIVOT.z);
-    let sweep = mesh
-        .vertices
-        .iter()
-        .filter(|v| pitches(v))
-        .map(|v| radius(Vec3::from(v.pos)))
-        .fold(0.0, f32::max);
-    assert!(
-        sweep <= SWEEP,
-        "{key}: head reaches {sweep} from its trunnion"
-    );
-    assert!(sweep >= REACH, "{key}: head short of its mouth ({sweep})");
-    for v in mesh.vertices.iter().filter(|v| !pitches(v)) {
-        let q = Vec3::from(v.pos);
-        if house(v) {
-            assert!(
-                q.y.abs() > 0.5 || radius(q) < 0.35 || radius(q) > sweep,
-                "{key}: yoke at {q:?} in the head's sweep"
-            );
-        } else {
-            assert!(
-                q.z < PIVOT.z - sweep || (q.x - PIVOT.x).hypot(q.y) > sweep,
-                "{key}: hull at {q:?} in the head's sweep"
-            );
-        }
-    }
-    // The emitter the unit file names sits in the lit intake, at the mouth.
-    let mouth = PIVOT + Vec3::X * REACH;
-    let (lo, hi) = mesh
-        .vertices
-        .iter()
-        .filter(|v| pitches(v) && v.material == material::GLOW_MATERIALS)
-        .map(|v| Vec3::from(v.pos))
-        .filter(|q| q.x > mouth.x - 0.4)
-        .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), q| (lo.min(q), hi.max(q)));
-    assert!(
-        mouth.cmpge(lo - Vec3::splat(0.12)).all() && mouth.cmple(hi + Vec3::splat(0.12)).all(),
-        "{key}: emitter {mouth:?} outside the lit intake {lo:?}..{hi:?}"
-    );
 }
 
 /// The wreck pose word the shader reads is the one the mirror writes.

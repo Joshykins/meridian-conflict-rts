@@ -1,24 +1,20 @@
 //! The Regency's tech 2 aircraft (`data/factions/regency/units/air_t2.ron`): the Voulge
-//! fights from a circle out of reach of short-range anti-air and falls to fighters; the
-//! Winnow takes a wreck field apart with all four of its nanite heads at once.
+//! fights from a circle out of reach of short-range anti-air and falls to fighters.
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
-use mc_sim::reclaim::BEAM_NANITE_RECLAIM;
-use mc_sim::tables::{flag, Controller};
+use mc_sim::tables::Controller;
 use mc_sim::world::MapData;
-use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, RenderFrame, UnitId, World};
+use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, UnitId, World};
 use std::path::Path;
 use std::sync::Arc;
 
 const VOULGE: &str = "regency_t2_strike_drone";
-const WINNOW: &str = "regency_t2_reclaim_carrier";
 /// ARC's tech 2 mobile flak: the short-range anti-air the Voulge stands off from.
 const SQUALL: &str = "aster_t2_mobile_aa";
 const PEREGRINE: &str = "aster_t2_interceptor";
-const TANK: &str = "aster_t1_tank";
 
 fn world() -> World {
     let blueprints = Arc::new(
@@ -158,51 +154,4 @@ fn a_fighter_runs_the_voulge_down() {
         }
     }
     panic!("a Peregrine could not bring down a Voulge in a minute");
-}
-
-#[test]
-fn the_winnow_takes_four_wrecks_apart_at_once() {
-    let mut w = world();
-    w.tick(&[
-        spawn(&w, 0, "regency_storage", 1600, 1600, 0),
-        spawn(&w, 0, WINNOW, 2000, 2000, 0),
-        spawn(&w, 1, TANK, 2060, 2060, flag::PASSIVE),
-        spawn(&w, 1, TANK, 2060, 1940, flag::PASSIVE),
-        spawn(&w, 1, TANK, 1940, 2060, flag::PASSIVE),
-        spawn(&w, 1, TANK, 1940, 1940, flag::PASSIVE),
-    ])
-    .unwrap();
-    let tanks = ids(&w, 1, TANK);
-    assert_eq!(tanks.len(), 4);
-    w.tick(&[PlayerCommand {
-        player: 0,
-        command: Command::DebugDamage {
-            units: tanks,
-            permille: 1000,
-        },
-    }])
-    .unwrap();
-    let mut frame = RenderFrame::default();
-    let mut most = 0;
-    for _ in 0..20 * TICKS_PER_SECOND as usize {
-        w.tick(&[]).unwrap();
-        w.write_render_frame(None, &mut frame);
-        let streams = frame
-            .beams
-            .iter()
-            .filter(|b| b.kind == BEAM_NANITE_RECLAIM)
-            .count();
-        most = most.max(streams);
-        if most == 4 {
-            break;
-        }
-    }
-    assert_eq!(
-        most, 4,
-        "a nanite stream from each head, each on a wreck of its own"
-    );
-    assert!(
-        w.state.players[0].reclaimed_mass > Fx::ZERO,
-        "the Winnow is paid"
-    );
 }

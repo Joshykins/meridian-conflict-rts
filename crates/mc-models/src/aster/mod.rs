@@ -25,8 +25,6 @@ mod missile_defense;
 mod mobile_shield;
 mod naval;
 pub(crate) use naval::{MEGALODON_RAIL, NARWHAL_RAIL};
-#[cfg(test)]
-pub(crate) use naval::{RECLAIM_BOAT_PIVOT, RECLAIM_BOAT_REACH, RECLAIM_BOAT_SWEEP};
 mod parts;
 mod reactor;
 pub(super) mod reclaim_tower;
@@ -68,9 +66,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("bore_tank", 8.2, 4.2, bore_tank::bore_tank),
     ModelDef::new("assault_tank", 19.0, 15.0, assault_tank::assault_tank),
     ModelDef::new("titan", 40.0, 120.0, titan::titan),
-    // Land reclaimers: the Gleaner salvage truck and the Thresher carrier.
-    ModelDef::new("gleaner", 4.6, 3.4, reclaimers::gleaner),
-    ModelDef::new("thresher", 6.2, 4.4, reclaimers::thresher),
+    // The Reclaimer: one hover salvager, drawn bigger per tier.
+    ModelDef::new("reclaimer", 4.6, 3.4, reclaimers::reclaimer),
     ModelDef::new("titan_sabot", 7.5, 6.0, titan::sabot),
     // Air units.
     ModelDef::new("interceptor", 3.6, 1.8, air::interceptor),
@@ -78,7 +75,6 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("air_scout", 3.5, 1.7, air::scout_air),
     ModelDef::new("rotor_gunship", 5.5, 3.2, air::rotor_gunship),
     ModelDef::new("support_air", 9.2, 4.0, air::support),
-    ModelDef::new("reclaim_carrier", 10.0, 4.5, air::carrier),
     ModelDef::new("light_transport", 58.0, 38.0, air::light_transport),
     ModelDef::new("lift_ship", 160.0, 95.0, air::lift_ship),
     ModelDef::new("space_frigate", 150.0, 70.0, air::space_frigate),
@@ -86,7 +82,6 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("sensor_ship", 36.0, 22.0, air::sensor_ship),
     ModelDef::new("rail_corvette", 58.0, 30.0, air::rail_corvette),
     ModelDef::new("reclaim_drone", 1.8, 1.2, air::drone),
-    ModelDef::new("magpie", 3.0, 1.9, air::magpie),
     ModelDef::new("gunship", 7.5, 3.5, air::gunship),
     ModelDef::new("fire_bomber", 13.0, 5.0, air::fortress),
     ModelDef::new("torpedo_bomber", 7.2, 3.0, air::torpedo_bomber),
@@ -120,7 +115,6 @@ pub(super) const MODELS: &[ModelDef] = &[
         naval::torpedo_defense,
     ),
     ModelDef::new("seabed_defense", 16.0, 9.0, naval::seabed_defense),
-    ModelDef::new("reclaim_boat", 8.0, 6.0, naval::reclaim_boat),
     ModelDef::new("destroyer", 22.0, 12.0, naval::destroyer),
     ModelDef::new("aa_cruiser", 22.0, 14.0, naval::aa_cruiser),
     ModelDef::new("missile_ship", 20.0, 10.0, naval::missile_ship),

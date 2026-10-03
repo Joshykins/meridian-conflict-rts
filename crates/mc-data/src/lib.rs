@@ -439,12 +439,8 @@ pub struct Reclaimer {
     /// Ticks a head must stay on a target before its beam comes on. Zero: it fires as it aims.
     pub charge_ticks: u16,
     /// It keeps clearing the wrecks within reach while it moves or patrols, without
-    /// stopping for them (a salvage vehicle, boat or aircraft). A tower never moves.
+    /// stopping for them (the Reclaimer). A tower never moves.
     pub mobile: bool,
-    /// It goes with the army: guarding a unit of it, it takes apart the wrecks that fall
-    /// round it as the fight moves, and the AI keeps it on its main army instead of
-    /// sending it to wreck fields (a heavy scavenger, the Scythe).
-    pub follows_army: bool,
     heads: [ReclaimHead; MAX_RECLAIM_HEADS],
     head_count: u8,
 }
@@ -482,7 +478,6 @@ impl Reclaimer {
             range,
             charge_ticks,
             mobile,
-            follows_army: false,
             heads: all,
             head_count: heads.len() as u8,
         }
@@ -937,9 +932,9 @@ impl UnitBlueprint {
         }
     }
 
-    /// This unit reclaims, or it commands drones that do.
+    /// This unit reclaims (a commander's drone port works beside its own tools).
     pub fn sends_reclaimers(&self) -> bool {
-        self.reclaims().is_some() || (self.drone.is_some() && !self.launches_drones())
+        self.reclaims().is_some()
     }
 
     /// Its drones are its shells (`Weapon::launches`, the Quiver's Wicks): it fires them,
@@ -955,14 +950,7 @@ impl UnitBlueprint {
         self.is_mobile()
             && self.weapons.is_empty()
             && self.radar == Fx::ZERO
-            && (self.reclaimer.is_some_and(|r| r.mobile) || self.drone_carrier())
-    }
-
-    /// A carrier: its drones are how it reclaims, so they work the wrecks it is told to
-    /// and come home when it moves off. A unit that reclaims with its own tools (a
-    /// commander's drone port) leaves its drones to salvage round it on their own.
-    pub fn drone_carrier(&self) -> bool {
-        self.drone.is_some() && self.reclaims().is_none() && !self.launches_drones()
+            && self.reclaimer.is_some_and(|r| r.mobile)
     }
 
     pub fn max_weapon_range(&self) -> Fx {
@@ -1522,8 +1510,7 @@ impl Blueprints {
                     h.write_u64(
                         r.charge_ticks as u64
                             | (r.mobile as u64) << 16
-                            | (r.heads().len() as u64) << 24
-                            | (r.follows_army as u64) << 32,
+                            | (r.heads().len() as u64) << 24,
                     );
                     for head in r.heads() {
                         h.write_u64(

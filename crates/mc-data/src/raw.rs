@@ -113,10 +113,10 @@ pub enum IconKind {
     /// A reclaim structure: the Extractor's disc (salvage feeds mass as a mine does)
     /// inside a ring for its reach. Every salvage icon carries that disc.
     Salvage = 29,
-    /// A salvage boat: the disc riding a hull.
-    SalvageBoat = 30,
+    // retired: 30 (the salvage boat).
     // 31 is the shader's own unidentified radar contact (icons.wgsl), never a kind.
-    /// A salvage aircraft from above: the disc with swept wings and a tail.
+    /// A salvage carrier (the commander's drone port) from above: the disc with swept
+    /// wings and a tail.
     SalvageCarrier = 32,
     /// A carrier's salvage drone: the disc alone, drawn small.
     SalvageDrone = 33,
@@ -734,10 +734,6 @@ pub(crate) struct RawReclaimer {
     /// Keeps reclaiming what it passes while it moves (`Reclaimer::mobile`).
     #[serde(default)]
     pub mobile: bool,
-    /// Goes with the army and takes apart what falls round it (`Reclaimer::follows_army`).
-    /// Needs `mobile`.
-    #[serde(default)]
-    pub follows_army: bool,
     pub heads: Vec<RawReclaimHead>,
 }
 
@@ -1337,20 +1333,13 @@ fn compile_reclaimer(key: &str, r: &RawReclaimer, weapons: usize) -> Result<Recl
             pitch_max: Angle(steps(up).round().min(16383.0) as u16),
         });
     }
-    if r.follows_army && !r.mobile {
-        return Err(DataError::Invalid(format!(
-            "{key}: a reclaimer that follows the army works on the move (`mobile`)"
-        )));
-    }
-    let mut reclaimer = Reclaimer::new(
+    Ok(Reclaimer::new(
         fx(r.power),
         fx(r.range),
         ticks(r.charge).clamp(0, 600) as u16,
         r.mobile,
         &out,
-    );
-    reclaimer.follows_army = r.follows_army;
-    Ok(reclaimer)
+    ))
 }
 
 fn mask(names: &[String], ctx: &str) -> Result<u32, DataError> {

@@ -15,8 +15,6 @@ pub(crate) mod maul;
 pub(crate) mod partisan;
 pub(crate) mod petard;
 pub(crate) mod quarrel;
-pub(crate) mod scythe;
-pub(crate) mod sickle;
 
 use glam::{Affine3A, Vec3};
 

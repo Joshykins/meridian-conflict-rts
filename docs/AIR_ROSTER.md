@@ -7,8 +7,6 @@ All units are available through the existing tiered factories and engineer/comma
 | 1 | Swift | Fast, fragile scout with radar; circles on guard |
 | 1 | Shrike | Fighter |
 | 1 | Wasp | Low-altitude helicopter, light machine gun and unguided rockets |
-| 1 | Magpie | Salvage aircraft: swept wing, tilting engine pods, one reclaim beam that works wrecks within 450 m as it flies |
-| 2 | Osprey | Reclaim carrier with four salvage drones |
 | 2 | Kestrel | Four-engine tilt-jet gunship with a chin autocannon and volley rocket pods |
 | 2 | Hellkite | Four-engine flying fortress; 24 scattered incendiaries and three independent AA guns |
 | 2 | Peregrine | Fast guided-missile interceptor |
@@ -17,13 +15,13 @@ All units are available through the existing tiered factories and engineer/comma
 | 3 | Raptor | Fast, highly maneuverable air-superiority fighter |
 | 3 | Eclipse | Fast strategic bomber; one AEB bomb that bursts as the electric bore's blast |
 | 3 | Thunderhead | Armored, shielded assault aircraft; forward rotary cannon and forward AA |
-| 3 | Argus | High-flying radar, sonar, missile interception and a 1,700 m salvage ray (a Scavenger III's reach, a fifth of its pull); guards a point or friendly unit |
+| 3 | Argus | High-flying radar, sonar and missile interception; guards a point or friendly unit |
 
 Aircraft circle on the **Guard** order (Ctrl+G; see [The guard order](#the-guard-order)): press on a point or a friendly unit and drag out the area. They fly halfway between its centre and its edge, and follow the ally if one was picked. Shift queues a guard; Stop cancels it. If the ally is destroyed, the aircraft keep circling its last position. Move and attack commands replace a guard normally. (The separate Orbit order and its **O** key were merged into Guard on 2026-09-26.)
 
-Osprey (tech 2, from the tech 2 air factory) builds up to four salvage drones, one at a time, each on its own pylon under the wing: a drone costs 3 mass and 30 energy over 3 seconds, paid like any build, in the tier the side's materials priority (`Focus::mines`) puts it, so Materials First fields a starved side's drones first and Materials Last leaves them waiting. The drone going up shows its construction on the pylon. Drones recover visible wreckage within **800 m of the carrier**, including while it flies (it never waits for them); a drone left outside that reach is called home, and drones fly faster (100 m/s) than the Osprey (65 m/s) so they catch up. They return when there is no work, and wait when mass storage is full. Losses are replaced. Drones depend on their parent carrier and are removed when it is destroyed. The selection shows the recovery radius.
+There are no salvage aircraft. Every air factory builds the hover Reclaimer up to its own tier (see the README's reclaim paragraph and `docs/BALANCE.md`).
 
-Argus (tech 3) cruises at 450 m, above every other aircraft, at 165 m/s. It has 6,000 m radar, 900 m sonar, 2,000 m sight and a hull shield, and burns hostile missiles with two lasers within 650 m while powered (a sphere: from 450 m up it still covers about 470 m of ground). A salvage ray under its belly pulls 40 mass a second from wrecks up to 1,700 m across the ground from it (a Scavenger III tower's reach, a fifth of its 200 a second) while it flies (`reclaimer.mobile`). A light rocket fails in one tick; heavier missiles take a longer burst, then the laser waits 0.3 seconds before the next. It cannot intercept shells or bombs. Guided AA missiles retain their own target handle; vertical launch stays upright for 0.6 seconds before curving into pursuit. Losing a target leaves a finite-lived unguided missile.
+Argus (tech 3) cruises at 450 m, above every other aircraft, at 165 m/s. It has 6,000 m radar, 900 m sonar, 2,000 m sight and a hull shield, and burns hostile missiles with two lasers within 650 m while powered (a sphere: from 450 m up it still covers about 470 m of ground). A light rocket fails in one tick; heavier missiles take a longer burst, then the laser waits 0.3 seconds before the next. It cannot intercept shells or bombs. Guided AA missiles retain their own target handle; vertical launch stays upright for 0.6 seconds before curving into pursuit. Losing a target leaves a finite-lived unguided missile.
 
 Incendiary bombs spread across consecutive releases and inflict six seconds of burning damage, with persistent flame and smoke. Flak and missile splash use altitude and weapon target masks, so an airburst cannot damage ground units underneath it. Dome and hull shields intercept impacts.
 
@@ -62,24 +60,19 @@ thrust-vectoring engines. Wasp retains its tail, rotor and chin gun through its
 lower LODs and keeps full detail farther away. Hellkite gains nacelle armor,
 wing panels and a sensor spine.
 
-Osprey remains airborne even without orders. Salvage drones cannot be selected
-or directly ordered, prefer separate wrecks, and keep circling while reclaiming.
-The flock hangs from four pylons under the wing, two a side, each drone's lugs in
-its pylon's clamp jaws (`drone_sockets` in `air.ron`, matched by the model's
-`PYLONS`). Each drone keeps its own pylon (`drone_socket` in the unit table).
-Letting go, a drone drops 3 m clear (`drone_approach`) and flies; coming home it
-glides in under its pylon, slowing all the way, and rises onto the clamp
-(`air_support::seat_drones`). Docked drones are placed after movement, so they
-keep pace with the flying Osprey, and the shader draws them in the Osprey's own
-drawn frame (`mirror::UNIT_RIDING`, `entity.wgsl` `riding_frame`), so they ride
-its heave, sway and lean. The commander's drone port lands its drones on its
-back pads the same way, from above.
+The commander's salvage drones cannot be selected or directly ordered, prefer
+separate wrecks, and keep circling while reclaiming. Each keeps its own socket on
+the drone port (`drone_sockets` in the commander's unit file, `drone_socket` in
+the unit table). Letting go, a drone drops 3 m clear (`drone_approach`) and flies;
+coming home it glides in over its pad, slowing all the way, and settles onto it
+from above (`air_support::seat_drones`). Docked drones are placed after movement,
+so they keep pace with the commander, and the shader draws them in the carrier's
+own drawn frame (`mirror::UNIT_RIDING`, `entity.wgsl` `riding_frame`), so they
+ride its heave, sway and lean.
 
-## Kestrel and Osprey (2026-09-23 rework)
+## Kestrel
 
-Both had been built from the shared fuselage helpers with plain white barrels for
-engines and no engine effects at all when hovering. Each now has a file of its own
-(`models/aster/air/kestrel.rs`, `osprey.rs`, the Salvage Drone in the latter):
+The Kestrel has a model file of its own (`models/aster/air/kestrel.rs`):
 
 - **Kestrel** (reworked 2026-09-28): a two-nacelle tilt-jet. A chisel nose over
   the chin gun steps out into armoured cheeks, a hump sits under a high straight
@@ -90,28 +83,18 @@ engines and no engine effects at all when hovering. Each now has a file of its o
   autocannon (`pivot (4.75, 0, 0.56)`, muzzle `(7.3, 0, 0.56)`); a six-tube
   launcher under each wing ripples a 12-rocket volley off in left-right pairs
   (muzzles round `(1.45, ±2.7, 1.7)`).
-- **Osprey** (reworked 2026-09-29): a twin-boom tilt-jet. A deep pod fuselage
-  with a glazed nose and a chin window, a long straight shoulder wing with a
-  blue-burning jet nacelle at each tip, twin booms back to a tailplane and two
-  fins, an amber-slotted salvage hopper on the back. Four drone pylons hang under
-  the wing, each with a clamp beam, a jaw over each lug and an amber lamp.
-- **Salvage Drone** (reworked 2026-09-29): a grapple, a flat faceted wedge with a
-  lift fan through its middle (blades on `part::ROTOR`), two claw arms down to
-  the reclaim emitter, two lugs on posts for the pylon's jaws, two steering jets
-  behind.
 - **Engine effects**: a vector-thrust jet leaves a flame cone and a white-hot
   bloom at each nozzle that reach past the pod's rim (a jet pointing straight
   down is otherwise hidden under its pod from the camera), and a thin haze when
   under way; a lift fan throws a wide blue field into its wash. Every hovering
   aircraft raises a downwash on the ground under it (`renderer::air_downwash`):
-  a ring of dust driven outward, spray over water, strong at the Osprey's 22 m
+  a ring of dust driven outward, spray over water, strong close to the ground
   and only a stir at the Kestrel's 65 m. The pods' nozzles carry lamps after dark
   (`lights` in `air.ron`). Hovering aircraft heave gently on their lift
-  (`entity.wgsl`). The Osprey and its drones no longer call `set_hover()`, which
-  had been raising a hovercraft's ground dust around them in mid-air.
+  (`entity.wgsl`).
 - **Range**: `--scenario salvage` leaves six medium-tank wrecks 48 m east of the
-  pad for any reclaimer (builder, tower or carrier), so the flock can be watched
-  going out: `--range --unit aster_t2_reclaim_carrier --scenario salvage --ticks
+  pad for any reclaimer (builder, tower, Reclaimer or the commander's drones):
+  `--range --unit aster_t2_mobile_reclaimer --scenario salvage --ticks
   140 --follow 12 --alpha 0.5 --camera 0,0,110,200`. Hover shots need `--follow`
   of ten or so ticks for the short-lived engine puffs to settle;
   `MERIDIAN_HOUR=23` shows the nozzle lamps.
@@ -119,7 +102,7 @@ Idle aircraft reserve landing clearance against other descending or parked
 aircraft. An idle aircraft stopped where it cannot set down (water, cliffs,
 structures, a pad another aircraft took) flies to the nearest clear ground
 within 1.5 km, searched in widening rings nose side first, and lands there;
-only the Osprey, its drones and the Magpie (salvage aircraft, whose beams keep working) stay up. Persistent velocity smooths VTOL movement and terrain-following altitude;
+only drone carriers, their drones and capital ships (which land only when told to) stay up. Persistent velocity smooths VTOL movement and terrain-following altitude;
 that velocity is serialized and hashed.
 
 Bombing return distances include turn radius, fall time and carpet duration.
@@ -432,11 +415,9 @@ rotors, no jet plumes. Each is anchored on ARC's unit of the same job.
 | Quarrel (`regency_t1_fighter`) | Fighter: Twin Plasmeric Repeater, aircraft only | Shrike | About the same damage a second in heavier bolts, a little less reach; crescent wing |
 | Petard (`regency_t1_bomber`) | Light bomber: a stick of three Plasmeric Bombs | Petrel | 270 a pass in three lighter bombs strung along the run; a cleaver of a flying wing |
 | Coffer (`regency_t2_transport`, tech 2) | Light transport, eight slots, raised on a 7x5 lot by the Artificer II and III and the Exarch's Engineering Suites | Courier | No warp drive, a little quicker; an open-sterned box hold between two sponsons on six lift bells |
-| Sickle (`regency_t1_air_reclaimer`) | Salvage drone: one nanite head under it, works wrecks as it flies | Magpie | Takes apart faster (power 5 to 4) at a shorter reach (380 m to 450 m); a pod with two hooked blades on three lift bells |
 
-The Skyforge (all three tiers) makes the Quarrel, Petard, Flechette and Sickle; there is no
-tech 1 gunship. The Sickle's stream is drawn as the Regency's nanite strands, as the
-Breaker's is. The Commander AI fields them by role like any other unit
+The Skyforge (all three tiers) makes the Quarrel, Petard and Flechette, and the Regency
+Reclaimer up to its tier; there is no tech 1 gunship. The Commander AI fields them by role like any other unit
 (`ai::commander::profile` test `the_regency_builds_its_own_air_force`). Sounds are still
 ARC stand-ins (`aster_jet`, `aster_hover`).
 
@@ -456,7 +437,7 @@ plasma crackling under them.
   mark dies first takes the nearest enemy within 160 m or comes home unspent. The bays are
   the magazine: with none home the launcher waits, and the racked Wicks on the hull show
   it. Spent Wicks are built again in their bays, one at a time (2 mass, 20 energy, 1.5 s
-  each), as the Osprey's drones are (`air_support.rs`). Wicks are aircraft: flak and
+  each), as the commander's salvage drones are (`air_support.rs`). Wicks are aircraft: flak and
   fighters shoot them down on the way in, and they die with their carrier.
 - **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged craft on six bells
   that does not strafe. It `hangs`: it flies in to two fifths of its reach from its mark
@@ -471,9 +452,8 @@ determinism match.
 ## The Regency's tech 3 air (2026-10-02)
 
 Data `data/factions/regency/units/air_t3.ron`, models `crates/mc-models/src/regency/air/`
-(`partisan.rs`, `maul.rs`, `augur.rs`, `scythe.rs`, jet pieces in `blade_jet.rs`), tests
-`crates/mc-sim/tests/regency_air_t3.rs` and `crates/mc-sim/src/ai/escorts_tests.rs`. All
-four are built by the Skyforge III.
+(`partisan.rs`, `maul.rs`, `augur.rs`, jet pieces in `blade_jet.rs`), tests
+`crates/mc-sim/tests/regency_air_t3.rs`. All three are built by the Skyforge III.
 
 - **Partisan** (`regency_t3_air_superiority`): a long blade jet, one Pinch-fusion Rifle
   down its keel with the muzzle under the nose blade. At par with the Raptor: 660 a
@@ -491,22 +471,12 @@ four are built by the Skyforge III.
     sites, heavy flak and seeker batteries can.
   - The Commander gives it the scout and sensor roles from its data (unarmed, radar), so
     it joins scout operations.
-- **Scythe** (`regency_t3_scavenger`): a heavy salvage craft on six lift bells, two nanite
-  heads on plated arms (`reclaimer` power 240, range 260, no limit on what it takes apart:
-  an experimental's wreck goes in seconds).
-  - **It follows the army.** Guarding a friendly unit (Ctrl+G on it), any salvager whose
-    reclaimer works on the move goes to the wrecks anywhere in the guard ring, not only
-    those under its heads, then picks up the guard again (`area_work.rs`); an aircraft
-    does this between circles.
-  - `reclaimer: (..., follows_army: true)` marks it for the AI (`ai/escorts.rs`): it is
-    not a field salvager; each ground operation of 2000 mass or more (two at most) gets
-    one, put on guard round the operation's lead unit.
 
 ## The Regency's air force: tech 2 (2026-10-02)
 
 Data `data/factions/regency/units/air_t2.ron`, models `crates/mc-models/src/regency/air_t2/`
 (one file per airframe on the shared jet kit `jet.rs`), tests
-`crates/mc-sim/tests/regency_air_t2.rs`. Skyforge II and III build all four; the Regency have
+`crates/mc-sim/tests/regency_air_t2.rs`. Skyforge II and III build all three; the Regency have
 no fire bomber.
 
 | Unit (key) | Job | ARC counterpart | How it differs |
@@ -514,7 +484,6 @@ no fire bomber.
 | Pilum (`regency_t2_interceptor`) | Interceptor: Gravitic Seeker Battery, aircraft only | Peregrine | At par; a crescent wing falling into spikes, two seeker cradles under the chin |
 | Voulge (`regency_t2_strike_drone`) | Long-range strike drone: Gravitic Seeker Pod, 900 m, ground and ships | none | Slow (70 m/s) and thin-skinned (650); circles its mark out of reach of short-range anti-air; fighters are its answer. A sawtooth flying wing, four seeker cages on its back |
 | Trident (`regency_t2_torpedo_bomber`) | Torpedo bomber with sonar: Gravitic Torpedo Cradles | Gannet | At par; twin booms, a cradle under each |
-| Winnow (`regency_t2_reclaim_carrier`) | Reclaim carrier on lift bells: four nanite heads, each on a wreck of its own | Osprey | No drones to build or lose: the Osprey's 20 power in four heads, 500 m reach to the drones' 800. A manta wing |
 
 **Standing off.** A jet with `motion.stand_off: true` (only the Voulge) never makes a run over
 what it fights: attacking a unit or the ground (`air_fight`, `run_attack_ground`), it flies a
@@ -523,10 +492,6 @@ the circle (`mc-sim/src/stand_off.rs`). Its seekers launch upward and turn onto 
 fires from anywhere on the circle. At 900 m reach that keeps it out of every ARC mobile gun
 (360-640 m). Tests: `cargo test -p mc-sim --test sim -- regency_air_t2::`; it is in the
 determinism match.
-
-**The Winnow's cloud** is the reclaim heads' own work (`reclaim_heads.rs`): left alone, each head
-takes the wreck nearest its aim, so four strands of nanites run to four wrecks at once
-(beams.wgsl `BEAM_NANITE_RECLAIM`). The Commander's salvage plan fields it like any salvager.
 
 **Contrails.** A jet trails from its mesh's nozzles in `aircraft_exhausts`, or else from the
 exhausts its model records (`MeshBuilder::add_exhaust`); every Regency jet uses the latter

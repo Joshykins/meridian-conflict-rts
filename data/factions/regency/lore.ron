@@ -74,10 +74,6 @@
             "Plasmeric AA Repeater": "Plasma bolts out of each tube in turn, bursting among aircraft in a spray of burning plasma.",
         },
     ),
-    "regency_t1_land_reclaimer": (
-        lore: "A salvage craft on a gravity lift; its nanite head unpicks wrecks as it glides past and carries the matter home down the strands.",
-        weapons: {},
-    ),
     "regency_t3_air_superiority": (
         lore: "A long blade of a jet built round one rifle laid down its keel; it hunts other aircraft and seldom has to fire twice.",
         weapons: {
@@ -92,10 +88,6 @@
     ),
     "regency_t3_spy_plane": (
         lore: "An unarmed glider on long straight wings that flies far above the weather, too high for most guns and too fast for the fighters that try; it looks down and the empire sees.",
-        weapons: {},
-    ),
-    "regency_t3_scavenger": (
-        lore: "A heavy salvage craft on six lift bells that keeps with the army, its two nanite heads unpicking even the greatest wrecks while the fight moves on ahead of it.",
         weapons: {},
     ),
     "regency_t1_artillery": (
@@ -198,10 +190,6 @@
     ),
     "regency_t2_transport": (
         lore: "A plated hold slung between lift bells; it sets down flat, takes a company aboard at the stern and lifts it across anything.",
-        weapons: {},
-    ),
-    "regency_t1_air_reclaimer": (
-        lore: "A small craft that hangs over a wreck field on its lift bells, unpicking what lies under it with a nanite head as it drifts on.",
         weapons: {},
     ),
     "regency_t1_attack_boat": (
@@ -380,7 +368,13 @@
             "Gravitic Torpedo Cradles": "Each torpedo is a charge of plasma in a gravity cage; it falls in, steers onto the hull below and boils the sea round it.",
         },
     ),
-    "regency_t2_reclaim_carrier": (
-        lore: "A broad craft on gravity lift that passes over a wreck field and leaves it bare, its nanite heads taking four wrecks apart at once.",
+    "regency_t1_mobile_reclaimer": (
+        lore: "A lift hull with one nanite head. Its strands unpick whatever lies in reach as it drifts across the field.",
+    ),
+    "regency_t2_mobile_reclaimer": (
+        lore: "Grown larger, its strands thicker and its reach longer.",
+    ),
+    "regency_t3_mobile_reclaimer": (
+        lore: "The largest of the line: a whole wreck comes apart into its strands while it passes.",
     ),
 }

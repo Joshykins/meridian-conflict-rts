@@ -50,9 +50,8 @@
             SensorShip: "select_intel",
             // A titan: its own answer (titan_alerts.ron), the size of the thing in it.
             Titan: "select_titan",
-            // Salvage answers like the engineers and boats it works beside.
+            // Salvage answers like the engineers it works beside.
             Salvage: "select_engineer",
-            SalvageBoat: "select_ship",
             SalvageCarrier: "select_engineer",
             SalvageDrone: "select_engineer",
         },

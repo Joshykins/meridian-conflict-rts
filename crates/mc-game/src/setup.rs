@@ -657,7 +657,7 @@ pub fn opening_commands(
                     ("aster_t2_shield_boat", 350, -20),
                     ("aster_t3_carrier", 540, 120),
                     ("aster_t3_rail_trimaran", 600, -150),
-                    ("aster_t1_salvage_boat", 200, -170),
+                    ("aster_t1_mobile_reclaimer", 200, -170),
                 ] {
                     out.push(PlayerCommand {
                         player: owner,

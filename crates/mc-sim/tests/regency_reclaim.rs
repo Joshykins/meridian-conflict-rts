@@ -12,8 +12,8 @@ use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, RenderFrame, Unit
 use std::path::Path;
 use std::sync::Arc;
 
-const BREAKER: &str = "regency_t1_land_reclaimer";
-const GLEANER: &str = "aster_t1_land_reclaimer";
+const REGENCY_RECLAIMER: &str = "regency_t1_mobile_reclaimer";
+const ARC_RECLAIMER: &str = "aster_t1_mobile_reclaimer";
 const TANK: &str = "aster_t1_tank";
 
 fn world() -> World {
@@ -86,8 +86,8 @@ fn a_regency_salvager_takes_a_wreck_apart_with_a_nanite_stream() {
     w.tick(&[
         spawn(&w, 0, "regency_storage", 300, 512, 0),
         spawn(&w, 1, "aster_mass_storage", 300, 1500, 0),
-        spawn(&w, 0, BREAKER, 500, 512, 0),
-        spawn(&w, 1, GLEANER, 500, 1500, 0),
+        spawn(&w, 0, REGENCY_RECLAIMER, 500, 512, 0),
+        spawn(&w, 1, ARC_RECLAIMER, 500, 1500, 0),
         spawn(&w, 2, TANK, 560, 512, flag::PASSIVE),
         spawn(&w, 2, TANK, 560, 1500, flag::PASSIVE),
     ])
@@ -117,5 +117,42 @@ fn a_regency_salvager_takes_a_wreck_apart_with_a_nanite_stream() {
     assert!(
         w.state.players[0].reclaimed_mass > Fx::ZERO,
         "the Breaker is paid"
+    );
+}
+
+#[test]
+fn a_breaker_iii_takes_an_experimentals_wreck_apart_in_seconds() {
+    let mut w = world();
+    let bp = w.blueprints.id_of("regency_t3_mobile_reclaimer").unwrap();
+    let reclaimer = w
+        .spawn_unit(bp, 0, FxVec2::from_ints(1000, 1000), Angle::ZERO, true)
+        .unwrap();
+    let power = w.bp(reclaimer).reclaimer.unwrap().power;
+    let titan = w.blueprints.id_of("aster_t4_assault_tank").unwrap();
+    let big = w
+        .state
+        .wrecks
+        .spawn(
+            titan,
+            FxVec2::from_ints(1050, 1000),
+            w.blueprints.unit(titan).radius,
+            Angle::ZERO,
+            Fx::from_int(2400),
+            0,
+        )
+        .unwrap();
+    // Its pull for the whole mass, and a few seconds to get there and charge.
+    let seconds = (Fx::from_int(2400) / power).ceil_int() + 8;
+    for _ in 0..seconds * mc_core::TICKS_PER_SECOND as i32 {
+        w.tick(&[]).unwrap();
+        // Mass stores are counted afresh each tick: keep room for what is reclaimed.
+        w.state.players[0].mass_capacity = Fx::from_int(1_000_000);
+        if !w.state.wrecks.slots.is_alive(big) {
+            break;
+        }
+    }
+    assert!(
+        !w.state.wrecks.slots.is_alive(big),
+        "the titan's wreck is gone within {seconds} s"
     );
 }

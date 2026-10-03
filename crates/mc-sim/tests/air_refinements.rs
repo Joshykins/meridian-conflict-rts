@@ -96,10 +96,9 @@ fn gunships_orbit_and_keep_the_target_in_front() {
     }
 }
 #[test]
-fn carrier_stays_airborne_and_drones_divide_and_orbit_wrecks() {
+fn port_drones_divide_and_orbit_wrecks_and_ignore_orders() {
     let mut w = world();
-    add(&mut w, "aster_commander", 0, 150, 150);
-    let c = add(&mut w, "aster_t2_reclaim_carrier", 0, 900, 900);
+    let c = super::drone_port::ported_commander(&mut w, 900, 900);
     w.state.players[0].mass = Fx::ZERO;
     w.state.players[0].energy = Fx::ZERO;
     w.state.players[0].mass_capacity = Fx::from_int(100000);
@@ -107,10 +106,12 @@ fn carrier_stays_airborne_and_drones_divide_and_orbit_wrecks() {
     let tank = w.blueprints.id_of("aster_t1_tank").unwrap();
     let mut drones = Vec::new();
     let mut wrecks = Vec::new();
-    for i in 0..4 {
-        let x = 810 + i * 60;
+    // One finished drone on each of the port's two pads.
+    for i in 0..2 {
+        let x = 810 + i * 180;
         let d = add(&mut w, "aster_reclaim_drone", 0, x, 1030);
         w.state.units.drone_parent[d] = parent;
+        w.state.units.drone_socket[d] = i as u8;
         drones.push(d);
         wrecks.push(
             w.state
@@ -136,13 +137,12 @@ fn carrier_stays_airborne_and_drones_divide_and_orbit_wrecks() {
     for &d in &drones {
         assert_eq!(w.state.units.order_head[d], mc_sim::tables::NO_ORDER);
     }
-    let mut distance = [Fx::ZERO; 4];
+    let mut distance = [Fx::ZERO; 2];
     for _ in 0..500 {
         w.tick(&[]).unwrap();
         for (i, &d) in drones.iter().enumerate() {
             distance[i] += w.state.units.pos[d].distance(w.state.units.prev_pos[d]);
         }
-        assert!(w.state.units.z[c] > Fx::from_int(30), "carrier landed");
     }
     for (i, &d) in drones.iter().enumerate() {
         assert!(distance[i] > Fx::from_int(80), "drone stationary");
@@ -176,7 +176,8 @@ fn overlapping_aircraft_reserve_only_one_landing_site() {
 #[test]
 fn cruise_vertical_velocity_changes_gradually_and_is_hashed() {
     let mut w = world();
-    let a = add(&mut w, "aster_t2_reclaim_carrier", 0, 900, 900);
+    // A drone carrier: an idle hover aircraft that never sets down.
+    let a = add(&mut w, "regency_t2_drone_carrier", 0, 900, 900);
     w.state.units.z[a] = Fx::from_int(180);
     let mut previous = Fx::ZERO;
     for _ in 0..100 {
@@ -441,7 +442,8 @@ fn fighters_dive_and_climb_to_their_targets_and_fire_below_cruise() {
     ] {
         let mut w = world();
         let a = add(&mut w, key, 0, 780, 900);
-        let t = add(&mut w, "aster_t2_reclaim_carrier", 1, 900, 900);
+        // A drone carrier stays up while idle, at gunship height.
+        let t = add(&mut w, "regency_t2_drone_carrier", 1, 900, 900);
         w.state.units.flags[t] |= flag::PASSIVE | flag::INVULNERABLE;
         let motion = w
             .blueprints

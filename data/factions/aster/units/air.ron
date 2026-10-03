@@ -81,7 +81,7 @@
  sounds: (death: "blast_small", moving: "aster_rotor"), 
 ),
 (
- key: "aster_t3_support", name: "Argus", role: "Radar / Salvage / Anti-Missile Support", tech: 3, categories: ["Air", "Intel"],
+ key: "aster_t3_support", name: "Argus", role: "Radar / Anti-Missile Support", tech: 3, categories: ["Air", "Intel"],
  health: 2400, cost: (mass: 1200, energy: 36000, time: 6000),
  radius: 9.2, height: 4.0, vision: 2000,
  motion: (layer: Air, size: 0, speed: 165, accel: 70, turn: 64, altitude: 450, hover: false),
@@ -91,59 +91,15 @@
  anti_missile: 650, anti_missile_lasers: 2,
  // It orbits: its guard is an Orbit on the whole ring, and idle it circles where it is.
  orbit: 400,
- // Radar, sonar, the lasers and its own small field draw energy; the salvage ray takes none.
+ // Radar, sonar, the lasers and its own small field draw energy.
  economy: (energy_upkeep: 200),
  shield: (kind: Hull, health: 3000, regen: 45),
  // The laser heads on the wingtip pods (`models/aster/air/argus.rs`).
  anti_missile_mounts: [(-2.53, 9.03, 3.77), (-2.53, -9.03, 3.77)],
- // A salvage ray in a ball turret under the belly that reaches far out and down from its
- // cruise height, clearing wrecks as it flies. It reaches as far as a Scavenger III tower
- // (`aster_t3_reclaimer`) but pulls a fifth as hard (40 against 200): it sweeps a field the
- // tower would strip.
- reclaimer: (power: 40, range: 1700, charge: 1.0, mobile: true, heads: [
-  (pivot: (0.345, 0, 0.805), emitter: (1.495, 0, 0.805), turn: 240, pitch: (-90, 10)),
- ]),
 ),
 (
- key: "aster_t2_reclaim_carrier", name: "Osprey", role: "Reclaim Carrier", title: "Reclaim Carrier", tech: 2, categories: ["Air"],
- health: 1000, cost: (mass: 200, energy: 3800, time: 1100),
- radius: 10, height: 4.5, vision: 480,
- motion: (layer: Air, size: 0, speed: 65, accel: 24, turn: 65, altitude: 22, hover: true, deploy: 0.6),
- weapons: [], mesh: "reclaim_carrier", icon: SalvageCarrier,
- // After dark: the blue mouths of the wingtip nacelles, and the amber lamps on the
- // four drone pylons (the model's `pylon`).
- lights: [
-  (kind: Point, at: (0.3, 9.15, 1.4), color: (0.45, 0.7, 1.0), intensity: 90, range: 20),
-  (kind: Point, at: (0.3, -9.15, 1.4), color: (0.45, 0.7, 1.0), intensity: 90, range: 20),
-  (kind: Point, at: (1.02, 3.6, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
-  (kind: Point, at: (1.02, -3.6, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
-  (kind: Point, at: (1.02, 6.4, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
-  (kind: Point, at: (1.02, -6.4, 1.83), color: (1.0, 0.72, 0.12), intensity: 30, range: 10),
- ],
- sounds: (death: "blast_small", moving: "aster_hover"), drone: "aster_reclaim_drone", drone_radius: 800,
- // Slung under the wing, two a side, each from a pylon's clamp (the model's `PYLONS`).
- // Home, a drone lines up 3 m under its pylon and rises onto it; letting go, it drops 3 m.
- drone_sockets: [(0.4, 3.6, 0.25), (0.4, -3.6, 0.25), (0.4, 6.4, 0.25), (0.4, -6.4, 0.25)], drone_approach: -3,
-),
-(
- // A small winged tilt-engine drone with one reclaim beam: the Gleaner of the air. It hovers low and works the
- // wrecks under and round it as it flies, without stopping; quicker than the truck,
- // shorter in reach and thinner-skinned.
- key: "aster_t1_air_reclaimer", name: "Magpie", role: "Salvage Drone", title: "Salvage Drone", tech: 1, categories: ["Air"],
- health: 200, cost: (mass: 55, energy: 650, time: 300),
- radius: 3.0, height: 1.9, vision: 420,
- motion: (layer: Air, size: 0, speed: 80, accel: 34, turn: 160, altitude: 30, hover: true),
- weapons: [], mesh: "magpie", icon: SalvageDrone,
- sounds: (death: "blast_small", moving: "aster_hover"),
- // The Cradle head hung under the belly (the Magpie model's `PIVOT`, `HEAD`): it turns
- // full circle and looks from a little above level to straight down.
- reclaimer: (power: 4, range: 450, charge: 0.8, mobile: true, heads: [
-  (pivot: (0.7, 0, 0.35), emitter: (1.5525, 0, 0.35), turn: 240, pitch: (-90, 15)),
- ]),
-),
-(
- key: "aster_reclaim_drone", name: "Salvage Drone", role: "Carrier Reclaim Drone", tech: 1, categories: ["Air"],
- // Cheap: built on its carrier's pylon (or port's pad) under the side's materials
+ key: "aster_reclaim_drone", name: "Salvage Drone", role: "Commander Reclaim Drone", tech: 1, categories: ["Air"],
+ // Cheap: built on the commander's drone port pad under the side's materials
  // priority, like any other build.
  health: 150, cost: (mass: 3, energy: 30, time: 30),
  radius: 1.8, height: 1.2, vision: 360,

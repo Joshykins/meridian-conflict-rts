@@ -1,9 +1,10 @@
-//! Gleaner: the tech 1 land reclaimer, a salvage hovercraft riding on two cushion pods
+//! The Reclaimer (every tier, drawn bigger at 2 and 3): a salvage hovercraft riding on two cushion pods
 //! down its sides, working land and water alike, with a reclaim head (weapon 0) on a low A-frame over its tail. The head turns
 //! full circle and pitches steeply down or up while the craft drives on; the haul drops
 //! down a chute into the hoppers behind the cab.
 //!
-//! Authored at blueprint scale (radius 4.6, height 3.4): model metres are unit metres.
+//! Authored at the tech 1 blueprint's scale (radius 4.6, height 3.4): model metres are unit
+//! metres, and the higher tiers' head numbers are these times their scale.
 
 use glam::Vec3;
 
@@ -18,7 +19,7 @@ const HEAD: f32 = 1.05;
 /// The deck: the top of the hull.
 const DECK: f32 = 1.75;
 
-pub(in crate::aster) fn gleaner(b: &mut MeshBuilder, _tech: u8) {
+pub(in crate::aster) fn reclaimer(b: &mut MeshBuilder, _tech: u8) {
     b.set_hover();
     if b.coarse() {
         coarse(b, (-3.8, 3.9, 2.35, 1.2), DECK, &[(PIVOT, DECK)]);
@@ -58,7 +59,7 @@ pub(in crate::aster) fn gleaner(b: &mut MeshBuilder, _tech: u8) {
         v3(-0.95, 0.0, deck.z + 0.62),
         0.36,
     );
-    reclaim_head(b, 0, p, apex.z + 0.15, HEAD, Head::Lance);
+    reclaim_head(b, 0, p, apex.z + 0.15, HEAD);
     if b.fine() {
         b.mirror_y(|b| {
             b.paint(ACCENT);

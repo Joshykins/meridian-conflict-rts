@@ -41,7 +41,7 @@ fn roles_come_from_what_a_unit_can_do() {
 
 /// The Regency's tech 2 aircraft take the same places in the plans as ARC's: the Pilum
 /// hunts aircraft, the Trident ships under and on the water, the Voulge strikes the
-/// ground, the Winnow salvages, and Skyforge II builds each of them.
+/// ground, and Skyforge II builds each of them, and the Breaker II that salvages.
 #[test]
 fn regency_tech_2_aircraft_take_arc_places() {
     let b = roster();
@@ -62,15 +62,15 @@ fn regency_tech_2_aircraft_take_arc_places() {
         assert!(has(arc, r), "{arc}");
         assert!(has(regency, r), "{regency}");
     }
-    let winnow = b.unit(b.id_of("regency_t2_reclaim_carrier").unwrap());
-    assert!(winnow.is_salvager(), "the Winnow salvages");
+    let reclaimer = b.unit(b.id_of("regency_t2_mobile_reclaimer").unwrap());
+    assert!(reclaimer.is_salvager(), "the Breaker II salvages");
     let skyforge = b.unit(b.id_of("regency_t2_air_factory").unwrap());
     let builds = &skyforge.builder.as_ref().unwrap().builds;
     for key in [
         "regency_t2_interceptor",
         "regency_t2_strike_drone",
         "regency_t2_torpedo_bomber",
-        "regency_t2_reclaim_carrier",
+        "regency_t2_mobile_reclaimer",
     ] {
         assert!(
             builds.contains(&b.id_of(key).unwrap()),
@@ -124,7 +124,7 @@ fn every_armed_unit_of_every_race_has_a_role() {
 }
 
 /// A Commander playing the Regency fields its own air force: its Skyforge makes a
-/// fighter for the air guard, a bomber for strikes, an air scout and a salvage drone, and
+/// fighter for the air guard, a bomber for strikes, an air scout and a Breaker, and
 /// its Exarch raises a transport for landings, all of them the Regency's own.
 #[test]
 fn the_regency_builds_its_own_air_force() {
@@ -158,8 +158,8 @@ fn the_regency_builds_its_own_air_force() {
         assert!(regency_air(&|p| p.has(role::SCOUT)), "{factory}: scout");
         assert!(
             made.iter()
-                .any(|&id| b.unit(id).key == "regency_t1_air_reclaimer"),
-            "{factory}: salvage drone"
+                .any(|&id| b.unit(id).key == "regency_t1_mobile_reclaimer"),
+            "{factory}: Breaker"
         );
         assert!(
             !made

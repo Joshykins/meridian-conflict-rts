@@ -100,7 +100,8 @@ unit spotting for it. Killing the spotters blinds it.
 ## The wreck economy
 
 Ships sink and lie on the seabed. Any reclaimer takes a wreck within its reach however deep it
-lies, engineers included; the **Trawler** (salvage boat) is the one that can sail out to it.
+lies, engineers included; the **Reclaimer**, a hover salvager every naval yard builds,
+can go out over the shallows to it.
 Tier 3 wrecks keep 90%: a sunk Leviathan is nearly 4,000 mass on the seabed. Controlling the
 sea after a battle pays for the battle.
 
@@ -111,7 +112,6 @@ sea after a battle pays for the battle.
 | Skiff | 1 | Attack boat | Rotary gun. |
 | Pike | 1 | Frigate | Deck gun, AA mount, radar. |
 | Barracuda | 1 | Attack submarine | Torpedoes, sonar. |
-| Trawler | 1 | Salvage boat | A mobile reclaim head, 600 m reach; works what it passes while it sails. |
 | Marlin | 2 | Destroyer | A bolt rifle (the Paladin's gun a size down) that lobs a little over terrain, 1500 m (a small battleship); torpedo tubes, sonar, interceptor tubes, light AA. |
 | Manta | 2 | Air-defence cruiser | A 16-cell vertical missile array fired as one ripple to 1,850 m (past any flak gun, short of the Skyguard), spread over the fliers in range; radar, two missile-interception lasers screening 600 m around it, one light gun. |
 | Swordfish | 2 | Rocket ship | Thirty-two unguided rockets per salvo, lobbed from fixed cells. No other weapon. |
@@ -223,7 +223,7 @@ cargo test -p mc-models --lib tests::
 (`naval scene: fleets either side of X,Y`; Twin Shoals: 7109,8663), both sides funded so
 shields, sonar and lasers run; `naval-still` holds fire. Player 0's fleet lies to the west:
 the Leviathan 420 m out on the line, the Atoll at (-540, -120), the Kraken at (-380, +90),
-the Swordfish at (-340, -80), the Trawler at (-200, +170). The Leviathan's first salvo lands
+the Swordfish at (-340, -80). The Leviathan's first salvo lands
 at tick 36 (`--ticks 36 --follow 8 --alpha 0.5 --camera 6689,8663,170,140`).
 
 Software previews of every hull: `MODEL_DUMP_DIR=DIR cargo test -p mc-models --lib -- --ignored dump_models`.

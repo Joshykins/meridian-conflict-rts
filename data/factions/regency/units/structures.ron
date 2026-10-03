@@ -33,7 +33,7 @@
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "regency_t1_engineer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t1_land_reclaimer", "regency_t1_mobile_aa",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t1_mobile_aa",
         ]),
         upgrades_to: "regency_t2_land_factory",
         mesh: "regency_brood", icon: Factory,
@@ -52,7 +52,7 @@
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t1_land_reclaimer", "regency_t2_tank", "regency_t2_bombard", "regency_t1_mobile_aa", "regency_t2_mobile_aa",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t2_tank", "regency_t2_bombard", "regency_t1_mobile_aa", "regency_t2_mobile_aa",
         ]),
         upgrades_to: "regency_t3_land_factory",
         mesh: "regency_brood", icon: Factory,
@@ -71,7 +71,7 @@
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t1_land_reclaimer", "regency_t2_tank", "regency_t2_bombard", "regency_t3_strider", "regency_t3_wake_tank", "regency_t3_artillery", "regency_t1_mobile_aa", "regency_t2_mobile_aa", "regency_t3_mobile_aa",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t3_engineer", "regency_t3_mobile_reclaimer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t2_tank", "regency_t2_bombard", "regency_t3_strider", "regency_t3_wake_tank", "regency_t3_artillery", "regency_t1_mobile_aa", "regency_t2_mobile_aa", "regency_t3_mobile_aa",
         ]),
         mesh: "regency_brood", icon: Factory,
         sounds: (death: "blast_large"),
@@ -87,7 +87,7 @@
         radius: 46, height: 30, footprint: (8, 8),
         vision: 200,
         builder: (power: 20, range: 0, builds: [
-            "regency_t1_engineer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t1_air_reclaimer",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout",
         ]),
         upgrades_to: "regency_t2_air_factory",
         mesh: "regency_hatchery", icon: Factory,
@@ -105,9 +105,9 @@
         cost: (mass: 3100, energy: 24000, time: 3900),
         radius: 46, height: 30, footprint: (8, 8),
         vision: 200,
-        // The Regency have no fire bomber; their reclaim carrier is the Winnow.
+        // The Regency have no fire bomber.
         builder: (power: 120, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t1_air_reclaimer", "regency_t2_drone_carrier", "regency_t2_interceptor", "regency_t2_strike_drone", "regency_t2_torpedo_bomber", "regency_t2_reclaim_carrier",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t2_drone_carrier", "regency_t2_interceptor", "regency_t2_strike_drone", "regency_t2_torpedo_bomber",
         ]),
         upgrades_to: "regency_t3_air_factory",
         mesh: "regency_hatchery", icon: Factory,
@@ -126,7 +126,7 @@
         radius: 46, height: 38, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t1_air_reclaimer", "regency_t2_drone_carrier", "regency_t2_interceptor", "regency_t2_strike_drone", "regency_t2_torpedo_bomber", "regency_t2_reclaim_carrier", "regency_t3_air_superiority", "regency_t3_spy_plane", "regency_t3_strategic_bomber", "regency_t3_scavenger", "regency_t3_assault_aircraft",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t3_engineer", "regency_t3_mobile_reclaimer", "regency_t1_fighter", "regency_t1_bomber", "regency_t1_air_scout", "regency_t2_drone_carrier", "regency_t2_interceptor", "regency_t2_strike_drone", "regency_t2_torpedo_bomber", "regency_t3_air_superiority", "regency_t3_spy_plane", "regency_t3_strategic_bomber", "regency_t3_assault_aircraft",
         ]),
         mesh: "regency_hatchery", icon: Factory,
         sounds: (death: "blast_large"),
@@ -141,9 +141,8 @@
         cost: (mass: 270, energy: 2100, time: 330),
         radius: 46, height: 20, footprint: (8, 8),
         vision: 200, water_build: true,
-        // No salvage boat: the Regency reclaim nothing.
         builder: (power: 20, range: 0, builds: [
-            "regency_t1_engineer", "regency_t1_attack_boat", "regency_t1_submarine", "regency_t1_frigate",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t1_attack_boat", "regency_t1_submarine", "regency_t1_frigate",
         ]),
         upgrades_to: "regency_t2_naval_factory",
         mesh: "regency_tidebrood", icon: Factory,
@@ -160,7 +159,7 @@
         radius: 46, height: 24, footprint: (8, 8),
         vision: 200, water_build: true,
         builder: (power: 120, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t1_attack_boat", "regency_t1_submarine", "regency_t1_frigate", "regency_t2_destroyer", "regency_t2_cruiser",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t1_attack_boat", "regency_t1_submarine", "regency_t1_frigate", "regency_t2_destroyer", "regency_t2_cruiser",
         ]),
         upgrades_to: "regency_t3_naval_factory",
         mesh: "regency_tidebrood", icon: Factory,
@@ -177,7 +176,7 @@
         radius: 46, height: 32, footprint: (8, 8),
         vision: 200, water_build: true,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "regency_t2_engineer", "regency_t3_engineer",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t3_engineer", "regency_t3_mobile_reclaimer",
             "regency_t1_attack_boat", "regency_t1_submarine", "regency_t1_frigate",
             "regency_t2_destroyer", "regency_t2_cruiser",
             "regency_t3_battleship", "regency_t3_carrier", "regency_t3_submarine",

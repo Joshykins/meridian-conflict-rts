@@ -152,4 +152,74 @@
         lights: [(kind: Point, at: (-0.4, 0, 0.4), color: (1.0, 0.14, 0.06), intensity: 90, range: 13, night_only: false)],
         sounds: (moving: "aster_hover"),
     ),
+    // The Reclaimer: the Artificer's partner, a hover hull on gravity lift with one nanite
+    // head on a turning house over its stern that takes apart what it passes without
+    // stopping. Regency reclaim is nanite work: the head shoots the faction's strands at the
+    // wreck and the matter rides home down them (beams.wgsl `BEAM_NANITE_RECLAIM`). Against
+    // ARC's Reclaimer its nanites pull harder at a shorter reach. Every factory makes it, and
+    // it builds its next tier onto itself. One mesh (`regency_reclaimer`) drawn bigger per
+    // tier, 7/6 and 4/3, so the head's pivot and lens are the tech 1 numbers times that.
+    // Each lift bell casts red plasma under it (the model's `lifts`), lighting the ground.
+    (
+        key: "regency_t1_mobile_reclaimer",
+        name: "Breaker",
+        role: "Reclaimer", title: "Reclaimer",
+        tech: 1,
+        categories: ["Land"],
+        health: 300,
+        cost: (mass: 60, energy: 360, time: 240),
+        radius: 4.6, height: 3.4,
+        vision: 400,
+        motion: (layer: Hover, size: 0, speed: 31, accel: 28, turn: 110),
+        reclaimer: (power: 6, range: 450, charge: 0.8, mobile: true, heads: [
+            (pivot: (-1.5, 0, 2.9), emitter: (0.75, 0, 2.9), turn: 90, pitch: (-70, 80)),
+        ]),
+        upgrades_to: "regency_t2_mobile_reclaimer",
+        weapons: [],
+        mesh: "regency_reclaimer", icon: Salvage,
+        lights: [(kind: Point, at: (-0.4, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 50, range: 10, night_only: false)],
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast_small", moving: "aster_hover"),
+    ),
+    (
+        key: "regency_t2_mobile_reclaimer",
+        name: "Breaker II",
+        role: "Field Reclaimer", title: "Reclaimer",
+        tech: 2,
+        categories: ["Land"],
+        health: 950,
+        cost: (mass: 240, energy: 1440, time: 1000),
+        radius: 5.367, height: 3.967,
+        vision: 550,
+        motion: (layer: Hover, size: 0, speed: 30, accel: 28, turn: 110),
+        reclaimer: (power: 24, range: 650, charge: 0.8, mobile: true, heads: [
+            (pivot: (-1.75, 0, 3.383), emitter: (0.875, 0, 3.383), turn: 90, pitch: (-70, 80)),
+        ]),
+        upgrades_to: "regency_t3_mobile_reclaimer",
+        weapons: [],
+        mesh: "regency_reclaimer", icon: Salvage,
+        lights: [(kind: Point, at: (-0.467, 0, 0.35), color: (1.0, 0.14, 0.06), intensity: 70, range: 12, night_only: false)],
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast_small", moving: "aster_hover"),
+    ),
+    (
+        key: "regency_t3_mobile_reclaimer",
+        name: "Breaker III",
+        role: "Heavy Reclaimer", title: "Reclaimer",
+        tech: 3,
+        categories: ["Land"],
+        health: 2300,
+        cost: (mass: 840, energy: 6000, time: 3200),
+        radius: 6.133, height: 4.533,
+        vision: 700,
+        motion: (layer: Hover, size: 1, speed: 29, accel: 28, turn: 110),
+        reclaimer: (power: 84, range: 900, charge: 0.8, mobile: true, heads: [
+            (pivot: (-2, 0, 3.867), emitter: (1, 0, 3.867), turn: 90, pitch: (-70, 80)),
+        ]),
+        weapons: [],
+        mesh: "regency_reclaimer", icon: Salvage,
+        lights: [(kind: Point, at: (-0.533, 0, 0.4), color: (1.0, 0.14, 0.06), intensity: 100, range: 14, night_only: false)],
+        // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
+        sounds: (death: "blast_small", moving: "aster_hover"),
+    ),
 ]

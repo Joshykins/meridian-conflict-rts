@@ -106,29 +106,4 @@
         lights: [(kind: Point, at: (0, 0, 0.5), color: (1.0, 0.14, 0.06), intensity: 260, range: 46, night_only: false)],
         sounds: (death: "blast", moving: "aster_hover"),
     ),
-    // The salvage drone: a small craft on lift bells that works wrecks from the air as it
-    // flies, with a nanite head hung under it that turns full circle and looks straight
-    // down. Regency reclaim is nanite work, drawn as the faction's strands. Anchored on the
-    // Magpie; bent as the Breaker is from the Gleaner: its nanites take apart a quarter
-    // faster (power 5 to 4) at a shorter reach (380 to 450), a little quicker, a little
-    // thinner. Model: `regency_sickle`; the head's pivot and lens are its numbers.
-    (
-        key: "regency_t1_air_reclaimer",
-        name: "Sickle",
-        role: "Salvage Drone", title: "Salvage Drone",
-        tech: 1,
-        categories: ["Air"],
-        health: 180,
-        cost: (mass: 55, energy: 650, time: 300),
-        radius: 3.0, height: 1.6,
-        vision: 420,
-        motion: (layer: Air, size: 0, speed: 84, accel: 34, turn: 160, altitude: 30, hover: true),
-        weapons: [],
-        mesh: "regency_sickle", icon: SalvageDrone,
-        lights: [(kind: Point, at: (0, 0, 0.2), color: (1.0, 0.14, 0.06), intensity: 40, range: 9, night_only: false)],
-        sounds: (death: "blast_small", moving: "aster_hover"),
-        reclaimer: (power: 5, range: 380, charge: 0.8, mobile: true, heads: [
-            (pivot: (0.6, 0, 0.45), emitter: (1.4, 0, 0.45), turn: 240, pitch: (-90, 15)),
-        ]),
-    ),
 ]

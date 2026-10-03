@@ -1,7 +1,7 @@
 //! The reclaim tower's head: gun house 0 on the head house's roof. What only turns
 //! (turntable, cheeks, drives) is built round the tower's axis; what pitches is built
 //! round the trunnion at [`super::PIVOT_Z`] and ends at the barrel's tip,
-//! [`super::EMIT_X`] ahead of it. The head is the Thresher's Cradle at tower scale
+//! [`super::EMIT_X`] ahead of it. The head is the Cradle at tower scale
 //! with a long, slim barrel: heavy plant, not a gun. The barrel is the same length at
 //! every tier, ends in a plain emitter head (no flared mouth), and gains a ribbed
 //! cooling jacket at tech 2 and guide rails and induction rings at tech 3.
@@ -15,7 +15,7 @@ use crate::builder::MeshBuilder;
 use crate::material::*;
 use crate::pattern;
 
-/// The head's machinery (drive house, feed drop) at the scale the Thresher's Cradle
+/// The head's machinery (drive house, feed drop) at the scale the Cradle
 /// was first fitted to the tower with: `K` over its authored 4.5 m unit.
 const S: f32 = K / 4.52;
 
@@ -79,7 +79,7 @@ pub(super) fn turret(b: &mut MeshBuilder, tech: u8) {
     cradle(b, pivot, RING_TOP + 0.55 * S, tech);
 }
 
-/// The Thresher's Cradle head at tower scale (the user's favourite reclaim head): two
+/// The Cradle head at tower scale (the user's favourite reclaim head): two
 /// plated yoke cheeks rising past the trunnion, a bridge low between them, and slung in
 /// them a boxy processor with a charge pack aft and a long barrel forward. Round it, the
 /// drive house and feed drop a head this size needs.

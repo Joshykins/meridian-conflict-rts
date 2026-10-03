@@ -185,8 +185,8 @@ impl Renderer {
     }
 
     /// The wash of a hovering aircraft's lift on the ground under it: a ring of
-    /// dust driven outward, spray over water, stronger the lower it hangs. The
-    /// Osprey works at 22 m and raises a storm; the Kestrel at 65 m only stirs
+    /// dust driven outward, spray over water, stronger the lower it hangs. A
+    /// salvage drone at 22 m raises a storm; the Kestrel at 65 m only stirs
     /// the grass. Nothing from high up.
     fn air_downwash(&mut self, u: &UnitInstance, radius: f32, time: f32) {
         let at = Vec3::from(u.pos);

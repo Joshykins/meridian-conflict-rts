@@ -306,11 +306,6 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
         // Salvage: the Extractor's disc (salvage feeds mass as a mine does) with its
         // domain's mark (`hud/icons.rs` draws the same). A structure rings it with its reach.
         case 29u: { return min(sd_ore_disc(p, vec2<f32>(0.0), 0.5), abs(length(p) - 0.8) - 0.07); }
-        // Salvage boat: the disc riding a hull.
-        case 30u: {
-            let hull = max(abs(p.y + 0.52) - 0.13, (abs(p.x) - 0.66 - (p.y + 0.65) * 0.9) * 0.75);
-            return min(sd_ore_disc(p, vec2<f32>(0.0, 0.2), 0.5), hull);
-        }
         // Salvage carrier, from above: the disc with swept wings out of its sides and a tail.
         case 32u: {
             let wings = sd_segment(vec2<f32>(abs(p.x), p.y), vec2<f32>(0.45, -0.05), vec2<f32>(0.95, -0.3)) - 0.1;
