@@ -43,6 +43,9 @@ const HOT: vec3<f32> = vec3<f32>(1.0, 0.42, 0.16);
 const RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.05);
 const EMBER: vec3<f32> = vec3<f32>(0.34, 0.01, 0.03);
 const VIOLET: vec3<f32> = vec3<f32>(0.6, 0.18, 1.0);
+// The front burns hotter than the trail it leaves: past white to a blue-white.
+const ICE: vec3<f32> = vec3<f32>(0.72, 0.86, 1.0);
+const PALE: vec3<f32> = vec3<f32>(1.0, 0.62, 0.55);
 
 struct ShellOut {
     @builtin(position) clip: vec4<f32>,
@@ -186,7 +189,7 @@ fn vs_wake_trail(@builtin(vertex_index) v: u32, @builtin(instance_index) instanc
     let passed = max(age - along / s.speed, 0.0);
     let xy = s.apex.xy + out_xy * along;
     // Its heat lifts it a little off the ground as it cools.
-    let floor = mix(s.apex.z, ground_at(xy), smoothstep(0.0, 20.0, along)) + 0.3 + 0.8 * passed;
+    let floor = mix(s.apex.z, ground_at(xy), smoothstep(0.0, 20.0, along)) + 0.3 + 0.4 * passed;
     let p = vec3<f32>(xy, floor + 0.3 * tall * ramp * ramp);
     var out: ShellOut;
     out.shell = instance;
@@ -196,6 +199,14 @@ fn vs_wake_trail(@builtin(vertex_index) v: u32, @builtin(instance_index) instanc
     out.passed = vec2<f32>(along, passed);
     out.clip = globals.view_proj * vec4<f32>(p, 1.0);
     return out;
+}
+
+// The front's plasma by heat, 0 its cooler back to 1 its hottest: red, a pale pink-hot,
+// white, a blue-white at the top.
+fn front_heat(h: f32) -> vec3<f32> {
+    let c = mix(RED, PALE, smoothstep(0.0, 0.4, h));
+    let d = mix(c, WHITE, smoothstep(0.35, 0.7, h));
+    return mix(d, ICE, smoothstep(0.7, 1.0, h));
 }
 
 // Thin bright lines where noise crosses its middle, `sharp` the thinner; softened where
@@ -233,25 +244,25 @@ fn fs_wake_front_lit(in: ShellOut) -> vec4<f32> {
     let warp = value_noise2(vec2<f32>(a * span * 0.5, roll * 0.5) + seed, 1.0);
     let lumps = value_noise2(vec2<f32>(a * span + warp * 1.5, roll * 0.6 + warp) + seed * 1.3, 1.0);
     let flow = streaks(vec2<f32>(a * span * 5.0 + warp * 1.2, roll * 0.15) + seed * 0.7, 10.0);
-    // Its leading face and crest white-hot, orange over its body, red down its back; hot
-    // spots where the lumps run hot; cooling as it breaks.
+    // Its leading face and crest blue-white, white and pink-hot over its body, red down
+    // its back; hot spots where the lumps run hot; cooling as it breaks.
     let face = smoothstep(0.3, 0.95, lead);
     let back = smoothstep(0.1, -1.0, lead);
     let crest = smoothstep(0.75, 1.0, up);
     let touch = touching(in.world);
     let hot_spot = smoothstep(0.62, 0.85, lumps);
-    let heat = clamp(0.12 + 0.3 * face + 0.35 * crest + 0.35 * hot_spot * (0.4 + face)
-        + 0.12 * flow - 0.25 * back + 0.3 * touch - 0.9 * b, 0.0, 1.0);
+    let heat = clamp(0.2 + 0.4 * face + 0.3 * crest + 0.3 * hot_spot * (0.4 + face)
+        + 0.12 * flow - 0.4 * back + 0.25 * touch - 0.9 * b, 0.0, 1.0);
     // Its back thins away into the trail; its body is lumpy, not even.
     let body = (1.0 - 0.85 * back * back) * (0.35 + 0.65 * smoothstep(0.25, 0.75, lumps));
     // Broken up, it is eaten through from its crest and back down.
     let grain = value_noise2(vec2<f32>(a * span * 1.3, in.at.y * 9.0) + seed * 2.1, 1.0);
     let alive = smoothstep(-0.03, 0.03, grain * 0.6 + 0.5 + 0.2 * lead - 0.3 * up - 1.1 * b);
-    let glow = 0.2 + 0.5 * pow(edge, 3.0) + 0.45 * flow + 0.35 * face * face + 0.4 * crest;
-    let light = wake_heat(heat) * glow * body * (1.0 + 0.8 * touch)
+    let glow = 0.25 + 0.5 * pow(edge, 3.0) + 0.5 * flow + 0.4 * face * face + 0.4 * crest;
+    let light = front_heat(heat) * glow * body * (1.0 + 0.8 * touch)
         + VIOLET * pow(edge, 6.0) * back * 0.5;
     let cover = clamp((0.06 + 0.22 * pow(edge, 3.0)) * body, 0.0, 0.4);
-    return vec4<f32>(light * 0.8, cover) * alive * s.fade;
+    return vec4<f32>(light * 0.95, cover) * alive * s.fade;
 }
 
 fn fs_wake_trail_lit(in: ShellOut) -> vec4<f32> {
@@ -264,25 +275,34 @@ fn fs_wake_trail_lit(in: ShellOut) -> vec4<f32> {
     let passed = in.passed.y;
     // Hot where the front has just been, cooling behind it.
     let heat = exp(-passed / WAKE_SHELL_COOL);
-    // Long threads of light running out to the wall, streaming out after it: fine ones
-    // close across the fan, and broader ones between them.
-    let out_flow = along * 0.025 - age * s.speed * 0.02;
+    // Where the plasma here was left: thrown on at the front's pace as the front passes,
+    // it slows to a stop over the ground, so its threads stream after the front and
+    // settle.
+    let drift = s.speed * WAKE_SHELL_SETTLE * (1.0 - exp(-passed / WAKE_SHELL_SETTLE));
+    let laid = along - drift;
     // As many threads across as the arc is wide, round a ring as well.
     let across = max(1.0, arc_half(s) / 0.45);
-    let q1 = vec2<f32>(c * 26.0 * across + sin(along * 0.03 + seed) * 0.6, out_flow) + seed;
-    let q2 = vec2<f32>(c * 11.0 * across - along * 0.004, out_flow * 1.6) + seed * 1.7;
+    // Long threads of light running out to the wall, writhing as they burn: fine ones
+    // close across the fan, and broader ones between them.
+    let writhe = value_noise2(vec2<f32>(c * 7.0 * across, laid * 0.02 + age * 0.9) + seed * 2.3, 1.0);
+    let q1 = vec2<f32>(c * 26.0 * across + sin(laid * 0.03 + seed) * 0.6 + writhe * 1.4, laid * 0.025)
+        + seed;
+    let q2 = vec2<f32>(c * 11.0 * across - laid * 0.004 + writhe * 0.8, laid * 0.04 - age * 0.3)
+        + seed * 1.7;
     let threads = streaks(q1, 14.0) + 0.6 * streaks(q2, 6.0);
+    // It flickers as it burns down: patches flaring and dimming.
+    let flicker = 0.55 + 0.9 * value_noise2(vec2<f32>(c * 10.0 * across, laid * 0.06 + age * 2.6) + seed * 4.7, 1.0);
     // Eaten through in hard-edged holes, long ones down the threads, as it cools, from the
     // muzzle out behind the front.
-    let grain = value_noise2(vec2<f32>(c * 9.0 * across, along * 0.04) + seed * 3.1, 1.0) * 0.6
-        + value_noise2(vec2<f32>(c * 30.0 * across, along * 0.12) + seed * 1.9, 1.0) * 0.4;
+    let grain = value_noise2(vec2<f32>(c * 9.0 * across, laid * 0.04) + seed * 3.1, 1.0) * 0.6
+        + value_noise2(vec2<f32>(c * 30.0 * across, laid * 0.12) + seed * 1.9, 1.0) * 0.4;
     let alive = smoothstep(-0.03, 0.03, grain * 0.75 + 0.3 - passed / WAKE_SHELL_LINGER);
     // A breath back at the muzzle, building out to the wall, and thinning at the fan's
     // edges.
     let near_wall = smoothstep(0.0, 1.0, u);
     let sides = select(1.0 - smoothstep(0.75, 1.0, abs(c)), 1.0, closed(s));
     let fill = smoothstep(0.0, 0.3, u) * sides;
-    let lit = (0.015 + threads * (0.12 + 0.7 * heat)) * (0.4 + 0.6 * near_wall)
+    let lit = (0.015 + threads * (0.12 + 0.7 * heat) * flicker) * (0.4 + 0.6 * near_wall)
         + 0.12 * heat * near_wall * near_wall;
     let tone = wake_heat(clamp(heat * 0.6 + 0.25 * threads * heat, 0.0, 1.0));
     let light = tone * lit * fill;

@@ -21,6 +21,7 @@
 //! from `regency_trails`); the front and trail themselves are drawn where the front stands
 //! each frame (`upload_wake_shells`). Presentation only; the renderer's own clock.
 
+use super::ground_melt::Burn;
 use super::regency_guns_fx::{BURST, GLOW, HOT, MOTE, RED, WAKE, WHITE};
 use super::wake_shell::GpuWakeShell;
 use super::{Renderer, PUFF_CLOD, PUFF_DUST};
@@ -31,6 +32,16 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 /// Metres between the stretches of the front's foot laid at once.
 const RING: f32 = 6.0;
+/// The front's light: hotter than the trail, a blue-white (wake_shell.wgsl `ICE`).
+const ICE: Vec3 = Vec3::new(0.72, 0.86, 1.0);
+/// Metres apart along the arc the ground is scorched as the front passes, and how far
+/// each scorch reaches; how hot it gets (under the melt: it scorches and glows, never
+/// melts) and seconds its glow takes to die.
+const SCORCH_STEP: f32 = 14.0;
+const SCORCH_RADIUS: f32 = 7.0;
+const SCORCH_HEAT: f32 = 0.16;
+const SCORCH_COOL: f32 = 1.5;
+
 /// The wake's plasma between red and white-hot (wake_shell.wgsl `HOT`): more orange
 /// than the rest of the suite's pink-hot, so a wake runs red, orange and white.
 const FIRE: Vec3 = Vec3::new(1.0, 0.42, 0.16);
@@ -193,6 +204,20 @@ impl Renderer {
         self.wake_shells.upload(&shells);
     }
 
+    /// Whether a rolling wake's front has passed over `at` by `time`: a tree felled there
+    /// burns (`tree_fires`).
+    pub(super) fn wake_seared(&self, at: Vec2, time: f32) -> bool {
+        self.plasma_fx.wakes.iter().any(|wake| {
+            let Some(reach) = self.wake_reach(wake) else {
+                return false;
+            };
+            let d = at - wake.at.truncate();
+            let out = d.length();
+            let front = ((time - wake.start + self.tick_seconds) * reach.speed).min(reach.range);
+            out <= front + 8.0 && d.angle_to(wake.ahead).abs() <= reach.arc + 4.0 / out.max(1.0)
+        })
+    }
+
     /// A point on the ground along the wall's foot when it stands `r` out: `across` of
     /// the way along its arc from its middle (0) to one end (±1), and which way it throws
     /// things off (wake_shell.wgsl `radial`).
@@ -212,6 +237,23 @@ impl Renderer {
         let water = self.map_info.water_level.to_f32();
         let width = reach.half_width(r);
         let kicks = ((r * reach.arc / 6.0).ceil() as usize).clamp(2, 24);
+        // The ground it rolls over scorched all along the arc, glowing a moment. A
+        // deliberate cosmetic cap on how many a stretch lays.
+        let scorches = ((2.0 * r * reach.arc / SCORCH_STEP).ceil() as usize).clamp(1, 64);
+        for n in 0..scorches {
+            let across = 2.0 * (n as f32 + self.scatter.unit()) / scorches as f32 - 1.0;
+            let (p, _) = self.front_foot(wake, reach, r, across);
+            if p.z > water + 0.05 {
+                self.ground_melt.burn(Burn {
+                    pos: p.truncate(),
+                    radius: SCORCH_RADIUS * (0.8 + 0.4 * self.scatter.unit()),
+                    peak: SCORCH_HEAT,
+                    start: when,
+                    rise: 0.0,
+                    cool: SCORCH_COOL,
+                });
+            }
+        }
         for _ in 0..kicks {
             let across = self.scatter.signed();
             let (p, out) = self.front_foot(wake, reach, r, across);
@@ -263,7 +305,7 @@ impl Renderer {
             let (p, _) = self.front_foot(wake, reach, r, across);
             let size = 0.6 + 0.05 * width.min(30.0) * (0.5 + self.scatter.unit());
             let heat = 0.1 + 0.3 * self.scatter.unit();
-            let life = 1.2 + 0.5 * self.scatter.unit();
+            let life = 2.4 + 1.2 * self.scatter.unit();
             self.push_lit(
                 WAKE,
                 p + Vec3::Z * size * 0.3,
@@ -301,7 +343,7 @@ impl Renderer {
         if k.is_multiple_of(2) {
             self.plasma_fx.guns.flare(
                 mid + Vec3::Z * wall_height(width) * 0.5,
-                RED.lerp(HOT, 0.35) * 140.0 * reach.impact,
+                WHITE.lerp(ICE, 0.5) * 170.0 * reach.impact,
                 (width * 1.4 + 10.0).min(90.0),
                 when,
                 0.25,
@@ -350,7 +392,7 @@ impl Renderer {
         let mid = mid.extend(self.ground_height(mid) + wall_height(width) * 0.5);
         self.plasma_fx.guns.flare(
             mid,
-            HOT * 120.0 * reach.impact,
+            WHITE.lerp(ICE, 0.4) * 140.0 * reach.impact,
             (width * 1.6 + 10.0).min(90.0),
             when,
             BREAK,

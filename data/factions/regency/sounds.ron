@@ -402,37 +402,40 @@
                 Roll(at: 0.03, from: 700, to: 140, glide: 0.5, attack: 0.03, decay: 0.2, gain: 0.5, swell: 10, depth: 0.5, seed: 24),
             ],
         ),
-        // The Wake's wake: the projector's pinch opens wide and its plasma floods out flat
-        // over the ground ahead. A hard pressure slam with a chest-deep boom under it, then
-        // the wake rolling away: a rough held growl sinking as it spreads, a roar that falls
-        // and widens across the stereo field as the front runs out, the ground searing under
-        // it all the way, and the boom rolling back off the far ground. Heavier and longer
-        // than the Halberd's shot; no falling tone above the low mids, no crackle.
+        // The Wake's wave: the plasma gathered across the projector's mouth is let go as one
+        // wall that rolls out over 400 m of ground. Not a gun: the pinch dumping its pressure
+        // (a soft-edged whoomp with a rough growl in it, no crack), then the wave surging away
+        // as a roaring, searing rush that holds for most of a second, spreads across the
+        // stereo field as the front widens, and recedes as it runs out, its plasma crackling
+        // as it breaks and cools. The weight sits in the low mids, not the sub, so it carries
+        // on small speakers; done well before the next shot 2.6 s later. No tone falls above
+        // the low mids, no pitched layer rings out.
         "regency_wake_fire": (
-            length: 2.4, peak: 0.8, room: 0.45,
+            length: 2.5, peak: 0.8, room: 0.35,
             layers: [
-                // The pinch letting go.
-                Burst(low: 500, high: 2400, attack: 0.0002, decay: 0.006, gain: 10),
-                Burst(low: 80, high: 700, attack: 0.0005, decay: 0.05, gain: 16),
-                Burst(at: 0.002, low: 28, high: 200, attack: 0.004, decay: 0.3, gain: 14),
-                // The boom, deep, sinking.
-                Tone(from: 110, to: 46, glide: 0.12, attack: 0.001, decay: 0.2, gain: 1.4),
-                Tone(from: 58, to: 28, glide: 0.5, attack: 0.003, decay: 0.6, gain: 1.4),
-                // The wake: a rough growl held as it rolls out, sinking as it spreads.
-                Fm(from: 88, to: 58, glide: 0.6, ratio: 0.5, index: 2.6, fade: 0.6, attack: 0.006, decay: 0.45, gain: 0.8),
-                Fm(at: 0.01, from: 176, to: 120, glide: 0.6, ratio: 0.5, index: 1.7, fade: 0.6, attack: 0.02, decay: 0.4, gain: 0.45),
-                Drive(1.6),
-                // The front roaring away over the ground, spreading either side as it goes.
-                Roll(at: 0.005, from: 1400, to: 420, glide: 0.6, attack: 0.02, decay: 0.45, gain: 0.85, swell: 24, depth: 0.75, seed: 41),
-                Roll(at: 0.08, from: 1100, to: 300, glide: 0.7, attack: 0.05, decay: 0.45, gain: 0.5, swell: 20, depth: 0.7, pan: -0.35, seed: 42),
-                Roll(at: 0.1, from: 1050, to: 280, glide: 0.7, attack: 0.05, decay: 0.45, gain: 0.5, swell: 20, depth: 0.7, pan: 0.35, seed: 43),
-                // The ground searing under it, cooling.
-                Foam(at: 0.01, from: 2400, to: 1300, glide: 0.8, q: 0.9, attack: 0.02, decay: 0.6, gain: 1.6, swell: 36, depth: 0.7, seed: 44),
-                Foam(at: 0.4, from: 1900, to: 900, glide: 1.4, q: 0.9, attack: 0.08, decay: 0.7, gain: 0.5, swell: 30, depth: 0.85, seed: 45),
-                // The boom rolling back off the far ground.
-                Roll(at: 0.15, from: 300, to: 60, glide: 1.5, attack: 0.1, decay: 0.9, gain: 0.35, swell: 4, depth: 0.55, seed: 46),
-                Burst(at: 0.42, low: 50, high: 420, attack: 0.004, decay: 0.14, gain: 2.0, pan: 0.3, seed: 47),
-                Tone(at: 0.42, from: 52, to: 30, glide: 0.3, attack: 0.006, decay: 0.35, gain: 0.35, pan: 0.3),
+                // The pinch dumping its pressure: a push of air with soft edges, the whoomp.
+                Burst(low: 300, high: 1500, attack: 0.002, decay: 0.012, gain: 5, seed: 61),
+                Burst(low: 70, high: 650, attack: 0.004, decay: 0.09, gain: 13, seed: 62),
+                Burst(at: 0.002, low: 35, high: 220, attack: 0.008, decay: 0.2, gain: 9, seed: 71),
+                Tone(from: 82, to: 44, glide: 0.18, attack: 0.004, decay: 0.28, gain: 1.2),
+                Fm(from: 150, to: 84, glide: 0.2, ratio: 0.5, index: 2.4, fade: 0.15, attack: 0.004, decay: 0.2, gain: 0.8),
+                // The wave's body: a rough growl held as it rolls out, rough all the way.
+                Fm(at: 0.02, from: 104, to: 86, glide: 1.4, ratio: 0.5, index: 2.4, fade: 1.6, attack: 0.08, decay: 0.65, gain: 0.55),
+                Fm(at: 0.05, from: 212, to: 176, glide: 1.4, ratio: 0.5, index: 1.6, fade: 1.6, attack: 0.15, decay: 0.6, gain: 0.4),
+                Drive(1.5),
+                // The surge: a rushing roar swelling in behind the whoomp and holding.
+                Roll(at: 0.01, from: 1700, to: 700, glide: 1.6, attack: 0.08, decay: 0.65, gain: 0.8, swell: 22, depth: 0.7, seed: 63),
+                Sweep(at: 0.02, from: 2200, to: 600, glide: 1.8, q: 0.8, attack: 0.12, decay: 0.7, gain: 1.1, seed: 64),
+                // The front widening either side as it runs out.
+                Roll(at: 0.15, from: 1400, to: 500, glide: 1.6, attack: 0.3, decay: 0.6, gain: 0.55, swell: 18, depth: 0.75, pan: -0.45, seed: 65),
+                Roll(at: 0.2, from: 1350, to: 480, glide: 1.6, attack: 0.3, decay: 0.6, gain: 0.55, swell: 18, depth: 0.75, pan: 0.45, seed: 66),
+                // The plasma searing over the ground.
+                Foam(at: 0.02, from: 2400, to: 1400, glide: 1.6, q: 0.9, attack: 0.1, decay: 0.65, gain: 1.8, swell: 38, depth: 0.7, seed: 67),
+                // Its crackle, thicker as the wall breaks up and cools.
+                Roll(at: 0.1, from: 3400, to: 1800, glide: 1.6, attack: 0.35, decay: 0.5, gain: 0.35, swell: 100, depth: 1.0, pan: -0.2, seed: 68),
+                Roll(at: 0.4, from: 3000, to: 1500, glide: 1.4, attack: 0.4, decay: 0.45, gain: 0.4, swell: 110, depth: 1.0, pan: 0.25, seed: 69),
+                // The ground shaking under the front as it goes.
+                Roll(at: 0.05, from: 420, to: 110, glide: 1.8, attack: 0.15, decay: 0.55, gain: 0.35, swell: 6, depth: 0.55, seed: 70),
             ],
         ),
         // The Halberd's jet striking: the squeezed plasma lets go all at once. A hard crack

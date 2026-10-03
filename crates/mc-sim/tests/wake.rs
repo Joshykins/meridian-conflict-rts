@@ -6,7 +6,7 @@
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
-use mc_map::Heightfield;
+use mc_map::{Heightfield, Prop, PropKind};
 use mc_sim::tables::{Controller, UnitId};
 use mc_sim::world::MapData;
 use mc_sim::{MatchConfig, PlayerSetup, SimEvent, World};
@@ -18,8 +18,9 @@ const CELLS: u32 = 256;
 const GROUND: u16 = 20;
 const WALL: u16 = 40;
 
-/// A flat field, with a short wall where `wall` says (cells, inclusive: x range, y range).
-fn world(wall: Option<((usize, usize), (usize, usize))>) -> World {
+/// A flat field, with a short wall where `wall` says (cells, inclusive: x range, y range),
+/// and trees standing at `trees`.
+fn world(wall: Option<((usize, usize), (usize, usize))>, trees: &[(i32, i32)]) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -38,7 +39,15 @@ fn world(wall: Option<((usize, usize), (usize, usize))>) -> World {
         content_id: 1,
         ore: Vec::new(),
         starts: vec![FxVec2::from_ints(300, 300), FxVec2::from_ints(1700, 1700)],
-        props: Vec::new(),
+        props: trees
+            .iter()
+            .map(|&(x, y)| Prop {
+                kind: PropKind::TreeConifer,
+                pos: FxVec2::from_ints(x, y),
+                heading: Angle::ZERO,
+                scale_milli: 1000,
+            })
+            .collect(),
     };
     let player = |faction: &str, team| PlayerSetup {
         name: faction.into(),
@@ -130,7 +139,7 @@ fn first_wake(w: &mut World, marks: &[UnitId]) -> Vec<Option<(u32, Fx)>> {
 
 #[test]
 fn the_wake_rolls_out_over_its_fan() {
-    let mut w = world(None);
+    let mut w = world(None, &[]);
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
     // Bulwarks: dead ahead at 88 m, 5 degrees off at 300 m, out of the fan (30 degrees
     // off, in reach) and past its reach (460 m dead ahead).
@@ -166,7 +175,7 @@ fn the_wake_rolls_out_over_its_fan() {
 #[test]
 fn ground_between_shields_a_unit_from_the_wake() {
     // A 20 m wall beside the line to the open Bulwark (cells are 8 m): x 584-592, y 520-528.
-    let mut w = world(Some(((73, 74), (65, 66))));
+    let mut w = world(Some(((73, 74), (65, 66))), &[]);
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
     // In the open, 200 m dead east; behind the wall, 109 m off 6 degrees north of east
     // (inside the fan).
@@ -185,7 +194,7 @@ fn ground_between_shields_a_unit_from_the_wake() {
 
 #[test]
 fn a_half_turn_either_side_rolls_out_all_round() {
-    let mut w = world(None);
+    let mut w = world(None, &[]);
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
     // The projector opened to a full circle (`angle: 180`).
     let bp = w.blueprints.id_of("regency_t3_wake_tank").unwrap();
@@ -203,4 +212,15 @@ fn a_half_turn_either_side_rolls_out_all_round() {
         struck.iter().all(Option::is_some),
         "a full circle missed some: {struck:?}"
     );
+}
+
+#[test]
+fn the_trees_it_rolls_over_burn_down() {
+    // Trees 150 m ahead in the fan, and 150 m off to one side, out of it.
+    let mut w = world(None, &[(662, 520), (512, 662)]);
+    add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
+    let mark = add(&mut w, "aster_t2_tank", 1, 712, 512, 180);
+    first_wake(&mut w, &[mark]);
+    assert!(!w.is_prop_alive(0), "the tree in the fan still stands");
+    assert!(w.is_prop_alive(1), "the tree out of the fan burned");
 }

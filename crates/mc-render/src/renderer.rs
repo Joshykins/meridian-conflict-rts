@@ -3901,7 +3901,7 @@ impl Renderer {
                     .clamp(0.0, 1.0);
                     at.truncate().distance(from + segment * t) <= width.to_f32().max(4.0) + 0.1
                 });
-                if !blasted && !seared {
+                if !blasted && !seared && !self.wake_seared(at.truncate(), time) {
                     continue;
                 }
                 let height = fallen_trees::tree_height(kind, &instance);

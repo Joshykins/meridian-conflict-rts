@@ -19,7 +19,7 @@
 //!   between takes the hit for all it covers, once a wake, as a blast's is
 //!   (`blast_blocker`); a hull shield takes its own unit's share.
 //! - **The ground:** seared along the fan (stains) as the front passes, as a plasma
-//!   strike sears it.
+//!   strike sears it, and the trees it passes over burn down.
 //!
 //! The firing itself (cooldown, salvo, `ShotFired` for what is drawn and heard) is the
 //! ordinary gun's (`combat::step_weapon`); only the projectile is left out.
@@ -38,6 +38,8 @@ use serde::{Deserialize, Serialize};
 /// be reached: more than the widest hull's radius, so the search never misses one the
 /// cone's own test takes.
 const HULL_MARGIN: i32 = 40;
+/// Metres outside the fan a tree's trunk may stand and still burn: its crown overhangs.
+const TREE_REACH: i32 = 2;
 /// Searing stains laid along the fan's middle each wake.
 const STAINS: i32 = 3;
 
@@ -150,19 +152,7 @@ impl World {
                 continue;
             }
             let bp = self.bp(t);
-            let d = units.pos[t] - from;
-            let out = d.length();
-            // In the facing's frame, folded onto the edge's side.
-            let p = FxVec2::new(d.dot(dir), d.cross(dir).abs());
-            // How far its middle stands outside the fan: at most 0 inside it (short of the
-            // edge's line), else past the edge's line while that is the nearest of the fan,
-            // else from the muzzle.
-            let past = edge.cross(p);
-            let outside = if past <= Fx::ZERO || p.dot(edge) >= Fx::ZERO {
-                past
-            } else {
-                out
-            };
+            let (out, outside) = from_fan(units.pos[t] - from, dir, edge);
             // The front passed over its hull this tick, and its hull reaches into the fan.
             if out + bp.radius < behind
                 || out - bp.radius > ahead
@@ -197,6 +187,27 @@ impl World {
             }
         }
 
+        // The trees it rolls over burn down (the renderer sets them alight, `wake_fx`).
+        let mut trees = Vec::new();
+        self.prop_index.query(middle, reach, kind::PROP, |e| {
+            let prop = e.row as usize;
+            let (out, outside) = from_fan(e.pos - from, dir, edge);
+            if out > behind
+                && out <= ahead
+                && outside <= Fx::from_int(TREE_REACH)
+                && self.map.props[prop].kind.is_tree()
+                && self.is_prop_alive(prop)
+            {
+                trees.push(prop);
+            }
+            true
+        });
+        // The index hands rows over in its own order: felled in row order.
+        trees.sort_unstable();
+        for prop in trees {
+            self.state.props_dead[prop / 64] |= 1 << (prop % 64);
+        }
+
         // The ground it rolls over, seared down the fan's middle, wider as it spreads.
         for k in 1..=STAINS {
             let along = range * k / (STAINS + 1);
@@ -215,6 +226,23 @@ impl World {
         }
         ahead < range
     }
+}
+
+/// How far `d` (from the muzzle) stands from it, and how far outside the fan along
+/// `dir` with its edge at `edge` (in the facing's frame): at most 0 inside it (short of
+/// the edge's line), else past the edge's line while that is the nearest of the fan,
+/// else from the muzzle.
+fn from_fan(d: FxVec2, dir: FxVec2, edge: FxVec2) -> (Fx, Fx) {
+    let out = d.length();
+    // In the facing's frame, folded onto the edge's side.
+    let p = FxVec2::new(d.dot(dir), d.cross(dir).abs());
+    let past = edge.cross(p);
+    let outside = if past <= Fx::ZERO || p.dot(edge) >= Fx::ZERO {
+        past
+    } else {
+        out
+    };
+    (out, outside)
 }
 
 /// The rolling wakes, for the state hash.
