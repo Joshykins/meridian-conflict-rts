@@ -865,18 +865,19 @@ impl App {
     /// Leaves the current stage for `pending`, behind the loading screen when
     /// there is a `title` (the first stage of a run just comes up from black).
     fn load(&mut self, pending: Pending, title: &str, detail: &str) {
-        self.curtain = (!title.is_empty()).then(|| {
-            let from_black = matches!(self.stage, Stage::Front(_));
-            let mut curtain = Curtain::new(title, detail, from_black);
-            if let Pending::Match(start) = &pending {
+        self.curtain = (!title.is_empty()).then(|| match &pending {
+            Pending::Front => Curtain::standing_down(title, detail),
+            Pending::Match(start) => {
+                let from_black = matches!(self.stage, Stage::Front(_));
+                let mut curtain = Curtain::new(title, detail, from_black);
                 curtain.set_map(
                     &start.map,
                     &start.roster,
                     &start.colors,
                     (!start.observing).then_some(start.local as usize),
                 );
+                curtain
             }
-            curtain
         });
         if matches!(self.stage, Stage::Match(_)) {
             self.audio.release_world();
@@ -1235,11 +1236,13 @@ impl App {
                 };
                 match game.frame(ctx)? {
                     Some(GameEvent::Leave) => {
-                        next = Some((
-                            Pending::Front,
-                            "Standing Down",
-                            "Returning to Command".into(),
-                        ));
+                        // What was left, and how long it was played.
+                        let detail = format!(
+                            "{}   \u{b7}   {}",
+                            game.map().name(),
+                            crate::hud::replay_clock(game.tick())
+                        );
+                        next = Some((Pending::Front, "Standing Down", detail));
                     }
                     Some(GameEvent::Quit) => quit = true,
                     Some(GameEvent::RangeMap { stem, subject }) => {

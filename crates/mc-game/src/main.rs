@@ -162,6 +162,7 @@ straight into a match instead.
   --loading SECONDS      with --screenshot: the loading screen that long after it came up;
                          FROM:TO:FPS shoots a run of numbered frames (FILE-0000.png, ...)
   --opening              with --loading: the run's opening screen instead of a map's
+  --standing-down        with --loading: the screen out of a match, back to the front end
   --cursor X,Y           with --ui: where the pointer is, in pixels
   --smoke                open the front end, play a default skirmish for a few seconds, return
                          to the front end and exit: an unattended check of every stage change
@@ -225,7 +226,7 @@ fn run() -> Result<(), String> {
     let mut direct = false;
     let mut ui_screen: Option<ui::front::Screen> = None;
     let mut loading_at: Option<Vec<f32>> = None;
-    let mut opening = false;
+    let mut loading_screen = loading::Screen::Briefing;
     let mut cursor: Option<[f32; 2]> = None;
     let mut smoke = false;
     let mut dump_sounds: Option<String> = None;
@@ -344,7 +345,8 @@ fn run() -> Result<(), String> {
                 sized = true;
             }
             "--loading" => loading_at = Some(loading_times(&value("--loading")?).ok_or("--loading takes SECONDS or FROM:TO:FPS")?),
-            "--opening" => opening = true,
+            "--opening" => loading_screen = loading::Screen::Opening,
+            "--standing-down" => loading_screen = loading::Screen::StandingDown,
             "--ui" => ui_screen = Some(ui::front::Screen::parse(&value("--ui")?).ok_or("--ui takes menu, skirmish, survival, multiplayer, history or settings")?),
             "--cursor" => {
                 let v: Vec<f32> = value("--cursor")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
@@ -426,7 +428,7 @@ fn run() -> Result<(), String> {
             .take()
             .ok_or("--loading draws a screenshot: give it --screenshot FILE.png")?;
         (shot.width, shot.height) = size;
-        return loading::screenshot(blueprints, pool, &shot, &times, opening);
+        return loading::screenshot(blueprints, pool, &shot, &times, loading_screen);
     }
     if let Some(screen) = ui_screen {
         let mut shot = shot

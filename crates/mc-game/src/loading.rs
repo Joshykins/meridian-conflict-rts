@@ -18,6 +18,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 
 mod opening;
+mod standing_down;
 
 /// A value that holds raw window or GPU handles (so it is not `Send`) but may be
 /// handed whole to another thread, because Vulkan objects may be used from any
@@ -269,9 +270,18 @@ struct Step {
     ended: Option<f32>,
 }
 
+/// Which screen the curtain is.
+enum Look {
+    /// A match deploying: its map, who is where, the steps under way.
+    Briefing,
+    /// The run's first load, before the front end.
+    Opening(opening::Opening),
+    /// Out of a match, back to the front end.
+    StandingDown(standing_down::StandingDown),
+}
+
 pub struct Curtain {
-    /// The run's first load draws the opening instead of the map screen.
-    opening: Option<opening::Opening>,
+    look: Look,
     /// The screen it arrives over was black already (the front end fades out
     /// before a match), rather than a stage to fade over.
     from_black: bool,
@@ -317,7 +327,7 @@ fn ease_in_out(t: f32) -> f32 {
 impl Curtain {
     pub fn new(title: &str, detail: &str, from_black: bool) -> Curtain {
         Curtain {
-            opening: None,
+            look: Look::Briefing,
             from_black,
             title: title.to_owned(),
             detail: detail.to_owned(),
@@ -348,8 +358,18 @@ impl Curtain {
     /// mark over a wireframe valley rather than a map (see `opening.rs`).
     pub fn opening() -> Curtain {
         Curtain {
-            opening: Some(opening::Opening::new()),
+            look: Look::Opening(opening::Opening::new()),
             ..Curtain::new("Starting", "Taking Command", true)
+        }
+    }
+
+    /// The loading screen out of a match and back to the front end, over the
+    /// match's last picture: `title` over the line, `detail` (what was left,
+    /// and for how long) under it (see `standing_down.rs`).
+    pub fn standing_down(title: &str, detail: &str) -> Curtain {
+        Curtain {
+            look: Look::StandingDown(standing_down::StandingDown::new()),
+            ..Curtain::new(title, detail, false)
         }
     }
 
@@ -456,7 +476,7 @@ impl Curtain {
     pub fn still(&self) -> bool {
         self.motion == 0.0
             && (self.goal() - self.shown).abs() < 0.001
-            && (self.opening.is_none() || self.clock >= opening::INTRO)
+            && (!matches!(self.look, Look::Opening(_)) || self.clock >= opening::INTRO)
     }
 
     /// The window changed hands: the new stage now runs underneath.
@@ -468,9 +488,9 @@ impl Curtain {
 
     /// What the new stage getting going is called.
     fn stage_step(&self) -> &'static str {
-        match self.opening {
-            Some(_) => opening::STAGE,
-            None => DEPLOYING,
+        match self.look {
+            Look::Briefing => DEPLOYING,
+            Look::Opening(_) | Look::StandingDown(_) => opening::STAGE,
         }
     }
 
@@ -515,8 +535,14 @@ impl Curtain {
             self.report("Ready", 1.0);
         }
         // The bar reaches the end before the curtain goes, and the opening
-        // stays long enough for its name to be read.
-        let read = self.opening.is_none() || self.clock >= opening::LINGER;
+        // and standing down stay long enough for their words to be read.
+        let read = match self.look {
+            Look::Briefing => true,
+            Look::Opening(_) => self.clock >= opening::LINGER,
+            Look::StandingDown(_) => {
+                self.now - self.born.unwrap_or(self.now) >= standing_down::LINGER
+            }
+        };
         if self.reported >= 1.0 && self.shown > 0.995 && read {
             self.phase = Phase::Lifting { since: self.now };
             for s in &mut self.steps {
@@ -594,7 +620,7 @@ impl Curtain {
             && self.goal() - self.shown > 0.001;
         // The opening plays its intro through the end of the build; the
         // window is not handed over until it is done (see `still`).
-        let intro = self.opening.is_some()
+        let intro = matches!(self.look, Look::Opening(_))
             && self.clock < opening::INTRO
             && self.hold != Hold::Start
             && self.phase == Phase::Building;
@@ -650,9 +676,18 @@ impl Curtain {
         // The toolkit's own animations (the emblem) keep the screen's time too.
         ui.time = self.clock;
         let step = self.current();
-        match &mut self.opening {
-            Some(o) => o.draw(ui, self.clock, lift, self.shown, step),
-            None => self.scene(ui, age, lift),
+        match &mut self.look {
+            Look::Opening(o) => o.draw(ui, self.clock, lift, self.shown, step),
+            Look::StandingDown(s) => s.draw(
+                ui,
+                age,
+                self.clock,
+                lift,
+                self.shown,
+                step,
+                (&self.title, &self.detail),
+            ),
+            Look::Briefing => self.scene(ui, age, lift),
         }
         (ui.fade, ui.shift, ui.interactive, ui.time) = saved;
     }
@@ -1106,8 +1141,15 @@ impl Curtain {
     }
 }
 
+/// Which loading screen `--loading` shoots.
+pub enum Screen {
+    Briefing,
+    Opening,
+    StandingDown,
+}
+
 /// `--loading SECONDS --screenshot FILE`: the loading screen for a match on
-/// the backdrop map (or with `opening`, the run's opening), that long after
+/// the backdrop map (or the run's opening, or standing down), that long after
 /// it came up, with the build going at the pace it goes on the RTX 3080 Ti.
 /// One time writes `shot.path`; several write it numbered (`shot-0000.png`, ...).
 pub fn screenshot(
@@ -1115,7 +1157,7 @@ pub fn screenshot(
     pool: Arc<Pool>,
     shot: &crate::headless::Shot,
     times: &[f32],
-    opening: bool,
+    screen: Screen,
 ) -> Result<(), String> {
     use mc_render::{Camera, Overlay};
     let path = crate::setup::backdrop_map().ok_or("no maps found")?;
@@ -1139,10 +1181,14 @@ pub fn screenshot(
     let audio = crate::audio::Audio::silent();
     let (mut overlay, mut memory) = (Overlay::default(), ui::Memory::default());
     let input = ui::Input::default();
-    let mut curtain = if opening {
-        Curtain::opening()
-    } else {
-        Curtain::new("Deploying", "Skirmish   \u{b7}   2 commanders", true)
+    let opening = matches!(screen, Screen::Opening);
+    let mut curtain = match screen {
+        Screen::Briefing => Curtain::new("Deploying", "Skirmish   \u{b7}   2 commanders", true),
+        Screen::Opening => Curtain::opening(),
+        Screen::StandingDown => {
+            let detail = format!("{}   \u{b7}   24:13", map.name());
+            Curtain::standing_down("Standing Down", &detail)
+        }
     };
     // Two commanders across the map, as a 1v1 on it would seat them.
     let last = map.start_positions().len().saturating_sub(1) as u8;
@@ -1168,7 +1214,7 @@ pub fn screenshot(
         },
     )
     .collect();
-    if !opening {
+    if matches!(screen, Screen::Briefing) {
         curtain.set_map(&map, &roster, &crate::setup::TEAM_COLORS, Some(0));
     }
     // The build's steps and when each began, in seconds after the build started.

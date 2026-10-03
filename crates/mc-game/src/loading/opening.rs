@@ -397,9 +397,7 @@ impl Wire<'_> {
 
 /// The opening's own state: the loading line's words as they change.
 pub(super) struct Opening {
-    step: &'static str,
-    was: &'static str,
-    changed: f32,
+    status: StatusLine,
 }
 
 /// Where the parts sit, in points.
@@ -414,9 +412,7 @@ struct Layout {
 impl Opening {
     pub(super) fn new() -> Opening {
         Opening {
-            step: "",
-            was: "",
-            changed: 0.0,
+            status: StatusLine::new(),
         }
     }
 
@@ -587,19 +583,173 @@ impl Opening {
     /// The M, traced round from the foot of its V, then filled with steel;
     /// the meridian's bar grows through it.
     fn monogram(&self, ui: &mut Ui, l: &Layout, t: f32) {
+        let breath = 0.85 + 0.15 * (t * 1.7).sin() * phase(t, (INTRO, INTRO + 1.0));
+        let m = Monogram {
+            fill: ease_in_out(phase(t, FILL)),
+            trace: phase(t, TRACE),
+            bar: ease_out(phase(t, BAR)),
+            breath,
+        };
+        m.draw(ui, l.m_at, l.m_k);
+    }
+
+    /// The name either side of the meridian, a rule under it, the credit.
+    fn title(&self, ui: &mut Ui, l: &Layout, t: f32) {
+        let (cx, y) = (l.view.centre, l.title_y);
+        let bold = ui::style(Face::Bold, 44.0, 1.0);
+        let light = ui::style(Face::Light, 44.0, 1.0);
+        let gap = 15.0;
+        let e = ease_out(phase(t, TITLE));
+        if e > 0.0 {
+            let left = ui.text_width(bold, "Meridian");
+            let right = ui.text_width(light, "Conflict");
+            let slide = (1.0 - e) * 22.0;
+            let saved = ui.fade;
+            ui.fade *= e;
+            let text = rgb(palette::TEXT, 1.0);
+            // In toward the meridian from either side.
+            ui.text(cx - gap - left - slide, y, bold, text, "Meridian");
+            ui.text(cx + gap + slide, y, light, text, "Conflict");
+            ui.fade = saved;
+            // The rule, out from the meridian to the ends of the words.
+            let rule = y + 32.0;
+            let line = rgb(palette::LINE, 0.28 * e);
+            let (l_len, r_len) = ((left + 6.0) * e, (right + 6.0) * e);
+            ui.hline(cx - gap - l_len, rule, l_len, line);
+            ui.hline(cx + gap, rule, r_len, line);
+            ui.vline(cx - gap - l_len, rule - 3.0, 7.0, line);
+            ui.vline(cx + gap + r_len, rule - 3.0, 7.0, line);
+            ui.disc(Vec2::new(cx, rule + 0.5), 2.5, rgb(palette::ACCENT, e));
+        }
+        let credit = ease_out(phase(t, CREDIT));
+        if credit > 0.0 {
+            ui.text_centred(
+                cx,
+                y + 58.0 + (1.0 - credit) * 8.0,
+                ui::style(Face::Medium, 15.0, 1.4),
+                rgb(palette::DIM, credit),
+                "By Joshowaaah",
+            );
+        }
+    }
+
+    /// What is loading and how far it has got, and the build at the side.
+    fn status(&mut self, ui: &mut Ui, t: f32, bar: f32, step: Option<&'static str>) {
+        let shown = ease_out(phase(t, STATUS));
+        if shown <= 0.0 {
+            return;
+        }
+        let (w, h) = (ui.size.x, ui.size.y);
+        let y = h - 64.0;
+        let saved = ui.fade;
+        ui.fade *= shown;
+        self.status.draw(ui, Vec2::new(w * 0.5, y), t, bar, step);
+        ui.text_right(
+            w - 48.0,
+            y,
+            ui::type_scale::MICRO,
+            rgb(palette::FAINT, 1.0),
+            &format!(
+                "{}   \u{b7}   {}",
+                crate::build_label(),
+                env!("CARGO_PKG_VERSION")
+            ),
+        );
+        ui.fade = saved;
+    }
+}
+
+/// The loading line: a bar filling out both ways from the meridian, and
+/// what is being done over it, the words changing as the step does.
+pub(super) struct StatusLine {
+    step: &'static str,
+    was: &'static str,
+    changed: f32,
+}
+
+impl StatusLine {
+    pub(super) fn new() -> StatusLine {
+        StatusLine {
+            step: "",
+            was: "",
+            changed: 0.0,
+        }
+    }
+
+    /// The bar's middle at `at`, `bar` of it filled; `t` the screen's clock.
+    pub(super) fn draw(
+        &mut self,
+        ui: &mut Ui,
+        at: Vec2,
+        t: f32,
+        bar: f32,
+        step: Option<&'static str>,
+    ) {
+        let step = step.unwrap_or("Ready");
+        if step != self.step {
+            self.was = self.step;
+            self.step = step;
+            self.changed = t;
+        }
+        let (cx, y) = (at.x, at.y);
+        let half = 210.0;
+        ui.hline(cx - half, y, half * 2.0, rgb(palette::LINE, 0.14));
+        let filled = bar.clamp(0.0, 1.0) * half;
+        let accent = rgb(palette::ACCENT, 1.0);
+        ui.fill(Rect::new(cx - filled, y - 0.5, filled * 2.0, 2.0), accent);
+        for side in [-1.0, 1.0] {
+            glow_dot(ui, Vec2::new(cx + side * filled, y + 0.5), 9.0, 0.7);
+        }
+
+        let words = ui::style(Face::Medium, 13.0, 0.6);
+        // The old words rise out before the new ones rise in, so the two never overlap.
+        let swap = ((t - self.changed) / 0.4).clamp(0.0, 1.0);
+        let (out, into) = (ease_out(swap * 2.0), ease_out(swap * 2.0 - 1.0));
+        if out < 1.0 && !self.was.is_empty() {
+            ui.text_centred(
+                cx,
+                y - 22.0 - out * 8.0,
+                words,
+                rgb(palette::DIM, 1.0 - out),
+                self.was,
+            );
+        }
+        let into = if self.was.is_empty() { swap } else { into };
+        ui.text_centred(
+            cx,
+            y - 22.0 + (1.0 - into) * 8.0,
+            words,
+            rgb(palette::DIM, into),
+            self.step,
+        );
+    }
+}
+
+/// The game's M, part drawn: its outline `trace`d round from the foot of the
+/// V, `fill`ed with steel and the meridian's `bar` grown through it, each 0..1;
+/// `breath` sets the bar's glow.
+pub(super) struct Monogram {
+    pub(super) fill: f32,
+    pub(super) trace: f32,
+    pub(super) bar: f32,
+    pub(super) breath: f32,
+}
+
+impl Monogram {
+    /// Its middle at `middle`, `k` points per design unit.
+    pub(super) fn draw(&self, ui: &mut Ui, middle: Vec2, k: f32) {
         let at = |d: Vec2, mirror: bool| {
             let d = if mirror {
                 Vec2::new(1000.0 - d.x, d.y)
             } else {
                 d
             };
-            l.m_at + (d - M_MIDDLE) * l.m_k
+            middle + (d - M_MIDDLE) * k
         };
         let design = m_half();
         let (top, foot) = m_span();
         let halves = [false, true].map(|mirror| design.map(|d| at(d, mirror)));
-        let fill = ease_in_out(phase(t, FILL));
-        let trace = phase(t, TRACE);
+        let (fill, trace) = (self.fill, self.trace);
 
         if fill > 0.0 {
             for half in &halves {
@@ -645,7 +795,7 @@ impl Opening {
         }
 
         // The meridian's bar, out from the middle of the V.
-        let grow = ease_out(phase(t, BAR));
+        let grow = self.bar;
         if grow > 0.0 {
             let (half, top, foot) = M_BAR;
             let mid = at(Vec2::new(500.0, 505.0), false).y;
@@ -653,12 +803,12 @@ impl Opening {
                 mid + (at(Vec2::new(500.0, top), false).y - mid) * grow,
                 mid + (at(Vec2::new(500.0, foot), false).y - mid) * grow,
             );
-            let hw = (half * l.m_k * grow).max(0.75);
-            let cx = l.m_at.x;
-            let breath = 0.85 + 0.15 * (t * 1.7).sin() * phase(t, (INTRO, INTRO + 1.0));
+            let hw = (half * k * grow).max(0.75);
+            let cx = middle.x;
+            let breath = self.breath;
             let accent = rgb(palette::ACCENT, 1.0);
             let halo = alpha(accent, 0.30 * breath * grow);
-            let reach = 70.0 * l.m_k;
+            let reach = 70.0 * k;
             let clear = alpha(halo, 0.0);
             let across = [
                 (-1.0, 0.0, clear),
@@ -679,111 +829,16 @@ impl Opening {
             ui.fill(Rect::new(cx - hw, y0, hw * 2.0, y1 - y0), accent);
         }
     }
+}
 
-    /// The name either side of the meridian, a rule under it, the credit.
-    fn title(&self, ui: &mut Ui, l: &Layout, t: f32) {
-        let (cx, y) = (l.view.centre, l.title_y);
-        let bold = ui::style(Face::Bold, 44.0, 1.0);
-        let light = ui::style(Face::Light, 44.0, 1.0);
-        let gap = 15.0;
-        let e = ease_out(phase(t, TITLE));
-        if e > 0.0 {
-            let left = ui.text_width(bold, "Meridian");
-            let right = ui.text_width(light, "Conflict");
-            let slide = (1.0 - e) * 22.0;
-            let saved = ui.fade;
-            ui.fade *= e;
-            let text = rgb(palette::TEXT, 1.0);
-            // In toward the meridian from either side.
-            ui.text(cx - gap - left - slide, y, bold, text, "Meridian");
-            ui.text(cx + gap + slide, y, light, text, "Conflict");
-            ui.fade = saved;
-            // The rule, out from the meridian to the ends of the words.
-            let rule = y + 32.0;
-            let line = rgb(palette::LINE, 0.28 * e);
-            let (l_len, r_len) = ((left + 6.0) * e, (right + 6.0) * e);
-            ui.hline(cx - gap - l_len, rule, l_len, line);
-            ui.hline(cx + gap, rule, r_len, line);
-            ui.vline(cx - gap - l_len, rule - 3.0, 7.0, line);
-            ui.vline(cx + gap + r_len, rule - 3.0, 7.0, line);
-            ui.disc(Vec2::new(cx, rule + 0.5), 2.5, rgb(palette::ACCENT, e));
-        }
-        let credit = ease_out(phase(t, CREDIT));
-        if credit > 0.0 {
-            ui.text_centred(
-                cx,
-                y + 58.0 + (1.0 - credit) * 8.0,
-                ui::style(Face::Medium, 15.0, 1.4),
-                rgb(palette::DIM, credit),
-                "By Joshowaaah",
-            );
-        }
-    }
-
-    /// What is loading and how far it has got: a bar filling out from the meridian.
-    fn status(&mut self, ui: &mut Ui, t: f32, bar: f32, step: Option<&'static str>) {
-        let step = step.unwrap_or("Ready");
-        if step != self.step {
-            self.was = self.step;
-            self.step = step;
-            self.changed = t;
-        }
-        let shown = ease_out(phase(t, STATUS));
-        if shown <= 0.0 {
-            return;
-        }
-        let (w, h) = (ui.size.x, ui.size.y);
-        let (cx, y) = (w * 0.5, h - 64.0);
-        let saved = ui.fade;
-        ui.fade *= shown;
-
-        let half = 210.0;
-        ui.hline(cx - half, y, half * 2.0, rgb(palette::LINE, 0.14));
-        let filled = bar.clamp(0.0, 1.0) * half;
-        let accent = rgb(palette::ACCENT, 1.0);
-        ui.fill(Rect::new(cx - filled, y - 0.5, filled * 2.0, 2.0), accent);
-        for side in [-1.0, 1.0] {
-            glow_dot(ui, Vec2::new(cx + side * filled, y + 0.5), 9.0, 0.7);
-        }
-
-        let words = ui::style(Face::Medium, 13.0, 0.6);
-        // The old words rise out before the new ones rise in, so the two never overlap.
-        let swap = ((t - self.changed) / 0.4).clamp(0.0, 1.0);
-        let (out, into) = (ease_out(swap * 2.0), ease_out(swap * 2.0 - 1.0));
-        if out < 1.0 && !self.was.is_empty() {
-            ui.text_centred(
-                cx,
-                y - 22.0 - out * 8.0,
-                words,
-                rgb(palette::DIM, 1.0 - out),
-                self.was,
-            );
-        }
-        let into = if self.was.is_empty() { swap } else { into };
-        ui.text_centred(
-            cx,
-            y - 22.0 + (1.0 - into) * 8.0,
-            words,
-            rgb(palette::DIM, into),
-            self.step,
-        );
-        ui.text_right(
-            w - 48.0,
-            y,
-            ui::type_scale::MICRO,
-            rgb(palette::FAINT, 1.0),
-            &format!(
-                "{}   \u{b7}   {}",
-                crate::build_label(),
-                env!("CARGO_PKG_VERSION")
-            ),
-        );
-        ui.fade = saved;
-    }
+/// The size of the M, design units: points per unit times this is its height.
+pub(super) fn m_height() -> f32 {
+    let (top, foot) = m_span();
+    foot - top
 }
 
 /// A soft round glow's stops, from `peak` in the middle to nothing at the rim.
-fn falloff(peak: f32) -> Vec<(f32, f32, Color)> {
+pub(super) fn falloff(peak: f32) -> Vec<(f32, f32, Color)> {
     let dawn = rgb(palette::ACCENT_DEEP, 0.0);
     (0..=16)
         .map(|i| {
@@ -795,7 +850,7 @@ fn falloff(peak: f32) -> Vec<(f32, f32, Color)> {
 }
 
 /// A point of light: a hot core in a soft orange bloom.
-fn glow_dot(ui: &mut Ui, at: Vec2, radius: f32, strength: f32) {
+pub(super) fn glow_dot(ui: &mut Ui, at: Vec2, radius: f32, strength: f32) {
     if strength <= 0.0 {
         return;
     }
