@@ -38,7 +38,17 @@ mod tests;
 pub(crate) use stacked::LAMPS as DOMINION_LAMPS;
 
 pub(super) fn build(b: &mut MeshBuilder) {
-    b.with_facets(stacked::build);
+    b.with_facets(|b| stacked::build(b, prow::Bow::Sharp));
+}
+
+pub(super) fn build_citadel(b: &mut MeshBuilder) {
+    b.with_facets(|b| stacked::build(b, prow::Bow::Citadel));
+}
+pub(super) fn build_fork(b: &mut MeshBuilder) {
+    b.with_facets(|b| stacked::build(b, prow::Bow::Fork));
+}
+pub(super) fn build_chisel(b: &mut MeshBuilder) {
+    b.with_facets(|b| stacked::build(b, prow::Bow::Chisel));
 }
 
 // ---- the contract -------------------------------------------------------------------

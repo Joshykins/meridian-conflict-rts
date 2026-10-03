@@ -74,9 +74,9 @@ pub(super) fn layer_half(w: f32, foot: f32, top: f32) -> Vec<[f32; 2]> {
     ]
 }
 
-pub(super) fn build(b: &mut MeshBuilder) {
+pub(super) fn build(b: &mut MeshBuilder, bow: super::prow::Bow) {
     if b.coarse() {
-        hull::coarse(b);
+        hull::coarse(b, bow);
         b.paint(PLATING);
         b.extrude_z(
             &[
@@ -91,7 +91,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.cuboid_open(v3(-30.0, 0.0, L3_TOP - 7.0), v3(150.0, 30.0, 14.0));
         return;
     }
-    hull::build(b, &LAMPS);
+    hull::build(b, &LAMPS, bow);
     layers(b);
     super::detail::build(b);
     for x in RIBS_3 {

@@ -114,6 +114,16 @@ pub(crate) fn space_dreadnought(b: &mut MeshBuilder, _tech: u8) {
     dominion::build(b);
 }
 
+pub(crate) fn dominion_citadel(b: &mut MeshBuilder, _tech: u8) {
+    dominion::build_citadel(b);
+}
+pub(crate) fn dominion_fork(b: &mut MeshBuilder, _tech: u8) {
+    dominion::build_fork(b);
+}
+pub(crate) fn dominion_chisel(b: &mut MeshBuilder, _tech: u8) {
+    dominion::build_chisel(b);
+}
+
 /// Bastion: capital assault transport with a vehicle hangar and fusion drives.
 pub(crate) fn lift_ship(b: &mut MeshBuilder, _tech: u8) {
     bastion::build(b);
