@@ -1,9 +1,9 @@
-//! The Condenser (mesh `regency_fabricator`), the Regency's material fabricator, on a 4×4 lot
-//! (48 m square): energy cells on the grid side (-x) cabled into a sealed vessel where
-//! gravity squeezes the charge until matter condenses out of it, and a small bin of product
-//! on the far side (+x). It upgrades in place; each tier adds working machinery (more
-//! cells, a taller vessel, more field gear), in the Regency's dark lapped plate over
-//! graphite machinery, red where it runs hot.
+//! The Condenser (mesh `regency_fabricator`), the Regency's material fabricator: energy
+//! cells on the grid side (-x) cabled into a sealed vessel where gravity squeezes the charge
+//! until matter condenses out of it, and a small bin of product on the far side (+x). Each
+//! tier is a building of its own on its power generator's lot (2x2, 4x4, 8x8), with more
+//! working machinery the higher it goes (more cells, a taller vessel, more field gear), in
+//! the Regency's dark lapped plate over graphite machinery, red where it runs hot.
 //!
 //! Three designs are on the table (`regency_fabricator`, `~orbit`, `~press`), all built
 //! from the kit here.
@@ -12,7 +12,7 @@ pub(super) mod orbit;
 pub(super) mod press;
 pub(super) mod vessel;
 
-use glam::{Vec2, Vec3};
+use glam::{Affine3A, Vec2, Vec3};
 
 use crate::builder::{ngon, MeshBuilder, Section};
 use crate::material::*;
@@ -20,9 +20,36 @@ use crate::material::*;
 use super::kit::{cable, dark_plate, metal, seam, v3};
 use super::machine::*;
 
-/// The (radius, height) each tier is authored at: as tall as the blueprint
-/// (`data/factions/regency/units/structures.ron`).
-pub(super) const SIZES: [(f32, f32); 3] = [(23.0, 14.0), (23.0, 22.0), (23.0, 30.0)];
+/// The (radius, height) of each tier, the blueprint's: its own lot, as big as that tier's
+/// power plant's.
+pub(super) const SIZES: [(f32, f32); 3] = [(11.0, 7.0), (23.0, 22.0), (42.5, 34.0)];
+/// Each tier's lot, in build cells a side.
+#[cfg(test)]
+const LOTS: [u32; 3] = [2, 4, 8];
+/// The plant is authored on the 4x4 lot: the tech 1 building is that plant's first tier
+/// drawn down to a 2x2 lot, and the tech 3 one its full plant drawn up in the middle of
+/// an 8x8 lot, with the yard round it.
+const T1_SCALE: f32 = 0.52;
+const T3_SCALE: f32 = 1.3;
+
+/// Draws `plant`'s building for `tech`: each tier a building of its own (see `T1_SCALE`).
+pub(super) fn standalone(b: &mut MeshBuilder, tech: u8, plant: fn(&mut MeshBuilder, u8)) {
+    match tech.clamp(1, 3) {
+        1 => b.with(Affine3A::from_scale(Vec3::splat(T1_SCALE)), |b| plant(b, 1)),
+        2 => plant(b, 2),
+        _ => {
+            yard(b);
+            b.with(Affine3A::from_scale(Vec3::splat(T3_SCALE)), |b| plant(b, 3));
+        }
+    }
+}
+
+/// A tier's machinery in a plant drawn at `tech`: there when the building has that tier.
+pub(super) fn fitted(b: &mut MeshBuilder, tech: u8, tier: u8, f: impl FnOnce(&mut MeshBuilder)) {
+    if tier <= tech {
+        f(b);
+    }
+}
 
 /// A plate's thickness.
 pub(super) const THICK: f32 = 0.5;
@@ -252,33 +279,86 @@ fn v2(x: f32, y: f32) -> Vec2 {
     Vec2::new(x, y)
 }
 
+/// The tech 3 yard round the plant on its 8x8 lot: two more rows of cells on the grid side
+/// and a long cell out on each flank, all cabled in to the plant's own cells, and two more
+/// bins on the far side fed from the plant's.
+fn yard(b: &mut MeshBuilder) {
+    if b.coarse() {
+        // The rows of cells as plates lying where they are.
+        dark_plate(b);
+        for (c, half) in [
+            (v3(-37.2, 0.0, 3.4), v2(6.5, 21.0)),
+            (v3(0.0, 36.0, 3.4), v2(24.0, 2.8)),
+            (v3(0.0, -36.0, 3.4), v2(24.0, 2.8)),
+        ] {
+            b.decal(c, half * 2.0);
+        }
+        return;
+    }
+    let k = T3_SCALE;
+    for x in [-34.0f32, -40.5] {
+        for y in [-12.0f32, 12.0] {
+            cell(b, v3(x, y, 3.4), 8.0, 2.8);
+            feed(
+                b,
+                v3(x + 2.0, y, 6.0),
+                v3(-19.4, y.signum() * FLANK * k, 4.7),
+            );
+        }
+    }
+    for s in [-1.0f32, 1.0] {
+        for (x, into) in [(-14.0f32, -8.0 * k), (14.0, 5.0 * k)] {
+            let at = v3(x, s * 36.0, 0.0);
+            b.yawed(at, s * std::f32::consts::FRAC_PI_2, |b| {
+                cell(b, v3(0.0, 0.0, 3.4), 9.0, 2.8)
+            });
+            feed(b, v3(x, s * 34.6, 6.0), v3(into, s * FLANK * k, 6.6));
+        }
+    }
+    for y in [-10.0f32, 10.0] {
+        bin(b, v3(14.5 * k, 0.0, 5.0), v3(34.0, y, 0.0), 4.5);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::SIZES;
+    use super::{LOTS, SIZES};
     use crate::{build_model_scaled, rig};
 
-    /// Each design carries the next tier's machinery as upgrade pieces and grows by tier.
+    const DESIGNS: [&str; 3] = [
+        "regency_fabricator",
+        "regency_fabricator~orbit",
+        "regency_fabricator~press",
+    ];
+
+    /// Each tier is a building of its own: nothing waits on it for a refit, it fills its
+    /// own lot (and no more), and each tier carries more machinery than the one below.
     #[test]
-    fn every_design_upgrades_in_place_and_grows() {
-        for key in [
-            "regency_fabricator",
-            "regency_fabricator~orbit",
-            "regency_fabricator~press",
-        ] {
+    fn every_tier_stands_alone_on_its_own_lot() {
+        for key in DESIGNS {
             let mut last = 0;
-            for (i, (r, h)) in SIZES.into_iter().enumerate() {
+            for (i, ((r, h), cells)) in SIZES.into_iter().zip(LOTS).enumerate() {
                 let tech = i as u8 + 1;
                 let model = build_model_scaled(key, r, h, tech).unwrap();
-                let lod = &model.lods[0];
-                let upgrade = lod.vertices.iter().any(|v| v.rig & rig::UPGRADE != 0);
-                assert_eq!(upgrade, tech < 3, "{key} T{tech}: upgrade pieces");
-                let own = lod
-                    .indices
-                    .iter()
-                    .filter(|&&i| lod.vertices[i as usize].rig & rig::UPGRADE == 0)
-                    .count();
-                assert!(own > last, "{key} T{tech} adds machinery");
-                last = own;
+                let half = cells as f32 * 6.0;
+                for (lod, mesh) in model.lods.iter().enumerate() {
+                    assert!(
+                        mesh.vertices.iter().all(|v| v.rig & rig::UPGRADE == 0),
+                        "{key} T{tech} lod{lod}: upgrade pieces"
+                    );
+                    let reach = mesh
+                        .vertices
+                        .iter()
+                        .map(|v| v.pos[0].abs().max(v.pos[1].abs()))
+                        .fold(0.0, f32::max);
+                    assert!(
+                        reach <= half && reach >= half * 0.55,
+                        "{key} T{tech} lod{lod}: reach {reach} on a {cells}x{cells} lot"
+                    );
+                }
+                let full = model.lods[0].indices.len();
+                assert!(full > last, "{key} T{tech} has more machinery");
+                last = full;
             }
         }
     }
@@ -289,11 +369,7 @@ mod tests {
     #[test]
     #[ignore = "a probe: prints triangle counts"]
     fn zz_condenser_counts() {
-        for key in [
-            "regency_fabricator",
-            "regency_fabricator~orbit",
-            "regency_fabricator~press",
-        ] {
+        for key in DESIGNS {
             for (i, (r, h)) in SIZES.into_iter().enumerate() {
                 let m = build_model_scaled(key, r, h, i as u8 + 1).unwrap();
                 let n: Vec<usize> = m.lods.iter().map(|l| l.indices.len() / 3).collect();

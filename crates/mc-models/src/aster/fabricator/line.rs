@@ -12,7 +12,6 @@ use std::f32::consts::FRAC_PI_2;
 use glam::{Vec2, Vec3};
 
 use super::super::parts::*;
-use super::super::structures::kit;
 use super::*;
 
 /// The vessel's middle on x, and its stages: (radius, foot, top of the straight body).
@@ -35,6 +34,11 @@ fn centre() -> Vec3 {
 }
 
 pub(in crate::aster) fn line_plant(b: &mut MeshBuilder, tech: u8) {
+    standalone(b, tech, plant);
+}
+
+/// The plant drawn with every tier's machinery up to `tech`, at the 4x4 lot's scale.
+fn plant(b: &mut MeshBuilder, tech: u8) {
     if b.coarse() {
         coarse(b, tech);
         return;
@@ -57,7 +61,7 @@ pub(in crate::aster) fn line_plant(b: &mut MeshBuilder, tech: u8) {
     hopper(b, v3(AT + r * 0.9, 0.0, 5.6), v3(15.5, 0.0, DECK), 3.4);
 
     // ---- Tech 2: flank banks and their lines, the upper stage, radiators.
-    kit(b, tech, 2, 0.15, |b| {
+    fitted(b, tech, 2, |b| {
         for y in [-11.0f32, 11.0] {
             bank_x(b, v3(-17.0, y, DECK), 3, 7.0);
             let from = v3(-12.6, y * 0.92, LINE_Z);
@@ -65,21 +69,21 @@ pub(in crate::aster) fn line_plant(b: &mut MeshBuilder, tech: u8) {
             line(b, from, to, &[0.25, 0.65]);
         }
     });
-    kit(b, tech, 2, 0.45, |b| {
+    fitted(b, tech, 2, |b| {
         let (r, z0, z1) = STAGES[1];
         vessel(b, centre(), r, z0, z1);
         coil(b, v3(AT, 0.0, 14.0), r + 0.02, 0.8, 0.9);
         coil(b, v3(AT, 0.0, 15.9), r + 0.02, 0.8, 0.9);
     });
-    kit(b, tech, 2, 0.75, |b| {
+    fitted(b, tech, 2, |b| {
         for y in [-13.5, 13.5] {
             radiator(b, v3(4.0, y, DECK), Vec3::X, 12.0, 2.6);
         }
     });
 
     // ---- Tech 3: the portal, a third stage under its crown, more coils and banks.
-    kit(b, tech, 3, 0.1, portal);
-    kit(b, tech, 3, 0.35, |b| {
+    fitted(b, tech, 3, portal);
+    fitted(b, tech, 3, |b| {
         let (r, z0, z1) = STAGES[2];
         vessel(b, centre(), r, z0, z1);
         coil(b, v3(AT, 0.0, 21.0), r + 0.02, 0.7, 0.9);
@@ -88,7 +92,7 @@ pub(in crate::aster) fn line_plant(b: &mut MeshBuilder, tech: u8) {
         b.paint(GLOW).pattern(pattern::CHARGE);
         annulus_on(b, centre(), Vec3::Z, 8, 5.6, 5.68, 24.8, 25.4);
     });
-    kit(b, tech, 3, 0.6, |b| {
+    fitted(b, tech, 3, |b| {
         for y in [-15.8f32, 15.8] {
             bank_x(b, v3(-17.0, y, DECK), 3, 8.5);
         }
@@ -96,7 +100,7 @@ pub(in crate::aster) fn line_plant(b: &mut MeshBuilder, tech: u8) {
             coil_on(b, v3(x, 0.0, LINE_Z), Vec3::X, DUCT * 0.6, 0.8, 1.2);
         }
     });
-    kit(b, tech, 3, 0.85, |b| {
+    fitted(b, tech, 3, |b| {
         b.mirror_y(|b| {
             conduit(
                 b,

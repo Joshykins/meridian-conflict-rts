@@ -238,8 +238,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_assault_submarine" => 8000,
         // Three tiers, and the next one's pieces waiting on each.
         "regency_cyst" => 6000,
-        // A 4 x 4 plant of a few a side: three tiers of vessel, cells and field gear.
-        "regency_fabricator" => 7000,
+        // Up to an 8 x 8 plant, a few a side: a vessel, cells and field gear.
+        "regency_fabricator" => 9500,
         // Four tiers, and the next one's pieces waiting on each.
         "regency_taproot" => 8500,
         "regency_heart" | "regency_barb" | "regency_spitter" => 4000,

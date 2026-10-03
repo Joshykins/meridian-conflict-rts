@@ -10,7 +10,6 @@
 use glam::Vec3;
 
 use super::super::parts::*;
-use super::super::structures::kit;
 use super::*;
 
 /// The vessel's stages: (radius, foot, top of the straight body). Each stands on the
@@ -24,6 +23,11 @@ fn hatch(stage: usize) -> f32 {
 }
 
 pub(in crate::aster) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
+    standalone(b, tech, plant);
+}
+
+/// The plant drawn with every tier's machinery up to `tech`, at the 4x4 lot's scale.
+fn plant(b: &mut MeshBuilder, tech: u8) {
     if b.coarse() {
         coarse(b, tech);
         return;
@@ -51,7 +55,7 @@ pub(in crate::aster) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
     }
 
     // ---- Tech 2: the upper stage in its containment frame, banks on the flanks, cooling.
-    kit(b, tech, 2, 0.15, |b| {
+    fitted(b, tech, 2, |b| {
         b.radial(4, |b| {
             b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_4, |b| {
                 b.paint(PLATING_DARK);
@@ -60,7 +64,7 @@ pub(in crate::aster) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
             });
         });
     });
-    kit(b, tech, 2, 0.4, |b| {
+    fitted(b, tech, 2, |b| {
         let (r, z0, z1) = STAGES[1];
         vessel(b, Vec3::ZERO, r, z0, z1);
         for z in [13.8, 15.8] {
@@ -72,7 +76,7 @@ pub(in crate::aster) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
             annulus_on(b, Vec3::ZERO, Vec3::Z, 8, 4.9, 5.9, 17.2, 18.2)
         });
     });
-    kit(b, tech, 2, 0.65, |b| {
+    fitted(b, tech, 2, |b| {
         for s in [-1.0f32, 1.0] {
             b.yawed(Vec3::ZERO, s * std::f32::consts::FRAC_PI_2, |b| {
                 bank(b, v3(-15.5, 0.0, DECK), 3, 7.5);
@@ -80,19 +84,19 @@ pub(in crate::aster) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
             });
         }
     });
-    kit(b, tech, 2, 0.85, |b| {
+    fitted(b, tech, 2, |b| {
         for y in [-7.0, 7.0] {
             radiator(b, v3(9.0, y, DECK), Vec3::X, 10.5, 2.6);
         }
     });
 
     // ---- Tech 3: a third stage under a crown, corner pylons feeding it, more banks.
-    kit(b, tech, 3, 0.1, |b| {
+    fitted(b, tech, 3, |b| {
         b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_4, |b| {
             b.radial(4, |b| pylon(b, 23.0));
         });
     });
-    kit(b, tech, 3, 0.35, |b| {
+    fitted(b, tech, 3, |b| {
         let (r, z0, z1) = STAGES[2];
         vessel(b, Vec3::ZERO, r, z0, z1);
         coil(b, v3(0.0, 0.0, 20.6), r + 0.02, 0.8, 0.9);
@@ -106,14 +110,14 @@ pub(in crate::aster) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
             relief(b, v3(0.0, 0.0, hatch(2)), 2.4);
         }
     });
-    kit(b, tech, 3, 0.6, |b| {
+    fitted(b, tech, 3, |b| {
         b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_4, |b| {
             b.radial(4, |b| {
                 conduit(b, &[v3(21.6, 0.0, 25.0), v3(6.3, 0.0, 25.0)], 0.8);
             });
         });
     });
-    kit(b, tech, 3, 0.8, |b| {
+    fitted(b, tech, 3, |b| {
         bank(b, v3(-19.4, 0.0, DECK), 5, 9.0);
         for y in [-7.0, 7.0] {
             radiator(b, v3(-12.0, y, DECK), Vec3::X, 5.5, 2.4);

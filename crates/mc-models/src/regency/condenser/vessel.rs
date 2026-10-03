@@ -32,6 +32,11 @@ fn hatch(stage: usize) -> f32 {
 }
 
 pub(in crate::regency) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
+    standalone(b, tech, plant);
+}
+
+/// The plant drawn with every tier's machinery up to `tech`, at the 4x4 lot's scale.
+fn plant(b: &mut MeshBuilder, tech: u8) {
     let tech = tech.clamp(1, 3);
     if b.coarse() {
         coarse(b, tech);
@@ -56,12 +61,12 @@ pub(in crate::regency) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
     bin(b, v3(5.4, 0.0, 2.4), v3(14.5, 0.0, 0.0), 3.2);
 
     // ---- Tech 2: the upper stage on four buttresses, cells on the flanks.
-    tier(b, tech, 2, 0.2, |b| {
+    fitted(b, tech, 2, |b| {
         b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_4, |b| {
             b.radial(4, buttress);
         });
     });
-    tier(b, tech, 2, 0.45, |b| {
+    fitted(b, tech, 2, |b| {
         let (r, z0, z1) = STAGES[1];
         vessel(b, Vec3::ZERO, r, z0, z1);
         if b.fine() {
@@ -70,19 +75,19 @@ pub(in crate::regency) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
             }
         }
     });
-    tier(b, tech, 2, 0.7, |b| {
+    fitted(b, tech, 2, |b| {
         flank_cells(b, 5.0, 4.0, 2.0, |s| v3(1.6, s * (r * 0.92 + 0.1), 8.3));
     });
 
     // ---- Tech 3: a third stage, a plated crown over it, a second row of cells.
-    tier(b, tech, 3, 0.2, |b| {
+    fitted(b, tech, 3, |b| {
         let (r, z0, z1) = STAGES[2];
         vessel(b, Vec3::ZERO, r, z0, z1);
         if b.fine() {
             field_collar(b, Vec3::ZERO, r, 21.4);
         }
     });
-    tier(b, tech, 3, 0.5, |b| {
+    fitted(b, tech, 3, |b| {
         b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_4, |b| {
             b.radial(4, |b| {
                 let (_, top_out, top_z) = BUTTRESS;
@@ -99,7 +104,7 @@ pub(in crate::regency) fn vessel_plant(b: &mut MeshBuilder, tech: u8) {
             }
         }
     });
-    tier(b, tech, 3, 0.8, |b| {
+    fitted(b, tech, 3, |b| {
         for y in [-5.0, 5.0] {
             cell(b, v3(-20.0, y, 2.2), 3.4, 1.7);
         }

@@ -32,6 +32,11 @@ const CORNER: (f32, f32, f32) = (8.0, 3.2, 12.6);
 const SIDE: (f32, f32, f32) = (7.6, 3.0, 19.4);
 
 pub(in crate::regency) fn press_plant(b: &mut MeshBuilder, tech: u8) {
+    standalone(b, tech, plant);
+}
+
+/// The plant drawn with every tier's machinery up to `tech`, at the 4x4 lot's scale.
+fn plant(b: &mut MeshBuilder, tech: u8) {
     let tech = tech.clamp(1, 3);
     if b.coarse() {
         coarse(b, tech);
@@ -51,24 +56,24 @@ pub(in crate::regency) fn press_plant(b: &mut MeshBuilder, tech: u8) {
     bin(b, v3(CASE.0, 0.0, 2.8), v3(15.0, 0.0, 0.0), 3.2);
 
     // ---- Tech 2.
-    tier(b, tech, 2, 0.2, |b| {
+    fitted(b, tech, 2, |b| {
         b.radial(4, |b| field_plate(b, SIDE, 2.6));
     });
-    tier(b, tech, 2, 0.45, |b| {
+    fitted(b, tech, 2, |b| {
         core(b, CORE_TOP[0], CORE_TOP[1]);
         metal(b);
         hoop(b, v3(0.0, 0.0, SIDE.2 - 0.8), SIDE.1 + 0.4, 1.2, 1.0, 8);
     });
-    tier(b, tech, 2, 0.75, |b| {
+    fitted(b, tech, 2, |b| {
         flank_cells(b, 5.0, 4.0, 2.0, |s| v3(1.6, s * (CASE.0 + 0.3), 3.2));
     });
 
     // ---- Tech 3.
-    tier(b, tech, 3, 0.25, |b| {
+    fitted(b, tech, 3, |b| {
         core(b, CORE_TOP[1], CORE_TOP[2]);
         head(b);
     });
-    tier(b, tech, 3, 0.8, |b| {
+    fitted(b, tech, 3, |b| {
         for y in [-5.0, 5.0] {
             cell(b, v3(-20.4, y, 2.2), 3.4, 1.7);
         }

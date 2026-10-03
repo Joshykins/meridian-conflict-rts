@@ -12,7 +12,6 @@ use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 use glam::Vec3;
 
 use super::super::parts::*;
-use super::super::structures::kit;
 use super::*;
 
 /// Half the ring's span (to its duct's middle), the duct's size and the height of its
@@ -31,6 +30,11 @@ fn hatch(stage: usize) -> f32 {
 }
 
 pub(in crate::aster) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
+    standalone(b, tech, plant);
+}
+
+/// The plant drawn with every tier's machinery up to `tech`, at the 4x4 lot's scale.
+fn plant(b: &mut MeshBuilder, tech: u8) {
     if b.coarse() {
         coarse(b, tech);
         return;
@@ -63,21 +67,21 @@ pub(in crate::aster) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
     hopper(b, v3(3.0, 3.0, 5.2), v3(7.6, 7.6, DECK), 2.8);
 
     // ---- Tech 2: coils all round, the upper stage on a gantry, flank banks, cooling.
-    kit(b, tech, 2, 0.15, |b| {
+    fitted(b, tech, 2, |b| {
         b.radial(4, |b| {
             for y in [-6.5, 6.5] {
                 coil_on(b, v3(RING, y - 0.7, DUCT_Z), Vec3::Y, DUCT * 0.55, 0.9, 1.4);
             }
         });
     });
-    kit(b, tech, 2, 0.35, |b| {
+    fitted(b, tech, 2, |b| {
         let (r, z0, z1) = STAGES[1];
         vessel(b, Vec3::ZERO, r, z0, z1);
         coil(b, v3(0.0, 0.0, 14.6), r + 0.02, 0.8, 0.9);
         b.paint(ACCENT);
         annulus_on(b, Vec3::ZERO, Vec3::Z, 8, 4.0, 5.2, 17.0, 18.0);
     });
-    kit(b, tech, 2, 0.55, |b| {
+    fitted(b, tech, 2, |b| {
         b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
             b.radial(4, |b| {
                 let corner = RING * std::f32::consts::SQRT_2;
@@ -91,7 +95,7 @@ pub(in crate::aster) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
             });
         });
     });
-    kit(b, tech, 2, 0.75, |b| {
+    fitted(b, tech, 2, |b| {
         for s in [-1.0f32, 1.0] {
             b.yawed(Vec3::ZERO, s * FRAC_PI_2, |b| {
                 bank(b, v3(-17.0, 0.0, DECK), 3, 7.0);
@@ -103,14 +107,14 @@ pub(in crate::aster) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
             });
         }
     });
-    kit(b, tech, 2, 0.9, |b| {
+    fitted(b, tech, 2, |b| {
         for y in [-4.5, 4.5] {
             radiator(b, v3(15.0, y, DECK), Vec3::X, 5.8, 2.6);
         }
     });
 
     // ---- Tech 3: the gantry raised, a third stage under a crown, more banks and cooling.
-    kit(b, tech, 3, 0.15, |b| {
+    fitted(b, tech, 3, |b| {
         b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
             b.radial(4, |b| {
                 let corner = RING * std::f32::consts::SQRT_2;
@@ -138,7 +142,7 @@ pub(in crate::aster) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
             });
         });
     });
-    kit(b, tech, 3, 0.4, |b| {
+    fitted(b, tech, 3, |b| {
         let (r, z0, z1) = STAGES[2];
         vessel(b, Vec3::ZERO, r, z0, z1);
         coil(b, v3(0.0, 0.0, 21.0), r + 0.02, 0.7, 0.9);
@@ -147,10 +151,10 @@ pub(in crate::aster) fn ring_plant(b: &mut MeshBuilder, tech: u8) {
         b.paint(GLOW).pattern(pattern::CHARGE);
         annulus_on(b, Vec3::ZERO, Vec3::Z, 8, 6.0, 6.08, 25.0, 26.0);
     });
-    kit(b, tech, 3, 0.65, |b| {
+    fitted(b, tech, 3, |b| {
         bank(b, v3(-20.2, 0.0, DECK), 5, 8.5);
     });
-    kit(b, tech, 3, 0.85, |b| {
+    fitted(b, tech, 3, |b| {
         for (x, y) in [(-17.5, 8.4), (-17.5, -16.4), (17.5, 8.4), (17.5, -16.4)] {
             radiator(b, v3(x, y, DECK), Vec3::Y, 8.0, 2.4);
         }

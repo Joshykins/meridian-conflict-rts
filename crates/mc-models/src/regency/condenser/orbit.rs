@@ -48,6 +48,11 @@ const RINGS: [(f32, Vec3, Vec3, f32); 3] = [
 ];
 
 pub(in crate::regency) fn orbit_plant(b: &mut MeshBuilder, tech: u8) {
+    standalone(b, tech, plant);
+}
+
+/// The plant drawn with every tier's machinery up to `tech`, at the 4x4 lot's scale.
+fn plant(b: &mut MeshBuilder, tech: u8) {
     let tech = tech.clamp(1, 3);
     if b.coarse() {
         coarse(b, tech);
@@ -68,20 +73,20 @@ pub(in crate::regency) fn orbit_plant(b: &mut MeshBuilder, tech: u8) {
     bin(b, v3(8.0, 0.0, 2.6), v3(15.0, 0.0, 0.0), 3.2);
 
     // ---- Tech 2.
-    tier(b, tech, 2, 0.2, |b| {
+    fitted(b, tech, 2, |b| {
         b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_4, |b| {
             b.radial(4, |b| pylon(b, PYLON_TOP[0], PYLON_TOP[1], false));
         });
     });
-    tier(b, tech, 2, 0.5, |b| ring(b, 1));
-    tier(b, tech, 2, 0.75, |b| {
+    fitted(b, tech, 2, |b| ring(b, 1));
+    fitted(b, tech, 2, |b| {
         flank_cells(b, 5.0, 4.0, 2.0, |s| {
             v3(1.6, s * (CASE.1 * 0.92 + 0.6), 3.6)
         });
     });
 
     // ---- Tech 3.
-    tier(b, tech, 3, 0.2, |b| {
+    fitted(b, tech, 3, |b| {
         b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_4, |b| {
             b.radial(4, |b| pylon(b, PYLON_TOP[1], PYLON_TOP[2], false));
         });
@@ -95,8 +100,8 @@ pub(in crate::regency) fn orbit_plant(b: &mut MeshBuilder, tech: u8) {
             8,
         );
     });
-    tier(b, tech, 3, 0.5, |b| ring(b, 2));
-    tier(b, tech, 3, 0.8, |b| {
+    fitted(b, tech, 3, |b| ring(b, 2));
+    fitted(b, tech, 3, |b| {
         for y in [-5.0, 5.0] {
             cell(b, v3(-20.4, y, 2.2), 3.4, 1.7);
         }
@@ -229,7 +234,7 @@ fn ring(b: &mut MeshBuilder, k: usize) {
     });
 }
 
-/// Far off: the casemate, the pylons as one plate each way at the tier's height, the mote,
+/// Far off: the casemate, the pylons as one plate each way at the tier's height,
 /// the cell and the bin, the owner's colour on top.
 fn coarse(b: &mut MeshBuilder, tech: u8) {
     let (r0, r1, h) = CASE;
@@ -242,14 +247,6 @@ fn coarse(b: &mut MeshBuilder, tech: u8) {
         b.face(&quad);
         b.face(&[quad[3], quad[2], quad[1], quad[0]]);
     }
-    b.paint(ROCK);
-    b.prism(
-        MOTE - Vec3::Z * MOTE_R,
-        3,
-        MOTE_R,
-        MOTE_R * 0.4,
-        MOTE_R * 2.0,
-    );
     flank_cells(b, -8.0, 5.5, 2.2, |_| Vec3::ZERO);
     bin(b, Vec3::ZERO, v3(15.0, 0.0, 0.0), 3.2);
     b.paint(TEAM);
