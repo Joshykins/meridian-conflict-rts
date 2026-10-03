@@ -146,11 +146,27 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_heart", 6.9, 7.5, heart::heart),
     ModelDef::new("regency_heart_2", 18.75, 18.0, heart::heart_2),
     ModelDef::new("regency_heart_3", 42.5, 35.0, heart::heart_3),
-    // The Condenser, the material fabricator: a building of its own per tier (`condenser`).
+    // The Condenser, the material fabricator (`condenser`): tech 2, upgrading in place to
+    // tech 3. Three designs to pick from; the mesh is the first until one is chosen.
     ModelDef::tiered(
         "regency_fabricator",
         condenser::SIZES,
-        condenser::vessel::vessel_plant,
+        condenser::spire::build,
+    ),
+    ModelDef::tiered(
+        "regency_fabricator~a",
+        condenser::SIZES,
+        condenser::spire::build,
+    ),
+    ModelDef::tiered(
+        "regency_fabricator~b",
+        condenser::SIZES,
+        condenser::jaws::build,
+    ),
+    ModelDef::tiered(
+        "regency_fabricator~c",
+        condenser::SIZES,
+        condenser::pyramid::build,
     ),
     ModelDef::tiered(
         "regency_cyst",
@@ -227,7 +243,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_assault_submarine" => 8000,
         // Three tiers, and the next one's pieces waiting on each.
         "regency_cyst" => 6000,
-        // Up to an 8 x 8 plant, a few a side: a vessel, cells and field gear.
+        // One 2 x 2 machine, its tech 3 plate and field gear waiting on it.
         "regency_fabricator" => 9500,
         // Four tiers, and the next one's pieces waiting on each.
         "regency_taproot" => 8500,
@@ -280,6 +296,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_barb" | "regency_pinch_cannon" => Some(0.52),
         // Towers and talons: plates that keep their sides when reduced.
         "regency_heart_2" | "regency_heart_3" => Some(0.5),
+        // Lofted vessels, plates and pyramid tiers that keep their sides when reduced.
+        "regency_fabricator" => Some(0.5),
         // The tech 1 line: faceted plates and lift bells that keep their shape when reduced.
         "regency_hover_tank" | "regency_raider" | "regency_mobile_aa" => Some(0.5),
         // Faceted plates and skirts that keep their sides when reduced.

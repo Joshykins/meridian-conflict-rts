@@ -1,316 +1,92 @@
-//! The Material Fabricator (mesh `fabricator`): a plant that pours the grid's
-//! energy into a sealed formation chamber and draws off a trickle of material. It reads at a
-//! glance from the grid side (capacitor banks and the conduits out of them) through the
-//! field coils round the chamber to a small hopper of product, and it looks like a bad
-//! place to stand: a pressure vessel in hazard bands. Each tier is a building of its own on
-//! its power plant's lot (2x2, 4x4, 8x8), with more working machinery the higher it goes
-//! (coils, banks, cooling), never spikes or glow for menace.
+//! The Material Fabricator (mesh `fabricator`): one machine-building on a 2x2 lot, built
+//! at tech 2 and upgraded in place to tech 3. It is drawn in the fusion plants' manner, a
+//! four-fold foundation building up to a raised middle, but what it raises is a chamber
+//! where matter condenses, lit in the warm orange of hot product instead of the plants'
+//! blue charge. Tech 3 is the tech 2 building with more and taller machinery on it: those
+//! pieces ride the tech 2 model as upgrade pieces (`structures::kit`), going up during the
+//! refit.
 //!
-//! Tech 1 and 3 are the accelerator ring plant (`ring`), tech 2 the stacked vessel
-//! (`vessel`), both built from the kit here.
+//! Design candidates, one per file, all built from the kit here:
+//! - `clamp` (`fabricator~a`): a glazed condensing column held by four leaning clamp plates.
+//! - `crucible` (`fabricator~b`): a crucible bowl on a neck, a condenser head held over it.
+//! - `stack` (`fabricator~c`): a press stack of plates with matter sheets forming between.
 
-mod ring;
-mod vessel;
+pub(super) mod clamp;
+pub(super) mod crucible;
+pub(super) mod stack;
 
-use glam::{Affine3A, Vec2, Vec3};
+use std::f32::consts::FRAC_PI_4;
+
+use glam::{Vec2, Vec3};
 
 use super::parts::*;
 use crate::builder::{chamfered_rect, ngon, MeshBuilder, Section};
 use crate::material::*;
 use crate::pattern;
 
-/// The (radius, height) of each tier, the blueprint's: its own lot, as big as that tier's
-/// power plant's.
-pub(super) const SIZES: [(f32, f32); 3] = [(11.0, 7.0), (23.0, 22.0), (42.5, 34.0)];
-/// Each tier's lot, in build cells a side.
+/// The (radius, height) of each tier, the blueprints': tech 1 is never built and drawn
+/// as tech 2.
+pub(super) const SIZES: [(f32, f32); 3] = [(11.0, 16.0), (11.0, 16.0), (11.0, 22.0)];
+/// Every tier's lot, in build cells a side.
 #[cfg(test)]
-const LOTS: [u32; 3] = [2, 4, 8];
-/// The plants are authored on the 4x4 lot: the tech 1 building is the ring plant's first
-/// stage drawn down to a 2x2 lot, and the tech 3 one the whole ring plant drawn up in the
-/// middle of an 8x8 lot, with the yard round it.
-const T1_SCALE: f32 = 0.52;
-const T3_SCALE: f32 = 1.3;
+const LOT: u32 = 2;
 
-/// The Material Fabricator at `tech`, each tier a building of its own: tech 1 the ring
-/// plant's first stage on a 2x2 lot, tech 2 the vessel plant on a 4x4, tech 3 the whole
-/// ring plant in its yard on an 8x8.
-pub(super) fn fabricator(b: &mut MeshBuilder, tech: u8) {
-    match tech.clamp(1, 3) {
-        1 => b.with(Affine3A::from_scale(Vec3::splat(T1_SCALE)), |b| {
-            ring::ring_plant(b, 1)
-        }),
-        2 => vessel::vessel_plant(b),
-        _ => {
-            yard(b);
-            b.with(Affine3A::from_scale(Vec3::splat(T3_SCALE)), |b| {
-                ring::ring_plant(b, 3)
-            });
-        }
-    }
+/// Half the plinth, its corner cut, and the top of its deck.
+pub(super) const HALF: f32 = 11.6;
+const CHAMFER: f32 = 2.6;
+pub(super) const DECK: f32 = 0.9;
+
+/// The tier a model drawn at `tech` has: 2 or 3.
+pub(super) fn tier_of(tech: u8) -> u8 {
+    tech.clamp(2, 3)
 }
 
-/// A stage of the ring plant's machinery drawn at `tech`: there when the building has it.
-pub(super) fn fitted(b: &mut MeshBuilder, tech: u8, tier: u8, f: impl FnOnce(&mut MeshBuilder)) {
-    if tier <= tech {
-        f(b);
-    }
+/// Tech 3's machinery on a building drawn at `tech`: built at tech 3, an upgrade piece
+/// going up `at` of the way through the refit at tech 2.
+pub(super) fn tech_3(b: &mut MeshBuilder, tech: u8, at: f32, f: impl FnOnce(&mut MeshBuilder)) {
+    super::structures::kit(b, tier_of(tech), 3, at, f);
 }
 
-/// Half-width of the slab, and the top of its deck.
-pub(super) const SLAB: f32 = 21.5;
-pub(super) const DECK: f32 = 1.6;
-
-/// The slab every design stands on: a dark foot, a plated deck with hazard-striped edges,
-/// the owner's colour on all four sides.
-pub(super) fn slab(b: &mut MeshBuilder) {
-    slab_of(b, SLAB, 4.0);
-}
-
-/// [`slab`] `half` wide, its corners cut back `chamfer`.
-fn slab_of(b: &mut MeshBuilder, half: f32, chamfer: f32) {
+/// The plinth out to the lot's edge, the owner's colour on its two flanks (±y).
+pub(super) fn plinth(b: &mut MeshBuilder) {
     if b.coarse() {
         b.paint(PLATING);
-        b.cuboid_open(v3(0.0, 0.0, DECK * 0.5), v3(half * 2.0, half * 2.0, DECK));
+        b.cuboid_open(v3(0.0, 0.0, DECK * 0.5), v3(HALF * 2.0, HALF * 2.0, DECK));
+        team_panel(b, v3(0.0, HALF - 1.2, DECK), v2(4.0, 0.9));
         return;
     }
-    let plan = chamfered_rect(v2(half, half), chamfer);
-    if !b.fine() {
-        b.paint(PLATING);
-        b.loft_z(&plan, &[Section::new(0.0, 1.0), Section::new(DECK, 0.97)]);
-        return;
-    }
+    let plan = chamfered_rect(v2(HALF, HALF), CHAMFER);
     b.paint(ACCENT);
-    b.loft_z(&plan, &[Section::new(0.0, 1.0), Section::new(0.7, 1.0)]);
+    b.loft_z(
+        &plan,
+        &[Section::new(0.0, 1.02), Section::new(DECK * 0.4, 1.0)],
+    );
     b.paint(PLATING);
-    b.loft_z(&plan, &[Section::new(0.7, 0.99), Section::new(DECK, 0.97)]);
-    if b.fine() {
+    b.loft_z(
+        &plan,
+        &[Section::new(DECK * 0.4, 0.99), Section::new(DECK, 0.96)],
+    );
+    b.mirror_y(|b| team_panel(b, v3(0.0, HALF - 1.2, DECK), v2(4.0, 0.9)));
+}
+
+/// A heat sink on each diagonal, from `from` to `to` out, `w` across: the condensate's
+/// heat dumped off the four corners.
+pub(super) fn corner_sinks(b: &mut MeshBuilder, from: f32, to: f32, w: f32) {
+    if b.coarse() {
+        return;
+    }
+    b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
         b.radial(4, |b| {
-            b.paint(PLATING).pattern(pattern::HAZARD);
-            b.plate(v3(half - 1.4, 0.0, DECK), v2(0.7, half), 0.06, 0.02);
-        });
-    }
-}
-
-/// A team panel on the deck at each side's middle, `out` from the centre.
-pub(super) fn deck_marks(b: &mut MeshBuilder, out: f32) {
-    b.radial(4, |b| team_panel(b, v3(out, 0.0, DECK), v2(1.0, 7.0)));
-}
-
-/// A capacitor bank standing on the deck, its row along y at `at`: a dark plinth and
-/// `cans` hexagonal cans on it, each with a lit charge band, `h` tall.
-pub(super) fn bank(b: &mut MeshBuilder, at: Vec3, cans: usize, h: f32) {
-    let pitch = 2.6;
-    let len = pitch * cans as f32 + 0.8;
-    if b.coarse() {
-        b.paint(PLATING_DARK);
-        b.cuboid_open(at + Vec3::Z * (h * 0.5), v3(3.2, len, h));
-        return;
-    }
-    b.paint(PLATING_DARK);
-    if !b.fine() {
-        // The middle distance: the plinth, each can a plain block with its lit top.
-        b.cuboid_open(at + Vec3::Z * 0.5, v3(3.4, len, 1.0));
-        for k in 0..cans {
-            let y = (k as f32 - (cans as f32 - 1.0) * 0.5) * pitch;
-            b.paint(PLATING);
-            b.cuboid_open(
-                at + v3(0.0, y, 1.0 + (h - 1.2) * 0.5),
-                v3(1.9, 1.9, h - 1.2),
-            );
-            b.paint(GLOW).pattern(pattern::NONE);
-            b.decal(at + v3(0.0, y, h - 0.18), v2(1.3, 1.3));
-        }
-        return;
-    }
-    b.chamfered_box(at + Vec3::Z * 0.5, v3(3.4, len, 1.0), 0.3);
-    for k in 0..cans {
-        let y = (k as f32 - (cans as f32 - 1.0) * 0.5) * pitch;
-        let base = at + v3(0.0, y, 1.0);
-        b.paint(PLATING);
-        b.prism(base, 6, 1.15, 1.15, h - 1.8);
-        b.paint(PLATING_DARK);
-        b.prism(base + Vec3::Z * (h - 1.8), 6, 1.15, 0.7, 0.8);
-        b.paint(GLOW).pattern(pattern::NONE);
-        b.prism(base + Vec3::Z * ((h - 1.8) * 0.62), 6, 1.2, 1.2, 0.35);
-        b.paint(METAL);
-        b.prism(base + Vec3::Z * (h - 1.0), 6, 0.25, 0.2, 0.6);
-    }
-}
-
-/// A power run: a dark duct through `path` carrying lit pulses toward its end
-/// (`pattern::CONDUIT`), `w` across.
-pub(super) fn conduit(b: &mut MeshBuilder, path: &[Vec3], w: f32) {
-    if b.coarse() {
-        return;
-    }
-    b.paint(PLATING_DARK).pattern(pattern::CONDUIT);
-    for p in path.windows(2) {
-        b.beam(p[0], p[1], v2(w, w), v2(w, w));
-    }
-    // Bolted flanges where the run leaves and where it goes in.
-    if b.fine() {
-        b.paint(ACCENT);
-        let n = path.len();
-        for (a, c) in [(path[0], path[1]), (path[n - 1], path[n - 2])] {
-            let d = (c - a).normalize_or(Vec3::X);
-            let f = Vec2::splat(w * 1.35);
-            b.beam(a + d * 0.2, a + d * 0.55, f, f);
-        }
-    }
-}
-
-/// A field coil round the z axis at `z`: a dark ring `r` to `r + depth` out, `h` tall, its
-/// winding lit round the outside with charge running round it (`pattern::CHARGE`).
-pub(super) fn coil(b: &mut MeshBuilder, c: Vec3, r: f32, depth: f32, h: f32) {
-    coil_on(b, c, Vec3::Z, r, depth, h);
-}
-
-/// [`coil`] about `axis` through `c` instead of z (an accelerator line's coils).
-pub(super) fn coil_on(b: &mut MeshBuilder, c: Vec3, axis: Vec3, r: f32, depth: f32, h: f32) {
-    if b.fine() {
-        b.paint(PLATING_DARK).pattern(pattern::PLAIN);
-        annulus_on(b, c, axis, 8, r, r + depth, 0.0, h);
-        b.paint(GLOW).pattern(pattern::CHARGE);
-        band_on(b, c, axis, r + depth + 0.04, h * 0.3, h * 0.7);
-    } else {
-        // Further off, the winding's light alone, round what it wraps.
-        b.paint(GLOW).pattern(pattern::CHARGE);
-        band_on(b, c, axis, r + depth * 0.5, h * 0.15, h * 0.85);
-    }
-}
-
-/// An octagonal pressure vessel round the z axis at `c`: a flared foot ringed in hazard
-/// stripes, a straight body of `r` from `z0` to `z1`, a shoulder in to a sealed hatch.
-/// Lit slits onto the forming matter wrap the body (`pattern::FUSION`).
-pub(super) fn vessel(b: &mut MeshBuilder, c: Vec3, r: f32, z0: f32, z1: f32) {
-    let plan = ngon(8, 1.0);
-    let shoulder = z1 + r * 0.35;
-    b.at(c, |b| {
-        if b.coarse() {
-            b.paint(PLATING);
-            b.loft_z(
-                &ngon(4, r * 1.25),
-                &[Section::new(z0, 1.0), Section::new(shoulder, 0.6)],
-            );
-            return;
-        }
-        b.paint(PLATING);
-        if !b.fine() {
-            b.loft_z(
-                &plan,
-                &[
-                    Section::new(z0, r * 1.1),
-                    Section::new(z1, r),
-                    Section::new(shoulder, r * 0.62),
-                ],
-            );
-            team_panel(b, v3(0.0, 0.0, shoulder), Vec2::splat(r * 0.55));
-            return;
-        }
-        b.with_facets(|b| {
-            b.loft_z(
-                &plan,
-                &[
-                    Section::new(z0, r * 1.18),
-                    Section::new(z0 + 1.0, r * 1.18),
-                    Section::new(z0 + 1.6, r),
-                    Section::new(z1, r),
-                    Section::new(shoulder, r * 0.62),
-                ],
-            )
-        });
-        // The hatch: a dark collar, a lid with the owner's colour on it.
-        b.paint(ACCENT);
-        b.loft_z(
-            &plan,
-            &[
-                Section::new(shoulder - 0.1, r * 0.6),
-                Section::new(shoulder + 0.7, r * 0.56),
-            ],
-        );
-        team_panel(b, v3(0.0, 0.0, shoulder + 0.7), Vec2::splat(r * 0.55));
-        // Hazard band round the foot, and the slits round the body.
-        b.paint(PLATING).pattern(pattern::HAZARD);
-        b.loft_z(
-            &plan,
-            &[
-                Section::new(z0 + 0.15, r * 1.19),
-                Section::new(z0 + 0.85, r * 1.19),
-            ],
-        );
-        let (lo, hi) = (z0 + 2.4, z1 - 1.0);
-        if hi > lo + 1.0 {
-            b.radial(8, |b| {
-                b.yawed(Vec3::ZERO, std::f32::consts::TAU / 16.0, |b| {
-                    let x = r * (std::f32::consts::PI / 8.0).cos();
-                    b.paint(GLOW).pattern(pattern::FUSION);
-                    b.cuboid(
-                        v3(x + 0.04, 0.0, (lo + hi) * 0.5),
-                        v3(0.12, r * 0.18, hi - lo),
-                    );
-                });
-            });
-        }
+            radiator(b, v3(from, 0.0, DECK), Vec3::X, to - from, w)
+        })
     });
-}
-
-/// The output: a chute from `from` on the chamber down to a hopper at `at` on the deck,
-/// heaped with ore-red product. The chute's glazing shows the material going down it
-/// (`pattern::MASS_FLOW`).
-pub(super) fn hopper(b: &mut MeshBuilder, from: Vec3, at: Vec3, size: f32) {
-    b.paint(ACCENT);
-    if b.coarse() {
-        b.cuboid_open(at + Vec3::Z * (size * 0.5), Vec3::splat(size));
-        return;
-    }
-    let into = at + v3(0.0, 0.0, size * 1.2);
-    b.frustum(
-        at,
-        v2(size * 0.55, size * 0.55),
-        v2(size, size),
-        size,
-        Vec2::ZERO,
-    );
-    if !b.fine() {
-        b.beam(from, into, v2(1.0, 1.0), v2(0.9, 0.9));
-        b.paint(GLOW_ORANGE).pattern(pattern::NONE);
-        b.decal(at + Vec3::Z * (size + 0.02), v2(size * 0.6, size * 0.6));
-        return;
-    }
-    b.paint(PLATING).pattern(pattern::HAZARD);
-    b.frustum_open(
-        at + Vec3::Z * (size * 0.86),
-        v2(size * 1.03, size * 1.03),
-        v2(size * 1.03, size * 1.03),
-        size * 0.14,
-        Vec2::ZERO,
-    );
-    // The heap of product, its top lit where it is still hot.
-    b.paint(ROCK);
-    b.frustum(
-        at + Vec3::Z * (size - 0.05),
-        v2(size * 0.9, size * 0.9),
-        v2(size * 0.3, size * 0.25),
-        size * 0.3,
-        Vec2::ZERO,
-    );
-    b.paint(GLOW_ORANGE).pattern(pattern::NONE);
-    b.decal(
-        at + Vec3::Z * (size * 1.25 + 0.02),
-        v2(size * 0.26, size * 0.2),
-    );
-    // The chute, in to the hopper's top.
-    b.paint(ACCENT).pattern(pattern::MASS_FLOW);
-    b.beam(from, into, v2(1.0, 1.0), v2(0.9, 0.9));
-    b.paint(METAL);
-    b.cylinder_between(into, into - Vec3::Z * 0.7, 0.6, 0.6, 6);
 }
 
 /// A radiator along `along` from `at`, `len` long and `w` across: a dark housing, hot
 /// coolant glowing between its fins, the fins under a clamp bar.
 pub(super) fn radiator(b: &mut MeshBuilder, at: Vec3, along: Vec3, len: f32, w: f32) {
-    let base = 0.8;
-    let fin = w * 0.7;
+    let base = 0.7;
+    let fin = w * 0.6;
     b.yawed(at, along.y.atan2(along.x), |b| {
         b.paint(ACCENT);
         if b.coarse() {
@@ -330,7 +106,7 @@ pub(super) fn radiator(b: &mut MeshBuilder, at: Vec3, along: Vec3, len: f32, w: 
             v3(len * 0.5, 0.0, base + fin * 0.2),
             v3(len * 0.9, w * 0.5, fin * 0.4),
         );
-        let n = if b.fine() { 8 } else { 3 };
+        let n = if b.fine() { 7 } else { 3 };
         let pitch = len * 0.9 / n as f32;
         b.paint(PLATING);
         for k in 0..n {
@@ -343,142 +119,158 @@ pub(super) fn radiator(b: &mut MeshBuilder, at: Vec3, along: Vec3, len: f32, w: 
         if b.fine() {
             b.paint(ACCENT);
             b.cuboid(
-                v3(len * 0.5, 0.0, base + fin + 0.12),
-                v3(len * 0.94, w * 0.14, 0.24),
+                v3(len * 0.5, 0.0, base + fin + 0.1),
+                v3(len * 0.94, w * 0.14, 0.2),
             );
         }
     });
 }
 
-/// A flat ring about `axis` through `c`, `r0` to `r1` out and `a0` to `a1` along the axis,
-/// its flats square to the frame (a flat faces +x for the z axis, like the vessel's).
-#[expect(
-    clippy::too_many_arguments,
-    reason = "a ring's place, axis, facets and four measures"
-)]
-pub(super) fn annulus_on(
-    b: &mut MeshBuilder,
-    c: Vec3,
-    axis: Vec3,
-    sides: usize,
-    r0: f32,
-    r1: f32,
-    a0: f32,
-    a1: f32,
-) {
-    let (e1, e2, axis) = ring_frame(axis);
-    let section = [(r0, a0), (r1, a0), (r1, a1), (r0, a1)];
-    let rings: Vec<Vec<Vec3>> = (0..=sides)
-        .map(|i| {
-            let a = (i as f32 + 0.5) * std::f32::consts::TAU / sides as f32;
-            let d = e1 * a.cos() + e2 * a.sin();
-            section.iter().map(|&(r, h)| c + d * r + axis * h).collect()
-        })
-        .collect();
-    b.loft(&rings, false, false);
-}
-
-/// The outer face of a ring about `axis` through `c`: eight flats `r` out, `a0` to `a1`
-/// along the axis, open at both ends.
-pub(super) fn band_on(b: &mut MeshBuilder, c: Vec3, axis: Vec3, r: f32, a0: f32, a1: f32) {
-    let (e1, e2, axis) = ring_frame(axis);
-    let ring = |h: f32| -> Vec<Vec3> {
-        (0..8)
-            .map(|i| {
-                let a = (i as f32 + 0.5) * std::f32::consts::TAU / 8.0;
-                c + (e1 * a.cos() + e2 * a.sin()) * r + axis * h
-            })
-            .collect()
-    };
-    b.loft(&[ring(a0), ring(a1)], false, false);
-}
-
-/// Two axes square to `axis` (the first along x for an upright axis, else nearest z), and
-/// the axis made unit.
-fn ring_frame(axis: Vec3) -> (Vec3, Vec3, Vec3) {
-    let axis = axis.normalize();
-    let e1 = if axis.z.abs() > 0.9 { Vec3::X } else { Vec3::Z };
-    let e1 = (e1 - axis * e1.dot(axis)).normalize();
-    (e1, axis.cross(e1), axis)
-}
-
-/// A plated strut from `a` to `c`, `w` across: what holds a containment frame together.
-pub(super) fn brace(b: &mut MeshBuilder, a: Vec3, c: Vec3, w: f32) {
-    b.paint(PLATING_DARK);
-    b.beam(a, c, v2(w, w), v2(w * 0.85, w * 0.85));
-}
-
-/// The tech 3 yard round the plant on its 8x8 lot: the slab out to the lot, two more rows
-/// of capacitor banks on the grid side run in to the plant, radiator rows down both flanks
-/// and two more hoppers on the far side.
-fn yard(b: &mut MeshBuilder) {
+/// A glazed condensing chamber round the z axis from `z0` to `z1`, `r` out: the matter
+/// forming in it glows through glazing between dark mullions, dark collars at its foot
+/// and head.
+pub(super) fn chamber(b: &mut MeshBuilder, z0: f32, z1: f32, r: f32) {
     if b.coarse() {
-        // The deck alone: the plant's own coarse level has its slab and its colour.
-        b.paint(PLATING);
-        b.decal(v3(0.0, 0.0, DECK), Vec2::splat(YARD * 2.0));
+        b.paint(GLOW_ORANGE).pattern(pattern::NONE);
+        b.prism(v3(0.0, 0.0, z0), 4, r * 1.3, r * 1.3, z1 - z0);
         return;
     }
-    slab_of(b, YARD, 8.0);
-    deck_marks(b, YARD - 2.0);
-    for x in [-35.0, -41.0] {
-        for y in [-11.0, 11.0] {
-            bank(b, v3(x, y, DECK), 6, 9.0);
-        }
+    let sides = 8;
+    let plan = ngon(sides, 1.0);
+    let collar = (z1 - z0).min(6.0) * 0.12;
+    b.paint(GLOW_ORANGE).pattern(pattern::NONE);
+    b.loft_z(
+        &plan,
+        &[Section::new(z0 + collar, r), Section::new(z1 - collar, r)],
+    );
+    b.paint(ACCENT);
+    b.loft_z(
+        &plan,
+        &[
+            Section::new(z0, r * 1.18),
+            Section::new(z0 + collar, r * 1.12),
+        ],
+    );
+    b.loft_z(
+        &plan,
+        &[
+            Section::new(z1 - collar, r * 1.12),
+            Section::new(z1, r * 1.18),
+        ],
+    );
+    // Mullions on the glazing's corners, a rib band round its waist close to.
+    let (a, c) = (z0 + collar, z1 - collar);
+    let fine = b.fine();
+    let w = r * 0.24;
+    for k in 0..sides {
+        let ang = (k as f32 + 0.5) * std::f32::consts::TAU / sides as f32;
+        let d = v3(ang.cos(), ang.sin(), 0.0);
+        b.paint(ACCENT);
+        b.beam(
+            d * r + Vec3::Z * a,
+            d * r + Vec3::Z * c,
+            v2(w, w * 0.8),
+            v2(w, w * 0.8),
+        );
     }
-    for y in [-11.0f32, 11.0] {
-        conduit(b, &[v3(-33.2, y, 3.4), v3(-27.0, y * 0.5, 3.4)], 1.2);
-    }
-    for s in [-1.0f32, 1.0] {
-        for x in [-20.0, 2.0] {
-            for y in [35.0, 40.5] {
-                radiator(b, v3(x, s * y, DECK), Vec3::X, 17.0, 3.4);
-            }
-        }
-    }
-    for y in [-9.0f32, 9.0] {
-        hopper(b, v3(27.5, y * 0.5, 6.0), v3(36.0, y, DECK), 4.6);
+    if fine && c - a > 3.0 {
+        b.paint(ACCENT);
+        let mid = (a + c) * 0.5;
+        b.loft_z(
+            &plan,
+            &[
+                Section::new(mid - 0.2, r * 1.06),
+                Section::new(mid + 0.2, r * 1.06),
+            ],
+        );
     }
 }
 
-/// Half the tech 3 yard's slab.
-const YARD: f32 = 45.0;
+/// A capacitor bastion on the deck at `at`, its long side along y: a dark block with a row
+/// of cans on it, the grid's power going in.
+pub(super) fn bastion(b: &mut MeshBuilder, at: Vec3, len: f32, h: f32) {
+    if b.coarse() {
+        return;
+    }
+    b.paint(ACCENT);
+    if !b.fine() {
+        b.cuboid_open(at + Vec3::Z * (h * 0.5), v3(2.0, len, h));
+        return;
+    }
+    b.chamfered_box(at + Vec3::Z * (h * 0.5), v3(2.0, len, h), 0.4);
+    let n = (len / 1.4) as usize;
+    for k in 0..n {
+        let y = (k as f32 - (n as f32 - 1.0) * 0.5) * 1.4;
+        b.paint(PLATING);
+        b.prism(at + v3(0.0, y, h), 6, 0.5, 0.45, 0.6);
+        b.paint(METAL);
+        b.prism(at + v3(0.0, y, h + 0.6), 6, 0.2, 0.15, 0.35);
+    }
+}
+
+/// A bar of rectangular section (`size`: across in y, deep in the path's plane) swept
+/// along `path` in the x-z plane.
+pub(super) fn sweep(b: &mut MeshBuilder, path: &[Vec3], size: Vec2) {
+    let n = path.len();
+    let rings: Vec<Vec<Vec3>> = (0..n)
+        .map(|i| {
+            let (prev, next) = (path[i.saturating_sub(1)], path[(i + 1).min(n - 1)]);
+            let t = (next - prev).normalize_or(Vec3::Z);
+            let side = Vec3::Y;
+            let up = side.cross(t).normalize_or(Vec3::X);
+            let (s, u) = (side * size.x * 0.5, up * size.y * 0.5);
+            let p = path[i];
+            vec![p - s - u, p + s - u, p + s + u, p - s + u]
+        })
+        .collect();
+    b.loft(&rings, true, true);
+}
 
 #[cfg(test)]
 mod tests {
-    use super::{LOTS, SIZES};
+    use super::{LOT, SIZES};
     use crate::{build_model_scaled, rig};
 
-    const DESIGNS: [&str; 1] = ["fabricator"];
+    const DESIGNS: [&str; 3] = ["fabricator~a", "fabricator~b", "fabricator~c"];
 
-    /// Each tier is a building of its own: nothing waits on it for a refit, it fills its
-    /// own lot (and no more), and each tier carries more machinery than the one below.
+    /// Tech 2 and 3 stand on one 2x2 lot; tech 2 carries tech 3's machinery as upgrade
+    /// pieces (only those reach over its height), and tech 3 has more and stands taller.
     #[test]
-    fn every_tier_stands_alone_on_its_own_lot() {
+    fn tech_3_is_tech_2_upgraded_on_one_lot() {
+        let half = LOT as f32 * 6.0;
         for key in DESIGNS {
-            let mut last = 0;
-            for (i, ((r, h), cells)) in SIZES.into_iter().zip(LOTS).enumerate() {
-                let tech = i as u8 + 1;
+            let mut tops = Vec::new();
+            for tech in [2u8, 3] {
+                let (r, h) = SIZES[tech as usize - 1];
                 let model = build_model_scaled(key, r, h, tech).unwrap();
-                let half = cells as f32 * 6.0;
                 for (lod, mesh) in model.lods.iter().enumerate() {
-                    assert!(
-                        mesh.vertices.iter().all(|v| v.rig & rig::UPGRADE == 0),
-                        "{key} T{tech} lod{lod}: upgrade pieces"
-                    );
                     let reach = mesh
                         .vertices
                         .iter()
                         .map(|v| v.pos[0].abs().max(v.pos[1].abs()))
                         .fold(0.0, f32::max);
                     assert!(
-                        reach <= half && reach >= half * 0.55,
-                        "{key} T{tech} lod{lod}: reach {reach} on a {cells}x{cells} lot"
+                        reach <= half && reach >= half * 0.8,
+                        "{key} T{tech} lod{lod}: reach {reach}"
                     );
                 }
-                let full = model.lods[0].indices.len();
-                assert!(full > last, "{key} T{tech} has more machinery");
-                last = full;
+                let fine = &model.lods[0];
+                let upgrades = fine
+                    .vertices
+                    .iter()
+                    .filter(|v| v.rig & rig::UPGRADE != 0)
+                    .count();
+                assert_eq!(upgrades > 0, tech == 2, "{key} T{tech}: upgrade pieces");
+                let top = fine
+                    .vertices
+                    .iter()
+                    .filter(|v| v.rig & rig::UPGRADE == 0)
+                    .map(|v| v.pos[2])
+                    .fold(0.0, f32::max);
+                assert!(top <= h + 0.05, "{key} T{tech}: {top} m tall, not {h}");
+                tops.push(top);
             }
+            assert!(tops[1] > tops[0] + 4.0, "{key}: tech 3 stands taller");
         }
     }
 }
