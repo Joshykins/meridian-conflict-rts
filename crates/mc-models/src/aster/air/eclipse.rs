@@ -154,13 +154,13 @@ pub(super) fn build(b: &mut MeshBuilder) {
     b.mirror_y(|b| {
         if fine {
             b.paint(PLATING).pattern(pattern::AIRFRAME);
-            b.loft(&WING.map(upper).to_vec(), true, true);
+            b.loft(&WING.map(upper), true, true);
             b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
-            b.loft(&WING.map(lower).to_vec(), true, true);
+            b.loft(&WING.map(lower), true, true);
             surface(b);
         } else {
             b.paint(PLATING);
-            b.loft(&WING.map(diamond).to_vec(), true, true);
+            b.loft(&WING.map(diamond), true, true);
         }
         engine(b);
         fin(b);
@@ -481,11 +481,7 @@ fn capacitors(b: &mut MeshBuilder) {
 fn coarse(b: &mut MeshBuilder) {
     b.mirror_y(|b| {
         b.paint(PLATING);
-        b.loft(
-            &[WING[0], WING[2], WING[4]].map(diamond).to_vec(),
-            false,
-            false,
-        );
+        b.loft(&[WING[0], WING[2], WING[4]].map(diamond), false, false);
     });
     b.paint(PLATING);
     b.loft(&band(&[RIDGE[0], RIDGE[2], RIDGE[4]], 1, 2), false, false);
