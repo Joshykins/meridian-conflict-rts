@@ -155,25 +155,26 @@ impl Terrain {
         let east = self.fl_eastness(x, y);
         // The coves keep their drawn shape, and the bases their shores.
         let cove = dist(p, COVE_HEAD).min(dist(self.turned(p), COVE_HEAD));
-        // The narrow bridge keeps its drawn shores too: the noise would cut it.
+        // The narrow bridge keeps its drawn line: the broad swings would cut
+        // it. Its small coves and points stay, so its shores read as a coast.
         let (on_bridge, _) = segment(p, (6_300.0, SIZE / 2.0), (SIZE - 6_300.0, SIZE / 2.0));
+        let held = smoothstep(500.0, 1_600.0, on_bridge);
         let calm = (0.3 + 0.7 * smoothstep(1_100.0, 2_200.0, self.fl_start_dist(p)))
-            * (0.08 + 0.92 * smoothstep(500.0, 1_100.0, cove))
-            * (0.12 + 0.88 * smoothstep(500.0, 1_600.0, on_bridge));
-        let mut wobble = 0.0;
+            * (0.08 + 0.92 * smoothstep(500.0, 1_100.0, cove));
+        let (mut broad, mut fine) = (0.0, 0.0);
         if east < 1.0 {
-            wobble += (1.0 - east)
-                * (self.coast.fbm(x / 1_400.0, y / 1_400.0, 4, 0.55) * 900.0
-                    + self.coast_warp.fbm(x / 450.0, y / 450.0, 3, 0.5) * 500.0);
+            broad += (1.0 - east) * self.coast.fbm(x / 1_400.0, y / 1_400.0, 4, 0.55) * 900.0;
+            fine += (1.0 - east) * self.coast_warp.fbm(x / 450.0, y / 450.0, 3, 0.5) * 500.0;
         }
         if east > 0.0 {
-            wobble += east
-                * (self
+            broad += east
+                * self
                     .coast
                     .fbm(x / 1_100.0 + 50.0, y / 1_100.0 - 20.0, 4, 0.55)
-                    * 850.0
-                    + (0.55 - self.coast_warp.ridged(x / 700.0, y / 700.0, 3, 0.5)) * 420.0);
+                * 850.0;
+            fine += east * (0.55 - self.coast_warp.ridged(x / 700.0, y / 700.0, 3, 0.5)) * 420.0;
         }
+        let wobble = broad * (0.12 + 0.88 * held) + fine * (0.5 + 0.5 * held);
         let lobes = self.coast.fbm(x / 420.0 + 31.0, y / 420.0 - 17.0, 3, 0.5);
         let (cx, cy, r) = ISLE;
         let isle = r * (1.0 + 0.7 * lobes) - dist(p, (cx, cy)).min(dist(self.turned(p), (cx, cy)));

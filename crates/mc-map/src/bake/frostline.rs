@@ -28,8 +28,8 @@
 //! ocean one side's beach base faces the other's cliff base. One island
 //! stands in the middle of each ocean, the wall across it: half red rock,
 //! half snow. The bridge has beaches on both oceans; it narrows from some
-//! 1.2 km at its necks to some 680 m in the middle (as drawn), and the
-//! coasts' noise is held off it so it keeps that shape.
+//! 1.2 km at its necks to some 680 m in the middle (as drawn) in a gentle
+//! S, and the coasts' broad swings are held off it so it keeps that shape.
 //!
 //! The land is benches: the upland, a low basin behind the beach base's
 //! strand and the low bridge cut into it by an escarpment, and a high
@@ -104,14 +104,14 @@ const NORTH: &[(f64, f64)] = &[
     (5_750.0, 10_000.0),
     (5_700.0, 9_600.0),
     (5_950.0, 9_060.0),
-    (6_500.0, 8_740.0),
-    (7_000.0, 8_770.0),
-    (7_450.0, 8_610.0),
-    (7_900.0, 8_520.0),
+    (6_500.0, 8_700.0),
+    (7_000.0, 8_650.0),
+    (7_450.0, 8_470.0),
+    (7_900.0, 8_450.0),
     (8_200.0, 8_530.0),
-    (8_600.0, 8_620.0),
-    (9_200.0, 8_600.0),
-    (9_800.0, 8_760.0),
+    (8_600.0, 8_710.0),
+    (9_200.0, 8_740.0),
+    (9_800.0, 8_820.0),
     (10_450.0, 9_120.0),
     (10_750.0, 9_800.0),
     (10_550.0, 10_400.0),
@@ -158,14 +158,14 @@ const SOUTH: &[(f64, f64)] = &[
     (10_650.0, 6_400.0),
     (10_700.0, 6_800.0),
     (10_450.0, 7_310.0),
-    (9_900.0, 7_660.0),
-    (9_400.0, 7_630.0),
-    (8_950.0, 7_780.0),
-    (8_500.0, 7_870.0),
+    (9_900.0, 7_700.0),
+    (9_400.0, 7_750.0),
+    (8_950.0, 7_920.0),
+    (8_500.0, 7_940.0),
     (8_200.0, 7_850.0),
-    (7_800.0, 7_760.0),
-    (7_200.0, 7_790.0),
-    (6_600.0, 7_620.0),
+    (7_800.0, 7_670.0),
+    (7_200.0, 7_650.0),
+    (6_600.0, 7_560.0),
     (5_950.0, 7_300.0),
     (5_650.0, 6_600.0),
     (5_850.0, 6_000.0),
@@ -194,7 +194,7 @@ const SOUTH: &[(f64, f64)] = &[
 const CLIFFS: &[&[(f64, f64)]] = &[
     // The desert's, on the south ocean, from the neck to the map's corner.
     &[
-        (6_300.0, 7_560.0),
+        (6_300.0, 7_540.0),
         (5_950.0, 7_300.0),
         (5_650.0, 6_600.0),
         (5_850.0, 6_000.0),
@@ -219,11 +219,11 @@ const CLIFFS: &[&[(f64, f64)]] = &[
         (5_750.0, 10_000.0),
         (5_700.0, 9_600.0),
         (5_950.0, 9_060.0),
-        (6_300.0, 8_780.0),
+        (6_300.0, 8_760.0),
     ],
     // Alaska's, on the north ocean, from the neck to the map's corner.
     &[
-        (10_100.0, 8_820.0),
+        (10_100.0, 8_840.0),
         (10_450.0, 9_120.0),
         (10_750.0, 9_800.0),
         (10_550.0, 10_400.0),
@@ -248,7 +248,7 @@ const CLIFFS: &[&[(f64, f64)]] = &[
         (10_650.0, 6_400.0),
         (10_700.0, 6_800.0),
         (10_450.0, 7_310.0),
-        (10_100.0, 7_620.0),
+        (10_100.0, 7_640.0),
     ],
 ];
 
@@ -547,8 +547,8 @@ const PASSES: &[Capsule] = &[
 /// Ore away from the bases: centre, radius. The turn gives each its twin.
 const ORE: &[(f64, f64, f64)] = &[
     // On the bridge.
-    (6_700.0, 8_310.0, 80.0),
-    (7_550.0, 8_040.0, 75.0),
+    (6_700.0, 8_230.0, 80.0),
+    (7_550.0, 7_910.0, 75.0),
     // Forward of the front base, on the neck.
     (5_800.0, 8_700.0, 70.0),
     // The beach base's basin.
