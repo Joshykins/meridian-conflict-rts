@@ -113,7 +113,7 @@ says it can do (`commander/profile.rs`).
   10 s) counted as 60,000. Not where the side's own units are worth a quarter of that,
   and not into an interceptor's cover unless the salvo outnumbers the rounds it holds.
 
-## Island maps: sea, sea mines and spaceships
+## Island maps: sea and spaceships
 
 - The land route (`ai/theatre.rs`): on its first think a side floods the land it can
   walk from its start, on a 64 m grid from the terrain alone, and keeps which enemy
@@ -123,8 +123,6 @@ says it can do (`commander/profile.rs`).
   right after the opening mines, ahead of more power.
 - A shipyard goes on the water nearest the start where one can stand, found in rings
   out to 2.4 km (`shipyard_anchor`).
-- Sea mines: a mine at sea shares only with mines at sea, and reaches 1.5 km, so it is
-  kept a sea reach from those and is not kept off by the island's own land mines.
 - The navy only targets water its fleet can sail to (`ai/sea.rs` floods the sea on a
   128 m grid).
 - Spaceships jump (`ai/warp_ops.rs`): a strike comes out 260 m short of its target on

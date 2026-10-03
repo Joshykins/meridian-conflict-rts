@@ -185,7 +185,7 @@
         economy: (mass_storage: 100, energy_upkeep: 2),
         mine: (
             reach: 1000,
-            ground: 0.00015, per_hectare: 0.2, base: 0.1,
+            ground: 0.00015, per_hectare: 0.25, base: 0.1,
         ),
         upgrades_to: "aster_core_mine_t2",
         mesh: "core_mine", icon: Extractor,
@@ -204,7 +204,7 @@
         economy: (mass_storage: 200, energy_upkeep: 8),
         mine: (
             reach: 1000,
-            ground: 0.0006, per_hectare: 0.8, base: 0.4,
+            ground: 0.0006, per_hectare: 1.0, base: 0.4,
         ),
         upgrades_to: "aster_core_mine_t3",
         mesh: "core_mine", icon: Extractor,
@@ -223,7 +223,7 @@
         economy: (mass_storage: 400, energy_upkeep: 30),
         mine: (
             reach: 1000,
-            ground: 0.0018, per_hectare: 2.4, base: 1.2,
+            ground: 0.0018, per_hectare: 3.0, base: 1.2,
         ),
         upgrades_to: "aster_core_mine_t4",
         mesh: "core_mine", icon: Extractor,
@@ -247,7 +247,7 @@
         economy: (mass_storage: 800, energy_upkeep: 60),
         mine: (
             reach: 1000,
-            ground: 0.0036, per_hectare: 4.8, base: 2.4,
+            ground: 0.0036, per_hectare: 6.0, base: 2.4,
         ),
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
@@ -300,8 +300,8 @@
     // Material fabricators: they turn a lot of energy into a little material, as far as
     // their upkeep is paid (mc-sim mines.rs `fabricator_income`). The rule they are priced
     // by: one of them plus the same-tier power that feeds it pays back about ten times
-    // slower than a mine of that tier (T1 0.5/s for 15 energy/s, ~250 s; T2 2/s for 1200,
-    // ~27 min; T3 5/s for 9000, ~58 min), so they are what a side builds with energy to
+    // slower than a mine of that tier (T1 0.5/s for 30 energy/s, ~450 s; T2 2/s for 1200,
+    // ~30 min; T3 5/s for 13500, ~80 min), so they are what a side builds with energy to
     // spare, never instead of mines. Each tier is a building of its own on its power plant's
     // lot (2x2, 4x4, 8x8), not an upgrade, and a full containment going up takes the block
     // with it, like a reactor.
@@ -312,10 +312,10 @@
         tech: 1,
         categories: ["Land", "Economy"],
         health: 400,
-        cost: (mass: 50, energy: 300, time: 80),
+        cost: (mass: 75, energy: 450, time: 120),
         radius: 11, height: 7, footprint: (2, 2),
         vision: 120,
-        economy: (energy_upkeep: 15),
+        economy: (energy_upkeep: 30),
         fabricator: (mass: 0.5),
         death_blast: (radius: 40, damage: 1500),
         mesh: "fabricator", icon: Extractor,
@@ -328,7 +328,7 @@
         tech: 2,
         categories: ["Land", "Economy"],
         health: 2400,
-        cost: (mass: 900, energy: 5400, time: 1450),
+        cost: (mass: 1200, energy: 7200, time: 1900),
         radius: 23, height: 22, footprint: (4, 4),
         vision: 140,
         economy: (energy_upkeep: 1200),
@@ -344,10 +344,10 @@
         tech: 3,
         categories: ["Land", "Economy"],
         health: 9000,
-        cost: (mass: 4650, energy: 27900, time: 7400),
+        cost: (mass: 5000, energy: 30000, time: 8000),
         radius: 42.5, height: 34, footprint: (8, 8),
         vision: 160,
-        economy: (energy_upkeep: 9000),
+        economy: (energy_upkeep: 13500),
         fabricator: (mass: 5),
         death_blast: (radius: 220, damage: 24000),
         mesh: "fabricator", icon: Extractor,

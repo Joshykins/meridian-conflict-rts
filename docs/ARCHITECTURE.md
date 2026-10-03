@@ -68,12 +68,9 @@ straight line through the points where their circles cross. `State::mines` keeps
 territory (`Share`: land and ore it has, and would have alone; efficiency is the ratio),
 re-counted only when the set of mines changes. There is no feed or investment: the tiers
 (`aster_core_mine` -> `_t2` -> `_t3`, upgraded in place, same unit id) are the investment and
-raise the per-hectare yield; `_t4`, the deep core, adds only to the shaft's `base`. Mines may
-stand anywhere a structure fits, on open water too (`water_build`). A mine whose ground
-cell is sea (`OreGrid::at_sea`, `MineState::sea`) works the sea instead: its territory is the
-sea cells within its `sea_reach`, its shaft's share counted on those alone, and it divides
-ground only with other mines at sea, as land mines only with land mines; its worked water
-spreads at `SEA_SPREAD_SPEED`. Ore counts for the kind of ground above it. Ore lies deep
+raise the yield of the shaft, the land and the ore alike. Mines stand on land only, anywhere
+a land structure fits; the sea in a mine's circle is worth nothing, though it counts in its
+shaft's share. Ore counts only under land. Ore lies deep
 (`OreRegion::depth`, 140-400 m, hashed from the outline): a mine sinks its main shaft at
 `SHAFT_SPEED` and drives a drift to each field at `DRIFT_SPEED` once the shaft reaches that
 depth; a field's ore pays only from `Vein::reached_at` (mine age, kept through upgrades).

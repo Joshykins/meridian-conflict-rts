@@ -11,7 +11,7 @@ speed of whichever of the three is shortest.
 
 | Valve | What it is | Rule of thumb |
 |---|---|---|
-| Income | materials a second | a T1 mine is ~6/s on good ground for 160 |
+| Income | materials a second | a T1 mine is ~1/s on an ore field for 45 (bare land ~0.15) |
 | Build power | how fast you can spend | a new mine or reactor takes about **1-1.7 build-power seconds per material**, a mine upgrade about 1.6, units 4-7: growing the economy and spending it both take build power (since 2026-09-30). Buy it by tier: engineers 5 / 30 / 150, factories 20 / 120 / 360 |
 | Energy | the tax on spending | **6 energy per material** on economy (10 on commander refits), plus the mines' upkeep; when it runs dry everything slows, the mines included |
 
@@ -29,13 +29,13 @@ the money.** Paybacks, energy counted at 6 to 1:
 
 | Investment | Pays back in |
 |---|---|
-| T1 mine | ~25-30 s |
+| T1 mine (on a field) | ~45 s |
 | Engineer (build power turning a full store into mines) | as soon as it has work |
-| Commander MFE (+6 materials, +250 energy) | ~100 s |
-| Mine T1→T2 | ~165 s |
-| Mine T2→T3 | ~345 s |
-| Mine T3→T4 (the Deep Core) | ~550 s |
-| Material fabricator and the power it needs | ~10x a same-tier mine (250 s / 27 min / 58 min) |
+| Commander MFE (+1.5 materials, +100 energy) | ~10 min |
+| Mine T1→T2 | ~3 min |
+| Mine T2→T3 | ~8 min |
+| Mine T3→T4 (the Deep Core) | ~12 min |
+| Material fabricator and the power it needs | ~10x a same-tier mine (T1 ~450 s, T2 ~30 min, T3 ~80 min) |
 
 So: mines first, and enough build power to raise them. The tier upgrades come only when
 the time you have left is longer than their payback. In a race that ends at minute 12, a
@@ -44,7 +44,9 @@ game it does.
 
 ## The race
 
-The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
+**Stale since the 2026-10-02 mine rebalance** (ore worth far more, bare land far less, about
+1 / 4 / 12 / 24 a second by tier, tier paths dearer): rerun the search before leaning on any
+of the plan below. The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
 mass, build power by tier, reactors 15 / 350 / 2000): rerun the search before leaning on them.
 Searched again on the new numbers (4 maps x 2 starts): the best plan is the same but with
 **3 mines instead of 6**, at 12.4 minutes. With mine upgrades now costing build power, builders

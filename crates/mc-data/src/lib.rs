@@ -1978,10 +1978,10 @@ mod tests {
         let (mfe, shield) = (module("back", "mfe"), module("back", "shield"));
         let with_mfe = bp.refit_result(with_rail, mfe).unwrap();
         let e = &bp.unit(with_mfe).economy;
-        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::from_int(6));
+        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::ratio(3, 2));
         assert_eq!(
             e.energy_income,
-            acu.economy.energy_income + Fx::from_int(250)
+            acu.economy.energy_income + Fx::from_int(100)
         );
         let (set2, loadout) = bp.loadout(with_mfe).unwrap();
         assert_eq!(set2.replaces(&loadout.fitted, slot("back"), 1), Some(0));
