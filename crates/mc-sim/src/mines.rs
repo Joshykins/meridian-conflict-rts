@@ -17,12 +17,8 @@
 //! depth it drives a drift out to it at [`DRIFT_SPEED`]; a field's ore pays
 //! only once its drift has arrived. The land it works spreads out from the
 //! mine at [`SPREAD_SPEED`] too, so a new mine starts with only its shaft's
-//! `base` and grows into its territory.
-//!
-//! A mine standing in the sea mines the sea instead: its territory is the
-//! water in its (wider, `sea_reach`) circle, up to the shore, and it shares
-//! only with other mines at sea, as land mines share only with land mines.
-//! The sea is slow to take: its worked water spreads at [`SEA_SPREAD_SPEED`].
+//! `base` and grows into its territory. Mines stand on land only: the sea in
+//! a mine's circle is worth nothing, though it counts in its shaft's share.
 
 use crate::tables::UnitId;
 use crate::World;
@@ -38,13 +34,11 @@ pub const ORE_CELL_M: i32 = 8;
 /// interface can count it the same way from the overview.
 pub const GROUND_CELL_M: i32 = 32;
 /// Metres a second a new mine's main shaft goes down.
-pub const SHAFT_SPEED: i32 = 4;
+pub const SHAFT_SPEED: i32 = 8;
 /// Metres a second a drift goes out from the shaft to a field.
-pub const DRIFT_SPEED: i32 = 12;
+pub const DRIFT_SPEED: i32 = 24;
 /// Metres a second the land a mine works spreads out from it.
 pub const SPREAD_SPEED: i32 = 10;
-/// Metres a second the water a mine at sea works spreads out from it.
-pub const SEA_SPREAD_SPEED: i32 = 4;
 /// The share of its output a mine still makes with none of its energy upkeep
 /// paid, as a fraction: enough to climb out of a stall, never to live on.
 pub const UNPOWERED: (i64, i64) = (1, 4);
@@ -63,8 +57,6 @@ pub struct MineState {
     pub rings: Vec<Fx>,
     /// Ticks since it was finished. Kept through an upgrade.
     pub age: u32,
-    /// It stands in the sea and mines the sea.
-    pub sea: bool,
 }
 
 /// An ore field a mine draws on.
@@ -105,9 +97,9 @@ impl MineState {
         mine_rate(m, self.land.rock_part(), self.worked_ground(), reached)
     }
 
-    /// Metres out from the mine the land (or sea) it works reaches by now.
+    /// Metres out from the mine the land it works reaches by now.
     pub fn spread(&self) -> Fx {
-        Fx::from_int(spread_speed(self.sea)) * self.age as i32 / TICKS_PER_SECOND as i32
+        Fx::from_int(SPREAD_SPEED) * self.age as i32 / TICKS_PER_SECOND as i32
     }
 
     /// Hectares of its land within [`Self::spread`].
@@ -123,15 +115,6 @@ impl MineState {
     /// Materials per second once every drift is dug.
     pub fn full_rate(&self, m: &mc_data::Mine) -> Fx {
         self.land.rate(m)
-    }
-}
-
-/// Metres a second the ground a mine works spreads out, at sea or on land.
-pub fn spread_speed(sea: bool) -> i32 {
-    if sea {
-        SEA_SPREAD_SPEED
-    } else {
-        SPREAD_SPEED
     }
 }
 
@@ -183,7 +166,6 @@ impl Mines {
         h.write_u64(self.by_unit.len() as u64);
         for (id, m) in &self.by_unit {
             h.write_u64(id.0 as u64 | (m.age as u64) << 32);
-            h.write_u64(m.sea as u64);
             let l = &m.land;
             for v in [
                 l.ground,
@@ -209,8 +191,8 @@ impl Mines {
 }
 
 /// The map rasterised for counting: a land bit per ground cell, and one bit
-/// per ore cell inside each field's box. A mine works the cells of its own
-/// kind: land from land, sea from the sea.
+/// per ore cell inside each field's box. A mine works land and the ore under
+/// land; the sea is worth nothing.
 #[derive(Clone, Default)]
 pub struct OreGrid {
     fields: Vec<OreField>,
@@ -331,18 +313,8 @@ impl OreGrid {
         self.land[i / 64] >> (i % 64) & 1 != 0
     }
 
-    /// Whether a mine at `pos` stands in the sea, and so mines the sea.
-    pub fn at_sea(&self, pos: FxVec2) -> bool {
-        !self.is_land(
-            pos.x.floor_int().div_euclid(GROUND_CELL_M),
-            pos.y.floor_int().div_euclid(GROUND_CELL_M),
-        )
-    }
-
     /// The ground and ore of the territory of a mine at `pos` with `reach`
     /// among `others`; and of its whole circle, as if it had nobody near. Hectares.
-    /// Ground is land for a mine on land and sea for one at sea; `others` of
-    /// the other kind are left out, since they work other ground.
     pub fn share(&self, pos: FxVec2, reach: Fx, others: &[(FxVec2, Fx)]) -> Share {
         self.share_by_field(pos, reach, others).0
     }
@@ -369,13 +341,6 @@ impl OreGrid {
     ) -> (Share, Vec<FieldShare>, Vec<Fx>) {
         let reach_sq = reach * reach;
         let mut out = Share::default();
-        let sea = self.at_sea(pos);
-        let others: Vec<(FxVec2, Fx)> = others
-            .iter()
-            .copied()
-            .filter(|&(p, _)| self.at_sea(p) == sea)
-            .collect();
-        let others = &others[..];
 
         // Land, and the whole territory, on the coarse grid.
         let r = reach.ceil_int() / GROUND_CELL_M + 1;
@@ -392,12 +357,7 @@ impl OreGrid {
                 if at.distance_sq(pos) > reach_sq {
                     continue;
                 }
-                let ours = self.in_bounds(x, y) && self.is_land(x, y) != sea;
-                // At sea the circle stops at the shore (and the map's edge): the
-                // shaft's share too.
-                if sea && !ours {
-                    continue;
-                }
+                let ours = self.in_bounds(x, y) && self.is_land(x, y);
                 let part = portion(at, pos, reach, others);
                 rock_alone += 1;
                 rock += part;
@@ -439,10 +399,10 @@ impl OreGrid {
             for y in (cy - r).max(f.y0)..=(cy + r).min(f.y0 + f.h - 1) {
                 for x in (cx - r).max(f.x0)..=(cx + r).min(f.x0 + f.w - 1) {
                     if !f.has(x, y)
-                        || self.is_land(
+                        || !self.is_land(
                             x * ORE_CELL_M / GROUND_CELL_M,
                             y * ORE_CELL_M / GROUND_CELL_M,
-                        ) == sea
+                        )
                     {
                         continue;
                     }
@@ -543,7 +503,6 @@ impl World {
         self.state.mines.counted = layout;
         let mut counts = Vec::with_capacity(placed.len());
         for (i, &(id, pos, reach)) in placed.iter().enumerate() {
-            let sea = self.ore.at_sea(pos);
             let (land, fields, rings) =
                 self.ore
                     .share_with_rings(pos, reach, &neighbours(&placed, i, pos, reach));
@@ -555,11 +514,10 @@ impl World {
                     reached_at: dig_ticks(pos, centre, depth),
                 })
                 .collect::<Vec<_>>();
-            counts.push((id, land, veins, rings, sea));
+            counts.push((id, land, veins, rings));
         }
-        for (id, land, veins, rings, sea) in counts {
+        for (id, land, veins, rings) in counts {
             if let Some(m) = self.state.mines.by_unit.get_mut(&id) {
-                m.sea = sea;
                 m.land = land;
                 m.veins = veins;
                 m.rings = rings;
@@ -567,8 +525,7 @@ impl World {
         }
     }
 
-    /// Every finished mine's id, position and reach (its sea reach if it stands
-    /// in the sea), in id order; `except` left out.
+    /// Every finished mine's id, position and reach, in id order; `except` left out.
     pub fn mine_sites(&self, except: Option<UnitId>) -> Vec<(UnitId, FxVec2, Fx)> {
         let units = &self.state.units;
         self.state
@@ -579,7 +536,7 @@ impl World {
             .filter_map(|&id| {
                 let row = units.row(id)?;
                 let pos = units.pos[row];
-                let reach = self.bp(row).mine?.reach_on(self.ore.at_sea(pos));
+                let reach = self.bp(row).mine?.reach;
                 Some((id, pos, reach))
             })
             .collect()
@@ -591,7 +548,7 @@ impl World {
         let Some(m) = bp.mine else {
             return Share::default();
         };
-        let reach = m.reach_on(self.ore.at_sea(pos));
+        let reach = m.reach;
         let others: Vec<(FxVec2, Fx)> = self
             .mine_sites(None)
             .into_iter()

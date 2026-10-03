@@ -129,7 +129,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
             .units
             .iter()
             .any(|u| view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some());
-    let mut mines = super::mines_in_sight(s.map, s.blueprints, &view.frame.units);
+    let mut mines = super::mines_in_sight(s.blueprints, &view.frame.units);
     // In id order, so the territories a full chart leaves out stay the same ones.
     mines.sort_unstable_by_key(|m| m.id);
     let (line, fill) = if survey { (0.95, 0.22) } else { (0.45, 0.08) };
@@ -150,13 +150,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
         // A territory is a few pixels across on the chart: as many points as it has pixels round.
         let px = chart_pos(s, chart, centre + Vec2::new(reach, 0.0)).x - c.x;
         let points = (px * std::f32::consts::TAU / 3.0).clamp(10.0, 80.0) as usize;
-        // Land mines and sea mines work different ground: each shares only with its own kind.
         let others: Vec<(Vec2, f32)> = mines
             .iter()
             .enumerate()
-            .filter(|&(j, m)| {
-                j != i && m.sea == mine.sea && m.at.distance(centre) < reach + m.reach
-            })
+            .filter(|&(j, m)| j != i && m.at.distance(centre) < reach + m.reach)
             .map(|(_, m)| (m.at, m.reach))
             .collect();
         let territory = super::territory(centre, reach, &others);

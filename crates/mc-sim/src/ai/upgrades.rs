@@ -221,7 +221,7 @@ impl World {
     ) -> Option<(usize, &UnitBlueprint)> {
         let pl = &self.state.players[player as usize];
         let units = &self.state.units;
-        if pl.mass_income < Fx::from_int(8) {
+        if pl.mass_income < Fx::from_int(3) {
             return None;
         }
         let directives = self.commander_directives(player);

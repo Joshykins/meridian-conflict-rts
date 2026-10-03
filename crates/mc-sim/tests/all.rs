@@ -105,6 +105,7 @@ mod zz_dogfight_probe;
 mod zz_eco_ledger_probe;
 mod zz_eco_race_probe;
 mod zz_hellkite_probe;
+mod zz_mine_yield_probe;
 mod zz_naval_duel_probe;
 mod zz_petrel_probe;
 mod zz_restore_probe;

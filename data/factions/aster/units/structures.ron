@@ -161,14 +161,15 @@
         mesh: "factory_naval", icon: Factory,
         sounds: (death: "blast_large"),
     ),
-    // Core mines. They stand on land or, raised on stilts, on open water.
-    // Every hectare of land in `reach` is worth `ground` materials a
-    // second, and every hectare of ore `per_hectare`, and the shaft itself `base`
-    // from the moment the mine is finished. Where mines' reaches overlap, the
-    // ground is divided by a straight line through the two points where the
-    // circles cross. Every tier reaches as far; the tiers are the investment,
-    // and each is a poorer one than the last: 2.5x then 2x the yield of the
-    // tier below for ever dearer upgrades, so a new mine beats an upgrade.
+    // Core mines. They stand on land only. Ore is what they are for: every
+    // hectare of ore in `reach` is worth `per_hectare` materials a second, bare
+    // land only `ground` (a whole circle of it about a sixth of a mine on a
+    // field), and the shaft itself `base` from the moment the mine is finished.
+    // Where mines' reaches overlap, the ground is divided by a straight line
+    // through the two points where the circles cross. Every tier reaches as far
+    // and yields 4x, 12x, 24x a tier 1 (about 1 / 4 / 12 / 24 a second on a
+    // typical field); a new mine pays back in under a minute, the upgrades in
+    // about 3, 8 and 12 minutes, so climbing is a commitment.
     // The hammer runs on energy: a side that cannot pay its upkeep gets a
     // quarter of its mines' output at worst (mc-sim mines.rs `UNPOWERED`).
     (
@@ -178,13 +179,13 @@
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
         health: 600,
-        cost: (mass: 160, energy: 960, time: 160),
+        cost: (mass: 45, energy: 270, time: 72),
         radius: 12.8, height: 12.6, footprint: (3, 3),
-        vision: 300, water_build: true,
-        economy: (mass_storage: 250, energy_upkeep: 10),
+        vision: 300,
+        economy: (mass_storage: 100, energy_upkeep: 2),
         mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.010, per_hectare: 0.9, base: 1.1,
+            reach: 1000,
+            ground: 0.00015, per_hectare: 0.2, base: 0.1,
         ),
         upgrades_to: "aster_core_mine_t2",
         mesh: "core_mine", icon: Extractor,
@@ -197,13 +198,13 @@
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
         health: 2000,
-        cost: (mass: 1700, energy: 10200, time: 2500),
+        cost: (mass: 560, energy: 3360, time: 820),
         radius: 12.8, height: 20.8, footprint: (3, 3),
-        vision: 360, water_build: true,
-        economy: (mass_storage: 750, energy_upkeep: 60),
+        vision: 360,
+        economy: (mass_storage: 200, energy_upkeep: 8),
         mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.025, per_hectare: 2.25, base: 2.75,
+            reach: 1000,
+            ground: 0.0006, per_hectare: 0.8, base: 0.4,
         ),
         upgrades_to: "aster_core_mine_t3",
         mesh: "core_mine", icon: Extractor,
@@ -216,13 +217,13 @@
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
         health: 5000,
-        cost: (mass: 7200, energy: 43200, time: 8800),
+        cost: (mass: 4210, energy: 25260, time: 5840),
         radius: 12.8, height: 22.3, footprint: (3, 3),
-        vision: 420, water_build: true,
-        economy: (mass_storage: 2000, energy_upkeep: 300),
+        vision: 420,
+        economy: (mass_storage: 400, energy_upkeep: 30),
         mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.05, per_hectare: 4.5, base: 5.5,
+            reach: 1000,
+            ground: 0.0018, per_hectare: 2.4, base: 1.2,
         ),
         upgrades_to: "aster_core_mine_t4",
         mesh: "core_mine", icon: Extractor,
@@ -240,13 +241,13 @@
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
         health: 10000,
-        cost: (mass: 16000, energy: 96000, time: 14000),
+        cost: (mass: 12400, energy: 74400, time: 13100),
         radius: 12.8, height: 22.3, footprint: (3, 3),
-        vision: 480, water_build: true,
-        economy: (mass_storage: 4000, energy_upkeep: 600),
+        vision: 480,
+        economy: (mass_storage: 800, energy_upkeep: 60),
         mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.075, per_hectare: 6.75, base: 8.25,
+            reach: 1000,
+            ground: 0.0036, per_hectare: 4.8, base: 2.4,
         ),
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),

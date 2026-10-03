@@ -419,16 +419,18 @@ fn mine_upgrades_go_to_the_mine_that_pays_back_soonest() {
     // The economy allows two at once, each paying back within its horizon
     // (`commander/economy.rs`).
     let eco = &mut w.state.ai[0].commander.eco;
+    // Bare ground is worth little: on it even the lone mine's upgrade pays
+    // back only in about 40 minutes, the crowded ones' in about 90.
     eco.upgrades = 2;
-    eco.payback = 1100;
+    eco.payback = 3000;
     let mut census = w.survey_own(0);
     assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), Some(alone));
 
     // With the lone mine taken, a crowded one pays back too slowly for that
-    // horizon, and in time for one twice as long (a filling store's).
+    // horizon, and in time for a longer one.
     census.extractors.retain(|&r| r != alone);
     assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), None);
-    w.state.ai[0].commander.eco.payback = 2200;
+    w.state.ai[0].commander.eco.payback = 9000;
     assert!(crowded.contains(&w.mine_to_upgrade(0, &census).map(|(r, _)| r).unwrap()));
 }
 

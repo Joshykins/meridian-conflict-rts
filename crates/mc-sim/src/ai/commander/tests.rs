@@ -109,14 +109,15 @@ fn an_army_that_has_gathered_goes_for_the_enemy_and_trades_are_kept() {
         .unwrap();
     // Its scouts look first; the wave goes once it knows where to.
     run(&mut w, 9000);
+    // Kept by kind of operation: the army that made the kill may have finished
+    // and handed over to a new one since.
     let c = &w.state.ai[0].commander;
-    let army = c
-        .ops
-        .iter()
-        .find(|o| o.kind == OpKind::Army)
-        .expect("an army operation");
     assert!(
-        army.ledger.killed > Fx::ZERO,
+        c.ops.iter().any(|o| o.kind == OpKind::Army),
+        "an army operation"
+    );
+    assert!(
+        c.trades[OpKind::Army as usize].killed > Fx::ZERO,
         "the army never killed anything: {}\n{}",
         c.summary(),
         c.op_lines().join("\n")

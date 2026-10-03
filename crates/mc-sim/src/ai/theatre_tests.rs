@@ -132,51 +132,6 @@ fn a_shipyard_goes_on_the_water_nearest_home() {
 }
 
 #[test]
-fn a_sea_mine_is_not_kept_off_by_the_islands_own_land_mines() {
-    let mut w = islands(false);
-    for (x, y) in [(300, 700), (700, 300)] {
-        spawn(&mut w, "aster_core_mine", x, y);
-    }
-    w.tick(&[]).unwrap();
-    let start = w.state.players[0].start;
-    let spot = w
-        .free_deposit(
-            start,
-            &[],
-            Fx::from_int(1000),
-            &Intel::default(),
-            Some(Fx::ratio(1, 2)),
-        )
-        .expect("the sea round the island");
-    assert!(w.ore.at_sea(spot), "{spot:?}");
-    // The next one keeps a sea reach off it.
-    let sea = w
-        .blueprints
-        .unit(w.blueprints.id_of("aster_core_mine").unwrap())
-        .mine
-        .unwrap()
-        .sea_reach;
-    spawn(
-        &mut w,
-        "aster_core_mine",
-        spot.x.floor_int(),
-        spot.y.floor_int(),
-    );
-    w.tick(&[]).unwrap();
-    let next = w.free_deposit(
-        start,
-        &[],
-        Fx::from_int(3000),
-        &Intel::default(),
-        Some(Fx::ratio(1, 2)),
-    );
-    assert!(
-        next.is_none_or(|p| !w.ore.at_sea(p) || p.distance(spot) >= sea),
-        "{next:?}"
-    );
-}
-
-#[test]
 fn an_unarmed_radar_ship_is_no_project() {
     let w = islands(false);
     let vigil = w.blueprints.id_of("aster_t2_sensor_ship").unwrap();

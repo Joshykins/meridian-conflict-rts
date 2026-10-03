@@ -155,7 +155,7 @@ fn domains() {
         for p in 0..players as usize {
             let pl = &s.players[p];
             let start = pl.start;
-            let (mut land_mines, mut sea_mines, mut mine_sites) = (0, 0, 0);
+            let (mut mines, mut mine_sites) = (0, 0);
             let mut factories = [0; 5];
             let mut army = [[0u32; 3]; 5];
             let mut army_mass = [0f32; 5];
@@ -171,12 +171,10 @@ fn domains() {
                 let pos = s.units.pos[r];
                 lifts += (bp.transport.is_some() && live) as u32;
                 if bp.mine.is_some() {
-                    if !live {
-                        mine_sites += 1;
-                    } else if w.ore.at_sea(pos) {
-                        sea_mines += 1;
+                    if live {
+                        mines += 1;
                     } else {
-                        land_mines += 1;
+                        mine_sites += 1;
                     }
                 } else if bp.has(cat::FACTORY) && bp.is_structure() && live {
                     let d = bp
@@ -224,7 +222,7 @@ fn domains() {
                 })
                 .collect();
             println!(
-                "  P{p} t{} mines land {land_mines} sea {sea_mines} (+{mine_sites}) mass {:>5.1}/s tech {} | factories L/H/N/A {:?} | army home/out/enemy half: {} | lift ships {lifts} jumps {} | kills {} lost {} | {}",
+                "  P{p} t{} mines {mines} (+{mine_sites}) mass {:>5.1}/s tech {} | factories L/H/N/A {:?} | army home/out/enemy half: {} | lift ships {lifts} jumps {} | kills {} lost {} | {}",
                 (starts[p].x > mid) as u8,
                 pl.mass_income.to_f32(),
                 w.side_tech(p as u8),

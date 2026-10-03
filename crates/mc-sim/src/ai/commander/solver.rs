@@ -504,22 +504,22 @@ impl World {
             }
             let p = super::profile::Profile::of(bp);
             let toward = FxVec2::from_angle(facing);
-            // A coastal gun by the side's sea mine nearest the enemy; other guns
+            // A coastal gun by the side's shipyard nearest the enemy; other guns
             // toward the enemy; the rest behind the factories.
-            let sea_mine = || {
+            let shipyard = || {
                 units
                     .slots
                     .iter()
                     .filter(|&r| {
                         units.owner[r] == player
-                            && self.bp(r).mine.is_some()
-                            && self.ore.at_sea(units.pos[r])
+                            && self.bp(r).has(mc_data::cat::FACTORY)
+                            && self.bp(r).water_only()
                     })
                     .map(|r| units.pos[r])
                     .min_by_key(|m| (m.distance_sq(start + toward * Fx::from_int(4000)), m.x, m.y))
             };
             let near = if p.has(role::ANTI_SHIP) && p.has(role::DEFENSE) {
-                match sea_mine() {
+                match shipyard() {
                     Some(m) => m + toward * Fx::from_int(80),
                     None => continue,
                 }

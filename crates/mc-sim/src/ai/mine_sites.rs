@@ -1,11 +1,11 @@
-//! Where the AI's next core mine goes: ore first, then the open ground or sea
-//! that keeps enough of a mine's reach to itself.
+//! Where the AI's next core mine goes: ore first, then the open ground that
+//! keeps enough of a mine's reach to itself.
 use super::*;
 
 impl World {
     /// Nearest ore field with room for another mine, within `range` of `from`,
     /// staying off the enemy's doorstep until the army can contest it; with
-    /// `bare`, else the open ground or sea where a mine gets at least that share
+    /// `bare`, else the open ground where a mine gets at least that share
     /// of what a whole circle of land would give it, the most for the walk
     /// there. Its centre; the builder's site search finds the lot.
     pub(super) fn free_deposit(
@@ -42,8 +42,7 @@ impl World {
             // Against a whole circle of land, so the sea and the map's edge count as lost ground.
             let hectares = m.reach * m.reach * Fx::ratio(355, 113) / 10000;
             let whole = crate::mines::land_rate(&m, hectares, Fx::ZERO);
-            // The nearest few, the one that pays most for the walk: a mine out
-            // at sea a little farther off can make three times a land one's gap.
+            // The nearest few, the one that pays most for the walk.
             let walk = m.reach * 3 / 2;
             spots
                 .into_iter()
@@ -99,28 +98,22 @@ impl World {
         intel: &Intel,
     ) -> bool {
         // Mines may stand close, but split the ground between them: keep them
-        // a reach apart, where each still has about 80% of its circle. A mine
-        // at sea shares only with mines at sea and reaches farther, so it is
-        // kept a sea reach from those and nowhere near the land's: held a land
-        // reach off every mine, an island's own mines left it no sea to mine.
-        let at_sea = |p: FxVec2| self.ore.at_sea(p);
+        // a reach apart, where each still has about 80% of its circle. They
+        // stand on land only.
         let units = &self.state.units;
-        let sea = at_sea(d);
-        let spacing = m.reach_on(sea);
+        let spacing = m.reach;
         let crowded = units.slots.iter().any(|row| {
-            self.bp(row).mine.is_some()
-                && units.pos[row].distance_sq(d) < spacing * spacing
-                && at_sea(units.pos[row]) == sea
+            self.bp(row).mine.is_some() && units.pos[row].distance_sq(d) < spacing * spacing
         });
         d.distance(from) <= range
+            && self.terrain.height_at(d) > self.terrain.water_level()
             && !crowded
             // A planned mine counts like a built one. Its site can stand well off
             // the deposit (the middle may be steep), so a check near the site
             // alone sent every idle builder back to the same deposit, one
             // think after another, and piled mines up around it.
             && !claimed.iter().any(|c| {
-                let same = c.mine && at_sea(c.pos) == sea;
-                c.pos.distance(d) < if same { m.reach_on(sea) } else { Fx::from_int(32) }
+                c.pos.distance(d) < if c.mine { m.reach } else { Fx::from_int(32) }
             })
             && intel.enemy_start.is_none_or(|e| {
                 d.distance(e) > Fx::from_int(480) || d.distance(from) < d.distance(e)

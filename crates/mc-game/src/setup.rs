@@ -79,9 +79,8 @@ pub enum Scene {
     /// A yard of wrecks, one of each kind, all destroyed on the second tick: vehicles and
     /// structures where they stand, aircraft and spacecraft out of the sky, ships at sea.
     Wreckage,
-    /// Structures built out on open sea: the core mines' offshore rigs (a tier 1 and a deep
-    /// core), the anti-air emplacements on their floats, the Regency extractor and flak
-    /// cannon, and the Wharf on its piles.
+    /// Structures built out on open sea: the anti-air emplacements on their floats, the
+    /// Regency flak cannon, and the Wharf on its piles.
     Offshore,
     /// A tank block and a flight on patrol loops, a post added to each after the start.
     Patrol,
@@ -479,12 +478,9 @@ pub fn opening_commands(
         Scene::Offshore => {
             let at = ditch_point(map);
             for (key, dx, dy) in [
-                ("aster_core_mine", -90, 0),
-                ("aster_core_mine_t4", 90, 0),
                 ("aster_t1_aa", -60, 80),
                 ("aster_t2_aa", 0, 80),
                 ("aster_t3_sam", 60, 80),
-                ("regency_t1_extractor", -60, -80),
                 ("regency_t1_aa", 0, -80),
                 ("aster_t1_naval_factory", 40, -200),
             ] {
