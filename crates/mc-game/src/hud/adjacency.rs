@@ -39,6 +39,18 @@ pub fn tone(r: Resource) -> u32 {
     }
 }
 
+/// The tone a link from `provider` is drawn in on the ground: its faction's power line
+/// for energy (`Blueprints::power_line`, linear light, here as sRGB for the interface),
+/// the materials tone for materials. The panels keep the economy's own tones (`tone`).
+pub fn line_tone(blueprints: &Blueprints, provider: BlueprintId, r: Resource) -> u32 {
+    if r == Resource::Mass {
+        return MASS;
+    }
+    let srgb = |c: f32| (c.clamp(0.0, 1.0).powf(1.0 / 2.2) * 255.0).round() as u32;
+    let [cr, cg, cb] = blueprints.power_line(provider).color;
+    srgb(cr) << 16 | srgb(cg) << 8 | srgb(cb)
+}
+
 pub fn word(r: Resource) -> &'static str {
     match r {
         Resource::Mass => "Materials",

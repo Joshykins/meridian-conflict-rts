@@ -54,7 +54,7 @@ pub fn draw(
                 a,
                 b,
                 from,
-                adj::tone(l.resource),
+                adj::line_tone(field.blueprints, l.provider_blueprint, l.resource),
                 hot,
                 false,
                 &text,
@@ -161,7 +161,15 @@ fn placing_marks(ui: &mut Ui, field: &Field, bp: BlueprintId, site: Vec2) {
             a,
             b,
             from,
-            adj::tone(t.resource),
+            adj::line_tone(
+                field.blueprints,
+                if t.incoming {
+                    t.partner_blueprint
+                } else {
+                    bp.id
+                },
+                t.resource,
+            ),
             true,
             true,
             &text,
