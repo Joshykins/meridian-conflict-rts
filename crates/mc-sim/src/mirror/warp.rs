@@ -14,7 +14,7 @@
 
 use super::{DamperView, SimEvent, UnitInstance, WarpView};
 use crate::tables::WarpPhase;
-use crate::warp::{transit_ticks, EMERGE_DAMPED_TICKS};
+use crate::warp::{transit_ticks, warp_rate, EMERGE_DAMPED_TICKS};
 use crate::World;
 use mc_core::TICKS_PER_SECOND;
 
@@ -86,11 +86,10 @@ impl World {
             }
             WarpPhase::Emerge if w.ticks == 0 => [1.0, 0.0],
             // Charging: below zero, how full the drive is (a tick's full draw back, then now).
-            WarpPhase::Spool => self.bp(row).warp.map_or([0.0, 0.0], |d| {
-                let full = |e: mc_core::Fx| -(e / d.energy).to_f32().clamp(0.0, 1.0);
-                let tick = d.energy / d.spool_ticks.max(1) as i32;
-                [full(w.charge - tick), full(w.charge)]
-            }),
+            WarpPhase::Spool if w.need > mc_core::Fx::ZERO => {
+                let full = |e: mc_core::Fx| -(e / w.need).to_f32().clamp(0.0, 1.0);
+                [full(w.charge - warp_rate(w)), full(w.charge)]
+            }
             _ => [0.0, 0.0],
         };
         let [left, _] = units.stun[row];
@@ -181,15 +180,18 @@ impl World {
                 bearing: (w.to - w.from).angle().to_radians_f32(),
                 radius: bp.radius.to_f32(),
                 dampened: damper.is_some(),
-                charge: match (w.phase, bp.warp) {
-                    (WarpPhase::Spool, Some(d)) => (w.charge / d.energy).to_f32().min(1.0),
+                charge: match w.phase {
+                    WarpPhase::Spool if w.need > mc_core::Fx::ZERO => {
+                        (w.charge / w.need).to_f32().min(1.0)
+                    }
                     _ => 1.0,
                 },
                 aligned: w.phase != WarpPhase::Spool || self.warp_aligned(row),
-                energy: bp.warp.map_or(0.0, |d| d.energy.to_f32()),
-                draw: bp.warp.map_or(0.0, |d| {
-                    d.energy.to_f32() * TICKS_PER_SECOND as f32 / d.spool_ticks.max(1) as f32
-                }),
+                energy: w.need.to_f32(),
+                draw: match w.phase {
+                    WarpPhase::Spool => warp_rate(w).to_f32() * TICKS_PER_SECOND as f32,
+                    _ => 0.0,
+                },
             });
         }
     }

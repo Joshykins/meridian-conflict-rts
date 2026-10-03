@@ -296,13 +296,18 @@ pods or two (`Vtol::pairs`).
 
 ## Warp drives and the Undertow dampener (2026-09-29)
 
-The Courier, the Bastion, the Resolute and the Dominion carry a warp drive (`warp:` in their unit
-entries; any aircraft may be given one). `Command::Warp` (`crates/mc-sim/src/warp.rs`):
+The Vigil, the Courier, the Valiant, the Bastion, the Resolute and the Dominion carry a warp
+drive (`warp:` in their unit entries; any aircraft may be given one). `Command::Warp`
+(`crates/mc-sim/src/warp.rs`):
 
 1. **Charge.** The ship waits until its drive has recharged and it is up at 3/4 of its
    cruise height. Then it stops, turns its nose onto the mark and charges the drive. The
-   charge is `energy`, drawn off the grid over `spool` seconds at full power and paid
-   with the side's upkeep (`economy.rs`). A grid that cannot pay charges it more slowly
+   charge is priced by distance (2026-10-02): `per_km` energy for each kilometre from the
+   ship to where it comes out, never less than one kilometre's (`Warp::charge`), so a
+   10 km jump costs ten times a short hop. It is fixed when the spool starts
+   (`WarpState::need`). It charges over `spool * (10 + km) / 10` seconds at full power
+   (`Warp::charge_ticks`: a 10 km jump charges twice as long as the base spool), drawn off
+   the grid and paid with the side's upkeep (`economy.rs`). A grid that cannot pay charges it more slowly
    (never the last sliver), and a big charge can stall the grid, dropping its shields.
    The drive charges only two thirds while the nose is still coming round; the last
    third charges once it is on the mark, so a ship always charges a moment after it
@@ -317,13 +322,14 @@ entries; any aircraft may be given one). `Command::Warp` (`crates/mc-sim/src/war
    recharges for `cooldown` seconds. The order was done when it jumped, so the next one
    is taken up as it comes out.
 
-| ship     | charge          | cooldown | speed      |
-|----------|-----------------|----------|------------|
-| Vigil    | 1 200 E in 3 s  | 40 s     | 3 000 m/s  |
-| Courier  | 1 500 E in 3 s  | 40 s     | 3 000 m/s  |
-| Bastion  | 8 000 E in 4 s  | 60 s     | 3 500 m/s  |
-| Resolute | 20 000 E in 5 s | 75 s     | 4 000 m/s  |
-| Dominion | 45 000 E in 7 s | 110 s    | 4 000 m/s  |
+| ship (tier)  | per km   | spool | 1 km jump        | 10 km jump         | cooldown | speed     |
+|--------------|----------|-------|------------------|--------------------|----------|-----------|
+| Vigil (2)    | 1 200 E  | 3 s   | 1 200 E, 3.3 s   | 12 000 E, 6 s      | 40 s     | 3 000 m/s |
+| Courier (2)  | 1 500 E  | 3 s   | 1 500 E, 3.3 s   | 15 000 E, 6 s      | 40 s     | 3 000 m/s |
+| Valiant (3)  | 4 000 E  | 3 s   | 4 000 E, 3.3 s   | 40 000 E, 6 s      | 50 s     | 3 200 m/s |
+| Bastion (3)  | 8 000 E  | 4 s   | 8 000 E, 4.4 s   | 80 000 E, 8 s      | 60 s     | 3 500 m/s |
+| Resolute (4) | 20 000 E | 5 s   | 20 000 E, 5.5 s  | 200 000 E, 10 s    | 75 s     | 4 000 m/s |
+| Dominion (4) | 45 000 E | 7 s   | 45 000 E, 7.7 s  | 450 000 E, 14 s    | 110 s    | 4 000 m/s |
 
 **Undertow** (`aster_t2_warp_damper`, T2, 300 E/s upkeep, `warp_damper:`): an enemy
 jump that ends within 1 600 m of a finished, powered Undertow is snagged. The transit
@@ -352,8 +358,8 @@ matrix, which plays a Courier's jump into an Undertow). Headless:
 
 ## Warp: the interface (2026-09-29)
 
-The Courier, Bastion, Resolute and Dominion carry warp drives (`UnitBlueprint::warp`, `mc_sim::warp`).
-What the player sees of them:
+The Vigil, Courier, Valiant, Bastion, Resolute and Dominion carry warp drives
+(`UnitBlueprint::warp`, `mc_sim::warp`). What the player sees of them:
 
 - **Order card.** A **Warp** button (key **O**) in the Movement column of any selection that
   holds a ship with a drive. Click a point: the ships charge and jump there in the formation
@@ -361,17 +367,22 @@ What the player sees of them:
   running into it) wherever a click would send the jump.
 - **With the order in hand** (`warp_marks.rs`): a line from each ship to where it comes out
   (its place in the formation about the mark, kept on the map, as the sim does), and a
-  ghost ring there. Enemy Undertow fields are never drawn. Next to the pointer a card totals the energy the jumps take
-  (`Warp 9,500 E`) with a bar of the store against it, the store itself (warning-coloured,
-  with how much it falls short, when it cannot cover the charge: the jump still goes, the
-  charge just runs slower), and how long the charge takes at full power.
+  ghost ring there. Enemy Undertow fields are never drawn. Next to the pointer a card,
+  worked out afresh as the pointer moves, gives how far the jump goes and the energy all
+  the jumps take, each ship priced by its own distance (`Warp  4.2 km · 6,300 E`), a bar of
+  the store against it, the drive's price a kilometre for one ship (`1,500 E/km · charges
+  4.3 s at full power`; for a group, the ships and the longest charge), and the store
+  against what is needed (`Stored 12,000 of 6,300 E`; warning-coloured, with how much it
+  falls short, when it cannot cover the charge: the jump still goes, the charge just runs
+  slower).
 - **In the world.** A charge bar over a ship while it spools (`Charging warp 64%`), a pulsing
   ring and the seconds left where one of ours will come out while it is in warp, and over a
   stunned unit an electric bolt and **STUNNED 18 s** (the seconds only for our own).
 - **Unit card.** The activity line reads `Charging warp 64%` with a bar, `In warp 3 s`,
   `Leaving warp` (or `Thrown out of warp`), or `Stunned · systems down 18 s` in electric cyan.
-  Under it the drive's line: `Warp drive recharging 32 s` with a bar, or `Warp drive ready ·
-  O` with its charge. Our own Undertow's card says `Warp field up 1,600 m`, or `Warp field
+  Under it the drive's line: `Warp drive recharging 32 s` with a bar, `Warp drive ready ·
+  O` with its price a kilometre (`1,500 E/km`), or while it charges the jump's distance and
+  total (`Jump 4.2 km · 1,500 E/km`, `6,300 E`). Our own Undertow's card says `Warp field up 1,600 m`, or `Warp field
   down · powered down` / `· no power`.
 - **The Undertow** has an icon of its own (`IconKind::Damper`: a ring broken on the
   diagonals, four chevrons pulling in on its middle), and selected or being placed its field

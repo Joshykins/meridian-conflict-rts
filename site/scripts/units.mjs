@@ -450,7 +450,7 @@ function unitOf(u, factionKey, lore) {
     // `anti_missile` is the lasers' reach; they burn `anti_missile_lasers` missiles at once (at least one).
     antiMissile: u.anti_missile ? { range: u.anti_missile, lasers: Math.max(1, u.anti_missile_lasers ?? 1) } : null,
     transport: u.transport ? { capacity: u.transport.capacity, descent: u.transport.descent, unload: u.transport.unload } : null,
-    warp: u.warp ? { energy: u.warp.energy, spool: u.warp.spool, cooldown: u.warp.cooldown, speed: u.warp.speed } : null,
+    warp: u.warp ? { perKm: u.warp.per_km, spool: u.warp.spool, cooldown: u.warp.cooldown, speed: u.warp.speed } : null,
     warpDamper: u.warp_damper
       ? { radius: u.warp_damper.radius, drag: u.warp_damper.drag, damage: u.warp_damper.damage, stun: u.warp_damper.stun }
       : null,

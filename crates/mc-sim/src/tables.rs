@@ -262,7 +262,8 @@ pub enum WarpPhase {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WarpState {
     pub phase: WarpPhase,
-    /// Ticks spent in this phase, and how many it lasts.
+    /// Ticks spent in this phase, and how many it lasts. Spooling, `length` is the
+    /// charge's time at full power (`Warp::charge_ticks` for the jump's distance).
     pub ticks: u16,
     pub length: u16,
     /// Where the jump starts and where it comes out.
@@ -272,8 +273,12 @@ pub struct WarpState {
     pub damper: UnitId,
     /// Ticks until the drive can spool again.
     pub recharge: u16,
-    /// Spooling: energy charged into the drive so far, toward `Warp::energy`.
+    /// Spooling: energy charged into the drive so far, toward `need`.
     pub charge: Fx,
+    /// The whole charge this jump takes, priced by its distance when it began to spool
+    /// (`Warp::charge`): fixed then, so the economy and the mirror read it, not a
+    /// distance that moves.
+    pub need: Fx,
 }
 
 pub struct UnitSpawn {
@@ -570,6 +575,7 @@ impl Units {
             h.write_i64(warp.to.x.0);
             h.write_i64(warp.to.y.0);
             h.write_i64(warp.charge.0);
+            h.write_i64(warp.need.0);
             h.write_u64(
                 warp.damper.0 as u64
                     | (self.stun[row][0] as u64) << 32

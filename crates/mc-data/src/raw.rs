@@ -735,9 +735,10 @@ pub(crate) struct RawTransport {
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawWarp {
-    /// Energy one jump's charge takes.
-    pub energy: f64,
-    /// Seconds the charge takes at full power.
+    /// Energy a jump's charge takes for each kilometre it reaches (at least one).
+    pub per_km: f64,
+    /// The base of the charge's time, seconds: a jump of `km` kilometres charges for
+    /// `spool * (10 + km) / 10` at full power (`Warp::charge_ticks`).
     pub spool: f64,
     /// Seconds after coming out before it can spool again.
     pub cooldown: f64,
@@ -1896,18 +1897,18 @@ impl Unit {
                 Some(d)
                     if d.speed <= 0.0
                         || d.spool <= 0.0
-                        || d.energy <= 0.0
+                        || d.per_km <= 0.0
                         || !self
                             .motion
                             .as_ref()
                             .is_some_and(|m| m.layer == MoveLayer::Air) =>
                 {
                     return Err(DataError::Invalid(format!(
-                        "{key}: a warp drive is on an aircraft, with a speed, a spool and an energy cost"
+                        "{key}: a warp drive is on an aircraft, with a speed, a spool and an energy cost per km"
                     )));
                 }
                 Some(d) => Some(crate::Warp {
-                    energy: fx(d.energy),
+                    per_km: fx(d.per_km),
                     spool_ticks: ticks(d.spool).clamp(1, 600) as u16,
                     cooldown_ticks: ticks(d.cooldown).min(6000) as u16,
                     speed: fx(d.speed / TICKS_PER_SECOND as f64),

@@ -357,6 +357,8 @@ fn reference() -> Vec<u64> {
     let mut burst = 0;
     let fid = factories(&w)[0];
     let (mut last_held, mut batches_sent, mut held_at_snapshot) = (0, 0, 0);
+    let courier = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
+    let mut stunned_at_snapshot = false;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -383,6 +385,11 @@ fn reference() -> Vec<u64> {
             last_held = held;
             if t == SNAPSHOT_AT {
                 held_at_snapshot = held;
+                let u = &w.state.units;
+                stunned_at_snapshot = u
+                    .slots
+                    .iter()
+                    .any(|r| u.blueprint[r] == courier && u.stun[r][0] > 0);
             }
             intercepted += w
                 .events
@@ -405,6 +412,11 @@ fn reference() -> Vec<u64> {
     // The factory's scouts formed up, waited across the snapshot and left together.
     assert!(held_at_snapshot > 0, "no batch was waiting at the snapshot");
     assert!(batches_sent > 0, "no batch filled and left");
+    // The Courier charged its jump (priced by its distance), was dragged and stunned.
+    assert!(
+        stunned_at_snapshot,
+        "the Courier was not stunned across the snapshot"
+    );
     // The seabed installation's interceptors met the submarines' torpedoes.
     assert!(intercepted > 0, "no torpedo was intercepted in the match");
     // The experimental submarine's strike missiles went up on their high arc.

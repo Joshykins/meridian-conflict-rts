@@ -18,7 +18,7 @@
         radius: 36, height: 22, footprint: (6, 5), hull: (36, 27), vision: 1500, radar: 6000,
         motion: (layer: Air, size: 0, speed: 90, accel: 20, turn: 40, altitude: 280, hover: true),
         // Warp: a scout's light drive, cheaper to charge than the Courier's.
-        warp: (energy: 1200, spool: 3, cooldown: 40, speed: 3000),
+        warp: (per_km: 1200, spool: 3, cooldown: 40, speed: 3000),
         economy: (energy_upkeep: 40),
         weapons: [],
         mesh: "sensor_ship", icon: SensorShip,
@@ -40,7 +40,7 @@
         radius: 58, height: 30, footprint: (10, 5), hull: (58, 24), vision: 1400,
         motion: (layer: Air, size: 0, speed: 75, accel: 12, turn: 24, altitude: 420, hover: true),
         // Between the Vigil's light drive and the Bastion's.
-        warp: (energy: 4000, spool: 3, cooldown: 50, speed: 3200),
+        warp: (per_km: 4000, spool: 3, cooldown: 50, speed: 3200),
         hull_mounts: true,
         weapons: [
             // The long rail cannon, the Resolute's turret gun drawn out, hung under the belly
@@ -82,8 +82,8 @@
         cost: (mass: 8750, energy: 105000, time: 35000),
         radius: 150, height: 70, footprint: (27, 13), hull: (162, 78), vision: 1900, radar: 2400,
         motion: (layer: Air, size: 0, speed: 60, accel: 6, turn: 8, altitude: 560, hover: true),
-        // The costliest jump of the line, and the slowest to spool and to recharge.
-        warp: (energy: 20000, spool: 5, cooldown: 75, speed: 4000),
+        // A heavy drive, dear by the kilometre and slow to spool and to recharge.
+        warp: (per_km: 20000, spool: 5, cooldown: 75, speed: 4000),
         hull_mounts: true,
         weapons: [
             // Fixed along the keel: the ship turns and pitches to aim it. Charges, then one
@@ -180,7 +180,7 @@
         economy: (energy_upkeep: 800),
         motion: (layer: Air, size: 0, speed: 42, accel: 4, turn: 5, altitude: 700, hover: true, broadside: 90),
         // The heaviest drive of the line: the longest to spool and the dearest to charge.
-        warp: (energy: 45000, spool: 7, cooldown: 110, speed: 4000),
+        warp: (per_km: 45000, spool: 7, cooldown: 110, speed: 4000),
         hull_mounts: true,
         weapons: [
             // Six Arc Cannon casemates let into the flanks, three a side: the battleship's

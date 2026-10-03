@@ -104,11 +104,29 @@ pub(super) fn activity(s: &Scene, u: &UnitInstance) -> Option<Activity> {
 /// One line of the band: label, figure, a bar's share, the bar's and the label's colours.
 type Line = (String, String, Option<f32>, u32, u32);
 
-/// The drive's line for our own ship, when no jump is under way.
+/// The drive's line for our own ship: what the jump it is charging for costs, or, when no
+/// jump is under way, the drive's price a kilometre (or its recharge).
 pub(super) fn drive_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Option<Line> {
     let d = bp.warp?;
-    if (u.owner_flags & 0xFF) as u8 != s.view.local || jump_of(s, u).is_some() {
+    if (u.owner_flags & 0xFF) as u8 != s.view.local {
         return None;
+    }
+    if let Some(w) = jump_of(s, u) {
+        if w.phase != WarpPhase::Spool {
+            return None;
+        }
+        let far = glam::Vec2::new(w.to[0] - w.from[0], w.to[1] - w.from[1]).length();
+        return Some((
+            format!(
+                "Jump {:.1} km  \u{b7}  {} E/km",
+                far / 1000.0,
+                whole(d.per_km.to_f32())
+            ),
+            format!("{} E", whole(w.energy)),
+            None,
+            WARP,
+            WARP,
+        ));
     }
     let recharge = s.queue_of(u).map_or(0.0, |q| q.warp_recharge);
     Some(if recharge > 0.0 {
@@ -123,7 +141,7 @@ pub(super) fn drive_line(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> Opt
     } else {
         (
             "Warp drive ready  \u{b7}  O".to_owned(),
-            format!("{} E", whole(d.energy.to_f32())),
+            format!("{} E/km", whole(d.per_km.to_f32())),
             None,
             WARP,
             WARP,

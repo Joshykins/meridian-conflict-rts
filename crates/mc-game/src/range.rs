@@ -1028,7 +1028,7 @@ fn stage(
                 Command::DebugStorage {
                     player: BLUE,
                     mass: 0,
-                    energy: (drive.energy * 2).ceil_int().max(0) as u32,
+                    energy: (drive.charge(Fx::from_int(1800)) * 2).ceil_int().max(0) as u32,
                 },
                 Command::DebugStock {
                     player: BLUE,

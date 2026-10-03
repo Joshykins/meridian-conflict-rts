@@ -3,8 +3,10 @@
 //! - While the warp order is in hand (`Targeting::Warp`): a line from each selected ship
 //!   to where it would come out (the mark, with the ship kept in its place in the group's
 //!   formation, as the sim does) and a ghost ring at that exit. Enemy dampener fields are
-//!   never shown (`mc_sim::mirror::warp`). Next to the pointer, `cursor_card` totals the
-//!   energy the jumps take against the store.
+//!   never shown (`mc_sim::mirror::warp`). Next to the pointer, `cursor_card` gives how far
+//!   the jump goes, the energy it takes (each ship's drive priced by its own distance,
+//!   `mc_data::Warp::charge`, summed), how long the charge runs and the store against it,
+//!   following the pointer as it moves.
 //! - A ship charging its drive: a charge bar over it, filling as the grid pays.
 //! - One of ours in warp: its exit ringed, with the seconds left.
 //! - A stunned unit: an electric bolt and STUNNED over it, with the seconds left for ours.
@@ -32,7 +34,11 @@ pub struct Jump {
     /// Where it comes out: its place in the formation about the mark, kept on the map.
     pub to: Vec2,
     pub radius: f32,
-    /// Energy the whole charge takes, and seconds it takes at full power.
+    /// Metres from where it stands to where it comes out.
+    pub distance: f32,
+    /// The drive's price a kilometre; the energy this jump's whole charge takes, and the
+    /// seconds it takes at full power (the sim's own sums, `mc_data::Warp`).
+    pub per_km: f32,
     pub energy: f32,
     pub spool: f32,
     /// Too near to be worth a jump: the sim drops the order.
@@ -87,13 +93,17 @@ pub fn jumps(field: &Field, mark: Vec2, alpha: f32) -> Vec<Jump> {
         .map(|(u, d, radius)| {
             let from = at(u, alpha);
             let to = exit(from.truncate(), middle, mark, size);
+            let distance = from.truncate().distance(to);
+            let far = mc_core::Fx::from_f32(distance);
             Jump {
                 from,
                 to,
                 radius,
-                energy: d.energy.to_f32(),
-                spool: d.spool_ticks as f32 / 10.0,
-                short: from.truncate().distance(to) < radius * MIN_JUMP_RADII,
+                distance,
+                per_km: d.per_km.to_f32(),
+                energy: d.charge(far).to_f32(),
+                spool: d.charge_ticks(far) as f32 / 10.0,
+                short: distance < radius * MIN_JUMP_RADII,
             }
         })
         .collect()
@@ -255,8 +265,9 @@ fn stuns(ui: &mut Ui, field: &Field, alpha: f32) {
     }
 }
 
-/// The warp order's card next to the pointer: the energy the jumps take against the store,
-/// and how long the charge runs at full power.
+/// The warp order's card next to the pointer: how far the jump goes, the energy it takes
+/// against the store, and how long the charge runs at full power. It is worked out afresh
+/// for wherever the pointer is.
 pub fn cursor_card(ui: &mut Ui, field: &Field, cursor: Option<Vec3>) {
     let view = field.view;
     if view.mode != Mode::Target(Targeting::Warp) {
@@ -311,27 +322,42 @@ pub fn cursor_card(ui: &mut Ui, field: &Field, cursor: Option<Vec3>) {
     }
 }
 
+/// "4.2 km": a jump's distance in kilometres, to a tenth.
+fn km(metres: f32) -> String {
+    format!("{:.1} km", metres / 1000.0)
+}
+
 /// The card's title, its lines and their colours, and how much of the charge the store
-/// covers (0 to 1 and over): for `all` the jumps and `stored` energy.
+/// covers (0 to 1 and over): for `all` the jumps and `stored` energy. The title gives the
+/// distance (the farthest ship's) and the energy all the jumps take together, each ship's
+/// priced by its own distance; the lines the charge's time, and the store against it.
 fn card_text(all: &[Jump], stored: f32) -> (String, Vec<(String, u32)>, f32) {
     let going: Vec<&Jump> = all.iter().filter(|j| !j.short).collect();
     let need: f32 = going.iter().map(|j| j.energy).sum();
     let spool = going.iter().map(|j| j.spool).fold(0.0, f32::max);
+    let far = going.iter().map(|j| j.distance).fold(0.0, f32::max);
     let short = stored < need;
-    let title = format!("Warp  {} E", whole(need));
-    let ships = match going.len() {
-        0 => "Too near to jump".to_owned(),
-        1 => format!("Full power {spool:.0} s"),
-        n => format!("{n} ships  \u{b7}  full power {spool:.0} s"),
+    let title = format!("Warp  {}  \u{b7}  {} E", km(far), whole(need));
+    let ships = match going.as_slice() {
+        [] => "Too near to jump".to_owned(),
+        [j] => format!(
+            "{} E/km  \u{b7}  charges {spool:.1} s at full power",
+            whole(j.per_km)
+        ),
+        many => format!(
+            "{} ships  \u{b7}  charge {spool:.1} s at full power",
+            many.len()
+        ),
     };
     let store = if short {
         format!(
-            "Stored {} E  \u{b7}  {} short: charges slower",
+            "Stored {} of {} E  \u{b7}  {} short: charges slower",
             whole(stored),
+            whole(need),
             whole(need - stored)
         )
     } else {
-        format!("Stored {} E", whole(stored))
+        format!("Stored {} of {} E", whole(stored), whole(need))
     };
     let mut lines = vec![
         (ships, palette::DIM),
@@ -349,13 +375,24 @@ fn card_text(all: &[Jump], stored: f32) -> (String, Vec<(String, u32)>, f32) {
 mod tests {
     use super::*;
 
-    fn jump(energy: f32, spool: f32, short: bool) -> Jump {
+    /// A jump of `distance` metres by a drive of `per_km` and `spool` seconds, priced as
+    /// the sim prices it.
+    fn jump(per_km: f32, spool: f32, distance: f32, short: bool) -> Jump {
+        let d = mc_data::Warp {
+            per_km: mc_core::Fx::from_f32(per_km),
+            spool_ticks: (spool * 10.0) as u16,
+            cooldown_ticks: 400,
+            speed: mc_core::Fx::from_int(300),
+        };
+        let far = mc_core::Fx::from_f32(distance);
         Jump {
             from: Vec3::ZERO,
             to: Vec2::ZERO,
             radius: 20.0,
-            energy,
-            spool,
+            distance,
+            per_km,
+            energy: d.charge(far).to_f32(),
+            spool: d.charge_ticks(far) as f32 / 10.0,
             short,
         }
     }
@@ -386,26 +423,50 @@ mod tests {
 
     #[test]
     fn the_card_totals_the_charge_against_the_store() {
-        // A Courier and a Bastion; a third ship too near to jump is left out.
+        // A Courier and a Bastion 2 km out; a third ship too near to jump is left out.
         let all = [
-            jump(1500.0, 3.0, false),
-            jump(8000.0, 4.0, false),
-            jump(20000.0, 5.0, true),
+            jump(1500.0, 3.0, 2000.0, false),
+            jump(8000.0, 4.0, 2000.0, false),
+            jump(20000.0, 5.0, 30.0, true),
         ];
-        let (title, lines, cover) = card_text(&all, 12000.0);
-        assert_eq!(title, "Warp  9,500 E");
+        let (title, lines, cover) = card_text(&all, 24000.0);
+        assert_eq!(title, "Warp  2.0 km  \u{b7}  19,000 E");
         assert!(cover > 1.0);
-        assert_eq!(lines[0].0, "2 ships  \u{b7}  full power 4 s");
-        assert_eq!(lines[1], ("Stored 12,000 E".to_owned(), palette::DIM));
+        // The Bastion's 4 s spool, stretched a tenth a kilometre: 4.8 s.
+        assert_eq!(lines[0].0, "2 ships  \u{b7}  charge 4.8 s at full power");
+        assert_eq!(
+            lines[1],
+            ("Stored 24,000 of 19,000 E".to_owned(), palette::DIM)
+        );
         // A store that cannot cover it: warning-coloured, with how far short.
         let (_, lines, cover) = card_text(&all, 6200.0);
         assert!(cover < 1.0);
         assert_eq!(
             lines[1],
             (
-                "Stored 6,200 E  \u{b7}  3,300 short: charges slower".to_owned(),
+                "Stored 6,200 of 19,000 E  \u{b7}  12,800 short: charges slower".to_owned(),
                 palette::WARN
             )
         );
+    }
+
+    #[test]
+    fn a_jump_twice_as_far_costs_twice_as_much_on_the_card() {
+        // One Courier: its price a kilometre, and the charge's time, on the card.
+        let (title, lines, _) = card_text(&[jump(1500.0, 3.0, 5000.0, false)], 1e6);
+        assert_eq!(title, "Warp  5.0 km  \u{b7}  7,500 E");
+        assert_eq!(
+            lines[0].0,
+            "1,500 E/km  \u{b7}  charges 4.5 s at full power"
+        );
+        let (title, lines, _) = card_text(&[jump(1500.0, 3.0, 10000.0, false)], 1e6);
+        assert_eq!(title, "Warp  10.0 km  \u{b7}  15,000 E");
+        assert_eq!(
+            lines[0].0,
+            "1,500 E/km  \u{b7}  charges 6.0 s at full power"
+        );
+        // Under a kilometre is priced as one.
+        let (title, ..) = card_text(&[jump(1500.0, 3.0, 400.0, false)], 1e6);
+        assert_eq!(title, "Warp  0.4 km  \u{b7}  1,500 E");
     }
 }

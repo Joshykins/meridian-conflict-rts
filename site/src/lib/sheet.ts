@@ -212,7 +212,7 @@ export function sheetOf(unit: Unit, makers: Maker[], droneName: (key: string) =>
       : []),
     ...(unit.warp
       ? [
-          row("Warp charge", fmt(unit.warp.energy), "energy", `Spools in ${seconds(unit.warp.spool)} s at full power`),
+          row("Warp charge", fmt(unit.warp.perKm), "energy a km", `At least one km; spools in ${seconds(unit.warp.spool)} s plus a tenth a km at full power`),
           row("Warp speed", fmt(unit.warp.speed), "m/s"),
           row("Warp cooldown", seconds(unit.warp.cooldown), "s"),
         ]

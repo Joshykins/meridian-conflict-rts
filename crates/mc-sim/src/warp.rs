@@ -7,8 +7,10 @@
 //!
 //! - **Spool**: the ship waits for its drive to recharge and to be up at cruise height,
 //!   then stops where it is, charges the drive and brings its nose onto the mark. The
-//!   charge is `Warp::energy`, drawn off the grid over `Warp::spool_ticks` with the rest of
-//!   the side's upkeep (`economy.rs`), and slower by as much as the grid falls short. The
+//!   charge is priced by the jump's distance (`Warp::charge`: `per_km` a kilometre, at
+//!   least one), fixed as it starts (`WarpState::need`), and drawn off the grid over
+//!   `Warp::charge_ticks` (longer the farther it goes) with the rest of the side's upkeep
+//!   (`economy.rs`), slower by as much as the grid falls short. The
 //!   last third charges only once the nose is on the mark (`CHARGE_TURNING`), so there is
 //!   always a moment's charge between lining up and jumping. Its turrets keep firing. Any other order, or a stun, calls the jump off, and what was
 //!   charged is lost.
@@ -61,6 +63,12 @@ const SAG_HEIGHT: Fx = Fx::ratio(17, 20);
 const SAG_RATE: Fx = Fx::ratio(3, 2);
 /// Its way comes off by this share a tick.
 const DRIFT_KEEP: Fx = Fx::ratio(9, 10);
+
+/// Energy a tick the jump `w` draws while it spools at full power: its whole charge over
+/// its charge time.
+pub(crate) fn warp_rate(w: &WarpState) -> Fx {
+    w.need / w.length.max(1) as i32
+}
 
 /// Ticks a clean transit of the jump `w` lasts at `speed` metres a tick.
 pub(crate) fn transit_ticks(w: &WarpState, speed: Fx) -> u16 {
@@ -123,23 +131,26 @@ impl World {
         if self.state.units.warp[row].recharge > 0 || !self.warp_height(row) {
             return Ok(());
         }
+        let distance = from.distance(to);
+        let length = drive.charge_ticks(distance);
         let units = &mut self.state.units;
         units.warp[row] = WarpState {
             phase: WarpPhase::Spool,
             ticks: 0,
-            length: drive.spool_ticks,
+            length,
             from,
             to,
             damper: Handle::NONE,
             recharge: 0,
             charge: Fx::ZERO,
+            need: drive.charge(distance),
         };
         units.flags[row] |= flag::HOLD;
         self.events.push(SimEvent::WarpSpooling {
             unit: units.id(row),
             from: from.extend(units.z[row]),
             to,
-            ticks: drive.spool_ticks,
+            ticks: length,
             blueprint: units.blueprint[row],
             owner: units.owner[row],
         });
@@ -249,7 +260,7 @@ impl World {
         units.speed[row] = Fx::ZERO;
         units.flags[row] |= flag::HOLD;
         units.warp[row].ticks = w.ticks.saturating_add(1);
-        if w.charge < drive.energy || !self.warp_aligned(row) {
+        if w.charge < w.need || !self.warp_aligned(row) {
             return;
         }
         // Into warp: out of the world at once, already where it comes out.
@@ -298,21 +309,21 @@ impl World {
         units.heading[row].delta_to(bearing).unsigned_abs() <= ALIGNED
     }
 
-    /// The drive in `row` charging: the energy a tick it draws at full power, and what
-    /// is left to charge. `None` when it is not charging, or has charged all it may
-    /// while it turns (`CHARGE_TURNING`). A stall slows the draw, never the little that
-    /// is left, or that remainder would shrink for ever (`economy.rs`).
+    /// The drive in `row` charging: the energy a tick it draws at full power (the jump's
+    /// whole charge over its charge time), and what is left to charge. `None` when it is
+    /// not charging, or has charged all it may while it turns (`CHARGE_TURNING`). A stall
+    /// slows the draw, never the little that is left, or that remainder would shrink for
+    /// ever (`economy.rs`).
     pub(crate) fn warp_draw(&self, row: usize) -> Option<(Fx, Fx)> {
         let w = &self.state.units.warp[row];
-        let d = self.bp(row).warp?;
         let cap = if w.phase == WarpPhase::Spool && self.warp_aligned(row) {
-            d.energy
+            w.need
         } else {
-            d.energy * CHARGE_TURNING
+            w.need * CHARGE_TURNING
         };
         let left = cap - w.charge;
         (w.phase == WarpPhase::Spool && self.state.units.is_active(row) && left > Fx::ZERO)
-            .then(|| (d.energy / d.spool_ticks.max(1) as i32, left))
+            .then(|| (warp_rate(w), left))
     }
 
     /// A transit of `length` ticks, `done` of them gone, snagged by the dampener in `row`:

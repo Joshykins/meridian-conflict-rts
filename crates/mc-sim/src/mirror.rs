@@ -1359,9 +1359,11 @@ pub struct WarpView {
     /// Spooling: its nose is on the mark. Until it is, the charge stops short of the
     /// last third (`crate::warp`).
     pub aligned: bool,
-    /// Energy the whole charge takes.
+    /// Energy this jump's whole charge takes: its drive's price a kilometre times how far
+    /// it goes (`mc_data::Warp::charge`), fixed when it began to spool.
     pub energy: f32,
-    /// Energy the grid is asked for each second while it charges at full power.
+    /// Spooling: energy the grid is asked for each second while it charges at full power
+    /// (0 otherwise).
     pub draw: f32,
 }
 

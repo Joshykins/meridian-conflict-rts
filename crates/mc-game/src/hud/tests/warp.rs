@@ -37,8 +37,9 @@ fn spooling(charge: f32) -> WarpView {
         dampened: false,
         charge,
         aligned: true,
-        energy: 1500.0,
-        draw: 500.0,
+        // 4 km at the Courier's 1,500 a kilometre.
+        energy: 6000.0,
+        draw: 1500.0,
     }
 }
 
@@ -76,7 +77,7 @@ fn the_card_tells_a_jump_a_stun_and_the_drives_recharge() {
     let u = s.view.frame.units[0];
     let (label, value, ..) = super::super::warp::drive_line(&s, &u, bp).expect("a drive line");
     assert_eq!(label, "Warp drive ready  \u{b7}  O");
-    assert_eq!(value, "1,500 E");
+    assert_eq!(value, "1,500 E/km");
     // Charging: the activity line and its share.
     rig.view.frame.warps = vec![spooling(0.64)];
     let s = scene(&rig, &stats);
@@ -85,7 +86,10 @@ fn the_card_tells_a_jump_a_stun_and_the_drives_recharge() {
         (a.label.as_str(), a.value.as_str(), a.progress),
         ("Charging warp", "64%", Some(0.64))
     );
-    assert!(super::super::warp::drive_line(&s, &u, bp).is_none());
+    // The drive's line gives what this jump costs.
+    let (label, value, ..) = super::super::warp::drive_line(&s, &u, bp).expect("the jump's cost");
+    assert_eq!(label, "Jump 4.0 km  \u{b7}  1,500 E/km");
+    assert_eq!(value, "6,000 E");
     // In warp: the seconds left.
     let mut transit = spooling(1.0);
     transit.phase = WarpPhase::Transit;

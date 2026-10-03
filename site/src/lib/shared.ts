@@ -185,7 +185,7 @@ export type Unit = {
   shield: Shield | null;
   antiMissile: { range: number; lasers: number } | null;
   transport: { capacity: number; descent: number; unload: number } | null;
-  warp: { energy: number; spool: number; cooldown: number; speed: number } | null;
+  warp: { perKm: number; spool: number; cooldown: number; speed: number } | null;
   warpDamper: { radius: number; drag: number; damage: number; stun: number } | null;
   strategic: {
     kind: "Nuke" | "Interceptor";

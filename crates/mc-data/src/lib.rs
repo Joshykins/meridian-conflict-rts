@@ -474,19 +474,42 @@ pub struct Transport {
 }
 
 /// A capital ship's warp drive (`mc_sim::warp`): it spools up on the spot, turns its nose to
-/// where it is going, drops out of the world and comes out again up to `range` away.
+/// where it is going, drops out of the world and comes out again wherever it was sent.
 #[derive(Clone, Copy, Debug)]
 pub struct Warp {
-    /// Energy one jump's charge takes, drawn over `spool_ticks` while the grid can pay
-    /// (slower while it cannot).
-    pub energy: Fx,
-    /// Ticks the drive takes to charge at full power; it jumps once charged and its nose
-    /// is on the mark.
+    /// Energy a jump's charge takes for each kilometre from the ship to where it comes out
+    /// (`Warp::charge`), drawn over `Warp::charge_ticks` while the grid can pay (slower
+    /// while it cannot).
+    pub per_km: Fx,
+    /// The base of the charge's time: a jump of `km` kilometres charges for
+    /// `spool_ticks * (10 + km) / 10` ticks at full power (`Warp::charge_ticks`). It jumps
+    /// once charged and its nose is on the mark.
     pub spool_ticks: u16,
     /// Ticks after coming out before the drive can spool again.
     pub cooldown_ticks: u16,
     /// Metres a tick the ship covers in warp: the transit lasts as long as the jump is far.
     pub speed: Fx,
+}
+
+impl Warp {
+    /// Kilometres a jump of `distance` metres is priced at: never less than one.
+    pub fn km(distance: Fx) -> Fx {
+        (distance / 1000).max(Fx::ONE)
+    }
+
+    /// Energy the charge for a jump of `distance` metres takes: `per_km` for each
+    /// kilometre, and at least one kilometre's.
+    pub fn charge(&self, distance: Fx) -> Fx {
+        self.per_km * Self::km(distance)
+    }
+
+    /// Ticks the charge for a jump of `distance` metres takes at full power: `spool_ticks`
+    /// stretched by a tenth for each kilometre, `spool_ticks * (10 + km) / 10`.
+    pub fn charge_ticks(&self, distance: Fx) -> u16 {
+        let stretch = Fx::from_int(10) + Self::km(distance);
+        let ticks = Fx::from_int(self.spool_ticks as i32) * stretch / 10;
+        ticks.ceil_int().clamp(1, u16::MAX as i32) as u16
+    }
 }
 
 /// A warp dampener (`mc_sim::warp`): an enemy ship whose jump ends inside `radius` of it is
@@ -1449,7 +1472,7 @@ impl Blueprints {
                 Some(d) => {
                     h.write_u64(d.spool_ticks as u64 | (d.cooldown_ticks as u64) << 16);
                     h.write_i64(d.speed.0);
-                    h.write_i64(d.energy.0);
+                    h.write_i64(d.per_km.0);
                 }
                 None => h.write_u64(u64::MAX),
             }

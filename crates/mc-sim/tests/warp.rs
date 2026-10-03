@@ -1,6 +1,6 @@
-//! Warp (`warp.rs`): capital ships charge their drive off the grid, jump, and come out;
-//! an enemy warp dampener drags a jump that ends in its field and throws the ship out
-//! hurt and stunned.
+//! Warp (`warp.rs`): capital ships charge their drive off the grid (priced by how far the
+//! jump goes), jump, and come out; an enemy warp dampener drags a jump that ends in its
+//! field and throws the ship out hurt and stunned.
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::Blueprints;
@@ -47,8 +47,9 @@ fn world() -> World {
     let mut w =
         World::with_terrain(terrain, map, blueprints, Arc::new(Pool::new(1)), &config).unwrap();
     for p in &mut w.state.players {
-        p.bonus_storage[1] = Fx::from_int(200_000);
-        p.energy = Fx::from_int(100_000);
+        // A frigate's 6 km jump alone takes 120 000.
+        p.bonus_storage[1] = Fx::from_int(2_000_000);
+        p.energy = Fx::from_int(1_000_000);
     }
     w
 }
@@ -106,26 +107,28 @@ fn a_ship_still_charges_after_its_nose_comes_onto_the_mark() {
     // Due south, a half turn behind it: the turn outlasts the charge it may take.
     let mark = FxVec2::from_ints(6000, 2000);
     warp(&mut w, ship, 6000, 2000);
-    let drive = w.bp(row(&w, ship)).warp.unwrap();
     let mut lined_up = None;
+    let mut length = 0;
     for t in 0..seconds(30) {
         let r = row(&w, ship);
         let state = w.state.units.warp[r];
         if state.phase == WarpPhase::Transit {
             let at = lined_up.expect("it jumped before its nose was on the mark");
             assert!(
-                t - at >= drive.spool_ticks as usize / 3,
-                "it jumped {} ticks after lining up; a third of its {}-tick charge is left then",
+                t - at >= length as usize / 3,
+                "it jumped {} ticks after lining up; a third of its {length}-tick charge is left then",
                 t - at,
-                drive.spool_ticks
             );
             return;
         }
         let bearing = (mark - w.state.units.pos[r]).angle();
         let on = w.state.units.heading[r].delta_to(bearing).unsigned_abs() <= 546;
+        if state.phase == WarpPhase::Spool {
+            length = state.length;
+        }
         if state.phase == WarpPhase::Spool && !on {
             assert!(
-                state.charge <= drive.energy * Fx::ratio(2, 3),
+                state.charge <= state.need * Fx::ratio(2, 3),
                 "it charged past two thirds while still turning"
             );
         }
@@ -146,14 +149,15 @@ fn a_courier_charges_off_the_grid_jumps_and_comes_out_where_it_was_sent() {
     // Due north: it turns a quarter turn onto the mark while it charges.
     warp(&mut w, ship, 3000, 7000);
     let charged = until(&mut w, ship, WarpPhase::Transit, seconds(20)).expect("it never jumped");
+    // 4 km: 3 s stretched by four tenths, 4.2 s.
     assert!(
-        (seconds(2)..seconds(6)).contains(&charged),
-        "a 3 s charge took {charged} ticks"
+        (seconds(3)..seconds(8)).contains(&charged),
+        "a 4.2 s charge took {charged} ticks"
     );
     let spent = (before - w.state.players[0].energy).to_f32();
     assert!(
-        (1400.0..1600.0).contains(&spent),
-        "a jump's charge took {spent} energy, not 1500"
+        (5900.0..6100.0).contains(&spent),
+        "a 4 km jump's charge took {spent} energy, not 6000 (1500 a kilometre)"
     );
     until(&mut w, ship, WarpPhase::Idle, seconds(10)).expect("it never came out");
     let r = row(&w, ship);
@@ -178,7 +182,7 @@ fn a_jump_reaches_across_the_whole_map() {
     let ship = add(&mut w, COURIER, 0, 1000, 1000);
     run(&mut w, seconds(10));
     warp(&mut w, ship, 15000, 15000);
-    until(&mut w, ship, WarpPhase::Transit, seconds(10)).expect("it never jumped");
+    until(&mut w, ship, WarpPhase::Transit, seconds(20)).expect("it never jumped");
     until(&mut w, ship, WarpPhase::Idle, seconds(20)).expect("it never came out");
     let at = w.state.units.pos[row(&w, ship)];
     assert!(
@@ -237,8 +241,8 @@ fn a_starved_grid_charges_the_drive_only_as_far_as_it_can_pay() {
     let mut w = world();
     let ship = add(&mut w, COURIER, 0, 3000, 3000);
     run(&mut w, seconds(10));
-    // Half a charge in the store and nothing coming in.
-    w.state.players[0].energy = Fx::from_int(750);
+    // Half of a 4 km jump's 6000 in the store and nothing coming in.
+    w.state.players[0].energy = Fx::from_int(3000);
     warp(&mut w, ship, 7000, 3000);
     assert!(
         until(&mut w, ship, WarpPhase::Transit, seconds(15)).is_none(),
@@ -248,23 +252,66 @@ fn a_starved_grid_charges_the_drive_only_as_far_as_it_can_pay() {
     let charge = w.state.units.warp[r].charge.to_f32();
     assert_eq!(w.state.units.warp[r].phase, WarpPhase::Spool);
     assert!(
-        (700.0..=760.0).contains(&charge),
-        "charged {charge} of 750 to be had"
+        (2900.0..=3010.0).contains(&charge),
+        "charged {charge} of 3000 to be had"
     );
     w.state.players[0].energy = Fx::from_int(5000);
     until(&mut w, ship, WarpPhase::Transit, seconds(5)).expect("it never finished its charge");
 }
 
 #[test]
-fn a_larger_ship_draws_more_for_its_jump() {
+fn a_larger_ship_pays_more_a_kilometre() {
     let blueprints =
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
-    let energy = |key: &str| {
+    let per_km = |key: &str| {
         let bp = blueprints.unit(blueprints.id_of(key).unwrap());
-        bp.warp.expect("a drive").energy
+        bp.warp.expect("a drive").per_km
     };
-    assert!(energy(COURIER) < energy("aster_t3_lift_ship"));
-    assert!(energy("aster_t3_lift_ship") < energy(FRIGATE));
+    assert!(per_km(COURIER) < per_km("aster_t3_lift_ship"));
+    assert!(per_km("aster_t3_lift_ship") < per_km(FRIGATE));
+}
+
+/// Energy a Courier spends on, and ticks it takes to charge, a jump due east (the way it
+/// faces, so it never turns) of `km` kilometres; and the charge its jump was priced at.
+fn jump_east(km: i32) -> (f32, usize, Fx) {
+    let mut w = world();
+    let ship = add(&mut w, COURIER, 0, 3000, 3000);
+    run(&mut w, seconds(10));
+    let before = w.state.players[0].energy;
+    warp(&mut w, ship, 3000 + km * 1000, 3000);
+    let need = w.state.units.warp[row(&w, ship)].need;
+    let ticks = until(&mut w, ship, WarpPhase::Transit, seconds(30)).expect("it never jumped");
+    ((before - w.state.players[0].energy).to_f32(), ticks, need)
+}
+
+#[test]
+fn a_jump_twice_as_far_costs_twice_as_much_and_charges_longer() {
+    let (near, near_ticks, near_need) = jump_east(3);
+    let (far, far_ticks, far_need) = jump_east(6);
+    assert_eq!(near_need, Fx::from_int(4500), "1500 a kilometre, 3 km");
+    assert_eq!(far_need, near_need * 2);
+    assert!(
+        (far / near - 2.0).abs() < 0.02,
+        "the 6 km jump took {far} energy, the 3 km one {near}"
+    );
+    // 3 s stretched a tenth a kilometre: 3.9 s against 4.8 s.
+    assert!(
+        far_ticks > near_ticks + 5,
+        "the 6 km charge took {far_ticks} ticks, the 3 km one {near_ticks}"
+    );
+}
+
+#[test]
+fn a_jump_under_a_kilometre_is_priced_as_one() {
+    let mut w = world();
+    let ship = add(&mut w, COURIER, 0, 3000, 3000);
+    run(&mut w, seconds(10));
+    warp(&mut w, ship, 3500, 3000);
+    let state = w.state.units.warp[row(&w, ship)];
+    assert_eq!(state.phase, WarpPhase::Spool);
+    assert_eq!(state.need, Fx::from_int(1500));
+    // 3 s stretched by the one kilometre it is priced at: 3.3 s.
+    assert_eq!(state.length, 33);
 }
 
 #[test]

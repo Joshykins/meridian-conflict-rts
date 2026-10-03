@@ -17,18 +17,22 @@ const WORTH_A_JUMP: Fx = Fx::from_int(1400);
 const DAMPER_MARGIN: Fx = Fx::from_int(150);
 
 impl World {
-    /// Whether `row`'s drive is ready to spool and its side can pay the charge.
-    pub(super) fn can_jump(&self, row: usize) -> bool {
+    /// Whether `row`'s drive is ready to spool and its side can pay the charge for a
+    /// jump to `to`: priced by how far that is (`Warp::charge`), out of the store and
+    /// what comes in over the charge's time.
+    pub(super) fn can_jump(&self, row: usize, to: FxVec2) -> bool {
         let Some(drive) = self.bp(row).warp else {
             return false;
         };
         let units = &self.state.units;
         let w = &units.warp[row];
         let pl = &self.state.players[units.owner[row] as usize];
+        let distance = units.pos[row].distance(to);
+        let seconds =
+            Fx::from_int(drive.charge_ticks(distance) as i32) / mc_core::TICKS_PER_SECOND as i32;
         w.phase == WarpPhase::Idle
             && w.recharge == 0
-            && pl.energy + pl.energy_income * Fx::from_int(drive.spool_ticks as i32 / 10)
-                >= drive.energy
+            && pl.energy + pl.energy_income * seconds >= drive.charge(distance)
     }
 
     /// `want`, moved out of every remembered enemy dampener's field, toward `from`.
@@ -68,11 +72,11 @@ impl World {
         out: &mut Vec<Command>,
     ) {
         let units = &self.state.units;
-        let (jump, fly): (Vec<usize>, Vec<usize>) = rows
-            .iter()
-            .partition(|&&r| self.can_jump(r) && units.pos[r].distance(target) >= WORTH_A_JUMP);
+        let mark = self.safe_mark(player, offset_toward(target, from, STANDOFF), from);
+        let (jump, fly): (Vec<usize>, Vec<usize>) = rows.iter().partition(|&&r| {
+            self.can_jump(r, mark) && units.pos[r].distance(target) >= WORTH_A_JUMP
+        });
         if !jump.is_empty() {
-            let mark = self.safe_mark(player, offset_toward(target, from, STANDOFF), from);
             let ids = self.ids_of(&jump);
             out.push(Command::Warp {
                 units: ids.clone(),
@@ -98,7 +102,7 @@ impl World {
     pub(super) fn go_home(&self, row: usize, home: FxVec2, out: &mut Vec<Command>) {
         let far = self.state.units.pos[row].distance(home) >= WORTH_A_JUMP;
         let units = vec![self.state.units.id(row)];
-        out.push(if far && self.can_jump(row) {
+        out.push(if far && self.can_jump(row, home) {
             Command::Warp {
                 units,
                 pos: home,

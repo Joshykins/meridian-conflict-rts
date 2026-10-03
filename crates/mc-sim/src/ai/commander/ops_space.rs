@@ -144,12 +144,12 @@ impl World {
             taken.push(spot);
             let p = ctx.profiles.get(self.state.units.blueprint[r]);
             let id = vec![self.state.units.id(r)];
-            if p.has(role::WARP) && self.can_jump(r) {
-                let mark = self.safe_mark(
-                    ctx.player,
-                    super::super::offset_toward(spot, ctx.start, Fx::from_int(900)),
-                    ctx.start,
-                );
+            let mark = self.safe_mark(
+                ctx.player,
+                super::super::offset_toward(spot, ctx.start, Fx::from_int(900)),
+                ctx.start,
+            );
+            if p.has(role::WARP) && self.can_jump(r, mark) {
                 out.push(Command::Warp {
                     units: id.clone(),
                     pos: mark,
@@ -249,7 +249,7 @@ impl World {
                     super::super::offset_toward(target, from, LANDING_STANDOFF),
                     from,
                 );
-                let jump = self.can_jump(ship);
+                let jump = self.can_jump(ship, mark);
                 if jump {
                     out.push(Command::Warp {
                         units: vec![op.carrier],
@@ -296,7 +296,7 @@ impl World {
                         units: vec![op.carrier],
                     });
                     let units = vec![op.carrier];
-                    out.push(if self.can_jump(ship) {
+                    out.push(if self.can_jump(ship, home) {
                         Command::Warp {
                             units,
                             pos: home,
