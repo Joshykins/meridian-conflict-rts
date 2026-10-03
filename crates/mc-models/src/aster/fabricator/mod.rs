@@ -8,21 +8,12 @@
 //! Tech 3 is the tech 2 machine with more on it: those pieces ride the tech 2 model as
 //! upgrade pieces (`structures::kit`), going up during the refit.
 //!
-//! Design candidates, one per file, all built from the kit here:
-//! - `drum` (`fabricator~a`): an indexing drum of four cassettes round a squat spindle,
-//!   a cross-head stamping them, heat sinks on wedge feet off the diagonals.
-//! - `frame` (`fabricator~b`): a press frame of four upright posts on a heavy bed, a
-//!   cross-head ram stamping a die in a turning table, heat sinks down two sides.
-//! - `carousel` (`fabricator~c`): a carousel of eight cells turning round a finned hub, a
-//!   hammer dropping on the hub's head under a capped crown.
+//! The machine (`carousel`): a carousel of eight cells turning round a finned hub, a
+//! hammer dropping on the hub's head under a capped crown, built from the kit here.
 
 pub(super) mod carousel;
-pub(super) mod drum;
-pub(super) mod frame;
 
-use std::f32::consts::FRAC_PI_4;
-
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 
 use super::parts::*;
 use crate::builder::{chamfered_rect, MeshBuilder, Section};
@@ -80,102 +71,6 @@ pub(super) fn plinth(b: &mut MeshBuilder) {
     b.mirror_y(|b| team_panel(b, v3(0.0, HALF - 1.2, DECK), v2(4.0, 0.9)));
 }
 
-/// A chamfered square step from `z0` to `z1`, `half` across: a dark band at its foot,
-/// plate above.
-pub(super) fn step(b: &mut MeshBuilder, half: f32, chamfer: f32, z0: f32, z1: f32) {
-    if b.coarse() {
-        b.paint(PLATING);
-        b.cuboid_open(
-            v3(0.0, 0.0, (z0 + z1) * 0.5),
-            v3(half * 2.0, half * 2.0, z1 - z0),
-        );
-        return;
-    }
-    let plan = chamfered_rect(v2(half, half), chamfer);
-    if !b.fine() {
-        b.paint(PLATING);
-        b.loft_z(&plan, &[Section::new(z0, 1.0), Section::new(z1, 0.96)]);
-        return;
-    }
-    let band = ((z1 - z0) * 0.25).min(0.5);
-    b.paint(ACCENT);
-    b.loft_z(
-        &plan,
-        &[Section::new(z0, 1.0), Section::new(z0 + band, 1.0)],
-    );
-    b.paint(PLATING);
-    b.loft_z(
-        &plan,
-        &[Section::new(z0 + band, 0.99), Section::new(z1, 0.96)],
-    );
-}
-
-/// A heat sink along `along` from `at`, `len` long and `w` across, standing on whatever
-/// is at `at`: a dark housing, plate fins tall and short in turn under a clamp bar, end
-/// caps. Not drawn far off.
-pub(super) fn heat_sink(b: &mut MeshBuilder, at: Vec3, along: Vec3, len: f32, w: f32) {
-    if b.coarse() {
-        return;
-    }
-    let base = 0.6;
-    let fin = w * 0.55;
-    b.yawed(at, along.y.atan2(along.x), |b| {
-        b.paint(ACCENT);
-        b.cuboid_open(v3(len * 0.5, 0.0, base * 0.5), v3(len, w, base));
-        if !b.fine() {
-            // The middle distance: the fins as one block.
-            b.paint(PLATING);
-            b.cuboid_open(
-                v3(len * 0.5, 0.0, base + fin * 0.5),
-                v3(len * 0.86, w * 0.84, fin),
-            );
-            return;
-        }
-        let n = 8;
-        let pitch = len * 0.86 / n as f32;
-        b.paint(PLATING);
-        for k in 0..n {
-            let x = len * 0.07 + pitch * (k as f32 + 0.5);
-            let tall = if k % 2 == 0 { 1.0 } else { 0.78 };
-            b.cuboid_open(
-                v3(x, 0.0, base + fin * tall * 0.5),
-                v3(pitch * 0.34, w * 0.84, fin * tall),
-            );
-        }
-        {
-            b.paint(ACCENT);
-            b.cuboid(
-                v3(len * 0.5, 0.0, base + fin + 0.1),
-                v3(len * 0.9, w * 0.12, 0.2),
-            );
-            for x in [len * 0.035, len * 0.965] {
-                b.cuboid_open(v3(x, 0.0, base + fin * 0.5), v3(len * 0.07, w * 0.94, fin));
-            }
-        }
-    });
-}
-
-/// A wedge on +x from `x0` to `x1` standing on `z`, `width` across and `height` tall at
-/// each end, its top shoulders bevelled.
-pub(super) fn wedge(b: &mut MeshBuilder, x0: f32, x1: f32, z: f32, width: Vec2, height: Vec2) {
-    let ring = |x: f32, w: f32, h: f32| -> Vec<Vec3> {
-        let (s, e) = (w * 0.5, w * 0.16);
-        vec![
-            v3(x, -s, z),
-            v3(x, s, z),
-            v3(x, s, z + h * 0.78),
-            v3(x, s - e, z + h),
-            v3(x, -s + e, z + h),
-            v3(x, -s, z + h * 0.78),
-        ]
-    };
-    b.loft(
-        &[ring(x0, width.x, height.x), ring(x1, width.y, height.y)],
-        true,
-        true,
-    );
-}
-
 /// A box of matter in the Materials colour, `size` at `center`: lit by the work, flashing
 /// at each stroke (`pattern::FAB_MATTER`).
 pub(super) fn matter(b: &mut MeshBuilder, center: Vec3, size: Vec3) {
@@ -193,48 +88,10 @@ pub(super) fn lamp(b: &mut MeshBuilder, center: Vec3, size: Vec3) {
     b.cuboid(center, size);
 }
 
-/// A capacitor bastion on the deck at `at`, its long side along y: a dark block with a row
-/// of cans on it, the grid's power going in. Not drawn far off.
-pub(super) fn bastion(b: &mut MeshBuilder, at: Vec3, len: f32, h: f32) {
-    if b.coarse() {
-        return;
-    }
-    b.paint(ACCENT);
-    if !b.fine() {
-        b.cuboid_open(at + Vec3::Z * (h * 0.5), v3(1.8, len, h));
-        return;
-    }
-    b.chamfered_box(at + Vec3::Z * (h * 0.5), v3(1.8, len, h), 0.4);
-    let n = (len / 1.4) as usize;
-    for k in 0..n {
-        let y = (k as f32 - (n as f32 - 1.0) * 0.5) * 1.4;
-        b.paint(PLATING);
-        b.prism(at + v3(0.0, y, h), 6, 0.5, 0.45, 0.6);
-        b.paint(METAL);
-        b.prism(at + v3(0.0, y, h + 0.6), 6, 0.2, 0.15, 0.35);
-    }
-}
-
-/// A box `size` at `center`, its upright edges cut back `chamfer` close to.
-pub(super) fn block(b: &mut MeshBuilder, center: Vec3, size: Vec3, chamfer: f32) {
-    if b.fine() {
-        b.chamfered_box(center, size, chamfer);
-    } else {
-        b.cuboid(center, size);
-    }
-}
-
-/// `f` drawn on +x and turned onto each of the four diagonals.
-pub(super) fn diagonals(b: &mut MeshBuilder, f: impl Fn(&mut MeshBuilder)) {
-    b.yawed(Vec3::ZERO, FRAC_PI_4, |b| b.radial(4, &f));
-}
-
 #[cfg(test)]
 mod tests {
     use super::{LOT, SIZES};
     use crate::{build_model_scaled, part, rig};
-
-    const DESIGNS: [&str; 3] = ["fabricator~a", "fabricator~b", "fabricator~c"];
 
     /// Tech 2 and 3 stand on one 2x2 lot; tech 2 carries tech 3's machinery as upgrade
     /// pieces (only those reach over its height), tech 3 stands taller, and every one has
@@ -242,7 +99,8 @@ mod tests {
     #[test]
     fn tech_3_is_tech_2_upgraded_on_one_lot() {
         let half = LOT as f32 * 6.0;
-        for key in DESIGNS {
+        {
+            let key = "fabricator";
             let mut tops = Vec::new();
             for tech in [2u8, 3] {
                 let (r, h) = SIZES[tech as usize - 1];

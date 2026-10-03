@@ -1,6 +1,6 @@
-//! Design C (`fabricator~c`), the carousel: a low octagonal base, a carousel of eight cells
-//! turning round a finned hub, four guide columns on the hub's head holding a capped
-//! crown, and a hammer dropping between them onto the matter in the hub's head
+//! The Material Fabricator's machine, the carousel: a low octagonal base, a carousel
+//! of eight cells turning round a finned hub, four guide columns on the hub's head
+//! holding a capped crown, and a hammer dropping between them onto the matter in the hub's head
 //! (`part::FAB_INDEX`, `part::FAB_PRESS`).
 //! - Tech 2: all of that, lamps on the crown.
 //! - Tech 3: a finned condenser on the crown under a higher cap.

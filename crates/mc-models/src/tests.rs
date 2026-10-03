@@ -784,6 +784,9 @@ const OVER_BUDGET: &[Over] = &[
     // The Valiant's mid detail is mostly its shared rig: drives, legs, lift jets, the
     // Resolute's rail house and the Bastion's rotary gun.
     ("rail_corvette", None, Some(0.56), None),
+    // The Material Fabricator is a small 2x2 machine; most of its mid detail is the
+    // carousel's cells and the hammer that work in beats.
+    ("fabricator", None, Some(0.55), None),
 ];
 type Over = (&'static str, Option<usize>, Option<f32>, Option<usize>);
 
@@ -859,7 +862,7 @@ fn lods_reduce_and_respect_budgets() {
         } else if model.key == "power" {
             REACTOR_TRIANGLES
         } else if base_key(&model.key) == "fabricator" {
-            // A 4x4 plant of a few per side: its tech 3 vessel, coils, banks and cooling.
+            // A 2x2 machine of a few per side, its tech 3 pieces riding the tech 2 model.
             FABRICATOR_TRIANGLES
         } else if model.key.starts_with("factory_")
             || model.key == "airbase"
