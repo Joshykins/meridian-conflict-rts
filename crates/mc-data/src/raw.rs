@@ -153,6 +153,9 @@ pub(crate) struct Faction {
     pub plating_color: [f32; 3],
     pub accent_color: [f32; 3],
     pub highlight_color: [f32; 3],
+    /// The light of its power lines: the energy conduits between buildings that save
+    /// each other upkeep. Linear RGB.
+    pub power_color: [f32; 3],
     /// The faction's shield fields. Pale cyan when left out.
     #[serde(default = "default_shield_color")]
     pub shield_color: [f32; 3],

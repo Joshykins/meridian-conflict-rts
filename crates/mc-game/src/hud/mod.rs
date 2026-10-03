@@ -68,12 +68,12 @@ use mine_marks::{mine_marks, mines_in_sight, territory, TERRITORY_SEGMENTS};
 pub use mine_marks::{ore_claimed, ore_claims};
 pub use minimap::MINIMAP_SLOT;
 
-/// Materials (the sim's `mass`): red-orange. The world's adjacency conduits light the
-/// same colours (`gpu_consts::tone`).
+/// Materials (the sim's `mass`): red-orange. The world's materials conduits light the
+/// same colour (`gpu_consts::tone`).
 pub const MASS: u32 = mc_render::gpu_consts::tone::MASS;
 /// Healthy units: the green that used to be the materials colour.
 pub const HEALTHY: u32 = 0x6FE39B;
-pub const ENERGY: u32 = mc_render::gpu_consts::tone::ENERGY;
+pub const ENERGY: u32 = 0xF4C25E;
 /// A store running low. Yellower than `ENERGY`, so it reads on that row too.
 const LOW: u32 = 0xFFE23D;
 

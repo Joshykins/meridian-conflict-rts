@@ -148,10 +148,10 @@ pub fn planned_links(
                 .iter()
                 .find(|u| u.unit_id == t.partner)
                 .map_or(site, |u| [u.pos[0], u.pos[1]]);
-            let (provider, consumer, from) = if t.incoming {
-                (t.partner, 0, partner)
+            let (provider, consumer, from, to) = if t.incoming {
+                (t.partner, 0, partner, site)
             } else {
-                (0, t.partner, site)
+                (0, t.partner, site, partner)
             };
             LinkView {
                 provider,
@@ -171,6 +171,7 @@ pub fn planned_links(
                 share: t.share,
                 edge: t.edge,
                 from,
+                to,
                 bound: t.bound,
             }
         })

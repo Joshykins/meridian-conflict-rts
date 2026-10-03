@@ -18,8 +18,9 @@ pub struct LinkView {
     pub share: f32,
     /// The stretch of lot edge the two share, end to end, metres.
     pub edge: [[f32; 2]; 2],
-    /// The provider's lot centre, so the conduit can run toward the neighbour.
+    /// The provider's lot centre and the neighbour's: the conduit runs from one to the other.
     pub from: [f32; 2],
+    pub to: [f32; 2],
     /// The two go down together (`adjacency::bound`).
     pub bound: bool,
 }
@@ -70,6 +71,7 @@ impl World {
                 share: l.share.to_f32(),
                 edge: [l.edge.0.to_f32(), l.edge.1.to_f32()],
                 from: units.pos[p].to_f32(),
+                to: units.pos[c].to_f32(),
                 bound: adjacency::bound(pbp, cbp),
             });
         }

@@ -124,7 +124,7 @@ impl Renderer {
             );
             self.adjacency_links.set_sim(&frame.links, input.time);
         }
-        self.adjacency_links.upload();
+        self.adjacency_links.upload(&self.blueprints);
         let ghosts = &input.ghosts[..input.ghosts.len().min(MAX_GHOSTS)];
         self.dynamic.write(
             (self.sim_units as usize * size_of::<UnitInstance>()) as u64,
@@ -586,8 +586,6 @@ impl Renderer {
                 draw_terrain(self.pipelines.terrain_shadow, kind);
                 self.foundations
                     .record(&self.gpu, cmd, self.layouts.scene, kind);
-                self.adjacency_links
-                    .record(&self.gpu, cmd, self.layouts.scene, kind);
                 draw_entities(
                     [self.pipelines.entity_shadow, self.pipelines.prop[2]],
                     kind,
@@ -642,8 +640,6 @@ impl Renderer {
                 );
                 draw_terrain(self.pipelines.terrain_prepass, pass::MAIN);
                 self.foundations
-                    .record(&self.gpu, cmd, self.layouts.scene, pass::PREPASS);
-                self.adjacency_links
                     .record(&self.gpu, cmd, self.layouts.scene, pass::PREPASS);
                 draw_entities(
                     [self.pipelines.entity_prepass, self.pipelines.prop[3]],
@@ -803,7 +799,7 @@ impl Renderer {
             self.timers.end(&device, cmd);
             // After the lots' paving, which is biased toward the eye over anything low.
             self.adjacency_links
-                .record(&self.gpu, cmd, self.layouts.scene, pass::MAIN);
+                .record(&self.gpu, cmd, self.layouts.scene);
             self.timers.draws(&device, cmd, "scene.grass");
             self.grass.draw(&self.gpu, cmd, self.scene_set, |band| {
                 self.timers.crumb(cmd, || format!("grass band {band}"))

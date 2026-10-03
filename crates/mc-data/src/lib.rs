@@ -146,6 +146,9 @@ pub struct Faction {
     pub plating_color: [f32; 3],
     pub accent_color: [f32; 3],
     pub highlight_color: [f32; 3],
+    /// The light of its power lines (the energy conduits between adjacent buildings, and
+    /// the interface's marks for them): `Blueprints::power_color`.
+    pub power_color: [f32; 3],
     /// Its shield fields' idle colour; hits and seams are drawn from it.
     pub shield_color: [f32; 3],
     /// How its construction sites look. Presentation only, so not in the content hash.
@@ -1239,6 +1242,7 @@ impl Blueprints {
                 plating_color: f.plating_color,
                 accent_color: f.accent_color,
                 highlight_color: f.highlight_color,
+                power_color: f.power_color,
                 shield_color: f.shield_color,
                 construction: f.construction,
                 sounds: f.sounds.clone(),
@@ -1310,6 +1314,12 @@ impl Blueprints {
 
     pub fn id_of(&self, key: &str) -> Option<BlueprintId> {
         self.by_key.get(key).copied()
+    }
+
+    /// The light of the power lines of the faction that fields `unit` (`Faction::power_color`),
+    /// linear RGB.
+    pub fn power_color(&self, unit: BlueprintId) -> [f32; 3] {
+        self.factions[self.unit(unit).faction.0 as usize].power_color
     }
 
     pub fn faction_by_key(&self, key: &str) -> Option<&Faction> {
