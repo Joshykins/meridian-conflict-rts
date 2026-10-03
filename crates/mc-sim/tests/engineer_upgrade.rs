@@ -103,9 +103,9 @@ fn an_engineer_upgrades_itself_once_the_side_has_the_tier() {
     w.tick(&[cmd(Command::Upgrade { units: vec![mason] })])
         .unwrap();
     let before = w.state.units.pos[w.state.units.row(mason).unwrap()];
-    // Its own build power puts the next tier on: 900 / 5 = 180 s, with some to spare.
+    // It fits its next tier at that tier's build power: 900 / 30 = 30 s, with some to spare.
     let mut paid = (0.0, 0.0);
-    for _ in 0..200 * TICKS_PER_SECOND {
+    for _ in 0..40 * TICKS_PER_SECOND {
         w.tick(&[]).unwrap();
         let pl = &w.state.players[0];
         paid.0 += pl.mass_spent.to_f64() / TICKS_PER_SECOND as f64;

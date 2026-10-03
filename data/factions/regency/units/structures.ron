@@ -48,7 +48,7 @@
         tech: 2,
         categories: ["Land", "Factory"],
         health: 9200,
-        cost: (mass: 1580, energy: 12100, time: 2030),
+        cost: (mass: 3100, energy: 24000, time: 3900),
         radius: 46, height: 22, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
@@ -67,7 +67,7 @@
         tech: 3,
         categories: ["Land", "Factory"],
         health: 18500,
-        cost: (mass: 4840, energy: 39100, time: 5550),
+        cost: (mass: 9300, energy: 76000, time: 10600),
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
@@ -102,7 +102,7 @@
         tech: 2,
         categories: ["Land", "Air", "Factory"],
         health: 8800,
-        cost: (mass: 1580, energy: 12100, time: 2030),
+        cost: (mass: 3100, energy: 24000, time: 3900),
         radius: 46, height: 30, footprint: (8, 8),
         vision: 200,
         // The Regency have no fire bomber; their reclaim carrier is the Winnow.
@@ -122,7 +122,7 @@
         tech: 3,
         categories: ["Land", "Air", "Factory"],
         health: 17600,
-        cost: (mass: 4840, energy: 39100, time: 5550),
+        cost: (mass: 9300, energy: 76000, time: 10600),
         radius: 46, height: 38, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
@@ -156,7 +156,7 @@
         tech: 2,
         categories: ["Naval", "Factory"],
         health: 9200,
-        cost: (mass: 1580, energy: 12900, time: 1950),
+        cost: (mass: 3100, energy: 25500, time: 3800),
         radius: 46, height: 24, footprint: (8, 8),
         vision: 200, water_build: true,
         builder: (power: 120, range: 0, builds: [
@@ -173,7 +173,7 @@
         tech: 3,
         categories: ["Naval", "Factory"],
         health: 18500,
-        cost: (mass: 4700, energy: 41500, time: 5300),
+        cost: (mass: 9100, energy: 80500, time: 10200),
         radius: 46, height: 32, footprint: (8, 8),
         vision: 200, water_build: true,
         builder: (power: 360, range: 0, builds: [

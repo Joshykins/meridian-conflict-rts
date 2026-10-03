@@ -988,6 +988,21 @@ impl Blueprints {
         }
     }
 
+    /// Build power a unit of `from` puts its own upgrade into `to` on with: its own,
+    /// or `fallback` if it builds nothing. An engineer fitting its next tier works
+    /// at that tier's power, so climbing in the field takes seconds, not minutes.
+    pub fn upgrade_power(&self, from: &UnitBlueprint, to: &UnitBlueprint, fallback: Fx) -> Fx {
+        let own = from.builder.as_ref().map_or(fallback, |b| b.power);
+        let engineer = from.has(cat::ENGINEER)
+            && from.is_mobile()
+            && !from.has(cat::COMMANDER)
+            && from.upgrades_to == Some(to.id);
+        match &to.builder {
+            Some(b) if engineer => own.max(b.power),
+            _ => own,
+        }
+    }
+
     /// The tier a side must have reached before a unit may upgrade itself into `to`.
     /// Nothing climbs past the side's own tech (an economy structure, an engineer, a
     /// sonar or a shield alike): upgrading is not a way to reach a tier. A factory's
@@ -1952,10 +1967,10 @@ mod tests {
         let (mfe, shield) = (module("back", "mfe"), module("back", "shield"));
         let with_mfe = bp.refit_result(with_rail, mfe).unwrap();
         let e = &bp.unit(with_mfe).economy;
-        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::from_int(6));
+        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::ratio(3, 2));
         assert_eq!(
             e.energy_income,
-            acu.economy.energy_income + Fx::from_int(250)
+            acu.economy.energy_income + Fx::from_int(100)
         );
         let (set2, loadout) = bp.loadout(with_mfe).unwrap();
         assert_eq!(set2.replaces(&loadout.fitted, slot("back"), 1), Some(0));

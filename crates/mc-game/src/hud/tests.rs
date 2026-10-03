@@ -1186,10 +1186,11 @@ fn a_late_match_reclaim_survey_leaves_the_panels_room() {
 }
 
 #[test]
-fn a_late_match_mine_survey_leaves_the_panels_room() {
-    // Zoomed out over dozens of mines with one selected: the survey drew
-    // first and filled the overlay, and every panel after it vanished.
+fn a_late_match_mine_point_overlay_leaves_the_panels_room() {
+    // Zoomed out over dozens of mines with one selected: the mine marks draw
+    // first, and must never fill the overlay so the panels after them vanish.
     let mut rig = Rig::new("aster_core_mine");
+    with_mine_points(&mut rig);
     let size = Vec2::from(rig.map.info().size_metres().to_f32());
     let template = rig.view.frame.units[0];
     for k in 0..48u32 {
@@ -1233,23 +1234,23 @@ fn a_late_match_mine_survey_leaves_the_panels_room() {
     );
 }
 
+/// The rig's map with its mine points known, as the game has them once the
+/// placement sites are built.
+fn with_mine_points(rig: &mut Rig) {
+    let sites = mc_sim::placement::SiteMap::for_map(&rig.map, &rig.blueprints).unwrap();
+    assert!(!sites.mine_points().is_empty(), "the test field has ore");
+    let _ = rig.view.sites.set(sites);
+}
+
 #[test]
-fn a_builders_queued_mines_bring_up_their_territories_once_each() {
+fn a_builders_queued_mine_brings_up_the_mine_points() {
     let mut rig = Rig::new("aster_t1_engineer");
-    rig.camera.focus = glam::Vec3::new(4000.0, 4000.0, 0.0);
-    rig.camera.distance = 3000.0;
+    with_mine_points(&mut rig);
+    let point = rig.view.sites.get().unwrap().mine_points()[0];
+    let at = Vec2::from(point.to_f32());
+    rig.camera.focus = at.extend(0.0);
+    rig.camera.distance = 1500.0;
     let mine = rig.blueprints.id_of("aster_core_mine").expect("core mine");
-    let order = |x: i32| QueuedOrder {
-        formation: 0,
-        offset: [0.0; 2],
-        moving_slot: None,
-        formation_phase: 0,
-        kind: OrderKind::Build,
-        pos: [x as f32, 4000.0],
-        at: mc_core::FxVec2::from_ints(x, 4000),
-        blueprint: mine,
-        radius: 0.0,
-    };
     let drawn = |rig: &mut Rig, queues: Vec<UnitOrders>| {
         rig.view.status.queues = queues;
         rig.settle();
@@ -1260,28 +1261,21 @@ fn a_builders_queued_mines_bring_up_their_territories_once_each() {
         &mut rig,
         vec![UnitOrders {
             unit_id: 7,
-            orders: vec![order(4000), order(4300)],
+            orders: vec![QueuedOrder {
+                formation: 0,
+                offset: [0.0; 2],
+                moving_slot: None,
+                formation_phase: 0,
+                kind: OrderKind::Build,
+                pos: at.into(),
+                at: point,
+                blueprint: mine,
+                radius: 0.0,
+            }],
             ..Default::default()
         }],
     );
     assert!(queued > none, "{queued} vertices, {none} with none queued");
-    // A second builder carrying the same order draws nothing more.
-    let shared = drawn(
-        &mut rig,
-        vec![
-            UnitOrders {
-                unit_id: 7,
-                orders: vec![order(4000), order(4300)],
-                ..Default::default()
-            },
-            UnitOrders {
-                unit_id: 9,
-                orders: vec![order(4300)],
-                ..Default::default()
-            },
-        ],
-    );
-    assert_eq!(shared, queued);
 }
 
 #[test]

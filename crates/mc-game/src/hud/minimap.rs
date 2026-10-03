@@ -22,10 +22,6 @@ const MAX_COVER_RINGS: usize = 400;
 /// Range and vision rings of the selection at most (a cosmetic cap, as above).
 const MAX_SELECTION_RINGS: usize = 60;
 
-/// Overlay vertices the mine territories on the chart may use (a territory
-/// is ~250, so some 170 of them).
-const TERRITORY_BUDGET: usize = mc_render::overlay::MAX_OVERLAY_VERTICES / 6;
-
 /// Clips a segment to a rectangle (Liang-Barsky). `None` when it misses.
 fn clip(a: Vec2, b: Vec2, r: Rect) -> Option<(Vec2, Vec2)> {
     let d = b - a;
@@ -106,7 +102,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
 
     // Ore fields are baked into the chart image (`ui::preview`); the ones a
     // mine the viewer has seen is working get a bright materials outline.
-    let tapped = super::ore_tapped(s.map, s.blueprints, &view.frame.units);
+    let tapped = super::ore_tapped(view, s.blueprints, s.map);
     for (region, _) in s.map.ore_regions().iter().zip(&tapped).filter(|(_, t)| **t) {
         let pts: Vec<Vec2> = region
             .points
@@ -120,62 +116,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     }
     super::survival::minimap(hud, ui, s, &|p| chart_pos(s, chart, p));
 
-    // Every mine in sight with its territory: faint always, bright during the
-    // survey (placing or selecting a mine, or Ctrl).
-    let survey = matches!(view.mode, crate::game::Mode::Place(bp) if s.blueprints.unit(bp).mine.is_some())
-        || s.show_reclaim
-        || view
-            .frame
-            .units
-            .iter()
-            .any(|u| view.selection.contains(&u.unit_id) && s.bp(u).mine.is_some());
-    let mut mines = super::mines_in_sight(s.map, s.blueprints, &view.frame.units);
-    // In id order, so the territories a full chart leaves out stay the same ones.
-    mines.sort_unstable_by_key(|m| m.id);
-    let (line, fill) = if survey { (0.95, 0.22) } else { (0.45, 0.08) };
-    // Every panel and dropdown is drawn after the minimap: an 8-player match's
-    // hundred-odd territories must never use up their vertices. A fixed
-    // allowance from here, not what the marks drawn before happen to leave:
-    // those (the world's mine survey above all) move with the camera, and the
-    // cut would move with them, so mines flickered on and off the chart.
-    let budget_end = ui.o.vertices.len() + TERRITORY_BUDGET;
-    for (i, mine) in mines.iter().enumerate() {
-        let (centre, reach) = (mine.at, mine.reach);
-        let c = chart_pos(s, chart, centre);
-        // Past the allowance a mine still shows where it is, without its ground.
-        if ui.o.vertices.len() > budget_end {
-            ui.dot(c, 2.6, rgb(super::MASS, 1.0));
-            continue;
-        }
-        // A territory is a few pixels across on the chart: as many points as it has pixels round.
-        let px = chart_pos(s, chart, centre + Vec2::new(reach, 0.0)).x - c.x;
-        let points = (px * std::f32::consts::TAU / 3.0).clamp(10.0, 80.0) as usize;
-        // Land mines and sea mines work different ground: each shares only with its own kind.
-        let others: Vec<(Vec2, f32)> = mines
-            .iter()
-            .enumerate()
-            .filter(|&(j, m)| {
-                j != i && m.sea == mine.sea && m.at.distance(centre) < reach + m.reach
-            })
-            .map(|(_, m)| (m.at, m.reach))
-            .collect();
-        let territory = super::territory(centre, reach, &others);
-        let pts: Vec<Vec2> = hud
-            .survey
-            .on_own_ground(s, centre, reach, territory)
-            .into_iter()
-            .step_by(super::TERRITORY_SEGMENTS.div_ceil(points))
-            .map(|p| chart_pos(s, chart, p))
-            .collect();
-        for pair in pts.windows(2) {
-            ui.triangle(c, pair[0], pair[1], rgb(super::MASS, fill));
-            ui.stroke(pair[0], pair[1], 1.2, rgb(super::MASS, line));
-        }
-        if let (Some(&a), Some(&b)) = (pts.last(), pts.first()) {
-            ui.stroke(a, b, 1.2, rgb(super::MASS, line));
-        }
-        ui.dot(c, 2.6, rgb(super::MASS, 1.0));
-    }
+    // The mine points while they are shown (placing or selecting a mine, or Ctrl).
+    super::mine_points::chart(ui, s, &|p| chart_pos(s, chart, p));
 
     // Reach: the side's radar cover and shield domes, the selection's guns and eyes.
     let metre = chart_pos(s, chart, Vec2::new(1000.0, 0.0)).x - chart_pos(s, chart, Vec2::ZERO).x;

@@ -53,7 +53,7 @@ fn shown(s: &Scene) -> bool {
 }
 
 /// Each mine point, by who has it, in map order. Empty until the map's sites are known.
-pub(super) fn points(view: &View, blueprints: &Blueprints) -> Vec<(FxVec2, Held)> {
+fn points(view: &View, blueprints: &Blueprints) -> Vec<(FxVec2, Held)> {
     let Some(sites) = view.sites.get() else {
         return Vec::new();
     };
@@ -264,9 +264,15 @@ pub(super) fn chart(ui: &mut Ui, s: &Scene, at: &dyn Fn(Vec2) -> Vec2) {
     }
     for (p, held) in points(s.view, s.blueprints) {
         let c = at(Vec2::from(p.to_f32()));
+        let hollow = |ui: &mut Ui, color| {
+            let ring: Vec<Vec2> = (0..10)
+                .map(|i| c + Vec2::from_angle(i as f32 / 10.0 * TAU) * 2.6)
+                .collect();
+            ui.polyline(&ring, 1.0, color, true);
+        };
         match held {
-            Held::Free => ui.ring(c, 2.6, 1.0, rgb(MASS, 1.0)),
-            Held::Planned => ui.ring(c, 2.6, 1.0, rgb(PLANNED, 1.0)),
+            Held::Free => hollow(ui, rgb(MASS, 1.0)),
+            Held::Planned => hollow(ui, rgb(PLANNED, 1.0)),
             Held::Taken(owner) => ui.dot(c, 2.6, s.team_color(owner)),
         }
     }

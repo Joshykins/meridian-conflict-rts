@@ -34,7 +34,7 @@ pub const TIERS: u8 = 5;
 /// The tab past the tiers: refits.
 pub const UPGRADE_TAB: u8 = TIERS + 1;
 /// How fast a structure that is not a builder puts on its own upgrade (the sim's `SELF_UPGRADE_POWER`).
-const SELF_UPGRADE_POWER: f32 = 10.0;
+const SELF_UPGRADE_POWER: i32 = 10;
 
 /// Whether a unit gets the queue strip over its construction panel, which then shows
 /// what it is producing, building or upgrading and how far along (not the unit card).
@@ -422,7 +422,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             data_card(hud, ui, item, power, &hint, tile, floor - GAP);
         }
         Some(Hover::Climb(i, tile)) => {
-            upgrade_card(hud, ui, s, unit, bp, &line, i, reached, tile, floor - GAP)
+            upgrade_card(hud, ui, s, bp, &line, i, reached, tile, floor - GAP)
         }
         None => {}
     }
@@ -1059,7 +1059,6 @@ fn upgrade_card(
     hud: &Hud,
     ui: &mut Ui,
     s: &Scene,
-    u: &UnitInstance,
     current: &UnitBlueprint,
     line: &[&UnitBlueprint],
     i: usize,
@@ -1095,30 +1094,22 @@ fn upgrade_card(
             rows.push((label, a.to_f32(), b.to_f32(), ""));
         }
     }
-    // A core mine: what it makes on its own territory now and at the next tier.
-    let mine = s
-        .queue_of(u)
-        .and_then(|q| q.mine)
-        .filter(|_| from.mine.is_some());
-    if let Some(view) = mine {
-        let was = if from.id == current.id {
-            view.rate
-        } else {
-            super::mine::rate_on(from, &view.land)
-        };
+    // A core mine or a fabricator: the materials it makes now and at the next tier.
+    let makes = super::mine::makes(from) > 0.0 || super::mine::makes(next) > 0.0;
+    if makes {
         rows.insert(
             0,
             (
                 "Materials / s",
-                was,
-                super::mine::rate_on(next, &view.land),
+                super::mine::makes(from),
+                super::mine::makes(next),
                 "",
             ),
         );
     }
     rows.push(("Vision", from.vision.to_f32(), next.vision.to_f32(), " m"));
     // From the tier the mine is at now, so a later tier shows the whole climb.
-    let payback = mine.and_then(|v| super::mine::climb_gain(current, next, &v));
+    let payback = super::mine::climb_gain(current, next);
     let rows: Vec<_> = rows.into_iter().take(8).collect();
 
     let w = 380.0;
@@ -1157,10 +1148,10 @@ fn upgrade_card(
     );
 
     // The price: mass, energy, and how long it takes to put on.
-    let power = from
-        .builder
-        .as_ref()
-        .map_or(SELF_UPGRADE_POWER, |b| b.power.to_f32());
+    let power = s
+        .blueprints
+        .upgrade_power(from, next, mc_core::Fx::from_int(SELF_UPGRADE_POWER))
+        .to_f32();
     let (mass, energy) = s.blueprints.upgrade_cost(next);
     let costs = [
         ("Materials", whole(mass.to_f32()), MASS),

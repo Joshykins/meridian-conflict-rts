@@ -59,27 +59,25 @@ flow-field cache, render mirror).
 A replay is `(map id, blueprint hash, seed, player setup, command log)`.
 
 **Materials and core mines** (`mc_sim::mines`). Maps carry ore fields as polygons
-(`mc_map::OreRegion`, format v2). A blueprint with `mine` is a core mine: every hectare of
-land within `reach` (1000 m, the same for every tier) pays `ground` materials a second and
-every hectare of ore `per_hectare`, counted on grids (`OreGrid`: land at 32 m, the overview's
-pitch, ore at 8 m). Overlapping mines, anyone's, divide the ground as a power diagram: a cell
-goes to the mine with the least `distance^2 - reach^2`, so the border between two is the
-straight line through the points where their circles cross. `State::mines` keeps each mine's
-territory (`Share`: land and ore it has, and would have alone; efficiency is the ratio),
-re-counted only when the set of mines changes. There is no feed or investment: the tiers
-(`aster_core_mine` -> `_t2` -> `_t3`, upgraded in place, same unit id) are the investment and
-raise the per-hectare yield; `_t4`, the deep core, adds only to the shaft's `base`. Mines may
-stand anywhere a structure fits, on open water too (`water_build`). A mine whose ground
-cell is sea (`OreGrid::at_sea`, `MineState::sea`) works the sea instead: its territory is the
-sea cells within its `sea_reach`, its shaft's share counted on those alone, and it divides
-ground only with other mines at sea, as land mines only with land mines; its worked water
-spreads at `SEA_SPREAD_SPEED`. Ore counts for the kind of ground above it. Ore lies deep
-(`OreRegion::depth`, 140-400 m, hashed from the outline): a mine sinks its main shaft at
-`SHAFT_SPEED` and drives a drift to each field at `DRIFT_SPEED` once the shaft reaches that
-depth; a field's ore pays only from `Vein::reached_at` (mine age, kept through upgrades).
-The renderer draws the ore as real geometry (`ore_vein_mesh`, `fs_vein`, additive, no depth
-test) during the survey; the HUD draws territories, shafts and drifts, cut to the screen. The AI puts mines on
-the nearest free fields a reach apart, then on bare ground once it has defence and energy.
+(`mc_map::OreRegion`, format v2), and each field holds one mine point: `mines::mine_points`
+puts it on the 3x3 lot nearest the field's middle that a mine can stand on (by
+`placement::SiteMap`, land or water, never a city block, never overlapping another point),
+searching out to 96 m; a field with no such lot has none. It is a pure function of the map
+and the blueprints, so the sim (`World::mine_points`, worked out when the match begins) and
+the interface (`SiteMap::for_map`, built on a background thread into `View::sites`) agree.
+A blueprint with `mine` is a core mine and stands only on a point (`World::can_place`;
+`lot_fits` is the same without that rule, for the test range's spawns), one mine to a point,
+anyone's: the lot covers it. A build order dropped within 60 m of a point (`POINT_SNAP_M`)
+goes onto it; farther off, or onto a taken point, it is refused with
+`Refusal::NotOnMinePoint` / `MinePointTaken`, and the placement ghost says so first
+(`Unfit::NoMinePoint` / `MinePointTaken`). A mine digs its blueprint's `rate` a second from
+the moment it is finished, scaled by its side's energy share (`mine_power`, a quarter at
+worst); the tiers (`aster_core_mine` -> `_t2` -> `_t3` -> `_t4`, upgraded in place, same
+unit id) raise the rate. `State::mines` keeps each finished mine's age, for the hammer.
+A blueprint with `fabricator` (a material fabricator) makes its `mass` a second as far as
+its energy upkeep is paid, none at all with nothing paid. The HUD draws the points while a
+mine is placed or selected, a builder has one queued, or Ctrl is held (`hud/mine_points.rs`):
+free, taken (its side's colour) or planned. The AI claims the nearest free points.
 
 **The core mine's pit and pipe** (`models/aster/mine.rs`, `models::Pit`). The model digs a
 real hole below ground level, and the terrain is drawn across it, so the vertex shader pulls

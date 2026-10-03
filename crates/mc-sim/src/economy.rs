@@ -154,12 +154,20 @@ impl World {
             if remaining <= Fx::ZERO {
                 continue;
             }
-            let power = self
-                .bp(row)
-                .builder
-                .as_ref()
-                .map_or(crate::orders::SELF_UPGRADE_POWER, |b| b.power);
             let tbp = self.bp(target);
+            // Its own upgrade (the successor is a unit of its own) at the power
+            // `upgrade_power` gives it; anything else at its own.
+            let own_upgrade = self.state.units.has_flag(target, flag::UPGRADE)
+                && self.bp(row).upgrades_to == Some(tbp.id);
+            let power = if own_upgrade {
+                self.blueprints
+                    .upgrade_power(self.bp(row), tbp, crate::orders::SELF_UPGRADE_POWER)
+            } else {
+                self.bp(row)
+                    .builder
+                    .as_ref()
+                    .map_or(crate::orders::SELF_UPGRADE_POWER, |b| b.power)
+            };
             let focus = self.state.players[self.state.units.owner[row] as usize].focus;
             let tier = if constructing {
                 focus.priority(tbp, &self.blueprints).tier()

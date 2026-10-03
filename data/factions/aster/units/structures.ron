@@ -23,7 +23,7 @@
         tech: 2,
         categories: ["Land", "Factory"],
         health: 8200,
-        cost: (mass: 1520, energy: 12700, time: 1900),
+        cost: (mass: 3000, energy: 25000, time: 3700),
         radius: 46, height: 34, footprint: (8, 8), hull: (6.9, 6.9),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
@@ -40,7 +40,7 @@
         tech: 3,
         categories: ["Land", "Factory"],
         health: 16500,
-        cost: (mass: 4650, energy: 41100, time: 5200),
+        cost: (mass: 9000, energy: 80000, time: 10000),
         radius: 46, height: 42, footprint: (8, 8), hull: (6.9, 6.9),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
@@ -73,7 +73,7 @@
         tech: 2,
         categories: ["Land", "Air", "Factory"],
         health: 8000,
-        cost: (mass: 1520, energy: 12700, time: 1900),
+        cost: (mass: 3000, energy: 25000, time: 3700),
         radius: 46, height: 34, footprint: (8, 8),
         vision: 200,
         builder: (power: 120, range: 0, builds: [
@@ -90,7 +90,7 @@
         tech: 3,
         categories: ["Land", "Air", "Factory"],
         health: 16000,
-        cost: (mass: 4650, energy: 41100, time: 5200),
+        cost: (mass: 9000, energy: 80000, time: 10000),
         radius: 46, height: 42, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
@@ -126,7 +126,7 @@
         tech: 2,
         categories: ["Naval", "Factory"],
         health: 8400,
-        cost: (mass: 1560, energy: 12900, time: 1950),
+        cost: (mass: 3080, energy: 25500, time: 3800),
         radius: 46, height: 34, footprint: (8, 8),
         vision: 200, water_build: true,
         // A one-sided quay on piles, built out on open water: warships and
@@ -147,7 +147,7 @@
         tech: 3,
         categories: ["Naval", "Factory"],
         health: 16800,
-        cost: (mass: 4700, energy: 41500, time: 5300),
+        cost: (mass: 9100, energy: 80500, time: 10200),
         radius: 46, height: 42, footprint: (8, 8),
         vision: 200, water_build: true,
         // A one-sided quay on piles, built out on open water: warships and

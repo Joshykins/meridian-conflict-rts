@@ -119,7 +119,8 @@ fn a_commander_is_refitted_in_place_and_stays_the_same_unit() {
     );
     let mut shown = 0.0f32;
     let mut frame = mc_sim::RenderFrame::default();
-    let done = (0..1500).any(|_| {
+    // Suite II: 1800 build time at the commander's own power of 10, 180 s.
+    let done = (0..2000).any(|_| {
         w.tick(&[]).unwrap();
         w.write_render_frame(None, &mut frame);
         assert_eq!(
@@ -294,7 +295,7 @@ fn a_refit_drops_the_walk_and_then_pins_it_until_done() {
 
     // Done, it gets on with what was asked of it meanwhile.
     let t2 = module(&w, "eng_2").1;
-    let done = (0..1500).any(|_| {
+    let done = (0..2000).any(|_| {
         w.tick(&[]).unwrap();
         w.state.units.blueprint[row] == t2
     });

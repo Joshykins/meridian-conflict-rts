@@ -26,10 +26,6 @@ pub struct PlayerStatus {
     pub mass_income: f32,
     /// Materials a second coming in from reclaim, on top of `mass_income`.
     pub reclaim_income: f32,
-    /// Materials a second the mines will add as they finish growing into their
-    /// territories and digging out to their ore: `mass_income` plus this is the
-    /// income once every mine is fully grown.
-    pub mine_growth: f32,
     pub energy_income: f32,
     pub mass_demand: f32,
     pub energy_demand: f32,
@@ -264,7 +260,6 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
                 energy_capacity: f(p.energy_capacity),
                 mass_income: f(p.mass_income),
                 reclaim_income: f(p.reclaim_income),
-                mine_growth: 0.0,
                 energy_income: f(p.energy_income),
                 mass_demand: f(p.mass_demand),
                 energy_demand: f(p.energy_demand),
@@ -301,28 +296,7 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         replay: None,
     };
     forces_of(world, &mut status.players);
-    mine_growth_of(world, &mut status.players);
     status
-}
-
-/// What every side's mines have still to grow into, materials a second.
-fn mine_growth_of(world: &World, players: &mut [PlayerStatus]) {
-    let units = &world.state.units;
-    for (&id, m) in &world.state.mines.by_unit {
-        let Some(row) = units.row(id) else {
-            continue;
-        };
-        let Some(bp) = world.bp(row).mine else {
-            continue;
-        };
-        let owner = units.owner[row] as usize;
-        let (Some(p), Some(pl)) = (players.get_mut(owner), world.state.players.get(owner)) else {
-            continue;
-        };
-        // The test range's income dial turns the mines' output too.
-        let dial = pl.income_permille[0] as f32 / 1000.0;
-        p.mine_growth += (m.full_rate(&bp) - m.rate(&bp)).max(Fx::ZERO).to_f32() * dial;
-    }
 }
 
 /// The orders the interface asked for. With cheats on (test scenes) any side's may be

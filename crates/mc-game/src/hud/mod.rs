@@ -21,8 +21,7 @@ pub mod icons;
 mod issue_mark;
 pub use issue_mark::IssueMark;
 pub(crate) mod mine;
-mod mine_coast;
-mod mine_marks;
+mod mine_points;
 mod minimap;
 mod net_cards;
 mod netplay;
@@ -62,8 +61,8 @@ use mc_sim::mirror::{
 };
 use mc_sim::tables::flag;
 
-pub use mine_marks::ore_tapped;
-use mine_marks::{mine_marks, mines_in_sight, territory, TERRITORY_SEGMENTS};
+use mine_points::mine_points;
+pub use mine_points::ore_tapped;
 pub use minimap::MINIMAP_SLOT;
 
 /// Materials (the sim's `mass`): red-orange.
@@ -316,8 +315,6 @@ pub struct Hud {
     refit_prompt: Option<refit::Prompt>,
     /// Open the construction panel on its upgrade/refit tab next frame.
     want_refit_tab: bool,
-    /// The map counted for the mine survey, and each mine's coast; built on first use.
-    survey: mine_coast::Survey,
     /// Observing: every commander's income and army over the last minutes.
     observed: observer::History,
     /// Launch warnings and what came of them (`silo::alerts`).
@@ -535,8 +532,8 @@ impl Hud {
             ui.mem.popup = None;
         }
         self.net_news(ui, s);
-        // The mine survey lies on the world, under every panel.
-        mine_marks(ui, s, &mut self.survey);
+        // The mine points lie on the world, under every panel.
+        mine_points(ui, s);
         self.pause_frame(ui, view.paused && !view.menu_open);
         if !view.observing && !self.free.on {
             groups::badges(ui, s);
@@ -1044,3 +1041,24 @@ pub fn drag_box(ui: &mut Ui, from: Vec2, to: Vec2) {
 
 #[cfg(test)]
 mod tests;
+
+/// The height of the map's overview at `xy`: the ground under marks drawn on it.
+pub(super) fn overview_height(map: &MapFile, xy: Vec2) -> f32 {
+    let info = map.info();
+    let (ow, oh) = map.overview_dims();
+    let size = info.size_metres().to_f32();
+    let u = (xy.x / size[0] * (ow - 1) as f32).clamp(0.0, (ow - 1) as f32);
+    let v = (xy.y / size[1] * (oh - 1) as f32).clamp(0.0, (oh - 1) as f32);
+    let (x0, y0) = (u.floor() as u32, v.floor() as u32);
+    let (x1, y1) = ((x0 + 1).min(ow - 1), (y0 + 1).min(oh - 1));
+    let (fx, fy) = (u - x0 as f32, v - y0 as f32);
+    let o = map.overview();
+    let w = ow as usize;
+    let z = |x: u32, y: u32| {
+        info.sample_to_height(o[y as usize * w + x as usize])
+            .to_f32()
+    };
+    let a = z(x0, y0) * (1.0 - fx) + z(x1, y0) * fx;
+    let b = z(x0, y1) * (1.0 - fx) + z(x1, y1) * fx;
+    a * (1.0 - fy) + b * fy
+}

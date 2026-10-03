@@ -47,7 +47,8 @@ pub struct Focus {
 impl Focus {
     /// When building or upgrading a unit of this kind is paid under this focus.
     pub fn priority(self, bp: &UnitBlueprint, blueprints: &Blueprints) -> Priority {
-        if bp.categories & cat::EXTRACTOR != 0 {
+        // Fabricators make materials as the mines do, so they go with them.
+        if bp.categories & cat::EXTRACTOR != 0 || bp.fabricator.is_some() {
             self.mines
         } else if bp.categories & cat::POWER != 0 {
             self.power

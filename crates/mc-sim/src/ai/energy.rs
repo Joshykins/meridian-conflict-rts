@@ -96,11 +96,9 @@ impl World {
 
     /// Energy a second an upgrade of `row` into `next` draws while it runs.
     pub(super) fn upgrade_draw(&self, row: usize, next: &UnitBlueprint) -> Fx {
-        let power = self
-            .bp(row)
-            .builder
-            .as_ref()
-            .map_or(crate::orders::SELF_UPGRADE_POWER, |b| b.power);
+        let power =
+            self.blueprints
+                .upgrade_power(self.bp(row), next, crate::orders::SELF_UPGRADE_POWER);
         if next.build_time > Fx::ZERO {
             power * self.blueprints.upgrade_cost(next).1 / next.build_time
         } else {

@@ -520,13 +520,15 @@ impl Game {
         let mut view = View::new(start.local, start.colors, show_profiler);
         view.observing = start.observing;
         {
-            let (sites, map) = (view.sites.clone(), start.map.clone());
-            std::thread::spawn(move || match mc_sim::placement::SiteMap::for_map(&map) {
-                Ok(built) => {
-                    let _ = sites.set(built);
-                }
-                Err(e) => log::warn!("no placement sites for this map: {e}"),
-            });
+            let (sites, map, bps) = (view.sites.clone(), start.map.clone(), blueprints.clone());
+            std::thread::spawn(
+                move || match mc_sim::placement::SiteMap::for_map(&map, &bps) {
+                    Ok(built) => {
+                        let _ = sites.set(built);
+                    }
+                    Err(e) => log::warn!("no placement sites for this map: {e}"),
+                },
+            );
         }
         if let Some(subject) = start.range {
             let pad = crate::setup::range_pad(&start.map);
@@ -4690,7 +4692,7 @@ impl Game {
             self.hud_action(action, audio);
         }
 
-        // Ore shows its veins while a mine is placed or selected, or with Ctrl.
+        // Ore fields light up as mine points while a mine is placed or selected, or with Ctrl.
         let placing_mine =
             matches!(self.view.mode, Mode::Place(bp) if self.blueprints.unit(bp).mine.is_some());
         let mine_selected = self.selected_units().any(|u| {
@@ -4702,11 +4704,7 @@ impl Game {
         let survey = !self.hud.free.on
             && (placing_mine || mine_selected || (self.ctrl && !self.alt && self.menu.is_none()));
         renderer.set_ore_highlight(if survey { 1.0 } else { 0.0 });
-        renderer.set_ore_tapped(&hud::ore_tapped(
-            &self.map,
-            &self.blueprints,
-            &self.view.frame.units,
-        ));
+        renderer.set_ore_tapped(&hud::ore_tapped(&self.view, &self.blueprints, &self.map));
         let build_grid = matches!(self.view.mode, Mode::Place(_)) || self.orders.dragging_plan();
         if build_grid {
             let field = Field {
