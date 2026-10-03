@@ -220,7 +220,7 @@
         // A dome over the tanks round it, kept up while it drives. It draws energy
         // like every shield, and drops with the rest in a stall.
         economy: (energy_upkeep: 80),
-        shield: (radius: 55, health: 3600, regen: 36),
+        shield: (radius: 63, health: 3600, regen: 36),
         weapons: [],
         mesh: "mobile_shield", icon: Shield,
         // The shaft leaves from the crystal's crown, not an Aegis's 16 m.
