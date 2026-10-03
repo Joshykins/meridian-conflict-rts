@@ -11,7 +11,7 @@
 use crate::nav::cell_class;
 use crate::world::{path_cells_of, place_cells_of, prop_cells};
 use mc_core::{Fx, FxVec2};
-use mc_data::{Blueprints, UnitBlueprint};
+use mc_data::UnitBlueprint;
 use mc_map::{Heightfield, MapFile, Prop};
 use mc_path::terrain;
 
@@ -32,10 +32,6 @@ pub enum Unfit {
     City,
     /// Another structure, standing or planned, has the lot.
     Taken,
-    /// A core mine off the map's mine points.
-    NoMinePoint,
-    /// A core mine on a point another mine, standing or planned, has.
-    MinePointTaken,
 }
 
 impl Unfit {
@@ -49,8 +45,6 @@ impl Unfit {
             Unfit::Shallow => "Needs deeper water",
             Unfit::City => "City in the way",
             Unfit::Taken => "Lot taken",
-            Unfit::NoMinePoint => "Mines go on mine points",
-            Unfit::MinePointTaken => "Mine point taken",
         }
     }
 }
@@ -74,14 +68,12 @@ pub(crate) fn abyss(ground: &Heightfield, water: Fx, cx: u32, cy: u32) -> bool {
     water - high >= SEABED_DEPTH
 }
 
-/// Every 8 m cell's terrain class, and whether a city block stands on it; and,
-/// once known, the map's mine points.
+/// Every 8 m cell's terrain class, and whether a city block stands on it.
 pub struct SiteMap {
     w: u32,
     h: u32,
     size: FxVec2,
     cells: Vec<u8>,
-    mine_points: Vec<FxVec2>,
 }
 
 impl SiteMap {
@@ -119,33 +111,12 @@ impl SiteMap {
                 }
             }
         }
-        SiteMap {
-            w,
-            h,
-            size,
-            cells,
-            mine_points: Vec::new(),
-        }
+        SiteMap { w, h, size, cells }
     }
 
-    /// The sites of a map file, from its unedited ground, with its mine points.
-    pub fn for_map(map: &MapFile, blueprints: &Blueprints) -> Result<SiteMap, mc_map::MapError> {
-        let mut sites = SiteMap::new(&Heightfield::load(map)?, map.props());
-        if let Some(bp) = crate::mines::point_blueprint(blueprints) {
-            sites.mine_points = crate::mines::mine_points(&sites, map.ore_regions(), bp);
-        }
-        Ok(sites)
-    }
-
-    /// The map's mine points, as the sim has them (`World::mine_points`).
-    pub fn mine_points(&self) -> &[FxVec2] {
-        &self.mine_points
-    }
-
-    /// The mine point nearest `pos` within `mines::POINT_SNAP_M`, as the sim snaps a
-    /// mine's build order to it.
-    pub fn mine_point_near(&self, pos: FxVec2) -> Option<FxVec2> {
-        crate::mines::point_near(&self.mine_points, pos)
+    /// The sites of a map file, from its unedited ground.
+    pub fn for_map(map: &MapFile) -> Result<SiteMap, mc_map::MapError> {
+        Ok(SiteMap::new(&Heightfield::load(map)?, map.props()))
     }
 
     fn cell(&self, x: u32, y: u32) -> u8 {
@@ -158,71 +129,50 @@ impl SiteMap {
 
     /// Whether `bp` could stand at `pos` (already snapped to the build grid),
     /// leaving other structures out of it.
-    /// A core mine must also stand on a mine point.
     pub fn check(&self, bp: &UnitBlueprint, pos: FxVec2) -> Result<(), Unfit> {
-        self.ground_fits(bp, pos)?;
-        if bp.mine.is_some() && !self.mine_points.contains(&pos) {
-            return Err(Unfit::NoMinePoint);
+        let half = FxVec2::from_ints(
+            bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
+            bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
+        );
+        if pos.x - half.x < Fx::ZERO
+            || pos.y - half.y < Fx::ZERO
+            || pos.x + half.x > self.size.x
+            || pos.y + half.y > self.size.y
+        {
+            return Err(Unfit::OffMap);
+        }
+        let (min, max) = path_cells_of(bp.footprint, pos);
+        for y in min.1..=max.1 {
+            for x in min.0..=max.0 {
+                let class = self.cell(x, y);
+                let steep = class & terrain::STEEP != 0;
+                if bp.seabed {
+                    if class & ABYSS == 0 {
+                        return Err(Unfit::Shallow);
+                    }
+                } else if bp.water_only() {
+                    if class & terrain::DEEP == 0 {
+                        return Err(Unfit::Shore);
+                    }
+                } else if bp.water_build {
+                    if steep && class & (terrain::SHALLOW | terrain::DEEP) == 0 {
+                        return Err(Unfit::Steep);
+                    }
+                } else if class & terrain::LAND == 0 {
+                    return Err(Unfit::Water);
+                } else if steep {
+                    return Err(Unfit::Steep);
+                }
+            }
+        }
+        let (min, max) = place_cells_of(bp.footprint, pos);
+        for y in min.1..=max.1 {
+            for x in min.0..=max.0 {
+                if self.cell(x, y) & CITY != 0 {
+                    return Err(Unfit::City);
+                }
+            }
         }
         Ok(())
     }
-
-    /// `check` on the ground and cities alone, mine points left out.
-    pub fn ground_fits(&self, bp: &UnitBlueprint, pos: FxVec2) -> Result<(), Unfit> {
-        check_cells(bp, pos, self.size, |x, y| self.cell(x, y))
-    }
-}
-
-/// [`SiteMap::check`] over any source of cell classes: `class` gives an 8 m cell's
-/// terrain class with the [`CITY`] and [`ABYSS`] bits.
-fn check_cells(
-    bp: &UnitBlueprint,
-    pos: FxVec2,
-    size: FxVec2,
-    class: impl Fn(u32, u32) -> u8,
-) -> Result<(), Unfit> {
-    let half = FxVec2::from_ints(
-        bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
-        bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
-    );
-    if pos.x - half.x < Fx::ZERO
-        || pos.y - half.y < Fx::ZERO
-        || pos.x + half.x > size.x
-        || pos.y + half.y > size.y
-    {
-        return Err(Unfit::OffMap);
-    }
-    let (min, max) = path_cells_of(bp.footprint, pos);
-    for y in min.1..=max.1 {
-        for x in min.0..=max.0 {
-            let class = class(x, y);
-            let steep = class & terrain::STEEP != 0;
-            if bp.seabed {
-                if class & ABYSS == 0 {
-                    return Err(Unfit::Shallow);
-                }
-            } else if bp.water_only() {
-                if class & terrain::DEEP == 0 {
-                    return Err(Unfit::Shore);
-                }
-            } else if bp.water_build {
-                if steep && class & (terrain::SHALLOW | terrain::DEEP) == 0 {
-                    return Err(Unfit::Steep);
-                }
-            } else if class & terrain::LAND == 0 {
-                return Err(Unfit::Water);
-            } else if steep {
-                return Err(Unfit::Steep);
-            }
-        }
-    }
-    let (min, max) = place_cells_of(bp.footprint, pos);
-    for y in min.1..=max.1 {
-        for x in min.0..=max.0 {
-            if class(x, y) & CITY != 0 {
-                return Err(Unfit::City);
-            }
-        }
-    }
-    Ok(())
 }

@@ -37,6 +37,8 @@ struct Plan {
     mines: usize,
     /// How far from the start a mine may stand.
     range: f32,
+    /// A spot's yield, shared with the mines already there, must be this share of a lone mine's.
+    eff: f32,
     /// Masons made by a Forge (0: no Forge at all).
     engineers: usize,
     /// Mines the commander puts down before the Forge.
@@ -91,6 +93,7 @@ impl Default for Plan {
             name: "best".into(),
             mines: 6,
             range: 4500.0,
+            eff: 0.7,
             engineers: 8,
             factory_after: 1,
             ratio: 9.0,
@@ -132,6 +135,7 @@ impl Plan {
             match k {
                 "mines" => p.mines = f as usize,
                 "range" => p.range = f,
+                "eff" => p.eff = f,
                 "engineers" => p.engineers = f as usize,
                 "factory_after" => p.factory_after = f as usize,
                 "ratio" => p.ratio = f,
@@ -338,7 +342,7 @@ fn place(
     let foot = bp.footprint.0.max(bp.footprint.1) as i32;
     let pitch = ((foot + 2) * mc_map::BUILD_CELL_M) as f32;
     let ore = if keep_off_ore {
-        w.mine_points.clone()
+        w.ore_centres()
     } else {
         Vec::new()
     };
@@ -371,7 +375,7 @@ fn place(
     None
 }
 
-/// The free mine point nearest a builder at `from`, within the plan's range of the start.
+/// The best spot for a new tier 1 mine for a builder at `from`: yield over time to get there.
 fn mine_spot(
     w: &World,
     plan: &Plan,
@@ -381,15 +385,80 @@ fn mine_spot(
     v: &View,
 ) -> Option<FxVec2> {
     let bp = w.blueprints.unit(k.mine[0]);
-    w.mine_points
-        .iter()
-        .copied()
+    let m = bp.mine?;
+    let mut spots: Vec<FxVec2> = w
+        .ore_centres()
+        .into_iter()
         .filter(|o| o.distance(start).to_f32() <= plan.range)
-        .filter(|&o| w.can_place(bp, o))
-        // A planned mine takes its point as if it stood.
-        .filter(|o| v.mine_spots.iter().all(|p| p.distance(*o).to_f32() > 30.0))
-        .filter(|o| v.refused.iter().all(|p| p.distance(*o).to_f32() > 30.0))
-        .min_by_key(|o| (o.distance_sq(from), o.x, o.y))
+        .collect();
+    let step = 350.0;
+    let rings = (plan.range / step) as i32;
+    for ring in 1..=rings {
+        let r = step * ring as f32;
+        let n = ((std::f32::consts::TAU * r / step) as i32).max(6);
+        for i in 0..n {
+            let a = Angle(((i as u64 * 65536) / n as u64) as u16);
+            let p = start + FxVec2::from_angle(a) * Fx::from_f32(r);
+            if w.terrain.in_bounds(p) {
+                spots.push(p);
+            }
+        }
+    }
+    let mut best: Option<(f32, FxVec2)> = None;
+    for spot in spots {
+        // A planned mine takes its ground as if it stood.
+        if v.mine_spots
+            .iter()
+            .any(|p| p.distance(spot).to_f32() < 600.0)
+            || v.refused.iter().any(|p| p.distance(spot).to_f32() < 150.0)
+        {
+            continue;
+        }
+        let share = w.mine_share_at(bp, spot);
+        let rate = share.rate(&m).to_f32();
+        if share.efficiency(&m).to_f32() < plan.eff {
+            continue;
+        }
+        let travel = spot.distance(from).to_f32() / 28.0;
+        let score = rate / (60.0 + travel);
+        if best.is_none_or(|(b, _)| score > b) {
+            best = Some((score, spot));
+        }
+    }
+    if best.is_none() && std::env::var("ECO_DEBUG").is_ok() {
+        let effs: Vec<String> = w
+            .ore_centres()
+            .into_iter()
+            .map(|o| {
+                let s = w.mine_share_at(bp, o);
+                format!(
+                    "{:.0}m eff {:.2} rate {:.1}",
+                    o.distance(start).to_f32(),
+                    s.efficiency(&m).to_f32(),
+                    s.rate(&m).to_f32()
+                )
+            })
+            .collect();
+        eprintln!("no mine spot; ore: {effs:?}");
+    }
+    let spot = best?.1;
+    // The lot nearest the spot that takes a mine.
+    for ring in 0..6 {
+        let n = (ring * 6).max(1);
+        for i in 0..n {
+            let a = Angle(((i as u64 * 65536) / n as u64) as u16);
+            let site =
+                snap_to_build_grid(bp, spot + FxVec2::from_angle(a) * Fx::from_int(ring * 24));
+            if w.can_place(bp, site)
+                && v.planned
+                    .iter()
+                    .all(|(p, _)| p.distance(site).to_f32() > 40.0)
+            {
+                return Some(site);
+            }
+        }
+    }
+    None
 }
 
 /// The refit kit of the commander's module `key`, if it fits now and is not fitted.
@@ -546,7 +615,9 @@ impl Bot {
                 .mines
                 .by_unit
                 .get(&w.state.units.id(r))
-                .map_or(0, |_| (bp.mine.unwrap().rate.to_f32() * 100.0) as i64);
+                .map_or(0, |m| {
+                    (m.full_rate(&bp.mine.unwrap()).to_f32() * 100.0) as i64
+                });
             (bp.tech, rate, r)
         })?;
         let bp = w.bp(goal);
@@ -595,7 +666,11 @@ impl Bot {
             if next.tech > 3 || w.blueprints.upgrade_needs(next) > now.tech {
                 continue;
             }
-            let gain = next.mine.unwrap().rate.to_f32() - bp.mine.unwrap().rate.to_f32();
+            let Some(ms) = w.state.mines.by_unit.get(&w.state.units.id(r)) else {
+                continue;
+            };
+            let gain = ms.full_rate(&next.mine.unwrap()).to_f32()
+                - ms.full_rate(&bp.mine.unwrap()).to_f32();
             let (cm, ce) = w.blueprints.upgrade_cost(next);
             let payback = (cm.to_f32() + ce.to_f32() / ENERGY_PER_MASS) / gain.max(0.01);
             if payback < plan.horizon {
@@ -755,7 +830,10 @@ impl Bot {
         }
         if plan.build_dc && v.deep_core_going_up.is_none() && !v.deep_core && builds(k.mine[3]) {
             // Any spot will do for the goal itself.
-            let anywhere = Plan { ..plan.clone() };
+            let anywhere = Plan {
+                eff: 0.3,
+                ..plan.clone()
+            };
             if let Some(site) = mine_spot(w, &anywhere, k, now.start, pos, v) {
                 v.deep_core_going_up = Some(row);
                 self.line_start.get_or_insert(now.secs);

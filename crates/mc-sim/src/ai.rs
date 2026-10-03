@@ -54,6 +54,8 @@ const FAR_FROM_HOME: Fx = Fx::from_int(1500);
 const ENERGY_PER_MASS: i32 = 6;
 /// Mines a side puts down before anything but its first factory.
 const FIRST_MINES: usize = 3;
+/// Open-ground mine spots whose share is counted per search, nearest first.
+const BARE_MINE_PROBES: usize = 12;
 /// Enemies this close to a held point count as a raid.
 const RAID_RADIUS: Fx = Fx::from_int(550);
 /// Commander stays inside this radius of the start.
@@ -231,6 +233,8 @@ struct Job {
 struct Claim {
     pos: FxVec2,
     foot: i32,
+    /// A core mine: it takes ground from any mine planned within its reach.
+    mine: bool,
     /// A factory: the strip in front of its exit stays clear.
     factory: bool,
     /// A shield's radius, zero for anything else.
@@ -328,6 +332,7 @@ impl World {
                 Claim {
                     pos: o.pos,
                     foot: fp.0.max(fp.1) as i32,
+                    mine: bp.mine.is_some(),
                     factory: bp.has(cat::FACTORY),
                     cover: bp.shield.as_ref().map_or(Fx::ZERO, |s| s.radius),
                 }
@@ -921,7 +926,7 @@ impl World {
         let aim = start.lerp(enemy, frac);
         let along = enemy - start;
         let span = along.length().max(Fx::ONE);
-        let deposit = self.mine_points.clone().into_iter().filter(|d| {
+        let deposit = self.ore_centres().into_iter().filter(|d| {
             let t = (*d - start).dot(along) / span;
             t > Fx::from_int(350)
                 && t < span - Fx::from_int(600)
@@ -959,7 +964,7 @@ impl World {
             ^ (claimed.len() as u32).wrapping_mul(0x85EB_CA6B);
         let origin = snap_to_build_grid(bp, near);
         let ore = if keep_off_deposits {
-            self.mine_points.clone()
+            self.ore_centres()
         } else {
             Vec::new()
         };

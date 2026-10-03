@@ -173,7 +173,7 @@ fn domains() {
                 if bp.mine.is_some() {
                     if !live {
                         mine_sites += 1;
-                    } else if w.terrain.height_at(pos) < w.terrain.water_level() {
+                    } else if w.ore.at_sea(pos) {
                         sea_mines += 1;
                     } else {
                         land_mines += 1;

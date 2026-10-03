@@ -52,9 +52,9 @@ says it can do (`commander/profile.rs`).
 
 ## The economy and the base
 
-- The first three mines come right after the first factory, on the free mine points
-  nearest the start; later ones on the nearest free points within the skill's
-  `mine_travel` (a point has one mine, anyone's, so a point taken or claimed is passed over).
+- The first three mines come right after the first factory, on bare ground if no ore
+  is near. Later bare-ground mines go only where they would get at least the skill's
+  share of a whole circle of land, so the gaps between mines are left alone.
 - Mine upgrades go to the mine whose next tier pays back soonest (energy counted at 6
   per mass), within the payback and as many at once as the economy sets
   (`commander/economy.rs`: more while the store fills). They wait while power is
@@ -123,7 +123,8 @@ says it can do (`commander/profile.rs`).
   right after the opening mines, ahead of more power.
 - A shipyard goes on the water nearest the start where one can stand, found in rings
   out to 2.4 km (`shipyard_anchor`).
-- Sea mines: a mine point out at sea is taken like any other, by builders that float.
+- Sea mines: a mine at sea shares only with mines at sea, and reaches 1.5 km, so it is
+  kept a sea reach from those and is not kept off by the island's own land mines.
 - The navy only targets water its fleet can sail to (`ai/sea.rs` floods the sea on a
   128 m grid).
 - Spaceships jump (`ai/warp_ops.rs`): a strike comes out 260 m short of its target on

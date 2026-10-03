@@ -5,15 +5,15 @@ and the plan that measured best when an economy-only player raced to a Deep Core
 
 ## The model: one pipe, three valves, one gauge
 
-Materials come **in** (mines on the map's mine points, reclaim, material fabricators, the commander's MFE), are **spent** through build
+Materials come **in** (mines, reclaim, the commander's MFE), are **spent** through build
 power, and every material spent drags **energy** along with it. The economy runs at the
 speed of whichever of the three is shortest.
 
 | Valve | What it is | Rule of thumb |
 |---|---|---|
-| Income | materials a second | a T1 mine makes 1/s for 45, on a mine point; the points are few, so the tiers are how income grows |
+| Income | materials a second | a T1 mine is ~6/s on good ground for 160 |
 | Build power | how fast you can spend | a new mine or reactor takes about **1-1.7 build-power seconds per material**, a mine upgrade about 1.6, units 4-7: growing the economy and spending it both take build power (since 2026-09-30). Buy it by tier: engineers 5 / 30 / 150, factories 20 / 120 / 360 |
-| Energy | the tax on spending | **6 energy per material** on economy (10 on commander refits), plus the mines' and fabricators' upkeep; when it runs dry everything slows, the mines included |
+| Energy | the tax on spending | **6 energy per material** on economy (10 on commander refits), plus the mines' upkeep; when it runs dry everything slows, the mines included |
 
 **The materials store is the gauge.** Read it every few seconds:
 
@@ -29,12 +29,12 @@ the money.** Paybacks, energy counted at 6 to 1:
 
 | Investment | Pays back in |
 |---|---|
-| T1 mine | ~45 s |
+| T1 mine | ~25-30 s |
 | Engineer (build power turning a full store into mines) | as soon as it has work |
-| Mine T1→T2 | ~3 min |
-| Mine T2→T3 | ~8 min |
-| Mine T3→T4 (the Deep Core) | ~12 min |
-| Material fabricator and its power | ~10x a same-tier mine (7.5 min at T1, 30 at T2, 80 at T3) |
+| Commander MFE (+6 materials, +250 energy) | ~100 s |
+| Mine T1→T2 | ~165 s |
+| Mine T2→T3 | ~345 s |
+| Mine T3→T4 (the Deep Core) | ~550 s |
 
 So: mines first, and enough build power to raise them. The tier upgrades come only when
 the time you have left is longer than their payback. In a race that ends at minute 12, a
@@ -43,9 +43,7 @@ game it does.
 
 ## The race
 
-**Stale since the 2026-10-02 rebalance** (mine points, 1/4/12/24 a second, tier paths
-dearer): rerun the search before leaning on any of the plan below. The probe now puts its
-mines on the nearest free mine points. The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
+The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows
 mass, build power by tier, reactors 15 / 350 / 2000): rerun the search before leaning on them.
 Searched again on the new numbers (4 maps x 2 starts): the best plan is the same but with
 **3 mines instead of 6**, at 12.4 minutes. With mine upgrades now costing build power, builders

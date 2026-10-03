@@ -164,6 +164,7 @@ impl World {
                         claimed.push(Claim {
                             pos: site,
                             foot: bp.footprint.0.max(bp.footprint.1) as i32,
+                            mine: bp.mine.is_some(),
                             factory: bp.has(cat::FACTORY),
                             cover: bp.shield.as_ref().map_or(Fx::ZERO, |s| s.radius),
                         });
@@ -570,7 +571,8 @@ impl World {
             } else {
                 self.mex_range(false, census, persona, stance, skill)
             };
-            if let Some(spot) = self.free_deposit(start, claimed, range, intel) {
+            let least = Some(Fx::ratio(skill.bare_mine_efficiency as i64, 100));
+            if let Some(spot) = self.free_deposit(start, claimed, range, intel, least) {
                 if allow(spot) {
                     return self.job_structure(
                         row,
@@ -596,7 +598,7 @@ impl World {
             }
         }
         // Claim the mexes around the start before stacking reactors.
-        if let Some(deposit) = self.free_deposit(start, claimed, Fx::from_int(480), intel) {
+        if let Some(deposit) = self.free_deposit(start, claimed, Fx::from_int(480), intel, None) {
             if allow(deposit) {
                 return self.job_structure(
                     row,
@@ -729,7 +731,8 @@ impl World {
         } else {
             directives.reach
         };
-        if let Some(deposit) = self.free_deposit(start, claimed, mex_range, intel) {
+        let bare = (!energy_short).then(|| Fx::ratio(skill.bare_mine_efficiency as i64, 100));
+        if let Some(deposit) = self.free_deposit(start, claimed, mex_range, intel, bare) {
             if allow(deposit) {
                 return self.job_structure(
                     row,

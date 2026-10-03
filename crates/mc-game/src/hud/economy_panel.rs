@@ -257,9 +257,9 @@ impl Hud {
 }
 
 /// The materials' income line up to `limit`: what the mines and generators make, what
-/// the mines would make with their upkeep paid (left out while it is, so a powered
-/// economy reads as one number), and what reclaim brings in, while it brings anything.
-/// Short of room it is spelt tighter.
+/// that grows to once every mine has spread over its territory and dug out to its ore,
+/// powered (left out once they all have, so a grown economy reads as one number), and
+/// what reclaim brings in, while it brings anything. Short of room it is spelt tighter.
 fn materials_income(ui: &mut Ui, p: &crate::sim_thread::PlayerStatus, x: f32, y: f32, limit: f32) {
     let rate = |v: f32| {
         if v >= 10.0 {
@@ -269,7 +269,7 @@ fn materials_income(ui: &mut Ui, p: &crate::sim_thread::PlayerStatus, x: f32, y:
         }
     };
     let made = format!("Income  +{}", rate(p.mass_income));
-    let max = (p.mine_lost > 0.05).then(|| rate(p.mass_income + p.mine_lost));
+    let max = (p.mine_growth > 0.05).then(|| rate(p.mass_income + p.mine_lost + p.mine_growth));
     let reclaim = (p.reclaim_income > 0.05).then(|| rate(p.reclaim_income));
     let spelt = |long: bool| {
         let max = max.as_ref().map_or(String::new(), |m| {

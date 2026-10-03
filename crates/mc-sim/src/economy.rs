@@ -241,8 +241,8 @@ impl World {
             }
         }
 
-        // Mines and fabricators draw their upkeep with the rest, and make as much as
-        // the rest's energy is covered. Mass is not known yet (the mines make it), so what is put first is
+        // Mines draw their upkeep with the rest, and dig as hard as the rest's energy
+        // is covered. Mass is not known yet (the mines make it), so what is put first is
         // taken to spend all the energy it asks for: never more than it does.
         let mut powered = vec![Fx::ONE; player_count];
         for (p, pl) in self.state.players.iter().enumerate() {

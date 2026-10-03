@@ -9,7 +9,7 @@
 //! badge, its reach is drawn on the ground, and a reclaimer says how much mass a
 //! second it can pull.
 
-use super::{icons, overview_height, Scene, MASS};
+use super::{icons, mine_marks::overview_height, Scene, MASS};
 use crate::audio::Sfx;
 use crate::ui::{ink, rgb, type_scale, Rect, Ui};
 use glam::{Vec2, Vec3};

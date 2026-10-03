@@ -612,20 +612,19 @@ over about a minute. Both are drawn only near the camera.
 ## Ore fields and materials
 
 - **One red-orange for everything materials** (`hud::MASS`, 0xFF6B3D; linear
-  `(1.0, 0.147, 0.047)` in ground.wgsl): numbers, fields, mine points, the
-  minimap. The sim still calls it `mass`; the old mint green is
+  `(1.0, 0.147, 0.047)` in ground.wgsl): numbers, fields, veins, territories,
+  shafts, the minimap. The sim still calls it `mass`; the old mint green is
   now `hud::HEALTHY`, for unit health only.
 - **In play an ore field is a faint outline**, nothing else. A field a mine
   the viewer has seen is working gets a brighter rim and a light fill, the
   same hue, so worked ground reads on the strategic view and the minimap.
-- **Mine points** (placing or selecting a core mine, a builder with one
-  queued, or holding Ctrl): every ore field holds one point, and the fields
-  light up. Each point in view is a ring on the ground just outside a mine's
-  lot: a free one dashed in the materials red-orange, turning slowly; a taken
-  one solid in its mine's side colour; one the viewer's builders plan, grey
-  dashes turning the other way. Far out a ring becomes a small diamond, and the
-  minimap shows the same as dots. Placing a mine snaps it onto the nearest
-  point, with what it would make there and its payback over it.
+- **The survey** (placing or selecting a core mine, or holding Ctrl): the
+  fields light up with their veins, branching orange lines at depth under
+  each field; every mine in sight shows its territory, its circle cut
+  straight where it meets a neighbour of its own kind and back to the
+  shore (a mine at sea shows only sea, one on land only land), and a shaft sunk from the mine to each
+  field that falls to it. Placing shows what the mine would make there, its
+  efficiency and its payback.
 - **The core mine is major infrastructure**: a 3x3 lot (the model is
   authored at 7x7 and shrunk evenly), and it digs. The user
   found the first one "too mechanical" and wanted to see the hole: the middle

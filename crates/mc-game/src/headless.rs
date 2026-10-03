@@ -535,7 +535,7 @@ pub fn screenshot(
     );
     view.formation_panel = opts.scene == setup::Scene::Formations;
     view.observing = opts.observe;
-    match mc_sim::placement::SiteMap::for_map(&map, &blueprints) {
+    match mc_sim::placement::SiteMap::for_map(&map) {
         Ok(sites) => {
             let _ = view.sites.set(sites);
         }

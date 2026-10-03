@@ -62,10 +62,6 @@ pub enum Refusal {
     StandingOrdersFull,
     /// A factory's queue holds at most `orders::MAX_FACTORY_QUEUE` orders.
     FactoryQueueFull,
-    /// A core mine stands only on a mine point, and none was near enough.
-    NotOnMinePoint,
-    /// The mine point already has a mine on it, finished or being built.
-    MinePointTaken,
 }
 
 impl Refusal {
@@ -85,8 +81,6 @@ impl Refusal {
                 "A factory queue holds at most {} units",
                 crate::orders::MAX_FACTORY_QUEUE
             ),
-            Refusal::NotOnMinePoint => "A mine goes only on a mine point".to_string(),
-            Refusal::MinePointTaken => "That mine point already has a mine".to_string(),
         }
     }
 }
@@ -827,8 +821,10 @@ pub struct UnitOrders {
     pub reclaimed: f32,
     /// The highest tier its side has reached ([`World::side_tech`]): mines upgrade no further.
     pub side_tech: u8,
-    /// A finished core mine's output.
+    /// A finished core mine's territory and output.
     pub mine: Option<MineView>,
+    /// A core mine's ore fields: what each is worth and when its drift arrives.
+    pub mine_veins: Vec<MineVein>,
     /// Where the target its guns are laid on stands, its middle, while the ground hides
     /// it and none of them has anything it can see (`line_of_fire.rs`).
     pub hidden_target: Option<[f32; 3]>,
@@ -894,14 +890,36 @@ pub struct CargoUnit {
     pub room: u8,
 }
 
+/// One ore field a core mine works, as the interface shows it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct MineVein {
+    /// The field, in map order.
+    pub field: u16,
+    /// Hectares of its ore in the mine's territory.
+    pub ore: f32,
+    /// Materials per second it adds once reached.
+    pub rate: f32,
+    /// Seconds from the mine's finishing to the drift arriving, and seconds left.
+    pub dig: f32,
+    pub eta: f32,
+}
+
 /// A core mine as the interface shows it.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MineView {
-    /// Materials per second now (less in an energy stall), and at full power.
+    /// Its territory: land and ore it has, and would have alone.
+    pub land: crate::mines::Share,
+    /// Zero to one: what its territory gives over what its whole circle would.
+    pub share: f32,
+    /// Materials per second now, and once every drift is dug.
     pub rate: f32,
     pub full: f32,
     /// Seconds it has been digging.
     pub age: f32,
+    /// Metres out from it the land (or sea) it works reaches by now.
+    pub spread: f32,
+    /// It stands in the sea and mines the sea.
+    pub sea: bool,
 }
 
 impl UnitOrders {
@@ -2699,6 +2717,7 @@ impl World {
                     *t
                 },
                 mine: self.mine_view(row),
+                mine_veins: self.mine_veins(row),
                 hidden_target: self.hidden_target(row).map(|t| {
                     let p = s.units.pos[t].to_f32();
                     [p[0], p[1], (s.units.z[t] + self.bp(t).height / 2).to_f32()]
@@ -2711,19 +2730,37 @@ impl World {
         }
     }
 
+    fn mine_veins(&self, row: usize) -> Vec<MineVein> {
+        let Some(spec) = self.bp(row).mine else {
+            return Vec::new();
+        };
+        let Some(m) = self.state.mines.by_unit.get(&self.state.units.id(row)) else {
+            return Vec::new();
+        };
+        let tps = TICKS_PER_SECOND as f32;
+        m.veins
+            .iter()
+            .map(|v| MineVein {
+                field: v.field,
+                ore: v.ore.to_f32(),
+                rate: (v.ore * (spec.per_hectare - spec.ground).max(Fx::ZERO)).to_f32(),
+                dig: v.reached_at as f32 / tps,
+                eta: v.reached_at.saturating_sub(m.age) as f32 / tps,
+            })
+            .collect()
+    }
+
     fn mine_view(&self, row: usize) -> Option<MineView> {
         let spec = self.bp(row).mine?;
         let m = self.state.mines.by_unit.get(&self.state.units.id(row))?;
-        let owner = self.state.units.owner[row] as usize;
-        let powered = self
-            .state
-            .players
-            .get(owner)
-            .map_or(Fx::ONE, |p| p.mine_power);
         Some(MineView {
-            rate: (spec.rate * crate::mines::mine_power(powered)).to_f32(),
-            full: spec.rate.to_f32(),
+            land: m.land,
+            share: m.land.efficiency(&spec).to_f32(),
+            rate: m.rate(&spec).to_f32(),
+            full: m.full_rate(&spec).to_f32(),
             age: m.age as f32 / TICKS_PER_SECOND as f32,
+            spread: m.spread().to_f32(),
+            sea: m.sea,
         })
     }
 

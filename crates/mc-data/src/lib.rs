@@ -300,14 +300,36 @@ pub struct Economy {
     pub energy_storage: Fx,
 }
 
-/// A core mine. It stands on one of the map's mine points (`mc_sim::mines`) and digs
-/// a fixed amount a second out of it; a higher tier digs more.
+/// A core mine. Every patch of land within its reach is worth materials a
+/// second, ore much more than bare ground; where mines' reaches overlap the
+/// ground is divided between them. Higher tiers get more out of each hectare.
+/// One standing in the sea mines the sea instead, up to the shore.
 #[derive(Clone, Copy, Debug)]
 pub struct Mine {
-    /// Materials per second.
-    pub rate: Fx,
+    /// Metres around itself it mines, on land.
+    pub reach: Fx,
+    /// Metres around itself it mines when it stands in the sea.
+    pub sea_reach: Fx,
+    /// Materials per second per hectare of land in its territory.
+    pub ground: Fx,
+    /// Materials per second per hectare of ore in its territory (instead of `ground` there).
+    pub per_hectare: Fx,
+    /// Materials per second from the shaft itself, from the moment it is finished,
+    /// whatever its territory: a new mine pays at once while its land spreads out.
+    pub base: Fx,
     /// Strikes a pile hammer in a beat (`RawMine::hammer`). Presentation only.
     pub hammer: bool,
+}
+
+impl Mine {
+    /// Its reach, standing in the sea or on land.
+    pub fn reach_on(&self, sea: bool) -> Fx {
+        if sea {
+            self.sea_reach
+        } else {
+            self.reach
+        }
+    }
 }
 
 /// A material fabricator (MFE): materials a second made out of energy. It makes
@@ -730,7 +752,7 @@ pub struct UnitBlueprint {
     pub stomp: Option<Stomp>,
     pub motion: Option<Motion>,
     pub economy: Economy,
-    /// A core mine: digs materials out of the map point it stands on.
+    /// A core mine: makes materials out of the ground around it.
     pub mine: Option<Mine>,
     /// A material fabricator: turns its energy upkeep into a trickle of materials.
     pub fabricator: Option<Fabricator>,
@@ -1347,7 +1369,9 @@ impl Blueprints {
             }
             match &u.mine {
                 Some(m) => {
-                    h.write_i64(m.rate.0);
+                    for v in [m.reach, m.sea_reach, m.ground, m.per_hectare, m.base] {
+                        h.write_i64(v.0);
+                    }
                 }
                 None => h.write_u64(u64::MAX),
             }
@@ -1967,10 +1991,10 @@ mod tests {
         let (mfe, shield) = (module("back", "mfe"), module("back", "shield"));
         let with_mfe = bp.refit_result(with_rail, mfe).unwrap();
         let e = &bp.unit(with_mfe).economy;
-        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::ratio(3, 2));
+        assert_eq!(e.mass_income, acu.economy.mass_income + Fx::from_int(6));
         assert_eq!(
             e.energy_income,
-            acu.economy.energy_income + Fx::from_int(100)
+            acu.economy.energy_income + Fx::from_int(250)
         );
         let (set2, loadout) = bp.loadout(with_mfe).unwrap();
         assert_eq!(set2.replaces(&loadout.fitted, slot("back"), 1), Some(0));

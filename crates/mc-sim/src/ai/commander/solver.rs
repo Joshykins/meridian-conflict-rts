@@ -513,7 +513,7 @@ impl World {
                     .filter(|&r| {
                         units.owner[r] == player
                             && self.bp(r).mine.is_some()
-                            && self.terrain.height_at(units.pos[r]) < self.terrain.water_level()
+                            && self.ore.at_sea(units.pos[r])
                     })
                     .map(|r| units.pos[r])
                     .min_by_key(|m| (m.distance_sq(start + toward * Fx::from_int(4000)), m.x, m.y))

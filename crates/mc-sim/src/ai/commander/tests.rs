@@ -182,20 +182,6 @@ fn an_observer_can_read_a_commanders_mind() {
 #[test]
 fn the_economy_sets_expanders_apart_and_claims_mines() {
     let mut w = world();
-    // Mine points round the start, near and farther out.
-    w.mine_points = [
-        (400, 0),
-        (0, 400),
-        (-400, 0),
-        (0, -400),
-        (900, 900),
-        (-900, 900),
-        (900, -900),
-        (1500, 0),
-    ]
-    .into_iter()
-    .map(|(x, y)| FxVec2::from_ints(1206 + x, 1206 + y))
-    .collect();
     run(&mut w, 3600);
     let mines = w
         .state

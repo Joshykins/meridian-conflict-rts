@@ -235,7 +235,7 @@ pub fn site_verdict(
     taken: &[FxVec2],
 ) -> Option<(FxVec2, Result<(), Unfit>)> {
     let bp = field.blueprints.unit(blueprint);
-    let pos = snapped(field, bp, ground);
+    let pos = mc_sim::world::snap_to_build_grid(bp, to_fx(ground.truncate()));
     // The ground and the map's cities first, by the sim's own rules.
     if let Some(sites) = field.view.sites.get() {
         if let Err(why) = sites.check(bp, pos) {
@@ -243,25 +243,12 @@ pub fn site_verdict(
         }
     }
     let (pos, valid) = site_among(field, blueprint, ground, moving, taken)?;
-    let why = if field.view.sites.get().is_none() {
-        Unfit::Water
-    } else if bp.mine.is_some() {
-        Unfit::MinePointTaken
-    } else {
+    let why = if field.view.sites.get().is_some() {
         Unfit::Taken
+    } else {
+        Unfit::Water
     };
     Some((pos, if valid { Ok(()) } else { Err(why) }))
-}
-
-/// Where a structure of `bp` with the pointer on `ground` would stand: on the build
-/// grid, and a core mine on the mine point the sim would put it on, when one is near.
-fn snapped(field: &Field, bp: &mc_data::UnitBlueprint, ground: Vec3) -> FxVec2 {
-    let at = to_fx(ground.truncate());
-    let point = bp
-        .mine
-        .and(field.view.sites.get())
-        .and_then(|sites| sites.mine_point_near(at));
-    point.unwrap_or_else(|| mc_sim::world::snap_to_build_grid(bp, at))
 }
 
 /// `site`, treating `taken` as structures already spoken for (the earlier
@@ -282,7 +269,8 @@ fn site_among(
     } = field;
     let bp = blueprints.unit(blueprint);
     let mut valid = true;
-    let pos = snapped(field, bp, ground);
+    let pos = mc_sim::world::snap_to_build_grid(bp, to_fx(ground.truncate()));
+    // Core mines may stand close: they share what they reach (the HUD shows it).
     if moving == Some(pos) {
         return Some((pos, true));
     }

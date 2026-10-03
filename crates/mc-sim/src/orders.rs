@@ -170,20 +170,7 @@ impl World {
                 if !bp.built_on_site() {
                     return Ok(());
                 }
-                let mut site = snap_to_build_grid(bp, *pos);
-                // A core mine goes onto the mine point it was dropped near, and only
-                // onto a free one: anywhere else it is refused, saying why.
-                if bp.mine.is_some() {
-                    let Some(point) = self.mine_point_near(*pos) else {
-                        self.refuse(player, Refusal::NotOnMinePoint);
-                        return Ok(());
-                    };
-                    if self.mine_on_point(point).is_some() {
-                        self.refuse(player, Refusal::MinePointTaken);
-                        return Ok(());
-                    }
-                    site = point;
-                }
+                let site = snap_to_build_grid(bp, *pos);
                 // Against what it will be by then: a queued refit (an engineering suite) opens
                 // its tiers, as a factory's queued upgrade does. Only those can start it; the
                 // other builders in the selection go too and help once it stands (`run_build`).

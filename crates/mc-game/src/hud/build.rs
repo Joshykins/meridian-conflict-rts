@@ -422,7 +422,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             data_card(hud, ui, item, power, &hint, tile, floor - GAP);
         }
         Some(Hover::Climb(i, tile)) => {
-            upgrade_card(hud, ui, s, bp, &line, i, reached, tile, floor - GAP)
+            upgrade_card(hud, ui, s, unit, bp, &line, i, reached, tile, floor - GAP)
         }
         None => {}
     }
@@ -1059,6 +1059,7 @@ fn upgrade_card(
     hud: &Hud,
     ui: &mut Ui,
     s: &Scene,
+    u: &UnitInstance,
     current: &UnitBlueprint,
     line: &[&UnitBlueprint],
     i: usize,
@@ -1094,22 +1095,30 @@ fn upgrade_card(
             rows.push((label, a.to_f32(), b.to_f32(), ""));
         }
     }
-    // A core mine or a fabricator: the materials it makes now and at the next tier.
-    let makes = super::mine::makes(from) > 0.0 || super::mine::makes(next) > 0.0;
-    if makes {
+    // A core mine: what it makes on its own territory now and at the next tier.
+    let mine = s
+        .queue_of(u)
+        .and_then(|q| q.mine)
+        .filter(|_| from.mine.is_some());
+    if let Some(view) = mine {
+        let was = if from.id == current.id {
+            view.rate
+        } else {
+            super::mine::rate_on(from, &view.land)
+        };
         rows.insert(
             0,
             (
                 "Materials / s",
-                super::mine::makes(from),
-                super::mine::makes(next),
+                was,
+                super::mine::rate_on(next, &view.land),
                 "",
             ),
         );
     }
     rows.push(("Vision", from.vision.to_f32(), next.vision.to_f32(), " m"));
     // From the tier the mine is at now, so a later tier shows the whole climb.
-    let payback = super::mine::climb_gain(current, next);
+    let payback = mine.and_then(|v| super::mine::climb_gain(current, next, &v));
     let rows: Vec<_> = rows.into_iter().take(8).collect();
 
     let w = 380.0;

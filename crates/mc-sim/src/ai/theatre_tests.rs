@@ -38,7 +38,7 @@ fn islands(bridge: bool) -> World {
             }
         }
     }
-    World::with_terrain(
+    let mut w = World::with_terrain(
         Heightfield::from_samples(512, 512, samples, Fx::ZERO, Fx::ONE, Fx::from_int(20)),
         MapData {
             name: "islands".into(),
@@ -51,7 +51,11 @@ fn islands(bridge: bool) -> World {
         Arc::new(Pool::new(0)),
         &config,
     )
-    .unwrap()
+    .unwrap();
+    let water = w.terrain.water_level();
+    let size = w.terrain.size_metres();
+    w.ore = crate::mines::OreGrid::new(&w.map.ore, size, |p| w.terrain.height_at(p) > water);
+    w
 }
 
 fn spawn(w: &mut World, key: &str, x: i32, y: i32) -> usize {
@@ -125,6 +129,51 @@ fn a_shipyard_goes_on_the_water_nearest_home() {
         .expect("the sea is 700 m off");
     assert!(w.can_place(yard, at));
     assert!(at.distance(start) < Fx::from_int(1100), "{at:?}");
+}
+
+#[test]
+fn a_sea_mine_is_not_kept_off_by_the_islands_own_land_mines() {
+    let mut w = islands(false);
+    for (x, y) in [(300, 700), (700, 300)] {
+        spawn(&mut w, "aster_core_mine", x, y);
+    }
+    w.tick(&[]).unwrap();
+    let start = w.state.players[0].start;
+    let spot = w
+        .free_deposit(
+            start,
+            &[],
+            Fx::from_int(1000),
+            &Intel::default(),
+            Some(Fx::ratio(1, 2)),
+        )
+        .expect("the sea round the island");
+    assert!(w.ore.at_sea(spot), "{spot:?}");
+    // The next one keeps a sea reach off it.
+    let sea = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_core_mine").unwrap())
+        .mine
+        .unwrap()
+        .sea_reach;
+    spawn(
+        &mut w,
+        "aster_core_mine",
+        spot.x.floor_int(),
+        spot.y.floor_int(),
+    );
+    w.tick(&[]).unwrap();
+    let next = w.free_deposit(
+        start,
+        &[],
+        Fx::from_int(3000),
+        &Intel::default(),
+        Some(Fx::ratio(1, 2)),
+    );
+    assert!(
+        next.is_none_or(|p| !w.ore.at_sea(p) || p.distance(spot) >= sea),
+        "{next:?}"
+    );
 }
 
 #[test]

@@ -603,8 +603,13 @@ pub struct RawEconomy {
 #[derive(Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawMine {
-    /// Materials a second it digs out of its point.
-    pub rate: f64,
+    pub reach: f64,
+    /// Its reach standing in the sea, where it mines only the sea.
+    pub sea_reach: f64,
+    pub ground: f64,
+    pub per_hectare: f64,
+    #[serde(default)]
+    pub base: f64,
     /// It drives a pile hammer, blow by blow (the ARC core mine). False: it draws its
     /// mass up without striking (the Regency Taproot), so there is no beat to show or hear.
     #[serde(default = "yes")]
@@ -1835,7 +1840,11 @@ impl Unit {
                 energy_storage: fx(e.energy_storage),
             },
             mine: self.mine.as_ref().map(|m| Mine {
-                rate: fx(m.rate),
+                reach: fx(m.reach),
+                sea_reach: fx(m.sea_reach),
+                ground: fx(m.ground),
+                per_hectare: fx(m.per_hectare),
+                base: fx(m.base),
                 hammer: m.hammer,
             }),
             fabricator: self

@@ -161,11 +161,15 @@
         mesh: "factory_naval", icon: Factory,
         sounds: (death: "blast_large"),
     ),
-    // Core mines. They stand only on the map's mine points (one to an ore field), on land
-    // or, raised on stilts, out at sea, and each digs a fixed `rate` a second. A new mine
-    // pays for itself in under a minute; each tier above pays back slower (about 3, 8
-    // and 12 minutes for the upgrade's price), so a side climbs its mines only when it
-    // means to stay. The hammer runs on energy: a side that cannot pay its upkeep gets a
+    // Core mines. They stand on land or, raised on stilts, on open water.
+    // Every hectare of land in `reach` is worth `ground` materials a
+    // second, and every hectare of ore `per_hectare`, and the shaft itself `base`
+    // from the moment the mine is finished. Where mines' reaches overlap, the
+    // ground is divided by a straight line through the two points where the
+    // circles cross. Every tier reaches as far; the tiers are the investment,
+    // and each is a poorer one than the last: 2.5x then 2x the yield of the
+    // tier below for ever dearer upgrades, so a new mine beats an upgrade.
+    // The hammer runs on energy: a side that cannot pay its upkeep gets a
     // quarter of its mines' output at worst (mc-sim mines.rs `UNPOWERED`).
     (
         key: "aster_core_mine",
@@ -174,11 +178,14 @@
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
         health: 600,
-        cost: (mass: 45, energy: 270, time: 72),
+        cost: (mass: 160, energy: 960, time: 160),
         radius: 12.8, height: 12.6, footprint: (3, 3),
         vision: 300, water_build: true,
-        economy: (mass_storage: 100, energy_upkeep: 2),
-        mine: (rate: 1),
+        economy: (mass_storage: 250, energy_upkeep: 10),
+        mine: (
+            reach: 1000, sea_reach: 1500,
+            ground: 0.010, per_hectare: 0.9, base: 1.1,
+        ),
         upgrades_to: "aster_core_mine_t2",
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
@@ -190,11 +197,14 @@
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
         health: 2000,
-        cost: (mass: 585, energy: 3500, time: 900),
+        cost: (mass: 1700, energy: 10200, time: 2500),
         radius: 12.8, height: 20.8, footprint: (3, 3),
         vision: 360, water_build: true,
-        economy: (mass_storage: 200, energy_upkeep: 8),
-        mine: (rate: 4),
+        economy: (mass_storage: 750, energy_upkeep: 60),
+        mine: (
+            reach: 1000, sea_reach: 1500,
+            ground: 0.025, per_hectare: 2.25, base: 2.75,
+        ),
         upgrades_to: "aster_core_mine_t3",
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
@@ -206,18 +216,23 @@
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
         health: 5000,
-        cost: (mass: 4400, energy: 26400, time: 6200),
+        cost: (mass: 7200, energy: 43200, time: 8800),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 420, water_build: true,
-        economy: (mass_storage: 400, energy_upkeep: 30),
-        mine: (rate: 12),
+        economy: (mass_storage: 2000, energy_upkeep: 300),
+        mine: (
+            reach: 1000, sea_reach: 1500,
+            ground: 0.05, per_hectare: 4.5, base: 5.5,
+        ),
         upgrades_to: "aster_core_mine_t4",
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
     ),
-    // The deep core: the slowest payback of the line, twice tier 3's output for
-    // about twice its price again. The hammer drives in cycles, and each blow
-    // sends a small shockwave across the ground.
+    // The deep core: an upgrade only, and a poor investment next to the
+    // tiers below it. Like every tier it multiplies what the mine gets from
+    // its ground, ore and shaft, but by only 1.5x over tier 3, for over twice
+    // tier 3's price. The hammer drives in cycles, and each blow sends a
+    // small shockwave across the ground.
     (
         key: "aster_core_mine_t4",
         name: "Deep Core",
@@ -225,11 +240,14 @@
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
         health: 10000,
-        cost: (mass: 13000, energy: 78000, time: 13800),
+        cost: (mass: 16000, energy: 96000, time: 14000),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 480, water_build: true,
-        economy: (mass_storage: 800, energy_upkeep: 60),
-        mine: (rate: 24),
+        economy: (mass_storage: 4000, energy_upkeep: 600),
+        mine: (
+            reach: 1000, sea_reach: 1500,
+            ground: 0.075, per_hectare: 6.75, base: 8.25,
+        ),
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
     ),
@@ -281,23 +299,24 @@
     // Material fabricators: they turn a lot of energy into a little material, as far as
     // their upkeep is paid (mc-sim mines.rs `fabricator_income`). The rule they are priced
     // by: one of them plus the same-tier power that feeds it pays back about ten times
-    // slower than a mine of that tier, so they are what a side builds once its mine points
-    // are taken, never instead of them. Built on a T2 power plant's 4x4 lot and upgraded in
-    // place, and a full containment going up takes the block with it, like a reactor.
+    // slower than a mine of that tier (T1 0.5/s for 15 energy/s, ~250 s; T2 2/s for 1200,
+    // ~27 min; T3 5/s for 9000, ~58 min), so they are what a side builds with energy to
+    // spare, never instead of mines. Each tier is a building of its own on its power plant's
+    // lot (2x2, 4x4, 8x8), not an upgrade, and a full containment going up takes the block
+    // with it, like a reactor.
     (
         key: "aster_t1_fabricator",
         name: "Material Fabricator",
         role: "Material Fabricator", title: "Fabricator",
         tech: 1,
         categories: ["Land", "Economy"],
-        health: 700,
-        cost: (mass: 75, energy: 450, time: 120),
-        radius: 23, height: 14, footprint: (4, 4),
+        health: 400,
+        cost: (mass: 50, energy: 300, time: 80),
+        radius: 11, height: 9, footprint: (2, 2),
         vision: 120,
-        economy: (energy_upkeep: 30),
+        economy: (energy_upkeep: 15),
         fabricator: (mass: 0.5),
-        death_blast: (radius: 60, damage: 3000),
-        upgrades_to: "aster_t2_fabricator",
+        death_blast: (radius: 40, damage: 1500),
         mesh: "fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
     ),
@@ -308,13 +327,12 @@
         tech: 2,
         categories: ["Land", "Economy"],
         health: 2400,
-        cost: (mass: 1200, energy: 7200, time: 1900),
+        cost: (mass: 900, energy: 5400, time: 1450),
         radius: 23, height: 22, footprint: (4, 4),
         vision: 140,
         economy: (energy_upkeep: 1200),
         fabricator: (mass: 2),
         death_blast: (radius: 110, damage: 9000),
-        upgrades_to: "aster_t3_fabricator",
         mesh: "fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
     ),
@@ -325,12 +343,12 @@
         tech: 3,
         categories: ["Land", "Economy"],
         health: 9000,
-        cost: (mass: 5000, energy: 30000, time: 8000),
-        radius: 23, height: 30, footprint: (4, 4),
+        cost: (mass: 4650, energy: 27900, time: 7400),
+        radius: 42.5, height: 45, footprint: (8, 8),
         vision: 160,
-        economy: (energy_upkeep: 13500),
+        economy: (energy_upkeep: 9000),
         fabricator: (mass: 5),
-        death_blast: (radius: 180, damage: 20000),
+        death_blast: (radius: 220, damage: 24000),
         mesh: "fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
     ),

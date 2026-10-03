@@ -84,59 +84,47 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 
 ## Economy
 
-Rebalanced 2026-10-02 to be much slower, with tiers a commitment (the user's call): mines
-stand only on the map's mine points, income is small, and the paths to a new tier (factory
-upgrades, the commander's engineering suites) cost far more, while units keep their prices.
-
-- **Mine points.** A core mine stands only on a mine point, one to each ore field the map
-  has (`mines::mine_points`), one mine to a point, anyone's. Measured with
-  `zz_mine_points_probe`: three points at each start on every map but the survival one,
-  5-11 within 2.5 km and 9-26 within 5 km on the duel and team maps.
-- **Rates and paybacks** (the user's numbers). Each upgrade pays only the difference between
-  the tiers, so the payback is the upgrade's price over what it adds:
-
-  | Tier | Materials/s | Mass (energy) | Upgrade pays back in | Upkeep | Health |
-  |---|---|---|---|---|---|
-  | Core Mine | 1 | 45 (270) | 45 s (new) | 2 | 600 |
-  | Core Mine II | 4 | 585 (3,500) | 180 s | 8 | 2,000 |
-  | Core Mine III | 12 | 4,400 (26,400) | 8 min | 30 | 5,000 |
-  | Deep Core | 24 | 13,000 (78,000) | 12 min | 60 | 10,000 |
-
-  The Regency Excavator line digs as much at every tier for a little more mass and no upkeep
-  (55 / 600 / 4,500 / 13,300). Mines store 100 / 200 / 400 / 800.
-- **Material fabricators** (`fabricator: (mass)`) turn energy into a trickle of materials: an
-  MFE and the same-tier power it needs pay back in about ten times a same-tier mine (the
-  user's rule). T1 +0.5/s for 30 energy/s (75 mass + 150 of T1 reactors, 450 s); T2 +2/s for
-  1,200 (1,200 mass + 2,400 of T2 reactors, 30 min); T3 +5/s for 13,500 (5,000 + 18,900 of
-  T3 reactors, 80 min). They make only as much as their upkeep is paid, nothing in a full
-  stall, and go up like reactors. They share the Mines priority switch.
-- **Tier paths are the commitment.** A factory upgrade is how a side reaches a tier: land and
-  air factories 240 / 3,000 / 9,000 mass (Forge to II 2,760, II to III 6,000; naval 260 /
-  3,080 / 9,100). The commander's Engineering Suite II costs 2,400 and Suite III 6,000 (kits
-  pay in full). On the first T1 income (about 6-8 a second) a tier 2 factory is six minutes
-  of it. Units keep their prices, so they are cheap against the tiers.
-- **Engineers climb in the field.** An engineer puts its own next tier on at that tier's
-  build power (`Blueprints::upgrade_power`): Mason to Mason II (148 mass) in 30 s, II to III
-  in about 21 s, against 180 s and 107 s at its own power before. It still waits for the
-  side's tech: upgrading is not a way to reach a tier.
-- Measured with the duel probe, Serac Divide, Hard against Hard: 6-8 materials a second at
-  T1 for the first ten minutes, tier 2 factories at about 14 minutes (was 9), about 20 a
-  second and no tier 3 by 30 minutes.
-- Mines are easy to hurt: three Wardens kill a tier 1 mine in about 10 s, and three Petrels
-  in one pass. A raid on the mines is meant to pay.
+- Mines: reach 1000 m, so 3-5 fit round a base without sharing much ground. Each pays a `base`
+  from the moment it is finished (1.1 / 2.75 / 5.5 per second), and its land spreads out at
+  10 m/s (full in about 100 s); shafts sink at 4 m/s and drifts run at 12 m/s. Each mine stores
+  mass (250 / 750 / 2000).
+- A new mine is the good investment and each tier above it a poorer one (the user's call,
+  2026-09-26): a tier 2 mine yields 2.5x a tier 1, a tier 3 5x, the Deep Core 7.5x (T1 ground
+  0.010 a hectare, ore 0.9). On good ground a tier 1 mine makes about 6.4 mass/s and pays back
+  its 160 in about 25 s. An upgrade pays only the difference between the tiers: to tier 2
+  1540 (1700 - 160), paying back in about 165 s; to tier 3 5500, about 345 s; to the Deep
+  Core 8800, about 550 s.
+- A mine's `base` is shared with the mines next to it the way its land is: it gets the part of
+  the base that matches the part of its circle it holds, land or sea. Before this, every shaft
+  paid its full base however close the mines stood, so a packed block of mines made several
+  times what four spread out did (test `packing_mines_together_...`).
+- Mines are easy to hurt: 600 / 2000 / 5000 / 10000 health (T1-T4; 1500 / 5000 / 12000 / 24000
+  before 2026-09-30, when the user found tier 1 mines "bulky and hard to raid"). Three Wardens
+  kill a tier 1 mine in about 10 s, and three Petrels in one pass. A raid on the mines is meant
+  to pay: the mine that goes up again digs its land out from nothing, about 100 s.
+- Measured with the duel probe on Serac Divide, Hard against Hard: 25-29 mass/s at 15 minutes
+  (was 40-49 with 3x per tier), 48-65 at 30.
 - The Deep Core (T4, `aster_core_mine_t4`) is built by Mason IIIs and Engineering Suite III
-  commanders, or upgraded from a tier 3 mine. It opens with tech 3 (the only tech 4 build
-  besides the experimentals and the Resolute).
-- Mines stand on land or out at sea (`water_build`) wherever the map puts a point.
+  commanders, or upgraded from a tier 3 mine, and meant to be a poor one. Like
+  every tier it multiplies the mine's ground, ore and shaft yield, never a flat bonus (the user's
+  call): 7.5x a tier 1, only 1.5x over tier 3 (base 8.25), for 16000 mass / 96000 energy / 14000
+  time built outright (8800 / 52800 as an upgrade from tier 3). It opens with tech 3 (the only tech 4 build is the
+  Fulgur, raised by Mason IIIs), has 10000 health and stores 4000.
+- Mines stand on land or out at sea (`water_build`). A mine at sea mines only the sea, and a
+  mine on land only the land: each territory stops at the shore, and land and sea mines never
+  share ground with each other, only with their own kind (the user's call, 2026-09-29). At sea
+  the reach is wider, 1500 m (`sea_reach`, so a whole circle of sea is 2.25x a land circle, at
+  the same `ground` a hectare, with no ore), but the worked water spreads at only 4 m/s
+  (`SEA_SPREAD_SPEED`: full in about 375 s against 100 on land).
 - Reactors: 15 / 350 / 2000 energy/s for 75 / 700 / 2800 mass: 5 / 2 / 1.4 mass per energy a
   second, so each tier is far cheaper per unit of energy than the one below. A field of tier 1
   reactors is the stopgap of the opening, not the way to power a side (the user, 2026-09-30:
   "t1 pgens are too good of a deal"; they were 20 / 250 / 1500, only a third dearer than tier 2).
 - Every tier upgrade, structure or engineer, pays only what the new tier costs over the old
   one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy, core mine tier 1
-  to 2 540 / 3,230). A refit kit is paid in full.
-- Commander's Material Formation Engine: +1.5 mass, +100 energy a second for 1,200 mass (was
-  +6 / +250 for 1,600, worth six tier 1 mines after the mine rebalance).
+  to 2 1540 / 9240). A refit kit is paid in full.
+- Commander's Material Formation Engine: +6 mass, +250 energy a second (about a good tech 1
+  mine and a tech 2 reactor) for 1600 mass; it was +12 / +2000, worth a hundred tech 1 reactors.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus
   (`focus.rs`), the Mines and Power priorities in one row under the economy panel: each of
@@ -150,14 +138,15 @@ upgrades, the commander's engineering suites) cost far more, while units keep th
   and the mines (checked on load). Guns, missile launchers, missile defence, nuke silos and
   reclaim cost energy to build, never to keep (2026-09-29: the Zenith, Narwhal, Sunfall,
   Culverin and Corona lost theirs).
-- Mines run on energy: upkeep 2 / 8 / 30 / 60 per second (T1-T4). A mine digs at the share of the
+- Mines run on energy: upkeep 10 / 60 / 300 / 600 per second (T1-T4), about two thirds of a T1
+  reactor at T1 and a sixth of a reactor of their own tier above that. A mine digs at the share of the
   side's energy demand that is covered (behind the focus, if one is on): at worst a quarter of its output
   (`UNPOWERED` in `mines.rs`), so a side out of energy loses most of its mass too. That is why
   an energy stall is the one to prevent. A mass stall does not slow the mines, or it would feed
   itself. The stall chip names the resource short and shows the materials lost a second.
 
-`zz_mine_points_probe` (the points each real map gets, by start) and the duel probe are the
-check for any change to the mine numbers.
+The throwaway mine probe (a test that places mines on the real maps and prints their output
+over time) is the check for any change to the mine numbers.
 
 ### Build power (2026-09-30)
 
@@ -171,7 +160,7 @@ materials of economy against 5-12k of army. Two rules since:
 
 - **Build time follows mass.** Every build takes about as long per material as others of its
   kind, economy included: a mine upgrade takes about 1.6 build-power seconds per material it
-  pays (core mine times 72 / 900 / 6200 / 13800), reactors about 1.7 (Reactor III 4800).
+  pays (core mine times 160 / 2500 / 8800 / 14000), reactors about 1.7 (Reactor III 4800).
   Growing income now competes for build power with spending it.
 - **Build power gets cheaper by tier.** Factories 20 / 120 / 360, so each tier's factory rolls
   out its line tank in 11-14 s (Warden 14, Bulwark 11, Paladin 13). Engineers 5 / 30 / 150

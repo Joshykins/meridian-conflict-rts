@@ -901,6 +901,9 @@ pub struct Renderer {
     grid_ib: Buffer,
     grid_index_count: u32,
     patch_vb: Buffer,
+    /// The ore veins under every field, one static triangle list.
+    vein_vb: Buffer,
+    vein_count: u32,
     patch_ib: Buffer,
     patch_index_count: u32,
 
@@ -962,6 +965,8 @@ pub struct Renderer {
     /// placed. Eases toward the goal a little every frame.
     ore_highlight: f32,
     ore_highlight_goal: f32,
+    /// Seconds, for the veins' drifting glints.
+    vein_time: f32,
     /// Corner count of every ore field, in order, and which are being mined
     /// by a mine the viewer has seen.
     ore_regions: Vec<usize>,
@@ -1582,6 +1587,7 @@ impl Renderer {
             scene.map.ore_regions().iter().map(rounded_ore).collect();
         let (deposit_splats, ore_corners) = ore_splats(&rounded);
         let ore_regions: Vec<usize> = rounded.iter().map(|r| r.points.len()).collect();
+        let vein_mesh = ore_vein_mesh(scene.map.ore_regions());
         let static_count = statics_data.len() as u32;
 
         use vk::BufferUsageFlags as U;
@@ -1699,6 +1705,16 @@ impl Renderer {
             }
         }
         let patch_vb = gpu.buffer_with_data(bytemuck::cast_slice(&patch_v), U::VERTEX_BUFFER)?;
+        let vein_count = vein_mesh.len() as u32;
+        let empty = [MeshVertex::zeroed()];
+        let vein_vb = gpu.buffer_with_data(
+            bytemuck::cast_slice(if vein_mesh.is_empty() {
+                &empty[..]
+            } else {
+                &vein_mesh
+            }),
+            U::VERTEX_BUFFER,
+        )?;
         let patch_ib = gpu.buffer_with_data(bytemuck::cast_slice(&patch_i), U::INDEX_BUFFER)?;
 
         step("Weaving terrain textures", 0.7);
@@ -2455,6 +2471,8 @@ impl Renderer {
             grid_ib,
             grid_index_count: grid_i.len() as u32,
             patch_vb,
+            vein_vb,
+            vein_count,
             patch_ib,
             patch_index_count: patch_i.len() as u32,
             overview,
@@ -2503,6 +2521,7 @@ impl Renderer {
             ore_corners,
             ore_highlight: 0.0,
             ore_highlight_goal: 0.0,
+            vein_time: 0.0,
             ore_tapped: vec![false; ore_regions.len()],
             ore_regions,
             deposit_count: 0,
@@ -3215,6 +3234,7 @@ impl Renderer {
             // Corners carry the highlight in their unused radius, plus 2 on a
             // field a seen mine is working.
             self.ore_highlight += (self.ore_highlight_goal - self.ore_highlight) * 0.18;
+            self.vein_time += 1.0 / 60.0;
             let mut at = 0;
             for (i, &n) in self.ore_regions.iter().enumerate() {
                 let tapped = if self.ore_tapped.get(i).copied().unwrap_or(false) {
@@ -5607,6 +5627,7 @@ impl Drop for Renderer {
             &mut self.grid_ib,
             &mut self.patch_vb,
             &mut self.patch_ib,
+            &mut self.vein_vb,
         ] {
             gpu.destroy_buffer(std::mem::replace(b, placeholder()));
         }
@@ -6307,6 +6328,135 @@ fn polygon_distance(pts: &[[f32; 2]], p: [f32; 2]) -> f32 {
     } else {
         d.sqrt()
     }
+}
+
+/// The ore under every field as solid geometry: a lumpy body at the field's
+/// heart and lodes running out from it toward the outline, rising and sinking,
+/// each swelling into nodules along the way. Vertex `pos` is xy in metres and
+/// z as metres below the surface (negative); `vs_vein` hangs it under the
+/// terrain. Deterministic, from the outlines alone.
+fn ore_vein_mesh(regions: &[mc_map::OreRegion]) -> Vec<MeshVertex> {
+    use glam::{Vec2, Vec3};
+    let mut out = Vec::new();
+    let vertex = |pos: Vec3, normal: Vec3| {
+        let mut v = MeshVertex::zeroed();
+        v.pos = pos.into();
+        v.normal = normal.into();
+        v
+    };
+    let hash = |a: u32, b: u32| {
+        let mut h = a.wrapping_mul(0x9E37_79B9) ^ b.wrapping_mul(0x85EB_CA6B);
+        h ^= h >> 15;
+        h = h.wrapping_mul(0x2C1B_3C6D);
+        h ^= h >> 12;
+        (h & 0xFFFF) as f32 / 65535.0
+    };
+    // An ellipsoid of radii `r`, lumpy with `seed`.
+    let blob = |out: &mut Vec<MeshVertex>, c: Vec3, r: Vec3, seed: u32| {
+        const LAT: usize = 7;
+        const LON: usize = 12;
+        let at = |i: usize, j: usize| {
+            let th = i as f32 / LAT as f32 * std::f32::consts::PI;
+            let ph = j as f32 / LON as f32 * std::f32::consts::TAU;
+            let n = Vec3::new(th.sin() * ph.cos(), th.sin() * ph.sin(), th.cos());
+            let bump = 0.8 + 0.4 * hash(seed, (i * LON + j % LON) as u32);
+            (c + n * r * bump, n)
+        };
+        for i in 0..LAT {
+            for j in 0..LON {
+                let (a, na) = at(i, j);
+                let (b, nb) = at(i + 1, j);
+                let (cc, nc) = at(i + 1, j + 1);
+                let (d, nd) = at(i, j + 1);
+                out.extend([vertex(a, na), vertex(b, nb), vertex(cc, nc)]);
+                out.extend([vertex(a, na), vertex(cc, nc), vertex(d, nd)]);
+            }
+        }
+    };
+    // A tube through `line`, radius per point.
+    let tube = |out: &mut Vec<MeshVertex>, line: &[(Vec3, f32)]| {
+        const SIDES: usize = 9;
+        let ring = |k: usize| {
+            let (p, r) = line[k];
+            let dir = if k + 1 < line.len() {
+                line[k + 1].0 - p
+            } else {
+                p - line[k - 1].0
+            };
+            let dir = dir.normalize_or_zero();
+            let side = dir.cross(Vec3::Z).normalize_or(Vec3::X);
+            let up = side.cross(dir);
+            (0..=SIDES)
+                .map(|i| {
+                    let a = i as f32 / SIDES as f32 * std::f32::consts::TAU;
+                    let n = side * a.cos() + up * a.sin();
+                    (p + n * r, n)
+                })
+                .collect::<Vec<_>>()
+        };
+        for k in 0..line.len() - 1 {
+            let (a, b) = (ring(k), ring(k + 1));
+            for i in 0..SIDES {
+                let (p0, n0) = a[i];
+                let (p1, n1) = a[i + 1];
+                let (q0, m0) = b[i];
+                let (q1, m1) = b[i + 1];
+                out.extend([vertex(p0, n0), vertex(q0, m0), vertex(q1, m1)]);
+                out.extend([vertex(p0, n0), vertex(q1, m1), vertex(p1, n1)]);
+            }
+        }
+    };
+    for (index, region) in regions.iter().enumerate() {
+        let pts: Vec<Vec2> = region
+            .points
+            .iter()
+            .map(|p| Vec2::from(p.to_f32()))
+            .collect();
+        if pts.len() < 3 {
+            continue;
+        }
+        let seed = index as u32 * 977 + 13;
+        let centre = Vec2::from(region.centre().to_f32());
+        let depth = region.depth().to_f32();
+        let heart = centre.extend(-depth);
+        blob(&mut out, heart, Vec3::new(24.0, 19.0, 14.0), seed);
+        let lodes = 4 + (hash(seed, 1) * 3.0) as usize;
+        for v in 0..lodes {
+            let corner = pts
+                [(v * pts.len() / lodes + (hash(seed, 2 + v as u32) * 3.0) as usize) % pts.len()];
+            let end = centre + (corner - centre) * (0.7 + 0.25 * hash(seed, 20 + v as u32));
+            let rise = (hash(seed, 40 + v as u32) - 0.5) * 90.0;
+            let side = (end - centre).perp().normalize_or_zero();
+            let steps = 10;
+            let line: Vec<(Vec3, f32)> = (0..=steps)
+                .map(|k| {
+                    let t = k as f32 / steps as f32;
+                    let wander = (hash(seed, 100 + v as u32 * 16 + k as u32) - 0.5)
+                        * 30.0
+                        * (t * (1.0 - t) * 4.0);
+                    let xy = centre.lerp(end, t) + side * wander;
+                    let z = -depth
+                        - rise * t
+                        - (t * std::f32::consts::PI * 1.5 + v as f32).sin() * 10.0;
+                    (xy.extend(z), 11.0 * (1.0 - t).powf(0.8) + 2.5)
+                })
+                .collect();
+            tube(&mut out, &line);
+            // Nodules where the lode swells.
+            for k in [4usize, 7] {
+                if hash(seed, 300 + v as u32 * 4 + k as u32) > 0.35 {
+                    let (p, r) = line[k];
+                    blob(
+                        &mut out,
+                        p,
+                        Vec3::splat(r * 1.6),
+                        seed + 500 + v as u32 * 8 + k as u32,
+                    );
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Capital transports pass through cloud without changing its density or flow.
