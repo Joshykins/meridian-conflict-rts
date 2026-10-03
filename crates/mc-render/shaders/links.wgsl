@@ -30,9 +30,14 @@ struct LinkInstance {
 
 // The cable's half width up close, and at least this much per metre from the eye so it
 // stays a line a pixel or two wide when the camera pulls back. The pieces along it grow
-// with it.
+// with it a little, then shrink away into it: from far off, as in the strategic view,
+// only the lit line shows, not a chain of blocks swollen to a building's size.
 const CABLE_HALF_M: f32 = 0.35;
 const CABLE_HALF_PER_M: f32 = 0.0015;
+// The cable's widening (its half width over `CABLE_HALF_M`) at which the pieces stop
+// growing, and at which they are gone.
+const PIECE_GROW_MAX: f32 = 1.5;
+const PIECE_GONE: f32 = 3.0;
 // A highlighted line is this much wider.
 const HIGHLIGHT_WIDEN: f32 = 1.35;
 // The cable's height over its half width: a little flattened, as a cable lying on the
@@ -239,11 +244,12 @@ fn vs_main(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
             p.dir = normalize(p.at - l.points[min(turn, LINK_POINTS - 1u) - 1u] + vec2<f32>(1e-5, 0.0));
             out.part = select(PART_JUNCTION, PART_NODE, plated);
         }
-        if !shown {
+        let widen = half_width(p.at, l.flags) / CABLE_HALF_M;
+        let grow = min(widen, PIECE_GROW_MAX) * (1.0 - smoothstep(PIECE_GROW_MAX, PIECE_GONE, widen));
+        if !shown || grow <= 0.0 {
             out.clip = vec4<f32>(0.0);
             return out;
         }
-        let grow = half_width(p.at, l.flags) / CABLE_HALF_M;
         var b: Built;
         switch out.part {
             case PART_CLAMP: { b = block(p.at, p.dir, CLAMP_OUTLINE, grow, 0.36, 0.0, k); }

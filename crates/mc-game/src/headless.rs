@@ -514,6 +514,21 @@ pub fn screenshot(
         camera.yaw = 0.5;
     }
 
+    if shot.camera.is_none() && opts.scene == setup::Scene::Adjacency {
+        // The ARC yard from the south-west (setup.rs lays it out on the first start).
+        let size = map.info().size_metres();
+        let pad = map
+            .start_positions()
+            .first()
+            .copied()
+            .unwrap_or(size * mc_core::Fx::HALF);
+        log::info!("adjacency yard at {:?}", pad.to_f32());
+        let at = pad.to_f32();
+        camera.focus = glam::Vec3::new(at[0], at[1], renderer.ground_height(glam::Vec2::from(at)));
+        camera.distance = 260.0;
+        camera.yaw = -0.6;
+    }
+
     if shot.camera.is_none() && opts.scene == setup::Scene::Wreckage {
         // The yard from the south-west, the spacecraft's pieces beyond it.
         let (pad, sea) = (setup::range_pad(&map), setup::ditch_point(&map));

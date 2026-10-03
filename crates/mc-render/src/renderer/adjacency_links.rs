@@ -1,8 +1,8 @@
 //! Adjacency conduits: a provider (a reactor, a material fabricator) and each neighbour
 //! whose lot shares an edge with its own and which it makes cheaper to run (mc-sim
-//! `adjacency`) are joined by one slim line on the ground from the provider's lot centre
-//! to the neighbour's. It runs under both buildings, so what shows is the stretch between
-//! them. How it runs and what it is made of are the provider's faction's
+//! `adjacency`) are joined by one slim line on the ground from a little inside the
+//! provider's lot to a little inside the neighbour's, so it ducks under both buildings'
+//! edges and what shows is the stretch between them. How it runs and what it is made of are the provider's faction's
 //! (`mc_data::PowerLine`): ARC's square runs of armoured cable clamped down with a
 //! junction box at each turn, the Regency's bowed arc under lapped plates between field
 //! nodes (path.rs works out the run, links.wgsl builds the pieces). Its core is lit in the
@@ -43,7 +43,7 @@ const LINK_VERTICES: u32 = link::SEGMENTS * 12 + (link::PIECES + link::JUNCTIONS
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LinkInstance {
-    /// Its path from the provider's lot centre to the neighbour's (path.rs), metres:
+    /// Its path from inside the provider's lot to inside the neighbour's (path.rs), metres:
     /// the first `count` are used.
     pub(crate) points: [[f32; 2]; link::POINTS as usize],
     pub(crate) count: u32,
