@@ -59,7 +59,8 @@ pub enum Scene {
     Showcase,
     /// Buildings standing against each other at the first start position, for their
     /// adjacency conduits: a Reactor III between a factory and a Fabricator III (bound to
-    /// it), a Reactor I powering the fabricator, and the fabricator against the factory.
+    /// it), a Reactor I powering the fabricator, and a fabricator against the factory;
+    /// ARC's yard, and the Regency's 240 m south of it.
     Adjacency,
     /// The battle staged behind the front end's menus.
     Backdrop,
@@ -932,20 +933,23 @@ pub fn opening_commands(
             // Lots are 12 m build cells (`mc_map::BUILD_CELL_M`): a reactor III and a
             // factory 96 m across, fabricators and a reactor I 24 m.
             let base = map.start_positions().first().copied().unwrap_or(centre);
-            for (key, x, y) in [
-                ("aster_t3_power", 0, 0),
-                ("aster_t3_land_factory", 96, 0),
-                ("aster_t3_fabricator", -60, 12),
-                ("aster_t1_power", -84, 12),
-                ("aster_t3_fabricator", 72, 60),
-            ] {
-                out.push(spawn(
-                    0,
-                    key,
-                    base + FxVec2::from_ints(x, y),
-                    Angle::from_degrees(270),
-                    1,
-                ));
+            // The same yard twice: ARC's, and the Regency's 240 m south of it.
+            for (faction, south) in [("aster", 0), ("regency", 240)] {
+                for (kind, x, y) in [
+                    ("t3_power", 0, 0),
+                    ("t3_land_factory", 96, 0),
+                    ("t3_fabricator", -60, 12),
+                    ("t1_power", -84, 12),
+                    ("t3_fabricator", 72, 60),
+                ] {
+                    out.push(spawn(
+                        0,
+                        &format!("{faction}_{kind}"),
+                        base + FxVec2::from_ints(x, y - south),
+                        Angle::from_degrees(270),
+                        1,
+                    ));
+                }
             }
         }
         Scene::Showcase => {

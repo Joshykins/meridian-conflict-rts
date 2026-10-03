@@ -11,8 +11,9 @@
     plating_color: (0.03, 0.026, 0.026),
     accent_color: (0.012, 0.01, 0.01),
     highlight_color: (1.0, 0.05, 0.07),
-    // Power lines between buildings: the violet their nanites build in.
-    power_color: (0.66, 0.12, 1.0),
+    // Adjacency conduits: one bowed arc under lapped dark plates with lit seams, running
+    // between low faceted field nodes; energy in the violet their nanites build in.
+    power_line: (color: (0.66, 0.12, 1.0), path: Curve, look: Plated),
     shield_color: (0.95, 0.24, 0.12),
     // Nanites build for them: a builder pours a stream of them onto its work, and a black
     // swarm holding the building's shape condenses into plate, violet light running through

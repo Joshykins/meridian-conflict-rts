@@ -22,9 +22,9 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 pub use raw::{
-    AntiMissileLook, BuildSounds, Construction, FactionSounds, IconKind, MoveLayer, PlasmaGrade,
-    ShieldKind, ShieldLook, StructureLamps, TorpedoLook, Trajectory, UnitSounds, WeaponColor,
-    WeaponSounds,
+    AntiMissileLook, BuildSounds, Construction, FactionSounds, IconKind, LineLook, LinePath,
+    MoveLayer, PlasmaGrade, PowerLine, ShieldKind, ShieldLook, StructureLamps, TorpedoLook,
+    Trajectory, UnitSounds, WeaponColor, WeaponSounds,
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
@@ -146,9 +146,9 @@ pub struct Faction {
     pub plating_color: [f32; 3],
     pub accent_color: [f32; 3],
     pub highlight_color: [f32; 3],
-    /// The light of its power lines (the energy conduits between adjacent buildings, and
-    /// the interface's marks for them): `Blueprints::power_color`.
-    pub power_color: [f32; 3],
+    /// Its adjacency conduits: their energy colour (also the interface's marks for them),
+    /// their path and their look (`Blueprints::power_line`).
+    pub power_line: PowerLine,
     /// Its shield fields' idle colour; hits and seams are drawn from it.
     pub shield_color: [f32; 3],
     /// How its construction sites look. Presentation only, so not in the content hash.
@@ -1242,7 +1242,7 @@ impl Blueprints {
                 plating_color: f.plating_color,
                 accent_color: f.accent_color,
                 highlight_color: f.highlight_color,
-                power_color: f.power_color,
+                power_line: f.power_line,
                 shield_color: f.shield_color,
                 construction: f.construction,
                 sounds: f.sounds.clone(),
@@ -1316,10 +1316,10 @@ impl Blueprints {
         self.by_key.get(key).copied()
     }
 
-    /// The light of the power lines of the faction that fields `unit` (`Faction::power_color`),
-    /// linear RGB.
-    pub fn power_color(&self, unit: BlueprintId) -> [f32; 3] {
-        self.factions[self.unit(unit).faction.0 as usize].power_color
+    /// The adjacency conduits of the faction that fields `unit` (`Faction::power_line`):
+    /// `.color` is its energy colour, linear RGB.
+    pub fn power_line(&self, unit: BlueprintId) -> &PowerLine {
+        &self.factions[self.unit(unit).faction.0 as usize].power_line
     }
 
     pub fn faction_by_key(&self, key: &str) -> Option<&Faction> {
@@ -1786,6 +1786,14 @@ mod tests {
         assert_eq!(aster.torpedo_look, TorpedoLook::Bubbles);
         assert_eq!(regency.structure_lamps, StructureLamps::Ember);
         assert_eq!(aster.structure_lamps, StructureLamps::Sodium);
+        assert_eq!(
+            (regency.power_line.path, regency.power_line.look),
+            (LinePath::Curve, LineLook::Plated)
+        );
+        assert_eq!(
+            (aster.power_line.path, aster.power_line.look),
+            (LinePath::Straight, LineLook::Clamped)
+        );
         assert_eq!(regency.shield_look, ShieldLook::Prism);
         assert_eq!(aster.shield_look, ShieldLook::Honeycomb);
         assert_eq!(regency.anti_missile_look, AntiMissileLook::CounterSeeker);

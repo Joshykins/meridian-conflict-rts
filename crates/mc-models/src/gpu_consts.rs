@@ -1008,7 +1008,7 @@ shared! {
 
     /// Materials (the sim's `mass`) as the interface colours them (mc-game `hud::MASS`) and
     /// the world's materials conduits light them (renderer/adjacency_links.rs), sRGB
-    /// `0xRRGGBB`. Energy is the faction's own (`mc_data::Faction::power_color`).
+    /// `0xRRGGBB`. Energy is the faction's own (`mc_data::PowerLine::color`).
     pub mod tone as "TONE_" {
         pub const MASS: u32 = 0xFF6B3D;
     }
@@ -1021,8 +1021,21 @@ shared! {
         pub const HIGHLIGHT: u32 = 2;
         /// A would-be link of a placement ghost: drawn see-through, after the scene.
         pub const PLANNED: u32 = 4;
-        /// Stretches of a line at most, each laid on the ground on its own.
-        pub const SEGMENTS: u32 = 48;
+        /// The path's inner points are turns, each with the look's junction (else they
+        /// are points along a curve).
+        pub const TURNS: u32 = 8;
+        /// The look (`mc_data::LineLook`) sits in the flags from this bit up.
+        pub const LOOK_SHIFT: u32 = 8;
+        /// Looks. Never renumber one; retire a number with a comment.
+        pub const LOOK_CLAMPED: u32 = 0;
+        pub const LOOK_PLATED: u32 = 1;
+        /// Points of a conduit's path (`LinkInstance::points`) at most.
+        pub const POINTS: u32 = 16;
+        /// Stretches of the cable, each laid on the ground on its own.
+        pub const SEGMENTS: u32 = 64;
+        /// Pieces along the cable (clamps, plates, nodes) at most, and junctions at turns.
+        pub const PIECES: u32 = 24;
+        pub const JUNCTIONS: u32 = 4;
     }
 
     /// Bits of `UnitInstance::owner_flags` (`owner | flags << 8`) the shaders read that the

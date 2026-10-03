@@ -7,8 +7,9 @@
     plating_color: (0.16, 0.185, 0.225),
     accent_color: (0.072, 0.082, 0.1),
     highlight_color: (0.55, 0.85, 1.0),
-    // Power lines between buildings: the blue of the reactors' electrical glow.
-    power_color: (0.12, 0.45, 1.0),
+    // Adjacency conduits: engineered square runs of armoured cable, clamped down, a
+    // junction box at each turn; energy in the blue of the reactors' electrical glow.
+    power_line: (color: (0.12, 0.45, 1.0), path: Straight, look: Clamped),
     // Shield fields: blue-white. The shader draws hits and the projector shaft from a
     // denser blue of it, flares from a paler one.
     shield_color: (0.74, 0.85, 1.0),

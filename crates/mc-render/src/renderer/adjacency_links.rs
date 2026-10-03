@@ -1,26 +1,31 @@
 //! Adjacency conduits: a provider (a reactor, a material fabricator) and each neighbour
 //! whose lot shares an edge with its own and which it makes cheaper to run (mc-sim
-//! `adjacency`) are joined by one slim cable laid on the ground from the provider's lot
-//! centre to the neighbour's. It runs under both buildings, so what shows is the stretch
-//! between them. Its core is lit in the resource's colour, materials in the interface's
-//! (`gpu_consts::tone`), energy in the faction's own power colour
-//! (`mc_data::Blueprints::power_color`), with slow pulses running from the provider into
-//! the neighbour. A bound pair (they go down together) has its sheath banded amber and
-//! black.
+//! `adjacency`) are joined by one slim line on the ground from the provider's lot centre
+//! to the neighbour's. It runs under both buildings, so what shows is the stretch between
+//! them. How it runs and what it is made of are the provider's faction's
+//! (`mc_data::PowerLine`): ARC's square runs of armoured cable clamped down with a
+//! junction box at each turn, the Regency's bowed arc under lapped plates between field
+//! nodes (path.rs works out the run, links.wgsl builds the pieces). Its core is lit in the
+//! resource's colour, materials in the interface's (`gpu_consts::tone`), energy in the
+//! faction's (`PowerLine::color`), with slow pulses running from the provider into the
+//! neighbour. A bound pair (they go down together) is marked amber in the look's own way.
 //!
 //! The sim's links come with each tick's mirror (`RenderFrame::links`). The game adds
 //! the units it wants brought out (the selection, the hovered building) and the
 //! would-be links of a placement ghost each frame (`Renderer::set_link_focus`); the
-//! ghost's are drawn see-through after the scene. links.wgsl lays the cable on
-//! `terrain_height`, so it follows the ground. A new link's cable runs out from the
+//! ghost's are drawn see-through after the scene. links.wgsl lays everything on
+//! `terrain_height`, so it follows the ground. A new link's line runs out from the
 //! provider over a lot's settling time.
+
+mod path;
 
 use super::Renderer;
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::{link, tone};
 use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind};
 use ash::vk;
-use mc_data::Blueprints;
+use glam::Vec2;
+use mc_data::{Blueprints, LineLook};
 use mc_sim::adjacency::Resource;
 use mc_sim::mirror::LinkView;
 use std::collections::HashMap;
@@ -30,23 +35,27 @@ use std::collections::HashMap;
 const MAX_LINKS: usize = 4096;
 /// A ghost's conduits stand from the start: their render time is long past.
 const PLANNED_START: f32 = -1.0e9;
-/// Vertices per conduit (links.wgsl): per segment of the cable, its two sloping faces.
-const LINK_VERTICES: u32 = link::SEGMENTS * 12;
+/// Vertices per conduit (links.wgsl): per stretch of the cable its two halves, then the
+/// pieces along it and the junctions at its turns, each a six-sided block.
+const LINK_VERTICES: u32 = link::SEGMENTS * 12 + (link::PIECES + link::JUNCTIONS) * 48;
 
 /// One conduit (links.wgsl `LinkInstance`).
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LinkInstance {
-    /// The provider's lot centre and the neighbour's, metres.
-    pub(crate) provider_at: [f32; 2],
-    pub(crate) consumer_at: [f32; 2],
-    /// Render time the cable began to run out.
+    /// Its path from the provider's lot centre to the neighbour's (path.rs), metres:
+    /// the first `count` are used.
+    pub(crate) points: [[f32; 2]; link::POINTS as usize],
+    pub(crate) count: u32,
+    /// Metres along the path, end to end.
+    pub(crate) length: f32,
+    /// Render time the line began to run out.
     pub(crate) start: f32,
-    /// `link::BOUND` | `HIGHLIGHT` | `PLANNED`.
+    /// `link::BOUND` | `HIGHLIGHT` | `PLANNED` | `TURNS`, and the look from `LOOK_SHIFT`.
     pub(crate) flags: u32,
     /// The core's light, sRGB `0xRRGGBB`.
     pub(crate) rgb: u32,
-    /// Where its pulses are in their cycle, 0..1, so neighbouring cables do not beat
+    /// Where its pulses are in their cycle, 0..1, so neighbouring lines do not beat
     /// together.
     pub(crate) phase: f32,
 }
@@ -60,22 +69,39 @@ fn srgb_word(c: [f32; 3]) -> u32 {
 
 impl LinkInstance {
     fn new(l: &LinkView, blueprints: &Blueprints, start: f32, extra: u32) -> LinkInstance {
-        let mut flags = extra;
+        let line = blueprints.power_line(l.provider_blueprint);
+        let phase = (l.provider.wrapping_mul(7919) ^ l.consumer.wrapping_mul(104_729)) as f32
+            / u32::MAX as f32;
+        let route = path::route(
+            line.path,
+            Vec2::from(l.from),
+            Vec2::from(l.to),
+            l.edge.map(Vec2::from),
+            if phase < 0.5 { 1.0 } else { -1.0 },
+        );
+        let look = match line.look {
+            LineLook::Clamped => link::LOOK_CLAMPED,
+            LineLook::Plated => link::LOOK_PLATED,
+        };
+        let mut flags = extra | look << link::LOOK_SHIFT;
         if l.bound {
             flags |= link::BOUND;
         }
+        if route.turns {
+            flags |= link::TURNS;
+        }
         let rgb = match l.resource {
             Resource::Mass => tone::MASS,
-            Resource::Energy => srgb_word(blueprints.power_color(l.provider_blueprint)),
+            Resource::Energy => srgb_word(line.color),
         };
         LinkInstance {
-            provider_at: l.from,
-            consumer_at: l.to,
+            points: route.points,
+            count: route.count,
+            length: route.length,
             start,
             flags,
             rgb,
-            phase: (l.provider.wrapping_mul(7919) ^ l.consumer.wrapping_mul(104_729)) as f32
-                / u32::MAX as f32,
+            phase,
         }
     }
 }

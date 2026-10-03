@@ -153,9 +153,8 @@ pub(crate) struct Faction {
     pub plating_color: [f32; 3],
     pub accent_color: [f32; 3],
     pub highlight_color: [f32; 3],
-    /// The light of its power lines: the energy conduits between buildings that save
-    /// each other upkeep. Linear RGB.
-    pub power_color: [f32; 3],
+    /// Its adjacency conduits: the lines between buildings that save each other upkeep.
+    pub power_line: PowerLine,
     /// The faction's shield fields. Pale cyan when left out.
     #[serde(default = "default_shield_color")]
     pub shield_color: [f32; 3],
@@ -208,6 +207,41 @@ pub enum AntiMissileLook {
     /// The Gravitic Counter-seeker: a small red charge thrown off the mount that runs the
     /// missile down and bursts on it, hard and short (the Regency).
     CounterSeeker,
+}
+
+/// How a faction's adjacency conduits run and look (mc-render `adjacency_links`): one line
+/// per link from the provider's lot centre to the neighbour's. Presentation only.
+#[derive(Clone, Copy, PartialEq, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PowerLine {
+    /// The light of an energy line (a materials line is lit in the interface's materials
+    /// colour). Linear RGB.
+    pub color: [f32; 3],
+    pub path: LinePath,
+    pub look: LineLook,
+}
+
+/// The way a conduit runs between two buildings.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
+pub enum LinePath {
+    /// Square runs along the lot axes: out of the provider across the seam, a turn along
+    /// it where the two are not in line, and across again into the neighbour.
+    Straight,
+    /// One smooth arc bowed to the side, from centre to centre.
+    Curve,
+    /// Runs along the lot axes and at 45 degrees between them, turning only at 45.
+    Diagonal,
+}
+
+/// What the conduit is made of, and what stands along it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
+pub enum LineLook {
+    /// An armoured cable pinned down by steel clamps at intervals, a junction box at
+    /// each turn (ARC).
+    Clamped,
+    /// A cable under lapped dark plates with lit seams, running between low faceted
+    /// field nodes (the Regency).
+    Plated,
 }
 
 /// The lamps a faction's structures carry at night when their data names none
