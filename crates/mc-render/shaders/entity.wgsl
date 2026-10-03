@@ -1619,9 +1619,10 @@ fn vs_main(in: VsIn) -> VsOut {
         p = posed[0];
         n = posed[1];
     } else if (model.icon & 0x2000000u) != 0u && in.part == 7u {
-        // Courier stern bay plug doors, and the skylight leaves over the bay, slide into its shoulders.
+        // Courier stern doors slide as rigid leaves, including their centre-seam vertices.
         let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
-        p.y += sign(p.y) * open * 14.2;
+        let side = select(1.0, -1.0, (in.rig & HOLD_DOOR_RIGHT) != 0u);
+        p.y += side * open * HOLD_DOOR_TRAVEL;
     } else if model.capital[6].w != 0.0 && in.part == 16u {
         // A lift ship's belly ramp, authored lying on the ground; it swings up about
         // its hinge at the back of the hold floor to close (`CapitalRig::ramp`,

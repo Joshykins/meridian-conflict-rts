@@ -69,6 +69,13 @@ impl Literal for f32 {
 }
 
 shared! {
+    /// Courier stern door leaves: the side is attached to the whole leaf, including
+    /// vertices on its centre seam. Only used on `part::HOLD_DOOR`.
+    pub mod hold_door as "HOLD_DOOR_" {
+        pub const RIGHT: u32 = 1;
+        pub const TRAVEL: f32 = 14.2;
+    }
+
     /// A player slot as the GPU sees it: the low bits of `UnitInstance::owner_flags`, of a
     /// structure pad's word (`pad`), a shield's `packed` and a strategic missile's word, and
     /// the index into `Globals::team_colors`. Slots run `0..mc_core::MAX_PLAYERS`, which must

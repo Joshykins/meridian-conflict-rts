@@ -5,8 +5,7 @@
 //! tunnel (|y| < 14, z 0..26) runs from the stern doors (x -42) to the forward bulkhead
 //! (x 24) and nothing of the hull stands inside it; the two plug doors (`part::HOLD_DOOR`)
 //! slide 14.2 m sideways into the shoulders with `deploy` (`entity.wgsl`, icon bit
-//! 0x2000000), and so do the two skylight leaves over the tunnel's aft end, so units
-//! walking in and out show from above. Drive mouths are `NOZZLES`, belly lift jets `LIFT_JETS`; the lamp
+//! 0x2000000). A fixed roof covers the bay. Drive mouths are `NOZZLES`, belly lift jets `LIFT_JETS`; the lamp
 //! fittings modelled on the hull are the `LAMPS` table.
 use super::capital::{self, CapitalRig};
 use super::*;
@@ -126,7 +125,7 @@ fn octagon(x: f32, y: f32, z: f32, r: f32, cut: f32) -> Vec<Vec3> {
     .collect()
 }
 
-/// Where the fixed roof ends: aft of it the roof is the skylight's two leaves.
+/// Where the raised forward roof meets the lower fixed aft roof.
 const OPEN_X: f32 = -16.0;
 
 pub(super) fn build(b: &mut MeshBuilder) {
@@ -165,40 +164,21 @@ pub(super) fn build(b: &mut MeshBuilder) {
     stern(b);
     lamps(b);
     doors(b);
-    skylight(b);
+    aft_roof(b);
 }
 
-/// The aft roof, `OPEN_X` back to the doors: two leaves meeting on the centre line that
-/// slide out into the shoulders' crowns as the doors open (`part::HOLD_DOOR`, the doors'
-/// own move), so the units walking in and out can be seen from above.
-fn skylight(b: &mut MeshBuilder) {
+/// Fixed aft roof over the cargo bay, with no opening hatch or moving leaves.
+fn aft_roof(b: &mut MeshBuilder) {
     let (x0, x1) = (DOOR_X - 2.5, OPEN_X);
-    b.with_part(part::HOLD_DOOR, |b| {
-        b.mirror_y(|b| {
-            b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
-            b.block(v3(x0, 0.1, CEILING), v3(x1, BAY, CEILING + 3.0));
-            if b.mid() {
-                b.paint(PLATING).pattern(pattern::WARSHIP);
-                b.block(
-                    v3(x0 + 1.5, 1.2, CEILING + 3.0),
-                    v3(x1 - 1.5, BAY - 1.2, CEILING + 3.2),
-                );
-                b.paint(GLOW_AMBER);
-                b.cuboid(
-                    v3((x0 + x1) * 0.5, 0.3, CEILING + 3.1),
-                    v3(x1 - x0 - 2.0, 0.3, 0.2),
-                );
-            }
-            if b.fine() {
-                b.paint(ACCENT);
-                for x in [-36.0, -28.0, -20.0] {
-                    b.cuboid(v3(x, 7.0, CEILING + 3.3), v3(0.8, 10.0, 0.3));
-                }
-                b.paint(TEAM);
-                b.cuboid(v3(-40.0, 9.0, CEILING + 3.3), v3(3.0, 3.0, 0.25));
-            }
-        });
-    });
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
+    b.block(v3(x0, -BAY, CEILING), v3(x1, BAY, CEILING + 3.0));
+    if b.mid() {
+        b.paint(PLATING).pattern(pattern::WARSHIP);
+        b.block(
+            v3(x0 + 1.5, -BAY + 1.2, CEILING + 3.0),
+            v3(x1 - 1.5, BAY - 1.2, CEILING + 3.2),
+        );
+    }
 }
 
 /// The two shoulders the bay runs between: dark hull, pale armour brows along their
@@ -379,7 +359,7 @@ fn bay(b: &mut MeshBuilder) {
         v3((DOOR_X - 1.0 + BULKHEAD_X) * 0.5, 0.0, 0.04),
         v3(BULKHEAD_X - DOOR_X + 1.0, BAY * 2.0, 0.08),
     );
-    // Roof over the bay forward of the skylight (`OPEN_X`); the dorsal sits on it.
+    // Raised forward roof over the bay; the dorsal sits on it.
     b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(3.75, 0.0, CEILING),
@@ -619,8 +599,8 @@ fn prow(b: &mut MeshBuilder) {
 /// mast with a turning radar bar (`part::SPINNER`), sensor domes and the owner's panel.
 fn dorsal(b: &mut MeshBuilder) {
     let roof = CEILING + 6.6;
-    // The spine ends where the skylight starts; the radiators and sensor domes stand
-    // out on the shoulders, clear of the leaves.
+    // The spine ends at the lower aft roof; radiators and sensor domes stand
+    // out on the shoulders.
     let (spine_x, spine_len) = (0.0, 26.0);
     b.paint(PLATING).pattern(pattern::WARSHIP);
     b.frustum_open(
@@ -949,31 +929,67 @@ fn lamps(b: &mut MeshBuilder) {
 /// The stern plug doors slide sideways into the shoulders (`part::HOLD_DOOR`). No ramp.
 fn doors(b: &mut MeshBuilder) {
     b.with_part(part::HOLD_DOOR, |b| {
-        b.mirror_y(|b| {
-            b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
-            b.cuboid(v3(DOOR_X + 0.5, 7.0, 13.0), v3(1.0, 14.0, 26.0));
-            if b.mid() {
-                // Pale pressure plate with a raised frame, lit seam at the meeting edge.
-                b.paint(PLATING).pattern(pattern::WARSHIP);
-                b.chamfered_box(v3(DOOR_X - 0.2, 7.2, 13.0), v3(0.4, 12.2, 23.0), 0.6);
-                b.paint(GLOW_AMBER);
-                b.cuboid(v3(DOOR_X - 0.1, 0.25, 13.0), v3(0.2, 0.3, 24.0));
-            }
-            if b.fine() {
-                b.paint(ACCENT);
-                for z in [6.0, 13.0, 20.0] {
-                    b.cuboid(v3(DOOR_X - 0.5, 7.2, z), v3(0.25, 10.0, 1.0));
-                }
-                b.paint(TEAM);
-                b.cuboid(v3(DOOR_X - 0.5, 10.5, 24.0), v3(0.2, 4.0, 0.6));
-            }
-        });
+        for side in [0, crate::gpu_consts::hold_door::RIGHT] {
+            let scale = if side == 0 { 1.0 } else { -1.0 };
+            b.with(Affine3A::from_scale(v3(1.0, scale, 1.0)), |b| {
+                b.with_limb(side, |b| {
+                    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
+                    b.cuboid(v3(DOOR_X + 0.5, 7.0, 13.0), v3(1.0, 14.0, 26.0));
+                    if b.mid() {
+                        // Pale pressure plate with a raised frame, lit seam at the meeting edge.
+                        b.paint(PLATING).pattern(pattern::WARSHIP);
+                        b.chamfered_box(v3(DOOR_X - 0.2, 7.2, 13.0), v3(0.4, 12.2, 23.0), 0.6);
+                        b.paint(GLOW_AMBER);
+                        b.cuboid(v3(DOOR_X - 0.1, 0.25, 13.0), v3(0.2, 0.3, 24.0));
+                    }
+                    if b.fine() {
+                        b.paint(ACCENT);
+                        for z in [6.0, 13.0, 20.0] {
+                            b.cuboid(v3(DOOR_X - 0.5, 7.2, z), v3(0.25, 10.0, 1.0));
+                        }
+                        b.paint(TEAM);
+                        b.cuboid(v3(DOOR_X - 0.5, 10.5, 24.0), v3(0.2, 4.0, 0.6));
+                    }
+                })
+            });
+        }
     });
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{build_model_fitted, part};
+
+    #[test]
+    fn open_stern_door_triangles_clear_the_entire_portal() {
+        use crate::gpu_consts::hold_door::{RIGHT, TRAVEL};
+        let model = build_model_fitted("light_transport", 58.0, 38.0, 1, &[]).unwrap();
+        // Check faces, including the centre-seam vertices which used to stay at y=0
+        // while the outside edges moved, stretching a sheet across the opening.
+        for lod in &model.lods[..2] {
+            let mut leaves = [false; 2];
+            for face in lod.indices.as_chunks::<3>().0 {
+                let verts = face.map(|i| &lod.vertices[i as usize]);
+                if verts[0].part != part::HOLD_DOOR {
+                    continue;
+                }
+                let right = verts[0].rig & RIGHT != 0;
+                leaves[usize::from(right)] = true;
+                let side = if right { -1.0 } else { 1.0 };
+                for v in verts {
+                    assert_eq!(v.rig & RIGHT != 0, right, "door face spans two leaves");
+                    let open_y = v.pos[1] + side * TRAVEL;
+                    assert!(
+                        open_y * side >= super::BAY,
+                        "door blocks portal: {:?}",
+                        v.pos
+                    );
+                }
+            }
+            assert!(leaves.into_iter().all(|present| present));
+        }
+    }
+
     #[test]
     fn courier_has_enclosed_commander_bay_no_weapons_or_ramp_and_bounded_lods() {
         let model = build_model_fitted("light_transport", 58.0, 38.0, 1, &[]).unwrap();
@@ -1004,14 +1020,16 @@ mod tests {
                 );
             }
         }
-        // The skylight: sliding leaves over the aft of the tunnel, the doors' part.
+        // The roof stays fixed when the rear doors open.
+        assert!(model.lods[0].vertices.iter().any(|v| v.part == part::HULL
+            && v.pos[2] >= super::CEILING
+            && v.pos[0] < super::OPEN_X
+            && v.pos[1].abs() <= super::BAY));
         assert!(model.lods[0]
             .vertices
             .iter()
-            .any(|v| v.part == part::HOLD_DOOR
-                && v.pos[2] > 26.0
-                && v.pos[0] < super::OPEN_X
-                && v.pos[1].abs() < 2.0));
+            .filter(|v| v.part == part::HOLD_DOOR)
+            .all(|v| v.pos[2] <= 26.0));
         // Nothing hangs under the ground it lands on.
         assert!(model.lods[0].vertices.iter().all(|v| v.pos[2] >= -0.61));
     }
