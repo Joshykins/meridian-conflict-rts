@@ -228,6 +228,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Interceptor, strike drone, torpedo bomber, reclaim carrier (T2) | Pilum, Voulge, Trident, Winnow |
 | Mine | Excavator (II, III), Deep Excavator |
 | Power | Power Generator (II, III) |
+| Material fabricator | Condenser (II, III) |
 | Storage | Reliquary |
 | Point defence T1 / T2 / T3 | Picket / Halberd / Sunspear |
 | Anti-air, radar, wall | Canopy, Orrery (II, III), Palisade |

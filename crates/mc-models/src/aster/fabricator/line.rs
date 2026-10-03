@@ -78,7 +78,7 @@ pub(in crate::aster) fn line_plant(b: &mut MeshBuilder, tech: u8) {
     });
 
     // ---- Tech 3: the portal, a third stage under its crown, more coils and banks.
-    kit(b, tech, 3, 0.1, |b| portal(b));
+    kit(b, tech, 3, 0.1, portal);
     kit(b, tech, 3, 0.35, |b| {
         let (r, z0, z1) = STAGES[2];
         vessel(b, centre(), r, z0, z1);
