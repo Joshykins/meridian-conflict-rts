@@ -70,6 +70,7 @@ mod impact_craters;
 mod impact_fx;
 mod laser_fx;
 mod launch_fx;
+pub(crate) mod lens_flare;
 mod lift_fx;
 mod map_look;
 mod mine_fx;
@@ -877,6 +878,8 @@ pub struct Renderer {
     ground_melt: ground_melt::GroundMelt,
     /// Hot air shimmering over running engines' exhausts (renderer/heat_haze.rs, screen set 8).
     heat_haze: heat_haze::HeatHaze,
+    /// Lens flares on bright points (renderer/lens_flare.rs, screen set 9).
+    lens_flares: lens_flare::LensFlares,
     /// Red plasma under the bells of craft on gravity lift (renderer/lift_fx.rs).
     lift_fx: lift_fx::LiftFx,
     /// Arcs on running reactors, and reactors going up (renderer/reactor_fx.rs).
@@ -1931,7 +1934,7 @@ impl Renderer {
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: 124,
+                descriptor_count: 140,
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::SAMPLED_IMAGE,
@@ -2179,6 +2182,7 @@ impl Renderer {
             .map(|(e, d)| if d.is_some() { e.clone() } else { Vec::new() })
             .collect();
         let heat_haze = heat_haze::HeatHaze::new(&gpu, exhaust_models)?;
+        let lens_flares = lens_flare::LensFlares::new(&gpu)?;
         write_buffers(
             scene_set,
             29,
@@ -2225,6 +2229,12 @@ impl Renderer {
                 8,
                 vk::DescriptorType::STORAGE_BUFFER,
                 &[heat_haze.buffer()],
+            );
+            write_buffers(
+                *set,
+                9,
+                vk::DescriptorType::STORAGE_BUFFER,
+                &[lens_flares.buffer()],
             );
         }
 
@@ -2370,6 +2380,7 @@ impl Renderer {
             craters,
             ground_melt,
             heat_haze,
+            lens_flares,
             lift_fx: lift_fx::LiftFx::new(lift_models),
             reactor_fx: reactor_fx::ReactorFx::new(discharge_models, plant_vents),
             capital_fx: capital_fx::CapitalFx::default(),
@@ -5488,6 +5499,7 @@ impl Drop for Renderer {
         self.craters.destroy(&self.gpu);
         self.ground_melt.destroy(&self.gpu);
         self.heat_haze.destroy(&self.gpu);
+        self.lens_flares.destroy(&self.gpu);
         self.cull.destroy(&self.gpu);
         self.pipelines.destroy(&self.gpu);
         self.layouts.destroy(&self.gpu);

@@ -913,6 +913,12 @@ shared! {
         pub const MAX_PX: f32 = 4.0;
     }
 
+    /// Lens flares on bright points (renderer/lens_flare.rs, screen.wgsl `lens_flare`).
+    pub mod lens as "LENS_" {
+        /// Flares handed to the tone map at most: the strongest.
+        pub const MAX_FLARES: u32 = 32;
+    }
+
     /// A cone weapon's wake (renderer/wake_shell.rs, wake_shell.wgsl), drawn as two meshes
     /// bent in the vertex shader, one instance of each a wake rolling out: the front, a
     /// rolling crest arched over the fan, and the trail it leaves, a shell from the muzzle

@@ -359,6 +359,8 @@ impl Renderer {
             self.heat_haze
                 .upload(input.time, input.alpha.clamp(0.0, 1.0), camera);
             self.upload_wake_shells(input.time);
+            self.held_laser_glints(input.time);
+            self.lens_flares.upload(input.time, camera);
             self.upload_lights(input.time, input.alpha.clamp(0.0, 1.0), camera);
         }
         // Recording, submitting and presenting, to the end of the frame.

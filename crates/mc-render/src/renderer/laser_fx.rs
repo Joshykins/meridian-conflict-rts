@@ -3,8 +3,11 @@
 //! The emitter's head flares red while it holds, the casing glows white-hot where the
 //! beam bites and throws sparks back along it, and when the casing fails the round
 //! goes up red: a red flash, a red glowing ball, red embers, a little smoke.
+//! The beam's bite glints in the camera's glass (`lens_flare`): a hard star where it
+//! first strikes, a smaller one flickering while it burns, a big one when the round goes.
 //! Built to read at strategic zoom: the beam never thins below a few pixels.
 
+use super::lens_flare::Flare;
 use super::{blast_fx, FadeBeam, Renderer, PUFF_SMOKE, PUFF_SPARK};
 use crate::gpu_consts::puff;
 use glam::Vec3;
@@ -15,6 +18,23 @@ const PUFF_INTERCEPT: f32 = puff::INTERCEPT as f32;
 
 /// A held beam's thickness in the world, metres.
 const BEAM_WIDTH: f32 = 0.6;
+
+/// The glint where a beam first strikes, while it burns, and when the round goes up.
+const STRIKE_GLINT: Flare = Flare {
+    color: Vec3::new(9.0, 3.4, 2.6),
+    size: 30.0,
+    ghosts: 0.6,
+};
+const BURN_GLINT: Flare = Flare {
+    color: Vec3::new(3.2, 1.3, 1.0),
+    size: 16.0,
+    ghosts: 0.0,
+};
+const KILL_GLINT: Flare = Flare {
+    color: Vec3::new(14.0, 4.4, 2.6),
+    size: 46.0,
+    ghosts: 1.0,
+};
 
 /// An anti-missile laser held on a missile (`SimEvent::MissileLased` each tick it burns):
 /// one steady beam from its emitter that follows the missile between ticks, not a flash
@@ -28,6 +48,8 @@ pub(super) struct HeldLaser {
     last: f32,
     /// When the missile went up; the beam cuts just after.
     killed: Option<f32>,
+    /// Sets each beam's glint flicker apart.
+    seed: f32,
 }
 
 impl Renderer {
@@ -63,7 +85,10 @@ impl Renderer {
                     to: at,
                     last: time,
                     killed: killed.then_some(time),
+                    seed: self.scatter.unit() * 40.0,
                 });
+                self.lens_flares
+                    .flash(at, Vec3::ZERO, STRIKE_GLINT, time, 0.28);
                 (Vec3::ZERO, true)
             }
         };
@@ -104,6 +129,7 @@ impl Renderer {
     /// red, red embers thrown out and falling, and a little dark smoke left hanging.
     fn missile_killed(&mut self, at: Vec3, motion: Vec3, time: f32) {
         let carry = motion * 0.35;
+        self.lens_flares.flash(at, carry, KILL_GLINT, time, 0.4);
         self.push_effect(at.to_array(), time, 5.0, 0.1, 8.0, 0.0);
         self.push_effect(at.to_array(), time, 12.0, 0.18, 8.0, 0.0);
         self.push_shockwave(at.to_array(), time, 22.0, 0.34, 0.7, 1.0, Vec3::ZERO);
@@ -162,6 +188,26 @@ impl Renderer {
                 1.8,
                 (1.4, 4.0),
             );
+        }
+    }
+
+    /// The glint where each held beam burns, for this frame: flickering as the casing
+    /// spits, carried along with the round between ticks.
+    pub(super) fn held_laser_glints(&mut self, time: f32) {
+        let tick = self.tick_seconds.max(0.02);
+        for l in &self.held_lasers {
+            if l.killed.is_some() || time > l.last + tick * 1.6 {
+                continue;
+            }
+            let lead = ((time - l.last) / tick).clamp(0.0, 1.5);
+            let at = l.to + (l.to - l.prev_to) * lead;
+            let t = time * 23.0 + l.seed;
+            let flicker = 0.7 + 0.3 * (t.sin() * (t * 1.7).sin());
+            let glint = Flare {
+                color: BURN_GLINT.color * flicker,
+                ..BURN_GLINT
+            };
+            self.lens_flares.shine(at, glint);
         }
     }
 

@@ -551,6 +551,7 @@ impl Layouts {
                 (6, T::STORAGE_BUFFER),
                 (7, T::SAMPLED_IMAGE),
                 (8, T::STORAGE_BUFFER),
+                (9, T::STORAGE_BUFFER),
             ],
             gfx,
         )?;
