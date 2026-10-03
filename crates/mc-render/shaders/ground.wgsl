@@ -225,8 +225,8 @@ fn fs_ore(in: StainOut) -> @location(0) vec4<f32> {
         return vec4<f32>(apply_haze(col, in.world, eye), a);
     }
 
-    // Highlighted: the field turns to thin glass over the ore, which the
-    // vein geometry (fs_vein) shows underneath; a faint hatch drifts across it.
+    // Highlighted (a mine is being placed): the field lights up as a mine
+    // point, a faint hatch drifting across it.
     let inside = 1.0 - smoothstep(-aa, aa, sd);
     let hatch_w = mix(4.0, 40.0, far);
     let hatch = smoothstep(0.82, 1.0, sin((p.x + p.y) / hatch_w * 3.14159 + globals.camera.w * 1.5) * 0.5 + 0.5);
@@ -703,60 +703,6 @@ fn fs_track(in: TrackOut) -> @location(0) vec4<f32> {
     }
     let earth = apply_fog_of_war(vec3<f32>(0.05, 0.04, 0.03), in.world.xy);
     return vec4<f32>(apply_haze(earth, in.world, globals.camera.xyz), alpha);
-}
-
-// ---- Ore veins -------------------------------------------------------------
-// The ore under each field as solid tubes and nodules deep underground
-// (renderer::ore_vein_mesh). Positions are xy in metres and z metres below the
-// surface; the vertex shader hangs them under the terrain. Drawn additively
-// with no depth test, only while the mine survey is up: the ground turns to
-// glass and the deposits glow through it in the materials red-orange.
-
-struct VeinPush {
-    // 0..1: the survey highlight; time in seconds.
-    highlight: f32,
-    time: f32,
-}
-
-var<immediate> vein_push: VeinPush;
-
-struct VeinOut {
-    @builtin(position) clip: vec4<f32>,
-    @location(0) world: vec3<f32>,
-    @location(1) normal: vec3<f32>,
-    @location(2) depth: f32,
-}
-
-@vertex
-fn vs_vein(@location(0) pos: vec3<f32>, @location(1) normal: vec3<f32>) -> VeinOut {
-    let world = vec3<f32>(pos.xy, terrain_height(pos.xy) + pos.z);
-    var out: VeinOut;
-    out.clip = globals.view_proj * vec4<f32>(world, 1.0);
-    out.world = world;
-    out.normal = normal;
-    out.depth = -pos.z;
-    return out;
-}
-
-@fragment
-fn fs_vein(in: VeinOut) -> @location(0) vec4<f32> {
-    let hi = clamp(vein_push.highlight, 0.0, 1.0);
-    if hi < 0.01 {
-        discard;
-    }
-    let n = normalize(in.normal);
-    let v = normalize(globals.camera.xyz - in.world);
-    let sun = max(dot(n, globals.sun.xyz), 0.0);
-    // Round: lit side, dark side, and a bright rim where the tube turns away.
-    let rim = pow(1.0 - abs(dot(n, v)), 2.2);
-    let ore = vec3<f32>(1.0, 0.147, 0.047);
-    // Ore glinting in bands that drift through the rock.
-    let band = 0.5 + 0.5 * sin(in.world.x * 0.07 + in.world.y * 0.05 + in.depth * 0.11 - vein_push.time * 1.6);
-    let body = ore * (0.18 + 0.55 * sun + 0.25 * band);
-    let glow = ore * rim * 1.6 + vec3<f32>(1.0, 0.7, 0.5) * pow(rim, 6.0) * 0.6;
-    // The deeper, the dimmer, so depth reads.
-    let fade = clamp(1.25 - in.depth / 500.0, 0.35, 1.0);
-    return vec4<f32>((body + glow) * fade * hi * 2.2, 0.0);
 }
 
 // ---- A Regency lot (`PAD_NANITE`) --------------------------------------------------------

@@ -7,7 +7,7 @@
 
 use mc_core::FxVec2;
 use mc_data::Blueprints;
-use mc_sim::mines::{mine_points, point_blueprint};
+use mc_sim::placement::SiteMap;
 use std::path::Path;
 
 #[test]
@@ -15,7 +15,6 @@ use std::path::Path;
 fn probe() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let bps = Blueprints::load(&root.join("data")).unwrap();
-    let bp = point_blueprint(&bps).unwrap();
     let mut maps: Vec<_> = std::fs::read_dir(root.join("maps"))
         .unwrap()
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -24,8 +23,8 @@ fn probe() {
     maps.sort();
     for path in maps {
         let map = mc_map::MapFile::open(&path).unwrap();
-        let ground = mc_map::Heightfield::load(&map).unwrap();
-        let points = mine_points(&ground, map.props(), map.ore_regions(), bp);
+        let sites = SiteMap::for_map(&map, &bps).unwrap();
+        let points = sites.mine_points();
         let near = |s: FxVec2, r: i32| {
             points
                 .iter()

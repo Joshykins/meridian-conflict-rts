@@ -1108,23 +1108,6 @@ impl Renderer {
             }
 
             self.timers.end(&device, cmd);
-            // Ore veins glow through the ground, and through trees and units,
-            // while the mine survey is up.
-            self.timers.draws(&device, cmd, "scene.veins");
-            if self.vein_count > 0 && self.ore_highlight > 0.01 {
-                // Set 0 (scene) is bound already; the veins read nothing else.
-                device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.vein);
-                device.cmd_bind_vertex_buffers(cmd, 0, &[self.vein_vb.buffer], &[0]);
-                device.cmd_push_constants(
-                    cmd,
-                    self.layouts.scene,
-                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                    0,
-                    bytemuck::bytes_of(&[self.ore_highlight, self.vein_time]),
-                );
-                device.cmd_draw(cmd, self.vein_count, 1, 0, 0);
-            }
-            self.timers.end(&device, cmd);
             // Light shafts: the haze's sunlight taken back where the air is shadowed
             // (shafts.wgsl), before the clouds cover the far view.
             if self.shafts.enabled {

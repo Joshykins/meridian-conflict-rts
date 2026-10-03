@@ -107,8 +107,6 @@ pub struct Pipelines {
     pub hull_shield_depth: vk::Pipeline,
     pub stain: vk::Pipeline,
     pub deposit: vk::Pipeline,
-    /// Ore veins underground, glowing through the ground during the mine survey.
-    pub vein: vk::Pipeline,
     pub pad: vk::Pipeline,
     pub water: vk::Pipeline,
     pub icon: vk::Pipeline,
@@ -1056,15 +1054,6 @@ impl Pipelines {
                 Depth::Test,
                 none,
             )?,
-            vein: scene(
-                ground,
-                c"vs_vein",
-                c"fs_vein",
-                VertexKind::Mesh,
-                Blend::Additive,
-                Depth::Off,
-                none,
-            )?,
             pad: scene(
                 ground,
                 c"vs_pad",
@@ -1292,7 +1281,6 @@ impl Pipelines {
                 self.hull_shield_depth,
                 self.stain,
                 self.deposit,
-                self.vein,
                 self.pad,
                 self.water,
                 self.icon,
