@@ -267,7 +267,7 @@ fn plate_on(
 fn belly(b: &mut MeshBuilder) {
     for port in LIFT_JETS {
         let p = Vec3::from(port);
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.frustum(
             p + Vec3::Z * 0.8,
             v2(16.0, 15.0),
@@ -297,7 +297,7 @@ fn casemate(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, face: f32) {
     };
     let hole = v2(DRUM_R + 0.8, DRUM_H + 0.8);
     let rim = v2(DRUM_R + 5.0, DRUM_H + 4.0);
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &[
             frame(face - 1.5, hole, 2.0),
@@ -310,7 +310,7 @@ fn casemate(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, face: f32) {
         false,
     );
     // The hood over the drum, raked down and out.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     let top = pivot.z + DRUM_H + 1.4;
     b.loft(
         &[
@@ -333,7 +333,7 @@ fn casemate(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, face: f32) {
     b.with_house(weapon, pivot, 1.8, |b| {
         b.at(pivot, |b| {
             let plan = octagon(DRUM_R);
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             b.loft_z(
                 &plan,
                 &[
@@ -346,7 +346,7 @@ fn casemate(b: &mut MeshBuilder, weapon: usize, pivot: Vec3, face: f32) {
             b.paint(ACCENT).pattern(pattern::PLAIN);
             b.loft_z(&plan, &[Section::new(-0.7, 1.03), Section::new(0.7, 1.03)]);
             b.with_recoil(|b| {
-                b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+                b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
                 b.chamfered_box(v3(6.0, 0.0, 0.0), v3(8.0, 5.6, 11.6), 1.6);
                 for dz in [-CASEMATE_STACK, CASEMATE_STACK] {
                     siege_howitzer(b, v3(0.0, 0.0, dz), v3(CASEMATE_REACH, 0.0, dz), CASEMATE_R);
@@ -387,7 +387,7 @@ fn rifle_house(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
             let plan = rifle_plan();
             b.paint(ACCENT).pattern(pattern::PLAIN);
             b.prism(v3(0.0, 0.0, -5.2), b.sides(10), 6.6, 6.6, 1.0);
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             b.loft_z(
                 &plan,
                 &[
@@ -429,7 +429,7 @@ fn rifle_pedestal(b: &mut MeshBuilder, pivot: [f32; 3], foot: f32) {
     let plan = chamfered_rect(v2(13.0, 11.0), 4.0);
     let deck = pivot[2] - RIFLE_RAISE;
     b.at(v3(pivot[0], pivot[1], 0.0), |b| {
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft_z(
             &plan,
             &[Section::new(foot, 1.1), Section::new(deck - 0.6, 1.0)],
@@ -458,7 +458,7 @@ fn sam_cells(b: &mut MeshBuilder, foot: f32) {
         let c = v2(CELL_CENTRE.x, CELL_CENTRE.y * side);
         let plan = chamfered_rect(CELL_BOX, 1.6);
         b.at(c.extend(0.0), |b| {
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             b.loft_z(
                 &plan,
                 &[Section::new(foot, 1.06), Section::new(CELL_DECK - 0.6, 1.0)],
@@ -576,7 +576,7 @@ fn rib(
     };
     let (a, f) = (x - length * 0.5, x + length * 0.5);
     b.mirror_y(|b| {
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(&[ring(a, 0.0, 0.0), ring(f, 0.0, 0.0)], true, true);
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.loft(
@@ -587,7 +587,7 @@ fn rib(
     });
     if b.fine() {
         let crown = over[0][1];
-        b.paint(GLOW).pattern(pattern::PLAIN);
+        b.paint(GLOW_ORANGE).pattern(pattern::PLAIN);
         b.block(
             v3(f + 0.45, -5.0, crown - 1.6),
             v3(f + 0.65, 5.0, crown - 1.2),
@@ -635,7 +635,7 @@ const FLOODS: [[f32; 3]; 4] = [
 /// A shield projector: an armoured drum carrying a pale lens, the hull field thrown from
 /// its face (`set_shield_emitter`).
 fn shield_projector(b: &mut MeshBuilder, at: Vec3) {
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.prism(at - Vec3::Z * 4.0, b.sides(10), 5.2, 4.6, 3.2);
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.prism(at - Vec3::Z * 0.8, b.sides(10), 4.6, 4.0, 0.6);
@@ -677,7 +677,7 @@ fn tier(b: &mut MeshBuilder, x: [f32; 2], half_width: f32, z: [f32; 2], rake: f3
             &plan,
             &[Section::new(z0, 0.96), Section::new(z0 + band, 0.96)],
         );
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         let top = 1.0 - rake / (front - back);
         b.loft_z(
             &plan,

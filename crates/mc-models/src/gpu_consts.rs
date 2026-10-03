@@ -799,6 +799,14 @@ shared! {
         pub const DEEP: f32 = 14.0;
     }
 
+    /// A capital warship's armour (`pattern::WARSHIP`, surface.wgsl): strakes of uneven
+    /// depth cut into plates of uneven length, some carrying hatches, grilles or stencils,
+    /// rows of lit ports along its walls and running lamps at its seams.
+    pub mod warship as "WARSHIP_" {
+        /// `pattern::WARSHIP`.
+        pub const PATTERN: u32 = 36;
+    }
+
     /// Kind bits of a ground stain's `strength_seed` (ground.wgsl `fs_stain`,
     /// grass_gen.wgsl `cs_gather_stains`); neither set is a plain scorch.
     pub mod stain as "STAIN_" {

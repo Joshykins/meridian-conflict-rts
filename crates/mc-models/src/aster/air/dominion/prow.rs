@@ -28,7 +28,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         // Working lamps either side of the top tier's face, and the team's mark on it.
         let rows = &TIERS[2];
         let [x, w, top, _] = lerp_rows(rows, rows[2][0] - 6.0);
-        b.paint(GLOW_LAMP);
+        b.paint(GLOW_ORANGE);
         b.mirror_y(|b| b.cuboid(v3(x, w - 1.0, top - 3.0), v3(2.4, 0.6, 1.0)));
         b.paint(TEAM).pattern(pattern::PLAIN);
         b.block(v3(x - 24.0, -4.0, top - 0.2), v3(x - 18.0, 4.0, top + 0.6));
@@ -73,7 +73,7 @@ const TIERS: [[[f32; 4]; 3]; 3] = [
 fn terrace(b: &mut MeshBuilder) {
     for (k, rows) in TIERS.iter().enumerate() {
         let end = rows[2][0];
-        b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.loft(
             &rows
                 .iter()
@@ -85,7 +85,7 @@ fn terrace(b: &mut MeshBuilder) {
         let at = |x: f32| boxed(lerp_rows(rows, x));
         b.mirror_y(|b| {
             b.paint(if k == 1 { PLATING } else { PLATING_DARK })
-                .pattern(pattern::GENERIC);
+                .pattern(pattern::WARSHIP);
             plate_on(b, &at, [HULL_FORE + 4.0, end - 6.0], 2, 4, [0.2, 0.5], 1.4);
             b.paint(ACCENT).pattern(pattern::PLAIN);
             plate_on(b, &at, [HULL_FORE + 2.0, end - 2.0], 0, 2, [0.6, 0.6], 0.5);

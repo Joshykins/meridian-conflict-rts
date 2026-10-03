@@ -65,6 +65,10 @@ struct SurfaceIn {
     scale: f32,
     // Metres of surface under one pixel.
     px: f32,
+    // How level the face lies: 0 on a wall, 1 on a deck or a belly.
+    up: f32,
+    // How steeply the face's s and t axes climb in the world (0 level, 1 straight up).
+    rise: vec2<f32>,
     time: f32,
     // The unit is at work (a factory building).
     working: f32,
@@ -411,6 +415,263 @@ fn surf_relief_airframe(i: SurfaceIn, st: vec2<f32>, gap: f32) -> f32 {
     return h;
 }
 
+// ---- warship armour ---------------------------------------------------------
+
+// A capital ship's armour (`WARSHIP_PATTERN`). A 500 m hull cut into even courses is a
+// brick wall, so nothing here repeats: the face is laid in strakes of uneven depth, each
+// strake cut into plates of uneven length, and a plate may carry a hatch, a grille or a
+// stencil. Walls carry rows of lit ports in some strakes; running lamps sit at some
+// plates' corners. Its light is a warm orange, ports and lamps alike.
+// Redder than it looks: a bright emitter's green climbs first through the tonemap.
+const WS_LIGHT: vec3<f32> = vec3<f32>(1.0, 0.25, 0.03);
+// The port glass where a port is dark.
+const WS_GLASS: vec3<f32> = vec3<f32>(0.02, 0.022, 0.026);
+
+struct WarshipPlate {
+    // Metres from the plate's middle, along its strake (x) and up it (y), its half size.
+    p: vec2<f32>,
+    half: vec2<f32>,
+    id: f32,
+    // The strake's own random.
+    strake: f32,
+    // Its courses run up the face, not along it (a tall narrow face): no ports.
+    turned: bool,
+}
+
+// Cells of `pitch` along 0..n*pitch joined into runs: cell k's near edge is a seam where its
+// hash clears `breaks`, so runs are one cell to a few long. The run holding `x`: its start,
+// its end, its random.
+fn ws_run(x: f32, n: f32, pitch: f32, salt: f32, breaks: f32) -> vec3<f32> {
+    let c = clamp(floor(x / pitch), 0.0, n - 1.0);
+    var lo = c;
+    for (var j = 0; j < 5; j++) {
+        if lo <= 0.0 || hash21(vec2<f32>(lo, salt)) > breaks {
+            break;
+        }
+        lo -= 1.0;
+    }
+    var hi = c + 1.0;
+    for (var j = 0; j < 5; j++) {
+        if hi >= n || hash21(vec2<f32>(hi, salt)) > breaks {
+            break;
+        }
+        hi += 1.0;
+    }
+    return vec3<f32>(lo * pitch, hi * pitch, hash21(vec2<f32>(lo * 1.37 + 0.5, salt * 0.71 + 3.0)));
+}
+
+fn ws_plate(i: SurfaceIn, st_in: vec2<f32>) -> WarshipPlate {
+    var st = st_in;
+    var half = i.half;
+    let turned = !i.wraps && half.y > half.x * 1.5;
+    if turned {
+        st = st.yx;
+        half = half.yx;
+    }
+    let u = i.scale * 0.8;
+    let rows = surf_fit(2.0 * half.y, u * 0.7);
+    let rh = 2.0 * half.y / rows;
+    let y = st.y + half.y;
+    let salt = floor(i.seed * 251.0);
+    let s = ws_run(y, rows, rh, salt + 0.5, 0.45);
+    let cols = surf_fit(2.0 * half.x, u * 0.85);
+    let cw = 2.0 * half.x / cols;
+    var x = st.x + half.x;
+    if i.wraps {
+        x = x - 2.0 * half.x * floor(x / (2.0 * half.x));
+    }
+    let r = ws_run(x, cols, cw, salt * 7.0 + floor(s.z * 977.0), 0.62);
+    var plate: WarshipPlate;
+    plate.half = vec2<f32>(r.y - r.x, s.y - s.x) * 0.5;
+    plate.p = vec2<f32>(x - (r.x + r.y) * 0.5, y - (s.x + s.y) * 0.5);
+    plate.id = r.z;
+    plate.strake = s.z;
+    plate.turned = turned;
+    return plate;
+}
+
+// What a plate carries: 0 nothing, 1 a second seam across it, 2 a hatch, 3 a grille,
+// 4 a stencil.
+fn ws_style(i: SurfaceIn, plate: WarshipPlate) -> u32 {
+    let u = i.scale * 0.8;
+    let k = hash11(plate.id * 71.3 + 0.17);
+    if plate.half.x > u * 1.1 && k < 0.3 {
+        return 1u;
+    }
+    if min(plate.half.x, plate.half.y) < u * 0.3 {
+        return 0u;
+    }
+    if k < 0.44 {
+        return 2u;
+    }
+    if k < 0.54 {
+        return 3u;
+    }
+    if k < 0.6 {
+        return 4u;
+    }
+    return 0u;
+}
+
+// The inner rectangle a plate's hatch or grille fills.
+fn ws_inset(plate: WarshipPlate) -> SurfaceCell {
+    var c: SurfaceCell;
+    let off = (hash11(plate.id * 13.0) - 0.5) * plate.half.x * 0.6;
+    c.p = plate.p - vec2<f32>(off, 0.0);
+    c.half = plate.half * vec2<f32>(0.32, 0.55);
+    c.id = plate.id;
+    return c;
+}
+
+// Where the second seam of a style-1 plate falls, from its middle.
+fn ws_split(plate: WarshipPlate) -> f32 {
+    return (hash11(plate.id * 29.0) - 0.5) * plate.half.x * 0.8;
+}
+
+// The ports along a strake of a wall: lit windows in a row, fitted to each plate. x is
+// across a port's middle, y how far inside its outline (positive inside), z its random,
+// w 1 where this plate has ports at all.
+fn ws_ports(i: SurfaceIn, plate: WarshipPlate) -> vec4<f32> {
+    let u = i.scale * 0.8;
+    let wall = 1.0 - smoothstep(0.35, 0.55, i.up);
+    let row = step(0.8, hash11(plate.strake * 41.0 + 0.3)) * step(plate.half.y, u * 1.05);
+    let carry = step(0.45, hash11(plate.id * 5.3 + 0.9)) * step(u * 0.5, plate.half.x);
+    // A row of ports runs level: along the strake, which is the face's s, or t if turned.
+    let level = 1.0 - smoothstep(0.15, 0.3, select(i.rise.x, i.rise.y, plate.turned));
+    let on = wall * row * carry * level;
+    if on <= 0.0 {
+        return vec4<f32>(0.0);
+    }
+    let span = plate.half.x - u * 0.25;
+    let n = surf_fit(2.0 * span, u * 0.3);
+    let pitch = 2.0 * span / n;
+    let k = clamp(floor((plate.p.x + span) / pitch), 0.0, n - 1.0);
+    let q = vec2<f32>(plate.p.x + span - (k + 0.5) * pitch, plate.p.y - plate.half.y * 0.15);
+    let window = vec2<f32>(pitch * 0.2, min(plate.half.y * 0.16, u * 0.07));
+    let inside = select(-1e3, surf_edge(q, window), abs(plate.p.x) < span);
+    return vec4<f32>(q.x, inside, hash21(vec2<f32>(k, plate.id * 113.0)), 1.0);
+}
+
+// A running lamp near one of a plate's lower corners: distance to it, and its random;
+// distance is large where the plate has none.
+fn ws_lamp(i: SurfaceIn, plate: WarshipPlate) -> vec2<f32> {
+    let u = i.scale * 0.8;
+    let k = hash11(plate.id * 3.3 + 0.41);
+    if k < 0.93 || min(plate.half.x, plate.half.y) < u * 0.25 {
+        return vec2<f32>(1e3, 0.0);
+    }
+    let side = select(-1.0, 1.0, k > 0.965);
+    let at = vec2<f32>(side * (plate.half.x - u * 0.16), -plate.half.y + u * 0.16);
+    return vec2<f32>(distance(plate.p, at), k);
+}
+
+fn surf_relief_warship(i: SurfaceIn, st: vec2<f32>, gap: f32, bevel: f32) -> f32 {
+    let plate = ws_plate(i, st);
+    // Strake seams are welded deep; the butts between plates in a strake shallower.
+    let dy = plate.half.y - abs(plate.p.y);
+    let dx = plate.half.x - abs(plate.p.x);
+    var h = 1.0 - 0.75 * (1.0 - smoothstep(gap, gap + bevel, dy));
+    h = min(h, 1.0 - 0.45 * (1.0 - smoothstep(gap * 0.6, gap * 0.6 + bevel * 0.7, dx)));
+    // Plates stand a little proud of one another.
+    h *= 0.9 + 0.1 * plate.id;
+    let style = ws_style(i, plate);
+    if style == 1u {
+        h = min(h, 1.0 - 0.35 * (1.0 - smoothstep(gap * 0.5, gap * 0.5 + bevel * 0.5, abs(plate.p.x - ws_split(plate)))));
+    } else if style == 2u {
+        let hatch = ws_inset(plate);
+        let e = surf_edge(hatch.p, hatch.half);
+        h -= 0.5 * (1.0 - smoothstep(0.0, gap * 1.4, abs(e))) + 0.12 * step(0.0, e);
+    } else if style == 3u {
+        let bank = ws_inset(plate);
+        let e = surf_edge(bank.p, bank.half);
+        if e > 0.0 {
+            let pitch = 2.0 * bank.half.y / surf_fit(2.0 * bank.half.y, i.scale * 0.09);
+            let f = fract((bank.p.y + bank.half.y) / pitch);
+            h -= 0.6 * (1.0 - f) * smoothstep(0.0, bevel, e);
+        }
+    }
+    let ports = ws_ports(i, plate);
+    h -= 0.4 * ports.w * smoothstep(-gap, gap, ports.y);
+    return h;
+}
+
+// The armour's paint, tone, ports and lamps (`surface_at`'s case).
+fn surf_warship(i: SurfaceIn, st: vec2<f32>, out_in: Surface, scuff: f32, lamp: f32) -> Surface {
+    var out = out_in;
+    let fw = max(i.px, 1e-4);
+    let gap = i.scale * 0.012;
+    let bevel = i.scale * 0.035;
+    let hurt = 1.0 - saturate(i.health);
+    let plate = ws_plate(i, st);
+    let dy = plate.half.y - abs(plate.p.y);
+    let dx = plate.half.x - abs(plate.p.x);
+    out.cavity = 1.0 - 0.6 * surf_band(dy, gap * 1.2, fw) - 0.4 * surf_band(dx, gap * 0.8, fw);
+    // A patchwork: whole strakes a shade apart, plates within them more, and the odd plate
+    // replaced in a fresher or older grey.
+    out.cavity *= 0.92 + 0.12 * plate.strake;
+    out.cavity *= 0.86 + 0.24 * plate.id;
+    let odd = hash11(plate.id * 97.0 + 0.6);
+    out.cavity *= select(1.0, select(0.7, 1.22, odd > 0.96), odd > 0.91);
+    out.rough = (hash11(plate.id * 53.0) - 0.5) * 0.22;
+    let style = ws_style(i, plate);
+    if style == 1u {
+        out.cavity *= 1.0 - 0.45 * surf_band(plate.p.x - ws_split(plate), gap * 0.7, fw);
+    } else if style == 2u {
+        let hatch = ws_inset(plate);
+        out.cavity *= 1.0 - 0.55 * surf_band(surf_edge(hatch.p, hatch.half), gap * 0.9, fw);
+    } else if style == 3u {
+        let bank = ws_inset(plate);
+        let e = surf_edge(bank.p, bank.half);
+        let pitch = 2.0 * bank.half.y / surf_fit(2.0 * bank.half.y, i.scale * 0.09);
+        let f = fract((bank.p.y + bank.half.y) / pitch);
+        out.cavity *= 1.0 - 0.75 * surf_step(e, 0.0, fw) * surf_step(f, 0.5, fw / pitch);
+    } else if style == 4u {
+        // A stencil: a dark label with lines of print.
+        let q = plate.p - vec2<f32>(-plate.half.x * 0.4, plate.half.y * 0.35);
+        let label = vec2<f32>(min(plate.half.x * 0.28, i.scale * 0.6), min(plate.half.y * 0.16, i.scale * 0.12));
+        let inside = surf_step(surf_edge(q, label), 0.0, fw);
+        let pitch = label.y * 0.66;
+        let print = surf_band(fract(q.y / pitch + 0.5) * pitch - pitch * 0.5, pitch * 0.14, fw)
+            * surf_step(surf_edge(q, label * vec2<f32>(0.88, 0.8)), 0.0, fw)
+            * step(0.35, hash11(floor(q.x / (i.scale * 0.06)) + plate.id * 7.0));
+        out.paint = vec4<f32>(mix(vec3<f32>(0.035, 0.035, 0.04), vec3<f32>(0.55), print * 0.45), inside * 0.9);
+    }
+    // Plates are chipped at their seams, worse as the ship is hurt.
+    let chipped = 1.0 - smoothstep(0.0, bevel * (0.7 + 2.0 * hurt), min(dx, dy));
+    out.bare = max(out.bare, chipped * smoothstep(0.8 - 0.5 * hurt, 0.97 - 0.45 * hurt, scuff + chipped * 0.3));
+    // Grime run down the walls from every strake seam, streaked.
+    let wall = 1.0 - smoothstep(0.35, 0.55, i.up);
+    let below = saturate(1.0 - (plate.half.y - plate.p.y) / (plate.half.y * 2.0 + 1e-3));
+    let streak = smoothstep(0.45, 0.85, surf_noise3(vec3<f32>(i.local.x * 0.9, i.local.y * 0.9, i.unit * 5.0 + plate.strake * 11.0)));
+    out.cavity *= 1.0 - 0.18 * wall * streak * below * below;
+
+    // Lights: the ports, then the lamps. A hurt ship's go out one by one, sputtering first.
+    var light = 0.0;
+    let ports = ws_ports(i, plate);
+    if ports.w > 0.0 {
+        let pane = surf_step(ports.y, 0.0, fw);
+        let lit_port = step(0.4, ports.z);
+        out.paint = mix(out.paint, vec4<f32>(WS_GLASS, 1.0), pane);
+        out.rough = mix(out.rough, -0.35, pane);
+        // Each port a little different: some warmer, some dimmer.
+        light += pane * lit_port * (0.55 + 0.45 * hash11(ports.z * 31.0));
+    }
+    let l = ws_lamp(i, plate);
+    let r = i.scale * 0.055;
+    let bulb = 1.0 - surf_step(l.x, r, fw);
+    let housing = 1.0 - surf_step(l.x, r * 1.9, fw);
+    out.paint = mix(out.paint, vec4<f32>(0.02, 0.02, 0.022, 1.0), housing);
+    // The odd lamp blinks, slowly, out of step with its neighbours.
+    let blink = select(1.0, 0.25 + 1.5 * step(0.82, fract(i.time * 0.45 + l.y * 17.0)), l.y > 0.99);
+    light += bulb * 2.0 * blink;
+    let failing = hash11(plate.id * 71.0 + i.unit * 13.0);
+    var alive = 1.0 - smoothstep(failing * 0.9, failing * 0.9 + 0.12, hurt * 1.05);
+    let sputter = step(0.35, hash11(floor(i.time * 9.0 + plate.id * 90.0) * 0.173 + plate.id));
+    alive = max(alive, (1.0 - smoothstep(failing * 0.9 + 0.12, failing * 0.9 + 0.3, hurt)) * sputter);
+    out.emissive = WS_LIGHT * light * alive * lamp * 0.3 * i.lit;
+    return out;
+}
+
 // ---- precursor plate --------------------------------------------------------
 
 // Where a fragment sits in a Precursor face's cut. The face is divided along its long
@@ -568,6 +829,11 @@ fn surf_relief(i: SurfaceIn, st: vec2<f32>) -> f32 {
             h = min(h, 0.55 + 0.45 * surf_rise(d, 0.03, 0.12));
         }
         case 11u: {}
+        case WARSHIP_PATTERN: {
+            if small > i.scale * 0.3 {
+                h = min(h, surf_relief_warship(i, st, gap, bevel));
+            }
+        }
         // A hull's facets are one skin: no outline where two meet. Its seams are paint.
         case 12u: { h = 1.0; }
         case 13u: {
@@ -974,6 +1240,13 @@ fn surface_at(i: SurfaceIn) -> Surface {
                 out.paint = mix(out.paint, vec4<f32>(growth, 1.0), weed * (0.75 + 0.25 * rusty));
                 out.rough = -0.35 * wet * (1.0 - weed) + 0.3 * weed;
                 out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
+            }
+            case WARSHIP_PATTERN: {
+                if small > i.scale * 0.3 {
+                    out = surf_warship(i, st, out, scuff, lamp);
+                } else {
+                    out.cavity = 1.0 - 0.3 * surf_band(d_face, gap * 0.8, fw) * outlined;
+                }
             }
             case 11u: {
                 // Safety stripes, black on safety orange, raked at 45 degrees and fitted to

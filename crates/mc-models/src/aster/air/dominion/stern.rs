@@ -47,7 +47,7 @@ fn transom(b: &mut MeshBuilder) {
     let fine = b.fine();
     let face = STERN;
     // The ledges, the lower broader and deeper.
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &[
             vec![
@@ -66,7 +66,7 @@ fn transom(b: &mut MeshBuilder) {
         true,
         true,
     );
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             vec![
@@ -93,7 +93,7 @@ fn transom(b: &mut MeshBuilder) {
     // The centre hatch in a heavy frame.
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.block(v3(face - 1.0, -10.0, 73.0), v3(face + 1.0, 10.0, 84.0));
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.block(v3(face - 1.6, -8.0, 74.0), v3(face + 0.5, 8.0, 83.0));
     // Louvred vents in the bays either side of the hatch.
     b.mirror_y(|b| {
@@ -139,7 +139,7 @@ fn main_pod(b: &mut MeshBuilder) {
             .map(|p| v3(x, c.x + p[0], c.y + p[1]))
             .collect::<Vec<_>>()
     };
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             ring(POD_AFT, 0.88),
@@ -151,7 +151,7 @@ fn main_pod(b: &mut MeshBuilder) {
         true,
     );
     // Armour courses on the pod: a light belt round its middle, dark bands at its ends.
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(&[ring(-214.0, 1.06), ring(-192.0, 1.06)], true, true);
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.loft(
@@ -174,9 +174,9 @@ fn main_pod(b: &mut MeshBuilder) {
             v3(x, c.x + 2.0, h + 2.0),
         ]
     };
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(&[cowl(POD_AFT + 6.0), cowl(-204.0)], true, true);
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.block(
         v3(POD_AFT + 6.0, c.x - 12.0, c.y - POD.y - 1.4),
         v3(-206.0, c.x + 12.0, c.y - POD.y + 0.2),
@@ -188,7 +188,7 @@ fn main_pod(b: &mut MeshBuilder) {
             .map(|p| v3(x, c.x + p[0], c.y + p[1]))
             .collect::<Vec<_>>()
     };
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     let r = 12.2 * MAIN_SIZE;
     b.loft(
         &[
@@ -202,7 +202,7 @@ fn main_pod(b: &mut MeshBuilder) {
         false,
     );
     // The exhaust shroud: an armoured hood raked back over the bell's top.
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             vec![
@@ -330,7 +330,7 @@ fn aux_drive(b: &mut MeshBuilder, m: Vec3, size: f32) {
             .map(|p| v3(x, m.y + p[0], m.z + p[1]))
             .collect::<Vec<_>>()
     };
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &[
             house(m.x + 16.0 * size, 0.92),

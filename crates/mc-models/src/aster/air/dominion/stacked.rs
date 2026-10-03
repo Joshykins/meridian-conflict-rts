@@ -120,13 +120,13 @@ fn layers(b: &mut MeshBuilder) {
         let (w, top) = layer(&L3, x);
         full_ring(x, &layer_half(w, L2_TOP, top))
     };
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &L2.iter().map(|r| ring2(r[0])).collect::<Vec<_>>(),
         true,
         true,
     );
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &L3.iter().map(|r| ring3(r[0])).collect::<Vec<_>>(),
         true,
@@ -150,7 +150,7 @@ fn layers(b: &mut MeshBuilder) {
             &[(-196.0, -100.0), (-40.0, 198.0)]
         };
         for &(x0, x1) in belts {
-            b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+            b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
             plate_on(b, &half2, [x0, x1], 1, 3, [0.2, 0.6], 1.2);
         }
         b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -253,7 +253,7 @@ fn bridge(b: &mut MeshBuilder) {
             &[Section::new(146.0, 1.0), Section::new(148.4, 0.98)],
         );
     });
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.at(v3(-65.5, 0.0, 0.0), |b| {
         b.loft_z(
             &pointed_plan(12.5, 8.8, 3.0),

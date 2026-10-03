@@ -48,7 +48,7 @@ fn hangar(b: &mut MeshBuilder) {
         v3(a + 3.0, w - 0.8, CHINE_Z + 2.0),
         v3(f - 3.0, w + 0.1, WALL_TOP - 3.0),
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     let ribs = 5;
     for k in 0..=ribs {
         let x = a + 2.0 + (f - a - 4.0) * k as f32 / ribs as f32;
@@ -66,7 +66,7 @@ fn hangar(b: &mut MeshBuilder) {
         );
     }
     if b.mid() {
-        b.paint(GLOW_LAMP);
+        b.paint(GLOW_ORANGE);
         let mut x = a + 6.0;
         while x < f - 5.0 {
             b.cuboid(v3(x, w + 0.15, WALL_TOP - 5.0), v3(3.0, 0.3, 1.4));
@@ -80,9 +80,9 @@ type Half<'a> = &'a dyn Fn(f32) -> Vec<[f32; 2]>;
 /// The heavy armoured section over the engines (port; mirrored): two thick courses of
 /// armour down the wall astern, the upper standing proud of the lower, bolted.
 fn engine_armour(b: &mut MeshBuilder, half: Half) {
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     plate_on(b, half, [STERN + 2.0, -150.0], 3, 5, [0.0, 0.5], 3.4);
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     plate_on(b, half, [STERN + 6.0, -156.0], 4, 6, [0.0, 0.9], 2.2);
     if b.fine() {
         b.paint(METAL).pattern(pattern::PLAIN);
@@ -112,7 +112,7 @@ fn lower_chine(b: &mut MeshBuilder, half: Half) {
             continue;
         }
         b.paint(if k % 2 == 0 { PLATING } else { PLATING_DARK })
-            .pattern(pattern::GENERIC);
+            .pattern(pattern::WARSHIP);
         plate_on(b, half, [x0, x1], 1, 3, [0.3, 0.7], t);
     }
 }
@@ -143,7 +143,7 @@ fn sponsons(b: &mut MeshBuilder, half: Half) {
             ]
         };
         b.paint(if k % 2 == 0 { PLATING } else { PLATING_DARK })
-            .pattern(pattern::GENERIC);
+            .pattern(pattern::WARSHIP);
         b.loft(
             &[
                 ring(x0, out * 0.4),
@@ -182,7 +182,7 @@ fn sponsons(b: &mut MeshBuilder, half: Half) {
         }
     }
     // Plain belts between them, up under the shoulder.
-    b.paint(PLATING).pattern(pattern::GENERIC);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     plate_on(b, half, [-100.0, -32.0], 4, 6, [0.2, 0.8], 1.4);
     plate_on(b, half, [40.0, 150.0], 4, 6, [0.2, 0.8], 1.4);
 }

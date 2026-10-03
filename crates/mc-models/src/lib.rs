@@ -167,7 +167,11 @@ pub mod pattern {
     /// A window onto a fusion plant's plasma (`GLOW` faces): blue streaming round the
     /// model's z axis, bright threads in it (`gpu_consts::reactor`).
     pub const FUSION: u32 = crate::gpu_consts::reactor::PATTERN_FUSION;
-    pub const LAST: u32 = FUSION;
+    /// A capital warship's armour, on plated faces of any shade: strakes of uneven depth
+    /// cut into plates of uneven length, the odd hatch, grille or stencil, rows of lit
+    /// orange ports along the walls, running lamps at the seams (`gpu_consts::warship`).
+    pub const WARSHIP: u32 = crate::gpu_consts::warship::PATTERN;
+    pub const LAST: u32 = WARSHIP;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader

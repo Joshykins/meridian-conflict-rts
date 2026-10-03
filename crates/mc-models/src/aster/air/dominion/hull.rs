@@ -217,7 +217,7 @@ fn hull(b: &mut MeshBuilder) {
     let mut aft = vec![raked(STERN)];
     aft.extend([-214.0, -120.0, -96.0].map(|x| ring(x, width(x))));
     aft.push(ring(WAIST[0], AFT[4][1]));
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(&aft, true, true);
     b.loft(
         &[ring(WAIST[0] - 1.0, WAIST_W), ring(WAIST[1] + 1.0, WAIST_W)],
@@ -235,7 +235,7 @@ fn hull(b: &mut MeshBuilder) {
 /// The ventral hull under the middle, armoured in courses, a dark strake at its foot.
 fn ventral(b: &mut MeshBuilder) {
     let xs: Vec<f32> = VENTRAL.iter().map(|r| r[0]).collect();
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     hull_loft(b, &xs, &ventral_half);
     let half = |x: f32| ventral_half(x);
     b.mirror_y(|b| {
@@ -244,7 +244,7 @@ fn ventral(b: &mut MeshBuilder) {
             .enumerate()
         {
             b.paint(if k % 2 == 0 { PLATING } else { PLATING_DARK })
-                .pattern(pattern::GENERIC);
+                .pattern(pattern::WARSHIP);
             plate_on(b, &half, [x0, x1], 2, 4, [0.2, 0.7], 1.4);
         }
         b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -256,7 +256,7 @@ fn ventral(b: &mut MeshBuilder) {
 /// segments by dark seams, armour slabs on each segment's flanks.
 fn blade(b: &mut MeshBuilder) {
     let half = |x: f32| blade_half(x);
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     hull_loft(b, &[BLADE_AFT, BLADE_RAKE, BLADE_FORE], &half);
     let mut edges = vec![BLADE_AFT];
     edges.extend(SEAMS);
@@ -264,7 +264,7 @@ fn blade(b: &mut MeshBuilder) {
     for seg in edges.windows(2) {
         let (x0, x1) = (seg[0], seg[1]);
         b.mirror_y(|b| {
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             plate_on(b, &half, [x0 + 2.5, x1 - 2.5], 2, 4, [0.1, 0.6], 1.4);
         });
     }
@@ -278,7 +278,7 @@ fn blade(b: &mut MeshBuilder) {
 fn engine(b: &mut MeshBuilder) {
     let fine = b.fine();
     let xs: Vec<f32> = ENGINE.iter().map(|r| r[0]).collect();
-    b.paint(PLATING_DARK).pattern(pattern::GENERIC);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     hull_loft(b, &xs, &engine_half);
     let half = |x: f32| engine_half(x);
     b.mirror_y(|b| {
@@ -288,7 +288,7 @@ fn engine(b: &mut MeshBuilder) {
             &[(-214.0, -146.0)]
         };
         for &(x0, x1) in panels {
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             plate_on(b, &half, [x0, x1], 2, 4, [0.3, 0.5], 1.8);
         }
     });
@@ -312,7 +312,7 @@ fn sponson(b: &mut MeshBuilder, pivot: [f32; 3], face: f32) {
             })
             .to_vec()
     };
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &step(
             x - 22.0,
@@ -326,7 +326,7 @@ fn sponson(b: &mut MeshBuilder, pivot: [f32; 3], face: f32) {
         true,
         true,
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &step(x - 15.0, x + 15.0, 40.0, face, z - 11.0, z + 12.0, 4.0),
         true,

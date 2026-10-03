@@ -2869,13 +2869,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let ds2 = dpdy(in.face.xy);
         // From the world, not the face: a face with no frame still needs its noise filtered.
         si.px = max(length(dp1), length(dp2));
-        let sf = surface_at(si);
         let dp2perp = cross(dp2, n);
         let dp1perp = cross(n, dp1);
         let tangent = dp2perp * ds1.x + dp1perp * ds2.x;
         let bitangent = dp2perp * ds1.y + dp1perp * ds2.y;
         let ts = tangent * inverseSqrt(max(dot(tangent, tangent), 1e-12));
         let bs = bitangent * inverseSqrt(max(dot(bitangent, bitangent), 1e-12));
+        si.up = abs(face_n.z) / max(length(face_n), 1e-12);
+        si.rise = vec2<f32>(abs(ts.z), abs(bs.z));
+        let sf = surface_at(si);
         n = normalize(n - ts * sf.slope.x - bs * sf.slope.y);
 
         m.albedo = mix(m.albedo, sf.paint.rgb, sf.paint.a);
