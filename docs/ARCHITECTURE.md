@@ -280,7 +280,8 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   marks and shells in flight can be checked without a window. With `--ticks 1` the scene's orders are given on the
   first followed tick, so what they set off (`--scenario destruct`) happens where the renderer sees it.
 - **Upgrades** are one mechanism for everything. A blueprint names its successor (`upgrades_to`); the successor's
-  `cost` is the price. `Command::Upgrade` queues `OrderKind::Upgrade` behind the unit's other orders, the unit builds a
+  `cost` is the price. A builder puts it on at its build power (an engineer at its next tier's), a unit that
+  builds nothing at its `upgrade_power` (the Reclaimer, about 20 s a tier), else 10. `Command::Upgrade` queues `OrderKind::Upgrade` behind the unit's other orders, the unit builds a
   hidden successor (`flag::UPGRADE | IN_FACTORY`, which is what assisting engineers help with). Only `Stop` and
   `Command::CancelUpgrade` (a right-click on it in the queue strip) scrap it: a mobile unit being refitted is pinned
   (`give` keeps the refit at the front and puts the new order behind it), so it neither walks nor builds until it is

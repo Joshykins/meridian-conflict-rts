@@ -236,7 +236,8 @@
     ),
     // The Reclaimer: the engineer's partner, a salvage hovercraft with one reclaim head on
     // an A-frame that works what it passes without stopping, over land, shore and shallows.
-    // Every factory makes it, and like the engineer it builds its next tier onto itself.
+    // Every factory makes it, and like the engineer it builds its next tier onto itself,
+    // in about 20 s (`upgrade_power` over the next tier's build time).
     // One mesh (`reclaimer`, `models::aster::reclaimers`) drawn bigger per tier: 7/6 at tech 2,
     // 4/3 at tech 3, so the head's pivot and emitter are the tech 1 numbers times that.
     (
@@ -254,6 +255,7 @@
             (pivot: (-2.1, 0, 4.1), emitter: (0.23, 0, 4.1), turn: 90, pitch: (-70, 80)),
         ]),
         upgrades_to: "aster_t2_mobile_reclaimer",
+        upgrade_power: 50,
         weapons: [],
         mesh: "reclaimer", icon: Salvage,
         sounds: (death: "blast_small", moving: "aster_hover"),
@@ -273,6 +275,7 @@
             (pivot: (-2.45, 0, 4.783), emitter: (0.268, 0, 4.783), turn: 90, pitch: (-70, 80)),
         ]),
         upgrades_to: "aster_t3_mobile_reclaimer",
+        upgrade_power: 160,
         weapons: [],
         mesh: "reclaimer", icon: Salvage,
         sounds: (death: "blast_small", moving: "aster_hover"),

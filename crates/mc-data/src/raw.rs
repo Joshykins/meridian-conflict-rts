@@ -437,6 +437,10 @@ pub(crate) struct Unit {
     pub shield: Option<RawShield>,
     #[serde(default)]
     pub upgrades_to: Option<String>,
+    /// Build power it puts its own upgrade on with, if it is not a builder
+    /// (`UnitBlueprint::upgrade_power`).
+    #[serde(default)]
+    pub upgrade_power: Option<f64>,
     /// Parts refitted onto the unit where it stands, slot by slot (`crate::refit`).
     #[serde(default)]
     pub refits: Vec<crate::refit::RawRefitSlot>,
@@ -1805,6 +1809,13 @@ impl Unit {
                 "{key}: a shield needs energy_upkeep"
             )));
         }
+        if let Some(p) = self.upgrade_power {
+            if self.upgrades_to.is_none() || self.builder.is_some() || p <= 0.0 {
+                return Err(DataError::Invalid(format!(
+                    "{key}: upgrade_power is for a unit that upgrades and builds nothing, above 0"
+                )));
+            }
+        }
         Ok(UnitBlueprint {
             id,
             key: key.clone(),
@@ -2031,6 +2042,7 @@ impl Unit {
                 Some(k) => Some(lookup(k, key)?),
                 None => None,
             },
+            upgrade_power: self.upgrade_power.map(fx),
             weapons,
             wreck_fraction: fx(self
                 .wreck_fraction

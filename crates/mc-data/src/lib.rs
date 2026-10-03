@@ -793,6 +793,9 @@ pub struct UnitBlueprint {
     /// A projected dome, or a hull wrap that only covers this unit.
     pub shield: Option<Shield>,
     pub upgrades_to: Option<BlueprintId>,
+    /// Build power a unit that builds nothing puts its own upgrade on with (a
+    /// Reclaimer). `None`: the caller's fallback.
+    pub upgrade_power: Option<Fx>,
     pub weapons: Vec<Weapon>,
     /// Share of `cost_mass` left in the wreck.
     pub wreck_fraction: Fx,
@@ -1026,10 +1029,14 @@ impl Blueprints {
     }
 
     /// Build power a unit of `from` puts its own upgrade into `to` on with: its own,
-    /// or `fallback` if it builds nothing. An engineer fitting its next tier works
-    /// at that tier's power, so climbing in the field takes seconds, not minutes.
+    /// or its blueprint's `upgrade_power` (else `fallback`) if it builds nothing. An
+    /// engineer fitting its next tier works at that tier's power, so climbing in the
+    /// field takes seconds, not minutes.
     pub fn upgrade_power(&self, from: &UnitBlueprint, to: &UnitBlueprint, fallback: Fx) -> Fx {
-        let own = from.builder.as_ref().map_or(fallback, |b| b.power);
+        let own = from
+            .builder
+            .as_ref()
+            .map_or(from.upgrade_power.unwrap_or(fallback), |b| b.power);
         let engineer = from.has(cat::ENGINEER)
             && from.is_mobile()
             && !from.has(cat::COMMANDER)
@@ -1570,6 +1577,7 @@ impl Blueprints {
                 None => h.write_u64(u64::MAX),
             }
             h.write_u64(u.upgrades_to.map_or(u64::MAX, |id| id.0 as u64));
+            h.write_i64(u.upgrade_power.map_or(-1, |p| p.0));
             h.write_u64(u.weapons.len() as u64);
             for w in &u.weapons {
                 for v in [

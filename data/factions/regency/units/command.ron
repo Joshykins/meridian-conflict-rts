@@ -157,8 +157,8 @@
     // stopping. Regency reclaim is nanite work: the head shoots the faction's strands at the
     // wreck and the matter rides home down them (beams.wgsl `BEAM_NANITE_RECLAIM`). Against
     // ARC's Reclaimer its nanites pull harder at a shorter reach. Every factory makes it, and
-    // it builds its next tier onto itself. One mesh (`regency_reclaimer`) drawn bigger per
-    // tier, 7/6 and 4/3, so the head's pivot and lens are the tech 1 numbers times that.
+    // it builds its next tier onto itself in about 20 s (`upgrade_power`). One mesh
+    // (`regency_reclaimer`) drawn bigger per tier, 7/6 and 4/3, so the head's pivot and lens are the tech 1 numbers times that.
     // Each lift bell casts red plasma under it (the model's `lifts`), lighting the ground.
     (
         key: "regency_t1_mobile_reclaimer",
@@ -175,6 +175,7 @@
             (pivot: (-1.5, 0, 2.9), emitter: (0.75, 0, 2.9), turn: 90, pitch: (-70, 80)),
         ]),
         upgrades_to: "regency_t2_mobile_reclaimer",
+        upgrade_power: 50,
         weapons: [],
         mesh: "regency_reclaimer", icon: Salvage,
         lights: [(kind: Point, at: (-0.4, 0, 0.3), color: (1.0, 0.14, 0.06), intensity: 50, range: 10, night_only: false)],
@@ -196,6 +197,7 @@
             (pivot: (-1.75, 0, 3.383), emitter: (0.875, 0, 3.383), turn: 90, pitch: (-70, 80)),
         ]),
         upgrades_to: "regency_t3_mobile_reclaimer",
+        upgrade_power: 160,
         weapons: [],
         mesh: "regency_reclaimer", icon: Salvage,
         lights: [(kind: Point, at: (-0.467, 0, 0.35), color: (1.0, 0.14, 0.06), intensity: 70, range: 12, night_only: false)],

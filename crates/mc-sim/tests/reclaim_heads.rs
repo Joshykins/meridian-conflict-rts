@@ -428,7 +428,9 @@ fn a_gleaner_upgrades_in_place_once_the_side_has_tech_2() {
     assert_eq!(w.side_tech(0), 2);
     tick(&mut w, &[upgrade]);
     let before = w.state.units.pos[reclaimer];
-    for _ in 0..1200 {
+    // Quickly: about 20 s at its `upgrade_power`, not the 100 s a non-builder's default
+    // would take.
+    for _ in 0..25 * mc_core::TICKS_PER_SECOND {
         tick(&mut w, &[]);
         if w.state
             .units
