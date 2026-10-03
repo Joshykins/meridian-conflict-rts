@@ -137,20 +137,26 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   power (`Blueprints::upgrade_power`), so Mason to Mason II takes 30 s and II to III about
   21 s (180 s and 107 s at its own power before). It still waits for the side's tech.
 - **Material fabricators** (`fabricator: (mass)`) turn energy into material, as far as their
-  upkeep is paid (nothing in a full stall), and go up like reactors. Each eats a whole power
-  plant of its tier, and each tier is the better buy, even run on the cheapest (tier 3)
-  power, so spamming a lower tier never pays:
+  upkeep is paid (nothing in a full stall, nothing while paused), and go up like reactors.
+  One 2x2 building from tech 2 (the user, 2026-10-03), upgraded in place to tech 3. Each eats
+  a whole power plant of its tier, and tech 3 is the better buy:
 
-  | Tier | Makes | Draws | Mass | Payback, own-tier power | Payback, T3 power |
-  | --- | --- | --- | --- | --- | --- |
-  | T1 (2x2) | 0.25/s | 30 E/s (two T1 reactors) | 180 | ~22 min | ~15 min |
-  | T2 (4x4) | 3/s | 350 E/s (one T2 reactor) | 1,650 | ~13 min | ~12 min |
-  | T3 (8x8) | 20/s | 2,000 E/s (one T3 reactor) | 9,000 | ~10 min | ~10 min |
+  | Tier | Makes | Draws | Mass | Payback, own-tier power |
+  | --- | --- | --- | --- | --- |
+  | T2 (2x2) | 3/s | 350 E/s (one T2 reactor) | 1,650 | ~13 min |
+  | T3 (2x2, upgrade 7,350) | 20/s | 2,000 E/s (one T3 reactor) | 9,000 | ~10 min |
 
   All pay back slower than the mine upgrades, so they come after the mines; they need no
-  ground, so a side whose mines are done grows on them. Each tier is a building of its own
-  on its power plant's lot, not an upgrade. They share the Mines priority switch. The
-  Regency Condensers are the same.
+  ground, so a side whose mines are done grows on them. They share the Mines priority
+  switch. The Regency Condensers are the same.
+- **Adjacency** (`adjacency: (energy | mass)`, mc-sim `adjacency.rs`): a provider saves each
+  finished building of its owner's whose lot shares an edge with its own (a corner is not
+  enough). Power plants save energy: upkeep (fabricators, mines, shields, radar) and what a
+  factory builds; T1 5%, T2 10%, T3 20% each. Fabricators save a factory's materials: T2 5%,
+  T3 10% each. Savings add up to a cap: energy 50%, materials 33%. A fabricator and a power
+  plant of its tech that touch are bound: when one is destroyed (not reclaimed) the other
+  goes with it. The interface shows each link: a conduit on the ground, the unit panel's
+  Adjacency band, tags on the selection's links, and the placing site's would-be links.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus
   (`focus.rs`), the Mines and Power priorities in one row under the economy panel: each of
