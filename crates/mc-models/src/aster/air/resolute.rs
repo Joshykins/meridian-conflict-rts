@@ -417,7 +417,7 @@ fn coarse(b: &mut MeshBuilder) {
 fn spine(b: &mut MeshBuilder) {
     let fine = b.fine();
     b.mirror_y(|b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         let rings = STATIONS
             .iter()
             .map(|s| {
@@ -441,7 +441,7 @@ fn spine(b: &mut MeshBuilder) {
             &[(-40.0, 16.0), (20.0, 76.0), (80.0, 110.0)]
         };
         for &(x0, x1) in belts {
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             plate_on_hull(b, x0, x1, 2, 4, [0.2, 0.2], 1.6);
             if fine {
                 b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -499,7 +499,7 @@ fn side_pod(b: &mut MeshBuilder) {
             v3(x, y0, z1),
         ]
     };
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             ring(x0, 0.2),
@@ -516,7 +516,7 @@ fn side_pod(b: &mut MeshBuilder) {
         &[]
     };
     for &(a, c) in slabs {
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.block(v3(a, y1 - 0.4, z0 + 3.5), v3(c, y1 + 1.2, z1 - 3.5));
     }
     if b.fine() {
@@ -560,7 +560,7 @@ fn keel_hull(b: &mut MeshBuilder) {
     let full = half(LOWER_BELLY, LOWER_FLARE);
     // The bow: raked back from the top, so its foot is `LOWER_BOW[0]` and its head `[1]`.
     let rake = |z: f32| (z - KEEL) / (LOWER_TOP - KEEL) * (LOWER_BOW[1] - LOWER_BOW[0]);
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             full_ring(ENGINE_FORE - 12.0, &full, |_| 0.0),
@@ -581,7 +581,7 @@ fn keel_hull(b: &mut MeshBuilder) {
         } else {
             &[(-40.0, 46.0)]
         };
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         for &(x0, x1) in slabs {
             b.loft(
                 &[
@@ -664,7 +664,7 @@ fn keel_hull(b: &mut MeshBuilder) {
             v3(x, -hw, KEEL + 0.5),
         ]
     };
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             pod(x0 - 8.0, KEEL - 0.5, hw - 4.0),
@@ -704,7 +704,7 @@ fn engineering(b: &mut MeshBuilder) {
     let full = half(ENGINE_BELLY, ENGINE_SIDE, KEEL, ENGINE_DECK);
     // Forward the bulkhead rakes back from its foot to its head.
     let rake = |z: f32| -(z - KEEL) / (ENGINE_DECK - KEEL) * 8.0;
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             full_ring(
@@ -741,12 +741,12 @@ fn engineering(b: &mut MeshBuilder) {
             &[(-122.0, -62.0)]
         };
         for &(x0, x1) in panels {
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             b.block(
                 v3(x0, ENGINE_SIDE - 0.4, ENGINE_DECK - 22.0),
                 v3(x1, ENGINE_SIDE + 2.2, ENGINE_DECK - 10.5),
             );
-            b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+            b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
             b.block(
                 v3(x0 + 2.0, ENGINE_SIDE - 0.4, KEEL + 10.0),
                 v3(x1 - 2.0, ENGINE_SIDE + 1.0, ENGINE_DECK - 23.0),
@@ -776,7 +776,7 @@ fn engineering(b: &mut MeshBuilder) {
             }
         }
         // Armoured shoulders on the bulkhead where the spine runs out.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 vec![
@@ -806,7 +806,7 @@ const PROW_ROOF: f32 = 72.0;
 /// the overhang.
 fn prow(b: &mut MeshBuilder) {
     let fine = b.fine();
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     let roof = |x: f32| {
         let (_, _, c) = station(x);
         let w = TRENCH + 2.4;
@@ -830,10 +830,10 @@ fn prow(b: &mut MeshBuilder) {
     // Cheek armour down the last stretch in two plates, lying flush on the sides and ending
     // square at the face: the prow is the spine's own end, no wider.
     b.mirror_y(|b| {
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         plate_on_hull(b, 114.0, 131.0, 2, 4, [0.1, 0.3], 1.4);
         plate_on_hull(b, 133.0, MUZZLE_X, 2, 4, [0.1, 0.3], 1.4);
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         plate_on_hull(b, 116.0, MUZZLE_X, 0, 2, [0.3, 1.0], 1.0);
         b.paint(TEAM).pattern(pattern::PLAIN);
         plate_on_hull(b, 138.0, 143.0, 2, 3, [0.3, 1.0], 1.55);
@@ -871,7 +871,7 @@ fn capacitors(b: &mut MeshBuilder) {
     b.mirror_y(|b| {
         let (x0, x1, y0, y1) = (-36.0, -16.0, 11.2, 19.6);
         let (_, _, c) = station(-26.0);
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.frustum(
             v3((x0 + x1) * 0.5, (y0 + y1) * 0.5, c - 0.5),
             v2(x1 - x0, y1 - y0),
@@ -930,7 +930,7 @@ fn wing(b: &mut MeshBuilder) {
             v3(x0, y, z1),
         ]
     };
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             chord(root, ENGINE_AFT + 2.0, -50.0, top - 2.0, top + 5.0),
@@ -940,7 +940,7 @@ fn wing(b: &mut MeshBuilder) {
         true,
     );
     // Armour plates on its back, stepping out along the span, and a raked tip plate.
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     let plates: &[(f32, f32)] = if fine {
         &[(38.0, 52.0), (54.0, 68.0), (70.0, 80.0)]
     } else {
@@ -975,7 +975,7 @@ fn wing(b: &mut MeshBuilder) {
     b.paint(TEAM).pattern(pattern::PLAIN);
     b.block(v3(-128.0, 56.0, top + 5.0), v3(-112.0, 62.0, top + 5.6));
     // The strut down to the nacelle.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             vec![
@@ -1017,7 +1017,7 @@ fn nacelle(b: &mut MeshBuilder) {
     let cut = 5.0;
     let (y, z) = (NACELLE_Y, NACELLE_Z);
     let (hw, hh) = (NACELLE_HW, NACELLE_HH);
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             nacelle_ring(NACELLE_AFT, 0.94, cut),
@@ -1040,7 +1040,7 @@ fn nacelle(b: &mut MeshBuilder) {
             v3(x, y - hw * s, z + hh * 0.7),
         ]
     };
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &[
             cowl(-134.0, 1.03),
@@ -1062,7 +1062,7 @@ fn nacelle(b: &mut MeshBuilder) {
         &[(-154.0, -80.0)]
     };
     for &(x0, x1) in belts {
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.block(
             v3(x0, y + hw - 0.4, z - hh * 0.6),
             v3(x1, y + hw + 1.4, z + hh * 0.5),
@@ -1096,7 +1096,7 @@ fn nacelle(b: &mut MeshBuilder) {
         false,
         true,
     );
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.block(
         v3(NACELLE_AFT - 12.0, y - 1.2, z - hh * 0.7),
         v3(NACELLE_AFT - 2.0, y + 1.2, z + hh * 0.7),
@@ -1116,7 +1116,7 @@ fn stern(b: &mut MeshBuilder) {
         v3(ENGINE_AFT, 24.0, ENGINE_DECK - 8.0),
     );
     b.mirror_y(|b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.chamfered_box(v3(ENGINE_AFT - 2.0, 13.0, 42.0), v3(5.0, 12.0, 12.0), 2.0);
         b.paint(TREAD).pattern(pattern::NONE);
         b.block(
@@ -1141,7 +1141,7 @@ fn stern(b: &mut MeshBuilder) {
 fn belly(b: &mut MeshBuilder) {
     for port in LIFT_JETS {
         let p = Vec3::from(port);
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.frustum(
             p + Vec3::Z * 0.6,
             v2(13.0, 12.0),
@@ -1376,7 +1376,7 @@ fn bore(b: &mut MeshBuilder) {
             .collect::<Vec<_>>()
     };
     let mouth = oct(6.2);
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             at(MUZZLE_X, &mouth),
@@ -1428,7 +1428,7 @@ fn tower(b: &mut MeshBuilder) {
     let x = -76.0;
     let deck = 66.0;
     // Three armoured tiers, stepping back and in.
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.frustum(
         v3(x, 0.0, deck),
         v2(40.0, 30.0),
@@ -1444,7 +1444,7 @@ fn tower(b: &mut MeshBuilder) {
         0.8,
         v2(0.0, 0.0),
     );
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(x - 3.0, 0.0, deck + 11.8),
         v2(30.0, 22.0),
@@ -1460,7 +1460,7 @@ fn tower(b: &mut MeshBuilder) {
         2.4,
         v2(-0.6, 0.0),
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.frustum(
         v3(x - 4.2, 0.0, deck + 20.2),
         v2(29.4, 21.4),
@@ -1468,7 +1468,7 @@ fn tower(b: &mut MeshBuilder) {
         1.8,
         v2(-1.2, 0.0),
     );
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(x - 7.0, 0.0, deck + 22.0),
         v2(16.0, 13.0),
@@ -1486,7 +1486,7 @@ fn tower(b: &mut MeshBuilder) {
     );
     b.mirror_y(|b| {
         // Armour wings down the citadel's flanks.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 vec![
@@ -1595,7 +1595,7 @@ fn cells(b: &mut MeshBuilder) {
     let fine = b.fine();
     b.mirror_y(|b| {
         let (x0, x1, y0, y1) = (13.0, 47.0, 10.8, 22.2);
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.frustum(
             v3((x0 + x1) * 0.5, (y0 + y1) * 0.5, CELL_DECK - 1.0),
             v2(x1 - x0, y1 - y0),
@@ -1664,7 +1664,7 @@ fn chin_post(b: &mut MeshBuilder, pivot: Vec3) {
     let roof = pivot.z + HOUSE_ROOF * TURRET_SCALE;
     let (_, keel, _) = station(pivot.x);
     b.at(v3(pivot.x, pivot.y, 0.0), |b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.prism(
             v3(-3.0, 0.0, roof - 0.2),
             b.sides(10),
@@ -1684,7 +1684,7 @@ fn barbette(b: &mut MeshBuilder, pivot: Vec3, foot: f32) {
     let top = pivot.z - (HOUSE_SINK + 1.0) * TURRET_SCALE;
     let plan = chamfered_rect(v2(13.0, 13.0), 4.8);
     b.at(v3(pivot.x, pivot.y, 0.0), |b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.loft_z(
             &plan,
             &[Section::new(foot, 1.12), Section::new(top - 1.2, 1.0)],
@@ -1706,7 +1706,7 @@ fn sponson(b: &mut MeshBuilder) {
     // pass over its edge; a slim post carries the ring.
     let deck = z - 10.5;
     let ring = z - (HOUSE_SINK + 1.0) * TURRET_SCALE;
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             vec![
@@ -1725,7 +1725,7 @@ fn sponson(b: &mut MeshBuilder) {
         true,
         true,
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.prism(v3(x, y, deck - 5.0), b.sides(10), 7.6, 7.2, 5.0);
     b.paint(ACCENT).pattern(pattern::PLAIN);
     b.prism(v3(x, y, deck), b.sides(10), 5.0, 5.0, ring - deck);
@@ -1799,7 +1799,7 @@ fn turret_body(b: &mut MeshBuilder, reach: f32) {
         &house_plan(),
         &[Section::new(base, 0.95), Section::new(base + 0.6, 0.95)],
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft_z(
         &house_plan(),
         &[

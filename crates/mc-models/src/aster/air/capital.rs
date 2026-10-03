@@ -447,7 +447,7 @@ pub(crate) fn gear(b: &mut MeshBuilder, rig: &CapitalRig, door_sill: f32) {
                 v3(x1, y0, well),
             ]);
             b.with_part(part::GEAR_DOOR, |b| {
-                b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+                b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
                 let mid = (y0 + y1) * 0.5;
                 for (a, c) in [(y0, mid - 0.1), (mid + 0.1, y1)] {
                     b.block(v3(x0, a, door_sill), v3(x1, c, top));
@@ -468,7 +468,7 @@ fn leg_at_size_one(b: &mut MeshBuilder, dir: f32) {
         // Hinge trunnion, the armoured main leg, and the shock strut's cylinder.
         b.paint(METAL);
         b.cylinder_between(v3(0.0, -4.5, hz), v3(0.0, 4.5, hz), 3.4, 3.4, b.sides(10));
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.beam(
             v3(0.0, 0.2, hz),
             v3(0.0, 2.0, 18.0),
@@ -484,7 +484,7 @@ fn leg_at_size_one(b: &mut MeshBuilder, dir: f32) {
             b.sides(10),
         );
         // Drag brace, raked back to the side the leg stows away from.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.beam(
             v3(-6.5 * dir, 0.3, 33.0),
             v3(-1.5 * dir, 1.6, 20.0),
@@ -521,7 +521,7 @@ fn leg_at_size_one(b: &mut MeshBuilder, dir: f32) {
         b.prism(v3(0.0, LEG_SPLAY, 2.0), b.sides(8), 3.2, 2.8, 1.4);
         // Two broad armoured pads (dark plating: the shader folds only these) that fold
         // up against the strut about their inner top edges (x ±1, z 2.4).
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         for side in [-1.0, 1.0] {
             b.frustum(
                 v3(side * 4.6, LEG_SPLAY, 0.0),
@@ -607,7 +607,7 @@ fn rotary_gun(b: &mut MeshBuilder, hang: bool) {
         .map(|&(y, k)| c + v3(0.0, y, s * k * h))
         .collect::<Vec<_>>()
     };
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &[
             section(-8.5, 3.8, 2.5),

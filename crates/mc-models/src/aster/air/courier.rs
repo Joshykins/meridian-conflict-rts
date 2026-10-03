@@ -175,10 +175,10 @@ fn skylight(b: &mut MeshBuilder) {
     let (x0, x1) = (DOOR_X - 2.5, OPEN_X);
     b.with_part(part::HOLD_DOOR, |b| {
         b.mirror_y(|b| {
-            b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+            b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
             b.block(v3(x0, 0.1, CEILING), v3(x1, BAY, CEILING + 3.0));
             if b.mid() {
-                b.paint(PLATING).pattern(pattern::AIRFRAME);
+                b.paint(PLATING).pattern(pattern::WARSHIP);
                 b.block(
                     v3(x0 + 1.5, 1.2, CEILING + 3.0),
                     v3(x1 - 1.5, BAY - 1.2, CEILING + 3.2),
@@ -205,7 +205,7 @@ fn skylight(b: &mut MeshBuilder) {
 /// crowns, a service belt with a lit rail down each flank, and landing skids.
 fn hull(b: &mut MeshBuilder) {
     b.mirror_y(|b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         let rings = SHOULDERS
             .iter()
             .map(|p| shoulder(p[0], p[1], p[2]))
@@ -224,7 +224,7 @@ fn hull(b: &mut MeshBuilder) {
                     v3(x, w - 6.0, h - 0.2),
                 ]
             };
-            b.paint(PLATING).pattern(pattern::AIRFRAME);
+            b.paint(PLATING).pattern(pattern::WARSHIP);
             b.loft(&[section(x0), section(x1)], true, true);
             // A run of hatch lids let into the brow's crown.
             let on_top = |x: f32, u: f32, lift: f32| {
@@ -326,7 +326,7 @@ fn hull(b: &mut MeshBuilder) {
             }
         }
         // Heavy skids under the chine: the hull rests on these on the ground.
-        b.paint(ACCENT).pattern(pattern::AIRFRAME);
+        b.paint(ACCENT).pattern(pattern::WARSHIP);
         b.frustum(
             v3(-10.0, 24.0, 0.0),
             v2(52.0, 7.0),
@@ -337,7 +337,7 @@ fn hull(b: &mut MeshBuilder) {
         // Radiator terrace on each shoulder's widest crown: louvres over a hot tray.
         let (x, y) = (-12.0, 19.5);
         let (_, h) = shoulder_surface(x);
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.frustum_open(
             v3(x, y, h - 1.5),
             v2(16.0, 8.0),
@@ -380,7 +380,7 @@ fn bay(b: &mut MeshBuilder) {
         v3(BULKHEAD_X - DOOR_X + 1.0, BAY * 2.0, 0.08),
     );
     // Roof over the bay forward of the skylight (`OPEN_X`); the dorsal sits on it.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(3.75, 0.0, CEILING),
         v2(39.5, 30.0),
@@ -388,7 +388,7 @@ fn bay(b: &mut MeshBuilder) {
         6.6,
         v2(1.5, 0.0),
     );
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.cuboid(v3(BULKHEAD_X + 1.0, 0.0, 13.0), v3(2.0, BAY * 2.0, 26.0));
     if b.mid() {
         // Ceiling light strips down the bay, seen from behind through the open doors.
@@ -439,7 +439,7 @@ fn bay(b: &mut MeshBuilder) {
 /// Long wedge prow with split armour jaws, a raked cockpit canopy, a chin sensor keel,
 /// the forward lift jets and the landing floods.
 fn prow(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &band(
             &[
@@ -464,7 +464,7 @@ fn prow(b: &mut MeshBuilder) {
                 v3(x, inside + 2.0, top),
             ]
         };
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 cheek(23.5, 10.5, 26.5, 18.5, 29.4),
@@ -475,7 +475,7 @@ fn prow(b: &mut MeshBuilder) {
             true,
         );
         // Chin outrigger, carrying the forward lift jet.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 vec![
@@ -531,7 +531,7 @@ fn prow(b: &mut MeshBuilder) {
         true,
         true,
     );
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &band(
             &[[23.0, 7.4, 30.9, 5.0, 33.0], [35.5, 6.2, 27.0, 3.8, 28.9]],
@@ -555,7 +555,7 @@ fn prow(b: &mut MeshBuilder) {
         true,
         true,
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.loft(
         &band(
             &[[20.0, 9.5, 31.0, 6.0, 33.8], [24.0, 8.2, 32.8, 5.2, 34.2]],
@@ -603,7 +603,7 @@ fn prow(b: &mut MeshBuilder) {
     }
     for port in &LIFT_JETS[2..] {
         let c = Vec3::from(*port);
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.frustum(
             c + v3(0.0, 0.0, 1.8),
             v2(8.0, 7.0),
@@ -622,7 +622,7 @@ fn dorsal(b: &mut MeshBuilder) {
     // The spine ends where the skylight starts; the radiators and sensor domes stand
     // out on the shoulders, clear of the leaves.
     let (spine_x, spine_len) = (0.0, 26.0);
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.frustum_open(
         v3(spine_x, 0.0, roof - 0.2),
         v2(spine_len, 22.0),
@@ -690,7 +690,7 @@ fn radiators(b: &mut MeshBuilder, at: Vec3, across: f32) {
 fn sensor_house(b: &mut MeshBuilder, spine: f32) {
     // Sensor house forward, glazed slit round its face.
     let deck = spine;
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(0.0, 0.0, deck - 0.2),
         v2(15.0, 13.0),
@@ -706,7 +706,7 @@ fn sensor_house(b: &mut MeshBuilder, spine: f32) {
         1.1,
         v2(-0.3, 0.0),
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.frustum(
         v3(-0.4, 0.0, deck + 3.8),
         v2(13.6, 11.6),
@@ -787,7 +787,7 @@ fn stern(b: &mut MeshBuilder) {
         let [nx, y, z] = NOZZLES[1];
         // Nacelle: an octagonal housing growing out of the shoulder.
         let aft = nx + 27.6 * DRIVE_SCALE + 0.4;
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 octagon(-18.0, y, z, 6.0, 2.5),
@@ -799,7 +799,7 @@ fn stern(b: &mut MeshBuilder) {
             true,
         );
         // Pale armour saddle over the nacelle, with the owner's band.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         // (y, z) off the nacelle axis: a shell over its top and outer side.
         const SADDLE: [[f32; 2]; 8] = [
             [-6.7, 10.6],
@@ -868,7 +868,7 @@ fn stern(b: &mut MeshBuilder) {
             v3(DOOR_X - 3.2, BAY, 0.0),
             v3(DOOR_X - 0.45, BAY + 3.4, CEILING),
         );
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.block(
             v3(DOOR_X - 3.4, BAY + 3.4, 0.0),
             v3(DOOR_X - 0.45, BAY + 5.4, CEILING + 3.0),
@@ -889,7 +889,7 @@ fn stern(b: &mut MeshBuilder) {
         b.prism(bc - v3(0.0, 0.0, 0.4), b.sides(8), 0.7, 0.6, 0.8);
     });
     // Lintel over the opening and the aft fairing above it.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.block(
         v3(DOOR_X - 3.4, -BAY - 3.4, CEILING),
         v3(DOOR_X - 0.45, BAY + 3.4, CEILING + 4.6),
@@ -950,11 +950,11 @@ fn lamps(b: &mut MeshBuilder) {
 fn doors(b: &mut MeshBuilder) {
     b.with_part(part::HOLD_DOOR, |b| {
         b.mirror_y(|b| {
-            b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+            b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
             b.cuboid(v3(DOOR_X + 0.5, 7.0, 13.0), v3(1.0, 14.0, 26.0));
             if b.mid() {
                 // Pale pressure plate with a raised frame, lit seam at the meeting edge.
-                b.paint(PLATING).pattern(pattern::AIRFRAME);
+                b.paint(PLATING).pattern(pattern::WARSHIP);
                 b.chamfered_box(v3(DOOR_X - 0.2, 7.2, 13.0), v3(0.4, 12.2, 23.0), 0.6);
                 b.paint(GLOW_AMBER);
                 b.cuboid(v3(DOOR_X - 0.1, 0.25, 13.0), v3(0.2, 0.3, 24.0));

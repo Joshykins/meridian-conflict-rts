@@ -205,10 +205,10 @@ pub(super) fn build(b: &mut MeshBuilder) {
 
 /// The hull with its chine strakes, deck edges, ribs and seams.
 fn hull(b: &mut MeshBuilder) {
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     chined_hull(b, &HULL);
     // The lower hull under the chine in dark armour, stood a little proud of the plating.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     chined_hull(
         b,
         &[
@@ -281,7 +281,7 @@ fn hull(b: &mut MeshBuilder) {
         }
     });
     // A dark keel plate under the belly between the leg bays and the posts.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(-24.0, 0.0, KEEL - 0.9),
         v2(18.0, 3.4),
@@ -308,7 +308,7 @@ fn hull(b: &mut MeshBuilder) {
 
 /// The wedge bridge forward on the deck: a low raked house with a band of glass.
 fn bridge(b: &mut MeshBuilder) {
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     block(
         b,
         &[
@@ -350,7 +350,7 @@ fn bridge(b: &mut MeshBuilder) {
 /// search array, a beacon.
 fn engineering(b: &mut MeshBuilder) {
     let top = DECK + 5.0;
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     block(
         b,
         &[
@@ -396,7 +396,7 @@ fn engineering(b: &mut MeshBuilder) {
 /// A swept stub from the hull's quarter out to the port pod.
 fn stub(b: &mut MeshBuilder) {
     let [nx, y, z] = NOZZLES[0];
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             vec![
@@ -432,7 +432,7 @@ fn pod(b: &mut MeshBuilder, nozzle: [f32; 3]) {
     let aft = nx + 27.6 * DRIVE;
     let (fore, r) = (-18.0, 5.4);
     b.at(v3(0.0, y, 0.0), |b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         block(
             b,
             &[
@@ -459,7 +459,7 @@ fn pod(b: &mut MeshBuilder, nozzle: [f32; 3]) {
             ],
         );
         // An armour saddle over the pod, and a collar where it meets the drive.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         block(
             b,
             &[
@@ -493,7 +493,7 @@ fn pod(b: &mut MeshBuilder, nozzle: [f32; 3]) {
 /// the house hangs clear under the hull, turns right round and its rails depress freely.
 fn rail_mount(b: &mut MeshBuilder) {
     let [x, _, _] = RAIL;
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.prism(
         v3(x - 2.0, 0.0, RAIL_ROOF - 0.2),
         b.sides(10),
@@ -519,7 +519,7 @@ fn gatling_mount(b: &mut MeshBuilder) {
     let [x, _, _] = GATLING;
     let plan = crate::builder::chamfered_rect(v2(7.0, 7.0), 2.6);
     b.at(v3(x, 0.0, 0.0), |b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.loft_z(
             &plan,
             &[

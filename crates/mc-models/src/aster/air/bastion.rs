@@ -155,7 +155,7 @@ fn shoulder_surface(x: f32) -> (f32, f32) {
 
 /// Upper and lower cheeks enclose a dark recessed prow instead of one flat cap.
 fn prow(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &band(
             &[
@@ -181,7 +181,7 @@ fn prow(b: &mut MeshBuilder) {
                 v3(x, inside + 3.0, top),
             ]
         };
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 cheek(69.0, 8.0, 41.0, 62.0, 79.0),
@@ -192,7 +192,7 @@ fn prow(b: &mut MeshBuilder) {
             true,
         );
         // Lower chin outriggers leave a deep black separation under the brow.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 vec![
@@ -268,7 +268,7 @@ fn prow(b: &mut MeshBuilder) {
 /// with a turning radar bar (`part::SPINNER`).
 fn bridge(b: &mut MeshBuilder) {
     let deck = BRIDGE_DECK;
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.frustum(
         v3(-35.0, 0.0, deck),
         v2(28.0, 21.0),
@@ -294,7 +294,7 @@ fn bridge(b: &mut MeshBuilder) {
         3.6,
         v2(-0.6, 0.0),
     );
-    b.paint(PLATING).pattern(pattern::AIRFRAME);
+    b.paint(PLATING).pattern(pattern::WARSHIP);
     b.frustum(
         v3(-36.6, 0.0, deck + 13.6),
         v2(24.4, 17.8),
@@ -303,7 +303,7 @@ fn bridge(b: &mut MeshBuilder) {
         v2(-0.8, 0.0),
     );
     // Sensor house, set back, with its own slit of glass.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(-40.5, 0.0, deck + 15.0),
         v2(15.0, 12.0),
@@ -329,7 +329,7 @@ fn bridge(b: &mut MeshBuilder) {
     );
     b.mirror_y(|b| {
         // Bridge wings: glazed lookouts out past the deck edge.
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.frustum(
             v3(-28.5, 12.0, deck + 9.2),
             v2(8.0, 6.0),
@@ -452,7 +452,7 @@ fn dorsal(b: &mut MeshBuilder) {
     // reactor drops towards the engines; the taller bridge sits at the waist.
     for island in ISLANDS {
         let (x, length, width, top, height, shift) = island;
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.frustum_open(
             v3(x, 0.0, ISLAND_BASE),
             v2(length, width),
@@ -511,7 +511,7 @@ fn dorsal(b: &mut MeshBuilder) {
     b.paint(ACCENT);
     b.plate(v3(31.0, 0.0, top), v2(54.0, 7.0), 0.15, 0.05);
     b.mirror_y(|b| {
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.plate(v3(31.0, 7.2, top), v2(52.0, 7.4), 1.1, 0.4);
         if b.fine() {
             b.paint(METAL).pattern(pattern::PLAIN);
@@ -565,7 +565,7 @@ fn stern(b: &mut MeshBuilder) {
                 v3(x, 17.0, crown),
             ]
         };
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 section(-99.0, 29.8, 62.0, 75.0),
@@ -577,7 +577,7 @@ fn stern(b: &mut MeshBuilder) {
             true,
         );
         // Armour belt down the housing's flank, standing proud with a lit seam.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 vec![
@@ -637,7 +637,7 @@ fn stern(b: &mut MeshBuilder) {
             );
         }
         // Heat shield between the inner and outer drives.
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 vec![
@@ -657,7 +657,7 @@ fn stern(b: &mut MeshBuilder) {
             true,
         );
         // Lift jets under the housing and the chin.
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.frustum(
             v3(92.0, 30.0, 35.8),
             v2(16.0, 15.0),
@@ -689,7 +689,7 @@ fn stern(b: &mut MeshBuilder) {
     blister(b, v3(-116.0, 30.0, 76.4), 1.4);
     blister(b, v3(-116.0, -30.0, 76.4), -1.4);
     // The centre block closes the hold astern; the boom carries the stern gun.
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.block(v3(-141.0, -21.0, 34.0), v3(-103.0, 21.0, 72.0));
     b.loft(
         &band(
@@ -753,7 +753,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         return;
     }
     b.mirror_y(|b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         let rings = SHOULDERS
             .iter()
             .map(|p| shoulder(p[0], p[1], p[2], p[3]))
@@ -781,7 +781,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
                         v3(x, w - 2.0, h - 20.0),
                     ]
                 };
-                b.paint(PLATING).pattern(pattern::AIRFRAME);
+                b.paint(PLATING).pattern(pattern::WARSHIP);
                 b.loft(&[section(x0), section(x1)], true, true);
                 // A dark run of hatches let into the brow's sloping top.
                 let on_top = |x: f32, u: f32, lift: f32| {
@@ -854,7 +854,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
             (-80.0, 35.0, 75.0, 25.0, 24.0),
             (51.0, 24.5, 80.5, 23.0, 14.0),
         ] {
-            b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+            b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
             b.frustum_open(
                 v3(x, y, z - 2.8),
                 v2(l + 5.0, w),
@@ -901,7 +901,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
         b.block(v3(-93.0, 19.1, 65.0), v3(61.0, 19.6, 65.6));
     });
     prow(b);
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.block(v3(-108.0, -20.0, CEILING), v3(68.0, 20.0, 72.0));
     dorsal(b);
     stern(b);
@@ -948,7 +948,7 @@ pub(super) fn build(b: &mut MeshBuilder) {
 
 /// The chin beak run out under the prow's tip to carry the nose gun clear of the hull.
 fn chin_mount(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &band(
             &[
@@ -973,7 +973,7 @@ fn chin_mount(b: &mut MeshBuilder) {
 fn sponson(b: &mut MeshBuilder) {
     let ([x, y, z], _) = TURRETS[1];
     let deck = z - 6.5;
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             vec![

@@ -145,7 +145,7 @@ fn octagon(x: f32, y: f32, z: f32, r: f32, cut: f32) -> Vec<Vec3> {
 /// The dark hull, then the pale carapace over it in three overlapping plates, each a
 /// little proud of the one behind.
 fn hull(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &HULL
             .iter()
@@ -155,7 +155,7 @@ fn hull(b: &mut MeshBuilder) {
         true,
     );
     for (from, to, grow) in [(1, 2, 0.45), (2, 4, 0.3), (4, 6, 0.15)] {
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         let rings: Vec<Vec<Vec3>> = (from..=to)
             .map(|i| {
                 let [x, w, h, z] = HULL[i];
@@ -203,7 +203,7 @@ fn prow(b: &mut MeshBuilder) {
     b.paint(VISOR);
     b.cuboid(v3(x + 0.62, 0.0, z + 0.7), v3(0.2, w * 1.1, 0.5));
     b.mirror_y(|b| {
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 octagon(20.0, 6.0, 10.2, 1.6, 0.6),
@@ -236,7 +236,7 @@ fn boom(b: &mut MeshBuilder, root: Vec3, yaw: f32, k: f32, tiers: usize) {
         * Affine3A::from_scale(Vec3::splat(k));
     b.with(frame, |b| {
         let tip = 4.0 + 6.6 * tiers as f32;
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft_z(
             &ngon(b.sides(8), 1.0),
             &[
@@ -265,7 +265,7 @@ fn boom(b: &mut MeshBuilder, root: Vec3, yaw: f32, k: f32, tiers: usize) {
 fn sponsons(b: &mut MeshBuilder) {
     b.mirror_y(|b| {
         let (y, z) = (SPONSON_Y, SPONSON_Z);
-        b.paint(PLATING).pattern(pattern::AIRFRAME);
+        b.paint(PLATING).pattern(pattern::WARSHIP);
         b.loft(
             &[
                 octagon(18.4, y, z, 0.9, 0.35),
@@ -278,7 +278,7 @@ fn sponsons(b: &mut MeshBuilder) {
             true,
             true,
         );
-        b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+        b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
         b.frustum(
             v3(-1.0, y - 2.7, z - 1.0),
             v2(24.0, 3.0),
@@ -316,7 +316,7 @@ fn sponsons(b: &mut MeshBuilder) {
 /// riser up to the strobe, aerials and the beacon's plinth.
 fn spine(b: &mut MeshBuilder) {
     let top = HULL[3][3] + HULL[3][2];
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(-3.0, 0.0, top - 0.3),
         v2(30.0, 3.6),
@@ -352,7 +352,7 @@ fn spine(b: &mut MeshBuilder) {
 
 /// The keel plate under the belly, where the leg bays sit flush, and the legs.
 fn keel(b: &mut MeshBuilder) {
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.frustum(
         v3(1.0, 0.0, KEEL - 0.2),
         v2(41.0, 11.0),
@@ -368,7 +368,7 @@ fn stern(b: &mut MeshBuilder) {
     let [nx, _, z] = NOZZLE;
     let [tail, _, r, _] = HULL[7];
     let aft = nx + 27.6 * DRIVE_SCALE + 0.4;
-    b.paint(PLATING_DARK).pattern(pattern::AIRFRAME);
+    b.paint(PLATING_DARK).pattern(pattern::WARSHIP);
     b.loft(
         &[
             octagon(tail + 1.0, 0.0, z, r, r * 0.35),

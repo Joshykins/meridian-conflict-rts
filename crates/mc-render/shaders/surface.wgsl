@@ -668,7 +668,8 @@ fn surf_warship(i: SurfaceIn, st: vec2<f32>, out_in: Surface, scuff: f32, lamp: 
     var alive = 1.0 - smoothstep(failing * 0.9, failing * 0.9 + 0.12, hurt * 1.05);
     let sputter = step(0.35, hash11(floor(i.time * 9.0 + plate.id * 90.0) * 0.173 + plate.id));
     alive = max(alive, (1.0 - smoothstep(failing * 0.9 + 0.12, failing * 0.9 + 0.3, hurt)) * sputter);
-    out.emissive = WS_LIGHT * light * alive * lamp * 0.3 * i.lit;
+    // A crewed ship's ports are lit at every tier, even where a tech 1 hull's lines are paint.
+    out.emissive = WS_LIGHT * light * alive * lamp * 0.3;
     return out;
 }
 
