@@ -35,6 +35,7 @@ the money.** Paybacks, energy counted at 6 to 1:
 | Mine T1→T2 | ~165 s |
 | Mine T2→T3 | ~345 s |
 | Mine T3→T4 (the Deep Core) | ~550 s |
+| Material fabricator and the power it needs | ~10x a same-tier mine (250 s / 27 min / 58 min) |
 
 So: mines first, and enough build power to raise them. The tier upgrades come only when
 the time you have left is longer than their payback. In a race that ends at minute 12, a

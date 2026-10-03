@@ -125,6 +125,21 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   to 2 1540 / 9240). A refit kit is paid in full.
 - Commander's Material Formation Engine: +6 mass, +250 energy a second (about a good tech 1
   mine and a tech 2 reactor) for 1600 mass; it was +12 / +2000, worth a hundred tech 1 reactors.
+- **Tier paths are the commitment** (the user, 2026-10-02: "tiering more expensive, more of a
+  commitment", units cheaper against it). Only the ways to a new tier cost more; unit prices
+  stay. Land and air factories 240 / 3,000 / 9,000 mass (Forge to II 2,760, II to III 6,000;
+  naval 260 / 3,080 / 9,100; Regency alike), build times 3,700 / 10,000. The commander's
+  Engineering Suite II costs 2,400 and Suite III 6,000 (kits pay in full; 1,800 / 4,500 time).
+- **Engineers climb in the field**: an engineer puts its own next tier on at that tier's build
+  power (`Blueprints::upgrade_power`), so Mason to Mason II takes 30 s and II to III about
+  21 s (180 s and 107 s at its own power before). It still waits for the side's tech.
+- **Material fabricators** (`fabricator: (mass)`) turn a lot of energy into a little material,
+  as far as their upkeep is paid (nothing in a full stall), and go up like reactors. One of
+  them and the same-tier power it needs pays back about ten times slower than a same-tier
+  mine (the user's rule). Each tier is a building of its own on its power plant's lot, not
+  an upgrade: T1 (2x2) +0.5/s for 15 energy/s, 50 mass, ~250 s; T2 (4x4) +2/s for 1,200,
+  900 mass, ~27 min; T3 (8x8) +5/s for 9,000, 4,650 mass, ~58 min. They share the Mines
+  priority switch. The Regency Condensers are the same.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus
   (`focus.rs`), the Mines and Power priorities in one row under the economy panel: each of
