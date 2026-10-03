@@ -40,7 +40,7 @@ impl Renderer {
             self.slot_count,
             self.stain_count(),
             self.pad_count,
-            self.deposit_count,
+            self.ore.count,
             self.track_count,
             self.prints.count,
             self.projectile_count,
@@ -345,6 +345,7 @@ impl Renderer {
             settle: [settling_count as f32, 0.0, 0.0, 0.0],
             region_climate: climate.region_climate,
             map_look: climate.map_look,
+            ore_claims: [self.ore.claim_range[0], self.ore.claim_range[1], 0, 0],
         };
         self.globals.write(0, bytemuck::bytes_of(&globals));
         self.last_time = input.time;
@@ -700,14 +701,14 @@ impl Renderer {
             self.timers.end(&device, cmd);
 
             self.timers.draws(&device, cmd, "scene.decals");
-            if self.stain_count() + self.pad_count + self.deposit_count > 0 {
+            if self.stain_count() + self.pad_count + self.ore.count > 0 {
                 bind_pass_set(self.stains_set);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.patch_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.patch_ib.buffer, 0, vk::IndexType::UINT32);
                 // Ore fields are ground, under the foundations and the scorch marks.
-                if self.deposit_count > 0 {
+                if self.ore.count > 0 {
                     self.timers
-                        .crumb(cmd, || format!("ore fields x{}", self.deposit_count));
+                        .crumb(cmd, || format!("ore fields x{}", self.ore.count));
                     device.cmd_bind_pipeline(
                         cmd,
                         vk::PipelineBindPoint::GRAPHICS,
@@ -716,10 +717,10 @@ impl Renderer {
                     device.cmd_draw_indexed(
                         cmd,
                         self.patch_index_count,
-                        self.deposit_count,
+                        self.ore.count,
                         0,
                         0,
-                        self.deposit_first,
+                        self.ore.first,
                     );
                 }
                 if self.pad_count > 0 {
@@ -1111,7 +1112,7 @@ impl Renderer {
             // Ore veins glow through the ground, and through trees and units,
             // while the mine survey is up.
             self.timers.draws(&device, cmd, "scene.veins");
-            if self.vein_count > 0 && self.ore_highlight > 0.01 {
+            if self.vein_count > 0 && self.ore.highlight > 0.01 {
                 // Set 0 (scene) is bound already; the veins read nothing else.
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipelines.vein);
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.vein_vb.buffer], &[0]);
@@ -1120,7 +1121,7 @@ impl Renderer {
                     self.layouts.scene,
                     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     0,
-                    bytemuck::bytes_of(&[self.ore_highlight, self.vein_time]),
+                    bytemuck::bytes_of(&[self.ore.highlight, self.ore.vein_time]),
                 );
                 device.cmd_draw(cmd, self.vein_count, 1, 0, 0);
             }

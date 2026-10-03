@@ -973,6 +973,9 @@ pub fn screenshot(
             // MERIDIAN_RECLAIM=1: the reclaim survey, as if Control were held.
             show_reclaim: std::env::var("MERIDIAN_RECLAIM").is_ok_and(|v| v == "1"),
             placing,
+            placing_open: place.zip(placing).and_then(|(bp, at)| {
+                crate::orders::mine_reach::open_instead(&field, bp, glam::Vec2::from(at.to_f32()))
+            }),
         };
         // The report, like the in-match menu, has the pointer to itself.
         ui.interactive = report.is_none();
@@ -1033,6 +1036,10 @@ pub fn screenshot(
                 0.0
             },
         );
+        renderer.set_ore_claims(&crate::hud::ore_claims(
+            &world.blueprints,
+            &view.frame.units,
+        ));
         let input = FrameInput {
             camera: &camera,
             time: 10.0 + i as f32 * 0.016,

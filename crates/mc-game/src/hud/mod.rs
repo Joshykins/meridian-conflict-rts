@@ -62,8 +62,9 @@ use mc_sim::mirror::{
 };
 use mc_sim::tables::flag;
 
-pub use mine_marks::ore_tapped;
+pub(crate) use mine_marks::whose_mine;
 use mine_marks::{mine_marks, mines_in_sight, territory, TERRITORY_SEGMENTS};
+pub use mine_marks::{ore_claimed, ore_claims};
 pub use minimap::MINIMAP_SLOT;
 
 /// Materials (the sim's `mass`): red-orange.
@@ -204,6 +205,9 @@ pub struct Scene<'a> {
     pub show_reclaim: bool,
     /// While placing: the site under the pointer.
     pub placing: Option<mc_core::FxVec2>,
+    /// While placing a core mine inside another's reach: the nearest site out of it
+    /// (`orders::mine_reach::open_instead`).
+    pub placing_open: Option<Vec2>,
     /// A network match's link as it stands; `None` on one machine.
     pub net: Option<&'a crate::netplay::NetLink>,
     /// What the session had to say since the last frame.
@@ -935,8 +939,17 @@ pub fn cursor_hint(
         Mode::Place(b) => {
             let name = blueprints.unit(b).name.clone();
             let why = sites.iter().find_map(|(_, f)| f.err());
+            // A mine going down in the reach of one the side or an ally has planned.
+            let overlaps = sites.iter().filter(|(_, f)| f.is_ok()).find_map(|(at, _)| {
+                let at = Vec2::from(at.to_f32());
+                crate::orders::mine_reach::planned(view, blueprints, b, at, None)
+            });
             match why {
                 Some(why) if fit == 0 => (format!("{name}  \u{b7}  {}", why.label()), palette::BAD),
+                _ if overlaps.is_some() => (
+                    format!("Place {name}  \u{b7}  Overlaps a planned mine"),
+                    palette::WARN,
+                ),
                 _ if fit < placing => (format!("Place {fit} of {placing} {name}"), palette::WARN),
                 _ if placing > 1 => (format!("Place {placing} {name}"), palette::TEXT),
                 _ => (format!("Place {name}"), palette::TEXT),

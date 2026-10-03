@@ -161,11 +161,13 @@ fn overlapping_mines_split_the_ground_along_a_straight_line() {
     // The field sits right on the line between the two.
     let mut w = world(vec![square(5000, 5000, 80)]);
     let reach = spec(&w).reach.floor_int();
-    let a = mine(&mut w, 0, 5002 - reach / 2, 5002);
+    // Lot centres on the 12 m grid, a little over a reach apart: mines keep
+    // out of each other's reach, but their circles still overlap.
+    let a = mine(&mut w, 0, 4494, 5002);
     w.tick(&[]).unwrap();
     let alone = w.state.mines.by_unit[&a].clone();
-    // Anyone may build right beside it: an enemy mine a reach away.
-    let b = mine(&mut w, 1, 5002 + reach / 2, 5002);
+    // Anyone may build just outside its reach: an enemy mine.
+    let b = mine(&mut w, 1, 4494 + reach + 12, 5002);
     w.tick(&[]).unwrap();
     let m = spec(&w);
     let (sa, sb) = (
@@ -192,35 +194,6 @@ fn overlapping_mines_split_the_ground_along_a_straight_line() {
         .unwrap();
     w.tick(&[]).unwrap();
     assert_eq!(w.state.mines.by_unit[&a].land, alone.land);
-}
-
-#[test]
-fn packing_mines_together_pays_no_more_than_the_ground_they_share() {
-    // A 7 x 7 block of mines 100 m apart, against one mine on its own and four
-    // spread out so their reaches barely touch.
-    let rate = |at: &[(i32, i32)]| {
-        let mut w = world(Vec::new());
-        let ids: Vec<UnitId> = at.iter().map(|&(x, y)| mine(&mut w, 0, x, y)).collect();
-        w.tick(&[]).unwrap();
-        dig_out(&mut w);
-        ids.iter().map(|&id| made(&w, id).to_f64()).sum::<f64>()
-    };
-    let one = rate(&[(5002, 5002)]);
-    let block: Vec<(i32, i32)> = (0..49)
-        .map(|i| (4702 + i % 7 * 100, 4702 + i / 7 * 100))
-        .collect();
-    let packed = rate(&block);
-    let spread = rate(&[(3002, 3002), (7002, 3002), (3002, 7002), (7002, 7002)]);
-    // The block covers a little more ground than one circle, so it makes a
-    // little more; shafts crowded into it share one circle's base between them.
-    assert!(
-        packed < one * 2.5,
-        "49 packed make {packed}/s, one alone {one}/s"
-    );
-    assert!(
-        spread > packed,
-        "4 spread make {spread}/s, 49 packed {packed}/s"
-    );
 }
 
 #[test]

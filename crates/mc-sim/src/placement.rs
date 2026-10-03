@@ -32,6 +32,8 @@ pub enum Unfit {
     City,
     /// Another structure, standing or planned, has the lot.
     Taken,
+    /// A core mine inside another mine's reach (`World::mine_in_the_way`).
+    MineReach,
 }
 
 impl Unfit {
@@ -45,6 +47,7 @@ impl Unfit {
             Unfit::Shallow => "Needs deeper water",
             Unfit::City => "City in the way",
             Unfit::Taken => "Lot taken",
+            Unfit::MineReach => "Inside another mine's reach",
         }
     }
 }

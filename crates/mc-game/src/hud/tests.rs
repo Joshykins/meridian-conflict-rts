@@ -114,6 +114,7 @@ impl Rig {
             hover: self.hover,
             show_reclaim: self.reclaim,
             placing: None,
+            placing_open: None,
             net: None,
             net_notices: &[],
         };

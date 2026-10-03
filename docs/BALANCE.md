@@ -103,10 +103,11 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   tech 1, tier 3 at tech 2, the Deep Core at tech 3. Growing the economy, building the army
   and buying the next tier are three choices, not one: a side can raise its mines before it
   pays a tier path, and an upgraded mine (2000 health) is a target worth raiding.
-- A mine's `base` is shared with the mines next to it the way its land is: it gets the part of
-  the base that matches the part of its circle it holds, land or sea. Before this, every shaft
-  paid its full base however close the mines stood, so a packed block of mines made several
-  times what four spread out did (test `packing_mines_together_...`).
+- **A mine keeps out of every other mine's reach** (the user's call, 2026-10-03), anyone's,
+  finished or begun: mines stand at least 1000 m apart, so each keeps about 80% of its circle
+  at worst and nobody packs a field. A mine's `base` is still shared with its neighbours the
+  way its land is: it gets the part of the base that matches the part of its circle it holds,
+  land or sea.
 - Mines are easy to hurt: 600 / 2000 / 5000 / 10000 health (T1-T4). Three Wardens kill a tier 1
   mine in about 10 s, and three Petrels in one pass. A raid on the mines is meant to pay: the
   mine that goes up again digs its land out from nothing.

@@ -148,21 +148,123 @@ fn removing_one_neighbour_frees_its_lot() {
     );
 }
 
+fn spawn_for(w: &World, owner: u8, key: &str, x: i32, y: i32) -> PlayerCommand {
+    let mut c = spawn_at(w, key, x, y);
+    if let Command::DebugSpawn { owner: o, .. } = &mut c.command {
+        *o = owner;
+    }
+    c
+}
+
+fn refused_for_reach(w: &World) -> bool {
+    w.events.iter().any(|e| {
+        matches!(
+            e,
+            mc_sim::SimEvent::CommandRefused {
+                player: 0,
+                reason: mc_sim::Refusal::MineReach,
+            }
+        )
+    })
+}
+
 #[test]
-fn core_mines_may_stand_close_but_not_overlap() {
+fn core_mines_keep_out_of_each_others_reach() {
     let mut w = world();
     let mine = w
         .blueprints
         .unit(w.blueprints.id_of("aster_core_mine").unwrap())
         .clone();
-    let lot = mine.footprint.0 as i32 * mc_map::BUILD_CELL_M;
+    let reach = mine.mine.unwrap().reach.floor_int();
     w.tick(&[spawn_at(&w, "aster_core_mine", 522, 522)])
         .unwrap();
     assert_eq!(count(&w, "aster_core_mine"), 1);
-    let on_top = mc_sim::snap_to_build_grid(&mine, FxVec2::from_ints(522 + lot / 2, 522));
-    let beside = mc_sim::snap_to_build_grid(&mine, FxVec2::from_ints(522 + lot + 6, 522));
-    assert!(!w.can_place(&mine, on_top));
-    assert!(w.can_place(&mine, beside));
+    let site = |x: i32, y: i32| mc_sim::snap_to_build_grid(&mine, FxVec2::from_ints(x, y));
+    let lot = mine.footprint.0 as i32 * mc_map::BUILD_CELL_M;
+    assert!(!w.can_place(&mine, site(522 + lot + 6, 522)), "beside it");
+    assert!(
+        !w.can_place(&mine, site(522 + reach - 20, 522)),
+        "just inside its reach"
+    );
+    assert!(
+        w.can_place(&mine, site(522 + reach + 20, 522)),
+        "just outside"
+    );
+    // Anyone's mine keeps the ground: an enemy's as much as the side's own.
+    w.tick(&[spawn_for(&w, 1, "aster_core_mine", 522, 1580)])
+        .unwrap();
+    assert!(
+        !w.can_place(&mine, site(1000, 1580)),
+        "inside the enemy's reach"
+    );
+    // Other structures may stand in a mine's reach as ever.
+    let pgen = w
+        .blueprints
+        .unit(w.blueprints.id_of("aster_t1_power").unwrap())
+        .clone();
+    assert!(w.can_place(&pgen, FxVec2::from_ints(612, 612)));
+}
+
+#[test]
+fn a_mine_ordered_into_its_own_sides_reach_is_refused_and_the_player_told() {
+    let mut w = world();
+    w.tick(&[
+        spawn_at(&w, "aster_core_mine", 522, 522),
+        spawn_at(&w, "aster_t1_engineer", 700, 700),
+    ])
+    .unwrap();
+    let mine = w.blueprints.id_of("aster_core_mine").unwrap();
+    let build = |w: &World, x: i32, y: i32| {
+        cmd(Command::Build {
+            units: engineer_ids(w),
+            blueprint: mine,
+            pos: FxVec2::from_ints(x, y),
+            heading: Angle::ZERO,
+            queue: false,
+        })
+    };
+    w.tick(&[build(&w, 900, 522)]).unwrap();
+    assert!(refused_for_reach(&w), "the player is told why");
+    let row = w.state.units.row(engineer_ids(&w)[0]).unwrap();
+    assert!(
+        w.state.orders.front(&w.state.units, row).is_none(),
+        "no order was given"
+    );
+}
+
+#[test]
+fn an_enemy_mine_turns_a_builder_away_only_when_it_gets_there() {
+    let mut w = world();
+    w.tick(&[
+        cmd(Command::DebugFreeBuild {
+            player: 0,
+            on: true,
+        }),
+        spawn_for(&w, 1, "aster_core_mine", 522, 522),
+        spawn_at(&w, "aster_t1_engineer", 880, 540),
+    ])
+    .unwrap();
+    let mine = w.blueprints.id_of("aster_core_mine").unwrap();
+    w.tick(&[cmd(Command::Build {
+        units: engineer_ids(&w),
+        blueprint: mine,
+        pos: FxVec2::from_ints(900, 522),
+        heading: Angle::ZERO,
+        queue: false,
+    })])
+    .unwrap();
+    // The order says nothing of a mine the side may not have seen.
+    assert!(!refused_for_reach(&w));
+    let mut told = false;
+    for _ in 0..400 {
+        w.tick(&[]).unwrap();
+        told |= refused_for_reach(&w);
+        if told {
+            break;
+        }
+    }
+    assert!(told, "the builder arrived and the player was told why");
+    assert_eq!(count(&w, "aster_core_mine"), 1, "no second mine begun");
 }
 
 fn engineer_ids(w: &World) -> Vec<mc_sim::UnitId> {
@@ -328,9 +430,8 @@ fn packed_generators_leave_a_lane() {
 }
 
 #[test]
-fn packed_mines_and_storage_leave_a_lane() {
+fn packed_storage_leaves_a_lane() {
     for key in [
-        "aster_core_mine",
         "aster_mass_storage",
         "aster_energy_storage",
         "aster_t2_shield",

@@ -62,7 +62,11 @@ A replay is `(map id, blueprint hash, seed, player setup, command log)`.
 (`mc_map::OreRegion`, format v2). A blueprint with `mine` is a core mine: every hectare of
 land within `reach` (1000 m, the same for every tier) pays `ground` materials a second and
 every hectare of ore `per_hectare`, counted on grids (`OreGrid`: land at 32 m, the overview's
-pitch, ore at 8 m). Overlapping mines, anyone's, divide the ground as a power diagram: a cell
+pitch, ore at 8 m). A mine may not stand inside another mine's reach, anyone's, finished
+or begun (`World::mine_in_the_way`, checked by `can_place`): a Build order into the side's or
+an ally's reach is refused at once (`Refusal::MineReach`), and into an enemy's only when a
+builder arrives, so an order never finds a hidden mine. Their circles may still overlap, and
+overlapping mines divide the ground as a power diagram: a cell
 goes to the mine with the least `distance^2 - reach^2`, so the border between two is the
 straight line through the points where their circles cross. `State::mines` keeps each mine's
 territory (`Share`: land and ore it has, and would have alone; efficiency is the ratio),
@@ -75,7 +79,12 @@ shaft's share. Ore counts only under land. Ore lies deep
 `SHAFT_SPEED` and drives a drift to each field at `DRIFT_SPEED` once the shaft reaches that
 depth; a field's ore pays only from `Vein::reached_at` (mine age, kept through upgrades).
 The renderer draws the ore as real geometry (`ore_vein_mesh`, `fs_vein`, additive, no depth
-test) during the survey; the HUD draws territories, shafts and drifts, cut to the screen. The AI puts mines on
+test) during the survey; the HUD draws territories, shafts and drifts, cut to the screen. The ore
+inside a seen mine's reach dims, pixel by pixel (`renderer/ore_fields.rs`: the reaches go after
+the ore tiles in the stains buffer, `Globals::ore_claims` says where). Placing a mine inside a
+seen mine's reach shows why and the nearest open site (`orders/mine_reach.rs`,
+`hud/mine_marks/reach.rs`); inside a planned mine of the side's or an ally's
+(`SimStatus::ally_mine_plans`) it may go, warned. The AI puts mines on
 the nearest free fields a reach apart, then on bare ground once it has defence and energy.
 
 **The core mine's pit and pipe** (`models/aster/mine.rs`, `models::Pit`). The model digs a

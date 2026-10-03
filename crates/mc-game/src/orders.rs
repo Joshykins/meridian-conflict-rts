@@ -23,11 +23,14 @@ use mc_sim::{Command, Handle};
 use std::collections::{HashMap, HashSet};
 
 mod guard_rings;
+pub(crate) mod mine_reach;
 mod muster;
 mod reclaim_rings;
+mod sites;
 mod wall_line;
 
 pub(crate) use reclaim_rings::reclaim_radius;
+pub use sites::{site, site_verdict};
 
 use guard_rings::{guard_look, guard_ring, orbit_ring, selection_guard_look, GuardLook};
 
@@ -212,126 +215,6 @@ pub(crate) fn bombard_radius<'a>(
 fn half_footprint(blueprints: &Blueprints, blueprint: BlueprintId) -> Vec2 {
     let bp = blueprints.unit(blueprint);
     Vec2::new(bp.footprint.0 as f32, bp.footprint.1 as f32) * (mc_map::BUILD_CELL_M as f32 * 0.5)
-}
-
-/// Where `blueprint` would stand with the pointer on `ground`, and whether it looks
-/// buildable there. `moving` is the site of the plan being dragged, when it is one.
-/// The sim has the final say; this only drives the preview colour.
-pub fn site(
-    field: &Field,
-    blueprint: BlueprintId,
-    ground: Vec3,
-    moving: Option<FxVec2>,
-) -> Option<(FxVec2, bool)> {
-    site_verdict(field, blueprint, ground, moving, &[]).map(|(pos, fit)| (pos, fit.is_ok()))
-}
-
-/// `site`, with why it will not do when it will not.
-pub fn site_verdict(
-    field: &Field,
-    blueprint: BlueprintId,
-    ground: Vec3,
-    moving: Option<FxVec2>,
-    taken: &[FxVec2],
-) -> Option<(FxVec2, Result<(), Unfit>)> {
-    let bp = field.blueprints.unit(blueprint);
-    let pos = mc_sim::world::snap_to_build_grid(bp, to_fx(ground.truncate()));
-    // The ground and the map's cities first, by the sim's own rules.
-    if let Some(sites) = field.view.sites.get() {
-        if let Err(why) = sites.check(bp, pos) {
-            return Some((pos, Err(why)));
-        }
-    }
-    let (pos, valid) = site_among(field, blueprint, ground, moving, taken)?;
-    let why = if field.view.sites.get().is_some() {
-        Unfit::Taken
-    } else {
-        Unfit::Water
-    };
-    Some((pos, if valid { Ok(()) } else { Err(why) }))
-}
-
-/// `site`, treating `taken` as structures already spoken for (the earlier
-/// buildings of a place-drag). The ground itself is `site_verdict`'s, when
-/// the map's sites are known.
-fn site_among(
-    field: &Field,
-    blueprint: BlueprintId,
-    ground: Vec3,
-    moving: Option<FxVec2>,
-    taken: &[FxVec2],
-) -> Option<(FxVec2, bool)> {
-    let Field {
-        view,
-        blueprints,
-        map,
-        ..
-    } = field;
-    let bp = blueprints.unit(blueprint);
-    let mut valid = true;
-    let pos = mc_sim::world::snap_to_build_grid(bp, to_fx(ground.truncate()));
-    // Core mines may stand close: they share what they reach (the HUD shows it).
-    if moving == Some(pos) {
-        return Some((pos, true));
-    }
-    let half = half_footprint(blueprints, blueprint);
-    let p = Vec2::from(pos.to_f32());
-    let overlaps = |centre: Vec2, other: BlueprintId| {
-        let d = (centre - p).abs();
-        let reach = half + half_footprint(blueprints, other);
-        d.x < reach.x && d.y < reach.y
-    };
-    for u in &view.frame.units {
-        let other = BlueprintId(u.blueprint as u16);
-        if u.owner_flags & KIND_WRECK == 0
-            && blueprints.unit(other).is_structure()
-            && overlaps(Vec2::new(u.pos[0], u.pos[1]), other)
-        {
-            valid = false;
-        }
-    }
-    for plan in &view.status.plans {
-        let same = plan.blueprint == blueprint && plan.at == pos;
-        let selected = view.selection.contains(&plan.unit_id);
-        let out_of_the_way = match moving {
-            // The plan in hand; and the same plan in another queue, which it may join.
-            Some(from) => same || (plan.at == from && plan.blueprint == blueprint),
-            // An order that is not queued replaces the selection's plans; the same plan elsewhere can be joined.
-            None => (selected && !view.shift) || (same && !selected),
-        };
-        if !out_of_the_way && overlaps(Vec2::from(plan.pos), plan.blueprint) {
-            valid = false;
-        }
-    }
-    for &centre in taken {
-        if overlaps(Vec2::from(centre.to_f32()), blueprint) {
-            valid = false;
-        }
-    }
-    let water = map.info().water_level.to_f32();
-    if view.sites.get().is_some() {
-        // The ground was judged against the map, above.
-    } else if !bp.water_build && field.renderer.ground_height(ground.truncate()) < water {
-        valid = false;
-    }
-    // A naval yard wants open water under its whole lot: the middle and the corners.
-    if bp.water_only() && view.sites.get().is_none() {
-        let half = Vec2::new(bp.footprint.0 as f32, bp.footprint.1 as f32)
-            * (mc_map::BUILD_CELL_M as f32 * 0.5);
-        let at = Vec2::from(pos.to_f32());
-        for corner in [
-            Vec2::ZERO,
-            half,
-            -half,
-            Vec2::new(half.x, -half.y),
-            Vec2::new(-half.x, half.y),
-        ] {
-            if field.renderer.ground_height(at + corner) >= water {
-                valid = false;
-            }
-        }
-    }
-    Some((pos, valid))
 }
 
 /// Where a structure at `xy` stands: the ground, or the water's surface over the sea.

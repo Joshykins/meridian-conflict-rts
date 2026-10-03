@@ -198,26 +198,25 @@ fn fs_ore(in: StainOut) -> @location(0) vec4<f32> {
     let far = smoothstep(500.0, 3000.0, dist);
 
     // The first corner's unused radius carries the highlight (0..1: placing
-    // or selecting a mine, or Ctrl held), plus 2 when a mine the viewer has
-    // seen is working this field.
-    let raw = stains[first].radius;
-    let tapped = raw >= 1.5;
-    let hi = clamp(raw - select(0.0, 2.0, tapped), 0.0, 1.0);
+    // or selecting a mine, or Ctrl held).
+    let hi = clamp(stains[first].radius, 0.0, 1.0);
     let pulse = 0.5 + 0.5 * sin(globals.camera.w * 3.2 - length(p - stains[first].pos) * 0.03);
+    // Ore inside a mine's reach is spoken for: it dims to a dull rust, so the
+    // ore still free to claim is what stands out.
+    let claimed = ore_claimed(p);
+    let free = 1.0 - claimed;
 
-    // The outline: all a field is in play, a faint red-orange line (pale gold
-    // once tapped); bright and wider while highlighted.
-    let rim_w = 0.8 + far * 2.2 + hi * (1.0 + far * 3.0);
+    // The outline: all a field is in play, a faint red-orange line; bright and
+    // wider while highlighted, unless spoken for.
+    let rim_w = 0.8 + far * 2.2 + hi * free * (1.0 + far * 3.0);
     let rim = 1.0 - smoothstep(rim_w * 0.5, rim_w * 0.5 + aa * 1.5, abs(sd + rim_w * 0.6));
-    // The materials red-orange (hud::MASS, 0xFF6B3D), linear.
-    let ore_col = vec3<f32>(1.0, 0.147, 0.047);
-    let worked = select(0.0, 1.0, tapped);
-    let rim_col = apply_fog_of_war(ore_col, p) * (0.6 + far * 0.6 + worked * 0.5 + hi * (1.2 + 0.5 * pulse));
+    // The materials red-orange (hud::MASS, 0xFF6B3D), linear, and the dull rust
+    // it fades to once claimed.
+    let ore_col = mix(vec3<f32>(1.0, 0.147, 0.047), vec3<f32>(0.55, 0.3, 0.2), claimed * 0.8);
+    let lift = mix(1.0, 0.75, claimed);
+    let rim_col = apply_fog_of_war(ore_col, p) * (0.6 + far * 0.6 + hi * free * (1.2 + 0.5 * pulse)) * lift;
     if hi < 0.01 {
-        // A field a seen mine is working is filled lightly as well, so it
-        // stands apart on the strategic view; the rest are outlines only.
-        let inside = 1.0 - smoothstep(-aa, aa, sd);
-        let a = max(rim * mix(0.4, 0.8, worked), inside * worked * (0.08 + 0.14 * far));
+        let a = rim * mix(0.4, 0.26, claimed);
         if a < 0.01 {
             discard;
         }
@@ -227,16 +226,33 @@ fn fs_ore(in: StainOut) -> @location(0) vec4<f32> {
 
     // Highlighted: the field turns to thin glass over the ore, which the
     // vein geometry (fs_vein) shows underneath; a faint hatch drifts across it.
+    // Claimed ground keeps only a dim, still film.
     let inside = 1.0 - smoothstep(-aa, aa, sd);
     let hatch_w = mix(4.0, 40.0, far);
     let hatch = smoothstep(0.82, 1.0, sin((p.x + p.y) / hatch_w * 3.14159 + globals.camera.w * 1.5) * 0.5 + 0.5);
-    let fill = inside * (0.06 + 0.1 * hatch + 0.06 * pulse);
+    let fill = inside * mix(0.025, 0.06 + 0.1 * hatch + 0.06 * pulse, free);
     let col = mix(apply_fog_of_war(ore_col * 0.7, p), rim_col, rim);
-    let alpha = clamp(max(fill, rim * 0.9) * hi + rim * 0.4 * (1.0 - hi), 0.0, 0.9);
+    let rim_a = mix(0.9, 0.45, claimed);
+    let alpha = clamp(max(fill, rim * rim_a) * hi + rim * 0.4 * (1.0 - hi), 0.0, 0.9);
     if alpha < 0.01 {
         discard;
     }
     return vec4<f32>(apply_haze(col, in.world, eye), alpha);
+}
+
+// How far `p` lies in the reach of a mine in sight, 0..1, eased in over a few
+// metres at the edge and by how far the claim has faded in. The claims are Stains
+// after the ore fields (renderer/ore_fields.rs): centre, reach, strength 0..255.
+fn ore_claimed(p: vec2<f32>) -> f32 {
+    var k = 0.0;
+    let first = globals.ore_claims.x;
+    for (var i = 0u; i < globals.ore_claims.y; i++) {
+        let c = stains[first + i];
+        let strength = f32(c.strength_seed & 0xFFu) / 255.0;
+        let inside = 1.0 - smoothstep(c.radius - 8.0, c.radius + 8.0, distance(p, c.pos));
+        k = max(k, inside * strength);
+    }
+    return k;
 }
 
 struct PadOut {

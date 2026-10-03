@@ -17,6 +17,7 @@ fn scene<'a>(rig: &'a Rig, stats: &'a FrameStats) -> Scene<'a> {
         hover: None,
         show_reclaim: false,
         placing: None,
+        placing_open: None,
         net: None,
         net_notices: &[],
     }

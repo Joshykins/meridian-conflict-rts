@@ -94,6 +94,9 @@ struct Globals {
     region_climate: array<vec4<f32>, REGIONS_MAX>,
     // x metres the desert's rock beds are lowered (`MapConfig::strata_lift`, desert.wgsl).
     map_look: vec4<f32>,
+    // The mines' reaches the ore dims under (renderer/ore_fields.rs): x the first's
+    // index in `stains`, y how many. Each is a Stain: centre, reach, strength 0..255.
+    ore_claims: vec4<u32>,
 }
 
 // `a` where `w` is 0 and `b` where it is 1, exactly (so a map of one climate is drawn

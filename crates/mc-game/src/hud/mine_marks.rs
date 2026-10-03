@@ -14,6 +14,10 @@ use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK};
 use mc_sim::tables::OrderKind;
 use std::f32::consts::TAU;
 
+mod reach;
+
+pub(crate) use reach::whose as whose_mine;
+
 /// The middle of every ore field (the mean of its corners), in map order.
 fn ore_centres(map: &MapFile) -> Vec<Vec2> {
     map.ore_regions()
@@ -50,9 +54,21 @@ pub(super) fn mines_in_sight(blueprints: &Blueprints, units: &[UnitInstance]) ->
         .collect()
 }
 
-/// Which ore fields, in map order, a mine the viewer has seen is working:
-/// its middle lies in some mine's reach.
-pub fn ore_tapped(map: &MapFile, blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<bool> {
+/// The reach of every mine in sight, for the ore the renderer dims under it.
+pub fn ore_claims(blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<mc_render::OreClaim> {
+    mines_in_sight(blueprints, units)
+        .into_iter()
+        .map(|m| mc_render::OreClaim {
+            id: m.id,
+            centre: m.at.into(),
+            reach: m.reach,
+        })
+        .collect()
+}
+
+/// Which ore fields, in map order, are spoken for: the middle lies in the
+/// reach of a mine in sight.
+pub fn ore_claimed(map: &MapFile, blueprints: &Blueprints, units: &[UnitInstance]) -> Vec<bool> {
     let mines = mines_in_sight(blueprints, units);
     ore_centres(map)
         .into_iter()
@@ -465,6 +481,11 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
     let mut mines = built_sites(s);
     let planned = planned_sites(s, &mines);
     mines.extend(planned);
+    // What stands in the way of the mine under the pointer (`reach.rs`).
+    let verdict = placing.and_then(|(bp, _)| {
+        let at = Vec2::from(s.placing?.to_f32());
+        Some(reach::Verdict::of(s, bp, at))
+    });
     let ghost = placing.and_then(|(bp, m)| {
         let at = Vec2::from(s.placing?.to_f32());
         Some(Site {
@@ -475,6 +496,7 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
             age: None,
             spread: 0.0,
             kind: SiteKind::Ghost,
+            alarm: verdict.as_ref().and_then(reach::Verdict::tone),
         })
     });
     let ghost_at = ghost.as_ref().map(|g| g.at);
@@ -498,14 +520,32 @@ pub(super) fn mine_marks(ui: &mut Ui, s: &Scene, survey: &mut Survey) {
         }
     }
 
+    if let (Some(v), Some(at)) = (&verdict, ghost_at) {
+        reach::draw(ui, s, at, v, far, time);
+    }
+
     // The deposits themselves are real geometry the renderer draws through
     // the ground (`ore_vein_mesh`, `fs_vein`) while the survey is up.
     mine_cards(ui, s, &selected, &fields, time);
 
-    // What the mine under the pointer would make there.
+    // What the mine under the pointer would make there; or, when it cannot go
+    // there, why.
     let (Some((bp, mine)), Some(fx), Some(site)) = (placing, s.placing, ghost_at) else {
         return;
     };
+    let screen = s
+        .camera
+        .project(site.extend(overview_height(s.map, site)))
+        .map(|p| p / ui.s);
+    if let (Some(v), Some(c)) = (&verdict, screen) {
+        if let Some(crowd) = &v.crowd {
+            reach::blocked_card(ui, s, c, crowd, v.open.is_some());
+            return;
+        }
+        if let Some(warn) = &v.warn {
+            reach::warn_card(ui, s, c, warn);
+        }
+    }
     // Its neighbours, the planned ones too: the land it would have once they stand.
     let others: Vec<(Vec2, f32)> = mines
         .iter()
@@ -527,6 +567,8 @@ struct Site {
     /// Metres out the land it works reaches so far.
     spread: f32,
     kind: SiteKind,
+    /// The ghost's tone when another mine is in its way (`reach.rs`).
+    alarm: Option<u32>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -559,24 +601,30 @@ fn built_sites(s: &Scene) -> Vec<Site> {
                 age: Some(view.map_or(1.0e9, |v| v.age)),
                 spread: view.map_or(1.0e9, |v| v.spread),
                 kind: SiteKind::Built,
+                alarm: None,
             })
         })
         .collect()
 }
 
-/// Mines the viewer's side has queued and not started: each once, though a
-/// group's builders all carry it, and none where a site already stands.
+/// Mines the viewer's side and its allies have queued and not started: each
+/// once, though a group's builders all carry it, and none where a site already
+/// stands.
 fn planned_sites(s: &Scene, built: &[Site]) -> Vec<Site> {
     let mut planned: Vec<Site> = Vec::new();
-    for o in s.view.status.queues.iter().flat_map(|q| &q.orders) {
-        if o.kind != OrderKind::Build {
-            continue;
-        }
-        let bp = s.blueprints.unit(o.blueprint);
+    let status = &s.view.status;
+    let queued = (status.queues.iter().flat_map(|q| &q.orders))
+        .filter(|o| o.kind == OrderKind::Build)
+        .map(|o| (o.blueprint, o.at));
+    let plans = (status.plans.iter())
+        .chain(status.ally_mine_plans.iter().map(|(_, p)| p))
+        .map(|p| (p.blueprint, p.at));
+    for (blueprint, at) in queued.chain(plans) {
+        let bp = s.blueprints.unit(blueprint);
         let Some(m) = bp.mine else {
             continue;
         };
-        let at = Vec2::from(o.at.to_f32());
+        let at = Vec2::from(at.to_f32());
         if built
             .iter()
             .chain(&planned)
@@ -593,6 +641,7 @@ fn planned_sites(s: &Scene, built: &[Site]) -> Vec<Site> {
             age: None,
             spread: 0.0,
             kind: SiteKind::Planned,
+            alarm: None,
         });
     }
     planned
@@ -744,11 +793,11 @@ fn draw_territory(
     let viewport = s.camera.viewport / scale;
     let (outline, coarse) = (&plan.outline, &plan.coarse);
     let look = tier_look(site.tier);
-    let tone = if site.kind == SiteKind::Built {
+    let tone = site.alarm.unwrap_or(if site.kind == SiteKind::Built {
         heat(MASS, look.heat)
     } else {
         PLANNED
-    };
+    });
     // Close in the territory is bigger than the screen: only the edge.
     if far > 0.15 {
         if let Some(c) = ground(s, scale, site.at) {
@@ -799,7 +848,17 @@ fn draw_territory(
     let lift = |p: Vec2| p.extend(overview_height(s.map, p) + 1.5);
     let edge: Vec<Vec3> = outline.iter().map(|&p| lift(p)).collect();
     let width = look.width + far * 1.6;
-    if site.spread < site.reach {
+    if let (true, Some(alarm)) = (site.spread < site.reach, site.alarm) {
+        dashed(
+            ui,
+            s,
+            &edge,
+            width,
+            rgb(alarm, 0.8 * strength),
+            time * 18.0,
+            None,
+        );
+    } else if site.spread < site.reach {
         planned(ui, s, &edge, width, 0.6 * strength, time * 18.0);
     } else if let Some((on, period)) = look.dash {
         dashed_by(

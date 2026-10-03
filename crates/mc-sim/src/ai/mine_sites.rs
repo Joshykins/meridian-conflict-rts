@@ -97,17 +97,11 @@ impl World {
         claimed: &[Claim],
         intel: &Intel,
     ) -> bool {
-        // Mines may stand close, but split the ground between them: keep them
-        // a reach apart, where each still has about 80% of its circle. They
-        // stand on land only.
-        let units = &self.state.units;
-        let spacing = m.reach;
-        let crowded = units.slots.iter().any(|row| {
-            self.bp(row).mine.is_some() && units.pos[row].distance_sq(d) < spacing * spacing
-        });
+        // Mines keep out of each other's reach (`can_place`), where each still
+        // has about 80% of its circle. They stand on land only.
         d.distance(from) <= range
             && self.terrain.height_at(d) > self.terrain.water_level()
-            && !crowded
+            && self.mine_in_the_way(d, m.reach, None).is_none()
             // A planned mine counts like a built one. Its site can stand well off
             // the deposit (the middle may be steep), so a check near the site
             // alone sent every idle builder back to the same deposit, one

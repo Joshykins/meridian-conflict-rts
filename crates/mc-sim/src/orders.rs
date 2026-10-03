@@ -189,6 +189,16 @@ impl World {
                 if !rows.iter().any(|&row| can_start(row)) {
                     return Ok(());
                 }
+                // A mine inside the reach of one of the side's own or its allies'
+                // is refused at once. An enemy's turns it away only when a builder
+                // arrives: an order is not a way to find hidden mines.
+                if let Some(m) = bp.mine {
+                    let team = self.team_mask(player);
+                    if self.mine_in_the_way(site, m.reach, Some(team)).is_some() {
+                        self.refuse(player, Refusal::MineReach);
+                        return Ok(());
+                    }
+                }
                 // Plans these builders are about to drop are not in the way.
                 if self.plan_blocks(player, *blueprint, site, |row, _| {
                     !*queue && rows.contains(&row)
@@ -655,7 +665,7 @@ impl World {
                 || (self.can_place(self.blueprints.unit(blueprint), site)
                     && !self.plan_blocks(player, blueprint, site, moved));
             if !fits {
-                self.events.push(SimEvent::BuildRejected { player });
+                self.reject_site(player, blueprint, site);
                 return Ok(());
             }
             site
@@ -849,6 +859,21 @@ impl World {
             self.refuse(player, Refusal::PatrolTooLong);
         }
         Ok(())
+    }
+
+    /// Tells `player` that `blueprint` cannot go at `site`: why, when it is a mine
+    /// in another's reach, else that the lot will not do.
+    fn reject_site(&mut self, player: u8, blueprint: BlueprintId, site: FxVec2) {
+        let crowded = self
+            .blueprints
+            .unit(blueprint)
+            .mine
+            .is_some_and(|m| self.mine_in_the_way(site, m.reach, None).is_some());
+        if crowded {
+            self.refuse(player, Refusal::MineReach);
+        } else {
+            self.events.push(SimEvent::BuildRejected { player });
+        }
     }
 
     /// Tells `player` a command of theirs ran into a limit (CLAUDE.md: no silent caps).
@@ -2653,9 +2678,7 @@ impl World {
                 self.take_site(row, existing);
                 return Ok(());
             }
-            self.events.push(SimEvent::BuildRejected {
-                player: self.state.units.owner[row],
-            });
+            self.reject_site(self.state.units.owner[row], o.blueprint, o.pos);
             self.finish_order(row);
             return Ok(());
         }

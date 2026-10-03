@@ -615,9 +615,16 @@ over about a minute. Both are drawn only near the camera.
   `(1.0, 0.147, 0.047)` in ground.wgsl): numbers, fields, veins, territories,
   shafts, the minimap. The sim still calls it `mass`; the old mint green is
   now `hud::HEALTHY`, for unit health only.
-- **In play an ore field is a faint outline**, nothing else. A field a mine
-  the viewer has seen is working gets a brighter rim and a light fill, the
-  same hue, so worked ground reads on the strategic view and the minimap.
+- **In play an ore field is a faint outline**, nothing else. The ore inside
+  the reach of a mine in sight dims to a dull rust (on the minimap too), and
+  does so over half a second as the mine goes up, so the ore still free to
+  claim is what stands out.
+- **Placing a mine in another's reach**: inside a mine in sight it cannot go.
+  The ghost and its territory turn red, the circle in the way breathes red, a
+  bar with an arrow says how many metres too close it is, and green chevrons
+  lead to the nearest open site. Inside a mine the side or an ally has only
+  planned it may go: amber, with that plan's circle in marching amber dashes
+  and whose it is, and a notice when it is placed.
 - **The survey** (placing or selecting a core mine, or holding Ctrl): the
   fields light up with their veins, branching orange lines at depth under
   each field; every mine in sight shows its territory, its circle cut

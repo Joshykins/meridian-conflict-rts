@@ -44,6 +44,8 @@ mod game_nuke_sounds;
 pub(crate) mod groups;
 #[path = "game_menu.rs"]
 mod menu_screens;
+#[path = "game_mines.rs"]
+mod mine_placing;
 #[path = "game_music.rs"]
 mod music_notes;
 #[path = "game_reclaim.rs"]
@@ -1269,6 +1271,7 @@ impl Game {
                     audio.play(Sfx::Deny);
                 } else {
                     audio.play(Sfx::Order);
+                    self.warn_of_planned_mines(blueprint, &valid);
                     let units = self.selected_ids();
                     let heading = self.blueprints.unit(blueprint).build_heading();
                     for (i, pos) in valid.into_iter().enumerate() {
@@ -4623,6 +4626,19 @@ impl Game {
             // A network match's pause is the relay's, whoever asked for it.
             self.view.paused = link.paused_by.is_some();
         }
+        let placing_open = match (self.view.mode, sites.last()) {
+            (Mode::Place(bp), Some(&(at, _))) => {
+                let field = Field {
+                    view: &self.view,
+                    blueprints: &self.blueprints,
+                    map: &self.map,
+                    camera: &self.camera,
+                    renderer,
+                };
+                orders::mine_reach::open_instead(&field, bp, Vec2::from(at.to_f32()))
+            }
+            _ => None,
+        };
         let scene = hud::Scene {
             net: link.as_ref(),
             net_notices: &net_notices,
@@ -4633,6 +4649,7 @@ impl Game {
             gpu: &renderer.stats,
             show_reclaim: self.ctrl && !self.alt && self.menu.is_none() && !self.hud.free.on,
             placing: sites.last().map(|s| s.0),
+            placing_open,
             hover: hover_unit
                 .filter(|&i| self.can_inspect(&self.view.frame.units[i]))
                 .map(|i| self.view.frame.units[i].unit_id),
@@ -4702,11 +4719,7 @@ impl Game {
         let survey = !self.hud.free.on
             && (placing_mine || mine_selected || (self.ctrl && !self.alt && self.menu.is_none()));
         renderer.set_ore_highlight(if survey { 1.0 } else { 0.0 });
-        renderer.set_ore_tapped(&hud::ore_tapped(
-            &self.map,
-            &self.blueprints,
-            &self.view.frame.units,
-        ));
+        renderer.set_ore_claims(&hud::ore_claims(&self.blueprints, &self.view.frame.units));
         let build_grid = matches!(self.view.mode, Mode::Place(_)) || self.orders.dragging_plan();
         if build_grid {
             let field = Field {

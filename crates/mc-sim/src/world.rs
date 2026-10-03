@@ -1277,9 +1277,17 @@ pub(crate) fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (
 
 impl World {
     /// Placement rules for a structure: inside the map, on ground its layer
-    /// allows, not overlapping another structure. Core mines may stand close;
-    /// they share what they reach instead.
+    /// allows, not overlapping another structure. A core mine also keeps out
+    /// of every other mine's reach, anyone's, finished or begun (`mine_in_the_way`).
     pub fn can_place(&self, bp: &UnitBlueprint, pos: FxVec2) -> bool {
+        self.lot_fits(bp, pos)
+            && bp
+                .mine
+                .is_none_or(|m| self.mine_in_the_way(pos, m.reach, None).is_none())
+    }
+
+    /// `can_place` without the mines' reach: the lot alone.
+    pub(crate) fn lot_fits(&self, bp: &UnitBlueprint, pos: FxVec2) -> bool {
         let size = self.terrain.size_metres();
         let half = FxVec2::from_ints(
             bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
@@ -1314,10 +1322,7 @@ impl World {
             return false;
         }
         let place = place_cells_of(bp.footprint, pos);
-        if !self.nav.no_blockers(place.0, place.1) || !self.nav.lots_free(place.0, place.1) {
-            return false;
-        }
-        true
+        self.nav.no_blockers(place.0, place.1) && self.nav.lots_free(place.0, place.1)
     }
 
     /// A structure of category `categories` whose footprint contains `pos`, if any.

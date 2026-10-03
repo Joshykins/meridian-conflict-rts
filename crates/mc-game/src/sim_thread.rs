@@ -96,6 +96,9 @@ pub struct SimStatus {
     pub queues: Vec<UnitOrders>,
     /// Every structure the watched side has planned and not begun.
     pub plans: Vec<PlannedBuild>,
+    /// The core mines the watched side's allies have planned and not begun, with
+    /// whose they are: placing a mine in one's reach is warned of.
+    pub ally_mine_plans: Vec<(u8, PlannedBuild)>,
     /// Set when the match cannot continue: a limit was hit, a desync, a lost connection.
     pub error: Option<String>,
     /// Survival's rounds and nodes; None in any other match.
@@ -296,6 +299,7 @@ pub fn status_of(world: &World, worst: u64) -> SimStatus {
         owns_clock: false,
         queues: Vec::new(),
         plans: Vec::new(),
+        ally_mine_plans: Vec::new(),
         error: None,
         survival: world.survival_status(),
         replay: None,
@@ -366,6 +370,30 @@ fn write_watched(world: &World, local: Option<u8>, watch: &Watch, status: &mut S
         }
     } else if let Some(side) = side.filter(|s| (*s as usize) < world.state.players.len()) {
         world.write_plans(side, &mut status.plans);
+    }
+    write_ally_mine_plans(world, local.and(side), &mut status.ally_mine_plans);
+}
+
+/// The core mines `side`'s allies have planned, for the warning when the side places one
+/// in their reach. Observers place nothing.
+fn write_ally_mine_plans(world: &World, side: Option<u8>, out: &mut Vec<(u8, PlannedBuild)>) {
+    out.clear();
+    let Some(side) = side.filter(|s| (*s as usize) < world.state.players.len()) else {
+        return;
+    };
+    let team = world.state.players[side as usize].team;
+    let mut plans = Vec::new();
+    for (i, p) in world.state.players.iter().enumerate() {
+        if i == side as usize || p.team != team {
+            continue;
+        }
+        world.write_plans(i as u8, &mut plans);
+        out.extend(
+            plans
+                .drain(..)
+                .filter(|b| world.blueprints.unit(b.blueprint).mine.is_some())
+                .map(|b| (i as u8, b)),
+        );
     }
 }
 

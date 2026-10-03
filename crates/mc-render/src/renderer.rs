@@ -74,6 +74,7 @@ mod map_look;
 mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
+mod ore_fields;
 mod plasma_fx;
 mod post;
 mod quality;
@@ -101,6 +102,7 @@ mod work_beams;
 mod wreck_finish;
 mod wreck_fx;
 pub(crate) use effect_barriers::EffectBarrier;
+pub use ore_fields::OreClaim;
 pub use post::Antialiasing;
 pub use quality::SceneQuality;
 mod breadcrumbs;
@@ -345,6 +347,9 @@ pub(crate) struct Globals {
     pub(crate) region_climate: [[f32; 4]; crate::gpu_consts::regions::MAX as usize],
     /// x the map's `strata_lift` in metres.
     pub(crate) map_look: [f32; 4],
+    /// The mines' reaches the ore dims under (`ore_fields.rs`): x the first's
+    /// index in the stains, y how many.
+    pub(crate) ore_claims: [u32; 4],
 }
 
 /// Lots the build grid shows as taken, at most.
@@ -956,23 +961,8 @@ pub struct Renderer {
     /// device's breadcrumbs say which kind was on the GPU.
     stain_runs: [u32; 2],
     pad_count: u32,
-    /// Ore fields as ground splats, written after stains and pads: every
-    /// field's corners first, then the tiles that cover the fields.
-    deposit_splats: Vec<StainInstance>,
-    /// How many entries at the front of `deposit_splats` are corners, not tiles.
-    ore_corners: usize,
-    /// 0..1: how strongly ore fields show. Faint normally; full while a mine is
-    /// placed. Eases toward the goal a little every frame.
-    ore_highlight: f32,
-    ore_highlight_goal: f32,
-    /// Seconds, for the veins' drifting glints.
-    vein_time: f32,
-    /// Corner count of every ore field, in order, and which are being mined
-    /// by a mine the viewer has seen.
-    ore_regions: Vec<usize>,
-    ore_tapped: Vec<bool>,
-    deposit_count: u32,
-    deposit_first: u32,
+    /// The ore fields on the ground and the mines' reaches they dim under.
+    ore: ore_fields::OreFields,
     effect_cursor: usize,
     shockwave_cursor: usize,
     /// When each shockwave slot's wave is over, so the tone map visits only live ones.
@@ -1583,10 +1573,7 @@ impl Renderer {
             }));
             cliff_rocks::CliffRocks::new(&statics_data, first)
         };
-        let rounded: Vec<mc_map::OreRegion> =
-            scene.map.ore_regions().iter().map(rounded_ore).collect();
-        let (deposit_splats, ore_corners) = ore_splats(&rounded);
-        let ore_regions: Vec<usize> = rounded.iter().map(|r| r.points.len()).collect();
+        let ore = ore_fields::OreFields::new(scene.map.ore_regions());
         let vein_mesh = ore_vein_mesh(scene.map.ore_regions());
         let static_count = statics_data.len() as u32;
 
@@ -2517,15 +2504,7 @@ impl Renderer {
             projectile_count: 0,
             stain_runs: [0; 2],
             pad_count: 0,
-            deposit_splats,
-            ore_corners,
-            ore_highlight: 0.0,
-            ore_highlight_goal: 0.0,
-            vein_time: 0.0,
-            ore_tapped: vec![false; ore_regions.len()],
-            ore_regions,
-            deposit_count: 0,
-            deposit_first: 0,
+            ore,
             effect_cursor: 0,
             shockwave_cursor: 0,
             shockwave_ends: [f32::NEG_INFINITY; MAX_SHOCKWAVES],
@@ -2615,15 +2594,12 @@ impl Renderer {
     /// How strongly ore fields show, 0..1: faint in play, full while a core
     /// mine is being placed.
     pub fn set_ore_highlight(&mut self, k: f32) {
-        self.ore_highlight_goal = k.clamp(0.0, 1.0);
+        self.ore.set_highlight(k);
     }
 
-    /// Which ore fields (in map order) a mine the viewer has seen is working;
-    /// they take another colour from far away.
-    pub fn set_ore_tapped(&mut self, tapped: &[bool]) {
-        for (t, &v) in self.ore_tapped.iter_mut().zip(tapped) {
-            *t = v;
-        }
+    /// The mines in sight whose reach the ore under dims (`ore_fields.rs`).
+    pub fn set_ore_claims(&mut self, claims: &[OreClaim]) {
+        self.ore.set_claims(claims);
     }
 
     pub fn set_build_grid(&mut self, cursor: glam::Vec2, radius: f32, blocked: &[[f32; 4]]) {
@@ -3224,36 +3200,7 @@ impl Renderer {
         }
         self.pad_count = pads.len() as u32;
         let used = stained + pads.len();
-        // All or nothing: a tile without its field's corners would draw garbage.
-        let n = if self.deposit_splats.len() <= MAX_STAINS.saturating_sub(used) {
-            self.deposit_splats.len()
-        } else {
-            0
-        };
-        if n > 0 {
-            // Corners carry the highlight in their unused radius, plus 2 on a
-            // field a seen mine is working.
-            self.ore_highlight += (self.ore_highlight_goal - self.ore_highlight) * 0.18;
-            self.vein_time += 1.0 / 60.0;
-            let mut at = 0;
-            for (i, &n) in self.ore_regions.iter().enumerate() {
-                let tapped = if self.ore_tapped.get(i).copied().unwrap_or(false) {
-                    2.0
-                } else {
-                    0.0
-                };
-                for c in &mut self.deposit_splats[at..at + n] {
-                    c.radius = self.ore_highlight + tapped;
-                }
-                at += n;
-            }
-            self.stains.write(
-                (used * size_of::<StainInstance>()) as u64,
-                bytemuck::cast_slice(&self.deposit_splats[..n]),
-            );
-        }
-        self.deposit_first = (used + self.ore_corners) as u32;
-        self.deposit_count = n.saturating_sub(self.ore_corners) as u32;
+        self.ore.upload(&self.stains, used, MAX_STAINS, time);
 
         let dead_bytes: &[u8] =
             bytemuck::cast_slice(self.cliff_rocks.dead_props(&frame.props_dead));
@@ -6219,114 +6166,6 @@ mod glass_tests {
             dark_mean < under_mean * 0.75,
             "tinted glass is not darker: {dark_mean} vs {under_mean}"
         );
-    }
-}
-
-/// Edge of the square decal tiles an ore field is drawn with, metres: six
-/// patch quads of one terrain cell each.
-const ORE_TILE_M: f32 = 48.0;
-
-/// Ore fields for the ground pass. Every field's corners go first (only `pos`
-/// is used); then one tile per 48 m square that touches a field, whose
-/// `strength_seed` packs the corner count (low 8 bits) and how far back from
-/// the tile its field's first corner is (the rest), so the shader can find the
-/// outline whatever offset the block is uploaded at. Returns the entries and
-/// how many of them are corners.
-/// A field's outline with its corners rounded off (Chaikin corner cutting),
-/// for the drawn rim only: the few corners of a map polygon read as a hard,
-/// hand-cut shape. The rounded line lies just inside the real one; the sim
-/// keeps the real corners. At most 64 corners, the rim shader walks them all.
-fn rounded_ore(region: &mc_map::OreRegion) -> mc_map::OreRegion {
-    let mut pts: Vec<[f32; 2]> = region.points.iter().map(|p| p.to_f32()).collect();
-    for _ in 0..3 {
-        if pts.len() < 3 || pts.len() * 2 > 64 {
-            break;
-        }
-        let n = pts.len();
-        pts = (0..n)
-            .flat_map(|i| {
-                let (a, b) = (pts[i], pts[(i + 1) % n]);
-                let at = |t: f32| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-                [at(0.25), at(0.75)]
-            })
-            .collect();
-    }
-    let fx = |v: f32| mc_core::Fx::from_f32(v);
-    mc_map::OreRegion {
-        points: pts
-            .into_iter()
-            .map(|p| mc_core::FxVec2::new(fx(p[0]), fx(p[1])))
-            .collect(),
-    }
-}
-
-fn ore_splats(regions: &[mc_map::OreRegion]) -> (Vec<StainInstance>, usize) {
-    let mut corners = Vec::new();
-    let mut firsts = Vec::new();
-    for r in regions {
-        firsts.push(corners.len());
-        corners.extend(r.points.iter().map(|p| StainInstance {
-            pos: p.to_f32(),
-            radius: 0.0,
-            strength_seed: 0,
-        }));
-    }
-    let corner_count = corners.len();
-    let mut tiles = Vec::new();
-    for (r, &first) in regions.iter().zip(&firsts) {
-        let (lo, hi) = r.bounds();
-        let (lo, hi) = (lo.to_f32(), hi.to_f32());
-        // One tile of margin for the rim and the ragged edge.
-        let tx0 = ((lo[0] - 8.0) / ORE_TILE_M).floor() as i32;
-        let ty0 = ((lo[1] - 8.0) / ORE_TILE_M).floor() as i32;
-        let tx1 = ((hi[0] + 8.0) / ORE_TILE_M).floor() as i32;
-        let ty1 = ((hi[1] + 8.0) / ORE_TILE_M).floor() as i32;
-        let pts: Vec<[f32; 2]> = r.points.iter().map(|p| p.to_f32()).collect();
-        for ty in ty0..=ty1 {
-            for tx in tx0..=tx1 {
-                let centre = [
-                    (tx as f32 + 0.5) * ORE_TILE_M,
-                    (ty as f32 + 0.5) * ORE_TILE_M,
-                ];
-                // Skip tiles wholly outside the outline (plus the margin).
-                if polygon_distance(&pts, centre) > ORE_TILE_M * 0.72 + 8.0 {
-                    continue;
-                }
-                let index = corner_count + tiles.len();
-                let back = (index - first) as u32;
-                tiles.push(StainInstance {
-                    pos: centre,
-                    radius: ORE_TILE_M * 0.5,
-                    strength_seed: pts.len() as u32 | back << 8,
-                });
-            }
-        }
-    }
-    corners.extend(tiles);
-    (corners, corner_count)
-}
-
-/// Signed distance from `p` to the polygon `pts`, negative inside.
-fn polygon_distance(pts: &[[f32; 2]], p: [f32; 2]) -> f32 {
-    let mut d = f32::MAX;
-    let mut inside = false;
-    let n = pts.len();
-    for i in 0..n {
-        let (a, b) = (pts[i], pts[(i + n - 1) % n]);
-        let e = [b[0] - a[0], b[1] - a[1]];
-        let w = [p[0] - a[0], p[1] - a[1]];
-        let t =
-            ((w[0] * e[0] + w[1] * e[1]) / (e[0] * e[0] + e[1] * e[1]).max(1e-6)).clamp(0.0, 1.0);
-        let q = [w[0] - e[0] * t, w[1] - e[1] * t];
-        d = d.min(q[0] * q[0] + q[1] * q[1]);
-        if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < a[0] + e[0] * (p[1] - a[1]) / e[1] {
-            inside = !inside;
-        }
-    }
-    if inside {
-        -d.sqrt()
-    } else {
-        d.sqrt()
     }
 }
 

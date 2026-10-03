@@ -105,17 +105,25 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     );
 
     // Ore fields are baked into the chart image (`ui::preview`); the ones a
-    // mine the viewer has seen is working get a bright materials outline.
-    let tapped = super::ore_tapped(s.map, s.blueprints, &view.frame.units);
-    for (region, _) in s.map.ore_regions().iter().zip(&tapped).filter(|(_, t)| **t) {
+    // mine in sight has in its reach are dimmed, as on the ground, so the ore
+    // still free stands out.
+    let claimed = super::ore_claimed(s.map, s.blueprints, &view.frame.units);
+    for (region, _) in s
+        .map
+        .ore_regions()
+        .iter()
+        .zip(&claimed)
+        .filter(|(_, c)| **c)
+    {
         let pts: Vec<Vec2> = region
             .points
             .iter()
             .map(|p| chart_pos(s, chart, Vec2::from(p.to_f32())))
             .collect();
+        let middle = pts.iter().copied().sum::<Vec2>() / pts.len().max(1) as f32;
         for (i, &a) in pts.iter().enumerate() {
             let b = pts[(i + 1) % pts.len()];
-            ui.stroke(a, b, 1.6, rgb(super::MASS, 1.0));
+            ui.triangle(middle, a, b, ink(0.55));
         }
     }
     super::survival::minimap(hud, ui, s, &|p| chart_pos(s, chart, p));

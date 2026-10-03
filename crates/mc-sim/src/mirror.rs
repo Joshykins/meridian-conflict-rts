@@ -62,6 +62,8 @@ pub enum Refusal {
     StandingOrdersFull,
     /// A factory's queue holds at most `orders::MAX_FACTORY_QUEUE` orders.
     FactoryQueueFull,
+    /// A core mine may not stand inside another mine's reach (`World::mine_in_the_way`).
+    MineReach,
 }
 
 impl Refusal {
@@ -81,6 +83,7 @@ impl Refusal {
                 "A factory queue holds at most {} units",
                 crate::orders::MAX_FACTORY_QUEUE
             ),
+            Refusal::MineReach => "A core mine cannot stand inside another mine's reach".to_owned(),
         }
     }
 }

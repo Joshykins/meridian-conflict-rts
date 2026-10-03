@@ -22,7 +22,7 @@
 
 use crate::tables::UnitId;
 use crate::World;
-use mc_core::{Fx, FxVec2, StateHasher, TICKS_PER_SECOND};
+use mc_core::{player_bit, Fx, FxVec2, PlayerMask, StateHasher, TICKS_PER_SECOND};
 use mc_map::OreRegion;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -604,13 +604,37 @@ impl World {
         }
     }
 
-    /// A mine, finished or not, anyone's, within `distance` of `pos`.
-    pub fn mine_within(&self, pos: FxVec2, distance: Fx) -> bool {
+    /// The nearest mine, finished or begun, that a new mine of `reach` at `pos`
+    /// would crowd: one whose reach takes in `pos`, or that stands in the new
+    /// mine's own. Mines keep out of each other's circles ([`mines_clear`]).
+    /// `sides`: whose mines count, `None` everyone's.
+    pub fn mine_in_the_way(
+        &self,
+        pos: FxVec2,
+        reach: Fx,
+        sides: Option<PlayerMask>,
+    ) -> Option<usize> {
         let units = &self.state.units;
-        units.slots.iter().any(|row| {
-            self.bp(row).mine.is_some() && units.pos[row].distance_sq(pos) < distance * distance
-        })
+        units
+            .slots
+            .iter()
+            .filter(|&row| sides.is_none_or(|m| m & player_bit(units.owner[row]) != 0))
+            .filter_map(|row| {
+                let other = self.bp(row).mine?.reach;
+                let d = units.pos[row].distance_sq(pos);
+                (!mines_clear(d, reach, other)).then_some((d, row))
+            })
+            .min()
+            .map(|(_, row)| row)
     }
+}
+
+/// Whether two mines `distance_sq` apart, of reach `a` and `b`, keep out of
+/// each other's circles: neither stands inside the other's reach. Their
+/// territories may still overlap; the ground there is divided as ever.
+pub fn mines_clear(distance_sq: Fx, a: Fx, b: Fx) -> bool {
+    let r = a.max(b);
+    distance_sq >= r * r
 }
 
 /// The mines in `placed` other than `i` whose reach overlaps its own.
