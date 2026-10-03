@@ -3,7 +3,7 @@
 //! room between one shelf and the next, and the stops the strip scrolls
 //! between when it runs past the panel.
 
-use super::{Purpose, SHELF_H, STRIP_H, TILE_GAP, TILE_W};
+use super::{Purpose, STRIP_DROP, STRIP_H, TILE_GAP, TILE_W};
 use crate::ui::{palette, rgb, Rect, Ui};
 use mc_data::UnitBlueprint;
 
@@ -86,7 +86,7 @@ pub(super) fn lay_out<'a>(
         }
         (slots, shelves, at - TILE_GAP)
     };
-    let strip = Rect::new(grid.x, grid.y + SHELF_H + 8.0, grid.w, STRIP_H);
+    let strip = Rect::new(grid.x, grid.y + STRIP_DROP, grid.w, STRIP_H);
     let (slots, shelves, length) = lay(TILE_W);
     if length <= strip.w {
         return Layout {
@@ -106,11 +106,9 @@ pub(super) fn lay_out<'a>(
     );
     // Past the panel, tiles are sized so a whole number of them fill the view,
     // and the strip stops only where a tile starts (`snap`): it never rests on
-    // half a tile.
-    let fit = ((view.w + TILE_GAP) / (TILE_W + TILE_GAP)).round().max(1.0);
-    let w = (view.w + TILE_GAP) / fit - TILE_GAP;
-    // Never wider than a tile and a quarter: one more, smaller, fits better.
-    let fit = if w > TILE_W * 1.25 { fit + 1.0 } else { fit };
+    // half a tile. They only ever close up to fit one more, never stretch: the
+    // panel shows as many as it can.
+    let fit = ((view.w + TILE_GAP) / (TILE_W + TILE_GAP)).ceil().max(1.0);
     let tile_w = (view.w + TILE_GAP) / fit - TILE_GAP;
     let (slots, shelves, length) = lay(tile_w);
     Layout {
@@ -173,6 +171,31 @@ pub(super) fn dividers(
         ui.vline(x, top, h, rgb(palette::LINE, 0.5));
         for y in [top, top + h - 1.0] {
             ui.hline(x - 3.0, y, 7.0, rgb(palette::LINE, 0.8));
+        }
+    }
+}
+
+/// The bracket over the shelf in view: a wash behind its tiles (`from` to `to`
+/// along the view) and a bright rule along their top, its ends turned down
+/// wherever the shelf starts or ends inside the view.
+pub(super) fn bracket(ui: &mut Ui, view: Rect, from: f32, to: f32) {
+    let (a, b) = ((view.x + from).max(view.x), (view.x + to).min(view.right()));
+    if b - a < 2.0 {
+        return;
+    }
+    ui.fill(
+        Rect::new(a - 3.0, view.y - 4.0, b - a + 6.0, STRIP_H + 6.0),
+        rgb(palette::TEXT, 0.07),
+    );
+    let y = view.y - 6.0;
+    let tone = rgb(0xFFFFFF, 0.95);
+    ui.fill(Rect::new(a - 3.0, y, b - a + 6.0, 2.0), tone);
+    for (x, inside) in [
+        (a - 3.0, view.x + from >= view.x),
+        (b + 1.0, view.x + to <= view.right()),
+    ] {
+        if inside {
+            ui.fill(Rect::new(x, y, 2.0, 8.0), tone);
         }
     }
 }

@@ -26,7 +26,7 @@ pub(super) use data_card::data_card;
 pub(super) use queue::Split;
 use strip::{Slot, ARROW_W};
 
-pub(super) const TILE_W: f32 = 96.0;
+pub(super) const TILE_W: f32 = 86.0;
 /// Tile names: the caption face with less tracking, so most names fit on a line.
 pub(super) const NAME: crate::ui::Style = crate::ui::style(mc_render::Face::Medium, 11.0, 1.6);
 /// A construction tile's title (its role, "Land Factory"): bigger than a name.
@@ -85,6 +85,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
         hud.build_key = None;
         return;
     }
+    // Only as tall as the strip needs, on the deck's floor.
+    let r = Rect::new(r.x, r.bottom() - PANEL_H.min(r.h), r.w, PANEL_H.min(r.h));
     let speaker = builder_unit.or(upgrader).expect("one of them");
     let (unit, bp) = speaker;
     // Tier upgrades are tiles on their tiers' tabs, queued like what it builds; the
@@ -453,8 +455,14 @@ pub fn key_cap(ui: &mut Ui, x: f32, y: f32, key: char, live: bool) {
 
 /// The shelf buttons over the strip.
 const SHELF_H: f32 = 24.0;
-/// Tiles on the strip: taller than a grid tile, for a bigger picture.
-pub(super) const STRIP_H: f32 = 126.0;
+/// From the shelf buttons' top to the strip's: room under them for the bar of the
+/// shelf in view and the bracket over its tiles.
+const STRIP_DROP: f32 = SHELF_H + 12.0;
+/// Tiles on the strip: a picture over a three-line caption, kept low so the
+/// panel stands no taller than it needs.
+pub(super) const STRIP_H: f32 = 106.0;
+/// The panel's height: the tabs, the shelf buttons, the strip and its track.
+const PANEL_H: f32 = 44.0 + STRIP_DROP + STRIP_H + 22.0;
 /// How far past the strip's edge a tile takes to fade out.
 const FADE: f32 = 34.0;
 
@@ -553,7 +561,7 @@ fn tiles<'a>(
         overflow,
         view,
     } = strip::lay_out(&items, &climbs, is_factory, grid);
-    let strip = Rect::new(grid.x, grid.y + SHELF_H + 8.0, grid.w, STRIP_H);
+    let strip = Rect::new(grid.x, grid.y + STRIP_DROP, grid.w, STRIP_H);
     let pitch = tile_w + TILE_GAP;
     let max_scroll = (length - view.w).max(0.0);
     // How many tiles the view holds, and a page of them for the arrows.
@@ -612,6 +620,8 @@ fn tiles<'a>(
 
     // The shelves, as buttons with their keys: a click runs the strip to the shelf.
     let mut bx = grid.x;
+    // A shelf whose button is under the pointer, shown as if picked.
+    let mut previewed = None;
     for &(p, start, end, count) in &shelves {
         let label = p.label(!is_factory);
         let count_text = count.to_string();
@@ -663,12 +673,21 @@ fn tiles<'a>(
                 );
             }
         }
+        if t.hovered {
+            previewed = Some(p);
+        }
         if t.clicked {
             ui.audio.play(Sfx::Tick);
             hud.shelf = Some(p);
             hud.build_scroll = snap(start);
         }
         bx += w + 4.0;
+    }
+    // A shelf picked (by its button or key) or pointed at brings its tiles forward:
+    // the others dim, until the strip is run along by hand.
+    let focus = previewed.or(hud.shelf.filter(|p| start_of(*p).is_some()));
+    if let Some(&(_, start, end, _)) = shelves.iter().find(|s| s.0 == current) {
+        strip::bracket(ui, view, start - shown, end - shown);
     }
 
     let mut hovered = None;
@@ -684,7 +703,13 @@ fn tiles<'a>(
         let tr = Rect::new(x, view.y, tile_w, STRIP_H);
         let (fade, interactive) = (ui.fade, ui.interactive);
         let k = 1.0 - over / FADE;
-        ui.fade *= k * k;
+        let aside = focus.is_some_and(|f| f != slot.shelf);
+        let dim = ui.ease(
+            id("shelf-dim", slot.item.id.0 as usize),
+            if aside { 1.0 } else { 0.0 },
+            14.0,
+        );
+        ui.fade *= k * k * (1.0 - 0.6 * dim);
         // Only inside the view, so the arrows keep the part under them.
         ui.interactive &= view.contains(ui.cursor - ui.shift);
         if let Some(i) = slot.climb {
