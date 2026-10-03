@@ -888,8 +888,8 @@ shared! {
         pub const WIDTH: f32 = 1.15;
         /// Seconds a stretch of the trail stays hot (heat falls to a third), and seconds
         /// it lasts after the front has passed it.
-        pub const COOL: f32 = 0.8;
-        pub const LINGER: f32 = 3.2;
+        pub const COOL: f32 = 1.0;
+        pub const LINGER: f32 = 4.5;
         /// Seconds the plasma the front leaves takes to slow from the front's pace to a
         /// stop over the ground (falling to a third of its pace).
         pub const SETTLE: f32 = 0.35;

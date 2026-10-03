@@ -46,6 +46,11 @@ const VIOLET: vec3<f32> = vec3<f32>(0.6, 0.18, 1.0);
 // The front burns hotter than the trail it leaves: past white to a blue-white.
 const ICE: vec3<f32> = vec3<f32>(0.72, 0.86, 1.0);
 const PALE: vec3<f32> = vec3<f32>(1.0, 0.62, 0.55);
+// The trail once it has cooled: a tame red, not an angry one.
+const TAME: vec3<f32> = vec3<f32>(0.8, 0.04, 0.03);
+// Seconds the trail just behind the front keeps the front's own colour (falling to a
+// third).
+const FRESH: f32 = 0.3;
 
 struct ShellOut {
     @builtin(position) clip: vec4<f32>,
@@ -302,11 +307,17 @@ fn fs_wake_trail_lit(in: ShellOut) -> vec4<f32> {
     let near_wall = smoothstep(0.0, 1.0, u);
     let sides = select(1.0 - smoothstep(0.75, 1.0, abs(c)), 1.0, closed(s));
     let fill = smoothstep(0.0, 0.3, u) * sides;
+    // Just behind the front it is the front's own plasma, blue-white and pale pink-hot,
+    // bright; it cools through orange and red to a tame red.
+    let fresh = exp(-passed / FRESH);
     let lit = (0.015 + threads * (0.12 + 0.7 * heat) * flicker) * (0.4 + 0.6 * near_wall)
-        + 0.12 * heat * near_wall * near_wall;
-    let tone = wake_heat(clamp(heat * 0.6 + 0.25 * threads * heat, 0.0, 1.0));
+        + 0.05 * heat * near_wall * near_wall
+        + 0.35 * fresh * threads * flicker;
+    let warm = mix(TAME, wake_heat(clamp(heat * 0.45 + 0.2 * threads * heat, 0.0, 1.0)),
+        smoothstep(0.3, 0.8, heat));
+    let tone = mix(warm, front_heat(0.5 + 0.35 * fresh + 0.15 * threads), fresh);
     let light = tone * lit * fill;
-    let cover = clamp((0.03 + 0.1 * threads) * heat * fill, 0.0, 0.3);
+    let cover = clamp((0.05 + 0.12 * threads) * (0.3 + 0.7 * heat) * fill, 0.0, 0.3);
     return vec4<f32>(light * 0.7, cover) * alive * s.fade;
 }
 
