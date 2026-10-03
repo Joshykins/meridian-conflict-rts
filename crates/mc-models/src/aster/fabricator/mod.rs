@@ -1,26 +1,31 @@
-//! The Material Fabricator (mesh `fabricator`): one machine-building on a 2x2 lot, built
-//! at tech 2 and upgraded in place to tech 3. It is drawn in the fusion plants' manner, a
-//! four-fold foundation building up to a raised middle, but what it raises is a chamber
-//! where matter condenses, lit in the warm orange of hot product instead of the plants'
-//! blue charge. Tech 3 is the tech 2 building with more and taller machinery on it: those
-//! pieces ride the tech 2 model as upgrade pieces (`structures::kit`), going up during the
-//! refit.
+//! The Material Fabricator (mesh `fabricator`): one heavy machine on a 2x2 lot, built at
+//! tech 2 and upgraded in place to tech 3. It is drawn in the fusion plants' manner, a
+//! four-fold foundation building up to its middle, in plain plate: the matter it makes
+//! shows only as small windows in the Materials colour, flashing at each stroke, and its
+//! status as small lamps. It works in beats (`gpu_consts::fab`): a press comes down, the
+//! matter flashes, the press lifts and an indexer turns on a quarter, faltering when its
+//! side is short of energy, at rest with only its lamps lit when paused or without power.
+//! Tech 3 is the tech 2 machine with more on it: those pieces ride the tech 2 model as
+//! upgrade pieces (`structures::kit`), going up during the refit.
 //!
 //! Design candidates, one per file, all built from the kit here:
-//! - `clamp` (`fabricator~a`): a glazed condensing column held by four leaning clamp plates.
-//! - `crucible` (`fabricator~b`): a crucible bowl on a neck, a condenser head held over it.
-//! - `stack` (`fabricator~c`): a press stack of plates with matter sheets forming between.
+//! - `drum` (`fabricator~a`): an indexing drum of four cassettes round a squat spindle,
+//!   a cross-head stamping them, heat sinks on wedge feet off the diagonals.
+//! - `frame` (`fabricator~b`): a press frame of four upright posts on a heavy bed, a
+//!   cross-head ram stamping a die in a turning table, heat sinks down two sides.
+//! - `carousel` (`fabricator~c`): a carousel of eight cells turning round a finned hub, a
+//!   hammer dropping on the hub's head under a capped crown.
 
-pub(super) mod clamp;
-pub(super) mod crucible;
-pub(super) mod stack;
+pub(super) mod carousel;
+pub(super) mod drum;
+pub(super) mod frame;
 
 use std::f32::consts::FRAC_PI_4;
 
 use glam::{Vec2, Vec3};
 
 use super::parts::*;
-use crate::builder::{chamfered_rect, ngon, MeshBuilder, Section};
+use crate::builder::{chamfered_rect, MeshBuilder, Section};
 use crate::material::*;
 use crate::pattern;
 
@@ -56,6 +61,12 @@ pub(super) fn plinth(b: &mut MeshBuilder) {
         return;
     }
     let plan = chamfered_rect(v2(HALF, HALF), CHAMFER);
+    if !b.fine() {
+        b.paint(PLATING);
+        b.loft_z(&plan, &[Section::new(0.0, 1.0), Section::new(DECK, 0.96)]);
+        b.mirror_y(|b| team_panel(b, v3(0.0, HALF - 1.2, DECK), v2(4.0, 0.9)));
+        return;
+    }
     b.paint(ACCENT);
     b.loft_z(
         &plan,
@@ -69,135 +80,131 @@ pub(super) fn plinth(b: &mut MeshBuilder) {
     b.mirror_y(|b| team_panel(b, v3(0.0, HALF - 1.2, DECK), v2(4.0, 0.9)));
 }
 
-/// A heat sink on each diagonal, from `from` to `to` out, `w` across: the condensate's
-/// heat dumped off the four corners.
-pub(super) fn corner_sinks(b: &mut MeshBuilder, from: f32, to: f32, w: f32) {
+/// A chamfered square step from `z0` to `z1`, `half` across: a dark band at its foot,
+/// plate above.
+pub(super) fn step(b: &mut MeshBuilder, half: f32, chamfer: f32, z0: f32, z1: f32) {
     if b.coarse() {
-        return;
-    }
-    b.yawed(Vec3::ZERO, FRAC_PI_4, |b| {
-        b.radial(4, |b| {
-            radiator(b, v3(from, 0.0, DECK), Vec3::X, to - from, w)
-        })
-    });
-}
-
-/// A radiator along `along` from `at`, `len` long and `w` across: a dark housing, hot
-/// coolant glowing between its fins, the fins under a clamp bar.
-pub(super) fn radiator(b: &mut MeshBuilder, at: Vec3, along: Vec3, len: f32, w: f32) {
-    let base = 0.7;
-    let fin = w * 0.6;
-    b.yawed(at, along.y.atan2(along.x), |b| {
-        b.paint(ACCENT);
-        if b.coarse() {
-            b.cuboid_open(
-                v3(len * 0.5, 0.0, (base + fin) * 0.5),
-                v3(len, w, base + fin),
-            );
-            return;
-        }
-        if b.fine() {
-            b.chamfered_box(v3(len * 0.5, 0.0, base * 0.5), v3(len, w, base), 0.2);
-        } else {
-            b.cuboid_open(v3(len * 0.5, 0.0, base * 0.5), v3(len, w, base));
-        }
-        b.paint(GLOW_ORANGE).pattern(pattern::HEAT);
-        b.cuboid_open(
-            v3(len * 0.5, 0.0, base + fin * 0.2),
-            v3(len * 0.9, w * 0.5, fin * 0.4),
-        );
-        let n = if b.fine() { 7 } else { 3 };
-        let pitch = len * 0.9 / n as f32;
         b.paint(PLATING);
-        for k in 0..n {
-            let x = len * 0.05 + pitch * (k as f32 + 0.5);
-            b.cuboid_open(
-                v3(x, 0.0, base + fin * 0.5),
-                v3(pitch * 0.35, w * 0.86, fin),
-            );
-        }
-        if b.fine() {
-            b.paint(ACCENT);
-            b.cuboid(
-                v3(len * 0.5, 0.0, base + fin + 0.1),
-                v3(len * 0.94, w * 0.14, 0.2),
-            );
-        }
-    });
-}
-
-/// A glazed condensing chamber round the z axis from `z0` to `z1`, `r` out: the matter
-/// forming in it glows through glazing between dark mullions, dark collars at its foot
-/// and head.
-pub(super) fn chamber(b: &mut MeshBuilder, z0: f32, z1: f32, r: f32) {
-    if b.coarse() {
-        b.paint(GLOW_ORANGE).pattern(pattern::NONE);
-        b.prism(v3(0.0, 0.0, z0), 4, r * 1.3, r * 1.3, z1 - z0);
+        b.cuboid_open(
+            v3(0.0, 0.0, (z0 + z1) * 0.5),
+            v3(half * 2.0, half * 2.0, z1 - z0),
+        );
         return;
     }
-    let sides = 8;
-    let plan = ngon(sides, 1.0);
-    let collar = (z1 - z0).min(6.0) * 0.12;
-    b.paint(GLOW_ORANGE).pattern(pattern::NONE);
-    b.loft_z(
-        &plan,
-        &[Section::new(z0 + collar, r), Section::new(z1 - collar, r)],
-    );
+    let plan = chamfered_rect(v2(half, half), chamfer);
+    if !b.fine() {
+        b.paint(PLATING);
+        b.loft_z(&plan, &[Section::new(z0, 1.0), Section::new(z1, 0.96)]);
+        return;
+    }
+    let band = ((z1 - z0) * 0.25).min(0.5);
     b.paint(ACCENT);
     b.loft_z(
         &plan,
-        &[
-            Section::new(z0, r * 1.18),
-            Section::new(z0 + collar, r * 1.12),
-        ],
+        &[Section::new(z0, 1.0), Section::new(z0 + band, 1.0)],
     );
+    b.paint(PLATING);
     b.loft_z(
         &plan,
-        &[
-            Section::new(z1 - collar, r * 1.12),
-            Section::new(z1, r * 1.18),
-        ],
+        &[Section::new(z0 + band, 0.99), Section::new(z1, 0.96)],
     );
-    // Mullions on the glazing's corners, a rib band round its waist close to.
-    let (a, c) = (z0 + collar, z1 - collar);
-    let fine = b.fine();
-    let w = r * 0.24;
-    for k in 0..sides {
-        let ang = (k as f32 + 0.5) * std::f32::consts::TAU / sides as f32;
-        let d = v3(ang.cos(), ang.sin(), 0.0);
-        b.paint(ACCENT);
-        b.beam(
-            d * r + Vec3::Z * a,
-            d * r + Vec3::Z * c,
-            v2(w, w * 0.8),
-            v2(w, w * 0.8),
-        );
+}
+
+/// A heat sink along `along` from `at`, `len` long and `w` across, standing on whatever
+/// is at `at`: a dark housing, plate fins tall and short in turn under a clamp bar, end
+/// caps. Not drawn far off.
+pub(super) fn heat_sink(b: &mut MeshBuilder, at: Vec3, along: Vec3, len: f32, w: f32) {
+    if b.coarse() {
+        return;
     }
-    if fine && c - a > 3.0 {
+    let base = 0.6;
+    let fin = w * 0.55;
+    b.yawed(at, along.y.atan2(along.x), |b| {
         b.paint(ACCENT);
-        let mid = (a + c) * 0.5;
-        b.loft_z(
-            &plan,
-            &[
-                Section::new(mid - 0.2, r * 1.06),
-                Section::new(mid + 0.2, r * 1.06),
-            ],
-        );
+        b.cuboid_open(v3(len * 0.5, 0.0, base * 0.5), v3(len, w, base));
+        if !b.fine() {
+            // The middle distance: the fins as one block.
+            b.paint(PLATING);
+            b.cuboid_open(
+                v3(len * 0.5, 0.0, base + fin * 0.5),
+                v3(len * 0.86, w * 0.84, fin),
+            );
+            return;
+        }
+        let n = 8;
+        let pitch = len * 0.86 / n as f32;
+        b.paint(PLATING);
+        for k in 0..n {
+            let x = len * 0.07 + pitch * (k as f32 + 0.5);
+            let tall = if k % 2 == 0 { 1.0 } else { 0.78 };
+            b.cuboid_open(
+                v3(x, 0.0, base + fin * tall * 0.5),
+                v3(pitch * 0.34, w * 0.84, fin * tall),
+            );
+        }
+        {
+            b.paint(ACCENT);
+            b.cuboid(
+                v3(len * 0.5, 0.0, base + fin + 0.1),
+                v3(len * 0.9, w * 0.12, 0.2),
+            );
+            for x in [len * 0.035, len * 0.965] {
+                b.cuboid_open(v3(x, 0.0, base + fin * 0.5), v3(len * 0.07, w * 0.94, fin));
+            }
+        }
+    });
+}
+
+/// A wedge on +x from `x0` to `x1` standing on `z`, `width` across and `height` tall at
+/// each end, its top shoulders bevelled.
+pub(super) fn wedge(b: &mut MeshBuilder, x0: f32, x1: f32, z: f32, width: Vec2, height: Vec2) {
+    let ring = |x: f32, w: f32, h: f32| -> Vec<Vec3> {
+        let (s, e) = (w * 0.5, w * 0.16);
+        vec![
+            v3(x, -s, z),
+            v3(x, s, z),
+            v3(x, s, z + h * 0.78),
+            v3(x, s - e, z + h),
+            v3(x, -s + e, z + h),
+            v3(x, -s, z + h * 0.78),
+        ]
+    };
+    b.loft(
+        &[ring(x0, width.x, height.x), ring(x1, width.y, height.y)],
+        true,
+        true,
+    );
+}
+
+/// A box of matter in the Materials colour, `size` at `center`: lit by the work, flashing
+/// at each stroke (`pattern::FAB_MATTER`).
+pub(super) fn matter(b: &mut MeshBuilder, center: Vec3, size: Vec3) {
+    b.paint(GLOW_MATERIALS).pattern(pattern::FAB_MATTER);
+    b.cuboid(center, size);
+}
+
+/// A status lamp, `size` at `center`: green at work, blinking amber short of energy, a
+/// slow standby glow at rest (`pattern::FAB_LAMP`). Not drawn far off.
+pub(super) fn lamp(b: &mut MeshBuilder, center: Vec3, size: Vec3) {
+    if b.coarse() {
+        return;
     }
+    b.paint(GLOW_MATERIALS).pattern(pattern::FAB_LAMP);
+    b.cuboid(center, size);
 }
 
 /// A capacitor bastion on the deck at `at`, its long side along y: a dark block with a row
-/// of cans on it, the grid's power going in.
+/// of cans on it, the grid's power going in. Not drawn far off.
 pub(super) fn bastion(b: &mut MeshBuilder, at: Vec3, len: f32, h: f32) {
     if b.coarse() {
         return;
     }
     b.paint(ACCENT);
     if !b.fine() {
-        b.cuboid_open(at + Vec3::Z * (h * 0.5), v3(2.0, len, h));
+        b.cuboid_open(at + Vec3::Z * (h * 0.5), v3(1.8, len, h));
         return;
     }
-    b.chamfered_box(at + Vec3::Z * (h * 0.5), v3(2.0, len, h), 0.4);
+    b.chamfered_box(at + Vec3::Z * (h * 0.5), v3(1.8, len, h), 0.4);
     let n = (len / 1.4) as usize;
     for k in 0..n {
         let y = (k as f32 - (n as f32 - 1.0) * 0.5) * 1.4;
@@ -208,33 +215,30 @@ pub(super) fn bastion(b: &mut MeshBuilder, at: Vec3, len: f32, h: f32) {
     }
 }
 
-/// A bar of rectangular section (`size`: across in y, deep in the path's plane) swept
-/// along `path` in the x-z plane.
-pub(super) fn sweep(b: &mut MeshBuilder, path: &[Vec3], size: Vec2) {
-    let n = path.len();
-    let rings: Vec<Vec<Vec3>> = (0..n)
-        .map(|i| {
-            let (prev, next) = (path[i.saturating_sub(1)], path[(i + 1).min(n - 1)]);
-            let t = (next - prev).normalize_or(Vec3::Z);
-            let side = Vec3::Y;
-            let up = side.cross(t).normalize_or(Vec3::X);
-            let (s, u) = (side * size.x * 0.5, up * size.y * 0.5);
-            let p = path[i];
-            vec![p - s - u, p + s - u, p + s + u, p - s + u]
-        })
-        .collect();
-    b.loft(&rings, true, true);
+/// A box `size` at `center`, its upright edges cut back `chamfer` close to.
+pub(super) fn block(b: &mut MeshBuilder, center: Vec3, size: Vec3, chamfer: f32) {
+    if b.fine() {
+        b.chamfered_box(center, size, chamfer);
+    } else {
+        b.cuboid(center, size);
+    }
+}
+
+/// `f` drawn on +x and turned onto each of the four diagonals.
+pub(super) fn diagonals(b: &mut MeshBuilder, f: impl Fn(&mut MeshBuilder)) {
+    b.yawed(Vec3::ZERO, FRAC_PI_4, |b| b.radial(4, &f));
 }
 
 #[cfg(test)]
 mod tests {
     use super::{LOT, SIZES};
-    use crate::{build_model_scaled, rig};
+    use crate::{build_model_scaled, part, rig};
 
     const DESIGNS: [&str; 3] = ["fabricator~a", "fabricator~b", "fabricator~c"];
 
     /// Tech 2 and 3 stand on one 2x2 lot; tech 2 carries tech 3's machinery as upgrade
-    /// pieces (only those reach over its height), and tech 3 has more and stands taller.
+    /// pieces (only those reach over its height), tech 3 stands taller, and every one has
+    /// a press and an indexer to work in beats.
     #[test]
     fn tech_3_is_tech_2_upgraded_on_one_lot() {
         let half = LOT as f32 * 6.0;
@@ -255,6 +259,9 @@ mod tests {
                     );
                 }
                 let fine = &model.lods[0];
+                for p in [part::FAB_INDEX, part::FAB_PRESS] {
+                    assert!(fine.vertices.iter().any(|v| v.part == p), "{key}: part {p}");
+                }
                 let upgrades = fine
                     .vertices
                     .iter()

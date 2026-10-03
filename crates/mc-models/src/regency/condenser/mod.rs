@@ -6,20 +6,18 @@
 //! red slots where its fields run hot. Tech 3 is the tech 2 machine with more and taller
 //! plate and field gear on it, riding the tech 2 model as upgrade pieces (`machine::tier`).
 //!
-//! Design candidates, one per file, all built from the kit here:
-//! - `spire` (`regency_fabricator~a`): a lapped vessel on four plated buttresses.
-//! - `jaws` (`regency_fabricator~b`): great curved plates pressing on a column of matter.
-//! - `pyramid` (`regency_fabricator~c`): a stepped pyramid of swept plates, matter glowing
-//!   in the gaps between its tiers.
+//! The machine is in `spire`: an armoured vessel on four buttresses, field collars turning
+//! a step round it at each beat of its work and a plated point pressing down on its hatch
+//! (`gpu_consts::fab`), the matter glowing through slots down its faces, standby lamps
+//! under the point.
 
-pub(super) mod jaws;
-pub(super) mod pyramid;
 pub(super) mod spire;
 
 use glam::{Vec2, Vec3};
 
 use crate::builder::{ngon, MeshBuilder, Section};
 use crate::material::*;
+use crate::{part, pattern};
 
 use super::kit::{dark_plate, metal, seam, v3};
 use super::machine::*;
@@ -106,13 +104,12 @@ pub(super) fn vessel(b: &mut MeshBuilder, r: f32, z0: f32, z1: f32) -> f32 {
         if k % 2 == 0 {
             // The matter forming inside, seen through a slot down the face.
             let (lo, hi) = (z0 + 1.6, z1 - 0.6);
-            matter_slot(
+            glow_slot(
                 b,
+                pattern::FAB_MATTER,
                 d * face + Vec3::Z * ((lo + hi) * 0.5),
-                d,
-                Vec3::Z,
-                hi - lo,
-                r * 0.24,
+                [d, Vec3::Z],
+                Vec2::new(hi - lo, r * 0.24),
             );
         } else if b.fine() {
             let foot = d * (face + 0.05) + Vec3::Z * (z0 + 1.2);
@@ -133,41 +130,63 @@ pub(super) fn vessel(b: &mut MeshBuilder, r: f32, z0: f32, z1: f32) -> f32 {
     top
 }
 
-/// A slot onto the matter forming inside, in its hot orange: `len` along `along`, `h`
-/// across, standing just proud of the face whose outward normal is `out`.
-pub(super) fn matter_slot(b: &mut MeshBuilder, at: Vec3, out: Vec3, along: Vec3, len: f32, h: f32) {
+/// A slot in the Materials colour standing just proud of a face: onto the matter forming
+/// inside (`pattern::FAB_MATTER`), or a status lamp (`pattern::FAB_LAMP`). `[out, along]`
+/// are the face's outward normal and the slot's length; `size` its length and width.
+pub(super) fn glow_slot(
+    b: &mut MeshBuilder,
+    look: u32,
+    at: Vec3,
+    [out, along]: [Vec3; 2],
+    size: Vec2,
+) {
     let out = out.normalize();
     let along = along.normalize();
-    let across = out.cross(along) * (h * 0.5);
-    let half = along * (len * 0.5);
+    let across = out.cross(along) * (size.y * 0.5);
+    let half = along * (size.x * 0.5);
     let quad = |lift: f32| -> Vec<Vec3> {
         [-half - across, half - across, half + across, -half + across]
             .iter()
             .map(|&p| at + p + out * lift)
             .collect()
     };
-    b.paint(GLOW_ORANGE);
+    b.paint(GLOW_MATERIALS).pattern(look);
     b.loft(&[quad(0.0), quad(0.1)], false, true);
 }
 
-/// A graphite field collar round a vessel of radius `r` at height `z`, a red slot on
-/// four of its flats where the field runs hot.
+/// A graphite field collar round a vessel of radius `r` at height `z`, toothed round its
+/// rim, a slot on four of its flats where the field runs hot with the matter: the indexer, turned a
+/// quarter round at each beat of the work (`part::FAB_INDEX`), so all of it repeats every
+/// quarter turn.
 pub(super) fn field_collar(b: &mut MeshBuilder, r: f32, z: f32) {
     if b.coarse() {
         return;
     }
     // The hoop's flats lie across the vessel's corners: its inside clears them.
     let mid = r * 1.09 + 0.45;
-    metal(b);
-    hoop(b, Vec3::Z * z, mid, 0.8, 0.9, 8);
-    if b.fine() {
+    b.with_part(part::FAB_INDEX, |b| {
+        metal(b);
+        hoop(b, Vec3::Z * z, mid, 0.8, 0.9, 8);
+        if !b.fine() {
+            return;
+        }
+        seam(b);
+        b.yawed(Vec3::ZERO, std::f32::consts::FRAC_PI_8, |b| {
+            teeth(b, Vec3::Z * z, mid + 0.4, 8, v3(0.45, 0.6, 0.7))
+        });
         let face = (mid + 0.4) * (std::f32::consts::PI / 8.0).cos();
         for k in 0..4 {
             let a = std::f32::consts::FRAC_PI_2 * k as f32 + std::f32::consts::PI / 8.0;
             let d = v3(a.cos(), a.sin(), 0.0);
-            red_slot(b, d * face + Vec3::Z * z, d, v3(-d.y, d.x, 0.0), 1.4, 0.3);
+            glow_slot(
+                b,
+                pattern::FAB_MATTER,
+                d * face + Vec3::Z * z,
+                [d, v3(-d.y, d.x, 0.0)],
+                Vec2::new(1.4, 0.3),
+            );
         }
-    }
+    });
 }
 
 /// A plated buttress on +x (turned into place by the caller): a seam footing at `foot`
@@ -202,11 +221,7 @@ mod tests {
     use super::{LOT, SIZES};
     use crate::{build_model_scaled, rig};
 
-    const DESIGNS: [&str; 3] = [
-        "regency_fabricator~a",
-        "regency_fabricator~b",
-        "regency_fabricator~c",
-    ];
+    const DESIGNS: [&str; 1] = ["regency_fabricator"];
 
     /// Tech 2 and 3 stand on one 2x2 lot; tech 2 carries tech 3's machinery as upgrade
     /// pieces (only those reach over its height), and tech 3 stands taller.

@@ -159,14 +159,14 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::tiered("power", reactor::SIZES, reactor::power),
     // The Material Fabricator (`fabricator`): tech 2, upgrading in place to tech 3. Three
     // designs to pick from; the mesh is the first until one is chosen.
-    ModelDef::tiered("fabricator", fabricator::SIZES, fabricator::clamp::build),
-    ModelDef::tiered("fabricator~a", fabricator::SIZES, fabricator::clamp::build),
+    ModelDef::tiered("fabricator", fabricator::SIZES, fabricator::drum::build),
+    ModelDef::tiered("fabricator~a", fabricator::SIZES, fabricator::drum::build),
+    ModelDef::tiered("fabricator~b", fabricator::SIZES, fabricator::frame::build),
     ModelDef::tiered(
-        "fabricator~b",
+        "fabricator~c",
         fabricator::SIZES,
-        fabricator::crucible::build,
+        fabricator::carousel::build,
     ),
-    ModelDef::tiered("fabricator~c", fabricator::SIZES, fabricator::stack::build),
     ModelDef::tiered(
         "storage_mass",
         [(16.5, 8.0), (16.5, 13.0), (16.5, 19.0)],

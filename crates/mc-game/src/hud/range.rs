@@ -438,13 +438,14 @@ fn unit_page(
 }
 
 /// Scenarios: around the subject first, then what the subject is told to do itself, then
-/// its warp jumps.
+/// its warp jumps, then its work paused or short of energy.
 fn stage_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>) {
     let mut y = r.y;
     for (n, line) in [
         &Scenario::ALL[..4],
         &Scenario::ALL[4..10],
-        &Scenario::ALL[10..],
+        &Scenario::ALL[10..13],
+        &Scenario::ALL[13..],
     ]
     .into_iter()
     .enumerate()
@@ -457,7 +458,7 @@ fn stage_page(hud: &mut Hud, ui: &mut Ui, r: Rect, asked: &mut Vec<RangeAction>)
             if word_tile(
                 hud,
                 ui,
-                id("range-scenario", n * 4 + i),
+                id("range-scenario", n * 8 + i),
                 cell,
                 scenario.label(),
                 false,

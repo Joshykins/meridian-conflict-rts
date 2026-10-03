@@ -171,7 +171,13 @@ pub mod pattern {
     /// cut into plates of uneven length, the odd hatch, grille or stencil, rows of lit
     /// orange ports along the walls, running lamps at the seams (`gpu_consts::warship`).
     pub const WARSHIP: u32 = crate::gpu_consts::warship::PATTERN;
-    pub const LAST: u32 = WARSHIP;
+    /// A fabricator's matter (`GLOW_MATERIALS` faces): lit by how hard it works, flashing at
+    /// each stroke, sputtering when short of energy, dark at rest (`gpu_consts::fab`).
+    pub const FAB_MATTER: u32 = crate::gpu_consts::fab::PATTERN_MATTER;
+    /// A fabricator's status lamp (`GLOW_MATERIALS` faces): steady at work, blinking amber
+    /// when short of energy, a slow standby glow at rest (`gpu_consts::fab`).
+    pub const FAB_LAMP: u32 = crate::gpu_consts::fab::PATTERN_LAMP;
+    pub const LAST: u32 = FAB_LAMP;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader
@@ -277,6 +283,11 @@ pub mod part {
     /// z = 0 stands on the seabed under it (`gpu_consts::pile`).
     pub const PILE: u32 = crate::gpu_consts::pile::PART;
     const _: () = assert!(PILE > REACTOR_FIN);
+    /// A fabricator's indexer and press (`gpu_consts::fab`): turned a step about the model's
+    /// z axis, and let down and raised, each beat it works.
+    pub const FAB_INDEX: u32 = crate::gpu_consts::fab::PART_INDEX;
+    pub const FAB_PRESS: u32 = crate::gpu_consts::fab::PART_PRESS;
+    const _: () = assert!(FAB_INDEX > PILE && FAB_PRESS > FAB_INDEX);
 
     /// Drawn only where the structure stands in water (`AFLOAT` or `PILE`).
     pub(crate) fn afloat_only(part: u32) -> bool {

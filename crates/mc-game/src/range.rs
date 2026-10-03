@@ -100,10 +100,15 @@ pub enum Scenario {
     Warp,
     /// `Warp` into the field of a red warp dampener: dragged, then thrown out hurt and stunned.
     WarpDampened,
+    /// The subject's work is paused.
+    Pause,
+    /// The subject's side has half the energy its upkeep asks for: a power plant of its
+    /// faction off the pad, its output turned down to match, no stores and no free build.
+    Short,
 }
 
 impl Scenario {
-    pub const ALL: [Scenario; 13] = [
+    pub const ALL: [Scenario; 15] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -117,6 +122,8 @@ impl Scenario {
         Scenario::Lift,
         Scenario::Warp,
         Scenario::WarpDampened,
+        Scenario::Pause,
+        Scenario::Short,
     ];
 
     pub fn label(self) -> &'static str {
@@ -134,6 +141,8 @@ impl Scenario {
             Scenario::Lift => "Lift",
             Scenario::Warp => "Warp",
             Scenario::WarpDampened => "Dampened",
+            Scenario::Pause => "Pause",
+            Scenario::Short => "Short",
         }
     }
 
@@ -152,6 +161,8 @@ impl Scenario {
             "lift" => Scenario::Lift,
             "warp" => Scenario::Warp,
             "warp-dampened" => Scenario::WarpDampened,
+            "pause" => Scenario::Pause,
+            "short" => Scenario::Short,
             _ => return None,
         })
     }
@@ -253,6 +264,7 @@ enum PendingOrder {
     Warp {
         pos: FxVec2,
     },
+    Pause,
 }
 
 impl PendingOrder {
@@ -317,6 +329,10 @@ impl PendingOrder {
                 units: who,
                 pos,
                 queue: false,
+            }],
+            PendingOrder::Pause => vec![Command::SetPaused {
+                units: who,
+                paused: true,
             }],
             PendingOrder::Board(_) => Vec::new(),
         }
@@ -983,6 +999,48 @@ fn stage(
             })
             .ok_or("This unit does not move"),
         Scenario::Destruct => Ok((Vec::new(), Some((subject, PendingOrder::Destruct)))),
+        Scenario::Pause => Ok((Vec::new(), Some((subject, PendingOrder::Pause)))),
+        Scenario::Short => {
+            let upkeep = bp.economy.energy_upkeep;
+            let plant = blueprints
+                .units
+                .iter()
+                .filter(|b| {
+                    b.faction == bp.faction && b.is_structure() && blueprints.is_listed(b.id)
+                })
+                .max_by_key(|b| b.economy.energy_income)
+                .filter(|b| b.economy.energy_income > Fx::ZERO && upkeep > Fx::ZERO)
+                .ok_or("This Unit Draws No Energy")?;
+            let share = (upkeep * 500 / plant.economy.energy_income).ceil_int();
+            Ok((
+                vec![
+                    Command::DebugFreeBuild {
+                        player: BLUE,
+                        on: false,
+                    },
+                    Command::DebugStorage {
+                        player: BLUE,
+                        mass: BASE_STORAGE[0],
+                        energy: 0,
+                    },
+                    Command::DebugIncome {
+                        player: BLUE,
+                        mass: 1000,
+                        energy: share.clamp(1, u16::MAX as i32) as u16,
+                    },
+                    Command::DebugSpawn {
+                        owner: BLUE,
+                        blueprint: plant.id,
+                        pos: pad - FxVec2::from_ints(0, 500),
+                        heading: Angle::ZERO,
+                        count: 1,
+                        flags: flag::PASSIVE | flag::INVULNERABLE,
+                        build: 1000,
+                    },
+                ],
+                None,
+            ))
+        }
         Scenario::Lift => {
             // A column of tanks behind the pad (the ship's stern, as it faces east), told
             // to board: the ship comes down out of the clouds for them.
@@ -1302,7 +1360,8 @@ mod tests {
                 Scenario::Refit,
                 Scenario::Lift,
                 Scenario::Warp,
-                Scenario::WarpDampened
+                Scenario::WarpDampened,
+                Scenario::Short
             ],
             "the default subject supports everything a tank can do"
         );
@@ -1317,9 +1376,10 @@ mod tests {
                 Scenario::BuildIt,
                 Scenario::Lift,
                 Scenario::Warp,
-                Scenario::WarpDampened
+                Scenario::WarpDampened,
+                Scenario::Short
             ],
-            "nothing builds a commander; it does everything else"
+            "nothing builds a commander, and it draws no energy; it does everything else"
         );
     }
 

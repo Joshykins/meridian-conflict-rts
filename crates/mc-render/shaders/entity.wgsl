@@ -304,6 +304,27 @@ fn load_cycle(e: Entity, time: f32) -> vec2<f32> {
     return vec2<f32>(lid, hoist);
 }
 
+// A material fabricator's working beat (`gpu_consts::fab`): x how far its press is let
+// down, y how far its indexer has turned this beat, z the flash of the matter as the press
+// bears on it, w its work (0 at rest). The beats come at a fixed cadence whatever the
+// work, so nothing jumps when it changes; short of energy, a beat is missed with the share
+// of output its side cannot pay for, and the press only shudders through it.
+fn fab_beat(e: Entity, time: f32, t: f32) -> vec4<f32> {
+    let up = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
+    let work = select(0.0, clamp(mix(e.prev_deploy, e.deploy, t), 0.0, 1.0), up);
+    let seed = f32(e.unit_id & 255u) * 0.137;
+    let b = time / FAB_BEAT_S + seed;
+    let n = floor(b);
+    let u = b - n;
+    let fires = select(0.0, 1.0, work > 0.0 && hash11(n * 0.7311 + seed * 13.0) < work * 1.08);
+    let missed = select(0.0, 1.0 - fires, work > 0.0);
+    let press = fires * smoothstep(0.0, 0.2, u) * (1.0 - smoothstep(0.46, 0.68, u))
+        + missed * 0.18 * sin(3.1415927 * smoothstep(0.0, 0.5, u));
+    let turn = fires * smoothstep(0.7, 0.94, u);
+    let flash = fires * smoothstep(0.14, 0.22, u) * (1.0 - smoothstep(0.22, 0.5, u));
+    return vec4<f32>(press, turn, flash, work);
+}
+
 // A storage structure's fill pieces and status lamps (`gpu_consts::store`), by its side's
 // store in `status[2]`: a fill piece keeps its glow while the store is at least as full
 // as its level and goes dark below it; a lamp's lens goes amber while the store drains,
@@ -1866,6 +1887,17 @@ fn vs_main(in: VsIn) -> VsOut {
         // rolling out along the sinks, the hot core showing between them as they rise.
         let wave = 0.5 + 0.5 * sin(length(p.xy) * REACTOR_FIN_WAVE - time * REACTOR_FIN_RATE + f32(e.unit_id & 255u) * 0.7);
         p.z += model.height * REACTOR_FIN_LIFT * wave * wave;
+    } else if (in.part == FAB_PART_INDEX || in.part == FAB_PART_PRESS) && (e.owner_flags & KIND_WRECK) == 0u {
+        // A fabricator's indexer and press (`fab_beat`): a step round about the model's z
+        // axis, and down and up again, each beat it works.
+        let beat = fab_beat(e, time, t);
+        if in.part == FAB_PART_INDEX {
+            let turn = beat.y * FAB_INDEX_STEP;
+            p = rot_z(p, turn);
+            n = rot_z(n, turn);
+        } else {
+            p.z -= model.height * FAB_PRESS_TRAVEL * beat.x;
+        }
     } else if (in.part & ORBIT_PART_MASK) == ORBIT_PART && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
         // A gyroscope's ring (`gpu_consts::orbit`): about its own axis through the pivot.
         let pivot = model.spinner_pivot.xyz;
@@ -2327,6 +2359,12 @@ fn vs_main(in: VsIn) -> VsOut {
         let c = coil_state(e, time);
         out.drive = vec4<f32>(c.x, c.y, 0.0, 0.0);
         out.drive_at = vec4<f32>(f32(coil_pat - PAT_COIL), 0.0, 0.0, 3.0);
+    }
+    // A fabricator's matter and lamps know its work, its stroke and whether it is paused.
+    if (coil_pat == FAB_PATTERN_MATTER || coil_pat == FAB_PATTERN_LAMP) && in.material == MASS_GLOW_MATERIAL {
+        let beat = fab_beat(e, time, t);
+        out.drive = vec4<f32>(beat.w, beat.z, select(0.0, 1.0, (e.status[0] & UNIT_PAUSED) != 0u), 0.0);
+        out.drive_at = vec4<f32>(0.0, 0.0, 0.0, FAB_DRIVE_TAG);
     }
     out.dust = select(0.62, model.surface.y / max(model.height, 0.1), model.surface.y > 0.0);
     let crackles = (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST)) == 0u;
@@ -3291,6 +3329,41 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let hurt = 1.0 - saturate(select(in.state.y, 1.0, (flags & (KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u));
         let gutter = select(1.0, 0.25 + 0.75 * step(0.25, hash11(floor(time * 6.0) + in.state.w * 50.0)), hurt > 0.5);
         m.emissive *= (1.0 - 0.6 * smoothstep(0.4, 1.0, hurt)) * gutter;
+    }
+    if in.material == MASS_GLOW_MATERIAL && in.drive_at.w == FAB_DRIVE_TAG
+        && (flags & (KIND_WRECK | KIND_GHOST)) == 0u {
+        // A fabricator's matter and status lamps (`gpu_consts::fab`, `fab_beat`).
+        let work = in.drive.x;
+        let short = work > 0.0 && work < 0.97;
+        let seed = in.state.w * 53.0;
+        // Short of energy the light catches and drops out, the more often the shorter.
+        let sputter = select(1.0, 0.3 + 0.7 * step(0.2 + 0.5 * (1.0 - work), hash11(floor(time * 13.0) + seed)), short);
+        let held_pat = (in.model_class >> 16u) & 0xFFu;
+        if held_pat == FAB_PATTERN_MATTER {
+            let mass = vec3<f32>(MASS_R, MASS_G, MASS_B);
+            // Kept low enough to stay the Materials red-orange, not burn out to yellow.
+            let glow = (0.3 + 0.6 * work + 2.6 * in.drive.y) * sputter * step(0.001, work);
+            m.emissive = mass * glow;
+            // Dark glass when it rests.
+            m.albedo = mass * 0.03 + vec3<f32>(0.02);
+        } else {
+            var lamp = vec3<f32>(0.0);
+            if (flags & FLAG_UNDER_CONSTRUCTION) != 0u {
+                lamp = vec3<f32>(0.0);
+            } else if work >= 0.97 {
+                // Working: a steady green.
+                lamp = vec3<f32>(0.25, 1.0, 0.45) * 1.4;
+            } else if short {
+                // Short of energy: a quick amber warning blink.
+                lamp = vec3<f32>(1.0, 0.5, 0.04) * 3.2 * step(0.5, fract(time * 2.4 + seed));
+            } else {
+                // At rest: a slow standby glow, amber when paused, red when it has no power.
+                let breath = 0.5 + 0.5 * sin(time * 1.5 + seed * 6.0);
+                lamp = select(vec3<f32>(1.0, 0.1, 0.03), vec3<f32>(1.0, 0.55, 0.08), in.drive.z > 0.5) * (0.2 + 0.8 * breath);
+            }
+            m.emissive = lamp;
+            m.albedo = vec3<f32>(0.03) + lamp * 0.04;
+        }
     }
     if in.material == MAT_PRECURSOR_INLAY && (flags & KIND_PROP) != 0u && globals.tree_wind.w > 0.0 {
         // A dormant channel stirs as the facility wakes: never lit, only less dark.

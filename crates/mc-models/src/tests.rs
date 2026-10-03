@@ -609,7 +609,9 @@ fn meshes_are_valid() {
                                     + crate::gpu_consts::reactor::COLLARS)
                                 .contains(&v.part)
                             || v.part == part::REACTOR_FIN
-                            || v.part == part::PILE),
+                            || v.part == part::PILE
+                            || v.part == part::FAB_INDEX
+                            || v.part == part::FAB_PRESS),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.

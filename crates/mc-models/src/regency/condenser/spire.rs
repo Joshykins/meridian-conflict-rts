@@ -1,4 +1,4 @@
-//! Design A (`regency_fabricator~a`), the spire: an armoured octagonal vessel on a plated
+//! The Condenser, the spire: an armoured octagonal vessel on a plated
 //! footing, held by four buttresses off the diagonals, field collars round its waist and
 //! the matter glowing through slots down its faces; a plated point over its hatch.
 //! - Tech 2: the vessel, two collars, the buttresses, the point.
@@ -10,6 +10,7 @@ use std::f32::consts::FRAC_PI_4;
 use glam::{Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
+use crate::{part, pattern};
 
 use super::super::kit::{dark_plate, metal, v3};
 use super::super::machine::*;
@@ -58,19 +59,24 @@ pub(in crate::regency) fn build(b: &mut MeshBuilder, tech: u8) {
 }
 
 /// A graphite neck on a hatch at `z`, `r` across, and a plated point on it up to `top`,
-/// lit red slots at its foot.
+/// status lamps at its foot. The point is the press: it bears down over the neck at each
+/// beat of the work (`part::FAB_PRESS`).
 fn point(b: &mut MeshBuilder, z: f32, r: f32, top: f32) {
     let neck = z + (top - z) * 0.3;
     if !b.coarse() {
         metal(b);
         b.prism(v3(0.0, 0.0, z), b.sides(8), r, r * 0.85, neck - z);
     }
+    b.with_part(part::FAB_PRESS, |b| press_point(b, neck, r, top));
+}
+
+fn press_point(b: &mut MeshBuilder, neck: f32, r: f32, top: f32) {
     dark_plate(b);
     // Far off, three sides: the coarse level's budget.
     let sides = if b.coarse() { 3 } else { 4 };
     b.prism(v3(0.0, 0.0, neck), sides, r * 1.5, r * 0.1, top - neck);
-    if b.fine() {
-        // A slot low on each face: the faces of a four-sided prism look along the axes.
+    if !b.coarse() {
+        // A lamp low on each face: the faces of a four-sided prism look along the axes.
         let (rb, rt, h) = (
             r * 1.5 * std::f32::consts::FRAC_1_SQRT_2,
             r * 0.1 * std::f32::consts::FRAC_1_SQRT_2,
@@ -82,7 +88,13 @@ fn point(b: &mut MeshBuilder, z: f32, r: f32, top: f32) {
             let d = v3(a.cos(), a.sin(), 0.0);
             let at = d * (rb + (rt - rb) * t) + Vec3::Z * (neck + h * t);
             let out = d * h + Vec3::Z * (rb - rt);
-            red_slot(b, at, out, v3(-d.y, d.x, 0.0), rb * 0.9, 0.22);
+            glow_slot(
+                b,
+                pattern::FAB_LAMP,
+                at,
+                [out, v3(-d.y, d.x, 0.0)],
+                Vec2::new(rb * 0.7, 0.24),
+            );
         }
     }
 }

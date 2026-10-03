@@ -715,6 +715,37 @@ shared! {
         pub const FIN_RATE: f32 = 2.6;
     }
 
+    /// A material fabricator's working beat (`mc_models::aster::fabricator`,
+    /// `regency::condenser`, entity.wgsl `fab_beat`), driven by its work in
+    /// `UnitInstance::deploy` (`mc_sim::mirror::fabricator_work`: 1 at full output, less
+    /// while its side is short of energy, 0 paused, unpowered or going up). Each beat the
+    /// press comes down, the matter it squeezes flashes, the press lifts and the indexer
+    /// turns on to the next cell. Short of energy, beats are missed in proportion and
+    /// the matter's light sputters; at 0 everything rests and only the standby lamps show.
+    pub mod fab as "FAB_" {
+        /// Seconds a beat takes. The cadence never changes speed (so nothing jumps when
+        /// the work does); short of energy, beats are skipped instead.
+        pub const BEAT_S: f32 = 2.2;
+        /// The indexer: turned `INDEX_STEP` radians about the model's z axis late in each
+        /// beat it works, and back to where it was authored by symmetry, so its pieces must
+        /// repeat every `INDEX_STEP` round.
+        pub const PART_INDEX: u32 = 73;
+        pub const INDEX_STEP: f32 = 1.5707964;
+        /// The press: let down `PRESS_TRAVEL` of the model's height early in each beat it
+        /// works, held, and raised again.
+        pub const PART_PRESS: u32 = 74;
+        pub const PRESS_TRAVEL: f32 = 0.05;
+        /// Patterns on `material::GLOW_MATERIALS` faces: the matter being condensed (lit in
+        /// the Materials colour by the work, flashing at each stroke, sputtering when
+        /// short), and a status lamp (steady while it works, a quick amber blink while it
+        /// is short, a slow standby glow while it rests).
+        pub const PATTERN_MATTER: u32 = 37;
+        pub const PATTERN_LAMP: u32 = 38;
+        /// `VsOut::drive_at.w` on those faces: `drive` then holds the work, the stroke's
+        /// flash and whether the unit is paused.
+        pub const DRIVE_TAG: f32 = 4.0;
+    }
+
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
     /// (`mc_sim::reclaim`). The older kinds are still spelled out in the shader.
     pub mod beam as "BEAM_" {
