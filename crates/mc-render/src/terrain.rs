@@ -15,9 +15,12 @@ use std::sync::Arc;
 pub const LEAF_SIZE: f32 = 512.0;
 /// Terrain quads are kept to about this many pixels on screen. The distance
 /// out to which leaves are used follows from it; each coarser level doubles it.
-// Selection and morphing can each double the cell span: a 1 px target keeps the silhouette
-// within roughly 4 px, rather than the old 10-20 px angular coast segments.
-pub const QUAD_PIXELS: f32 = 1.0;
+// Selection and morphing can each double the cell span: a 2 px target keeps the silhouette
+// within roughly 8 px, rather than the old 10-20 px angular coast segments. At 1 px the
+// triangles were half a pixel, and the GPU shades pixels in 2x2 blocks per triangle, so
+// the terrain's shading ran several times over: a whole-map view of Frostline took
+// 15 ms of terrain at 1 px, 12 at 2, with no visible change but a few edge pixels.
+pub const QUAD_PIXELS: f32 = 2.0;
 pub const MAX_NODES: usize = 4096;
 /// Full-resolution tiles kept on the GPU.
 pub const TILE_LAYERS: u32 = 64;
@@ -565,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn strategic_mesh_keeps_morphed_cells_below_four_pixels() {
+    fn strategic_mesh_keeps_morphed_cells_below_eight_pixels() {
         // Screen-space acceptance bound, including the doubled cell span at
         // the end of a morph. A coarse mesh changed narrow bays and ridges
         // even though the underlying heightmap had plenty of detail.
@@ -593,7 +596,7 @@ mod tests {
                     let morphed_cell_px =
                         node.rect[2] / 64.0 * 2.0 * cam.projection_scale() / nearest;
                     assert!(
-                        morphed_cell_px <= 4.01,
+                        morphed_cell_px <= 4.0 * QUAD_PIXELS + 0.01,
                         "{morphed_cell_px:.2} px terrain cell at distance {} on {map_size} m map",
                         cam.distance
                     );
