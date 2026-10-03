@@ -113,7 +113,7 @@ tree_hash() {
     local list
     case $1 in
         engine) list=$(git -C "$repo" ls-files -co --exclude-standard -- crates Cargo.toml Cargo.lock \
-                    rust-toolchain.toml data/textures/terrain data/textures/foliage \
+                    rust-toolchain.toml data/textures/terrain data/textures/foliage data/textures/metal \
                     | grep -v -e '^crates/mc-render/shaders/' -e '^crates/mc-models/src/'
                 echo crates/mc-models/src/gpu_consts.rs) ;;
         looks) echo "$(tree_hash shaders) $(tree_hash models)"; return ;;
