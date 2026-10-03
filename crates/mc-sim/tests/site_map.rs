@@ -52,7 +52,13 @@ fn agree_on(params: &BakeParams) -> usize {
 
     // One blueprint of each kind of lot, in each footprint size.
     let mut kinds = std::collections::BTreeMap::new();
-    for bp in bps.units.iter().filter(|u| u.is_structure()) {
+    // Core mines are left out: past the map's ground they go only on its mine
+    // points, which the interface takes from `mines::mine_points`.
+    for bp in bps
+        .units
+        .iter()
+        .filter(|u| u.is_structure() && u.mine.is_none())
+    {
         kinds
             .entry((bp.water_only(), bp.water_build, bp.footprint))
             .or_insert(bp);

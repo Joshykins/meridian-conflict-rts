@@ -106,7 +106,7 @@ pub struct State {
     pub ai_pending: Vec<PlayerCommand>,
     /// Set when only one team is left.
     pub winner: Option<u8>,
-    /// Core mines' feed, investment and ore share.
+    /// Core mines standing finished, and how long each has dug.
     #[serde(default)]
     pub mines: crate::mines::Mines,
     /// Survival mode's rounds, engine and nodes. None in any other match.
@@ -136,7 +136,7 @@ pub struct TickTimings {
 pub struct MapData {
     pub name: String,
     pub content_id: u64,
-    /// Ore fields core mines draw on.
+    /// Ore fields: each holds one mine point (`World::mine_points`).
     pub ore: Vec<mc_map::OreRegion>,
     pub starts: Vec<FxVec2>,
     pub props: Vec<Prop>,
@@ -172,8 +172,9 @@ pub struct World {
     pub perf: mc_core::perf::Frame,
     /// Path statistics at the end of the last tick, to report per-tick deltas.
     perf_nav: mc_path::NavStats,
-    /// The map's ore fields, rasterised for the mines to count.
-    pub ore: crate::mines::OreGrid,
+    /// The map's mine points, one to an ore field: the only places a core mine
+    /// may stand (`mines.rs`). Worked out from the map when the match begins.
+    pub mine_points: Vec<FxVec2>,
     /// Index of the first terrain edit the renderer has not seen yet is tracked
     /// by the renderer; this is the count at the end of the last tick.
     pub(crate) scratch: Scratch,
@@ -424,8 +425,6 @@ impl World {
             next_batch: 0,
             strategic: Default::default(),
         };
-        let water = terrain.water_level();
-        let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);
         let mut world = World {
             blueprints,
             pool,
@@ -434,7 +433,7 @@ impl World {
             prop_index,
             fog: Fog::new(size),
             nav,
-            ore,
+            mine_points: Vec::new(),
             terrain,
             state,
             events: Vec::new(),
@@ -449,6 +448,7 @@ impl World {
             scratch: Scratch::default(),
         };
 
+        world.mine_points = world.find_mine_points();
         if config.spawn_commanders {
             for p in 0..world.state.players.len() {
                 let faction = world.state.players[p].faction as usize;
@@ -1276,10 +1276,16 @@ pub(crate) fn place_cells_of(footprint: (u8, u8), pos: FxVec2) -> ((u32, u32), (
 }
 
 impl World {
-    /// Placement rules for a structure: inside the map, on ground its layer
-    /// allows, not overlapping another structure. Core mines may stand close;
-    /// they share what they reach instead.
+    /// Placement rules for a structure: [`Self::lot_fits`], and a core mine
+    /// stands only on a mine point (a point taken by any mine is covered by its lot).
     pub fn can_place(&self, bp: &UnitBlueprint, pos: FxVec2) -> bool {
+        self.lot_fits(bp, pos) && (bp.mine.is_none() || self.mine_point_at(pos).is_some())
+    }
+
+    /// Whether a structure's lot fits at `pos`: inside the map, on ground its layer
+    /// allows, not overlapping another structure. Mine points left out: the test
+    /// range's spawns put a mine anywhere.
+    pub fn lot_fits(&self, bp: &UnitBlueprint, pos: FxVec2) -> bool {
         let size = self.terrain.size_metres();
         let half = FxVec2::from_ints(
             bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,

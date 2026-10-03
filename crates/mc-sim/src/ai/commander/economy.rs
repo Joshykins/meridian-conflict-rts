@@ -381,7 +381,6 @@ impl World {
             .map(|&(pos, _)| Claim {
                 pos,
                 foot: 0,
-                mine: false,
                 factory: false,
                 cover: Fx::ZERO,
             })
@@ -423,13 +422,11 @@ impl World {
         let units = &self.state.units;
         let ai = &self.state.ai[units.owner[row] as usize];
         let reach = ai.commander.eco.reach;
-        let bare = Fx::ratio(ai.config.skill().bare_mine_efficiency as i64, 100);
         let pos = units.pos[row];
         let spot = self
             .free_ores(start, claimed, reach, intel)
             .into_iter()
-            .min_by_key(|d| (d.distance_sq(pos), d.x, d.y))
-            .or_else(|| self.free_deposit(start, claimed, reach, intel, Some(bare)))?;
+            .min_by_key(|d| (d.distance_sq(pos), d.x, d.y))?;
         self.job_structure(row, cat::EXTRACTOR, 1, spot, facing, Fx::ZERO, false)
     }
 

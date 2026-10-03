@@ -221,7 +221,7 @@ impl World {
     ) -> Option<(usize, &UnitBlueprint)> {
         let pl = &self.state.players[player as usize];
         let units = &self.state.units;
-        if pl.mass_income < Fx::from_int(8) {
+        if pl.mass_income < Fx::from_int(3) {
             return None;
         }
         let directives = self.commander_directives(player);
@@ -244,8 +244,7 @@ impl World {
         // stall, and a good one is the best thing the side can spend on.
         // Energy counts at what a tech 1 mine costs in it for each unit of mass.
         open.filter_map(|(row, next)| {
-            let state = self.state.mines.by_unit.get(&units.id(row))?;
-            let gain = state.full_rate(&next.mine?) - state.full_rate(&self.bp(row).mine?);
+            let gain = next.mine?.rate - self.bp(row).mine?.rate;
             let (mass, energy) = self.blueprints.upgrade_cost(next);
             let cost = mass + energy / ENERGY_PER_MASS;
             (gain > Fx::ZERO).then(|| (row, next, cost / gain))

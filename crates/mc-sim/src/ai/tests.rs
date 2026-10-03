@@ -46,6 +46,15 @@ fn world_of(cells: u32) -> World {
     .unwrap()
 }
 
+/// Mine points every `pitch` metres across the map, on the 3x3 lot grid.
+fn point_grid(w: &mut World, pitch: i32) {
+    let size = w.terrain.size_metres().x.floor_int();
+    w.mine_points = (1..size / pitch)
+        .flat_map(|j| (1..size / pitch).map(move |i| (i, j)))
+        .map(|(i, j)| FxVec2::from_ints(i * pitch / 12 * 12 + 6, j * pitch / 12 * 12 + 6))
+        .collect();
+}
+
 fn spawn(w: &mut World, key: &str, owner: u8, x: i32, y: i32) -> usize {
     w.spawn_unit(
         w.blueprints.id_of(key).unwrap(),
@@ -251,9 +260,7 @@ fn configured_economy_duel_launches_attacks_and_sustains_combat() {
             });
         }
     }
-    let water = w.terrain.water_level();
-    let size = w.terrain.size_metres();
-    w.ore = crate::mines::OreGrid::new(&w.map.ore, size, |p| w.terrain.height_at(p) > water);
+    w.mine_points = w.find_mine_points();
     for _ in 0..12000 {
         w.tick(&[]).unwrap();
         if w.state.winner.is_some() {
@@ -368,68 +375,54 @@ fn upgraded_factory_trains_a_tech_builder_even_with_many_old_engineers() {
 }
 
 #[test]
-fn bare_mines_only_go_where_they_keep_their_ground() {
+fn the_next_mine_goes_on_the_nearest_free_point() {
     let mut w = world_of(1024);
-    // A ring of mines a reach apart round the start: the gaps between them are
-    // worth little, the ground beyond them a lot.
-    for (x, y) in [
-        (1300, 300),
-        (300, 1300),
-        (1300, 1300),
-        (2300, 300),
-        (300, 2300),
-    ] {
-        spawn(&mut w, "aster_core_mine", 0, x, y);
-    }
-    w.tick(&[]).unwrap();
-    let mine = w
-        .blueprints
-        .unit(w.blueprints.id_of("aster_core_mine").unwrap())
-        .clone();
-    let intel = Intel::default();
+    point_grid(&mut w, 600);
     let start = FxVec2::from_ints(1800, 800);
-    let least = Fx::ratio(55, 100);
-    let spot = w
-        .free_deposit(start, &[], Fx::from_int(3000), &intel, Some(least))
-        .expect("open ground beyond the ring");
-    assert!(
-        w.mine_share_at(&mine, spot).efficiency(&mine.mine.unwrap()) >= least,
-        "a new bare mine keeps most of its reach"
+    let intel = Intel::default();
+    let nearest = |w: &World| w.free_deposit(start, &[], Fx::from_int(3000), &intel);
+    let first = nearest(&w).expect("a free point in range");
+    assert!(w.mine_points.contains(&first));
+    // Taken by anyone's mine, it is passed over for the next nearest.
+    spawn(
+        &mut w,
+        "aster_core_mine",
+        1,
+        first.x.floor_int(),
+        first.y.floor_int(),
     );
+    let second = nearest(&w).expect("another point");
+    assert_ne!(second, first);
+    assert!(second.distance(start) >= first.distance(start));
     assert!(
-        w.free_deposit(start, &[], Fx::from_int(3000), &intel, Some(Fx::ONE))
+        w.free_deposit(start, &[], Fx::from_int(10), &intel)
             .is_none(),
-        "nowhere near the ring is a mine's reach all its own"
+        "nothing out of range"
     );
 }
 
 #[test]
 fn mine_upgrades_go_to_the_mine_that_pays_back_soonest() {
     let mut w = world_of(1024);
-    // A crowded cluster, and one mine with its reach to itself.
-    let crowded: Vec<usize> = [(600, 600), (1100, 600), (600, 1100), (1100, 1100)]
-        .into_iter()
-        .map(|(x, y)| spawn(&mut w, "aster_core_mine", 0, x, y))
-        .collect();
-    let alone = spawn(&mut w, "aster_core_mine", 0, 4000, 4000);
-    spawn(&mut w, "aster_t2_engineer", 0, 400, 400);
+    // A tech 1 mine climbs to tech 2 for a quicker payback than a tech 2 to tech 3.
+    let low = spawn(&mut w, "aster_core_mine", 0, 606, 606);
+    let high = spawn(&mut w, "aster_core_mine_t2", 0, 1206, 606);
+    spawn(&mut w, "aster_t3_engineer", 0, 400, 400);
     w.tick(&[]).unwrap();
     w.state.players[0].mass = Fx::from_int(800);
     w.state.players[0].mass_income = Fx::from_int(20);
-    // The economy allows two at once, each paying back within its horizon
-    // (`commander/economy.rs`).
     let eco = &mut w.state.ai[0].commander.eco;
     eco.upgrades = 2;
-    eco.payback = 1100;
+    eco.payback = 600;
     let mut census = w.survey_own(0);
-    assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), Some(alone));
+    assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), Some(low));
 
-    // With the lone mine taken, a crowded one pays back too slowly for that
-    // horizon, and in time for one twice as long (a filling store's).
-    census.extractors.retain(|&r| r != alone);
+    // With the tech 1 mine taken, the tech 2 one pays back too slowly for that
+    // horizon, and in time for a longer one.
+    census.extractors.retain(|&r| r != low);
     assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), None);
-    w.state.ai[0].commander.eco.payback = 2200;
-    assert!(crowded.contains(&w.mine_to_upgrade(0, &census).map(|(r, _)| r).unwrap()));
+    w.state.ai[0].commander.eco.payback = 1200;
+    assert_eq!(w.mine_to_upgrade(0, &census).map(|(r, _)| r), Some(high));
 }
 
 #[test]
@@ -461,46 +454,22 @@ fn aircraft_and_ships_by_a_mine_do_not_pin_the_land_army() {
 }
 
 #[test]
-fn a_planned_mine_claims_its_deposit_even_when_its_site_stands_off_it() {
-    let w = world();
+fn a_planned_mine_claims_its_point() {
+    let mut w = world();
+    point_grid(&mut w, 600);
     let start = FxVec2::from_ints(1000, 1000);
-    let reach = w
-        .blueprints
-        .units
-        .iter()
-        .find(|b| b.tech == 1 && b.mine.is_some())
-        .unwrap()
-        .mine
-        .unwrap()
-        .reach;
     let open = w
-        .free_deposit(
-            start,
-            &[],
-            Fx::from_int(2000),
-            &Intel::default(),
-            Some(Fx::ZERO),
-        )
+        .free_deposit(start, &[], Fx::from_int(2000), &Intel::default())
         .unwrap();
-    // A builder already walking to a site 200 m off that spot.
+    // A builder already walking to that point.
     let claim = Claim {
-        pos: open + FxVec2::from_ints(200, 0),
-        foot: 7,
-        mine: true,
+        pos: open,
+        foot: 3,
         factory: false,
         cover: Fx::ZERO,
     };
-    let next = w.free_deposit(
-        start,
-        &[claim],
-        Fx::from_int(2000),
-        &Intel::default(),
-        Some(Fx::ZERO),
-    );
-    assert!(
-        next.is_none_or(|p| p.distance(claim.pos) >= reach),
-        "{next:?}"
-    );
+    let next = w.free_deposit(start, &[claim], Fx::from_int(2000), &Intel::default());
+    assert!(next.is_none_or(|p| p != open), "{next:?}");
 }
 
 /// A 400 m square shelf, 100 m up a sheer cliff, under player 0's start.
@@ -635,15 +604,10 @@ fn builders_keep_off_ground_where_their_buildings_were_just_shot_down() {
 #[test]
 fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
     let mut w = world_of(1024);
+    point_grid(&mut w, 300);
     let start = FxVec2::from_ints(1800, 800);
     let first = w
-        .free_deposit(
-            start,
-            &[],
-            Fx::from_int(3000),
-            &Intel::default(),
-            Some(Fx::ZERO),
-        )
+        .free_deposit(start, &[], Fx::from_int(3000), &Intel::default())
         .unwrap();
     // An enemy turret the AI has seen, standing on that spot.
     let gun = spawn(
@@ -671,7 +635,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
         ..Intel::default()
     };
     let spot = w
-        .free_deposit(start, &[], Fx::from_int(3000), &intel, Some(Fx::ZERO))
+        .free_deposit(start, &[], Fx::from_int(3000), &intel)
         .expect("somewhere out of its reach");
     assert!(spot.distance(first) > reach, "no new mine under its guns");
 

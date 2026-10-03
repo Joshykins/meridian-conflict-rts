@@ -22,7 +22,6 @@ CAP = float(os.environ.get("CAP", "35"))
 ALTS = {
     "mines": [3, 4, 6, 8, 10],
     "range": [2000, 3000, 4500],
-    "eff": [0.4, 0.55, 0.7],
     "engineers": [0, 2, 4, 8],
     "factory_after": [0, 1, 2, 4],
     "ratio": [5, 6, 7, 9],
@@ -47,7 +46,7 @@ ALTS = {
     "t3_power_at": [20, 40, 80],
 }
 # The probe's Plan::default, which the search starts from.
-DEFAULT = {"mines": 6, "range": 4500, "eff": 0.7, "engineers": 8, "factory_after": 1, "ratio": 9,
+DEFAULT = {"mines": 6, "range": 4500, "engineers": 8, "factory_after": 1, "ratio": 9,
     "reclaim": 4000, "towers": 2, "tech2_at": 20, "tech3_at": 25, "tech": 0, "eng_up": 1,
     "engineers_max": 8, "reclaim_below": 0.5, "mfe_at": 10, "drones_at": -1, "horizon": 0,
     "lanes": 1, "build_dc": 0, "early_line": 1, "focus": 2, "assist": 1, "reclaim_first": 0,

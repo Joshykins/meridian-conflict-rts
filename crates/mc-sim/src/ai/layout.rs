@@ -101,7 +101,7 @@ impl World {
         // Square rings outward, so a farm fills in as a block, not a diamond.
         spots.sort_by_key(|&(ring, d2, p)| (ring, d2, p.x, p.y));
         let ore = if keep_off_deposits {
-            self.ore_centres()
+            self.mine_points.clone()
         } else {
             Vec::new()
         };
@@ -262,7 +262,7 @@ impl World {
         let cell = mc_map::BUILD_CELL_M;
         let origin = snap_to_build_grid(bp, spot);
         let n = SHIELD_SLACK / cell;
-        let ore = self.ore_centres();
+        let ore = self.mine_points.clone();
         let mut best: Option<(Fx, i32, FxVec2)> = None;
         for dy in -n..=n {
             for dx in -n..=n {

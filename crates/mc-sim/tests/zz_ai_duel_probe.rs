@@ -22,7 +22,7 @@ fn report(w: &World, minute: u32) {
     let s = &w.state;
     for p in 0..s.players.len() {
         let pl = &s.players[p];
-        let (mut mines, mut eff, mut mine_tiers) = (0, 0.0f32, [0; 5]);
+        let (mut mines, mut mine_tiers) = (0, [0; 5]);
         let (mut factories, mut army, mut army_mass, mut engineers) = (0, 0, 0.0f32, 0);
         let (mut power, mut builders, mut busy) = ([0; 4], [0; 4], 0);
         let (mut pd, mut fac_tiers) = (0, [0; 4]);
@@ -36,12 +36,9 @@ fn report(w: &World, minute: u32) {
             if !s.units.is_active(row) {
                 continue;
             }
-            if let Some(m) = bp.mine {
+            if bp.mine.is_some() {
                 mines += 1;
                 mine_tiers[bp.tech.min(4) as usize] += 1;
-                if let Some(st) = s.mines.by_unit.get(&s.units.id(row)) {
-                    eff += st.land.efficiency(&m).to_f32();
-                }
             } else if bp.has(cat::POWER) && bp.is_structure() {
                 power[bp.tech.min(3) as usize] += 1;
             } else if bp.has(cat::FACTORY) && bp.is_structure() {
@@ -154,7 +151,7 @@ fn report(w: &World, minute: u32) {
             }
         }
         println!(
-            "  {minute:>2}m P{p} {:?}: stored {:.0}/{:.0} demand {:.0}/s defenses {pd} factories T1-3 {:?} | mass {:>6.1}/s energy {:>7.1}/s eff {:.2} tech {} | mines {mines} (T1-4 {:?}) avg eff {:.2} | power T1-3 {:?} builders T1-3 {:?} busy {busy} | factories {factories} engineers {engineers} army {army} ({:.0} mass) | killed {} lost {}",
+            "  {minute:>2}m P{p} {:?}: stored {:.0}/{:.0} demand {:.0}/s defenses {pd} factories T1-3 {:?} | mass {:>6.1}/s energy {:>7.1}/s eff {:.2} tech {} | mines {mines} (T1-4 {:?}) | power T1-3 {:?} builders T1-3 {:?} busy {busy} | factories {factories} engineers {engineers} army {army} ({:.0} mass) | killed {} lost {}",
             s.ai[p].config.difficulty,
             pl.mass.to_f32(),
             pl.mass_capacity.to_f32(),
@@ -165,7 +162,6 @@ fn report(w: &World, minute: u32) {
             pl.efficiency.to_f32(),
             w.side_tech(p as u8),
             &mine_tiers[1..],
-            if mines > 0 { eff / mines as f32 } else { 0.0 },
             &power[1..],
             &builders[1..],
             army_mass,

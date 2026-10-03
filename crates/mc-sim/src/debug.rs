@@ -50,7 +50,7 @@ impl World {
                 let mut rows = Vec::new();
                 if bp.is_structure() {
                     let site = snap_to_build_grid(&bp, *pos);
-                    if self.can_place(&bp, site) {
+                    if self.lot_fits(&bp, site) {
                         rows.push(self.spawn_unit(*blueprint, *owner, site, *heading, true)?);
                     }
                 } else {

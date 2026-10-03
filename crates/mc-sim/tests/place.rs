@@ -148,23 +148,6 @@ fn removing_one_neighbour_frees_its_lot() {
     );
 }
 
-#[test]
-fn core_mines_may_stand_close_but_not_overlap() {
-    let mut w = world();
-    let mine = w
-        .blueprints
-        .unit(w.blueprints.id_of("aster_core_mine").unwrap())
-        .clone();
-    let lot = mine.footprint.0 as i32 * mc_map::BUILD_CELL_M;
-    w.tick(&[spawn_at(&w, "aster_core_mine", 522, 522)])
-        .unwrap();
-    assert_eq!(count(&w, "aster_core_mine"), 1);
-    let on_top = mc_sim::snap_to_build_grid(&mine, FxVec2::from_ints(522 + lot / 2, 522));
-    let beside = mc_sim::snap_to_build_grid(&mine, FxVec2::from_ints(522 + lot + 6, 522));
-    assert!(!w.can_place(&mine, on_top));
-    assert!(w.can_place(&mine, beside));
-}
-
 fn engineer_ids(w: &World) -> Vec<mc_sim::UnitId> {
     let bp = w.blueprints.id_of("aster_t1_engineer").unwrap();
     w.state

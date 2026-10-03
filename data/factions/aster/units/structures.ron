@@ -161,15 +161,11 @@
         mesh: "factory_naval", icon: Factory,
         sounds: (death: "blast_large"),
     ),
-    // Core mines. They stand on land or, raised on stilts, on open water.
-    // Every hectare of land in `reach` is worth `ground` materials a
-    // second, and every hectare of ore `per_hectare`, and the shaft itself `base`
-    // from the moment the mine is finished. Where mines' reaches overlap, the
-    // ground is divided by a straight line through the two points where the
-    // circles cross. Every tier reaches as far; the tiers are the investment,
-    // and each is a poorer one than the last: 2.5x then 2x the yield of the
-    // tier below for ever dearer upgrades, so a new mine beats an upgrade.
-    // The hammer runs on energy: a side that cannot pay its upkeep gets a
+    // Core mines. They stand only on the map's mine points (one to an ore field), on land
+    // or, raised on stilts, out at sea, and each digs a fixed `rate` a second. A new mine
+    // pays for itself in under a minute; each tier above pays back slower (about 3, 8
+    // and 12 minutes for the upgrade's price), so a side climbs its mines only when it
+    // means to stay. The hammer runs on energy: a side that cannot pay its upkeep gets a
     // quarter of its mines' output at worst (mc-sim mines.rs `UNPOWERED`).
     (
         key: "aster_core_mine",
@@ -178,14 +174,11 @@
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
         health: 600,
-        cost: (mass: 160, energy: 960, time: 160),
+        cost: (mass: 45, energy: 270, time: 72),
         radius: 12.8, height: 12.6, footprint: (3, 3),
         vision: 300, water_build: true,
-        economy: (mass_storage: 250, energy_upkeep: 10),
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.010, per_hectare: 0.9, base: 1.1,
-        ),
+        economy: (mass_storage: 100, energy_upkeep: 2),
+        mine: (rate: 1),
         upgrades_to: "aster_core_mine_t2",
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
@@ -197,14 +190,11 @@
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
         health: 2000,
-        cost: (mass: 1700, energy: 10200, time: 2500),
+        cost: (mass: 585, energy: 3500, time: 900),
         radius: 12.8, height: 20.8, footprint: (3, 3),
         vision: 360, water_build: true,
-        economy: (mass_storage: 750, energy_upkeep: 60),
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.025, per_hectare: 2.25, base: 2.75,
-        ),
+        economy: (mass_storage: 200, energy_upkeep: 8),
+        mine: (rate: 4),
         upgrades_to: "aster_core_mine_t3",
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
@@ -216,23 +206,18 @@
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
         health: 5000,
-        cost: (mass: 7200, energy: 43200, time: 8800),
+        cost: (mass: 4400, energy: 26400, time: 6200),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 420, water_build: true,
-        economy: (mass_storage: 2000, energy_upkeep: 300),
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.05, per_hectare: 4.5, base: 5.5,
-        ),
+        economy: (mass_storage: 400, energy_upkeep: 30),
+        mine: (rate: 12),
         upgrades_to: "aster_core_mine_t4",
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
     ),
-    // The deep core: an upgrade only, and a poor investment next to the
-    // tiers below it. Like every tier it multiplies what the mine gets from
-    // its ground, ore and shaft, but by only 1.5x over tier 3, for over twice
-    // tier 3's price. The hammer drives in cycles, and each blow sends a
-    // small shockwave across the ground.
+    // The deep core: the slowest payback of the line, twice tier 3's output for
+    // about twice its price again. The hammer drives in cycles, and each blow
+    // sends a small shockwave across the ground.
     (
         key: "aster_core_mine_t4",
         name: "Deep Core",
@@ -240,14 +225,11 @@
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
         health: 10000,
-        cost: (mass: 16000, energy: 96000, time: 14000),
+        cost: (mass: 13000, energy: 78000, time: 13800),
         radius: 12.8, height: 22.3, footprint: (3, 3),
         vision: 480, water_build: true,
-        economy: (mass_storage: 4000, energy_upkeep: 600),
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.075, per_hectare: 6.75, base: 8.25,
-        ),
+        economy: (mass_storage: 800, energy_upkeep: 60),
+        mine: (rate: 24),
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
     ),

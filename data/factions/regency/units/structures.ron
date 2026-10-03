@@ -186,11 +186,11 @@
         sounds: (death: "blast_large"),
     ),
     // ---- Economy ------------------------------------------------------------------------
-    // Works the same ore as a Core Mine, and as well at every tier, but it digs with a beam
-    // and lifts the ore on its own gravity pinch, drawing nothing from the grid: no energy
-    // upkeep, so a Regency economy never browns out its mass. It pays for that up front, and
-    // upgrades in place through the same four tiers (`models::regency::taproot`); the fourth,
-    // like the Deep Core, opens with tech 3 and only adds a fixed yield from its shaft.
+    // Stands on the same mine points as a Core Mine and digs as much at every tier, but it
+    // digs with a beam and lifts the ore on its own gravity pinch, drawing nothing from the
+    // grid: no energy upkeep, so a Regency economy never browns out its mass. It pays for
+    // that up front, and upgrades in place through the same four tiers
+    // (`models::regency::taproot`); the fourth, like the Deep Core, opens with tech 3.
     (
         key: "regency_t1_extractor",
         name: "Excavator",
@@ -198,15 +198,12 @@
         tech: 1,
         categories: ["Land", "Economy", "Extractor"],
         health: 480,
-        cost: (mass: 230, energy: 800, time: 200),
+        cost: (mass: 55, energy: 300, time: 90),
         radius: 12.8, height: 11, footprint: (3, 3),
         vision: 300, water_build: true,
-        economy: (mass_storage: 250),
+        economy: (mass_storage: 100),
         // The beam lifts the ore with no hammer: no blows to show or hear.
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.010, per_hectare: 0.9, base: 1.1, hammer: false,
-        ),
+        mine: (rate: 1, hammer: false),
         upgrades_to: "regency_t2_extractor",
         mesh: "regency_taproot", icon: Extractor,
     ),
@@ -217,14 +214,11 @@
         tech: 2,
         categories: ["Land", "Economy", "Extractor"],
         health: 3840,
-        cost: (mass: 1700, energy: 6000, time: 2350),
+        cost: (mass: 600, energy: 2100, time: 900),
         radius: 12.8, height: 15, footprint: (3, 3),
         vision: 360, water_build: true,
-        economy: (mass_storage: 750),
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.039, per_hectare: 3.6, base: 4.5, hammer: false,
-        ),
+        economy: (mass_storage: 200),
+        mine: (rate: 4, hammer: false),
         upgrades_to: "regency_t3_extractor",
         mesh: "regency_taproot", icon: Extractor,
     ),
@@ -235,14 +229,11 @@
         tech: 3,
         categories: ["Land", "Economy", "Extractor"],
         health: 10240,
-        cost: (mass: 6900, energy: 24000, time: 8300),
+        cost: (mass: 4500, energy: 15600, time: 6300),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 420, water_build: true,
-        economy: (mass_storage: 2000),
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.117, per_hectare: 10.8, base: 13.5, hammer: false,
-        ),
+        economy: (mass_storage: 400),
+        mine: (rate: 12, hammer: false),
         upgrades_to: "regency_t4_extractor",
         mesh: "regency_taproot", icon: Extractor,
     ),
@@ -253,14 +244,11 @@
         tech: 4,
         categories: ["Land", "Economy", "Extractor"],
         health: 19200,
-        cost: (mass: 23000, energy: 80000, time: 25800),
+        cost: (mass: 13300, energy: 46000, time: 14000),
         radius: 12.8, height: 19, footprint: (3, 3),
         vision: 480, water_build: true,
-        economy: (mass_storage: 4000),
-        mine: (
-            reach: 1000, sea_reach: 1500,
-            ground: 0.117, per_hectare: 10.8, base: 53.5, hammer: false,
-        ),
+        economy: (mass_storage: 800),
+        mine: (rate: 24, hammer: false),
         mesh: "regency_taproot", icon: Extractor,
     ),
     // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what

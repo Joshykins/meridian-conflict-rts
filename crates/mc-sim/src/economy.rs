@@ -233,8 +233,8 @@ impl World {
             }
         }
 
-        // Mines draw their upkeep with the rest, and dig as hard as the rest's energy
-        // is covered. Mass is not known yet (the mines make it), so what is put first is
+        // Mines and fabricators draw their upkeep with the rest, and make as much as
+        // the rest's energy is covered. Mass is not known yet (the mines make it), so what is put first is
         // taken to spend all the energy it asks for: never more than it does.
         let mut powered = vec![Fx::ONE; player_count];
         for (p, pl) in self.state.players.iter().enumerate() {
@@ -246,6 +246,7 @@ impl World {
             powered[p] = ratio(have, tiers[p][REST].energy);
         }
         let mine_lost = self.mine_income(&mut income, &powered);
+        self.fabricator_income(&mut income, &powered);
         for (p, pl) in self.state.players.iter().enumerate() {
             let m = pl.income_permille[0];
             if m != 1000 {

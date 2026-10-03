@@ -300,36 +300,23 @@ pub struct Economy {
     pub energy_storage: Fx,
 }
 
-/// A core mine. Every patch of land within its reach is worth materials a
-/// second, ore much more than bare ground; where mines' reaches overlap the
-/// ground is divided between them. Higher tiers get more out of each hectare.
-/// One standing in the sea mines the sea instead, up to the shore.
+/// A core mine. It stands on one of the map's mine points (`mc_sim::mines`) and digs
+/// a fixed amount a second out of it; a higher tier digs more.
 #[derive(Clone, Copy, Debug)]
 pub struct Mine {
-    /// Metres around itself it mines, on land.
-    pub reach: Fx,
-    /// Metres around itself it mines when it stands in the sea.
-    pub sea_reach: Fx,
-    /// Materials per second per hectare of land in its territory.
-    pub ground: Fx,
-    /// Materials per second per hectare of ore in its territory (instead of `ground` there).
-    pub per_hectare: Fx,
-    /// Materials per second from the shaft itself, from the moment it is finished,
-    /// whatever its territory: a new mine pays at once while its land spreads out.
-    pub base: Fx,
+    /// Materials per second.
+    pub rate: Fx,
     /// Strikes a pile hammer in a beat (`RawMine::hammer`). Presentation only.
     pub hammer: bool,
 }
 
-impl Mine {
-    /// Its reach, standing in the sea or on land.
-    pub fn reach_on(&self, sea: bool) -> Fx {
-        if sea {
-            self.sea_reach
-        } else {
-            self.reach
-        }
-    }
+/// A material fabricator (MFE): materials a second made out of energy. It makes
+/// them only as far as its `energy_upkeep` is paid, with nothing at all left over
+/// in a full stall, unlike a mine.
+#[derive(Clone, Copy, Debug)]
+pub struct Fabricator {
+    /// Materials per second with its upkeep paid in full.
+    pub mass: Fx,
 }
 
 /// What a volatile unit does when it is destroyed: a blast that hurts every unit
@@ -720,8 +707,10 @@ pub struct UnitBlueprint {
     pub stomp: Option<Stomp>,
     pub motion: Option<Motion>,
     pub economy: Economy,
-    /// A core mine: makes materials out of the ground around it.
+    /// A core mine: digs materials out of the map point it stands on.
     pub mine: Option<Mine>,
+    /// A material fabricator: turns its energy upkeep into a trickle of materials.
+    pub fabricator: Option<Fabricator>,
     /// A volatile unit: the blast it makes when it is destroyed.
     pub death_blast: Option<DeathBlast>,
     /// A strategic launcher: assembles and holds nuclear warheads or interceptors.
@@ -1223,10 +1212,11 @@ impl Blueprints {
                 || u.sonar > Fx::ZERO
                 || u.shield.is_some()
                 || u.warp_damper.is_some()
-                || u.mine.is_some();
+                || u.mine.is_some()
+                || u.fabricator.is_some();
             if u.economy.energy_upkeep > Fx::ZERO && !powered {
                 return Err(DataError::Invalid(format!(
-                    "{}: only a shield, radar, sonar, warp dampener or mine draws energy upkeep",
+                    "{}: only a shield, radar, sonar, warp dampener, mine or fabricator draws energy upkeep",
                     u.key
                 )));
             }
@@ -1319,12 +1309,11 @@ impl Blueprints {
             }
             match &u.mine {
                 Some(m) => {
-                    for v in [m.reach, m.sea_reach, m.ground, m.per_hectare, m.base] {
-                        h.write_i64(v.0);
-                    }
+                    h.write_i64(m.rate.0);
                 }
                 None => h.write_u64(u64::MAX),
             }
+            h.write_i64(u.fabricator.map_or(-1, |f| f.mass.0));
             match &u.death_blast {
                 Some(d) => {
                     h.write_i64(d.radius.0);

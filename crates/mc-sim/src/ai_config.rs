@@ -38,9 +38,6 @@ pub struct Skill {
     pub builders_per_think: usize,
     /// Metres from the start a builder is sent to put down a mine.
     pub mine_travel: i32,
-    /// Percent of its reach's worth a mine on bare ground must keep, shared
-    /// with the mines already standing, to be worth building.
-    pub bare_mine_efficiency: i32,
     /// Seconds a mine upgrade may take to pay back its cost (its energy
     /// counted as mass); doubled while materials pile up.
     pub upgrade_payback: i32,
@@ -98,33 +95,30 @@ impl AiConfig {
             Difficulty::Easy => Skill {
                 builders_per_think: 3,
                 mine_travel: 2200,
-                bare_mine_efficiency: 30,
-                upgrade_payback: 800,
+                upgrade_payback: 1000,
                 power_ratio: 5,
                 factory_cap: 3,
-                tech_income: 19,
+                tech_income: 8,
                 eager_tech: false,
                 wave_delta: -2,
             },
             Difficulty::Normal => Skill {
                 builders_per_think: 5,
                 mine_travel: 2600,
-                bare_mine_efficiency: 40,
-                upgrade_payback: 1100,
+                upgrade_payback: 1300,
                 power_ratio: 7,
                 factory_cap: 6,
-                tech_income: 14,
+                tech_income: 6,
                 eager_tech: false,
                 wave_delta: -1,
             },
             Difficulty::Hard => Skill {
                 builders_per_think: 8,
                 mine_travel: 3000,
-                bare_mine_efficiency: 50,
-                upgrade_payback: 1500,
+                upgrade_payback: 1600,
                 power_ratio: 8,
                 factory_cap: 10,
-                tech_income: 11,
+                tech_income: 5,
                 eager_tech: false,
                 wave_delta: 0,
             },

@@ -50,9 +50,9 @@ impl Unfit {
 }
 
 /// Bit on a cell with a city block on it.
-const CITY: u8 = 1 << 7;
+pub(crate) const CITY: u8 = 1 << 7;
 /// Bit on a cell with at least `SEABED_DEPTH` of water over all of it.
-const ABYSS: u8 = 1 << 6;
+pub(crate) const ABYSS: u8 = 1 << 6;
 
 /// Shallowest water a seabed installation (`UnitBlueprint::seabed`) stands in: its
 /// body wholly under the surface, with room over it for a keel to pass.
@@ -130,49 +130,60 @@ impl SiteMap {
     /// Whether `bp` could stand at `pos` (already snapped to the build grid),
     /// leaving other structures out of it.
     pub fn check(&self, bp: &UnitBlueprint, pos: FxVec2) -> Result<(), Unfit> {
-        let half = FxVec2::from_ints(
-            bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
-            bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
-        );
-        if pos.x - half.x < Fx::ZERO
-            || pos.y - half.y < Fx::ZERO
-            || pos.x + half.x > self.size.x
-            || pos.y + half.y > self.size.y
-        {
-            return Err(Unfit::OffMap);
-        }
-        let (min, max) = path_cells_of(bp.footprint, pos);
-        for y in min.1..=max.1 {
-            for x in min.0..=max.0 {
-                let class = self.cell(x, y);
-                let steep = class & terrain::STEEP != 0;
-                if bp.seabed {
-                    if class & ABYSS == 0 {
-                        return Err(Unfit::Shallow);
-                    }
-                } else if bp.water_only() {
-                    if class & terrain::DEEP == 0 {
-                        return Err(Unfit::Shore);
-                    }
-                } else if bp.water_build {
-                    if steep && class & (terrain::SHALLOW | terrain::DEEP) == 0 {
-                        return Err(Unfit::Steep);
-                    }
-                } else if class & terrain::LAND == 0 {
-                    return Err(Unfit::Water);
-                } else if steep {
+        check_cells(bp, pos, self.size, |x, y| self.cell(x, y))
+    }
+}
+
+/// [`SiteMap::check`] over any source of cell classes: `class` gives an 8 m cell's
+/// terrain class with the [`CITY`] and [`ABYSS`] bits.
+pub(crate) fn check_cells(
+    bp: &UnitBlueprint,
+    pos: FxVec2,
+    size: FxVec2,
+    class: impl Fn(u32, u32) -> u8,
+) -> Result<(), Unfit> {
+    let half = FxVec2::from_ints(
+        bp.footprint.0 as i32 * mc_map::BUILD_CELL_M / 2,
+        bp.footprint.1 as i32 * mc_map::BUILD_CELL_M / 2,
+    );
+    if pos.x - half.x < Fx::ZERO
+        || pos.y - half.y < Fx::ZERO
+        || pos.x + half.x > size.x
+        || pos.y + half.y > size.y
+    {
+        return Err(Unfit::OffMap);
+    }
+    let (min, max) = path_cells_of(bp.footprint, pos);
+    for y in min.1..=max.1 {
+        for x in min.0..=max.0 {
+            let class = class(x, y);
+            let steep = class & terrain::STEEP != 0;
+            if bp.seabed {
+                if class & ABYSS == 0 {
+                    return Err(Unfit::Shallow);
+                }
+            } else if bp.water_only() {
+                if class & terrain::DEEP == 0 {
+                    return Err(Unfit::Shore);
+                }
+            } else if bp.water_build {
+                if steep && class & (terrain::SHALLOW | terrain::DEEP) == 0 {
                     return Err(Unfit::Steep);
                 }
+            } else if class & terrain::LAND == 0 {
+                return Err(Unfit::Water);
+            } else if steep {
+                return Err(Unfit::Steep);
             }
         }
-        let (min, max) = place_cells_of(bp.footprint, pos);
-        for y in min.1..=max.1 {
-            for x in min.0..=max.0 {
-                if self.cell(x, y) & CITY != 0 {
-                    return Err(Unfit::City);
-                }
-            }
-        }
-        Ok(())
     }
+    let (min, max) = place_cells_of(bp.footprint, pos);
+    for y in min.1..=max.1 {
+        for x in min.0..=max.0 {
+            if class(x, y) & CITY != 0 {
+                return Err(Unfit::City);
+            }
+        }
+    }
+    Ok(())
 }
