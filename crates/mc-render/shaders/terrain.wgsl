@@ -912,19 +912,19 @@ fn glacier_shade(xy: vec2<f32>, z: f32, alt: f32, base_n: vec3<f32>, cover: f32,
     return out;
 }
 
-@fragment
-fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let xy = in.world.xy;
+// The ground at `world` as seen at screen pixel `pixel`: `crag` is the vertex
+// stage's crag relief (`VsOut::crag`, zero where none), `dpx`/`dpy` how `world`
+// changes a pixel across and down. Drawn forward by `fs_main`, or once per pixel
+// from the pre-pass's depth by `fs_lit` (renderer/terrain_lit.rs).
+fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f32>, dpy: vec3<f32>) -> vec4<f32> {
+    let xy = world.xy;
     // Classify beaches and submerged ground from the same heightfield as
     // the ocean, not interpolated coarse-triangle height. Otherwise LOD
     // changes move the sand band independently of the true coastline.
     let z = terrain_height(xy);
     let water = globals.map.z;
     let eye = globals.camera.xyz;
-    let dist = distance(in.world, eye);
-    // Texture derivatives come first: everything after may branch.
-    let dpx = dpdx(in.world);
-    let dpy = dpdy(in.world);
+    let dist = distance(world, eye);
     let dx = dpx.xy;
     let dy = dpy.xy;
     let px = max(length(dx), length(dy));
@@ -978,7 +978,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     var lw = max(vec3<f32>(wa, wb, wc) - wd, vec3<f32>(0.0));
     lw /= max(lw.x + lw.y + lw.z, 1e-4);
 
-    let view = normalize(eye - in.world);
+    let view = normalize(eye - world);
     let tangent_view = view - base_n * dot(view, base_n);
     let ray = (tangent_view / max(dot(view, base_n), 0.28)).xy;
     let near = 1.0 - smoothstep(65.0, 220.0, dist);
@@ -1016,7 +1016,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Beds and the ring by the drawn surface's own height: on a cliff the
         // heightfield under a pixel and the coarser mesh drawn there can be
         // metres apart, which would saw the lines.
-        site = canyon_site(xy, in.world.z - water, base_n, px, dz);
+        site = canyon_site(xy, world.z - water, base_n, px, dz);
         ground_color = side_mix3(ground_color, canyon_ground(ga, a, site) * bw.x + canyon_ground(gb, b, site) * bw.y
             + canyon_ground(gc, c, site) * bw.z, arid);
     }
@@ -1035,15 +1035,15 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     var cliff_n = base_n;
     // On a crag the drawn surface is the rock (`crag_relief`): its facets are lit as
     // they lie, worked out per pixel (`crag_shade`), and it is all rock.
-    let crag_w = in.crag.x;
+    let crag_w = crag.x;
     var facet = base_n;
     var crag_depth_here = 0.0;
     if crag_w > 0.004 {
         var c: Crag;
         c.weight = crag_w;
-        c.fine = in.crag.y;
-        c.mass_lift = in.crag.z;
-        c.facet_lift = in.crag.w;
+        c.fine = crag.y;
+        c.mass_lift = crag.z;
+        c.facet_lift = crag.w;
         let shade = crag_shade(xy, base_n, px, c);
         facet = shade.normal;
         crag_depth_here = shade.depth;
@@ -1053,7 +1053,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Mostly the facet as it lies, a little of the wall's own lean: a sliver
         // standing on end still catches the sky.
         cliff_n = normalize(mix(cliff_n, facet, crag_w * 0.75));
-        cliff = terrain_surface_grad(in.world, cliff_n, 17.0, MAT_ROCK_FACE, 1.25, dpx, dpy);
+        cliff = terrain_surface_grad(world, cliff_n, 17.0, MAT_ROCK_FACE, 1.25, dpx, dpy);
     }
     let rock_w = max(clamp(rock_face + (cliff.height - ground_h) * 0.35 * rock_face * (1.0 - rock_face) * 4.0, 0.0, 1.0),
         crag_w);
@@ -1128,7 +1128,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let graze = 1.0 - smoothstep(0.05, 0.45, upright);
         let field = grass_mass(grassy, hab, mix(0.5, 0.85, graze)) * ground_tone(hab, green_part) * macro_mod
             * (1.0 + graze * 0.12);
-        let drawn = grass_drawn(in.world);
+        let drawn = grass_drawn(world);
         let close = drawn * smoothstep(8.0, 24.0, GRASS_CELL_M * globals.lod.x / max(dist, 1.0));
         // Between close blades the soil shows. Further off, looking across a
         // field, only the blades are seen: whether they are drawn or not, the
@@ -1189,12 +1189,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // Where the bushes stand up as blades (grass_gen.wgsl), only the shade
         // and litter under them is painted: dark painted shapes on the ground
         // there would read as pits beside the bushes.
-        let standing = grass_drawn(in.world);
+        let standing = grass_drawn(world);
         albedo *= 1.0 - shrubs.shadow * mix(0.55, 0.25, standing);
         albedo = mix(albedo, mix(bush, albedo * 0.75, standing * 0.85), shrubs.cover);
         canyon_grad = shrubs.grad * arid;
         // The bathtub ring over everything below the old full-pool line.
-        let ring = canyon_ring(xy, in.world.z - water, steep, site.streak, dz);
+        let ring = canyon_ring(xy, world.z - water, steep, site.streak, dz);
         let cracks = canyon_mud_cracks(xy, px);
         // Silt dries paler on the rises, stays darker and damper in the dips.
         let silt = CANYON_SILT * (0.8 + 0.3 * fine) * (0.85 + 0.3 * patchy) * (1.0 - concavity * 0.6)
@@ -1365,7 +1365,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     m.metallic = crater_metal;
     m.roughness = rough;
     m.emissive = ice_glow + crater_glow;
-    let v = normalize(eye - in.world);
+    let v = normalize(eye - world);
     var horizon = 1.0;
     let toward_sun = normalize(globals.sun.xy);
     let rise = globals.sun.z / max(length(globals.sun.xy), 0.1);
@@ -1374,7 +1374,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let obstruction = terrain_height(xy + toward_sun * reach) - z - rise * reach;
         horizon = min(horizon, smoothstep(-3.0, 5.0, -obstruction));
     }
-    let shadow = sun_shadow(in.world, base_n) * horizon;
+    let shadow = sun_shadow(world, base_n) * horizon;
     // How much of the sky the ground sees: how far the land around rises above
     // this spot's own slope, in six directions at two reaches that grow with
     // the view, so gullies and the feet of slopes fall into shade at any zoom
@@ -1393,10 +1393,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
         open_sky += 1.0 - rise * inverseSqrt(1.0 + rise * rise);
     }
-    let sky_vis = pow(open_sky / 6.0, 1.6) * (0.55 + cavity * 0.45) * crater_sky * screen_ao(in.clip.xy);
+    let sky_vis = pow(open_sky / 6.0, 1.6) * (0.55 + cavity * 0.45) * crater_sky * screen_ao(pixel);
     var color = shade_pbr_vis(m, n, v, globals.sun.xyz, shadow, sky_vis);
-    color += albedo * lightning_light(in.world, n) * 0.35;
-    color += local_lights(m, in.world, n, v);
+    color += albedo * lightning_light(world, n) * 0.35;
+    color += local_lights(m, world, n, v);
 
     if push.build_grid == 1u {
         // Under the sea the grid is drawn on the water's surface instead (water.wgsl);
@@ -1411,6 +1411,73 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
 
     color = apply_fog_of_war(color, xy);
-    color = apply_haze(color, in.world, eye);
+    color = apply_haze(color, world, eye);
     return vec4<f32>(color, 1.0);
+}
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    return shade_ground(in.world, in.crag, in.clip.xy, dpdx(in.world), dpdy(in.world));
+}
+
+// The terrain shaded once per pixel before the scene pass (`fs_lit`), and the
+// pre-pass's depth it was shaded from. Set 2 of `layouts.water`.
+@group(2) @binding(0) var terrain_lit: texture_2d<f32>;
+@group(2) @binding(1) var lit_depth: texture_depth_2d;
+
+// The scene pass's terrain over a pre-pass: what `fs_lit` shaded at this pixel. Its
+// half-pixel triangles would otherwise run `shade_ground` several times a pixel
+// (the GPU shades 2x2 blocks per triangle). Crags are shaded here instead: their
+// relief comes from the vertex stage.
+@fragment
+fn fs_over_lit(in: VsOut) -> @location(0) vec4<f32> {
+    let dpx = dpdx(in.world);
+    let dpy = dpdy(in.world);
+    if in.crag.x > 0.0 {
+        return shade_ground(in.world, in.crag, in.clip.xy, dpx, dpy);
+    }
+    return textureLoad(terrain_lit, vec2<i32>(in.clip.xy), 0);
+}
+
+struct LitOut {
+    @builtin(position) clip: vec4<f32>,
+}
+
+@vertex
+fn vs_lit(@builtin(vertex_index) i: u32) -> LitOut {
+    var out: LitOut;
+    let uv = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
+    out.clip = vec4<f32>(uv * 2.0 - 1.0, 0.0, 1.0);
+    return out;
+}
+
+// The point the pre-pass left at pixel `p` (xyz) and its depth (w, 0 where nothing).
+fn lit_point(p: vec2<i32>) -> vec4<f32> {
+    let size = vec2<i32>(textureDimensions(lit_depth));
+    let q = clamp(p, vec2<i32>(0), size - vec2<i32>(1));
+    let d = textureLoad(lit_depth, q, 0);
+    let uv = (vec2<f32>(q) + vec2<f32>(0.5)) / vec2<f32>(size);
+    let h = globals.inv_view_proj * vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    return vec4<f32>(h.xyz / h.w, d);
+}
+
+// Of the steps to the two neighbours along an axis, the one on the same surface:
+// the one whose depth changes least, so a ridge's edge does not take its slope
+// from the land behind it.
+fn lit_step(c: vec4<f32>, before: vec4<f32>, after: vec4<f32>) -> vec3<f32> {
+    return select(c.xyz - before.xyz, after.xyz - c.xyz, abs(after.w - c.w) < abs(c.w - before.w));
+}
+
+// The ground at every pixel the pre-pass left something at (terrain or what stands
+// on it: the scene pass keeps only where the terrain is in front).
+@fragment
+fn fs_lit(in: LitOut) -> @location(0) vec4<f32> {
+    let p = vec2<i32>(in.clip.xy);
+    let c = lit_point(p);
+    if c.w <= 0.0 {
+        return vec4<f32>(0.0);
+    }
+    let dpx = lit_step(c, lit_point(p - vec2<i32>(1, 0)), lit_point(p + vec2<i32>(1, 0)));
+    let dpy = lit_step(c, lit_point(p - vec2<i32>(0, 1)), lit_point(p + vec2<i32>(0, 1)));
+    return shade_ground(c.xyz, vec4<f32>(0.0), in.clip.xy, dpx, dpy);
 }

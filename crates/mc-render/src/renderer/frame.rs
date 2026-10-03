@@ -491,17 +491,18 @@ impl Renderer {
         let push = |a: u32, b: u32| unsafe {
             device.cmd_push_constants(cmd, self.layouts.scene, gfx, 0, bytemuck::bytes_of(&[a, b]))
         };
-        // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
-        // recording, after set 0 is bound; the grid buffers are live, made with vertex/index
-        // usage, and `grid_index_count` indices fit `grid_ib`.
-        let draw_terrain = |pipeline: vk::Pipeline, pass_kind: u32| unsafe {
-            device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
-            bind_pass_set(self.nodes_set);
-            push(pass_kind, input.build_grid as u32);
-            device.cmd_bind_vertex_buffers(cmd, 0, &[self.grid_vb.buffer], &[0]);
-            device.cmd_bind_index_buffer(cmd, self.grid_ib.buffer, 0, vk::IndexType::UINT32);
-            device.cmd_draw_indexed(cmd, self.grid_index_count, node_count, 0, 0, 0);
+        let terrain = terrain_lit::TerrainDraw {
+            gpu: &self.gpu,
+            cmd,
+            nodes_set: self.nodes_set,
+            grid_vb: &self.grid_vb,
+            grid_ib: &self.grid_ib,
+            index_count: self.grid_index_count,
+            node_count,
+            build_grid: input.build_grid,
         };
+        let draw_terrain =
+            |pipeline, pass_kind| terrain.draw(pipeline, self.layouts.scene, pass_kind, None);
         // SAFETY: the closure is called only inside a render pass of `render` while `cmd` is
         // recording, after set 0 is bound; `commands` has INDIRECT_BUFFER usage and holds
         // `slot_count` 20-byte commands for each of the `cull_list::COUNT` lists, and
@@ -692,6 +693,7 @@ impl Renderer {
         self.timers.scope(&device, cmd, "gtao");
         self.gtao.record(&self.gpu, cmd);
         self.timers.end(&device, cmd);
+        self.record_terrain_lit(&terrain);
 
         // Scene pass.
         self.timers.scope(&device, cmd, "scene");
@@ -735,7 +737,7 @@ impl Renderer {
                 &[],
             );
             self.timers.draws(&device, cmd, "scene.terrain");
-            draw_terrain(self.pipelines.terrain, pass::MAIN);
+            self.draw_scene_terrain(&terrain);
             self.foundations
                 .record(&self.gpu, cmd, self.layouts.scene, pass::MAIN);
             self.timers.end(&device, cmd);

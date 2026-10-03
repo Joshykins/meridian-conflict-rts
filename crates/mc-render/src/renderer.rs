@@ -90,6 +90,7 @@ mod structure_pads;
 mod stun_fx;
 mod supernova_fx;
 mod survival_fx;
+mod terrain_lit;
 mod trail_fx;
 mod tree_wind;
 mod wake_fx;
@@ -796,6 +797,8 @@ pub struct Renderer {
     quality: SceneQuality,
     /// Ambient occlusion from the pre-pass's depth, for the scene's shaders (gtao.rs).
     gtao: gtao::Gtao,
+    /// The terrain shaded once per pixel before the scene pass (terrain_lit.rs).
+    terrain_lit: terrain_lit::TerrainLit,
     /// Fields of grass round the eye (grass.rs).
     grass: grass::Grass,
     /// Walls where a structure's lot was levelled into the ground.
@@ -2087,6 +2090,7 @@ impl Renderer {
         write_image(scene_set, 27, sky.shade_view(), vk::ImageLayout::GENERAL);
         write_image(scene_set, 8, fog.view(), vk::ImageLayout::GENERAL);
         let gtao = gtao::Gtao::new(&gpu, &globals)?;
+        let terrain_lit = terrain_lit::TerrainLit::new(&gpu, layouts.screen_set)?;
         let foundations =
             foundations::Foundations::new(&gpu, &layouts, &passes, scene.map.clone())?;
         let grass = grass::Grass::new(
@@ -2357,6 +2361,7 @@ impl Renderer {
             shafts,
             quality: SceneQuality::from_env(),
             gtao,
+            terrain_lit,
             grass,
             foundations,
             hull_set,
@@ -2810,6 +2815,8 @@ impl Renderer {
             (self.width, self.height),
         )?;
         self.gtao.resize(&self.gpu, (sw, sh), self.depth.view)?;
+        self.terrain_lit
+            .resize(&self.gpu, (sw, sh), self.depth.view, self.passes.bloom_down)?;
         self.shafts.resize(&self.gpu, (sw, sh), self.depth.view)?;
         // SAFETY: the device went idle at the top of this function, so no command buffer in
         // flight reads `scene_set`; `ao_view` is GTAO's live view, just remade by its `resize`,
@@ -5561,6 +5568,7 @@ impl Drop for Renderer {
         self.wake_shells.destroy(&self.gpu);
         self.post.destroy(&self.gpu);
         self.gtao.destroy(&self.gpu);
+        self.terrain_lit.destroy(&self.gpu);
         self.fog.destroy(&self.gpu);
         self.grass.destroy(&self.gpu);
         self.foundations.destroy(&self.gpu);

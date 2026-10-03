@@ -87,6 +87,10 @@ pub struct Layouts {
 
 pub struct Pipelines {
     pub terrain: vk::Pipeline,
+    /// The terrain shaded once per pixel from the pre-pass's depth, into an image
+    /// of its own (renderer/terrain_lit.rs), and the scene pass's terrain reading it.
+    pub terrain_lit: vk::Pipeline,
+    pub terrain_over_lit: vk::Pipeline,
     pub terrain_shadow: vk::Pipeline,
     pub entity: vk::Pipeline,
     /// `entity` over the pre-pass's own depth: tested, not written, so a hidden
@@ -927,6 +931,35 @@ impl Pipelines {
                 Depth::TestWrite,
                 back,
             )?,
+            // Set 2 (`layouts.water`) holds the lit image and the depth it was lit from.
+            terrain_lit: graphics_pipeline(
+                gpu,
+                &PipelineDesc {
+                    module: terrain,
+                    vs: c"vs_lit",
+                    fs: c"fs_lit",
+                    layout: layouts.water,
+                    pass: passes.bloom_down,
+                    vertex: VertexKind::None,
+                    blend: Blend::Opaque,
+                    depth: Depth::Off,
+                    cull: none,
+                },
+            )?,
+            terrain_over_lit: graphics_pipeline(
+                gpu,
+                &PipelineDesc {
+                    module: terrain,
+                    vs: c"vs_main",
+                    fs: c"fs_over_lit",
+                    layout: layouts.water,
+                    pass: passes.scene,
+                    vertex: VertexKind::Vec2,
+                    blend: Blend::Opaque,
+                    depth: Depth::TestWrite,
+                    cull: back,
+                },
+            )?,
             terrain_shadow: shadow(terrain, c"vs_main", c"fs_shadow", VertexKind::Vec2)?,
             entity: scene(
                 entity,
@@ -1218,6 +1251,8 @@ impl Pipelines {
         unsafe {
             for p in [
                 self.terrain,
+                self.terrain_lit,
+                self.terrain_over_lit,
                 self.terrain_shadow,
                 self.entity,
                 self.entity_over_prepass,
