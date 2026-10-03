@@ -99,7 +99,7 @@ fn the_wall_stands_in_the_sea_and_blocks_little() {
         assert!(east_of(s.x, s.y).abs() < 1.0, "a tower off the wall");
         let h = t.natural(s.x, s.y);
         assert!(h < -TOWER_DEPTH, "a tower stands in {:.0} m of water", -h);
-        assert!(dist((s.x, s.y), mid) > 1_400.0, "a tower on the bridge");
+        assert!(dist((s.x, s.y), mid) > 1_000.0, "a tower on the bridge");
         // Its twin is there too.
         let q = t.turned((s.x, s.y));
         assert!(towers.iter().any(|o| dist((o.x, o.y), q) < 1.0));

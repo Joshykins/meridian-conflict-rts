@@ -155,8 +155,11 @@ impl Terrain {
         let east = self.fl_eastness(x, y);
         // The coves keep their drawn shape, and the bases their shores.
         let cove = dist(p, COVE_HEAD).min(dist(self.turned(p), COVE_HEAD));
+        // The narrow bridge keeps its drawn shores too: the noise would cut it.
+        let (on_bridge, _) = segment(p, (6_300.0, SIZE / 2.0), (SIZE - 6_300.0, SIZE / 2.0));
         let calm = (0.3 + 0.7 * smoothstep(1_100.0, 2_200.0, self.fl_start_dist(p)))
-            * (0.08 + 0.92 * smoothstep(500.0, 1_100.0, cove));
+            * (0.08 + 0.92 * smoothstep(500.0, 1_100.0, cove))
+            * (0.12 + 0.88 * smoothstep(500.0, 1_600.0, on_bridge));
         let mut wobble = 0.0;
         if east < 1.0 {
             wobble += (1.0 - east)

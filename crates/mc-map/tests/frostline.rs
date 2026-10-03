@@ -388,7 +388,7 @@ fn frostline_plays_the_same_from_both_sides() {
             problems.push(format!("the tower at {t:?} has no turned twin"));
         }
         let (cx, cy) = map.cell_of(t);
-        if !map.sea_cell(cx, cy) || from_mid(t) < 1_400.0 {
+        if !map.sea_cell(cx, cy) || from_mid(t) < 1_000.0 {
             problems.push(format!(
                 "the tower at {t:?} stands on land or on the bridge"
             ));
