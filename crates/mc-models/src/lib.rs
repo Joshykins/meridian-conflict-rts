@@ -1000,7 +1000,7 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "interceptor_t2" => &[[-5.11, -0.55, 0.9], [-5.11, 0.55, 0.9]],
         "torpedo_bomber" => &[[-1.95, -2.55, 0.62], [-1.95, 2.55, 0.62]],
         "superiority" => &[[-6.52, -0.72, 1.02], [-6.52, 0.72, 1.02]],
-        "strategic_bomber" => &[[-5.87, -2.2, 1.4], [-5.87, 2.2, 1.4]],
+        "strategic_bomber" => &aster::air::ECLIPSE_NOZZLES,
         "assault_air" => &[[-7.37, -3.4, 3.6], [-7.37, 3.4, 3.6]],
         _ => &[],
     }

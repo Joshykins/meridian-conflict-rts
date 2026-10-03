@@ -15,7 +15,7 @@ All units are available through the existing tiered factories and engineer/comma
 | 2 | Courier | Fast unarmed transport; eight cargo slots; built on site |
 | 3 | Bastion | Capital assault transport; carries the T1-T3 land roster; built on site |
 | 3 | Raptor | Fast, highly maneuverable air-superiority fighter |
-| 3 | Eclipse | Fast strategic bomber with a large blast |
+| 3 | Eclipse | Fast strategic bomber; one AEB bomb that bursts as the electric bore's blast |
 | 3 | Thunderhead | Armored, shielded assault aircraft; forward rotary cannon and forward AA |
 | 3 | Argus | High-flying radar, sonar, missile interception and a 1,700 m salvage ray (a Scavenger III's reach, a fifth of its pull); guards a point or friendly unit |
 

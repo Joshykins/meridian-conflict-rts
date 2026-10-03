@@ -12,10 +12,12 @@ use crate::{part, pattern, rig};
 mod argus;
 mod bastion;
 mod dominion;
+mod eclipse;
 pub(crate) use dominion::{
     DOMINION_LAMPS, LIFT_JETS as DOMINION_LIFT_JETS, NOZZLES as DOMINION_NOZZLES,
     RIG as DOMINION_RIG,
 };
+pub(crate) use eclipse::NOZZLES as ECLIPSE_NOZZLES;
 mod resolute;
 pub use resolute::SpinalRail;
 pub(crate) use resolute::{
@@ -481,30 +483,9 @@ pub(crate) fn interceptor_t2(b: &mut MeshBuilder, _: u8) {
 pub(crate) fn superiority(b: &mut MeshBuilder, _: u8) {
     raptor::build(b);
 }
+/// The Eclipse: tech 3 strategic bomber, a faceted flying wing carrying one AEB bomb ([`eclipse`]).
 pub(crate) fn strategic(b: &mut MeshBuilder, _: u8) {
-    if !b.fine() {
-        reduced_air(b, 16.0, 30.0, 4.5, -5.0);
-        return;
-    }
-    fuselage(b, 16.0, 1.5, 3.4);
-    b.mirror_y(|b| {
-        wing(
-            b,
-            &[
-                [6.4, 0.5],
-                [-4.3, 15.0],
-                [-6.0, 15.0],
-                [-3.4, 5.2],
-                [-6.8, 1.0],
-            ],
-            1.1,
-            0.32,
-        );
-        engine(b, -5.5, 2.2, 1.4, 4.0, 0.8);
-        tail(b, -5.0, 2.8, 1.5, 2.5);
-    });
-    b.paint(ACCENT);
-    b.cuboid(v3(0.2, 0.0, 0.3), v3(6.0, 2.4, 0.4));
+    eclipse::build(b);
 }
 /// The Thunderhead: an unmanned, hard-chined armoured tub built round its gun. The
 /// Avenger's seven barrels run out of a channel between two armoured cheeks, well past

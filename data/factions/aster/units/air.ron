@@ -232,9 +232,11 @@ burn: 20, burn_dps: 75, flash: 0.2, impact: 3, trail: true, wake: 1.2, sounds: (
  health: 6000, cost: (mass: 1150, energy: 45000, time: 7200),
  radius: 16, height: 4.5, vision: 1000,
  motion: (layer: Air, size: 0, speed: 210, accel: 95, turn: 62, altitude: 300, hover: false),
- weapons: [(name: "Strategic Bomb", damage: 5000, splash: 65, range: 950, reload: 10, speed: 100, trajectory: Ballistic, loft: 0.4,
-muzzle: (0, 0, 0.5), targets: ["Land", "Naval", "Structure"], color: Orange, impact: 3.5, shockwave: 2.5,
-trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "shell_heavy"))], mesh: "strategic_bomber", icon: Bomber,
+ // An AEB bomb: it goes off as the electric bore's blast (`ion_blast`), the charge
+ // striking back up its last fall as lightning (`discharge`), like the Megalodon's warheads.
+ weapons: [(name: "AEB Bomb", damage: 5000, splash: 65, range: 950, reload: 10, speed: 100, trajectory: Ballistic, loft: 0.4,
+muzzle: (-0.3, 0, 0.74), targets: ["Land", "Naval", "Structure"], color: Blue, impact: 3.5, shockwave: 2.5, ion_blast: 55, discharge: 60,
+trail: true, wake: 1.2, sounds: (fire: "bomb_release", impact: "aster_bore_heavy_strike", ground: "aster_bore_heavy_strike"))], mesh: "strategic_bomber", icon: Bomber,
  sounds: (death: "blast_small", moving: "aster_heavy_jet"), 
 ),
 (

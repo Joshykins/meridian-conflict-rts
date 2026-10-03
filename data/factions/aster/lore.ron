@@ -221,7 +221,7 @@
     "aster_t3_strategic_bomber": (
         lore: "A strategic bomber released sparingly, its mission known before the target.",
         weapons: {
-            "Strategic Bomb": "A single bomb whose blast levels almost whatever it lands on.",
+            "AEB Bomb": "An electric bore's whole charge in one casing: it bursts into a ball of ionised air that lightning strikes out of, levelling almost whatever it lands on.",
         },
     ),
     "aster_t3_assault_aircraft": (
