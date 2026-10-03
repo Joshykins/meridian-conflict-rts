@@ -55,6 +55,8 @@ pub struct Shot {
     pub alpha: f32,
     /// Draw the build grid, as while a structure is being placed.
     pub build_grid: bool,
+    /// Draw at this graphics preset instead of the renderer's default.
+    pub quality: Option<crate::settings::Quality>,
 }
 
 /// Builds the world for `opts` and runs it for `ticks`; `chronicle` keeps the
@@ -411,6 +413,13 @@ pub fn screenshot(
         scene,
     )
     .map_err(|e| e.to_string())?;
+    if let Some(quality) = shot.quality {
+        let mut settings = crate::settings::Settings::default();
+        settings.apply_quality(quality);
+        settings
+            .apply_graphics(&mut renderer)
+            .map_err(|e| e.to_string())?;
+    }
     // The map's own palette (`MERIDIAN_CLIMATE` overrides it), and on a map with
     // regions each region's own weather (`MERIDIAN_WEATHER` plays one preset in
     // them all). Any other map is shot in the sky's own default weather.
@@ -1273,7 +1282,10 @@ pub fn ui_screenshot(
         viewport,
     );
 
+    // Captures keep a fixed preset (`--quality`, else the default), whatever card
+    // they run on.
     let mut settings = crate::settings::Settings::default();
+    settings.apply_quality(shot.quality.unwrap_or_default());
     settings
         .apply_graphics(&mut renderer)
         .map_err(|e| e.to_string())?;

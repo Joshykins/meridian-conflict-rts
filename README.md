@@ -29,28 +29,34 @@ asset-capture path; performance parity with Windows is not assumed. Existing
 for developers using their own Vulkan SDK.
 
 **Settings → Display → Quality** groups render scale, anti-aliasing, scenery
-detail and cloud resolution into presets. Changes apply immediately in the menu
-and in a match, and are saved for the next launch.
+detail, shadows, ambient occlusion, grass, water reflections and cloud resolution
+into presets. Changes apply immediately in the menu and in a match, and are saved
+for the next launch.
 
-| Preset | Render scale | Anti-aliasing | Scenery | Clouds | Shading |
-|---|---|---|---|---|---|
-| Low | 50% | Off | Least detail | Quarter resolution | Simple |
-| Balanced | 75% | SMAA | Reduced distant detail | Quarter resolution | Simple |
-| High | 100% | SMAA | Full detail | Third resolution | Full |
-| Ultra | 150% | SMAA | Finer geometry | Half resolution | Full |
+| Preset | Render scale | AA | Shadows | Ambient occlusion | Grass | Water reflections | Scenery | Clouds | Shading |
+|---|---|---|---|---|---|---|---|---|---|
+| Low | 50% | Off | 1024, to 4 km | Off | None | Off | Least detail | Quarter resolution | Simple |
+| Medium | 75% | SMAA | 2048, to 6 km | Off | Half | On | Reduced distant detail | Quarter resolution | Simple |
+| High | 100% | SMAA | 2048, to 8 km | On | Full | On | Full detail | Third resolution | Full |
+| Ultra | 150% | SMAA | 4096, to 12 km | On | Full | On | Finer geometry | Half resolution | Full |
+
+**Auto** (the default for a new install) picks the preset for the graphics card
+at every start: Low for integrated and software devices, and for discrete cards
+under 3.5 GB; Medium under 7 GB; High above. A screen larger than 4K costs one
+step. Ultra is only chosen by hand. Picking a preset, render scale or AA by hand
+turns Auto off. Settings saved before Auto existed keep their preset.
 
 Simple shading keeps material colours, normal maps, weather and shadows, but uses
 one terrain texture patch instead of three anti-tiling patches, hardware shadow
 filtering instead of nine taps, and refreshes one quarter of the cloud-shadow
 field per frame. Full shading retains the original detail. These paths work on
-all supported GPUs; existing Low/Balanced settings gain the cheaper shading on
-next launch without resetting preferences.
+all supported GPUs.
 
 The performance suite also runs natively on macOS and Linux:
 
 ```bash
 PERF_SIZE=2560x1600 PERF_FOLLOW=60 \
-PERF_ENV="MERIDIAN_RENDER_SCALE=0.5 MERIDIAN_AA=off MERIDIAN_PROP_DETAIL=6,4,8 MERIDIAN_CLOUD_RES=4 MERIDIAN_SIMPLE_SHADING=1" \
+PERF_ENV="MERIDIAN_RENDER_SCALE=0.5 MERIDIAN_AA=off MERIDIAN_PROP_DETAIL=6,4,8 MERIDIAN_CLOUD_RES=4 MERIDIAN_SIMPLE_SHADING=1 MERIDIAN_SHADOW_SIZE=1024 MERIDIAN_SHADOW_DISTANCE=4000 MERIDIAN_GTAO=0 MERIDIAN_GRASS=0 MERIDIAN_WATER_REFLECTIONS=0" \
 scripts/perf-suite.sh artifacts/perf-mac battle_mid
 ```
 
@@ -59,16 +65,15 @@ skips building and uses that binary; omit it to build through `play.sh`. Compare
 runs at the same size, camera and settings with other GPU applications idle.
 Headless captures take environment overrides, independently of saved settings.
 
-New Mac settings default to Balanced; other platforms default to High. Existing
-saved render scale and anti-aliasing choices are preserved. Adjusting either
+Existing saved render scale and anti-aliasing choices are preserved. Adjusting either
 manually displays **Custom**, retaining the base preset's scenery and clouds;
 the first Quality arrow click restores that base preset. The interface stays at
 native resolution at every quality level. Use Low or a custom 50% render scale
 for additional relief on Retina displays.
 
 The launcher no longer forces graphics settings through environment variables.
-`MERIDIAN_PROP_DETAIL` and `MERIDIAN_CLOUD_RES` still work for headless match
-captures; interactive play and front-end captures use the Settings presets.
+The scenery switches in docs/SWITCHES.md override the preset for A/B
+measurements; headless captures use the fixed default preset, never Auto.
 The main menu runs a live 3D battle and shares its GPU cost. These adjustments
 improve frame time but do not guarantee 60 FPS on Mac.
 

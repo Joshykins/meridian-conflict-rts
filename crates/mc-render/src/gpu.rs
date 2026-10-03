@@ -17,6 +17,10 @@ pub struct Gpu {
     pub device_name: String,
     /// The PCI vendor id (`AMD_VENDOR` for AMD).
     pub(crate) vendor_id: u32,
+    pub(crate) kind: DeviceKind,
+    /// Device-local memory in MiB: video memory on a discrete card, shared system
+    /// memory on an integrated one.
+    pub(crate) vram_mib: u64,
     pub surface_fn: ash::khr::surface::Instance,
     pub swapchain_fn: Option<ash::khr::swapchain::Device>,
     pub command_pool: vk::CommandPool,
@@ -31,6 +35,32 @@ pub struct Gpu {
     /// `allocate` and the `destroy_*` functions, so a resource its owner forgot shows
     /// up here when the device goes (CLAUDE.md section 6: GPU resources are owned).
     live_allocations: std::sync::atomic::AtomicUsize,
+}
+
+/// What sort of device the renderer runs on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DeviceKind {
+    Discrete,
+    /// Shares the CPU's memory: laptops, Apple silicon.
+    Integrated,
+    /// Rendered on the CPU (lavapipe, SwiftShader).
+    Software,
+    Other,
+}
+
+/// The device as the graphics settings see it (`Renderer::adapter`).
+#[derive(Clone, Debug)]
+pub struct Adapter {
+    pub name: String,
+    pub kind: DeviceKind,
+    /// The PCI vendor id (`APPLE_VENDOR` for Apple silicon under MoltenVK).
+    pub vendor_id: u32,
+    /// Device-local memory in MiB.
+    pub vram_mib: u64,
+}
+
+impl Adapter {
+    pub const APPLE_VENDOR: u32 = 0x106b;
 }
 
 #[derive(Debug)]
@@ -258,6 +288,13 @@ impl Gpu {
             queue_family,
             device_name,
             vendor_id: props.vendor_id,
+            kind: match props.device_type {
+                vk::PhysicalDeviceType::DISCRETE_GPU => DeviceKind::Discrete,
+                vk::PhysicalDeviceType::INTEGRATED_GPU => DeviceKind::Integrated,
+                vk::PhysicalDeviceType::CPU => DeviceKind::Software,
+                _ => DeviceKind::Other,
+            },
+            vram_mib,
             surface_fn,
             swapchain_fn,
             command_pool,

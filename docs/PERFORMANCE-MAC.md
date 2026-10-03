@@ -24,7 +24,7 @@ Windows/Linux runtime performance has not been measured in this pass.
 
 ## Changes and tradeoffs
 
-- Low and Balanced use fewer terrain texture samples, hardware shadow filtering,
+- Low and Medium use fewer terrain texture samples, hardware shadow filtering,
   and one quarter of the full-resolution cloud-shadow texels per frame after
   initialization. Texture repetition and sharper shadow edges may be more visible.
   High and Ultra retain their original shading quality.
@@ -35,7 +35,7 @@ Windows/Linux runtime performance has not been measured in this pass.
 - Skip negligible blast influence outside six radii in the visual weather field.
 - Extend the performance suite to native macOS/Linux and add active-slot counters.
 
-Existing saved Low/Balanced settings gain the shading changes automatically;
+Existing saved Low/Medium (formerly Balanced) settings gain the shading changes automatically;
 custom resolution and antialiasing settings remain intact. The deterministic
 simulation is unchanged.
 

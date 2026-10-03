@@ -436,7 +436,7 @@ fn cs_shade(@builtin(global_invocation_id) invocation: vec3<u32>) {
     // still pays for inactive lanes on SIMD GPUs. The first frame fills all.
     // Match the CPU dispatch and periodically refresh the entire field at wrap.
     let frame = u32(atmos.frame.x);
-    let stagger = globals.detail.w > 0.5 && frame > 1u;
+    let stagger = quality(QUALITY_SIMPLE_SHADING) && frame > 1u;
     let stride = select(1u, 2u, stagger);
     let phase = frame % 4u;
     let offset = select(vec2<u32>(0u), vec2<u32>(phase & 1u, phase >> 1u), stagger);

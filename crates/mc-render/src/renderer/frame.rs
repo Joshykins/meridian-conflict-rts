@@ -252,8 +252,8 @@ impl Renderer {
             tick_seconds: self.tick_seconds,
             selected: &selected,
         });
-        let shadow_strength = 1.0 - ((camera.distance - 3000.0) / 5000.0).clamp(0.0, 1.0);
-        let cascades = shadow_cascades::fit(camera, sun, z_range, SHADOW_SIZE);
+        let shadow_strength = self.quality.shadow_strength(camera.distance);
+        let cascades = shadow_cascades::fit(camera, sun, z_range, self.shadow.size());
         let shadow_view_proj: Mat4 = cascades[0].view_proj;
 
         let view_proj = camera.view_proj();
@@ -331,7 +331,7 @@ impl Renderer {
             strategic,
             climate: [
                 climate.climate,
-                self.grass.enabled as u32 as f32,
+                self.grass.enabled() as u32 as f32,
                 grass::reach(camera.projection_scale()),
                 // How many sim ticks this frame covers (game time is sim time), so a
                 // treads' links blur when they move too far a frame to read (entity.wgsl).
@@ -341,7 +341,7 @@ impl Renderer {
                 self.quality.prop_detail[0],
                 self.quality.prop_detail[1],
                 self.quality.prop_detail[2],
-                self.quality.simple_shading as u32 as f32,
+                self.quality.bits() as f32,
             ],
             settling,
             settle: [settling_count as f32, 0.0, 0.0, 0.0],
@@ -540,7 +540,8 @@ impl Renderer {
         // Shadow pass, once per cascade. Always begun so every layer ends up in its
         // sampled layout.
         self.timers.scope(&device, cmd, "shadow");
-        for (cascade, &shadow_fb) in self.shadow_fbs.iter().enumerate() {
+        let shadow_size = self.shadow.size();
+        for (cascade, &shadow_fb) in self.shadow.framebuffers().iter().enumerate() {
             let clear = [vk::ClearValue {
                 depth_stencil: vk::ClearDepthStencilValue {
                     depth: 1.0,
@@ -553,13 +554,13 @@ impl Renderer {
                 .render_area(vk::Rect2D {
                     offset: vk::Offset2D::default(),
                     extent: vk::Extent2D {
-                        width: SHADOW_SIZE,
-                        height: SHADOW_SIZE,
+                        width: shadow_size,
+                        height: shadow_size,
                     },
                 })
                 .clear_values(&clear);
             // SAFETY: `cmd` is recording and outside a render pass; the shadow framebuffer was
-            // made for `passes.shadow` at `SHADOW_SIZE`, the render area, and `begin` and
+            // made for `passes.shadow` at `shadow_size`, the render area, and `begin` and
             // `clear` live to the end of the call.
             unsafe { device.cmd_begin_render_pass(cmd, &begin, vk::SubpassContents::INLINE) };
             self.timers.draws(
@@ -570,7 +571,7 @@ impl Renderer {
             if shadow_strength > 0.0 {
                 // Shaders read the cascade from above the pass kind's low byte.
                 let kind = pass::SHADOW | (cascade as u32) << pass::CASCADE_SHIFT;
-                set_viewport(SHADOW_SIZE, SHADOW_SIZE);
+                set_viewport(shadow_size, shadow_size);
                 // SAFETY: `cmd` is recording inside the shadow pass; `scene_set` is live and
                 // made for set 0 of `layouts.scene`.
                 unsafe {

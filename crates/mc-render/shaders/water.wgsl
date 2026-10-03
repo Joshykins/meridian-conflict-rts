@@ -399,7 +399,7 @@ fn shore_reflect(origin: vec3<f32>, r: vec3<f32>, dist: f32) -> vec3<f32> {
 // take the first thing standing above the water that it passes behind.
 // xyz colour, w how sure (0 = nothing found, use the fallback).
 fn screen_reflect(origin: vec3<f32>, r: vec3<f32>, dist: f32) -> vec4<f32> {
-    if r.z <= 0.0 || dist > 2400.0 {
+    if r.z <= 0.0 || dist > 2400.0 || !quality(QUALITY_WATER_REFLECTIONS) {
         return vec4<f32>(0.0);
     }
     let eye = globals.camera.xyz;

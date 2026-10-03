@@ -118,7 +118,8 @@ pub(super) struct Grass {
     last_time: Option<f32>,
     /// Whether any grass was grown this frame (else nothing is drawn).
     grown: bool,
-    pub(super) enabled: bool,
+    /// Tufts grown as a fraction of the full field (`SceneQuality::grass_density`);
+    /// 0 grows none.
     density: f32,
 }
 
@@ -140,6 +141,14 @@ fn band_indices(blades: u32, segments: u32) -> Vec<u32> {
 }
 
 impl Grass {
+    pub(super) fn enabled(&self) -> bool {
+        self.density > 0.0
+    }
+
+    pub(super) fn set_density(&mut self, density: f32) {
+        self.density = density;
+    }
+
     pub(super) fn new(
         gpu: &Gpu,
         scene_set_layout: vk::DescriptorSetLayout,
@@ -279,11 +288,6 @@ impl Grass {
                 cull: vk::CullModeFlags::NONE,
             },
         )?;
-        let enabled = std::env::var("MERIDIAN_GRASS").map_or(true, |v| v != "0");
-        let density = std::env::var("MERIDIAN_GRASS_DENSITY")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(1.0);
         Ok(Grass {
             set_layout,
             compute_layout,
@@ -311,8 +315,7 @@ impl Grass {
             frame: 0,
             last_time: None,
             grown: false,
-            enabled,
-            density,
+            density: 1.0,
         })
     }
 
@@ -327,7 +330,8 @@ impl Grass {
         f: &GrassFrame,
     ) {
         self.grown = false;
-        if !self.enabled {
+        if !self.enabled() {
+            self.window = None;
             return;
         }
         let dev = &gpu.device;

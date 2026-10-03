@@ -160,7 +160,6 @@ impl Gtao {
         let blur = pipelines::compute_pipeline(gpu, module, c"cs_gtao_blur", layout)?;
         let raw = storage_image(gpu, 1, 1, vk::Format::R16G16B16A16_SFLOAT)?;
         let ao = storage_image(gpu, 1, 1, vk::Format::R8G8B8A8_UNORM)?;
-        let enabled = std::env::var("MERIDIAN_GTAO").map_or(true, |v| v != "0");
         let gtao = Gtao {
             set_layout,
             layout,
@@ -171,7 +170,7 @@ impl Gtao {
             blur,
             raw,
             ao,
-            enabled,
+            enabled: true,
         };
         gtao.write_images(gpu);
         Ok(gtao)

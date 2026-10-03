@@ -11,7 +11,6 @@ pub const HDR_FORMAT: vk::Format = vk::Format::R16G16B16A16_SFLOAT;
 /// The cloud march (sky.rs): rgb and alpha as four halves in two words, then its depth.
 pub const CLOUD_MARCH_FORMAT: vk::Format = vk::Format::R32G32B32A32_UINT;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
-pub const SHADOW_SIZE: u32 = 2048;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum VertexKind {

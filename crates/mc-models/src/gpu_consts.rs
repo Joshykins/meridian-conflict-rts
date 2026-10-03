@@ -427,6 +427,14 @@ shared! {
         pub const FIELD_SCALE: u32 = 4;
     }
 
+    /// Graphics quality bits (renderer `SceneQuality`), in `Globals.detail.w`.
+    pub mod quality as "QUALITY_" {
+        /// Single-patch terrain textures, one-tap shadows, staggered cloud shade.
+        pub const SIMPLE_SHADING: u32 = 1;
+        /// Screen-space reflections on water (water.wgsl `screen_reflect`).
+        pub const WATER_REFLECTIONS: u32 = 2;
+    }
+
     /// Grass round the eye (renderer/grass.rs, grass_gen.wgsl, grass.wgsl).
     pub mod grass as "GRASS_" {
         /// A candidate tuft per this many metres each way.

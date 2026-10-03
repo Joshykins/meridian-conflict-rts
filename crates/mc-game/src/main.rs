@@ -126,6 +126,8 @@ straight into a match instead.
   --camera X,Y,DIST[,YAW[,Z]]  screenshot camera: focus in metres, eye distance, yaw in degrees,
                          focus height in metres (default: the ground)
   --size WxH             screenshot size (default 1920x1080)
+  --quality PRESET       screenshot: draw at that graphics preset, low | medium | high |
+                         ultra (default: high, whatever the card)
   --select KEY           match screenshot: select player 0's first unit whose blueprint key
                          contains KEY (all of them with a trailing *), not the commander
   --unit-picker          range screenshot: show the unit browser
@@ -172,8 +174,11 @@ straight into a match instead.
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
 
-MERIDIAN_SIMPLE_SHADING=1 uses cheaper terrain/shadow shading in headless captures.
-Interactive Low and Balanced presets enable it automatically; High/Ultra use full shading.
+Graphics presets (Auto, Low, Medium, High, Ultra) are in Settings > Display. These override
+a preset's scenery for A/B measurements (docs/SWITCHES.md): MERIDIAN_SIMPLE_SHADING=0|1,
+MERIDIAN_PROP_DETAIL=a,b,c, MERIDIAN_CLOUD_RES=1-4, MERIDIAN_SHADOW_SIZE=512-4096,
+MERIDIAN_SHADOW_DISTANCE=metres, MERIDIAN_GTAO=0|1, MERIDIAN_GRASS=0,
+MERIDIAN_GRASS_DENSITY=0-1, MERIDIAN_WATER_REFLECTIONS=0|1.
 
 On AMD GPUs every draw is marked so a lost device's error log names the draw the GPU
 stopped in (models drawn one at a time, a little slower); MERIDIAN_GPU_CRUMBS=0 turns it off,
@@ -246,6 +251,7 @@ fn run() -> Result<(), String> {
     let mut place: Option<String> = None;
     let (mut plans, mut drag): (bool, Option<[f32; 2]>) = (false, None);
     let mut build_grid = false;
+    let mut quality = None;
     let (mut follow, mut alpha) = (0u32, 1.0f32);
     let mut bot: Option<net_bot::Bot> = None;
     let mut drop_at: Option<u32> = None;
@@ -333,7 +339,7 @@ fn run() -> Result<(), String> {
             "--bench" => bench = Some(value("--bench")?.parse().map_err(|_| "--bench takes a tick count")?),
             "--ticks" => ticks = value("--ticks")?.parse().map_err(|_| "--ticks takes a number")?,
             "--at" => at = Some(value("--at")?),
-            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, report: None, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false }),
+            "--screenshot" => shot = Some(headless::Shot { path: value("--screenshot")?, camera: None, focus_z: None, width: 0, height: 0, select: None, cursor: None, paused: false, net: None, unit_picker: false, range_maps: false, refit_tab: false, details: false, report: None, range_tab: None, place: None, plans: false, drag: None, follow: 0, alpha: 1.0, build_grid: false, quality: None }),
             "--camera" => {
                 let v: Vec<f32> = value("--camera")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 if v.len() < 3 {
@@ -368,6 +374,7 @@ fn run() -> Result<(), String> {
             "--place" => place = Some(value("--place")?),
             "--plans" => plans = true,
             "--build-grid" => build_grid = true,
+            "--quality" => quality = Some(settings::Quality::parse(&value("--quality")?).ok_or("--quality takes low, medium, high or ultra")?),
             "--drag" => {
                 let v: Vec<f32> = value("--drag")?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 drag = Some([*v.first().ok_or("--drag takes X,Y")?, *v.get(1).ok_or("--drag takes X,Y")?]);
@@ -529,6 +536,7 @@ fn run() -> Result<(), String> {
         (shot.follow, shot.alpha) = (follow, alpha);
         (shot.plans, shot.drag) = (plans, drag);
         shot.build_grid = build_grid;
+        shot.quality = quality;
         return headless::screenshot(&opts, map, blueprints, pool, ticks, &shot);
     }
 

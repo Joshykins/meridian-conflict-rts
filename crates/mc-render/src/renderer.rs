@@ -11,7 +11,7 @@ use crate::gpu_consts::{cull_list, lod, pass, settle, sprite_layer};
 use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
-use crate::pipelines::{Layouts, Passes, Pipelines, DEPTH_FORMAT, HDR_FORMAT, SHADOW_SIZE};
+use crate::pipelines::{Layouts, Passes, Pipelines, DEPTH_FORMAT, HDR_FORMAT};
 use crate::swapchain;
 use crate::terrain::{self, TerrainNode, TerrainUpload, TileCache, MAX_NODES, TILE_LAYERS};
 use crate::textures;
@@ -109,6 +109,7 @@ pub use quality::SceneQuality;
 mod breadcrumbs;
 mod gpu_timers;
 mod shadow_cascades;
+mod shadow_map;
 mod titan_charge;
 mod titan_fx;
 pub use gpu_timers::{to_perf as gpu_scopes_to_perf, DrawStats, GpuScope};
@@ -770,7 +771,8 @@ pub struct Renderer {
     pipelines: Pipelines,
     hdr: Image,
     depth: Image,
-    shadow: Image,
+    /// The sun's shadow cascades, sized by the graphics quality (shadow_map.rs).
+    shadow: shadow_map::ShadowMap,
     /// Bloom chain, largest (half size) first.
     bloom: Vec<Image>,
     bloom_fbs: Vec<vk::Framebuffer>,
@@ -813,9 +815,6 @@ pub struct Renderer {
     adjacency_links: adjacency_links::AdjacencyLinks,
     hull_set: vk::DescriptorSet,
     scene_fb: vk::Framebuffer,
-    /// One view and framebuffer per cascade layer of `shadow`.
-    shadow_layer_views: [vk::ImageView; shadow_cascades::CASCADES],
-    shadow_fbs: [vk::Framebuffer; shadow_cascades::CASCADES],
     present_fbs: Vec<vk::Framebuffer>,
 
     descriptor_pool: vk::DescriptorPool,
@@ -1886,15 +1885,6 @@ impl Renderer {
             array: false,
         })?;
 
-        let shadow = gpu.image(&ImageDesc {
-            width: SHADOW_SIZE,
-            height: SHADOW_SIZE,
-            format: DEPTH_FORMAT,
-            usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
-            layers: shadow_cascades::CASCADES as u32,
-            mips: 1,
-            array: true,
-        })?;
         let samplers = [
             gpu.sampler(
                 vk::Filter::LINEAR,
@@ -2076,22 +2066,20 @@ impl Renderer {
         ] {
             write_image(scene_set, binding, image.view, read);
         }
-        write_image(
-            scene_set,
-            11,
-            shadow.view,
-            vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-        );
+        let quality = SceneQuality::from_env();
+        let shadow =
+            shadow_map::ShadowMap::new(&gpu, passes.shadow, scene_set, quality.shadow_size)?;
         write_image(scene_set, 21, sky.weather_view(), vk::ImageLayout::GENERAL);
         write_image(scene_set, 23, sky.flow_view(), vk::ImageLayout::GENERAL);
         write_image(scene_set, 24, sky.floor_view(), read);
         write_image(scene_set, 27, sky.shade_view(), vk::ImageLayout::GENERAL);
         write_image(scene_set, 8, fog.view(), vk::ImageLayout::GENERAL);
-        let gtao = gtao::Gtao::new(&gpu, &globals)?;
+        let mut gtao = gtao::Gtao::new(&gpu, &globals)?;
+        gtao.enabled = quality.ambient_occlusion;
         let terrain_lit = terrain_lit::TerrainLit::new(&gpu, layouts.screen_set)?;
         let foundations =
             foundations::Foundations::new(&gpu, &layouts, &passes, scene.map.clone())?;
-        let grass = grass::Grass::new(
+        let mut grass = grass::Grass::new(
             &gpu,
             layouts.scene_set,
             passes.scene,
@@ -2099,6 +2087,7 @@ impl Renderer {
             &track_marks,
             foundations.cells(),
         )?;
+        grass.set_density(quality.grass_density);
         let adjacency_links = adjacency_links::AdjacencyLinks::new(&gpu, &layouts, &passes)?;
         write_image(scene_set, 30, gtao.ao_view(), vk::ImageLayout::GENERAL);
         write_buffers(
@@ -2239,48 +2228,6 @@ impl Renderer {
             );
         }
 
-        let mut shadow_layer_views = [vk::ImageView::null(); shadow_cascades::CASCADES];
-        let mut shadow_fbs = [vk::Framebuffer::null(); shadow_cascades::CASCADES];
-        for (layer, (view, fb)) in shadow_layer_views
-            .iter_mut()
-            .zip(&mut shadow_fbs)
-            .enumerate()
-        {
-            // SAFETY: `shadow` is a live depth array image of this device with `CASCADES`
-            // layers, and the view names one of them in its own format; the create info lives
-            // to the end of the call.
-            *view = unsafe {
-                gpu.device.create_image_view(
-                    &vk::ImageViewCreateInfo::default()
-                        .image(shadow.image)
-                        .view_type(vk::ImageViewType::TYPE_2D)
-                        .format(DEPTH_FORMAT)
-                        .subresource_range(vk::ImageSubresourceRange {
-                            aspect_mask: vk::ImageAspectFlags::DEPTH,
-                            base_mip_level: 0,
-                            level_count: 1,
-                            base_array_layer: layer as u32,
-                            layer_count: 1,
-                        }),
-                    None,
-                )
-            }?;
-            // SAFETY: the shadow pass has one depth attachment of `DEPTH_FORMAT`, which is
-            // `view`'s format, and the size matches the image; the create info and the one-view
-            // slice live to the end of the call.
-            *fb = unsafe {
-                gpu.device.create_framebuffer(
-                    &vk::FramebufferCreateInfo::default()
-                        .render_pass(passes.shadow)
-                        .attachments(std::slice::from_ref(view))
-                        .width(SHADOW_SIZE)
-                        .height(SHADOW_SIZE)
-                        .layers(1),
-                    None,
-                )
-            }?;
-        }
-
         // SAFETY: the pool is this device's and used only from the thread that owns the `Gpu`;
         // the allocate info lives to the end of the call.
         let cmd = unsafe {
@@ -2358,7 +2305,7 @@ impl Renderer {
             prepass_fb: vk::Framebuffer::null(),
             prepass: std::env::var("MERIDIAN_PREPASS").map_or(true, |v| v != "0"),
             shafts,
-            quality: SceneQuality::from_env(),
+            quality,
             gtao,
             terrain_lit,
             grass,
@@ -2378,8 +2325,6 @@ impl Renderer {
             pipelines,
             shadow,
             scene_fb: vk::Framebuffer::null(),
-            shadow_layer_views,
-            shadow_fbs,
             present_fbs: Vec::new(),
             descriptor_pool,
             scene_set,
@@ -2615,6 +2560,16 @@ impl Renderer {
 
     pub fn device_name(&self) -> &str {
         &self.gpu.device_name
+    }
+
+    /// The device, for choosing a graphics preset to suit it.
+    pub fn adapter(&self) -> crate::gpu::Adapter {
+        crate::gpu::Adapter {
+            name: self.gpu.device_name.clone(),
+            kind: self.gpu.kind,
+            vendor_id: self.gpu.vendor_id,
+            vram_mib: self.gpu.vram_mib,
+        }
     }
 
     pub fn size(&self) -> (u32, u32) {
@@ -5497,10 +5452,6 @@ impl Drop for Renderer {
             device.destroy_framebuffer(self.refract_fb, None);
             device.destroy_framebuffer(self.hull_depth_fb, None);
             device.destroy_framebuffer(self.prepass_fb, None);
-            for (fb, view) in self.shadow_fbs.iter().zip(&self.shadow_layer_views) {
-                device.destroy_framebuffer(*fb, None);
-                device.destroy_image_view(*view, None);
-            }
             for fb in self.bloom_fbs.drain(..).chain(self.glass_fbs.drain(..)) {
                 device.destroy_framebuffer(fb, None);
             }
@@ -5592,7 +5543,6 @@ impl Drop for Renderer {
             &self.depth,
             &self.refract,
             &self.hull_depth,
-            &self.shadow,
             &self.overview,
             &self.tiles,
             &self.tile_index,
@@ -5609,6 +5559,7 @@ impl Drop for Renderer {
         {
             gpu.destroy_image_ref(image);
         }
+        self.shadow.destroy(gpu);
         if let Output::Headless { image, readback } = &mut self.output {
             gpu.destroy_image_ref(image);
             gpu.destroy_buffer(std::mem::replace(readback, placeholder()));

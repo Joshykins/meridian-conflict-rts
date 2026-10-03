@@ -25,6 +25,10 @@ pub struct Settings {
     pub music_volume: f32,
     pub fullscreen: bool,
     pub vsync: bool,
+    /// Pick `quality` for the graphics card at every start (`Quality::detect`). On
+    /// for a new install; a file from before it existed keeps the preset it chose.
+    #[serde(default)]
+    pub auto_quality: bool,
     /// Base scenery/cloud preset; resolution and AA may be customised below.
     pub quality: Quality,
     /// The 3D scene's resolution against the window's, one of `RENDER_SCALES`:
@@ -58,6 +62,7 @@ impl Default for Settings {
             music_volume: 0.6,
             fullscreen: false,
             vsync: true,
+            auto_quality: true,
             quality: Quality::default(),
             render_scale: Quality::default().render_scale(),
             antialiasing: Quality::default().antialiasing(),
@@ -233,6 +238,8 @@ mod tests {
         assert_eq!(old.player_name, "Commander");
         assert_eq!(old.master_volume, 1.0);
         assert_eq!(old.vsync, Settings::default().vsync);
+        assert!(!old.auto_quality, "an older file keeps the preset it had");
+        assert!(Settings::default().auto_quality);
         let odd: Settings = ron::from_str("(render_scale: 1.4)").unwrap();
         assert_eq!(odd.sanitised().render_scale, 1.5);
         let fxaa: Settings = ron::from_str("(antialiasing: Fxaa)").unwrap();

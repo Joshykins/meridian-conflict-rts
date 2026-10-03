@@ -1,15 +1,24 @@
 # Rendering performance switches
 
-Headless screenshots and performance captures use these environment overrides.
-Interactive play takes its graphics settings from Settings → Display instead.
+Interactive play takes its graphics settings from Settings → Display (Auto, Low,
+Medium, High, Ultra; `crates/mc-game/src/settings/quality.rs`). The scenery overrides
+below win over the preset everywhere, in play and in headless captures, so an A/B
+measurement holds whatever the settings say; render scale and AA override only
+headless captures.
 
 | Variable | Values | Purpose |
 |---|---|---|
-| `MERIDIAN_SIMPLE_SHADING` | `1` to enable, otherwise off | Single-patch terrain textures, hardware shadow filtering and staggered cloud-shadow updates. Low and Balanced enable this automatically in interactive play. |
+| `MERIDIAN_SIMPLE_SHADING` | `1` on, `0` off | Single-patch terrain textures, hardware shadow filtering and staggered cloud-shadow updates. Low and Medium use it. |
 | `MERIDIAN_RENDER_SCALE` | `0.5`–`2.0` | Scene resolution relative to output; UI stays at output resolution. |
 | `MERIDIAN_AA` | `off`, `smaa` | Edge smoothing. |
-| `MERIDIAN_PROP_DETAIL` | `minimum radius,LOD bias,shadow radius` | Scenery detail; Low is `6,4,8`, Balanced is `4,3,6`. |
+| `MERIDIAN_PROP_DETAIL` | `minimum radius,LOD bias,shadow radius` | Scenery detail; Low is `6,4,8`, Medium `3,3,5`, High `1.2,2,0`, Ultra `1.2,1,0`. |
 | `MERIDIAN_CLOUD_RES` | `1`–`4` | Divide output dimensions by this for the cloud march. |
+| `MERIDIAN_SHADOW_SIZE` | `512`–`4096`, a power of two | Texels along each sun shadow cascade; Low 1024, Medium/High 2048, Ultra 4096. |
+| `MERIDIAN_SHADOW_DISTANCE` | metres, `1000`–`30000` | Camera distance at which sun shadows have faded out and the shadow pass stops; Low 4000, Medium 6000, High 8000, Ultra 12000. |
+| `MERIDIAN_GTAO` | `0` off, `1` on | Ground-truth ambient occlusion; High and Ultra. |
+| `MERIDIAN_GRASS` | `0` off | No grass at all. |
+| `MERIDIAN_GRASS_DENSITY` | `0`–`1` | Fraction of the grass field grown; Low 0, Medium 0.5, High/Ultra 1. |
+| `MERIDIAN_WATER_REFLECTIONS` | `0` off, `1` on | Screen-space reflections on water; off on Low. |
 | `MERIDIAN_GPU_TIMERS` | `0` to disable | A/B profiling overhead. GPU timing values are unavailable when off; compare `cpu.render` instead. |
 | `MERIDIAN_GPU_CRUMBS` | `0` to disable, `1` to enable | Finding a lost device (`VK_AMD_buffer_marker`), on by default on AMD GPUs: a breadcrumb before every scope, ground decal, grass band, missile and model draw (models drawn one draw slot at a time), so the error log lists which draws the GPU reached and finished. Costs frame time (2 ms GPU and 4 ms CPU a frame on a large map); `0` keeps only the scope edges. Other GPUs whose driver has the extension (NVIDIA) mark only the scope edges unless `1`; GPUs without it have no breadcrumbs. |
 

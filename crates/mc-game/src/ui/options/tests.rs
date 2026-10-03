@@ -47,7 +47,7 @@ fn quality_click_applies_and_requests_save_and_live_update() {
     settings.apply_quality(Quality::Low);
     // Quality row's right arrow, on the Display tab.
     let right = Vec2::new(766.0, 363.0);
-    for quality in [Quality::Balanced, Quality::High, Quality::Ultra] {
+    for quality in [Quality::Medium, Quality::High, Quality::Ultra] {
         let outcome = click(&mut settings, right);
         assert!(outcome.changed && outcome.display_changed && !outcome.back);
         assert_eq!(settings.quality, quality);
@@ -62,6 +62,22 @@ fn quality_click_applies_and_requests_save_and_live_update() {
     assert!(click(&mut settings, right).display_changed);
     assert_eq!(settings.quality_label(), "Ultra");
     assert_eq!(settings.antialiasing, Antialiasing::Smaa);
+}
+
+#[test]
+fn quality_steps_down_from_low_to_auto_and_a_manual_scale_leaves_auto() {
+    let mut settings = Settings::default();
+    settings.apply_quality(Quality::Low);
+    let left = Vec2::new(634.0, 363.0);
+    assert!(click(&mut settings, left).display_changed);
+    assert!(settings.auto_quality);
+    assert_eq!(settings.quality_label(), "Auto");
+    // Already at the start: stays Auto.
+    click(&mut settings, left);
+    assert!(settings.auto_quality);
+    // A render scale chosen by hand is no longer Auto.
+    assert!(click(&mut settings, Vec2::new(634.0, 413.0)).display_changed);
+    assert!(!settings.auto_quality);
 }
 
 #[test]

@@ -1,4 +1,5 @@
-//! The preset and its optional manual resolution/AA overrides.
+//! The preset (or Auto, picked for the graphics card) and its optional manual
+//! resolution/AA overrides.
 
 use super::*;
 use crate::settings::Quality;
@@ -38,10 +39,14 @@ fn preset(ui: &mut Ui, settings: &mut Settings, r: Rect) -> bool {
         rgb(palette::TEXT, 0.82),
         "Quality",
     );
-    let note = if settings.quality_label() == "Custom" {
-        format!("Based on {}", settings.quality.label())
-    } else {
-        settings.quality.description().to_owned()
+    let note = match settings.quality_label() {
+        "Custom" => format!("Based on {}", settings.quality.label()),
+        "Auto" => format!(
+            "{} for this graphics card: {}",
+            settings.quality.label(),
+            settings.quality.description()
+        ),
+        _ => settings.quality.description().to_owned(),
     };
     ui.text(
         end + 12.0,
@@ -60,17 +65,27 @@ fn preset(ui: &mut Ui, settings: &mut Settings, r: Rect) -> bool {
     if step == 0 {
         return false;
     }
-    let at = Quality::ALL
-        .iter()
-        .position(|&q| q == settings.quality)
-        .unwrap_or(0) as i32;
+    // Auto first, then the presets: Auto, Low, Medium, High, Ultra.
+    let at = if settings.auto_quality {
+        0
+    } else {
+        1 + Quality::ALL
+            .iter()
+            .position(|&q| q == settings.quality)
+            .unwrap_or(0) as i32
+    };
     // The first click from Custom restores its base preset, even at an end.
     let at = if settings.quality_label() == "Custom" {
         at
     } else {
-        (at + step).clamp(0, Quality::ALL.len() as i32 - 1)
+        (at + step).clamp(0, Quality::ALL.len() as i32)
     };
-    settings.apply_quality(Quality::ALL[at as usize]);
+    if at == 0 {
+        // The preset itself is chosen when the renderer takes the settings.
+        settings.auto_quality = true;
+    } else {
+        settings.apply_quality(Quality::ALL[at as usize - 1]);
+    }
     true
 }
 
@@ -109,6 +124,7 @@ fn render_scale(ui: &mut Ui, settings: &mut Settings, r: Rect) -> bool {
             .position(|&s| s == settings.render_scale)
             .unwrap_or(2) as i32;
         settings.render_scale = scales[(at + step).clamp(0, scales.len() as i32 - 1) as usize];
+        settings.auto_quality = false;
         return true;
     }
     false
@@ -137,6 +153,7 @@ fn antialiasing(ui: &mut Ui, settings: &mut Settings, r: Rect) -> bool {
             .position(|&a| a == settings.antialiasing)
             .unwrap_or(1) as i32;
         settings.antialiasing = all[(at + step).clamp(0, all.len() as i32 - 1) as usize];
+        settings.auto_quality = false;
         return true;
     }
 

@@ -236,9 +236,14 @@ fn shadow_coord(i: u32, world: vec3<f32>, n: vec3<f32>) -> vec4<f32> {
     return vec4<f32>(clip.x * 0.5 + 0.5, 0.5 - clip.y * 0.5, z, select(edge, 2.0, clip.z <= 0.0 || clip.z >= 1.0));
 }
 
+// Whether the graphics quality has `QUALITY_*` bit `bit` on.
+fn quality(bit: u32) -> bool {
+    return (u32(globals.detail.w) & bit) != 0u;
+}
+
 // 3x3 bilinear PCF in one cascade.
 fn shadow_pcf(i: u32, c: vec4<f32>) -> f32 {
-    if globals.detail.w > 0.5 {
+    if quality(QUALITY_SIMPLE_SHADING) {
         // Hardware bilinear comparison still softens edges without nine filter taps.
         return textureSampleCompareLevel(shadow_map, shadow_sampler, c.xy, i, c.z);
     }
@@ -412,7 +417,7 @@ fn terrain_patch(uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>, id: vec2<f32>,
 
 fn terrain_projection(uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>, layer: i32,
     ray: vec2<f32>, relief: f32) -> TerrainPatch {
-    if globals.detail.w > 0.5 {
+    if quality(QUALITY_SIMPLE_SHADING) {
         // Keep every material and its normal/roughness; save the three rotated
         // anti-tiling patches and relief trace on the lower quality presets.
         var out: TerrainPatch;
