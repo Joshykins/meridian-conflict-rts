@@ -43,11 +43,15 @@ fn rings_follow_the_data() {
             (Reach::Torpedo, 0, 0.0, 600.0)
         ]
     );
+    // A Reclaimer's reach is a reclaim ring.
+    assert_eq!(
+        of(&b, "aster_t1_mobile_reclaimer"),
+        vec![(Reach::Reclaim, 0, 0.0, 550.0)]
+    );
     assert_eq!(
         of(&b, "aster_t3_support"),
         vec![
             (Reach::Radar, 0, 0.0, 6000.0),
-            (Reach::Reclaim, 0, 0.0, 1700.0),
             (Reach::AntiMissile, 0, 0.0, 650.0),
             (Reach::Sonar, 0, 0.0, 900.0),
         ]
