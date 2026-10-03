@@ -23,6 +23,7 @@ use std::collections::HashMap;
 mod batch;
 mod destruct;
 mod fog;
+mod links;
 mod units;
 mod walls;
 mod warp;
@@ -31,6 +32,7 @@ mod wrecks;
 pub use batch::{BatchView, UNIT_BATCH};
 pub use destruct::DestructView;
 pub use fog::VisionDisc;
+pub use links::{link_saving, LinkView};
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
 pub use wrecks::WRECK_EXTRA_INSTANCES;
@@ -1330,6 +1332,8 @@ pub struct RenderFrame {
     pub destructs: Vec<DestructView>,
     /// Warp dampeners the viewer knows of, and their fields.
     pub dampers: Vec<DamperView>,
+    /// Adjacency links the viewer may see (`crate::adjacency`).
+    pub links: Vec<LinkView>,
     /// Each side's stores as the storage structures' lamps last judged them.
     pub stores: crate::store_lights::StoreWatch,
 }
@@ -2569,6 +2573,7 @@ impl World {
         self.write_warps(viewer, &mut frame.warps);
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_dampers(viewer, &mut frame.dampers);
+        self.write_links(viewer, &mut frame.links);
 
         self.write_fog(viewer, frame);
 
