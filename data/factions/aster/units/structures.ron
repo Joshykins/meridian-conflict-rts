@@ -555,20 +555,20 @@
         categories: ["Land", "Defense", "DirectFire"],
         health: 20000,
         cost: (mass: 2400, energy: 22000, time: 5400),
-        radius: 20, height: 17, footprint: (4, 4),
+        radius: 20, height: 28, footprint: (4, 4),
         vision: 360,
         weapons: [(
             name: "Citadel Rail Cannon",
             damage: 3800, splash: 3, range: 1500, reload: 7.5, speed: 1500, rail: true, trajectory: Direct,
             // With nothing left to shoot the gun stays laid where it last fired.
-            turret_turn: 18, pivot: (0, 0, 13), muzzle: (34, 0, 13), keeps_aim: true,
+            turret_turn: 18, pivot: (0, 0, 26), muzzle: (34, 0, 26), keeps_aim: true,
             targets: ["Land", "Naval"], color: Orange,
             flash: 2.4, impact: 2.2, shockwave: 1.4, heavy_rail: 0.2,
             // The spent cartridge leaves by the breech door on the gun body's back
             // (models/aster/citadel.rs `BODY_BACK`), straight out behind and a little up,
             // hard enough to clear the keep and its corner towers: it comes down some 45 m
             // out, lies there a while and sinks away. It is worth nothing.
-            sabot: (port: (-13.8, 0, 12.8), throw: (-1, 0, 0.2), kick: 16, damage: 0, splash: 0, casing: "aster_t3_citadel_casing"),
+            sabot: (port: (-13.8, 0, 25.8), throw: (-1, 0, 0.2), kick: 16, damage: 0, splash: 0, casing: "aster_t3_citadel_casing"),
             sounds: (fire: "citadel_rail_fire", charge: "citadel_rail_charge", charge_time: 1.2, impact: "citadel_rail_hit", ground: "citadel_rail_hit", casing: "citadel_casing_land"),
         )],
         mesh: "citadel", icon: Defense,

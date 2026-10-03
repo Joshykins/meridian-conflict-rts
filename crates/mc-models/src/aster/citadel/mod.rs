@@ -1,5 +1,5 @@
 //! Citadel (`aster_t3_point_defense`, mesh "citadel"): the tech 3 rail point defence,
-//! authored at blueprint scale (metres, 4x4 lot, radius 20, height 17).
+//! authored at blueprint scale (metres, 4x4 lot, radius 20, height 28).
 //!
 //! A keep built round one heavy rail cannon: the Zenith's little sister, laid flat at
 //! the ground instead of up at the sky. Nothing on it is lit (docs/STYLE.md, rail guns
@@ -8,9 +8,11 @@
 //! mechanism behind it, and only a short length of bare rail runs out in front.
 //! - Fixed (`part::HULL`): the lot slab; a sloped lower step with its corners cut, a
 //!   squat capacitor tower on each cut corner with its conduit run into the plinth, an
-//!   octagonal plinth, and the race ring the turret turns on.
-//! - Turning (`part::TURRET`, about the lot's centre): the turntable, a low armoured
-//!   carriage with sponsons down its flanks, and two cheeks carrying the trunnion.
+//!   octagonal plinth, and on it the armoured gun tower that lifts the turret high
+//!   enough for the gun to lay down onto ground close in.
+//! - Turning (`part::TURRET`, about the lot's centre): the turntable on the tower's
+//!   top, a low armoured carriage with a glacis falling away under the gun's nose and
+//!   sponsons down its flanks, and two tall cheeks carrying the trunnion.
 //! - Elevating (`rig::ARM_GUN`, about [`TRUNNION`]): the gun body, a long faceted
 //!   armoured shell wrapped round the gun from the breech door to a square clamp at
 //!   its nose, the capacitor pods strapped along its flanks behind the trunnion,
@@ -29,7 +31,7 @@ use crate::{part, pattern, rig, TurretRail};
 /// The trunnion (model space), over the turret's axis: keep `weapons[0].pivot` in
 /// structures.ron equal to it, and `weapons[0].muzzle` equal to it plus [`MUZZLE`]
 /// along x.
-pub(crate) const TRUNNION: Vec3 = Vec3::new(0.0, 0.0, 13.0);
+pub(crate) const TRUNNION: Vec3 = Vec3::new(0.0, 0.0, 26.0);
 
 // ---- the gun (barrel frame: metres from the trunnion along the bore) -----------------
 
@@ -72,17 +74,27 @@ const BREECH_OPEN: f32 = -1.35;
 
 // ---- the carriage (model space) ---------------------------------------------------
 
-/// The turntable's top, where the carriage stands, and the carriage's deck.
-const DECK: f32 = 8.6;
-const CARRIAGE_TOP: f32 = 10.0;
-/// The carriage's plan at its foot: front, rear, half width.
-const CARRIAGE_FRONT: f32 = 9.5;
-const CARRIAGE_REAR: f32 = -13.5;
-const CARRIAGE_HW: f32 = 8.8;
+/// The turret's collar: the deck height its shoulder rises to (plus 0.7), and the
+/// shoulder's radius there.
+const DECK: f32 = 19.6;
+const COLLAR_SHOULDER: f32 = 7.6;
+/// The collar's skirt radius, over the tower's lip.
+const COLLAR_R: f32 = 10.3;
+/// The carriage: the top of its flat between the cheeks, which runs from a glacis in
+/// front down to a low back deck; its plan at its foot (front, rear, half width).
+const CARRIAGE_TOP: f32 = 21.2;
+const CARRIAGE_FLAT: [f32; 2] = [-4.0, 1.5];
+const CARRIAGE_FRONT: f32 = 5.5;
+const CARRIAGE_REAR: f32 = -9.0;
+const CARRIAGE_HW: f32 = 7.0;
 /// The cheeks carrying the trunnion: inner face (y), thickness, half length at the foot.
 const CHEEK_IN: f32 = 3.7;
 const CHEEK_T: f32 = 2.2;
-const CHEEK_FOOT: f32 = 4.6;
+const CHEEK_FOOT: f32 = 4.8;
+/// How far below level the gun lays before it touches its own carriage or keep (a test
+/// checks it): the tower is tall so the gun reaches down onto ground close in.
+#[cfg(test)]
+const DEPRESSION_DEG: f32 = 22.0;
 // The gun body clears the carriage deck when level.
 const _: () = assert!(TRUNNION.z - BODY_HH > CARRIAGE_TOP);
 
@@ -98,6 +110,8 @@ const FOUND_TOP: f32 = 4.2;
 /// The upper plinth: radius (to its corners) at its foot, and its top.
 const PLINTH_R: f32 = 14.5;
 const PLINTH_TOP: f32 = 8.0;
+/// The gun tower standing on the plinth: its top, under the turntable.
+const KEEP_TOP: f32 = 19.0;
 /// The capacitor towers on the cut corners: centre (±, ±), half width, top.
 const TOWER_C: f32 = 17.2;
 const TOWER_HW: f32 = 3.9;
@@ -113,11 +127,12 @@ pub(crate) fn citadel(b: &mut MeshBuilder, _tech: u8) {
     }
     slab(b);
     plinth(b);
+    keep(b);
     for (sx, sy) in [(1.0, 1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)] {
         tower(b, v2(sx, sy));
     }
     b.with_part(part::TURRET, |b| {
-        turntable(b);
+        collar(b);
         carriage(b);
         b.with_limb(rig::ARM_GUN, |b| b.at(TRUNNION, gun_body));
         b.with_limb(rig::ARM_GUN | rig::RECOIL, |b| b.at(TRUNNION, barrel));
@@ -127,13 +142,24 @@ pub(crate) fn citadel(b: &mut MeshBuilder, _tech: u8) {
 /// Far off: the keep, the carriage, the gun as one bar from the breech door to the
 /// muzzle, and the owner's colour on its back. Under 60 triangles.
 fn coarse(b: &mut MeshBuilder) {
+    // The keep and the gun tower as one block, open underneath.
     b.paint(PLATING);
-    b.frustum_open(
-        Vec3::ZERO,
-        v2(2.0 * FOUND, 2.0 * FOUND),
-        v2(2.0 * PLINTH_R, 2.0 * PLINTH_R),
-        PLINTH_TOP,
-        Vec2::ZERO,
+    let ring = |half: f32, z: f32| {
+        vec![
+            v3(half, -half, z),
+            v3(half, half, z),
+            v3(-half, half, z),
+            v3(-half, -half, z),
+        ]
+    };
+    b.loft(
+        &[
+            ring(FOUND, 0.0),
+            ring(12.0, PLINTH_TOP),
+            ring(COLLAR_SHOULDER, DECK),
+        ],
+        false,
+        true,
     );
     b.with_part(part::TURRET, |b| {
         b.paint(PLATING);
@@ -141,7 +167,7 @@ fn coarse(b: &mut MeshBuilder) {
         b.frustum_open(
             v3((CARRIAGE_FRONT + CARRIAGE_REAR) * 0.5, 0.0, DECK),
             v2(length, 2.0 * CARRIAGE_HW),
-            v2(length - 2.0, 2.0 * CARRIAGE_HW - 2.0),
+            v2(length - 5.0, 2.0 * CARRIAGE_HW - 2.0),
             CARRIAGE_TOP - DECK,
             Vec2::ZERO,
         );
@@ -248,33 +274,11 @@ fn plinth(b: &mut MeshBuilder) {
 
 /// One capacitor tower on a cut corner (`corner` is (±1, ±1)): a squat sloped
 /// blockhouse, dark roof with a raised can housing, louvres, and a conduit trunk over
-/// the lower step into the plinth.
+/// the lower step into the plinth. The tower is built about its own centre, so its walls
+/// slope in evenly and what sits on them stays on them.
 fn tower(b: &mut MeshBuilder, corner: Vec2) {
-    let fine = b.fine();
     let c = corner * TOWER_C;
-    let plan: Vec<[f32; 2]> = chamfered_rect(v2(TOWER_HW, TOWER_HW), 1.1)
-        .iter()
-        .map(|p| [p[0] + c.x, p[1] + c.y])
-        .collect();
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.loft_z(
-        &plan,
-        &[Section::new(SLAB_TOP - 0.1, 1.0), Section::new(1.4, 1.0)],
-    );
-    b.paint(PLATING);
-    b.loft_z(
-        &plan,
-        &[
-            Section::new(1.3, 0.99),
-            Section::new(TOWER_TOP - 0.7, 0.86),
-            Section::new(TOWER_TOP, 0.8),
-        ],
-    );
-    b.paint(PLATING_DARK);
-    b.decal(
-        c.extend(TOWER_TOP + 0.02),
-        v2(TOWER_HW * 1.3, TOWER_HW * 1.3),
-    );
+    b.at(c.extend(0.0), |b| tower_body(b, corner));
     // The conduit trunk into the plinth.
     let inward = -corner.normalize();
     let from = c + inward * (TOWER_HW * 0.8);
@@ -286,8 +290,7 @@ fn tower(b: &mut MeshBuilder, corner: Vec2) {
         v2(2.6, 2.2),
         v2(2.6, 2.2),
     );
-    team_panel(b, (c - inward * 0.9).extend(TOWER_TOP), v2(1.8, 1.8));
-    if !fine {
+    if !b.fine() {
         return;
     }
     b.paint(ACCENT).pattern(pattern::PLAIN);
@@ -297,33 +300,6 @@ fn tower(b: &mut MeshBuilder, corner: Vec2) {
         v2(1.8, 0.3),
         v2(1.8, 0.3),
     );
-    // A low hatch on the roof's inner half with dark slats across it.
-    let hatch = c + inward * 1.2;
-    b.paint(PLATING);
-    b.chamfered_box(hatch.extend(TOWER_TOP + 0.35), v3(3.2, 3.2, 0.7), 0.25);
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    for k in -1..=1 {
-        let o = hatch + v2(0.0, k as f32 * 0.9);
-        b.block(
-            v3(o.x - 1.3, o.y - 0.18, TOWER_TOP + 0.7),
-            v3(o.x + 1.3, o.y + 0.18, TOWER_TOP + 0.85),
-        );
-    }
-    // Louvres down each outward face.
-    b.paint(ACCENT).pattern(pattern::PLAIN);
-    for (axis, sign) in [(0usize, corner.x), (1usize, corner.y)] {
-        let face = c[axis] + sign * (TOWER_HW * 0.93);
-        for k in 0..3 {
-            let z = 3.0 + 1.3 * k as f32;
-            let (lo, hi) = (face.min(face + sign * 0.3), face.max(face + sign * 0.3));
-            let (a, e) = if axis == 0 {
-                (v3(lo, c.y - 1.8, z), v3(hi, c.y + 1.8, z + 0.45))
-            } else {
-                (v3(c.x - 1.8, lo, z), v3(c.x + 1.8, hi, z + 0.45))
-            };
-            b.block(a, e);
-        }
-    }
     // Feeders laid along the trunk.
     let side = v2(-inward.y, inward.x);
     for k in [-1.0, 1.0] {
@@ -340,84 +316,166 @@ fn tower(b: &mut MeshBuilder, corner: Vec2) {
     }
 }
 
-// ---- the turret ---------------------------------------------------------------------
-
-/// The turntable ring the carriage stands on.
-fn turntable(b: &mut MeshBuilder) {
-    let sides = b.sides(16);
-    b.paint(PLATING_DARK);
-    b.prism(
-        v3(0.0, 0.0, PLINTH_TOP - 0.05),
-        sides,
-        12.5,
-        12.2,
-        DECK - PLINTH_TOP + 0.05,
-    );
-    if b.fine() {
-        b.paint(METAL).pattern(pattern::PLAIN);
-        b.prism(v3(0.0, 0.0, PLINTH_TOP + 0.3), sides, 12.6, 12.6, 0.2);
-    }
+/// The tower's walls (scale 0.99 at their foot to 0.86 near the roof, then 0.8 at the
+/// roof), at the given height.
+fn tower_wall_scale(z: f32) -> f32 {
+    let t = ((z - 1.3) / (TOWER_TOP - 0.7 - 1.3)).clamp(0.0, 1.0);
+    0.99 + (0.86 - 0.99) * t
 }
 
-/// The carriage: a low armoured deck under the gun, sponsons down its flanks, a dark
-/// well under the gun for its breech to dip into, and the two cheeks that carry it.
-fn carriage(b: &mut MeshBuilder) {
+/// The tower itself, in a frame at its centre.
+fn tower_body(b: &mut MeshBuilder, corner: Vec2) {
     let fine = b.fine();
-    let (f, r, hw) = (CARRIAGE_FRONT, CARRIAGE_REAR, CARRIAGE_HW);
-    let plan: Vec<[f32; 2]> = vec![
-        [f, -5.0],
-        [f, 5.0],
-        [f - 3.5, hw],
-        [r + 2.5, hw],
-        [r, hw - 2.5],
-        [r, -(hw - 2.5)],
-        [r + 2.5, -hw],
-        [f - 3.5, -hw],
-    ];
+    let plan = chamfered_rect(v2(TOWER_HW, TOWER_HW), 1.1);
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.loft_z(
+        &plan,
+        &[Section::new(SLAB_TOP - 0.1, 1.0), Section::new(1.4, 1.0)],
+    );
     b.paint(PLATING);
     b.loft_z(
         &plan,
         &[
-            Section::new(DECK - 0.05, 1.0),
-            Section::new(CARRIAGE_TOP - 0.7, 1.0),
-            Section::scaled(CARRIAGE_TOP, 0.95, 0.93),
+            Section::new(1.3, 0.99),
+            Section::new(TOWER_TOP - 0.7, 0.86),
+            Section::new(TOWER_TOP, 0.8),
+        ],
+    );
+    b.paint(PLATING_DARK);
+    b.decal(
+        v3(0.0, 0.0, TOWER_TOP + 0.02),
+        v2(TOWER_HW * 1.3, TOWER_HW * 1.3),
+    );
+    let inward = -corner.normalize();
+    team_panel(b, (-inward * 0.9).extend(TOWER_TOP), v2(1.8, 1.8));
+    if !fine {
+        return;
+    }
+    // A low hatch on the roof's inner half with dark slats across it.
+    let hatch = inward * 1.2;
+    b.paint(PLATING);
+    b.chamfered_box(hatch.extend(TOWER_TOP + 0.35), v3(3.2, 3.2, 0.7), 0.25);
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    for k in -1..=1 {
+        let o = hatch + v2(0.0, k as f32 * 0.9);
+        b.block(
+            v3(o.x - 1.3, o.y - 0.18, TOWER_TOP + 0.7),
+            v3(o.x + 1.3, o.y + 0.18, TOWER_TOP + 0.85),
+        );
+    }
+    // Louvres down each outward face, each slat's back set into the sloping wall.
+    for (axis, sign) in [(0usize, corner.x), (1usize, corner.y)] {
+        for k in 0..3 {
+            let z = 3.0 + 1.3 * k as f32;
+            let back = TOWER_HW * tower_wall_scale(z + 0.45) - 0.1;
+            let front = TOWER_HW * tower_wall_scale(z) + 0.3;
+            let (lo, hi) = (sign * back, sign * front);
+            let (lo, hi) = (lo.min(hi), lo.max(hi));
+            let (a, e) = if axis == 0 {
+                (v3(lo, -1.8, z), v3(hi, 1.8, z + 0.45))
+            } else {
+                (v3(-1.8, lo, z), v3(1.8, hi, z + 0.45))
+            };
+            b.block(a, e);
+        }
+    }
+}
+
+// ---- the turret ---------------------------------------------------------------------
+
+/// The turret's collar on the tower's top: a round armoured skirt dropped over the
+/// tower's lip, and a sloped shoulder up from it to the deck the carriage stands on, low
+/// enough in front for the gun's nose to dip past it.
+fn collar(b: &mut MeshBuilder) {
+    let sides = b.sides(16);
+    let r = COLLAR_R;
+    let ring = ngon(sides, r);
+    b.paint(PLATING);
+    b.loft_z(
+        &ring,
+        &[
+            Section::new(KEEP_TOP - 1.2, 1.0),
+            Section::new(KEEP_TOP + 0.2, 1.0),
+            Section::new(DECK + 0.7, COLLAR_SHOULDER / r),
         ],
     );
     b.paint(ACCENT).pattern(pattern::PLAIN);
-    b.decal(
-        v3(-2.0, 0.0, CARRIAGE_TOP + 0.02),
-        v2(19.0, 2.0 * CHEEK_IN - 0.4),
+    b.loft_z(
+        &ring,
+        &[
+            Section::new(KEEP_TOP - 1.25, 1.008),
+            Section::new(KEEP_TOP - 0.85, 1.008),
+        ],
     );
-    team_panel(b, v3(-8.0, 5.6, CARRIAGE_TOP), v2(2.4, 1.8));
-    team_panel(b, v3(-8.0, -5.6, CARRIAGE_TOP), v2(2.4, 1.8));
+    if b.fine() {
+        b.paint(METAL).pattern(pattern::PLAIN);
+        b.loft_z(
+            &ring,
+            &[
+                Section::new(KEEP_TOP + 0.1, 1.006),
+                Section::new(KEEP_TOP + 0.3, 1.006),
+            ],
+        );
+    }
+}
+
+/// The carriage: a low armoured hull under the gun, a glacis in front falling away from
+/// the gun's nose so it can lay down, a low back deck under the breech, sponsons down
+/// its flanks, and the two tall cheeks that carry the gun.
+fn carriage(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    let (f, r, hw) = (CARRIAGE_FRONT, CARRIAGE_REAR, CARRIAGE_HW);
+    let low = DECK + 0.7;
+    b.paint(PLATING);
+    // The hull over it: glacis, flat, back deck.
+    let [flat_back, flat_front] = CARRIAGE_FLAT;
+    b.extrude_y(
+        &[
+            [r + 0.6, low - 0.1],
+            [f - 0.4, low - 0.1],
+            [flat_front, CARRIAGE_TOP],
+            [flat_back, CARRIAGE_TOP],
+            [r + 1.6, low + 0.7],
+        ],
+        -(hw - 1.4),
+        hw - 1.4,
+    );
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.decal(
+        v3((flat_back + flat_front) * 0.5, 0.0, CARRIAGE_TOP + 0.02),
+        v2(flat_front - flat_back - 0.6, 2.0 * CHEEK_IN - 0.4),
+    );
+    let sponson_top = low + 0.9;
+    team_panel(b, v3(-4.5, hw - 0.6, sponson_top), v2(2.4, 1.2));
+    team_panel(b, v3(-4.5, -(hw - 0.6), sponson_top), v2(2.4, 1.2));
     b.mirror_y(|b| {
         // A low sponson down the flank, a light lid on it.
         b.paint(ACCENT).pattern(pattern::PLAIN);
         b.extrude_y(
             &[
-                [r + 1.8, DECK + 0.3],
-                [f - 4.2, DECK + 0.3],
-                [f - 5.0, CARRIAGE_TOP - 0.2],
-                [r + 2.4, CARRIAGE_TOP - 0.2],
+                [r + 1.8, KEEP_TOP + 0.3],
+                [f - 3.4, KEEP_TOP + 0.3],
+                [f - 4.2, sponson_top],
+                [r + 2.4, sponson_top],
             ],
-            hw - 0.6,
-            hw + 0.9,
+            hw - 1.5,
+            hw + 0.4,
         );
         b.paint(PLATING);
         b.plate(
-            v3((f + r) * 0.5 - 0.5, hw + 0.15, CARRIAGE_TOP - 0.2),
-            v2(f - r - 7.6, 1.5),
+            v3((f + r) * 0.5 - 1.5, hw - 0.6, sponson_top),
+            v2(f - r - 9.0, 1.4),
             0.14,
             0.04,
         );
-        // The cheek: a sloped armoured wall up to the trunnion, a dark boss on it.
+        // The cheek: a tall sloped armoured wall up to the trunnion, a dark boss on it.
         b.paint(PLATING);
         b.extrude_y(
             &[
-                [-CHEEK_FOOT, CARRIAGE_TOP - 0.1],
-                [CHEEK_FOOT, CARRIAGE_TOP - 0.1],
-                [2.4, TRUNNION.z + 1.7],
-                [-2.4, TRUNNION.z + 1.7],
+                [-CHEEK_FOOT, low - 0.1],
+                [CHEEK_FOOT, low - 0.1],
+                [2.6, TRUNNION.z + 1.7],
+                [-2.6, TRUNNION.z + 1.7],
             ],
             CHEEK_IN,
             CHEEK_IN + CHEEK_T,
@@ -440,18 +498,120 @@ fn carriage(b: &mut MeshBuilder) {
                 0.6,
                 8,
             );
-            // Vision slits along the sponson.
+            // A dark rib up the cheek's face, and vision slits along the sponson.
+            b.paint(ACCENT).pattern(pattern::PLAIN);
+            b.block(
+                v3(-0.4, out - 0.05, low + 0.4),
+                v3(0.4, out + 0.15, TRUNNION.z - 1.6),
+            );
             b.paint(TREAD).pattern(pattern::NONE);
-            for x in [-8.0, -3.0, 2.0] {
+            for x in [-5.5, -1.5] {
                 b.block(
-                    v3(x - 1.3, hw + 0.88, DECK + 0.7),
-                    v3(x + 1.3, hw + 0.96, DECK + 1.05),
+                    v3(x - 1.2, hw + 0.38, low + 0.15),
+                    v3(x + 1.2, hw + 0.46, low + 0.5),
                 );
             }
         }
     });
     if fine {
-        antenna_unlit(b, v3(-10.6, 5.2, CARRIAGE_TOP - 0.3), 3.8, 0.12);
+        antenna_unlit(b, v3(-7.0, 4.6, low + 0.5), 3.8, 0.12);
+    }
+}
+
+// ---- the gun tower ------------------------------------------------------------------
+
+/// A frame on a sloping face of the tower: `yaw` is the face's outward direction, the
+/// face runs from `foot` out from the axis at `z0` to `top` out at `z1`, and `f` draws at
+/// height `z` with +x out of the face, y across it and +z up its slope.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "a face is its bearing, two stations and the height drawn at"
+)]
+fn on_face(
+    b: &mut MeshBuilder,
+    yaw: f32,
+    foot: f32,
+    top: f32,
+    z0: f32,
+    z1: f32,
+    z: f32,
+    f: impl FnOnce(&mut MeshBuilder),
+) {
+    let t = (z - z0) / (z1 - z0);
+    let out = foot + (top - foot) * t;
+    let lean = ((foot - top) / (z1 - z0)).atan();
+    b.with(
+        glam::Affine3A::from_rotation_z(yaw)
+            * glam::Affine3A::from_translation(v3(out, 0.0, z))
+            * glam::Affine3A::from_rotation_y(-lean),
+        f,
+    );
+}
+
+/// The tower the gun stands on, from the plinth's top to the turret's collar: an
+/// octagonal drum in two slopes, a steep glacis up from the plinth and a near-sheer
+/// wall above, a dark band where they meet, ribs up its corners and slits in its faces.
+fn keep(b: &mut MeshBuilder) {
+    let fine = b.fine();
+    const R: f32 = 12.6;
+    const BAND: f32 = 12.6;
+    let ring = ngon(8, R);
+    let (foot, waist, top) = (1.0, 0.9, 0.8);
+    b.paint(PLATING);
+    b.loft_z(
+        &ring,
+        &[
+            Section::new(PLINTH_TOP - 0.1, foot),
+            Section::new(BAND, waist),
+            Section::new(KEEP_TOP - 0.6, top),
+        ],
+    );
+    b.paint(ACCENT).pattern(pattern::PLAIN);
+    b.loft_z(
+        &ring,
+        &[
+            Section::new(BAND - 0.4, waist + 0.026),
+            Section::new(BAND + 0.4, waist + 0.016),
+        ],
+    );
+    b.loft_z(
+        &ring,
+        &[
+            Section::new(KEEP_TOP - 0.7, top + 0.01),
+            Section::new(KEEP_TOP, top - 0.02),
+        ],
+    );
+    if !fine {
+        return;
+    }
+    // Ribs up the eight corners, on the upper wall.
+    let apothem = |s: f32| R * s * (std::f32::consts::PI / 8.0).cos();
+    for k in 0..8 {
+        let a = (k as f32 + 0.5) * std::f32::consts::FRAC_PI_4;
+        let dir = v2(a.cos(), a.sin());
+        b.paint(PLATING_DARK);
+        b.beam(
+            (dir * (R * waist + 0.1)).extend(BAND + 0.4),
+            (dir * (R * top + 0.1)).extend(KEEP_TOP - 0.7),
+            v2(0.7, 0.7),
+            v2(0.7, 0.7),
+        );
+    }
+    // A slit and an armour plate on each face of the upper wall.
+    for k in 0..8 {
+        let yaw = k as f32 * std::f32::consts::FRAC_PI_4;
+        let (lo, hi) = (BAND, KEEP_TOP - 0.6);
+        on_face(b, yaw, apothem(waist), apothem(top), lo, hi, 15.8, |b| {
+            if k % 2 == 0 {
+                b.paint(ACCENT).pattern(pattern::PLAIN);
+                b.block(v3(-0.1, -2.2, -0.9), v3(0.12, 2.2, 0.9));
+                b.paint(TREAD).pattern(pattern::NONE);
+                b.block(v3(0.1, -1.6, -0.2), v3(0.16, 1.6, 0.2));
+            } else {
+                b.paint(PLATING_DARK);
+                b.block(v3(-0.1, -1.4, -1.6), v3(0.15, 1.4, 1.6));
+            }
+        });
     }
 }
 
@@ -768,248 +928,4 @@ pub(crate) const RAIL: TurretRail = TurretRail {
 };
 
 #[cfg(test)]
-mod tests {
-    use glam::Vec3;
-
-    use super::{BODY_FRONT, BREECH_HINGE, MUZZLE, RAIL, RAIL_HH, TRUNNION};
-    use crate::{build_model_scaled, material, part, rig, MeshLod, Model};
-
-    /// The unit file's size (`aster_t3_point_defense`): radius, height, tech; 4x4 lot.
-    const SIZE: (f32, f32, u8) = (20.0, 17.0, 3);
-    const HALF_LOT: f32 = 24.0;
-
-    fn built() -> Model {
-        build_model_scaled("citadel", SIZE.0, SIZE.1, SIZE.2).unwrap()
-    }
-
-    fn tris(mesh: &MeshLod) -> usize {
-        mesh.indices.len() / 3
-    }
-
-    fn weapon() -> (Vec3, Vec3) {
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
-        let blueprints = mc_data::Blueprints::load(&data).unwrap();
-        let bp = blueprints.unit(blueprints.id_of("aster_t3_point_defense").unwrap());
-        let w = &bp.weapons[0];
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
-        (v(w.pivot.expect("the Citadel's gun elevates")), v(w.muzzle))
-    }
-
-    /// The unit file's pivot and muzzle are the model's trunnion and barrel tip, and the
-    /// barrel reaches the muzzle at every level of detail.
-    #[test]
-    fn citadel_barrel_ends_at_the_muzzle_and_pitches_about_the_trunnion() {
-        let (pivot, muzzle) = weapon();
-        assert!(pivot.distance(TRUNNION) < 1e-2, "data pivot {pivot}");
-        let tip = TRUNNION + Vec3::X * MUZZLE;
-        assert!(muzzle.distance(tip) < 1e-2, "data muzzle {muzzle} vs {tip}");
-        let model = built();
-        assert_eq!(model.arm_pivot, Some(TRUNNION.to_array()));
-        assert!(model.recoil.is_some());
-        for (l, lod) in model.lods.iter().enumerate() {
-            let barrel: Vec<Vec3> = lod
-                .vertices
-                .iter()
-                .filter(|v| {
-                    v.part == part::TURRET
-                        && v.rig & rig::LIMB_MASK == rig::ARM_GUN
-                        && v.rig & rig::RECOIL != 0
-                })
-                .map(|v| Vec3::from(v.pos))
-                .collect();
-            let front = barrel.iter().map(|p| p.x).fold(f32::MIN, f32::max);
-            assert!(
-                (front - tip.x).abs() < 0.2,
-                "lod{l}: barrel ends at {front}"
-            );
-            // Out of the gun body, the barrel is five times longer than its widest clamp.
-            let wide = barrel
-                .iter()
-                .filter(|p| p.x > TRUNNION.x + BODY_FRONT)
-                .map(|p| p.y.abs().max((p.z - TRUNNION.z).abs()))
-                .fold(0.0, f32::max);
-            assert!(
-                MUZZLE - BODY_FRONT > 5.0 * 2.0 * wide,
-                "lod{l}: {wide} m half-wide"
-            );
-        }
-    }
-
-    /// Stands in its 4x4 lot (only the barrel overhangs), to its height, bigger than the
-    /// Redoubt's 2x2 keep; wears team colour, and nothing on it glows.
-    #[test]
-    fn citadel_fits_its_lot_and_is_unlit_hardware() {
-        let model = built();
-        for (l, lod) in model.lods.iter().enumerate() {
-            let fixed = lod.vertices.iter().filter(|v| v.part != part::TURRET);
-            let (x, y) = fixed.fold((0.0f32, 0.0f32), |(x, y), v| {
-                (x.max(v.pos[0].abs()), y.max(v.pos[1].abs()))
-            });
-            assert!(x <= HALF_LOT && y <= HALF_LOT, "lod{l}: base {x} x {y}");
-            assert!(x >= 19.0 && y >= 19.0, "lod{l}: base {x} x {y}");
-            let top = lod.vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
-            assert!(
-                top >= SIZE.1 * 0.8 && top <= SIZE.1 * 1.1,
-                "lod{l}: top {top}"
-            );
-            assert!(
-                lod.vertices.iter().any(|v| v.material == material::TEAM),
-                "lod{l}: team colour"
-            );
-            let lit = lod
-                .vertices
-                .iter()
-                .filter(|v| matches!(v.material, material::GLOW | material::GLOW_ORANGE))
-                .count();
-            assert_eq!(lit, 0, "lod{l}: lit");
-            assert!(
-                lod.vertices.iter().all(|v| v.pos[2] >= -1e-3),
-                "lod{l}: below ground"
-            );
-        }
-        let [full, mid, coarse] = [0, 1, 2].map(|l| tris(&model.lods[l]));
-        println!("citadel: {full}/{mid}/{coarse}");
-    }
-
-    /// The breech door hangs on the gun from its hinge: at full and middle detail its verts
-    /// carry `rig::BREECH` on the gun's limb and never the barrel's kick, and the model's
-    /// hinge is the door's, where the unit file throws the cartridge out.
-    #[test]
-    fn citadel_breech_door_rides_the_gun_and_swings_up() {
-        let model = built();
-        let [x, y, z, open] = model.breech.expect("the Citadel has a breech door");
-        let hinge = TRUNNION + BREECH_HINGE;
-        assert!(
-            Vec3::new(x, y, z).distance(hinge) < 1e-3,
-            "hinge {x} {y} {z}"
-        );
-        assert!(open < -1.0, "the door swings up and back: {open}");
-        for (l, lod) in model.lods.iter().take(2).enumerate() {
-            let door: Vec<_> = lod
-                .vertices
-                .iter()
-                .filter(|v| v.rig & rig::BREECH != 0)
-                .collect();
-            assert!(!door.is_empty(), "lod{l}: no door");
-            for v in door {
-                assert_eq!(v.part, part::TURRET);
-                assert_eq!(
-                    v.rig & rig::LIMB_MASK,
-                    rig::ARM_GUN,
-                    "lod{l}: door off the gun"
-                );
-                assert_eq!(
-                    v.rig & (rig::RECOIL | rig::UPGRADE),
-                    0,
-                    "lod{l}: door kicks"
-                );
-                // It hangs below its hinge, over the mouth on the back face.
-                assert!(v.pos[2] <= hinge.z + 0.3 && v.pos[0] < TRUNNION.x + BODY_FRONT);
-            }
-        }
-        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
-        let blueprints = mc_data::Blueprints::load(&data).unwrap();
-        let bp = blueprints.unit(blueprints.id_of("aster_t3_point_defense").unwrap());
-        let sabot = bp.weapons[0]
-            .sabot
-            .expect("the Citadel throws its cartridges");
-        let port = Vec3::new(
-            sabot.port.x.to_f32(),
-            sabot.port.y.to_f32(),
-            sabot.port.z.to_f32(),
-        );
-        assert!(
-            (port.x - (TRUNNION.x + super::BODY_BACK)).abs() < 1.5
-                && port.y.abs() < super::BREECH_MOUTH.x
-                && (port.z - TRUNNION.z).abs() < super::BREECH_MOUTH.y,
-            "the unit file's port {port} is not in the breech mouth"
-        );
-    }
-
-    /// The spent cartridge: small, sound, and lying on the ground.
-    #[test]
-    fn citadel_cartridge_is_a_sound_little_mesh() {
-        let model = build_model_scaled("citadel_casing", 2.2, 1.3, 3).unwrap();
-        let [full, mid, coarse] = [0, 1, 2].map(|l| tris(&model.lods[l]));
-        println!("citadel_casing: {full}/{mid}/{coarse}");
-        assert!(full <= 400 && coarse < 20, "{full}/{mid}/{coarse}");
-        for lod in &model.lods {
-            let top = lod.vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
-            assert!(lod.vertices.iter().all(|v| v.pos[2] >= -1e-3) && top < 1.5);
-        }
-    }
-
-    /// Sound meshes: no degenerate triangles, winding agreeing with the normals, one
-    /// material and part per triangle.
-    #[test]
-    fn citadel_is_a_sound_mesh() {
-        for (l, mesh) in built().lods.iter().enumerate() {
-            for t in mesh.indices.chunks(3) {
-                let v = [0, 1, 2].map(|k| mesh.vertices[t[k] as usize]);
-                let p = v.map(|v| Vec3::from(v.pos));
-                let n = (p[1] - p[0]).cross(p[2] - p[0]);
-                assert!(n.length() * 0.5 > 1e-7, "lod{l}: degenerate at {}", p[0]);
-                for v in &v {
-                    assert!(
-                        n.normalize().dot(Vec3::from(v.normal)) > 0.5,
-                        "lod{l}: winding at {}",
-                        p[0]
-                    );
-                }
-                assert!(v[0].material == v[1].material && v[1].material == v[2].material);
-                assert!(v[0].part == v[1].part && v[1].part == v[2].part);
-            }
-        }
-    }
-
-    /// Previews at rest and elevated: `MODEL_DUMP_DIR=... cargo test -p mc-models --lib
-    /// -- --ignored citadel_previews`.
-    #[test]
-    #[ignore = "writes preview images"]
-    fn citadel_previews() {
-        let dir =
-            std::path::PathBuf::from(std::env::var_os("MODEL_DUMP_DIR").expect("MODEL_DUMP_DIR"));
-        std::fs::create_dir_all(&dir).unwrap();
-        let model = built();
-        for (l, lod) in model.lods.iter().enumerate() {
-            for pitch in [0.0f32, 0.2] {
-                let mut posed = lod.clone();
-                for v in &mut posed.vertices {
-                    if v.rig & rig::LIMB_MASK == rig::ARM_GUN {
-                        let r = Vec3::from(v.pos) - TRUNNION;
-                        let (s, c) = pitch.sin_cos();
-                        v.pos = (TRUNNION + Vec3::new(r.x * c - r.z * s, r.y, r.x * s + r.z * c))
-                            .to_array();
-                    }
-                }
-                let res = if l == 0 { 900 } else { 300 };
-                for az in [-38.0f32, 52.0, 142.0] {
-                    if l > 0 && az != -38.0 {
-                        continue;
-                    }
-                    crate::preview::render(&posed, res, az)
-                        .write_ppm(&dir.join(format!(
-                            "citadel_l{l}_p{}_{}.ppm",
-                            (pitch * 100.0) as i32,
-                            az as i32
-                        )))
-                        .unwrap();
-                }
-            }
-        }
-    }
-
-    /// The charge's arcs crawl on the bare rails, breech forward, and the gun they run
-    /// along is the one the unit file fires from.
-    #[test]
-    fn citadel_charge_arcs_run_along_the_bare_rails() {
-        let (pivot, muzzle) = weapon();
-        assert!((pivot.x + RAIL.muzzle - muzzle.x).abs() < 0.01);
-        assert!(RAIL.breech < 0.0 && (RAIL.rail_top - RAIL_HH).abs() < 1e-6);
-        let mut last = BODY_FRONT - TRUNNION.x;
-        for x in RAIL.arcs {
-            assert!(x > last && x < RAIL.muzzle, "arc stretch at {x}");
-            last = x;
-        }
-    }
-}
+mod tests;
