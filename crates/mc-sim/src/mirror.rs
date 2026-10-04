@@ -966,8 +966,9 @@ pub struct PlannedBuild {
     pub heading: f32,
 }
 
-/// Set in `ProjectileInstance::color` for a missile. Not for a Gravitic Seeker, which has
-/// no motor or body to draw: it is its plasma charge (`plasma_look`).
+/// Set in `ProjectileInstance::color` for a missile. Not for a bare Gravitic Seeker, which
+/// has no motor or body to draw: it is its plasma charge (`plasma_look`). A cased one
+/// (`Weapon::cased_seeker`) has it, and its seeker look in `_pad[0]` too.
 pub const PROJECTILE_MISSILE: u32 = 1 << 8;
 /// `plasma_look` of a Regency seeker: a Gravitic Seeker, or any other plasma `missile`.
 /// `mc_models::gpu_consts::plasma_look::GRAVITIC_SEEKER`
@@ -1152,11 +1153,12 @@ const _: () = assert!(std::mem::size_of::<ProjectileInstance>() == 80);
 /// Plasmeric bolt (a fat glowing teardrop, as a plasma repeater throws), 5 a seeker, any
 /// plasma `missile` (`plasma_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`): its contained charge
 /// in its lens, violet, so every Regency missile reads as one a missile defence can take.
-/// Zero for anything else.
+/// A cased seeker carries it too, beside `PROJECTILE_MISSILE`: its body is drawn, in the
+/// Regency's look. Zero for anything else.
 pub fn plasma_look(weapon: &mc_data::Weapon) -> u32 {
     use mc_data::PlasmaGrade;
     match weapon.plasma_shot() {
-        _ if plasma_seeker(weapon) => PLASMA_LOOK_GRAVITIC_SEEKER,
+        _ if plasma_seeker(weapon) || weapon.cased_seeker() => PLASMA_LOOK_GRAVITIC_SEEKER,
         Some(_) if weapon.curve.0 > 0 => 3,
         Some(PlasmaGrade::Pinched) => 1,
         Some(PlasmaGrade::PinchFusion) => 2,
@@ -1200,9 +1202,10 @@ fn wings_or_turn(weapon: &mc_data::Weapon, age: u16) -> f32 {
 
 /// A Regency seeker: a plasma `missile` of any grade, a charge held in gravity
 /// containment and steered onto its mark. It has no body and no motor, so it is not drawn
-/// as a missile (`PROJECTILE_MISSILE`) but as the charge it is (`plasma_look`).
+/// as a missile (`PROJECTILE_MISSILE`) but as the charge it is (`plasma_look`). A cased
+/// seeker (`Weapon::cased_seeker`) is drawn as its body.
 fn plasma_seeker(weapon: &mc_data::Weapon) -> bool {
-    weapon.missile && weapon.plasma_grade.is_some()
+    weapon.missile && weapon.plasma_grade.is_some() && !weapon.cased
 }
 
 /// A shot's `aim.w`: a missile's body across (`Weapon::caliber`), any other shot's

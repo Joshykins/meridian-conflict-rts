@@ -38,6 +38,10 @@ impl Renderer {
                 }
                 continue;
             }
+            if regency_guns_fx::cased_seeker(p) {
+                // A cased seeker's smoke is black, a seeker's (`gravitic_fx`).
+                continue;
+            }
             let missile = p.color & PROJECTILE_MISSILE != 0;
             let arc = p.color & PROJECTILE_TRAIL != 0;
             let smoke = p.color & PROJECTILE_SMOKE != 0;

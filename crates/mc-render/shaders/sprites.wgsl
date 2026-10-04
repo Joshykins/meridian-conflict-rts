@@ -127,6 +127,17 @@ fn plasma_look(p: Projectile) -> u32 {
     return u32(floor((p.extras.z - 1.0) * 0.5));
 }
 
+// A Gravitic Seeker in a solid casing (`Weapon::cased_seeker`): a missile that carries the
+// seeker's look in extras.z as well. Drawn as a faceted Regency body (`vs_missile`) with
+// its charge glowing violet out of the tail in place of a motor flame.
+fn cased_seeker(p: Projectile) -> bool {
+    return (p.color & 0x100u) != 0u && p.extras.z > 2.5
+        && u32(floor((p.extras.z - 1.0) * 0.5)) == PLASMA_LOOK_GRAVITIC_SEEKER;
+}
+
+// A cased seeker's charge and line work, as the strategic warhead's (nova.wgsl `NOVA_VIOLET`).
+const SEEKER_VIOLET: vec3<f32> = vec3<f32>(0.62, 0.12, 1.0);
+
 struct SpritePush {
     // SPRITE_LAYER_*: which side of the clouds this draw of the shots is.
     layer: u32,
@@ -256,6 +267,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         let half_length = missile_half_length(p);
         head -= normalize(stride + vec3<f32>(0.0, 0.0, 1e-6)) * half_length;
         trace = half_length * select(0.9, 1.1, skim) * select(1.0, 2.4, boost);
+        // A cased seeker has no motor: a short glow of its charge out of the tail.
+        trace *= select(1.0, 0.45, cased_seeker(p));
     }
     if (p.color & 0x800u) != 0u {
         // An energy slug: a longer blue streak the wake hangs off.
@@ -446,6 +459,10 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             // The seeker's lens is round: `fs_sprite` needs the quad's length over its
             // width, carried in green over red (both dimmed alike).
             out.color = vec3<f32>(1.0, (len + 2.0 * width_px) / max(2.0 * width_px, 0.001), 0.0);
+        }
+        if cased_seeker(p) {
+            // Its charge out of the tail, violet right through: no flame.
+            out.color = SEEKER_VIOLET * 9.0;
         }
     }
     if fade_beam {
@@ -1170,6 +1187,10 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
 struct MissileOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) normal: vec3<f32>,
+    // A cased seeker's surface (`fs_missile_lit`): along the body (-1 tail .. 1 nose), round
+    // it (0..1), and the piece (0 the body, 1 the prow, 2 the tail, 3 a fin).
+    @location(1) surface: vec3<f32>,
+    @location(2) @interpolate(flat) cased: u32,
 }
 fn missile_axis(p: Projectile) -> vec3<f32> {
     if (p.color & 0x8000u) != 0u {
@@ -1193,26 +1214,38 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     }
     let half_length = missile_half_length(p);
     let radius = half_length * 0.14;
+    let cased = cased_seeker(p);
+    // Where the body meets the prow: a cased seeker's faceted prow is longer.
+    let prow = select(0.55, 0.4, cased);
     var local = vec3<f32>(0.0);
     var normal = vec3<f32>(0.0);
+    var surface = vec3<f32>(0.0);
     let quad = array<u32, 6>(0u, 1u, 2u, 0u, 2u, 3u);
     if vertex < 48u {
         let segment = vertex / 6u;
         let corner = quad[vertex % 6u];
-        let a = (f32(segment) + select(0.0, 1.0, corner == 1u || corner == 2u)) * 0.785398163;
-        local = vec3<f32>(select(-1.0, 0.55, corner >= 2u) * half_length, cos(a) * radius, sin(a) * radius);
+        let side = f32(segment) + select(0.0, 1.0, corner == 1u || corner == 2u);
+        let a = side * 0.785398163;
+        let x = select(-1.0, prow, corner >= 2u);
+        local = vec3<f32>(x * half_length, cos(a) * radius, sin(a) * radius);
         let middle = (f32(segment) + 0.5) * 0.785398163;
         normal = vec3<f32>(0.0, cos(middle), sin(middle));
+        surface = vec3<f32>(x, side / 8.0, 0.0);
     } else if vertex < 96u {
         let nose = vertex < 72u;
         let v = (vertex - 48u) % 24u;
-        let a = (f32(v / 3u) + select(0.0, 1.0, v % 3u == 1u)) * 0.785398163;
-        local = vec3<f32>(select(-1.0, 0.55, nose) * half_length, cos(a) * radius, sin(a) * radius);
+        let side = f32(v / 3u) + select(0.0, 1.0, v % 3u == 1u);
+        let a = side * 0.785398163;
+        local = vec3<f32>(select(-1.0, prow, nose) * half_length, cos(a) * radius, sin(a) * radius);
+        surface = vec3<f32>(select(-1.0, prow, nose), side / 8.0, select(2.0, 1.0, nose));
         if v % 3u == 2u {
             local = vec3<f32>(select(-1.0, 1.0, nose) * half_length, 0.0, 0.0);
+            surface = vec3<f32>(select(-1.0, 1.0, nose), (f32(v / 3u) + 0.5) / 8.0, surface.z);
         }
         let middle = (f32(v / 3u) + 0.5) * 0.785398163;
-        normal = select(vec3<f32>(-1.0, 0.0, 0.0), normalize(vec3<f32>(0.31, cos(middle), sin(middle))), nose);
+        // A cased seeker's prow is longer, so its facets lean back less.
+        let lean = select(0.31, 0.2, cased);
+        normal = select(vec3<f32>(-1.0, 0.0, 0.0), normalize(vec3<f32>(lean, cos(middle), sin(middle))), nose);
     } else if vertex >= 120u {
         // A cruise missile's wings (extras.w, 0 folded to 1 out): stowed flat along the
         // body, they swing out about a pivot just forward of the middle, a swept pair.
@@ -1231,16 +1264,24 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     } else {
         let fin = (vertex - 96u) / 6u;
         let corner = quad[(vertex - 96u) % 6u];
-        let a = f32(fin) * 1.570796327;
+        // A cased seeker's fins stand on the diagonals, between the casing's seams.
+        let a = (f32(fin) + select(0.0, 0.5, cased)) * 1.570796327;
         // A rocket sized to its tube keeps its fins inside the tube's mouth, a little proud
         // of the body: spread as wide as any other missile's, a salvo read as jets.
         let reach = select(0.38, 0.165, p.aim.w > 0.0);
-        let profile = array<vec2<f32>, 4>(
+        var profile = array<vec2<f32>, 4>(
             vec2<f32>(-0.96, 0.12), vec2<f32>(-0.96, reach),
             vec2<f32>(-0.65, reach), vec2<f32>(-0.25, 0.12));
+        if cased {
+            // Swept forward, as the strategic warhead's wings: the tip ahead of the root.
+            profile = array<vec2<f32>, 4>(
+                vec2<f32>(-1.0, 0.1), vec2<f32>(-0.8, reach),
+                vec2<f32>(-0.42, reach), vec2<f32>(-0.62, 0.1));
+        }
         let q = profile[corner] * half_length;
         local = vec3<f32>(q.x, cos(a) * q.y, sin(a) * q.y);
         normal = vec3<f32>(0.0, -sin(a), cos(a));
+        surface = vec3<f32>(profile[corner].x, select(0.0, 1.0, corner == 1u || corner == 2u), 3.0);
     }
     let axis = missile_axis(p);
     let reference = select(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(0.0, 1.0, 0.0), abs(axis.z) > 0.95);
@@ -1248,11 +1289,57 @@ fn vs_missile(@builtin(vertex_index) vertex: u32, @builtin(instance_index) insta
     let up = cross(side, axis);
     out.clip = globals.view_proj * vec4<f32>(at.xyz + axis * local.x + side * local.y + up * local.z, 1.0);
     out.normal = axis * normal.x + side * normal.y + up * normal.z;
+    out.surface = surface;
+    out.cased = select(0u, 1u, cased);
     return out;
 }
 fn fs_missile_lit(in: MissileOut) -> vec4<f32> {
     let light = 0.45 + 0.55 * abs(dot(normalize(in.normal), normalize(vec3<f32>(0.4, -0.5, 0.8))));
-    return vec4<f32>(vec3<f32>(0.024, 0.028, 0.033) * light, 1.0);
+    if in.cased == 0u {
+        return vec4<f32>(vec3<f32>(0.024, 0.028, 0.033) * light, 1.0);
+    }
+    let look = cased_seeker_color(in.surface);
+    return vec4<f32>(look[0] * light + look[1], 1.0);
+}
+
+// A cased seeker's surface at `s` (`MissileOut::surface`): its base colour and the violet
+// light of its line work and charge (added unlit). Graphite in steel courses, as the
+// strategic warhead (nova.wgsl `nova_missile_color`): chevrons cut into the prow's facets,
+// a ring at its foot, seams down every other edge, and the charge seen through the tail.
+fn cased_seeker_color(s: vec3<f32>) -> array<vec3<f32>, 2> {
+    let graphite = vec3<f32>(0.03, 0.03, 0.034);
+    let steel = vec3<f32>(0.2, 0.205, 0.225);
+    let pulse = 0.85 + 0.15 * sin(globals.camera.w * 4.0 + s.x * 6.0);
+    let piece = u32(s.z + 0.5);
+    if piece == 2u {
+        // The tail: the charge, held, seen through it.
+        return array<vec3<f32>, 2>(graphite, SEEKER_VIOLET * 6.0 * pulse);
+    }
+    if piece == 3u {
+        // A fin: plate, its tip edge steel.
+        return array<vec3<f32>, 2>(select(graphite * 1.3, steel * 0.8, s.y > 0.85), vec3<f32>(0.0));
+    }
+    var base = graphite;
+    if s.x < -0.94 || (s.x > -0.36 && s.x < -0.3) || (s.x > 0.2 && s.x < 0.25) {
+        base = steel;
+    }
+    // Across one facet, 0 at its middle, 0.5 at its edges.
+    let d = abs(fract(s.y * 8.0 + 1e-3) - 0.5);
+    let w = 0.025;
+    var line = 0.0;
+    if piece == 1u {
+        // Along the prow, 0 at its foot to 1 at its point.
+        let t = (s.x - 0.4) / 0.6;
+        // A chevron on every facet, its point forward, and a smaller one ahead of it.
+        line = max(line, 1.0 - step(w * 1.6, abs(t - (0.42 - 0.5 * d))));
+        line = max(line, (1.0 - step(w * 1.6, abs(t - (0.7 - 0.3 * d)))) * step(d, 0.3));
+    } else {
+        // A ring at the prow's foot, and seams down every other edge running back from it.
+        line = max(line, 1.0 - step(w, abs(s.x - 0.34)));
+        let edge = (u32(floor(s.y * 8.0 + 0.5)) & 1u) == 0u;
+        line = max(line, step(0.46, d) * step(0.05, s.x) * step(s.x, 0.34) * select(0.0, 1.0, edge));
+    }
+    return array<vec3<f32>, 2>(base, SEEKER_VIOLET * line * 4.0 * pulse);
 }
 
 // fs_shot, seen through the water from under it (bindings.wgsl `under_sea_seen`).

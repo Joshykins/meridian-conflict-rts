@@ -9,8 +9,10 @@
 //!   `gravitic_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`, any plasma `missile`): a
 //!   lavender-white heart in a violet body in a faint shimmering lens, and behind it a black
 //!   smoke tube (`seeker_smoke`). Violet and black are how a Regency missile reads as one a
-//!   missile defence can take, apart from ARC's white smoke. Where it strikes the lens lets
-//!   go: it snaps in, then a hard
+//!   missile defence can take, apart from ARC's white smoke. A cased seeker (the Sower's,
+//!   `Weapon::cased_seeker`) is drawn as its faceted body instead (sprites.wgsl `vs_missile`),
+//!   its charge glowing violet at the tail, with the same smoke, launch and strike. Where it
+//!   strikes the lens lets go: it snaps in, then a hard
 //!   red burst over a white heart, filaments torn out, globs and spatter thrown out low, the
 //!   ground glassed under it; a heavy one's many times bigger, by its damage and `impact`.
 //! - **The counter-seeker** (missile defence, `SimEvent::MissileLased` from a faction that
@@ -23,7 +25,7 @@
 //! Presentation only; the renderer's own clock.
 
 use super::nuke_fx::PUFF_STRATEGIC_TRAIL;
-use super::regency_guns_fx::drawn_look;
+use super::regency_guns_fx::{cased_seeker, drawn_look};
 use super::Renderer;
 use crate::gpu_consts::{fade_beam, plasma_look, puff};
 use glam::Vec3;
@@ -417,27 +419,44 @@ impl Renderer {
     }
 
     /// The black smoke each seeker in flight lays down the stretch it flies this tick, each
-    /// piece lit as the charge passes it.
+    /// piece lit as the charge passes it. A cased seeker's leaves from its tail.
     fn seeker_trails(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         for p in projectiles {
-            if p.color & PROJECTILE_FADE_BEAM != 0 || drawn_look(p) != plasma_look::GRAVITIC_SEEKER
+            let cased = cased_seeker(p);
+            if p.color & PROJECTILE_FADE_BEAM != 0
+                || !(cased || drawn_look(p) == plasma_look::GRAVITIC_SEEKER)
             {
                 continue;
             }
+            let behind = if cased {
+                super::missile_half_length(p.size, p.aim[3])
+            } else {
+                p.size * 0.5
+            };
             let ends = ((p.color >> PROJECTILE_ENDS_SHIFT) & 0xFF) as f32 / 255.0;
             let span = if ends > 0.0 { ends } else { 1.0 };
             let starts = (p.color >> PROJECTILE_STARTS_SHIFT) as f32 / 255.0;
             let to = Vec3::from(p.pos);
             let from = Vec3::from(p.prev_pos).lerp(to, (starts / span).min(1.0));
-            self.seeker_smoke(from, to, time, starts, span, p.size);
+            self.seeker_smoke(from, to, time, starts, span, p.size, behind);
         }
     }
 
-    /// A seeker's smoke down `from` to `to`, flown from `starts` to `span` of the tick: the
-    /// missile's smoke tube (puffs.wgsl `strategic_trail`) in black, a little violet glow
-    /// where the charge has just passed, spreading and going grey as it hangs. Puffs a step
-    /// apart, each a tent a step either side, add up to an unbroken column.
-    fn seeker_smoke(&mut self, from: Vec3, to: Vec3, time: f32, starts: f32, span: f32, size: f32) {
+    /// A seeker's smoke down `from` to `to`, flown from `starts` to `span` of the tick, laid
+    /// `behind` metres back of where the charge is drawn: the missile's smoke tube
+    /// (puffs.wgsl `strategic_trail`) in black, a little violet glow where the charge has
+    /// just passed, spreading and going grey as it hangs. Puffs a step apart, each a tent a
+    /// step either side, add up to an unbroken column.
+    fn seeker_smoke(
+        &mut self,
+        from: Vec3,
+        to: Vec3,
+        time: f32,
+        starts: f32,
+        span: f32,
+        size: f32,
+        behind: f32,
+    ) {
         let tick = self.tick_seconds.max(0.02);
         let dir = (to - from).normalize_or_zero();
         let width = (0.8 + size * 0.35).min(2.6);
@@ -448,9 +467,8 @@ impl Renderer {
         // A deliberate cosmetic cap on one stretch: a tick's flight is far under this many.
         let n = (from.distance(to) / SMOKE_STEP).ceil().clamp(1.0, 8.0) as u32;
         let step = from.distance(to) / n as f32;
-        let behind = dir * size * 0.5;
         for k in 0..n {
-            let at = from.lerp(to, k as f32 / n as f32) - behind;
+            let at = from.lerp(to, k as f32 / n as f32) - dir * behind;
             let f1 = (k + 1) as f32 / n as f32;
             let start = time + tick * (starts + (span - starts).max(0.0) * f1);
             // Strength one, below zero for black smoke (`push_puff_with_motion`).

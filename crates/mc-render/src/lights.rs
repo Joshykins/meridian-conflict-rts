@@ -1081,6 +1081,18 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
         }
         // The motor's flame, behind the nose; a booster's is bigger, a skimmer's a little brighter.
         let back = (from - to).normalize_or_zero() * 1.5;
+        // A cased Gravitic Seeker (`mirror::plasma_look` in `_pad[0]` beside the missile bit):
+        // no flame, its charge glowing violet at the tail.
+        let look = ((p._pad[0] - 1.0) * 0.5).floor();
+        if p._pad[0] > 2.5 && look == crate::gpu_consts::plasma_look::GRAVITIC_SEEKER as f32 {
+            return Some(Glow {
+                from: from + back,
+                to: to + back,
+                color: Vec3::new(0.55, 0.1, 1.0) * 90.0,
+                range: 20.0,
+                line: false,
+            });
+        }
         let (gain, range) = if flags & PROJECTILE_APOGEE != 0 {
             (260.0, 40.0)
         } else if flags & PROJECTILE_SKIM != 0 {

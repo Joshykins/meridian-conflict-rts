@@ -138,6 +138,8 @@ pub struct Weapon {
     pub caliber: f32,
     /// A Regency plasma weapon's grade (`RawWeapon::plasma_grade`). Cosmetic. None: not plasma.
     pub plasma_grade: Option<PlasmaGrade>,
+    /// A Gravitic Seeker carried in a solid casing (`RawWeapon::cased`, `cased_seeker`).
+    pub cased: bool,
     /// How far a gun house on a capital hull may dip below its deck; zero: no limit.
     pub depression: Angle,
     /// How far a torso gun may swing off the torso, pitching on its own (`RawWeapon::sway`).
@@ -227,9 +229,16 @@ impl Weapon {
 
     /// A Gravitic Seeker: a missile whose plasma charge is held and steered in gravity
     /// containment. Drawn as its charge (`renderer::gravitic_fx`), never as a rocket: no
-    /// motor, plume or smoke.
+    /// motor, plume or white smoke.
     pub fn gravitic_seeker(&self) -> bool {
         self.missile && self.plasma_grade == Some(PlasmaGrade::Gravitic)
+    }
+
+    /// A Gravitic Seeker in a solid casing (`Weapon::cased`): its charge rides in a faceted
+    /// Regency body with violet line work, glowing violet at the tail, and it launches,
+    /// smokes and strikes as any seeker does.
+    pub fn cased_seeker(&self) -> bool {
+        self.gravitic_seeker() && self.cased
     }
 
     /// Whether a missile `age` ticks out flies with no motor burning: tossed out of its
@@ -287,8 +296,8 @@ mod tests {
 
     use crate::Blueprints;
 
-    /// The Regency's guns name their plasma grade, and nothing of ARC's does.
-    /// Cased cluster missiles select the solid missile renderer instead (docs/STYLE.md).
+    /// The Regency fires plasma (docs/STYLE.md, "The Regency suite"): every gun of theirs names
+    /// its grade, and nothing of ARC's does.
     #[test]
     fn only_the_regency_fires_plasma() {
         let bp =
@@ -301,7 +310,7 @@ mod tests {
                 regency_guns += usize::from(regency_gun);
                 assert_eq!(
                     w.plasma_grade.is_some(),
-                    regency_gun && !(w.missile && w.cluster.is_some()),
+                    regency_gun,
                     "{}: {}",
                     unit.key,
                     w.name

@@ -108,7 +108,7 @@
     "regency_t2_bombard": (
         lore: "A siege walker that raises the pod on its back and lobs seekers high over the field; ARC crews hear them break apart overhead before they see them.",
         weapons: {
-            "Heavy Gravitic Seeker": "A finned missile carrying six cased warheads, lobbed on a high arc; it opens over its mark and rains the smaller missiles down round it.",
+            "Heavy Gravitic Seeker": "A plasma charge in a gravity cage, carried in a faceted casing and lobbed on a high arc, that parts over its mark into six smaller cased charges and rains them down round it.",
         },
     ),
     "regency_t1_land_factory": (

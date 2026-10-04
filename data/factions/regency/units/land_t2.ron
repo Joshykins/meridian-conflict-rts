@@ -94,7 +94,7 @@
     // its back on a turning ring; it raises the pod to its launch angle and lobs a pair
     // of Heavy Gravitic Seekers on a high arc. Coming down over the target, each seeker
     // breaks into six sub-seekers (`cluster`) that fall over a disc round the mark, each
-    // with its own blast: cased cluster missiles with red warheads, poor against anything that
+    // with its own blast: cased seekers bursting in red plasma, poor against anything that
     // keeps moving.
     //
     // Balance against the Javelin (same cost, about the same health and damage a second):
@@ -129,9 +129,10 @@
             muzzles: [(2.0, -0.62, 6.2), (2.0, 0.62, 6.2)],
             spread: 1,
             targets: ["Structure", "Land", "Naval"], prefer: ["Structure"], color: Orange, red: 1.0,
-            // Cased missiles, not violet seeker orbs. The 0.44 m body and folded fins
-            // fit the launcher's 0.60 m mouth; the cluster pieces use smaller bodies.
-            missile: true, intercept: 240, caliber: 0.44,
+            // Seekers in solid casings (`cased`): a faceted body with violet line work and
+            // forward-swept fins that fit the launcher's 0.60 m mouth, black smoke behind.
+            // The cluster pieces are smaller casings.
+            missile: true, intercept: 240, caliber: 0.44, plasma_grade: Some(Gravitic), cased: true,
             flash: 1.0, impact: 1.6, shockwave: 0.0,
             sounds: (fire: "regency_seeker_launch", split: "regency_seeker_split", impact: "regency_seeker_hit", ground: "regency_seeker_hit"),
         )],

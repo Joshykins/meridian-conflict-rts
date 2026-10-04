@@ -426,12 +426,16 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     - **Gravitic Seeker Pod:** salvos.
     - **Gravitic Seeker Battery:** AA.
     - **Heavy Gravitic Seeker:** tactical and cruise strikes.
-      The Sower uses cased cluster missiles instead of the violet charge visual:
-      a dark finned body, pointed nose, orange-white motor flame and a pale exhaust trail.
-      Its 0.44 m body fits the pod's 0.60 m mouth. Lobbed high, it opens over
-      the mark into six smaller cased missiles (`Weapon::cluster`), with a
-      white flash, red sparks and a separate blast for each piece. This weapon
-      leaves `plasma_grade` unset to select the solid missile renderer.
+      The Sower's are cased (`cased: true`, `Weapon::cased_seeker`): the charge
+      rides in a solid body drawn as a small strategic warhead, eight graphite
+      facets in steel courses, a long faceted prow with violet chevrons, a
+      violet ring and seams, and four small fins swept forward on the
+      diagonals. The charge glows violet out of the tail in place of a motor
+      flame, and it lays the seekers' black smoke. Its 0.44 m body and fins fit
+      the pod's 0.60 m mouth. Lobbed high, it parts over the mark into six
+      smaller cased seekers (`Weapon::cluster`): a hard white heart in a red
+      flash and sparks, each piece striking as a seeker at the size of its
+      share.
     - **Gravitic Counter-seeker:** missile defence (a faction's
       `anti_missile_look: CounterSeeker`; ARC's is the laser). A small red
       charge thrown off the mount runs the missile down along a cooling

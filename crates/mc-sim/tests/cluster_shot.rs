@@ -186,8 +186,8 @@ fn missile_defence_takes_seekers_and_their_pieces() {
 }
 
 #[test]
-fn sower_draws_cased_missiles_and_smaller_cluster_pieces() {
-    use mc_sim::mirror::PROJECTILE_MISSILE;
+fn sower_draws_cased_seekers_and_smaller_cluster_pieces() {
+    use mc_sim::mirror::{PLASMA_LOOK_GRAVITIC_SEEKER, PROJECTILE_MISSILE};
     use mc_sim::RenderFrame;
 
     let mut w = world();
@@ -209,7 +209,12 @@ fn sower_draws_cased_missiles_and_smaller_cluster_pieces() {
         w.write_render_frame(None, &mut frame);
         for p in &frame.projectiles {
             assert_ne!(p.color & PROJECTILE_MISSILE, 0, "solid missile geometry");
-            assert_eq!(p._pad[0], 0.0, "no violet plasma orb");
+            // The seeker's look rides with the casing: violet line work, black smoke.
+            let look = ((p._pad[0] - 1.0) * 0.5).floor();
+            assert_eq!(
+                look, PLASMA_LOOK_GRAVITIC_SEEKER as f32,
+                "a gravitic seeker"
+            );
             assert_eq!(p.aim[3], p.prev_aim[3]);
             if (p.aim[3] - caliber).abs() < 0.0001 {
                 carrier = true;

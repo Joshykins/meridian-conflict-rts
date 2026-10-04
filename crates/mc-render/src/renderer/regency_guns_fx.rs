@@ -50,7 +50,7 @@
 
 use super::star_core_fx::{LAVENDER, ROSE, STAR};
 use super::{Puff, Renderer, PUFF_RING};
-use crate::gpu_consts::{fade_beam, puff};
+use crate::gpu_consts::{fade_beam, plasma_look, puff};
 use glam::Vec3;
 use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{
@@ -1025,6 +1025,14 @@ pub(super) fn drawn_look(p: &ProjectileInstance) -> u32 {
         return 0;
     }
     ((p._pad[0] - 1.0) * 0.5).floor() as u32
+}
+
+/// A Gravitic Seeker in a solid casing (`Weapon::cased_seeker`): a missile body that carries
+/// the seeker's look in `_pad[0]` as well (`mirror::plasma_look`; sprites.wgsl `cased_seeker`).
+pub(super) fn cased_seeker(p: &ProjectileInstance) -> bool {
+    p.color & PROJECTILE_MISSILE != 0
+        && p._pad[0] > 2.5
+        && ((p._pad[0] - 1.0) * 0.5).floor() as u32 == plasma_look::GRAVITIC_SEEKER
 }
 
 fn smooth(a: f32, b: f32, x: f32) -> f32 {
