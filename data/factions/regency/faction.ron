@@ -3,7 +3,7 @@
     // Replays, saves and network matches store the key.
     name: "The Regency",
     abbreviation: "Regency",
-    description: "An old empire of rival houses that has waited for a king since its first one died, and rules in his place. Its technology was learned from Precursor machines long before humanity found any. Ultra-mechanical war machines of graphite plate over darker workings, lit red; plasma bound by gravity, star cores, nanites that build, and shields.",
+    description: "An old empire of rival houses that has waited for a king since its first one died, and rules in his place. Its technology was learned from Precursor machines long before humanity found any. Ultra-mechanical war machines of black plate with a red iridescent sheen over dark graphite workings, lit red; plasma bound by gravity, star cores, nanites that build, and shields.",
     // Their own structures and engineer, but no fighting units yet: their factories turn out
     // the stand-in's until they have some. Structures are always their own (mc-data checks).
     stand_in: Some("Aster"),

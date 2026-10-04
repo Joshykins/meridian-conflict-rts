@@ -2,8 +2,8 @@
 // after surface.wgsl and metal.wgsl (it uses their noise, bands and scan) to shaders that contain the line
 // `//!use regency` (entity.wgsl).
 //
-// The Regency look is clean: broad satin plates whose facets each catch the light a
-// little differently, a lit edge where a face ends, and now and then one panel line
+// The Regency look is clean: broad black plates under a red iridescent film, whose
+// facets each catch the light a little differently, a lit edge where a face ends, and now and then one panel line
 // that follows the face's own outline (`surf_ember_line`, cut by surface.wgsl's
 // relief). Nothing is laid across the model regardless of its shape, and nothing on
 // the plate is lit: a Regency model's red is in the slots it is built with. The
@@ -15,9 +15,16 @@
 
 // The foundation strips' plate (foundations.wgsl): a dark warm graphite.
 const REG_GUNMETAL: vec3<f32> = vec3<f32>(0.047, 0.043, 0.038);
-// The plate as metal (its reflectance), and where it is worn bright.
-const REG_STEEL: vec3<f32> = vec3<f32>(0.12, 0.11, 0.097);
+// Where the plate is worn through its film to bright steel (and the foundation
+// strips' lit lips).
 const REG_STEEL_LIT: vec3<f32> = vec3<f32>(0.36, 0.34, 0.315);
+// The plate: near-black steel under a thin film. Seen square on it is black; as a
+// face turns away the film's sheen rises, and its hue cycles crimson, deep red,
+// copper and back with the angle, each facet started at its own point in the cycle.
+const REG_FILM_BLACK: vec3<f32> = vec3<f32>(0.03, 0.026, 0.024);
+const REG_FILM_RED: vec3<f32> = vec3<f32>(0.36, 0.018, 0.022);
+const REG_FILM_DEEP: vec3<f32> = vec3<f32>(0.2, 0.008, 0.016);
+const REG_FILM_COPPER: vec3<f32> = vec3<f32>(0.34, 0.075, 0.02);
 // The machinery under the plates: a darker graphite than the plate, darker still in
 // its grooves, and the lighter steel it polishes to where it is worked.
 const REG_WORKS: vec3<f32> = vec3<f32>(0.055, 0.051, 0.046);
@@ -314,9 +321,19 @@ fn regency_look(i: RegencyIn, works: bool) -> RegencyLook {
     return regency_plate(i);
 }
 
+// The film's colour at `cos_v` (the face's normal against the view).
+fn reg_film(cos_v: f32, seed: f32) -> vec3<f32> {
+    let off = 1.0 - saturate(cos_v);
+    let rise = smoothstep(0.3, 0.9, off);
+    // Ping-pong crimson -> deep red -> copper -> deep red -> crimson.
+    let h = abs(fract(off * 1.6 + seed * 0.8) * 2.0 - 1.0) * 2.0;
+    let hue = mix(mix(REG_FILM_RED, REG_FILM_DEEP, smoothstep(0.0, 1.0, h)), REG_FILM_COPPER, smoothstep(1.0, 2.0, h));
+    return mix(REG_FILM_BLACK, hue, rise);
+}
+
 // Regency colours over the shared palette's (`lum` keeps the model's own light and
 // shade): plate, the darker trim (`ACCENT`) and the dark graphite machinery (`METAL`).
-fn regency_paint(m_in: Pbr, works: bool, look: RegencyLook) -> Pbr {
+fn regency_paint(m_in: Pbr, works: bool, look: RegencyLook, cos_v: f32, seed: f32) -> Pbr {
     var m = m_in;
     let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
     if works {
@@ -325,13 +342,14 @@ fn regency_paint(m_in: Pbr, works: bool, look: RegencyLook) -> Pbr {
         m.metallic = 0.88;
         m.roughness = clamp(0.4 + look.rough - 0.18 * look.lift, 0.22, 0.6);
     } else {
-        // Bare dark steel, not paint: a metal, so its colour is what it reflects, and
-        // what makes it read as real is its sheen varying, smudged here, polished bright
-        // where it is worn, dull with grime in its seams.
+        // Steel under an iridescent film, not paint: a metal, so its colour is what it
+        // reflects, black seen square on and a crimson to copper sheen as it turns away; what makes it read as real is its
+        // sheen varying, smudged here, worn through to bright steel at its edges, dull
+        // with grime in its seams.
         let tone = look.tone * clamp(0.8 + lum, 0.8, 1.2);
-        m.albedo = mix(REG_STEEL * tone, REG_STEEL_LIT, saturate(look.lift) * 0.65);
-        m.metallic = 0.65;
-        m.roughness = clamp(0.55 + look.rough - 0.1 * saturate(look.lift), 0.3, 0.88);
+        m.albedo = mix(reg_film(cos_v, seed) * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
+        m.metallic = 0.85;
+        m.roughness = clamp(0.42 + look.rough - 0.1 * saturate(look.lift), 0.24, 0.8);
     }
     return m;
 }

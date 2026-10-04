@@ -179,11 +179,14 @@ without toes.
 
 ### Finish
 
-- **Warm graphite plating** (2026-10-02): steel a little warm of neutral, so the
-  blue sky it reflects never turns it blue.
+- **Black-red iridescent plating** (2026-10-03): near-black steel under a thin
+  film. A face seen square on is black; as it turns away a red sheen rises whose
+  hue cycles crimson, deep red and copper with the angle, each facet started at
+  its own point in the cycle (`reg_film`). No violet or blue in it: the user
+  turned down every purple-leaning version.
 - **Darker graphite machinery** (no bronze or gold since 2026-10-02) on the exposed
   workings under the plates: shafts, joints, cables, rings, polished lighter
-  where they are worked. From above a unit reads as graphite armour over darker
+  where they are worked. From above a unit reads as black armour over dark graphite
   workings.
 - **Red highlights:** lit slots, optics and weapon heat, built into the model.
   Nothing on the plate's texture is lit.
