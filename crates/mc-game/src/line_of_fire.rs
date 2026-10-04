@@ -21,7 +21,10 @@ fn needs_line(unit: &UnitBlueprint, weapon: &Weapon) -> bool {
     let flat = if weapon.torpedo {
         !weapon.intercepts
     } else {
-        weapon.trajectory == Trajectory::Direct && !weapon.guided
+        weapon.trajectory == Trajectory::Direct
+            && !weapon.guided
+            && weapon.curve.0 == 0
+            && weapon.cone.is_none()
     };
     flat && unit.motion.is_none_or(|m| m.layer != MoveLayer::Air)
 }

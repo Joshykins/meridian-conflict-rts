@@ -1,7 +1,7 @@
 //! Cone weapons (`Weapon::cone`, `wake.rs`): the Regency Wake's wake rolls out over the fan
 //! ahead of its projector and strikes every enemy in it as the front arrives, the nearer
-//! sooner and harder, and nothing outside the fan or past its reach; ground between the
-//! projector and a hull shields it.
+//! sooner and harder, and nothing outside the fan or past its reach; it rolls over the
+//! ground, so a hull behind a wall is no shelter.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -143,11 +143,11 @@ fn the_wake_rolls_out_over_its_fan() {
     let mut w = world(None, &[]);
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
     // Bulwarks: dead ahead at 88 m, 5 degrees off at 300 m, out of the fan (30 degrees
-    // off, in reach) and past its reach (460 m dead ahead).
+    // off, in reach) and past its reach (580 m dead ahead).
     let near = add(&mut w, "aster_t2_tank", 1, 600, 512, 180);
     let far = add(&mut w, "aster_t2_tank", 1, 811, 538, 180);
     let beside = add(&mut w, "aster_t2_tank", 1, 642, 587, 180);
-    let beyond = add(&mut w, "aster_t2_tank", 1, 972, 512, 180);
+    let beyond = add(&mut w, "aster_t2_tank", 1, 1092, 512, 180);
     let struck = first_wake(&mut w, &[near, far, beside, beyond]);
     let weapon = w
         .blueprints
@@ -174,22 +174,17 @@ fn the_wake_rolls_out_over_its_fan() {
 }
 
 #[test]
-fn ground_between_shields_a_unit_from_the_wake() {
-    // A 20 m wall beside the line to the open Bulwark (cells are 8 m): x 584-592, y 520-528.
-    let mut w = world(Some(((73, 74), (65, 66))), &[]);
+fn a_wall_between_is_no_shelter() {
+    // A 20 m wall across the line, 80 m east (cells are 8 m): x 592-600, y 496-528.
+    let mut w = world(Some(((74, 75), (62, 66))), &[]);
     add(&mut w, "regency_t3_wake_tank", 0, 512, 512, 0);
-    // In the open, 200 m dead east; behind the wall, 109 m off 6 degrees north of east
-    // (inside the fan).
-    let open = add(&mut w, "aster_t2_tank", 1, 712, 512, 180);
-    let hidden = add(&mut w, "aster_t2_tank", 1, 620, 524, 180);
-    let struck = first_wake(&mut w, &[open, hidden]);
+    // The only mark, 150 m dead east behind the wall: the projector fires on it unseen,
+    // and the wake rolls over the wall to it.
+    let hidden = add(&mut w, "aster_t2_tank", 1, 662, 512, 180);
+    let struck = first_wake(&mut w, &[hidden]);
     assert!(
         struck[0].is_some(),
-        "the Bulwark in the open was not struck"
-    );
-    assert_eq!(
-        struck[1], None,
-        "the wall did not shield the hidden Bulwark"
+        "the wake did not reach the Bulwark behind the wall"
     );
 }
 

@@ -5,7 +5,8 @@
 //! What is checked, and when:
 //! - Only guns that fly flat (`Trajectory::Direct`, not homing, not curving) on units
 //!   that are not aircraft. Shells that lob, missiles that climb and thrown charges that
-//!   curve go over hills; that is what they are for.
+//!   curve go over hills; that is what they are for. A cone's wake rolls over them
+//!   (`wake.rs`).
 //! - Torpedoes too, but only land that breaks the surface blocks them: they climb over a
 //!   mound under the water (`World::bed_climb`).
 //! - Every `CHECK_EVERY` ticks for a unit, spread over the rows, and at once when a gun
@@ -37,7 +38,10 @@ impl World {
             // Interceptors run at torpedoes, not at anything a unit is laid on.
             !weapon.intercepts
         } else {
-            weapon.trajectory == Trajectory::Direct && !weapon.guided && weapon.curve.0 == 0
+            weapon.trajectory == Trajectory::Direct
+                && !weapon.guided
+                && weapon.curve.0 == 0
+                && weapon.cone.is_none()
         };
         flat && self
             .bp(row)

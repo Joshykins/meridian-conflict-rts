@@ -88,17 +88,18 @@
     // with threads of cooling red light running out to it from the projector, that rolls
     // out along the ground faster than a man can run (120 m a second), and strikes
     // everything it rolls over (`cone`, `mc-sim` `wake.rs`; drawn by `wake_fx.rs` and
-    // wake_shell.wgsl), in a fan 22.5 degrees either side of the projector's line (a 45
+    // wake_shell.wgsl), in a fan 12.5 degrees either side of the projector's line (a 25
     // degree arc; `angle` may go up to 180, a full circle), full weight close in and two
     // fifths of it at the end of its reach. Once let go it rolls on by itself: what
-    // outruns it, or leaves the fan before it arrives, is missed. A wall between the
-    // projector and a unit shields it, and the wake never reaches aircraft or
-    // what is under the water. It scorches the ground it rolls over.
+    // outruns it, or leaves the fan before it arrives, is missed. It rolls over the
+    // ground, so it needs no line of fire: it is let go at what is behind a hill and
+    // reaches it. Shield domes still stop it, and it never reaches aircraft or what is
+    // under the water. It scorches the ground it rolls over.
     //
     // Balance: a line breaker that reaches out. HP and cost about 2.6 Bulwarks (the
-    // Arbalest's class); it outreaches a Bulwark (420 m to 360), but the front takes three
-    // and a half seconds to get there, so moving targets slip it at range and a column
-    // driving at it does not. Against one target it does three and a half Bulwarks'
+    // Arbalest's class); it outreaches a Bulwark by half again (540 m to 360), but the
+    // front takes four and a half seconds to get there, so moving targets slip it at
+    // range and a column driving at it does not. Against one target it does three and a half Bulwarks'
     // damage a second close in, falling to under one and a half at its edge; against a
     // column it strikes every hull down the fan. Hover, so it crosses water (the Regency's
     // lift; ARC's heavy tanks cannot), and slower than a Bulwark to pay for it.
@@ -118,8 +119,8 @@
         weapons: [(
             name: "Pinched-plasmeric Wake Projector",
             // Charged a second across the projector's mouth, then let go as one wake.
-            damage: 680, range: 420, reload: 2.6, hitscan: true, trajectory: Direct,
-            cone: (angle: 22.5, edge: 0.4, speed: 120),
+            damage: 680, range: 540, reload: 2.6, hitscan: true, trajectory: Direct,
+            cone: (angle: 12.5, edge: 0.4, speed: 120),
             turret_turn: 70, muzzle: (8.2, 0, 3.4), pivot: (1.4, 0, 3.4),
             targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
             plasma_grade: Some(Pinched),

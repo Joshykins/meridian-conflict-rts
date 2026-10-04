@@ -14,9 +14,9 @@
 //!   a half turn, a full circle round the gun. Each unit is struck once a wake.
 //! - **Falloff:** full damage at the muzzle, falling in a straight line with the distance
 //!   from it to `Cone::edge` of it at full range.
-//! - **Cover:** the wake rolls over the ground, so ground between the muzzle and a unit
-//!   shields it (`clear_from`, the line every direct-fire gun needs). A shield dome
-//!   between takes the hit for all it covers, once a wake, as a blast's is
+//! - **Cover:** the wake rolls over the ground, up hills and down, so the ground hides
+//!   nothing from it and the gun needs no line of fire (`World::needs_line`). A shield
+//!   dome between takes the hit for all it covers, once a wake, as a blast's is
 //!   (`blast_blocker`); a hull shield takes its own unit's share.
 //! - **The ground:** seared along the fan (stains) as the front passes, as a plasma
 //!   strike sears it, and the trees it passes over burn down.
@@ -154,11 +154,7 @@ impl World {
             let bp = self.bp(t);
             let (out, outside) = from_fan(units.pos[t] - from, dir, edge);
             // The front passed over its hull this tick, and its hull reaches into the fan.
-            if out + bp.radius < behind
-                || out - bp.radius > ahead
-                || outside > bp.radius
-                || !self.clear_from(wake.from, t)
-            {
+            if out + bp.radius < behind || out - bp.radius > ahead || outside > bp.radius {
                 continue;
             }
             let out = out.clamp(Fx::ZERO, range) / range;
