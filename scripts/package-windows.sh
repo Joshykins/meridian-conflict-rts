@@ -34,8 +34,10 @@ cp -u maps/*.mcmap "$wt/maps/"
 
 win_wt=$(wslpath -w "$wt")
 win_wt=${win_wt//\'/\'\'}
+# Not under %TEMP%: Storage Sense deletes old files there one by one, and cargo,
+# finding its fingerprints intact, then misses a build script's lost output.
 powershell.exe -NoProfile -Command "
-\$env:CARGO_TARGET_DIR = \"\$env:TEMP\\meridian-package-target\"
+\$env:CARGO_TARGET_DIR = \"\$env:LOCALAPPDATA\\meridian-package-target\"
 \$env:RUSTFLAGS = '-C target-feature=+crt-static'
 Set-Location '$win_wt'
 cargo build --release -p mc-game 2>&1 | ForEach-Object { \"\$_\" }
