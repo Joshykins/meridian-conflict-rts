@@ -378,6 +378,15 @@
     "regency_t3_mobile_reclaimer": (
         lore: "The largest of the line: a whole wreck comes apart into its strands while it passes.",
     ),
+    "regency_t1_reclaimer": (
+        lore: "A plated mast over a sealed vault, one nanite head at its crown. What its strands reach comes home down them and is melted into stock below.",
+    ),
+    "regency_t2_reclaimer": (
+        lore: "Two flank pylons rise beside the mast, each with a head of its own: three wrecks come apart at once.",
+    ),
+    "regency_t3_reclaimer": (
+        lore: "The vault deepened and the heads rewound for the longest pull the Regency fields; a battlefield empties into it.",
+    ),
     "regency_t3_assault_transport": (
         lore: "A vaulted cargo ark that sets an armoured force down beneath its swept shoulders, its broad ramp opening into a deep protected hold.", weapons: {},
     ),

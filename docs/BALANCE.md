@@ -222,6 +222,9 @@ replacing the mines.
   | Scavenger (tower, upgrades in place) | 1 | 120 | 6 | 640 | 20 s |
   | Scavenger II | 2 | 420 | 40 | 1,100 | 11 s |
   | Scavenger III | 3 | 1,700 | 200 | 1,700 | 9 s |
+  | Crucible, the Regency tower (upgrades in place; 1 head, then 3 from tech 2) | 1 | 130 | 7 | 560 | 19 s |
+  | Crucible II | 2 | 450 | 45 | 950 | 10 s |
+  | Crucible III | 3 | 1,800 | 220 | 1,450 | 8 s |
   | Gleaner, the ARC Reclaimer (hover: land and shallows, works while moving; upgrades in place) | 1 | 60 | 5 | 550 | 12 s |
   | Gleaner II | 2 | 240 | 20 | 800 | 12 s |
   | Gleaner III | 3 | 840 | 70 | 1,100 | 12 s |
@@ -229,7 +232,7 @@ replacing the mines.
   | Commander drone port (2 drones) | 2 | 450 | 10 | 1,400 | 45 s |
 - Materials Vault tiers hold 1,500 / 6,000 / 24,000 for 150 / 400 / 1,000 mass: storage gets cheaper per
   unit the higher the tier, so it never taxes a big economy. The Capacitor Bank costs 120 mass.
-- Economy structures (mines, vaults, Scavengers) upgrade only as far as the side's tech.
+- Economy structures (mines, vaults, Scavengers, Crucibles) upgrade only as far as the side's tech.
 - The HUD shows reclaim in the materials income and its share ("40% reclaim").
 
 ## Warships

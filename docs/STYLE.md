@@ -215,6 +215,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 |---|---|
 | Commander, engineer, scout | Exarch, Artificer, Outrider |
 | Reclaimer (T1 to T3, upgrades in place) | Breaker (II, III) |
+| Reclaim tower (T1 to T3, upgrades in place) | Crucible (II, III) |
 | Wake tank, assault tripod (T3) | Wake, Strider |
 | Battle scorpion (T4) | Harrow |
 | Raider, light tank, mobile anti-air (T1) | Marauder, Sledge, Brazier |

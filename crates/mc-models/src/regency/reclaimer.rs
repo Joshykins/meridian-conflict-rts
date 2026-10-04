@@ -281,7 +281,7 @@ fn pedestal(b: &mut MeshBuilder) {
 
 /// What turns but does not pitch: a bronze yaw collar and an armoured cheek either side of
 /// the trunnion.
-fn house(b: &mut MeshBuilder, p: Vec3) {
+pub(super) fn house(b: &mut MeshBuilder, p: Vec3) {
     metal(b);
     let sides = b.sides(12);
     b.prism(v3(p.x, 0.0, p.z - 0.62), sides, 0.72, 0.66, 0.2);
@@ -306,7 +306,7 @@ fn house(b: &mut MeshBuilder, p: Vec3) {
 /// The pitching head from its trunnion `p` to the lens's tip `tip`, built facing +x: a
 /// bronze trunnion drum, a keeled cowl, a swept plate down its back, red optics either
 /// side, a seam-dark collar, the bronze nozzle and the violet lens.
-fn head(b: &mut MeshBuilder, p: Vec3, tip: Vec3) {
+pub(super) fn head(b: &mut MeshBuilder, p: Vec3, tip: Vec3) {
     metal(b);
     let sides = b.sides(10);
     b.cylinder_between(p - Vec3::Y * 0.5, p + Vec3::Y * 0.5, 0.25, 0.25, sides);

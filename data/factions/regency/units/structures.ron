@@ -621,4 +621,64 @@
         economy: (energy_upkeep: 1000),
         mesh: "regency_eye", icon: Intel,
     ),
+    // The Crucible line: the Regency's reclaim tower, upgrading in place, tech 1 to 3. Its
+    // nanite heads shoot the faction's strands at a wreck and the matter rides home down
+    // them into the vault at its foot (beams.wgsl `BEAM_NANITE_RECLAIM`). Against ARC's
+    // Scavenger it pulls harder at a shorter reach, and from tech 2 it works three wrecks
+    // at once: two flank pylons each raise a head of their own beside the mast's
+    // (`models::regency::crucible`, whose `PIVOT`s and `EMIT_X`s these heads are).
+    (
+        key: "regency_t1_reclaimer",
+        name: "Crucible",
+        role: "Reclaim Tower", title: "Reclaim Tower",
+        tech: 1,
+        categories: ["Land", "Economy"],
+        health: 1400,
+        cost: (mass: 130, energy: 900, time: 260),
+        radius: 16.9, height: 28, footprint: (3, 3),
+        vision: 400,
+        reclaimer: (power: 7, range: 560, charge: 0.8, heads: [
+            (pivot: (0, 0, 25.5), emitter: (8.1, 0, 25.5), turn: 30, pitch: (-40, 80)),
+        ]),
+        upgrades_to: "regency_t2_reclaimer",
+        mesh: "regency_crucible", icon: Salvage,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "regency_t2_reclaimer",
+        name: "Crucible II",
+        role: "Reclaim Tower", title: "Reclaim Tower",
+        tech: 2,
+        categories: ["Land", "Economy"],
+        health: 3600,
+        cost: (mass: 450, energy: 3300, time: 820),
+        radius: 16.9, height: 28, footprint: (3, 3),
+        vision: 600,
+        reclaimer: (power: 45, range: 950, charge: 0.8, heads: [
+            (pivot: (0, 0, 25.5), emitter: (8.1, 0, 25.5), turn: 36, pitch: (-40, 80)),
+            (pivot: (0, 12.6, 15), emitter: (5.72, 12.6, 15), turn: 36, pitch: (-50, 80)),
+            (pivot: (0, -12.6, 15), emitter: (5.72, -12.6, 15), turn: 36, pitch: (-50, 80)),
+        ]),
+        upgrades_to: "regency_t3_reclaimer",
+        mesh: "regency_crucible", icon: Salvage,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        key: "regency_t3_reclaimer",
+        name: "Crucible III",
+        role: "Reclaim Tower", title: "Reclaim Tower",
+        tech: 3,
+        categories: ["Land", "Economy"],
+        health: 10000,
+        cost: (mass: 1800, energy: 10500, time: 1650),
+        radius: 16.9, height: 28, footprint: (3, 3),
+        vision: 900,
+        reclaimer: (power: 220, range: 1450, charge: 0.8, heads: [
+            (pivot: (0, 0, 25.5), emitter: (8.1, 0, 25.5), turn: 45, pitch: (-40, 80)),
+            (pivot: (0, 12.6, 15), emitter: (5.72, 12.6, 15), turn: 45, pitch: (-50, 80)),
+            (pivot: (0, -12.6, 15), emitter: (5.72, -12.6, 15), turn: 45, pitch: (-50, 80)),
+        ]),
+        mesh: "regency_crucible", icon: Salvage,
+        sounds: (death: "blast_large"),
+    ),
 ]

@@ -281,8 +281,8 @@ Playable: a land war with the Aster faction (commander, three engineer tiers, ni
 nineteen structures across three tech tiers), flow economy, construction and assisting, factories
 with queues and standing orders (move, attack-move, patrol, attack, assist, guard, ground fire: every unit
 made takes them, and a factory still going up takes both its queue and its orders), in-place upgrades, reclaim (wrecks, your own units, enemies; idle engineers
-clear the wrecks within their reach while there is room for the mass, and so does the Scavenger reclaim
-tower (tech 1 to 3) over a much wider one, though its head is slow to aim and has to charge before the beam comes on;
+clear the wrecks within their reach while there is room for the mass, and so do the reclaim
+towers, ARC's Scavenger and the Regency Crucible (tech 1 to 3), over a much wider one, though their heads are slow to aim and have to charge before the beam comes on;
 the Reclaimer (the Gleaner and the Regency Breaker, a hover salvager on land and shallows, tech 1 to 3, upgraded in place like the engineer and
 built by every factory up to its tier) clears what it passes while it moves;
 nothing reclaims a live unit without an order, and a builder that carries weapons

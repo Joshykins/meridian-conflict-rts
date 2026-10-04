@@ -132,3 +132,23 @@ fn factories_make_a_cheap_salvager_while_wrecks_lie_about_and_idle_ones_go_to_th
         [crate::Command::Move { target, .. }] if target.distance(FxVec2::from_ints(930, 930)) < Fx::from_int(100)
     ));
 }
+
+/// The Regency's builders put up the Crucible, their own tower: the tech 1 one, the first in
+/// every list, which upgrades in place.
+#[test]
+fn a_regency_builder_puts_up_its_own_tower() {
+    let mut w = world();
+    for builder in [
+        "regency_t1_engineer",
+        "regency_t2_engineer",
+        "regency_t3_engineer",
+    ] {
+        let row = spawn(&mut w, builder, 320, 320);
+        let pick = w.pick_reclaimer(row).expect(builder);
+        assert_eq!(
+            w.blueprints.unit(pick).key,
+            "regency_t1_reclaimer",
+            "{builder}"
+        );
+    }
+}

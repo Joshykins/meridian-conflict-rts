@@ -19,6 +19,7 @@ mod brood;
 mod chassis;
 mod commander;
 mod condenser;
+mod crucible;
 mod cyst;
 mod engineer;
 mod eye;
@@ -172,6 +173,12 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(13.9, 26.0), (13.9, 26.0), (13.9, 32.0)],
         ward::ward,
     ),
+    // The reclaim tower (`crucible`): tech 1 to 3 in place, as tall at every tier.
+    ModelDef::tiered(
+        "regency_crucible",
+        [(crucible::RADIUS, crucible::HEIGHT); 3],
+        crucible::crucible,
+    ),
     // Radar (`eye`).
     ModelDef::tiered(
         "regency_eye",
@@ -234,6 +241,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_heart_2" => 6000,
         "regency_heart_3" => 9000,
         "regency_eye" => 7000,
+        "regency_crucible" => crucible::TRIANGLES,
         "regency_scout" => 3000,
         // The tech 1 line: a few hundred of each in a battle.
         "regency_raider" => 2600,
