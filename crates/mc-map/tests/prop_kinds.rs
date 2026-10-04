@@ -63,6 +63,31 @@ fn every_kind() -> Vec<PropKind> {
         DamPylon,
         DamTown,
         DamSpan,
+        CityHouse,
+        CityRowhouses,
+        CityShops,
+        CityFarmstead,
+        CityWarehouse,
+        CityFactory,
+        CityTankFarm,
+        CityTenement,
+        CityCourtyard,
+        CityApartments,
+        CityOffice,
+        CityHighrise,
+        CitySkyscraper,
+        CitySpire,
+        CitySlab,
+        CityCivic,
+        CityStation,
+        CityGarage,
+        CityMall,
+        CityChurch,
+        CityRuin,
+        CityWall,
+        CityWallTower,
+        CityGate,
+        CityRubble,
     ];
     for kind in &all {
         match kind {
@@ -76,7 +101,12 @@ fn every_kind() -> Vec<PropKind> {
             | PrecursorForge | PrecursorCradle | PrecursorHeart | PrecursorHalo
             | PrecursorMonolith | PrecursorSeaGate | PrecursorPlatform | PrecursorGate
             | PrecursorNeedle | PrecursorRampart | PrecursorFloor | PrecursorSeaway
-            | PrecursorCitadel | Dam | DamSwitchyard | DamPylon | DamTown | DamSpan => {}
+            | PrecursorCitadel | Dam | DamSwitchyard | DamPylon | DamTown | DamSpan | CityHouse
+            | CityRowhouses | CityShops | CityFarmstead | CityWarehouse | CityFactory
+            | CityTankFarm | CityTenement | CityCourtyard | CityApartments | CityOffice
+            | CityHighrise | CitySkyscraper | CitySpire | CitySlab | CityCivic | CityStation
+            | CityGarage | CityMall | CityChurch | CityRuin | CityWall | CityWallTower
+            | CityGate | CityRubble => {}
         }
     }
     all

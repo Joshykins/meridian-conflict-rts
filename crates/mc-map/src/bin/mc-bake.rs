@@ -382,7 +382,7 @@ fn write_preview(map: &MapFile, path: &Path) -> std::io::Result<()> {
     for Prop { kind, pos, .. } in map.props() {
         if kind.is_tree() {
             dot(*pos, 0, [30, 80, 40]);
-        } else if kind.is_building() {
+        } else if kind.is_building() || kind.is_city() {
             dot(*pos, 0, [70, 70, 80]);
         }
     }

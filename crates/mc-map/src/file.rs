@@ -488,6 +488,7 @@ mod tests {
             pos: FxVec2::from_ints(x, y),
             heading: Angle(77),
             scale_milli: 1100,
+            wear_milli: 0,
         };
         // Deliberately not in tile order: the writer sorts.
         let props = vec![

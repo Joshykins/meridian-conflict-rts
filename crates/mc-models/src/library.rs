@@ -440,6 +440,10 @@ pub fn prop_model_key(kind_raw: u16) -> &'static str {
         82 => "landmark_pylon",
         83 => "landmark_town",
         84 => "landmark_span",
+        96..=127 => match mc_map::PropKind::from_raw(kind_raw).and_then(mc_map::city::structure) {
+            Some(structure) => structure.model,
+            None => "building_small",
+        },
 
         _ => "building_small",
     }

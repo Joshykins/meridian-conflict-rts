@@ -14,6 +14,7 @@
 //! The file layout is documented in [`mod@format`].
 
 pub mod bake;
+pub mod city;
 pub mod file;
 pub mod format;
 pub mod heightfield;

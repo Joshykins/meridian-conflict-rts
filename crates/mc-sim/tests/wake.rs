@@ -46,6 +46,7 @@ fn world(wall: Option<((usize, usize), (usize, usize))>, trees: &[(i32, i32)]) -
                 pos: FxVec2::from_ints(x, y),
                 heading: Angle::ZERO,
                 scale_milli: 1000,
+                wear_milli: 0,
             })
             .collect(),
     };

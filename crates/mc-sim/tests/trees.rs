@@ -16,6 +16,7 @@ fn tree(x: i32, y: i32) -> Prop {
         pos: FxVec2::from_ints(x, y),
         heading: Angle::ZERO,
         scale_milli: 1000,
+        wear_milli: 0,
     }
 }
 

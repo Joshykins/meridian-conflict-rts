@@ -424,6 +424,7 @@ impl Terrain {
                 ),
                 heading: Angle(heading),
                 scale_milli: (s.scale * 1_000.0).round().clamp(100.0, 65_000.0) as u16,
+                wear_milli: 0,
             });
         }
     }

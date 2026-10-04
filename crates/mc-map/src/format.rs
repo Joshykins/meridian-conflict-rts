@@ -69,8 +69,9 @@
 //!   and residuals are bit-packed LSB-first in blocks of 64 as `width u8` plus
 //!   `ceil(n * width / 8)` bytes. Lossless; roughly halves natural terrain.
 //!
-//! Prop record: `kind u16, scale u16 (thousandths), heading u16 (Angle), pad
-//! u16, x i64, y i64`.
+//! Prop record: `kind u16, scale u16 (thousandths), heading u16 (Angle), wear
+//! u16 (a city structure's damage before the match, thousandths; zero in older
+//! files, where it was padding), x i64, y i64`.
 //!
 //! The content id hashes the decoded content (grid parameters, every tile's
 //! samples, overview, props, markers), not the file bytes, so it survives a
@@ -296,10 +297,62 @@ pub enum PropKind {
     /// clamps on along +x to the next tower's, pitched to meet that tower's
     /// ground ([`PropKind::span`]). Overhead only.
     DamSpan = 84,
+    /// The city kit (`crate::city`): structures that block the ground, take
+    /// hits and come down (`city::structure` holds their numbers).
+    /// A detached house on a garden plot, pitched roof; 16 by 12 m.
+    CityHouse = 96,
+    /// A terrace of four houses; 40 by 12 m.
+    CityRowhouses = 97,
+    /// A two-storey row of shops under flats; 44 by 18 m.
+    CityShops = 98,
+    /// A barn and its silo.
+    CityFarmstead = 99,
+    /// A sawtooth-roofed warehouse; 64 by 36 m.
+    CityWarehouse = 100,
+    /// A works hall and its stack.
+    CityFactory = 101,
+    /// Four fuel tanks in their bund.
+    CityTankFarm = 102,
+    /// A six-storey block on a street front; 48 by 16 m.
+    CityTenement = 103,
+    /// A perimeter block round a courtyard; 72 m square.
+    CityCourtyard = 104,
+    /// A fourteen-storey slab of flats.
+    CityApartments = 105,
+    /// A twelve-storey office block, glass bands.
+    CityOffice = 106,
+    /// A glass tower on a podium; 132 m.
+    CityHighrise = 107,
+    /// A setback glass skyscraper on a podium; 212 m.
+    CitySkyscraper = 108,
+    /// A supertall with a crown; 320 m. A handful per city.
+    CitySpire = 109,
+    /// A glass slab tower; 110 m.
+    CitySlab = 110,
+    /// A stone hall of government under a dome.
+    CityCivic = 111,
+    /// A railway station under an arched glass roof.
+    CityStation = 112,
+    /// A multi-storey car park.
+    CityGarage = 113,
+    /// A mall under glass roofs.
+    CityMall = 114,
+    /// A church, its tower at the west end (-x).
+    CityChurch = 115,
+    /// A gutted shell of a block, burnt out before the match.
+    CityRuin = 116,
+    /// A 64 m run of the city's wall along x (`city::WALL_SEGMENT_M`).
+    CityWall = 117,
+    /// A tower on the wall.
+    CityWallTower = 118,
+    /// A gatehouse over a road along x: two towers and a bridge between.
+    CityGate = 119,
+    /// A heap of rubble: walked over, never hit.
+    CityRubble = 120,
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 53] = [
+    pub const ALL: [PropKind; 78] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -353,6 +406,31 @@ impl PropKind {
         PropKind::DamPylon,
         PropKind::DamTown,
         PropKind::DamSpan,
+        PropKind::CityHouse,
+        PropKind::CityRowhouses,
+        PropKind::CityShops,
+        PropKind::CityFarmstead,
+        PropKind::CityWarehouse,
+        PropKind::CityFactory,
+        PropKind::CityTankFarm,
+        PropKind::CityTenement,
+        PropKind::CityCourtyard,
+        PropKind::CityApartments,
+        PropKind::CityOffice,
+        PropKind::CityHighrise,
+        PropKind::CitySkyscraper,
+        PropKind::CitySpire,
+        PropKind::CitySlab,
+        PropKind::CityCivic,
+        PropKind::CityStation,
+        PropKind::CityGarage,
+        PropKind::CityMall,
+        PropKind::CityChurch,
+        PropKind::CityRuin,
+        PropKind::CityWall,
+        PropKind::CityWallTower,
+        PropKind::CityGate,
+        PropKind::CityRubble,
     ];
 
     pub fn from_raw(raw: u16) -> Option<PropKind> {
@@ -387,6 +465,13 @@ impl PropKind {
     #[inline]
     pub fn is_landmark(self) -> bool {
         (80..96).contains(&(self as u16))
+    }
+
+    /// The city kit: blocks, towers and the wall, which take hits and come
+    /// down (`crate::city`).
+    #[inline]
+    pub fn is_city(self) -> bool {
+        (96..128).contains(&(self as u16))
     }
 
     /// A span of wires strung along +x from its origin to the next tower,
@@ -477,7 +562,10 @@ impl PropKind {
                 (0, -65, 4, 4),
             ],
 
-            _ => &[],
+            _ => match crate::city::structure(self) {
+                Some(structure) => structure.plan,
+                None => &[],
+            },
         }
     }
 }
@@ -547,6 +635,9 @@ pub struct Prop {
     pub heading: Angle,
     /// Uniform scale in thousandths; 1000 is the model's authored size.
     pub scale_milli: u16,
+    /// A city structure's damage before the match, thousandths of its
+    /// health (`crate::city`); 0 for everything else.
+    pub wear_milli: u16,
 }
 
 /// Wreckage a map starts with: salvage from fighting before the match. It is
@@ -840,7 +931,10 @@ pub(crate) fn content_id(
     h.write_u64(props.len() as u64);
     for p in props {
         h.write_u64(
-            p.kind.raw() as u64 | (p.heading.0 as u64) << 16 | (p.scale_milli as u64) << 32,
+            p.kind.raw() as u64
+                | (p.heading.0 as u64) << 16
+                | (p.scale_milli as u64) << 32
+                | (p.wear_milli as u64) << 48,
         );
         h.write_i64(p.pos.x.0);
         h.write_i64(p.pos.y.0);
@@ -1010,13 +1104,17 @@ pub(crate) fn parse_prop(r: &mut Reader<'_>) -> Result<Prop, MapError> {
     let kind = PropKind::from_raw(r.u16()?).ok_or(MapError::Corrupt("unknown prop kind"))?;
     let scale_milli = r.u16()?;
     let heading = Angle(r.u16()?);
-    r.u16()?;
+    let wear_milli = r.u16()?;
+    if wear_milli > 1000 {
+        return Err(MapError::Corrupt("prop wear over 1000"));
+    }
     let pos = FxVec2::new(Fx(r.i64()?), Fx(r.i64()?));
     Ok(Prop {
         kind,
         pos,
         heading,
         scale_milli,
+        wear_milli,
     })
 }
 
@@ -1294,7 +1392,8 @@ mod tests {
                     + k.is_rock() as u8
                     + k.is_building() as u8
                     + k.is_precursor() as u8
-                    + k.is_landmark() as u8,
+                    + k.is_landmark() as u8
+                    + k.is_city() as u8,
                 1
             );
         }

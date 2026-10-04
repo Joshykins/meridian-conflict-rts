@@ -242,7 +242,7 @@ impl MapWriter {
             buf.extend_from_slice(&p.kind.raw().to_le_bytes());
             buf.extend_from_slice(&p.scale_milli.to_le_bytes());
             buf.extend_from_slice(&p.heading.0.to_le_bytes());
-            buf.extend_from_slice(&0u16.to_le_bytes());
+            buf.extend_from_slice(&p.wear_milli.to_le_bytes());
             buf.extend_from_slice(&p.pos.x.0.to_le_bytes());
             buf.extend_from_slice(&p.pos.y.0.to_le_bytes());
         }

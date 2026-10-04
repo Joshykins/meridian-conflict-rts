@@ -691,6 +691,7 @@ mod tests {
                     } else {
                         700 + (col * 97 % 600) as u16
                     },
+                    wear_milli: 0,
                 });
             }
         }
@@ -709,6 +710,7 @@ mod tests {
                 pos: FxVec2::new(fx(v[0]), fx(v[1])),
                 heading: Angle(0),
                 scale_milli: 1000,
+                wear_milli: 0,
             });
         }
         let out = env("LINEUP_OUT");

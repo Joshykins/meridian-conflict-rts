@@ -278,6 +278,7 @@ impl Terrain {
                     pos: FxVec2::new(Fx((x * 65536.0) as i64), Fx((y * 65536.0) as i64)),
                     heading: Angle((hash >> 8) as u16),
                     scale_milli: scale,
+                    wear_milli: 0,
                 });
             }
         }
@@ -310,6 +311,7 @@ impl Terrain {
                     pos: FxVec2::new(Fx((x * 65536.0) as i64), Fx((y * 65536.0) as i64)),
                     heading: Angle((hash >> 8) as u16),
                     scale_milli: (scale as u16).min(1500),
+                    wear_milli: 0,
                 });
             }
         }
@@ -352,6 +354,7 @@ impl Terrain {
                         // Square to the street grid, facing any of the four ways.
                         heading: Angle(heading.wrapping_add(((hash >> 50) as u16 & 3) << 14)),
                         scale_milli: 850 + ((hash >> 32) % 400) as u16,
+                        wear_milli: 0,
                     });
                 }
             }

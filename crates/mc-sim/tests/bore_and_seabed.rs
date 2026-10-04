@@ -359,6 +359,7 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
                 pos: FxVec2::from_ints(x, 512),
                 heading: Angle::ZERO,
                 scale_milli: 1000,
+                wear_milli: 0,
             });
         }
         let on_path = terrain_map.props.len();
@@ -367,6 +368,7 @@ fn both_bores_burn_the_whole_tree_corridor_without_harming_off_path_props() {
             pos: FxVec2::from_ints(500, 550),
             heading: Angle::ZERO,
             scale_milli: 1000,
+            wear_milli: 0,
         });
         let terrain = Heightfield::flat(256, 256, Fx::from_int(20));
         let mut w = World::with_terrain(
