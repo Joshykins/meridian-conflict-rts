@@ -1297,7 +1297,7 @@ pub fn screenshot(
     Ok(())
 }
 
-fn shoot(
+pub(crate) fn shoot(
     renderer: &mut Renderer,
     camera: &mc_render::Camera,
     time: f32,

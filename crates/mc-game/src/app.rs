@@ -19,7 +19,7 @@ use crate::ui::front::{Front, FrontEvent};
 use crate::ui::lineup::ReadAhead;
 use crate::ui::menu::Telemetry;
 use crate::ui::setup::MatchRequest;
-use crate::ui::{self, Key, Ui};
+use crate::ui::{self, Ui};
 use crate::window_chrome;
 use glam::Vec2;
 use mc_data::Blueprints;
@@ -30,9 +30,8 @@ use mc_sim::RenderFrame;
 use std::sync::Arc;
 use std::time::Instant;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, MouseButton, WindowEvent};
+use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::{Fullscreen, Window, WindowId};
 
@@ -551,67 +550,7 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // The interface's view of the input, whatever the stage.
-        match &event {
-            WindowEvent::MouseWheel { delta, .. } => {
-                self.input.scroll += match delta {
-                    winit::event::MouseScrollDelta::LineDelta(_, y) => *y,
-                    winit::event::MouseScrollDelta::PixelDelta(p) => p.y as f32 / 40.0,
-                };
-            }
-            WindowEvent::CursorMoved { position, .. } => {
-                self.input.cursor = Vec2::new(position.x as f32, position.y as f32)
-            }
-            WindowEvent::MouseInput {
-                state,
-                button: MouseButton::Left,
-                ..
-            } => {
-                self.input.down = *state == ElementState::Pressed;
-                self.input.pressed |= self.input.down;
-                self.input.released |= !self.input.down;
-            }
-            WindowEvent::MouseInput {
-                state: ElementState::Pressed,
-                button: MouseButton::Right,
-                ..
-            } => self.input.right_pressed = true,
-            WindowEvent::ModifiersChanged(m) => {
-                let m = m.state();
-                // Ctrl+Alt is AltGr on European layouts: that types characters.
-                self.input.command = (m.control_key() && !m.alt_key()) || m.super_key();
-            }
-            WindowEvent::KeyboardInput { event: key, .. } if key.state == ElementState::Pressed => {
-                if let PhysicalKey::Code(code) = key.physical_key {
-                    let mapped = match code {
-                        KeyCode::KeyA if self.input.command => Some(Key::SelectAll),
-                        KeyCode::KeyC if self.input.command => Some(Key::Copy),
-                        KeyCode::KeyX if self.input.command => Some(Key::Cut),
-                        KeyCode::KeyV if self.input.command => Some(Key::Paste),
-                        KeyCode::ArrowUp | KeyCode::KeyW => Some(Key::Up),
-                        KeyCode::ArrowDown | KeyCode::KeyS => Some(Key::Down),
-                        KeyCode::ArrowLeft => Some(Key::Left),
-                        KeyCode::ArrowRight => Some(Key::Right),
-                        KeyCode::Enter | KeyCode::NumpadEnter => Some(Key::Enter),
-                        KeyCode::Escape => Some(Key::Escape),
-                        KeyCode::Backspace => Some(Key::Backspace),
-                        KeyCode::Tab => Some(Key::Tab),
-                        _ => None,
-                    };
-                    // W and S steer menus only while nothing is being typed.
-                    let letter = matches!(code, KeyCode::KeyW | KeyCode::KeyS);
-                    if let Some(k) = mapped.filter(|_| !(letter && self.memory.editing.is_some())) {
-                        if !key.repeat || k == Key::Backspace {
-                            self.input.keys.push(k);
-                        }
-                    }
-                }
-                // A shortcut types nothing, whatever text the platform attaches to it.
-                if let Some(text) = key.text.as_ref().filter(|_| !self.input.command) {
-                    self.input.typed.push_str(text);
-                }
-            }
-            _ => {}
-        }
+        self.input.feed(&event, self.memory.editing.is_some());
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),

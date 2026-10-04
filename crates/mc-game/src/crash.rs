@@ -30,6 +30,8 @@ mod dialog;
 mod drill;
 #[cfg(windows)]
 mod native;
+mod reporter;
+mod screen;
 mod session;
 #[cfg(windows)]
 mod stack;
@@ -41,6 +43,8 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub use drill::{arm as arm_drill, tick as drill_tick, Drill};
+pub(crate) use reporter::{run as run_screen, screenshot as screen_shot};
+pub(crate) use screen::Summary;
 pub use session::LogTee;
 
 /// Keeps this many reports of each kind; older ones are deleted when a new one is
@@ -159,6 +163,48 @@ impl Drop for FatalGuard {
     }
 }
 
+/// Shows a failure: the crash screen, a process of its own; or, when that cannot
+/// come up (or the report could not be saved for it to read), the task dialog.
+fn present(shown: &dialog::Shown<'_>) {
+    if let Some(path) = shown.path {
+        let summary = Summary {
+            title: shown.title.to_owned(),
+            message: shown.message.to_owned(),
+            hint: shown.hint.map(str::to_owned),
+            path: path.to_owned(),
+        };
+        if reporter::launch(&summary) {
+            return;
+        }
+    }
+    dialog::show(shown);
+}
+
+/// Shows `path` in the system's file browser: selected in Explorer on Windows,
+/// its folder elsewhere.
+fn open_folder(path: &Path) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Explorer reads `/select,` and the quoted path as one argument, which the
+        // standard quoting would split.
+        let _ = std::process::Command::new("explorer.exe")
+            .raw_arg(format!("/select,\"{}\"", path.display()))
+            .spawn();
+    }
+    #[cfg(not(windows))]
+    {
+        let opener = if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
+        if let Some(dir) = path.parent() {
+            let _ = std::process::Command::new(opener).arg(dir).spawn();
+        }
+    }
+}
+
 /// Shows the panic this thread raised last (or, if none was kept, the last one).
 fn show_panic() {
     let me = std::thread::current().id();
@@ -176,12 +222,14 @@ fn show_panic() {
     if !claim_window() {
         return;
     }
-    dialog::show(&dialog::Shown {
+    present(&dialog::Shown {
         heading: "Meridian Conflict crashed",
+        title: "The game crashed",
         content: &format!(
             "Something went wrong inside the game and it had to close.\n\n{}",
             clip(&message, 600)
         ),
+        message: &message,
         hint: None,
         report: &report,
         path: path.as_deref(),
@@ -209,9 +257,11 @@ pub fn report_error(message: &str) {
         "The graphics driver reset the GPU. Updating the graphics driver usually fixes \
          this; if not, please send us the details.",
     );
-    dialog::show(&dialog::Shown {
+    present(&dialog::Shown {
         heading: "Meridian Conflict had to stop",
+        title: "The game had to stop",
         content: &clip(message, 1200),
+        message,
         hint,
         report: &report,
         path: path.as_deref(),
@@ -249,7 +299,7 @@ fn panic_report(info: &std::panic::PanicHookInfo<'_>) -> Panicked {
         "Meridian Conflict {} crashed\n{}\nthread: {name}\n{info}\n\nbacktrace:\n{}\n",
         env!("MERIDIAN_BUILD"),
         system_line(),
-        std::backtrace::Backtrace::force_capture(),
+        from_the_panic(&std::backtrace::Backtrace::force_capture().to_string()),
     );
     #[cfg(windows)]
     report.push_str(&format!("stack:\n{}\n", stack::here()));
@@ -264,6 +314,52 @@ fn panic_report(info: &std::panic::PanicHookInfo<'_>) -> Panicked {
         message,
         path,
         report,
+    }
+}
+
+/// A backtrace from where the panic was raised: the frames of the capture and
+/// of the panic machinery above it (the hook, `panic_fmt`) are cut, so the
+/// first frame is the code that panicked. Unchanged when the machinery is not
+/// found (a symbol-less build prints `<unknown>` for every frame).
+fn from_the_panic(trace: &str) -> String {
+    // Frames start "  N: name"; their "at file:line" lines follow.
+    let starts: Vec<(usize, &str)> = trace
+        .match_indices('\n')
+        .map(|(i, _)| i + 1)
+        .chain([0])
+        .filter_map(|at| {
+            let line = trace[at..].lines().next()?;
+            let (n, name) = line.trim_start().split_once(": ")?;
+            n.parse::<u32>().ok().map(|_| (at, name))
+        })
+        .collect();
+    // The run of frames that raise a panic, from the hook down to `panic_fmt`
+    // and the `unwrap`/`expect` that called it. Only the first run is cut: a
+    // `catch_unwind` further down the stack is the game's own.
+    const MACHINERY: [&str; 7] = [
+        "std::panicking::",
+        "core::panicking::",
+        "rust_begin_unwind",
+        "std::sys::backtrace::__rust_end_short_backtrace",
+        "core::option::unwrap_failed",
+        "core::option::expect_failed",
+        "core::result::unwrap_failed",
+    ];
+    let raising = |name: &str| MACHINERY.iter().any(|m| name.starts_with(m));
+    let last = starts
+        .iter()
+        .position(|(_, name)| raising(name))
+        .map(|first| {
+            first
+                + starts[first..]
+                    .iter()
+                    .take_while(|(_, name)| raising(name))
+                    .count()
+                - 1
+        });
+    match last.and_then(|i| starts.get(i + 1)) {
+        Some(&(at, _)) => trace[at..].to_owned(),
+        None => trace.to_owned(),
     }
 }
 
@@ -375,6 +471,20 @@ mod tests {
             ]
         );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_backtrace_starts_where_the_panic_was_raised() {
+        let trace = "   0: std::backtrace::Backtrace::create\n             at backtrace.rs:331\n   1: meridian::crash::panic_report\n   2: std::panicking::panic_handler\n   3: std::sys::backtrace::__rust_end_short_backtrace<x>\n  10: core::panicking::panic_fmt\n             at panicking.rs:80\n  11: meridian::game::tick\n             at game.rs:12\n  12: std::panicking::catch_unwind\n  13: main\n";
+        let trimmed = from_the_panic(trace);
+        assert!(
+            trimmed.starts_with("  11: meridian::game::tick"),
+            "{trimmed}"
+        );
+        assert!(trimmed.contains("  13: main"));
+        // A trace without the machinery is kept whole.
+        let bare = "   0: <unknown>\n   1: <unknown>\n";
+        assert_eq!(from_the_panic(bare), bare);
     }
 
     #[test]

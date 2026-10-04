@@ -2,8 +2,10 @@
 //! graphics driver, which no panic hook sees and which otherwise closes the game
 //! without a word. The unhandled-exception filter writes `crash-<secs>.log` and a
 //! minidump (`crash-<secs>.dmp`, every thread's stack; open it in Visual Studio
-//! or WinDbg beside the build's `.pdb`), shows the crash window, and lets Windows
-//! end the process as it would have.
+//! or WinDbg beside the build's `.pdb`) and shows the crash screen. A player's
+//! run then ends at once, so its window goes and the crash screen is left on its
+//! own: handed on to Windows Error Reporting, the frozen game stays on screen,
+//! over the crash screen, for as long as that takes. A tool run is handed on.
 
 use std::ffi::c_void;
 use std::os::windows::io::AsRawHandle;
@@ -50,6 +52,7 @@ extern "system" {
     fn GetProcAddress(module: isize, name: *const u8) -> *const c_void;
     fn GetCurrentProcess() -> isize;
     fn GetCurrentProcessId() -> u32;
+    fn TerminateProcess(process: isize, code: u32) -> i32;
     fn GetCurrentThreadId() -> u32;
 }
 
@@ -104,15 +107,19 @@ unsafe extern "system" fn filter(pointers: *const ExceptionPointers) -> i32 {
         super::session::note(&format!("crash report written to {}", path.display()));
     }
     if super::claim_window() {
-        super::dialog::show(&super::dialog::Shown {
+        super::present(&super::dialog::Shown {
             heading: "Meridian Conflict crashed",
+            title: "The game crashed",
             content: &format!(
                 "The game hit a fault it could not recover from and has to close.\n\n{what}"
             ),
+            message: &what,
             hint: driver_hint(&what),
             report: &report,
             path: path.as_deref(),
         });
+        // SAFETY: ends this process, with the fault's code; nothing runs after it.
+        unsafe { TerminateProcess(GetCurrentProcess(), record.code) };
     }
     CONTINUE_SEARCH
 }

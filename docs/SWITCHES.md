@@ -62,13 +62,17 @@ Whatever ends the game badly is written beside the settings file (`%APPDATA%\mer
 on Windows, `~/.config/meridian-conflict` elsewhere; `crates/mc-game/src/crash.rs`): a panic or
 native fault to `crash-<unix secs>.log` (a native fault also to `crash-<secs>.dmp`, a minidump
 for Visual Studio or WinDbg with the build's `.pdb`), an error to `error-<secs>.log`. A
-player's run (no arguments, or one that opens the window) also shows the crash window, with
-Copy details and Open folder, and writes its whole log to `meridian.log` (the run before it:
-`meridian-previous.log`). Tool runs (headless shots, the shot server, bots) write the reports
-and never wait on a window.
+player's run (no arguments, or one that opens the window) also shows the crash screen, and
+writes its whole log to `meridian.log` (the run before it: `meridian-previous.log`). The crash
+screen is the game's own interface in a process of its own (the game started again with
+`--crash-screen`; `crates/mc-game/src/crash/screen.rs`): what happened, the report, and Copy
+details, Open folder, Restart and Quit. When it cannot come up, a system task dialog with Copy
+details and Open folder stands in. Tool runs (headless shots, the shot server, bots) write the
+reports and never wait on a window.
 
 | Switch | Values | Purpose |
 |---|---|---|
+| `--crash-screen FILE` | a report's path, then `--crash-title T`, `--crash-message M`, `--crash-hint H` | The crash screen for a saved report, as a crashed run starts it. With `--screenshot OUT.png` it is drawn headless (at `--size`, `--cursor` hovering), and `OUT-copied.png` just after Copy details. |
 | `--crash-test` | `panic`, `sim`, `native`, `error` | Fail on purpose 8 s after start, to check the crash window over the running game: a panic on the main thread, a panic on a thread the game needs (as the sim thread is), an access violation (Windows), an error that ends the game. |
 
 ## AI probes and tournaments

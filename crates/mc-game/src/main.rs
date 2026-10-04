@@ -171,6 +171,9 @@ straight into a match instead.
   --cursor X,Y           with --ui: where the pointer is, in pixels
   --smoke                open the front end, play a default skirmish for a few seconds, return
                          to the front end and exit: an unattended check of every stage change
+  --crash-screen FILE    the crash screen for a saved report, as a crashed run starts it (with
+                         --crash-title T, --crash-message M, --crash-hint H); with
+                         --screenshot OUT.png: drawn headless, and OUT-copied.png after Copy details
   --crash-test KIND      fail on purpose 8 s in, to check the crash window: panic (main
                          thread) | sim (a thread the game needs) | native (an access
                          violation, Windows) | error (an error that ends the game)
@@ -241,6 +244,7 @@ fn run() -> Result<(), String> {
     let mut cursor: Option<[f32; 2]> = None;
     let mut smoke = false;
     let mut crash_test = None;
+    let mut crash_screen: Option<crash::Summary> = None;
     let mut dump_sounds: Option<String> = None;
     let mut select: Option<String> = None;
     let mut paused = false;
@@ -386,6 +390,16 @@ fn run() -> Result<(), String> {
             "--alpha" => alpha = value("--alpha")?.parse::<f32>().map_err(|_| "--alpha takes a number from 0 to 1")?.clamp(0.0, 1.0),
             "--smoke" => smoke = true,
             "--dump-sounds" => dump_sounds = Some(value("--dump-sounds")?),
+            "--crash-screen" => crash_screen = Some(crash::Summary { path: value("--crash-screen")?.into(), title: "The game crashed".into(), message: String::new(), hint: None }),
+            "--crash-title" | "--crash-message" | "--crash-hint" => {
+                let text = value(&arg)?;
+                let s = crash_screen.as_mut().ok_or("--crash-title, --crash-message and --crash-hint go after --crash-screen")?;
+                match arg.as_str() {
+                    "--crash-title" => s.title = text,
+                    "--crash-message" => s.message = text,
+                    _ => s.hint = Some(text),
+                }
+            }
             "--crash-test" => crash_test = Some(crash::Drill::parse(&value("--crash-test")?).ok_or("--crash-test takes panic, sim, native or error")?),
             "--dump-cursors" => {
                 let (rgba, width, height) = pointer::sheet(2.0);
@@ -397,6 +411,11 @@ fn run() -> Result<(), String> {
             }
             other => return Err(format!("unknown option {other}\n\n{USAGE}")),
         }
+    }
+
+    // The crash screen needs no data: it comes up when the data is what broke.
+    if let Some(summary) = crash_screen.take_if(|_| shot.is_none()) {
+        return crash::run_screen(summary);
     }
 
     if let Some(key) = &unit_shot_key {
@@ -451,6 +470,13 @@ fn run() -> Result<(), String> {
             .ok_or("--ui draws a screenshot: give it --screenshot FILE.png")?;
         (shot.width, shot.height) = size;
         return headless::ui_screenshot(screen, blueprints, pool, ticks, &shot, cursor);
+    }
+    if let Some(summary) = crash_screen {
+        let mut shot = shot
+            .take()
+            .ok_or("--crash-screen draws in a window, or with --screenshot FILE.png")?;
+        (shot.width, shot.height) = size;
+        return crash::screen_shot(summary, blueprints, pool, &shot, cursor);
     }
     if let Some(drill) = crash_test {
         crash::arm_drill(drill);

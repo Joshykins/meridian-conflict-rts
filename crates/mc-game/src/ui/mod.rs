@@ -17,6 +17,7 @@ pub mod emblem;
 pub mod faction;
 pub mod front;
 pub mod history;
+mod input;
 pub mod lineup;
 pub mod maps;
 pub mod menu;

@@ -7,10 +7,14 @@
 use std::path::Path;
 
 pub(super) struct Shown<'a> {
-    /// The window's large first line.
+    /// The task dialog's large first line.
     pub heading: &'a str,
-    /// What happened.
+    /// The crash screen's headline.
+    pub title: &'a str,
+    /// What happened, for the task dialog.
     pub content: &'a str,
+    /// What went wrong, bare, for the crash screen.
+    pub message: &'a str,
     /// What the player can do about it, when we know.
     pub hint: Option<&'a str>,
     /// The whole report, for Copy details.
@@ -277,22 +281,12 @@ mod windows {
             }
             BUTTON_CLICKED if wparam as i32 == OPEN_FOLDER => {
                 if let Some(path) = state.path {
-                    open_folder(path);
+                    crate::crash::open_folder(path);
                 }
                 KEEP_OPEN
             }
             _ => 0,
         }
-    }
-
-    /// Explorer, with the report selected.
-    fn open_folder(path: &Path) {
-        use std::os::windows::process::CommandExt;
-        // Explorer reads `/select,` and the quoted path as one argument, which the
-        // standard quoting would split.
-        let _ = std::process::Command::new("explorer.exe")
-            .raw_arg(format!("/select,\"{}\"", path.display()))
-            .spawn();
     }
 
     /// The fallback: a message box. Its text can be copied with Ctrl+C, which it
