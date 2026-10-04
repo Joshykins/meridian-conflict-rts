@@ -32,6 +32,13 @@ Off the lines, measured the same way:
   up and spread over the ground targets within 900 m. Shorter reach than the Fulgur's
   AEB-2 and nothing against aircraft. Raised on a lot by Artificer IIIs or the Exarch's
   Engineering Suite III.
+- Breacher (T4 assault walker, 3800 mass): 72000 health plus a 16000 hull field, about 2000
+  dps from its two gatling-breach cannons at full spin (300 a shot, 0.3 s) and 430 from the
+  thermobaric launchers (32 rockets of 240 every 18 s), so about 3.9 per unit of mass, a little
+  over the 1.3x a tier 3 rule: it has to close to 600 m (the Fulgur stands off at 1500).
+  Each rocket also leaves 16 s of burning ground (40 a second to each enemy in it), which a
+  clump standing in the field pays for many times. Raised on a lot by Mason IIIs like the
+  Fulgur; it carries nothing for the air.
 
 - Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 mass) assembles warheads
   of 6000 mass / 120000 energy in about 300 s at its own power (60), holds 2, and each does

@@ -9,6 +9,7 @@ use super::{
     MeshLod, Model, LOD_COUNT,
 };
 
+mod breacher;
 mod cells;
 
 /// The blueprints in `data/factions/aster/units/*.ron` that matter to a model.
@@ -906,6 +907,10 @@ fn lods_reduce_and_respect_budgets() {
             // rails in a rotary cluster, the AEB-3, rocket pods, two flak turrets, and the
             // deck gear that tells its size.
             30000
+        } else if model.key == "breacher" {
+            // The tech 4 Breacher: a 54 m walker, two rigged legs, two six-barrel arm guns
+            // with their drums, two sixteen-cell rocket launchers and layered plating.
+            14000
         } else if model.key == "citadel" {
             // The tech 3 rail keep: a 4x4 lot, corner towers, a casemate and a 54 m rail.
             4200
@@ -3049,7 +3054,11 @@ fn marlin_and_manta_hulls() {
 }
 
 /// Nearest distance from `p` to the triangles of `mesh` whose first vertex passes `keep`.
-fn nearest_where(mesh: &MeshLod, p: Vec3, keep: impl Fn(&super::MeshVertex) -> bool) -> f32 {
+pub(super) fn nearest_where(
+    mesh: &MeshLod,
+    p: Vec3,
+    keep: impl Fn(&super::MeshVertex) -> bool,
+) -> f32 {
     mesh.indices
         .chunks(3)
         .filter(|t| keep(&mesh.vertices[t[0] as usize]))

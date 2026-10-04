@@ -9,7 +9,9 @@
 //!
 //! Guns of one name that cover other arcs (a capital ship's turrets on the bow, the stern
 //! and each flank) are separate guns: held back, one on the far side of the hull would sit
-//! through a charge it can never fire.
+//! through a charge it can never fire. So are rotary guns (the Breacher's arms): each
+//! keeps its own spin and fires as its own barrels come to the top (`Weapon::rotary`), and
+//! held back on every shot of the other, the later would never fire at all.
 
 use mc_data::Weapon;
 
@@ -20,9 +22,13 @@ fn stagger(weapon: &Weapon) -> u16 {
     weapon.reload_ticks / 2 + 1
 }
 
-/// Whether `a` and `b` are twins: one gun's name, covering the same arc.
+/// Whether `a` and `b` are twins: one gun's name, covering the same arc, neither rotary.
 fn twins(a: &Weapon, b: &Weapon) -> bool {
-    a.name == b.name && a.facing == b.facing && a.half_arc == b.half_arc
+    a.name == b.name
+        && a.facing == b.facing
+        && a.half_arc == b.half_arc
+        && a.spin_ticks == 0
+        && b.spin_ticks == 0
 }
 
 impl World {

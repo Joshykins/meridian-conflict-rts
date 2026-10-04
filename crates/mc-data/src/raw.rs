@@ -1226,6 +1226,10 @@ pub struct WeaponSounds {
     pub charge_time: f64,
     /// A rotary gun's barrels starting to turn (`spin_up`): heard as the spin-up begins.
     pub spin: Option<String>,
+    /// A rotary gun's barrels turning: a loop that rises with their speed.
+    pub whir: Option<String>,
+    /// A rotary gun's barrels coasting down with nothing left to shoot.
+    pub spindown: Option<String>,
     /// A held beam's loop (`beam`), heard while it fires in place of `fire`.
     pub hold: Option<String>,
     /// The hit as heard from far across the map, late by the distance: only for the
@@ -1556,9 +1560,16 @@ impl Unit {
             None => None,
         };
 
-        let mut weapons = Vec::with_capacity(self.weapons.len());
+        let mut weapons: Vec<Weapon> = Vec::with_capacity(self.weapons.len());
         for w in &self.weapons {
             let ctx = format!("{key}/{}", w.name);
+            let rotary = weapons.iter().filter(|w| w.spin_ticks > 0).count();
+            if w.spin_up > 0.0 && rotary >= crate::ROTARY_SLOTS {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a unit spins up at most {} rotary guns",
+                    crate::ROTARY_SLOTS
+                )));
+            }
             if w.loft > 0.0 && w.trajectory != Trajectory::Ballistic {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: loft is only for ballistic weapons"
@@ -1768,6 +1779,7 @@ impl Unit {
                 mount: w.mount,
                 slant: w.slant,
                 spin_ticks: ticks(w.spin_up).clamp(0, 600) as u16,
+                rotary: if w.spin_up > 0.0 { rotary as u8 } else { 0 },
                 spin_ramp: (w.spin_ramp.clamp(0.0, 20.0) * 100.0).round() as u16,
                 barrels: if w.spin_up > 0.0 {
                     w.barrels.min(12)

@@ -69,6 +69,73 @@
         sounds: (death: "blast_colossal", moving: "tracks_colossal"),
     ),
     (
+        // A hunched assault walker on reverse knees, built to close in where the Fulgur
+        // stands off: a gatling-breach cannon for each forearm, each laying on a mark of its
+        // own a little off where the torso points, and two thermobaric rocket launchers in
+        // the hump on its back that set the ground in front of it alight. A hull field over
+        // its plates; nothing for the air.
+        key: "aster_t4_breacher",
+        name: "Breacher",
+        role: "Assault Walker",
+        tech: 4,
+        categories: ["Land", "DirectFire", "Experimental"],
+        health: 72000,
+        cost: (mass: 3800, energy: 38000, time: 22000),
+        radius: 24, height: 54,
+        footprint: (6, 6),
+        vision: 1000,
+        shield: (kind: Hull, health: 16000, regen: 110),
+        economy: (energy_upkeep: 300),
+        motion: (layer: Land, size: 5, speed: 14, accel: 7, turn: 40),
+        weapons: [
+            (
+                // The hump's launchers: sixteen cells each, raked steeply over the head, the
+                // whole load rippled out in under two seconds and scattered wide over the
+                // ground ahead. Each rocket bursts as a fuel-air charge and leaves the ground
+                // burning where it fell. Listed first: the launchers ride the torso, so the
+                // torso's aim is theirs, and the arms after them each swing off it on their
+                // own (`sway`).
+                name: "Thermobaric Rocket Pods",
+                damage: 240, splash: 36, range_min: 150, range: 900, reload: 18.0, salvo: 32, salvo_delay: 0.05, speed: 220, trajectory: Ballistic, rake: 20, loft: 2,
+                turret_turn: 40, pivot: (0, 0, 40), muzzle: (-7, 5.2, 50),
+                // The model's `pods::mouths`, the left launcher's then the right's in turn.
+                muzzles: [(-5.05, 2.8, 48.6), (-5.05, -2.8, 48.6), (-5.05, 4.4, 48.6), (-5.05, -4.4, 48.6), (-5.05, 6, 48.6), (-5.05, -6, 48.6), (-5.05, 7.6, 48.6), (-5.05, -7.6, 48.6),
+                          (-6.35, 2.8, 49.53), (-6.35, -2.8, 49.53), (-6.35, 4.4, 49.53), (-6.35, -4.4, 49.53), (-6.35, 6, 49.53), (-6.35, -6, 49.53), (-6.35, 7.6, 49.53), (-6.35, -7.6, 49.53),
+                          (-7.65, 2.8, 50.47), (-7.65, -2.8, 50.47), (-7.65, 4.4, 50.47), (-7.65, -4.4, 50.47), (-7.65, 6, 50.47), (-7.65, -6, 50.47), (-7.65, 7.6, 50.47), (-7.65, -7.6, 50.47),
+                          (-8.95, 2.8, 51.4), (-8.95, -2.8, 51.4), (-8.95, 4.4, 51.4), (-8.95, -4.4, 51.4), (-8.95, 6, 51.4), (-8.95, -6, 51.4), (-8.95, 7.6, 51.4), (-8.95, -7.6, 51.4)],
+                targets: ["Land", "Naval", "Structure"], color: Orange, missile: true,
+                intercept: 60, spread: 9, trail: true, wake: 3, tracer: 2, flash: 0.8, impact: 3.5, shockwave: 2.0,
+                caliber: 1.1,
+                burn: 16, burn_dps: 40,
+                sounds: (fire: "breacher_rockets", impact: "fire_bomb"),
+            ),
+            (
+                // Right forearm. Six barrels turn in the cluster, the Tempest cut down to an arm:
+                // it opens fire a third of the way into its spin-up and comes up to a heavy
+                // stream of shells (`spin_ramp`), each shot seen as three (`rounds`).
+                name: "Gatling-Breach Cannon",
+                damage: 300, splash: 10, range: 600, reload: 0.3, speed: 900, trajectory: Direct,
+                turret_turn: 50, pivot: (0, 0, 40), muzzle: (35.5, -17.5, 24), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
+                barrels: 6, sway: 40, rounds: 3, casings: 22,
+                targets: ["Land", "Naval", "Structure"], color: Orange,
+                flash: 1.6, impact: 1.8, shockwave: 0.8, tracer: 0.8,
+                sounds: (fire: "breacher_gatling_fire", spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
+            ),
+            (
+                // Left forearm, the right's mirror.
+                name: "Gatling-Breach Cannon",
+                damage: 300, splash: 10, range: 600, reload: 0.3, speed: 900, trajectory: Direct,
+                turret_turn: 50, pivot: (0, 0, 40), muzzle: (35.5, 17.5, 24), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
+                barrels: 6, sway: 40, rounds: 3, casings: 22,
+                targets: ["Land", "Naval", "Structure"], color: Orange,
+                flash: 1.6, impact: 1.8, shockwave: 0.8, tracer: 0.8,
+                sounds: (fire: "breacher_gatling_fire", spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
+            ),
+        ],
+        mesh: "breacher", icon: Titan,
+        sounds: (death: "blast_colossal", moving: "breacher_walk", step: "breacher_step"),
+    ),
+    (
         // The first tier 5: a two-legged siege walker nearly five hundred metres tall, raised
         // on a lot of its own like the Fulgur. It strides straight over structures and slopes
         // rather than round them, and wades any sea on the maps with the water below its
@@ -141,7 +208,7 @@
                 // off on its own: it comes down like a falling girder, crushing what it lands
                 // on, lies there a while and sinks away. It is worth nothing.
                 sabot: (port: (40, -178.4, 300), throw: (0, -0.83, 0.56), kick: 18, damage: 1500, splash: 24, casing: "aster_t5_titan_sabot"),
-                sounds: (fire: "titan_gatling_fire", spin: "titan_gatling_spin", impact: "titan_shell_hit", ground: "titan_shell_hit", casing: "titan_casing_land"),
+                sounds: (fire: "titan_gatling_fire", spin: "titan_gatling_spin", whir: "titan_gatling_whir", spindown: "titan_gatling_spindown", impact: "titan_shell_hit", ground: "titan_shell_hit", casing: "titan_casing_land"),
             ),
             (
                 // Left arm. An argon tracer too fast to see, then the whole charge down its

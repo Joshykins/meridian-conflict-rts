@@ -4376,7 +4376,7 @@ impl Game {
                     spin_recoil: [0.0; 4],
                     fx: [0.0; 4],
                     drive_swing: [0.0; 2],
-                    _pad3: [0.0; 2],
+                    twin_spin: [0.0; 2],
                 });
             }
         }
@@ -4459,7 +4459,7 @@ impl Game {
                         spin_recoil: [0.0; 4],
                         fx: [0.0; 4],
                         drive_swing: [0.0; 2],
-                        _pad3: [0.0; 2],
+                        twin_spin: [0.0; 2],
                     });
                 }
             }
@@ -4888,7 +4888,7 @@ mod tests {
             spin_recoil: [0.0; 4],
             fx: [0.0; 4],
             drive_swing: [0.0; 2],
-            _pad3: [0.0; 2],
+            twin_spin: [0.0; 2],
         }
     }
 

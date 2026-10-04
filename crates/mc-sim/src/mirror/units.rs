@@ -168,9 +168,11 @@ impl World {
         let (recoil, prev_recoil) = match bp.weapons.get(main) {
             // A held beam never kicks: it fires every tick, and a kick a tick shook the
             // gun at ten a second. Its "recoil" is how braced it is, this tick and last.
-            Some(w) if w.beam => {
-                beam_brace(w, s.units.spin[row], s.units.weapon_cooldown[row][main])
-            }
+            Some(w) if w.beam => beam_brace(
+                w,
+                s.units.spin[row][w.rotary as usize],
+                s.units.weapon_cooldown[row][main],
+            ),
             w => barrel_recoil_pair(
                 s.units.weapon_cooldown[row][main],
                 w.map(|w| w.reload_ticks).unwrap_or(0),
@@ -182,16 +184,17 @@ impl World {
             barrel_recoil_pair(s.units.weapon_cooldown[row][w], bp.weapons[w].reload_ticks)
         });
         let house = self.house_pose(row, mounted.or(twin.map(|t| t.0)), houses);
-        let spin = bp
-            .weapons
-            .iter()
-            .find(|w| w.spin_ticks > 0)
-            .map_or([0.0; 2], |_| {
-                let [_, turn, step, _] = s.units.spin[row];
-                let step = step as f32;
-                let now = turn as f32 * (std::f32::consts::TAU / 65536.0);
-                [now - step * (std::f32::consts::TAU / 65536.0), now]
-            });
+        // Each rotary gun's barrels, by its slot (`Weapon::rotary`): turned last tick and this.
+        let spin = |slot: usize| {
+            if bp.weapons.iter().filter(|w| w.spin_ticks > 0).count() <= slot {
+                return [0.0; 2];
+            }
+            let [_, turn, step, _] = s.units.spin[row][slot];
+            let step = step as f32 * (std::f32::consts::TAU / 65536.0);
+            let now = turn as f32 * (std::f32::consts::TAU / 65536.0);
+            [now - step, now]
+        };
+        let (spin, twin_spin) = (spin(0), spin(1));
         let (weld, weld_first, weld_count) = weld_on_unit(pass.weld_range, pass.welds, weld_id)
             .or_else(|| weld_on_unit(pass.weld_range, pass.welds, s.units.id(row).0))
             .unwrap_or(([0.0; 3], 0, 0));
@@ -358,7 +361,7 @@ impl World {
             spin_recoil: [spin[0], spin[1], prev_mount_kick, mount_kick],
             fx: warp_fx,
             drive_swing: [0.0; 2],
-            _pad3: [0.0; 2],
+            twin_spin,
         })
     }
 

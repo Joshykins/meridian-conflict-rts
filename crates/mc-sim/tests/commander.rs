@@ -996,7 +996,7 @@ fn the_vulcan_spins_up_before_it_fires() {
         first as u16 + 2 >= spin,
         "fired after {first} ticks, before spinning up ({spin})"
     );
-    assert_eq!(w.state.units.spin[row][0], spin);
+    assert_eq!(w.state.units.spin[row][0][0], spin);
 }
 
 #[test]

@@ -173,7 +173,8 @@ struct Entity {
     fx: vec4<f32>,
     // A spacecraft's drive nozzles, swung last tick and this (radians; renderer capital_fx.rs).
     drive_swing: vec2<f32>,
-    _pad3: vec2<f32>,
+    // The second rotary gun's barrels, turned last tick and this (`spin_recoil.xy` is the first's).
+    twin_spin: vec2<f32>,
 }
 
 // One per blueprint / prop kind.

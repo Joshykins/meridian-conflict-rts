@@ -18,6 +18,7 @@ mod aircraft_crash;
 mod atoll;
 mod battle;
 mod bore_and_seabed;
+mod breacher;
 mod broadside;
 mod build_line;
 mod citadel;

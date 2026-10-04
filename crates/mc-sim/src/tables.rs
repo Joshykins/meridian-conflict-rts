@@ -6,7 +6,7 @@ pub use crate::slots::Handle;
 use crate::slots::{put, Slots};
 use crate::{SimError, Table};
 use mc_core::{Angle, Fx, FxVec2, FxVec3, StateHasher};
-use mc_data::{BlueprintId, MAX_WEAPONS};
+use mc_data::{BlueprintId, MAX_WEAPONS, ROTARY_SLOTS};
 
 /// Pitch slots per unit: the gun arm, the build arm, then one for each weapon that is a
 /// mount of its own (`Weapon::mount`), at `2 + w`.
@@ -186,11 +186,11 @@ pub struct Units {
     /// weapon `w`'s own turret when it is a mount (`Weapon::mount`).
     pub arm_pitch: Vec<[Angle; ARM_SLOTS]>,
     pub prev_arm_pitch: Vec<[Angle; ARM_SLOTS]>,
-    /// A rotary gun (`Weapon::spin_ticks`, the first one on the unit): how far spun up,
-    /// in ticks, the barrels' turn (angle steps, wrapping), how far they turned on the
+    /// Each rotary gun (`Weapon::spin_ticks`), by its slot (`Weapon::rotary`): how far spun
+    /// up, in ticks, the barrels' turn (angle steps, wrapping), how far they turned on the
     /// last tick, and how far spun up it was the tick before (so the presentation can
     /// ease a held beam's brace in and out between ticks).
-    pub spin: Vec<[u16; 4]>,
+    pub spin: Vec<[[u16; 4]; ROTARY_SLOTS]>,
     /// A sweeping gun (`Weapon::sweep`) is mid-stream: it has fired and its barrels are
     /// still at speed, so it keeps firing down the barrel as it swings to its next mark.
     pub streaming: Vec<bool>,
@@ -418,7 +418,7 @@ impl Units {
         put(&mut self.prev_weapon_yaw, row, [Angle::ZERO; MAX_WEAPONS]);
         put(&mut self.arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
         put(&mut self.prev_arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
-        put(&mut self.spin, row, [0; 4]);
+        put(&mut self.spin, row, [[0; 4]; ROTARY_SLOTS]);
         put(&mut self.streaming, row, false);
         put(&mut self.gait, row, 0);
         put(&mut self.gait_step, row, [0; 2]);
@@ -535,13 +535,10 @@ impl Units {
             h.write_u64((7..ARM_SLOTS).fold(0u64, |acc, s| {
                 acc | (self.arm_pitch[row][s].0 as u64) << ((s - 7) * 16)
             }));
-            h.write_u64(
-                self.spin[row][0] as u64
-                    | (self.spin[row][1] as u64) << 16
-                    | (self.streaming[row] as u64) << 32
-                    | (self.shot_blocked[row] as u64) << 40,
-            );
-            h.write_u64(self.spin[row][2] as u64 | (self.spin[row][3] as u64) << 16);
+            h.write_u64((self.streaming[row] as u64) | (self.shot_blocked[row] as u64) << 8);
+            for spin in &self.spin[row] {
+                h.write_u64(spin.iter().fold(0u64, |acc, &n| acc << 16 | n as u64));
+            }
             h.write_i64(self.reclaimed[row].0);
             h.write_i64(self.shield_hp[row].0);
             h.write_u64(

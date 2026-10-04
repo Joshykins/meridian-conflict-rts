@@ -91,6 +91,13 @@
             "Rotary AA Gun": "A rotary gun on the engine deck, turned aft and raised to the sky to guard the tank's back.",
         },
     ),
+    "aster_t4_breacher": (
+        lore: "Where the Fulgur stands off, the Breacher walks in. Its crews call the ground behind it the kiln.",
+        weapons: {
+            "Gatling-Breach Cannon": "Six heavy barrels turning on each forearm, each arm laying on a mark of its own.",
+            "Thermobaric Rocket Pods": "Two launchers in the hump on its back, rippled out over the ground ahead; every rocket bursts as a fuel-air charge and leaves it burning.",
+        },
+    ),
     "aster_t5_titan": (
         lore: "Nothing on Meridia stops a Behemoth. It walks over what it cannot be bothered to walk round, and the ground remembers every step.",
         weapons: {

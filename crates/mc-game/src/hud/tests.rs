@@ -69,7 +69,7 @@ impl Rig {
             spin_recoil: [0.0; 4],
             fx: [0.0; 4],
             drive_swing: [0.0; 2],
-            _pad3: [0.0; 2],
+            twin_spin: [0.0; 2],
         });
         view.index_of.insert(7, 0);
         view.selection = vec![7].into();

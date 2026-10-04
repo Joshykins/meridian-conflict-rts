@@ -1771,9 +1771,16 @@ fn vs_main(in: VsIn) -> VsOut {
             } else if (in.rig & RIG_SPIN) != 0u && model.spin.w > 0.0 {
                 // Rotary barrels in any other house (the Behemoth's arm, a carrier's close-in
                 // gun) turn with the weapon's spin-up about the axis the model gives
-                // (`Model::spins`, along x), before the house pitches.
-                let turn = mix(e.spin_recoil.x, e.spin_recoil.y, t);
-                let axis = vec3<f32>(0.0, model.spin.y, model.spin.z);
+                // (`Model::spins`, along x), before the house pitches. Barrels across the
+                // centreline from that axis are the unit's second rotary gun (the Breacher's
+                // left arm): they turn the other way about its mirror, by their own spin.
+                let twin = model.spin.y * p.y < 0.0;
+                let turn = select(
+                    mix(e.spin_recoil.x, e.spin_recoil.y, t),
+                    -mix(e.twin_spin.x, e.twin_spin.y, t),
+                    twin,
+                );
+                let axis = vec3<f32>(0.0, select(model.spin.y, -model.spin.y, twin), model.spin.z);
                 let q = p - axis;
                 p = vec3<f32>(q.x, q.y * cos(turn) - q.z * sin(turn), q.y * sin(turn) + q.z * cos(turn)) + axis;
                 n = vec3<f32>(n.x, n.y * cos(turn) - n.z * sin(turn), n.y * sin(turn) + n.z * cos(turn));

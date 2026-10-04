@@ -467,7 +467,7 @@ fn the_rotary_cannon_fires_off_the_top_barrel_one_casing_a_shot() {
             .iter()
             .filter(|e| matches!(e, SimEvent::SabotThrown { .. }))
             .count();
-        let [speed, turn, _, _] = w.state.units.spin[row(&w, titan)];
+        let [speed, turn, _, _] = w.state.units.spin[row(&w, titan)][0];
         if fired > 0 && speed == full {
             at_speed += 1;
             let phase = (turn as i32 - spacing / 2).rem_euclid(65536) % spacing;

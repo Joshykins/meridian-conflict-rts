@@ -210,6 +210,9 @@ fn setup(w: &mut World) {
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);
+                // Two rotary guns on one unit, each with its own spin (`Weapon::rotary`),
+                // and pods that set the ground alight.
+                add("aster_t4_breacher", 1, 1200, 950);
                 // A map gun, and a powered radar that finds the south's silo for it.
                 add("aster_t4_artillery", 1, 300, 250);
                 add("aster_t3_power", 1, 700, 150);

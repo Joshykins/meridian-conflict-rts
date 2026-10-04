@@ -977,6 +977,10 @@ impl UnitBlueprint {
 
 /// Most weapons one unit can carry. The sim stores weapon state in fixed slots.
 pub const MAX_WEAPONS: usize = 10;
+/// Most rotary guns (`Weapon::spin_ticks`) one unit carries: each keeps its own spin
+/// (`Weapon::rotary`), and the renderer turns at most two clusters (the second about the
+/// mirror of the first's bore).
+pub const ROTARY_SLOTS: usize = 2;
 /// Most drones one unit keeps (`drone_sockets`).
 pub const MAX_DRONES: usize = 6;
 /// Weapons that may turn on gun houses of their own (`mount`) and be drawn turning: the

@@ -180,7 +180,7 @@ fn unit_at(x: f32, y: f32) -> UnitInstance {
         spin_recoil: [0.0; 4],
         fx: [0.0; 4],
         drive_swing: [0.0; 2],
-        _pad3: [0.0; 2],
+        twin_spin: [0.0; 2],
     }
 }
 
@@ -290,7 +290,7 @@ fn rings_sit_between_ticks_and_never_outgrow_the_renderer() {
         spin_recoil: [0.0; 4],
         fx: [0.0; 4],
         drive_swing: [0.0; 2],
-        _pad3: [0.0; 2],
+        twin_spin: [0.0; 2],
     };
     let (one, drawn) = rings.collect([&unit].into_iter(), 0.5, true, &|_| 0.0);
     assert_eq!((one.len(), drawn), (1, 1));
@@ -349,7 +349,7 @@ fn rings_buried_in_a_blob_are_not_drawn() {
         spin_recoil: [0.0; 4],
         fx: [0.0; 4],
         drive_swing: [0.0; 2],
-        _pad3: [0.0; 2],
+        twin_spin: [0.0; 2],
     };
     let block: Vec<UnitInstance> = (0..15)
         .flat_map(|x| (0..15).map(move |y| at(1000.0 + x as f32 * 20.0, 1000.0 + y as f32 * 20.0)))

@@ -607,6 +607,18 @@ pressure-wave radius is 3.33 times its former size. The Arbalest keeps the ringe
 and breech centered on the turret, and reaches 520 m, on a pitching trunnion
 drum and receiver sleeve that overlaps the barrel throughout recoil.
 
+The Breacher (tech 4) is the close-in counterpart: a hunched assault walker on short,
+heavy, reverse-kneed legs set wide. It must not read as a small Behemoth (the user turned
+down a humanoid torso with arms hanging off the shoulders, and the Behemoth's hood and
+orange visor band, 2026-10-04): the upper body is thrown forward over the hips, a
+heavy brow juts over a low pointed head with one thin blue sensor line wrapped round
+its prow, and the gatling-breach cannons are its forearms, carried low and ahead. The
+guns are the Tempest cut down (six barrels turning out of a shroud) in faceted, plated
+housings; the user found them too big at full arm size, so they are drawn at three
+quarters. The thermobaric launchers sit in a hump on its back, raked steeply over the
+head. "Advanced" here means faceted plates lapped over a dark core, with thin seams of
+blue light at some of the joins, never broad glowing panels.
+
 ## Ground contact
 
 Tracked vehicles mark the ground and raise dust while they move. Marks fade

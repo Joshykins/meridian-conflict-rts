@@ -11,6 +11,7 @@ mod airbase;
 mod assault_tank;
 mod bolt_rifle;
 mod bore_tank;
+pub(super) mod breacher;
 mod citadel;
 mod commander_head;
 mod culverin;
@@ -18,6 +19,7 @@ mod drone_port;
 mod fabricator;
 pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
+mod limbs;
 mod mechs;
 pub(crate) use mechs::RAIL as COMMANDER_RAIL;
 mod mine;
@@ -65,6 +67,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("artillery_heavy", 7.333, 5.333, trebuchet::artillery_heavy),
     ModelDef::new("bore_tank", 8.2, 4.2, bore_tank::bore_tank),
     ModelDef::new("assault_tank", 19.0, 15.0, assault_tank::assault_tank),
+    ModelDef::new("breacher", 24.0, 54.0, breacher::breacher),
     ModelDef::new("titan", 40.0, 120.0, titan::titan),
     // The Reclaimer: one hover salvager, drawn bigger per tier.
     ModelDef::new("reclaimer", 4.6, 3.4, reclaimers::reclaimer),

@@ -211,6 +211,17 @@
         // still short of the capital rails (data/sounds/heavy_rail.ron).
         "citadel_rail_fire": (like: "aster_rail_cannon", size: 1.5, peak: 0.9),
         "citadel_rail_hit": (like: "shell_on_armour", size: 1.9, peak: 0.8),
+        // The Breacher: the Behemoth's sounds on a machine a quarter its height. Its
+        // gatling-breach cannons are the Tempest cut down to an arm (fire, spin-up, the
+        // barrels' whir and their run-down), its pods the Hailstorm's smaller cousins, and
+        // its footfalls lighter and quicker.
+        "breacher_gatling_fire": (like: "titan_gatling_fire", size: 0.6, peak: 0.8),
+        "breacher_gatling_spin": (like: "titan_gatling_spin", size: 0.55, length: 3.6, peak: 0.6),
+        "breacher_gatling_whir": (like: "titan_gatling_whir", size: 0.55, peak: 0.45),
+        "breacher_gatling_spindown": (like: "titan_gatling_spindown", size: 0.55, peak: 0.5),
+        "breacher_rockets": (like: "titan_rockets", size: 0.65, peak: 0.75),
+        "breacher_step": (like: "titan_step", size: 0.4, peak: 0.7),
+        "breacher_walk": (like: "titan_walk", size: 0.45, peak: 0.5),
         // Its spent cartridge hitting the ground: the Behemoth's casing, far smaller.
         "citadel_casing_land": (like: "titan_casing_land", size: 0.5, peak: 0.55),
         // Its charge, 1.2 s before each shot: the Paladin's charge on a gun many times its

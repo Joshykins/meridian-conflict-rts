@@ -300,6 +300,14 @@ fn unit_users(
                 format!("spins up {gun}"),
                 side,
             );
+            add(s.whir.as_ref(), false, &who, format!("whirs {gun}"), side);
+            add(
+                s.spindown.as_ref(),
+                false,
+                &who,
+                format!("runs down {gun}"),
+                side,
+            );
             add(
                 s.hold.as_ref(),
                 false,

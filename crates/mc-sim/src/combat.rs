@@ -814,11 +814,22 @@ impl World {
                                 && this.fires_at_will(row)
                                 && (!doomed(*t) || ordered == Some(*t))
                         });
+                        // An arm that sways off the torso (`Weapon::sway`) looks for the foe
+                        // nearest its own side of the body, so two arms split two marks
+                        // either side of where the torso points instead of sharing one.
+                        let side = if w != 0 && weapon.sway.0 > 0 {
+                            weapon.muzzle.y
+                        } else {
+                            Fx::ZERO
+                        };
+                        let from = units.pos[row]
+                            + FxVec2::new(Fx::ZERO, side)
+                                .rotate(units.heading[row] + units.weapon_yaw[row][0]);
                         let in_grid = |prefer: u32| {
                             this.index
                                 .nearest_foe(
-                                    units.pos[row],
-                                    weapon.range_max + this.gun_offset(row, weapon),
+                                    from,
+                                    weapon.range_max + this.gun_offset(row, weapon) + side.abs(),
                                     // A torpedo also takes a walker on the seabed.
                                     if weapon.torpedo {
                                         kind::UNIT
@@ -1144,7 +1155,7 @@ impl World {
         let held = drowned || (units.has_flag(row, flag::WORKING) && !weapon.mount);
         // A rotary gun spins up while it has something to shoot, and down again after.
         if weapon.spin_ticks > 0 {
-            let spin = &mut units.spin[row];
+            let spin = &mut units.spin[row][weapon.rotary as usize];
             spin[3] = spin[0];
             spin[0] = if mark.is_some() && !held {
                 (spin[0] + 1).min(weapon.spin_ticks)
@@ -1162,7 +1173,7 @@ impl World {
         // The stream ends once the barrels have run down, or at once for a gun without any.
         if weapon.sweep > 0
             && (mark.is_none() || held)
-            && (weapon.spin_ticks == 0 || units.spin[row][0] == 0)
+            && (weapon.spin_ticks == 0 || units.spin[row][weapon.rotary as usize][0] == 0)
         {
             units.streaming[row] = false;
         }
@@ -1784,13 +1795,12 @@ impl World {
         } else {
             weapon.spin_ticks
         };
-        if weapon.spin_ticks > 0 && units.spin[row][0] < spun {
+        let spin = units.spin[row][weapon.rotary as usize];
+        if weapon.spin_ticks > 0 && spin[0] < spun {
             return Ok(());
         }
         // A barrel-timed rotary gun fires only as a barrel comes up to the top.
-        if weapon.barrels > 0
-            && !barrel_topped(weapon.barrels, units.spin[row][1], units.spin[row][2])
-        {
+        if weapon.barrels > 0 && !barrel_topped(weapon.barrels, spin[1], spin[2]) {
             return Ok(());
         }
         if let Some(motion) = bp.unit(units.blueprint[row]).motion {
@@ -1861,7 +1871,7 @@ impl World {
             // own reload at full spin.
             let (full, spin) = (
                 weapon.spin_ticks as u32,
-                units.spin[row][0].min(weapon.spin_ticks) as u32,
+                units.spin[row][weapon.rotary as usize][0].min(weapon.spin_ticks) as u32,
             );
             let stretch = 100 * full + (weapon.spin_ramp as u32 - 100) * (full - spin);
             ((weapon.reload_ticks as u32 * stretch).div_ceil(100 * full)).clamp(1, u16::MAX as u32)

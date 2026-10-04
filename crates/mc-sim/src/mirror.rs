@@ -554,7 +554,10 @@ pub struct UnitInstance {
     /// it zero; the renderer eases it toward the hull's turn in the copy it draws
     /// (`capital_fx.rs` `drive_swing`), so the nozzles glide instead of jumping each tick.
     pub drive_swing: [f32; 2],
-    pub _pad3: [f32; 2],
+    /// The unit's second rotary gun (`Weapon::rotary` 1): its barrels, turned last tick and
+    /// this (radians, unwrapped between the two), as `spin_recoil` gives the first's. The
+    /// shader turns them about the mirror of the first gun's bore.
+    pub twin_spin: [f32; 2],
 }
 
 const _: () = assert!(std::mem::size_of::<UnitInstance>() == 224);

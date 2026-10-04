@@ -153,6 +153,10 @@ pub struct Weapon {
     pub slant: bool,
     /// Ticks a rotary gun spins up before it fires. Zero: it fires at once.
     pub spin_ticks: u16,
+    /// Which of the unit's rotary guns this is, in weapon order (below `ROTARY_SLOTS`):
+    /// the slot of the sim's spin table that keeps its barrels' spin. Zero for a gun
+    /// that does not spin.
+    pub rotary: u8,
     /// Hundredths: a rotary gun that fires while it spins up, its reload this much longer
     /// at a third of its spin and down to `reload` at full (`RawWeapon::spin_ramp`). Zero:
     /// it waits for full spin.

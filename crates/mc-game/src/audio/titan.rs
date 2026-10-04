@@ -34,8 +34,11 @@ const HIT_REACH: f32 = 450.0;
 #[derive(Clone, Copy, Default)]
 struct Ids {
     step_far: Option<SoundId>,
-    /// The first rotary gun's spin-up.
+    /// The first rotary gun's spin-up, the whir of its turning barrels and their run-down
+    /// (heard for either of the unit's two).
     spin: Option<SoundId>,
+    whir: Option<SoundId>,
+    spindown: Option<SoundId>,
     /// Per weapon, its far hit.
     far: [Option<SoundId>; mc_data::MAX_WEAPONS],
     /// Per weapon, a spent casing (`sabot`) landing: its `casing` sound, or failing
@@ -51,8 +54,6 @@ pub struct GiantSounds {
     spin_speed: HashMap<u32, (f32, bool)>,
     /// This tick's barrel whir loops (sound, gain, pan, pitch), for the game's loop mix.
     whirs: Vec<(SoundId, f32, f32, f32)>,
-    /// `titan_gatling_whir`, `titan_gatling_spindown`.
-    rotary: [Option<SoundId>; 2],
     /// Ground shocks the camera feels.
     tremors: tremor::Tremors,
     /// Trees knocked over, and `tree_fall`.
@@ -80,11 +81,8 @@ impl GiantSounds {
         if self.generation != Some(generation) {
             self.ids.clear();
             self.generation = Some(generation);
-            self.rotary =
-                ["titan_gatling_whir", "titan_gatling_spindown"].map(|n| library.id_of(n));
             self.tree_fall = library.id_of("tree_fall");
         }
-        let [whir, spindown] = self.rotary;
         self.whirs.clear();
         let mut speeds = HashMap::new();
         let mut ids = |blueprint: u32| -> Ids {
@@ -101,13 +99,12 @@ impl GiantSounds {
                         .or_else(|| id(&w.sounds.ground))
                         .or_else(|| id(&w.sounds.impact));
                 }
+                let rotary = bp.weapons.iter().find(|w| w.spin_ticks > 0);
                 Ids {
                     step_far: id(&bp.sounds.step_far),
-                    spin: bp
-                        .weapons
-                        .iter()
-                        .find(|w| w.spin_ticks > 0)
-                        .and_then(|w| id(&w.sounds.spin)),
+                    spin: rotary.and_then(|w| id(&w.sounds.spin)),
+                    whir: rotary.and_then(|w| id(&w.sounds.whir)),
+                    spindown: rotary.and_then(|w| id(&w.sounds.spindown)),
                     far,
                     casing,
                 }
@@ -130,8 +127,10 @@ impl GiantSounds {
             let found = ids(u.blueprint);
             let at = Vec3::from(u.pos);
             if let Some(sound) = found.spin {
+                // Heard while either cluster turns (a second rotary gun: `twin_spin`).
                 let [before, now, ..] = u.spin_recoil;
-                let speed = now - before;
+                let [twin_before, twin_now] = u.twin_spin;
+                let speed = (now - before).max(twin_now - twin_before);
                 let (last, mut ran_down) = self
                     .spin_speed
                     .get(&u.unit_id)
@@ -145,7 +144,7 @@ impl GiantSounds {
                     }
                     // Coasting down: the barrels lose speed with nothing left to shoot.
                     if speed < last * 0.97 && !ran_down {
-                        if let Some(down) = spindown {
+                        if let Some(down) = found.spindown {
                             audio.play_world(down, gain, pan, 1.0);
                         }
                         ran_down = true;
@@ -153,7 +152,7 @@ impl GiantSounds {
                         ran_down = false;
                     }
                     // The cluster turning: a loop that rises with its speed.
-                    if let Some(loop_id) = whir {
+                    if let Some(loop_id) = found.whir {
                         let top = speed.max(last).max(1e-4);
                         let share = (speed / top).clamp(0.0, 1.0);
                         self.whirs.push((

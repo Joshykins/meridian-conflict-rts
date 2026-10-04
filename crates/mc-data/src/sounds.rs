@@ -462,8 +462,18 @@ impl SoundLibrary {
             for w in &u.weapons {
                 let s = &w.sounds;
                 for name in [
-                    &s.fire, &s.charge, &s.impact, &s.ground, &s.spin, &s.far, &s.casing, &s.hold,
-                    &s.flight, &s.split,
+                    &s.fire,
+                    &s.charge,
+                    &s.impact,
+                    &s.ground,
+                    &s.spin,
+                    &s.whir,
+                    &s.spindown,
+                    &s.far,
+                    &s.casing,
+                    &s.hold,
+                    &s.flight,
+                    &s.split,
                 ]
                 .into_iter()
                 .flatten()
