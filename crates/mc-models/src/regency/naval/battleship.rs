@@ -15,7 +15,7 @@
 //! - Houses 4 to 7: four twin plasmeric repeaters on the beam ([`SECONDARY`]), resting
 //!   trained outboard.
 //! - 8: four gravitic torpedo doors in the bow's blunt face under the water ([`TUBES`]).
-//! - Four counter-seeker heads ([`DEFENCE`], the unit's `anti_missile_mounts`).
+//! - Four gravity lenses ([`DEFENCE`], the unit's `anti_missile_mounts`).
 
 use glam::Vec3;
 
@@ -87,7 +87,7 @@ const TUBES: [[f32; 3]; 4] = [
 ];
 const BOW_FACE: f32 = 61.9;
 
-/// The counter-seeker heads: a pair forward on the superstructure, a pair aft.
+/// The gravity lenses: a pair forward on the superstructure, a pair aft.
 const DEFENCE: [Vec3; 4] = [
     Vec3::new(-1.0, 5.0, 13.0),
     Vec3::new(-1.0, -5.0, 13.0),

@@ -67,6 +67,22 @@ pub(in crate::regency) fn crush_lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3
     }
 }
 
+/// A warship's gravity lens at `at` (one of the unit's `anti_missile_mounts`), looking up,
+/// on a bronze post from the deck at `foot`. Close up and mid only.
+pub(in crate::regency) fn lens_post(b: &mut MeshBuilder, at: Vec3, foot: f32) {
+    if b.coarse() {
+        return;
+    }
+    const R: f32 = 0.6;
+    let neck = at - Vec3::Z * R * 1.1;
+    if neck.z - foot > 0.05 {
+        dark_plate(b);
+        b.prism(at.with_z(foot - 0.1), 6, 0.9, 0.7, 0.4);
+        shaft(b, at.with_z(foot), neck, 0.3);
+    }
+    crush_lens(b, at, Vec3::Z, R);
+}
+
 /// The lenses drawn at `tech`: the tech 2 pair, and Rondel II's waiting on it as an
 /// upgrade piece (or drawn, at tech 3).
 fn lenses(b: &mut MeshBuilder, tech: u8) {

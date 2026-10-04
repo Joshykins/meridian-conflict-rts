@@ -99,7 +99,7 @@ fn it_fits() {
 
 /// Each main house holds both its charges between projectors, clear of them, and reaches
 /// no further than its charges; the secondaries', AA repeater's and torpedo doors' muzzles are
-/// drawn; each counter-seeker head is red.
+/// drawn; each gravity lens is red.
 #[test]
 fn it_holds_its_weapons() {
     let key = KEY;
@@ -151,7 +151,7 @@ fn it_holds_its_weapons() {
         }
         for at in DEFENCE {
             let red = nearest(&model, lod, at, |v| v.material == material::GLOW_LASER);
-            assert!(red < 0.9, "{name}: no red at the counter-seeker {at}");
+            assert!(red < 0.9, "{name}: no red at the gravity lens {at}");
         }
     }
 }

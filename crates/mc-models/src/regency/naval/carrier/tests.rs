@@ -83,7 +83,7 @@ fn it_fits_its_blueprint() {
 }
 
 /// Two blocks of six cells, a round under each muzzle; a AA house on each pivot
-/// reaching its muzzle; red on each counter-seeker head; a turning radar; an interceptor
+/// reaching its muzzle; red on each gravity lens; a turning radar; an interceptor
 /// door at each tube.
 #[test]
 fn it_carries_its_weapons() {
@@ -174,7 +174,7 @@ fn the_unit_files_numbers_are_the_models() {
     let mounts: Vec<Vec3> = bp.anti_missile_mounts.iter().map(|&m| v(m)).collect();
     assert_eq!(mounts.len(), 4);
     for (m, d) in mounts.iter().zip(l.defence) {
-        assert!(m.distance(d) < 1e-3, "counter-seeker head {m} for {d}");
+        assert!(m.distance(d) < 1e-3, "gravity lens {m} for {d}");
     }
 }
 

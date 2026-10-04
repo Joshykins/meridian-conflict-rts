@@ -14,8 +14,8 @@
 //! - 1: the heavy gravitic seeker aft: one big charge in gravity containment, launched
 //!   straight up from its silo; it is the ship's signature.
 //! - 2: a Plasmeric Repeater forward on a gun house of its own.
-//! - Two counter-seeker heads (`anti_missile_mounts`): faceted heads on bronze posts, a red
-//!   band round each and a red lens on top, a launch rail either side.
+//! - Two gravity lenses (`anti_missile_mounts`) on bronze posts, looking up
+//!   (`turrets::rondel::lens_post`).
 //! - The radar (2600 m), turning (`part::SPINNER`).
 
 use glam::{Vec2, Vec3};
@@ -27,6 +27,7 @@ use crate::part;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::{armour, hoop, red_slot, shaft, swept, Course, Frame};
+use super::super::turrets::rondel::lens_post;
 
 pub(crate) const MODELS: &[ModelDef] = &[ModelDef::new("regency_cruiser", 27.0, 15.0, spine)];
 
@@ -470,53 +471,6 @@ fn repeater(b: &mut MeshBuilder) {
     });
 }
 
-// ---- Missile defence ----------------------------------------------------------------
-
-/// A counter-seeker head centred on `at` (one of the unit's `anti_missile_mounts`) on a
-/// bronze post up from `foot`: a faceted dark head, the missile defence's red round its
-/// waist and on its lens, a launch rail swept back either side.
-fn counter_seeker(b: &mut MeshBuilder, at: Vec3, foot: f32) {
-    if b.coarse() {
-        return;
-    }
-    let fine = b.fine();
-    shaft(b, v3(at.x, at.y, foot), at - Vec3::Z * 0.45, 0.3);
-    let head = ngon(6, 0.8);
-    b.at(v3(at.x, at.y, 0.0), |b| {
-        dark_plate(b);
-        b.loft_z(
-            &head,
-            &[
-                Section::new(at.z - 0.55, 0.6),
-                Section::new(at.z - 0.12, 1.0),
-                Section::new(at.z + 0.18, 1.0),
-                Section::new(at.z + 0.48, 0.5),
-            ],
-        );
-        b.paint(GLOW_LASER);
-        b.loft_z(
-            &head,
-            &[
-                Section::new(at.z - 0.08, 1.06),
-                Section::new(at.z + 0.1, 1.06),
-            ],
-        );
-    });
-    b.paint(GLOW_LASER);
-    b.cuboid(at + Vec3::Z * 0.52, Vec3::new(0.32, 0.32, 0.1));
-    if fine {
-        b.mirror_y(|b| {
-            dark_plate(b);
-            b.beam(
-                at + v3(0.45, 0.7, -0.1),
-                at + v3(-0.55, 0.95, 0.55),
-                Vec2::new(0.28, 0.2),
-                Vec2::new(0.12, 0.2),
-            );
-        });
-    }
-}
-
 // ---- The spine ----------------------------------------------------------------------
 
 /// A long raised spine down the middle, plates lapped back off it either side; the
@@ -605,8 +559,8 @@ fn spine(b: &mut MeshBuilder, _tech: u8) {
     );
     visor(b, -3.4, 3.0, 2.2, 7.8, 0.93);
     blade_mast(b);
-    counter_seeker(b, DEFENCE[0], 8.6);
-    counter_seeker(b, DEFENCE[1], SPINE);
+    lens_post(b, DEFENCE[0], 8.6);
+    lens_post(b, DEFENCE[1], SPINE);
     silo(b, HEAVY);
 }
 
@@ -615,7 +569,7 @@ const SPINE: f32 = 5.0;
 const CELL_X: [f32; 2] = [9.2, 3.6];
 const PITCH: f32 = 1.6;
 const CELL_DECK: f32 = 6.4;
-/// The radar bearing, counter-seeker heads and heavy seeker's muzzle.
+/// The radar bearing, gravity lenses and heavy seeker's muzzle.
 const RADAR: Vec3 = Vec3::new(-6.8, 0.0, 12.8);
 const DEFENCE: [Vec3; 2] = [Vec3::new(-1.2, 0.0, 9.9), Vec3::new(-12.0, 0.0, 6.6)];
 const HEAVY: Vec3 = Vec3::new(-19.2, 0.0, 7.6);
@@ -808,7 +762,7 @@ mod tests {
     }
 
     /// Two blocks of six cells, a round under each muzzle; the repeater's house on its
-    /// pivot reaching its muzzle; red on each counter-seeker head; a turning radar; the
+    /// pivot reaching its muzzle; red on each gravity lens; a turning radar; the
     /// heavy seeker's nose at its muzzle.
     #[test]
     fn it_carries_its_weapons() {
@@ -885,7 +839,7 @@ mod tests {
         let mounts: Vec<Vec3> = bp.anti_missile_mounts.iter().map(|&m| v(m)).collect();
         assert_eq!(mounts.len(), 2);
         for (m, d) in mounts.iter().zip(DEFENCE) {
-            assert!(m.distance(d) < 1e-3, "counter-seeker head {m} for {d}");
+            assert!(m.distance(d) < 1e-3, "gravity lens {m} for {d}");
         }
     }
 

@@ -9,8 +9,8 @@
 //! - 1, 2: a Plasmeric AA Repeater on a gun house of its own each side, port first: the
 //!   Canopy's organ of four short tubes held up at the sky.
 //! - 3: two interceptor doors in the transom under the water.
-//! - Four counter-seeker heads (`anti_missile_mounts`): faceted heads on bronze posts, a
-//!   red band round each and a red lens on top.
+//! - Four gravity lenses (`anti_missile_mounts`) on bronze posts, looking up
+//!   (`turrets::rondel::lens_post`).
 //! - The radar (3800 m): the Orrery's floating rings (`regency/eye.rs`) over the island,
 //!   turning (`part::SPINNER`).
 //!
@@ -22,7 +22,7 @@
 
 use glam::{Vec2, Vec3};
 
-use crate::builder::{chamfered_rect, ngon, CellGrid, MeshBuilder, Section};
+use crate::builder::{chamfered_rect, CellGrid, MeshBuilder, Section};
 use crate::library::ModelDef;
 use crate::material::*;
 use crate::part;
@@ -31,6 +31,7 @@ use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::{
     armour, collar, hoop, mouth_rim, red_slot, shaft, strut, swept, Course, Frame,
 };
+use super::super::turrets::rondel::lens_post;
 
 pub(crate) const MODELS: &[ModelDef] =
     &[ModelDef::new("regency_carrier", RADIUS, HEIGHT, arrowhead)];
@@ -44,7 +45,7 @@ const SLAB: f32 = 1.6;
 
 /// Where the ship puts what the unit file names: the two cell blocks (fore first) and
 /// their hatches' deck, the AA houses' pivots and muzzles (port first), the
-/// counter-seeker heads, the radar's bearing and the interceptor doors.
+/// gravity lenses, the radar's bearing and the interceptor doors.
 struct Layout {
     cells: [Vec2; 2],
     cell_deck: f32,
@@ -722,54 +723,6 @@ fn organ(b: &mut MeshBuilder, len: f32) {
     }
 }
 
-// ---- Missile defence -----------------------------------------------------------------
-
-/// A counter-seeker head centred on `at` on a bronze post up from `foot`: a faceted dark
-/// head, the missile defence's red round its waist and on its lens, a launch rail swept
-/// back either side.
-fn counter_seeker(b: &mut MeshBuilder, at: Vec3, foot: f32) {
-    let fine = b.fine();
-    dark_plate(b);
-    b.prism(at.with_z(foot - 0.1), 6, 1.2, 0.9, 0.5);
-    shaft(b, at.with_z(foot), at - Vec3::Z * 0.5, 0.35);
-    let head = ngon(6, 0.95);
-    b.at(at.with_z(0.0), |b| {
-        dark_plate(b);
-        b.loft_z(
-            &head,
-            &[
-                Section::new(at.z - 0.65, 0.6),
-                Section::new(at.z - 0.15, 1.0),
-                Section::new(at.z + 0.2, 1.0),
-                Section::new(at.z + 0.55, 0.5),
-            ],
-        );
-        b.paint(GLOW_LASER);
-        b.loft_z(
-            &head,
-            &[
-                Section::new(at.z - 0.1, 1.06),
-                Section::new(at.z + 0.12, 1.06),
-            ],
-        );
-    });
-    b.paint(GLOW_LASER);
-    b.cuboid(at + Vec3::Z * 0.6, Vec3::new(0.38, 0.38, 0.12));
-    if fine {
-        b.at(at.with_z(0.0), |b| {
-            b.mirror_y(|b| {
-                dark_plate(b);
-                b.beam(
-                    v3(0.55, 0.8, at.z - 0.1),
-                    v3(-0.65, 1.1, at.z + 0.65),
-                    Vec2::new(0.32, 0.24),
-                    Vec2::new(0.14, 0.24),
-                );
-            });
-        });
-    }
-}
-
 // ---- The arrowhead -------------------------------------------------------------------
 
 const LAYOUT: Layout = Layout {
@@ -867,7 +820,7 @@ fn arrowhead(b: &mut MeshBuilder, _tech: u8) {
         aa_house(b, 1 + k, f);
     }
     for d in l.defence {
-        counter_seeker(b, d, DECK);
+        lens_post(b, d, DECK);
     }
     interceptor_doors(b, &l.tubes);
     flank(b, 44.0, 88.0, 10.0, 2.6);

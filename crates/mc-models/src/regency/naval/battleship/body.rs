@@ -1,7 +1,7 @@
 //! The Flamberge's body: the Claymore grown to a capital ship. A broad arrowhead, its
 //! whaleback deck rolling down into low sides, the beam widest aft where a course of plates
 //! along each deck edge runs out past the stern into the quarters' points; one long low
-//! fin down the middle, raked back, carrying the AA repeater on its crown and the counter-seekers
+//! fin down the middle, raked back, carrying the AA repeater on its crown and the gravity lenses
 //! on swept wings; a bronze trench of machinery along each side.
 
 use glam::{Vec2, Vec3};
@@ -10,7 +10,8 @@ use crate::builder::{MeshBuilder, Section};
 
 use super::super::super::kit::{dark_plate, metal, v3};
 use super::super::super::machine::{armour, red_slot, swept, Course, Frame};
-use super::guns::{aa_house, counter_seeker, main_gun, secondary};
+use super::super::super::turrets::rondel::lens_post;
+use super::guns::{aa_house, main_gun, secondary};
 use super::hull::{
     body_x, deck, edge, flank, hull, mirrored, st, team_patch, top_at, tube_doors, Station, RIDGE,
 };
@@ -68,14 +69,14 @@ pub(super) fn build(b: &mut MeshBuilder, _tech: u8) {
     tube_doors(b);
     for at in DEFENCE {
         let foot = if at.x > -10.0 { 12.45 } else { 9.85 };
-        counter_seeker(b, at, foot);
+        lens_post(b, at, foot);
     }
     sides(b);
     decks(b);
 }
 
 /// The long low fin, a bronze band round it, a crest plate swept back off its crown past
-/// its tail into a spike, swept wings carrying the counter-seekers, and a plated spine
+/// its tail into a spike, swept wings carrying the gravity lenses, and a plated spine
 /// from the second house's barbette to its nose.
 fn fin(b: &mut MeshBuilder) {
     let plan = mirrored(&FIN);
@@ -129,7 +130,7 @@ fn fin(b: &mut MeshBuilder) {
         0.3,
     );
     b.mirror_y(|b| {
-        // The wings under the counter-seekers, swept out and back.
+        // The wings under the gravity lenses, swept out and back.
         dark_plate(b);
         armour(
             b,

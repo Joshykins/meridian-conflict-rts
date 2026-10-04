@@ -1,5 +1,5 @@
 //! The Flamberge's guns: the three twin Pinch-fusion Cannon houses, the beam
-//! secondaries, the AA house and the counter-seeker heads.
+//! secondaries and the AA house (the gravity lenses are `turrets::rondel::lens_post`).
 //!
 //! A Pinch-fusion gun gathers its charge in front of its bore, held between projectors:
 //! a twin house holds two, side by side, so its projectors stand either side of each and
@@ -9,12 +9,12 @@
 
 use glam::{Vec2, Vec3};
 
-use crate::builder::{ngon, MeshBuilder, Section};
+use crate::builder::{MeshBuilder, Section};
 use crate::material::*;
 
 use super::super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::super::machine::{
-    armour, collar, hoop, hoop_on, mouth_rim, red_slot, shaft, swept, Course, Frame,
+    armour, collar, hoop, hoop_on, mouth_rim, red_slot, swept, Course, Frame,
 };
 use super::hull::{body_x, mirrored, pointed, team_patch, tier, CHAMFERED};
 use super::{charge, AA, AA_MUZZLE, MAIN, SECONDARY, SECONDARY_REACH, SECONDARY_TWIN, TWIN};
@@ -496,54 +496,5 @@ fn organ(b: &mut MeshBuilder, len: f32) {
     }
     if fine {
         red_slot(b, v3(-0.3, 0.0, 0.6), Vec3::Z, Vec3::Y, 1.4, 0.08);
-    }
-}
-
-// ---- Missile defence ---------------------------------------------------------------
-
-/// A counter-seeker head centred on `at` on a bronze post up from `foot`: a faceted dark
-/// head, the missile defence's red round its waist and on its lens, a launch rail swept
-/// back either side.
-pub(super) fn counter_seeker(b: &mut MeshBuilder, at: Vec3, foot: f32) {
-    if b.coarse() {
-        return;
-    }
-    let fine = b.fine();
-    if at.z - 0.45 - foot > 0.05 {
-        shaft(b, v3(at.x, at.y, foot), at - Vec3::Z * 0.45, 0.3);
-    }
-    let head = ngon(6, 0.8);
-    b.at(v3(at.x, at.y, 0.0), |b| {
-        dark_plate(b);
-        b.loft_z(
-            &head,
-            &[
-                Section::new(at.z - 0.55, 0.6),
-                Section::new(at.z - 0.12, 1.0),
-                Section::new(at.z + 0.18, 1.0),
-                Section::new(at.z + 0.48, 0.5),
-            ],
-        );
-        b.paint(GLOW_LASER);
-        b.loft_z(
-            &head,
-            &[
-                Section::new(at.z - 0.08, 1.06),
-                Section::new(at.z + 0.1, 1.06),
-            ],
-        );
-    });
-    b.paint(GLOW_LASER);
-    b.cuboid(at + Vec3::Z * 0.52, Vec3::new(0.32, 0.32, 0.1));
-    if fine {
-        for side in [-1.0f32, 1.0] {
-            dark_plate(b);
-            b.beam(
-                at + v3(0.45, 0.7 * side, -0.1),
-                at + v3(-0.55, 0.95 * side, 0.55),
-                Vec2::new(0.28, 0.2),
-                Vec2::new(0.12, 0.2),
-            );
-        }
     }
 }
