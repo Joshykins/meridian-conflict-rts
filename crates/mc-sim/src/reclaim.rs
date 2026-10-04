@@ -47,7 +47,7 @@ pub const BEAM_RECLAIM: u32 = 0;
 pub const BEAM_NANITE: u32 = 1;
 /// A Regency site being fed by nanite streams: one per site, however many feed it. `from`
 /// is the site's foot, `to` (and `to_prev`) the middle of its build front, `radius` and
-/// `height` the hull's. The renderer draws the rings and the filaments rising round it.
+/// `height` the hull's. The renderer draws the swarm and the rings round it.
 pub const BEAM_NANITE_SITE: u32 = 6;
 /// Salvage riding from a drone into the underside of its carrier: particles, no ribbon.
 pub const BEAM_RELAY: u32 = 3;

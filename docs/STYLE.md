@@ -248,8 +248,9 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 - **Construction is violet,** the Regency's counterpart to ARC's amber: it marks
   what can build.
 - **Nanites build.** A structure forms out of violet light that cools to red
-  and then to plate, with thin rings and slow beams of particles round it
-  (user direction, 2026-09-26; it replaced a black swarm).
+  and then to plate, in a dark swarm with thin violet rings through it (user
+  direction, 2026-09-26; on 2026-10-04 the swarm came back round the site, in
+  place of the red filaments).
   - The builder shoots **strands of particles** from its violet emitter, not one
     beam and not an arch: a few hairline threads that writhe like liquid,
     beaded with motes drifting slowly along them, violet as they leave and red
@@ -260,14 +261,19 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
   - The hull **forms from the ground up.** What has just formed glows violet,
     then slowly turns red, then becomes the finished plate. The band is a few
     metres deep on any hull. A thin hot line runs along the front with a haze
-    of violet motes just above it. Nothing shows above that (`entity.wgsl`
-    `nanite_site`).
-  - Round the site while it is fed (`BEAM_NANITE_SITE`, one per site), **violet
-    rings** of many sizes come and go up its height, most of them near the
-    front. Each turns red as it fades. They stay mostly inside the hull and
-    never reach far past it. **Sheaves of red particle filaments** are thrown
-    slowly up out of the lot, fanning apart and leaning a little outward,
-    higher than the hull will stand.
+    Black motes of the swarm settle on the hull's shape just above the front,
+    packed close there and thinning out, a few glinting violet. Nothing shows
+    above that (`entity.wgsl` `nanite_site`).
+  - Round the site while it is fed (`BEAM_NANITE_SITE`, one per site), a **dark
+    swarm** hangs round the part of the hull still to come: a smoky haze of
+    black motes, thickest just over the front and thinning above it, circling
+    slowly and drifting in and down into the front. A few motes glint violet.
+    It darkens what is behind it and is never a solid blob.
+  - Through the swarm, **violet rings** of many sizes come and go up the hull,
+    most of them at the front. Each lifts into a crown, its light drawn into the
+    peaks, and turns red as it fades. They stay mostly inside the hull and never
+    reach far past it. Nothing is thrown up out of the site: the red filaments
+    were removed on 2026-10-04 ("a little insane" in a busy base).
   - The site's work light is still a tenth of ARC's amber. A work lamp's worth
     of violet floods a hull purple.
   - It sounds **deep and heavy**, a great machine felt more than heard. The

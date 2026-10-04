@@ -2574,6 +2574,8 @@ const UNIT_NANITE: u32 = 2u;
 const CLASS_NANITE: u32 = 0x4000u;
 const NANITE_VIOLET: vec3<f32> = vec3<f32>(0.66, 0.12, 1.0);
 const NANITE_RED: vec3<f32> = vec3<f32>(1.0, 0.06, 0.1);
+// Metres the swarm lies on the hull over the front at most (a quarter of a short hull).
+const NANITE_SWARM_SKIN: f32 = 2.5;
 
 // How far the swarm has condensed into plate at `build`: over the first four fifths of the
 // work, then the site settles and its light goes.
@@ -2590,24 +2592,29 @@ fn nanite_order(local: vec3<f32>, height: f32, seed: f32) -> f32 {
 
 // A Regency site's colour, and 0 in w where there is nothing there yet. It forms from the
 // ground up: what has just condensed is glowing violet, which slowly cools through red
-// into the finished plate; a thin hot line runs along the front and a haze of violet
-// motes gathers just above it. Above that there is nothing yet (the rings and filaments
-// round the site, beams.wgsl, show where it will stand). The glowing band is a share of
+// into the finished plate; a thin hot line runs along the front and black motes of the
+// swarm settle just above it. Above that there is nothing yet (the swarm and rings round
+// the site, beams.wgsl, show where it will stand). The glowing band is a share of
 // the height, so it takes the same share of the work on any hull.
 fn nanite_site(color: vec3<f32>, local: vec3<f32>, build: f32, height: f32, seed: f32, time: f32) -> vec4<f32> {
     let grow = nanite_grow(build);
     let order = nanite_order(local, height, seed);
     let settle = smoothstep(0.8, 1.0, build);
     if order > grow {
-        // Motes gathering over the front, thinning out above it.
+        // The swarm settling onto the hull's shape just over the front (the rest of it
+        // hangs round the site, beams.wgsl `nanite_swarm_vertex`): black motes drifting
+        // down onto the front, packed close there and thinning out above, a few glinting
+        // violet.
         let above = (order - grow) * max(height, 1.0);
-        let cell = floor(local * 7.0 + vec3<f32>(0.0, 0.0, -time * 3.0));
+        let band = min(height * 0.25, NANITE_SWARM_SKIN);
+        let thin = above / max(band, 0.5);
+        let cell = floor(local * 6.0 + vec3<f32>(0.0, 0.0, time * 1.5));
         let h = hash21(cell.xy + vec2<f32>(cell.z * 1.7, seed * 13.0));
-        if above > 0.8 || h < 0.88 + above * 0.12 {
+        if thin > 1.0 || h < 0.5 + 0.5 * thin {
             return vec4<f32>(0.0);
         }
-        let twinkle = 0.5 + 0.5 * sin(time * 7.0 + h * 40.0);
-        return vec4<f32>(NANITE_VIOLET * (1.0 + 1.5 * twinkle), 1.0);
+        let glint = step(0.993, h) * (0.5 + 0.5 * sin(time * 7.0 + h * 40.0));
+        return vec4<f32>(color * 0.08 + NANITE_VIOLET * glint * 1.5 * (1.0 - settle), 1.0);
     }
     // Metres behind the front: the band is the same depth on any hull, so on a tall one
     // it is a band and not the whole of what is up.

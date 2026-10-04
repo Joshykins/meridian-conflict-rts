@@ -2398,7 +2398,7 @@ impl World {
                 u.status[1] |= UNIT_NANITE;
             }
         }
-        // Round each Regency site at work, its rings and rising filaments: one record a site,
+        // Round each Regency site at work, its swarm and rings: one record a site,
         // timed by the site's id with bits 27..31 set (no stream's source has them all). A
         // Regency refit gets the same, fed or not: it goes up the way a new hull does.
         nanite_sites.sort_unstable();
