@@ -738,12 +738,12 @@ fn city_plain(i: CityIn) -> CityLook {
         let fine = surf_noise3(q * 2.7 + vec3<f32>(3.0, 7.0, 1.0));
         let kind = surf_noise3(i.local * 0.6 + vec3<f32>(5.0, 1.0, 3.0) + i.inst * 4.0);
         // Grey concrete, brick in places, dark grout and shadow between the chunks.
-        var c = mix(vec3<f32>(0.24, 0.235, 0.22), vec3<f32>(0.22, 0.1, 0.065), smoothstep(0.58, 0.68, kind));
+        var c = mix(vec3<f32>(0.11, 0.105, 0.098), vec3<f32>(0.13, 0.06, 0.04), smoothstep(0.58, 0.68, kind));
         c *= 0.7 + 0.6 * lump * (0.8 + 0.4 * fine);
-        let gap = smoothstep(0.32, 0.18, lump) * surf_resolved(0.25, i.px);
+        let gap = smoothstep(0.26, 0.14, lump) * surf_resolved(0.25, i.px);
         c = mix(c, vec3<f32>(0.025, 0.022, 0.02), gap * 0.85);
         // Dust settled on what faces up, soot in patches.
-        c = mix(c, vec3<f32>(0.3, 0.28, 0.24), 0.25 * smoothstep(0.6, 0.95, i.normal.z) * smoothstep(0.4, 0.7, fine));
+        c = mix(c, vec3<f32>(0.2, 0.19, 0.165), 0.3 * smoothstep(0.6, 0.95, i.normal.z) * smoothstep(0.4, 0.7, fine));
         c = mix(c, vec3<f32>(0.03, 0.027, 0.025), 0.4 * smoothstep(0.6, 0.85, surf_noise3(i.local * 0.15 + 9.0)));
         o.albedo = c * (1.0 + 0.3 * broad);
         o.roughness = 0.95;

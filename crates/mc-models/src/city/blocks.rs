@@ -914,10 +914,10 @@ pub(super) fn rubble(b: &mut MeshBuilder, _tech: u8) {
                 v3(
                     r,
                     r * (0.6 + 0.4 * hash_unit(83, k)),
-                    0.7 + 0.9 * hash_unit(89, k),
+                    0.5 + 0.6 * hash_unit(89, k),
                 ),
-                if coarse { 4 } else { 6 },
-                2,
+                if coarse { 4 } else { 7 },
+                if coarse { 2 } else { 3 },
                 0.35,
                 11 + k,
             );
