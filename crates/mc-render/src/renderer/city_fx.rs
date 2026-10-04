@@ -105,6 +105,27 @@ impl Shape {
     }
 }
 
+/// One solid part of a structure in the world: an oriented box from the
+/// ground to `top` (`mc_map::city`'s plan as laid).
+#[derive(Clone, Copy, Debug)]
+struct Part {
+    prop: u32,
+    centre: Vec2,
+    half: Vec2,
+    along: Vec2,
+    top: f32,
+}
+
+impl Part {
+    fn covers(&self, p: Vec2) -> bool {
+        let d = p - self.centre;
+        d.dot(self.along).abs() <= self.half.x && d.dot(self.along.perp()).abs() <= self.half.y
+    }
+}
+
+/// Edge of the buckets the solid parts are filed in, metres.
+const BUCKET: f32 = 64.0;
+
 /// A building on its way down.
 #[derive(Clone, Copy)]
 struct Falling {
@@ -128,6 +149,12 @@ pub(super) struct CityFx {
     falling: Vec<Falling>,
     /// Burning or smouldering structures, and when their fire started or went out.
     fires: Vec<(u32, f32, bool)>,
+    /// Every structure's solid parts, filed by bucket (`buckets` wide), and the
+    /// sim's dead props as last seen: what a line of fire must clear.
+    parts: Vec<Part>,
+    buckets: Vec<Vec<u32>>,
+    buckets_wide: usize,
+    dead: Vec<u32>,
 }
 
 /// The rubble heaps for every city structure a map has, as static entities
@@ -191,7 +218,42 @@ impl CityFx {
         let props = map.props().len().max(1);
         let buffer = gpu.host_buffer((props * 4) as u64, vk::BufferUsageFlags::STORAGE_BUFFER)?;
         buffer.write(0, &vec![0u8; props * 4]);
+        let size = Vec2::from(map.info().size_metres().to_f32());
+        let buckets_wide = (size.x / BUCKET).ceil().max(1.0) as usize;
+        let buckets_high = (size.y / BUCKET).ceil().max(1.0) as usize;
+        let mut parts = Vec::new();
+        let mut buckets = vec![Vec::new(); buckets_wide * buckets_high];
+        for (i, p) in map.props().iter().enumerate() {
+            let Some(s) = city::structure(p.kind).filter(|s| s.health > 0) else {
+                continue;
+            };
+            let scale = p.scale_milli as f32 / 1000.0;
+            let along = Vec2::from_angle(p.heading.to_radians_f32());
+            let origin = Vec2::from(p.pos.to_f32());
+            for (&(cx, cy, hx, hy), &top) in s.plan.iter().zip(s.tops) {
+                let part = Part {
+                    prop: i as u32,
+                    centre: origin + along.rotate(Vec2::new(cx as f32, cy as f32) * scale),
+                    half: Vec2::new(hx as f32, hy as f32) * scale,
+                    along,
+                    top: top as f32 * scale,
+                };
+                let r = part.half.length();
+                let lo = ((part.centre - r) / BUCKET).floor().max(Vec2::ZERO);
+                let hi = ((part.centre + r) / BUCKET).floor();
+                for by in lo.y as usize..=(hi.y as usize).min(buckets_high - 1) {
+                    for bx in lo.x as usize..=(hi.x as usize).min(buckets_wide - 1) {
+                        buckets[by * buckets_wide + bx].push(parts.len() as u32);
+                    }
+                }
+                parts.push(part);
+            }
+        }
         Ok(CityFx {
+            parts,
+            buckets,
+            buckets_wide,
+            dead: Vec::new(),
             shapes: map.props().iter().map(Shape::of).collect(),
             looks: vec![0; props],
             buffer,
@@ -212,7 +274,9 @@ impl CityFx {
 
     /// Hides, in `bits` (one per static entity), every rubble heap whose
     /// building still stands (`dead`: the sim's dead props).
-    pub(super) fn hide_heaps(&self, dead: &[u32], bits: &mut [u32]) {
+    pub(super) fn hide_heaps(&mut self, dead: &[u32], bits: &mut [u32]) {
+        self.dead.clear();
+        self.dead.extend_from_slice(dead);
         for &(entity, prop) in &self.heaps {
             let down = dead
                 .get(prop as usize / 32)
@@ -256,6 +320,33 @@ impl CityFx {
             self.marked.push(s.prop);
         }
         self.buffer.write(0, bytemuck::cast_slice(&self.looks));
+    }
+
+    /// The top of the standing structure over `p`, metres over the ground; 0
+    /// where none stands.
+    pub(super) fn standing_top(&self, p: Vec2) -> f32 {
+        let (bx, by) = ((p.x / BUCKET).floor(), (p.y / BUCKET).floor());
+        if bx < 0.0 || by < 0.0 || bx as usize >= self.buckets_wide {
+            return 0.0;
+        }
+        let Some(bucket) = self
+            .buckets
+            .get(by as usize * self.buckets_wide + bx as usize)
+        else {
+            return 0.0;
+        };
+        bucket
+            .iter()
+            .map(|&i| &self.parts[i as usize])
+            .filter(|part| {
+                let dead = self
+                    .dead
+                    .get(part.prop as usize / 32)
+                    .is_some_and(|w| w & (1 << (part.prop % 32)) != 0);
+                !dead && part.covers(p)
+            })
+            .map(|part| part.top)
+            .fold(0.0, f32::max)
     }
 
     /// The burning buildings nearest `focus` (a few dozen; past that a fire is

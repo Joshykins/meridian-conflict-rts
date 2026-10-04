@@ -2629,6 +2629,12 @@ impl Renderer {
         self.tile_cache.overview_height(xy)
     }
 
+    /// How high a standing city structure rises over the ground at `xy`, metres
+    /// (0 where none stands): what a line of fire must also clear (city_fx.rs).
+    pub fn building_top(&self, xy: glam::Vec2) -> f32 {
+        self.city_fx.standing_top(xy)
+    }
+
     /// Cursor ray against what the player sees: the terrain, or the water's
     /// surface where the ray reaches the sea before the seabed.
     pub fn pick_surface(&self, origin: Vec3, dir: Vec3) -> Option<Vec3> {

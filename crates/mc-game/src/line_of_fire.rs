@@ -122,8 +122,8 @@ pub fn draw_hover(ui: &mut Ui, field: &Field, target: usize) {
     tag(ui, ui.cursor + Vec2::new(0.0, 26.0), &text);
 }
 
-/// Whether the ground stays below the line from `from` to `to`, stopping `short` metres
-/// before `to` as the sim does.
+/// Whether the ground and the city's standing buildings stay below the line from
+/// `from` to `to`, stopping `short` metres before `to` as the sim does.
 fn clear(field: &Field, from: Vec3, to: Vec3, short: f32) -> bool {
     let across = (to - from).truncate().length();
     if across <= short * 2.0 {
@@ -133,7 +133,8 @@ fn clear(field: &Field, from: Vec3, to: Vec3, short: f32) -> bool {
     let steps = ((across - short) / MARCH_STEP).ceil().max(1.0) as usize;
     (1..=steps).all(|i| {
         let p = from.lerp(end, i as f32 / steps as f32);
-        field.renderer.ground_height(p.truncate()) < p.z
+        let ground = field.renderer.ground_height(p.truncate());
+        ground + field.renderer.building_top(p.truncate()) < p.z
     })
 }
 
