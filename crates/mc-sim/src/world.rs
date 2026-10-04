@@ -840,6 +840,14 @@ impl World {
             let _t = mc_core::perf_span!("fn.check_victory");
             self.check_victory();
         }
+        {
+            // Again for the next tick's orders: the deaths, wrecks and scorch marks
+            // since the rebuild above are in it, as they are in a world restored from a
+            // snapshot taken now (`restore` builds it from the state alone).
+            let _t = mc_core::perf_span!("fn.rebuild_index");
+            self.rebuild_index();
+        }
+        phase(&mut self.timings, "index_after");
         let sections = self.hash_sections();
         phase(&mut self.timings, "hash");
         self.timings.total_ns = start.elapsed().as_nanos() as u64;
