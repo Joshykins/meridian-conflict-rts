@@ -8,6 +8,7 @@
 //! - `regency_seeker_silo`: the Belfry, a Gravitic Seeker Silo (`belfry`).
 //! - `regency_pinch_cannon`: the Halberd, a Pinched-plasmeric Cannon (`halberd`).
 //! - `regency_fusion_cannon`: the Sunspear, a Pinch-fusion Cannon (`sunspear`).
+//! - `regency_missile_defense`: the Rondel, gravity lenses that crush missiles (`rondel`).
 //! - `regency_springald`: the Springald map gun, a Triune Pinch-fusion Howitzer
 //!   (`springald`).
 //!
@@ -22,6 +23,8 @@ mod canopy;
 mod gorget;
 mod halberd;
 mod picket;
+/// Its three designs are catalogue keys of their own.
+pub(super) mod rondel;
 mod springald;
 /// The Sunspear's gun pieces are shared by the tech 3 mobile fusion guns
 /// (`fusion_guns`), the same gun drawn smaller.

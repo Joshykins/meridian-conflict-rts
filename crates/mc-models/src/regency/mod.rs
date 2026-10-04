@@ -60,6 +60,9 @@ use super::library::ModelDef;
 #[cfg(test)]
 pub(super) const COMMANDER_TRIANGLES: usize = 9000;
 
+/// The Rondel's size at each tech: Rondel II stands taller.
+const RONDEL: [(f32, f32); 3] = [(5.25, 12.0), (5.25, 12.0), (5.25, 15.0)];
+
 pub(super) const MODELS: &[ModelDef] = &[
     // The commander: a tall walker, fusion cannon forearm and taloned hand (`commander`).
     ModelDef::new("regency_commander", 10.4, 25.0, commander::commander),
@@ -176,6 +179,18 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
     ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
+    // Missile defence (`turrets::rondel`): tech 2, upgrading in place to tech 3.
+    ModelDef::tiered("regency_missile_defense", RONDEL, turrets::rondel::disc),
+    ModelDef::tiered(
+        "regency_missile_defense~petals",
+        RONDEL,
+        turrets::rondel::petals,
+    ),
+    ModelDef::tiered(
+        "regency_missile_defense~hover",
+        RONDEL,
+        turrets::rondel::hover,
+    ),
     // The shield generator (`ward`): tech 2, upgrading in place to tech 3.
     ModelDef::tiered(
         "regency_ward",
@@ -298,6 +313,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_fusion_cannon" => 7500,
         // Eight cells, each a lid, a rim and a seeker, round a turning array.
         "regency_seeker_silo" => 6000,
+        // Two lens heads, two more waiting for the refit.
+        "regency_missile_defense" => 4000,
         // Its tech 3 kit waiting on it.
         "regency_ward" => 6000,
         // A skirted tracked body, a turret, the gun and its caged core.

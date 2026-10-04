@@ -322,6 +322,12 @@
             "Gravitic Seeker Battery": "Eight seekers leave their cells one after another and spread over every aircraft in reach.",
         },
     ),
+    "regency_t2_missile_defense": (
+        lore: "Two gravity lenses on a plated stand. Each throws a lens onto an incoming missile and squeezes its containment until it folds in on itself and bursts short of the base.",
+    ),
+    "regency_t3_missile_defense": (
+        lore: "A second pair of lenses lifted higher, and a longer reach: four missiles held and crushed at once, where a battery would saturate two.",
+    ),
     "regency_t1_radar": (
         lore: "A braced mast crowned with a sensor ring that turns free of it, held by gravity alone.",
         weapons: {},
