@@ -3,22 +3,15 @@
 use super::*;
 use crate::{build_model, Model};
 
-/// The base mesh and its design variants.
-const KEYS: [&str; 3] = [
-    "regency_strider",
-    "regency_strider~collars",
-    "regency_strider~rails",
-];
-
 fn model() -> Model {
     build_model("regency_strider").unwrap()
 }
 
 #[test]
 fn fits_the_librarys_checks() {
-    for key in KEYS {
+    {
         super::super::check_charge(
-            key,
+            "regency_strider",
             RADIUS,
             HEIGHT,
             None,
@@ -70,7 +63,8 @@ fn the_unit_files_guns_are_the_models() {
 /// meets a knee.
 #[test]
 fn stands_on_three_legs() {
-    for key in KEYS {
+    {
+        let key = "regency_strider";
         let model = build_model(key).unwrap();
         let crawl = model.legs.and_then(|l| l.crawl).expect("a crawler");
         assert_eq!(crawl.pairs, 2);
@@ -134,6 +128,25 @@ fn stands_on_three_legs() {
                 leg_high < turret_low - 0.3,
                 "{key}: a leg at {leg_high} m under the head's sweep at {turret_low} m"
             );
+        }
+    }
+}
+
+/// Nothing of the head rises through a seeker cell's mouth: the deck stands clear over
+/// the head's ridge, and only the cell's own collar and rim stand on it.
+#[test]
+fn the_cells_are_clear() {
+    let model = model();
+    for lod in &model.lods[..2] {
+        for [x, y] in CELLS {
+            let top = lod
+                .vertices
+                .iter()
+                .filter(|v| v.part == part::TURRET)
+                .filter(|v| Vec2::new(v.pos[0] - x, v.pos[1] - y).length() < CELL_R * 0.7)
+                .map(|v| v.pos[2])
+                .fold(f32::MIN, f32::max);
+            assert!(top <= DECK + 0.2, "cell {x},{y}: the head stands to {top}");
         }
     }
 }

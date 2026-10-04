@@ -40,7 +40,6 @@ use crate::{part, rig};
 use super::commander::form::{ball, blade, ring, sleeve, KEEL, OCT};
 use super::kit::{dark_plate, metal, seam, v3};
 use super::machine::{collar, hoop_on, red_slot, shaft};
-use cannon::Design;
 
 /// Authored size (the unit file's is `SCALE` times it).
 pub(super) const RADIUS: f32 = 12.0;
@@ -59,18 +58,19 @@ const MUZZLES: [Vec3; 2] = [
 /// How far round each charge the gun stands: none of it closer than 0.4 of this.
 #[cfg(test)]
 const HOLD: f32 = 2.0;
-/// The seeker launcher on the back of the head: its deck, and its cells (x along the
-/// head, y across) in the order they fire, front pair first, left before right.
-const DECK: f32 = 30.4;
+/// The seeker launcher on the back of the head: its deck, clear over the head's ridge, and
+/// its cells (x along the head, y across) in the order they fire, front pair first, left
+/// before right.
+const DECK: f32 = 31.0;
 const CELLS: [[f32; 2]; 8] = [
-    [-2.4, 0.62],
-    [-2.4, -0.62],
-    [-3.6, 0.62],
-    [-3.6, -0.62],
-    [-4.8, 0.62],
-    [-4.8, -0.62],
-    [-6.0, 0.62],
-    [-6.0, -0.62],
+    [-2.8, 0.62],
+    [-2.8, -0.62],
+    [-3.9, 0.62],
+    [-3.9, -0.62],
+    [-5.0, 0.62],
+    [-5.0, -0.62],
+    [-6.1, 0.62],
+    [-6.1, -0.62],
 ];
 /// A cell's mouth across.
 const CELL_R: f32 = 0.42;
@@ -108,22 +108,7 @@ fn legs() -> [(Vec3, Vec3, Vec3, f32); 2] {
     [leg_joints(50.0, 60.0, 0.0), leg_joints(180.0, 180.0, 0.25)]
 }
 
-/// The Strider with its cannons split down the bore (the base mesh).
 pub(super) fn strider(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, Design::Split);
-}
-
-/// The Strider with collared cannons (`regency_strider~collars`).
-pub(super) fn strider_collars(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, Design::Collars);
-}
-
-/// The Strider with railed cannons (`regency_strider~rails`).
-pub(super) fn strider_rails(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, Design::Rails);
-}
-
-fn draw(b: &mut MeshBuilder, design: Design) {
     let legs = legs();
     b.set_crawl_legs(&legs, STRIDE, STANCE, LIFT);
     b.set_lone_leg(1);
@@ -142,7 +127,7 @@ fn draw(b: &mut MeshBuilder, design: Design) {
     b.with_part(part::TURRET, |b| {
         prow(b);
         launcher(b);
-        b.with_limb(rig::ARM_GUN, |b| b.mirror_y(|b| mount(b, design)));
+        b.with_limb(rig::ARM_GUN, |b| b.mirror_y(mount));
     });
 }
 
@@ -520,9 +505,9 @@ fn launcher(b: &mut MeshBuilder) {
 /// The left cannon (the right is its mirror), in the head's frame: it pitches about
 /// `PIVOT`. A trunnion out from the neck to the gun, which is drawn in its own frame
 /// (`cannon`).
-fn mount(b: &mut MeshBuilder, design: Design) {
+fn mount(b: &mut MeshBuilder) {
     let m = MUZZLES[0];
     shaft(b, v3(PIVOT.x, 1.6, m.z), v3(PIVOT.x, m.y - 0.6, m.z), 0.36);
     collar(b, v3(PIVOT.x, m.y - 0.7, m.z), Vec3::Y, 0.55, 0.3);
-    b.at(v3(PIVOT.x, m.y, m.z), |b| cannon::cannon(b, design));
+    b.at(v3(PIVOT.x, m.y, m.z), cannon::cannon);
 }

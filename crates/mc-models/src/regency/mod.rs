@@ -119,25 +119,12 @@ pub(super) const MODELS: &[ModelDef] = &[
     // The tech 3 wake tank: a hover hull, a wide flat projector in front of its turret
     // (`wake_tank`).
     ModelDef::new("regency_wake_tank", 7.6, 4.6, wake_tank::wake_tank),
-    // The tech 4 assault tripod: a keeled head high on three legs (`strider`), and two
-    // more cannon designs to pick from.
+    // The tech 4 assault tripod: a keeled head high on three legs (`strider`).
     ModelDef::new(
         "regency_strider",
         strider::RADIUS,
         strider::HEIGHT,
         strider::strider,
-    ),
-    ModelDef::new(
-        "regency_strider~collars",
-        strider::RADIUS,
-        strider::HEIGHT,
-        strider::strider_collars,
-    ),
-    ModelDef::new(
-        "regency_strider~rails",
-        strider::RADIUS,
-        strider::HEIGHT,
-        strider::strider_rails,
     ),
     // Factories: the land press works (`brood`), the air launch frame (`hatchery`), the
     // one-sided quay (`tidebrood`). All three upgrade in place to tech 3, the land one's
