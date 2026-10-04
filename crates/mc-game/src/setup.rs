@@ -547,7 +547,7 @@ pub fn opening_commands(
                 }
             }
             // Printed so a headless shot can be framed on it (`--camera X,Y,DIST`).
-            eprintln!(
+            log::info!(
                 "sea scene: shore at {:.0},{:.0}",
                 shore.x.to_f32(),
                 shore.y.to_f32()
@@ -572,7 +572,7 @@ pub fn opening_commands(
         Scene::TorpedoRun => {
             let base = map.start_positions().first().copied().unwrap_or(centre);
             let sea = open_sea(map, base);
-            eprintln!(
+            log::info!(
                 "torpedo run: fleet at {:.0},{:.0}",
                 sea.x.to_f32(),
                 sea.y.to_f32()
@@ -614,7 +614,7 @@ pub fn opening_commands(
             let base = map.start_positions().first().copied().unwrap_or(centre);
             let sea = open_sea(map, base);
             // Printed so a headless shot can be framed on it (`--camera X,Y,DIST`).
-            eprintln!(
+            log::info!(
                 "naval scene: fleets either side of {:.0},{:.0}",
                 sea.x.to_f32(),
                 sea.y.to_f32()

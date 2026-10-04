@@ -3,6 +3,9 @@
 //! all happen on the GPU.
 
 #![expect(unsafe_code, reason = "raw Vulkan through ash")]
+// A closed stderr pipe (whoever started the game went away) makes `eprintln!`
+// panic: the renderer logs instead.
+#![cfg_attr(not(test), warn(clippy::print_stdout, clippy::print_stderr))]
 
 pub mod camera;
 mod cliff_blocks;

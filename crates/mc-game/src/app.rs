@@ -133,6 +133,7 @@ struct App {
 }
 
 pub fn run(mut args: AppArgs) -> Result<(), String> {
+    crate::crash::set_interactive();
     raise_this_thread();
     let settings = Settings::load();
     // The smoke test opens the device like any run, but is not there to be heard.
@@ -644,7 +645,10 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if let Err(e) = crate::crash::drill_tick() {
+            self.fail(event_loop, e);
+        }
         if let Some(w) = &self.window {
             w.request_redraw();
         }

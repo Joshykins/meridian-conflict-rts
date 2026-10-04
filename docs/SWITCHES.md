@@ -56,6 +56,21 @@ match that long is run with the built exe directly.
 | `MERIDIAN_HISTORY_REPORT` | `N[:PAGE]`, 1 = the newest | With `--ui history`: match N's battle report open over Match History on PAGE (`overview`, `economy`, `military`, `battlefield`, `timeline`), fully drawn in. A replay without a kept record (`replays/<id>.mcreport`) is played through first, which the shot waits for. |
 | `MERIDIAN_VISION` | player slot | An `--observe` shot is drawn through that player's eyes, as if its vision chip were picked (and shows its AI Mind card when a Commander plays it, docs/AI_COMMANDER.md). |
 
+## Crash reports
+
+Whatever ends the game badly is written beside the settings file (`%APPDATA%\meridian-conflict`
+on Windows, `~/.config/meridian-conflict` elsewhere; `crates/mc-game/src/crash.rs`): a panic or
+native fault to `crash-<unix secs>.log` (a native fault also to `crash-<secs>.dmp`, a minidump
+for Visual Studio or WinDbg with the build's `.pdb`), an error to `error-<secs>.log`. A
+player's run (no arguments, or one that opens the window) also shows the crash window, with
+Copy details and Open folder, and writes its whole log to `meridian.log` (the run before it:
+`meridian-previous.log`). Tool runs (headless shots, the shot server, bots) write the reports
+and never wait on a window.
+
+| Switch | Values | Purpose |
+|---|---|---|
+| `--crash-test` | `panic`, `sim`, `native`, `error` | Fail on purpose 8 s after start, to check the crash window over the running game: a panic on the main thread, a panic on a thread the game needs (as the sim thread is), an access violation (Windows), an error that ends the game. |
+
 ## AI probes and tournaments
 
 Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.md).

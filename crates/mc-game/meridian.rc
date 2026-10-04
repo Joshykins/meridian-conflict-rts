@@ -4,6 +4,9 @@
 
 1 ICON "assets/meridian.ico"
 
+// The manifest (resource type 24, id 1: the process's own), for the crash window.
+1 24 "meridian.manifest"
+
 1 VERSIONINFO
 FILEVERSION VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, 0
 PRODUCTVERSION VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, 0

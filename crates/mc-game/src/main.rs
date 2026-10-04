@@ -171,6 +171,9 @@ straight into a match instead.
   --cursor X,Y           with --ui: where the pointer is, in pixels
   --smoke                open the front end, play a default skirmish for a few seconds, return
                          to the front end and exit: an unattended check of every stage change
+  --crash-test KIND      fail on purpose 8 s in, to check the crash window: panic (main
+                         thread) | sim (a thread the game needs) | native (an access
+                         violation, Windows) | error (an error that ends the game)
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
 
@@ -209,10 +212,9 @@ fn main() {
     .format_timestamp_millis()
     .target(env_logger::Target::Pipe(Box::new(crash::LogTee)))
     .init();
-    if let Err(e) = run() {
-        eprintln!("error: {e}");
-        crash::report_error(&e);
-        std::process::exit(1);
+    let code = crash::run_guarded(run);
+    if code != 0 {
+        std::process::exit(code);
     }
 }
 
@@ -238,6 +240,7 @@ fn run() -> Result<(), String> {
     let mut loading_screen = loading::Screen::Briefing;
     let mut cursor: Option<[f32; 2]> = None;
     let mut smoke = false;
+    let mut crash_test = None;
     let mut dump_sounds: Option<String> = None;
     let mut select: Option<String> = None;
     let mut paused = false;
@@ -383,6 +386,7 @@ fn run() -> Result<(), String> {
             "--alpha" => alpha = value("--alpha")?.parse::<f32>().map_err(|_| "--alpha takes a number from 0 to 1")?.clamp(0.0, 1.0),
             "--smoke" => smoke = true,
             "--dump-sounds" => dump_sounds = Some(value("--dump-sounds")?),
+            "--crash-test" => crash_test = Some(crash::Drill::parse(&value("--crash-test")?).ok_or("--crash-test takes panic, sim, native or error")?),
             "--dump-cursors" => {
                 let (rgba, width, height) = pointer::sheet(2.0);
                 return headless::write_png(std::path::Path::new(&value("--dump-cursors")?), width, height, &rgba);
@@ -447,6 +451,9 @@ fn run() -> Result<(), String> {
             .ok_or("--ui draws a screenshot: give it --screenshot FILE.png")?;
         (shot.width, shot.height) = size;
         return headless::ui_screenshot(screen, blueprints, pool, ticks, &shot, cursor);
+    }
+    if let Some(drill) = crash_test {
+        crash::arm_drill(drill);
     }
     if !direct && bench.is_none() && shot.is_none() {
         log::info!(

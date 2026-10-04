@@ -441,6 +441,9 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
     std::thread::Builder::new()
         .name("mc-sim".into())
         .spawn(move || {
+            // The match cannot go on without this thread: a panic here ends the game
+            // with the crash window, rather than leaving it frozen.
+            let _fatal = crate::crash::FatalGuard;
             let fail = |message: String| {
                 log::error!("{message}");
                 let mut p = out.lock().unwrap();

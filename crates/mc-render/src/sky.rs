@@ -592,10 +592,6 @@ impl Sky {
             "cloud floor {floor_min:.0}..{floor_max:.0} m, sea {water_level:.0} m, centre {:.0} m",
             floor[(n / 2) * n + n / 2]
         );
-        eprintln!(
-            "cloud floor {floor_min:.0}..{floor_max:.0} m, sea {water_level:.0} m, centre {:.0} m",
-            floor[(n / 2) * n + n / 2]
-        );
         let floor_image = gpu.image(&ImageDesc {
             width: FLOOR_RES,
             height: FLOOR_RES,
