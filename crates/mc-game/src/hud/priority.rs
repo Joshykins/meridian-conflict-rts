@@ -4,9 +4,10 @@
 //! First overrides the Mines/Power row for the unit's work; Even leaves it to the row.
 
 use super::build::{tip, BUILDING};
+use super::segmented;
 use super::{HudAction, Scene};
 use crate::audio::Sfx;
-use crate::ui::{id, ink, palette, rgb, type_scale, Color, Rect, Ui};
+use crate::ui::{id, palette, rgb, type_scale, Color, Rect, Ui};
 use glam::Vec2;
 use mc_sim::focus::Priority;
 use mc_sim::mirror::UnitInstance;
@@ -113,33 +114,26 @@ pub(in crate::hud) fn control(
     tip_up: f32,
 ) {
     let shared = mix.shared();
-    let seg_w = r.w / 3.0;
-    ui.fill(r, ink(0.45));
-    // The highlight slides to the segment the selection shares, and takes its colour.
+    // Interaction first, so the body can brighten under the pointer before its marks.
+    let res: [_; 3] =
+        std::array::from_fn(|n| ui.interact(id(key, n), segmented::segment(r, n, 3), true));
+    segmented::body(ui, r, res.iter().fold(0.0, |a, s| s.glow.max(a)));
+    // The pill slides to the segment the selection shares, and takes its colour.
     let at = ui.ease(id(key, 9), shared.map_or(1.0, |p| slot(p) as f32), 16.0);
     let lit = ui.ease(id(key, 10), if shared.is_some() { 1.0 } else { 0.0 }, 16.0);
-    if lit > 0.01 {
-        let hi_ink = blend(at);
-        let hi = Rect::new(r.x + at * seg_w, r.y, seg_w, r.h);
-        let a = (0.12 + 0.08 * at) * lit;
-        ui.gradient_v(hi, with_alpha(hi_ink, a * 1.6), with_alpha(hi_ink, a * 0.5));
-        ui.fill(
-            Rect::new(hi.x + 5.0, hi.bottom() - 2.0, hi.w - 10.0, 2.0),
-            with_alpha(hi_ink, 0.9 * lit),
-        );
-    }
+    segmented::pill(ui, r, at, 3, blend(at), lit);
     let total: usize = mix.counts.iter().sum();
     let mut hover = None;
     for (n, &(which, label)) in SEGMENTS.iter().enumerate() {
-        let sr = Rect::new(r.x + n as f32 * seg_w, r.y, seg_w, r.h);
-        let res = ui.interact(id(key, n), sr, true);
-        if res.glow > 0.01 {
-            ui.fill(sr, rgb(palette::TEXT, 0.06 * res.glow));
-        }
+        let sr = segmented::segment(r, n, 3);
+        let res = &res[n];
+        segmented::hover(ui, r, n, 3, res.glow);
+        segmented::divider(ui, r, n, 3, shared.map(|_| at));
         let on = shared == Some(which);
         let some = mix.counts[n] > 0;
+        // Lit, it reads white on its pill, as a lit tile's glyph does.
         let c = if on {
-            rgb(tone(which), 1.0)
+            rgb(0xFFFFFF, 1.0)
         } else if some {
             // A split selection: each part that has it is half lit.
             rgb(tone(which), 0.75)
@@ -154,12 +148,10 @@ pub(in crate::hud) fn control(
             }
             Size::Glyphs => chevron(ui, Vec2::new(mid, sr.mid_y()), which, 3.5, c),
         }
-        if n > 0 {
-            ui.vline(sr.x, sr.y + 4.0, sr.h - 8.0, rgb(palette::LINE, 0.12));
-        }
         // A split selection: a gauge along each segment's foot, filled to its share.
         if shared.is_none() && some {
-            let g = Rect::new(sr.x + 4.0, sr.bottom() - 3.0, sr.w - 8.0, 2.0);
+            let inner = segmented::inner_segment(r, n, 3);
+            let g = Rect::new(inner.x + 3.0, inner.bottom() - 2.0, inner.w - 6.0, 2.0);
             ui.fill(g, rgb(tone(which), 0.18));
             ui.fill(
                 Rect::new(g.x, g.y, g.w * mix.counts[n] as f32 / total as f32, g.h),
@@ -179,7 +171,6 @@ pub(in crate::hud) fn control(
             hud.actions.push(HudAction::Priority(next));
         }
     }
-    ui.frame(r, rgb(palette::LINE, 0.14));
     if let Some(which) = hover {
         let act = if shared == Some(which) && which != Priority::Even {
             "  \u{b7}  Click to set back to Even"
@@ -244,9 +235,4 @@ fn blend(at: f32) -> Color {
     };
     let (a, b) = (rgb(a, 1.0), rgb(b, 1.0));
     std::array::from_fn(|n| a[n] + (b[n] - a[n]) * k)
-}
-
-fn with_alpha(mut c: Color, a: f32) -> Color {
-    c[3] = a;
-    c
 }

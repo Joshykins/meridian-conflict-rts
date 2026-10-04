@@ -38,6 +38,7 @@ mod reclaim;
 mod replay_bar;
 pub use replay_bar::{clock as replay_clock, ReplayBar};
 mod refit;
+mod segmented;
 mod selection;
 pub mod silo;
 pub mod survival;

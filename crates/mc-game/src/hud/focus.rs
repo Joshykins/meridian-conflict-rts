@@ -5,10 +5,11 @@
 
 use super::build::tip;
 use super::notices::{Glyph, Notices};
+use super::segmented;
 use super::{Hud, HudAction, ENERGY, LOW, MASS};
 use crate::audio::Sfx;
 use crate::sim_thread::PlayerStatus;
-use crate::ui::{id, ink, palette, rgb, type_scale, Color, Rect, Ui};
+use crate::ui::{id, palette, rgb, type_scale, Color, Rect, Ui};
 use glam::Vec2;
 use mc_sim::focus::{Focus, Priority};
 
@@ -287,65 +288,41 @@ fn control(ui: &mut Ui, row: Rect, i: usize, f: &Face) -> Option<Priority> {
         }
     }
 
-    ui.fill(seg, ink(0.45));
-    // The highlight slides between segments and takes the colour of where it rests:
-    // grey for Last, white for Even, the resource's own for First.
-    let shade = |k: f32| -> (Color, f32) {
-        if k < 1.0 {
-            (
-                mix(rgb(palette::DIM, 1.0), rgb(palette::TEXT, 1.0), k),
-                0.10 + 0.04 * k,
-            )
-        } else {
-            let k = k - 1.0;
-            (
-                mix(rgb(palette::TEXT, 1.0), rgb(tone, 1.0), k),
-                0.14 + 0.16 * k,
-            )
-        }
+    let key = if i == 0 {
+        "hud-focus-mines"
+    } else {
+        "hud-focus-power"
     };
-    let (hi_ink, hi_a) = shade(f.pos);
-    let hi = Rect::new(seg.x + f.pos * SEG_W, seg.y, SEG_W, SEG_H);
-    ui.gradient_v(
-        hi,
-        with_alpha(hi_ink, hi_a * 1.6),
-        with_alpha(hi_ink, hi_a * 0.6),
-    );
-    ui.fill(
-        Rect::new(hi.x + 6.0, hi.bottom() - 2.0, hi.w - 12.0, 2.0),
-        with_alpha(hi_ink, 0.9),
-    );
+    // Interaction first, so the body can brighten under the pointer before its marks.
+    let res: [_; 3] =
+        std::array::from_fn(|n| ui.interact(id(key, n), segmented::segment(seg, n, 3), true));
+    segmented::body(ui, seg, res.iter().fold(0.0, |a, s| s.glow.max(a)));
+    // The pill slides between segments and takes the colour of where it rests:
+    // grey for Last, white for Even, the resource's own for First.
+    let hi_ink = if f.pos < 1.0 {
+        mix(rgb(palette::DIM, 1.0), rgb(palette::TEXT, 1.0), f.pos)
+    } else {
+        mix(rgb(palette::TEXT, 1.0), rgb(tone, 1.0), f.pos - 1.0)
+    };
+    segmented::pill(ui, seg, f.pos, 3, hi_ink, 1.0);
 
-    let first = Rect::new(seg.x + SEG_W * 2.0, seg.y, SEG_W, SEG_H);
     if let Some((c, k)) = alarm {
+        let first = segmented::inner_segment(seg, 2, 3);
         ui.gradient_h(first, rgb(c, 0.05), rgb(c, 0.12 + 0.18 * k));
         sheen(ui, first, t);
-        ui.frame(first, rgb(c, 0.35 + 0.55 * k));
+        ui.outline_cut(first, 2.0, rgb(c, 0.35 + 0.55 * k), rgb(c, 0.35 + 0.55 * k));
     }
 
     let mut picked = None;
     let mut hover = None;
     for (n, &(which, label)) in SEGMENTS.iter().enumerate() {
-        let r = Rect::new(seg.x + n as f32 * SEG_W, seg.y, SEG_W, SEG_H);
-        let res = ui.interact(
-            id(
-                if i == 0 {
-                    "hud-focus-mines"
-                } else {
-                    "hud-focus-power"
-                },
-                n,
-            ),
-            r,
-            true,
-        );
-        if res.glow > 0.01 {
-            ui.fill(r, rgb(palette::TEXT, 0.06 * res.glow));
-        }
+        let r = segmented::segment(seg, n, 3);
+        let res = &res[n];
+        segmented::hover(ui, seg, n, 3, res.glow);
+        segmented::divider(ui, seg, n, 3, Some(f.pos));
         let on = which == f.now;
         let ink = match (on, which, alarm) {
-            (true, Priority::First, _) => rgb(tone, 1.0),
-            (true, ..) => rgb(palette::TEXT, 1.0),
+            (true, ..) => rgb(0xFFFFFF, 1.0),
             (false, Priority::First, Some((c, k))) => rgb(c, 0.7 + 0.3 * k),
             (false, ..) => rgb(palette::FAINT, 0.9 + 0.1 * res.glow),
         };
@@ -355,9 +332,6 @@ fn control(ui: &mut Ui, row: Rect, i: usize, f: &Face) -> Option<Priority> {
             ink
         };
         ui.text_centred(r.x + r.w * 0.5, mid, type_scale::MICRO, ink, label);
-        if n > 0 {
-            ui.vline(r.x, r.y + 4.0, r.h - 8.0, rgb(palette::LINE, 0.10));
-        }
         if res.hovered {
             hover = Some(which);
         }
@@ -365,8 +339,6 @@ fn control(ui: &mut Ui, row: Rect, i: usize, f: &Face) -> Option<Priority> {
             picked = Some(which);
         }
     }
-    ui.frame(seg, rgb(palette::LINE, 0.14));
-
     if let Some(which) = hover {
         let kind = f.kind.name.to_lowercase();
         let what = match which {
@@ -451,9 +423,4 @@ fn outline(ui: &mut Ui, c: Vec2, s: f32, pts: &[Vec2], color: Color) {
 
 fn mix(a: Color, b: Color, k: f32) -> Color {
     std::array::from_fn(|n| a[n] + (b[n] - a[n]) * k)
-}
-
-fn with_alpha(mut c: Color, a: f32) -> Color {
-    c[3] = a;
-    c
 }
