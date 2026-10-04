@@ -148,7 +148,7 @@
                 ],
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
                 missile: true, guided: true, vertical_launch: true, apogee: 300,
-                cold_launch: 0.6, boost: 0.4, salvo: 8, salvo_delay: 0.15, split: true,
+                salvo: 8, salvo_delay: 0.15, split: true,
                 intercept: 60, caliber: 1.0, flash: 1.2, impact: 2.2, shockwave: 1.0,
                 plasma_grade: Some(Gravitic),
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
