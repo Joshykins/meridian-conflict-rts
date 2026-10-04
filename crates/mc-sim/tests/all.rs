@@ -84,6 +84,7 @@ mod skyguard;
 mod straight_moves;
 mod stranded_ships;
 mod stream;
+mod strider;
 mod survival;
 mod thirty_two;
 mod titan;

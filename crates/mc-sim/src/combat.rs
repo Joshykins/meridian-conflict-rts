@@ -1836,8 +1836,14 @@ impl World {
             return Ok(());
         }
         // On target and ready, but it has not just finished a countdown: charge first.
+        // A twin waits its turn and is seen charging at the end of the wait (`twins.rs`).
         if weapon.charge_ticks > 0 && !cooling && units.weapon_salvo_left[row][w] == 0 {
-            units.weapon_cooldown[row][w] = weapon.charge_ticks;
+            let countdown = self.twin_charge(row, w, weapon);
+            let units = &mut self.state.units;
+            units.weapon_cooldown[row][w] = countdown;
+            if countdown > weapon.charge_ticks {
+                return Ok(());
+            }
             let at = units.pos[row].extend(units.z[row] + weapon.muzzle.z);
             self.events.push(SimEvent::WeaponCharging {
                 unit: units.id(row),
@@ -1890,37 +1896,11 @@ impl World {
         } else {
             weapon.reload_ticks
         };
-        // Twin barrels of the same gun take turns. The later one waits half a
-        // reload whenever the earlier one fires and it is ready, so they do
-        // not dump both shots on the same tick after sitting idle. Guns of one name
-        // that cover other arcs (a capital ship's turrets on the bow, the stern and
-        // each flank) are separate guns: held back, one on the far side of the hull
-        // would sit through a charge it can never fire.
+        // Twin barrels of the same gun take turns (`twins.rs`).
         if units.weapon_salvo_left[row][w] == 0 {
-            let stagger = weapon.reload_ticks / 2 + 1;
-            if stagger > 1 {
-                let later: Vec<usize> = bp
-                    .unit(units.blueprint[row])
-                    .weapons
-                    .iter()
-                    .enumerate()
-                    .skip(w + 1)
-                    .filter(|(_, other)| {
-                        other.name == weapon.name
-                            && other.facing == weapon.facing
-                            && other.half_arc == weapon.half_arc
-                    })
-                    .map(|(i, _)| i)
-                    .collect();
-                for i in later {
-                    // Ready, or counting its last tick (a twin that charged beside this one
-                    // would otherwise fire on this very tick and stay in step for good).
-                    if units.weapon_cooldown[row][i] <= 1 && units.weapon_salvo_left[row][i] == 0 {
-                        units.weapon_cooldown[row][i] = stagger;
-                    }
-                }
-            }
+            self.stagger_twins(row, w, weapon);
         }
+        let units = &mut self.state.units;
 
         let facing = units.heading[row]
             + if weapon.vertical_launch {
