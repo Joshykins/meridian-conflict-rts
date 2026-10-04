@@ -13,7 +13,7 @@
 fn is_plasma_puff(kind: u32) -> bool {
     return kind == PUFF_PLASMA_ORB || kind == PUFF_PLASMA_BURST || kind == PUFF_PLASMA_GLOB
         || kind == PUFF_PLASMA_WAKE || kind == PUFF_STAR_CORE || kind == PUFF_SUPERNOVA
-        || kind == PUFF_NOVA_WISP;
+        || kind == PUFF_NOVA_WISP || kind == PUFF_CRUSH_LENS;
 }
 
 // Turned to the eye, where it was born; a burst is drawn a little toward the eye so the
@@ -110,7 +110,36 @@ fn plasma_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     if u32(in.state.y) == PUFF_NOVA_WISP {
         return nova_wisp(in, d);
     }
+    if u32(in.state.y) == PUFF_CRUSH_LENS {
+        return crush_lens(in, d);
+    }
     return plasma_burst(in, d);
+}
+
+// A gravity crush's grip on a missile (renderer/crush_fx.rs): a ring of bent light round
+// it, tightening as the puff shrinks over its life. A hard red rim, white-pink on its inner
+// edge, wavering where the field bends the light; faint heat-haze rings running in from it;
+// a dark heart, the light pulled out of it. The rim is light added; the heart hides a
+// little of what is behind it.
+fn crush_lens(in: PuffOut, d: f32) -> vec4<f32> {
+    let now = globals.camera.w;
+    let age = in.state.x;
+    let seed = in.state.z;
+    let rgb = in.appearance.rgb;
+    let angle = atan2(in.uv.y, in.uv.x);
+    let waver = 0.035 * sin(angle * 5.0 + now * 31.0 + seed * 40.0)
+        + 0.02 * sin(angle * 9.0 - now * 23.0 + seed * 17.0);
+    let rim_r = 0.74 + waver;
+    let rim = exp(-pow((d - rim_r) / 0.075, 2.0));
+    let inner = exp(-pow((d - rim_r + 0.06) / 0.035, 2.0));
+    // Rings of haze drawn in to the heart.
+    let rings = pow(0.5 + 0.5 * sin(d * 26.0 + now * 40.0 + seed * 9.0), 6.0)
+        * smoothstep(0.12, 0.35, d) * (1.0 - smoothstep(rim_r - 0.18, rim_r - 0.04, d));
+    let fade = smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.5, 1.0, age));
+    let white = vec3<f32>(length(rgb) * 0.55, length(rgb) * 0.42, length(rgb) * 0.45);
+    let light = rgb * (rim + rings * 0.25) + white * inner * 0.8;
+    let dark = (1.0 - smoothstep(0.1, rim_r - 0.15, d)) * 0.4 * fade;
+    return vec4<f32>(light * fade, dark);
 }
 
 // A charge: a ball of plasma held in the pinch. Its skin boils, its face churns in hotter

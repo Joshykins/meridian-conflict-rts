@@ -325,11 +325,8 @@ struct SoundTable {
     build: Vec<[Option<mc_data::SoundId>; 3]>,
     shield_hit: Option<mc_data::SoundId>,
     shield_break: Option<mc_data::SoundId>,
-    /// The intercept laser's zap, the counter-seekers' hum, and the snap when a missile
-    /// casing fails (audio/intercept.rs).
-    intercept_laser: Option<mc_data::SoundId>,
-    intercept_hum: Option<mc_data::SoundId>,
-    intercept_break: Option<mc_data::SoundId>,
+    /// Missile defence's shots and kills, by look (audio/intercept.rs).
+    intercept: crate::audio::intercept::Sounds,
     /// Pneumatic toss of a cold-launched missile, before the motor lights.
     cold_eject: Option<mc_data::SoundId>,
     /// A shot landing in the sea instead of on the ground: `shell_in_water`, and its heavy version.
@@ -3302,9 +3299,7 @@ impl Game {
                 .collect(),
             shield_hit: library.id_of("shield_hit"),
             shield_break: library.id_of("shield_break"),
-            intercept_laser: library.id_of("intercept_laser"),
-            intercept_hum: library.id_of("intercept_hum"),
-            intercept_break: library.id_of("intercept_break"),
+            intercept: crate::audio::intercept::Sounds::new(&library),
             cold_eject: library.id_of("cold_eject"),
             water: ["shell_in_water", "shell_in_water_heavy"].map(|name| library.id_of(name)),
             rain: ["rain_light", "rain_heavy"].map(|name| library.id_of(name)),
@@ -3687,23 +3682,12 @@ impl Game {
         }
         self.ambience.listen(din);
 
-        // Missile defence: a zap per laser shot, the counter-seekers' hum (a loop, below),
-        // and a pop at the missile when the casing fails. Deliberately capped: past the
-        // loudest few, more zaps in one tick only smear into noise.
+        // Missile defence: a sound per tick of burn, and one at the missile when it goes.
         let intercepts =
             crate::audio::intercept::heard(&self.view.frame.events, &self.blueprints, |p| {
                 self.hear(p)
             });
-        if let Some(sound) = table.intercept_laser {
-            for &(gain, pan, pitch) in intercepts.zaps.iter().take(3) {
-                audio.play_world(sound, gain, pan, pitch);
-            }
-        }
-        if let Some(sound) = table.intercept_break {
-            for &(gain, pan, pitch) in intercepts.breaks.iter().take(2) {
-                audio.play_world(sound, gain, pan, pitch);
-            }
-        }
+        table.intercept.play(&intercepts, audio);
 
         // Footfalls. A foot comes down each time the ground a walker has covered passes another
         // step's worth, part of the way through the tick: the sound waits for that moment.
@@ -3866,16 +3850,6 @@ impl Game {
                     1.0,
                 ));
             }
-        }
-        // Counter-seekers on missiles: one hum, from where they are.
-        let hum = intercepts.hum;
-        if let (Some(sound), true) = (table.intercept_hum, hum.0 > 0.0) {
-            loops.push((
-                sound,
-                (hum.0.sqrt() * 0.35).min(0.5),
-                hum.1 / hum.0.max(1e-9),
-                1.0,
-            ));
         }
         loops.extend(self.warhead_loops(audio));
         // Missiles heard as they fly (audio/flight.rs).

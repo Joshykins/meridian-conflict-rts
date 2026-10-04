@@ -7,7 +7,7 @@
 //! `rail_wakes`; the smoke and sparks every gun leaves are added by the `ShotFired` handler.
 
 use super::water_fx::PUFF_STEAM;
-use super::{FadeBeam, Renderer, PUFF_SPARK};
+use super::{FadeBeam, Renderer, FADE_RAIL, PUFF_SPARK};
 use crate::camera::Camera;
 use glam::Vec3;
 use mc_sim::mirror::{
@@ -149,8 +149,7 @@ impl Renderer {
                     start,
                     life: 0.12,
                     width: line * 1.4,
-                    laser: false,
-                    rail: true,
+                    kind: FADE_RAIL,
                 });
                 self.fade_beams.push(FadeBeam {
                     from: a,
@@ -158,8 +157,7 @@ impl Renderer {
                     start,
                     life: 0.5,
                     width: line * 0.6,
-                    laser: false,
-                    rail: true,
+                    kind: FADE_RAIL,
                 });
             }
             let vapour = 0.45 + p.size * 0.4;

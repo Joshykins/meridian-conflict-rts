@@ -7,7 +7,7 @@
 
 use crate::camera::Camera;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
-use crate::gpu_consts::{cull_list, lod, pass, settle, sprite_layer};
+use crate::gpu_consts::{cull_list, fade_beam, lod, pass, settle, sprite_layer};
 use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
@@ -50,6 +50,7 @@ mod clearing;
 mod cliff_rocks;
 mod cluster_fx;
 mod craters;
+mod crush_fx;
 mod cull_lists;
 mod effect_barriers;
 mod fallen_trees;
@@ -509,11 +510,18 @@ struct FadeBeam {
     start: f32,
     life: f32,
     width: f32,
-    /// A red intercept laser shot: struck at full brightness, fading fast (sprites.wgsl).
-    laser: bool,
-    /// A rail slug's path: white-hot, cooling to orange (sprites.wgsl beam colour 5).
-    rail: bool,
+    /// How it is drawn: its colour under `PROJECTILE_FADE_BEAM` (sprites.wgsl), one of
+    /// the `FADE_*` looks or `fade_beam::GRAVITY_TETHER`.
+    kind: u32,
 }
+
+/// A plain fading beam: a pale blue line.
+const FADE_PLAIN: u32 = 0;
+/// A red intercept laser shot: struck at full brightness, fading fast (sprites.wgsl beam
+/// colour 1).
+const FADE_LASER: u32 = 1;
+/// A rail slug's path: white-hot, cooling to orange (sprites.wgsl beam colour 5).
+const FADE_RAIL: u32 = 5;
 
 /// A hitscan shot waiting for its impact so the beam can run muzzle to hit.
 struct PendingRail {
@@ -3425,12 +3433,11 @@ impl Renderer {
         for b in &self.fade_beams {
             let k = 1.0 - ((time - b.start) / b.life.max(0.01)).clamp(0.0, 1.0);
             // A rail slug's path is white-hot and thin: a faint white light, never blue.
-            let color = if b.laser {
-                Vec3::new(1.0, 0.08, 0.04)
-            } else if b.rail {
-                Vec3::new(1.0, 0.96, 0.9) * 0.3
-            } else {
-                Vec3::new(0.3, 0.62, 1.0)
+            // A laser shot and a gravity crush's tether light red.
+            let color = match b.kind {
+                FADE_LASER | fade_beam::GRAVITY_TETHER => Vec3::new(1.0, 0.08, 0.04),
+                FADE_RAIL => Vec3::new(1.0, 0.96, 0.9) * 0.3,
+                _ => Vec3::new(0.3, 0.62, 1.0),
             };
             self.lights.beam(
                 b.from,
@@ -4340,13 +4347,7 @@ impl Renderer {
             }
             let inst = ProjectileInstance {
                 prev_pos: beam.from.to_array(),
-                color: if beam.laser {
-                    PROJECTILE_FADE_BEAM | 1
-                } else if beam.rail {
-                    PROJECTILE_FADE_BEAM | 5
-                } else {
-                    PROJECTILE_FADE_BEAM
-                },
+                color: PROJECTILE_FADE_BEAM | beam.kind,
                 pos: beam.to.to_array(),
                 size: beam.width,
                 wake: beam.start,
@@ -4371,8 +4372,7 @@ impl Renderer {
                 start: time,
                 life: 0.14,
                 width: width * 1.8,
-                laser: false,
-                rail: false,
+                kind: FADE_PLAIN,
             });
             self.fade_beams.push(FadeBeam {
                 from,
@@ -4380,8 +4380,7 @@ impl Renderer {
                 start: time,
                 life: 0.55,
                 width,
-                laser: false,
-                rail: false,
+                kind: FADE_PLAIN,
             });
             return;
         }
@@ -4396,8 +4395,7 @@ impl Renderer {
             start: time,
             life: 0.1,
             width: line * 1.6,
-            laser: false,
-            rail: true,
+            kind: FADE_RAIL,
         });
         self.fade_beams.push(FadeBeam {
             from,
@@ -4405,8 +4403,7 @@ impl Renderer {
             start: time,
             life: 0.6,
             width: line * 0.6,
-            laser: false,
-            rail: true,
+            kind: FADE_RAIL,
         });
         let length = from.distance(to);
         let wind = self.sky.wind_heading();
@@ -4758,8 +4755,8 @@ impl Renderer {
                 killed,
                 blueprint,
             } => {
-                // A faction that throws counter-seekers draws them (`gravitic_fx`), not a laser.
-                if !self.counter_seeker(*blueprint, from, to, *killed, time) {
+                // A faction whose look is the gravity crush draws that (`crush_fx`), not a laser.
+                if !self.missile_crushed(*blueprint, from, to, *killed, time) {
                     self.missile_lased(from, to, *killed, time);
                 }
             }

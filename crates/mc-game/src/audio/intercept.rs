@@ -1,19 +1,70 @@
-//! Missile defence heard (`SimEvent::MissileLased`). A laser faction's shot is a
-//! one-shot zap from its emitter, each tick it fires; a counter-seeker faction's is a
-//! low hum, one loop for all of them, while any holds on a missile. Either way the
-//! casing giving way is a muffled pop out at the missile.
+//! Missile defence heard (`SimEvent::MissileLased`), one sound a tick of burn from the
+//! emitter, by the faction's look: a laser faction's shot is a zap (`intercept_laser`), a
+//! gravity crush's grip a low thrum (`intercept_grip`). The round giving way is heard out at
+//! the missile: a laser's kill a muffled pop (`intercept_break`), a crush's a short indrawn
+//! breath into a dull thump (`intercept_implode`).
 
+use crate::audio::Audio;
 use glam::Vec3;
-use mc_data::{AntiMissileLook, Blueprints};
+use mc_data::{AntiMissileLook, Blueprints, SoundId, SoundLibrary};
 use mc_sim::SimEvent;
 
-/// What this frame's missile defence sounds like: the hum's summed power and
-/// power-weighted pan, and the zaps and pops as (gain, pan, pitch), loudest first.
+/// One sound heard: its gain, pan and pitch, and the look it is the sound of.
+#[derive(Clone, Copy)]
+pub(crate) struct Hit {
+    gain: f32,
+    pan: f32,
+    pitch: f32,
+    look: AntiMissileLook,
+}
+
+/// What this frame's missile defence sounds like: the shots and kills, loudest first.
 #[derive(Default)]
 pub(crate) struct Heard {
-    pub(crate) hum: (f32, f32),
-    pub(crate) zaps: Vec<(f32, f32, f32)>,
-    pub(crate) breaks: Vec<(f32, f32, f32)>,
+    shots: Vec<Hit>,
+    kills: Vec<Hit>,
+}
+
+/// The sounds missile defence plays, by look.
+pub(crate) struct Sounds {
+    laser: Option<SoundId>,
+    grip: Option<SoundId>,
+    laser_kill: Option<SoundId>,
+    crush_kill: Option<SoundId>,
+}
+
+impl Sounds {
+    pub(crate) fn new(library: &SoundLibrary) -> Sounds {
+        Sounds {
+            laser: library.id_of("intercept_laser"),
+            grip: library.id_of("intercept_grip"),
+            laser_kill: library.id_of("intercept_break"),
+            crush_kill: library.id_of("intercept_implode"),
+        }
+    }
+
+    /// Plays this frame's missile defence. Deliberately capped: past the loudest few, more
+    /// shots in one tick only smear into noise.
+    pub(crate) fn play(&self, heard: &Heard, audio: &Audio) {
+        for h in heard.shots.iter().take(3) {
+            let sound = match h.look {
+                AntiMissileLook::Laser => self.laser,
+                AntiMissileLook::Gravitic => self.grip,
+            };
+            if let Some(sound) = sound {
+                audio.play_world(sound, h.gain, h.pan, h.pitch);
+            }
+        }
+        for h in heard.kills.iter().take(2) {
+            let sound = match h.look {
+                AntiMissileLook::Laser => self.laser_kill,
+                AntiMissileLook::Gravitic => self.crush_kill,
+            };
+            if let Some(sound) = sound {
+                audio.play_world(sound, h.gain, h.pan, h.pitch);
+            }
+        }
+    }
 }
 
 /// A little pitch spread, from where it happened, so a battery does not ring as one.
@@ -47,18 +98,23 @@ pub(crate) fn heard(
             .get(blueprints.unit(*blueprint).faction.0 as usize)
             .map_or(AntiMissileLook::Laser, |f| f.anti_missile_look);
         let (gain, pan) = hear(from);
-        match look {
-            AntiMissileLook::Laser => out.zaps.push((gain, pan, 0.95 + jitter(from) * 0.1)),
-            AntiMissileLook::CounterSeeker => {
-                out.hum = (out.hum.0 + gain * gain, out.hum.1 + gain * gain * pan);
-            }
-        }
+        out.shots.push(Hit {
+            gain,
+            pan,
+            pitch: 0.95 + jitter(from) * 0.1,
+            look,
+        });
         if *killed {
             let (gain, pan) = hear(to);
-            out.breaks.push((gain * 0.8, pan, 0.92 + jitter(to) * 0.12));
+            out.kills.push(Hit {
+                gain: gain * 0.8,
+                pan,
+                pitch: 0.92 + jitter(to) * 0.12,
+                look,
+            });
         }
     }
-    out.zaps.sort_by(|a, b| b.0.total_cmp(&a.0));
-    out.breaks.sort_by(|a, b| b.0.total_cmp(&a.0));
+    out.shots.sort_by(|a, b| b.gain.total_cmp(&a.gain));
+    out.kills.sort_by(|a, b| b.gain.total_cmp(&a.gain));
     out
 }

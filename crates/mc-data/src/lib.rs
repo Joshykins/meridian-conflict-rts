@@ -1860,7 +1860,7 @@ mod tests {
         );
         assert_eq!(regency.shield_look, ShieldLook::Prism);
         assert_eq!(aster.shield_look, ShieldLook::Honeycomb);
-        assert_eq!(regency.anti_missile_look, AntiMissileLook::CounterSeeker);
+        assert_eq!(regency.anti_missile_look, AntiMissileLook::Gravitic);
         assert_eq!(aster.anti_missile_look, AntiMissileLook::Laser);
         assert!(
             regency.sounds.select.contains_key(&IconKind::Factory)

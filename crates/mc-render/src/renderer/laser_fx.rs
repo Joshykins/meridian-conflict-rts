@@ -7,7 +7,7 @@
 //! Built to read at strategic zoom: the beam never thins below a few pixels.
 
 use super::lens_flare::Flare;
-use super::{blast_fx, FadeBeam, Renderer, PUFF_SPARK};
+use super::{blast_fx, FadeBeam, Renderer, FADE_LASER, PUFF_SPARK};
 use crate::gpu_consts::puff;
 use glam::Vec3;
 use mc_core::FxVec3;
@@ -40,8 +40,7 @@ impl Renderer {
             start: time,
             life: BEAM_LIFE,
             width: BEAM_WIDTH,
-            laser: true,
-            rail: false,
+            kind: FADE_LASER,
         });
         // The emitter's head flashes as the bank dumps into it.
         self.push_effect(origin.to_array(), time, 3.6, BEAM_LIFE, 8.0, 0.0);

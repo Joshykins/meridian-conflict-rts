@@ -1,7 +1,7 @@
-//! The Regency's Gravitic Seekers and Counter-seekers as they are drawn (docs/STYLE.md "The
-//! Regency suite"): a plasma charge held and steered in gravity containment, never a rocket.
-//! Picked by data, never by a unit: a missile weapon with `plasma_grade: Gravitic`
-//! (`Weapon::gravitic_seeker`), and a faction's `anti_missile_look: CounterSeeker`.
+//! The Regency's Gravitic Seekers as they are drawn (docs/STYLE.md "The Regency suite"): a
+//! plasma charge held and steered in gravity containment, never a rocket. Picked by data,
+//! never by a unit: a missile weapon with `plasma_grade: Gravitic`
+//! (`Weapon::gravitic_seeker`). The Regency's missile defence is drawn by `crush_fx`.
 //!
 //! - **The seeker** (the Pavise's battery and heavy seeker, the silos): it leaves its cell
 //!   the moment it is fired, with a hard red flash and a snap of filaments, no motor flame,
@@ -15,11 +15,6 @@
 //!   strikes the lens lets go: it snaps in, then a hard
 //!   red burst over a white heart, filaments torn out, globs and spatter thrown out low, the
 //!   ground glassed under it; a heavy one's many times bigger, by its damage and `impact`.
-//! - **The counter-seeker** (missile defence, `SimEvent::MissileLased` from a faction that
-//!   throws them): a small red charge (`PLASMA_LOOK_COUNTER_SEEKER`) off the mount that runs the missile down along a
-//!   cooling filament and bursts on it, hard and short, the tick the sim kills it. A burn the
-//!   sim lets go of without a kill fizzles where the counter-seeker had got to. Only the
-//!   look: what dies, and when, is the sim's.
 //!
 //! Nothing is wound round a middle (no spiral arms, no rings), and nothing hangs as a mist.
 //! Presentation only; the renderer's own clock.
@@ -27,13 +22,11 @@
 use super::nuke_fx::PUFF_STRATEGIC_TRAIL;
 use super::regency_guns_fx::{cased_seeker, drawn_look};
 use super::Renderer;
-use crate::gpu_consts::{fade_beam, plasma_look, puff};
+use crate::gpu_consts::{plasma_look, puff};
 use glam::Vec3;
-use mc_core::FxVec3;
-use mc_data::{AntiMissileLook, BlueprintId, Weapon, WeaponColor};
+use mc_data::{BlueprintId, Weapon};
 use mc_sim::mirror::{
-    ProjectileInstance, PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_FRESH,
-    PROJECTILE_STARTS_SHIFT,
+    ProjectileInstance, PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_STARTS_SHIFT,
 };
 
 const BURST: f32 = puff::PLASMA_BURST as f32;
@@ -47,33 +40,10 @@ const MOTE: f32 = puff::WARP_MOTE as f32;
 const RED: Vec3 = Vec3::new(1.0, 0.07, 0.04);
 const HOT: Vec3 = Vec3::new(1.0, 0.55, 0.5);
 const WHITE: Vec3 = Vec3::new(1.0, 0.96, 1.0);
-/// Metres a piece of a counter-seeker's filament runs.
-const TRAIL_STEP: f32 = 12.0;
 /// Metres of a seeker's path between two puffs of its smoke tube.
 const SMOKE_STEP: f32 = 9.0;
-/// Trail pieces held at most. A deliberate cosmetic cap: the oldest goes first.
-const MAX_TRAILS: usize = 1600;
 /// Timed lights held at most. A deliberate cosmetic cap: the oldest goes first.
 const MAX_GLOWS: usize = 64;
-/// Counter-seekers in flight that are drawn. A deliberate cosmetic cap: past it a burn is
-/// not drawn (the kill is still the sim's).
-const MAX_COUNTERS: usize = 96;
-/// A counter-seeker closes this share of the gap to its missile each tick it chases it,
-/// and meets it this far through the tick the sim kills it.
-const CHASE: f32 = 0.55;
-const MEET: f32 = 0.6;
-/// A counter-seeker's charge across, metres.
-const COUNTER_SIZE: f32 = 0.55;
-
-/// A piece of a filament: from `start` for `life` seconds, cooling as it goes.
-#[derive(Clone, Copy)]
-struct Filament {
-    from: Vec3,
-    to: Vec3,
-    start: f32,
-    life: f32,
-    width: f32,
-}
 
 /// A light: from `start` for `life` seconds, fading out.
 #[derive(Clone, Copy)]
@@ -85,26 +55,9 @@ struct Glow {
     life: f32,
 }
 
-/// A counter-seeker running a missile down.
-struct Counter {
-    /// The mount it left.
-    mount: Vec3,
-    /// Where it has got to.
-    head: Vec3,
-    /// Where the missile was on the tick before, and on the latest.
-    prev_target: Vec3,
-    target: Vec3,
-    /// When the latest tick's burn came in.
-    last: f32,
-    killed: bool,
-    fresh: bool,
-}
-
 #[derive(Default)]
 pub(super) struct GraviticFx {
-    trails: Vec<Filament>,
     glows: Vec<Glow>,
-    counters: Vec<Counter>,
 }
 
 impl GraviticFx {
@@ -353,69 +306,10 @@ impl Renderer {
         });
     }
 
-    /// A tick of missile defence (`MissileLased`) from a defender whose faction throws
-    /// counter-seekers (`AntiMissileLook::CounterSeeker`). True when this draws it (and the
-    /// laser should not).
-    pub(super) fn counter_seeker(
-        &mut self,
-        defender: BlueprintId,
-        from: &FxVec3,
-        to: &FxVec3,
-        killed: bool,
-        time: f32,
-    ) -> bool {
-        let faction = self.blueprints.unit(defender).faction;
-        let look = self
-            .blueprints
-            .factions
-            .get(faction.0 as usize)
-            .map_or(AntiMissileLook::Laser, |f| f.anti_missile_look);
-        if look != AntiMissileLook::CounterSeeker {
-            return false;
-        }
-        let mount = Vec3::from(from.to_f32());
-        let at = Vec3::from(to.to_f32());
-        let tick = self.tick_seconds.max(0.02);
-        let fx = &mut self.plasma_fx.seekers;
-        // The one already running this missile down from this mount: the missile near where
-        // its last step says it would be.
-        let held = fx.counters.iter().position(|c| {
-            !c.killed
-                && c.mount.distance(mount) < 0.5
-                && (c.target
-                    + (c.target - c.prev_target) * ((time - c.last) / tick).clamp(0.0, 2.0))
-                .distance(at)
-                    < 60.0
-        });
-        match held {
-            Some(i) => {
-                let c = &mut fx.counters[i];
-                c.prev_target = c.target;
-                c.target = at;
-                c.last = time;
-                c.killed = killed;
-            }
-            None if fx.counters.len() < MAX_COUNTERS => fx.counters.push(Counter {
-                mount,
-                head: mount,
-                prev_target: at,
-                target: at,
-                last: time,
-                killed,
-                fresh: true,
-            }),
-            None => {}
-        }
-        true
-    }
-
-    /// The next tick of every seeker and counter-seeker (from `upload_sim`, after this tick's
-    /// events and shots): the filaments seekers leave, the counter-seekers moved on, burst
-    /// or fizzled.
+    /// The next tick of every seeker (from `upload_sim`, after this tick's shots): the
+    /// smoke each one leaves.
     pub(super) fn gravitic_tick(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         self.seeker_trails(projectiles, time);
-        self.counter_seekers(time);
-        self.write_gravitic(time);
     }
 
     /// The black smoke each seeker in flight lays down the stretch it flies this tick, each
@@ -484,202 +378,26 @@ impl Renderer {
         }
     }
 
-    /// A filament down `from` to `to`, flown from `starts` to `span` of the tick: a thin
-    /// hot thread and the sheath round it that goes out sooner.
-    fn lay_filament(
+    /// A red light at `pos` from `start` for `life` seconds, fading out: a gravity crush's
+    /// kill (`crush_fx`) lights what is round it as a seeker's strike does.
+    pub(super) fn gravitic_glow(
         &mut self,
-        from: Vec3,
-        to: Vec3,
-        time: f32,
-        starts: f32,
-        span: f32,
-        size: f32,
+        pos: Vec3,
+        color: Vec3,
+        range: f32,
+        start: f32,
         life: f32,
     ) {
-        let tick = self.tick_seconds.max(0.02);
-        // A deliberate cosmetic cap on one stretch: a tick's flight is far under this many.
-        let n = ((from.distance(to) / TRAIL_STEP).ceil() as usize).clamp(1, 16);
-        let fx = &mut self.plasma_fx.seekers;
-        for k in 0..n {
-            let (f0, f1) = (k as f32 / n as f32, (k + 1) as f32 / n as f32);
-            let (a, b) = (from.lerp(to, f0), from.lerp(to, f1));
-            let start = time + tick * (starts + (span - starts).max(0.0) * f1);
-            fx.trails.push(Filament {
-                from: a,
-                to: b,
-                start,
-                life,
-                width: size * 0.1,
-            });
-            fx.trails.push(Filament {
-                from: a,
-                to: b,
-                start,
-                life: life * 0.25,
-                width: size * 0.25,
-            });
-        }
-    }
-
-    /// Every counter-seeker moved on a tick: closing on its missile while the burn goes on,
-    /// meeting it and bursting on the tick it is killed, fizzling where it got to when the
-    /// burn stops without one.
-    fn counter_seekers(&mut self, time: f32) {
-        let tick = self.tick_seconds.max(0.02);
-        let mut shots = Vec::new();
-        let mut bursts = Vec::new();
-        let mut fizzles = Vec::new();
-        let mut filaments = Vec::new();
-        self.plasma_fx.seekers.counters.retain_mut(|c| {
-            if c.last < time - tick * 0.5 {
-                fizzles.push(c.head);
-                return false;
-            }
-            let lead = c.target + (c.target - c.prev_target) * 0.5;
-            let next = if c.killed {
-                c.target
-            } else {
-                c.head + (lead - c.head) * CHASE
-            };
-            let ends = if c.killed { MEET } else { 0.0 };
-            shots.push((c.head, next, ends, c.fresh));
-            filaments.push((c.head, next, if c.killed { MEET } else { 1.0 }));
-            c.head = next;
-            c.fresh = false;
-            if c.killed {
-                bursts.push(c.target);
-            }
-            !c.killed
-        });
-        let hot = 1.0 + 1.0 + 2.0 * plasma_look::COUNTER_SEEKER as f32;
-        let out: Vec<ProjectileInstance> = shots
-            .into_iter()
-            .map(|(from, to, ends, fresh)| ProjectileInstance {
-                prev_pos: from.to_array(),
-                color: WeaponColor::Orange as u32
-                    | ((ends * 255.0) as u32) << PROJECTILE_ENDS_SHIFT
-                    | if fresh { PROJECTILE_FRESH } else { 0 },
-                pos: to.to_array(),
-                size: COUNTER_SIZE,
-                wake: 0.0,
-                plasma: 0.0,
-                _pad: [hot, 0.0],
-                aim: [0.0; 4],
-                prev_aim: [0.0; 4],
-            })
-            .collect();
-        self.push_projectiles(&out);
-        for (from, to, span) in filaments {
-            self.lay_filament(from, to, time, 0.0, span, COUNTER_SIZE * 1.4, 0.3);
-        }
-        for at in bursts {
-            self.counter_burst(at, time + tick * MEET);
-        }
-        for at in fizzles {
-            self.push_lit(
-                BURST,
-                at,
-                Vec3::ZERO,
-                time,
-                0.15,
-                (0.3, 1.2),
-                RED * 2.4,
-                0.0,
-            );
-        }
-    }
-
-    /// A counter-seeker meeting its missile: a small hard burst, white at the heart, red
-    /// filaments and sparks thrown out, gone fast.
-    fn counter_burst(&mut self, at: Vec3, start: f32) {
-        let s = 3.2;
-        self.push_lit(
-            GLOW,
-            at,
-            Vec3::ZERO,
-            start,
-            0.08,
-            (s * 0.5, s * 0.9),
-            WHITE * 3.0,
-            0.0,
-        );
-        self.push_lit(
-            BURST,
-            at,
-            Vec3::ZERO,
-            start,
-            0.3,
-            (s * 0.3, s * 1.3),
-            RED * 3.2,
-            0.0,
-        );
-        for _ in 0..6 {
-            let mut r = || self.scatter.signed();
-            let out = scatter_dir(&mut r, 0.0);
-            let reach = s * (0.8 + 0.6 * self.scatter.unit());
-            self.push_lit(
-                STREAK,
-                at,
-                out * reach,
-                start,
-                0.18,
-                (0.1, 0.06),
-                RED.lerp(HOT, 0.4) * 4.0,
-                0.0,
-            );
-        }
-        for _ in 0..10 {
-            let mut r = || self.scatter.signed();
-            let out = scatter_dir(&mut r, 0.1);
-            let speed = 14.0 + 20.0 * self.scatter.unit();
-            self.push_lit(
-                MOTE,
-                at,
-                out * speed,
-                start,
-                0.45,
-                (0.22, 0.08),
-                RED.lerp(HOT, 0.3) * 4.0,
-                0.0,
-            );
-        }
         self.plasma_fx.seekers.light(Glow {
-            pos: at,
-            color: RED * 260.0,
-            range: 18.0,
+            pos,
+            color,
+            range,
             start,
-            life: 0.25,
+            life,
         });
     }
 
-    /// This tick's filaments among the fading beams.
-    fn write_gravitic(&mut self, time: f32) {
-        let fx = &mut self.plasma_fx.seekers;
-        fx.trails.retain(|t| time < t.start + t.life);
-        if fx.trails.len() > MAX_TRAILS {
-            let extra = fx.trails.len() - MAX_TRAILS;
-            fx.trails.drain(..extra);
-        }
-        let out: Vec<ProjectileInstance> = fx
-            .trails
-            .iter()
-            .map(|t| ProjectileInstance {
-                prev_pos: t.from.to_array(),
-                color: PROJECTILE_FADE_BEAM | fade_beam::PLASMA_TRAIL,
-                pos: t.to.to_array(),
-                size: t.width,
-                wake: t.start,
-                plasma: t.life,
-                _pad: [0.0; 2],
-                // A counter-seeker's filament: pink-hot to red, never white (sprites.wgsl).
-                aim: [0.0, 0.0, 0.0, fade_beam::PLASMA_TRAIL_PINK],
-                prev_aim: [0.0; 4],
-            })
-            .collect();
-        self.push_projectiles(&out);
-    }
-
-    /// Every seeker's and counter-seeker's light this frame (from `upload_lights`).
+    /// Every seeker's and gravity crush's light this frame (from `upload_lights`).
     pub(super) fn gravitic_lights(&mut self, time: f32) {
         let fx = &mut self.plasma_fx.seekers;
         fx.glows.retain(|g| time < g.start + g.life);

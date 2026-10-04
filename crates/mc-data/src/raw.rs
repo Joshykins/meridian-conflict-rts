@@ -197,7 +197,7 @@ pub enum ShieldLook {
 }
 
 /// How a faction's missile defence (`anti_missile`) is drawn taking a missile down
-/// (mc-render `laser_fx`, `gravitic_fx`). Only the look: what it kills, and when, is the
+/// (mc-render `laser_fx`, `crush_fx`). Only the look: what it kills, and when, is the
 /// sim's either way.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Deserialize)]
 pub enum AntiMissileLook {
@@ -205,9 +205,10 @@ pub enum AntiMissileLook {
     /// until it fails (ARC).
     #[default]
     Laser,
-    /// The Gravitic Counter-seeker: a small red charge thrown off the mount that runs the
-    /// missile down and bursts on it, hard and short (the Regency).
-    CounterSeeker,
+    /// The Regency's gravity lens: the mount takes hold of the missile, a thin red tether
+    /// rippling out to it and a ring of bent light closing round it each tick, and crushes
+    /// it, imploding and popping red, hard and short (the Regency).
+    Gravitic,
 }
 
 /// How a faction's adjacency conduits run and look (mc-render `adjacency_links`): one line

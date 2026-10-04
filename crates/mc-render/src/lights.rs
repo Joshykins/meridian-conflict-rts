@@ -1119,21 +1119,15 @@ fn glow_of(p: &ProjectileInstance) -> Option<Glow> {
         });
     }
     // A seeker's charge (`mirror::plasma_look`, twice over in `_pad[0]` past one and its
-    // redness): a violet light round it, a heavy one's wide; a counter-seeker's, red.
+    // redness): a violet light round it, a heavy one's wide.
     let look = ((p._pad[0] - 1.0) * 0.5).floor();
     let seeker = look == crate::gpu_consts::plasma_look::GRAVITIC_SEEKER as f32;
-    let counter = look == crate::gpu_consts::plasma_look::COUNTER_SEEKER as f32;
-    if p._pad[0] > 2.5 && (seeker || counter) {
+    if p._pad[0] > 2.5 && seeker {
         let size = p.size.clamp(0.3, 4.0);
-        let tint = if counter {
-            Vec3::new(1.0, 0.1, 0.06)
-        } else {
-            Vec3::new(0.55, 0.1, 1.0)
-        };
         return Some(Glow {
             from,
             to,
-            color: tint * 40.0 * size,
+            color: Vec3::new(0.55, 0.1, 1.0) * 40.0 * size,
             range: 8.0 + 5.0 * size,
             line: false,
         });

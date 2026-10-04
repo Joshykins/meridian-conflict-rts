@@ -30,9 +30,10 @@
     // curtain, on a lattice of red-tinged triangles. Their generators' cores, and the
     // Exarch's back projector, burn the same prism.
     shield_look: Prism,
-    // Their missile defence throws Gravitic Counter-seekers: a small red charge off the
-    // mount that runs the missile down and bursts on it, where ARC holds a laser on it.
-    anti_missile_look: CounterSeeker,
+    // Their missile defence is a gravity lens that grips the missile and crushes it: a thin
+    // red tether rippling out to it, a ring of bent light closing round it, an implosion and
+    // a hard red pop, where ARC holds a laser on it.
+    anti_missile_look: Gravitic,
     // Their warheads are pinch fusion: a red plasma nova that leaves a dying star hanging
     // over the ground for minutes in an hourglass of rings, where ARC's roll into a
     // mushroom of smoke on a stem. Their missiles are faceted, finless, ringed by floating

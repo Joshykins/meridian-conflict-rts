@@ -127,16 +127,15 @@
                 Hiss(at: 0.01, freq: 4500, q: 0.9, attack: 0.002, decay: 0.14, gain: 0.07, seed: 902),
             ],
         ),
-        // The Regency counter-seekers holding on missiles, looped while any does: a low
-        // electrical hum with a faint dry fizz on top, steady, never bright. It sits
-        // under the battle.
-        "intercept_hum": (
-            length: 1.0, peak: 0.16, room: 0.1, looped: true,
+        // The Regency's gravity lens taking hold of a missile, once a tick it grips: a low
+        // thrum of pressure squeezing in, soft at the front, heavy, never a note or a zap.
+        // Short: a battery grips many together.
+        "intercept_grip": (
+            length: 0.45, peak: 0.24, room: 0.18,
             layers: [
-                Drone(freq: 100, gain: 0.12, wobble: 9, depth: 0.2),
-                Drone(freq: 200, gain: 0.08, wobble: 9, depth: 0.25),
-                Drone(freq: 300, gain: 0.03, wobble: 4.5, depth: 0.3),
-                Rumble(freq: 1400, q: 2.5, gain: 0.7, wobble: 13, depth: 0.5),
+                Tone(from: 74, to: 50, glide: 0.22, attack: 0.035, decay: 0.08, gain: 0.6),
+                Fm(from: 56, to: 46, glide: 0.25, ratio: 0.5, index: 1.4, fade: 0.12, attack: 0.03, decay: 0.07, gain: 0.3),
+                Roll(from: 320, to: 110, glide: 0.25, attack: 0.03, decay: 0.07, gain: 0.35, swell: 28, depth: 0.6, seed: 911),
             ],
         ),
         // The casing giving way: a muffled pop and a short cough as the motor goes, out
@@ -148,6 +147,19 @@
                 Burst(low: 120, high: 600, attack: 0.001, decay: 0.05, gain: 6),
                 Tone(from: 140, to: 60, glide: 0.1, attack: 0.002, decay: 0.14, gain: 0.5),
                 Burst(at: 0.05, low: 150, high: 700, attack: 0.02, decay: 0.2, gain: 1.4),
+            ],
+        ),
+        // A missile the gravity lens crushes: the air drawn in for a breath as it shuts, then
+        // a dull, hard thump with a crack in it as the casing folds. Out at the missile,
+        // well under the guns; no ring, no tail of debris.
+        "intercept_implode": (
+            length: 0.6, peak: 0.24, room: 0.3,
+            layers: [
+                Sweep(from: 1500, to: 220, glide: 0.08, q: 0.8, attack: 0.07, decay: 0.01, gain: 0.6, seed: 912),
+                Roll(from: 160, to: 520, glide: 0.08, attack: 0.07, decay: 0.01, gain: 0.35, swell: 0, depth: 0, seed: 913),
+                Burst(at: 0.08, low: 700, high: 2000, attack: 0.0003, decay: 0.004, gain: 2.2),
+                Burst(at: 0.08, low: 80, high: 400, attack: 0.001, decay: 0.045, gain: 6.5),
+                Tone(at: 0.08, from: 105, to: 40, glide: 0.1, attack: 0.002, decay: 0.11, gain: 0.6),
             ],
         ),
         // A cold SAM leaving the tube: a piston thump and a short breath of gas.

@@ -754,6 +754,11 @@ shared! {
         /// A pane's worth of glass thrown off a building (renderer/city_fx.rs):
         /// flies and tumbles like a casing, glinting, and lies where it lands.
         pub const GLASS: u32 = 59;
+        /// A gravity crush's grip on a missile (renderer/crush_fx.rs, plasma_puffs.wgsl): a
+        /// ring of bent light round it that tightens, a red rim, faint heat-haze rings running
+        /// in, a dark heart. Its size runs from `params.x` to `params.y` (smaller) over its
+        /// life; `appearance.rgb` its brightness.
+        pub const CRUSH_LENS: u32 = 60;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under
@@ -771,10 +776,12 @@ shared! {
         pub const PLASMA_TRAIL: u32 = 11;
         /// A Pinch-fusion round's: starts white and takes the prism's pinks.
         pub const PLASMA_TRAIL_FUSION: f32 = 1.0;
-        /// Pink-hot to red, never white: a Gravitic Seeker's filament (renderer/gravitic_fx.rs)
-        /// and a cone weapon's wake (renderer/wake_fx.rs), so a fan of them reads red, not as
-        /// white sticks.
-        pub const PLASMA_TRAIL_PINK: f32 = 2.0;
+        // retired: 2.0 (a plasma trail's kind)
+        /// A gravity crush's tether (renderer/crush_fx.rs), the Regency's missile defence
+        /// gripping a missile: a thin hard red core, lensing ripples running out from the
+        /// emitter to the missile, a faint prism shimmer at its edges. Struck and fading
+        /// fast, as the laser.
+        pub const GRAVITY_TETHER: u32 = 12;
     }
 
     /// How a Regency plasma shot is drawn in flight (`mc_sim::mirror::plasma_look`, carried in
@@ -787,9 +794,7 @@ shared! {
         /// defence can take it. No motor, plume or body.
         /// `mc_sim::mirror::PLASMA_LOOK_GRAVITIC_SEEKER`; a test holds them equal.
         pub const GRAVITIC_SEEKER: u32 = 5;
-        /// A counter-seeker (renderer/gravitic_fx.rs), the Regency's missile defence: the
-        /// seeker's charge in red, never the seeker's violet. Only the renderer writes it.
-        pub const COUNTER_SEEKER: u32 = 6;
+        // retired: 6
     }
 
     /// A strategic launcher (models/aster/strategic.rs, entity.wgsl). The rounds word

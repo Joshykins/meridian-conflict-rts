@@ -215,6 +215,13 @@ fn beam_fade(age: f32, laser: bool, held: bool) -> f32 {
     return pow(max(1.0 - age, 0.0), 1.2);
 }
 
+// A fading beam struck at full and gone fast (`beam_fade`): an intercept laser shot, or a
+// gravity crush's tether (renderer/crush_fx.rs).
+fn struck_beam(p: Projectile) -> bool {
+    let kind = p.color & 0xFu;
+    return (p.color & FADE_BEAM) != 0u && (kind == 1u || kind == FADE_BEAM_GRAVITY_TETHER);
+}
+
 @vertex
 fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u32) -> SpriteOut {
     let p = projectiles[instance];
@@ -287,9 +294,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // A Regency plasma shot (`mirror::plasma_look`, twice over in extras.z): 1 a
     // Pinched-plasmeric stream slug, 2 a Pinch-fusion slug, 3 a thrown gravitic charge,
     // each a longer streak than a shell's trace; 4 a Plasmeric bolt, a short fat teardrop;
-    // a seeker (or a counter-seeker), its charge in its lens, little longer than it is wide.
+    // a seeker, its charge in its lens, little longer than it is wide.
     let look = plasma_look(p);
-    let seeker = look == PLASMA_LOOK_GRAVITIC_SEEKER || look == PLASMA_LOOK_COUNTER_SEEKER;
+    let seeker = look == PLASMA_LOOK_GRAVITIC_SEEKER;
     if look == 1u {
         trace = length(stride) * 0.5;
     } else if look == 2u {
@@ -366,7 +373,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         core_frac = core_px / max(width_px, 0.001);
     }
     if fade_beam {
-        let laser = (p.color & 0xFu) == 1u;
+        let laser = struck_beam(p);
         let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
         let fade = beam_fade(age, laser, held);
         let floor_px = select(3.4, 2.4, laser);
@@ -391,7 +398,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         var true_m = 0.55;
         var floor_px = 1.4;
         if fade_beam {
-            let laser = (p.color & 0xFu) == 1u;
+            let laser = struck_beam(p);
             let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
             let fade = beam_fade(age, laser, false);
             let shrink = select(0.6 + 0.5 * fade, 0.9, laser) * select(1.0, fade, laser);
@@ -468,8 +475,13 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     if fade_beam {
         let laser = (p.color & 0xFu) == 1u;
         let age = (globals.camera.w - p.extras.x) / max(p.extras.y, 0.001);
-        let fade = beam_fade(age, laser, false);
-        if laser {
+        let fade = beam_fade(age, struck_beam(p), false);
+        if (p.color & 0xFu) == FADE_BEAM_GRAVITY_TETHER {
+            // A gravity crush's tether (renderer/crush_fx.rs): struck as bright as the laser
+            // and gone as fast; `fs_sprite` draws its core, ripples and shimmer.
+            out.color = vec3<f32>(fade * (1.0 + 1.2 * fade * fade * fade));
+            out.shape = vec2<f32>(-distance(head, tail), 4.3);
+        } else if laser {
             // Struck brighter than it burns: the first instant runs well over white.
             out.color = vec3<f32>(1.0, 0.08, 0.04) * 6.0 * fade * (1.0 + 1.2 * fade * fade * fade);
             out.shape = vec2<f32>(-distance(head, tail), 4.0);
@@ -498,22 +510,19 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
             // A Regency plasma shot's trail (renderer/regency_guns_fx.rs): hot where the shot
             // has just passed, cooling to a deep red as it goes out. A fusion round's starts
             // white, takes the prism's pinks and cools through them to violet, as a supernova's
-            // streamers do (never red); a wake's never goes past pink-hot. The age goes to
-            // `fs_sprite` in the shape, for the breaking up.
+            // streamers do (never red). The age goes to `fs_sprite` in the shape, for the
+            // breaking up.
             let heat = max(1.0 - age, 0.0);
             let fusion = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_FUSION) < 0.5;
-            // A Gravitic Seeker's filament and a wake's (renderer/gravitic_fx.rs, wake_fx.rs)
-            // never go white: pink-hot where the charge has just passed, then red.
-            let seeker = abs(p.aim.w - FADE_BEAM_PLASMA_TRAIL_PINK) < 0.5;
             var red = mix(vec3<f32>(0.45, 0.012, 0.008), vec3<f32>(1.0, 0.06, 0.035), smoothstep(0.0, 0.45, heat));
             if fusion {
                 red = mix(vec3<f32>(0.22, 0.1, 0.5), vec3<f32>(0.6, 0.4, 1.0), smoothstep(0.0, 0.45, heat));
             }
             let hue = prism(f32(instance) * 0.137 + globals.camera.w * PRISM_RATE * 3.0);
-            let pink = select(vec3<f32>(1.0, 0.45, 0.42), vec3<f32>(1.0, 0.22, 0.2), seeker);
+            let pink = vec3<f32>(1.0, 0.45, 0.42);
             var warm = mix(red, mix(pink, hue, select(0.0, 0.8, fusion)), smoothstep(0.45, 0.8, heat));
-            warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat) * select(1.0, 0.0, seeker));
-            out.color = warm * select(select(7.0, 9.0, fusion), 4.5, seeker) * pow(heat, 0.8);
+            warm = mix(warm, vec3<f32>(1.0, 0.9, 0.92), smoothstep(select(0.88, 0.8, fusion), 1.0, heat));
+            out.color = warm * select(7.0, 9.0, fusion) * pow(heat, 0.8);
             out.shape = vec2<f32>(-distance(head, tail), 6.6 + 0.4 * clamp(age, 0.0, 1.0));
         } else if (p.color & 0xFu) == 6u {
             // A capital rail's ionised channel (renderer/heavy_rail_fx.rs): white-hot,
@@ -575,7 +584,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     let p = projectiles[instance];
     // Lightning segments have their own soft caps. The ordinary shot-head sprite
     // would put a bead at every kink, turning dark as the light faded.
-    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL)) {
+    if (p.color & 0x100u) != 0u || ((p.color & FADE_BEAM) != 0u && ((p.color & 0xFu) == 3u || (p.color & 0xFu) == 4u || (p.color & 0xFu) == 6u || (p.color & 0xFu) == FADE_BEAM_TETHER || (p.color & 0xFu) == FADE_BEAM_PLASMA_TRAIL || (p.color & 0xFu) == FADE_BEAM_GRAVITY_TETHER)) {
         var hidden: SpriteOut;
         hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
         return hidden;
@@ -712,7 +721,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         out.color = mix(vec3<f32>(1.0, 0.38, 0.1), vec3<f32>(1.0, 0.06, 0.03), clamp(p.extras.z - 1.0, 0.0, 1.0));
     }
     let look = plasma_look(p);
-    if look == PLASMA_LOOK_GRAVITIC_SEEKER || look == PLASMA_LOOK_COUNTER_SEEKER {
+    if look == PLASMA_LOOK_GRAVITIC_SEEKER {
         // A seeker's heart is its streak's (`gravitic_seeker`): no bead over it.
         out.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
     }
@@ -728,9 +737,6 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     } else if look == PLASMA_LOOK_GRAVITIC_SEEKER {
         // A seeker: violet, its heart is the streak's (`gravitic_seeker`).
         out.color = vec3<f32>(0.62, 0.12, 1.1);
-    } else if look == PLASMA_LOOK_COUNTER_SEEKER {
-        // A counter-seeker: red.
-        out.color = vec3<f32>(1.1, 0.1, 0.07);
     }
     if (p.color & 0x100u) != 0u {
         out.color = SHOT_YELLOW;
@@ -898,9 +904,8 @@ fn vs_effect(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: 
 // to 1 at the head, `y` across (-1 to 1), `aspect` the quad's length over its width.
 // A hard-edged plasma charge: a lavender-white heart in a violet body drawn out a little
 // behind, held in a faint gravity lens that shimmers at its edge; violet so it reads as a
-// missile a defence can take. A counter-seeker (`PLASMA_LOOK_COUNTER_SEEKER`, `counter`) is
-// the same charge in red with a pink heart. No motor, no plume; nothing wound round it.
-fn gravitic_seeker(u: f32, y: f32, aspect: f32, time: f32, counter: bool) -> vec3<f32> {
+// missile a defence can take. No motor, no plume; nothing wound round it.
+fn gravitic_seeker(u: f32, y: f32, aspect: f32, time: f32) -> vec3<f32> {
     // Half-widths along the quad from its tail, and the charge's middle one in from the head.
     let s = u * 2.0 * max(aspect, 1.0);
     let middle = 2.0 * max(aspect, 1.0) - 1.0;
@@ -920,9 +925,9 @@ fn gravitic_seeker(u: f32, y: f32, aspect: f32, time: f32, counter: bool) -> vec
     let ripple = value_noise2(around * 2.2 + vec2<f32>(time * 6.0, time * 3.1), 1.0);
     let skin = smoothstep(0.5, 0.82, d) * (1.0 - smoothstep(0.82, 0.98, d));
     let lens = skin * (0.15 + 0.45 * smoothstep(0.3, 0.9, ripple));
-    let tint = select(vec3<f32>(0.55, 0.06, 1.0), vec3<f32>(1.0, 0.06, 0.04), counter);
-    let heart_tint = select(vec3<f32>(0.82, 0.66, 1.0), vec3<f32>(1.0, 0.62, 0.66), counter);
-    let lens_tint = select(vec3<f32>(0.6, 0.25, 1.0), vec3<f32>(1.0, 0.2, 0.25), counter);
+    let tint = vec3<f32>(0.55, 0.06, 1.0);
+    let heart_tint = vec3<f32>(0.82, 0.66, 1.0);
+    let lens_tint = vec3<f32>(0.6, 0.25, 1.0);
     let glow = mix(0.7, 1.0, 1.0 - clamp(body_d, 0.0, 1.0));
     return tint * body * 3.2 * glow * (1.0 - heart)
         + heart_tint * heart * 6.0
@@ -958,8 +963,7 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let red = vec3<f32>(1.0, 0.045, 0.02);
             let white = vec3<f32>(1.0, 0.86, 0.8);
             if in.shape.y > 11.1 {
-                let counter = in.shape.y > 12.1;
-                return vec4<f32>(gravitic_seeker(u, in.uv.y, in.color.g / max(in.color.r, 0.0001), time, counter) * in.color.r, 1.0);
+                return vec4<f32>(gravitic_seeker(u, in.uv.y, in.color.g / max(in.color.r, 0.0001), time) * in.color.r, 1.0);
             }
             if in.shape.y > 10.1 {
                 // A Plasmeric bolt: a fat bolt of red plasma, a round head and a short tail
@@ -1066,6 +1070,25 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let sheath = pow(across, 1.6);
             let rgb = vec3<f32>(0.10, 0.38, 1.0) * sheath * 3.6
                 + vec3<f32>(0.78, 0.94, 1.0) * core * 8.5 * flow;
+            return vec4<f32>(rgb * in.color.r, 1.0);
+        }
+        if in.shape.y > 4.2 {
+            // A gravity crush's tether (renderer/crush_fx.rs): a thin hard red core; lensing
+            // ripples, bright bands that swell the light round it, running out from the
+            // emitter to the missile; a faint prism shimmer at its edges where the field
+            // bends the light. Struck and fading as the laser (`in.color.r`).
+            let y = abs(in.uv.y);
+            let across = 1.0 - y;
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let now = globals.camera.w;
+            let band = exp(-pow(fract(run * 0.07 - now * 22.0) - 0.5, 2.0) * 45.0);
+            let core = pow(across, 10.0);
+            let sheath = pow(across, mix(3.2, 1.5, band));
+            let edge = smoothstep(0.3, 0.7, y) * (1.0 - smoothstep(0.7, 1.0, y));
+            let hue = mix(vec3<f32>(1.0, 0.3, 0.45), prism(run * 0.02 - now * PRISM_RATE * 3.0), 0.5);
+            let rgb = vec3<f32>(1.0, 0.07, 0.035) * sheath * 5.0 * (0.6 + 0.9 * band)
+                + vec3<f32>(1.0, 0.45, 0.42) * core * (4.0 + 3.0 * band)
+                + hue * edge * (0.25 + 0.9 * band);
             return vec4<f32>(rgb * in.color.r, 1.0);
         }
         if in.shape.y > 3.5 {

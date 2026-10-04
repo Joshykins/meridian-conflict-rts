@@ -81,7 +81,7 @@ pub(super) struct PlasmaFx {
     charges: Vec<Charge>,
     /// The direct-fire guns' charges and lights (`regency_guns_fx`).
     pub(super) guns: super::regency_guns_fx::RegencyGunFx,
-    /// The Gravitic Seekers and Counter-seekers (`gravitic_fx`).
+    /// The Gravitic Seekers' lights, and a gravity crush's (`gravitic_fx`, `crush_fx`).
     pub(super) seekers: super::gravitic_fx::GraviticFx,
     /// Cone weapons' wakes rolling out (`wake_fx`).
     pub(super) wakes: Vec<super::wake_fx::RollingWake>,
