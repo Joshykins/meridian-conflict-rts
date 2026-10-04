@@ -82,6 +82,11 @@ See `docs/RELEASES.md`.
 | Switch | Values | Purpose |
 |---|---|---|
 | `MERIDIAN_CHANNEL` (compile time) | `dev` (default), `playtest`, `release` | Who the build is for. Part of the build's name (`0.1.0-playtest+<commit>`; a release is `0.1.0+<commit>`), which replays record and network players must share. A release build has no unit or map marked `playtest: true`. |
+| `MERIDIAN_STORE` (compile time) | an `https://` URL | The build store this build updates from and fetches old builds from (`release/config.sh`'s `STORE_URL`, set by `scripts/release.sh`). Unset: no updates, and Match History names the build an old replay needs instead of fetching it. |
+| `MERIDIAN_LAUNCHER` | the launcher's path | Set by the launcher for the game it starts: the game downloads updates and old builds into the install beside it, and asks it to run them. |
+| `MERIDIAN_RELEASE_STORE` | a folder | Where `scripts/release.sh` keeps its copy of the build store (default `~/.local/share/meridian-release/store`). |
+| `--replay-only` | with `--replay` | An old build playing a replay for a newer one: leaving the replay quits, and the settings file is never written. |
+| `--open SCREEN` | `menu`, `skirmish`, `survival`, `multiplayer`, `history`, `settings` | The front end opens on that screen. |
 | `--version` | | Print the build's name, number, channel, commit and simulation fingerprint, one `key: value` a line, and exit. |
 | `MERIDIAN_SERVER_PLAYTEST` (compile time) | `host[:port]` | The server a playtest build plays on until the player types another. Unset: none (the multiplayer screen opens on the local network). |
 | `MERIDIAN_SERVER_RELEASE` (compile time) | `host[:port]` | The same for a release build. A dev build reads neither and has no server of its own. |
