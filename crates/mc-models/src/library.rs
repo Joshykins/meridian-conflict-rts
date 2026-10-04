@@ -98,6 +98,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .chain(regency::air::quarrel::MODELS.iter())
         .chain(regency::air::petard::MODELS.iter())
         .chain(regency::space::MODELS.iter())
+        .chain(regency::space::ark::MODELS.iter())
         .chain(regency::gunships::quiver::MODELS.iter())
         .chain(regency::gunships::wick::MODELS.iter())
         .chain(regency::gunships::reaper::MODELS.iter())

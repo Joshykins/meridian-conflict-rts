@@ -19,7 +19,14 @@ filter in the testing ground also exposes all five.
 Coffer preserves the existing `regency_t2_transport` unit ID and `regency_coffer`
 mesh key while replacing the old model completely. Its 26 m wide, 28 m high bay
 clears the Exarch; commanders use all eight slots. Ark clears the complete Regency
-land roster through tech 3, including the tall Strider. Transport cargo capacity
+land roster through tech 3, including the tall Strider.
+
+The Ark is the Bastion's counterpart at the Bastion's size (300 m): a broad arrowhead
+whose wings are laid in feathered plates, their tails the saw-toothed trailing edge,
+with two armour ridges and a machinery trench down the spine, a bridge on the foredeck
+and canted fins over the stern drives (`crates/mc-models/src/regency/space/ark/`). It
+never sets down: it hangs on eight gravity lifts with its hold floor 38 m up, and its
+ramp drops one in two from the belly, so it swings shut flush with the hull. Transport cargo capacity
 is the engine's existing abstract hold capacity; units board and stow in sequence.
 
 Select cargo and right-click a transport to board. The ship lands, opens its ramp

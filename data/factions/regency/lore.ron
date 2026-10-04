@@ -431,7 +431,7 @@
         lore: "The vault deepened and the heads rewound for the longest pull the Regency fields; a battlefield empties into it.",
     ),
     "regency_t3_assault_transport": (
-        lore: "A vaulted cargo ark that sets an armoured force down beneath its swept shoulders, its broad ramp opening into a deep protected hold.", weapons: {},
+        lore: "A feathered arrowhead the length of a Bastion. It never touches the ground: it hangs on its gravity lifts and lets its ramp down through its belly, and an armoured force walks up into the hold.", weapons: {},
     ),
     "regency_t2_space_frigate": (
         lore: "An economical two-gun escort, its narrow split bow carrying only the plasma cannons it needs to guard the fleet.",

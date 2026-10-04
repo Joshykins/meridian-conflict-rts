@@ -7,11 +7,10 @@ fn blueprints() -> mc_data::Blueprints {
 }
 
 #[test]
-fn all_five_hulls_fit_their_blueprints_and_keep_their_identity_at_each_lod() {
+fn the_hulls_fit_their_blueprints_and_keep_their_identity_at_each_lod() {
     let bp = blueprints();
     for key in [
         "regency_t2_transport",
-        "regency_t3_assault_transport",
         "regency_t2_space_frigate",
         "regency_t3_space_cruiser",
         "regency_t3_space_destroyer",
@@ -70,12 +69,9 @@ fn all_five_hulls_fit_their_blueprints_and_keep_their_identity_at_each_lod() {
 }
 
 #[test]
-fn transport_meshes_clear_the_entire_boarding_lane_and_match_the_animated_ramps() {
+fn the_coffer_clears_the_entire_boarding_lane_and_matches_its_animated_ramp() {
     let bp = blueprints();
-    for (key, front) in [
-        ("regency_t2_transport", 23.0),
-        ("regency_t3_assault_transport", 45.0),
-    ] {
+    for (key, front) in [("regency_t2_transport", 23.0)] {
         let unit = bp.unit(bp.id_of(key).unwrap());
         let t = unit.transport.unwrap();
         let model = build_model(&unit.visual.mesh).unwrap();

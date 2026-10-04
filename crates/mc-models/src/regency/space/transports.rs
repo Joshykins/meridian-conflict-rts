@@ -55,48 +55,6 @@ pub(super) fn light(b: &mut MeshBuilder, _tech: u8) {
     mark(b, v3(10.0, 0.0, 34.08), 5.0);
 }
 
-pub(super) fn assault(b: &mut MeshBuilder, _tech: u8) {
-    let hold = Hold {
-        hinge: -46.0,
-        lip: -60.0,
-        front: 45.0,
-        half: 22.0,
-        clear: 37.0,
-        roof: 41.0,
-    };
-    if b.coarse() {
-        coarse_lobes(
-            b,
-            &[[-67.0, 28.0], [-27.0, 61.0], [66.0, 37.0], [42.0, 28.0]],
-            2.0,
-            35.0,
-        );
-        chamber(b, hold);
-        crest(b, 25.0, 0.0, 43.0, 48.0, 38.0);
-        mark(b, v3(20.0, 0.0, 48.05), 8.0);
-        return;
-    }
-    chamber(b, hold);
-    b.mirror_y(|b| {
-        lobe(
-            b,
-            &[
-                (v3(-67.0, 33.0, 12.0), 3.0, 4.0),
-                (v3(-43.0, 46.0, 23.0), 14.0, 16.0),
-                (v3(-8.0, 48.0, 24.0), 15.0, 17.0),
-                (v3(33.0, 44.0, 22.0), 14.0, 15.0),
-                (v3(66.0, 33.0, 15.0), 4.0, 5.0),
-            ],
-        );
-        for x in [-40.0, -6.0, 30.0] {
-            drive(b, v3(x, 48.0, 1.2), 5.6);
-            crest(b, x + 12.0, 30.0, 37.0, 46.0, 20.0);
-        }
-    });
-    crest(b, 25.0, 0.0, 43.0, 48.0, 38.0);
-    mark(b, v3(22.0, 0.0, 43.1), 8.0);
-}
-
 fn chamber(b: &mut MeshBuilder, h: Hold) {
     dark_plate(b);
     if b.coarse() {
