@@ -695,7 +695,7 @@ impl World {
             if strength < Fx::from_int(SMALL_FRY) {
                 continue;
             }
-            let need = strength * 13 / 10 + Fx::from_int(100);
+            let need = strength * 13 / 10 + Fx::from_int(50);
             let id = self.open_op(
                 ctx.player,
                 OpKind::Defend,
@@ -754,9 +754,10 @@ impl World {
                 )
             });
             // Outmatched away from the base, the mine is let go: two tanks sent at
-            // a raiding party of six were lost for nothing.
+            // a raiding party of six were lost for nothing. A match is enough:
+            // holding out for a quarter more let raids of four bots take eleven mines.
             let can: Fx = cands.iter().map(|c| c.3).sum();
-            if !base && can * 4 < need * 5 {
+            if !base && can < need {
                 let c = &mut self.state.ai[ctx.player as usize].commander;
                 if let Some(d) = c.ops.iter_mut().find(|o| o.id == id) {
                     d.phase = Phase::Done;

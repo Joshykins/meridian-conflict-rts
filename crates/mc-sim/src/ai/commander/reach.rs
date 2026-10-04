@@ -39,6 +39,31 @@ impl Reach {
             })
         })
     }
+
+    /// The walkable spot nearest `p` no further than `within` metres along either
+    /// axis: where a land unit sent to look at `p` can stand. `None` when that
+    /// whole square is cliff, water or cut off from home.
+    pub(in crate::ai) fn walkable_near(&self, p: FxVec2, within: i32) -> Option<FxVec2> {
+        let (px, py) = (p.x.floor_int(), p.y.floor_int());
+        let span = within / NODE + 1;
+        let (cx, cy) = (px / NODE, py / NODE);
+        (cy - span..=cy + span)
+            .flat_map(|y| (cx - span..=cx + span).map(move |x| (x, y)))
+            .filter(|&(x, y)| x >= 0 && y >= 0 && x < self.w && y < self.h)
+            .filter(|&(x, y)| {
+                let i = (y * self.w + x) as usize;
+                self.bits
+                    .get(i / 64)
+                    .is_some_and(|b| b >> (i % 64) & 1 != 0)
+            })
+            .map(|(x, y)| (x * NODE + NODE / 2, y * NODE + NODE / 2))
+            .filter(|&(x, y)| (x - px).abs() <= within && (y - py).abs() <= within)
+            .min_by_key(|&(x, y)| {
+                let (dx, dy) = (i64::from(x - px), i64::from(y - py));
+                (dx * dx + dy * dy, y, x)
+            })
+            .map(|(x, y)| FxVec2::from_ints(x, y))
+    }
 }
 
 impl World {
@@ -106,5 +131,37 @@ impl World {
             }
         }
         bits
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A 4x4 grid walkable only along its bottom row.
+    fn bottom_row() -> Reach {
+        let mut bits = vec![0u64; 1];
+        for x in 0..4 {
+            bits[0] |= 1 << x;
+        }
+        Reach { w: 4, h: 4, bits }
+    }
+
+    #[test]
+    fn walkable_near_finds_the_nearest_walkable_node() {
+        let r = bottom_row();
+        // Above node (1, 0), two nodes up: the walkable spot below it.
+        let at = FxVec2::from_ints(NODE + NODE / 2, 2 * NODE + NODE / 2);
+        assert_eq!(
+            r.walkable_near(at, 2 * NODE),
+            Some(FxVec2::from_ints(NODE + NODE / 2, NODE / 2))
+        );
+    }
+
+    #[test]
+    fn walkable_near_is_none_when_nothing_is_in_range() {
+        let r = bottom_row();
+        let at = FxVec2::from_ints(NODE + NODE / 2, 3 * NODE + NODE / 2);
+        assert_eq!(r.walkable_near(at, NODE), None);
     }
 }

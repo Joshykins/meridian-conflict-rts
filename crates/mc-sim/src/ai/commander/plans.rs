@@ -704,16 +704,21 @@ impl World {
         let warships = c.plan(PlanKind::Warships);
         let i = income.floor_int();
         for o in &mut c.ops {
-            let stale = tick > o.phase_since + 3000 && o.phase == Phase::Gathering;
+            // Minutes spent gathering: a wave that cannot fill goes with what it has.
+            let waited = if o.phase == Phase::Gathering {
+                tick.saturating_sub(o.phase_since) / 1200
+            } else {
+                0
+            };
             let want = match o.kind {
                 // Off: the army holds at home and answers raids. Otherwise a wave is
                 // so many seconds of income: sized by what had been seen, the first
                 // wave waited nine minutes while the enemy took the map.
                 OpKind::Army => match pressure {
                     Stake::Off => Fx::ZERO,
-                    Stake::Probe => Fx::from_int(300 + i * 10),
-                    Stake::Invest => Fx::from_int(500 + i * 18),
-                    Stake::AllIn => Fx::from_int(1000 + i * 40),
+                    Stake::Probe => Fx::from_int(150 + i * 10),
+                    Stake::Invest => Fx::from_int(300 + i * 18),
+                    Stake::AllIn => Fx::from_int(700 + i * 40),
                 },
                 OpKind::Strike => Fx::from_int(by_stake(air, [600, 2000, 5000]).max(600) as i32),
                 OpKind::Fleet => Fx::from_int(by_stake(sea, [1500, 4000, 9000]).max(1500) as i32),
@@ -725,13 +730,19 @@ impl World {
                 }
                 _ => o.want,
             };
-            // Waited five minutes: go with three quarters.
-            o.want = if stale { want * 3 / 4 } else { want };
+            // Two minutes gathering: go with three quarters; four: with half. A Hard
+            // side on 7 a second waited all match for a 380-mass wave that never
+            // filled, and never once attacked.
+            o.want = match waited {
+                0 | 1 => want,
+                2 | 3 => want * 3 / 4,
+                _ => want / 2,
+            };
             if o.kind == OpKind::Army {
                 o.rally = ctx.staging;
             }
             if o.kind == OpKind::Guard {
-                o.want = Fx::from_int((i * 8).clamp(300, 1200));
+                o.want = Fx::from_int((i * 8).clamp(150, 1200));
                 o.rally = guard_post;
             }
         }

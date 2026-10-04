@@ -207,6 +207,9 @@ Ground rules learnt in the tournaments (each is a comment at its code):
 - scouts belong to the scouting operation only: the army and raids, filled first,
   used to take every one of them, and a side with 25 scouts saw nothing for
   twenty minutes;
+- scouts on foot go to the walkable ground nearest the place to look at, and skip
+  places with none: sent at cell centres on mountains, a side's scouts never left
+  home in a 19-minute match;
 - never into a turret belt it cannot take; a probe goes only at soft targets;
 - shelled while gathering: helpless against aircraft, it goes home; against
   ground guns it charges them or steps the rally back;
@@ -214,7 +217,12 @@ Ground rules learnt in the tournaments (each is a comment at its code):
   a group; near the rally it turns and fights instead;
 - a raid on the base takes the guard first, then gathering groups, then, if that is
   not enough, groups out in the field: the commander dying at home loses the game;
-- a raid far from home is answered only by enough to win, or let go;
+- a raid far from home is answered only by enough to win (a third more than the
+  raiders, and a little), or let go;
+- a wave that cannot fill goes with three quarters of its mark after two minutes
+  gathering and with half after four: a Hard side on 7 a second waited a whole
+  match for a 380-mass wave and never attacked;
+- the tier path never takes the side's only factory: upgrading it stops the army;
 - one army, not a trickle: while a wave is out fighting, what gathers behind it
   joins it once it is worth a thousand mass (waves of two and three thousand met a
   five-thousand army one after another);

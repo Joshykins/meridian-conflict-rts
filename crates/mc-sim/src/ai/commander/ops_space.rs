@@ -1,7 +1,8 @@
 //! Orders for warships, scouts and landings: everything that warps.
 use super::ops_ground::THREAT_MASS;
-use super::profile::{role, Target};
+use super::profile::{role, Domain, Target};
 use super::state::{OpKind, Operation, Phase};
+use super::world_model::CELL;
 use super::Ctx;
 use crate::command::Command;
 use crate::tables::{Handle, OrderKind, WarpPhase, NO_ORDER};
@@ -138,11 +139,12 @@ impl World {
             if self.state.units.order_head[r] != NO_ORDER {
                 continue;
             }
-            let Some(spot) = self.stalest(ctx, &taken) else {
-                break;
+            let p = ctx.profiles.get(self.state.units.blueprint[r]);
+            let walks = p.domain == Some(Domain::Land);
+            let Some(spot) = self.stalest(ctx, &taken, walks) else {
+                continue;
             };
             taken.push(spot);
-            let p = ctx.profiles.get(self.state.units.blueprint[r]);
             let id = vec![self.state.units.id(r)];
             let mark = self.safe_mark(
                 ctx.player,
@@ -174,13 +176,24 @@ impl World {
 
     /// The place most worth a look: least recently seen, weighted toward enemy
     /// starts and their side of the map, kept off anti-air and away from `taken`.
-    fn stalest(&self, ctx: &Ctx, taken: &[FxVec2]) -> Option<FxVec2> {
+    /// For a unit that `walks`, the walkable spot nearest that place, and only
+    /// places that have one: a cell's centre on a mountain is no goal at all, and
+    /// a Serac Divide side's scouts were sent to one every think for 19 minutes
+    /// and never left home.
+    fn stalest(&self, ctx: &Ctx, taken: &[FxVec2], walks: bool) -> Option<FxVec2> {
         let tick = self.state.tick;
         let seen = &self.state.ai[ctx.player as usize].commander.seen;
         let enemy = ctx.enemy_start?;
         let span = enemy.distance(ctx.start).max(Fx::ONE);
         (0..seen.len())
-            .map(|i| (i, ctx.wm.centre(i)))
+            .filter_map(|i| {
+                let c = ctx.wm.centre(i);
+                if walks {
+                    ctx.reach.walkable_near(c, CELL / 2).map(|c| (i, c))
+                } else {
+                    Some((i, c))
+                }
+            })
             .filter(|(_, c)| !taken.iter().any(|t| t.distance(*c) < Fx::from_int(1500)))
             // Never where anti-air is known to be: three Vigils were lost over bases.
             .filter(|(_, c)| ctx.wm.threat_at(*c, Target::Air) == Fx::ZERO)

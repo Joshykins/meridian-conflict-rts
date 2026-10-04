@@ -934,8 +934,35 @@ fn a_ready_warhead_goes_at_the_enemy_commander_unless_interceptors_guard_it() {
 
 #[test]
 fn a_factory_goes_up_a_tier_at_the_income_mark_without_waiting_for_a_surplus() {
+    let mut w = tech_mark_side();
+    let factories = [
+        spawn(&mut w, "aster_t1_land_factory", 0, 500, 500),
+        spawn(&mut w, "aster_t1_land_factory", 0, 500, 300),
+    ]
+    .map(|r| w.state.units.id(r));
+    let mut out = vec![];
+    w.direct_upgrades(0, &w.survey_own(0), &mut out);
+    assert!(
+        matches!(out.as_slice(), [Command::Upgrade { units }] if units.len() == 1 && factories.contains(&units[0])),
+        "{out:?}"
+    );
+}
+
+#[test]
+fn a_side_never_takes_its_only_factory_up_a_tier() {
+    let mut w = tech_mark_side();
+    spawn(&mut w, "aster_t1_land_factory", 0, 500, 500);
+    let mut out = vec![];
+    w.direct_upgrades(0, &w.survey_own(0), &mut out);
+    assert!(
+        !out.iter().any(|c| matches!(c, Command::Upgrade { .. })),
+        "{out:?}"
+    );
+}
+
+/// A side at the skill's tech income with power to spare and no pile of materials.
+fn tech_mark_side() -> World {
     let mut w = world();
-    let factory = spawn(&mut w, "aster_t1_land_factory", 0, 500, 500);
     spawn(&mut w, "aster_t1_power", 0, 700, 500);
     spawn(&mut w, "aster_t1_power", 0, 700, 560);
     let skill = w.state.ai[0].config.skill();
@@ -948,13 +975,7 @@ fn a_factory_goes_up_a_tier_at_the_income_mark_without_waiting_for_a_surplus() {
     pl.energy_capacity = Fx::from_int(5000);
     pl.energy = pl.energy_capacity;
     pl.efficiency = Fx::ONE;
-    let mut out = vec![];
-    w.direct_upgrades(0, &w.survey_own(0), &mut out);
-    let id = w.state.units.id(factory);
-    assert!(
-        matches!(out.as_slice(), [Command::Upgrade { units }] if units == &vec![id]),
-        "{out:?}"
-    );
+    w
 }
 
 #[test]

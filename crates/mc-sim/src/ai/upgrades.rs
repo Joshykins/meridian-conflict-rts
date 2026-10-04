@@ -85,6 +85,7 @@ impl World {
             .count();
         if income >= Fx::from_int(skill.tech_income)
             && surplus
+            && census.factories.len() > 1
             && upgrading < 1 + census.factories.len() / 4
         {
             let behind = self.state.ai[player as usize].commander.behind;
@@ -134,7 +135,11 @@ impl World {
         // A Commander behind on army takes tech 3 later: a tech 3 factory begun at
         // half the enemy's army left it nothing to hold its base with.
         let held = best >= 2 && self.state.ai[player as usize].commander.behind;
-        if !(1..3).contains(&best)
+        // Never its only factory: upgrading it stops the army. A side on one mine
+        // took its one factory to tech 2 at 9 a second and built nothing for six
+        // minutes; the tier path waits for a second factory to keep producing.
+        if census.factories.len() < 2
+            || !(1..3).contains(&best)
             || income < step
             || held
             || census.factories.iter().any(|&r| self.upgrading(r))
