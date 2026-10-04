@@ -40,7 +40,7 @@ pub(super) fn frigate(b: &mut MeshBuilder, _tech: u8) {
         4.0,
     );
     for (slot, y) in [-16.0, 16.0].into_iter().enumerate() {
-        gun(b, slot, v3(10.0, y, 7.0), v3(20.0, y, 7.0), 1.25);
+        gun(b, slot, v3(10.0, y, 12.0), v3(20.0, y, 12.0), 1.25);
     }
 }
 
@@ -90,7 +90,7 @@ pub(super) fn cruiser(b: &mut MeshBuilder, _tech: u8) {
         8.0,
     );
     for (slot, y) in [-12.0, 12.0].into_iter().enumerate() {
-        gun(b, slot, v3(46.0, y, 22.0), v3(58.0, y, 22.0), 2.5);
+        gun(b, slot, v3(46.0, y, 27.0), v3(58.0, y, 27.0), 2.5);
     }
     for (i, x) in [-28.0, 0.0, 28.0].into_iter().enumerate() {
         for (j, y) in [-55.0, 55.0].into_iter().enumerate() {
