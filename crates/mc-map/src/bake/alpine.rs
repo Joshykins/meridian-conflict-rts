@@ -668,11 +668,43 @@ impl Terrain {
         self.size_y / 2.0 - y
     }
 
-    /// Nearest build-grid vertex of a design position.
+    /// Nearest build-grid vertex of a design position. A position on the middle
+    /// line stays on it: the line is not on the build grid on every map (Serac
+    /// Divide's 4096 m is between 12 m cells), and a point snapped off it would
+    /// get a mirrored twin a cell away, overlapping it.
     fn snap_a(&self, p: (f64, f64)) -> (f64, f64) {
+        self.snap_middle(self.ap(p))
+    }
+
+    /// Nearest build-grid vertex, keeping a point on the middle line on it.
+    fn snap_middle(&self, p: (f64, f64)) -> (f64, f64) {
         let g = BUILD_CELL_M as f64;
-        let p = self.ap(p);
-        ((p.0 / g).round() * g, (p.1 / g).round() * g)
+        let y = if self.south_of_middle(p.1).abs() < 1.0 {
+            p.1
+        } else {
+            (p.1 / g).round() * g
+        };
+        ((p.0 / g).round() * g, y)
+    }
+
+    /// A field on the middle line made its own mirror image, so neither side's
+    /// half is bigger: corners south of the line kept, those north of it the
+    /// reflections of their twins. Corner `i` lies at `i / ORE_CORNERS` of a
+    /// turn from the field's facing, which is along the line here, so its twin
+    /// across the line is corner `ORE_CORNERS - i`.
+    fn mirror_field(&self, field: super::OreField) -> super::OreField {
+        let n = field.corners.len();
+        let corners = (0..n)
+            .map(|i| {
+                let c = field.corners[i];
+                if self.south_of_middle(c.1) >= 0.0 {
+                    c
+                } else {
+                    self.mirror(field.corners[(n - i) % n])
+                }
+            })
+            .collect();
+        super::OreField { corners, ..field }
     }
 
     /// Starts, pads, towns and ore for an alpine layout.
@@ -760,24 +792,25 @@ impl Terrain {
         for &(x, y, r) in design.towns {
             sites.push((self.snap_a((x, y)), 0.45 * self.al(r)));
         }
-        let g = BUILD_CELL_M as f64;
         let mut fields = Vec::new();
         for (p, r) in sites {
-            let p = ((p.0 / g).round() * g, (p.1 / g).round() * g);
+            let p = self.snap_middle(p);
             let field = self.ore_field(p.0, p.1, r);
-            // The north copy is the south one reflected, corner for corner.
-            if !on_middle(self, p) {
-                let mut corners: Vec<(f64, f64)> =
-                    field.corners.iter().map(|&c| self.mirror(c)).collect();
-                corners.reverse();
-                let m = self.mirror(p);
-                fields.push(super::OreField {
-                    x: m.0,
-                    y: m.1,
-                    radius: field.radius,
-                    corners,
-                });
+            if on_middle(self, p) {
+                fields.push(self.mirror_field(field));
+                continue;
             }
+            // The north copy is the south one reflected, corner for corner.
+            let mut corners: Vec<(f64, f64)> =
+                field.corners.iter().map(|&c| self.mirror(c)).collect();
+            corners.reverse();
+            let m = self.mirror(p);
+            fields.push(super::OreField {
+                x: m.0,
+                y: m.1,
+                radius: field.radius,
+                corners,
+            });
             fields.push(field);
         }
         self.ore = fields;

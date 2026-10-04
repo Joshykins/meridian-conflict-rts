@@ -16,8 +16,7 @@
 //!
 //! Round every bench stand the machine's doodads, set out square to it: beacons at
 //! the corners, pylons flanking each boom's shoulder, a course of revetment wherever
-//! the bench is cut into higher ground, conduits of light in the ground under a
-//! span where it leaves.
+//! the bench is cut into higher ground.
 
 use super::{Layout, Terrain};
 use crate::format::PropKind;
@@ -302,39 +301,6 @@ impl<'a> Machine<'a> {
     /// One span out of a node along `heading`: off the map, or as half a link.
     pub(super) fn span(&mut self, from: Node, heading: f64, scale: f64) {
         self.put(PropKind::PrecursorSpan, (from.x, from.y), heading, scale);
-        // Two lines of light in the ground under its flanks, the whole way along it
-        // wherever the ground is even enough to take them: the machine's line across
-        // the valleys. Flush, so they block nothing.
-        let (s, c) = heading.sin_cos();
-        let mut along = 30.0;
-        while along < SPAN_LEN * scale - 30.0 {
-            for side in [-1.0, 1.0] {
-                let off = 30.0 * scale * side;
-                let p = (from.x + c * along - s * off, from.y + s * along + c * off);
-                let clear = self
-                    .benches
-                    .iter()
-                    .all(|b| b.outside(p.0, p.1) > b.blend + 20.0);
-                let inside = p.0 > 40.0
-                    && p.1 > 40.0
-                    && p.0 < self.t.size_x - 40.0
-                    && p.1 < self.t.size_y - 40.0;
-                if clear && inside && self.walkable_flat(p) {
-                    self.put(PropKind::PrecursorConduit, p, heading, 1.0);
-                }
-            }
-            along += 61.0;
-        }
-    }
-
-    /// Ground gentle enough for a flush conduit to lie on.
-    fn walkable_flat(&self, (x, y): (f64, f64)) -> bool {
-        let z = |dx: f64, dy: f64| self.t.natural(x + dx, y + dy);
-        let h = z(0.0, 0.0);
-        h > 1.0
-            && [(30.0, 0.0), (-30.0, 0.0), (0.0, 30.0), (0.0, -30.0)]
-                .iter()
-                .all(|&(dx, dy)| (z(dx, dy) - h).abs() < 3.0)
     }
 
     /// A bench's doodads: spires in a bastion's corners and pylons in rows along
