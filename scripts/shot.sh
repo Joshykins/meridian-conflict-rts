@@ -3,6 +3,10 @@
 # from WSL, in one command. The picture lands in artifacts/shots/ here.
 #
 #   scripts/shot.sh unit KEY [flags]   a unit alone, several angles in one PNG
+#                                      (KEY may be a map prop's model key,
+#                                      city_office: it stands on the pad, its
+#                                      front its street side, --hurt PERCENT
+#                                      breaking a city structure's windows)
 #                                      (meridian --unit-shot; see its --help)
 #   scripts/shot.sh run [flags]        any other headless shot (--range, --scene,
 #                                      --ui, ...); --screenshot is added for you
@@ -29,6 +33,7 @@
 #   scripts/shot.sh variants aster_t1_tank base tank_light~slim tank_light~twin
 #   scripts/shot.sh variants aster_t1_tank=base,tank_light~slim aster_t1_scout=base,scout~b
 #   scripts/shot.sh variants aster_t1_frigate=base,frigate~b --map twin_shoals   (ships at sea)
+#   scripts/shot.sh variants city_office=base,city_office~b   (a prop's model key works too)
 #
 # Design variants live in the model catalogue as extra keys, `<mesh>~<name>`,
 # built like any model (ModelDef::new("tank_light~slim", ...)). Each is drawn as
@@ -273,7 +278,7 @@ fi
 
 case "$mode" in
     unit)
-        [[ $# -gt 0 ]] || { echo "shot.sh unit needs a blueprint key" >&2; exit 2; }
+        [[ $# -gt 0 ]] || { echo "shot.sh unit needs a blueprint or prop model key" >&2; exit 2; }
         key="$1"; shift
         game_args=(--unit-shot "$key" "$@")
         stem="${out_name:-$key}" ;;

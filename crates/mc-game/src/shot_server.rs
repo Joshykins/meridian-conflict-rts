@@ -178,8 +178,13 @@ impl Server {
             self.studio = None;
         }
         let (opts, ticks, spec) = parse(&self.base, args)?;
-        if self.blueprints.id_of(&opts.subject).is_none() {
-            return Err(format!("{:?} is not a unit", opts.subject));
+        if self.blueprints.id_of(&opts.subject).is_none()
+            && unit_shot::prop_kind(&opts.subject).is_none()
+        {
+            return Err(format!(
+                "{:?} is not a unit or a prop's model",
+                opts.subject
+            ));
         }
         said += &self.studio(spec.width, spec.height)?;
         let studio = self.studio.as_mut().ok_or("no renderer")?;
@@ -206,21 +211,22 @@ impl Server {
         ))
     }
 
-    /// Writes to `path` the mesh calls the renderer made for unit `key`'s model,
-    /// for `mc-models` to build again with edited model code.
+    /// Writes to `path` the mesh calls the renderer made for unit `key`'s model, or for
+    /// the prop model `key`, for `mc-models` to build again with edited model code.
     fn write_calls(&mut self, key: &str, path: &Path) -> Result<usize, String> {
-        let id = self
-            .blueprints
-            .id_of(key)
-            .ok_or_else(|| format!("{key:?} is not a unit"))?;
+        let mesh = match self.blueprints.id_of(key) {
+            Some(id) => self
+                .blueprints
+                .unit(self.blueprints.base_of(id))
+                .visual
+                .mesh
+                .clone(),
+            None if unit_shot::prop_kind(key).is_some() => key.to_owned(),
+            None => return Err(format!("{key:?} is not a unit or a prop's model")),
+        };
         // The renderer records its calls as it builds.
         self.studio(800, 600)?;
-        let mesh = &self
-            .blueprints
-            .unit(self.blueprints.base_of(id))
-            .visual
-            .mesh;
-        let calls = remote::kept_calls(mesh);
+        let calls = remote::kept_calls(&mesh);
         let bytes = remote::encode_request(&calls).map_err(|e| e.to_string())?;
         std::fs::write(path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(calls.len())

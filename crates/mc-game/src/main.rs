@@ -147,7 +147,9 @@ straight into a match instead.
                          so smoke, dust, track marks and shells in flight are in the picture
   --alpha A              with --follow: how far into the last tick the kept frame is (0..1)
   --unit-shot KEY        with --screenshot: that unit alone on the range, no HUD, from several
-                         angles in one run, three to a row (--size is one view; default 800x600)
+                         angles in one run, three to a row (--size is one view; default 800x600);
+                         or a map prop by its model key (city_office), its front its street
+                         side, --hurt taking that much off its health (city windows break)
   --views LIST           with --unit-shot: the angles, default front34,front,left,rear34,back,top;
                          each front34 | front | left | right | rear34 | back | top | low, or
                          BEARING:ELEVATION in degrees (bearing from the nose, towards its left)

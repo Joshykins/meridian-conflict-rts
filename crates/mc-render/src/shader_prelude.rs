@@ -24,6 +24,7 @@ pub(crate) const PRELUDES: [&str; 19] = [
     "habitat",
     "streets",
     "scenery",
+    "city",
     "desert",
     "rock",
     "warp_hull",
@@ -46,6 +47,7 @@ pub(crate) struct Preludes {
     habitat: String,
     streets: String,
     scenery: String,
+    city: String,
     desert: String,
     rock: String,
     warp_hull: String,
@@ -77,6 +79,7 @@ impl Preludes {
             habitat: read("habitat"),
             streets: read("streets"),
             scenery: read("scenery"),
+            city: read("city"),
             desert: read("desert"),
             rock: read("rock"),
             warp_hull: read("warp_hull"),
@@ -134,6 +137,10 @@ impl Preludes {
         // Desert scenery's looks (needs surface).
         if uses("scenery") {
             prelude = format!("{prelude}\n{}", self.scenery);
+        }
+        // The city kit's walls, windows and roofs (needs surface).
+        if uses("city") {
+            prelude = format!("{prelude}\n{}", self.city);
         }
         // A capital ship's warp: its hull drawn as a streak (entity.wgsl), and the light
         // round a jump (puffs.wgsl; needs bindings).

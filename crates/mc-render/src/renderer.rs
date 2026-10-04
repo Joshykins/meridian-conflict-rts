@@ -20,7 +20,7 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
-use mc_map::{MapFile, PropKind, BUILD_CELL_M, TILE_SAMPLES};
+use mc_map::{MapFile, Prop, PropKind, BUILD_CELL_M, TILE_SAMPLES};
 use mc_sim::mirror::{
     FireInstance, ProjectileInstance, RenderFrame, SimEvent, StainInstance, UnitInstance,
     KIND_GHOST, KIND_PROP, KIND_WRECK, MAX_CONSTRUCTION_WELDS, PROJECTILE_APOGEE, PROJECTILE_BEAM,
@@ -1120,6 +1120,28 @@ impl Renderer {
         scene: SceneDesc,
         progress: &dyn Fn(&'static str, f32),
     ) -> Result<Renderer, GpuError> {
+        Self::prepare_staged(target, scene, &[], progress)
+    }
+
+    /// [`Self::new`] with `staged` props standing among the map's, after them: a prop
+    /// shot (`--unit-shot` of a prop's model key) stages them and hides all but its
+    /// subject through `RenderFrame::props_dead`, bits from the map's prop count on.
+    pub fn new_staged(
+        target: Target,
+        scene: SceneDesc,
+        staged: &[Prop],
+    ) -> Result<Renderer, GpuError> {
+        let mut renderer = Self::prepare_staged(target, scene, staged, &|_, _| {})?;
+        renderer.attach()?;
+        Ok(renderer)
+    }
+
+    fn prepare_staged(
+        target: Target,
+        scene: SceneDesc,
+        staged: &[Prop],
+        progress: &dyn Fn(&'static str, f32),
+    ) -> Result<Renderer, GpuError> {
         let clock = std::time::Instant::now();
         let last = std::cell::Cell::new(("Waking the graphics card", clock));
         // Shares are measured build time on the RTX 3080 Ti.
@@ -1510,6 +1532,7 @@ impl Renderer {
             .map
             .props()
             .iter()
+            .chain(staged)
             .enumerate()
             .map(|(i, p)| {
                 let xy = p.pos.to_f32();
@@ -1546,7 +1569,9 @@ impl Renderer {
                     heading,
                     blueprint: prop_base + kind,
                     owner_flags: KIND_PROP,
-                    health: 1.0,
+                    // A city structure the map has already knocked about: its glass
+                    // broken to match (city.wgsl).
+                    health: 1.0 - f32::from(p.wear_milli.min(1000)) / 1000.0,
                     build: 1.0,
                     turret_yaw: 0.0,
                     radius: 4.0,

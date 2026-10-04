@@ -113,6 +113,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .chain(super::cliffs::MODELS.iter())
         .chain(super::dam::MODELS.iter())
         .chain(super::dam_works::MODELS.iter())
+        .chain(super::city::MODELS.iter())
         .chain(super::replicator::MODELS.iter())
         .chain(super::precursor::MODELS.iter())
         .chain(super::precursor_mega::MODELS.iter())

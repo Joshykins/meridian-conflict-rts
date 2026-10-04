@@ -293,6 +293,141 @@ shared! {
         pub const CONCRETE_ROOF: u32 = 10;
     }
 
+    /// The city kit (`city/`, prop kinds 96..=120, `mc_map::city`): what the shader draws on
+    /// a city structure's `CONCRETE` face, by its pattern byte (city.wgsl). Every pattern
+    /// from `FIRST` to `LAST` is the city's, kept clear of the dam's scenery patterns.
+    ///
+    /// Glazing: every window, shopfront, curtain wall and glass roof is drawn by the shader
+    /// on a facade face, never as a mesh of its own, so it can be broken pane by pane. A
+    /// facade face's frame (`MeshVertex::face`: xy metres from the middle, y up the wall,
+    /// zw its half size) is cut into a grid of cells: `n = max(1, round(width / BAY))`
+    /// bays across, `m = max(1, round(height / STOREY))` storeys up, each cell the face's
+    /// size over n and m (the shopfront, lobby and church faces lay out storeys from the
+    /// ground, model z, instead). A cell is a window of `WIDE` of the cell's width and
+    /// from `SILL` to `HEAD` of its height; `PANES` across it; a pane's key is its cell,
+    /// its column, the face's seed and the instance (city.wgsl `city_pane_key`). The
+    /// models lay balconies, sills and doors to the same grid (`city::kit::grid`).
+    pub mod city as "CITY_" {
+        pub const FIRST: u32 = 32;
+        /// Plain walls, no windows: smooth render, brick, ashlar, concrete. The finish's
+        /// colour is the instance's (a palette per finish, picked by its hash).
+        pub const RENDER: u32 = 32;
+        pub const BRICK: u32 = 33;
+        pub const STONE: u32 = 34;
+        pub const CONCRETE: u32 = 35;
+        /// Facades with windows, by building type: the finish picked by the instance.
+        pub const HOUSE: u32 = 40;
+        pub const TERRACE: u32 = 41;
+        pub const FLATS: u32 = 42;
+        pub const OFFICE: u32 = 43;
+        pub const RIBBON: u32 = 44;
+        /// A curtain wall: all glass on a mullion grid, a dark spandrel at each floor.
+        pub const CURTAIN: u32 = 45;
+        /// A ground-floor shopfront, laid out from the ground: stall riser, plate glass
+        /// in a frame, a fascia with the shop's sign over it.
+        pub const SHOP: u32 = 46;
+        /// A tower's glazed lobby, from the ground: tall glass between stone piers.
+        pub const LOBBY: u32 = 47;
+        /// Industrial cladding: profiled steel sheet, a band of high windows.
+        pub const SHED: u32 = 48;
+        /// Stone with tall arched windows: a church's, a civic hall's.
+        pub const ARCHED: u32 = 49;
+        /// A car park's open decks: concrete spandrels over dark open floors.
+        pub const DECKS: u32 = 50;
+        /// A burnt-out shell: blackened walls, empty window holes.
+        pub const GUTTED: u32 = 51;
+        /// Roofs: clay or slate tiles in courses down the slope; a flat roof's
+        /// membrane and gravel; profiled metal sheet; glazing on a grid.
+        pub const ROOF_TILE: u32 = 60;
+        pub const ROOF_FLAT: u32 = 61;
+        pub const ROOF_METAL: u32 = 62;
+        pub const ROOF_GLASS: u32 = 63;
+        /// Painted steel: tanks, pipes, frames, masts.
+        pub const STEEL: u32 = 70;
+        /// A dark opening: a door, a loading bay, a passage.
+        pub const SHADOW: u32 = 71;
+        /// Paving, asphalt and yards.
+        pub const PAVING: u32 = 72;
+        /// The city wall's military concrete: cast in lifts, patched, ARC stencils.
+        pub const FORT: u32 = 73;
+        /// A blast door: heavy steel leaves, hazard bands at their edges.
+        pub const BLAST_DOOR: u32 = 74;
+        /// Broken concrete, brick and plaster: rubble, a ruin's floors.
+        pub const RUBBLE: u32 = 75;
+        /// Weathered timber boarding: a barn.
+        pub const TIMBER: u32 = 76;
+        /// Copper gone green: domes, a spire's cap.
+        pub const COPPER: u32 = 77;
+        /// A facade pattern plus this: the same wall in the same finish, no windows (a
+        /// gable, the pier beside a door, a stair tower's blind face).
+        pub const BLANK: u32 = 100;
+        pub const LAST: u32 = 151;
+        /// Each facade's grid in metres: a storey's height and a bay's width, and the
+        /// window in its cell: its share of the cell's width, sill and head as shares
+        /// of the cell's height, and the panes across it.
+        pub const HOUSE_STOREY: f32 = 2.9;
+        pub const HOUSE_BAY: f32 = 3.4;
+        pub const HOUSE_WIDE: f32 = 0.42;
+        pub const HOUSE_SILL: f32 = 0.3;
+        pub const HOUSE_HEAD: f32 = 0.8;
+        pub const HOUSE_PANES: u32 = 2;
+        pub const TERRACE_STOREY: f32 = 3.4;
+        pub const TERRACE_BAY: f32 = 2.9;
+        pub const TERRACE_WIDE: f32 = 0.42;
+        pub const TERRACE_SILL: f32 = 0.24;
+        pub const TERRACE_HEAD: f32 = 0.84;
+        pub const TERRACE_PANES: u32 = 2;
+        pub const FLATS_STOREY: f32 = 3.1;
+        pub const FLATS_BAY: f32 = 3.6;
+        pub const FLATS_WIDE: f32 = 0.62;
+        pub const FLATS_SILL: f32 = 0.3;
+        pub const FLATS_HEAD: f32 = 0.86;
+        pub const FLATS_PANES: u32 = 3;
+        pub const OFFICE_STOREY: f32 = 3.9;
+        pub const OFFICE_BAY: f32 = 1.8;
+        pub const OFFICE_WIDE: f32 = 0.6;
+        pub const OFFICE_SILL: f32 = 0.22;
+        pub const OFFICE_HEAD: f32 = 0.86;
+        pub const OFFICE_PANES: u32 = 1;
+        pub const RIBBON_STOREY: f32 = 3.8;
+        pub const RIBBON_BAY: f32 = 1.5;
+        pub const RIBBON_WIDE: f32 = 0.96;
+        pub const RIBBON_SILL: f32 = 0.3;
+        pub const RIBBON_HEAD: f32 = 0.9;
+        pub const RIBBON_PANES: u32 = 1;
+        pub const CURTAIN_STOREY: f32 = 3.9;
+        pub const CURTAIN_BAY: f32 = 1.5;
+        pub const CURTAIN_WIDE: f32 = 0.97;
+        pub const CURTAIN_SILL: f32 = 0.2;
+        pub const CURTAIN_HEAD: f32 = 0.985;
+        pub const CURTAIN_PANES: u32 = 1;
+        /// The shopfront from the ground: a bay per shop window, stall riser to the
+        /// head of the glass, then the fascia to `SHOP_TOP` (model z).
+        pub const SHOP_BAY: f32 = 5.6;
+        pub const SHOP_RISER: f32 = 0.55;
+        pub const SHOP_HEAD: f32 = 3.3;
+        pub const SHOP_TOP: f32 = 4.4;
+        pub const SHOP_PANES: u32 = 3;
+        pub const LOBBY_BAY: f32 = 4.0;
+        pub const LOBBY_HEAD: f32 = 7.2;
+        pub const LOBBY_PANES: u32 = 2;
+        pub const SHED_BAY: f32 = 6.0;
+        pub const SHED_SILL: f32 = 0.72;
+        pub const SHED_HEAD: f32 = 0.9;
+        pub const SHED_PANES: u32 = 4;
+        pub const ARCHED_STOREY: f32 = 9.0;
+        pub const ARCHED_BAY: f32 = 4.6;
+        pub const ARCHED_WIDE: f32 = 0.34;
+        pub const ARCHED_SILL: f32 = 0.22;
+        pub const ARCHED_HEAD: f32 = 0.86;
+        pub const ARCHED_PANES: u32 = 2;
+        pub const DECKS_STOREY: f32 = 3.0;
+        pub const GUTTED_STOREY: f32 = 3.2;
+        pub const GUTTED_BAY: f32 = 3.2;
+        /// A glass roof's panes, along and across the slope.
+        pub const ROOF_GLASS_PITCH: f32 = 1.6;
+    }
+
     /// A gun's breech door (`rig::BREECH`, `Model::breech`): swings open on its hinge as
     /// the gun kicks and shuts as it runs out (entity.wgsl `breech_open`).
     pub mod breech as "BREECH_" {

@@ -6,6 +6,7 @@
 //!use metal
 //!use regency
 //!use scenery
+//!use city
 //!use warp_hull
 //!use emp
 //!use wreck
@@ -3174,11 +3175,47 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     // Scenery concrete with a pattern of its own: the dam (scenery.wgsl).
     let concrete = (in.model_class >> 16u) & 0xFFu;
-    if in.material == MAT_CONCRETE && (flags & KIND_PROP) != 0u && concrete != 0u {
+    let city_pattern = concrete >= CITY_FIRST && concrete <= CITY_LAST;
+    if in.material == MAT_CONCRETE && (flags & KIND_PROP) != 0u && concrete != 0u && !city_pattern {
         let px = max(length(dpdx(in.world)), length(dpdy(in.world)));
         let look = dam_concrete(concrete, in.local, in.face, n, px);
         m.albedo = look.albedo;
         m.roughness = look.roughness;
+    }
+    // The city kit (city.wgsl): walls by the instance's palette, windows on the facade's
+    // grid, each pane glass over a room and broken as the structure is hurt.
+    var city: CityLook;
+    var city_axes = mat2x3<f32>(vec3<f32>(0.0), vec3<f32>(0.0));
+    if in.material == MAT_CONCRETE && (flags & KIND_PROP) != 0u && city_pattern {
+        let dp1 = dpdx(in.world);
+        let dp2 = dpdy(in.world);
+        let ds1 = dpdx(in.face.xy);
+        let ds2 = dpdy(in.face.xy);
+        let dp2perp = cross(dp2, n);
+        let dp1perp = cross(n, dp1);
+        let tangent = dp2perp * ds1.x + dp1perp * ds2.x;
+        let bitangent = dp2perp * ds1.y + dp1perp * ds2.y;
+        let ts = tangent * inverseSqrt(max(dot(tangent, tangent), 1e-12));
+        let bs = bitangent * inverseSqrt(max(dot(bitangent, bitangent), 1e-12));
+        city_axes = mat2x3<f32>(ts, bs);
+        // The face's normal in the model, turned to face the eye as the world's does.
+        let facing = select(-1.0, 1.0, dot(cross(dp1, dp2), v) >= 0.0);
+        var ci: CityIn;
+        ci.pattern = concrete;
+        ci.local = in.local;
+        ci.face = in.face;
+        ci.eye = vec3<f32>(dot(v, ts), dot(v, bs), dot(v, n));
+        ci.normal = normalize(face_n + vec3<f32>(0.0, 0.0, 1e-9)) * facing;
+        ci.px = max(length(dp1), length(dp2));
+        ci.inst = surf_ihash(in.unit_id, 977u);
+        ci.unit_id = in.unit_id;
+        ci.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
+        ci.damage = 1.0 - clamp(in.state.y, 0.0, 1.0);
+        ci.night = smoothstep(0.12, -0.04, globals.sun.z);
+        city = city_look(ci);
+        m.albedo = city.albedo;
+        m.roughness = city.roughness;
+        m.metallic = city.metallic;
     }
     // Trees. Leaves: the crown's normal (from the mesh) bent a little toward the
     // card's own facing, colour varied per tree (state.w) and per card, and the
@@ -3742,6 +3779,19 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let refl = env_reflection(in.world, reflect(-v, n), m.roughness, ao);
     var color = shade_pbr_refl(m, n, v, globals.sun.xyz, shadow, atmos.sun_color.rgb, sky,
         atmos.ground_color.rgb, ao, refl);
+    if city.glass > 0.0 {
+        // City glass: what the room behind lets through by daylight, the sky mirrored
+        // in the pane (each pane a little out of true), the sun's glint, a lit room.
+        let pn = normalize(n + city_axes[0] * city.tilt.x + city_axes[1] * city.tilt.y);
+        let r = reflect(-v, pn);
+        let mirrored = env_reflection(in.world, r, 0.03, ao);
+        let fres = (0.05 + 0.75 * pow(1.0 - clamp(dot(pn, v), 0.0, 1.0), 4.0)) * city.reflect;
+        let daylight = atmos.sky_color.rgb * 0.8 + atmos.sun_color.rgb * 0.1 * max(globals.sun.z, 0.0);
+        let glint = pow(max(dot(r, globals.sun.xyz), 0.0), 900.0) * shadow * city.reflect;
+        let pane = city.interior * daylight * (1.0 - fres) + mirrored * city.tint * fres
+            + atmos.sun_color.rgb * glint * 4.0 + city.lamp;
+        color = mix(color, pane, city.glass);
+    }
     if in.material == MAT_VISOR {
         // Tinted glass over a dark gold film, not paint: the lens is deep amber
         // until it catches the sky. A face-forward lens mirrors the ground from

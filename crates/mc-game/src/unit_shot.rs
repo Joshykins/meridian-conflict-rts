@@ -8,12 +8,18 @@
 //! frame (metres: x forward, y left, z up from the ground under its centre) and
 //! `--zoom` closes in on it, for one piece of a unit: a turret, a flank, a muzzle.
 //! The range's `--scenario`, `--hurt` and `--ticks` stage what the unit is doing.
+//!
+//! KEY may also be a map prop's model key (`city_office`): the prop then stands
+//! alone on the range pad at its authored size, its front (`front`, `front34`)
+//! its street side, local +y (`mc_map::city`), and `--hurt` takes that share off
+//! its health, so a city structure's windows break.
 
 use crate::headless::{run_sim, write_png};
 use crate::setup::{self, Options};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::MapFile;
+use mc_map::{Prop, PropKind};
 use mc_render::{Camera, FrameInput, Overlay, Renderer, SceneDesc, Target};
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK, WRECK_INNER};
 use mc_sim::{RenderFrame, World};
@@ -160,6 +166,8 @@ pub(crate) struct Studio {
     pool: Arc<Pool>,
     overlay: Overlay,
     time: f32,
+    /// The staged props' wear (`staged_props`).
+    hurt: i16,
 }
 
 impl Studio {
@@ -170,7 +178,20 @@ impl Studio {
         width: u32,
         height: u32,
     ) -> Result<Studio, String> {
-        let mut renderer = Renderer::new(
+        Studio::with_hurt(map, blueprints, pool, width, height, 0)
+    }
+
+    /// A studio whose staged props (`staged_props`) have `hurt` permille of their
+    /// health gone.
+    fn with_hurt(
+        map: Arc<MapFile>,
+        blueprints: Arc<Blueprints>,
+        pool: Arc<Pool>,
+        width: u32,
+        height: u32,
+        hurt: i16,
+    ) -> Result<Studio, String> {
+        let mut renderer = Renderer::new_staged(
             Target::Headless { width, height },
             SceneDesc {
                 map: map.clone(),
@@ -178,6 +199,7 @@ impl Studio {
                 pool: pool.clone(),
                 team_colors: setup::TEAM_COLORS,
             },
+            &staged_props(&map, hurt),
         )
         .map_err(|e| e.to_string())?;
         renderer.set_map_look(&setup::map_config(&map).look());
@@ -188,6 +210,7 @@ impl Studio {
             pool,
             overlay: Overlay::default(),
             time: 10.0,
+            hurt,
         })
     }
 
@@ -200,6 +223,38 @@ impl Studio {
     ) -> Result<String, String> {
         use std::fmt::Write as _;
         let started = std::time::Instant::now();
+        // A prop is staged on the range's default subject's pad, in its place.
+        let prop = prop_kind(&opts.subject);
+        let staged;
+        let (key, opts) = match prop {
+            Some(_) => {
+                if spec.frames > 0 {
+                    return Err(format!(
+                        "{}: a prop stands still: no --frames",
+                        opts.subject
+                    ));
+                }
+                // The staged props wear the shot's `--hurt`: a studio staged with
+                // another is built again.
+                if self.hurt != opts.hurt {
+                    *self = Studio::with_hurt(
+                        self.map.clone(),
+                        self.blueprints.clone(),
+                        self.pool.clone(),
+                        spec.width,
+                        spec.height,
+                        opts.hurt,
+                    )?;
+                }
+                staged = Options {
+                    subject: crate::range::DEFAULT_SUBJECT.into(),
+                    hurt: 0,
+                    ..opts.clone()
+                };
+                (opts.subject.as_str(), &staged)
+            }
+            None => (opts.subject.as_str(), opts),
+        };
         // The range puts its subject down on the first ticks.
         let mut world = run_sim(
             opts,
@@ -212,7 +267,10 @@ impl Studio {
         )?;
         let mut frame = RenderFrame::default();
         world.write_render_frame(None, &mut frame);
-        let subject = find_subject(&world, &frame, &opts.subject)?;
+        let mut subject = find_subject(&world, &frame, &opts.subject)?;
+        if let Some(kind) = prop {
+            subject = stage_prop(self, &mut frame, kind, key, subject)?;
+        }
         self.renderer
             .resize(spec.width, spec.height)
             .map_err(|e| e.to_string())?;
@@ -222,7 +280,7 @@ impl Studio {
         );
         let mut said = format!(
             "{} (radius {:.1} m) staged in {:.1} s\n",
-            opts.subject,
+            key,
             subject.radius,
             started.elapsed().as_secs_f32()
         );
@@ -274,6 +332,75 @@ impl Studio {
             .read_pixels()
             .ok_or_else(|| "no pixels from a headless target".to_owned())
     }
+}
+
+/// The map prop kind drawn with model `key`: a prop shot. None for a unit's key.
+pub(crate) fn prop_kind(key: &str) -> Option<PropKind> {
+    PropKind::ALL
+        .iter()
+        .copied()
+        .find(|k| mc_render::models::prop_model_key(k.raw()) == key)
+}
+
+/// Frames prop `kind` (model `key`), staged on the pad by the studio (`Studio::new`):
+/// every unit on the range taken away, every other staged prop hidden. The prop's
+/// front is its street side (local +y).
+fn stage_prop(
+    studio: &Studio,
+    frame: &mut RenderFrame,
+    kind: PropKind,
+    key: &str,
+    at: UnitInstance,
+) -> Result<UnitInstance, String> {
+    let model =
+        mc_render::models::build_model(key).ok_or_else(|| format!("{key}: no model is made"))?;
+    let first = studio.map.props().len();
+    let subject = PropKind::ALL.iter().position(|k| *k == kind).unwrap_or(0);
+    frame
+        .props_dead
+        .resize((first + PropKind::ALL.len()).div_ceil(32), 0);
+    for i in (0..PropKind::ALL.len()).filter(|&i| i != subject) {
+        let bit = first + i;
+        frame.props_dead[bit / 32] |= 1 << (bit % 32);
+    }
+    frame.units.clear();
+    let xy = pad(&studio.map);
+    let pos = [xy.x, xy.y, studio.renderer.ground_height(xy)];
+    Ok(UnitInstance {
+        pos,
+        prev_pos: pos,
+        heading: std::f32::consts::FRAC_PI_2,
+        prev_heading: std::f32::consts::FRAC_PI_2,
+        radius: model.bounds_radius,
+        ..at
+    })
+}
+
+/// Where a prop shot's props stand: the first start position.
+fn pad(map: &MapFile) -> glam::Vec2 {
+    map.start_positions()
+        .first()
+        .map_or(glam::Vec2::ZERO, |p| glam::Vec2::from(p.to_f32()))
+}
+
+/// One of every map prop, for prop shots: on the pad, `hurt` (permille) of each one's
+/// health gone.
+fn staged_props(map: &MapFile, hurt: i16) -> Vec<Prop> {
+    let at = map
+        .start_positions()
+        .first()
+        .copied()
+        .unwrap_or(mc_core::FxVec2::ZERO);
+    PropKind::ALL
+        .iter()
+        .map(|&kind| Prop {
+            kind,
+            pos: at,
+            heading: mc_core::Angle::ZERO,
+            scale_milli: 1000,
+            wear_milli: hurt.clamp(0, 1000) as u16,
+        })
+        .collect()
 }
 
 /// The unit to frame; once it is destroyed (`--scenario destruct`), its settled wreck,

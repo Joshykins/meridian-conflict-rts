@@ -831,6 +831,7 @@ pub struct Pit {
 mod aster;
 pub mod builder;
 pub mod burns;
+mod city;
 pub mod cliffs;
 mod dam;
 mod dam_works;
