@@ -145,13 +145,13 @@
         motion: (layer: Land, size: 1, speed: 25, accel: 20, turn: 90),
         weapons: [(
             name: "Tactical Missile Rack",
-            damage: 174, splash: 16, range_min: 120, range: 1400, reload: 1.5, salvo: 6, salvo_delay: 1.5, speed: 160, trajectory: Ballistic, loft: 3,
+            damage: 174, splash: 16, range_min: 120, range: 1400, reload: 3.0, salvo: 6, salvo_delay: 3.0, speed: 160, trajectory: Ballistic, loft: 3,
             turret_turn: 20, arc: 360, muzzle: (2.49, 0, 2.32), pivot: (-1.4, 0, 2.0),
             muzzles: [
                 (2.49, -1.12, 2.32), (2.49, 0, 2.32), (2.49, 1.12, 2.32),
                 (2.49, -1.12, 2.88), (2.49, 0, 2.88), (2.49, 1.12, 2.88),
             ],
-            // One rocket at a time, round the six tubes: 1.5 s apart, the same rate as the
+            // One rocket at a time, round the six tubes: 3 s apart, half the rate of the
             // old six-rocket volley every 9 s.
             // Anti-building: a volley lands in a factory's footprint at full range, but the
             // rockets fly unguided for seconds, so anything that keeps moving walks out of it.

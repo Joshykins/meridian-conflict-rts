@@ -257,7 +257,7 @@ fn javelin_fires_one_rocket_at_a_time_round_the_tubes() {
         }
     };
     record(&w);
-    for _ in 0..140 {
+    for _ in 0..260 {
         w.tick(&[]).unwrap();
         record(&w);
     }
