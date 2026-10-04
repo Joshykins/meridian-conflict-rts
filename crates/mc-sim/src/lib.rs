@@ -50,6 +50,7 @@ mod hover_flight;
 mod impacts;
 mod launch_cells;
 mod line_of_fire;
+mod lots;
 mod marching;
 pub mod mines;
 pub mod mirror;

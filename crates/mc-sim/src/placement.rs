@@ -8,8 +8,9 @@
 //!
 //! [`World::can_place`]: crate::world::World::can_place
 
+use crate::lots::prop_cells;
 use crate::nav::cell_class;
-use crate::world::{path_cells_of, place_cells_of, prop_cells};
+use crate::world::{path_cells_of, place_cells_of};
 use mc_core::{Fx, FxVec2};
 use mc_data::UnitBlueprint;
 use mc_map::{Heightfield, MapFile, Prop};
