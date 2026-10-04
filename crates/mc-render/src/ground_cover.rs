@@ -200,8 +200,15 @@ fn streets_at_texels(
                 .unwrap_or(0);
             let battered = corners.iter().map(|s| s[3] >> 4).max().unwrap_or(0);
             let i = (y * w + x) * 4;
-            out[i] = blend(0);
-            out[i + 1] = blend(1);
+            // Where the nearest road changes between the samples, their offsets
+            // jump: blended, they would make a false centreline. The nearest
+            // road's own sample stands instead.
+            let (lo, hi) = corners
+                .iter()
+                .fold((u8::MAX, 0), |(lo, hi), s| (lo.min(s[0]), hi.max(s[0])));
+            let jump = (hi - lo) as f32 * 0.25 > 1.5 * pitch;
+            out[i] = if jump { nearest[0] } else { blend(0) };
+            out[i + 1] = if jump { nearest[1] } else { blend(1) };
             out[i + 2] = nearest[2] & 0x7F | junction << 7;
             out[i + 3] = ground | battered << 4;
         }

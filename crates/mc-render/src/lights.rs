@@ -734,6 +734,20 @@ impl Lights {
         ));
     }
 
+    /// A building burning round `pos` (its middle, `size` metres across, `age`
+    /// seconds alight): renderer/city_fx.rs. Brighter and further-reaching than a
+    /// tree, flickering slower.
+    pub fn building_fire(&mut self, pos: Vec3, size: f32, age: f32) {
+        let heat = (age / 4.0).clamp(0.0, 1.0);
+        let flicker = 0.8 + 0.2 * (age * 5.0 + pos.x).sin() * (age * 3.1 + pos.y).cos();
+        self.extra.push(GpuLight::point(
+            pos,
+            Vec3::new(1.0, 0.45, 0.14) * (300.0 + size * 12.0) * heat * flicker,
+            size * 1.6 + 30.0,
+            3.0,
+        ));
+    }
+
     /// The flashes of weapons and explosions shining now, for the clouds to be lit by
     /// (`Sky::set_glows`): where, their light (colour times brightness, as the scene
     /// lights take it) and their reach, within `near` of `focus`.

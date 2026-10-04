@@ -3376,6 +3376,9 @@ impl Renderer {
             let at = Vec3::from(tree.instance.pos) + Vec3::Z * tree.height * 0.3;
             self.lights.tree_fire(at, time - tree.start);
         }
+        for (at, size, age) in self.city_fx.fire_lights(time, focus) {
+            self.lights.building_fire(at, size, age);
+        }
         for b in &self.fade_beams {
             let k = 1.0 - ((time - b.start) / b.life.max(0.01)).clamp(0.0, 1.0);
             // A rail slug's path is white-hot and thin: a faint white light, never blue.

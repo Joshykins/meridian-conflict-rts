@@ -161,11 +161,15 @@ fn street_damage(xy: vec2<f32>, battered: f32, px: f32) -> vec3<f32> {
     }
     let cells = crater_cells(xy / 2.7);
     let crack = crater_crack(cells.x, 0.035, px / 2.7) * smoothstep(0.15, 0.6, battered + (cells.y - 0.5) * 0.4);
-    let pothole = smoothstep(0.82, 0.9, value_noise2(xy, 3.1) + battered * 0.25) * battered;
-    // Chips and chunks on a fine lattice, more of them the worse it is.
+    let pothole = smoothstep(0.88, 0.94, value_noise2(xy, 3.1) + battered * 0.12) * smoothstep(0.35, 0.7, battered);
+    // Chips and chunks: small irregular lumps scattered on a fine lattice,
+    // more of them the worse it is.
     let cell = floor(xy / 0.7);
     let r = hash21(cell + 0.37);
-    let chip = select(0.0, 1.0, r < battered * 0.18) * (1.0 - smoothstep(0.1, 0.35, px));
+    let centre = (cell + 0.25 + 0.5 * vec2<f32>(hash21(cell + 3.1), hash21(cell - 5.7))) * 0.7;
+    let size = 0.06 + 0.14 * hash21(cell + 9.9);
+    let lump = 1.0 - smoothstep(size * 0.6, size, length(xy - centre) * (1.0 + 0.4 * sin(atan2(xy.y - centre.y, xy.x - centre.x) * 3.0 + r * 9.0)));
+    let chip = select(0.0, lump, r < battered * 0.09) * (1.0 - smoothstep(0.06, 0.25, px));
     let dust = battered * smoothstep(0.3, 0.75, grad_noise2(xy - 19.0, 7.0));
     return vec3<f32>(max(crack, pothole), chip, dust);
 }
@@ -300,24 +304,26 @@ fn street_ground(xy: vec2<f32>, c: StreetCell, ground: vec3<f32>, px: f32) -> St
             let by_road = c.road != STREET_ROAD_NONE && abs(c.offset) < c.half + 7.0;
             let size = select(2.4, 1.2, by_road);
             let sl = street_slabs(xy, size, 0.02, px);
-            let tone = 0.88 + 0.2 * sl.y;
-            s.rgb = vec3<f32>(0.27, 0.262, 0.245) * tone * (0.85 + 0.3 * grad_noise2(xy + 5.0, 3.5));
-            s.rgb *= 1.0 - 0.45 * sl.x;
-            // Some slabs cracked or lifted.
-            let broken = step(1.0 - 0.3 * c.battered, sl.z);
-            s.rgb = mix(s.rgb, s.rgb * 0.7, broken);
+            let tone = 0.95 + 0.07 * sl.y * fine;
+            // Weathered, grimy concrete: grey-buff, darker in broad stains.
+            let grime = 0.8 + 0.25 * grad_noise2(xy + 5.0, 23.0) + 0.08 * grad_noise2(xy, 3.5);
+            s.rgb = vec3<f32>(0.175, 0.168, 0.155) * tone * grime;
+            s.rgb *= 1.0 - 0.4 * sl.x;
+            // Slabs cracked or lifted where the ground is battered.
+            let broken = step(1.0 - 0.15 * c.battered, sl.z);
+            s.rgb = mix(s.rgb, s.rgb * 0.82, broken * fine);
             s.rough = 0.85;
         }
         case STREET_GROUND_YARD: {
             let sl = street_slabs(xy, 6.0, 0.04, px);
             let stain = smoothstep(0.62, 0.8, grad_noise2(xy + 101.0, 5.0));
-            s.rgb = vec3<f32>(0.205, 0.198, 0.188) * (0.85 + 0.25 * sl.y) * (0.85 + 0.3 * grad_noise2(xy, 1.7 + px));
+            s.rgb = vec3<f32>(0.15, 0.145, 0.138) * (0.88 + 0.18 * sl.y) * (0.85 + 0.3 * grad_noise2(xy, 1.7 + px));
             s.rgb = mix(s.rgb, vec3<f32>(0.06, 0.058, 0.055), stain * 0.6);
             s.rgb *= 1.0 - 0.5 * sl.x;
         }
         case STREET_GROUND_APRON: {
             let sl = street_slabs(xy, 7.5, 0.05, px);
-            s.rgb = vec3<f32>(0.33, 0.33, 0.32) * (0.9 + 0.15 * sl.y) * (0.9 + 0.2 * grad_noise2(xy, 2.2 + px));
+            s.rgb = vec3<f32>(0.24, 0.24, 0.235) * (0.9 + 0.15 * sl.y) * (0.9 + 0.2 * grad_noise2(xy, 2.2 + px));
             s.rgb *= 1.0 - 0.55 * sl.x;
             // Faded yellow taxi lines every 60 m, and black tyre marks.
             let taxi = street_stripe(fract(xy.y / 60.0 + 0.5) * 60.0 - 30.0, 0.3, px);
@@ -386,8 +392,8 @@ fn street_shade(xy: vec2<f32>, c: StreetCell, ground: vec3<f32>, px: f32) -> Str
     let dmg = street_damage(xy, c.battered, px);
     if hard || c.road != STREET_ROAD_NONE {
         s.rgb *= 1.0 - 0.6 * dmg.x;
-        s.rgb = mix(s.rgb, vec3<f32>(0.24, 0.23, 0.21), dmg.y * 0.8);
-        s.rgb = mix(s.rgb, vec3<f32>(0.2, 0.185, 0.165), dmg.z * 0.35);
+        s.rgb = mix(s.rgb, vec3<f32>(0.2, 0.19, 0.175), dmg.y * 0.7);
+        s.rgb = mix(s.rgb, vec3<f32>(0.17, 0.158, 0.14), dmg.z * 0.3);
     }
     return s;
 }

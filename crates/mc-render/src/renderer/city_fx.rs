@@ -258,6 +258,29 @@ impl CityFx {
         self.buffer.write(0, bytemuck::cast_slice(&self.looks));
     }
 
+    /// The burning buildings nearest `focus` (a few dozen; past that a fire is
+    /// its glow and smoke), each as its middle a third of the way up, its size
+    /// and how long it has burned.
+    pub(super) fn fire_lights(&self, time: f32, focus: Vec3) -> Vec<(Vec3, f32, f32)> {
+        let mut lit: Vec<(Vec3, f32, f32)> = self
+            .fires
+            .iter()
+            .filter(|f| f.2)
+            .filter_map(|&(prop, since, _)| {
+                let s = self.shapes.get(prop as usize).copied().flatten()?;
+                Some((s.centre.extend(s.top * 0.3), s.radius() * 2.0, time - since))
+            })
+            .collect();
+        if lit.len() > 48 {
+            lit.sort_by(|a, b| {
+                a.0.distance_squared(focus)
+                    .total_cmp(&b.0.distance_squared(focus))
+            });
+            lit.truncate(48);
+        }
+        lit
+    }
+
     /// The buildings coming down at `time`, posed for the vertex shader: each
     /// sinks into its own dust, slow to start, leaning a little as it goes.
     pub(super) fn falling_instances(&self, time: f32) -> Vec<UnitInstance> {

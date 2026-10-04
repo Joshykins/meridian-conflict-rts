@@ -370,21 +370,49 @@ struct StreetCell {
     battered: f32,
 }
 
-// The streets layer's blended offset alone, metres.
+// The streets layer's offset and half width at `xy`, metres, filtered by hand:
+// blended between the four texels round it where they belong to one road (an
+// offset is linear across a road), the nearest texel's own where the nearest
+// road changes between them, so the jump there never blends into a false
+// centreline.
+fn street_offset_half(xy: vec2<f32>) -> vec2<f32> {
+    let size = vec2<i32>(textureDimensions(ground_cover).xy);
+    let cell = globals.map.xy / vec2<f32>(size);
+    let t = xy / cell - 0.5;
+    let i0 = vec2<i32>(floor(t));
+    let f = t - floor(t);
+    let top = size - 1;
+    let a = textureLoad(ground_cover, clamp(i0, vec2<i32>(0), top), 2, 0).rg;
+    let b = textureLoad(ground_cover, clamp(i0 + vec2<i32>(1, 0), vec2<i32>(0), top), 2, 0).rg;
+    let c = textureLoad(ground_cover, clamp(i0 + vec2<i32>(0, 1), vec2<i32>(0), top), 2, 0).rg;
+    let d = textureLoad(ground_cover, clamp(i0 + vec2<i32>(1, 1), vec2<i32>(0), top), 2, 0).rg;
+    // Quarter metres, as stored.
+    let o = (vec4<f32>(a.x, b.x, c.x, d.x) * 255.0 - 128.0) * 0.25;
+    let h = vec4<f32>(a.y, b.y, c.y, d.y) * 255.0 * 0.25;
+    let spread = max(max(o.x, o.y), max(o.z, o.w)) - min(min(o.x, o.y), min(o.z, o.w));
+    if spread > 1.5 * max(cell.x, cell.y) {
+        let pick = select(select(o.x, o.y, f.x > 0.5), select(o.z, o.w, f.x > 0.5), f.y > 0.5);
+        let half = select(select(h.x, h.y, f.x > 0.5), select(h.z, h.w, f.x > 0.5), f.y > 0.5);
+        return vec2<f32>(pick, half);
+    }
+    let w = vec4<f32>((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
+    return vec2<f32>(dot(o, w), dot(h, w));
+}
+
+// The streets layer's offset alone, metres.
 fn street_offset(xy: vec2<f32>) -> f32 {
-    let uv = xy / globals.map.xy;
-    return (textureSampleLevel(ground_cover, clamp_sampler, uv, 2, 0.0).r * 255.0 - 128.0) * 0.25;
+    return street_offset_half(xy).x;
 }
 
 fn street_cell(xy: vec2<f32>) -> StreetCell {
     let uv = xy / globals.map.xy;
-    let blended = textureSampleLevel(ground_cover, clamp_sampler, uv, 2, 0.0);
+    let blended = street_offset_half(xy);
     let size = vec2<i32>(textureDimensions(ground_cover).xy);
     let texel = clamp(vec2<i32>(floor(uv * vec2<f32>(size))), vec2<i32>(0), size - 1);
     let own = vec4<u32>(round(textureLoad(ground_cover, texel, 2, 0) * 255.0));
     var c: StreetCell;
-    c.offset = (blended.r * 255.0 - 128.0) * 0.25;
-    c.half = blended.g * 255.0 * 0.25;
+    c.offset = blended.x;
+    c.half = blended.y;
     c.road = own.b & ~STREET_JUNCTION;
     c.junction = (own.b & STREET_JUNCTION) != 0u;
     c.ground = own.a & STREET_KIND_MASK;
