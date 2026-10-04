@@ -239,6 +239,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Anti-air T1 / T2 / T3, radar, wall | Canopy / Gorget / Belfry, Orrery (II, III), Palisade |
 | Sonar (T1 to T3), torpedo launcher (T1, T2) | Plummet (II, III), Harpoon (II) |
 | Shield generator (T2, T3) | Ward (II) |
+| Missile defence (T2, T3) | Rondel (II) |
 | Nuke silo, nuke defence, map gun (T4) | Mangonel, Barbican, Springald |
 | Air superiority fighter, strategic bomber (T3) | Partisan, Maul |
 | Spy plane (T3) | Augur |
@@ -423,7 +424,7 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     glows violet just behind the charge, spreads and goes grey as it hangs.
     Violet and black smoke are the sign of a Regency missile a defence can
     take, set apart from ARC's white smoke; only the missiles are violet, so
-    the counter-seekers that hunt them stay red. Where it strikes the lens snaps in and lets
+    the lenses that crush them stay red. Where it strikes the lens snaps in and lets
     go: a hard red burst over a white heart, filaments torn out, globs and
     sparks thrown out low, the ground glassed under it; sized by its damage
     and `impact`, so a heavy seeker's is many times a battery seeker's, and
@@ -442,11 +443,16 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
       smaller cased seekers (`Weapon::cluster`): a hard white heart in a red
       flash and sparks, each piece striking as a seeker at the size of its
       share.
-    - **Gravitic Counter-seeker:** missile defence (a faction's
-      `anti_missile_look: CounterSeeker`; ARC's is the laser). A small red
-      charge thrown off the mount runs the missile down along a cooling
-      filament and bursts on it, small, hard and short, the tick the
-      defence kills it; a burn let go without a kill fizzles where it got to.
+    - **Gravitic Lens:** missile defence (a faction's `anti_missile_look:
+      Gravitic`; ARC's is the laser), on the Rondel and the warships. Each tick a
+      lens holds a missile, a thin red tether ripples from the emitter to it and a
+      ring of bent light round the missile tightens; the tether strikes bright and
+      fades fast. The tick the casing fails, the lens snaps shut and the charge
+      implodes, then pops: a hard white heart in a red burst, filaments torn out,
+      sparks; no smoke, no shockwave. It sounds a low gravitic squeeze per grip and
+      an indrawn thump on the kill, never a zap. A grip let go without a kill just
+      springs open and fades. The emitters are red lenses on dark housings, so the
+      missile defence reads apart from the rest of a model as ARC's laser heads do.
     - **Gravitic Interceptor:** anti-nuke.
     - **Gravitic Torpedo:** the same containment steering under water (also
       air-dropped); it boils the sea around a hull, and its hit is a steam

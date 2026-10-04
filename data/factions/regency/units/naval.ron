@@ -184,7 +184,7 @@
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),
     // The cruiser: the Manta's place. A gravitic seeker battery for the air, two
-    // counter-seeker heads that burn down missiles over the ships round it, a light
+    // gravity lenses that crush missiles over the ships round it, a light
     // repeater for what comes close, radar, and one long arm the Manta lacks: a heavy
     // gravitic seeker, fired one at a time far over the coast at structures, and at
     // nothing else.
@@ -250,7 +250,7 @@
     ),
     // ---- Tech 3 -------------------------------------------------------------------------
     // The battleship: the Leviathan's place, and it dives. Three twin Pinch-fusion Cannon
-    // houses, four twin heavy repeaters on the beams, a light AA repeater, counter-seekers, and bow
+    // houses, four twin heavy repeaters on the beams, a light AA repeater, gravity lenses, and bow
     // torpedoes. Its guns all need the surface; dived it fights with torpedoes alone and
     // comes up on order. A hull its size needs deep water to go under: about 30 m.
     // No sonar and no torpedo defence: its gaps are the point, as the Leviathan's are.
@@ -381,7 +381,7 @@
         sounds: (death: "blast_large", moving: "ship_engine"),
     ),
     // The carrier: the Atoll's place. A battery of heavy gravitic seekers that reaches far
-    // past any flak, plasmeric AA repeaters on both beams for what gets close, counter-seekers,
+    // past any flak, plasmeric AA repeaters on both beams for what gets close, gravity lenses,
     // interceptor tubes, and the longest radar at sea. No gun.
     (
         key: "regency_t3_carrier",
