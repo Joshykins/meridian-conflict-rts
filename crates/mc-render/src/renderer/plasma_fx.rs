@@ -145,7 +145,9 @@ impl Renderer {
     ) {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let range = w.range_max.to_f32();
-        let width = (0.5 + w.damage.to_f32().max(1.0).sqrt() * 0.08) * w.flash.max(1.0);
+        // Tracer width also applies to a held stream, alongside its existing flash scale.
+        let width =
+            (0.5 + w.damage.to_f32().max(1.0).sqrt() * 0.08) * w.flash.max(1.0) * w.tracer.max(0.1);
         let fusion = w.plasma_grade == Some(PlasmaGrade::PinchFusion);
         let start = muzzle - travel;
         let reach = travel.length() + 6.0;

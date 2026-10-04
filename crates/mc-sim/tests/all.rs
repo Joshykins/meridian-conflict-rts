@@ -74,6 +74,7 @@ mod regency_air_t3;
 mod regency_gunships;
 mod regency_navy;
 mod regency_reclaim;
+mod regency_space;
 mod regency_t3_guns;
 mod repair;
 mod self_destruct;

@@ -9,7 +9,6 @@
 
 pub(crate) mod augur;
 mod blade_jet;
-pub(crate) mod coffer;
 pub(crate) mod flechette;
 pub(crate) mod maul;
 pub(crate) mod partisan;

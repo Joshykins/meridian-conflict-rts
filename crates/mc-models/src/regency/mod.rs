@@ -41,6 +41,7 @@ mod reclaimer;
 mod scorpion;
 mod scout;
 mod seeker_hover;
+pub(crate) mod space;
 mod strategic;
 mod strider;
 mod taproot;
@@ -212,7 +213,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // The tech 1 air force: jets by the dozen, a transport the size of a frigate.
         "regency_flechette" => 2200,
         "regency_quarrel" | "regency_petard" => 3200,
-        "regency_coffer" => 6000,
+        "regency_coffer" | "regency_ark" | "regency_space_frigate" => 6000,
+        "regency_space_cruiser" | "regency_space_destroyer" => 9000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,

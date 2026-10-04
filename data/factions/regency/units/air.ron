@@ -85,25 +85,18 @@
         mesh: "regency_petard", icon: Bomber,
         sounds: (death: "blast_small", moving: "aster_jet"),
     ),
-    // The light transport: an open-ended box of a hold slung between lift bells, raised on
-    // a lot by the Exarch and the Artificers as ARC's Courier is by its builders. It sets
-    // the hold down flat on the ground and units drive in at the stern. No warp drive (the
-    // Regency's one exception is gravity, not jumps), so it cruises a little quicker than
-    // the Courier and carries as much. Model: `regency_coffer`; the hold's numbers are its.
+    // Coffer: the fleet's unarmed commander lift, built on site. Its protected chamber
+    // has 26 m of clear width and 28 m of clear height, with the ramp at the stern.
     (
         key: "regency_t2_transport",
         name: "Coffer",
         role: "Light Transport", title: "Transport",
-        tech: 2,
-        categories: ["Air"],
-        health: 420,
-        cost: (mass: 280, energy: 4200, time: 1400),
-        radius: 40, height: 22, footprint: (7, 5), hull: (40, 28), vision: 320,
-        motion: (layer: Air, size: 0, speed: 165, accel: 42, turn: 90, altitude: 140, hover: true, deploy: 0.6),
-        transport: (capacity: 8, descent: 120, hold: (-4, 0), ramp: (-30, -34), width: 18, floor: 0, clearance: 13, unload: 0.25),
-        weapons: [],
-        mesh: "regency_coffer", icon: Transport,
-        lights: [(kind: Point, at: (0, 0, 0.5), color: (1.0, 0.14, 0.06), intensity: 260, range: 46, night_only: false)],
+        tech: 2, categories: ["Air", "Space"],
+        health: 1400, cost: (mass: 280, energy: 4200, time: 1400),
+        radius: 44, height: 36, footprint: (8, 7), hull: (44, 40), vision: 500,
+        motion: (layer: Air, size: 0, speed: 165, accel: 42, turn: 70, altitude: 320, hover: true, deploy: 0.6),
+        transport: (capacity: 8, descent: 120, hold: (-2, 0), ramp: (-28, -40), width: 26, floor: 1, clearance: 28, unload: 0.25),
+        weapons: [], mesh: "regency_coffer", icon: Transport,
         sounds: (death: "blast", moving: "aster_hover"),
     ),
 ]

@@ -921,6 +921,9 @@ pub fn capital_lamps(mesh: &str) -> Option<&'static CapitalLamps> {
 /// `aster::air::capital::CapitalRig::gpu`): its landing legs and bay doors, drives, lift
 /// jets and ramp. `None` for everything else. A new spacecraft adds its `CapitalRig` here.
 pub fn capital_rig(mesh: &str) -> Option<[[f32; 4]; 7]> {
+    if let Some(rig) = library::find(mesh).and_then(|def| def.capital) {
+        return Some(rig);
+    }
     match design_of(mesh) {
         "space_dreadnought" => Some(aster::air::DOMINION_RIG.gpu()),
         "lift_ship" => Some(aster::air::BASTION_RIG.gpu()),

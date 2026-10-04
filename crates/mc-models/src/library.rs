@@ -23,6 +23,8 @@ pub(super) struct ModelDef {
     pub max_tech: u8,
     /// It has a far level of its own ([`MeshBuilder::far`]).
     pub far: bool,
+    /// Optional capital animation metadata, authored with this model.
+    pub capital: Option<[[f32; 4]; 7]>,
 }
 
 impl ModelDef {
@@ -38,6 +40,7 @@ impl ModelDef {
             build,
             max_tech: MAX_TECH,
             far: false,
+            capital: None,
         }
     }
 
@@ -52,7 +55,17 @@ impl ModelDef {
             build,
             max_tech: MAX_TECH,
             far: false,
+            capital: None,
         }
+    }
+
+    /// A transport ramp's hinge and floor, consumed directly by the entity shader.
+    pub(super) const fn with_ramp(mut self, hinge: f32, floor: f32) -> Self {
+        let mut rig = [[0.0; 4]; 7];
+        rig[6][2] = hinge;
+        rig[6][3] = floor;
+        self.capital = Some(rig);
+        self
     }
 
     /// The model has a far level, cheaper than its coarse one, for when it is only a
@@ -84,7 +97,7 @@ fn catalogue() -> impl Iterator<Item = &'static ModelDef> {
         .chain(regency::air::flechette::MODELS.iter())
         .chain(regency::air::quarrel::MODELS.iter())
         .chain(regency::air::petard::MODELS.iter())
-        .chain(regency::air::coffer::MODELS.iter())
+        .chain(regency::space::MODELS.iter())
         .chain(regency::gunships::quiver::MODELS.iter())
         .chain(regency::gunships::wick::MODELS.iter())
         .chain(regency::gunships::reaper::MODELS.iter())

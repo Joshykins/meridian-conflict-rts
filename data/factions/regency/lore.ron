@@ -190,7 +190,7 @@
         },
     ),
     "regency_t2_transport": (
-        lore: "A plated hold slung between lift bells; it sets down flat, takes a company aboard at the stern and lifts it across anything.",
+        lore: "A compact split-hull spacecraft whose protected hold carries one Exarch. Its swept charcoal armour frames a violet-lit loading bay; it sets down to take its commander aboard.",
         weapons: {},
     ),
     "regency_t1_attack_boat": (
@@ -377,5 +377,23 @@
     ),
     "regency_t3_mobile_reclaimer": (
         lore: "The largest of the line: a whole wreck comes apart into its strands while it passes.",
+    ),
+    "regency_t3_assault_transport": (
+        lore: "A vaulted cargo ark that sets an armoured force down beneath its swept shoulders, its broad ramp opening into a deep protected hold.", weapons: {},
+    ),
+    "regency_t2_space_frigate": (
+        lore: "An economical two-gun escort, its narrow split bow carrying only the plasma cannons it needs to guard the fleet.",
+        weapons: {"Escort Plasma Cannon": "A compact cannon firing contained plasma against ships, aircraft and surface targets."},
+    ),
+    "regency_t3_space_cruiser": (
+        lore: "A crescent of overlapping armour around a heavy spine, built to suppress armies, bombard bases and break enemy ships.",
+        weapons: {
+            "Heavy Anti-ship Plasma Cannon": "Two heavy bow cannons throw dense plasma charges at capital hulls.",
+            "Suppression Plasma Battery": "Six independently aiming casemates lay overlapping plasma salvos over a wide area.",
+        },
+    ),
+    "regency_t3_space_destroyer": (
+        lore: "Two immense arched hulls carry a caged plasma projector. It holds station over its mark while the beam sweeps across the ground and turns its path to molten glass.",
+        weapons: {"Excavation Plasma Beam": "A sustained pinch-fusion discharge swept across a broad swath, melting and searing what it crosses."},
     ),
 }

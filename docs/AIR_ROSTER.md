@@ -498,3 +498,9 @@ determinism match.
 **Contrails.** A jet trails from its mesh's nozzles in `aircraft_exhausts`, or else from the
 exhausts its model records (`MeshBuilder::add_exhaust`); every Regency jet uses the latter
 (`models::tests::every_jet_has_exhaust_ports`). Sounds are still ARC stand-ins.
+
+## Regency space fleet
+
+The Regency also builds five site-built spacecraft: Coffer, Ark, Vassal, Suzerain
+and Scourge. Their build access, transport controls and combat roles are documented
+in [REGENCY_SPACE_FLEET.md](REGENCY_SPACE_FLEET.md).
