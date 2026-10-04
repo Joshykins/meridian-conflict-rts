@@ -49,7 +49,7 @@ pub(in crate::regency) fn crush_lens(b: &mut MeshBuilder, at: Vec3, toward: Vec3
     metal(b);
     b.cylinder_between(at - d * r * 1.1, at - d * r * 0.1, r * 0.95, r * 1.1, sides);
     b.paint(GLOW_LASER);
-    b.cylinder_between(at - d * r * 0.1, at + d * 0.04, r * 0.7, r * 0.62, sides);
+    b.cylinder_between(at - d * r * 0.1, at + d * 0.04, r * 0.42, r * 0.36, sides);
     if !b.fine() {
         return;
     }
@@ -330,7 +330,7 @@ fn collar_plates(b: &mut MeshBuilder, at: Vec3) {
         plate(
             b,
             at + e * 1.15 + d * 0.3,
-            at + e * 0.6 - d * 2.4 - Vec3::Z * 0.6,
+            at + e * 0.8 - d * 1.5 - Vec3::Z * 0.3,
             e,
             0.5,
             0.25,
