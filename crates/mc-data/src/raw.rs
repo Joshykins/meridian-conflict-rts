@@ -331,6 +331,10 @@ pub(crate) struct Unit {
     /// What it is in a word or two, the build tile's title over its name (`UnitBlueprint::title`).
     #[serde(default)]
     pub title: Option<String>,
+    /// Only playtest and dev builds have it: a release build leaves it out, and every
+    /// build list and upgrade that names it (`crate::playtest`).
+    #[serde(default)]
+    pub playtest: bool,
     pub tech: u8,
     pub categories: Vec<String>,
     pub health: f64,

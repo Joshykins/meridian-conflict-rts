@@ -234,7 +234,7 @@ impl Server {
 }
 
 fn load(data_dir: &Path) -> Result<Arc<Blueprints>, String> {
-    Blueprints::load(data_dir)
+    Blueprints::load_for(data_dir, crate::build_info::channel())
         .map(Arc::new)
         .map_err(|e| e.to_string())
 }

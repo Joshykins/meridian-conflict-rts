@@ -207,7 +207,7 @@ units whose blueprint key contains each KEY (group 1 is the selection).
 
 MERIDIAN_CHANNEL=dev|playtest|release at compile time: who the build is for (default
 dev). It is part of the build's name, which replays record and network players must
-share (docs/RELEASES.md).
+share (docs/RELEASES.md). A release build has no unit or map marked `playtest: true`.
 ";
 
 fn main() {
@@ -434,7 +434,9 @@ fn run() -> Result<(), String> {
     let data_dir = Blueprints::locate_data_dir().ok_or(
         "could not find the data/ directory next to the executable or above the working directory",
     )?;
-    let blueprints = Arc::new(Blueprints::load(&data_dir).map_err(|e| e.to_string())?);
+    let blueprints = Arc::new(
+        Blueprints::load_for(&data_dir, build_info::channel()).map_err(|e| e.to_string())?,
+    );
     // The sound library is data too, and a unit file naming a sound that is not in it is an error here, not silence later.
     let sounds = mc_data::SoundLibrary::load(&data_dir).map_err(|e| e.to_string())?;
     sounds.check(&blueprints).map_err(|e| e.to_string())?;

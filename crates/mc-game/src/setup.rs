@@ -1,11 +1,11 @@
 //! Match set-up shared by the windowed game, the headless tools and the test scenes.
 
-use mc_core::{Angle, FxVec2};
+use mc_core::{Angle, Channel, FxVec2};
 use mc_data::{BlueprintId, Blueprints};
 use mc_map::MapFile;
 use mc_sim::tables::Controller;
 use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// A colour per player slot, linear RGB.
 pub type Palette = [[f32; 3]; mc_core::MAX_PLAYERS];
@@ -240,7 +240,9 @@ fn roots() -> Vec<PathBuf> {
         .collect()
 }
 
-/// Every `.mcmap` in the nearest `maps/` directory, sorted by name.
+/// Every `.mcmap` in the nearest `maps/` directory that this build offers
+/// ([`offered`]), sorted by name. Every map list (skirmish, survival,
+/// multiplayer, the map browser, the range) reads this one.
 pub fn list_maps() -> Vec<PathBuf> {
     let Some(dir) = roots()
         .into_iter()
@@ -257,7 +259,22 @@ pub fn list_maps() -> Vec<PathBuf> {
         .filter(|p| p.extension().is_some_and(|e| e == "mcmap"))
         .collect();
     maps.sort();
-    maps
+    offered(maps, crate::build_info::channel())
+}
+
+/// The maps a build of `channel` has: all of them, or, in a build without
+/// playtest content, all but those whose settings file says `playtest: true`.
+fn offered(maps: Vec<PathBuf>, channel: Channel) -> Vec<PathBuf> {
+    if channel.has_playtest_content() {
+        return maps;
+    }
+    maps.into_iter().filter(|p| !playtest_only(p)).collect()
+}
+
+/// The map's settings file marks it playtest-only. A file that does not read is
+/// reported where the map is played, not here.
+fn playtest_only(map: &Path) -> bool {
+    mc_data::weather::MapConfig::for_map(map).is_ok_and(|c| c.playtest)
 }
 
 /// Which file in `maps/` holds each map content found so far: finding one
@@ -311,15 +328,21 @@ pub fn find_map(name: Option<&str>) -> Result<PathBuf, String> {
         ],
     };
     let roots = roots();
-    for c in &candidates {
+    let channel = crate::build_info::channel();
+    let found = candidates.iter().find_map(|c| {
         if c.is_absolute() && c.exists() {
-            return Ok(c.clone());
+            return Some(c.clone());
         }
-        for root in &roots {
-            if root.join(c).exists() {
-                return Ok(root.join(c));
-            }
+        roots.iter().map(|r| r.join(c)).find(|p| p.exists())
+    });
+    if let Some(path) = found {
+        if offered(vec![path.clone()], channel).is_empty() {
+            return Err(format!(
+                "{} is a playtest map, and this is a {channel} build",
+                path.display()
+            ));
         }
+        return Ok(path);
     }
     Err(format!(
         "no map found (looked for {candidates:?}). Bake one with: cargo run --release -p mc-map --bin mc-bake -- --size-km 16 --seed 7 -o maps/crosswater.mcmap"
@@ -1348,4 +1371,32 @@ fn open_sea(map: &MapFile, from: FxVec2) -> FxVec2 {
         }
     }
     from
+}
+
+#[cfg(test)]
+mod playtest_tests {
+    use super::*;
+
+    /// A release build does not list a map marked playtest-only; dev and
+    /// playtest builds list it with the rest.
+    #[test]
+    fn a_playtest_map_is_not_listed_in_a_release_build() {
+        let dir = std::env::temp_dir().join(format!("mc_playtest_maps_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (open, trial, plain) = (
+            dir.join("open.mcmap"),
+            dir.join("trial.mcmap"),
+            dir.join("plain.mcmap"),
+        );
+        for map in [&open, &trial, &plain] {
+            std::fs::write(map, b"").unwrap();
+        }
+        std::fs::write(dir.join("open.ron"), "(time: Morning, playtest: false)").unwrap();
+        std::fs::write(dir.join("trial.ron"), "(time: Morning, playtest: true)").unwrap();
+        let all = vec![open.clone(), plain.clone(), trial.clone()];
+        assert_eq!(offered(all.clone(), Channel::Release), vec![open, plain]);
+        assert_eq!(offered(all.clone(), Channel::Playtest), all);
+        assert_eq!(offered(all.clone(), Channel::Dev), all);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

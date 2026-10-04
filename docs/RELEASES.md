@@ -18,6 +18,33 @@ written into replays, so they are never renumbered.
 Network players must run builds with the same name, so a playtest build and a release
 build never share a match.
 
+## Playtest-only units and maps
+
+A unit or a map can be marked playtest-only, to try it on playtesters before
+everyone has it. Dev and playtest builds have it; a release build does not have it
+at all.
+
+- **A unit:** `playtest: true` in its entry in `data/factions/<faction>/units/*.ron`.
+  mc-game loads the data with `Blueprints::load_for(dir, build_info::channel())`; in
+  a release build that leaves the unit out before the tables are compiled
+  (`crates/mc-data/src/playtest.rs`), and with it its lore and every build list
+  entry naming it (factories, engineers, the commander, refit modules), so it is in
+  no build menu, factory roster, AI plan, unit browser or line-up. An upgrade into it
+  goes too: the unit below stops at its own tier. A unit that cannot work without it
+  is an error, not a broken unit: mark that one playtest-only as well. That covers
+  a builder whose whole list is playtest-only (a release factory that builds
+  nothing), a faction's commander, a drone and a gun's sabot casing. A test loads
+  the checked-in data as a release build, so `scripts/check.sh` catches such a flag
+  before any release does.
+- **A map:** `playtest: true` in its settings file, `maps/<stem>.ron`.
+  `setup::list_maps`, which every map list reads (skirmish, survival, multiplayer,
+  the map browser, the range), leaves it out of a release build, and `--map` refuses
+  it there.
+
+Since the unit data differ, a release build's unit data hash differs from a
+playtest build's whenever anything is flagged: replays and network games never
+cross between them.
+
 ## Why the fingerprint
 
 A replay holds commands, not state, so it plays back faithfully only on a build with

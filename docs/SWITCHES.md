@@ -81,7 +81,7 @@ See `docs/RELEASES.md`.
 
 | Switch | Values | Purpose |
 |---|---|---|
-| `MERIDIAN_CHANNEL` (compile time) | `dev` (default), `playtest`, `release` | Who the build is for. Part of the build's name (`0.1.0-playtest+<commit>`; a release is `0.1.0+<commit>`), which replays record and network players must share. |
+| `MERIDIAN_CHANNEL` (compile time) | `dev` (default), `playtest`, `release` | Who the build is for. Part of the build's name (`0.1.0-playtest+<commit>`; a release is `0.1.0+<commit>`), which replays record and network players must share. A release build has no unit or map marked `playtest: true`. |
 | `--version` | | Print the build's name, number, channel, commit and simulation fingerprint, one `key: value` a line, and exit. |
 
 ## AI probes and tournaments
