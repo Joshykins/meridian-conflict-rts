@@ -181,6 +181,11 @@ fn aim_error(rng: &mut mc_core::Rng, spread: u16) -> (i32, i32) {
     }
 }
 
+/// Ticks a ballistic shell is given past its flight to its mark (`Projectiles::ticks_left`),
+/// so one that falls short of the ground there still comes down: a shell's `ticks_left`
+/// less this is the ticks before it lands.
+pub(crate) const BALLISTIC_OVERRUN: i32 = 20;
+
 /// Ticks a ballistic shell spends in the air to cover `dist`, including `loft`.
 fn ballistic_ticks(dist: Fx, weapon: &Weapon) -> i32 {
     let step = weapon.projectile_speed / DT;
@@ -2134,7 +2139,7 @@ impl World {
                 let n = (n as i32).max(1);
                 let horiz = range / n;
                 let vz = horiz * tan_rake;
-                ((ahead * horiz).extend(vz), n + 20)
+                ((ahead * horiz).extend(vz), n + BALLISTIC_OVERRUN)
             } else {
                 let mut delta = aim - muzzle_xy;
                 let mut aim_z = aim_z;
@@ -2174,7 +2179,10 @@ impl World {
                         let n = ballistic_ticks(dist, weapon);
                         let drop = GRAVITY * (n * (n + 1) / 2);
                         let vz = (aim_z - muzzle.z + drop) / n;
-                        (FxVec2::new(delta.x / n, delta.y / n).extend(vz), n + 20)
+                        (
+                            FxVec2::new(delta.x / n, delta.y / n).extend(vz),
+                            n + BALLISTIC_OVERRUN,
+                        )
                     }
                 }
             };

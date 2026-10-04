@@ -21,6 +21,12 @@
             "Pinch-fusion Cannon": "Plasma squeezed until it fuses and pinched out in one fast shot up at a hull in the upper air, where it opens like a small sun.",
         },
     ),
+    "regency_t4_artillery": (
+        lore: "A bore built for three charges at once on a turntable the size of a factory; it throws them over the curve of the world wound round each other like a rope, and they close into one strike on whatever its side can see.",
+        weapons: {
+            "Triune Pinch-fusion Howitzer": "Three knots of fusion gathered and thrown together, corkscrewing round each other all the way up and over, closing into one supernova where they land.",
+        },
+    ),
     "regency_t3_artillery": (
         lore: "A long pinch bore that charges coil by coil and lobs a single shot of fusion over the horizon; where it lands the ground runs like glass.",
         weapons: {

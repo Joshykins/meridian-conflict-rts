@@ -891,6 +891,7 @@ fn strategic_projects_are_told_apart_by_their_data() {
     assert_eq!(kind("aster_t3_nuke_defense"), Some(Interceptor));
     assert_eq!(kind("aster_t4_anti_ship"), Some(SkyGun));
     assert_eq!(kind("aster_t4_artillery"), Some(MapGun));
+    assert_eq!(kind("regency_t4_artillery"), Some(MapGun));
     assert_eq!(kind("aster_t4_assault_tank"), Some(Mobile));
     assert_eq!(kind("aster_t5_titan"), Some(Mobile));
     assert_eq!(kind("aster_t4_frigate"), Some(Mobile));

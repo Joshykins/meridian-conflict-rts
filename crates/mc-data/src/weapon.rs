@@ -162,6 +162,10 @@ pub struct Weapon {
     /// Ticks the rounds are spread over (`RawWeapon::round_span`). Zero: the time to the
     /// next shot. Cosmetic.
     pub round_span: f32,
+    /// Strands a lobbed plasma shot is drawn as, corkscrewing round its line of flight
+    /// and closing into one where it lands (`RawWeapon::braid`). Zero: drawn as it is.
+    /// Cosmetic: not in the content hash.
+    pub braid: u8,
     /// Metres behind the muzzle where spent casings are thrown out, one per round.
     /// Zero: none. Cosmetic: not in the content hash.
     pub casings: f32,

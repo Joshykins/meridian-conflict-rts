@@ -185,6 +185,14 @@ pub(super) const MODELS: &[ModelDef] = &[
         [(7.0, 24.0), (7.0, 28.0), (7.0, 32.0)],
         eye::eye,
     ),
+    // The Springald map gun: a three-rail Pinch-fusion gun laid high on a turntable, three
+    // capacitor cells on its back (`turrets::springald`).
+    ModelDef::new(
+        "regency_springald",
+        turrets::SPRINGALD_RADIUS,
+        turrets::SPRINGALD_HEIGHT,
+        turrets::springald,
+    ),
     // Strategic launchers (`strategic`): the Mangonel silo and the Barbican array.
     ModelDef::new(
         "regency_nuke_silo",
@@ -266,6 +274,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Strategic: an 8 x 8 launch complex, and a 4 x 4 array; a few a match.
         "regency_nuke_silo" => 9000,
         "regency_nuke_defense" => 6000,
+        // A 6 x 6 map gun: plinth and pylons, a long turret, its plant, a three-rail gun.
+        "regency_springald" => 12000,
         _ => return None,
     })
 }

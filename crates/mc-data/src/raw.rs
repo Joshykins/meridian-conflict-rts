@@ -1108,6 +1108,13 @@ pub struct RawWeapon {
     /// the time to the next shot.
     #[serde(default)]
     pub round_span: f64,
+    /// Strands a lobbed shot is drawn as, wound round its line of flight like the strands
+    /// of a rope: they part off the muzzle, corkscrew round each other all the way up and
+    /// over, and close into one just before it lands. Cosmetic: the sim flies the one
+    /// shot and it strikes once. Zero (the default): drawn as it is. Ballistic plasma guns
+    /// only, two to six.
+    #[serde(default)]
+    pub braid: u8,
     /// Metres behind the muzzle where the gun throws out its spent casings, one per
     /// round. Cosmetic. Zero (the default): it throws none.
     #[serde(default)]
@@ -1551,6 +1558,16 @@ impl Unit {
                     "{ctx}: round_span needs rounds above one"
                 )));
             }
+            if w.braid > 0
+                && (w.trajectory != Trajectory::Ballistic
+                    || w.missile
+                    || w.plasma_grade.is_none()
+                    || !(2..=6).contains(&w.braid))
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: braid is two to six strands, for a ballistic plasma gun"
+                )));
+            }
             if w.hitscan && (w.trajectory != Trajectory::Direct || w.missile) {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: hitscan is only for direct-fire guns"
@@ -1746,6 +1763,7 @@ impl Unit {
                 },
                 rounds: w.rounds.clamp(1, 32),
                 round_span: (w.round_span.clamp(0.0, 10.0) * TICKS_PER_SECOND as f64) as f32,
+                braid: w.braid,
                 casings: w.casings.clamp(0.0, 40.0) as f32,
                 red: w.red.clamp(0.0, 1.0) as f32,
                 torpedo: w.torpedo,

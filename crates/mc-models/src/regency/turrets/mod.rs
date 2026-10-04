@@ -5,6 +5,8 @@
 //! - `regency_spitter`: the Canopy, a Plasmeric AA Repeater (`canopy`).
 //! - `regency_pinch_cannon`: the Halberd, a Pinched-plasmeric Cannon (`halberd`).
 //! - `regency_fusion_cannon`: the Sunspear, a Pinch-fusion Cannon (`sunspear`).
+//! - `regency_springald`: the Springald map gun, a Triune Pinch-fusion Howitzer
+//!   (`springald`).
 //!
 //! The pinch guns gather their charge in front of the bore, between projectors that reach
 //! past its mouth, and their `muzzle` is the middle of that charge.
@@ -15,6 +17,7 @@
 mod canopy;
 mod halberd;
 mod picket;
+mod springald;
 /// The Sunspear's gun pieces are shared by the tech 3 mobile fusion guns
 /// (`fusion_guns`), the same gun drawn smaller.
 pub(super) mod sunspear;
@@ -22,6 +25,7 @@ pub(super) mod sunspear;
 pub(super) use canopy::canopy;
 pub(super) use halberd::halberd;
 pub(super) use picket::picket;
+pub(super) use springald::{springald, HEIGHT as SPRINGALD_HEIGHT, RADIUS as SPRINGALD_RADIUS};
 pub(super) use sunspear::sunspear;
 
 use glam::{Vec2, Vec3};

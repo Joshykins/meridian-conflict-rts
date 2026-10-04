@@ -1,6 +1,6 @@
 // Regency strategic weapons: the silo that throws a Pinch-fusion Warhead and the array of
-// Gravitic Interceptors that answers one. They assemble and fire by the same rules as
-// ARC's Sunfall and Parhelion (`docs/NUKES.md`), with a yield to match; only the look and
+// Gravitic Interceptors that answers one, and the Springald map gun (last). The two
+// launchers assemble and fire by the same rules as ARC's Sunfall and Parhelion (`docs/NUKES.md`), with a yield to match; only the look and
 // the sound are the Regency's (`nuke_look: Plasma` in faction.ron): the warhead goes up
 // as a red plasma nova and leaves a glowing cloud of plasma standing over the ground for
 // minutes, and the missiles leave dark trails with a white-hot streak at the tail.
@@ -55,6 +55,54 @@
             coverage: 2400,
         ),
         mesh: "regency_nuke_defense", icon: AntiNuke,
+        sounds: (death: "blast_large"),
+    ),
+    (
+        // The Regency's map gun, the Culverin's answer: a Pinch-fusion Howitzer on a
+        // turntable, its bore made for three charges at once. It gathers three knots of
+        // fusion in front of its bore and lobs them high over everything as one shot, the
+        // three wound round each other like the strands of a rope all the way up and over
+        // (`braid`, drawn only: the sim flies one shot), closing into one just before it
+        // lands as a supernova. Like the Culverin it shells the nearest enemy its side can
+        // see or has on radar anywhere in reach, building, army or fleet.
+        //
+        // Balance: the Culverin's (10000 mass, 30000 HP, 5200 every 9 s, 45 m splash, 1
+        // degree of spread, 22 km), bent the Regency way as the Kiln is bent from the
+        // Trebuchet: a harder strike (5600) in a tighter blast (40 m), laid truer (0.8
+        // degrees) and charged longer (4 s), a little slower to load (10 s), so about the
+        // same damage a second.
+        //
+        // Model: `regency_springald` (`models::regency::turrets::springald`), authored at this
+        // size; `pivot`/`muzzle` are its trunnion and the middle of its charge, the gun laid
+        // 45 degrees up at rest so it always stands raised (it only ever lobs higher, and
+        // `keeps_aim` holds it there); the raised gun is why it stands 48 m.
+        key: "regency_t4_artillery",
+        name: "Springald",
+        role: "Strategic Artillery",
+        tech: 4,
+        categories: ["Land", "Artillery", "Strategic", "Experimental"],
+        health: 30000,
+        cost: (mass: 10000, energy: 100000, time: 36000),
+        radius: 30, height: 48, footprint: (6, 6),
+        vision: 300,
+        weapons: [(
+            name: "Triune Pinch-fusion Howitzer",
+            damage: 5600, splash: 40, range_min: 1500, range: 22000, reload: 10.0, speed: 800,
+            trajectory: Ballistic, loft: 15,
+            spread: 0.8,
+            turret_turn: 8, pivot: (0, 0, 18), muzzle: (36.77, 0, 54.77),
+            targets: ["Structure", "Land", "Naval"], keeps_aim: true,
+            bombard: 2000,
+            color: Orange, red: 1.0,
+            plasma_grade: Some(PinchFusion), braid: 3,
+            flash: 1.6, impact: 1.6, tracer: 2.4,
+            sounds: (
+                fire: "regency_triune_fire", charge: "regency_triune_charge", charge_time: 4.0,
+                charge_volume: 1.8,
+                impact: "regency_triune_hit", ground: "regency_triune_hit", far: "regency_triune_far",
+            ),
+        )],
+        mesh: "regency_springald", icon: Artillery,
         sounds: (death: "blast_large"),
     ),
 ]

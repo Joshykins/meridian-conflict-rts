@@ -40,8 +40,9 @@
 //!   it lands it goes off as a small supernova (`fusion.rs`).
 //!
 //! Nothing is wound round a middle (no spiral arms, no rings; a fusion strike's streamers
-//! are thrown out in a loose band round its waist, as a supernova's), and nothing hangs as
-//! a mist: the plasma is hard-edged and goes out fast (plasma_puffs.wgsl).
+//! are thrown out in a loose band round its waist, as a supernova's), except a braided
+//! shot's strands (`Weapon::braid`, the Springald's), which the mirror draws as shots of
+//! their own and so leave trails of their own; and nothing hangs as a mist: the plasma is hard-edged and goes out fast (plasma_puffs.wgsl).
 //!
 //! Presentation only; the renderer's own clock. The light is plasma_puffs.wgsl's (the
 //! ball, the bursts, the globs, the thrown clumps), warp_puffs.wgsl's (motes, filaments,

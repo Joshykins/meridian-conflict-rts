@@ -19,6 +19,7 @@ fn roles_come_from_what_a_unit_can_do() {
     assert!(has("aster_t3_lift_ship", role::TRANSPORT | role::PROJECT));
     assert!(has("aster_t2_sensor_ship", role::SENSOR | role::WARP));
     assert!(has("aster_t4_artillery", role::MAP_GUN | role::PROJECT));
+    assert!(has("regency_t4_artillery", role::MAP_GUN | role::PROJECT));
     assert!(has("aster_t4_nuke_silo", role::STRATEGIC));
     assert!(has("aster_t3_nuke_defense", role::INTERCEPTOR));
     assert!(has("aster_t1_submarine", role::HUNTER | role::ANTI_SHIP));

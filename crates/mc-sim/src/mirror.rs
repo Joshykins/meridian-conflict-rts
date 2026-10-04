@@ -21,6 +21,7 @@ use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
 mod batch;
+mod braid;
 pub mod city;
 mod destruct;
 mod fog;
@@ -2005,7 +2006,7 @@ impl World {
                     weapon: s.projectiles.weapon[i],
                 });
             }
-            frame.projectiles.push(ProjectileInstance {
+            let shot = ProjectileInstance {
                 prev_pos: off(from, age - 1.0),
                 color: color | fresh(from),
                 pos,
@@ -2023,7 +2024,22 @@ impl World {
                     s.projectiles.prev_aim[i],
                     aim_w(weapon, s.projectiles.sub[i] > 0),
                 ),
-            });
+            };
+            // A braided shot is seen as its strands (`Weapon::braid`); once landed (`spent`
+            // below) they have closed into the one shot.
+            if weapon.braid > 1 && s.projectiles.sub[i] == 0 {
+                braid::strands(
+                    &shot,
+                    weapon.braid,
+                    s.projectiles.age[i],
+                    s.projectiles.ticks_left[i],
+                    s.projectiles.vel[i].to_f32(),
+                    s.projectiles.serial[i],
+                    &mut frame.projectiles,
+                );
+            } else {
+                frame.projectiles.push(shot);
+            }
         }
         // Shots that landed this tick fly their last stretch, so a shell is seen
         // all the way in, and one fired at point-blank range is seen at all.

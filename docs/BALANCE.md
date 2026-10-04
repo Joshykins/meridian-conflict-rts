@@ -40,6 +40,10 @@ Off the lines, measured the same way:
   area only about one shell in ten lands on the building it was aimed at, the rest on
   what stands round it. A dome is the answer: a T2 dome (9000, 90/s) goes down in about 20 s of hits, a T3
   dome (36000, 360/s) holds one gun off for nearly 3 minutes and two for under one.
+- The Regency's Springald (same cost and reach) is bent as the Kiln is from the Trebuchet:
+  5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
+  shot is drawn as three strands wound round each other but is one shot and strikes once
+  (`Weapon::braid`), so a dome takes it as it takes a Culverin shell.
 
 ## Air and anti-air
 

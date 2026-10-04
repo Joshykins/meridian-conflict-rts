@@ -1038,5 +1038,13 @@
                 Roll(at: 0.9, from: 200, to: 50, glide: 3.5, attack: 0.6, decay: 1.6, gain: 0.6, swell: 1.8, depth: 0.7, pan: 0.3, seed: 9604),
             ],
         ),
-    },
+            // The Springald's Triune Pinch-fusion Howitzer: the Sunspear's charge, fire and
+        // strike made for a gun three times its size, lower and longer.
+        "regency_triune_charge": (like: "regency_sunspear_charge", size: 1.5),
+        "regency_triune_fire": (like: "regency_sunspear_fire", size: 1.7, peak: 0.95),
+        "regency_triune_hit": (like: "regency_sunspear_hit", size: 1.6, peak: 0.9),
+        // A Triune strike heard from anywhere on the map: the titan's far strike, as the
+        // Culverin's, a little lower.
+        "regency_triune_far": (like: "titan_bore_far", size: 1.05, peak: 0.8),
+},
 )
