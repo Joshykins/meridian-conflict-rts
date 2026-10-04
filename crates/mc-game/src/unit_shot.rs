@@ -251,6 +251,7 @@ impl Studio {
         )?;
         let mut frame = RenderFrame::default();
         world.write_render_frame(None, &mut frame);
+        hide_staged(&self.map, &mut frame, None);
         let mut subject = find_subject(&world, &frame, &opts.subject)?;
         if let Some(kind) = prop {
             subject = stage_prop(self, &mut frame, kind, key, subject)?;
@@ -347,15 +348,8 @@ fn stage_prop(
 ) -> Result<UnitInstance, String> {
     let model =
         mc_render::models::build_model(key).ok_or_else(|| format!("{key}: no model is made"))?;
-    let first = studio.map.props().len();
     let subject = PropKind::ALL.iter().position(|k| *k == kind).unwrap_or(0);
-    frame
-        .props_dead
-        .resize((first + PropKind::ALL.len()).div_ceil(32), 0);
-    for i in (0..PropKind::ALL.len()).filter(|&i| i != subject) {
-        let bit = first + i;
-        frame.props_dead[bit / 32] |= 1 << (bit % 32);
-    }
+    hide_staged(&studio.map, frame, Some(subject));
     frame.units.clear();
     let xy = pad(&studio.map);
     let pos = [xy.x, xy.y, studio.renderer.ground_height(xy)];
@@ -367,6 +361,19 @@ fn stage_prop(
         radius: model.bounds_radius,
         ..at
     })
+}
+
+/// Hides the props staged on the pad (`staged_props`), all but `keep`: a prop shot shows
+/// its own, and every other shot none, since they stand where the subject is put down.
+fn hide_staged(map: &MapFile, frame: &mut RenderFrame, keep: Option<usize>) {
+    let first = map.props().len();
+    frame
+        .props_dead
+        .resize((first + PropKind::ALL.len()).div_ceil(32), 0);
+    for i in (0..PropKind::ALL.len()).filter(|&i| Some(i) != keep) {
+        let bit = first + i;
+        frame.props_dead[bit / 32] |= 1 << (bit % 32);
+    }
 }
 
 /// Where a prop shot's props stand: the first start position.
@@ -553,6 +560,8 @@ fn animate(
             world.tick(&late).map_err(|e| e.to_string())?;
             t += 1;
             world.write_render_frame(None, frame);
+            // A prop never animates (`shoot`), so none of the staged ones shows.
+            hide_staged(&studio.map, frame, None);
         }
         let alpha = if half { 0.5 } else { 1.0 };
         // Framed where the unit is drawn, part way through the tick, or a moving unit
