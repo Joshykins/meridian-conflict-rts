@@ -278,8 +278,8 @@ mod tests {
 
     use crate::Blueprints;
 
-    /// The Regency fires plasma (docs/STYLE.md, "The Regency suite"): every gun of theirs names
-    /// its grade, and nothing of ARC's does.
+    /// The Regency's guns name their plasma grade, and nothing of ARC's does.
+    /// Cased cluster missiles select the solid missile renderer instead (docs/STYLE.md).
     #[test]
     fn only_the_regency_fires_plasma() {
         let bp =
@@ -292,7 +292,7 @@ mod tests {
                 regency_guns += usize::from(regency_gun);
                 assert_eq!(
                     w.plasma_grade.is_some(),
-                    regency_gun,
+                    regency_gun && !(w.missile && w.cluster.is_some()),
                     "{}: {}",
                     unit.key,
                     w.name

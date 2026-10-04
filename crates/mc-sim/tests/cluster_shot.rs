@@ -184,3 +184,44 @@ fn missile_defence_takes_seekers_and_their_pieces() {
         bare.hits.len()
     );
 }
+
+#[test]
+fn sower_draws_cased_missiles_and_smaller_cluster_pieces() {
+    use mc_sim::mirror::PROJECTILE_MISSILE;
+    use mc_sim::RenderFrame;
+
+    let mut w = world();
+    let sower = w.blueprints.id_of(SOWER).unwrap();
+    let caliber = w.blueprints.unit(sower).weapons[0].caliber;
+    assert!(
+        caliber > 0.0 && caliber * (0.165 / 0.14) < 0.60,
+        "the body and folded fins must fit the launch cell"
+    );
+    w.tick(&[
+        spawn(&w, 1, SOWER, 1500, 1000, flag::INVULNERABLE),
+        spawn(&w, 0, TARGET, 600, 1000, flag::PASSIVE),
+    ])
+    .unwrap();
+    let mut frame = RenderFrame::default();
+    let (mut carrier, mut piece, mut landed_piece) = (false, false, false);
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        w.write_render_frame(None, &mut frame);
+        for p in &frame.projectiles {
+            assert_ne!(p.color & PROJECTILE_MISSILE, 0, "solid missile geometry");
+            assert_eq!(p._pad[0], 0.0, "no violet plasma orb");
+            assert_eq!(p.aim[3], p.prev_aim[3]);
+            if (p.aim[3] - caliber).abs() < 0.0001 {
+                carrier = true;
+            } else {
+                assert!((p.aim[3] - caliber * 0.55).abs() < 0.0001);
+                piece = true;
+                landed_piece |= p.color >> 16 != 0;
+            }
+        }
+    }
+    assert!(
+        carrier && piece && landed_piece,
+        "carrier, split pieces and their last stretch"
+    );
+}

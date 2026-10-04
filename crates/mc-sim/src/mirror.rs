@@ -1185,9 +1185,9 @@ fn plasma_seeker(weapon: &mc_data::Weapon) -> bool {
 
 /// A shot's `aim.w`: a missile's body across (`Weapon::caliber`), any other shot's
 /// tail-length multiplier (`Weapon::streak`).
-fn aim_w(weapon: &mc_data::Weapon) -> f32 {
+fn aim_w(weapon: &mc_data::Weapon, sub: bool) -> f32 {
     if !plasma_seeker(weapon) && weapon.missile {
-        weapon.caliber
+        weapon.caliber * sub_scale(sub)
     } else {
         weapon.streak
     }
@@ -1989,8 +1989,16 @@ impl World {
                 wake,
                 plasma,
                 _pad: [hot, wings_or_turn(weapon, s.projectiles.age[i])],
-                aim: nose_pad(cold_body, s.projectiles.aim[i], aim_w(weapon)),
-                prev_aim: nose_pad(cold_body, s.projectiles.prev_aim[i], aim_w(weapon)),
+                aim: nose_pad(
+                    cold_body,
+                    s.projectiles.aim[i],
+                    aim_w(weapon, s.projectiles.sub[i] > 0),
+                ),
+                prev_aim: nose_pad(
+                    cold_body,
+                    s.projectiles.prev_aim[i],
+                    aim_w(weapon, s.projectiles.sub[i] > 0),
+                ),
             });
         }
         // Shots that landed this tick fly their last stretch, so a shell is seen
@@ -2009,8 +2017,7 @@ impl World {
             };
             let ends = ((shot.after.to_f32() * 255.0) as u32).clamp(1, 255);
             let from = shot.from.to_f32();
-            let caliber =
-                aim_w(&self.blueprints.unit(shot.blueprint).weapons[shot.weapon as usize]);
+            let caliber = aim_w(shot_weapon, shot.sub);
             frame.projectiles.push(ProjectileInstance {
                 prev_pos: std::array::from_fn(|a| from[a] + shot.lead[a]),
                 color: color
