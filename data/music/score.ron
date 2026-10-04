@@ -4,9 +4,9 @@
 // over it and the song dips by duck_db, then comes back. Events in `endings` stop
 // the song instead (the match is over).
 (
-    menu: "reach_command",
-    battle: {"default": "reach_command"},
-    survival: "reach_command",
+    menu: "meridian_2",
+    battle: {"default": "meridian_2"},
+    survival: "meridian_2",
     fade: 3.0,
     moments: {
         "nuke": "nuke",

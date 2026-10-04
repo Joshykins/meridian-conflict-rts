@@ -1,0 +1,32 @@
+#![enable(implicit_some)]
+(
+    name: "Meridian 2",
+    // 42 bars of 4 at this tempo run 167.88 s, just past the 167.87 s recording, so
+    // it plays whole and loops from the top.
+    tempo: 60.04,
+    beats_per_bar: 4,
+    root: 0,
+    scale: Minor,
+    tracks: [(
+        name: "recording",
+        instrument: Sampler((
+            set: "meridian_2",
+            velocity: 0.0,
+            voices: 1,
+        )),
+        // Mastered at -9.8 LUFS; down to about Reach Command's -13 under the battle.
+        db: -3.0,
+    )],
+    patterns: [(
+        name: "whole",
+        beats: 168,
+        notes: [(0, 16128, 60, 127)],
+    )],
+    sections: [(
+        name: "whole",
+        bars: 42,
+        clips: [(track: "recording", pattern: "whole", at: 0, times: 1)],
+    )],
+    arrangement: ["whole"],
+    notes: "A finished recording, not a score: one sampler note plays samples/meridian_2/track.ogg end to end. To change the music, replace the recording.",
+)

@@ -1,0 +1,12 @@
+// "Meridian 2", the game's soundtrack: one finished stereo recording, played whole
+// by data/music/meridian_2.ron. Made from the user's Meridian 2.mp3 with
+// ffmpeg -c:a libvorbis -q:a 5.
+(
+    title: "Meridian 2",
+    rate: 44100,
+    pitched: false,
+    held: false,
+    zones: [
+        (file: "track.ogg", key: 60),
+    ],
+)
