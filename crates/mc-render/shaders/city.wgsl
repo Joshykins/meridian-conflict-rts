@@ -240,18 +240,22 @@ fn city_scars(c: vec3<f32>, i: CityIn) -> vec3<f32> {
         return c;
     }
     var out = c;
-    let n = surf_noise3(i.local * 0.9 + vec3<f32>(i.inst * 57.0));
-    let cut = 0.86 - 0.3 * d;
-    let pit = smoothstep(cut, cut + 0.03, n);
-    let rim = smoothstep(cut - 0.05, cut, n) * (1.0 - pit);
-    let vis = surf_resolved(0.5, i.px);
-    out = mix(out, vec3<f32>(0.62, 0.6, 0.55), rim * 0.6 * vis * step(0.01, d));
-    out = mix(out, vec3<f32>(0.08, 0.075, 0.07), pit * 0.9 * step(0.01, d));
-    let scorch = smoothstep(0.55, 0.85, surf_noise3(i.local * 0.09 + vec3<f32>(i.inst * 13.0, 3.0, 7.0)));
-    out = mix(out, vec3<f32>(0.03, 0.028, 0.026), scorch * smoothstep(0.3, 1.0, d) * 0.8);
+    let wall = 1.0 - smoothstep(0.6, 0.85, abs(i.normal.z));
+    // Hits come in clusters where a burst landed: small pits, a pale rim of fresh
+    // concrete round each, only on walls.
+    let cluster = smoothstep(0.62 - 0.35 * d, 0.8 - 0.3 * d, surf_noise3(i.local * 0.11 + vec3<f32>(i.inst * 57.0)));
+    let n = surf_noise3(i.local * 3.2 + vec3<f32>(i.inst * 19.0));
+    let pit = smoothstep(0.8, 0.84, n) * cluster * wall;
+    let rim = smoothstep(0.74, 0.8, n) * (1.0 - pit) * cluster * wall;
+    let vis = surf_resolved(0.3, i.px);
+    out = mix(out, vec3<f32>(0.6, 0.58, 0.53), rim * 0.5 * vis);
+    out = mix(out, vec3<f32>(0.07, 0.065, 0.06), pit * 0.85 * vis);
+    // Smoke stains: streaks running up the walls, patches on the roofs.
+    let streak = surf_noise3(vec3<f32>(i.local.x * 0.35, i.local.y * 0.35, i.local.z * 0.05) + vec3<f32>(i.inst * 13.0));
+    let stain = smoothstep(0.55, 0.8, streak) * smoothstep(0.35, 1.0, d);
+    out = mix(out, vec3<f32>(0.035, 0.032, 0.03), stain * 0.7);
     // Burnt out: soot over everything, heaviest high up where the smoke rolled out.
-    let streak = surf_noise3(vec3<f32>(i.local.x * 0.7, i.local.y * 0.7, i.local.z * 0.05));
-    out = mix(out, vec3<f32>(0.03, 0.026, 0.024), i.gutted * (0.45 + 0.35 * streak));
+    out = mix(out, vec3<f32>(0.03, 0.026, 0.024), i.gutted * (0.5 + 0.35 * streak));
     return out;
 }
 
@@ -472,9 +476,9 @@ fn city_facade(i: CityIn) -> CityLook {
     o.lamp = inner * select(vec3<f32>(1.0, 0.72, 0.42), vec3<f32>(0.85, 0.9, 1.0), curtain || i.pattern == CITY_OFFICE)
         * 2.2 * room.lit * i.night * (1.0 - broken) * (1.0 - gutted_f(gutted));
     // Fire seen through the hole: hottest low in the room, smoke darkening its head.
-    let blaze = mix(vec3<f32>(1.0, 0.5, 0.12), vec3<f32>(0.9, 0.22, 0.04), smoothstep(-win_half.y, win_half.y, q.y));
-    o.lamp += blaze * (4.0 * flicker) * flames * (1.0 - 0.7 * smoothstep(0.2, 1.0, q.y / max(win_half.y, 0.1)));
-    o.interior = mix(o.interior, vec3<f32>(0.6, 0.25, 0.06), flames * 0.6);
+    let blaze = mix(vec3<f32>(1.0, 0.32, 0.05), vec3<f32>(0.7, 0.1, 0.02), smoothstep(-win_half.y, win_half.y, q.y));
+    o.lamp += blaze * (3.5 * flicker) * flames * (1.0 - 0.7 * smoothstep(0.2, 1.0, q.y / max(win_half.y, 0.1)));
+    o.interior = mix(o.interior, vec3<f32>(0.25, 0.07, 0.02), flames * 0.8);
     var tint = vec3<f32>(0.92, 0.97, 1.0);
     if curtain {
         let t = hash11(i.inst * 77.0);
