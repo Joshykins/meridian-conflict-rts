@@ -179,15 +179,23 @@ pub(super) fn heaps(
         } else {
             (shape.half.y, shape.half.x, shape.along.perp())
         };
-        let scale = (2.0 * narrow * 1.15 / HEAP.y).clamp(0.6, 4.5);
+        // Heaps no bigger than a couple of times the model: a wide footprint
+        // gets rows of them across it, not one giant heap.
+        let scale = (2.0 * narrow * 1.15 / HEAP.y).clamp(0.6, 2.5);
         let n = ((2.0 * long) / (HEAP.x * scale * 0.85)).ceil().max(1.0) as usize;
-        for k in 0..n {
-            let t = (k as f32 + 0.5) / n as f32 * 2.0 - 1.0;
+        let rows = ((2.0 * narrow * 1.1) / (HEAP.y * scale)).ceil().max(1.0) as usize;
+        for k in 0..n * rows {
+            let (along_k, across_k) = (k % n, k / n);
+            let t = (along_k as f32 + 0.5) / n as f32 * 2.0 - 1.0;
+            let u = (across_k as f32 + 0.5) / rows as f32 * 2.0 - 1.0;
             let jitter = Vec2::new(
                 hash(i as u32, k as u32 * 3),
                 hash(i as u32, k as u32 * 3 + 1),
             ) - 0.5;
-            let at = shape.centre + along * (t * long) + jitter * narrow * 0.25;
+            let at = shape.centre
+                + along * (t * long)
+                + along.perp() * (u * narrow * 0.8)
+                + jitter * narrow.min(HEAP.y * scale) * 0.25;
             let heading = along.y.atan2(along.x) + (hash(i as u32, k as u32 * 3 + 2) - 0.5) * 0.6;
             let pos = [at.x, at.y, height(at)];
             let mut u: UnitInstance = bytemuck::Zeroable::zeroed();

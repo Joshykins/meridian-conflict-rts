@@ -837,12 +837,13 @@ impl Planner {
             District::Downtown => {
                 let core = downtown(c);
                 match pick {
-                    p if p < 0.1 => self.plaza(b),
-                    p if p < 0.25 + 0.55 * core => {
+                    p if p < 0.12 => self.plaza(b),
+                    // Towers thickest at the heart, offices and squares between them.
+                    p if p < 0.16 + 0.44 * core => {
                         let kind = match tall {
-                            t if t < 0.04 + 0.35 * core * core => CitySpire,
-                            t if t < 0.55 => CitySkyscraper,
-                            t if t < 0.8 => CityHighrise,
+                            t if t < 0.03 + 0.25 * core * core => CitySpire,
+                            t if t < 0.4 => CitySkyscraper,
+                            t if t < 0.75 => CityHighrise,
                             _ => CitySlab,
                         };
                         self.tower(b, kind)
