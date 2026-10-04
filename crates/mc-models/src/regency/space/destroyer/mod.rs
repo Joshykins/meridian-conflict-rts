@@ -3,9 +3,10 @@
 //! overlapping plate courses that sweep back into spikes, a dark trench down the spine
 //! carrying the power conduit to the drives, red optics in the chine seam at the head.
 //! Two broad pincers sweep out of the hump and curve back in past the stern either side
-//! of the drives, each with its dampening channel down the inside (`tines.rs`); under the
-//! keel at the ship's middle hangs the pod of the energy core the Heavy Pinch-fusion
-//! Lance is fired from (`core.rs`).
+//! of the drives, each with its dampening channel down the inside (`tines.rs`); through
+//! the ship's middle stands the drum of the energy core the Heavy Pinch-fusion Lance is
+//! fired from, lit above and below (`core.rs`). Two blocks of open seeker cells stand on
+//! the hump (`cells.rs`).
 //! +X is forward, +Y port, the ground at z 0 (it is built on its lot, the core lowest).
 //!
 //! The ship is authored in its first hull's frame and built `SCALE` times bigger, moved
@@ -80,9 +81,20 @@ const fn place(p: [f32; 3]) -> [f32; 3] {
 /// The drives' size as the drive effects take it (1: a 12 m mouth): the great drive's.
 pub(crate) const DRIVE_SIZE: f32 = fittings::DRIVES[0].1 * SCALE / 12.0;
 
-/// How far under its cell's deck a seeker is launched from (model frame).
+/// Where each seeker block's seekers leave from (model frame), port block first, in
+/// firing order: `space.ron` weapons 1 and 2's `muzzles`.
 #[cfg(test)]
-pub(crate) const SEEKER_DROP: f32 = cells::MUZZLE_DROP * SCALE;
+pub(crate) fn seeker_muzzles() -> Vec<Vec<Vec3>> {
+    cells::muzzles(&HULL)
+        .iter()
+        .map(|block| {
+            block
+                .iter()
+                .map(|&p| Vec3::from(place(p.to_array())))
+                .collect()
+        })
+        .collect()
+}
 
 /// The pincers: rooted deep in the hump, swept out wide and thick, curving back in to
 /// their points past the stern.
@@ -116,7 +128,7 @@ pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
         fittings::drives(b);
         tines::tines(b, &PINCER);
         core::core(b, body);
-        cells::cells(b, body);
+        cells::blocks(b, body);
     });
 }
 

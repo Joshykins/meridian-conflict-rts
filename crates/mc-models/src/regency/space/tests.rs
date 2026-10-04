@@ -1,6 +1,6 @@
-use super::destroyer::{CORE_MUZZLE, SEEKER_DROP};
+use super::destroyer::{seeker_muzzles, CORE_MUZZLE};
 use crate::{build_model, build_model_scaled, material};
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 
 fn blueprints() -> mc_data::Blueprints {
     mc_data::Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
@@ -150,27 +150,18 @@ fn the_destroyers_lance_leaves_its_core_and_its_seekers_leave_their_cells() {
         .vertices
         .iter()
         .all(|v| v.part != crate::part::TURRET));
-    // The seeker battery fires from both blocks' cells, port block first, each in its
-    // block's firing order.
-    assert_eq!(model.cells.len(), 2);
-    let want: Vec<Vec3> = model
-        .cells
-        .iter()
-        .flat_map(|block| {
-            (0..8).map(|k| {
-                Vec2::from(block.missile_centre(k).unwrap()).extend(block.deck - SEEKER_DROP)
-            })
-        })
-        .collect();
-    let weapon = &unit.weapons[1];
-    let have: Vec<Vec3> = weapon.muzzles.iter().map(|&p| at(p)).collect();
-    assert!(
-        have.len() == want.len() && have.iter().zip(&want).all(|(h, w)| h.distance(*w) < 0.02),
-        "{}: muzzles {:?}",
-        weapon.name,
-        want.iter()
-            .map(|p| format!("({:.2}, {:.2}, {:.2})", p.x, p.y, p.z))
-            .collect::<Vec<_>>()
-    );
-    assert!(at(weapon.muzzle).distance(want[0]) < 0.02);
+    // Each seeker battery fires from its own block's open cells, port block first.
+    for (want, weapon) in seeker_muzzles().iter().zip(&unit.weapons[1..3]) {
+        assert_eq!(weapon.hatch_ticks, 0, "open cells");
+        let have: Vec<Vec3> = weapon.muzzles.iter().map(|&p| at(p)).collect();
+        assert!(
+            have.len() == want.len() && have.iter().zip(want).all(|(h, w)| h.distance(*w) < 0.02),
+            "{}: muzzles {:?}",
+            weapon.name,
+            want.iter()
+                .map(|p| format!("({:.2}, {:.2}, {:.2})", p.x, p.y, p.z))
+                .collect::<Vec<_>>()
+        );
+        assert!(at(weapon.muzzle).distance(want[0]) < 0.02);
+    }
 }

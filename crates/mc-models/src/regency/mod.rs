@@ -260,8 +260,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_ark" => 14000,
         "regency_space_cruiser" => 9000,
         // A hero hull: plate courses laid over the whole of it, the pincers, the core's
-        // pod and two seeker blocks.
-        "regency_space_destroyer" => 15000,
+        // drum with an aperture each end, and two seeker blocks.
+        "regency_space_destroyer" => 16000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,

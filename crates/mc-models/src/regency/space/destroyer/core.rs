@@ -1,8 +1,8 @@
-//! The lance's energy core: a plated pod under the keel at the ship's middle, a belt of
-//! lit slots round its widest, and at its lowest point a round aperture: an armoured
-//! rim, a bright ring, overlapping iris plates stepped in to a bronze collar and the
-//! white-hot pinch-fusion lens. Nothing turns: the Heavy Pinch-fusion Lance is laid from
-//! the lens itself (`LENS`).
+//! The lance's energy core: an armoured drum through the hull at the ship's middle, clamped
+//! where it passes through the plating, a round aperture in each end: an armoured rim, a
+//! bright ring, overlapping iris plates stepped in to a bronze collar and the white-hot
+//! pinch-fusion lens. The upper face is what is seen from above; the Heavy Pinch-fusion
+//! Lance is laid from the lower lens (`LENS`). Nothing turns.
 
 use glam::{Vec2, Vec3};
 
@@ -15,64 +15,40 @@ use super::body::Body;
 
 /// The core's middle along the hull (authoring frame): the ship's middle as built, so the
 /// beam leaves the same point whichever way it is laid.
-const CORE_X: f32 = -25.0;
-/// The aperture's face, its rim's radius, and how far the lens stands out of it.
-const FACE: f32 = 6.0;
-const RIM: f32 = 11.0;
+pub(super) const CORE_X: f32 = -25.0;
+/// The drum's lower and upper faces: clear of the keel below and the spine above there.
+pub(super) const LOW: f32 = 11.0;
+pub(super) const HIGH: f32 = 43.5;
+/// The drum's radius, its apertures' rims', and how far a lens stands out of its face.
+const DRUM: f32 = 13.5;
+const RIM: f32 = 12.5;
 const LENS_OUT: f32 = 1.9;
-/// The lens's face: where the beam leaves (authoring frame).
+/// The lower lens's face: where the beam leaves (authoring frame).
 #[cfg(test)]
-pub(super) const LENS: [f32; 3] = [CORE_X, 0.0, FACE - LENS_OUT];
+pub(super) const LENS: [f32; 3] = [CORE_X, 0.0, LOW - LENS_OUT];
 
 pub(super) fn core(b: &mut MeshBuilder, body: &Body) {
-    let keel = body.at(CORE_X).keel;
-    let middle = keel + 1.0;
-    let (rings, bands) = if b.fine() { (24, 10) } else { (12, 5) };
-    dark_plate(b);
-    b.spheroid(
-        v3(CORE_X, 0.0, middle),
-        v3(26.0, 17.0, middle - 7.0),
-        rings,
-        bands,
-    );
-    // The aperture's collar, out of the pod's underside.
     let sides = b.sides(28);
-    b.prism(v3(CORE_X, 0.0, FACE), sides, RIM + 0.6, RIM + 1.4, 3.5);
-    if !b.coarse() {
-        belt(b, middle);
+    dark_plate(b);
+    b.prism(v3(CORE_X, 0.0, LOW), sides, DRUM, DRUM, HIGH - LOW);
+    if b.fine() {
+        // Clamp bands where it passes through the hull.
+        let s = body.at(CORE_X);
+        seam(b);
+        for z in [s.keel + 1.0, s.spine - 1.0] {
+            hoop(b, v3(CORE_X, 0.0, z), DRUM + 0.3, 1.2, 1.6, sides);
+        }
     }
-    aperture(b, v3(CORE_X, 0.0, FACE));
+    aperture(b, v3(CORE_X, 0.0, HIGH), 1.0);
+    let lens = aperture(b, v3(CORE_X, 0.0, LOW), -1.0);
+    b.set_beam_core(lens, RIM * 0.39);
 }
 
-/// The lit belt: slots round the pod's widest.
-fn belt(b: &mut MeshBuilder, middle: f32) {
-    b.paint(GLOW_LASER);
-    let n = if b.fine() { 14 } else { 6 };
-    for i in 0..n {
-        let a = std::f32::consts::TAU * (i as f32 + 0.5) / n as f32;
-        let at = |s: f32| {
-            let e = Vec2::from_angle(a + s);
-            v3(CORE_X + e.x * 25.9, e.y * 16.9, middle)
-        };
-        let d = Vec2::from_angle(a).extend(0.0);
-        slab(
-            b,
-            [
-                at(-0.08) - Vec3::Z * 0.35,
-                at(0.08) - Vec3::Z * 0.35,
-                at(0.08) + Vec3::Z * 0.35,
-                at(-0.08) + Vec3::Z * 0.35,
-            ],
-            d * 0.25,
-        );
-    }
-}
-
-/// The aperture on the face at `c`, facing down.
-fn aperture(b: &mut MeshBuilder, c: Vec3) {
+/// An aperture on the face at `c` facing `dir` (+1 up, -1 down). Returns its lens's face.
+fn aperture(b: &mut MeshBuilder, c: Vec3, dir: f32) -> Vec3 {
     let r = RIM;
     let sides = b.sides(28);
-    let out = -Vec3::Z;
+    let out = Vec3::Z * dir;
     dark_plate(b);
     hoop(b, c + out * 0.4, r, r * 0.12, 0.8, sides);
     // The recess behind the plates, dark.
@@ -105,6 +81,7 @@ fn aperture(b: &mut MeshBuilder, c: Vec3) {
     metal(b);
     hoop(b, c + out * 1.4, r * 0.45, r * 0.08, 1.0, sides);
     b.paint(GLOW_PRISM);
-    b.cylinder_between(c, c + out * LENS_OUT, r * 0.41, r * 0.39, sides);
-    b.set_beam_core(c + out * LENS_OUT, r * 0.39);
+    let face = c + out * LENS_OUT;
+    b.cylinder_between(c, face, r * 0.41, r * 0.39, sides);
+    face
 }

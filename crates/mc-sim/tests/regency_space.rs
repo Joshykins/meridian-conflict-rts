@@ -370,8 +370,9 @@ fn destroyers_seeker_cells_see_off_fighters() {
     let ship = add(&mut w, "regency_t3_space_destroyer", 0, 500, 700);
     let blueprint = w.state.units.blueprint[ship];
     let bp = w.blueprints.unit(blueprint);
-    let cells = &bp.weapons[1];
-    assert!(cells.missile && cells.guided && cells.hatch_ticks > 0 && cells.muzzles.len() == 16);
+    for w in &bp.weapons[1..3] {
+        assert!(w.missile && w.guided && w.hatch_ticks == 0 && w.muzzles.len() == 8);
+    }
     let fighters: Vec<usize> = (0..3)
         .map(|i| add(&mut w, "aster_t1_interceptor", 1, 900 + i * 40, 760))
         .collect();
@@ -386,7 +387,7 @@ fn destroyers_seeker_cells_see_off_fighters() {
             .events
             .iter()
             .filter(|e| {
-                matches!(e, SimEvent::ShotFired { blueprint: b, weapon: 1, .. } if *b == blueprint)
+                matches!(e, SimEvent::ShotFired { blueprint: b, weapon: 1 | 2, .. } if *b == blueprint)
             })
             .count();
     }

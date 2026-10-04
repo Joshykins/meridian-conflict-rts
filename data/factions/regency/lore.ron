@@ -460,10 +460,10 @@
         },
     ),
     "regency_t3_space_destroyer": (
-        lore: "A long armoured hull spreading into two great pincers astern, with an energy core hung beneath its heart. The core gathers itself for long seconds before the lance lights; then it holds its mark under a white-hot beam, and when the mark is gone the beam does not go out: it drags slowly across the ground to the next, and leaves a line of glass behind.",
+        lore: "A long armoured hull spreading into two great pincers astern, with an energy core set through its heart. The core gathers itself for long seconds before the lance lights; then it holds its mark under a white-hot beam, and when the mark is gone the beam does not go out: it drags slowly across the ground to the next, and leaves a line of glass behind.",
         weapons: {
-            "Heavy Pinch-fusion Lance": "A held pinch-fusion beam laid from the lens of the core under the keel: it burns what it is on and cuts the ground it crosses on the way to the next.",
-            "Gravitic Seeker Battery": "Sixteen cells in two blocks on the hump, rippling gravitic seekers out one after another and spreading them over the aircraft in reach: enough to see off a few fighters, not a wing.",
+            "Heavy Pinch-fusion Lance": "A held pinch-fusion beam laid from the lower lens of the core through the ship's middle: it burns what it is on and cuts the ground it crosses on the way to the next.",
+            "Gravitic Seeker Battery": "Two blocks of eight open cells on the hump, each letting a gravitic seeker out in turn onto the aircraft in reach: enough to see off a few fighters, not a wing.",
         },
     ),
 }
