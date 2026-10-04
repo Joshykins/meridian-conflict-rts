@@ -361,34 +361,32 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
         }
         drop(send);
         // Tiles finish out of order; hold the early ones until their turn.
+        // (In turn for the snow and ways layers too: two tiles' samples on
+        // the edge they share can differ, each taking its slopes from its own
+        // samples, and the later tile's must stand whichever thread finished
+        // first, or the bake would not be reproducible.)
+        let tiles_w = params.tiles_w;
+        let lay = |layer: &mut [u8], samples: &[u8], index: usize, bytes: usize| {
+            let n = SNOW_PER_TILE;
+            let (tx, ty) = (index as u32 % tiles_w, index as u32 / tiles_w);
+            for j in 0..n {
+                let row = (ty * (n - 1) + j) * snow_w + tx * (n - 1);
+                let (at, from) = (row as usize * bytes, (j * n) as usize * bytes);
+                layer[at..at + n as usize * bytes]
+                    .copy_from_slice(&samples[from..from + n as usize * bytes]);
+            }
+        };
         let mut early = BTreeMap::new();
-        for (index, mut tile) in receive {
-            if !tile.snow.is_empty() {
-                // The tile's snow samples, shared edges included, into the map's.
-                let n = SNOW_PER_TILE;
-                let (tx, ty) = (index as u32 % params.tiles_w, index as u32 / params.tiles_w);
-                for j in 0..n {
-                    let row = (ty * (n - 1) + j) * snow_w + tx * (n - 1);
-                    let (at, from) = (row as usize * 2, (j * n) as usize * 2);
-                    snow[at..at + n as usize * 2]
-                        .copy_from_slice(&tile.snow[from..from + n as usize * 2]);
-                }
-                tile.snow = Vec::new();
-            }
-            if !tile.ways.is_empty() {
-                // Likewise the ways layer, three bytes per sample.
-                let n = SNOW_PER_TILE;
-                let (tx, ty) = (index as u32 % params.tiles_w, index as u32 / params.tiles_w);
-                for j in 0..n {
-                    let row = (ty * (n - 1) + j) * snow_w + tx * (n - 1);
-                    let (at, from) = (row as usize * 3, (j * n) as usize * 3);
-                    ways[at..at + n as usize * 3]
-                        .copy_from_slice(&tile.ways[from..from + n as usize * 3]);
-                }
-                tile.ways = Vec::new();
-            }
+        for (index, tile) in receive {
             early.insert(index, tile);
             while let Some(tile) = early.remove(&writer.tiles_written()) {
+                let index = writer.tiles_written();
+                if !tile.snow.is_empty() {
+                    lay(&mut snow, &tile.snow, index, 2);
+                }
+                if !tile.ways.is_empty() {
+                    lay(&mut ways, &tile.ways, index, 3);
+                }
                 writer.push_tile(&tile.encoded)?;
                 props.extend(tile.props);
                 land_samples += tile.land_samples;
