@@ -191,28 +191,28 @@ fn radiators(b: &mut MeshBuilder) {
 }
 
 /// The breech round the trunnion in the gun's frame: a short plated block, no more than 4 m
-/// behind the trunnion so it clears the roof at full elevation, its front squared off to
-/// the rails' fairing's round section (`rails`), a plate lapped back over its top.
+/// behind the trunnion so it clears the roof at full elevation; the gun's thickest part, its
+/// front the size of the rails' fairing's root (`rails`), a plate lapped back over its top.
 fn breech(b: &mut MeshBuilder) {
     dark_plate(b);
     hull_x(
         b,
         &[
-            [-4.0, 6.0, 4.6, 0.0],
-            [-1.5, 7.2, 5.6, 0.0],
-            [5.0, 7.0, 6.0, 0.0],
-            [8.5, 5.6, 5.6, 0.0],
+            [-4.0, 8.4, 5.6, 0.0],
+            [-1.5, 10.0, 8.4, 0.0],
+            [5.0, 10.4, 9.6, 0.0],
+            [8.5, 9.6, 9.6, 0.0],
         ],
         &CHAMFERED,
     );
     if b.fine() {
         armour(
             b,
-            &Frame::new(v3(9.5, 0.0, 2.9), v3(-1.0, 0.0, -0.05), Vec3::Z),
-            &swept(11.0, 2.6, 0.0, 0.4),
+            &Frame::new(v3(9.5, 0.0, 4.75), v3(-1.0, 0.0, -0.05), Vec3::Z),
+            &swept(11.0, 3.6, 0.0, 0.4),
             0.4,
         );
-        b.mirror_y(|b| slit(b, v3(1.5, 3.52, 0.0), Vec3::Y, Vec3::X, 5.0, 0.5));
+        b.mirror_y(|b| slit(b, v3(1.5, 5.22, 0.0), Vec3::Y, Vec3::X, 5.0, 0.5));
     }
 }
 
@@ -222,16 +222,14 @@ mod tests {
 
     #[test]
     fn springald_holds_its_charge() {
-        for key in ["regency_springald"] {
-            super::super::super::check_charge(
-                key,
-                RADIUS,
-                HEIGHT,
-                Some(6),
-                &[LINE.muzzle.to_array()],
-                HOLD,
-            );
-        }
+        super::super::super::check_charge(
+            "regency_springald",
+            RADIUS,
+            HEIGHT,
+            Some(6),
+            &[LINE.muzzle.to_array()],
+            HOLD,
+        );
     }
 
     /// The unit file's pivot and muzzle are the model's own.
