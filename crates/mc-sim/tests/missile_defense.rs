@@ -1,5 +1,6 @@
 //! The Corona, tech 2 tactical missile defence: its lasers burn Javelin rockets and
-//! Ballista shells out of the air before they reach what it guards.
+//! Ballista shells out of the air before they reach what it guards. The Regency's Rondel
+//! crushes them in gravity lenses instead, drawn its own way, and holds as a Corona does.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -174,6 +175,32 @@ fn the_tier_three_corona_holds_where_two_lasers_saturate() {
         four.1,
         two.1
     );
+}
+
+const RONDEL: &str = "regency_t2_missile_defense";
+const RONDEL_T3: &str = "regency_t3_missile_defense";
+
+/// The Rondel is the Corona's match, tier for tier: a lens takes a casing as fast as a
+/// laser burns one, so the same barrage gets as far against either.
+#[test]
+fn the_rondel_holds_as_a_corona_does() {
+    let w = world();
+    let t2 = w.blueprints.unit(w.blueprints.id_of(RONDEL).unwrap());
+    let t3 = w.blueprints.id_of(RONDEL_T3).unwrap();
+    assert_eq!(t2.upgrades_to, Some(t3));
+    let t3 = w.blueprints.unit(t3);
+    assert_eq!((t2.anti_missile_lasers, t3.anti_missile_lasers), (2, 4));
+    assert!(t3.anti_missile > t2.anti_missile);
+    for (rondel, corona) in [(RONDEL, CORONA), (RONDEL_T3, CORONA_T3)] {
+        let lenses = barrage_on(rondel, JAVELIN, 1060, 1, 1, 340);
+        let lasers = barrage_on(corona, JAVELIN, 1060, 1, 1, 340);
+        println!("javelin (killed, through): {rondel} {lenses:?}, {corona} {lasers:?}");
+        assert!(lenses.0 >= 8, "{rondel} crushed only {} rockets", lenses.0);
+        assert_eq!(lenses, lasers, "{rondel} against {corona}");
+    }
+    let lenses = barrage_on(RONDEL_T3, BALLISTA, 900, 8, 1, 340);
+    let lasers = barrage_on(CORONA_T3, BALLISTA, 900, 8, 1, 340);
+    assert_eq!(lenses, lasers, "eight Ballistas");
 }
 
 #[test]
