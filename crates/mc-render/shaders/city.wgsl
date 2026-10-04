@@ -42,6 +42,8 @@ struct CityLook {
     lamp: vec3<f32>,
     tint: vec3<f32>,
     tilt: vec2<f32>,
+    // How much the glass mirrors face on: plain glass, or a tower's coated glazing.
+    f0: f32,
 }
 
 // Finishes: which wall a facade is, and the instance's colour of it.
@@ -363,7 +365,10 @@ fn city_facade(i: CityIn) -> CityLook {
         let r = length(vec2<f32>(q.x, above));
         inside_y *= clamp((win_half.x - r) / max(i.px, 1e-5) + 0.5, 0.0, 1.0);
     }
-    let resolve = smoothstep(1.2 * i.px, 3.5 * i.px, min(win_half.x / g.panes, win_half.y));
+    // The window itself reads while it is a pixel or two across; its bars, blinds and
+    // sill only once they are a few pixels across.
+    let resolve = smoothstep(0.6 * i.px, 1.8 * i.px, min(win_half.x, win_half.y));
+    let detail = smoothstep(1.2 * i.px, 3.5 * i.px, min(win_half.x / g.panes, win_half.y * 0.3));
     let area = g.wide * (g.head - g.sill);
     let opening = mix(area, city_box(q.x, win_half.x, i.px) * inside_y, resolve);
     // Frames, mullions between panes, a transom near the head.
@@ -379,7 +384,7 @@ fn city_facade(i: CityIn) -> CityLook {
     if shed {
         bars = max(bars, city_line(fract(q.y / 0.9 + 0.5) - 0.5, frame_w / 0.9, 1.0, i.px / 0.9));
     }
-    bars *= resolve;
+    bars *= detail;
     let key = city_pane_key(i, cell, column);
     let room_key = city_pane_key(i, cell, 0.0);
     // Broken: the hash under the damage. A gutted shell has nothing left in its holes.
@@ -393,10 +398,10 @@ fn city_facade(i: CityIn) -> CityLook {
     // Blinds and curtains, drawn down a share of the window, on intact panes.
     let blind = hash11(room_key * 43.0) * 0.7 - 0.12;
     let blind_at = step(win_half.y - q.y, blind * 2.0 * win_half.y);
-    inner = mix(inner, vec3<f32>(0.62, 0.58, 0.5) * (0.85 + 0.1 * step(0.5, fract(q.y * 12.0))), blind_at * (1.0 - broken) * resolve * select(1.0, 0.4, curtain));
+    inner = mix(inner, vec3<f32>(0.62, 0.58, 0.5) * (0.85 + 0.1 * step(0.5, fract(q.y * 12.0))), blind_at * (1.0 - broken) * detail * select(1.0, 0.4, curtain));
     let drape = step(0.55, hash11(room_key * 61.0)) * step(win_half.x * 0.75, abs(q.x)) * (1.0 - broken);
     let drape_rgb = mix(vec3<f32>(0.42, 0.2, 0.14), vec3<f32>(0.5, 0.48, 0.4), hash11(room_key * 3.0));
-    inner = mix(inner, drape_rgb * 0.6, drape * resolve * select(1.0, 0.0, curtain));
+    inner = mix(inner, drape_rgb * 0.6, drape * detail * select(1.0, 0.0, curtain));
     // A broken room is dark and burnt.
     inner = mix(inner, inner * vec3<f32>(0.3, 0.27, 0.25), broken * select(1.0, 1.3, gutted));
     // Far off a window is its average: dark glass.
@@ -405,10 +410,10 @@ fn city_facade(i: CityIn) -> CityLook {
     var wall_here = wall;
     if !curtain && !shed {
         let sill = city_box(cu, win_half.x + 0.08, i.px) * city_box(q.y + win_half.y + 0.06, 0.06, i.px);
-        wall_here = mix(wall_here, base * 1.25 + vec3<f32>(0.04), sill * resolve);
+        wall_here = mix(wall_here, base * 1.25 + vec3<f32>(0.04), sill * detail);
         let below = clamp(-(q.y + win_half.y + 0.12) / 0.9, 0.0, 1.0);
         let run = city_box(cu, win_half.x * 0.8, i.px) * step(0.001, below) * (1.0 - below);
-        wall_here *= 1.0 - 0.07 * run * resolve;
+        wall_here *= 1.0 - 0.07 * run * detail;
         let over = clamp((q.y - win_half.y) / (1.5 * ch), 0.0, 1.0);
         let burnt = select(broken, 1.0, gutted) * step(0.001, over) * (1.0 - over);
         let plume = city_box(cu, win_half.x * (1.0 + over), i.px);
@@ -429,6 +434,7 @@ fn city_facade(i: CityIn) -> CityLook {
         o.interior *= 0.55;
     }
     o.tint = tint * (0.85 + 0.3 * hash11(key * 17.0));
+    o.f0 = select(0.06, 0.24, curtain);
     o.tilt = (vec2<f32>(hash11(key * 7.0), hash11(key * 9.0)) - 0.5) * select(0.06, 0.025, curtain);
     return o;
 }
@@ -497,6 +503,7 @@ fn city_shop(i: CityIn) -> CityLook {
     o.lamp = inner * vec3<f32>(1.0, 0.85, 0.6) * 2.0 * room.lit * i.night * (1.0 - broken);
     o.tint = vec3<f32>(0.92, 0.97, 1.0);
     o.tilt = (vec2<f32>(hash11(key * 7.0), hash11(key * 9.0)) - 0.5) * 0.02;
+    o.f0 = 0.08;
     return o;
 }
 
@@ -532,6 +539,7 @@ fn city_lobby(i: CityIn) -> CityLook {
     o.lamp = inner * vec3<f32>(0.95, 0.9, 0.8) * 2.5 * i.night * (1.0 - broken);
     o.tint = vec3<f32>(0.9, 0.95, 1.0);
     o.tilt = vec2<f32>(0.0);
+    o.f0 = 0.1;
     return o;
 }
 
@@ -552,7 +560,9 @@ fn city_glass_roof(i: CityIn) -> CityLook {
     o.reflect = 1.0 - broken;
     // Grime on the glass: soot and pigeon-grey dust.
     let grime = 0.6 + 0.4 * surf_noise3(i.local * 0.3);
-    o.interior = vec3<f32>(0.12, 0.12, 0.11) * grime;
+    // The shed's daylit inside through grimy glass: pale, hazy.
+    o.interior = vec3<f32>(0.55, 0.53, 0.5) * grime;
+    o.f0 = 0.08;
     o.lamp = vec3<f32>(0.0);
     o.tint = vec3<f32>(0.85, 0.9, 0.9) * grime;
     o.tilt = (vec2<f32>(hash11(key * 7.0), hash11(key * 9.0)) - 0.5) * 0.04;
@@ -602,11 +612,12 @@ fn city_plain(i: CityIn) -> CityLook {
             let rib = fract(st.x / 0.5);
             c *= 1.0 - 0.2 * surf_resolved(0.4, i.px) * smoothstep(0.42, 0.5, abs(rib - 0.5));
         }
-        let rust = smoothstep(0.6, 0.9, surf_noise3(vec3<f32>(i.local.xy * 0.4, i.local.z * 0.08)));
-        c = mix(c, vec3<f32>(0.3, 0.13, 0.05), rust * 0.5);
+        let rust = smoothstep(0.62, 0.9, surf_noise3(vec3<f32>(i.local.xy * 1.3, i.local.z * 0.3)));
+        let runs = smoothstep(0.55, 0.85, surf_noise3(vec3<f32>(st.x * 2.0, st.y * 0.15, i.inst * 7.0)));
+        c = mix(c, vec3<f32>(0.3, 0.14, 0.06), max(rust * 0.3, runs * 0.2) * surf_resolved(0.6, i.px));
         o.albedo = c * (1.0 + 0.25 * broad);
-        o.roughness = 0.55;
-        o.metallic = 0.35;
+        o.roughness = 0.62;
+        o.metallic = 0.15;
     } else if p == CITY_SHADOW {
         o.albedo = vec3<f32>(0.02, 0.02, 0.019);
         o.roughness = 0.95;
@@ -620,11 +631,17 @@ fn city_plain(i: CityIn) -> CityLook {
     } else if p == CITY_FORT || p == CITY_BLAST_DOOR {
         o = city_fort(i, st, broad);
     } else if p == CITY_RUBBLE {
-        let k = surf_noise3(i.local * 1.7 + i.inst * 20.0);
-        var c = mix(vec3<f32>(0.42, 0.41, 0.39), vec3<f32>(0.34, 0.15, 0.09), smoothstep(0.45, 0.6, k));
-        c = mix(c, vec3<f32>(0.6, 0.57, 0.5), smoothstep(0.75, 0.85, surf_noise3(i.local * 3.1)));
-        c = mix(c, vec3<f32>(0.04, 0.035, 0.03), 0.6 * smoothstep(0.5, 0.8, surf_noise3(i.local * 0.5 + 9.0)));
-        o.albedo = c * (1.0 + 0.4 * broad);
+        // Broken concrete and brick under a coat of dust: lumps a few tens of cm,
+        // brick red in some, dark voids between, all dulled toward the dust's tan.
+        let q = i.local * 2.6 + vec3<f32>(i.inst * 20.0);
+        let lump = surf_noise3(q);
+        let kind = surf_noise3(q * 0.37 + vec3<f32>(5.0, 1.0, 3.0));
+        var c = mix(vec3<f32>(0.36, 0.35, 0.33), vec3<f32>(0.3, 0.15, 0.1), smoothstep(0.55, 0.7, kind));
+        c *= 0.75 + 0.5 * lump;
+        c *= 1.0 - 0.6 * smoothstep(0.25, 0.1, lump) * surf_resolved(0.3, i.px);
+        c = mix(c, vec3<f32>(0.4, 0.37, 0.32), 0.35);
+        c = mix(c, vec3<f32>(0.035, 0.03, 0.028), 0.35 * smoothstep(0.55, 0.8, surf_noise3(i.local * 0.2 + 9.0)));
+        o.albedo = c * (1.0 + 0.3 * broad);
         o.roughness = 0.95;
     } else if p == CITY_TIMBER {
         let board = floor(st.x / 0.18);

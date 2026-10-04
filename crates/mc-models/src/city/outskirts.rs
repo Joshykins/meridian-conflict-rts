@@ -471,7 +471,7 @@ pub(super) fn farmstead(b: &mut MeshBuilder, _tech: u8) {
     let sides = b.sides(20);
     paint(b, pat::STEEL);
     b.prism(silo_at.extend(-1.0), sides, silo_r, silo_r, silo_top - 2.0);
-    b.prism(silo_at.extend(silo_top - 1.0), sides, silo_r, 0.6, 1.0);
+    b.prism(silo_at.extend(silo_top - 3.0), sides, silo_r, 0.6, 3.0);
     if !b.mid() {
         return;
     }

@@ -52,7 +52,7 @@ pub(super) fn tenement(b: &mut MeshBuilder, _tech: u8) {
     );
     let roof_h = top - eaves - 0.2;
     if !b.mid() {
-        mansard(b, body, eaves, roof_h, 1.6, pat::ROOF_TILE, pat::ROOF_FLAT);
+        mansard(b, body, eaves, roof_h, 1.6, pat::ROOF_TILE, pat::ROOF_TILE);
         return;
     }
     cornice(b, body, eaves + 0.5, 0.6, 0.45, pat::STONE);

@@ -3785,10 +3785,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let pn = normalize(n + city_axes[0] * city.tilt.x + city_axes[1] * city.tilt.y);
         let r = reflect(-v, pn);
         let mirrored = env_reflection(in.world, r, 0.03, ao);
-        let fres = (0.05 + 0.75 * pow(1.0 - clamp(dot(pn, v), 0.0, 1.0), 4.0)) * city.reflect;
-        let daylight = atmos.sky_color.rgb * 0.8 + atmos.sun_color.rgb * 0.1 * max(globals.sun.z, 0.0);
+        let fres = (city.f0 + (0.8 - city.f0) * pow(1.0 - clamp(dot(pn, v), 0.0, 1.0), 4.0)) * city.reflect;
+        // A room is lit by the sky it sees through its window: far dimmer than the street.
+        let daylight = atmos.sky_color.rgb * 0.3 + atmos.sun_color.rgb * 0.04 * max(globals.sun.z, 0.0);
         let glint = pow(max(dot(r, globals.sun.xyz), 0.0), 900.0) * shadow * city.reflect;
-        let pane = city.interior * daylight * (1.0 - fres) + mirrored * city.tint * fres
+        let pane = city.interior * daylight * (1.0 - fres) + mirrored * city.tint * fres * 0.8
             + atmos.sun_color.rgb * glint * 4.0 + city.lamp;
         color = mix(color, pane, city.glass);
     }
