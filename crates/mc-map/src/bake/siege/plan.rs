@@ -15,6 +15,8 @@ use crate::city::{self, GATE_PASSAGE_M, WALL_SEGMENT_M, WALL_THICK_M};
 use crate::noise::hash2;
 use std::f64::consts::{FRAC_PI_2, PI};
 
+pub(super) mod furniture;
+
 /// The city grid's pitch, metres; lines run from the middle line both ways.
 const PITCH: f64 = 128.0;
 /// The first east-west grid line north of the wall.
@@ -87,6 +89,9 @@ struct Planner {
     planted: Vec<(P, PropKind, u16)>,
     /// Ore fields: nothing built within reach of them.
     ore: Vec<(P, f64)>,
+    /// The plazas' middles, for their monuments.
+    plazas: Vec<P>,
+    dressing: Vec<furniture::Dressing>,
 }
 
 impl Terrain {
@@ -101,6 +106,8 @@ impl Terrain {
             craters: Vec::new(),
             planted: Vec::new(),
             ore: ore.to_vec(),
+            plazas: Vec::new(),
+            dressing: Vec::new(),
         };
         plan.bases();
         plan.city_roads();
@@ -113,6 +120,7 @@ impl Terrain {
         plan.farms();
         plan.villages();
         plan.street_trees();
+        plan.furniture();
         plan.craters();
 
         // Level each lot to the ground under it: the mean of its corners and
@@ -151,6 +159,7 @@ impl Terrain {
             craters: plan.craters,
             crater_index: Some(crater_index),
             planted: plan.planted,
+            dressing: plan.dressing,
         };
     }
 }
@@ -964,6 +973,7 @@ impl Planner {
 
     /// A paved square with trees round it.
     fn plaza(&mut self, b: Rect) {
+        self.plazas.push(b.c);
         for i in 0..4 {
             let (sx, sy) = ([-1.0, 1.0, 1.0, -1.0][i], [-1.0, -1.0, 1.0, 1.0][i]);
             let p = (b.c.0 + sx * (b.hx - 10.0), b.c.1 + sy * (b.hy - 10.0));

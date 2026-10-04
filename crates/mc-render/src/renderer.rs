@@ -1562,6 +1562,14 @@ impl Renderer {
                     ),
                     None => ([0.0; 4], p.scale_milli as u32),
                 };
+                // City dressing that nothing hits (cars, lights) shows its wear
+                // as health: a burnt-out car. Structures' damage is `city_look`.
+                let dressing = mc_map::city::structure(p.kind).is_some_and(|s| s.health == 0);
+                let health = if dressing {
+                    1.0 - p.wear_milli as f32 / 1000.0
+                } else {
+                    1.0
+                };
                 UnitInstance {
                     prev_pos: pos,
                     prev_heading: heading,
@@ -1569,7 +1577,7 @@ impl Renderer {
                     heading,
                     blueprint: prop_base + kind,
                     owner_flags: KIND_PROP,
-                    health: 1.0,
+                    health,
                     build: 1.0,
                     turret_yaw: 0.0,
                     radius: 4.0,

@@ -137,6 +137,9 @@ pub(super) struct Siege {
     /// Trees planted in rows (avenues, pavements, hedges), laid with the
     /// buildings rather than grown by the woods.
     pub(super) planted: Vec<(P, PropKind, u16)>,
+    /// Street furniture and works that neither block the plan nor are
+    /// levelled for (`siege/plan/furniture.rs`).
+    pub(super) dressing: Vec<plan::furniture::Dressing>,
 }
 
 /// A structure laid on the plan.
@@ -475,6 +478,15 @@ impl Terrain {
                 heading: angle(lot.heading),
                 scale_milli: (lot.scale * 1000.0).round() as u16,
                 wear_milli: (lot.wear.clamp(0.0, 1.0) * 1000.0).round() as u16,
+            });
+        }
+        for d in &self.siege.dressing {
+            out.push(crate::format::Prop {
+                kind: d.kind,
+                pos: FxVec2::new(fx(d.at.0), fx(d.at.1)),
+                heading: angle(d.heading),
+                scale_milli: (d.scale * 1000.0).round() as u16,
+                wear_milli: (d.wear.clamp(0.0, 1.0) * 1000.0).round() as u16,
             });
         }
         for &(p, kind, scale) in &self.siege.planted {

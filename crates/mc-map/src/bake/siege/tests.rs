@@ -38,13 +38,18 @@ fn lots_stand_on_level_ground() {
 }
 
 /// Nothing is built on a road or its pavement, but the wall's gates over
-/// their own roads.
+/// their own roads and the maglev in the avenues' medians.
 #[test]
 fn lots_keep_off_the_roads() {
     let t = &*HALCYON;
     let index = t.siege.road_index.as_ref().unwrap();
     for lot in &t.siege.lots {
-        if wall_piece(lot.kind) || lot.kind == PropKind::CityRubble {
+        // The maglev stands in the avenues' medians, between the carriageways.
+        let transit = matches!(
+            lot.kind,
+            PropKind::CityTransit | PropKind::CityTransitStation
+        );
+        if wall_piece(lot.kind) || lot.kind == PropKind::CityRubble || transit {
             continue;
         }
         let r = lot.rect.hx.hypot(lot.rect.hy);

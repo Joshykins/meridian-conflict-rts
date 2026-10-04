@@ -309,6 +309,19 @@ fn every_road_is_walkable() {
     let Some(map) = load() else { return };
     let streets = map.file.streets().expect("a streets layer");
     let (sw, _) = map.file.info().streets_dims();
+    let mut transit = vec![false; (map.w * map.h) as usize];
+    for p in map
+        .file
+        .props()
+        .iter()
+        .filter(|p| matches!(p.kind, PropKind::CityTransit | PropKind::CityTransitStation))
+    {
+        for (y, a, b) in p.solid_runs((map.w, map.h)) {
+            for x in a..=b {
+                transit[(y * map.w + x) as usize] = true;
+            }
+        }
+    }
     let mut steep = Vec::new();
     let mut roads = 0;
     for y in 0..map.h {
@@ -324,7 +337,8 @@ fn every_road_is_walkable() {
                 continue;
             }
             roads += 1;
-            if !map.land_cell(x, y) {
+            // The maglev's pylons stand in the avenues' medians.
+            if !map.land_cell(x, y) && !transit[(y * map.w + x) as usize] {
                 steep.push((x * 8, y * 8));
             }
         }
