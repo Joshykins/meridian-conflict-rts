@@ -314,7 +314,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         }
     } else if kind == PUFF_COLUMN {
         pos = p.pos;
-    } else if kind == PUFF_THRUST_GLOW || kind == PUFF_LAMP || kind == PUFF_PLUME {
+    } else if kind == PUFF_THRUST_GLOW || kind == PUFF_LAMP || kind == PUFF_PLUME || kind == PUFF_PLASMA_PLUME {
         pos = p.pos + p.appearance.xyz * t;
     } else if kind == PUFF_BLAST {
         // Thrown out hard, stopped by the air, then the hot gas climbs faster
@@ -448,7 +448,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     if kind == PUFF_STRATEGIC_TRAIL {
         return strategic_trail_vertex(out, p, corner, pos, age);
     }
-    if kind == PUFF_PLUME {
+    if kind == PUFF_PLUME || kind == PUFF_PLASMA_PLUME {
         return plume_vertex(out, p, corner, pos, age);
     }
     if kind == PUFF_TRAIL || kind == PUFF_ARC || kind == PUFF_BOMB_TRAIL {
@@ -608,7 +608,7 @@ fn strategic_trail_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, at: vec3<f32>,
     return out;
 }
 
-// A capital drive's plume (`PUFF_PLUME`, renderer/capital_fx.rs): the quad over one point
+// A capital drive's plume (`PUFF_PLUME` or `PUFF_PLASMA_PLUME`, renderer/capital_fx.rs): the quad over one point
 // of the chain and a step either way of it, grown to hold the tube seen end on.
 fn plume_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, pos: vec3<f32>, age: f32) -> PuffOut {
     var out = o;
@@ -657,7 +657,7 @@ fn plume_vertex(o: PuffOut, p: Puff, corner: vec2<f32>, pos: vec3<f32>, age: f32
 // longer and hotter with the heat. Summed along the eye's ray through a tube (a tent a
 // step either way, as `strategic_trail`), so the chain is one tube that bends with the
 // ship, filling the nozzle's mouth; looking up it from astern, a bright disc.
-fn plume_color(in: PuffOut) -> vec4<f32> {
+fn plume_color(in: PuffOut, plasma: bool) -> vec4<f32> {
     let age = in.state.x;
     let pos = in.roll;
     let half = max(length(in.appearance.xyz), 0.5);
@@ -679,9 +679,21 @@ fn plume_color(in: PuffOut) -> vec4<f32> {
     let knot = pow(max(1.0 - abs(c * 2.0 - 1.0) * 1.3, 0.0), 1.6) * exp(-d2 * 9.0)
         * (1.0 - smoothstep(core_len * 0.8, core_len * 1.4, x)) * smoothstep(0.04, 0.12, x);
     let flow = 0.88 + 0.12 * sin(x * 50.0 - now * 45.0);
-    let rgb = vec3<f32>(0.1, 0.35, 1.0) * sheath * 0.55
+    var rgb = vec3<f32>(0.1, 0.35, 1.0) * sheath * 0.55
         + vec3<f32>(0.85, 0.95, 1.0) * core * 2.4
         + vec3<f32>(0.95, 0.98, 1.0) * knot * 4.0;
+    if plasma {
+        // Gravity-held plasma (`PUFF_PLASMA_PLUME`): a violet sheath round a rose-white
+        // core, and in place of standing shock diamonds, rings of plasma let go by the
+        // containment one after another and carried away down the plume, thinning out.
+        let carried = fract(x * cells * 0.8 - now * 2.6);
+        let ring = pow(max(1.0 - abs(carried * 2.0 - 1.0) * 1.6, 0.0), 2.0)
+            * exp(-d2 * 3.0) * (1.0 - smoothstep(0.2, 0.85, x)) * smoothstep(0.02, 0.1, x);
+        let hem = exp(-pow(sqrt(d2) - 0.75, 2.0) * 18.0) * (1.0 - smoothstep(0.3, 0.9, x));
+        rgb = vec3<f32>(0.42, 0.06, 0.95) * (sheath * 0.8 + hem * 0.9)
+            + vec3<f32>(1.0, 0.62, 0.92) * core * 2.2
+            + vec3<f32>(0.85, 0.4, 1.0) * ring * 3.2;
+    }
     // The tent along the chain, seen through the tube's width, and one over its life.
     let sg = max(r * abs(hit.b) / (1.4142136 * hit.sin_t), 0.02 * half);
     let along = trail_tent(hit.s, half, sg) / max(hit.sin_t, 0.6);
@@ -800,15 +812,15 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
     if is_plasma_puff(kind) {
         return plasma_puff_color(in, d);
     }
-    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLUME && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && kind != PUFF_VEIL && d > 1.0 {
+    if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLUME && kind != PUFF_PLASMA_PLUME && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && kind != PUFF_VEIL && d > 1.0 {
         discard;
     }
     let eye = globals.camera.xyz;
     if kind == PUFF_STRATEGIC_TRAIL {
         return strategic_trail(in);
     }
-    if kind == PUFF_PLUME {
-        return plume_color(in);
+    if kind == PUFF_PLUME || kind == PUFF_PLASMA_PLUME {
+        return plume_color(in, kind == PUFF_PLASMA_PLUME);
     }
     if kind == PUFF_CASING {
         let spin = in.roll.x;

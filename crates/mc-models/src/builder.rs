@@ -128,6 +128,7 @@ pub struct MeshBuilder {
     pit: Option<super::Pit>,
     excavation: Option<super::Excavation>,
     star_core: Option<[f32; 4]>,
+    beam_core: Option<[f32; 4]>,
     exhausts: Vec<super::Exhaust>,
     lifts: Vec<super::Lift>,
     discharge: Option<super::Discharge>,
@@ -193,6 +194,7 @@ impl MeshBuilder {
             pit: None,
             excavation: None,
             star_core: None,
+            beam_core: None,
             exhausts: Vec::new(),
             lifts: Vec::new(),
             discharge: None,
@@ -867,6 +869,22 @@ impl MeshBuilder {
 
     pub fn star_core(&self) -> Option<[f32; 4]> {
         self.star_core
+    }
+
+    /// Records the energy core a held beam is laid from: its lens's face and radius (given
+    /// in the current frame), which the renderer charges and lights with the beam
+    /// (`Model::beam_core`).
+    pub fn set_beam_core(&mut self, at: Vec3, radius: f32) {
+        let at = self.transform.transform_point3(at);
+        let r = self
+            .transform
+            .transform_vector3(Vec3::new(radius, 0.0, 0.0))
+            .length();
+        self.beam_core = Some([at.x, at.y, at.z, r]);
+    }
+
+    pub fn beam_core(&self) -> Option<[f32; 4]> {
+        self.beam_core
     }
 
     /// Records the spinner axis (given in the current frame).

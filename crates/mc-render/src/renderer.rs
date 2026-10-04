@@ -71,6 +71,7 @@ mod heavy_rail_fx;
 mod hull_frame;
 mod impact_craters;
 mod impact_fx;
+mod lance_core_fx;
 mod laser_fx;
 mod launch_fx;
 pub(crate) mod lens_flare;
@@ -80,6 +81,7 @@ mod mine_fx;
 mod nuke_fx;
 mod nuke_volume;
 mod ore_fields;
+mod plasma_drive_fx;
 mod plasma_fx;
 mod post;
 mod quality;
@@ -1106,6 +1108,7 @@ fn fallback_model(key: &str, radius: f32, height: f32) -> Model {
         pit: None,
         excavation: None,
         star_core: None,
+        beam_core: None,
         exhausts: Vec::new(),
         lifts: Vec::new(),
         discharge: None,
@@ -1214,6 +1217,7 @@ impl Renderer {
         let mut vtol = aircraft_trails::VtolPods::default();
         let mut excavations: Vec<Option<(models::Excavation, models::Pit)>> = Vec::new();
         let mut stars: Vec<Option<[f32; 4]>> = Vec::new();
+        let mut beam_cores: Vec<Option<[f32; 4]>> = Vec::new();
         let mut burn_sites: Vec<BurnSite> = Vec::new();
         let mut pad_layers: Vec<Vec<u8>> = Vec::new();
         let mut hull_layers: Vec<(Vec<u8>, f32)> = Vec::new();
@@ -1312,6 +1316,7 @@ impl Renderer {
             vtol.0.push(model.vtol);
             excavations.push(model.excavation.clone().zip(model.pit));
             stars.push(model.star_core);
+            beam_cores.push(model.beam_core);
             burn_sites.push(BurnSite {
                 grid: models::burns::BurnGrid::bake(&model.lods[0]),
                 // As `entity.wgsl` hands them to the surface shader, so the marks agree.
@@ -2437,7 +2442,7 @@ impl Renderer {
             hull_crash_fx: capital_crash_fx::HullCrashFx::default(),
             impact_craters: impact_craters::ImpactCraters::default(),
             bore_fx: bore_fx::BoreFx::default(),
-            plasma_fx: plasma_fx::PlasmaFx::default(),
+            plasma_fx: plasma_fx::PlasmaFx::new(beam_cores),
             regency_mine_fx: regency_mine_fx::RegencyMineFx::new(excavations),
             star_core_fx: star_core_fx::StarCoreFx::new(stars),
             giant_fx: titan_fx::GiantFx::default(),
@@ -3338,6 +3343,7 @@ impl Renderer {
         self.gravitic_tick(projectiles, time);
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
+        self.lance_core_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
         self.arc_howitzer_tick(units, &frame.houses, time);
         self.write_bore_strokes(time);
@@ -3452,6 +3458,7 @@ impl Renderer {
         self.regency_guns_lights(time);
         self.gravitic_lights(time);
         self.star_core_lights(time);
+        self.lance_core_lights(time);
         self.heavy_rail_lights(time);
         self.emp_lights(time);
         self.bolt_rifle_lights(time);

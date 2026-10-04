@@ -759,6 +759,11 @@ shared! {
         /// in, a dark heart. Its size runs from `params.x` to `params.y` (smaller) over its
         /// life; `appearance.rgb` its brightness.
         pub const CRUSH_LENS: u32 = 60;
+        /// A Regency capital ship's plasma drive exhaust (renderer/capital_fx.rs): laid
+        /// as `PLUME` is, one point of a seamless tube down the plume. Drawn as gravity-held
+        /// plasma: a violet sheath round a rose-white core, and bright rings of plasma
+        /// carried down it from the throat in place of a jet's standing shock diamonds.
+        pub const PLASMA_PLUME: u32 = 61;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under

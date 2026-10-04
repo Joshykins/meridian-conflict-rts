@@ -708,6 +708,116 @@
                 Rumble(freq: 720, q: 1.8, gain: 1.3, wobble: 10, depth: 0.55),
             ],
         ),
+        // ---- the Scourge's Heavy Pinch-fusion Lance ----
+        // The belly core spinning up, heard once as the 2.5 s charge begins. It starts low
+        // and quiet so the end can be big: a field clunk as the containment engages, a deep
+        // rough hum the gravity clamp makes as it bears down, a growl that fills in over it
+        // and only leans up, the plasma's pressure heaving at random and rising, the air
+        // drawn in. In the last second the core overloads: a rougher growl an octave up,
+        // a fizz and crackle thickening at random (never on an even beat), arcs snapping
+        // out, and the pinch drawing in on itself until the lance lights at 2.5 s with a
+        // crack, a slam and a deep boom, its roar rolling off over half a second.
+        "regency_lance_charge": (
+            length: 3.2, peak: 0.8, room: 0.3,
+            layers: [
+                // The containment engaging, deep, with a dull clank of the ring taking up.
+                Burst(low: 45, high: 380, attack: 0.001, decay: 0.035, gain: 3.5, seed: 101),
+                Tone(from: 58, to: 36, glide: 0.12, attack: 0.002, decay: 0.16, gain: 0.45),
+                Fm(at: 0.004, from: 210, to: 196, glide: 0.05, ratio: 1.41, index: 1.2, fade: 0.03, attack: 0.001, decay: 0.05, gain: 0.18),
+                // The gravity clamp bearing down: a deep rough hum filling the whole charge.
+                Fm(at: 0.03, from: 34, to: 46, glide: 2.4, ratio: 0.5, index: 2.6, fade: 8.0, attack: 2.45, decay: 0.03, gain: 0.6),
+                // Its mid body, coming in behind it.
+                Fm(at: 0.35, from: 96, to: 124, glide: 2.1, ratio: 0.5, index: 2.2, fade: 8.0, attack: 2.12, decay: 0.03, gain: 0.85),
+                // The overload: a rougher growl an octave up, only in the last stretch.
+                Fm(at: 1.35, from: 196, to: 248, glide: 1.1, ratio: 0.5, index: 1.7, fade: 8.0, attack: 1.12, decay: 0.03, gain: 0.55),
+                Fm(at: 1.9, from: 300, to: 372, glide: 0.6, ratio: 0.5, index: 1.2, fade: 8.0, attack: 0.58, decay: 0.03, gain: 0.25, pan: 0.15),
+                // The lance lighting: a crack, a slam, a deep boom that holds, a growl in it.
+                Burst(at: 2.5, low: 600, high: 2800, attack: 0.0002, decay: 0.007, gain: 14, seed: 102),
+                Burst(at: 2.5, low: 90, high: 900, attack: 0.0005, decay: 0.08, gain: 26, seed: 103),
+                Burst(at: 2.502, low: 30, high: 220, attack: 0.004, decay: 0.22, gain: 13, seed: 104),
+                Tone(at: 2.5, from: 120, to: 46, glide: 0.15, attack: 0.001, decay: 0.2, gain: 1.3),
+                Tone(at: 2.5, from: 58, to: 32, glide: 0.35, attack: 0.004, decay: 0.3, gain: 0.9),
+                Fm(at: 2.5, from: 140, to: 82, glide: 0.25, ratio: 0.5, index: 2.4, fade: 0.2, attack: 0.002, decay: 0.22, gain: 0.7),
+                Drive(1.5),
+                // The air drawn in early on, its band falling as it is pulled in.
+                Sweep(at: 0.05, from: 2400, to: 500, glide: 1.5, q: 0.9, attack: 0.9, decay: 0.55, gain: 0.45, seed: 105),
+                // The plasma's pressure: a slow random heave that grows and brightens.
+                Roll(at: 0.08, from: 220, to: 700, glide: 2.4, attack: 2.4, decay: 0.03, gain: 0.8, swell: 6, depth: 0.4, seed: 306),
+                // The core going white: a fizz spreading up, then crackle thickening either side.
+                Foam(at: 0.9, from: 1100, to: 2000, glide: 1.6, q: 0.9, attack: 1.58, decay: 0.03, gain: 1.3, swell: 40, depth: 0.9, seed: 107),
+                Roll(at: 1.2, from: 1800, to: 2600, glide: 1.3, attack: 1.28, decay: 0.03, gain: 0.45, swell: 95, depth: 1.0, pan: -0.3, seed: 108),
+                Roll(at: 1.55, from: 1700, to: 2500, glide: 0.95, attack: 0.93, decay: 0.03, gain: 0.45, swell: 105, depth: 1.0, pan: 0.3, seed: 109),
+                // Arcs snapping out, at random, harder as it goes.
+                Burst(at: 1.31, low: 700, high: 2600, attack: 0.0002, decay: 0.004, gain: 0.9, pan: 0.3, seed: 111),
+                Burst(at: 1.62, low: 700, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.1, pan: -0.35, seed: 112),
+                Burst(at: 1.71, low: 700, high: 2600, attack: 0.0002, decay: 0.005, gain: 1.2, pan: 0.1, seed: 113),
+                Burst(at: 1.93, low: 700, high: 2600, attack: 0.0002, decay: 0.004, gain: 1.5, pan: -0.15, seed: 114),
+                Burst(at: 2.04, low: 700, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.4, pan: 0.4, seed: 115),
+                Burst(at: 2.09, low: 700, high: 2600, attack: 0.0002, decay: 0.005, gain: 1.8, pan: -0.3, seed: 116),
+                Burst(at: 2.23, low: 700, high: 2600, attack: 0.0002, decay: 0.004, gain: 2.0, pan: 0.2, seed: 117),
+                Burst(at: 2.31, low: 700, high: 2600, attack: 0.0002, decay: 0.003, gain: 1.7, pan: -0.1, seed: 118),
+                Burst(at: 2.38, low: 700, high: 2600, attack: 0.0002, decay: 0.005, gain: 2.2, pan: 0.35, seed: 119),
+                // The pinch drawing in on itself into the ignition.
+                Sweep(at: 2.2, from: 500, to: 1600, glide: 0.3, q: 0.8, attack: 0.29, decay: 0.02, gain: 0.8, seed: 120),
+                // The lance's roar rolling off, close and rough, then low.
+                Roll(at: 2.505, from: 1600, to: 300, glide: 0.5, attack: 0.01, decay: 0.17, gain: 1.1, swell: 24, depth: 0.7, seed: 121),
+                Roll(at: 2.52, from: 360, to: 70, glide: 0.6, attack: 0.04, decay: 0.2, gain: 0.4, swell: 5, depth: 0.5, seed: 122),
+                Foam(at: 2.51, from: 2000, to: 900, glide: 0.5, q: 0.9, attack: 0.01, decay: 0.14, gain: 0.9, swell: 34, depth: 0.7, seed: 123),
+            ],
+        ),
+        // The lance held, heard as this loop while it burns down onto the ground: a fusion
+        // stream roaring out of the core. A deep rough growl and its body a fifth and an
+        // octave up, breathing slowly as the pinch flexes; a broad roar of the stream that
+        // flutters like a torch and drifts in colour; a searing sizzle where it bites, never
+        // above the low highs. Every steady tone and wobble is a whole number of cycles in
+        // the 4 s loop.
+        "regency_lance_hold": (
+            length: 4.0, peak: 0.7, room: 0.15, looped: true,
+            layers: [
+                Fm(from: 55, to: 55, glide: 1, ratio: 0.5, index: 2.2, fade: 1000, attack: 0.01, decay: 100000, gain: 0.26),
+                Fm(from: 110, to: 110, glide: 1, ratio: 0.5, index: 1.8, fade: 1000, attack: 0.01, decay: 100000, gain: 0.32, pan: -0.15),
+                Fm(from: 165, to: 165, glide: 1, ratio: 0.5, index: 1.3, fade: 1000, attack: 0.01, decay: 100000, gain: 0.18, pan: 0.15),
+                Drone(freq: 55.25, gain: 0.12, wobble: 0.5, depth: 0.35),
+                Drone(freq: 220, gain: 0.06, wobble: 1.25, depth: 0.6, pan: 0.2),
+                Drive(1.5),
+                // The stream's roar, fluttering and drifting.
+                Rumble(freq: 180, q: 0.7, gain: 1.8, wobble: 0.75, depth: 0.3),
+                Wind(freq: 560, q: 0.7, gain: 3.4, swell: 3, depth: 0.55, sway: 0.5, pan: -0.25, seed: 131),
+                Wind(freq: 600, q: 0.7, gain: 3.4, swell: 3.4, depth: 0.55, sway: 0.5, pan: 0.25, seed: 132),
+                Rumble(freq: 1100, q: 1.0, gain: 2.6, wobble: 1.75, depth: 0.45),
+                // The sizzle where it bites.
+                Foam(from: 1700, to: 1700, glide: 1, q: 0.9, attack: 0.01, decay: 100000, gain: 2.4, swell: 34, depth: 0.85, seed: 133),
+                Wind(freq: 1900, q: 1.2, gain: 0.6, swell: 14, depth: 1.0, sway: 0.4, seed: 134),
+            ],
+        ),
+        // The lance going out with nothing left to burn: the core venting. The pinch lets go
+        // with a soft deep thump, the growl sinking and roughening as it powers down, the
+        // pressure blown off as a broad falling rush (no whine), the core cooling with a low
+        // rumble, and the ring settling: a few dull ticks and clanks at random, softer as it goes.
+        "regency_lance_vent": (
+            length: 2.2, peak: 0.6, room: 0.35,
+            layers: [
+                Burst(low: 45, high: 360, attack: 0.003, decay: 0.06, gain: 5, seed: 141),
+                Tone(from: 64, to: 34, glide: 0.3, attack: 0.004, decay: 0.25, gain: 0.6),
+                Fm(from: 124, to: 46, glide: 1.1, ratio: 0.5, index: 2.4, fade: 0.9, attack: 0.01, decay: 0.42, gain: 0.8),
+                Fm(from: 248, to: 92, glide: 1.0, ratio: 0.5, index: 1.4, fade: 0.6, attack: 0.01, decay: 0.3, gain: 0.35),
+                Drive(1.4),
+                // The pressure blown off: a broad rush, falling.
+                Roll(at: 0.01, from: 1500, to: 300, glide: 1.0, attack: 0.03, decay: 0.38, gain: 0.8, swell: 14, depth: 0.7, seed: 142),
+                Sweep(at: 0.02, from: 1600, to: 380, glide: 1.1, q: 0.8, attack: 0.04, decay: 0.42, gain: 0.9, seed: 143),
+                Foam(at: 0.02, from: 1500, to: 520, glide: 1.0, q: 0.9, attack: 0.04, decay: 0.3, gain: 0.8, swell: 26, depth: 0.75, seed: 144),
+                // Cooling, low.
+                Roll(at: 0.05, from: 380, to: 90, glide: 1.4, attack: 0.08, decay: 0.55, gain: 0.35, swell: 4, depth: 0.5, seed: 145),
+                // The ring settling.
+                Fm(at: 0.58, from: 340, to: 330, glide: 0.05, ratio: 1.41, index: 1.3, fade: 0.02, attack: 0.001, decay: 0.045, gain: 0.25, pan: 0.3),
+                Burst(at: 0.58, low: 250, high: 1400, attack: 0.0004, decay: 0.006, gain: 2.2, pan: 0.3, seed: 146),
+                Burst(at: 0.86, low: 300, high: 1600, attack: 0.0004, decay: 0.004, gain: 1.6, pan: -0.35, seed: 147),
+                Fm(at: 1.07, from: 260, to: 252, glide: 0.05, ratio: 1.41, index: 1.2, fade: 0.02, attack: 0.001, decay: 0.05, gain: 0.2, pan: -0.15),
+                Burst(at: 1.07, low: 200, high: 1200, attack: 0.0004, decay: 0.007, gain: 1.8, pan: -0.15, seed: 148),
+                Burst(at: 1.31, low: 300, high: 1600, attack: 0.0004, decay: 0.004, gain: 1.1, pan: 0.2, seed: 149),
+                Burst(at: 1.68, low: 250, high: 1400, attack: 0.0004, decay: 0.005, gain: 0.9, pan: 0.4, seed: 150),
+            ],
+        ),
         // A Gravitic Bomb charging between the claw's fingers: a contactor, then the cage
         // climbing onto its note, a growl rising under it and the air hissing in low.
         "regency_gravitic_charge": (

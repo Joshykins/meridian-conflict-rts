@@ -10,7 +10,7 @@ dimensions; weapon mounts and cargo apertures use the same metre coordinates.
 | Ark | 3 | Artificer III; Exarch Engineering Suite III | Heavy transport; 96 slots, 44 m bay width and 36 m clearance |
 | Vassal | 2 | Artificer II/III; Exarch Engineering Suite II/III | Economical frigate with two independently aiming plasma cannons |
 | Suzerain | 3 | Artificer III; Exarch Engineering Suite III | Cruiser with two anti-ship guns and six area suppression batteries |
-| Scourge | 3 | Artificer III; Exarch Engineering Suite III | Destroyer with one Heavy Pinch-fusion Lance under the keel |
+| Scourge | 3 | Artificer III; Exarch Engineering Suite III | Destroyer: a Heavy Pinch-fusion Lance from the energy core under the keel, two Gravitic Seeker Batteries |
 
 All five are site-built aircraft tagged Space. Select an appropriate engineer,
 place the ship on its own lot and let construction finish. The Space subject/spawn
@@ -39,18 +39,25 @@ engage ships, aircraft and naval hulls; its six splash batteries also bombard la
 units and structures. Each casemate uses its own weapon slot and pivot, so barrels
 pitch and traverse with the weapon they represent.
 
-Scourge closes to weapon range and holds station while the lance turret slung under
-the middle of its keel turns and pitches. The lance is a held beam fired down its
-barrel (`sweep`): locked on, it stays on the mark; when the mark dies the beam stays
-lit while the turret slews onto the next, and the stretch between lands on the ground
-and glasses it (the renderer's molten-ground effect). It does not cut a navigable
-trench in the simulation heightfield.
+Scourge closes to weapon range and holds station. The lance is laid from the lens of
+the energy core in the pod under the middle of its keel; nothing turns. The core charges
+for 2.5 s (`spin_up`: the core's charge animation and `regency_lance_charge` keep time
+with it) before the beam lights. The lance is a held beam fired down its line (`sweep`):
+locked on, it stays on the mark; when the mark dies the beam stays lit while it slowly
+slews (12°/s) onto the next, and the stretch between lands on the ground and glasses
+it (the renderer's molten-ground effect). It does not cut a navigable trench in the
+simulation heightfield. With nothing left to shoot the core winds down and vents
+(`regency_lance_vent`). Two blocks of eight hatched cells on the hump let out gravitic
+seekers onto aircraft, as the Resolute's rocket cells do. Its stern drives burn as
+plasma (`models::plasma_drives`): violet plumes with rings carried down them, arcs at
+the mouths.
 
 Inspect the fleet with:
 
 ```sh
 scripts/shot.sh variants regency_t2_transport=base regency_t3_assault_transport=base regency_t2_space_frigate=base regency_t3_space_cruiser=base regency_t3_space_destroyer=base --views front34,rear34,top
 scripts/shot.sh unit regency_t3_space_destroyer --scenario targets --ticks 115 --views left --look 180,0,-240 --zoom 0.5
+scripts/shot.sh unit regency_t3_space_destroyer --scenario targets --ticks 20 --views 60:-5 --look 0,0,0 --zoom 2   (the core charging)
 ```
 
 Focused acceptance tests:

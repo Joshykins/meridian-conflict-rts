@@ -24,6 +24,10 @@
 //!   the ground and settle on the pad (beams seen through the air at night), amber
 //!   beacons while the ramp moves, the hold lit down the open ramp.
 //!
+//! - A Regency hull's drives (`models::plasma_drives`) burn as gravity-held plasma
+//!   (`puff::PLASMA_PLUME`), throw violet light, and crackle at the mouths
+//!   (`plasma_drive_fx.rs`).
+//!
 //! - Stunned by an EMP (`UnitInstance::stun`): drives, lift jets and lamps are dead; as
 //!   the stun wears off they stutter back, lit or out a tick at a time, lit more often
 //!   the nearer it is to over (`systems_up`).
@@ -50,6 +54,8 @@ pub(super) const PUFF_THRUST_GLOW: f32 = 31.0;
 
 /// A drive plume (`gpu_consts::puff::PLUME`): one point of the tube down a stern plume.
 const PUFF_PLUME: f32 = gpu_consts::puff::PLUME as f32;
+/// A Regency plasma drive's plume, laid the same way.
+const PUFF_PLASMA_PLUME: f32 = gpu_consts::puff::PLASMA_PLUME as f32;
 /// Seconds the exhaust takes from the nozzle to a plume's tip: through a turn the tip
 /// trails back to where the nozzle pointed this long ago.
 const PLUME_LAG: f32 = 0.7;
@@ -74,6 +80,8 @@ struct Kit {
     cruise: f32,
     /// Half length and half width of the hull on the ground, metres.
     half: (f32, f32),
+    /// Plasma drives (`models::plasma_drives`) rather than jets.
+    plasma: bool,
 }
 /// Base colour of the dust the wash throws up (linear RGB, shaded by the puff).
 const WASH_DUST: [f32; 3] = [0.43, 0.40, 0.35];
@@ -174,6 +182,7 @@ impl Renderer {
             } else {
                 (radius, radius * 0.45)
             },
+            plasma: crate::models::plasma_drives(mesh),
         };
         // Ground torn up by the wash is earthier than a blast's grey pressure dust.
         let saved = (self.effect_origin, self.effect_settings);
@@ -368,7 +377,13 @@ impl Renderer {
                             * (1.0 + 0.12 * (x * 6.0).min(1.0) - 0.75 * x.powf(1.3))
                             * if along * length < throat { 0.85 } else { 1.0 };
                         let dx = length / steps as f32 / reach.max(1.0);
-                        self.push_plume(p, step, start, life, (radius, x, dx), vel, heat);
+                        let kind = if kit.plasma {
+                            PUFF_PLASMA_PLUME
+                        } else {
+                            PUFF_PLUME
+                        };
+                        let params = [radius, x, kind, dx];
+                        self.push_plume(p, step, start, life, params, vel, heat);
                     }
                 }
             }
@@ -388,8 +403,23 @@ impl Renderer {
                     );
                 }
             }
+            if kit.plasma && near {
+                for &port in nozzles {
+                    let mouth = super::plasma_drive_fx::Mouth {
+                        at: [place(&f0, port), place(&f1, port)],
+                        aft: -(f1.1 * swing1.cos() - f1.2 * swing1.sin()),
+                        radius: mouth * 0.9,
+                    };
+                    self.plasma_drive_mouth(&mouth, heat, vel, time);
+                }
+            }
             // Light off the plumes: each pair's, from the mouths down the flame.
-            let color = Vec3::new(0.45, 0.68, 1.0) * (1500.0 + 4000.0 * throttle) * burn * k * k;
+            let hue = if kit.plasma {
+                super::plasma_drive_fx::VIOLET
+            } else {
+                Vec3::new(0.45, 0.68, 1.0)
+            };
+            let color = hue * (1500.0 + 4000.0 * throttle) * burn * k * k;
             // One light per side (port nozzles, starboard nozzles), not one per nozzle.
             for port_side in [true, false] {
                 let side: Vec<[f32; 3]> = nozzles
@@ -624,16 +654,17 @@ impl Renderer {
         }
     }
 
-    /// One point of a drive plume's tube (`PUFF_PLUME`): at `pos`, `step` to its
-    /// neighbours; `shape` its radius, how far down the plume it is (0 the mouth, 1 the
-    /// tip) and how much further the next point is.
+    /// One point of a drive plume's tube: at `pos`, `step` to its neighbours; `params` as
+    /// the shader takes them: its radius, how far down the plume it is (0 the mouth, 1 the
+    /// tip), its kind (`PUFF_PLUME`, or `PUFF_PLASMA_PLUME` for a plasma drive) and how
+    /// much further the next point is.
     fn push_plume(
         &mut self,
         pos: Vec3,
         step: Vec3,
         start: f32,
         life: f32,
-        shape: (f32, f32, f32),
+        params: [f32; 4],
         motion: Vec3,
         heat: f32,
     ) {
@@ -646,7 +677,7 @@ impl Renderer {
             start,
             vel: step.to_array(),
             life,
-            params: [shape.0, shape.1, PUFF_PLUME, shape.2],
+            params,
         };
         self.puffs.write(
             (self.puff_cursor * size_of::<Puff>()) as u64,

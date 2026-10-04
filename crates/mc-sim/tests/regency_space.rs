@@ -325,3 +325,75 @@ fn destroyer_holds_its_lance_on_the_mark_and_drags_it_across_the_ground_to_the_n
     assert_eq!(dark, 0, "the lance went out between marks");
     assert!(ground >= 2, "no line cut between the marks: {ground}");
 }
+
+#[test]
+fn destroyers_core_charges_before_the_lance_lights() {
+    let mut w = world();
+    let ship = add(&mut w, "regency_t3_space_destroyer", 0, 500, 700);
+    let tank = add(&mut w, "aster_t4_assault_tank", 1, 1000, 700);
+    w.state.units.flags[tank] |= flag::PASSIVE;
+    w.state.units.health[tank] = Fx::from_int(500000);
+    let blueprint = w.state.units.blueprint[ship];
+    let spin_ticks = w.blueprints.unit(blueprint).weapons[0].spin_ticks as usize;
+    assert_eq!(spin_ticks, 25, "a 2.5 s charge");
+    let (id, tank_id) = (w.state.units.id(ship), w.state.units.id(tank));
+    w.tick(&[cmd(Command::Attack {
+        units: vec![id],
+        target: tank_id,
+        queue: false,
+    })])
+    .unwrap();
+    let lit = |w: &World| {
+        w.events.iter().any(
+            |e| matches!(e, SimEvent::ShotFired { blueprint: b, weapon: 0, .. } if *b == blueprint),
+        )
+    };
+    let mut first = None;
+    for t in 1..80 {
+        w.tick(&[]).unwrap();
+        if lit(&w) {
+            first = Some(t);
+            break;
+        }
+    }
+    // The order's own tick is the charge's first.
+    let first = first.expect("the lance never lit") + 1;
+    assert!(
+        (spin_ticks..spin_ticks + 3).contains(&first),
+        "lit on tick {first} of a {spin_ticks}-tick charge"
+    );
+}
+
+#[test]
+fn destroyers_seeker_cells_see_off_fighters() {
+    let mut w = world();
+    let ship = add(&mut w, "regency_t3_space_destroyer", 0, 500, 700);
+    let blueprint = w.state.units.blueprint[ship];
+    let bp = w.blueprints.unit(blueprint);
+    let cells = &bp.weapons[1];
+    assert!(cells.missile && cells.guided && cells.hatch_ticks > 0 && cells.muzzles.len() == 16);
+    let fighters: Vec<usize> = (0..3)
+        .map(|i| add(&mut w, "aster_t1_interceptor", 1, 900 + i * 40, 760))
+        .collect();
+    for &f in &fighters {
+        w.state.units.flags[f] |= flag::PASSIVE;
+    }
+    let ids: Vec<Handle> = fighters.iter().map(|&f| w.state.units.id(f)).collect();
+    let mut launched = 0;
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+        launched += w
+            .events
+            .iter()
+            .filter(|e| {
+                matches!(e, SimEvent::ShotFired { blueprint: b, weapon: 1, .. } if *b == blueprint)
+            })
+            .count();
+    }
+    assert!(launched >= 4, "{launched} seekers launched");
+    let alive = ids
+        .iter()
+        .filter(|&&id| w.state.units.row(id).is_some())
+        .count();
+    assert!(alive < 3, "the seekers killed none of the fighters");
+}

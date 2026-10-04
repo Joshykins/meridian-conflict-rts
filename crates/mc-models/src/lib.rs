@@ -624,6 +624,9 @@ pub struct Model {
     /// A Regency power generator's star (xyz its middle, w its radius): drawn as light by the
     /// renderer (`renderer/star_core_fx.rs`) while the plant runs.
     pub star_core: Option<[f32; 4]>,
+    /// The energy core a held beam is laid from (xyz its lens's face, w the lens's radius):
+    /// charged and lit by the renderer with the beam (`renderer/lance_core_fx.rs`).
+    pub beam_core: Option<[f32; 4]>,
     /// Engine exhaust ports whose hot air shimmers above them (`MeshBuilder::add_exhaust`,
     /// renderer `heat_haze.rs`).
     pub exhausts: Vec<Exhaust>,
@@ -992,6 +995,12 @@ pub fn lift_jets(mesh: &str) -> &'static [[f32; 3]] {
     }
 }
 
+/// How a capital ship's stern drives burn: a Regency hull's plasma drives
+/// (`puff::PLASMA_PLUME`, violet light) or a jet's white-hot exhaust (`puff::PLUME`).
+pub fn plasma_drives(mesh: &str) -> bool {
+    matches!(design_of(mesh), "regency_space_destroyer")
+}
+
 /// Jet nozzle origins in model space, shared with the aircraft effect renderer.
 pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
     match design_of(mesh) {
@@ -1001,6 +1010,7 @@ pub fn aircraft_exhausts(mesh: &str) -> &'static [[f32; 3]] {
         "sensor_ship" => &aster::air::VIGIL_NOZZLES,
         "rail_corvette" => &aster::air::VALIANT_NOZZLES,
         "lift_ship" => &aster::air::BASTION_NOZZLES,
+        "regency_space_destroyer" => &regency::space::DESTROYER_NOZZLES,
         "interceptor" => &[[-3.31, -0.2, 0.9], [-3.31, 0.2, 0.9]],
         "bomber" => &[[-3.0, -2.2, 1.0], [-3.0, 2.2, 1.0]],
         "air_scout" => &[[-2.97, 0.0, 0.65]],

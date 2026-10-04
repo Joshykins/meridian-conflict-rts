@@ -68,6 +68,20 @@ impl ModelDef {
         self
     }
 
+    /// Stern drives without a capital rig's gear: the great drive's mouth, the |y| of the
+    /// outer pair, and their size (`CapitalRig::drives`; 1: a 12 m mouth), for the drive
+    /// effects.
+    pub(super) const fn with_drives(mut self, mouth: [f32; 3], outer: f32, size: f32) -> Self {
+        let mut rig = match self.capital {
+            Some(rig) => rig,
+            None => [[0.0; 4]; 7],
+        };
+        rig[4] = [mouth[0], mouth[2], 0.0, outer];
+        rig[6][1] = size;
+        self.capital = Some(rig);
+        self
+    }
+
     /// The model has a far level, cheaper than its coarse one, for when it is only a
     /// few pixels across: props there are by the hundred thousand.
     pub(super) const fn with_far(mut self) -> Self {
@@ -215,6 +229,7 @@ fn build_fitted_made(
     let mut pit = None;
     let mut excavation = None;
     let mut star_core = None;
+    let mut beam_core = None;
     let mut scans = false;
     let mut exhausts = Vec::new();
     let mut lifts = Vec::new();
@@ -247,6 +262,7 @@ fn build_fitted_made(
             pit = builder.pit();
             excavation = builder.excavation();
             star_core = builder.star_core();
+            beam_core = builder.beam_core();
             exhausts = builder.exhausts();
             lifts = builder.lifts();
             discharge = builder.discharge();
@@ -310,6 +326,7 @@ fn build_fitted_made(
         pit,
         excavation,
         star_core,
+        beam_core,
         exhausts,
         lifts,
         discharge,

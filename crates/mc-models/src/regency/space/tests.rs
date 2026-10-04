@@ -1,6 +1,6 @@
-use super::destroyer::{LANCE_MUZZLE, LANCE_PIVOT};
-use crate::{build_model, build_model_scaled, material, rig};
-use glam::Vec3;
+use super::destroyer::{CORE_MUZZLE, SEEKER_DROP};
+use crate::{build_model, build_model_scaled, material};
+use glam::{Vec2, Vec3};
 
 fn blueprints() -> mc_data::Blueprints {
     mc_data::Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
@@ -119,21 +119,58 @@ fn plasma_gun_houses_are_bound_to_their_weapons_and_end_at_their_muzzles() {
             assert!(near < 1.2, "{key} gun {slot}: no emitter at muzzle, {near}");
         }
     }
-    // The destroyer's lance: one turret under the keel at the middle of the ship, its
-    // prism lens at the muzzle the data fires from.
+}
+
+#[test]
+fn the_destroyers_lance_leaves_its_core_and_its_seekers_leave_their_cells() {
+    let bp = blueprints();
     let unit = bp.unit(bp.id_of("regency_t3_space_destroyer").unwrap());
-    let lance = &unit.weapons[0];
-    let p = lance.pivot.unwrap();
-    assert_eq!([p.x.to_f32(), p.y.to_f32(), p.z.to_f32()], LANCE_PIVOT);
-    let m = lance.muzzle;
-    assert_eq!([m.x.to_f32(), m.y.to_f32(), m.z.to_f32()], LANCE_MUZZLE);
     let model = build_model(&unit.visual.mesh).unwrap();
-    assert_eq!(model.turret_pivot, LANCE_PIVOT);
-    let near = model.lods[0]
+    let at = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    // The lance is laid from the core's lens at the ship's middle: no turret, nothing
+    // turns or pitches (a pivot would pitch the hull: `capital_ship` in entity.wgsl).
+    let lance = &unit.weapons[0];
+    let core = Vec3::from(CORE_MUZZLE);
+    assert!(lance.pivot.is_none() && core.truncate().length() < 0.01);
+    assert!(at(lance.muzzle).distance(core) < 0.01, "lance muzzle");
+    // The lens's face lies in the muzzle's plane, round it.
+    let face: Vec<Vec3> = model.lods[0]
         .vertices
         .iter()
-        .filter(|v| v.rig & rig::LIMB_MASK == rig::ARM_GUN && v.material == material::GLOW_PRISM)
-        .map(|v| Vec3::from(v.pos).distance(Vec3::from(LANCE_MUZZLE)))
-        .fold(f32::MAX, f32::min);
-    assert!(near < 1.3, "no lens at the lance's muzzle, {near}");
+        .filter(|v| v.material == material::GLOW_PRISM && (v.pos[2] - core.z).abs() < 0.05)
+        .map(|v| Vec3::from(v.pos))
+        .collect();
+    let middle = face.iter().sum::<Vec3>() / face.len().max(1) as f32;
+    assert!(
+        face.len() >= 8 && middle.distance(core) < 0.1,
+        "no lens at the core's muzzle: {} points about {middle}",
+        face.len()
+    );
+    assert!(model.lods[0]
+        .vertices
+        .iter()
+        .all(|v| v.part != crate::part::TURRET));
+    // The seeker battery fires from both blocks' cells, port block first, each in its
+    // block's firing order.
+    assert_eq!(model.cells.len(), 2);
+    let want: Vec<Vec3> = model
+        .cells
+        .iter()
+        .flat_map(|block| {
+            (0..8).map(|k| {
+                Vec2::from(block.missile_centre(k).unwrap()).extend(block.deck - SEEKER_DROP)
+            })
+        })
+        .collect();
+    let weapon = &unit.weapons[1];
+    let have: Vec<Vec3> = weapon.muzzles.iter().map(|&p| at(p)).collect();
+    assert!(
+        have.len() == want.len() && have.iter().zip(&want).all(|(h, w)| h.distance(*w) < 0.02),
+        "{}: muzzles {:?}",
+        weapon.name,
+        want.iter()
+            .map(|p| format!("({:.2}, {:.2}, {:.2})", p.x, p.y, p.z))
+            .collect::<Vec<_>>()
+    );
+    assert!(at(weapon.muzzle).distance(want[0]) < 0.02);
 }

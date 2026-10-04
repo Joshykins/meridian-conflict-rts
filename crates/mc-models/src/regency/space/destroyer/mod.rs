@@ -1,18 +1,26 @@
 //! Scourge: the Regency's tech 3 space destroyer (`regency_t3_space_destroyer`, mesh
-//! `regency_space_destroyer`). A long hull of swelling and pinching sections, clad in overlapping plate courses
-//! that sweep back into spikes, a dark trench down the spine carrying the power conduit
-//! to the drives, red optics in the chine seam at the head, and one Heavy Pinch-fusion
-//! Lance slung under the keel at the middle of the ship (`lance.rs`).
-//! +X is forward, +Y port, the ground at z 0 (it is built on its lot, the lance lowest).
+//! `regency_space_destroyer`). A long hull of swelling and pinching sections, clad in
+//! overlapping plate courses that sweep back into spikes, a dark trench down the spine
+//! carrying the power conduit to the drives, red optics in the chine seam at the head.
+//! Two broad pincers sweep out of the hump and curve back in past the stern either side
+//! of the drives, each with its dampening channel down the inside (`tines.rs`); under the
+//! keel at the ship's middle hangs the pod of the energy core the Heavy Pinch-fusion
+//! Lance is fired from (`core.rs`).
+//! +X is forward, +Y port, the ground at z 0 (it is built on its lot, the core lowest).
 //!
-//! Contracts: `LANCE_PIVOT` and `LANCE_MUZZLE` are `space.ron` weapon 0's `pivot` and
-//! `muzzle`.
+//! The ship is authored in its first hull's frame and built `SCALE` times bigger, moved
+//! `SHIFT` forward so its middle, pincers and all, is the origin (`frame`).
+//!
+//! Contracts: `CORE_MUZZLE` is `space.ron` weapon 0's `muzzle`, and the seeker cells are
+//! weapon 1's `muzzles` (tests.rs).
 
 mod body;
+mod cells;
+mod core;
 mod fittings;
-mod lance;
+mod tines;
 
-use glam::Vec3;
+use glam::{Affine3A, Vec3};
 
 use crate::builder::MeshBuilder;
 use crate::material::{GLOW_LASER, GLOW_VIOLET, TEAM};
@@ -20,11 +28,7 @@ use crate::material::{GLOW_LASER, GLOW_VIOLET, TEAM};
 use super::super::kit::{dark_plate, metal, v3};
 use super::hull::mark;
 use body::{feather, skin, skin_in, st, tube, Body};
-
-/// Where the lance turns and pitches: under the keel at the ship's middle.
-pub(crate) const LANCE_PIVOT: [f32; 3] = [0.0, 0.0, 5.0];
-/// The lens at the lance's mouth, laid forward at rest: where the beam leaves.
-pub(crate) const LANCE_MUZZLE: [f32; 3] = [28.0, 0.0, 5.0];
+use tines::{knot, Tine};
 
 /// The hull: a wide, shallow head on a narrow neck, the body swelling again aft to the
 /// hump, and the head rounding off into a broad blunt front.
@@ -47,31 +51,73 @@ const HULL: Body = Body {
     far: &[0, 2, 4, 6, 8, 10],
 };
 
+/// The ship is authored this much smaller than it is built.
+const SCALE: f32 = 1.25;
+/// And moved this far forward (authoring metres) when built.
+const SHIFT: f32 = 25.0;
+
+/// The authoring frame placed on the model: scaled up and moved forward.
+fn frame() -> Affine3A {
+    Affine3A::from_translation(Vec3::X * SHIFT * SCALE) * Affine3A::from_scale(Vec3::splat(SCALE))
+}
+
+/// Where the lance leaves the core: the lens's face at the pod's lowest point (model
+/// frame, metres; `core::LENS` placed by `frame`).
+#[cfg(test)]
+pub(crate) const CORE_MUZZLE: [f32; 3] = place(core::LENS);
+
+/// The stern drives' mouths (model frame), for the drive effects.
+pub(crate) const NOZZLES: [[f32; 3]; 3] = {
+    let d = fittings::DRIVES;
+    [place(d[0].0), place(d[1].0), place(d[2].0)]
+};
+
+/// A point in the authoring frame, placed on the model (`frame`).
+const fn place(p: [f32; 3]) -> [f32; 3] {
+    [(p[0] + SHIFT) * SCALE, p[1] * SCALE, p[2] * SCALE]
+}
+
+/// The drives' size as the drive effects take it (1: a 12 m mouth): the great drive's.
+pub(crate) const DRIVE_SIZE: f32 = fittings::DRIVES[0].1 * SCALE / 12.0;
+
+/// How far under its cell's deck a seeker is launched from (model frame).
+#[cfg(test)]
+pub(crate) const SEEKER_DROP: f32 = cells::MUZZLE_DROP * SCALE;
+
+/// The pincers: rooted deep in the hump, swept out wide and thick, curving back in to
+/// their points past the stern.
+const PINCER: Tine = Tine {
+    knots: &[
+        knot(-40.0, 20.0, 27.0, 5.0, 6.0),
+        knot(-70.0, 38.0, 27.0, 11.0, 8.0),
+        knot(-105.0, 58.0, 27.0, 11.0, 7.5),
+        knot(-140.0, 60.0, 27.5, 9.0, 6.0),
+        knot(-168.0, 46.0, 28.0, 6.0, 4.0),
+        knot(-186.0, 34.0, 28.5, 0.8, 0.8),
+    ],
+    channel: (0.3, 0.95),
+};
+
 pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
-    build(b, &HULL);
-}
-
-/// The ship on `body`: the hull, plating and lance, chine blades the length of it and
-/// the blunt stern's drive lenses.
-fn build(b: &mut MeshBuilder, body: &Body) {
-    if b.coarse() {
-        coarse(b, body, &fittings::BLADES_FAR);
-        return;
-    }
-    common(b, body);
-    fittings::blades(b, body);
-    fittings::stern_lenses(b, body);
-}
-
-/// What every plan shares: the hull, its plate courses, the spine trench, the optics,
-/// the owner's colour, the lift plates and the lance.
-fn common(b: &mut MeshBuilder, body: &Body) {
-    body.hull(b);
-    b.mirror_y(|b| plates(b, body));
-    trench(b, body);
-    b.mirror_y(|b| optics(b, body));
-    lifts(b, body);
-    lance::lance(b, body);
+    b.with(frame(), |b| {
+        let body = &HULL;
+        if b.coarse() {
+            let mut fins = vec![([[110.0, 12.0], [-90.0, 30.0], [-70.0, 20.0]], 25.0)];
+            fins.extend(tines::far(&PINCER));
+            coarse(b, body, &fins);
+            return;
+        }
+        body.hull(b);
+        b.mirror_y(|b| plates(b, body));
+        trench(b, body);
+        b.mirror_y(|b| optics(b, body));
+        lifts(b, body);
+        fittings::chine_blades(b, body, -84.0, 8.0);
+        fittings::drives(b);
+        tines::tines(b, &PINCER);
+        core::core(b, body);
+        cells::cells(b, body);
+    });
 }
 
 /// The plate courses, port side: a cowl over the head, a mantle course down the upper

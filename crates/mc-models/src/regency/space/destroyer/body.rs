@@ -40,7 +40,7 @@ pub(super) struct Body {
     pub(super) far: &'static [usize],
 }
 
-fn catmull(p0: f32, p1: f32, p2: f32, p3: f32, t: f32) -> f32 {
+pub(super) fn catmull(p0: f32, p1: f32, p2: f32, p3: f32, t: f32) -> f32 {
     let t2 = t * t;
     0.5 * ((2.0 * p1)
         + (-p0 + p2) * t

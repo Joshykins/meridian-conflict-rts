@@ -85,11 +85,27 @@ pub(super) struct PlasmaFx {
     pub(super) seekers: super::gravitic_fx::GraviticFx,
     /// Cone weapons' wakes rolling out (`wake_fx`).
     pub(super) wakes: Vec<super::wake_fx::RollingWake>,
+    /// Held beams' energy cores (`lance_core_fx`).
+    pub(super) cores: super::lance_core_fx::LanceCores,
 }
 
 impl PlasmaFx {
+    /// The blueprints' beam cores (`lance_core_fx`), per blueprint in id order.
+    pub(super) fn new(cores: Vec<Option<[f32; 4]>>) -> Self {
+        PlasmaFx {
+            cores: super::lance_core_fx::LanceCores::new(cores),
+            ..PlasmaFx::default()
+        }
+    }
+
+    /// Forgets everything in flight; the blueprints' cores stay.
     pub(super) fn clear(&mut self) {
-        *self = PlasmaFx::default();
+        let mut cores = std::mem::take(&mut self.cores);
+        cores.clear();
+        *self = PlasmaFx {
+            cores,
+            ..PlasmaFx::default()
+        };
     }
 }
 
