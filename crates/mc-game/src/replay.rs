@@ -10,6 +10,13 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
+/// The build a recording says made it: `MERIDIAN_BUILD` at compile time (a
+/// release pipeline sets it), else the package version marked `-dev`.
+pub const BUILD: &str = match option_env!("MERIDIAN_BUILD") {
+    Some(b) => b,
+    None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
+};
+
 pub struct Playback {
     replay: Replay,
     path: PathBuf,
@@ -334,12 +341,10 @@ pub struct Summary {
     pub players: Vec<(String, bool)>,
     pub survival: bool,
     pub marks: Vec<crate::issues::Mark>,
-    /// Why it cannot be played here, when it cannot.
+    /// Why it cannot be played, when it cannot.
     pub problem: Option<String>,
-    /// Who recorded it, as far as the file says.
-    pub origin: Option<mc_net::Origin>,
-    /// Whether this build plays it as it was played.
-    pub fit: Fit,
+    /// The build that recorded it, when it said (older recordings did not).
+    pub build: Option<String>,
     /// Its battle report's record is kept beside it, so the report opens at once.
     pub report_kept: bool,
 }
@@ -348,50 +353,10 @@ impl Summary {
     pub fn playable(&self) -> bool {
         self.problem.is_none()
     }
-
-    /// The build that plays it faithfully, when that is not this one.
-    pub fn other_build(&self) -> Option<&str> {
-        match self.fit {
-            Fit::Here => None,
-            Fit::Differs | Fit::Elsewhere => self
-                .origin
-                .as_ref()
-                .map(|o| o.build.as_str())
-                // The same build with other unit data: edited data/, nothing to fetch.
-                .filter(|b| !b.is_empty() && *b != crate::BUILD),
-        }
-    }
 }
 
-/// Whether this build plays a recording as it was played.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Fit {
-    /// Same simulation, unit data and map: it plays out as it did.
-    Here,
-    /// This build can open it, but its simulation or unit data differ (or the
-    /// recording does not say): it may play out differently.
-    Differs,
-    /// Only the build that recorded it can open it: another replay format, or
-    /// a map that is no longer in maps/.
-    Elsewhere,
-}
-
-/// How a recording made by `origin`, in replay `format`, fits this build,
-/// whose unit data hashes to `blueprints`; `map_here` when maps/ has its map.
-pub fn fit(format: u32, origin: &mc_net::Origin, blueprints: u64, map_here: bool) -> Fit {
-    if format != mc_net::REPLAY_FORMAT_VERSION || !map_here {
-        Fit::Elsewhere
-    } else if origin.sim == crate::build_info::sim() && origin.content.blueprint_hash == blueprints
-    {
-        Fit::Here
-    } else {
-        Fit::Differs
-    }
-}
-
-/// Every recording in replays/, newest first, as it fits this build, whose
-/// unit data hashes to `blueprints`. Reads every file, so off the UI thread.
-pub fn summaries(blueprints: u64) -> Vec<Summary> {
+/// Every recording in replays/, newest first. Reads every file, so off the UI thread.
+pub fn summaries() -> Vec<Summary> {
     let maps: Vec<(u64, String, PathBuf)> = setup::list_maps()
         .into_iter()
         .filter_map(|p| {
@@ -408,13 +373,10 @@ pub fn summaries(blueprints: u64) -> Vec<Summary> {
         .collect();
     // The names are start times: newest first.
     paths.sort_unstable_by(|a, b| b.cmp(a));
-    paths
-        .into_iter()
-        .map(|p| summary(p, &maps, blueprints))
-        .collect()
+    paths.into_iter().map(|p| summary(p, &maps)).collect()
 }
 
-fn summary(path: PathBuf, maps: &[(u64, String, PathBuf)], blueprints: u64) -> Summary {
+fn summary(path: PathBuf, maps: &[(u64, String, PathBuf)]) -> Summary {
     let id = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -431,47 +393,34 @@ fn summary(path: PathBuf, maps: &[(u64, String, PathBuf)], blueprints: u64) -> S
         players: Vec::new(),
         survival: false,
         problem: None,
-        origin: None,
-        fit: Fit::Elsewhere,
+        build: None,
         report_kept: false,
     };
     out.report_kept = crate::chronicle::file_for(&out.path).exists();
-    let peeked = match mc_net::Origin::peek_file(&out.path) {
-        Ok(p) => p,
-        Err(e) => {
-            out.problem = Some(format!("Unreadable: {e}"));
-            return out;
-        }
-    };
-    if let Some(m) = maps.iter().find(|m| m.0 == peeked.origin.content.map_id) {
-        out.map = Some(m.1.clone());
-        out.map_path = Some(m.2.clone());
-    }
-    out.fit = fit(peeked.format, &peeked.origin, blueprints, out.map.is_some());
-    out.origin = Some(peeked.origin);
-    if out.fit == Fit::Elsewhere {
-        let by = match out.origin.as_ref().map(|o| o.build.as_str()) {
-            Some(b) if !b.is_empty() => b.to_owned(),
-            _ => "another build".to_owned(),
-        };
-        out.problem = Some(
-            if out.map.is_none() && peeked.format == mc_net::REPLAY_FORMAT_VERSION {
-                format!("Plays in {by}: its map is not in this build's maps/")
-            } else {
-                format!("Plays in {by}")
-            },
-        );
-        return out;
-    }
     let replay = match Replay::load(&out.path) {
         Ok(r) => r,
+        Err(mc_net::NetError::Version { theirs }) => {
+            out.problem = Some(format!(
+                "Recorded by another build (replay format {theirs}, this build reads {})",
+                mc_net::REPLAY_FORMAT_VERSION
+            ));
+            return out;
+        }
         Err(e) => {
             out.problem = Some(format!("Unreadable: {e}"));
             return out;
         }
     };
     out.length = replay.bundles.len() as u32;
+    out.build = replay.build.clone();
     out.complete = replay.complete;
+    if let Some(m) = maps.iter().find(|m| m.0 == replay.start.content.map_id) {
+        out.map = Some(m.1.clone());
+        out.map_path = Some(m.2.clone());
+    }
+    if out.map.is_none() {
+        out.problem = Some("Its map is not in maps/ (rebaked since?)".into());
+    }
     match crate::match_options::MatchOptions::from_start(&replay.start) {
         Ok(options) => {
             out.survival = options.survival.is_some();

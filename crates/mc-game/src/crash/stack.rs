@@ -1,7 +1,7 @@
 //! The raw stack as `module+offset`, one frame a line. A player's copy of the game
 //! has no `.pdb`, so the standard backtrace prints `<unknown>` for every frame;
 //! these offsets still name the code, given the build's `.pdb`
-//! (`scripts/release.sh` keeps it beside the zip).
+//! (`scripts/package-windows.sh` keeps it beside the zip).
 
 use std::ffi::c_void;
 

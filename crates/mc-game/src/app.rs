@@ -50,10 +50,6 @@ pub struct AppArgs {
     /// Drive the whole loop unattended: front end, a default skirmish, back to
     /// the front end, exit. Fails loudly if any stage change does.
     pub smoke: bool,
-    /// The screen the front end opens on the first time, instead of the menu (`--open`).
-    pub open: Option<crate::ui::front::Screen>,
-    /// An old build playing a replay for a newer one (`--replay-only`): leaving it quits.
-    pub replay_only: bool,
 }
 
 /// What the loading card is covering for.
@@ -297,7 +293,6 @@ pub fn local_start(
         }
         .encode()?,
     };
-    let content = start.content;
     let mut session = if observing {
         mc_net::LocalSession::observer(start, mc_net::session::Pacing::RealTime)
     } else {
@@ -309,12 +304,11 @@ pub fn local_start(
     }
     .map_err(|e| e.to_string())?;
     let record = if record {
-        let recorded = crate::issues::MatchRecord::new().and_then(|m| {
-            let origin = crate::build_info::origin(content);
-            session.record_to(&m.replay, &origin).map(|()| m)
-        });
+        let recorded = crate::issues::MatchRecord::new()
+            .and_then(|m| session.record_to(&m.replay).map(|()| m));
         match recorded {
             Ok(m) => {
+                session.stamp_build(crate::replay::BUILD);
                 log::info!("recording match {} to {}", m.id, m.replay.display());
                 Some(m)
             }
@@ -787,9 +781,6 @@ impl App {
                 let mut stage =
                     FrontStage::new(&self.args, &self.settings, self.viewport(), map, maps)?;
                 stage.front.set_preview(chart);
-                if let Some(screen) = self.args.open.take() {
-                    stage.front.show(screen, &self.settings);
-                }
                 self.stage = Stage::Front(Box::new(stage));
             }
             Pending::Match(start) => {
@@ -1193,7 +1184,6 @@ impl App {
                     cover: self.curtain.as_mut(),
                 };
                 match game.frame(ctx)? {
-                    Some(GameEvent::Leave) if self.args.replay_only => quit = true,
                     Some(GameEvent::Leave) => {
                         // What was left, and how long it was played.
                         let detail = format!(
@@ -1234,8 +1224,7 @@ impl App {
                             .ok_or("the data/ directory is gone".to_owned())
                             .and_then(|dir| {
                                 let blueprints =
-                                    Blueprints::load_for(&dir, crate::build_info::channel())
-                                        .map_err(|e| e.to_string())?;
+                                    Blueprints::load(&dir).map_err(|e| e.to_string())?;
                                 let sounds =
                                     mc_data::SoundLibrary::load(&dir).map_err(|e| e.to_string())?;
                                 sounds.check(&blueprints).map_err(|e| e.to_string())?;

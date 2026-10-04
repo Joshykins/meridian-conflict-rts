@@ -3,7 +3,6 @@
 //! Nothing in here uses floating point on a path that feeds the simulation.
 //! `to_f32`/`from_f32` exist for the renderer, UI and offline tools only.
 
-pub mod channel;
 pub mod fx;
 pub mod hash;
 pub mod perf;
@@ -12,7 +11,6 @@ pub mod rng;
 pub mod trig;
 pub mod vec;
 
-pub use channel::Channel;
 pub use fx::Fx;
 pub use hash::StateHasher;
 pub use rng::Rng;

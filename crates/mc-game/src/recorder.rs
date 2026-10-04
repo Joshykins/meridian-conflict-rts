@@ -75,8 +75,8 @@ impl Recorder {
         else {
             return;
         };
-        let origin = crate::build_info::origin(start.content);
-        let opened = ReplayWriter::create(&path, &origin, start).and_then(|mut writer| {
+        let opened = ReplayWriter::create(&path, start).and_then(|mut writer| {
+            writer.build(crate::replay::BUILD)?;
             for note in &notes {
                 writer.note(note)?;
             }
@@ -233,8 +233,7 @@ mod tests {
         drop(r);
         let replay = mc_net::Replay::load(&path).unwrap();
         assert!(replay.complete);
-        assert_eq!(replay.origin.build, crate::BUILD);
-        assert_eq!(replay.origin.sim, crate::build_info::sim());
+        assert_eq!(replay.build.as_deref(), Some(crate::replay::BUILD));
         let first: Vec<&[u8]> = replay.bundles[0].commands().map(|(_, c)| c).collect();
         assert_eq!(first, [staged[0].command.encode().as_slice(), &[42]]);
         assert_eq!(replay.notes, [(0, vec![7]), (2, vec![8])]);

@@ -2,7 +2,6 @@
 //! length, players and the marks made on it. Read its battle report
 //! (`summary.rs`), or watch its replay from the start or from any mark.
 
-mod old_build;
 mod summary;
 
 use super::{id, ink, palette, rgb, type_scale, ButtonKind, Key, Rect, Ui};
@@ -24,8 +23,6 @@ pub enum HistoryAction {
     Back,
     /// Watch this replay, jumping to the tick if one is given.
     Watch(PathBuf, Option<u32>),
-    /// Watch this replay in the build that recorded it: the launcher runs it.
-    WatchInItsBuild(PathBuf),
 }
 
 pub struct HistoryState {
@@ -41,22 +38,14 @@ pub struct HistoryState {
     summary: Option<SummaryState>,
     /// A report had the image slots; what the other screens keep there must go back.
     slots_taken: bool,
-    /// The install old builds come into, when the launcher started the game.
-    install: Option<Arc<crate::builds::Install>>,
-    fetching: old_build::Fetching,
 }
 
 impl HistoryState {
-    pub fn new(
-        blueprints: Arc<Blueprints>,
-        pool: Arc<Pool>,
-        install: Option<Arc<crate::builds::Install>>,
-    ) -> HistoryState {
+    pub fn new(blueprints: Arc<Blueprints>, pool: Arc<Pool>) -> HistoryState {
         let found: Arc<Mutex<Option<Vec<Summary>>>> = Arc::default();
         let into = found.clone();
-        let hash = blueprints.content_hash();
         std::thread::spawn(move || {
-            let list = crate::replay::summaries(hash);
+            let list = crate::replay::summaries();
             *into.lock().unwrap() = Some(list);
         });
         HistoryState {
@@ -67,8 +56,6 @@ impl HistoryState {
             pool,
             summary: None,
             slots_taken: false,
-            install,
-            fetching: old_build::Fetching::default(),
         }
     }
 
@@ -256,17 +243,10 @@ fn list(ui: &mut Ui, state: &mut HistoryState, enter: f32) -> Option<HistoryActi
                 );
             }
             if let Some(s) = found.get(state.selected) {
-                let old = OldBuild {
-                    install: state.install.as_deref(),
-                    fetching: &mut state.fetching,
-                };
-                match details(ui, detail, s, old) {
+                match details(ui, detail, s) {
                     Some(Pick::Report) => report = Some(state.selected),
                     Some(Pick::Watch(at)) => {
                         action = Some(HistoryAction::Watch(s.path.clone(), at))
-                    }
-                    Some(Pick::WatchInItsBuild) => {
-                        action = Some(HistoryAction::WatchInItsBuild(s.path.clone()))
                     }
                     None => {}
                 }
@@ -371,17 +351,10 @@ enum Pick {
     Report,
     /// Watch the replay, from the tick if one is given.
     Watch(Option<u32>),
-    WatchInItsBuild,
-}
-
-/// What the selected match's card needs to offer the build that recorded it.
-struct OldBuild<'a> {
-    install: Option<&'a crate::builds::Install>,
-    fetching: &'a mut old_build::Fetching,
 }
 
 /// The selected match: who played, its marks, and the report and watch buttons.
-fn details(ui: &mut Ui, r: Rect, s: &Summary, old: OldBuild) -> Option<Pick> {
+fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<Pick> {
     let mut action = None;
     ui.panel(r);
     let (x, cw) = (r.x + 28.0, r.w - 56.0);
@@ -393,10 +366,7 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary, old: OldBuild) -> Option<Pick> {
         ("Match", s.id.clone()),
         (
             "Build",
-            match s.origin.as_ref().map(|o| o.build.as_str()) {
-                Some(b) if !b.is_empty() => b.to_owned(),
-                _ => "not recorded".into(),
-            },
+            s.build.clone().unwrap_or_else(|| "not recorded".into()),
         ),
         (
             "Length",
@@ -429,22 +399,20 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary, old: OldBuild) -> Option<Pick> {
         );
         y += 24.0;
     }
-    let other_build = (s.fit == crate::replay::Fit::Differs).then(|| match s.other_build() {
-        Some(b) => format!(
-            "Recorded by {b}, whose simulation or unit data differ from {}: it may play out differently",
-            crate::BUILD
-        ),
-        None => "The build that recorded it is not known: it may play out differently".into(),
-    });
+    let other_build = s
+        .build
+        .as_deref()
+        .filter(|b| *b != crate::replay::BUILD)
+        .map(|b| {
+            format!(
+                "Recorded by {b}, this is {}: it may play out differently",
+                crate::replay::BUILD
+            )
+        });
     if let Some(p) = s.problem.as_ref().or(other_build.as_ref()) {
         y += 8.0;
         ui.text_fit_left(x, y, cw, type_scale::CAPTION, rgb(palette::WARN, 1.0), p);
         y += 24.0;
-    }
-    let (taken, watch_old) = old_build::draw(ui, x, y, cw, s, old.install, old.fetching);
-    y += taken;
-    if watch_old {
-        action = Some(Pick::WatchInItsBuild);
     }
 
     y += 16.0;

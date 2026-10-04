@@ -339,9 +339,6 @@ pub struct MapConfig {
     /// `h` above the water is coloured as Vermilion Gorge's is at `h +
     /// strata_lift` (shaders/desert.wgsl).
     pub strata_lift: f32,
-    /// Only playtest and dev builds list the map: a release build has no
-    /// `playtest: true` map in any list (mc-game `setup::list_maps`).
-    pub playtest: bool,
 }
 
 impl Default for MapConfig {
@@ -355,7 +352,6 @@ impl Default for MapConfig {
             biome: None,
             style: None,
             strata_lift: 0.0,
-            playtest: false,
         }
     }
 }
@@ -377,7 +373,6 @@ struct MapConfigFile {
     biome: Option<Biome>,
     style: Option<MapStyle>,
     strata_lift: f32,
-    playtest: bool,
 }
 
 impl TryFrom<MapConfigFile> for MapConfig {
@@ -420,7 +415,6 @@ impl TryFrom<MapConfigFile> for MapConfig {
             biome: file.biome,
             style: file.style,
             strata_lift: file.strata_lift,
-            playtest: file.playtest,
         })
     }
 }

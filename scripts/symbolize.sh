@@ -5,9 +5,8 @@
 #   scripts/symbolize.sh REPORT.log --pdb FILE   any .pdb (a dev build's is beside its exe)
 #
 # A player's copy of the game has no symbols, so its reports name code as
-# meridian.exe+0x1c4e2d. The build's .pdb, which scripts/release.sh keeps in the
-# main checkout's target/dist as MeridianConflict-<Channel>-Build<N>-<commit>.pdb,
-# turns those back into
+# meridian.exe+0x1c4e2d. The build's .pdb, which scripts/package-windows.sh keeps
+# beside the zip as MeridianConflict-Build<N>-<commit>.pdb, turns those back into
 # functions, files and lines. The report's first line names the commit
 # ("Meridian Conflict 0.1.0+54da4b549a"), and the .pdb of that commit is found in
 # target/dist of the main checkout. Prints the report with each frame named;

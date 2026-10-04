@@ -73,22 +73,29 @@ held its focus at (the fifth `--camera` value), so the shot sees what the window
 
 ## Older builds
 
-A replay only plays back faithfully on a build with the same simulation, unit data and
-map as the one that recorded it. Every replay from format 27 on starts with an origin
-block that every later build can read, whatever else changes in the format
-(`crates/mc-net/src/origin.rs`): the build's name, commit and channel, its simulation
-fingerprint (`MERIDIAN_SIM`, a hash of the sources of every crate the simulation is
-built from) and the map's and unit data's content ids. Older replays give what they
-have: the content ids and, when recorded, the build's name.
+A replay only plays back faithfully on the build that recorded it. Four things decide
+that, and the game checks each:
 
-Match History sorts each recording into one of three:
-
-| Fit | When | What it does |
+| What | Where it is kept | What happens on a mismatch |
 |---|---|---|
-| Here | Same replay format, simulation fingerprint and unit data, and its map is in `maps/` | Plays |
-| Differs | This build can open it, but the simulation or unit data differ (or the recording does not say) | Plays, with a warning that it may play out differently |
-| Elsewhere | Another replay format, or its map is not in `maps/` | Not played; names the build it plays in |
+| Replay format | `REPLAY_FORMAT_VERSION` in the file header | Refused; listed as "recorded by another build" |
+| Unit data | `blueprint_hash` in the start message | Plays, but may diverge |
+| Map | `map_id` (content id) in the start message | Refused when no map in `maps/` has it |
+| Simulation code | the build name (record 5) | Plays, but may diverge; Match History warns |
 
 Divergence is caught: the recording keeps the state hash of every tick, and playback logs
-`replay diverged at tick N` at the first tick that differs. How a replay gets to the
-build it needs is `docs/RELEASES.md`.
+`replay diverged at tick N` at the first tick that differs.
+
+The build name is `MERIDIAN_BUILD` at compile time, or the package version with `-dev`.
+Playing an old replay faithfully therefore means running the build it names. That is a
+distribution job, not something a single binary can do:
+
+1. The release pipeline sets `MERIDIAN_BUILD` to a unique name (version plus commit) and
+   keeps every released build, with its `data/` and baked maps, available to download.
+2. The launcher, given a replay whose build is not the installed one, fetches that build
+   into a side-by-side folder and starts it with `--replay FILE`.
+3. The newest build can still list, and explain, every old replay: it reads the header
+   and the build record without playing it.
+
+Until then, a replay from another build opens with a warning and may play out
+differently from the match that was recorded.

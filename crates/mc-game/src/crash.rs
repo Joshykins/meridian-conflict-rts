@@ -29,7 +29,7 @@
 //! - the first lines of the log and its last ones (how far the game got).
 //!
 //! On Windows stacks are `module+offset`, which the build's `.pdb` turns back
-//! into names when the player's copy has none (`scripts/release.sh`
+//! into names when the player's copy has none (`scripts/package-windows.sh`
 //! keeps it, `scripts/symbolize.sh` reads it).
 //!
 //! Dialogs are only shown to a player: a run with no arguments, or one that
