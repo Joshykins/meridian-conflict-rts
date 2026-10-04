@@ -18,7 +18,7 @@ pub(super) fn fin(b: &mut MeshBuilder) {
         v3(-1.0, 0.18, 0.5),
         v3(0.0, 1.0, -0.3),
     );
-    shard(b, &f, 78.0, 8.0, 0.8, 2.4);
+    shard(b, &f, 72.0, 8.0, 0.8, 2.4);
     if !b.mid() {
         return;
     }
@@ -37,7 +37,7 @@ pub(super) fn fin(b: &mut MeshBuilder) {
         shard(b, &h, 40.0, 4.0, 0.9, 1.2);
         // The leading edge: from the root up the fin's front to its spike.
         let root = f.at(0.0, 8.0, 1.4);
-        let tip = f.at(78.0 * 0.35, 8.0, 1.4);
+        let tip = f.at(72.0 * 0.35, 8.0, 1.4);
         b.paint(GLOW_LASER);
         b.cylinder_between(root, tip, 0.3, 0.3, 4);
     }

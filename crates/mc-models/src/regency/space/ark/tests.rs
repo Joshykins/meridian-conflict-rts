@@ -1,4 +1,4 @@
-use super::{FLOOR, FRONT, HINGE, LIP};
+use super::{FLOOR, HINGE, LIP};
 use crate::{build_model, build_model_scaled, material, part};
 
 fn ark() -> mc_data::UnitBlueprint {
@@ -58,11 +58,13 @@ fn the_ark_leaves_its_hold_lane_and_the_way_in_under_its_stern_clear() {
     let model = build_model("regency_ark").unwrap();
     let half = t.width.to_f32() * 0.5;
     let roof = FLOOR + t.clearance.to_f32();
+    // As far forward as cargo stows (`mc_sim::transport`, its stow reach twice over).
+    let front = t.hold.x.to_f32() + 8.0;
     for (lod, mesh) in model.lods.iter().enumerate().take(2) {
         let blocked = mesh.vertices.iter().find(|v| {
             let [x, y, z] = v.pos;
             let lane = y.abs() < half - 0.1;
-            let hold = x > HINGE + 0.1 && x < FRONT - 3.0 && z > FLOOR + 0.1 && z < roof - 0.1;
+            let hold = x > HINGE + 0.1 && x < front && z > FLOOR + 0.1 && z < roof - 0.1;
             let walk_in = x < LIP - 0.1 && z < FLOOR - 1.0;
             lane && (hold || walk_in) && v.part != part::RAMP
         });
