@@ -1,0 +1,19 @@
+[package]
+name = "mc-launcher"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+# What players start: it runs the installed build, and an old build for an
+# old replay (docs/RELEASES.md).
+[[bin]]
+name = "MeridianConflict"
+path = "src/main.rs"
+
+[dependencies]
+mc-core = { workspace = true }
+mc-net = { workspace = true }
+mc-builds = { workspace = true }
+
+[lints]
+workspace = true

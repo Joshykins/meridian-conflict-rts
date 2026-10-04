@@ -101,6 +101,26 @@ pub struct Front {
     /// `None` inside is the test range: there is nothing to set up first.
     launching: Option<(Launching, f32)>,
     quitting: Option<f32>,
+    /// This install's update and old builds (`ui/updates.rs`).
+    builds: super::updates::Builds,
+}
+
+/// Has the launcher take over (an update, an old build); true when it did,
+/// and the game quits.
+fn hand_over(
+    builds: &super::updates::Builds,
+    start: impl FnOnce(&crate::builds::Install) -> std::io::Result<()>,
+) -> bool {
+    let Some(install) = &builds.install else {
+        return false;
+    };
+    match start(install) {
+        Ok(()) => true,
+        Err(e) => {
+            log::error!("the launcher did not start: {e}");
+            false
+        }
+    }
 }
 
 fn smooth(t: f32) -> f32 {
@@ -133,6 +153,7 @@ impl Front {
             director,
             launching: None,
             quitting: None,
+            builds: super::updates::Builds::new(),
         }
     }
 
@@ -141,7 +162,7 @@ impl Front {
         self.maps
     }
 
-    /// Jumps straight to a screen, fully arrived (tools and tests).
+    /// Jumps straight to a screen, fully arrived (tools, tests and `--open`).
     pub fn show(&mut self, screen: Screen, settings: &Settings) {
         self.go(screen, settings);
         self.open(settings, true);
@@ -186,6 +207,7 @@ impl Front {
             self.history = Some(HistoryState::new(
                 self.blueprints.clone(),
                 self.pool.clone(),
+                self.builds.install.clone(),
             ));
         }
         // Set-up and multiplayer share an image slot for their charts.
@@ -309,6 +331,11 @@ impl Front {
                     Some(MenuAction::Quit) => self.quitting = Some(0.0),
                     None => {}
                 }
+                if super::updates::card(ui, &self.builds, enter)
+                    && hand_over(&self.builds, |install| install.restart())
+                {
+                    self.quitting = Some(0.0);
+                }
             }
             Screen::Setup(_) => {
                 let Some(state) = self.setup.as_mut() else {
@@ -349,7 +376,13 @@ impl Front {
                         self.launching =
                             Some((Launching::Event(FrontEvent::Replay(path, at)), 0.0));
                     }
-                    None => {}
+                    Some(HistoryAction::WatchInItsBuild(path))
+                        if hand_over(&self.builds, |install| install.watch_in_its_build(&path)) =>
+                    {
+                        self.quitting = Some(0.0);
+                    }
+                    // The launcher did not start: logged, and the game stays.
+                    Some(HistoryAction::WatchInItsBuild(_)) | None => {}
                 }
                 if state.take_slots_back() {
                     self.slots_lost();

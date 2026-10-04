@@ -140,6 +140,15 @@ pub(crate) fn path() -> Option<PathBuf> {
     Some(config_dir()?.join("settings.ron"))
 }
 
+/// Set for an old build playing a replay for a newer one (`--replay-only`):
+/// the settings file is the newer build's, which this one may not read whole,
+/// so it is never written over.
+static KEEP_UNSAVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn keep_unsaved() {
+    KEEP_UNSAVED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 impl Settings {
     pub fn load() -> Settings {
         let Some(path) = path() else {
@@ -158,6 +167,9 @@ impl Settings {
     }
 
     pub fn save(&self) {
+        if KEEP_UNSAVED.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
         let Some(path) = path() else { return };
         let write = || -> Result<(), String> {
             std::fs::create_dir_all(path.parent().expect("settings path has a parent"))

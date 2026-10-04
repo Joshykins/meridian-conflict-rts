@@ -50,6 +50,10 @@ pub struct AppArgs {
     /// Drive the whole loop unattended: front end, a default skirmish, back to
     /// the front end, exit. Fails loudly if any stage change does.
     pub smoke: bool,
+    /// The screen the front end opens on the first time, instead of the menu (`--open`).
+    pub open: Option<crate::ui::front::Screen>,
+    /// An old build playing a replay for a newer one (`--replay-only`): leaving it quits.
+    pub replay_only: bool,
 }
 
 /// What the loading card is covering for.
@@ -783,6 +787,9 @@ impl App {
                 let mut stage =
                     FrontStage::new(&self.args, &self.settings, self.viewport(), map, maps)?;
                 stage.front.set_preview(chart);
+                if let Some(screen) = self.args.open.take() {
+                    stage.front.show(screen, &self.settings);
+                }
                 self.stage = Stage::Front(Box::new(stage));
             }
             Pending::Match(start) => {
@@ -1186,6 +1193,7 @@ impl App {
                     cover: self.curtain.as_mut(),
                 };
                 match game.frame(ctx)? {
+                    Some(GameEvent::Leave) if self.args.replay_only => quit = true,
                     Some(GameEvent::Leave) => {
                         // What was left, and how long it was played.
                         let detail = format!(

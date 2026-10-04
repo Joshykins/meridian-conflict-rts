@@ -357,7 +357,8 @@ impl Summary {
                 .origin
                 .as_ref()
                 .map(|o| o.build.as_str())
-                .filter(|b| !b.is_empty()),
+                // The same build with other unit data: edited data/, nothing to fetch.
+                .filter(|b| !b.is_empty() && *b != crate::BUILD),
         }
     }
 }
