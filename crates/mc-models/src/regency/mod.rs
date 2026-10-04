@@ -180,17 +180,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
     // Missile defence (`turrets::rondel`): tech 2, upgrading in place to tech 3.
-    ModelDef::tiered("regency_missile_defense", RONDEL, turrets::rondel::disc),
-    ModelDef::tiered(
-        "regency_missile_defense~petals",
-        RONDEL,
-        turrets::rondel::petals,
-    ),
-    ModelDef::tiered(
-        "regency_missile_defense~hover",
-        RONDEL,
-        turrets::rondel::hover,
-    ),
+    ModelDef::tiered("regency_missile_defense", RONDEL, turrets::rondel::rondel),
     // The shield generator (`ward`): tech 2, upgrading in place to tech 3.
     ModelDef::tiered(
         "regency_ward",

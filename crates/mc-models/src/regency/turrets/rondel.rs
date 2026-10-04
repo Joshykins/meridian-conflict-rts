@@ -5,21 +5,16 @@
 //! [`T3_LENSES`] and the data in step. Nothing on it turns that carries a lens, since the
 //! sim fires from the mounts as laid.
 //!
-//! Three designs to pick from (`regency_missile_defense` and its `~` variants):
-//! - the disc: a plated drum under a broad tilted rondel that turns slowly, the lenses on
-//!   swept cheeks either side;
-//! - `~petals`: four swept plates rising round a short core in a star, the lenses at the
-//!   tips of two;
-//! - `~hover`: a squat plinth and a gravity pylon, the lenses floating over it in open
-//!   swept collars, held by nothing.
+//! A squat plated plinth and a gravity pylon lit in the prism; the lenses float over it,
+//! each in an open collar of two swept plates, held by nothing. Rondel II lifts the pylon
+//! and floats a second pair higher.
 
-use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, TAU};
+use std::f32::consts::{FRAC_PI_4, TAU};
 
 use glam::{Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
 use crate::material::*;
-use crate::part;
 
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::*;
@@ -151,143 +146,9 @@ fn plate(b: &mut MeshBuilder, foot: Vec3, tip: Vec3, out: Vec3, half: f32, thick
     );
 }
 
-// ---- A: the disc ------------------------------------------------------------------------
-
-/// The disc: a plated drum, a broad rondel tilted over it turning slowly, and a swept
-/// cheek either side up to each lens.
-pub(in crate::regency) fn disc(b: &mut MeshBuilder, tech: u8) {
-    let tech = tech.clamp(2, 3);
-    plinth(b);
-    dark_plate(b);
-    let core = if b.coarse() { 4 } else { 8 };
-    b.prism(Vec3::Z * PLINTH_TOP, core, 3.2, 2.6, 5.0);
-    if b.coarse() {
-        coarse_lenses(b, tech);
-        return;
-    }
-    seam(b);
-    b.prism(Vec3::Z * 6.2, 8, 2.6, 2.6, 0.25);
-    // The rondel: a thick plated disc on a bronze hub, tilted, turning.
-    let hub = Vec3::Z * 7.6;
-    b.set_spinner_pivot(hub);
-    shaft(b, Vec3::Z * 6.4, hub, 0.5);
-    b.with_part(part::SPINNER, |b| {
-        let n = v3(0.35, 0.0, 1.0).normalize();
-        dark_plate(b);
-        let sides = b.sides(16);
-        b.cylinder_between(hub - n * 0.3, hub + n * 0.3, 2.3, 2.1, sides);
-        if b.fine() {
-            seam(b);
-            hoop_on(b, hub, n, 2.3, 0.18, 0.66, sides);
-        }
-        b.paint(GLOW_LASER);
-        hoop_on(b, hub + n * 0.32, n, 1.2, 0.12, 0.04, sides);
-    });
-    for at in T2_LENSES {
-        let d = v3(0.0, at.y.signum(), 0.0);
-        plate(
-            b,
-            d * 2.9 + Vec3::Z * 3.0,
-            at - d * 0.6 - Vec3::Z * 0.4,
-            d,
-            0.9,
-            0.4,
-        );
-        if b.fine() {
-            red_slot(b, d * 3.25 + Vec3::Z * 5.0, d, Vec3::Z, 2.4, 0.12);
-        }
-    }
-    tier(b, tech, 3, 0.4, |b| {
-        for at in T3_LENSES {
-            let d = v3(at.x.signum(), 0.0, 0.0);
-            plate(
-                b,
-                d * 2.9 + Vec3::Z * 3.0,
-                at - d * 0.6 - Vec3::Z * 0.4,
-                d,
-                0.8,
-                0.4,
-            );
-        }
-    });
-    lenses(b, tech);
-}
-
-// ---- B: the petals ----------------------------------------------------------------------
-
-/// The petals: a short core, four swept plates rising round it in a star, a lens at the
-/// tips of the pair across y; Rondel II raises the pair across x into a crown with lenses.
-pub(in crate::regency) fn petals(b: &mut MeshBuilder, tech: u8) {
-    let tech = tech.clamp(2, 3);
-    plinth(b);
-    dark_plate(b);
-    let core = if b.coarse() { 4 } else { 8 };
-    b.prism(Vec3::Z * PLINTH_TOP, core, 2.3, 1.7, 6.6);
-    if b.coarse() {
-        coarse_lenses(b, tech);
-        return;
-    }
-    seam(b);
-    b.prism(Vec3::Z * 7.8, 8, 1.7, 1.2, 0.3);
-    for k in 0..4 {
-        let a = k as f32 * FRAC_PI_2;
-        let d = v3(a.cos(), a.sin(), 0.0);
-        if k % 2 == 1 {
-            // Across y: up to the lens.
-            plate(
-                b,
-                d * 3.9 + Vec3::Z * 1.0,
-                d * 3.0 + Vec3::Z * 9.4,
-                d,
-                1.2,
-                0.45,
-            );
-            if b.fine() {
-                strut(b, d * 1.9 + Vec3::Z * 4.0, d * 3.5 + Vec3::Z * 5.6, 0.25);
-            }
-        } else {
-            // Across x: a lower petal, raised by Rondel II.
-            plate(
-                b,
-                d * 3.9 + Vec3::Z * 1.0,
-                d * 2.6 + Vec3::Z * 7.4,
-                d,
-                1.1,
-                0.4,
-            );
-            if b.fine() {
-                red_slot(
-                    b,
-                    d * 3.7 + Vec3::Z * 3.4,
-                    d,
-                    v3(-d.x * 0.2, 0.0, 1.0),
-                    2.2,
-                    0.12,
-                );
-            }
-        }
-    }
-    tier(b, tech, 3, 0.4, |b| {
-        for at in T3_LENSES {
-            let d = v3(at.x.signum(), 0.0, 0.0);
-            plate(
-                b,
-                d * 2.0 + Vec3::Z * 6.0,
-                at - d * 0.4 - Vec3::Z * 0.5,
-                d,
-                0.9,
-                0.4,
-            );
-        }
-    });
-    lenses(b, tech);
-}
-
-// ---- C: the hover -----------------------------------------------------------------------
-
-/// The hover: a squat plinth and a gravity pylon lit in the prism, the lenses floating
+/// The Rondel: a squat plinth and a gravity pylon lit in the prism, the lenses floating
 /// over it each in an open collar of two swept plates, held by nothing.
-pub(in crate::regency) fn hover(b: &mut MeshBuilder, tech: u8) {
+pub(in crate::regency) fn rondel(b: &mut MeshBuilder, tech: u8) {
     let tech = tech.clamp(2, 3);
     plinth(b);
     dark_plate(b);
@@ -370,13 +231,8 @@ mod tests {
 
     #[test]
     fn rondel() {
-        for key in [
-            "regency_missile_defense",
-            "regency_missile_defense~petals",
-            "regency_missile_defense~hover",
-        ] {
-            super::super::super::check_at(key, 2, 5.25, 12.0, Some(1), &[]);
-            super::super::super::check_at(key, 3, 5.25, 15.0, Some(1), &[]);
-        }
+        let key = "regency_missile_defense";
+        super::super::super::check_at(key, 2, 5.25, 12.0, Some(1), &[]);
+        super::super::super::check_at(key, 3, 5.25, 15.0, Some(1), &[]);
     }
 }

@@ -23,7 +23,6 @@ mod canopy;
 mod gorget;
 mod halberd;
 mod picket;
-/// Its three designs are catalogue keys of their own.
 pub(super) mod rondel;
 mod springald;
 /// The Sunspear's gun pieces are shared by the tech 3 mobile fusion guns
