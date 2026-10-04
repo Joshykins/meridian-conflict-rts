@@ -263,8 +263,8 @@
         mesh: "regency_taproot", icon: Extractor,
     ),
     // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what
-    // a Reactor gives, but a breached field frees the star to go supernova, all light and
-    // no blast, so it can be packed tight. Tougher, dearer. The death sound is sized to the
+    // a Reactor gives, and a breached field frees the star to go supernova with a Reactor's
+    // blast (the renderer draws the nova, not the Reactor's discharge). Tougher, dearer. The death sound is sized to the
     // star (renderer supernova_fx.rs): tech 3's at size 1, the smaller stars `like` it.
     (
         key: "regency_t1_power",
@@ -278,12 +278,13 @@
         vision: 120,
         economy: (energy_income: 25),
         adjacency: Energy,
+        death_blast: (radius: 24, damage: 400),
         mesh: "regency_heart", icon: Power,
         sounds: (death: "regency_supernova_small"),
     ),
     // The tech 2 and 3 generators: bigger cores in more rings, on lots of their own (like
     // Reactor II and III, built new, not upgraded). The same trade as the tech 1 generator:
-    // tougher and dearer than the Reactor of their tier, and no blast when it is breached.
+    // tougher and dearer than the Reactor of their tier, with its blast.
     (
         key: "regency_t2_power",
         name: "Power Generator II",
@@ -296,6 +297,7 @@
         vision: 160,
         economy: (energy_income: 350),
         adjacency: Energy,
+        death_blast: (radius: 60, damage: 2000),
         mesh: "regency_heart_2", icon: Power,
         sounds: (death: "regency_supernova_mid"),
     ),
@@ -311,6 +313,7 @@
         vision: 200,
         economy: (energy_income: 2000),
         adjacency: Energy,
+        death_blast: (radius: 130, damage: 6000),
         mesh: "regency_heart_3", icon: Power,
         sounds: (death: "regency_supernova"),
     ),

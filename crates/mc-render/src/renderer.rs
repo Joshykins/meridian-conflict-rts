@@ -5346,13 +5346,19 @@ impl Renderer {
                 );
                 let bp = self.blueprints.unit(*blueprint);
                 let (r, h) = (bp.radius.to_f32(), bp.height.to_f32());
+                let blast = bp.death_blast.filter(|_| complete);
                 if bp.has(mc_data::cat::COMMANDER) {
                     // A commander goes up as a small nuclear blast: the sim's
                     // `NuclearDetonation` draws it (nuke_fx.rs).
                     return;
                 }
+                // A Regency power generator's burning star breaks free and goes supernova:
+                // that is how its blast looks.
+                if self.star_nova(at, time) {
+                    return;
+                }
                 // Only a finished plant goes up, as the sim's blast does.
-                if let Some(db) = bp.death_blast.filter(|_| complete) {
+                if let Some(db) = blast {
                     // A volatile plant: the same detonation, sized to its blast. The
                     // fireball's puffs keep the commander's proportion to the blast,
                     // not the building's footprint.
@@ -5360,10 +5366,7 @@ impl Renderer {
                     self.reactor_death(*blueprint, at, h, blast, time);
                     return;
                 }
-                // A Regency power generator's burning star breaks free and goes supernova.
-                if !self.star_nova(at, time) {
-                    self.unit_blast(at, r, h, time);
-                }
+                self.unit_blast(at, r, h, time);
             }
             SimEvent::Reclaimed {
                 pos,

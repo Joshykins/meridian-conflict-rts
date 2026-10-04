@@ -1,6 +1,6 @@
-//! A Regency power generator's star going supernova when its field is breached (`star_core_fx.rs`). It
-//! does no harm (the sim has no blast for it: the Regency's trade for tough, packable
-//! power), but it is the biggest light a plant makes. One explosion, all of it sized by
+//! A Regency power generator's star going supernova when its field is breached (`star_core_fx.rs`):
+//! how its blast (the sim's `death_blast`, a Reactor's of its tech) looks, and the
+//! biggest light a plant makes. One explosion, all of it sized by
 //! the star, the tech 3 crown's being the reference:
 //!
 //! - **Break**: the cage gives way (sparks and plates, no fireball: nothing in it burns).

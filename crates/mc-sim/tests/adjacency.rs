@@ -239,6 +239,8 @@ fn a_reactors_blast_takes_the_fabricators_it_touches() {
     for (plant, fab, cells) in [
         ("aster_t2_power", "aster_t2_fabricator", 4),
         ("aster_t3_power", "aster_t3_fabricator", 8),
+        ("regency_t2_power", "regency_t2_fabricator", 4),
+        ("regency_t3_power", "regency_t3_fabricator", 8),
     ] {
         let mut w = world();
         let f = spawn(&mut w, 0, fab, 792, 792, 1000);
@@ -247,12 +249,6 @@ fn a_reactors_blast_takes_the_fabricators_it_touches() {
         destroy(&mut w, p);
         assert!(w.state.units.row(f).is_none(), "{plant}'s blast left {fab}");
     }
-    // A Power Generator burns out as light, with no blast: its Condenser stands.
-    let mut w = world();
-    let f = spawn(&mut w, 0, "regency_t2_fabricator", 792, 792, 1000);
-    let p = spawn(&mut w, 0, "regency_t2_power", 828, 792, 1000);
-    destroy(&mut w, p);
-    assert!(w.state.units.row(f).is_some());
 }
 
 #[test]

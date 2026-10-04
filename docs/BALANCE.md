@@ -182,8 +182,8 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   a fabricator's blast (T2 3500 to 50 m, T3 12500 to 80 m) destroys a power plant of its
   tech against any side of it (Reactor II 2200 / Generator II 3200, Reactor III 9720 /
   Generator III 12000) but not a factory of its tech, and a reactor's blast takes the
-  fabricators against it. A Regency Power Generator has no blast, so its Condensers
-  outlive it. The interface shows each link: a conduit on the ground, the unit panel's
+  fabricators against it (a Regency Power Generator's blast is a Reactor's of its tech,
+  drawn as its supernova). The interface shows each link: a conduit on the ground, the unit panel's
   Adjacency band, tags on the selection's links, and the placing site's would-be links.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus
