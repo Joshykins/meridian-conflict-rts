@@ -1430,6 +1430,13 @@ impl World {
         } else {
             aim
         };
+        // An excavation sweep lays onto the surface, so a miss still cuts the
+        // ground instead of sailing past above it. Units in its path intercept it.
+        let aim_z = if weapon.beam && weapon.walk > Fx::ZERO {
+            self.terrain.height_at(aim).max(self.terrain.water_level())
+        } else {
+            aim_z
+        };
         // A gun house on a pitched hull turns and elevates in the deck's frame.
         let deck = (weapon.mount && hull_pitched(bp.unit(units.blueprint[row]))).then(|| {
             house_lay(
@@ -1933,6 +1940,18 @@ impl World {
         let mut wakes = Vec::new();
         for i in 0..volley {
             let tube = first_tube + i as usize;
+            let (aim, aim_z) = if weapon.corkscrew > Fx::ZERO {
+                let phase = Angle::from_degrees(
+                    (tube % 6) as i32 * 60 + if w.is_multiple_of(2) { 30 } else { 0 },
+                );
+                let area = aim + FxVec2::from_angle(phase) * (weapon.splash * Fx::ratio(4, 5));
+                (
+                    area,
+                    self.terrain.height_at(area).max(self.terrain.water_level()),
+                )
+            } else {
+                (aim, aim_z)
+            };
             // A salvo longer than the rack goes round its tubes again.
             let local = if weapon.muzzles.is_empty() {
                 weapon.muzzle

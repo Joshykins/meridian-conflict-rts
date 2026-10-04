@@ -1137,6 +1137,10 @@ pub struct RawWeapon {
     /// Zero (the default): it flies the usual way.
     #[serde(default)]
     pub curve: f64,
+    /// Orbit radius for a curving charge: straight first, then spiralling onto a
+    /// six-point area pattern inside its splash. Zero keeps the usual fan.
+    #[serde(default)]
+    pub corkscrew: f64,
     /// Fires the unit's drones (`drone`) instead of shots (the Regency's Wick): each launch
     /// lets one drone go from its socket at the mark, and it flies into it and bursts there
     /// with this weapon's charge (`damage`, `splash` and its look); the drone is the shell.
@@ -1602,6 +1606,11 @@ impl Unit {
                     "{ctx}: a drone launcher is a direct weapon on a unit with a `drone`"
                 )));
             }
+            if w.corkscrew > 0.0 && (w.curve <= 0.0 || w.cluster.is_some()) {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: a corkscrew needs a curving charge without cluster sub-shots"
+                )));
+            }
             if w.walk > 0.0 && !w.beam {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: only a held beam walks across its mark"
@@ -1744,6 +1753,7 @@ impl Unit {
                 skim: fx(w.skim),
                 apogee: fx(w.apogee),
                 curve: Angle(steps(w.curve.clamp(0.0, 80.0)).round() as i64 as u16),
+                corkscrew: fx(w.corkscrew.clamp(0.0, 80.0)),
                 launches: w.launches,
                 walk: fx(w.walk.clamp(0.0, 200.0)),
                 surfaced: w.surfaced,

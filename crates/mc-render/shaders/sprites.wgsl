@@ -459,7 +459,7 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         } else if held {
             // A Pinched-plasmeric beam: holds, then is cut (renderer/plasma_fx.rs).
             out.color = vec3<f32>(1.0 - smoothstep(0.72, 1.0, age));
-            out.shape = vec2<f32>(-distance(head, tail), 6.0);
+            out.shape = vec2<f32>(-distance(head, tail), select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION));
         } else if (p.color & 0xFu) == 4u {
             let envelope = smoothstep(0.0, 0.035, age) * (1.0 - smoothstep(0.82, 1.0, age));
             out.color = vec3<f32>(envelope);
@@ -730,7 +730,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         }
         if (p.color & 0xFu) == 7u || (p.color & 0xFu) == 8u {
             // A held beam's bite, and a charge: white-hot in red.
-            out.color = vec3<f32>(2.4, 0.75, 0.55) * fade;
+            out.color = select(vec3<f32>(2.4, 0.75, 0.55), vec3<f32>(2.7, 1.9, 2.8), (p.color & 0xFu) == 7u && p.aim.w == FADE_BEAM_HELD_FUSION) * fade;
         }
     } else if beam {
         out.color = vec3<f32>(1.0, 0.82, 0.38) * 3.4;
@@ -1019,6 +1019,15 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let thread = pow(across, mix(4.0, 9.0, age));
             let sheath = pow(across, 2.2) * 0.3 * (1.0 - age);
             return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
+        }
+        if in.shape.y > 6.1 {
+            // Excavation fusion: the Sunspear/shield prism around a white-hot core.
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let pulse = exp(-pow(fract(run * 0.045 - globals.camera.w * 12.0) - 0.5, 2.0) * 55.0);
+            let hue = mix(vec3<f32>(0.8, 0.62, 1.0), prism(run * 0.018 - globals.camera.w * PRISM_RATE), 0.65);
+            let sheath = hue * pow(across, 1.6) * (3.8 + 1.7 * pulse);
+            let core = vec3<f32>(1.0, 0.95, 1.0) * pow(across, 5.5) * (10.0 + 7.0 * pulse);
+            return vec4<f32>((sheath + core) * in.color.r, 1.0);
         }
         if in.shape.y > 5.5 {
             // A Pinched-plasmeric beam: plasma squeezed into a dense stream. A white-hot core

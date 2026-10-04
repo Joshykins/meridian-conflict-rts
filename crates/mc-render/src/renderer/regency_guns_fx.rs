@@ -380,6 +380,7 @@ impl Renderer {
             let (fusion, plasmeric) = match look {
                 1 => (false, false),
                 2 => (true, false),
+                3 => (false, false),
                 4 => (false, true),
                 _ => continue,
             };

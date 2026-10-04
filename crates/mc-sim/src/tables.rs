@@ -1014,7 +1014,7 @@ pub struct Projectiles {
     /// at the ground flies to (`naval_arms.rs`).
     pub mark: Vec<FxVec3>,
     /// Where the shot was fired from.
-    pub origin: Vec<FxVec2>,
+    pub origin: Vec<FxVec3>,
     /// Which of a cluster shot's sub-shots this is (`Weapon::cluster`, `cluster.rs`), from
     /// one; zero for a whole shot.
     pub sub: Vec<u8>,
@@ -1067,7 +1067,7 @@ impl Projectiles {
         self.serial.push(self.next_serial);
         self.quarry.push(0);
         self.mark.push(pos);
-        self.origin.push(pos.xy());
+        self.origin.push(pos);
         self.sub.push(0);
         Ok(())
     }
@@ -1103,7 +1103,7 @@ impl Projectiles {
         h.write_u64(self.len() as u64 | (self.next_serial as u64) << 32);
         for i in 0..self.len() {
             h.write_u64(self.serial[i] as u64 | (self.quarry[i] as u64) << 32);
-            for v in [self.mark[i], self.origin[i].extend(Fx::ZERO)] {
+            for v in [self.mark[i], self.origin[i]] {
                 h.write_i64(v.x.0);
                 h.write_i64(v.y.0);
                 h.write_i64(v.z.0);

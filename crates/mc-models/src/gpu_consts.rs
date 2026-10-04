@@ -559,6 +559,8 @@ shared! {
     /// `PROJECTILE_FADE_BEAM`; sprites.wgsl). The older ones are still spelled out in the
     /// shader; new ones are declared here.
     pub mod fade_beam as "FADE_BEAM_" {
+        /// Held lance takes the Sunspear prism rather than red plasma (`aim.w`).
+        pub const HELD_FUSION: f32 = 1.0;
         /// A warp dampener's tether (renderer/damper_fx.rs): crimson lightning with a
         /// white-pink core, crackling.
         pub const TETHER: u32 = 10;

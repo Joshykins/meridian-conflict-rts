@@ -694,16 +694,16 @@
         // narrow sizzle where it bites. Nothing above the low mids. Every frequency and
         // wobble is a whole number of cycles in the 2 s loop.
         "regency_pinched_beam": (
-            length: 2.0, peak: 0.5, room: 0.15, looped: true,
+            length: 2.0, peak: 0.62, room: 0.15, looped: true,
             layers: [
-                Drone(freq: 41, gain: 0.09, wobble: 5, depth: 0.35),
-                Drone(freq: 82, gain: 0.07, wobble: 5, depth: 0.45),
-                Drone(freq: 123, gain: 0.045, wobble: 10, depth: 0.5),
-                Drone(freq: 164, gain: 0.03, wobble: 10, depth: 0.6),
-                Drone(freq: 246, gain: 0.015, wobble: 10, depth: 0.7),
+                Drone(freq: 32, gain: 0.09, wobble: 5, depth: 0.35),
+                Drone(freq: 64, gain: 0.07, wobble: 5, depth: 0.45),
+                Drone(freq: 96, gain: 0.045, wobble: 10, depth: 0.5),
+                Drone(freq: 128, gain: 0.03, wobble: 10, depth: 0.6),
+                Drone(freq: 256, gain: 0.015, wobble: 10, depth: 0.7),
                 Drive(1.5),
                 Rumble(freq: 140, q: 0.7, gain: 2.4, wobble: 5, depth: 0.35),
-                Rumble(freq: 480, q: 1.6, gain: 1.0, wobble: 10, depth: 0.55),
+                Rumble(freq: 720, q: 1.8, gain: 1.3, wobble: 10, depth: 0.55),
             ],
         ),
         // A Gravitic Bomb charging between the claw's fingers: a contactor, then the cage

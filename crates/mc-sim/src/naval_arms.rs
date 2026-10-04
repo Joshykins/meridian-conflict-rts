@@ -412,7 +412,7 @@ impl World {
             if (mark - pos).length() <= ARC_TERMINAL {
                 return desired;
             }
-            let span = p.origin[i].distance(mark.xy()).max(Fx::ONE);
+            let span = p.origin[i].xy().distance(mark.xy()).max(Fx::ONE);
             let half = span / 2;
             let top = weapon.apogee.min(span * ARC_RISE).max(ARC_FLOOR);
             // Where the missile is on the ellipse's frame: x from -1 (launch) to 1

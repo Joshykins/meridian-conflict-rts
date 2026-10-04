@@ -913,7 +913,12 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
         step.x = reach * (0.5 - phase / stance);
     } else {
         let u = (phase - stance) / (1.0 - stance);
-        step = vec2<f32>(reach * (u * u * (3.0 - 2.0 * u) - 0.5), lift * sin(u * PI));
+        // Match the planted foot's velocity at both ends, with a soft lift and
+        // landing. The leg retracts briefly before reaching ahead, without a snap.
+        let advance = reach * (u * u * (3.0 - 2.0 * u) - 0.5)
+            - stride * (1.0 - stance) * (2.0 * u * u * u - 3.0 * u * u + u);
+        let arc = sin(u * PI);
+        step = vec2<f32>(advance, lift * arc * arc);
     }
     // The foot comes down on the ground under it.
     let heading = lerp_angle(e.prev_heading, e.heading, t);
@@ -944,6 +949,11 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
 
     var q = rot_z(pos - hip0, -az0);
     var m = rot_z(normal, -az0);
+    if limb == LIMB_FOOT {
+        // Level contact patch: only the shin articulates, never roll the whole foot.
+        let qfoot = rot_z(pos - foot0, az - az0) + foot;
+        return array<vec3<f32>, 2>(qfoot, rot_z(normal, az - az0));
+    }
     if limb == LIMB_THIGH {
         let turn = atan2(k1.y, k1.x) - atan2(k0.y, k0.x);
         q = rot_xz(q, turn);
@@ -1008,15 +1018,15 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
     let seed = hash11(f32(e.unit_id & 0xFFFFu) * 0.517 + 1.7) * 6.2831853;
     let alive = crawl_alive(e);
     let busy = crawl_busy(e, t);
-    let gun = mix(e.arm_pitch.x, e.arm_pitch.y, t);
     let kick = mix(e.prev_recoil, e.recoil, t);
     // The aim: the sim holds the turret within the body's `aim_arc` and turns the body for
     // the rest. The top four joints share it, 1, 2, 3 and 4 tenths from the lowest, so the
     // tail bends round at its top instead of swivelling whole. The unit file's `turret_at`
     // is the single pivot that best matches this chain (models/regency/commander.rs test).
     let aim = lerp_angle(e.prev_turret_yaw, e.turret_yaw, t);
-    let lively = alive * mix(1.0, 0.45, busy) * (1.0 - 0.8 * clamp(kick, 0.0, 1.0)) * (1.0 + 0.5 * walk.x);
-    let throb = 0.012 * kick * sin(time * 7.0 + seed);
+    let ready = max(busy, clamp(kick, 0.0, 1.0));
+    let folded = alive * (1.0 - ready);
+    let lively = alive * (1.0 - ready) * (1.0 + 0.2 * walk.x);
     var r0 = vec3<f32>(1.0, 0.0, 0.0);
     var r1 = vec3<f32>(0.0, 1.0, 0.0);
     var r2 = vec3<f32>(0.0, 0.0, 1.0);
@@ -1029,9 +1039,9 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
         var d = lively * (0.5 + 0.5 * u) * (
             0.034 * sin(time * (1.05 + 0.5 * walk.x) - u * 3.4 + seed)
             + 0.02 * sin(time * 0.43 + u * 1.9 + seed * 1.7));
-        d += alive * busy * -0.045 * smoothstep(0.35, 1.0, u);
-        d += alive * select(0.0, 0.1 * gun, j + 3u > last);
-        d += alive * (0.06 * kick + throb) * smoothstep(0.5, 1.0, u);
+        // Curl down behind the carapace at rest. Unfold from the root into the
+        // authored firing pose; at full brace the muzzle matches the sim's mount.
+        d -= folded * select(0.035, 0.12, j < 3u);
         let y = lively * (0.4 + 0.6 * u) * (
             0.022 * sin(time * 0.71 - u * 2.6 + seed * 2.3)
             + 0.012 * sin(time * 1.63 + u * 4.1 + seed * 0.7))
@@ -1104,10 +1114,10 @@ fn claw_pose(pos: vec3<f32>, normal: vec3<f32>, jaw: bool, model: ModelInfo, e: 
         p = rot_z(p - hinge, -side * open) + hinge;
         n = rot_z(n, -side * open);
     }
-    let swing = 0.1 * cos(walk.y * 6.2831853 + select(0.0, 3.14159, side < 0.0)) * walk.x;
-    let yaw = alive * (0.05 * sin(time * 0.8 + seed * 40.0) * still + swing - 0.1 * busy) * side
-        + 0.08 * flung * side;
-    let pitch = alive * (0.035 * sin(time * 0.61 + seed * 23.0) + 0.16 * busy) + 0.14 * flung;
+    let swing = 0.012 * cos(walk.y * 6.2831853) * walk.x;
+    let yaw = alive * (0.012 * sin(time * 0.8 + seed * 40.0) * still + swing - 0.025 * busy) * side
+        + 0.018 * flung * side;
+    let pitch = alive * (0.008 * sin(time * 0.61 + seed * 23.0) * still + 0.035 * busy) + 0.025 * flung;
     p = rot_z(rot_xz(p - shoulder, pitch), yaw) + shoulder;
     n = rot_z(rot_xz(n, pitch), yaw);
     return array<vec3<f32>, 2>(p, n);

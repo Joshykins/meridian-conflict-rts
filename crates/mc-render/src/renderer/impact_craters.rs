@@ -41,7 +41,7 @@ impl ImpactCraters {
     }
 
     /// A crater of `radius` at `at` once `start` comes round.
-    fn dig(&mut self, at: Vec2, radius: f32, start: f32) {
+    pub(super) fn dig(&mut self, at: Vec2, radius: f32, start: f32) {
         self.seed = self.seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
         let strength = 150 + (self.seed >> 25) % 90;
         let seed = (self.seed >> 9) & 0x7FFF;

@@ -5,13 +5,13 @@
     // The battle scorpion: a heavy armoured scorpion on eight legs. Its tail is the turret:
     // the top of it bends round to aim within `aim_arc` (60 degrees either side of the
     // nose), and past that the scorpion turns its whole body. The tail ends in a
-    // Pinched-plasmeric Beam projector that holds a dense red stream on what it fights,
+    // fusion excavation lance that immediately sweeps a white-rose stream across its mark,
     // glassing the ground where the stream lands. Each claw charges a Gravitic Bomb between
-    // its fingers and throws it, a salvo of three from each: fast streaks that curve in on
+    // its fingers and throws it, a salvo of six from each: straight launches opening into corkscrews over
     // the mark from around it.
     //
     // Model: `regency_scorpion` (`models::regency::scorpion`), authored at 10.4 x 19 m and built
-    // 1.3 times bigger: every point below is the model's times 1.3.
+    // 3.25 times authored size (2.5 times its previous size): every mount follows it.
     (
         key: "regency_t4_scorpion",
         name: "Harrow",
@@ -20,54 +20,50 @@
         categories: ["Land", "DirectFire", "Experimental"],
         health: 9200,
         cost: (mass: 900, energy: 7200, time: 5200),
-        radius: 13.52, height: 24.7,
-        footprint: (3, 3),
+        radius: 33.8, height: 61.75,
+        footprint: (7, 7),
         vision: 360,
         // It walks the seabed like the Paladin; wading, the tail stays above the water.
-        motion: (layer: Amphibious, size: 2, speed: 24, accel: 20, turn: 110, aim_arc: 120),
+        motion: (layer: Amphibious, size: 4, speed: 24, accel: 20, turn: 110, aim_arc: 120),
         // The single point that best matches the tail's bending top joints (the model's
         // `AIM_PIVOT`): the beam's muzzle turns about it, not the unit's middle.
-        turret_at: (-8.84, 0.0),
+        turret_at: (-22.1, 0.0),
         // The claws' bombs turn on their own, each about its own claw (`mount`, `pivot`
         // at the muzzle: whichever way it throws, it leaves from between the fingers).
         hull_mounts: true,
         weapons: [
             (
-                name: "Pinched-plasmeric Beam",
-                // A hitscan gun that fires every tick it bears: one steady stream while it
-                // holds on its mark (`beam`), sweeping onto whatever is in its cone. The
-                // projector runs up its pinch for 0.4 s before the stream lights (`spin_up`),
-                // and runs down after it: the tail braces onto the shot and eases off with it.
+                name: "Excavation Lance",
+                // Immediate sustained surface sweep: 32 metres either side of its
+                // mark, striking units along the line and excavating where it meets ground.
                 damage: 30, range: 280, reload: 0.1, hitscan: true, beam: true, trajectory: Direct,
-                spin_up: 0.4,
-                turret_turn: 50, muzzle: (5.72, 0, 22.88), pivot: (-2.08, 0, 24.18), sweep: 6,
-                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                flash: 1.0, impact: 1.0, plasma_grade: Some(Pinched),
+                walk: 32, splash: 4,
+                turret_turn: 180, muzzle: (14.3, 0, 57.2), pivot: (-5.2, 0, 60.45), sweep: 6,
+                targets: ["Land", "Naval", "Structure"], color: Blue, red: 0.0,
+                flash: 2.5, impact: 1.0, plasma_grade: Some(PinchFusion),
                 sounds: (hold: "regency_pinched_beam"),
             ),
             (
-                name: "Gravitic Bomb",
-                // The left claw. Charged between its fingers, then thrown three at a time as
-                // fast streaks that curve onto the mark (`curve`): the first swung out to
-                // the left of the line, the second over it, the third across to the right,
-                // each bending back onto the target from its own side.
-                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 240,
-                trajectory: Direct, curve: 45, tracer: 1.8, salvo: 3, salvo_delay: 0.25,
+                name: "Left Gravitic Salvo",
+                // Left six: charge together, leave straight, then corkscrew above
+                // the ground onto six area points. Right six interleave with them.
+                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 180,
+                trajectory: Direct, curve: 45, corkscrew: 18, tracer: 2.6, salvo: 6, salvo_delay: 0.1,
                 mount: true, arc: 120, turret_turn: 90,
-                muzzle: (22.75, 4.29, 6.89), pivot: (22.75, 4.29, 6.89),
+                muzzle: (56.875, 10.725, 17.225), pivot: (56.875, 10.725, 17.225),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                flash: 0.9, impact: 2.2, shockwave: 1.0, plasma_grade: Some(Plasmeric),
+                flash: 1.3, impact: 2.2, shockwave: 1.0, plasma_grade: Some(Plasmeric),
                 sounds: (fire: "regency_gravitic_throw", charge: "regency_gravitic_charge", charge_time: 1.2, impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
             ),
             (
-                name: "Gravitic Bomb",
-                // The right claw: its fan the mirror of the left's.
-                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 240,
-                trajectory: Direct, curve: 45, tracer: 1.8, salvo: 3, salvo_delay: 0.25,
+                name: "Right Gravitic Salvo",
+                // Right six: identical timing, the area pattern rotated half a sector.
+                damage: 300, splash: 12, range_min: 40, range: 340, reload: 5.0, speed: 180,
+                trajectory: Direct, curve: 45, corkscrew: 18, tracer: 2.6, salvo: 6, salvo_delay: 0.1,
                 mount: true, arc: 120, turret_turn: 90,
-                muzzle: (22.75, -4.29, 6.89), pivot: (22.75, -4.29, 6.89),
+                muzzle: (56.875, -10.725, 17.225), pivot: (56.875, -10.725, 17.225),
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                flash: 0.9, impact: 2.2, shockwave: 1.0, plasma_grade: Some(Plasmeric),
+                flash: 1.3, impact: 2.2, shockwave: 1.0, plasma_grade: Some(Plasmeric),
                 sounds: (fire: "regency_gravitic_throw", charge: "regency_gravitic_charge", charge_time: 1.2, impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
             ),
         ],

@@ -1655,6 +1655,7 @@ impl Blueprints {
                         | (w.launches as u64) << 48,
                 );
                 h.write_i64(w.walk.0);
+                h.write_i64(w.corkscrew.0);
                 if let Some(s) = w.sabot {
                     for v in [
                         s.port.x, s.port.y, s.port.z, s.throw.x, s.throw.y, s.throw.z, s.kick,

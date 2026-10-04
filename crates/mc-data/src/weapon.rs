@@ -184,6 +184,9 @@ pub struct Weapon {
     /// A thrown charge that curves onto its mark (`RawWeapon::curve`): how far off the line
     /// to the mark a salvo's shots leave. Zero: it flies the usual way.
     pub curve: Angle,
+    /// Orbit radius in metres for a straight-launch, area-converging curving charge.
+    /// Zero retains the usual fanned path.
+    pub corkscrew: Fx,
     /// Fires its unit's drones (`UnitBlueprint::drone`) instead of shots (`RawWeapon::launches`):
     /// each is let go at the mark and flies into it, where this weapon's charge goes off.
     pub launches: bool,

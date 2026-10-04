@@ -18,7 +18,7 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
     let heft = if pair == 0 || pair == 3 { 1.0 } else { 1.08 };
     let thigh = knee - hip;
     let shin = foot - knee;
-    let ankle = knee + shin * 0.66;
+    let ankle = foot + Vec3::Z * 0.85;
     b.with_part(part::LOCOMOTION, |b| {
         b.with_limb(rig::THIGH, |b| {
             seam(b);
@@ -104,7 +104,9 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
                 ],
                 out + Vec3::Z,
             );
-            // The foot: a heavy hooked claw driven into the ground, a spur behind it.
+        });
+        b.with_limb(rig::FOOT, |b| {
+            // A broad hooked foot that stays level while the shin articulates.
             seam(b);
             knuckle(b, ankle, out.cross(Vec3::Z), 0.5, 0.95);
             dark_plate(b);
@@ -125,6 +127,10 @@ pub(super) fn leg(b: &mut MeshBuilder, hip: Vec3, knee: Vec3, foot: Vec3, pair: 
                     ankle.lerp(foot, 0.7) + back + Vec3::Z * 0.1,
                     0.24,
                 );
+            }
+        });
+        b.with_limb(rig::SHIN, |b| {
+            if b.fine() {
                 ram(
                     b,
                     knee + shin * 0.12 - out * 0.7,

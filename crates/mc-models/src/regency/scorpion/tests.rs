@@ -20,7 +20,7 @@ fn stands_on_eight_legs_each_rigged_to_its_pair() {
                         && (v.rig & rig::PAIR_MASK) >> rig::PAIR_SHIFT == pair
                 })
             };
-            for limb in [rig::THIGH, rig::SHIN] {
+            for limb in [rig::THIGH, rig::SHIN, rig::FOOT] {
                 assert!(
                     bones(limb).any(|v| v.pos[1] > 0.0),
                     "pair {pair} left bone {limb}"
@@ -32,11 +32,15 @@ fn stands_on_eight_legs_each_rigged_to_its_pair() {
             }
             // The foot's tip reaches the ground its pair's rest pose names.
             let [_, _, foot] = crawl.joints[pair as usize];
-            let low = bones(rig::SHIN).map(|v| v.pos[2]).fold(f32::MAX, f32::min);
+            let low = bones(rig::FOOT).map(|v| v.pos[2]).fold(f32::MAX, f32::min);
             assert!(low < 0.3, "pair {pair} foot at {low}");
-            let reach = bones(rig::SHIN).map(|v| v.pos[1]).fold(0.0f32, f32::max);
             assert!(
-                (reach - foot[1]).abs() < 0.6,
+                bones(rig::FOOT).any(|v| Vec3::from(v.pos).distance(Vec3::from(foot)) < 0.3),
+                "pair {pair} must reach its planted tip"
+            );
+            let reach = bones(rig::FOOT).map(|v| v.pos[1]).fold(0.0f32, f32::max);
+            assert!(
+                (reach - foot[1]).abs() < 0.85,
                 "pair {pair} reaches y {reach} for {}",
                 foot[1]
             );

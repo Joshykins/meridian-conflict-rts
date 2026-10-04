@@ -18,9 +18,11 @@
 //!
 //! Presentation only; the renderer's own clock.
 
+use super::star_core_fx::{LAVENDER, ROSE, WHITE};
+use crate::gpu_consts::{fade_beam, puff};
 use crate::models::Crawl;
 use glam::{Vec2, Vec3};
-use mc_data::{BlueprintId, Trajectory, Weapon};
+use mc_data::{BlueprintId, PlasmaGrade, Trajectory, Weapon};
 use mc_sim::mirror::{ProjectileInstance, UnitInstance, PROJECTILE_FADE_BEAM};
 use std::mem::size_of;
 
@@ -49,6 +51,7 @@ struct Held {
     dir: Vec3,
     range: f32,
     width: f32,
+    fusion: bool,
     /// When it was last fed, whether this tick's strike has come in, and whether it had
     /// struck anything before (a new beam starts at its first strike, not from nowhere).
     last: f32,
@@ -117,7 +120,7 @@ fn held_in_claw(crawl: &Crawl, u: &UnitInstance, local: Vec3, t: f32) -> Vec3 {
         .clamp(0.0, 1.0);
     let side = if local.y > 0.0 { 1.0 } else { -1.0 };
     let shoulder = Vec3::from(shoulder) * Vec3::new(1.0, side, 1.0);
-    let (pitch, yaw) = (0.16 * busy, -0.1 * busy * side);
+    let (pitch, yaw) = (0.035 * busy, -0.025 * busy * side);
     let q = local - shoulder;
     let (s, c) = pitch.sin_cos();
     let q = Vec3::new(q.x * c - q.z * s, q.y, q.x * s + q.z * c);
@@ -142,7 +145,8 @@ impl Renderer {
     ) {
         let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
         let range = w.range_max.to_f32();
-        let width = 0.5 + w.damage.to_f32().max(1.0).sqrt() * 0.08;
+        let width = (0.5 + w.damage.to_f32().max(1.0).sqrt() * 0.08) * w.flash.max(1.0);
+        let fusion = w.plasma_grade == Some(PlasmaGrade::PinchFusion);
         let start = muzzle - travel;
         let reach = travel.length() + 6.0;
         let fx = &mut self.plasma_fx;
@@ -170,6 +174,7 @@ impl Renderer {
                 dir,
                 range,
                 width,
+                fusion,
                 last: time,
                 struck: false,
                 new: true,
@@ -206,6 +211,7 @@ impl Renderer {
         }
         h.struck = true;
         let width = h.width;
+        let fusion = h.fusion;
         // It glasses the ground where it lands, a pool at a time as the strike walks.
         let glass = !on_unit
             && h.glassed
@@ -215,7 +221,10 @@ impl Renderer {
         }
         if glass {
             self.ground_melt
-                .melt(at.truncate(), width * 2.2, time, GLASS_COOL);
+                .melt(at.truncate(), width * 2.8, time, GLASS_COOL);
+            if fusion {
+                self.impact_craters.dig(at.truncate(), width * 2.2, time);
+            }
             self.push_puff(
                 PUFF_TREE_SMOKE,
                 at + Vec3::Z * 0.8,
@@ -223,6 +232,46 @@ impl Renderer {
                 time,
                 2.2,
                 (width * 1.2, width * 3.5),
+            );
+        }
+        if fusion {
+            self.push_lit(
+                puff::WARP_GLOW as f32,
+                at + Vec3::Z * width,
+                Vec3::ZERO,
+                time,
+                0.18,
+                (width * 2.0, width * 3.4),
+                ROSE * 8.0,
+                0.0,
+            );
+            for _ in 0..4 {
+                let spray = Vec3::new(
+                    self.scatter.signed(),
+                    self.scatter.signed(),
+                    0.5 + self.scatter.unit(),
+                )
+                .normalize_or(Vec3::Z);
+                self.push_lit(
+                    puff::WARP_STREAK as f32,
+                    at,
+                    spray * 36.0,
+                    time,
+                    0.35,
+                    (width * 0.25, width * 0.08),
+                    LAVENDER * 5.0,
+                    0.0,
+                );
+            }
+            self.push_lit(
+                puff::WARP_GLOW as f32,
+                at,
+                Vec3::ZERO,
+                time,
+                0.1,
+                (width, width * 1.6),
+                WHITE * 9.0,
+                0.0,
             );
         }
         // Molten spatter thrown up where it bites, every tick.
@@ -374,7 +423,11 @@ impl Renderer {
             } else {
                 (h.last + tick * 1.5, CUT)
             };
-            out.push(held_instance(HELD_BEAM, h.from, h.to, h.width, start, life));
+            let mut beam = held_instance(HELD_BEAM, h.from, h.to, h.width, start, life);
+            if h.fusion {
+                beam.aim[3] = fade_beam::HELD_FUSION;
+            }
+            out.push(beam);
         }
         let legs = &self.legs;
         for c in &mut fx.charges {

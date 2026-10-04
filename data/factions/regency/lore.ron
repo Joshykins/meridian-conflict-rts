@@ -8,10 +8,11 @@
         },
     ),
     "regency_t4_scorpion": (
-        lore: "A walking siege engine in the shape of a scorpion; ARC crews learned to fear the red line it draws before they learned its name.",
+        lore: "A walking siege engine in the shape of a scorpion; ARC crews learned to fear the white lance that tears trenches across the field before they learned its name.",
         weapons: {
-            "Pinched-plasmeric Beam": "Plasma squeezed by gravity into a dense stream and held on the target; it leaves glass wherever it lands.",
-            "Gravitic Bomb": "A charge of plasma held in a gravity cage between the claws, thrown, and let go all at once where it comes down.",
+            "Excavation Lance": "A sustained white-rose fusion lance that sweeps the field, gouges the ground and leaves molten glass across its path.",
+            "Left Gravitic Salvo": "Six charged plasma missiles launch straight, spiral above the ground and converge across the target area.",
+            "Right Gravitic Salvo": "A matching six-shot salvo interleaves with the left claw to cover the target area with twelve impacts.",
         },
     ),
     "regency_t3_mobile_aa": (

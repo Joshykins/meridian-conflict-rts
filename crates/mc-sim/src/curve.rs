@@ -36,6 +36,9 @@ pub(crate) fn launch_dir(
     side: Fx,
 ) -> FxVec3 {
     let to = aim - muzzle;
+    if weapon.corkscrew > Fx::ZERO {
+        return to.normalize();
+    }
     let bearing = to.xy().angle();
     let elevation = FxVec2::new(to.xy().length(), to.z).angle();
     let fan = weapon.curve.0 as i32;
@@ -69,6 +72,21 @@ impl World {
             if weapon.curve.0 == 0 {
                 continue;
             }
+            if weapon.corkscrew > Fx::ZERO {
+                let next = corkscrew_next(
+                    p.origin[i],
+                    p.mark[i],
+                    p.pos[i],
+                    p.age[i],
+                    p.serial[i],
+                    weapon.projectile_speed / mc_core::TICKS_PER_SECOND as i32,
+                    weapon.corkscrew,
+                );
+                let velocity = next - p.pos[i];
+                self.state.projectiles.aim[i] = velocity.normalize();
+                self.state.projectiles.vel[i] = velocity;
+                continue;
+            }
             let units = &self.state.units;
             let mark = units
                 .row(p.target[i])
@@ -90,6 +108,79 @@ impl World {
                 self.state.projectiles.aim[i] = dir;
                 self.state.projectiles.vel[i] = dir * step;
             }
+        }
+    }
+}
+
+/// A helix about the immutable launch-to-area line. The first tick is straight;
+/// the orbit opens smoothly above the firing line, rotates, then closes over the
+/// last quarter of the flight. Its lower turns clear the ground. Projecting
+/// onto the axis makes progress independent of the lateral orbit and of tick rate.
+fn corkscrew_next(
+    origin: FxVec3,
+    mark: FxVec3,
+    pos: FxVec3,
+    age: u16,
+    serial: u32,
+    step: Fx,
+    radius: Fx,
+) -> FxVec3 {
+    let line = mark - origin;
+    let length = line.length().max(Fx::ONE);
+    let axis = line.normalize();
+    let run = ((pos - origin).dot(axis) + step).min(length + step);
+    let forward = origin + axis * run;
+    let lateral = FxVec3::new(axis.y, -axis.x, Fx::ZERO).normalize();
+    let up = FxVec3::new(
+        lateral.y * axis.z,
+        -lateral.x * axis.z,
+        lateral.x * axis.y - lateral.y * axis.x,
+    )
+    .normalize();
+    let opening = Fx::ratio(age.min(3) as i64, 3);
+    let opening = opening * opening * (Fx::from_int(3) - opening * 2);
+    let closing = ((length - run) / (length / 4).max(step)).clamp(Fx::ZERO, Fx::ONE);
+    let phase = Angle::from_degrees(age as i32 * 80 + (serial % 6) as i32 * 60);
+    forward + (lateral * phase.cos() + up * (Fx::ONE + phase.sin())) * (radius * opening * closing)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn helix_leaves_straight_rotates_and_closes_onto_the_area() {
+        for (distance, step) in [(90, 18), (240, 18)] {
+            let origin = FxVec2::from_ints(0, 0).extend(Fx::from_int(20));
+            let mark = FxVec2::from_ints(distance, 0).extend(Fx::ZERO);
+            let axis = (mark - origin).normalize();
+            let mut pos = origin;
+            let mut sides = [false; 2];
+            let mut high = Fx::ZERO;
+            for age in 0..45 {
+                let next = corkscrew_next(
+                    origin,
+                    mark,
+                    pos,
+                    age,
+                    1,
+                    Fx::from_int(step),
+                    Fx::from_int(18),
+                );
+                let offset = next - origin - axis * (next - origin).dot(axis);
+                if age == 0 {
+                    assert!(offset.length() < Fx::ratio(1, 20));
+                }
+                sides[0] |= offset.y > Fx::from_int(6);
+                sides[1] |= offset.y < Fx::from_int(-6);
+                high = high.max(offset.z.abs());
+                pos = next;
+                if (pos - origin).dot(axis) >= (mark - origin).length() {
+                    break;
+                }
+            }
+            assert!(sides.into_iter().all(|v| v));
+            assert!(high > Fx::from_int(6));
+            assert!(pos.distance(mark) <= Fx::from_int(step + 1));
         }
     }
 }

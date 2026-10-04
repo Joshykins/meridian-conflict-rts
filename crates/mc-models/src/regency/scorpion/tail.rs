@@ -225,7 +225,7 @@ fn barrel(b: &mut MeshBuilder) {
         Vec3::Z,
     );
     // The bore, lit where the rings leave it bare.
-    b.paint(GLOW_LASER);
+    b.paint(GLOW_PRISM);
     b.cylinder_between(at(0.3), at(0.97), 0.2, 0.17, 6);
     // The pinch rings, each tighter than the last.
     metal(b);

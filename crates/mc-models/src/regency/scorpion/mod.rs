@@ -11,7 +11,7 @@
 //! working machinery under them (rams, ribs, cables, the projector's pinch rings) dark
 //! bronze (`METAL` under `EMBER`).
 //!
-//! Rig: the body is `HULL`. Each leg is two bones posed by `entity.wgsl` `crawl_leg`
+//! Rig: the body is `HULL`. Each leg is two bones and a level foot posed by `entity.wgsl` `crawl_leg`
 //! (`MeshBuilder::set_crawl_legs`), pair by pair. The claws ride `rig::TAIL` on the hull
 //! (`MeshBuilder::with_claw`): the arm swings about its shoulder, the inner finger opens
 //! about its hinge (`claw_pose`). The tail is the turret: segment `i` turns about joint
@@ -21,8 +21,8 @@
 //! past that the body turns. The sim turns the muzzle about the one point that best
 //! matches that chain (`turret_at`). The projector pitches about its joint (`ARM_GUN`).
 //!
-//! Authored at the old commander's size (10.4 x 19 m) and built 1.3 times bigger: every
-//! number in `data/factions/regency/units/land.ron` is this file's times `SCALE` (tests).
+//! Authored at the old commander's size (10.4 x 19 m) and built 3.25 times bigger: every
+//! number in `data/factions/regency/units/experimental.ron` is this file's times `SCALE` (tests).
 
 mod body;
 mod limbs;
@@ -43,7 +43,7 @@ pub(super) const RADIUS: f32 = 10.4;
 pub(super) const HEIGHT: f32 = 19.0;
 /// How much bigger the unit file builds it.
 #[cfg(test)]
-const SCALE: f32 = 1.3;
+const SCALE: f32 = 3.25;
 
 /// The projector's joint on the tail's tip, and its muzzle.
 const BEAM_PIVOT: Vec3 = Vec3::new(-1.6, 0.0, 18.6);
@@ -114,7 +114,7 @@ const PALM: Vec3 = Vec3::new(16.2, 4.1, 5.4);
 const JAW_HINGE: Vec3 = Vec3::new(16.0, 3.2, 5.3);
 
 pub(super) fn scorpion(b: &mut MeshBuilder, _tech: u8) {
-    b.set_crawl_legs(&LEGS, 8.0, 0.62, 1.6);
+    b.set_crawl_legs(&LEGS, 16.0, 0.72, 0.95);
     b.set_tail(&TAIL, TAIL[TAIL.len() - 1].z - 0.4);
     b.set_claw(SHOULDER, JAW_HINGE);
     // The claws throw the unit file's weapons 1 (left) and 2 (right): the Gravitic Bombs.

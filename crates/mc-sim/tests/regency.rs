@@ -1,11 +1,8 @@
-//! The Regency's own rules. The battle scorpion's tail reaches only across its nose
-//! (`aim_arc`), so it turns its whole body onto a mark behind it instead of swinging the
-//! tail round, and does not lay past the mark while the body comes round; its beam runs
-//! up, then holds on its mark every tick; its claws throw their bombs from between their
-//! fingers as fast streaks that curve in on the mark, each from its own angle.
+//! Regency combat: Harrow turns its body within the tail arc, immediately sweeps an
+//! excavation lance over the surface, and charges two six-shot corkscrew area salvos.
 //! A lot remembers the faction it was levelled for.
 
-use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
+use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::Blueprints;
 use mc_jobs::Pool;
 use mc_map::Heightfield;
@@ -100,6 +97,8 @@ fn the_beam_holds_on_its_mark_every_tick() {
     let mut w = world();
     let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let target = add(&mut w, "aster_t3_assault_bot", 1, 712, 512, 180);
+    let t = w.state.units.row(target).unwrap();
+    w.state.units.flags[t] |= mc_sim::tables::flag::PASSIVE | mc_sim::tables::flag::INVULNERABLE;
     let beam = w.blueprints.id_of("regency_t4_scorpion").unwrap();
     let mut first = None;
     let mut fed = 0;
@@ -127,148 +126,96 @@ fn the_beam_holds_on_its_mark_every_tick() {
 }
 
 #[test]
-fn the_claws_throw_bombs_that_land_around_the_mark() {
+fn the_claws_charge_then_throw_two_sixes_onto_a_ground_area() {
     let mut w = world();
     let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
-    let target = add(&mut w, "aster_t3_assault_bot", 1, 772, 512, 180);
+    let target = add(&mut w, "aster_t3_assault_bot", 1, 800, 512, 180);
+    let t = w.state.units.row(target).unwrap();
+    w.state.units.flags[t] |= mc_sim::tables::flag::PASSIVE | mc_sim::tables::flag::INVULNERABLE;
     let id = w.blueprints.id_of("regency_t4_scorpion").unwrap();
-    let bomb = w.blueprints.unit(id).weapons[1].clone();
-    let mut charged = 0;
-    let mut throws = Vec::new();
-    let mut landed = Vec::new();
-    for _ in 0..(12 * TICKS_PER_SECOND) {
+    let mut charge_at = [None; 2];
+    let mut thrown = [0; 2];
+    let mut impacts = Vec::new();
+    let mut marks = Vec::new();
+    let mut seen = Vec::new();
+    for tick in 0..40 {
         w.tick(&[]).unwrap();
-        let row = w.state.units.row(scorpion).unwrap();
-        let (pos, heading) = (w.state.units.pos[row], w.state.units.heading[row]);
-        let Some(mark) = w.state.units.row(target).map(|r| w.state.units.pos[r]) else {
-            break;
-        };
         for e in &w.events {
             match e {
                 SimEvent::WeaponCharging {
                     unit,
                     blueprint,
-                    weapon: 1 | 2,
+                    weapon: which @ (1 | 2),
                     ..
                 } if *blueprint == id => {
-                    assert_eq!(*unit, scorpion, "the charge names its unit");
-                    charged += 1;
+                    assert_eq!(*unit, scorpion);
+                    charge_at[*which as usize - 1] = Some(tick);
                 }
                 SimEvent::ShotFired {
-                    pos: at,
+                    pos,
                     blueprint,
                     weapon: which @ (1 | 2),
                     ..
                 } if *blueprint == id => {
-                    // Out of the claw that threw it: between its fingers.
-                    let side = if *which == 1 { 1 } else { -1 };
-                    let claw =
-                        pos + FxVec2::new(bomb.muzzle.x, bomb.muzzle.y * side).rotate(heading);
-                    throws.push(at.xy().distance(claw).to_f32());
+                    let slot = *which as usize - 1;
+                    let charged = charge_at[slot].expect("each claw charges before firing");
+                    assert!(
+                        tick - charged
+                            >= w.blueprints.unit(id).weapons[*which as usize].charge_ticks as i32
+                    );
+                    let r = w.state.units.row(scorpion).unwrap();
+                    let mount = w.blueprints.unit(id).weapons[*which as usize].muzzle;
+                    let claw = w.state.units.pos[r] + mount.xy().rotate(w.state.units.heading[r]);
+                    assert!(pos.xy().distance(claw) < Fx::from_int(2));
+                    thrown[slot] += 1;
                 }
                 SimEvent::Impact {
-                    pos: at,
+                    pos,
                     blueprint,
                     weapon: 1 | 2,
                     ..
-                } if *blueprint == id => landed.push(at.xy().distance(mark).to_f32()),
+                } if *blueprint == id => impacts.push(*pos),
                 _ => {}
             }
         }
-    }
-    assert!(charged >= 2, "each claw charges first ({charged})");
-    assert!(throws.len() >= 6, "{} bombs thrown", throws.len());
-    assert!(
-        throws.iter().all(|d| *d < 1.5),
-        "thrown from off the claws: {throws:?}"
-    );
-    assert!(landed.len() >= 6, "{} bombs landed", landed.len());
-    // On the mark, each on the side it came in from: they home on the target.
-    assert!(landed.iter().all(|d| *d < 20.0), "{landed:?}");
-    assert!(landed.iter().any(|d| *d > 1.0), "{landed:?}");
-}
-
-/// Degrees between two directions across the ground.
-fn bearing_gap(a: FxVec3, b: FxVec3) -> f32 {
-    let d = a.xy().angle().delta_to(b.xy().angle()) as f32;
-    (d * 360.0 / 65536.0).abs()
-}
-
-#[test]
-fn the_bombs_streak_out_and_curve_in_from_around_the_mark() {
-    let mut w = world();
-    add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
-    let target = add(&mut w, "aster_t3_assault_bot", 1, 800, 512, 180);
-    let id = w.blueprints.id_of("regency_t4_scorpion").unwrap();
-    // Per shot (by serial): how it left, the line to the mark then, and how it arrived.
-    let mut shots: Vec<(u32, FxVec3, FxVec3, Option<FxVec3>)> = Vec::new();
-    let mut hits = 0;
-    for _ in 0..(10 * TICKS_PER_SECOND) {
-        let before: Vec<(u32, FxVec3)> = {
-            let p = &w.state.projectiles;
-            (0..p.len())
-                .filter(|&i| p.blueprint[i] == id && p.weapon[i] != 0)
-                .map(|i| (p.serial[i], p.vel[i]))
-                .collect()
-        };
-        w.tick(&[]).unwrap();
-        let Some(mark) = w.state.units.row(target).map(|r| w.state.units.pos[r]) else {
-            break;
-        };
         let p = &w.state.projectiles;
         for i in (0..p.len()).filter(|&i| p.blueprint[i] == id && p.weapon[i] != 0) {
-            if p.age[i] == 1 && !shots.iter().any(|s| s.0 == p.serial[i]) {
-                let line = (mark - p.pos[i].xy()).extend(Fx::ZERO);
-                shots.push((p.serial[i], p.vel[i], line, None));
+            if !seen.contains(&p.serial[i]) {
+                seen.push(p.serial[i]);
+                marks.push(p.mark[i]);
+                // Straight out for the first part of flight.
+                let direction = (p.mark[i] - p.origin[i]).normalize();
+                assert!(p.vel[i].normalize().dot(direction) > Fx::ratio(999, 1000));
             }
         }
-        // A shot gone since last tick arrived on what it last flew.
-        for (serial, vel) in before {
-            if !(0..p.len()).any(|i| p.serial[i] == serial) {
-                if let Some(s) = shots.iter_mut().find(|s| s.0 == serial) {
-                    s.3 = Some(vel);
-                }
-            }
-        }
-        hits += w
-            .events
-            .iter()
-            .filter(|e| matches!(e, SimEvent::Impact { blueprint, weapon: 1 | 2, on_unit: true, .. } if *blueprint == id))
-            .count();
     }
-    assert!(shots.len() >= 6, "{} bombs thrown", shots.len());
-    let speed = |v: FxVec3| v.length().to_f32() * TICKS_PER_SECOND as f32;
-    // Fast streaks, not a lob.
-    assert!(
-        shots.iter().all(|s| speed(s.1) > 200.0),
-        "left at {:?} m/s",
-        shots.iter().map(|s| speed(s.1)).collect::<Vec<_>>()
-    );
-    // Fanned off the line to the mark: the outer ones well out to either side.
-    let off: Vec<f32> = shots.iter().map(|s| bearing_gap(s.2, s.1)).collect();
-    assert!(
-        off.iter().filter(|d| **d > 25.0).count() >= 4,
-        "left off the line by {off:?}"
-    );
-    // Every one arrived, and not down one line: their last legs come in from around it.
-    let arrived: Vec<FxVec3> = shots.iter().filter_map(|s| s.3).collect();
-    assert!(
-        arrived.len() >= 6 && hits >= 6,
-        "{} arrived, {hits} hit",
-        arrived.len()
-    );
-    let widest = arrived
+    assert_eq!(thrown, [6, 6], "two charged six-shot salvos");
+    assert_eq!(marks.len(), 12);
+    assert_eq!(impacts.len(), 12, "all charges arrive");
+    let centre = FxVec2::from_ints(800, 512);
+    assert!(marks
         .iter()
-        .flat_map(|a| arrived.iter().map(move |b| bearing_gap(*a, *b)))
-        .fold(0.0f32, f32::max);
-    assert!(
-        widest > 30.0,
-        "all came in within {widest} degrees of each other"
+        .all(|m| m.xy().distance(centre) > Fx::from_int(8)
+            && m.xy().distance(centre) < Fx::from_int(11)
+            && m.z == Fx::from_int(20)));
+    let mut unique: Vec<_> = marks
+        .iter()
+        .map(|p| (p.x.raw(), p.y.raw(), p.z.raw()))
+        .collect();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(
+        unique.len(),
+        12,
+        "the two rings interleave into twelve area points"
     );
+    assert!(impacts
+        .iter()
+        .all(|p| p.xy().distance(centre) < Fx::from_int(24)));
 }
 
 #[test]
-fn the_tail_does_not_lay_past_its_mark_while_the_body_turns() {
+fn the_tail_stays_within_its_sweep_while_the_body_turns() {
     let mut w = world();
     // A tank off the scorpion's left quarter, 100 degrees off the nose: past the tail's
     // reach, so the body comes round while the tail lays on it.
@@ -281,48 +228,59 @@ fn the_tail_does_not_lay_past_its_mark_while_the_body_turns() {
             break;
         };
         let u = &w.state.units;
-        let root = u.pos[r] + FxVec2::new(Fx::from_int(-884) / 100, Fx::ZERO).rotate(u.heading[r]);
+        let root = u.pos[r]
+            + w.blueprints
+                .unit(w.state.units.blueprint[r])
+                .turret_at
+                .unwrap()
+                .rotate(u.heading[r]);
         let bearing = (u.pos[t] - root).angle();
         let laid = u.heading[r] + u.weapon_yaw[r][0];
-        // How far past the mark (on the far side from where it came round: the left) it lies.
+        // The lance intentionally crosses its mark; it must stay inside its 32 m swath.
         worst = worst.max(bearing.delta_to(laid) as i32);
     }
     assert!(
-        worst <= Angle::from_degrees(2).0 as i32,
+        worst <= Angle::from_degrees(12).0 as i32,
         "laid {} degrees past its mark",
         worst * 360 / 65536
     );
 }
 
 #[test]
-fn the_beam_runs_up_before_it_lights_and_down_after() {
+fn the_lance_fires_without_spin_up_and_sweeps_both_sides_of_the_mark() {
     let mut w = world();
-    let scorpion = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
-    let target = add(&mut w, "aster_t1_tank", 1, 712, 512, 180);
+    add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
+    let target = add(&mut w, "aster_t3_assault_bot", 1, 712, 512, 180);
+    let t = w.state.units.row(target).unwrap();
+    w.state.units.flags[t] |= mc_sim::tables::flag::PASSIVE | mc_sim::tables::flag::INVULNERABLE;
     let id = w.blueprints.id_of("regency_t4_scorpion").unwrap();
-    let run = w.blueprints.unit(id).weapons[0].spin_ticks;
-    assert!(run > 0);
-    let mut levels = Vec::new();
+    assert_eq!(w.blueprints.unit(id).weapons[0].spin_ticks, 0);
     let mut first = None;
-    for t in 0..(10 * TICKS_PER_SECOND) {
+    let mut directions = Vec::new();
+    for tick in 0..100 {
         w.tick(&[]).unwrap();
-        let r = w.state.units.row(scorpion).unwrap();
-        let spin = w.state.units.spin[r];
-        // Last tick's level is kept, a step behind.
-        assert!(spin[0].abs_diff(spin[3]) <= 1, "{spin:?}");
-        levels.push(spin[0]);
-        let fired = w.events.iter().any(
-            |e| matches!(e, SimEvent::ShotFired { blueprint, weapon: 0, .. } if *blueprint == id),
-        );
-        if fired && first.is_none() {
-            first = Some(t);
-            assert_eq!(spin[0], run, "lit before it had run up");
+        for event in &w.events {
+            if let SimEvent::ShotFired {
+                blueprint,
+                weapon: 0,
+                vel,
+                ..
+            } = event
+            {
+                if *blueprint == id {
+                    first.get_or_insert(tick);
+                    directions.push(vel.y);
+                }
+            }
         }
     }
-    assert!(first.is_some(), "the beam never fired");
-    assert!(w.state.units.row(target).is_none(), "the tank still stands");
-    // With nothing left to shoot, it ran down again.
-    assert_eq!(*levels.last().unwrap(), 0);
+    assert!(
+        first.is_some_and(|t| t < 5),
+        "ready lance lights immediately: {first:?}"
+    );
+    assert!(directions.iter().any(|y| *y > Fx::ZERO));
+    assert!(directions.iter().any(|y| *y < Fx::ZERO));
+    assert!(directions.len() > 80, "holds through its terrain sweep");
 }
 
 /// A lot remembers which faction it was levelled for, so the renderer clads the slopes
