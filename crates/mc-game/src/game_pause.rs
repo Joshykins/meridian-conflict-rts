@@ -81,7 +81,7 @@ impl Game {
                 hud::style::Family::Control.tone(),
             ),
             Priority::Even => (
-                "Priority Even: follows the Mines/Power row",
+                "Priority Auto: follows the Mines/Power row",
                 hud::style::Family::Control.tone(),
             ),
         };

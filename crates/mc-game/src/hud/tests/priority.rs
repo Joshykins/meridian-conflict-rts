@@ -26,6 +26,25 @@ fn card_segment(col: usize, n: f32) -> Vec2 {
     )
 }
 
+/// The order card's last column, the one that holds Pause and the small Priority control.
+fn last_col(rig: &Rig) -> usize {
+    let stats = FrameStats::default();
+    let s = Scene {
+        view: &rig.view,
+        blueprints: &rig.blueprints,
+        map: &rig.map,
+        camera: &rig.camera,
+        gpu: &stats,
+        hover: None,
+        show_reclaim: false,
+        placing: None,
+        placing_open: None,
+        net: None,
+        net_notices: &[],
+    };
+    selection::order_families(&s, &[&rig.view.frame.units[0]]) - 1
+}
+
 fn set(rig: &mut Rig, p: Priority) {
     rig.view.frame.units[0].status[0] |= (p as u32) << UNIT_PRIORITY_SHIFT;
     rig.settle();
@@ -57,22 +76,7 @@ fn the_strip_sets_a_factorys_priority_and_the_lit_one_goes_back_to_even() {
 fn the_card_head_sets_an_idle_engineers_priority_and_a_tank_has_none() {
     // An idle engineer has no queue, so no strip: its card's last column (Work) has it.
     let mut rig = Rig::new("aster_t1_engineer");
-    let col = selection::order_families(
-        &Scene {
-            view: &rig.view,
-            blueprints: &rig.blueprints,
-            map: &rig.map,
-            camera: &rig.camera,
-            gpu: &FrameStats::default(),
-            hover: None,
-            show_reclaim: false,
-            placing: None,
-            placing_open: None,
-            net: None,
-            net_notices: &[],
-        },
-        &[&rig.view.frame.units[0]],
-    ) - 1;
+    let col = last_col(&rig);
     assert_eq!(
         rig.click(card_segment(col, 2.0)),
         vec![HudAction::Priority(Priority::First)]
@@ -85,4 +89,64 @@ fn the_card_head_sets_an_idle_engineers_priority_and_a_tank_has_none() {
     // A tank has no work to order.
     let mut rig = Rig::new("aster_t1_tank");
     assert_eq!(rig.click(card_segment(3, 2.0)), vec![]);
+}
+
+#[test]
+fn on_auto_a_unit_inherits_what_the_row_gives_its_current_work() {
+    use mc_sim::focus::Focus;
+    let mut rig = Rig::new("aster_t1_engineer");
+    let build = |rig: &mut Rig, key: &str| {
+        let blueprint = rig.blueprints.id_of(key).unwrap();
+        rig.view.status.queues = vec![UnitOrders {
+            unit_id: 7,
+            orders: vec![QueuedOrder {
+                formation: 0,
+                offset: [0.0; 2],
+                moving_slot: None,
+                formation_phase: 0,
+                kind: OrderKind::Build,
+                pos: [0.0, 0.0],
+                at: mc_core::FxVec2::ZERO,
+                blueprint,
+                radius: 0.0,
+            }],
+            ..Default::default()
+        }];
+    };
+    let inherit = |rig: &Rig| {
+        let stats = FrameStats::default();
+        let s = Scene {
+            view: &rig.view,
+            blueprints: &rig.blueprints,
+            map: &rig.map,
+            camera: &rig.camera,
+            gpu: &stats,
+            hover: None,
+            show_reclaim: false,
+            placing: None,
+            placing_open: None,
+            net: None,
+            net_notices: &[],
+        };
+        super::super::priority::inherited(&s, &rig.view.frame.units[0]).map(|i| i.p)
+    };
+    assert_eq!(inherit(&rig), None, "idle: nothing to judge by");
+    rig.view.status.players[0].focus = Focus {
+        mines: Priority::Last,
+        power: Priority::First,
+    };
+    build(&mut rig, "aster_t1_power");
+    assert_eq!(inherit(&rig), Some(Priority::First));
+    build(&mut rig, "aster_t1_land_factory");
+    assert_eq!(
+        inherit(&rig),
+        Some(Priority::Even),
+        "the row does not cover factories"
+    );
+    // Drawn with its ghost and clickable as ever: Auto is the middle segment.
+    build(&mut rig, "aster_t1_power");
+    assert_eq!(
+        rig.click(card_segment(last_col(&rig), 2.0)),
+        vec![HudAction::Priority(Priority::First)]
+    );
 }

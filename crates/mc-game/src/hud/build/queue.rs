@@ -69,6 +69,8 @@ pub(super) struct Queue<'a> {
     /// How the selection stands on Priority, and this builder's own.
     pub(super) priority: Mix,
     pub(super) own_priority: mc_sim::focus::Priority,
+    /// What the economy row gives this builder's work while it is on Auto.
+    pub(super) inherit: Option<priority::Inherit>,
     /// What the front entry is (producing, building, upgrading), when it heads the queue.
     pub(super) front: Option<OrderKind>,
     /// The builder whose queue it is: another one closes the whole-queue tray.
@@ -272,7 +274,7 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
         )
     } else if queue.paused {
         (format!("{waiting} waiting  \u{b7}  Z resumes"), BUILDING)
-    } else if let Some(note) = priority::note(s, queue.own_priority) {
+    } else if let Some(note) = priority::note(s, queue.own_priority, queue.inherit) {
         note
     } else if queue.front.is_some() {
         let next = match waiting {

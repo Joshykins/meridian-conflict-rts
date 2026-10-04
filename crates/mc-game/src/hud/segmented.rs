@@ -69,6 +69,37 @@ pub(in crate::hud) fn pill(ui: &mut Ui, r: Rect, at: f32, count: usize, color: C
     ui.outline_cut(p, c, edge, edge);
 }
 
+/// A dashed ghost of the pill on segment `n`, `k` zero to one: where something else (the
+/// economy row) puts it, short of a choice of its own.
+pub(in crate::hud) fn ghost(ui: &mut Ui, r: Rect, n: usize, count: usize, color: Color, k: f32) {
+    if k <= 0.01 {
+        return;
+    }
+    let p = inner(r, segment(r, n, count));
+    let c = cut(p);
+    let color = with_alpha(color, color[3] * k);
+    let t = 1.0;
+    let dash = |ui: &mut Ui, from: f32, len: f32, at: f32, across: bool| {
+        let (d, gap): (f32, f32) = (3.0, 2.5);
+        let mut x = from;
+        while x < from + len - 0.5 {
+            let l = d.min(from + len - x);
+            if across {
+                ui.fill(Rect::new(x, at, l, t), color);
+            } else {
+                ui.fill(Rect::new(at, x, t, l), color);
+            }
+            x += d + gap;
+        }
+    };
+    dash(ui, p.x + c, p.w - 2.0 * c, p.y, true);
+    dash(ui, p.x + c, p.w - 2.0 * c, p.bottom() - t, true);
+    dash(ui, p.y + c, p.h - 2.0 * c, p.x, false);
+    dash(ui, p.y + c, p.h - 2.0 * c, p.right() - t, false);
+    // The cut corners solid, so it still reads as the pill's shape.
+    ui.outline_cut(p, c, with_alpha(color, 0.0), color);
+}
+
 /// Where segment `n`'s inner area is, for a caller's own marks (a split gauge, an alarm).
 pub(in crate::hud) fn inner_segment(r: Rect, n: usize, count: usize) -> Rect {
     inner(r, segment(r, n, count))

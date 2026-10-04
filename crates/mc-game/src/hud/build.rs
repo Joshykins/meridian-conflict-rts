@@ -404,6 +404,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             paused: unit.paused(),
             priority: super::priority::Mix::of(s, units),
             own_priority: unit.priority(),
+            inherit: super::priority::inherited(s, unit),
             front: queue
                 .and_then(|q| q.orders.first())
                 .map(|o| o.kind)
