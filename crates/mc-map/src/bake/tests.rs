@@ -2,7 +2,7 @@ use super::*;
 use crate::file::MapFile;
 use crate::heightfield::Heightfield;
 use crate::test_util::{baked_4km, baked_islands, temp_path};
-use crate::MAX_MAP_TILES;
+use crate::{MAX_MAP_TILES, MAX_START_POSITIONS};
 
 /// Mean corner of every ore field.
 fn ore_centres(map: &MapFile) -> Vec<FxVec2> {
