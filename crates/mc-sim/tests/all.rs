@@ -80,6 +80,7 @@ mod regency_space;
 mod regency_t3_guns;
 mod repair;
 mod repair_field;
+mod sealed_pocket;
 mod self_destruct;
 mod shield;
 mod site_map;

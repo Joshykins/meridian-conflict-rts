@@ -10,6 +10,8 @@ use mc_path::{
 };
 use std::sync::Arc;
 
+mod pockets;
+
 /// Steeper than this (rise over run) and ground units cannot cross the cell.
 const MAX_SLOPE: Fx = Fx::ratio(1, 2);
 /// Water shallower than this is wadeable but not navigable by ships.
@@ -62,6 +64,7 @@ pub struct Nav {
     /// apron, from being built over. Derived from the units: never snapshotted.
     lots: Vec<bool>,
     lots_w: u32,
+    pockets: pockets::Pockets,
 }
 
 fn layer(l: mc_data::MoveLayer) -> mc_path::MoveLayer {
@@ -88,6 +91,7 @@ pub struct NavSnapshot {
     path_state: Vec<u8>,
     handles: Vec<Option<u64>>,
     free: Vec<u32>,
+    pockets: Vec<(u8, u8, i32, i32)>,
 }
 
 /// A cell's terrain class (`mc_path::terrain`) from the heightfield alone:
@@ -123,6 +127,7 @@ impl Nav {
             free: Vec::new(),
             lots: vec![false; (w * h) as usize],
             lots_w: w,
+            pockets: pockets::Pockets::default(),
         })
     }
 
@@ -136,6 +141,7 @@ impl Nav {
                 .map(|h| h.map(FieldId::to_bits))
                 .collect(),
             free: self.free.clone(),
+            pockets: self.pockets.export(),
         }
     }
 
@@ -163,6 +169,7 @@ impl Nav {
             free: snapshot.free.clone(),
             lots: vec![false; (terrain.size_cells().0 * terrain.size_cells().1) as usize],
             lots_w: terrain.size_cells().0,
+            pockets: pockets::Pockets::import(&snapshot.pockets),
         })
     }
 
@@ -194,7 +201,7 @@ impl Nav {
         from: FxVec2,
     ) -> Result<Route, SimError> {
         let (l, s) = (layer(l), size(size_class));
-        let Some(goal_cell) = self.inner.nearest_passable(l, s, goal, GOAL_SEARCH_CELLS) else {
+        let Some(goal_cell) = self.nearest_cell(l, s, goal) else {
             return Ok(Route::Unreachable);
         };
         let goal = if Cell::from_pos(goal) == goal_cell {
@@ -202,16 +209,13 @@ impl Nav {
         } else {
             goal_cell.center()
         };
-        let from = self
-            .inner
-            .nearest_passable(l, s, from, GOAL_SEARCH_CELLS)
-            .map_or(from, |c| {
-                if Cell::from_pos(from) == c {
-                    from
-                } else {
-                    c.center()
-                }
-            });
+        let from = self.nearest_cell(l, s, from).map_or(from, |c| {
+            if Cell::from_pos(from) == c {
+                from
+            } else {
+                c.center()
+            }
+        });
         let id = match self.inner.request(l, s, goal, &[from]) {
             Ok(id) => id,
             Err(PathError::GoalImpassable | PathError::OutOfMap | PathError::Impassable) => {
@@ -282,8 +286,8 @@ impl Nav {
         if l == mc_data::MoveLayer::Air {
             return true;
         }
-        self.inner
-            .is_passable(layer(l), size(size_class), Cell::from_pos(pos))
+        let (l, s, c) = (layer(l), size(size_class), Cell::from_pos(pos));
+        self.inner.is_passable(l, s, c) && !self.pockets.contains(l, s, c)
     }
 
     /// Closest standable point to `pos` for this hull. Air may stand anywhere.
@@ -324,15 +328,13 @@ impl Nav {
         if l == mc_data::MoveLayer::Air {
             return Some(pos);
         }
-        self.inner
-            .nearest_passable(layer(l), size(size_class), pos, GOAL_SEARCH_CELLS)
-            .map(|c| {
-                if Cell::from_pos(pos) == c {
-                    pos
-                } else {
-                    c.center()
-                }
-            })
+        self.nearest_cell(layer(l), size(size_class), pos).map(|c| {
+            if Cell::from_pos(pos) == c {
+                pos
+            } else {
+                c.center()
+            }
+        })
     }
 
     fn rect(min: (u32, u32), max_inclusive: (u32, u32)) -> CellRect {
@@ -398,6 +400,63 @@ impl Nav {
         }
     }
 
+    /// Works out the pockets round cells a structure just took or gave back.
+    /// Only structures and city blocks coming down call this: the map's own
+    /// city, blocked before the match, is full of shut courtyards no unit is in.
+    pub fn reseal(&mut self, min: (u32, u32), max_inclusive: (u32, u32)) {
+        self.pockets
+            .update(&self.inner, Self::rect(min, max_inclusive));
+    }
+
+    /// Path cells inside pockets, summed over every layer and size class.
+    pub fn pocket_cells(&self) -> usize {
+        self.pockets.len()
+    }
+
+    /// The standable cell nearest `pos`: its own if it can stand there. A
+    /// pocket's cells are left out, so this is the way out of one.
+    fn nearest_cell(&self, l: mc_path::MoveLayer, s: SizeClass, pos: FxVec2) -> Option<Cell> {
+        let found = self.inner.nearest_passable(l, s, pos, GOAL_SEARCH_CELLS)?;
+        if !self.pockets.contains(l, s, found) {
+            return Some(found);
+        }
+        let origin = Cell::from_pos(pos);
+        let open = |c: Cell| self.inner.is_passable(l, s, c) && !self.pockets.contains(l, s, c);
+        // Ring by ring, as `mc_path`'s own search: nearest centre, then lowest y, then x.
+        let mut best: Option<(i64, Cell)> = None;
+        for r in 1..=GOAL_SEARCH_CELLS {
+            if let Some((d, _)) = best {
+                let reach = i64::from(r * mc_path::CELL_SIZE - mc_path::CELL_SIZE / 2)
+                    << (Fx::FRAC_BITS - 8);
+                if reach * reach >= d {
+                    break;
+                }
+            }
+            let ring = (-r..=r)
+                .flat_map(|i| {
+                    [
+                        Cell::new(origin.x + i, origin.y - r),
+                        Cell::new(origin.x + i, origin.y + r),
+                    ]
+                })
+                .chain(((1 - r)..r).flat_map(|i| {
+                    [
+                        Cell::new(origin.x - r, origin.y + i),
+                        Cell::new(origin.x + r, origin.y + i),
+                    ]
+                }));
+            for c in ring.filter(|&c| open(c)) {
+                let d = c.center() - pos;
+                let (dx, dy) = (d.x.0 >> 8, d.y.0 >> 8);
+                let key = (dx * dx + dy * dy, c);
+                if best.is_none_or(|b| (key.0, key.1.y, key.1.x) < (b.0, b.1.y, b.1.x)) {
+                    best = Some(key);
+                }
+            }
+        }
+        best.map(|(_, c)| c)
+    }
+
     pub fn stats(&self) -> mc_path::NavStats {
         self.inner.stats()
     }
@@ -405,6 +464,7 @@ impl Nav {
     pub fn hash(&self, h: &mut StateHasher) {
         self.inner.hash(h);
         h.write_u32s(&self.free);
+        self.pockets.hash(h);
         h.write_u64(self.handles.len() as u64);
     }
 }

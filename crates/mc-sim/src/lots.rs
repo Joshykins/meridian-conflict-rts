@@ -124,6 +124,9 @@ impl World {
         for (min, max) in restore {
             self.nav.block_cells(min, max);
         }
+        for (min, max) in released {
+            self.nav.reseal(min, max);
+        }
     }
 
     /// Opens the cells map prop `prop` (a city structure that came down, its
@@ -161,12 +164,16 @@ impl World {
         for (min, max) in restore {
             self.nav.block_cells(min, max);
         }
+        for (min, max) in released {
+            self.nav.reseal(min, max);
+        }
     }
 
     /// Blocks a structure's hull for pathing and takes its lot.
     pub(crate) fn occupy_lot(&mut self, bp: &UnitBlueprint, pos: FxVec2, heading: Angle) {
         for (min, max) in hull_cells(bp, pos, heading) {
             self.nav.block_cells(min, max);
+            self.nav.reseal(min, max);
         }
         let lot = place_cells_of(bp.footprint, pos);
         self.nav.set_lot(lot.0, lot.1, true);
