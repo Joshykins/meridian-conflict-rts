@@ -636,6 +636,60 @@ fn two_builders_print_on_their_own_side() {
 }
 
 #[test]
+fn a_refit_tells_its_own_side_the_time_it_has_left() {
+    let (mut w, acu) = with_commander();
+    w.tick(&[cmd(refit(&w, acu, "eng_2"))]).unwrap();
+    w.tick(&[]).unwrap();
+    let mut frame = mc_sim::RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    // Shown on the commander as drawn, not on the hidden body it is becoming.
+    let left = frame
+        .work_left
+        .iter()
+        .find(|l| l.unit_id == acu.0)
+        .expect("the refit lists its time left")
+        .seconds;
+    // Suite II: 1800 build time at the commander's own power of 10, 180 s.
+    assert!((170.0..=180.0).contains(&left), "{left} s left");
+    for _ in 0..50 {
+        w.tick(&[]).unwrap();
+    }
+    w.write_render_frame(Some(0), &mut frame);
+    assert!(frame.work_left[0].seconds < left, "the time left runs down");
+    w.write_render_frame(Some(1), &mut frame);
+    assert!(frame.work_left.is_empty(), "shown to the enemy");
+}
+
+#[test]
+fn a_structure_upgrade_tells_the_time_it_has_left() {
+    let (mut w, _) = with_commander();
+    w.tick(&[spawn(&w, 0, "aster_t1_land_factory", 600, 0)])
+        .unwrap();
+    let factory = w.blueprints.id_of("aster_t1_land_factory").unwrap();
+    let fid = w
+        .state
+        .units
+        .slots
+        .iter()
+        .find(|&r| w.state.units.blueprint[r] == factory)
+        .map(|r| w.state.units.id(r))
+        .expect("the factory spawned");
+    w.tick(&[cmd(Command::Upgrade { units: vec![fid] })])
+        .unwrap();
+    w.tick(&[]).unwrap();
+    let mut frame = mc_sim::RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    assert!(
+        frame
+            .work_left
+            .iter()
+            .any(|l| l.unit_id == fid.0 && l.seconds > 0.0),
+        "the upgrade lists its time left on the factory ({:?})",
+        frame.work_left
+    );
+}
+
+#[test]
 fn assisting_an_upgrade_puts_a_build_beam_on_it() {
     let (mut w, acu) = with_commander();
     w.tick(&[spawn(&w, 0, "aster_t1_land_factory", 600, 0)])

@@ -118,17 +118,16 @@ impl World {
         let paused_mark = s.units.paused[row] && own_view;
         let batch_mark = own_view && self.batching(row);
         let site = self.structure_upgrade(row);
+        // The modules it is being refitted with show on it as the work goes on.
         let refit = s
             .orders
             .front(&s.units, row)
             .filter(|o| o.kind == crate::tables::OrderKind::Upgrade && self.upgrades_in_place(row));
-        let upgrade = site
-            .or(refit.and_then(|_| s.units.row(s.units.build_target[row])))
-            .map_or(0.0, |t| {
-                (s.units.build_progress[t] / self.bp(t).build_time)
-                    .to_f32()
-                    .clamp(0.002, 1.0)
-            });
+        let upgrade = self.upgrade_work(row).map_or(0.0, |t| {
+            (s.units.build_progress[t] / self.bp(t).build_time)
+                .to_f32()
+                .clamp(0.002, 1.0)
+        });
         let step = s.units.gait_step[row];
         let mut flags = s.units.flags[row];
         // In warp it is out of the world, not in a factory: drawn as it leaves, then only listed.

@@ -1,9 +1,9 @@
 //! Work under way shows without a selection. Whatever a side builds carries its
 //! progress bar (bars only, no ring): a site going up, a structure upgrading, a
-//! factory's product, an engineer's build or assist. A site also carries its
-//! percentage, and the time it has left while its builders are at it, on a tab
-//! hanging from its construction bar; the engineers round it do not, so a crowd of
-//! them does not repeat the figure.
+//! factory's product, an engineer's build or assist. A site or an upgrade also
+//! carries its percentage, and the time it has left while its work moves
+//! (`mirror::WorkLeft`), on a tab hanging from its construction bar; the engineers
+//! round it do not, so a crowd of them does not repeat the figure.
 
 use super::{unit_bar_shield, unit_bar_work, View};
 use crate::orders::Field;
@@ -76,18 +76,17 @@ const BUILD_H: f32 = 5.0;
 const SHIELD_H: f32 = 4.0;
 const GAP: f32 = 2.0;
 
-/// The percentage tag under each friendly site's bars, with the time left when a
-/// builder of the viewer's is on it.
+/// The percentage tag under each friendly site's or upgrade's bars, with the time
+/// left while its work moves.
 pub(crate) fn draw_tags(ui: &mut Ui, field: &Field, alpha: f32, friend: impl Fn(u8) -> bool) {
     let _t = mc_core::perf_span!("ui.work_tags");
     let view = field.view;
-    // Every builder on a site sees the same pace, so any one of them gives its time.
     let eta_of = |id: u32| {
-        view.status
-            .queues
+        view.frame
+            .work_left
             .iter()
-            .find(|q| q.building == Some(id))
-            .and_then(|q| q.eta)
+            .find(|w| w.unit_id == id)
+            .map(|w| w.seconds)
     };
     let camera = field.camera;
     let eye = camera.eye();

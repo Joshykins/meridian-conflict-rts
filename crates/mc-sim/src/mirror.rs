@@ -29,6 +29,7 @@ mod links;
 mod units;
 mod walls;
 mod warp;
+mod work;
 mod wrecks;
 
 pub use batch::{BatchView, UNIT_BATCH};
@@ -37,6 +38,7 @@ pub use fog::VisionDisc;
 pub use links::LinkView;
 pub use walls::{join_walls, WALL_JOINS};
 pub use warp::{UNIT_IN_WARP, UNIT_WARP_DAMPED};
+pub use work::WorkLeft;
 pub use wrecks::WRECK_EXTRA_INSTANCES;
 
 /// Wave origins drawn at once. A crowd on one site is clustered before it lands here.
@@ -834,9 +836,6 @@ pub struct UnitOrders {
     /// Seconds of game time before that thing is finished at last tick's pace, every
     /// builder on it counted; `None` when it builds nothing or the work stands still.
     pub eta: Option<f32>,
-    /// The unit id of that thing (itself while it goes up with builders on it), so a
-    /// site's own tag can read the time left off the builders at it.
-    pub building: Option<u32>,
     /// Per second, last tick. Made: what it produced (generator or mine output, materials
     /// reclaimed). Wanted: what its building, repairs and upkeep asked for at the full rate.
     /// Used: what it was given of that; less than wanted while its side stalls.
@@ -1362,6 +1361,9 @@ pub struct RenderFrame {
     pub warps: Vec<WarpView>,
     /// Timed self-destructs counting down that the viewer may see (`crate::destruct`).
     pub destructs: Vec<DestructView>,
+    /// The time left on the viewer's side's sites and upgrades whose work is moving
+    /// (`work::WorkLeft`), by the unit as drawn.
+    pub work_left: Vec<WorkLeft>,
     /// Warp dampeners the viewer knows of, and their fields.
     pub dampers: Vec<DamperView>,
     /// Adjacency links the viewer may see (`crate::adjacency`).
@@ -1720,23 +1722,6 @@ impl World {
         self.state.units.slots.iter().find(|&row| {
             self.bp(row).has(mc_data::cat::FACTORY) && self.state.units.build_target[row] == id
         })
-    }
-
-    /// The hidden successor a structure is assembling in place, when there is one.
-    /// Factories, extractors, intel towers and shield generators are refitted
-    /// like a mobile unit: the next kit is built onto them.
-    fn structure_upgrade(&self, row: usize) -> Option<usize> {
-        use crate::tables::flag;
-        if self.upgrades_in_place(row) {
-            return None;
-        }
-        self.state
-            .units
-            .row(self.state.units.build_target[row])
-            .filter(|&t| {
-                self.state.units.has_flag(t, flag::UPGRADE)
-                    && self.state.units.has_flag(t, flag::UNDER_CONSTRUCTION)
-            })
     }
 
     /// Each open site's print origins: one per mobile builder after nearby
@@ -2630,6 +2615,7 @@ impl World {
         );
         self.write_warps(viewer, &mut frame.warps);
         self.write_destructs(viewer, &mut frame.destructs);
+        self.write_work_left(viewer, &mut frame.work_left);
         self.write_dampers(viewer, &mut frame.dampers);
         self.write_links(viewer, &mut frame.links);
 
@@ -2738,11 +2724,7 @@ impl World {
             let rate = |v: Fx| (v * TICKS_PER_SECOND as i32).to_f32();
             // What it builds, or itself while it goes up with builders on it.
             let building = target.or_else(|| (flow.built > Fx::ZERO).then_some(row));
-            let eta = building.and_then(|t| {
-                let pace = rate(self.flows.get(t).map_or(Fx::ZERO, |f| f.built));
-                let left = (self.bp(t).build_time - s.units.build_progress[t]).to_f32();
-                (pace > 0.0 && left > 0.0).then(|| left / pace)
-            });
+            let eta = building.and_then(|t| self.work_left(t));
             let standing = self
                 .standing_view(row)
                 .into_iter()
@@ -2764,7 +2746,6 @@ impl World {
                 standing,
                 progress,
                 eta,
-                building: building.map(|t| s.units.id(t).0),
                 mass_made: rate(flow.made[0]),
                 energy_made: rate(flow.made[1]),
                 mass_wanted: rate(flow.wanted[0]),
