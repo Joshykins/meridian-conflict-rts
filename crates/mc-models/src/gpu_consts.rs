@@ -216,6 +216,19 @@ shared! {
         pub const GRID: u32 = 12;
     }
 
+    /// A city structure's look, one word per map prop in scene set binding 33
+    /// (renderer/city_fx.rs, entity.wgsl): how hurt it is (the low byte, 0
+    /// whole to 255 down), whether it burns, has burned out or is down, and
+    /// the seconds since that last changed.
+    pub mod city_look as "CITY_LOOK_" {
+        pub const DAMAGE_MASK: u32 = 0xFF;
+        pub const BURNING: u32 = 0x100;
+        pub const GUTTED: u32 = 0x200;
+        pub const DOWN: u32 = 0x400;
+        pub const AGE_SHIFT: u32 = 16;
+        pub const AGE_MAX: u32 = 0xFFFF;
+    }
+
     /// The map's streets layer as the terrain shader reads it (ground cover
     /// layer 2, `ground_cover::streets_at_texels`): the kinds of road and of
     /// ground are `mc_map::Road` and `mc_map::Ground`, held equal by
@@ -584,6 +597,9 @@ shared! {
         /// swelling from `params.x` to `params.y`; `appearance.rgb` its brightness.
         pub const NOVA_WISP: u32 = 58;
         pub const NOVA_WISP_DRAG: f32 = 1.2;
+        /// A pane's worth of glass thrown off a building (renderer/city_fx.rs):
+        /// flies and tumbles like a casing, glinting, and lies where it lands.
+        pub const GLASS: u32 = 59;
     }
 
     /// Colours of a fading beam (`ProjectileInstance::color` low bits under

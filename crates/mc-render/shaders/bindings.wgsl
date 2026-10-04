@@ -838,6 +838,9 @@ struct CraterList {
 
 // Heat in the ground (renderer/ground_melt.rs): the layout is `MELT_FIELD_*`.
 @group(0) @binding(32) var<storage, read> ground_melt: array<u32>;
+// A city structure's look, one word per map prop (renderer/city_fx.rs,
+// gpu_consts::city_look): 0 for every prop that is whole or no building.
+@group(0) @binding(33) var<storage, read> city_look: array<u32>;
 
 // The slot (plus one) of the melt field's tile at `tile`, 0 if it has none. The
 // renderer's `first_entry` hashes the same way.

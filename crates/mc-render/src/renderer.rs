@@ -45,6 +45,7 @@ mod damper_fx;
 mod dive_fx;
 mod drive_swing;
 pub use capture::Shot;
+mod city_fx;
 mod clearing;
 mod cliff_rocks;
 mod cluster_fx;
@@ -129,7 +130,8 @@ pub const MAX_DYNAMIC: usize = MAX_SIM_ENTITIES
     + MAX_GHOSTS
     + MAX_BURNING_TREES
     + fallen_trees::MOST_SHOWN
-    + wreck_finish::MOST_SHOWN;
+    + wreck_finish::MOST_SHOWN
+    + city_fx::MOST_FALLING;
 /// Gun-house poses (`mirror::HousePose`): at most one per unit, so every unit can have one.
 pub const MAX_HOUSES: usize = mc_sim::tables::MAX_UNITS;
 /// Selection rings and status bars: at most one per unit or wreck drawn.
@@ -879,6 +881,8 @@ pub struct Renderer {
     craters: craters::Craters,
     /// Heat in the ground, molten then glass (renderer/ground_melt.rs, scene set 32).
     ground_melt: ground_melt::GroundMelt,
+    /// A city coming apart (renderer/city_fx.rs, scene set 33).
+    city_fx: city_fx::CityFx,
     /// Hot air shimmering over running engines' exhausts (renderer/heat_haze.rs, screen set 8).
     heat_haze: heat_haze::HeatHaze,
     /// Lens flares on bright points (renderer/lens_flare.rs, screen set 9).
@@ -1580,6 +1584,21 @@ impl Renderer {
             }));
             cliff_rocks::CliffRocks::new(&statics_data, first)
         };
+        // Under every city structure, the rubble it would leave (city_fx.rs).
+        let (heaps, heap_list) = {
+            let rubble = PropKind::ALL
+                .iter()
+                .position(|k| *k == PropKind::CityRubble)
+                .unwrap_or(0) as u32;
+            city_fx::heaps(
+                &scene.map,
+                statics_data.len() as u32,
+                prop_base + rubble,
+                |at| tile_cache.overview_height(at),
+            )
+        };
+        statics_data.extend(heaps);
+        let city_fx = city_fx::CityFx::new(&gpu, &scene.map, heap_list)?;
         let ore = ore_fields::OreFields::new(scene.map.ore_regions());
         let vein_mesh = ore_vein_mesh(scene.map.ore_regions());
         let static_count = statics_data.len() as u32;
@@ -2201,6 +2220,12 @@ impl Renderer {
         );
         write_buffers(
             scene_set,
+            33,
+            vk::DescriptorType::STORAGE_BUFFER,
+            &[city_fx.buffer()],
+        );
+        write_buffers(
+            scene_set,
             25,
             vk::DescriptorType::STORAGE_BUFFER,
             &[&light_list, &light_grid],
@@ -2382,6 +2407,7 @@ impl Renderer {
             nuke_fx: nuke_fx::NukeFx::default(),
             craters,
             ground_melt,
+            city_fx,
             heat_haze,
             lens_flares,
             lift_fx: lift_fx::LiftFx::new(lift_models),
@@ -3175,12 +3201,11 @@ impl Renderer {
         let used = stained + pads.len();
         self.ore.upload(&self.stains, used, MAX_STAINS, time);
 
-        let dead_bytes: &[u8] =
-            bytemuck::cast_slice(self.cliff_rocks.dead_props(&frame.props_dead));
-        self.props_dead.write(
-            0,
-            &dead_bytes[..dead_bytes.len().min(self.props_dead.size as usize)],
-        );
+        let mut dead = self.cliff_rocks.dead_props(&frame.props_dead).to_vec();
+        dead.resize(self.props_dead.size as usize / 4, 0);
+        self.city_fx.hide_heaps(&frame.props_dead, &mut dead);
+        self.props_dead.write(0, bytemuck::cast_slice(&dead));
+        self.city_fx.set_looks(&frame.city, frame.tick);
 
         // Units glide from the last tick's place to this one's over the coming
         // tick, so what a tick reports is timed against that stretch.
@@ -3212,6 +3237,7 @@ impl Renderer {
             }
         }
         self.tree_fires(frame, time, camera);
+        self.city_events(frame, time, camera);
         self.trample_trees(frame, time);
         self.clear_lots(frame, time);
         for event in &frame.events {
@@ -3672,6 +3698,14 @@ impl Renderer {
                 [motion.x, motion.y, motion.z, 1.0]
             } else if kind == nuke_fx::PUFF_STRATEGIC_TRAIL && motion.x != 0.0 {
                 [-1.0, -1.0, -1.0, motion.x]
+            } else if dusty && motion != Vec3::ZERO {
+                // Dust or smoke of a colour of its own: a city's masonry (city_fx.rs).
+                [
+                    motion.x,
+                    motion.y,
+                    motion.z,
+                    self.effect_settings.dust_brightness,
+                ]
             } else if dusty {
                 let rgb = self.effect_settings.dust_color.unwrap_or([-1.0; 3]);
                 [rgb[0], rgb[1], rgb[2], self.effect_settings.dust_brightness]
@@ -5499,6 +5533,7 @@ impl Drop for Renderer {
         self.shafts.destroy(&self.gpu);
         self.craters.destroy(&self.gpu);
         self.ground_melt.destroy(&self.gpu);
+        self.city_fx.destroy(&self.gpu);
         self.heat_haze.destroy(&self.gpu);
         self.lens_flares.destroy(&self.gpu);
         self.cull.destroy(&self.gpu);

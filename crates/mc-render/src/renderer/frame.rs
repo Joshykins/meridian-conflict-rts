@@ -172,9 +172,24 @@ impl Renderer {
             bytemuck::cast_slice(going),
         );
         self.dynamic_count += going.len() as u32;
-        self.cull
-            .draws
-            .update(ghosts.iter().chain(&trees).chain(fallen).chain(going));
+        // City buildings coming down (city_fx.rs).
+        let falling = self.city_fx.falling_instances(input.time);
+        let falling = &falling[..falling
+            .len()
+            .min(MAX_DYNAMIC.saturating_sub(self.dynamic_count as usize))];
+        self.dynamic.write(
+            (self.dynamic_count as usize * size_of::<UnitInstance>()) as u64,
+            bytemuck::cast_slice(falling),
+        );
+        self.dynamic_count += falling.len() as u32;
+        self.cull.draws.update(
+            ghosts
+                .iter()
+                .chain(&trees)
+                .chain(fallen)
+                .chain(going)
+                .chain(falling),
+        );
 
         let z_range = (
             self.map_info.min_z.to_f32(),

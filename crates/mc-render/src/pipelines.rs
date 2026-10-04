@@ -526,6 +526,8 @@ pub(crate) const SCENE_SET: &[(u32, vk::DescriptorType)] = &[
     (31, vk::DescriptorType::STORAGE_BUFFER),
     // Heat in the ground (renderer/ground_melt.rs).
     (32, vk::DescriptorType::STORAGE_BUFFER),
+    // How hurt each city structure is (renderer/city_fx.rs).
+    (33, vk::DescriptorType::STORAGE_BUFFER),
 ];
 
 impl Layouts {

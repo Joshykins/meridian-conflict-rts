@@ -208,7 +208,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     var pos: vec3<f32>;
     // How far a casing has tumbled (radians), frozen once it lies still.
     var tumble = 0.0;
-    if kind == PUFF_CASING {
+    if kind == PUFF_CASING || kind == PUFF_GLASS {
         let at = casing_at(p, t);
         pos = at.xyz;
         // Into the sea: under the water it would draw on top of it.
@@ -508,7 +508,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
         return out;
     }
     let center = globals.view_proj * vec4<f32>(pos, 1.0);
-    let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_CASING || kind == PUFF_RECLAIM || kind == PUFF_INTERCEPT;
+    let mote = kind == PUFF_SPARK || kind == PUFF_BOLT || kind == PUFF_SHARD || kind == PUFF_CASING || kind == PUFF_GLASS || kind == PUFF_RECLAIM || kind == PUFF_INTERCEPT;
     // A floor keeps a fire visible once the camera is far enough that its true
     // size would fall under the cull and the whole patch would vanish at once.
     let floor_px = select(select(select(0.0, 1.2, mote), 3.2, kind == PUFF_FIRE || kind == PUFF_BLAST || kind == PUFF_FLAK), 6.0, kind == PUFF_GROUND_FIRE);
@@ -537,7 +537,7 @@ fn puff_vertex(corner: vec2<f32>, instance: u32) -> PuffOut {
     if kind == PUFF_LAMP {
         out.roll = p.vel;
     }
-    if kind == PUFF_CASING {
+    if kind == PUFF_CASING || kind == PUFF_GLASS {
         // x tumble, y pixels across: a casing a pixel or two wide is drawn as a dot.
         out.roll = vec3<f32>(tumble, px, 0.0);
     }
@@ -832,6 +832,25 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
 
         let alpha = 1.0 - smoothstep(0.7, 1.0, age);
         return vec4<f32>((brass + light) * alpha, alpha);
+    }
+    if kind == PUFF_GLASS {
+        // A shard of a pane (renderer/city_fx.rs): a thin, jagged sliver turning
+        // over as it falls, the sky in it, flashing as a face swings to the sun.
+        let spin = in.roll.x;
+        let c = cos(spin);
+        let s = sin(spin);
+        let q = vec2<f32>(in.uv.x * c - in.uv.y * s, in.uv.x * s + in.uv.y * c);
+        let thin = 0.12 + 0.75 * abs(cos(spin * 0.83 + in.state.z * 4.0));
+        let jag = 0.85 - 0.3 * abs(fract(q.x * 2.3 + in.state.z * 7.0) - 0.5);
+        let tiny = in.roll.y < 3.0;
+        if !tiny && (abs(q.y) > thin * 0.6 || abs(q.x) > jag) { discard; }
+        let sky = vec3<f32>(0.32, 0.38, 0.45) * (0.7 + 0.5 * abs(q.y / max(thin, 0.1)));
+        var glass = apply_haze(apply_fog_of_war(sky, in.world.xy), in.world, eye);
+        let glint = pow(max(cos(spin * 1.9 + in.state.z * 11.0), 0.0), 18.0) * 3.0;
+        let fog = fog_at(in.world.xy).x;
+        glass += vec3<f32>(1.0, 0.97, 0.9) * glint * fog;
+        let alpha = (1.0 - smoothstep(0.75, 1.0, age)) * 0.85;
+        return vec4<f32>(glass * alpha, alpha);
     }
     if kind == PUFF_RECLAIM {
         // White-hot as it tears off, then the Materials red-orange (`MASS_*`), then a red
