@@ -212,6 +212,9 @@ fn setup(w: &mut World) {
                 add("aster_t3_power", 1, 700, 150);
                 add("aster_t2_radar", 1, 150, 150);
                 add("aster_t2_warp_damper", 1, 1300, 300);
+                // An Exarch with its Nanite Repair Field by the north's AA, which start
+                // half dead, mending them (`repair_field.rs`).
+                add("regency_commander+nano_field", 1, 800, 540);
             }
         }
     }
@@ -225,6 +228,13 @@ fn setup(w: &mut World) {
         },
     });
     w.tick(&spawns).unwrap();
+    // The north's AA start hurt, for the Exarch's repair field to mend.
+    let aa = w.blueprints.id_of("aster_t1_aa").unwrap();
+    for row in w.state.units.slots.iter().collect::<Vec<_>>() {
+        if w.state.units.owner[row] == 1 && w.state.units.blueprint[row] == aa {
+            w.state.units.health[row] = w.unit_max_health(row) / 2;
+        }
+    }
 }
 
 /// A tank of the south's that, from tick 3, shoots at the ground behind a house.

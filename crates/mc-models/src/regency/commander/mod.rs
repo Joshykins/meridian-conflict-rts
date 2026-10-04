@@ -19,16 +19,20 @@
 //! - Refits (`b.module`): the engineering suites go on the hand's forearm. Suite II adds
 //!   twin emitters rocking on it and bronze feed canisters; Suite III a lance that runs
 //!   out of the palm while it builds (`LANCE_TIP`, the unit file's `arm_emitter` when run
-//!   out), a ring of emitters round the wrist and a feed drum over the elbow. The back
-//!   carries the Personal Shield (`back`).
+//!   out), a ring of emitters round the wrist and a feed drum over the elbow. The cannon
+//!   forearm is rebuilt as the pinched-plasmeric, then the pinch-fusion cannon
+//!   (`cannons`). The back carries Nanite Repair and its field, or the Material Formation
+//!   Engine (`back`); the left shoulder the auxiliary engineering arm (`shoulder`).
 
 mod arms;
 mod back;
 mod body;
+mod cannons;
 mod chest;
 pub(super) mod form;
 mod head;
 mod legs;
+mod shoulder;
 #[cfg(test)]
 mod tests;
 
@@ -86,7 +90,8 @@ pub(super) fn commander(b: &mut MeshBuilder, _tech: u8) {
         head::head(b);
         arms::cannon(b);
         arms::claw(b);
-        back::shield(b);
+        back::back(b);
+        shoulder::aux_eng(b);
     });
 }
 
@@ -128,7 +133,14 @@ fn coarse(b: &mut MeshBuilder) {
         dark_plate(b);
         b.face(&[v3(1.6, -0.5, 20.6), v3(-0.6, 0.0, 23.0), v3(1.6, 0.5, 20.6)]);
         b.with_limb(rig::ARM_GUN, |b| {
-            bar(b, v3(-1.0, MUZZLE.y, MUZZLE.z), MUZZLE, 0.6, false)
+            let tier = |b: &mut MeshBuilder, x: f32, w: f32| {
+                bar(b, v3(-1.0, MUZZLE.y, MUZZLE.z), MUZZLE.with_x(x), w, false)
+            };
+            b.until("pinched", |b| tier(b, MUZZLE.x, 0.6));
+            b.module("pinched", 0.3, |b| {
+                b.until("fusion", |b| tier(b, cannons::PINCHED_TIP, 0.7))
+            });
+            b.module("fusion", 0.3, |b| tier(b, cannons::FUSION_TIP, 0.85));
         });
         b.with_limb(rig::ARM_TOOL, |b| {
             bar(
@@ -147,15 +159,8 @@ fn coarse(b: &mut MeshBuilder) {
                 b.face(&[v3(2.4, y - 0.3, z), v3(4.4, y, z), v3(2.4, y + 0.3, z)])
             });
         });
-        // The Personal Shield's star on the back, a lit point far off.
-        b.module("shield", 0.0, |b| {
-            b.paint(GLOW_PRISM);
-            b.face(&[
-                v3(-3.3, -0.5, 20.8),
-                v3(-3.6, 0.0, 22.2),
-                v3(-3.3, 0.5, 20.8),
-            ]);
-        });
+        back::coarse(b);
+        shoulder::coarse(b);
     });
 }
 

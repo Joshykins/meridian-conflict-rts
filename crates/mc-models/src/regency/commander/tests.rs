@@ -228,3 +228,91 @@ fn fits_the_triangle_budgets() {
         "{full}/{mid}/{coarse}"
     );
 }
+
+/// The unit file's commander with `keys` fitted, one after another.
+fn loadout(keys: &[&str]) -> mc_data::UnitBlueprint {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let blueprints = mc_data::Blueprints::load(&dir).unwrap();
+    let mut at = blueprints.id_of("regency_commander").unwrap();
+    for key in keys {
+        let set = blueprints.refit_set(at).unwrap();
+        let kit = set
+            .slots
+            .iter()
+            .flat_map(|s| &s.modules)
+            .find(|m| m.key == *key)
+            .unwrap()
+            .kit;
+        at = blueprints.refit_result(at, kit).unwrap();
+    }
+    blueprints.unit(at).clone()
+}
+
+#[test]
+fn each_rebuilt_cannon_ends_at_its_muzzle() {
+    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let model =
+        build_model_fitted("regency_commander", 10.4, HEIGHT, 1, &["pinched", "fusion"]).unwrap();
+    let tag = |key: &str| {
+        ["pinched", "fusion"]
+            .iter()
+            .position(|k| *k == key)
+            .unwrap() as u32
+            + 1
+    };
+    for (keys, module, tip) in [
+        (&["pinched"][..], "pinched", cannons::PINCHED_TIP),
+        (&["pinched", "fusion"][..], "fusion", cannons::FUSION_TIP),
+    ] {
+        let bp = loadout(keys);
+        assert_eq!(
+            bp.weapons.len(),
+            1,
+            "{module}: the new gun replaces the Repeater"
+        );
+        let muzzle = v(bp.weapons[0].muzzle);
+        assert!(
+            muzzle.distance(MUZZLE.with_x(tip)) < 1e-3,
+            "{module}: the unit file's muzzle {muzzle}"
+        );
+        for lod in 0..3 {
+            let front = limb(&model, lod, rig::ARM_GUN)
+                .filter(|v| (v.rig & rig::MODULE_MASK) >> rig::MODULE_SHIFT == tag(module))
+                .map(|v| v.pos[0])
+                .fold(f32::MIN, f32::max);
+            assert!(
+                (front - tip).abs() < 0.1,
+                "lod{lod} {module}: ends at {front}"
+            );
+        }
+    }
+    // The Repeater's sleeves come off for the first rebuild, and the first for the second.
+    let until = |key: &str| {
+        model.lods[0]
+            .vertices
+            .iter()
+            .any(|v| (v.rig & rig::UNTIL_MASK) >> rig::UNTIL_SHIFT == tag(key))
+    };
+    assert!(until("pinched") && until("fusion"));
+}
+
+#[test]
+fn the_auxiliary_arm_is_the_unit_files() {
+    let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let bp = loadout(&["aux_eng"]);
+    let builder = bp.builder.as_ref().unwrap();
+    assert_eq!(builder.emitters.len(), 1);
+    assert!(v(builder.emitters[0]).distance(shoulder::AUX_EMITTER) < 1e-3);
+    assert!(v(builder.hinge.unwrap()).distance(shoulder::AUX_WRIST) < 1e-3);
+    let model = build_model_fitted("regency_commander", 10.4, HEIGHT, 1, &["aux_eng"]).unwrap();
+    let fold = model.fold.expect("the arm folds");
+    assert!(Vec3::new(fold[0], fold[1], fold[2]).distance(shoulder::AUX_HINGE) < 1e-3);
+    // The head's tip is the emitter.
+    let tip = model.lods[0]
+        .vertices
+        .iter()
+        .filter(|v| v.rig & rig::LIMB_MASK == rig::FOLD_HEAD && v.material == GLOW_VIOLET)
+        .map(|v| Vec3::from(v.pos).distance(shoulder::AUX_EMITTER))
+        .fold(f32::MAX, f32::min);
+    assert!(tip < 0.1, "the head's emitter is {tip} m off");
+}

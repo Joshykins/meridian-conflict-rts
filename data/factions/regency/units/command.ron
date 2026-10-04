@@ -7,8 +7,10 @@
     // `regency_commander` (`models::regency::commander`). It builds only Regency structures (mc-data
     // refuses anything else).
     //
-    // Refits: the engineering suites on the hand's forearm, and the Personal Shield on its
-    // back (a small caged star between the shoulder blades, which throws the veil).
+    // Refits: the engineering suites on the hand's forearm; the cannon forearm rebuilt as a
+    // pinched-plasmeric cannon, then a pinch-fusion one; on the back, nanite repair (then a
+    // field that mends everything of its side round it) or the Material Formation Engine;
+    // and an auxiliary engineering arm over the left shoulder.
     (
         key: "regency_commander",
         name: "Exarch",
@@ -62,14 +64,78 @@
                 ],
             ),
             (
+                key: "gun", name: "Cannon Arm",
+                modules: [
+                    (
+                        key: "pinched", icon: Tank, name: "Pinched-plasmeric Cannon",
+                        summary: "The cannon forearm rebuilt longer, the plasma squeezed by gravity into a dense stream: heavier hits at longer reach.",
+                        cost: (mass: 700, energy: 8400, time: 800),
+                        // The forearm is one gun: the new one takes the Repeater's place.
+                        replaces: "Plasmeric Repeater",
+                        weapons: [(
+                            name: "Pinched-plasmeric Cannon",
+                            damage: 240, splash: 3, range: 420, reload: 0.7, speed: 900, trajectory: Direct, red: 1.0,
+                            turret_turn: 36, muzzle: (10.6, -5.2, 14.6), pivot: (-0.5, -5.2, 14.6), spread: 0.4, sweep: 30,
+                            targets: ["Land", "Naval"], color: Orange, flash: 1.5, impact: 1.5, tracer: 1.1,
+                            rounds: 4, round_span: 0.15, plasma_grade: Some(Pinched),
+                            sounds: (fire: "regency_glaive_fire", impact: "regency_glaive_hit", ground: "regency_glaive_hit"),
+                        )],
+                    ),
+                    (
+                        key: "fusion", icon: Tank, name: "Pinch-fusion Cannon", after: "pinched",
+                        summary: "The cannon pushed until the plasma fuses: long, white-hot pinch-fusion jets that burst like small stars.",
+                        cost: (mass: 2000, energy: 24000, time: 2400),
+                        replaces: "Plasmeric Repeater",
+                        weapons: [(
+                            name: "Pinch-fusion Cannon",
+                            damage: 900, splash: 10, range: 700, reload: 1.4, speed: 1350, trajectory: Direct, red: 1.0,
+                            turret_turn: 36, muzzle: (11.6, -5.2, 14.6), pivot: (-0.5, -5.2, 14.6), sweep: 20,
+                            targets: ["Land", "Naval"], color: Orange, flash: 1.6, impact: 2.0, tracer: 1.6,
+                            plasma_grade: Some(PinchFusion),
+                            sounds: (fire: "regency_sunspear_fire", impact: "regency_sunspear_hit", ground: "regency_sunspear_hit"),
+                        )],
+                    ),
+                ],
+            ),
+            (
                 key: "back", name: "Back",
                 modules: [
                     (
-                        key: "shield", icon: Shield, name: "Personal Shield",
-                        summary: "A prism veil wrapped round the Exarch, thrown from a small caged star on its back.",
+                        key: "nano_repair", icon: Engineer, name: "Nanite Repair",
+                        summary: "Nanite feeds down the spine mend the Exarch's own hull, far faster than it heals bare.",
+                        cost: (mass: 900, energy: 10800, time: 1100),
+                        regen: 60,
+                    ),
+                    (
+                        key: "nano_field", icon: Engineer, name: "Nanite Repair Field", after: "nano_repair",
+                        summary: "The nanites go out in a cloud: every unit and structure of its side near the Exarch slowly mends, and the Exarch still mends itself.",
+                        cost: (mass: 2200, energy: 26400, time: 2600),
+                        // It takes Nanite Repair's place, so it carries its regen too.
+                        regen: 60,
+                        // A hundredth of each friend's full health a second, within 120 m.
+                        repair_field: (radius: 120, rate: 0.01),
+                    ),
+                    (
+                        key: "mfe", icon: Power, name: "Material Formation Engine",
+                        summary: "Makes materials and energy on the Exarch's back.",
                         cost: (mass: 1200, energy: 14400, time: 1400),
-                        economy: (energy_upkeep: 150),
-                        shield: (kind: Hull, health: 8000, regen: 80),
+                        // As ARC's: about a tech 1 mine and a half and a third of a tech 2
+                        // reactor, carried on the one unit that ends the game if it dies.
+                        economy: (mass_income: 3, energy_income: 100),
+                    ),
+                ],
+            ),
+            (
+                key: "shoulder", name: "Shoulder",
+                modules: [
+                    (
+                        key: "aux_eng", icon: Engineer, name: "Auxiliary Engineering Suite",
+                        summary: "A nanite arm folds out over the left shoulder and builds with a second beam.",
+                        cost: (mass: 800, energy: 9600, time: 900),
+                        build_power: 60,
+                        // Stands up behind the pauldron; the arm sweeps up over it, then the
+                        // head unfolds at its wrist (`hinge`) and points down at the work.
+                        emitters: [(3.6, 3.15, 23.5)], unfold: 1.4, hinge: (1.3, 3.15, 24.4),
                     ),
                 ],
             ),

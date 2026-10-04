@@ -34,6 +34,8 @@ pub enum Reach {
     Sonar,
     /// A warp dampener's field: an enemy jump that ends inside it is snagged.
     Damper,
+    /// A nanite repair field: friendly units inside it slowly mend.
+    Repair,
 }
 
 impl Reach {
@@ -51,6 +53,7 @@ impl Reach {
             Reach::AntiMissile => "ANTI-MISSILE",
             Reach::Sonar => "SONAR",
             Reach::Damper => "WARP FIELD",
+            Reach::Repair => "REPAIR FIELD",
         }
     }
 
@@ -69,6 +72,8 @@ impl Reach {
             Reach::AntiMissile => 0xFF7A1A,
             Reach::Sonar => 0x1D7A3A,
             Reach::Damper => crate::hud::warp::DAMPER,
+            // The nanites' violet.
+            Reach::Repair => 0xB07CFF,
         }
     }
 
@@ -226,6 +231,11 @@ pub fn projections(bp: &UnitBlueprint) -> Vec<Projection> {
         Reach::Damper,
         bp.warp_damper.map_or(0.0, |d| d.radius.to_f32()),
         "Warp Field",
+    ));
+    all.push(Projection::round(
+        Reach::Repair,
+        bp.repair_field.map_or(0.0, |f| f.radius.to_f32()),
+        "Repair Field",
     ));
     all.retain(|p| p.outer > 0.0);
     // Farthest first; of two alike, the one that reaches round first.
@@ -606,7 +616,7 @@ impl Rings {
 
     /// The HUD's key to `rings`: each kind and rank drawn, with its farthest reach and that ring's dead zone.
     pub fn key(rings: &[RangeRing]) -> Vec<(Reach, u8, f32, f32)> {
-        const ALL: [Reach; 12] = [
+        const ALL: [Reach; 13] = [
             Reach::Direct,
             Reach::Indirect,
             Reach::Missile,
@@ -619,6 +629,7 @@ impl Rings {
             Reach::Reclaim,
             Reach::Shield,
             Reach::Damper,
+            Reach::Repair,
         ];
         ALL.into_iter()
             .flat_map(|reach| (0..RANKS).map(move |rank| (reach, rank)))

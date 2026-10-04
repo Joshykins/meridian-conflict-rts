@@ -433,6 +433,9 @@ pub(crate) struct Unit {
     /// Drags enemy warps down around it ([`crate::WarpDamper`]).
     #[serde(default)]
     pub warp_damper: Option<RawWarpDamper>,
+    /// Mends every friendly unit around it ([`crate::RepairField`]).
+    #[serde(default)]
+    pub repair_field: Option<RawRepairField>,
     #[serde(default)]
     pub shield: Option<RawShield>,
     #[serde(default)]
@@ -798,6 +801,15 @@ pub(crate) struct RawWarp {
     pub cooldown: f64,
     /// Metres per second in warp.
     pub speed: f64,
+}
+
+/// A nanite repair field: the friendly units within `radius` metres heal `rate` of their
+/// full health a second.
+#[derive(Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct RawRepairField {
+    pub radius: f64,
+    pub rate: f64,
 }
 
 /// A warp dampener's field.
@@ -2056,6 +2068,18 @@ impl Unit {
                     drag: fx(d.drag),
                     damage: fx(d.damage),
                     stun_ticks: ticks(d.stun).min(6000) as u16,
+                }),
+                None => None,
+            },
+            repair_field: match self.repair_field {
+                Some(f) if f.radius <= 0.0 || !(f.rate > 0.0 && f.rate <= 1.0) => {
+                    return Err(DataError::Invalid(format!(
+                        "{key}: a repair field needs a radius and a rate above 0, at most 1"
+                    )));
+                }
+                Some(f) => Some(crate::RepairField {
+                    radius: fx(f.radius),
+                    rate: fx(f.rate),
                 }),
                 None => None,
             },

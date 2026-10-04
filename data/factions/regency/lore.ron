@@ -5,6 +5,8 @@
         lore: "A walking command machine that comes ashore alone and puts up a stronghold with the nanite emitter in its taloned hand; ARC crews call it the Exarch.",
         weapons: {
             "Plasmeric Repeater": "The cannon that is its right forearm fires slugs of plasma held tight by gravity; they hit like shells and glaze the ground they miss.",
+            "Pinched-plasmeric Cannon": "The forearm rebuilt longer, its vanes squeezing the plasma into a dense red stream that reaches farther and hits harder.",
+            "Pinch-fusion Cannon": "The forearm split down its length and pushed until the plasma fuses: long white-hot jets that burst like small stars.",
         },
     ),
     "regency_t4_scorpion": (

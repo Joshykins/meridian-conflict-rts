@@ -550,6 +550,14 @@ impl Warp {
     }
 }
 
+/// A nanite repair field (`mc_sim::repair_field`): every finished friendly unit within
+/// `radius` of it, not itself, heals `rate` of its full health a second.
+#[derive(Clone, Copy, Debug)]
+pub struct RepairField {
+    pub radius: Fx,
+    pub rate: Fx,
+}
+
 /// A warp dampener (`mc_sim::warp`): an enemy ship whose jump ends inside `radius` of it is
 /// dragged through a slow, torn warp and thrown out hurt and stunned.
 #[derive(Clone, Copy, Debug)]
@@ -790,6 +798,8 @@ pub struct UnitBlueprint {
     pub warp: Option<Warp>,
     /// A structure that drags enemy warps down around it.
     pub warp_damper: Option<WarpDamper>,
+    /// Mends the friendly units around it.
+    pub repair_field: Option<RepairField>,
     /// A projected dome, or a hull wrap that only covers this unit.
     pub shield: Option<Shield>,
     pub upgrades_to: Option<BlueprintId>,
@@ -1567,6 +1577,13 @@ impl Blueprints {
                 }
                 None => h.write_u64(u64::MAX),
             }
+            match &u.repair_field {
+                Some(f) => {
+                    h.write_i64(f.radius.0);
+                    h.write_i64(f.rate.0);
+                }
+                None => h.write_u64(u64::MAX),
+            }
             match &u.shield {
                 Some(s) => {
                     h.write_u64(s.kind as u64);
@@ -1774,7 +1791,32 @@ mod tests {
             .flat_map(|s| &s.modules)
             .map(|m| m.key.as_str())
             .collect();
-        assert_eq!(suites, ["eng_2", "eng_3", "shield"]);
+        assert_eq!(
+            suites,
+            [
+                "eng_2",
+                "eng_3",
+                "pinched",
+                "fusion",
+                "nano_repair",
+                "nano_field",
+                "mfe",
+                "aux_eng"
+            ]
+        );
+        // The rebuilt cannon takes the Repeater's place: still one gun, at the same index.
+        let fusion = set.loadouts[set.index(&[0, 2, 0, 0, 0, 0])];
+        let guns: Vec<&str> = bp
+            .unit(fusion)
+            .weapons
+            .iter()
+            .map(|w| w.name.as_str())
+            .collect();
+        assert_eq!(guns, ["Pinch-fusion Cannon"]);
+        assert_eq!(
+            bp.unit(fusion).weapons[0].plasma_grade,
+            Some(PlasmaGrade::PinchFusion)
+        );
         let builds = &commander.builder.as_ref().unwrap().builds;
         assert!(builds.len() >= 8);
         assert!(builds.iter().all(|&b| bp.unit(b).faction == regency.id

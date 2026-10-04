@@ -736,6 +736,10 @@ impl World {
             let _t = mc_core::perf_span!("fn.run_regen");
             self.run_regen();
         }
+        {
+            let _t = mc_core::perf_span!("fn.run_repair_fields");
+            self.run_repair_fields();
+        }
         phase(&mut self.timings, "regen");
 
         {

@@ -5,6 +5,7 @@
 //! The cannon telescopes: a heavy faceted housing, then two sleeves each narrower than
 //! the last, their mouths lapped over the next, and a split muzzle of two jaws with the
 //! bore lit red between them. It is one weapon grown out of the arm, not a tube on it.
+//! Rebuilt (`cannons`), the housing stays and the sleeves are the new gun's.
 
 use glam::{Vec2, Vec3};
 
@@ -14,12 +15,13 @@ use crate::rig;
 
 use super::super::kit::{cable, dark_plate, metal, seam, v3};
 use super::super::plating::joint;
+use super::cannons::cannons;
 use super::form::ram;
 use super::form::{blade, ring, sleeve, KEEL, OCT};
 use super::{ELBOW, EMITTER, LANCE_TIP, MUZZLE};
 
 /// Where the sleeves leave the housing; they kick back this far when it fires.
-const BREECH: f32 = 3.4;
+pub(super) const BREECH: f32 = 3.4;
 const KICK: f32 = 0.45;
 
 /// A forearm's armoured housing along `y`, from behind the elbow to `front`, `w` either
@@ -81,61 +83,68 @@ pub(super) fn cannon(b: &mut MeshBuilder) {
             ram(b, c(-0.6) + Vec3::Y * 1.0, c(2.6) + Vec3::Y * 0.9, 0.17);
         }
         b.with_recoil(|b| {
-            // The first sleeve, its root inside the housing.
-            dark_plate(b);
-            sleeve(
-                b,
-                &[
-                    ring(c(BREECH - 0.5), Vec3::Z, 0.82, 0.82),
-                    ring(c(BREECH + 0.4), Vec3::Z, 0.86, 0.86),
-                    ring(c(6.3), Vec3::Z, 0.66, 0.66),
-                ],
-                &OCT,
-            );
-            // Bronze showing where the second sleeve leaves the first.
-            metal(b);
-            b.cylinder_between(c(6.2), c(6.55), 0.52, 0.52, b.sides(8));
-            dark_plate(b);
-            sleeve(
-                b,
-                &[
-                    ring(c(6.45), Vec3::Z, 0.6, 0.6),
-                    ring(c(6.8), Vec3::Z, 0.62, 0.62),
-                    ring(c(8.4), Vec3::Z, 0.46, 0.46),
-                ],
-                &OCT,
-            );
-            // The split muzzle: two keeled jaws above and below the bore.
-            for up in [1.0f32, -1.0] {
-                sleeve(
-                    b,
-                    &[
-                        ring(c(8.1) + Vec3::Z * (up * 0.36), Vec3::Z * up, 0.42, 0.26),
-                        ring(c(8.9) + Vec3::Z * (up * 0.4), Vec3::Z * up, 0.36, 0.22),
-                        ring(MUZZLE + Vec3::Z * (up * 0.26), Vec3::Z * up, 0.12, 0.08),
-                    ],
-                    &KEEL,
-                );
-            }
-            // Heat slits down the sleeves' sides.
-            if b.fine() {
-                b.paint(GLOW_LASER);
-                for side in [1.0f32, -1.0] {
-                    b.beam(
-                        c(4.4) + Vec3::Y * (side * 0.8),
-                        c(5.9) + Vec3::Y * (side * 0.64),
-                        Vec2::new(0.04, 0.09),
-                        Vec2::new(0.04, 0.07),
-                    );
-                }
-            }
-            // The bore, lit between the jaws.
-            seam(b);
-            b.cylinder_between(c(8.35), c(9.1), 0.3, 0.26, b.sides(8));
-            b.paint(GLOW_LASER);
-            b.cylinder_between(c(9.0), MUZZLE, 0.2, 0.14, b.sides(8));
+            b.until("pinched", |b| repeater(b, &c));
+            cannons(b, &c);
         });
     });
+}
+
+/// The Repeater's sleeves and split muzzle, out of the housing: the bare commander's gun,
+/// taken off when the forearm is rebuilt (`cannons`).
+fn repeater(b: &mut MeshBuilder, c: &dyn Fn(f32) -> Vec3) {
+    // The first sleeve, its root inside the housing.
+    dark_plate(b);
+    sleeve(
+        b,
+        &[
+            ring(c(BREECH - 0.5), Vec3::Z, 0.82, 0.82),
+            ring(c(BREECH + 0.4), Vec3::Z, 0.86, 0.86),
+            ring(c(6.3), Vec3::Z, 0.66, 0.66),
+        ],
+        &OCT,
+    );
+    // Bronze showing where the second sleeve leaves the first.
+    metal(b);
+    b.cylinder_between(c(6.2), c(6.55), 0.52, 0.52, b.sides(8));
+    dark_plate(b);
+    sleeve(
+        b,
+        &[
+            ring(c(6.45), Vec3::Z, 0.6, 0.6),
+            ring(c(6.8), Vec3::Z, 0.62, 0.62),
+            ring(c(8.4), Vec3::Z, 0.46, 0.46),
+        ],
+        &OCT,
+    );
+    // The split muzzle: two keeled jaws above and below the bore.
+    for up in [1.0f32, -1.0] {
+        sleeve(
+            b,
+            &[
+                ring(c(8.1) + Vec3::Z * (up * 0.36), Vec3::Z * up, 0.42, 0.26),
+                ring(c(8.9) + Vec3::Z * (up * 0.4), Vec3::Z * up, 0.36, 0.22),
+                ring(MUZZLE + Vec3::Z * (up * 0.26), Vec3::Z * up, 0.12, 0.08),
+            ],
+            &KEEL,
+        );
+    }
+    // Heat slits down the sleeves' sides.
+    if b.fine() {
+        b.paint(GLOW_LASER);
+        for side in [1.0f32, -1.0] {
+            b.beam(
+                c(4.4) + Vec3::Y * (side * 0.8),
+                c(5.9) + Vec3::Y * (side * 0.64),
+                Vec2::new(0.04, 0.09),
+                Vec2::new(0.04, 0.07),
+            );
+        }
+    }
+    // The bore, lit between the jaws.
+    seam(b);
+    b.cylinder_between(c(8.35), c(9.1), 0.3, 0.26, b.sides(8));
+    b.paint(GLOW_LASER);
+    b.cylinder_between(c(9.0), MUZZLE, 0.2, 0.14, b.sides(8));
 }
 
 /// The talons round the palm: (angle round the forearm's axis in degrees from up, reach).

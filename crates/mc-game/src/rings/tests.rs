@@ -81,6 +81,8 @@ fn rings_follow_the_data() {
         of(&b, "aster_t2_warp_damper"),
         vec![(Reach::Damper, 0, 0.0, 1600.0)]
     );
+    // The Exarch's Nanite Repair Field, where its side's units mend.
+    assert!(of(&b, "regency_commander+nano_field").contains(&(Reach::Repair, 0, 0.0, 120.0)));
     assert_eq!(
         of(&b, "aster_commander"),
         vec![

@@ -12,7 +12,7 @@
 //! upgrade. Each module also compiles to a kit: a hidden blueprint with the
 //! module's price and build time, which is what the refit assembles.
 
-use crate::raw::{Cost, RawEconomy, RawShield, RawWeapon, Unit};
+use crate::raw::{Cost, RawEconomy, RawRepairField, RawShield, RawWeapon, Unit};
 use crate::{BlueprintId, Blueprints, DataError, FactionId, UnitBlueprint};
 use mc_core::Fx;
 use serde::Deserialize;
@@ -92,8 +92,15 @@ pub struct RawModule {
     pub drone_sockets: Vec<(f64, f64, f64)>,
     #[serde(default)]
     pub drone_approach: f64,
+    /// A nanite repair field it gives the unit.
+    #[serde(default)]
+    pub repair_field: Option<RawRepairField>,
     #[serde(default)]
     pub weapons: Vec<RawWeapon>,
+    /// A weapon the unit already has that this module's first weapon takes the place
+    /// of, in the same place in the unit's list (the gun the arm is rebuilt as).
+    #[serde(default)]
+    pub replaces: Option<String>,
     /// Weapons the unit already has that move when this module goes on (a gun that
     /// makes room for a bigger one): new muzzle, and pivot when given.
     #[serde(default)]
@@ -473,6 +480,14 @@ fn check(unit: &Unit) -> Result<(), DataError> {
                 m.key, r.weapon
             )));
         }
+        if let Some(r) = &m.replaces {
+            if m.weapons.is_empty() || !unit.weapons.iter().any(|w| &w.name == r) {
+                return Err(DataError::Invalid(format!(
+                    "{key}/{}: replaces {r}, but it needs a weapon of its own and the unit must carry {r}",
+                    m.key
+                )));
+            }
+        }
         let builds = m.build_power != 0.0
             || m.build_range != 0.0
             || !m.builds.is_empty()
@@ -506,6 +521,7 @@ fn kit_unit(unit: &Unit, module: &RawModule) -> Unit {
     kit.economy = RawEconomy::default();
     kit.builder = None;
     kit.shield = None;
+    kit.repair_field = None;
     kit.weapons.clear();
     kit.refits.clear();
     kit
@@ -569,7 +585,19 @@ fn loadout_unit(unit: &Unit, fitted: &[u8; MAX_REFIT_SLOTS]) -> Unit {
             out.drone_sockets = m.drone_sockets.clone();
             out.drone_approach = m.drone_approach;
         }
-        out.weapons.extend(m.weapons.iter().cloned());
+        if m.repair_field.is_some() {
+            out.repair_field = m.repair_field;
+        }
+        let mut weapons = m.weapons.iter().cloned();
+        if let Some(r) = &m.replaces {
+            if let (Some(w), Some(new)) = (
+                out.weapons.iter_mut().find(|w| &w.name == r),
+                weapons.next(),
+            ) {
+                *w = new;
+            }
+        }
+        out.weapons.extend(weapons);
     }
     out.key = keys.join("+");
     out

@@ -74,6 +74,7 @@ mod reclaim_area;
 mod reclaim_heads;
 mod reform;
 pub mod repair;
+mod repair_field;
 mod seabed;
 mod shields;
 pub mod sinking;

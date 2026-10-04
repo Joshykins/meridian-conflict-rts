@@ -448,8 +448,8 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
 - **Nanites** build and take apart (the Regency reclaim). They are never a
   weapon.
 - **Shields:** bubble shields under the same rules as ARC's (they draw energy
-  and drop in any stall). The Ward (tech 2, upgrading to Ward II) and the
-  Exarch's Personal Shield. A Regency field is a **prism veil**
+  and drop in any stall): the Ward (tech 2, upgrading to Ward II). The Exarch
+  carries none; its back takes nanite repair instead. A Regency field is a **prism veil**
   (faction.ron `shield_look: Prism`): white-hot glass with pinch fusion's
   prism drifting over it, the colour turning with the angle it is seen at,
   folds of brighter colour hanging in it like a curtain, on a lattice of
