@@ -131,7 +131,8 @@ fn local_lights(m: Pbr, world: vec3<f32>, n: vec3<f32>, v: vec3<f32>) -> vec3<f3
         let h = normalize(v + arrival.l);
         let f = f0 + (1.0 - f0) * pow(clamp(1.0 - dot(h, v), 0.0, 1.0), 5.0);
         let spec = d_ggx(max(dot(n, h), 0.0), a) * g_smith(n_dot_v, n_dot_l, rough) * f
-            / (4.0 * n_dot_v * max(n_dot_l, 0.001)) * comp;
+            / (4.0 * n_dot_v * max(n_dot_l, 0.001)) * comp
+            * macro_mask(n_dot_v, m.matte) * macro_mask(n_dot_l, m.matte);
         sum += ((1.0 - f) * diffuse + spec) * arrival.e * n_dot_l;
     }
     return sum;

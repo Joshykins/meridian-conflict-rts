@@ -1388,6 +1388,9 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     m.albedo = albedo;
     m.metallic = max(crater_metal, street_metal);
     m.roughness = rough;
+    // Soil, rock, snow and meadow are matte at grazing angles; glass, ice and
+    // standing water keep their glints.
+    m.matte = smoothstep(0.3, 0.5, rough);
     m.emissive = ice_glow + crater_glow;
     let v = normalize(eye - world);
     var horizon = 1.0;

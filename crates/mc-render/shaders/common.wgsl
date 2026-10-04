@@ -489,6 +489,11 @@ struct Pbr {
     metallic: f32,
     roughness: f32,
     emissive: vec3<f32>,
+    // How much the surface's own clods, pebbles and blades, far larger than its
+    // microfacets, shadow and hide each other (0 none: a machined or glassy face;
+    // 1 open ground). Natural ground then loses its glint toward a low sun or
+    // seen at a grazing angle, where a flat rough dielectric would turn glossy.
+    matte: f32,
 }
 
 fn d_ggx(n_dot_h: f32, a: f32) -> f32 {
@@ -496,6 +501,16 @@ fn d_ggx(n_dot_h: f32, a: f32) -> f32 {
     let d = n_dot_h * n_dot_h * (a2 - 1.0) + 1.0;
     return a2 / (PI * d * d);
 }
+
+// Smith masking (Schlick's form) of one direction by the surface's macro relief
+// (`Pbr::matte`); 1 with no relief.
+fn macro_mask(n_dot: f32, matte: f32) -> f32 {
+    let k = MACRO_RELIEF_K * matte;
+    return n_dot / (n_dot * (1.0 - k) + k);
+}
+
+// The Smith `k` of fully matte ground's macro relief.
+const MACRO_RELIEF_K: f32 = 0.6;
 
 fn g_smith(n_dot_v: f32, n_dot_l: f32, rough: f32) -> f32 {
     let k = (rough + 1.0) * (rough + 1.0) / 8.0;
@@ -556,8 +571,9 @@ fn shade_pbr_refl(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32,
     let f = f0 + (1.0 - f0) * pow(clamp(1.0 - dot(h, v), 0.0, 1.0), 5.0);
     let rough = clamp(m.roughness, 0.06, 1.0);
     let ab = env_brdf(rough, n_dot_v);
+    let mask_v = macro_mask(n_dot_v, m.matte);
     let spec = d_ggx(n_dot_h, rough * rough) * g_smith(n_dot_v, n_dot_l, rough) * f / (4.0 * n_dot_v * max(n_dot_l, 0.001))
-        * energy_compensation(f0, ab);
+        * energy_compensation(f0, ab) * mask_v * macro_mask(max(n_dot_l, 0.001), m.matte);
     let diffuse = (1.0 - f) * (1.0 - m.metallic) * m.albedo / PI;
     let direct = (diffuse + spec) * sun_rgb * n_dot_l * shadow;
 
@@ -574,7 +590,7 @@ fn shade_pbr_refl(m: Pbr, n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, shadow: f32,
     let e_ss = ab.x + ab.y;
     let f_avg = f0 + (1.0 - f0) / 21.0;
     let f_ms = ss * f_avg / (1.0 - (1.0 - e_ss) * f_avg);
-    let spec_amb = ss + f_ms * (1.0 - e_ss);
+    let spec_amb = (ss + f_ms * (1.0 - e_ss)) * mask_v;
     let ambient = (1.0 - m.metallic) * m.albedo * (1.0 - spec_amb) * sky + spec_amb * sky_refl;
     return direct + ambient + m.emissive;
 }
