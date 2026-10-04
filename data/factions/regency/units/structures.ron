@@ -204,7 +204,7 @@
         // The beam lifts the ore with no hammer: no blows to show or hear.
         mine: (
             reach: 1000,
-            ground: 0.00036, per_hectare: 0.6, base: 0.2, hammer: false,
+            ground: 0.00054, per_hectare: 0.9, base: 0.3, hammer: false,
         ),
         upgrades_to: "regency_t2_extractor",
         mesh: "regency_taproot", icon: Extractor,
@@ -222,7 +222,7 @@
         economy: (mass_storage: 200),
         mine: (
             reach: 1000,
-            ground: 0.00108, per_hectare: 1.8, base: 0.6, hammer: false,
+            ground: 0.00162, per_hectare: 2.7, base: 0.9, hammer: false,
         ),
         upgrades_to: "regency_t3_extractor",
         mesh: "regency_taproot", icon: Extractor,
@@ -240,7 +240,7 @@
         economy: (mass_storage: 400),
         mine: (
             reach: 1000,
-            ground: 0.00252, per_hectare: 4.2, base: 1.4, hammer: false,
+            ground: 0.00378, per_hectare: 6.3, base: 2.1, hammer: false,
         ),
         upgrades_to: "regency_t4_extractor",
         mesh: "regency_taproot", icon: Extractor,
@@ -258,7 +258,7 @@
         economy: (mass_storage: 800),
         mine: (
             reach: 1000,
-            ground: 0.00432, per_hectare: 7.2, base: 2.4, hammer: false,
+            ground: 0.00648, per_hectare: 10.8, base: 3.6, hammer: false,
         ),
         mesh: "regency_taproot", icon: Extractor,
     ),

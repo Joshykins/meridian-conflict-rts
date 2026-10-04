@@ -167,9 +167,9 @@
     // field), and the shaft itself `base` from the moment the mine is finished.
     // Where mines' reaches overlap, the ground is divided by a straight line
     // through the two points where the circles cross. Every tier reaches as far
-    // and yields 3x, 7x, 12x a tier 1 (about 2 / 6 / 14 / 23 a second on a
+    // and yields 3x, 7x, 12x a tier 1 (about 3 / 9 / 21 / 35 a second on a
     // duel map's field); a new mine pays back in under a minute, the upgrades in
-    // about 3, 7 and 11 minutes. A mine climbs one tier past its side's tech
+    // about 2, 5 and 7 minutes. A mine climbs one tier past its side's tech
     // (`Blueprints::upgrade_needs`), so the economy grows before the army tiers.
     // The hammer runs on energy: a side that cannot pay its upkeep gets a
     // quarter of its mines' output at worst (mc-sim mines.rs `UNPOWERED`).
@@ -186,7 +186,7 @@
         economy: (mass_storage: 100, energy_upkeep: 2),
         mine: (
             reach: 1000,
-            ground: 0.00036, per_hectare: 0.6, base: 0.2,
+            ground: 0.00054, per_hectare: 0.9, base: 0.3,
         ),
         upgrades_to: "aster_core_mine_t2",
         mesh: "core_mine", icon: Extractor,
@@ -205,7 +205,7 @@
         economy: (mass_storage: 200, energy_upkeep: 8),
         mine: (
             reach: 1000,
-            ground: 0.00108, per_hectare: 1.8, base: 0.6,
+            ground: 0.00162, per_hectare: 2.7, base: 0.9,
         ),
         upgrades_to: "aster_core_mine_t3",
         mesh: "core_mine", icon: Extractor,
@@ -224,7 +224,7 @@
         economy: (mass_storage: 400, energy_upkeep: 30),
         mine: (
             reach: 1000,
-            ground: 0.00252, per_hectare: 4.2, base: 1.4,
+            ground: 0.00378, per_hectare: 6.3, base: 2.1,
         ),
         upgrades_to: "aster_core_mine_t4",
         mesh: "core_mine", icon: Extractor,
@@ -248,7 +248,7 @@
         economy: (mass_storage: 800, energy_upkeep: 60),
         mine: (
             reach: 1000,
-            ground: 0.00432, per_hectare: 7.2, base: 2.4,
+            ground: 0.00648, per_hectare: 10.8, base: 3.6,
         ),
         mesh: "core_mine", icon: Extractor,
         sounds: (step: "mine_blow"),
@@ -305,7 +305,7 @@
     // (mc-sim mines.rs `fabricator_income`). One 2x2 building from tech 2, upgraded in
     // place to tech 3. Small and many: two eat a Reactor II, four a Reactor III, so a
     // player adds them a few at a time rather than saving up for one. Still worth it
-    // after the mine upgrades (3 / 7 / 11 min): T2 1.5/s pays back in ~13 min, T3 5/s
+    // after the mine upgrades (2 / 5 / 7 min): T2 1.5/s pays back in ~13 min, T3 5/s
     // in ~10, with their share of a reactor. Adjacency (mc-sim adjacency.rs): a reactor
     // against it cuts its upkeep, and it cuts the materials of what a factory against it builds.
     // A fabricator and a reactor of its tier that touch go down together: kill one and

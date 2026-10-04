@@ -45,7 +45,7 @@ buy a tier path.
 
 ## The race
 
-**Stale since the 2026-10-02/03 mine rebalances** (ore worth far more, about 2 / 6 / 14 / 23
+**Stale since the 2026-10-02/03 mine rebalances** (ore worth far more, about 3 / 9 / 21 / 35
 a second by tier on a duel field, mines one tier past the tech, fabricators by tier, tier
 paths dearer): rerun the search before leaning on any
 of the plan below. The plan and numbers below were searched before the 2026-09-30 rebalance (build time follows

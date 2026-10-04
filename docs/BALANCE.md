@@ -84,20 +84,21 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 
 ## Economy
 
-- Mines (2026-10-03 rebalance; the first numbers, 2026-10-02, left a tier 1 side on 5 a
-  second for twenty minutes against unit prices set at Forged Alliance's): reach 1000 m. Ore
-  is what a mine is for: a hectare of ore pays `per_hectare` 0.6 a second at tier 1, a hectare
-  of bare land `ground` 0.00036 (a whole circle of it about 0.1), and the shaft `base` 0.2 from
-  the moment the mine is finished. Each tier multiplies all three: 3x, 7x, 12x a tier 1, so
+- Mines (2026-10-03 rebalance, then half again the same day after a played Serac Divide duel
+  sat on 3-7 a second for its first seven minutes; the first numbers, 2026-10-02, left a tier 1
+  side on 5 a second for twenty minutes against unit prices set at Forged Alliance's): reach
+  1000 m. Ore is what a mine is for: a hectare of ore pays `per_hectare` 0.9 a second at tier 1,
+  a hectare of bare land `ground` 0.00054 (a whole circle of it about 0.15), and the shaft
+  `base` 0.3 from the moment the mine is finished. Each tier multiplies all three: 3x, 7x, 12x a tier 1, so
   each step up gains less than the one before. `zz_mine_yield_probe` puts a median 3-4 ha of
   ore in a lone mine's reach on the duel maps (Serac Divide 2.9, about 13 on the 80 km maps),
-  so a tier 1 mine on a duel field makes about 2 a second (FAF's tier 1 mine), one on bare
-  land about 0.3. Land spreads out at 10 m/s (full in about 100 s); shafts sink at 8 m/s and
-  drifts run at 24 m/s, so the ore pays within a minute or so. Each mine stores 100 / 200 /
+  so a tier 1 mine on a duel field makes about 3 a second (half again FAF's tier 1 mine), one
+  on bare land about 0.45. Land spreads out at 10 m/s (full in about 100 s); shafts sink at
+  8 m/s and drifts run at 24 m/s, so the ore pays within a minute or so. Each mine stores 100 / 200 /
   400 / 800.
 - Prices (mass / energy): 45 / 270, 750 / 4,500, 4,000 / 24,000, Deep Core 11,000 / 66,000.
   A new mine on a field pays back in under a minute; an upgrade pays only the difference
-  between the tiers, about 3, 7 and 11 minutes on a duel field. The Regency Excavators dig
+  between the tiers, about 2, 5 and 7 minutes on a duel field. The Regency Excavators dig
   as much for a little more mass, less energy and no upkeep (55 / 770 / 4,080 / 11,200).
 - **A mine climbs one tier past its side's tech** (`Blueprints::upgrade_needs`): tier 2 at
   tech 1, tier 3 at tech 2, the Deep Core at tech 3. Growing the economy, building the army
