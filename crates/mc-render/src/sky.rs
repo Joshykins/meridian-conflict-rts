@@ -1411,8 +1411,26 @@ impl Sky {
                 && s.pos.x < size.x + s.radius * 2.0
                 && s.pos.y < size.y + s.radius * 2.0
         });
-        let natural = self.storms.iter().filter(|s| s.life < 1.0e8).count();
-        if natural < self.target_storms() && self.rng.next() < dt / 20.0 {
+        // Only a storm still building or raging over the map counts toward the
+        // weather's number: one blown off the edge, or raining itself out, is
+        // replaced while it goes. Counted while it was kept, a storm leaving the map
+        // on a stiff wind left a Fair sky empty for minutes.
+        let natural = self
+            .storms
+            .iter()
+            .filter(|s| {
+                s.life < 1.0e8
+                    && s.age < s.life * 0.7
+                    && s.pos.cmpgt(-Vec2::splat(s.radius)).all()
+                    && s.pos.cmplt(size + s.radius).all()
+            })
+            .count();
+        // Storms leaving the map are drawn until they are gone; the shaders take
+        // MAX_STORMS, so a new one waits for room.
+        if natural < self.target_storms()
+            && self.storms.len() < MAX_STORMS
+            && self.rng.next() < dt / 20.0
+        {
             let s = self.new_storm();
             self.storms.push(s);
         }

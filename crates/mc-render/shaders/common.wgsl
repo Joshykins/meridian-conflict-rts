@@ -755,9 +755,12 @@ fn cloud_climate(xy: vec2<f32>, drift: vec2<f32>, scale: f32, size: f32) -> vec2
     if vast > 0.0 {
         field += climate_field(p + 3301.0, s * 2.1) * vast;
     }
-    // Fronts tens of kilometres across.
+    // Fronts tens of kilometres across. A front is wider than a map, so it moves
+    // the cover of the whole map at once: kept gentle, or the wind carries a clear
+    // stretch over and a Fair sky stands empty for minutes (Fair at 0.55: the map
+    // under 8% cover an eighth of the time; at 0.3, one time in 25).
     let front = grad_noise2(p * 0.5 + 3170.0, 9000.0);
-    let cover = smoothstep(0.50, 0.72, field + (front - 0.5) * 0.55 + (scale - 1.0) * 0.25);
+    let cover = smoothstep(0.50, 0.72, field + (front - 0.5) * 0.3 + (scale - 1.0) * 0.25);
     let convect = smoothstep(0.55, 0.85, front) * cover;
     return vec2<f32>(cover, convect);
 }
