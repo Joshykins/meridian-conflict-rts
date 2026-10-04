@@ -1176,11 +1176,6 @@ pub struct RawWeapon {
     /// drones spent are built again on them. `speed` is the burst's, over its last metres.
     #[serde(default)]
     pub launches: bool,
-    /// A held beam (`beam`) that walks back and forth across its mark as it holds, this
-    /// many metres either side of it across the line of fire, glassing a swath. Zero (the
-    /// default): it holds on the mark.
-    #[serde(default)]
-    pub walk: f64,
     /// Only fires with the hull on the surface: a submarine's deck gun.
     #[serde(default)]
     pub surfaced: bool,
@@ -1649,11 +1644,6 @@ impl Unit {
                     "{ctx}: a corkscrew needs a curving charge without cluster sub-shots"
                 )));
             }
-            if w.walk > 0.0 && !w.beam {
-                return Err(DataError::Invalid(format!(
-                    "{ctx}: only a held beam walks across its mark"
-                )));
-            }
             if !w.hitscan && w.speed <= 0.0 {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: needs a speed, or hitscan"
@@ -1796,7 +1786,6 @@ impl Unit {
                 curve: Angle(steps(w.curve.clamp(0.0, 80.0)).round() as i64 as u16),
                 corkscrew: fx(w.corkscrew.clamp(0.0, 80.0)),
                 launches: w.launches,
-                walk: fx(w.walk.clamp(0.0, 200.0)),
                 surfaced: w.surfaced,
                 intercepts: w.intercepts,
                 bore: w.bore.map(|b| crate::Bore {

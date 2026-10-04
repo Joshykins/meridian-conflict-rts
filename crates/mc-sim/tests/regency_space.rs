@@ -245,47 +245,83 @@ fn frigate_and_cruiser_fire_their_independent_casemates_at_cruise_height() {
 }
 
 #[test]
-fn destroyer_holds_station_and_sweeps_a_wide_sustained_fusion_beam_over_the_ground() {
+fn destroyer_holds_its_lance_on_the_mark_and_drags_it_across_the_ground_to_the_next() {
     let mut w = world();
     let ship = add(&mut w, "regency_t3_space_destroyer", 0, 500, 700);
-    let target = add(&mut w, "aster_t4_assault_tank", 1, 1200, 700);
-    w.state.units.flags[target] |= flag::PASSIVE;
-    w.state.units.health[target] = Fx::from_int(500000);
+    let first = add(&mut w, "aster_t4_assault_tank", 1, 1200, 700);
+    let second = add(&mut w, "aster_t4_assault_tank", 1, 1180, 1000);
+    for t in [first, second] {
+        w.state.units.flags[t] |= flag::PASSIVE;
+        w.state.units.health[t] = Fx::from_int(500000);
+    }
     let id = w.state.units.id(ship);
-    let tid = w.state.units.id(target);
+    let first_id = w.state.units.id(first);
     let blueprint = w.state.units.blueprint[ship];
     let beam = &w.blueprints.unit(blueprint).weapons[0];
-    assert!(beam.beam && beam.hitscan && beam.walk >= Fx::from_int(40));
+    assert!(beam.beam && beam.hitscan && beam.sweep > 0);
     w.tick(&[cmd(Command::Attack {
         units: vec![id],
-        target: tid,
+        target: first_id,
         queue: false,
     })])
     .unwrap();
     ticks(&mut w, 120);
     let station = w.state.units.pos[ship];
-    let mut across = (Fx::from_int(10000), Fx::from_int(-10000));
-    let mut shots = 0;
-    for _ in 0..100 {
+    let mark = w.state.units.pos[first];
+    // Strokes land on the tank's hull, out to its radius from the middle.
+    let hull = w.blueprints.unit(w.state.units.blueprint[first]).radius + Fx::from_int(4);
+    // Locked on: every stroke lands on the mark.
+    let (mut shots, mut strayed) = (0, Fx::ZERO);
+    for _ in 0..60 {
         w.tick(&[]).unwrap();
         for event in &w.events {
             match event {
                 SimEvent::ShotFired { blueprint: b, .. } if *b == blueprint => shots += 1,
-                SimEvent::Impact { pos, .. } => {
-                    across.0 = across.0.min(pos.y);
-                    across.1 = across.1.max(pos.y);
-                }
+                SimEvent::Impact {
+                    pos, blueprint: b, ..
+                } if *b == blueprint => strayed = strayed.max(pos.xy().distance(mark)),
                 _ => {}
             }
         }
     }
     assert!(shots > 40, "sustained stream: {shots} shots");
-    assert!(
-        across.1 - across.0 > Fx::from_int(40),
-        "sweep width: {across:?}"
-    );
+    assert!(strayed < hull, "the lance strayed {strayed} m");
     assert!(
         w.state.units.pos[ship].distance(station) < Fx::from_int(8),
         "ship did not hold station"
     );
+    // The mark dies: the beam stays lit and cuts the ground on its way to the next.
+    let next = w.state.units.pos[second];
+    let row = w.state.units.row(first_id).unwrap();
+    w.state.units.health[row] = Fx::ZERO;
+    let (mut dark, mut ground, mut on_next) = (0, 0, false);
+    for _ in 0..80 {
+        w.tick(&[]).unwrap();
+        let mut lit = false;
+        for event in &w.events {
+            match event {
+                SimEvent::ShotFired { blueprint: b, .. } if *b == blueprint => lit = true,
+                SimEvent::Impact {
+                    pos,
+                    on_unit,
+                    blueprint: b,
+                    ..
+                } if *b == blueprint => {
+                    let between =
+                        pos.y > mark.y + Fx::from_int(20) && pos.y < next.y - Fx::from_int(20);
+                    if !on_unit && between {
+                        ground += 1;
+                    }
+                    on_next |= *on_unit && pos.xy().distance(next) < hull;
+                }
+                _ => {}
+            }
+        }
+        if !lit && !on_next {
+            dark += 1;
+        }
+    }
+    assert!(on_next, "the lance never reached the next mark");
+    assert_eq!(dark, 0, "the lance went out between marks");
+    assert!(ground >= 2, "no line cut between the marks: {ground}");
 }

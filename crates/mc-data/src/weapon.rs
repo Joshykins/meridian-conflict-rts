@@ -198,9 +198,6 @@ pub struct Weapon {
     /// Fires its unit's drones (`UnitBlueprint::drone`) instead of shots (`RawWeapon::launches`):
     /// each is let go at the mark and flies into it, where this weapon's charge goes off.
     pub launches: bool,
-    /// A held beam that walks back and forth across its mark (`RawWeapon::walk`): metres
-    /// either side of it, across the line of fire. Zero: it holds on the mark.
-    pub walk: Fx,
     /// Only fires with the hull on the surface (a submarine's deck gun).
     pub surfaced: bool,
     /// Interceptor torpedo tubes: fired at enemy torpedoes in range, never at units.

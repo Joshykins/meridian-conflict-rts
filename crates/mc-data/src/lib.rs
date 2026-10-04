@@ -1672,7 +1672,6 @@ impl Blueprints {
                         | (w.curve.0 as u64) << 32
                         | (w.launches as u64) << 48,
                 );
-                h.write_i64(w.walk.0);
                 h.write_i64(w.corkscrew.0);
                 if let Some(s) = w.sabot {
                     for v in [

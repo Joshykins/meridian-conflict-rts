@@ -85,15 +85,19 @@
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
     (
-        key: "regency_t3_space_destroyer", name: "Scourge", role: "Excavation Destroyer", title: "Destroyer",
+        key: "regency_t3_space_destroyer", name: "Scourge", role: "Destroyer", title: "Destroyer",
         tech: 3, categories: ["Air", "Space", "DirectFire"], health: 30000,
         cost: (mass: 7800, energy: 145000, time: 42000),
-        radius: 122, height: 48, footprint: (23, 16), hull: (134, 92), vision: 1400,
+        radius: 122, height: 48, footprint: (23, 7), hull: (136, 40), vision: 1400,
         motion: (layer: Air, size: 0, speed: 62, accel: 15, turn: 22, altitude: 480, hover: true, hangs: true),
         weapons: [(
-            name: "Excavation Plasma Beam", damage: 160, splash: 14, range: 1100, reload: 0.1,
-            hitscan: true, beam: true, trajectory: Direct, spin_up: 1.2, walk: 48,
-            turret_turn: 65, pivot: (12, 0, 16), muzzle: (32, 0, 9), sweep: 10,
+            // One held beam from the turret slung under the keel at the ship's middle. It
+            // fires down its barrel (`sweep`): locked on, it holds on the mark; when the
+            // mark dies it stays lit as it slews onto the next, dragging a molten line
+            // across the ground between them.
+            name: "Heavy Pinch-fusion Lance", damage: 160, splash: 14, range: 1100, reload: 0.1,
+            hitscan: true, beam: true, trajectory: Direct, spin_up: 1.2,
+            turret_turn: 40, pivot: (0, 0, 5), muzzle: (28, 0, 5), sweep: 10,
             targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
             plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 12.0,
             sounds: (hold: "regency_pinched_beam"),

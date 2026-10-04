@@ -1,3 +1,4 @@
+use super::destroyer::{LANCE_MUZZLE, LANCE_PIVOT};
 use crate::{build_model, build_model_scaled, material, rig};
 use glam::Vec3;
 
@@ -16,20 +17,17 @@ fn the_hulls_fit_their_blueprints_and_keep_their_identity_at_each_lod() {
         "regency_t3_space_destroyer",
     ] {
         let unit = bp.unit(bp.id_of(key).unwrap());
-        let model = build_model_scaled(
-            &unit.visual.mesh,
-            unit.radius.to_f32(),
-            unit.height.to_f32(),
-            unit.tech,
-        )
-        .unwrap();
+        let mesh = &unit.visual.mesh;
+        let model = build_model_scaled(mesh, unit.radius.to_f32(), unit.height.to_f32(), unit.tech)
+            .unwrap();
         let full = model.lods[0].indices.len() / 3;
         let mid = model.lods[1].indices.len() / 3;
         let coarse = model.lods[2].indices.len() / 3;
-        assert!((250..=9000).contains(&full), "{key}: {full} triangles");
+        let most = super::super::triangles(mesh).unwrap_or(9000);
+        assert!((250..=most).contains(&full), "{mesh}: {full} triangles");
         assert!(
             mid as f32 <= full as f32 * 0.45 + 20.0 && coarse < 60,
-            "{key}: {full}/{mid}/{coarse}"
+            "{mesh}: {full}/{mid}/{coarse}"
         );
         for mesh in &model.lods {
             let top = mesh
@@ -121,11 +119,21 @@ fn plasma_gun_houses_are_bound_to_their_weapons_and_end_at_their_muzzles() {
             assert!(near < 1.2, "{key} gun {slot}: no emitter at muzzle, {near}");
         }
     }
+    // The destroyer's lance: one turret under the keel at the middle of the ship, its
+    // prism lens at the muzzle the data fires from.
     let unit = bp.unit(bp.id_of("regency_t3_space_destroyer").unwrap());
+    let lance = &unit.weapons[0];
+    let p = lance.pivot.unwrap();
+    assert_eq!([p.x.to_f32(), p.y.to_f32(), p.z.to_f32()], LANCE_PIVOT);
+    let m = lance.muzzle;
+    assert_eq!([m.x.to_f32(), m.y.to_f32(), m.z.to_f32()], LANCE_MUZZLE);
     let model = build_model(&unit.visual.mesh).unwrap();
-    assert_eq!(model.turret_pivot, [12.0, 0.0, 16.0]);
-    assert!(model.lods[0]
+    assert_eq!(model.turret_pivot, LANCE_PIVOT);
+    let near = model.lods[0]
         .vertices
         .iter()
-        .any(|v| v.rig & rig::LIMB_MASK == rig::ARM_GUN && v.material == material::GLOW_VIOLET));
+        .filter(|v| v.rig & rig::LIMB_MASK == rig::ARM_GUN && v.material == material::GLOW_PRISM)
+        .map(|v| Vec3::from(v.pos).distance(Vec3::from(LANCE_MUZZLE)))
+        .fold(f32::MAX, f32::min);
+    assert!(near < 1.3, "no lens at the lance's muzzle, {near}");
 }

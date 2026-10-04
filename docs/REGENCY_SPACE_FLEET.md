@@ -10,7 +10,7 @@ dimensions; weapon mounts and cargo apertures use the same metre coordinates.
 | Ark | 3 | Artificer III; Exarch Engineering Suite III | Heavy transport; 96 slots, 44 m bay width and 36 m clearance |
 | Vassal | 2 | Artificer II/III; Exarch Engineering Suite II/III | Economical frigate with two independently aiming plasma cannons |
 | Suzerain | 3 | Artificer III; Exarch Engineering Suite III | Cruiser with two anti-ship guns and six area suppression batteries |
-| Scourge | 3 | Artificer III; Exarch Engineering Suite III | Destroyer with one sustained excavation beam sweeping 48 m either side of its mark |
+| Scourge | 3 | Artificer III; Exarch Engineering Suite III | Destroyer with one Heavy Pinch-fusion Lance under the keel |
 
 All five are site-built aircraft tagged Space. Select an appropriate engineer,
 place the ship on its own lot and let construction finish. The Space subject/spawn
@@ -39,10 +39,12 @@ engage ships, aircraft and naval hulls; its six splash batteries also bombard la
 units and structures. Each casemate uses its own weapon slot and pivot, so barrels
 pitch and traverse with the weapon they represent.
 
-Scourge closes to weapon range and holds station while its ring-caged projector
-turns and pitches. Its beam uses the established walking pinch-fusion system and
-the renderer's molten-ground effect. This heats and glasses the surface; it does
-not excavate a new navigable trench in the simulation heightfield.
+Scourge closes to weapon range and holds station while the lance turret slung under
+the middle of its keel turns and pitches. The lance is a held beam fired down its
+barrel (`sweep`): locked on, it stays on the mark; when the mark dies the beam stays
+lit while the turret slews onto the next, and the stretch between lands on the ground
+and glasses it (the renderer's molten-ground effect). It does not cut a navigable
+trench in the simulation heightfield.
 
 Inspect the fleet with:
 

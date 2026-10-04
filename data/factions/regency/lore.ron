@@ -12,7 +12,7 @@
     "regency_t4_scorpion": (
         lore: "A walking siege engine in the shape of a scorpion; ARC crews learned to fear the white lance that tears trenches across the field before they learned its name.",
         weapons: {
-            "Excavation Lance": "A sustained white-rose fusion lance that sweeps the field, gouges the ground and leaves molten glass across its path.",
+            "Excavation Lance": "A sustained white-rose fusion lance that holds on its mark and, between marks, drags across the field, leaving molten glass in its path.",
             "Left Gravitic Salvo": "Six charged plasma missiles launch straight, spiral above the ground and converge across the target area.",
             "Right Gravitic Salvo": "A matching six-shot salvo interleaves with the left claw to cover the target area with twelve impacts.",
         },
@@ -392,9 +392,9 @@
         weapons: {},
     ),
     "regency_t3_assault_aircraft": (
-        lore: "A heavy craft that comes in over a battle and stops there, hanging on six lift bells while its beam walks back and forth below it and the ground turns to glass.",
+        lore: "A heavy craft that comes in over a battle and stops there, hanging on six lift bells while its beam burns what lies below it and drags a line of glass from one mark to the next.",
         weapons: {
-            "Pinch-fusion Beam": "Plasma pinched until it fuses and held as a beam, white at its heart with bursts of fusion strobing along it; it sweeps across its mark and melts the ground it crosses.",
+            "Pinch-fusion Beam": "Plasma pinched until it fuses and held as a beam, white at its heart with bursts of fusion strobing along it; it holds on its mark and melts the ground it crosses between marks.",
         },
     ),
     "regency_t2_interceptor": (
@@ -448,7 +448,7 @@
         },
     ),
     "regency_t3_space_destroyer": (
-        lore: "Two immense arched hulls carry a caged plasma projector. It holds station over its mark while the beam sweeps across the ground and turns its path to molten glass.",
-        weapons: {"Excavation Plasma Beam": "A sustained pinch-fusion discharge swept across a broad swath, melting and searing what it crosses."},
+        lore: "A long armoured hull with one lance slung beneath its heart. It holds its mark under a white-hot beam, and when the mark is gone the beam does not go out: it drags across the ground to the next, and leaves a line of glass behind.",
+        weapons: {"Heavy Pinch-fusion Lance": "A held pinch-fusion beam laid down its barrel: it burns what it is on and cuts the ground it crosses on the way to the next."},
     ),
 }

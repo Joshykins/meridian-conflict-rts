@@ -34,10 +34,10 @@
         weapons: [
             (
                 name: "Excavation Lance",
-                // Immediate sustained surface sweep: 32 metres either side of its
-                // mark, striking units along the line and excavating where it meets ground.
+                // Lights at once and holds on its mark; between marks it stays lit as the
+                // tail slews, striking units along the line and glassing the ground.
                 damage: 30, range: 280, reload: 0.1, hitscan: true, beam: true, trajectory: Direct,
-                walk: 32, splash: 4,
+                splash: 4,
                 turret_turn: 180, muzzle: (14.3, 0, 57.2), pivot: (-5.2, 0, 60.45), sweep: 6,
                 targets: ["Land", "Naval", "Structure"], color: Blue, red: 0.0,
                 flash: 2.5, impact: 1.0, plasma_grade: Some(PinchFusion),

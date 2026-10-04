@@ -149,27 +149,6 @@ const LASER_GAP: u16 = 3;
 /// A shot's aim error, angle steps across and along (or up): a point drawn evenly from a
 /// disc of radius `spread`, so the misses scatter in a circle round the aim point rather
 /// than along a line or over a square.
-/// Ticks a walking beam (`Weapon::walk`) takes to cross its swath and back.
-const WALK_TICKS: u32 = 2 * WALK_HALF;
-const WALK_HALF: u32 = 2 * TICKS_PER_SECOND;
-
-/// Where a walking beam lays off its mark this tick: across the line of fire from `from`,
-/// out to `walk` either side and back, at a steady pace. Each unit walks from its own
-/// place in the swing.
-fn walk_offset(from: FxVec2, mark: FxVec2, walk: Fx, tick: u32, row: usize) -> FxVec2 {
-    let line = mark - from;
-    if line.length() < Fx::ONE {
-        return FxVec2::ZERO;
-    }
-    let phase = ((tick as u64 + row as u64 * 7) % WALK_TICKS as u64) as i32;
-    // -1 to 1 and back, in straight runs.
-    let swing = Fx::ratio(
-        (phase - WALK_HALF as i32).abs() as i64 * 2,
-        WALK_HALF as i64,
-    ) - Fx::ONE;
-    line.normalize().perp() * (walk * swing)
-}
-
 fn aim_error(rng: &mut mc_core::Rng, spread: u16) -> (i32, i32) {
     let s = spread as i32;
     loop {
@@ -1428,20 +1407,6 @@ impl World {
             };
             t.pos + t.lead * flight_ticks
         };
-        // A walking beam (`Weapon::walk`) lays back and forth across the mark: the gun
-        // swings through it and the stream walks a swath over the ground.
-        let aim = if weapon.walk > Fx::ZERO {
-            aim + walk_offset(pos, aim, weapon.walk, self.state.tick, row)
-        } else {
-            aim
-        };
-        // An excavation sweep lays onto the surface, so a miss still cuts the
-        // ground instead of sailing past above it. Units in its path intercept it.
-        let aim_z = if weapon.beam && weapon.walk > Fx::ZERO {
-            self.terrain.height_at(aim).max(self.terrain.water_level())
-        } else {
-            aim_z
-        };
         // A gun house on a pitched hull turns and elevates in the deck's frame.
         let deck = (weapon.mount && hull_pitched(bp.unit(units.blueprint[row]))).then(|| {
             house_lay(
@@ -1656,10 +1621,11 @@ impl World {
                             };
                             units.heading[row] = units.heading[row].turn_toward(lay, m.turn_rate);
                         } else {
-                            // An excavation tail handles small aim changes on its own.
-                            // Leave a quarter of its traverse for the terrain sweep before
-                            // asking the hull to step round. Other limited guns square up.
-                            let tail = weapon.beam && weapon.walk > Fx::ZERO;
+                            // A held beam's mount (the Harrow's tail) handles small aim
+                            // changes on its own, so the stream drags across the ground from
+                            // mark to mark; the hull steps round only for the last quarter
+                            // of its traverse. Other limited guns square up.
+                            let tail = weapon.beam;
                             let free = if tail {
                                 ((half_arc as u32 * 3) / 4) as u16
                             } else {
@@ -1679,9 +1645,9 @@ impl World {
                 in_arc = d.unsigned_abs() <= half_arc;
                 want = Angle(d.clamp(-(half_arc as i32) as i16, half_arc as i16) as u16);
             }
-            // Combat can turn an excavation walker's body after movement has run.
+            // Combat can turn a beam walker's body after movement has run.
             // Count that ground too, so its feet step rather than swivel on the spot.
-            if w == 0 && weapon.beam && weapon.walk > Fx::ZERO {
+            if w == 0 && weapon.beam {
                 let turn = facing_before.delta_to(units.heading[row]).unsigned_abs() as i32;
                 let radius = bp.unit(units.blueprint[row]).radius;
                 let ground = (radius * turn).mul_div(355, 113 * 0x10000);
@@ -1916,11 +1882,25 @@ impl World {
                 units.weapon_yaw[row][w]
             };
         // A sweeping gun fires down its barrel, not at its target: the stream walks onto
-        // what is in the cone as the torso comes round.
-        let aim = if weapon.sweep > 0 && !weapon.missile {
-            pos + FxVec2::from_angle(facing) * pos.distance(aim)
+        // what is in the cone as the torso comes round. A held beam off its mark lays onto
+        // the surface under the barrel, so as it slews from one mark to the next it drags a
+        // line across the ground; units in its path intercept it.
+        let (aim, aim_z) = if weapon.sweep > 0 && !weapon.missile {
+            // Down the barrel from where the gun turns (`turret_at`: the Harrow's tail root).
+            let root = pos
+                + bp.unit(units.blueprint[row])
+                    .turret_at
+                    .map_or(FxVec2::ZERO, |at| at.rotate(units.heading[row]));
+            let down = root + FxVec2::from_angle(facing) * root.distance(aim);
+            let off_mark = weapon.beam && down.distance(aim) > t.radius;
+            let z = if off_mark {
+                self.terrain.height_at(down).max(self.terrain.water_level())
+            } else {
+                aim_z
+            };
+            (down, z)
         } else {
-            aim
+            (aim, aim_z)
         };
         let unit_z = units.z[row];
         let travel = (units.pos[row] - units.prev_pos[row]).extend(unit_z - units.prev_z[row]);

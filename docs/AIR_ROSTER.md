@@ -444,9 +444,9 @@ plasma crackling under them.
 - **Reaper** (`regency_t3_assault_aircraft`, tech 3): a scythe-winged craft on six bells
   that does not strafe. It `hangs`: it flies in to two fifths of its reach from its mark
   and holds still there, moving again only when the mark drifts out of that band
-  (`orders.rs` `air_hang`). Its Pinch-fusion Beam (a `beam`, like the Harrow's) `walk`s
-  14 m either side of the mark across the line of fire, back and forth every 4 s, so the
-  stream glasses a swath and splashes everything standing in it.
+  (`orders.rs` `air_hang`). Its Pinch-fusion Beam (a `beam`, like the Harrow's) holds
+  on the mark; fired down the barrel (`sweep`), it stays lit while it slews to the next
+  mark and glasses the ground it crosses on the way.
 
 Check: `cargo test -p mc-sim --test sim -- regency_gunships::`; both are in the
 determinism match.

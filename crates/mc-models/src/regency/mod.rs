@@ -252,7 +252,9 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_coffer" | "regency_space_frigate" => 6000,
         // The Bastion's counterpart, at the Bastion's size and detail.
         "regency_ark" => 14000,
-        "regency_space_cruiser" | "regency_space_destroyer" => 9000,
+        "regency_space_cruiser" => 9000,
+        // A hero hull: plate courses laid over the whole of it, and the lance turret.
+        "regency_space_destroyer" => 12000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,

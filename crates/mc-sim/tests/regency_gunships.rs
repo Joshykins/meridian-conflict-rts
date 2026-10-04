@@ -1,7 +1,7 @@
 //! The Regency's hovering combat craft (`data/factions/regency/units/air_gunships.ron`): the
 //! Quiver lets its Wicks go at what it fights and each bursts on the mark (`strike_drones.rs`),
-//! and the Reaper hangs over its mark walking a beam across it (`Motion::hangs`,
-//! `Weapon::walk`).
+//! and the Reaper hangs over its mark holding a beam on it (`Motion::hangs`,
+//! `Weapon::beam`).
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -212,13 +212,17 @@ fn a_quiver_with_empty_bays_waits_for_its_wicks() {
 }
 
 #[test]
-fn the_reaper_hangs_still_over_its_mark_and_walks_its_beam_across_it() {
+fn the_reaper_hangs_still_over_its_mark_and_holds_its_beam_on_it() {
     let mut w = world();
     rich(&mut w, 0);
     let reaper = spawn(&mut w, "regency_t3_assault_aircraft", 0, 400, 600);
     let tank = target(&mut w, "aster_t4_assault_tank", 1100, 600);
     let tank_bp = w.blueprints.unit(w.state.units.blueprint[row(&w, tank)]);
-    let (full, at) = (tank_bp.health, w.state.units.pos[row(&w, tank)]);
+    let (full, reach, at) = (
+        tank_bp.health,
+        tank_bp.radius,
+        w.state.units.pos[row(&w, tank)],
+    );
     attack(&mut w, reaper, tank);
     for _ in 0..200 {
         w.tick(&[]).unwrap();
@@ -247,9 +251,10 @@ fn the_reaper_hangs_still_over_its_mark_and_walks_its_beam_across_it() {
         w.state.units.pos[r].distance(still) < Fx::from_int(8),
         "it held still while it fired"
     );
+    // On the hull, not swinging either side of it.
     assert!(
-        across.1 - across.0 > Fx::from_int(15),
-        "the beam walked a swath {:?}",
+        across.1 - across.0 < reach * 2,
+        "the beam strayed across {:?}",
         across
     );
     let left = w

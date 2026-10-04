@@ -1,5 +1,5 @@
-//! Regency combat: Harrow turns its body within the tail arc, immediately sweeps an
-//! excavation lance over the surface, and charges two six-shot corkscrew area salvos.
+//! Regency combat: Harrow turns its body within the tail arc, lights its excavation lance
+//! at once and holds it on the mark, and charges two six-shot corkscrew area salvos.
 //! A lot remembers the faction it was levelled for.
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
@@ -236,7 +236,7 @@ fn the_tail_stays_within_its_sweep_while_the_body_turns() {
                 .rotate(u.heading[r]);
         let bearing = (u.pos[t] - root).angle();
         let laid = u.heading[r] + u.weapon_yaw[r][0];
-        // The lance intentionally crosses its mark; it must stay inside its 32 m swath.
+        // The tail may lay a little past its mark while the body comes round.
         worst = worst.max(bearing.delta_to(laid) as i32);
     }
     assert!(
@@ -247,30 +247,39 @@ fn the_tail_stays_within_its_sweep_while_the_body_turns() {
 }
 
 #[test]
-fn the_lance_fires_without_spin_up_and_sweeps_both_sides_of_the_mark() {
+fn the_lance_fires_without_spin_up_and_holds_on_its_mark() {
     let mut w = world();
     add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
     let target = add(&mut w, "aster_t3_assault_bot", 1, 712, 512, 180);
     let t = w.state.units.row(target).unwrap();
     w.state.units.flags[t] |= mc_sim::tables::flag::PASSIVE | mc_sim::tables::flag::INVULNERABLE;
+    let at = w.state.units.pos[t];
+    // Its strokes land on the bot's hull, out to its radius from the middle.
+    let hull = w.blueprints.unit(w.state.units.blueprint[t]).radius + Fx::from_int(3);
     let id = w.blueprints.id_of("regency_t4_scorpion").unwrap();
     assert_eq!(w.blueprints.unit(id).weapons[0].spin_ticks, 0);
     let mut first = None;
-    let mut directions = Vec::new();
+    let mut shots = 0;
+    let mut worst = Fx::ZERO;
     for tick in 0..100 {
         w.tick(&[]).unwrap();
         for event in &w.events {
-            if let SimEvent::ShotFired {
-                blueprint,
-                weapon: 0,
-                vel,
-                ..
-            } = event
-            {
-                if *blueprint == id {
+            match event {
+                SimEvent::ShotFired {
+                    blueprint,
+                    weapon: 0,
+                    ..
+                } if *blueprint == id => {
                     first.get_or_insert(tick);
-                    directions.push(vel.y);
+                    shots += 1;
                 }
+                SimEvent::Impact {
+                    pos,
+                    blueprint,
+                    weapon: 0,
+                    ..
+                } if *blueprint == id => worst = worst.max(pos.xy().distance(at)),
+                _ => {}
             }
         }
     }
@@ -278,9 +287,8 @@ fn the_lance_fires_without_spin_up_and_sweeps_both_sides_of_the_mark() {
         first.is_some_and(|t| t < 5),
         "ready lance lights immediately: {first:?}"
     );
-    assert!(directions.iter().any(|y| *y > Fx::ZERO));
-    assert!(directions.iter().any(|y| *y < Fx::ZERO));
-    assert!(directions.len() > 80, "holds through its terrain sweep");
+    assert!(shots > 80, "holds its stream: {shots} shots");
+    assert!(worst < hull, "the lance strayed {worst} m off its mark");
 }
 
 /// A lot remembers which faction it was levelled for, so the renderer clads the slopes
