@@ -860,7 +860,7 @@ pub(super) fn ruin(b: &mut MeshBuilder, _tech: u8) {
                 c.y + (hash_unit(37, i) - 0.5) * 16.0,
                 0.5,
             );
-            let d = Vec2::from_angle(hash_unit(41, i) * 6.28)
+            let d = Vec2::from_angle(hash_unit(41, i) * std::f32::consts::TAU)
                 .extend(0.5 + hash_unit(43, i))
                 .normalize();
             paint(b, pat::TIMBER);
@@ -933,7 +933,7 @@ pub(super) fn rubble(b: &mut MeshBuilder, _tech: u8) {
                 (hash_unit(63, i) - 0.5) * 9.0,
                 0.9,
             );
-            let d = Vec2::from_angle(hash_unit(67, i) * 6.28)
+            let d = Vec2::from_angle(hash_unit(67, i) * std::f32::consts::TAU)
                 .extend(0.6 + hash_unit(69, i))
                 .normalize();
             paint(b, pat::STEEL);

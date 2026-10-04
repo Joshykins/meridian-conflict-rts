@@ -29,6 +29,9 @@ struct CityIn {
     gutted: f32,
     age: f32,
     time: f32,
+    // The instance's own health, 0 to 1: what wears cars and billboards, which are no
+    // structure and have no `city_look` word.
+    health: f32,
     // 0 by day, 1 by night.
     night: f32,
 }
@@ -230,6 +233,35 @@ fn city_wall(finish: u32, rgb: vec3<f32>, st: vec2<f32>, local: vec3<f32>, px: f
     let streak = smoothstep(0.55, 0.85, surf_noise3(vec3<f32>(st.x * 1.3, st.y * 0.06, inst * 9.0)));
     c *= 1.0 - 0.12 * streak * surf_resolved(0.8, px);
     return c;
+}
+
+// An LED billboard's screen (`st` metres on it, 6 by 3): the instance's advert, a
+// broad wash of two colours, a bold shape and lines of text, brighter by night;
+// worn, it goes out in blocks and cracks; badly worn, dark.
+fn city_screen(i: CityIn, st: vec2<f32>) -> CityLook {
+    var o: CityLook;
+    o.tint = vec3<f32>(1.0);
+    let a = city_hash(i.inst, 21.0);
+    let hue_a = prism(a);
+    let hue_b = prism(fract(a + 0.35));
+    let uv = st / vec2<f32>(6.0, 3.0);
+    var c = mix(hue_a, hue_b, smoothstep(0.1, 0.9, uv.x + 0.3 * sin(uv.y * 3.0 + a * 9.0)));
+    let blob = length((uv - vec2<f32>(0.3 + 0.4 * city_hash(i.inst, 22.0), 0.55)) * vec2<f32>(2.0, 1.0));
+    c = mix(c, vec3<f32>(1.0), smoothstep(0.32, 0.28, blob) * 0.8);
+    let line = step(0.55, fract(uv.y * 5.0)) * step(0.62, uv.x) * step(uv.x, 0.94) * step(uv.y, 0.6)
+        * step(0.3, fract(uv.x * 11.0 + a * 5.0));
+    c = mix(c, vec3<f32>(0.95, 0.95, 0.9), line);
+    // Pixels: a fine grid of LEDs up close.
+    let led = 1.0 - 0.35 * surf_resolved(0.04, i.px) * max(step(0.75, fract(st.x / 0.04)), step(0.75, fract(st.y / 0.04)));
+    let worn = 1.0 - i.health;
+    let block = hash21(floor(st / 0.5) + vec2<f32>(i.inst * 13.0));
+    let dead = step(block, worn * 1.4) + step(0.75, worn);
+    let crack = smoothstep(0.9, 0.97, surf_noise3(vec3<f32>(st * 2.5, i.inst * 7.0))) * step(0.2, worn);
+    let on = clamp(1.0 - dead, 0.0, 1.0) * (1.0 - crack) * (1.0 - i.gutted);
+    o.albedo = vec3<f32>(0.02) + c * 0.05;
+    o.roughness = 0.25;
+    o.glow = c * led * on * mix(1.2, 2.4, i.night);
+    return o;
 }
 
 // A wall knocked about: pocked where shells and bullets struck (dark pits with a
@@ -722,6 +754,61 @@ fn city_plain(i: CityIn) -> CityLook {
         o.albedo = mix(mix(vec3<f32>(0.025, 0.035, 0.07), vec3<f32>(0.12, 0.13, 0.15), min(cell, 1.0) * 0.5), vec3<f32>(0.55, 0.56, 0.58), frame);
         o.roughness = 0.18;
         o.metallic = 0.4;
+    } else if p == CITY_SCREEN {
+        o = city_screen(i, st);
+    } else if p == CITY_CAR || p == CITY_TYRE {
+        // Paint in the instance's colour, a sheen of clear coat; burnt out, charred
+        // metal going to rust.
+        let pick = city_hash(i.inst, 14.0);
+        var c = vec3<f32>(0.55, 0.55, 0.56);
+        if pick > 0.25 { c = vec3<f32>(0.04, 0.04, 0.045); }
+        if pick > 0.45 { c = vec3<f32>(0.7, 0.7, 0.68); }
+        if pick > 0.6 { c = vec3<f32>(0.32, 0.04, 0.03); }
+        if pick > 0.72 { c = vec3<f32>(0.05, 0.12, 0.3); }
+        if pick > 0.84 { c = vec3<f32>(0.2, 0.22, 0.24); }
+        if pick > 0.93 { c = vec3<f32>(0.5, 0.38, 0.12); }
+        o.roughness = 0.25;
+        o.metallic = 0.5;
+        if p == CITY_TYRE {
+            c = vec3<f32>(0.02);
+            o.roughness = 0.9;
+            o.metallic = 0.0;
+        }
+        let burnt = step(i.health, 0.5);
+        let rust = mix(vec3<f32>(0.05, 0.045, 0.04), vec3<f32>(0.22, 0.09, 0.04), smoothstep(0.4, 0.7, surf_noise3(i.local * 2.0 + i.inst * 9.0)));
+        o.albedo = mix(c, rust, burnt);
+        o.roughness = mix(o.roughness, 0.95, burnt);
+        o.metallic = mix(o.metallic, 0.1, burnt);
+    } else if p == CITY_CAR_GLASS {
+        // Tinted glass over a dark cabin; a burnt-out car has none left.
+        let burnt = step(i.health, 0.5);
+        o.albedo = mix(vec3<f32>(0.02, 0.025, 0.03), vec3<f32>(0.01, 0.009, 0.008), burnt);
+        o.glass = 1.0 - burnt;
+        o.reflect = 1.0;
+        o.interior = vec3<f32>(0.03, 0.03, 0.035);
+        o.tint = vec3<f32>(0.8, 0.85, 0.9);
+        o.f0 = 0.08;
+        o.roughness = 0.1;
+    } else if p == CITY_SANDBAG {
+        let row = floor(st.y / 0.3);
+        let bag = fract(st.x / 0.6 + 0.5 * fract(row * 0.5));
+        var c = vec3<f32>(0.42, 0.36, 0.25) * (0.85 + 0.3 * hash11(row * 7.0 + floor(st.x / 0.6) + i.inst));
+        c *= 1.0 - 0.35 * surf_resolved(0.3, i.px) * (1.0 - smoothstep(0.0, 0.12, min(bag, 1.0 - bag)));
+        o.albedo = c * (1.0 + 0.3 * broad);
+        o.roughness = 0.95;
+    } else if p == CITY_WATER {
+        o.albedo = vec3<f32>(0.01, 0.02, 0.02);
+        o.roughness = 0.05;
+        o.glass = 1.0;
+        o.reflect = 1.0 - i.gutted;
+        o.interior = vec3<f32>(0.03, 0.06, 0.06);
+        o.tint = vec3<f32>(0.85, 0.95, 0.95);
+        o.f0 = 0.04;
+        o.tilt = vec2<f32>(sin(i.time * 1.3 + i.local.x * 2.0), cos(i.time * 1.1 + i.local.y * 2.3)) * 0.02;
+    } else if p == CITY_WHITE_STEEL {
+        o.albedo = vec3<f32>(0.72, 0.73, 0.72) * (1.0 + 0.15 * broad);
+        o.roughness = 0.45;
+        o.metallic = 0.1;
     } else if p == CITY_COPPER {
         var c = vec3<f32>(0.22, 0.42, 0.36);
         c = mix(c, vec3<f32>(0.12, 0.2, 0.17), smoothstep(0.5, 0.8, surf_noise3(vec3<f32>(i.local.xy * 0.8, i.local.z * 0.1))));

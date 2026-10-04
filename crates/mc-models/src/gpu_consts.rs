@@ -363,6 +363,19 @@ shared! {
         pub const LED: u32 = 78;
         /// Photovoltaic panels: dark glass cells in a silver frame.
         pub const SOLAR: u32 = 79;
+        /// An LED billboard's screen: the instance's advert, dark and cracked once worn.
+        pub const SCREEN: u32 = 80;
+        /// A car's paint in the instance's colour, and its glass and tyres; burnt out
+        /// (instance health under a half) all of them go to a charred shell.
+        pub const CAR: u32 = 81;
+        pub const CAR_GLASS: u32 = 82;
+        pub const TYRE: u32 = 83;
+        /// Sandbags: tan sacking in stacked bags.
+        pub const SANDBAG: u32 = 84;
+        /// Still water in a basin: dark, mirroring the sky.
+        pub const WATER: u32 = 85;
+        /// Steel painted white: wind turbines, dishes.
+        pub const WHITE_STEEL: u32 = 86;
         /// A facade pattern plus this: the same wall in the same finish, no windows (a
         /// gable, the pier beside a door, a stair tower's blind face).
         pub const BLANK: u32 = 100;

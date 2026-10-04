@@ -17,6 +17,7 @@ mod blocks;
 mod civic;
 mod kit;
 mod outskirts;
+mod street;
 mod towers;
 mod wall;
 
@@ -100,6 +101,32 @@ pub(super) const MODELS: &[ModelDef] = &[
     def("city_wall_tower", PropKind::CityWallTower, wall::tower),
     def("city_gate", PropKind::CityGate, wall::gate),
     def("city_rubble", PropKind::CityRubble, blocks::rubble),
+    def(
+        "city_streetlight",
+        PropKind::CityStreetLight,
+        street::streetlight,
+    ),
+    def("city_transit", PropKind::CityTransit, street::transit),
+    def(
+        "city_transit_station",
+        PropKind::CityTransitStation,
+        street::transit_station,
+    ),
+    def("city_billboard", PropKind::CityBillboard, street::billboard),
+    def("city_car", PropKind::CityCar, street::car),
+    def("city_barricade", PropKind::CityBarricade, street::barricade),
+    def(
+        "city_wind_turbine",
+        PropKind::CityWindTurbine,
+        street::wind_turbine,
+    ),
+    def(
+        "city_solar_array",
+        PropKind::CitySolarArray,
+        street::solar_array,
+    ),
+    def("city_mast", PropKind::CityMast, street::mast_tower),
+    def("city_monument", PropKind::CityMonument, street::monument),
 ];
 
 /// Full-detail triangle budgets above the default: the towers, a few dozen on the

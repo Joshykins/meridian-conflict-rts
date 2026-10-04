@@ -3218,6 +3218,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         ci.gutted = select(0.0, 1.0, (word & CITY_LOOK_GUTTED) != 0u);
         ci.age = f32(word >> CITY_LOOK_AGE_SHIFT);
         ci.time = time;
+        ci.health = clamp(in.state.y, 0.0, 1.0);
         ci.night = smoothstep(0.12, -0.04, globals.sun.z);
         city = city_surface(ci);
         m.emissive += city.glow;

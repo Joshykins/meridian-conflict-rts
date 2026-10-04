@@ -50,8 +50,10 @@ fn city_models_keep_to_their_plans() {
         let model = build_model(def.key).unwrap();
         let verts = &model.lods[0].vertices;
         if s.plan.is_empty() {
-            let high = verts.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
-            assert!(high < 3.0, "{}: rubble stands {high} m high", def.key);
+            if kind == PropKind::CityRubble {
+                let high = verts.iter().map(|v| v.pos[2]).fold(f32::MIN, f32::max);
+                assert!(high < 3.0, "{}: rubble stands {high} m high", def.key);
+            }
             continue;
         }
         let mut lo = glam::Vec2::splat(f32::MAX);
@@ -63,17 +65,42 @@ fn city_models_keep_to_their_plans() {
             );
             lo = lo.min(c - h);
             hi = hi.max(c + h);
-            let inside = |p: Vec3| {
-                let d = (p.truncate() - c).abs();
-                d.x <= h.x && d.y <= h.y
-            };
+            // The highest level face over the part: a triangle lying level whose
+            // outline overlaps the part's footprint.
             let top = s.tops[i] as f32;
-            let reach = verts
-                .iter()
-                .map(|v| Vec3::from(v.pos))
-                .filter(|p| inside(*p))
-                .map(|p| p.z)
-                .fold(f32::MIN, f32::max);
+            let mesh = &model.lods[0];
+            let reach = mesh
+                .indices
+                .chunks(3)
+                .map(|t| {
+                    t.iter()
+                        .map(|&k| Vec3::from(mesh.vertices[k as usize].pos))
+                        .collect::<Vec<_>>()
+                })
+                .filter(|t| {
+                    let (a, b) = t
+                        .iter()
+                        .fold((Vec3::MAX, Vec3::MIN), |(a, b), p| (a.min(*p), b.max(*p)));
+                    a.x <= c.x + h.x
+                        && b.x >= c.x - h.x
+                        && a.y <= c.y + h.y
+                        && b.y >= c.y - h.y
+                        && b.z - a.z < 0.6
+                })
+                .map(|t| t.iter().map(|p| p.z).fold(f32::MIN, f32::max))
+                .fold(f32::MIN, f32::max)
+                .max(
+                    // Or the highest point over it: a ridge, a spire.
+                    mesh.vertices
+                        .iter()
+                        .map(|v| Vec3::from(v.pos))
+                        .filter(|p| {
+                            let d = (p.truncate() - c).abs();
+                            d.x <= h.x && d.y <= h.y
+                        })
+                        .map(|p| p.z)
+                        .fold(f32::MIN, f32::max),
+                );
             assert!(
                 reach >= top - 1.0,
                 "{} part {i}: reaches {reach} m of its {top} m top",
@@ -81,10 +108,11 @@ fn city_models_keep_to_their_plans() {
             );
         }
         let highest = s.tops.iter().copied().max().unwrap_or(0) as f32;
+        let over = overhang(kind);
         for v in verts {
             let p = Vec3::from(v.pos).truncate();
             assert!(
-                p.cmpge(lo - 3.2).all() && p.cmple(hi + 3.2).all(),
+                p.cmpge(lo - over).all() && p.cmple(hi + over).all(),
                 "{}: {p} is off its plan {lo}..{hi}",
                 def.key
             );
@@ -99,6 +127,18 @@ fn city_models_keep_to_their_plans() {
                 );
             }
         }
+    }
+}
+
+/// How far past its solid plan a model may reach: eaves and canopies, or what is
+/// drawn but never solid (a guideway between its pylons, a turbine's blades).
+fn overhang(kind: PropKind) -> f32 {
+    match kind {
+        PropKind::CityTransit => mc_map::city::TRANSIT_SEGMENT_M as f32 * 0.5,
+        PropKind::CityTransitStation => 14.0,
+        PropKind::CityWindTurbine => 48.0,
+        PropKind::CityMast => 6.0,
+        _ => 3.2,
     }
 }
 
@@ -128,7 +168,13 @@ fn city_faces_carry_city_patterns() {
         let model = build_model(def.key).unwrap();
         for lod in model.lods.iter().chain(&model.far) {
             for v in &lod.vertices {
-                if v.material == material::GLOW_RED {
+                if [
+                    material::GLOW_RED,
+                    material::GLOW_LAMP,
+                    material::GLOW_NAV_RED,
+                ]
+                .contains(&v.material)
+                {
                     continue;
                 }
                 assert_eq!(v.material, material::CONCRETE, "{}", def.key);
