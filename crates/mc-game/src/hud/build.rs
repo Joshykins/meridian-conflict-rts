@@ -1126,6 +1126,33 @@ fn upgrade_card(
             rows.push((label, a.to_f32(), b.to_f32(), ""));
         }
     }
+    // A shield: how much it takes, how far it reaches, how fast it fills.
+    if from.shield.is_some() || next.shield.is_some() {
+        let sh = |bp: &UnitBlueprint, f: fn(mc_data::Shield) -> f32| bp.shield.map_or(0.0, f);
+        rows.push((
+            "Shield",
+            sh(from, |x| x.health.to_f32()),
+            sh(next, |x| x.health.to_f32()),
+            "",
+        ));
+        if [from, next]
+            .iter()
+            .any(|bp| bp.shield.is_some_and(|x| x.is_dome()))
+        {
+            rows.push((
+                "Shield Radius",
+                sh(from, |x| x.radius.to_f32()),
+                sh(next, |x| x.radius.to_f32()),
+                " m",
+            ));
+        }
+        rows.push((
+            "Shield Regen",
+            sh(from, |x| x.regen.to_f32()),
+            sh(next, |x| x.regen.to_f32()),
+            " / s",
+        ));
+    }
     // A core mine: what it makes on its own territory now and at the next tier.
     let mine = s
         .queue_of(u)
@@ -1162,7 +1189,6 @@ fn upgrade_card(
             let cost = (next.cost_mass - current.cost_mass).to_f32().max(0.0);
             (gain > 0.0).then(|| (gain, cost / gain))
         });
-    let rows: Vec<_> = rows.into_iter().take(8).collect();
 
     let w = 380.0;
     let row_h = 19.0;
