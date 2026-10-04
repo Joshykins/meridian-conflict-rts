@@ -33,7 +33,7 @@ fn pole(b: &mut MeshBuilder, at: Vec2, r0: f32, r1: f32, z0: f32, z1: f32, n: us
 pub(super) fn streetlight(b: &mut MeshBuilder, _tech: u8) {
     let h = 10.0;
     let reach = 3.2;
-    paint(b, pat::STEEL);
+    paint(b, pat::WHITE_STEEL);
     if b.far() {
         pole(b, Vec2::ZERO, 0.14, 0.08, -0.5, h, 3);
         return;
@@ -71,7 +71,12 @@ pub(super) fn streetlight(b: &mut MeshBuilder, _tech: u8) {
     ]);
     if b.fine() {
         // The base and its service hatch.
-        boxed(b, v3(-0.25, -0.25, -0.3), v3(0.25, 0.25, 1.0), pat::STEEL);
+        boxed(
+            b,
+            v3(-0.25, -0.25, -0.3),
+            v3(0.25, 0.25, 1.0),
+            pat::WHITE_STEEL,
+        );
     }
 }
 
@@ -370,13 +375,12 @@ pub(super) fn car(b: &mut MeshBuilder, _tech: u8) {
         );
         return;
     }
-    b.with_facets(|b| b.extrude_y(&body, -w * 0.5, w * 0.5));
-    // The glasshouse: windscreen, roof, rear screen.
-    paint(b, pat::CAR_GLASS);
-    let glass = [[-1.55, 0.98], [0.75, 0.98], [0.05, 1.47], [-1.25, 1.47]];
-    b.with_facets(|b| b.extrude_y(&glass, -w * 0.5 + 0.08, w * 0.5 - 0.08));
-    // Wheels: round up close, a dark block an axle further off.
     if !b.fine() {
+        b.with_facets(|b| b.extrude_y(&body, -w * 0.5, w * 0.5));
+        paint(b, pat::CAR_GLASS);
+        let glass = [[-1.55, 0.98], [0.75, 0.98], [0.05, 1.47], [-1.25, 1.47]];
+        b.with_facets(|b| b.extrude_y(&glass, -w * 0.5 + 0.08, w * 0.5 - 0.08));
+        // Wheels: a dark block an axle.
         for x in [1.4f32, -1.4] {
             boxed(
                 b,
@@ -387,16 +391,65 @@ pub(super) fn car(b: &mut MeshBuilder, _tech: u8) {
         }
         return;
     }
+    // Up close: a bonnet sloping to the nose, a boot, the flanks drawn in toward the
+    // top (tumblehome), a glasshouse with raked pillars, arches over the wheels.
+    let body = [
+        [-2.3, 0.32],
+        [2.3, 0.32],
+        [2.33, 0.55],
+        [2.25, 0.72],
+        [1.9, 0.82],
+        [0.85, 0.95],
+        [-1.6, 1.0],
+        [-2.2, 0.93],
+        [-2.33, 0.72],
+    ];
+    b.with_facets(|b| b.extrude_y_chamfered(&body, w * 0.5, 0.14));
+    paint(b, pat::CAR_GLASS);
+    let glass = [[-1.62, 0.97], [0.85, 0.94], [0.1, 1.46], [-1.2, 1.48]];
+    b.with_facets(|b| b.extrude_y_chamfered(&glass, w * 0.5 - 0.1, 0.2));
     boxed(
         b,
-        v3(-1.15, -w * 0.5 + 0.12, 1.47),
-        v3(0.0, w * 0.5 - 0.12, 1.52),
+        v3(-1.12, -w * 0.5 + 0.3, 1.47),
+        v3(0.05, w * 0.5 - 0.3, 1.5),
         pat::CAR,
     );
-    paint(b, pat::TYRE);
-    for (x, y) in [(1.4f32, 1.0f32), (1.4, -1.0), (-1.4, 1.0), (-1.4, -1.0)] {
-        let y = y * (w * 0.5 - 0.12);
+    // Bumpers, lamps.
+    for (x0, x1) in [(2.26, 2.36), (-2.36, -2.26)] {
+        boxed(
+            b,
+            v3(x0, -w * 0.5 + 0.05, 0.3),
+            v3(x1, w * 0.5 - 0.05, 0.46),
+            pat::TYRE,
+        );
+    }
+    for y in [-0.65f32, 0.65] {
+        paint(b, pat::CAR_GLASS);
+        facing(
+            b,
+            vec![
+                v3(2.3, y - 0.22, 0.6),
+                v3(2.3, y + 0.22, 0.6),
+                v3(2.25, y + 0.22, 0.7),
+                v3(2.25, y - 0.22, 0.7),
+            ],
+            Vec3::new(1.0, 0.0, 0.4),
+        );
+    }
+    // Wheels under arches.
+    for (x, side) in [(1.4f32, 1.0f32), (1.4, -1.0), (-1.4, 1.0), (-1.4, -1.0)] {
+        let y = side * (w * 0.5 - 0.12);
+        paint(b, pat::TYRE);
         b.cylinder_between(v3(x, y - 0.11, 0.33), v3(x, y + 0.11, 0.33), 0.33, 0.33, 8);
+        let face_y = side * (w * 0.5 + 0.005);
+        let arch: Vec<Vec3> = (0..=6)
+            .map(|k| {
+                let a = std::f32::consts::PI * k as f32 / 6.0;
+                v3(x + 0.42 * a.cos(), face_y, 0.32 + 0.42 * a.sin())
+            })
+            .collect();
+        paint(b, pat::SHADOW);
+        facing(b, arch, Vec3::Y * side);
     }
 }
 

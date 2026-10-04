@@ -881,65 +881,81 @@ pub(super) fn ruin(b: &mut MeshBuilder, _tech: u8) {
 pub(super) fn rubble(b: &mut MeshBuilder, _tech: u8) {
     paint(b, pat::RUBBLE);
     if b.far() {
-        b.lumpy_spheroid(v3(0.0, 0.0, -0.5), v3(9.0, 7.0, 2.2), 4, 2, 0.2, 3);
+        b.lumpy_spheroid(v3(0.0, 0.0, -0.5), v3(8.5, 6.5, 2.2), 4, 2, 0.2, 3);
         return;
     }
-    let sides = b.sides(10);
-    b.lumpy_spheroid(
-        v3(0.0, 0.0, -0.5),
-        v3(9.0, 7.0, 2.3),
-        sides,
-        if b.coarse() { 2 } else { 4 },
-        0.25,
-        3,
-    );
+    // Hard broken shapes: every chunk's facets flat.
+    b.with_facets(|b| {
+        let coarse = b.coarse();
+        // The mound, peaked off-centre.
+        b.lumpy_spheroid(
+            v3(-0.8, 0.4, -0.3),
+            v3(7.0, 5.2, 2.2),
+            if coarse { 5 } else { b.sides(12) },
+            if coarse { 2 } else { 4 },
+            0.2,
+            3,
+        );
+        // Spill round its foot: lumps at uneven reach, so the edge is ragged.
+        let spill = if coarse {
+            3
+        } else if b.fine() {
+            9
+        } else {
+            6
+        };
+        for k in 0..spill as u32 {
+            let a = k as f32 / spill as f32 * std::f32::consts::TAU + hash_unit(71, k) * 0.5;
+            let reach = 5.5 + 3.0 * hash_unit(73, k);
+            let at = Vec2::new(a.cos() * reach * 1.25, a.sin() * reach * 0.95);
+            let r = 1.6 + 1.6 * hash_unit(79, k);
+            b.lumpy_spheroid(
+                at.extend(-0.5),
+                v3(
+                    r,
+                    r * (0.6 + 0.4 * hash_unit(83, k)),
+                    0.7 + 0.9 * hash_unit(89, k),
+                ),
+                if coarse { 4 } else { 6 },
+                2,
+                0.35,
+                11 + k,
+            );
+        }
+    });
     if b.coarse() {
         return;
     }
-    for (i, (x, y, r)) in [(-5.0f32, 3.0f32, 3.6f32), (4.5, -3.0, 4.0), (6.0, 4.0, 2.6)]
-        .iter()
-        .enumerate()
-    {
-        if !b.fine() && i > 0 {
-            continue;
-        }
-        b.lumpy_spheroid(
-            v3(*x, *y, -0.8),
-            v3(*r, *r * 0.8, 1.9),
-            sides,
-            3,
-            0.3,
-            7 + i as u32,
-        );
-    }
-    // Slabs tipped over the heap.
-    for i in 0..4u32 {
+    // Slabs tipped over the heap, a wall's piece standing on edge.
+    for i in 0..if b.fine() { 6u32 } else { 3 } {
         let at = v3(
-            (hash_unit(51, i) - 0.5) * 12.0,
-            (hash_unit(53, i) - 0.5) * 9.0,
-            1.0,
+            (hash_unit(51, i) - 0.5) * 11.0,
+            (hash_unit(53, i) - 0.5) * 8.0,
+            0.5 + hash_unit(55, i) * 0.8,
         );
-        let tilt = (hash_unit(57, i) - 0.5) * 0.7;
+        let tilt = (hash_unit(57, i) - 0.5) * 0.85;
+        let size = v3(1.2 + hash_unit(61, i) * 1.4, 0.9 + hash_unit(63, i), 0.14);
         b.pitched(at, tilt, |b| {
             b.yawed(Vec3::ZERO, hash_unit(59, i) * 3.0, |b| {
-                boxed(b, -v3(2.2, 1.6, 0.12), v3(2.2, 1.6, 0.12), pat::RUBBLE);
+                boxed(b, -size, size, pat::RUBBLE);
             });
         });
     }
     if b.fine() {
-        for i in 0..10u32 {
+        // Bent rebar out of the broken slabs, dark with rust.
+        for i in 0..12u32 {
             let a = v3(
-                (hash_unit(61, i) - 0.5) * 12.0,
-                (hash_unit(63, i) - 0.5) * 9.0,
-                0.9,
+                (hash_unit(61, i) - 0.5) * 11.0,
+                (hash_unit(63, i) - 0.5) * 8.0,
+                0.5 + hash_unit(65, i) * 0.6,
             );
             let d = Vec2::from_angle(hash_unit(67, i) * std::f32::consts::TAU)
-                .extend(0.6 + hash_unit(69, i))
+                .extend(0.5 + hash_unit(69, i))
                 .normalize();
-            paint(b, pat::STEEL);
+            paint(b, pat::TYRE);
             b.beam(
                 a,
-                a + d * (0.8 + hash_unit(71, i) * 1.2),
+                a + d * (0.8 + hash_unit(71, i) * 1.4),
                 Vec2::splat(0.05),
                 Vec2::splat(0.04),
             );

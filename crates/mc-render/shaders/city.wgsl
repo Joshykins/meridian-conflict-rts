@@ -389,7 +389,13 @@ fn city_n_of(len: f32, pitch: f32) -> f32 {
 }
 
 // A facade with windows on its grid.
-fn city_facade(i: CityIn) -> CityLook {
+fn city_facade(i_in: CityIn) -> CityLook {
+    // A curtain-walled tower is clad in stone with punched windows on some instances,
+    // so a downtown of the same towers is not all glass.
+    var i = i_in;
+    if i.pattern == CITY_CURTAIN && city_hash(i.inst, 40.0) < 0.3 {
+        i.pattern = CITY_OFFICE;
+    }
     var o: CityLook;
     o.roughness = 0.88;
     o.tint = vec3<f32>(1.0);
@@ -513,13 +519,20 @@ fn city_facade(i: CityIn) -> CityLook {
     o.interior = mix(o.interior, vec3<f32>(0.25, 0.07, 0.02), flames * 0.8);
     var tint = vec3<f32>(0.92, 0.97, 1.0);
     if curtain {
+        // The glass's coating, the instance's: blue, green, bronze, grey or smoked.
         let t = hash11(i.inst * 77.0);
-        tint = select(select(vec3<f32>(0.55, 0.85, 0.85), vec3<f32>(0.95, 0.75, 0.5), t < 0.6), vec3<f32>(0.75, 0.85, 1.0), t < 0.35);
-        o.interior *= 0.55;
+        tint = vec3<f32>(0.5, 0.7, 1.0);
+        if t > 0.25 { tint = vec3<f32>(0.5, 0.85, 0.75); }
+        if t > 0.45 { tint = vec3<f32>(0.95, 0.72, 0.45); }
+        if t > 0.65 { tint = vec3<f32>(0.75, 0.78, 0.8); }
+        if t > 0.85 { tint = vec3<f32>(0.4, 0.42, 0.45); }
+        o.interior *= 0.45 * tint;
     }
     o.tint = tint * (0.85 + 0.3 * hash11(key * 17.0));
-    o.f0 = select(0.06, 0.24, curtain);
-    o.tilt = (vec2<f32>(hash11(key * 7.0), hash11(key * 9.0)) - 0.5) * select(0.06, 0.025, curtain);
+    o.f0 = select(0.06, 0.15, curtain);
+    // Panes a little out of true up close; far off one flat mirror, or each pane's
+    // glint sparkles into streaks.
+    o.tilt = (vec2<f32>(hash11(key * 7.0), hash11(key * 9.0)) - 0.5) * select(0.06, 0.025, curtain) * detail;
     return o;
 }
 
@@ -680,9 +693,12 @@ fn city_plain(i: CityIn) -> CityLook {
         o.albedo = c * (1.0 + 0.3 * broad);
         o.roughness = 0.75;
     } else if p == CITY_ROOF_FLAT {
-        var c = vec3<f32>(0.2, 0.2, 0.2);
-        let gravel = smoothstep(0.45, 0.6, surf_noise3(i.local * 0.15 + i.inst * 30.0));
-        c = mix(c, vec3<f32>(0.36, 0.35, 0.33), gravel);
+        // Membrane in the instance's grey, gravel ballast speckled over it, darker
+        // where water stood.
+        var c = vec3<f32>(0.2, 0.2, 0.2) * (0.8 + 0.4 * city_hash(i.inst, 33.0));
+        let gravel = surf_noise3(i.local * 1.7 + i.inst * 30.0) * surf_resolved(0.5, i.px);
+        c *= 0.9 + 0.2 * gravel;
+        c *= 1.0 - 0.15 * smoothstep(0.55, 0.75, surf_noise3(i.local * 0.25 + i.inst * 3.0));
         let seam = fract(st.x / 1.0);
         c *= 1.0 - 0.15 * surf_resolved(0.2, i.px) * (1.0 - smoothstep(0.0, 0.04, min(seam, 1.0 - seam)));
         o.albedo = c * (1.0 + 0.4 * broad);
@@ -719,12 +735,16 @@ fn city_plain(i: CityIn) -> CityLook {
         // brick red in some, dark voids between, all dulled toward the dust's tan.
         let q = i.local * 2.6 + vec3<f32>(i.inst * 20.0);
         let lump = surf_noise3(q);
-        let kind = surf_noise3(q * 0.37 + vec3<f32>(5.0, 1.0, 3.0));
-        var c = mix(vec3<f32>(0.36, 0.35, 0.33), vec3<f32>(0.3, 0.15, 0.1), smoothstep(0.55, 0.7, kind));
-        c *= 0.75 + 0.5 * lump;
-        c *= 1.0 - 0.6 * smoothstep(0.25, 0.1, lump) * surf_resolved(0.3, i.px);
-        c = mix(c, vec3<f32>(0.4, 0.37, 0.32), 0.35);
-        c = mix(c, vec3<f32>(0.035, 0.03, 0.028), 0.35 * smoothstep(0.55, 0.8, surf_noise3(i.local * 0.2 + 9.0)));
+        let fine = surf_noise3(q * 2.7 + vec3<f32>(3.0, 7.0, 1.0));
+        let kind = surf_noise3(i.local * 0.6 + vec3<f32>(5.0, 1.0, 3.0) + i.inst * 4.0);
+        // Grey concrete, brick in places, dark grout and shadow between the chunks.
+        var c = mix(vec3<f32>(0.24, 0.235, 0.22), vec3<f32>(0.22, 0.1, 0.065), smoothstep(0.58, 0.68, kind));
+        c *= 0.7 + 0.6 * lump * (0.8 + 0.4 * fine);
+        let gap = smoothstep(0.32, 0.18, lump) * surf_resolved(0.25, i.px);
+        c = mix(c, vec3<f32>(0.025, 0.022, 0.02), gap * 0.85);
+        // Dust settled on what faces up, soot in patches.
+        c = mix(c, vec3<f32>(0.3, 0.28, 0.24), 0.25 * smoothstep(0.6, 0.95, i.normal.z) * smoothstep(0.4, 0.7, fine));
+        c = mix(c, vec3<f32>(0.03, 0.027, 0.025), 0.4 * smoothstep(0.6, 0.85, surf_noise3(i.local * 0.15 + 9.0)));
         o.albedo = c * (1.0 + 0.3 * broad);
         o.roughness = 0.95;
     } else if p == CITY_TIMBER {
