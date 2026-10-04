@@ -84,9 +84,10 @@ says it can do (`commander/profile.rs`).
   the most a second: what it saves the neighbours that use what it provides (a
   factory's build energy and materials at full speed, upkeep) and what they save it,
   materials counted at 6 energy. From the corners of a side in, so a side takes as
-  many as fit. Only where it would save nothing does it go to a farm. A fabricator and
-  a plant of its tech (which go down together) are never set against each other, and
-  a fabricator is not upgraded into a tier that would bind it.
+  many as fit. Only where it would save nothing does it go to a farm. Two buildings
+  where one's blast would destroy the other and the other is worth as much (a
+  fabricator and a plant of its tech) are never set against each other, and a
+  fabricator is not upgraded into a tier whose blast would take a neighbour so.
 - Fabricators are built when the side has energy to spare (power not wanted, the store
   three-quarters full), its materials are not piling up, its income is at least three
   times the skill's `tech_income`, their upkeep stays under half the energy income,

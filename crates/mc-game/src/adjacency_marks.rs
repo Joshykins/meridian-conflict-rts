@@ -2,14 +2,12 @@
 //!
 //! - The links of the buildings selected or under the pointer: a tag on each shared
 //!   edge with what it saves, and an arrow across the seam from the provider into the
-//!   building it saves; a bound pair's tag says so. The neighbour lit from the unit
-//!   panel's band stands out.
+//!   building it saves. The neighbour lit from the unit panel's band stands out.
 //! - Placing a building: every link it would make with the side's finished buildings,
 //!   tagged on its seam (the renderer draws its planned conduit), and a card at the
-//!   site with what it would gain, what it would give, and whether it would be bound
-//!   to a neighbour.
+//!   site with what it would gain and what it would give.
 
-use crate::hud::adjacency::{self as adj, Tie, BOUND};
+use crate::hud::adjacency::{self as adj, Tie};
 use crate::nuke_marks::{project, surface, tag};
 use crate::orders::Field;
 use crate::ui::{palette, rgb, type_scale, Rect, Ui};
@@ -58,7 +56,6 @@ pub fn draw(
                 hot,
                 false,
                 &text,
-                l.bound,
             );
         }
     }
@@ -83,7 +80,6 @@ fn seam(
     hot: bool,
     planned: bool,
     text: &str,
-    bound: bool,
 ) {
     let mid = (a + b) * 0.5;
     let lift = |p: Vec2| p.extend(surface(field, p) + 1.5);
@@ -119,9 +115,6 @@ fn seam(
         ui.stroke(t1, t1 - d * 6.0 - n * 4.0, w, c);
     }
     tag(ui, pm - Vec2::new(0.0, 16.0), text, tone);
-    if bound {
-        tag(ui, pm - Vec2::new(0.0, 36.0), "Bound", BOUND);
-    }
 }
 
 /// The links a building placed at `site` would make, and the card that sums them up.
@@ -173,7 +166,6 @@ fn placing_marks(ui: &mut Ui, field: &Field, bp: BlueprintId, site: Vec2) {
             true,
             true,
             &text,
-            t.bound,
         );
     }
     let Some(g) = project(ui, field, site.extend(surface(field, site) + 2.0)) else {
@@ -182,7 +174,7 @@ fn placing_marks(ui: &mut Ui, field: &Field, bp: BlueprintId, site: Vec2) {
     card(ui, field, bp, &ties, g);
 }
 
-/// The placing card beside `anchor`: what the site gains and gives, and any bond.
+/// The placing card beside `anchor`: what the site gains and gives.
 fn card(ui: &mut Ui, field: &Field, bp: &mc_data::UnitBlueprint, ties: &[Tie], anchor: Vec2) {
     let gains = adj::totals(ties);
     let mut lines: Vec<(String, u32)> = Vec::new();
@@ -225,15 +217,6 @@ fn card(ui: &mut Ui, field: &Field, bp: &mc_data::UnitBlueprint, ties: &[Tie], a
                 field.blueprints.unit(t.partner_blueprint).name
             ),
             adj::tone(t.resource),
-        ));
-    }
-    if let Some(b) = ties.iter().find(|t| t.bound) {
-        lines.push((
-            format!(
-                "Bound to {}: either dying takes both",
-                field.blueprints.unit(b.partner_blueprint).name
-            ),
-            BOUND,
         ));
     }
     if lines.is_empty() {

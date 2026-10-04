@@ -2,7 +2,7 @@
 //! how hard a fabricator works, for its animation.
 
 use super::World;
-use crate::adjacency::{self, Resource};
+use crate::adjacency::Resource;
 use mc_data::BlueprintId;
 
 /// One provider saving one neighbour one resource, as the viewer sees it.
@@ -21,8 +21,6 @@ pub struct LinkView {
     /// The provider's lot centre and the neighbour's: the conduit runs from one to the other.
     pub from: [f32; 2],
     pub to: [f32; 2],
-    /// The two go down together (`adjacency::bound`).
-    pub bound: bool,
 }
 
 impl World {
@@ -72,7 +70,6 @@ impl World {
                 edge: [l.edge.0.to_f32(), l.edge.1.to_f32()],
                 from: units.pos[p].to_f32(),
                 to: units.pos[c].to_f32(),
-                bound: adjacency::bound(pbp, cbp),
             });
         }
     }

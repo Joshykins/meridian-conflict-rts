@@ -8,8 +8,8 @@
 //! or a fabricator takes the free lot flush against the side's buildings where it
 //! saves the most a second: what it saves the neighbours that use what it
 //! provides, and what they save it. It goes to a farm only where it would save
-//! nothing. A fabricator and a plant that would be bound (go down together) are
-//! never set against each other.
+//! nothing. Two buildings where one's blast would destroy the other (`ruinous`: a
+//! fabricator and a plant of its tech) are never set against each other.
 use super::*;
 use crate::adjacency::{self, Resource};
 
@@ -31,11 +31,23 @@ struct Neighbour<'a> {
     lot: Lot,
 }
 
-/// Whether one of `a` and `b` saves the other something, and they are not bound:
-/// a provider may stand flush against such a neighbour (`lots.rs`).
+/// Whether one of `a` and `b` saves the other something, and neither's blast would
+/// destroy the other: a provider may stand flush against such a neighbour (`lots.rs`).
 pub(super) fn feeds(a: &UnitBlueprint, b: &UnitBlueprint) -> bool {
     let any = |o: [Option<(Resource, Fx)>; 2]| o.iter().any(Option::is_some);
-    (any(adjacency::offers(a, b)) || any(adjacency::offers(b, a))) && !adjacency::bound(a, b)
+    (any(adjacency::offers(a, b)) || any(adjacency::offers(b, a))) && !ruinous(a, b)
+}
+
+/// Whether `a` or `b`, going up, would destroy the other standing against it and the
+/// other is worth at least as much: its `death_blast` at full strength (a neighbour's
+/// near side is inside half its reach) is at least the other's health. A big reactor
+/// that takes a small fabricator with it is no reason to keep them apart; a fabricator
+/// that takes the reactor of its tech is.
+fn ruinous(a: &UnitBlueprint, b: &UnitBlueprint) -> bool {
+    let kills = |x: &UnitBlueprint, y: &UnitBlueprint| {
+        y.cost_mass >= x.cost_mass && x.death_blast.is_some_and(|db| db.damage >= y.health)
+    };
+    kills(a, b) || kills(b, a)
 }
 
 /// Energy a unit of `resource` is worth: materials at `ENERGY_PER_MASS`.
@@ -82,7 +94,7 @@ impl World {
 
     /// What a building of `bp` on `lot` saves its side a second, in energy, against
     /// `neighbours`: what it saves those it touches and what they save it. `None`
-    /// where it would touch one it is bound to.
+    /// where it would touch one that it or its blast would destroy (`ruinous`).
     fn adjacency_worth(
         &self,
         bp: &UnitBlueprint,
@@ -94,7 +106,7 @@ impl World {
             let Some(edge) = adjacency::shared_edge(lot, n.lot) else {
                 continue;
             };
-            if adjacency::bound(bp, n.bp) {
+            if ruinous(bp, n.bp) {
                 return None;
             }
             for (r, full) in adjacency::offers(bp, n.bp).into_iter().flatten() {
@@ -132,7 +144,7 @@ impl World {
             .map(|(_, o)| (self.blueprints.unit(o.blueprint), o.pos));
         let mut out: Vec<Neighbour> = standing
             .chain(planned)
-            .filter(|(n, _)| n.is_structure() && (feeds(bp, n) || adjacency::bound(bp, n)))
+            .filter(|(n, _)| n.is_structure() && (feeds(bp, n) || ruinous(bp, n)))
             .map(|(n, pos)| Neighbour {
                 bp: n,
                 lot: adjacency::lot(n, pos),
@@ -331,14 +343,14 @@ impl World {
                     next.economy.energy_upkeep - bp.economy.energy_upkeep,
                 );
                 let lot = adjacency::lot(next, units.pos[row]);
-                let binds = units.slots.iter().any(|r| {
+                let ruins = units.slots.iter().any(|r| {
                     units.owner[r] == player
                         && self.bp(r).is_structure()
-                        && adjacency::bound(next, self.bp(r))
+                        && ruinous(next, self.bp(r))
                         && adjacency::shared_edge(lot, adjacency::lot(self.bp(r), units.pos[r]))
                             .is_some()
                 });
-                (payback <= horizon && !binds).then_some((row, payback))
+                (payback <= horizon && !ruins).then_some((row, payback))
             })
             .min_by_key(|&(row, payback)| (payback, row))
             .map(|(row, _)| row)

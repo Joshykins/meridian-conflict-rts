@@ -5,10 +5,9 @@
 // cable whose core is lit in the link's colour, slow pulses running from the provider
 // into the neighbour, and the pieces of its faction's look along it:
 // - `LINK_LOOK_CLAMPED` (ARC): an armoured cable pinned by steel clamps, a junction box
-//   with a lamp at each turn; a bound pair's cable is banded amber and black and its
-//   clamps painted amber;
+//   with a lamp at each turn;
 // - `LINK_LOOK_PLATED` (the Regency): a dark cable under lapped graphite plates whose
-//   lips glow, between low faceted field nodes; a bound pair's lips and nodes burn amber.
+//   lips glow, between low faceted field nodes.
 // Everything follows `terrain_height`, and a new link runs out from the provider over
 // `SETTLE_SECONDS`.
 
@@ -49,10 +48,9 @@ const LIFT_M: f32 = 0.04;
 const SINK_M: f32 = 0.2;
 // The lit core is this share of the cable's width.
 const CORE: f32 = 0.38;
-// Pulses run at this speed, this far apart; a bound pair's bands are this long.
+// Pulses run at this speed, this far apart.
 const PULSE_SPEED: f32 = 5.0;
 const PULSE_GAP_M: f32 = 9.0;
-const BAND_M: f32 = 1.6;
 // Pieces come about this far apart: clamps, or the plates (every fourth a node).
 const CLAMP_STEP_M: f32 = 7.0;
 const PLATE_STEP_M: f32 = 4.0;
@@ -274,11 +272,6 @@ fn srgb_word(rgb: u32) -> vec3<f32> {
     return pow(c, vec3<f32>(2.2));
 }
 
-const HAZARD_AMBER: vec3<f32> = vec3<f32>(0.62, 0.36, 0.035);
-const HAZARD_BLACK: vec3<f32> = vec3<f32>(0.025, 0.024, 0.022);
-// The light a bound pair's Regency pieces burn with.
-const BOUND_GLOW: vec3<f32> = vec3<f32>(1.0, 0.45, 0.05);
-
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let l = links[in.link];
@@ -286,7 +279,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let p = in.world;
     let v = normalize(eye - p);
     let bright = (l.flags & LINK_HIGHLIGHT) != 0u;
-    let bound = (l.flags & LINK_BOUND) != 0u;
     let plated = (l.flags >> LINK_LOOK_SHIFT) == LINK_LOOK_PLATED;
     let tone = srgb_word(l.rgb);
     let time = globals.camera.w;
@@ -304,10 +296,6 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             albedo = vec3<f32>(0.035, 0.033, 0.04);
             metal = 0.85;
             rough = 0.38;
-        } else if bound {
-            albedo = mix(HAZARD_AMBER, HAZARD_BLACK, step(0.5, fract(in.local.x / BAND_M)));
-            metal = 0.1;
-            rough = 0.55;
         } else {
             albedo = vec3<f32>(0.075, 0.08, 0.088);
         }
@@ -328,18 +316,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         let top = in.top == 1u;
         switch in.part {
             case PART_CLAMP: {
-                // Bright worn steel, painted amber on a bound pair.
-                albedo = select(vec3<f32>(0.3, 0.32, 0.34), HAZARD_AMBER, bound);
-                rough = select(0.4, 0.55, bound);
+                // Bright worn steel.
+                albedo = vec3<f32>(0.3, 0.32, 0.34);
+                rough = 0.4;
             }
             case PART_JUNCTION: {
-                // A steel box, its lamp on top in the line's colour, hazard banded on a
-                // bound pair.
+                // A steel box, its lamp on top in the line's colour.
                 albedo = vec3<f32>(0.16, 0.17, 0.19);
-                if bound && !top {
-                    albedo = mix(HAZARD_AMBER, HAZARD_BLACK, step(0.5, fract((o.x + o.y + in.local.z * 0.8) / 0.5)));
-                    metal = 0.1;
-                }
                 let lamp = f32(top) * (1.0 - smoothstep(0.35, 0.4, max(abs(o.x), abs(o.y))));
                 emissive = tone * lamp * 1.6 * lit;
                 albedo = mix(albedo, tone * 0.3, lamp);
@@ -351,7 +334,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                 rough = 0.38;
                 if !top {
                     let lip = smoothstep(0.35, 0.9, in.local.z);
-                    emissive = select(tone, BOUND_GLOW, bound) * lip * 1.4 * lit;
+                    emissive = tone * lip * 1.4 * lit;
                 }
             }
             default: {
@@ -363,7 +346,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
                     let r = length(o);
                     let inset = 1.0 - smoothstep(0.62, 0.7, r);
                     let breathe = 0.75 + 0.25 * sin(time * 1.7 + l.phase * 6.283);
-                    emissive = select(tone, BOUND_GLOW, bound) * inset * breathe * 1.8 * lit;
+                    emissive = tone * inset * breathe * 1.8 * lit;
                     albedo = mix(albedo, tone * 0.2, inset);
                 }
             }

@@ -14,12 +14,13 @@
 //! way round, and it scales with what the provider makes. A neighbour gets that in
 //! proportion to how much of its perimeter the two share (`edge_share`), and the savings
 //! from every provider touching it add up, so each side covered saves more until the
-//! building is ringed: a ring is the most there is, with no other cap. A fabricator and a power plant of its tech that touch are bound
-//! (`World::bound_partners`): when one is destroyed the other goes up with it.
+//! building is ringed: a ring is the most there is, with no other cap. Standing close
+//! has its price all the same: a material fabricator is volatile (`death_blast`), and
+//! one that goes up takes a power plant of its tech it touches, as a reactor's blast
+//! takes the fabricators against it.
 //!
 //! Nothing here is state. The links are worked out from the units table each economy
-//! tick and kept for the mirror (the ground links and the interface), and the bound
-//! partners of a dying unit are worked out when it dies.
+//! tick and kept for the mirror (the ground links and the interface).
 
 use crate::tables::{flag, UnitId};
 use crate::World;
@@ -131,14 +132,6 @@ pub fn offers(provider: &UnitBlueprint, consumer: &UnitBlueprint) -> [Option<(Re
     [one(Resource::Mass, a.mass), one(Resource::Energy, a.energy)]
 }
 
-/// Whether two buildings that touch go down together: a material fabricator and a
-/// power plant (an energy provider) of the same tech.
-pub fn bound(a: &UnitBlueprint, b: &UnitBlueprint) -> bool {
-    let powers = |p: &UnitBlueprint| p.adjacency.is_some_and(|a| a.energy > Fx::ZERO);
-    a.tech == b.tech
-        && ((a.fabricator.is_some() && powers(b)) || (b.fabricator.is_some() && powers(a)))
-}
-
 impl World {
     /// Works out this tick's links from the finished structures: run by the economy
     /// before anything is paid.
@@ -226,30 +219,6 @@ impl World {
         }
         let less = |v: Fx, r| v - v * self.adjacency.saving(row, r);
         (less(cost.0, Resource::Mass), less(cost.1, Resource::Energy))
-    }
-
-    /// The finished buildings bound to the one in `row` (`bound`) that touch it: they
-    /// go up when it is destroyed. Worked out from the table, so it holds on the tick
-    /// a snapshot is restored as on any other.
-    pub(crate) fn bound_partners(&self, row: usize) -> Vec<usize> {
-        let units = &self.state.units;
-        let bp = self.bp(row);
-        if bp.fabricator.is_none() && bp.adjacency.is_none_or(|a| a.energy <= Fx::ZERO) {
-            return Vec::new();
-        }
-        let own = lot(bp, units.pos[row]);
-        units
-            .slots
-            .iter()
-            .filter(|&r| {
-                r != row
-                    && units.owner[r] == units.owner[row]
-                    && units.is_active(r)
-                    && self.bp(r).is_structure()
-                    && bound(bp, self.bp(r))
-                    && shared_edge(own, lot(self.bp(r), units.pos[r])).is_some()
-            })
-            .collect()
     }
 }
 

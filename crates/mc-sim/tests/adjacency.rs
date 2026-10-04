@@ -1,6 +1,6 @@
 //! Adjacency (`mc_sim::adjacency`): reactors against a building save it energy,
-//! fabricators against a factory save it materials, and a fabricator and a power
-//! plant of its tier that touch go down together.
+//! fabricators against a factory save it materials, and a fabricator's blast takes a
+//! power plant of its tier that touches it (and a reactor's its fabricators).
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -209,37 +209,70 @@ fn fabricators_against_a_factory_save_its_materials_and_reactors_its_energy() {
     assert!((saving(&w, factory, Resource::Energy) - energy).abs() < 1e-3);
 }
 
-#[test]
-fn a_fabricator_and_a_reactor_of_its_tier_go_down_together() {
-    let mut w = world();
-    let fab = spawn(&mut w, 0, "aster_t3_fabricator", 792, 792, 1000);
-    let reactor = spawn(&mut w, 0, "aster_t3_power", 852, 792, 1000);
-    // The fabricator's blast alone would not finish a Reactor III.
-    let r = row(&w, reactor);
-    w.state.units.health[r] = w.blueprints.unit(w.state.units.blueprint[r]).health;
-    destroy(&mut w, fab);
-    assert!(
-        w.state.units.row(reactor).is_none(),
-        "the reactor went with it"
-    );
+/// Where a lot of `cells` square stands against the fabricator at (792, 792) (lot
+/// 780..804) on its east side, slid as far north as it goes and still shares an edge:
+/// the furthest a touching neighbour's centre can be.
+fn far_east(cells: i32) -> (i32, i32) {
+    let half = cells * 6;
+    (804 + half, 792 + half)
 }
 
 #[test]
-fn a_reactor_takes_its_fabricator_but_not_one_of_another_tier() {
+fn a_fabricators_blast_takes_a_power_plant_of_its_tier_it_touches() {
+    for (fab, plant, cells) in [
+        ("aster_t2_fabricator", "aster_t2_power", 4),
+        ("aster_t3_fabricator", "aster_t3_power", 8),
+        ("regency_t2_fabricator", "regency_t2_power", 4),
+        ("regency_t3_fabricator", "regency_t3_power", 8),
+    ] {
+        let mut w = world();
+        let f = spawn(&mut w, 0, fab, 792, 792, 1000);
+        let (x, y) = far_east(cells);
+        let p = spawn(&mut w, 0, plant, x, y, 1000);
+        destroy(&mut w, f);
+        assert!(w.state.units.row(p).is_none(), "{fab}'s blast left {plant}");
+    }
+}
+
+#[test]
+fn a_reactors_blast_takes_the_fabricators_it_touches() {
+    for (plant, fab, cells) in [
+        ("aster_t2_power", "aster_t2_fabricator", 4),
+        ("aster_t3_power", "aster_t3_fabricator", 8),
+    ] {
+        let mut w = world();
+        let f = spawn(&mut w, 0, fab, 792, 792, 1000);
+        let (x, y) = far_east(cells);
+        let p = spawn(&mut w, 0, plant, x, y, 1000);
+        destroy(&mut w, p);
+        assert!(w.state.units.row(f).is_none(), "{plant}'s blast left {fab}");
+    }
+    // A Power Generator burns out as light, with no blast: its Condenser stands.
     let mut w = world();
-    let same = spawn(&mut w, 0, "regency_t2_fabricator", 792, 792, 1000);
-    let other = spawn(&mut w, 0, "regency_t3_fabricator", 864, 792, 1000);
-    // A Power Generator II between them: 804..852, touching both.
-    let reactor = spawn(&mut w, 0, "regency_t2_power", 828, 792, 1000);
-    destroy(&mut w, reactor);
-    assert!(
-        w.state.units.row(same).is_none(),
-        "its tier's fabricator went"
-    );
-    assert!(
-        w.state.units.row(other).is_some(),
-        "a tech 3 fabricator is not bound to a tech 2 plant"
-    );
+    let f = spawn(&mut w, 0, "regency_t2_fabricator", 792, 792, 1000);
+    let p = spawn(&mut w, 0, "regency_t2_power", 828, 792, 1000);
+    destroy(&mut w, p);
+    assert!(w.state.units.row(f).is_some());
+}
+
+#[test]
+fn a_fabricators_blast_leaves_a_factory_of_its_tier_standing() {
+    for (fab, factory) in [
+        ("aster_t2_fabricator", "aster_t2_air_factory"),
+        ("aster_t3_fabricator", "aster_t3_air_factory"),
+        ("regency_t2_fabricator", "regency_t2_air_factory"),
+        ("regency_t3_fabricator", "regency_t3_air_factory"),
+    ] {
+        let mut w = world();
+        let f = spawn(&mut w, 0, fab, 792, 792, 1000);
+        // Flush against the fabricator's west side, centre to centre: the worst of it.
+        let k = spawn(&mut w, 0, factory, 732, 792, 1000);
+        destroy(&mut w, f);
+        assert!(
+            w.state.units.row(k).is_some(),
+            "{fab}'s blast took {factory}"
+        );
+    }
 }
 
 #[test]

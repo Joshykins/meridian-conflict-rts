@@ -305,7 +305,7 @@
         role: "Power Generator",
         tech: 3,
         categories: ["Land", "Economy", "Power"],
-        health: 14000,
+        health: 12000,
         cost: (mass: 3360, energy: 15600, time: 5700),
         radius: 42.5, height: 35, footprint: (8, 8),
         vision: 200,
@@ -316,10 +316,9 @@
     ),
     // Condensers: the Regency's material fabricators, at the same price and the same trade
     // as ARC's Material Fabricator: one 2x2 building from tech 2, upgraded in place to tech
-    // 3, the same adjacency savings, and bound to a Power Generator of its tier that it
-    // touches: either one dying takes the other with it. A breached one does not burn
-    // out as light like a Power Generator: the matter half formed in it goes up like a
-    // reactor.
+    // 3, the same adjacency savings and the same blast. A breached one does not burn out
+    // as light like a Power Generator: the matter half formed in it goes up like a
+    // reactor, and takes a Power Generator of its tier that it touches with it.
     (
         key: "regency_t2_fabricator",
         name: "Condenser II",
@@ -333,7 +332,7 @@
         economy: (energy_upkeep: 175),
         fabricator: (mass: 1.5),
         adjacency: Mass,
-        death_blast: (radius: 45, damage: 1500),
+        death_blast: (radius: 50, damage: 3500),
         upgrades_to: "regency_t3_fabricator",
         mesh: "regency_fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
@@ -351,7 +350,7 @@
         economy: (energy_upkeep: 500),
         fabricator: (mass: 5),
         adjacency: Mass,
-        death_blast: (radius: 70, damage: 3500),
+        death_blast: (radius: 80, damage: 12500),
         mesh: "regency_fabricator", icon: Extractor,
         sounds: (death: "reactor_blast"),
     ),

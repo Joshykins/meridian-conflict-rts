@@ -178,9 +178,12 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   there is no other cap. The full-ring saving scales with the fourth root of what the
   provider makes (`mc_data::Adjacency::ring`): energy 60% at 2000/s, so T1 (25/s) 20%,
   T2 (350/s) 39%, T3 60%; materials 40% at 5/s, so T2 (1.5/s) 30%, T3 40%. Mixed rings add
-  up side by side. A fabricator and a power
-  plant of its tech that touch are bound: when one is destroyed (not reclaimed) the other
-  goes with it. The interface shows each link: a conduit on the ground, the unit panel's
+  up side by side. Standing close is a risk, and the blasts make it so, not a rule:
+  a fabricator's blast (T2 3500 to 50 m, T3 12500 to 80 m) destroys a power plant of its
+  tech against any side of it (Reactor II 2200 / Generator II 3200, Reactor III 9720 /
+  Generator III 12000) but not a factory of its tech, and a reactor's blast takes the
+  fabricators against it. A Regency Power Generator has no blast, so its Condensers
+  outlive it. The interface shows each link: a conduit on the ground, the unit panel's
   Adjacency band, tags on the selection's links, and the placing site's would-be links.
 - Stalls (`economy.rs`): short of materials or energy, everything slows by the same share:
   factories, builders, upkeep and the mines alike. The one exception is the side's focus

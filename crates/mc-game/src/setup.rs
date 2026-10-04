@@ -58,8 +58,8 @@ pub enum Scene {
     /// One of every unit in a row, for looking at models.
     Showcase,
     /// Buildings standing against each other at the first start position, for their
-    /// adjacency conduits: a Reactor III between a factory and a Fabricator III (bound to
-    /// it), a Reactor I powering the fabricator, and a fabricator against the factory;
+    /// adjacency conduits: a Reactor III between a factory and a Fabricator III, a
+    /// Reactor I powering the fabricator, and a fabricator against the factory;
     /// ARC's yard, and the Regency's 240 m south of it.
     Adjacency,
     /// The battle staged behind the front end's menus.

@@ -2,9 +2,8 @@
 //! from and what they come to, wherever a building is shown.
 //!
 //! - the unit panel's Adjacency band: the total saved of each resource and what that
-//!   is a second, each provider it comes from, each building it saves in turn, and a
-//!   warning when it is bound to a neighbour (they go down together); a building that
-//!   could be saved and is not says what to build against it;
+//!   is a second, each provider it comes from, and each building it saves in turn; a
+//!   building that could be saved and is not says what to build against it;
 //! - the build card: what it gets from neighbours and what it gives them;
 //! - the placing card and ground tags (`crate::adjacency_marks`).
 //!
@@ -19,8 +18,6 @@ use mc_data::{BlueprintId, Blueprints, UnitBlueprint};
 use mc_sim::adjacency::{self, Resource};
 use mc_sim::mirror::{LinkView, UnitInstance, KIND_GHOST, KIND_PROP, KIND_WRECK};
 
-/// A warning, not a selection: the warning amber (as the Volatile chip).
-pub const BOUND: u32 = palette::WARN;
 /// Rows of neighbours the band lists before it sums up the rest.
 const ROWS: usize = 3;
 const ROW_H: f32 = 17.0;
@@ -68,7 +65,6 @@ pub struct Tie {
     pub share: f32,
     /// The other building saves this one (else this one saves it).
     pub incoming: bool,
-    pub bound: bool,
     pub edge: [[f32; 2]; 2],
 }
 
@@ -89,7 +85,6 @@ pub fn ties_of(links: &[LinkView], id: u32) -> Vec<Tie> {
                 resource: l.resource,
                 share: l.share,
                 incoming,
-                bound: l.bound,
                 edge: l.edge,
             }
         })
@@ -123,7 +118,6 @@ pub fn prospective(
             continue;
         };
         let edge = [shared.0.to_f32(), shared.1.to_f32()];
-        let bound = adjacency::bound(bp, other);
         for (incoming, offered, consumer) in [
             (true, adjacency::offers(other, bp), own),
             (false, adjacency::offers(bp, other), theirs),
@@ -135,7 +129,6 @@ pub fn prospective(
                     resource,
                     share: adjacency::edge_share(full, shared, consumer).to_f32(),
                     incoming,
-                    bound,
                     edge,
                 });
             }
@@ -185,7 +178,6 @@ pub fn planned_links(
                 edge: t.edge,
                 from,
                 to,
-                bound: t.bound,
             }
         })
         .collect()
@@ -296,25 +288,7 @@ pub fn card_rows(blueprints: &Blueprints, bp: &UnitBlueprint) -> Vec<(String, St
             }
         }
     }
-    if let Some(partner) = bound_kind(blueprints, bp) {
-        rows.push((
-            "Bound".into(),
-            format!("dies with a {partner} it touches"),
-            BOUND,
-        ));
-    }
     rows
-}
-
-/// What a building of `bp` is bound to when it touches one: "Reactor III".
-fn bound_kind(blueprints: &Blueprints, bp: &UnitBlueprint) -> Option<String> {
-    let mut names = blueprints
-        .units
-        .iter()
-        .filter(|o| o.faction == bp.faction && adjacency::bound(bp, o))
-        .map(|o| o.name.clone());
-    let first = names.next()?;
-    Some(names.fold(first, |a, n| format!("{a} or {n}")))
 }
 
 /// What to build against a building of `bp` that is saved nothing: one line, or none.
@@ -374,8 +348,7 @@ pub fn band_h(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> f32 {
         };
     }
     let rows = ties.len().min(ROWS) + usize::from(ties.len() > ROWS);
-    let bound = usize::from(ties.iter().any(|t| t.bound));
-    ROW_H * (1 + rows + bound) as f32 + 6.0
+    ROW_H * (1 + rows) as f32 + 6.0
 }
 
 /// The unit panel's Adjacency band at `y`; the y below it. `focus` gets the neighbour
@@ -488,18 +461,6 @@ pub fn band(
         );
         y += ROW_H;
     }
-    if let Some(b) = ties.iter().find(|t| t.bound) {
-        let name = &s.blueprints.unit(b.partner_blueprint).name;
-        ui.fill(Rect::new(x, y - 6.0, 2.0, 12.0), rgb(BOUND, 1.0));
-        ui.text(
-            x + 8.0,
-            y,
-            type_scale::MICRO,
-            rgb(BOUND, 1.0),
-            &format!("Bound to {name}: if either is destroyed, both go"),
-        );
-        y += ROW_H;
-    }
     focus.partner = hovered;
     y + 2.0
 }
@@ -547,7 +508,7 @@ mod tests {
     }
 
     #[test]
-    fn a_site_against_a_reactor_and_a_factory_shows_both_ways_and_the_bond() {
+    fn a_site_against_a_reactor_and_a_factory_shows_both_ways() {
         let b = blueprints();
         // Lots: the site 780..804; the Reactor III east (804..900), the factory west (684..780).
         let units = [
@@ -563,20 +524,17 @@ mod tests {
         assert!(ties
             .iter()
             .any(|t| !t.incoming && t.partner == 2 && t.resource == Resource::Mass));
-        assert!(ties.iter().any(|t| t.bound && t.partner == 1));
     }
 
     #[test]
-    fn the_build_card_says_what_a_fabricator_gets_gives_and_is_bound_to() {
+    fn the_build_card_says_what_a_fabricator_gets_and_gives() {
         let b = blueprints();
         let fab = b.unit(b.id_of("aster_t2_fabricator").unwrap());
         let rows = card_rows(&b, fab);
         let labels: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
         assert!(labels.contains(&"Ringed by Power Plants"));
         assert!(labels.contains(&"Saves a Ringed Neighbour"));
-        assert!(rows
-            .iter()
-            .any(|r| r.0 == "Bound" && r.1.contains("Reactor II")));
+        assert!(!rows.iter().any(|r| r.0 == "Bound"));
         assert!(hint(&b, fab, &[]).is_some_and(|h| h.contains("power plants")));
     }
 }

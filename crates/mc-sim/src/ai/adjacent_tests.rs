@@ -115,7 +115,7 @@ fn a_plant_with_nothing_to_save_goes_to_a_farm() {
 }
 
 #[test]
-fn a_fabricator_goes_where_it_saves_most_and_never_against_a_plant_it_dies_with() {
+fn a_fabricator_goes_where_it_saves_most_and_never_against_a_plant_its_blast_takes() {
     let mut w = world();
     let start = FxVec2::from_ints(1000, 1000);
     let reactor = spawn(&mut w, "aster_t3_power", 1000, 1000);
@@ -124,12 +124,12 @@ fn a_fabricator_goes_where_it_saves_most_and_never_against_a_plant_it_dies_with(
     let fab2 = bp(&w, "aster_t2_fabricator");
     let site = w.adjacent_site(&fab2, 0, start, &[], None).unwrap();
     assert!(touches(&w, reactor, &fab2, site), "{site:?}");
-    // A tech 3 one would go up with that plant: it goes against the factory instead.
+    // A tech 3 one's blast would take that plant: it goes against the factory instead.
     let fab3 = bp(&w, "aster_t3_fabricator");
     let site = w.adjacent_site(&fab3, 0, start, &[], None).unwrap();
     assert!(
         !touches(&w, reactor, &fab3, site),
-        "{site:?} bound to the plant"
+        "{site:?} its blast takes the plant"
     );
     assert!(touches(&w, factory, &fab3, site), "{site:?}");
 }

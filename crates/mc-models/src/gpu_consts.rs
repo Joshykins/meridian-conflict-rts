@@ -1300,8 +1300,7 @@ shared! {
 
     /// An adjacency conduit (`renderer/adjacency_links.rs` `LinkInstance::flags`, links.wgsl).
     pub mod link as "LINK_" {
-        /// The two buildings go down together (`mc_sim::adjacency::bound`).
-        pub const BOUND: u32 = 1;
+        // retired: 1 (BOUND, a fabricator and power plant that went down together)
         /// One of its two buildings is selected or under the pointer: drawn brighter.
         pub const HIGHLIGHT: u32 = 2;
         /// A would-be link of a placement ghost: drawn see-through, after the scene.

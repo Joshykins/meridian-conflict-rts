@@ -2680,13 +2680,6 @@ impl World {
         // Taken apart to the last plate: nothing is left to blow up or to lie about.
         // A commander's reactor goes up all the same.
         let reclaimed = units.has_flag(row, flag::RECLAIMED) && !bp.has(cat::COMMANDER);
-        // A fabricator and the power plant of its tier it stands against go down
-        // together (`adjacency.rs`): destroyed, not taken apart.
-        let bound = if complete && visible && !reclaimed {
-            self.bound_partners(row)
-        } else {
-            Vec::new()
-        };
         let surface = self.terrain.height_at(pos).max(self.terrain.water_level());
         let airborne = visible
             && complete
@@ -2801,10 +2794,6 @@ impl World {
             let afloat = bp.motion.map(|m| m.layer) == Some(mc_data::MoveLayer::Naval)
                 || (bp.water_build && self.terrain.height_at(pos) < self.terrain.water_level());
             self.death_blast(pos, db, owner, afloat);
-        }
-        // Bound partners go on the next reap, like a blast's victims.
-        for partner in bound {
-            self.state.units.health[partner] = Fx::ZERO;
         }
         if complete && visible && bp.has(cat::COMMANDER) {
             // A commander's reactor goes up as a small nuclear blast (`nukes.rs`).

@@ -8,7 +8,7 @@
 //! nodes (path.rs works out the run, links.wgsl builds the pieces). Its core is lit in the
 //! resource's colour, materials in the interface's (`gpu_consts::tone`), energy in the
 //! faction's (`PowerLine::color`), with slow pulses running from the provider into the
-//! neighbour. A bound pair (they go down together) is marked amber in the look's own way.
+//! neighbour.
 //!
 //! The sim's links come with each tick's mirror (`RenderFrame::links`). The game adds
 //! the units it wants brought out (the selection, the hovered building) and the
@@ -51,7 +51,7 @@ pub(crate) struct LinkInstance {
     pub(crate) length: f32,
     /// Render time the line began to run out.
     pub(crate) start: f32,
-    /// `link::BOUND` | `HIGHLIGHT` | `PLANNED` | `TURNS`, and the look from `LOOK_SHIFT`.
+    /// `link::HIGHLIGHT` | `PLANNED` | `TURNS`, and the look from `LOOK_SHIFT`.
     pub(crate) flags: u32,
     /// The core's light, sRGB `0xRRGGBB`.
     pub(crate) rgb: u32,
@@ -84,9 +84,6 @@ impl LinkInstance {
             LineLook::Plated => link::LOOK_PLATED,
         };
         let mut flags = extra | look << link::LOOK_SHIFT;
-        if l.bound {
-            flags |= link::BOUND;
-        }
         if route.turns {
             flags |= link::TURNS;
         }
