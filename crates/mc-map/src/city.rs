@@ -57,6 +57,14 @@ pub const WALL_THICK_M: i32 = 20;
 pub const WALL_TOP_M: i32 = 26;
 /// The road through a [`PropKind::CityGate`], between its towers, metres.
 pub const GATE_PASSAGE_M: i32 = 48;
+/// One [`PropKind::CityTransit`] segment's length along its heading, laid end
+/// to end at scale 1, and its deck's height over the ground.
+pub const TRANSIT_SEGMENT_M: i32 = 64;
+pub const TRANSIT_DECK_M: i32 = 14;
+/// A [`PropKind::CityTransitStation`]'s length along its heading: its pylons
+/// stand at `±TRANSIT_STATION_PYLONS_M` along x, in an avenue's median.
+pub const TRANSIT_STATION_M: i32 = 84;
+pub const TRANSIT_STATION_PYLONS_M: i32 = 30;
 
 /// The numbers of a city kind; `None` for every other kind.
 pub const fn structure(kind: PropKind) -> Option<Structure> {
@@ -194,6 +202,34 @@ pub const fn structure(kind: PropKind) -> Option<Structure> {
             false,
         ),
         CityRubble => s("city_rubble", &[], &[], 0, 0, false),
+        // The street furniture and the works round the city.
+        CityStreetLight => s("city_streetlight", &[], &[], 0, 0, false),
+        CityTransit => s(
+            "city_transit",
+            &[(0, 0, 2, 3)],
+            &[TRANSIT_DECK_M],
+            6_000,
+            0,
+            false,
+        ),
+        CityTransitStation => s(
+            "city_transit_station",
+            &[
+                (TRANSIT_STATION_PYLONS_M, 0, 3, 3),
+                (-TRANSIT_STATION_PYLONS_M, 0, 3, 3),
+            ],
+            &[TRANSIT_DECK_M + 8, TRANSIT_DECK_M + 8],
+            9_000,
+            160,
+            false,
+        ),
+        CityBillboard => s("city_billboard", &[], &[], 0, 0, false),
+        CityCar => s("city_car", &[], &[], 0, 0, false),
+        CityBarricade => s("city_barricade", &[], &[], 0, 0, false),
+        CityWindTurbine => s("city_wind_turbine", &[(0, 0, 3, 3)], &[95], 4_000, 0, false),
+        CitySolarArray => s("city_solar_array", &[], &[], 0, 0, false),
+        CityMast => s("city_mast", &[(0, 0, 4, 4)], &[110], 3_000, 0, false),
+        CityMonument => s("city_monument", &[(0, 0, 7, 7)], &[9], 2_500, 0, false),
         _ => return None,
     })
 }

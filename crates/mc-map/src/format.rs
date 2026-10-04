@@ -353,10 +353,30 @@ pub enum PropKind {
     CityGate = 119,
     /// A heap of rubble: walked over, never hit.
     CityRubble = 120,
+    /// A street light: a slim mast with two LED arms, ~10 m.
+    CityStreetLight = 121,
+    /// 64 m of an elevated maglev guideway along x, its deck 14 m up on a pylon at the origin (`city::TRANSIT_SEGMENT_M`).
+    CityTransit = 122,
+    /// An elevated maglev station along x over an avenue: platforms and canopy on pylons in its median.
+    CityTransitStation = 123,
+    /// A free-standing LED billboard on a pole.
+    CityBillboard = 124,
+    /// A civilian car, heading along x; burnt out once worn.
+    CityCar = 125,
+    /// A 16 m row of anti-tank hedgehogs and sandbags along x. Walked through.
+    CityBarricade = 126,
+    /// A wind turbine: a tower to its hub ~95 m up, three blades.
+    CityWindTurbine = 127,
+    /// A field of solar panel rows, 40 by 24 m. Walked through.
+    CitySolarArray = 128,
+    /// A lattice communications mast, 110 m.
+    CityMast = 129,
+    /// A square's monument over a fountain basin.
+    CityMonument = 130,
 }
 
 impl PropKind {
-    pub const ALL: [PropKind; 78] = [
+    pub const ALL: [PropKind; 88] = [
         PropKind::TreeBroadleaf,
         PropKind::TreeConifer,
         PropKind::TreePine,
@@ -435,6 +455,16 @@ impl PropKind {
         PropKind::CityWallTower,
         PropKind::CityGate,
         PropKind::CityRubble,
+        PropKind::CityStreetLight,
+        PropKind::CityTransit,
+        PropKind::CityTransitStation,
+        PropKind::CityBillboard,
+        PropKind::CityCar,
+        PropKind::CityBarricade,
+        PropKind::CityWindTurbine,
+        PropKind::CitySolarArray,
+        PropKind::CityMast,
+        PropKind::CityMonument,
     ];
 
     pub fn from_raw(raw: u16) -> Option<PropKind> {
@@ -472,10 +502,10 @@ impl PropKind {
     }
 
     /// The city kit: blocks, towers and the wall, which take hits and come
-    /// down (`crate::city`).
+    /// down, and the street furniture round them (`crate::city`).
     #[inline]
     pub fn is_city(self) -> bool {
-        (96..128).contains(&(self as u16))
+        (96..160).contains(&(self as u16))
     }
 
     /// A span of wires strung along +x from its origin to the next tower,
