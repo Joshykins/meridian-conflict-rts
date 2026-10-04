@@ -849,8 +849,9 @@ struct Shield {
     contact_n: u32,
     // `radius` last tick while an upgraded dome swells out; zero when the same.
     prev_radius: f32,
-    _pad1: u32,
-    _pad2: u32,
+    // The shield's unit in `dynamic_entities` (SHIELD_NO_ENTITY: none), to ease it between ticks.
+    entity: u32,
+    _pad: u32,
     contacts: array<u32, 16>,
 }
 

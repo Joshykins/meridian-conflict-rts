@@ -44,10 +44,15 @@ const UNION_INSET: f32 = 0.985;
 const HEX: f32 = 5.5;
 const SQRT3: f32 = 1.7320508;
 
-// A shield record with its radius eased between ticks, so an upgraded dome
-// swelling out to its new size does not step at the sim rate.
+// A shield record eased between ticks as its unit is: a mobile generator's dome and
+// projector beam ride with the drawn hull instead of stepping at the sim rate, and an
+// upgraded dome swelling out to its new size does not step either.
 fn shield_at(i: u32) -> Shield {
     var s = shields[i];
+    if s.entity != SHIELD_NO_ENTITY {
+        let e = dynamic_entities[s.entity];
+        s.pos += mix(e.prev_pos, e.pos, globals.sun.w) - e.pos;
+    }
     if s.prev_radius > 0.0 {
         s.radius = mix(s.prev_radius, s.radius, globals.sun.w);
     }

@@ -126,6 +126,23 @@ impl Renderer {
             .filter(|e| touches(e))
             .map(|e| e.radius * 2.2 + 4.0)
             .fold(0.0, f32::max);
+        // Each shield's unit, found in one pass over the units. The first instance of a
+        // unit is the unit itself; wreck sections come later.
+        let mut wearers: Vec<u32> = src.iter().map(|s| s.unit_id).collect();
+        wearers.sort_unstable();
+        let mut worn: Vec<(u32, u32)> = units
+            .iter()
+            .enumerate()
+            .filter(|(_, u)| wearers.binary_search(&u.unit_id).is_ok())
+            .map(|(i, u)| (u.unit_id, i as u32))
+            .collect();
+        worn.sort_by_key(|w| w.0);
+        worn.dedup_by_key(|w| w.0);
+        let entity_of = |s: &ShieldInstance| {
+            worn.binary_search_by_key(&s.unit_id, |w| w.0)
+                .ok()
+                .map(|k| worn[k].1)
+        };
         let mut gpu = Vec::with_capacity(n);
         for (i, s) in src.iter().enumerate() {
             let team = (s.packed >> 8) & 255;
@@ -220,7 +237,8 @@ impl Renderer {
                 overlap,
                 contact_n,
                 prev_radius: s.prev_radius,
-                _pad: [0; 2],
+                entity: entity_of(s).unwrap_or(crate::gpu_consts::shield::NO_ENTITY),
+                _pad: 0,
                 contacts,
             });
         }
@@ -239,23 +257,8 @@ impl Renderer {
         let is_hull = |s: &&ShieldInstance| (s.packed >> 25) & 1 == 1;
         self.hull_shield_count = src.iter().filter(is_hull).count() as u32;
         self.hull_draws.clear();
-        // Each hull field's unit, found in one pass over the units.
-        let mut wearers: Vec<u32> = src.iter().filter(is_hull).map(|s| s.unit_id).collect();
-        wearers.sort_unstable();
-        let mut worn: Vec<(u32, u32)> = frame
-            .units
-            .iter()
-            .filter(|u| wearers.binary_search(&u.unit_id).is_ok())
-            .map(|u| (u.unit_id, u.blueprint))
-            .collect();
-        // The first instance of a unit is the unit itself; wreck sections come later.
-        worn.sort_by_key(|w| w.0);
-        worn.dedup_by_key(|w| w.0);
         for s in src.iter().filter(is_hull) {
-            let unit = worn
-                .binary_search_by_key(&s.unit_id, |w| w.0)
-                .ok()
-                .map(|k| worn[k].1);
+            let unit = entity_of(s).map(|e| units[e as usize].blueprint);
             let Some(&[first, lods]) = unit.and_then(|b| self.model_draws.get(b as usize)) else {
                 self.hull_draws.clear();
                 break;

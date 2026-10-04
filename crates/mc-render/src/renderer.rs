@@ -559,7 +559,10 @@ pub(crate) struct GpuShield {
     pub(crate) contact_n: u32,
     /// `radius` last tick, eased in the shader while an upgraded dome swells.
     pub(crate) prev_radius: f32,
-    pub(crate) _pad: [u32; 2],
+    /// The shield's unit in the entity buffer (`shield::NO_ENTITY`: none drawn), so the
+    /// shader moves the dome and its projector beam with the unit between ticks.
+    pub(crate) entity: u32,
+    pub(crate) _pad: u32,
     pub(crate) contacts: [u32; SHIELD_CONTACTS],
 }
 

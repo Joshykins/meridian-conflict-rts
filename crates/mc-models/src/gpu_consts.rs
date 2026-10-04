@@ -808,10 +808,6 @@ shared! {
         pub const RATE: f32 = 0.35;
     }
 
-    /// How a shield field is drawn: the look bits of a shield's `packed` word (mc-sim
-    /// `mirror::SHIELD_LOOK_SHIFT`, set from its faction's `mc_data::ShieldLook`, whose
-    /// numbers these are; tests hold both equal). shields.wgsl draws domes by it,
-    /// entity.wgsl `fs_hull` personal fields.
     /// How a strategic missile and a nuclear blast are drawn (`mc_data::strategic::StrategicLook`,
     /// nuke.wgsl, clouds.wgsl `gather_fires`): the blast's in the spare lane of its fourth
     /// vec4 in `Globals::nukes`. Never renumber one.
@@ -822,6 +818,10 @@ shared! {
         pub const PLASMA: u32 = 1;
     }
 
+    /// How a shield field is drawn: the look bits of a shield's `packed` word (mc-sim
+    /// `mirror::SHIELD_LOOK_SHIFT`, set from its faction's `mc_data::ShieldLook`, whose
+    /// numbers these are; tests hold both equal). shields.wgsl draws domes by it,
+    /// entity.wgsl `fs_hull` personal fields.
     pub mod shield_look as "SHIELD_LOOK_" {
         pub const SHIFT: u32 = 28;
         pub const MASK: u32 = 3;
@@ -834,6 +834,13 @@ shared! {
         /// field's (drawn on the hull, so much finer).
         pub const CELL: f32 = 9.0;
         pub const HULL_CELL: f32 = 2.4;
+    }
+
+    /// A shield record (renderer `GpuShield`, common.wgsl `Shield`).
+    pub mod shield as "SHIELD_" {
+        /// `entity` of a shield whose unit is not in the entity buffer: it is drawn
+        /// where the tick put it, not eased along with a moving unit.
+        pub const NO_ENTITY: u32 = 0xFFFF_FFFF;
     }
 
     /// Rock a beam has melted: the walls of a Regency mine's bore (`pattern::MOLTEN`,
