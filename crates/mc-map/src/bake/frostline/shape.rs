@@ -2,6 +2,7 @@
 //! canyon, the small relief of each climate, the mountains and their erosion.
 
 use super::*;
+use crate::bake::alpine::Erosion;
 use crate::bake::bays::{inside, polyline, segment};
 use crate::bake::canyon::{BENCH_TOP, COCONINO_TOP, HERMIT_TOP, REDWALL_TOP, RIM, SUPAI_TOP};
 use crate::landmark::FROSTLINE_STRATA_LIFT as LIFT;
@@ -15,7 +16,7 @@ const WALL_RUN: f64 = 85.0;
 /// Height of the wall both climates share: too steep to climb from about
 /// 7 m up it to its top, so nothing walks onto what stands above. Each
 /// climate's own mountain begins where it ends.
-pub(super) const WALL_H: f64 = 70.0;
+pub(in crate::bake) const WALL_H: f64 = 70.0;
 /// How far the designed lines are bent out of true, metres at most, about.
 const WARP: f64 = 420.0;
 /// A canyon wall's run where it is sheer, and the grade it is laid back to
@@ -35,7 +36,7 @@ const POOL_FLOOR: f32 = -3.0;
 /// by the strata lift, so the terrain shader's colours fall on the cliffs
 /// and benches cut here. The Redwall cliff, the Supai's stair of ledges, the
 /// Hermit slope, the Coconino cliff, the Kaibab cap, then the rim's gentle top.
-pub(super) fn mesa(run: f64) -> f64 {
+pub(in crate::bake) fn mesa(run: f64) -> f64 {
     let bed = |top: f64| top - LIFT;
     let mut knots = vec![(0.0, bed(BENCH_TOP)), (37.5, bed(REDWALL_TOP))];
     let step = (bed(SUPAI_TOP) - bed(REDWALL_TOP)) / 5.0;
@@ -63,7 +64,7 @@ pub(super) fn mesa(run: f64) -> f64 {
 }
 
 /// The run at which [`mesa`] stands at `height` on the big cliff.
-pub(super) fn mesa_run(height: f64) -> f64 {
+pub(in crate::bake) fn mesa_run(height: f64) -> f64 {
     let (foot, top) = (BENCH_TOP - LIFT, REDWALL_TOP - LIFT);
     37.5 * ((height - foot) / (top - foot)).clamp(0.0, 1.0)
 }
@@ -622,12 +623,34 @@ impl Terrain {
         h + self.frost.pools.at(x, y)
     }
 
-    /// Water erosion. Over the mountains above the shared wall: couloirs and
-    /// fans on the ranges, gullies down the mesas' slopes. Over the open
-    /// country: the drainage, shallow valleys gathering into washes and
-    /// streams, no steeper anywhere than a unit can walk. And the pools the
-    /// coasts' noise cut off from the oceans, filled.
+    /// Water erosion (`erode_benched`): couloirs and fans on the ranges and
+    /// gullies down the mesas (the desert's rock is harder), the drainage over
+    /// the open country, and the pools the coasts' noise cut off from the
+    /// oceans, filled.
     pub(super) fn erode_frostline(&mut self) {
+        let w = self.erode_benched(
+            Terrain::fl_shape,
+            |x, y| 0.4 + 0.6 * self.fl_eastness(x, y),
+            0x6672_6F73,
+        );
+        self.erosion = w.mountains;
+        self.frost.gullies = w.gullies;
+        self.frost.pools = w.pools;
+    }
+
+    /// Water erosion over a map of benches and mountains, from its ground
+    /// before erosion (`shape`): over the mountains above the shared wall,
+    /// couloirs and fans, as deep as the rock is `soft` (0..1) at a point;
+    /// over the open country, the drainage, shallow valleys gathering into
+    /// washes and streams, no steeper anywhere than a unit can walk; and the
+    /// water cut off in pieces too small for a sea, filled. `salt` seeds the
+    /// mountains' second pass.
+    pub(in crate::bake) fn erode_benched(
+        &self,
+        shape: impl Fn(&Terrain, f64, f64) -> Ground + Sync,
+        soft: impl Fn(f64, f64) -> f64,
+        salt: u64,
+    ) -> Weathered {
         const STEP: f64 = 16.0;
         /// Metres per unit of height while the droplets run: the mountains
         /// flattened to the slopes the droplets are tuned for, the open
@@ -645,12 +668,12 @@ impl Terrain {
                 .zip(rise.chunks_mut(rows * n))
                 .enumerate()
             {
-                let t = &*self;
+                let (t, shape) = (self, &shape);
                 s.spawn(move || {
                     for (r, (row, rrow)) in hs.chunks_mut(n).zip(rs.chunks_mut(n)).enumerate() {
                         let y = (k * rows + r) as f64 * STEP;
                         for (i, (v, rv)) in row.iter_mut().zip(rrow.iter_mut()).enumerate() {
-                            let g = t.fl_shape(i as f64 * STEP, y);
+                            let g = shape(t, i as f64 * STEP, y);
                             *v = g.h as f32;
                             *rv = g.rise as f32;
                         }
@@ -658,7 +681,7 @@ impl Terrain {
                 });
             }
         });
-        self.frost.pools = crate::bake::alpine::Erosion {
+        let pools = Erosion {
             n,
             step: STEP,
             delta: pool_fill(&raw, n, (POOL_AREA / (STEP * STEP)) as usize),
@@ -681,19 +704,19 @@ impl Terrain {
         // The mountains.
         let mut high: Vec<f32> = h.iter().map(|v| v / VERTICAL).collect();
         crate::bake::alpine::erode(&mut high, n, self.seed);
-        crate::bake::alpine::erode(&mut high, n, self.seed ^ 0x6672_6F73);
+        crate::bake::alpine::erode(&mut high, n, self.seed ^ salt);
         let mut delta: Vec<f32> = (0..n * n)
             .map(|at| {
                 let (x, y) = ((at % n) as f64 * STEP, (at / n) as f64 * STEP);
-                // Only above the wall, and the desert's rock is harder.
+                // Only above the wall.
                 let own = smoothstep(WALL_H + 15.0, WALL_H + 60.0, rise[at] as f64);
-                let k = own * (0.4 + 0.6 * self.fl_eastness(x, y));
+                let k = own * soft(x, y);
                 (high[at] * VERTICAL - h[at]).clamp(-70.0, 14.0) * k as f32
             })
             .collect();
         // Softened, so single droplets do not scratch thin straight lines.
         soften(&mut delta, 2);
-        self.erosion = crate::bake::alpine::Erosion {
+        let mountains = Erosion {
             n,
             step: STEP,
             delta,
@@ -730,12 +753,26 @@ impl Terrain {
         soften(&mut gullies, 1);
         let cut = gullies.iter().filter(|d| **d < -1.5).count() as f64 / gullies.len() as f64;
         debug_assert!(cut > 0.01, "water cut no gullies: {cut}");
-        self.frost.gullies = crate::bake::alpine::Erosion {
-            n,
-            step: STEP,
-            delta: gullies,
-        };
+        Weathered {
+            mountains,
+            gullies: Erosion {
+                n,
+                step: STEP,
+                delta: gullies,
+            },
+            pools,
+        }
     }
+}
+
+/// What water did to a map of benches and mountains (`Terrain::erode_benched`).
+pub(in crate::bake) struct Weathered {
+    /// Couloirs and fans on the mountains above the shared wall.
+    pub mountains: Erosion,
+    /// Gullies, washes and streams over the open country.
+    pub gullies: Erosion,
+    /// Water cut off in pieces too small for a sea, filled.
+    pub pools: Erosion,
 }
 
 /// How far to raise each sample of `raw` (heights, row-major, `n` per edge)

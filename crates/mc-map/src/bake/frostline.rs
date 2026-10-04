@@ -64,7 +64,7 @@ use crate::noise::{smoothstep, unit};
 use crate::BUILD_CELL_M;
 use std::f64::consts::PI;
 
-mod shape;
+pub(super) mod shape;
 #[cfg(test)]
 mod tests;
 
