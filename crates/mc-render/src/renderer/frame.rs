@@ -6,7 +6,7 @@ impl Renderer {
     /// Renders one frame. Returns `false` if the swapchain had to be rebuilt and the frame was skipped.
     pub fn render(&mut self, input: &FrameInput) -> Result<bool, GpuError> {
         let result = self.render_frame(input);
-        if matches!(result, Err(GpuError::Vk(vk::Result::ERROR_DEVICE_LOST))) {
+        if matches!(&result, Err(e) if e.vk_result() == Some(vk::Result::ERROR_DEVICE_LOST)) {
             self.timers.lost();
             log::error!("{}", self.loss_context(input));
             match self.gpu.fault_report() {

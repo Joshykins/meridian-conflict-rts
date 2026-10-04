@@ -2,7 +2,8 @@
 //! (its window is up by then), to see the crash window over a running game. `panic` panics on the main
 //! thread, `sim` on a thread whose death ends the game (as the sim thread's
 //! does), `native` raises an access violation (Windows), `error` ends the game
-//! with an error.
+//! with an error raised as a failed Vulkan call is (its report lists it under
+//! "errors raised", with its stack).
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -71,7 +72,10 @@ pub fn tick() -> Result<(), String> {
             if let Ok(mut armed) = ARMED.lock() {
                 *armed = None;
             }
-            Err("--crash-test error: the game stopped with an error".into())
+            Err(format!(
+                "--crash-test error: the game stopped with an error: {}",
+                mc_render::GpuError::drill()
+            ))
         }
         Drill::Sim | Drill::Native => Ok(()),
     }

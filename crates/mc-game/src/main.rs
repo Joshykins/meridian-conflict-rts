@@ -176,7 +176,8 @@ straight into a match instead.
                          --screenshot OUT.png: drawn headless, and OUT-copied.png after Copy details
   --crash-test KIND      fail on purpose 8 s in, to check the crash window: panic (main
                          thread) | sim (a thread the game needs) | native (an access
-                         violation, Windows) | error (an error that ends the game)
+                         violation, Windows) | error (an error that ends the game, raised
+                         as a failed Vulkan call is)
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
   --version              print the build's name, number, channel, commit and simulation

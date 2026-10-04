@@ -17,10 +17,20 @@
 //! details (the whole report onto the clipboard, to paste into a message) and
 //! Open folder (the file, selected in Explorer).
 //!
-//! Every report carries the build, the first lines of the log (the GPU and
-//! driver), its last ones (how far the game got), and on Windows the raw stack
-//! as `module+offset`, which the build's `.pdb` turns back into names when the
-//! player's copy has none (`scripts/package-windows.sh` keeps it).
+//! Every report is meant to be enough to find the cause without asking the
+//! player anything (CLAUDE.md section 7). After what happened, it carries:
+//!
+//! - the machine (`system.rs`): OS, processor, memory (the machine's and the
+//!   game's), GPU and driver, the exe and its arguments;
+//! - what the game was doing (`state.rs`): the window, graphics preset, map and
+//!   match the game recorded (`context`), the sim's last tick, and the errors
+//!   raised before the failure, each with its source line and stack;
+//! - the player's `settings.ron`;
+//! - the first lines of the log and its last ones (how far the game got).
+//!
+//! On Windows stacks are `module+offset`, which the build's `.pdb` turns back
+//! into names when the player's copy has none (`scripts/package-windows.sh`
+//! keeps it, `scripts/symbolize.sh` reads it).
 //!
 //! Dialogs are only shown to a player: a run with no arguments, or one that
 //! opened the game's window. A tool run (a headless shot, the shot server, a
@@ -35,6 +45,8 @@ mod screen;
 mod session;
 #[cfg(windows)]
 mod stack;
+mod state;
+mod system;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -46,6 +58,7 @@ pub use drill::{arm as arm_drill, tick as drill_tick, Drill};
 pub(crate) use reporter::{run as run_screen, screenshot as screen_shot};
 pub(crate) use screen::Summary;
 pub use session::LogTee;
+pub use state::{context, note_window, sim_tick};
 
 /// Keeps this many reports of each kind; older ones are deleted when a new one is
 /// written.
@@ -74,6 +87,8 @@ const KEEP_PANICS: usize = 8;
 static PANICS: Mutex<(Vec<Panicked>, usize)> = Mutex::new((Vec::new(), 0));
 
 pub fn install() {
+    state::start();
+    mc_render::gpu::set_error_hook(state::on_gpu_error);
     if std::env::args_os().len() <= 1 {
         set_interactive();
     }
@@ -240,9 +255,10 @@ fn show_panic() {
 /// window, broken data): written to `error-<unix seconds>.log` and shown.
 pub fn report_error(message: &str) {
     let report = format!(
-        "Meridian Conflict {} stopped\n{}\n\n{message}\n{}",
+        "Meridian Conflict {} stopped\n{}\n\n{message}\n\n{}{}",
         env!("MERIDIAN_BUILD"),
         system_line(),
+        details(),
         session::kept_lines()
     );
     let path = save("error", "log", report.as_bytes());
@@ -306,6 +322,7 @@ fn panic_report(info: &std::panic::PanicHookInfo<'_>) -> Panicked {
     if !earlier.is_empty() {
         report.push_str(&format!("earlier panics this run:\n{earlier}\n"));
     }
+    report.push_str(&details());
     report.push_str(&session::kept_lines());
     let path = save("crash", "log", report.as_bytes());
     Panicked {
@@ -360,6 +377,35 @@ fn from_the_panic(trace: &str) -> String {
     match last.and_then(|i| starts.get(i + 1)) {
         Some(&(at, _)) => trace[at..].to_owned(),
         None => trace.to_owned(),
+    }
+}
+
+/// What every report carries after what happened: the machine (`system.rs`), what
+/// the game was doing and the errors raised before the failure (`state.rs`), and
+/// the player's settings as saved. Enough to find the cause without asking the
+/// player anything.
+fn details() -> String {
+    let mut text = system::describe();
+    text.push('\n');
+    text.push_str(&state::describe());
+    text.push('\n');
+    text.push_str(&settings_file());
+    text
+}
+
+/// `settings.ron` as saved: the graphics preset, render scale, window mode.
+fn settings_file() -> String {
+    const MAX: usize = 6000;
+    let Some(path) = crate::settings::path() else {
+        return "settings: (no settings folder)\n".into();
+    };
+    match std::fs::read_to_string(&path) {
+        Ok(text) => format!(
+            "settings ({}):\n{}\n",
+            path.display(),
+            clip(text.trim(), MAX)
+        ),
+        Err(e) => format!("settings: {} ({e})\n", path.display()),
     }
 }
 
@@ -491,5 +537,15 @@ mod tests {
     fn clip_cuts_on_characters() {
         assert_eq!(clip("héllo", 2), "hé…");
         assert_eq!(clip("hi", 2), "hi");
+    }
+
+    /// Every report says what machine it came from, what the game was doing and how
+    /// it was set up, so its cause can be found without asking the player.
+    #[test]
+    fn a_report_carries_the_machine_the_state_and_the_settings() {
+        let text = details();
+        for section in ["system:\n", "state:\n", "settings"] {
+            assert!(text.contains(section), "no {section:?} in:\n{text}");
+        }
     }
 }

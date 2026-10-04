@@ -4,6 +4,8 @@
 
 use ash::vk;
 use std::ffi::{c_char, CStr};
+use std::panic::Location;
+use std::sync::{Mutex, OnceLock};
 
 pub struct Gpu {
     pub entry: ash::Entry,
@@ -67,7 +69,48 @@ impl Adapter {
 pub enum GpuError {
     Load(String),
     NoDevice(String),
-    Vk(vk::Result),
+    /// A Vulkan call failed. `at` is where in the source: the `?` (or `from`) that
+    /// turned the result into this error, or, through a `#[track_caller]` helper such
+    /// as `Gpu::image`, the line that called the helper.
+    Vk {
+        result: vk::Result,
+        at: &'static Location<'static>,
+    },
+    /// A descriptor set did not fit its pool (`descriptors::SetPool`): caught before
+    /// the driver is asked, so the mistake shows on every GPU, not only the strict ones.
+    /// `ty` is the descriptor type that ran out; `None`, the pool's count of sets.
+    PoolTooSmall {
+        ty: Option<vk::DescriptorType>,
+        at: &'static Location<'static>,
+    },
+}
+
+impl GpuError {
+    /// The error `--crash-test error` ends the game with: raised as a failed Vulkan
+    /// call is, so the drill's report shows what a real one would.
+    #[track_caller]
+    pub fn drill() -> GpuError {
+        GpuError::from(vk::Result::ERROR_OUT_OF_POOL_MEMORY)
+    }
+
+    /// A set that does not fit its pool (`descriptors::SetPool`), raised as a failed
+    /// Vulkan call is.
+    pub(crate) fn pool_too_small(
+        ty: Option<vk::DescriptorType>,
+        at: &'static Location<'static>,
+    ) -> GpuError {
+        let e = GpuError::PoolTooSmall { ty, at };
+        raised(&e);
+        e
+    }
+
+    /// The Vulkan result, when a Vulkan call is what failed.
+    pub fn vk_result(&self) -> Option<vk::Result> {
+        match self {
+            GpuError::Vk { result, .. } => Some(*result),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for GpuError {
@@ -75,7 +118,16 @@ impl std::fmt::Display for GpuError {
         match self {
             GpuError::Load(e) => write!(f, "could not load Vulkan: {e}"),
             GpuError::NoDevice(e) => write!(f, "no usable Vulkan device: {e}"),
-            GpuError::Vk(e) => write!(f, "Vulkan error: {e}"),
+            GpuError::Vk { result, at } => {
+                write!(f, "Vulkan error {result:?} at {}:{}", at.file(), at.line())
+            }
+            GpuError::PoolTooSmall { ty, at } => {
+                match ty {
+                    Some(ty) => write!(f, "a descriptor pool has no {ty:?} left")?,
+                    None => write!(f, "a descriptor pool has no set left")?,
+                }
+                write!(f, " at {}:{}", at.file(), at.line())
+            }
         }
     }
 }
@@ -83,8 +135,42 @@ impl std::fmt::Display for GpuError {
 impl std::error::Error for GpuError {}
 
 impl From<vk::Result> for GpuError {
-    fn from(e: vk::Result) -> Self {
-        GpuError::Vk(e)
+    #[track_caller]
+    fn from(result: vk::Result) -> Self {
+        let e = GpuError::Vk {
+            result,
+            at: Location::caller(),
+        };
+        // A swapchain that went out of date is routine (a resize), not a fault.
+        if result.as_raw() < 0 && result != vk::Result::ERROR_OUT_OF_DATE_KHR {
+            raised(&e);
+        }
+        e
+    }
+}
+
+/// The device the last `Gpu` opened, as its log line describes it (`device_line`).
+static DEVICE_LINE: Mutex<Option<String>> = Mutex::new(None);
+
+/// The graphics card, driver and Vulkan version the last device was opened on, for a
+/// crash report. Never waits: `None` while another thread holds it.
+pub fn device_line() -> Option<String> {
+    DEVICE_LINE.try_lock().ok()?.clone()
+}
+
+/// Called with every Vulkan error as it is raised (`set_error_hook`).
+static ERROR_HOOK: OnceLock<fn(&GpuError)> = OnceLock::new();
+
+/// Has `hook` called with every Vulkan error as it is raised, before anything handles
+/// or rewords it: the game keeps the last few, each with the stack that raised it, for
+/// the crash report. Only the first hook set is kept.
+pub fn set_error_hook(hook: fn(&GpuError)) {
+    let _ = ERROR_HOOK.set(hook);
+}
+
+fn raised(e: &GpuError) {
+    if let Some(hook) = ERROR_HOOK.get() {
+        hook(e);
     }
 }
 
@@ -266,8 +352,8 @@ impl Gpu {
             .filter(|h| h.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL))
             .map(|h| h.size >> 20)
             .sum();
-        log::info!(
-            "Vulkan device: {device_name} ({:?}, vendor {:04x}, device {:04x}), driver {}, \
+        let line = format!(
+            "{device_name} ({:?}, vendor {:04x}, device {:04x}), driver {}, \
              Vulkan {}.{}.{}, {vram_mib} MiB device memory",
             props.device_type,
             props.vendor_id,
@@ -277,6 +363,10 @@ impl Gpu {
             vk::api_version_minor(props.api_version),
             vk::api_version_patch(props.api_version),
         );
+        log::info!("Vulkan device: {line}");
+        if let Ok(mut last) = DEVICE_LINE.lock() {
+            *last = Some(line);
+        }
         Ok(Gpu {
             memory,
             limits: props.limits,
@@ -422,6 +512,7 @@ impl Gpu {
         })
     }
 
+    #[track_caller]
     pub(crate) fn allocate(
         &self,
         req: vk::MemoryRequirements,
@@ -450,6 +541,7 @@ impl Gpu {
     }
 
     /// A buffer the CPU writes every frame or tick; stays mapped.
+    #[track_caller]
     pub fn host_buffer(&self, size: u64, usage: vk::BufferUsageFlags) -> Result<Buffer, GpuError> {
         self.buffer(
             size,
@@ -460,6 +552,7 @@ impl Gpu {
     }
 
     /// A buffer only the GPU touches after an optional initial upload.
+    #[track_caller]
     pub fn device_buffer(
         &self,
         size: u64,
@@ -473,6 +566,7 @@ impl Gpu {
         )
     }
 
+    #[track_caller]
     fn buffer(
         &self,
         size: u64,
@@ -511,6 +605,7 @@ impl Gpu {
     }
 
     /// Creates a device-local buffer holding `data`.
+    #[track_caller]
     pub fn buffer_with_data(
         &self,
         data: &[u8],
@@ -547,6 +642,7 @@ impl Gpu {
         self.freed(b.memory);
     }
 
+    #[track_caller]
     pub fn image(&self, desc: &ImageDesc) -> Result<Image, GpuError> {
         let info = vk::ImageCreateInfo::default()
             .image_type(vk::ImageType::TYPE_2D)
@@ -633,6 +729,7 @@ impl Gpu {
     }
 
     /// Records, submits and waits. For set-up work only, never per frame.
+    #[track_caller]
     pub fn submit_once(&self, record: impl FnOnce(vk::CommandBuffer)) -> Result<(), GpuError> {
         // SAFETY: the pool is this device's and allows resetting; the buffer is allocated,
         // begun, recorded, ended and submitted in order, and `queue_wait_idle` finishes it
@@ -664,6 +761,7 @@ impl Gpu {
 
     /// Uploads pixel data into one layer/mip of `image` and leaves it shader-readable.
     /// `first_use` transitions from UNDEFINED; otherwise from SHADER_READ_ONLY.
+    #[track_caller]
     pub fn upload_image(
         &self,
         image: &Image,
@@ -812,6 +910,7 @@ impl Gpu {
         }
     }
 
+    #[track_caller]
     pub fn sampler(
         &self,
         filter: vk::Filter,
@@ -848,6 +947,7 @@ impl Gpu {
         Ok(unsafe { self.device.create_sampler(&info, None) }?)
     }
 
+    #[track_caller]
     pub fn shader(&self, spirv: &[u8]) -> Result<vk::ShaderModule, GpuError> {
         let words: Vec<u32> = spirv
             .as_chunks::<4>()
@@ -919,7 +1019,10 @@ impl Drop for Gpu {
     fn drop(&mut self) {
         let leaked = *self.live_allocations.get_mut();
         if leaked != 0 {
-            log::error!("{leaked} GPU memory allocations were never freed: a buffer or image lost its owner");
+            log::error!(
+                "{leaked} GPU memory allocations were never freed: a buffer or image lost its \
+                 owner (after an error, what was built before it)"
+            );
             debug_assert!(
                 std::thread::panicking(),
                 "{leaked} GPU memory allocations leaked"
@@ -1038,4 +1141,29 @@ pub struct Image {
 /// Name of an entry point as a C string; shaders use fixed names.
 pub fn entry(name: &'static CStr) -> &'static CStr {
     name
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A helper that makes something on the device, as `Gpu::image` does.
+    #[track_caller]
+    fn make() -> Result<(), GpuError> {
+        let refused: Result<(), vk::Result> = Err(vk::Result::ERROR_OUT_OF_POOL_MEMORY);
+        refused?;
+        Ok(())
+    }
+
+    #[test]
+    fn a_vulkan_error_names_the_line_that_asked_for_it() {
+        let e = make().unwrap_err();
+        let line = line!() - 1;
+        let text = e.to_string();
+        assert!(
+            text.ends_with(&format!("src/gpu.rs:{line}")),
+            "through a #[track_caller] helper, the error names its caller's line: {text}"
+        );
+        assert!(text.contains("ERROR_OUT_OF_POOL_MEMORY"), "{text}");
+    }
 }

@@ -533,7 +533,10 @@ impl ApplicationHandler for App {
             attrs = attrs.with_fullscreen(Some(Fullscreen::Borderless(None)));
         }
         match event_loop.create_window(attrs) {
-            Ok(w) => self.window = Some(Arc::new(w)),
+            Ok(w) => {
+                crate::crash::note_window(&w);
+                self.window = Some(Arc::new(w));
+            }
             Err(e) => return self.fail(event_loop, format!("could not create a window: {e}")),
         }
         // The renderer's build starts first, then the splash comes up beside it.
@@ -557,6 +560,9 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
+                if let Some(w) = &self.window {
+                    crate::crash::note_window(w);
+                }
                 let viewport = Vec2::new(size.width.max(1) as f32, size.height.max(1) as f32);
                 match &mut self.stage {
                     Stage::Front(f) => f.camera.viewport = viewport,

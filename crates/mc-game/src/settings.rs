@@ -136,7 +136,7 @@ pub fn config_dir() -> Option<PathBuf> {
     Some(base?.join("meridian-conflict"))
 }
 
-fn path() -> Option<PathBuf> {
+pub(crate) fn path() -> Option<PathBuf> {
     Some(config_dir()?.join("settings.ron"))
 }
 

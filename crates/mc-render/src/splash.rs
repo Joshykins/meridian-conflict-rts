@@ -4,6 +4,7 @@
 //! thread. Its own device, the overlay pipeline and nothing else: no scene,
 //! no glass (glass panels show black). `release_window` hands the window on.
 
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
 use crate::overlay::{Overlay, MAX_OVERLAY_VERTICES};
 use crate::pipelines::{self, Blend, Depth, PipelineDesc, VertexKind};
@@ -53,8 +54,7 @@ impl Splash {
         else {
             return Err(GpuError::NoDevice("the splash draws to a window".into()));
         };
-        let extensions =
-            ash_window::enumerate_required_extensions(display).map_err(GpuError::Vk)?;
+        let extensions = ash_window::enumerate_required_extensions(display)?;
         let gpu = Gpu::new(extensions)?;
         // SAFETY: the handles come from a live window that outlives this presenter
         // (the app drops the splash before the window).
@@ -98,15 +98,12 @@ impl Splash {
 
         // The overlay's bindings in screen.wgsl: the scene (read by glass), the atlas, the sampler.
         let gfx = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
-        let set_layout = pipelines::set_layout(
-            &gpu,
-            &[
-                (0, vk::DescriptorType::SAMPLED_IMAGE),
-                (1, vk::DescriptorType::SAMPLED_IMAGE),
-                (2, vk::DescriptorType::SAMPLER),
-            ],
-            gfx,
-        )?;
+        const BINDINGS: &[Binding] = &[
+            (0, vk::DescriptorType::SAMPLED_IMAGE),
+            (1, vk::DescriptorType::SAMPLED_IMAGE),
+            (2, vk::DescriptorType::SAMPLER),
+        ];
+        let set_layout = pipelines::set_layout(&gpu, BINDINGS, gfx)?;
         let layout = {
             // The same push block as the renderer's screen layout.
             let push = [vk::PushConstantRange {
@@ -164,32 +161,9 @@ impl Splash {
             None,
         )?;
 
-        let descriptor_pool = {
-            let sizes = [
-                vk::DescriptorPoolSize {
-                    ty: vk::DescriptorType::SAMPLED_IMAGE,
-                    descriptor_count: 2,
-                },
-                vk::DescriptorPoolSize {
-                    ty: vk::DescriptorType::SAMPLER,
-                    descriptor_count: 1,
-                },
-            ];
-            let info = vk::DescriptorPoolCreateInfo::default()
-                .max_sets(1)
-                .pool_sizes(&sizes);
-            // SAFETY: as above.
-            unsafe { device.create_descriptor_pool(&info, None) }?
-        };
-        let layouts = [set_layout];
-        // SAFETY: the pool was sized for exactly this one set.
-        let set = unsafe {
-            device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(descriptor_pool)
-                    .set_layouts(&layouts),
-            )
-        }?[0];
+        let mut sets = SetPool::new(&gpu, &[(BINDINGS, 1)])?;
+        let set = sets.alloc(&gpu, set_layout, BINDINGS)?;
+        let descriptor_pool = sets.into_raw();
         let image_info = |view| {
             [vk::DescriptorImageInfo {
                 sampler: vk::Sampler::null(),

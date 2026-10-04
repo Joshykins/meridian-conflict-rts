@@ -8,9 +8,10 @@ use std::mem::size_of;
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 
+use crate::descriptors::SetPool;
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::wake_shell::{ALONG, ARCH, AROUND, MAX_SHELLS, TUBE};
-use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind};
+use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, PASS_SET};
 use crate::shader_reload::spirv;
 
 /// One wake's shell (`WakeShell` in wake_shell.wgsl).
@@ -54,29 +55,9 @@ impl WakeShells {
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
         buffer.write(0, &vec![0u8; buffer.size as usize]);
-        let sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::STORAGE_BUFFER,
-            descriptor_count: 2,
-        }];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let set_layouts = [layouts.pass_set];
-        // SAFETY: the pool was made just above for exactly this one set of two storage
-        // buffers, and `set_layouts` lives to the end of the call.
-        let set = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&set_layouts),
-            )
-        }?[0];
+        let mut sets = SetPool::new(gpu, &[(PASS_SET, 1)])?;
+        let set = sets.alloc(gpu, layouts.pass_set, PASS_SET)?;
+        let pool = sets.into_raw();
         let infos = [vk::DescriptorBufferInfo {
             buffer: buffer.buffer,
             offset: 0,

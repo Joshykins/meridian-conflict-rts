@@ -2,9 +2,16 @@
 //! half the scene's size, then its composite, subtracted from the picture in
 //! `scene_over`. Set 1 of both: 0 the scene's depth, 1 the walk's target.
 
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Gpu, GpuError, Image, ImageDesc};
 use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, HDR_FORMAT};
 use ash::vk;
+
+/// Set 1: the scene's depth and the walk's target.
+const BINDINGS: &[Binding] = &[
+    (0, vk::DescriptorType::SAMPLED_IMAGE),
+    (1, vk::DescriptorType::SAMPLED_IMAGE),
+];
 
 pub(super) struct Shafts {
     target: Option<(Image, vk::Framebuffer)>,
@@ -47,19 +54,7 @@ impl Shafts {
     pub(super) fn new(gpu: &Gpu, layouts: &Layouts, passes: &Passes) -> Result<Shafts, GpuError> {
         let dev = &gpu.device;
         let gfx = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
-        let bindings: Vec<_> = (0..2)
-            .map(|b| {
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(b)
-                    .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
-                    .descriptor_count(1)
-                    .stage_flags(gfx)
-            })
-            .collect();
-        let set_layout =
-            // SAFETY: the device is alive and the create info borrows `bindings`, which lives
-            // to the end of the call.
-            unsafe { dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None) }?;
+        let set_layout = pipelines::set_layout(gpu, BINDINGS, gfx)?;
         let sets = [layouts.scene_set, set_layout];
         // SAFETY: the device is alive; both set layouts are this device's and `sets` lives to
         // the end of the call.
@@ -69,29 +64,9 @@ impl Shafts {
                 None,
             )
         }?;
-        let sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::SAMPLED_IMAGE,
-            descriptor_count: 2,
-        }];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let one = [set_layout];
-        // SAFETY: the pool was made just above for exactly this one set of two sampled images,
-        // and `one` lives to the end of the call.
-        let set = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&one),
-            )
-        }?[0];
+        let mut sets = SetPool::new(gpu, &[(BINDINGS, 1)])?;
+        let set = sets.alloc(gpu, set_layout, BINDINGS)?;
+        let pool = sets.into_raw();
         let module = gpu.shader(crate::shader_reload::spirv!("shafts"))?;
         let graphics = |fs, pass, blend| {
             pipelines::graphics_pipeline(

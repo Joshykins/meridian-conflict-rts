@@ -9,6 +9,7 @@
 
 pub mod camera;
 mod cliff_blocks;
+mod descriptors;
 pub mod foliage;
 pub mod gpu;
 pub use mc_models::gpu_consts;

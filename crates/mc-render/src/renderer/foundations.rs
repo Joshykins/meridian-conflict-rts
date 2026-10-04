@@ -17,9 +17,10 @@
 //! A new lot's plating comes up out of the ground as it settles (terrain.rs
 //! `TileCache::settling`, `settle::SECONDS`).
 
+use crate::descriptors::SetPool;
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::settle;
-use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind};
+use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, PASS_SET};
 use ash::vk;
 use mc_map::{FlattenRecord, MapFile, CELL_SIZE_M, TILE_CELLS, TILE_SAMPLES};
 use std::collections::HashMap;
@@ -100,29 +101,9 @@ impl Foundations {
             (MAX_CELLS * size_of::<FoundationCell>()) as u64,
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
-        let sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::STORAGE_BUFFER,
-            descriptor_count: 2,
-        }];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let own = [layouts.pass_set];
-        // SAFETY: the pool was made just above for exactly this one pass set of two storage
-        // buffers, and `own` lives to the end of the call.
-        let set = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&own),
-            )
-        }?[0];
+        let mut sets = SetPool::new(gpu, &[(PASS_SET, 1)])?;
+        let set = sets.alloc(gpu, layouts.pass_set, PASS_SET)?;
+        let pool = sets.into_raw();
         // Both of the pass set's bindings name the cells; the shader reads the first.
         let info = [cells.info()];
         let writes = [0, 1].map(|b| {

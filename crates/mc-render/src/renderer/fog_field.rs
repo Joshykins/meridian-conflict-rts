@@ -10,6 +10,7 @@
 //! GENERAL), 2 the discs, 3 the cover the discs are laid into.
 
 use super::gtao::storage_image;
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
 use crate::gpu_consts::fog;
 use crate::pipelines;
@@ -38,6 +39,14 @@ pub(crate) struct FogPush {
     _pad1: u32,
     _pad2: u32,
 }
+
+/// The fog's set: the vision grid it reads, the field it writes, and two buffers.
+const BINDINGS: &[Binding] = &[
+    (0, vk::DescriptorType::SAMPLED_IMAGE),
+    (1, vk::DescriptorType::STORAGE_IMAGE),
+    (2, vk::DescriptorType::STORAGE_BUFFER),
+    (3, vk::DescriptorType::STORAGE_BUFFER),
+];
 
 pub(super) struct FogField {
     set_layout: vk::DescriptorSetLayout,
@@ -96,31 +105,7 @@ impl FogField {
 
         let dev = &gpu.device;
         use vk::DescriptorType as T;
-        let types = [
-            T::SAMPLED_IMAGE,
-            T::STORAGE_IMAGE,
-            T::STORAGE_BUFFER,
-            T::STORAGE_BUFFER,
-        ];
-        let bindings: Vec<_> = types
-            .iter()
-            .enumerate()
-            .map(|(b, &ty)| {
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(b as u32)
-                    .descriptor_type(ty)
-                    .descriptor_count(1)
-                    .stage_flags(vk::ShaderStageFlags::COMPUTE)
-            })
-            .collect();
-        // SAFETY: the device is alive and the create info borrows `bindings`, which lives to
-        // the end of the call.
-        let set_layout = unsafe {
-            dev.create_descriptor_set_layout(
-                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
-                None,
-            )
-        }?;
+        let set_layout = pipelines::set_layout(gpu, BINDINGS, vk::ShaderStageFlags::COMPUTE)?;
         let push = [vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::COMPUTE,
             offset: 0,
@@ -137,38 +122,9 @@ impl FogField {
                 None,
             )
         }?;
-        let sizes = [
-            vk::DescriptorPoolSize {
-                ty: T::SAMPLED_IMAGE,
-                descriptor_count: 1,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::STORAGE_IMAGE,
-                descriptor_count: 1,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::STORAGE_BUFFER,
-                descriptor_count: 2,
-            },
-        ];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        // SAFETY: the pool was made just above with room for exactly this one set, and
-        // `set_layouts` lives to the end of the call.
-        let set = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&set_layouts),
-            )
-        }?[0];
+        let mut sets = SetPool::new(gpu, &[(BINDINGS, 1)])?;
+        let set = sets.alloc(gpu, set_layout, BINDINGS)?;
+        let pool = sets.into_raw();
         for (binding, view, ty, image_layout) in [
             (
                 0,

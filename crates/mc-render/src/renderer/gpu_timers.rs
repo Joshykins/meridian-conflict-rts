@@ -118,9 +118,9 @@ impl GpuTimers {
                 .get_physical_device_queue_family_properties(gpu.physical)
         }[gpu.queue_family as usize]
             .timestamp_valid_bits;
-        let breadcrumbs = Breadcrumbs::new(gpu).map_err(|e| match e {
-            crate::gpu::GpuError::Vk(e) => e,
-            _ => vk::Result::ERROR_OUT_OF_DEVICE_MEMORY,
+        let breadcrumbs = Breadcrumbs::new(gpu).map_err(|e| {
+            e.vk_result()
+                .unwrap_or(vk::Result::ERROR_OUT_OF_DEVICE_MEMORY)
         })?;
         Ok(GpuTimers {
             breadcrumbs,

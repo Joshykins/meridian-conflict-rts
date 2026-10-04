@@ -161,6 +161,7 @@ fn build(order: Order, shared: &Mutex<Shared>) -> Result<Ready, String> {
             Arc::new(MapFile::open(&path).map_err(|e| format!("{}: {e}", path.display()))?)
         }
     };
+    crate::crash::context("map", format!("{:?}", map.name()));
     let blueprints = &order.blueprints;
     std::thread::scope(|s| {
         let chart = s.spawn(|| {

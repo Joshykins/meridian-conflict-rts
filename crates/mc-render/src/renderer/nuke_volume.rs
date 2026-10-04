@@ -13,9 +13,19 @@
 //! the clouds' resolved picture (how much gets through), so what lies past the deck is
 //! seen through it. One set per cloud history, as the clouds alternate theirs.
 
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Gpu, GpuError, Image, ImageDesc};
 use crate::pipelines::{self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, HDR_FORMAT};
 use ash::vk;
+
+/// The volume's own set: five sampled images (binding 1 the sky's noise).
+const BINDINGS: &[Binding] = &[
+    (0, vk::DescriptorType::SAMPLED_IMAGE),
+    (1, vk::DescriptorType::SAMPLED_IMAGE),
+    (2, vk::DescriptorType::SAMPLED_IMAGE),
+    (3, vk::DescriptorType::SAMPLED_IMAGE),
+    (4, vk::DescriptorType::SAMPLED_IMAGE),
+];
 
 pub(super) struct NukeVolume {
     target: Option<(Image, vk::Framebuffer)>,
@@ -63,19 +73,7 @@ impl NukeVolume {
     ) -> Result<NukeVolume, GpuError> {
         let dev = &gpu.device;
         let gfx = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
-        let bindings: Vec<_> = (0..5)
-            .map(|b| {
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(b)
-                    .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
-                    .descriptor_count(1)
-                    .stage_flags(gfx)
-            })
-            .collect();
-        let set_layout =
-            // SAFETY: the device is alive and the create info borrows `bindings`, which lives
-            // to the end of the call.
-            unsafe { dev.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings), None) }?;
+        let set_layout = pipelines::set_layout(gpu, BINDINGS, gfx)?;
         let sets = [layouts.scene_set, set_layout];
         // SAFETY: the device is alive; both set layouts are this device's and `sets` lives to
         // the end of the call.
@@ -85,30 +83,12 @@ impl NukeVolume {
                 None,
             )
         }?;
-        let sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::SAMPLED_IMAGE,
-            descriptor_count: 10,
-        }];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(2)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let two = [set_layout; 2];
-        // SAFETY: the pool was made just above for exactly these two sets of five sampled
-        // images, and `two` lives to the end of the call.
-        let allocated = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&two),
-            )
-        }?;
-        let sets = [allocated[0], allocated[1]];
+        let mut pool = SetPool::new(gpu, &[(BINDINGS, 2)])?;
+        let sets = [
+            pool.alloc(gpu, set_layout, BINDINGS)?,
+            pool.alloc(gpu, set_layout, BINDINGS)?,
+        ];
+        let pool = pool.into_raw();
         for set in sets {
             write_image(gpu, set, 1, noise, vk::ImageLayout::GENERAL);
         }

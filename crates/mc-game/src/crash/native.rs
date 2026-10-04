@@ -101,6 +101,8 @@ unsafe extern "system" fn filter(pointers: *const ExceptionPointers) -> i32 {
     if let Some(dump) = &dump {
         report.push_str(&format!("\nminidump: {}\n", dump.display()));
     }
+    report.push('\n');
+    report.push_str(&super::details());
     report.push_str(&super::session::kept_lines());
     let path = super::save("crash", "log", report.as_bytes());
     if let Some(path) = &path {

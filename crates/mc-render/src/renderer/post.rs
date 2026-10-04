@@ -15,6 +15,7 @@
 //! Set 0 of every post pipeline: 0 what the pass reads, 1 SMAA's area texture,
 //! 2 its search texture, 3 SMAA's weights, 4 a linear and 5 a point sampler.
 
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Gpu, GpuError, Image, ImageDesc};
 use crate::pipelines::{self, Blend, Depth, PipelineDesc, VertexKind};
 use ash::vk;
@@ -26,6 +27,16 @@ pub enum Antialiasing {
     #[default]
     Smaa,
 }
+
+/// Each pass's set: four images it reads and two samplers.
+const BINDINGS: &[Binding] = &[
+    (0, vk::DescriptorType::SAMPLED_IMAGE),
+    (1, vk::DescriptorType::SAMPLED_IMAGE),
+    (2, vk::DescriptorType::SAMPLED_IMAGE),
+    (3, vk::DescriptorType::SAMPLED_IMAGE),
+    (4, vk::DescriptorType::SAMPLER),
+    (5, vk::DescriptorType::SAMPLER),
+];
 
 const LDR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 const EDGES_FORMAT: vk::Format = vk::Format::R8G8_UNORM;
@@ -186,27 +197,7 @@ impl Post {
         // Edge detection discards where there is no edge: those pixels must read 0.
         let edges_pass = color_pass(gpu, EDGES_FORMAT, vk::AttachmentLoadOp::CLEAR)?;
 
-        let bindings: Vec<_> = (0..6u32)
-            .map(|b| {
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(b)
-                    .descriptor_type(if b < 4 {
-                        vk::DescriptorType::SAMPLED_IMAGE
-                    } else {
-                        vk::DescriptorType::SAMPLER
-                    })
-                    .descriptor_count(1)
-                    .stage_flags(gfx)
-            })
-            .collect();
-        // SAFETY: the device is alive and the create info borrows `bindings`, which lives to
-        // the end of the call.
-        let set_layout = unsafe {
-            dev.create_descriptor_set_layout(
-                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
-                None,
-            )
-        }?;
+        let set_layout = pipelines::set_layout(gpu, BINDINGS, gfx)?;
         let push = [vk::PushConstantRange {
             stage_flags: gfx,
             offset: 0,
@@ -223,35 +214,12 @@ impl Post {
                 None,
             )
         }?;
-        let sizes = [
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::SAMPLED_IMAGE,
-                descriptor_count: 20,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::SAMPLER,
-                descriptor_count: 10,
-            },
-        ];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(5)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let five = [set_layout; 5];
-        // SAFETY: the pool was made just above with room for exactly these five sets (20
-        // images, 10 samplers), and `five` lives to the end of the call.
-        let sets = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&five),
-            )
-        }?;
+        // Edges, weights, blend, EASU and RCAS.
+        let mut pool = SetPool::new(gpu, &[(BINDINGS, 5)])?;
+        let sets = (0..5)
+            .map(|_| pool.alloc(gpu, set_layout, BINDINGS))
+            .collect::<Result<Vec<_>, _>>()?;
+        let pool = pool.into_raw();
 
         let area = gpu.image(&ImageDesc {
             width: 160,

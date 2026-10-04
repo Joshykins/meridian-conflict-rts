@@ -12,7 +12,7 @@
 # N being the build number the game's menu shows. The build's symbols stay beside
 # it, not in it (MeridianConflict-Build<N>-<commit>.pdb): a tester's crash report
 # names code as meridian.exe+0x..., and a minidump opens in Visual Studio or WinDbg,
-# only with that .pdb.
+# only with that .pdb (scripts/symbolize.sh REPORT names the frames with it).
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 repo=$PWD

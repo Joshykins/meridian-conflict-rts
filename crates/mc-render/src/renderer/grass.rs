@@ -19,6 +19,7 @@
 //! clad slopes round levelled lots (foundations.rs).
 //! `MERIDIAN_GRASS=0` turns it off, `MERIDIAN_GRASS_DENSITY` scales it.
 
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Buffer, Gpu, GpuError};
 use crate::gpu_consts::grass;
 use crate::pipelines::{self, Blend, Depth, PipelineDesc, VertexKind};
@@ -88,6 +89,17 @@ pub(super) struct GrassFrame {
     /// Seconds, `FrameInput::time`.
     pub time: f32,
 }
+
+/// The grass's own set: seven storage buffers.
+const BINDINGS: &[Binding] = &[
+    (0, vk::DescriptorType::STORAGE_BUFFER),
+    (1, vk::DescriptorType::STORAGE_BUFFER),
+    (2, vk::DescriptorType::STORAGE_BUFFER),
+    (3, vk::DescriptorType::STORAGE_BUFFER),
+    (4, vk::DescriptorType::STORAGE_BUFFER),
+    (5, vk::DescriptorType::STORAGE_BUFFER),
+    (6, vk::DescriptorType::STORAGE_BUFFER),
+];
 
 pub(super) struct Grass {
     set_layout: vk::DescriptorSetLayout,
@@ -162,23 +174,7 @@ impl Grass {
         let stages = vk::ShaderStageFlags::VERTEX
             | vk::ShaderStageFlags::FRAGMENT
             | vk::ShaderStageFlags::COMPUTE;
-        let bindings: Vec<_> = (0..7)
-            .map(|b| {
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(b)
-                    .descriptor_type(T::STORAGE_BUFFER)
-                    .descriptor_count(1)
-                    .stage_flags(stages)
-            })
-            .collect();
-        // SAFETY: the device is alive and the create info borrows `bindings` (seven distinct
-        // binding numbers), which lives to the end of the call.
-        let set_layout = unsafe {
-            dev.create_descriptor_set_layout(
-                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
-                None,
-            )
-        }?;
+        let set_layout = pipelines::set_layout(gpu, BINDINGS, stages)?;
         let set_layouts = [scene_set_layout, set_layout];
         let compute_push = [vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::COMPUTE,
@@ -213,29 +209,9 @@ impl Grass {
                 None,
             )
         }?;
-        let sizes = [vk::DescriptorPoolSize {
-            ty: T::STORAGE_BUFFER,
-            descriptor_count: 7,
-        }];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let own = [set_layout];
-        // SAFETY: the pool was made just above for exactly this one set of seven storage buffers,
-        // and `own` lives to the end of the call.
-        let set = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&own),
-            )
-        }?[0];
+        let mut sets = SetPool::new(gpu, &[(BINDINGS, 1)])?;
+        let set = sets.alloc(gpu, set_layout, BINDINGS)?;
+        let pool = sets.into_raw();
 
         let storage = vk::BufferUsageFlags::STORAGE_BUFFER;
         let tufts = gpu.device_buffer(BAND_CAP.iter().sum::<u32>() as u64 * TUFT_BYTES, storage)?;

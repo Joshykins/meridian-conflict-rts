@@ -228,6 +228,29 @@ In addition:
   - `tests/untrusted_input.rs` feeds corrupted bytes in and must never panic.
 - A panic anywhere in the game writes `crash-<time>.log` beside the settings
   file (`crash.rs`).
+- **A report must be enough to find the cause without asking the player
+  anything.** "The player can see and copy it" is not the bar. Every crash and
+  error report carries:
+  - the source line that failed
+  - the stack that led there
+  - the machine: OS, CPU, memory, GPU and driver
+  - what the game was doing (`crash::context`, the sim tick)
+  - the player's settings
+  - the log
+
+  So:
+  - An error type that crosses crates records where it was raised. `GpuError`
+    does it with `#[track_caller]` on its `From`, so a helper that returns one
+    is `#[track_caller]` too.
+  - A long build or load logs its steps at info, so the log ends on the step
+    that failed.
+  - Something that only one driver or one machine enforces is checked on every
+    machine. A descriptor pool is sized from its layouts' binding lists
+    (`descriptors::SetPool`), never counted by hand.
+  - A new fatal error path is tried with `--crash-test`. Read the report it
+    writes and ask whether you could find the cause from it alone.
+    `scripts/symbolize.sh REPORT` names the `meridian.exe+0x...` frames of a
+    player's report from the build's `.pdb`.
 - Library crates return typed errors. `Result<_, String>` is for the binary's
   top level only.
 - Every env switch and CLI flag is listed in one place: the `--help` text and

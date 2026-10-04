@@ -170,6 +170,22 @@ impl Settings {
             }
             self.set_preset(quality);
         }
+        let (w, h) = renderer.size();
+        crate::crash::context(
+            "graphics",
+            format!(
+                "{} ({}{}), render scale {}, {:?}, output {w}x{h}",
+                self.quality_label(),
+                self.quality.label(),
+                if self.auto_quality {
+                    ", chosen for this card"
+                } else {
+                    ""
+                },
+                self.render_scale,
+                self.antialiasing,
+            ),
+        );
         renderer.set_graphics_quality(
             self.render_scale,
             self.antialiasing.to_renderer(),

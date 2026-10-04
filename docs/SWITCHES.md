@@ -73,7 +73,7 @@ reports and never wait on a window.
 | Switch | Values | Purpose |
 |---|---|---|
 | `--crash-screen FILE` | a report's path, then `--crash-title T`, `--crash-message M`, `--crash-hint H` | The crash screen for a saved report, as a crashed run starts it. With `--screenshot OUT.png` it is drawn headless (at `--size`, `--cursor` hovering), and `OUT-copied.png` just after Copy details. |
-| `--crash-test` | `panic`, `sim`, `native`, `error` | Fail on purpose 8 s after start, to check the crash window over the running game: a panic on the main thread, a panic on a thread the game needs (as the sim thread is), an access violation (Windows), an error that ends the game. |
+| `--crash-test` | `panic`, `sim`, `native`, `error` | Fail on purpose 8 s after start, to check the crash window over the running game: a panic on the main thread, a panic on a thread the game needs (as the sim thread is), an access violation (Windows), an error that ends the game (raised as a failed Vulkan call is, so its report lists it under "errors raised" with its stack). |
 
 ## Builds and channels
 

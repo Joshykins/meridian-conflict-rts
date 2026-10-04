@@ -6,12 +6,15 @@
 //! draw generation, animation) runs in shaders.
 
 use crate::camera::Camera;
+use crate::descriptors::SetPool;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
 use crate::gpu_consts::{cull_list, fade_beam, lod, pass, settle, sprite_layer};
 use crate::ground_cover;
 use crate::models::{self, Legs, MeshVertex, Model, Treads};
 use crate::overlay::{Overlay, OverlayVertex, MAX_OVERLAY_VERTICES};
-use crate::pipelines::{Layouts, Passes, Pipelines, DEPTH_FORMAT, HDR_FORMAT};
+use crate::pipelines::{
+    Layouts, Passes, Pipelines, CULL_SET, DEPTH_FORMAT, HDR_FORMAT, PASS_SET, SCENE_SET, SCREEN_SET,
+};
 use crate::swapchain;
 use crate::terrain::{self, TerrainNode, TerrainUpload, TileCache, MAX_NODES, TILE_LAYERS};
 use crate::textures;
@@ -1159,9 +1162,11 @@ impl Renderer {
         // Shares are measured build time on the RTX 3080 Ti.
         let step = |name: &'static str, done: f32| {
             let (was, since) = last.replace((name, std::time::Instant::now()));
-            log::debug!(
-                "renderer build: {was} {:.0} ms",
-                since.elapsed().as_secs_f32() * 1000.0
+            // At info, so a report of a build that failed ends on the step it failed in.
+            log::info!(
+                "renderer build: {was} {:.0} ms; next: {}",
+                since.elapsed().as_secs_f32() * 1000.0,
+                if name.is_empty() { "done" } else { name }
             );
             progress(name, done);
         };
@@ -1174,8 +1179,7 @@ impl Renderer {
                 height,
                 vsync,
             } => {
-                let extensions =
-                    ash_window::enumerate_required_extensions(*display).map_err(GpuError::Vk)?;
+                let extensions = ash_window::enumerate_required_extensions(*display)?;
                 let gpu = Gpu::new(extensions)?;
                 // SAFETY: `Target::Window` carries the handles of the app's live window, which
                 // it keeps open while it draws with this renderer (`App` drops its renderer
@@ -1993,68 +1997,43 @@ impl Renderer {
         let shafts = shafts::Shafts::new(&gpu, &layouts, &passes)?;
 
         step("Wiring the passes together", 0.96);
-        // Descriptor sets.
-        let pool_sizes = [
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 16,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: 140,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::SAMPLED_IMAGE,
-                descriptor_count: 96,
-            },
-            vk::DescriptorPoolSize {
-                ty: vk::DescriptorType::SAMPLER,
-                descriptor_count: 16,
-            },
-        ];
-        // SAFETY: the device is alive and the create info borrows `pool_sizes`, which lives to
-        // the end of the call.
-        let descriptor_pool = unsafe {
-            gpu.device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(28)
-                    .pool_sizes(&pool_sizes),
-                None,
-            )
-        }?;
-        let alloc = |layout: vk::DescriptorSetLayout| -> Result<vk::DescriptorSet, GpuError> {
-            let layouts = [layout];
-            // SAFETY: the pool and layout are this device's, `layouts` lives to the end of the
-            // call, and the pool is only touched from this thread while the renderer is built.
-            Ok(unsafe {
-                gpu.device.allocate_descriptor_sets(
-                    &vk::DescriptorSetAllocateInfo::default()
-                        .descriptor_pool(descriptor_pool)
-                        .set_layouts(&layouts),
-                )
-            }?[0])
-        };
-        let scene_set = alloc(layouts.scene_set)?;
-        let cull_set = alloc(layouts.cull_set)?;
-        let screen_set = alloc(layouts.screen_set)?;
-        let nodes_set = alloc(layouts.pass_set)?;
-        let marks_set = alloc(layouts.pass_set)?;
-        let ranges_set = alloc(layouts.pass_set)?;
-        let shockwaves_set = alloc(layouts.pass_set)?;
-        let sprites_set = alloc(layouts.pass_set)?;
-        let stains_set = alloc(layouts.pass_set)?;
-        let puffs_set = alloc(layouts.pass_set)?;
-        let shields_set = alloc(layouts.pass_set)?;
-        let hdr_set = alloc(layouts.screen_set)?;
+        // Descriptor sets: the pool holds exactly the sets allocated below.
+        let mut sets = SetPool::new(
+            &gpu,
+            &[
+                (SCENE_SET, 1),
+                (CULL_SET, 1),
+                // screen, hdr, a bloom set a level, two glass, water, hull
+                (SCREEN_SET, 6 + BLOOM_LEVELS as u32),
+                // nodes, marks, ranges, shockwaves, sprites, stains, puffs, shields, sea
+                (PASS_SET, 9),
+            ],
+        )?;
+        let scene_set = sets.alloc(&gpu, layouts.scene_set, SCENE_SET)?;
+        let cull_set = sets.alloc(&gpu, layouts.cull_set, CULL_SET)?;
+        let screen_set = sets.alloc(&gpu, layouts.screen_set, SCREEN_SET)?;
+        let nodes_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let marks_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let ranges_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let shockwaves_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let sprites_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let stains_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let puffs_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let shields_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let hdr_set = sets.alloc(&gpu, layouts.screen_set, SCREEN_SET)?;
         let bloom_sets = (0..BLOOM_LEVELS)
-            .map(|_| alloc(layouts.screen_set))
+            .map(|_| sets.alloc(&gpu, layouts.screen_set, SCREEN_SET))
             .collect::<Result<Vec<_>, _>>()?;
-        let glass_sets = [alloc(layouts.screen_set)?, alloc(layouts.screen_set)?];
-        let water_set = alloc(layouts.screen_set)?;
-        let hull_set = alloc(layouts.screen_set)?;
+        let glass_sets = [
+            sets.alloc(&gpu, layouts.screen_set, SCREEN_SET)?,
+            sets.alloc(&gpu, layouts.screen_set, SCREEN_SET)?,
+        ];
+        let water_set = sets.alloc(&gpu, layouts.screen_set, SCREEN_SET)?;
+        let hull_set = sets.alloc(&gpu, layouts.screen_set, SCREEN_SET)?;
         // What the water reads of the effects on it (renderer/water_fx.rs), in both bindings of a pass set.
         let sea_fx = gpu.host_buffer(water_fx::SEA_FX_BYTES as u64, storage)?;
-        let sea_set = alloc(layouts.pass_set)?;
+        let sea_set = sets.alloc(&gpu, layouts.pass_set, PASS_SET)?;
+        let descriptor_pool = sets.into_raw();
 
         let write_buffers =
             |set: vk::DescriptorSet, first: u32, ty: vk::DescriptorType, buffers: &[&Buffer]| {
@@ -2065,7 +2044,7 @@ impl Renderer {
                         .dst_binding(first + i as u32)
                         .descriptor_type(ty)
                         .buffer_info(&info)];
-                    // SAFETY: `set` is a fresh set from `alloc` that no command buffer uses
+                    // SAFETY: `set` is a fresh set from `sets` that no command buffer uses
                     // yet, `b` is a live buffer of this device, and `write`/`info` live to the
                     // end of the call.
                     unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
@@ -2083,7 +2062,7 @@ impl Renderer {
                     .dst_binding(binding)
                     .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
                     .image_info(&info)];
-                // SAFETY: `set` is a fresh set from `alloc` that no command buffer uses yet,
+                // SAFETY: `set` is a fresh set from `sets` that no command buffer uses yet,
                 // `view` is a live view of this device, and `write`/`info` live to the end of
                 // the call.
                 unsafe { gpu.device.update_descriptor_sets(&write, &[]) };
@@ -2099,7 +2078,7 @@ impl Renderer {
                 .dst_binding(binding)
                 .descriptor_type(vk::DescriptorType::SAMPLER)
                 .image_info(&info)];
-            // SAFETY: `set` is a fresh set from `alloc` that no command buffer uses yet,
+            // SAFETY: `set` is a fresh set from `sets` that no command buffer uses yet,
             // `sampler` is a live sampler of this device, and `write`/`info` live to the end of
             // the call.
             unsafe { gpu.device.update_descriptor_sets(&write, &[]) };

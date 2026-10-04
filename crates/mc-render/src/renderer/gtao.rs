@@ -6,6 +6,7 @@
 //! occlusion (written, then read), 4 the blurred result. Both images stay in
 //! the GENERAL layout.
 
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
 use crate::pipelines;
 use ash::vk;
@@ -67,36 +68,21 @@ pub(super) fn storage_image(
     Ok(image)
 }
 
+/// The set: the frame's uniforms, the depth, the raw AO (written, then read by the blur)
+/// and the blurred AO.
+const BINDINGS: &[Binding] = &[
+    (0, vk::DescriptorType::UNIFORM_BUFFER),
+    (1, vk::DescriptorType::SAMPLED_IMAGE),
+    (2, vk::DescriptorType::STORAGE_IMAGE),
+    (3, vk::DescriptorType::SAMPLED_IMAGE),
+    (4, vk::DescriptorType::STORAGE_IMAGE),
+];
+
 impl Gtao {
     pub(super) fn new(gpu: &Gpu, globals: &Buffer) -> Result<Gtao, GpuError> {
         let dev = &gpu.device;
         use vk::DescriptorType as T;
-        let types = [
-            T::UNIFORM_BUFFER,
-            T::SAMPLED_IMAGE,
-            T::STORAGE_IMAGE,
-            T::SAMPLED_IMAGE,
-            T::STORAGE_IMAGE,
-        ];
-        let bindings: Vec<_> = types
-            .iter()
-            .enumerate()
-            .map(|(b, &ty)| {
-                vk::DescriptorSetLayoutBinding::default()
-                    .binding(b as u32)
-                    .descriptor_type(ty)
-                    .descriptor_count(1)
-                    .stage_flags(vk::ShaderStageFlags::COMPUTE)
-            })
-            .collect();
-        // SAFETY: the device is alive and the create info borrows `bindings`, which lives to
-        // the end of the call.
-        let set_layout = unsafe {
-            dev.create_descriptor_set_layout(
-                &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
-                None,
-            )
-        }?;
+        let set_layout = pipelines::set_layout(gpu, BINDINGS, vk::ShaderStageFlags::COMPUTE)?;
         let push = [vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::COMPUTE,
             offset: 0,
@@ -113,38 +99,9 @@ impl Gtao {
                 None,
             )
         }?;
-        let sizes = [
-            vk::DescriptorPoolSize {
-                ty: T::UNIFORM_BUFFER,
-                descriptor_count: 1,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::SAMPLED_IMAGE,
-                descriptor_count: 2,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::STORAGE_IMAGE,
-                descriptor_count: 2,
-            },
-        ];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        // SAFETY: the pool was made just above with room for exactly this one set, and
-        // `set_layouts` lives to the end of the call.
-        let set = unsafe {
-            dev.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&set_layouts),
-            )
-        }?[0];
+        let mut sets = SetPool::new(gpu, &[(BINDINGS, 1)])?;
+        let set = sets.alloc(gpu, set_layout, BINDINGS)?;
+        let pool = sets.into_raw();
         let info = [globals.info()];
         let write = [vk::WriteDescriptorSet::default()
             .dst_set(set)

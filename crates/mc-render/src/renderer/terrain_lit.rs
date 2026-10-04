@@ -10,9 +10,10 @@
 //!
 //! Set 2 of `layouts.water`: 0 the lit image, 1 the scene's depth.
 
+use crate::descriptors::SetPool;
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
 use crate::gpu_consts::pass;
-use crate::pipelines::HDR_FORMAT;
+use crate::pipelines::{HDR_FORMAT, SCREEN_SET};
 use ash::vk;
 
 /// What any pass needs to draw the terrain's nodes (terrain.wgsl `vs_main`), while
@@ -124,30 +125,11 @@ pub(super) struct TerrainLit {
 
 impl TerrainLit {
     pub(super) fn new(gpu: &Gpu, set_layout: vk::DescriptorSetLayout) -> Result<Self, GpuError> {
-        let sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::SAMPLED_IMAGE,
-            descriptor_count: 2,
-        }];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            gpu.device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(1)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let layouts = [set_layout];
-        // SAFETY: the pool was made just above with room for this one set; only bindings 0
-        // and 1 of the screen set are ever written (both sampled images), and `layouts`
-        // lives to the end of the call.
-        let set = unsafe {
-            gpu.device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::default()
-                    .descriptor_pool(pool)
-                    .set_layouts(&layouts),
-            )
-        }?[0];
+        // Only bindings 0 and 1 of the screen set are written (both sampled images), but
+        // the pool holds the whole set: AMD refuses a set its pool has no room for.
+        let mut sets = SetPool::new(gpu, &[(SCREEN_SET, 1)])?;
+        let set = sets.alloc(gpu, set_layout, SCREEN_SET)?;
+        let pool = sets.into_raw();
         Ok(TerrainLit {
             pool,
             set,

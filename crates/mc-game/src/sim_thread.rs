@@ -558,6 +558,24 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                                 Ok(w) => Some(w),
                                 Err(e) => return fail(e.to_string()),
                             };
+                            if let Some(w) = &world {
+                                let kind = if net.is_some() {
+                                    "a network match"
+                                } else if scrub.is_some() {
+                                    "a replay"
+                                } else {
+                                    "on this machine"
+                                };
+                                crate::crash::context(
+                                    "match",
+                                    format!(
+                                        "{:?}, {} sides, fog {}, {kind}, playing as {local:?}",
+                                        setup.map.name(),
+                                        w.state.players.len(),
+                                        if fog { "on" } else { "off" },
+                                    ),
+                                );
+                            }
                             if let Some(survival) = options.survival {
                                 if let Err(e) = world.as_mut().unwrap().begin_survival(survival) {
                                     return fail(e.to_string());
@@ -614,6 +632,7 @@ pub fn spawn(setup: SimSetup, mut session: Box<dyn Session + Send>) -> SimHandle
                             };
                             if !held {
                                 session.report_hash(bundle.tick, hash);
+                                crate::crash::sim_tick(bundle.tick);
                                 if let Some(r) = &mut recorder {
                                     r.hash(bundle.tick, hash);
                                 }

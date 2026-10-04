@@ -22,6 +22,7 @@ mod shade;
 mod targets;
 
 use crate::camera::Camera;
+use crate::descriptors::{Binding, SetPool};
 use crate::gpu::{Buffer, Gpu, GpuError, Image, ImageDesc};
 use crate::pipelines::{
     self, Blend, Depth, Layouts, Passes, PipelineDesc, VertexKind, CLOUD_MARCH_FORMAT, HDR_FORMAT,
@@ -34,6 +35,31 @@ use mc_data::weather::{Weather, WeatherPreset};
 /// Texels a side of the weather map, whatever the map's size.
 pub const WEATHER_RES: u32 = 1024;
 /// Texels across the clouds' shade on the land (clouds.wgsl `cs_shade`).
+/// The weather step's set: the atmosphere, the state and flow it reads, the two it
+/// writes, a sampler, the disturbers and storms, and the noise it bakes.
+const SIM_SET: &[Binding] = &[
+    (0, vk::DescriptorType::UNIFORM_BUFFER),
+    (1, vk::DescriptorType::SAMPLED_IMAGE),
+    (2, vk::DescriptorType::SAMPLED_IMAGE),
+    (3, vk::DescriptorType::STORAGE_IMAGE),
+    (4, vk::DescriptorType::STORAGE_IMAGE),
+    (5, vk::DescriptorType::SAMPLER),
+    (6, vk::DescriptorType::STORAGE_BUFFER),
+    (7, vk::DescriptorType::STORAGE_BUFFER),
+    (8, vk::DescriptorType::STORAGE_IMAGE),
+];
+
+/// The clouds' drawing set: the images the march and composite read, and the shade
+/// map the shade pass writes.
+const DRAW_SET: &[Binding] = &[
+    (0, vk::DescriptorType::SAMPLED_IMAGE),
+    (1, vk::DescriptorType::SAMPLED_IMAGE),
+    (2, vk::DescriptorType::SAMPLED_IMAGE),
+    (3, vk::DescriptorType::SAMPLED_IMAGE),
+    (4, vk::DescriptorType::SAMPLED_IMAGE),
+    (5, vk::DescriptorType::STORAGE_IMAGE),
+];
+
 const SHADE_RES: u32 = 512;
 const NOISE_RES: u32 = 128;
 pub const MAX_DISTURBERS: usize = 128;
@@ -692,52 +718,10 @@ impl Sky {
         )?;
 
         use vk::DescriptorType as T;
-        let set_layout = |bindings: &[(u32, vk::DescriptorType)], stages| {
-            let b: Vec<_> = bindings
-                .iter()
-                .map(|&(binding, ty)| {
-                    vk::DescriptorSetLayoutBinding::default()
-                        .binding(binding)
-                        .descriptor_type(ty)
-                        .descriptor_count(1)
-                        .stage_flags(stages)
-                })
-                .collect();
-            // SAFETY: the device is alive and the create info borrows `b`, which lives to the
-            // end of the call.
-            unsafe {
-                dev.create_descriptor_set_layout(
-                    &vk::DescriptorSetLayoutCreateInfo::default().bindings(&b),
-                    None,
-                )
-            }
-        };
-        let sim_layout = set_layout(
-            &[
-                (0, T::UNIFORM_BUFFER),
-                (1, T::SAMPLED_IMAGE),
-                (2, T::SAMPLED_IMAGE),
-                (3, T::STORAGE_IMAGE),
-                (4, T::STORAGE_IMAGE),
-                (5, T::SAMPLER),
-                (6, T::STORAGE_BUFFER),
-                (7, T::STORAGE_BUFFER),
-                (8, T::STORAGE_IMAGE),
-            ],
-            vk::ShaderStageFlags::COMPUTE,
-        )?;
+        let sim_layout = crate::pipelines::set_layout(gpu, SIM_SET, vk::ShaderStageFlags::COMPUTE)?;
         let gfx = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
-        let draw_layout = set_layout(
-            &[
-                (0, T::SAMPLED_IMAGE),
-                (1, T::SAMPLED_IMAGE),
-                (2, T::SAMPLED_IMAGE),
-                (3, T::SAMPLED_IMAGE),
-                (4, T::SAMPLED_IMAGE),
-                (5, T::STORAGE_IMAGE),
-            ],
-            gfx | vk::ShaderStageFlags::COMPUTE,
-        )?;
+        let draw_layout =
+            crate::pipelines::set_layout(gpu, DRAW_SET, gfx | vk::ShaderStageFlags::COMPUTE)?;
         let pipeline_layout = |sets: &[vk::DescriptorSetLayout], stages| {
             let push = [vk::PushConstantRange {
                 stage_flags: stages,
@@ -758,51 +742,17 @@ impl Sky {
         let sim_pipeline_layout = pipeline_layout(&[sim_layout], vk::ShaderStageFlags::COMPUTE)?;
         let draw_pipeline_layout = pipeline_layout(&[layouts.scene_set, draw_layout], gfx)?;
 
-        let sizes = [
-            vk::DescriptorPoolSize {
-                ty: T::UNIFORM_BUFFER,
-                descriptor_count: 2,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::SAMPLED_IMAGE,
-                descriptor_count: 16,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::STORAGE_IMAGE,
-                descriptor_count: 8,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::SAMPLER,
-                descriptor_count: 2,
-            },
-            vk::DescriptorPoolSize {
-                ty: T::STORAGE_BUFFER,
-                descriptor_count: 4,
-            },
+        // Two of each: the weather steps from one state image to the other and back.
+        let mut sets = SetPool::new(gpu, &[(SIM_SET, 2), (DRAW_SET, 2)])?;
+        let sim_sets = [
+            sets.alloc(gpu, sim_layout, SIM_SET)?,
+            sets.alloc(gpu, sim_layout, SIM_SET)?,
         ];
-        // SAFETY: the device is alive and `sizes` lives to the end of the call.
-        let pool = unsafe {
-            dev.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::default()
-                    .max_sets(4)
-                    .pool_sizes(&sizes),
-                None,
-            )
-        }?;
-        let alloc = |layout: vk::DescriptorSetLayout| -> Result<vk::DescriptorSet, GpuError> {
-            let layouts = [layout];
-            // SAFETY: the pool was made just above for these four sets (two of each layout),
-            // within its per-type counts; `layouts` lives to the end of the call.
-            Ok(unsafe {
-                dev.allocate_descriptor_sets(
-                    &vk::DescriptorSetAllocateInfo::default()
-                        .descriptor_pool(pool)
-                        .set_layouts(&layouts),
-                )
-            }?[0])
-        };
-        let sim_sets = [alloc(sim_layout)?, alloc(sim_layout)?];
-        let draw_sets = [alloc(draw_layout)?, alloc(draw_layout)?];
+        let draw_sets = [
+            sets.alloc(gpu, draw_layout, DRAW_SET)?,
+            sets.alloc(gpu, draw_layout, DRAW_SET)?,
+        ];
+        let pool = sets.into_raw();
 
         let general = vk::ImageLayout::GENERAL;
         for (i, set) in sim_sets.iter().enumerate() {
