@@ -137,10 +137,12 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   the side's energy demand that is covered (behind the focus, if one is on): at worst a
   quarter of its output (`UNPOWERED` in `mines.rs`), so a side out of energy loses most of
   its mass too. A mass stall does not slow the mines, or it would feed itself.
-- Reactors: 15 / 350 / 2000 energy/s for 75 / 700 / 2800 mass: 5 / 2 / 1.4 mass per energy a
+- Reactors: 25 / 350 / 2000 energy/s for 125 / 700 / 2800 mass: 5 / 2 / 1.4 mass per energy a
   second, so each tier is far cheaper per unit of energy than the one below. A field of tier 1
   reactors is the stopgap of the opening, not the way to power a side (the user, 2026-09-30:
   "t1 pgens are too good of a deal"; they were 20 / 250 / 1500, only a third dearer than tier 2).
+  On 2026-10-04 tier 1 went from 15/s to 25/s with its whole price (mass, energy, time)
+  scaled by the same 5/3, so the mass per energy held.
 - Every tier upgrade, structure or engineer, pays only what the new tier costs over the old
   one (`Blueprints::upgrade_cost`: Mason to Mason II 148 mass / 940 energy, core mine tier 1
   to 2 705 / 4,230). A refit kit is paid in full.
@@ -174,7 +176,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   would save a building it rings all the way round, times the share of that building's
   perimeter the two share, so every side covered adds more until the building is ringed;
   there is no other cap. The full-ring saving scales with the fourth root of what the
-  provider makes (`mc_data::Adjacency::ring`): energy 60% at 2000/s, so T1 (15/s) 18%,
+  provider makes (`mc_data::Adjacency::ring`): energy 60% at 2000/s, so T1 (25/s) 20%,
   T2 (350/s) 39%, T3 60%; materials 40% at 5/s, so T2 (1.5/s) 30%, T3 40%. Mixed rings add
   up side by side. A fabricator and a power
   plant of its tech that touch are bound: when one is destroyed (not reclaimed) the other

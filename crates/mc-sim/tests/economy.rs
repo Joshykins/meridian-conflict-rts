@@ -87,9 +87,9 @@ fn race(mines: Priority, power: Priority) -> (f64, f64, mc_sim::tables::Player) 
 fn race_with(first: &str, mines: Priority, power: Priority) -> (f64, f64, mc_sim::tables::Player) {
     let mut w = world();
     spawn(&mut w, "aster_t1_power", 300, 300, 1000);
-    // The reactor makes 15 a second; turned up to 20, so the reactor site's 18 fits and
+    // The reactor makes 25 a second; turned down to 20, so the reactor site's 18 fits and
     // leaves a little for the factory.
-    w.state.players[0].income_permille[1] = 1334;
+    w.state.players[0].income_permille[1] = 800;
     spawn(&mut w, "aster_mass_storage", 330, 300, 1000);
     let reactor = spawn(&mut w, first, 500, 500, 100);
     let factory = spawn(&mut w, "aster_t1_land_factory", 600, 500, 100);

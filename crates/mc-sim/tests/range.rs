@@ -344,7 +344,7 @@ fn stores_income_and_wrecks_can_be_set_up() {
     })])
     .unwrap();
     assert!(
-        p(&w).energy < Fx::from_int(5),
+        p(&w).energy <= made * 2 / mc_core::TICKS_PER_SECOND as i32,
         "emptied, bar one tick of income"
     );
     assert_eq!(p(&w).mass, Fx::from_int(1000));

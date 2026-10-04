@@ -113,10 +113,10 @@ fn ring(w: &World, key: &str, r: Resource) -> f32 {
 fn a_full_ring_saves_more_the_more_a_provider_makes() {
     let w = world();
     for (key, r, want) in [
-        ("aster_t1_power", Resource::Energy, 0.177),
+        ("aster_t1_power", Resource::Energy, 0.2006),
         ("aster_t2_power", Resource::Energy, 0.388),
         ("aster_t3_power", Resource::Energy, 0.6),
-        ("regency_t1_power", Resource::Energy, 0.177),
+        ("regency_t1_power", Resource::Energy, 0.2006),
         ("aster_t2_fabricator", Resource::Mass, 0.296),
         ("aster_t3_fabricator", Resource::Mass, 0.4),
     ] {
