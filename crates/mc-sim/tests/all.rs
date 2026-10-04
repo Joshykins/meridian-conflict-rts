@@ -21,6 +21,7 @@ mod bore_and_seabed;
 mod broadside;
 mod build_line;
 mod citadel;
+mod city;
 mod cluster_shot;
 mod combat;
 mod commander;

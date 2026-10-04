@@ -185,6 +185,7 @@ fn main() {
                     after: Fx::ZERO,
                     on_unit: true,
                     on_shield: false,
+                    on_structure: None,
                     blueprint: id,
                     weapon: 0,
                 });

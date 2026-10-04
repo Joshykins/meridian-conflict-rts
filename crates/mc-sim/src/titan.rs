@@ -424,6 +424,10 @@ impl World {
                 let edge = ((d * 2 - reach) / reach.max(Fx::ONE)).clamp(Fx::ZERO, Fx::ONE);
                 per_tick * (Fx::ONE - edge * Fx::ratio(3, 5))
             });
+            self.blast_structures(point, reach, crate::city::Blow::BLAST, |d| {
+                let edge = ((d * 2 - reach) / reach.max(Fx::ONE)).clamp(Fx::ZERO, Fx::ONE);
+                per_tick * (Fx::ONE - edge * Fx::ratio(3, 5))
+            });
             // It vaporises the woods as it spreads, and scorches the ground.
             if storm.age % 3 == 0 {
                 let mut trees = Vec::new();

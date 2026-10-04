@@ -184,6 +184,7 @@ mod survival_shots {
                                     after: Fx::from_f32(0.3),
                                     on_unit: false,
                                     on_shield: true,
+                                    on_structure: None,
                                     blueprint: tank_bp,
                                     weapon: 0,
                                 });

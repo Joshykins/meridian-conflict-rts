@@ -1218,6 +1218,19 @@ impl World {
                 Fx::ZERO
             }
         });
+        // City blocks go under the front as it passes them, dome or no dome.
+        let blow = crate::city::Blow {
+            share: crate::city::NUCLEAR_SHARE,
+            ignite: false,
+            domes: false,
+        };
+        self.blast_structures(origin, front, blow, |reach| {
+            if reach >= from {
+                blast.damage_at(reach)
+            } else {
+                Fx::ZERO
+            }
+        });
         let tree_from = from * TREE_REACH;
         let mut felled = Vec::new();
         self.prop_index.query(center, tree_front, kind::PROP, |e| {

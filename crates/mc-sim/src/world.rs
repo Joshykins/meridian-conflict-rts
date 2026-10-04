@@ -101,6 +101,9 @@ pub struct State {
     pub terrain_edits: Vec<TerrainEdit>,
     /// One bit per map prop: set once the prop has been destroyed.
     pub props_dead: Vec<u64>,
+    /// City structures' health and fires (`city.rs`).
+    #[serde(default)]
+    pub city: crate::city::Structures,
     pub ai: Vec<AiState>,
     /// Commands the AI decided on last tick; applied with this tick's player commands.
     pub ai_pending: Vec<PlayerCommand>,
@@ -152,6 +155,8 @@ pub struct World {
     pub index: SpatialIndex,
     /// Map props; built once.
     pub prop_index: SpatialIndex,
+    /// Where the city's structures stand, and the buckets that find them (`city.rs`); built once.
+    pub city_shapes: crate::city::CityShapes,
     pub fog: Fog,
     pub nav: Nav,
     /// What happened this tick, for effects, audio and UI. Not state.
@@ -394,6 +399,7 @@ impl World {
 
         let mut nav = Nav::new(&terrain, pool.clone())?;
         crate::lots::block_buildings(&mut nav, &map.props, size);
+        let (city, city_shapes) = crate::city::build(&map.props, &terrain);
         let state = State {
             tick: 0,
             rng: Rng::new(config.seed),
@@ -417,6 +423,7 @@ impl World {
             pads: Pads::default(),
             terrain_edits: Vec::new(),
             props_dead: vec![0; map.props.len().div_ceil(64)],
+            city,
             ai_pending: Vec::new(),
             winner: None,
             mines: Default::default(),
@@ -434,6 +441,7 @@ impl World {
             map,
             index: SpatialIndex::new(size),
             prop_index,
+            city_shapes,
             fog: Fog::new(size),
             nav,
             ore,
@@ -786,6 +794,10 @@ impl World {
             let _t = mc_core::perf_span!("fn.run_strategic");
             self.run_strategic()?;
         }
+        {
+            let _t = mc_core::perf_span!("fn.run_city_fires");
+            self.run_city_fires();
+        }
         phase(&mut self.timings, "projectiles");
 
         {
@@ -1042,6 +1054,8 @@ impl World {
             .map_err(SimError::Snapshot)?;
         if state.players.len() != self.state.players.len()
             || state.props_dead.len() != self.state.props_dead.len()
+            || state.city.prop != self.state.city.prop
+            || state.city.max != self.state.city.max
         {
             return Err(SimError::Snapshot(
                 "snapshot is from a different match".into(),

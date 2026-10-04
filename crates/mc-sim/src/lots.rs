@@ -6,7 +6,7 @@ use crate::nav::Nav;
 use crate::tables::*;
 use crate::world::{hull_cells, place_cells_of};
 use crate::World;
-use mc_core::{Angle, FxVec2};
+use mc_core::{Angle, Fx, FxVec2, FxVec3};
 use mc_data::{BlueprintId, UnitBlueprint};
 use mc_map::Prop;
 
@@ -106,8 +106,11 @@ impl World {
                 }
             }
             let map_size = self.terrain.size_metres();
-            for p in &self.map.props {
-                if !(p.kind.is_building() || !p.kind.solid_plan().is_empty()) {
+            for (i, p) in self.map.props.iter().enumerate() {
+                // A city block that came down left rubble its cells stay open over.
+                if !(p.kind.is_building() || !p.kind.solid_plan().is_empty())
+                    || !self.is_prop_alive(i)
+                {
                     continue;
                 }
                 for cells in prop_cells(p, map_size) {
@@ -118,6 +121,43 @@ impl World {
             }
             restore
         };
+        for (min, max) in restore {
+            self.nav.block_cells(min, max);
+        }
+    }
+
+    /// Opens the cells map prop `prop` (a city structure that came down, its
+    /// footprint `reach` round `middle`) blocked, save those a live neighbour
+    /// still stands on: another structure, or a solid prop that is not one.
+    pub(crate) fn open_prop_cells(&mut self, prop: usize, middle: FxVec3, reach: Fx) {
+        let map_size = self.terrain.size_metres();
+        let released = prop_cells(&self.map.props[prop], map_size);
+        for &(min, max) in &released {
+            self.nav.unblock_cells(min, max);
+        }
+        let mut restore = Vec::new();
+        let mut keep = |p: &Prop| {
+            for cells in prop_cells(p, map_size) {
+                if released.iter().any(|&r| cells_overlap(r, cells)) {
+                    restore.push(cells);
+                }
+            }
+        };
+        // The cells a part covers have their centres in it: a neighbour sharing
+        // one reaches within a cell of this footprint.
+        let near = self.city_shapes.near(
+            &self.state.city,
+            middle,
+            reach + Fx::from_int(mc_map::CELL_SIZE_M * 2),
+        );
+        for (row, _, _) in near {
+            keep(&self.map.props[self.state.city.prop[row] as usize]);
+        }
+        for &other in &self.city_shapes.other_solids {
+            if self.is_prop_alive(other as usize) {
+                keep(&self.map.props[other as usize]);
+            }
+        }
         for (min, max) in restore {
             self.nav.block_cells(min, max);
         }

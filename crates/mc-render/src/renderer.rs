@@ -5053,6 +5053,7 @@ impl Renderer {
                 after,
                 on_unit,
                 on_shield,
+                on_structure: _,
                 blueprint,
                 weapon,
             } => {
@@ -5681,6 +5682,7 @@ mod environment_tests {
             after: mc_core::Fx::ZERO,
             on_unit: false,
             on_shield: true,
+            on_structure: None,
             blueprint,
             weapon: 0,
         });

@@ -139,6 +139,7 @@ impl World {
                     h.write_u64(e.sample as u64 | (e.faction as u64) << 16);
                 }
                 h.write_u64s(&s.props_dead);
+                s.city.hash(h);
             },
             &|h| {
                 for ai in &s.ai {

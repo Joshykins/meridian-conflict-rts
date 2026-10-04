@@ -46,6 +46,7 @@ impl State {
         columns("stains", &self.stains)?;
         columns("fires", &self.fires)?;
         columns("pads", &self.pads)?;
+        self.city.validate()?;
         Ok(())
     }
 

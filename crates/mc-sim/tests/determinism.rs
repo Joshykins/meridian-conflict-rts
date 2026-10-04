@@ -2,7 +2,7 @@
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
 //! curving charges, a wake tank's cone, a warp into a dampener and the stun it leaves, wrecks worn down by
 //! blasts, two factories' linked batch forming up, a self-destruct counting down across
-//! the snapshot) must hash identically at every worker count and after a snapshot is
+//! the snapshot, city blocks shot, set alight and brought down) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -47,7 +47,7 @@ fn world(threads: usize) -> World {
         content_id: 1,
         ore: Vec::new(),
         starts: vec![FxVec2::from_ints(800, 500), FxVec2::from_ints(800, 3600)],
-        props: Vec::new(),
+        props: city(),
     };
     let player = |name: &str, team| PlayerSetup {
         name: name.into(),
@@ -72,6 +72,43 @@ fn world(threads: usize) -> World {
         &config,
     )
     .unwrap()
+}
+
+/// City blocks (`city.rs`): houses round where the warhead lands, which it brings
+/// down; worn houses and a wall among the north's buildings, which the strike
+/// missiles and the map guns set alight; a row of blocks across the middle.
+fn city() -> Vec<mc_map::Prop> {
+    use mc_map::{Prop, PropKind};
+    let at = |kind, x, y, heading: u16, wear_milli| Prop {
+        kind,
+        pos: FxVec2::from_ints(x, y),
+        heading: Angle(heading),
+        scale_milli: 1000,
+        wear_milli,
+    };
+    let mut props = vec![
+        at(PropKind::CityHouse, 840, 3300, 0, 0),
+        at(PropKind::CityHouse, 960, 3300, 0, 300),
+        at(PropKind::CityTenement, 900, 3390, 0x4000, 0),
+        at(PropKind::CityOffice, 900, 3200, 0x2000, 0),
+        at(PropKind::CityHouse, 450, 3750, 0, 500),
+        at(PropKind::CityHouse, 600, 3760, 0x1000, 500),
+        at(PropKind::CityRowhouses, 850, 3700, 0, 500),
+        at(PropKind::CityWall, 1100, 3600, 0, 0),
+        at(PropKind::CityWallTower, 1180, 3600, 0, 200),
+        // In front of the gunner's tank (`GUNNER`).
+        at(PropKind::CityHouse, 380, 1000, 0, 0),
+    ];
+    for i in 0..8 {
+        props.push(at(
+            PropKind::CityApartments,
+            500 + 130 * i,
+            2048,
+            0,
+            100 * i as u16,
+        ));
+    }
+    props
 }
 
 /// What each side fields, and where: (unit, count, x, distance from home).
@@ -141,6 +178,9 @@ fn setup(w: &mut World) {
         for &(key, count, x, y) in ARMY {
             add(key, count, x, y);
         }
+        if player == 0 {
+            add("aster_t1_tank", 1, GUNNER.0, GUNNER.1);
+        }
         // Room for what the Reclaimers bring in.
         add("aster_mass_storage", 1, 500, 150);
         match player {
@@ -186,6 +226,9 @@ fn setup(w: &mut World) {
     });
     w.tick(&spawns).unwrap();
 }
+
+/// A tank of the south's that, from tick 3, shoots at the ground behind a house.
+const GUNNER: (i32, i32) = (300, 1000);
 
 /// Where the warhead lands, and a field of wrecks lies.
 const WRECK_FIELD: FxVec2 = FxVec2::from_ints(900, 3300);
@@ -328,6 +371,25 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             }]
         }
+        // The gunner fires on the ground beyond its house: its shells meet the house.
+        3 => {
+            let u = &w.state.units;
+            let spot = FxVec2::from_ints(GUNNER.0, GUNNER.1);
+            let gunner = u
+                .slots
+                .iter()
+                .find(|&r| u.owner[r] == 0 && u.pos[r].distance(spot) < Fx::from_int(30))
+                .map(|r| u.id(r))
+                .unwrap();
+            vec![PlayerCommand {
+                player: 0,
+                command: Command::AttackGround {
+                    units: vec![gunner],
+                    pos: FxVec2::from_ints(460, 1000),
+                    queue: false,
+                },
+            }]
+        }
         // A timed self-destruct still counting down when the snapshot is taken.
         t if t == SNAPSHOT_AT - 20 => vec![PlayerCommand {
             player: 1,
@@ -363,6 +425,7 @@ fn reference() -> Vec<u64> {
     let (mut last_held, mut batches_sent, mut held_at_snapshot) = (0, 0, 0);
     let courier = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
     let mut stunned_at_snapshot = false;
+    let (mut on_blocks, mut alight, mut down) = (0, 0, 0);
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -405,6 +468,17 @@ fn reference() -> Vec<u64> {
                 .iter()
                 .filter(|e| matches!(e, mc_sim::SimEvent::Impact { blueprint, .. } if *blueprint == quiver))
                 .count();
+            for e in &w.events {
+                match e {
+                    mc_sim::SimEvent::Impact {
+                        on_structure: Some(_),
+                        ..
+                    } => on_blocks += 1,
+                    mc_sim::SimEvent::StructureAlight { .. } => alight += 1,
+                    mc_sim::SimEvent::StructureCollapsed { .. } => down += 1,
+                    _ => {}
+                }
+            }
             split += w
                 .events
                 .iter()
@@ -413,6 +487,11 @@ fn reference() -> Vec<u64> {
             hash
         })
         .collect();
+    eprintln!("determinism: city {on_blocks} shots on blocks, {alight} alight, {down} down");
+    // City blocks took shots, caught fire and came down.
+    assert!(on_blocks > 0, "no shot met a city block");
+    assert!(alight > 0, "no city block caught fire");
+    assert!(down > 0, "no city block came down");
     // The factory's scouts formed up, waited across the snapshot and left together.
     assert!(held_at_snapshot > 0, "no batch was waiting at the snapshot");
     assert!(batches_sent > 0, "no batch filled and left");

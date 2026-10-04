@@ -187,6 +187,20 @@ impl World {
             }
         }
 
+        // The city blocks it rolls over, each once: as the front passes its middle.
+        let blocks = self
+            .city_shapes
+            .near(&self.state.city, middle.extend(wake.from.z), reach);
+        for (row, _, _) in blocks {
+            let (mid, size, _) = self.city_shapes.outline(row);
+            let (out, outside) = from_fan(mid.xy() - from, dir, edge);
+            if out > behind && out <= ahead && outside <= size {
+                let out = out.clamp(Fx::ZERO, range) / range;
+                let damage = weapon.damage * (Fx::ONE - (Fx::ONE - cone.edge) * out);
+                self.damage_structure(row, damage * crate::city::Blow::BLAST.share, false);
+            }
+        }
+
         // The trees it rolls over burn down (the renderer sets them alight, `wake_fx`).
         let mut trees = Vec::new();
         self.prop_index.query(middle, reach, kind::PROP, |e| {

@@ -82,6 +82,7 @@ fn main() {
                     after,
                     on_unit: false,
                     on_shield: false,
+                    on_structure: None,
                     blueprint: id,
                     weapon: 0,
                 });
@@ -142,6 +143,7 @@ fn main() {
                 after: Fx::ZERO,
                 on_unit: true,
                 on_shield: false,
+                on_structure: None,
                 blueprint: raptor,
                 weapon: 0,
             });
@@ -209,6 +211,7 @@ fn main() {
                 after: Fx::ZERO,
                 on_unit: false,
                 on_shield: false,
+                on_structure: None,
                 blueprint: kraken,
                 weapon: cells as u8,
             });
@@ -319,6 +322,7 @@ fn main() {
                 after: Fx::ZERO,
                 on_unit: false,
                 on_shield: true,
+                on_structure: None,
                 blueprint: id,
                 weapon: 0,
             });

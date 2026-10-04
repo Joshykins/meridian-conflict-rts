@@ -6,6 +6,7 @@
 //! The sweeps are read-only and run in parallel over fixed-size chunks of the
 //! projectile table; impacts are applied after, in hit order.
 
+use crate::city::{Blow, KINETIC_SHARE};
 use crate::combat::{CHUNK, GRAVITY};
 use crate::mirror::SimEvent;
 use crate::shields::{in_dome, ray_dome};
@@ -21,6 +22,9 @@ struct Hit {
     unit: Option<usize>,
     /// A dome that stopped the shot. Mutually exclusive with `unit`.
     shield: Option<usize>,
+    /// The city structure (`city.rs` row) the shot ran into. Mutually exclusive
+    /// with `unit` and `shield`.
+    structure: Option<usize>,
     /// Share of this tick's step flown before the hit.
     after: Fx,
     /// Where the hit shows: `point` can lie deep inside a unit (the sweep finds
@@ -178,6 +182,7 @@ impl World {
                 point,
                 unit: None,
                 shield: None,
+                structure: None,
                 after: t,
                 seen: point,
             });
@@ -191,6 +196,7 @@ impl World {
                 point,
                 unit: None,
                 shield: None,
+                structure: None,
                 after: t,
                 seen: point,
             });
@@ -207,6 +213,7 @@ impl World {
                 point,
                 unit: None,
                 shield: None,
+                structure: None,
                 after: best_t.clamp(Fx::ZERO, Fx::ONE),
                 seen: point,
             });
@@ -224,6 +231,7 @@ impl World {
                     point,
                     unit: None,
                     shield: None,
+                    structure: None,
                     after: t.clamp(Fx::ZERO, Fx::ONE),
                     seen: point,
                 });
@@ -291,12 +299,34 @@ impl World {
                             point,
                             unit: if on_hull { None } else { Some(row) },
                             shield: if on_hull { Some(row) } else { None },
+                            structure: None,
                             after: t - back,
                             seen: from + vel * (t - back),
                         });
                     }
                     true
                 });
+        }
+        // A city block in the way: a miss, a stray round or a shell over the
+        // rooftops lands on it. A torpedo runs in the water, under the quays.
+        if !weapon.torpedo {
+            if let Some((t, row)) = self
+                .city_shapes
+                .first_hit(&self.state.city, from, to)
+                .filter(|&(t, _)| t < best_t)
+            {
+                best_t = t;
+                let point = from + vel * t;
+                best = Some(Hit {
+                    projectile: i,
+                    point,
+                    unit: None,
+                    shield: None,
+                    structure: Some(row),
+                    after: t,
+                    seen: point,
+                });
+            }
         }
         self.sweep_shields(i, domes, from, vel, &mut best_t, &mut best);
         best
@@ -345,6 +375,7 @@ impl World {
                         point,
                         unit: None,
                         shield: Some(row),
+                        structure: None,
                         after: t,
                         seen: point,
                     });
@@ -374,6 +405,7 @@ impl World {
             after: hit.after,
             on_unit: hit.unit.is_some(),
             on_shield: hit.shield.is_some(),
+            on_structure: hit.structure.map(|row| self.state.city.prop[row]),
             blueprint: p.blueprint[projectile],
             weapon: p.weapon[projectile],
         });
@@ -409,6 +441,20 @@ impl World {
         if let Some(row) = hit.shield {
             self.damage_shield(row, weapon.damage);
             return Ok(());
+        }
+        // City blocks: a blast reaches every one round it (the one struck at no
+        // distance), a slug only the one it struck (`city.rs` for the shares).
+        // A torpedo bursts under the water, clear of them.
+        let ignite = weapon.burn_ticks > 0;
+        if weapon.splash > Fx::ZERO && !weapon.torpedo {
+            let dealt = weapon.damage;
+            let blow = Blow {
+                ignite,
+                ..Blow::BLAST
+            };
+            self.blast_structures(hit.point, weapon.splash, blow, |_| dealt);
+        } else if let Some(row) = hit.structure {
+            self.damage_structure(row, weapon.damage * KINETIC_SHARE, ignite);
         }
         if weapon.splash > Fx::ZERO {
             let victims: Vec<_> = self
@@ -536,7 +582,7 @@ impl World {
         } else {
             if let Some(row) = hit.unit {
                 self.damage_unit(row, weapon.damage, owner, source);
-            } else {
+            } else if hit.structure.is_none() {
                 self.add_stain(
                     hit.point.xy(),
                     Fx::from_int(2) + weapon.damage.sqrt() / 4,
@@ -641,6 +687,9 @@ impl World {
             self.damage_unit(row, damage, by, Handle::NONE);
         }
         self.wear_wrecks(origin, db.radius, |reach| db.damage * db.falloff(reach));
+        self.blast_structures(origin, db.radius, Blow::BLAST, |reach| {
+            db.damage * db.falloff(reach)
+        });
         let mut felled = Vec::new();
         self.prop_index
             .query(center, db.radius * Fx::ratio(3, 4), kind::PROP, |e| {

@@ -19,6 +19,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 fn world(size_cells: u32) -> World {
+    world_with(size_cells, Vec::new())
+}
+
+fn world_with(size_cells: u32, props: Vec<mc_map::Prop>) -> World {
     let blueprints = Arc::new(
         Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap(),
     );
@@ -28,7 +32,7 @@ fn world(size_cells: u32) -> World {
         content_id: 1,
         ore: Vec::new(),
         starts: vec![FxVec2::from_ints(512, 512), FxVec2::from_ints(3500, 3500)],
-        props: Vec::new(),
+        props,
     };
     let player = |name: &str, team| PlayerSetup {
         name: name.into(),
@@ -144,6 +148,78 @@ fn paladins_vs_paladins() {
         .unwrap();
     mc_sim::perf::save(&report);
     mc_sim::perf::budget(&report, &[("sim.tick", 16.0)]);
+}
+
+/// The Paladin fight in a city: about 18 000 blocks on a 60 m grid over the whole
+/// 8 km map, the two hundred fighting down a 200 m wide avenue through it, every
+/// shot and line of fire tested against the blocks (`city.rs`), misses and
+/// blasts knocking the avenue's houses about.
+#[test]
+fn paladins_in_a_city() {
+    use mc_map::{Prop, PropKind};
+    let mut props = Vec::new();
+    for gy in 0..136 {
+        for gx in 0..136 {
+            let (x, y) = (30 + gx * 60, 30 + gy * 60);
+            if (1600..1900).contains(&y) {
+                continue;
+            }
+            let kind = match (gx + gy) % 4 {
+                0 => PropKind::CityApartments,
+                1 => PropKind::CityOffice,
+                _ => PropKind::CityHouse,
+            };
+            let heading = if kind == PropKind::CityApartments {
+                0
+            } else {
+                0x4000
+            };
+            props.push(Prop {
+                kind,
+                pos: FxVec2::from_ints(x, y),
+                heading: Angle(heading),
+                scale_milli: 1000,
+                wear_milli: 0,
+            });
+        }
+    }
+    assert!(props.len() > 17_000);
+    let mut w = world_with(1024, props);
+    let blue = block(&mut w, "aster_t3_assault_bot", 0, 100, (1500, 1690), 14, 0);
+    let red = block(
+        &mut w,
+        "aster_t3_assault_bot",
+        1,
+        100,
+        (2300, 1690),
+        14,
+        180,
+    );
+    let report = w
+        .perf_ticks("paladins_in_a_city", 300, |t, _| match t {
+            0 => vec![
+                attack_move(0, blue.clone(), (2400, 1760)),
+                attack_move(1, red.clone(), (1500, 1760)),
+            ],
+            _ => Vec::new(),
+        })
+        .unwrap();
+    let hurt = w.state.city.touched.len();
+    eprintln!("paladins_in_a_city: {hurt} blocks hurt");
+    assert!(hurt > 0, "the fight never touched the city");
+    mc_sim::perf::save(&report);
+    // The blocks crowd the fight into the avenue, so its moving costs more than the
+    // open field's: the time budget only catches a collapse. What the city itself
+    // costs is held by its counters: rows tried by shots and lines of fire a tick
+    // (about 420 measured), and the sweeps that reach the buckets (about 220).
+    mc_sim::perf::budget(
+        &report,
+        &[
+            ("sim.tick", 40.0),
+            ("city.rows", 1500.0),
+            ("city.sweeps", 800.0),
+        ],
+    );
 }
 
 /// A flat 16 km map with `players` starts on a 3 km ring round the centre,

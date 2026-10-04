@@ -21,6 +21,7 @@ use mc_data::{BlueprintId, Trajectory, WeaponColor};
 use std::collections::HashMap;
 
 mod batch;
+pub mod city;
 mod destruct;
 mod fog;
 mod links;
@@ -129,6 +130,23 @@ pub enum SimEvent {
         half: Fx,
         wave: u8,
     },
+    /// City structure `prop` (a map prop, `crate::city`) caught fire: from a
+    /// fire weapon, or hit below `city::BURN_AT_PERMILLE` of its health. `pos`:
+    /// its footprint's middle, half its height up. It burns until
+    /// `RenderFrame::city` shows it `city::GUTTED` or `city::DOWN`.
+    StructureAlight {
+        prop: u32,
+        pos: FxVec3,
+    },
+    /// City structure `prop` came down: its `props_dead` bit is set this tick.
+    /// `pos`: its footprint's middle on the ground; `radius`: how far its
+    /// footprint reaches from there; `height`: its tallest part, over `pos`.
+    StructureCollapsed {
+        prop: u32,
+        pos: FxVec3,
+        radius: Fx,
+        height: Fx,
+    },
     /// A clearing field centred on `center` took map prop `prop`, a tree.
     TreeVaporized {
         prop: u32,
@@ -222,6 +240,9 @@ pub enum SimEvent {
         after: mc_core::Fx,
         on_unit: bool,
         on_shield: bool,
+        /// The map prop (a city structure, `crate::city`) it struck, at `pos` on
+        /// its wall or roof: where the glass shatters. `None` for anything else.
+        on_structure: Option<u32>,
         blueprint: BlueprintId,
         weapon: u8,
     },
@@ -1314,6 +1335,9 @@ pub struct RenderFrame {
     pub vision: Vec<VisionDisc>,
     /// One bit per map prop, set when destroyed.
     pub props_dead: Vec<u32>,
+    /// Every city structure that is not whole: hit, worn by the map, burning,
+    /// burned out or down (`city::StructureView`), in the order first hurt.
+    pub city: Vec<city::StructureView>,
     /// The whole terrain edit table, in order (copied again only when it changed).
     pub terrain_edits: Vec<mc_map::FlattenRecord>,
     /// The faction each of `terrain_edits` was levelled for (`TerrainEdit::faction`).
@@ -2589,6 +2613,7 @@ impl World {
 
         self.write_fog(viewer, frame);
 
+        self.write_city(&mut frame.city);
         frame.props_dead.clear();
         frame.props_dead.extend(
             s.props_dead

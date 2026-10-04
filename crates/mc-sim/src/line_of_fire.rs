@@ -10,6 +10,10 @@
 //!   mound under the water (`World::bed_climb`).
 //! - Every `CHECK_EVERY` ticks for a unit, spread over the rows, and at once when a gun
 //!   takes a new target: one or two raycasts against the heightfield per gun.
+//! - City blocks stand in the way as the ground does (`city.rs`): the line asks the
+//!   same question a shot's sweep does, so a gun never pours its shells into a wall
+//!   with its target behind it. Attack-ground is not checked: a gun told to fire on a
+//!   point behind or in a block fires, and its shells meet the block.
 //!
 //! The answer is `Units::shot_blocked`, set by `World::run_targeting`. The weapons phase
 //! does not fire a blocked gun (its turret keeps tracking), and the orders phase walks an
@@ -90,7 +94,8 @@ impl World {
         seen(units.z[target] + bp.height / 2) || seen(units.z[target] + bp.height)
     }
 
-    /// Whether the segment stays above the ground all the way, in pieces the raycast takes.
+    /// Whether the segment stays above the ground all the way, in pieces the raycast
+    /// takes, and meets no city block standing (the same test a shot's sweep makes).
     fn line_clear(&self, from: FxVec3, to: FxVec3) -> bool {
         let d = to - from;
         let longest = d.x.abs().max(d.y.abs()).max(d.z.abs());
@@ -110,7 +115,9 @@ impl World {
             }
             a = b;
         }
-        true
+        self.city_shapes
+            .first_hit(&self.state.city, from, to)
+            .is_none()
     }
 
     /// The nearest target other than `hidden` that `weapon` of `row` may shoot and can

@@ -740,6 +740,7 @@ fn main() {
                         after: Fx::ratio((ends * 1000.0) as i64, 1000),
                         on_unit: stage.on_unit,
                         on_shield: false,
+                        on_structure: None,
                         blueprint: stage.blueprint,
                         weapon: stage.weapon,
                     });

@@ -2032,6 +2032,7 @@ mod sea_shots {
             after: Fx::from_f32(after),
             on_unit,
             on_shield: false,
+            on_structure: None,
             blueprint: bp,
             weapon,
         }
