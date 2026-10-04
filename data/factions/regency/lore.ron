@@ -298,6 +298,12 @@
             "Pinched-plasmeric Cannon": "Plasma squeezed dense by gravity and pinched out downrange in one long jet; all of it stops in what it hits.",
         },
     ),
+    "regency_t2_artillery": (
+        lore: "A low braced keep under an open cradle, a long tube laid up off its deck and a capacitor block on its back.",
+        weapons: {
+            "Pinched-plasmeric Howitzer": "The Halberd's charge, squeezed longer and lobbed high: one dense glob that falls on what shells the base and sears the ground round it.",
+        },
+    ),
     "regency_t3_point_defense": (
         lore: "A great keep carrying a fusion chamber on its turret's back. Placeholder text.",
         weapons: {

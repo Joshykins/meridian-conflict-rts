@@ -236,6 +236,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Material fabricator | Condenser (II, III) |
 | Storage | Reliquary |
 | Point defence T1 / T2 / T3 | Picket / Halberd / Sunspear |
+| Artillery installation (T2) | Basilisk |
 | Anti-air T1 / T2 / T3, radar, wall | Canopy / Gorget / Belfry, Orrery (II, III), Palisade |
 | Sonar (T1 to T3), torpedo launcher (T1, T2) | Plummet (II, III), Harpoon (II) |
 | Shield generator (T2, T3) | Ward (II) |

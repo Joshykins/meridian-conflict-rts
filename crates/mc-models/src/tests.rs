@@ -373,6 +373,7 @@ const BLUEPRINTS: &[Blueprint] = &[
         2,
         &[[11.6, 0.0, 8.4]],
     ),
+    structure("regency_basilisk", 10.5, 12.0, 2, 2, &[[12.4, 0.0, 12.6]]),
     structure(
         "regency_fusion_cannon",
         24.0,

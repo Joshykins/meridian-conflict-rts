@@ -177,6 +177,19 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_airburst_repeater", 10.0, 9.0, turrets::gorget),
     ModelDef::new("regency_seeker_silo", 12.0, 14.0, turrets::belfry),
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
+    ModelDef::new("regency_basilisk", 10.5, 12.0, turrets::basilisk),
+    ModelDef::new(
+        "regency_basilisk~blades",
+        10.5,
+        12.0,
+        turrets::basilisk_blades,
+    ),
+    ModelDef::new(
+        "regency_basilisk~cross",
+        10.5,
+        12.0,
+        turrets::basilisk_cross,
+    ),
     ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
     // Missile defence (`turrets::rondel`): tech 2, upgrading in place to tech 3.
@@ -300,6 +313,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Walls come by the dozen.
         "regency_palisade" => 1500,
         "regency_pinch_cannon" | "regency_airburst_repeater" => 5000,
+        // A keep, an open cradle, a capacitor block and a long banded tube.
+        "regency_basilisk" => 3500,
         "regency_fusion_cannon" => 7500,
         // Eight cells, each a lid, a rim and a seeker, round a turning array.
         "regency_seeker_silo" => 6000,
@@ -334,6 +349,7 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_tidebrood" => Some(0.52),
         "regency_barb"
         | "regency_pinch_cannon"
+        | "regency_basilisk"
         | "regency_airburst_repeater"
         | "regency_seeker_silo" => Some(0.52),
         // Walls and launcher drums: plated solids that keep their sides reduced.

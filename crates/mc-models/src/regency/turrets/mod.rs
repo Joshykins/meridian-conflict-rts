@@ -7,6 +7,7 @@
 //!   (`gorget`).
 //! - `regency_seeker_silo`: the Belfry, a Gravitic Seeker Silo (`belfry`).
 //! - `regency_pinch_cannon`: the Halberd, a Pinched-plasmeric Cannon (`halberd`).
+//! - `regency_basilisk`: the Basilisk, a Pinched-plasmeric Howitzer (`basilisk`).
 //! - `regency_fusion_cannon`: the Sunspear, a Pinch-fusion Cannon (`sunspear`).
 //! - `regency_missile_defense`: the Rondel, gravity lenses that crush missiles (`rondel`).
 //! - `regency_springald`: the Springald map gun, a Triune Pinch-fusion Howitzer
@@ -18,6 +19,7 @@
 //! Guns are drawn in their own frame ([`gun_frame`]): the origin at the trunnion, +x down
 //! the bore, +z up off it.
 
+mod basilisk;
 mod belfry;
 mod canopy;
 mod gorget;
@@ -29,6 +31,7 @@ mod springald;
 /// (`fusion_guns`), the same gun drawn smaller.
 pub(super) mod sunspear;
 
+pub(super) use basilisk::{basilisk, basilisk_blades, basilisk_cross};
 pub(super) use belfry::belfry;
 pub(super) use canopy::canopy;
 pub(super) use gorget::gorget;
@@ -342,6 +345,7 @@ mod tests {
             ("regency_spitter", canopy::LINE),
             ("regency_airburst_repeater", gorget::LINE),
             ("regency_pinch_cannon", halberd::LINE),
+            ("regency_basilisk", basilisk::LINE),
             ("regency_fusion_cannon", sunspear::LINE),
         ] {
             let unit = bp.units.iter().find(|u| u.visual.mesh == mesh).expect(mesh);

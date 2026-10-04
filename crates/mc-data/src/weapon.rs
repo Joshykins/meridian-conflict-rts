@@ -405,6 +405,39 @@ mod tests {
         assert!(!shoulder.is_empty());
         assert!(shoulder.iter().all(|&r| r == onager), "{shoulder:?}");
     }
+
+    /// The Basilisk sits just out of reach of both tech 3 siege guns, the Trebuchet and
+    /// the Kiln, and kills either in fewer hits than the Onager.
+    #[test]
+    fn the_basilisk_outranges_both_t3_siege_guns() {
+        let bp =
+            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let unit = |key: &str| bp.unit(bp.id_of(key).unwrap());
+        let reach = |key: &str| unit(key).weapons[0].range_max;
+        let basilisk = reach("regency_t2_artillery");
+        let trebuchet = reach("aster_t3_artillery");
+        let kiln = reach("regency_t3_artillery");
+        assert!(basilisk > trebuchet && basilisk > kiln, "{basilisk:?}");
+        assert!(
+            basilisk <= trebuchet * Fx::ratio(6, 5),
+            "only slightly further"
+        );
+        let hits = |gun: &str, target: &str| {
+            let (dmg, mut hp) = (unit(gun).weapons[0].damage, unit(target).health);
+            let mut n = 0;
+            while hp > Fx::ZERO {
+                hp -= dmg;
+                n += 1;
+            }
+            n
+        };
+        for siege in ["aster_t3_artillery", "regency_t3_artillery"] {
+            assert!(
+                hits("regency_t2_artillery", siege) < hits("aster_t2_artillery", siege),
+                "{siege}"
+            );
+        }
+    }
 }
 
 /// An Arc Howitzer's tube (`RawWeapon::howitzer`): metres from breech to muzzle, and half
