@@ -45,7 +45,7 @@ const GRIP_LIFE: f32 = 0.15;
 const SNAP: (f32, f32) = (6.5, 0.4);
 const SNAP_LIFE: f32 = 0.07;
 /// The pop's size, metres.
-const POP: f32 = 3.0;
+const POP: f32 = 4.5;
 
 /// The glint at the mount each tick, and the pop's.
 const MOUNT_GLINT: Flare = Flare {
