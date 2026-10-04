@@ -86,8 +86,8 @@ pub(crate) fn halberd(b: &mut MeshBuilder, _tech: u8) {
 }
 
 /// A square core with its corners cut, a buttress out from each corner with a plate
-/// down its back, a plated strut on each face between them.
-fn braced_core(b: &mut MeshBuilder) {
+/// down its back, a plated strut on each face between them. The Basilisk stands on it too.
+pub(super) fn braced_core(b: &mut MeshBuilder) {
     dark_plate(b);
     b.chamfered_box(v3(0.0, 0.0, 2.6), v3(9.0, 9.0, 5.2), 2.2);
     for k in 0..4 {

@@ -1,17 +1,21 @@
 //! The Basilisk (tech 2 artillery installation, a 2 x 2 lot): a Pinched-plasmeric
-//! Howitzer. Like the Halberd it gathers its charge in front of the bore and pinches it
-//! out, but lobs it. It is drawn as a heavy howitzer: a long thick barrel laid up off a
-//! turret on a low keep, ending in a plated muzzle brake, and the charge forms at the
-//! brake's mouth between its baffles. The `muzzle` is the middle of that charge.
+//! Howitzer. It gathers its charge in front of the bore, as the Halberd does, and lobs it.
+//! The `muzzle` is the middle of that charge.
 //!
-//! Design round (`~` keys): the turret.
-//! - `regency_basilisk`: an armoured casemate, the barrel out of a mantlet.
-//! - `regency_basilisk~cradle`: an open cradle between two tall sloped cheeks.
-//! - `regency_basilisk~sleeve`: the casemate, a plated jacket over the barrel's back half.
+//! The gun is the Kiln's kind of bore at tech 2: split down its length into two heavy
+//! plated halves that part through the charge, Pinched red let into their inner faces,
+//! a course of swept plates along each half and graphite bands across them. It is laid
+//! up off an open cradle, slab cheeks swept back into spikes, on the Halberd's braced core.
+//!
+//! Design round (`~` keys): how the bore is split.
+//! - `regency_basilisk`: two halves side by side, plates along their tops.
+//! - `regency_basilisk~jacket`: the same halves, their back half sheathed in a plated
+//!   jacket with plates feathered down its flanks.
+//! - `regency_basilisk~upright`: the halves one above the other, plates along their flanks.
 //!
 //! Its pivot and muzzle are the unit file's (`data/factions/regency/units/structures.ron`).
 
-use glam::{Vec2, Vec3};
+use glam::{Affine3A, Vec2, Vec3};
 
 use crate::builder::MeshBuilder;
 use crate::material::*;
@@ -19,229 +23,219 @@ use crate::{part, rig};
 
 use super::super::kit::{dark_plate, metal, v3};
 use super::super::machine::*;
+use super::halberd::braced_core;
 use super::*;
 
-/// The trunnion over the keep's middle, the charge 13.4 m out down a bore laid 22 degrees
+/// The trunnion over the core's middle, the charge 13.4 m out down a bore laid 22 degrees
 /// up.
 pub(super) const LINE: Line = Line::new(Vec3::new(0.0, 0.0, 7.6), Vec3::new(12.4, 0.0, 12.6));
-/// How far round the charge the brake's baffles stand: none closer than 0.4 of it.
+/// How far round the charge the halves' tips stand: none closer than 0.4 of it.
 #[cfg(test)]
-const HOLD: f32 = 2.4;
-/// The brake: how long it is, and its half width and height.
-const BRAKE: f32 = 2.8;
-const BRAKE_W: f32 = 1.3;
-const BRAKE_H: f32 = 0.95;
-/// The keep's top, where the turret's race sits.
-const KEEP: f32 = 4.6;
+const HOLD: f32 = 2.2;
+/// The braced core's top, where the turret's race sits.
+const CORE: f32 = 5.2;
+/// Half the gap between the halves.
+const GAP: f32 = 0.3;
 
 #[derive(Clone, Copy, PartialEq)]
-enum Turret {
-    Casemate,
-    Cradle,
-    Sleeve,
+enum Bore {
+    Side,
+    Jacket,
+    Upright,
 }
 
 pub(crate) fn basilisk(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, Turret::Casemate);
+    draw(b, Bore::Side);
 }
 
-pub(crate) fn basilisk_cradle(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, Turret::Cradle);
+pub(crate) fn basilisk_jacket(b: &mut MeshBuilder, _tech: u8) {
+    draw(b, Bore::Jacket);
 }
 
-pub(crate) fn basilisk_sleeve(b: &mut MeshBuilder, _tech: u8) {
-    draw(b, Turret::Sleeve);
+pub(crate) fn basilisk_upright(b: &mut MeshBuilder, _tech: u8) {
+    draw(b, Bore::Upright);
 }
 
-fn draw(b: &mut MeshBuilder, turret: Turret) {
-    LINE.rig(b, 1.4);
+fn draw(b: &mut MeshBuilder, bore: Bore) {
+    LINE.rig(b, 1.2);
     if b.coarse() {
         coarse(
             b,
             &LINE,
             &Coarse {
-                base_r: 9.6,
-                base_h: KEEP,
-                x0: -6.0,
+                base_r: 9.4,
+                base_h: CORE,
+                x0: -5.6,
                 x1: 3.0,
                 half: 3.0,
-                top: LINE.pivot.z + 1.8,
+                top: LINE.pivot.z + 1.4,
                 gun: Vec2::splat(2.2),
-                tip: Vec2::splat(1.6),
-                mouth: Some((LINE.len() - BRAKE, BRAKE_W)),
+                tip: Vec2::splat(1.4),
+                mouth: Some((LINE.len() - 3.0, 1.4)),
             },
         );
         return;
     }
-    keep(b);
+    braced_core(b);
     b.with_part(part::TURRET, |b| {
-        match turret {
-            Turret::Casemate | Turret::Sleeve => casemate(b),
-            Turret::Cradle => cradle(b),
+        plan_hull(
+            b,
+            &[[3.0, 2.8], [-2.0, 3.4], [-6.2, 2.6], [-6.6, 0.0]],
+            &[(CORE + 0.4, 1.0), (CORE + 1.4, 1.0), (CORE + 1.8, 0.86)],
+        );
+        cheeks(b, [-2.6, 2.4], 2.0, [CORE + 1.6, LINE.pivot.z + 1.4], 0.55);
+        // A plated block on the turret's back, swept up at its front: what feeds the
+        // charge.
+        plan_hull(
+            b,
+            &[[-3.4, 1.5], [-5.8, 1.5], [-6.2, 0.0]],
+            &[(CORE + 1.7, 1.0), (CORE + 3.0, 0.8)],
+        );
+        team_patch(b, -5.2, -3.8, 0.8, CORE + 3.01);
+        if b.fine() {
+            b.mirror_y(|b| slit(b, v3(-4.7, 1.5, CORE + 2.2), Vec3::Y, Vec3::X, 1.8, 0.2));
         }
-        b.with_limb(rig::ARM_GUN, |b| gun_frame(b, &LINE, |b| gun(b, turret)));
+        b.with_limb(rig::ARM_GUN, |b| gun_frame(b, &LINE, |b| gun(b, bore)));
     });
 }
 
-/// The keep: an octagonal drum braced by a buttress out of each side, a plate swept
-/// down each slanted face between them, and the race the turret turns on.
-fn keep(b: &mut MeshBuilder) {
-    step(b, 8, 6.2, 5.0, 0.0, KEEP);
-    for k in 0..4 {
-        let a = (90.0 * k as f32).to_radians();
-        b.yawed(Vec3::ZERO, a, |b| {
-            buttress(b, 4.2, 3.6, 4.2, 7.6, 2.4, 0.9);
-            dark_plate(b);
-            armour(
-                b,
-                &Frame::new(v3(4.6, 0.0, 4.2), v3(1.0, 0.0, -0.9), v3(0.9, 0.0, 1.0)),
-                &swept(4.6, 1.1, 0.0, 0.55),
-                0.3,
-            );
-        });
-        if b.fine() {
-            b.yawed(Vec3::ZERO, a + std::f32::consts::FRAC_PI_4, |b| {
-                let (out, down) = (v3(0.972, 0.0, 0.235), v3(0.235, 0.0, -0.972));
-                dark_plate(b);
-                armour(
-                    b,
-                    &Frame::new(v3(4.66, 0.0, 4.4), down, out),
-                    &swept(3.4, 1.5, 0.0, 0.6),
-                    0.25,
-                );
-                if k % 2 == 1 {
-                    slit(b, v3(5.64, 0.0, 0.55) + out * 0.05, out, Vec3::Y, 2.2, 0.24);
-                }
-            });
-        }
-    }
-    b.paint(TEAM);
-    hoop(b, Vec3::Z * (KEEP + 0.02), 4.4, 0.8, 0.05, b.sides(24));
-    metal(b);
-    hoop(b, Vec3::Z * (KEEP + 0.2), 3.4, 1.4, 0.4, b.sides(24));
-}
-
-/// An armoured house round the trunnion: sloped faces drawn in toward a flat roof, the
-/// owner's colour on the roof's back, a red line down each flank.
-fn casemate(b: &mut MeshBuilder) {
-    let z = LINE.pivot.z;
-    plan_hull(
-        b,
-        &[
-            [3.0, 1.9],
-            [1.2, 3.1],
-            [-4.4, 3.1],
-            [-6.2, 2.0],
-            [-6.6, 0.0],
-        ],
-        &[(KEEP + 0.4, 1.0), (z + 0.2, 1.0), (z + 2.0, 0.8)],
-    );
-    team_patch(b, -4.8, -2.6, 1.2, z + 2.01);
-    if b.fine() {
-        // Plates hung on the flanks, swept back into spikes past the house's tail.
-        b.mirror_y(|b| {
-            dark_plate(b);
-            armour(
-                b,
-                &Frame::new(v3(0.6, 3.1, z - 0.6), -Vec3::X, Vec3::Y),
-                &swept(6.8, 1.1, 0.3, 0.7),
-                0.25,
-            );
-            slit(b, v3(-2.4, 3.37, z - 1.6), Vec3::Y, Vec3::X, 3.0, 0.24);
-        });
-    }
-}
-
-/// An open cradle: a low deck, a tall cheek either side of the gun with a plate swept
-/// down its outside, and a wedge of armour on the deck's back under the owner's colour.
-fn cradle(b: &mut MeshBuilder) {
-    let z = LINE.pivot.z;
-    plan_hull(
-        b,
-        &[[3.0, 2.6], [-1.6, 3.2], [-6.4, 2.6], [-6.8, 0.0]],
-        &[(KEEP + 0.4, 1.0), (KEEP + 1.6, 1.0), (KEEP + 2.0, 0.86)],
-    );
-    cheeks(b, [-2.8, 2.8], 1.7, [KEEP + 1.8, z + 2.0], 0.8);
-    plan_hull(
-        b,
-        &[[-3.6, 1.6], [-6.2, 1.6], [-6.4, 0.0]],
-        &[(KEEP + 1.9, 1.0), (KEEP + 3.4, 0.82)],
-    );
-    team_patch(b, -5.6, -4.0, 0.9, KEEP + 3.41);
-}
-
-/// The gun in its own frame: the trunnion pin, a heavy breech, the recoiling barrel and
-/// its muzzle brake.
-fn gun(b: &mut MeshBuilder, turret: Turret) {
-    let fine = b.fine();
-    let len = LINE.len();
-    let neck = len - BRAKE;
+/// The gun in its own frame: the trunnion pin, a short plated breech, and the split bore,
+/// which recoils.
+fn gun(b: &mut MeshBuilder, bore: Bore) {
     collar(b, Vec3::ZERO, Vec3::Y, 0.8, 4.4);
+    dark_plate(b);
+    b.with_facets(|b| {
+        b.beam(
+            v3(-2.6, 0.0, 0.0),
+            v3(2.0, 0.0, 0.0),
+            Vec2::new(2.8, 2.2),
+            Vec2::new(2.6, 2.0),
+        )
+    });
+    b.with_recoil(|b| {
+        let turn = if bore == Bore::Upright {
+            std::f32::consts::FRAC_PI_2
+        } else {
+            0.0
+        };
+        b.with(Affine3A::from_rotation_x(turn), split);
+        if bore == Bore::Jacket {
+            jacket(b);
+        }
+    });
+}
+
+/// The bore split down its length into two plated halves either side of the gap, a red
+/// strip let into each inner face a pace at a time from the breech, a course of swept
+/// plates along each half's top, graphite bands across both, and a graphite rod down the
+/// gap that stops short of the charge.
+fn split(b: &mut MeshBuilder) {
+    let len = LINE.len();
+    let fine = b.fine();
+    // A half's section, out from its flat inner face (`y` from 0 out, `z` up).
+    let shape: &[[f32; 2]] = &[
+        [0.0, 1.0],
+        [0.55, 0.9],
+        [1.0, 0.4],
+        [1.0, -0.4],
+        [0.55, -0.9],
+        [0.0, -1.0],
+    ];
+    let stations = [
+        (1.6, 1.15, 1.05),
+        (3.6, 1.15, 1.05),
+        (len - 2.6, 0.9, 0.8),
+        (len - 1.0, 0.72, 0.62),
+    ];
+    metal(b);
+    b.cylinder_between(
+        v3(1.8, 0.0, 0.0),
+        v3(len - 3.4, 0.0, 0.0),
+        0.24,
+        0.2,
+        b.sides(8),
+    );
+    for x in [3.0f32, 6.4, 9.6] {
+        b.block(v3(x, -GAP - 1.25, -1.12), v3(x + 0.55, GAP + 1.25, -0.98));
+    }
+    b.mirror_y(|b| {
+        let rings: Vec<Vec<Vec3>> = stations
+            .iter()
+            .map(|&(x, w, h)| {
+                shape
+                    .iter()
+                    .map(|&[y, z]| v3(x, GAP + y * w, z * h))
+                    .collect()
+            })
+            .collect();
+        dark_plate(b);
+        b.with_facets(|b| b.loft(&rings, true, true));
+        // The inner face lit a pace at a time from the breech: Pinched red, not fusion.
+        let strips: Vec<u32> = if fine { (0..6).collect() } else { vec![1, 4] };
+        b.paint(GLOW_LASER);
+        for i in strips {
+            let x = 2.4 + 1.5 * i as f32;
+            b.block(v3(x, GAP - 0.04, -0.22), v3(x + 1.0, GAP, 0.22));
+        }
+        if fine {
+            metal(b);
+            for x in [3.0f32, 6.4, 9.6] {
+                b.block(v3(x, GAP + 0.5, -1.02), v3(x + 0.55, GAP + 1.2, 1.02));
+            }
+            dark_plate(b);
+            Course {
+                count: 3,
+                step: 3.4,
+                len: 4.0,
+                half: 0.5,
+                tip: -0.4,
+                thick: 0.18,
+                tail: 0.6,
+            }
+            .lay(
+                b,
+                &Frame::new(
+                    v3(len - 1.6, GAP + 0.55, 0.86),
+                    v3(-1.0, 0.0, 0.03),
+                    v3(0.0, 0.3, 1.0),
+                ),
+            );
+        }
+    });
+}
+
+/// A plated jacket over the bore's back half, keeled, with a course of swept plates
+/// feathered down each flank.
+fn jacket(b: &mut MeshBuilder) {
     dark_plate(b);
     hull_x(
         b,
         &[
-            [-3.6, 2.4, 2.4, 0.0],
-            [-0.4, 2.8, 2.8, 0.0],
-            [2.2, 2.8, 2.6, 0.0],
+            [1.0, 3.6, 2.7, 0.0],
+            [5.4, 3.4, 2.5, 0.0],
+            [6.4, 3.0, 2.2, 0.0],
         ],
-        &CHAMFERED,
+        &KEELED,
     );
-    if turret != Turret::Cradle {
-        // The mantlet the barrel leaves the casemate through.
-        hull_x(b, &[[2.0, 3.4, 3.0, 0.0], [3.4, 3.0, 2.6, 0.0]], &CHAMFERED);
-    }
-    b.with_recoil(|b| {
-        dark_plate(b);
-        hull_x(
-            b,
-            &[
-                [2.2, 2.0, 2.0, 0.0],
-                [neck - 2.0, 1.6, 1.6, 0.0],
-                [neck, 1.5, 1.5, 0.0],
-            ],
-            &CHAMFERED,
-        );
-        if turret == Turret::Sleeve {
-            hull_x(
+    if b.fine() {
+        b.mirror_y(|b| {
+            dark_plate(b);
+            Course {
+                count: 2,
+                step: 2.4,
+                len: 3.0,
+                half: 0.55,
+                tip: 0.4,
+                thick: 0.16,
+                tail: 0.8,
+            }
+            .lay(
                 b,
-                &[
-                    [3.0, 2.3, 2.2, 0.08],
-                    [7.6, 2.1, 2.0, 0.06],
-                    [8.2, 1.7, 1.6, 0.0],
-                ],
-                &CHAMFERED,
+                &Frame::new(v3(5.6, 1.72, 0.1), v3(-1.0, 0.03, 0.0), Vec3::Y),
             );
-            if fine {
-                slit(b, v3(5.2, 0.0, 1.17), Vec3::Z, Vec3::X, 3.6, 0.16);
-            }
-        } else if fine {
-            for x in [4.4f32, 7.2] {
-                collar(b, v3(x, 0.0, 0.0), Vec3::X, 0.95, 0.45);
-            }
-        }
-        brake(b, neck, len);
-    });
-}
-
-/// A muzzle brake from `x0` to just short of `len`: a plated box, open at the front, its
-/// flanks cut through by two windows each, so the baffles that hold the charge stand
-/// either side of its mouth.
-fn brake(b: &mut MeshBuilder, x0: f32, len: f32) {
-    let x1 = len - 0.1;
-    let (w, h, t) = (BRAKE_W, BRAKE_H, 0.26);
-    dark_plate(b);
-    // Roof and floor.
-    b.block(v3(x0, -w, h - t), v3(x1, w, h));
-    b.block(v3(x0, -w, -h), v3(x1, w, -h + t));
-    // Three posts down each flank: back, middle and the front baffle.
-    let posts = [(x0, x0 + 0.6), (x0 + 1.15, x0 + 1.55), (x1 - 0.45, x1)];
-    b.mirror_y(|b| {
-        dark_plate(b);
-        for &(a, c) in &posts {
-            b.block(v3(a, w - t, -h + t), v3(c, w, h - t));
-        }
-    });
+            slit(b, v3(3.4, 1.71, -0.6), Vec3::Y, Vec3::X, 3.0, 0.2);
+        });
+    }
 }
 
 #[cfg(test)]
@@ -252,8 +246,8 @@ mod tests {
     fn basilisk_holds_its_charge() {
         for key in [
             "regency_basilisk",
-            "regency_basilisk~cradle",
-            "regency_basilisk~sleeve",
+            "regency_basilisk~jacket",
+            "regency_basilisk~upright",
         ] {
             super::super::super::check_charge(
                 key,

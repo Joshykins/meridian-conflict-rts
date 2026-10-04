@@ -179,16 +179,16 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
     ModelDef::new("regency_basilisk", 10.5, 12.0, turrets::basilisk),
     ModelDef::new(
-        "regency_basilisk~cradle",
+        "regency_basilisk~jacket",
         10.5,
         12.0,
-        turrets::basilisk_cradle,
+        turrets::basilisk_jacket,
     ),
     ModelDef::new(
-        "regency_basilisk~sleeve",
+        "regency_basilisk~upright",
         10.5,
         12.0,
-        turrets::basilisk_sleeve,
+        turrets::basilisk_upright,
     ),
     ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
@@ -313,7 +313,7 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         // Walls come by the dozen.
         "regency_palisade" => 1500,
         "regency_pinch_cannon" | "regency_airburst_repeater" => 5000,
-        // A keep, a casemate or cradle, a heavy barrel and its brake.
+        // The Halberd's core, an open cradle, and a split bore with plate courses.
         "regency_basilisk" => 3500,
         "regency_fusion_cannon" => 7500,
         // Eight cells, each a lid, a rim and a seeker, round a turning array.
