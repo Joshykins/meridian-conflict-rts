@@ -150,3 +150,20 @@ fn the_cells_are_clear() {
         }
     }
 }
+
+/// Built at the unit file's size the legs take strides to match: the stride grows with the
+/// build, or the long legs patter through tiny steps.
+#[test]
+fn strides_grow_with_the_build() {
+    let authored = model().legs.expect("the strider walks");
+    assert_eq!(authored.stride, STRIDE);
+    let built = crate::build_model_scaled("regency_strider", RADIUS * SCALE, HEIGHT * SCALE, 4)
+        .unwrap()
+        .legs
+        .unwrap();
+    assert!(
+        built.stride >= STRIDE * SCALE,
+        "stride {} at {SCALE}x",
+        built.stride
+    );
+}

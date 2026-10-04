@@ -81,8 +81,10 @@ const HIP_Z: f32 = 20.0;
 const HIP_R: f32 = 2.2;
 /// How far out the feet stand.
 const FOOT_R: f32 = 10.5;
-/// The ground one walking cycle covers, the share of it a foot stands, and how high a foot
-/// lifts: three steps and a beat on every foot standing (`crawl_leg`).
+/// The ground one walking cycle covers at the authored size, the share of it a foot
+/// stands, and how high a foot lifts: three steps and a beat on every foot standing
+/// (`crawl_leg`). The builder scales the joints and the lift but not the stride, so
+/// `strider` scales it to the build (`rig_legs`).
 const STRIDE: f32 = 16.0;
 const STANCE: f32 = 0.75;
 const LIFT: f32 = 3.0;
@@ -110,8 +112,7 @@ fn legs() -> [(Vec3, Vec3, Vec3, f32); 2] {
 
 pub(super) fn strider(b: &mut MeshBuilder, _tech: u8) {
     let legs = legs();
-    b.set_crawl_legs(&legs, STRIDE, STANCE, LIFT);
-    b.set_lone_leg(1);
+    rig_legs(b, &legs);
     b.set_turret_pivot(v3(0.0, 0.0, RACE));
     b.set_arm_pivot(PIVOT);
     b.set_recoil(PIVOT, MUZZLES[0].with_y(0.0), 0.4);
@@ -129,6 +130,16 @@ pub(super) fn strider(b: &mut MeshBuilder, _tech: u8) {
         launcher(b);
         b.with_limb(rig::ARM_GUN, |b| b.mirror_y(mount));
     });
+}
+
+/// The walking rig, its stride grown with the build to the nearest power of two (64 m at
+/// the unit file's size): a stride left at the authored 16 m has the long legs patter
+/// through tiny quick steps.
+fn rig_legs(b: &mut MeshBuilder, legs: &[(Vec3, Vec3, Vec3, f32); 2]) {
+    b.set_crawl_legs(legs, STRIDE, STANCE, LIFT);
+    let scale = b.legs().map_or(1.0, |l| l.hip[2] / HIP_Z);
+    b.set_crawl_legs(legs, STRIDE * scale.log2().round().exp2(), STANCE, LIFT);
+    b.set_lone_leg(1);
 }
 
 /// Far off: the crown a spindle, flat legs that do not walk, the head a wedge with the
