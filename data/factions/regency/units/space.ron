@@ -95,7 +95,7 @@
             hitscan: true, beam: true, trajectory: Direct, spin_up: 1.2, walk: 48,
             turret_turn: 65, pivot: (12, 0, 16), muzzle: (32, 0, 9), sweep: 10,
             targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-            plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 5.0,
+            plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 12.0,
             sounds: (hold: "regency_pinched_beam"),
         )], mesh: "regency_space_destroyer", icon: Warship,
         shield: (kind: Hull, health: 9000, regen: 90), economy: (energy_upkeep: 240),

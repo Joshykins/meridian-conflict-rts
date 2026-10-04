@@ -41,7 +41,7 @@ Inspect the fleet with:
 
 ```sh
 scripts/shot.sh variants regency_t2_transport=base regency_t3_assault_transport=base regency_t2_space_frigate=base regency_t3_space_cruiser=base regency_t3_space_destroyer=base --views front34,rear34,top
-scripts/shot.sh unit regency_t3_space_destroyer --scenario targets --ticks 120 --views left --zoom 0.45
+scripts/shot.sh unit regency_t3_space_destroyer --scenario targets --ticks 115 --views left --look 180,0,-240 --zoom 0.5
 ```
 
 Focused acceptance tests:
