@@ -16,6 +16,7 @@
 //!
 //! Everything here is cosmetic and client-side: nothing feeds back into the sim.
 
+mod blast;
 mod regions;
 mod shade;
 mod targets;
@@ -1284,28 +1285,6 @@ impl Sky {
         self.flyers.clear();
         self.flyers
             .extend(flyers.map(|(prev, pos, radius)| Flyer { prev, pos, radius }));
-    }
-
-    /// A blast big enough to shove the clouds about: its reach in metres and
-    /// how hard it hits (1 a large explosion, 3 a reactor going up).
-    /// A blast below the layer reaches it only if it is big for the gap: a
-    /// shell or a tank going up on the ground leaves the cloud a couple of
-    /// hundred metres overhead alone; an aircraft blowing up inside it, or a
-    /// reactor, does not.
-    pub fn blast(&mut self, at: Vec3, reach: f32, strength: f32, time: f32) {
-        let gap = (self.floor_at(at.truncate()) + self.base - at.z).max(0.0);
-        let fade = 1.0 - smoothstep(0.0, reach * 0.5, gap);
-        if fade < 0.05 {
-            return;
-        }
-        if self.blasts.len() < 48 {
-            self.blasts.push((
-                at.truncate(),
-                reach * (0.5 + 0.5 * fade),
-                strength * fade,
-                time,
-            ));
-        }
     }
 
     /// Steps the weather and writes this frame's uniforms. Call once per frame,

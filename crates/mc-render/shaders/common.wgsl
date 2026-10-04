@@ -318,6 +318,13 @@ fn rot_z(v: vec3<f32>, angle: f32) -> vec3<f32> {
     return vec3<f32>(v.x * c - v.y * s, v.x * s + v.y * c, v.z);
 }
 
+// Every component a number, not NaN or inf. By the bits: drivers may fold
+// `x != x` away, and NVIDIA's select does not scrub a NaN.
+fn finite4(v: vec4<f32>) -> bool {
+    let e = bitcast<vec4<u32>>(v) & vec4<u32>(0x7f800000u);
+    return all(e != vec4<u32>(0x7f800000u));
+}
+
 fn hash11(n: f32) -> f32 {
     return fract(sin(n * 12.9898) * 43758.5453);
 }

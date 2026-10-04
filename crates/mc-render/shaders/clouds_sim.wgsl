@@ -308,6 +308,17 @@ fn cs_force(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     state.z *= exp(-dt / 22.0);
     state.x = clamp(state.x, 0.0, 1.5);
+    // Never carry a bad value on: the advection spreads a texel's NaN to its
+    // neighbours every frame and nothing decays it, so one bad blast once
+    // took over the whole map's weather for the rest of the match (every
+    // cloud a smooth smear: the billows looked up at NaN). Such a texel starts
+    // over from the air mass.
+    if !finite4(state) {
+        state = vec4<f32>(rest, 0.0, rain_from(sky, rest.x, rest.y));
+    }
+    if !finite4(flow) {
+        flow = vec4<f32>(0.0);
+    }
     textureStore(state_out, vec2<i32>(id.xy), state);
     textureStore(flow_out, vec2<i32>(id.xy), flow);
 }

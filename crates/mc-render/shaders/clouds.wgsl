@@ -515,13 +515,6 @@ fn fs_march(in: FullOut) -> @location(0) vec4<u32> {
     return vec4<u32>(pack2x16float(c.rg), pack2x16float(c.ba), bitcast<u32>(march_depth), bitcast<u32>(march_reach));
 }
 
-// Every component a number, not NaN or inf. By the bits: drivers may fold
-// `x != x` away, and NVIDIA's select does not scrub a NaN.
-fn finite4(v: vec4<f32>) -> bool {
-    let e = bitcast<vec4<u32>>(v) & vec4<u32>(0x7f800000u);
-    return all(e != vec4<u32>(0x7f800000u));
-}
-
 fn march_texel(px: vec2<i32>) -> vec4<f32> {
     let v = textureLoad(cloud_march, px, 0);
     return vec4<f32>(unpack2x16float(v.x), unpack2x16float(v.y));
