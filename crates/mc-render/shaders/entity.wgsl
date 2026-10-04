@@ -433,7 +433,9 @@ fn charge_gear_turn(e: Entity, time: f32) -> f32 {
 // rest frame, before the gun pitches and the turret turns: rails part and projector heads
 // reach into the charge as it fills, vents lift with the heat after the shot, the gimbal
 // cage spins about `rig.xyz`. Travels are `rig.w` times their authored metres.
-fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, e: Entity, time: f32) -> array<vec3<f32>, 2> {
+// `bore` is the model's rest-space barrel axis (`ModelInfo::recoil`), zero if it has none:
+// a gun authored laid up runs its gear out along it, not along the level +x.
+fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, bore: vec3<f32>, e: Entity, time: f32) -> array<vec3<f32>, 2> {
     var p = p0;
     var n = n0;
     let s = charge_gear_state(e, time);
@@ -441,7 +443,8 @@ fn charge_gear_pose(p0: vec3<f32>, n0: vec3<f32>, gear: u32, rig: vec4<f32>, e: 
         p.y += sign(p.y) * CHARGE_GEAR_SPREAD_M * rig.w * s.x;
     }
     if gear == CHARGE_GEAR_EXTEND || gear == CHARGE_GEAR_REACH {
-        p.x += CHARGE_GEAR_EXTEND_M * rig.w * s.x;
+        let along = select(vec3<f32>(1.0, 0.0, 0.0), bore, dot(bore, bore) > 0.25);
+        p += along * (CHARGE_GEAR_EXTEND_M * rig.w * s.x);
     }
     if gear == CHARGE_GEAR_VENT {
         p.z += CHARGE_GEAR_VENT_M * rig.w * s.y;
@@ -1527,7 +1530,7 @@ fn vs_main(in: VsIn) -> VsOut {
         // A charge gun's working gear moves with its charge, before the gun pitches.
         let gear = (in.rig >> CHARGE_GEAR_SHIFT) & CHARGE_GEAR_MASK;
         if gear != 0u && model.charge_gear.w > 0.0 && e.mount.w == CHARGE_RECORD {
-            let posed = charge_gear_pose(p, n, gear, model.charge_gear, e, time);
+            let posed = charge_gear_pose(p, n, gear, model.charge_gear, model.recoil.xyz, e, time);
             p = posed[0];
             n = posed[1];
         }

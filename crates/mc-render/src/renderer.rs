@@ -4724,16 +4724,10 @@ impl Renderer {
                 blueprint,
                 weapon,
             } => {
-                self.plasma_charging(
-                    unit.0,
-                    *owner,
-                    *blueprint,
-                    *weapon,
-                    Vec3::from(pos.to_f32()),
-                    time,
-                );
                 // A squeezed plasma gun gathers its charge in front of the bore
-                // (`regency_guns_fx`), not as an ordinary gun's glow.
+                // (`regency_guns_fx`), not as an ordinary gun's glow nor as a thrown
+                // charge held at its unpitched muzzle (the Springald lobs, but its
+                // charge rides its barrel).
                 if !self.regency_charging(
                     unit.0,
                     *blueprint,
@@ -4741,6 +4735,14 @@ impl Renderer {
                     Vec3::from(pos.to_f32()),
                     time,
                 ) {
+                    self.plasma_charging(
+                        unit.0,
+                        *owner,
+                        *blueprint,
+                        *weapon,
+                        Vec3::from(pos.to_f32()),
+                        time,
+                    );
                     self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
                 }
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];

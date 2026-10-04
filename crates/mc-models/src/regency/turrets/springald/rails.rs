@@ -38,8 +38,11 @@ fn at(x: f32, a: f32, r: f32) -> Vec3 {
     v3(x, 0.0, 0.0) + radial(a) * r
 }
 
-/// Rails' distance out from the bore.
+/// Rails' distance out from the bore, and at their tips.
 const RAIL_R: f32 = 3.6;
+const TIP_R: f32 = 3.1;
+/// How far back from the charge the rails' tips run level with the bore.
+const TRACK: f32 = 8.0;
 
 pub(super) fn draw(b: &mut MeshBuilder) {
     let len = LINE.len();
@@ -68,13 +71,14 @@ pub(super) fn draw(b: &mut MeshBuilder) {
     coils(b, stack);
     for a in bearings() {
         dark_plate(b);
+        // The last stretch runs level with the bore, so the lens's sleeve slides on it.
         bar_through(
             b,
             &[
                 (at(12.0, a, RAIL_R + 0.6), Vec2::new(2.2, 3.0)),
                 (at(30.0, a, RAIL_R), Vec2::new(1.5, 2.2)),
-                (at(len - 4.5, a, RAIL_R - 0.2), Vec2::new(1.1, 1.6)),
-                (at(len - 2.4, a, RAIL_R - 0.6), Vec2::new(0.8, 1.1)),
+                (at(len - TRACK, a, TIP_R), Vec2::new(1.1, 1.3)),
+                (at(len - 1.8, a, TIP_R), Vec2::new(0.8, 0.9)),
             ],
             round(a),
         );
@@ -89,14 +93,12 @@ pub(super) fn draw(b: &mut MeshBuilder) {
         }
         .lay(
             b,
-            &Frame::new(at(len - 6.0, a, RAIL_R + 1.0), -Vec3::X, radial(a)),
+            &Frame::new(at(len - 10.0, a, RAIL_R + 1.0), -Vec3::X, radial(a)),
         );
-        // The lenses stand behind the charge at rest and run out round it through
-        // the charge (`EXTEND`, 2.2 m at this model's gear scale).
-        b.with_charge_gear(EXTEND, |b| {
-            let x = len - 2.6;
-            lens(b, at(x, a, 2.8), v3(x, 0.0, 0.0), 0.7)
-        });
+        // The lens rides a sleeve on the rail's tip, behind the charge at rest; through
+        // the charge the sleeve runs out along the rail (`EXTEND`, down the bore, 2.2 m
+        // at this model's gear scale), still on it at the end of its travel.
+        b.with_charge_gear(EXTEND, |b| sleeve(b, len - 4.9, a, len));
     }
     if fine {
         // A band tying the rails across the coils.
@@ -111,6 +113,32 @@ pub(super) fn draw(b: &mut MeshBuilder) {
             b.sides(12),
         );
     }
+}
+
+/// A lens's sleeve round the rail at bearing `a`, its middle `x` down the bore: a plated
+/// collar a little proud of the rail all round, the lens on a stalk off its inner face,
+/// ahead of the last pinch coil all the way out, looking at the charge at `charge` down
+/// the bore.
+fn sleeve(b: &mut MeshBuilder, x: f32, a: f32, charge: f32) {
+    dark_plate(b);
+    bar_through(
+        b,
+        &[
+            (at(x - 0.9, a, TIP_R), Vec2::new(1.5, 1.6)),
+            (at(x + 0.9, a, TIP_R), Vec2::new(1.5, 1.6)),
+        ],
+        round(a),
+    );
+    let face = TIP_R - 0.8;
+    metal(b);
+    b.cylinder_between(
+        at(x + 0.3, a, face + 0.05),
+        at(x + 1.2, a, face - 0.5),
+        0.35,
+        0.3,
+        b.sides(8),
+    );
+    lens(b, at(x + 1.4, a, face - 0.55), v3(charge, 0.0, 0.0), 0.6);
 }
 
 /// The breech's front run on into the rails: a plated fairing lofted from the breech's

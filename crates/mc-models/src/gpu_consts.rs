@@ -467,7 +467,8 @@ shared! {
         pub const MASK: u32 = 0x7;
         /// Moves out from the bore along +-y (by the sign of its y): rails parting.
         pub const SPREAD: u32 = 1;
-        /// Runs out along +x, the bore: projector heads reaching into the charge.
+        /// Runs out along the bore (the model's recoil axis, else +x): projector heads
+        /// reaching into the charge.
         pub const EXTEND: u32 = 2;
         /// Lifts along +z with the heat after a shot: vent flaps standing open.
         pub const VENT: u32 = 3;
