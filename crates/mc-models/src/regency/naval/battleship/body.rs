@@ -1,7 +1,7 @@
 //! The Flamberge's body: the Claymore grown to a capital ship. A broad arrowhead, its
 //! whaleback deck rolling down into low sides, the beam widest aft where a course of plates
 //! along each deck edge runs out past the stern into the quarters' points; one long low
-//! fin down the middle, raked back, carrying the flak on its crown and the counter-seekers
+//! fin down the middle, raked back, carrying the AA repeater on its crown and the counter-seekers
 //! on swept wings; a bronze trench of machinery along each side.
 
 use glam::{Vec2, Vec3};
@@ -10,7 +10,7 @@ use crate::builder::{MeshBuilder, Section};
 
 use super::super::super::kit::{dark_plate, metal, v3};
 use super::super::super::machine::{armour, red_slot, swept, Course, Frame};
-use super::guns::{counter_seeker, flak, main_gun, secondary};
+use super::guns::{aa_house, counter_seeker, main_gun, secondary};
 use super::hull::{
     body_x, deck, edge, flank, hull, mirrored, st, team_patch, top_at, tube_doors, Station, RIDGE,
 };
@@ -45,7 +45,7 @@ const FIN_FOOT: f32 = 5.3;
 const FIN_TOP: f32 = 13.9;
 
 /// The fin's section at height `z`: drawn in and moved aft as it rises, so its leading
-/// edge rakes back and its crown sits over the flak.
+/// edge rakes back and its crown sits over the AA repeater.
 fn fin_section(z: f32, inset: f32) -> Section {
     let t = (z - FIN_FOOT) / (FIN_TOP - FIN_FOOT);
     Section::scaled(z, (1.0 - 0.54 * t) * inset, (1.0 - 0.58 * t) * inset).shifted(2.0 * t, 0.0)
@@ -57,7 +57,7 @@ pub(super) fn build(b: &mut MeshBuilder, _tech: u8) {
     for (i, p) in MAIN.iter().enumerate() {
         main_gun(b, i, deck(&HULL, p.x));
     }
-    flak(b, FIN_TOP);
+    aa_house(b, FIN_TOP);
     for (k, p) in SECONDARY.iter().enumerate() {
         secondary(b, k, top_at(&HULL, p.x, p.y));
     }

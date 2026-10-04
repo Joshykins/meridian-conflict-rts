@@ -82,7 +82,7 @@ fn it_fits_its_blueprint() {
     }
 }
 
-/// Two blocks of six cells, a round under each muzzle; a flak house on each pivot
+/// Two blocks of six cells, a round under each muzzle; a AA house on each pivot
 /// reaching its muzzle; red on each counter-seeker head; a turning radar; an interceptor
 /// door at each tube.
 #[test]
@@ -99,7 +99,7 @@ fn it_carries_its_weapons() {
         assert!(round < 1.0, "{key}: no round near muzzle {k}");
     }
     assert_eq!(model.houses.len(), 2, "{key}: two gun houses");
-    for (slot, (pivot, muzzle)) in l.flak.into_iter().enumerate() {
+    for (slot, (pivot, muzzle)) in l.aa.into_iter().enumerate() {
         let house = model.houses[slot];
         assert_eq!(house.weapon as usize, 1 + slot, "{key}");
         assert!(Vec3::from(house.pivot).distance(pivot) < 1e-3, "{key}");
@@ -161,10 +161,10 @@ fn the_unit_files_numbers_are_the_models() {
         );
     }
     assert!(v(seekers.muzzle).distance(cells[0]) < 1e-3);
-    for (k, (pivot, muzzle)) in l.flak.into_iter().enumerate() {
+    for (k, (pivot, muzzle)) in l.aa.into_iter().enumerate() {
         let w = &bp.weapons[1 + k];
-        assert!(v(w.pivot.unwrap()).distance(pivot) < 1e-3, "flak {k} pivot");
-        assert!(v(w.muzzle).distance(muzzle) < 1e-3, "flak {k} muzzle");
+        assert!(v(w.pivot.unwrap()).distance(pivot) < 1e-3, "AA {k} pivot");
+        assert!(v(w.muzzle).distance(muzzle) < 1e-3, "AA {k} muzzle");
     }
     let tubes = &bp.weapons[3];
     assert_eq!(tubes.muzzles.len(), 2);
@@ -187,8 +187,8 @@ fn carrier_numbers() {
     let l = &LAYOUT;
     let cells: Vec<String> = muzzles(l).into_iter().map(f).collect();
     println!("{key} muzzles: [{}]", cells.join(", "));
-    for (p, m) in l.flak {
-        println!("  flak pivot {} muzzle {}", f(p), f(m));
+    for (p, m) in l.aa {
+        println!("  AA pivot {} muzzle {}", f(p), f(m));
     }
     let heads: Vec<String> = l.defence.into_iter().map(f).collect();
     println!("  anti_missile_mounts: [{}]", heads.join(", "));

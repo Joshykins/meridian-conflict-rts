@@ -3,10 +3,9 @@
 //! Picked by data, never by a unit: a missile weapon with `plasma_grade: Gravitic`
 //! (`Weapon::gravitic_seeker`), and a faction's `anti_missile_look: CounterSeeker`.
 //!
-//! - **The seeker** (the Pavise's battery and heavy seeker): a heavy one gathers its charge
-//!   over its cell first (`SimEvent::WeaponCharging`), a ball of red plasma swelling, motes
-//!   drawn in to it. Each leaves its cell with a hard red flash and a snap of filaments, no
-//!   motor flame. In flight every Regency missile is its charge (sprites.wgsl
+//! - **The seeker** (the Pavise's battery and heavy seeker, the silos): it leaves its cell
+//!   the moment it is fired, with a hard red flash and a snap of filaments, no motor flame,
+//!   nothing gathered or held first. In flight every Regency missile is its charge (sprites.wgsl
 //!   `gravitic_seeker`, `PLASMA_LOOK_GRAVITIC_SEEKER`, any plasma `missile`): a
 //!   lavender-white heart in a violet body in a faint shimmering lens, and behind it a black
 //!   smoke tube (`seeker_smoke`). Violet and black are how a Regency missile reads as one a
@@ -31,11 +30,10 @@ use glam::Vec3;
 use mc_core::FxVec3;
 use mc_data::{AntiMissileLook, BlueprintId, Weapon, WeaponColor};
 use mc_sim::mirror::{
-    ProjectileInstance, UnitInstance, KIND_GHOST, KIND_WRECK, PROJECTILE_ENDS_SHIFT,
-    PROJECTILE_FADE_BEAM, PROJECTILE_FRESH, PROJECTILE_STARTS_SHIFT,
+    ProjectileInstance, PROJECTILE_ENDS_SHIFT, PROJECTILE_FADE_BEAM, PROJECTILE_FRESH,
+    PROJECTILE_STARTS_SHIFT,
 };
 
-const ORB: f32 = puff::PLASMA_ORB as f32;
 const BURST: f32 = puff::PLASMA_BURST as f32;
 const GLOB: f32 = puff::PLASMA_GLOB as f32;
 const GLOW: f32 = puff::WARP_GLOW as f32;
@@ -55,9 +53,6 @@ const SMOKE_STEP: f32 = 9.0;
 const MAX_TRAILS: usize = 1600;
 /// Timed lights held at most. A deliberate cosmetic cap: the oldest goes first.
 const MAX_GLOWS: usize = 64;
-/// Heavy seekers gathering their charge at once that are drawn. A deliberate cosmetic cap:
-/// a charge past it is not drawn (its seeker still is).
-const MAX_CHARGES: usize = 24;
 /// Counter-seekers in flight that are drawn. A deliberate cosmetic cap: past it a burn is
 /// not drawn (the kill is still the sim's).
 const MAX_COUNTERS: usize = 96;
@@ -67,15 +62,6 @@ const CHASE: f32 = 0.55;
 const MEET: f32 = 0.6;
 /// A counter-seeker's charge across, metres.
 const COUNTER_SIZE: f32 = 0.55;
-
-/// A heavy seeker gathering its charge over its cell.
-struct Charge {
-    unit: u32,
-    blueprint: BlueprintId,
-    weapon: u8,
-    start: f32,
-    due: f32,
-}
 
 /// A piece of a filament: from `start` for `life` seconds, cooling as it goes.
 #[derive(Clone, Copy)]
@@ -114,7 +100,6 @@ struct Counter {
 
 #[derive(Default)]
 pub(super) struct GraviticFx {
-    charges: Vec<Charge>,
     trails: Vec<Filament>,
     glows: Vec<Glow>,
     counters: Vec<Counter>,
@@ -140,47 +125,12 @@ fn charge_size_of(w: &Weapon, damage: mc_core::Fx) -> f32 {
     (1.0 + damage.to_f32().max(1.0).sqrt() * 0.1) * w.flash.max(0.5)
 }
 
-/// `v` turned `a` radians about the upright.
-fn rot_z(v: Vec3, a: f32) -> Vec3 {
-    let (s, c) = a.sin_cos();
-    Vec3::new(v.x * c - v.y * s, v.x * s + v.y * c, v.z)
-}
-
 /// A random direction, `lift` added upward before it is made unit length.
 fn scatter_dir(r: &mut impl FnMut() -> f32, lift: f32) -> Vec3 {
     Vec3::new(r(), r(), r() + lift).normalize_or(Vec3::Z)
 }
 
 impl Renderer {
-    /// A gun began charging (`WeaponCharging`). True when it is a Gravitic Seeker, whose
-    /// charge this draws over its cell (and nothing else should).
-    pub(super) fn seeker_charging(
-        &mut self,
-        unit: u32,
-        blueprint: BlueprintId,
-        weapon: u8,
-        time: f32,
-    ) -> bool {
-        let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
-        if !w.gravitic_seeker() {
-            return false;
-        }
-        let due = time + w.charge_ticks as f32 * self.tick_seconds;
-        let fx = &mut self.plasma_fx.seekers;
-        fx.charges
-            .retain(|c| !(c.unit == unit && c.blueprint == blueprint && c.weapon == weapon));
-        if fx.charges.len() < MAX_CHARGES {
-            fx.charges.push(Charge {
-                unit,
-                blueprint,
-                weapon,
-                start: time,
-                due,
-            });
-        }
-        true
-    }
-
     /// A Gravitic Seeker left its cell (`ShotFired`): `at` the cell's mouth as drawn, `dir`
     /// the way it goes. A hard red flash and a snap of filaments; no flame, no smoke. True
     /// when this drew the launch.
@@ -197,12 +147,8 @@ impl Renderer {
             return false;
         }
         let s = charge_size(w);
-        let charged = w.charge_ticks > 0;
-        // A gathered charge goes out of its cell with it.
-        self.plasma_fx
-            .seekers
-            .charges
-            .retain(|c| !(c.blueprint == blueprint && c.weapon == weapon && time >= c.due - 0.2));
+        // A heavy seeker leaves with more filaments snapping off it.
+        let heavy = w.damage.to_f32() >= 1000.0;
         let mouth = at + dir * s * 0.3;
         self.push_lit(
             BURST,
@@ -225,7 +171,7 @@ impl Renderer {
             0.0,
         );
         // The containment closing on the charge as it leaves: filaments snapping in to it.
-        let snaps = if charged { 7 } else { 3 };
+        let snaps = if heavy { 7 } else { 3 };
         for _ in 0..snaps {
             let mut r = || self.scatter.signed();
             let out = scatter_dir(&mut r, 0.0);
@@ -462,81 +408,12 @@ impl Renderer {
     }
 
     /// The next tick of every seeker and counter-seeker (from `upload_sim`, after this tick's
-    /// events and shots): charges laid over their cells, the filaments seekers leave, the
-    /// counter-seekers moved on, burst or fizzled.
-    pub(super) fn gravitic_tick(
-        &mut self,
-        units: &[UnitInstance],
-        projectiles: &[ProjectileInstance],
-        time: f32,
-    ) {
-        self.seeker_charges(units, time);
+    /// events and shots): the filaments seekers leave, the counter-seekers moved on, burst
+    /// or fizzled.
+    pub(super) fn gravitic_tick(&mut self, projectiles: &[ProjectileInstance], time: f32) {
         self.seeker_trails(projectiles, time);
         self.counter_seekers(time);
         self.write_gravitic(time);
-    }
-
-    /// A tick of every heavy seeker's charge, swelling over its cell.
-    fn seeker_charges(&mut self, units: &[UnitInstance], time: f32) {
-        let tick = self.tick_seconds.max(0.02);
-        self.plasma_fx
-            .seekers
-            .charges
-            .retain(|c| time < c.due + tick * 4.0);
-        for i in 0..self.plasma_fx.seekers.charges.len() {
-            let c = &self.plasma_fx.seekers.charges[i];
-            let (unit, blueprint, weapon, start, due) =
-                (c.unit, c.blueprint, c.weapon, c.start, c.due);
-            let live = |u: &&UnitInstance| {
-                u.unit_id == unit && u.owner_flags & (KIND_WRECK | KIND_GHOST) == 0
-            };
-            let Some(u) = units.iter().find(live).copied() else {
-                continue;
-            };
-            let w = &self.blueprints.unit(blueprint).weapons[weapon as usize];
-            let s = charge_size(w);
-            // Over the cell's mouth as the hull is drawn this tick.
-            let muzzle = Vec3::from(w.muzzle.to_f32()) + Vec3::Z * s * 0.7;
-            let at = Vec3::from(u.pos) + rot_z(muzzle, u.heading);
-            let f = ((time - start) / (due - start).max(0.01)).clamp(0.0, 1.0);
-            let across = s * (0.25 + 0.75 * f.sqrt());
-            self.push_lit(
-                ORB,
-                at,
-                Vec3::ZERO,
-                time,
-                tick * 2.0,
-                (across, across * 1.04),
-                RED * (1.6 + 4.0 * f * f),
-                0.0,
-            );
-            let motes = (1.0 + f * 3.0 + self.scatter.unit()) as usize;
-            for _ in 0..motes {
-                let mut r = || self.scatter.signed();
-                let out = scatter_dir(&mut r, 0.0);
-                let from = at + out * s * (1.5 + self.scatter.unit() * 1.2);
-                let dot = s * 0.07;
-                let late = self.scatter.unit() * tick;
-                let tint = RED.lerp(HOT, self.scatter.unit() * 0.5) * (3.0 + 4.0 * f);
-                self.push_lit(
-                    MOTE,
-                    from,
-                    (at - from) / 0.329,
-                    time + late,
-                    0.5,
-                    (dot, dot * 0.5),
-                    tint,
-                    0.0,
-                );
-            }
-            self.plasma_fx.seekers.light(Glow {
-                pos: at,
-                color: RED * (5.0 + 60.0 * f * f) * s,
-                range: s * (2.5 + 3.5 * f),
-                start: time,
-                life: tick * 2.0,
-            });
-        }
     }
 
     /// The black smoke each seeker in flight lays down the stretch it flies this tick, each

@@ -883,6 +883,11 @@ pub struct RawWeapon {
     /// glowing shell and a black-cored airburst (renderer `flak_fx`).
     #[serde(default)]
     pub flak: bool,
+    /// A plasma airburst (the Regency's): the timed fuse of a `flak` shell, bursting at the
+    /// point it was laid on if its proximity fuse has not gone off first, drawn as its
+    /// `plasma_grade`'s own burst, not as flak.
+    #[serde(default)]
+    pub airburst: bool,
     /// Extra seconds a ballistic shell stays up. The shot still lands on the
     /// aim point; it just goes higher. Zero (the default) flies at `speed`.
     #[serde(default)]
@@ -1679,6 +1684,7 @@ impl Unit {
                 hitscan: w.hitscan,
                 rail: w.rail,
                 flak: w.flak,
+                airburst: w.airburst,
                 beam: w.beam,
                 loft_ticks: ticks(w.loft).clamp(0, 200) as u16,
                 turret_turn: (steps(w.turret_turn) / TICKS_PER_SECOND as f64)

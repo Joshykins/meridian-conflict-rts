@@ -536,9 +536,10 @@
         mesh: "regency_fusion_cannon", icon: Defense,
         sounds: (death: "blast_large"),
     ),
-    // A plasmeric AA repeater: an organ of four tubes rippling bolts that burst among
-    // aircraft in a spray of plasma, one out of each tube in turn. Less on one plane than a
-    // Sparrow's rotary, but every plane in a burst takes it.
+    // The tech 1 anti-air: a Plasmeric Repeater, the Picket's gun turned on the sky. An organ
+    // of four tubes rippling plasma bolts at aircraft, one out of each tube in turn, each
+    // striking the plane it is fired at. Against the Sparrow: a little more damage a second
+    // on one plane, from under three quarters of its reach.
     (
         key: "regency_t1_aa",
         name: "Canopy",
@@ -550,18 +551,85 @@
         radius: 5.5, height: 7.5, footprint: (1, 1),
         vision: 450, water_build: true,
         weapons: [(
-            name: "Plasmeric AA Repeater",
-            // 4 bolts of 15 a second: 60 a second on one plane.
-            damage: 15, splash: 9, range: 300, reload: 0.7, speed: 650, trajectory: Direct,
+            name: "Plasmeric Repeater",
+            // 4 bolts of 24 every 0.8 s: 120 a second on one plane, to the Sparrow's 110.
+            damage: 24, splash: 1, range: 340, reload: 0.8, speed: 650, trajectory: Direct,
             salvo: 4, salvo_delay: 0.1,
             turret_turn: 240, muzzle: (3.8, 0, 5.8), pivot: (0, 0, 5.8),
             muzzles: [(3.8, -1.35, 5.8), (3.8, -0.45, 5.8), (3.8, 0.45, 5.8), (3.8, 1.35, 5.8)],
-            targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
+            targets: ["Air"], color: Orange, red: 1.0,
             plasma_grade: Some(Plasmeric),
-            flash: 1.2, impact: 1.4, tracer: 0.7,
-            sounds: (fire: "regency_canopy_fire", impact: "regency_canopy_burst", ground: "regency_canopy_burst"),
+            flash: 1.2, impact: 1.0, tracer: 0.7,
+            sounds: (fire: "regency_canopy_fire", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
         )],
         mesh: "regency_spitter", icon: AntiAir,
+        sounds: (death: "blast_large"),
+    ),
+    // The tech 2 anti-air: a Twin Pinched-plasmeric Airburst Repeater, the Regency's answer
+    // to the Barrage. Two barrels, one over the other, fire in turn, each shot a pinched bolt that bursts on a
+    // timed fuse where it was laid (`airburst`: flak's fuse, drawn as Pinched plasma), so a
+    // near miss still takes the flight round it. Against the Barrage: a tenth more damage a
+    // second in a tighter burst, from seven eighths of its reach.
+    (
+        key: "regency_t2_aa",
+        name: "Gorget",
+        role: "Airburst Repeater",
+        tech: 2,
+        categories: ["Land", "Naval", "Defense", "AntiAir"],
+        health: 5800,
+        cost: (mass: 540, energy: 4800, time: 1600),
+        radius: 10, height: 9, footprint: (2, 2),
+        vision: 450, radar: 650, water_build: true,
+        weapons: [(
+            name: "Twin Pinched-plasmeric Airburst Repeater",
+            // 4 bolts of 150 every 1.6 s, the barrels in turn: 375 a second.
+            damage: 150, splash: 30, proximity: 8, airburst: true,
+            range: 560, reload: 1.6, speed: 420, trajectory: Direct,
+            salvo: 4, salvo_delay: 0.15,
+            turret_turn: 160, muzzle: (8.0, 0, 7.0), pivot: (0, 0, 7.0),
+            muzzles: [(8.0, 0, 7.6), (8.0, 0, 6.4)],
+            targets: ["Air"], color: Orange, red: 1.0,
+            plasma_grade: Some(Pinched),
+            flash: 0.9, impact: 1.4, tracer: 1.2,
+            sounds: (fire: "regency_gorget_fire", impact: "regency_gorget_burst", ground: "regency_gorget_burst"),
+        )],
+        mesh: "regency_airburst_repeater", icon: AntiAir,
+        sounds: (death: "blast_large"),
+    ),
+    // The tech 3 anti-air: a Gravitic Seeker Silo, the Regency's answer to the Skyguard.
+    // Eight hatched cells in two rows along the arms of a star; a salvo leaves them the moment it is fired, one seeker after
+    // another, spread over the aircraft in reach (`split`). Against the Skyguard: twice the
+    // seekers at four sevenths the weight each, a little more damage a second, from seven
+    // eighths of its reach, and each seeker as easy for missile defence to take.
+    (
+        key: "regency_t3_aa",
+        name: "Belfry",
+        role: "Seeker Silo",
+        tech: 3,
+        categories: ["Land", "Naval", "Defense", "AntiAir"],
+        health: 10000,
+        cost: (mass: 1500, energy: 15000, time: 4500),
+        radius: 12, height: 14, footprint: (2, 2),
+        vision: 450, water_build: true,
+        weapons: [(
+            name: "Gravitic Seeker Battery",
+            // 8 seekers of 800 every 11 s: 580 a second if every one finds its mark.
+            damage: 800, splash: 24, proximity: 10, range: 2800, reload: 11, speed: 480,
+            trajectory: Direct,
+            turret_turn: 0, arc: 360, muzzle: (4.2, 0, 4.6),
+            // Each under its cell's deck in firing order, the row at +x first (the model's
+            // `CellBlock`s).
+            muzzles: [
+                (4.2, 0, 4.6), (9.0, 0, 4.6), (5.8, 0, 4.6), (7.4, 0, 4.6),
+                (-9.0, 0, 4.6), (-4.2, 0, 4.6), (-7.4, 0, 4.6), (-5.8, 0, 4.6),
+            ],
+            salvo: 8, salvo_delay: 0.2, split: true, hatch: 0.5, caliber: 0.6,
+            targets: ["Air"], color: Orange, red: 1.0, missile: true, guided: true, vertical_launch: true,
+            intercept: 80, impact: 1.6, shockwave: 0.8,
+            plasma_grade: Some(Gravitic),
+            sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
+        )],
+        mesh: "regency_seeker_silo", icon: AntiAir,
         sounds: (death: "blast_large"),
     ),
     (

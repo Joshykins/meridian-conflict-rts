@@ -92,11 +92,11 @@
         // A stand-in: ARC's hover hum until the Regency has a lift sound of their own.
         sounds: (death: "blast", moving: "aster_hover"),
     ),
-    // The mobile anti-air: a stocky six-legged walker carrying a Plasmeric AA Repeater,
-    // the Canopy's organ made small: proximity bolts that burst among aircraft in a spray of
-    // plasma, one out of each tube in turn. Bent from the Gnat: about its damage a second on one plane
-    // but splashed over every plane in the burst, at a ninth less reach. Model:
-    // `regency_mobile_aa` (`models::regency::mobile_aa`), at this size.
+    // The mobile anti-air: a stocky six-legged walker carrying a Plasmeric Repeater, the
+    // Canopy's organ made small: plasma bolts at aircraft, one out of each tube in turn,
+    // each striking the plane it is fired at. Bent from the Gnat: a third more damage a
+    // second on one plane, at a ninth less reach. Model: `regency_mobile_aa`
+    // (`models::regency::mobile_aa`), at this size.
     (
         key: "regency_t1_mobile_aa",
         name: "Brazier",
@@ -109,16 +109,16 @@
         vision: 360,
         motion: (layer: Land, size: 0, speed: 33, accel: 30, turn: 110),
         weapons: [(
-            name: "Plasmeric AA Repeater",
-            // 3 bolts of 12 every 0.8 s: 45 a second on one plane, to the Gnat's 46.
-            damage: 12, splash: 8, range: 320, reload: 0.6, speed: 650, trajectory: Direct,
+            name: "Plasmeric Repeater",
+            // 3 bolts of 14 every 0.7 s: 60 a second on one plane, to the Gnat's 46.
+            damage: 14, splash: 1, range: 320, reload: 0.7, speed: 650, trajectory: Direct,
             salvo: 3, salvo_delay: 0.1,
             turret_turn: 240, muzzle: (2.2, 0, 3.2), pivot: (0, 0, 3.2),
             muzzles: [(2.2, -0.48, 3.2), (2.2, 0.0, 3.2), (2.2, 0.48, 3.2)],
-            targets: ["Air"], color: Orange, red: 1.0, proximity: 6,
+            targets: ["Air"], color: Orange, red: 1.0,
             plasma_grade: Some(Plasmeric),
-            flash: 1.0, impact: 1.2, tracer: 0.6,
-            sounds: (fire: "regency_flak_light_fire", impact: "regency_flak_light_burst", ground: "regency_flak_light_burst"),
+            flash: 1.0, impact: 1.0, tracer: 0.6,
+            sounds: (fire: "regency_brazier_fire", impact: "regency_repeater_hit", ground: "regency_repeater_hit"),
         )],
         mesh: "regency_mobile_aa", icon: AntiAir,
         sounds: (death: "blast", moving: "regency_skitter"),

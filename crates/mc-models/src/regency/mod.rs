@@ -88,7 +88,7 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("regency_raider", 2.6, 4.0, raider::raider),
     // The tech 1 tank: a Plasmeric Repeater on a hull on gravity lift (`hover_tank`).
     ModelDef::new("regency_hover_tank", 4.6, 3.4, hover_tank::hover_tank),
-    // The tech 1 mobile anti-air: a flak organ on a six-legged walker (`mobile_aa`).
+    // The tech 1 mobile anti-air: a AA organ on a six-legged walker (`mobile_aa`).
     ModelDef::new("regency_mobile_aa", 4.0, 4.0, mobile_aa::mobile_aa),
     // The tech 2 battle tank: a lift hull, its turret's gun a Pinched-plasmeric Cannon
     // (`battle_tank`).
@@ -166,6 +166,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     // (`palisade`).
     ModelDef::new("regency_barb", 5.5, 8.0, turrets::picket),
     ModelDef::new("regency_spitter", 5.5, 7.5, turrets::canopy),
+    ModelDef::new("regency_airburst_repeater", 10.0, 9.0, turrets::gorget),
+    ModelDef::new("regency_seeker_silo", 12.0, 14.0, turrets::belfry),
     ModelDef::new("regency_pinch_cannon", 10.5, 11.0, turrets::halberd),
     ModelDef::new("regency_fusion_cannon", 24.0, 24.0, turrets::sunspear),
     ModelDef::new("regency_palisade", 6.0, 5.4, palisade::palisade),
@@ -283,8 +285,10 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_engineer" => 3600,
         // Walls come by the dozen.
         "regency_palisade" => 1500,
-        "regency_pinch_cannon" => 5000,
+        "regency_pinch_cannon" | "regency_airburst_repeater" => 5000,
         "regency_fusion_cannon" => 7500,
+        // Eight cells, each a lid, a rim and a seeker, round a turning array.
+        "regency_seeker_silo" => 6000,
         // Its tech 3 kit waiting on it.
         "regency_ward" => 6000,
         // A skirted tracked body, a turret, the gun and its caged core.
@@ -312,7 +316,10 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_brood" | "regency_hatchery" => Some(0.57),
         // The quay's tech 3: plated booms, pylons and crabs that keep their sides reduced.
         "regency_tidebrood" => Some(0.52),
-        "regency_barb" | "regency_pinch_cannon" => Some(0.52),
+        "regency_barb"
+        | "regency_pinch_cannon"
+        | "regency_airburst_repeater"
+        | "regency_seeker_silo" => Some(0.52),
         // Walls and launcher drums: plated solids that keep their sides reduced.
         "regency_torpedo" => Some(0.52),
         // Towers and talons: plates that keep their sides when reduced.

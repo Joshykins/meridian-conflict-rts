@@ -78,7 +78,7 @@
     "regency_t1_mobile_aa": (
         lore: "A six-legged gun carriage whose repeater organ is always held up at the sky.",
         weapons: {
-            "Plasmeric AA Repeater": "Plasma bolts out of each tube in turn, bursting among aircraft in a spray of burning plasma.",
+            "Plasmeric Repeater": "Plasma bolts out of each tube in turn, each one striking the aircraft it is fired at.",
         },
     ),
     "regency_t3_air_superiority": (
@@ -163,8 +163,8 @@
         lore: "A carrier that holds the sky over a fleet: heavy seekers rising from its deck reach aircraft far past any gun.",
         weapons: {
             "Heavy Gravitic Seeker Battery": "Twelve cells of heavy gravitic seekers, rippled off and spread over the fliers in reach.",
-            "Port Plasmeric AA Repeater": "Bursting bolts for what gets close on the port side.",
-            "Starboard Plasmeric AA Repeater": "Bursting bolts for what gets close on the starboard side.",
+            "Port Plasmeric AA Repeater": "Plasma bolts for what gets close on the port side, each striking the aircraft it is fired at.",
+            "Starboard Plasmeric AA Repeater": "Plasma bolts for what gets close on the starboard side, each striking the aircraft it is fired at.",
             "Interceptor Tubes": "Short gravitic torpedoes that meet torpedoes coming in.",
         },
     ),
@@ -215,7 +215,7 @@
         lore: "The one small hull of the Regency's that stays on the surface: the eyes and the umbrella of a squadron.",
         weapons: {
             "Heavy Plasmeric Repeater": "A heavy plasmeric gun forward that fires slow, hard bolts of plasma.",
-            "Plasmeric AA Repeater": "Bolts of plasma out of each tube in turn, bursting into a spray among aircraft.",
+            "Plasmeric AA Repeater": "Bolts of plasma out of each tube in turn, each striking the aircraft it is fired at.",
         },
     ),
     "regency_t2_destroyer": (
@@ -302,9 +302,21 @@
         },
     ),
     "regency_t1_aa": (
-        lore: "Twin raised barrels on a braced column, fed from a drum magazine, filling the sky with bursting plasma.",
+        lore: "An organ of four short tubes on a braced column, held up at the sky, rippling bolts at anything that flies over.",
         weapons: {
-            "Plasmeric AA Repeater": "Each bolt bursts among aircraft into a spray of hot plasma that burns every one it reaches.",
+            "Plasmeric Repeater": "A plasma bolt out of each tube in turn, each one striking the aircraft it is fired at.",
+        },
+    ),
+    "regency_t2_aa": (
+        lore: "Twin barrels one over the other on an armoured keep, firing in turn; every bolt is fused to burst where the gun laid it.",
+        weapons: {
+            "Twin Pinched-plasmeric Airburst Repeater": "Pinched plasma bolts that burst at the lead point, so a near miss still burns the flight round it.",
+        },
+    ),
+    "regency_t3_aa": (
+        lore: "A star of armoured arms, two of them lined with hatched cells round a fire-control head, throwing gravitic seekers at aircraft far out of sight.",
+        weapons: {
+            "Gravitic Seeker Battery": "Eight seekers leave their cells one after another and spread over every aircraft in reach.",
         },
     ),
     "regency_t1_radar": (

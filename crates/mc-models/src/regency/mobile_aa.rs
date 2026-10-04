@@ -1,5 +1,5 @@
 //! The Regency's tech 1 mobile anti-air, the Brazier, the counterpart of ARC's Gnat: a
-//! stocky six-legged walker with the Outrider's gait, carrying a Plasmeric AA Repeater on a
+//! stocky six-legged walker with the Outrider's gait, carrying a Plasmeric Repeater on a
 //! turret over its back: the Canopy's organ made small (three short tubes in one
 //! clamped block), drawn level and held up at the sky by the sim at rest so it reads as
 //! anti-air from any angle,
@@ -21,7 +21,7 @@ use crate::{part, rig};
 
 use super::chassis::{coarse_crawl_leg, crawl_leg};
 use super::commander::form::{blade, ring, sleeve, OCT};
-use super::guns::flak_organ;
+use super::guns::aa_organ;
 use super::kit::{dark_plate, metal, v3};
 use super::machine::{armour, red_slot, swept, Frame};
 
@@ -208,7 +208,7 @@ fn turret(b: &mut MeshBuilder, line: &Line, z0: f32) {
     });
     b.with_limb(rig::ARM_GUN, |b| {
         b.at(p, |b| {
-            flak_organ(b, line.len(), &TUBES, TUBE_R, CHEEK + 0.05);
+            aa_organ(b, line.len(), &TUBES, TUBE_R, CHEEK + 0.05);
         });
     });
 }

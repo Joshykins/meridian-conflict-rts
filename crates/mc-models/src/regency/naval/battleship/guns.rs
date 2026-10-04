@@ -1,5 +1,5 @@
 //! The Flamberge's guns: the three twin Pinch-fusion Cannon houses, the beam
-//! secondaries, the flak house and the counter-seeker heads.
+//! secondaries, the AA house and the counter-seeker heads.
 //!
 //! A Pinch-fusion gun gathers its charge in front of its bore, held between projectors:
 //! a twin house holds two, side by side, so its projectors stand either side of each and
@@ -17,7 +17,7 @@ use super::super::super::machine::{
     armour, collar, hoop, hoop_on, mouth_rim, red_slot, shaft, swept, Course, Frame,
 };
 use super::hull::{body_x, mirrored, pointed, team_patch, tier, CHAMFERED};
-use super::{charge, FLAK, FLAK_MUZZLE, MAIN, SECONDARY, SECONDARY_REACH, SECONDARY_TWIN, TWIN};
+use super::{charge, AA, AA_MUZZLE, MAIN, SECONDARY, SECONDARY_REACH, SECONDARY_TWIN, TWIN};
 
 /// `n` facets round a drum close up, half as many at the reduced level: a capital ship
 /// carries dozens of drums, and from the reduced level's distance they read as round.
@@ -410,18 +410,18 @@ pub(super) fn secondary(b: &mut MeshBuilder, k: usize, deck: f32) {
     });
 }
 
-// ---- Flak --------------------------------------------------------------------------
+// ---- AA --------------------------------------------------------------------------
 
-/// The flak house on the crown at `deck`: a drum, a hex step on a bronze race with a
-/// plated cheek either side swept back into spikes, and between them two flak tubes in a
+/// The AA house on the crown at `deck`: a drum, a hex step on a bronze race with a
+/// plated cheek either side swept back into spikes, and between them two AA tubes in a
 /// clamped breech held up at the sky, red rims at their mouths.
-pub(super) fn flak(b: &mut MeshBuilder, deck: f32) {
-    let base = FLAK.z - 0.9;
+pub(super) fn aa_house(b: &mut MeshBuilder, deck: f32) {
+    let base = AA.z - 0.9;
     if !b.coarse() {
         let sides = facets(b, 10);
         dark_plate(b);
         b.prism(
-            v3(FLAK.x, 0.0, deck - 0.3),
+            v3(AA.x, 0.0, deck - 0.3),
             sides,
             2.3,
             2.1,
@@ -429,27 +429,27 @@ pub(super) fn flak(b: &mut MeshBuilder, deck: f32) {
         );
         if b.fine() {
             metal(b);
-            hoop(b, v3(FLAK.x, 0.0, base - 0.04), 1.8, 0.45, 0.14, sides);
+            hoop(b, v3(AA.x, 0.0, base - 0.04), 1.8, 0.45, 0.14, sides);
         }
     }
-    let d = FLAK_MUZZLE - FLAK;
+    let d = AA_MUZZLE - AA;
     let len = d.length();
-    b.with_house(3, FLAK, 0.3, |b| {
+    b.with_house(3, AA, 0.3, |b| {
         if b.coarse() {
             return;
         }
         dark_plate(b);
-        b.prism(v3(FLAK.x, 0.0, base), 6, 1.95, 1.7, 0.55);
+        b.prism(v3(AA.x, 0.0, base), 6, 1.95, 1.7, 0.55);
         b.mirror_y(|b| {
             dark_plate(b);
             b.block(
-                v3(FLAK.x - 1.2, 1.25, base + 0.5),
-                v3(FLAK.x + 0.9, 1.7, FLAK.z + 0.65),
+                v3(AA.x - 1.2, 1.25, base + 0.5),
+                v3(AA.x + 0.9, 1.7, AA.z + 0.65),
             );
             armour(
                 b,
                 &Frame::new(
-                    v3(FLAK.x + 0.9, 1.7, FLAK.z + 0.25),
+                    v3(AA.x + 0.9, 1.7, AA.z + 0.25),
                     v3(-1.0, 0.0, 0.35),
                     Vec3::Y,
                 ),
@@ -458,12 +458,12 @@ pub(super) fn flak(b: &mut MeshBuilder, deck: f32) {
             );
         });
         b.with_recoil(|b| {
-            b.at(FLAK, |b| organ(b, len));
+            b.at(AA, |b| organ(b, len));
         });
     });
 }
 
-/// The flak organ in its own frame (the trunnion at the origin, +x up the bore).
+/// The AA organ in its own frame (the trunnion at the origin, +x up the bore).
 fn organ(b: &mut MeshBuilder, len: f32) {
     let fine = b.fine();
     collar(b, Vec3::ZERO, Vec3::Y, 0.5, 2.4);

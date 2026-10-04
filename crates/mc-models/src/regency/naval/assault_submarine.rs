@@ -13,7 +13,7 @@
 //! - 1, two interceptor doors astern ([`INTERCEPT`]).
 //! - Houses 2 and 3, the twin repeaters fore and aft ([`FORE`], [`AFT`]): low plated
 //!   cupolas that sit in the deck's lines, the aft one authored forward and rested round.
-//! - House 4, the flak organ on the sail's back ([`FLAK`]), held up at the sky.
+//! - House 4, the AA organ on the sail's back ([`AA`]), held up at the sky.
 //! - 5, six seeker hatches in the sail's top ([`SEEKERS`]).
 
 use glam::{Vec2, Vec3};
@@ -56,9 +56,9 @@ const AFT: Vec3 = Vec3::new(-12.0, 0.0, 2.7);
 const BORE: f32 = 3.0;
 const BORE_Y: f32 = 0.35;
 const BORE_RISE: f32 = 0.3;
-/// The flak organ's trunnion on the sail's back, and the middle of its two tube mouths.
-const FLAK: Vec3 = Vec3::new(-2.5, 0.0, 4.6);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-0.3, 0.0, 4.6);
+/// The AA organ's trunnion on the sail's back, and the middle of its two tube mouths.
+const AA: Vec3 = Vec3::new(-2.5, 0.0, 4.6);
+const AA_MUZZLE: Vec3 = Vec3::new(-0.3, 0.0, 4.6);
 /// The seeker hatches, in the unit file's order: the muzzles are their doors.
 const SEEKERS: [[f32; 3]; 6] = [
     [4.0, -0.8, 4.5],
@@ -431,43 +431,43 @@ fn twin_bores(b: &mut MeshBuilder, p: Vec3) {
     }
 }
 
-/// The flak house on the sail's back: a hex step on a bronze race, a plated cheek either
-/// side swept back into a spike, and two short flak tubes in a clamped breech held up at
+/// The AA house on the sail's back: a hex step on a bronze race, a plated cheek either
+/// side swept back into a spike, and two short AA tubes in a clamped breech held up at
 /// the sky, red rims at their mouths.
-fn flak(b: &mut MeshBuilder) {
+fn aa_house(b: &mut MeshBuilder) {
     let base = SAIL_TOP - 0.05;
     if b.fine() {
         metal(b);
-        hoop(b, v3(FLAK.x, 0.0, base), 1.2, 0.3, 0.12, 12);
+        hoop(b, v3(AA.x, 0.0, base), 1.2, 0.3, 0.12, 12);
     }
-    let d = FLAK_MUZZLE - FLAK;
+    let d = AA_MUZZLE - AA;
     let len = d.length();
-    b.with_house(4, FLAK, 0.2, |b| {
+    b.with_house(4, AA, 0.2, |b| {
         if b.coarse() {
             return;
         }
         dark_plate(b);
-        b.prism(v3(FLAK.x, 0.0, base), 6, 1.25, 1.05, 0.3);
+        b.prism(v3(AA.x, 0.0, base), 6, 1.25, 1.05, 0.3);
         b.mirror_y(|b| {
             dark_plate(b);
             b.block(
-                v3(FLAK.x - 0.8, 0.72, base + 0.25),
-                v3(FLAK.x + 0.6, 0.98, FLAK.z + 0.45),
+                v3(AA.x - 0.8, 0.72, base + 0.25),
+                v3(AA.x + 0.6, 0.98, AA.z + 0.45),
             );
             let f = Frame::new(
-                v3(FLAK.x + 0.6, 1.0, FLAK.z + 0.15),
+                v3(AA.x + 0.6, 1.0, AA.z + 0.15),
                 v3(-1.0, 0.0, 0.3),
                 Vec3::Y,
             );
             armour(b, &f, &swept(2.5, 0.45, 0.3, 0.45), 0.14);
         });
         b.with_recoil(|b| {
-            b.at(FLAK, |b| organ(b, len));
+            b.at(AA, |b| organ(b, len));
         });
     });
 }
 
-/// The flak organ in its own frame (the trunnion at the origin, +x up the bore).
+/// The AA organ in its own frame (the trunnion at the origin, +x up the bore).
 fn organ(b: &mut MeshBuilder, len: f32) {
     collar(b, Vec3::ZERO, Vec3::Y, 0.3, 1.4);
     dark_plate(b);
@@ -532,7 +532,7 @@ fn seeker_hatches(b: &mut MeshBuilder) {
 }
 
 /// The sail: `outline` (a plan, `mirrored`) lofted from inside the hull at `foot` up to
-/// the flat top, each section `(z, scale x, scale y, shift x)`; the hatches, the flak
+/// the flat top, each section `(z, scale x, scale y, shift x)`; the hatches, the AA repeater
 /// house and a pair of red optics forward under the top.
 fn sail(b: &mut MeshBuilder, outline: &[[f32; 2]], sections: &[[f32; 4]], optic: Vec3) {
     let plan = mirrored(outline);
@@ -552,7 +552,7 @@ fn sail(b: &mut MeshBuilder, outline: &[[f32; 2]], sections: &[[f32; 4]], optic:
     } else {
         b.loft_z(&plan, &s);
     }
-    flak(b);
+    aa_house(b);
     seeker_hatches(b);
     if b.fine() {
         b.mirror_y(|b| red_slot(b, optic, Vec3::Y, v3(1.0, 0.0, -0.4), 1.1, 0.12));
@@ -811,11 +811,7 @@ mod tests {
             .iter()
             .map(|h| (h.weapon, Vec3::from(h.pivot)))
             .collect();
-        assert_eq!(
-            houses,
-            vec![(4, FLAK), (2, FORE), (3, AFT)],
-            "{key}: houses"
-        );
+        assert_eq!(houses, vec![(4, AA), (2, FORE), (3, AFT)], "{key}: houses");
         let tris = |lod: usize| model.lods[lod].indices.len() / 3;
         let (full, mid, coarse) = (tris(0), tris(1), tris(2));
         let budget = super::super::super::triangles(key).unwrap();
@@ -893,8 +889,8 @@ mod tests {
                 let past = gun.iter().map(|q| q.x).fold(f32::MIN, f32::max);
                 assert!(past <= p.x + BORE + 0.1, "{name}: house reaches {past}");
             }
-            let d = near(&house_verts(&model, lod, 4), FLAK_MUZZLE);
-            assert!(d < 0.4, "{name}: flak tubes {d} m from the muzzle");
+            let d = near(&house_verts(&model, lod, 4), AA_MUZZLE);
+            assert!(d < 0.4, "{name}: AA tubes {d} m from the muzzle");
         }
     }
 
@@ -924,7 +920,7 @@ mod tests {
         all(5, &SEEKERS.map(Vec3::from));
         assert!(close(v(w[2].pivot.unwrap()), FORE));
         assert!(close(v(w[3].pivot.unwrap()), AFT));
-        assert!(close(v(w[4].pivot.unwrap()), FLAK));
-        assert!(close(v(w[4].muzzle), FLAK_MUZZLE));
+        assert!(close(v(w[4].pivot.unwrap()), AA));
+        assert!(close(v(w[4].muzzle), AA_MUZZLE));
     }
 }

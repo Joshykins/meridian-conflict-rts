@@ -3289,7 +3289,7 @@ impl Renderer {
         self.write_plasma_fx(units, time);
         self.regency_guns_tick(units, time);
         self.regency_trails(projectiles, time);
-        self.gravitic_tick(units, projectiles, time);
+        self.gravitic_tick(projectiles, time);
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
@@ -4697,15 +4697,13 @@ impl Renderer {
                 );
                 // A squeezed plasma gun gathers its charge in front of the bore
                 // (`regency_guns_fx`), not as an ordinary gun's glow.
-                // A Gravitic Seeker gathers its charge over its cell (`gravitic_fx`).
                 if !self.regency_charging(
                     unit.0,
                     *blueprint,
                     *weapon,
                     Vec3::from(pos.to_f32()),
                     time,
-                ) && !self.seeker_charging(unit.0, *blueprint, *weapon, time)
-                {
+                ) {
                     self.weapon_charging(Vec3::from(pos.to_f32()), *blueprint, *weapon, time);
                 }
                 let w = &self.blueprints.unit(*blueprint).weapons[*weapon as usize];

@@ -26,8 +26,8 @@ const GUN: Vec3 = Vec3::new(8.0, 0.0, 4.0);
 const MUZZLE: Vec3 = Vec3::new(12.6, 0.0, 4.2);
 /// The AA organ's trunnion and the middle of its row of tube mouths, the bore level
 /// (weapon 1, its own gun house; the sim holds it up at the sky at rest).
-const FLAK: Vec3 = Vec3::new(-6.0, 0.0, 7.0);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-3.25, 0.0, 7.0);
+const AA: Vec3 = Vec3::new(-6.0, 0.0, 7.0);
+const AA_MUZZLE: Vec3 = Vec3::new(-3.25, 0.0, 7.0);
 /// The AA organ's tubes across its bore.
 const TUBES: [f32; 4] = [-1.05, -0.35, 0.35, 1.05];
 
@@ -393,16 +393,16 @@ fn fin(b: &mut MeshBuilder, root: Vec3, out: Vec3, face: Vec3, len: f32, w0: f32
 /// The AA organ in its gun house (weapon 1): a hexagonal drum, a cheek either side swept
 /// back and up into a spike, and four short tubes in one clamped block, their hot rims
 /// red. The block pitches and kicks back as one.
-fn flak_house(b: &mut MeshBuilder) {
-    let d = FLAK_MUZZLE - FLAK;
+fn aa_house(b: &mut MeshBuilder) {
+    let d = AA_MUZZLE - AA;
     let len = d.length();
-    b.with_house(1, FLAK, 0.25, |b| {
+    b.with_house(1, AA, 0.25, |b| {
         if b.coarse() {
             b.with_recoil(|b| {
                 dark_plate(b);
                 b.beam(
-                    FLAK - d * 0.25,
-                    FLAK_MUZZLE,
+                    AA - d * 0.25,
+                    AA_MUZZLE,
                     Vec2::new(2.8, 1.2),
                     Vec2::new(0.5, 0.4),
                 );
@@ -412,18 +412,18 @@ fn flak_house(b: &mut MeshBuilder) {
         let fine = b.fine();
         dark_plate(b);
         let sides = b.sides(6);
-        b.prism(FLAK - Vec3::Z * 1.1, sides, 1.7, 1.45, 0.6);
+        b.prism(AA - Vec3::Z * 1.1, sides, 1.7, 1.45, 0.6);
         b.mirror_y(|b| {
             dark_plate(b);
             b.block(
-                v3(FLAK.x - 1.1, 1.55, FLAK.z - 0.5),
-                v3(FLAK.x + 0.7, 1.85, FLAK.z + 0.6),
+                v3(AA.x - 1.1, 1.55, AA.z - 0.5),
+                v3(AA.x + 0.7, 1.85, AA.z + 0.6),
             );
             if fine {
                 armour(
                     b,
                     &Frame::new(
-                        v3(FLAK.x + 0.8, 1.85, FLAK.z - 0.2),
+                        v3(AA.x + 0.8, 1.85, AA.z - 0.2),
                         v3(-1.0, 0.0, 0.55),
                         Vec3::Y,
                     ),
@@ -433,7 +433,7 @@ fn flak_house(b: &mut MeshBuilder) {
             }
         });
         b.with_recoil(|b| {
-            b.at(FLAK, |b| {
+            b.at(AA, |b| {
                 collar(b, Vec3::ZERO, Vec3::Y, 0.42, 3.1);
                 dark_plate(b);
                 loft_x(
@@ -532,22 +532,16 @@ fn tower(b: &mut MeshBuilder, _tech: u8) {
                 2.2,
             );
         });
-        // Tier 1: the long casemate, the flak plinth on its tail.
+        // Tier 1: the long casemate, the AA plinth on its tail.
         tier(b, &arrow(5.4, -11.0, 2.75, 1.6), 2.15, 4.2, 0.9, 0.3);
         // Tier 2 and the crown, stepped up amidships.
         tier(b, &arrow(3.6, -3.2, 2.05, 1.0), 4.2, 6.0, 0.88, 0.25);
         tier(b, &arrow(1.9, -2.3, 1.4, 0.7), 6.0, RADAR.z, 0.85, 0.2);
-        // The flak plinth.
+        // The AA plinth.
         metal(b);
-        b.prism(v3(FLAK.x, 0.0, 4.2), sides, 1.6, 1.6, 0.4);
+        b.prism(v3(AA.x, 0.0, 4.2), sides, 1.6, 1.6, 0.4);
         dark_plate(b);
-        b.prism(
-            v3(FLAK.x, 0.0, 4.6),
-            b.sides(6),
-            2.0,
-            1.7,
-            FLAK.z - 1.1 - 4.6,
-        );
+        b.prism(v3(AA.x, 0.0, 4.6), b.sides(6), 2.0, 1.7, AA.z - 1.1 - 4.6);
         if b.fine() {
             b.mirror_y(|b| {
                 // The tiers' eyes and hot slots: red hairlines let into their faces.
@@ -633,7 +627,7 @@ fn tower(b: &mut MeshBuilder, _tech: u8) {
         });
     }
     main_gun(b, seat);
-    flak_house(b);
+    aa_house(b);
 }
 
 #[cfg(test)]
@@ -657,8 +651,8 @@ mod tests {
             "{key}: {full}/{mid}/{coarse}"
         );
         assert_eq!(model.houses.len(), 1, "{key}: one gun house");
-        assert_eq!(model.houses[0].weapon, 1, "{key}: the flak's house");
-        assert!(Vec3::from(model.houses[0].pivot).distance(FLAK) < 1e-3);
+        assert_eq!(model.houses[0].weapon, 1, "{key}: the AA repeater's house");
+        assert!(Vec3::from(model.houses[0].pivot).distance(AA) < 1e-3);
         for (lod, mesh) in model.lods.iter().enumerate() {
             let name = format!("{key} lod{lod}");
             let top = mesh.vertices.iter().map(|v| v.pos[2]).fold(0.0, f32::max);
@@ -712,10 +706,10 @@ mod tests {
                 .map(|v| v.pos[0])
                 .fold(f32::MIN, f32::max);
             assert!(past <= MUZZLE.x + 0.5, "{name}: turret reaches {past}");
-            let house = near(FLAK_MUZZLE, &|v| v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST);
+            let house = near(AA_MUZZLE, &|v| v.rig & rig::LIMB_MASK == rig::HOUSE_FIRST);
             assert!(
                 house < 0.4,
-                "{name}: gun house {house} m from the flak muzzle"
+                "{name}: gun house {house} m from the AA repeater muzzle"
             );
             if lod < 2 {
                 assert!(
@@ -742,11 +736,11 @@ mod tests {
         assert!((bp.radius.to_f32() - RADIUS).abs() < 1e-3);
         assert!((bp.height.to_f32() - HEIGHT).abs() < 1e-3);
         assert!(bp.radar.to_f32() > 0.0, "it carries radar");
-        let (gun, flak) = (&bp.weapons[0], &bp.weapons[1]);
-        assert!(!gun.mount && flak.mount);
+        let (gun, aa) = (&bp.weapons[0], &bp.weapons[1]);
+        assert!(!gun.mount && aa.mount);
         assert!(v(gun.muzzle).distance(MUZZLE) < 1e-3);
         assert!(v(gun.pivot.unwrap()).distance(GUN) < 1e-3);
-        assert!(v(flak.muzzle).distance(FLAK_MUZZLE) < 1e-3);
-        assert!(v(flak.pivot.unwrap()).distance(FLAK) < 1e-3);
+        assert!(v(aa.muzzle).distance(AA_MUZZLE) < 1e-3);
+        assert!(v(aa.pivot.unwrap()).distance(AA) < 1e-3);
     }
 }

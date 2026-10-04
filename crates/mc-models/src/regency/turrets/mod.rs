@@ -2,7 +2,10 @@
 //! machine on a base of its own:
 //!
 //! - `regency_barb`: the Picket, a Plasmeric Repeater (`picket`).
-//! - `regency_spitter`: the Canopy, a Plasmeric AA Repeater (`canopy`).
+//! - `regency_spitter`: the Canopy, a Plasmeric Repeater at the sky (`canopy`).
+//! - `regency_airburst_repeater`: the Gorget, a Twin Pinched-plasmeric Airburst Repeater
+//!   (`gorget`).
+//! - `regency_seeker_silo`: the Belfry, a Gravitic Seeker Silo (`belfry`).
 //! - `regency_pinch_cannon`: the Halberd, a Pinched-plasmeric Cannon (`halberd`).
 //! - `regency_fusion_cannon`: the Sunspear, a Pinch-fusion Cannon (`sunspear`).
 //! - `regency_springald`: the Springald map gun, a Triune Pinch-fusion Howitzer
@@ -14,7 +17,9 @@
 //! Guns are drawn in their own frame ([`gun_frame`]): the origin at the trunnion, +x down
 //! the bore, +z up off it.
 
+mod belfry;
 mod canopy;
+mod gorget;
 mod halberd;
 mod picket;
 mod springald;
@@ -22,7 +27,9 @@ mod springald;
 /// (`fusion_guns`), the same gun drawn smaller.
 pub(super) mod sunspear;
 
+pub(super) use belfry::belfry;
 pub(super) use canopy::canopy;
+pub(super) use gorget::gorget;
 pub(super) use halberd::halberd;
 pub(super) use picket::picket;
 pub(super) use springald::{springald, HEIGHT as SPRINGALD_HEIGHT, RADIUS as SPRINGALD_RADIUS};
@@ -331,6 +338,7 @@ mod tests {
         for (mesh, line) in [
             ("regency_barb", picket::LINE),
             ("regency_spitter", canopy::LINE),
+            ("regency_airburst_repeater", gorget::LINE),
             ("regency_pinch_cannon", halberd::LINE),
             ("regency_fusion_cannon", sunspear::LINE),
         ] {

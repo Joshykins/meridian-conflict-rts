@@ -1621,7 +1621,8 @@ impl Blueprints {
                         | (w.surfaced as u64) << 5
                         | (w.intercepts as u64) << 6
                         | (w.keeps_aim as u64) << 7
-                        | (w.flak as u64) << 8,
+                        | (w.flak as u64) << 8
+                        | (w.airburst as u64) << 9,
                 );
                 h.write_u64(w.cant.0 as u64);
                 h.write_i64(w.skim.0);

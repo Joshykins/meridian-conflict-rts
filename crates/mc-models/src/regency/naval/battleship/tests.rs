@@ -39,7 +39,7 @@ fn it_fits() {
         .iter()
         .map(|h| (h.weapon, Vec3::from(h.pivot)))
         .collect();
-    let mut want = vec![(0, MAIN[0]), (1, MAIN[1]), (2, MAIN[2]), (3, FLAK)];
+    let mut want = vec![(0, MAIN[0]), (1, MAIN[1]), (2, MAIN[2]), (3, AA)];
     want.extend(SECONDARY.iter().enumerate().map(|(k, &p)| (4 + k as u8, p)));
     assert_eq!(houses, want, "{key}: houses");
     let tris = |lod: usize| model.lods[lod].indices.len() / 3;
@@ -98,7 +98,7 @@ fn it_fits() {
 }
 
 /// Each main house holds both its charges between projectors, clear of them, and reaches
-/// no further than its charges; the secondaries', flak's and torpedo doors' muzzles are
+/// no further than its charges; the secondaries', AA repeater's and torpedo doors' muzzles are
 /// drawn; each counter-seeker head is red.
 #[test]
 fn it_holds_its_weapons() {
@@ -141,9 +141,9 @@ fn it_holds_its_weapons() {
                 assert!(near < 0.4, "{name}: secondary {k} {near} m from {m}");
             }
         }
-        let flak = of_house(&model, 3);
-        let near = nearest(&model, lod, FLAK_MUZZLE, flak);
-        assert!(near < 0.5, "{name}: flak tubes {near} m from the muzzle");
+        let aa = of_house(&model, 3);
+        let near = nearest(&model, lod, AA_MUZZLE, aa);
+        assert!(near < 0.5, "{name}: AA tubes {near} m from the muzzle");
         for t in TUBES {
             let t = Vec3::from(t);
             let near = nearest(&model, lod, t, |v| v.rig & rig::LIMB_MASK == 0);
@@ -176,7 +176,7 @@ fn the_unit_files_weapons_are_the_models() {
             "main {i} charges"
         );
     }
-    assert!(close(v(w[3].pivot.unwrap()), FLAK) && close(v(w[3].muzzle), FLAK_MUZZLE));
+    assert!(close(v(w[3].pivot.unwrap()), AA) && close(v(w[3].muzzle), AA_MUZZLE));
     for (k, &p) in SECONDARY.iter().enumerate() {
         let s = &w[4 + k];
         assert!(close(v(s.pivot.unwrap()), p), "secondary {k} pivot");

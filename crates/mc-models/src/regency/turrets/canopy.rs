@@ -1,5 +1,5 @@
-//! The Canopy (anti-air, a one-cell lot): a Plasmeric AA Repeater rippling proximity-fused
-//! bolts at aircraft, one out of each barrel in turn: the organ. Four short tubes side by
+//! The Canopy (anti-air, a one-cell lot): a Plasmeric Repeater rippling plasma bolts at
+//! aircraft, one out of each barrel in turn: the organ. Four short tubes side by
 //! side in one clamped block on a tripod of plated struts round a bronze column. The organ
 //! is drawn level; the sim holds it up at the sky at rest, so it reads as anti-air from
 //! any angle. Built at sea it stands on a triangular raft.

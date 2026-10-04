@@ -617,10 +617,12 @@
             ],
         ),
 
-        // The Brazier's Plasmeric AA Repeater: the Canopy's launch and burst from a
-        // smaller organ.
-        "regency_flak_light_fire": (like: "regency_canopy_fire", size: 0.85, peak: 0.34),
-        "regency_flak_light_burst": (like: "regency_canopy_burst", size: 0.85, peak: 0.38),
+        // The Brazier's Plasmeric Repeater: the Canopy's launch from a smaller organ.
+        "regency_brazier_fire": (like: "regency_canopy_fire", size: 0.85, peak: 0.34),
+        // The Gorget's airburst repeater: a Halberd's pinch from a smaller bore, and a burst
+        // like the Canopy's old one, bigger.
+        "regency_gorget_fire": (like: "regency_halberd_fire", size: 0.55, peak: 0.42),
+        "regency_gorget_burst": (like: "regency_canopy_burst", size: 1.35, peak: 0.5),
 
         // ---- movement ------------------------------------------------------------------
         // The Outrider walking: a small six-legged crawler scuttling on alternate tripods,

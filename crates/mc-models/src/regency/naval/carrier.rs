@@ -43,12 +43,12 @@ const DECK: f32 = 9.0;
 const SLAB: f32 = 1.6;
 
 /// Where the ship puts what the unit file names: the two cell blocks (fore first) and
-/// their hatches' deck, the flak houses' pivots and muzzles (port first), the
+/// their hatches' deck, the AA houses' pivots and muzzles (port first), the
 /// counter-seeker heads, the radar's bearing and the interceptor doors.
 struct Layout {
     cells: [Vec2; 2],
     cell_deck: f32,
-    flak: [(Vec3, Vec3); 2],
+    aa: [(Vec3, Vec3); 2],
     defence: [Vec3; 4],
     radar: Vec3,
     tubes: [Vec3; 2],
@@ -56,17 +56,17 @@ struct Layout {
 
 /// The AA organ's muzzle from its pivot, the bore level (the sim holds it up at the sky
 /// at rest).
-const FLAK_REACH: Vec3 = Vec3::new(3.4, 0.0, 0.0);
+const AA_REACH: Vec3 = Vec3::new(3.4, 0.0, 0.0);
 
-const fn flak(x: f32, y: f32, z: f32) -> [(Vec3, Vec3); 2] {
+const fn aa_houses(x: f32, y: f32, z: f32) -> [(Vec3, Vec3); 2] {
     [
         (
             Vec3::new(x, y, z),
-            Vec3::new(x + FLAK_REACH.x, y, z + FLAK_REACH.z),
+            Vec3::new(x + AA_REACH.x, y, z + AA_REACH.z),
         ),
         (
             Vec3::new(x, -y, z),
-            Vec3::new(x + FLAK_REACH.x, -y, z + FLAK_REACH.z),
+            Vec3::new(x + AA_REACH.x, -y, z + AA_REACH.z),
         ),
     ]
 }
@@ -645,12 +645,12 @@ fn cells(b: &mut MeshBuilder, centre: Vec2, deck: f32, foot: f32) {
     }
 }
 
-// ---- Weapons 1, 2: the flak houses ---------------------------------------------------
+// ---- Weapons 1, 2: the AA houses ---------------------------------------------------
 
-/// A flak house, weapon `weapon`, on its pivot and muzzle: a barbette up from the deck, a
+/// A AA house, weapon `weapon`, on its pivot and muzzle: a barbette up from the deck, a
 /// hex step on a bronze race, a plated cheek either side swept back into a spike, and the
-/// organ of four flak tubes between them held up at the sky, red rims at their mouths.
-fn flak_house(b: &mut MeshBuilder, weapon: usize, (pivot, muzzle): (Vec3, Vec3)) {
+/// organ of four AA tubes between them held up at the sky, red rims at their mouths.
+fn aa_house(b: &mut MeshBuilder, weapon: usize, (pivot, muzzle): (Vec3, Vec3)) {
     let base = pivot.z - 1.1;
     let sides = b.sides(10);
     dark_plate(b);
@@ -683,7 +683,7 @@ fn flak_house(b: &mut MeshBuilder, weapon: usize, (pivot, muzzle): (Vec3, Vec3))
     });
 }
 
-/// The flak organ in its own frame (the trunnion at the origin, +x up the bore), `len` to
+/// The AA organ in its own frame (the trunnion at the origin, +x up the bore), `len` to
 /// its mouths: a bronze trunnion, a plated breech, four tubes side by side whose sleeves
 /// are rimmed red.
 fn organ(b: &mut MeshBuilder, len: f32) {
@@ -775,7 +775,7 @@ fn counter_seeker(b: &mut MeshBuilder, at: Vec3, foot: f32) {
 const LAYOUT: Layout = Layout {
     cells: [Vec2::new(-1.0, -11.0), Vec2::new(-29.0, -11.0)],
     cell_deck: 10.9,
-    flak: flak(21.0, 16.4, 10.6),
+    aa: aa_houses(21.0, 16.4, 10.6),
     defence: [
         Vec3::new(38.0, 10.5, 10.6),
         Vec3::new(38.0, -10.5, 10.6),
@@ -816,7 +816,7 @@ const TOWER: Vec2 = Vec2::new(-15.0, -11.0);
 
 /// One hull under an arrowhead deck: the bow drawn to a point, the quarters out into two
 /// spikes past the stern; a long armoured ridge on the starboard edge with a cell block
-/// at each end of it and the tower between, the radar's rings over the tower; a flak
+/// at each end of it and the tower between, the radar's rings over the tower; an AA repeater
 /// house on a sponson either side forward.
 fn arrowhead(b: &mut MeshBuilder, _tech: u8) {
     let l = &LAYOUT;
@@ -862,9 +862,9 @@ fn arrowhead(b: &mut MeshBuilder, _tech: u8) {
         cells(b, c, l.cell_deck, ridge_top - 0.1);
     }
     island(b, TOWER, 17.0, 3.4, ridge_top, l.radar);
-    for (k, f) in l.flak.into_iter().enumerate() {
+    for (k, f) in l.aa.into_iter().enumerate() {
         sponson(b, f.0, Vec2::new(f.0.x, f.0.y.signum() * 13.4));
-        flak_house(b, 1 + k, f);
+        aa_house(b, 1 + k, f);
     }
     for d in l.defence {
         counter_seeker(b, d, DECK);

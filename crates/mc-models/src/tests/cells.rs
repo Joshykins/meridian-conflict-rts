@@ -57,7 +57,7 @@ fn cell_muzzles_stand_in_the_cells_their_model_declares() {
             weapon.salvo as usize >= total,
             "{key}: a salvo empties every cell"
         );
-        assert!(weapon.boost_ticks > 0 && weapon.split, "{key}");
+        assert!(weapon.split, "{key}");
         let bits = CellBlock::gpu(blocks).1;
         for (k, m) in weapon.muzzles.iter().enumerate() {
             let [x, y, z] = [m.x.to_f32(), m.y.to_f32(), m.z.to_f32()];

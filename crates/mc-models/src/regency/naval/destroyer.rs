@@ -9,7 +9,7 @@
 //! - House 0, the Pinched-plasmeric Cannon forward ([`GUN`]): a fork whose projectors
 //!   reach past the bore and hold the charge between them ([`CHARGE`], the `muzzle`).
 //! - 1, four torpedo doors in the bow's blunt face under the water ([`TUBES`]).
-//! - House 2, the Plasmeric AA Repeater aft ([`FLAK`]): two short tubes held up at the sky.
+//! - House 2, the Plasmeric AA Repeater aft ([`AA`]): two short tubes held up at the sky.
 //! - 3, two interceptor doors in the transom under the water ([`INTERCEPT`]).
 //!
 //! The hull shield's projector is set with `set_shield_emitter`, the search radar turns on
@@ -39,10 +39,10 @@ const BORE_MOUTH: f32 = 19.4;
 /// How far round the charge the projectors stand.
 #[cfg(test)]
 const HOLD: f32 = 2.2;
-/// The flak house's trunnion, and the middle of its row of tube mouths: the tubes are
+/// The AA house's trunnion, and the middle of its row of tube mouths: the tubes are
 /// held raised at the sky.
-const FLAK: Vec3 = Vec3::new(-13.0, 0.0, 5.0);
-const FLAK_MUZZLE: Vec3 = Vec3::new(-10.9, 0.0, 5.0);
+const AA: Vec3 = Vec3::new(-13.0, 0.0, 5.0);
+const AA_MUZZLE: Vec3 = Vec3::new(-10.9, 0.0, 5.0);
 /// The torpedo doors in the bow's face, as in the unit file.
 const TUBES: [[f32; 3]; 4] = [
     [25.3, -0.7, -1.55],
@@ -469,16 +469,16 @@ fn fork(b: &mut MeshBuilder) {
     }
 }
 
-/// The flak house aft: a barbette from the deck at `deck`, a hex step on a bronze race
+/// The AA house aft: a barbette from the deck at `deck`, a hex step on a bronze race
 /// with a plated cheek either side swept back into spikes, and between them two short
-/// flak tubes in a clamped breech, held up at the sky, red rims at their mouths.
-fn flak(b: &mut MeshBuilder, deck: f32) {
-    let base = FLAK.z - 0.75;
+/// AA tubes in a clamped breech, held up at the sky, red rims at their mouths.
+fn aa_house(b: &mut MeshBuilder, deck: f32) {
+    let base = AA.z - 0.75;
     if !b.coarse() {
         let sides = b.sides(10);
         dark_plate(b);
         b.prism(
-            v3(FLAK.x, 0.0, deck - 0.3),
+            v3(AA.x, 0.0, deck - 0.3),
             sides,
             1.9,
             1.7,
@@ -486,37 +486,37 @@ fn flak(b: &mut MeshBuilder, deck: f32) {
         );
         if b.fine() {
             metal(b);
-            hoop(b, v3(FLAK.x, 0.0, base - 0.04), 1.45, 0.4, 0.12, sides);
+            hoop(b, v3(AA.x, 0.0, base - 0.04), 1.45, 0.4, 0.12, sides);
         }
     }
-    let d = FLAK_MUZZLE - FLAK;
+    let d = AA_MUZZLE - AA;
     let len = d.length();
-    b.with_house(2, FLAK, 0.25, |b| {
+    b.with_house(2, AA, 0.25, |b| {
         if b.coarse() {
             return;
         }
         dark_plate(b);
-        b.prism(v3(FLAK.x, 0.0, base), 6, 1.5, 1.3, 0.45);
+        b.prism(v3(AA.x, 0.0, base), 6, 1.5, 1.3, 0.45);
         b.mirror_y(|b| {
             dark_plate(b);
             b.block(
-                v3(FLAK.x - 0.9, 0.95, base + 0.4),
-                v3(FLAK.x + 0.7, 1.3, FLAK.z + 0.5),
+                v3(AA.x - 0.9, 0.95, base + 0.4),
+                v3(AA.x + 0.7, 1.3, AA.z + 0.5),
             );
             let f = Frame::new(
-                v3(FLAK.x + 0.7, 1.3, FLAK.z + 0.2),
+                v3(AA.x + 0.7, 1.3, AA.z + 0.2),
                 v3(-1.0, 0.0, 0.35),
                 Vec3::Y,
             );
             armour(b, &f, &swept(2.8, 0.55, 0.3, 0.45), 0.2);
         });
         b.with_recoil(|b| {
-            b.at(FLAK, |b| organ(b, len));
+            b.at(AA, |b| organ(b, len));
         });
     });
 }
 
-/// The flak organ in its own frame (the trunnion at the origin, +x up the bore).
+/// The AA organ in its own frame (the trunnion at the origin, +x up the bore).
 fn organ(b: &mut MeshBuilder, len: f32) {
     let fine = b.fine();
     collar(b, Vec3::ZERO, Vec3::Y, 0.4, 1.9);
@@ -586,7 +586,7 @@ fn build(b: &mut MeshBuilder, _tech: u8) {
     hull(b, &HULL, &[0, 3, 8]);
     fin(b);
     pinch_gun(b, deck(&HULL, GUN.x));
-    flak(b, deck(&HULL, FLAK.x));
+    aa_house(b, deck(&HULL, AA.x));
     if b.coarse() {
         team_patch(b, -18.5, -16.0, 1.4, deck(&HULL, -18.0) + 0.05);
         return;
@@ -780,7 +780,7 @@ mod tests {
             .iter()
             .map(|h| (h.weapon, Vec3::from(h.pivot)))
             .collect();
-        assert_eq!(houses, vec![(0, GUN), (2, FLAK)], "{key}: houses");
+        assert_eq!(houses, vec![(0, GUN), (2, AA)], "{key}: houses");
         let shield = Vec3::from(model.shield_emitter.expect("a hull shield"));
         assert!(shield.z > 8.0, "{key}: shield projector at {shield}");
         for (lod, mesh) in model.lods.iter().enumerate() {
@@ -847,12 +847,12 @@ mod tests {
                 round.iter().any(|a| round.iter().any(|c| a.dot(*c) < 0.0)),
                 "{name}: nothing holds the charge from both sides"
             );
-            let flak = house_verts(&model, lod, 2);
-            let near = flak
+            let aa = house_verts(&model, lod, 2);
+            let near = aa
                 .iter()
-                .map(|p| p.distance(FLAK_MUZZLE))
+                .map(|p| p.distance(AA_MUZZLE))
                 .fold(f32::MAX, f32::min);
-            assert!(near < 0.4, "{name}: flak tubes {near} m from the muzzle");
+            assert!(near < 0.4, "{name}: AA tubes {near} m from the muzzle");
             for m in TUBES.iter().chain(INTERCEPT.iter()) {
                 let m = Vec3::from(*m);
                 let near = mesh
@@ -877,7 +877,7 @@ mod tests {
         let w = &bp.weapons;
         let close = |a: Vec3, b: Vec3| a.distance(b) < 0.02;
         assert!(close(v(w[0].pivot.unwrap()), GUN) && close(v(w[0].muzzle), CHARGE));
-        assert!(close(v(w[2].pivot.unwrap()), FLAK) && close(v(w[2].muzzle), FLAK_MUZZLE));
+        assert!(close(v(w[2].pivot.unwrap()), AA) && close(v(w[2].muzzle), AA_MUZZLE));
         let tubes: Vec<Vec3> = w[1].muzzles.iter().map(|&p| v(p)).collect();
         assert_eq!(tubes.len(), TUBES.len());
         assert!(tubes

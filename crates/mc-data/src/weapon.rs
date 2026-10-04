@@ -40,6 +40,8 @@ pub struct Weapon {
     /// A flak shell (`RawWeapon::flak`): bursts at its aim point on a timed fuse if its
     /// proximity fuse has not gone off first.
     pub flak: bool,
+    /// A plasma airburst (`RawWeapon::airburst`): flak's timed fuse, drawn as plasma.
+    pub airburst: bool,
     /// Extra ticks a ballistic shell stays up. Zero: it flies at `projectile_speed`.
     pub loft_ticks: u16,
     /// Angle steps per tick. Zero means the weapon is fixed to the hull.
@@ -328,6 +330,45 @@ mod tests {
             }
         }
         assert!(guns >= 5, "flak guns: {guns}");
+    }
+
+    /// A Gravitic Seeker leaves its cell the moment it is fired: no toss, no booster and
+    /// coast, no charge gathered over the cell first.
+    #[test]
+    fn a_gravitic_seeker_launches_at_once() {
+        let bp =
+            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let mut seekers = 0;
+        for unit in &bp.units {
+            for w in unit.weapons.iter().filter(|w| w.gravitic_seeker()) {
+                seekers += 1;
+                let what = format!("{}: {}", unit.key, w.name);
+                assert_eq!(w.cold_launch_ticks, 0, "{what}: held before its motor");
+                assert_eq!(w.charge_ticks, 0, "{what}: charged before launch");
+            }
+        }
+        assert!(seekers >= 5, "gravitic seekers: {seekers}");
+    }
+
+    /// A plasma airburst is a plasma shot on flak's fuse: never flak itself, and its
+    /// splash is the burst.
+    #[test]
+    fn an_airburst_is_plasma_on_a_fuse() {
+        let bp =
+            Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
+        let mut guns = 0;
+        for unit in &bp.units {
+            for w in unit.weapons.iter().filter(|w| w.airburst) {
+                guns += 1;
+                let what = format!("{}: {}", unit.key, w.name);
+                assert!(!w.flak && !w.missile && !w.hitscan, "{what}");
+                assert!(w.plasma_shot().is_some(), "{what}: not plasma");
+                assert!(w.splash >= Fx::from_int(20), "{what}: burst too small");
+                assert!(w.proximity > Fx::ZERO, "{what}: no proximity fuse");
+                assert_ne!(w.target_mask & crate::cat::AIR, 0, "{what}");
+            }
+        }
+        assert!(guns >= 1, "airburst guns: {guns}");
     }
 
     /// The Onager sits just out of a Trebuchet's reach, and the commander's Shoulder

@@ -3,7 +3,7 @@
 //!
 //! - [`repeater`]: a Plasmeric Repeater pod, chunky and hunched to shed heat, a wide red
 //!   emitter mouth rather than a rifle's bore (the Picket's gun, small).
-//! - [`flak_organ`]: a Plasmeric AA Repeater, short tubes side by side in one clamped
+//! - [`aa_organ`]: a Plasmeric AA Repeater, short tubes side by side in one clamped
 //!   block (the Canopy's organ, small).
 
 use glam::Vec3;
@@ -74,7 +74,7 @@ pub(super) fn repeater(b: &mut MeshBuilder, breech: Vec3, muzzle: Vec3, r: f32) 
 /// bore): a bronze trunnion `trunnion` across, a plated breech block and a clamp, and a
 /// tube at each of `tubes` (y) running out to `len`, each `r` round, a red lip on its
 /// mouth. The tubes' mouths are in a row through `(len, 0, 0)`.
-pub(super) fn flak_organ(b: &mut MeshBuilder, len: f32, tubes: &[f32], r: f32, trunnion: f32) {
+pub(super) fn aa_organ(b: &mut MeshBuilder, len: f32, tubes: &[f32], r: f32, trunnion: f32) {
     let fine = b.fine();
     let half = tubes.iter().fold(0.0f32, |m, y| m.max(y.abs())) + r * 1.4;
     let sides = b.sides(8);

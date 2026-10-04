@@ -236,7 +236,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Material fabricator | Condenser (II, III) |
 | Storage | Reliquary |
 | Point defence T1 / T2 / T3 | Picket / Halberd / Sunspear |
-| Anti-air, radar, wall | Canopy, Orrery (II, III), Palisade |
+| Anti-air T1 / T2 / T3, radar, wall | Canopy / Gorget / Belfry, Orrery (II, III), Palisade |
 | Sonar (T1 to T3), torpedo launcher (T1, T2) | Plummet (II, III), Harpoon (II) |
 | Shield generator (T2, T3) | Ward (II) |
 | Nuke silo, nuke defence, map gun (T4) | Mangonel, Barbican, Springald |
@@ -394,15 +394,21 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     - **Pinch-fusion Beam:** a grade up, with fusion bursts strobing along
       it. The **Orbital Pinch-fusion Beam** is the campaign's glassing beam.
   - **Indirect fire:** **Plasmeric Mortar**, **Plasmeric Howitzer**.
-  - **AA:** **Plasmeric AA Repeater**, bolts out of each tube in turn that
-    burst into a spray of plasma.
+  - **AA:** no flak (user call 2026-10-03). Tech 1 is a **Plasmeric
+    Repeater** turned on the sky, bolts out of each tube in turn that strike
+    the plane they are fired at. Tech 2 is the **Twin Pinched-plasmeric
+    Airburst Repeater**: pinched bolts on flak's timed fuse (`airburst`),
+    bursting as Pinched plasma where they were laid. Tech 3 is a silo of
+    **Gravitic Seekers**. A warship's sky mount is the same plain repeater,
+    named **Plasmeric AA Repeater** to tell it from the surface gun beside it.
   - **Air-dropped:** **Plasmeric Bomb**.
   - **Thrown:** the **Gravitic Bomb**, a plasma charge in gravity containment,
     charged in the hands and launched to land around its target (the T4
     battle scorpion's claws).
   - **Guided: the Gravitic Seeker.** The Regency's missiles: a gravity
     containment holds a plasma charge and steers it onto its target. No
-    exhaust plume. Drawn as its charge, not a rocket (renderer/gravitic_fx.rs,
+    exhaust plume. It launches the moment it is fired (user call
+    2026-10-03): no toss, no booster and coast, no charge gathered first. Drawn as its charge, not a rocket (renderer/gravitic_fx.rs,
     sprites.wgsl `gravitic_seeker`; any missile with a `plasma_grade`): no
     body or motor flame. It leaves its cell with a hard red flash and
     filaments snapping in on it; in flight it is a hard-edged lavender-white
@@ -419,8 +425,7 @@ guided weapons all come from it. As with ARC, it is not a strict ladder.
     ARC's missiles do:
     - **Gravitic Seeker Pod:** salvos.
     - **Gravitic Seeker Battery:** AA.
-    - **Heavy Gravitic Seeker:** tactical and cruise strikes. Its charge
-      gathers over the cell first, a red ball swelling as motes are drawn in.
+    - **Heavy Gravitic Seeker:** tactical and cruise strikes.
       The Sower uses cased cluster missiles instead of the violet charge visual:
       a dark finned body, pointed nose, orange-white motor flame and a pale exhaust trail.
       Its 0.44 m body fits the pod's 0.60 m mouth. Lobbed high, it opens over
