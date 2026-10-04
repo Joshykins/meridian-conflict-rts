@@ -61,7 +61,8 @@ impl Symmetry {
             Layout::Canyon => Some(Symmetry::MirrorSides),
             Layout::Crosswater => Some(Symmetry::QuarterTurn),
             Layout::Tripoint => Some(Symmetry::Thirds),
-            Layout::Threshold => None,
+            // The siege lays its own wreckage with its plan.
+            Layout::Threshold | Layout::Siege => None,
         }
     }
 

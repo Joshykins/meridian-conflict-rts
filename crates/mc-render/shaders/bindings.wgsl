@@ -353,6 +353,45 @@ fn ground_way_heading(xy: vec2<f32>) -> vec2<f32> {
     return vec2<f32>(cos(a), sin(a));
 }
 
+// The streets layer at a map point (ground cover layer 2, ground_cover.rs
+// `streets_at_texels`; mc_map's `StreetSample`): what made ground a city has
+// laid there. Off every city it is a road of no kind on natural ground.
+struct StreetCell {
+    // Signed offset from the nearest road's centreline (positive to its left)
+    // and that road's half width to the kerb, metres; both blended between the
+    // layer's samples, so a kerb or a lane line is as sharp as wanted.
+    offset: f32,
+    half: f32,
+    // STREET_ROAD_* and STREET_GROUND_*, one texel's own.
+    road: u32,
+    junction: bool,
+    ground: u32,
+    // How shelled the ground is, 0-1.
+    battered: f32,
+}
+
+// The streets layer's blended offset alone, metres.
+fn street_offset(xy: vec2<f32>) -> f32 {
+    let uv = xy / globals.map.xy;
+    return (textureSampleLevel(ground_cover, clamp_sampler, uv, 2, 0.0).r * 255.0 - 128.0) * 0.25;
+}
+
+fn street_cell(xy: vec2<f32>) -> StreetCell {
+    let uv = xy / globals.map.xy;
+    let blended = textureSampleLevel(ground_cover, clamp_sampler, uv, 2, 0.0);
+    let size = vec2<i32>(textureDimensions(ground_cover).xy);
+    let texel = clamp(vec2<i32>(floor(uv * vec2<f32>(size))), vec2<i32>(0), size - 1);
+    let own = vec4<u32>(round(textureLoad(ground_cover, texel, 2, 0) * 255.0));
+    var c: StreetCell;
+    c.offset = (blended.r * 255.0 - 128.0) * 0.25;
+    c.half = blended.g * 255.0 * 0.25;
+    c.road = own.b & ~STREET_JUNCTION;
+    c.junction = (own.b & STREET_JUNCTION) != 0u;
+    c.ground = own.a & STREET_KIND_MASK;
+    c.battered = f32(own.a >> STREET_BATTERED_SHIFT) / 15.0;
+    return c;
+}
+
 // x: glacier ice, y: lying snow, from the map's snow layer; z: 1 on a map
 // that has one (the layer's snow is stored from 1/255 up), else 0.
 fn ground_snow_at(xy: vec2<f32>) -> vec3<f32> {

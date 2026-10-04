@@ -481,6 +481,8 @@ pub enum Biome {
     Arctic,
     Desert,
     Wasteland,
+    /// A city and its outskirts.
+    Urban,
 }
 
 impl Biome {
@@ -493,6 +495,7 @@ impl Biome {
             Biome::Arctic => "Arctic",
             Biome::Desert => "Desert",
             Biome::Wasteland => "Wasteland",
+            Biome::Urban => "Urban",
         }
     }
 }

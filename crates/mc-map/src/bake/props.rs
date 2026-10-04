@@ -30,6 +30,10 @@ impl Terrain {
                 Layout::Frostline => self.frostline_forest(x, y, height, slope),
                 Layout::Tripoint => self.tripoint_forest(x, y, height, slope),
                 Layout::Crosswater => self.cw_forest(x, y, height, slope),
+                Layout::Siege => (
+                    self.siege_forest(x, y) * (1.0 - smoothstep(0.3, 0.5, slope)),
+                    0.0,
+                ),
                 _ => self.basin_forest(x, y, height, slope),
             }
         };
@@ -167,6 +171,9 @@ impl Terrain {
         if self.layout == Layout::Tripoint {
             return self.tripoint_tree(x, y, conifer, hash);
         }
+        if self.layout == Layout::Siege {
+            return self.siege_tree(x, y, hash);
+        }
         // The alpine maps' and Crosswater's woods are not mirrored.
         let (px, py) = match self.layout {
             Layout::Alpine | Layout::AlpineTeams | Layout::Crosswater => (x, y),
@@ -218,6 +225,9 @@ impl Terrain {
         };
         let blocked = |x: f64, y: f64| {
             if self.layout == Layout::Canyon && !self.canyon_clear(x, y) {
+                return true;
+            }
+            if self.layout == Layout::Siege && !self.siege_clear(x, y) {
                 return true;
             }
             // Starts sit in ragged glades (`start_clearing`), not drawn circles;

@@ -7,12 +7,12 @@
 //! shader (after the numbers the CPU shares with the shaders, generated from
 //! `gpu_consts.rs`), and `bindings.wgsl` with `regions.wgsl` and `lights.wgsl` in
 //! front of those containing the line `//!use bindings` (`regions` alone for a
-//! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `desert`, `rock`, `surface`,
+//! shader that binds the atmosphere itself and says `//!use regions`); then `shore`, `habitat`, `streets`, `desert`, `rock`, `surface`,
 //! `metal`, `regency`, `scenery`, `warp_hull` and `warp_puffs` for their own `//!use` lines, in that order,
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 18] = [
+pub(crate) const PRELUDES: [&str; 19] = [
     "common",
     "bindings",
     "regions",
@@ -22,6 +22,7 @@ pub(crate) const PRELUDES: [&str; 18] = [
     "regency",
     "lights",
     "habitat",
+    "streets",
     "scenery",
     "desert",
     "rock",
@@ -43,6 +44,7 @@ pub(crate) struct Preludes {
     metal: String,
     regency: String,
     habitat: String,
+    streets: String,
     scenery: String,
     desert: String,
     rock: String,
@@ -73,6 +75,7 @@ impl Preludes {
             metal: read("metal"),
             regency: read("regency"),
             habitat: read("habitat"),
+            streets: read("streets"),
             scenery: read("scenery"),
             desert: read("desert"),
             rock: read("rock"),
@@ -104,6 +107,10 @@ impl Preludes {
         // Where things grow and the air near the ground (needs bindings).
         if uses("habitat") {
             prelude = format!("{prelude}\n{}", self.habitat);
+        }
+        // A city's streets, yards and fields (needs habitat).
+        if uses("streets") {
+            prelude = format!("{prelude}\n{}", self.streets);
         }
         // Canyon-country desert colours (needs habitat).
         if uses("desert") {

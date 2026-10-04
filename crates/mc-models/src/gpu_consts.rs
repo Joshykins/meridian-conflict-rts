@@ -216,6 +216,37 @@ shared! {
         pub const GRID: u32 = 12;
     }
 
+    /// The map's streets layer as the terrain shader reads it (ground cover
+    /// layer 2, `ground_cover::streets_at_texels`): the kinds of road and of
+    /// ground are `mc_map::Road` and `mc_map::Ground`, held equal by
+    /// mc-render's `street_kinds_match_the_map_format` test; the packing is
+    /// `mc_map::StreetSample`'s.
+    pub mod streets as "STREET_" {
+        pub const ROAD_NONE: u32 = 0;
+        pub const ROAD_STREET: u32 = 1;
+        pub const ROAD_AVENUE: u32 = 2;
+        pub const ROAD_HIGHWAY: u32 = 3;
+        pub const ROAD_LANE: u32 = 4;
+        pub const ROAD_RAIL: u32 = 5;
+        pub const GROUND_NATURAL: u32 = 0;
+        pub const GROUND_PAVING: u32 = 1;
+        pub const GROUND_LAWN: u32 = 2;
+        pub const GROUND_YARD: u32 = 3;
+        pub const GROUND_BALLAST: u32 = 4;
+        pub const GROUND_FIELD: u32 = 5;
+        pub const GROUND_RUBBLE: u32 = 6;
+        pub const GROUND_EARTH: u32 = 7;
+        pub const GROUND_APRON: u32 = 8;
+        /// The road byte's junction flag; its kind is below it.
+        pub const JUNCTION: u32 = 0x80;
+        /// The ground byte: its kind in the low nibble, how battered it is
+        /// (0-15) above.
+        pub const KIND_MASK: u32 = 0x0F;
+        pub const BATTERED_SHIFT: u32 = 4;
+        /// The outskirts' fields' grid, metres (`mc_map` `siege/fields.rs`).
+        pub const FIELD_CELL: f32 = 280.0;
+    }
+
     /// Desert map scenery the entity shader dresses by a face's pattern byte
     /// (models/desert.rs, models/dam.rs, scenery.wgsl). Patterns only mean panel
     /// detail on plated materials, so leaves, bark, rock and concrete use the

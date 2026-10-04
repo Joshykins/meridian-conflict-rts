@@ -15,6 +15,8 @@
 //!             row-major: how trodden the ground is (a trail's floor 255),
 //!             then the trail's heading as cos 2a and sin 2a (128 = 0), which
 //!             blend between samples without a seam where a heading wraps
+//! streets     optional: four bytes per height sample (`streets_dims`, 8 m
+//!             apart), row-major: [`StreetSample`]s
 //! ```
 //!
 //! Header:
@@ -42,13 +44,15 @@
 //! 196  u64      wrecks offset, 0 when the map starts with none
 //! 204  u32      wreck count
 //! 208  u64      ways offset, 0 when the map has no ways layer
-//! 216           reserved, zero
+//! 216  u64      streets offset, 0 when the map has no streets layer
+//! 224           reserved, zero
 //! ```
 //!
 //! The snow layer came after version 2 was fixed, in bytes that were reserved
 //! and zero, so every older file reads as a map without one. It is only for
 //! the renderer; the simulation never reads it. The wreckage came the same way,
-//! and the ways layer (also for the renderer only) after it.
+//! and the ways layer (also for the renderer only) after it, and the streets
+//! layer (renderer only too) after that.
 //!
 //! Wreck record (`WRECK_RECORD_LEN`, 72 bytes): `blueprint key [u8; 48]`
 //! (UTF-8, zero padded), `x i64, y i64, heading u16 (Angle), bank i16, mass
@@ -627,6 +631,99 @@ impl Prop {
     }
 }
 
+/// What a road is, in the streets layer. The numbers are in map files and
+/// the terrain shader: never renumber one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum Road {
+    None = 0,
+    /// Asphalt between kerbs, a lane each way.
+    Street = 1,
+    /// A boulevard: two carriageways either side of a planted median.
+    Avenue = 2,
+    /// A highway: two carriageways, a crash barrier between, no kerbs.
+    Highway = 3,
+    /// An unpaved country lane: wheel ruts and a grass crown.
+    Lane = 4,
+    /// A railway: ballast, sleepers and rails along the line.
+    Rail = 5,
+}
+
+/// What the ground off the road is, in the streets layer. The numbers are in
+/// map files and the terrain shader: never renumber one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum Ground {
+    /// The terrain's own (grass, earth, rock): outside the city.
+    Natural = 0,
+    /// Paving slabs: pavements, squares, building lots.
+    Paving = 1,
+    /// A park's mown lawn and paths.
+    Lawn = 2,
+    /// Stained concrete hardstanding: works yards, depots.
+    Yard = 3,
+    /// A rail yard's ballast.
+    Ballast = 4,
+    /// A ploughed or planted field.
+    Field = 5,
+    /// Broken ground, brick and concrete rubble: where a block was flattened.
+    Rubble = 6,
+    /// Bare trodden earth: a vacant lot, a building site.
+    Earth = 7,
+    /// A spaceport's apron: large poured slabs with markings.
+    Apron = 8,
+}
+
+/// The edge of the cells [`Ground::Field`] is surveyed into, metres: one
+/// field per cell (`bake/siege/fields.rs`), the terrain shader drawing the
+/// same cells to lay each field's furrows.
+pub const FIELD_CELL_M: f64 = 280.0;
+
+/// One sample of the streets layer: what the ground is at a height sample,
+/// for the terrain shader. The offset is signed, so it blends between samples
+/// even across a road's centreline, and kerbs and lane lines are drawn from it
+/// far finer than the 8 m grid.
+///
+/// Bytes: offset, half, then the road's kind in the low nibble with the
+/// junction flag in the top bit, then the ground's kind in the low nibble
+/// with how battered it is in the high nibble.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StreetSample {
+    /// Offset from the nearest road's centreline, quarter metres, positive to
+    /// the left of the way the road was laid, stored plus 128: 128 on the
+    /// centreline, 0 and 255 at 32 m or more either side.
+    pub offset: u8,
+    /// That road's half width from its centreline to the kerb, quarter metres.
+    pub half: u8,
+    pub road: Road,
+    /// Where roads cross: no lane lines are painted through it.
+    pub junction: bool,
+    pub ground: Ground,
+    /// How shelled and worn the ground is, 0 to 15: cracks, debris, scorch.
+    pub battered: u8,
+}
+
+impl StreetSample {
+    /// Off every road, on the terrain's own ground.
+    pub const NATURAL: StreetSample = StreetSample {
+        offset: 255,
+        half: 0,
+        road: Road::None,
+        junction: false,
+        ground: Ground::Natural,
+        battered: 0,
+    };
+
+    pub fn bytes(self) -> [u8; 4] {
+        [
+            self.offset,
+            self.half,
+            self.road as u8 | (self.junction as u8) << 7,
+            self.ground as u8 | self.battered.min(15) << 4,
+        ]
+    }
+}
+
 /// A static map object. It has no height: it stands on the terrain at `pos`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Prop {
@@ -754,6 +851,13 @@ impl MapInfo {
         (w / OVERVIEW_STRIDE + 1, h / OVERVIEW_STRIDE + 1)
     }
 
+    /// Streets layer samples per row and per column: one per height sample.
+    #[inline]
+    pub fn streets_dims(&self) -> (u32, u32) {
+        let (w, h) = self.size_cells();
+        (w + 1, h + 1)
+    }
+
     /// Snow layer samples per row and per column.
     #[inline]
     pub fn snow_dims(&self) -> (u32, u32) {
@@ -836,6 +940,8 @@ pub(crate) struct Layout {
     pub wreck_count: u32,
     /// 0: no ways layer.
     pub ways_offset: u64,
+    /// 0: no streets layer.
+    pub streets_offset: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -915,6 +1021,7 @@ pub(crate) fn content_id(
     snow: &[u8],
     wrecks: &[MapWreck],
     ways: &[u8],
+    streets: &[u8],
 ) -> u64 {
     let mut h = StateHasher::new();
     h.write_u32(VERSION);
@@ -974,6 +1081,11 @@ pub(crate) fn content_id(
         h.write_u64(ways.len() as u64);
         h.write_u8s(ways);
     }
+    // And the streets layer.
+    if !streets.is_empty() {
+        h.write_u64(streets.len() as u64);
+        h.write_u8s(streets);
+    }
     h.finish()
 }
 
@@ -1009,6 +1121,7 @@ pub(crate) fn write_header(info: &MapInfo, content_id: u64, layout: &Layout) -> 
     put(196, &layout.wrecks_offset.to_le_bytes());
     put(204, &layout.wreck_count.to_le_bytes());
     put(208, &layout.ways_offset.to_le_bytes());
+    put(216, &layout.streets_offset.to_le_bytes());
     h
 }
 
@@ -1051,6 +1164,7 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
     let wrecks_offset = r.u64()?;
     let wreck_count = r.u32()?;
     let ways_offset = r.u64()?;
+    let streets_offset = r.u64()?;
     let info = MapInfo {
         name,
         tiles_w,
@@ -1085,6 +1199,7 @@ pub(crate) fn parse_header(bytes: &[u8; HEADER_LEN]) -> Result<(MapInfo, u64, La
         wrecks_offset,
         wreck_count,
         ways_offset,
+        streets_offset,
     };
     Ok((info, content_id, layout))
 }

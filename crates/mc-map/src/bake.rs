@@ -66,6 +66,7 @@ mod frostline;
 mod machine;
 mod params;
 mod props;
+mod siege;
 mod threshold;
 mod tripoint;
 
@@ -122,6 +123,12 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     } else {
         Vec::new()
     };
+    let (streets_w, streets_h) = info.streets_dims();
+    let mut streets = if terrain.has_streets() {
+        vec![0u8; (streets_w * streets_h * 4) as usize]
+    } else {
+        Vec::new()
+    };
 
     std::thread::scope(|s| -> Result<(), MapError> {
         // Bounded, so workers stall rather than pile up tiles if the disk is slow.
@@ -169,6 +176,17 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
                 if !tile.ways.is_empty() {
                     lay(&mut ways, &tile.ways, index, 3);
                 }
+                if !tile.streets.is_empty() {
+                    // The streets layer, four bytes per height sample.
+                    let n = TILE_SAMPLES;
+                    let (tx, ty) = (index as u32 % tiles_w, index as u32 / tiles_w);
+                    for j in 0..n {
+                        let row = (ty * TILE_CELLS + j) * streets_w + tx * TILE_CELLS;
+                        let (at, from) = (row as usize * 4, (j * n) as usize * 4);
+                        streets[at..at + n as usize * 4]
+                            .copy_from_slice(&tile.streets[from..from + n as usize * 4]);
+                    }
+                }
                 writer.push_tile(&tile.encoded)?;
                 props.extend(tile.props);
                 land_samples += tile.land_samples;
@@ -179,11 +197,14 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
 
     terrain.city_props(&mut props);
     terrain.precursor_props(&mut props);
+    if terrain.layout == Layout::Siege {
+        terrain.siege_props(&mut props);
+    }
     let count = |family: fn(PropKind) -> bool| props.iter().filter(|p| family(p.kind)).count();
     let (trees, rocks, buildings) = (
         count(PropKind::is_tree),
         count(PropKind::is_rock),
-        count(PropKind::is_building),
+        count(|k| k.is_building() || k.is_city()),
     );
     let precursor = count(PropKind::is_precursor);
     let starts: Vec<FxVec2> = terrain.starts.iter().map(|&p| to_fx(p)).collect();
@@ -199,6 +220,13 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     }
     if !ways.is_empty() {
         writer.set_ways(ways)?;
+    }
+    if !streets.is_empty() {
+        writer.set_streets(streets)?;
+    }
+    // The siege lays its own wreckage, with its plan (`siege/wrecks.rs`).
+    if terrain.layout == Layout::Siege {
+        writer.set_wrecks(terrain.siege_wrecks())?;
     }
     let content_id = writer.finish(props, &starts, &ore)?;
 
@@ -245,6 +273,8 @@ struct BakedTile {
     /// `(wear, cos 2a, sin 2a)` triples, [`SNOW_PER_TILE`] squared; empty on
     /// maps without trails.
     ways: Vec<u8>,
+    /// Street samples, four bytes per height sample; empty on maps without a city.
+    streets: Vec<u8>,
 }
 
 /// Snow layer samples along one tile edge, shared edge included.
@@ -368,6 +398,8 @@ struct Terrain {
     frost: frostline::Frostline,
     /// Tripoint layout only: what it works out at set-up (`tripoint.rs`).
     tp: tripoint::Tripoint,
+    /// Siege layout only: the city's plan (`siege.rs`).
+    siege: siege::Siege,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
     /// Empty until the machine is laid, so what is designed before it sees the landscape.
     benches: Vec<machine::Bench>,
@@ -449,6 +481,7 @@ impl Terrain {
             arch: archipelago::Archipelago::default(),
             canyon: canyon::Canyon::default(),
             frost: frostline::Frostline::default(),
+            siege: siege::Siege::default(),
             tp: tripoint::Tripoint::default(),
             benches: Vec::new(),
         };
@@ -499,6 +532,10 @@ impl Terrain {
         }
         if params.layout == Layout::Crosswater {
             t.setup_crosswater();
+            return t;
+        }
+        if params.layout == Layout::Siege {
+            t.setup_siege();
             return t;
         }
 
@@ -561,8 +598,8 @@ impl Terrain {
     fn fold(&self, x: f64, y: f64) -> (f64, f64, f64) {
         let (vx, vy) = (x - self.size_x / 2.0, y - self.size_y / 2.0);
         let r = (vx * vx + vy * vy).sqrt();
-        // The survival maps are not symmetric: nothing folds.
-        if self.layout == Layout::Threshold {
+        // The survival map and the siege are not symmetric: nothing folds.
+        if matches!(self.layout, Layout::Threshold | Layout::Siege) {
             return (vx, vy, r);
         }
         // The alpine map is fair by a half turn: fold the far half onto the near.
@@ -636,6 +673,7 @@ impl Terrain {
             Layout::Frostline => self.natural_frostline(x, y),
             Layout::Tripoint => self.natural_tripoint(x, y),
             Layout::Crosswater => self.natural_crosswater(x, y),
+            Layout::Siege => self.natural_siege(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -651,6 +689,11 @@ impl Terrain {
                 self.layout,
                 Layout::Threshold | Layout::Frostline | Layout::Tripoint
             )
+    }
+
+    /// Whether the map carries a streets layer: the siege's city.
+    fn has_streets(&self) -> bool {
+        self.layout == Layout::Siege
     }
 
     /// Whether the map carries a ways layer: the canyon's trails.
@@ -1185,12 +1228,18 @@ impl Terrain {
         } else {
             Vec::new()
         };
+        let streets = if self.has_streets() {
+            self.tile_streets(x0, y0)
+        } else {
+            Vec::new()
+        };
         BakedTile {
             encoded: encode_tile(&samples),
             props,
             land_samples,
             snow,
             ways,
+            streets,
         }
     }
 
@@ -1275,4 +1324,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::crosswater("Crosswater", 8, 7)));
     pub(super) static TRIPOINT: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::tripoint("t", 6, 13)));
+    pub(super) static HALCYON: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::siege("t", 6, 3)));
 }

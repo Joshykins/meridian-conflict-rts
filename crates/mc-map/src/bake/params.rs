@@ -1,7 +1,7 @@
 //! The layouts a map can be baked to, the parameters of a bake, and what
 //! each layout asks of them.
 
-use super::{crosswater, frostline, tripoint};
+use super::{crosswater, frostline, siege, tripoint};
 use crate::format::MapError;
 use crate::{MAX_START_POSITIONS, TILE_SIZE_M};
 
@@ -60,6 +60,11 @@ pub enum Layout {
     /// third of a turn wherever units can go; starts Alaska, desert, jungle.
     /// Exactly 12 km.
     Tripoint,
+    /// "Halcyon": three against three at the wall of a besieged city, the
+    /// city north of it, its outskirts south (see `siege.rs`). Not fair by
+    /// symmetry: the city's starts alternate with the outskirts'. Exactly
+    /// 12 km.
+    Siege,
 }
 
 #[derive(Clone, Debug)]
@@ -177,6 +182,15 @@ impl BakeParams {
         }
     }
 
+    /// A square six-player [`Layout::Siege`] map.
+    pub fn siege(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 6,
+            layout: Layout::Siege,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -248,6 +262,15 @@ impl BakeParams {
         {
             return Err(MapError::Invalid(
                 "the Tripoint layout is for exactly 3 players on a 12 km map".into(),
+            ));
+        }
+        if self.layout == Layout::Siege
+            && (self.players != 6
+                || (self.tiles_w as i32 * TILE_SIZE_M) as f64 != siege::SIZE
+                || self.tiles_h != self.tiles_w)
+        {
+            return Err(MapError::Invalid(
+                "the Siege layout is for exactly 6 players on a 12 km map".into(),
             ));
         }
         if self.layout == Layout::Threshold && self.players != 4 {

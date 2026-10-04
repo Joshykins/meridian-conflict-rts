@@ -1,6 +1,7 @@
 //!use bindings
 //!use shore
 //!use habitat
+//!use streets
 //!use desert
 //!use rock
 // Terrain: CDLOD quadtree patches over a streamed heightmap.
@@ -1068,6 +1069,9 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     var relief = o1.yz * 2.2 + o2.yz * 0.55 * (1.0 - smoothstep(0.8, 3.0, px))
         + o3.yz * 0.12 * (1.0 - smoothstep(0.25, 0.9, px));
     relief *= max(rough_ground, 0.15);
+    // A city's paved ground is smooth; its earth and rubble keep some relief.
+    let bare_city = hab.street.ground == STREET_GROUND_EARTH || hab.street.ground == STREET_GROUND_RUBBLE;
+    relief *= 1.0 - hab.made * select(1.0, 0.4, bare_city);
 
     // Boulders you can pick out from a battle camera, where the ground is
     // stony: the rock scan, greyed like the cliffs, on a lit dome.
@@ -1076,9 +1080,11 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     let stony = clamp(w[5] * 0.8 + w[7] * 0.7 + w[6] * 0.3 + w[2] * 0.06
         - sand_w - w[9] * 0.5 - canopy * 0.3, 0.0, 1.0) * (1.0 - max(snow_w, ice_w))
         * (1.0 - smoothstep(0.08, 0.2, slope)) * (1.0 - canyon_trail_floor(hab.way)) + canyon_trail_margin(hab.way) * 0.8;
+    // No boulders on made ground but shelled earth.
+    let stony_here = stony * (1.0 - hab.made * select(1.0, 0.5, hab.street.ground == STREET_GROUND_EARTH));
     // Canyon country's flats are mostly soil and shrubs: fewer loose blocks,
     // which lit from behind read as pits.
-    let boulders = stones(xy, 7.0, stony * side_mix(0.45, 0.18, arid), px, 91.0);
+    let boulders = stones(xy, 7.0, stony_here * side_mix(0.45, 0.18, arid), px, 91.0);
     let boulder_cover = boulders.cover * (1.0 - smoothstep(1.5, 3.0, px));
     var boulder_rgb = vec3<f32>(0.0);
     if boulder_cover > 0.004 {
@@ -1219,6 +1225,20 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
         }
         albedo = side_mix3(plain, albedo, arid);
     }
+    // A city's made ground (streets.wgsl): roads and their markings, kerbs,
+    // pavements, yards, rail yards, rubble, shelled earth, fields.
+    var street_grad = vec2<f32>(0.0);
+    var street_rough = -1.0;
+    var street_metal = 0.0;
+    var street_flat = 0.0;
+    if hab.made > 0.004 {
+        let st = street_shade(xy, hab.street, albedo, px);
+        albedo = mix(albedo, st.rgb, hab.made);
+        street_grad = st.grad * hab.made;
+        street_rough = st.rough;
+        street_metal = st.metal * hab.made;
+        street_flat = st.flat * hab.made;
+    }
     // Snow: drifts a little brighter and darker, bluer in its hollows.
     let drift = 0.93 + 0.1 * fine + 0.05 * sward;
     let snow_rgb = vec3<f32>(0.65, 0.69, 0.74) * drift * mix(vec3<f32>(1.0), vec3<f32>(0.9, 0.95, 1.05), concavity * 1.5);
@@ -1247,7 +1267,8 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
 
     // Scan normals, then the procedural relief and stones as world slopes.
     let g = ground_n.xy / max(ground_n.z, 0.3);
-    let grad = vec3<f32>(g * 1.1 - relief - boulders.grad * boulder_cover - canyon_grad, 0.0);
+    let grad = vec3<f32>(g * 1.1 * (1.0 - street_flat) - relief - boulders.grad * boulder_cover - canyon_grad
+        - street_grad, 0.0);
     let ground_normal = normalize(base_n + (grad - base_n * dot(grad, base_n)));
     var n = normalize(mix(ground_normal, cliff.normal, rock_w));
     n = normalize(mix(n, base_n, max(snow_here * (1.0 - crag_w * 0.6), ice_w) * 0.7));
@@ -1263,6 +1284,9 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
     rough = mix(rough, ice_rough, ice_w);
     if canyon_rough >= 0.0 {
         rough = mix(rough, canyon_rough, rock_w * arid);
+    }
+    if street_rough >= 0.0 {
+        rough = mix(rough, street_rough, hab.made);
     }
     // Rain darkens the ground and gives it a sheen while it falls.
     let soaked = weather_at(xy).w;
@@ -1362,7 +1386,7 @@ fn shade_ground(world: vec3<f32>, crag: vec4<f32>, pixel: vec2<f32>, dpx: vec3<f
 
     var m: Pbr;
     m.albedo = albedo;
-    m.metallic = crater_metal;
+    m.metallic = max(crater_metal, street_metal);
     m.roughness = rough;
     m.emissive = ice_glow + crater_glow;
     let v = normalize(eye - world);

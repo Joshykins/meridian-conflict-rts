@@ -92,9 +92,10 @@ cargo run --release -p mc-map --bin mc-bake -- --layout twin-bays --size-km 16 -
 cargo run --release -p mc-map --bin mc-bake -- --layout canyon --size-km 12 --seed 11 --name "Vermilion Gorge" -o maps/vermilion_gorge.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout frostline --size-km 16 --seed 9 --name "Frostline" -o maps/frostline.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout tripoint --size-km 12 --seed 13 --name "Tripoint" -o maps/tripoint.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout siege --size-km 12 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
 ```
 
-Every layout but the survival ones comes out with starting wreckage (`mc_map::wreckage`). To lay it on a map already
+Every layout but the survival ones comes out with starting wreckage (`mc_map::wreckage`; the siege lays its own with its plan). To lay it on a map already
 baked without baking the terrain again, give `--wreckage-only` with the layout and seed it was baked with, e.g.
 `mc-bake --wreckage-only --layout alpine --seed 3 -o maps/serac_divide.mcmap`.
 

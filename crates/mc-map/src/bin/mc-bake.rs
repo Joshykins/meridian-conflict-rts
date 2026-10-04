@@ -12,9 +12,11 @@
 //! mc-bake --layout frostline --size-km 16 --seed 9 --name "Frostline" -o maps/frostline.mcmap
 //! mc-bake --layout crosswater --size-km 16 --seed 7 --name "Crosswater" -o maps/crosswater.mcmap
 //! mc-bake --layout tripoint --size-km 12 --seed 13 --name "Tripoint" -o maps/tripoint.mcmap
+//! mc-bake --layout siege --size-km 12 --seed 3 --name "Halcyon" -o maps/halcyon.mcmap
 //! ```
 //!
-//! Every layout but the survival ones is then stamped with starting wreckage
+//! Every layout but the survival and siege ones (the siege lays its own) is then
+//! stamped with starting wreckage
 //! (`mc_map::wreckage`). `--wreckage-only` lays it afresh on a map already baked,
 //! terrain untouched: give it the layout and seed the map was baked with.
 
@@ -59,6 +61,10 @@ usage: mc-bake -o <file.mcmap> [options]
                    tripoint: \"Tripoint\", three-way free-for-all: Alaska,
                    desert and jungle parted by Precursor climate walls that
                    meet at an installation in the middle; exactly 12 km
+                   siege: \"Halcyon\", 3v3 at the wall of a besieged city:
+                   the city north of its wall, the outskirts south, the
+                   city's starts alternating with the outskirts'; destructible
+                   buildings; exactly 12 km
   --players <n>    start positions, 1-32 (default: 2 up to 8 km, 4 up to 24 km,
                    else 8; islands and alpine: always 2; the 8-player layouts
                    take exactly 8, crosswater 4, tripoint 3)
@@ -123,9 +129,10 @@ fn parse_args() -> Result<Args, String> {
                     "frostline" => Layout::Frostline,
                     "crosswater" => Layout::Crosswater,
                     "tripoint" => Layout::Tripoint,
+                    "siege" => Layout::Siege,
                     other => {
                         return Err(format!(
-                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater or tripoint)"
+                            "unknown layout '{other}' (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline, crosswater, tripoint or siege)"
                         ))
                     }
                 }
@@ -173,6 +180,9 @@ fn parse_args() -> Result<Args, String> {
     if args.layout == Layout::Crosswater && args.players.is_some_and(|n| n != 4) {
         return Err("--layout crosswater is a four-player layout (--players 4)".into());
     }
+    if args.layout == Layout::Siege && args.players.is_some_and(|n| n != 6) {
+        return Err("--layout siege is a six-player layout (--players 6)".into());
+    }
     if args.layout == Layout::Threshold && args.players.is_some_and(|n| n != 4) {
         return Err("--layout threshold has exactly 4 starts (--players 4)".into());
     }
@@ -218,6 +228,7 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         Layout::Frostline => BakeParams::frostline(&name, args.size_km / 2, args.seed),
         Layout::Crosswater => BakeParams::crosswater(&name, args.size_km / 2, args.seed),
         Layout::Tripoint => BakeParams::tripoint(&name, args.size_km / 2, args.seed),
+        Layout::Siege => BakeParams::siege(&name, args.size_km / 2, args.seed),
     };
     params.threads = args.threads;
     if let Some(players) = args.players {

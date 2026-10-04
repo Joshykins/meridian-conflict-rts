@@ -51,6 +51,26 @@ struct Habitat {
     // sides meet. Everything above is already mixed by them.
     tropical: f32,
     desert: f32,
+    // A city's made ground (the map's streets layer): the cell, and how much of
+    // the ground here is made, 0-1 (roads, pavements, yards, rubble, fields:
+    // everything but its lawns and the terrain's own ground). Nothing grows on it.
+    street: StreetCell,
+    made: f32,
+}
+
+// How much of the ground under a street cell is made, 0-1: a road's running
+// surface to its kerb (a highway's to its shoulder), and every kind of ground
+// but lawn and the terrain's own.
+fn street_made(c: StreetCell) -> f32 {
+    var made = 0.0;
+    if c.road != STREET_ROAD_NONE {
+        let shoulder = select(0.0, 1.8, c.road == STREET_ROAD_HIGHWAY);
+        made = 1.0 - smoothstep(c.half + shoulder - 0.15, c.half + shoulder + 0.25, abs(c.offset));
+    }
+    if c.ground != STREET_GROUND_NATURAL && c.ground != STREET_GROUND_LAWN {
+        made = 1.0;
+    }
+    return made;
 }
 
 // A canyon trail's floor, 0-1, from Habitat::way (its margin is
@@ -81,6 +101,8 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
     let climate = climate_at(xy, px);
     h.tropical = climate.x;
     h.desert = climate.y;
+    h.street = street_cell(xy);
+    h.made = street_made(h.street);
 
     // Warped, non-periodic fields: soil patches (tens of metres), habitats
     // (hundreds) and moisture (the better part of a kilometre).
@@ -194,6 +216,29 @@ fn habitat(xy: vec2<f32>, z: f32, base_n: vec3<f32>, px: f32) -> Habitat {
         + smoothstep(0.78, 0.9, broad * 0.6 + patchy * 0.5) * 0.9) * (1.0 - canopy);
     h.w[8] = sand_w * 2.0;
     h.w[9] = (1.0 - sand_w) * smoothstep(0.55, 0.85, wet + concavity * 0.6) * (1.0 - smoothstep(0.08, 0.2, slope)) * 1.2;
+    if h.street.ground == STREET_GROUND_LAWN {
+        // A park's mown lawn: lush grass, no stones or bare patches.
+        h.w[1] = max(h.w[1], open * 1.4);
+        h.w[2] *= 0.4;
+        h.w[5] *= 0.15;
+        h.w[6] *= 0.2;
+        h.w[7] *= 0.1;
+        h.w[9] *= 0.3;
+    }
+    let g = h.street.ground;
+    if g == STREET_GROUND_EARTH || g == STREET_GROUND_RUBBLE || g == STREET_GROUND_FIELD {
+        // Bare soil, which streets.wgsl lays its rubble, soot or crop over:
+        // dry dirt, mud in the shelled ground, stones in the rubble.
+        let bare = 1.0 - sand_w;
+        h.w[1] = 0.0;
+        h.w[2] = 0.0;
+        h.w[3] = 0.0;
+        h.w[4] = 0.0;
+        h.w[6] = max(h.w[6], bare * 1.4);
+        h.w[7] *= 0.3;
+        h.w[9] = select(h.w[9] * 0.5, max(h.w[9], bare * 0.45), g == STREET_GROUND_EARTH);
+        h.w[5] = select(h.w[5] * 0.3, max(h.w[5], bare * 0.7), g == STREET_GROUND_RUBBLE);
+    }
     if h.desert > 0.0 {
         // Nothing lush: dry dirt, talus, slickrock and sand (desert.wgsl colours them).
         let ground = 1.0 - sand_w;
@@ -387,7 +432,9 @@ fn grass_share(h: Habitat) -> vec4<f32> {
         * smoothstep(0.3, 1.4, h.alt)
         * (1.0 - h.canopy * 0.92)
         * (1.0 - h.sand_w);
-    let green = vec4<f32>(density, lush, meadow, moss);
+    // Nothing grows on a city's made ground; a lawn is kept mown short.
+    let mown = select(1.0, 0.55, h.street.ground == STREET_GROUND_LAWN);
+    let green = vec4<f32>(density * (1.0 - h.made) * mown, lush, meadow, moss);
     if h.desert > 0.0 {
         // Where two regions meet at a climate wall.
         return mix(green, arid, h.desert);

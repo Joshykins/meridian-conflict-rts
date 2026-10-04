@@ -24,6 +24,7 @@ pub struct MapWriter {
     snow: Vec<u8>,
     wrecks: Vec<MapWreck>,
     ways: Vec<u8>,
+    streets: Vec<u8>,
     pos: u64,
 }
 
@@ -43,6 +44,7 @@ impl MapWriter {
             snow: Vec::new(),
             wrecks: Vec::new(),
             ways: Vec::new(),
+            streets: Vec::new(),
             pos: reserved as u64,
             info,
         })
@@ -82,13 +84,31 @@ impl MapWriter {
         Ok(())
     }
 
-    /// Carries over a map's renderer layers (snow, ways) when rewriting it.
+    /// Gives the map a streets layer: [`StreetSample`]s, four bytes each, on
+    /// the height samples' grid ([`MapInfo::streets_dims`]), row-major.
+    pub fn set_streets(&mut self, layer: Vec<u8>) -> Result<(), MapError> {
+        let (w, h) = self.info.streets_dims();
+        if layer.len() != (w * h * 4) as usize {
+            return Err(MapError::Invalid(format!(
+                "a streets layer of {} bytes; this map's is {}",
+                layer.len(),
+                w * h * 4
+            )));
+        }
+        self.streets = layer;
+        Ok(())
+    }
+
+    /// Carries over a map's renderer layers (snow, ways, streets) when rewriting it.
     pub fn keep_layers(&mut self, file: &MapFile) -> Result<(), MapError> {
         if let Some(snow) = file.snow() {
             self.set_snow(snow.to_vec())?;
         }
         if let Some(ways) = file.ways() {
             self.set_ways(ways.to_vec())?;
+        }
+        if let Some(streets) = file.streets() {
+            self.set_streets(streets.to_vec())?;
         }
         Ok(())
     }
@@ -275,6 +295,11 @@ impl MapWriter {
         if !self.ways.is_empty() {
             layout.ways_offset = at;
             self.out.write_all(&self.ways)?;
+            at += self.ways.len() as u64;
+        }
+        if !self.streets.is_empty() {
+            layout.streets_offset = at;
+            self.out.write_all(&self.streets)?;
         }
 
         let id = content_id(
@@ -287,6 +312,7 @@ impl MapWriter {
             &self.snow,
             &self.wrecks,
             &self.ways,
+            &self.streets,
         );
         self.out.seek(SeekFrom::Start(0))?;
         self.out.write_all(&write_header(&info, id, &layout))?;

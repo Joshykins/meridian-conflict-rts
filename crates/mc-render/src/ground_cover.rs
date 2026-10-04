@@ -2,7 +2,8 @@
 //! forest floor and canopy shade where the forests actually stand, instead of
 //! guessing from noise that has nothing to do with where the baker put them.
 //! A map with a snow layer adds its glacier ice and lying snow, one with a
-//! ways layer the trails trodden into it.
+//! ways layer the trails trodden into it, one with a streets layer its city's
+//! roads, pavements, yards and fields.
 
 use crate::keep::{kept, Kept};
 use mc_map::{MapFile, PropKind};
@@ -26,6 +27,14 @@ pub struct GroundCover {
     /// the trail's heading as cos 2a, sin 2a (0.5 = 0); a = how much of a crag
     /// the ground is (`cliff_blocks::crag_field`).
     pub ways: Vec<u8>,
+    /// The third layer, the same size, RGBA8, from the map's streets layer
+    /// (`mc_map::StreetSample`) moved to the texels' middles: r = signed
+    /// offset from the nearest road's centreline and g = its half width,
+    /// both in quarter metres and blended, so they filter; b = the road's
+    /// kind and junction flag, a = the ground's kind and how battered it is,
+    /// each one sample's own (read unfiltered). All zero on a map without
+    /// one: ground of the terrain's own on a road of no kind.
+    pub streets: Vec<u8>,
 }
 
 /// A tree's crown radius at scale 1 in metres, and how much of it is conifer
@@ -115,12 +124,89 @@ fn ground_cover_made(map: &MapFile) -> GroundCover {
     {
         ways[i * 4 + 3] = (crag * 255.0).round() as u8;
     }
+    let streets = match map.streets() {
+        Some(layer) => streets_at_texels(layer, map.info().streets_dims(), cell, (w, h)),
+        None => vec![0u8; w * h * 4],
+    };
     GroundCover {
         width: w as u32,
         height: h as u32,
         texels,
         ways,
+        streets,
     }
+}
+
+/// The streets layer's samples (one per height sample, `CELL_SIZE_M` apart)
+/// at the middles of `(w, h)` texels `cell` metres across: the offsets
+/// blended from the four samples round each middle (exact for a straight
+/// road), the kinds of the nearest of those to a road, the ground's kind by
+/// most of them, the most battered.
+fn streets_at_texels(
+    layer: &[u8],
+    (sw, sh): (u32, u32),
+    cell: f32,
+    (w, h): (usize, usize),
+) -> Vec<u8> {
+    let pitch = mc_map::CELL_SIZE_M as f32;
+    let at = |x: usize, y: usize| {
+        let i = (y.min(sh as usize - 1) * sw as usize + x.min(sw as usize - 1)) * 4;
+        [layer[i], layer[i + 1], layer[i + 2], layer[i + 3]]
+    };
+    let mut out = vec![0u8; w * h * 4];
+    for y in 0..h {
+        for x in 0..w {
+            let (sx, sy) = (
+                (x as f32 + 0.5) * cell / pitch,
+                (y as f32 + 0.5) * cell / pitch,
+            );
+            let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
+            let (fx, fy) = (sx.fract(), sy.fract());
+            let corners = [
+                at(x0, y0),
+                at(x0 + 1, y0),
+                at(x0, y0 + 1),
+                at(x0 + 1, y0 + 1),
+            ];
+            let weights = [
+                (1.0 - fx) * (1.0 - fy),
+                fx * (1.0 - fy),
+                (1.0 - fx) * fy,
+                fx * fy,
+            ];
+            let blend = |c: usize| {
+                corners
+                    .iter()
+                    .zip(weights)
+                    .map(|(s, wt)| s[c] as f32 * wt)
+                    .sum::<f32>()
+                    .round() as u8
+            };
+            let nearest = corners
+                .iter()
+                .min_by_key(|s| s[0].abs_diff(128))
+                .copied()
+                .unwrap_or_default();
+            let junction = corners.iter().any(|s| s[2] & 0x80 != 0) as u8;
+            let ground = corners
+                .iter()
+                .map(|s| s[3] & 0x0F)
+                .max_by_key(|g| {
+                    (
+                        corners.iter().filter(|s| s[3] & 0x0F == *g).count(),
+                        u8::MAX - g,
+                    )
+                })
+                .unwrap_or(0);
+            let battered = corners.iter().map(|s| s[3] >> 4).max().unwrap_or(0);
+            let i = (y * w + x) * 4;
+            out[i] = blend(0);
+            out[i + 1] = blend(1);
+            out[i + 2] = nearest[2] & 0x7F | junction << 7;
+            out[i + 3] = ground | battered << 4;
+        }
+    }
+    out
 }
 
 /// A layer of `(sw, sh)` byte samples `pitch` metres apart, read bilinearly at
@@ -191,6 +277,49 @@ fn box_line(src: &[f32], dst: &mut [f32], r: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The shader's street kinds are the map format's.
+    #[test]
+    fn street_kinds_match_the_map_format() {
+        use crate::gpu_consts::streets as g;
+        use mc_map::{Ground, Road};
+        let roads = [
+            (Road::None, g::ROAD_NONE),
+            (Road::Street, g::ROAD_STREET),
+            (Road::Avenue, g::ROAD_AVENUE),
+            (Road::Highway, g::ROAD_HIGHWAY),
+            (Road::Lane, g::ROAD_LANE),
+            (Road::Rail, g::ROAD_RAIL),
+        ];
+        for (road, id) in roads {
+            assert_eq!(road as u32, id, "{road:?}");
+            assert_eq!(road as u32 & g::JUNCTION, 0);
+        }
+        let grounds = [
+            (Ground::Natural, g::GROUND_NATURAL),
+            (Ground::Paving, g::GROUND_PAVING),
+            (Ground::Lawn, g::GROUND_LAWN),
+            (Ground::Yard, g::GROUND_YARD),
+            (Ground::Ballast, g::GROUND_BALLAST),
+            (Ground::Field, g::GROUND_FIELD),
+            (Ground::Rubble, g::GROUND_RUBBLE),
+            (Ground::Earth, g::GROUND_EARTH),
+            (Ground::Apron, g::GROUND_APRON),
+        ];
+        for (ground, id) in grounds {
+            assert_eq!(ground as u32, id, "{ground:?}");
+            assert!(id <= g::KIND_MASK);
+        }
+        let sample = mc_map::StreetSample {
+            junction: true,
+            battered: 9,
+            ..mc_map::StreetSample::NATURAL
+        };
+        let b = sample.bytes();
+        assert_eq!(b[2] as u32 & g::JUNCTION, g::JUNCTION);
+        assert_eq!(b[3] as u32 >> g::BATTERED_SHIFT, 9);
+        assert_eq!(g::FIELD_CELL as f64, mc_map::format::FIELD_CELL_M);
+    }
 
     #[test]
     fn box_blur_keeps_the_total_away_from_edges() {

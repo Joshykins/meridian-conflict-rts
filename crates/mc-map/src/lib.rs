@@ -27,7 +27,8 @@ pub mod wreckage;
 pub use bake::{bake, BakeParams, BakeReport, Layout};
 pub use file::MapFile;
 pub use format::{
-    encode_tile, EncodedTile, MapError, MapInfo, MapWreck, MapWriter, OreRegion, Prop, PropKind,
+    encode_tile, EncodedTile, Ground, MapError, MapInfo, MapWreck, MapWriter, OreRegion, Prop,
+    PropKind, Road, StreetSample,
 };
 pub use heightfield::{FlattenRecord, Heightfield, RAYCAST_MAX_LENGTH_M, RAYCAST_MAX_STEPS};
 

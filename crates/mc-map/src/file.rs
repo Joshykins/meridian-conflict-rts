@@ -27,6 +27,7 @@ pub struct MapFile {
     ore: Vec<OreRegion>,
     snow: Vec<u8>,
     ways: Vec<u8>,
+    streets: Vec<u8>,
     wrecks: Vec<MapWreck>,
 }
 
@@ -122,6 +123,14 @@ impl MapFile {
             }
         };
 
+        let streets = match layout.streets_offset {
+            0 => Vec::new(),
+            at => {
+                let (w, h) = info.streets_dims();
+                section(at, (w * h * 4) as usize)?
+            }
+        };
+
         let wrecks = match layout.wrecks_offset {
             0 => Vec::new(),
             at => {
@@ -144,6 +153,7 @@ impl MapFile {
             ore,
             snow,
             ways,
+            streets,
             wrecks,
         })
     }
@@ -242,6 +252,13 @@ impl MapFile {
         (!self.ways.is_empty()).then_some(&self.ways[..])
     }
 
+    /// The streets: [`StreetSample`](crate::format::StreetSample)s, four bytes
+    /// each, one per height sample ([`MapInfo::streets_dims`]), row-major.
+    /// `None` for a map without a city. For the renderer only.
+    pub fn streets(&self) -> Option<&[u8]> {
+        (!self.streets.is_empty()).then_some(&self.streets[..])
+    }
+
     /// Wreckage the map starts with; empty for a map without any.
     pub fn wrecks(&self) -> &[MapWreck] {
         &self.wrecks
@@ -268,6 +285,7 @@ impl MapFile {
             &self.snow,
             &self.wrecks,
             &self.ways,
+            &self.streets,
         );
         if computed == self.content_id {
             Ok(())
@@ -435,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn ways_layer_round_trips_after_the_other_sections() {
+    fn ways_and_streets_layers_round_trip_after_the_other_sections() {
         let path = temp_path("ways");
         let mut w = MapWriter::create(&path, info(1, 1)).unwrap();
         let samples: Vec<u16> = (0..TILE_SAMPLE_COUNT as u32)
@@ -459,10 +477,18 @@ mod tests {
             w.set_ways(vec![0; 10]).is_err(),
             "a layer of the wrong size"
         );
+        let (tw, th) = info(1, 1).streets_dims();
+        let streets: Vec<u8> = (0..tw * th * 4).map(|i| (i * 13 % 241) as u8).collect();
+        w.set_streets(streets.clone()).unwrap();
+        assert!(
+            w.set_streets(vec![0; 12]).is_err(),
+            "a layer of the wrong size"
+        );
         let id = w
             .finish(Vec::new(), &[FxVec2::from_ints(512, 512)], &[])
             .unwrap();
         let file = MapFile::open(&path).unwrap();
+        assert_eq!(file.streets(), Some(&streets[..]));
         assert_eq!(file.ways(), Some(&ways[..]));
         assert_eq!(file.snow(), Some(&snow[..]));
         assert_eq!(file.wrecks(), &[wreck][..]);
