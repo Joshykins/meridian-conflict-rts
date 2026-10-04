@@ -31,7 +31,7 @@ mod springald;
 /// (`fusion_guns`), the same gun drawn smaller.
 pub(super) mod sunspear;
 
-pub(super) use basilisk::{basilisk, basilisk_jacket, basilisk_upright};
+pub(super) use basilisk::basilisk;
 pub(super) use belfry::belfry;
 pub(super) use canopy::canopy;
 pub(super) use gorget::gorget;
