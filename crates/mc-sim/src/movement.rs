@@ -246,8 +246,10 @@ impl World {
                         // Ease toward cruise altitude and limit changes in vertical
                         // velocity, so terrain steps do not jerk the airframe.
                         let previous = self.state.units.air_velocity[row].z;
-                        let takeoff =
-                            self.state.units.z[row] < self.ground_surface(m.pos) + mo.altitude / 2;
+                        // Taking off, or far under the height it wants (a tower ahead).
+                        let takeoff = self.state.units.z[row]
+                            < self.ground_surface(m.pos) + mo.altitude / 2
+                            || self.state.units.z[row] < want_z - mo.altitude / 2;
                         let limit = if let Some(rate) = lift {
                             rate / DT
                         } else if takeoff {

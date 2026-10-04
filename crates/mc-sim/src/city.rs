@@ -407,6 +407,29 @@ impl CityShapes {
         )
     }
 
+    /// The tallest city structure's top an aircraft at `p` heading along
+    /// `dir` (a unit vector) must clear within `reach` metres ahead: the
+    /// buckets round its course. `None` where the city has nothing. Tops of
+    /// fallen structures still count: an aircraft keeps its height over a
+    /// ruined district.
+    pub(crate) fn roof_ahead(&self, p: FxVec2, dir: FxVec2, reach: Fx) -> Option<Fx> {
+        if self.bucket_top.is_empty() || self.highest == Fx::MIN {
+            return None;
+        }
+        let step = Fx::from_int(BUCKET_M);
+        let steps = (reach / step).ceil_int().clamp(0, 16);
+        let mut roof = Fx::MIN;
+        for k in 0..=steps {
+            let (bx, by) = self.bucket_of(p + dir * (step * k));
+            for y in (by - 1).max(0)..=(by + 1).min(self.dims.1 - 1) {
+                for x in (bx - 1).max(0)..=(bx + 1).min(self.dims.0 - 1) {
+                    roof = roof.max(self.bucket_top[(y * self.dims.0 + x) as usize]);
+                }
+            }
+        }
+        (roof > Fx::MIN).then_some(roof)
+    }
+
     fn parts_of(&self, row: usize) -> &[Part] {
         &self.parts[self.first[row] as usize..self.first[row + 1] as usize]
     }

@@ -391,3 +391,45 @@ fn a_snapshot_of_a_bad_city_table_is_refused() {
     let bytes = other.snapshot();
     assert!(r.restore(terrain(), &bytes).is_err());
 }
+
+/// An aircraft keeps its cruise height over a city's rooftops: crossing a
+/// skyscraper it climbs over it, not through it.
+#[test]
+fn an_aircraft_flies_over_a_skyscraper_not_through_it() {
+    let tower = prop(PropKind::CitySkyscraper, 1000, 1000, Angle::ZERO, 0);
+    let roof = Fx::from_int(20 + 212);
+    let mut w = world(vec![tower]);
+    w.tick(&[spawn(&w, 0, "aster_t2_gunship", 400, 1000, 0)])
+        .unwrap();
+    w.tick(&[cmd(Command::Move {
+        units: ids_of(&w, 0),
+        target: FxVec2::from_ints(1600, 1000),
+        queue: false,
+    })])
+    .unwrap();
+    let craft = w.state.units.slots.iter().next().unwrap();
+    let mut lowest_over = Fx::MAX;
+    let crossed = run_until(&mut w, 1200, |w| {
+        w.state.units.pos[craft].x > Fx::from_int(1100)
+    });
+    assert!(crossed, "the gunship should cross the tower");
+    // Again, watching it over the roof this time.
+    w.tick(&[cmd(Command::Move {
+        units: ids_of(&w, 0),
+        target: FxVec2::from_ints(400, 1000),
+        queue: false,
+    })])
+    .unwrap();
+    run_until(&mut w, 1200, |w| {
+        let (p, z) = (w.state.units.pos[craft], w.state.units.z[craft]);
+        if (p.x - Fx::from_int(1000)).abs() < Fx::from_int(22) {
+            lowest_over = lowest_over.min(z);
+        }
+        p.x < Fx::from_int(900)
+    });
+    assert!(lowest_over < Fx::MAX, "it never passed over the roof");
+    assert!(
+        lowest_over > roof,
+        "over the roof at {lowest_over:?}, the roof at {roof:?}"
+    );
+}

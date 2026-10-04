@@ -3148,7 +3148,15 @@ impl World {
                 {
                     surface
                 } else {
-                    surface + m.altitude
+                    // Flying, it keeps its height over a city's rooftops too,
+                    // those on its course some six seconds ahead included.
+                    let ahead = FxVec2::from_angle(units.heading[row]);
+                    let reach = units.speed[row] * 6 + Fx::from_int(64);
+                    let roofs = self
+                        .city_shapes
+                        .roof_ahead(pos, ahead, reach)
+                        .unwrap_or(surface);
+                    surface.max(roofs) + m.altitude
                 }
             }
             _ => surface,
