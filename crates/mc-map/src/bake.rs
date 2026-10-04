@@ -106,6 +106,12 @@ pub enum Layout {
     /// neighbours (see `crosswater.rs`). Fair by a quarter turn; the south-west start first,
     /// the others counter-clockwise. Exactly 16 km.
     Crosswater,
+    /// "Tripoint": three players, each for themselves, in three climates
+    /// (Alaska, desert, jungle) parted by the Precursors' climate walls, which
+    /// meet at the installation in the middle (see `tripoint.rs`). Fair by a
+    /// third of a turn wherever units can go; starts Alaska, desert, jungle.
+    /// Exactly 12 km.
+    Tripoint,
 }
 
 mod alpine;
@@ -117,6 +123,7 @@ mod frostline;
 mod machine;
 mod props;
 mod threshold;
+mod tripoint;
 
 #[derive(Clone, Debug)]
 pub struct BakeParams {
@@ -224,6 +231,15 @@ impl BakeParams {
         }
     }
 
+    /// A square three-player [`Layout::Tripoint`] map.
+    pub fn tripoint(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 3,
+            layout: Layout::Tripoint,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -301,6 +317,15 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     {
         return Err(MapError::Invalid(
             "the Crosswater layout is for exactly 4 players on a 16 km map".into(),
+        ));
+    }
+    if params.layout == Layout::Tripoint
+        && (params.players != 3
+            || (params.tiles_w as i32 * TILE_SIZE_M) as f64 != tripoint::SIZE
+            || params.tiles_h != params.tiles_w)
+    {
+        return Err(MapError::Invalid(
+            "the Tripoint layout is for exactly 3 players on a 12 km map".into(),
         ));
     }
     if params.layout == Layout::Threshold && params.players != 4 {
@@ -584,6 +609,8 @@ struct Terrain {
     canyon: canyon::Canyon,
     /// Frostline layout only: what it works out at set-up (`frostline.rs`).
     frost: frostline::Frostline,
+    /// Tripoint layout only: what it works out at set-up (`tripoint.rs`).
+    tp: tripoint::Tripoint,
     /// The machine's benches: ground cut level for its nodes (`machine.rs`).
     /// Empty until the machine is laid, so what is designed before it sees the landscape.
     benches: Vec<machine::Bench>,
@@ -665,6 +692,7 @@ impl Terrain {
             arch: archipelago::Archipelago::default(),
             canyon: canyon::Canyon::default(),
             frost: frostline::Frostline::default(),
+            tp: tripoint::Tripoint::default(),
             benches: Vec::new(),
         };
 
@@ -706,6 +734,10 @@ impl Terrain {
         }
         if params.layout == Layout::Frostline {
             t.setup_frostline();
+            return t;
+        }
+        if params.layout == Layout::Tripoint {
+            t.setup_tripoint();
             return t;
         }
         if params.layout == Layout::Crosswater {
@@ -787,6 +819,13 @@ impl Terrain {
         if self.layout == Layout::Canyon {
             return (-vx.abs(), vy, r);
         }
+        // Tripoint is fair by a third of a turn: turn every point into the
+        // north third.
+        if self.layout == Layout::Tripoint {
+            let k = tripoint::third((vx, vy));
+            let (qx, qy) = tripoint::turn((vx, vy), 3 - k);
+            return (qx, qy, r);
+        }
         // Halden's Grip, The Axis and Frostline are fair by a half turn: fold
         // the north-east half onto the south-west.
         if matches!(
@@ -838,6 +877,7 @@ impl Terrain {
             Layout::Threshold => self.natural_threshold(x, y),
             Layout::Canyon => self.natural_canyon(x, y),
             Layout::Frostline => self.natural_frostline(x, y),
+            Layout::Tripoint => self.natural_tripoint(x, y),
             Layout::Crosswater => self.natural_crosswater(x, y),
         };
         if self.benches.is_empty() {
@@ -849,7 +889,11 @@ impl Terrain {
 
     /// Whether the map carries a snow layer.
     fn has_snow(&self) -> bool {
-        self.is_alpine() || matches!(self.layout, Layout::Threshold | Layout::Frostline)
+        self.is_alpine()
+            || matches!(
+                self.layout,
+                Layout::Threshold | Layout::Frostline | Layout::Tripoint
+            )
     }
 
     /// Whether the map carries a ways layer: the canyon's trails.
@@ -1415,6 +1459,7 @@ impl Terrain {
                 let (ice, snow) = match self.layout {
                     Layout::Threshold => self.threshold_snow(x, y, z(i, j), gx, gy),
                     Layout::Frostline => self.frostline_snow(x, y, z(i, j), gx, gy),
+                    Layout::Tripoint => self.tripoint_snow(x, y, z(i, j), gx, gy),
                     _ => self.alpine_snow(x, y, z(i, j), gx, gy),
                 };
                 // No glacier ice on the machine's benches or their cut faces.
@@ -1471,4 +1516,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::frostline("t", 8, 9)));
     pub(super) static CROSSWATER: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::crosswater("Crosswater", 8, 7)));
+    pub(super) static TRIPOINT: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::tripoint("t", 6, 13)));
 }

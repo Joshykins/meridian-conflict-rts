@@ -28,6 +28,7 @@ impl Terrain {
                 Layout::Threshold => self.threshold_forest(x, y, height, slope),
                 Layout::Canyon => self.canyon_forest(x, y, height, slope),
                 Layout::Frostline => self.frostline_forest(x, y, height, slope),
+                Layout::Tripoint => self.tripoint_forest(x, y, height, slope),
                 Layout::Crosswater => self.cw_forest(x, y, height, slope),
                 _ => self.basin_forest(x, y, height, slope),
             }
@@ -162,6 +163,10 @@ impl Terrain {
         if self.layout == Layout::Frostline {
             return self.frostline_tree(x, y, conifer, hash);
         }
+        // Tripoint's by the region.
+        if self.layout == Layout::Tripoint {
+            return self.tripoint_tree(x, y, conifer, hash);
+        }
         // The alpine maps' and Crosswater's woods are not mirrored.
         let (px, py) = match self.layout {
             Layout::Alpine | Layout::AlpineTeams | Layout::Crosswater => (x, y),
@@ -233,7 +238,12 @@ impl Terrain {
         } else {
             (0.3, 0.93)
         };
-        let forest_slope = if alpine { 0.95 } else { 0.5 };
+        // (So do Tripoint's jungle's, up its mountains.)
+        let forest_slope = if alpine || self.layout == Layout::Tripoint {
+            0.95
+        } else {
+            0.5
+        };
 
         // Rocks on the slopes, and lone trees out in the open.
         let per_tile = (TILE_SIZE_M as f64 / PROP_GRID_M) as i64;
@@ -261,7 +271,10 @@ impl Terrain {
                     && self.machine_clear(x, y)
                 {
                     let desert = self.layout == Layout::Canyon
-                        || (self.layout == Layout::Frostline && frostline::east_of(x, y) < 0.0);
+                        || (self.layout == Layout::Frostline && frostline::east_of(x, y) < 0.0)
+                        || (self.layout == Layout::Tripoint
+                            && crate::landmark::tripoint_region((x, y))
+                                == crate::landmark::TRIPOINT_DESERT);
                     let kind = if desert {
                         // Blocks of bedded sandstone fallen from the walls.
                         [PropKind::RockSlab, PropKind::RockLarge][(roll > 0.985) as usize]

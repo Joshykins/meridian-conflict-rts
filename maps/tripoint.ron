@@ -1,0 +1,24 @@
+// Tripoint: three players, each for themselves, in three climates. Alaska to
+// the north under cloud and snow, red-rock desert to the south-west under a
+// clear dry sky, jungle to the south-east in heavy, showery air. The
+// Precursors' climate walls run out between them from the installation in the
+// middle; each wall's line is the bake's (`mc_map::landmark::TRIPOINT_WALLS`;
+// `tests/tripoint.rs` holds the two together), and so is the lift the
+// desert's mesas were cut to (Frostline's). Skirmish set-up can pick each
+// region's weather, and the time of day.
+(
+    biome: Alpine,
+    style: FreeForAll,
+    time: Afternoon,
+    strata_lift: 50,
+    regions: [
+        (name: "Alaska", climate: Temperate, weather: Cloudy, tweaks: (rain: 0.7)),
+        (name: "Desert", climate: Desert, weather: Clear, tweaks: (rain: 0.0, wind: 9)),
+        (name: "Jungle", climate: Tropical, weather: Cloudy, tweaks: (rain: 0.5)),
+    ],
+    walls: [
+        (line: [(6144, 6144), (13072, 10144)], left: 0, right: 2),
+        (line: [(6144, 6144), (-784, 10144)], left: 1, right: 0),
+        (line: [(6144, 6144), (6144, -1856)], left: 2, right: 1),
+    ],
+)

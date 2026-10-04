@@ -161,6 +161,46 @@ pub fn frostline_on_map((x, y): (f64, f64)) -> (f64, f64) {
 /// its mesas are cut in the beds above. The sidecar's `strata_lift`.
 pub const FROSTLINE_STRATA_LIFT: f64 = 50.0;
 
+/// Tripoint's climate walls (`bake/tripoint.rs`): three lines out from the
+/// Precursor installation in the middle of the 12 288 m map, a third of a turn
+/// apart, each to beyond the map's edge: north-east, north-west and south.
+/// Map metres. Alaska lies between the first two, the desert between the
+/// second and the third, the jungle between the third and the first. The
+/// map's sidecar (`maps/tripoint.ron`) gives the renderer the same lines;
+/// `tests/tripoint.rs` holds the two together.
+pub const TRIPOINT_WALLS: [[(f64, f64); 2]; 3] = [
+    [(6_144.0, 6_144.0), (13_072.0, 10_144.0)],
+    [(6_144.0, 6_144.0), (-784.0, 10_144.0)],
+    [(6_144.0, 6_144.0), (6_144.0, -1_856.0)],
+];
+
+/// Tripoint's regions, in the sidecar's order: Alaska, the desert, the jungle.
+pub const TRIPOINT_ALASKA: usize = 0;
+pub const TRIPOINT_DESERT: usize = 1;
+pub const TRIPOINT_JUNGLE: usize = 2;
+
+/// Which of Tripoint's regions a point of the map lies in, by its walls
+/// ([`TRIPOINT_WALLS`]): the region between the two walls either side of it.
+pub fn tripoint_region((x, y): (f64, f64)) -> usize {
+    let [(cx, cy), _] = TRIPOINT_WALLS[0];
+    let heading = |w: usize| {
+        let [_, (ex, ey)] = TRIPOINT_WALLS[w];
+        (ey - cy).atan2(ex - cx)
+    };
+    let turn = |from: f64, to: f64| (to - from).rem_euclid(std::f64::consts::TAU);
+    let at = (y - cy).atan2(x - cx);
+    // Counter-clockwise from the north-east wall: Alaska up to the north-west
+    // wall, the desert on to the south wall, the jungle back round.
+    let a = turn(heading(0), at);
+    if a < turn(heading(0), heading(1)) {
+        TRIPOINT_ALASKA
+    } else if a < turn(heading(0), heading(2)) {
+        TRIPOINT_DESERT
+    } else {
+        TRIPOINT_JUNGLE
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,5 +213,26 @@ mod tests {
         assert_eq!(d.surface(-1.0, 0.0), None);
         assert!((d.downstream_x(d.height()) - (d.base - d.crest_width)).abs() < 1e-9);
         const { assert!(GORGE_DAM.floor_z > 0.0 && GORGE_DAM.crest_z > GORGE_DAM.ring_top) };
+    }
+
+    #[test]
+    fn tripoints_walls_part_its_three_regions() {
+        let mid = 6_144.0;
+        let at = |deg: f64| {
+            let (s, c) = deg.to_radians().sin_cos();
+            (mid + 3_000.0 * c, mid + 3_000.0 * s)
+        };
+        assert_eq!(tripoint_region(at(90.0)), TRIPOINT_ALASKA);
+        assert_eq!(tripoint_region(at(210.0)), TRIPOINT_DESERT);
+        assert_eq!(tripoint_region(at(330.0)), TRIPOINT_JUNGLE);
+        // Either side of each wall, a few metres off it.
+        for (deg, left, right) in [
+            (30.0, TRIPOINT_ALASKA, TRIPOINT_JUNGLE),
+            (150.0, TRIPOINT_DESERT, TRIPOINT_ALASKA),
+            (270.0, TRIPOINT_JUNGLE, TRIPOINT_DESERT),
+        ] {
+            assert_eq!(tripoint_region(at(deg + 0.2)), left);
+            assert_eq!(tripoint_region(at(deg - 0.2)), right);
+        }
     }
 }

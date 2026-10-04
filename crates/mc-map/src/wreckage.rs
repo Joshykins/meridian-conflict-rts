@@ -42,6 +42,9 @@ pub enum Symmetry {
     HalfTurn,
     /// Quarter turns: every quarter folds onto the south-west one.
     QuarterTurn,
+    /// Thirds of a turn: the south-west and south-east thirds turn onto the
+    /// north one, which lies between 30 and 150 degrees.
+    Thirds,
 }
 
 impl Symmetry {
@@ -57,6 +60,7 @@ impl Symmetry {
             Layout::TwinBays | Layout::Archipelago | Layout::Frostline => Some(Symmetry::HalfTurn),
             Layout::Canyon => Some(Symmetry::MirrorSides),
             Layout::Crosswater => Some(Symmetry::QuarterTurn),
+            Layout::Tripoint => Some(Symmetry::Thirds),
             Layout::Threshold => None,
         }
     }
@@ -102,6 +106,12 @@ impl Symmetry {
                     rotate: k as f64 * PI / 2.0,
                 })
                 .collect(),
+            Symmetry::Thirds => (0..3)
+                .map(|k| Image {
+                    line: None,
+                    rotate: k as f64 * TAU / 3.0,
+                })
+                .collect(),
         }
     }
 
@@ -115,6 +125,7 @@ impl Symmetry {
             Symmetry::MirrorSides => v.0 <= 0.0,
             Symmetry::HalfTurn => v.0 + v.1 <= 0.0,
             Symmetry::QuarterTurn => v.0 < 0.0 && v.1 <= 0.0,
+            Symmetry::Thirds => (v.1.atan2(v.0) - PI / 6.0).rem_euclid(TAU) < TAU / 3.0,
         }
     }
 }
@@ -927,6 +938,7 @@ mod tests {
             Symmetry::MirrorSides,
             Symmetry::HalfTurn,
             Symmetry::QuarterTurn,
+            Symmetry::Thirds,
         ] {
             let images = sym.images();
             // A point in the sector: each copy is somewhere else, and exactly
