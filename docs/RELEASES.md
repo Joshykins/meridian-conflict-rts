@@ -45,6 +45,24 @@ Since the unit data differ, a release build's unit data hash differs from a
 playtest build's whenever anything is flagged: replays and network games never
 cross between them.
 
+## Each channel's server
+
+Playtest and release builds play on servers of their own, so the two never meet in
+one list of games. The address is set when the build is made:
+
+| Variable (compile time) | Read by |
+|---|---|
+| `MERIDIAN_SERVER_PLAYTEST` | a playtest build |
+| `MERIDIAN_SERVER_RELEASE` | a release build |
+
+`host:port`, or a host alone for port 7777. The release script sets both, for every
+build: each build reads only its own channel's, so the two cannot be crossed. Left
+unset, and in a dev build always, there is no default server and the multiplayer
+screen opens on the local network. A player can still type any address; the
+settings file remembers it per channel (`servers`), so a playtest and a release
+build on one computer keep their own. How to run the second server:
+`docs/SERVER.md`, *A second server for playtest builds*.
+
 ## Why the fingerprint
 
 A replay holds commands, not state, so it plays back faithfully only on a build with

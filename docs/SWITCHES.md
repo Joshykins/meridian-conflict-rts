@@ -83,6 +83,9 @@ See `docs/RELEASES.md`.
 |---|---|---|
 | `MERIDIAN_CHANNEL` (compile time) | `dev` (default), `playtest`, `release` | Who the build is for. Part of the build's name (`0.1.0-playtest+<commit>`; a release is `0.1.0+<commit>`), which replays record and network players must share. A release build has no unit or map marked `playtest: true`. |
 | `--version` | | Print the build's name, number, channel, commit and simulation fingerprint, one `key: value` a line, and exit. |
+| `MERIDIAN_SERVER_PLAYTEST` (compile time) | `host[:port]` | The server a playtest build plays on until the player types another. Unset: none (the multiplayer screen opens on the local network). |
+| `MERIDIAN_SERVER_RELEASE` (compile time) | `host[:port]` | The same for a release build. A dev build reads neither and has no server of its own. |
+| `MERIDIAN_MP_SERVER` | `host:port` | With `--ui`: the multiplayer screen connects to that server, whatever the settings say. |
 
 ## AI probes and tournaments
 

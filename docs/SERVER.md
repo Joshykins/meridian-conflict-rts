@@ -292,6 +292,42 @@ sudo docker run --rm -v meridian-data:/data -v "$PWD":/backup debian:bookworm-sl
 
 Stop with `sudo docker stop meridian` (games in progress end, replays are kept).
 
+## A second server for playtest builds
+
+Playtest and release builds each play on their own server, so playtesters and
+everyone else never see each other's games (a playtest build's list of games
+would otherwise show every release game, greyed out as another build). Both can
+run on one machine: a second `meridian-server` on its own port, with its own
+data (its own names and replays).
+
+```bash
+# Its own unit: port 7778, data in /var/lib/meridian-playtest.
+sed -e 's|--data-dir /var/lib/meridian|--data-dir /var/lib/meridian-playtest --bind 0.0.0.0:7778|' \
+    -e 's|^StateDirectory=meridian$|StateDirectory=meridian-playtest|' \
+    -e 's|^Description=.*|Description=Meridian Conflict playtest server|' \
+    deploy/meridian-server.service | sudo tee /etc/systemd/system/meridian-playtest.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now meridian-playtest
+sudo ufw allow 7778/tcp
+```
+
+It is run like the first, under its own name: `sudo systemctl restart
+meridian-playtest`, `journalctl -u meridian-playtest -f`. Back up
+`/var/lib/meridian-playtest` as well (section 8). At home, the same with
+`./server.sh --bind 0.0.0.0:7778 --data-dir ~/meridian-data-playtest`, and the
+router forwarding 7778 too.
+
+**Builds find their server by themselves.** The release script builds each
+channel with its server's address (`docs/RELEASES.md`):
+
+```bash
+MERIDIAN_SERVER_PLAYTEST=play.example.com:7778 MERIDIAN_SERVER_RELEASE=play.example.com:7777 \
+    MERIDIAN_CHANNEL=playtest cargo build --release -p mc-game
+```
+
+A player who types another address keeps it: each channel's builds remember
+their own.
+
 ## 10. Updating
 
 Players must update the game at the same time, since the server refuses

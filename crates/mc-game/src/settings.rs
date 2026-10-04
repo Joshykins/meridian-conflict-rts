@@ -5,7 +5,9 @@
 //! are ignored and missing ones take their defaults.
 
 use crate::audio::Volumes;
+use mc_core::Channel;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 mod quality;
@@ -47,8 +49,19 @@ pub struct Settings {
     pub range_map: String,
     /// File stem of the map last chosen for survival.
     pub survival_map: String,
-    /// The multiplayer server last connected to, as typed.
+    /// The multiplayer server last connected to, as typed, for this build's channel:
+    /// read from and written to `servers`, and the channel's own server
+    /// ([`default_server`]) until another is typed.
+    #[serde(skip)]
     pub server: String,
+    /// The server typed in each channel's builds, by channel name, when it is not
+    /// the channel's own: a playtest and a release build on one computer share this
+    /// file, and must not follow each other to their servers.
+    pub(crate) servers: BTreeMap<String, String>,
+    /// `server` as files from before `servers` kept it: taken over by the first
+    /// build that reads the file.
+    #[serde(rename = "server", skip_serializing)]
+    pub(crate) older_server: String,
 }
 
 impl Default for Settings {
@@ -72,7 +85,9 @@ impl Default for Settings {
             skirmish_map: String::new(),
             range_map: String::new(),
             survival_map: String::new(),
-            server: String::new(),
+            server: default_server(crate::build_info::channel()).to_owned(),
+            servers: BTreeMap::new(),
+            older_server: String::new(),
         }
     }
 }
@@ -134,7 +149,7 @@ impl Settings {
             return Settings::default();
         };
         match ron::from_str::<Settings>(&text) {
-            Ok(s) => s.sanitised(),
+            Ok(s) => s.sanitised().with_server_of(crate::build_info::channel()),
             Err(e) => {
                 log::warn!("{}: {e}; using default settings", path.display());
                 Settings::default()
@@ -147,7 +162,8 @@ impl Settings {
         let write = || -> Result<(), String> {
             std::fs::create_dir_all(path.parent().expect("settings path has a parent"))
                 .map_err(|e| e.to_string())?;
-            let text = ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::default())
+            let kept = self.keeping_server_of(crate::build_info::channel());
+            let text = ron::ser::to_string_pretty(&kept, ron::ser::PrettyConfig::default())
                 .map_err(|e| e.to_string())?;
             std::fs::write(&path, text).map_err(|e| e.to_string())
         };
@@ -192,6 +208,34 @@ impl Settings {
         self
     }
 
+    /// `server` as a build of `channel` reads it: what was typed in that channel's
+    /// builds, else the channel's own server.
+    fn with_server_of(mut self, channel: Channel) -> Settings {
+        let older = std::mem::take(&mut self.older_server);
+        if !older.is_empty() && !self.servers.contains_key(channel.name()) {
+            self.servers.insert(channel.name().to_owned(), older);
+        }
+        self.server = match self.servers.get(channel.name()) {
+            Some(typed) => typed.clone(),
+            None => default_server(channel).to_owned(),
+        };
+        self
+    }
+
+    /// The settings to write from a build of `channel`: `server` kept under that
+    /// channel, unless it is the channel's own (so a build that moves the server
+    /// moves everyone who never typed one).
+    fn keeping_server_of(&self, channel: Channel) -> Settings {
+        let mut kept = self.clone();
+        if self.server == default_server(channel) {
+            kept.servers.remove(channel.name());
+        } else {
+            kept.servers
+                .insert(channel.name().to_owned(), self.server.clone());
+        }
+        kept
+    }
+
     pub fn volumes(&self) -> Volumes {
         Volumes {
             master: self.master_volume,
@@ -200,6 +244,21 @@ impl Settings {
             weather: self.weather_volume,
         }
     }
+}
+
+/// The server a build of `channel` plays on until the player types another, set
+/// when the game is built: `MERIDIAN_SERVER_PLAYTEST` for a playtest build,
+/// `MERIDIAN_SERVER_RELEASE` for a release one (`host:port`, or a host for port
+/// 7777). Each channel has its own server, so playtesters and players of the
+/// release never meet in one list of games (docs/RELEASES.md). A dev build has
+/// none: its multiplayer screen opens on the local network.
+pub fn default_server(channel: Channel) -> &'static str {
+    let set = match channel {
+        Channel::Dev => None,
+        Channel::Playtest => option_env!("MERIDIAN_SERVER_PLAYTEST"),
+        Channel::Release => option_env!("MERIDIAN_SERVER_RELEASE"),
+    };
+    set.map_or("", str::trim)
 }
 
 /// Names are ASCII (the fonts and the wire format both cope with more, the
@@ -244,5 +303,44 @@ mod tests {
         assert_eq!(odd.sanitised().render_scale, 1.5);
         let fxaa: Settings = ron::from_str("(antialiasing: Fxaa)").unwrap();
         assert_eq!(fxaa.antialiasing, Antialiasing::Smaa);
+    }
+
+    /// A server typed in a playtest build stays with playtest builds: a release
+    /// build reading the same file plays on its own server.
+    #[test]
+    fn each_channel_remembers_its_own_server() {
+        let read = |text: &str, channel| {
+            ron::from_str::<Settings>(text)
+                .unwrap()
+                .with_server_of(channel)
+        };
+        let write =
+            |s: &Settings, channel| ron::ser::to_string(&s.keeping_server_of(channel)).unwrap();
+        let mut playtest = read("()", Channel::Playtest);
+        assert_eq!(playtest.server, default_server(Channel::Playtest));
+        playtest.server = "trial.example:7777".into();
+        let text = write(&playtest, Channel::Playtest);
+        assert_eq!(read(&text, Channel::Playtest).server, "trial.example:7777");
+        let release = read(&text, Channel::Release);
+        assert_eq!(release.server, default_server(Channel::Release));
+        // Saving from the release build keeps the playtest build's server.
+        let text = write(&release, Channel::Release);
+        assert_eq!(read(&text, Channel::Playtest).server, "trial.example:7777");
+        assert!(
+            !release
+                .keeping_server_of(Channel::Release)
+                .servers
+                .contains_key("release"),
+            "the channel's own server is not pinned"
+        );
+        // A file from before: its one server goes to the first build to read it.
+        let old = read("(server: \"home.example\")", Channel::Dev);
+        assert_eq!(old.server, "home.example");
+        let text = write(&old, Channel::Dev);
+        assert_eq!(read(&text, Channel::Dev).server, "home.example");
+        assert_eq!(
+            read(&text, Channel::Release).server,
+            default_server(Channel::Release)
+        );
     }
 }

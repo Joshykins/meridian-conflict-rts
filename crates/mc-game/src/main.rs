@@ -208,6 +208,12 @@ units whose blueprint key contains each KEY (group 1 is the selection).
 MERIDIAN_CHANNEL=dev|playtest|release at compile time: who the build is for (default
 dev). It is part of the build's name, which replays record and network players must
 share (docs/RELEASES.md). A release build has no unit or map marked `playtest: true`.
+
+MERIDIAN_SERVER_PLAYTEST=HOST[:PORT], MERIDIAN_SERVER_RELEASE=HOST[:PORT] at compile time:
+the server a playtest or a release build plays on until another is typed (none: the
+multiplayer screen opens on the local network, as a dev build's always does).
+
+MERIDIAN_MP_SERVER=HOST:PORT with --ui: the multiplayer screen connects to that server.
 ";
 
 fn main() {
