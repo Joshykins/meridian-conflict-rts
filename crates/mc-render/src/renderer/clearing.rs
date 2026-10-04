@@ -248,13 +248,13 @@ mod tests {
     /// Real Vulkan check: a clearing field over a patch of forest, played the
     /// way the sim sends it. `CLEARING_DIR` gets a picture of each stage.
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn a_clearing_field_vaporizes_a_wood_in_waves() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let out = std::env::var("CLEARING_DIR")
             .map(std::path::PathBuf::from)
             .ok();
-        let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
+        let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let start = Vec2::from(map.start_positions()[0].to_f32());
         let trees: Vec<(usize, Vec2)> = map

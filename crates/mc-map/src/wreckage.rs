@@ -40,6 +40,8 @@ pub enum Symmetry {
     MirrorSides,
     /// A half turn: the north-east half folds onto the south-west.
     HalfTurn,
+    /// Quarter turns: every quarter folds onto the south-west one.
+    QuarterTurn,
 }
 
 impl Symmetry {
@@ -54,6 +56,7 @@ impl Symmetry {
             Layout::Alpine | Layout::AlpineTeams => Some(Symmetry::Mirror),
             Layout::TwinBays | Layout::Archipelago | Layout::Frostline => Some(Symmetry::HalfTurn),
             Layout::Canyon => Some(Symmetry::MirrorSides),
+            Layout::Crosswater => Some(Symmetry::QuarterTurn),
             Layout::Threshold => None,
         }
     }
@@ -93,6 +96,12 @@ impl Symmetry {
                     rotate: PI,
                 },
             ],
+            Symmetry::QuarterTurn => (0..4)
+                .map(|k| Image {
+                    line: None,
+                    rotate: k as f64 * PI / 2.0,
+                })
+                .collect(),
         }
     }
 
@@ -105,6 +114,7 @@ impl Symmetry {
             Symmetry::Mirror => v.1 <= 0.0,
             Symmetry::MirrorSides => v.0 <= 0.0,
             Symmetry::HalfTurn => v.0 + v.1 <= 0.0,
+            Symmetry::QuarterTurn => v.0 < 0.0 && v.1 <= 0.0,
         }
     }
 }
@@ -916,6 +926,7 @@ mod tests {
             Symmetry::Mirror,
             Symmetry::MirrorSides,
             Symmetry::HalfTurn,
+            Symmetry::QuarterTurn,
         ] {
             let images = sym.images();
             // A point in the sector: each copy is somewhere else, and exactly

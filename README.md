@@ -80,7 +80,7 @@ improve frame time but do not guarantee 60 FPS on Mac.
 Maps are baked files and are not checked in. Bake them once:
 
 ```bash
-cargo run --release -p mc-map --bin mc-bake -- --size-km 16 --seed 7 --name "Dev Basin 16" -o maps/dev16.mcmap
+cargo run --release -p mc-map --bin mc-bake -- --layout crosswater --size-km 16 --seed 7 --name "Crosswater" -o maps/crosswater.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --size-km 80 --seed 7 --name "Meridian Basin" -o maps/meridian_basin.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --size-km 80 --seed 7 --players 32 --name "Meridian Crown" -o maps/meridian_crown.mcmap
 cargo run --release -p mc-map --bin mc-bake -- --layout islands --size-km 10 --seed 46 --name "Twin Shoals" -o maps/twin_shoals.mcmap
@@ -112,7 +112,7 @@ Direct Cargo commands also work when the Vulkan runtime is on your library path
 
 ```bash
 cargo run --release -p mc-game                                   # the front end: main menu, skirmish set-up, settings
-cargo run --release -p mc-game -- --map dev16                    # straight into a skirmish against the AI
+cargo run --release -p mc-game -- --map crosswater                    # straight into a skirmish against the AI
 cargo run --release -p mc-game -- --map meridian_basin --players 8   # 8-way on the 80 km map
 cargo run --release -p mc-game -- --map meridian_crown --players 32 --teams 8 --observe   # 32 AI commanders, eight teams of four
 cargo run --release -p mc-game -- --scene battle                 # two pre-built armies (test scene)
@@ -263,7 +263,7 @@ Slow motion is the ordinary game speed control: `-` goes down to 0.1x.
 | `brand/` | collected brand assets, colors, writing guidance, and Discord setup |
 | `crates/mc-core` | fixed point, integer trig, RNG, state hashing |
 | `crates/mc-jobs` | worker pool, job graph, deterministic parallel-for, background tasks |
-| `crates/mc-map` | `.mcmap` format, tile streaming, sim heightfield, `mc-bake` (basin, islands, alpine, alpine-teams, archipelago, twin-bays and threshold layouts) |
+| `crates/mc-map` | `.mcmap` format, tile streaming, sim heightfield, `mc-bake` (basin, islands, alpine, alpine-teams, archipelago, twin-bays, threshold, canyon, frostline and crosswater layouts) |
 | `crates/mc-path` | hierarchical flow fields with deterministic background builds |
 | `crates/mc-sim` | the simulation: state tables, spatial index, commands, economy, combat, AI, snapshots |
 | `crates/mc-data` | blueprint loader; `data/factions/aster/` is the Aster faction |
@@ -293,8 +293,8 @@ build queues, order lines and planned-structure ghosts that can be dragged, idle
 ground for whatever is selected or being placed (weapons by kind with their dead zones, radar, build range). A front end (main menu, skirmish set-up, settings) with a
 synthesised interface sound set. Skirmish control can be OBSERVE: the AIs fight, the map opens
 from orbit, pause and game speed still work, and a click on the roster jumps to that commander.
-Three maps: the 80 km Meridian Basin, a 16 km dev
-basin, and Twin Shoals, a 10 km 1v1 island map (both commanders on the main island around a
+Three maps: the 80 km Meridian Basin, Crosswater, a 16 km four-player free-for-all
+(a lake with an island and four fords in the middle, a sea round the map and into a bay between every two neighbours), and Twin Shoals, a 10 km 1v1 island map (both commanders on the main island around a
 central lake, a ridge in each passage, two town islands reachable by amphibious units and hovers). Local matches are recorded to `replays/<id>.mcreplay` (the relay records with `--replay-dir`);
 the main menu's **Match History** opens each one's battle report or watches it with a timeline to scrub, and F1's **Mark Issue** flags a
 moment with a note, the timings and a screenshot for later: see `docs/REPLAYS.md`.
@@ -337,7 +337,7 @@ Idle fighters automatically intercept hostile aircraft; air factories are ground
 targets, so fighters cannot attack them. Ground hulls collide across locomotion
 types, including tanks and amphibious commanders.
 
-Use `cargo run -p mc-game -- --scene formations --map dev16` to watch ten fighters,
+Use `cargo run -p mc-game -- --scene formations --map crosswater` to watch ten fighters,
 five bombers, and a nine-tank block travel two legs and settle. The scene also
 works with `--ticks 300 --screenshot formations.png`. This movement/state update
 requires matching protocol/replay version 3; older replays are rejected.

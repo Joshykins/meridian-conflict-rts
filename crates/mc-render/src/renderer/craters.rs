@@ -274,16 +274,15 @@ mod shots {
     /// `dist,yaw,tilt;...` (radians), `CRATER_SIZE` = `w,h`, `CRATER_OUT` the folder.
     /// Prints the scene pass's median GPU time with and without the craters.
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn crater_shots() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map =
-            Arc::new(
-                mc_map::MapFile::open(root.join(
-                    std::env::var("CRATER_MAP").unwrap_or_else(|_| "maps/dev16.mcmap".into()),
-                ))
-                .unwrap(),
-            );
+        let map = Arc::new(
+            mc_map::MapFile::open(root.join(
+                std::env::var("CRATER_MAP").unwrap_or_else(|_| "maps/crosswater.mcmap".into()),
+            ))
+            .unwrap(),
+        );
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
         let env = |key: &str, def: &str| std::env::var(key).unwrap_or_else(|_| def.into());
         let nums =

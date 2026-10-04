@@ -47,7 +47,7 @@ mod survival_shots {
         u
     }
 
-    /// Stages the replicators on dev16 and writes PPMs.
+    /// Stages the replicators on crosswater and writes PPMs.
     /// `SURV_SCENES`: veil, ray, print (default all). `SURV_CAMS`: `;`-separated
     /// `dx,dy,dist,yaw,tilt` (metres off the engine, radians); `SURV_TIMES` seconds;
     /// `SURV_OUT` folder; `SURV_RAY` metres from the engine to the node site;
@@ -55,10 +55,11 @@ mod survival_shots {
     /// `SURV_NOFX` leaves the veil, beams and hits out (to measure what they cost).
     /// Prints the mean GPU pass times over the last 20 frames of each scene.
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn survival_shots() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(mc_map::MapFile::open(root.join("maps/dev16.mcmap")).expect("open map"));
+        let map =
+            Arc::new(mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).expect("open map"));
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
         let (w, h) = if std::env::var("SURV_BIG").is_ok() {
             (2560u32, 1440u32)

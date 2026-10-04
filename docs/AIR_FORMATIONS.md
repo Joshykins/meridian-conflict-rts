@@ -77,12 +77,12 @@ This does not introduce additional aircraft blueprints.
 
 From the repository root:
 
-    cargo run -p mc-game -- --scene formations --map dev16
+    cargo run -p mc-game -- --scene formations --map crosswater
 
 Ten fighters, five bombers, and nine tanks follow two legs, turn, and settle.
 The ordinary unit commands remain usable afterward. To render the final pose:
 
-    cargo run -p mc-game -- --scene formations --map dev16 --ticks 300 --screenshot formations.png
+    cargo run -p mc-game -- --scene formations --map crosswater --ticks 300 --screenshot formations.png
 
 ## Validation
 

@@ -2123,12 +2123,12 @@ mod shots {
     use std::sync::Arc;
 
     /// Renders the sky and weather headless. `SKY_SHOTS` = `name:x,y,dist,yaw,tilt[,seconds]; ...`,
-    /// `SKY_MAP` the map (dev16), `SKY_OUT` the folder for the PPMs.
+    /// `SKY_MAP` the map (crosswater), `SKY_OUT` the folder for the PPMs.
     #[test]
     #[ignore = "requires Vulkan and a map"]
     fn sky_shots() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map_name = std::env::var("SKY_MAP").unwrap_or_else(|_| "dev16".into());
+        let map_name = std::env::var("SKY_MAP").unwrap_or_else(|_| "crosswater".into());
         let map = Arc::new(
             mc_map::MapFile::open(root.join(format!("maps/{map_name}.mcmap"))).expect("open map"),
         );

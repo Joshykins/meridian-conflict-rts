@@ -1,6 +1,6 @@
 //! AI against AI on a real map, printing each side's economy over time.
 //! The check for AI difficulty and economy changes; run with
-//! `DUEL=dev16:easy:hard:30 cargo test --release -p mc-sim --test sim -- zz_ai_duel_probe:: --ignored --nocapture`
+//! `DUEL=crosswater:easy:hard:30 cargo test --release -p mc-sim --test sim -- zz_ai_duel_probe:: --ignored --nocapture`
 //! (map, player 0's difficulty, player 1's, minutes; optional `:seed` and `:swap` to trade starts).
 //! `DUEL_SALVAGE=1` adds each side's reclaim towers, salvage units and mass reclaimed.
 use mc_data::{cat, Blueprints};
@@ -176,7 +176,7 @@ fn report(w: &World, minute: u32) {
 #[test]
 #[ignore]
 fn duel() {
-    let spec = std::env::var("DUEL").unwrap_or_else(|_| "dev16:normal:normal:20".into());
+    let spec = std::env::var("DUEL").unwrap_or_else(|_| "crosswater:normal:normal:20".into());
     let parts: Vec<&str> = spec.split(':').collect();
     let map_name = parts[0];
     let (a, b) = (difficulty(parts[1]), difficulty(parts[2]));

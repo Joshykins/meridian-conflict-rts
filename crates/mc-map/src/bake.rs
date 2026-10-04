@@ -101,12 +101,18 @@ pub enum Layout {
     /// turn wherever units can go; the west side first, starts in pairs.
     /// Exactly 16 km.
     Frostline,
+    /// "Crosswater": four players, free for all, round a lake with an island
+    /// and four fords; a sea round the map and into a bay between every two
+    /// neighbours (see `crosswater.rs`). Fair by a quarter turn; the south-west start first,
+    /// the others counter-clockwise. Exactly 16 km.
+    Crosswater,
 }
 
 mod alpine;
 mod archipelago;
 mod bays;
 mod canyon;
+mod crosswater;
 mod frostline;
 mod machine;
 mod props;
@@ -209,6 +215,15 @@ impl BakeParams {
         }
     }
 
+    /// A square four-player [`Layout::Crosswater`] map.
+    pub fn crosswater(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
+        BakeParams {
+            players: 4,
+            layout: Layout::Crosswater,
+            ..BakeParams::square(name, size_tiles, seed)
+        }
+    }
+
     /// A square [`Layout::Threshold`] map: three defender starts and the facility's.
     pub fn threshold(name: &str, size_tiles: u32, seed: u64) -> BakeParams {
         BakeParams {
@@ -277,6 +292,15 @@ pub fn bake(params: &BakeParams, out: &Path) -> Result<BakeReport, MapError> {
     {
         return Err(MapError::Invalid(
             "the Frostline layout is for exactly 8 players on a 16 km map".into(),
+        ));
+    }
+    if params.layout == Layout::Crosswater
+        && (params.players != 4
+            || (params.tiles_w as i32 * TILE_SIZE_M) as f64 != crosswater::SIZE
+            || params.tiles_h != params.tiles_w)
+    {
+        return Err(MapError::Invalid(
+            "the Crosswater layout is for exactly 4 players on a 16 km map".into(),
         ));
     }
     if params.layout == Layout::Threshold && params.players != 4 {
@@ -686,6 +710,10 @@ impl Terrain {
             t.setup_frostline();
             return t;
         }
+        if params.layout == Layout::Crosswater {
+            t.setup_crosswater();
+            return t;
+        }
 
         let (cx, cy) = (size_x / 2.0, size_y / 2.0);
         let pad = |t: &Terrain, (x, y): (f64, f64), core: f64, floor: f64| Pad {
@@ -812,6 +840,7 @@ impl Terrain {
             Layout::Threshold => self.natural_threshold(x, y),
             Layout::Canyon => self.natural_canyon(x, y),
             Layout::Frostline => self.natural_frostline(x, y),
+            Layout::Crosswater => self.natural_crosswater(x, y),
         };
         if self.benches.is_empty() {
             h
@@ -1442,4 +1471,6 @@ mod test_maps {
         LazyLock::new(|| Terrain::new(&BakeParams::canyon("t", 6, 11)));
     pub(super) static FROSTLINE: LazyLock<Terrain> =
         LazyLock::new(|| Terrain::new(&BakeParams::frostline("t", 8, 9)));
+    pub(super) static CROSSWATER: LazyLock<Terrain> =
+        LazyLock::new(|| Terrain::new(&BakeParams::crosswater("Crosswater", 8, 7)));
 }

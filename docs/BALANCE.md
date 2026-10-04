@@ -191,7 +191,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
   aircraft stay a little slower (about 3 a second) on purpose.
 
 Measured 2026-10-03 with `zz_eco_ledger_probe` (36 min, Hard against Hard, Serac Divide,
-dev16 and Twin Shoals), before -> after: income at 6 minutes 5 -> 13-17 a second and at 12
+the old dev16 and Twin Shoals), before -> after: income at 6 minutes 5 -> 13-17 a second and at 12
 minutes 5 -> 19-32; tech 2 at 21-30 -> about 12 minutes; mass mined over the game 14-20k ->
 51-78k; tech 3 and the first experimentals by minute 36. The AI's own tech timing is
 untuned; its tier 3 comes late.

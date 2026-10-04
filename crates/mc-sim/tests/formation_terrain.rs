@@ -474,7 +474,7 @@ fn probe() {
     }
 }
 
-/// Marches across dev16's real relief, on routes whose straight line crosses
+/// Marches across crosswater's real relief, on routes whose straight line crosses
 /// ground a tank cannot climb. `ROUTES` (8) and `BLOCK` (25 tanks) size the
 /// run; `TRACE_DIR` gets each route's tracks, slots and the unclimbable cells
 /// round it, for plotting.
@@ -482,7 +482,7 @@ fn probe() {
 #[ignore]
 fn real_map_probe() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let file = mc_map::MapFile::open(root.join("maps/dev16.mcmap")).unwrap();
+    let file = mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).unwrap();
     let relief = || Heightfield::load(&file).unwrap();
     let probe_world = world(relief());
     let tank = probe_world
@@ -573,12 +573,12 @@ fn real_map_probe() {
     );
 }
 
-/// Movement phase cost with eight blocks of 25 tanks crossing dev16 at once.
+/// Movement phase cost with eight blocks of 25 tanks crossing crosswater at once.
 #[test]
 #[ignore]
 fn real_map_movement_cost() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let file = mc_map::MapFile::open(root.join("maps/dev16.mcmap")).unwrap();
+    let file = mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).unwrap();
     let mut w = world(Heightfield::load(&file).unwrap());
     let bp = w.blueprints.id_of("aster_t1_tank").unwrap();
     let routes = [

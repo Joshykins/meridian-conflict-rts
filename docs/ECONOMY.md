@@ -70,7 +70,7 @@ repeats. The search played 4 maps × 2 starts per plan; the result below was the
 on 3 maps it never saw.
 
 **Starting plan: 17.1 min. Best plan: 12.4 min** (11.1-12.4 on the maps searched, 12.2-14.0
-on the unseen dev16, the_axis and serac_sound).
+on the unseen dev16 (retired), the_axis and serac_sound).
 
 ### The best plan
 
@@ -126,7 +126,7 @@ builder's time.
 
 ```
 cargo test --profile gate -p mc-sim --test sim --no-run
-ECO=serac_divide,dev16 ECO_PLANS='best; lean:engineers=4' ECO_LOG=1 \
+ECO=serac_divide,crosswater ECO_PLANS='best; lean:engineers=4' ECO_LOG=1 \
   cargo test --profile gate -p mc-sim --test sim -- zz_eco_race_probe:: --ignored --nocapture
 scripts/eco-search.py - 3
 ```

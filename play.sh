@@ -3,7 +3,7 @@
 # macOS uses MoltenVK (Vulkan over Metal); WSL uses the Windows GPU.
 #
 #   ./play.sh                          the front end (main menu)
-#   ./play.sh --map dev16              straight into a skirmish against the AI
+#   ./play.sh --map crosswater              straight into a skirmish against the AI
 #   ./play.sh --map meridian_basin --players 8
 #   ./play.sh --scene battle
 #   ./play.sh --range                  the test range (add --unit KEY, --scenario under-fire|targets|build)

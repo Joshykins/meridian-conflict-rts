@@ -4,7 +4,7 @@
 //! charging and firing on the ground below (`turret`: a light `heavy_rail`, arcs only), and
 //! the commander's rail cannon refit firing on a tank (`commander`: the same, on its arm).
 //!
-//! Run: cargo run --release -p mc-render --example heavy_rail_shots -- maps/dev16.mcmap OUT [zenith|frigate|turret|commander]..
+//! Run: cargo run --release -p mc-render --example heavy_rail_shots -- maps/crosswater.mcmap OUT [zenith|frigate|turret|commander]..
 //! Writes `<scene>-<shot>.ppm`. `HEAVY_SIZE=WxH` (1280x800). `HEAVY_BENCH=1` renders every
 //! frame of the sequence and prints the mean and worst frame time (not a pass timing).
 use glam::{Vec2, Vec3};

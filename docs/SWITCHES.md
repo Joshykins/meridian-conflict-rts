@@ -44,7 +44,7 @@ For shots and tests; a match takes both from the map's `maps/<stem>.ron` and ski
 Headless screenshots (`--screenshot`, `scripts/shot.sh run`) can show an order being aimed.
 `--report PAGE[@M:SS]` draws the battle report over the match instead (overview, economy,
 military, battlefield, timeline; the battlefield replay stopped at M:SS). It reports on
-the `--ticks` played: an `--observe` match run long enough to be decided (dev16, two AIs:
+the `--ticks` played: an `--observe` match run long enough to be decided (crosswater, two AIs:
 about 45 minutes) has its verdict. `scripts/shot.sh run` stops a shot at 3 minutes, so a
 match that long is run with the built exe directly.
 

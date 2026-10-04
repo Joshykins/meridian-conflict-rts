@@ -1,5 +1,5 @@
 //! Native GPU look at the Leviathan's charged shells landing (`Weapon::discharge`).
-//! Run: cargo run --release -p mc-render --example charged_shell_shots -- maps/dev16.mcmap OUT_DIR
+//! Run: cargo run --release -p mc-render --example charged_shell_shots -- maps/crosswater.mcmap OUT_DIR
 //! Writes 24 frames (20 fps) of a three-shell salvo landing on open ground, then 16 of a
 //! Raptor's bolt rifle shots bursting on aircraft 250 m up (`storm-NN.ppm`), then 24 (7 fps)
 //! of the Kraken's AEB cruise missiles going off (`Weapon::ion_blast`, `aeb-NN.ppm`).

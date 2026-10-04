@@ -1,7 +1,7 @@
 //! Behemoth visual check: native GPU shots of the `aster_t5_titan` model posed by hand:
 //! standing, at points through its stride, the torso turned with the arms following, the
 //! arms pitched, the rail cluster spun, and from the RTS camera.
-//! cargo run --release -p mc-render --example titan_shots -- maps/dev16.mcmap OUT [only-shot-names...]
+//! cargo run --release -p mc-render --example titan_shots -- maps/crosswater.mcmap OUT [only-shot-names...]
 //! Env: TITAN_W / TITAN_H (default 1600x1000).
 use glam::{Vec2, Vec3};
 use mc_data::Blueprints;

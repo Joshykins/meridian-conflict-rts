@@ -28,6 +28,7 @@ impl Terrain {
                 Layout::Threshold => self.threshold_forest(x, y, height, slope),
                 Layout::Canyon => self.canyon_forest(x, y, height, slope),
                 Layout::Frostline => self.frostline_forest(x, y, height, slope),
+                Layout::Crosswater => self.cw_forest(x, y, height, slope),
                 _ => self.basin_forest(x, y, height, slope),
             }
         };
@@ -161,9 +162,9 @@ impl Terrain {
         if self.layout == Layout::Frostline {
             return self.frostline_tree(x, y, conifer, hash);
         }
-        // The alpine map's woods are not mirrored.
+        // The alpine maps' and Crosswater's woods are not mirrored.
         let (px, py) = match self.layout {
-            Layout::Alpine | Layout::AlpineTeams => (x, y),
+            Layout::Alpine | Layout::AlpineTeams | Layout::Crosswater => (x, y),
             _ => {
                 let (px, py, _) = self.fold(x, y);
                 (px, py)

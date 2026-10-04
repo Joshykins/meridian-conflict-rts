@@ -78,7 +78,7 @@ With no match options the game opens its front end: main menu, match set-up
 (skirmish and survival), multiplayer, settings. Any of --map, --scene, --players, --seed, --army, --connect or --observe goes
 straight into a match instead.
 
-  --map NAME|PATH        map to play (default: maps/dev16.mcmap, else maps/meridian_basin.mcmap)
+  --map NAME|PATH        map to play (default: maps/crosswater.mcmap, else maps/meridian_basin.mcmap)
   --scene NAME           skirmish (default) | battle | stress | showcase | adjacency | range | reclaim | repair | formations | aircraft | aircraft-crash | aircraft-ditch | offshore | wreckage
   --range                the test range (same as --scene range): one unit on a pad and a
                          panel to attack it, destroy it, scrub its build state, have it

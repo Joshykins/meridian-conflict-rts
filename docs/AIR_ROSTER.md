@@ -42,9 +42,9 @@ Network and replay versions are **8** because orbit commands and drone, burning 
 ## Inspect
 
 ```sh
-./play.sh --range --unit aster_t3_assault_aircraft --scenario targets --map dev16
-./play.sh --range --unit aster_t2_fire_bomber --scenario targets --map dev16
-./play.sh --range --unit aster_t3_air_factory --map dev16
+./play.sh --range --unit aster_t3_assault_aircraft --scenario targets --map crosswater
+./play.sh --range --unit aster_t2_fire_bomber --scenario targets --map crosswater
+./play.sh --range --unit aster_t3_air_factory --map crosswater
 cargo test -p mc-sim --test sim -- air_roster::
 cargo test -p mc-models complete_air_roster_models_meet_lod_budgets
 ```
@@ -257,7 +257,7 @@ Cargo uses the same weighted capacity, fit checks and loss-on-destruction as Bas
 
 Preview: `./play.sh --range --unit aster_t2_lift_ship --scenario lift`.
 Close-ups (GPU, doors open, loading/unloading frames):
-`cargo run --release -p mc-render --example courier_shots -- maps/dev16.mcmap artifacts/courier`.
+`cargo run --release -p mc-render --example courier_shots -- maps/crosswater.mcmap artifacts/courier`.
 
 ## Hover flight (2026-09-28)
 

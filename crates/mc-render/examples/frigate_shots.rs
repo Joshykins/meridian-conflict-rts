@@ -1,7 +1,7 @@
 //! Resolute heavy frigate visual check: native GPU shots of the `aster_t4_frigate` model from the
 //! RTS camera and close up, aloft (gear stowed) and on its lot (gear down), with the
 //! Bastion alongside for scale in one of them, and nose down laying its spinal gun (`dive`).
-//! cargo run --release -p mc-render --example frigate_shots -- maps/dev16.mcmap OUT [only-shot-names...]
+//! cargo run --release -p mc-render --example frigate_shots -- maps/crosswater.mcmap OUT [only-shot-names...]
 //! Env: FRIGATE_W / FRIGATE_H (default 1600x1000).
 use glam::{Vec2, Vec3};
 use mc_data::Blueprints;

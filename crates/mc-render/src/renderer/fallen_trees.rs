@@ -263,13 +263,13 @@ mod tests {
     /// Real Vulkan check: a walker's path knocks over a clump of trees.
     /// `FALLEN_TREES_DIR` gets a picture before, during and after the fall.
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn trampled_trees_fall_and_lie_down() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let out = std::env::var("FALLEN_TREES_DIR")
             .map(std::path::PathBuf::from)
             .ok();
-        let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
+        let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let start = Vec2::from(map.start_positions()[0].to_f32());
         let trees: Vec<(usize, Vec2)> = map

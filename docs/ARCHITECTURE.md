@@ -346,7 +346,7 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   `replicator_fragment` in `beams.wgsl` from the two end points only (a far end behind the eye is clipped to the near
   plane), lit by `Lights::replication_light`. `UnitInstance::_pad3[1]` bit 0 (`UNIT_REPLICATING`) draws a site's fill in
   the replication blue (`replication_tint` in `entity.wgsl`; the ray, print beams, veil and lights use the same cold
-  blue, `REP_BLUE`/`VEIL_BLUE`). `survival_shots` (mc-render, ignored) stages all of it on dev16.
+  blue, `REP_BLUE`/`VEIL_BLUE`). `survival_shots` (mc-render, ignored) stages all of it on crosswater.
 
 ## Sky, light and weather (mc-render `sky.rs`, `clouds.wgsl`, `clouds_sim.wgsl`; mc-data `weather.rs`)
 

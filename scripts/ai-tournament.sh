@@ -6,7 +6,7 @@
 #
 # Environment:
 #   TOURNEY_MAPS     maps:players, space separated
-#                    (default "serac_divide:2 twin_shoals:2 meridian_basin:2 dev16:2 the_axis:8 haldens_grip:8")
+#                    (default "serac_divide:2 twin_shoals:2 meridian_basin:2 crosswater:2 the_axis:8 haldens_grip:8")
 #   TOURNEY_SEEDS    seeds (default "3 7 11")
 #   TOURNEY_SIDES    pairs A,B of doctrines (adaptive, aggressive, economic,
 #                    defensive; default: adaptive against each of the others, each
@@ -21,7 +21,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:-$root/artifacts/tournament/$(date +%Y%m%d-%H%M%S)}
 mkdir -p "$out"
-maps=${TOURNEY_MAPS:-"serac_divide:2 twin_shoals:2 meridian_basin:2 dev16:2 the_axis:8 haldens_grip:8"}
+maps=${TOURNEY_MAPS:-"serac_divide:2 twin_shoals:2 meridian_basin:2 crosswater:2 the_axis:8 haldens_grip:8"}
 seeds=${TOURNEY_SEEDS:-"3 7 11"}
 sides=${TOURNEY_SIDES:-"adaptive,aggressive aggressive,adaptive adaptive,economic economic,adaptive adaptive,defensive defensive,adaptive"}
 minutes=${TOURNEY_MINUTES:-35}

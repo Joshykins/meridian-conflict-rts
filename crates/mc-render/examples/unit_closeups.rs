@@ -1,5 +1,5 @@
 //! Native GPU close-ups of units, and one shot from each.
-//! Run: cargo run --release -p mc-render --example unit_closeups -- maps/dev16.mcmap OUT_DIR KEY [KEY..]
+//! Run: cargo run --release -p mc-render --example unit_closeups -- maps/crosswater.mcmap OUT_DIR KEY [KEY..]
 //! Per unit: `KEY-front.ppm` and `KEY-back.ppm`, then `KEY-shot-NN.ppm`, 12 frames
 //! (20 fps) of weapon 0 firing at the ground 120 m ahead.
 use glam::{Vec2, Vec3};

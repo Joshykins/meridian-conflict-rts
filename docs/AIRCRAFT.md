@@ -93,12 +93,12 @@ Simulation behavior changed, so network and replay versions are 8.
 
 ## Inspect
 
-    cargo run -p mc-game -- --scene aircraft --map dev16
+    cargo run -p mc-game -- --scene aircraft --map crosswater
 
 Three bombers repeatedly attack a powered heavy shield. This exercises release,
 shield interception, formation spacing, egress and return in the ordinary simulation.
 
-    cargo run -p mc-game -- --scene aircraft --map dev16 --ticks 60 --follow 10 --screenshot aircraft-pass.png
+    cargo run -p mc-game -- --scene aircraft --map crosswater --ticks 60 --follow 10 --screenshot aircraft-pass.png
 
 The formations scene still exercises queued turns and arrival. Focused tests
 cover idle close-target bombing, complete repeated salvos, forward-only bomb
@@ -123,7 +123,7 @@ Both model previews and an in-game shield-pass overview were inspected; the
 overview visibly shows three engine wakes. The close-up in-game capture timed
 out on software Vulkan. A small overview is substantially faster:
 
-    cargo run -p mc-game -- --scene aircraft --map dev16 --ticks 65 --follow 1 --size 400x250 --screenshot aircraft-small.png
+    cargo run -p mc-game -- --scene aircraft --map crosswater --ticks 65 --follow 1 --size 400x250 --screenshot aircraft-small.png
 
 For close inspection on a hardware renderer, add --select aster_t1_bomber
 without --camera; the aircraft scene then focuses the selected plane.
@@ -142,12 +142,12 @@ hashed simulation state. Replay and network versions are 8 for this state change
 
 Inspect the full death sequence with:
 
-    cargo run -p mc-game -- --scene aircraft-crash --map dev16
+    cargo run -p mc-game -- --scene aircraft-crash --map crosswater
 
 For a rendered falling-frame capture with smoke history:
 
-    cargo run -p mc-game -- --scene aircraft-crash --map dev16 --ticks 1 --follow 25 --size 400x250 --screenshot aircraft-crash.png
+    cargo run -p mc-game -- --scene aircraft-crash --map crosswater --ticks 1 --follow 25 --size 400x250 --screenshot aircraft-crash.png
 
-On the current Dev Basin setup, --follow 30 captures the impact; --follow 50 shows the smoking wreck.
+On the old Dev Basin, --follow 30 captured the impact and --follow 50 the smoking wreck; the frames may differ on Crosswater.
 
 See AIR_ROSTER.md, Flight refinements, for the current VTOL, trails, altitude, and bombing-return behavior.

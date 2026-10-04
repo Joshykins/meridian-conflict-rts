@@ -529,6 +529,73 @@ pub(super) fn inside(p: (f64, f64), poly: &[(f64, f64)]) -> f64 {
     }
 }
 
+/// What droplet erosion did to a gentle country, made fit to lay on it: from
+/// the grid before (`before`) and after (`h`) the droplets ran, both in units
+/// of `vertical` metres on a grid of `step` metres. Nothing is left steeper
+/// than a unit can climb; the mountains keep shallow gullies (deep ones would
+/// open ways up them) and cut deep only high up; the change is softened, the
+/// more on the mountains. Returns metres moved per sample.
+pub(super) fn settle_gullies(
+    h: &[f32],
+    before: &[f32],
+    n: usize,
+    step: f64,
+    vertical: f32,
+) -> Vec<f32> {
+    let mut h = h.to_vec();
+    // Nothing left steeper than a unit can climb, gully sides included.
+    let talus = 0.42 * step as f32 / vertical;
+    for _ in 0..12 {
+        for j in 1..n - 1 {
+            for i in 1..n - 1 {
+                let at = j * n + i;
+                for nb in [at - 1, at + 1, at - n, at + n] {
+                    let drop = h[at] - h[nb];
+                    let was = before[at] - before[nb];
+                    if drop > talus && drop > was {
+                        let moved = (drop - talus.max(was)) * 0.25;
+                        h[at] -= moved;
+                        h[nb] += moved;
+                    }
+                }
+            }
+        }
+    }
+    let raw: Vec<f32> = h
+        .iter()
+        .zip(before)
+        .map(|(a, b)| {
+            // The mountains take shallow gullies, too shallow to open a way up
+            // them (deep ones and their fans make ramps); the meadows stay flat.
+            // High up, well above the walls at their feet, they cut deep.
+            let was = (b * vertical) as f64;
+            let high = smoothstep(80.0, 250.0, was) as f32;
+            let top = smoothstep(220.0, 420.0, was) as f32;
+            ((a - b) * vertical).clamp(-3.0 - 22.0 * high - 35.0 * top, 3.0 + 2.0 * high)
+        })
+        .collect();
+    // Softened once everywhere, and three times more on the mountains,
+    // where single droplets would otherwise scratch thin straight lines.
+    let high: Vec<f32> = before
+        .iter()
+        .map(|&b| smoothstep(80.0, 250.0, (b * vertical) as f64) as f32)
+        .collect();
+    let mut soft = raw.clone();
+    for pass in 0..4 {
+        let from = soft.clone();
+        for j in 1..n - 1 {
+            for i in 1..n - 1 {
+                let at = j * n + i;
+                let blur = 0.5 * from[at]
+                    + 0.125 * (from[at - 1] + from[at + 1] + from[at - n] + from[at + n]);
+                let w = if pass == 0 { 1.0 } else { high[at] };
+                soft[at] = from[at] + (blur - from[at]) * w;
+            }
+        }
+    }
+    soft
+}
+
 impl Terrain {
     /// Reference pixels to map metres.
     fn bw(&self, (px, py): (f64, f64)) -> (f64, f64) {
@@ -901,56 +968,7 @@ impl Terrain {
         let before = h.clone();
         super::alpine::erode(&mut h, n, self.seed);
         super::alpine::erode(&mut h, n, self.seed ^ 0x6261_7973);
-        // Nothing left steeper than a unit can climb, gully sides included.
-        let talus = 0.42 * STEP as f32 / VERTICAL;
-        for _ in 0..12 {
-            for j in 1..n - 1 {
-                for i in 1..n - 1 {
-                    let at = j * n + i;
-                    for nb in [at - 1, at + 1, at - n, at + n] {
-                        let drop = h[at] - h[nb];
-                        let was = before[at] - before[nb];
-                        if drop > talus && drop > was {
-                            let moved = (drop - talus.max(was)) * 0.25;
-                            h[at] -= moved;
-                            h[nb] += moved;
-                        }
-                    }
-                }
-            }
-        }
-        let raw: Vec<f32> = h
-            .iter()
-            .zip(&before)
-            .map(|(a, b)| {
-                // The mountains take shallow gullies, too shallow to open a way up
-                // them (deep ones and their fans make ramps); the meadows stay flat.
-                // High up, well above the walls at their feet, they cut deep.
-                let was = (b * VERTICAL) as f64;
-                let high = smoothstep(80.0, 250.0, was) as f32;
-                let top = smoothstep(220.0, 420.0, was) as f32;
-                ((a - b) * VERTICAL).clamp(-3.0 - 22.0 * high - 35.0 * top, 3.0 + 2.0 * high)
-            })
-            .collect();
-        // Softened once everywhere, and three times more on the mountains,
-        // where single droplets would otherwise scratch thin straight lines.
-        let high: Vec<f32> = before
-            .iter()
-            .map(|&b| smoothstep(80.0, 250.0, (b * VERTICAL) as f64) as f32)
-            .collect();
-        let mut soft = raw.clone();
-        for pass in 0..4 {
-            let from = soft.clone();
-            for j in 1..n - 1 {
-                for i in 1..n - 1 {
-                    let at = j * n + i;
-                    let blur = 0.5 * from[at]
-                        + 0.125 * (from[at - 1] + from[at + 1] + from[at - n] + from[at + n]);
-                    let w = if pass == 0 { 1.0 } else { high[at] };
-                    soft[at] = from[at] + (blur - from[at]) * w;
-                }
-            }
-        }
+        let soft = settle_gullies(&h, &before, n, STEP, VERTICAL);
         // The same both ways round: blended across the diagonal like the noise.
         let mut delta = soft.clone();
         for j in 0..n {

@@ -330,7 +330,7 @@ shows
   "losing trades", "answered", "hedge", "stale", "less appealing").
 
 The data comes from `World::ai_mind` (`mind.rs`), sent to the HUD with each side's
-status. Headless: `MERIDIAN_VISION=N scripts/shot.sh run --map dev16 --players 2
+status. Headless: `MERIDIAN_VISION=N scripts/shot.sh run --map crosswater --players 2
 --observe --ticks 9000` (from WSL, pass the variable through
 with `WSLENV=MERIDIAN_VISION`).
 
@@ -361,7 +361,7 @@ own in its header. Notes on reading the results:
 ## Where it stands
 
 Tournament runs while the classic AI still stood, Hard, the Commander (adaptive)
-against the classic AI on four 2-player maps (dev16, meridian_basin, serac_divide,
+against the classic AI on four 2-player maps (the old dev16, meridian_basin, serac_divide,
 twin_shoals), each of the classic AI's four doctrines, both seats, 25 minutes: 32
 games a run.
 
@@ -392,7 +392,7 @@ far more than over 25-minute games.
 | r7 | bombers go for the artillery shelling it | 64 | 0.66 | +1.70 |
 
 By map at r7: Frostline 0.97, Halden's Grip 0.84, Vermilion Gorge 0.81, Meridian
-Basin 0.75, Meridian Crown 0.56, dev16 0.53, Serac Divide 0.44, Twin Shoals 0.38.
+Basin 0.75, Meridian Crown 0.56, dev16 (retired) 0.53, Serac Divide 0.44, Twin Shoals 0.38.
 Operation trades at r7 (killed : lost): strike 5.2, air guard 3.4, warships 2.5,
 defend 2.5, army 0.62, siege 0.23. One run to the next swings a map by up to 0.4
 with no change near it: outcomes turn on eliminations, so judge a change by the
@@ -410,7 +410,7 @@ same four maps, means; "dry" is an energy store under 10% with building slowed):
 | Army mass at 20 min | 20.5k | 14.3k |
 
 Score: a win 1, a lead 0.75, a draw 0.5. The classic AI still has the edge, mostly
-on serac_divide; dev16 and meridian_basin are now draws. Per-operation trades over
+on serac_divide; dev16 (retired) and meridian_basin are now draws. Per-operation trades over
 t47 (killed : lost): warships 5.7, defend 1.1, army 0.65, raids small. The
 Commander loses its army's trades where it gathers, to hover raids, corvettes and
 artillery, and still builds a thinner army than the classic AI at the same income.
@@ -421,7 +421,7 @@ minutes): 12 of 16 drawn, score 0.36; the four losses are all on Serac Sound, wh
 the Commander's whole team was eliminated. There its operations trade well: army
 1.3, fleet 1.7, defence 1.9, and it warps 20 to 70 times a match.
 
-Commander against Commander (t50: dev16, serac_divide and The Axis, aggressive
+Commander against Commander (t50: dev16 (retired), serac_divide and The Axis, aggressive
 against economic and defensive against adaptive, both ways, 30 minutes): the
 doctrines play different games. Aggressive held its waves all in and raided
 (score 0.62); Defensive fortified and sieged (0.50); Adaptive mixed waves, raids,

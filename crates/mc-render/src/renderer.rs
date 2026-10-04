@@ -5596,10 +5596,10 @@ mod environment_tests {
 
     /// Real Vulkan pipeline check, with a captured frame for visual inspection.
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn forest_fire_lifecycle_and_render() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
+        let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let start = Vec2::from(map.start_positions()[0].to_f32());
         let index = map
@@ -5802,12 +5802,12 @@ mod shockwave_tests {
 
     /// Captures the real Vulkan effect at several ages and across a live dome.
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn shockwave_shield_color_render() {
         use super::*;
         use glam::Vec2;
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
+        let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let mut renderer = Renderer::new(
             Target::Headless {
@@ -6021,12 +6021,12 @@ mod glass_tests {
     /// Overlay glass shows the scene blurred and darkened, and leaves the rest alone.
     /// `GLASS_DUMP` names a PPM to write the frame to.
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn glass_blurs_the_scene_behind_it() {
         use glam::Vec2;
         let (w, h) = (640u32, 360u32);
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
+        let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
         let mut renderer = Renderer::new(
             Target::Headless {

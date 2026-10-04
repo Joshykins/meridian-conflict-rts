@@ -1,7 +1,7 @@
 //! Captures several views of a map's terrain and props in one run, for
 //! judging ground materials and forests without starting a match.
 //!
-//!   cargo run --release -p mc-render --example terrain_shots -- maps/dev16.mcmap OUT_DIR \
+//!   cargo run --release -p mc-render --example terrain_shots -- maps/crosswater.mcmap OUT_DIR \
 //!       near:6000,6000,120,0.5,0.3 far:6000,6000,900,0.9,0.3
 //!
 //! Each view is `name:x,y,distance,tilt[,yaw]`; frames are written as `OUT_DIR/name.ppm`.

@@ -1,5 +1,5 @@
 //! Native GPU inspection of both Argon models and their timed discharge.
-//! Run: cargo run --release -p mc-render --example bore_shots -- maps/dev16.mcmap artifacts/argon
+//! Run: cargo run --release -p mc-render --example bore_shots -- maps/crosswater.mcmap artifacts/argon
 //! Writes model closeups plus 40 frames per weapon (20 fps), including launch and decay.
 use glam::{Vec2, Vec3};
 use mc_core::{Fx, FxVec3};

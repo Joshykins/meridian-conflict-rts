@@ -1,5 +1,5 @@
 //! Courier visual acceptance: native GPU closeups with the ARC Commander for scale.
-//! cargo run --release -p mc-render --example courier_shots -- maps/dev16.mcmap artifacts/courier
+//! cargo run --release -p mc-render --example courier_shots -- maps/crosswater.mcmap artifacts/courier
 use glam::{Vec2, Vec3};
 use mc_core::{Angle, FxVec2};
 use mc_data::Blueprints;

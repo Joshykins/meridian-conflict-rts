@@ -306,7 +306,7 @@ pub fn find_map(name: Option<&str>) -> Result<PathBuf, String> {
     let candidates: Vec<PathBuf> = match name {
         Some(n) => vec![PathBuf::from(n), PathBuf::from(format!("maps/{n}.mcmap"))],
         None => vec![
-            PathBuf::from("maps/dev16.mcmap"),
+            PathBuf::from("maps/crosswater.mcmap"),
             PathBuf::from("maps/meridian_basin.mcmap"),
         ],
     };
@@ -322,7 +322,7 @@ pub fn find_map(name: Option<&str>) -> Result<PathBuf, String> {
         }
     }
     Err(format!(
-        "no map found (looked for {candidates:?}). Bake one with: cargo run --release -p mc-map --bin mc-bake -- --size-km 16 --seed 7 -o maps/dev16.mcmap"
+        "no map found (looked for {candidates:?}). Bake one with: cargo run --release -p mc-map --bin mc-bake -- --size-km 16 --seed 7 -o maps/crosswater.mcmap"
     ))
 }
 

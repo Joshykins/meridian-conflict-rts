@@ -7,11 +7,11 @@ use super::FlakBurst;
 /// wind. Run on the Windows build: `cargo test --release -p mc-render --lib
 /// flak_bursts_render -- --ignored`.
 #[test]
-#[ignore = "requires Vulkan and maps/dev16.mcmap"]
+#[ignore = "requires Vulkan and maps/crosswater.mcmap"]
 fn flak_bursts_render() {
     use glam::Vec2;
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let map = Arc::new(MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
+    let map = Arc::new(MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
     let blueprints = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let mut renderer = Renderer::new(
         Target::Headless {

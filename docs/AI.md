@@ -31,8 +31,8 @@ survive map changes for shared slots. Observer slots have the same controls.
 From WSL, build and play on Windows:
 
 ```bash
-./play.sh --map dev16 --ai-difficulty hard --ai-doctrine adaptive
-./play.sh --map dev16 --observe --ai-doctrine aggressive --ai-domains 100,140,80
+./play.sh --map crosswater --ai-difficulty hard --ai-doctrine adaptive
+./play.sh --map crosswater --observe --ai-doctrine aggressive --ai-domains 100,140,80
 ```
 
 CLI tuning applies to every AI in the launched match; use the skirmish set-up for
@@ -191,5 +191,5 @@ Ignored tests that play AI matches on a real map and print what they measure:
 ```bash
 cargo test --profile gate -p mc-sim --lib -- ai::
 cargo test --profile gate -p mc-sim --test sim -- battle::
-cargo run --release -p mc-game -- --map dev16 --observe --ai-difficulty hard --bench 18000 --threads 4
+cargo run --release -p mc-game -- --map crosswater --observe --ai-difficulty hard --bench 18000 --threads 4
 ```

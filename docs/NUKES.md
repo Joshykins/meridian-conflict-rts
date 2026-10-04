@@ -294,7 +294,7 @@ Checks: `cargo test -p mc-game --bin meridian salvo`.
   the Reclaim order with what is under `--cursor` ringed, and `MERIDIAN_RECLAIM=1` holds up
   the Control reclaim survey); `MERIDIAN_NUKE=x,y,ticks,x2,y2` queues a second mark on the same silo. E.g. `--range --unit aster_t4_nuke_silo
   --select nuke_silo --ticks 100 --follow 200 --camera 10200,12300,3200,20` with
-  `MERIDIAN_NUKE=10200,12300,190` on dev16.
+  `MERIDIAN_NUKE=10200,12300,190` on crosswater.
 
 ## Not done
 

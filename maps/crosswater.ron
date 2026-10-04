@@ -1,0 +1,10 @@
+// Crosswater: four players, free for all, round a lake with an island and
+// four fords; a sea runs round the whole map and into a bay between every
+// two neighbours. A fair afternoon, mild and temperate. Skirmish set-up can
+// override the weather and the time of day.
+(
+    biome: Temperate,
+    style: FreeForAll,
+    weather: Fair,
+    time: Afternoon,
+)

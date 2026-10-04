@@ -1058,7 +1058,7 @@ mod shots {
     };
     use std::sync::Arc;
 
-    /// Sets off a warhead headless and writes frames of it. `NUKE_AT` = `x,y` (dev16 woods
+    /// Sets off a warhead headless and writes frames of it. `NUKE_AT` = `x,y` (crosswater woods
     /// by default), `NUKE_CAM` = `dist,yaw,tilt` (radians), `NUKE_TIMES` = seconds after the
     /// burst to write (`0.05,1,3,...`), `NUKE_OUT` the folder, `NUKE_SIZE` = `w,h`,
     /// `NUKE_RADIUS` the damage radius (520 a warhead, 300 a commander). `NUKE_MISSILE=1`
@@ -1066,10 +1066,10 @@ mod shots {
     /// keeps the eye that far off the warhead). `NUKE_LOOK=plasma`
     /// draws all of it as the Regency's (a nova, their missiles).
     #[test]
-    #[ignore = "requires Vulkan and maps/dev16.mcmap"]
+    #[ignore = "requires Vulkan and maps/crosswater.mcmap"]
     fn nuke_shots() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let map = Arc::new(mc_map::MapFile::open(root.join("maps/dev16.mcmap")).unwrap());
+        let map = Arc::new(mc_map::MapFile::open(root.join("maps/crosswater.mcmap")).unwrap());
         let blueprints = Arc::new(mc_data::Blueprints::load(&root.join("data")).unwrap());
         let nums = |key: &str, def: &str| -> Vec<f32> {
             std::env::var(key)
