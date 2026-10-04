@@ -47,6 +47,7 @@ pub mod formations;
 mod guard;
 mod held;
 mod hover_flight;
+mod impacts;
 mod launch_cells;
 mod line_of_fire;
 mod marching;
