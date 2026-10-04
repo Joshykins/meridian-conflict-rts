@@ -17,6 +17,8 @@ use std::sync::Arc;
 const WATER: i32 = 45;
 const BREAKWATER: &str = "aster_t1_torpedo_defense";
 const FATHOM: &str = "aster_t3_torpedo_defense";
+const HARPOON: &str = "regency_t1_torpedo_defense";
+const HARPOON_II: &str = "regency_t2_torpedo_defense";
 
 fn sea(fog: bool) -> World {
     let mut samples = vec![0u16; 257 * 257];
@@ -223,6 +225,44 @@ fn a_breakwater_sinks_a_dived_barracuda_that_cannot_reach_it() {
 }
 
 #[test]
+fn a_harpoon_sinks_a_dived_stiletto_that_cannot_reach_it() {
+    let mut w = sea(false);
+    let float = spawn(&mut w, HARPOON, 0, 1300, 1000, 0);
+    // 600 m off: inside the Harpoon's 620 m, outside the Stiletto's 560.
+    let sub = spawn(&mut w, "regency_t1_submarine", 1, 700, 1000, 0);
+    dive(&mut w, 1, sub);
+    let full = health(&w, float);
+    for _ in 0..900 {
+        w.tick(&[]).unwrap();
+        if w.state.units.row(sub).is_none() {
+            assert!(health(&w, float) >= full, "the Stiletto reached the float");
+            return;
+        }
+    }
+    panic!(
+        "the Stiletto lived through a minute and a half of torpedoes ({:?} left)",
+        health(&w, sub)
+    );
+}
+
+/// The Harpoon II, the Regency's last tier, meets torpedoes coming in at a ship by it.
+#[test]
+fn a_harpoon_ii_meets_torpedoes_coming_in() {
+    let mut w = sea(false);
+    spawn(&mut w, HARPOON_II, 0, 1300, 1000, 0);
+    only_interceptors(&mut w, HARPOON_II);
+    let pike = spawn(&mut w, "aster_t1_frigate", 0, 1300, 1150, flag::PASSIVE);
+    let sub = spawn(&mut w, "aster_t1_submarine", 1, 1300, 1650, 0);
+    attack(&mut w, 1, sub, pike);
+    let mut seen = 0;
+    for _ in 0..200 {
+        w.tick(&[]).unwrap();
+        seen += met(&w);
+    }
+    assert!(seen >= 2, "only {seen} torpedoes intercepted");
+}
+
+#[test]
 fn a_seabed_installation_puts_torpedoes_into_ships_over_it() {
     let mut w = sea(false);
     spawn(&mut w, FATHOM, 0, 1400, 1000, 0);
@@ -303,6 +343,9 @@ fn launchers_are_far_more_mass_efficient_than_submarines() {
         (BREAKWATER, "aster_t1_submarine"),
         ("aster_t2_torpedo_defense", "aster_t2_submarine"),
         (FATHOM, "aster_t3_submarine"),
+        // The Regency's two tiers: the Harpoon II meets the diving destroyer.
+        (HARPOON, "regency_t1_submarine"),
+        (HARPOON_II, "regency_t2_destroyer"),
     ] {
         let (l, s) = (bp(launcher), bp(sub));
         let per_mass = |b: &UnitBlueprint, v: f32| v / b.cost_mass.to_f32();

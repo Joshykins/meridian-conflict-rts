@@ -237,6 +237,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Storage | Reliquary |
 | Point defence T1 / T2 / T3 | Picket / Halberd / Sunspear |
 | Anti-air, radar, wall | Canopy, Orrery (II, III), Palisade |
+| Sonar (T1 to T3), torpedo launcher (T1, T2) | Plummet (II, III), Harpoon (II) |
 | Shield generator (T2, T3) | Ward (II) |
 | Nuke silo, nuke defence, map gun (T4) | Mangonel, Barbican, Springald |
 | Air superiority fighter, strategic bomber (T3) | Partisan, Maul |

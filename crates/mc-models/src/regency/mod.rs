@@ -42,11 +42,13 @@ mod reclaimer;
 mod scorpion;
 mod scout;
 mod seeker_hover;
+mod sonar;
 pub(crate) mod space;
 mod strategic;
 mod strider;
 mod taproot;
 mod tidebrood;
+mod torpedo;
 mod turrets;
 mod wake_tank;
 mod ward;
@@ -193,6 +195,18 @@ pub(super) const MODELS: &[ModelDef] = &[
         turrets::SPRINGALD_HEIGHT,
         turrets::springald,
     ),
+    // At sea: the sonar's bell tripod (`sonar`), three tiers, and the torpedo launcher's
+    // caisson (`torpedo`), two.
+    ModelDef::tiered(
+        "regency_sonar",
+        [(6.0, 12.0), (6.0, 15.0), (6.0, 18.0)],
+        sonar::sonar,
+    ),
+    ModelDef::tiered(
+        "regency_torpedo",
+        [(8.0, 6.0), (8.0, 8.0), (8.0, 8.0)],
+        torpedo::torpedo,
+    ),
     // Strategic launchers (`strategic`): the Mangonel silo and the Barbican array.
     ModelDef::new(
         "regency_nuke_silo",
@@ -250,6 +264,10 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_heart_3" => 9000,
         "regency_eye" => 7000,
         "regency_crucible" => crucible::TRIANGLES,
+        // Three tiers of bells over a raft, the plummet under it.
+        "regency_sonar" => 5000,
+        // Two launcher houses in a caisson of plated walls.
+        "regency_torpedo" => 6000,
         "regency_scout" => 3000,
         // The tech 1 line: a few hundred of each in a battle.
         "regency_raider" => 2600,
@@ -295,6 +313,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         // The quay's tech 3: plated booms, pylons and crabs that keep their sides reduced.
         "regency_tidebrood" => Some(0.52),
         "regency_barb" | "regency_pinch_cannon" => Some(0.52),
+        // Walls and launcher drums: plated solids that keep their sides reduced.
+        "regency_torpedo" => Some(0.52),
         // Towers and talons: plates that keep their sides when reduced.
         "regency_heart_2" | "regency_heart_3" => Some(0.5),
         // A lofted vessel and plates that keep their sides when reduced.

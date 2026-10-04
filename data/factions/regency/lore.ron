@@ -319,6 +319,31 @@
         lore: "The mast refitted with a third floating ring and clamped feet; it reaches farther still.",
         weapons: {},
     ),
+    "regency_t1_sonar": (
+        lore: "A plated bell hung in a tripod over a raft, listening to the sea; a sounding weight hangs beneath the raft on no line, held in the water by gravity alone.",
+        weapons: {},
+    ),
+    "regency_t2_sonar": (
+        lore: "Refitted with a second, smaller bell over the first; it hears twice as far.",
+        weapons: {},
+    ),
+    "regency_t3_sonar": (
+        lore: "Refitted with a third bell at the top; it hears across a whole sea.",
+        weapons: {},
+    ),
+    "regency_t1_torpedo_defense": (
+        lore: "A low armoured caisson round an open well, a launcher turning in it at the waterline with its tubes under the sea. It puts gravitic torpedoes into any hull in reach, dived or not.",
+        weapons: {
+            "Gravitic Torpedo Launcher": "Two tubes under the waterline, fired in pairs at hulls up to 620 m off, submarines included.",
+        },
+    ),
+    "regency_t2_torpedo_defense": (
+        lore: "The caisson refitted with a second launcher hung under the first and interceptor tubes in its walls: a harbour mouth no submarine gets into, and the one place a Regency fleet at anchor is safe from torpedoes.",
+        weapons: {
+            "Gravitic Torpedo Launcher": "Two tubes of heavier gravitic torpedoes in each house, reaching 900 m.",
+            "Interceptor Tubes": "Short gravitic torpedoes that meet torpedoes coming in and burst them under the water.",
+        },
+    ),
     "regency_wall": (
         lore: "Plated sections that lock into one wall where they stand side by side: armour lapped down over a graphite waist, a spiked tower at every end and corner, a block of them one rampart. Slow to build, very hard to cut.",
         weapons: {},

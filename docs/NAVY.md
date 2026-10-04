@@ -165,6 +165,18 @@ berth is open water, so a capital ship longer than the yard still fits. Every Re
 hull that dives and carries guns brings them up only on order (the Dirk excepted, which
 lies in ambush).
 
+Its structures at sea, both moored and refitted in place where they float:
+
+- The **Plummet** (sonar, tiers 1 to 3) hears a little less far than the Hydrophone at
+  each tier (1,400 / 2,800 / 5,600 m) but, like the Orrery on land, its optics see
+  further.
+- The **Harpoon** (torpedo launcher) has two tiers, not three: past them the Regency
+  meets submarines with its own (the Rapier, and the Claymore that dives), not with a
+  seabed battery. A launcher house turns at the waterline with two gravitic tubes under
+  it (620 m, past the Stiletto's 560). The Harpoon II, its last tier, hangs a second house
+  under the first (900 m, past the Claymore's 700) and fits three fixed interceptor tubes
+  in the float, the Regency's one fixed defence against torpedoes coming in.
+
 ## The Leviathan
 
 The unit the naval design language is nailed on:

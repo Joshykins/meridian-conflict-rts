@@ -389,6 +389,11 @@ const BLUEPRINTS: &[Blueprint] = &[
     structure("regency_crucible", 16.9, 28.0, 3, 3, &[]),
     structure("regency_ward", 13.9, 26.0, 2, 3, &[]),
     structure("regency_ward", 13.9, 32.0, 3, 3, &[]),
+    structure("regency_sonar", 6.0, 12.0, 1, 1, &[]),
+    structure("regency_sonar", 6.0, 15.0, 2, 1, &[]),
+    structure("regency_sonar", 6.0, 18.0, 3, 1, &[]),
+    structure("regency_torpedo", 8.0, 6.0, 1, 2, &[]),
+    structure("regency_torpedo", 8.0, 8.0, 2, 2, &[]),
 ];
 
 /// Ships: the keel is below the waterline (model z = 0), and nothing is running gear.
