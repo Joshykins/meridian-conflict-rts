@@ -5,7 +5,7 @@
 
 use super::{titan_fx, Renderer, TrackMark, PUFF_DUST, TRACK_MARK_LIFE};
 use crate::models::{self, Legs};
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use mc_sim::mirror::UnitInstance;
 
 impl Renderer {
@@ -128,10 +128,20 @@ impl Renderer {
                 if (now - offset).floor() == (before - offset).floor() {
                     continue;
                 }
-                let plant = Vec3::from(u.pos)
-                    + forward * (ankle[0] + legs.stride * legs.stance * 0.5)
-                    + left * (side * ankle[1])
-                    + Vec3::Z * 0.2;
+                let travel = Vec3::from(u.pos) - Vec3::from(u.prev_pos);
+                let local = Vec2::new(travel.dot(forward), travel.dot(left));
+                let turn = (u.heading - u.prev_heading)
+                    .sin()
+                    .atan2((u.heading - u.prev_heading).cos());
+                let contact = crawl_contact(
+                    Vec2::new(ankle[0], side * ankle[1]),
+                    legs.stride * legs.stance * 0.5,
+                    local,
+                    turn,
+                    u.gait[1],
+                );
+                let plant =
+                    Vec3::from(u.pos) + forward * contact.x + left * contact.y + Vec3::Z * 0.2;
                 for _ in 0..2 {
                     let out = Vec3::new(self.scatter.signed(), self.scatter.signed(), 0.2)
                         .normalize_or_zero();
@@ -145,6 +155,64 @@ impl Renderer {
                         (0.35, 1.3),
                     );
                 }
+            }
+        }
+    }
+}
+
+/// The same ground contact as `entity.wgsl::crawl_contact`, used for landing dust.
+fn crawl_contact(foot: Vec2, advance: f32, travel: Vec2, turn: f32, ground: f32) -> Vec2 {
+    let v = travel / ground.max(0.001);
+    let omega = turn / ground.max(0.001);
+    let angle = omega * advance;
+    let (s, c) = angle.sin_cos();
+    let shift = if omega.abs() > 0.0001 {
+        Vec2::new(s * v.x - (1.0 - c) * v.y, (1.0 - c) * v.x + s * v.y) / omega
+    } else {
+        v * advance
+    };
+    Vec2::from_angle(angle).rotate(foot) + shift
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn planted_feet_hold_world_contacts_through_both_pivot_directions() {
+        for sign in [-1.0, 1.0] {
+            let turn = sign * 0.16;
+            let ground = 2.7;
+            for foot in [
+                Vec2::new(35.0, 25.0),
+                Vec2::new(35.0, -25.0),
+                Vec2::new(-30.0, 26.0),
+                Vec2::new(-30.0, -26.0),
+            ] {
+                let first = crawl_contact(foot, 5.76, Vec2::ZERO, turn, ground);
+                for tick in 1..=3 {
+                    let heading = turn * tick as f32;
+                    let step =
+                        crawl_contact(foot, 5.76 - ground * tick as f32, Vec2::ZERO, turn, ground);
+                    let world = Vec2::from_angle(heading).rotate(step);
+                    assert!(
+                        world.distance(first) < 0.001,
+                        "planted foot skated by {} m",
+                        world.distance(first)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn planted_feet_hold_world_contacts_during_forward_and_reverse_travel() {
+        for travel in [Vec2::new(2.4, 0.0), Vec2::new(-2.4, 0.0)] {
+            let foot = Vec2::new(35.0, 25.0);
+            let first = crawl_contact(foot, 5.76, travel, 0.0, 2.4);
+            for tick in 1..=3 {
+                let step = crawl_contact(foot, 5.76 - 2.4 * tick as f32, travel, 0.0, 2.4);
+                assert!((step + travel * tick as f32).distance(first) < 0.001);
             }
         }
     }

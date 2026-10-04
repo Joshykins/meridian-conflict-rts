@@ -1648,12 +1648,20 @@ impl World {
                                 to + m.broadside
                             };
                             units.heading[row] = units.heading[row].turn_toward(lay, m.turn_rate);
-                        } else if d.unsigned_abs() > half_arc || body_arc < 0x8000 {
-                            // A land unit with an `aim_arc` squares up to what it fights,
-                            // not just until the mark is at the edge of its reach: the tail
-                            // aims the rest of the way while the body comes round.
-                            units.heading[row] =
-                                units.heading[row].turn_toward(bearing - base, m.turn_rate);
+                        } else {
+                            // An excavation tail handles small aim changes on its own.
+                            // Leave a quarter of its traverse for the terrain sweep before
+                            // asking the hull to step round. Other limited guns square up.
+                            let tail = weapon.beam && weapon.walk > Fx::ZERO;
+                            let free = if tail {
+                                ((half_arc as u32 * 3) / 4) as u16
+                            } else {
+                                half_arc
+                            };
+                            if d.unsigned_abs() > free || (body_arc < 0x8000 && !tail) {
+                                units.heading[row] =
+                                    units.heading[row].turn_toward(bearing - base, m.turn_rate);
+                            }
                         }
                     }
                 }
@@ -1663,6 +1671,16 @@ impl World {
                 let d = Angle::ZERO.delta_to(bearing - units.heading[row] - base);
                 in_arc = d.unsigned_abs() <= half_arc;
                 want = Angle(d.clamp(-(half_arc as i32) as i16, half_arc as i16) as u16);
+            }
+            // Combat can turn an excavation walker's body after movement has run.
+            // Count that ground too, so its feet step rather than swivel on the spot.
+            if w == 0 && weapon.beam && weapon.walk > Fx::ZERO {
+                let turn = facing_before.delta_to(units.heading[row]).unsigned_abs() as i32;
+                let radius = bp.unit(units.blueprint[row]).radius;
+                let ground = (radius * turn).mul_div(355, 113 * 0x10000);
+                let step = (ground * 256).floor_int().clamp(0, u16::MAX as i32) as u16;
+                units.gait[row] = units.gait[row].wrapping_add(step as u32);
+                units.gait_step[row][0] = units.gait_step[row][0].saturating_add(step);
             }
             // Guns sharing a torso (`on_torso`) turn it together: the lead turns it, the
             // others ride where it points, or swing onto their own marks within their sway.

@@ -79,13 +79,13 @@ fn the_scorpion_turns_its_body_onto_a_mark_behind_it() {
             yaw * 360 / 65536
         );
     }
-    // It squared up to the tank (due west) and the beam killed it.
+    // The hull brought the tank into the tail's independent traverse and the beam killed it.
     let row = w.state.units.row(scorpion).unwrap();
     let off = w.state.units.heading[row]
         .delta_to(Angle::from_degrees(180))
         .unsigned_abs();
     assert!(
-        off <= Angle::from_degrees(3).0,
+        off <= Angle::from_degrees(60).0,
         "still {} degrees off the tank",
         off as u32 * 360 / 65536
     );
@@ -302,4 +302,72 @@ fn a_lot_records_the_faction_it_was_levelled_for() {
         [faction("regency_t1_power"), faction("aster_t1_power")]
     );
     assert_ne!(edits[0], edits[1]);
+}
+
+#[test]
+fn the_tail_tracks_nearby_bearings_without_dragging_the_body_round() {
+    for side in [-1, 1] {
+        let mut w = world();
+        let harrow = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
+        let target = add(&mut w, "aster_t3_assault_bot", 1, 712, 512 + side * 80, 180);
+        let target_row = w.state.units.row(target).unwrap();
+        w.state.units.flags[target_row] |=
+            mc_sim::tables::flag::PASSIVE | mc_sim::tables::flag::INVULNERABLE;
+        let mut fired = false;
+        let mut traverse = 0;
+        for _ in 0..30 {
+            w.tick(&[]).unwrap();
+            let row = w.state.units.row(harrow).unwrap();
+            assert!(
+                w.state.units.heading[row]
+                    .delta_to(Angle::ZERO)
+                    .unsigned_abs()
+                    < Angle::from_degrees(1).0
+            );
+            traverse = traverse.max(
+                Angle::ZERO
+                    .delta_to(w.state.units.weapon_yaw[row][0])
+                    .unsigned_abs(),
+            );
+            fired |= w.events.iter().any(|event| matches!(event, SimEvent::ShotFired { blueprint, weapon: 0, .. } if *blueprint == w.state.units.blueprint[row]));
+        }
+        assert!(
+            traverse > Angle::from_degrees(12).0,
+            "the tail did not traverse"
+        );
+        assert!(fired, "the independently aimed lance never fired");
+    }
+}
+
+#[test]
+fn combat_body_turns_drive_the_feet_even_without_translation() {
+    let mut w = world();
+    let harrow = add(&mut w, "regency_t4_scorpion", 0, 512, 512, 0);
+    let target = add(&mut w, "aster_t3_assault_bot", 1, 440, 710, 180);
+    let target_row = w.state.units.row(target).unwrap();
+    w.state.units.flags[target_row] |=
+        mc_sim::tables::flag::PASSIVE | mc_sim::tables::flag::INVULNERABLE;
+    let mut turns = 0;
+    for _ in 0..20 {
+        let row = w.state.units.row(harrow).unwrap();
+        let before = (
+            w.state.units.heading[row],
+            w.state.units.pos[row],
+            w.state.units.gait[row],
+        );
+        w.tick(&[]).unwrap();
+        if w.state.units.heading[row] != before.0 {
+            turns += 1;
+            assert_eq!(
+                w.state.units.pos[row], before.1,
+                "a stationary pivot translated"
+            );
+            assert_ne!(
+                w.state.units.gait[row], before.2,
+                "the hull turned over frozen feet"
+            );
+            assert!(w.state.units.gait_step[row][0] > 0);
+        }
+    }
+    assert!(turns >= 3, "no sustained combat pivot was exercised");
 }

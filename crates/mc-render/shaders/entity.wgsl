@@ -886,6 +886,24 @@ fn crawl_body_ground(e: Entity, model: ModelInfo, t: f32) -> f32 {
     return mix(0.25 * (g0 + g1 + g2 + g3), min(min(g0, g1), min(g2, g3)), 0.4);
 }
 
+// A future/past ground contact along the body's translation and turn. During stance
+// `advance` counts back at exactly the body's ground speed: a pivoting body's planted
+// feet stay fixed in world space, then lift and step around the outside of its turn.
+fn crawl_contact(foot: vec2<f32>, advance: f32, travel: vec2<f32>, turn: f32,
+                 ground: f32) -> vec3<f32> {
+    let v = travel / max(ground, 0.001);
+    let omega = turn / max(ground, 0.001);
+    let angle = omega * advance;
+    let c = cos(angle);
+    let s = sin(angle);
+    var shift = v * advance;
+    if abs(omega) > 0.0001 {
+        shift = vec2<f32>(s * v.x - (1.0 - c) * v.y,
+                         (1.0 - c) * v.x + s * v.y) / omega;
+    }
+    return vec3<f32>(vec2<f32>(c * foot.x - s * foot.y, s * foot.x + c * foot.y) + shift, angle);
+}
+
 // A leg vertex of a many-legged walker, posed for this moment of the stride. Each leg has
 // two bones, hip to knee and knee to the foot's tip, in the vertical plane through its
 // hip and foot; the foot is planted and passes back under the body, or lifts and swings
@@ -925,9 +943,12 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
     let at = mix(e.prev_pos, e.pos, t).xy;
     let fwd = vec2<f32>(cos(heading), sin(heading));
     let lft = vec2<f32>(-fwd.y, fwd.x);
-    let fx = foot0.x + step.x * walk.x;
-    let ground = terrain_height(at + fwd * fx + lft * foot0.y) - terrain_height(at);
-    let foot = vec3<f32>(fx, foot0.y, foot0.z + step.y * walk.x + ground);
+    let travel = e.pos.xy - e.prev_pos.xy;
+    let local_travel = vec2<f32>(dot(travel, fwd), dot(travel, lft));
+    let turn = atan2(sin(e.heading - e.prev_heading), cos(e.heading - e.prev_heading));
+    let contact = crawl_contact(foot0.xy, step.x * walk.x, local_travel, turn, e.gait.y);
+    let ground = terrain_height(at + fwd * contact.x + lft * contact.y) - terrain_height(at);
+    let foot = vec3<f32>(contact.xy, foot0.z + step.y * walk.x + ground);
     let hip = hip0 + body;
 
     // The leg's plane at rest and now, and the bones in it: r out from the hip, z up.
@@ -951,8 +972,8 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
     var m = rot_z(normal, -az0);
     if limb == LIMB_FOOT {
         // Level contact patch: only the shin articulates, never roll the whole foot.
-        let qfoot = rot_z(pos - foot0, az - az0) + foot;
-        return array<vec3<f32>, 2>(qfoot, rot_z(normal, az - az0));
+        let qfoot = rot_z(pos - foot0, contact.z) + foot;
+        return array<vec3<f32>, 2>(qfoot, rot_z(normal, contact.z));
     }
     if limb == LIMB_THIGH {
         let turn = atan2(k1.y, k1.x) - atan2(k0.y, k0.x);
@@ -1039,7 +1060,7 @@ fn tail_pose(e: Entity, model: ModelInfo, walk: vec2<f32>, t: f32, seg: u32) -> 
         var d = lively * (0.5 + 0.5 * u) * (
             0.034 * sin(time * (1.05 + 0.5 * walk.x) - u * 3.4 + seed)
             + 0.02 * sin(time * 0.43 + u * 1.9 + seed * 1.7));
-        // Curl down behind the carapace at rest. Unfold from the root into the
+        // Fold down over the carapace at rest. Unfold from the root into the
         // authored firing pose; at full brace the muzzle matches the sim's mount.
         d -= folded * select(0.035, 0.12, j < 3u);
         let y = lively * (0.4 + 0.6 * u) * (
