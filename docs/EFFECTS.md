@@ -17,7 +17,7 @@ effects: (
 - `dust_brightness`: lighting multiplier, 0–4; default 1. Zero makes dark dust; it does not make the cloud transparent. Brightness does not change opacity or lifetime.
 - `dust_lifetime`: lifetime multiplier, 0–10; default 1. Zero disables emission.
 - `shockwave_color`: optional linear RGB channels, each 0–1. `None` keeps the natural weapon tint. A specified color tints the faint transparent surface and its brighter edge; ground dust uses its separate `dust_color` setting.
-- `shield_projector`: optional metres above the unit's feet where its dome's shaft is born, inside its crystal. Default `None` is an Aegis pad's 16 m. A lower projector also gets a thinner shaft (the Testudo, `aster_t2_mobile_shield`, uses 6).
+- `shield_projector`: optional metres above the unit's feet where its dome's shaft is born, inside its crystal. Default `None` is an Aegis pad's 16 m. A lower projector also gets a thinner shaft (the Testudo, `aster_t2_mobile_shield`, uses 6; the Regency Ward uses 11.5, so its jet leaves from the cone under its star).
 
 Settings belong to the emitting unit blueprint: its weapons, impacts, flak bursts, destruction, and movement dust all use them. They change presentation, not damage or shield strength. Reload the game after editing definitions.
 

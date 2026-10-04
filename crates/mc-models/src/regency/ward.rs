@@ -1,8 +1,9 @@
 //! The Ward, the Regency shield generator, on its 3 x 3 lot: a small caged star that throws
 //! the field. Tech 2, upgrading in place to Ward II. The star is light, as a power
 //! generator's is (`Model::star_core`, renderer `star_core_fx.rs`), held at the height
-//! every dome's shaft leaves from (`mc_data::SHIELD_PROJECTOR_HEIGHT`), so the white-hot
-//! jet that climbs to the veil's crown is born in it (shields.wgsl `column_shade`).
+//! an Aegis's crystal sits at (`mc_data::SHIELD_PROJECTOR_HEIGHT`). The white-hot jet that
+//! climbs to the veil's crown (shields.wgsl `column_shade`) is born lower, in the emitter
+//! cone on the pinch block (the unit file's `shield_projector`), and runs up through it.
 //!
 //! The fork: on a plated octagonal plinth, two tall plated prongs stand either side of the
 //! star, each a course of two swept plates braced off the plinth by a plated strut, a
@@ -20,7 +21,7 @@ use crate::material::*;
 use super::kit::{dark_plate, metal, seam, v3};
 use super::machine::*;
 
-/// The star: where every dome's shaft leaves from (`mc_data::SHIELD_PROJECTOR_HEIGHT`).
+/// The star, at an Aegis crystal's height (`mc_data::SHIELD_PROJECTOR_HEIGHT`).
 const CORE: Vec3 = Vec3::new(0.0, 0.0, 16.0);
 /// The star's face, and Ward II's.
 /// (Both small, so a breached Ward's nova keeps time with `regency_supernova_small`.)
@@ -118,7 +119,7 @@ pub(super) fn ward(b: &mut MeshBuilder, tech: u8) {
         coarse_fork(b, tech);
         return;
     }
-    // The pinch block the prongs stand on.
+    // The pinch block the prongs stand on, and the emitter cone the jet leaves from.
     dark_plate(b);
     b.prism(v3(0.0, 0.0, PLINTH_TOP), 8, 5.6, 4.4, 3.4);
     metal(b);
@@ -201,7 +202,7 @@ mod tests {
         super::super::check_at("regency_ward", 3, 13.9, 32.0, Some(3), &[]);
     }
 
-    /// The star sits where every dome's shaft leaves from.
+    /// The star sits at an Aegis crystal's height.
     #[test]
     fn the_star_is_the_projector() {
         let model = crate::build_model_scaled("regency_ward", 13.9, 26.0, 2).unwrap();
