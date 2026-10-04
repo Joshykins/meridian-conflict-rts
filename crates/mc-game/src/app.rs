@@ -293,6 +293,7 @@ pub fn local_start(
         }
         .encode()?,
     };
+    let content = start.content;
     let mut session = if observing {
         mc_net::LocalSession::observer(start, mc_net::session::Pacing::RealTime)
     } else {
@@ -304,11 +305,12 @@ pub fn local_start(
     }
     .map_err(|e| e.to_string())?;
     let record = if record {
-        let recorded = crate::issues::MatchRecord::new()
-            .and_then(|m| session.record_to(&m.replay).map(|()| m));
+        let recorded = crate::issues::MatchRecord::new().and_then(|m| {
+            let origin = crate::build_info::origin(content);
+            session.record_to(&m.replay, &origin).map(|()| m)
+        });
         match recorded {
             Ok(m) => {
-                session.stamp_build(crate::replay::BUILD);
                 log::info!("recording match {} to {}", m.id, m.replay.display());
                 Some(m)
             }

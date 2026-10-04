@@ -9,6 +9,7 @@ use mc_core::PlayerId;
 
 use super::hub::{frame, random_u64, seat_mask, Hub, Kind, Match, Slot};
 use super::{ConnId, RoomPhase};
+use crate::origin::Origin;
 use crate::protocol::{
     Hello, LobbyPlayer, LobbyState, MatchConfig, MatchStart, Message, PlayerSetup, RefuseReason,
     Role, Welcome,
@@ -355,7 +356,15 @@ impl Hub {
                 .duration_since(UNIX_EPOCH)
                 .map_or(0, |d| d.as_secs());
             let path = dir.join(format!("match-{unix}-{seed:016x}.{REPLAY_EXTENSION}"));
-            match std::fs::create_dir_all(dir).and_then(|_| ReplayWriter::create(&path, &start)) {
+            // The server knows the build the players agreed on, not its fingerprint.
+            let origin = Origin {
+                build: self.build.clone().unwrap_or_default(),
+                content: start.content,
+                ..Origin::default()
+            };
+            let created = std::fs::create_dir_all(dir)
+                .and_then(|_| ReplayWriter::create(&path, &origin, &start));
+            match created {
                 Ok(w) => {
                     replay = Some(w);
                     self.summary.replay_path = Some(path);

@@ -1,14 +1,16 @@
-//! The `.mcreplay` file: a [`MatchStart`] header followed by the bundle log.
+//! The `.mcreplay` file: who recorded it ([`Origin`]), a [`MatchStart`]
+//! header, then the bundle log.
 //!
 //! ```text
-//! "MCRP"  u32 format version  u32 header length  MatchStart
+//! "MCRP"  u32 format version  u32 origin length  origin  (fixed for good: origin.rs)
+//! u32 header length  MatchStart
 //! then records:  u8 tag  u32 length  payload
 //!     1 Bundle   one TickBundle; ticks are contiguous from 0
 //!     2 Hash     u32 tick, u64 agreed state hash (optional, any subset of ticks)
 //!     3 End      u32 tick count; the match finished cleanly
 //!     4 Held     one TickBundle given while the clock was held; its `tick` is the
 //!                next tick to run, and its commands are carried out before it
-//!     5 Build    UTF-8 name of the build that recorded it (optional, first)
+//!     retired: 5 (the build's name, before the origin block held it)
 //!     6 Note     u32 tick, bytes: something the recording machine showed rather
 //!                than simulated (the test range's weather), opaque to this crate;
 //!                `tick` is the next tick to run when it changed
@@ -22,18 +24,20 @@ use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::Path;
 
+use crate::origin::{read_block, Origin};
 use crate::protocol::{MatchStart, TickBundle, MAX_FRAME_LEN};
 use crate::wire::{Dec, Enc, NetError};
 
-pub const REPLAY_FORMAT_VERSION: u32 = 26;
+pub const REPLAY_FORMAT_VERSION: u32 = 27;
 pub const REPLAY_EXTENSION: &str = "mcreplay";
 
-const MAGIC: [u8; 4] = *b"MCRP";
+pub(crate) const MAGIC: [u8; 4] = *b"MCRP";
 const REC_BUNDLE: u8 = 1;
 const REC_HASH: u8 = 2;
 const REC_END: u8 = 3;
 const REC_HELD: u8 = 4;
-const REC_BUILD: u8 = 5;
+/// Read only by [`Origin::peek`], from replays older than the origin block.
+pub(crate) const REC_BUILD_LEGACY: u8 = 5;
 const REC_NOTE: u8 = 6;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -42,7 +46,6 @@ pub enum ReplayRecord {
     Hash { tick: u32, hash: u64 },
     End { ticks: u32 },
     Held(TickBundle),
-    Build(String),
     Note { tick: u32, note: Vec<u8> },
 }
 
@@ -53,18 +56,22 @@ pub struct ReplayWriter<W: Write> {
 }
 
 impl ReplayWriter<BufWriter<File>> {
-    pub fn create(path: impl AsRef<Path>, start: &MatchStart) -> io::Result<Self> {
-        ReplayWriter::new(BufWriter::new(File::create(path)?), start)
+    pub fn create(path: impl AsRef<Path>, origin: &Origin, start: &MatchStart) -> io::Result<Self> {
+        ReplayWriter::new(BufWriter::new(File::create(path)?), origin, start)
     }
 }
 
 impl<W: Write> ReplayWriter<W> {
-    pub fn new(mut out: W, start: &MatchStart) -> io::Result<Self> {
+    pub fn new(mut out: W, origin: &Origin, start: &MatchStart) -> io::Result<Self> {
         start.validate()?;
+        origin.validate()?;
         let mut e = Enc::new();
         start.encode(&mut e);
         out.write_all(&MAGIC)?;
         out.write_all(&REPLAY_FORMAT_VERSION.to_le_bytes())?;
+        let o = origin.encode();
+        out.write_all(&(o.len() as u32).to_le_bytes())?;
+        out.write_all(&o)?;
         out.write_all(&(e.buf.len() as u32).to_le_bytes())?;
         out.write_all(&e.buf)?;
         Ok(ReplayWriter {
@@ -115,11 +122,6 @@ impl<W: Write> ReplayWriter<W> {
         self.record(REC_HELD, &e.buf)
     }
 
-    /// Names the build that records, so a player can say which build plays it back.
-    pub fn build(&mut self, name: &str) -> io::Result<()> {
-        self.record(REC_BUILD, name.as_bytes())
-    }
-
     /// Something shown, not simulated, that changed in front of the next tick.
     pub fn note(&mut self, note: &[u8]) -> io::Result<()> {
         let mut e = Enc::new();
@@ -161,6 +163,7 @@ impl<W: Write> ReplayWriter<W> {
 
 pub struct ReplayReader<R: Read> {
     input: R,
+    origin: Origin,
     start: MatchStart,
     next_tick: u32,
 }
@@ -173,33 +176,30 @@ impl ReplayReader<BufReader<File>> {
 
 impl<R: Read> ReplayReader<R> {
     pub fn new(mut input: R) -> Result<Self, NetError> {
-        let mut head = [0u8; 12];
+        let mut head = [0u8; 8];
         input.read_exact(&mut head)?;
         if head[..4] != MAGIC {
             return Err(NetError::Malformed("not a replay file"));
         }
-        let [_, _, _, _, v0, v1, v2, v3, l0, l1, l2, l3] = head;
-        let version = u32::from_le_bytes([v0, v1, v2, v3]);
+        let version = u32::from_le_bytes([head[4], head[5], head[6], head[7]]);
         if version != REPLAY_FORMAT_VERSION {
             return Err(NetError::Version { theirs: version });
         }
-        let len = u32::from_le_bytes([l0, l1, l2, l3]) as usize;
-        if len > MAX_FRAME_LEN {
-            return Err(NetError::FrameTooLarge {
-                len,
-                max: MAX_FRAME_LEN,
-            });
-        }
-        let mut buf = vec![0u8; len];
-        input.read_exact(&mut buf)?;
+        let origin = Origin::decode(&read_block(&mut input, MAX_FRAME_LEN)?)?;
+        let buf = read_block(&mut input, MAX_FRAME_LEN)?;
         let mut d = Dec::new(&buf);
         let start = MatchStart::decode(&mut d)?;
         d.finish()?;
         Ok(ReplayReader {
             input,
+            origin,
             start,
             next_tick: 0,
         })
+    }
+
+    pub fn origin(&self) -> &Origin {
+        &self.origin
     }
 
     pub fn start(&self) -> &MatchStart {
@@ -245,10 +245,6 @@ impl<R: Read> ReplayReader<R> {
                     hash: d.u64()?,
                 },
                 REC_END => ReplayRecord::End { ticks: d.u32()? },
-                REC_BUILD => {
-                    let name = String::from_utf8_lossy(&buf).into_owned();
-                    return Ok(Some(ReplayRecord::Build(name)));
-                }
                 REC_HELD => {
                     let bundle = TickBundle::decode(&mut d)?;
                     if bundle.tick != self.next_tick {
@@ -281,8 +277,8 @@ pub struct Replay {
     pub hashes: BTreeMap<u32, u64>,
     /// False when the end marker is missing: the recorder crashed or was killed.
     pub complete: bool,
-    /// The build that recorded it, when it said.
-    pub build: Option<String>,
+    /// The build that recorded it.
+    pub origin: Origin,
     /// `(tick, note)` in order: what the recording machine showed (`ReplayWriter::note`).
     pub notes: Vec<(u32, Vec<u8>)>,
 }
@@ -298,18 +294,17 @@ impl Replay {
         let mut reader = ReplayReader::new(input)?;
         let mut replay = Replay {
             start: reader.start().clone(),
+            origin: reader.origin().clone(),
             bundles: Vec::new(),
             held: Vec::new(),
             hashes: BTreeMap::new(),
             complete: false,
-            build: None,
             notes: Vec::new(),
         };
         loop {
             match reader.next_record() {
                 Ok(Some(ReplayRecord::Bundle(b))) => replay.bundles.push(b),
                 Ok(Some(ReplayRecord::Held(b))) => replay.held.push(b),
-                Ok(Some(ReplayRecord::Build(name))) => replay.build = Some(name),
                 Ok(Some(ReplayRecord::Note { tick, note })) => replay.notes.push((tick, note)),
                 Ok(Some(ReplayRecord::Hash { tick, hash })) => {
                     replay.hashes.insert(tick, hash);
@@ -337,7 +332,17 @@ impl Replay {
 mod tests {
     use super::*;
     use crate::protocol::{ContentId, PlayerSetup};
-    use mc_core::PlayerId;
+    use mc_core::{Channel, PlayerId};
+
+    fn origin() -> Origin {
+        Origin {
+            build: "0.1.0-dev+0123456789".into(),
+            commit: "0123456789abcdef0123456789abcdef01234567".into(),
+            channel: Some(Channel::Dev),
+            sim: 77,
+            content: start().content,
+        }
+    }
 
     fn start() -> MatchStart {
         MatchStart {
@@ -366,7 +371,7 @@ mod tests {
                 }
             })
             .collect();
-        let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
+        let mut w = ReplayWriter::new(Vec::new(), &origin(), &start()).unwrap();
         for b in &bundles {
             if b.tick == 5 {
                 w.held(&held()).unwrap();
@@ -397,20 +402,49 @@ mod tests {
     }
 
     #[test]
-    fn the_recording_build_is_named() {
-        let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
-        w.build("0.1.0-dev").unwrap();
-        w.bundle(&TickBundle::empty(0)).unwrap();
-        w.finish().unwrap();
-        let replay = Replay::read(w.into_inner().as_slice()).unwrap();
-        assert_eq!(replay.build.as_deref(), Some("0.1.0-dev"));
-        assert_eq!(replay.bundles.len(), 1);
-        assert!(replay.complete);
+    fn the_origin_reads_whatever_follows_it() {
+        let (bytes, _) = write_sample();
+        let replay = Replay::read(bytes.as_slice()).unwrap();
+        assert_eq!(replay.origin, origin());
+        assert_eq!(Origin::peek(bytes.as_slice()).unwrap().origin, origin());
+        // A later format: this build cannot play it, but can say who made it.
+        let mut future = bytes.clone();
+        future[4..8].copy_from_slice(&(REPLAY_FORMAT_VERSION + 7).to_le_bytes());
+        let tail = 12 + u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+        future.truncate(tail);
+        future.extend_from_slice(b"a layout from the future");
+        let peeked = Origin::peek(future.as_slice()).unwrap();
+        assert_eq!(peeked.format, REPLAY_FORMAT_VERSION + 7);
+        assert_eq!(peeked.origin, origin());
+    }
+
+    #[test]
+    fn older_formats_name_their_build_record() {
+        // Format 26: "MCRP" 26, the start message, then the build record.
+        let mut e = Enc::new();
+        start().encode(&mut e);
+        let mut bytes = b"MCRP".to_vec();
+        bytes.extend_from_slice(&26u32.to_le_bytes());
+        bytes.extend_from_slice(&(e.buf.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&e.buf);
+        let name = b"0.1.0+e9fea68abc";
+        bytes.push(REC_BUILD_LEGACY);
+        bytes.extend_from_slice(&(name.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(name);
+        let peeked = Origin::peek(bytes.as_slice()).unwrap();
+        assert_eq!(peeked.format, 26);
+        assert_eq!(peeked.origin.build, "0.1.0+e9fea68abc");
+        assert_eq!(peeked.origin.commit, "e9fea68abc");
+        assert_eq!(peeked.origin.content, start().content);
+        assert!(matches!(
+            Replay::read(bytes.as_slice()),
+            Err(NetError::Version { theirs: 26 })
+        ));
     }
 
     #[test]
     fn notes_keep_their_tick() {
-        let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
+        let mut w = ReplayWriter::new(Vec::new(), &origin(), &start()).unwrap();
         w.note(b"overcast").unwrap();
         w.bundle(&TickBundle::empty(0)).unwrap();
         w.bundle(&TickBundle::empty(1)).unwrap();
@@ -426,7 +460,7 @@ mod tests {
 
     #[test]
     fn writer_refuses_gaps() {
-        let mut w = ReplayWriter::new(Vec::new(), &start()).unwrap();
+        let mut w = ReplayWriter::new(Vec::new(), &origin(), &start()).unwrap();
         assert!(w.bundle(&TickBundle::empty(1)).is_err());
         w.bundle(&TickBundle::empty(0)).unwrap();
         assert!(w.bundle(&TickBundle::empty(0)).is_err());
@@ -459,7 +493,10 @@ mod tests {
             Err(NetError::Version { theirs }) if theirs == unsupported
         ));
         let mut huge = bytes.clone();
-        let header_len = 12 + u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+        let origin_end = 12 + u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+        let header_len = origin_end
+            + 4
+            + u32::from_le_bytes(bytes[origin_end..origin_end + 4].try_into().unwrap()) as usize;
         huge[header_len + 1..header_len + 5].copy_from_slice(&u32::MAX.to_le_bytes());
         assert!(matches!(
             Replay::read(huge.as_slice()),

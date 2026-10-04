@@ -44,8 +44,9 @@ impl HistoryState {
     pub fn new(blueprints: Arc<Blueprints>, pool: Arc<Pool>) -> HistoryState {
         let found: Arc<Mutex<Option<Vec<Summary>>>> = Arc::default();
         let into = found.clone();
+        let hash = blueprints.content_hash();
         std::thread::spawn(move || {
-            let list = crate::replay::summaries();
+            let list = crate::replay::summaries(hash);
             *into.lock().unwrap() = Some(list);
         });
         HistoryState {
@@ -366,7 +367,10 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<Pick> {
         ("Match", s.id.clone()),
         (
             "Build",
-            s.build.clone().unwrap_or_else(|| "not recorded".into()),
+            match s.origin.as_ref().map(|o| o.build.as_str()) {
+                Some(b) if !b.is_empty() => b.to_owned(),
+                _ => "not recorded".into(),
+            },
         ),
         (
             "Length",
@@ -399,16 +403,13 @@ fn details(ui: &mut Ui, r: Rect, s: &Summary) -> Option<Pick> {
         );
         y += 24.0;
     }
-    let other_build = s
-        .build
-        .as_deref()
-        .filter(|b| *b != crate::replay::BUILD)
-        .map(|b| {
-            format!(
-                "Recorded by {b}, this is {}: it may play out differently",
-                crate::replay::BUILD
-            )
-        });
+    let other_build = (s.fit == crate::replay::Fit::Differs).then(|| match s.other_build() {
+        Some(b) => format!(
+            "Recorded by {b}, whose simulation or unit data differ from {}: it may play out differently",
+            crate::BUILD
+        ),
+        None => "The build that recorded it is not known: it may play out differently".into(),
+    });
     if let Some(p) = s.problem.as_ref().or(other_build.as_ref()) {
         y += 8.0;
         ui.text_fit_left(x, y, cw, type_scale::CAPTION, rgb(palette::WARN, 1.0), p);

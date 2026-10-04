@@ -75,6 +75,15 @@ reports and never wait on a window.
 | `--crash-screen FILE` | a report's path, then `--crash-title T`, `--crash-message M`, `--crash-hint H` | The crash screen for a saved report, as a crashed run starts it. With `--screenshot OUT.png` it is drawn headless (at `--size`, `--cursor` hovering), and `OUT-copied.png` just after Copy details. |
 | `--crash-test` | `panic`, `sim`, `native`, `error` | Fail on purpose 8 s after start, to check the crash window over the running game: a panic on the main thread, a panic on a thread the game needs (as the sim thread is), an access violation (Windows), an error that ends the game. |
 
+## Builds and channels
+
+See `docs/RELEASES.md`.
+
+| Switch | Values | Purpose |
+|---|---|---|
+| `MERIDIAN_CHANNEL` (compile time) | `dev` (default), `playtest`, `release` | Who the build is for. Part of the build's name (`0.1.0-playtest+<commit>`; a release is `0.1.0+<commit>`), which replays record and network players must share. |
+| `--version` | | Print the build's name, number, channel, commit and simulation fingerprint, one `key: value` a line, and exit. |
+
 ## AI probes and tournaments
 
 Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.md).

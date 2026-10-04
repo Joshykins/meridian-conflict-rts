@@ -13,6 +13,7 @@ mod adjacency_marks;
 mod ambience;
 mod app;
 mod audio;
+mod build_info;
 mod chronicle;
 mod cine;
 mod clipboard;
@@ -56,18 +57,13 @@ use mc_map::MapFile;
 use setup::{Options, Scene};
 use std::sync::Arc;
 
-/// `<version>+<commit>`: network players must match (build.rs).
-pub const BUILD: &str = env!("MERIDIAN_BUILD");
-
-/// The number of commits up to this build, empty outside a git checkout (build.rs).
-const BUILD_NUMBER: &str = env!("MERIDIAN_BUILD_NUMBER");
+pub use build_info::BUILD;
 
 /// "Build N" for the menu and the opening screen; "Dev build" where there is no number.
 fn build_label() -> String {
-    if BUILD_NUMBER.is_empty() {
-        "Dev build".to_owned()
-    } else {
-        format!("Build {BUILD_NUMBER}")
+    match build_info::number() {
+        Some(n) => format!("Build {n}"),
+        None => "Dev build".to_owned(),
     }
 }
 
@@ -183,6 +179,8 @@ straight into a match instead.
                          violation, Windows) | error (an error that ends the game)
   --dump-sounds DIR      write the synthesised sound set as WAV files and exit
   --dump-cursors FILE.png  write every mouse pointer, over dark, grass and bright ground, and exit
+  --version              print the build's name, number, channel, commit and simulation
+                         fingerprint, and exit
 
 Graphics presets (Auto, Low, Medium, High, Ultra) are in Settings > Display. These override
 a preset's scenery for A/B measurements (docs/SWITCHES.md): MERIDIAN_SIMPLE_SHADING=0|1,
@@ -207,8 +205,9 @@ first when no record was kept.
 MERIDIAN_GROUPS=KEY,KEY,... with --screenshot: control groups 2, 3, ... hold player 0's
 units whose blueprint key contains each KEY (group 1 is the selection).
 
-MERIDIAN_BUILD=NAME at compile time names the build in the replays it records
-(default: the package version with -dev).
+MERIDIAN_CHANNEL=dev|playtest|release at compile time: who the build is for (default
+dev). It is part of the build's name, which replays record and network players must
+share (docs/RELEASES.md).
 ";
 
 fn main() {
@@ -411,6 +410,10 @@ fn run() -> Result<(), String> {
             }
             "-h" | "--help" => {
                 print!("{USAGE}");
+                return Ok(());
+            }
+            "--version" => {
+                print!("{}", build_info::version_text());
                 return Ok(());
             }
             other => return Err(format!("unknown option {other}\n\n{USAGE}")),

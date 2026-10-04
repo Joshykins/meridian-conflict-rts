@@ -140,6 +140,10 @@ impl<'a> Dec<'a> {
         Ok(head)
     }
 
+    pub(crate) fn take_raw(&mut self, n: usize) -> Result<&'a [u8]> {
+        self.take(n)
+    }
+
     pub(crate) fn u8(&mut self) -> Result<u8> {
         Ok(self.take(1)?[0])
     }

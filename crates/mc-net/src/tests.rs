@@ -615,7 +615,7 @@ fn relay_and_local_replays_play_back_identically() {
         options: vec![2],
     };
     let mut session = LocalSession::new(start.clone(), PlayerId(0), Pacing::PerPoll(7)).unwrap();
-    session.record_to(&path).unwrap();
+    session.record_to(&path, &Origin::default()).unwrap();
     let mut local = Client::new(session, 5);
     while local.ticks() < 300 {
         local.pump();
@@ -941,7 +941,7 @@ fn orders_on_pause_are_carried_out_held_and_replayed_in_place() {
         options: vec![],
     };
     let mut session = LocalSession::new(start, PlayerId(0), Pacing::PerPoll(3)).unwrap();
-    session.record_to(&path).unwrap();
+    session.record_to(&path, &Origin::default()).unwrap();
     let mut local = Client::new(session, 11);
     while local.ticks() < 60 {
         local.pump();
