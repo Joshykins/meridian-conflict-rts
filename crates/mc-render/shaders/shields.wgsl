@@ -25,7 +25,8 @@
 
 struct ShieldPush {
     count: u32,
-    _pad: u32,
+    // SHIELD_DRAW_GLASS or SHIELD_DRAW_SHAFTS.
+    draw: u32,
 }
 
 var<immediate> push: ShieldPush;
@@ -997,8 +998,6 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
     if near_count == 0u {
         return kill();
     }
-    let surf = union_hit(eye, dir);
-    let hit = surf.x >= 0.0;
     var color = vec3<f32>(0.0);
     var alpha = 0.0;
     var depth_t = 1.0e9;
@@ -1018,6 +1017,29 @@ fn fs_shield(in: ShieldOut) -> ShieldFrag {
             alpha += veil.a;
             depth_t = min(depth_t, ts);
         }
+    }
+    let shafts = push.draw == SHIELD_DRAW_SHAFTS;
+    if shafts && depth_t > 1.0e8 {
+        return kill();
+    }
+    let surf = union_hit(eye, dir);
+    let hit = surf.x >= 0.0;
+    // A shaft behind the front glass goes in the shafts draw, at its own depth: written
+    // with the glass's, nearer, depth it would show through the generator's own body.
+    let behind = hit && depth_t < 1.0e8 && depth_t > surf.x;
+    if shafts {
+        if !behind || alpha < 0.002 {
+            return kill();
+        }
+        let at = eye + dir * depth_t;
+        let shaft_a = saturate(alpha);
+        color = apply_haze(apply_fog_of_war(color, at.xy), at, eye);
+        return ShieldFrag(vec4<f32>(color * shaft_a, shaft_a), hit_depth(at));
+    }
+    if behind {
+        color = vec3<f32>(0.0);
+        alpha = 0.0;
+        depth_t = 1.0e9;
     }
     if !hit && depth_t > 1.0e8 {
         return kill();

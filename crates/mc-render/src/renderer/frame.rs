@@ -1075,9 +1075,15 @@ impl Renderer {
                 );
                 bind_pass_set(self.shields_set);
                 // One fullscreen triangle traces every dome. Instancing a cube
-                // per bubble re-solved the same union on overlapping pixels.
-                push(self.shield_count, 0);
-                device.cmd_draw(cmd, 3, 1, 0, 0);
+                // per bubble re-solved the same union on overlapping pixels. The
+                // shafts behind the glass go first, at their own depth, then the glass.
+                for draw in [
+                    crate::gpu_consts::shield::DRAW_SHAFTS,
+                    crate::gpu_consts::shield::DRAW_GLASS,
+                ] {
+                    push(self.shield_count, draw);
+                    device.cmd_draw(cmd, 3, 1, 0, 0);
+                }
             }
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.puffs");

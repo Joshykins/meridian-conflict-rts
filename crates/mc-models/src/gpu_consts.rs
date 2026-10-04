@@ -1044,6 +1044,12 @@ shared! {
         /// `entity` of a shield whose unit is not in the entity buffer: it is drawn
         /// where the tick put it, not eased along with a moving unit.
         pub const NO_ENTITY: u32 = 0xFFFF_FFFF;
+        /// The shield draw's second push word: the glass, with every shaft not behind it.
+        pub const DRAW_GLASS: u32 = 0;
+        /// The shield draw's second push word: only the shafts seen through a dome's
+        /// front glass, at their own depth, drawn before the glass so a generator's
+        /// body hides them (the glass would carry its own depth, in front of the body).
+        pub const DRAW_SHAFTS: u32 = 1;
     }
 
     /// Rock a beam has melted: the walls of a Regency mine's bore (`pattern::MOLTEN`,
