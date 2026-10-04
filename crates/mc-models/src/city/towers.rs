@@ -17,10 +17,6 @@ pub(super) enum Crown {
     Plant(f32),
     /// A helipad on the roof, its plant under a deck, a mast beside it rising `h`.
     Helipad(f32),
-    /// Stepped crown tiers, and a needle rising `h` over the top.
-    Needle(f32),
-    /// An open frame over the roof, `h` tall.
-    Frame(f32),
 }
 
 /// A tower's design.
@@ -28,21 +24,13 @@ pub(super) enum Crown {
 pub(super) struct Design {
     pub kind: PropKind,
     pub facade: u32,
-    pub storey: f32,
     /// Corners cut this far (m).
     pub chamfer: f32,
     /// Set-backs: from this share of the shaft's height up, drawn in this far (m).
     pub tiers: &'static [(f32, f32)],
-    /// The shaft tapers in facets from a square to a square turned 45 degrees,
-    /// shrinking to this share of its width at the top.
-    pub taper: Option<f32>,
     pub crown: Crown,
     /// A fin every this many bays (0: none).
     pub fins: usize,
-    /// A balcony slab and a glass front round every floor.
-    pub balconies: bool,
-    /// A stone cornice at the podium and at every set-back.
-    pub cornices: bool,
 }
 
 /// An octagon `half` wide each way with its corners cut `c`, as a ring at `z`.
@@ -98,9 +86,8 @@ pub(super) fn tower(b: &mut MeshBuilder, d: Design) {
     let (shaft, top) = part(d.kind, 1);
     let half = shaft.size() * 0.5;
     let crown_h = match d.crown {
-        Crown::Plant(h) | Crown::Frame(h) => h,
+        Crown::Plant(h) => h,
         Crown::Helipad(_) => 2.0,
-        Crown::Needle(_) => top * 0.12,
     };
     let shaft_top = top - crown_h;
     let rise = shaft_top - podium_top;
@@ -125,13 +112,7 @@ pub(super) fn tower(b: &mut MeshBuilder, d: Design) {
         &[Side::Back, Side::East, Side::West],
         pat::SHOP,
     );
-    walls(
-        b,
-        podium,
-        lobby_top,
-        podium_top,
-        if d.cornices { pat::OFFICE } else { pat::RIBBON },
-    );
+    walls(b, podium, lobby_top, podium_top, pat::RIBBON);
     deck(b, podium, podium_top, pat::ROOF_FLAT);
     // The shaft, tier by tier.
     let mut tiers: Vec<(f32, f32, f32)> = Vec::new();
@@ -152,21 +133,7 @@ pub(super) fn tower(b: &mut MeshBuilder, d: Design) {
         }
         for &(lo, hi, inset) in &tiers {
             let r = Rect::centred(0.0, 0.0, half.x - inset, half.y - inset);
-            match d.taper {
-                Some(shrink) => {
-                    paint(b, d.facade);
-                    let h = half.x - inset;
-                    b.loft(
-                        &[
-                            octagon(Vec2::splat(h), 0.0, lo),
-                            octagon(Vec2::splat(h * shrink), h * shrink, hi),
-                        ],
-                        false,
-                        true,
-                    );
-                }
-                None => solid(b, r, lo, hi, d.facade, pat::ROOF_FLAT),
-            }
+            solid(b, r, lo, hi, d.facade, pat::ROOF_FLAT);
         }
         let last = tiers
             .last()
@@ -177,37 +144,15 @@ pub(super) fn tower(b: &mut MeshBuilder, d: Design) {
         return;
     }
     let mut roof_half = half;
-    let mut roof_c = d.chamfer;
     for (k, &(lo, hi, inset)) in tiers.iter().enumerate() {
         let h = half - Vec2::splat(inset);
-        match d.taper {
-            Some(shrink) => {
-                // Square at the foot to a square turned 45 degrees at the top, in facets.
-                let steps = if b.fine() { 8 } else { 4 };
-                let rings: Vec<Vec<Vec3>> = (0..=steps)
-                    .map(|i| {
-                        let t = i as f32 / steps as f32;
-                        let z = lo + (hi - lo) * t;
-                        let w = h.x * (1.0 + (shrink - 1.0) * t);
-                        octagon(Vec2::splat(w), w * t, z)
-                    })
-                    .collect();
-                paint(b, d.facade);
-                b.loft(&rings, false, false);
-                roof_half = Vec2::splat(h.x * shrink);
-                roof_c = roof_half.x;
-            }
-            None => {
-                paint(b, d.facade);
-                b.loft(
-                    &[octagon(h, d.chamfer, lo), octagon(h, d.chamfer, hi)],
-                    false,
-                    false,
-                );
-                roof_half = h;
-                roof_c = d.chamfer;
-            }
-        }
+        paint(b, d.facade);
+        b.loft(
+            &[octagon(h, d.chamfer, lo), octagon(h, d.chamfer, hi)],
+            false,
+            false,
+        );
+        roof_half = h;
         // The set-back's terrace over the tier below.
         if k > 0 {
             let below = half - Vec2::splat(tiers[k - 1].2);
@@ -218,40 +163,14 @@ pub(super) fn tower(b: &mut MeshBuilder, d: Design) {
                 true,
                 pat::ROOF_FLAT,
             );
-            if d.cornices {
-                band(b, below, d.chamfer, lo - 0.6, lo + 0.4, 0.4, pat::STONE);
+            // A band of light along the set-back's edge.
+            if b.mid() {
+                band(b, below, d.chamfer, lo - 0.5, lo, 0.25, pat::LED);
             }
         }
-        if d.fins > 0 && b.fine() && d.taper.is_none() {
+        if d.fins > 0 && b.fine() {
             fins(b, h, d.chamfer, lo, hi, d.fins, d.facade);
         }
-        if d.balconies {
-            let floors = ((hi - lo) / d.storey).round() as usize;
-            for f in 1..floors {
-                let z = lo + f as f32 * (hi - lo) / floors as f32;
-                band(b, h, d.chamfer, z - 0.22, z, 1.3, pat::CONCRETE);
-                if b.fine() {
-                    paint(b, pat::CURTAIN + BLANK);
-                    let o = h + Vec2::splat(1.3);
-                    b.loft(
-                        &[octagon(o, d.chamfer, z), octagon(o, d.chamfer, z + 1.05)],
-                        false,
-                        false,
-                    );
-                }
-            }
-        }
-    }
-    if d.cornices {
-        band(
-            b,
-            podium.size() * 0.5,
-            0.0,
-            podium_top - 0.4,
-            podium_top + 0.5,
-            0.4,
-            pat::STONE,
-        );
     }
     // Entrance canopy.
     let (min, max) = Side::Front.block(podium, -6.0, 6.0, 0.0, 3.0, 5.0, 5.4);
@@ -272,7 +191,7 @@ pub(super) fn tower(b: &mut MeshBuilder, d: Design) {
             false,
         );
     }
-    crown(b, d, roof_half, roof_c, shaft_top, top);
+    crown(b, d, roof_half, d.chamfer, shaft_top, top);
 }
 
 /// Vertical fins up the four main faces of an octagonal shaft, one every `every` bays.
@@ -314,44 +233,6 @@ fn crown(b: &mut MeshBuilder, d: Design, half: Vec2, c: f32, z: f32, top: f32) {
             if b.mid() {
                 mast(b, v3(s.x * 0.5, -s.y * 0.4, z + h), 14.0, 0.5);
                 beacon(b, v3(s.x * 0.5, -s.y * 0.4, z + h + 14.0));
-            }
-        }
-        Crown::Frame(h) => {
-            paint(b, pat::ROOF_FLAT);
-            b.face(&octagon(half, c, z));
-            let s = half - Vec2::splat(0.4);
-            plant(
-                b,
-                Rect::centred(0.0, 0.0, s.x * 0.6, s.y * 0.6),
-                z,
-                61,
-                6,
-                false,
-            );
-            // Corner posts and a ring beam: the crown's frame.
-            for (sx, sy) in [(1.0f32, 1.0f32), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)] {
-                let p = Vec2::new(sx * (s.x - c * 0.5), sy * (s.y - c * 0.5));
-                boxed(
-                    b,
-                    (p - Vec2::splat(0.6)).extend(z),
-                    (p + Vec2::splat(0.6)).extend(top),
-                    pat::CONCRETE,
-                );
-            }
-            band(
-                b,
-                s - Vec2::splat(1.0),
-                c,
-                top - 1.6,
-                top,
-                1.0,
-                pat::CONCRETE,
-            );
-            if b.fine() {
-                for k in 1..4 {
-                    let zz = z + h * k as f32 / 4.0;
-                    band(b, s - Vec2::splat(0.3), c, zz - 0.15, zz, 0.3, pat::STEEL);
-                }
             }
         }
         Crown::Helipad(m) => {
@@ -410,44 +291,6 @@ fn crown(b: &mut MeshBuilder, d: Design, half: Vec2, c: f32, z: f32, top: f32) {
                 );
             }
         }
-        Crown::Needle(h) => {
-            // Three stepped tiers, then the needle.
-            let steps = 3;
-            let mut at = z;
-            let mut s = half;
-            let mut cc = c;
-            for k in 0..steps {
-                let next = s * 0.78;
-                let nc = cc * 0.78;
-                let zz = at + (top - z) / steps as f32;
-                ring_ledge(
-                    b,
-                    &octagon(next, nc, at),
-                    &octagon(s, cc, at),
-                    true,
-                    pat::ROOF_FLAT,
-                );
-                paint(b, if k + 1 == steps { pat::STONE } else { d.facade });
-                b.loft(
-                    &[octagon(next, nc, at), octagon(next, nc, zz)],
-                    false,
-                    false,
-                );
-                if d.cornices && b.mid() {
-                    band(b, next, nc, zz - 0.5, zz, 0.3, pat::STONE);
-                }
-                at = zz;
-                s = next;
-                cc = nc;
-            }
-            paint(b, pat::ROOF_FLAT);
-            b.face(&octagon(s, cc, top));
-            paint(b, pat::STEEL);
-            b.prism(v3(0.0, 0.0, top), b.sides(8), s.x * 0.3, 0.3, h);
-            if b.mid() {
-                beacon(b, v3(0.0, 0.0, top + h));
-            }
-        }
     }
 }
 
@@ -462,60 +305,17 @@ fn beacon(b: &mut MeshBuilder, at: Vec3) {
 
 // ---- the designs --------------------------------------------------------------------
 
-/// A residential tower: rendered flats with a balcony round every floor, a plant
-/// screen crown.
+/// An office tower in glass, a set-back near the top, fins every fourth bay.
 pub(super) fn highrise(b: &mut MeshBuilder, _tech: u8) {
     tower(
         b,
         Design {
             kind: PropKind::CityHighrise,
-            facade: pat::FLATS,
-            storey: pat::FLATS_STOREY,
-            chamfer: 3.0,
-            tiers: &[],
-            taper: None,
-            crown: Crown::Plant(4.0),
-            fins: 0,
-            balconies: true,
-            cornices: false,
-        },
-    );
-}
-
-/// An office tower in glass, a set-back near the top, fins every other bay.
-pub(super) fn highrise_glass(b: &mut MeshBuilder, _tech: u8) {
-    tower(
-        b,
-        Design {
-            kind: PropKind::CityHighrise,
             facade: pat::CURTAIN,
-            storey: pat::CURTAIN_STOREY,
             chamfer: 0.0,
             tiers: &[(0.82, 3.0)],
-            taper: None,
             crown: Crown::Plant(6.0),
             fins: 4,
-            balconies: false,
-            cornices: false,
-        },
-    );
-}
-
-/// A stone office tower with piers, cornices at its set-backs, an open frame crown.
-pub(super) fn highrise_stone(b: &mut MeshBuilder, _tech: u8) {
-    tower(
-        b,
-        Design {
-            kind: PropKind::CityHighrise,
-            facade: pat::OFFICE,
-            storey: pat::OFFICE_STOREY,
-            chamfer: 0.0,
-            tiers: &[(0.6, 2.5), (0.85, 5.0)],
-            taper: None,
-            crown: Crown::Frame(7.0),
-            fins: 4,
-            balconies: false,
-            cornices: true,
         },
     );
 }
@@ -527,110 +327,25 @@ pub(super) fn skyscraper(b: &mut MeshBuilder, _tech: u8) {
         Design {
             kind: PropKind::CitySkyscraper,
             facade: pat::CURTAIN,
-            storey: pat::CURTAIN_STOREY,
             chamfer: 5.0,
             tiers: &[(0.55, 2.5), (0.8, 5.5)],
-            taper: None,
             crown: Crown::Plant(8.0),
             fins: 6,
-            balconies: false,
-            cornices: false,
         },
     );
 }
 
-/// A stone skyscraper in tiers, a cornice at each, its crown stepped to a needle.
-pub(super) fn skyscraper_deco(b: &mut MeshBuilder, _tech: u8) {
-    tower(
-        b,
-        Design {
-            kind: PropKind::CitySkyscraper,
-            facade: pat::OFFICE,
-            storey: pat::OFFICE_STOREY,
-            chamfer: 2.0,
-            tiers: &[(0.45, 3.0), (0.7, 6.0), (0.88, 9.0)],
-            taper: None,
-            crown: Crown::Needle(26.0),
-            fins: 4,
-            balconies: false,
-            cornices: true,
-        },
-    );
-}
-
-/// A ribbon-windowed skyscraper with stone fins, crowned by an open frame.
-pub(super) fn skyscraper_frame(b: &mut MeshBuilder, _tech: u8) {
-    tower(
-        b,
-        Design {
-            kind: PropKind::CitySkyscraper,
-            facade: pat::RIBBON,
-            storey: pat::RIBBON_STOREY,
-            chamfer: 0.0,
-            tiers: &[],
-            taper: None,
-            crown: Crown::Frame(12.0),
-            fins: 2,
-            balconies: false,
-            cornices: false,
-        },
-    );
-}
-
-/// The city's tallest: glass, stepped back three times, a helipad on its roof.
+/// The city's tallest: glass, stepped back three times, a VTOL pad on its roof.
 pub(super) fn spire(b: &mut MeshBuilder, _tech: u8) {
     tower(
         b,
         Design {
             kind: PropKind::CitySpire,
             facade: pat::CURTAIN,
-            storey: pat::CURTAIN_STOREY,
             chamfer: 6.0,
             tiers: &[(0.4, 3.0), (0.65, 6.0), (0.85, 9.5)],
-            taper: None,
             crown: Crown::Helipad(30.0),
             fins: 6,
-            balconies: false,
-            cornices: false,
-        },
-    );
-}
-
-/// A tapering glass obelisk: its square foot turning by facets to a smaller square set
-/// at 45 degrees, a needle on top.
-pub(super) fn spire_taper(b: &mut MeshBuilder, _tech: u8) {
-    tower(
-        b,
-        Design {
-            kind: PropKind::CitySpire,
-            facade: pat::CURTAIN,
-            storey: pat::CURTAIN_STOREY,
-            chamfer: 0.0,
-            tiers: &[],
-            taper: Some(0.62),
-            crown: Crown::Needle(40.0),
-            fins: 0,
-            balconies: false,
-            cornices: false,
-        },
-    );
-}
-
-/// A stone spire in the old style: set-backs with cornices, a stepped crown and a needle.
-pub(super) fn spire_deco(b: &mut MeshBuilder, _tech: u8) {
-    tower(
-        b,
-        Design {
-            kind: PropKind::CitySpire,
-            facade: pat::OFFICE,
-            storey: pat::OFFICE_STOREY,
-            chamfer: 4.0,
-            tiers: &[(0.35, 3.0), (0.6, 6.0), (0.8, 9.0), (0.92, 12.0)],
-            taper: None,
-            crown: Crown::Needle(36.0),
-            fins: 4,
-            balconies: false,
-            cornices: true,
         },
     );
 }

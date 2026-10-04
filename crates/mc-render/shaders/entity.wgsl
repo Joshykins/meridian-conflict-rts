@@ -3210,9 +3210,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         ci.inst = surf_ihash(in.unit_id, 977u);
         ci.unit_id = in.unit_id;
         ci.seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
-        ci.damage = 1.0 - clamp(in.state.y, 0.0, 1.0);
+        // How the structure stands (renderer/city_fx.rs, gpu_consts::city_look); a
+        // rubble heap reads its building's word.
+        let word = city_look[min(in.unit_id, arrayLength(&city_look) - 1u)];
+        ci.damage = f32(word & CITY_LOOK_DAMAGE_MASK) / f32(CITY_LOOK_DAMAGE_MASK);
+        ci.burning = select(0.0, 1.0, (word & CITY_LOOK_BURNING) != 0u);
+        ci.gutted = select(0.0, 1.0, (word & CITY_LOOK_GUTTED) != 0u);
+        ci.age = f32(word >> CITY_LOOK_AGE_SHIFT);
+        ci.time = time;
         ci.night = smoothstep(0.12, -0.04, globals.sun.z);
-        city = city_look(ci);
+        city = city_surface(ci);
+        m.emissive += city.glow;
         m.albedo = city.albedo;
         m.roughness = city.roughness;
         m.metallic = city.metallic;

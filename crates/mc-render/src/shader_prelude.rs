@@ -12,7 +12,7 @@
 //! then `emp` (an EMP stun's look on a model) and `wreck` (how a wreck lies and looks).
 
 /// Files put in front of shaders, never compiled on their own.
-pub(crate) const PRELUDES: [&str; 19] = [
+pub(crate) const PRELUDES: [&str; 20] = [
     "common",
     "bindings",
     "regions",

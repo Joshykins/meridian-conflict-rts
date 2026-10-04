@@ -159,6 +159,8 @@ straight into a match instead.
   --frames N             with --unit-shot: an animated PNG of N frames at 20 a second, the sim
                          playing on (two frames a tick) from the first --views angle
   --turn DEG             with --frames: the camera turns this many degrees about the unit
+  --fire SECONDS         with --unit-shot of a city structure: it has been burning this long
+  --gutted               with --unit-shot of a city structure: burnt out
   --shot-server DIR      stay up with a warm renderer and answer --unit-shot requests dropped in
                          DIR as NAME.req files (one argument per line; --reload re-reads data/,
                          --shaders recompiles the WGSL, --map NAME shoots on that map, a sea for

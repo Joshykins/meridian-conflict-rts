@@ -358,6 +358,11 @@ shared! {
         pub const TIMBER: u32 = 76;
         /// Copper gone green: domes, a spire's cap.
         pub const COPPER: u32 = 77;
+        /// A band of light: LED strips along a tower's set-backs and crowns, cool white
+        /// or the building's own tint, steady (and failing as the building is hurt).
+        pub const LED: u32 = 78;
+        /// Photovoltaic panels: dark glass cells in a silver frame.
+        pub const SOLAR: u32 = 79;
         /// A facade pattern plus this: the same wall in the same finish, no windows (a
         /// gable, the pier beside a door, a stair tower's blind face).
         pub const BLANK: u32 = 100;

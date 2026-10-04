@@ -1569,9 +1569,7 @@ impl Renderer {
                     heading,
                     blueprint: prop_base + kind,
                     owner_flags: KIND_PROP,
-                    // A city structure the map has already knocked about: its glass
-                    // broken to match (city.wgsl).
-                    health: 1.0 - f32::from(p.wear_milli.min(1000)) / 1000.0,
+                    health: 1.0,
                     build: 1.0,
                     turret_yaw: 0.0,
                     radius: 4.0,
@@ -1623,7 +1621,7 @@ impl Renderer {
             )
         };
         statics_data.extend(heaps);
-        let city_fx = city_fx::CityFx::new(&gpu, &scene.map, heap_list)?;
+        let city_fx = city_fx::CityFx::new(&gpu, &scene.map, staged.len(), heap_list)?;
         let ore = ore_fields::OreFields::new(scene.map.ore_regions());
         let vein_mesh = ore_vein_mesh(scene.map.ore_regions());
         let static_count = statics_data.len() as u32;
@@ -2648,6 +2646,12 @@ impl Renderer {
     /// Ground stains of every kind in the buffer, ahead of the pads.
     fn stain_count(&self) -> u32 {
         self.stain_runs.iter().sum()
+    }
+
+    /// Sets how staged prop `index` (`Self::new_staged`) looks hurt: a
+    /// `gpu_consts::city_look` word, as the sim's damage would set it.
+    pub fn set_staged_look(&mut self, index: usize, word: u32) {
+        self.city_fx.stage_look(index, word);
     }
 
     pub fn ground_height(&self, xy: glam::Vec2) -> f32 {

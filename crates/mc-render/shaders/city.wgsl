@@ -21,8 +21,14 @@ struct CityIn {
     inst: f32,
     unit_id: u32,
     seed: f32,
-    // How badly the structure is hurt, 0 to 1: how many of its panes are broken.
+    // Its `city_look` word (renderer/city_fx.rs): how badly it is hurt, 0 to 1 (how
+    // many of its panes are broken, how scarred its walls); burning, and for how
+    // many seconds; burnt out. And the time, for a fire's flicker.
     damage: f32,
+    burning: f32,
+    gutted: f32,
+    age: f32,
+    time: f32,
     // 0 by day, 1 by night.
     night: f32,
 }
@@ -44,6 +50,8 @@ struct CityLook {
     tilt: vec2<f32>,
     // How much the glass mirrors face on: plain glass, or a tower's coated glazing.
     f0: f32,
+    // Light the surface gives off itself: LED bands.
+    glow: vec3<f32>,
 }
 
 // Finishes: which wall a facade is, and the instance's colour of it.
@@ -224,6 +232,29 @@ fn city_wall(finish: u32, rgb: vec3<f32>, st: vec2<f32>, local: vec3<f32>, px: f
     return c;
 }
 
+// A wall knocked about: pocked where shells and bullets struck (dark pits with a
+// fresh pale rim), scorched in broad patches, all of it sooted once gutted.
+fn city_scars(c: vec3<f32>, i: CityIn) -> vec3<f32> {
+    let d = i.damage;
+    if d <= 0.0 && i.gutted < 0.5 {
+        return c;
+    }
+    var out = c;
+    let n = surf_noise3(i.local * 0.9 + vec3<f32>(i.inst * 57.0));
+    let cut = 0.86 - 0.3 * d;
+    let pit = smoothstep(cut, cut + 0.03, n);
+    let rim = smoothstep(cut - 0.05, cut, n) * (1.0 - pit);
+    let vis = surf_resolved(0.5, i.px);
+    out = mix(out, vec3<f32>(0.62, 0.6, 0.55), rim * 0.6 * vis * step(0.01, d));
+    out = mix(out, vec3<f32>(0.08, 0.075, 0.07), pit * 0.9 * step(0.01, d));
+    let scorch = smoothstep(0.55, 0.85, surf_noise3(i.local * 0.09 + vec3<f32>(i.inst * 13.0, 3.0, 7.0)));
+    out = mix(out, vec3<f32>(0.03, 0.028, 0.026), scorch * smoothstep(0.3, 1.0, d) * 0.8);
+    // Burnt out: soot over everything, heaviest high up where the smoke rolled out.
+    let streak = surf_noise3(vec3<f32>(i.local.x * 0.7, i.local.y * 0.7, i.local.z * 0.05));
+    out = mix(out, vec3<f32>(0.03, 0.026, 0.024), i.gutted * (0.45 + 0.35 * streak));
+    return out;
+}
+
 // A pane's key and how it fares: broken when its hash falls under the damage.
 fn city_pane_key(i: CityIn, cell: vec2<f32>, column: f32) -> f32 {
     let dir = u32(floor(atan2(i.normal.y, i.normal.x) * 1.273 + 4.5)) & 7u;
@@ -336,7 +367,7 @@ fn city_facade(i: CityIn) -> CityLook {
     let shed = i.pattern == CITY_SHED;
     let curtain = i.pattern == CITY_CURTAIN;
     let ribbon = i.pattern == CITY_RIBBON;
-    let gutted = i.pattern == CITY_GUTTED;
+    let gutted = i.pattern == CITY_GUTTED || i.gutted > 0.5;
     let n = city_n_of(w, g.bay);
     let m = select(city_n_of(h, g.storey), 1.0, shed);
     let cw = w / n;
@@ -347,7 +378,7 @@ fn city_facade(i: CityIn) -> CityLook {
     if gutted {
         base = mix(base, vec3<f32>(0.1, 0.09, 0.085), 0.55);
     }
-    var wall = city_wall(finish, base, vec2<f32>(u, v), i.local, i.px, i.inst);
+    var wall = city_scars(city_wall(finish, base, vec2<f32>(u, v), i.local, i.px, i.inst), i);
     if curtain {
         // Spandrels: dark glass over the slab, with the mullions running on through.
         wall = mix(vec3<f32>(0.05, 0.06, 0.07), base * 0.3, 0.3);
@@ -387,8 +418,17 @@ fn city_facade(i: CityIn) -> CityLook {
     bars *= detail;
     let key = city_pane_key(i, cell, column);
     let room_key = city_pane_key(i, cell, 0.0);
-    // Broken: the hash under the damage. A gutted shell has nothing left in its holes.
-    let broken = select(step(key, i.damage * 1.15), 1.0, gutted);
+    // Broken: the hash under the damage, a few panes holding however bad it gets. A
+    // gutted shell has nothing left in its holes.
+    let broken = select(step(key, min(i.damage * 1.15, 0.9)), 1.0, gutted);
+    // A burning building: fire in some of its broken rooms, spreading over more
+    // storeys the longer it burns, flickering.
+    let seat = floor(hash11(i.inst * 31.0) * m);
+    let reach = 0.5 + i.age / 25.0;
+    let fire_share = clamp(0.25 + i.age / 80.0, 0.25, 0.85);
+    let flames = i.burning * (1.0 - gutted_f(gutted)) * broken
+        * step(abs(cell.y - seat), reach) * step(hash11(room_key * 91.0), fire_share);
+    let flicker = 0.65 + 0.35 * sin(i.time * 9.0 + room_key * 40.0) * sin(i.time * 13.7 + room_key * 17.0);
     // Shards left in the frame of a broken pane.
     let edge = min(win_half.y - abs(q.y), 0.5 * pane_w - abs(pq));
     let shard = (1.0 - gutted_f(gutted)) * broken
@@ -414,10 +454,14 @@ fn city_facade(i: CityIn) -> CityLook {
         let below = clamp(-(q.y + win_half.y + 0.12) / 0.9, 0.0, 1.0);
         let run = city_box(cu, win_half.x * 0.8, i.px) * step(0.001, below) * (1.0 - below);
         wall_here *= 1.0 - 0.07 * run * detail;
-        let over = clamp((q.y - win_half.y) / (1.5 * ch), 0.0, 1.0);
-        let burnt = select(broken, 1.0, gutted) * step(0.001, over) * (1.0 - over);
-        let plume = city_box(cu, win_half.x * (1.0 + over), i.px);
-        wall_here = mix(wall_here, vec3<f32>(0.03, 0.028, 0.026), burnt * plume * 0.85 * smoothstep(0.2, 0.9, i.damage + select(0.0, 1.0, gutted)));
+        // Soot licked up the wall over broken windows, taller and blacker over a fire.
+        let tall = select(1.5, 2.6, flames > 0.0 || gutted);
+        let over = clamp((q.y - win_half.y) / (tall * ch), 0.0, 1.0);
+        let lick = 0.75 + 0.5 * surf_noise3(vec3<f32>(i.local.xy * 0.8, i.local.z * 0.25));
+        let burnt = select(broken, 1.0, gutted) * step(0.001, over) * (1.0 - over * lick);
+        let plume = city_box(cu, win_half.x * (1.0 + 0.8 * over), i.px);
+        let strength = max(smoothstep(0.25, 0.9, i.damage), max(flames, gutted_f(gutted)));
+        wall_here = mix(wall_here, vec3<f32>(0.025, 0.022, 0.02), clamp(burnt * plume * strength, 0.0, 0.92));
     }
     let frame_rgb = select(vec3<f32>(0.62, 0.61, 0.58), vec3<f32>(0.12, 0.12, 0.13), curtain || ribbon || i.pattern == CITY_OFFICE || shed || hash11(i.inst * 5.0) < 0.35);
     let frame = max(bars, shard * 0.7) * opening;
@@ -427,6 +471,10 @@ fn city_facade(i: CityIn) -> CityLook {
     o.interior = inner;
     o.lamp = inner * select(vec3<f32>(1.0, 0.72, 0.42), vec3<f32>(0.85, 0.9, 1.0), curtain || i.pattern == CITY_OFFICE)
         * 2.2 * room.lit * i.night * (1.0 - broken) * (1.0 - gutted_f(gutted));
+    // Fire seen through the hole: hottest low in the room, smoke darkening its head.
+    let blaze = mix(vec3<f32>(1.0, 0.5, 0.12), vec3<f32>(0.9, 0.22, 0.04), smoothstep(-win_half.y, win_half.y, q.y));
+    o.lamp += blaze * (4.0 * flicker) * flames * (1.0 - 0.7 * smoothstep(0.2, 1.0, q.y / max(win_half.y, 0.1)));
+    o.interior = mix(o.interior, vec3<f32>(0.6, 0.25, 0.06), flames * 0.6);
     var tint = vec3<f32>(0.92, 0.97, 1.0);
     if curtain {
         let t = hash11(i.inst * 77.0);
@@ -458,7 +506,7 @@ fn city_shop(i: CityIn) -> CityLook {
     let z = i.local.z;
     let finish = select(CITY_FINISH_RENDER, CITY_FINISH_STONE, city_hash(i.inst, 4.0) < 0.5);
     let base = city_finish_rgb(finish, i.inst);
-    let wall = city_wall(finish, base, vec2<f32>(u, z), i.local, i.px, i.inst);
+    let wall = city_scars(city_wall(finish, base, vec2<f32>(u, z), i.local, i.px, i.inst), i);
     let shop = hash11(bay * 3.1 + i.inst * 41.0 + i.seed * 7.0);
     // A door in some bays: the glass to the ground, off to one side.
     let pier = 0.35;
@@ -483,7 +531,7 @@ fn city_shop(i: CityIn) -> CityLook {
     bars = max(bars, city_line(z - CITY_SHOP_HEAD + 0.6, 0.06, CITY_SHOP_HEAD, i.px));
     bars = max(bars, city_line(z - lo, 0.1, CITY_SHOP_HEAD, i.px));
     let key = city_pane_key(i, vec2<f32>(bay, 0.0), column);
-    let broken = step(key, i.damage * 1.15);
+    let broken = max(step(key, min(i.damage * 1.15, 0.9)), i.gutted);
     let room = city_room(i, vec2<f32>(cu, z - 0.5 * CITY_SHOP_HEAD), vec2<f32>(0.5 * cw, 0.5 * CITY_SHOP_HEAD), 9.0, key, false);
     // Shelves and stock: dark and bright blocks down the shop.
     var inner = room.rgb * (0.7 + 0.6 * step(0.5, fract(z * 1.6 + hue)));
@@ -518,7 +566,7 @@ fn city_lobby(i: CityIn) -> CityLook {
     let cu = u - (bay + 0.5) * cw;
     let z = i.local.z;
     let base = city_stone_rgb(city_hash(i.inst, 2.0));
-    let wall = city_wall(CITY_FINISH_STONE, base, vec2<f32>(u, z), i.local, i.px, i.inst);
+    let wall = city_scars(city_wall(CITY_FINISH_STONE, base, vec2<f32>(u, z), i.local, i.px, i.inst), i);
     let glass_half = 0.5 * cw - 0.45;
     let opening = city_box(cu, glass_half, i.px) * step(0.0, z) * step(z, CITY_LOBBY_HEAD);
     let pane_w = 2.0 * glass_half / f32(CITY_LOBBY_PANES);
@@ -527,7 +575,7 @@ fn city_lobby(i: CityIn) -> CityLook {
     var bars = city_line(abs(pq) - 0.5 * pane_w, 0.06, pane_w, i.px);
     bars = max(bars, city_line(z - 3.2, 0.08, CITY_LOBBY_HEAD, i.px));
     let key = city_pane_key(i, vec2<f32>(bay, 0.0), column);
-    let broken = step(key, i.damage * 1.15);
+    let broken = max(step(key, min(i.damage * 1.15, 0.9)), i.gutted);
     let room = city_room(i, vec2<f32>(cu, z - 0.5 * CITY_LOBBY_HEAD), vec2<f32>(0.5 * cw, 0.5 * CITY_LOBBY_HEAD), 14.0, key, true);
     var inner = mix(room.rgb, room.rgb * 0.25, broken);
     let frame = bars * opening;
@@ -552,7 +600,7 @@ fn city_glass_roof(i: CityIn) -> CityLook {
     var bars = city_line(abs(f.x) - 0.5, 0.06 / CITY_ROOF_GLASS_PITCH, 1.0, i.px / CITY_ROOF_GLASS_PITCH);
     bars = max(bars, city_line(abs(f.y) - 0.5, 0.04 / CITY_ROOF_GLASS_PITCH, 1.0, i.px / CITY_ROOF_GLASS_PITCH));
     let key = city_pane_key(i, cell, 0.0);
-    let broken = step(key, i.damage * 1.15);
+    let broken = max(step(key, min(i.damage * 1.15, 0.9)), i.gutted);
     o.albedo = vec3<f32>(0.16, 0.17, 0.18);
     o.roughness = 0.5;
     o.metallic = 0.5;
@@ -651,6 +699,25 @@ fn city_plain(i: CityIn) -> CityLook {
         c *= 1.0 - 0.5 * surf_resolved(0.18, i.px) * (1.0 - smoothstep(0.0, 0.08, gap));
         o.albedo = c * (1.0 + 0.4 * surf_fbm3(vec3<f32>(i.local.xy, i.local.z * 0.1), 1.5, i.px));
         o.roughness = 0.9;
+    } else if p == CITY_LED {
+        // A strip of LEDs behind a diffuser: cool white, or the building's tint; dim
+        // by day, bright at night; dead in stretches once the building is hurt.
+        let pick = city_hash(i.inst, 12.0);
+        var tint = vec3<f32>(0.85, 0.95, 1.0);
+        if pick > 0.5 { tint = vec3<f32>(0.4, 0.85, 1.0); }
+        if pick > 0.8 { tint = vec3<f32>(1.0, 0.85, 0.6); }
+        let dead = step(1.0 - i.damage * 1.2, hash11(floor(st.x / 3.0) * 7.1 + i.inst * 31.0));
+        let on = (1.0 - dead) * (1.0 - i.gutted);
+        o.albedo = vec3<f32>(0.6, 0.62, 0.64) * (0.3 + 0.7 * on);
+        o.roughness = 0.3;
+        o.glow = tint * on * mix(0.5, 2.6, i.night);
+    } else if p == CITY_SOLAR {
+        // Cells 16 cm square in panels 1 m by 1.7 m, a silver frame round each panel.
+        let cell = city_lines(st.x, 0.01, 0.16, fwidth(st.x)) + city_lines(st.y, 0.01, 0.16, fwidth(st.y));
+        let frame = max(city_lines(st.x, 0.04, 1.0, fwidth(st.x)), city_lines(st.y, 0.04, 1.7, fwidth(st.y)));
+        o.albedo = mix(mix(vec3<f32>(0.025, 0.035, 0.07), vec3<f32>(0.12, 0.13, 0.15), min(cell, 1.0) * 0.5), vec3<f32>(0.55, 0.56, 0.58), frame);
+        o.roughness = 0.18;
+        o.metallic = 0.4;
     } else if p == CITY_COPPER {
         var c = vec3<f32>(0.22, 0.42, 0.36);
         c = mix(c, vec3<f32>(0.12, 0.2, 0.17), smoothstep(0.5, 0.8, surf_noise3(vec3<f32>(i.local.xy * 0.8, i.local.z * 0.1))));
@@ -658,6 +725,13 @@ fn city_plain(i: CityIn) -> CityLook {
         o.roughness = 0.65;
     } else {
         o.albedo = vec3<f32>(0.42, 0.41, 0.39);
+    }
+    if p != CITY_SHADOW {
+        o.albedo = city_scars(o.albedo, i);
+    }
+    if p == CITY_RUBBLE {
+        // A heap left by a building that burned is charred through.
+        o.albedo *= 1.0 - 0.55 * max(i.burning, i.gutted);
     }
     return o;
 }
@@ -714,7 +788,7 @@ fn city_fort(i: CityIn, st: vec2<f32>, broad: f32) -> CityLook {
     return o;
 }
 
-fn city_look(i: CityIn) -> CityLook {
+fn city_surface(i: CityIn) -> CityLook {
     let p = i.pattern;
     if p >= CITY_HOUSE + CITY_BLANK {
         // A facade's wall with no windows in it.
@@ -724,7 +798,7 @@ fn city_look(i: CityIn) -> CityLook {
         if p - CITY_BLANK == CITY_GUTTED {
             base = mix(base, vec3<f32>(0.1, 0.09, 0.085), 0.55);
         }
-        o.albedo = city_wall(finish, base, i.face.xy + abs(i.face.zw), i.local, i.px, i.inst);
+        o.albedo = city_scars(city_wall(finish, base, i.face.xy + abs(i.face.zw), i.local, i.px, i.inst), i);
         o.roughness = 0.88;
         o.tint = vec3<f32>(1.0);
         if p - CITY_BLANK == CITY_CURTAIN {

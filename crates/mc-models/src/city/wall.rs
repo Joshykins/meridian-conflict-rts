@@ -12,104 +12,42 @@ use super::kit::*;
 use crate::builder::MeshBuilder;
 use crate::gpu_consts::city as pat;
 
-/// How the wall is built (one design question for the wall, its towers and gates).
-#[derive(Clone, Copy, PartialEq)]
-pub(super) enum Style {
-    /// A battered outer face rising to a parapet, the walkway behind it, counterforts
-    /// down the city side.
-    Bastion,
-    /// Sheer faces, an overhanging firing gallery near the top, the city side stepped
-    /// down to a firing terrace and a row of casemates.
-    Casemate,
-    /// A rubble glacis heaped against a precast panel wall, a steel gallery on the
-    /// city side.
-    Glacis,
-}
-
 /// Half the segment's length.
 fn half_len() -> f32 {
     WALL_SEGMENT_M as f32 * 0.5
 }
 
-/// The wall's cross-section (y, z) for a style, outer face (-y) first.
-fn section(style: Style, coarse: bool) -> Vec<[f32; 2]> {
+/// The wall's cross-section (y, z), outer face (-y) first: a battered face up to a
+/// parapet, the walkway behind it.
+fn section(coarse: bool) -> Vec<[f32; 2]> {
     let (wall, top) = part(PropKind::CityWall, 0);
-    let (o, i) = (wall.min.y, wall.max.y);
-    match (style, coarse) {
-        (Style::Bastion, true) => vec![[o, -2.0], [o + 3.5, top], [2.5, top], [2.5, -2.0]],
-        (Style::Bastion, false) => vec![
-            [o, -2.0],
-            [o + 3.5, top - 4.0],
-            [o + 3.5, top],
-            [o + 4.7, top],
-            [o + 4.7, top - 1.5],
-            [2.5, top - 1.5],
-            [2.5, -2.0],
-        ],
-        (Style::Casemate, true) => vec![
-            [o + 0.5, -2.0],
-            [o + 0.5, top],
-            [-1.0, top],
-            [-1.0, 14.0],
-            [i, 6.5],
-            [i, -2.0],
-        ],
-        (Style::Casemate, false) => vec![
-            [o + 0.5, -2.0],
-            [o + 0.5, 16.0],
-            [o - 0.8, 16.8],
-            [o - 0.8, top],
-            [o + 0.6, top],
-            [o + 0.6, top - 1.5],
-            [-1.0, top - 1.5],
-            [-1.0, 14.0],
-            [6.5, 14.0],
-            [6.5, 6.5],
-            [i, 6.5],
-            [i, -2.0],
-        ],
-        (Style::Glacis, _) => vec![
-            [o + 5.5, -2.0],
-            [o + 5.5, top],
-            [o + 11.5, top],
-            [o + 11.5, -2.0],
-        ],
+    let o = wall.min.y;
+    if coarse {
+        return vec![[o, -2.0], [o + 3.5, top], [2.5, top], [2.5, -2.0]];
     }
+    vec![
+        [o, -2.0],
+        [o + 3.5, top - 4.0],
+        [o + 3.5, top],
+        [o + 4.7, top],
+        [o + 4.7, top - 1.5],
+        [2.5, top - 1.5],
+        [2.5, -2.0],
+    ]
 }
 
+/// A segment of the wall: the battered section the segment's whole length, its
+/// counterforts down the city side, the walkway and the parapet's slits.
 pub(super) fn wall(b: &mut MeshBuilder, _tech: u8) {
-    wall_segment(b, Style::Bastion);
-}
-
-pub(super) fn wall_casemate(b: &mut MeshBuilder, _tech: u8) {
-    wall_segment(b, Style::Casemate);
-}
-
-pub(super) fn wall_glacis(b: &mut MeshBuilder, _tech: u8) {
-    wall_segment(b, Style::Glacis);
-}
-
-fn wall_segment(b: &mut MeshBuilder, style: Style) {
     let (wall, top) = part(PropKind::CityWall, 0);
     let h = half_len();
     paint(b, pat::FORT);
-    b.extrude_x(&section(style, b.coarse()), -h, h);
-    if style == Style::Glacis {
-        // The glacis: rubble and spoil heaped against the outer face.
-        let o = wall.min.y;
-        paint(b, pat::RUBBLE);
-        let berm = if b.coarse() {
-            vec![[o, -2.0], [o + 5.5, 10.0], [o + 5.5, -2.0]]
-        } else {
-            vec![[o, -2.0], [o + 2.5, 5.5], [o + 5.5, 10.0], [o + 5.5, -2.0]]
-        };
-        b.extrude_x(&berm, -h, h);
-    }
+    b.extrude_x(&section(b.coarse()), -h, h);
     if b.coarse() {
         return;
     }
-    match style {
-        Style::Bastion => {
+    {
+        {
             // Counterforts down the city side, every 16 m.
             for k in 0..4 {
                 let x = -h + 8.0 + 16.0 * k as f32;
@@ -128,63 +66,6 @@ fn wall_segment(b: &mut MeshBuilder, style: Style) {
             }
             walkway(b, wall.min.y + 4.7, 2.5, top - 1.5);
             slits(b, wall.min.y + 3.5, top - 1.2, top - 0.3, 4.0);
-        }
-        Style::Casemate => {
-            walkway(b, wall.min.y + 0.6, -1.0, top - 1.5);
-            // Gun slits along the gallery, and casemate doors on the city side.
-            slits(b, wall.min.y - 0.8, 18.0, 19.4, 5.33);
-            if b.fine() {
-                for k in 0..4 {
-                    let x = -h + 8.0 + 16.0 * k as f32;
-                    paint(b, pat::BLAST_DOOR);
-                    facing(
-                        b,
-                        vec![
-                            v3(x - 1.6, wall.max.y + 0.05, 0.0),
-                            v3(x + 1.6, wall.max.y + 0.05, 0.0),
-                            v3(x + 1.6, wall.max.y + 0.05, 3.6),
-                            v3(x - 1.6, wall.max.y + 0.05, 3.6),
-                        ],
-                        Vec3::Y,
-                    );
-                }
-                rail(b, 6.4, 14.0, h);
-            }
-        }
-        Style::Glacis => {
-            let (o, i) = (wall.min.y + 5.5, wall.min.y + 11.5);
-            walkway(b, o, i, top);
-            // The steel gallery on the city side, on columns.
-            let deck = 18.0;
-            for k in 0..8 {
-                let x = -h + 4.0 + 8.0 * k as f32;
-                boxed(
-                    b,
-                    v3(x - 0.25, wall.max.y - 2.0, -0.5),
-                    v3(x + 0.25, wall.max.y - 1.5, deck),
-                    pat::STEEL,
-                );
-            }
-            boxed(
-                b,
-                v3(-h, i, deck - 0.4),
-                v3(h, wall.max.y - 1.3, deck),
-                pat::STEEL,
-            );
-            if b.fine() {
-                rail(b, wall.max.y - 1.4, deck, h);
-                // The precast panels' joints: a rib every 1.5 m up the outer face.
-                for k in 0..42 {
-                    let x = -h + 0.75 + 1.5 * k as f32;
-                    boxed(
-                        b,
-                        v3(x - 0.1, o - 0.25, 10.0),
-                        v3(x + 0.1, o, top),
-                        pat::FORT,
-                    );
-                }
-            }
-            slits(b, o, top - 2.2, top - 1.3, 4.0);
         }
     }
 }
@@ -261,104 +142,33 @@ fn slits(b: &mut MeshBuilder, y: f32, z0: f32, z1: f32, pitch: f32) {
 
 pub(super) fn tower(b: &mut MeshBuilder, _tech: u8) {
     let (r, top) = part(PropKind::CityWallTower, 0);
-    fort_tower(b, Style::Bastion, r, top, Side::Front, true);
+    fort_tower(b, r, top, Side::Front, true);
 }
 
-pub(super) fn tower_casemate(b: &mut MeshBuilder, _tech: u8) {
-    let (r, top) = part(PropKind::CityWallTower, 0);
-    fort_tower(b, Style::Casemate, r, top, Side::Front, true);
-}
-
-pub(super) fn tower_glacis(b: &mut MeshBuilder, _tech: u8) {
-    let (r, top) = part(PropKind::CityWallTower, 0);
-    fort_tower(b, Style::Glacis, r, top, Side::Front, true);
-}
-
-/// A tower of the wall in `style` on `r` up to `top`: its door on `inner`, a radar and
+/// A tower of the wall on `r` up to `top`: its door on `inner`, a radar and
 /// a mast on its roof when `crowned`.
-fn fort_tower(b: &mut MeshBuilder, style: Style, r: Rect, top: f32, inner: Side, crowned: bool) {
+fn fort_tower(b: &mut MeshBuilder, r: Rect, top: f32, inner: Side, crowned: bool) {
     let c = r.centre();
     let deck_z = top - 4.0;
     let gun = deck_z - 8.0;
-    match style {
-        Style::Bastion => {
-            let waist = r.grow(-2.2);
-            paint(b, pat::FORT);
-            b.loft(&[r.ring(-2.0), waist.ring(gun)], false, false);
-            if b.coarse() {
-                solid(b, waist, gun, top, pat::FORT, pat::ROOF_FLAT);
-                return;
-            }
-            walls(b, waist, gun, deck_z, pat::FORT);
-            ledge(b, waist, waist.grow(1.2), deck_z, false, pat::FORT);
-            walls(b, waist.grow(1.2), deck_z, top, pat::FORT);
-            parapet_top(b, waist.grow(1.2), top);
-            slit_ring(b, waist, gun + 3.0, gun + 4.4, 3.5);
-        }
-        Style::Casemate => {
-            let body = r.grow(-0.5);
-            walls(b, body, -2.0, gun, pat::FORT);
-            if b.coarse() {
-                solid(b, r, gun, top, pat::FORT, pat::ROOF_FLAT);
-                return;
-            }
-            ledge(b, body, r, gun, false, pat::FORT);
-            walls(b, r, gun, top, pat::FORT);
-            parapet_top(b, r, top);
-            slit_ring(b, r, gun + 3.0, gun + 4.4, 4.0);
-            // Observation cupolas on the corners.
-            for (sx, sy) in [(1.0f32, 1.0f32), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)] {
-                let p = c + Vec2::new(sx, sy) * (r.size() * 0.5 - Vec2::splat(3.0));
-                paint(b, pat::FORT);
-                b.prism(p.extend(top - 1.5), b.sides(10), 1.8, 1.8, 2.2);
-                if b.fine() {
-                    b.spheroid(p.extend(top + 0.7), v3(1.8, 1.8, 1.0), 10, 3);
-                }
-            }
-        }
-        Style::Glacis => {
-            let body = r.grow(-4.5);
-            paint(b, pat::RUBBLE);
-            b.loft(&[r.ring(-2.0), body.ring(10.0)], false, false);
-            if b.coarse() {
-                solid(b, body, 10.0, top, pat::FORT, pat::ROOF_FLAT);
-                return;
-            }
-            walls(b, body, 10.0, gun + 4.0, pat::FORT);
-            deck(b, body, gun + 4.0, pat::PAVING);
-            // The watch cabin: steel walls, armoured glass all round.
-            let cabin = body.grow(-1.5);
-            walls(b, cabin, gun + 4.0, gun + 5.2, pat::STEEL);
-            walls(b, cabin, gun + 5.2, top - 0.8, pat::RIBBON);
-            solid(
-                b,
-                cabin.grow(0.6),
-                top - 0.8,
-                top,
-                pat::STEEL,
-                pat::ROOF_FLAT,
-            );
-            if b.fine() {
-                for side in Side::ALL {
-                    let (a0, a1, _) = side.run(body);
-                    for a in cells(a0, a1 - a0, 1.5) {
-                        let (min, max) =
-                            side.block(body, a - 0.1, a + 0.1, 0.0, 0.25, 10.0, gun + 4.0);
-                        boxed(b, min, max, pat::FORT);
-                    }
-                }
-            }
-        }
+    // A battered base, a gun deck with slits, an overhanging roof deck and parapet.
+    let waist = r.grow(-2.2);
+    paint(b, pat::FORT);
+    b.loft(&[r.ring(-2.0), waist.ring(gun)], false, false);
+    if b.coarse() {
+        solid(b, waist, gun, top, pat::FORT, pat::ROOF_FLAT);
+        return;
     }
+    walls(b, waist, gun, deck_z, pat::FORT);
+    ledge(b, waist, waist.grow(1.2), deck_z, false, pat::FORT);
+    walls(b, waist.grow(1.2), deck_z, top, pat::FORT);
+    parapet_top(b, waist.grow(1.2), top);
+    slit_ring(b, waist, gun + 3.0, gun + 4.4, 3.5);
     // The door to the city side, and the roof's kit.
     let (a0, a1, _) = inner.run(r);
     let mid = (a0 + a1) * 0.5;
-    let face = match style {
-        Style::Bastion => r.grow(-0.4),
-        Style::Casemate => r.grow(-0.5),
-        Style::Glacis => r.grow(-4.5),
-    };
-    let door_z = if style == Style::Glacis { 10.0 } else { 0.0 };
+    let face = r.grow(-0.4);
+    let door_z = 0.0;
     paint(b, pat::BLAST_DOOR);
     panel(
         b,
@@ -373,11 +183,7 @@ fn fort_tower(b: &mut MeshBuilder, style: Style, r: Rect, top: f32, inner: Side,
     if !crowned || !b.mid() {
         return;
     }
-    let roof = if style == Style::Glacis {
-        top
-    } else {
-        top - 1.4
-    };
+    let roof = top - 1.4;
     // A radome on a plinth, a lattice mast with its dishes.
     boxed(
         b,
@@ -408,8 +214,7 @@ fn fort_tower(b: &mut MeshBuilder, style: Style, r: Rect, top: f32, inner: Side,
         }
         // Floodlights at the corners.
         for (sx, sy) in [(1.0f32, 1.0f32), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)] {
-            let p = c + Vec2::new(sx, sy)
-                * (r.size() * 0.5 - Vec2::splat(if style == Style::Glacis { 6.0 } else { 2.5 }));
+            let p = c + Vec2::new(sx, sy) * (r.size() * 0.5 - Vec2::splat(2.5));
             boxed(
                 b,
                 (p - Vec2::splat(0.4)).extend(roof),
@@ -445,29 +250,17 @@ fn slit_ring(b: &mut MeshBuilder, r: Rect, z0: f32, z1: f32, pitch: f32) {
 
 // ---- the gatehouse -----------------------------------------------------------------------
 
-pub(super) fn gate(b: &mut MeshBuilder, _tech: u8) {
-    gatehouse(b, Style::Bastion);
-}
-
-pub(super) fn gate_casemate(b: &mut MeshBuilder, _tech: u8) {
-    gatehouse(b, Style::Casemate);
-}
-
-pub(super) fn gate_glacis(b: &mut MeshBuilder, _tech: u8) {
-    gatehouse(b, Style::Glacis);
-}
-
 /// Two towers either side of the road (along x, the city at +x), a bridge between them
 /// carrying a gallery over the road, and the blast doors standing open against the
 /// towers' inner walls.
-fn gatehouse(b: &mut MeshBuilder, style: Style) {
+pub(super) fn gate(b: &mut MeshBuilder, _tech: u8) {
     let towers: Vec<(Rect, f32)> = (0..2).map(|i| part(PropKind::CityGate, i)).collect();
     let road = GATE_PASSAGE_M as f32 * 0.5;
     let top = towers[0].1;
     for (k, &(r, t)) in towers.iter().enumerate() {
         // Each tower's door opens off the road.
         let inner = if k == 0 { Side::Back } else { Side::Front };
-        fort_tower(b, style, r, t, inner, k == 0);
+        fort_tower(b, r, t, inner, k == 0);
     }
     let len = towers[0].0.size().x;
     // The bridge: a gallery across the road, its underside clear of traffic.

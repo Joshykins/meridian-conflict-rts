@@ -11,8 +11,9 @@
 //!
 //! KEY may also be a map prop's model key (`city_office`): the prop then stands
 //! alone on the range pad at its authored size, its front (`front`, `front34`)
-//! its street side, local +y (`mc_map::city`), and `--hurt` takes that share off
-//! its health, so a city structure's windows break.
+//! its street side, local +y (`mc_map::city`); `--hurt` takes that share off
+//! its health, `--fire SECONDS` sets it burning that long and `--gutted` burnt
+//! out (its `gpu_consts::city_look` word), so a city structure shows its damage.
 
 use crate::headless::{run_sim, write_png};
 use crate::setup::{self, Options};
@@ -43,6 +44,10 @@ pub(crate) struct Spec {
     /// turning `turn` degrees about the unit over them from the first view.
     pub(crate) frames: u32,
     pub(crate) turn: f32,
+    /// A city structure shot: burning this many seconds (`--fire`), or burnt out
+    /// (`--gutted`).
+    pub(crate) fire: Option<u32>,
+    pub(crate) gutted: bool,
 }
 
 /// Where the eye is: `bearing` degrees round from the unit's nose (positive
@@ -122,6 +127,10 @@ pub(crate) fn flag(
             spec.frames = value(arg)?.parse().map_err(|_| "--frames takes a number")?;
         }
         "--turn" => spec.turn = value(arg)?.parse().map_err(|_| "--turn takes degrees")?,
+        "--fire" => {
+            spec.fire = Some(value(arg)?.parse().map_err(|_| "--fire takes seconds")?);
+        }
+        "--gutted" => spec.gutted = true,
         _ => return Ok(false),
     }
     Ok(true)
@@ -138,6 +147,8 @@ impl Default for Spec {
             zoom: 1.0,
             frames: 0,
             turn: 0.0,
+            fire: None,
+            gutted: false,
         }
     }
 }
@@ -166,8 +177,6 @@ pub(crate) struct Studio {
     pool: Arc<Pool>,
     overlay: Overlay,
     time: f32,
-    /// The staged props' wear (`staged_props`).
-    hurt: i16,
 }
 
 impl Studio {
@@ -178,19 +187,6 @@ impl Studio {
         width: u32,
         height: u32,
     ) -> Result<Studio, String> {
-        Studio::with_hurt(map, blueprints, pool, width, height, 0)
-    }
-
-    /// A studio whose staged props (`staged_props`) have `hurt` permille of their
-    /// health gone.
-    fn with_hurt(
-        map: Arc<MapFile>,
-        blueprints: Arc<Blueprints>,
-        pool: Arc<Pool>,
-        width: u32,
-        height: u32,
-        hurt: i16,
-    ) -> Result<Studio, String> {
         let mut renderer = Renderer::new_staged(
             Target::Headless { width, height },
             SceneDesc {
@@ -199,7 +195,7 @@ impl Studio {
                 pool: pool.clone(),
                 team_colors: setup::TEAM_COLORS,
             },
-            &staged_props(&map, hurt),
+            &staged_props(&map),
         )
         .map_err(|e| e.to_string())?;
         renderer.set_map_look(&setup::map_config(&map).look());
@@ -210,7 +206,6 @@ impl Studio {
             pool,
             overlay: Overlay::default(),
             time: 10.0,
-            hurt,
         })
     }
 
@@ -225,6 +220,7 @@ impl Studio {
         let started = std::time::Instant::now();
         // A prop is staged on the range's default subject's pad, in its place.
         let prop = prop_kind(&opts.subject);
+        let hurt = opts.hurt;
         let staged;
         let (key, opts) = match prop {
             Some(_) => {
@@ -233,18 +229,6 @@ impl Studio {
                         "{}: a prop stands still: no --frames",
                         opts.subject
                     ));
-                }
-                // The staged props wear the shot's `--hurt`: a studio staged with
-                // another is built again.
-                if self.hurt != opts.hurt {
-                    *self = Studio::with_hurt(
-                        self.map.clone(),
-                        self.blueprints.clone(),
-                        self.pool.clone(),
-                        spec.width,
-                        spec.height,
-                        opts.hurt,
-                    )?;
                 }
                 staged = Options {
                     subject: crate::range::DEFAULT_SUBJECT.into(),
@@ -270,6 +254,15 @@ impl Studio {
         let mut subject = find_subject(&world, &frame, &opts.subject)?;
         if let Some(kind) = prop {
             subject = stage_prop(self, &mut frame, kind, key, subject)?;
+            // How hurt it looks: as the sim's damage would write its word.
+            use mc_render::gpu_consts::city_look as look;
+            let damage = (hurt.clamp(0, 1000) as u32 * look::DAMAGE_MASK) / 1000;
+            let fire = spec.fire.map_or(0, |age| {
+                look::BURNING | age.min(look::AGE_MAX) << look::AGE_SHIFT
+            });
+            let gutted = if spec.gutted { look::GUTTED } else { 0 };
+            let at = PropKind::ALL.iter().position(|k| *k == kind).unwrap_or(0);
+            self.renderer.set_staged_look(at, damage | fire | gutted);
         }
         self.renderer
             .resize(spec.width, spec.height)
@@ -383,9 +376,8 @@ fn pad(map: &MapFile) -> glam::Vec2 {
         .map_or(glam::Vec2::ZERO, |p| glam::Vec2::from(p.to_f32()))
 }
 
-/// One of every map prop, for prop shots: on the pad, `hurt` (permille) of each one's
-/// health gone.
-fn staged_props(map: &MapFile, hurt: i16) -> Vec<Prop> {
+/// One of every map prop, for prop shots: on the pad.
+fn staged_props(map: &MapFile) -> Vec<Prop> {
     let at = map
         .start_positions()
         .first()
@@ -398,7 +390,7 @@ fn staged_props(map: &MapFile, hurt: i16) -> Vec<Prop> {
             pos: at,
             heading: mc_core::Angle::ZERO,
             scale_milli: 1000,
-            wear_milli: hurt.clamp(0, 1000) as u16,
+            wear_milli: 0,
         })
         .collect()
 }

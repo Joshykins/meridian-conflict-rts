@@ -10,11 +10,10 @@ fn city_kinds() -> impl Iterator<Item = PropKind> {
     PropKind::ALL.iter().copied().filter(|k| k.is_city())
 }
 
-/// The kind a catalogue key (or a design variant of one) is the model of.
+/// The kind a catalogue key is the model of.
 fn kind_of(key: &str) -> PropKind {
-    let base = key.split('~').next().unwrap_or(key);
     city_kinds()
-        .find(|k| structure(*k).is_some_and(|s| s.model == base))
+        .find(|k| structure(*k).is_some_and(|s| s.model == key))
         .unwrap_or_else(|| panic!("{key} is no city kind's model"))
 }
 
@@ -164,7 +163,7 @@ fn city_far_levels_are_cheaper() {
 #[test]
 fn wall_segments_join_end_to_end() {
     let h = mc_map::city::WALL_SEGMENT_M as f32 * 0.5;
-    for key in ["city_wall", "city_wall~casemate", "city_wall~glacis"] {
+    for key in ["city_wall"] {
         let model = build_model(key).unwrap();
         for lod in &model.lods {
             let (lo, hi) = lod.vertices.iter().fold((f32::MAX, f32::MIN), |(a, b), v| {
@@ -182,7 +181,7 @@ fn wall_segments_join_end_to_end() {
 #[test]
 fn the_gate_passage_is_clear() {
     let road = mc_map::city::GATE_PASSAGE_M as f32 * 0.5;
-    for key in ["city_gate", "city_gate~casemate", "city_gate~glacis"] {
+    for key in ["city_gate"] {
         let model = build_model(key).unwrap();
         for v in &model.lods[0].vertices {
             let p = Vec3::from(v.pos);

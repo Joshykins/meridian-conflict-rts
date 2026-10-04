@@ -579,3 +579,31 @@ pub(super) fn mast(b: &mut MeshBuilder, at: Vec3, h: f32, w: f32) {
     paint(b, pat::STEEL);
     b.beam(at, at + Vec3::Z * h, Vec2::splat(w), Vec2::splat(w * 0.4));
 }
+
+/// Solar panels in rows over a flat roof `r` at `z`, tilted to the sun on low frames.
+/// Full detail; a single dark sheet at mid.
+pub(super) fn solar(b: &mut MeshBuilder, r: Rect, z: f32) {
+    if !b.mid() || r.size().min_element() < 3.0 {
+        return;
+    }
+    if !b.fine() {
+        deck(b, r.grow(-0.4), z + 0.5, pat::SOLAR);
+        return;
+    }
+    let rows = ((r.size().y - 0.6) / 2.6).floor().max(1.0) as usize;
+    for k in 0..rows {
+        let y0 = r.min.y + 0.4 + k as f32 * 2.6;
+        let (x0, x1) = (r.min.x + 0.4, r.max.x - 0.4);
+        paint(b, pat::SOLAR);
+        facing(
+            b,
+            vec![
+                v3(x0, y0, z + 0.3),
+                v3(x1, y0, z + 0.3),
+                v3(x1, y0 + 1.8, z + 1.0),
+                v3(x0, y0 + 1.8, z + 1.0),
+            ],
+            Vec3::new(0.0, -0.36, 0.93),
+        );
+    }
+}

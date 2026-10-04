@@ -81,56 +81,14 @@ pub(super) const MODELS: &[ModelDef] = &[
         PropKind::CityApartments,
         blocks::apartments,
     ),
-    def(
-        "city_apartments~mansion",
-        PropKind::CityApartments,
-        blocks::apartments_mansion,
-    ),
-    def(
-        "city_apartments~crate",
-        PropKind::CityApartments,
-        blocks::apartments_crate,
-    ),
     def("city_office", PropKind::CityOffice, blocks::office),
-    def(
-        "city_office~ribbon",
-        PropKind::CityOffice,
-        blocks::office_ribbon,
-    ),
-    def(
-        "city_office~glass",
-        PropKind::CityOffice,
-        blocks::office_glass,
-    ),
     def("city_highrise", PropKind::CityHighrise, towers::highrise),
-    def(
-        "city_highrise~glass",
-        PropKind::CityHighrise,
-        towers::highrise_glass,
-    ),
-    def(
-        "city_highrise~stone",
-        PropKind::CityHighrise,
-        towers::highrise_stone,
-    ),
     def(
         "city_skyscraper",
         PropKind::CitySkyscraper,
         towers::skyscraper,
     ),
-    def(
-        "city_skyscraper~deco",
-        PropKind::CitySkyscraper,
-        towers::skyscraper_deco,
-    ),
-    def(
-        "city_skyscraper~frame",
-        PropKind::CitySkyscraper,
-        towers::skyscraper_frame,
-    ),
     def("city_spire", PropKind::CitySpire, towers::spire),
-    def("city_spire~taper", PropKind::CitySpire, towers::spire_taper),
-    def("city_spire~deco", PropKind::CitySpire, towers::spire_deco),
     def("city_slab", PropKind::CitySlab, towers::slab),
     def("city_civic", PropKind::CityCivic, civic::civic),
     def("city_station", PropKind::CityStation, civic::station),
@@ -139,30 +97,8 @@ pub(super) const MODELS: &[ModelDef] = &[
     def("city_church", PropKind::CityChurch, civic::church),
     def("city_ruin", PropKind::CityRuin, blocks::ruin),
     def("city_wall", PropKind::CityWall, wall::wall),
-    def(
-        "city_wall~casemate",
-        PropKind::CityWall,
-        wall::wall_casemate,
-    ),
-    def("city_wall~glacis", PropKind::CityWall, wall::wall_glacis),
     def("city_wall_tower", PropKind::CityWallTower, wall::tower),
-    def(
-        "city_wall_tower~casemate",
-        PropKind::CityWallTower,
-        wall::tower_casemate,
-    ),
-    def(
-        "city_wall_tower~glacis",
-        PropKind::CityWallTower,
-        wall::tower_glacis,
-    ),
     def("city_gate", PropKind::CityGate, wall::gate),
-    def(
-        "city_gate~casemate",
-        PropKind::CityGate,
-        wall::gate_casemate,
-    ),
-    def("city_gate~glacis", PropKind::CityGate, wall::gate_glacis),
     def("city_rubble", PropKind::CityRubble, blocks::rubble),
 ];
 
@@ -170,8 +106,7 @@ pub(super) const MODELS: &[ModelDef] = &[
 /// map and seen from everywhere, and the big public buildings, one or two each.
 #[cfg(test)]
 pub(super) fn triangles(key: &str) -> Option<usize> {
-    let base = key.split('~').next().unwrap_or(key);
-    match base {
+    match key {
         "city_highrise" | "city_skyscraper" | "city_spire" | "city_slab" => Some(6500),
         "city_civic" | "city_station" | "city_church" | "city_courtyard" => Some(4500),
         _ => None,

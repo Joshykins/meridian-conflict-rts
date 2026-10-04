@@ -213,9 +213,11 @@ impl CityFx {
     pub(super) fn new(
         gpu: &Gpu,
         map: &MapFile,
+        staged: usize,
         heaps: Vec<(u32, u32)>,
     ) -> Result<CityFx, GpuError> {
-        let props = map.props().len().max(1);
+        // A word for each of the map's props, and for each prop a shot stages after them.
+        let props = (map.props().len() + staged).max(1);
         let buffer = gpu.host_buffer((props * 4) as u64, vk::BufferUsageFlags::STORAGE_BUFFER)?;
         buffer.write(0, &vec![0u8; props * 4]);
         let size = Vec2::from(map.info().size_metres().to_f32());
@@ -286,6 +288,16 @@ impl CityFx {
                     *w |= 1 << (entity % 32);
                 }
             }
+        }
+    }
+
+    /// Sets the look of staged prop `index` (`Renderer::new_staged`): a prop shot's
+    /// damage, fire or gutting, held until the next call.
+    pub(super) fn stage_look(&mut self, index: usize, word: u32) {
+        let prop = self.shapes.len() + index;
+        if let Some(w) = self.looks.get_mut(prop) {
+            *w = word;
+            self.buffer.write(0, bytemuck::cast_slice(&self.looks));
         }
     }
 

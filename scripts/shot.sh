@@ -5,8 +5,9 @@
 #   scripts/shot.sh unit KEY [flags]   a unit alone, several angles in one PNG
 #                                      (KEY may be a map prop's model key,
 #                                      city_office: it stands on the pad, its
-#                                      front its street side, --hurt PERCENT
-#                                      breaking a city structure's windows)
+#                                      front its street side; for a city
+#                                      structure --hurt PERCENT, --fire SECONDS
+#                                      and --gutted show its damage)
 #                                      (meridian --unit-shot; see its --help)
 #   scripts/shot.sh run [flags]        any other headless shot (--range, --scene,
 #                                      --ui, ...); --screenshot is added for you
