@@ -1464,7 +1464,9 @@ impl World {
         let slot = pitch_slot(weapon, w);
         // A torso gun that sways lays its own yaw and pitch within its sway of the torso.
         let swaying = on_body && w != 0 && weapon.sway.0 > 0;
-        if let (true, Some(pivot)) = (drives || swaying, weapon.pivot) {
+        // A vertical launcher's cells stand as they are: it never pitches.
+        let laid = weapon.pivot.filter(|_| !weapon.vertical_launch);
+        if let (true, Some(pivot)) = (drives || swaying, laid) {
             let want = if weapon.missile {
                 missile_rack_pitch(weapon)
             } else if weapon.trajectory == Trajectory::Ballistic {
@@ -1985,7 +1987,14 @@ impl World {
                 pos + p.xy().rotate(units.heading[row]) + (at.xy() - p.xy()).rotate(facing)
             } else if let (true, Some(p)) = (weapon.mount, pivot) {
                 // A shoulder gun: its trunnion rides the torso, the barrel turns about it.
-                pos + p.xy().rotate(torso) + (at.xy() - p.xy()).rotate(facing)
+                // A vertical launcher on the turret (the Strider's) turns with it, cells and
+                // all: it never turns on its own.
+                let turn = if weapon.vertical_launch {
+                    torso
+                } else {
+                    facing
+                };
+                pos + p.xy().rotate(torso) + (at.xy() - p.xy()).rotate(turn)
             } else {
                 pos + bp.unit(blueprint).turret_point(
                     FxVec2::new(at.x, at.y),

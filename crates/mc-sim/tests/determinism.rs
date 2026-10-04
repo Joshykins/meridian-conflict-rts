@@ -133,6 +133,9 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     // The Regency battle scorpion: a held beam that runs up (`spin`), claws whose charges
     // curve onto their marks (`curve.rs`).
     ("regency_t4_scorpion", 1, 1100, 700),
+    // The Regency assault tripod: twin charging cannons taking turns (`twins.rs`), and
+    // vertical-launch seekers riding its turning head.
+    ("regency_t4_strider", 1, 1300, 750),
     // The Regency tech 3 fusion guns: a Pinch-fusion Howitzer's charged high lob, and a gun
     // that shoots only spacecraft (none here: it must hold through the whole battle).
     ("regency_t3_artillery", 1, 600, 350),

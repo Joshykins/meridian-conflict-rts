@@ -19,7 +19,7 @@ filter in the testing ground also exposes all five.
 Coffer preserves the existing `regency_t2_transport` unit ID and `regency_coffer`
 mesh key while replacing the old model completely. Its 26 m wide, 28 m high bay
 clears the Exarch; commanders use all eight slots. Ark clears the complete Regency
-land roster through tech 3, including the tall Strider.
+land roster through tech 3.
 
 The Ark is the Bastion's counterpart at the Bastion's size (300 m): a broad arrowhead
 whose wings are laid in feathered plates, their tails the saw-toothed trailing edge,

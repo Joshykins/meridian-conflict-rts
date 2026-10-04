@@ -71,7 +71,7 @@
         radius: 46, height: 35, footprint: (8, 8),
         vision: 200,
         builder: (power: 360, range: 0, builds: [
-            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t3_engineer", "regency_t3_mobile_reclaimer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t2_tank", "regency_t2_bombard", "regency_t3_strider", "regency_t3_wake_tank", "regency_t3_artillery", "regency_t1_mobile_aa", "regency_t2_mobile_aa", "regency_t3_mobile_aa",
+            "regency_t1_engineer", "regency_t1_mobile_reclaimer", "regency_t2_engineer", "regency_t2_mobile_reclaimer", "regency_t3_engineer", "regency_t3_mobile_reclaimer", "regency_t1_scout", "regency_t1_raider", "regency_t1_tank", "regency_t1_artillery", "regency_t2_tank", "regency_t2_bombard", "regency_t3_wake_tank", "regency_t3_artillery", "regency_t1_mobile_aa", "regency_t2_mobile_aa", "regency_t3_mobile_aa",
         ]),
         mesh: "regency_brood", icon: Factory,
         sounds: (death: "blast_large"),

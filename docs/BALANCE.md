@@ -26,6 +26,12 @@ Off the lines, measured the same way:
   unit of mass, near the Paladin's. What puts it over is the AEB-2's channel: 2000 damage to
   everything within 7 m of it, which a column or a clump pays for many times. Raised on a
   lot by Mason IIIs (build power 150: one takes about 135 s); it has no factory.
+- Strider (Regency T4 assault tripod, 3400 mass, the Fulgur's price): 72000 health and no
+  shield, about 1040 direct dps from two Pinch-fusion Cannons (2400 a shot, taking turns
+  half a reload apart) out to 1000 m, and about 230 more from eight Gravitic Seekers thrown
+  up and spread over the ground targets within 900 m. Shorter reach than the Fulgur's
+  AEB-2 and nothing against aircraft. Raised on a lot by Artificer IIIs or the Exarch's
+  Engineering Suite III.
 
 - Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 mass) assembles warheads
   of 6000 mass / 120000 energy in about 300 s at its own power (60), holds 2, and each does

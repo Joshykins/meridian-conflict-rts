@@ -1,25 +1,35 @@
-//! The Strider, the Regency's tech 3 assault tripod: a fighting machine on three long legs,
-//! a tall keeled head carried high over the field, a Pinched-plasmeric Cannon slung under
-//! a plated outrigger either side of it. Tall and lean: the head stands 25 m up on legs as thick as a
-//! tank's hull is high, so it wades out to sea and still fires over the water.
+//! The Strider, the Regency's tech 4 assault tripod: a fighting machine on three long
+//! legs, a tall keeled head carried high over the field, a Pinch-fusion Cannon slung
+//! under a plated outrigger either side of it and a battery of Gravitic Seekers in a
+//! launcher on the back of its head. Tall and lean: the head stands 75 m up on legs as
+//! thick as a tank is long, so it wades out to sea and still fires over the water.
 //!
-//! Under the head the legs meet at a faceted crown, bronze hip drums round it and plates
-//! hanging between the legs to a point. Each leg is a plated thigh out to a bronze knee
-//! under a guard swept up into a spike, then a long keeled shin down to an armoured hoof,
-//! a bronze tendon showing behind the shin's plate. The head is a narrow prow, flat-faceted
-//! and swept back to a point, a keel fin rising off its back, three red optics low on its
-//! prow. Each cannon gathers its charge between two flat prongs past its bore, lit red
-//! inside; the unit file's `muzzle` is the middle of that charge.
+//! Under the head the legs meet at a faceted crown, drums at the hips round it and plates
+//! hanging between the legs to a point. Each leg is a plated thigh out to a knee under a
+//! guard swept up into a spike, then a long keeled shin down to an armoured hoof, a tendon
+//! showing behind the shin's plate. The head is a narrow prow, flat-faceted and swept back
+//! to a point, a keel fin rising off its brow, three red optics low on its prow, the
+//! seeker launcher a plated hump on its back, its cells open to the sky. Each cannon
+//! gathers its charge past its mouth, held between the gun's lit faces
+//! (`cannon`); the unit file's `muzzle` is the middle of that charge.
 //!
-//! Finish (docs/STYLE.md "The Regency look"): dark plates, seam-dark joints, dark bronze on
-//! the machinery, red optics. No violet: it does not build.
+//! Finish (docs/STYLE.md "The Regency look"): dark plates, seam-dark joints, graphite
+//! machinery, red optics, the cannons' fusion lit in the prism. No violet: it does not
+//! build.
 //!
 //! Rig: three legs posed by `entity.wgsl` `crawl_leg` (`MeshBuilder::set_crawl_legs`): the
 //! front two a mirrored pair, the rear one a lone leg on the centreline (`set_lone_leg`),
 //! so they step one at a time, front left, rear, front right, then all three stand a beat.
-//! The head is the turret and turns about the unit's middle; the cannons pitch about their
-//! common trunnion (`rig::ARM_GUN`). The numbers match `regency_t3_strider` in
-//! `data/factions/regency/units/land_t3.ron`.
+//! The head is the turret and turns about the unit's middle, the launcher with it; the
+//! cannons pitch about their common trunnion (`rig::ARM_GUN`).
+//!
+//! Authored at the old tech 3 size and built [`SCALE`] times bigger: every number for it in
+//! `data/factions/regency/units/experimental.ron` (`regency_t4_strider`) is this file's
+//! times `SCALE` (tests).
+
+mod cannon;
+#[cfg(test)]
+mod tests;
 
 use glam::{Vec2, Vec3};
 
@@ -29,15 +39,41 @@ use crate::{part, rig};
 
 use super::commander::form::{ball, blade, ring, sleeve, KEEL, OCT};
 use super::kit::{dark_plate, metal, seam, v3};
-use super::machine::{collar, red_slot, shaft};
+use super::machine::{collar, hoop_on, red_slot, shaft};
+use cannon::Design;
+
+/// Authored size (the unit file's is `SCALE` times it).
+pub(super) const RADIUS: f32 = 12.0;
+pub(super) const HEIGHT: f32 = 32.0;
+/// How much bigger the unit file builds it.
+#[cfg(test)]
+const SCALE: f32 = 3.0;
 
 /// The cannons' trunnion and the middles of their charges: the unit file's weapon `pivot`
 /// and `muzzle`s, left then right.
-const PIVOT: Vec3 = Vec3::new(1.2, 0.0, 24.4);
-const MUZZLES: [Vec3; 2] = [Vec3::new(9.0, 3.8, 24.4), Vec3::new(9.0, -3.8, 24.4)];
-/// How far round each charge its prongs stand: none closer than 0.4 of it.
+const PIVOT: Vec3 = Vec3::new(1.2, 0.0, 24.9);
+const MUZZLES: [Vec3; 2] = [
+    Vec3::new(PIVOT.x + cannon::LEN, 3.8, PIVOT.z),
+    Vec3::new(PIVOT.x + cannon::LEN, -3.8, PIVOT.z),
+];
+/// How far round each charge the gun stands: none of it closer than 0.4 of this.
 #[cfg(test)]
 const HOLD: f32 = 2.0;
+/// The seeker launcher on the back of the head: its deck, and its cells (x along the
+/// head, y across) in the order they fire, front pair first, left before right.
+const DECK: f32 = 30.4;
+const CELLS: [[f32; 2]; 8] = [
+    [-2.4, 0.62],
+    [-2.4, -0.62],
+    [-3.6, 0.62],
+    [-3.6, -0.62],
+    [-4.8, 0.62],
+    [-4.8, -0.62],
+    [-6.0, 0.62],
+    [-6.0, -0.62],
+];
+/// A cell's mouth across.
+const CELL_R: f32 = 0.42;
 /// Where the head turns on the crown.
 const RACE: f32 = 24.0;
 /// The hips' height and how far out from the middle they sit.
@@ -72,7 +108,22 @@ fn legs() -> [(Vec3, Vec3, Vec3, f32); 2] {
     [leg_joints(50.0, 60.0, 0.0), leg_joints(180.0, 180.0, 0.25)]
 }
 
+/// The Strider with its cannons split down the bore (the base mesh).
 pub(super) fn strider(b: &mut MeshBuilder, _tech: u8) {
+    draw(b, Design::Split);
+}
+
+/// The Strider with collared cannons (`regency_strider~collars`).
+pub(super) fn strider_collars(b: &mut MeshBuilder, _tech: u8) {
+    draw(b, Design::Collars);
+}
+
+/// The Strider with railed cannons (`regency_strider~rails`).
+pub(super) fn strider_rails(b: &mut MeshBuilder, _tech: u8) {
+    draw(b, Design::Rails);
+}
+
+fn draw(b: &mut MeshBuilder, design: Design) {
     let legs = legs();
     b.set_crawl_legs(&legs, STRIDE, STANCE, LIFT);
     b.set_lone_leg(1);
@@ -90,12 +141,13 @@ pub(super) fn strider(b: &mut MeshBuilder, _tech: u8) {
     b.with_pair(1, |b| leg(b, rear));
     b.with_part(part::TURRET, |b| {
         prow(b);
-        b.with_limb(rig::ARM_GUN, |b| b.mirror_y(cannon));
+        launcher(b);
+        b.with_limb(rig::ARM_GUN, |b| b.mirror_y(|b| mount(b, design)));
     });
 }
 
-/// Far off: the crown a spindle, flat legs that do not walk, the head a wedge with the team
-/// colour on it, the cannons bars that still pitch.
+/// Far off: the crown a spindle, flat legs that do not walk, the head a wedge with the
+/// team colour on it, the cannons bars that still pitch.
 fn coarse(b: &mut MeshBuilder, legs: &[(Vec3, Vec3, Vec3, f32); 2]) {
     dark_plate(b);
     b.loft_z(
@@ -323,7 +375,7 @@ fn neck(b: &mut MeshBuilder) {
 }
 
 /// The prow head: a tall narrow keeled head swept back to a point, a plated outrigger
-/// either side over its gun, three red optics low on its prow, the team colour on its back.
+/// either side over its gun, a keel fin on its brow, three red optics low on its prow.
 fn prow(b: &mut MeshBuilder) {
     neck(b);
     let plan = [
@@ -364,24 +416,18 @@ fn prow(b: &mut MeshBuilder) {
             0.4,
         );
     });
-    // The keel fin rising off its back.
+    // The keel fin rising off its brow, swept back into the launcher.
     blade(
         b,
-        v3(1.0, 0.0, 30.6),
+        v3(3.4, 0.0, 30.0),
         v3(-1.0, 0.0, 0.3),
         Vec3::Y,
-        5.4,
+        3.8,
         0.7,
         0.8,
         0.3,
     );
     eyes(b, 6.2, 26.6, 0.7);
-    b.paint(TEAM);
-    b.face(&[
-        v3(-0.6, 0.0, 30.82),
-        v3(-2.8, 0.7, 30.82),
-        v3(-2.8, -0.7, 30.82),
-    ]);
 }
 
 /// Three red optics under the brow at `x`, `z`: one in the middle, one either side `wide`
@@ -400,187 +446,83 @@ fn eyes(b: &mut MeshBuilder, x: f32, z: f32, wide: f32) {
     });
 }
 
-/// The left cannon (the right is its mirror), in the head's frame: it pitches about
-/// `PIVOT`. A bronze trunnion out from the neck, a plated breech, a keeled barrel banded in
-/// bronze, and two flat prongs either side past its mouth, lit red inside, holding the
-/// charge between them.
-fn cannon(b: &mut MeshBuilder) {
-    let m = MUZZLES[0];
-    let (y, z) = (m.y, m.z);
-    shaft(b, v3(PIVOT.x, 1.6, z), v3(PIVOT.x, y - 0.6, z), 0.36);
+/// The seeker launcher: a plated hump on the back of the head, swept down at its tail,
+/// its deck open in two rows of cells, a lit red rim round each mouth, the team colour
+/// down the deck between the rows.
+fn launcher(b: &mut MeshBuilder) {
+    let fine = b.fine();
     dark_plate(b);
-    sleeve(
-        b,
-        &[
-            ring(v3(PIVOT.x - 1.1, y, z), Vec3::Z, 0.55, 0.5),
-            ring(v3(PIVOT.x - 0.6, y, z), Vec3::Z, 0.8, 0.7),
-            ring(v3(PIVOT.x + 1.6, y, z), Vec3::Z, 0.8, 0.68),
-            ring(v3(PIVOT.x + 2.2, y, z), Vec3::Z, 0.52, 0.48),
-        ],
-        &OCT,
-    );
-    sleeve(
-        b,
-        &[
-            ring(v3(PIVOT.x + 2.1, y, z), Vec3::Z, 0.48, 0.45),
-            ring(v3(7.2, y, z), Vec3::Z, 0.42, 0.4),
-        ],
-        &KEEL,
-    );
-    if b.fine() {
-        for x in [4.4f32, 5.9] {
-            collar(b, v3(x, y, z), Vec3::X, 0.5, 0.3);
+    b.with_facets(|b| {
+        b.loft_z(
+            &[
+                [-1.4, 0.0],
+                [-1.8, 1.45],
+                [-6.4, 1.45],
+                [-7.2, 0.9],
+                [-7.2, -0.9],
+                [-6.4, -1.45],
+                [-1.8, -1.45],
+            ],
+            &[
+                Section::new(27.6, 0.86),
+                Section::new(29.4, 1.0),
+                Section::new(DECK, 0.98),
+            ],
+        );
+    });
+    for [x, y] in CELLS {
+        let mouth = v3(x, y, DECK);
+        // The cell's collar standing proud of the deck, dark inside.
+        dark_plate(b);
+        let sides = b.sides(8);
+        b.cylinder_between(
+            mouth - Vec3::Z * 0.2,
+            mouth + Vec3::Z * 0.14,
+            CELL_R + 0.1,
+            CELL_R + 0.06,
+            sides,
+        );
+        seam(b);
+        b.cylinder_between(
+            mouth + Vec3::Z * 0.1,
+            mouth + Vec3::Z * 0.15,
+            CELL_R * 0.86,
+            CELL_R * 0.86,
+            sides,
+        );
+        if fine {
+            b.paint(GLOW_LASER);
+            hoop_on(
+                b,
+                mouth + Vec3::Z * 0.16,
+                Vec3::Z,
+                CELL_R * 0.78,
+                0.07,
+                0.03,
+                sides,
+            );
         }
     }
-    // The prongs, either side of the charge, red on their inner faces.
-    for side in [1.0f32, -1.0] {
-        let py = y + side * 1.15;
-        let ring = |dy: f32| {
-            vec![
-                v3(6.2, py + dy, z - 0.32),
-                v3(9.3, py + dy, z - 0.18),
-                v3(9.3, py + dy, z + 0.18),
-                v3(6.2, py + dy, z + 0.32),
-            ]
-        };
-        dark_plate(b);
-        b.loft(&[ring(0.0), ring(side * 0.26)], true, true);
-        // The root tying the prong to the barrel.
-        b.beam(
-            v3(6.4, y, z),
-            v3(6.4, py + side * 0.13, z),
-            Vec2::new(0.6, 0.5),
-            Vec2::new(0.6, 0.5),
-        );
-        b.paint(GLOW_LASER);
-        let inner = py - side * 0.02;
-        let face = [
-            v3(6.9, inner, z - 0.16),
-            v3(9.0, inner, z - 0.1),
-            v3(9.0, inner, z + 0.1),
-            v3(6.9, inner, z + 0.16),
-        ];
-        if side > 0.0 {
-            b.face(&face);
-        } else {
-            b.face(&[face[3], face[2], face[1], face[0]]);
-        }
+    b.paint(TEAM);
+    b.face(&[
+        v3(-1.9, 0.0, DECK + 0.01),
+        v3(-6.6, 0.16, DECK + 0.01),
+        v3(-6.6, -0.16, DECK + 0.01),
+    ]);
+    if fine {
+        // Red lines down the hump's flanks.
+        b.mirror_y(|b| {
+            red_slot(b, v3(-4.2, 1.46, 28.9), Vec3::Y, Vec3::X, 3.6, 0.12);
+        });
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{build_model, Model};
-
-    fn model() -> Model {
-        build_model("regency_strider").unwrap()
-    }
-
-    #[test]
-    fn fits_the_librarys_checks() {
-        super::super::check_charge(
-            "regency_strider",
-            12.0,
-            32.0,
-            None,
-            &MUZZLES.map(|m| m.to_array()),
-            HOLD,
-        );
-    }
-
-    #[test]
-    fn the_unit_files_cannons_are_the_models() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
-        let blueprints = mc_data::Blueprints::load(&dir).unwrap();
-        let bp = blueprints.unit(blueprints.id_of("regency_t3_strider").unwrap());
-        let v = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
-        assert_eq!(bp.visual.mesh, "regency_strider");
-        assert_eq!(bp.weapons.len(), 2);
-        for (w, m) in bp.weapons.iter().zip(MUZZLES) {
-            assert!(v(w.muzzle).distance(m) < 1e-3, "{}", w.name);
-            assert!(v(w.pivot.unwrap()).distance(PIVOT) < 1e-3);
-        }
-        assert!(bp.turret_at.is_none(), "the head turns about the middle");
-        let model = model();
-        assert_eq!(Vec3::from(model.turret_pivot), v3(0.0, 0.0, RACE));
-        assert_eq!(Vec3::from(model.arm_pivot.unwrap()), PIVOT);
-        for lod in &model.lods {
-            assert!(lod.vertices.iter().all(|v| v.material != GLOW_VIOLET));
-        }
-    }
-
-    /// Three legs: a front pair, and a lone rear leg on the centreline that walks as one.
-    /// Each reaches the ground where its rest pose stands it, and the head's sweep never
-    /// meets a knee.
-    #[test]
-    fn stands_on_three_legs() {
-        {
-            let key = "regency_strider";
-            let model = build_model(key).unwrap();
-            let crawl = model.legs.and_then(|l| l.crawl).expect("a crawler");
-            assert_eq!(crawl.pairs, 2);
-            assert_eq!(crawl.lone, Some(1));
-            assert_eq!(crawl.gpu()[5][3], 1.0, "{key}: the rear leg is marked lone");
-            for lod in &model.lods[..2] {
-                for pair in 0..2u32 {
-                    let bones = |limb: u32| {
-                        lod.vertices.iter().filter(move |v| {
-                            v.part == part::LOCOMOTION
-                                && v.rig & rig::LIMB_MASK == limb
-                                && (v.rig & rig::PAIR_MASK) >> rig::PAIR_SHIFT == pair
-                        })
-                    };
-                    for limb in [rig::THIGH, rig::SHIN] {
-                        assert!(bones(limb).count() > 0, "{key}: pair {pair} bone {limb}");
-                    }
-                    let [_, _, foot] = crawl.joints[pair as usize];
-                    let foot = Vec2::new(foot[0], foot[1]);
-                    let low = bones(rig::SHIN).map(|v| v.pos[2]).fold(f32::MAX, f32::min);
-                    assert!(low < 0.08, "{key}: pair {pair} foot at {low}");
-                    let reach = bones(rig::SHIN)
-                        .map(|v| Vec2::new(v.pos[0], v.pos[1]).dot(foot))
-                        .fold(f32::MIN, f32::max)
-                        / foot.length();
-                    assert!(reach >= FOOT_R - 0.1, "{key}: pair {pair} reaches {reach}");
-                    if pair == 1 {
-                        // A lone leg is its own mirror.
-                        let ys: Vec<f32> = bones(rig::SHIN).map(|v| v.pos[1]).collect();
-                        let (lo, hi) = ys
-                            .iter()
-                            .fold((f32::MAX, f32::MIN), |(a, b), &y| (a.min(y), b.max(y)));
-                        assert!((lo + hi).abs() < 1e-3, "{key}: lone leg off the centreline");
-                    }
-                }
-                // The head sweeps round over the knees: everything that turns stays above
-                // every leg vertex within its reach.
-                let turret_low = lod
-                    .vertices
-                    .iter()
-                    .filter(|v| v.part == part::TURRET)
-                    .map(|v| v.pos[2])
-                    .fold(f32::MAX, f32::min);
-                let reach = lod
-                    .vertices
-                    .iter()
-                    .filter(|v| v.part == part::TURRET)
-                    .map(|v| Vec2::new(v.pos[0], v.pos[1]).length())
-                    .fold(0.0f32, f32::max);
-                let leg_high = lod
-                    .vertices
-                    .iter()
-                    .filter(|v| {
-                        v.part == part::LOCOMOTION
-                            && Vec2::new(v.pos[0], v.pos[1]).length() > HIP_R + 1.3
-                            && Vec2::new(v.pos[0], v.pos[1]).length() < reach
-                    })
-                    .map(|v| v.pos[2])
-                    .fold(f32::MIN, f32::max);
-                assert!(
-                    leg_high < turret_low - 0.3,
-                    "{key}: a leg at {leg_high} m under the head's sweep at {turret_low} m"
-                );
-            }
-        }
-    }
+/// The left cannon (the right is its mirror), in the head's frame: it pitches about
+/// `PIVOT`. A trunnion out from the neck to the gun, which is drawn in its own frame
+/// (`cannon`).
+fn mount(b: &mut MeshBuilder, design: Design) {
+    let m = MUZZLES[0];
+    shaft(b, v3(PIVOT.x, 1.6, m.z), v3(PIVOT.x, m.y - 0.6, m.z), 0.36);
+    collar(b, v3(PIVOT.x, m.y - 0.7, m.z), Vec3::Y, 0.55, 0.3);
+    b.at(v3(PIVOT.x, m.y, m.z), |b| cannon::cannon(b, design));
 }

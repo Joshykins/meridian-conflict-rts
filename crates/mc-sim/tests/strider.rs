@@ -1,8 +1,8 @@
-//! The Strider, the Regency assault tripod: its two cannons take turns, and every charge
-//! that is seen is fired.
+//! The Strider, the Regency assault tripod: its two cannons take turns, every charge that
+//! is seen is fired, and its seekers leave from the cells on its head.
 
 use mc_core::{Angle, Fx, FxVec2};
-use mc_data::Blueprints;
+use mc_data::{cat, Blueprints};
 use mc_jobs::Pool;
 use mc_map::Heightfield;
 use mc_sim::tables::{flag, Controller};
@@ -11,7 +11,7 @@ use mc_sim::{Command, MatchConfig, PlayerCommand, PlayerSetup, SimEvent, World};
 use std::path::Path;
 use std::sync::Arc;
 
-const STRIDER: &str = "regency_t3_strider";
+const STRIDER: &str = "regency_t4_strider";
 
 fn world() -> World {
     let blueprints = Arc::new(
@@ -93,10 +93,10 @@ fn cannon_log(gap: i32, ticks: u32) -> Log {
             match e {
                 SimEvent::WeaponCharging {
                     blueprint, weapon, ..
-                } if *blueprint == strider => charged.push((tick, *weapon)),
+                } if *blueprint == strider && *weapon < 2 => charged.push((tick, *weapon)),
                 SimEvent::ShotFired {
                     blueprint, weapon, ..
-                } if *blueprint == strider => fired.push((tick, *weapon)),
+                } if *blueprint == strider && *weapon < 2 => fired.push((tick, *weapon)),
                 _ => {}
             }
         }
@@ -147,4 +147,75 @@ fn every_charge_is_fired() {
     for pair in fired.windows(2) {
         assert_ne!(pair[0].0, pair[1].0, "both fired on one tick: {fired:?}");
     }
+}
+
+/// The seekers leave from the cells on the back of the head wherever the head has turned:
+/// the launcher rides it (a `mount` vertical launcher, `combat.rs`).
+#[test]
+fn seekers_leave_from_the_heads_cells() {
+    let mut w = world();
+    let id = w.blueprints.id_of(STRIDER).unwrap();
+    let cells = w.blueprints.unit(id).weapons[2].muzzles.clone();
+    assert_eq!(cells.len(), 8);
+    w.tick(&[spawn(&w, 0, STRIDER, 500, 0)]).unwrap();
+    let row = w
+        .state
+        .units
+        .blueprint
+        .iter()
+        .position(|b| *b == id)
+        .unwrap();
+    // A mark off the left flank: the head turns a quarter round onto it.
+    w.tick(&[PlayerCommand {
+        player: 0,
+        command: Command::DebugSpawn {
+            owner: 1,
+            blueprint: w.blueprints.id_of("aster_t3_assault_bot").unwrap(),
+            pos: FxVec2::from_ints(500, 1100),
+            heading: Angle::ZERO,
+            count: 1,
+            flags: flag::PASSIVE | flag::INVULNERABLE,
+            build: 1000,
+        },
+    }])
+    .unwrap();
+    let mut turned = 0;
+    for _ in 0..600 {
+        w.tick(&[]).unwrap();
+        let u = &w.state.units;
+        let torso = u.heading[row] + u.weapon_yaw[row][0];
+        for e in &w.events {
+            let SimEvent::ShotFired {
+                pos,
+                blueprint,
+                weapon: 2,
+                ..
+            } = e
+            else {
+                continue;
+            };
+            assert_eq!(*blueprint, id);
+            let near = cells
+                .iter()
+                .map(|c| (u.pos[row] + c.xy().rotate(torso)).distance(pos.xy()))
+                .min()
+                .unwrap();
+            assert!(
+                near < Fx::from_int(2),
+                "a seeker left {near:?} m from the nearest cell"
+            );
+            if u.heading[row].delta_to(torso).unsigned_abs() > Angle::from_degrees(45).0 {
+                turned += 1;
+            }
+        }
+    }
+    assert!(turned >= 8, "{turned} seekers left with the head turned");
+}
+
+/// No anti-air: nothing on it shoots at aircraft.
+#[test]
+fn it_has_no_anti_air() {
+    let w = world();
+    let bp = w.blueprints.unit(w.blueprints.id_of(STRIDER).unwrap());
+    assert!(bp.weapons.iter().all(|w| w.target_mask & cat::AIR == 0));
 }

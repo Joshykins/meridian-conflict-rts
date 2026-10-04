@@ -70,4 +70,91 @@
         mesh: "regency_scorpion", icon: Bot,
         sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
     ),
+    // The strider: a fighting machine on three long legs (a tripod) nearly a hundred metres
+    // tall, its keeled head carried high over the field. The head is the turret: it turns
+    // on the legs' crown and carries a Pinch-fusion Cannon slung under a plated outrigger
+    // either side. Each squeezes a charge in front of its mouth until it fuses and launches
+    // it as one shot; the two take turns, the second half a reload behind the first. A
+    // launcher on the back of the head throws a battery of Gravitic Seekers straight up;
+    // they climb high and rain down over what is near it, spread over the targets in
+    // reach (`split`). No anti-air: aircraft are safe from it.
+    //
+    // It walks one leg at a time, the third swinging while two stand (`set_crawl_legs` with
+    // a lone leg on the centreline). It wades: it walks the seabed like the Paladin, its
+    // head high enough over the water to fire on anything ashore or afloat.
+    //
+    // Balance: the Fulgur's class, the Regency way: shorter reach (1000 m to 1500), no
+    // shield (more armour instead: its HP is near the Fulgur's HP and shield together), the
+    // seekers for what hides behind a rise.
+    //
+    // Model: `regency_strider` (`models::regency::strider`), authored at the old tech 3
+    // size (12 x 32 m) and built 3 times authored size: every mount follows it.
+    (
+        key: "regency_t4_strider",
+        name: "Strider",
+        role: "Assault Tripod",
+        tech: 4,
+        categories: ["Land", "DirectFire", "Experimental"],
+        health: 72000,
+        cost: (mass: 3400, energy: 34000, time: 20000),
+        radius: 36.0, height: 96.0,
+        footprint: (6, 6),
+        vision: 1200,
+        motion: (layer: Amphibious, size: 4, speed: 20, accel: 14, turn: 70),
+        weapons: [
+            (
+                name: "Pinch-fusion Cannon",
+                // The left cannon. Its charge is squeezed until it fuses, then launched as one
+                // shot, laid a little up so it arcs over a low rise (`flat_fire`).
+                damage: 2400, splash: 8, range: 1000, reload: 4.6, speed: 1350, trajectory: Ballistic,
+                loft: 0.6, flat_fire: true,
+                turret_turn: 40, muzzle: (30.0, 11.4, 74.7), pivot: (3.6, 0, 74.7),
+                targets: ["Land", "Naval"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion),
+                flash: 0.8, impact: 2.6, tracer: 2.4,
+                sounds: (
+                    fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 1.6,
+                    charge_volume: 1.6,
+                    impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+                ),
+            ),
+            (
+                name: "Pinch-fusion Cannon",
+                // The right cannon: half a reload behind the left (`twins.rs`).
+                damage: 2400, splash: 8, range: 1000, reload: 4.6, speed: 1350, trajectory: Ballistic,
+                loft: 0.6, flat_fire: true,
+                turret_turn: 40, muzzle: (30.0, -11.4, 74.7), pivot: (3.6, 0, 74.7),
+                targets: ["Land", "Naval"], color: Orange, red: 1.0,
+                plasma_grade: Some(PinchFusion),
+                flash: 0.8, impact: 2.6, tracer: 2.4,
+                sounds: (
+                    fire: "regency_sunspear_fire", charge: "regency_sunspear_charge", charge_time: 1.6,
+                    charge_volume: 1.6,
+                    impact: "regency_sunspear_hit", ground: "regency_sunspear_hit",
+                ),
+            ),
+            (
+                name: "Gravitic Seeker Battery",
+                // Eight cells in two rows on the head's back, front pair first. The launcher
+                // rides the head (`mount` on a vertical launcher): the seekers leave straight
+                // up out of their cells, climb to `apogee` and fall on their marks, spread
+                // over the targets in reach. Ground only.
+                damage: 260, splash: 14, range_min: 120, range: 900, reload: 9.0, speed: 240,
+                trajectory: Direct, turret_turn: 0, arc: 360, mount: true,
+                muzzle: (-7.2, 1.86, 91.2), pivot: (-12.6, 0, 91.2),
+                muzzles: [
+                    (-7.2, 1.86, 91.2), (-7.2, -1.86, 91.2), (-10.8, 1.86, 91.2), (-10.8, -1.86, 91.2),
+                    (-14.4, 1.86, 91.2), (-14.4, -1.86, 91.2), (-18.0, 1.86, 91.2), (-18.0, -1.86, 91.2),
+                ],
+                targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
+                missile: true, guided: true, vertical_launch: true, apogee: 300,
+                cold_launch: 0.6, boost: 0.4, salvo: 8, salvo_delay: 0.15, split: true,
+                intercept: 60, caliber: 1.0, flash: 1.2, impact: 2.2, shockwave: 1.0,
+                plasma_grade: Some(Gravitic),
+                sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit", ground: "regency_gravitic_hit"),
+            ),
+        ],
+        mesh: "regency_strider", icon: Bot,
+        sounds: (death: "blast_large", moving: "regency_crawl", step: "regency_footfall"),
+    ),
 ]

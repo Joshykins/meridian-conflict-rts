@@ -177,7 +177,7 @@ fn ark_carries_a_commander_and_a_heavy_ground_unit_together() {
     let ship = add(&mut w, "regency_t3_assault_transport", 0, 1000, 1000);
     let sid = w.state.units.id(ship);
     let commander = add(&mut w, "regency_commander", 0, 780, 1000);
-    let tank = add(&mut w, "regency_t3_strider", 0, 700, 1000);
+    let tank = add(&mut w, "regency_t3_wake_tank", 0, 700, 1000);
     let ids = vec![w.state.units.id(commander), w.state.units.id(tank)];
     w.tick(&[cmd(Command::Board {
         units: ids,

@@ -41,10 +41,11 @@
             "Pinched-plasmeric Wake Projector": "Plasma gathered across a wide mouth and pinched out flat, so it spreads as it goes: a wake that sears everything in front of the tank and glasses the ground under it.",
         },
     ),
-    "regency_t3_strider": (
-        lore: "A fighting machine on three long legs that walks one leg at a time; its keeled head stands so high that it wades out into the sea and keeps firing.",
+    "regency_t4_strider": (
+        lore: "A fighting machine on three long legs nearly a hundred metres tall that walks one leg at a time; its keeled head stands so high that it wades out into the sea and keeps firing.",
         weapons: {
-            "Pinched-plasmeric Cannon": "Plasma squeezed by gravity into a ball in front of the bore and pinched out as one dense jet; the strider's two take turns.",
+            "Pinch-fusion Cannon": "A charge squeezed by gravity in front of the bore until it fuses, then launched as one white-hot shot; the strider's two take turns.",
+            "Gravitic Seeker Battery": "Eight seekers thrown straight up out of the back of its head; they climb high and fall on whatever stands near it.",
         },
     ),
     "regency_t1_engineer": (
