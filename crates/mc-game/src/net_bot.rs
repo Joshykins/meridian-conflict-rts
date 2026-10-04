@@ -242,7 +242,7 @@ fn chaos(
             .unwrap_or(any_bp);
         let pos = near(rng, anchor);
         let queue = rng.below(3) == 0;
-        let command = match rng.below(38) {
+        let command = match rng.below(39) {
             0..=4 => Command::Move {
                 units: group,
                 target: pos,
@@ -414,6 +414,14 @@ fn chaos(
                 batch: rng.below(2) == 0,
             },
             36 => Command::ReleaseBatch { factories: group },
+            37 => Command::SetPriority {
+                units: group,
+                priority: match rng.below(3) {
+                    0 => Priority::Even,
+                    1 => Priority::First,
+                    _ => Priority::Last,
+                },
+            },
             _ => {
                 // Bytes that do not decode are skipped everywhere the same way.
                 let len = rng.below(40) as usize;

@@ -113,9 +113,15 @@ impl World {
         if stored && viewer.is_some_and(|v| self.are_enemies(v, s.units.owner[row])) {
             return None;
         }
-        // A pause is an order, not something the enemy can see: no mark on their side.
+        // A pause or a priority is an order, not something the enemy can see: no mark on
+        // their side.
         let own_view = !viewer.is_some_and(|v| self.are_enemies(v, s.units.owner[row]));
         let paused_mark = s.units.paused[row] && own_view;
+        let priority_mark = if own_view {
+            s.units.priority[row] as u32
+        } else {
+            0
+        };
         let batch_mark = own_view && self.batching(row);
         let site = self.structure_upgrade(row);
         // The modules it is being refitted with show on it as the work goes on.
@@ -327,6 +333,7 @@ impl World {
                         0
                     }
                     | if paused_mark { UNIT_PAUSED } else { 0 }
+                    | priority_mark << UNIT_PRIORITY_SHIFT
                     | if batch_mark { UNIT_BATCH } else { 0 }
                     | if stored { UNIT_STORED } else { 0 }
                     | self.lift_gear(row) << UNIT_GEAR_SHIFT

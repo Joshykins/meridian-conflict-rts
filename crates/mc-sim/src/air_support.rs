@@ -234,7 +234,8 @@ impl World {
     /// Drones going up on their sockets, for the economy to pay for like any build:
     /// (carrier, drone, build-time units a tick at full speed, mass and energy that
     /// asks for, the tier it is paid in). A drone makes materials, so the side's
-    /// materials priority (`Focus::mines`) says when it is paid in a stall.
+    /// materials priority (`Focus::mines`) says when it is paid in a stall, unless the
+    /// carrier has a priority of its own.
     pub(crate) fn drone_jobs(&self) -> Vec<DroneJob> {
         let units = &self.state.units;
         units
@@ -257,7 +258,10 @@ impl World {
                     drone,
                     rate,
                     want,
-                    tier: focus.mines.tier(),
+                    tier: match units.priority[carrier] {
+                        crate::focus::Priority::Even => focus.mines.tier(),
+                        own => own.tier(),
+                    },
                 })
             })
             .collect()

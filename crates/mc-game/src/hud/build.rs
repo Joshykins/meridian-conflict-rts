@@ -402,6 +402,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                     .map(|u| u.paused()),
             ),
             paused: unit.paused(),
+            priority: super::priority::Mix::of(s, units),
+            own_priority: unit.priority(),
             front: queue
                 .and_then(|q| q.orders.first())
                 .map(|o| o.kind)
@@ -1379,7 +1381,7 @@ pub(super) fn shorten(ui: &mut Ui, text: &str, width: f32) -> String {
 }
 
 /// The construction amber: what is being built right now.
-const BUILDING: u32 = 0xFFA928;
+pub(in crate::hud) const BUILDING: u32 = 0xFFA928;
 
 /// The pause mark over a tile's picture, drawn after it: two amber bars on a dark plate
 /// `size` across, centred on `c`. The strategic icon in the world carries the same mark.

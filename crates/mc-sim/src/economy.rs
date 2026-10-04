@@ -167,11 +167,12 @@ impl World {
                     .as_ref()
                     .map_or(crate::orders::SELF_UPGRADE_POWER, |b| b.power)
             };
+            // The unit's own priority, its leader's or the site's overrides the focus.
             let focus = self.state.players[self.state.units.owner[row] as usize].focus;
-            let tier = if constructing {
-                focus.priority(tbp, &self.blueprints).tier()
-            } else {
-                REST
+            let tier = match self.work_priority(row, target) {
+                Some(p) => p.tier(),
+                None if constructing => focus.priority(tbp, &self.blueprints).tier(),
+                None => REST,
             };
             let rate = power / DT;
             let progress = rate.min(remaining);
@@ -205,18 +206,20 @@ impl World {
             demand[p].1 += upkeep[p];
             tiers[p][REST].add([Fx::ZERO, upkeep[p]], true);
         }
-        // Strategic launchers assembling rounds (`nukes.rs`): paid like any other build.
+        // Strategic launchers assembling rounds (`nukes.rs`): paid like any other build,
+        // with the rest unless the launcher has a priority of its own.
         let launchers = self.launcher_jobs();
-        for &(row, _, want) in &launchers {
+        for &(row, _, want, tier) in &launchers {
             let p = self.state.units.owner[row] as usize;
             demand[p].0 += want[0];
             demand[p].1 += want[1];
-            tiers[p][REST].add(want, false);
+            tiers[p][tier].add(want, false);
             self.flows[row].wanted[0] += want[0];
             self.flows[row].wanted[1] += want[1];
         }
         // Drones going up on their carriers (`air_support.rs`): paid in the tier the
-        // side's materials priority puts them in, and shown on the carrier.
+        // carrier's own priority or else the side's materials priority puts them in, and
+        // shown on the carrier.
         let drones = self.drone_jobs();
         for job in &drones {
             let p = self.state.units.owner[job.drone] as usize;
@@ -360,11 +363,11 @@ impl World {
             }
         }
 
-        for &(row, rate, want) in &launchers {
+        for &(row, rate, want, tier) in &launchers {
             let p = self.state.units.owner[row] as usize;
-            let e = paid[p][REST];
-            power[p][REST].0 += rate;
-            power[p][REST].1 += rate * e;
+            let e = paid[p][tier];
+            power[p][tier].0 += rate;
+            power[p][tier].1 += rate * e;
             spent[p].0 += want[0] * e;
             spent[p].1 += want[1] * e;
             self.flows[row].used[0] += want[0] * e;
@@ -509,6 +512,7 @@ impl World {
     pub(crate) fn complete_unit(&mut self, row: usize) -> Result<(), SimError> {
         self.state.units.flags[row] &= !flag::UNDER_CONSTRUCTION;
         self.state.units.health[row] = self.unit_max_health(row);
+        self.settle_priority(row);
         let owner = self.state.units.owner[row];
         self.state.players[owner as usize].units_built += 1;
         self.events.push(SimEvent::UnitCompleted {

@@ -1027,10 +1027,11 @@ fn a_factory_card_orders_its_units_and_its_queue_holds_repeat() {
     assert_eq!(rig.click(order_slot(3, 2)), vec![HudAction::Stop]);
     let repeat = Vec2::new(1920.0 - EDGE - 12.0 - 48.0, BUILD_Y - GAP - 31.0);
     assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
-    // Pause sits beside it on the strip, and Batch beside that.
+    // Pause sits beside it on the strip.
     let pause = Vec2::new(repeat.x - 48.0 - 10.0 - 48.0, repeat.y);
     assert_eq!(rig.click(pause), vec![HudAction::PauseWork(true)]);
-    let batch = Vec2::new(pause.x - 48.0 - 10.0 - 48.0, repeat.y);
+    // Priority beside that (120 wide), and Batch beside that.
+    let batch = Vec2::new(pause.x - 48.0 - 10.0 - 120.0 - 10.0 - 48.0, repeat.y);
     assert_eq!(rig.click(batch), vec![HudAction::Batch(true)]);
 }
 
@@ -1786,5 +1787,6 @@ fn a_lift_ship_hold_lets_out_what_is_clicked_and_its_card_lands_and_takes_off() 
 
 mod batch;
 mod idle;
+mod priority;
 mod queue_tray;
 mod warp;

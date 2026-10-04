@@ -1,5 +1,5 @@
 //! The queue strip over the construction panel: what the builder has queued, and the
-//! Repeat, Pause and Batch switches (`batch.rs`). A selection of several builders can be
+//! Repeat, Pause, Priority (`hud/priority.rs`) and Batch switches (`batch.rs`). A selection of several builders can be
 //! split on any switch; the buttons show how it is split and what a click will do. On a
 //! narrow screen the switches fold to their glyphs, so the strip always fits. A queue too
 //! long for the strip opens whole over it (`tray.rs`).
@@ -7,6 +7,7 @@
 use super::{pause_mark, tip, Stack, BUILDING};
 use crate::audio::Sfx;
 use crate::hud::icons;
+use crate::hud::priority::{self, Mix};
 use crate::hud::style::{domain_wash, Domain};
 use crate::hud::{Hud, HudAction, Scene};
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
@@ -65,6 +66,9 @@ pub(super) struct Queue<'a> {
     pub(super) pause: Split,
     /// This builder's work is paused: its queue waits, the front entry holds where it got to.
     pub(super) paused: bool,
+    /// How the selection stands on Priority, and this builder's own.
+    pub(super) priority: Mix,
+    pub(super) own_priority: mc_sim::focus::Priority,
     /// What the front entry is (producing, building, upgrading), when it heads the queue.
     pub(super) front: Option<OrderKind>,
     /// The builder whose queue it is: another one closes the whole-queue tray.
@@ -84,6 +88,8 @@ pub(super) struct Layout {
     pub(super) stepper: f32,
     pub(super) send: f32,
     pub(super) join: f32,
+    /// The Priority control's three segments together.
+    priority: f32,
 }
 
 const FULL: Layout = Layout {
@@ -93,6 +99,7 @@ const FULL: Layout = Layout {
     stepper: 76.0,
     send: 64.0,
     join: 4.0,
+    priority: 120.0,
 };
 
 /// Switches as glyphs alone (the label and key are in the tip), a shorter head.
@@ -103,6 +110,7 @@ const FOLDED: Layout = Layout {
     stepper: 62.0,
     send: 30.0,
     join: 3.0,
+    priority: 60.0,
 };
 
 /// A queued tile, and the gap after it.
@@ -115,6 +123,9 @@ pub(super) const STACK_GAP: f32 = 5.0;
 fn layout(w: f32, queue: &Queue) -> &'static Layout {
     let wants = |l: &Layout| {
         let mut switches = l.switch;
+        if queue.priority.any() {
+            switches += l.gap + l.priority;
+        }
         if queue.is_factory {
             switches += l.gap + l.switch + l.gap + super::batch::width(queue, l);
         }
@@ -217,9 +228,25 @@ pub(super) fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue
             hud.actions.push(HudAction::PauseWork(paused));
         }
         right = tr.x - l.gap;
-        if queue.is_factory {
-            batch_right = Some(right);
-        }
+    }
+    // Priority, beside Pause: when the work is paid in a stall.
+    if queue.priority.any() {
+        let tr = Rect::new(
+            right - l.priority,
+            r.y + (r.h - 34.0) * 0.5,
+            l.priority,
+            34.0,
+        );
+        let size = if l.priority < FULL.priority {
+            priority::Size::Glyphs
+        } else {
+            priority::Size::Full
+        };
+        priority::control(hud, ui, tr, queue.priority, size, "queue-priority", 46.0);
+        right = tr.x - l.gap;
+    }
+    if queue.is_factory {
+        batch_right = Some(right);
     }
     // Batch, for a factory, leftmost: it is the one that grows, and it grows away from
     // the other switches.
@@ -245,6 +272,8 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
         )
     } else if queue.paused {
         (format!("{waiting} waiting  \u{b7}  Z resumes"), BUILDING)
+    } else if let Some(note) = priority::note(s, queue.own_priority) {
+        note
     } else if queue.front.is_some() {
         let next = match waiting {
             0 => "Nothing after it".to_owned(),

@@ -259,7 +259,7 @@ fn units_of(w: &World, player: u8) -> Vec<UnitId> {
 }
 
 /// The south's factories, their standing orders the tick-1 attack-move: linked in one
-/// batch of five, three scouts a lap each, repeating.
+/// batch of five, three scouts a lap each, repeating, one paid first and one last.
 fn batch_on(w: &World) -> Vec<PlayerCommand> {
     let factories = factories(w);
     [
@@ -281,6 +281,15 @@ fn batch_on(w: &World) -> Vec<PlayerCommand> {
         Command::SetRepeat {
             factories: factories.clone(),
             repeat: true,
+        },
+        // One paid first in a stall, the other last (`focus.rs`): held per unit, and restored.
+        Command::SetPriority {
+            units: factories[..1].to_vec(),
+            priority: Priority::First,
+        },
+        Command::SetPriority {
+            units: factories[1..].to_vec(),
+            priority: Priority::Last,
         },
         Command::Produce {
             factories,

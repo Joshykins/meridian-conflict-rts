@@ -7,7 +7,13 @@
 //! mines, but are never held back with them: only First changes when they are paid.
 //! A refit that makes materials or energy goes First with either resource it makes,
 //! and is likewise never held back.
+//!
+//! A unit can be given a priority of its own (`Command::SetPriority`). First or Last
+//! then overrides the focus for all of its work, whatever it builds; Even leaves it to
+//! the focus. Helpers take the priority of the unit they assist, and builders on a site
+//! the site's, unless they have one of their own.
 
+use crate::tables::{flag, OrderKind, UnitId};
 use crate::World;
 use mc_data::{cat, Blueprints, UnitBlueprint};
 use serde::{Deserialize, Serialize};
@@ -87,11 +93,58 @@ fn reclaims(bp: &UnitBlueprint, blueprints: &Blueprints) -> bool {
                 .is_some_and(|d| blueprints.unit(d).reclaimer.is_some()))
 }
 
+/// Whether a unit of this kind has work a priority of its own can order: it builds,
+/// upgrades, refits or assembles rounds. A site under construction can be given one too
+/// (`World::set_priority`).
+pub fn prioritizable(blueprints: &Blueprints, bp: &UnitBlueprint) -> bool {
+    bp.builder.is_some()
+        || bp.upgrades_to.is_some()
+        || bp.strategic.is_some()
+        || blueprints.refit_set(bp.id).is_some()
+}
+
 impl World {
     /// `Command::SetFocus`.
     pub(crate) fn set_focus(&mut self, player: u8, focus: Focus) {
         if let Some(pl) = self.state.players.get_mut(player as usize) {
             pl.focus = focus;
         }
+    }
+
+    /// `Command::SetPriority`: the player's units among `ids` that have work to order,
+    /// and sites still going up (everyone building one is paid by its priority).
+    pub(crate) fn set_priority(&mut self, player: u8, ids: &[UnitId], priority: Priority) {
+        for row in self.owned_or_site(player, ids) {
+            if prioritizable(&self.blueprints, self.bp(row))
+                || self.state.units.has_flag(row, flag::UNDER_CONSTRUCTION)
+            {
+                self.state.units.priority[row] = priority;
+            }
+        }
+    }
+
+    /// A finished unit keeps a priority only if it has work of its own to order: a
+    /// prioritised site of a power plant goes back to Even once it is built.
+    pub(crate) fn settle_priority(&mut self, row: usize) {
+        if !prioritizable(&self.blueprints, self.bp(row)) {
+            self.state.units.priority[row] = Priority::Even;
+        }
+    }
+
+    /// The priority that overrides the focus for `builder`'s work on `target`, if any:
+    /// its own, else that of the unit it assists, else that of the site it builds.
+    pub(crate) fn work_priority(&self, builder: usize, target: usize) -> Option<Priority> {
+        let units = &self.state.units;
+        let set = |row: usize| Some(units.priority[row]).filter(|&p| p != Priority::Even);
+        set(builder)
+            .or_else(|| {
+                self.state
+                    .orders
+                    .front(units, builder)
+                    .filter(|o| o.kind == OrderKind::Assist)
+                    .and_then(|o| units.row(o.target))
+                    .and_then(set)
+            })
+            .or_else(|| set(target).filter(|_| units.has_flag(target, flag::UNDER_CONSTRUCTION)))
     }
 }

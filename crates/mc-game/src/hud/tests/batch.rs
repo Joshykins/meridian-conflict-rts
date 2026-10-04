@@ -11,6 +11,11 @@ fn strip(step: f32) -> Vec2 {
     Vec2::new(repeat.x - step * (48.0 + 10.0 + 48.0), repeat.y)
 }
 
+/// The Batch switch: left of Pause, past the Priority control (120 wide).
+fn batch_switch() -> Vec2 {
+    strip(1.0) - Vec2::X * (48.0 + 10.0 + 120.0 + 10.0 + 48.0)
+}
+
 /// A factory batching with `count` of `size` ready.
 fn batching(rig: &mut Rig, count: u16, size: u16) {
     rig.view.frame.units[0].status[0] |= UNIT_BATCH;
@@ -32,7 +37,7 @@ fn batching(rig: &mut Rig, count: u16, size: u16) {
 #[test]
 fn a_batching_factory_sets_its_size_and_sends_what_is_ready_early() {
     let mut rig = Rig::new("aster_t1_land_factory");
-    let batch = strip(2.0);
+    let batch = batch_switch();
     assert_eq!(rig.click(batch), vec![HudAction::Batch(true)]);
 
     // On, with two of ten ready: the switch turns it off, the stepper beside it sets the
@@ -70,7 +75,8 @@ fn on_a_narrow_screen_the_switches_fold_to_their_glyphs() {
     assert_eq!(rig.click(repeat), vec![HudAction::Repeat(true)]);
     let pause = repeat - Vec2::X * 46.0;
     assert_eq!(rig.click(pause), vec![HudAction::PauseWork(true)]);
-    let batch = pause - Vec2::X * 46.0;
+    // Priority folds to its chevrons, 60 wide, between Pause and Batch.
+    let batch = pause - Vec2::X * (20.0 + 6.0 + 60.0 + 6.0 + 20.0);
     assert_eq!(rig.click(batch), vec![HudAction::Batch(false)]);
     let size = batch - Vec2::X * (20.0 + 3.0 + 31.0);
     assert_eq!(

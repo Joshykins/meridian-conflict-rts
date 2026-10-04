@@ -30,6 +30,8 @@ pub const ORDER_H: f32 = 40.0;
 /// Order names: medium weight, tracked lightly so they fit their tile.
 const LABEL: Style = crate::ui::style(mc_render::Face::Medium, 11.5, 1.2);
 pub const ORDER_GAP: f32 = 5.0;
+/// The small Priority control in the order card's last column head.
+const PRIORITY_W: f32 = 54.0;
 /// Width of the order card for this many families.
 pub fn orders_width(families: usize) -> f32 {
     families as f32 * (ORDER_W + ORDER_GAP) - ORDER_GAP + 28.0
@@ -1132,18 +1134,33 @@ pub fn orders(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r:
     }
 
     let mut hint = None;
+    let priority = super::priority::Mix::of(s, units);
     for (col, (family, orders)) in card.iter().enumerate() {
         let tone = family.tone();
         let cx = x + col as f32 * (ORDER_W + ORDER_GAP);
         // The family's name over its column, in its colour.
         ui.fill(Rect::new(cx, r.y + 12.0, ORDER_W, 2.0), rgb(tone, 0.9));
-        ui.text(
+        let label_end = ui.text(
             cx,
             r.y + 24.0,
             type_scale::MICRO,
             rgb(tone, 1.0),
             family.label(),
         );
+        // Priority sits small in the head of the last column, the one that holds Pause:
+        // its tiles are full, and the queue strip has it at full size.
+        let pr = Rect::new(cx + ORDER_W - PRIORITY_W, r.y + 17.0, PRIORITY_W, 15.0);
+        if col + 1 == card.len() && priority.any() && label_end + 6.0 < pr.x {
+            super::priority::control(
+                hud,
+                ui,
+                pr,
+                priority,
+                super::priority::Size::Glyphs,
+                "card-priority",
+                44.0,
+            );
+        }
         for (i, o) in orders.iter().enumerate() {
             // Reclaim is lit in the Materials red-orange it brings in, not the family's colour.
             let tone = if o.action == HudAction::Target(Targeting::Reclaim) {

@@ -231,6 +231,9 @@ pub struct Units {
     /// The player paused this unit's work (`Command::SetPaused`): it keeps its queue
     /// but spends nothing on building, assisting, producing, upgrading or repairing.
     pub paused: Vec<bool>,
+    /// When the player has this unit's work paid in a stall (`Command::SetPriority`):
+    /// Even follows the side's focus, First and Last override it (`focus.rs`).
+    pub priority: Vec<crate::focus::Priority>,
     /// Ticks left on a timed self-destruct (`destruct.rs`). Zero: none armed.
     pub destruct: Vec<u16>,
     /// A land unit in a lift ship's hold: that ship (`transport.rs`). `NONE` otherwise. A stored unit is
@@ -360,6 +363,7 @@ impl Units {
             dive_goal: Vec::new(),
             revealed: Vec::new(),
             paused: Vec::new(),
+            priority: Vec::new(),
             destruct: Vec::new(),
             hangar: Vec::new(),
             ground_aim: Vec::new(),
@@ -437,6 +441,7 @@ impl Units {
         put(&mut self.dive_goal, row, false);
         put(&mut self.revealed, row, 0);
         put(&mut self.paused, row, false);
+        put(&mut self.priority, row, crate::focus::Priority::Even);
         put(&mut self.destruct, row, 0);
         put(&mut self.hangar, row, Handle::NONE);
         // Far from any map: the first bombardment picks a point.
@@ -553,6 +558,7 @@ impl Units {
                     | (self.dive[row] as u64) << 8
                     | (self.dive_goal[row] as u64) << 16
                     | (self.paused[row] as u64) << 24
+                    | (self.priority[row] as u64) << 28
                     | (self.destruct[row] as u64) << 32,
             );
             h.write_u64(self.hangar[row].0 as u64);

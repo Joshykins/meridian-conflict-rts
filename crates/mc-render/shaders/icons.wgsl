@@ -67,27 +67,41 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         size_px = 14.0;
     }
     let center = globals.view_proj * vec4<f32>(entity_center(e) + vec3<f32>(0.0, 0.0, model.height * 0.5), 1.0);
-    // Paused work: the quad reaches out to the right to carry a pause mark beside the symbol.
-    let paused = (e.status[0] & UNIT_PAUSED) != 0u
-        && (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | STATE_UNIDENTIFIED)) == 0u;
+    // Paused work: the quad reaches out to the right to carry a pause mark beside the
+    // symbol. A priority of its own: out to the left, for a chevron.
+    let marked = (e.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST | STATE_UNIDENTIFIED)) == 0u;
+    let paused = (e.status[0] & UNIT_PAUSED) != 0u && marked;
+    let priority = select(0u, (e.status[0] >> UNIT_PRIORITY_SHIFT) & UNIT_PRIORITY_MASK, marked);
     var c = corner;
-    if paused {
-        c.x = corner.x * PAUSE_REACH + (PAUSE_REACH - 1.0);
-    }
+    let left = select(1.0, 2.0 * PAUSE_REACH - 1.0, priority != 0u);
+    let right = select(1.0, 2.0 * PAUSE_REACH - 1.0, paused);
+    c.x = mix(-left, right, corner.x * 0.5 + 0.5);
     let ndc = center.xy / center.w + c * size_px * globals.viewport.zw;
     // Icons ignore depth; keep w so clipping behind the camera still works.
     out.clip = vec4<f32>(ndc * center.w, center.w * 0.5, center.w);
     out.uv = c;
-    out.icon = select(model.icon, 31u, (e.owner_flags & STATE_UNIDENTIFIED) != 0u)
+    // Only the shape and tech bytes of the model's icon word are read past here.
+    out.icon = (select(model.icon, 31u, (e.owner_flags & STATE_UNIDENTIFIED) != 0u) & 0xFFFFu)
+        | priority << ICON_PRIORITY_SHIFT
         | select(0u, ICON_PAUSED, paused);
     out.owner_flags = e.owner_flags;
     return out;
 }
 
-// `IconOut::icon` bit: draw the pause mark. Clear of the shape and tech bytes and the model's icon bits.
+// `IconOut::icon` bit: draw the pause mark. Clear of the shape and tech bytes.
 const ICON_PAUSED: u32 = 0x80000000u;
-// A paused icon's quad runs from -1 to 2 * PAUSE_REACH - 1 across; the mark sits in the added part.
+// `IconOut::icon` bits 16..18: the unit's own priority, as `UNIT_PRIORITY_*` numbers it.
+const ICON_PRIORITY_SHIFT: u32 = 16u;
+// A paused icon's quad runs from -1 to 2 * PAUSE_REACH - 1 across; the mark sits in the
+// added part. A prioritised one reaches as far the other way, for its chevron.
 const PAUSE_REACH: f32 = 1.55;
+
+// A chevron pointing up (First) or down (Last), centred on the origin.
+fn sd_chevron(p: vec2<f32>, up: bool) -> f32 {
+    let q = vec2<f32>(p.x, select(-p.y, p.y, up));
+    let tip = vec2<f32>(0.0, 0.17);
+    return min(sd_segment(q, vec2<f32>(-0.3, -0.15), tip), sd_segment(q, tip, vec2<f32>(0.3, -0.15))) - 0.1;
+}
 
 // Two upright bars: the pause mark, centred on the origin.
 fn sd_pause(p: vec2<f32>) -> f32 {
@@ -458,7 +472,18 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
         mark_fill = 1.0 - smoothstep(-aam, aam, m);
         mark_edge = 1.0 - smoothstep(-aam, aam, m - 0.16);
     }
-    if outline <= 0.01 && mark_edge <= 0.01 {
+    // A priority of its own: a chevron up beside the symbol on the other side, amber
+    // pointing up for First, grey pointing down for Last.
+    let priority = (in.icon >> ICON_PRIORITY_SHIFT) & UNIT_PRIORITY_MASK;
+    var chev_fill = 0.0;
+    var chev_edge = 0.0;
+    if priority != 0u {
+        let m = sd_chevron(in.uv - vec2<f32>(1.0 - 2.0 * PAUSE_REACH + 0.52, 0.34), priority == UNIT_PRIORITY_FIRST);
+        let aam = fwidth(m) * 1.2;
+        chev_fill = 1.0 - smoothstep(-aam, aam, m);
+        chev_edge = 1.0 - smoothstep(-aam, aam, m - 0.16);
+    }
+    if outline <= 0.01 && mark_edge <= 0.01 && chev_edge <= 0.01 {
         discard;
     }
     var color = globals.team_colors[in.owner_flags & OWNER_MASK].rgb;
@@ -470,8 +495,11 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
     let icon = mix(mix(vec3<f32>(0.0), color * 1.3, fill), mix(color, vec3<f32>(1.0), 0.55) * 1.3, frame);
     // Construction amber (0xFFA928), a little over one so it holds its own beside team colours.
     let amber = vec3<f32>(1.0, 0.40, 0.024) * 1.35;
-    let rgb = mix(icon * outline, mix(vec3<f32>(0.0), amber, mark_fill), mark_edge);
-    return vec4<f32>(rgb / max(max(outline, mark_edge), 1e-4), max(outline, mark_edge));
+    let chev = select(vec3<f32>(0.62, 0.65, 0.70), amber, priority == UNIT_PRIORITY_FIRST);
+    var rgb = mix(icon * outline, mix(vec3<f32>(0.0), amber, mark_fill), mark_edge);
+    rgb = mix(rgb, mix(vec3<f32>(0.0), chev, chev_fill), chev_edge);
+    let alpha = max(max(outline, mark_edge), chev_edge);
+    return vec4<f32>(rgb / max(alpha, 1e-4), alpha);
 }
 
 

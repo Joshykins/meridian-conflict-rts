@@ -384,6 +384,12 @@ pub enum Command {
         factories: Vec<UnitId>,
         size: u16,
     },
+    /// When these units' work is paid in a stall: First before the rest, Last only out
+    /// of what the rest leaves, Even back to the side's focus (`focus.rs`).
+    SetPriority {
+        units: Vec<UnitId>,
+        priority: crate::focus::Priority,
+    },
 }
 
 impl Command {
@@ -432,6 +438,7 @@ impl Command {
             | Command::Reform { units, .. }
             | Command::SetDive { units, .. }
             | Command::SetPaused { units, .. }
+            | Command::SetPriority { units, .. }
             | Command::Guard { units, .. }
             | Command::Board { units, .. }
             | Command::Land { units, .. }

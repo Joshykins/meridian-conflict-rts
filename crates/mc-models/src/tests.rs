@@ -2093,6 +2093,17 @@ fn riding_bit_matches_the_mirror() {
     );
 }
 
+/// The icon's priority chevron reads the bits the mirror sets.
+#[test]
+fn priority_bits_match_the_mirror() {
+    use crate::gpu_consts::unit_priority;
+    use mc_sim::focus::Priority;
+    assert_eq!(unit_priority::SHIFT, mc_sim::mirror::UNIT_PRIORITY_SHIFT);
+    assert_eq!(unit_priority::MASK, mc_sim::mirror::UNIT_PRIORITY_MASK);
+    assert_eq!(unit_priority::FIRST, Priority::First as u32);
+    assert_eq!(unit_priority::LAST, Priority::Last as u32);
+}
+
 #[test]
 fn hellkite_barrels_are_seated_in_their_guns() {
     let model = build_model("fire_bomber").unwrap();

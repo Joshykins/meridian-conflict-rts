@@ -1202,6 +1202,18 @@ shared! {
         pub const RIDING: u32 = 0x400;
     }
 
+    /// A unit's own priority in a stall (`mc_sim::mirror::UNIT_PRIORITY_SHIFT` and
+    /// `UNIT_PRIORITY_MASK` in `UnitInstance::status[0]`; a test holds them equal): drawn
+    /// as a chevron on its strategic icon (icons.wgsl).
+    pub mod unit_priority as "UNIT_PRIORITY_" {
+        pub const SHIFT: u32 = 25;
+        pub const MASK: u32 = 0x3;
+        /// The value in those bits for First (`mc_sim::focus::Priority::First`).
+        pub const FIRST: u32 = 1;
+        /// The value for Last (`Priority::Last`).
+        pub const LAST: u32 = 2;
+    }
+
     /// The metal scans the plate is finished with (metal.wgsl): two layers each in
     /// the terrain material array, after the ground and foliage layers
     /// (`mc_render::textures::terrain_materials`, a test holds the indices).

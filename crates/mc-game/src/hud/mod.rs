@@ -30,6 +30,7 @@ mod netplay;
 pub mod notices;
 mod observer;
 mod pause;
+mod priority;
 mod profiler;
 mod range;
 mod range_maps;
@@ -149,6 +150,8 @@ pub enum HudAction {
     /// Builders, factories and upgrading structures in the selection pause (`true`)
     /// or resume their work, keeping their queues.
     PauseWork(bool),
+    /// When the selection's work is paid in a stall (`Command::SetPriority`).
+    Priority(mc_sim::focus::Priority),
     /// What the side's economy builds first when it stalls.
     Focus(mc_sim::focus::Focus),
     /// Selected lift ships that are down raise the ramp and climb back to the clouds.

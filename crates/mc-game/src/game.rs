@@ -54,6 +54,8 @@ mod reclaim_input;
 mod survival_notes;
 #[path = "game_work.rs"]
 pub(crate) mod work;
+#[path = "game_pause.rs"]
+mod work_switches;
 pub use cine_input::CursorMode;
 
 pub(crate) const DRAG_THRESHOLD: f32 = 6.0;
@@ -2287,6 +2289,7 @@ impl Game {
             HudAction::FireState(state) => self.set_fire_state(state),
             HudAction::Dive(dive) => self.set_dive(dive),
             HudAction::PauseWork(paused) => self.set_paused(paused),
+            HudAction::Priority(priority) => self.set_priority(priority),
             HudAction::Focus(focus) => self.send(Command::SetFocus { focus }),
             HudAction::TakeOff => self.take_off(),
             HudAction::UnloadUnits(ids) => {
@@ -2474,49 +2477,6 @@ impl Game {
     /// The guard area a click with no drag gives.
     fn guard_radius(&self) -> f32 {
         GUARD_DEFAULT
-    }
-
-    /// Pauses (or resumes) the work of whatever in the selection has work to pause.
-    fn set_paused(&mut self, paused: bool) {
-        let units: Vec<Handle> = self
-            .selected_units()
-            .filter(|u| {
-                mc_sim::pause::pausable(
-                    &self.blueprints,
-                    self.blueprints.unit(BlueprintId(u.blueprint as u16)),
-                )
-            })
-            .map(|u| Handle(u.unit_id))
-            .collect();
-        if !units.is_empty() {
-            self.send(Command::SetPaused { units, paused });
-            self.hud.toast(
-                if paused {
-                    "Work paused"
-                } else {
-                    "Work resumed"
-                },
-                hud::style::Family::Engineering.tone(),
-            );
-        }
-    }
-
-    /// Z: resumes the selection's work if all of it is paused, pauses all of it otherwise
-    /// (the Pause buttons say which).
-    fn toggle_paused(&mut self) {
-        let (mut paused, mut workers) = (0, 0);
-        for u in self.selected_units() {
-            if mc_sim::pause::pausable(
-                &self.blueprints,
-                self.blueprints.unit(BlueprintId(u.blueprint as u16)),
-            ) {
-                workers += 1;
-                paused += usize::from(u.paused());
-            }
-        }
-        if workers > 0 {
-            self.set_paused(paused < workers);
-        }
     }
 
     /// V: surfaces the selection's submarines if most are down, dives them otherwise.

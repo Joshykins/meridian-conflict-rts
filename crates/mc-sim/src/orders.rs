@@ -491,6 +491,10 @@ impl World {
                 self.set_focus(player, *focus);
                 Ok(())
             }
+            Command::SetPriority { units, priority } => {
+                self.set_priority(player, units, *priority);
+                Ok(())
+            }
             Command::Guard {
                 units,
                 pos,
@@ -3417,6 +3421,7 @@ impl World {
         units.flags[t] |= units.flags[row] & flag::REPEAT;
         units.fire_state[t] = units.fire_state[row];
         units.paused[t] = units.paused[row];
+        units.priority[t] = units.priority[row];
         units.rally[t] = units.rally[row];
 
         units.build_target[row] = Handle::NONE;

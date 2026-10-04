@@ -712,11 +712,11 @@ impl World {
     }
 
     /// Paid out of `run_economy`: what every launcher still assembling a round wants this
-    /// tick at full supply (mass, energy per tick), by row, with its build-time rate: its
-    /// own power and that of every engineer assisting it. The rate is not cut to what is
+    /// tick at full supply (mass, energy per tick), by row, with its build-time rate (its
+    /// own power and that of every engineer assisting it) and the tier it is paid in. The rate is not cut to what is
     /// left of the round, so a stall slows the round down but never its last bit
     /// (`advance_launchers` stops at the end).
-    pub(crate) fn launcher_jobs(&mut self) -> Vec<(usize, Fx, [Fx; 2])> {
+    pub(crate) fn launcher_jobs(&mut self) -> Vec<(usize, Fx, [Fx; 2], usize)> {
         let mut jobs = Vec::new();
         // Engineers on an assist whose work is a launcher's round (`run_assist`).
         let mut helpers: BTreeMap<UnitId, Fx> = BTreeMap::new();
@@ -754,7 +754,9 @@ impl World {
                 spec.round_mass * left / spec.round_time,
                 spec.round_energy * left / spec.round_time,
             ];
-            jobs.push((row, rate, want));
+            // Even is the rest's tier: a launcher round is paid with the rest by default.
+            let tier = self.state.units.priority[row].tier();
+            jobs.push((row, rate, want, tier));
         }
         jobs
     }

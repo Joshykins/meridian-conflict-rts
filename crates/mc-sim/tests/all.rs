@@ -63,6 +63,7 @@ mod pause;
 mod pinned_hulls;
 mod place;
 mod player_orders;
+mod priority;
 mod radar;
 mod range;
 mod reclaim;

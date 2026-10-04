@@ -626,6 +626,19 @@ impl UnitInstance {
             && self.status[0] & UNIT_PAUSED != 0
     }
 
+    /// The unit's own priority in a stall (`UNIT_PRIORITY_SHIFT`): Even when it has none
+    /// or the viewer may not see it.
+    pub fn priority(&self) -> crate::focus::Priority {
+        if self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0 {
+            return crate::focus::Priority::Even;
+        }
+        match (self.status[0] >> UNIT_PRIORITY_SHIFT) & UNIT_PRIORITY_MASK {
+            1 => crate::focus::Priority::First,
+            2 => crate::focus::Priority::Last,
+            _ => crate::focus::Priority::Even,
+        }
+    }
+
     /// How far a submarine is under: 0 surfaced, 1 dived.
     pub fn dive(&self) -> f32 {
         if self.owner_flags & (KIND_WRECK | KIND_PROP | KIND_GHOST) != 0 {
@@ -757,6 +770,12 @@ pub const UNIT_DIVE_MASK: u32 = 0xFF;
 pub const UNIT_DIVE_GOAL: u32 = 1 << 8;
 /// Units' `status[0]`: the player paused this unit's work (`Command::SetPaused`).
 pub const UNIT_PAUSED: u32 = 1 << 9;
+/// Units' `status[0]` bits 25..27: the unit's own priority in a stall
+/// (`Command::SetPriority`), as `focus::Priority` numbers it: 0 Even, 1 First, 2 Last.
+/// Sent to its own side, allies and observers. `mc_models::gpu_consts::unit_priority`;
+/// a test holds them equal.
+pub const UNIT_PRIORITY_SHIFT: u32 = 25;
+pub const UNIT_PRIORITY_MASK: u32 = 0x3;
 pub const UNIT_BURNING: u32 = 1 << 23;
 /// Units' `status[0]`: a unit stored in a lift ship's hold. Listed for its own side's
 /// interface (the hold, selecting and ordering it); never drawn. It is `IN_FACTORY` too,
