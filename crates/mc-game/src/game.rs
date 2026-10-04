@@ -3344,8 +3344,9 @@ impl Game {
             .collect();
         let Some(table) = &self.sounds else { return };
         let bps = &self.blueprints;
-        // (sound, gain, pan, pitch, delay) per kind: shots, impacts, deaths, charging, beams starting and stopping.
-        type Heard = (mc_data::SoundId, f32, f32, f32, f32);
+        // (sound, gain, pan, pitch, delay, (rounds, seconds between)) per kind: shots,
+        // impacts, deaths, charging, beams starting and stopping.
+        type Heard = (mc_data::SoundId, f32, f32, f32, f32, (u8, f32));
         let mut heard: [Vec<Heard>; 5] = Default::default();
         let switched = beaming
             .iter()
@@ -3407,7 +3408,7 @@ impl Game {
             let jitter = ((at[0] * 12.9898 + at[1] * 78.233).sin() * 43_758.547)
                 .fract()
                 .abs();
-            heard[4].push((sound, gain, pan, 0.96 + jitter * 0.08, 0.0));
+            heard[4].push((sound, gain, pan, 0.96 + jitter * 0.08, 0.0, (1, 0.0)));
         }
         let water = self.map.info().water_level;
         let folded = crate::audio::volley::fold(&self.view.frame.events, bps);
@@ -3661,20 +3662,38 @@ impl Game {
                     loud *= close.sqrt();
                 }
             }
-            heard[kind].push((sound, gain * loud, pan, tone, delay));
+            // A gun whose `fire` is one round is heard on each round (`audio/rounds.rs`).
+            let rounds = match event {
+                mc_sim::SimEvent::ShotFired {
+                    blueprint, weapon, ..
+                } => crate::audio::rounds::heard(
+                    &bps.unit(*blueprint).weapons[*weapon as usize],
+                    TICK_SECONDS,
+                ),
+                _ => (1, 0.0),
+            };
+            heard[kind].push((sound, gain * loud, pan, tone, delay, rounds));
         }
         // The shots, hits and deaths as loud as they are played: the ambience ducks under them.
         let mut din = 0.0;
         for (kind, most) in [(0, 5), (1, 4), (2, 3), (3, 2), (4, 3)] {
             heard[kind].sort_by(|a, b| b.1.total_cmp(&a.1));
-            for (i, (sound, gain, pan, pitch, delay)) in heard[kind].iter().take(most).enumerate() {
+            for (i, (sound, gain, pan, pitch, delay, (rounds, gap))) in
+                heard[kind].iter().take(most).enumerate()
+            {
                 // Those that lose out still lend the loudest ones a little weight.
                 let crowd = if i == 0 {
                     1.0 + (heard[kind].len().saturating_sub(most) as f32 * 0.04).min(0.3)
                 } else {
                     1.0
                 };
-                audio.play_world_after(*sound, gain * crowd, *pan, *pitch, *delay);
+                for k in 0..*rounds {
+                    let (pitch, delay) = (
+                        pitch * crate::audio::rounds::pitch(k),
+                        delay + k as f32 * gap,
+                    );
+                    audio.play_world_after(*sound, gain * crowd, *pan, pitch, delay);
+                }
                 if kind <= 2 {
                     din += gain * crowd;
                 }

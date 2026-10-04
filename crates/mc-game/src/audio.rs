@@ -27,6 +27,7 @@ pub(crate) mod flight;
 pub(crate) mod intercept;
 pub(crate) mod listener;
 pub mod music;
+pub(crate) mod rounds;
 pub mod salvo;
 pub mod stakes;
 pub mod titan;

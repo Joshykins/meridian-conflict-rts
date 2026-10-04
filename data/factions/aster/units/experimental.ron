@@ -81,12 +81,12 @@
         categories: ["Land", "DirectFire", "Experimental"],
         health: 72000,
         cost: (mass: 3800, energy: 38000, time: 22000),
-        radius: 24, height: 54,
-        footprint: (6, 6),
-        vision: 1000,
+        radius: 30, height: 67.5,
+        footprint: (8, 8),
+        vision: 1250,
         shield: (kind: Hull, health: 16000, regen: 110),
         economy: (energy_upkeep: 300),
-        motion: (layer: Land, size: 5, speed: 14, accel: 7, turn: 40),
+        motion: (layer: Land, size: 5, speed: 19, accel: 9, turn: 40),
         weapons: [
             (
                 // The hump's launchers: sixteen cells each, raked steeply over the head, the
@@ -96,40 +96,41 @@
                 // torso's aim is theirs, and the arms after them each swing off it on their
                 // own (`sway`).
                 name: "Thermobaric Rocket Pods",
-                damage: 240, splash: 36, range_min: 150, range: 900, reload: 18.0, salvo: 32, salvo_delay: 0.05, speed: 220, trajectory: Ballistic, rake: 20, loft: 2,
-                turret_turn: 40, pivot: (0, 0, 40), muzzle: (-7, 5.2, 50),
+                damage: 240, splash: 36, range_min: 190, range: 1125, reload: 18.0, salvo: 32, salvo_delay: 0.05, speed: 300, trajectory: Ballistic, rake: 20, loft: 2,
+                turret_turn: 40, pivot: (0, 0, 50), muzzle: (-8.75, 6.5, 62.5),
                 // The model's `pods::mouths`, the left launcher's then the right's in turn.
-                muzzles: [(-5.05, 2.8, 48.6), (-5.05, -2.8, 48.6), (-5.05, 4.4, 48.6), (-5.05, -4.4, 48.6), (-5.05, 6, 48.6), (-5.05, -6, 48.6), (-5.05, 7.6, 48.6), (-5.05, -7.6, 48.6),
-                          (-6.35, 2.8, 49.53), (-6.35, -2.8, 49.53), (-6.35, 4.4, 49.53), (-6.35, -4.4, 49.53), (-6.35, 6, 49.53), (-6.35, -6, 49.53), (-6.35, 7.6, 49.53), (-6.35, -7.6, 49.53),
-                          (-7.65, 2.8, 50.47), (-7.65, -2.8, 50.47), (-7.65, 4.4, 50.47), (-7.65, -4.4, 50.47), (-7.65, 6, 50.47), (-7.65, -6, 50.47), (-7.65, 7.6, 50.47), (-7.65, -7.6, 50.47),
-                          (-8.95, 2.8, 51.4), (-8.95, -2.8, 51.4), (-8.95, 4.4, 51.4), (-8.95, -4.4, 51.4), (-8.95, 6, 51.4), (-8.95, -6, 51.4), (-8.95, 7.6, 51.4), (-8.95, -7.6, 51.4)],
+                muzzles: [(-6.3125, 3.5, 60.75), (-6.3125, -3.5, 60.75), (-6.3125, 5.5, 60.75), (-6.3125, -5.5, 60.75), (-6.3125, 7.5, 60.75), (-6.3125, -7.5, 60.75), (-6.3125, 9.5, 60.75), (-6.3125, -9.5, 60.75),
+                          (-7.9375, 3.5, 61.9125), (-7.9375, -3.5, 61.9125), (-7.9375, 5.5, 61.9125), (-7.9375, -5.5, 61.9125), (-7.9375, 7.5, 61.9125), (-7.9375, -7.5, 61.9125), (-7.9375, 9.5, 61.9125), (-7.9375, -9.5, 61.9125),
+                          (-9.5625, 3.5, 63.0875), (-9.5625, -3.5, 63.0875), (-9.5625, 5.5, 63.0875), (-9.5625, -5.5, 63.0875), (-9.5625, 7.5, 63.0875), (-9.5625, -7.5, 63.0875), (-9.5625, 9.5, 63.0875), (-9.5625, -9.5, 63.0875),
+                          (-11.1875, 3.5, 64.25), (-11.1875, -3.5, 64.25), (-11.1875, 5.5, 64.25), (-11.1875, -5.5, 64.25), (-11.1875, 7.5, 64.25), (-11.1875, -7.5, 64.25), (-11.1875, 9.5, 64.25), (-11.1875, -9.5, 64.25)],
                 targets: ["Land", "Naval", "Structure"], color: Orange, missile: true,
-                intercept: 60, spread: 9, trail: true, wake: 3, tracer: 2, flash: 0.8, impact: 3.5, shockwave: 2.0,
-                caliber: 1.1,
+                intercept: 60, spread: 11, trail: true, tracer: 1.2, flash: 0.8, impact: 3.5, shockwave: 2.0,
+                caliber: 0.7,
                 burn: 16, burn_dps: 40,
                 sounds: (fire: "breacher_rockets", impact: "fire_bomb"),
             ),
             (
                 // Right forearm. Six barrels turn in the cluster, the Tempest cut down to an arm:
                 // it opens fire a third of the way into its spin-up and comes up to a heavy
-                // stream of shells (`spin_ramp`), each shot seen as three (`rounds`).
+                // stream of shells (`spin_ramp`), each shot seen and heard as three (`rounds`,
+                // `each_round`).
                 name: "Gatling-Breach Cannon",
-                damage: 300, splash: 10, range: 600, reload: 0.3, speed: 900, trajectory: Direct,
-                turret_turn: 50, pivot: (0, 0, 40), muzzle: (35.5, -17.5, 24), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
-                barrels: 6, sway: 40, rounds: 3, casings: 22,
+                damage: 300, splash: 10, range: 750, reload: 0.3, speed: 900, trajectory: Direct,
+                turret_turn: 50, pivot: (0, 0, 50), muzzle: (44.375, -21.875, 30), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
+                barrels: 6, sway: 40, rounds: 3, casings: 27.5,
                 targets: ["Land", "Naval", "Structure"], color: Orange,
                 flash: 1.6, impact: 1.8, shockwave: 0.8, tracer: 0.8,
-                sounds: (fire: "breacher_gatling_fire", spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
+                sounds: (fire: "breacher_gatling_fire", each_round: true, spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
             ),
             (
                 // Left forearm, the right's mirror.
                 name: "Gatling-Breach Cannon",
-                damage: 300, splash: 10, range: 600, reload: 0.3, speed: 900, trajectory: Direct,
-                turret_turn: 50, pivot: (0, 0, 40), muzzle: (35.5, 17.5, 24), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
-                barrels: 6, sway: 40, rounds: 3, casings: 22,
+                damage: 300, splash: 10, range: 750, reload: 0.3, speed: 900, trajectory: Direct,
+                turret_turn: 50, pivot: (0, 0, 50), muzzle: (44.375, 21.875, 30), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
+                barrels: 6, sway: 40, rounds: 3, casings: 27.5,
                 targets: ["Land", "Naval", "Structure"], color: Orange,
                 flash: 1.6, impact: 1.8, shockwave: 0.8, tracer: 0.8,
-                sounds: (fire: "breacher_gatling_fire", spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
+                sounds: (fire: "breacher_gatling_fire", each_round: true, spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
             ),
         ],
         mesh: "breacher", icon: Titan,

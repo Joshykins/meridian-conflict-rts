@@ -211,14 +211,132 @@
         // still short of the capital rails (data/sounds/heavy_rail.ron).
         "citadel_rail_fire": (like: "aster_rail_cannon", size: 1.5, peak: 0.9),
         "citadel_rail_hit": (like: "shell_on_armour", size: 1.9, peak: 0.8),
-        // The Breacher: the Behemoth's sounds on a machine a quarter its height. Its
-        // gatling-breach cannons are the Tempest cut down to an arm (fire, spin-up, the
-        // barrels' whir and their run-down), its pods the Hailstorm's smaller cousins, and
-        // its footfalls lighter and quicker.
-        "breacher_gatling_fire": (like: "titan_gatling_fire", size: 0.6, peak: 0.8),
-        "breacher_gatling_spin": (like: "titan_gatling_spin", size: 0.55, length: 3.6, peak: 0.6),
-        "breacher_gatling_whir": (like: "titan_gatling_whir", size: 0.55, peak: 0.45),
-        "breacher_gatling_spindown": (like: "titan_gatling_spindown", size: 0.55, peak: 0.5),
+        // The Breacher's gatling-breach cannons: a heavy six-barrel rotary on each arm,
+        // smaller and quicker than the Tempest, firing ten rounds a second at full speed.
+        // `fire` is one round (`each_round`), heard as each is seen leaving the muzzle; the
+        // spin-up is timed to the gun's 1.2 s, its detents closing in on the barrels' rate
+        // at full speed, where the whir takes over on the same notes.
+        //
+        // One round: a hard crack and a heavy chug at once, a short low report and the
+        // drum indexing the next barrel. Short, so ten a second stay ten rounds, a
+        // pounding stream rather than a smear, and no tone falls long enough to whine.
+        "breacher_gatling_fire": (
+            length: 0.6, peak: 0.6, room: 0.35,
+            layers: [
+                Burst(low: 650, high: 2600, attack: 0.0002, decay: 0.005, gain: 15),
+                Burst(low: 150, high: 900, attack: 0.0004, decay: 0.026, gain: 24),
+                Burst(at: 0.001, low: 36, high: 230, attack: 0.0015, decay: 0.065, gain: 9),
+                Tone(from: 128, to: 54, glide: 0.035, attack: 0.0008, decay: 0.055, gain: 1.1),
+                Tone(from: 70, to: 36, glide: 0.09, attack: 0.0015, decay: 0.09, gain: 0.7),
+                Drive(1.8),
+                // The report, short and low, fluttering off over the ground.
+                Roll(at: 0.004, from: 520, to: 95, glide: 0.3, attack: 0.008, decay: 0.15, gain: 0.42, swell: 11, depth: 0.5),
+                // The drum indexing: a dull steel knock as the next barrel comes round.
+                Burst(at: 0.048, low: 320, high: 1700, attack: 0.0004, decay: 0.005, gain: 1.1, pan: -0.15),
+                Fm(at: 0.048, from: 300, to: 286, glide: 0.03, ratio: 1.41, index: 1.0, fade: 0.02, attack: 0.0008, decay: 0.025, gain: 0.05, pan: -0.15),
+            ],
+        ),
+        // The barrels starting to turn: the clutch going in, the motor and drum growling up
+        // together (rough, never a clean rising note), the air off the barrels rising, and
+        // the drum's detents, slow and heavy, closing in to the full-speed rate by 1.2 s.
+        "breacher_gatling_spin": (
+            length: 2.3, peak: 0.55, room: 0.3,
+            layers: [
+                // The clutch going in.
+                Burst(low: 60, high: 700, attack: 0.0006, decay: 0.03, gain: 5.0),
+                Tone(from: 92, to: 42, glide: 0.08, attack: 0.002, decay: 0.15, gain: 0.6),
+                // The motor and the drum, an octave apart, climbing to the whir's notes.
+                Fm(at: 0.02, from: 34, to: 100, glide: 1.18, ratio: 0.5, index: 1.6, fade: 5.0, attack: 1.15, decay: 0.24, gain: 0.85),
+                Fm(at: 0.03, from: 68, to: 200, glide: 1.17, ratio: 1.0, index: 1.1, fade: 3.0, attack: 1.12, decay: 0.22, gain: 0.3),
+                // The motor's windings, rough and low in the mix.
+                Fm(at: 0.05, from: 180, to: 540, glide: 1.15, ratio: 0.5, index: 1.2, fade: 6.0, attack: 1.1, decay: 0.2, gain: 0.05),
+                // Air thrown off the turning barrels.
+                Sweep(at: 0.2, from: 220, to: 900, glide: 1.0, q: 0.8, attack: 0.95, decay: 0.15, gain: 0.22, seed: 141),
+                // The detents.
+                Burst(at: 0.16, low: 110, high: 850, attack: 0.0007, decay: 0.02, gain: 2.2, pan: 0.2),
+                Tone(at: 0.16, from: 130, to: 72, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.28, pan: 0.2),
+                Burst(at: 0.42, low: 115, high: 907, attack: 0.0007, decay: 0.0184, gain: 2.31, pan: -0.2),
+                Tone(at: 0.42, from: 145, to: 80, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.28, pan: -0.2),
+                Burst(at: 0.63, low: 121, high: 964, attack: 0.0007, decay: 0.0169, gain: 2.43, pan: 0.2),
+                Tone(at: 0.63, from: 160, to: 88, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.28, pan: 0.2),
+                Burst(at: 0.8, low: 127, high: 1021, attack: 0.0007, decay: 0.0153, gain: 2.54, pan: -0.2),
+                Tone(at: 0.8, from: 175, to: 96, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.28, pan: -0.2),
+                Burst(at: 0.94, low: 132, high: 1078, attack: 0.0007, decay: 0.0137, gain: 2.66, pan: 0.2),
+                Burst(at: 1.06, low: 138, high: 1135, attack: 0.0007, decay: 0.0121, gain: 2.77, pan: -0.2),
+                Burst(at: 1.16, low: 144, high: 1192, attack: 0.0007, decay: 0.0106, gain: 2.89, pan: 0.2),
+                Burst(at: 1.26, low: 150, high: 1250, attack: 0.0007, decay: 0.009, gain: 3.0, pan: -0.2),
+                Drive(1.3),
+            ],
+        ),
+        // The barrels at full speed: the drum's growl on 100 Hz with its octave, pulsing ten
+        // times a second as the barrels pass, the air off them, and the detents' ratchet.
+        // Every steady frequency is a whole number of cycles in the 2 s loop, and the
+        // clacks fall on the fold.
+        "breacher_gatling_whir": (
+            length: 2.0, peak: 0.32, room: 0.0, looped: true,
+            layers: [
+                Fm(from: 100, to: 100, glide: 1, ratio: 0.5, index: 1.4, fade: 1000, attack: 0.01, decay: 100000, gain: 0.35),
+                Drone(freq: 200, gain: 0.14, wobble: 10, depth: 0.45),
+                Drone(freq: 300, gain: 0.06, wobble: 10, depth: 0.5, pan: -0.1),
+                Drone(freq: 400, gain: 0.03, wobble: 5, depth: 0.5, pan: 0.1),
+                Drone(freq: 540, gain: 0.014, wobble: 2, depth: 0.4),
+                Drive(1.3),
+                Rumble(freq: 170, q: 0.8, gain: 2.6, wobble: 10, depth: 0.5),
+                Burst(at: 0.0, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 2.6, pan: 0.2, seed: 81),
+                Burst(at: 0.1, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 82),
+                Burst(at: 0.2, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 83),
+                Burst(at: 0.3, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 84),
+                Burst(at: 0.4, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 85),
+                Burst(at: 0.5, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 86),
+                Burst(at: 0.6, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 2.6, pan: 0.2, seed: 87),
+                Burst(at: 0.7, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 88),
+                Burst(at: 0.8, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 89),
+                Burst(at: 0.9, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 90),
+                Burst(at: 1.0, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 91),
+                Burst(at: 1.1, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 92),
+                Burst(at: 1.2, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 2.6, pan: 0.2, seed: 93),
+                Burst(at: 1.3, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 94),
+                Burst(at: 1.4, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 95),
+                Burst(at: 1.5, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 96),
+                Burst(at: 1.6, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 97),
+                Burst(at: 1.7, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 98),
+                Burst(at: 1.8, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 2.6, pan: 0.2, seed: 99),
+                Burst(at: 1.9, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 100),
+                Burst(at: 2.0, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 81),
+                Burst(at: 2.1, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: -0.2, seed: 82),
+                Burst(at: 2.2, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 1.9, pan: 0.2, seed: 83),
+            ],
+        ),
+        // The barrels coasting down with nothing left to shoot: the growl falling away, the
+        // ratchet opening out into slower, duller clacks, then the drum latching.
+        "breacher_gatling_spindown": (
+            length: 2.4, peak: 0.5, room: 0.3,
+            layers: [
+                Fm(from: 100, to: 26, glide: 1.7, ratio: 0.5, index: 1.4, fade: 4.0, attack: 0.02, decay: 0.8, gain: 0.85),
+                Fm(from: 200, to: 52, glide: 1.7, ratio: 1.0, index: 1.0, fade: 3.0, attack: 0.02, decay: 0.6, gain: 0.3),
+                Sweep(from: 900, to: 200, glide: 1.0, q: 0.8, attack: 0.02, decay: 0.35, gain: 0.2, seed: 142),
+                Burst(at: 0.05, low: 150, high: 1250, attack: 0.0007, decay: 0.009, gain: 2.9, pan: 0.2),
+                Burst(at: 0.16, low: 145, high: 1200, attack: 0.0007, decay: 0.0105, gain: 2.76, pan: -0.2),
+                Burst(at: 0.28, low: 140, high: 1150, attack: 0.0007, decay: 0.012, gain: 2.62, pan: 0.2),
+                Burst(at: 0.41, low: 135, high: 1100, attack: 0.0007, decay: 0.0135, gain: 2.49, pan: -0.2),
+                Burst(at: 0.56, low: 130, high: 1050, attack: 0.0007, decay: 0.015, gain: 2.35, pan: 0.2),
+                Burst(at: 0.73, low: 125, high: 1000, attack: 0.0007, decay: 0.0165, gain: 2.21, pan: -0.2),
+                Tone(at: 0.73, from: 125, to: 70, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.24, pan: -0.2),
+                Burst(at: 0.93, low: 120, high: 950, attack: 0.0007, decay: 0.018, gain: 2.07, pan: 0.2),
+                Tone(at: 0.93, from: 119, to: 67, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.24, pan: 0.2),
+                Burst(at: 1.17, low: 115, high: 900, attack: 0.0007, decay: 0.0195, gain: 1.94, pan: -0.2),
+                Tone(at: 1.17, from: 113, to: 64, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.24, pan: -0.2),
+                Burst(at: 1.45, low: 110, high: 850, attack: 0.0007, decay: 0.021, gain: 1.8, pan: 0.2),
+                Tone(at: 1.45, from: 107, to: 61, glide: 0.03, attack: 0.001, decay: 0.05, gain: 0.24, pan: 0.2),
+                // The drum stopping and latching: a heavy clunk and a short dull clank.
+                Burst(at: 1.75, low: 60, high: 650, attack: 0.0006, decay: 0.03, gain: 5.0),
+                Tone(at: 1.75, from: 95, to: 44, glide: 0.07, attack: 0.002, decay: 0.15, gain: 0.6),
+                Fm(at: 1.755, from: 205, to: 190, glide: 0.08, ratio: 1.41, index: 1.2, fade: 0.04, attack: 0.001, decay: 0.06, gain: 0.11),
+                Drive(1.3),
+            ],
+        ),
+        // Its rocket pods are the Hailstorm's smaller cousins, its footfalls the Behemoth's,
+        // lighter and quicker.
         "breacher_rockets": (like: "titan_rockets", size: 0.65, peak: 0.75),
         "breacher_step": (like: "titan_step", size: 0.4, peak: 0.7),
         "breacher_walk": (like: "titan_walk", size: 0.45, peak: 0.5),

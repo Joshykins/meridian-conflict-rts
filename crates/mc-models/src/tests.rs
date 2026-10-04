@@ -908,7 +908,7 @@ fn lods_reduce_and_respect_budgets() {
             // deck gear that tells its size.
             30000
         } else if model.key == "breacher" {
-            // The tech 4 Breacher: a 54 m walker, two rigged legs, two six-barrel arm guns
+            // The tech 4 Breacher: a 67 m walker, two rigged legs, two six-barrel arm guns
             // with their drums, two sixteen-cell rocket launchers and layered plating.
             14000
         } else if model.key == "citadel" {

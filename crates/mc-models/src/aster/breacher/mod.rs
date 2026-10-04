@@ -1,5 +1,6 @@
-//! Breacher (`aster_t4_breacher`, mesh "breacher"): the tech 4 assault walker, authored at
-//! blueprint scale (metres; the unit file is 1:1 with these numbers). A hunched upper
+//! Breacher (`aster_t4_breacher`, mesh "breacher"): the tech 4 assault walker, authored in
+//! metres at radius 24 and 54 m tall; the unit file draws it 1.25 times that (radius 30,
+//! 67.5 m), and its muzzles and pivots are these numbers grown to match. A hunched upper
 //! body thrown forward over two short, heavy, reverse-kneed legs set wide; a
 //! gatling-breach cannon for each forearm (the Behemoth's Tempest cut down: six barrels
 //! turning out of a shroud), carried low and ahead; two sixteen-cell thermobaric rocket

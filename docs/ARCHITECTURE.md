@@ -271,7 +271,9 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   (split across the view, slightly detuned, so a column is not one machine),
   reclaim beams into `reclaim_beam`, repair beams into `repair_beam`, and construction beams into `build_beam`
   (`Audio::set_loops`). `SimEvent::WeaponCharging` is raised `charge_time` before a salvo for weapons that name a
-  `charge` sound; it is heard only near the gun, unless `charge_volume` lifts it over the battle. A unit answers being selected the same way (`data/sounds/responses.ron`): a unit's
+  `charge` sound; it is heard only near the gun, unless `charge_volume` lifts it over the battle. A stream gun
+  whose `fire` is one round (`each_round`) is heard on every round it is drawn as, each as it leaves the muzzle
+  (`audio/rounds.rs`). A unit answers being selected the same way (`data/sounds/responses.ron`): a unit's
   `sounds.select`, or the library's `defaults.select` for its `icon` kind. `Game::answer_selection` compares the
   selection with the one it last answered, once a frame, so every way of selecting is covered and a death in the
   selection is not one; the units new to it answer in the voice most of them share (every tier of a unit alike),

@@ -1245,6 +1245,10 @@ pub struct WeaponSounds {
     pub flight: Option<String>,
     /// A cluster shot (`cluster`) breaking into its sub-shots, heard where it splits.
     pub split: Option<String>,
+    /// `fire` is one round, heard for each round a shot is drawn as (`rounds`), as that
+    /// round leaves the muzzle. False (the default): heard once a shot, so a stream gun's
+    /// `fire` is its whole burst.
+    pub each_round: bool,
     /// Multiplies how loud the shot is heard. Zero (the default) is as loud as its damage implies.
     pub volume: f64,
     /// Multiplies how loud the charge is heard, at any zoom: a wind-up meant to carry over
@@ -1579,6 +1583,11 @@ impl Unit {
             if w.rounds > 1 && (w.trajectory != Trajectory::Direct || w.missile) {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: rounds is only for direct-fire guns"
+                )));
+            }
+            if w.sounds.each_round && w.rounds < 2 {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: each_round needs rounds above one"
                 )));
             }
             if w.round_span > 0.0 && w.rounds < 2 {

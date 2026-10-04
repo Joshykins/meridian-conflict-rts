@@ -1,5 +1,5 @@
 //! The Breacher (`aster_t4_breacher`, mesh "breacher"): the unit file's muzzles are the
-//! model's, both arms are houses about the torso's axis that reach their muzzles at every
+//! model's at the unit's size, both arms are houses about the torso's axis that reach their muzzles at every
 //! level, and the model's spin axis is the right gun's bore, the left gun its mirror.
 
 use glam::Vec3;
@@ -14,12 +14,19 @@ fn blueprint() -> mc_data::UnitBlueprint {
     bps.unit(bps.id_of("aster_t4_breacher").unwrap()).clone()
 }
 
-/// The unit file is authored 1:1 with the model: its pods' muzzles are the pod mouths, its
-/// arms' muzzles the gun muzzles, all three weapons turn about the shoulder.
+/// The unit file is the model drawn at the unit's size: its pods' muzzles are the pod
+/// mouths, its arms' muzzles the gun muzzles, all three weapons turn about the shoulder.
 #[test]
 fn breacher_unit_file_matches_the_model() {
     let bp = blueprint();
-    let to = |p: mc_core::FxVec3| Vec3::from(p.to_f32());
+    let (radius, height) = crate::authored_size("breacher").unwrap();
+    let grown = Vec3::new(
+        bp.radius.to_f32() / radius,
+        bp.radius.to_f32() / radius,
+        bp.height.to_f32() / height,
+    );
+    // The unit file's points, back at the size the model is authored at.
+    let to = |p: mc_core::FxVec3| Vec3::from(p.to_f32()) / grown;
     let pods_w = &bp.weapons[0];
     let mouths = pods::mouths(POD.0, POD.1);
     assert_eq!(pods_w.muzzles.len(), 2 * mouths.len());

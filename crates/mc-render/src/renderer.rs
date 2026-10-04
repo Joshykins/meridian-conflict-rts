@@ -41,6 +41,7 @@ mod bore_fx;
 mod capital_crash_fx;
 mod capital_fx;
 mod capture;
+mod casing_fx;
 mod damper_fx;
 mod dive_fx;
 mod drive_swing;
@@ -4912,6 +4913,12 @@ impl Renderer {
                 let rounds = weapon.rounds;
                 let round_gap = mc_sim::mirror::round_gap(weapon) * self.tick_seconds;
                 let casings = weapon.casings;
+                // A gun off to the left of the hull throws its casings out to its left.
+                let outboard = if weapon.muzzle.y.to_f32() > 0.5 {
+                    -1.0
+                } else {
+                    1.0
+                };
                 // An aircraft's casings leave at its speed and fall away behind it.
                 let flying = unit
                     .motion
@@ -4973,40 +4980,17 @@ impl Renderer {
                     );
                 }
                 if casings > 0.0 {
-                    // One casing per round, out of the breech: to the gun's right from
-                    // the ground, straight down out of an aircraft.
-                    let right = dir.cross(Vec3::Z).normalize_or(Vec3::Y);
-                    let breech = at + travel - dir * casings;
-                    // They leave at the gun's own speed, then the air takes it off them.
-                    let carried = travel / self.tick_seconds.max(0.01);
-                    let size = 0.3 + power * 0.03;
-                    for k in 0..rounds.max(1) {
-                        let jitter = Vec3::new(
-                            self.scatter.signed(),
-                            self.scatter.signed(),
-                            self.scatter.signed(),
-                        );
-                        let (vel, life) = match flying {
-                            Some(speed) => {
-                                let ahead =
-                                    Vec3::new(dir.x, dir.y, 0.0).normalize_or_zero() * speed;
-                                let drop = Vec3::Z * -(6.0 + 3.0 * self.scatter.unit());
-                                (ahead + drop + right * jitter.x * 2.0 + jitter * 1.2, 1.6)
-                            }
-                            None => {
-                                let throw = right * (4.0 + 3.0 * self.scatter.unit())
-                                    + Vec3::Z * (3.0 + 2.0 * self.scatter.unit())
-                                    - dir * 1.0;
-                                (
-                                    carried + throw + jitter * 1.1,
-                                    2.4 + 0.6 * self.scatter.unit(),
-                                )
-                            }
-                        };
-                        let (from, start) = (round_at(breech, k), time + k as f32 * round_gap);
-                        self.push_puff(PUFF_CASING, from, vel, start, life, (size, size));
-                        self.casing_splash(from, vel, start, life, k % 2 == 0);
-                    }
+                    let breech = casing_fx::Breech {
+                        at: at + travel - dir * casings,
+                        dir,
+                        outboard,
+                        travel,
+                        gap_ticks,
+                        flying,
+                        size: 0.3 + power * 0.03,
+                        reach: casings,
+                    };
+                    self.casings_thrown(&breech, rounds, round_gap, time);
                 }
                 if !shell {
                     // A hotter knot at the bore, with a small ring, so an energy
