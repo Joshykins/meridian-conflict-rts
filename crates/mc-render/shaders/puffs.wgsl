@@ -4,6 +4,12 @@
 // Particles that are not light: dust off the tracks, gun smoke, clods of earth
 // thrown by an impact, and the sparks that go with them. Like the flashes they
 // are written once and animate on the GPU from their birth time.
+//
+// Nothing here (nor in warp_puffs/plasma_puffs) discards: a pixel a puff misses returns a
+// clear colour, which draws nothing (premultiplied blend, no depth written). A `discard`
+// (SPIR-V OpKill) in divergent flow, one inside the supernova's ground-test loop among
+// them, hung AMD's RDNA3 driver the moment a Regency generator blew up (a friend's
+// RX 7900 XTX, 2026-10-04), as it had in the stains (ground.wgsl `fs_stain`).
 
 //!rust crate::renderer::Puff
 struct Puff {
@@ -666,7 +672,7 @@ fn plume_color(in: PuffOut, plasma: bool) -> vec4<f32> {
     let r = max(in.cloud_size, 0.1);
     let d2 = dot(hit.off, hit.off) / (r * r);
     if d2 > 4.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let heat = clamp(in.appearance.w, 0.0, 1.0);
     let x = clamp(in.state.z + clamp(hit.s / half, -1.0, 1.0) * in.uv.x, 0.0, 1.0);
@@ -782,7 +788,7 @@ fn strategic_trail(in: PuffOut) -> vec4<f32> {
     let tau = through * exp(-dot(off, off) / (r * r)) * trail_tent(s0, half, sg) / sin_t;
     let alpha = 1.0 - exp(-tau);
     if alpha < 0.002 {
-        discard;
+        return vec4<f32>(0.0);
     }
     // Lit on the sun's side of the tube.
     let lit = 0.82 + 0.3 * clamp(dot(off / max(r, 0.01), globals.sun.xyz), -1.0, 1.0);
@@ -813,7 +819,7 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
         return plasma_puff_color(in, d);
     }
     if kind != PUFF_TRAIL && kind != PUFF_ARC && kind != PUFF_BOMB_TRAIL && kind != PUFF_STRATEGIC_TRAIL && kind != PUFF_PLUME && kind != PUFF_PLASMA_PLUME && kind != PUFF_PLASMA_BOLT && kind != PUFF_SHRAPNEL && kind != PUFF_ION && kind != PUFF_THRUST && kind != PUFF_LAMP_CONE && kind != PUFF_COLUMN && kind != PUFF_VEIL && d > 1.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let eye = globals.camera.xyz;
     if kind == PUFF_STRATEGIC_TRAIL {
@@ -831,7 +837,7 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
         let q = vec2<f32>(in.uv.x * c - in.uv.y * s, in.uv.x * s + in.uv.y * c);
         let tiny = in.roll.y < 3.5;
         let body = vec2<f32>(max(abs(q.x) - long + 0.3, 0.0), q.y);
-        if !tiny && length(body) > 0.3 { discard; }
+        if !tiny && length(body) > 0.3 { return vec4<f32>(0.0); }
         // Brass, lit along its top, with a glint each time it turns to the light.
         let round = select(clamp(q.y / 0.3, -1.0, 1.0), 0.3, tiny);
         var brass = mix(vec3<f32>(0.14, 0.085, 0.03), vec3<f32>(0.5, 0.35, 0.13), 0.55 + 0.45 * round);
@@ -855,7 +861,7 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
         let thin = 0.12 + 0.75 * abs(cos(spin * 0.83 + in.state.z * 4.0));
         let jag = 0.85 - 0.3 * abs(fract(q.x * 2.3 + in.state.z * 7.0) - 0.5);
         let tiny = in.roll.y < 3.0;
-        if !tiny && (abs(q.y) > thin * 0.6 || abs(q.x) > jag) { discard; }
+        if !tiny && (abs(q.y) > thin * 0.6 || abs(q.x) > jag) { return vec4<f32>(0.0); }
         let sky = vec3<f32>(0.32, 0.38, 0.45) * (0.7 + 0.5 * abs(q.y / max(thin, 0.1)));
         var glass = apply_haze(apply_fog_of_war(sky, in.world.xy), in.world, eye);
         let glint = pow(max(cos(spin * 1.9 + in.state.z * 11.0), 0.0), 18.0) * 3.0;
@@ -961,7 +967,7 @@ fn puff_color(in: PuffOut) -> vec4<f32> {
         let g = abs(q);
         let hex = max(g.x * 0.866 + g.y * 0.5, g.y);
         if hex > 0.92 {
-            discard;
+            return vec4<f32>(0.0);
         }
         // A glass plate, not a glow blob: filled hex with a hotter rim.
         let fill = 1.0 - smoothstep(0.58, 0.92, hex);
@@ -1465,7 +1471,7 @@ fn damper_veil(in: PuffOut) -> vec4<f32> {
 fn fs_puff_lit(in: PuffOut) -> vec4<f32> {
     // An origin above 1e8 m: a muzzle's own puff, leaving through the firer's shield
     // (renderer `PUFF_UNCLIPPED_Z`).
-    if in.origin.z < 1.0e8 && effect_blocked(in.origin, in.world) { discard; }
+    if in.origin.z < 1.0e8 && effect_blocked(in.origin, in.world) { return vec4<f32>(0.0); }
     let puff = puff_color(in);
     let alpha = clamp(puff.a * in.opacity, 0.0, 1.0);
     // Pure additive sparks have RGB with zero alpha; retain that emitted light.

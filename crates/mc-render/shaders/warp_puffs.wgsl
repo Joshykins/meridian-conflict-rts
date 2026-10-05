@@ -83,7 +83,7 @@ fn warp_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
         return warp_arc(in, rgb, age, seed);
     }
     if d > 1.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     if kind == PUFF_WARP_RIFT {
         return warp_rift(in, d, rgb, torn, age, seed);
@@ -114,7 +114,7 @@ fn warp_streak(in: PuffOut, rgb: vec3<f32>, torn: f32, age: f32, seed: f32) -> v
     let run = min(age / 0.35, 1.0);
     let head = 1.0 - (1.0 - run) * (1.0 - run);
     if x > head + 0.02 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let lead = pow(clamp(x / max(head, 0.001), 0.0, 1.0), 3.0);
     let left = 0.3 * (1.0 - age);

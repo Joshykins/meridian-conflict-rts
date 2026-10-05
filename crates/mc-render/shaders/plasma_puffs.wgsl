@@ -90,7 +90,7 @@ fn plasma_puff_vertex(p: Puff, corner: vec2<f32>, life_age: f32, o: PuffOut) -> 
 
 fn plasma_puff_color(in: PuffOut, d: f32) -> vec4<f32> {
     if d > 1.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     if u32(in.state.y) == PUFF_PLASMA_ORB {
         return plasma_orb(in, d);
@@ -201,7 +201,7 @@ fn plasma_burst(in: PuffOut, d: f32) -> vec4<f32> {
     let lumps = lump_a * 0.62 + lump_b * 0.38;
     let field = 1.0 - d / mix(0.55, 1.0, lumps);
     if field <= 0.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let level = length(rgb);
     let white = vec3<f32>(level * 0.85);
@@ -236,13 +236,13 @@ fn plasma_wake(in: PuffOut, d: f32) -> vec4<f32> {
     let lumps = value_noise2(in.uv * 2.8 + vec2<f32>(seed * 23.0, age * 1.8), 1.0);
     let field = 1.0 - d / mix(0.55, 1.0, lumps);
     if field <= 0.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     // Eaten through as it cools.
     let grain = value_noise2(in.uv * 6.0 + vec2<f32>(seed * 13.0, age * 0.8), 1.0);
     let alive = smoothstep(-0.02, 0.03, grain * 0.55 + field * 0.75 - age * 1.05 - 0.05);
     if alive <= 0.001 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let level = length(rgb);
     let heat = 1.0 - smoothstep(0.0, 0.6, age);
@@ -415,7 +415,7 @@ fn supernova(in: PuffOut, d: f32) -> vec4<f32> {
     // The ragged outer face reaches past `r` a little.
     let outer = r * 1.06;
     if miss >= outer * outer {
-        discard;
+        return vec4<f32>(0.0);
     }
     let reach = sqrt(outer * outer - miss);
     let t_out = vec2<f32>(max(-along - reach, 0.0), -along + reach);
@@ -431,17 +431,17 @@ fn supernova(in: PuffOut, d: f32) -> vec4<f32> {
             for (var k = 1; k <= 3; k++) {
                 let q = eye + ray * mix(-along - hollow, seg.x, f32(k) * 0.25);
                 if q.z < max(terrain_height(q.xy), globals.map.z) {
-                    discard;
+                    return vec4<f32>(0.0);
                 }
             }
         }
     } else if far {
-        discard;
+        return vec4<f32>(0.0);
     }
     let steps = 8;
     let dt = (seg.y - seg.x) / f32(steps);
     if dt <= 0.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let jitter = hash21(floor(in.clip.xy) + vec2<f32>(seed * 17.0, 3.0));
     let white = vec3<f32>(1.0, 0.95, 0.98);
@@ -493,7 +493,7 @@ fn nova_wisp(in: PuffOut, d: f32) -> vec4<f32> {
     let lumps = value_noise2(in.uv * 2.6 + vec2<f32>(seed * 23.0, age * 1.5), 1.0);
     let field = 1.0 - d / mix(0.6, 1.0, lumps);
     if field <= 0.0 {
-        discard;
+        return vec4<f32>(0.0);
     }
     let strands = value_noise2(vec2<f32>(in.uv.x * 1.2 - age * 2.0, in.uv.y * 7.0) + seed * 13.0, 1.0);
     let body = pow(field, 1.3) * (0.35 + 1.1 * strands * strands);
