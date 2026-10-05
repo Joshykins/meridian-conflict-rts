@@ -132,7 +132,7 @@ pub type Shared = Arc<Mutex<Published>>;
 /// Whose orders the interface wants published with every tick.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Watch {
-    /// Units whose order queues are wanted (the selection).
+    /// Units whose order queues are wanted: the selection, and the unit under the pointer.
     pub units: Vec<u32>,
     /// The side the interface commands: its planned structures are always published.
     pub side: u8,

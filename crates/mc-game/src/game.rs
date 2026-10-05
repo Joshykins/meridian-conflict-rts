@@ -4214,33 +4214,6 @@ impl Game {
             }
         }
 
-        // The sim publishes the order queues of the whole side: every command group wears
-        // its count on the map. Only the selection's lines show without shift.
-        let everyone = true;
-        if !self
-            .view
-            .selection
-            .iter()
-            .take(MAX_WATCHED)
-            .eq(self.watched.units.iter())
-            || self.watched.side != self.view.local
-            || self.watched.everyone != everyone
-            || self.watched.perspective != self.view.perspective
-        {
-            self.watched = Watch {
-                units: self
-                    .view
-                    .selection
-                    .iter()
-                    .take(MAX_WATCHED)
-                    .copied()
-                    .collect(),
-                side: self.view.local,
-                everyone,
-                perspective: self.view.perspective,
-            };
-            self.sim.watch.lock().unwrap().clone_from(&self.watched);
-        }
         self.answer_selection(audio, now);
 
         self.result_frame(dt);
@@ -4255,6 +4228,35 @@ impl Game {
         } else {
             None
         };
+
+        // The sim publishes the order queues of the whole side: every command group wears
+        // its count on the map. Only the selection's lines show without shift. The unit
+        // under the pointer is watched too, so its card (`hud::selection::hover_card`)
+        // shows the sim's own figures, as the selected unit's card does.
+        let everyone = true;
+        let hovered = hover_unit
+            .map(|i| self.view.frame.units[i].unit_id)
+            .filter(|id| !self.view.selection.contains(id));
+        let watch = self
+            .view
+            .selection
+            .iter()
+            .take(MAX_WATCHED)
+            .copied()
+            .chain(hovered);
+        if !watch.clone().eq(self.watched.units.iter().copied())
+            || self.watched.side != self.view.local
+            || self.watched.everyone != everyone
+            || self.watched.perspective != self.view.perspective
+        {
+            self.watched = Watch {
+                units: watch.collect(),
+                side: self.view.local,
+                everyone,
+                perspective: self.view.perspective,
+            };
+            self.sim.watch.lock().unwrap().clone_from(&self.watched);
+        }
         let mut marks: Vec<Mark> = self
             .view
             .selection

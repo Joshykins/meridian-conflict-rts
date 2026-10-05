@@ -35,11 +35,12 @@ impl Flow {
     }
 }
 
-/// A unit's mass and energy flows: the sim's own figures when it reports them,
-/// else what its blueprint says it makes and costs to keep running.
+/// A unit's mass and energy flows: the sim's own figures when it reports them (the
+/// selection, the unit under the pointer and the side's busy units: `sim_thread::Watch`),
+/// else what its blueprint says.
 pub fn flows(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> (Flow, Flow) {
-    if let Some(q) = s.queue_of(u) {
-        return (
+    match s.queue_of(u) {
+        Some(q) => (
             Flow {
                 made: q.mass_made,
                 wanted: q.mass_wanted,
@@ -50,13 +51,18 @@ pub fn flows(s: &Scene, u: &UnitInstance, bp: &UnitBlueprint) -> (Flow, Flow) {
                 wanted: q.energy_wanted,
                 used: q.energy_used,
             },
-        );
+        ),
+        None => rated(bp),
     }
+}
+
+/// What a blueprint makes, a fabricator's materials included, and costs to keep running.
+fn rated(bp: &UnitBlueprint) -> (Flow, Flow) {
     let e = &bp.economy;
     let upkeep = e.energy_upkeep.to_f32();
     (
         Flow {
-            made: e.mass_income.to_f32(),
+            made: e.mass_income.to_f32() + bp.fabricator.map_or(0.0, |f| f.mass.to_f32()),
             ..Default::default()
         },
         Flow {
@@ -176,4 +182,22 @@ pub fn strip(ui: &mut Ui, mass: Flow, energy: Flow, r: Rect) -> bool {
         super::build::tip(ui, r.x, r.y - 30.0, &text);
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mc_data::Blueprints;
+
+    #[test]
+    fn a_fabricator_unreported_by_the_sim_still_shows_what_it_makes() {
+        let blueprints = Blueprints::load(&Blueprints::locate_data_dir().expect("data dir"))
+            .expect("blueprints");
+        let bp = blueprints.unit(blueprints.id_of("aster_t2_fabricator").expect("fabricator"));
+        let made = bp.fabricator.expect("a fabricator").mass.to_f32();
+        let (mass, energy) = rated(bp);
+        assert!(made > 0.0);
+        assert_eq!(mass.made, made + bp.economy.mass_income.to_f32());
+        assert_eq!(energy.used, bp.economy.energy_upkeep.to_f32());
+    }
 }
