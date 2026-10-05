@@ -8,7 +8,8 @@
 // - Power Generator: gravity squeezes plasma to a star's pressure until it fuses; it never
 //   explodes, so generators can be packed tight where ARC reactors cannot.
 // - Reliquary: one building holds mass and energy both, in three tiers.
-// - Picket: a short-ranged brawler, more damage than a Sentinel inside its reach.
+// - Picket: shorter-ranged than a Sentinel but past a light tank's reach, more damage
+//   than a Sentinel inside it.
 // - Canopy: a repeater of bursting bolts that hurts a whole flight, not one plane.
 // - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
 // - Palisade: slow to build, very hard to cut; sections join into one wall as ARC's do.
@@ -448,8 +449,8 @@
     ),
     // ---- Defence ------------------------------------------------------------------------
     // A plasmeric repeater: a steady stream of plasma bolts, five a second. Shorter reach
-    // than a Sentinel, a third more damage inside it. It wants to be where the fight comes
-    // to, not where it can see.
+    // than a Sentinel, a third more damage inside it, but it outreaches the tech 1 tanks
+    // (Warden 300, Sledge 265), so they cannot shell it from outside its own fire.
     (
         key: "regency_t1_point_defense",
         name: "Picket",
@@ -459,11 +460,11 @@
         health: 1500,
         cost: (mass: 260, energy: 2000, time: 260),
         radius: 5.5, height: 8, footprint: (1, 1),
-        vision: 240,
+        vision: 360,
         weapons: [(
             name: "Plasmeric Repeater",
             // A bolt every 0.2 s: 85 a second, as the old three-slug burst.
-            damage: 17, splash: 1, range: 220, reload: 0.2, speed: 420, trajectory: Direct,
+            damage: 17, splash: 1, range: 340, reload: 0.2, speed: 420, trajectory: Direct,
             turret_turn: 160, muzzle: (5.2, 0, 6.8), pivot: (0, 0, 6),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Plasmeric),
