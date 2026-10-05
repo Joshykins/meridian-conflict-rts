@@ -8,8 +8,8 @@
 // - Power Generator: gravity squeezes plasma to a star's pressure until it fuses; it never
 //   explodes, so generators can be packed tight where ARC reactors cannot.
 // - Reliquary: one building holds mass and energy both, in three tiers.
-// - Picket: shorter-ranged than a Sentinel but past a light tank's reach, more damage
-//   than a Sentinel inside it.
+// - Picket, Halberd, Sunspear: point defence of the Sentinel's, Redoubt's and Citadel's
+//   reach and weight; the Halberd and Sunspear trade some damage for a wider burst.
 // - Canopy: a repeater of bursting bolts that hurts a whole flight, not one plane.
 // - Orrery: a shorter radar that sees far more; its floating rings add a tier each.
 // - Palisade: slow to build, very hard to cut; sections join into one wall as ARC's do.
@@ -448,23 +448,23 @@
         sounds: (death: "regency_supernova_small"),
     ),
     // ---- Defence ------------------------------------------------------------------------
-    // A plasmeric repeater: a steady stream of plasma bolts, five a second. Shorter reach
-    // than a Sentinel, a third more damage inside it, but it outreaches the tech 1 tanks
-    // (Warden 300, Sledge 265), so they cannot shell it from outside its own fire.
+    // A plasmeric repeater: a steady stream of plasma bolts, five a second. Reach, armour
+    // and damage a second as a Sentinel's (405, 1300, 62), so it outreaches the tech 1
+    // tanks (Warden 300, Sledge 265) as the Sentinel does.
     (
         key: "regency_t1_point_defense",
         name: "Picket",
         role: "Point Defense",
         tech: 1,
         categories: ["Land", "Defense", "DirectFire"],
-        health: 1500,
-        cost: (mass: 260, energy: 2000, time: 260),
+        health: 1300,
+        cost: (mass: 250, energy: 2000, time: 250),
         radius: 5.5, height: 8, footprint: (1, 1),
         vision: 360,
         weapons: [(
             name: "Plasmeric Repeater",
-            // A bolt every 0.2 s: 85 a second, as the old three-slug burst.
-            damage: 17, splash: 1, range: 340, reload: 0.2, speed: 420, trajectory: Direct,
+            // A bolt every 0.2 s: 65 a second, to the Sentinel's 62.
+            damage: 13, splash: 1, range: 400, reload: 0.2, speed: 420, trajectory: Direct,
             turret_turn: 160, muzzle: (5.2, 0, 6.8), pivot: (0, 0, 6),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
             plasma_grade: Some(Plasmeric),
@@ -476,9 +476,9 @@
     // The tech 2 point defence: a Pinched-plasmeric Cannon. It gathers its plasma in front
     // of the bore and squeezes it dense by gravity (a second's charge), then pinches it out
     // as one shot: a jet of plasma a quarter of a second long (`rounds` over `round_span`,
-    // drawn; the sim flies the one shot). It bursts where it hits and sears the ground, all
-    // its weight on the one hull, next to nothing splashed. Reach and weight as a
-    // Redoubt's. Model: `regency_pinch_cannon` (`models::regency::turrets::halberd`).
+    // drawn; the sim flies the one shot). It bursts where it hits and sears the ground.
+    // Reach and armour as a Redoubt's (780, 7800); a shot is a little lighter than the
+    // Redoubt's three slugs (560 to 678) but bursts 10 m wide, so it hurts a crowd more. Model: `regency_pinch_cannon` (`models::regency::turrets::halberd`).
     (
         key: "regency_t2_point_defense",
         name: "Halberd",
@@ -491,7 +491,7 @@
         vision: 300,
         weapons: [(
             name: "Pinched-plasmeric Cannon",
-            damage: 720, splash: 1, range: 520, reload: 2.4, rounds: 8, round_span: 0.25,
+            damage: 560, splash: 10, range: 780, reload: 2.4, rounds: 8, round_span: 0.25,
             speed: 900, trajectory: Direct,
             turret_turn: 90, muzzle: (11.6, 0, 8.4), pivot: (0, 0, 8.4),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
@@ -508,9 +508,10 @@
     // The tech 3 point defence: a Pinch-fusion Cannon. Its charge is squeezed until it
     // fuses (over two seconds, going white), then launched as one shot, the fastest of any
     // Regency gun, that melts the ground where it lands and leaves a knot of fusion burning
-    // there. Near the Citadel's weight a shot, a little of it splashed. The shot is laid a
-    // little up and arcs onto its mark (`flat_fire`: a direct-fire gun, not artillery), so
-    // it reaches over a low rise in the ground; it crosses its full reach in 1.5 s. Model:
+    // there. The Citadel's reach (1500); a shot is lighter than the Citadel's (3000 to
+    // 3800) but bursts 14 m wide where the Citadel's is 3. The shot is laid a little up and
+    // arcs onto its mark (`flat_fire`: a direct-fire gun, not artillery), so it reaches
+    // over a low rise in the ground. Model:
     // `regency_fusion_cannon` (`models::regency::turrets::sunspear`), the Citadel's size.
     (
         key: "regency_t3_point_defense",
@@ -524,7 +525,7 @@
         vision: 360,
         weapons: [(
             name: "Pinch-fusion Cannon",
-            damage: 3400, splash: 8, range: 1200, reload: 7.5, speed: 1350, trajectory: Ballistic,
+            damage: 3000, splash: 14, range: 1500, reload: 7.5, speed: 1500, trajectory: Ballistic,
             loft: 0.6, flat_fire: true,
             turret_turn: 18, muzzle: (35, 0, 19.04), pivot: (0, 0, 19.04),
             targets: ["Land", "Naval"], color: Orange, red: 1.0,
