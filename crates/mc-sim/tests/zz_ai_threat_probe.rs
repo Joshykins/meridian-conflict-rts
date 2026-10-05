@@ -8,6 +8,8 @@
 //! `THREAT_AI=1` makes slot 0 an AI too (a duel with the same readout).
 //! `THREAT_ECON=1` adds each side's economy: mines, plants and engineers by tier (sites
 //! in brackets), energy stored, and the seconds of the minute out of energy.
+//! `THREAT_INCOME=X[,Y]` gives P1 (the AI) X times a fair income (`AiConfig::income`),
+//! and in a duel P0 Y times (default 1).
 use mc_data::{cat, Blueprints};
 use mc_jobs::Pool;
 use mc_sim::tables::Controller;
@@ -205,6 +207,18 @@ fn threat() {
     let seed: u64 = parts.get(3).and_then(|m| m.parse().ok()).unwrap_or(7);
     let swap = parts.get(4) == Some(&"swap");
     let duel = std::env::var("THREAT_AI").is_ok();
+    let incomes: Vec<u16> = std::env::var("THREAT_INCOME")
+        .unwrap_or_default()
+        .split(',')
+        .map(|x| {
+            x.parse::<f64>()
+                .map_or(1000, |x| (x * 1000.0).round() as u16)
+        })
+        .collect();
+    let income = |i: u8| match i {
+        1 => incomes.first().copied().unwrap_or(1000),
+        _ => incomes.get(1).copied().unwrap_or(1000),
+    };
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let bps = Arc::new(Blueprints::load(&root.join("data")).unwrap());
     let map = mc_map::MapFile::open(root.join(format!("maps/{}.mcmap", parts[0]))).unwrap();
@@ -213,6 +227,7 @@ fn threat() {
         faction: "Aster".into(),
         ai: AiConfig {
             difficulty: diff,
+            income: income(i),
             ..AiConfig::default()
         },
         team: i,
@@ -231,7 +246,12 @@ fn threat() {
         spawn_commanders: true,
     };
     let mut w = World::new(&map, bps, Arc::new(Pool::new(1)), &config).unwrap();
-    println!("threat {spec}{}", if duel { " (AI duel)" } else { "" });
+    println!(
+        "threat {spec}{} income P1 {} P0 {}",
+        if duel { " (AI duel)" } else { "" },
+        income(1),
+        income(0)
+    );
     let mut first_near: Option<u32> = None;
     let opening: u32 = std::env::var("THREAT_OPENING")
         .ok()
