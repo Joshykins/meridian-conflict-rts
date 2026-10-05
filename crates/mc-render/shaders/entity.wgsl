@@ -1362,6 +1362,17 @@ fn vs_main(in: VsIn) -> VsOut {
     let entity_index = visible[in.instance];
     let e = load_entity(entity_index);
     let model = models[e.blueprint];
+    // The hull-field passes draw every unit of a model that any unit wears a field on:
+    // one without a live field of its own is let go before any of its posing.
+    var hull = -1;
+    if push.pass_kind == PASS_HULL {
+        hull = find_hull_shield(e.unit_id);
+        if hull < 0 || (e.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u {
+            var hidden: VsOut;
+            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+            return hidden;
+        }
+    }
     let t = globals.sun.w;
     let time = globals.camera.w;
     var scale = 1.0;
@@ -2288,16 +2299,9 @@ fn vs_main(in: VsIn) -> VsOut {
             ));
         }
     }
-    var hull = -1;
 
     // A hull field is the posed mesh, pushed out along its skin — not a bubble.
     if push.pass_kind == PASS_HULL {
-        hull = find_hull_shield(e.unit_id);
-        if hull < 0 || (e.owner_flags & (KIND_WRECK | KIND_GHOST | KIND_PROP | FLAG_UNDER_CONSTRUCTION)) != 0u {
-            var hidden: VsOut;
-            hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
-            return hidden;
-        }
         // Along the shared shell direction, plus a little away from the middle so a
         // sheet whose two sides cancel still stands off its own surface. Thin: the
         // field is a skin on the plates, and a sharp corner is not let balloon.
