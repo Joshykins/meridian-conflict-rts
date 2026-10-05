@@ -19,6 +19,9 @@ struct EntityPush {
     pass_kind: u32,
     // Live shield records, when this is the hull-shield pass.
     count: u32,
+    // The hull-shield pass: where the hull fields begin, after the domes. They run to
+    // `count` in unit-id order (renderer `shield_upload::field_order`).
+    hull_first: u32,
 }
 
 var<immediate> push: EntityPush;
@@ -1259,11 +1262,22 @@ fn shell_dir(surface: u32) -> vec4<f32> {
 }
 
 fn find_hull_shield(unit_id: u32) -> i32 {
-    let n = push.count;
-    for (var i = 0u; i < n; i++) {
+    // Every vertex of every unit of a model that wears a field asks, so a binary search
+    // over the hull block, not a walk of the whole list: the first record of this unit.
+    var lo = push.hull_first;
+    var hi = push.count;
+    while lo < hi {
+        let mid = (lo + hi) / 2u;
+        if shields[mid].unit_id < unit_id {
+            lo = mid + 1u;
+        } else {
+            hi = mid;
+        }
+    }
+    for (var i = lo; i < push.count; i++) {
         let s = shields[i];
-        if s.unit_id != unit_id || ((s.packed >> 25u) & 1u) == 0u {
-            continue;
+        if s.unit_id != unit_id {
+            break;
         }
         if mix(s.prev_open, s.open, globals.sun.w) > 0.001 {
             return i32(i);

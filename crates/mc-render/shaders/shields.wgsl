@@ -24,6 +24,8 @@
 // white-hot jet for the shaft, and hits that flash white and ring out red.
 
 struct ShieldPush {
+    // The domes: the list's hull fields come after them and are not this pass's
+    // (renderer `shield_upload::field_order`).
     count: u32,
     // SHIELD_DRAW_GLASS or SHIELD_DRAW_SHAFTS.
     draw: u32,

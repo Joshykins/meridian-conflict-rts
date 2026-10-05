@@ -94,10 +94,36 @@ impl UnitGrid {
     }
 }
 
+/// Whether a shield record is a hull field (`ShieldInstance::packed` bit 25).
+fn is_hull(s: &ShieldInstance) -> bool {
+    (s.packed >> 25) & 1 == 1
+}
+
+/// The shields in the order the GPU list holds them: every dome first, then the hull
+/// fields by unit id. The dome pass walks only the domes (a battle's hundreds of hull
+/// fields cost every pixel a test each, `shields.wgsl` `gather`), and the hull passes
+/// find a unit's field by a binary search (`entity.wgsl` `find_hull_shield`), not a
+/// walk of the list for every vertex. Past `MAX_SHIELDS` the hull fields furthest from
+/// the eye are left undrawn: a cosmetic cap, the sim's fields are untouched.
+fn field_order(shields: &[ShieldInstance], eye: Vec3) -> Vec<ShieldInstance> {
+    let mut order: Vec<ShieldInstance> = shields.iter().filter(|s| !is_hull(s)).copied().collect();
+    order.truncate(MAX_SHIELDS);
+    let mut hulls: Vec<ShieldInstance> = shields.iter().filter(|s| is_hull(s)).copied().collect();
+    let room = MAX_SHIELDS - order.len();
+    if hulls.len() > room {
+        let away = |s: &ShieldInstance| (Vec3::from(s.pos) - eye).length_squared();
+        hulls.sort_by(|a, b| away(a).total_cmp(&away(b)));
+        hulls.truncate(room);
+    }
+    hulls.sort_by_key(|s| s.unit_id);
+    order.extend(hulls);
+    order
+}
+
 impl Renderer {
     pub(super) fn upload_shields(&mut self, frame: &RenderFrame, eye: Vec3) {
-        let n = frame.shields.len().min(MAX_SHIELDS);
-        let src = &frame.shields[..n];
+        let src = &field_order(&frame.shields, eye)[..];
+        let n = src.len();
         self.live_effect_barriers.clear();
         for s in src {
             if s.open < 200.0 / 255.0
@@ -146,14 +172,14 @@ impl Renderer {
         let mut gpu = Vec::with_capacity(n);
         for (i, s) in src.iter().enumerate() {
             let team = (s.packed >> 8) & 255;
-            let hull = (s.packed >> 25) & 1 == 1;
+            let hull = is_hull(s);
             let mut overlap = 0u32;
             // Hull wraps stay their own membrane: they do not fuse with a dome. Nor does a veil.
             if !hull && s.packed & mc_sim::mirror::SHIELD_VEIL == 0 {
                 for (j, other) in src.iter().enumerate() {
                     if i == j
                         || ((other.packed >> 8) & 255) != team
-                        || (other.packed >> 25) & 1 == 1
+                        || is_hull(other)
                         || other.packed & mc_sim::mirror::SHIELD_VEIL != 0
                     {
                         continue;
@@ -254,10 +280,9 @@ impl Renderer {
             );
         }
         self.shield_count = n as u32;
-        let is_hull = |s: &&ShieldInstance| (s.packed >> 25) & 1 == 1;
-        self.hull_shield_count = src.iter().filter(is_hull).count() as u32;
+        self.hull_shield_count = src.iter().filter(|s| is_hull(s)).count() as u32;
         self.hull_draws.clear();
-        for s in src.iter().filter(is_hull) {
+        for s in src.iter().filter(|s| is_hull(s)) {
             let unit = entity_of(s).map(|e| units[e as usize].blueprint);
             let Some(&[first, lods]) = unit.and_then(|b| self.model_draws.get(b as usize)) else {
                 self.hull_draws.clear();
@@ -282,6 +307,41 @@ mod tests {
             pos: [x, y, 0.0],
             ..UnitInstance::zeroed()
         }
+    }
+
+    fn field(unit_id: u32, x: f32, hull: bool) -> ShieldInstance {
+        ShieldInstance {
+            pos: [x, 0.0, 0.0],
+            unit_id,
+            packed: u32::from(hull) << 25,
+            ..ShieldInstance::zeroed()
+        }
+    }
+
+    /// Domes lead the list; the hull fields follow by unit id, and when the list is
+    /// full the hull fields furthest from the eye are the ones left out.
+    #[test]
+    fn domes_lead_and_hull_fields_follow_by_unit() {
+        let mut shields = vec![
+            field(9, 0.0, true),
+            field(5, 0.0, false),
+            field(3, 0.0, true),
+        ];
+        shields.push(field(1, 0.0, false));
+        let order = field_order(&shields, Vec3::ZERO);
+        let ids: Vec<u32> = order.iter().map(|s| s.unit_id).collect();
+        assert_eq!(ids, [5, 1, 3, 9]);
+
+        let mut crowd: Vec<ShieldInstance> = (0..MAX_SHIELDS as u32)
+            .map(|i| field(1000 - i, i as f32, true))
+            .collect();
+        crowd.push(field(7, 50_000.0, false));
+        let order = field_order(&crowd, Vec3::ZERO);
+        assert_eq!(order.len(), MAX_SHIELDS);
+        assert!(!is_hull(&order[0]) && order[0].unit_id == 7);
+        assert!(order[1..].windows(2).all(|w| w[0].unit_id < w[1].unit_id));
+        let furthest = 1000 - (MAX_SHIELDS as u32 - 1);
+        assert!(order.iter().all(|s| s.unit_id != furthest));
     }
 
     /// The grid hands back everything within reach (and may add a few more from the

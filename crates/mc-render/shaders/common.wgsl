@@ -854,6 +854,17 @@ fn barrier_meets(source: vec3<f32>, to: vec3<f32>, barrier: EffectBarrier, wall:
     return false;
 }
 fn barrier_crosses(source: vec3<f32>, to: vec3<f32>, barrier: EffectBarrier) -> bool {
+    // The cap and the wall both lie in the box of the radius across, from the wall's foot
+    // to the cap's top: a segment clear of the box meets neither. Every puff and spark
+    // pixel asks this of every live field, a battle's hundreds of hull fields among them,
+    // so the far ones cost this box and nothing else.
+    let lo = min(source, to);
+    let hi = max(source, to);
+    let top = barrier.center.z + 1.0 / barrier.inverse_axes.z;
+    if any(lo.xy > barrier.center.xy + barrier.radius) || any(hi.xy < barrier.center.xy - barrier.radius)
+        || lo.z > top || hi.z < barrier.min_z - 0.1 {
+        return false;
+    }
     let v = (to - source) * barrier.inverse_axes;
     if dot(v, v) < 0.0000001 || (barrier_inside(source, barrier) && barrier_inside(to, barrier)) { return false; }
     return barrier_meets(source, to, barrier, false) || barrier_meets(source, to, barrier, true);

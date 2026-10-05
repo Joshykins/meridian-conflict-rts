@@ -500,6 +500,20 @@ impl Renderer {
         let push = |a: u32, b: u32| unsafe {
             device.cmd_push_constants(cmd, self.layouts.scene, gfx, 0, bytemuck::bytes_of(&[a, b]))
         };
+        // The shields list holds the domes first and the hull fields after them
+        // (`shield_upload::field_order`).
+        let dome_count = self.shield_count - self.hull_shield_count;
+        // The hull passes: the whole list, and where its hull fields begin.
+        // SAFETY: as `push`; three words fit the 16-byte range.
+        let push_hull = || unsafe {
+            device.cmd_push_constants(
+                cmd,
+                self.layouts.scene,
+                gfx,
+                0,
+                bytemuck::bytes_of(&[pass::HULL, self.shield_count, dome_count]),
+            )
+        };
         let terrain = terrain_lit::TerrainDraw {
             gpu: &self.gpu,
             cmd,
@@ -920,7 +934,7 @@ impl Renderer {
                     self.pipelines.hull_shield_depth,
                 );
                 bind_pass_set(self.shields_set);
-                push(pass::HULL, self.shield_count);
+                push_hull();
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
                 draw_hull_slots();
@@ -1067,7 +1081,7 @@ impl Renderer {
             );
             self.timers.end(&device, cmd);
             self.timers.draws(&device, cmd, "scene.shields");
-            if self.shield_count > self.hull_shield_count {
+            if dome_count > 0 {
                 device.cmd_bind_pipeline(
                     cmd,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -1081,7 +1095,7 @@ impl Renderer {
                     crate::gpu_consts::shield::DRAW_SHAFTS,
                     crate::gpu_consts::shield::DRAW_GLASS,
                 ] {
-                    push(self.shield_count, draw);
+                    push(dome_count, draw);
                     device.cmd_draw(cmd, 3, 1, 0, 0);
                 }
             }
@@ -1132,7 +1146,7 @@ impl Renderer {
                     &[self.shields_set, self.hull_set],
                     &[],
                 );
-                push(pass::HULL, self.shield_count);
+                push_hull();
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.mesh_vb.buffer], &[0]);
                 device.cmd_bind_index_buffer(cmd, self.mesh_ib.buffer, 0, vk::IndexType::UINT32);
                 draw_hull_slots();
