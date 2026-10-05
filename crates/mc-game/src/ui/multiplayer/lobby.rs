@@ -6,12 +6,14 @@
 //! teams, landing zones, colours, the rules) and publishes it as the match
 //! options, the open-seat mask, the content and the listing. Everyone else's
 //! line-up is rebuilt from the options. Each person picks their own race
-//! (`SeatChoice`). An open seat nobody takes at the start is played by an AI.
+//! (`SeatChoice`), and asks the host for a colour nobody else wears, which the
+//! host's plan then gives them. An open seat nobody takes at the start is
+//! played by an AI.
 
-use crate::match_options::{MatchOptions, SeatChoice};
+use crate::match_options::{ColorAsk, MatchOptions, SeatChoice};
 use crate::ui::faction::Pick;
 use crate::ui::lineup::chat::Chat;
-use crate::ui::lineup::roster::Control;
+use crate::ui::lineup::roster::{Control, Roster};
 use crate::ui::lineup::{Catalog, Lineup, Mode, Occupant, OPEN_NAME};
 use mc_core::PlayerId;
 use mc_net::{
@@ -58,6 +60,39 @@ impl Drop for LanHost {
     }
 }
 
+/// Notes each seated person's colour ask; with the plan (`roster`, while this machine
+/// hosts), gives each new one when the seat is open and nobody else wears the colour.
+/// Asks seen while someone else hosts are theirs to answer, so a host who takes the
+/// room over grants only what is asked after.
+pub(super) fn grant_colors(
+    seen: &mut Vec<(u8, ColorAsk)>,
+    players: &[mc_net::LobbyPlayer],
+    mut roster: Option<&mut Roster>,
+) {
+    // Whoever takes a seat someone left starts with no ask seen.
+    seen.retain(|&(slot, _)| players.iter().any(|p| p.slot.0 == slot));
+    for p in players {
+        let Some(ask) = SeatChoice::decode(&p.setup).and_then(|c| c.color) else {
+            continue;
+        };
+        match seen.iter_mut().find(|(slot, _)| *slot == p.slot.0) {
+            Some((_, last)) if *last == ask => continue,
+            Some((_, last)) => *last = ask,
+            None => seen.push((p.slot.0, ask)),
+        }
+        let Some(roster) = roster.as_deref_mut() else {
+            continue;
+        };
+        let i = p.slot.index();
+        let fits = (ask.color as usize) < crate::setup::TEAM_COLORS.len()
+            && roster.seats.get(i).is_some_and(|s| s.open());
+        // Taken since they asked (by another ask, or by the host): theirs stays.
+        if fits && !roster.taken(i, |s| s.color, ask.color) {
+            roster.seats[i].color = ask.color;
+        }
+    }
+}
+
 /// Where the room is.
 pub enum Place {
     /// On a server, by code.
@@ -100,6 +135,9 @@ pub struct Lobby {
     /// The plan as last published, to publish only changes.
     published: Option<(Vec<u8>, mc_core::PlayerMask, u64)>,
     pub choice: SeatChoice,
+    /// Each seated person's colour ask as last seen, by slot: an ask is granted once,
+    /// when it is new, so the host may still recolour them after.
+    color_asks: Vec<(u8, ColorAsk)>,
     pub stats: Vec<PeerStat>,
     /// What the room says, and what changed in the plan.
     pub chat: Chat,
@@ -139,6 +177,7 @@ impl Lobby {
             missing_map: None,
             published: None,
             choice: SeatChoice::default(),
+            color_asks: Vec::new(),
             stats: Vec::new(),
             chat: Chat::default(),
             error: None,
@@ -318,6 +357,13 @@ impl Lobby {
             self.planning = false;
             self.follow(catalog);
         }
+        if let Some(state) = &self.state {
+            let roster = match &mut self.lineup {
+                Some(l) if self.planning => Some(&mut l.roster),
+                _ => None,
+            };
+            grant_colors(&mut self.color_asks, &state.players, roster);
+        }
         self.publish(catalog);
     }
 
@@ -411,6 +457,16 @@ impl Lobby {
             let _ = s.set_setup(choice.encode());
         }
         self.choice = choice;
+    }
+
+    /// Asks the host for colour `n` for this machine's seat.
+    pub fn ask_color(&mut self, n: u8) {
+        let asked = self.choice.color.map_or(0, |a| a.n.wrapping_add(1));
+        let choice = SeatChoice {
+            color: Some(ColorAsk { color: n, n: asked }),
+            ..self.choice.clone()
+        };
+        self.set_choice(choice);
     }
 
     pub fn take_seat(&mut self, seat: u8) {

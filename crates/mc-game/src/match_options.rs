@@ -39,6 +39,17 @@ pub struct SeatChoice {
     pub faction: String,
     /// A race dealt at the start, from the match seed (over `faction`).
     pub random: bool,
+    /// The colour last asked of the host, who gives it when nobody else wears it.
+    pub color: Option<ColorAsk>,
+}
+
+/// A colour a person asks the host for. `n` counts their asks, so asking again for
+/// a colour the host has since moved them off is a new ask.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ColorAsk {
+    /// Index into `setup::TEAM_COLORS`.
+    pub color: u8,
+    pub n: u16,
 }
 
 impl SeatChoice {
@@ -135,6 +146,7 @@ mod tests {
                 data: SeatChoice {
                     faction: "Regency".into(),
                     random: false,
+                    color: None,
                 }
                 .encode(),
             }],

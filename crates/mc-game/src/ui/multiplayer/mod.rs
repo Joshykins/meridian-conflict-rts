@@ -305,10 +305,11 @@ pub fn draw(ui: &mut Ui, state: &mut MultiplayerState, enter: f32) -> Option<Mul
     action
 }
 
-/// A seat's own choices from a race pick.
-fn choice_of(pick: super::faction::Pick) -> SeatChoice {
+/// A seat's own choices with its race picked anew.
+fn choice_of(pick: super::faction::Pick, was: &SeatChoice) -> SeatChoice {
     SeatChoice {
         faction: pick.race().map_or_else(String::new, |r| r.key.clone()),
         random: pick.race().is_none(),
+        color: was.color,
     }
 }

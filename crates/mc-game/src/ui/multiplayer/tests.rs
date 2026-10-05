@@ -3,9 +3,11 @@
 //! see the same seats, the guest readies up, the host starts, and both come out
 //! with the same match to launch. Once for skirmish, once for co-op survival.
 
-use super::lobby::{Launch, Lobby, Place};
+use super::lobby::{grant_colors, Launch, Lobby, Place};
 use super::open;
 use super::server::{Answer, Server, Status};
+use crate::match_options::{ColorAsk, SeatChoice};
+use crate::ui::lineup::roster::Roster;
 use crate::ui::lineup::{Catalog, Lineup, Mode};
 use crate::ui::maps::MapCard;
 use crate::ui::survival::Theatre;
@@ -160,6 +162,23 @@ fn meet(catalog: &Catalog, plan: Lineup, room: &str) -> (Launch, Launch) {
         ["Host", "Guest"]
     );
 
+    // The guest asks for a colour nobody wears, and the host's plan gives it.
+    let colors = |l: &Lobby| {
+        let seats = &l.lineup.as_ref().unwrap().roster.seats;
+        (seats[0].color, seats[1].color)
+    };
+    let (theirs, _) = colors(&host);
+    let free = (0..crate::setup::TEAM_COLORS.len() as u8)
+        .rev()
+        .find(|&n| n != theirs)
+        .unwrap();
+    guest.ask_color(free);
+    wait("the guest's colour given", || {
+        host.pump(catalog);
+        guest.pump(catalog);
+        colors(&host) == (theirs, free) && colors(&guest) == (theirs, free)
+    });
+
     // Ready, start, and both have the same match to launch.
     guest.set_ready(true);
     wait("the guest ready", || {
@@ -267,4 +286,60 @@ fn friends_defend_together_in_co_op_survival() {
         assert_eq!(seats[2].start, 2);
         assert_eq!(launch.options.colors[2], crate::survival::ENGINE_COLOR);
     }
+}
+
+fn asking(slot: u8, color: u8, n: u16) -> mc_net::LobbyPlayer {
+    mc_net::LobbyPlayer {
+        slot: mc_core::PlayerId(slot),
+        name: format!("P{slot}"),
+        ready: false,
+        setup: SeatChoice {
+            color: Some(ColorAsk { color, n }),
+            ..Default::default()
+        }
+        .encode(),
+        verified: false,
+    }
+}
+
+#[test]
+fn a_colour_ask_is_granted_only_when_nobody_wears_it() {
+    let mut roster = Roster::new(3, 3, 0, false);
+    let worn = roster.seats[0].color;
+    let mut seen = Vec::new();
+    let free = 7;
+    grant_colors(
+        &mut seen,
+        &[asking(1, worn, 0), asking(2, free, 0)],
+        Some(&mut roster),
+    );
+    assert_ne!(roster.seats[1].color, worn, "another seat wears it");
+    assert_eq!(roster.seats[2].color, free);
+    assert_eq!(roster.seats[0].color, worn, "the wearer keeps it");
+}
+
+#[test]
+fn a_colour_ask_is_granted_once_so_the_host_may_recolour_after() {
+    let mut roster = Roster::new(2, 2, 0, false);
+    let mut seen = Vec::new();
+    grant_colors(&mut seen, &[asking(1, 7, 0)], Some(&mut roster));
+    assert_eq!(roster.seats[1].color, 7);
+    // The host moves them on; the same standing ask does not move them back.
+    roster.seats[1].color = 5;
+    grant_colors(&mut seen, &[asking(1, 7, 0)], Some(&mut roster));
+    assert_eq!(roster.seats[1].color, 5);
+    // Asking again for it is a new ask.
+    grant_colors(&mut seen, &[asking(1, 7, 1)], Some(&mut roster));
+    assert_eq!(roster.seats[1].color, 7);
+}
+
+#[test]
+fn a_host_who_takes_the_room_over_grants_only_new_asks() {
+    let mut roster = Roster::new(2, 2, 0, false);
+    let before = roster.seats[1].color;
+    let mut seen = Vec::new();
+    // Seen while someone else hosted: theirs to answer.
+    grant_colors(&mut seen, &[asking(1, 7, 0)], None);
+    grant_colors(&mut seen, &[asking(1, 7, 0)], Some(&mut roster));
+    assert_eq!(roster.seats[1].color, before);
 }

@@ -390,11 +390,10 @@ fn heading(
         lineup.tuning = None;
     }
     if lineup.coloring.is_some_and(|k| {
-        !table.host
-            || lineup
-                .roster
-                .index_of(k)
-                .is_none_or(|i| !lineup.roster.seats[i].open())
+        lineup
+            .roster
+            .index_of(k)
+            .is_none_or(|i| !lineup.roster.seats[i].open() || !recolours(table, i))
     }) {
         lineup.coloring = None;
     }
@@ -499,9 +498,20 @@ fn seat_rows(
             let strip_h = swatch_strip_h(under.w);
             let at_y = row_y + row_h + line;
             shown(ui, at_y, strip_h, &mut |ui, at| {
-                if let Some(i) = lineup.roster.index_of(seat.key) {
-                    colour_picker(ui, lineup, i, Rect::new(under.x, at, under.w, strip_h));
+                let Some(i) = lineup.roster.index_of(seat.key) else {
+                    return;
+                };
+                let strip = Rect::new(under.x, at, under.w, strip_h);
+                let Some(n) = colour_picker(ui, lineup, i, table.host, strip) else {
+                    return;
+                };
+                if table.host {
+                    lineup.roster.take_color(i, n);
+                } else {
+                    asks.push(Ask::MyColor(n));
                 }
+                lineup.coloring = None;
+                ui.audio.play(Sfx::Tick);
             });
             y += strip_h;
         }
@@ -666,7 +676,7 @@ fn seat_row(
         },
     );
 
-    swatch_cell(ui, lineup, table.host, cols, seat, row);
+    swatch_cell(ui, lineup, recolours(table, i), cols, seat, row);
     let name = name_cell(ui, lineup, table, cols, i, seat, top);
     let inset = if cols.dense { 2.0 } else { 10.0 };
     let field = |x: f32, w: f32| Rect::new(x, top.y + inset, w, top.h - 2.0 * inset);
@@ -738,11 +748,16 @@ fn seat_row(
     asks
 }
 
-/// The seat's colour down the row and as a swatch; the host opens every colour under the row.
+/// Who may change seat `i`'s colour: the host any seat's, a person in a lobby their own.
+fn recolours(table: &Table, i: usize) -> bool {
+    table.host || (table.lobby && table.me == Some(i))
+}
+
+/// The seat's colour down the row and as a swatch; `picks` opens every colour under the row.
 fn swatch_cell(
     ui: &mut Ui,
     lineup: &mut Lineup,
-    host: bool,
+    picks: bool,
     cols: &Columns,
     seat: Seat,
     row: Rect,
@@ -751,11 +766,11 @@ fn swatch_cell(
     let open = seat.open();
     let live = if open { 1.0 } else { 0.4 };
     let top = Rect::new(row.x, row.y, row.w, cols.row_h());
-    // Colour swatch: the host opens every colour under the row.
+    // Colour swatch: opens every colour under the row.
     let coloring = lineup.coloring == Some(seat.key);
     let c = TEAM_COLORS[seat.color as usize % TEAM_COLORS.len()];
     let hit = Rect::new(top.x, top.y, cols.name - top.x - 10.0, top.h);
-    let res = ui.interact(id("slot-color", key), hit, open && host);
+    let res = ui.interact(id("slot-color", key), hit, open && picks);
     let side = cols.swatch;
     let swatch =
         Rect::new(top.x + 8.0, top.mid_y() - side / 2.0, side, side).inset(-2.0 * res.glow);
@@ -768,7 +783,7 @@ fn swatch_cell(
         swatch,
         rgb(0xFFFFFF, if coloring { 0.9 } else { 0.15 + 0.6 * res.glow }),
     );
-    if open && host {
+    if open && picks {
         // A caret in the corner says it opens.
         let k = Vec2::new(swatch.right() - 5.0, swatch.bottom() - 5.0);
         ui.triangle(
@@ -1195,8 +1210,6 @@ fn team_rail(ui: &mut Ui, x: f32, top: f32, bottom: f32, team: u8) {
     ui.hline(x, bottom - 1.0, 5.0, rgb(palette::LINE, 0.55));
 }
 
-/// Every colour for seat `i`; one another commander wears shows their seat
-/// number, and picking it swaps the two.
 /// Swatches a line of the colour strip `width` wide holds.
 fn swatches_per_line(width: f32) -> usize {
     (((width - 84.0) / (SWATCH + SWATCH_GAP)) as usize).max(1)
@@ -1208,7 +1221,10 @@ fn swatch_strip_h(width: f32) -> f32 {
     lines as f32 * (SWATCH + SWATCH_GAP) + 18.0
 }
 
-fn colour_picker(ui: &mut Ui, lineup: &mut Lineup, i: usize, area: Rect) {
+/// Every colour for seat `i`, and the one picked. One another commander wears
+/// shows their seat number; the host may pick it (`swap`), which swaps the two,
+/// and anyone else may not.
+fn colour_picker(ui: &mut Ui, lineup: &Lineup, i: usize, swap: bool, area: Rect) -> Option<u8> {
     ui.fill(area, ink(0.35));
     ui.fill(
         Rect::new(area.x, area.y, 2.0, area.h),
@@ -1237,11 +1253,25 @@ fn colour_picker(ui: &mut Ui, lineup: &mut Lineup, i: usize, area: Rect) {
         let mine = seats[i].color as usize == n;
         let holder =
             (0..seats.len()).find(|&k| k != i && seats[k].open() && seats[k].color as usize == n);
-        let res = ui.interact(id("slot-swatch", key * TEAM_COLORS.len() + n), r, !mine);
+        let free = holder.is_none() || swap;
+        let res = ui.interact(
+            id("slot-swatch", key * TEAM_COLORS.len() + n),
+            r,
+            !mine && free,
+        );
         let grow = r.inset(-2.0 * res.glow);
         ui.fill(
             grow,
-            [c[0], c[1], c[2], if holder.is_some() { 0.45 } else { 1.0 }],
+            [
+                c[0],
+                c[1],
+                c[2],
+                match (holder, free) {
+                    (None, _) => 1.0,
+                    (Some(_), true) => 0.45,
+                    (Some(_), false) => 0.25,
+                },
+            ],
         );
         ui.frame(
             grow.inset(-3.0),
@@ -1256,22 +1286,23 @@ fn colour_picker(ui: &mut Ui, lineup: &mut Lineup, i: usize, area: Rect) {
                 &format!("{}", k + 1),
             );
         }
-        if res.glow > 0.3 && holder.is_some() {
+        let over = ui.interactive && r.contains(ui.cursor - ui.shift);
+        if holder.is_some() && (res.glow > 0.3 || over) {
             ui.text_right(
                 area.right() - 12.0,
                 area.bottom() - 6.0,
                 type_scale::MICRO,
                 rgb(palette::DIM, 1.0),
-                "Taken \u{b7} Click to Swap",
+                if free {
+                    "Taken \u{b7} Click to Swap"
+                } else {
+                    "Taken"
+                },
             );
         }
         if res.clicked {
             pick = Some(n as u8);
         }
     }
-    if let Some(n) = pick {
-        lineup.roster.take_color(i, n);
-        lineup.coloring = None;
-        ui.audio.play(Sfx::Tick);
-    }
+    pick
 }

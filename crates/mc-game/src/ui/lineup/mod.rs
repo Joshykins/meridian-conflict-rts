@@ -272,6 +272,8 @@ pub enum Ask {
     Kick(usize),
     /// This machine picks its own race.
     MyRace(Pick),
+    /// This machine asks the host for colour n for its own seat.
+    MyColor(u8),
     /// A change was refused: say why.
     Say(String),
 }

@@ -81,7 +81,8 @@ pub(super) fn draw(
             match ask {
                 Ask::Sit(i) => lobby.take_seat(i as u8),
                 Ask::Kick(i) => lobby.kick(i as u8),
-                Ask::MyRace(pick) => lobby.set_choice(choice_of(pick)),
+                Ask::MyRace(pick) => lobby.set_choice(choice_of(pick, &lobby.choice)),
+                Ask::MyColor(n) => lobby.ask_color(n),
                 Ask::Say(text) => lobby.chat.warn(text),
             }
         }
