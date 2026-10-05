@@ -1,5 +1,5 @@
-//! An AI commander's settings in the line-up: its doctrine and the forces it
-//! favours. They sit in a line of choices under the AI's row (`seats`), and
+//! An AI commander's settings in the line-up: its doctrine, the forces it
+//! favours and the income it is given. They sit in a line of choices under the AI's row (`seats`), and
 //! are said in short wherever a line will not fit.
 
 use super::roster::Seat;
@@ -12,6 +12,10 @@ pub(super) const AI_LINE: f32 = 36.0;
 const FORCE_PRESETS: [[u8; 3]; 4] = [[100, 100, 100], [160, 60, 60], [60, 160, 60], [60, 60, 160]];
 const FORCE_LABELS: [&str; 4] = ["Balanced", "Land", "Air", "Naval"];
 
+/// The incomes an AI may be given, in thousandths of a fair share (`AiConfig::income`).
+const INCOMES: [u16; 5] = [1000, 1500, 2000, 3000, 5000];
+const INCOME_LABELS: [&str; 5] = ["1x", "1.5x", "2x", "3x", "5x"];
+
 const DOCTRINES: [Doctrine; 4] = [
     Doctrine::Adaptive,
     Doctrine::Aggressive,
@@ -19,8 +23,8 @@ const DOCTRINES: [Doctrine; 4] = [
     Doctrine::Defensive,
 ];
 
-/// An AI's settings as a line of choices in `r`: its doctrine and the forces it
-/// favours. Whoever may plan changes them; everyone else reads them.
+/// An AI's settings as a line of choices in `r`: its doctrine, the forces it
+/// favours and its income. Whoever may plan changes them; everyone else reads them.
 pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
     let key = seat.key as usize;
     let ai = &mut seat.ai;
@@ -31,7 +35,12 @@ pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
     if force_at.is_none() {
         forces.push("Custom");
     }
-    let fields: [(&str, &[&str], usize); 2] = [
+    let income_at = INCOMES.iter().position(|i| *i == ai.income);
+    let mut incomes = INCOME_LABELS.to_vec();
+    if income_at.is_none() {
+        incomes.push("Custom");
+    }
+    let fields: [(&str, &[&str], usize); 3] = [
         (
             "Doctrine",
             &doctrines,
@@ -41,6 +50,7 @@ pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
                 .unwrap_or(0),
         ),
         ("Forces", &forces, force_at.unwrap_or(FORCE_LABELS.len())),
+        ("Income", &incomes, income_at.unwrap_or(INCOMES.len())),
     ];
     // Each as wide as its label and longest option; the labels go when the
     // line is too narrow for them, and the choices share what is left over.
@@ -79,9 +89,14 @@ pub(super) fn ai_line(ui: &mut Ui, seat: &mut Seat, r: Rect, host: bool) {
         if let Some(pick) = ui.choice(id("ai-line", key * 4 + n), cell, label, options, *at, host) {
             match n {
                 0 => ai.doctrine = DOCTRINES[pick],
-                _ => {
+                1 => {
                     if let Some(w) = FORCE_PRESETS.get(pick) {
                         ai.domain_weights = *w;
+                    }
+                }
+                _ => {
+                    if let Some(i) = INCOMES.get(pick) {
+                        ai.income = *i;
                     }
                 }
             }
@@ -118,13 +133,27 @@ pub(super) fn settings_toggle(
     res.clicked
 }
 
-/// An AI's settings in short: "Adaptive \u{b7} Balanced".
+/// An AI's settings in short: "Adaptive \u{b7} Balanced", and its income
+/// when it is not a fair share: "\u{b7} 2x Income".
 pub(super) fn summary(ai: &mc_sim::AiConfig) -> String {
-    format!(
+    let mut s = format!(
         "{}  \u{b7}  {}",
         doctrine_label(ai.doctrine),
         force_label(ai.domain_weights)
-    )
+    );
+    if ai.income != 1000 {
+        s += &format!("  \u{b7}  {} Income", income_label(ai.income));
+    }
+    s
+}
+
+/// "2x", "1.5x", "0.25x": an income in thousandths as a multiple.
+fn income_label(permille: u16) -> String {
+    let whole = permille / 1000;
+    match permille % 1000 {
+        0 => format!("{whole}x"),
+        part => format!("{}x", format!("{whole}.{part:03}").trim_end_matches('0')),
+    }
 }
 
 /// A caret at `x`, `y`: down for something that opens, up once it is open.
@@ -161,4 +190,15 @@ fn force_label(weights: [u8; 3]) -> &'static str {
         .iter()
         .position(|w| *w == weights)
         .map_or("Custom", |i| FORCE_LABELS[i])
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn incomes_are_said_as_multiples() {
+        assert_eq!(super::income_label(1500), "1.5x");
+        assert_eq!(super::income_label(5000), "5x");
+        assert_eq!(super::income_label(250), "0.25x");
+        assert_eq!(super::income_label(1125), "1.125x");
+    }
 }

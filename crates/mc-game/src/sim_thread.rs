@@ -323,7 +323,7 @@ fn mine_growth_of(world: &World, players: &mut [PlayerStatus]) {
         let (Some(p), Some(pl)) = (players.get_mut(owner), world.state.players.get(owner)) else {
             continue;
         };
-        // The test range's income dial turns the mines' output too.
+        // The income dial (an AI's bonus, the test range's) turns the mines' output too.
         let dial = pl.income_permille[0] as f32 / 1000.0;
         p.mine_growth += (m.full_rate(&bp) - m.rate(&bp)).max(Fx::ZERO).to_f32() * dial;
     }

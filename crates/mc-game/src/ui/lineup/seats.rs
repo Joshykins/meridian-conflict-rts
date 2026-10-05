@@ -1133,9 +1133,9 @@ fn layouts(ui: &mut Ui, lineup: &mut Lineup, catalog: &Catalog, table: &Table, a
             type_scale::MICRO,
             rgb(palette::FAINT, 1.0),
             if table.lobby {
-                "Open seats nobody takes are played by the AI. AI commanders get no resource bonuses."
+                "Open seats nobody takes are played by the AI. Income gives an AI more resources."
             } else {
-                "AI commanders get no resource bonuses. Difficulty sets reaction speed and memory."
+                "Difficulty sets how well an AI plays. Income gives it more resources than a fair share."
             },
         );
     }

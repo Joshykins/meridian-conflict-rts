@@ -98,6 +98,7 @@ straight into a match instead.
   --ai-difficulty NAME  easy | normal | hard (how well it spends and how many orders it gives)
   --ai-doctrine NAME    adaptive | aggressive | economic | defensive
   --ai-domains L,A,N    land, air, naval production preferences, 0-200 each
+  --ai-income X         times a fair income the AI gets, 0.25-10 (e.g. 1.5, 2, 3, 5)
   --army N               units per player in the stress scene (default 500)
   --seed N               match seed
   --no-fog               reveal the map
@@ -297,6 +298,7 @@ fn run() -> Result<(), String> {
                 | "--ai-difficulty"
                 | "--ai-doctrine"
                 | "--ai-domains"
+                | "--ai-income"
         );
         match arg.as_str() {
             "--map" => map_name = Some(value("--map")?),
@@ -321,6 +323,13 @@ fn run() -> Result<(), String> {
                     return Err("--ai-domains takes three numbers from 0-200".into());
                 }
                 opts.ai.domain_weights.copy_from_slice(&weights);
+            },
+            "--ai-income" => {
+                let range = mc_sim::INCOME_RANGE;
+                opts.ai.income = value("--ai-income")?.parse::<f64>().ok()
+                    .map(|x| (x * 1000.0).round())
+                    .filter(|p| (*range.start() as f64..=*range.end() as f64).contains(p))
+                    .ok_or("--ai-income takes a multiple from 0.25 to 10")? as u16;
             },
             "--unit" => opts.subject = value("--unit")?,
             "--unit-shot" => unit_shot_key = Some(value("--unit-shot")?),

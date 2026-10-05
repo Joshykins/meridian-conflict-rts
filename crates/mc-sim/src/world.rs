@@ -385,7 +385,11 @@ impl World {
                 units_killed: 0,
                 acts_as: players.len() as u8,
                 free_build: false,
-                income_permille: [1000, 1000],
+                // An AI may be set up to earn more (or less) than a fair share.
+                income_permille: match p.controller {
+                    Controller::Ai => [p.ai.normalized().income; 2],
+                    _ => [1000, 1000],
+                },
                 bonus_storage: [Fx::ZERO; 2],
             });
         }

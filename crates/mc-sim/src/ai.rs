@@ -3,7 +3,8 @@
 //! It runs inside the simulation on every machine, reads only game state and
 //! its own hashed `AiState`, and acts by queueing ordinary commands for the
 //! next tick. It gets no information a player would not have except the enemy
-//! start positions, and no resource bonus.
+//! start positions, and no resource bonus but what the set-up gives it
+//! (`AiConfig::income`).
 //!
 //! The Commander (`commander/`, `docs/AI_COMMANDER.md`) decides: it holds game
 //! plans at a stake, runs operations of grouped units, and runs the economy.

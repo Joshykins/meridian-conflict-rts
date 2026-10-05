@@ -29,7 +29,14 @@ pub struct AiConfig {
     /// Production preferences for land, air, and naval units (0..=200).
     /// Zero disables combat production in that domain.
     pub domain_weights: [u8; 3],
+    /// What share of a side's normal mass and energy income this AI gets, in
+    /// thousandths: 1000 is a fair match, 2000 doubles it. The set-up's way to
+    /// make an AI harder than its difficulty alone; a person's seat never gets it.
+    pub income: u16,
 }
+
+/// The least and most `AiConfig::income` may be: a quarter and ten times.
+pub const INCOME_RANGE: std::ops::RangeInclusive<u16> = 250..=10_000;
 
 /// The decisions a difficulty level changes; see [`AiConfig::skill`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,6 +70,7 @@ impl Default for AiConfig {
             difficulty: Difficulty::Normal,
             doctrine: Doctrine::Adaptive,
             domain_weights: [100, 100, 100],
+            income: 1000,
         }
     }
 }
@@ -70,6 +78,9 @@ impl Default for AiConfig {
 impl AiConfig {
     pub fn normalized(mut self) -> Self {
         self.domain_weights = self.domain_weights.map(|w| w.min(200));
+        self.income = self
+            .income
+            .clamp(*INCOME_RANGE.start(), *INCOME_RANGE.end());
         self
     }
 
@@ -90,7 +101,8 @@ impl AiConfig {
         }
     }
 
-    /// How well this AI plays. No level gets resources the others do not:
+    /// How well this AI plays. No level gets resources the others do not (that
+    /// is `income`, set apart from the difficulty):
     /// Hard plays as well as the AI can, and the levels below it are handicapped
     /// in how they spend (measured with `tests/zz_ai_duel_probe.rs`).
     pub fn skill(self) -> Skill {
@@ -136,5 +148,6 @@ impl AiConfig {
         for w in self.domain_weights {
             h.write_u64(w as u64);
         }
+        h.write_u64(self.income as u64);
     }
 }

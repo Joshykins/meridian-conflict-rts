@@ -21,7 +21,7 @@
 pub mod adjacency;
 pub mod ai;
 pub mod ai_config;
-pub use ai_config::{AiConfig, Difficulty, Doctrine, Skill};
+pub use ai_config::{AiConfig, Difficulty, Doctrine, Skill, INCOME_RANGE};
 mod air_support;
 pub mod aircraft_crash;
 mod approach;

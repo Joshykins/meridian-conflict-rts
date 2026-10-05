@@ -13,6 +13,11 @@ fn world() -> World {
 
 /// A flat map `cells` 8 m cells a side.
 fn world_of(cells: u32) -> World {
+    world_seated(cells, [(Controller::Human, AiConfig::default()); 2])
+}
+
+/// `world_of`, with each of the two seats' controller and AI settings.
+fn world_seated(cells: u32, seats: [(Controller, AiConfig); 2]) -> World {
     let data = Blueprints::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")).unwrap();
     let config = MatchConfig {
         seed: 47,
@@ -24,9 +29,9 @@ fn world_of(cells: u32) -> World {
                 name: format!("AI {i}"),
                 faction: "Aster".into(),
                 team: i,
-                controller: Controller::Human,
+                controller: seats[i as usize].0,
                 start: i,
-                ai: AiConfig::default(),
+                ai: seats[i as usize].1,
             })
             .collect(),
     };
@@ -167,6 +172,27 @@ fn doctrine_is_independent_of_player_slot_and_difficulty_has_no_income_bonus() {
         w.state.players[0].energy_income,
         w.state.players[1].energy_income
     );
+}
+
+#[test]
+fn an_ai_set_up_with_bonus_income_earns_that_much_more_and_a_person_never_does() {
+    let rich = AiConfig {
+        income: 3000,
+        ..AiConfig::default()
+    };
+    let mut w = world_seated(256, [(Controller::Ai, rich), (Controller::Human, rich)]);
+    assert_eq!(w.state.players[0].income_permille, [3000, 3000]);
+    assert_eq!(w.state.players[1].income_permille, [1000, 1000]);
+    for owner in 0..2u8 {
+        let x = 300 + owner as i32 * 1400;
+        spawn(&mut w, "aster_t1_power", owner, x, x);
+        spawn(&mut w, "aster_commander", owner, x + 60, x);
+    }
+    w.tick(&[]).unwrap();
+    let (ai, person) = (&w.state.players[0], &w.state.players[1]);
+    assert!(person.energy_income > Fx::ZERO && person.mass_income > Fx::ZERO);
+    assert_eq!(ai.energy_income, person.energy_income * 3);
+    assert_eq!(ai.mass_income, person.mass_income * 3);
 }
 
 #[test]

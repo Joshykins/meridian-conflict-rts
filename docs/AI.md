@@ -27,12 +27,18 @@ survive map changes for shared slots. Observer slots have the same controls.
 - **Forces** (balanced, land, air or naval emphasis): weights on the share of new
   units each force gets (`AiConfig::domain_weights`, 0..=200 each, 100 even). A zero
   weight builds no factory and no combat unit of that domain.
+- **Income** (1x, 1.5x, 2x, 3x, 5x): what its mines, generators and fabricators
+  make, times this (`AiConfig::income`, thousandths, 250..=10000). The one way to
+  make an AI harder than Hard plays: the difficulty itself never touches income. It
+  becomes the player's `income_permille` (the test range's dial) when the world is
+  built, so it only ever applies to an AI seat; a person's seat stays at 1x.
 
 From WSL, build and play on Windows:
 
 ```bash
 ./play.sh --map crosswater --ai-difficulty hard --ai-doctrine adaptive
 ./play.sh --map crosswater --observe --ai-doctrine aggressive --ai-domains 100,140,80
+./play.sh --map crosswater --ai-difficulty hard --ai-income 2
 ```
 
 CLI tuning applies to every AI in the launched match; use the skirmish set-up for
@@ -41,7 +47,8 @@ match setup and snapshots, and included in the simulation hash.
 
 ## Decisions and information
 
-The AI sends ordinary commands with no income multiplier. It knows enemy landing
+The AI sends ordinary commands with no income multiplier but the one its set-up
+gives it (Income, above). It knows enemy landing
 zones, as a player does. Unit composition comes only from detected, identified
 contacts. Unknown radar blips do not disclose blueprints; unseen movement never
 updates a remembered position. Sightings expire and revisiting an empty position

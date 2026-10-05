@@ -25,7 +25,7 @@ use std::path::Path;
 use crate::protocol::{MatchStart, TickBundle, MAX_FRAME_LEN};
 use crate::wire::{Dec, Enc, NetError};
 
-pub const REPLAY_FORMAT_VERSION: u32 = 26;
+pub const REPLAY_FORMAT_VERSION: u32 = 27;
 pub const REPLAY_EXTENSION: &str = "mcreplay";
 
 const MAGIC: [u8; 4] = *b"MCRP";
