@@ -366,6 +366,8 @@ pub fn draw(ui: &mut Ui, chat: &mut Chat, r: Rect, input: Input) -> Option<Reply
     match input {
         Input::Live => {
             let at = id("lineup-chat", 0);
+            // The field gives up the keyboard on Enter, so ask first.
+            let editing = ui.mem.editing == Some(at);
             ui.text_field(at, field, &mut chat.draft, 200);
             if chat.draft.is_empty() && ui.mem.editing != Some(at) {
                 ui.text_fit_left(
@@ -377,7 +379,7 @@ pub fn draw(ui: &mut Ui, chat: &mut Chat, r: Rect, input: Input) -> Option<Reply
                     "Message the lobby",
                 );
             }
-            if ui.mem.editing == Some(at) && ui.input.key(Key::Enter) {
+            if editing && ui.input.key(Key::Enter) {
                 // Keep the keyboard: chat is a conversation.
                 ui.mem.editing = Some(at);
                 let text = std::mem::take(&mut chat.draft).trim().to_owned();
@@ -618,5 +620,52 @@ mod tests {
             chat.lines[1].kind,
             Kind::Person { from: Some(1), .. }
         ));
+    }
+
+    /// One frame of the live chat with the keyboard in its field.
+    fn frame(
+        chat: &mut Chat,
+        mem: &mut crate::ui::Memory,
+        input: crate::ui::Input,
+    ) -> Option<Reply> {
+        let mut o = mc_render::Overlay::default();
+        let audio = crate::audio::Audio::silent();
+        mem.editing = Some(id("lineup-chat", 0));
+        mem.begin_frame();
+        let mut ui = Ui::new(
+            &mut o,
+            &input,
+            mem,
+            &audio,
+            Vec2::new(1920.0, 1080.0),
+            1.0,
+            0.0,
+            0.016,
+        );
+        draw(
+            &mut ui,
+            chat,
+            Rect::new(20.0, 100.0, 360.0, 600.0),
+            Input::Live,
+        )
+    }
+
+    #[test]
+    fn enter_sends_and_keeps_the_keyboard() {
+        let mut chat = Chat::default();
+        let mut mem = crate::ui::Memory::default();
+        let typed = crate::ui::Input {
+            typed: "gl hf".into(),
+            ..Default::default()
+        };
+        assert!(frame(&mut chat, &mut mem, typed).is_none());
+        let enter = crate::ui::Input {
+            keys: vec![Key::Enter],
+            ..Default::default()
+        };
+        let sent = frame(&mut chat, &mut mem, enter);
+        assert!(matches!(sent, Some(Reply::Send(t)) if t == "gl hf"));
+        assert!(chat.draft.is_empty());
+        assert_eq!(mem.editing, Some(id("lineup-chat", 0)));
     }
 }

@@ -413,6 +413,8 @@ fn join_panel(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) {
     let button_w = 118.0;
     let field = Rect::new(r.x, y + 24.0, r.w - button_w - 10.0, 40.0);
     let code_id = id("mp-code", 0);
+    // The field gives up the keyboard on Enter, so ask first.
+    let editing = ui.mem.editing == Some(code_id);
     ui.text_field(code_id, field, &mut state.code, 7);
     let parsed = state.code.parse::<mc_net::RoomCode>();
     let online = state.server.online();
@@ -431,10 +433,7 @@ fn join_panel(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) {
         "Codes are six letters and digits, like K7F-Q2M"
     };
     caption(ui, r.x, y + 78.0, r.w, hint, palette::FAINT);
-    if let (true, Ok(code)) = (
-        go || (ui.mem.editing == Some(code_id) && ui.input.key(Key::Enter)),
-        parsed,
-    ) {
+    if let (true, Ok(code)) = (go || (editing && ui.input.key(Key::Enter)), parsed) {
         if online {
             ui.audio.play(Sfx::Select);
             if let Some(c) = state.server.client() {
@@ -447,8 +446,9 @@ fn join_panel(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) {
     ui.section(r.x, y, r.w, "Direct Connect");
     let field = Rect::new(r.x, y + 24.0, r.w - button_w - 10.0, 40.0);
     let direct_id = id("mp-direct", 0);
+    let editing = ui.mem.editing == Some(direct_id);
     ui.text_field(direct_id, field, &mut state.direct, 64);
-    if state.direct.is_empty() && ui.mem.editing != Some(direct_id) {
+    if state.direct.is_empty() && !editing {
         ui.text(
             field.x + 12.0,
             field.mid_y(),
@@ -464,9 +464,7 @@ fn join_panel(ui: &mut Ui, state: &mut MultiplayerState, r: Rect) {
         ButtonKind::Secondary,
         !state.direct.trim().is_empty(),
     );
-    if (go || (ui.mem.editing == Some(direct_id) && ui.input.key(Key::Enter)))
-        && !state.direct.trim().is_empty()
-    {
+    if (go || (editing && ui.input.key(Key::Enter))) && !state.direct.trim().is_empty() {
         ui.audio.play(Sfx::Select);
         let addr = state.direct.clone();
         state.join_direct(&addr, "Direct Game");
