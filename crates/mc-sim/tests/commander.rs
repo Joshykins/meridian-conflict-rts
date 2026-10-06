@@ -119,7 +119,7 @@ fn a_commander_is_refitted_in_place_and_stays_the_same_unit() {
     );
     let mut shown = 0.0f32;
     let mut frame = mc_sim::RenderFrame::default();
-    // Suite II: 1800 build time at the commander's own power of 10, 180 s.
+    // Suite II: 1260 build time at the commander's own power of 10, 126 s.
     let done = (0..2000).any(|_| {
         w.tick(&[]).unwrap();
         w.write_render_frame(None, &mut frame);
