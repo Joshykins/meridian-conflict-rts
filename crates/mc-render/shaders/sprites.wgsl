@@ -297,7 +297,8 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
     // A seeker is a missile (`cased_seeker`), its look zero here.
     let look = plasma_look(p);
     if look == 1u {
-        trace = length(stride) * 0.5;
+        // `Weapon::streak` draws a lobbed Pinched shot's tail that many times longer.
+        trace = length(stride) * 0.5 * max(p.aim.w, 1.0);
     } else if look == 2u {
         trace = length(stride) * 1.4;
     } else if look == 3u {

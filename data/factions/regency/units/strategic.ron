@@ -152,7 +152,7 @@
             targets: ["Air", "Land", "Naval", "Structure"],
             color: Orange, red: 1.0,
             plasma_grade: Some(Pinched), melt: 1.4,
-            flash: 1.0, impact: 1.8, tracer: 0.9, streak: 2.2, wake: 3.0,
+            flash: 1.0, impact: 1.8, tracer: 1.2, streak: 4.0, wake: 4.0,
             sounds: (
                 fire: "regency_carillon_fire", make: "regency_carillon_make",
                 impact: "regency_carillon_hit", ground: "regency_carillon_hit",

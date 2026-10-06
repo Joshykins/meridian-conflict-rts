@@ -69,7 +69,7 @@ pub(super) fn carillon(b: &mut MeshBuilder, _tech: u8) {
     });
     let places = orbs();
     for (k, &z) in RING_Z.iter().enumerate() {
-        ring(b, k, z, &places[k * BATCH..(k + 1) * BATCH]);
+        ring(b, z, &places[k * BATCH..(k + 1) * BATCH]);
     }
 }
 
@@ -199,9 +199,9 @@ fn crown(b: &mut MeshBuilder) {
     }
 }
 
-/// Ring `k` of cradles at height `z`: a hoop floating off the shaft on studs, and an arm
+/// A ring of cradles at height `z`: a hoop floating off the shaft on studs, and an arm
 /// out to each cradle.
-fn ring(b: &mut MeshBuilder, k: usize, z: f32, places: &[Vec3]) {
+fn ring(b: &mut MeshBuilder, z: f32, places: &[Vec3]) {
     let under = z - DROP;
     let r = STAGES
         .iter()
@@ -216,7 +216,7 @@ fn ring(b: &mut MeshBuilder, k: usize, z: f32, places: &[Vec3]) {
         0.5,
         if b.fine() { 16 } else { 8 },
     );
-    for (i, p) in places.iter().enumerate() {
+    for p in places {
         let a = p.y.atan2(p.x);
         let d = v3(a.cos(), a.sin(), 0.0);
         // The stud and the arm: plated, from the shaft out to under the dish.
@@ -232,13 +232,13 @@ fn ring(b: &mut MeshBuilder, k: usize, z: f32, places: &[Vec3]) {
             d * (ORB_RADIUS - DISH * 0.6) + Vec3::Z * (under - 0.15),
             0.5,
         );
-        cradle(b, *p, d, (k + i) % 2 == 0);
+        cradle(b, *p, d);
     }
 }
 
 /// An orb's cradle: a shallow dish under the place and three prongs curving up round it,
 /// the dish lit red by the surface (`seam`'s ember pattern).
-fn cradle(b: &mut MeshBuilder, at: Vec3, out: Vec3, _odd: bool) {
+fn cradle(b: &mut MeshBuilder, at: Vec3, out: Vec3) {
     let base = at - Vec3::Z * DROP;
     dark_plate(b);
     b.prism(base - Vec3::Z * 0.5, 6, 1.0, DISH, 0.9);
