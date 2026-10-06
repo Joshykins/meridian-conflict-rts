@@ -2,7 +2,8 @@
 //! the sea, air, a titan, a nuclear strike, a map gun, a battle scorpion's held beam and
 //! curving charges, a wake tank's cone, a warp into a dampener and the stun it leaves, wrecks worn down by
 //! blasts, two factories' linked batch forming up, a self-destruct counting down across
-//! the snapshot, city blocks shot, set alight and brought down) must hash identically at every worker count and after a snapshot is
+//! the snapshot, city blocks shot, set alight and brought down, a space elevator's cable
+//! clamped and its first platform docked) must hash identically at every worker count and after a snapshot is
 //! restored mid-match.
 //!
 //! `battle.rs` covers a land-only battle the same way; this is the one to extend
@@ -207,6 +208,10 @@ fn setup(w: &mut World) {
                 // The experimental submarine: strike missiles on a high arc spread over the
                 // north's buildings, deck rails that wait for the surface.
                 add("aster_t4_submarine", 1, 3600, 500);
+                // A space elevator: its cable comes down and is clamped before the
+                // snapshot, its first platform docks after it with what was queued
+                // (`elevator.rs`).
+                add("aster_t5_space_elevator", 1, 250, 1600);
             }
             _ => {
                 add("aster_t4_assault_tank", 2, 1000, 900);
@@ -302,6 +307,35 @@ fn batch_on(w: &World) -> Vec<PlayerCommand> {
     .collect()
 }
 
+/// The south's elevator: tanks, a Fulgur and fighters queued for its first platform,
+/// more than fits on it.
+fn elevator_on(w: &World) -> Vec<PlayerCommand> {
+    let bp = w.blueprints.id_of("aster_t5_space_elevator").unwrap();
+    let u = &w.state.units;
+    let factories: Vec<UnitId> = u
+        .slots
+        .iter()
+        .filter(|&r| u.blueprint[r] == bp)
+        .map(|r| u.id(r))
+        .collect();
+    [
+        ("aster_t4_assault_tank", 2),
+        ("aster_t1_tank", 20),
+        ("aster_t1_interceptor", 6),
+        ("aster_t4_assault_tank", 4),
+    ]
+    .into_iter()
+    .map(|(key, count)| PlayerCommand {
+        player: 0,
+        command: Command::Produce {
+            factories: factories.clone(),
+            blueprint: w.blueprints.id_of(key).unwrap(),
+            count,
+        },
+    })
+    .collect()
+}
+
 /// The south's two factories.
 fn factories(w: &World) -> Vec<UnitId> {
     let bp = w.blueprints.id_of("aster_t1_land_factory").unwrap();
@@ -327,6 +361,7 @@ fn script(w: &mut World, tick: u32) -> Vec<PlayerCommand> {
                 },
             })
             .chain(batch_on(w))
+            .chain(elevator_on(w))
             // The economy's focus (`focus.rs`): held in each side's state, and restored.
             .chain([PlayerCommand {
                 player: 1,
@@ -451,6 +486,7 @@ fn reference() -> Vec<u64> {
     let courier = w.blueprints.id_of("aster_t2_lift_ship").unwrap();
     let mut stunned_at_snapshot = false;
     let (mut on_blocks, mut alight, mut down) = (0, 0, 0);
+    let mut platforms = 0;
     let hashes = (1..TICKS)
         .map(|t| {
             let commands = script(&mut w, t);
@@ -501,6 +537,9 @@ fn reference() -> Vec<u64> {
                     } => on_blocks += 1,
                     mc_sim::SimEvent::StructureAlight { .. } => alight += 1,
                     mc_sim::SimEvent::StructureCollapsed { .. } => down += 1,
+                    mc_sim::SimEvent::ElevatorDocked { units, .. } if *units > 0 => {
+                        platforms += 1
+                    }
                     _ => {}
                 }
             }
@@ -513,6 +552,8 @@ fn reference() -> Vec<u64> {
         })
         .collect();
     eprintln!("determinism: city {on_blocks} shots on blocks, {alight} alight, {down} down");
+    // The elevator's first platform brought its queue down after the snapshot.
+    assert!(platforms > 0, "no elevator platform docked with units");
     // City blocks took shots, caught fire and came down.
     assert!(on_blocks > 0, "no shot met a city block");
     assert!(alight > 0, "no city block caught fire");

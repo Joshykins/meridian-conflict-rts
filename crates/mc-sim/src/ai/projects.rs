@@ -38,6 +38,9 @@ pub(super) fn project_kind(bp: &UnitBlueprint) -> Option<Project> {
         || bp.has(cat::REPLICATOR)
         || bp.mine.is_some()
         || bp.transport.is_some()
+        // A space elevator is a factory and a mine at once, not an army or a weapon: the
+        // plans do not choose it (yet).
+        || bp.elevator.is_some()
         || bp.cost_mass <= Fx::ZERO
         // An unarmed ship (the Vigil) is no project: counted as one, each Vigil
         // finished freed the slot for the next, and sides had 30 to 60 of them

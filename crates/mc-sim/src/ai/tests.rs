@@ -924,6 +924,7 @@ fn strategic_projects_are_told_apart_by_their_data() {
     // A transport, a mine and a plain tank are not projects.
     assert_eq!(kind("aster_t3_lift_ship"), None);
     assert_eq!(kind("aster_core_mine_t4"), None);
+    assert_eq!(kind("aster_t5_space_elevator"), None);
     assert_eq!(kind("aster_t1_tank"), None);
 }
 
