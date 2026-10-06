@@ -40,7 +40,7 @@ pub fn place(home: FxVec3, slot: usize, tick: u32) -> FxVec3 {
     let pace = 30 + slot * 13 % 50;
     let swing = tick.wrapping_mul(pace) as u16;
     let start = (slot as u16).wrapping_mul(2039);
-    let round = Angle(if slot % 2 == 0 {
+    let round = Angle(if slot.is_multiple_of(2) {
         start.wrapping_add(swing)
     } else {
         start.wrapping_sub(swing)
