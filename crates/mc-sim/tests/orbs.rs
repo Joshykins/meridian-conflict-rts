@@ -169,3 +169,20 @@ fn flecks_with_no_mark_left_return_to_the_spire() {
         stock(&w, spire)
     );
 }
+
+#[test]
+fn flecks_climb_over_a_ridge_in_their_way() {
+    let mut w = world();
+    // A ridge across the way to the mark, taller than the spire's flecks float.
+    w.terrain
+        .flatten_rect((150, 0), (155, 511), Some(Fx::from_int(120)));
+    let spire = full_spire(&mut w);
+    let tank = spawn(&mut w, "aster_t1_tank", 1, (AT.0 + 900, AT.1));
+    run(&mut w, 150);
+    assert!(stock(&w, spire) < 32, "orbs were spent");
+    let row = w.state.units.row(tank);
+    let hurt = row.is_none_or(|r| {
+        w.state.units.health[r] < w.blueprints.unit(w.state.units.blueprint[r]).health
+    });
+    assert!(hurt, "the flecks got over the ridge");
+}

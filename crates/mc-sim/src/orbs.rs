@@ -27,6 +27,13 @@ pub(crate) const FLIGHT_TICKS: i32 = 25 * DT;
 const TURN: Fx = Fx::ratio(2, 5);
 /// Strides from its aim point inside which a fleck turns straight onto it.
 const CLOSE_STRIDES: i32 = 5;
+/// Metres ahead a fleck reads the ground, how far apart, the clearance it keeps over it,
+/// the margin it climbs with over what it reads (as a fraction), and the steepest climb.
+const GROUND_LOOK: i32 = 480;
+const GROUND_SAMPLE: i32 = 12;
+const GROUND_CLEARANCE: Fx = Fx::from_int(8);
+const GROUND_MARGIN: Fx = Fx::ratio(5, 4);
+const MAX_CLIMB: Fx = Fx::from_int(3);
 /// Metres from its spire's axis inside which a returning fleck is taken back in.
 const HOME_REACH: Fx = Fx::from_int(14);
 /// How far past the gun's range a fleck chases a mark before it gives it up, as a
@@ -210,7 +217,17 @@ impl World {
             } else {
                 TURN
             };
-            let dir = (vel.normalize() * (Fx::ONE - turn) + wants.normalize() * turn).normalize();
+            let want = wants.normalize();
+            let level = want.xy().length();
+            // Over rising ground it flies at least the slope that clears it; it never
+            // levels off short of its aim point, and straight above it just drops.
+            let wanted = match self.ground_slope(i, wants.length()) {
+                Some(ground) if level > Fx::ratio(1, 10) && ground > want.z / level => {
+                    want.xy().normalize().extend(ground).normalize()
+                }
+                _ => want,
+            };
+            let dir = (vel.normalize() * (Fx::ONE - turn) + wanted * turn).normalize();
             if dir != FxVec3::ZERO {
                 self.state.projectiles.aim[i] = dir;
                 self.state.projectiles.vel[i] = dir * speed;
@@ -219,6 +236,27 @@ impl World {
         for i in gone.into_iter().rev() {
             self.state.projectiles.swap_remove(i);
         }
+    }
+
+    /// The steepest rise over run fleck `i` needs from where it is to clear the ground
+    /// along the way it is heading, read every `GROUND_SAMPLE` metres out to
+    /// `GROUND_LOOK`, with a margin. The stretch round its aim point (`reach` metres off)
+    /// is left out: it goes down onto it. `None` when nothing is read.
+    fn ground_slope(&self, i: usize, reach: Fx) -> Option<Fx> {
+        let p = &self.state.projectiles;
+        let (pos, vel) = (p.pos[i], p.vel[i]);
+        let ahead = vel.xy().normalize();
+        let stride = vel.length();
+        let mut slope: Option<Fx> = None;
+        for j in 1..=GROUND_LOOK / GROUND_SAMPLE {
+            let along = Fx::from_int(j * GROUND_SAMPLE);
+            if along + stride * 2 >= reach {
+                break;
+            }
+            let rise = self.terrain.height_at(pos.xy() + ahead * along) + GROUND_CLEARANCE - pos.z;
+            slope = Some(slope.map_or(rise / along, |s| s.max(rise / along)));
+        }
+        slope.map(|s| if s > Fx::ZERO { s * GROUND_MARGIN } else { s }.min(MAX_CLIMB))
     }
 
     /// `UnitInstance::status[2]` for an orb battery: a bit for each slot holding an orb.

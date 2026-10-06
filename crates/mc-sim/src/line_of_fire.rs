@@ -40,6 +40,8 @@ impl World {
         } else {
             weapon.trajectory == Trajectory::Direct
                 && !weapon.guided
+                // A fleck homes and climbs over what is in its way (`orbs.rs`).
+                && weapon.orbs == 0
                 && weapon.curve.0 == 0
                 && weapon.cone.is_none()
         };
