@@ -16,9 +16,11 @@ mod ops_space;
 mod plans;
 mod profile;
 mod reach;
+mod scratch;
 mod solver;
 pub(super) mod state;
 mod world_model;
+mod zones;
 
 use super::{offset_toward, Census, Intel};
 use crate::command::Command;
@@ -30,9 +32,14 @@ use mc_core::{Fx, FxVec2};
 use profile::Profiles;
 use state::{OpKind, Operation, Phase};
 use world_model::WorldModel;
+use zones::{ZoneView, Zones};
 
 /// Kills waiting to be credited are dropped past this many: a think comes long before.
 const MOST_KILLS: usize = 512;
+/// A side thinks one period slower for every this many units it owns...
+const UNITS_PER_SLOWDOWN: usize = 800;
+/// ...and four times slower at the most.
+const MOST_SLOWDOWN: usize = 4;
 
 /// What every operation reads in one think.
 pub(in crate::ai) struct Ctx<'a> {
@@ -51,6 +58,9 @@ pub(in crate::ai) struct Ctx<'a> {
     pub land_route: bool,
     /// Ground walkable from home (`reach.rs`).
     pub reach: &'a reach::Reach,
+    /// The ground split into zones, and what the side believes of each (`zones.rs`).
+    pub zones: &'a Zones,
+    pub zv: &'a ZoneView,
 }
 
 impl Ctx<'_> {
@@ -142,10 +152,23 @@ impl World {
         intel: &Intel,
         out: &mut Vec<Command>,
     ) {
-        let blueprints = self.blueprints.clone();
-        let profiles = Profiles::build(&blueprints);
+        let profiles = self.profiles(player);
         let reach = self.home_reach(player);
+        let zones = self.zones(player, &reach);
+        // Past a few hundred units a side thinks less often (a deliberate cap on its
+        // cost, kept in the state so a restored match thinks on the same ticks).
+        let owned = {
+            let units = &self.state.units;
+            units
+                .slots
+                .iter()
+                .filter(|&r| units.owner[r] == player)
+                .count()
+        };
+        self.state.ai[player as usize].commander.think_scale =
+            (1 + owned / UNITS_PER_SLOWDOWN).min(MOST_SLOWDOWN) as u8;
         let wm = self.world_model(player, &profiles);
+        let zv = self.zone_view(player, &zones, &wm);
         let beliefs = self.beliefs(player, &profiles);
         // Behind, for spending on the next tier: what it fields against the army it
         // believes in, and never less than two minutes of their income. Under fog
@@ -162,6 +185,10 @@ impl World {
         self.state.ai[player as usize].commander.behind = ours < theirs;
         self.ops_upkeep(player);
         self.recall_commander(player, out);
+        // What its defences found missing fades over a few minutes.
+        for n in &mut self.state.ai[player as usize].commander.role_need {
+            *n = *n * 127 / 128;
+        }
         // What hurt it fades: a minute and a half's losses count most.
         for h in &mut self.state.ai[player as usize].commander.hurt {
             *h -= *h / 60;
@@ -199,12 +226,22 @@ impl World {
             arrived,
             land_route: census.land_route,
             reach: &reach,
+            zones: &zones,
+            zv: &zv,
         };
         self.review_plans(&ctx, census);
         self.keep_ops(&ctx);
         let free = self.free_units(player, &profiles);
         self.assign(player, &profiles, &free, census.land_route);
-        let incursions = self.incursions(&ctx);
+        let mut incursions = self.incursions(&ctx);
+        // The most valuable ground is answered first (a stable sort).
+        incursions.sort_by_key(|&(at, ..)| {
+            std::cmp::Reverse(
+                ctx.zones
+                    .of(at)
+                    .map_or(0, |z| ctx.zv.value(ctx.zones, z).floor_int()),
+            )
+        });
         self.raise_defence(&ctx, &incursions);
         self.load_landings(&ctx, out);
         self.run_ops(&ctx, out);
@@ -260,8 +297,9 @@ impl World {
     fn run_ops(&mut self, ctx: &Ctx, out: &mut Vec<Command>) {
         let player = ctx.player as usize;
         let config = self.state.ai[player].config;
-        let per_think =
-            Fx::from_int(orders_a_minute(config.difficulty)) * config.think_period() as i32 / 600;
+        let period =
+            config.think_period() * self.state.ai[player].commander.think_scale.max(1) as u32;
+        let per_think = Fx::from_int(orders_a_minute(config.difficulty)) * period as i32 / 600;
         let c = &mut self.state.ai[player].commander;
         c.attention = (c.attention + per_think).min(per_think * 3 + Fx::from_int(2));
         let mut ops = std::mem::take(&mut c.ops);

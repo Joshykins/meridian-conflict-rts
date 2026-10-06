@@ -227,6 +227,10 @@ impl World {
                         // No lot by that deposit: an expander kept choosing one
                         // for half a minute (`commander/economy.rs` skips it).
                         planned.failed_mines.push(job.near);
+                    } else if bp.is_structure() {
+                        // The same for any structure: the plans' wants skip a
+                        // place no lot was found at (`commander/solver.rs`).
+                        planned.failed_wants.push((job.blueprint, job.near));
                     }
                 }
                 None => {

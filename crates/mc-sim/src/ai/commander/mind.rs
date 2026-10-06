@@ -88,6 +88,12 @@ pub struct AiMind {
     /// Where the waves gather.
     pub rally: Option<(i32, i32)>,
     pub economy: MindEconomy,
+    /// Zones it plays on, and how many hold ore (`zones.rs`); zero before the first think.
+    pub zones: (u32, u32),
+    /// Work its last think spent, in world-model cells and contacts walked.
+    pub work: u32,
+    /// What its defences found missing, per mille: anti-air, artillery, raiders.
+    pub need: [i32; 3],
 }
 
 const HURT_NAMES: [&str; 6] = ["land", "artillery", "air", "space", "sea", "turrets"];
@@ -210,6 +216,9 @@ impl World {
             hurt,
             seen,
             rally: c.rally.map(xy),
+            zones: c.scratch.zone_counts(),
+            work: c.scratch.work,
+            need: c.role_need.map(i32::from),
         })
     }
 }

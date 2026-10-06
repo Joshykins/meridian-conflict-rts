@@ -424,7 +424,22 @@ pub(in crate::ai) struct CommanderState {
     /// The wants that answer a threat it is under now: builders take them first.
     #[serde(default)]
     pub urgent: Vec<BlueprintId>,
+    /// What the defences it raised found missing, per mille of the force it makes
+    /// (`ROLE_NEEDS`), fading: production leans toward it (`solver.rs`).
+    #[serde(default)]
+    pub role_need: [i16; ROLE_NEEDS],
+    /// Thinks take this many times the difficulty's period: it grows with the
+    /// units the side owns, so a vast army's thinking does not swallow the tick
+    /// (`commander.rs`). Zero reads as one.
+    #[serde(default)]
+    pub think_scale: u8,
+    /// Derived from the data and the map, never saved (`scratch.rs`).
+    #[serde(skip)]
+    pub scratch: super::scratch::Scratch,
 }
+
+/// Roles a defence can find missing: anti-air, artillery, raiders.
+pub(in crate::ai) const ROLE_NEEDS: usize = 3;
 
 impl CommanderState {
     pub(in crate::ai) fn hash(&self, h: &mut StateHasher) {
@@ -486,6 +501,10 @@ impl CommanderState {
         for w in &self.urgent {
             h.write_u64(w.0 as u64 | 1 << 32);
         }
+        for n in &self.role_need {
+            h.write_u64(*n as u64);
+        }
+        h.write_u64(self.think_scale as u64);
         match self.raided {
             Some((p, t)) => {
                 h.write_i64(p.x.0);

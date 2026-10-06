@@ -69,6 +69,7 @@ impl World {
             ours: vec![Fx::ZERO; n],
         };
         let contacts = &self.state.ai[player as usize].contacts;
+        let mut work = n as u32;
         for c in contacts {
             let p = profiles.get(c.blueprint);
             let bp = self.blueprints.unit(c.blueprint);
@@ -89,6 +90,7 @@ impl World {
             let longest = longest.min(Fx::from_int(4 * CELL));
             let (cx, cy) = (c.pos.x.floor_int() / CELL, c.pos.y.floor_int() / CELL);
             let r = reach_cells(longest);
+            work += ((2 * r + 1) * (2 * r + 1)) as u32;
             for y in (cy - r).max(0)..=(cy + r).min(h - 1) {
                 for x in (cx - r).max(0)..=(cx + r).min(w - 1) {
                     let i = (y * w + x) as usize;
@@ -121,11 +123,24 @@ impl World {
         if seen.len() != n {
             *seen = vec![0; n];
         }
+        // A side with a vast army looks at a share of its cells each think and the
+        // rest on the next ones (a deliberate cap on the work: `think_scale`).
+        let slices = u32::from(self.state.ai[player as usize].commander.think_scale.max(1));
+        let turn = tick / self.state.ai[player as usize].config.think_period();
+        let seen = &mut self.state.ai[player as usize].commander.seen;
+        let mut looked = 0;
         for (i, s) in seen.iter_mut().enumerate() {
+            if slices > 1 && !(i as u32 + turn).is_multiple_of(slices) {
+                continue;
+            }
+            looked += 1;
             if !fog || self.fog.is_visible(m.centre(i), mask) {
                 *s = tick;
             }
         }
+        work += looked;
+        mc_core::perf_count!("ai.world_model_work", work);
+        self.state.ai[player as usize].commander.scratch.work = work;
         m
     }
 }

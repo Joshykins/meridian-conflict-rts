@@ -219,6 +219,8 @@ struct Planned {
     guards: Vec<FxVec2>,
     /// Deposits a mine was chosen for this think and could not be placed by.
     failed_mines: Vec<FxVec2>,
+    /// Structures chosen this think that no lot was found for, and where.
+    failed_wants: Vec<(BlueprintId, FxVec2)>,
 }
 
 struct Job {
@@ -289,7 +291,8 @@ impl World {
             }
             // Sides think in turn, spread evenly over the period: with 32 of them
             // a fixed step would pile several onto one tick.
-            let period = self.state.ai[p].config.think_period();
+            let period = self.state.ai[p].config.think_period()
+                * self.state.ai[p].commander.think_scale.max(1) as u32;
             let turn = p as u32 * period / self.state.players.len() as u32;
             if (self.state.tick + turn).is_multiple_of(period) {
                 self.think(p as u8);
@@ -365,7 +368,7 @@ impl World {
             &mut planned,
             &mut out,
         );
-        self.note_failed_mines(player, &planned.failed_mines);
+        self.note_failed_sites(player, &planned.failed_mines, &planned.failed_wants);
         drop(span);
         let span = mc_core::perf_span!("ai.rest");
         self.direct_factories(player, &census, &planned.salvage, &mut out);
@@ -412,6 +415,7 @@ impl World {
                 .copied()
                 .collect(),
             failed_mines: Vec::new(),
+            failed_wants: Vec::new(),
         };
 
         for &row in &census.sites {

@@ -202,7 +202,13 @@ impl World {
                 // Their half counts double, their start four times.
                 let theirs = (c.distance(ctx.start) * 2 > span) as i64;
                 let home = (c.distance(enemy) < Fx::from_int(1200)) as i64;
-                (age * (1 + theirs + 2 * home), c)
+                // Ground with ore in it is looked at again sooner than bare ground.
+                let ore = ctx
+                    .zones
+                    .of(c)
+                    .is_some_and(|z| ctx.zones.zones[z as usize].ore > 0)
+                    as i64;
+                (age * (1 + theirs + 2 * home + ore), c)
             })
             .max_by_key(|&(w, c)| (w, std::cmp::Reverse((c.x, c.y))))
             .filter(|&(w, _)| w > 900)

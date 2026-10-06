@@ -45,7 +45,7 @@ impl Hud {
         let w = 340.0;
         let (plans, ops) = lines(m);
         let want =
-            HEAD * 5.0 + LINE * (plans + ops + 5 + NOTES.min(m.notes.len().max(1))) as f32 + 22.0;
+            HEAD * 5.0 + LINE * (plans + ops + 6 + NOTES.min(m.notes.len().max(1))) as f32 + 22.0;
         let h = want.min(bottom - top);
         if h < HEAD * 3.0 {
             return;
@@ -181,6 +181,19 @@ impl Hud {
                 type_scale::MICRO,
                 dim,
                 &format!("expanding {} (free ore {}){roam}", e.expanders, e.free_ore),
+            );
+            y += LINE;
+        }
+        if fits(y) {
+            ui.text(
+                x,
+                y,
+                type_scale::MICRO,
+                dim,
+                &format!(
+                    "{} zones ({} with ore)  \u{b7}  think {}  \u{b7}  short of AA {} / guns {} / raiders {}",
+                    m.zones.0, m.zones.1, m.work, m.need[0], m.need[1], m.need[2]
+                ),
             );
             y += LINE;
         }

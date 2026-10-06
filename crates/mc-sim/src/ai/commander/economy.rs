@@ -23,7 +23,7 @@ use crate::tables::UnitId;
 use crate::tables::WreckId;
 use crate::World;
 use mc_core::{Angle, Fx, FxVec2, StateHasher};
-use mc_data::cat;
+use mc_data::{cat, BlueprintId};
 use serde::{Deserialize, Serialize};
 
 /// Where the store and the build speed are read as filling and stalling.
@@ -50,7 +50,7 @@ const ROAM_THREAT: i32 = 200;
 /// A wreck field worth the commander's walk, in mass.
 const ROAM_FIELD: i32 = 150;
 /// Ticks a deposit no lot was found by is skipped (three minutes).
-const BLOCKED_FOR: u32 = 1800;
+pub(in crate::ai) const BLOCKED_FOR: u32 = 1800;
 
 /// What power the side should put up.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -92,6 +92,11 @@ pub(in crate::ai) struct Eco {
     pub reach: Fx,
     /// Deposits no lot could be found by, and when: skipped for `BLOCKED_FOR`.
     pub blocked: Vec<(FxVec2, u32)>,
+    /// Structures the plans wanted that no lot was found for, where they were to go
+    /// and when: the wants skip them for `BLOCKED_FOR` (`solver.rs`), the same
+    /// pause deposits get.
+    #[serde(default)]
+    pub blocked_wants: Vec<(BlueprintId, FxVec2, u32)>,
 }
 
 impl Eco {
@@ -115,6 +120,12 @@ impl Eco {
             h.write_i64(p.x.0);
             h.write_i64(p.y.0);
             h.write_u64(*t as u64);
+        }
+        h.write_u64(self.blocked_wants.len() as u64);
+        for (b, p, t) in &self.blocked_wants {
+            h.write_u64(b.0 as u64 | (*t as u64) << 32);
+            h.write_i64(p.x.0);
+            h.write_i64(p.y.0);
         }
         h.write_u64(self.expanders.len() as u64);
         for u in &self.expanders {
@@ -388,14 +399,27 @@ impl World {
             .collect()
     }
 
-    /// Remembers this think's failed deposits and forgets the old ones.
-    pub(in crate::ai) fn note_failed_mines(&mut self, player: u8, failed: &[FxVec2]) {
+    /// Remembers this think's failed deposits and failed sites for wants, and
+    /// forgets the old ones.
+    pub(in crate::ai) fn note_failed_sites(
+        &mut self,
+        player: u8,
+        failed: &[FxVec2],
+        failed_wants: &[(BlueprintId, FxVec2)],
+    ) {
         let tick = self.state.tick;
-        let blocked = &mut self.state.ai[player as usize].commander.eco.blocked;
-        blocked.retain(|&(_, t)| tick < t + BLOCKED_FOR);
+        let eco = &mut self.state.ai[player as usize].commander.eco;
+        eco.blocked.retain(|&(_, t)| tick < t + BLOCKED_FOR);
         for &p in failed {
-            if !blocked.iter().any(|&(b, _)| b == p) {
-                blocked.push((p, tick));
+            if !eco.blocked.iter().any(|&(b, _)| b == p) {
+                eco.blocked.push((p, tick));
+            }
+        }
+        eco.blocked_wants
+            .retain(|&(_, _, t)| tick < t + BLOCKED_FOR);
+        for &(id, p) in failed_wants {
+            if !eco.blocked_wants.iter().any(|&(b, q, _)| b == id && q == p) {
+                eco.blocked_wants.push((id, p, tick));
             }
         }
     }

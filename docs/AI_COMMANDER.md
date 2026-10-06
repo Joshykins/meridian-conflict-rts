@@ -103,6 +103,34 @@ or they hide everything), enemy `value` standing there (the commander weighs mos
 and `ours`. `commander.seen` keeps the tick each cell was last in view (without fog,
 every cell always is); scouts and plans read how stale each cell is.
 
+Past 800 owned units a side's think period grows (one period slower per 800 units,
+four times at most; `think_scale` in its state, so a restored match thinks on the same
+ticks) and the fog pass is spread over that many thinks. `Profiles` are built once and
+shared (`scratch.rs`, never saved). The work a think spent (cells and contacts walked)
+is on the overlay card and in the `ai.world_model_work` perf counter.
+
+### 3b. Zones (`zones.rs`)
+
+The ground the land army can walk (`reach.rs`), split once around every start and ore
+field into zones (seeds within 400 m join, at most 250) that know their neighbours.
+The graph depends on the map alone, so it is rebuilt after a restore rather than saved.
+Each think a `ZoneView` reads what changes from the world model and contacts: land
+fire, enemy mass, and the mass of our own structures in each zone.
+
+- **Value**: 250 mass per ore field plus the enemy mass remembered in the zone. Raids
+  and the army rank targets by it over the square of the walk (`land_objective`), less
+  the worst fire on the zones between; incursions are answered most valuable first;
+  scouts revisit ground with ore sooner than bare ground.
+- **Shortfalls**: a defence raised against aircraft, shelling or raiders posts what it
+  found missing (`commander.role_need`: anti-air, artillery, raiders, per mille) as a
+  floor on that role's share of new units, fading over a few minutes (`solver.rs`).
+- **Hedging nukes**: with the nukes only a maybe (40-89), an interceptor is raised
+  only when one zone holds 11 000 mass of our structures.
+- **Opening**: starts close together raise Pressure (a rush), free ore on its half
+  raises Boom for the first 12 minutes.
+- A structure the plans' wants found no lot for is skipped at that place for three
+  minutes (`eco.blocked_wants`), as a deposit is.
+
 ### 4. Beliefs (`beliefs.rs`)
 
 What the side thinks of the enemy, each a guess from what it has seen, where it has

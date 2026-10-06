@@ -2,6 +2,7 @@
 //! make what the plans need, picked from the menu by how well each unit fares
 //! against the enemy the side believes in, per mass; builders put up what the
 //! plans want (`wants`); and the economy code is steered by the plans.
+use super::economy::BLOCKED_FOR;
 use super::matchup::edge;
 use super::profile::{role, Domain, Profile, Profiles};
 use super::state::{Hurt, PlanKind, Stake};
@@ -124,7 +125,7 @@ impl World {
         let p = |k: PlanKind| points(c.plan(k));
         let land_route = self.land_route_to_enemy(player);
         let outranging = self
-            .outranging_air(player, &Profiles::build(&self.blueprints))
+            .outranging_air(player, &self.profiles(player))
             .floor_int() as i64;
         let shares = [
             p(PlanKind::Pressure)
@@ -166,7 +167,7 @@ impl World {
         counts: &BTreeMap<BlueprintId, usize>,
         serial: u32,
     ) -> Option<BlueprintId> {
-        let profiles = Profiles::build(&self.blueprints);
+        let profiles = self.profiles(player);
         let c = &self.state.ai[player as usize].commander;
         let land_route = self.land_route_to_enemy(player);
         let stake = |k: PlanKind| s(c.plan(k));
@@ -250,16 +251,26 @@ impl World {
                     60 * stake(PlanKind::AirDefense)
                 }
         };
+        // What the defences it raised found missing counts as a floor: the zone that
+        // was bombed asks for anti-air, the one shelled for guns.
+        let need = self.state.ai[player as usize]
+            .commander
+            .role_need
+            .map(i64::from);
         let roles: [Vec<(Fits, i64)>; FORCES] = [
             vec![
-                (Box::new(|p: &Profile| p.has(role::ANTI_AIR)), aa_land),
+                (
+                    Box::new(|p: &Profile| p.has(role::ANTI_AIR)),
+                    aa_land.max(need[0]),
+                ),
                 (
                     Box::new(|p: &Profile| p.has(role::ARTILLERY)),
-                    120 + 100 * stake(PlanKind::Siege) + (fort_share * 3 / 10).min(200),
+                    (120 + 100 * stake(PlanKind::Siege) + (fort_share * 3 / 10).min(200))
+                        .max(need[1]),
                 ),
                 (
                     Box::new(|p: &Profile| p.has(role::RAIDER) && !p.has(role::LINE)),
-                    100 * stake(PlanKind::Raid),
+                    (100 * stake(PlanKind::Raid)).max(need[2]),
                 ),
                 (Box::new(|p: &Profile| p.has(role::LINE)), 300),
             ],
@@ -543,6 +554,14 @@ impl World {
             } else {
                 start - toward * Fx::from_int(260)
             };
+            // A place no lot was found at lately is left alone for a while, as a
+            // deposit is: the want would otherwise be chosen again every think.
+            let tick = self.state.tick;
+            if ai.commander.eco.blocked_wants.iter().any(|&(b, p, t)| {
+                b == id && tick < t + BLOCKED_FOR && p.distance(near) < Fx::from_int(300)
+            }) {
+                continue;
+            }
             return Some(Job {
                 blueprint: id,
                 near,

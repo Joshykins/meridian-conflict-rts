@@ -57,6 +57,11 @@ impl World {
         let contacts = &self.state.ai[ctx.player as usize].contacts;
         // Put ashore off home's ground, a group takes whatever is about it.
         let ashore = !ctx.can_walk(from);
+        // The fire on each zone's way from here, found once for every target.
+        let fire = ctx
+            .zones
+            .of(from)
+            .map_or_else(Vec::new, |a| ctx.zv.fire_along(ctx.zones, a));
         contacts
             .iter()
             .filter(|c| {
@@ -77,15 +82,22 @@ impl World {
             .filter_map(|c| {
                 let threat = self.enemy_strength_at(ctx, c.pos, Fx::from_int(700), Target::Land);
                 (threat * OUTMATCHED <= mass * 2).then(|| {
-                    let value: Fx = contacts
-                        .iter()
-                        .filter(|o| o.pos.distance(c.pos) < Fx::from_int(600))
-                        .map(|o| self.blueprints.unit(o.blueprint).cost_mass)
-                        .sum();
+                    // What the zone it stands in is worth (its ore and the enemy
+                    // mass in it), less the fire on the zones between.
+                    let zone = ctx.zones.of(c.pos);
+                    let value = zone.map_or_else(
+                        || self.blueprints.unit(c.blueprint).cost_mass,
+                        |z| ctx.zv.value(ctx.zones, z),
+                    );
+                    let along = zone.map_or(Fx::ZERO, |b| {
+                        fire.get(b as usize).copied().unwrap_or(Fx::ZERO)
+                    });
                     // Near targets first, by the square of the walk: a wave sent
                     // 8 km at the enemy's base bled out on its defences on the way.
                     let walk = c.pos.distance(from).floor_int() as i64 / 100 + 15;
-                    let score = (value - threat / 2).floor_int() as i64 * 10_000 / (walk * walk);
+                    let score = (value - threat / 2 - along * THREAT_MASS / 4).floor_int() as i64
+                        * 10_000
+                        / (walk * walk);
                     (score, c.pos)
                 })
             })
@@ -655,6 +667,34 @@ impl World {
         out
     }
 
+    /// What the incursion at `enemy` shows the side is short of: anti-air against
+    /// aircraft, guns against shelling, quick units against raiders. Posted as a
+    /// floor on that role's share of new units (`solver.rs`), fading with time
+    /// (`commander.rs`), so the zone that was hit gets what it lacked.
+    fn post_role_need(&mut self, ctx: &Ctx, enemy: FxVec2, air: bool, strength: Fx) {
+        let (mut guns, mut raiders) = (Fx::ZERO, Fx::ZERO);
+        for c in &self.state.ai[ctx.player as usize].contacts {
+            let p = ctx.profiles.get(c.blueprint);
+            if c.pos.distance(enemy) >= Fx::from_int(700) {
+                continue;
+            }
+            if p.has(role::ARTILLERY) {
+                guns += p.mass;
+            } else if p.has(role::RAIDER) {
+                raiders += p.mass;
+            }
+        }
+        let share = |m: Fx| (m.floor_int() / 4).clamp(120, 450) as i16;
+        let need = &mut self.state.ai[ctx.player as usize].commander.role_need;
+        if air {
+            need[0] = need[0].max(share(strength));
+        } else if guns > strength / 4 {
+            need[1] = need[1].max(share(guns));
+        } else if raiders > strength / 2 {
+            need[2] = need[2].max(share(raiders));
+        }
+    }
+
     /// Opens a defence for each raid on home or an outlying mine no defence answers,
     /// taking the nearest gathering units of the land operations and free ones.
     pub(in crate::ai) fn raise_defence(&mut self, ctx: &Ctx, threats: &[(FxVec2, FxVec2, bool)]) {
@@ -696,6 +736,7 @@ impl World {
                 continue;
             }
             let need = strength * 13 / 10 + Fx::from_int(50);
+            self.post_role_need(ctx, enemy, air, strength);
             let id = self.open_op(
                 ctx.player,
                 OpKind::Defend,

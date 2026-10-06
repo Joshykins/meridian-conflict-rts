@@ -112,6 +112,9 @@ impl Menu<'_> {
     }
 }
 
+/// Mass of our structures in one zone below which a maybe-nuke is not hedged.
+const HEDGE_WORTH: i32 = 11_000;
+
 impl World {
     pub(in crate::ai) fn menu<'a>(&self, ctx: &Ctx<'a>) -> Menu<'a> {
         Menu {
@@ -175,7 +178,11 @@ impl World {
                 // The land army is the main effort wherever it can walk to the enemy.
                 let base = if island { 25 } else { 80 };
                 // Waves into an artillery park behind turrets lose, however big.
-                base + 40 * ahead - (fortified / 2000).min(50)
+                // Starts close together make a rush; far apart, a long walk.
+                let rush = ctx.enemy_start.map_or(0, |e| {
+                    ((4000 - e.distance(ctx.start).floor_int()) / 200).clamp(-10, 10)
+                });
+                base + 40 * ahead + rush - (fortified / 2000).min(50)
             }
             PlanKind::Raid => {
                 if !has(&|p| p.has(role::RAIDER)) || island || census.factories.is_empty() {
@@ -288,7 +295,20 @@ impl World {
                 let raided = !ctx.intel.threats.is_empty();
                 15 + b.nukes * 4 / 5 + 20 * raided as i32 + b.air / 5
             }
-            PlanKind::Boom => (90 - minutes * 5).max(10) + 20 * (our_land > their_land * 2) as i32,
+            PlanKind::Boom => {
+                // Free ore on its half is worth taking before anything else.
+                let ore = if minutes < 12 {
+                    self.state.ai[ctx.player as usize]
+                        .commander
+                        .eco
+                        .free_ore
+                        .min(10) as i32
+                        * 2
+                } else {
+                    0
+                };
+                (90 - minutes * 5).max(10) + 20 * (our_land > their_land * 2) as i32 + ore
+            }
             PlanKind::Intel => {
                 let blind = b.base_unseen > 3000;
                 let unsure = (25..=70).contains(&b.nukes);
@@ -804,7 +824,14 @@ impl World {
         let need_int = match b.nukes {
             100.. => (2 + b.silos).min(8),
             90.. => 1,
-            40..=89 if stake(PlanKind::Fortify) >= Stake::Probe => 1,
+            // A hedge is worth its mass only where there is something to lose: a
+            // zone holding as much as `HEDGE_WORTH` of our structures.
+            40..=89
+                if stake(PlanKind::Fortify) >= Stake::Probe
+                    && ctx.zv.held.iter().any(|&h| h >= Fx::from_int(HEDGE_WORTH)) =>
+            {
+                1
+            }
             _ => 0,
         };
         if held(&interceptor) < need_int {

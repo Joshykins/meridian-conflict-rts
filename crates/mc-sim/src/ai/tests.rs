@@ -750,6 +750,7 @@ fn builders_do_not_start_or_help_build_under_an_enemys_guns() {
             projects: 0,
             guards: vec![],
             failed_mines: vec![],
+            failed_wants: vec![],
         },
         &mut out,
     );

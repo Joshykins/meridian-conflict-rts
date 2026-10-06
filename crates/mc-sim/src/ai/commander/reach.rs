@@ -7,7 +7,7 @@ use mc_data::MoveLayer;
 use std::collections::VecDeque;
 
 /// Metres between the grid's nodes.
-const NODE: i32 = 128;
+pub(super) const NODE: i32 = 128;
 
 pub(in crate::ai) struct Reach {
     w: i32,
@@ -16,6 +16,38 @@ pub(in crate::ai) struct Reach {
 }
 
 impl Reach {
+    /// Nodes across and down.
+    pub(super) fn dims(&self) -> (i32, i32) {
+        (self.w, self.h)
+    }
+
+    /// Whether node (`x`, `y`) is walkable from home.
+    pub(super) fn walkable_node(&self, x: i32, y: i32) -> bool {
+        if x < 0 || y < 0 || x >= self.w || y >= self.h {
+            return false;
+        }
+        let i = (y * self.w + x) as usize;
+        self.bits
+            .get(i / 64)
+            .is_some_and(|b| b >> (i % 64) & 1 != 0)
+    }
+
+    /// A grid of `w` by `h` nodes, walkable where `rows` (top row first is row 0) say.
+    #[cfg(test)]
+    pub(super) fn from_rows(rows: &[&str]) -> Reach {
+        let (w, h) = (rows[0].len() as i32, rows.len() as i32);
+        let mut bits = vec![0u64; ((w * h) as usize).div_ceil(64)];
+        for (y, row) in rows.iter().enumerate() {
+            for (x, c) in row.chars().enumerate() {
+                if c == '#' {
+                    let i = y * w as usize + x;
+                    bits[i / 64] |= 1 << (i % 64);
+                }
+            }
+        }
+        Reach { w, h, bits }
+    }
+
     fn node(&self, p: FxVec2) -> Option<usize> {
         let (x, y) = (p.x.floor_int() / NODE, p.y.floor_int() / NODE);
         (x >= 0 && y >= 0 && x < self.w && y < self.h).then(|| (y * self.w + x) as usize)
