@@ -33,6 +33,8 @@ pub enum Glyph {
     Titan,
     /// A lightning bolt in a turning ring: a titan's great bore.
     Storm,
+    /// A space elevator's figure (`hud/elevator.rs`).
+    Elevator,
 }
 
 /// Something going on right now, grouped: built fresh every frame.
@@ -343,6 +345,7 @@ fn glyph(ui: &mut Ui, c: Vec2, g: Glyph, tone: u32, t: f32, k: f32) {
             ui.disc(c, 2.4, rgb(tone, k));
         }
         Glyph::Titan => super::icons::titan(ui, c, 9.0, rgb(tone, k)),
+        Glyph::Elevator => super::icons::elevator(ui, c, 9.0, rgb(tone, k)),
         Glyph::Storm => super::titan::bolt(ui, c, 7.0, rgb(tone, 0.95 * k), t * 0.9),
         Glyph::Intercept => {
             ui.arc(c, 6.5, 0.0, std::f32::consts::TAU, 1.5, rgb(tone, 0.9 * k));

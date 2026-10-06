@@ -22,7 +22,7 @@ mod data_card;
 pub(super) mod queue;
 mod strip;
 pub(super) mod tray;
-pub(super) use data_card::data_card;
+pub(super) use data_card::{data_card, Pace};
 pub(super) use queue::Split;
 use strip::{Slot, ARROW_W};
 
@@ -285,6 +285,8 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
             format!("Refit  \u{b7}  {}", bp.name)
         } else if builds.is_empty() {
             format!("Upgrades  \u{b7}  {}", bp.name)
+        } else if bp.elevator.is_some() {
+            format!("Bring Down  \u{b7}  {}", bp.name)
         } else {
             format!("Construction  \u{b7}  {}", bp.name)
         },
@@ -367,12 +369,17 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     let queue_rect = Rect::new(r.x, r.y - GAP - QUEUE_H, r.w, QUEUE_H);
     // A factory always shows its strip: REPEAT lives there.
     let has_queue = !stacks.is_empty() || (is_factory && builder_unit.is_some());
+    // An elevator's queue is never built: the strip counts down to its next platform.
+    let platform = queue
+        .and_then(|q| q.elevator.as_ref())
+        .map(super::elevator::strip);
     let floor = if has_queue {
         // The switches speak for the whole selection, which may be split on them.
         let strip = queue::Queue {
             stacks: &stacks,
-            progress: queue.map_or(0.0, |q| q.progress),
-            eta: queue.and_then(|q| q.eta),
+            progress: platform.map_or(queue.map_or(0.0, |q| q.progress), |p| p.1),
+            eta: platform.map_or(queue.and_then(|q| q.eta), |p| Some(p.2)),
+            platform: platform.map(|p| p.0),
             is_factory,
             repeat: Split::count(
                 units
@@ -395,13 +402,15 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                 size: b.size,
                 linked: b.linked.len(),
             }),
+            // An elevator's platform comes whether or not it is paused: no switch for it.
             pause: Split::count(
                 units
                     .iter()
                     .filter(|u| mc_sim::pause::pausable(s.blueprints, s.bp(u)))
+                    .filter(|u| s.bp(u).elevator.is_none())
                     .map(|u| u.paused()),
             ),
-            paused: unit.paused(),
+            paused: unit.paused() && platform.is_none(),
             priority: super::priority::Mix::of(s, units),
             own_priority: unit.priority(),
             inherit: super::priority::inherited(s, unit),
@@ -419,7 +428,10 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
     super::refit::prompt(hud, ui, floor);
     match hovered {
         Some(Hover::Unit(item, tile, locked)) => {
-            let power = bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32());
+            let pace = match bp.elevator {
+                Some(e) => Pace::Platform(e.payload.to_f32()),
+                None => Pace::Build(bp.builder.as_ref().map_or(0.0, |b| b.power.to_f32())),
+            };
             let hint = match locked {
                 Some(up) => format!("Queue the {} Upgrade First", up.name),
                 None if is_factory => {
@@ -430,7 +442,7 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                         .to_owned()
                 }
             };
-            data_card(hud, ui, s.blueprints, item, power, &hint, tile, floor - GAP);
+            data_card(hud, ui, s.blueprints, item, pace, &hint, tile, floor - GAP);
         }
         Some(Hover::Climb(i, tile)) => {
             upgrade_card(hud, ui, s, unit, bp, &line, i, reached, tile, floor - GAP)

@@ -60,10 +60,10 @@ pub(crate) fn unit_at(
     best.map(|(_, i)| i)
 }
 
-/// How wide icons.wgsl draws an icon, in pixels. Only the titan's is wider than the
-/// click reach every unit gets anyway.
+/// How wide icons.wgsl draws an icon, in pixels. Only the tier 5s' (a titan's, a space
+/// elevator's) are wider than the click reach every unit gets anyway.
 fn icon_px(kind: IconKind) -> f32 {
-    if kind == IconKind::Titan {
+    if matches!(kind, IconKind::Titan | IconKind::Elevator) {
         icon::TITAN_PX
     } else {
         0.0

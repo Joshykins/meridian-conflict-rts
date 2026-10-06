@@ -15,6 +15,7 @@ mod builders;
 pub mod cargo;
 mod economy;
 mod economy_panel;
+mod elevator;
 mod focus;
 pub mod free_camera;
 mod groups;
@@ -338,6 +339,8 @@ pub struct Hud {
     nuke_alerts: silo::Alerts,
     /// Titan calls and strike cards (`titan::alerts`).
     titan: titan::Alerts,
+    /// Space elevator calls (`elevator::alerts`).
+    elevator: elevator::Calls,
     /// Ctrl+Alt: the panels folded away for the camera (`free_camera.rs`).
     pub free: free_camera::FreeCamera,
     /// Drawing a folded region: its panels do not keep the pointer from the battlefield.
@@ -795,6 +798,16 @@ impl Hud {
                         x += pw + GAP;
                     }
                 }
+                // A space elevator's platform and next payload, beside its build menu
+                // (`elevator.rs`).
+                if let Some((lift, v, count)) = elevator::elevator_of(s, &units) {
+                    let pw = elevator::WIDTH.min(w - EDGE - x);
+                    if pw > 220.0 {
+                        let r = Rect::new(x, deck_y, pw, DECK_H);
+                        elevator::panel(self, ui, s, lift, &v, count, r);
+                        x += pw + GAP;
+                    }
+                }
                 // A lift ship's hold, where a builder's construction panel goes.
                 if let Some((ship, view)) = cargo::ship_of(s, &units) {
                     let hold_w = cargo::width(w - EDGE - x);
@@ -845,6 +858,7 @@ impl Hud {
 
         silo::alerts(self, s);
         titan::alerts(self, ui, s, dt);
+        elevator::alerts(self, ui, s, dt);
         notices::draw(self, ui, self.toast_top, dt);
         self.free_camera_guide(ui, dt);
         self.match_state(ui, s);

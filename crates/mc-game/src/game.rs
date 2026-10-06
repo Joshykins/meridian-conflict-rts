@@ -2210,8 +2210,16 @@ impl Game {
             }
             HudAction::Build(blueprint) => {
                 let bp = self.blueprints.unit(blueprint);
-                // An experimental is placed on a lot like a structure (`built_on_site`).
-                if bp.built_on_site() {
+                // An experimental is placed on a lot like a structure (`built_on_site`),
+                // unless a factory picked makes it (a space elevator brings tech 4s down).
+                let factory_makes = self.selected_units().any(|u| {
+                    let f = self.blueprints.unit(BlueprintId(u.blueprint as u16));
+                    f.has(cat::FACTORY)
+                        && f.builder
+                            .as_ref()
+                            .is_some_and(|b| b.builds.contains(&blueprint))
+                });
+                if bp.built_on_site() && !factory_makes {
                     self.hud.build_keys = false;
                     self.view.mode = Mode::Place(blueprint);
                     self.place_from = None;

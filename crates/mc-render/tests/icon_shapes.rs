@@ -43,13 +43,15 @@ fn every_kind() -> Vec<IconKind> {
         TorpedoBomber,
         SensorShip,
         Damper,
+        Elevator,
     ];
     for kind in &all {
         match kind {
             Commander | Engineer | Bot | Tank | Artillery | AntiAir | Scout | Factory
             | Extractor | Power | Storage | Defense | Intel | Wall | Shield | Fighter | Bomber
             | Ship | Submarine | Gunship | Transport | Silo | AntiNuke | Warship | Titan
-            | Salvage | SalvageCarrier | SalvageDrone | TorpedoBomber | SensorShip | Damper => {}
+            | Salvage | SalvageCarrier | SalvageDrone | TorpedoBomber | SensorShip | Damper
+            | Elevator => {}
         }
     }
     all
@@ -96,5 +98,15 @@ fn every_icon_kind_has_a_shape() {
     assert!(
         unused.is_empty(),
         "icons.wgsl draws shapes nothing uses: {unused:?}"
+    );
+}
+
+/// The space elevator's number is the one the shader sizes and frames as a tier 5
+/// (`gpu_consts::icon::ELEVATOR`, generated into `icons.wgsl` as `ICON_ELEVATOR`).
+#[test]
+fn the_elevator_shape_is_its_icon_kind() {
+    assert_eq!(
+        IconKind::Elevator as u32,
+        mc_models::gpu_consts::icon::ELEVATOR
     );
 }

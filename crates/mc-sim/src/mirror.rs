@@ -24,6 +24,7 @@ mod batch;
 mod braid;
 pub mod city;
 mod destruct;
+mod elevator;
 mod fog;
 mod links;
 mod mend;
@@ -35,6 +36,7 @@ mod wrecks;
 
 pub use batch::{BatchView, UNIT_BATCH};
 pub use destruct::DestructView;
+pub use elevator::{platform_load, ElevatorPhase, ElevatorView};
 pub use fog::VisionDisc;
 pub use links::LinkView;
 pub use walls::{join_walls, WALL_JOINS};
@@ -922,6 +924,8 @@ pub struct UnitOrders {
     pub stunned: f32,
     /// A factory with batch on: its muster block and who stands in it.
     pub batch: Option<BatchView>,
+    /// A finished space elevator: its cycle and what rides its next platform.
+    pub elevator: Option<ElevatorView>,
 }
 
 /// A lift ship as the interface shows it: its hold (`transport.rs`).
@@ -2852,6 +2856,7 @@ impl World {
                 warp_recharge: self.warp_recharge_seconds(row),
                 stunned: self.stun_seconds(row),
                 batch: self.batch_view(row),
+                elevator: self.elevator_view(row),
             });
         }
     }

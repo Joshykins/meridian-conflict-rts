@@ -1786,6 +1786,7 @@ fn a_lift_ship_hold_lets_out_what_is_clicked_and_its_card_lands_and_takes_off() 
 }
 
 mod batch;
+mod elevator;
 mod idle;
 mod priority;
 mod queue_tray;

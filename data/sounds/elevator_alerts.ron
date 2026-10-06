@@ -1,0 +1,65 @@
+// A space elevator in the interface (`hud/elevator.rs`): its answer to being picked, and
+// the calls that tell a player one stands on the field. Heard at interface volume and from
+// no place in the world, like the titan's horns; the platform's own sirens and the cable's
+// noise in the world are `elevator.ron`'s. An elevator is told by its cable: a taut
+// thing thousands of kilometres long, so every call here is a deep metallic thrum that
+// rings on, struck or drawn tight, never a horn (the titan's) and never a beep.
+(
+    sounds: {
+        // Picked: the winch takes up the slack, the clamps bite with a dull clank, and the
+        // cable answers on D and A, ringing on under it.
+        "select_elevator": (
+            length: 1.8, peak: 0.34, room: 0.8,
+            layers: [
+                Sweep(from: 140, to: 360, glide: 0.28, q: 1.2, attack: 0.03, decay: 0.16, gain: 0.45),
+                Fm(from: 55, to: 73.4, glide: 0.26, ratio: 0.5, index: 1.4, fade: 0.25, attack: 0.03, decay: 0.22, gain: 0.7),
+                Burst(at: 0.26, low: 70, high: 640, attack: 0.001, decay: 0.035, gain: 2.0),
+                Tone(at: 0.26, from: 92, to: 46, glide: 0.18, attack: 0.003, decay: 0.24, gain: 0.9),
+                Fm(at: 0.3, from: 73.4, to: 73.4, glide: 1, ratio: 2.76, index: 0.9, fade: 0.6, attack: 0.01, decay: 0.7, gain: 0.45, pan: -0.15),
+                Fm(at: 0.36, from: 110, to: 110, glide: 1, ratio: 2.76, index: 0.7, fade: 0.6, attack: 0.01, decay: 0.6, gain: 0.3, pan: 0.15),
+            ],
+        ),
+        // An enemy space elevator seen: the cable struck twice, far off, each stroke a
+        // deep metallic ring sinking a little as it dies, over a slow roll of distance.
+        "elevator_sighted": (
+            length: 5.4, peak: 0.55, room: 1.0,
+            layers: [
+                Burst(low: 40, high: 420, attack: 0.002, decay: 0.12, gain: 4),
+                Fm(from: 61.7, to: 58.3, glide: 1.6, ratio: 2.76, index: 1.6, fade: 1.2, attack: 0.004, decay: 1.4, gain: 0.7, pan: -0.2),
+                Stack(from: 61.7, to: 58.3, glide: 1.6, attack: 0.01, decay: 1.3, gain: 0.35, detune: 1.004, width: 0.3,
+                    partials: [(1, 1), (2.76, 0.5), (5.4, 0.22), (8.9, 0.08)]),
+                Burst(at: 1.3, low: 40, high: 420, attack: 0.002, decay: 0.12, gain: 3.4),
+                Fm(at: 1.3, from: 55, to: 51.9, glide: 2.2, ratio: 2.76, index: 1.5, fade: 1.6, attack: 0.004, decay: 1.9, gain: 0.7, pan: 0.2),
+                Stack(at: 1.3, from: 55, to: 51.9, glide: 2.2, attack: 0.01, decay: 1.8, gain: 0.35, detune: 1.004, width: 0.35,
+                    partials: [(1, 1), (2.76, 0.5), (5.4, 0.22), (8.9, 0.08)]),
+                Roll(at: 0.05, from: 100, to: 50, glide: 4.0, attack: 0.5, decay: 2.2, gain: 0.5, swell: 1.2, depth: 0.5),
+            ],
+        ),
+        // An enemy elevator going up: one stroke on the cable, shorter, and the clank of
+        // its clamp towers being raised.
+        "elevator_site_spotted": (
+            length: 4.0, peak: 0.48, room: 0.9,
+            layers: [
+                Burst(low: 120, high: 900, attack: 0.0005, decay: 0.012, gain: 1.3),
+                Fm(at: 0.02, from: 196, to: 185, glide: 0.2, ratio: 3.5, index: 1.0, fade: 0.1, attack: 0.002, decay: 0.12, gain: 0.32, pan: 0.3),
+                Burst(at: 0.3, low: 40, high: 420, attack: 0.002, decay: 0.1, gain: 3),
+                Fm(at: 0.3, from: 58.3, to: 55, glide: 1.4, ratio: 2.76, index: 1.4, fade: 1.0, attack: 0.004, decay: 1.2, gain: 0.6),
+                Roll(at: 0.25, from: 100, to: 55, glide: 2.4, attack: 0.3, decay: 1.3, gain: 0.4, swell: 1.1, depth: 0.5),
+            ],
+        ),
+        // Our own elevator online: the cable drawn tight from the floor up, the clamps
+        // shutting on it with a deep slam, and the cable ringing on D, A and D.
+        "elevator_online": (
+            length: 5.0, peak: 0.52, room: 0.9,
+            layers: [
+                Sweep(from: 70, to: 520, glide: 1.2, q: 1.2, attack: 0.5, decay: 0.4, gain: 0.35),
+                Fm(from: 36.7, to: 73.4, glide: 1.2, ratio: 0.5, index: 1.5, fade: 0.9, attack: 0.45, decay: 0.7, gain: 0.6),
+                Burst(at: 1.2, low: 32, high: 320, attack: 0.003, decay: 0.25, gain: 7),
+                Tone(at: 1.2, from: 98, to: 36.7, glide: 0.45, attack: 0.003, decay: 0.7, gain: 1.4),
+                Fm(at: 1.26, from: 73.4, to: 73.4, glide: 1, ratio: 2.76, index: 1.2, fade: 1.0, attack: 0.01, decay: 1.3, gain: 0.45, pan: -0.25),
+                Fm(at: 1.36, from: 110, to: 110, glide: 1, ratio: 2.76, index: 1.0, fade: 1.0, attack: 0.01, decay: 1.2, gain: 0.34, pan: 0.25),
+                Fm(at: 1.46, from: 146.8, to: 146.8, glide: 1, ratio: 2.76, index: 0.8, fade: 1.0, attack: 0.01, decay: 1.1, gain: 0.26),
+            ],
+        ),
+    },
+)

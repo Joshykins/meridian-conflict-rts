@@ -105,10 +105,13 @@ pub enum Scenario {
     /// The subject's side has half the energy its upkeep asks for: a power plant of its
     /// faction off the pad, its output turned down to match, no stores and no free build.
     Short,
+    /// A space elevator has a mixed batch queued (tanks, gunships, tech-4 machines): its
+    /// cable comes down, and its first platform brings them down and they roll off.
+    Elevator,
 }
 
 impl Scenario {
-    pub const ALL: [Scenario; 15] = [
+    pub const ALL: [Scenario; 16] = [
         Scenario::UnderFire,
         Scenario::PointBlank,
         Scenario::Targets,
@@ -124,6 +127,7 @@ impl Scenario {
         Scenario::WarpDampened,
         Scenario::Pause,
         Scenario::Short,
+        Scenario::Elevator,
     ];
 
     pub fn label(self) -> &'static str {
@@ -143,6 +147,7 @@ impl Scenario {
             Scenario::WarpDampened => "Dampened",
             Scenario::Pause => "Pause",
             Scenario::Short => "Short",
+            Scenario::Elevator => "Elevator",
         }
     }
 
@@ -163,6 +168,7 @@ impl Scenario {
             "warp-dampened" => Scenario::WarpDampened,
             "pause" => Scenario::Pause,
             "short" => Scenario::Short,
+            "elevator" => Scenario::Elevator,
             _ => return None,
         })
     }
@@ -265,6 +271,11 @@ enum PendingOrder {
         pos: FxVec2,
     },
     Pause,
+    /// Queue each of these, so many of each, in order (a space elevator's batch).
+    ProduceMix {
+        batch: [(BlueprintId, u8); 3],
+        rally: FxVec2,
+    },
 }
 
 impl PendingOrder {
@@ -335,6 +346,18 @@ impl PendingOrder {
                 paused: true,
             }],
             PendingOrder::Board(_) => Vec::new(),
+            PendingOrder::ProduceMix { batch, rally } => {
+                let mut commands = vec![Command::SetRally {
+                    factories: who.clone(),
+                    pos: rally,
+                }];
+                commands.extend(batch.iter().map(|&(blueprint, count)| Command::Produce {
+                    factories: who.clone(),
+                    blueprint,
+                    count,
+                }));
+                commands
+            }
         }
     }
 }
@@ -781,6 +804,49 @@ fn attacker_for<'a>(
     })
 }
 
+/// `Scenario::Elevator`: from what the elevator brings down, a line of its heaviest tanks,
+/// a flight of gunships (or whatever armed aircraft it has), and tech-4 machines, enough to
+/// fill most of one platform, rallying east down the range.
+fn elevator_batch(
+    blueprints: &Blueprints,
+    bp: &UnitBlueprint,
+    pad: FxVec2,
+) -> Result<Staged, &'static str> {
+    let builds = bp
+        .builder
+        .as_ref()
+        .filter(|_| bp.elevator.is_some())
+        .ok_or("This Is Not a Space Elevator")?
+        .builds
+        .iter()
+        .map(|&id| blueprints.unit(id));
+    let layer = |b: &UnitBlueprint| b.motion.map(|m| m.layer);
+    let tank = builds
+        .clone()
+        .filter(|b| b.visual.icon == mc_data::IconKind::Tank && b.tech < 4)
+        .max_by_key(|b| b.tech)
+        .ok_or("It Brings Down No Tanks")?;
+    let air = builds
+        .clone()
+        .filter(|b| layer(b) == Some(mc_data::MoveLayer::Air) && !b.weapons.is_empty())
+        .min_by_key(|b| {
+            (
+                b.visual.icon != mc_data::IconKind::Gunship,
+                std::cmp::Reverse(b.tech),
+            )
+        })
+        .ok_or("It Brings Down No Aircraft")?;
+    let heavy = builds
+        .filter(|b| b.tech >= 4)
+        .min_by_key(|b| b.cost_mass)
+        .ok_or("It Brings Down No Experimentals")?;
+    let order = PendingOrder::ProduceMix {
+        batch: [(tank.id, 6), (air.id, 4), (heavy.id, 4)],
+        rally: pad + FxVec2::from_ints(520, 0),
+    };
+    Ok((Vec::new(), Some((bp.id, order))))
+}
+
 fn stage(
     scenario: Scenario,
     blueprints: &Blueprints,
@@ -999,6 +1065,7 @@ fn stage(
             })
             .ok_or("This unit does not move"),
         Scenario::Destruct => Ok((Vec::new(), Some((subject, PendingOrder::Destruct)))),
+        Scenario::Elevator => elevator_batch(blueprints, bp, pad),
         Scenario::Pause => Ok((Vec::new(), Some((subject, PendingOrder::Pause)))),
         Scenario::Short => {
             let upkeep = bp.economy.energy_upkeep;
@@ -1343,163 +1410,4 @@ pub fn step_subject(blueprints: &Blueprints, from: BlueprintId, step: i32) -> Bl
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn blueprints() -> Blueprints {
-        Blueprints::load(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data"))
-            .unwrap()
-    }
-
-    /// Every scenario either stages or says why not, for every unit there is.
-    #[test]
-    fn every_unit_can_be_the_subject() {
-        let b = blueprints();
-        let pad = FxVec2::from_ints(2000, 2000);
-        for bp in b.units.iter().filter(|bp| b.is_listed(bp.id)) {
-            for s in Scenario::ALL {
-                match stage(s, &b, pad, bp.id) {
-                    Ok((commands, owed)) => assert!(
-                        !commands.is_empty() || owed.is_some(),
-                        "{} / {s:?} staged nothing",
-                        bp.key
-                    ),
-                    Err(why) => assert!(!why.is_empty()),
-                }
-            }
-        }
-        let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
-        let cannot: Vec<Scenario> = Scenario::ALL
-            .into_iter()
-            .filter(|s| stage(*s, &b, pad, tank).is_err())
-            .collect();
-        assert_eq!(
-            cannot,
-            [
-                Scenario::AtWork,
-                Scenario::Salvage,
-                Scenario::Refit,
-                Scenario::Lift,
-                Scenario::Warp,
-                Scenario::WarpDampened,
-                Scenario::Short
-            ],
-            "the default subject supports everything a tank can do"
-        );
-        let commander = b.unit_by_key("aster_commander").unwrap().id;
-        let cannot: Vec<Scenario> = Scenario::ALL
-            .into_iter()
-            .filter(|s| stage(*s, &b, pad, commander).is_err())
-            .collect();
-        assert_eq!(
-            cannot,
-            [
-                Scenario::BuildIt,
-                Scenario::Lift,
-                Scenario::Warp,
-                Scenario::WarpDampened,
-                Scenario::Short
-            ],
-            "nothing builds a commander, and it draws no energy; it does everything else"
-        );
-    }
-
-    #[test]
-    fn attackers_and_targets_stand_inside_weapon_range() {
-        let b = blueprints();
-        let pad = FxVec2::from_ints(2000, 2000);
-        let tank = b.unit(b.id_of(DEFAULT_SUBJECT).unwrap());
-        let (commands, _) = stage(Scenario::Targets, &b, pad, tank.id).unwrap();
-        for c in commands {
-            let Command::DebugSpawn { pos, .. } = c else {
-                panic!()
-            };
-            assert!(pos.distance(pad) < tank.weapons[0].range_max);
-        }
-    }
-
-    #[test]
-    fn a_map_gun_gets_targets_a_few_kilometres_out() {
-        let b = blueprints();
-        let pad = FxVec2::from_ints(2000, 2000);
-        let gun = b.unit(b.id_of("aster_t4_artillery").unwrap());
-        let (commands, _) = stage(Scenario::Targets, &b, pad, gun.id).unwrap();
-        assert!(!commands.is_empty());
-        for c in commands {
-            let Command::DebugSpawn { pos, blueprint, .. } = c else {
-                panic!()
-            };
-            assert!(b.unit(blueprint).categories & gun.weapons[0].target_mask != 0);
-            let gap = pos.distance(pad);
-            assert!(gap > gun.weapons[0].range_min && gap < Fx::from_int(4000));
-        }
-    }
-
-    #[test]
-    fn spawn_subject_places_the_subject() {
-        let b = blueprints();
-        let shield = b.id_of("aster_t2_shield").unwrap();
-        assert_ne!(shield, b.id_of(DEFAULT_SUBJECT).unwrap());
-        let range = Range::new(FxVec2::from_ints(2000, 2000), shield);
-        let Command::DebugSpawn { blueprint, .. } = range.spawn_at(range.pad, &b) else {
-            panic!()
-        };
-        assert_eq!(blueprint, shield);
-    }
-
-    #[test]
-    fn line_up_places_each_unit_once_inside_the_map() {
-        let b = blueprints();
-        let tank = b.id_of(DEFAULT_SUBJECT).unwrap();
-        let mut range = Range::new(FxVec2::from_ints(100, 100), tank);
-        let all: Vec<BlueprintId> = b
-            .units
-            .iter()
-            .filter(|u| b.is_listed(u.id))
-            .map(|u| u.id)
-            .collect();
-        let bounds = FxVec2::from_ints(4096, 4096);
-        let wet = |id: BlueprintId| {
-            let u = b.unit(id);
-            u.water_only()
-                || u.motion
-                    .is_some_and(|m| m.layer == mc_data::MoveLayer::Naval)
-        };
-        let shown = |l: &LineUp| -> Vec<(BlueprintId, [f32; 2])> {
-            l.commands
-                .iter()
-                .filter_map(|c| match c {
-                    Command::DebugSpawn {
-                        blueprint,
-                        pos,
-                        count: 1,
-                        owner: BLUE,
-                        ..
-                    } => Some((*blueprint, pos.to_f32())),
-                    Command::DebugSpawn { .. } => panic!("one Blue unit each"),
-                    _ => None,
-                })
-                .collect()
-        };
-        let dry = range.line_up(&b, &all, None, bounds);
-        assert!(matches!(dry.commands[0], Command::DebugClear));
-        let placed = shown(&dry);
-        assert_eq!(dry.stranded, all.iter().filter(|&&id| wet(id)).count());
-        assert_eq!(placed.len() + dry.stranded, all.len());
-        // Near the map's corner, the block is pushed back inside it.
-        assert!(placed
-            .iter()
-            .all(|(_, [x, y])| *x > 0.0 && *y > 0.0 && *x < 4096.0 && *y < 4096.0));
-        for (i, (_, p)) in placed.iter().enumerate() {
-            for (_, q) in &placed[i + 1..] {
-                assert!(
-                    (p[0] - q[0]).hypot(p[1] - q[1]) > 4.0,
-                    "two units on one spot"
-                );
-            }
-        }
-        let wet_sea = range.line_up(&b, &all, Some(FxVec2::from_ints(3000, 3000)), bounds);
-        assert_eq!(wet_sea.stranded, 0);
-        assert_eq!(shown(&wet_sea).len(), all.len());
-    }
-}
+mod tests;

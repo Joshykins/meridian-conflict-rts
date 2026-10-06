@@ -465,6 +465,7 @@ pub fn strategic(ui: &mut Ui, kind: IconKind, tech: u8, c: Vec2, r: f32, color: 
             );
         }
         IconKind::Titan => titan(ui, c, r, color),
+        IconKind::Elevator => elevator(ui, c, r, color),
         IconKind::Salvage | IconKind::SalvageCarrier | IconKind::SalvageDrone => {
             salvage(ui, kind, c, r, color, cut)
         }
@@ -585,6 +586,43 @@ pub fn titan(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
     limb(ui, (0.24, -0.3), (0.29, -0.66), 0.085);
     bx(ui, 0.31, -0.72, 0.14, 0.055);
     // The tier-5 frame, where there is room for it.
+    if r >= 9.0 {
+        let frame = Rect::new(c.x - r * 1.05, c.y - r * 1.02, r * 2.1, r * 2.36);
+        ui.brackets(
+            frame,
+            r * 0.32,
+            [color[0], color[1], color[2], color[3] * 0.8],
+        );
+    }
+}
+
+/// A space elevator from the front, as `icons.wgsl` draws it (`sd_elevator`): its cable
+/// coming down out of the sky with a platform on it, into the clamp jaws of two tower
+/// flanks and the one between them. Given in the renderer's icon square (y up), placed in
+/// a box of half-size `r`; framed as a tier 5 where there is room.
+pub fn elevator(ui: &mut Ui, c: Vec2, r: f32, color: Color) {
+    let k = r * 0.9;
+    let at = |x: f32, y: f32| c + Vec2::new(x, -y) * k;
+    let bx = |ui: &mut Ui, x: f32, y: f32, hw: f32, hh: f32| {
+        let (a, b) = (at(x - hw, y + hh), at(x + hw, y - hh));
+        ui.fill(Rect::new(a.x, a.y, b.x - a.x, b.y - a.y), color);
+    };
+    let limb = |ui: &mut Ui, a: (f32, f32), b: (f32, f32), w: f32| {
+        let (pa, pb) = (at(a.0, a.1), at(b.0, b.1));
+        ui.stroke(pa, pb, w * 2.0 * k, color);
+        ui.disc(pa, w * k, color);
+        ui.disc(pb, w * k, color);
+    };
+    bx(ui, 0.0, 0.42, 0.045, 0.54);
+    bx(ui, 0.0, 0.5, 0.26, 0.07);
+    bx(ui, 0.0, -0.8, 0.82, 0.07);
+    for side in [-1.0, 1.0] {
+        let tower = [(0.52, -0.76), (0.8, -0.76), (0.6, 0.08), (0.42, 0.08)];
+        fill_outline(ui, &tower.map(|(x, y)| at(side * x, y)), color);
+        limb(ui, (side * 0.47, 0.02), (side * 0.13, -0.16), 0.07);
+    }
+    let middle = [(-0.17, -0.76), (0.17, -0.76), (0.08, -0.3), (-0.08, -0.3)];
+    fill_outline(ui, &middle.map(|(x, y)| at(x, y)), color);
     if r >= 9.0 {
         let frame = Rect::new(c.x - r * 1.05, c.y - r * 1.02, r * 2.1, r * 2.36);
         ui.brackets(

@@ -8,6 +8,15 @@ use crate::ui::{palette, rgb, type_scale, Rect, Ui};
 use mc_core::TICKS_PER_SECOND;
 use mc_data::{Blueprints, UnitBlueprint};
 
+/// How the builder whose card it is turns out what it offers.
+#[derive(Clone, Copy)]
+pub(in crate::hud) enum Pace {
+    /// Builds it at this build power.
+    Build(f32),
+    /// A space elevator: its platform brings it down free, out of a payload this big.
+    Platform(f32),
+}
+
 /// Everything about a blueprint, over the tile the pointer is on.
 #[expect(
     clippy::too_many_arguments,
@@ -18,7 +27,7 @@ pub(in crate::hud) fn data_card(
     ui: &mut Ui,
     blueprints: &Blueprints,
     item: &UnitBlueprint,
-    build_power: f32,
+    pace: Pace,
     hint: &str,
     tile: Rect,
     bottom: f32,
@@ -173,13 +182,28 @@ pub(in crate::hud) fn data_card(
     );
     crate::hud::volatile::chip(ui, item, end + 8.0, r.y + 48.0);
 
-    // The price: mass, energy, and how long this builder takes over it.
-    let seconds = item.build_time.to_f32() / build_power.max(0.1);
-    let costs = [
-        ("Materials", whole(item.cost_mass.to_f32()), MASS),
-        ("Energy", whole(item.cost_energy.to_f32()), ENERGY),
-        ("Time", crate::hud::clock(seconds), palette::TEXT),
-    ];
+    // The price: mass, energy, and how long this builder takes over it. An elevator's
+    // platform brings it down free, taking its mass out of the payload.
+    let costs = match pace {
+        Pace::Build(power) => [
+            ("Materials", whole(item.cost_mass.to_f32()), MASS),
+            ("Energy", whole(item.cost_energy.to_f32()), ENERGY),
+            (
+                "Time",
+                crate::hud::clock(item.build_time.to_f32() / power.max(0.1)),
+                palette::TEXT,
+            ),
+        ],
+        Pace::Platform(payload) => [
+            (
+                "Of Payload",
+                format!("{:.0}%", 100.0 * item.cost_mass.to_f32() / payload.max(1.0)),
+                crate::hud::elevator::CABLE,
+            ),
+            ("Price", "Free".to_owned(), palette::TEXT),
+            ("Arrives", "By platform".to_owned(), palette::TEXT),
+        ],
+    };
     for (i, (label, value, tone)) in costs.iter().enumerate() {
         let cx = x + i as f32 * (cw - 70.0) / 3.0;
         ui.fill(Rect::new(cx, r.y + 66.0, 2.0, 28.0), rgb(*tone, 0.9));

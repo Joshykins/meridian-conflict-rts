@@ -50,6 +50,8 @@
             SensorShip: "select_intel",
             // A titan: its own answer (titan_alerts.ron), the size of the thing in it.
             Titan: "select_titan",
+            // A space elevator: its cable drawn tight (elevator_alerts.ron).
+            Elevator: "select_elevator",
             // Salvage answers like the engineers it works beside.
             Salvage: "select_engineer",
             SalvageCarrier: "select_engineer",

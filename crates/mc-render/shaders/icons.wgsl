@@ -59,8 +59,8 @@ fn vs_icon(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
     if shape == 13u {
         size_px = 8.0;
     }
-    if shape == ICON_TITAN {
-        // A tier-5 titan: bigger than anything else, framed (`fs_icon`).
+    if shape == ICON_TITAN || shape == ICON_ELEVATOR {
+        // A tier 5 (a titan, a space elevator): bigger than anything else, framed (`fs_icon`).
         size_px = ICON_TITAN_PX;
     }
     if shape == ICON_SALVAGE_DRONE {
@@ -378,6 +378,10 @@ fn icon_shape(shape: u32, p: vec2<f32>) -> f32 {
             let chevron = sd_segment(q, vec2<f32>(0.0, 0.2), vec2<f32>(0.2, 0.46)) - 0.075;
             return min(min(ring, chevron), length(p) - 0.11);
         }
+        // Space elevator, from the front: its cable coming down out of the sky with a
+        // platform on it, into the clamp jaws of two tower flanks and the one between them
+        // (`hud/icons.rs` draws the same; `fs_icon` frames it as a tier 5).
+        case 37u: { return sd_elevator(p); }
         default: { return sd_box(p, vec2<f32>(0.6)); }
     }
 }
@@ -432,6 +436,17 @@ fn sd_titan(p: vec2<f32>) -> f32 {
     return d;
 }
 
+fn sd_elevator(p: vec2<f32>) -> f32 {
+    let q = vec2<f32>(abs(p.x), p.y);
+    let cable = sd_box(p - vec2<f32>(0.0, 0.42), vec2<f32>(0.045, 0.54));
+    let platform = sd_box(p - vec2<f32>(0.0, 0.5), vec2<f32>(0.26, 0.07));
+    let base = sd_box(p - vec2<f32>(0.0, -0.8), vec2<f32>(0.82, 0.07));
+    let tower = sd_poly4(q, vec2<f32>(0.52, -0.76), vec2<f32>(0.8, -0.76), vec2<f32>(0.6, 0.08), vec2<f32>(0.42, 0.08));
+    let jaw = sd_segment(q, vec2<f32>(0.47, 0.02), vec2<f32>(0.13, -0.16)) - 0.07;
+    let middle = sd_poly4(p, vec2<f32>(-0.17, -0.76), vec2<f32>(0.17, -0.76), vec2<f32>(0.08, -0.3), vec2<f32>(-0.08, -0.3));
+    return min(min(min(cable, platform), min(base, tower)), min(jaw, middle));
+}
+
 // A titan's frame: four corner brackets round the whole quad (in `uv`).
 fn sd_titan_frame(uv: vec2<f32>) -> f32 {
     let q = abs(uv);
@@ -452,9 +467,9 @@ fn fs_icon(in: IconOut) -> @location(0) vec4<f32> {
         let x = (f32(i) - (f32(min(tech, 5u)) - 1.0) * 0.5) * 0.3;
         d = min(d, sd_box(in.uv - vec2<f32>(x, -0.84), vec2<f32>(0.1, 0.07)));
     }
-    // A titan's corner brackets: drawn paler than the figure, outlined like it.
+    // A tier 5's corner brackets: drawn paler than the figure, outlined like it.
     var frame = 0.0;
-    if shape == ICON_TITAN {
+    if shape == ICON_TITAN || shape == ICON_ELEVATOR {
         let f = sd_titan_frame(in.uv);
         d = min(d, f);
         let aaf = fwidth(f) * 1.2;

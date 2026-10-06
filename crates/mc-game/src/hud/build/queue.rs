@@ -54,6 +54,9 @@ pub(super) struct Queue<'a> {
     pub(super) progress: f32,
     /// Seconds before the front entry is done at the pace it is going, when it is moving.
     pub(super) eta: Option<f32>,
+    /// A space elevator: what its platform is doing. Its queue is never built: the
+    /// progress and time are the wait for the next platform (`elevator::strip`).
+    pub(super) platform: Option<&'static str>,
     pub(super) is_factory: bool,
     /// The selected factories that build their queues over and over.
     pub(super) repeat: Split,
@@ -339,10 +342,10 @@ fn head(ui: &mut Ui, s: &Scene, r: Rect, queue: &Queue, head_w: f32) -> f32 {
     );
     let (tx, w) = (x + 12.0, head_w - 12.0);
     // What it is doing, and to what: a refit by its module's name.
-    let doing = if paused {
-        "Paused"
-    } else {
-        crate::hud::selection::activity(front)
+    let doing = match queue.platform {
+        Some(doing) => doing,
+        None if paused => "Paused",
+        None => crate::hud::selection::activity(front),
     };
     let item = s.blueprints.unit(first.blueprint);
     let name = crate::hud::refit::queued_name(s.blueprints, first.blueprint).unwrap_or(&item.name);
