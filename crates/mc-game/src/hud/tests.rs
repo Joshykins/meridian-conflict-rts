@@ -1351,23 +1351,17 @@ fn a_factory_queues_its_upgrade_and_the_units_it_opens_on_the_tier_tab() {
 }
 
 /// A commander's refit tab: row `row` (slot), tile `n` along it counting `or`
-/// gaps after `ors` alternatives and `arrows` tier arrows.
-fn refit_tile(row: usize, n: usize, ors: usize, arrows: usize) -> Vec2 {
+/// gaps after `ors` alternatives. A module and its tiers are one tile.
+fn refit_tile(row: usize, n: usize, ors: usize) -> Vec2 {
     let row_h = ((build::PANEL_H - 52.0 - 12.0) / 4.0).clamp(26.0, 44.0);
     Vec2::new(
-        build_x(4)
-            + 14.0
-            + 104.0
-            + n as f32 * 172.0
-            + ors as f32 * 34.0
-            + arrows as f32 * 26.0
-            + 86.0,
+        build_x(4) + 14.0 + 104.0 + n as f32 * 172.0 + ors as f32 * 34.0 + 86.0,
         BUILD_Y + 44.0 + row as f32 * (row_h + 4.0) + row_h * 0.5,
     )
 }
 
 #[test]
-fn refits_queue_their_earlier_tiers_and_ask_before_replacing() {
+fn refits_queue_their_tiers_one_click_at_a_time_and_ask_before_replacing() {
     let mut rig = Rig::new("aster_commander+mfe");
     let bps = rig.blueprints.clone();
     let set = bps
@@ -1385,16 +1379,43 @@ fn refits_queue_their_earlier_tiers_and_ask_before_replacing() {
             .kit
     };
     rig.hud.open_refit_tab();
-    // The rail cannon goes over the cannon: one click queues both, in order.
+    // The cannon and the rail cannon are one tile: a click queues the first tier...
+    let gun = refit_tile(1, 0, 0);
     assert_eq!(
-        rig.click(refit_tile(1, 1, 0, 1)),
-        vec![HudAction::Refit(vec![
-            kit("gun", "cannon"),
-            kit("gun", "railgun")
-        ])]
+        rig.click(gun),
+        vec![HudAction::Refit(vec![kit("gun", "cannon")])]
+    );
+    // ...and with that waiting in the queue, the same tile queues the next.
+    let queued = |blueprint| QueuedOrder {
+        formation: 0,
+        offset: [0.0; 2],
+        moving_slot: None,
+        formation_phase: 0,
+        kind: OrderKind::Upgrade,
+        pos: [0.0, 0.0],
+        at: mc_core::FxVec2::ZERO,
+        blueprint,
+        radius: 0.0,
+    };
+    rig.view.status.queues = vec![UnitOrders {
+        unit_id: 7,
+        orders: vec![queued(kit("gun", "cannon"))],
+        progress: 0.0,
+        ..Default::default()
+    }];
+    assert_eq!(
+        rig.click(gun),
+        vec![HudAction::Refit(vec![kit("gun", "railgun")])]
+    );
+    // A right-click takes the last queued tier out.
+    assert_eq!(
+        rig.right_click(gun),
+        vec![HudAction::CancelRefit(kit("gun", "cannon"))]
     );
     // The shield would take the formation engine off: nothing is sent until the player says so.
-    let shield = refit_tile(2, 1, 1, 0);
+    // (With the queue empty again, so the card stands where the panel's own top puts it.)
+    rig.view.status.queues.clear();
+    let shield = refit_tile(2, 1, 1);
     assert_eq!(rig.click(shield), vec![]);
     assert!(rig.hud.refit_prompt.is_some(), "a replacement asks first");
     // The card stands over the panel: its buttons along its foot.

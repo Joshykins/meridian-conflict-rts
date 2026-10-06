@@ -1,10 +1,9 @@
 //! The refit tab: what can be fitted to a unit with refit slots (`mc_data::refit`),
-//! a row per slot. In a row, a module's later tiers follow it behind an arrow;
-//! alternatives are split by "or". Each tile says whether its module is fitted,
-//! being fitted, waiting in the queue, or what it costs, and a click queues it:
-//! with the earlier tiers it needs in front of it, and, when it would take
-//! another module off, only after the player confirms. Right-click takes a
-//! queued module back out. Nothing here knows about any one unit: every unit
+//! a row per slot. In a row, a module and its later tiers are one tile with a pip
+//! per tier (fitted, being fitted, queued, open); alternatives are split by "or".
+//! The tile names the next tier to fit, and each click queues it: after the
+//! tiers already queued, and, when it would take another module off, only after
+//! the player confirms. Right-click takes the last queued tier back out. Nothing here knows about any one unit: every unit
 //! whose file lists `refits` gets this tab.
 
 use super::selection::dps;
@@ -22,7 +21,6 @@ const BUILDING: u32 = 0xFFA928;
 const FITTED: u32 = 0x78E08A;
 const LABEL_W: f32 = 104.0;
 const TILE_W: f32 = 172.0;
-const ARROW_W: f32 = 26.0;
 const OR_W: f32 = 34.0;
 
 /// A choice that takes a module off, waiting for the player to say yes.
@@ -167,32 +165,15 @@ pub fn tab(hud: &mut Hud, ui: &mut Ui, s: &Scene, u: &UnitInstance, r: Rect, flo
                 or_mark(ui, x, row);
                 x += OR_W;
             }
-            let mut line = vec![root];
-            // Later tiers in the order the file gives them.
-            let mut i = 0;
-            while i < line.len() {
-                let at = line[i];
-                for (m, module) in slot.modules.iter().enumerate() {
-                    if module.after == Some(at) {
-                        line.push(m as u8);
-                    }
-                }
-                i += 1;
-            }
-            for (li, &m) in line.iter().enumerate() {
-                if li > 0 {
-                    tier_arrow(ui, x, row);
-                    x += ARROW_W;
-                }
-                let w = TILE_W.min((r.right() - x).max(60.0));
-                let at = Rect::new(x, row.y, w, row_h);
-                if at.right() <= r.right() + 0.5
-                    && module_tile(hud, ui, s, &plan, si, m, at, r.y - 44.0)
-                {
+            let line = chain_line(slot, root);
+            let w = TILE_W.min((r.right() - x).max(60.0));
+            let at = Rect::new(x, row.y, w, row_h);
+            if at.right() <= r.right() + 0.5 {
+                if let Some(m) = chain_tile(hud, ui, s, &plan, si, &line, at, r.y - 44.0) {
                     hovered = Some((si, m, at));
                 }
-                x += w;
             }
+            x += w;
         }
     }
     ui.interactive = live;
@@ -219,20 +200,28 @@ fn or_mark(ui: &mut Ui, x: f32, row: Rect) {
     );
 }
 
-fn tier_arrow(ui: &mut Ui, x: f32, row: Rect) {
-    let (a, b) = (
-        Vec2::new(x + 5.0, row.mid_y()),
-        Vec2::new(x + ARROW_W - 8.0, row.mid_y()),
-    );
-    ui.stroke(a, b, 1.4, rgb(palette::TEXT, 0.8));
-    super::icons::arrow_head(
-        ui,
-        Vec2::new(b.x + 2.0, b.y),
-        Vec2::X,
-        4.5,
-        1.4,
-        rgb(palette::TEXT, 0.8),
-    );
+/// A root module and its later tiers, in the order the file gives them.
+fn chain_line(slot: &mc_data::RefitSlot, root: u8) -> Vec<u8> {
+    let mut line = vec![root];
+    let mut i = 0;
+    while i < line.len() {
+        let at = line[i];
+        for (m, module) in slot.modules.iter().enumerate() {
+            if module.after == Some(at) {
+                line.push(m as u8);
+            }
+        }
+        i += 1;
+    }
+    line
+}
+
+/// The tier a right-click takes out: the last of the chain being fitted or waiting.
+fn cancel_target(plan: &Plan, slot: usize, line: &[u8]) -> Option<u8> {
+    line.iter()
+        .rev()
+        .copied()
+        .find(|&m| matches!(state(plan, slot, m), State::Fitting(_) | State::Queued(_)))
 }
 
 fn state(plan: &Plan, slot: usize, m: u8) -> State {
@@ -246,26 +235,40 @@ fn state(plan: &Plan, slot: usize, m: u8) -> State {
     }
 }
 
-/// One module's tile. Returns whether the pointer is on it.
-fn module_tile(
+/// One chain's tile: it names the next tier to fit (the last, once all are on),
+/// with a pip per tier. Returns that tier when the pointer is on the tile.
+fn chain_tile(
     hud: &mut Hud,
     ui: &mut Ui,
     s: &Scene,
     plan: &Plan,
     slot: usize,
-    m: u8,
+    line: &[u8],
     r: Rect,
     top: f32,
-) -> bool {
+) -> Option<u8> {
+    let total = line.len();
+    let next = line
+        .iter()
+        .position(|&m| !plan.fitted(&plan.planned, slot, m));
+    let at = next.unwrap_or(total - 1);
+    let m = line[at];
     let module = plan.set.module(slot, m);
     let st = state(plan, slot, m);
-    // Superseded: an earlier tier under what is (or will be) on. Nothing to do there.
-    let under = plan.fitted(&plan.planned, slot, m) && plan.planned[slot] != m + 1;
-    let lit = matches!(st, State::Fitted | State::Fitting(_) | State::Queued(_));
-    let t = hud.tile(ui, id("refit", module.kit.0 as usize), r, lit, true);
+    let tier = format!("Tier {}/{total}", at + 1);
+    let lit = line
+        .iter()
+        .any(|&x| !matches!(state(plan, slot, x), State::Open));
+    let t = hud.tile(
+        ui,
+        id("refit", plan.set.module(slot, line[0]).kit.0 as usize),
+        r,
+        lit,
+        true,
+    );
     let inner = Rect::new(r.x + 3.0, r.y + 3.0, r.w - 6.0, r.h - 6.0);
     let (tone, status) = match st {
-        State::Fitted if under => (FITTED, "Fitted  \u{b7}  under the next tier".to_owned()),
+        State::Fitted if total > 1 => (FITTED, format!("Fitted  \u{b7}  {tier}")),
         State::Fitted => (FITTED, "Fitted".to_owned()),
         State::Fitting(p) => (BUILDING, format!("Refitting  {:.0}%", p * 100.0)),
         State::Queued(i) => (palette::TEXT, format!("Queued  \u{b7}  {}", ordinal(i + 1))),
@@ -279,14 +282,17 @@ fn module_tile(
                 .iter()
                 .map(|&x| plan.set.module(slot, x).cost_energy.to_f32())
                 .sum();
-            (
-                palette::DIM,
-                format!("{}  \u{b7}  {}", short(mass), short(energy)),
-            )
+            let price = format!("{}  \u{b7}  {}", short(mass), short(energy));
+            let status = if total > 1 {
+                format!("{tier}  \u{b7}  {price}")
+            } else {
+                price
+            };
+            (palette::DIM, status)
         }
     };
     match st {
-        State::Fitting(p) => {
+        State::Fitting(p) if total == 1 => {
             ui.gradient_v(
                 inner,
                 rgb(BUILDING, 0.06),
@@ -299,6 +305,11 @@ fn module_tile(
                 rgb(BUILDING, 1.0),
             );
         }
+        State::Fitting(_) => ui.gradient_v(
+            inner,
+            rgb(BUILDING, 0.06),
+            rgb(BUILDING, 0.2 + 0.15 * (ui.time * 3.2).sin().abs()),
+        ),
         State::Fitted => ui.gradient_h(inner, rgb(FITTED, 0.14), rgb(FITTED, 0.0)),
         _ => {}
     }
@@ -306,19 +317,31 @@ fn module_tile(
         Rect::new(r.x + 3.0, r.y + 5.0, 2.0, r.h - 10.0),
         rgb(tone, if st == State::Open { 0.35 } else { 0.95 }),
     );
-    let text_w = r.w - 18.0;
+    // One pip per tier, along the name line: filled as the tier goes on.
+    let pips = if total > 1 {
+        tier_pips(
+            ui,
+            plan,
+            slot,
+            line,
+            Vec2::new(r.right() - 9.0, r.y + r.h * 0.36),
+        )
+    } else {
+        0.0
+    };
+    let text_w = r.w - 18.0 - pips;
     ui.text_fit_left(
         r.x + 11.0,
         r.y + r.h * 0.36,
         text_w,
         super::build::NAME,
-        rgb(0xFFFFFF, if under { 0.55 } else { 1.0 }),
+        rgb(0xFFFFFF, 1.0),
         &module.name,
     );
     ui.text_fit_left(
         r.x + 11.0,
         r.y + r.h * 0.72,
-        text_w,
+        r.w - 18.0,
         type_scale::MICRO,
         rgb(tone, 1.0),
         &status,
@@ -327,12 +350,41 @@ fn module_tile(
         click(hud, ui, s, plan, slot, m, r, top, st);
     }
     if t.right_clicked {
-        if let State::Fitting(_) | State::Queued(_) = st {
+        if let Some(c) = cancel_target(plan, slot, line) {
             ui.audio.play(Sfx::Back);
-            hud.actions.push(HudAction::CancelRefit(module.kit));
+            hud.actions
+                .push(HudAction::CancelRefit(plan.set.module(slot, c).kit));
         }
     }
-    t.hovered
+    t.hovered.then_some(m)
+}
+
+/// The tier pips, right-aligned to `right_mid`: green fitted, amber being fitted,
+/// white queued, dim open. Returns the width taken, with a gap.
+fn tier_pips(ui: &mut Ui, plan: &Plan, slot: usize, line: &[u8], right_mid: Vec2) -> f32 {
+    let (w, h, gap) = (14.0, 4.0, 3.0);
+    let width = line.len() as f32 * (w + gap) - gap;
+    for (i, &m) in line.iter().enumerate() {
+        let pip = Rect::new(
+            right_mid.x - width + i as f32 * (w + gap),
+            right_mid.y - h * 0.5,
+            w,
+            h,
+        );
+        match state(plan, slot, m) {
+            State::Fitted => ui.fill(pip, rgb(FITTED, 1.0)),
+            State::Fitting(p) => {
+                ui.fill(pip, rgb(BUILDING, 0.3));
+                ui.fill(
+                    Rect::new(pip.x, pip.y, pip.w * p.clamp(0.0, 1.0), h),
+                    rgb(BUILDING, 1.0),
+                );
+            }
+            State::Queued(_) => ui.fill(pip, rgb(palette::TEXT, 0.9)),
+            State::Open => ui.frame(pip, rgb(palette::TEXT, 0.35)),
+        }
+    }
+    width + 8.0
 }
 
 fn click(
@@ -498,6 +550,11 @@ fn card(
     bottom: f32,
 ) {
     let module = plan.set.module(slot, m);
+    let line = chain_line(
+        &plan.set.slots[slot],
+        plan.set.chain(slot, m).last().unwrap_or(m),
+    );
+    let tier = line.iter().position(|&x| x == m).unwrap_or(0);
     let bps = s.blueprints;
     // Against what the unit will have when this comes up.
     let before = plan.blueprint(&plan.planned);
@@ -584,14 +641,8 @@ fn card(
     let mut notes: Vec<(String, u32)> = Vec::new();
     match state(plan, slot, m) {
         State::Fitted => notes.push(("Fitted.".into(), FITTED)),
-        State::Fitting(_) => notes.push((
-            "Being fitted now  \u{b7}  right-click to cancel".into(),
-            BUILDING,
-        )),
-        State::Queued(_) => notes.push((
-            "In the queue  \u{b7}  right-click to take it out".into(),
-            palette::TEXT,
-        )),
+        State::Fitting(_) => notes.push(("Being fitted now.".into(), BUILDING)),
+        State::Queued(_) => notes.push(("In the queue.".into(), palette::TEXT)),
         State::Open => {
             if route.len() > 1 {
                 let names: Vec<&str> = route[..route.len() - 1]
@@ -644,7 +695,17 @@ fn card(
         cw,
         type_scale::MICRO,
         rgb(palette::TEXT, 1.0),
-        &format!("{}  \u{b7}  {}", plan.set.slots[slot].name, module.summary),
+        &if line.len() > 1 {
+            format!(
+                "{}  \u{b7}  Tier {} of {}  \u{b7}  {}",
+                plan.set.slots[slot].name,
+                tier + 1,
+                line.len(),
+                module.summary
+            )
+        } else {
+            format!("{}  \u{b7}  {}", plan.set.slots[slot].name, module.summary)
+        },
     );
     // The price of this module (and the tiers queued before it), and how long this unit takes.
     let (mass, energy, time): (f32, f32, f32) = if route.is_empty() {
@@ -715,17 +776,20 @@ fn card(
         ui.text_fit_left(x, y, cw, type_scale::CAPTION, rgb(*tone, 1.0), line);
         y += 20.0;
     }
-    let hint = match state(plan, slot, m) {
-        State::Open => "Click to queue",
-        State::Fitting(_) | State::Queued(_) => "Right-click to cancel",
-        State::Fitted => "",
+    let undo = cancel_target(plan, slot, &line)
+        .map(|c| format!("Right-click takes out {}", plan.set.module(slot, c).name));
+    let hint = match (state(plan, slot, m), undo) {
+        (State::Open, Some(undo)) => format!("Click to queue  \u{b7}  {undo}"),
+        (State::Open, None) => "Click to queue".to_owned(),
+        (_, Some(undo)) => undo,
+        (_, None) => String::new(),
     };
     ui.text(
         x,
         r.bottom() - 14.0,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
-        hint,
+        &hint,
     );
 }
 
