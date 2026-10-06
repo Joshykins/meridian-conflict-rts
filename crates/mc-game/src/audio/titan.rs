@@ -280,6 +280,68 @@ impl GiantSounds {
 impl GiantSounds {
     /// The rotary guns turning now, as loops for the game's mix: (sound, gain, pan, pitch).
     pub fn loops(&self) -> Vec<(SoundId, f32, f32, f32)> {
-        self.whirs.clone()
+        mix_whirs(&self.whirs)
+    }
+}
+
+/// How far either side of the middle a whir sits before it is heard on that side.
+const WHIR_BIN_EDGE: f32 = 0.28;
+/// The most a side's whir rises over its loudest gun however many turn there.
+const WHIR_CROWD: f32 = 1.3;
+/// Per side, a slightly different speed, so the sides do not lock into one drone.
+const WHIR_DETUNE: [f32; 3] = [0.97, 1.0, 1.035];
+
+/// Many rotary guns turning together as at most one whir per side of the view (left,
+/// middle, right) per sound: their power summed, but never more than `WHIR_CROWD` times
+/// the loudest. A loop per gun used to stack a dozen Breachers' held growl into one
+/// deafening drone.
+fn mix_whirs(whirs: &[(SoundId, f32, f32, f32)]) -> Vec<(SoundId, f32, f32, f32)> {
+    // Per (sound, side): summed power, loudest gain, its pan and pitch.
+    let mut sides: Vec<(SoundId, usize, f32, f32, f32, f32)> = Vec::new();
+    for &(sound, gain, pan, pitch) in whirs {
+        let side = if pan < -WHIR_BIN_EDGE {
+            0
+        } else if pan > WHIR_BIN_EDGE {
+            2
+        } else {
+            1
+        };
+        match sides.iter_mut().find(|s| s.0 == sound && s.1 == side) {
+            Some(s) => {
+                s.2 += gain * gain;
+                if gain > s.3 {
+                    (s.3, s.4, s.5) = (gain, pan, pitch);
+                }
+            }
+            None => sides.push((sound, side, gain * gain, gain, pan, pitch)),
+        }
+    }
+    sides
+        .into_iter()
+        .map(|(sound, side, power, loudest, pan, pitch)| {
+            let gain = power.sqrt().min(loudest * WHIR_CROWD);
+            (sound, gain, pan, pitch * WHIR_DETUNE[side])
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_crowd_of_rotary_guns_is_a_whir_a_side_no_louder_than_a_few() {
+        let whir = SoundId(7);
+        let crowd: Vec<_> = (0..12)
+            .map(|i| (whir, 0.9, -0.9 + 0.15 * i as f32, 1.0))
+            .collect();
+        let mixed = mix_whirs(&crowd);
+        assert_eq!(mixed.len(), 3, "one whir per side: {mixed:?}");
+        for &(_, gain, _, _) in &mixed {
+            assert!(gain <= 0.9 * WHIR_CROWD + 1e-6, "{mixed:?}");
+        }
+        let lone = mix_whirs(&[(whir, 0.6, 0.0, 1.0)]);
+        assert_eq!(lone.len(), 1);
+        assert!((lone[0].1 - 0.6).abs() < 1e-6, "a lone gun keeps its level");
     }
 }
