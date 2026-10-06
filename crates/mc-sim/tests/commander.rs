@@ -649,8 +649,8 @@ fn a_refit_tells_its_own_side_the_time_it_has_left() {
         .find(|l| l.unit_id == acu.0)
         .expect("the refit lists its time left")
         .seconds;
-    // Suite II: 1800 build time at the commander's own power of 10, 180 s.
-    assert!((170.0..=180.0).contains(&left), "{left} s left");
+    // Suite II: 1260 build time at the commander's own power of 10, 126 s.
+    assert!((116.0..=126.0).contains(&left), "{left} s left");
     for _ in 0..50 {
         w.tick(&[]).unwrap();
     }
