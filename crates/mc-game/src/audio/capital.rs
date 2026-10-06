@@ -117,6 +117,8 @@ impl CapitalSounds {
                 .collect();
             // And the warp loops, which follow the charge and the rift (audio/warp.rs).
             gliding.extend(super::warp::gliding(&library, blueprints));
+            // And the space elevators' sirens and platform loops (audio/elevator.rs).
+            gliding.extend(super::elevator::gliding(&library, blueprints));
             audio.set_gliding(&gliding);
         }
         let mut drives = Vec::new();

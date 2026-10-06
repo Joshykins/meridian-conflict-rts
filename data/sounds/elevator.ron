@@ -1,0 +1,273 @@
+// The Skyhook space elevator (`mc_sim::elevator`), heard by `audio/elevator.rs`, which
+// looks each part up as `<moving>_<part>` (the unit's `moving` sound) and falls back to
+// `elevator_<part>` here.
+//
+// The loops are steady on purpose: the game glides their pitch and level with the
+// platform's height and speed and with the siren's rotors, which is where they move.
+// Every steady frequency is a whole number of cycles in its loop. The one-shots are
+// tied to the moments the sim and the pose report: the cable falling from orbit, its
+// foot passing the clouds, seating in the well, the three jaws closing on it; a
+// platform braking, docking, letting its units off, and leaving.
+//
+// Everything is weight first: bodies at 30 to 150 Hz with mids at 150 Hz to 1.5 kHz
+// so small speakers carry them, and no held noise above about 2 kHz.
+(
+    sounds: {
+        // The towers' sirens, one voice per tower crown. A big motor siren with two rotor
+        // speeds: the game winds it up from half pitch, then swings it between its high
+        // note and a fourth under it every 1.3 s (the mixer's pitch glide slurs each
+        // change, so it wails "hi-lo" rather than stepping), turns each tower's horn so its
+        // level sweeps round, and winds it down at half pitch as it falls quiet. The nuke
+        // alarm is one rotor rising and falling once, a semitone pair; this one alternates.
+        // A reedy horn note with a slightly wavering copy beside it, the odd harmonics a
+        // ported rotor makes, air chopping through the ports and the motor under it.
+        "elevator_siren": (
+            length: 4, peak: 0.5, room: 0.4, looped: true,
+            layers: [
+                Fm(from: 300, to: 300, glide: 1, ratio: 1, index: 1.3, fade: 1000, attack: 0.01, decay: 100000, gain: 0.4),
+                Fm(from: 300.25, to: 300.25, glide: 1, ratio: 0.0125, index: 1.6, fade: 1000, attack: 0.01, decay: 100000, gain: 0.28, pan: 0.15),
+                Drone(freq: 600, gain: 0.05, wobble: 7.5, depth: 0.2),
+                Drone(freq: 900, gain: 0.11, wobble: 7.5, depth: 0.25, pan: -0.1),
+                Drone(freq: 1500, gain: 0.035, wobble: 7.5, depth: 0.3, pan: 0.1),
+                Drive(1.5),
+                Rumble(freq: 300, q: 4, gain: 5, wobble: 7.5, depth: 0.35),
+                Rumble(freq: 900, q: 2, gain: 1.5, wobble: 3.75, depth: 0.3),
+                Rumble(freq: 75, q: 0.8, gain: 5, wobble: 0.5, depth: 0.3),
+            ],
+        ),
+        // A platform coming down the cable from orbit: the air it shoves aside. A deep growl
+        // and its harmonics, buffeting low roar, and tearing air higher up, each swelling at
+        // random. The game brings it up as the platform nears and lifts its pitch with speed.
+        "elevator_platform_roar": (
+            length: 6, peak: 0.4, room: 0, looped: true,
+            layers: [
+                Fm(from: 29, to: 29, glide: 1, ratio: 0.5, index: 1.7, fade: 1000, attack: 0.01, decay: 100000, gain: 0.4),
+                Drone(freq: 58, gain: 0.2, wobble: 0.5, depth: 0.3),
+                Drone(freq: 87, gain: 0.12, wobble: 0.3333, depth: 0.35, pan: -0.15),
+                Drone(freq: 116, gain: 0.1, wobble: 0.6667, depth: 0.35, pan: 0.15),
+                Drone(freq: 145, gain: 0.06, wobble: 0.8333, depth: 0.4),
+                Drive(1.4),
+                Rumble(freq: 40, q: 0.8, gain: 12, wobble: 0.3333, depth: 0.3),
+                Wind(freq: 90, q: 0.7, gain: 10, swell: 1.5, depth: 0.6, sway: 0.4),
+                Wind(freq: 220, q: 0.9, gain: 8, swell: 3, depth: 0.5, sway: 0.5, pan: -0.25),
+                Wind(freq: 450, q: 1.1, gain: 3, swell: 5, depth: 0.6, sway: 0.4, pan: 0.25),
+            ],
+        ),
+        // The platform's ring of thrusters burning: braking over the last third of the
+        // descent, and lifting it away again. A low growl, a roaring bed, and the ragged
+        // crackle a big motor makes, fluttering fast.
+        "elevator_thrusters": (
+            length: 4, peak: 0.42, room: 0, looped: true,
+            layers: [
+                Fm(from: 37.5, to: 37.5, glide: 1, ratio: 0.5, index: 1.8, fade: 1000, attack: 0.01, decay: 100000, gain: 0.4),
+                Drone(freq: 75, gain: 0.2, wobble: 0.75, depth: 0.3),
+                Drone(freq: 112.5, gain: 0.1, wobble: 1.25, depth: 0.35, pan: 0.15),
+                Drone(freq: 150, gain: 0.08, wobble: 1.75, depth: 0.4, pan: -0.15),
+                Drive(1.4),
+                Rumble(freq: 60, q: 0.7, gain: 12, wobble: 0.5, depth: 0.35),
+                Wind(freq: 160, q: 0.8, gain: 10, swell: 4, depth: 0.5, sway: 0.4, pan: -0.2),
+                Wind(freq: 320, q: 0.9, gain: 7, swell: 12, depth: 0.7, sway: 0.5, pan: 0.2),
+                Wind(freq: 700, q: 1.0, gain: 2.5, swell: 18, depth: 0.85, sway: 0.4),
+            ],
+        ),
+        // The platform's collars running down through the towers' guide sleeves: steel
+        // dragging on steel. Inharmonic metal partials chattering on and off as the collars
+        // stick and slip, a low groan of the frame under them, and scraping grit. Kept
+        // under 1.5 kHz so it grinds rather than whines; the game raises it with speed.
+        "elevator_sleeve_screech": (
+            length: 3, peak: 0.3, room: 0, looped: true,
+            layers: [
+                Fm(from: 130, to: 130, glide: 1, ratio: 1.41, index: 1.5, fade: 1000, attack: 0.01, decay: 100000, gain: 0.25),
+                Drone(freq: 520, gain: 0.09, wobble: 6, depth: 0.85),
+                Drone(freq: 733.33, gain: 0.06, wobble: 4.3333, depth: 0.9, pan: -0.2),
+                Drone(freq: 1013.33, gain: 0.035, wobble: 7.6667, depth: 0.9, pan: 0.2),
+                Drive(1.3),
+                Wind(freq: 800, q: 2.5, gain: 4, swell: 9, depth: 0.9, sway: 0.4, pan: -0.15),
+                Wind(freq: 1250, q: 3, gain: 2.5, swell: 6, depth: 0.9, sway: 0.5, pan: 0.15),
+                Wind(freq: 300, q: 1.2, gain: 5, swell: 4, depth: 0.6, sway: 0.3),
+            ],
+        ),
+        // The running elevator at rest: mains hum off its plant, a pump chugging slowly,
+        // machinery murmuring in the towers.
+        "elevator_hum": (
+            length: 4, peak: 0.3, room: 0, looped: true,
+            layers: [
+                Fm(from: 50, to: 50, glide: 1, ratio: 0.5, index: 1.0, fade: 1000, attack: 0.01, decay: 100000, gain: 0.3),
+                Drone(freq: 100, gain: 0.18, wobble: 0.25, depth: 0.2),
+                Drone(freq: 150, gain: 0.07, wobble: 0.5, depth: 0.25, pan: -0.15),
+                Drone(freq: 200, gain: 0.05, wobble: 0.25, depth: 0.3, pan: 0.15),
+                Drone(freq: 300, gain: 0.025, wobble: 0.75, depth: 0.3),
+                Drone(freq: 75, gain: 0.1, wobble: 1.5, depth: 0.7),
+                Drive(1.2),
+                Rumble(freq: 120, q: 1.5, gain: 3, wobble: 1.25, depth: 0.3),
+                Rumble(freq: 450, q: 1.5, gain: 0.8, wobble: 0.5, depth: 0.4, pan: 0.2),
+            ],
+        ),
+        // The cable's foot falling out of orbit, 18 s from first sound to the well: far up
+        // and faint at first, a deep breathy whistle across the cable sinking in pitch, the
+        // roar of torn air opening under it and the growl of the mass coming down, all
+        // swelling as it nears and slows, and gone the moment it seats.
+        "elevator_cable_fall": (
+            length: 19.5, peak: 0.6, room: 0.7,
+            layers: [
+                Fm(from: 46, to: 31, glide: 17, ratio: 0.5, index: 1.6, fade: 20, attack: 15.5, decay: 0.8, gain: 0.45),
+                Fm(from: 330, to: 120, glide: 17, ratio: 0.5, index: 0.7, fade: 20, attack: 15, decay: 0.8, gain: 0.09),
+                Drive(1.4),
+                Sweep(from: 760, to: 190, glide: 17, q: 5, attack: 15.5, decay: 0.7, gain: 2.5),
+                Sweep(at: 0.3, from: 520, to: 150, glide: 17, q: 3, attack: 15.2, decay: 0.7, gain: 2.5, pan: 0.2),
+                Roll(at: 1.0, from: 220, to: 480, glide: 15, attack: 14.5, decay: 0.8, gain: 1.3, swell: 3, depth: 0.5, pan: -0.2),
+                Roll(from: 80, to: 150, glide: 17, attack: 15.5, decay: 0.9, gain: 1.2, swell: 1.2, depth: 0.5),
+            ],
+        ),
+        // The cable's foot breaking down through the cloud deck: a sonic double boom, a
+        // short shove of air, and thunder rolling off it both ways.
+        "elevator_cloud_thump": (
+            length: 7, peak: 0.6, room: 1.0,
+            layers: [
+                Burst(low: 30, high: 320, attack: 0.002, decay: 0.08, gain: 10),
+                Tone(from: 58, to: 30, glide: 0.35, attack: 0.002, decay: 0.45, gain: 1.6),
+                Burst(at: 0.14, low: 30, high: 300, attack: 0.002, decay: 0.09, gain: 8),
+                Tone(at: 0.14, from: 54, to: 28, glide: 0.4, attack: 0.002, decay: 0.5, gain: 1.3),
+                Drive(1.5),
+                Roll(at: 0.05, from: 280, to: 80, glide: 4, attack: 0.05, decay: 1.6, gain: 1.4, swell: 2, depth: 0.6),
+                Roll(at: 0.4, from: 200, to: 60, glide: 5, attack: 0.4, decay: 1.8, gain: 0.9, swell: 1.2, depth: 0.7, pan: -0.5),
+                Roll(at: 0.6, from: 190, to: 58, glide: 5, attack: 0.5, decay: 1.8, gain: 0.9, swell: 1.0, depth: 0.7, pan: 0.5),
+            ],
+        ),
+        // The cable seating in the well: a crack, a colossal low slam, the ground taking it
+        // and the whole steel mass ringing low and short. Then, as the dust rolls out, the
+        // three jaws' rams start to drive: a servo groan rising and the oil rushing.
+        "elevator_cable_seat": (
+            length: 9, peak: 0.85, room: 0.9,
+            layers: [
+                Burst(low: 90, high: 1100, attack: 0.0006, decay: 0.03, gain: 6),
+                Burst(at: 0.002, low: 28, high: 260, attack: 0.003, decay: 0.4, gain: 16),
+                Burst(at: 0.003, low: 160, high: 750, attack: 0.002, decay: 0.12, gain: 6),
+                Tone(from: 70, to: 28, glide: 0.6, attack: 0.003, decay: 1.0, gain: 2.2),
+                Tone(from: 46, to: 24, glide: 1.5, attack: 0.006, decay: 2.0, gain: 1.4),
+                Fm(at: 0.01, from: 74, to: 66, glide: 2.5, ratio: 1.41, index: 2.0, fade: 0.8, attack: 0.003, decay: 1.4, gain: 0.5),
+                Fm(at: 0.02, from: 151, to: 140, glide: 2, ratio: 2.76, index: 1.2, fade: 0.5, attack: 0.002, decay: 0.7, gain: 0.2, pan: 0.2),
+                Fm(at: 1.6, from: 48, to: 64, glide: 4.5, ratio: 2.0, index: 1.6, fade: 4, attack: 1.2, decay: 2.0, gain: 0.3),
+                Fm(at: 1.7, from: 96, to: 128, glide: 4.5, ratio: 1.0, index: 1.2, fade: 3, attack: 1.3, decay: 1.8, gain: 0.12, pan: -0.2),
+                Drive(1.6),
+                Roll(at: 0.01, from: 170, to: 60, glide: 4, attack: 0.02, decay: 2.0, gain: 1.2, swell: 3, depth: 0.6),
+                Sweep(at: 0.05, from: 600, to: 150, glide: 2.5, q: 0.8, attack: 0.03, decay: 1.0, gain: 2.0),
+                Sweep(at: 1.6, from: 280, to: 480, glide: 4.5, q: 2, attack: 1.2, decay: 1.8, gain: 1.0, pan: 0.15),
+            ],
+        ),
+        // The three jaws closing on the cable one after another, each a hydraulic slam (a
+        // crack, a deep blow and the jaw's steel ringing short) from its own tower, the
+        // locking pins driving home, and then the rams' pressure let off in one long hiss
+        // of steam that rolls and thins away.
+        "elevator_jaws": (
+            length: 11, peak: 0.8, room: 0.9,
+            layers: [
+                Burst(low: 80, high: 900, attack: 0.0006, decay: 0.02, gain: 6, pan: -0.45),
+                Burst(at: 0.002, low: 30, high: 240, attack: 0.003, decay: 0.25, gain: 12, pan: -0.45),
+                Tone(from: 62, to: 30, glide: 0.4, attack: 0.003, decay: 0.7, gain: 1.8, pan: -0.45),
+                Fm(at: 0.005, from: 88, to: 80, glide: 1.2, ratio: 1.41, index: 1.8, fade: 0.5, attack: 0.002, decay: 0.6, gain: 0.35, pan: -0.45),
+                Burst(at: 0.45, low: 80, high: 900, attack: 0.0006, decay: 0.02, gain: 6, pan: 0.45),
+                Burst(at: 0.452, low: 30, high: 240, attack: 0.003, decay: 0.25, gain: 12, pan: 0.45),
+                Tone(at: 0.45, from: 58, to: 29, glide: 0.4, attack: 0.003, decay: 0.7, gain: 1.8, pan: 0.45),
+                Fm(at: 0.455, from: 83, to: 76, glide: 1.2, ratio: 1.41, index: 1.8, fade: 0.5, attack: 0.002, decay: 0.6, gain: 0.35, pan: 0.45),
+                Burst(at: 0.85, low: 80, high: 900, attack: 0.0006, decay: 0.022, gain: 7),
+                Burst(at: 0.852, low: 28, high: 230, attack: 0.003, decay: 0.3, gain: 14),
+                Tone(at: 0.85, from: 60, to: 27, glide: 0.5, attack: 0.003, decay: 0.9, gain: 2.1),
+                Fm(at: 0.855, from: 79, to: 72, glide: 1.4, ratio: 1.41, index: 1.8, fade: 0.6, attack: 0.002, decay: 0.75, gain: 0.4),
+                Drive(1.5),
+                Burst(at: 1.3, low: 110, high: 800, attack: 0.0008, decay: 0.015, gain: 3.5, pan: -0.3),
+                Burst(at: 1.38, low: 110, high: 800, attack: 0.0008, decay: 0.015, gain: 3.5, pan: 0.3),
+                Burst(at: 1.45, low: 110, high: 800, attack: 0.0008, decay: 0.015, gain: 3.5),
+                Burst(at: 1.6, low: 300, high: 1600, attack: 0.01, decay: 0.15, gain: 3),
+                Roll(at: 1.6, from: 520, to: 200, glide: 6, attack: 0.1, decay: 2.6, gain: 0.8, swell: 6, depth: 0.4),
+                Foam(at: 1.6, from: 1400, to: 650, glide: 7, q: 0.7, attack: 0.08, decay: 2.8, gain: 1.0, swell: 30, depth: 0.4),
+                Sweep(at: 1.65, from: 900, to: 380, glide: 7, q: 0.6, attack: 0.12, decay: 3.0, gain: 1.6, pan: -0.25),
+                Sweep(at: 1.7, from: 850, to: 360, glide: 7, q: 0.6, attack: 0.15, decay: 3.0, gain: 1.6, pan: 0.25),
+            ],
+        ),
+        // The platform's thrusters lighting to brake over the last third of its fall: a
+        // deep whump, the growl taking hold and the roar coming up with a crackle.
+        "elevator_brake_ignite": (
+            length: 5, peak: 0.6, room: 0.6,
+            layers: [
+                Burst(low: 35, high: 400, attack: 0.004, decay: 0.2, gain: 10),
+                Tone(from: 64, to: 32, glide: 0.5, attack: 0.004, decay: 0.7, gain: 1.6),
+                Fm(at: 0.05, from: 30, to: 40, glide: 2, ratio: 0.5, index: 1.8, fade: 2, attack: 0.15, decay: 1.4, gain: 0.45),
+                Drive(1.5),
+                Roll(at: 0.04, from: 420, to: 240, glide: 3, attack: 0.15, decay: 1.4, gain: 1.4, swell: 8, depth: 0.55),
+                Roll(at: 0.06, from: 130, to: 80, glide: 3, attack: 0.2, decay: 1.6, gain: 1.2, swell: 3, depth: 0.4),
+                Burst(at: 0.2, low: 260, high: 1200, attack: 0.0005, decay: 0.014, gain: 3.5, pan: 0.3),
+                Burst(at: 0.27, low: 300, high: 1300, attack: 0.0005, decay: 0.012, gain: 3, pan: -0.35),
+                Burst(at: 0.41, low: 240, high: 1100, attack: 0.0005, decay: 0.015, gain: 3.2, pan: 0.1),
+                Burst(at: 0.52, low: 320, high: 1250, attack: 0.0005, decay: 0.01, gain: 2.6, pan: -0.2),
+                Burst(at: 0.7, low: 280, high: 1150, attack: 0.0005, decay: 0.013, gain: 2.4, pan: 0.4),
+                Burst(at: 0.93, low: 260, high: 1300, attack: 0.0005, decay: 0.012, gain: 2, pan: -0.4),
+            ],
+        ),
+        // A platform docking: the colossal clunk of thousands of tonnes meeting the deck
+        // (a crack, a slam held down low, the hull's steel ringing low and dying), the
+        // ground taking it, then the hydraulic locks driving home one, two, three, and the
+        // brakes' steam let off in a long hiss.
+        "elevator_dock": (
+            length: 9, peak: 0.88, room: 1.0,
+            layers: [
+                Burst(low: 70, high: 900, attack: 0.0006, decay: 0.03, gain: 6),
+                Burst(at: 0.002, low: 24, high: 220, attack: 0.003, decay: 0.5, gain: 18),
+                Burst(at: 0.003, low: 150, high: 700, attack: 0.002, decay: 0.14, gain: 7),
+                Tone(from: 58, to: 24, glide: 0.8, attack: 0.003, decay: 1.4, gain: 2.6),
+                Tone(from: 36, to: 22, glide: 2, attack: 0.008, decay: 2.2, gain: 1.4),
+                Fm(at: 0.005, from: 52, to: 47, glide: 3, ratio: 1.41, index: 2.2, fade: 1.0, attack: 0.003, decay: 1.8, gain: 0.55),
+                Fm(at: 0.01, from: 117, to: 110, glide: 2, ratio: 2.76, index: 1.3, fade: 0.6, attack: 0.002, decay: 0.9, gain: 0.3, pan: -0.25),
+                Fm(at: 0.015, from: 173, to: 166, glide: 2, ratio: 1.41, index: 0.9, fade: 0.4, attack: 0.002, decay: 0.6, gain: 0.12, pan: 0.25),
+                Fm(at: 1.25, from: 70, to: 95, glide: 0.3, ratio: 2, index: 1.5, fade: 0.6, attack: 0.08, decay: 0.3, gain: 0.25, pan: -0.3),
+                Fm(at: 1.65, from: 68, to: 92, glide: 0.3, ratio: 2, index: 1.5, fade: 0.6, attack: 0.08, decay: 0.3, gain: 0.25, pan: 0.3),
+                Fm(at: 2.0, from: 66, to: 90, glide: 0.3, ratio: 2, index: 1.5, fade: 0.6, attack: 0.08, decay: 0.3, gain: 0.25),
+                Drive(1.7),
+                Roll(at: 0.01, from: 180, to: 55, glide: 5, attack: 0.02, decay: 2.4, gain: 1.3, swell: 2.5, depth: 0.6),
+                Burst(at: 1.5, low: 100, high: 800, attack: 0.0008, decay: 0.015, gain: 4, pan: -0.3),
+                Tone(at: 1.5, from: 140, to: 70, glide: 0.05, attack: 0.001, decay: 0.1, gain: 0.3, pan: -0.3),
+                Burst(at: 1.9, low: 100, high: 800, attack: 0.0008, decay: 0.015, gain: 4, pan: 0.3),
+                Tone(at: 1.9, from: 136, to: 68, glide: 0.05, attack: 0.001, decay: 0.1, gain: 0.3, pan: 0.3),
+                Burst(at: 2.25, low: 100, high: 800, attack: 0.0008, decay: 0.015, gain: 4.5),
+                Tone(at: 2.25, from: 132, to: 66, glide: 0.05, attack: 0.001, decay: 0.12, gain: 0.35),
+                Burst(at: 2.5, low: 300, high: 1600, attack: 0.01, decay: 0.12, gain: 3),
+                Foam(at: 2.5, from: 1300, to: 600, glide: 5, q: 0.7, attack: 0.05, decay: 2.2, gain: 0.9, swell: 28, depth: 0.45),
+                Sweep(at: 2.5, from: 800, to: 350, glide: 5, q: 0.7, attack: 0.08, decay: 2.4, gain: 1.5),
+            ],
+        ),
+        // The deck horn as the units start to roll off: one long low blast, two brassy
+        // notes a major third apart scooping up onto pitch, a sub under them, air in the
+        // throat, and the echo coming back off the towers.
+        "elevator_deck_horn": (
+            length: 7, peak: 0.55, room: 1.0,
+            layers: [
+                Fm(from: 92, to: 98, glide: 0.3, ratio: 1, index: 2.2, fade: 3, attack: 0.15, decay: 1.6, gain: 0.45),
+                Fm(from: 115, to: 123, glide: 0.3, ratio: 1, index: 2.0, fade: 3, attack: 0.18, decay: 1.6, gain: 0.3, pan: 0.15),
+                Fm(from: 46, to: 49, glide: 0.3, ratio: 0.5, index: 1.2, fade: 3, attack: 0.2, decay: 1.6, gain: 0.25),
+                Drive(1.4),
+                Hiss(freq: 600, q: 1, attack: 0.1, decay: 1.2, gain: 0.04),
+            ],
+        ),
+        // The platform letting go: the locks releasing, a breath of steam, the thrusters
+        // spooling up (a growl climbing out of the deck) and lighting with a deep whump
+        // into a roar that the thruster loop carries up and away.
+        "elevator_depart": (
+            length: 9, peak: 0.7, room: 0.8,
+            layers: [
+                Burst(low: 90, high: 700, attack: 0.0008, decay: 0.02, gain: 4.5),
+                Tone(from: 120, to: 60, glide: 0.06, attack: 0.001, decay: 0.12, gain: 0.35),
+                Burst(at: 0.25, low: 90, high: 700, attack: 0.0008, decay: 0.02, gain: 4.5, pan: 0.3),
+                Tone(at: 0.25, from: 116, to: 58, glide: 0.06, attack: 0.001, decay: 0.12, gain: 0.35, pan: 0.3),
+                Fm(at: 0.6, from: 22, to: 44, glide: 3, ratio: 0.5, index: 1.8, fade: 4, attack: 2.4, decay: 2.2, gain: 0.5),
+                Fm(at: 0.8, from: 44, to: 88, glide: 3, ratio: 1, index: 1.4, fade: 3, attack: 2.2, decay: 1.4, gain: 0.25),
+                Burst(at: 3.0, low: 30, high: 380, attack: 0.004, decay: 0.25, gain: 12),
+                Tone(at: 3.0, from: 64, to: 30, glide: 0.6, attack: 0.004, decay: 0.9, gain: 1.8),
+                Drive(1.5),
+                Foam(at: 0.35, from: 1200, to: 600, glide: 2, q: 0.7, attack: 0.05, decay: 0.9, gain: 0.6, swell: 26, depth: 0.45),
+                Sweep(at: 0.6, from: 60, to: 220, glide: 2.6, q: 0.9, attack: 2.4, decay: 0.8, gain: 3),
+                Roll(at: 3.0, from: 420, to: 180, glide: 5, attack: 0.2, decay: 1.8, gain: 1.4, swell: 8, depth: 0.55),
+                Roll(at: 3.05, from: 120, to: 60, glide: 5, attack: 0.3, decay: 2.0, gain: 1.4, swell: 3, depth: 0.4),
+            ],
+        ),
+    },
+)
