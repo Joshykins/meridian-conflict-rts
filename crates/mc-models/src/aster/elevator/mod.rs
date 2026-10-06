@@ -21,13 +21,10 @@
 //! cheeks, and everything over and behind its hinge out of reach), and nothing but the
 //! jaws stands inside the platform's run (`DECK_R` round the cable) above the deck.
 //!
-//! Three designs are in the catalogue while one is picked (CLAUDE.md §9): `gantry`
-//! (the base), `pylon` (`space_elevator~b`) and `buttress` (`space_elevator~c`). They
-//! share the cable, the platform, the foundation and the far levels.
+//! The towers and jaws are the `gantry` design (picked over an A-frame pylon and a
+//! terraced buttress design, in history at a03495cf); the rest is shared with them.
 
-mod buttress;
 mod gantry;
-mod pylon;
 
 use std::f32::consts::TAU;
 
@@ -86,19 +83,6 @@ const _: () = assert!(CABLE_TOP <= 300.0 && GRIP_Z + BAND_HALF < CABLE_SPLIT);
 /// The base design: three hunched gantry towers with knuckle-boom jaws.
 pub(super) fn space_elevator(b: &mut MeshBuilder, _tech: u8) {
     build(b, gantry::tower, gantry::jaw);
-}
-
-/// Design B: armoured A-frame pylons with straight ram-driven jaws over a fortified well.
-pub(super) fn space_elevator_b(b: &mut MeshBuilder, _tech: u8) {
-    build(b, pylon::tower, pylon::jaw);
-    if !b.coarse() {
-        b.radial(3, pylon::bastion);
-    }
-}
-
-/// Design C: buttress towers on stepped terraces, curved claw jaws.
-pub(super) fn space_elevator_c(b: &mut MeshBuilder, _tech: u8) {
-    build(b, buttress::tower, buttress::jaw);
 }
 
 fn build(b: &mut MeshBuilder, tower: fn(&mut MeshBuilder), jaw: fn(&mut MeshBuilder)) {

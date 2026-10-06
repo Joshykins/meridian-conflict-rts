@@ -7,7 +7,7 @@ use crate::{build_model_scaled, part, MeshVertex};
 
 /// The unit file's size (`aster_t5_space_elevator`): radius, height, tech.
 const SIZE: (f32, f32, u8) = (150.0, 300.0, 5);
-const DESIGNS: [&str; 3] = ["space_elevator", "space_elevator~b", "space_elevator~c"];
+const DESIGNS: [&str; 1] = ["space_elevator"];
 
 fn pos(v: &MeshVertex) -> Vec3 {
     Vec3::from(v.pos)
