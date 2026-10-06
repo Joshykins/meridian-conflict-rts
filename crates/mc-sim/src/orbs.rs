@@ -25,6 +25,8 @@ const DT: i32 = TICKS_PER_SECOND as i32;
 pub(crate) const FLIGHT_TICKS: i32 = 25 * DT;
 /// Share of the way to its wanted heading a fleck turns each tick, as a fraction.
 const TURN: Fx = Fx::ratio(2, 5);
+/// Strides from its aim point inside which a fleck turns straight onto it.
+const CLOSE_STRIDES: i32 = 5;
 /// Metres from its spire's axis inside which a returning fleck is taken back in.
 const HOME_REACH: Fx = Fx::from_int(14);
 /// How far past the gun's range a fleck chases a mark before it gives it up, as a
@@ -201,7 +203,14 @@ impl World {
             let Some(wants) = s.wants else { continue };
             let vel = self.state.projectiles.vel[i];
             let speed = vel.length();
-            let dir = (vel.normalize() * (Fx::ONE - TURN) + wants.normalize() * TURN).normalize();
+            // Its turning circle is wider than what it hits: close in it turns straight onto
+            // the aim point, or it would circle a mark (or the spire) it keeps passing.
+            let turn = if wants.length() <= speed * CLOSE_STRIDES {
+                Fx::ONE
+            } else {
+                TURN
+            };
+            let dir = (vel.normalize() * (Fx::ONE - turn) + wants.normalize() * turn).normalize();
             if dir != FxVec3::ZERO {
                 self.state.projectiles.aim[i] = dir;
                 self.state.projectiles.vel[i] = dir * speed;
