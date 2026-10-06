@@ -81,6 +81,7 @@ pub(crate) mod lens_flare;
 mod lift_fx;
 mod map_look;
 mod mine_fx;
+mod nanite_repair_fx;
 mod nuke_fx;
 mod nuke_volume;
 mod ore_fields;
@@ -3322,6 +3323,7 @@ impl Renderer {
         self.gravitic_tick(projectiles, time);
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
+        self.nanite_repair_tick(frame, time, camera);
         self.lance_core_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
         self.arc_howitzer_tick(units, &frame.houses, time);

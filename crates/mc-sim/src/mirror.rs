@@ -26,6 +26,7 @@ pub mod city;
 mod destruct;
 mod fog;
 mod links;
+mod mend;
 mod units;
 mod walls;
 mod warp;
@@ -1385,6 +1386,10 @@ pub struct RenderFrame {
     pub work_left: Vec<WorkLeft>,
     /// Warp dampeners the viewer knows of, and their fields.
     pub dampers: Vec<DamperView>,
+    /// Hulls nanites are mending this tick, by their own regen or a repair field
+    /// (`mirror::mend`), and the repair fields the viewer may see.
+    pub mends: Vec<MendView>,
+    pub repair_fields: Vec<RepairFieldView>,
     /// Adjacency links the viewer may see (`crate::adjacency`).
     pub links: Vec<LinkView>,
     /// Each side's stores as the storage structures' lamps last judged them.
@@ -1453,6 +1458,26 @@ pub struct DamperView {
     pub radius: f32,
     /// Finished and powered: its field is up.
     pub live: bool,
+}
+
+/// A hull nanites are mending this tick: where it stands, how big it is, and where the
+/// nanites come from, the top of the repair field's carrier, or none when it mends itself.
+#[derive(Clone, Copy, Debug)]
+pub struct MendView {
+    pub unit_id: u32,
+    pub pos: [f32; 3],
+    pub radius: f32,
+    pub height: f32,
+    pub from: Option<[f32; 3]>,
+}
+
+/// A nanite repair field (`UnitBlueprint::repair_field`) and its carrier.
+#[derive(Clone, Copy, Debug)]
+pub struct RepairFieldView {
+    pub unit_id: u32,
+    pub pos: [f32; 3],
+    /// How far it reaches, metres.
+    pub radius: f32,
 }
 
 /// A warhead or an interceptor in flight. Seen by everyone, fog or no fog.
@@ -2636,6 +2661,7 @@ impl World {
         self.write_destructs(viewer, &mut frame.destructs);
         self.write_work_left(viewer, &mut frame.work_left);
         self.write_dampers(viewer, &mut frame.dampers);
+        self.write_mends(viewer, &mut frame.mends, &mut frame.repair_fields);
         self.write_links(viewer, &mut frame.links);
 
         self.write_fog(viewer, frame);

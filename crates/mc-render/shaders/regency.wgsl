@@ -52,6 +52,11 @@ struct RegencyIn {
     grads: array<vec3<f32>, 4>,
     // Per face, zero to one, shared with its mirror twin.
     seed: f32,
+    // A nanite face (`nanite::PATTERN_SLOT`): a lit slot down its middle.
+    nanite: bool,
+    // Seconds, and the unit's own random, zero to one.
+    time: f32,
+    unit: f32,
 }
 
 struct RegencyLook {
@@ -63,10 +68,104 @@ struct RegencyLook {
     lift: f32,
     // Added to roughness.
     rough: f32,
+    // Light of its own (HDR): a nanite slot's.
+    glow: vec3<f32>,
 }
 
 fn regency_none() -> RegencyLook {
-    return RegencyLook(vec3<f32>(0.0), 1.0, 0.0, 0.0);
+    return RegencyLook(vec3<f32>(0.0), 1.0, 0.0, 0.0, vec3<f32>(0.0));
+}
+
+// Regency plate, or Regency plate with nanite slots let in (both are coloured here).
+fn regency_pattern(p: u32) -> bool {
+    return p == PAT_EMBER || p == NANITE_PATTERN_SLOT;
+}
+
+// A nanite face's slot, down the middle of the face the long way: how far across from
+// its centre line (`x`) and how far in from its nearer end (`y`) the point is, and the
+// slot's half width (`z`). `z` is zero on a face too narrow to hold one.
+fn reg_nanite_slot(i: RegencyIn) -> vec3<f32> {
+    let f = i.face;
+    var across = 0.0;
+    var along = 0.0;
+    var broad = 0.0;
+    // Half the face's length along the slot, where it is known.
+    var long = 1e4;
+    if f.w < 0.0 {
+        // The longest edge, and of the other three the one that faces it most nearly: a
+        // long face's two sides, or across a swept plate from its leading edge to the
+        // far side of its point. The slot runs between them; the other two end it.
+        let d = vec4<f32>(f.xyz, -f.w - FACE_EDGES_BIAS);
+        var g = i.grads;
+        g[3] = -g[3];
+        var partner = 1u;
+        var facing = 2.0;
+        for (var k = 1u; k < 4u; k++) {
+            let c = dot(normalize(g[0] + vec3<f32>(1e-9)), normalize(g[k] + vec3<f32>(1e-9)));
+            if c < facing {
+                facing = c;
+                partner = k;
+            }
+        }
+        if facing > -0.3 {
+            return vec3<f32>(0.0);
+        }
+        let ends = select(select(vec2<f32>(d.y, d.z), vec2<f32>(d.y, d.w), partner == 2u), vec2<f32>(d.z, d.w), partner == 1u);
+        across = abs(d.x - d[partner]) * 0.5;
+        along = min(ends.x, ends.y);
+        broad = (d.x + d[partner]) * 0.5;
+    } else if f.z >= 0.0 && max(f.z, f.w) > 0.0 {
+        // The long way; on a face near square, the way that climbs the model.
+        var major = select(1u, 0u, f.z >= f.w);
+        if max(f.z, f.w) < min(f.z, f.w) * 1.25 {
+            let climb0 = abs(i.grads[0].z) * inverseSqrt(max(dot(i.grads[0], i.grads[0]), 1e-12));
+            let climb1 = abs(i.grads[1].z) * inverseSqrt(max(dot(i.grads[1], i.grads[1]), 1e-12));
+            major = select(1u, 0u, climb0 > climb1);
+        }
+        let minor = 1u - major;
+        across = abs(f[minor]);
+        along = f[major + 2u] - abs(f[major]);
+        broad = f[minor + 2u];
+        long = f[major + 2u];
+    }
+    let half = clamp(broad * 0.16, i.scale * 0.035, i.scale * 0.11);
+    // Too narrow, or too short to run past its rounded ends: no slot, not a stub.
+    if broad < i.scale * 0.08 || long < half * 4.0 {
+        return vec3<f32>(across, along, 0.0);
+    }
+    return vec3<f32>(across, along, half);
+}
+
+// The slot cut in a nanite face: dark glazing, framed by a groove and a lit lip, the
+// nanites streaming along it in violet, thickening and thinning, a slow beat over them.
+fn reg_nanite(i: RegencyIn, out_in: RegencyLook, fw: f32) -> RegencyLook {
+    var out = out_in;
+    let slot = reg_nanite_slot(i);
+    let half = slot.z;
+    if half <= 0.0 {
+        return out;
+    }
+    let end = half * 1.5;
+    // Inside the slot, its ends rounded off.
+    let d = max(slot.x - half, end - slot.y);
+    let inside = 1.0 - smoothstep(-fw, fw, d);
+    let lip = surf_band(d - fw * 1.5, max(half * 0.18, fw * 0.5), fw);
+    out.tone *= 1.0 - 0.85 * inside;
+    out.lift += 0.5 * lip;
+    out.rough -= 0.25 * inside;
+    // The nanites: knots running along the slot through a finer churn, in model space so
+    // neighbouring faces' slots run as one stream.
+    let flow = i.local + vec3<f32>(i.unit * 41.0, i.unit * 13.0, -i.time * NANITE_FLOW_SPEED);
+    let knot = smoothstep(0.35, 0.8, surf_noise3(flow * vec3<f32>(1.3, 1.3, 0.7)));
+    let churn = 0.5 + surf_fbm3(flow * 2.0, i.scale * 0.08, fw);
+    let seen = surf_resolved(half, fw);
+    let stream = mix(0.55, 0.25 + 1.3 * knot * churn, seen);
+    let beat = 0.8 + 0.2 * sin(i.time * 1.7 + i.unit * 31.0);
+    // Brightest down the slot's middle.
+    let core = 1.0 - smoothstep(0.0, half, slot.x) * 0.6;
+    let violet = vec3<f32>(NANITE_R, NANITE_G, NANITE_B);
+    out.glow = violet * inside * stream * core * beat * 0.9;
+    return out;
 }
 
 // Where a point lies on its face, whatever form the face's outline came in: `e`
@@ -279,6 +378,9 @@ fn regency_plate(i: RegencyIn) -> RegencyLook {
     out.tone *= 1.0 + 0.15 * surf_fbm3(i.local + vec3<f32>(21.0, 4.0, 13.0), i.scale * 1.6, fw);
     // Grime in the seams dulls them.
     out.rough += 0.3 * (1.0 - smoothstep(w, w * 5.0, min(seams.d.x, line.x))) * seen;
+    if i.nanite {
+        out = reg_nanite(i, out, fw);
+    }
     return out;
 }
 

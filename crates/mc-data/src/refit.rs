@@ -56,6 +56,9 @@ pub struct RawModule {
     pub health: f64,
     #[serde(default)]
     pub regen: f64,
+    /// The unit's regen is nanites at work from then on (`Unit::nanite_regen`).
+    #[serde(default)]
+    pub nanite_regen: bool,
     #[serde(default)]
     pub vision: f64,
     #[serde(default)]
@@ -541,6 +544,7 @@ fn loadout_unit(unit: &Unit, fitted: &[u8; MAX_REFIT_SLOTS]) -> Unit {
         out.tech = out.tech.max(m.tech);
         out.health += m.health;
         out.regen += m.regen;
+        out.nanite_regen |= m.nanite_regen;
         out.vision += m.vision;
         for c in &m.categories {
             if !out.categories.contains(c) {

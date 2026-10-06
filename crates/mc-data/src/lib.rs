@@ -733,6 +733,9 @@ pub struct UnitBlueprint {
     pub health: Fx,
     /// Health per second.
     pub regen: Fx,
+    /// Its regen is nanites at work (presentation only: the renderer draws them while
+    /// it mends).
+    pub nanite_regen: bool,
     pub cost_mass: Fx,
     pub cost_energy: Fx,
     /// Build time units; divide by build power for seconds.

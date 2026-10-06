@@ -3126,7 +3126,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // ARC plate (metal.wgsl): steel grain under the paint, scratched through to bright
         // metal. The Regency's plate has its own scan (regency.wgsl); props are not armour.
         if (in.material == MAT_PLATING || in.material == MAT_ACCENT || in.material == MAT_PLATING_DARK)
-            && si.pattern != PAT_EMBER && (flags & KIND_PROP) == 0u {
+            && !regency_pattern(si.pattern) && (flags & KIND_PROP) == 0u {
             let dl1 = dpdx(in.local);
             let dl2 = dpdy(in.local);
             let at = arc_scan_at(in.local, normalize(face_n + vec3<f32>(0.0, 0.0, 1e-9)), dl1, dl2, si.scale, si.seed);
@@ -3165,7 +3165,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // panel line that follow the face, collared graphite machinery.
     var regency = regency_none();
     let works = in.material == MAT_METAL;
-    if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER
+    if regency_pattern((in.model_class >> 16u) & 0xFFu)
         && (works || in.material == MAT_PLATING_DARK || in.material == MAT_PLATING)
         && (flags & (KIND_GHOST | KIND_PROP)) == 0u && !wreck {
         let dl1 = dpdx(in.local);
@@ -3185,7 +3185,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         for (var k = 0u; k < 4u; k++) {
             ri.grads[k] = reg_face_grad(df1[k], df2[k], dl1, dl2);
         }
+        ri.nanite = ((in.model_class >> 16u) & 0xFFu) == NANITE_PATTERN_SLOT;
+        ri.time = time;
+        ri.unit = in.state.w;
         regency = regency_look(ri, works);
+        lights += regency.glow;
         n = normalize(n - reg_to_world(regency.slope, dl1, dl2, dpdx(in.world), dpdy(in.world)));
     }
     // Mineral props share the terrain's rock texture and correctly oriented normals.
@@ -3711,7 +3715,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         }
         // Regency plate (`pattern::EMBER`) is not paint: a unit gathers dust at its feet, never
         // grime, and a Regency building stands kept clean.
-        if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER {
+        if regency_pattern((in.model_class >> 16u) & 0xFFu) {
             grit = 0.0;
             kick = select(0.0, kick, (in.model_class & 0x100u) != 0u);
             // Black plate under a red iridescent film, darker seams, dark graphite

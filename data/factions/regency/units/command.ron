@@ -8,8 +8,9 @@
     // refuses anything else).
     //
     // Refits: the engineering suites on the hand's forearm; the cannon forearm rebuilt as a
-    // pinched-plasmeric cannon, then a pinch-fusion one; on the back, nanite repair (then a
-    // field that mends everything of its side round it) or the Material Formation Engine;
+    // pinched-plasmeric cannon, then a pinch-fusion one; on the back, nanite repair, a stack
+    // of slotted plates down the spine (then a field that mends everything of its side round
+    // it, the stack fanned out into wings) or the Material Formation Engine;
     // and an auxiliary engineering arm over the left shoulder.
     (
         key: "regency_commander",
@@ -104,14 +105,14 @@
                         key: "nano_repair", icon: Engineer, name: "Nanite Repair",
                         summary: "Nanite feeds down the spine mend the Exarch's own hull, far faster than it heals bare.",
                         cost: (mass: 900, energy: 10800, time: 1100),
-                        regen: 60,
+                        regen: 60, nanite_regen: true,
                     ),
                     (
                         key: "nano_field", icon: Engineer, name: "Nanite Repair Field", after: "nano_repair",
                         summary: "The nanites go out in a cloud: every unit and structure of its side near the Exarch slowly mends, and the Exarch still mends itself.",
                         cost: (mass: 2200, energy: 26400, time: 2600),
                         // It takes Nanite Repair's place, so it carries its regen too.
-                        regen: 60,
+                        regen: 60, nanite_regen: true,
                         // A hundredth of each friend's full health a second, within 120 m.
                         repair_field: (radius: 120, rate: 0.01),
                     ),

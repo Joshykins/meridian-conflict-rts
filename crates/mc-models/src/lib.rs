@@ -177,7 +177,11 @@ pub mod pattern {
     /// A fabricator's status lamp (`GLOW_MATERIALS` faces): steady at work, blinking amber
     /// when short of energy, a slow standby glow at rest (`gpu_consts::fab`).
     pub const FAB_LAMP: u32 = crate::gpu_consts::fab::PATTERN_LAMP;
-    pub const LAST: u32 = FAB_LAMP;
+    /// Regency plate with a slot let in down each long face, the nanites streaming
+    /// along it in violet (`gpu_consts::nanite`, regency.wgsl): where a model shows its
+    /// nanites, the light is in the plate, not a lit piece.
+    pub const NANITE_SLOT: u32 = crate::gpu_consts::nanite::PATTERN_SLOT;
+    pub const LAST: u32 = NANITE_SLOT;
 }
 
 /// Which rigid part of the model a vertex belongs to. The vertex shader

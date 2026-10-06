@@ -113,3 +113,32 @@ fn nanite_repair_alone_mends_only_the_exarch() {
         .unit(w.blueprints.id_of("regency_commander").unwrap());
     assert!(bp.regen > base.regen);
 }
+
+#[test]
+fn the_mirror_shows_the_nanites_at_work() {
+    let mut w = world();
+    let acu = exarch(&mut w, &["nano_repair", "nano_field"], 900, 900);
+    let tank = w.blueprints.id_of("regency_t1_tank").unwrap();
+    let mut put = |owner: u8, x: i32| {
+        w.spawn_unit(tank, owner, FxVec2::from_ints(x, 900), Angle::ZERO, true)
+            .unwrap()
+    };
+    let (hurt, whole, foe) = (put(0, 940), put(0, 960), put(1, 860));
+    for row in [acu, hurt, foe] {
+        w.state.units.health[row] = Fx::from_int(50);
+    }
+    for row in [acu, hurt, whole, foe] {
+        w.state.units.fire_state[row] = FireState::HoldFire;
+    }
+    w.tick(&[]).unwrap();
+    let mut frame = mc_sim::RenderFrame::default();
+    w.write_render_frame(Some(0), &mut frame);
+    let id = |row: usize| w.state.units.id(row).0;
+    let mended = |row: usize| frame.mends.iter().find(|m| m.unit_id == id(row));
+    // The Exarch mends itself with its own nanites; the hurt friend is fed from it.
+    assert!(mended(acu).is_some_and(|m| m.from.is_none()));
+    assert!(mended(hurt).is_some_and(|m| m.from.is_some()));
+    assert!(mended(whole).is_none() && mended(foe).is_none());
+    assert_eq!(frame.repair_fields.len(), 1);
+    assert_eq!(frame.repair_fields[0].unit_id, id(acu));
+}

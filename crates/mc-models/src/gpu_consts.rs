@@ -996,6 +996,20 @@ shared! {
         pub const FIXED_QUADS: u32 = 32;
     }
 
+    /// The Regency's nanites showing through their plate: light drawn by the surface,
+    /// never a lit piece of the mesh.
+    pub mod nanite as "NANITE_" {
+        /// `pattern::NANITE_SLOT` (regency.wgsl): Regency plate with one slot let in down
+        /// the middle of each long face, glazed, the nanites streaming along it in violet.
+        pub const PATTERN_SLOT: u32 = 39;
+        /// Their violet (linear), kept low: bright violet blooms to white.
+        pub const R: f32 = 0.66;
+        pub const G: f32 = 0.12;
+        pub const B: f32 = 1.0;
+        /// How fast the nanites run along a slot, metres a second.
+        pub const FLOW_SPEED: f32 = 1.6;
+    }
+
     /// Materials (the sim's mass) as a light: the HUD's Materials red-orange
     /// (`hud::MASS`, 0xFF6B3D) in linear RGB. Reclaim's beams, the stream down a reclaim
     /// tower's chutes and anything else that shows mass on the move share it.

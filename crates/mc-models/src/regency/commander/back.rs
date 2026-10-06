@@ -1,12 +1,14 @@
 //! The back refits, one at a time: Nanite Repair (`nano_repair`), the Nanite Repair
 //! Field over it (`nano_field`), or the Material Formation Engine (`mfe`). They ride the
-//! torso (`part::TURRET`), so nothing on them turns on its own. The two differ in outline:
-//! the nanites stand tall and narrow on the spine, the engine lies low and wide across it.
+//! torso (`part::TURRET`), so nothing on them turns on its own.
 //!
-//! - Nanite Repair: a plated housing lapped down the spine between two keeled reservoirs,
-//!   the nanites lit violet down their ridges and piped into the housing.
-//! - The field adds a mast up out of the housing, taller than the pauldrons, with three
-//!   violet vanes round its head that let the nanites out over everything round it.
+//! - Nanite Repair: a dorsal stack of keeled plates in courses down the spine over a
+//!   plated core, topped by a keeled crest; the nanites show in a glazed slot let into
+//!   each plate (`kit::nanite_plate`: the light is the surface's, not a lit piece).
+//! - The field is its next tier, built onto the same stack: the pieces it changes are
+//!   drawn `until("nano_field")` and go up again rebuilt. Every course fans a wing plate
+//!   out of either side, slotted like the courses, and the crest splits into two
+//!   prongs, the nanites let out between them.
 //! - The engine: a low plated block across the shoulder blades, its back cut with red
 //!   condenser slots, two short stacks raked back off its top corners.
 
@@ -15,132 +17,122 @@ use glam::{Vec2, Vec3};
 use crate::builder::MeshBuilder;
 use crate::material::*;
 
-use super::super::kit::{cable, dark_plate, metal, seam, v3};
-use super::form::{ring, sleeve, KEEL, OCT};
-
-/// The housing on the spine: a plated block lapped down the back.
-fn housing(b: &mut MeshBuilder, top: f32) {
-    dark_plate(b);
-    b.beam(
-        v3(-2.55, 0.0, 16.4),
-        v3(-2.75, 0.0, top),
-        Vec2::new(2.0, 1.1),
-        Vec2::new(1.6, 1.0),
-    );
-    seam(b);
-    b.beam(
-        v3(-3.05, 0.0, 16.8),
-        v3(-3.2, 0.0, top - 0.3),
-        Vec2::new(1.3, 0.25),
-        Vec2::new(1.1, 0.25),
-    );
-}
-
-/// Where the mast's vanes let the nanites out.
-const MAST_HEAD: Vec3 = Vec3::new(-3.9, 0.0, 24.6);
+use super::super::kit::{cable, dark_plate, metal, nanite_plate, v3};
+use super::form::{blade, ring, sleeve, KEEL, OCT};
 
 pub(super) fn back(b: &mut MeshBuilder) {
-    b.module("nano_repair", 0.0, |b| housing(b, 20.6));
-    b.module("nano_repair", 0.35, reservoirs);
-    b.module("nano_field", 0.4, mast);
+    b.module("nano_repair", 0.0, core);
+    b.until("nano_field", |b| {
+        b.module("nano_repair", 0.3, |b| courses(b, false))
+    });
+    b.module("nano_field", 0.2, |b| courses(b, true));
+    b.module("nano_field", 0.6, prongs);
     b.module("mfe", 0.0, engine);
 }
 
-/// A keeled reservoir either side of the housing, its ridge lit violet, piped in at the top.
-fn reservoirs(b: &mut MeshBuilder) {
-    b.mirror_y(|b| {
-        let out = Vec3::new(-1.0, 0.35, 0.0).normalize();
-        dark_plate(b);
-        sleeve(
-            b,
-            &[
-                ring(v3(-2.85, 1.25, 16.7), out, 0.42, 0.4),
-                ring(v3(-3.05, 1.35, 18.3), out, 0.56, 0.55),
-                ring(v3(-3.0, 1.3, 20.0), out, 0.36, 0.34),
-            ],
-            &KEEL,
-        );
-        b.paint(GLOW_VIOLET);
-        b.beam(
-            v3(-3.05, 1.35, 17.3) + out * 0.56,
-            v3(-3.05, 1.35, 19.3) + out * 0.5,
-            Vec2::new(0.12, 0.12),
-            Vec2::new(0.1, 0.1),
-        );
-        if b.fine() {
-            metal(b);
-            cable(
-                b,
-                &[
-                    v3(-3.0, 1.25, 20.0),
-                    v3(-3.1, 0.9, 20.5),
-                    v3(-2.95, 0.55, 20.4),
-                ],
-                0.1,
-            );
-        }
-    });
-    b.paint(GLOW_VIOLET);
-    b.beam(
-        v3(-3.25, -0.4, 19.9),
-        v3(-3.25, 0.4, 19.9),
-        Vec2::splat(0.16),
-        Vec2::splat(0.16),
+/// A keeled emitter prong from `root` to a point at `tip`, keeled toward `out`, the
+/// nanites showing in its faces.
+fn prong(b: &mut MeshBuilder, root: Vec3, tip: Vec3, out: Vec3, w: f32) {
+    nanite_plate(b);
+    sleeve(
+        b,
+        &[
+            ring(root, out, w, w * 0.8),
+            ring(root.lerp(tip, 0.55), out, w * 0.7, w * 0.6),
+            ring(tip, out, 0.03, 0.03),
+        ],
+        &KEEL,
     );
 }
 
-/// The field's mast up out of the housing, three violet vanes round its head.
-fn mast(b: &mut MeshBuilder) {
-    let foot = v3(-2.85, 0.0, 19.6);
-    let along = (MAST_HEAD - foot).normalize();
+/// Plates in the stack, top to bottom.
+const COURSES: usize = 4;
+
+/// Course `k` from the top: where its upper edge is.
+fn course(k: usize) -> Vec3 {
+    v3(-3.05 - 0.04 * k as f32, 0.0, 21.2 - 1.35 * k as f32)
+}
+
+/// The plated core the courses lie on, a feed line either side of it.
+fn core(b: &mut MeshBuilder) {
     dark_plate(b);
     sleeve(
         b,
         &[
-            ring(foot, Vec3::X, 0.5, 0.42),
-            ring(foot.lerp(MAST_HEAD, 0.55), Vec3::X, 0.36, 0.3),
-            ring(MAST_HEAD - along * 0.2, Vec3::X, 0.24, 0.22),
+            ring(v3(-2.6, 0.0, 15.2), -Vec3::X, 0.6, 0.3),
+            ring(v3(-2.85, 0.0, 18.0), -Vec3::X, 0.7, 0.5),
+            ring(v3(-2.95, 0.0, 21.3), -Vec3::X, 0.5, 0.4),
         ],
         &OCT,
     );
-    let vanes: &[f32] = if b.fine() {
-        &[0.0, 120.0, 240.0]
-    } else {
-        &[60.0, 300.0]
-    };
-    for &deg in vanes {
-        let a = deg.to_radians();
-        // Round the mast's axis, from straight back.
-        let side = along.cross(Vec3::Y).normalize();
-        let dir = (side * a.cos() + Vec3::Y * a.sin()).normalize();
-        let root = MAST_HEAD - along * 1.6;
+    b.mirror_y(|b| {
+        metal(b);
+        cable(
+            b,
+            &[
+                v3(-2.6, 0.75, 15.6),
+                v3(-2.95, 0.8, 18.0),
+                v3(-3.0, 0.6, 20.8),
+            ],
+            0.13,
+        );
+    });
+}
+
+/// The courses; `field`: with their wings, and the crest left for the prongs.
+fn courses(b: &mut MeshBuilder, field: bool) {
+    let n = if b.fine() { COURSES } else { 2 };
+    for k in 0..n {
+        let o = course(k);
+        let half = 0.95 - 0.08 * k as f32;
+        nanite_plate(b);
+        blade(
+            b,
+            o,
+            Vec3::new(-0.25, 0.0, -1.0),
+            -Vec3::X,
+            1.85,
+            half,
+            0.0,
+            0.42,
+        );
+        if field {
+            b.mirror_y(|b| {
+                let root = o + Vec3::new(-0.15, half * 0.7, -0.2);
+                let u = Vec3::new(-0.55, 0.8, -0.35).normalize();
+                let n = Vec3::new(-0.6, -0.2, 0.75).normalize();
+                let len = 2.4 - 0.3 * k as f32;
+                nanite_plate(b);
+                blade(b, root, u, n, len, 0.46, 0.2, 0.3);
+            });
+        }
+    }
+    if !field {
         dark_plate(b);
         sleeve(
             b,
             &[
-                ring(root + dir * 0.2, dir, 0.08, 0.2),
-                ring(root + along * 0.9 + dir * 0.55, dir, 0.1, 0.26),
-                ring(MAST_HEAD + along * 0.5 + dir * 0.3, dir, 0.03, 0.03),
+                ring(v3(-3.0, 0.0, 21.0), -Vec3::X, 0.45, 0.35),
+                ring(v3(-3.35, 0.0, 22.2), -Vec3::X, 0.32, 0.26),
+                ring(v3(-3.85, 0.0, 23.3), -Vec3::X, 0.03, 0.03),
             ],
             &KEEL,
         );
-        b.paint(GLOW_VIOLET);
-        b.cylinder_between(
-            root + along * 0.5 + dir * 0.3,
-            root + along * 1.3 + dir * 0.3,
-            0.09,
-            0.06,
-            6,
+    }
+}
+
+/// The field's split crest.
+fn prongs(b: &mut MeshBuilder) {
+    for s in [-1.0f32, 1.0] {
+        let y = Vec3::Y * s;
+        prong(
+            b,
+            v3(-3.0, 0.3 * s, 21.0),
+            v3(-4.1, 0.75 * s, 24.4),
+            y,
+            0.34,
         );
     }
-    b.paint(GLOW_VIOLET);
-    b.cylinder_between(
-        MAST_HEAD - along * 0.2,
-        MAST_HEAD + along * 0.35,
-        0.2,
-        0.05,
-        b.sides(8),
-    );
 }
 
 /// The Material Formation Engine: a low plated block across the shoulder blades.
@@ -196,16 +188,27 @@ fn engine(b: &mut MeshBuilder) {
     });
 }
 
-/// From far off: the repair housing a dark ridge, the field's mast a lit spike, the
-/// engine a dark block.
+/// From far off: the nanite stack a dark ridge; the field fans a wing out of either side
+/// and raises the split crest. The engine a dark block.
 pub(super) fn coarse(b: &mut MeshBuilder) {
     b.module("nano_repair", 0.0, |b| {
         dark_plate(b);
-        b.block(v3(-3.3, -0.9, 16.6), v3(-2.5, 0.9, 20.2));
+        b.block(v3(-3.5, -0.9, 15.4), v3(-2.6, 0.9, 21.5));
     });
     b.module("nano_field", 0.0, |b| {
-        b.paint(GLOW_VIOLET);
-        b.face(&[v3(-3.0, -0.4, 20.4), MAST_HEAD, v3(-3.0, 0.4, 20.4)]);
+        nanite_plate(b);
+        b.mirror_y(|b| {
+            b.face(&[
+                v3(-3.1, 0.7, 21.0),
+                v3(-4.4, 2.3, 19.4),
+                v3(-3.3, 0.8, 17.0),
+            ]);
+            b.face(&[
+                v3(-3.0, 0.1, 21.0),
+                v3(-4.1, 0.75, 24.4),
+                v3(-3.0, 0.5, 21.0),
+            ]);
+        });
     });
     b.module("mfe", 0.0, |b| {
         dark_plate(b);

@@ -192,6 +192,12 @@ pub(super) fn dark_plate(b: &mut MeshBuilder) {
     b.paint(PLATING_DARK).pattern(pattern::EMBER);
 }
 
+/// Armour plate with the nanites showing through it: a glazed slot down each long face,
+/// lit violet by the shader (`pattern::NANITE_SLOT`), never a lit piece of the mesh.
+pub(super) fn nanite_plate(b: &mut MeshBuilder) {
+    b.paint(PLATING_DARK).pattern(pattern::NANITE_SLOT);
+}
+
 /// The darker seams between the plates, lit red.
 pub(super) fn seam(b: &mut MeshBuilder) {
     b.paint(ACCENT).pattern(pattern::EMBER);

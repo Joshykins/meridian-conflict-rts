@@ -336,6 +336,9 @@ pub(crate) struct Unit {
     pub health: f64,
     #[serde(default)]
     pub regen: f64,
+    /// Its regen is nanites at work: drawn crawling over the hull while it mends.
+    #[serde(default)]
+    pub nanite_regen: bool,
     pub cost: Cost,
     pub radius: f64,
     pub height: f64,
@@ -1896,6 +1899,7 @@ impl Unit {
             categories,
             health: fx(self.health),
             regen: fx(self.regen),
+            nanite_regen: self.nanite_regen,
             cost_mass: fx(self.cost.mass),
             cost_energy: fx(self.cost.energy),
             build_time: fx(self.cost.time),

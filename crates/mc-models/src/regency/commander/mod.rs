@@ -21,8 +21,9 @@
 //!   out of the palm while it builds (`LANCE_TIP`, the unit file's `arm_emitter` when run
 //!   out), a ring of emitters round the wrist and a feed drum over the elbow. The cannon
 //!   forearm is rebuilt as the pinched-plasmeric, then the pinch-fusion cannon
-//!   (`cannons`). The back carries Nanite Repair and its field, or the Material Formation
-//!   Engine (`back`); the left shoulder the auxiliary engineering arm (`shoulder`).
+//!   (`cannons`). The back carries Nanite Repair, a stack of slotted plates the field
+//!   fans out into wings, or the Material Formation Engine (`back`); the left shoulder
+//!   the auxiliary engineering arm (`shoulder`).
 
 mod arms;
 mod back;
