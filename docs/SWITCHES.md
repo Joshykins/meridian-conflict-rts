@@ -87,6 +87,7 @@ Read by the ignored probe tests in mc-sim, never by the game (docs/AI_COMMANDER.
 | `TOURNEY_DEATHS` | any | Print every unit that dies: when, how far from home, the nearest enemy. |
 | `TOURNEY_OPS` | player slot | Print that Commander's operations whenever one changes. |
 | `TOURNEY_ARMY` | `key*n,key*n` | Give every side the same army at its start (a mirror of fighting alone). |
+| `TOURNEY_RESOURCES` | whole number | Multiply every player's mass and energy income (the harness tops the stores up; default 1). |
 | `TOURNEY_SNAP` | tick | Print each side's armed mobile units at that tick. |
 | `TOURNEY_MAPS`, `TOURNEY_SEEDS`, `TOURNEY_SIDES`, `TOURNEY_MINUTES`, `TOURNEY_DIFF`, `TOURNEY_JOBS` | see `scripts/ai-tournament.sh` | What the tournament script plays. |
 | `MATCHUP` | `SHARD/SHARDS` | The share of unit pairs `zz_matchup_probe` stages. |

@@ -11,7 +11,11 @@
 //! `TOURNEY_SNAP=tick` each side's armed mobile units at that tick,
 //! `TOURNEY_DEATHS=1` every unit that dies, where and when, `TOURNEY_OPS=N` slot N's
 //! operations whenever one changes (every 10 s).
-//! The `RESULT key=value ...` line sums the match up.
+//! `TOURNEY_RESOURCES=N` (a whole number, default 1) multiplies every player's mass and
+//! energy income by N: the harness tops the stores up each tick with the extra, so the
+//! sim itself is untouched.
+//! The `RESULT key=value ...` line sums the match up, with `wall_s`, the real time the
+//! match took (the AI's thinking dominates it).
 //!
 //! `TOURNEY=serac_divide:2:40:7:adaptive:aggressive cargo test --profile gate -p mc-sim --test sim -- zz_ai_tournament:: --ignored --nocapture`
 use mc_core::Fx;
@@ -134,6 +138,12 @@ fn match_up() {
             }
         }
     }
+    let resources: i32 = std::env::var("TOURNEY_RESOURCES")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(1)
+        .max(1);
+    let started = std::time::Instant::now();
     let mut jumps = [0u32; 2];
     let mut nukes = [0u32; 2];
     let mut first_blood: Option<u32> = None;
@@ -142,6 +152,15 @@ fn match_up() {
         minute += 1;
         for _ in 0..600 {
             w.tick(&[]).unwrap();
+            if resources > 1 {
+                // Income is per second and a second is ten ticks.
+                for pl in w.state.players.iter_mut() {
+                    pl.mass =
+                        (pl.mass + pl.mass_income * (resources - 1) / 10).min(pl.mass_capacity);
+                    pl.energy = (pl.energy + pl.energy_income * (resources - 1) / 10)
+                        .min(pl.energy_capacity);
+                }
+            }
             for e in &w.events {
                 let owner = |u: mc_sim::tables::UnitId| {
                     w.state
@@ -283,7 +302,7 @@ fn match_up() {
             .join(" || ")
     };
     println!(
-        "RESULT map={} players={} seed={} A={} B={} difficulty={:?} verdict={} minute={} worthA={} worthB={} killsA={} killsB={} jumpsA={} jumpsB={} nukesA={} nukesB={} first_loss={}",
+        "RESULT map={} players={} seed={} A={} B={} difficulty={:?} verdict={} minute={} worthA={} worthB={} killsA={} killsB={} jumpsA={} jumpsB={} nukesA={} nukesB={} first_loss={} wall_s={}",
         parts[0],
         players,
         seed,
@@ -301,6 +320,7 @@ fn match_up() {
         nukes[0],
         nukes[1],
         first_blood.map_or(-1, |t| t as i64 / 10),
+        started.elapsed().as_secs(),
     );
     if std::env::var("TOURNEY_ROSTER").is_ok() {
         for p in 0..w.state.players.len() {
