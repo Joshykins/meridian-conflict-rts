@@ -1,6 +1,5 @@
 //! Air is the Behemoth's counter (`aster_t5_titan`, `docs/BALANCE.md`): it outranges the
-//! ground, but against aircraft it has only two light flak turrets, and a wing of
-//! assault aircraft brings it down.
+//! ground, but it has no anti-air at all, and a wing of assault aircraft brings it down.
 
 use mc_core::{Angle, Fx, FxVec2, TICKS_PER_SECOND};
 use mc_data::Blueprints;
@@ -113,7 +112,7 @@ fn a_strafing_cannon_fires_on_a_titan() {
     );
 }
 
-/// Forty Thunderheads, under half the titan's mass, bring it down, and most come home.
+/// Forty Thunderheads, under half the titan's mass, bring it down, and none is lost: it has no anti-air.
 #[test]
 fn an_air_wing_brings_a_titan_down() {
     let mut w = world();
@@ -126,7 +125,7 @@ fn an_air_wing_brings_a_titan_down() {
                 .filter(|&&id| w.state.units.row(id).is_none())
                 .count();
             assert!(
-                lost < 15,
+                lost == 0,
                 "the titan fell at {} s but took {lost} of 40 with it",
                 t / 10
             );

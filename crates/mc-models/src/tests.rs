@@ -3349,25 +3349,6 @@ fn titan_houses_muzzles_and_rig() {
                 assert!(near < 0.4, "titan lod{lod}: pod mouth {mouth} {near} m off");
             }
         }
-        // The flak turrets: drawn at the two finer levels, gun houses riding the torso.
-        if lod < 2 {
-            for (i, &p) in titan::FLAK.iter().enumerate() {
-                let slot = slot_of(3 + i as u8, up(p));
-                let on_torso = |v: &super::MeshVertex| {
-                    (v.rig & rig::LIMB_MASK) == limb(slot)
-                        && ((v.rig & rig::HOUSE_HIGH) != 0) == (slot >= 4)
-                        && v.part == part::TURRET
-                };
-                for s in [-1.0f32, 1.0] {
-                    let muzzle = up(p) + Vec3::new(titan::FLAK_REACH, s * titan::FLAK_GAP, 0.0);
-                    let near = nearest_where(mesh, muzzle, on_torso);
-                    assert!(
-                        near < 0.5,
-                        "titan lod{lod}: flak {i} barrel ends {near} m from its muzzle"
-                    );
-                }
-            }
-        }
         // Legs walk on their bones.
         if lod < 2 {
             for bone in [rig::THIGH, rig::SHIN, rig::FOOT] {

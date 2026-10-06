@@ -628,8 +628,8 @@ fn main() {
             _ => [never, never, never, -1000.0],
         };
         let mut pose = HousePose::default();
-        // The pods and arms turn with the torso; the shoulder flak rest turned a little outboard of it.
-        let rest = [torso, torso, torso, torso + 30.0 * d, torso - 30.0 * d];
+        // The pods and arms turn with the torso.
+        let rest = [torso, torso, torso];
         for (w, yaw) in rest.into_iter().enumerate() {
             // Weapon 0 is the pods on the torso; 1 and 2 the arms.
             let p = if w == 1 || w == 2 { pitch } else { 0.0 };

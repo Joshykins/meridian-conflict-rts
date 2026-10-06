@@ -1231,7 +1231,7 @@ fn reach_labels(ui: &mut Ui, field: &Field, u: &UnitInstance, alpha: f32) {
     // Bands: the great bore, the others by name, farthest first; twin guns once.
     let mut marks: Vec<(f32, String, u32)> = Vec::new();
     let mut shortest = f32::MAX;
-    // Its flak is left to the anti-air ring: only the guns that reach the ground.
+    // Anti-air guns are left to the anti-air ring: only the guns that reach the ground.
     for w in bp
         .weapons
         .iter()
@@ -1269,20 +1269,14 @@ fn reach_labels(ui: &mut Ui, field: &Field, u: &UnitInstance, alpha: f32) {
             tag(ui, g + Vec2::new(w * 0.5 + 8.0, 0.0), text, *tone, 0.95);
         }
     }
-    // Under it, short of every gun: only its feet and its flak.
+    // Under it, short of every gun: only its feet.
     if shortest > 0.0 && shortest < f32::MAX {
         let a = bearing + std::f32::consts::PI;
         let room = label_room(ui);
         if let Some(g) = ground(ui, field, c + Vec2::from_angle(a) * shortest * 0.7)
             .filter(|g| room.contains(*g))
         {
-            tag(
-                ui,
-                g,
-                "Under its guns: feet and flak only",
-                palette::WARN,
-                0.9,
-            );
+            tag(ui, g, "Under its guns: only its feet", palette::WARN, 0.9);
         }
     }
 }

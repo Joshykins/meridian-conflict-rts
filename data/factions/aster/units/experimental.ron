@@ -151,10 +151,7 @@
         tech: 5,
         categories: ["Land", "DirectFire", "Experimental"],
         // Air is its counter: its guns outrange anything on the ground and its feet crush
-        // what gets under them, but against aircraft it has only its two light flak
-        // turrets. 40 Thunderheads (under half its mass) bring it down in under two
-        // minutes and lose a few; 40 strategic bombers in three to four. Fewer than about
-        // 30 Thunderheads never get through the field's regen and its rank (veterancy).
+        // what gets under them, but it has no anti-air at all; it wants escorts.
         health: 1300000,
         cost: (mass: 120000, energy: 1200000, time: 400000),
         radius: 160, height: 480,
@@ -229,26 +226,6 @@
                 tracer: 0, trail: false, wake: 0, bolts: 0,
                 bore: (width: 60, damage: 20000, cool: 150, storm: (radius: 440, seconds: 9, damage: 6000)),
                 sounds: (fire: "titan_bore_fire", charge: "titan_bore_charge", charge_time: 6.0, impact: "titan_bore_strike", ground: "titan_bore_strike", far: "titan_bore_far"),
-            ),
-            (
-                // A twin flak turret on each pauldron, beside the pods: a tight burst
-                // from light shells, enough to see off a few gunships. It is not the air defence
-                // it could carry: an air wing is what brings a Behemoth down. A wing of hover
-                // gunships held in one spot over it still dies to it, burst after burst.
-                name: "Heavy Twin Flak",
-                damage: 100, splash: 25, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
-                turret_turn: 160, mount: true, pivot: (-24, 132, 456), muzzle: (16, 132, 456),
-                muzzles: [(16, 128.6, 456), (16, 135.4, 456)],
-                targets: ["Air"], color: Orange, flak: true, casings: 3,
-                sounds: (fire: "flak_gun", impact: "flak_burst"),
-            ),
-            (
-                name: "Heavy Twin Flak",
-                damage: 100, splash: 25, proximity: 16, range: 1200, reload: 0.9, speed: 380, trajectory: Direct,
-                turret_turn: 160, mount: true, pivot: (-24, -132, 456), muzzle: (16, -132, 456),
-                muzzles: [(16, -135.4, 456), (16, -128.6, 456)],
-                targets: ["Air"], color: Orange, flak: true, casings: 3,
-                sounds: (fire: "flak_gun", impact: "flak_burst"),
             ),
         ],
         mesh: "titan", icon: Titan,

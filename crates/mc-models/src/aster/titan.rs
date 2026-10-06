@@ -2,9 +2,8 @@
 //! a quarter of blueprint scale (metres: radius 40, height 120; the unit file builds it at
 //! 4x). Two legs that step over buildings, the Tempest rotary cannon on the right arm
 //! (six barrels turning out of a fixed shroud; a barrel at the top fires, `barrels`), the AEB-3 Cataclysm
-//! Bore on the left, rocket pods on the shoulders with a twin flak turret beside each (not
-//! the best air defence it could carry: it leans on escorts), and a hull field thrown from
-//! a dorsal projector.
+//! Bore on the left, rocket pods on the shoulders, and a hull field thrown from a dorsal
+//! projector. It carries no anti-air at all: aircraft are its counter.
 //!
 //! Rig (the unit file is authored 1:1 with these numbers; keep them in step):
 //! - `part::LOCOMOTION` legs posed by the shader's two-bone IK (`HIP`, `KNEE`, `ANKLE`,
@@ -14,8 +13,7 @@
 //! - `part::TURRET` waist ring, torso, pauldrons, rocket pods (weapon 0, `POD_MOUTHS`: the
 //!   torso's own weapon),
 //!   head (`with_head`, idles about `NECK`) and the shield projector (`SHIELD`), turning
-//!   about the waist (`WAIST`). The two flak turrets on the pauldrons (weapons 3 and 4,
-//!   `FLAK`) are gun houses on it: they turn off the torso and are carried round with it.
+//!   about the waist (`WAIST`).
 //! - The arms are gun houses too (weapons 1 and 2), turning about `SHOULDER`, a point on
 //!   the torso's axis at shoulder height: they orbit with the torso, each swinging a
 //!   little off it on its own (`sway`), and each pitches on its own about the line
@@ -132,11 +130,6 @@ pub(crate) const GATLING_MUZZLE_AT: Vec3 = up(GATLING_MUZZLE);
 pub(crate) const EJECT_AT: Vec3 = up(EJECT);
 #[cfg(test)]
 pub(crate) const BORE_MUZZLE_AT: Vec3 = up(BORE_MUZZLE);
-/// Flak turret pivots on the pauldrons, weapons 3 and 4 (left, right); each gun's muzzle
-/// is its pivot plus `FLAK_REACH` of x, its two barrels `FLAK_GAP` either side.
-pub(crate) const FLAK: [Vec3; 2] = [Vec3::new(-6.0, 33.0, 94.0), Vec3::new(-6.0, -33.0, 94.0)];
-pub(crate) const FLAK_REACH: f32 = 10.0;
-pub(crate) const FLAK_GAP: f32 = 0.85;
 /// Where the head turns (x, centreline, z).
 pub(crate) const NECK: Vec3 = Vec3::new(9.0, 0.0, 87.0);
 /// The shield projector's tip, on the back of the torso.
@@ -734,7 +727,7 @@ fn foot(b: &mut MeshBuilder) {
     }
 }
 
-// ---- pelvis and flak ----------------------------------------------------------------
+// ---- pelvis ----------------------------------------------------------------------
 
 /// The pelvis: a deep dark armoured block between the hips, light tassets fore and aft,
 /// a keel under it, and a heavy cowl over each hip actuator for the thigh to swing in.
@@ -834,65 +827,6 @@ fn pelvis(b: &mut MeshBuilder) {
     }
 }
 
-/// A twin flak turret on a pauldron (`weapon`, turning about `pivot`): a low faceted
-/// turret on a ring, two plain gun barrels with flash hiders out of a dark mantlet.
-/// Authored facing the nose.
-fn flak(b: &mut MeshBuilder, weapon: usize, pivot: Vec3) {
-    b.with_house(weapon, pivot, 0.6, |b| {
-        b.at(pivot, |b| {
-            let fine = b.fine();
-            b.paint(ACCENT).pattern(pattern::PLAIN);
-            b.prism(v3(0.0, 0.0, -3.0), b.sides(10), 4.1, 3.9, 0.9);
-            b.paint(PLATING);
-            b.at(v3(-1.0, 0.0, 0.0), |b| {
-                b.loft_z(
-                    &turret_plan(8.4, 7.4),
-                    &[
-                        Section::new(-2.2, 0.9),
-                        Section::new(0.9, 1.0),
-                        Section::scaled(2.8, 0.66, 0.7).shifted(-0.8, 0.0),
-                    ],
-                )
-            });
-            if fine {
-                b.paint(ACCENT).pattern(pattern::PLAIN);
-                b.cuboid(v3(-2.6, 0.0, 3.0), v3(2.4, 2.2, 0.5));
-                b.paint(METAL);
-                b.cuboid(v3(-0.6, 2.2, 2.5), v3(1.4, 0.9, 0.9));
-            }
-            b.with_recoil(|b| {
-                b.paint(ACCENT).pattern(pattern::PLAIN);
-                b.chamfered_box(v3(2.4, 0.0, 0.0), v3(3.4, 3.8, 2.6), 0.6);
-                if fine {
-                    for s in [-1.0f32, 1.0] {
-                        let y = s * FLAK_GAP;
-                        b.paint(METAL);
-                        b.cylinder_between(
-                            v3(2.8, y, 0.0),
-                            v3(FLAK_REACH - 1.2, y, 0.0),
-                            0.34,
-                            0.3,
-                            8,
-                        );
-                        b.paint(ACCENT).pattern(pattern::PLAIN);
-                        b.cylinder_between(v3(4.2, y, 0.0), v3(5.4, y, 0.0), 0.46, 0.46, 8);
-                        b.cylinder_between(
-                            v3(FLAK_REACH - 1.2, y, 0.0),
-                            v3(FLAK_REACH, y, 0.0),
-                            0.44,
-                            0.4,
-                            8,
-                        );
-                    }
-                } else {
-                    b.paint(METAL);
-                    b.cylinder_between(v3(2.8, 0.0, 0.0), v3(FLAK_REACH, 0.0, 0.0), 0.7, 0.6, 6);
-                }
-            });
-        });
-    });
-}
-
 // ---- torso --------------------------------------------------------------------------
 
 /// The chest's dark core under its armour: plan (half length, half width, corner cut) and
@@ -906,7 +840,7 @@ const CHEST_SECTIONS: [(f32, f32, f32, f32); 5] = [
     (90.0, 0.64, 0.66, -2.2),
 ];
 /// The pauldrons' deck: the plan's middle (x, y), half extents, and the deck's height (the
-/// flak turrets and the pods' pylons stand on it).
+/// pods' pylons stand on it).
 const DECK: (f32, f32, f32, f32, f32) = (-3.0, 29.0, 11.0, 14.0, 90.4);
 
 /// One section of a V-fronted armour plate at height `z`: its ridge on the centreline at
@@ -1117,13 +1051,6 @@ fn torso(b: &mut MeshBuilder) {
         pauldron(b);
         rocket_pod(b);
     });
-    // A flak turret beside each pod, on the pauldron's outer deck.
-    for (i, &pivot) in FLAK.iter().enumerate() {
-        b.paint(ACCENT).pattern(pattern::PLAIN);
-        b.prism(pivot - Vec3::Z * 3.6, b.sides(10), 4.4, 4.6, 1.2);
-        flak(b, 3 + i, pivot);
-    }
-
     head(b);
     back(b);
     if fine {
@@ -1206,8 +1133,8 @@ fn chest_detail(b: &mut MeshBuilder) {
     );
 }
 
-/// The left pauldron: a thick angular deck over the shoulder socket (the pods' pylon and a
-/// flak turret stand on it) and three armour lames stepping down its outer side, each
+/// The left pauldron: a thick angular deck over the shoulder socket (the pods' pylon stands
+/// on it) and three armour lames stepping down its outer side, each
 /// lapped under the one above, clear of the upper arm swinging beneath.
 fn pauldron(b: &mut MeshBuilder) {
     let fine = b.fine();
