@@ -85,6 +85,7 @@ mod mine_fx;
 mod nanite_repair_fx;
 mod nuke_fx;
 mod nuke_volume;
+mod orb_fx;
 mod ore_fields;
 mod plasma_drive_fx;
 mod plasma_fx;
@@ -886,6 +887,8 @@ pub struct Renderer {
     regency_mine_fx: regency_mine_fx::RegencyMineFx,
     /// The Regency power generators' stars (renderer/star_core_fx.rs).
     star_core_fx: star_core_fx::StarCoreFx,
+    /// The Carillon's stored plasma orbs (renderer/orb_fx.rs).
+    orb_fx: orb_fx::OrbFx,
     giant_fx: titan_fx::GiantFx,
     heavy_rail: heavy_rail_fx::HeavyRailFx,
     /// EMP stuns and warp dampeners in the world (stun_fx.rs, damper_fx.rs).
@@ -2428,6 +2431,7 @@ impl Renderer {
             plasma_fx: plasma_fx::PlasmaFx::new(beam_cores),
             regency_mine_fx: regency_mine_fx::RegencyMineFx::new(excavations),
             star_core_fx: star_core_fx::StarCoreFx::new(stars),
+            orb_fx: orb_fx::OrbFx::default(),
             giant_fx: titan_fx::GiantFx::default(),
             heavy_rail: heavy_rail_fx::HeavyRailFx::default(),
             emp_fx: stun_fx::EmpFx::default(),
@@ -3327,6 +3331,7 @@ impl Renderer {
         self.gravitic_tick(projectiles, time);
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
+        self.orb_tick(units, time, camera);
         self.nanite_repair_tick(frame, time, camera);
         self.elevator_tick(units, &frame.events, time, camera);
         self.lance_core_tick(units, time, camera);

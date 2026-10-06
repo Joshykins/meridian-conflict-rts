@@ -1163,6 +1163,19 @@ pub struct RawWeapon {
     /// only, two to six.
     #[serde(default)]
     pub braid: u8,
+    /// An orb battery: the gun holds plasma orbs, one in each of its `muzzles`, made
+    /// this many at a time (`orb_time` apart) while it stands idle, and each shot spends
+    /// one. A salvo ends when the store is empty. Ballistic guns only. Zero (the default):
+    /// an ordinary gun.
+    #[serde(default)]
+    pub orbs: u8,
+    /// Seconds between the batches of an orb battery.
+    #[serde(default)]
+    pub orb_time: f64,
+    /// Up to this many extra seconds a lobbed shell stays up, chosen at random for each
+    /// shot: the shells of one salvo go over on arcs of different heights.
+    #[serde(default)]
+    pub loft_scatter: f64,
     /// Metres behind the muzzle where the gun throws out its spent casings, one per
     /// round. Cosmetic. Zero (the default): it throws none.
     #[serde(default)]
@@ -1271,6 +1284,8 @@ pub struct WeaponSounds {
     pub flight: Option<String>,
     /// A cluster shot (`cluster`) breaking into its sub-shots, heard where it splits.
     pub split: Option<String>,
+    /// An orb battery (`orbs`) making a batch of orbs, heard at the gun.
+    pub make: Option<String>,
     /// `fire` is one round, heard for each round a shot is drawn as (`rounds`), as that
     /// round leaves the muzzle. False (the default): heard once a shot, so a stream gun's
     /// `fire` is its whole burst.
@@ -1649,6 +1664,20 @@ impl Unit {
                     "{ctx}: braid is two to six strands, for a ballistic plasma gun"
                 )));
             }
+            if w.orbs > 0
+                && (w.trajectory != Trajectory::Ballistic
+                    || w.missile
+                    || w.orb_time <= 0.0
+                    || w.muzzles.is_empty()
+                    || w.muzzles.len() > crate::MAX_ORBS
+                    || w.muzzles.len() % w.orbs as usize != 0)
+            {
+                return Err(DataError::Invalid(format!(
+                    "{ctx}: an orb battery is a ballistic gun with an orb_time and a muzzle \
+                     for each orb it holds (at most {}, whole batches)",
+                    crate::MAX_ORBS
+                )));
+            }
             if w.hitscan && (w.trajectory != Trajectory::Direct || w.missile) {
                 return Err(DataError::Invalid(format!(
                     "{ctx}: hitscan is only for direct-fire guns"
@@ -1846,6 +1875,9 @@ impl Unit {
                 rounds: w.rounds.clamp(1, 32),
                 round_span: (w.round_span.clamp(0.0, 10.0) * TICKS_PER_SECOND as f64) as f32,
                 braid: w.braid,
+                orbs: w.orbs,
+                orb_ticks: ticks(w.orb_time).clamp(1, u16::MAX as u32) as u16,
+                loft_scatter_ticks: ticks(w.loft_scatter).min(200) as u16,
                 casings: w.casings.clamp(0.0, 40.0) as f32,
                 red: w.red.clamp(0.0, 1.0) as f32,
                 torpedo: w.torpedo,

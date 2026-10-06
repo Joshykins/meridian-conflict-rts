@@ -206,6 +206,10 @@ pub struct Units {
     /// Ticks a builder has spent clearing the trees off a lot (`trees.rs`). Reclaim
     /// heads keep their charge in `weapon_cooldown` (`reclaim_heads.rs`).
     pub reclaim_charge: Vec<u16>,
+    /// An orb battery's store (`Weapon::orbs`): orbs held, and ticks into making the next
+    /// batch (`orbs.rs`). Zero for everything else.
+    pub orb_stock: Vec<u8>,
+    pub orb_clock: Vec<u16>,
     /// Mass this unit has reclaimed since it was made; a carrier also counts its drones'.
     pub reclaimed: Vec<Fx>,
     /// Current hit points of a projected shield bubble. Zero when the unit has none.
@@ -354,6 +358,8 @@ impl Units {
             gait: Vec::new(),
             gait_step: Vec::new(),
             reclaim_charge: Vec::new(),
+            orb_stock: Vec::new(),
+            orb_clock: Vec::new(),
             reclaimed: Vec::new(),
             shield_hp: Vec::new(),
             shield_open: Vec::new(),
@@ -433,6 +439,8 @@ impl Units {
         put(&mut self.gait, row, 0);
         put(&mut self.gait_step, row, [0; 2]);
         put(&mut self.reclaim_charge, row, 0);
+        put(&mut self.orb_stock, row, 0);
+        put(&mut self.orb_clock, row, 0);
         put(&mut self.reclaimed, row, Fx::ZERO);
         put(&mut self.shield_hp, row, Fx::ZERO);
         put(&mut self.shield_open, row, 0);
@@ -540,6 +548,7 @@ impl Units {
                     | (self.reclaim_charge[row] as u64) << 32
                     | (self.arm_pitch[row][2].0 as u64) << 48,
             );
+            h.write_u64(self.orb_stock[row] as u64 | (self.orb_clock[row] as u64) << 8);
             h.write_u64((3..7).fold(0u64, |acc, s| {
                 acc | (self.arm_pitch[row][s].0 as u64) << ((s - 3) * 16)
             }));

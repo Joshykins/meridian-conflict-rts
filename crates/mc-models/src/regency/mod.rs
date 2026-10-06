@@ -16,6 +16,7 @@ pub(crate) mod air_t2;
 mod battle_tank;
 mod bombard;
 mod brood;
+mod carillon;
 mod chassis;
 mod commander;
 mod condenser;
@@ -208,6 +209,13 @@ pub(super) const MODELS: &[ModelDef] = &[
         turrets::SPRINGALD_HEIGHT,
         turrets::springald,
     ),
+    // The Carillon, the orb-battery spire (`carillon`).
+    ModelDef::new(
+        "regency_carillon",
+        carillon::RADIUS,
+        carillon::HEIGHT,
+        carillon::carillon,
+    ),
     // At sea: the sonar's bell tripod (`sonar`), three tiers, and the torpedo launcher's
     // caisson (`torpedo`), two.
     ModelDef::tiered(
@@ -320,6 +328,8 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_nuke_defense" => 6000,
         // A 6 x 6 map gun: plinth and pylons, a long turret, its plant, a three-rail gun.
         "regency_springald" => 12000,
+        // A plinth, a five-stage shaft, and twenty cradles of dish and prongs on arms.
+        "regency_carillon" => 5000,
         _ => return None,
     })
 }
@@ -359,6 +369,8 @@ pub(super) fn reduced_share(key: &str) -> Option<f32> {
         "regency_strider" | "regency_wake_tank" => Some(0.5),
         // Bunkers, pylons and casemates of faceted plate that keep their sides reduced.
         "regency_nuke_silo" | "regency_nuke_defense" => Some(0.58),
+        // Octagonal stages and prongs that keep their sides when reduced.
+        "regency_carillon" => Some(0.7),
         _ => None,
     }
 }

@@ -353,6 +353,8 @@ struct WeaponSoundIds {
     ground: Option<mc_data::SoundId>,
     /// A cluster shot breaking into its sub-shots (`WeaponSounds::split`).
     split: Option<mc_data::SoundId>,
+    /// An orb battery making a batch (`WeaponSounds::make`).
+    make: Option<mc_data::SoundId>,
 }
 
 pub struct Game {
@@ -3187,6 +3189,7 @@ impl Game {
                             },
                         ),
                         split: id(&w.sounds.split, &None),
+                        make: id(&w.sounds.make, &None),
                     })
                     .collect(),
             })
@@ -3486,6 +3489,18 @@ impl Game {
                 } => (
                     3,
                     table.units[blueprint.index()].weapons[*weapon as usize].charge,
+                    pos.to_f32(),
+                    26.0,
+                    0.0,
+                ),
+                mc_sim::SimEvent::OrbsMade {
+                    pos,
+                    blueprint,
+                    weapon,
+                    ..
+                } => (
+                    3,
+                    table.units[blueprint.index()].weapons[*weapon as usize].make,
                     pos.to_f32(),
                     26.0,
                     0.0,

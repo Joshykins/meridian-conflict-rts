@@ -365,6 +365,7 @@ impl World {
                 } else {
                     deck_up(row)
                         .or_else(|| self.loaded_cells(row))
+                        .or_else(|| self.held_orbs(row))
                         .unwrap_or_else(|| self.launcher_pad(row))
                 },
             ],

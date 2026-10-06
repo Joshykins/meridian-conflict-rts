@@ -1055,6 +1055,7 @@ impl World {
             }
             let Some(motion) = self.bp(row).motion else {
                 self.step_hatches(row);
+                self.step_orbs(row);
                 continue;
             };
             if self.bp(row).transport.is_some() {
@@ -1579,6 +1580,9 @@ impl World {
                     && along - release <= travel / 2
                     && along - release >= -travel * 2
                     && cross <= t.radius + weapon.splash.max(Fx::from_int(4)))
+        } else if weapon.orbs > 0 {
+            // An orb battery throws from the orbs round it, whichever way its mark lies.
+            true
         } else if weapon.turret_turn == 0
             && (aircraft.is_none() || bp.unit(units.blueprint[row]).is_capital_ship())
             && (weapon.guided || weapon.vertical_launch)
@@ -1857,6 +1861,11 @@ impl World {
         if weapon.hatch_ticks > 0 && units.deploy[row] < weapon.hatch_ticks {
             return Ok(());
         }
+        // An orb battery with nothing in store has nothing to throw (`orbs.rs`).
+        if weapon.orbs > 0 && units.orb_stock[row] == 0 {
+            units.weapon_salvo_left[row][w] = 0;
+            return Ok(());
+        }
         if !in_reach || slant_out {
             return Ok(());
         }
@@ -2009,8 +2018,15 @@ impl World {
             } else {
                 (aim, aim_z)
             };
-            // A salvo longer than the rack goes round its tubes again.
-            let local = if weapon.muzzles.is_empty() {
+            // A salvo longer than the rack goes round its tubes again. An orb battery's shot
+            // leaves from the top slot still holding an orb, and spends it (`orbs.rs`).
+            let local = if weapon.orbs > 0 {
+                units.orb_stock[row] = units.orb_stock[row].saturating_sub(1);
+                if units.orb_stock[row] == 0 {
+                    units.weapon_salvo_left[row][w] = 0;
+                }
+                weapon.muzzles[units.orb_stock[row] as usize]
+            } else if weapon.muzzles.is_empty() {
                 weapon.muzzle
             } else {
                 weapon.muzzles[tube % weapon.muzzles.len()]
@@ -2237,7 +2253,13 @@ impl World {
                         )
                     }
                     Trajectory::Ballistic => {
-                        let n = ballistic_ticks(dist, weapon);
+                        // Each shell of a scattering gun goes over on an arc of its own.
+                        let scatter = if weapon.loft_scatter_ticks > 0 {
+                            self.state.rng.below(weapon.loft_scatter_ticks as u32 + 1) as i32
+                        } else {
+                            0
+                        };
+                        let n = ballistic_ticks(dist, weapon) + scatter;
                         let drop = GRAVITY * (n * (n + 1) / 2);
                         let vz = (aim_z - muzzle.z + drop) / n;
                         (

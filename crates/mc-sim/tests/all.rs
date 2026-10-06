@@ -58,6 +58,7 @@ mod naval;
 mod naval_roster;
 mod nuke_salvo;
 mod nukes;
+mod orbs;
 mod path_budget;
 mod patrol;
 mod pause;

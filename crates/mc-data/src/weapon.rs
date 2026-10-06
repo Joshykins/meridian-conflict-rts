@@ -12,6 +12,9 @@ pub const BOMBARD_RADIUS: f64 = 250.0;
 /// refused at load, so one split never floods the projectile table.
 pub const MAX_CLUSTER: u8 = 16;
 
+/// The most orbs an orb battery (`Weapon::orbs`) holds: one bit each in what the renderer is told.
+pub const MAX_ORBS: usize = 32;
+
 #[derive(Clone, Debug)]
 pub struct Weapon {
     pub name: String,
@@ -183,6 +186,13 @@ pub struct Weapon {
     /// and closing into one where it lands (`RawWeapon::braid`). Zero: drawn as it is.
     /// Cosmetic: not in the content hash.
     pub braid: u8,
+    /// An orb battery (`RawWeapon::orbs`): orbs made each batch. Zero: an ordinary gun.
+    /// The most it holds is its muzzles, one orb at each.
+    pub orbs: u8,
+    /// Ticks between an orb battery's batches.
+    pub orb_ticks: u16,
+    /// Most extra ticks a lobbed shell is kept up, at random for each shot.
+    pub loft_scatter_ticks: u16,
     /// Metres behind the muzzle where spent casings are thrown out, one per round.
     /// Zero: none. Cosmetic: not in the content hash.
     pub casings: f32,

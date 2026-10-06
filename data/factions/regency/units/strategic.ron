@@ -105,4 +105,60 @@
         mesh: "regency_springald", icon: Artillery,
         sounds: (death: "blast_large"),
     ),
+    (
+        // The Regency's area defence: a tall plated spire that makes plasma orbs and holds
+        // them floating round it in the air, four at a time, up to twenty (five batches),
+        // so a quiet hour stores a whole barrage. When anything comes into reach the orbs
+        // tear loose from the top down and go over as red streaks, each on an arc of its
+        // own height (`loft_scatter`) from its own place round the spire, and come down
+        // wide of the mark (`spread`), each melting the ground in a pool and bursting in
+        // plasma. It shells anything that is not a submerged boat: structures, land
+        // units, ships, and aircraft too, which it catches in the streaks' proximity burst
+        // as they fall. The orbs are the weapon's `muzzles`, the model's own numbers; slot
+        // 0 is the lowest ring, a batch is a ring of four (`mc_sim::orbs`).
+        //
+        // Balance: it is a T4 that holds the line, not one that breaks it. 20 orbs of 700
+        // is 14000 stored; made at one batch (2800) every 7 s it sustains 400 a second,
+        // against the Springald's 560, but it can spend all of it in two seconds on whatever
+        // walks into 1700 m. The scatter wastes much of it on a single mark and none of it
+        // on a mass; the spire can't shoot at anything inside 80 m.
+        //
+        // Model: `regency_carillon` (`models::regency::carillon`), authored at this size.
+        key: "regency_t4_area_defense",
+        name: "Carillon",
+        role: "Orb Battery", title: "Area Defense",
+        tech: 4,
+        categories: ["Land", "Defense", "Experimental"],
+        health: 26000,
+        cost: (mass: 6500, energy: 65000, time: 26000),
+        radius: 18.75, height: 66, footprint: (4, 4),
+        vision: 450, radar: 900,
+        economy: (energy_upkeep: 30),
+        weapons: [(
+            name: "Plasma Orb Battery",
+            damage: 700, splash: 36, proximity: 16, range_min: 80, range: 1700, reload: 2.0, speed: 520,
+            trajectory: Ballistic, loft: 1.0, loft_scatter: 3.5,
+            spread: 2.5,
+            salvo: 20, salvo_delay: 0.1,
+            orbs: 4, orb_time: 7.0,
+            turret_turn: 0, arc: 360, muzzle: (11.5, 0, 56),
+            muzzles: [
+                (11.5, 0, 20), (0, 11.5, 20), (-11.5, 0, 20), (0, -11.5, 20),
+                (10.62, 4.4, 29), (-4.4, 10.62, 29), (-10.62, -4.4, 29), (4.4, -10.62, 29),
+                (8.13, 8.13, 38), (-8.13, 8.13, 38), (-8.13, -8.13, 38), (8.13, -8.13, 38),
+                (4.4, 10.62, 47), (-10.62, 4.4, 47), (-4.4, -10.62, 47), (10.62, -4.4, 47),
+                (0, 11.5, 56), (-11.5, 0, 56), (0, -11.5, 56), (11.5, 0, 56),
+            ],
+            targets: ["Air", "Land", "Naval", "Structure"],
+            color: Orange, red: 1.0,
+            plasma_grade: Some(Pinched), melt: 1.4,
+            flash: 1.0, impact: 1.8, tracer: 0.9, streak: 2.2, wake: 3.0,
+            sounds: (
+                fire: "regency_carillon_fire", make: "regency_carillon_make",
+                impact: "regency_carillon_hit", ground: "regency_carillon_hit",
+            ),
+        )],
+        mesh: "regency_carillon", icon: Defense,
+        sounds: (death: "blast_large"),
+    ),
 ]

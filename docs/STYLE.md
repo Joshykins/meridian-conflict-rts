@@ -243,6 +243,7 @@ structure that upgrades in place are numbered; the deepest mine is named for it.
 | Shield generator (T2, T3) | Ward (II) |
 | Missile defence (T2, T3) | Rondel (II) |
 | Nuke silo, nuke defence, map gun (T4) | Mangonel, Barbican, Springald |
+| Area defence, orb battery (T4) | Carillon |
 | Air superiority fighter, strategic bomber (T3) | Partisan, Maul |
 | Spy plane (T3) | Augur |
 

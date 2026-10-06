@@ -227,6 +227,13 @@ pub enum SimEvent {
     },
     /// A missile left a dived hull at `pos` (under the water): the boil on the surface, and
     /// the launch that paints the boat.
+    /// An orb battery (`Weapon::orbs`) made a batch of orbs: `held` are in store now.
+    OrbsMade {
+        pos: FxVec3,
+        blueprint: BlueprintId,
+        weapon: u8,
+        held: u8,
+    },
     DivedLaunch {
         pos: FxVec3,
         blueprint: BlueprintId,

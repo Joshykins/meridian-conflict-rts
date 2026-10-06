@@ -75,6 +75,15 @@ Off the lines, measured the same way:
   5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
   shot is drawn as three strands wound round each other but is one shot and strikes once
   (`Weapon::braid`), so a dome takes it as it takes a Culverin shell.
+- The Regency's Carillon (T4 area defence, 6500 mass, 26000 HP, 30 energy/s upkeep) is
+  a store of damage, not a rate of it: it makes four plasma orbs every 7 s and holds up
+  to twenty (`Weapon::orbs`, `orb_time`), so a quiet 35 s stores 14000 damage (700 each
+  in 36 m), and spends it from the top ring down in two seconds on whatever comes into
+  80-1700 m: land, ships, structures and aircraft (the shells' 16 m proximity burst
+  catches them as they fall), never a submerged boat. Each shell goes over on its own
+  arc (`loft_scatter`) and lands up to 2.5 degrees wide (`spread`), so on one mark most
+  of a barrage is wasted and on a mass none is. Once empty it fires each batch as it
+  forms, 400 a second.
 
 ## Air and anti-air
 

@@ -29,7 +29,7 @@ pub use raw::{
 };
 pub use refit::{Loadout, Module, Refit, RefitSet, RefitSlot, MAX_REFIT_SLOTS};
 pub use sounds::{SoundId, SoundLibrary};
-pub use weapon::{HowitzerLook, Weapon, BOMBARD_RADIUS, MAX_CLUSTER};
+pub use weapon::{HowitzerLook, Weapon, BOMBARD_RADIUS, MAX_CLUSTER, MAX_ORBS};
 
 #[derive(
     Clone,
@@ -1697,6 +1697,9 @@ impl Blueprints {
                         | (w.hatch_ticks as u64) << 32
                         | (w.split as u64) << 48
                         | (w.split_ordered as u64) << 49,
+                );
+                h.write_u64(
+                    w.orbs as u64 | (w.orb_ticks as u64) << 8 | (w.loft_scatter_ticks as u64) << 24,
                 );
                 h.write_i64(w.proximity.0);
                 h.write_i64(w.burn_dps.0);

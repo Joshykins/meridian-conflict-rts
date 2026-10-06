@@ -29,6 +29,12 @@
             "Triune Pinch-fusion Howitzer": "Three knots of fusion gathered and thrown together, corkscrewing round each other all the way up and over, closing into one supernova where they land.",
         },
     ),
+    "regency_t4_area_defense": (
+        lore: "A spire that never stops making fire. It gathers plasma out of the air into orbs and holds them floating round its shaft, a ring at a time, for as long as the peace lasts; when the sky or the ground fills, it lets them all go at once.",
+        weapons: {
+            "Plasma Orb Battery": "Orbs of red plasma, stored in rings round the spire and loosed from the top down, each streaking over on its own arc to come down wide of the mark, melt the ground and burst.",
+        },
+    ),
     "regency_t3_artillery": (
         lore: "A long pinch bore that charges coil by coil and lobs a single shot of fusion over the horizon; where it lands the ground runs like glass.",
         weapons: {
