@@ -14,20 +14,20 @@
 // entity.wgsl carries into the world with `reg_to_world`.
 
 // The foundation strips' plate (foundations.wgsl): a dark warm graphite.
-const REG_GUNMETAL: vec3<f32> = vec3<f32>(0.047, 0.043, 0.038);
+const REG_GUNMETAL: vec3<f32> = vec3<f32>(0.1, 0.092, 0.082);
 // Where the plate is worn through its film to bright steel (and the foundation
 // strips' lit lips).
 const REG_STEEL_LIT: vec3<f32> = vec3<f32>(0.36, 0.34, 0.315);
-// The plate: near-black steel under a thin film. Seen square on it is black; as a
+// The plate: dark charcoal steel under a thin film. Seen square on it is charcoal; as a
 // face turns away the film's sheen rises, and its hue cycles crimson, deep red,
 // copper and back with the angle, each facet started at its own point in the cycle.
-const REG_FILM_BLACK: vec3<f32> = vec3<f32>(0.03, 0.026, 0.024);
+const REG_FILM_BLACK: vec3<f32> = vec3<f32>(0.1, 0.092, 0.084);
 const REG_FILM_RED: vec3<f32> = vec3<f32>(0.36, 0.018, 0.022);
 const REG_FILM_DEEP: vec3<f32> = vec3<f32>(0.2, 0.008, 0.016);
 const REG_FILM_COPPER: vec3<f32> = vec3<f32>(0.34, 0.075, 0.02);
-// The machinery under the plates: a darker graphite than the plate, darker still in
+// The machinery under the plates: a dark graphite a shade off the plate, darker in
 // its grooves, and the lighter steel it polishes to where it is worked.
-const REG_WORKS: vec3<f32> = vec3<f32>(0.055, 0.051, 0.046);
+const REG_WORKS: vec3<f32> = vec3<f32>(0.12, 0.112, 0.1);
 const REG_WORKS_DEEP: vec3<f32> = vec3<f32>(0.02, 0.019, 0.017);
 const REG_WORKS_POLISH: vec3<f32> = vec3<f32>(0.24, 0.225, 0.205);
 
@@ -339,16 +339,16 @@ fn regency_paint(m_in: Pbr, works: bool, look: RegencyLook, cos_v: f32, seed: f3
     if works {
         let base = mix(REG_WORKS_DEEP, REG_WORKS, saturate(look.tone)) * clamp(0.75 + lum, 0.75, 1.3);
         m.albedo = mix(base, REG_WORKS_POLISH, saturate(look.lift));
-        m.metallic = 0.88;
+        m.metallic = 0.6;
         m.roughness = clamp(0.4 + look.rough - 0.18 * look.lift, 0.22, 0.6);
     } else {
         // Steel under an iridescent film, not paint: a metal, so its colour is what it
-        // reflects, black seen square on and a crimson to copper sheen as it turns away; what makes it read as real is its
+        // reflects, charcoal seen square on and a crimson to copper sheen as it turns away; what makes it read as real is its
         // sheen varying, smudged here, worn through to bright steel at its edges, dull
         // with grime in its seams.
         let tone = look.tone * clamp(0.8 + lum, 0.8, 1.2);
         m.albedo = mix(reg_film(cos_v, seed) * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
-        m.metallic = 0.85;
+        m.metallic = 0.55;
         m.roughness = clamp(0.42 + look.rough - 0.1 * saturate(look.lift), 0.24, 0.8);
     }
     return m;
