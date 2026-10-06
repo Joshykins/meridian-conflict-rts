@@ -75,7 +75,7 @@ const FLOOR_RES: u32 = 128;
 /// wings cruise through them and a low one can swallow a gunship.
 const CLOUD_BASE: f32 = 150.0;
 /// Fair-weather tops above the base, before towering weather lifts them.
-const CLOUD_DECK: f32 = 380.0;
+pub(crate) const CLOUD_DECK: f32 = 380.0;
 /// Mirrors `RAIN_DROPS` in clouds.wgsl.
 const RAIN_DROPS: u32 = 15000;
 /// Toward the sun at `hour` (24-hour clock) on an equinox day: up at 6 from

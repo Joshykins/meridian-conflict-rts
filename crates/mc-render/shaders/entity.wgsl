@@ -1515,6 +1515,8 @@ fn vs_main(in: VsIn) -> VsOut {
     let falling = (e.owner_flags & KIND_WRECK) != 0u && (e.packed == 1u || e.packed == 2u);
     // A trampled tree tips over from its foot (renderer/fallen_trees.rs).
     let toppled = (e.owner_flags & KIND_PROP) != 0u && e.arm_pitch.x != 0.0;
+    // Set when no branch of the first half of the chain below took the vertex.
+    var rest = false;
     if (e.owner_flags & KIND_WRECK) != 0u && !falling {
         // A fresh wreck carries its age (`mirror::UnitInstance::gait`); one long settled lies as it fell.
         p = wrecked(p, in.part, model, hash11(f32(e.unit_id & 0xFFFFu)), e.turret_yaw, wreck.age, e.health, wreck);
@@ -1912,153 +1914,160 @@ fn vs_main(in: VsIn) -> VsOut {
             }
             p.z += car * (ELEVATOR_SKY_Z - ELEVATOR_CAR_DOCK);
         }
-    } else if in.part == PART_SILO_DOOR && (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
-        // A silo's or an interceptor array's blast doors: two leaves meeting on y = 0,
-        // slid apart along y by half the opening (`models/aster/strategic.rs`): 5.2 m on
-        // the silo (icon 25), 5 m on the array (icon 26). Heavy: slow to start and to stop.
-        let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
-        let travel = select(5.0, 5.2, (model.icon & 0xFFu) == LAUNCHER_ICON_SILO);
-        p.y += sign(p.y) * open * travel;
-    } else if in.part == LAUNCHER_PART_LID || in.part == LAUNCHER_PART_HOIST {
-        // A launcher's load cycle while a round assembles: the store's lid slides back, the
-        // hoist block goes down into the hatch and up, the lid shuts. The cables' tops
-        // stay on the trolley, so they stretch.
-        let cycle = load_cycle(e, time);
-        let silo = (model.icon & 0xFFu) == LAUNCHER_ICON_SILO;
-        if in.part == LAUNCHER_PART_LID {
-            let slide = cycle.x * select(LAUNCHER_ARRAY_LID_TRAVEL, LAUNCHER_SILO_LID_TRAVEL, silo);
-            p += select(vec3<f32>(0.0, -slide, 0.0), vec3<f32>(-slide, 0.0, 0.0), silo);
-        } else if p.z < select(LAUNCHER_ARRAY_HOIST_SPLIT, LAUNCHER_SILO_HOIST_SPLIT, silo) {
-            p.z -= cycle.y * select(LAUNCHER_ARRAY_HOIST_DROP, LAUNCHER_SILO_HOIST_DROP, silo);
-        }
-    } else if (in.part == CELLS_PART_HATCH || in.part == CELLS_PART_ROUND) && model.cell_grid.x != 0u {
-        // A block of missile cells (`models::CellBlock`): each hatch swings up and out about
-        // its outer edge as the hatches open (`deploy`), and a missile stands in each cell
-        // whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
-        let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
-        // The nearer block's middle, then the nearest cell of its grid.
-        var blk = 0u;
-        if model.cell_grid.y != 0u
-            && distance(p.xy, model.cells[2].xy) < distance(p.xy, model.cells[0].xy) {
-            blk = 1u;
-        }
-        let at = model.cells[2u * blk];
-        let grid = select(model.cell_grid.x, model.cell_grid.y, blk == 1u);
-        let count = vec2<f32>(f32(grid & 15u), f32((grid >> 4u) & 15u));
-        let ij = clamp(round((p.xy - at.xy) / at.w + (count - 1.0) * 0.5), vec2<f32>(0.0), count - 1.0);
-        let centre = at.xy + (ij - (count - 1.0) * 0.5) * at.w;
-        if in.part == CELLS_PART_HATCH {
-            let open = select(0.0, smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t)), live);
-            let half = model.cells[2u * blk + 1u].x;
-            if ((grid >> 8u) & 1u) == 0u {
-                let side = select(-1.0, 1.0, centre.x >= at.x);
-                let hinge = vec3<f32>(centre.x + side * half, 0.0, at.z);
-                let turn = -side * open * CELLS_SWING;
-                p = rot_xz(p - hinge, turn) + hinge;
-                n = rot_xz(n, turn);
-            } else {
-                let side = select(-1.0, 1.0, centre.y >= at.y);
-                let hinge = vec3<f32>(0.0, centre.y + side * half, at.z);
-                let turn = -side * open * CELLS_SWING;
-                p = rot_x(p - hinge, turn) + hinge;
-                n = rot_x(n, turn);
+    } else {
+        rest = true;
+    }
+    // The chain goes on here in a block of its own: one `else if` chain this long
+    // recursed past a 1 MB stack in naga's parser (the Windows build script's).
+    if rest {
+        if in.part == PART_SILO_DOOR && (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
+            // A silo's or an interceptor array's blast doors: two leaves meeting on y = 0,
+            // slid apart along y by half the opening (`models/aster/strategic.rs`): 5.2 m on
+            // the silo (icon 25), 5 m on the array (icon 26). Heavy: slow to start and to stop.
+            let open = smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t));
+            let travel = select(5.0, 5.2, (model.icon & 0xFFu) == LAUNCHER_ICON_SILO);
+            p.y += sign(p.y) * open * travel;
+        } else if in.part == LAUNCHER_PART_LID || in.part == LAUNCHER_PART_HOIST {
+            // A launcher's load cycle while a round assembles: the store's lid slides back, the
+            // hoist block goes down into the hatch and up, the lid shuts. The cables' tops
+            // stay on the trolley, so they stretch.
+            let cycle = load_cycle(e, time);
+            let silo = (model.icon & 0xFFu) == LAUNCHER_ICON_SILO;
+            if in.part == LAUNCHER_PART_LID {
+                let slide = cycle.x * select(LAUNCHER_ARRAY_LID_TRAVEL, LAUNCHER_SILO_LID_TRAVEL, silo);
+                p += select(vec3<f32>(0.0, -slide, 0.0), vec3<f32>(-slide, 0.0, 0.0), silo);
+            } else if p.z < select(LAUNCHER_ARRAY_HOIST_SPLIT, LAUNCHER_SILO_HOIST_SPLIT, silo) {
+                p.z -= cycle.y * select(LAUNCHER_ARRAY_HOIST_DROP, LAUNCHER_SILO_HOIST_DROP, silo);
             }
-        } else {
-            let cell = u32(ij.x) * ((grid >> 4u) & 15u) + u32(ij.y);
-            let order = select(model.cell_grid.z, model.cell_grid.w, blk == 1u);
-            let bit = (order >> (4u * cell)) & 15u;
-            if !live || (e.status[2] & (1u << bit)) == 0u {
+        } else if (in.part == CELLS_PART_HATCH || in.part == CELLS_PART_ROUND) && model.cell_grid.x != 0u {
+            // A block of missile cells (`models::CellBlock`): each hatch swings up and out about
+            // its outer edge as the hatches open (`deploy`), and a missile stands in each cell
+            // whose bit is set in `status[2]`. A wreck or a site: shut, and empty.
+            let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
+            // The nearer block's middle, then the nearest cell of its grid.
+            var blk = 0u;
+            if model.cell_grid.y != 0u
+                && distance(p.xy, model.cells[2].xy) < distance(p.xy, model.cells[0].xy) {
+                blk = 1u;
+            }
+            let at = model.cells[2u * blk];
+            let grid = select(model.cell_grid.x, model.cell_grid.y, blk == 1u);
+            let count = vec2<f32>(f32(grid & 15u), f32((grid >> 4u) & 15u));
+            let ij = clamp(round((p.xy - at.xy) / at.w + (count - 1.0) * 0.5), vec2<f32>(0.0), count - 1.0);
+            let centre = at.xy + (ij - (count - 1.0) * 0.5) * at.w;
+            if in.part == CELLS_PART_HATCH {
+                let open = select(0.0, smoothstep(0.0, 1.0, mix(e.prev_deploy, e.deploy, t)), live);
+                let half = model.cells[2u * blk + 1u].x;
+                if ((grid >> 8u) & 1u) == 0u {
+                    let side = select(-1.0, 1.0, centre.x >= at.x);
+                    let hinge = vec3<f32>(centre.x + side * half, 0.0, at.z);
+                    let turn = -side * open * CELLS_SWING;
+                    p = rot_xz(p - hinge, turn) + hinge;
+                    n = rot_xz(n, turn);
+                } else {
+                    let side = select(-1.0, 1.0, centre.y >= at.y);
+                    let hinge = vec3<f32>(0.0, centre.y + side * half, at.z);
+                    let turn = -side * open * CELLS_SWING;
+                    p = rot_x(p - hinge, turn) + hinge;
+                    n = rot_x(n, turn);
+                }
+            } else {
+                let cell = u32(ij.x) * ((grid >> 4u) & 15u) + u32(ij.y);
+                let order = select(model.cell_grid.z, model.cell_grid.w, blk == 1u);
+                let bit = (order >> (4u * cell)) & 15u;
+                if !live || (e.status[2] & (1u << bit)) == 0u {
+                    p = vec3<f32>(0.0, 0.0, -50.0);
+                }
+            }
+        } else if in.part == PART_SILO_ROUND {
+            // The rounds a launcher holds (`nukes::LAUNCHER_*` in `status[2]`): the silo's one
+            // tube is drawn while it has a warhead; the array's cells empty in firing order,
+            // (-x -y) first, so a cell shows while it is among the last `stock` of them.
+            let stock = e.status[2] & LAUNCHER_STOCK_MASK;
+            let capacity = (e.status[2] >> LAUNCHER_CAPACITY_SHIFT) & 0xFFu;
+            let cell = select(0u, 2u, p.x >= 0.0) + select(0u, 1u, p.y >= 0.0);
+            let silo = (model.icon & 0xFFu) == LAUNCHER_ICON_SILO;
+            let held = select(cell + stock >= max(capacity, 4u), stock > 0u, silo);
+            let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
+                && (e.status[2] & LAUNCHER_MARK) != 0u;
+            if !(live && held) {
                 p = vec3<f32>(0.0, 0.0, -50.0);
             }
-        }
-    } else if in.part == PART_SILO_ROUND {
-        // The rounds a launcher holds (`nukes::LAUNCHER_*` in `status[2]`): the silo's one
-        // tube is drawn while it has a warhead; the array's cells empty in firing order,
-        // (-x -y) first, so a cell shows while it is among the last `stock` of them.
-        let stock = e.status[2] & LAUNCHER_STOCK_MASK;
-        let capacity = (e.status[2] >> LAUNCHER_CAPACITY_SHIFT) & 0xFFu;
-        let cell = select(0u, 2u, p.x >= 0.0) + select(0u, 1u, p.y >= 0.0);
-        let silo = (model.icon & 0xFFu) == LAUNCHER_ICON_SILO;
-        let held = select(cell + stock >= max(capacity, 4u), stock > 0u, silo);
-        let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u
-            && (e.status[2] & LAUNCHER_MARK) != 0u;
-        if !(live && held) {
-            p = vec3<f32>(0.0, 0.0, -50.0);
-        }
-    } else if in.part >= REACTOR_PART_COLLAR_FIRST && in.part < REACTOR_PART_COLLAR_FIRST + REACTOR_COLLARS
-        && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
-        // A reactor's collar (`gpu_consts::reactor`): turned about the plant's z axis,
-        // neighbours the other way, each quicker than the one below.
-        let k = f32(in.part - REACTOR_PART_COLLAR_FIRST);
-        let way = select(1.0, -1.0, (in.part & 1u) != 0u);
-        let turn = way * time * REACTOR_COLLAR_SPIN * (1.0 + k * REACTOR_COLLAR_STEP) + f32(e.unit_id & 255u) * 0.7;
-        p = rot_z(p, turn);
-        n = rot_z(n, turn);
-    } else if in.part == REACTOR_PART_FIN && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
-        // A reactor's heat sink fins (`gpu_consts::reactor`): lifted and settled in a wave
-        // rolling out along the sinks, the hot core showing between them as they rise.
-        let wave = 0.5 + 0.5 * sin(length(p.xy) * REACTOR_FIN_WAVE - time * REACTOR_FIN_RATE + f32(e.unit_id & 255u) * 0.7);
-        p.z += model.height * REACTOR_FIN_LIFT * wave * wave;
-    } else if (in.part == FAB_PART_INDEX || in.part == FAB_PART_PRESS) && (e.owner_flags & KIND_WRECK) == 0u {
-        // A fabricator's indexer and press (`fab_beat`): a step round about the model's z
-        // axis, and down and up again, each beat it works.
-        let beat = fab_beat(e, time, t);
-        if in.part == FAB_PART_INDEX {
-            let turn = beat.y * FAB_INDEX_STEP;
+        } else if in.part >= REACTOR_PART_COLLAR_FIRST && in.part < REACTOR_PART_COLLAR_FIRST + REACTOR_COLLARS
+            && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
+            // A reactor's collar (`gpu_consts::reactor`): turned about the plant's z axis,
+            // neighbours the other way, each quicker than the one below.
+            let k = f32(in.part - REACTOR_PART_COLLAR_FIRST);
+            let way = select(1.0, -1.0, (in.part & 1u) != 0u);
+            let turn = way * time * REACTOR_COLLAR_SPIN * (1.0 + k * REACTOR_COLLAR_STEP) + f32(e.unit_id & 255u) * 0.7;
             p = rot_z(p, turn);
             n = rot_z(n, turn);
-        } else {
-            p.z -= model.height * FAB_PRESS_TRAVEL * beat.x;
+        } else if in.part == REACTOR_PART_FIN && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
+            // A reactor's heat sink fins (`gpu_consts::reactor`): lifted and settled in a wave
+            // rolling out along the sinks, the hot core showing between them as they rise.
+            let wave = 0.5 + 0.5 * sin(length(p.xy) * REACTOR_FIN_WAVE - time * REACTOR_FIN_RATE + f32(e.unit_id & 255u) * 0.7);
+            p.z += model.height * REACTOR_FIN_LIFT * wave * wave;
+        } else if (in.part == FAB_PART_INDEX || in.part == FAB_PART_PRESS) && (e.owner_flags & KIND_WRECK) == 0u {
+            // A fabricator's indexer and press (`fab_beat`): a step round about the model's z
+            // axis, and down and up again, each beat it works.
+            let beat = fab_beat(e, time, t);
+            if in.part == FAB_PART_INDEX {
+                let turn = beat.y * FAB_INDEX_STEP;
+                p = rot_z(p, turn);
+                n = rot_z(n, turn);
+            } else {
+                p.z -= model.height * FAB_PRESS_TRAVEL * beat.x;
+            }
+        } else if (in.part & ORBIT_PART_MASK) == ORBIT_PART && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
+            // A gyroscope's ring (`gpu_consts::orbit`): about its own axis through the pivot.
+            let pivot = model.spinner_pivot.xyz;
+            let azimuth = f32((in.part >> ORBIT_AZIMUTH_SHIFT) & 255u) / 256.0 * 6.2831853;
+            let tilt = f32((in.part >> ORBIT_TILT_SHIFT) & 255u) / 255.0 * 1.5707963;
+            let axis = vec3<f32>(sin(tilt) * cos(azimuth), sin(tilt) * sin(azimuth), cos(tilt));
+            let rate = f32(bitcast<i32>(in.part) >> ORBIT_RATE_SHIFT) * ORBIT_RATE_STEP;
+            let spin = time * rate + f32(e.unit_id & 255u) * 0.37;
+            p = rot_about(p - pivot, axis, spin) + pivot;
+            n = rot_about(n, axis, spin);
+        } else if (in.part == PART_SPINNER || in.part == 4u) && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
+            let pivot = model.spinner_pivot.xyz;
+            let rate = select(select(1.6, 0.48, (e.owner_flags & STATE_CHARGING) != 0u), 38.0, in.part == 4u);
+            var spin = time * rate + f32(e.unit_id & 255u);
+            if (model.icon & ICON_SPINNER_SCANS) != 0u {
+                // A watching eye (`Model::spinner_scans`): it swings slowly one way, dwells,
+                // and looks back, never round and round.
+                let seed = f32(e.unit_id & 255u);
+                let look = sin(time * 0.23 + seed) + 0.35 * sin(time * 0.61 + seed * 2.3);
+                spin = 1.4 * look / 1.35 + seed;
+            }
+            p = rot_z(p - pivot, spin) + pivot;
+            n = rot_z(n, spin);
+        } else if in.part == PART_LOCOMOTION && crawls && limb != 0u {
+            let body = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z + crawl_set(e, model, t));
+            // Clamped to the pairs the model has: `crawl` is a fixed array, never read past it.
+            let pair = min((in.rig >> 16u) & 7u, u32(model.crawl[0].x + 0.5) - 1u);
+            let posed = crawl_leg(p, n, limb, min(pair, 3u), model, walk, e, t, body);
+            p = posed[0];
+            n = posed[1];
+        } else if in.part == PART_LOCOMOTION && walks && limb != 0u {
+            let posed = walk_leg(p, n, limb, model, walk, footing, stance);
+            p = posed[0];
+            n = posed[1];
+            // The legs lean with the body's shift, the feet staying where they stand.
+            p.y += stance.body.y * clamp(p.z / model.leg_hip.z, 0.0, 1.0);
+        } else if in.part == PART_LOCOMOTION && !walks && (model.icon & 0x20000u) == 0u
+            && (e.owner_flags & KIND_WRECK) == 0u
+            && (in.rig & RIG_DEPLOY) == 0u
+            && terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
+            // Running gear without a rig: a small shudder. Quiet while floating.
+            // Hover skirts are not tracks: they do not crawl or bounce with the belt.
+            // It follows the ground covered, not the clock, and fades in with speed, so a
+            // hull nudged a hair by the crowd (one tick of MOVING) does not twitch.
+            let gt = globals.sun.w;
+            let step = mix(e.gait.z, e.gait.y, gt);
+            let rolled = e.gait.x - e.gait.y * (1.0 - gt);
+            let phase = fract(rolled * 0.25) * 6.2831853 + p.x * 0.8 + sign(p.y) * 1.57;
+            p.z += max(sin(phase), 0.0) * 0.12 * model.height * 0.1 * smoothstep(0.1, 0.8, step);
         }
-    } else if (in.part & ORBIT_PART_MASK) == ORBIT_PART && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
-        // A gyroscope's ring (`gpu_consts::orbit`): about its own axis through the pivot.
-        let pivot = model.spinner_pivot.xyz;
-        let azimuth = f32((in.part >> ORBIT_AZIMUTH_SHIFT) & 255u) / 256.0 * 6.2831853;
-        let tilt = f32((in.part >> ORBIT_TILT_SHIFT) & 255u) / 255.0 * 1.5707963;
-        let axis = vec3<f32>(sin(tilt) * cos(azimuth), sin(tilt) * sin(azimuth), cos(tilt));
-        let rate = f32(bitcast<i32>(in.part) >> ORBIT_RATE_SHIFT) * ORBIT_RATE_STEP;
-        let spin = time * rate + f32(e.unit_id & 255u) * 0.37;
-        p = rot_about(p - pivot, axis, spin) + pivot;
-        n = rot_about(n, axis, spin);
-    } else if (in.part == PART_SPINNER || in.part == 4u) && (e.owner_flags & (KIND_WRECK | FLAG_UNDER_CONSTRUCTION | STATE_UNPOWERED)) == 0u {
-        let pivot = model.spinner_pivot.xyz;
-        let rate = select(select(1.6, 0.48, (e.owner_flags & STATE_CHARGING) != 0u), 38.0, in.part == 4u);
-        var spin = time * rate + f32(e.unit_id & 255u);
-        if (model.icon & ICON_SPINNER_SCANS) != 0u {
-            // A watching eye (`Model::spinner_scans`): it swings slowly one way, dwells,
-            // and looks back, never round and round.
-            let seed = f32(e.unit_id & 255u);
-            let look = sin(time * 0.23 + seed) + 0.35 * sin(time * 0.61 + seed * 2.3);
-            spin = 1.4 * look / 1.35 + seed;
-        }
-        p = rot_z(p - pivot, spin) + pivot;
-        n = rot_z(n, spin);
-    } else if in.part == PART_LOCOMOTION && crawls && limb != 0u {
-        let body = walk_bob(walk, model) + vec3<f32>(0.0, 0.0, footing.ground.z + crawl_set(e, model, t));
-        // Clamped to the pairs the model has: `crawl` is a fixed array, never read past it.
-        let pair = min((in.rig >> 16u) & 7u, u32(model.crawl[0].x + 0.5) - 1u);
-        let posed = crawl_leg(p, n, limb, min(pair, 3u), model, walk, e, t, body);
-        p = posed[0];
-        n = posed[1];
-    } else if in.part == PART_LOCOMOTION && walks && limb != 0u {
-        let posed = walk_leg(p, n, limb, model, walk, footing, stance);
-        p = posed[0];
-        n = posed[1];
-        // The legs lean with the body's shift, the feet staying where they stand.
-        p.y += stance.body.y * clamp(p.z / model.leg_hip.z, 0.0, 1.0);
-    } else if in.part == PART_LOCOMOTION && !walks && (model.icon & 0x20000u) == 0u
-        && (e.owner_flags & KIND_WRECK) == 0u
-        && (in.rig & RIG_DEPLOY) == 0u
-        && terrain_height(e.pos.xy) >= globals.map.z - 0.25 {
-        // Running gear without a rig: a small shudder. Quiet while floating.
-        // Hover skirts are not tracks: they do not crawl or bounce with the belt.
-        // It follows the ground covered, not the clock, and fades in with speed, so a
-        // hull nudged a hair by the crowd (one tick of MOVING) does not twitch.
-        let gt = globals.sun.w;
-        let step = mix(e.gait.z, e.gait.y, gt);
-        let rolled = e.gait.x - e.gait.y * (1.0 - gt);
-        let phase = fract(rolled * 0.25) * 6.2831853 + p.x * 0.8 + sign(p.y) * 1.57;
-        p.z += max(sin(phase), 0.0) * 0.12 * model.height * 0.1 * smoothstep(0.1, 0.8, step);
     }
     // Factory deck: up while a hull is printing, down to release it. A refit
     // leaves the deck down so the factory's own guns stay out of the work.

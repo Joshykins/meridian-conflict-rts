@@ -57,6 +57,7 @@ mod craters;
 mod crush_fx;
 mod cull_lists;
 mod effect_barriers;
+mod elevator_fx;
 mod fallen_trees;
 mod flak_fx;
 pub(crate) mod fog_field;
@@ -910,6 +911,8 @@ pub struct Renderer {
     capital_fx: capital_fx::CapitalFx,
     /// Capital ships' warp jumps: charge, flash, streak, rift (renderer/warp_fx.rs).
     warp_fx: warp_fx::WarpFx,
+    /// Space elevators' tether, platform, lamps and pulses (renderer/elevator_fx.rs).
+    elevator_fx: elevator_fx::ElevatorFx,
     nodes: Buffer,
     marks: Buffer,
     ranges: Buffer,
@@ -2439,6 +2442,7 @@ impl Renderer {
             reactor_fx: reactor_fx::ReactorFx::new(discharge_models, plant_vents),
             capital_fx: capital_fx::CapitalFx::default(),
             warp_fx: warp_fx::WarpFx::default(),
+            elevator_fx: elevator_fx::ElevatorFx::default(),
             nodes,
             marks,
             ranges,
@@ -3324,6 +3328,7 @@ impl Renderer {
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
         self.nanite_repair_tick(frame, time, camera);
+        self.elevator_tick(units, &frame.events, time, camera);
         self.lance_core_tick(units, time, camera);
         self.bolt_rifle_tick(units, &frame.houses, time);
         self.arc_howitzer_tick(units, &frame.houses, time);
@@ -3439,6 +3444,7 @@ impl Renderer {
         self.regency_guns_lights(time);
         self.gravitic_lights(time);
         self.star_core_lights(time);
+        self.elevator_lights(time, alpha);
         self.lance_core_lights(time);
         self.heavy_rail_lights(time);
         self.emp_lights(time);

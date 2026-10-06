@@ -143,11 +143,11 @@ struct Lamps {
 /// Below this height (m) the landing lights are on.
 const FLOODS_ON: f32 = 250.0;
 pub(super) const PUFF_LAMP: f32 = 32.0;
-const PUFF_LAMP_CONE: f32 = 33.0;
+pub(super) const PUFF_LAMP_CONE: f32 = 33.0;
 /// Seconds from one strobe double-flash to the next (puffs.wgsl `lamp_flare` agrees).
 const STROBE_PERIOD: f32 = 1.3;
 /// Beacon turn rate, radians a second (puffs.wgsl `lamp_flare` agrees).
-const BEACON_TURN: f32 = 7.0;
+pub(super) const BEACON_TURN: f32 = 7.0;
 
 #[derive(Default)]
 pub(super) struct CapitalFx {
