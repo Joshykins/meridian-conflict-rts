@@ -27,7 +27,7 @@
             speed: 320,
             apogee: 4200,
             // The Sunfall's yield: every race's warhead does about the same (user, 2026-09-25).
-            blast: (radius: 520, core: 200, damage: 80000, edge: 2500, front: 1.0),
+            blast: (radius: 598, core: 230, damage: 80000, edge: 2500, front: 1.0),
         ),
         mesh: "regency_nuke_silo", icon: Silo,
         sounds: (death: "blast_large"),

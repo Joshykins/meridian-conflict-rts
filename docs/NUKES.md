@@ -49,9 +49,10 @@ under the player's control; and the commander's death a nuke too.
   come round. Several arrays covering one mark each take a different warhead. A mark just past
   the edge of an array's cover, reached from beyond it, is outside it: the cover is a
   radius, not a promise.
-- **A detonation runs out.** A warhead is about 130 kt (a megaton, twice the reach since
-  blast reach goes with the cube root of yield, was tried 2026-09-25 and halved back).
-  Everything inside 200 m takes 80000; it falls off to 2500 at 520 m. The damage front runs
+- **A detonation runs out.** A warhead is about 200 kt (a megaton, twice the first reach
+  since blast reach goes with the cube root of yield, was tried 2026-09-25 and halved back;
+  the reach went up 15% on 2026-10-05). Everything inside 230 m takes 80000; it falls off
+  to 2500 at 598 m. The damage front runs
   out over 1 s (fast at first), so the middle dies at once and the edge a moment later. It hurts **everything**, its owner's too. **Domes do not stop it**:
   a dome takes what it has left and the rest goes through to what is under it, so no dome
   survives the middle of a warhead (a charged dome can still hold back a commander's
@@ -72,8 +73,8 @@ under the player's control; and the commander's death a nuke too.
   sampled each step), so neighbouring caps blend without a seam. The view ray runs from the eye through depth 0.01, as the clouds' does: through
   depth 1e-7 it lost the cloud at some angles and zooms (rounding in `w`). No `pow()` of a
   negative base anywhere (NaN on NVIDIA, the black holes of 2026-09-25).
-- **Size**: everything is drawn for the damage radius over 520 m (`scale`, 1 for a
-  warhead); widths go with `scale`, heights with `rise` = scale^0.6 above 1 (a real cloud's
+- **Size**: everything is drawn for the damage radius over 520 m (`scale`, 1.15 for a
+  warhead's 598 m); widths go with `scale`, heights with `rise` = scale^0.6 above 1 (a real cloud's
   top rises far slower with yield than it spreads), fire times with `slow` = sqrt(scale). Nothing
   whites out the screen: the flash is the fireball itself, far too bright to look at, and the
   light it throws over the country. The shock runs out fast along the ground (the sim's
@@ -233,12 +234,15 @@ mc-data; presentation only, never hashed). It rides on the events (`NuclearLaunc
   numbered in the order given, its blast ring, the whole flight from its silo, and the time
   to the burst ("Doors opening" for the one under way); on the minimap, the track from the
   silo and the number.
-- **In flight** (`RenderFrame::warhead_tracks`): every warhead's icon on the map with what
-  is left of its flight ahead of it and that flight's ground track, the blast rings at the
-  mark pulsing faster as it comes, and a countdown; interceptors as cyan darts; the same
-  on the minimap (a warhead flies in the upright plane through silo and mark, so its
-  track there is straight). A banner per warhead across the top ("Nuclear launch detected"
-  for an enemy's, with a klaxon), click to look. Short notes for "Warhead intercepted" and
+- **In flight** (`RenderFrame::warhead_tracks`): every warhead's icon on the map. Ours and
+  our allies' show what is left of the flight ahead and its ground track, the blast rings at
+  the mark pulsing faster as it comes, and a countdown; the same on the minimap (a warhead
+  flies in the upright plane through silo and mark, so its track there is straight). **An
+  enemy's never shows where it will land**: only the arc it has flown, trailing behind it
+  up from the silo, on the map and the minimap, and "Incoming warhead" beside it. Interceptors
+  are cyan darts. A banner per side across the top ("Nuclear launch detected" for an
+  enemy's, with a klaxon, impact times but no place), click to look (at an enemy warhead
+  itself, not its mark). Short notes for "Warhead intercepted" and
   "Warhead ready".
 - **Icons**: `IconKind::Silo` (a missile in an open tube) and `IconKind::AntiNuke` (a
   missile rising out of a shield's bowl toward its mark).

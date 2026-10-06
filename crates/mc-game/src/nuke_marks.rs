@@ -150,6 +150,57 @@ fn flight(ui: &mut Ui, field: &Field, points: &[Vec3], width: f32, tone: u32, al
     }
 }
 
+/// The warhead itself: an arrowhead along its flight `heading` at `at`, in a ring.
+fn arrowhead(ui: &mut Ui, at: Vec2, heading: Vec2, pulse: f32) {
+    let side = heading.perp();
+    let nose = at + heading * 11.0;
+    let back = at - heading * 7.0;
+    ui.triangle(
+        nose,
+        back + side * 7.0,
+        back - side * 7.0,
+        rgb(WARHEAD, 1.0),
+    );
+    ui.stroke(
+        at - heading * 7.0,
+        at - heading * 15.0,
+        2.2,
+        rgb(0xFFFFFF, 0.8),
+    );
+    ui.arc(
+        at,
+        15.0 + 2.0 * pulse,
+        0.0,
+        std::f32::consts::TAU,
+        1.2,
+        rgb(WARHEAD, 0.5),
+    );
+}
+
+/// The arc a warhead has flown, the first `travelled` metres of `path` up to `pos`, as a
+/// solid line in the sky fading toward the silo: all an enemy's warhead shows, so nothing
+/// drawn runs ahead of it to its mark.
+fn wake(ui: &mut Ui, field: &Field, path: &WarheadPath, travelled: f32, pos: Vec3) {
+    let n = PATH_POINTS;
+    let mut last: Option<Vec2> = None;
+    for i in 0..=n {
+        let p = if i == n {
+            pos
+        } else {
+            Vec3::from(
+                path.at(mc_core::Fx::from_f32(travelled * i as f32 / n as f32))
+                    .to_f32(),
+            )
+        };
+        let air = project(ui, field, p);
+        if let (Some(a), Some(b)) = (last, air) {
+            let k = i as f32 / n as f32;
+            ui.stroke(a, b, 1.5, rgb(WARHEAD, 0.15 + 0.55 * k));
+        }
+        last = air;
+    }
+}
+
 /// `path` from `from` metres on, as points for `flight`.
 fn trace(path: &WarheadPath, from: f32) -> Vec<Vec3> {
     path.trace(mc_core::Fx::from_f32(from), PATH_POINTS)
@@ -159,7 +210,7 @@ fn trace(path: &WarheadPath, from: f32) -> Vec<Vec3> {
 }
 
 /// A warhead's blast radius and core (strategic.ron), for marks with no silo at hand.
-pub const WARHEAD_BLAST: (f32, f32) = (520.0, 200.0);
+pub const WARHEAD_BLAST: (f32, f32) = (598.0, 230.0);
 
 /// The blast radius and core of `u`'s warhead.
 fn blast_of(field: &Field, u: Option<&UnitInstance>) -> (f32, f32) {
@@ -253,7 +304,26 @@ pub fn draw(
         let heading = project(ui, field, pos + (pos - prev).normalize_or(Vec3::Z) * 40.0)
             .map(|q| (q - at).normalize_or(Vec2::NEG_Y))
             .unwrap_or(Vec2::NEG_Y);
-        if warhead {
+        if warhead && enemy(m.owner as u8) {
+            // An enemy's warhead: where it is and the arc it has flown, never where it will
+            // land.
+            if let Some(track) = view
+                .frame
+                .warhead_tracks
+                .iter()
+                .find(|w| w.serial == m.serial)
+            {
+                wake(ui, field, &track.path, track.travelled.to_f32(), pos);
+            }
+            let pulse = 0.5 + 0.5 * (t * 6.0).sin();
+            arrowhead(ui, at, heading, pulse);
+            let text = if m.boost > 0.5 {
+                "Incoming warhead  \u{b7}  launching"
+            } else {
+                "Incoming warhead"
+            };
+            tag(ui, at + Vec2::new(0.0, 30.0), text, palette::BAD);
+        } else if warhead {
             let mark = Vec3::from(m.mark);
             let ground = mark.truncate().extend(surface(field, mark.truncate()));
             // What is left of its flight, and its track over the ground.
@@ -303,8 +373,6 @@ pub fn draw(
                 }
                 let who = if owner_of_missile(m.owner) == local {
                     "Our warhead"
-                } else if enemy(m.owner as u8) {
-                    "Incoming warhead"
                 } else {
                     "Warhead"
                 };
@@ -313,41 +381,9 @@ pub fn draw(
                 } else {
                     format!("{who}  \u{b7}  {}", clock(m.eta))
                 };
-                tag(
-                    ui,
-                    g + Vec2::new(0.0, 26.0),
-                    &text,
-                    if enemy(m.owner as u8) {
-                        palette::BAD
-                    } else {
-                        WARHEAD
-                    },
-                );
+                tag(ui, g + Vec2::new(0.0, 26.0), &text, WARHEAD);
             }
-            // The warhead: an arrowhead along its flight, in a ring.
-            let side = heading.perp();
-            let nose = at + heading * 11.0;
-            let back = at - heading * 7.0;
-            ui.triangle(
-                nose,
-                back + side * 7.0,
-                back - side * 7.0,
-                rgb(WARHEAD, 1.0),
-            );
-            ui.stroke(
-                at - heading * 7.0,
-                at - heading * 15.0,
-                2.2,
-                rgb(0xFFFFFF, 0.8),
-            );
-            ui.arc(
-                at,
-                15.0 + 2.0 * pulse,
-                0.0,
-                std::f32::consts::TAU,
-                1.2,
-                rgb(WARHEAD, 0.5),
-            );
+            arrowhead(ui, at, heading, pulse);
         } else {
             // An interceptor: a slim dart, and a thin line to what it hunts.
             if let Some(q) = project(ui, field, Vec3::from(m.mark)) {

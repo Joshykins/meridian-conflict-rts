@@ -287,11 +287,31 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, outer: Rect) {
     }
 
     // Warheads in flight (`docs/NUKES.md`): each one's track to where it will land, and the
-    // blast's ring there, pulsing; interceptors as cyan points.
+    // blast's ring there, pulsing; an enemy's only the track behind it back to its silo,
+    // never its mark. Interceptors as cyan points.
     let metres = s.map.info().size_metres().to_f32()[0].max(1.0);
+    let team = |p: u8| view.status.players.get(p as usize).map(|pl| pl.team);
     for m in &view.frame.strategic {
         let at = chart_pos(s, chart, Vec2::new(m.pos[0], m.pos[1]));
-        if m.kind == mc_sim::mirror::STRATEGIC_WARHEAD {
+        let enemy = !view.observing && team(m.owner as u8) != team(view.local);
+        if m.kind == mc_sim::mirror::STRATEGIC_WARHEAD && enemy {
+            let tone = super::silo::WARHEAD;
+            if let Some(track) = view
+                .frame
+                .warhead_tracks
+                .iter()
+                .find(|w| w.serial == m.serial)
+            {
+                let from = track.path.at(mc_core::Fx::ZERO).to_f32();
+                let from = chart_pos(s, chart, Vec2::new(from[0], from[1]));
+                if let Some((a, b)) = clip(from, at, chart) {
+                    ui.stroke(a, b, 1.0, rgb(tone, 0.6));
+                }
+            }
+            if chart.contains(at) {
+                ui.disc(at, 3.0, rgb(tone, 1.0));
+            }
+        } else if m.kind == mc_sim::mirror::STRATEGIC_WARHEAD {
             let tone = super::silo::WARHEAD;
             let mark = chart_pos(s, chart, Vec2::new(m.mark[0], m.mark[1]));
             if let Some((a, b)) = clip(at, mark, chart) {

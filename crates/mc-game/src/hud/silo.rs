@@ -819,8 +819,9 @@ pub struct Alerts {
 
 /// Warheads in flight become one live card per side (an enemy's loud, ours quieter),
 /// however many there are: the count, the soonest impact and the last, a tick for each
-/// on a time strip, and a click steps through where they will land. What just happened
-/// (a warhead intercepted, a warhead ready) goes up as a note that counts repeats.
+/// on a time strip, and a click steps through where they will land (an enemy's: where
+/// they are). What just happened (a warhead intercepted, a warhead ready) goes up as a
+/// note that counts repeats.
 pub fn alerts(hud: &mut Hud, s: &Scene) {
     let _t = mc_core::perf_span!("ui.silo_alerts");
     use super::notices::{Glyph, Live};
@@ -880,11 +881,9 @@ pub fn alerts(hud: &mut Hud, s: &Scene) {
         } else {
             2
         };
-        sides[side].push((
-            m.eta.max(0.0),
-            Vec2::new(m.mark[0], m.mark[1]),
-            m.boost > 0.5,
-        ));
+        // A click looks at where an enemy's warhead is, never where it will land.
+        let look = if side == 0 { m.pos } else { m.mark };
+        sides[side].push((m.eta.max(0.0), Vec2::new(look[0], look[1]), m.boost > 0.5));
     }
     for (side, group) in sides.iter().enumerate() {
         let n = group.len();

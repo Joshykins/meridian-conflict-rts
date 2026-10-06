@@ -42,7 +42,7 @@ Off the lines, measured the same way:
 
 - Strategic weapons (`docs/NUKES.md`): the Sunfall silo (T4, 9000 mass) assembles warheads
   of 6000 mass / 120000 energy in about 300 s at its own power (60), holds 2, and each does
-  80000 inside 200 m falling to 2500 at 520 m: it erases a base's core, domes included. The
+  80000 inside 230 m falling to 2500 at 598 m: it erases a base's core, domes included. The
   Parhelion array (T3, 3200 mass) answers it at a quarter of the price a round (1500 mass,
   about 100 s), four held, covering marks within 2.4 km. A side that sees silos should
   build arrays; one array stops one warhead per interceptor it holds.

@@ -29,9 +29,10 @@
             speed: 320,
             apogee: 4200,
             // Everything inside `core` takes `damage`; it falls to `edge` at `radius`.
-            // The front takes `front` seconds to run out to `radius`. About 130 kt (a megaton,
-            // tried 2026-09-25, was twice the reach and too big for the maps).
-            blast: (radius: 520, core: 200, damage: 80000, edge: 2500, front: 1.0),
+            // The front takes `front` seconds to run out to `radius`. About 200 kt (a megaton,
+            // tried 2026-09-25, was twice the reach and too big for the maps; 15% more reach
+            // than the first 520 m, 2026-10-05).
+            blast: (radius: 598, core: 230, damage: 80000, edge: 2500, front: 1.0),
         ),
         mesh: "nuke_silo", icon: Silo,
         sounds: (death: "blast_large"),
