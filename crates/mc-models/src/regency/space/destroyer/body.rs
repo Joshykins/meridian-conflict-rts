@@ -22,7 +22,9 @@ pub(super) const SPINE: f32 = 6.0;
 const CORNERS: usize = 7;
 
 /// One station: the half-beam at the chine, the keel flat's half-width, the deck's
-/// half-width, and the keel's, the chine's, the deck edge's and the spine's heights.
+/// half-width, and the keel's, the chine's, the deck edge's and the spine's heights;
+/// and how far the chine alone is pressed in there (a gun's pocket), the corners above
+/// and below it standing.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Station {
     pub(super) x: f32,
@@ -33,6 +35,7 @@ pub(super) struct Station {
     pub(super) deck_w: f32,
     pub(super) deck: f32,
     pub(super) spine: f32,
+    pub(super) notch: f32,
 }
 
 #[expect(clippy::too_many_arguments, reason = "one station of a hull table")]
@@ -55,6 +58,7 @@ pub(super) const fn st(
         deck_w,
         deck,
         spine,
+        notch: 0.0,
     }
 }
 
@@ -70,6 +74,7 @@ impl Station {
             deck_w: f(a.deck_w, c.deck_w),
             deck: f(a.deck, c.deck),
             spine: f(a.spine, c.spine),
+            notch: f(a.notch, c.notch),
         }
     }
 
@@ -84,7 +89,7 @@ impl Station {
                 self.keel_w + (self.w - self.keel_w) * 0.8,
                 self.chine - lower * 0.4,
             ),
-            Vec2::new(self.w, self.chine),
+            Vec2::new(self.w - self.notch, self.chine),
             Vec2::new(
                 self.deck_w + (self.w - self.deck_w) * 0.68,
                 self.chine + upper * 0.45,
@@ -95,11 +100,9 @@ impl Station {
     }
 }
 
-/// A hull: its stations stern first, and its centreline's offset to port (a sponson's
-/// hull is a body of its own, off the middle).
+/// A hull: its stations stern first.
 pub(super) struct Body {
-    pub(super) stations: &'static [Station],
-    pub(super) y: f32,
+    pub(super) stations: Vec<Station>,
 }
 
 impl Body {
@@ -110,7 +113,7 @@ impl Body {
 
     /// The section at `x`, straight between its stations.
     pub(super) fn at(&self, x: f32) -> Station {
-        let s = self.stations;
+        let s = &self.stations;
         let (lo, hi) = self.span();
         let x = x.clamp(lo, hi);
         let i = s
@@ -127,7 +130,7 @@ impl Body {
         let u = u.clamp(0.0, SPINE);
         let i = (u as usize).min(CORNERS - 2);
         let p = c[i].lerp(c[i + 1], u - i as f32);
-        v3(x, p.x + self.y, p.y)
+        v3(x, p.x, p.y)
     }
 
     /// The outward normal in the section's plane at `x`, `u`: the facet's, or between
@@ -196,7 +199,7 @@ impl Body {
         let mut ring: Vec<Vec3> = (0..CORNERS).map(|i| self.point(x, i as f32)).collect();
         ring.extend((1..CORNERS - 1).rev().map(|i| {
             let p = self.point(x, i as f32);
-            v3(p.x, 2.0 * self.y - p.y, p.z)
+            v3(p.x, -p.y, p.z)
         }));
         ring
     }

@@ -5,9 +5,8 @@
 //! plate are laid over it in courses that sweep back into spikes: charcoal over the
 //! deck and flanks, a pale stripe course down each shoulder. Through the ship's middle
 //! stands the drum of the energy core the Heavy Pinch-fusion Lance is fired from
-//! (`core.rs`); six Pinch-plasma Batteries turn in ball mounts on sponsons swelling
-//! out of the chines (`battery.rs`), out past the flanks so they fire down clear of
-//! the hull, and two blocks of hatched seeker cells on the stern deck (`cells.rs`).
+//! (`core.rs`); six Pinch-plasma Batteries turn in ball mounts seated in pockets
+//! pressed into the chines (`battery.rs`), so they fire down clear of the hull, and two blocks of hatched seeker cells on the stern deck (`cells.rs`).
 //! +X is forward, +Y port, the ground at z 0 (it is built on its lot, the core lowest).
 //! Authored in metres as built.
 //!
@@ -20,6 +19,8 @@ mod body;
 mod cells;
 mod core;
 
+use std::sync::LazyLock;
+
 use glam::Vec3;
 
 use crate::builder::{MeshBuilder, Section};
@@ -29,23 +30,45 @@ use crate::pattern;
 use super::super::kit::{dark_plate, metal, seam, v3};
 use super::super::machine::hoop_on;
 use battery::{battery, BALL_R};
-use body::{feather, st, Body, BILGE, CHINE, DECK_EDGE, KEEL_EDGE, SPINE};
+use body::{feather, st, Body, Station, BILGE, CHINE, DECK_EDGE, KEEL_EDGE, SPINE};
 use cells::{blocks, Cells};
 use core::{core, Core};
 
-const HULL: Body = Body {
-    stations: &[
-        st(-310.0, 58.0, 20.0, 50.0, 68.0, 30.0, 96.0, 100.0),
-        st(-262.0, 100.0, 26.0, 40.0, 64.0, 40.0, 108.0, 116.0),
-        st(-160.0, 114.0, 28.0, 36.0, 62.0, 44.0, 112.0, 122.0),
-        st(-40.0, 98.0, 24.0, 34.0, 62.0, 38.0, 106.0, 114.0),
-        st(80.0, 78.0, 20.0, 38.0, 62.0, 30.0, 98.0, 104.0),
-        st(200.0, 54.0, 16.0, 44.0, 63.0, 22.0, 88.0, 92.0),
-        st(300.0, 30.0, 10.0, 52.0, 64.0, 12.0, 78.0, 80.0),
-        st(362.0, 8.0, 3.0, 60.0, 65.0, 3.0, 70.0, 70.0),
-    ],
-    y: 0.0,
-};
+/// The hull's stations, stern first, before the guns' pockets are pressed into them.
+const STATIONS: [Station; 8] = [
+    st(-310.0, 58.0, 20.0, 50.0, 68.0, 30.0, 96.0, 100.0),
+    st(-262.0, 100.0, 26.0, 40.0, 64.0, 40.0, 108.0, 116.0),
+    st(-160.0, 114.0, 28.0, 36.0, 62.0, 44.0, 112.0, 122.0),
+    st(-40.0, 98.0, 24.0, 34.0, 62.0, 38.0, 106.0, 114.0),
+    st(80.0, 78.0, 20.0, 38.0, 62.0, 30.0, 98.0, 104.0),
+    st(200.0, 54.0, 16.0, 44.0, 63.0, 22.0, 88.0, 92.0),
+    st(300.0, 30.0, 10.0, 52.0, 64.0, 12.0, 78.0, 80.0),
+    st(362.0, 8.0, 3.0, 60.0, 65.0, 3.0, 70.0, 70.0),
+];
+
+/// The hull: `STATIONS`, the chine pressed in round each battery's ball into a faceted
+/// pocket the hull's shoulder and bilge fold down and up into.
+static HULL: LazyLock<Body> = LazyLock::new(|| {
+    let plain = Body {
+        stations: STATIONS.to_vec(),
+    };
+    let mut stations = STATIONS.to_vec();
+    for &m in &MOUNTS {
+        for (dx, notch) in [
+            (POCKET.0, 0.0),
+            (POCKET.1, NOTCH),
+            (-POCKET.1, NOTCH),
+            (-POCKET.0, 0.0),
+        ] {
+            stations.push(Station {
+                notch,
+                ..plain.at(m + dx)
+            });
+        }
+    }
+    stations.sort_by(|a, c| a.x.total_cmp(&c.x));
+    Body { stations }
+});
 
 /// The core stands at the ship's middle, so the beam leaves the same point whichever
 /// way it is laid.
@@ -70,31 +93,24 @@ pub(crate) const NOZZLES: [[f32; 3]; 3] = [DRIVES[0].0, DRIVES[1].0, DRIVES[2].0
 /// The drives' size as the drive effects take it (1: a 12 m mouth): the great drive's.
 pub(crate) const DRIVE_SIZE: f32 = DRIVES[0].1 / 12.0;
 
-/// The batteries' sponsons down each chine, fore to aft (port of each pair first),
-/// all ahead of the great blades' roots.
+/// The batteries' sockets down each chine, fore to aft (port of each pair first), all
+/// ahead of the great blades' roots.
 const MOUNTS: [f32; 3] = [230.0, 130.0, 30.0];
-/// The chine's fairing: its run (head, tail), and at a sponson how far it stands out of
-/// the chine, how high its deck stands over it and how deep its belly hangs under it.
-const FAIRING: (f32, f32) = (290.0, -20.0);
-const SPONSON_OUT: f32 = 30.0;
-const SPONSON_UP: f32 = 12.0;
-const SPONSON_DOWN: f32 = 13.0;
-/// How far out of the chine the ball's socket is cut, and how far over the socket's
-/// rim the ball's middle stands.
-const SOCKET_OUT: f32 = 0.6 * SPONSON_OUT;
-const BALL_SEAT: f32 = 0.35 * BALL_R;
+/// Each ball's pocket: how far the chine is pressed in at its bottom, and its half
+/// lengths at the hull's line and at its flat bottom.
+const NOTCH: f32 = 0.75 * BALL_R;
+const POCKET: (f32, f32) = (1.7 * BALL_R, 0.45 * BALL_R);
+/// How far the ball's middle stands out of the pocket's bottom: just inside the hull's
+/// line, so its back half sits in the pocket.
+const BALL_OUT: f32 = NOTCH - 0.1 * BALL_R;
 
-/// The socket's rim on the port sponson at `x`.
-fn socket(x: f32) -> Vec3 {
-    HULL.point(x, CHINE) + v3(0.0, SOCKET_OUT, SPONSON_UP)
-}
-
-/// Each battery's pivot in weapon order (weapons 1 to 6): the ball's middle, seated in
-/// its socket.
+/// Each battery's pivot in weapon order (weapons 1 to 6): the ball's middle, in its
+/// socket on the port or starboard chine.
 fn battery_pivots() -> [Vec3; 6] {
     std::array::from_fn(|k| {
         let side = if k % 2 == 0 { 1.0 } else { -1.0 };
-        let p = socket(MOUNTS[k / 2]) + Vec3::Z * BALL_SEAT;
+        let x = MOUNTS[k / 2];
+        let p = HULL.out(x, CHINE, BALL_OUT);
         v3(p.x, p.y * side, p.z)
     })
 }
@@ -123,7 +139,7 @@ pub(crate) fn seeker_muzzles() -> Vec<Vec3> {
 }
 
 pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
-    let body = &HULL;
+    let body: &Body = &HULL;
     if b.coarse() {
         coarse(b);
         return;
@@ -152,7 +168,6 @@ pub(super) fn destroyer(b: &mut MeshBuilder, _tech: u8) {
     );
     core(b, body, CORE);
     blocks(b, body, CELLS);
-    b.mirror_y(|b| fairing(b, body));
     for (k, pivot) in battery_pivots().into_iter().enumerate() {
         battery(b, 1 + k, pivot);
     }
@@ -170,64 +185,6 @@ fn blade(b: &mut MeshBuilder, body: &Body) {
         (6.0, 1.4),
         6.0,
     );
-}
-
-/// How much the chine's fairing swells at `x`: 1 at a sponson, easing to 0 between.
-fn swell(x: f32) -> f32 {
-    let s = MOUNTS
-        .iter()
-        .map(|&m| (1.0 - (x - m).abs() / 44.0).clamp(0.0, 1.0))
-        .fold(0.0, f32::max);
-    s * s * (3.0 - 2.0 * s)
-}
-
-/// The port chine's fairing: one faceted strake grown out of the hull along the chine,
-/// its deck rising off the shoulder and its belly off the bilge, low between the
-/// batteries and swelling round each into a sponson with the ball's socket cut in its
-/// deck, a pale collar round the ball.
-fn fairing(b: &mut MeshBuilder, body: &Body) {
-    let (head, tail) = FAIRING;
-    let n = if b.fine() { 30 } else { 12 };
-    let rings: Vec<Vec<Vec3>> = (0..=n)
-        .map(|i| {
-            let t = i as f32 / n as f32;
-            let x = head + (tail - head) * t;
-            let c = body.point(x, CHINE);
-            // Pointed at both ends, run back into the chine.
-            let end = (t * 7.0).min((1.0 - t) * 7.0).min(1.0);
-            let s = swell(x) * end;
-            let out = 4.0 * end + (SPONSON_OUT - 4.0) * s;
-            let up = 2.0 * end + (SPONSON_UP - 2.0) * s;
-            let down = 3.0 * end + (SPONSON_DOWN - 3.0) * s;
-            vec![
-                body.out(x, CHINE + 0.3 + 0.35 * s, -0.6),
-                c + v3(0.0, out * 0.72, up),
-                c + v3(0.0, out, up * 0.35),
-                c + v3(0.0, out * 0.7, -down),
-                body.out(x, CHINE - 0.3 - 0.4 * s, -0.6),
-            ]
-        })
-        .collect();
-    dark_plate(b);
-    b.with_facets(|b| b.loft(&rings, true, true));
-    let sides = b.sides(12);
-    for &x in &MOUNTS {
-        let rim = socket(x);
-        pale_plate(b);
-        b.with_facets(|b| {
-            b.cylinder_between(
-                rim - Vec3::Z * 2.0,
-                rim + Vec3::Z * 1.4,
-                BALL_R * 1.14,
-                BALL_R * 1.0,
-                10,
-            )
-        });
-        if b.fine() {
-            metal(b);
-            hoop_on(b, rim + Vec3::Z * 1.4, Vec3::Z, BALL_R, 0.4, 1.0, sides);
-        }
-    }
 }
 
 /// Far off: the hull's plan as one slab, the blades as flat triangles (drawn both

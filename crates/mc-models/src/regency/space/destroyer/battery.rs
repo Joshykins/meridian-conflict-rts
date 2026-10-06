@@ -15,7 +15,7 @@ use super::super::super::machine::hoop_on;
 use super::pale_plate;
 
 /// The house's size against the authored one.
-pub(super) const SIZE: f32 = 1.9;
+pub(super) const SIZE: f32 = 1.35;
 /// Each fork's charge point ahead of the pivot (authored, before `SIZE`), port fork.
 const GAP: Vec3 = Vec3::new(24.0, 3.6, 0.0);
 /// The ball's radius (authored, before `SIZE`); its middle is the pivot.

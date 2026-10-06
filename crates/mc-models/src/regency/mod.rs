@@ -260,9 +260,10 @@ pub(super) fn triangles(key: &str) -> Option<usize> {
         "regency_ark" => 14000,
         "regency_space_cruiser" => 9000,
         // The tech 4 hero hull, the Dominion's peer: plate courses laid over the whole
-        // of it, the blades, the core's drum with an aperture each end, a sponsoned
-        // fairing down each chine, six ball mounts and sixteen hatched cells.
-        "regency_space_destroyer" => 22000,
+        // of it, the blades, the core's drum with an aperture each end, six ball
+        // mounts in pockets pressed into the chines (each pocket's stations add a
+        // ring to every plate course) and sixteen hatched cells.
+        "regency_space_destroyer" => 24000,
         "regency_submarine" => 2800,
         "regency_frigate" => 4500,
         "regency_destroyer" | "regency_cruiser" => 7000,
