@@ -16,6 +16,7 @@ mod citadel;
 mod commander_head;
 mod culverin;
 mod drone_port;
+mod elevator;
 mod fabricator;
 pub(crate) use citadel::RAIL as CITADEL_RAIL;
 mod factories;
@@ -69,6 +70,11 @@ pub(super) const MODELS: &[ModelDef] = &[
     ModelDef::new("assault_tank", 19.0, 15.0, assault_tank::assault_tank),
     ModelDef::new("breacher", 24.0, 54.0, breacher::breacher),
     ModelDef::new("titan", 40.0, 120.0, titan::titan),
+    // The tech 5 space elevator, at blueprint scale (`gpu_consts::elevator` is in its
+    // metres), and its design variants while one is picked.
+    ModelDef::new("space_elevator", 150.0, 300.0, elevator::space_elevator),
+    ModelDef::new("space_elevator~b", 150.0, 300.0, elevator::space_elevator_b),
+    ModelDef::new("space_elevator~c", 150.0, 300.0, elevator::space_elevator_c),
     // The Reclaimer: one hover salvager, drawn bigger per tier.
     ModelDef::new("reclaimer", 4.6, 3.4, reclaimers::reclaimer),
     ModelDef::new("titan_sabot", 7.5, 6.0, titan::sabot),

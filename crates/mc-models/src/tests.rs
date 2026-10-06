@@ -619,7 +619,8 @@ fn meshes_are_valid() {
                             || v.part == part::REACTOR_FIN
                             || v.part == part::PILE
                             || v.part == part::FAB_INDEX
-                            || v.part == part::FAB_PRESS),
+                            || v.part == part::FAB_PRESS
+                            || (part::ELEVATOR_ARM..=part::ELEVATOR_CAR).contains(&v.part)),
                     "{name}: ids"
                 );
                 // Units stand on the ground; props are rooted a little into it for slopes.
@@ -637,6 +638,10 @@ fn meshes_are_valid() {
                 let floor = if v.part == part::AFLOAT {
                     // Floats and bracing in the sea, drawn only there.
                     -12.0
+                } else if v.part == part::ELEVATOR_CAR {
+                    // A space elevator's platform docks flush in its well, its girder
+                    // frame and braking thrusters sunk under the deck.
+                    crate::gpu_consts::elevator::CAR_UNDER_Z
                 } else if v.rig & rig::DEPLOY != 0 && v.rig & rig::STAKE_SPIKE != 0 {
                     // A planted ground stake's point, driven into the ground.
                     -1.0
@@ -907,6 +912,10 @@ fn lods_reduce_and_respect_budgets() {
             // The tech 5 Behemoth: a 400 m walker, one a match; two long rigged legs, six
             // rails in a rotary cluster, the AEB-3, rocket pods, two flak turrets, and the
             // deck gear that tells its size.
+            30000
+        } else if base_key(&model.key) == "space_elevator" {
+            // The tech 5 Skyhook: a 312 m lot, one a match; three 160 m clamp towers and
+            // their jaws, the cable and the cargo platform (each design has the one budget).
             30000
         } else if model.key == "breacher" {
             // The tech 4 Breacher: a 67 m walker, two rigged legs, two six-barrel arm guns

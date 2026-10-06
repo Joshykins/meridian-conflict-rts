@@ -991,16 +991,16 @@ shared! {
         /// of `HINGE_R` at `HINGE_Z` over its own tower's bearing, swung out by `OPEN`
         /// radians while the clamps are open (grip 0) and in on the cable at grip 1.
         pub const PART_ARM: u32 = 75;
-        pub const HINGE_R: f32 = 78.0;
-        pub const HINGE_Z: f32 = 186.0;
-        pub const OPEN: f32 = 0.42;
+        pub const HINGE_R: f32 = 84.0;
+        pub const HINGE_Z: f32 = 120.0;
+        pub const OPEN: f32 = 0.65;
         /// The cable: authored from its collar up to `CABLE_SPLIT`; what is above the split
         /// is stretched up to `SKY_Z`, and the whole of it rides up out of sight by the
         /// share of the drop not yet made (it hangs in orbit before the elevator is done).
         pub const PART_CABLE: u32 = 76;
-        pub const CABLE_SPLIT: f32 = 290.0;
+        pub const CABLE_SPLIT: f32 = 286.0;
         /// The lowest point of the cable as authored (its collar's foot, seated in the well).
-        pub const CABLE_FOOT: f32 = 30.0;
+        pub const CABLE_FOOT: f32 = 0.4;
         pub const SKY_Z: f32 = 6000.0;
         /// The platform, authored docked: raised by `deploy` x (`SKY_Z` - `CAR_DOCK`).
         pub const PART_CAR: u32 = 77;
@@ -1008,16 +1008,16 @@ shared! {
         /// Shared with the effects (renderer `elevator_fx`) and audio: where things are on
         /// the model. The deck's top and radius when docked; the platform's underside
         /// (its braking thrusters fire down from a ring of `THRUSTER_R` there).
-        pub const DECK_Z: f32 = 6.0;
-        pub const DECK_R: f32 = 96.0;
-        pub const CAR_UNDER_Z: f32 = -4.0;
-        pub const THRUSTER_R: f32 = 70.0;
+        pub const DECK_Z: f32 = 0.6;
+        pub const DECK_R: f32 = 60.0;
+        pub const CAR_UNDER_Z: f32 = -12.0;
+        pub const THRUSTER_R: f32 = 46.0;
         /// Where the jaws close on the cable (height, and the cable's radius there).
-        pub const GRIP_Z: f32 = 200.0;
-        pub const CABLE_R: f32 = 7.0;
+        pub const GRIP_Z: f32 = 232.0;
+        pub const CABLE_R: f32 = 11.0;
         /// The warning beacons on each tower's crown: height and distance from the middle.
-        pub const BEACON_Z: f32 = 236.0;
-        pub const BEACON_R: f32 = 112.0;
+        pub const BEACON_Z: f32 = 162.0;
+        pub const BEACON_R: f32 = 132.0;
     }
 
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
