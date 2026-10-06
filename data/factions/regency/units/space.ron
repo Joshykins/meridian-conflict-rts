@@ -86,7 +86,7 @@
     ),
     // The Scourge: the Regency's capital warship, the Dominion's peer. It fights from the
     // Dominion's height with the lance held from its core under it, six batteries in
-    // houses along the hull and a T3 seeker silo's worth of cells twice over.
+    // ball mounts out on its chines and a T3 seeker silo's worth of cells twice over.
     (
         key: "regency_t4_space_destroyer", name: "Scourge", role: "Destroyer", title: "Destroyer",
         tech: 4, categories: ["Air", "Space", "Experimental"], health: 170000,
@@ -113,15 +113,16 @@
                 sounds: (spin: "regency_lance_charge", hold: "regency_lance_hold", spindown: "regency_lance_vent"),
             ),
             // Six Pinch-plasma Batteries, three a side (port of each pair first, fore to
-            // aft): twin forks in a gun house, each fork gathering plasma in the gap ahead
-            // of its blades and pinching it out as one jet. Each bears from a little past
+            // aft): twin forks out of a ball mount on a sponson out of the chine, clear of
+            // the hull below, each fork gathering plasma in the gap ahead of its blades and
+            // pinching it out as one jet. Each bears from a little past
             // the nose round its own side to a little past the stern.
             (
                 name: "Pinch-plasma Battery",
                 damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (150, 44, 92.02), muzzle: (189.9, 50.84, 92.02),
-                muzzles: [(189.9, 50.84, 92.02), (189.9, 37.16, 92.02)],
+                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (230, 64.8, 80.62), muzzle: (275.6, 71.64, 80.62),
+                muzzles: [(275.6, 71.64, 80.62), (275.6, 57.96, 80.62)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
@@ -133,8 +134,8 @@
                 name: "Pinch-plasma Battery",
                 damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (150, -44, 92.02), muzzle: (189.9, -37.16, 92.02),
-                muzzles: [(189.9, -37.16, 92.02), (189.9, -50.84, 92.02)],
+                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (230, -64.8, 80.62), muzzle: (275.6, -57.96, 80.62),
+                muzzles: [(275.6, -57.96, 80.62), (275.6, -71.64, 80.62)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
@@ -146,8 +147,8 @@
                 name: "Pinch-plasma Battery",
                 damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (40, 62, 94.42), muzzle: (79.9, 68.84, 94.42),
-                muzzles: [(79.9, 68.84, 94.42), (79.9, 55.16, 94.42)],
+                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (130, 86, 79.74), muzzle: (175.6, 92.84, 79.74),
+                muzzles: [(175.6, 92.84, 79.74), (175.6, 79.16, 79.74)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
@@ -159,8 +160,8 @@
                 name: "Pinch-plasma Battery",
                 damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (40, -62, 94.42), muzzle: (79.9, -55.16, 94.42),
-                muzzles: [(79.9, -55.16, 94.42), (79.9, -68.84, 94.42)],
+                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (130, -86, 79.74), muzzle: (175.6, -79.16, 79.74),
+                muzzles: [(175.6, -79.16, 79.74), (175.6, -92.84, 79.74)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
@@ -172,8 +173,8 @@
                 name: "Pinch-plasma Battery",
                 damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (-90, 76, 99.09), muzzle: (-50.1, 82.84, 99.09),
-                muzzles: [(-50.1, 82.84, 99.09), (-50.1, 69.16, 99.09)],
+                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (30, 104.33, 79.32), muzzle: (75.6, 111.17, 79.32),
+                muzzles: [(75.6, 111.17, 79.32), (75.6, 97.49, 79.32)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
@@ -185,8 +186,8 @@
                 name: "Pinch-plasma Battery",
                 damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
                 rounds: 8, round_span: 0.3,
-                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (-90, -76, 99.09), muzzle: (-50.1, -69.16, 99.09),
-                muzzles: [(-50.1, -69.16, 99.09), (-50.1, -82.84, 99.09)],
+                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (30, -104.33, 79.32), muzzle: (75.6, -97.49, 79.32),
+                muzzles: [(75.6, -97.49, 79.32), (75.6, -111.17, 79.32)],
                 targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
                 plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
                 sounds: (
