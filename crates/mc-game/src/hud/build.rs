@@ -6,7 +6,7 @@
 
 use super::icons;
 use super::selection::dps;
-use super::style::{domain_wash, Domain, Purpose, ITEM_KEYS};
+use super::style::{domain_wash, role_backdrop, Domain, Purpose, Role, ITEM_KEYS};
 use super::{has_flag, whole, Hud, HudAction, Scene, ENERGY, GAP, MASS};
 use crate::audio::Sfx;
 use crate::game::Mode;
@@ -536,7 +536,8 @@ fn tiles<'a>(
         .map(|b| s.blueprints.unit(*b))
         .filter(|b| b.tech == hud.tab)
         .collect();
-    items.sort_by_key(|b| Purpose::of(b, !is_factory));
+    // Stable: each shelf lists its roles together, in the colour order.
+    items.sort_by_key(|b| (Purpose::of(b, !is_factory), Role::of(b)));
     // The tier's upgrade leads the strip, ahead of what it opens.
     let climbs: Vec<(usize, &UnitBlueprint)> = offer
         .line
@@ -949,7 +950,7 @@ pub fn unit_face(hud: &Hud, ui: &mut Ui, item: &UnitBlueprint, tr: Rect, glow: f
     // Inside the tile's cut corners.
     let art = Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 44.0);
     // A darker well for the picture, lit from above where the model stands.
-    ui.gradient_v(art, ink(0.5), ink(0.2));
+    role_backdrop(ui, art, Role::of(item), glow);
     domain_wash(ui, art, Domain::of(item), glow);
     let side = art.h;
     let pic = Rect::new(art.x + (art.w - side) * 0.5, art.y, side, side);

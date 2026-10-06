@@ -1,12 +1,14 @@
 //! The HUD's colour code: what a unit's tile is tinted by (where it fights, or
 //! what it makes), which family an order belongs to, and veterancy.
 
-use crate::ui::{rgb, Rect, Ui};
+use crate::ui::{ink, rgb, Rect, Ui};
 use mc_data::{cat, MoveLayer, UnitBlueprint};
 
 pub const LAND: u32 = 0x5FBF4A;
 pub const AIR: u32 = 0x62C6FF;
 pub const NAVY: u32 = 0x2F6BFF;
+/// What a land unit's tile says it fights on: dry ground, a sand beige.
+pub const GROUND: u32 = 0xCDB98F;
 /// Structures that fight nothing and make nothing that moves: extractors, power, walls.
 pub const SUPPORT: u32 = 0x8C8C88;
 /// Veterancy and everything to do with it.
@@ -52,10 +54,10 @@ impl Domain {
     /// The colours, left and right. The same twice for one domain.
     pub fn tones(self) -> (u32, u32) {
         match self {
-            Domain::Land => (LAND, LAND),
+            Domain::Land => (GROUND, GROUND),
             Domain::Air => (AIR, AIR),
             Domain::Navy => (NAVY, NAVY),
-            Domain::Both => (LAND, NAVY),
+            Domain::Both => (GROUND, NAVY),
             Domain::Support => (SUPPORT, SUPPORT),
         }
     }
@@ -97,6 +99,78 @@ pub fn domain_wash(ui: &mut Ui, r: Rect, domain: Domain, glow: f32) {
     ui.fill(
         Rect::new(r.x + r.w * 0.5, r.bottom() - h, r.w * 0.5, h),
         rgb(right, 0.85),
+    );
+}
+
+/// What a thing is for, each with its own colour, so engineers, reclaimers,
+/// tanks, mines and generators can be told apart at a glance. Declared in the
+/// order a shelf lists them, so like sits beside like.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+pub enum Role {
+    Engineer,
+    Reclaimer,
+    Factory,
+    /// Everything that makes, keeps or recovers materials: mines, fabricators,
+    /// materials stores, reclaim towers.
+    Material,
+    /// Power plants and energy stores.
+    Energy,
+    Combat,
+    AntiAir,
+    Artillery,
+    Intel,
+}
+
+impl Role {
+    pub fn of(bp: &UnitBlueprint) -> Role {
+        let has = |c: u32| bp.categories & c != 0;
+        let energy_store = bp.economy.energy_storage > mc_core::Fx::ZERO
+            && bp.economy.mass_storage == mc_core::Fx::ZERO;
+        if has(cat::ENGINEER) {
+            Role::Engineer
+        } else if bp.is_salvager() {
+            Role::Reclaimer
+        } else if has(cat::FACTORY) {
+            Role::Factory
+        } else if has(cat::POWER) || (has(cat::STORAGE) && energy_store) {
+            Role::Energy
+        } else if has(cat::EXTRACTOR | cat::ECONOMY | cat::STORAGE) {
+            Role::Material
+        } else if has(cat::ANTI_AIR) {
+            Role::AntiAir
+        } else if has(cat::ARTILLERY) {
+            Role::Artillery
+        } else if has(cat::INTEL | cat::SHIELD | cat::SCOUT) {
+            Role::Intel
+        } else {
+            Role::Combat
+        }
+    }
+
+    pub const fn tone(self) -> u32 {
+        match self {
+            Role::Engineer => 0x2FB8A8,
+            Role::Reclaimer => 0x9A6BD6,
+            Role::Factory => 0x7C8FB0,
+            Role::Material => 0xC9803A,
+            Role::Energy => 0xF2D338,
+            Role::Combat => 0xD4483A,
+            Role::AntiAir => 0x9BD13A,
+            Role::Artillery => 0xB2406E,
+            Role::Intel => 0xB4BCCB,
+        }
+    }
+}
+
+/// A tile's picture well in its role's colour, strongest at the top where it
+/// used to be black, settling toward the foot.
+pub fn role_backdrop(ui: &mut Ui, r: Rect, role: Role, glow: f32) {
+    let tone = role.tone();
+    ui.fill(r, ink(0.55));
+    ui.gradient_v(
+        r,
+        rgb(tone, 0.34 + 0.1 * glow),
+        rgb(tone, 0.12 + 0.06 * glow),
     );
 }
 

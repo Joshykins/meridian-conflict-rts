@@ -8,7 +8,7 @@ use super::{pause_mark, tip, Stack, BUILDING};
 use crate::audio::Sfx;
 use crate::hud::icons;
 use crate::hud::priority::{self, Mix};
-use crate::hud::style::{domain_wash, Domain};
+use crate::hud::style::{domain_wash, role_backdrop, Domain, Role};
 use crate::hud::{Hud, HudAction, Scene};
 use crate::ui::{id, ink, palette, rgb, type_scale, Rect, Ui};
 use glam::Vec2;
@@ -655,12 +655,9 @@ pub(super) fn stack_tile(
     } else if i == 0 {
         building(ui, tr, progress);
     } else {
-        domain_wash(
-            ui,
-            Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0),
-            Domain::of(item),
-            t.glow * 0.5,
-        );
+        let well = Rect::new(tr.x + 3.0, tr.y + 3.0, tr.w - 6.0, tr.h - 6.0);
+        role_backdrop(ui, well, Role::of(item), t.glow * 0.5);
+        domain_wash(ui, well, Domain::of(item), t.glow * 0.5);
     }
     if !hud.thumbs.draw(
         ui,
@@ -678,6 +675,16 @@ pub(super) fn stack_tile(
             ink(0.9),
         );
     }
+    // The strategic icon small in the corner, as on the build tiles.
+    icons::strategic(
+        ui,
+        item.visual.icon,
+        item.tech,
+        Vec2::new(tr.x + 10.0, tr.y + 10.0),
+        5.5,
+        rgb(palette::TEXT, 0.9),
+        ink(0.9),
+    );
     if i == 0 && paused {
         pause_mark(ui, Vec2::new(tr.x + 18.0, tr.y + 18.0), 18.0);
     }
