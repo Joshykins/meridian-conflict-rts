@@ -284,6 +284,12 @@ In addition:
   for picks by letter (e.g. "tank B, scout A"), not one unit per round.
 - Once a variant is chosen it becomes the mesh and the other `~` keys are
   deleted before the unit is committed (section 2: no parked code).
+- **Glow is drawn by the surface, not modelled.** A lit slot, strip, window or
+  emitter is a pattern on the plate it sits in (`models::pattern`, drawn in
+  surface.wgsl or regency.wgsl), never a separate thin piece of mesh painted a
+  `GLOW_*` material. For the Regency's nanites, paint the plate
+  `kit::nanite_plate` (`pattern::NANITE_SLOT`). Older models still carry lit
+  pieces; when you rework one, move its glow into the surface.
 
 ## 10. Every finished request leaves a check task for the user
 
