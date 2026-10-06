@@ -1876,8 +1876,12 @@ fn vs_main(in: VsIn) -> VsOut {
         // ghost or a wreck: clamps open, no cable, no platform.
         let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
         let drop = select(0.0, mix(e.mount.x, e.mount.y, t), live);
-        let grip = select(0.0, mix(e.mount.z, e.mount.w, t), live);
         let car = select(2.0, mix(e.prev_deploy, e.deploy, t), live);
+        // The jaws hold the cable over the platform's path: they swing clear while it
+        // passes them, shut on the cable again once it is docked under them or gone above.
+        let car_z = car * (ELEVATOR_SKY_Z - ELEVATOR_CAR_DOCK);
+        let passing = select(0.0, smoothstep(900.0, 320.0, car_z) * smoothstep(5.0, 70.0, car_z), car < 1.0);
+        let grip = select(0.0, mix(e.mount.z, e.mount.w, t), live) * (1.0 - passing);
         if in.part == ELEVATOR_PART_ARM {
             // Each jaw swings out about its own tower's hinge, tangent to the well.
             let third = 2.0943951;
