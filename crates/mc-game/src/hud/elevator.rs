@@ -459,7 +459,7 @@ pub fn panel(
         cw,
         type_scale::MICRO,
         rgb(palette::FAINT, 1.0),
-        "Queued units ride down free  \u{b7}  the rest of the payload is materials",
+        "Units ride down free  \u{b7}  the rest lands as materials",
     );
 }
 
