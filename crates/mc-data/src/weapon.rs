@@ -170,6 +170,9 @@ pub struct Weapon {
     /// Barrels round a rotary gun's cluster (`RawWeapon::barrels`): it fires as one of
     /// them reaches the top. Zero: whenever it is ready.
     pub barrels: u8,
+    /// Barrel spacings the cluster turns per shot at full spin (`RawWeapon::laps`): one,
+    /// or more for a cluster that spins faster than it fires.
+    pub laps: u8,
     /// Rounds each shot is drawn as, spread over the time to the next shot. Cosmetic:
     /// the sim flies one projectile; the mirror draws the rest behind it. One: just the shot.
     pub rounds: u8,

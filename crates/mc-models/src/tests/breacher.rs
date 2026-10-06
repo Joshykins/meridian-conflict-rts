@@ -5,6 +5,7 @@
 use glam::Vec3;
 
 use super::nearest_where;
+use crate::aster::breacher::gun::TOP;
 use crate::aster::breacher::{muzzle, pods, GUN, PIVOT, POD};
 use crate::{build_model, part, rig, MeshVertex};
 
@@ -89,11 +90,21 @@ fn breacher_arms_reach_their_muzzles() {
         for (weapon, side) in [(1u8, -1.0), (2, 1.0)] {
             let slot = slot_of(weapon);
             let muzzle = muzzle() * Vec3::new(1.0, side, 1.0);
-            let near = nearest_where(mesh, muzzle, in_house(slot));
+            // The arm's end is on the bore; the shot leaves from the top barrel's mouth,
+            // which every level that draws the barrels (the finest) reaches.
+            let end = muzzle - Vec3::Z * TOP;
+            let near = nearest_where(mesh, end, in_house(slot));
             assert!(
                 near < 0.5,
-                "breacher lod{lod}: arm {weapon} ends {near} m from its muzzle"
+                "breacher lod{lod}: arm {weapon} ends {near} m from its bore end"
             );
+            if lod == 0 {
+                let near = nearest_where(mesh, muzzle, in_house(slot));
+                assert!(
+                    near < 0.5,
+                    "breacher: arm {weapon} ends {near} m from its muzzle"
+                );
+            }
             assert!(
                 mesh.vertices
                     .iter()

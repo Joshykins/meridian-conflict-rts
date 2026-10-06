@@ -116,8 +116,8 @@
                 // `each_round`).
                 name: "Gatling-Breach Cannon",
                 damage: 300, splash: 10, range: 750, reload: 0.3, speed: 900, trajectory: Direct,
-                turret_turn: 50, pivot: (0, 0, 50), muzzle: (44.375, -21.875, 30), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
-                barrels: 6, sway: 40, rounds: 3, casings: 27.5,
+                turret_turn: 50, pivot: (0, 0, 50), muzzle: (44.375, -21.875, 32.4375), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
+                barrels: 6, laps: 3, sway: 40, rounds: 3, casings: 27.5,
                 targets: ["Land", "Naval", "Structure"], color: Orange,
                 flash: 1.6, impact: 1.8, shockwave: 0.8, tracer: 0.8,
                 sounds: (fire: "breacher_gatling_fire", each_round: true, spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),
@@ -126,8 +126,8 @@
                 // Left forearm, the right's mirror.
                 name: "Gatling-Breach Cannon",
                 damage: 300, splash: 10, range: 750, reload: 0.3, speed: 900, trajectory: Direct,
-                turret_turn: 50, pivot: (0, 0, 50), muzzle: (44.375, 21.875, 30), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
-                barrels: 6, sway: 40, rounds: 3, casings: 27.5,
+                turret_turn: 50, pivot: (0, 0, 50), muzzle: (44.375, 21.875, 32.4375), spread: 1.5, spin_up: 1.2, spin_ramp: 3.0,
+                barrels: 6, laps: 3, sway: 40, rounds: 3, casings: 27.5,
                 targets: ["Land", "Naval", "Structure"], color: Orange,
                 flash: 1.6, impact: 1.8, shockwave: 0.8, tracer: 0.8,
                 sounds: (fire: "breacher_gatling_fire", each_round: true, spin: "breacher_gatling_spin", whir: "breacher_gatling_whir", spindown: "breacher_gatling_spindown", impact: "shell_heavy", ground: "shell_heavy"),

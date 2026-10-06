@@ -1711,7 +1711,8 @@ impl Blueprints {
                     w.sweep as u64
                         | (w.facing.0 as u64) << 16
                         | (w.spin_ramp as u64) << 32
-                        | (w.barrels as u64) << 48,
+                        | (w.barrels as u64) << 48
+                        | (w.laps as u64) << 56,
                 );
                 h.write_u64(
                     w.sway.0 as u64

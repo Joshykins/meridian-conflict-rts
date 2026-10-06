@@ -364,7 +364,7 @@ pub(crate) fn barrel_off_top(barrels: u8, turn: u16) -> i32 {
 /// spin the cluster locks with a barrel at the top on every shot.
 pub(crate) fn barrel_step(weapon: &Weapon, speed: u16, turn: u16) -> u16 {
     let spacing = 65536 / weapon.barrels.max(1) as u32;
-    let full = spacing / weapon.reload_ticks.max(1) as u32;
+    let full = spacing * weapon.laps.max(1) as u32 / weapon.reload_ticks.max(1) as u32;
     let step =
         (full * speed.min(weapon.spin_ticks) as u32 / weapon.spin_ticks.max(1) as u32) as i32;
     if step == 0 {

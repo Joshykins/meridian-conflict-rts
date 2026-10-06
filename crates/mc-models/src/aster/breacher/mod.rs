@@ -66,10 +66,11 @@ pub(crate) const POD: (Vec3, f32) = (Vec3::new(-7.0, 5.2, 50.0), 0.95);
 /// The shield projector's tip.
 const SHIELD: Vec3 = Vec3::new(-17.0, 0.0, 47.0);
 
-/// The left gun's muzzle.
+/// The left gun's muzzle: the mouth of the barrel at the top of the cluster, which is
+/// where a barrel-timed shot leaves.
 #[cfg(test)]
 pub(crate) fn muzzle() -> Vec3 {
-    GUN + Vec3::X * gun::REACH
+    GUN + Vec3::X * gun::REACH + Vec3::Z * gun::TOP
 }
 
 pub(crate) fn breacher(b: &mut MeshBuilder, _tech: u8) {

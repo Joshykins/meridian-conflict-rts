@@ -26,6 +26,9 @@ pub(super) const REACH: f32 = LENGTH * SCALE;
 /// The barrel cluster: its drum plate's face, the barrels' distance off the axis.
 const CLUSTER: f32 = 11.6;
 const BARREL_R: f32 = 2.6;
+/// How far above the bore line the top barrel stands, as drawn.
+#[cfg(test)]
+pub(crate) const TOP: f32 = BARREL_R * SCALE;
 
 /// The weapon a gun is: the right (`side` -1) is weapon 1, the left weapon 2.
 pub(super) fn weapon(side: f32) -> usize {

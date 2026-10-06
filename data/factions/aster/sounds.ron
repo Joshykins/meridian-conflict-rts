@@ -212,7 +212,7 @@
         "citadel_rail_fire": (like: "aster_rail_cannon", size: 1.5, peak: 0.9),
         "citadel_rail_hit": (like: "shell_on_armour", size: 1.9, peak: 0.8),
         // The Breacher's gatling-breach cannons: a heavy six-barrel rotary on each arm,
-        // smaller and quicker than the Tempest, firing ten rounds a second at full speed.
+        // smaller and quicker than the Tempest, firing ten rounds a second at full speed, the cluster turning three barrels a shot (`laps`).
         // `fire` is one round (`each_round`), heard as each is seen leaving the muzzle; the
         // spin-up is timed to the gun's 1.2 s, its detents closing in on the barrels' rate
         // at full speed, where the whir takes over on the same notes.
@@ -231,6 +231,9 @@
                 Drive(1.8),
                 // The report, short and low, fluttering off over the ground.
                 Roll(at: 0.004, from: 520, to: 95, glide: 0.3, attack: 0.008, decay: 0.15, gain: 0.42, swell: 11, depth: 0.5),
+                // The bolt slamming home: a ringing steel clank, the round's own signature.
+                Burst(at: 0.012, low: 1800, high: 5200, attack: 0.0002, decay: 0.012, gain: 3.2, pan: 0.1),
+                Fm(at: 0.012, from: 1450, to: 1380, glide: 0.04, ratio: 2.76, index: 1.4, fade: 0.05, attack: 0.0002, decay: 0.07, gain: 0.16, pan: 0.1),
                 // The drum indexing: a dull steel knock as the next barrel comes round.
                 Burst(at: 0.048, low: 320, high: 1700, attack: 0.0004, decay: 0.005, gain: 1.1, pan: -0.15),
                 Fm(at: 0.048, from: 300, to: 286, glide: 0.03, ratio: 1.41, index: 1.0, fade: 0.02, attack: 0.0008, decay: 0.025, gain: 0.05, pan: -0.15),
@@ -250,6 +253,8 @@
                 Fm(at: 0.03, from: 68, to: 200, glide: 1.17, ratio: 1.0, index: 1.1, fade: 3.0, attack: 1.12, decay: 0.22, gain: 0.3),
                 // The motor's windings, rough and low in the mix.
                 Fm(at: 0.05, from: 180, to: 540, glide: 1.15, ratio: 0.5, index: 1.2, fade: 6.0, attack: 1.1, decay: 0.2, gain: 0.05),
+                // The servo whine climbing to the whir's: the cluster coming up to speed.
+                Fm(at: 0.05, from: 260, to: 880, glide: 1.15, ratio: 1.5, index: 0.8, fade: 4.0, attack: 1.1, decay: 0.2, gain: 0.09, pan: 0.1),
                 // Air thrown off the turning barrels.
                 Sweep(at: 0.2, from: 220, to: 900, glide: 1.0, q: 0.8, attack: 0.95, decay: 0.15, gain: 0.22, seed: 141),
                 // The detents.
@@ -280,6 +285,10 @@
                 Drone(freq: 300, gain: 0.06, wobble: 10, depth: 0.5, pan: -0.1),
                 Drone(freq: 400, gain: 0.03, wobble: 5, depth: 0.5, pan: 0.1),
                 Drone(freq: 540, gain: 0.014, wobble: 2, depth: 0.4),
+                // The cluster turning three times faster than it fires: a servo whine over
+                // the growl, a fifth apart, that no other gun here has.
+                Drone(freq: 880, gain: 0.07, wobble: 10, depth: 0.3, pan: 0.1),
+                Drone(freq: 1320, gain: 0.04, wobble: 10, depth: 0.3, pan: -0.1),
                 Drive(1.3),
                 Rumble(freq: 170, q: 0.8, gain: 2.6, wobble: 10, depth: 0.5),
                 Burst(at: 0.0, low: 160, high: 1300, attack: 0.0006, decay: 0.008, gain: 2.6, pan: 0.2, seed: 81),
@@ -315,6 +324,8 @@
                 Fm(from: 100, to: 26, glide: 1.7, ratio: 0.5, index: 1.4, fade: 4.0, attack: 0.02, decay: 0.8, gain: 0.85),
                 Fm(from: 200, to: 52, glide: 1.7, ratio: 1.0, index: 1.0, fade: 3.0, attack: 0.02, decay: 0.6, gain: 0.3),
                 Sweep(from: 900, to: 200, glide: 1.0, q: 0.8, attack: 0.02, decay: 0.35, gain: 0.2, seed: 142),
+                // The servo whine dying away.
+                Fm(from: 880, to: 200, glide: 1.6, ratio: 1.5, index: 0.8, fade: 3.0, attack: 0.02, decay: 0.7, gain: 0.09, pan: 0.1),
                 Burst(at: 0.05, low: 150, high: 1250, attack: 0.0007, decay: 0.009, gain: 2.9, pan: 0.2),
                 Burst(at: 0.16, low: 145, high: 1200, attack: 0.0007, decay: 0.0105, gain: 2.76, pan: -0.2),
                 Burst(at: 0.28, low: 140, high: 1150, attack: 0.0007, decay: 0.012, gain: 2.62, pan: 0.2),

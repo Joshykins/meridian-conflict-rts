@@ -1140,6 +1140,11 @@ pub struct RawWeapon {
     /// full spin. Zero (the default): it fires whenever it is ready.
     #[serde(default)]
     pub barrels: u8,
+    /// Barrel spacings the cluster turns per shot at full spin: a barrel-timed gun
+    /// spins this many times faster than it fires, with a barrel at the top on every
+    /// shot all the same. One (the default): a barrel spacing a shot.
+    #[serde(default = "one")]
+    pub laps: u8,
     /// Rounds each shot is seen as: a stream of tracers spread over the time to the
     /// next shot, all carried by the one simulated projectile, so a fast gun reads as
     /// a stream without the sim flying every bullet. Cosmetic. One (the default): the
@@ -1837,6 +1842,7 @@ impl Unit {
                 } else {
                     0
                 },
+                laps: w.laps.clamp(1, 8),
                 rounds: w.rounds.clamp(1, 32),
                 round_span: (w.round_span.clamp(0.0, 10.0) * TICKS_PER_SECOND as f64) as f32,
                 braid: w.braid,
