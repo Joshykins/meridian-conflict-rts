@@ -53,6 +53,14 @@ Off the lines, measured the same way:
   area only about one shell in ten lands on the building it was aimed at, the rest on
   what stands round it. A dome is the answer: a T2 dome (9000, 90/s) goes down in about 20 s of hits, a T3
   dome (36000, 360/s) holds one gun off for nearly 3 minutes and two for under one.
+- The Skyhook space elevator (ARC T5, 160000 mass / 1.6 M energy, `docs/ELEVATOR.md`):
+  once its cable is clamped (24 s after it is finished) a platform docks every 30 s with
+  20000 mass: the front of its queue, free, then the rest as plain mass. That is about
+  670 mass a second, more than a whole late-game economy (about 250 a second at 20
+  minutes), so it pays for itself in four minutes if left alone. It is the reason to
+  reach tier 5 and the first thing an enemy should want dead: 1.5 M health, no shield,
+  no guns. It brings down land and air units and the T4 land walkers and tanks, never
+  ships, and nothing dearer than one payload (the Behemoth).
 - The Regency's Springald (same cost and reach) is bent as the Kiln is from the Trebuchet:
   5600 in 40 m every 10 s (560 dps on paper), a 0.8 degree spread and a 4 s charge. Its
   shot is drawn as three strands wound round each other but is one shot and strikes once
