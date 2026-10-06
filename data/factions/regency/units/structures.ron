@@ -208,6 +208,7 @@
             ground: 0.00054, per_hectare: 0.9, base: 0.3, hammer: false,
         ),
         upgrades_to: "regency_t2_extractor",
+        adjacency: Mass,
         mesh: "regency_taproot", icon: Extractor,
     ),
     (
@@ -226,6 +227,7 @@
             ground: 0.00162, per_hectare: 2.7, base: 0.9, hammer: false,
         ),
         upgrades_to: "regency_t3_extractor",
+        adjacency: Mass,
         mesh: "regency_taproot", icon: Extractor,
     ),
     (
@@ -244,6 +246,7 @@
             ground: 0.00378, per_hectare: 6.3, base: 2.1, hammer: false,
         ),
         upgrades_to: "regency_t4_extractor",
+        adjacency: Mass,
         mesh: "regency_taproot", icon: Extractor,
     ),
     (
@@ -261,6 +264,7 @@
             reach: 1000,
             ground: 0.00648, per_hectare: 10.8, base: 3.6, hammer: false,
         ),
+        adjacency: Mass,
         mesh: "regency_taproot", icon: Extractor,
     ),
     // Gravity compresses plasma to the pressure inside a star until it fuses: it gives what

@@ -190,7 +190,7 @@ A fixed ratio per kind means a reactor count that fits one activity fits the oth
 - **Adjacency** (`adjacency: Energy | Mass`, mc-sim `adjacency.rs`): a provider saves each
   finished building of its owner's whose lot shares an edge with its own (a corner is not
   enough). Power plants save energy: upkeep (fabricators, mines, shields, radar) and what a
-  factory builds. Fabricators save a factory's materials. A provider's saving is what it
+  factory builds. Fabricators and mines save a factory's materials (a mine's rated output is its shaft, `base`: T1 0.3/s 20%, T4 3.6/s 35%). A provider's saving is what it
   would save a building it rings all the way round, times the share of that building's
   perimeter the two share, so every side covered adds more until the building is ringed;
   there is no other cap. The full-ring saving scales with the fourth root of what the

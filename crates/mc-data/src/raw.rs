@@ -1334,6 +1334,7 @@ fn compile_adjacency(
     kind: RawAdjacency,
     e: &RawEconomy,
     fabricator: Option<&RawFabricator>,
+    mine: Option<&RawMine>,
 ) -> Result<crate::Adjacency, DataError> {
     let invalid = |why: &str| DataError::Invalid(format!("{key}: adjacency {why}"));
     let a = match kind {
@@ -1341,8 +1342,15 @@ fn compile_adjacency(
             energy: crate::Adjacency::ring(crate::Adjacency::ENERGY_RING, fx(e.energy_income)),
             mass: Fx::ZERO,
         },
-        RawAdjacency::Mass if fabricator.is_some_and(|f| f.mass > 0.0) || e.mass_income > 0.0 => {
-            let made = e.mass_income + fabricator.map_or(0.0, |f| f.mass);
+        RawAdjacency::Mass
+            if fabricator.is_some_and(|f| f.mass > 0.0)
+                || mine.is_some_and(|m| m.base > 0.0)
+                || e.mass_income > 0.0 =>
+        {
+            // A mine's rated output is its shaft (`base`): what it pays from the moment it
+            // is finished, whatever ore lies in its reach.
+            let made =
+                e.mass_income + fabricator.map_or(0.0, |f| f.mass) + mine.map_or(0.0, |m| m.base);
             crate::Adjacency {
                 energy: Fx::ZERO,
                 mass: crate::Adjacency::ring(crate::Adjacency::MASS_RING, fx(made)),
@@ -2038,7 +2046,13 @@ impl Unit {
                 None => None,
             },
             adjacency: match self.adjacency {
-                Some(kind) => Some(compile_adjacency(key, kind, e, self.fabricator.as_ref())?),
+                Some(kind) => Some(compile_adjacency(
+                    key,
+                    kind,
+                    e,
+                    self.fabricator.as_ref(),
+                    self.mine.as_ref(),
+                )?),
                 None => None,
             },
             strategic: match &self.strategic {
