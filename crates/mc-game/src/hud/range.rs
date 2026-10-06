@@ -49,7 +49,7 @@ impl Tab {
     fn body_h(self, sky_rows: usize) -> f32 {
         match self {
             Tab::Unit => 16.0 + ROW + 4.0 + ROW + 8.0 + ROW,
-            Tab::Stage => 3.0 * (ROW + 4.0) + 2.0 * 4.0,
+            Tab::Stage => 4.0 * (ROW + 4.0) + 3.0 * 4.0,
             Tab::Economy => 26.0 + 2.0 * (22.0 + ROW + 10.0) + ROW + 6.0 + ROW,
             Tab::Sky => sky_rows as f32 * (ROW + 4.0) + ROW,
             Tab::Range => 16.0 + ROW + 8.0 + 16.0 + ROW + 8.0 + ROW,

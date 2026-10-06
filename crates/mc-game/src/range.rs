@@ -840,8 +840,15 @@ fn elevator_batch(
         .filter(|b| b.tech >= 4)
         .min_by_key(|b| b.cost_mass)
         .ok_or("It Brings Down No Experimentals")?;
+    // As many tech 4s as leave a little of the payload over, so some materials come
+    // down too: at least one, at most four.
+    let payload = bp.elevator.map_or(Fx::ZERO, |e| e.payload);
+    let room = payload * 9 / 10 - tank.cost_mass * 6 - air.cost_mass * 4;
+    let heavies = (room / heavy.cost_mass.max(Fx::ONE))
+        .floor_int()
+        .clamp(1, 4) as u8;
     let order = PendingOrder::ProduceMix {
-        batch: [(tank.id, 6), (air.id, 4), (heavy.id, 4)],
+        batch: [(tank.id, 6), (air.id, 4), (heavy.id, heavies)],
         rally: pad + FxVec2::from_ints(520, 0),
     };
     Ok((Vec::new(), Some((bp.id, order))))

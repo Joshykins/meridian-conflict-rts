@@ -597,7 +597,7 @@ fn the_range_panel_reports_what_was_asked() {
     );
     // The panel is shorter on this tab, and Reset came up with it.
     assert_eq!(
-        rig.click(Vec2::new(184.0, 441.0 + focus::FOCUS_H)),
+        rig.click(Vec2::new(184.0, 477.0 + focus::FOCUS_H)),
         range(RangeAction::Reset)
     );
 
