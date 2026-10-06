@@ -48,6 +48,8 @@ mod menu_screens;
 mod mine_placing;
 #[path = "game_music.rs"]
 mod music_notes;
+#[path = "game_orbit.rs"]
+mod orbit_input;
 #[path = "game_reclaim.rs"]
 mod reclaim_input;
 #[path = "game_survival.rs"]
@@ -77,13 +79,8 @@ const RANGE_LOOK_AHEAD: f32 = 60.0;
 const ORBIT_YAW: f32 = 0.0032;
 /// Radians of extra tilt per pixel while Alt is held. Mouse-up looks more shallow.
 const ORBIT_TILT: f32 = 0.0026;
-/// How fast Alt-orbit closes on the yaw, tilt and pivot the mouse asked for, per second.
-const ORBIT_RATE: f32 = 18.0;
 /// How long leaving a network match waits for its surrender to be carried out.
 const SURRENDER_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
-/// How fast the camera settles back to its old view after Alt comes up, per second.
-/// Slow on purpose: the view drifts home over about a second rather than snapping.
-const ORBIT_RETURN_RATE: f32 = 3.0;
 
 /// Everything a match starts from, whether it was set up in the front end,
 /// on the command line, or in a relay's lobby.
@@ -2609,102 +2606,6 @@ impl Game {
         }
     }
 
-    /// Hold Alt: swing around the unit under the pointer, or the tracked unit,
-    /// or the ground under the pointer. Releasing Alt puts the camera back.
-    fn begin_orbit(&mut self, r: &Renderer) {
-        if self.orbit_saved.is_some() {
-            return;
-        }
-        // Alt again while still drifting home: home stays the view from before the first orbit.
-        let home = match self.orbit_return.take() {
-            Some((yaw, tilt, _)) if self.track.is_some() || !self.orbit_return_focus => {
-                (yaw, tilt, self.camera.focus)
-            }
-            Some(home) => home,
-            None => (self.camera.yaw, self.camera.tilt, self.camera.focus),
-        };
-        self.orbit_saved = Some(home);
-        self.orbit_aim = Some((self.camera.yaw, self.camera.tilt));
-        self.orbit_from = Some(self.camera.focus);
-        self.orbit_blend = 0.0;
-        self.orbit_unit = self
-            .unit_at(self.cursor)
-            .map(|i| &self.view.frame.units[i])
-            .filter(|u| u.owner_flags & KIND_WRECK == 0)
-            .map(|u| u.unit_id)
-            .or(self.track);
-        self.orbit_pivot = if self.orbit_unit.is_some() {
-            None
-        } else {
-            self.ground_under_cursor(r)
-        };
-    }
-
-    fn end_orbit(&mut self) {
-        self.orbit_unit = None;
-        self.orbit_aim = None;
-        self.orbit_from = None;
-        self.orbit_pivot = None;
-        self.orbit_blend = 0.0;
-        if let Some((yaw, tilt, focus)) = self.orbit_saved.take() {
-            // Drift back the short way round, however many turns the orbit wound up.
-            let turn = std::f32::consts::TAU;
-            let yaw = self.camera.yaw + (yaw - self.camera.yaw + turn * 0.5).rem_euclid(turn)
-                - turn * 0.5;
-            self.orbit_return = Some((yaw, tilt, focus));
-            self.orbit_return_far = true;
-            self.orbit_return_focus = true;
-        }
-    }
-
-    /// Hands the focus back to the player after a pan or a jump; the yaw and tilt
-    /// still ease home, so the orbit's angle never sticks.
-    fn cancel_orbit_return(&mut self) {
-        self.orbit_return_focus = false;
-    }
-
-    /// Closes a fixed share of the remaining orbit every frame, so mouse motion
-    /// is smooth at every frame rate and does not jump when events bunch up.
-    fn ease_orbit(&mut self, dt: f32) {
-        self.orbit_return_share = 0.0;
-        if let Some((yaw, tilt, focus)) = self.orbit_return {
-            let share = 1.0 - (-dt * ORBIT_RETURN_RATE).exp();
-            self.orbit_return_share = share;
-            self.camera.yaw += (yaw - self.camera.yaw) * share;
-            self.camera.tilt += (tilt - self.camera.tilt) * share;
-            // Tracking brings the focus home to the unit in `follow_camera`.
-            let mut settled =
-                (yaw - self.camera.yaw).abs() < 1e-3 && (tilt - self.camera.tilt).abs() < 1e-3;
-            if self.track.is_some() {
-                settled &= !self.orbit_return_far;
-            } else if self.orbit_return_focus {
-                self.camera.focus = self.camera.focus.lerp(focus, share);
-                self.camera.clamp_focus();
-                settled &= self.camera.focus.truncate().distance(focus.truncate()) < 0.05;
-            }
-            if settled {
-                self.camera.yaw = yaw;
-                self.camera.tilt = tilt;
-                if self.track.is_none() && self.orbit_return_focus {
-                    self.camera.focus = focus;
-                    self.camera.clamp_focus();
-                }
-                self.orbit_return = None;
-            }
-        }
-        if self.orbit_saved.is_none() {
-            return;
-        }
-        let share = 1.0 - (-dt * ORBIT_RATE).exp();
-        if let Some((yaw, tilt)) = &mut self.orbit_aim {
-            let (lo, hi) = self.camera.tilt_limits();
-            *tilt = tilt.clamp(lo, hi);
-            self.camera.yaw += (*yaw - self.camera.yaw) * share;
-            self.camera.tilt += (*tilt - self.camera.tilt) * share;
-        }
-        self.orbit_blend += (1.0 - self.orbit_blend) * share;
-    }
-
     fn start_track(&mut self) {
         self.track = track_target(
             self.unit_at(self.cursor)
@@ -4114,46 +4015,7 @@ impl Game {
         self.cine.hand_back_lift(&mut self.camera);
         if self.orbit_saved.is_none() && !self.hud.browser_open() && !self.hud.net.typing() && !cine
         {
-            let mut pan = Vec2::ZERO;
-            for (key, d) in [
-                (KeyCode::KeyW, Vec2::Y),
-                (KeyCode::ArrowUp, Vec2::Y),
-                (KeyCode::KeyS, -Vec2::Y),
-                (KeyCode::ArrowDown, -Vec2::Y),
-                (KeyCode::KeyA, Vec2::X),
-                (KeyCode::ArrowLeft, Vec2::X),
-                (KeyCode::KeyD, -Vec2::X),
-                (KeyCode::ArrowRight, -Vec2::X),
-            ] {
-                if self.keys.contains(&key) {
-                    pan += d;
-                }
-            }
-            if pan != Vec2::ZERO {
-                self.pan_camera(pan * dt * 900.0);
-            }
-            let tilt_up = self.keys.contains(&KeyCode::PageUp);
-            let tilt_down = self.keys.contains(&KeyCode::PageDown);
-            if tilt_up
-                || tilt_down
-                || self.keys.contains(&KeyCode::KeyQ)
-                || self.keys.contains(&KeyCode::KeyE)
-            {
-                // Turning or tilting by hand is the player's angle: the drift would fight it.
-                self.orbit_return = None;
-            }
-            if self.keys.contains(&KeyCode::KeyQ) {
-                self.camera.yaw -= dt * 1.4;
-            }
-            if self.keys.contains(&KeyCode::KeyE) {
-                self.camera.yaw += dt * 1.4;
-            }
-            if tilt_up {
-                self.camera.orbit(0.0, dt * 0.8);
-            }
-            if tilt_down {
-                self.camera.orbit(0.0, -dt * 0.8);
-            }
+            self.keyboard_camera(dt);
         }
         if !cine {
             self.ease_zoom(dt);
