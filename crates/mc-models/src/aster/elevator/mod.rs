@@ -21,10 +21,11 @@
 //! cheeks, and everything over and behind its hinge out of reach), and nothing but the
 //! jaws stands inside the platform's run (`DECK_R` round the cable) above the deck.
 //!
-//! The towers and jaws are the `gantry` design (picked over an A-frame pylon and a
-//! terraced buttress design, in history at a03495cf); the rest is shared with them.
+//! The towers and jaws are the `pylon` design: armoured A-frames with straight
+//! ram-driven jaws over a fortified well (picked over a knuckle-boom gantry and a
+//! terraced buttress design, in history at a03495cf).
 
-mod gantry;
+mod pylon;
 
 use std::f32::consts::TAU;
 
@@ -80,9 +81,12 @@ const CABLE_TOP: f32 = CABLE_SPLIT + 1.5;
 const _: () = assert!(COUPLING_R < SLEEVE_IN && COUPLING_TOP < SLEEVE_TOP);
 const _: () = assert!(CABLE_TOP <= 300.0 && GRIP_Z + BAND_HALF < CABLE_SPLIT);
 
-/// The base design: three hunched gantry towers with knuckle-boom jaws.
+/// Three armoured A-frame pylons with straight ram-driven jaws over a fortified well.
 pub(super) fn space_elevator(b: &mut MeshBuilder, _tech: u8) {
-    build(b, gantry::tower, gantry::jaw);
+    build(b, pylon::tower, pylon::jaw);
+    if !b.coarse() {
+        b.radial(3, pylon::bastion);
+    }
 }
 
 fn build(b: &mut MeshBuilder, tower: fn(&mut MeshBuilder), jaw: fn(&mut MeshBuilder)) {
