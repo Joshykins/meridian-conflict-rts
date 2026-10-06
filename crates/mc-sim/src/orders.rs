@@ -1425,6 +1425,8 @@ impl World {
                 OrderKind::Assist => self.run_assist(row, &o)?,
                 OrderKind::Reclaim => self.run_reclaim(row, &o)?,
                 OrderKind::ReclaimUnit => self.run_reclaim_unit(row, &o)?,
+                // An elevator's queue is not built: its platform brings it down (`elevator.rs`).
+                OrderKind::Produce if self.bp(row).elevator.is_some() => {}
                 OrderKind::Produce => self.run_produce(row, &o)?,
                 OrderKind::Upgrade => self.run_upgrade(row, &o)?,
                 OrderKind::AttackGround | OrderKind::Strike | OrderKind::Bombard => {
@@ -3027,7 +3029,7 @@ impl World {
 
     /// A hull out of the bay joins its factory's batch, or takes its standing orders, or
     /// heads for the rally point.
-    fn send_off(&mut self, row: usize, t: usize, exit: FxVec2) -> Result<(), SimError> {
+    pub(crate) fn send_off(&mut self, row: usize, t: usize, exit: FxVec2) -> Result<(), SimError> {
         if self.join_batch(row, t)? {
             return Ok(());
         }

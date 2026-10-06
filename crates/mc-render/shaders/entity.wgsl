@@ -1869,6 +1869,49 @@ fn vs_main(in: VsIn) -> VsOut {
         let half = (model.pit.y - 0.4) * 0.70710678;
         let travel = select(half * 0.5, half, abs(p.y) < half * 0.5);
         p.y += sign(p.y) * open * travel;
+    } else if in.part == ELEVATOR_PART_ARM || in.part == ELEVATOR_PART_CABLE || in.part == ELEVATOR_PART_CAR {
+        // A space elevator (`gpu_consts::elevator`, `mc_sim::elevator::pose`). A site, a
+        // ghost or a wreck: clamps open, no cable, no platform.
+        let live = (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u;
+        let drop = select(0.0, mix(e.mount.x, e.mount.y, t), live);
+        let grip = select(0.0, mix(e.mount.z, e.mount.w, t), live);
+        let car = select(2.0, mix(e.prev_deploy, e.deploy, t), live);
+        if in.part == ELEVATOR_PART_ARM {
+            // Each jaw swings out about its own tower's hinge, tangent to the well.
+            let third = 2.0943951;
+            let k = round(atan2(p.y, p.x) / third);
+            let dir = vec2<f32>(cos(k * third), sin(k * third));
+            let side = vec2<f32>(-dir.y, dir.x);
+            let a = ELEVATOR_OPEN * (1.0 - grip);
+            let c = cos(a);
+            let s = sin(a);
+            let r = dot(p.xy, dir) - ELEVATOR_HINGE_R;
+            let z = p.z - ELEVATOR_HINGE_Z;
+            let along = dot(p.xy, side);
+            p = vec3<f32>(dir * (ELEVATOR_HINGE_R + r * c + z * s) + side * along, ELEVATOR_HINGE_Z - r * s + z * c);
+            let nr = dot(n.xy, dir);
+            n = vec3<f32>(dir * (nr * c + n.z * s) + side * dot(n.xy, side), -nr * s + n.z * c);
+        } else if in.part == ELEVATOR_PART_CABLE {
+            if drop <= 0.001 {
+                var hidden: VsOut;
+                hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+                return hidden;
+            }
+            // The top of the authored cable reaches up into orbit; all of it hangs that
+            // much higher while it is still being let down.
+            if p.z > ELEVATOR_CABLE_SPLIT {
+                p.z = ELEVATOR_SKY_Z;
+            }
+            p.z = min(p.z + (1.0 - drop) * (ELEVATOR_SKY_Z - ELEVATOR_CABLE_FOOT), ELEVATOR_SKY_Z);
+        } else {
+            // The platform runs only on a seated cable, and is gone while it is away.
+            if car >= 1.0 || drop < 0.999 {
+                var hidden: VsOut;
+                hidden.clip = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+                return hidden;
+            }
+            p.z += car * (ELEVATOR_SKY_Z - ELEVATOR_CAR_DOCK);
+        }
     } else if in.part == PART_SILO_DOOR && (e.owner_flags & (KIND_WRECK | KIND_GHOST | FLAG_UNDER_CONSTRUCTION)) == 0u {
         // A silo's or an interceptor array's blast doors: two leaves meeting on y = 0,
         // slid apart along y by half the opening (`models/aster/strategic.rs`): 5.2 m on

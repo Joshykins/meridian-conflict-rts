@@ -977,6 +977,33 @@ shared! {
         pub const DRIVE_TAG: f32 = 4.0;
     }
 
+    /// A space elevator (`mc_models::aster::elevator`, entity.wgsl `elevator_pose`,
+    /// `mc_sim::elevator`). Model space, metres, +x the first clamp tower; towers stand at
+    /// 0, 120 and 240 degrees round the well and units leave between them. The mirror
+    /// gives the cable's drop and the clamps' grip in `UnitInstance::mount` (last tick and
+    /// this, each 0 to 1) and the platform's height in `deploy` / `prev_deploy` (0 docked,
+    /// 1 at `SKY_Z`, more: away in orbit, not drawn).
+    pub mod elevator as "ELEVATOR_" {
+        /// The three clamp jaws: each turns about a horizontal hinge tangent to the circle
+        /// of `HINGE_R` at `HINGE_Z` over its own tower's bearing, swung out by `OPEN`
+        /// radians while the clamps are open (grip 0) and in on the cable at grip 1.
+        pub const PART_ARM: u32 = 75;
+        pub const HINGE_R: f32 = 78.0;
+        pub const HINGE_Z: f32 = 186.0;
+        pub const OPEN: f32 = 0.42;
+        /// The cable: authored from its collar up to `CABLE_SPLIT`; what is above the split
+        /// is stretched up to `SKY_Z`, and the whole of it rides up out of sight by the
+        /// share of the drop not yet made (it hangs in orbit before the elevator is done).
+        pub const PART_CABLE: u32 = 76;
+        pub const CABLE_SPLIT: f32 = 290.0;
+        /// The lowest point of the cable as authored (its collar's foot, seated in the well).
+        pub const CABLE_FOOT: f32 = 30.0;
+        pub const SKY_Z: f32 = 6000.0;
+        /// The platform, authored docked: raised by `deploy` x (`SKY_Z` - `CAR_DOCK`).
+        pub const PART_CAR: u32 = 77;
+        pub const CAR_DOCK: f32 = 0.0;
+    }
+
     /// Work-beam kinds (beams.wgsl) that the sim writes into `BeamInstance::kind`
     /// (`mc_sim::reclaim`). The older kinds are still spelled out in the shader.
     pub mod beam as "BEAM_" {

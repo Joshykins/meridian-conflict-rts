@@ -40,6 +40,7 @@ mod debug;
 mod destruct;
 mod dogfight;
 pub mod economy;
+pub mod elevator;
 mod flak;
 pub mod focus;
 pub mod fog;

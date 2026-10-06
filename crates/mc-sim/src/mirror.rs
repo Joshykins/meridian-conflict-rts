@@ -425,6 +425,39 @@ pub enum SimEvent {
         commander: bool,
         look: mc_data::strategic::StrategicLook,
     },
+    /// A finished space elevator's cable began to come down out of orbit (`elevator.rs`).
+    ElevatorTethering {
+        unit: UnitId,
+        pos: FxVec3,
+        owner: u8,
+    },
+    /// Its cable is seated and clamped: the elevator is running.
+    ElevatorTethered {
+        unit: UnitId,
+        pos: FxVec3,
+        owner: u8,
+    },
+    /// A platform has started down the cable; it docks `Elevator::descent_ticks` later.
+    ElevatorInbound {
+        unit: UnitId,
+        pos: FxVec3,
+        owner: u8,
+    },
+    /// A platform docked: `units` came off it, and `mass` of its payload went into the
+    /// store.
+    ElevatorDocked {
+        unit: UnitId,
+        pos: FxVec3,
+        owner: u8,
+        units: u16,
+        mass: Fx,
+    },
+    /// The platform let go and is going back up.
+    ElevatorDeparting {
+        unit: UnitId,
+        pos: FxVec3,
+        owner: u8,
+    },
     /// A launcher finished assembling a round (`warhead`: a silo's; else an interceptor).
     RoundReady {
         unit: UnitId,
@@ -539,7 +572,9 @@ pub struct UnitInstance {
     /// `RenderFrame::units` (zero when it is not drawn).
     pub status: [u32; 3],
     /// A weapon on a turret of its own (`Weapon::mount`): its yaw off the torso last tick
-    /// and this, then its pitch last tick and this (radians).
+    /// and this, then its pitch last tick and this (radians). A space elevator: its
+    /// cable's drop last tick and this, then its clamps' grip (`elevator::pose`); its
+    /// platform's height is in `deploy`.
     pub mount: [f32; 4],
     /// A rotary gun's barrels, turned last tick and this (radians, unwrapped between the
     /// two); then the mounted weapon's kick-back, last tick and this (1 the instant it fires).

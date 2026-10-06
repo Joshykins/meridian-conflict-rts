@@ -128,6 +128,8 @@ pub enum IconKind {
     /// A warp dampener: a broken ring (its field) with four chevrons pulling in on a
     /// point at its middle, where it drags a jump down.
     Damper = 36,
+    /// A space elevator: a cable coming down into three clamp jaws.
+    Elevator = 37,
 }
 
 /// One unit's entry in a faction's `lore.ron`: its own text, and its weapons' by weapon name.
@@ -425,6 +427,9 @@ pub(crate) struct Unit {
     /// A strategic launcher ([`crate::strategic::Strategic`]).
     #[serde(default)]
     pub strategic: Option<crate::strategic::RawStrategic>,
+    /// A space elevator ([`crate::elevator::Elevator`]).
+    #[serde(default)]
+    pub elevator: Option<crate::elevator::RawElevator>,
     #[serde(default)]
     pub builder: Option<RawBuilder>,
     #[serde(default)]
@@ -2021,6 +2026,10 @@ impl Unit {
             },
             strategic: match &self.strategic {
                 Some(s) => Some(s.compile(key, fx, TICKS_PER_SECOND)?),
+                None => None,
+            },
+            elevator: match &self.elevator {
+                Some(e) => Some(e.compile(key, fx, TICKS_PER_SECOND)?),
                 None => None,
             },
             builder,

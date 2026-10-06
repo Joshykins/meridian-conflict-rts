@@ -249,6 +249,39 @@
         sounds: (death: "titan_death", moving: "titan_walk", step: "titan_step", step_far: "titan_step_far"),
     ),
     (
+        // The second tier 5: a space elevator. Three great clamp towers stand round a
+        // receiving well; once they are finished a cable is let down out of orbit into
+        // the well and they close on it. From then on a cargo platform rides down the
+        // cable every `period`, sirens sounding as it comes, lets off what was queued on
+        // the elevator, free, up to its `payload` of mass, and goes back up. Whatever of
+        // the payload the queue leaves is brought down as plain mass for the store.
+        key: "aster_t5_space_elevator",
+        name: "Skyhook",
+        role: "Space Elevator", title: "Space Elevator",
+        tech: 5,
+        categories: ["Land", "Factory", "Experimental"],
+        health: 1500000,
+        cost: (mass: 160000, energy: 1600000, time: 500000),
+        radius: 150, height: 300, footprint: (26, 26), hull: (22, 22),
+        vision: 600,
+        // 20 000 mass every 30 s: about 670 mass a second once it is running, so it
+        // pays for itself in four minutes if nothing touches it.
+        elevator: (period: 30, payload: 20000, tether: 24, descent: 9, dock: 9, ascent: 9),
+        // What it brings down: everything ARC's land and air factories make, and the
+        // tech 4 land experimentals; nothing that floats.
+        builder: (power: 0, range: 0, builds: [
+            "aster_t1_engineer", "aster_t1_mobile_reclaimer", "aster_t1_scout", "aster_t1_bot", "aster_t1_tank", "aster_t1_artillery", "aster_t1_mobile_aa",
+            "aster_t2_engineer", "aster_t2_mobile_reclaimer", "aster_t2_tank", "aster_t2_hover", "aster_t2_missile", "aster_t2_mobile_shield", "aster_t2_mobile_aa",
+            "aster_t3_engineer", "aster_t3_mobile_reclaimer", "aster_t3_assault_bot", "aster_t3_artillery", "aster_t3_sniper",
+            "aster_t1_interceptor", "aster_t1_bomber", "aster_t1_air_scout", "aster_t1_rotor_gunship",
+            "aster_t2_gunship", "aster_t2_fire_bomber", "aster_t2_torpedo_bomber", "aster_t2_interceptor",
+            "aster_t3_air_superiority", "aster_t3_support", "aster_t3_strategic_bomber", "aster_t3_assault_aircraft",
+            "aster_t4_assault_tank", "aster_t4_breacher",
+        ]),
+        mesh: "space_elevator", icon: Elevator,
+        sounds: (death: "blast_large"),
+    ),
+    (
         // The Tempest's spent casing, as it is drawn falling and lying where it fell
         // (`sabot` on the gun). Nobody builds it, and it is worth nothing.
         key: "aster_t5_titan_sabot",

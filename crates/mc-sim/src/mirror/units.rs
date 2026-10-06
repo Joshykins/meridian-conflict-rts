@@ -203,6 +203,15 @@ impl World {
         let (weld, weld_first, weld_count) = weld_on_unit(pass.weld_range, pass.welds, weld_id)
             .or_else(|| weld_on_unit(pass.weld_range, pass.welds, s.units.id(row).0))
             .unwrap_or(([0.0; 3], 0, 0));
+        // A space elevator: its cable, clamps and platform, last tick and this
+        // (`elevator::pose`), in `mount` and `deploy` (`gpu_consts::elevator`).
+        let elevator = bp.elevator.map(|e| {
+            let age = self.elevator_age(row);
+            (
+                crate::elevator::pose(&e, age.map(|a| a.saturating_sub(1))),
+                crate::elevator::pose(&e, age),
+            )
+        });
         Some(UnitInstance {
             prev_pos: {
                 let mut p = s.units.prev_pos[row].extend(s.units.prev_z[row]).to_f32();
@@ -298,7 +307,9 @@ impl World {
             weld_count,
             // A siege gun's spade, or a builder's folding gear (`Builder::unfold_ticks`).
             // A material fabricator: how hard it works this tick, in both (`fabricator_work`).
-            deploy: if let Some(work) = self.fabricator_work(row) {
+            deploy: if let Some((_, now)) = elevator {
+                now[2]
+            } else if let Some(work) = self.fabricator_work(row) {
                 work
             } else {
                 let need = self.deploy_span(row);
@@ -308,7 +319,9 @@ impl World {
                     s.units.deploy[row] as f32 / need as f32
                 }
             },
-            prev_deploy: if let Some(work) = self.fabricator_work(row) {
+            prev_deploy: if let Some((was, _)) = elevator {
+                was[2]
+            } else if let Some(work) = self.fabricator_work(row) {
                 work
             } else {
                 let need = self.deploy_span(row);
@@ -355,15 +368,19 @@ impl World {
                         .unwrap_or_else(|| self.launcher_pad(row))
                 },
             ],
-            mount: mounted.map_or([0.0; 4], |w| {
-                let off = |yaw: &[mc_core::Angle; mc_data::MAX_WEAPONS]| pitch(yaw[w] - yaw[0]);
-                [
-                    off(&s.units.prev_weapon_yaw[row]),
-                    off(&s.units.weapon_yaw[row]),
-                    pitch(s.units.prev_arm_pitch[row][2 + w]),
-                    pitch(s.units.arm_pitch[row][2 + w]),
-                ]
-            }),
+            mount: if let Some((was, now)) = elevator {
+                [was[0], now[0], was[1], now[1]]
+            } else {
+                mounted.map_or([0.0; 4], |w| {
+                    let off = |yaw: &[mc_core::Angle; mc_data::MAX_WEAPONS]| pitch(yaw[w] - yaw[0]);
+                    [
+                        off(&s.units.prev_weapon_yaw[row]),
+                        off(&s.units.weapon_yaw[row]),
+                        pitch(s.units.prev_arm_pitch[row][2 + w]),
+                        pitch(s.units.arm_pitch[row][2 + w]),
+                    ]
+                })
+            },
             spin_recoil: [spin[0], spin[1], prev_mount_kick, mount_kick],
             fx: warp_fx,
             drive_swing: [0.0; 2],

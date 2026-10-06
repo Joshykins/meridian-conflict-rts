@@ -292,6 +292,11 @@ pub mod part {
     pub const FAB_INDEX: u32 = crate::gpu_consts::fab::PART_INDEX;
     pub const FAB_PRESS: u32 = crate::gpu_consts::fab::PART_PRESS;
     const _: () = assert!(FAB_INDEX > PILE && FAB_PRESS > FAB_INDEX);
+    /// A space elevator's clamp jaws, cable and platform (`gpu_consts::elevator`).
+    pub const ELEVATOR_ARM: u32 = crate::gpu_consts::elevator::PART_ARM;
+    pub const ELEVATOR_CABLE: u32 = crate::gpu_consts::elevator::PART_CABLE;
+    pub const ELEVATOR_CAR: u32 = crate::gpu_consts::elevator::PART_CAR;
+    const _: () = assert!(ELEVATOR_ARM > FAB_PRESS && ELEVATOR_CAR < 256);
 
     /// Drawn only where the structure stands in water (`AFLOAT` or `PILE`).
     pub(crate) fn afloat_only(part: u32) -> bool {

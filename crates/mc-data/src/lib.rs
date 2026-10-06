@@ -7,6 +7,7 @@
 //! tables, and [`Blueprints::content_hash`] lets peers verify that before a
 //! match starts.
 
+pub mod elevator;
 mod raw;
 pub mod refit;
 pub mod regions;
@@ -793,6 +794,8 @@ pub struct UnitBlueprint {
     pub adjacency: Option<Adjacency>,
     /// A strategic launcher: assembles and holds nuclear warheads or interceptors.
     pub strategic: Option<strategic::Strategic>,
+    /// A space elevator: brings down its queue, free, on a platform every period.
+    pub elevator: Option<elevator::Elevator>,
     pub builder: Option<Builder>,
     pub reclaimer: Option<Reclaimer>,
     /// A lift ship: carries land units in its hold.
@@ -1311,6 +1314,37 @@ impl Blueprints {
                 }
             }
         }
+        // An elevator brings down mobile land and air units, each light enough to ride one
+        // platform; it builds nothing, so its build power is nil.
+        for u in &units {
+            let Some(e) = &u.elevator else { continue };
+            let Some(b) = &u.builder else {
+                return Err(DataError::Invalid(format!(
+                    "{}: an elevator lists what it brings down as its builder's builds",
+                    u.key
+                )));
+            };
+            if b.power != Fx::ZERO || !u.has(cat::FACTORY) {
+                return Err(DataError::Invalid(format!(
+                    "{}: an elevator is a Factory with builder power 0",
+                    u.key
+                )));
+            }
+            for &id in &b.builds {
+                let made = &units[id.index()];
+                let naval = made.motion.is_some_and(|m| m.layer == MoveLayer::Naval);
+                if made.is_structure()
+                    || made.motion.is_none()
+                    || naval
+                    || made.cost_mass > e.payload
+                {
+                    return Err(DataError::Invalid(format!(
+                        "{}: brings down {}, which is not a land or air unit within one payload",
+                        u.key, made.key
+                    )));
+                }
+            }
+        }
         // Standing energy draw is for powered systems only (the user's rule): a shield,
         // a radar or sonar, a warp dampener's field, or a mine's dig. Guns, launchers,
         // missile defence and reclaim (not even a tower's) run free; they cost energy to
@@ -1447,6 +1481,10 @@ impl Blueprints {
             }
             match &u.strategic {
                 Some(s) => s.hash(&mut h),
+                None => h.write_u64(u64::MAX),
+            }
+            match &u.elevator {
+                Some(e) => e.hash(&mut h),
                 None => h.write_u64(u64::MAX),
             }
             h.write_u64(u.water_build as u64);

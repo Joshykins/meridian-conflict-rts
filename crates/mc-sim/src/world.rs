@@ -127,6 +127,9 @@ pub struct State {
     /// Nuclear silos and interceptor arrays, warheads in flight, blasts running out (`nukes.rs`).
     #[serde(default)]
     pub strategic: crate::nukes::Strategic,
+    /// Space elevators' clocks: their cables, platforms and deliveries (`elevator.rs`).
+    #[serde(default)]
+    pub elevators: crate::elevator::Elevators,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -436,6 +439,7 @@ impl World {
             batches: Default::default(),
             next_batch: 0,
             strategic: Default::default(),
+            elevators: Default::default(),
         };
         let water = terrain.water_level();
         let ore = crate::mines::OreGrid::new(&map.ore, size, |p| terrain.height_at(p) > water);
@@ -699,6 +703,10 @@ impl World {
         {
             let _t = mc_core::perf_span!("fn.run_orders");
             self.run_orders()?;
+        }
+        {
+            let _t = mc_core::perf_span!("fn.run_elevators");
+            self.run_elevators()?;
         }
         {
             let _t = mc_core::perf_span!("fn.lose_orphaned_cargo");

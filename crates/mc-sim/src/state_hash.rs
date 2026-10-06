@@ -125,6 +125,7 @@ impl World {
                         h.write_i64(held.at.y.0);
                     }
                 }
+                s.elevators.hash(h);
             },
             &|h| {
                 if let Some(survival) = &s.survival {
