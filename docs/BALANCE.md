@@ -53,6 +53,15 @@ Off the lines, measured the same way:
   area only about one shell in ten lands on the building it was aimed at, the rest on
   what stands round it. A dome is the answer: a T2 dome (9000, 90/s) goes down in about 20 s of hits, a T3
   dome (36000, 360/s) holds one gun off for nearly 3 minutes and two for under one.
+- The Behemoth (ARC T5 walker, 120000 mass) is countered by air (2026-10-06): 1.3 M
+  health and a 200000 hull field (600/s), about 12 health per mass, half a T4's. Rank
+  adds up to half again and 1600/s of mending, and a Behemoth in a fight ranks fast. Its
+  guns outrange the ground and its feet crush what gets under it, but against aircraft it
+  has only two Heavy Twin Flak (100 a shell, 24 m burst). Measured (40 aircraft attacking
+  it from one side, it fighting back): Thunderheads kill it in 105 s and lose 4, Eclipses
+  in 240 s and lose 13, Regency strategic bombers in 180 s and lose 13. 25 Thunderheads
+  never get through. A wing of hover gunships (Kestrels, the Regency assault craft) held
+  in one spot over it dies to the flak whatever its size.
 - The Skyhook space elevator (ARC T5, 160000 mass / 1.6 M energy, `docs/ELEVATOR.md`):
   once its cable is clamped (24 s after it is finished) a platform docks every 30 s with
   20000 mass: the front of its queue, free, then the rest as plain mass. That is about

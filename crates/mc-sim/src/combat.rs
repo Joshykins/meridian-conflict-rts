@@ -27,6 +27,17 @@ const AIM_TOLERANCE: u16 = 364;
 const IDLE_SKY_PITCH: Angle = Angle::from_degrees(60);
 /// Fixed strafing gun may correct at most eight degrees from the pitched nose.
 const ASSAULT_GUN_CONE: Angle = Angle::from_degrees(8);
+/// Highest over a ground mark's foot an aircraft aims (`air_strike_z`).
+const AIR_STRIKE_HEIGHT: Fx = Fx::from_int(12);
+
+/// The height an aircraft's guns and rockets aim at on a ground or sea mark standing at
+/// `z`, `height` tall: its middle, but no higher than [`AIR_STRIKE_HEIGHT`] over its foot.
+/// An aircraft attacks along its glide, nose down, and a strafing gun fixed to the nose
+/// could never lay up onto the middle of a giant (the Behemoth's is 240 m up): it never
+/// fired at one at all. It strikes the legs and the hull's foot instead.
+fn air_strike_z(z: Fx, height: Fx) -> Fx {
+    z + (height / 2).min(AIR_STRIKE_HEIGHT)
+}
 /// Steepest a warship pitches its hull to lay a spinal gun (`spinal_gun`): nose down, and up.
 pub const HULL_DIVE_DEGREES: i32 = 40;
 const HULL_DIVE: Angle = Angle::from_degrees(HULL_DIVE_DEGREES as _);
@@ -1418,7 +1429,12 @@ impl World {
                 step,
             )
         });
-        let aim_z = air_aim.map_or(target_center.z, |aim| aim.z);
+        let ground_z = if aircraft.is_some() {
+            air_strike_z(t.z, t.height)
+        } else {
+            target_center.z
+        };
+        let aim_z = air_aim.map_or(ground_z, |aim| aim.z);
         // Rockets aim at the current position; guided missiles update their intercept in flight.
         let aim = if let Some(aim) = air_aim {
             aim.xy()
@@ -1778,7 +1794,7 @@ impl World {
                     .extend(units.z[row] + offset.z);
             let elevation = FxVec2::from_angle(units.arm_pitch[row][0]);
             let gun = (FxVec2::from_angle(facing) * elevation.x).extend(elevation.y);
-            let solution = aim.extend(t.z + t.height / 2) - muzzle;
+            let solution = aim.extend(aim_z) - muzzle;
             if (t.pos - pos).dot(units.air_velocity[row].xy()) <= Fx::ZERO
                 || gun.dot(solution.normalize()) < FxVec2::from_angle(ASSAULT_GUN_CONE).x
             {

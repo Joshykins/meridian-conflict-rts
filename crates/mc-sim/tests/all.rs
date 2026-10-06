@@ -94,6 +94,7 @@ mod strider;
 mod survival;
 mod thirty_two;
 mod titan;
+mod titan_air;
 mod titan_water;
 mod torpedo_bomber;
 mod torpedo_launchers;
