@@ -52,6 +52,8 @@ struct Held {
     range: f32,
     width: f32,
     fusion: bool,
+    /// Drawn as the star, and melts the ground without digging (`Weapon::star_beam`).
+    star: bool,
     /// When it was last fed, whether this tick's strike has come in, and whether it had
     /// struck anything before (a new beam starts at its first strike, not from nowhere).
     last: f32,
@@ -165,6 +167,7 @@ impl Renderer {
         let width =
             (0.5 + w.damage.to_f32().max(1.0).sqrt() * 0.08) * w.flash.max(1.0) * w.tracer.max(0.1);
         let fusion = w.plasma_grade == Some(PlasmaGrade::PinchFusion);
+        let star = fusion && w.star_beam;
         let start = muzzle - travel;
         let reach = travel.length() + 6.0;
         let fx = &mut self.plasma_fx;
@@ -193,6 +196,7 @@ impl Renderer {
                 range,
                 width,
                 fusion,
+                star,
                 last: time,
                 struck: false,
                 new: true,
@@ -230,6 +234,7 @@ impl Renderer {
         h.struck = true;
         let width = h.width;
         let fusion = h.fusion;
+        let star = h.star;
         // It glasses the ground where it lands, a pool at a time as the strike walks.
         let glass = !on_unit
             && h.glassed
@@ -240,7 +245,8 @@ impl Renderer {
         if glass {
             self.ground_melt
                 .melt(at.truncate(), width * 2.8, time, GLASS_COOL);
-            if fusion {
+            // The excavation lance digs as it glasses; the star only melts.
+            if fusion && !star {
                 self.impact_craters.dig(at.truncate(), width * 2.2, time);
             }
             self.push_puff(
@@ -442,7 +448,9 @@ impl Renderer {
                 (h.last + tick * 1.5, CUT)
             };
             let mut beam = held_instance(HELD_BEAM, h.from, h.to, h.width, start, life);
-            if h.fusion {
+            if h.star {
+                beam.aim[3] = fade_beam::HELD_STAR;
+            } else if h.fusion {
                 beam.aim[3] = fade_beam::HELD_FUSION;
             }
             out.push(beam);

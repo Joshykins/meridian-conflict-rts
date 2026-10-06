@@ -25,6 +25,9 @@ const REG_FILM_BLACK: vec3<f32> = vec3<f32>(0.1, 0.092, 0.084);
 const REG_FILM_RED: vec3<f32> = vec3<f32>(0.36, 0.018, 0.022);
 const REG_FILM_DEEP: vec3<f32> = vec3<f32>(0.2, 0.008, 0.016);
 const REG_FILM_COPPER: vec3<f32> = vec3<f32>(0.34, 0.075, 0.02);
+// The second plate (`PLATING` under `pattern::EMBER`): a paler steel under a thinner
+// film, for a two-tone hull whose bands of it stand against the charcoal.
+const REG_FILM_PALE: vec3<f32> = vec3<f32>(0.15, 0.14, 0.13);
 // The machinery under the plates: a dark graphite a shade off the plate, darker in
 // its grooves, and the lighter steel it polishes to where it is worked.
 const REG_WORKS: vec3<f32> = vec3<f32>(0.12, 0.112, 0.1);
@@ -322,18 +325,19 @@ fn regency_look(i: RegencyIn, works: bool) -> RegencyLook {
 }
 
 // The film's colour at `cos_v` (the face's normal against the view).
-fn reg_film(cos_v: f32, seed: f32) -> vec3<f32> {
+fn reg_film(cos_v: f32, seed: f32, pale: bool) -> vec3<f32> {
     let off = 1.0 - saturate(cos_v);
-    let rise = smoothstep(0.3, 0.9, off);
+    let rise = smoothstep(0.3, 0.9, off) * select(1.0, 0.7, pale);
     // Ping-pong crimson -> deep red -> copper -> deep red -> crimson.
     let h = abs(fract(off * 1.6 + seed * 0.8) * 2.0 - 1.0) * 2.0;
     let hue = mix(mix(REG_FILM_RED, REG_FILM_DEEP, smoothstep(0.0, 1.0, h)), REG_FILM_COPPER, smoothstep(1.0, 2.0, h));
-    return mix(REG_FILM_BLACK, hue, rise);
+    return mix(select(REG_FILM_BLACK, REG_FILM_PALE, pale), hue, rise);
 }
 
 // Regency colours over the shared palette's (`lum` keeps the model's own light and
-// shade): plate, the darker trim (`ACCENT`) and the dark graphite machinery (`METAL`).
-fn regency_paint(m_in: Pbr, works: bool, look: RegencyLook, cos_v: f32, seed: f32) -> Pbr {
+// shade): plate (`PLATING_DARK`, and the paler `PLATING`), the darker trim (`ACCENT`) and
+// the dark graphite machinery (`METAL`).
+fn regency_paint(m_in: Pbr, works: bool, pale: bool, look: RegencyLook, cos_v: f32, seed: f32) -> Pbr {
     var m = m_in;
     let lum = dot(m.albedo, vec3<f32>(0.3, 0.59, 0.11));
     if works {
@@ -347,7 +351,7 @@ fn regency_paint(m_in: Pbr, works: bool, look: RegencyLook, cos_v: f32, seed: f3
         // sheen varying, smudged here, worn through to bright steel at its edges, dull
         // with grime in its seams.
         let tone = look.tone * clamp(0.8 + lum, 0.8, 1.2);
-        m.albedo = mix(reg_film(cos_v, seed) * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
+        m.albedo = mix(reg_film(cos_v, seed, pale) * tone, REG_STEEL_LIT, saturate(look.lift) * 0.5);
         m.metallic = 0.55;
         m.roughness = clamp(0.42 + look.rough - 0.1 * saturate(look.lift), 0.24, 0.8);
     }

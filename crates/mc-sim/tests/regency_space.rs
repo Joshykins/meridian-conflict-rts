@@ -83,7 +83,7 @@ fn engineers_can_build_the_fleet_on_site_and_cargo_sizes_fit_their_roles() {
         ("regency_t2_space_frigate", "regency_t2_engineer"),
         ("regency_t3_assault_transport", "regency_t3_engineer"),
         ("regency_t3_space_cruiser", "regency_t3_engineer"),
-        ("regency_t3_space_destroyer", "regency_t3_engineer"),
+        ("regency_t4_space_destroyer", "regency_t3_engineer"),
     ] {
         let id = bp.id_of(key).unwrap();
         let u = bp.unit(id);
@@ -245,9 +245,47 @@ fn frigate_and_cruiser_fire_their_independent_casemates_at_cruise_height() {
 }
 
 #[test]
+fn destroyers_batteries_all_bear_on_a_ground_mark_ahead_from_cruise_height() {
+    let mut w = world();
+    let ship = add(&mut w, "regency_t4_space_destroyer", 0, 500, 800);
+    // Dead ahead, past the lance's reach from the Dominion's height but in the
+    // batteries'.
+    let tank = add(&mut w, "aster_t4_assault_tank", 1, 2500, 800);
+    w.state.units.flags[tank] |= flag::PASSIVE;
+    w.state.units.health[tank] = Fx::from_int(500000);
+    let health = w.state.units.health[tank];
+    let blueprint = w.state.units.blueprint[ship];
+    let (id, tank_id) = (w.state.units.id(ship), w.state.units.id(tank));
+    w.tick(&[cmd(Command::Attack {
+        units: vec![id],
+        target: tank_id,
+        queue: false,
+    })])
+    .unwrap();
+    let mut fired = std::collections::BTreeSet::new();
+    for _ in 0..300 {
+        w.tick(&[]).unwrap();
+        for event in &w.events {
+            if let SimEvent::ShotFired {
+                blueprint: b,
+                weapon,
+                ..
+            } = event
+            {
+                if *b == blueprint && (1..=6).contains(weapon) {
+                    fired.insert(*weapon);
+                }
+            }
+        }
+    }
+    assert_eq!(fired.len(), 6, "batteries fired: {fired:?}");
+    assert!(w.state.units.health[tank] < health, "no damage");
+}
+
+#[test]
 fn destroyer_holds_its_lance_on_the_mark_and_drags_it_across_the_ground_to_the_next() {
     let mut w = world();
-    let ship = add(&mut w, "regency_t3_space_destroyer", 0, 500, 700);
+    let ship = add(&mut w, "regency_t4_space_destroyer", 0, 500, 700);
     let first = add(&mut w, "aster_t4_assault_tank", 1, 1200, 700);
     let second = add(&mut w, "aster_t4_assault_tank", 1, 1180, 1000);
     for t in [first, second] {
@@ -329,7 +367,7 @@ fn destroyer_holds_its_lance_on_the_mark_and_drags_it_across_the_ground_to_the_n
 #[test]
 fn destroyers_core_charges_before_the_lance_lights() {
     let mut w = world();
-    let ship = add(&mut w, "regency_t3_space_destroyer", 0, 500, 700);
+    let ship = add(&mut w, "regency_t4_space_destroyer", 0, 500, 700);
     let tank = add(&mut w, "aster_t4_assault_tank", 1, 1000, 700);
     w.state.units.flags[tank] |= flag::PASSIVE;
     w.state.units.health[tank] = Fx::from_int(500000);
@@ -367,12 +405,11 @@ fn destroyers_core_charges_before_the_lance_lights() {
 #[test]
 fn destroyers_seeker_cells_see_off_fighters() {
     let mut w = world();
-    let ship = add(&mut w, "regency_t3_space_destroyer", 0, 500, 700);
+    let ship = add(&mut w, "regency_t4_space_destroyer", 0, 500, 700);
     let blueprint = w.state.units.blueprint[ship];
     let bp = w.blueprints.unit(blueprint);
-    for w in &bp.weapons[1..3] {
-        assert!(w.missile && w.guided && w.hatch_ticks == 0 && w.muzzles.len() == 8);
-    }
+    let cells = &bp.weapons[7];
+    assert!(cells.missile && cells.guided && cells.hatch_ticks > 0 && cells.muzzles.len() == 16);
     let fighters: Vec<usize> = (0..3)
         .map(|i| add(&mut w, "aster_t1_interceptor", 1, 900 + i * 40, 760))
         .collect();
@@ -387,7 +424,7 @@ fn destroyers_seeker_cells_see_off_fighters() {
             .events
             .iter()
             .filter(|e| {
-                matches!(e, SimEvent::ShotFired { blueprint: b, weapon: 1 | 2, .. } if *b == blueprint)
+                matches!(e, SimEvent::ShotFired { blueprint: b, weapon: 7, .. } if *b == blueprint)
             })
             .count();
     }

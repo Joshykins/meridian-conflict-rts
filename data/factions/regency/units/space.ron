@@ -84,53 +84,136 @@
         shield: (kind: Hull, health: 7000, regen: 70), economy: (energy_upkeep: 180),
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
+    // The Scourge: the Regency's capital warship, the Dominion's peer. It fights from the
+    // Dominion's height with the lance held from its core under it, six batteries in
+    // houses along the hull and a T3 seeker silo's worth of cells twice over.
     (
-        key: "regency_t3_space_destroyer", name: "Scourge", role: "Destroyer", title: "Destroyer",
-        tech: 3, categories: ["Air", "Space", "DirectFire"], health: 30000,
-        cost: (mass: 7800, energy: 145000, time: 42000),
-        radius: 160, height: 60, footprint: (32, 14), hull: (200, 85), vision: 1400,
-        motion: (layer: Air, size: 0, speed: 62, accel: 15, turn: 22, altitude: 480, hover: true, hangs: true),
+        key: "regency_t4_space_destroyer", name: "Scourge", role: "Destroyer", title: "Destroyer",
+        tech: 4, categories: ["Air", "Space", "Experimental"], health: 170000,
+        cost: (mass: 17500, energy: 240000, time: 76000),
+        radius: 320, height: 130, footprint: (52, 20), hull: (330, 140), vision: 2400, radar: 3600,
+        // Shots meet the long hull along its length, not a disc of its radius.
+        body: (fore: 320, aft: -320, beam: 110),
+        motion: (layer: Air, size: 0, speed: 40, accel: 4, turn: 6, altitude: 700, hover: true, hangs: true),
+        hull_mounts: true,
         weapons: [
             // One held beam laid from the lower lens of the energy core in the drum through
             // the ship's middle (nothing turns: the beam is aimed from the lens). The core charges for 2.5 s
             // (`spin_up`) before the beam lights, and winds down when it has nothing left.
             // It fires down its line (`sweep`): locked on, it holds on the mark; when the
             // mark dies it stays lit as it slowly drags across the ground onto the next,
-            // leaving a molten line between them.
+            // melting a line of glass between them. Drawn as the power generator's star
+            // (`star_beam`): it melts the ground, it digs no crater.
             (
-                name: "Heavy Pinch-fusion Lance", damage: 160, splash: 14, range: 1100, reload: 0.1,
-                hitscan: true, beam: true, trajectory: Direct, spin_up: 2.5,
-                turret_turn: 12, muzzle: (0, 0, 11.375), sweep: 10,
+                name: "Heavy Pinch-fusion Lance", damage: 160, splash: 20, range: 1800, reload: 0.1,
+                hitscan: true, beam: true, star_beam: true, trajectory: Direct, spin_up: 2.5,
+                turret_turn: 12, muzzle: (0, 0, 15.2), sweep: 10,
                 targets: ["Land", "Naval", "Structure"], color: Orange, red: 1.0,
-                plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 12.0,
+                plasma_grade: Some(PinchFusion), flash: 0.4, impact: 3.2, tracer: 26.0,
                 sounds: (spin: "regency_lance_charge", hold: "regency_lance_hold", spindown: "regency_lance_vent"),
             ),
-            // Two blocks of eight open cells on the hump either side of the spine (port
-            // first): a gravitic seeker let out of each in turn and steered onto the
-            // aircraft in reach, as the Resolute's rocket cells do. Enough to see off a few
-            // fighters, not a wing.
+            // Six Pinch-plasma Batteries, three a side (port of each pair first, fore to
+            // aft): twin forks in a gun house, each fork gathering plasma in the gap ahead
+            // of its blades and pinching it out as one jet. Each bears from a little past
+            // the nose round its own side to a little past the stern.
             (
-                name: "Gravitic Seeker Battery",
-                damage: 260, splash: 10, range: 1200, reload: 1.6, speed: 420, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (-48.25, 17.88, 55.94),
-                muzzles: [(-48.25, 17.88, 55.94), (-42.25, 20.88, 55.94), (-45.25, 17.88, 55.94), (-39.25, 20.88, 55.94), (-48.25, 20.88, 55.94), (-42.25, 17.88, 55.94), (-45.25, 20.88, 55.94), (-39.25, 17.88, 55.94)],
-                targets: ["Air"], color: Orange, red: 1.0, missile: true, guided: true, vertical_launch: true,
-                intercept: 25, proximity: 12, caliber: 0.4,
-                plasma_grade: Some(Gravitic),
-                sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
+                name: "Pinch-plasma Battery",
+                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
+                rounds: 8, round_span: 0.3,
+                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (150, 44, 92.02), muzzle: (189.9, 50.84, 92.02),
+                muzzles: [(189.9, 50.84, 92.02), (189.9, 37.16, 92.02)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
             ),
             (
+                name: "Pinch-plasma Battery",
+                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
+                rounds: 8, round_span: 0.3,
+                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (150, -44, 92.02), muzzle: (189.9, -37.16, 92.02),
+                muzzles: [(189.9, -37.16, 92.02), (189.9, -50.84, 92.02)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+            (
+                name: "Pinch-plasma Battery",
+                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
+                rounds: 8, round_span: 0.3,
+                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (40, 62, 94.42), muzzle: (79.9, 68.84, 94.42),
+                muzzles: [(79.9, 68.84, 94.42), (79.9, 55.16, 94.42)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+            (
+                name: "Pinch-plasma Battery",
+                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
+                rounds: 8, round_span: 0.3,
+                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (40, -62, 94.42), muzzle: (79.9, -55.16, 94.42),
+                muzzles: [(79.9, -55.16, 94.42), (79.9, -68.84, 94.42)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+            (
+                name: "Pinch-plasma Battery",
+                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
+                rounds: 8, round_span: 0.3,
+                turret_turn: 40, arc: 220, facing: 90, mount: true, pivot: (-90, 76, 99.09), muzzle: (-50.1, 82.84, 99.09),
+                muzzles: [(-50.1, 82.84, 99.09), (-50.1, 69.16, 99.09)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+            (
+                name: "Pinch-plasma Battery",
+                damage: 1400, splash: 18, range: 2400, reload: 8, salvo: 2, salvo_delay: 0.35, speed: 900, trajectory: Direct,
+                rounds: 8, round_span: 0.3,
+                turret_turn: 40, arc: 220, facing: -90, mount: true, pivot: (-90, -76, 99.09), muzzle: (-50.1, -69.16, 99.09),
+                muzzles: [(-50.1, -69.16, 99.09), (-50.1, -82.84, 99.09)],
+                targets: ["Land", "Naval", "Structure", "Space"], color: Orange, red: 1.0,
+                plasma_grade: Some(Pinched), flash: 1.8, impact: 2.6, tracer: 2.0,
+                sounds: (
+                    fire: "regency_halberd_fire", charge: "regency_halberd_charge", charge_time: 1.0,
+                    impact: "regency_halberd_hit", ground: "regency_halberd_hit",
+                ),
+            ),
+            // Two blocks of eight hatched cells either side of the spine, port block first,
+            // as one launcher: a Belfry's seekers twice over, a salvo spread over the
+            // aircraft in reach.
+            (
                 name: "Gravitic Seeker Battery",
-                damage: 260, splash: 10, range: 1200, reload: 1.6, speed: 420, trajectory: Direct,
-                turret_turn: 0, arc: 360, muzzle: (-48.25, -20.88, 55.94),
-                muzzles: [(-48.25, -20.88, 55.94), (-42.25, -17.88, 55.94), (-45.25, -20.88, 55.94), (-39.25, -17.88, 55.94), (-48.25, -17.88, 55.94), (-42.25, -20.88, 55.94), (-45.25, -17.88, 55.94), (-39.25, -20.88, 55.94)],
+                damage: 800, splash: 24, proximity: 10, range: 2900, reload: 11, speed: 480,
+                trajectory: Direct,
+                turret_turn: 0, arc: 360, muzzle: (-290.5, 18.5, 112.86),
+                muzzles: [
+                    (-290.5, 18.5, 112.86), (-276.5, 25.5, 112.86), (-283.5, 18.5, 112.86), (-269.5, 25.5, 112.86), (-290.5, 25.5, 112.86), (-276.5, 18.5, 112.86), (-283.5, 25.5, 112.86), (-269.5, 18.5, 112.86),
+                    (-290.5, -25.5, 112.86), (-276.5, -18.5, 112.86), (-283.5, -25.5, 112.86), (-269.5, -18.5, 112.86), (-290.5, -18.5, 112.86), (-276.5, -25.5, 112.86), (-283.5, -18.5, 112.86), (-269.5, -25.5, 112.86),
+                ],
+                salvo: 16, salvo_delay: 0.2, split: true, hatch: 0.5, caliber: 0.8,
                 targets: ["Air"], color: Orange, red: 1.0, missile: true, guided: true, vertical_launch: true,
-                intercept: 25, proximity: 12, caliber: 0.4,
+                intercept: 80, impact: 1.6, shockwave: 0.8,
                 plasma_grade: Some(Gravitic),
                 sounds: (fire: "regency_gravitic_throw", impact: "regency_gravitic_hit"),
             ),
         ], mesh: "regency_space_destroyer", icon: Warship,
-        shield: (kind: Hull, health: 9000, regen: 90), economy: (energy_upkeep: 240),
+        shield: (kind: Hull, health: 64000, regen: 420), economy: (energy_upkeep: 850),
         sounds: (death: "blast_large", moving: "aster_hover"),
     ),
 ]

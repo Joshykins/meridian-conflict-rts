@@ -1,4 +1,4 @@
-use super::destroyer::{seeker_muzzles, CORE_MUZZLE};
+use super::destroyer::{battery_mounts, lance_muzzle, seeker_muzzles};
 use crate::{build_model, build_model_scaled, material};
 use glam::Vec3;
 
@@ -14,7 +14,7 @@ fn the_hulls_fit_their_blueprints_and_keep_their_identity_at_each_lod() {
         "regency_t2_transport",
         "regency_t2_space_frigate",
         "regency_t3_space_cruiser",
-        "regency_t3_space_destroyer",
+        "regency_t4_space_destroyer",
     ] {
         let unit = bp.unit(bp.id_of(key).unwrap());
         let mesh = &unit.visual.mesh;
@@ -122,17 +122,22 @@ fn plasma_gun_houses_are_bound_to_their_weapons_and_end_at_their_muzzles() {
 }
 
 #[test]
-fn the_destroyers_lance_leaves_its_core_and_its_seekers_leave_their_cells() {
+fn the_destroyers_lance_leaves_its_core_and_its_batteries_and_seekers_their_mounts() {
     let bp = blueprints();
-    let unit = bp.unit(bp.id_of("regency_t3_space_destroyer").unwrap());
+    let unit = bp.unit(bp.id_of("regency_t4_space_destroyer").unwrap());
     let model = build_model(&unit.visual.mesh).unwrap();
     let at = |p: mc_core::FxVec3| Vec3::new(p.x.to_f32(), p.y.to_f32(), p.z.to_f32());
+    let show = |p: Vec3| format!("({:.2}, {:.2}, {:.2})", p.x, p.y, p.z);
     // The lance is laid from the core's lens at the ship's middle: no turret, nothing
     // turns or pitches (a pivot would pitch the hull: `capital_ship` in entity.wgsl).
     let lance = &unit.weapons[0];
-    let core = Vec3::from(CORE_MUZZLE);
+    let core = lance_muzzle();
     assert!(lance.pivot.is_none() && core.truncate().length() < 0.01);
-    assert!(at(lance.muzzle).distance(core) < 0.01, "lance muzzle");
+    assert!(
+        at(lance.muzzle).distance(core) < 0.01,
+        "lance muzzle {}",
+        show(core)
+    );
     // The lens's face lies in the muzzle's plane, round it.
     let face: Vec<Vec3> = model.lods[0]
         .vertices
@@ -150,18 +155,69 @@ fn the_destroyers_lance_leaves_its_core_and_its_seekers_leave_their_cells() {
         .vertices
         .iter()
         .all(|v| v.part != crate::part::TURRET));
-    // Each seeker battery fires from its own block's open cells, port block first.
-    for (want, weapon) in seeker_muzzles().iter().zip(&unit.weapons[1..3]) {
-        assert_eq!(weapon.hatch_ticks, 0, "open cells");
+    // Each battery turns in its own house about its weapon's pivot, its forks' gaps
+    // its muzzles.
+    let mounts = battery_mounts();
+    assert_eq!(model.houses.len(), mounts.len());
+    let every = mounts
+        .iter()
+        .map(|(p, g)| {
+            format!(
+                "pivot {}, muzzles [{}, {}]",
+                show(*p),
+                show(g[0]),
+                show(g[1])
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    for (k, (pivot, gaps)) in mounts.iter().enumerate() {
+        let weapon = &unit.weapons[1 + k];
+        let house = model
+            .houses
+            .iter()
+            .find(|h| h.weapon as usize == 1 + k)
+            .expect("a house for each battery");
+        assert!(Vec3::from(house.pivot).distance(*pivot) < 0.01);
         let have: Vec<Vec3> = weapon.muzzles.iter().map(|&p| at(p)).collect();
         assert!(
-            have.len() == want.len() && have.iter().zip(want).all(|(h, w)| h.distance(*w) < 0.02),
-            "{}: muzzles {:?}",
-            weapon.name,
-            want.iter()
-                .map(|p| format!("({:.2}, {:.2}, {:.2})", p.x, p.y, p.z))
-                .collect::<Vec<_>>()
+            weapon.pivot.is_some_and(|p| at(p).distance(*pivot) < 0.02)
+                && have.len() == 2
+                && have.iter().zip(gaps).all(|(h, w)| h.distance(*w) < 0.02)
+                && at(weapon.muzzle).distance(gaps[0]) < 0.02,
+            "battery {}; the batteries in weapon order:\n{every}",
+            1 + k,
         );
-        assert!(at(weapon.muzzle).distance(want[0]) < 0.02);
     }
+    // The seekers leave their cells, port block first, as one weapon.
+    let want = seeker_muzzles();
+    let seekers = &unit.weapons[7];
+    let have: Vec<Vec3> = seekers.muzzles.iter().map(|&p| at(p)).collect();
+    assert!(
+        have.len() == want.len()
+            && have.iter().zip(&want).all(|(h, w)| h.distance(*w) < 0.02)
+            && at(seekers.muzzle).distance(want[0]) < 0.02,
+        "{}: muzzles [{}]",
+        seekers.name,
+        want.iter().map(|&p| show(p)).collect::<Vec<_>>().join(", ")
+    );
+    // And those are the model's own hatched cells, in the order they open.
+    let cells: Vec<Vec3> = model
+        .cells
+        .iter()
+        .flat_map(|block| {
+            (0..block.nx as usize * block.ny as usize)
+                .filter_map(move |k| block.missile_centre(k))
+                .map(move |[x, y]| Vec3::new(x, y, block.deck))
+        })
+        .collect();
+    assert_eq!(model.cells.len(), 2, "two blocks of hatched cells");
+    assert!(
+        cells.len() == want.len()
+            && cells
+                .iter()
+                .zip(&want)
+                .all(|(c, w)| c.truncate().distance(w.truncate()) < 0.02 && c.z > w.z),
+        "the seekers leave cells the model has not got"
+    );
 }

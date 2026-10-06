@@ -140,6 +140,9 @@ pub struct Weapon {
     pub plasma_grade: Option<PlasmaGrade>,
     /// A Gravitic Seeker carried in a solid casing (`RawWeapon::cased`, `cased_seeker`).
     pub cased: bool,
+    /// A held pinch-fusion beam drawn as the star, melting the ground without a crater
+    /// (`RawWeapon::star_beam`). Cosmetic.
+    pub star_beam: bool,
     /// How far a gun house on a capital hull may dip below its deck; zero: no limit.
     pub depression: Angle,
     /// How far a torso gun may swing off the torso, pitching on its own (`RawWeapon::sway`).

@@ -488,7 +488,9 @@ fn vs_projectile(@location(0) corner: vec2<f32>, @builtin(instance_index) instan
         } else if held {
             // A Pinched-plasmeric beam: holds, then is cut (renderer/plasma_fx.rs).
             out.color = vec3<f32>(1.0 - smoothstep(0.72, 1.0, age));
-            out.shape = vec2<f32>(-distance(head, tail), select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION));
+            var look = select(6.0, 6.3, p.aim.w == FADE_BEAM_HELD_FUSION);
+            look = select(look, 6.45, p.aim.w == FADE_BEAM_HELD_STAR);
+            out.shape = vec2<f32>(-distance(head, tail), look);
         } else if (p.color & 0xFu) == 4u {
             let envelope = smoothstep(0.0, 0.035, age) * (1.0 - smoothstep(0.82, 1.0, age));
             out.color = vec3<f32>(envelope);
@@ -753,7 +755,7 @@ fn vs_shot(@location(0) corner: vec2<f32>, @builtin(instance_index) instance: u3
         }
         if (p.color & 0xFu) == 7u || (p.color & 0xFu) == 8u {
             // A held beam's bite, and a charge: white-hot in red.
-            out.color = select(vec3<f32>(2.4, 0.75, 0.55), vec3<f32>(2.7, 1.9, 2.8), (p.color & 0xFu) == 7u && p.aim.w == FADE_BEAM_HELD_FUSION) * fade;
+            out.color = select(vec3<f32>(2.4, 0.75, 0.55), vec3<f32>(2.7, 1.9, 2.8), (p.color & 0xFu) == 7u && p.aim.w >= FADE_BEAM_HELD_FUSION) * fade;
         }
     } else if beam {
         out.color = vec3<f32>(1.0, 0.82, 0.38) * 3.4;
@@ -1040,6 +1042,23 @@ fn fs_sprite_lit(in: SpriteOut) -> vec4<f32> {
             let thread = pow(across, mix(4.0, 9.0, age));
             let sheath = pow(across, 2.2) * 0.3 * (1.0 - age);
             return vec4<f32>(in.color * (thread + sheath) * alive, 1.0);
+        }
+        if in.shape.y > 6.4 {
+            // The star (`Weapon::star_beam`): pinch fusion held as one beam, drawn as the
+            // power generator's star is. A white-hot core of fusing plasma in a broad sheath
+            // of the prism's pinks, drifting patches of colour run down it and cool to
+            // lavender at its rim (never red), and fusion events strobe along it, each
+            // swelling the core and flaring the sheath for an instant.
+            let run = (in.uv.x * 0.5 + 0.5) * -in.shape.x;
+            let t = globals.camera.w;
+            let cell = run * 0.03 - t * 14.0;
+            let burst = exp(-pow(fract(cell) - 0.5, 2.0) * 60.0) * step(0.35, hash11(floor(cell) + 3.7));
+            let drift = value_noise2(vec2<f32>(run * 0.04 - t * 6.0, in.uv.y * 2.0), 1.0);
+            let hue = prism(run * 0.012 + drift * 0.7 - t * PRISM_RATE * 3.0);
+            let sheath = mix(vec3<f32>(0.8, 0.62, 1.0), hue, 0.85) * pow(across, 0.8)
+                * (3.4 + 3.0 * burst);
+            let core = vec3<f32>(1.0, 0.97, 1.0) * pow(across, mix(12.0, 5.0, burst)) * (6.0 + 14.0 * burst);
+            return vec4<f32>((sheath + core) * in.color.r, 1.0);
         }
         if in.shape.y > 6.1 {
             // Excavation fusion: the Sunspear/shield prism around a white-hot core.

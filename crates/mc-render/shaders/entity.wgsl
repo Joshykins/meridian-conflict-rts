@@ -3165,7 +3165,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // panel line that follow the face, collared graphite machinery.
     var regency = regency_none();
     let works = in.material == MAT_METAL;
-    if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER && (works || in.material == MAT_PLATING_DARK)
+    if ((in.model_class >> 16u) & 0xFFu) == PAT_EMBER
+        && (works || in.material == MAT_PLATING_DARK || in.material == MAT_PLATING)
         && (flags & (KIND_GHOST | KIND_PROP)) == 0u && !wreck {
         let dl1 = dpdx(in.local);
         let dl2 = dpdy(in.local);
@@ -3717,7 +3718,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             // machinery (regency.wgsl). The film's hue follows the plate's own shape, not
             // its scan relief: each bump would flip it between colours.
             let face_seed = f32((in.model_class >> 24u) & 0xFFu) / 255.0;
-            m = regency_paint(m, in.material == MAT_METAL, regency, dot(normalize(in.normal), v), face_seed);
+            m = regency_paint(m, in.material == MAT_METAL, in.material == MAT_PLATING, regency,
+                dot(normalize(in.normal), v), face_seed);
         }
         let unit_at = vec3<f32>(in.state.w * 131.0, in.state.w * 71.0, in.state.w * 17.0);
         let rise = in.state.z / max(line, 0.02);
