@@ -20,6 +20,12 @@ pub use vec::{FxVec2, FxVec3};
 /// Simulation rate. One tick is 100 ms of game time.
 pub const TICKS_PER_SECOND: u32 = 10;
 
+/// Where a unit's ground covered wraps for its walk cycle, in metres (the render
+/// mirror's `UnitInstance::gait`): 2^8 x 3 x 5 x 7, so a walker's stride can be any
+/// length that divides it (the Behemoth's 256 m, the Strider's 52.5 m) and its feet keep
+/// their place in the cycle across the wrap.
+pub const GAIT_WRAP: u32 = 26880;
+
 /// Most players a match supports.
 pub const MAX_PLAYERS: usize = 32;
 

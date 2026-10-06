@@ -135,7 +135,7 @@ impl Renderer {
                     .atan2((u.heading - u.prev_heading).cos());
                 let contact = crawl_contact(
                     Vec2::new(ankle[0], side * ankle[1]),
-                    legs.stride * legs.stance * 0.5,
+                    legs.stride * crawl.stance[i] * 0.5,
                     local,
                     turn,
                     u.gait[1],

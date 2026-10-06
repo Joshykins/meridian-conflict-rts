@@ -278,7 +278,7 @@ impl World {
                 // A mine that strikes nothing has no beat.
                 Some(_) => [0.0; 3],
                 None => [
-                    (s.units.gait[row] & 0xF_FFFF) as f32 / 256.0,
+                    (s.units.gait[row] % (mc_core::GAIT_WRAP * 256)) as f32 / 256.0,
                     step[0] as f32 / 256.0,
                     step[1] as f32 / 256.0,
                 ],

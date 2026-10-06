@@ -334,7 +334,7 @@ What a fight looks and sounds like is decided outside the simulation; `docs/STYL
   cycle behind the left (a stance under a half is a run, and the body bob inverts). `game.rs` plays a unit's `step`
   sound from the same counter, delayed to where in the tick the foot lands (`Audio::play_world_after`). The cycle comes from `Units::gait`, ground covered in 1/256 m including turning on the spot
   (`UnitInstance::gait`: the total and the last two ticks' steps, so both the phase and the ease in and out are
-  interpolated). A stride is a power of two metres so the wrapping counter never breaks it.
+  interpolated). The mirror wraps the counter at `mc_core::GAIT_WRAP` (26880 m), and a stride divides that (`MeshBuilder::fitted_stride`) so the wrap never breaks it.
 - **Replicators (Survival).** Models in `models/replicator.rs` (contract points as consts there: ray emitter
   `(0,0,140)`, bay k at k*45 degrees with its projector at radius 100 m, z 55 and the unit printed at radius 150 m;
   node ray catch `(0,0,46)`, print emitter `(0,0,40)`). They are Precursor work: `PRECURSOR` / `PRECURSOR_DARK` /

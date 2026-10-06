@@ -910,6 +910,13 @@ impl MeshBuilder {
         });
     }
 
+    /// The stride nearest `len` metres that `set_legs` takes: one that divides the gait's
+    /// wrap (`mc_core::GAIT_WRAP`), so the feet keep their place across it.
+    pub fn fitted_stride(len: f32) -> f32 {
+        let wrap = mc_core::GAIT_WRAP as f32;
+        wrap / (wrap / len).round().max(1.0)
+    }
+
     /// Records the left leg's joints at rest (given in the current frame), the
     /// ground one full cycle covers, the share of it a foot is planted for and
     /// how high a foot lifts. Everything emitted `with_limb` is then posed by
@@ -923,9 +930,11 @@ impl MeshBuilder {
         stance: f32,
         lift: f32,
     ) {
+        let cycles = mc_core::GAIT_WRAP as f32 / stride;
         assert!(
-            stride > 0.0 && stride.log2().fract() == 0.0,
-            "a stride is a power of two metres"
+            stride > 0.0 && (cycles - cycles.round()).abs() < 1e-3,
+            "a stride divides the gait's wrap, {} m (`fitted_stride`)",
+            mc_core::GAIT_WRAP
         );
         assert!((0.2..0.9).contains(&stance));
         let at = |p: Vec3| self.transform.transform_point3(p).to_array();
@@ -974,6 +983,7 @@ impl MeshBuilder {
             pairs: pairs.len(),
             joints: [[[0.0; 3]; 3]; super::MAX_CRAWL_PAIRS],
             phase: [0.0; super::MAX_CRAWL_PAIRS],
+            stance: [stance; super::MAX_CRAWL_PAIRS],
             tail: [0.0; 2],
             tail_joints: [[0.0; 2]; super::MAX_TAIL_JOINTS],
             tail_count: 0,
@@ -1004,6 +1014,19 @@ impl MeshBuilder {
             "a lone leg stands on the centreline"
         );
         crawl.lone = Some(pair);
+    }
+
+    /// Has leg pair `pair` (`set_crawl_legs`) stand `stance` of the cycle rather than the
+    /// walker's own: a shorter stance is a shorter step at the same pace, and a longer
+    /// swing to make it in.
+    pub fn set_pair_stance(&mut self, pair: usize, stance: f32) {
+        let crawl = self
+            .legs
+            .as_mut()
+            .and_then(|l| l.crawl.as_mut())
+            .expect("set_crawl_legs first");
+        assert!(pair < crawl.pairs && stance > 0.0 && stance < 1.0);
+        crawl.stance[pair] = stance;
     }
 
     /// Runs `f` as leg pair `pair` of a many-legged walker (`set_crawl_legs`).

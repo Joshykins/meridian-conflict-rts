@@ -931,7 +931,8 @@ fn crawl_leg(pos: vec3<f32>, normal: vec3<f32>, limb: u32, pair: u32, model: Mod
     let phase = fract(walk.y - model.crawl[1u + 3u * pair].w + select(select(0.5, 0.0, left), 0.0, lone));
     let stride = model.leg_hip.w;
     let lift = model.leg_knee.w;
-    let stance = model.leg_ankle.w;
+    // Each pair's own stance (`Crawl::stance`): a shorter one is a shorter step.
+    let stance = model.crawl[3u + 3u * pair].w;
     let reach = stance * stride;
     var step = vec2<f32>(0.0);
     if phase < stance {

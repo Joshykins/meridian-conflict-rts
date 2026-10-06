@@ -162,8 +162,28 @@ fn strides_grow_with_the_build() {
         .legs
         .unwrap();
     assert!(
-        built.stride >= STRIDE * SCALE,
+        (built.stride - STRIDE * SCALE).abs() < 0.01,
         "stride {} at {SCALE}x",
         built.stride
     );
+}
+
+/// The rear foot steps shorter than the front, and the three swing in turn so two feet
+/// are always down: each swing fits in a gap the others leave.
+#[test]
+fn rear_steps_shorter_and_two_feet_stand() {
+    let crawl = model().legs.unwrap().crawl.unwrap();
+    assert!(crawl.stance[1] < crawl.stance[0]);
+    // The cycle's share each foot is in the air: front left, front right, rear.
+    let up = |p: f32, s: f32| move |t: f32| (t - p).rem_euclid(1.0) >= s;
+    let feet = [
+        up(crawl.phase[0], crawl.stance[0]),
+        up(crawl.phase[0] + 0.5, crawl.stance[0]),
+        up(crawl.phase[1], crawl.stance[1]),
+    ];
+    for i in 0..1000 {
+        let t = (i as f32 + 0.5) / 1000.0;
+        let lifted = feet.iter().filter(|f| f(t)).count();
+        assert!(lifted <= 1, "{lifted} feet up at {t}");
+    }
 }

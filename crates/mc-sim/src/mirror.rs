@@ -495,7 +495,7 @@ pub struct UnitInstance {
     /// progress toward the next rank (0..=255) in 24..32.
     /// Wrecks: WRECK_FALLING while still airborne, zero after impact.
     pub packed: u32,
-    /// Ground covered in metres (wraps at 4096), then what this tick and the
+    /// Ground covered in metres (wraps at `mc_core::GAIT_WRAP`), then what this tick and the
     /// tick before added to it: the vertex shader times a walker's stride by it.
     /// A spent casing in the air: seconds since it was thrown, last tick and this.
     /// A wreck left in the last `WRECK_SETTLED` seconds: seconds since it was left, last

@@ -100,7 +100,7 @@
         radius: 36.0, height: 96.0,
         footprint: (6, 6),
         vision: 1200,
-        motion: (layer: Amphibious, size: 4, speed: 20, accel: 14, turn: 40),
+        motion: (layer: Amphibious, size: 4, speed: 35, accel: 20, turn: 40),
         weapons: [
             (
                 name: "Pinch-fusion Cannon",

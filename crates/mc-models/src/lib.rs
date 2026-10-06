@@ -499,6 +499,10 @@ pub struct Crawl {
     pub joints: [[[f32; 3]; 3]; MAX_CRAWL_PAIRS],
     /// Where in the cycle each pair's left foot lifts (0..1); its right foot is half a cycle on.
     pub phase: [f32; MAX_CRAWL_PAIRS],
+    /// The share of the cycle each pair's feet stand (`Legs::stance` unless
+    /// `MeshBuilder::set_pair_stance` says otherwise): a pair standing less takes a
+    /// shorter step, its planted foot still keeping pace with the ground.
+    pub stance: [f32; MAX_CRAWL_PAIRS],
     /// The tail's root and top heights (`rig::TAIL`): zero for no tail.
     pub tail: [f32; 2],
     /// The tail's spine at rest, root first, as (x, z) in its plane (y = 0): each
@@ -520,7 +524,7 @@ pub struct Crawl {
 
 impl Crawl {
     /// As `entity.wgsl` reads `ModelInfo::crawl`: [0] pair count, tail root z, tail top z,
-    /// tail joint count; then per pair hip (w: phase), knee (w: 1 for a lone leg), ankle; then the tail's joints,
+    /// tail joint count; then per pair hip (w: phase), knee (w: 1 for a lone leg), ankle (w: stance); then the tail's joints,
     /// two to a vec4 (x, z, x, z); then the pincer's shoulder (w: 1 when there are pincers)
     /// and its jaw hinge (w: the left pincer's weapon slot plus one, and the right's plus
     /// one times 16; zero for none).
@@ -537,7 +541,7 @@ impl Crawl {
             out[1 + 3 * i] = [h[0], h[1], h[2], self.phase[i]];
             let lone = if self.lone == Some(i) { 1.0 } else { 0.0 };
             out[2 + 3 * i] = [k[0], k[1], k[2], lone];
-            out[3 + 3 * i] = [a[0], a[1], a[2], 0.0];
+            out[3 + 3 * i] = [a[0], a[1], a[2], self.stance[i]];
         }
         let base = 1 + 3 * MAX_CRAWL_PAIRS;
         for (i, j) in self.tail_joints[..self.tail_count].iter().enumerate() {
