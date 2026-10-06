@@ -194,6 +194,9 @@ pub struct Units {
     /// A sweeping gun (`Weapon::sweep`) is mid-stream: it has fired and its barrels are
     /// still at speed, so it keeps firing down the barrel as it swings to its next mark.
     pub streaming: Vec<bool>,
+    /// Where a held beam's stream lands on the ground while it streams (`Weapon::beam`):
+    /// it walks from here onto its mark, and its next mark is the one nearest here.
+    pub beam_at: Vec<FxVec2>,
     /// Ground covered since the unit was made, in 1/256 m, wrapping; turning on
     /// the spot counts too. Only the presentation reads it: it times a walker's stride.
     pub gait: Vec<u32>,
@@ -346,6 +349,7 @@ impl Units {
             prev_arm_pitch: Vec::new(),
             spin: Vec::new(),
             streaming: Vec::new(),
+            beam_at: Vec::new(),
             gait: Vec::new(),
             gait_step: Vec::new(),
             reclaim_charge: Vec::new(),
@@ -424,6 +428,7 @@ impl Units {
         put(&mut self.prev_arm_pitch, row, [Angle::ZERO; ARM_SLOTS]);
         put(&mut self.spin, row, [[0; 4]; ROTARY_SLOTS]);
         put(&mut self.streaming, row, false);
+        put(&mut self.beam_at, row, FxVec2::ZERO);
         put(&mut self.gait, row, 0);
         put(&mut self.gait_step, row, [0; 2]);
         put(&mut self.reclaim_charge, row, 0);
@@ -541,6 +546,8 @@ impl Units {
                 acc | (self.arm_pitch[row][s].0 as u64) << ((s - 7) * 16)
             }));
             h.write_u64((self.streaming[row] as u64) | (self.shot_blocked[row] as u64) << 8);
+            h.write_i64(self.beam_at[row].x.0);
+            h.write_i64(self.beam_at[row].y.0);
             for spin in &self.spin[row] {
                 h.write_u64(spin.iter().fold(0u64, |acc, &n| acc << 16 | n as u64));
             }

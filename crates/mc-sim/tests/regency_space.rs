@@ -435,3 +435,60 @@ fn destroyers_seeker_cells_see_off_fighters() {
         .count();
     assert!(alive < 3, "the seekers killed none of the fighters");
 }
+
+#[test]
+fn destroyers_lance_drags_straight_to_the_mark_nearest_where_it_lands() {
+    let mut w = world();
+    let ship = add(&mut w, "regency_t4_space_destroyer", 0, 500, 700);
+    let first = add(&mut w, "aster_t4_assault_tank", 1, 900, 700);
+    // Nearest the beam once the first is dead, though not nearest the hull.
+    let next = add(&mut w, "aster_t4_assault_tank", 1, 900, 1300);
+    let decoy = add(&mut w, "aster_t4_assault_tank", 1, 100, 700);
+    for t in [first, next, decoy] {
+        w.state.units.flags[t] |= flag::PASSIVE;
+        w.state.units.health[t] = Fx::from_int(500000);
+    }
+    let blueprint = w.state.units.blueprint[ship];
+    let (id, first_id) = (w.state.units.id(ship), w.state.units.id(first));
+    w.tick(&[cmd(Command::Attack {
+        units: vec![id],
+        target: first_id,
+        queue: false,
+    })])
+    .unwrap();
+    ticks(&mut w, 120);
+    w.tick(&[cmd(Command::Stop { units: vec![id] })]).unwrap();
+    let row = w.state.units.row(first_id).unwrap();
+    w.state.units.health[row] = Fx::ZERO;
+    let (a, b) = (w.state.units.pos[first], w.state.units.pos[next]);
+    let mut strayed = Fx::ZERO;
+    let mut arrived = false;
+    for _ in 0..120 {
+        w.tick(&[]).unwrap();
+        for event in &w.events {
+            if let SimEvent::Impact {
+                pos,
+                blueprint: bl,
+                weapon: 0,
+                ..
+            } = event
+            {
+                if *bl == blueprint {
+                    // Off the line from the dead mark to the next: a straight drag stays on it.
+                    let along = b - a;
+                    let off = (pos.xy() - a).cross(along).abs() / along.length();
+                    strayed = strayed.max(off);
+                    arrived |= pos.xy().distance(b) < Fx::from_int(20);
+                }
+            }
+        }
+    }
+    assert!(
+        arrived,
+        "the lance never reached the mark nearest where it landed"
+    );
+    assert!(
+        strayed < Fx::from_int(30),
+        "the drag bowed {strayed} m off the line"
+    );
+}

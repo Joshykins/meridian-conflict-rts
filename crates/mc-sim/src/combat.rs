@@ -822,14 +822,32 @@ impl World {
                         } else {
                             Fx::ZERO
                         };
-                        let from = units.pos[row]
-                            + FxVec2::new(Fx::ZERO, side)
-                                .rotate(units.heading[row] + units.weapon_yaw[row][0]);
+                        // A held beam still streaming takes the foe nearest where it lands,
+                        // so it drags the shortest way on, not back across the field to
+                        // whatever stands nearest the hull.
+                        let dragging = weapon.beam && units.streaming[row];
+                        let from = if dragging {
+                            units.beam_at[row]
+                        } else {
+                            units.pos[row]
+                                + FxVec2::new(Fx::ZERO, side)
+                                    .rotate(units.heading[row] + units.weapon_yaw[row][0])
+                        };
+                        // Searched round the stroke, its reach still the gun's
+                        // (`is_valid_target`): anything in reach lies within twice it.
+                        let around = if dragging {
+                            from.distance(units.pos[row])
+                        } else {
+                            Fx::ZERO
+                        };
                         let in_grid = |prefer: u32| {
                             this.index
                                 .nearest_foe(
                                     from,
-                                    weapon.range_max + this.gun_offset(row, weapon) + side.abs(),
+                                    weapon.range_max
+                                        + this.gun_offset(row, weapon)
+                                        + side.abs()
+                                        + around,
                                     // A torpedo also takes a walker on the seabed.
                                     if weapon.torpedo {
                                         kind::UNIT
@@ -1854,6 +1872,9 @@ impl World {
         if units.weapon_salvo_left[row][w] == 0 {
             units.weapon_salvo_left[row][w] = weapon.salvo;
         }
+        // Whether it was already streaming before this shot: a held beam walks on from
+        // where it last landed (`Units::beam_at`).
+        let streamed = units.streaming[row];
         if weapon.sweep > 0 && !weapon.missile {
             units.streaming[row] = true;
         }
@@ -1902,12 +1923,29 @@ impl World {
                     .turret_at
                     .map_or(FxVec2::ZERO, |at| at.rotate(units.heading[row]));
             let down = root + FxVec2::from_angle(facing) * root.distance(aim);
+            // A held beam's stroke walks over the ground in a straight line from where it
+            // last landed onto its mark, as fast as its gun's traverse would carry it at
+            // that reach (never under a third of its range): turning the barrel at the
+            // mark's own distance swung it round in a circle, a tight one under the hull
+            // for a mark close below, where it seemed to fire straight down.
+            let down = if weapon.beam && streamed {
+                let from = units.beam_at[row];
+                let reach = root.distance(from).max(weapon.range_max / 3);
+                // The traverse a tick, as ground at that reach: turns of 0x10000 steps.
+                let step = (reach * weapon.turret_turn as i32).mul_div(710, 113 * 0x10000);
+                from + (aim - from).clamp_length(step)
+            } else {
+                down
+            };
             let off_mark = weapon.beam && down.distance(aim) > t.radius;
             let z = if off_mark {
                 self.terrain.height_at(down).max(self.terrain.water_level())
             } else {
                 aim_z
             };
+            if weapon.beam {
+                units.beam_at[row] = if off_mark { down } else { aim };
+            }
             (down, z)
         } else {
             (aim, aim_z)
