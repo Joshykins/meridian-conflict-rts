@@ -62,7 +62,7 @@ mod naval;
 mod naval_arms;
 pub mod nukes;
 mod orbit;
-mod orbs;
+pub mod orbs;
 pub mod orders;
 pub mod pause;
 pub mod perf;

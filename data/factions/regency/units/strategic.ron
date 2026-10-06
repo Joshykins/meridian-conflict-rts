@@ -106,22 +106,25 @@
         sounds: (death: "blast_large"),
     ),
     (
-        // The Regency's area defence: a tall plated spire that makes plasma orbs and holds
-        // them floating round it in the air, four at a time, up to twenty (five batches),
-        // so a quiet hour stores a whole barrage. When anything comes into reach the orbs
-        // tear loose from the top down and go over as red streaks, each on an arc of its
-        // own height (`loft_scatter`) from its own place round the spire, and come down
-        // wide of the mark (`spread`), each melting the ground in a pool and bursting in
-        // plasma. It shells anything that is not a submerged boat: structures, land
-        // units, ships, and aircraft too, which it catches in the streaks' proximity burst
-        // as they fall. The orbs are the weapon's `muzzles`, the model's own numbers; slot
-        // 0 is the lowest ring, a batch is a ring of four (`mc_sim::orbs`).
+        // The Regency's area defence: a tall plated spire that makes plasma orbs, small red
+        // flecks, and keeps them drifting round its shaft in the air like fireflies, eight
+        // at a time, up to thirty-two (four batches), so a quiet minute stores a whole
+        // barrage. When anything comes into reach the flecks go out at it one after
+        // another, each leaving from wherever it floats, and home on it: they are fast and
+        // very accurate, they take another foe when their mark dies, and a fleck with
+        // nothing left to hit flies back to the spire and rejoins the store. It shoots
+        // anything that is not a submerged boat: structures, land units, ships and, above
+        // all, aircraft, which dodge a lobbed shell but not a fleck that turns with them.
+        // Each melts a small pool of ground and bursts in plasma. The flecks' homes are
+        // the weapon's `muzzles` (the places they drift about, `mc_sim::orbs::place`); the
+        // model has no cradles for them, they are light drawn by the renderer.
         //
-        // Balance: it is a T4 that holds the line, not one that breaks it. 20 orbs of 700
-        // is 14000 stored; made at one batch (2800) every 7 s it sustains 400 a second,
-        // against the Springald's 560, but it can spend all of it in two seconds on whatever
-        // walks into 1700 m. The scatter wastes much of it on a single mark and none of it
-        // on a mass; the spire can't shoot at anything inside 80 m.
+        // Balance: it is a T4 that holds the line, not one that breaks it. A fleck is 200;
+        // a batch of eight every 4 s sustains 400 a second, against the Springald's 560,
+        // and the full store, 6400, goes out in under two seconds on whatever walks into
+        // 1700 m. Because the flecks home, nearly all of it lands: on one mark it is far
+        // more than lobbed shells of the same weight were, and it can't be outrun or dodged
+        // by air. The spire can't shoot at anything inside 80 m.
         //
         // Model: `regency_carillon` (`models::regency::carillon`), authored at this size.
         key: "regency_t4_area_defense",
@@ -135,24 +138,27 @@
         vision: 450, radar: 900,
         economy: (energy_upkeep: 30),
         weapons: [(
-            name: "Plasma Orb Battery",
-            damage: 700, splash: 36, proximity: 16, range_min: 80, range: 1700, reload: 2.0, speed: 520,
-            trajectory: Ballistic, loft: 1.0, loft_scatter: 3.5,
-            spread: 2.5,
-            salvo: 20, salvo_delay: 0.1,
-            orbs: 4, orb_time: 7.0,
-            turret_turn: 0, arc: 360, muzzle: (11.5, 0, 56),
+            name: "Plasma Fleck Battery",
+            damage: 200, splash: 14, proximity: 7, range_min: 80, range: 1700, reload: 1.0, speed: 420,
+            trajectory: Direct,
+            spread: 12,
+            salvo: 32, salvo_delay: 0.05,
+            orbs: 8, orb_time: 4.0,
+            turret_turn: 0, arc: 360, muzzle: (11.5, 0, 40),
             muzzles: [
-                (11.5, 0, 20), (0, 11.5, 20), (-11.5, 0, 20), (0, -11.5, 20),
-                (10.62, 4.4, 29), (-4.4, 10.62, 29), (-10.62, -4.4, 29), (4.4, -10.62, 29),
-                (8.13, 8.13, 38), (-8.13, 8.13, 38), (-8.13, -8.13, 38), (8.13, -8.13, 38),
-                (4.4, 10.62, 47), (-10.62, 4.4, 47), (-4.4, -10.62, 47), (10.62, -4.4, 47),
-                (0, 11.5, 56), (-11.5, 0, 56), (0, -11.5, 56), (11.5, 0, 56),
+                (11.00, 0.00, 18.0), (-9.95, 9.12, 36.2), (1.39, -15.94, 54.4), (7.46, 9.72, 27.8),
+                (-14.53, -2.56, 46.0), (9.28, -5.91, 19.4), (-3.49, 13.04, 37.6), (-7.39, -14.19, 55.8),
+                (11.51, 4.19, 29.2), (-13.63, 5.64, 47.4), (4.65, -9.97, 20.8), (4.06, 12.88, 39.0),
+                (-13.86, -8.00, 57.2), (11.96, -2.65, 30.6), (-8.46, 12.08, 48.8), (-1.44, -10.91, 22.2),
+                (10.34, 8.68, 40.4), (-15.98, 0.70, 58.6), (8.66, -8.66, 32.0), (-0.64, 14.74, 50.2),
+                (-7.07, -8.43, 23.6), (13.38, 1.76, 41.8), (-13.11, 9.18, 60.0), (2.65, -11.96, 33.4),
+                (7.38, 12.77, 51.6), (-10.49, -3.31, 25.0), (12.24, -5.71, 43.2), (-6.12, 14.78, 61.4),
+                (-4.19, -11.51, 34.8), (13.08, 6.81, 53.0), (-10.63, 2.85, 26.4), (7.25, -11.39, 44.6),
             ],
             targets: ["Air", "Land", "Naval", "Structure"],
             color: Orange, red: 1.0,
-            plasma_grade: Some(Pinched), melt: 1.4,
-            flash: 1.0, impact: 1.8, tracer: 1.2, streak: 4.0, wake: 4.0,
+            plasma_grade: Some(Pinched), melt: 0.6,
+            flash: 0.4, impact: 0.8, tracer: 0.5, streak: 1.6, wake: 1.5,
             sounds: (
                 fire: "regency_carillon_fire", make: "regency_carillon_make",
                 impact: "regency_carillon_hit", ground: "regency_carillon_hit",

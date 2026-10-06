@@ -1,11 +1,12 @@
-//! The Carillon's orbs (`Weapon::orbs`, `mc_sim::orbs`): plasma held floating round the
-//! spire, one at each of the weapon's `muzzles` the sim says is held (`status[2]`, a bit a
-//! slot). Drawn as light, never as mesh: each tick lays every held orb as a ball of red
-//! plasma round a hot pink heart in a faint halo, bobbing a little and drifting in a slow
-//! circle about its place, each out of step with the next.
+//! The Carillon's orbs (`Weapon::orbs`, `mc_sim::orbs`): flecks of plasma held floating
+//! round the spire like fireflies, one for each slot of the weapon's `muzzles` the sim
+//! says is held (`status[2]`, a bit a slot). Drawn as light, never as mesh: each tick lays
+//! every held orb as a small red fleck round a hot pink heart in a faint halo, at the
+//! place the sim says it floats (`mc_sim::orbs::place`, so a shot leaves from the orb that
+//! is drawn), carrying its drift as velocity so it moves smoothly between ticks.
 //!
-//! A batch the sim has just made (bits that came on since last tick) forms: the four
-//! balls swell out of nothing over a second, a white flash where each opens and motes of
+//! A batch the sim has just made (bits that came on since last tick) forms: the flecks
+//! swell out of nothing over a second, a white flash where each opens and motes of
 //! plasma drawn in from round it. An orb let go simply is not drawn any more: its shot
 //! leaves the same place (`regency_guns_fx`, `regency_trails`).
 //!
@@ -15,6 +16,7 @@
 use std::collections::HashMap;
 
 use glam::Vec3;
+use mc_core::FxVec3;
 use mc_sim::mirror::{UnitInstance, KIND_GHOST, KIND_WRECK, STATE_RADAR};
 
 use super::regency_guns_fx::{GLOW, HOT, MOTE, RED, WHITE};
@@ -24,7 +26,7 @@ use crate::gpu_consts::puff;
 
 const ORB: f32 = puff::PLASMA_ORB as f32;
 /// Metres across a full-grown orb's ball (the quad holds its corona too).
-const ACROSS: f32 = 7.5;
+const ACROSS: f32 = 2.6;
 /// Seconds a new orb takes to swell to full size.
 const GROW: f32 = 1.1;
 /// Seconds a mote takes to reach the orb it is drawn into, and the share of its birth
@@ -45,26 +47,30 @@ struct Held {
 /// Each blueprint's orb places (`None`: it holds none), and the orbs each spire held last tick.
 #[derive(Default)]
 pub(super) struct OrbFx {
-    places: Vec<Option<Vec<[f32; 3]>>>,
+    places: Vec<Option<Vec<FxVec3>>>,
     held: HashMap<u32, Held>,
     tick: u64,
 }
 
 impl Renderer {
     /// Once a sim tick: lays every spire's orbs.
-    pub(super) fn orb_tick(&mut self, units: &[UnitInstance], time: f32, camera: &Camera) {
+    pub(super) fn orb_tick(
+        &mut self,
+        units: &[UnitInstance],
+        sim_tick: u32,
+        time: f32,
+        camera: &Camera,
+    ) {
         if self.orb_fx.places.is_empty() {
             self.orb_fx.places = self
                 .blueprints
                 .units
                 .iter()
                 .map(|bp| {
-                    bp.weapons.iter().find(|w| w.orbs > 0).map(|w| {
-                        w.muzzles
-                            .iter()
-                            .map(|m| m.to_f32())
-                            .collect::<Vec<[f32; 3]>>()
-                    })
+                    bp.weapons
+                        .iter()
+                        .find(|w| w.orbs > 0)
+                        .map(|w| w.muzzles.clone())
                 })
                 .collect();
         }
@@ -119,20 +125,19 @@ impl Renderer {
                 drawn += 1;
                 let grow = smooth((time - born[k]) / GROW);
                 let phase = k as f32 * 1.713 + u.unit_id as f32 * 0.37;
-                // Bobbing, and drifting in a slow circle about its place.
-                let bob = (time * 1.1 + phase).sin() * 0.7;
-                let drift = Vec3::new(
-                    (time * 0.6 + phase).cos() * 0.5,
-                    (time * 0.6 + phase).sin() * 0.5,
-                    bob,
-                );
-                let centre = at + Vec3::new(p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]) + drift;
+                // Where the sim has it floating now, and where it will be a tick on.
+                let float = |tick: u32| {
+                    let o = mc_sim::orbs::place(*p, k, tick).to_f32();
+                    Vec3::new(o[0] * c - o[1] * s, o[0] * s + o[1] * c, o[2])
+                };
+                let centre = at + float(sim_tick);
+                let drift = (float(sim_tick + 1) - float(sim_tick)) / self.tick_seconds.max(0.01);
                 let size = ACROSS * grow;
                 let breath = 1.0 + 0.12 * (time * 3.1 + phase * 2.0).sin();
                 self.push_lit(
                     GLOW,
                     centre,
-                    Vec3::ZERO,
+                    drift,
                     time,
                     life,
                     (size * 1.9, size * 1.9),
@@ -142,7 +147,7 @@ impl Renderer {
                 self.push_lit(
                     ORB,
                     centre,
-                    Vec3::ZERO,
+                    drift,
                     time,
                     life,
                     (size * breath, size * breath * 1.04),
@@ -152,7 +157,7 @@ impl Renderer {
                 self.push_lit(
                     ORB,
                     centre,
-                    Vec3::ZERO,
+                    drift,
                     time,
                     life,
                     (size * 0.42, size * 0.42),

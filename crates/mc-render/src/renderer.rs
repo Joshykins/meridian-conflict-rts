@@ -3331,7 +3331,7 @@ impl Renderer {
         self.gravitic_tick(projectiles, time);
         self.excavation_tick(units, time, camera);
         self.star_core_tick(units, time, camera);
-        self.orb_tick(units, time, camera);
+        self.orb_tick(units, frame.tick, time, camera);
         self.nanite_repair_tick(frame, time, camera);
         self.elevator_tick(units, &frame.events, time, camera);
         self.lance_core_tick(units, time, camera);

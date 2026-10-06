@@ -76,14 +76,15 @@ Off the lines, measured the same way:
   shot is drawn as three strands wound round each other but is one shot and strikes once
   (`Weapon::braid`), so a dome takes it as it takes a Culverin shell.
 - The Regency's Carillon (T4 area defence, 6500 mass, 26000 HP, 30 energy/s upkeep) is
-  a store of damage, not a rate of it: it makes four plasma orbs every 7 s and holds up
-  to twenty (`Weapon::orbs`, `orb_time`), so a quiet 35 s stores 14000 damage (700 each
-  in 36 m), and spends it from the top ring down in two seconds on whatever comes into
-  80-1700 m: land, ships, structures and aircraft (the shells' 16 m proximity burst
-  catches them as they fall), never a submerged boat. Each shell goes over on its own
-  arc (`loft_scatter`) and lands up to 2.5 degrees wide (`spread`), so on one mark most
-  of a barrage is wasted and on a mass none is. Once empty it fires each batch as it
-  forms, 400 a second.
+  a store of damage, not a rate of it: it makes eight plasma flecks every 4 s and holds
+  up to thirty-two (`Weapon::orbs`, `orb_time`), drifting round the spire like fireflies,
+  so a quiet 16 s stores 6400 damage (200 each in 14 m), and spends it in under two
+  seconds on whatever comes into 80-1700 m: land, ships, structures and aircraft, never
+  a submerged boat. Flecks fly straight at 420 m/s and home on their mark with a lead
+  (`mc_sim::orbs`): a mark that dies hands them to the nearest foe in reach, and with
+  none they fly home and rejoin the store. They almost never miss, so on one mark it is
+  far more than the lobbed shells it replaced, and aircraft can't dodge it. Once empty
+  it fires each batch as it forms, 400 a second.
 
 ## Air and anti-air
 

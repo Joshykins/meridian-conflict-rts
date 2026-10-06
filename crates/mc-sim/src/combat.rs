@@ -2025,7 +2025,8 @@ impl World {
                 if units.orb_stock[row] == 0 {
                     units.weapon_salvo_left[row][w] = 0;
                 }
-                weapon.muzzles[units.orb_stock[row] as usize]
+                let slot = units.orb_stock[row] as usize;
+                crate::orbs::place(weapon.muzzles[slot], slot, self.state.tick)
             } else if weapon.muzzles.is_empty() {
                 weapon.muzzle
             } else {
@@ -2242,24 +2243,23 @@ impl World {
                         let dir = delta.extend(aim_z - muzzle.z).normalize();
                         (
                             dir * step,
-                            (delta
-                                .extend(aim_z - muzzle.z)
-                                .length()
-                                .max(weapon.range_max)
-                                * Fx::ratio(13, 10)
-                                / step)
-                                .ceil_int()
-                                + 2,
+                            if weapon.orbs > 0 {
+                                // Homing flecks stay up until they strike or are home (`orbs.rs`).
+                                crate::orbs::FLIGHT_TICKS
+                            } else {
+                                (delta
+                                    .extend(aim_z - muzzle.z)
+                                    .length()
+                                    .max(weapon.range_max)
+                                    * Fx::ratio(13, 10)
+                                    / step)
+                                    .ceil_int()
+                                    + 2
+                            },
                         )
                     }
                     Trajectory::Ballistic => {
-                        // Each shell of a scattering gun goes over on an arc of its own.
-                        let scatter = if weapon.loft_scatter_ticks > 0 {
-                            self.state.rng.below(weapon.loft_scatter_ticks as u32 + 1) as i32
-                        } else {
-                            0
-                        };
-                        let n = ballistic_ticks(dist, weapon) + scatter;
+                        let n = ballistic_ticks(dist, weapon);
                         let drop = GRAVITY * (n * (n + 1) / 2);
                         let vz = (aim_z - muzzle.z + drop) / n;
                         (

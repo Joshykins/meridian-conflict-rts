@@ -1,15 +1,73 @@
 //! Orb batteries (`Weapon::orbs`, the Regency's Carillon): a gun that makes plasma orbs a
 //! batch at a time while it stands idle and holds them, up to one for each of its
-//! muzzles, until something comes into reach. Each shot spends an orb and leaves from
-//! the muzzle where that orb floated, so the stored orbs are stored damage: a battery
-//! that has waited long enough empties its whole store onto the field in one salvo.
+//! muzzles, until something comes into reach. The orbs drift round the spire like
+//! fireflies, each about its muzzle's place (`place`). Each shot spends an orb and leaves
+//! from where that orb floats, so the stored orbs are stored damage: a battery that has
+//! waited long enough empties its whole store onto the field in one salvo.
+//!
+//! A shot is a fleck of plasma that flies straight and homes on its mark. When the mark
+//! dies it takes the nearest foe the spire could still shoot, and when there is none it
+//! flies home and is taken back into the store (`steer_orb_shots`).
 //!
 //! The store is `Units::orb_stock`, filled from slot 0 up and spent from the top slot
 //! down, so a batch is the next `orbs` slots and the renderer is told which slots are
 //! held (`UnitInstance::status[2]`, `World::held_orbs`).
 
+use crate::spatial::kind;
+use crate::tables::{flag, UnitId};
 use crate::{SimEvent, World};
+use mc_core::{Angle, Fx, FxVec2, FxVec3, TICKS_PER_SECOND};
 use mc_data::Weapon;
+
+const DT: i32 = TICKS_PER_SECOND as i32;
+/// Ticks a fleck stays up (25 s) before it gutters out: a cap on a shot that can neither
+/// reach a mark nor find its way home (its spire is gone).
+pub(crate) const FLIGHT_TICKS: i32 = 25 * DT;
+/// Share of the way to its wanted heading a fleck turns each tick, as a fraction.
+const TURN: Fx = Fx::ratio(2, 5);
+/// Metres from its spire's axis inside which a returning fleck is taken back in.
+const HOME_REACH: Fx = Fx::from_int(14);
+/// How far past the gun's range a fleck chases a mark before it gives it up, as a
+/// fraction of the range.
+const LEASH: Fx = Fx::ratio(5, 4);
+
+/// Where the orb in slot `slot`, whose place is `home` (the weapon's muzzle, in the
+/// spire's own frame), floats at sim tick `tick`: round the axis at a pace of its own, a
+/// little off its path and bobbing. Integer maths only; the renderer draws the same place
+/// (`orb_fx.rs`), so a shot leaves from the orb the player sees.
+pub fn place(home: FxVec3, slot: usize, tick: u32) -> FxVec3 {
+    let slot = slot as u32;
+    let pace = 30 + slot * 13 % 50;
+    let swing = tick.wrapping_mul(pace) as u16;
+    let start = (slot as u16).wrapping_mul(2039);
+    let round = Angle(if slot % 2 == 0 {
+        start.wrapping_add(swing)
+    } else {
+        start.wrapping_sub(swing)
+    });
+    let wander = Angle(
+        (tick.wrapping_mul(23 + slot * 5 % 17) as u16)
+            .wrapping_add((slot as u16).wrapping_mul(5003)),
+    );
+    let bob = Angle(
+        (tick.wrapping_mul(17 + slot % 7 * 3) as u16)
+            .wrapping_add((slot as u16).wrapping_mul(3001)),
+    );
+    let xy = home.xy().rotate(round)
+        + FxVec2::new(wander.sin() * 3, wander.cos() * 3)
+        + home.xy().rotate(round) * (bob.cos() / 6);
+    xy.extend(home.z + bob.sin() * 4)
+}
+
+/// What one fleck does this tick.
+struct Steer {
+    shot: usize,
+    target: UnitId,
+    /// Where it turns toward; `None` flies straight on.
+    wants: Option<FxVec3>,
+    /// Home and taken back in.
+    absorbed: bool,
+}
 
 impl World {
     /// The orb battery among `row`'s weapons, with its slot.
@@ -46,6 +104,111 @@ impl World {
                 weapon: slot as u8,
                 held,
             });
+        }
+    }
+
+    /// Turns every orb shot onto its mark: a unit it homes on with a lead while that
+    /// stands and is in reach, else the nearest foe the spire could shoot, else the spire
+    /// itself, where it is taken back into the store. Shots of a spire that is gone fly on
+    /// until they gutter out.
+    pub(crate) fn steer_orb_shots(&mut self) {
+        let blueprints = self.blueprints.clone();
+        let mut steers: Vec<Steer> = Vec::new();
+        let units = &self.state.units;
+        let p = &self.state.projectiles;
+        for i in 0..p.len() {
+            let weapon = &blueprints.unit(p.blueprint[i]).weapons[p.weapon[i] as usize];
+            if weapon.orbs == 0 {
+                continue;
+            }
+            let step = weapon.projectile_speed / DT;
+            let owner = p.owner[i];
+            let at = p.pos[i];
+            let spire = units
+                .row(p.source[i])
+                .filter(|&s| units.health[s] > Fx::ZERO);
+            // The gun's own place, or the shot's if the gun is gone, is what reach is from.
+            let centre = spire.map_or(at.xy(), |s| units.pos[s]);
+            let leash = weapon.range_max * LEASH;
+            let holds = |t: usize| {
+                units.health[t] > Fx::ZERO
+                    && !units.has_flag(t, flag::IN_FACTORY)
+                    && self.weapon_reaches(t, weapon)
+                    && units.pos[t].distance_sq(centre) <= leash * leash
+            };
+            let mut target = units.row(p.target[i]).filter(|&t| holds(t));
+            if target.is_none() {
+                let mut best: Option<(Fx, usize)> = None;
+                self.index.query_foes(
+                    centre,
+                    weapon.range_max,
+                    kind::UNIT,
+                    self.team_mask(owner),
+                    |e| {
+                        let t = e.row as usize;
+                        if !self.unit_entry_is_current(e)
+                            || !holds(t)
+                            || !self.are_enemies(owner, units.owner[t])
+                            || !self.detects(owner, t)
+                        {
+                            return true;
+                        }
+                        let off = units.pos[t].distance_sq(at.xy());
+                        if best.is_none_or(|(s, _)| off < s) {
+                            best = Some((off, t));
+                        }
+                        true
+                    },
+                );
+                target = best.map(|(_, t)| t);
+            }
+            let (wants, absorbed) = if let Some(t) = target {
+                let aim = units.pos[t].extend(units.z[t] + self.bp(t).height / 2);
+                let moving =
+                    (units.pos[t] - units.prev_pos[t]).extend(units.z[t] - units.prev_z[t]);
+                let lead = ((aim - at).length() / step).min(Fx::from_int(20));
+                (Some(aim + moving * lead - at), false)
+            } else if let Some(s) = spire {
+                let home = units.pos[s].extend(units.z[s] + self.bp(s).height / 2);
+                let near = units.pos[s].distance_sq(at.xy()) <= HOME_REACH * HOME_REACH;
+                (Some(home - at), near)
+            } else {
+                (None, false)
+            };
+            steers.push(Steer {
+                shot: i,
+                target: target.map_or(UnitId::NONE, |t| units.id(t)),
+                wants,
+                absorbed,
+            });
+        }
+        let mut gone = Vec::new();
+        for s in steers {
+            let i = s.shot;
+            self.state.projectiles.target[i] = s.target;
+            if s.absorbed {
+                gone.push(i);
+                let source = self.state.projectiles.source[i];
+                if let Some(row) = self.state.units.row(source) {
+                    let cap = self.orb_battery(row).map_or(0, |(_, w)| w.muzzles.len());
+                    // A store with no room takes nothing back: the fleck dissolves.
+                    if (self.state.units.orb_stock[row] as usize) < cap {
+                        self.state.units.orb_stock[row] += 1;
+                    }
+                }
+                continue;
+            }
+            let Some(wants) = s.wants else { continue };
+            let vel = self.state.projectiles.vel[i];
+            let speed = vel.length();
+            let dir = (vel.normalize() * (Fx::ONE - TURN) + wants.normalize() * TURN).normalize();
+            if dir != FxVec3::ZERO {
+                self.state.projectiles.aim[i] = dir;
+                self.state.projectiles.vel[i] = dir * speed;
+            }
+        }
+        for i in gone.into_iter().rev() {
+            self.state.projectiles.swap_remove(i);
         }
     }
 

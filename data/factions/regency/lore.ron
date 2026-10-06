@@ -30,9 +30,9 @@
         },
     ),
     "regency_t4_area_defense": (
-        lore: "A spire that never stops making fire. It gathers plasma out of the air into orbs and holds them floating round its shaft, a ring at a time, for as long as the peace lasts; when the sky or the ground fills, it lets them all go at once.",
+        lore: "A spire that never stops making fire. It gathers plasma out of the air into orbs and holds them drifting round its shaft like fireflies, a batch at a time, for as long as the peace lasts; when the sky or the ground fills, it lets them all go at once.",
         weapons: {
-            "Plasma Orb Battery": "Orbs of red plasma, stored in rings round the spire and loosed from the top down, each streaking over on its own arc to come down wide of the mark, melt the ground and burst.",
+            "Plasma Fleck Battery": "Red flecks of plasma, drifting round the spire until something comes in reach, then loosed in a stream. Each turns with its mark, takes another when the first falls and flies home when none is left, melting the ground where it bursts.",
         },
     ),
     "regency_t3_artillery": (

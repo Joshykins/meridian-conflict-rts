@@ -161,7 +161,7 @@ const ARMY: &[(&str, u16, i32, i32)] = &[
     // runs over it (`stand_off.rs`).
     ("regency_t2_strike_drone", 2, 1300, 350),
     // The Regency orb battery: orbs stored in batches, spent one a shot on arcs of random
-    // height (`orbs.rs`, `Weapon::loft_scatter`); the store is mid-way at the snapshot.
+    // height (`orbs.rs`); the store is mid-way at the snapshot.
     ("regency_t4_area_defense", 1, 1700, 600),
 ];
 

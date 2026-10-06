@@ -187,12 +187,11 @@ pub struct Weapon {
     /// Cosmetic: not in the content hash.
     pub braid: u8,
     /// An orb battery (`RawWeapon::orbs`): orbs made each batch. Zero: an ordinary gun.
-    /// The most it holds is its muzzles, one orb at each.
+    /// The most it holds is its muzzles, one orb at each: the places they drift about.
+    /// Its shots home on their mark (`mc_sim::orbs`).
     pub orbs: u8,
     /// Ticks between an orb battery's batches.
     pub orb_ticks: u16,
-    /// Most extra ticks a lobbed shell is kept up, at random for each shot.
-    pub loft_scatter_ticks: u16,
     /// Metres behind the muzzle where spent casings are thrown out, one per round.
     /// Zero: none. Cosmetic: not in the content hash.
     pub casings: f32,

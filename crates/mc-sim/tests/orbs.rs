@@ -1,7 +1,7 @@
 //! The Carillon, the Regency's orb battery: it makes plasma orbs a batch at a time while
-//! idle and holds up to five batches, spends one orb a shot from the top slot down when
-//! something comes into reach, lobs each on an arc of its own height, and reaches land,
-//! sea, structures and aircraft but not a submerged boat.
+//! idle and holds up to four batches, spends one orb a shot when something comes into
+//! reach, and sends each as a fleck that homes on its mark, takes another when the mark
+//! dies and flies home to the store when there is none.
 
 use mc_core::{Angle, Fx, FxVec2};
 use mc_data::Blueprints;
@@ -66,13 +66,13 @@ fn stock(w: &World, spire: UnitId) -> u8 {
 }
 
 #[test]
-fn it_makes_a_batch_at_a_time_and_holds_five() {
+fn it_makes_a_batch_at_a_time_and_holds_four() {
     let mut w = world();
     let spire = spawn(&mut w, SPIRE, 0, AT);
     let bp = w.blueprints.id_of(SPIRE).unwrap();
     let weapon = &w.blueprints.unit(bp).weapons[0];
     let (batch, period, cap) = (weapon.orbs, weapon.orb_ticks as u32, weapon.muzzles.len());
-    assert_eq!(cap, 5 * batch as usize, "it holds five batches");
+    assert_eq!(cap, 4 * batch as usize, "it holds four batches");
     run(&mut w, period - 1);
     assert_eq!(
         stock(&w, spire),
@@ -85,7 +85,7 @@ fn it_makes_a_batch_at_a_time_and_holds_five() {
     assert_eq!(
         stock(&w, spire) as usize,
         cap,
-        "the store stops at five batches"
+        "the store stops at four batches"
     );
     let mut frame = RenderFrame::default();
     w.write_render_frame(None, &mut frame);
@@ -94,46 +94,78 @@ fn it_makes_a_batch_at_a_time_and_holds_five() {
         .iter()
         .find(|u| u.unit_id == spire.0)
         .map(|u| u.status[2]);
-    assert_eq!(held, Some((1u32 << cap) - 1), "every slot is told held");
+    assert_eq!(
+        held,
+        Some(u32::MAX >> (32 - cap)),
+        "every slot is told held"
+    );
 }
 
-#[test]
-fn a_full_store_goes_over_on_arcs_of_different_heights() {
-    let mut w = world();
-    let spire = spawn(&mut w, SPIRE, 0, AT);
+/// Flecks in the air.
+fn flecks(w: &World) -> usize {
+    w.state.projectiles.len()
+}
+
+fn full_spire(w: &mut World) -> UnitId {
+    let spire = spawn(w, SPIRE, 0, AT);
     let period = w
         .blueprints
         .unit(w.blueprints.id_of(SPIRE).unwrap())
         .weapons[0]
         .orb_ticks;
-    run(&mut w, period as u32 * 5 + 1);
+    run(w, period as u32 * 4 + 1);
+    spire
+}
+
+#[test]
+fn flecks_home_on_an_aircraft() {
+    let mut w = world();
+    let spire = full_spire(&mut w);
+    let full = stock(&w, spire);
+    let plane = spawn(&mut w, "aster_t1_interceptor", 1, (AT.0, AT.1 + 800));
+    run(&mut w, 120);
+    assert!(stock(&w, spire) < full, "orbs were spent");
+    let hurt = w.state.units.row(plane).is_none_or(|r| {
+        w.state.units.health[r] < w.blueprints.unit(w.state.units.blueprint[r]).health
+    });
+    assert!(hurt, "the flecks caught the aircraft");
+}
+
+#[test]
+fn flecks_take_another_mark_when_theirs_dies() {
+    let mut w = world();
+    let spire = full_spire(&mut w);
+    let first = spawn(&mut w, "aster_t1_tank", 1, (AT.0 + 900, AT.1));
+    let second = spawn(&mut w, "aster_t1_tank", 1, (AT.0 + 900, AT.1 + 150));
+    run(&mut w, 8);
+    assert!(flecks(&w) > 0, "flecks are in the air");
+    let row = w.state.units.row(first).unwrap();
+    w.state.units.health[row] = Fx::ZERO;
+    w.tick(&[]).unwrap();
+    w.tick(&[]).unwrap();
+    let on_second = (0..w.state.projectiles.len())
+        .filter(|&i| w.state.projectiles.target[i] == second)
+        .count();
+    assert!(on_second > 0, "flecks went on to the other tank");
+    assert!(w.state.units.row(spire).is_some());
+}
+
+#[test]
+fn flecks_with_no_mark_left_return_to_the_spire() {
+    let mut w = world();
+    let spire = full_spire(&mut w);
     let full = stock(&w, spire);
     let tank = spawn(&mut w, "aster_t1_tank", 1, (AT.0 + 900, AT.1));
-    let plane = spawn(&mut w, "aster_t1_interceptor", 1, (AT.0, AT.1 + 800));
-    // Each shell's whole flight, in ticks: what it has flown and what it has left.
-    let (mut fired, mut flights) = (0, std::collections::BTreeSet::new());
-    for _ in 0..60 {
-        w.tick(&[]).unwrap();
-        fired += w
-            .events
-            .iter()
-            .filter(|e| matches!(e, mc_sim::SimEvent::ShotFired { .. }))
-            .count();
-        let p = &w.state.projectiles;
-        for i in 0..p.len() {
-            flights.insert(p.age[i] as u32 + p.ticks_left[i] as u32);
-        }
-    }
-    assert!(stock(&w, spire) < full, "orbs were spent");
-    assert!(fired >= 8, "a salvo of orbs went up: {fired}");
-    let (lo, hi) = (*flights.first().unwrap(), *flights.last().unwrap());
-    assert!(hi > lo + 5, "arcs of different heights: {lo}..{hi} ticks");
-    // The last shells land.
-    run(&mut w, 150);
-    let hurt = |id: UnitId| {
-        w.state.units.row(id).is_none_or(|r| {
-            w.state.units.health[r] < w.blueprints.unit(w.state.units.blueprint[r]).health
-        })
-    };
-    assert!(hurt(tank) || hurt(plane), "something was hit");
+    run(&mut w, 8);
+    let spent = stock(&w, spire);
+    assert!(spent < full && flecks(&w) > 0);
+    let row = w.state.units.row(tank).unwrap();
+    w.state.units.health[row] = Fx::ZERO;
+    run(&mut w, 400);
+    assert_eq!(flecks(&w), 0, "no fleck is left flying");
+    assert!(
+        stock(&w, spire) > spent,
+        "the flecks went back into the store: {} of {full}",
+        stock(&w, spire)
+    );
 }

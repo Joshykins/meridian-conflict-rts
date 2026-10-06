@@ -40,6 +40,7 @@ impl World {
         self.steer_torpedoes();
         self.steer_interceptors();
         self.steer_curving_shots();
+        self.steer_orb_shots();
         self.split_cluster_shots()?;
         drop(span);
         let span = mc_core::perf_span!("shots.sweep");
