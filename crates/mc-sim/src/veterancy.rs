@@ -38,9 +38,10 @@ impl World {
 
     pub(crate) fn run_regen(&mut self) {
         for row in self.state.units.slots.iter() {
+            // Regen waits out a tick the unit was hit in, unless it is nanites at work.
             if !self.state.units.is_active(row)
                 || self.state.units.health[row] <= Fx::ZERO
-                || self.state.units.has_flag(row, flag::HURT)
+                || (self.state.units.has_flag(row, flag::HURT) && !self.bp(row).nanite_regen)
             {
                 continue;
             }

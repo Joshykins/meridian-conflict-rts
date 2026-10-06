@@ -4,7 +4,6 @@
 
 use super::{MendView, RepairFieldView};
 use crate::spatial::kind;
-use crate::tables::flag;
 use crate::World;
 use mc_core::Fx;
 
@@ -48,10 +47,9 @@ impl World {
             {
                 continue;
             }
-            // As `run_regen` mends it: hurt, and not hit this tick.
+            // As `run_regen` mends it: hurt, hit this tick or not.
             if bp.nanite_regen
                 && bp.regen > Fx::ZERO
-                && !s.units.has_flag(row, flag::HURT)
                 && s.units.health[row] < self.unit_max_health(row)
             {
                 mends.push(self.mend_view(row, None));

@@ -733,8 +733,8 @@ pub struct UnitBlueprint {
     pub health: Fx,
     /// Health per second.
     pub regen: Fx,
-    /// Its regen is nanites at work (presentation only: the renderer draws them while
-    /// it mends).
+    /// Its regen is nanites at work: it keeps mending while it is hit (`run_regen`), and
+    /// the renderer draws the nanites while it mends.
     pub nanite_regen: bool,
     pub cost_mass: Fx,
     pub cost_energy: Fx,
@@ -1388,6 +1388,7 @@ impl Blueprints {
                 h.write_i64(v.0);
             }
             h.write_u64(u.footprint.0 as u64 | (u.footprint.1 as u64) << 8);
+            h.write_u64(u.nanite_regen as u64);
             h.write_i64(u.hull.0 .0);
             h.write_i64(u.hull.1 .0);
             match &u.motion {

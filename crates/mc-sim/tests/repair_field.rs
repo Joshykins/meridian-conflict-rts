@@ -142,3 +142,32 @@ fn the_mirror_shows_the_nanites_at_work() {
     assert_eq!(frame.repair_fields.len(), 1);
     assert_eq!(frame.repair_fields[0].unit_id, id(acu));
 }
+
+#[test]
+fn nanite_repair_mends_under_fire_where_bare_regen_waits() {
+    // An enemy tank shooting at each Exarch, half dead, its own fire held.
+    let under_fire = |keys: &[&str]| {
+        let mut w = world();
+        let acu = exarch(&mut w, keys, 900, 900);
+        let tank = w.blueprints.id_of("regency_t1_tank").unwrap();
+        w.spawn_unit(tank, 1, FxVec2::from_ints(960, 900), Angle::ZERO, true)
+            .unwrap();
+        w.state.units.fire_state[acu] = FireState::HoldFire;
+        let start = Fx::from_int(5000);
+        w.state.units.health[acu] = start;
+        let mut hit = false;
+        for _ in 0..100 {
+            w.tick(&[]).unwrap();
+            hit |= w.state.units.has_flag(acu, mc_sim::tables::flag::HURT);
+        }
+        assert!(hit, "the tank never hit it");
+        w.state.units.health[acu] - start
+    };
+    let bare = under_fire(&[]);
+    let nanite = under_fire(&["nano_repair"]);
+    assert!(bare < Fx::ZERO, "bare regen waits out the hits: {bare:?}");
+    assert!(
+        nanite > Fx::ZERO,
+        "nanites outmend a light tank: {nanite:?}"
+    );
+}

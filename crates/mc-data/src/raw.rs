@@ -336,7 +336,8 @@ pub(crate) struct Unit {
     pub health: f64,
     #[serde(default)]
     pub regen: f64,
-    /// Its regen is nanites at work: drawn crawling over the hull while it mends.
+    /// Its regen is nanites at work: it does not wait out hits, and the nanites are drawn
+    /// crawling over the hull while it mends.
     #[serde(default)]
     pub nanite_regen: bool,
     pub cost: Cost,

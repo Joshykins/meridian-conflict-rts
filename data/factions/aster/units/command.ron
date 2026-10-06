@@ -43,7 +43,7 @@
                     (
                         key: "eng_2", icon: Engineer, name: "Engineering Suite II", tech: 2,
                         summary: "Tech 2 construction, faster building, heavier armour.",
-                        cost: (mass: 2400, energy: 24000, time: 1800),
+                        cost: (mass: 1680, energy: 16800, time: 1260),
                         health: 3000, regen: 5, build_power: 30, build_range: 5,
                         // The suite's gear comes to work (turns, opens) over this long.
                         unfold: 0.6,
@@ -52,7 +52,7 @@
                     (
                         key: "eng_3", icon: Engineer, name: "Engineering Suite III", tech: 3, after: "eng_2",
                         summary: "Tech 3 and experimental construction, much faster building, heavy armour.",
-                        cost: (mass: 6000, energy: 60000, time: 4500),
+                        cost: (mass: 4200, energy: 42000, time: 3150),
                         health: 7000, regen: 15, build_power: 150, build_range: 10,
                         // The lance runs out past the projector while it builds: the beam leaves its tip.
                         arm_emitter: (12.0, 4.8, 15.52),
@@ -103,16 +103,17 @@
                         key: "mfe", icon: Power, name: "Material Formation Engine",
                         summary: "Makes materials and energy on the commander's back.",
                         cost: (mass: 1200, energy: 14400, time: 1400),
-                        // About a tech 1 mine and a half on a field and a third of a tech 2 reactor, carried
-                        // on the one unit that ends the game if it dies.
-                        economy: (mass_income: 3, energy_income: 100),
+                        // A tech 3 reactor running a tech 3 fabricator (2000 energy less the
+                        // fabricator's 500, and its 5 materials), for far less, carried on the
+                        // one unit that ends the game if it dies.
+                        economy: (mass_income: 5, energy_income: 1500),
                     ),
                     (
                         key: "shield", icon: Shield, name: "Personal Shield",
                         summary: "A field wrapped round the commander.",
                         cost: (mass: 1200, energy: 14400, time: 1400),
                         economy: (energy_upkeep: 150),
-                        shield: (kind: Hull, health: 8000, regen: 80),
+                        shield: (kind: Hull, health: 15000, regen: 80),
                     ),
                     (
                         key: "drone_port", icon: SalvageCarrier, name: "Salvage Drone Port",
