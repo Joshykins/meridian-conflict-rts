@@ -402,15 +402,15 @@ pub fn draw(hud: &mut Hud, ui: &mut Ui, s: &Scene, units: &[&UnitInstance], r: R
                 size: b.size,
                 linked: b.linked.len(),
             }),
-            // An elevator's platform comes whether or not it is paused: no switch for it.
+            // A paused elevator's platform still comes, and holds its queue: it brings the
+            // whole payload down as materials.
             pause: Split::count(
                 units
                     .iter()
                     .filter(|u| mc_sim::pause::pausable(s.blueprints, s.bp(u)))
-                    .filter(|u| s.bp(u).elevator.is_none())
                     .map(|u| u.paused()),
             ),
-            paused: unit.paused() && platform.is_none(),
+            paused: unit.paused(),
             priority: super::priority::Mix::of(s, units),
             own_priority: unit.priority(),
             inherit: super::priority::inherited(s, unit),

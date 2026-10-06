@@ -409,6 +409,9 @@ pub fn panel(
         "Next platform",
     );
     let rides = match (v.riding, queued) {
+        (0, q) if q > 0 && u.paused() => {
+            "Paused  \u{b7}  the queue waits, all materials".to_owned()
+        }
         (0, 0) => "Queue units to bring them down".to_owned(),
         (n, q) if n as usize >= q => format!("{n} of {q} queued ride it"),
         (n, q) => format!("{n} of {q} queued ride it  \u{b7}  rest wait"),

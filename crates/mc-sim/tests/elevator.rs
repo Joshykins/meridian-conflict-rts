@@ -287,3 +287,46 @@ fn an_unfinished_elevator_lowers_nothing() {
         SimEvent::ElevatorTethering { .. } | SimEvent::ElevatorDocked { .. }
     )));
 }
+
+#[test]
+fn a_paused_elevator_holds_its_queue_and_brings_down_mass() {
+    let mut w = world();
+    let id = elevator(&mut w);
+    let e = spec(&w);
+    let pause = PlayerCommand {
+        player: 0,
+        command: Command::SetPaused {
+            units: vec![id],
+            paused: true,
+        },
+    };
+    let order = produce(&w, id, "aster_t1_tank", 5);
+    w.tick(&[pause, order]).unwrap();
+    let n = first_dock(&w) - 1;
+    let events = run(&mut w, n, &[]);
+    assert_eq!(count_of(&w, "aster_t1_tank"), 0, "the queue waits");
+    assert!(events.iter().any(
+        |ev| matches!(ev, SimEvent::ElevatorDocked { units: 0, mass, .. } if *mass == e.payload)
+    ));
+}
+
+#[test]
+fn nothing_is_set_down_on_the_cable_collar() {
+    let mut w = world();
+    let id = elevator(&mut w);
+    let order = produce(&w, id, "aster_t1_scout", 60);
+    w.tick(&[order]).unwrap();
+    let n = first_dock(&w) - 1;
+    run(&mut w, n, &[]);
+    let centre = FxVec2::from_ints(AT.0, AT.1);
+    let bp = w.blueprints.id_of("aster_t1_scout").unwrap();
+    let near = w
+        .state
+        .units
+        .slots
+        .iter()
+        .filter(|&r| w.state.units.blueprint[r] == bp)
+        .map(|r| w.state.units.pos[r].distance(centre))
+        .fold(Fx::from_int(9999), |a, b| a.min(b));
+    assert!(near >= Fx::from_int(30), "nearest {near:?}");
+}

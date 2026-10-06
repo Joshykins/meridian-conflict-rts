@@ -58,6 +58,9 @@ pub fn phase(e: &mc_data::elevator::Elevator, age: u32) -> Phase {
     }
 }
 
+/// Metres round the cable's collar in the deck's middle where nothing is set down.
+const COLLAR: Fx = Fx::from_int(30);
+
 /// Share of the tether spent letting the cable down; the clamps close in the rest.
 const CABLE_SHARE: (u32, u32) = (3, 4);
 
@@ -216,13 +219,18 @@ impl World {
     ) -> Result<(u16, Fx), SimError> {
         let mut left = e.payload;
         let mut made: u16 = 0;
+        // Paused, its queue is held: the platform brings the whole payload down as mass.
+        let queued = if self.work_paused(row) {
+            0
+        } else {
+            self.state.orders.iter(&self.state.units, row).count()
+        };
         let owner = self.state.units.owner[row];
         let centre = self.state.units.pos[row];
         let heading = self.state.units.heading[row];
         let repeat = self.state.units.has_flag(row, flag::REPEAT);
         // At most one pass over the queue as it stood: a repeated order goes to the back
         // and must not come round again on the same platform.
-        let queued = self.state.orders.iter(&self.state.units, row).count();
         for _ in 0..queued {
             let Some(o) = self.state.orders.front(&self.state.units, row).copied() else {
                 break;
@@ -301,21 +309,24 @@ impl World {
 }
 
 /// Where the `n`th unit of a platform is set down, off the deck's middle: in rings out
-/// from the middle (ring `k` seats `6k`), spaced for units of `radius`. A platform of
-/// small units can fill rings past the deck's edge; those stand on the well's apron.
+/// from the cable's collar (`COLLAR`), each seating as many units of `radius` as its
+/// round holds. A platform of small units can fill rings past the deck's edge; those
+/// stand on the well's apron.
 fn deck_spot(n: u16, radius: Fx) -> FxVec2 {
-    if n == 0 {
-        return FxVec2::ZERO;
-    }
     let pitch = (radius * 2 + Fx::from_int(4)).max(Fx::from_int(8));
-    let n = n as i32;
-    // The first seat of ring k is 1 + 3k(k - 1).
-    let mut ring = 1;
-    while 3 * (ring + 1) * ring < n {
+    let mut first = 0i32;
+    let mut ring = 0i32;
+    loop {
+        let r = COLLAR + radius + pitch * ring;
+        // Seats round a ring of radius r: 2 pi r / pitch, a little under.
+        let seats = ((r * 6) / pitch).0 / Fx::ONE.0;
+        let seats = (seats as i32).max(1);
+        if (n as i32) < first + seats || ring >= 64 {
+            let i = n as i32 - first;
+            let angle = Angle::from_degrees(i * 360 / seats + ring * 17);
+            return FxVec2::from_angle(angle) * r;
+        }
+        first += seats;
         ring += 1;
     }
-    let seats = ring * 6;
-    let i = n - (1 + 3 * ring * (ring - 1));
-    let angle = Angle::from_degrees(i * 360 / seats + ring * 17);
-    FxVec2::from_angle(angle) * (pitch * ring)
 }

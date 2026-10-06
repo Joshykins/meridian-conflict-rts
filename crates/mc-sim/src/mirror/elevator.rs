@@ -120,7 +120,7 @@ impl World {
         let costs = s
             .orders
             .iter(&s.units, row)
-            .take_while(|o| o.kind == OrderKind::Produce)
+            .take_while(|o| o.kind == OrderKind::Produce && !self.work_paused(row))
             .map(|o| self.blueprints.unit(o.blueprint).cost_mass);
         let (riding, riding_mass) = platform_load(costs, e.payload);
         Some(ElevatorView {
