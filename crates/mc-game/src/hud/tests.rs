@@ -1596,7 +1596,7 @@ fn construction_keys_pick_a_tier_a_shelf_and_an_item() {
     rig.hud.build_keys = true;
     rig.frame(&Input::default());
     let blueprints = rig.blueprints.clone();
-    let items: Vec<&UnitBlueprint> = blueprints
+    let mut items: Vec<&UnitBlueprint> = blueprints
         .unit(blueprints.id_of("aster_t1_engineer").unwrap())
         .builder
         .as_ref()
@@ -1606,6 +1606,8 @@ fn construction_keys_pick_a_tier_a_shelf_and_an_item() {
         .map(|b| blueprints.unit(*b))
         .filter(|b| b.tech == 1 && style::Purpose::of(b, true) == style::Purpose::Economy)
         .collect();
+    // A shelf lists its roles together, in colour order.
+    items.sort_by_key(|b| style::Role::of(b));
     rig.hud.build_key = Some('1');
     rig.frame(&Input::default());
     rig.hud.build_key = Some('W');
